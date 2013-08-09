@@ -1,73 +1,91 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Fri, 9 Aug 2013 15:23:31 +0800
-Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
-In-Reply-To: <20130808110136.GA6427@sirena.org.uk>
-References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
- <1375944991-29182-2-git-send-email-wni@nvidia.com>
- <20130808110136.GA6427@sirena.org.uk>
-Message-ID: <520498F3.8030101@nvidia.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  9 Aug 2013 09:36:42 +0200
+Subject: [RFC PATCH] ARM: add workaround for ambiguous C99 stdint.h types
+Message-ID: <1376033802-12826-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 07:01 PM, Mark Brown wrote:
-> * PGP Signed by an unknown key
-> 
-> On Thu, Aug 08, 2013 at 02:56:29PM +0800, Wei Ni wrote:
-> 
->> +	mutex_lock(&data->update_lock);
->> +
->> +	if (is_enable)
->> +		ret = regulator_enable(data->lm90_reg);
->> +	else
->> +		ret = regulator_disable(data->lm90_reg);
->> +
->> +	if (ret < 0)
->> +		dev_err(&client->dev,
->> +			"Error in %s rail vdd, error %d\n",
->> +			(is_enable) ? "enabling" : "disabling", ret);
->> +	else
->> +		dev_info(&client->dev, "success in %s rail vdd\n",
->> +			 (is_enable) ? "enabling" : "disabling");
->> +
->> +	mutex_unlock(&data->update_lock);
-> 
-> Two things here.  One is that it's not clear what this lokc is
-> protecting since the only thing in the locked region is the regulator
-> operation and that is thread safe.  The other thing is that I'm not
-> seeing anthing that ensures that enables and disables are matched -
-> regulators are reference counted so two enables need two disables.
-> 
->> +	data->lm90_reg = regulator_get(&client->dev, "vdd");
->> +	if (IS_ERR_OR_NULL(data->lm90_reg)) {
-> 
-> NULL is a valid regulator, use IS_ERR().
-> 
->> +		if (PTR_ERR(data->lm90_reg) == -ENODEV)
->> +			dev_info(&client->dev,
->> +				 "No regulator found for vdd. Assuming vdd is always powered.");
->> +		else
->> +			dev_warn(&client->dev,
->> +				 "Error [%ld] in getting the regulator handle for vdd.\n",
->> +				 PTR_ERR(data->lm90_reg));
-> 
-> You shouldn't just be ignoring errors here, though there are deployment
-> difficulties with making sure a stub regulator is provided.  These
-> should be getting easier after the next merge window, the stubs will be
-> being tweaked slightly to have an "assume it's there" option even when
+The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
+unambiguous on ARM as you would expect. For the types below, there is a
+difference on ARM between GCC built for bare metal ARM, GCC built for glibc
+and the kernel itself, which results in build errors if you try to build with
+-ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
+in order to use NEON intrinsics)
 
-Oh, really, could you show me the patch, I wish to take a look :)
+As the typedefs for these types in 'stdint.h' are based on builtin defines
+supplied by GCC, we can tweak these to align with the kernel's idea of those
+types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
+source file (provided that -ffreestanding is used).
 
-Wei.
+                   int32_t         uint32_t               uintptr_t
+bare metal GCC     long            unsigned long          unsigned long
+glibc GCC          int             unsigned int           unsigned int
+kernel             int             unsigned int           unsigned long
 
-> regulators are used.  Especially in cases with device tree you should be
-> paying attention to -EPROBE_DEFER, that will accurately reflect if a
-> regulator is present but not loaded yet.
-> 
-> That said if you *are* going to do this you should request the
-> regulator using devm_regulator_get_optional(), this is intended to
-> support things that don't need regulators (though that's not the case
-> here).
-> 
-> * Unknown Key
-> * 0x7EA229BD
-> 
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+
+Hi all,
+
+This is another, less obtrusive way of handling the problem for which I
+previously sent an RFC patch 'types.h: use GCC supplied typedefs if appropriate'
+In this case, only source files that in fact include stdint.h and are being
+built for ARM should be affected.
+
+Regards,
+-- 
+Ard.
+
+
+ arch/arm/include/asm/types.h | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 arch/arm/include/asm/types.h
+
+diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
+new file mode 100644
+index 0000000..976ac31
+--- /dev/null
++++ b/arch/arm/include/asm/types.h
+@@ -0,0 +1,40 @@
++#ifndef _ASM_TYPES_H
++#define _ASM_TYPES_H
++
++#include <asm-generic/int-ll64.h>
++
++/*
++ * The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
++ * unambiguous on ARM as you would expect. For the types below, there is a
++ * difference on ARM between GCC built for bare metal ARM, GCC built for glibc
++ * and the kernel itself, which results in build errors if you try to build with
++ * -ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
++ * in order to use NEON intrinsics)
++ *
++ * As the typedefs for these types in 'stdint.h' are based on builtin defines
++ * supplied by GCC, we can tweak these to align with the kernel's idea of those
++ * types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
++ * source file (provided that -ffreestanding is used).
++ * 
++ *                    int32_t         uint32_t               uintptr_t
++ * bare metal GCC     long            unsigned long          unsigned long
++ * glibc GCC          int             unsigned int           unsigned int
++ * kernel             int             unsigned int           unsigned long
++ */
++
++#ifdef __INT32__TYPE__
++#undef __INT32__TYPE__
++#define __INT32__TYPE__		int
++#endif
++
++#ifdef __UINT32__TYPE__
++#undef __UINT32__TYPE__
++#define __UINT32__TYPE__	unsigned int
++#endif
++
++#ifdef __UINTPTR_TYPE__
++#undef __UINTPTR_TYPE__
++#define __UINTPTR_TYPE__	unsigned long
++#endif
++
++#endif /* _ASM_TYPES_H */
+-- 
+1.8.1.2
