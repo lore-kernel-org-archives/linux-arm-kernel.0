@@ -1,48 +1,25 @@
-From: anton@enomsg.org (Anton Vorontsov)
-Date: Fri, 9 Aug 2013 14:31:17 -0700
-Subject: [PATCH 2/2] power: arm64: Add DTS entry for APM X-Gene reboot
- driver.
-In-Reply-To: <1372797539-13111-3-git-send-email-lho@apm.com>
-References: <1372797539-13111-1-git-send-email-lho@apm.com>
- <1372797539-13111-2-git-send-email-lho@apm.com>
- <1372797539-13111-3-git-send-email-lho@apm.com>
-Message-ID: <20130809213116.GE12638@lizard.sbx05730.santaca.wayport.net>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sat, 10 Aug 2013 07:54:18 +1000
+Subject: [PATCHv8 04/10] of: pci: add registry of MSI chips
+In-Reply-To: <20130809142724.GD25111@titan.lakedaemon.net>
+References: <1376000268-18397-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1376000268-18397-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1376027346.32100.8.camel@pasglop>
+ <20130809134427.GC25111@titan.lakedaemon.net> <20130809141806.GA15973@ulmo>
+ <20130809142724.GD25111@titan.lakedaemon.net>
+Message-ID: <1376085258.32100.40.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 02, 2013 at 02:38:59PM -0600, Loc Ho wrote:
-> power: arm64: Add DTS entry for APM X-Gene reboot driver.
+On Fri, 2013-08-09 at 10:27 -0400, Jason Cooper wrote:
 > 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
-> ---
+> You're correct, I sent this a little too hastily.  I thought Ben knew
+> something I didn't (see above), but the error was only where you
+> indicated.  I'm revising my fix to just append the semi-colon after
+> the
+> NULL.
 
-I've applied patch 1/2 to battery-2.6.git tree. I need an ack from ARM
-maintainers to grab this together with the first one.
+I messed up in my reply, I was talking about the one after the NULL.
 
->  arch/arm64/boot/dts/apm-storm.dtsi |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-> index d37d736..e686919 100644
-> --- a/arch/arm64/boot/dts/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-> @@ -178,6 +178,12 @@
->  			};
->  		};
->  
-> +                reboot at 0x17000014 {
-> +                        compatible = "apm,xgene-reboot";
-> +                        reg = <0x0 0x17000014 0x0 0x100>;
-> +                        mask = <0x1>;
-> +                };
-
-There should be tabs instead of whitespaces.
-
-> +
->  		serial0: serial at 1c020000 {
->  			device_type = "serial";
->  			compatible = "ns16550";
-> -- 
-> 1.5.5
+Cheers,
+Ben.
