@@ -1,336 +1,65 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Fri, 9 Aug 2013 09:54:20 -0500
-Subject: [PATCH] mmc: dw_mmc-exynos: Common bindings for dw-mshc timing
-In-Reply-To: <001301ce94fd$09c78330$1d568990$%jun@samsung.com>
-References: <1376002520-7461-1-git-send-email-dinguyen@altera.com>
- <520459C9.8020305@samsung.com>
- <001301ce94fd$09c78330$1d568990$%jun@samsung.com>
-Message-ID: <1376060060.11201.5.camel@linux-builds1>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 09 Aug 2013 17:02:02 +0200
+Subject: [PATCH v9 07/16] iommu/exynos: support for device tree
+In-Reply-To: <CAL_JsqKM_YP0Cj3Uo7TeCVcKcbzzsuK3yxTSn6pG8qGFOnZAiA@mail.gmail.com>
+References: <002b01ce941b$160a88a0$421f99e0$@samsung.com>
+ <20130809153730.83d3a5ba419def5424bcbb0e@samsung.com>
+ <CAL_JsqKM_YP0Cj3Uo7TeCVcKcbzzsuK3yxTSn6pG8qGFOnZAiA@mail.gmail.com>
+Message-ID: <33568604.vCtP4hvQ1q@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Seungwon Jeon,
-
-On Fri, 2013-08-09 at 21:36 +0900, Seungwon Jeon wrote:
-> On Fri, August 09, 2013, Jaehoon Chung wrote:
-> > Hi Dinh
+On Friday 09 of August 2013 08:28:09 Rob Herring wrote:
+> On Fri, Aug 9, 2013 at 1:37 AM, Cho KyongHo <pullip.cho@samsung.com> 
+wrote:
+> > On Fri, 09 Aug 2013 00:41:25 +0200, Tomasz Figa wrote:
+> >> Hi KyongHo,
+> >> 
+> >> On Thursday 08 of August 2013 18:38:49 Cho KyongHo wrote:
+> >> > This commit adds device tree support for System MMU.
+> >> > This also include the following changes and enhancements:
+> >> > 
+> >> > * use managed device helper functions.
+> >> > Simplyfies System MMU device driver.
+> >> > 
+> >> > * use only a single clock descriptor.
+> >> > System MMU device descriptor is seperate if it is imposible to make
+> >> > a single clock descriptor to make a device descriptor for a group of
+> >> > System MMUs.
+> >> > 
+> >> > * removed dbgname member from sysmmu_drvdata structure.
+> >> > debugging kernel message for a System MMU is distinguisheable with
+> >> > the
+> >> > name of device descroptors.
+> >> 
+> >> Please put all these three changes in separate patches. This patch is
+> >> hard to review with all the changes mixed together...
+> 
+> Agreed.
+> 
+> > Ok.
 > > 
-> > On 08/09/2013 07:55 AM, dinguyen at altera.com wrote:
-> > > From: Dinh Nguyen <dinguyen@altera.com>
-> > >
-> > > Remove the "samsung" in "samsung,dw-mshc-ciu-div", "samsung,dw-mshc-sdr-timing",
-> > > and "samsung,dw-mshc-ddr-timing". These characteristics are not applicable to
-> > > just Samsung platforms, but to any platform that uses the Synopsis SD/MMC IP.
-> > >
-> Though host controller based on Synopsys is required to implement clock phase shift,
-> actual implementation could be different. I'm not sure that this above parameters are common just now.
-> But if some more host controllers are introduced, we may define clearly.
-
-But the bindings can be common between socfpga and exynos right? The
-values in the bindings represent the same thing, just the implementation
-for the clock phase shift can be different.
-
-Thanks,
-
-Dinh
-> 
-> Thanks,
-> Seungwon Jeon
-> 
-> > > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > > CC: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: Olof Johansson <olof@lixom.net>
-> > > Cc: Jaehoon Chung <jh80.chung@samsung.com>
-> > > Cc: Seungwon Jeon <tgih.jun@samsung.com>
-> > > Cc: Rob Herring <rob.herring@calxeda.com>
-> > > Cc: Pawel Moll <pawel.moll@arm.com>
-> > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > > Cc: Ian Campbell <ian.campbell@citrix.com>
-> > > Cc: devicetree at vger.kernel.org
-> > > Cc: linux-mmc at vger.kernel.org
-> > > CC: linux-arm-kernel at lists.infradead.org
-> > > ---
-> > >  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |   30 --------------------
-> > >  .../devicetree/bindings/mmc/synopsis-dw-mshc.txt   |   29 +++++++++++++++++++
-> > >  arch/arm/boot/dts/cros5250-common.dtsi             |   18 ++++++------
-> > >  arch/arm/boot/dts/exynos4412-odroidx.dts           |    6 ++--
-> > >  arch/arm/boot/dts/exynos4412-origen.dts            |    6 ++--
-> > >  arch/arm/boot/dts/exynos5250-arndale.dts           |   12 ++++----
-> > >  arch/arm/boot/dts/exynos5250-smdk5250.dts          |   12 ++++----
-> > >  drivers/mmc/host/dw_mmc-exynos.c                   |    6 ++--
-> > >  8 files changed, 59 insertions(+), 60 deletions(-)
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> > b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> > > index 6d1c098..ddb1d95 100644
-> > > --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> > > +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> > > @@ -17,33 +17,6 @@ Required Properties:
-> > >  	- "samsung,exynos5250-dw-mshc": for controllers with Samsung Exynos5250
-> > >  	  specific extensions.
-> > >
-> > > -* samsung,dw-mshc-ciu-div: Specifies the divider value for the card interface
-> > > -  unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
-> > > -  ignored for Exynos4 SoC's. The valid range of divider value is 0 to 7.
-> > > -
-> > > -* samsung,dw-mshc-sdr-timing: Specifies the value of CIU clock phase shift value
-> > > -  in transmit mode and CIU clock phase shift value in receive mode for single
-> > > -  data rate mode operation. Refer notes below for the order of the cells and the
-> > > -  valid values.
-> > > -
-> > > -* samsung,dw-mshc-ddr-timing: Specifies the value of CUI clock phase shift value
-> > > -  in transmit mode and CIU clock phase shift value in receive mode for double
-> > > -  data rate mode operation. Refer notes below for the order of the cells and the
-> > > -  valid values.
-> > > -
-> > > -  Notes for the sdr-timing and ddr-timing values:
-> > > -
-> > > -    The order of the cells should be
-> > > -      - First Cell: CIU clock phase shift value for tx mode.
-> > > -      - Second Cell: CIU clock phase shift value for rx mode.
-> > > -
-> > > -    Valid values for SDR and DDR CIU clock timing for Exynos5250:
-> > > -      - valid value for tx phase shift and rx phase shift is 0 to 7.
-> > > -      - when CIU clock divider value is set to 3, all possible 8 phase shift
-> > > -        values can be used.
-> > > -      - if CIU clock divider value is 0 (that is divide by 1), both tx and rx
-> > > -        phase shift clocks should be 0.
-> > > -
-> > >  Required properties for a slot:
-> > >
-> > >  * gpios: specifies a list of gpios used for command, clock and data bus. The
-> > > @@ -71,9 +44,6 @@ Example:
-> > >  		broken-cd;
-> > >  		fifo-depth = <0x80>;
-> > >  		card-detect-delay = <200>;
-> > > -		samsung,dw-mshc-ciu-div = <3>;
-> > > -		samsung,dw-mshc-sdr-timing = <2 3>;
-> > > -		samsung,dw-mshc-ddr-timing = <1 2>;
-> > >
-> > >  		slot at 0 {
-> > >  			reg = <0>;
-> > > diff --git a/Documentation/devicetree/bindings/mmc/synopsis-dw-mshc.txt
-> > b/Documentation/devicetree/bindings/mmc/synopsis-dw-mshc.txt
-> > > index cdcebea..cf85a8c 100644
-> > > --- a/Documentation/devicetree/bindings/mmc/synopsis-dw-mshc.txt
-> > > +++ b/Documentation/devicetree/bindings/mmc/synopsis-dw-mshc.txt
-> > > @@ -71,6 +71,32 @@ Optional properties:
-> > >  * vmmc-supply: The phandle to the regulator to use for vmmc.  If this is
-> > >    specified we'll defer probe until we can find this regulator.
-> > >
-> > > +* dw-mshc-ciu-div: Specifies the divider value for the card interface
-> > > +  unit (ciu) clock. The valid range of divider value is 0 to 7.
-> > > +
-> > > +* dw-mshc-sdr-timing: Specifies the value of CIU clock phase shift value
-> > > +  in transmit mode and CIU clock phase shift value in receive mode for single
-> > > +  data rate mode operation. Refer notes below for the order of the cells and the
-> > > +  valid values.
-> > > +
-> > > +* dw-mshc-ddr-timing: Specifies the value of CUI clock phase shift value
-> > > +  in transmit mode and CIU clock phase shift value in receive mode for double
-> > > +  data rate mode operation. Refer notes below for the order of the cells and the
-> > > +  valid values.
-> > > +
-> > > +	Notes for the sdr-timing and ddr-timing values:
-> > > +
-> > > +	The order of the cells should be
-> > > +		- First Cell: CIU clock phase shift value for tx mode.
-> > > +		- Second Cell: CIU clock phase shift value for rx mode.
-> > > +
-> > > +	Valid values for SDR and DDR CIU clock timing for Exynos5250:
-> > Exynos5250? Maybe It should be mentioned common SoC.
-> > > +		- valid value for tx phase shift and rx phase shift is 0 to 7.
-> > > +		- when CIU clock divider value is set to 3, all possible 8 phase shift
-> > > +			values can be used.
-> > > +		- if CIU clock divider value is 0 (that is divide by 1), both tx and rx
-> > > +			phase shift clocks should be 0.
-> > > +
-> > >  Aliases:
-> > >
-> > >  - All the MSHC controller nodes should be represented in the aliases node using
-> > > @@ -99,6 +125,9 @@ board specific portions as listed below.
-> > >  		fifo-depth = <0x80>;
-> > >  		card-detect-delay = <200>;
-> > >  		vmmc-supply = <&buck8>;
-> > > +		dw-mshc-ciu-div = <3>;
-> > > +		dw-mshc-sdr-timing = <2 3>;
-> > > +		dw-mshc-ddr-timing = <1 2>;
-> > >
-> > >  		slot at 0 {
-> > >  			reg = <0>;
-> > > diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
-> > > index dc259e8b..93d3c85 100644
-> > > --- a/arch/arm/boot/dts/cros5250-common.dtsi
-> > > +++ b/arch/arm/boot/dts/cros5250-common.dtsi
-> > > @@ -235,9 +235,9 @@
-> > >  		broken-cd;
-> > >  		fifo-depth = <0x80>;
-> > >  		card-detect-delay = <200>;
-> > > -		samsung,dw-mshc-ciu-div = <3>;
-> > > -		samsung,dw-mshc-sdr-timing = <2 3>;
-> > > -		samsung,dw-mshc-ddr-timing = <1 2>;
-> > > +		dw-mshc-ciu-div = <3>;
-> > > +		dw-mshc-sdr-timing = <2 3>;
-> > > +		dw-mshc-ddr-timing = <1 2>;
-> > >  		pinctrl-names = "default";
-> > >  		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4 &sd0_bus8>;
-> > >
-> > > @@ -256,9 +256,9 @@
-> > >  		supports-highspeed;
-> > >  		fifo-depth = <0x80>;
-> > >  		card-detect-delay = <200>;
-> > > -		samsung,dw-mshc-ciu-div = <3>;
-> > > -		samsung,dw-mshc-sdr-timing = <2 3>;
-> > > -		samsung,dw-mshc-ddr-timing = <1 2>;
-> > > +		dw-mshc-ciu-div = <3>;
-> > > +		dw-mshc-sdr-timing = <2 3>;
-> > > +		dw-mshc-ddr-timing = <1 2>;
-> > >  		pinctrl-names = "default";
-> > >  		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-> > >
-> > > @@ -275,9 +275,9 @@
-> > >  		broken-cd;
-> > >  		fifo-depth = <0x80>;
-> > >  		card-detect-delay = <200>;
-> > > -		samsung,dw-mshc-ciu-div = <3>;
-> > > -		samsung,dw-mshc-sdr-timing = <2 3>;
-> > > -		samsung,dw-mshc-ddr-timing = <1 2>;
-> > > +		dw-mshc-ciu-div = <3>;
-> > > +		dw-mshc-sdr-timing = <2 3>;
-> > > +		dw-mshc-ddr-timing = <1 2>;
-> > >  		/* See board-specific dts files for pin setup */
-> > >
-> > >  		slot at 0 {
-> > > diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
-> > > index 46c678e..e6c3b23 100644
-> > > --- a/arch/arm/boot/dts/exynos4412-odroidx.dts
-> > > +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-> > > @@ -51,9 +51,9 @@
-> > >  		broken-cd;
-> > >  		fifo-depth = <0x80>;
-> > >  		card-detect-delay = <200>;
-> > > -		samsung,dw-mshc-ciu-div = <3>;
-> > > -		samsung,dw-mshc-sdr-timing = <2 3>;
-> > > -		samsung,dw-mshc-ddr-timing = <1 2>;
-> > > +		dw-mshc-ciu-div = <3>;
-> > > +		dw-mshc-sdr-timing = <2 3>;
-> > > +		dw-mshc-ddr-timing = <1 2>;
-> > >
-> > >  		slot at 0 {
-> > >  			reg = <0>;
-> > > diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
-> > > index 7993641..b403a57 100644
-> > > --- a/arch/arm/boot/dts/exynos4412-origen.dts
-> > > +++ b/arch/arm/boot/dts/exynos4412-origen.dts
-> > > @@ -122,9 +122,9 @@
-> > >  		broken-cd;
-> > >  		fifo-depth = <0x80>;
-> > >  		card-detect-delay = <200>;
-> > > -		samsung,dw-mshc-ciu-div = <3>;
-> > > -		samsung,dw-mshc-sdr-timing = <2 3>;
-> > > -		samsung,dw-mshc-ddr-timing = <1 2>;
-> > > +		dw-mshc-ciu-div = <3>;
-> > > +		dw-mshc-sdr-timing = <2 3>;
-> > > +		dw-mshc-ddr-timing = <1 2>;
-> > >
-> > >  		slot at 0 {
-> > >  			reg = <0>;
-> > > diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-> > > index abc7272..72aa743 100644
-> > > --- a/arch/arm/boot/dts/exynos5250-arndale.dts
-> > > +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-> > > @@ -324,9 +324,9 @@
-> > >  		broken-cd;
-> > >  		fifo-depth = <0x80>;
-> > >  		card-detect-delay = <200>;
-> > > -		samsung,dw-mshc-ciu-div = <3>;
-> > > -		samsung,dw-mshc-sdr-timing = <2 3>;
-> > > -		samsung,dw-mshc-ddr-timing = <1 2>;
-> > > +		dw-mshc-ciu-div = <3>;
-> > > +		dw-mshc-sdr-timing = <2 3>;
-> > > +		dw-mshc-ddr-timing = <1 2>;
-> > >  		vmmc-supply = <&mmc_reg>;
-> > >  		pinctrl-names = "default";
-> > >  		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-> > > @@ -346,9 +346,9 @@
-> > >  		supports-highspeed;
-> > >  		fifo-depth = <0x80>;
-> > >  		card-detect-delay = <200>;
-> > > -		samsung,dw-mshc-ciu-div = <3>;
-> > > -		samsung,dw-mshc-sdr-timing = <2 3>;
-> > > -		samsung,dw-mshc-ddr-timing = <1 2>;
-> > > +		dw-mshc-ciu-div = <3>;
-> > > +		dw-mshc-sdr-timing = <2 3>;
-> > > +		dw-mshc-ddr-timing = <1 2>;
-> > >  		vmmc-supply = <&mmc_reg>;
-> > >  		pinctrl-names = "default";
-> > >  		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-> > > diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> > > index 49f18c2..220da19 100644
-> > > --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> > > +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> > > @@ -146,9 +146,9 @@
-> > >  		broken-cd;
-> > >  		fifo-depth = <0x80>;
-> > >  		card-detect-delay = <200>;
-> > > -		samsung,dw-mshc-ciu-div = <3>;
-> > > -		samsung,dw-mshc-sdr-timing = <2 3>;
-> > > -		samsung,dw-mshc-ddr-timing = <1 2>;
-> > > +		dw-mshc-ciu-div = <3>;
-> > > +		dw-mshc-sdr-timing = <2 3>;
-> > > +		dw-mshc-ddr-timing = <1 2>;
-> > >  		pinctrl-names = "default";
-> > >  		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-> > >
-> > > @@ -167,9 +167,9 @@
-> > >  		supports-highspeed;
-> > >  		fifo-depth = <0x80>;
-> > >  		card-detect-delay = <200>;
-> > > -		samsung,dw-mshc-ciu-div = <3>;
-> > > -		samsung,dw-mshc-sdr-timing = <2 3>;
-> > > -		samsung,dw-mshc-ddr-timing = <1 2>;
-> > > +		dw-mshc-ciu-div = <3>;
-> > > +		dw-mshc-sdr-timing = <2 3>;
-> > > +		dw-mshc-ddr-timing = <1 2>;
-> > >  		pinctrl-names = "default";
-> > >  		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-> > >
-> > > diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-> > > index 866edef..553f3c1 100644
-> > > --- a/drivers/mmc/host/dw_mmc-exynos.c
-> > > +++ b/drivers/mmc/host/dw_mmc-exynos.c
-> > > @@ -131,18 +131,18 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
-> > >  	u32 div = 0;
-> > >  	int ret;
-> > >
-> > > -	of_property_read_u32(np, "samsung,dw-mshc-ciu-div", &div);
-> > > +	of_property_read_u32(np, "dw-mshc-ciu-div", &div);
-> > >  	priv->ciu_div = div;
-> > >
-> > >  	ret = of_property_read_u32_array(np,
-> > > -			"samsung,dw-mshc-sdr-timing", timing, 2);
-> > > +			"dw-mshc-sdr-timing", timing, 2);
-> > >  	if (ret)
-> > >  		return ret;
-> > >
-> > >  	priv->sdr_timing = SDMMC_CLKSEL_TIMING(timing[0], timing[1], div);
-> > >
-> > >  	ret = of_property_read_u32_array(np,
-> > > -			"samsung,dw-mshc-ddr-timing", timing, 2);
-> > > +			"dw-mshc-ddr-timing", timing, 2);
-> > >  	if (ret)
-> > >  		return ret;
-> > Then we can move functions related with clksel from dw-mmc-exynos.c to dw-mmc.c, isn't it?
+> >> In addition, I believe this is the patch that should be adding device
+> >> tree binding documentation, not the 6/16 one, as this is where
+> >> actually support for this binding gets added to the kernel.
 > > 
-> > Best Regards,
-> > Jaehoon Chung
-> > >
-> > >
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Oh, I didn't know that devicetree binding description and
+> > implementation need to be in the same patch.
+> > I will do as you advised.
 > 
-> 
+> Actually, I prefer the binding docs be separate patches. The reason
+> being so we can get closer to having them in a separate repository.
+> Also, then the binding can be acked separately from the kernel
+> implementation using the binding.
+
+OK. This is a good point. So maybe let's fully define this order to be as 
+following (and have first best practice for the DT binding best practices 
+that need to be defined):
+
+Bindings documentation should be added with a separate patch, before any 
+user of these bindings is introduced.
+
+What do you think?
+
+Best regards,
+Tomasz
