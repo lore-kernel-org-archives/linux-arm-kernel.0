@@ -1,31 +1,73 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 9 Aug 2013 03:47:02 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP4: clock: Lock PLLs in the right sequence
-In-Reply-To: <20130809011820.5348.78407@quantum>
-References: <1375956851-842-1-git-send-email-rnayak@ti.com>
- <20130809011820.5348.78407@quantum>
-Message-ID: <alpine.DEB.2.02.1308090345340.32157@utopia.booyaka.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu,  8 Aug 2013 20:53:08 -0700
+Subject: [PATCH] ARM: KVM: Fix unaligned unmap_range leak
+Message-ID: <1376020388-9880-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+The unmap_range function did not properly cover the case when the start
+address was not aligned to PMD_SIZE or PUD_SIZE and an entire pte table
+or pmd table was cleared, causing us to leak memory when incrementing
+the addr.
 
-On Thu, 8 Aug 2013, Mike Turquette wrote:
+The fix is to always move onto the next page table entry boundary
+instead of adding the full size of the VA range covered by the
+corresponding table level entry.
 
-> Quoting Rajendra Nayak (2013-08-08 03:14:11)
-> > On OMAP4 we have clk_set_rate()s being done for a few
-> > DPLL clock nodes, as part of the clock init code, since
-> > the bootloaders no longer locks these DPLLs.
-> ...
-> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> 
-> Taken into clk-next. Thanks for the fix. Besides the annoying prints is
-> there a functional regression fixed by this? If so I can take into
-> clk-fixes as needed.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm/kvm/mmu.c |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-It's best if I take this patch upstream.  That way, potential merge 
-conflicts are avoided, since I might have other changes to 
-arch/arm/mach-omap2/cclock44xx_data.c to send upstream at the same time.
-
-
-- Paul
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index ca6bea4..80a83ec 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -132,37 +132,37 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+ 	unsigned long long addr = start, end = start + size;
+-	u64 range;
++	u64 next;
+ 
+ 	while (addr < end) {
+ 		pgd = pgdp + pgd_index(addr);
+ 		pud = pud_offset(pgd, addr);
+ 		if (pud_none(*pud)) {
+-			addr += PUD_SIZE;
++			addr = pud_addr_end(addr, end);
+ 			continue;
+ 		}
+ 
+ 		pmd = pmd_offset(pud, addr);
+ 		if (pmd_none(*pmd)) {
+-			addr += PMD_SIZE;
++			addr = pmd_addr_end(addr, end);
+ 			continue;
+ 		}
+ 
+ 		pte = pte_offset_kernel(pmd, addr);
+ 		clear_pte_entry(kvm, pte, addr);
+-		range = PAGE_SIZE;
++		next = addr + PAGE_SIZE;
+ 
+ 		/* If we emptied the pte, walk back up the ladder */
+ 		if (pte_empty(pte)) {
+ 			clear_pmd_entry(kvm, pmd, addr);
+-			range = PMD_SIZE;
++			next = pmd_addr_end(addr, end);
+ 			if (pmd_empty(pmd)) {
+ 				clear_pud_entry(kvm, pud, addr);
+-				range = PUD_SIZE;
++				next = pud_addr_end(addr, end);
+ 			}
+ 		}
+ 
+-		addr += range;
++		addr = next;
+ 	}
+ }
+ 
+-- 
+1.7.10.4
