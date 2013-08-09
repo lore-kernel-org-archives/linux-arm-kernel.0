@@ -1,189 +1,138 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 9 Aug 2013 09:03:02 -0700
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <5204C54A.9020105@st.com>
-References: <068436c6-ff98-428f-8875-bb1c6f86466b@TX2EHSMHS008.ehs.local>
- <51F97CE3.9030306@linaro.org>
- <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
- <51F99747.4060901@linaro.org>
- <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
- <51FA9AE8.1060004@linaro.org>
- <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
- <51FA9F54.3060704@linaro.org>
- <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
- <5204C54A.9020105@st.com>
-Message-ID: <cacc7429-9101-4cc6-bb4d-059274604b56@CO9EHSMHS004.ehs.local>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Aug 2013 17:04:01 +0100
+Subject: [PATCH v6 09/11] clk: mmp: parse clock from dts
+In-Reply-To: <1374833133-21119-10-git-send-email-haojian.zhuang@gmail.com>
+References: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
+ <1374833133-21119-10-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20130809160401.GU27325@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 11:32:42AM +0100, Srinivas KANDAGATLA wrote:
-> On 08/08/13 18:11, S?ren Brinkmann wrote:
-> > Hi Daniel,
-> > 
-> > On Thu, Aug 01, 2013 at 07:48:04PM +0200, Daniel Lezcano wrote:
-> >> On 08/01/2013 07:43 PM, S?ren Brinkmann wrote:
-> >>> On Thu, Aug 01, 2013 at 07:29:12PM +0200, Daniel Lezcano wrote:
-> >>>> On 08/01/2013 01:38 AM, S?ren Brinkmann wrote:
-> >>>>> On Thu, Aug 01, 2013 at 01:01:27AM +0200, Daniel Lezcano wrote:
-> >>>>>> On 08/01/2013 12:18 AM, S?ren Brinkmann wrote:
-> >>>>>>> On Wed, Jul 31, 2013 at 11:08:51PM +0200, Daniel Lezcano wrote:
-> >>>>>>>> On 07/31/2013 10:58 PM, S?ren Brinkmann wrote:
-> >>>>>>>>> On Wed, Jul 31, 2013 at 10:49:06PM +0200, Daniel Lezcano wrote:
-> >>>>>>>>>> On 07/31/2013 12:34 AM, S?ren Brinkmann wrote:
-> >>>>>>>>>>> On Tue, Jul 30, 2013 at 10:47:15AM +0200, Daniel Lezcano wrote:
-> >>>>>>>>>>>> On 07/30/2013 02:03 AM, S?ren Brinkmann wrote:
-> >>>>>>>>>>>>> Hi Daniel,
-> >>>>>>>>>>>>>
-> >>>>>>>>>>>>> On Mon, Jul 29, 2013 at 02:51:49PM +0200, Daniel Lezcano wrote:
-> >>>>>>>>>>>>> (snip)
-> >>>>>>>>>>>>>>
-> >>>>>>>>>>>>>> the CPUIDLE_FLAG_TIMER_STOP flag tells the cpuidle framework the local
-> >>>>>>>>>>>>>> timer will be stopped when entering to the idle state. In this case, the
-> >>>>>>>>>>>>>> cpuidle framework will call clockevents_notify(ENTER) and switches to a
-> >>>>>>>>>>>>>> broadcast timer and will call clockevents_notify(EXIT) when exiting the
-> >>>>>>>>>>>>>> idle state, switching the local timer back in use.
-> >>>>>>>>>>>>>
-> >>>>>>>>>>>>> I've been thinking about this, trying to understand how this makes my
-> >>>>>>>>>>>>> boot attempts on Zynq hang. IIUC, the wrongly provided TIMER_STOP flag
-> >>>>>>>>>>>>> would make the timer core switch to a broadcast device even though it
-> >>>>>>>>>>>>> wouldn't be necessary. But shouldn't it still work? It sounds like we do
-> >>>>>>>>>>>>> something useless, but nothing wrong in a sense that it should result in
-> >>>>>>>>>>>>> breakage. I guess I'm missing something obvious. This timer system will
-> >>>>>>>>>>>>> always remain a mystery to me.
-> >>>>>>>>>>>>>
-> >>>>>>>>>>>>> Actually this more or less leads to the question: What is this
-> >>>>>>>>>>>>> 'broadcast timer'. I guess that is some clockevent device which is
-> >>>>>>>>>>>>> common to all cores? (that would be the cadence_ttc for Zynq). Is the
-> >>>>>>>>>>>>> hang pointing to some issue with that driver?
-> >>>>>>>>>>>>
-> >>>>>>>>>>>> If you look at the /proc/timer_list, which timer is used for broadcasting ?
-> >>>>>>>>>>>
-> >>>>>>>>>>> So, the correct run results (full output attached).
-> >>>>>>>>>>>
-> >>>>>>>>>>> The vanilla kernel uses the twd timers as local timers and the TTC as
-> >>>>>>>>>>> broadcast device:
-> >>>>>>>>>>> 	Tick Device: mode:     1                                                         
-> >>>>>>>>>>> 	Broadcast device  
-> >>>>>>>>>>> 	Clock Event Device: ttc_clockevent
-> >>>>>>>>>>>
-> >>>>>>>>>>> When I remove the offending CPUIDLE flag and add the DT fragment to
-> >>>>>>>>>>> enable the global timer, the twd timers are still used as local timers
-> >>>>>>>>>>> and the broadcast device is the global timer:
-> >>>>>>>>>>> 	Tick Device: mode:     1                                                         
-> >>>>>>>>>>> 	Broadcast device                                                                 
-> >>>>>>>>>>> 	Clock Event Device: arm_global_timer
-> >>>>>>>>>>>
-> >>>>>>>>>>> Again, since boot hangs in the actually broken case, I don't see way to
-> >>>>>>>>>>> obtain this information for that case.
-> >>>>>>>>>>
-> >>>>>>>>>> Can't you use the maxcpus=1 option to ensure the system to boot up ?
-> >>>>>>>>>
-> >>>>>>>>> Right, that works. I forgot about that option after you mentioned, that
-> >>>>>>>>> it is most likely not that useful.
-> >>>>>>>>>
-> >>>>>>>>> Anyway, this are those sysfs files with an unmodified cpuidle driver and
-> >>>>>>>>> the gt enabled and having maxcpus=1 set.
-> >>>>>>>>>
-> >>>>>>>>> /proc/timer_list:
-> >>>>>>>>> 	Tick Device: mode:     1
-> >>>>>>>>> 	Broadcast device
-> >>>>>>>>> 	Clock Event Device: arm_global_timer
-> >>>>>>>>> 	 max_delta_ns:   12884902005
-> >>>>>>>>> 	 min_delta_ns:   1000
-> >>>>>>>>> 	 mult:           715827876
-> >>>>>>>>> 	 shift:          31
-> >>>>>>>>> 	 mode:           3
-> >>>>>>>>
-> >>>>>>>> Here the mode is 3 (CLOCK_EVT_MODE_ONESHOT)
-> >>>>>>>>
-> >>>>>>>> The previous timer_list output you gave me when removing the offending
-> >>>>>>>> cpuidle flag, it was 1 (CLOCK_EVT_MODE_SHUTDOWN).
-> >>>>>>>>
-> >>>>>>>> Is it possible you try to get this output again right after onlining the
-> >>>>>>>> cpu1 in order to check if the broadcast device switches to SHUTDOWN ?
-> >>>>>>>
-> >>>>>>> How do I do that? I tried to online CPU1 after booting with maxcpus=1
-> >>>>>>> and that didn't end well:
-> >>>>>>> 	# echo 1 > online && cat /proc/timer_list 
-> >>>>>>
-> >>>>>> Hmm, I was hoping to have a small delay before the kernel hangs but
-> >>>>>> apparently this is not the case... :(
-> >>>>>>
-> >>>>>> I suspect the global timer is shutdown at one moment but I don't
-> >>>>>> understand why and when.
-> >>>>>>
-> >>>>>> Can you add a stack trace in the "clockevents_shutdown" function with
-> >>>>>> the clockevent device name ? Perhaps, we may see at boot time an
-> >>>>>> interesting trace when it hangs.
-> >>>>>
-> >>>>> I did this change:
-> >>>>> 	diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-> >>>>> 	index 38959c8..3ab11c1 100644
-> >>>>> 	--- a/kernel/time/clockevents.c
-> >>>>> 	+++ b/kernel/time/clockevents.c
-> >>>>> 	@@ -92,6 +92,8 @@ void clockevents_set_mode(struct clock_event_device *dev,
-> >>>>> 	  */
-> >>>>> 	 void clockevents_shutdown(struct clock_event_device *dev)
-> >>>>> 	 {
-> >>>>> 	+       pr_info("ce->name:%s\n", dev->name);
-> >>>>> 	+       dump_stack();
-> >>>>> 	        clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
-> >>>>> 	        dev->next_event.tv64 = KTIME_MAX;
-> >>>>> 	 }
-> >>>>>
-> >>>>> It is hit a few times during boot, so I attach a full boot log. I really
-> >>>>> don't know what to look for, but I hope you can spot something in it. I
-> >>>>> really appreciate you taking the time.
-> >>>>
-> >>>> Thanks for the traces.
-> >>>
-> >>> Sure.
-> >>>
-> >>>>
-> >>>> If you try without the ttc_clockevent configured in the kernel (but with
-> >>>> twd and gt), does it boot ?
-> >>>
-> >>> Absence of the TTC doesn't seem to make any difference. It hangs at the
-> >>> same location.
-> >>
-> >> Ok, IMO there is a problem with the broadcast device registration (may
-> >> be vs twd).
-> > 
-> > I have an idea, but no real evidence to prove it:
-> > Some of the registers in the arm_global_timer are banked per CPU. I.e.
-> > some code must be executed on the CPU the timer is associated with
-> > (struct clock_event_device.cpumask) to have the intended effect
-> > As far as I can tell, there is no guarantee, that the set_mode()
-> > and program_next_event() calls execute on the correct CPU.
-> > If this was correct, shutting down the timer for the CPU entering
-> > idle might actually shut down the timer for the running CPU, if
-> > set_mode() executes on the CPU which is _not_ about to enter idle.
-> 
-> Hi S?ren,
-> Am able to reproduce similar issue on StiH415 SOC by enabling both
-> global_timer and twd and using cpuidle driver like zynq.
-> 
-> When CPU0 goes to idle, I noticed that the global timer used for
-> boardcast is actually scheduled on wrong cpu.
-> My traces for printk like this
-> 	printk("DEBUG: %s on CPU:%d CPUMASK:%s\n", __FUNCTION__,
-> smp_processor_id(), scpumask);
-> 
-> shows:
-> 
-> DEBUG: gt_clockevent_set_mode on CPU:1 CPUMASK: 0
-> DEBUG: gt_clockevent_set_next_event on CPU:1 CPUMASK:0
-> 
-> Which indicates that setting the mode and next_event for a clkevent with
-> cpumask 0 is scheduled on cpu1, this will generate an global timer
-> interrupt on cpu1 rather than cpu0.
-> 
-> This might be the reason for cpu0 not coming out of the cpu_idle_loop.
+On Fri, Jul 26, 2013 at 11:05:31AM +0100, Haojian Zhuang wrote:
+> Parse clock information from DTS file for mach-mmp.
+>
+> Changelog:
+> v6:
+> 1. Remove marvell string from properties in clock driver.
+> 2. Append document for clock binding device tree.
+> 3. Use apbc to replace apbcp. Since the main difference is register
+> base.
+>
+> v5:
+> 1. Replace clk_register_mux() by clk_register_mux_table().
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> ---
+>  .../devicetree/bindings/clock/mmp-clock.txt        |  51 ++++
+>  arch/arm/mach-mmp/mmp-dt.c                         |   2 +
+>  drivers/clk/mmp/Makefile                           |   2 +-
+>  drivers/clk/mmp/clk-mmp.c                          | 300 +++++++++++++++++++++
+>  4 files changed, 354 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/mmp-clock.txt
+>  create mode 100644 drivers/clk/mmp/clk-mmp.c
+>
+> diff --git a/Documentation/devicetree/bindings/clock/mmp-clock.txt b/Documentation/devicetree/bindings/clock/mmp-clock.txt
+> new file mode 100644
+> index 0000000..5fe52a2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/mmp-clock.txt
+> @@ -0,0 +1,51 @@
+> +Device Tree Clock bindings for arch-mmp
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
 
-Thanks for reproducing.
-I think so too. I had similar debug prints in set_mode and
-program_next event, which compared the passed struct clocke_event_device
-pointer with the this_cpu_ptr(gt_evt) pointer, which clearly indicate
-this mismatch.
+Are these used somewhere already?
 
-	S?ren
+> +Required properties for fixed rate clocks:
+> +  - compatible : should be "marvell,mmp-fixed-clkrate".
+> +  - clocks : should be the input parent clock phandle for the clock. This
+> +       should be the reference clock.
+> +  - clock-output-names : should be reference name.
+> +  - #clock-cells : from common clock binding; should be set to 0.
+> +  - clock-frequency : frequency of the fixed rate clock
+
+Why is "fixed-clock" not good enough?
+
+This doesn't seem to describe anything more, and there's nothing
+additional in the driver...
+
+> +
+> +Required properties for fixed factor clocks:
+> +  - compatible : should be "marvell,mmp-fixed-clkfactor".
+> +  - clocks : should be the input parent clock phandle for the clock. This
+> +       should be the reference clock.
+> +  - clock-output-names : should be reference name.
+> +  - #clock-cells : from common clock binding; should be set to 0.
+
+The code seems to use an additional property not described here
+(mmp-fixed-factor). What does that represent?
+
+Why not "fixed-factor-clock"?
+
+> +
+> +Required properties for mux clocks:
+> +  - compatible : should be "marvell,mmp-clkmux".
+> +  - clocks : should be the input parent clock phandle for the clock. This
+> +       should be the reference clock.
+> +  - clock-output-names : should be reference name.
+> +  - #clock-cells : from common clock binding; should be set to 0.
+> +  - mmp-clk-reg : mux register offset & mask bits.
+
+Offset from where? There's no reg, no container's described and there's
+no example.
+
+> +  - mmp-clk-sel : array of mux select bits
+> +
+> +Required properties for divider clocks:
+> +  - compatible : should be "marvell,mmp-apmu-clkdiv".
+> +  - clocks : should be the input parent clock phandle for the clock. This
+> +       should be the reference clock.
+> +  - clock-output-names : should be reference name.
+> +  - #clock-cells : from common clock binding; should be set to 0.
+> +  - mmp-clk-reg : divider register offset & mask bits.
+
+Similar comments to those above. This is also a fixed-factor-clock, no?
+
+> +
+> +Required properties for gate clocks:
+> +  - compatible : should be "marvell,mmp-apbc-clk".
+> +  - clocks : should be the input parent clock phandle for the clock. This
+> +       should be the reference clock.
+> +  - clock-output-names : should be reference name.
+> +  - #clock-cells : from common clock binding; should be set to 0.
+> +  - mmp-clk-reg : gate register offset & mask bits.
+
+Offset from where?
+
+> +
+> +Optional properties for gate clocks:
+> +  - mmp-clk-delay : delay between enabling function clock and apb clock
+
+Units?
+
+> +  - mmp-apbc-power-ctrl : enable apbc power control bit
+
+Is this a boolean or the offset of the bit offset?
+
+> +
+> +For example:
+
+Missing example?
+
+[...]
+
+> +static const struct of_device_id mmp_of_match[] = {
+> +       { .compatible = "marvell,mmp-mpmu", .data = (void *)MMP_MPMU, },
+> +       { .compatible = "marvell,mmp-apmu", .data = (void *)MMP_APMU, },
+> +       { .compatible = "marvell,mmp-apbc", .data = (void *)MMP_APBC, },
+> +       { .compatible = "marvell,mmp-apbcp", .data = (void *)MMP_APBCP, },
+> +       { .compatible = "mrvl,apb-bus", .data = (void *)MMP_APB, },
+> +};
+
+Not documented?
+
+Thanks,
+Mark.
