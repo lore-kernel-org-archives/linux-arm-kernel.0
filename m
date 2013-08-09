@@ -1,48 +1,48 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 09 Aug 2013 15:00:23 -0600
-Subject: [PATCHv2] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <1376003457.22740.25.camel@linux-builds1>
-References: <1375735392-6836-1-git-send-email-dinguyen@altera.com>
- <5203FC1A.3090903@wwwdotorg.org> <1375993920.22740.9.camel@linux-builds1>
- <5204017A.1040607@wwwdotorg.org> <1375995281.22740.16.camel@linux-builds1>
- <520409F2.1090906@wwwdotorg.org> <1376003457.22740.25.camel@linux-builds1>
-Message-ID: <52055867.9000602@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 9 Aug 2013 23:08:45 +0200
+Subject: [PATCH 06/12] dma: mmp_pdma: make the controller a DMA provider
+In-Reply-To: <CAMj5Bkj5PmvdOV307PSpXvTomJsad_7G91X-UFxYJ2KukcqX6g@mail.gmail.com>
+References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
+ <5204EA60.4060502@gmail.com>
+ <CAMj5Bkj5PmvdOV307PSpXvTomJsad_7G91X-UFxYJ2KukcqX6g@mail.gmail.com>
+Message-ID: <201308092308.45922.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 05:10 PM, Dinh Nguyen wrote:
-> On Thu, 2013-08-08 at 15:13 -0600, Stephen Warren wrote:
-...
->> Why is there a need to directly represent the divider anywhere? The
->> driver can find the rate of the input clock, and I assume it knows what
->> rate it wants the clock to run at, so can't it calculate the divider
->> based on those two pieces of information?
+On Friday 09 August 2013, zhangfei gao wrote:
+> On Fri, Aug 9, 2013 at 9:10 PM, Daniel Mack <zonque@gmail.com> wrote:
+> > On 07.08.2013 18:12, Arnd Bergmann wrote:
+
+> >
+> > I had another look at that and Zhangfei's case is not really applicable
+> > to mine, unfortunately.
+> >
+> > In his case, one specific out of many channels has to be used, depending
+> > on the first argument of the phandle. In my case though, the pdma
+> > controller may just take any of its channels, and just assign the
+> > correct DMA request to it.
+
+This should still be fine since your driver can keep track of which
+channels are currently in use. The locking can be done inside of the
+dmaengine core, but you might have to retry if the channel is getting
+acquired between your lookup and the lock.
+
+> Though any physical channel is workable, the virtual channel does not.
+> Each device has to set specific request line.
 > 
-> CC: Chris Ball
->>
->> Or, does the driver really not know what rate it wants the clock to be
->> after the internal divider? If not, then I think that *rate* should be
->> recorded in DT, not the divider to obtain that rate.
->>
+> pdma.c
+> chan->drcmr = cfg->slave_id;
+> nand.c
+>   conf.slave_id = info->drcmr_dat;
 > 
-> I believe that this is the case, that the driver does not know what rate
-> it will clock the SD card at. I think internally we did have a "bus_hz"
-> in DT a while back. I guess I don't really understand why it would be
-> better to have a *rate* DT entry instead of a fixed-divider entry?
+> The specific virtual channel can be directly specificied by request line.
+> While pdma.c choose the free physical channel inside, which is
+> transparent to client.
 
-The value of the divider depends on two things:
+It is a bug to override the slave_id value from the dma slave driver when
+using dma_request_slave_channel, and the dmaengine driver should not allow
+that. The slave_config function should only be used to set the configuration
+parts that the slave driver knows about, which does not include the
+slave_id in this case (since there is no platform data).
 
-1) Input clock rate.
-2) Desired rate after applying the internal divider.
-
-The input clock rate may vary, either between SoCs the IP is integrated
-into, or even at run-time perhaps base on clk_set_rate() etc.
-
-If the MMC driver knows the clock rate it wants to run at, it can
-calculate the divider easily; it can automatically adjust to any input
-clock that its environment may provide.
-
-If the MMC driver is simply told "use this divider", that's encoding
-assumptions about the rate of the input clock which might not be valid;.
-Encoding the desire clock rate within the MMC HW block allows the
-divider to be calculated based on the actual environment.
+	Arnd
