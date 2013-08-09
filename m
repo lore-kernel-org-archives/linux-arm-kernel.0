@@ -1,119 +1,154 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  9 Aug 2013 22:27:14 +0200
-Subject: [PATCHv9 09/10] PCI: mvebu: add support for MSI
-In-Reply-To: <1376080035-29344-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1376080035-29344-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1376080035-29344-10-git-send-email-thomas.petazzoni@free-electrons.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 09 Aug 2013 13:34:40 -0700
+Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <52051A9B.1060606@ti.com> (Nishanth Menon's message of "Fri, 9
+ Aug 2013 11:36:43 -0500")
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
+ <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
+ <52038E88.2050604@ti.com> <5203B336.90102@ti.com>
+ <5203C211.7040207@ti.com> <87iozfga1t.fsf@kernel.org>
+ <52040E67.4050402@ti.com> <87pptndbtj.fsf@kernel.org>
+ <520506B6.7060806@ti.com> <87wqnu9720.fsf@kernel.org>
+ <52051A9B.1060606@ti.com>
+Message-ID: <87bo5661sv.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds support for Message Signaled Interrupts in the
-Marvell PCIe host controller. The work is very simple: it simply gets
-a reference to the msi_chip associated to the PCIe controller thanks
-to the msi-parent DT property, and stores this reference in the
-pci_bus structure. This is enough to let the Linux PCI core use the
-functions of msi_chip to setup and teardown MSIs.
+Nishanth Menon <nm@ti.com> writes:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
----
- .../devicetree/bindings/pci/mvebu-pci.txt          |  3 +++
- drivers/pci/host/pci-mvebu.c                       | 26 ++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
+> On 08/09/2013 11:12 AM, Kevin Hilman wrote:
+>> Nishanth Menon <nm@ti.com> writes:
+>>
+>>> On 08/08/2013 06:04 PM, Kevin Hilman wrote:
+>>>> Nishanth Menon <nm@ti.com> writes:
+>>>>
+>>>>> On 08/08/2013 04:14 PM, Kevin Hilman wrote:
+>>>>>> Dave Gerlach <d-gerlach@ti.com> writes:
+>>>>>>
+>>>>>>> On 08/08/2013 10:03 AM, Santosh Shilimkar wrote:
+>>>>>>>> $subject and patch don't match.
+>>>>>>>>
+>>>>>>>> On Thursday 08 August 2013 08:26 AM, Nishanth Menon wrote:
+>>>>>>>>> On 08/08/2013 03:45 AM, Russ Dill wrote:
+>>>>>>>>>>       In reference to
+>>>>>>>>>> the M3 handling it, the M3 wouldn't know which devices have a driver
+>>>>>>>>>> bound and which don't.
+>>>>>>>>> Does it need to? M3 firmware can pretty much define "I will force
+>>>>>>>>> the device into low power state, and if the drivers dont handle
+>>>>>>>>> things properly, fix the darned driver". M3 behavior should be
+>>>>>>>>> considered as a "hardware" as far as Linux running on MPU is
+>>>>>>>>> concerned, and firmware helps change the behavior by accounting for
+>>>>>>>>> SoC quirks. *if* we have ability to handle this in the firmware,
+>>>>>>>>> there is no need to carry this in Linux.
+>>>>>>>>>
+>>>>>>>> I agree with Nishant. I don't like this patch and IIRC, I gave same
+>>>>>>>> comment in the last version. Linux need not know about all such firmware
+>>>>>>>> quirks. Also all these M3 specific stuff, should be done somewhere
+>>>>>>>> else. Probably having a small M3 driver won't be a bad idea.
+>>>>>>>
+>>>>>>> I am not opposed to doing it this way and letting the M3 firmware
+>>>>>>> handle idling these modules, however the one concern raised in the
+>>>>>>> last series is that an approach that does not acknowledge drivers will
+>>>>>>> hide driver PM bugs. I suppose as long as I make sure to document that
+>>>>>>> the devices are being idled by the M3 firmware this may not be an
+>>>>>>> issue. I will look into implementing this.
+>>>>>>
+>>>>>> No, please don't start idling devices in firmware that are otherwise
+>>>>>> managed by Linux.  Keep the firmware simple and dumb.  Linux is managing
+>>>>>> these devices, it should manage their bugs too.
+>>>>>
+>>>>>>
+>>>>>> This is not just about idling devices.  This is about handling broken IP
+>>>>>> blocks whose power-on reset state does not allow the the powerdomain to
+>>>>>> reach its target state.  That's just bad hardware design.
+>>>>>
+>>>>> Right, this is where M3 can help -> provide a consistent state for
+>>>>> linux kernel to work with. by the fact that we want to keep majority
+>>>>> of the power code inside master CPU, we are just letting M3 help us
+>>>>> with nothing major at all..
+>>>>
+>>>> heh, I would say HW design bugs like this are more than "nothing major
+>>>> at all." :)
+>>>>
+>>>>> tiny stuff like these can help "fix" the hardware design quirks by
+>>>>> hiding it behind the firmware and modifying the hardware behavior.
+>>>>
+>>>> I disagree here.  I'm a firmware minimalist, and hiding bugs like this
+>>>> in the firmware is wrong when Linux is otherwise managing these devices.
+>>>> It also imposes criteria on the firmware of future SoCs that doesn't
+>>>> belong there either.  IMO, the only stuff the firmware should do is what
+>>>> Linux *cannot* do.
+>>>>
+>>>> Remember, this only needs to happen when there isn't a driver for these
+>>>> devices.  Should we communicate to the firmware that the OS has no
+>>>> driver, so please enable the hack?  I think not.
+>>>
+>>> My view is that the M3 should *ignore* the presence/existence of MPU's
+>>> drivers. M3 will do whatever to force the system to go to suspend once
+>>> notified - this saves us the prehistoric perpetual trouble when
+>>> drivers have bugs (which get exposed in weird usage scenarios) in
+>>> production systems, we dont get any hardware help to fix them up while
+>>> attempting low power states and system never really hits low power
+>>> state. This was always because OMAP and it's derivatives have been
+>>> "democratic" in power management - if every hardware block achieves
+>>> proper state, then we achieve a system-wide low power state.
+>>>
+>>>>
+>>>>> I know it breaks the purity of role, but as the
+>>>>> next evolution, we might want to consider M3 something like an
+>>>>> "accelerator" for power management activity.. (not saying it is that
+>>>>> fast.. but conceptually).
+>>>>
+>>>> Yes, it breaks the purity of role, and makes it hard to maintain and
+>>>> extend to future SoCs.  As a maintainer, that's a red flag.  IMO, the
+>>>> roles need to be kept clear.  The M3 manages some devices and the
+>>>> interconnect that MPU/Linux cannot, the rest are managed by Linux.
+>>>
+>>> suspend is a very controlled state as against cpuidle where driver
+>>> knowledge is necessary and in fact mandatory. drivers are supposed to
+>>> release their resources - and even though we test the hell out of
+>>> them, we do have paths untrodden when it comes to production systems.
+>>
+>> Since folks don't seem to care about idle for AM33xx (starting with the
+>> hw designers, from what I can tell), you have the luxury of thinking
+>> only about suspend, where firmware can be heavy handed and force things
+>> into submission.  Unfortunately, with cpuidle, life is not that easy and
+>> you have to have cooperation of the device drivers.  Coordinating that
+>> with firmware is not so simple, to put it mildly.
+>>
+>> Any SW/firmware design that does not account for *both* static PM
+>> (suspend/resume) and dynamic PM (runtime PM + CPUidle) is not long-term
+>> maintainable, and thus ready for mainline IMO.  (BTW, this is another
+>> theme from previous reviews of this series.)
+>
+> I completely agree with you.  But is'nt the specific suspend state we
+> are attempting to achieve on AM335x just tooo expensive latency wise
+> for being even considered for cpuidle? 
+>
+> I am sure you recollect the latencies involved in OMAP3 OFF mode Vs
+> OMAP4+ OFF mode - which basically kicked out OFF mode from OMAP4
+> cpuidle C states? - it was practically useless
+>
+> in this *specific* power state we are attempting, we do a bunch of i2c
+> operations, etc, in short something that cannot even be considered for
+> cpuidle.
+>
+> Considering this, we can consider the same only for suspend path -
+> hence allowing firmware to do more here.
+>
+>
+> This does not conflict with cpuidle (which controls MPU) or runtime PM
+> (which kicks in once you have drivers active, but if drivers get
+> active, we dont need to deal with this crap).
+>
+> Dont you think this helps the specific case to move this into firmware
+> rather than into omap_device?
 
-diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-index f8d4058..77e0ffe 100644
---- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-@@ -12,6 +12,8 @@ Mandatory properties:
- - device_type, set to "pci"
- - ranges: ranges for the PCI memory and I/O regions, as well as the
-   MMIO registers to control the PCIe interfaces.
-+- msi-parent: Link to the hardware entity that serves as the Message
-+  Signaled Interrupt controller for this PCI controller.
- 
- In addition, the Device Tree node must have sub-nodes describing each
- PCIe interface, having the following mandatory properties:
-@@ -46,6 +48,7 @@ pcie-controller {
- 	#size-cells = <2>;
- 
- 	bus-range = <0x00 0xff>;
-+	msi-parent = <&mpic>;
- 
- 	ranges = <0x82000000 0 0xd0040000 0xd0040000 0 0x00002000   /* Port 0.0 registers */
- 		  0x82000000 0 0xd0042000 0xd0042000 0 0x00002000   /* Port 2.0 registers */
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 13a633b..5715a97 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -11,6 +11,7 @@
- #include <linux/clk.h>
- #include <linux/module.h>
- #include <linux/mbus.h>
-+#include <linux/msi.h>
- #include <linux/slab.h>
- #include <linux/platform_device.h>
- #include <linux/of_address.h>
-@@ -107,6 +108,7 @@ struct mvebu_pcie_port;
- struct mvebu_pcie {
- 	struct platform_device *pdev;
- 	struct mvebu_pcie_port *ports;
-+	struct msi_chip *msi;
- 	struct resource io;
- 	struct resource realio;
- 	struct resource mem;
-@@ -695,6 +697,12 @@ static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
- 	return bus;
- }
- 
-+void mvebu_pcie_add_bus(struct pci_bus *bus)
-+{
-+	struct mvebu_pcie *pcie = sys_to_pcie(bus->sysdata);
-+	bus->msi = pcie->msi;
-+}
-+
- resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 					  const struct resource *res,
- 					  resource_size_t start,
-@@ -731,6 +739,7 @@ static void __init mvebu_pcie_enable(struct mvebu_pcie *pcie)
- 	hw.map_irq        = mvebu_pcie_map_irq;
- 	hw.ops            = &mvebu_pcie_ops;
- 	hw.align_resource = mvebu_pcie_align_resource;
-+	hw.add_bus        = mvebu_pcie_add_bus;
- 
- 	pci_common_init(&hw);
- }
-@@ -755,6 +764,21 @@ mvebu_pcie_map_registers(struct platform_device *pdev,
- 	return devm_request_and_ioremap(&pdev->dev, &regs);
- }
- 
-+static void __init mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
-+{
-+	struct device_node *msi_node;
-+
-+	msi_node = of_parse_phandle(pcie->pdev->dev.of_node,
-+				    "msi-parent", 0);
-+	if (!msi_node)
-+		return;
-+
-+	pcie->msi = of_pci_find_msi_chip_by_node(msi_node);
-+
-+	if (pcie->msi)
-+		pcie->msi->dev = &pcie->pdev->dev;
-+}
-+
- static int __init mvebu_pcie_probe(struct platform_device *pdev)
- {
- 	struct mvebu_pcie *pcie;
-@@ -879,6 +903,8 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- 		i++;
- 	}
- 
-+	mvebu_pcie_msi_enable(pcie);
-+
- 	mvebu_pcie_enable(pcie);
- 
- 	return 0;
--- 
-1.8.1.2
+No, I don't.
+
+That means the firmware design is based on several assumptions about
+what Linux can and can't do in idle, and then imposing that on future
+Linux designs as well.  I dont' buy it.
+
+Kevin
