@@ -1,154 +1,58 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 09 Aug 2013 13:34:40 -0700
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <52051A9B.1060606@ti.com> (Nishanth Menon's message of "Fri, 9
- Aug 2013 11:36:43 -0500")
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
- <52038E88.2050604@ti.com> <5203B336.90102@ti.com>
- <5203C211.7040207@ti.com> <87iozfga1t.fsf@kernel.org>
- <52040E67.4050402@ti.com> <87pptndbtj.fsf@kernel.org>
- <520506B6.7060806@ti.com> <87wqnu9720.fsf@kernel.org>
- <52051A9B.1060606@ti.com>
-Message-ID: <87bo5661sv.fsf@kernel.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Aug 2013 21:38:47 +0100
+Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu
+ audio subsystem
+In-Reply-To: <20130809194434.GP6427@sirena.org.uk>
+References: <5204A716.6070507@gmail.com> <20130809091953.GO6427@sirena.org.uk>
+ <5204B7A6.9050907@gmail.com> <20130809094340.GO23006@n2100.arm.linux.org.uk>
+ <5204CC04.4000401@gmail.com> <20130809113940.GY6427@sirena.org.uk>
+ <20130809130932.GS23006@n2100.arm.linux.org.uk>
+ <20130809180058.GM6427@sirena.org.uk>
+ <20130809182516.GT23006@n2100.arm.linux.org.uk>
+ <20130809194434.GP6427@sirena.org.uk>
+Message-ID: <20130809203847.GU23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+On Fri, Aug 09, 2013 at 08:44:34PM +0100, Mark Brown wrote:
+> If someone wants to it should also be possible to convert the existing
+> platforms without S/PDIF support over to DT, providing you don't mind
+> changing the code once the DPCM and S/PDIF support is added and a bit of
+> thought is put into where the S/PDIF output will fit into the bindings.
 
-> On 08/09/2013 11:12 AM, Kevin Hilman wrote:
->> Nishanth Menon <nm@ti.com> writes:
->>
->>> On 08/08/2013 06:04 PM, Kevin Hilman wrote:
->>>> Nishanth Menon <nm@ti.com> writes:
->>>>
->>>>> On 08/08/2013 04:14 PM, Kevin Hilman wrote:
->>>>>> Dave Gerlach <d-gerlach@ti.com> writes:
->>>>>>
->>>>>>> On 08/08/2013 10:03 AM, Santosh Shilimkar wrote:
->>>>>>>> $subject and patch don't match.
->>>>>>>>
->>>>>>>> On Thursday 08 August 2013 08:26 AM, Nishanth Menon wrote:
->>>>>>>>> On 08/08/2013 03:45 AM, Russ Dill wrote:
->>>>>>>>>>       In reference to
->>>>>>>>>> the M3 handling it, the M3 wouldn't know which devices have a driver
->>>>>>>>>> bound and which don't.
->>>>>>>>> Does it need to? M3 firmware can pretty much define "I will force
->>>>>>>>> the device into low power state, and if the drivers dont handle
->>>>>>>>> things properly, fix the darned driver". M3 behavior should be
->>>>>>>>> considered as a "hardware" as far as Linux running on MPU is
->>>>>>>>> concerned, and firmware helps change the behavior by accounting for
->>>>>>>>> SoC quirks. *if* we have ability to handle this in the firmware,
->>>>>>>>> there is no need to carry this in Linux.
->>>>>>>>>
->>>>>>>> I agree with Nishant. I don't like this patch and IIRC, I gave same
->>>>>>>> comment in the last version. Linux need not know about all such firmware
->>>>>>>> quirks. Also all these M3 specific stuff, should be done somewhere
->>>>>>>> else. Probably having a small M3 driver won't be a bad idea.
->>>>>>>
->>>>>>> I am not opposed to doing it this way and letting the M3 firmware
->>>>>>> handle idling these modules, however the one concern raised in the
->>>>>>> last series is that an approach that does not acknowledge drivers will
->>>>>>> hide driver PM bugs. I suppose as long as I make sure to document that
->>>>>>> the devices are being idled by the M3 firmware this may not be an
->>>>>>> issue. I will look into implementing this.
->>>>>>
->>>>>> No, please don't start idling devices in firmware that are otherwise
->>>>>> managed by Linux.  Keep the firmware simple and dumb.  Linux is managing
->>>>>> these devices, it should manage their bugs too.
->>>>>
->>>>>>
->>>>>> This is not just about idling devices.  This is about handling broken IP
->>>>>> blocks whose power-on reset state does not allow the the powerdomain to
->>>>>> reach its target state.  That's just bad hardware design.
->>>>>
->>>>> Right, this is where M3 can help -> provide a consistent state for
->>>>> linux kernel to work with. by the fact that we want to keep majority
->>>>> of the power code inside master CPU, we are just letting M3 help us
->>>>> with nothing major at all..
->>>>
->>>> heh, I would say HW design bugs like this are more than "nothing major
->>>> at all." :)
->>>>
->>>>> tiny stuff like these can help "fix" the hardware design quirks by
->>>>> hiding it behind the firmware and modifying the hardware behavior.
->>>>
->>>> I disagree here.  I'm a firmware minimalist, and hiding bugs like this
->>>> in the firmware is wrong when Linux is otherwise managing these devices.
->>>> It also imposes criteria on the firmware of future SoCs that doesn't
->>>> belong there either.  IMO, the only stuff the firmware should do is what
->>>> Linux *cannot* do.
->>>>
->>>> Remember, this only needs to happen when there isn't a driver for these
->>>> devices.  Should we communicate to the firmware that the OS has no
->>>> driver, so please enable the hack?  I think not.
->>>
->>> My view is that the M3 should *ignore* the presence/existence of MPU's
->>> drivers. M3 will do whatever to force the system to go to suspend once
->>> notified - this saves us the prehistoric perpetual trouble when
->>> drivers have bugs (which get exposed in weird usage scenarios) in
->>> production systems, we dont get any hardware help to fix them up while
->>> attempting low power states and system never really hits low power
->>> state. This was always because OMAP and it's derivatives have been
->>> "democratic" in power management - if every hardware block achieves
->>> proper state, then we achieve a system-wide low power state.
->>>
->>>>
->>>>> I know it breaks the purity of role, but as the
->>>>> next evolution, we might want to consider M3 something like an
->>>>> "accelerator" for power management activity.. (not saying it is that
->>>>> fast.. but conceptually).
->>>>
->>>> Yes, it breaks the purity of role, and makes it hard to maintain and
->>>> extend to future SoCs.  As a maintainer, that's a red flag.  IMO, the
->>>> roles need to be kept clear.  The M3 manages some devices and the
->>>> interconnect that MPU/Linux cannot, the rest are managed by Linux.
->>>
->>> suspend is a very controlled state as against cpuidle where driver
->>> knowledge is necessary and in fact mandatory. drivers are supposed to
->>> release their resources - and even though we test the hell out of
->>> them, we do have paths untrodden when it comes to production systems.
->>
->> Since folks don't seem to care about idle for AM33xx (starting with the
->> hw designers, from what I can tell), you have the luxury of thinking
->> only about suspend, where firmware can be heavy handed and force things
->> into submission.  Unfortunately, with cpuidle, life is not that easy and
->> you have to have cooperation of the device drivers.  Coordinating that
->> with firmware is not so simple, to put it mildly.
->>
->> Any SW/firmware design that does not account for *both* static PM
->> (suspend/resume) and dynamic PM (runtime PM + CPUidle) is not long-term
->> maintainable, and thus ready for mainline IMO.  (BTW, this is another
->> theme from previous reviews of this series.)
->
-> I completely agree with you.  But is'nt the specific suspend state we
-> are attempting to achieve on AM335x just tooo expensive latency wise
-> for being even considered for cpuidle? 
->
-> I am sure you recollect the latencies involved in OMAP3 OFF mode Vs
-> OMAP4+ OFF mode - which basically kicked out OFF mode from OMAP4
-> cpuidle C states? - it was practically useless
->
-> in this *specific* power state we are attempting, we do a bunch of i2c
-> operations, etc, in short something that cannot even be considered for
-> cpuidle.
->
-> Considering this, we can consider the same only for suspend path -
-> hence allowing firmware to do more here.
->
->
-> This does not conflict with cpuidle (which controls MPU) or runtime PM
-> (which kicks in once you have drivers active, but if drivers get
-> active, we dont need to deal with this crap).
->
-> Dont you think this helps the specific case to move this into firmware
-> rather than into omap_device?
+Okay, so you're thinking that the I2S output will be enabled in the
+absence of DPCM?  If so, that tells me that you don't understand my
+patches, and this is getting *really* tiresome.
 
-No, I don't.
+One more time:
+- There are two outputs from the FIFO.
+- There is an I2S output, and there is a SPDIF output.
+- All hardware has an I2S output.
+- Some hardware also has the SPDIF output.
+- Each output is individually enable-able via separate bits.
+- When both outputs are used, both must be enabled simultaneously.
+- Otherwise, only one output must be enabled at any one time.
+- At least one output must be enabled for there to be any activity
+  from the unit at all (that's obvious!)
 
-That means the firmware design is based on several assumptions about
-what Linux can and can't do in idle, and then imposing that on future
-Linux designs as well.  I dont' buy it.
+So, what I'm doing is providing _two_ AIF connection points, one for I2S
+and one for SPDIF.  The appropriate AIF connection point must be attached
+to for the appropriate output to be enabled.
 
-Kevin
+That means that if you want to use the SPDIF output, the SPDIF AIF must
+be linked to the codec.  If you want to use the I2S output, the I2S AIF
+must be linked to the codec.
+
+Without this, there's no way for the CPU DAI to know which output(s) are
+in use, and therefore which should be enabled.
+
+What this means is that the conventional setup where you have _one_ DAI
+link connecting the codec DAI to the CPU DAI won't work on Kirkwood
+anymore, because there is no way to know which of the two outputs
+should be enabled.  I avoided that in my patches, but you've objected
+to that saying that it must use DPCM.  That makes the whole of kirkwood
+entirely DPCM only, whether or not you have a single codec to connect.
+
+Surely you realise this, because you must have read the patches properly
+before you commented on them, and realised that one of spdifdo or i2sdo
+must be powered up to set either enable bit?
