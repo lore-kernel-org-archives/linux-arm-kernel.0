@@ -1,56 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Aug 2013 19:25:16 +0100
-Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu
- audio subsystem
-In-Reply-To: <20130809180058.GM6427@sirena.org.uk>
-References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
- <20130809091953.GO6427@sirena.org.uk> <5204B7A6.9050907@gmail.com>
- <20130809094340.GO23006@n2100.arm.linux.org.uk> <5204CC04.4000401@gmail.com>
- <20130809113940.GY6427@sirena.org.uk>
- <20130809130932.GS23006@n2100.arm.linux.org.uk>
- <20130809180058.GM6427@sirena.org.uk>
-Message-ID: <20130809182516.GT23006@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 09 Aug 2013 11:45:11 -0700
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <3a4049f6-aad6-4730-86e3-210afbc3836b@DB9EHSMHS028.ehs.local>
+References: <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
+ <51F99747.4060901@linaro.org>
+ <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
+ <51FA9AE8.1060004@linaro.org>
+ <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
+ <51FA9F54.3060704@linaro.org>
+ <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
+ <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
+ <20130809172757.GD14845@codeaurora.org>
+ <3a4049f6-aad6-4730-86e3-210afbc3836b@DB9EHSMHS028.ehs.local>
+Message-ID: <520538B7.8050306@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 07:00:58PM +0100, Mark Brown wrote:
-> On Fri, Aug 09, 2013 at 02:09:32PM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Aug 09, 2013 at 12:39:40PM +0100, Mark Brown wrote:
-> 
-> > > So extend Morimoto-san's work on the simple card for this - that's what
-> > > it's there for, it's doing exactly this job for non-DT systems but it
-> > > just didn't get DT support added yet.  All the trivial cards should end
-> > > up using this.
-> 
-> > It's quite rediculous to request that the simple card stuff is expanded at
-> > this time, when you're also telling us that we must use DPCM for Kirkwood,
-> 
-> That's the place to put the sort of shared infrastructure for trivial
-> cards that Sebastian said he wanted to see - if you guys are saying that
-> the machines should all be able to use a trivial binding with shared
-> code that's where that code should be.
+On 08/09/13 10:48, S?ren Brinkmann wrote:
+> On Fri, Aug 09, 2013 at 10:27:57AM -0700, Stephen Boyd wrote:
+>> On 08/09, Daniel Lezcano wrote:
+>>> yes, but at least the broadcast mechanism should send an IPI to cpu0 to
+>>> wake it up, no ? As Stephen stated this kind of configuration should has
+>>> never been tested before so the tick broadcast code is not handling this
+>>> case properly IMHO.
+>>>
+>> If you have a per-cpu tick device that isn't suffering from
+>> FEAT_C3_STOP why wouldn't you use that for the tick versus a
+>> per-cpu tick device that has FEAT_C3_STOP? It sounds like there
+>> is a bug in the preference logic or you should boost the rating
+>> of the arm global timer above the twd. Does this patch help? It
+>> should make the arm global timer the tick device and whatever the
+>> cadence timer you have into the broadcast device.
+> I'm not sure I'm getting this right. But neither the cadence_ttc nor the
+> arm_global_timer have the FEAT_C3_STOP flag set. So, shouldn't they be
+> treated equally even with your change?
 
-Sigh, you completely miss the point.
+The cadence_ttc is a global clockevent, i.e. the irq can interrupt any
+CPU, and it has a rating of 200. The arm global timer is a per-cpu
+clockevent with a rating of 300. The TWD is a per-cpu clockevent with a
+rating of 350. Because the arm global timer is rated higher than the
+cadence_ttc but less than the TWD the arm global timer will fill in the
+broadcast spot and the TWD will fill in the tick position. We really
+want the arm global timer to fill in the tick position and the
+cadence_ttc to fill in the broadcast spot (although the cadence_ttc
+should never be needed because the arm global timer doesn't need help in
+deep idle states).
 
-What all three of us are ultimately after is a DT description for the
-kirkwood stuff which covers all its use cases.  The use case which all
-three of us have in common is the Cubox, which is the one which needs
-the spdif stuff to work.
+Unless I got lost in all the combinations of tests you've done so far?
 
-Now, what you've said to date is:
-
-1. you want kirkwood to use DPCM.
-2. you want kirkwood using people to use the simple card stuff with the
-   kirkwood driver you want to use DPCM.
-
-To make it work with DPCM, we first need to know what DPCM requires,
-which means we either have to have the knowledge of DPCM and/or have a
-working implementation.  We don't have either of those yet.
-
-So, I again state plainly that what you're asking is for people to come
-up with a DT description for a DPCM implementation when we haven't yet
-got a working DPCM implementation, even without DT.
-
-It is this which I assert is a completely rediculous request at this
-moment in time for the reasons stated in my previous email and repeated
-in this email.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
