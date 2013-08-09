@@ -1,59 +1,131 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Fri, 9 Aug 2013 10:11:56 +0100
-Subject: [PATCH v1 04/14] clk: Add set_rate_and_parent() op
-In-Reply-To: <1374713022-6049-5-git-send-email-sboyd@codeaurora.org>
-References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
- <1374713022-6049-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <5204B25C.70102@imgtec.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 9 Aug 2013 06:13:37 -0300
+Subject: [PATCH v5 3/3] ARM: dts: mvebu: Introduce a new compatible
+ string for mv64xxx-i2c
+In-Reply-To: <1376039158-1896-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1376039158-1896-1-git-send-email-gregory.clement@free-electrons.com>
+ <1376039158-1896-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130809091336.GA2848@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+(Sending to devicetree)
 
-On 25/07/13 01:43, Stephen Boyd wrote:
-> Some of Qualcomm's clocks can change their parent and rate at the
-> same time with a single register write. Add support for this
-> hardware to the common clock framework by adding a new
-> set_rate_and_parent() op. When the clock framework determines
-> that both the parent and the rate are going to change during
-> clk_set_rate() it will call the .set_rate_and_parent() op if
-> available and fall back to calling .set_parent() followed by
-> .set_rate() otherwise.
+On Fri, Aug 09, 2013 at 11:05:58AM +0200, Gregory CLEMENT wrote:
+> The mv64xxx-i2c embedded in the Armada XP have a new feature to
+> offload i2c transaction. This new version of the IP come also with
+> some errata. This lead to the introduction to a another compatible
+> string.
 > 
-> Cc: James Hogan <james.hogan@imgtec.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> This commit split the i2c information into armada-370.dtsi and
+> armada-xp.dtsi. Most of the data remains the same and stay in the
+> common file Armada-370-xp.dtsi. With this new feature the size of the
+> registers are bigger for Armada XP and the new compatible string is
+> used.
+> 
+> The Device Tree binding documentation is updated accordingly.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 13 ++++++++++++-
+>  arch/arm/boot/dts/armada-370-xp.dtsi                  |  2 --
+>  arch/arm/boot/dts/armada-370.dtsi                     |  8 ++++++++
+>  arch/arm/boot/dts/armada-xp.dtsi                      | 10 ++++++++++
+>  4 files changed, 30 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> index a1ee681..c5dd952 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> @@ -4,7 +4,8 @@
+>  Required properties :
+>  
+>   - reg             : Offset and length of the register set for the device
+> - - compatible      : Should be "marvell,mv64xxx-i2c"
+> + - compatible      : Should be "marvell,mv64xxx-i2c" and "marvell,mv7230-i2c"
+> +for controller which support the I2C Transaction Generator
+>   - interrupts      : The interrupt number
+>  
+>  Optional properties :
+> @@ -20,3 +21,13 @@ Examples:
+>  		interrupts = <29>;
+>  		clock-frequency = <100000>;
+>  	};
+> +
+> +For a controller which support the I2C Transaction Generator:
+> +
+> +	i2c at 11000 {
+> +		compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+> +		reg = <0x11000 0x100>;
+> +		compatible = "marvell,mv64xxx-i2c";
+> +		interrupts = <29>;
+> +		clock-frequency = <100000>;
+> +	};
+> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> index 90b1176..d8b24c9 100644
+> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> @@ -121,7 +121,6 @@
+>  
+>  			i2c0: i2c at 11000 {
+>  				compatible = "marvell,mv64xxx-i2c";
+> -				reg = <0x11000 0x20>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				interrupts = <31>;
+> @@ -132,7 +131,6 @@
+>  
+>  			i2c1: i2c at 11100 {
+>  				compatible = "marvell,mv64xxx-i2c";
+> -				reg = <0x11100 0x20>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				interrupts = <32>;
+> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> index fa3dfc6..0e2eefa 100644
+> --- a/arch/arm/boot/dts/armada-370.dtsi
+> +++ b/arch/arm/boot/dts/armada-370.dtsi
+> @@ -155,6 +155,14 @@
+>  				};
+>  			};
+>  
+> +			i2c0: i2c at 11000 {
+> +				reg = <0x11000 0x20>;
+> +			};
+> +
+> +			i2c1: i2c at 11100 {
+> +				reg = <0x11100 0x20>;
+> +			};
+> +
+>  			usb at 50000 {
+>  				clocks = <&coreclk 0>;
+>  			};
+> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> index 416eb94..e1f2547 100644
+> --- a/arch/arm/boot/dts/armada-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> @@ -138,6 +138,16 @@
+>  				};
+>  			};
+>  
+> +			i2c0: i2c at 11000 {
+> +				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+> +				reg = <0x11000 0x100>;
+> +			};
+> +
+> +			i2c1: i2c at 11100 {
+> +				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+> +				reg = <0x11100 0x100>;
+> +			};
+> +
+>  			usb at 50000 {
+>  				clocks = <&gateclk 18>;
+>  			};
+> -- 
+> 1.8.1.2
+> 
 
-Aside from the nit below, I can't see anything wrong with this patch.
-Reviewed-by: James Hogan <james.hogan@imgtec.com>
-
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 484f8ad..1f7eabb 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -108,6 +108,18 @@ struct clk_hw;
->   *		which is likely helpful for most .set_rate implementation.
->   *		Returns 0 on success, -EERROR otherwise.
->   *
-> + * @set_rate_and_parent: Change the rate and the parent of this clock. The
-> + *		requested rate is specified by the second argument, which
-> + *		should typically be the return of .round_rate call.  The
-> + *		third argument gives the parent rate which is likely helpful
-> + *		for most .set_rate_and_parent implementation. The fourth
-> + *		argument gives the parent index. It is optional (and
-
-nit: s/It/This callback/ or add newline or something - I completely
-misread it the first time, thinking you were referring to the parent
-index argument :)
-
-> + *		unnecessary) for clocks with 0 or 1 parents as well as
-> + *		for clocks that can tolerate switching the rate and the parent
-> + *		separately via calls to .set_parent and .set_rate.
-> + *		Returns 0 on success, -EERROR otherwise.
-> + *
-> + *
->   * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
->   * implementations to split any work between atomic (enable) and sleepable
->   * (prepare) contexts.  If enabling a clock requires code that might sleep,
-
-Thanks
-James
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
