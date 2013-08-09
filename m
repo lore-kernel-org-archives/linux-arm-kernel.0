@@ -1,66 +1,54 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 09 Aug 2013 16:23:11 +0300
-Subject: [PATCH v14 11/12] usb: chipidea: udc: misuse flag
- CI_HDRC_REGS_SHARED and CI_HDRC_PULLUP_ON_VBUS
-In-Reply-To: <1375432445-31918-12-git-send-email-peter.chen@freescale.com>
-References: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
- <1375432445-31918-12-git-send-email-peter.chen@freescale.com>
-Message-ID: <874nazathc.fsf@ashishki-desk.ger.corp.intel.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 9 Aug 2013 08:28:09 -0500
+Subject: [PATCH v9 07/16] iommu/exynos: support for device tree
+In-Reply-To: <20130809153730.83d3a5ba419def5424bcbb0e@samsung.com>
+References: <002b01ce941b$160a88a0$421f99e0$@samsung.com>
+ <5396565.vjlSOm37Vf@flatron>
+ <20130809153730.83d3a5ba419def5424bcbb0e@samsung.com>
+Message-ID: <CAL_JsqKM_YP0Cj3Uo7TeCVcKcbzzsuK3yxTSn6pG8qGFOnZAiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Chen <peter.chen@freescale.com> writes:
+On Fri, Aug 9, 2013 at 1:37 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
+> On Fri, 09 Aug 2013 00:41:25 +0200, Tomasz Figa wrote:
+>> Hi KyongHo,
+>>
+>> On Thursday 08 of August 2013 18:38:49 Cho KyongHo wrote:
+>> > This commit adds device tree support for System MMU.
+>> > This also include the following changes and enhancements:
+>> >
+>> > * use managed device helper functions.
+>> > Simplyfies System MMU device driver.
+>> >
+>> > * use only a single clock descriptor.
+>> > System MMU device descriptor is seperate if it is imposible to make
+>> > a single clock descriptor to make a device descriptor for a group of
+>> > System MMUs.
+>> >
+>> > * removed dbgname member from sysmmu_drvdata structure.
+>> > debugging kernel message for a System MMU is distinguisheable with the
+>> > name of device descroptors.
+>>
+>> Please put all these three changes in separate patches. This patch is hard
+>> to review with all the changes mixed together...
 
-> CI_HDRC_REGS_SHARED stands for the controller registers is shared
-> with other USB drivers, if all USB drivers are at chipidea/, it doesn't
-> needed to set.
+Agreed.
 
-We still have the msm driver that uses REGS_SHARED.
-
-> CI_HDRC_PULLUP_ON_VBUS stands for pullup dp when the vbus is on. This
-> flag doesn't need to set if the vbus is always on for gadget
-> since dp has always pulled up after the gadget has initialized.
-
-Didn't we agree at some point to get rid of this flag altogether once we
-have proper VBUS detection?
-
+>>
 >
-> So, the current code seems to misuse this two flags.
-> - When the gadget initializes, the controller doesn't need to run if
-> it depends on vbus (CI_HDRC_PULLUP_ON_VBUS), it does not
-> relate to shared register.
-> - When the gadget starts (load one gadget module), the controller
-> can run if vbus is on (CI_HDRC_PULLUP_ON_VBUS), it also does not
-> relate to shared register.
+> Ok.
 >
-> Tested-by: Marek Vasut <marex@denx.de>
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/chipidea/udc.c |    5 ++---
->  1 files changed, 2 insertions(+), 3 deletions(-)
+>> In addition, I believe this is the patch that should be adding device tree
+>> binding documentation, not the 6/16 one, as this is where actually support
+>> for this binding gets added to the kernel.
 >
-> diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-> index c70ce38..45abf4d 100644
-> --- a/drivers/usb/chipidea/udc.c
-> +++ b/drivers/usb/chipidea/udc.c
-> @@ -1637,8 +1637,7 @@ static int ci_udc_start(struct usb_gadget *gadget,
->  	pm_runtime_get_sync(&ci->gadget.dev);
->  	if (ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS) {
->  		if (ci->vbus_active) {
-> -			if (ci->platdata->flags & CI_HDRC_REGS_SHARED)
-> -				hw_device_reset(ci, USBMODE_CM_DC);
-> +			hw_device_reset(ci, USBMODE_CM_DC);
->  		} else {
->  			pm_runtime_put_sync(&ci->gadget.dev);
->  			goto done;
-> @@ -1801,7 +1800,7 @@ static int udc_start(struct ci_hdrc *ci)
->  		}
->  	}
->  
-> -	if (!(ci->platdata->flags & CI_HDRC_REGS_SHARED)) {
-> +	if (!(ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS)) {
->  		retval = hw_device_reset(ci, USBMODE_CM_DC);
->  		if (retval)
->  			goto put_transceiver;
-> -- 
-> 1.7.0.4
+> Oh, I didn't know that devicetree binding description and implementation need
+> to be in the same patch.
+> I will do as you advised.
+
+Actually, I prefer the binding docs be separate patches. The reason
+being so we can get closer to having them in a separate repository.
+Also, then the binding can be acked separately from the kernel
+implementation using the binding.
+
+Rob
