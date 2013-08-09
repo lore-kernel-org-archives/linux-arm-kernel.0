@@ -1,24 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Aug 2013 12:16:08 +0100
-Subject: [PATCH] ARM: EXYNOS: Set 64-bit DMA mask for EXYNOS5250
-In-Reply-To: <CAHbNUh1z8ULaxpJuHe=B5+ey+19LznD_tzSopJ6y3h09rw=-8g@mail.gmail.com>
-References: <1376042714-26513-1-git-send-email-tushar.behera@linaro.org>
- <20130809102752.GP23006@n2100.arm.linux.org.uk>
- <CAHbNUh1z8ULaxpJuHe=B5+ey+19LznD_tzSopJ6y3h09rw=-8g@mail.gmail.com>
-Message-ID: <20130809111608.GR23006@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 9 Aug 2013 08:27:03 -0300
+Subject: [PATCH 1/1] ARM: dtsi: imx6qdl-sabresd: Add USB host 1 VBUS
+ regulator
+In-Reply-To: <20130809080540.GA23876@shlinux1.ap.freescale.net>
+References: <1376007824-16325-1-git-send-email-peter.chen@freescale.com>
+ <CAOMZO5AXprz7MsxmyWB_nH8pc0GX3sbcZUtDqEVkf0W9myBbxA@mail.gmail.com>
+ <20130809080540.GA23876@shlinux1.ap.freescale.net>
+Message-ID: <CAOMZO5BfLTG-8QAou-=m+bM_JL79wv_exedRbbh3hgB12WBWtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 04:41:57PM +0530, Tushar Behera wrote:
-> On 9 August 2013 15:57, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Fri, Aug 09, 2013 at 03:35:14PM +0530, Tushar Behera wrote:
-> >> When LPAE is enabled, we need to set 64bit DMA mask bits.
-> >
-> > *Please* check the list archives.  I sent during the last 7 days a patch
-> > series which should address this problem.  Unfortunately, it seems almost
-> > no one has looked at it.
-> 
-> Thanks for the patchset. Tested on Arndale.
+On Fri, Aug 9, 2013 at 5:05 AM, Peter Chen <peter.chen@freescale.com> wrote:
 
-Thanks - can I assume that's a proper Tested-by: ?  Also, please confirm
-the patch numbers which you tested.  Thanks.
+> Thanks, Fabio. What's the rule for adding gpio function for pinctrl
+> at dts? At pinctrl_hog or the device's pinctrl group?
+
+pinctrl_hog, as each board may have a different gpio to turn on the regulator.
+
+The pinctrl group is used for group of pins that control a peripheral,
+such as spi, uart, mmc, etc.
