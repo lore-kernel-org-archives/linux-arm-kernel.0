@@ -1,31 +1,35 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  9 Aug 2013 14:20:49 +0200
-Subject: [PATCH] pinctrl: i.MX: Make more robust against devicetree errors
-Message-ID: <1376050854-3303-1-git-send-email-s.hauer@pengutronix.de>
+Date: Fri,  9 Aug 2013 14:20:51 +0200
+Subject: [PATCH 2/5] pinctrl: imx: Catch no fsl,pins property
+In-Reply-To: <1376050854-3303-1-git-send-email-s.hauer@pengutronix.de>
+References: <1376050854-3303-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1376050854-3303-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When there is something wrong with pinctrl in the i.MX devicetree
-files this usually means the i.MX pinctrl driver bails out completely.
-In this case even the console is nonfunctional since it can't get
-the pins. Enabling earlyprintk isn't very helpful since the driver
-only prints that something is wrong, but not what is wrong.
+Instead of crashing the kernel print an error message when
+the fsl,pins property is missing.
 
-With this series the i.MX pinctrl driver continues on errors so that
-the system stays working and only the erroneous pinctrl groups fail
-later. Also the error messages are supplemented with the offending
-devicetree node to give a clue what went wrong.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/pinctrl/pinctrl-imx.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Sascha
-
-----------------------------------------------------------------
-Sascha Hauer (5):
-      pinctrl: imx: make error messages more informative
-      pinctrl: imx: Catch no fsl,pins property
-      pinctrl: imx: do not fail when parsing a group fails
-      pinctrl: imx: do not fail when parsing a function fails
-      pinctrl: imx: Use struct type for pins
-
- drivers/pinctrl/pinctrl-imx.c | 95 ++++++++++++++++++++-----------------------
- drivers/pinctrl/pinctrl-imx.h | 36 +++++++++-------
- 2 files changed, 64 insertions(+), 67 deletions(-)
+diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
+index b063189..780b197 100644
+--- a/drivers/pinctrl/pinctrl-imx.c
++++ b/drivers/pinctrl/pinctrl-imx.c
+@@ -426,6 +426,11 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
+ 	 * do sanity check and calculate pins number
+ 	 */
+ 	list = of_get_property(np, "fsl,pins", &size);
++	if (!list) {
++		dev_err(info->dev, "no fsl,pins property in node %s\n", np->full_name);
++		return -EINVAL;
++	}
++
+ 	/* we do not check return since it's safe node passed down */
+ 	if (!size || size % pin_size) {
+ 		dev_err(info->dev, "Invalid fsl,pins property in node %s\n", np->full_name);
+-- 
+1.8.4.rc1
