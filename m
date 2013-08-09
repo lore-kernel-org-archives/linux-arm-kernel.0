@@ -1,50 +1,194 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 09 Aug 2013 11:34:30 +0200
-Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu audio
- subsystem
-In-Reply-To: <20130809091953.GO6427@sirena.org.uk>
-References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
- <20130809091953.GO6427@sirena.org.uk>
-Message-ID: <5204B7A6.9050907@gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 09 Aug 2013 11:35:20 +0200
+Subject: [PATCH v9 04/16] iommu/exynos: allocate lv2 page table from own
+ slab
+In-Reply-To: <20130809175156.c7ffc68b865e4bca48ef47dd@samsung.com>
+References: <002801ce941a$fb6369e0$f22a3da0$@samsung.com>
+ <2101296.S6JDU5igl3@flatron>
+ <20130809175156.c7ffc68b865e4bca48ef47dd@samsung.com>
+Message-ID: <12183506.4f14O99EfL@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/13 11:19, Mark Brown wrote:
-> On Fri, Aug 09, 2013 at 10:23:50AM +0200, Sebastian Hesselbarth wrote:
->> On 08/08/2013 01:22 PM, Jean-Francois Moine wrote:
+On Friday 09 of August 2013 17:51:56 Cho KyongHo wrote:
+> On Fri, 09 Aug 2013 09:55:30 +0200, Tomasz Figa wrote:
+> > Hi KyongHo,
+> > 
+> > On Friday 09 of August 2013 14:58:49 Cho KyongHo wrote:
+> > > On Thu, 08 Aug 2013 16:00:18 +0200, Tomasz Figa wrote:
+> > > > On Thursday 08 of August 2013 18:38:04 Cho KyongHo wrote:
+> > > > > Since kmalloc() does not guarantee that the allignment of 1KiB
+> > > > > when
+> > > > > it
+> > > > > allocates 1KiB, it is required to allocate lv2 page table from
+> > > > > own
+> > > > > slab that guarantees alignment of 1KiB
+> > > > > 
+> > > > > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> > > > > ---
+> > > > > 
+> > > > >  drivers/iommu/exynos-iommu.c |   24 ++++++++++++++++++++----
+> > > > >  1 files changed, 20 insertions(+), 4 deletions(-)
+> > > > > 
+> > > > > diff --git a/drivers/iommu/exynos-iommu.c
+> > > > > b/drivers/iommu/exynos-iommu.c index d90e6fa..a318049 100644
+> > > > > --- a/drivers/iommu/exynos-iommu.c
+> > > > > +++ b/drivers/iommu/exynos-iommu.c
+> > > > > @@ -100,6 +100,8 @@
+> > > > > 
+> > > > >  #define REG_PB1_SADDR		0x054
+> > > > >  #define REG_PB1_EADDR		0x058
+> > > > > 
+> > > > > +static struct kmem_cache *lv2table_kmem_cache;
+> > > > > +
+> > > > > 
+> > > > >  static unsigned long *section_entry(unsigned long *pgtable,
+> > > > >  unsigned
+> > > > > 
+> > > > > long iova) {
+> > > > > 
+> > > > >  	return pgtable + lv1ent_offset(iova);
+> > > > > 
+> > > > > @@ -765,7 +767,8 @@ static void
+> > > > > exynos_iommu_domain_destroy(struct
+> > > > > iommu_domain *domain)
+> > > > > 
+> > > > >  	for (i = 0; i < NUM_LV1ENTRIES; i++)
+> > > > >  	
+> > > > >  		if (lv1ent_page(priv->pgtable + i))
+> > > > > 
+> > > > > -			kfree(__va(lv2table_base(priv->pgtable + i)));
+> > > > > +			kmem_cache_free(lv2table_kmem_cache,
+> > > > > +					__va(lv2table_base(priv->pgtable +
+> > 
+> > i)));
+> > 
+> > > > >  	free_pages((unsigned long)priv->pgtable, 2);
+> > > > >  	free_pages((unsigned long)priv->lv2entcnt, 1);
+> > > > > 
+> > > > > @@ -861,7 +864,7 @@ static unsigned long *alloc_lv2entry(unsigned
+> > > > > long
+> > > > > *sent, unsigned long iova, if (lv1ent_fault(sent)) {
+> > > > > 
+> > > > >  		unsigned long *pent;
+> > > > > 
+> > > > > -		pent = kzalloc(LV2TABLE_SIZE, GFP_ATOMIC);
+> > > > > +		pent = kmem_cache_zalloc(lv2table_kmem_cache, GFP_ATOMIC);
+> > > > > 
+> > > > >  		BUG_ON((unsigned long)pent & (LV2TABLE_SIZE - 1));
+> > > > >  		if (!pent)
+> > > > >  		
+> > > > >  			return ERR_PTR(-ENOMEM);
+> > > > > 
+> > > > > @@ -881,7 +884,7 @@ static int lv1set_section(unsigned long
+> > > > > *sent,
+> > > > > phys_addr_t paddr, short *pgcnt)
+> > > > > 
+> > > > >  	if (lv1ent_page(sent)) {
+> > > > >  	
+> > > > >  		BUG_ON(*pgcnt != NUM_LV2ENTRIES);
+> > > > > 
+> > > > > -		kfree(page_entry(sent, 0));
+> > > > > +		kmem_cache_free(lv2table_kmem_cache, page_entry(sent, 0));
+> > > > > 
+> > > > >  		*pgcnt = 0;
+> > > > >  	
+> > > > >  	}
+> > > > > 
+> > > > > @@ -1082,10 +1085,23 @@ static int __init exynos_iommu_init(void)
+> > > > > 
+> > > > >  {
+> > > > >  
+> > > > >  	int ret;
+> > > > > 
+> > > > > +	lv2table_kmem_cache =
+> > > > > kmem_cache_create("exynos-iommu-lv2table",
+> > > > > +				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
+> > > > > +	if (!lv2table_kmem_cache) {
+> > > > > +		pr_err("%s: Failed to create kmem cache\n", __func__);
+> > > > > +		return -ENOMEM;
+> > > > > +	}
+> > > > > +
+> > > > > 
+> > > > >  	ret = platform_driver_register(&exynos_sysmmu_driver);
+> > > > >  	
+> > > > >  	if (ret == 0)
+> > > > > 
+> > > > > -		bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
+> > > > > +		ret = bus_set_iommu(&platform_bus_type,
+> > 
+> > &exynos_iommu_ops);
+> > 
+> > > > > +
+> > > > > +	if (ret) {
+> > > > > +		pr_err("%s: Failed to register exynos-iommu driver.\n",
+> > > > > +								__func__);
+> > > > > +		kmem_cache_destroy(lv2table_kmem_cache);
+> > > > > +	}
+> > > > 
+> > > > What about making the return value handling here cleaner? For 
+example:
+> > > > 	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
+> > > > 	
+> > > > 				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
+> > > > 	
+> > > > 	if (!lv2table_kmem_cache) {
+> > > > 	
+> > > > 		...
+> > > > 		return -ENOMEM;
+> > > > 	
+> > > > 	}
+> > > > 	
+> > > > 	ret = platform_driver_register(&exynos_sysmmu_driver);
+> > > > 	if (ret) {
+> > > > 	
+> > > > 		...
+> > > > 		goto err_destroy_kmem_cache;
+> > > > 	
+> > > > 	}
+> > > > 	
+> > > > 	ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
+> > > > 	if (ret) {
+> > > > 	
+> > > > 		...
+> > > > 		goto err_platform_unregister;
+> > > > 	
+> > > > 	}
+> > > > 	
+> > > > 	return 0;
+> > > > 
+> > > > err_platform_unregister:
+> > > > 	...
+> > > > 
+> > > > err_destroy_kmem_cache:
+> > > > 	...
+> > > > 	return ret;
+> > > > 
+> > > > }
+> > > 
+> > > Thank you for suggestion.
+> > > I think you are worrying about missing the information who makes
+> > > 'ret'
+> > > non-zero.
+> > 
+> > Oh, this is a valid point, but it was more a nitpick about the coding
+> > style. Single path error handling (with goto) is widely used in the
+> > kernel in cases when more than one thing has to be undone and so I
+> > suggested this method of error handling here as well.
+> > 
+> > > Ok. I will process it separately.
+> > 
+> > Since this patch adds most of the error handling to this function, I
+> > think it should be fine to do it as a part of this patch.
+> 
+> I meant 'separately' that checking all return values each.
+> I think it can be simpler without goto.
 >
->>> +i2s1: audio-controller at b4000 {
->>> +	compatible = "mrvl,mvebu-audio";
->>> +	reg = <0xb4000 0x2210>;
->>> +	interrupts = <21>, <22>;
->>> +	clocks = <&gate_clk 13>;
->>> +	clock-names = "internal";
->>> +};
->
->> Also we will need some phandle reference to the audio codec here. As
->> this property is ongoing work in ASoC core, I suggest we wait for it
->> and propose a binding afterwards.
->
-> No, as discussed this should be in the binding for the audio subsystem
-> not in the binding for an individual component in that subsystem.
->
+> There are just 2 cases to rollback previous changes in that function.
 
-Mark,
+It might end up with less lines, but having roll back in single place is 
+more readable. That's why it's the preferred error handling way in Linux 
+kernel, if you have more than one action to undo on your error path.
 
-I do understand there may be SoCs requiring sophisticated extra audio
-nodes, but Marvell SoCs don't. I prefer having a single node for the
-i2s controller *and* exploit the audio subsystem properties from that.
-
-For Marvell audio, we only need a single node for all three ASoC
-drivers. No other subsystem _requires_ you to have extra nodes for
-it's needs. If you can provide interrupts, just have an interrupt-
-controller property. If you can provide clocks, you can link to that
-very node - no virtual device node required. Even for media they
-do not insist on a virtual node but they do have generic properties
-you can exploit.
-
-If you insist on creating a virtual sound card node just because
-ASoC wants it that way - okay, your call. But I don't see any value
-in that.
-
-Sebastian
+Best regards,
+Tomasz
