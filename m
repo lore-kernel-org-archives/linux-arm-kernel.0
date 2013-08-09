@@ -1,33 +1,38 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 9 Aug 2013 09:21:11 -0400
-Subject: [PATCH for v3.12] ARM: mvebu: Relocate PCIe node in Armada 370
- RD board
-In-Reply-To: <1375995789-24146-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1375995789-24146-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130809132111.GB25111@titan.lakedaemon.net>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 09 Aug 2013 16:21:32 +0300
+Subject: [PATCH v14 06/12] usb: chipidea: add flag
+ CI_HDRC_DUAL_ROLE_NOT_OTG
+In-Reply-To: <20130809111352.GA24763@shlinux1.ap.freescale.net>
+References: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
+ <1375432445-31918-7-git-send-email-peter.chen@freescale.com>
+ <87fvujauqr.fsf@ashishki-desk.ger.corp.intel.com>
+ <20130809111352.GA24763@shlinux1.ap.freescale.net>
+Message-ID: <877gfvatk3.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 06:03:09PM -0300, Ezequiel Garcia wrote:
-> The pcie-controller node needs to be relocated according the MBus
-> DT binding, since it's now a child of the mbus-compatible node.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
-> Applies on mvebu's for-next.
-> 
-> Jason,
-> 
-> Please pick this in mvebu/mbus_dt. Somehow this slipped through
-> our tests until just now.
-> 
-> Thanks!
-> 
->  arch/arm/boot/dts/armada-370-rd.dts | 32 ++++++++++++++++----------------
->  1 file changed, 16 insertions(+), 16 deletions(-)
+Peter Chen <peter.chen@freescale.com> writes:
 
-Applied to mvebu/mbus_dt
+> On Fri, Aug 09, 2013 at 03:55:56PM +0300, Alexander Shishkin wrote:
+>> > +		} else {
+>> > +			/*
+>> > +			 * If the controller is not OTG capable, but support
+>> > +			 * role switch, the defalt role is gadget, and the
+>> > +			 * user can switch it through debugfs (proc in future?)
+>> 
+>> It's not going to be in procfs ever, so that part of the comment can go.
+>> 
+>
+> I can delete now, but the role switch does not a debug function, we
+> may not put it at debugfs, do you think so?
 
-thx,
+Even if we were to put the role switch elsewhere, it wouldn't be
+procfs.
 
-Jason.
+If there is indeed a hardware platform that intentionally allows
+software to select the role, then yes. Right now, it is a debugging
+feature.
+
+Regards,
+--
+Alex
