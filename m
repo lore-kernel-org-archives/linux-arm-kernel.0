@@ -1,95 +1,54 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 8 Aug 2013 18:10:57 -0500
-Subject: [PATCHv2] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <520409F2.1090906@wwwdotorg.org>
-References: <1375735392-6836-1-git-send-email-dinguyen@altera.com>
- <5203FC1A.3090903@wwwdotorg.org> <1375993920.22740.9.camel@linux-builds1>
- <5204017A.1040607@wwwdotorg.org> <1375995281.22740.16.camel@linux-builds1>
- <520409F2.1090906@wwwdotorg.org>
-Message-ID: <1376003457.22740.25.camel@linux-builds1>
+From: dianders@google.com (Doug Anderson)
+Date: Thu, 8 Aug 2013 17:16:55 -0700
+Subject: dw_mmc: Does anyone use multiple slots?
+Message-ID: <CAD=FV=U3aT1KKtSwAFhYURJJerp70ij8h647=xyV51et4jYipg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-08-08 at 15:13 -0600, Stephen Warren wrote:
-> On 08/08/2013 02:54 PM, Dinh Nguyen wrote:
-> > On Thu, 2013-08-08 at 14:37 -0600, Stephen Warren wrote:
-> >> On 08/08/2013 02:32 PM, Dinh Nguyen wrote:
-> >>> On Thu, 2013-08-08 at 14:14 -0600, Stephen Warren wrote:
-> >>>> On 08/05/2013 02:43 PM, dinguyen at altera.com wrote:
-> >>>>> From: Dinh Nguyen <dinguyen@altera.com>
-> >>>>>
-> >>>>> Add bindings for SD/MMC for SOCFPGA.
-> >>>>> Add "syscon" to the "altr,sys-mgr" binding.
-> >>>>
-> >>>>> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
-> >>>>> new file mode 100644
-> >>>>> index 0000000..dc14922
-> >>>>> --- /dev/null
-> >>>>> +++ b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
-> >>>>> @@ -0,0 +1,48 @@
-> >>>>> +* Altera SOCFPGA specific extensions to the Synopsis Designware Mobile
-> >>>>> +  Storage Host Controller
-> >>>>> +
-> >>>>> +Required Properties:
-> >>>>> +
-> >>>>> +* compatible: should be
-> >>>>> +	- "altr,socfpga-dw-mshc": for controllers with Altera SOCFPGA
-> >>>>> +	  specific extensions.
-> >>>>> +
-> >>>>> +* altr,dw-mshc-ciu-div: Specifies the divider value for the card interface
-> >>>>> +  unit (ciu) clock. The value should be (n-1). For Altera's SOCFPGA, the divider
-> >>>>> +  value is fixed at 3, which means parent_clock/4.
-> >>>>
-> >>>> This feels like something that should be represented using the common
-> >>>> clock API; a driver should query the rate of its input clock, and then
-> >>>> calculate the MMC block's internal divider based on that (perhaps also
-> >>>> call clk_set_rate() on the input clock?).
-> >>>
-> >>> This means a change to the dw_mmc driver, which I can look into for the
-> >>> next round? I have promised Pawel to consolidate the bindings for both
-> >>> exynos and socfpga in the next round already. I will also look into
-> >>> using the common clock API for the MMC as well. 
-> >>>
-> >>> This patch is the only thing that is preventing from SD/MMC working for
-> >>> SOCFPGA in the mainline, can I get your Ack if I look into doing this
-> >>> for 3.13 for both the exynos and socfpga driver, and address your latter
-> >>> comments?
-> >>
-> >> The problem is that if the binding supports or requires that property
-> >> now, it has to at least support it forever. Given that we're getting
-> >> serious about DT ABI now, we should be only introducing DT bindings that
-> >> we believe are complete and corrrect, rather than bindings which we
-> >> actively expect to be temporary and to change incompatibly later.
-> >>
-> > Right ok. Then I guess I will have to look into consolidating the
-> > bindings sooner rather than later.
-> > 
-> > I went back to look at the driver again, and I think it is doing as you
-> > are suggesting:
-> > 
-> > host->bus_hz is getting its input value from the common clock API.
-> > "altr,dw-mshc-ciu-div" is specifying the internal divider that is in the
-> > SD/MMC IP itself.
-> > 
-> > I guess I'm still not clear on how I can represent the SD/MMC divider in
-> > in the context of the common clock API.
-> 
-> Why is there a need to directly represent the divider anywhere? The
-> driver can find the rate of the input clock, and I assume it knows what
-> rate it wants the clock to run at, so can't it calculate the divider
-> based on those two pieces of information?
+Hi,
 
-CC: Chris Ball
-> 
-> Or, does the driver really not know what rate it wants the clock to be
-> after the internal divider? If not, then I think that *rate* should be
-> recorded in DT, not the divider to obtain that rate.
-> 
+A quick question: does anyone know of any hardware that actually
+implements multiple slots per host on the dw_mmc controller?
 
-I believe that this is the case, that the driver does not know what rate
-it will clock the SD card at. I think internally we did have a "bus_hz"
-in DT a while back. I guess I don't really understand why it would be
-better to have a *rate* DT entry instead of a fixed-divider entry?
+When working on the driver I often find myself running into questions
+about how things should work on the theoretical "multiple slot" dw_mmc
+implementation.  ...and I often find bugs where things couldn't
+possibly work for a multiple slot implementation.
 
-Dinh
-> 
+As an example, recently I sent up (870556a mmc: dw_mmc: Handle late
+vmmc regulators with EPROBE_DEFER).  Before that patch the host-global
+"host->vmmc" was being set once per slot.  Said another way, if slot 0
+set host->mmc to ABC, then slot 1 would come along and clobber
+host->mmc to DEF.  After my patch the dw_mmc code assumes one vmmc
+regulator per host.  As Tomasz pointed out, that might not be so good
+(*), but it was better than what was there before.  Maybe all
+multislot implementations don't use vmmc?
+
+Another example, though, is dw_mci_init_slot().  It calls this once per slot:
+  mmc_alloc_host(sizeof(struct dw_mci_slot), host->dev);
+
+...where "host->dev" is shared among all the slots.  I haven't tested
+it (since I don't have multislot), but that doesn't seem wise to me.
+Reading through mmc_alloc_host(), it looks like it assumes that this
+host owns host->dev and it feels free to clobber variables.  Sound
+familiar?
+
+I guess my overall question is: if there are no actual implementations
+of multislot, shouldn't we kill it and simplify the code a whole lot?
+If someone out there has a real multislot device they can step back in
+and do it more correctly?
+
+Of course we need to find someone to actually go through and do the
+killing of multislot, but finding that person might be easier if there
+was some agreement that it was good to do.
+
+Cheers?  Flames?
+
+-Doug
+
+---
+
+(*) On the other hand, maybe my patch is OK.  A reasonable way that
+multi-slot power might work is with a since vmmc and then it is
+multiplexed through with PWREN?  All I know is that exynos says
+"PWREN" is not implemented and that exynos only has one slot per host.
