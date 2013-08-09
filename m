@@ -1,151 +1,42 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 9 Aug 2013 19:18:57 +0800
-Subject: [PATCH v14 04/12] usb: chipidea: otg: Add otg file used to
- access otgsc
-In-Reply-To: <87d2pnaujm.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
- <1375432445-31918-5-git-send-email-peter.chen@freescale.com>
- <87d2pnaujm.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20130809111856.GB24763@shlinux1.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Aug 2013 14:09:32 +0100
+Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu
+ audio subsystem
+In-Reply-To: <20130809113940.GY6427@sirena.org.uk>
+References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
+ <20130809091953.GO6427@sirena.org.uk> <5204B7A6.9050907@gmail.com>
+ <20130809094340.GO23006@n2100.arm.linux.org.uk> <5204CC04.4000401@gmail.com>
+ <20130809113940.GY6427@sirena.org.uk>
+Message-ID: <20130809130932.GS23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 04:00:13PM +0300, Alexander Shishkin wrote:
-> Peter Chen <peter.chen@freescale.com> writes:
-> 
-> > This file is mainly used to access otgsc currently, it may
-> > add otg related things in the future.
-> >
-> > Tested-by: Marek Vasut <marex@denx.de>
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/chipidea/Makefile |    2 +-
-> >  drivers/usb/chipidea/bits.h   |   10 ++++++++
-> >  drivers/usb/chipidea/core.c   |    3 +-
-> >  drivers/usb/chipidea/otg.c    |   50 +++++++++++++++++++++++++++++++++++++++++
-> >  drivers/usb/chipidea/otg.h    |   19 +++++++++++++++
-> >  5 files changed, 82 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> > index 6cf5f68..a99d980 100644
-> > --- a/drivers/usb/chipidea/Makefile
-> > +++ b/drivers/usb/chipidea/Makefile
-> > @@ -2,7 +2,7 @@ ccflags-$(CONFIG_USB_CHIPIDEA_DEBUG) := -DDEBUG
-> >  
-> >  obj-$(CONFIG_USB_CHIPIDEA)		+= ci_hdrc.o
-> >  
-> > -ci_hdrc-y				:= core.o
-> > +ci_hdrc-y				:= core.o otg.o
-> >  ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
-> >  ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
-> >  ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
-> > diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-> > index aefa026..dd0cf9e 100644
-> > --- a/drivers/usb/chipidea/bits.h
-> > +++ b/drivers/usb/chipidea/bits.h
-> > @@ -79,11 +79,21 @@
-> >  #define OTGSC_ASVIS	      BIT(18)
-> >  #define OTGSC_BSVIS	      BIT(19)
-> >  #define OTGSC_BSEIS	      BIT(20)
-> > +#define OTGSC_1MSIS	      BIT(21)
-> > +#define OTGSC_DPIS	      BIT(22)
-> >  #define OTGSC_IDIE	      BIT(24)
-> >  #define OTGSC_AVVIE	      BIT(25)
-> >  #define OTGSC_ASVIE	      BIT(26)
-> >  #define OTGSC_BSVIE	      BIT(27)
-> >  #define OTGSC_BSEIE	      BIT(28)
-> > +#define OTGSC_1MSIE	      BIT(29)
-> > +#define OTGSC_DPIE	      BIT(30)
-> > +#define OTGSC_INT_EN_BITS	(OTGSC_IDIE | OTGSC_AVVIE | OTGSC_ASVIE \
-> > +				| OTGSC_BSVIE | OTGSC_BSEIE | OTGSC_1MSIE \
-> > +				| OTGSC_DPIE)
-> > +#define OTGSC_INT_STATUS_BITS	(OTGSC_IDIS | OTGSC_AVVIS | OTGSC_ASVIS	\
-> > +				| OTGSC_BSVIS | OTGSC_BSEIS | OTGSC_1MSIS \
-> > +				| OTGSC_DPIS)
-> >  
-> >  /* USBMODE */
-> >  #define USBMODE_CM            (0x03UL <<  0)
-> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> > index 26f6599..a4be8a5 100644
-> > --- a/drivers/usb/chipidea/core.c
-> > +++ b/drivers/usb/chipidea/core.c
-> > @@ -72,6 +72,7 @@
-> >  #include "bits.h"
-> >  #include "host.h"
-> >  #include "debug.h"
-> > +#include "otg.h"
-> >  
-> >  /* Controller register map */
-> >  static uintptr_t ci_regs_nolpm[] = {
-> > @@ -530,7 +531,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
-> >  		goto stop;
-> >  
-> >  	if (ci->is_otg)
-> > -		hw_write(ci, OP_OTGSC, OTGSC_IDIE, OTGSC_IDIE);
-> > +		ci_hdrc_otg_init(ci);
-> >  
-> >  	ret = dbg_create_files(ci);
-> >  	if (!ret)
-> > diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-> > new file mode 100644
-> > index 0000000..abefb4d
-> > --- /dev/null
-> > +++ b/drivers/usb/chipidea/otg.c
-> > @@ -0,0 +1,50 @@
-> > +/*
-> > + * otg.c - ChipIdea USB IP core OTG driver
-> > + *
-> > + * Copyright (C) 2013 Freescale Semiconductor, Inc.
-> > + *
-> > + * Author: Peter Chen
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +/*
-> > + * This file mainly handles otgsc register, it may include OTG operation
-> > + * in the future.
-> > + */
-> > +
-> > +#include <linux/usb/otg.h>
-> > +#include <linux/usb/gadget.h>
-> > +#include <linux/usb/chipidea.h>
-> > +
-> > +#include "ci.h"
-> > +#include "bits.h"
-> 
-> You don't include otg.h here, which makes sparse think that you wanted
-> these functions to be static.
-> 
+On Fri, Aug 09, 2013 at 12:39:40PM +0100, Mark Brown wrote:
+> So extend Morimoto-san's work on the simple card for this - that's what
+> it's there for, it's doing exactly this job for non-DT systems but it
+> just didn't get DT support added yet.  All the trivial cards should end
+> up using this.
 
-Will add
+It's quite rediculous to request that the simple card stuff is expanded at
+this time, when you're also telling us that we must use DPCM for Kirkwood,
+but DPCM is not yet in a working state in mainline.  We don't yet know
+whether that's because of something the core is doing wrong or whether
+that's because something that I'm doing wrong.  The reason we don't know
+that is because the _only_ person who knows anything about this is Liam,
+and as you have said, Liam is away on vacation.
 
-> > +
-> > +void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-> > +{
-> > +	/* Only clear request bits */
-> > +	hw_write(ci, OP_OTGSC, OTGSC_INT_STATUS_BITS, bits);
-> > +}
-> > +
-> > +void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-> > +{
-> > +	hw_write(ci, OP_OTGSC, bits, bits);
-> > +}
-> > +
-> > +void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-> > +{
-> > +	hw_write(ci, OP_OTGSC, bits, 0);
-> > +}
-> 
-> These functions look like they would be better off as static inlines in
-> otg.h than here.
-> 
+All that we presently know is that DPCM is supposed to be "something like
+this".  However, when we do that, it doesn't work, which means we can't
+be certain what the end result is supposed to look like.  It may be that
+Liam has changed some of the design decisions with DPCM.
 
-Will do
+We know that various things are missing - like the .pcm_playback member in
+the DAI link.  That points to Liam having additional patches to the core
+code in his tree to make DPCM work.  That could impact our scenario here,
+and how the "simple" card should be implemented.
 
--- 
+So, what you're asking is for us to extend the design of something in a
+way that we know very little about how to make work.
 
-Best Regards,
-Peter Chen
+To that I say: No.  Let's wait for Liam to return from vacation so that
+this can be sorted out properly with someone who knows this code.
