@@ -1,38 +1,47 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri, 09 Aug 2013 17:05:09 +0530
-Subject: [PATCH RFC 46/51] ARM: DMA-API: better handing of DMA masks for
- coherent allocations
-In-Reply-To: <E1V51EE-0006uO-C2@rmk-PC.arm.linux.org.uk>
-References: <20130801213420.GL23006@n2100.arm.linux.org.uk>
- <E1V51EE-0006uO-C2@rmk-PC.arm.linux.org.uk>
-Message-ID: <5204D3ED.70504@linaro.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 9 Aug 2013 08:38:26 -0300
+Subject: [PATCH] PCI: mvebu: make Marvell PCIe driver depend on OF
+In-Reply-To: <1376044550-30572-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1376044550-30572-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130809113825.GD2848@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/2013 03:50 AM, Russell King wrote:
-> We need to start treating DMA masks as something which is specific to
-> the bus that the device resides on, otherwise we're going to hit all
-> sorts of nasty issues with LPAE and 32-bit DMA controllers in >32-bit
-> systems, where memory is offset from PFN 0.
+On Fri, Aug 09, 2013 at 12:35:50PM +0200, Thomas Petazzoni wrote:
+> The Marvell PCIe host controller driver is heavily tied to Device Tree
+> APIs, and can only be used on platforms where the Device Tree is
+> used. Therefore, it should "depends on OF" to avoid build failures on
+> !OF configurations.
 > 
-> In order to start doing this, we convert the DMA mask to a PFN using
-> the device specific dma_to_pfn() macro.  This is the reverse of the
-> pfn_to_dma() macro which is used to get the DMA address for the device.
-> 
-> This gives us a PFN mask, which we can then check against the PFN
-> limit of the DMA zone.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Reported-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+
 > ---
->  arch/arm/mm/dma-mapping.c |   49 ++++++++++++++++++++++++++++++++++++++++----
->  arch/arm/mm/init.c        |    2 +
->  arch/arm/mm/mm.h          |    2 +
->  3 files changed, 48 insertions(+), 5 deletions(-)
+> Bjorn, you can take this one through your tree. Either for 3.11 or
+> 3.12, at your preference.
+> ---
+>  drivers/pci/host/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-
-Tested on Arndale board with ARM_LPAE enabled.
-
-Tested-by: Tushar Behera <tushar.behera@linaro.org>
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 1184ff6..e5ba4eb 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -4,6 +4,7 @@ menu "PCI host controller drivers"
+>  config PCI_MVEBU
+>  	bool "Marvell EBU PCIe controller"
+>  	depends on ARCH_MVEBU || ARCH_KIRKWOOD
+> +	depends on OF
+>  
+>  config PCIE_DW
+>  	bool
+> -- 
+> 1.8.1.2
+> 
 
 -- 
-Tushar Behera
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
