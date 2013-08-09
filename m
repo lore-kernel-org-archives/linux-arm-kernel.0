@@ -1,31 +1,31 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  8 Aug 2013 20:41:58 -0700
-Subject: [PATCH] ARM: KVM: Fix kvm_set_pte assignment
-Message-ID: <1376019718-19378-1-git-send-email-christoffer.dall@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 9 Aug 2013 03:47:02 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP4: clock: Lock PLLs in the right sequence
+In-Reply-To: <20130809011820.5348.78407@quantum>
+References: <1375956851-842-1-git-send-email-rnayak@ti.com>
+ <20130809011820.5348.78407@quantum>
+Message-ID: <alpine.DEB.2.02.1308090345340.32157@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-THe kvm_set_pte function was actually assigning the entire struct to the
-structure member, which should work because the structure only has that
-one member, but it is still not very nice.
+Hi Mike,
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/include/asm/kvm_mmu.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Thu, 8 Aug 2013, Mike Turquette wrote:
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 472ac70..9b28c41 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -64,7 +64,7 @@ void kvm_clear_hyp_idmap(void);
- 
- static inline void kvm_set_pte(pte_t *pte, pte_t new_pte)
- {
--	pte_val(*pte) = new_pte;
-+	*pte = new_pte;
- 	/*
- 	 * flush_pmd_entry just takes a void pointer and cleans the necessary
- 	 * cache entries, so we can reuse the function for ptes.
--- 
-1.7.10.4
+> Quoting Rajendra Nayak (2013-08-08 03:14:11)
+> > On OMAP4 we have clk_set_rate()s being done for a few
+> > DPLL clock nodes, as part of the clock init code, since
+> > the bootloaders no longer locks these DPLLs.
+> ...
+> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> 
+> Taken into clk-next. Thanks for the fix. Besides the annoying prints is
+> there a functional regression fixed by this? If so I can take into
+> clk-fixes as needed.
+
+It's best if I take this patch upstream.  That way, potential merge 
+conflicts are avoided, since I might have other changes to 
+arch/arm/mach-omap2/cclock44xx_data.c to send upstream at the same time.
+
+
+- Paul
