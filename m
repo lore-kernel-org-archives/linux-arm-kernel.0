@@ -1,128 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 09 Aug 2013 14:55:34 -0700
-Subject: [PATCH 1/2] power: Add APM X-Gene system reboot driver
-In-Reply-To: <20130809212849.GD12638@lizard.sbx05730.santaca.wayport.net>
-References: <1372797539-13111-1-git-send-email-lho@apm.com>
- <1372797539-13111-2-git-send-email-lho@apm.com>
- <20130809212849.GD12638@lizard.sbx05730.santaca.wayport.net>
-Message-ID: <52056556.7060005@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 09 Aug 2013 16:08:02 -0600
+Subject: [PATCH 35/35] cpufreq: tegra: use
+ cpufreq_table_validate_and_show()
+In-Reply-To: <CAKohponQDAqHiRD7Aw5Wk6fEE-d8H=Svg0oBRyb9SKGdqYxGhw@mail.gmail.com>
+References: <cover.1375964117.git.viresh.kumar@linaro.org>
+ <568f3dbd414b050bb2319d960fb5044a5aed8ee3.1375964117.git.viresh.kumar@linaro.org>
+ <5203BCDD.40809@wwwdotorg.org>
+ <CAKohpomr8kwDitAFD7FKvHo3zNWz8qT5bkd3yOVEnC_k16o=Dw@mail.gmail.com>
+ <CAKohpo=Gy7D2LYmdFU1p+eL-nMoPE18YXWvE2M8t-fb-a5HBgg@mail.gmail.com>
+ <5205167F.1070906@wwwdotorg.org>
+ <CAKohponQDAqHiRD7Aw5Wk6fEE-d8H=Svg0oBRyb9SKGdqYxGhw@mail.gmail.com>
+Message-ID: <52056842.8060109@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/13 14:28, Anton Vorontsov wrote:
-> On Tue, Jul 02, 2013 at 02:38:58PM -0600, Loc Ho wrote:
->> + *
->> + * Copyright (c) 2013, Applied Micro Circuits Corporation
->> + * Author: Feng Kan <fkan@apm.com>
->> + * Author: Loc Ho <lho@apm.com>
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation; either version 2 of
->> + * the License, or (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program; if not, write to the Free Software
->> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
->> + * MA 02111-1307 USA
->> + *
->> + * This driver provides system reboot functionality for APM X-Gene SoC.
->> + * For system shutdown, this is board specify. If a board designer
->> + * implements GPIO shutdown, use the gpio-poweroff.c driver.
->> + *
->> + */
->> +#include <linux/io.h>
->> +#include <linux/of_device.h>
->> +#include <linux/of_address.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/stat.h>
->> +#include <linux/slab.h>
->> +#include <asm/system_misc.h>
->> +
->> +struct xgene_reboot_context {
->> +	struct platform_device *pdev;
->> +	void *csr;
+On 08/09/2013 11:09 AM, Viresh Kumar wrote:
+> On 9 August 2013 21:49, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 08/08/2013 10:04 PM, Viresh Kumar wrote:
+>>> On 8 August 2013 21:37, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>>>> Its useless and the correct routine isn't called at all :) .. I will add that
+>>>> additional patch and send it to you and will get this change out of this
+>>>> commit.
+>>>
+>>> The two commits look like this now attached too in case you want
+>>> to test:
+>>
+>> I'd be happy to test, but those changes cause build failures on top of
+>> next-20130809. Which other patches do I need to apply first?
+> 
+> None.. You applied all three attached patches? I have given it a try
+> on my side now and it worked without any issues..
+> 
+> Just pushed out a branch for you as well:
+> 
+> https://git.linaro.org/gitweb?p=people/vireshk/linux.git;a=shortlog;h=refs/heads/tegra-test
 
-__iomem. Please run sparse.
+Well, I don't see any issues running this, although the cpufreq sysfs
+files seem to have disappeared on Tegra, even without your changes, so
+I'm not sure how to really verify cpufreq.
 
->> +	u32 mask;
->> +};
->> +
->> +static struct xgene_reboot_context *xgene_restart_ctx;
->> +
->> +static void xgene_restart(char str, const char *cmd)
->> +{
->> +	struct xgene_reboot_context *ctx = xgene_restart_ctx;
->> +	unsigned long timeout;
->> +
->> +	/* Issue the reboot */
->> +	if (ctx)
->> +		writel(ctx->mask, ctx->csr);
->> +
->> +	timeout = jiffies + HZ;
->> +	while (time_before(jiffies, timeout))
->> +		cpu_relax();
-
-Maybe this should go into the arm64 layer. It doesn't seem that xgene
-specific.
-
->> +
->> +	dev_emerg(&ctx->pdev->dev, "Unable to restart system\n");
-
-If ctx is NULL here this will blow up so why check for ctx before the
-writel?
-
->> +}
->> +
->> +static int xgene_reboot_probe(struct platform_device *pdev)
->> +{
->> +	struct xgene_reboot_context *ctx;
->> +
->> +	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
->> +	if (ctx == NULL) {
-> !ctx is shorter
->
->> +		dev_err(&pdev->dev, "out of memory for context\n");
-
-kmalloc prints an error on failure so this print is unnecessary.
-
->> +		return -ENODEV;
->> +	}
->> +	ctx->csr = of_iomap(pdev->dev.of_node, 0);
-
-You should use platform functions instead of of_*() functions.
-
->> +	if (ctx->csr == NULL) {
->> +		devm_kfree(&pdev->dev, ctx);
-
-This isn't necessary.
-
->> +		dev_err(&pdev->dev, "can not map resource\n");
->> +		return -ENODEV;
->> +	}
->> +	if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
->> +		ctx->mask = 0xFFFFFFFF;
->> +	ctx->pdev = pdev;
->> +	arm_pm_restart = xgene_restart;
->> +	xgene_restart_ctx = ctx;
-
-Although it's unlikely, this exposes a race condition where the
-arm_pm_restart is assigned before ctx and if a restart happens in
-between we won't actually restart. The two should probably be swapped.
-
->> +
->> +	return 0;
->> +}
->> +
->> +static struct of_device_id xgene_reboot_of_match[] = {
-
-const?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Did the sysfs files go away, or do I need to investigate why/when the
+disappeared?
