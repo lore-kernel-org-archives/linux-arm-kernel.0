@@ -1,39 +1,181 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 9 Aug 2013 16:41:57 +0800
-Subject: [alsa-devel] [PATCH 1/3] ASoC: bt-sco: enable OF support
-In-Reply-To: <20130807144628.GC6427@sirena.org.uk>
-References: <1374041536-27643-1-git-send-email-Baohua.Song@csr.com>
- <20130717084039.GA15981@e106331-lin.cambridge.arm.com>
- <20130717094718.GE22506@sirena.org.uk>
- <CAGsJ_4w3fS=vzZmeJOxhKO1TdL9d6pgbrjtzfPugOSOprLV+nw@mail.gmail.com>
- <20130806170430.GL6427@sirena.org.uk>
- <CAGsJ_4xhkdNTKr6KBPMMPVfi7+NP+WHq2+_V545An6J+c6E7ug@mail.gmail.com>
- <20130807144628.GC6427@sirena.org.uk>
-Message-ID: <CAGsJ_4y1JoPtXinAvaohDQF_4+DizNYh1jy+iYymypgeZfapKA@mail.gmail.com>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Fri, 09 Aug 2013 17:51:56 +0900
+Subject: [PATCH v9 04/16] iommu/exynos: allocate lv2 page table from own
+ slab
+In-Reply-To: <2101296.S6JDU5igl3@flatron>
+References: <002801ce941a$fb6369e0$f22a3da0$@samsung.com>
+ <2544843.sndV7usHTj@amdc1227>
+ <20130809145849.790a9800f4f9893b30e54a1c@samsung.com>
+ <2101296.S6JDU5igl3@flatron>
+Message-ID: <20130809175156.c7ffc68b865e4bca48ef47dd@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/8/7 Mark Brown <broonie@kernel.org>:
-> On Wed, Aug 07, 2013 at 03:59:46PM +0800, Barry Song wrote:
->
->> For 1, what kind of codes will have in the codec driver if adding a
->> link to UART in codec dts node? UART is very generic to transfer path.
->> it even doesn't know bluetooth is running on top of it.
->
->> For 2, if the case is that we add codec subnode in UART node,  the
->> UART driver will need to walk child nodes and extend platform device
->> for them, it seems it is not uart driver likes.
->
-> I don't know what 1 and 2 are (they weren't numbered in the mail you're
-> replying to)...  I'd expect that any intelligence would go into
-> frameworks or into the device for the BT so for example if the BT device
-> was hanging off the UART then the kernel would have generic support for
-> parsing the DT and knowing that a fixed device was connected to the UART
-> and be able to handle that - AIUI line disciplines are often used for
-> this stuff.
+On Fri, 09 Aug 2013 09:55:30 +0200, Tomasz Figa wrote:
+> Hi KyongHo,
+> 
+> On Friday 09 of August 2013 14:58:49 Cho KyongHo wrote:
+> > On Thu, 08 Aug 2013 16:00:18 +0200, Tomasz Figa wrote:
+> > > On Thursday 08 of August 2013 18:38:04 Cho KyongHo wrote:
+> > > > Since kmalloc() does not guarantee that the allignment of 1KiB when
+> > > > it
+> > > > allocates 1KiB, it is required to allocate lv2 page table from own
+> > > > slab that guarantees alignment of 1KiB
+> > > > 
+> > > > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> > > > ---
+> > > > 
+> > > >  drivers/iommu/exynos-iommu.c |   24 ++++++++++++++++++++----
+> > > >  1 files changed, 20 insertions(+), 4 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/iommu/exynos-iommu.c
+> > > > b/drivers/iommu/exynos-iommu.c index d90e6fa..a318049 100644
+> > > > --- a/drivers/iommu/exynos-iommu.c
+> > > > +++ b/drivers/iommu/exynos-iommu.c
+> > > > @@ -100,6 +100,8 @@
+> > > > 
+> > > >  #define REG_PB1_SADDR		0x054
+> > > >  #define REG_PB1_EADDR		0x058
+> > > > 
+> > > > +static struct kmem_cache *lv2table_kmem_cache;
+> > > > +
+> > > > 
+> > > >  static unsigned long *section_entry(unsigned long *pgtable,
+> > > >  unsigned
+> > > > 
+> > > > long iova) {
+> > > > 
+> > > >  	return pgtable + lv1ent_offset(iova);
+> > > > 
+> > > > @@ -765,7 +767,8 @@ static void exynos_iommu_domain_destroy(struct
+> > > > iommu_domain *domain)
+> > > > 
+> > > >  	for (i = 0; i < NUM_LV1ENTRIES; i++)
+> > > >  	
+> > > >  		if (lv1ent_page(priv->pgtable + i))
+> > > > 
+> > > > -			kfree(__va(lv2table_base(priv->pgtable + i)));
+> > > > +			kmem_cache_free(lv2table_kmem_cache,
+> > > > +					__va(lv2table_base(priv->pgtable + 
+> i)));
+> > > > 
+> > > >  	free_pages((unsigned long)priv->pgtable, 2);
+> > > >  	free_pages((unsigned long)priv->lv2entcnt, 1);
+> > > > 
+> > > > @@ -861,7 +864,7 @@ static unsigned long *alloc_lv2entry(unsigned
+> > > > long
+> > > > *sent, unsigned long iova, if (lv1ent_fault(sent)) {
+> > > > 
+> > > >  		unsigned long *pent;
+> > > > 
+> > > > -		pent = kzalloc(LV2TABLE_SIZE, GFP_ATOMIC);
+> > > > +		pent = kmem_cache_zalloc(lv2table_kmem_cache, GFP_ATOMIC);
+> > > > 
+> > > >  		BUG_ON((unsigned long)pent & (LV2TABLE_SIZE - 1));
+> > > >  		if (!pent)
+> > > >  		
+> > > >  			return ERR_PTR(-ENOMEM);
+> > > > 
+> > > > @@ -881,7 +884,7 @@ static int lv1set_section(unsigned long *sent,
+> > > > phys_addr_t paddr, short *pgcnt)
+> > > > 
+> > > >  	if (lv1ent_page(sent)) {
+> > > >  	
+> > > >  		BUG_ON(*pgcnt != NUM_LV2ENTRIES);
+> > > > 
+> > > > -		kfree(page_entry(sent, 0));
+> > > > +		kmem_cache_free(lv2table_kmem_cache, page_entry(sent, 0));
+> > > > 
+> > > >  		*pgcnt = 0;
+> > > >  	
+> > > >  	}
+> > > > 
+> > > > @@ -1082,10 +1085,23 @@ static int __init exynos_iommu_init(void)
+> > > > 
+> > > >  {
+> > > >  
+> > > >  	int ret;
+> > > > 
+> > > > +	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
+> > > > +				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
+> > > > +	if (!lv2table_kmem_cache) {
+> > > > +		pr_err("%s: Failed to create kmem cache\n", __func__);
+> > > > +		return -ENOMEM;
+> > > > +	}
+> > > > +
+> > > > 
+> > > >  	ret = platform_driver_register(&exynos_sysmmu_driver);
+> > > >  	
+> > > >  	if (ret == 0)
+> > > > 
+> > > > -		bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
+> > > > +		ret = bus_set_iommu(&platform_bus_type, 
+> &exynos_iommu_ops);
+> > > > +
+> > > > +	if (ret) {
+> > > > +		pr_err("%s: Failed to register exynos-iommu driver.\n",
+> > > > +								__func__);
+> > > > +		kmem_cache_destroy(lv2table_kmem_cache);
+> > > > +	}
+> > > 
+> > > What about making the return value handling here cleaner? For example:
+> > > 	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
+> > > 	
+> > > 				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
+> > > 	
+> > > 	if (!lv2table_kmem_cache) {
+> > > 	
+> > > 		...
+> > > 		return -ENOMEM;
+> > > 	
+> > > 	}
+> > > 	
+> > > 	ret = platform_driver_register(&exynos_sysmmu_driver);
+> > > 	if (ret) {
+> > > 	
+> > > 		...
+> > > 		goto err_destroy_kmem_cache;
+> > > 	
+> > > 	}
+> > > 	
+> > > 	ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
+> > > 	if (ret) {
+> > > 	
+> > > 		...
+> > > 		goto err_platform_unregister;
+> > > 	
+> > > 	}
+> > > 	
+> > > 	return 0;
+> > > 
+> > > err_platform_unregister:
+> > > 	...
+> > > 
+> > > err_destroy_kmem_cache:
+> > > 	...
+> > > 	return ret;
+> > > 
+> > > }
+> > 
+> > Thank you for suggestion.
+> > I think you are worrying about missing the information who makes 'ret'
+> > non-zero.
+> 
+> Oh, this is a valid point, but it was more a nitpick about the coding 
+> style. Single path error handling (with goto) is widely used in the kernel 
+> in cases when more than one thing has to be undone and so I suggested this 
+> method of error handling here as well.
+> 
+> > Ok. I will process it separately.
+> 
+> Since this patch adds most of the error handling to this function, I think 
+> it should be fine to do it as a part of this patch.
+> 
 
-it is fine. but it seems we are not easy to achieve this goal as we
-actually want to do that at uart or tty core instead of specific uart
-driver instance.
+I meant 'separately' that checking all return values each.
+I think it can be simpler without goto.
+There are just 2 cases to rollback previous changes in that function.
 
--barry
+> Best regards,
+> Tomasz
+> 
