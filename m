@@ -1,91 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  9 Aug 2013 09:36:42 +0200
-Subject: [RFC PATCH] ARM: add workaround for ambiguous C99 stdint.h types
-Message-ID: <1376033802-12826-1-git-send-email-ard.biesheuvel@linaro.org>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 09 Aug 2013 09:37:40 +0200
+Subject: [PATCH RESEND] can: mcp251x: Replace power callbacks with
+ regulator API
+In-Reply-To: <1375963227-6468-1-git-send-email-shc_work@mail.ru>
+References: <1375963227-6468-1-git-send-email-shc_work@mail.ru>
+Message-ID: <52049C44.6030902@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
-unambiguous on ARM as you would expect. For the types below, there is a
-difference on ARM between GCC built for bare metal ARM, GCC built for glibc
-and the kernel itself, which results in build errors if you try to build with
--ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
-in order to use NEON intrinsics)
+On 08/08/2013 02:00 PM, Alexander Shiyan wrote:
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/mach-pxa/icontrol.c         |  3 --
+>  arch/arm/mach-pxa/zeus.c             | 46 ++++++++++----------
 
-As the typedefs for these types in 'stdint.h' are based on builtin defines
-supplied by GCC, we can tweak these to align with the kernel's idea of those
-types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
-source file (provided that -ffreestanding is used).
+What's pxa's status of DT conversion? Do you (still) accept patches to
+board files?
 
-                   int32_t         uint32_t               uintptr_t
-bare metal GCC     long            unsigned long          unsigned long
-glibc GCC          int             unsigned int           unsigned int
-kernel             int             unsigned int           unsigned long
+Marc
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-
-Hi all,
-
-This is another, less obtrusive way of handling the problem for which I
-previously sent an RFC patch 'types.h: use GCC supplied typedefs if appropriate'
-In this case, only source files that in fact include stdint.h and are being
-built for ARM should be affected.
-
-Regards,
 -- 
-Ard.
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-
- arch/arm/include/asm/types.h | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 arch/arm/include/asm/types.h
-
-diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
-new file mode 100644
-index 0000000..976ac31
---- /dev/null
-+++ b/arch/arm/include/asm/types.h
-@@ -0,0 +1,40 @@
-+#ifndef _ASM_TYPES_H
-+#define _ASM_TYPES_H
-+
-+#include <asm-generic/int-ll64.h>
-+
-+/*
-+ * The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
-+ * unambiguous on ARM as you would expect. For the types below, there is a
-+ * difference on ARM between GCC built for bare metal ARM, GCC built for glibc
-+ * and the kernel itself, which results in build errors if you try to build with
-+ * -ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
-+ * in order to use NEON intrinsics)
-+ *
-+ * As the typedefs for these types in 'stdint.h' are based on builtin defines
-+ * supplied by GCC, we can tweak these to align with the kernel's idea of those
-+ * types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
-+ * source file (provided that -ffreestanding is used).
-+ * 
-+ *                    int32_t         uint32_t               uintptr_t
-+ * bare metal GCC     long            unsigned long          unsigned long
-+ * glibc GCC          int             unsigned int           unsigned int
-+ * kernel             int             unsigned int           unsigned long
-+ */
-+
-+#ifdef __INT32__TYPE__
-+#undef __INT32__TYPE__
-+#define __INT32__TYPE__		int
-+#endif
-+
-+#ifdef __UINT32__TYPE__
-+#undef __UINT32__TYPE__
-+#define __UINT32__TYPE__	unsigned int
-+#endif
-+
-+#ifdef __UINTPTR_TYPE__
-+#undef __UINTPTR_TYPE__
-+#define __UINTPTR_TYPE__	unsigned long
-+#endif
-+
-+#endif /* _ASM_TYPES_H */
--- 
-1.8.1.2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130809/1e24b0f3/attachment.sig>
