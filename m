@@ -1,150 +1,313 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 09 Aug 2013 10:23:50 +0200
-Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu audio
- subsystem
-In-Reply-To: <20130808132201.2610aef3@armhf>
-References: <20130808132201.2610aef3@armhf>
-Message-ID: <5204A716.6070507@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 09 Aug 2013 10:32:40 +0200
+Subject: [PATCH v9 14/16] iommu/exynos: add support for power management
+ subsystems.
+In-Reply-To: <20130809164943.fe4b673e92b3f7680562f29b@samsung.com>
+References: <003201ce941b$6e5a90e0$4b0fb2a0$@samsung.com>
+ <1949492.N82v2nAcIY@flatron>
+ <20130809164943.fe4b673e92b3f7680562f29b@samsung.com>
+Message-ID: <3833452.V3JQdooaWE@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 01:22 PM, Jean-Francois Moine wrote:
-> This patch adds DT support to the audio subsystem of the mvebu family
-> (Kirkwood, Dove, Armada 370).
->
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
->   .../devicetree/bindings/sound/mvebu-audio.txt      | 29 ++++++++++++++++++++++
->   sound/soc/kirkwood/kirkwood-i2s.c                  | 26 +++++++++++++++++-----
->   2 files changed, 49 insertions(+), 6 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/sound/mvebu-audio.txt b/Documentation/devicetree/bindings/sound/mvebu-audio.txt
-> new file mode 100644
-> index 0000000..7e5fd37
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/mvebu-audio.txt
-> @@ -0,0 +1,29 @@
-> +* mvebu (Kirkwood, Dove, Armada 370) audio controller
-> +
-> +Required properties:
-> +
-> +- compatible: "mrvl,mvebu-audio"
+On Friday 09 of August 2013 16:49:43 Cho KyongHo wrote:
+> On Fri, 09 Aug 2013 01:03:05 +0200, Tomasz Figa wrote:
+> > Hi KyongHo,
+> > 
+> > nit: Please drop the trailing dot at the end of patch subject.
+> 
+> Oh. I didn't catch that.
+> Thank you.
+> 
+> > On Thursday 08 of August 2013 18:41:17 Cho KyongHo wrote:
+> > > This adds support for Advance Power Management and Runtime Power
+> > > Management.
+> > 
+> > This patch adds support for system-wide and runtime power management.
+> 
+> Ok.
+> 
+> > > Since System MMU is located in the same local power domain of its
+> > > master H/W, System MMU must be initialized before it is working if
+> > > its power domain was ever turned off. TLB invalidation according to
+> > > unmapping on page tables must also be performed while power domain
+> > > is
+> > > turned on.
+> > > 
+> > > This patch ensures that resume and runtime_resume(restore_state)
+> > > functions in this driver is called before the calls to resume and
+> > > runtime_resume callback functions in the drivers of master H/Ws.
+> > > Likewise, suspend and runtime_suspend(save_state) functions in this
+> > > driver is called after the calls to suspend and runtime_suspend in
+> > > the
+> > > drivers of master H/Ws.
+> > > 
+> > > In order to get benefit of this support, the master H/W and its
+> > > System
+> > > MMU must resides in the same power domain in terms of Linux kernel.
+> > > If
+> > > a master H/W does not use generic I/O power domain, its driver must
+> > > call iommu_attach_device() after its local power domain is turned
+> > > on,
+> > > iommu_detach_device before turned off.
+> > 
+> > I don't get the point of this last paragraph. What a power domain can
+> > be in other terms? Is there any other way to support power domains on
+> > Exynos than generic power domains?
+> 
+> I just addressed the case a device driver turns off local power of its
+> device without the help of generic I/O powerdomain.
 
-Jean-Francois,
+Out of curiosity, do we have such cases for Exynos in mainline kernel? 
+IMHO this is what the generic PM core is for and drivers shouldn't care 
+about such low level PM details.
 
-we need at least two more compatibles for the audio controller found on
-Dove and Kirkwood respectively. This is how we are going to distinguish
-those two, e.g. Kirkwood has SPDIF in which Dove hasn't.
+> > > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> > > ---
+> > > 
+> > >  drivers/iommu/exynos-iommu.c |  235
+> > > 
+> > > +++++++++++++++++++++++++++++++++++++++++- 1 files changed, 231
+> > > insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/drivers/iommu/exynos-iommu.c
+> > > b/drivers/iommu/exynos-iommu.c index 9e64483..56aead9 100644
+> > > --- a/drivers/iommu/exynos-iommu.c
+> > > +++ b/drivers/iommu/exynos-iommu.c
+> > > @@ -28,6 +28,7 @@
+> > > 
+> > >  #include <linux/export.h>
+> > >  #include <linux/of.h>
+> > >  #include <linux/of_platform.h>
+> > > 
+> > > +#include <linux/pm_domain.h>
+> > > 
+> > >  #include <linux/notifier.h>
+> > >  
+> > >  #include <asm/cacheflush.h>
+> > > 
+> > > @@ -186,6 +187,7 @@ struct sysmmu_drvdata {
+> > > 
+> > >  	int activations;
+> > >  	rwlock_t lock;
+> > >  	struct iommu_domain *domain;
+> > > 
+> > > +	bool runtime_active;
+> > > 
+> > >  	unsigned long pgtable;
+> > >  	void __iomem *sfrbases[0];
+> > >  
+> > >  };
+> > > 
+> > > @@ -438,7 +440,8 @@ static bool __sysmmu_disable(struct
+> > > sysmmu_drvdata
+> > > *data) data->pgtable = 0;
+> > > 
+> > >  		data->domain = NULL;
+> > > 
+> > > -		__sysmmu_disable_nocount(data);
+> > > +		if (data->runtime_active)
+> > > +			__sysmmu_disable_nocount(data);
+> > > 
+> > >  		dev_dbg(data->sysmmu, "Disabled\n");
+> > >  	
+> > >  	} else  {
+> > > 
+> > > @@ -505,7 +508,8 @@ static int __sysmmu_enable(struct sysmmu_drvdata
+> > > *data, data->pgtable = pgtable;
+> > > 
+> > >  		data->domain = domain;
+> > > 
+> > > -		__sysmmu_enable_nocount(data);
+> > > +		if (data->runtime_active)
+> > > +			__sysmmu_enable_nocount(data);
+> > > 
+> > >  		dev_dbg(data->sysmmu, "Enabled\n");
+> > >  	
+> > >  	} else {
+> > > 
+> > > @@ -609,7 +613,7 @@ static void sysmmu_tlb_invalidate_entry(struct
+> > > device *dev, unsigned long iova) data =
+> > > dev_get_drvdata(client->sysmmu[i]);
+> > > 
+> > >  		read_lock_irqsave(&data->lock, flags);
+> > > 
+> > > -		if (is_sysmmu_active(data)) {
+> > > +		if (is_sysmmu_active(data) && data->runtime_active) {
+> > > 
+> > >  			int i;
+> > >  			clk_enable(data->clk_master);
+> > >  			for (i = 0; i < data->nsfrs; i++)
+> > > 
+> > > @@ -637,7 +641,8 @@ void exynos_sysmmu_tlb_invalidate(struct device
+> > > *dev) data = dev_get_drvdata(client->sysmmu[i]);
+> > > 
+> > >  		read_lock_irqsave(&data->lock, flags);
+> > > 
+> > > -		if (is_sysmmu_active(data)) {
+> > > +		if (is_sysmmu_active(data) &&
+> > > +				data->runtime_active) {
+> > 
+> > nit: The whole if condition fits into single line.
+> 
+> Ok.
+> 
+> > >  			int i;
+> > >  			for (i = 0; i < data->nsfrs; i++) {
+> > >  			
+> > >  				clk_enable(data->clk_master);
+> > > 
+> > > @@ -711,6 +716,8 @@ static int __init exynos_sysmmu_probe(struct
+> > > platform_device *pdev) }
+> > > 
+> > >  	}
+> > > 
+> > > +	pm_runtime_enable(dev);
+> > > +
+> > > 
+> > >  	data->sysmmu = dev;
+> > >  	
+> > >  	data->clk = devm_clk_get(dev, "sysmmu");
+> > > 
+> > > @@ -736,6 +743,8 @@ static int __init exynos_sysmmu_probe(struct
+> > > platform_device *pdev) return ret;
+> > > 
+> > >  	}
+> > > 
+> > > +	data->runtime_active = !pm_runtime_enabled(dev);
+> > > +
+> > > 
+> > >  	rwlock_init(&data->lock);
+> > >  	
+> > >  	platform_set_drvdata(pdev, data);
+> > > 
+> > > @@ -744,6 +753,34 @@ static int __init exynos_sysmmu_probe(struct
+> > > platform_device *pdev) return ret;
+> > > 
+> > >  }
+> > > 
+> > > +#ifdef CONFIG_PM_SLEEP
+> > > +static int sysmmu_suspend(struct device *dev)
+> > > +{
+> > > +	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
+> > > +	unsigned long flags;
+> > > +	read_lock_irqsave(&data->lock, flags);
+> > > +	if (is_sysmmu_active(data) &&
+> > > +		(!pm_runtime_enabled(dev) || data->runtime_active))
+> > > +		__sysmmu_disable_nocount(data);
+> > > +	read_unlock_irqrestore(&data->lock, flags);
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +static int sysmmu_resume(struct device *dev)
+> > > +{
+> > > +	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
+> > > +	unsigned long flags;
+> > > +	read_lock_irqsave(&data->lock, flags);
+> > > +	if (is_sysmmu_active(data) &&
+> > > +		(!pm_runtime_enabled(dev) || data->runtime_active))
+> > > +		__sysmmu_enable_nocount(data);
+> > > +	read_unlock_irqrestore(&data->lock, flags);
+> > > +	return 0;
+> > > +}
+> > > +#endif
+> > > +
+> > > +static SIMPLE_DEV_PM_OPS(sysmmu_pm_ops, sysmmu_suspend,
+> > > sysmmu_resume); +
+> > > 
+> > >  #ifdef CONFIG_OF
+> > >  static struct of_device_id sysmmu_of_match[] __initconst = {
+> > >  
+> > >  	{ .compatible	= "samsung,exynos4210-sysmmu", },
+> > > 
+> > > @@ -756,6 +793,7 @@ static struct platform_driver
+> > > exynos_sysmmu_driver
+> > > __refdata = { .driver	= {
+> > > 
+> > >  		.owner		= THIS_MODULE,
+> > >  		.name		= "exynos-sysmmu",
+> > > 
+> > > +		.pm		= &sysmmu_pm_ops,
+> > > 
+> > >  		.of_match_table	= of_match_ptr(sysmmu_of_match),
+> > >  	
+> > >  	}
+> > >  
+> > >  };
+> > > 
+> > > @@ -1141,6 +1179,163 @@ static int __init exynos_iommu_init(void)
+> > > 
+> > >  }
+> > >  subsys_initcall(exynos_iommu_init);
+> > > 
+> > > +#ifdef CONFIG_PM_SLEEP
+> > > +static int sysmmu_pm_genpd_suspend(struct device *dev)
+> > > +{
+> > > +	struct exynos_iommu_client *client = dev->archdata.iommu;
+> > > +	int ret = 0;
+> > > +	int i;
+> > > +
+> > > +	for (i = 0; i < client->num_sysmmu; i++) {
+> > > +		ret = pm_generic_suspend(client->sysmmu[i]);
+> > > +		if (ret)
+> > > +			break;
+> > > +	}
+> > > +
+> > > +	if (!ret)
+> > > +		ret = pm_generic_suspend(dev);
+> > > +
+> > > +	if (ret) {
+> > > +		int j;
+> > > +
+> > > +		for (j = 0; j < i; j++)
+> > > +			pm_generic_resume(client->sysmmu[j]);
+> > > +	}
+> > > +
+> > > +	return ret;
+> > > +}
+> > > +
+> > > +static int sysmmu_pm_genpd_resume(struct device *dev)
+> > > +{
+> > > +	struct exynos_iommu_client *client = dev->archdata.iommu;
+> > > +	int ret = 0;
+> > > +	int i;
+> > > +
+> > > +	for (i = 0; i < client->num_sysmmu; i++) {
+> > > +		ret = pm_generic_resume(client->sysmmu[i]);
+> > > +		if (ret)
+> > > +			break;
+> > 
+> > Error handling here can be cleaned up a lot.
+> > 
+> > s/break/goto err_suspend/
+> > 
+> > > +	}
+> > > +
+> > > +	if (!ret)
+> > 
+> > Now you can drop this check.
+> > 
+> > > +		ret = pm_generic_resume(dev);
+> > 	
+> > 	ret = pm_generic_resume(dev);
+> > 	if (ret)
+> > 	
+> > 		goto err_suspend;
+> > 	
+> > 	return 0;
+> > 	
+> > > +
+> > 
+> > err_suspend:
+> > > +	if (ret) {
+> > 
+> > This check can be dropped here as well now.
+> 
+> Ok.
+> 
+> Let me think about it :)
 
-Also, we have used "marvell" as prefix for a long time. I know there has
-been discussion about the stock ticker appreviation, has there been any
-decision on that already?
+Thanks.
 
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +
-> +- interrupts: list of two irq numbers.
-> +  The first irq is used for data flow and the second one is used for errors.
-> +
-> +- clocks: one or two phandles.
-> +  The first one is mandatory and defines the internal clock.
-> +  The second one is optional and defines an external clock.
-> +
-> +- clock-names: names associated to the clocks:
-> +	"internal" for the internal clock
-
-s/internal/dcoclk/
-
-> +	"extclk" for the external clock
-> +
-> +Example:
-> +
-> +i2s1: audio-controller at b4000 {
-> +	compatible = "mrvl,mvebu-audio";
-> +	reg = <0xb4000 0x2210>;
-> +	interrupts = <21>, <22>;
-> +	clocks = <&gate_clk 13>;
-> +	clock-names = "internal";
-> +};
-
-Also we will need some phandle reference to the audio codec here. As
-this property is ongoing work in ASoC core, I suggest we wait for it
-and propose a binding afterwards.
-
-Sebastian
-
-> diff --git a/sound/soc/kirkwood/kirkwood-i2s.c.next b/sound/soc/kirkwood/kirkwood-i2s.c
-> index e5f3f7a..a4170b4 100644
-> --- a/sound/soc/kirkwood/kirkwood-i2s.c.next
-> +++ b/sound/soc/kirkwood/kirkwood-i2s.c
-> @@ -22,6 +22,8 @@
->   #include <sound/pcm_params.h>
->   #include <sound/soc.h>
->   #include <linux/platform_data/asoc-kirkwood.h>
-> +#include <linux/of.h>
-> +
->   #include "kirkwood.h"
->
->   #define DRV_NAME	"mvebu-audio"
-> @@ -453,6 +455,7 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
->   	struct snd_soc_dai_driver *soc_dai = &kirkwood_i2s_dai;
->   	struct kirkwood_dma_data *priv;
->   	struct resource *mem;
-> +	struct device_node *np = pdev->dev.of_node;
->   	int err;
->
->   	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> @@ -473,14 +476,16 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
->   		return -ENXIO;
->   	}
->
-> -	if (!data) {
-> -		dev_err(&pdev->dev, "no platform data ?!\n");
-> +	if (np) {
-> +		priv->burst = 128;		/* might be 32 or 128 */
-> +	} else if (data) {
-> +		priv->burst = data->burst;
-> +	} else {
-> +		dev_err(&pdev->dev, "no DT nor platform data ?!\n");
->   		return -EINVAL;
->   	}
->
-> -	priv->burst = data->burst;
-> -
-> -	priv->clk = devm_clk_get(&pdev->dev, NULL);
-> +	priv->clk = devm_clk_get(&pdev->dev, np ? "internal" : NULL);
->   	if (IS_ERR(priv->clk)) {
->   		dev_err(&pdev->dev, "no clock\n");
->   		return PTR_ERR(priv->clk);
-> @@ -507,7 +512,7 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
->   	priv->ctl_rec = KIRKWOOD_RECCTL_SIZE_24;
->
->   	/* Select the burst size */
-> -	if (data->burst == 32) {
-> +	if (priv->burst == 32) {
->   		priv->ctl_play |= KIRKWOOD_PLAYCTL_BURST_32;
->   		priv->ctl_rec |= KIRKWOOD_RECCTL_BURST_32;
->   	} else {
-> @@ -552,12 +557,21 @@ static int kirkwood_i2s_dev_remove(struct platform_device *pdev)
->   	return 0;
->   }
->
-> +#ifdef CONFIG_OF
-> +static struct of_device_id kirkwood_i2s_of_match[] = {
-> +	{ .compatible = "mrvl,mvebu-audio" },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, kirkwood_i2s_of_match);
-> +#endif
-> +
->   static struct platform_driver kirkwood_i2s_driver = {
->   	.probe  = kirkwood_i2s_dev_probe,
->   	.remove = kirkwood_i2s_dev_remove,
->   	.driver = {
->   		.name = DRV_NAME,
->   		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(kirkwood_i2s_of_match),
->   	},
->   };
->
->
+Best regards,
+Tomasz
