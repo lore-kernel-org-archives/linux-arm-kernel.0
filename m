@@ -1,55 +1,48 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 9 Aug 2013 15:55:15 -0500
-Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
- module registers and APIs
-In-Reply-To: <20130809051146.GB7656@atomide.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
- <5203A0BC.8060205@ti.com> <5203C457.80301@ti.com>
- <20130809051146.GB7656@atomide.com>
-Message-ID: <52055733.70808@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 09 Aug 2013 15:00:23 -0600
+Subject: [PATCHv2] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <1376003457.22740.25.camel@linux-builds1>
+References: <1375735392-6836-1-git-send-email-dinguyen@altera.com>
+ <5203FC1A.3090903@wwwdotorg.org> <1375993920.22740.9.camel@linux-builds1>
+ <5204017A.1040607@wwwdotorg.org> <1375995281.22740.16.camel@linux-builds1>
+ <520409F2.1090906@wwwdotorg.org> <1376003457.22740.25.camel@linux-builds1>
+Message-ID: <52055867.9000602@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/2013 12:11 AM, Tony Lindgren wrote:
-> * Dave Gerlach <d-gerlach@ti.com> [130808 09:23]:
->> On 08/08/2013 08:44 AM, Santosh Shilimkar wrote:
->>> Lets address the above better. I don't see a need of 8 functions
->>> exported doing one or 2 register writes.
->>>
->>> Look M3 based handling is going to be there on future SOCs
->>> as well and this kind of handling of IPC is very short cited.
->>>
+On 08/08/2013 05:10 PM, Dinh Nguyen wrote:
+> On Thu, 2013-08-08 at 15:13 -0600, Stephen Warren wrote:
+...
+>> Why is there a need to directly represent the divider anywhere? The
+>> driver can find the rate of the input clock, and I assume it knows what
+>> rate it wants the clock to run at, so can't it calculate the divider
+>> based on those two pieces of information?
+> 
+> CC: Chris Ball
 >>
->> The idea here was to move all control module register accesses into
->> one file in planning of implementing a driver for the control module
->> itself in the future.
+>> Or, does the driver really not know what rate it wants the clock to be
+>> after the internal divider? If not, then I think that *rate* should be
+>> recorded in DT, not the divider to obtain that rate.
 >>
->>> Probably we should have a separate driver for M3 in linux which
->>> can have all this local code instead of all these exports.
->>
->> The wkup_m3 code has been moved to a small driver found in patch 8
->> of this series, would it better to move this code there rather than
->> with the rest of the control module code?
->
-> Please make everything you can into regular device drivers.
->
-> We still have some dependencies to mach-omap2 code for PRCM
-> for example, but we're trying to get all that to live in
-> drivers.
->
-> So for new pieces, let's not add further dependencies to
-> complicate moving things to drivers.
->
-> Regards,
->
-> Tony
->
+> 
+> I believe that this is the case, that the driver does not know what rate
+> it will clock the SD card at. I think internally we did have a "bus_hz"
+> in DT a while back. I guess I don't really understand why it would be
+> better to have a *rate* DT entry instead of a fixed-divider entry?
 
-Ok I will go ahead and pull the control module code that handles IPC 
-into the wkup_m3 driver. The wkup_m3.c file is still present in 
-mach-omap2 as the right location for it wasn't decided in the last RFC. 
-Any thoughts on a good location for it?
+The value of the divider depends on two things:
 
-Regards,
-Dave
+1) Input clock rate.
+2) Desired rate after applying the internal divider.
+
+The input clock rate may vary, either between SoCs the IP is integrated
+into, or even at run-time perhaps base on clk_set_rate() etc.
+
+If the MMC driver knows the clock rate it wants to run at, it can
+calculate the divider easily; it can automatically adjust to any input
+clock that its environment may provide.
+
+If the MMC driver is simply told "use this divider", that's encoding
+assumptions about the rate of the input clock which might not be valid;.
+Encoding the desire clock rate within the MMC HW block allows the
+divider to be calculated based on the actual environment.
