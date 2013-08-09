@@ -1,112 +1,56 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 9 Aug 2013 20:16:41 +0200
-Subject: [PATCH 3/7] pinctrl: imx1 core driver
-In-Reply-To: <20130805092952.GO26614@pengutronix.de>
-References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
- <1375439907-10462-4-git-send-email-mpa@pengutronix.de>
- <20130805092952.GO26614@pengutronix.de>
-Message-ID: <20130809181641.GI13664@s25.your-server.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Aug 2013 19:25:16 +0100
+Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu
+ audio subsystem
+In-Reply-To: <20130809180058.GM6427@sirena.org.uk>
+References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
+ <20130809091953.GO6427@sirena.org.uk> <5204B7A6.9050907@gmail.com>
+ <20130809094340.GO23006@n2100.arm.linux.org.uk> <5204CC04.4000401@gmail.com>
+ <20130809113940.GY6427@sirena.org.uk>
+ <20130809130932.GS23006@n2100.arm.linux.org.uk>
+ <20130809180058.GM6427@sirena.org.uk>
+Message-ID: <20130809182516.GT23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 11:29:52AM +0200, Sascha Hauer wrote:
-> On Fri, Aug 02, 2013 at 12:38:23PM +0200, Markus Pargmann wrote:
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  drivers/pinctrl/Kconfig             |   5 +
-> >  drivers/pinctrl/Makefile            |   1 +
-> >  drivers/pinctrl/pinctrl-imx1-core.c | 667 ++++++++++++++++++++++++++++++++++++
-> >  drivers/pinctrl/pinctrl-imx1.h      |  23 ++
-> >  4 files changed, 696 insertions(+)
-> >  create mode 100644 drivers/pinctrl/pinctrl-imx1-core.c
-> >  create mode 100644 drivers/pinctrl/pinctrl-imx1.h
-> > 
-> > +static int imx1_pinctrl_parse_groups(struct device_node *np,
-> > +				    struct imx_pin_group *grp,
-> > +				    struct imx_pinctrl_soc_info *info,
-> > +				    u32 index)
-> > +{
-> > +	int size;
-> > +	const __be32 *list;
-> > +	int i;
-> > +	u32 config;
-> > +
-> > +	dev_dbg(info->dev, "group(%d): %s\n", index, np->name);
-> > +
-> > +	/* Initialise group */
-> > +	grp->name = np->name;
-> > +
-> > +	/*
-> > +	 * the binding format is fsl,pins = <PIN_FUNC_ID CONFIG ...>,
-> > +	 * do sanity check and calculate pins number
-> > +	 */
-> > +	list = of_get_property(np, "fsl,pins", &size);
-> > +	/* we do not check return since it's safe node passed down */
-> > +	if (!size || size % 12) {
-> > +		dev_notice(info->dev, "Not a valid fsl,pins property (%s)\n",
-> > +				np->name);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	grp->npins = size / 12;
-> > +	grp->pins = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
-> > +				GFP_KERNEL);
-> > +	grp->mux_mode = devm_kzalloc(info->dev,
-> > +				grp->npins * sizeof(unsigned int), GFP_KERNEL);
-> > +	grp->configs = devm_kzalloc(info->dev,
-> > +				grp->npins * sizeof(unsigned long), GFP_KERNEL);
+On Fri, Aug 09, 2013 at 07:00:58PM +0100, Mark Brown wrote:
+> On Fri, Aug 09, 2013 at 02:09:32PM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Aug 09, 2013 at 12:39:40PM +0100, Mark Brown wrote:
 > 
-> I know this is copied from the existing imx pinctrl driver, but normally
-> we check for allocation failures.
-
-Yes, I added allocation checks.
-
+> > > So extend Morimoto-san's work on the simple card for this - that's what
+> > > it's there for, it's doing exactly this job for non-DT systems but it
+> > > just didn't get DT support added yet.  All the trivial cards should end
+> > > up using this.
 > 
-> Also I find it very irritating that you allocate three arrays of
-> integers instead of a single array of a struct type. I know the pinctrl
-> framework forces you to pass an array of pin numbers (which is quite
-> horrible for drivers to handle, who came up with the idea that a pin is
-> a number instead of some struct pointer which can be attached data to?)
-
-Fixed, using new imx1_pin structs now.
-
+> > It's quite rediculous to request that the simple card stuff is expanded at
+> > this time, when you're also telling us that we must use DPCM for Kirkwood,
 > 
-> > +	for (i = 0; i < grp->npins; i++) {
-> > +		grp->pins[i] = be32_to_cpu(*list++);
-> > +		grp->mux_mode[i] = be32_to_cpu(*list++);
-> > +
-> > +		config = be32_to_cpu(*list++);
-> > +		grp->configs[i] = config;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> 
-> [...]
-> 
-> > +
-> > +	for_each_child_of_node(np, child) {
-> > +		func->groups[i] = child->name;
-> > +		grp = &info->groups[grp_index++];
-> > +		ret = imx1_pinctrl_parse_groups(child, grp, info, i++);
-> > +		if (ret)
-> > +			return ret;
-> 
-> This is one thing which nags me in the imx pinctrl driver aswell. Once
-> you made a single mistake in a single pinctrl group in the devicetree
-> you will never see the error message because the whole pinctrl driver
-> bails out leaving the serial driver with the console unusable. Wouldn't
-> it be possible to continue here instead of bailing out?
+> That's the place to put the sort of shared infrastructure for trivial
+> cards that Sebastian said he wanted to see - if you guys are saying that
+> the machines should all be able to use a trivial binding with shared
+> code that's where that code should be.
 
-Yes, it is possible. I changed it to continue if ret != -ENOMEM.
+Sigh, you completely miss the point.
 
-Thanks,
+What all three of us are ultimately after is a DT description for the
+kirkwood stuff which covers all its use cases.  The use case which all
+three of us have in common is the Cubox, which is the one which needs
+the spdif stuff to work.
 
-Markus
+Now, what you've said to date is:
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1. you want kirkwood to use DPCM.
+2. you want kirkwood using people to use the simple card stuff with the
+   kirkwood driver you want to use DPCM.
+
+To make it work with DPCM, we first need to know what DPCM requires,
+which means we either have to have the knowledge of DPCM and/or have a
+working implementation.  We don't have either of those yet.
+
+So, I again state plainly that what you're asking is for people to come
+up with a DT description for a DPCM implementation when we haven't yet
+got a working DPCM implementation, even without DT.
+
+It is this which I assert is a completely rediculous request at this
+moment in time for the reasons stated in my previous email and repeated
+in this email.
