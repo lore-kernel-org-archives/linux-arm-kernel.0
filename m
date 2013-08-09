@@ -1,56 +1,106 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Fri, 09 Aug 2013 13:02:10 +0900
-Subject: [PATCH v9 02/16] iommu/exynos: add missing cache flush for removed
- page table entries
-In-Reply-To: <1726114.ptuhYydfjT@amdc1227>
-References: <002601ce941a$e987ba50$bc972ef0$@samsung.com>
- <1726114.ptuhYydfjT@amdc1227>
-Message-ID: <20130809130210.e234ea77131fe15ab3f8abb1@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 9 Aug 2013 09:34:47 +0530
+Subject: [PATCH 35/35] cpufreq: tegra: use
+ cpufreq_table_validate_and_show()
+In-Reply-To: <CAKohpomr8kwDitAFD7FKvHo3zNWz8qT5bkd3yOVEnC_k16o=Dw@mail.gmail.com>
+References: <cover.1375964117.git.viresh.kumar@linaro.org>
+ <568f3dbd414b050bb2319d960fb5044a5aed8ee3.1375964117.git.viresh.kumar@linaro.org>
+ <5203BCDD.40809@wwwdotorg.org>
+ <CAKohpomr8kwDitAFD7FKvHo3zNWz8qT5bkd3yOVEnC_k16o=Dw@mail.gmail.com>
+Message-ID: <CAKohpo=Gy7D2LYmdFU1p+eL-nMoPE18YXWvE2M8t-fb-a5HBgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 08 Aug 2013 15:44:09 +0200, Tomasz Figa wrote:
-> On Thursday 08 of August 2013 18:37:34 Cho KyongHo wrote:
-> > This commit adds cache flush for removed small and large page entries
-> > in exynos_iommu_unmap(). Missing cache flush of removed page table
-> > entries can cause missing page fault interrupt when a master IP
-> > accesses an unmapped area.
-> > 
-> > Tested-by: Grant Grundler <grundler@chromium.org>
-> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> > ---
-> >  drivers/iommu/exynos-iommu.c |    2 ++
-> >  1 files changed, 2 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> > index 233f382..d545a25 100644
-> > --- a/drivers/iommu/exynos-iommu.c
-> > +++ b/drivers/iommu/exynos-iommu.c
-> > @@ -1002,6 +1002,7 @@ static size_t exynos_iommu_unmap(struct
-> > iommu_domain *domain, if (lv2ent_small(ent)) {
-> >  		*ent = 0;
-> >  		size = SPAGE_SIZE;
-> > +		pgtable_flush(ent, ent + 1);
-> >  		priv->lv2entcnt[lv1ent_offset(iova)] += 1;
-> >  		goto done;
-> >  	}
-> > @@ -1010,6 +1011,7 @@ static size_t exynos_iommu_unmap(struct
-> > iommu_domain *domain, BUG_ON(size < LPAGE_SIZE);
-> > 
-> >  	memset(ent, 0, sizeof(*ent) * SPAGES_PER_LPAGE);
-> > +	pgtable_flush(ent, ent + SPAGES_PER_LPAGE);
-> > 
-> >  	size = LPAGE_SIZE;
-> >  	priv->lv2entcnt[lv1ent_offset(iova)] += SPAGES_PER_LPAGE;
-> 
-> Looks reasonable.
-> 
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> 
+On 8 August 2013 21:37, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> Its useless and the correct routine isn't called at all :) .. I will add that
+> additional patch and send it to you and will get this change out of this
+> commit.
 
-Thanks.
+The two commits look like this now attached too in case you want
+to test:
 
-KyongHo.
-> Best regards,
-> Tomasz
-> 
+commit 9abdc9127b9f7f1e00c75694d15345843a60ff99
+Author: Viresh Kumar <viresh.kumar@linaro.org>
+Date:   Thu Aug 8 16:40:32 2013 +0530
+
+    cpufreq: tegra: use cpufreq_table_validate_and_show()
+
+    Lets use cpufreq_table_validate_and_show() instead of calling
+    cpufreq_frequency_table_cpuinfo() and cpufreq_frequency_table_get_attr().
+
+    Cc: Stephen Warren <swarren@nvidia.com>
+    Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/cpufreq/tegra-cpufreq.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
+index cd66b85..51752b3 100644
+--- a/drivers/cpufreq/tegra-cpufreq.c
++++ b/drivers/cpufreq/tegra-cpufreq.c
+@@ -215,8 +215,7 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
+        clk_prepare_enable(emc_clk);
+        clk_prepare_enable(cpu_clk);
+
+-       cpufreq_frequency_table_cpuinfo(policy, freq_table);
+-       cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
++       cpufreq_table_validate_and_show(policy, freq_table);
+        policy->cur = tegra_getspeed(policy->cpu);
+        target_cpu_speed[policy->cpu] = policy->cur;
+
+
+commit f1bb1cab6130501251eee616280b88c0b49d96d7
+Author: Viresh Kumar <viresh.kumar@linaro.org>
+Date:   Fri Aug 9 09:29:19 2013 +0530
+
+    cpufreq: tegra: fix implementation of ->exit()
+
+    ->exit() of drivers should call cpufreq_frequency_table_put_attr()
+if they have
+    called cpufreq_frequency_table_get_attr() earlier in init() and they aren't
+    required to validate their cpufreq table in exit by calling
+    cpufreq_frequency_table_cpuinfo(). Tegra's driver wasn't calling
+    cpufreq_frequency_table_put_attr() and was calling
+    cpufreq_frequency_table_cpuinfo() in exit.
+
+    Fix both these issues in it.
+
+    Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/cpufreq/tegra-cpufreq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
+index 51752b3..faf1ce5 100644
+--- a/drivers/cpufreq/tegra-cpufreq.c
++++ b/drivers/cpufreq/tegra-cpufreq.c
+@@ -232,7 +232,7 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
+
+ static int tegra_cpu_exit(struct cpufreq_policy *policy)
+ {
+-       cpufreq_frequency_table_cpuinfo(policy, freq_table);
++       cpufreq_frequency_table_put_attr(policy->cpu);
+        clk_disable_unprepare(emc_clk);
+        return 0;
+ }
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-cpufreq-Add-new-helper-cpufreq_table_validate_and_sh.patch
+Type: application/octet-stream
+Size: 2428 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130809/b0a4ba28/attachment.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0035-cpufreq-tegra-use-cpufreq_table_validate_and_show.patch
+Type: application/octet-stream
+Size: 1458 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130809/b0a4ba28/attachment-0001.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0036-cpufreq-tegra-fix-implementation-of-exit.patch
+Type: application/octet-stream
+Size: 1565 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130809/b0a4ba28/attachment-0002.obj>
