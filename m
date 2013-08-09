@@ -1,35 +1,28 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 9 Aug 2013 07:42:51 -0400
-Subject: [PATCHv8 04/10] of: pci: add registry of MSI chips
-In-Reply-To: <1376027346.32100.8.camel@pasglop>
-References: <1376000268-18397-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1376000268-18397-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <1376027346.32100.8.camel@pasglop>
-Message-ID: <20130809114251.GQ8204@titan.lakedaemon.net>
+From: muelli@cryptobitch.de (Tobias Mueller)
+Date: Fri,  9 Aug 2013 13:39:21 +0200
+Subject: [PATCH] arm: Fix is_gate_vma to have a == instead of a single =
+Message-ID: <1376048361-25836-1-git-send-email-muelli@cryptobitch.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+A typo was introduced when merging the "security-fixes" branch which made the
+comparison an assignment.
+---
+ arch/arm/kernel/process.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-On Fri, Aug 09, 2013 at 03:49:06PM +1000, Benjamin Herrenschmidt wrote:
-> On Fri, 2013-08-09 at 00:17 +0200, Thomas Petazzoni wrote:
-> > 
-> > +#if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-> > +int of_pci_msi_chip_add(struct msi_chip *chip);
-> > +void of_pci_msi_chip_remove(struct msi_chip *chip);
-> > +struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node
-> > *of_node);
-> > +#else
-> > +static inline int of_pci_msi_chip_add(struct msi_chip *chip) { return
-> > -EINVAL; }
-> > +static inline void of_pci_msi_chip_remove(struct msi_chip *chip) { }
-> 
-> Missing a ; at the end of the above line... breaks the build of
-> CONFIG_PCI_MSI is not set.
-
-If this is the same error Randy reported yesterday from -next, I'll just
-fix it up when I pull it in.
-
-thx,
-
-Jason.
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 536c85f..94f6b05 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -462,7 +462,7 @@ int in_gate_area_no_mm(unsigned long addr)
+ {
+ 	return in_gate_area(NULL, addr);
+ }
+-#define is_gate_vma(vma)	((vma) = &gate_vma)
++#define is_gate_vma(vma)	((vma) == &gate_vma)
+ #else
+ #define is_gate_vma(vma)	0
+ #endif
+-- 
+1.7.8.6
