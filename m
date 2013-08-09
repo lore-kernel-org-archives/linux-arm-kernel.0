@@ -1,46 +1,44 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 9 Aug 2013 16:05:42 +0800
-Subject: [PATCH 1/1] ARM: dtsi: imx6qdl-sabresd: Add USB host 1 VBUS
- regulator
-In-Reply-To: <CAOMZO5AXprz7MsxmyWB_nH8pc0GX3sbcZUtDqEVkf0W9myBbxA@mail.gmail.com>
-References: <1376007824-16325-1-git-send-email-peter.chen@freescale.com>
- <CAOMZO5AXprz7MsxmyWB_nH8pc0GX3sbcZUtDqEVkf0W9myBbxA@mail.gmail.com>
-Message-ID: <20130809080540.GA23876@shlinux1.ap.freescale.net>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 09 Aug 2013 12:05:58 +0200
+Subject: [alsa-devel] [PATCH v4 1/1] ASoc: kirkwood: add DT support to
+ the mvebu audio subsystem
+In-Reply-To: <5204B7A6.9050907@gmail.com>
+References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
+ <20130809091953.GO6427@sirena.org.uk> <5204B7A6.9050907@gmail.com>
+Message-ID: <5204BF06.3060806@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 11:22:43PM -0300, Fabio Estevam wrote:
-> On Thu, Aug 8, 2013 at 9:23 PM, Peter Chen <peter.chen@freescale.com> wrote:
-> > We enabled USB host 1, so host 1's vbus should be on to let
-> > host 1 work.
-> >
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/imx6qdl-sabresd.dtsi |   10 ++++++++++
-> >  1 files changed, 10 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > index 6e5dfdb..6e9d4d7 100644
-> > --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > @@ -27,6 +27,15 @@
-> >                         enable-active-high;
-> >                 };
-> >
-> > +               reg_usb_h1_vbus: usb_h1_vbus {
-> > +                       compatible = "regulator-fixed";
-> > +                       regulator-name = "usb_h1_vbus";
-> > +                       regulator-min-microvolt = <5000000>;
-> > +                       regulator-max-microvolt = <5000000>;
-> > +                       gpio = <&gpio1 29 0>;
+On 08/09/2013 11:34 AM, Sebastian Hesselbarth wrote:
+> On 08/09/13 11:19, Mark Brown wrote:
+>> On Fri, Aug 09, 2013 at 10:23:50AM +0200, Sebastian Hesselbarth wrote:
+>>> On 08/08/2013 01:22 PM, Jean-Francois Moine wrote:
+>>
+>>>> +i2s1: audio-controller at b4000 {
+>>>> +    compatible = "mrvl,mvebu-audio";
+>>>> +    reg = <0xb4000 0x2210>;
+>>>> +    interrupts = <21>, <22>;
+>>>> +    clocks = <&gate_clk 13>;
+>>>> +    clock-names = "internal";
+>>>> +};
+>>
+>>> Also we will need some phandle reference to the audio codec here. As
+>>> this property is ongoing work in ASoC core, I suggest we wait for it
+>>> and propose a binding afterwards.
+>>
+>> No, as discussed this should be in the binding for the audio subsystem
+>> not in the binding for an individual component in that subsystem.
+>>
 > 
-> You should also add en entry into pinctrl_hog for this gpio.
+> Mark,
 > 
+> I do understand there may be SoCs requiring sophisticated extra audio
+> nodes, but Marvell SoCs don't. I prefer having a single node for the
+> i2s controller *and* exploit the audio subsystem properties from that.
 
-Thanks, Fabio. What's the rule for adding gpio function for pinctrl
-at dts? At pinctrl_hog or the device's pinctrl group?
+It's not about SoCs, it's about the board. The audio fabric on a board can
+easily get complex enough to require its own driver. Speakers, mics, jacks
+and jack detection, external amplifiers, bluetooth, baseband, multiple
+CODECs. That's what the audio node describes.
 
--- 
-
-Best Regards,
-Peter Chen
+- Lars
