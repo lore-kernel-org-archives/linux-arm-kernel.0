@@ -1,66 +1,93 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 9 Aug 2013 17:23:10 +0800
-Subject: [PATCH 3/8] clk: tegra114: add LP1 suspend/resume support
-In-Reply-To: <5203F766.9050100@wwwdotorg.org>
-References: <1374830110-30685-1-git-send-email-josephl@nvidia.com>
- <1374830110-30685-4-git-send-email-josephl@nvidia.com>
- <51F6F209.2090309@wwwdotorg.org>
- <1375430985.6761.51.camel@jlo-ubuntu-64.nvidia.com>
- <51FC1751.9010401@wwwdotorg.org>
- <1375689749.1731.36.camel@jlo-ubuntu-64.nvidia.com>
- <51FFDA20.6050403@wwwdotorg.org>  <51FFE363.4080603@wwwdotorg.org>
- <1375780249.2261.63.camel@jlo-ubuntu-64.nvidia.com>
- <52014258.9070602@wwwdotorg.org>
- <1375866749.8111.57.camel@jlo-ubuntu-64.nvidia.com>
- <520279FC.1000006@wwwdotorg.org>
- <1375928591.1758.66.camel@jlo-ubuntu-64.nvidia.com>
- <5203F766.9050100@wwwdotorg.org>
-Message-ID: <1376040190.12024.10.camel@jlo-ubuntu-64.nvidia.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Fri, 09 Aug 2013 10:25:33 +0100
+Subject: [PATCH 2/5] ARM: vexpress: remove redundant vexpress_dt_cpus_num
+ to get cpu count
+In-Reply-To: <1374579164-30255-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374579164-30255-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374579164-30255-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <5204B58D.2030501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-08-09 at 03:54 +0800, Stephen Warren wrote:
-> On 08/07/2013 08:23 PM, Joseph Lo wrote:
-> > On Thu, 2013-08-08 at 00:46 +0800, Stephen Warren wrote:
-> ..
-> >> I still have absolutely no idea why Tegra30 and Tegra114 are different.
-> >>
-> >> You mentioned something about this low-level code only manipulating the
-> >> IDLE state, and the clock driver needing to restore the other 4 states.
-> >> This raises yet more questions:
-> >>
-> >> 1) Do we not need to restore the other 4 states on Tegra30? If not, why
-> >> not? If we do, presumably Tegra30 (and Tegra20?) need to the syscore_op
-> >> this patch series adds to Tegra114 only? If we don't, then why does
-> >> Tegra114 have to restore them?
-> >
-> > We need to restore all of them for all Tegra chips. For Tegra20/30, we
-> > had done it in the tegra_cpu_car_ops.suspend/resume. For Tegra114, the
-> > patch was here.
-> > 
-> > The other reason is:
-> > 1) The PLLX is the main CPU clock source in Tegra20/30. We can restore
-> > it ASAP to get a better performance.
-> > 2) For Tegra114, the PLLX is the CPU clock source when CPU runs at low
-> > rates. When CPU in high rate, it uses DFLL as clock source. So it
-> > depends on what the clock source of the CPU when it goes into suspend.
-> > And the DFLL has its own resume code, it needs to be restored before the
-> > CPU uses it as clock source again. It makes the CPU clock restore
-> > sequence like this.
-> 
-> So, we don't yet support the DFLL upstream. Presumably, the CPU is
-> always running off PLLX on Tegra114 upstream right now. As such, we can
-> hard-code that into the resume path just like we do on earlier chips,
-> i.e. using tegra_cpu_car_ops.resume().
-> 
-> Once we do get DFLL support, presumably the DFLL resume path can switch
-> the register from PLLX to DFLL, and we still won't need a custom
-> syscore_ops.
-> 
-> Will that work?
-Hmm. If we can implement DFLL resume code there, that may be work. But I
-can't confirm right now. I can move them to tegra_cpu_car_ops for now.
-We can re-visit this later when we get more function to support.
+Hi Pawel,
 
-Thanks,
-Joseph
+On 23/07/13 12:32, Sudeep KarkadaNagesha wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> arm_dt_init_cpu_maps parses the device tree, validates and sets the
+> cpu_possible_mask appropriately. It is unnecessary to do another DT
+> parse to get the number of cpus, use num_possible_cpus instead.
+> 
+> This patch also removes setting cpu_present_mask as platforms should
+> only re-initialize it in smp_prepare_cpus() if present != possible.
+> 
+Can you pick this patch for v3.12 ?
+
+Regards,
+Sudeep
+
+> Acked-by: Pawel Moll <pawel.moll@arm.com>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> ---
+>  arch/arm/mach-vexpress/platsmp.c | 32 +-------------------------------
+>  1 file changed, 1 insertion(+), 31 deletions(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index 993c9ae..4a2d8c4 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -77,39 +77,13 @@ void __init vexpress_dt_smp_map_io(void)
+>  		WARN_ON(of_scan_flat_dt(vexpress_dt_find_scu, NULL));
+>  }
+>  
+> -static int __init vexpress_dt_cpus_num(unsigned long node, const char *uname,
+> -		int depth, void *data)
+> -{
+> -	static int prev_depth = -1;
+> -	static int nr_cpus = -1;
+> -
+> -	if (prev_depth > depth && nr_cpus > 0)
+> -		return nr_cpus;
+> -
+> -	if (nr_cpus < 0 && strcmp(uname, "cpus") == 0)
+> -		nr_cpus = 0;
+> -
+> -	if (nr_cpus >= 0) {
+> -		const char *device_type = of_get_flat_dt_prop(node,
+> -				"device_type", NULL);
+> -
+> -		if (device_type && strcmp(device_type, "cpu") == 0)
+> -			nr_cpus++;
+> -	}
+> -
+> -	prev_depth = depth;
+> -
+> -	return 0;
+> -}
+> -
+>  static void __init vexpress_dt_smp_init_cpus(void)
+>  {
+>  	int ncores = 0, i;
+>  
+>  	switch (vexpress_dt_scu) {
+>  	case GENERIC_SCU:
+> -		ncores = of_scan_flat_dt(vexpress_dt_cpus_num, NULL);
+> -		break;
+> +		return;
+>  	case CORTEX_A9_SCU:
+>  		ncores = scu_get_core_count(vexpress_dt_cortex_a9_scu_base);
+>  		break;
+> @@ -133,12 +107,8 @@ static void __init vexpress_dt_smp_init_cpus(void)
+>  
+>  static void __init vexpress_dt_smp_prepare_cpus(unsigned int max_cpus)
+>  {
+> -	int i;
+> -
+>  	switch (vexpress_dt_scu) {
+>  	case GENERIC_SCU:
+> -		for (i = 0; i < max_cpus; i++)
+> -			set_cpu_present(i, true);
+>  		break;
+>  	case CORTEX_A9_SCU:
+>  		scu_enable(vexpress_dt_cortex_a9_scu_base);
+> 
