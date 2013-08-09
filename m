@@ -1,99 +1,51 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 9 Aug 2013 08:05:43 -0700
-Subject: [PATCH v4 2/4] mmc: dw_mmc: Add exynos resume_noirq callback to
- clear WAKEUP_INT
-In-Reply-To: <001901ce9505$04483820$0cd8a860$%jun@samsung.com>
-References: <1373470926-19314-1-git-send-email-dianders@chromium.org>
- <1375825071-20922-1-git-send-email-dianders@chromium.org>
- <1375825071-20922-3-git-send-email-dianders@chromium.org>
- <001901ce9505$04483820$0cd8a860$%jun@samsung.com>
-Message-ID: <CAD=FV=U3LD-PmEeiNzh0F6Wb2efc==kn_=mTNjwVfB52-phSDQ@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 09 Aug 2013 08:11:39 -0700
+Subject: [PATCHv3 4/9] ARM: OMAP2+: AM33XX: Reserve memory to comply with
+ EMIF spec
+In-Reply-To: <5203FB55.6000300@ti.com> (Santosh Shilimkar's message of "Thu, 8
+ Aug 2013 16:11:01 -0400")
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-5-git-send-email-d-gerlach@ti.com>
+ <87fvukhwtv.fsf@kernel.org> <5203F21F.3010801@ti.com>
+ <87vc3ggd8s.fsf@kernel.org> <5203FB55.6000300@ti.com>
+Message-ID: <87vc3eaogk.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seungwon,
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-On Fri, Aug 9, 2013 at 6:33 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
-> On Wed, August 07, 2013, Doug Anderson wrote:
->> If the WAKEUP_INT is asserted at wakeup and not cleared, we'll end up
->> looping around forever.  This has been seen to happen on exynos5420
->> silicon despite the fact that we haven't enabled any wakeup events due
->> to a silicon errata.  It is safe to do on all exynos variants.
->>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> ---
->> Changes in v4:
->> - Take Seungwon's suggestion and don't add any dw_mmc-pltfm code.
->>
->> Changes in v3:
->> - Add freeze/thaw and poweroff/restore noirq entries.
->>
->> Changes in v2:
->> - Use suspend_noirq as per James Hogan.
->>
->>  drivers/mmc/host/dw_mmc-exynos.c | 51 ++++++++++++++++++++++++++++++++++++++--
->>  1 file changed, 49 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
->> index 866edef..0c1f192 100644
->> --- a/drivers/mmc/host/dw_mmc-exynos.c
->> +++ b/drivers/mmc/host/dw_mmc-exynos.c
->> @@ -30,6 +30,7 @@
->>  #define SDMMC_CLKSEL_TIMING(x, y, z) (SDMMC_CLKSEL_CCLK_SAMPLE(x) |  \
->>                                       SDMMC_CLKSEL_CCLK_DRIVE(y) |    \
->>                                       SDMMC_CLKSEL_CCLK_DIVIDER(z))
->> +#define SDMMC_CLKSEL_WAKEUP_INT              BIT(11)
->>
->>  #define EXYNOS4210_FIXED_CIU_CLK_DIV 2
->>  #define EXYNOS4412_FIXED_CIU_CLK_DIV 4
->> @@ -100,6 +101,30 @@ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
->>       return 0;
->>  }
->>
->> +/**
->> + * dw_mci_exynos_resume_noirq - Exynos-specific resume code
->> + *
->> + * On exynos5420 there is a silicon errata that will sometimes leave the
->> + * WAKEUP_INT bit in the CLKSEL register asserted.  This bit is 1 to indicate
->> + * that it fired and we can clear it by writing a 1 back.  Clear it to prevent
->> + * interrupts from going off constantly.
->> + *
->> + * We run this code on all exynos variants because it doesn't hurt and the bug
->> + * may be more widespread than just exynos5420.
-> I guess just above comment can be removed. (Not be widespread)
-> Updating the origin value of CLKSEL looks like no harm while SDMMC_CLKSEL_WAKEUP_INT is cleared.
+> On Thursday 08 August 2013 04:05 PM, Kevin Hilman wrote:
+>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>> 
+>>> On Thursday 08 August 2013 02:16 PM, Kevin Hilman wrote:
+>>>> Dave Gerlach <d-gerlach@ti.com> writes:
+>>>>
+>>>>> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>>>>
+>>>>> SDRAM controller on AM33XX requires that a modification of certain
+>>>>> bit-fields in PWR_MGMT_CTRL register (ref. section 7.3.5.13 in
+>>>>> AM335x-Rev H) is followed by a dummy read access to SDRAM. This
+>>>>> scenario arises when entering a low power state like DeepSleep.
+>>>>> To ensure that the read is not from a cached region we reserve
+>>>>> some memory during bootup using the arm_memblock_steal() API.
+>>>>
+>>>> Hmm, sounds to me an awful lot like the existing omap_bus_sync() ?
+>>>>
+>>> All the credit of that awful omap_bus_sync() goes to me since 
+>>> I introduced it. And I keep beating the hardware guys
+>>> who have not left a choice but to introduce the ugly work
+>>> around in software. ;-)
+>> 
+>> Agreed, but what's even more awful than the current version is
+>> duplicating it in a slightly different way using yet another whole page
+>> mapping for a single read/write location.
+>> 
+> The real issue is limitation of the kernel memory steal(memblock) API which
+> won't let you still less than 1 MB. It would have been ok for page allocation
+> because that is any way what you will get minimum on standard non-cached
+> allocations.
 
-OK, no problem.  I'll clean up the comment next time revision.
+All the more reason that the omap_bus_sync() should be refactored
+slightly in a way that would be reusable for AM33xx.
 
-
->> -module_platform_driver(dw_mci_exynos_pltfm_driver);
->> +static int __init dw_mci_exynos_init(void)
->> +{
->> +     /* Add a "noirq" resume to platform pmops */
->> +     memcpy(&dw_mci_exynos_pmops, &dw_mci_pltfm_pmops,
->> +            sizeof(dw_mci_exynos_pmops));
->> +     WARN_ON(dw_mci_exynos_pmops.resume_noirq ||
->> +             dw_mci_exynos_pmops.thaw_noirq ||
->> +             dw_mci_exynos_pmops.restore_noirq);
->> +     dw_mci_exynos_pmops.resume_noirq = dw_mci_exynos_resume_noirq;
->> +     dw_mci_exynos_pmops.thaw_noirq = dw_mci_exynos_resume_noirq;
->> +     dw_mci_exynos_pmops.restore_noirq = dw_mci_exynos_resume_noirq;
->
-> If CONFIG_PM_SLEEP is not defined, we don't need to add it.
-> And also, instead of reusing dw_mci_pltfm_pmops, how about defining dw_mci_exynos_pmops's own?
-> Of course, suspend/resume will not different with dw_mci_pltfm* just now.
-> But specific code for exynos would be added soon.
-
-
-Whoops!  ...of course this should be conditional on CONFIG_PM_SLEEP.
-Thank you for catching.
-
-I spent a bit of time debating whether I should make my own structure
-or do a copy like this.  It felt like a bit of a toss up to me, but
-I'm happy to do it the other way.  I will call dw_mci_suspend(host)
-directly and assume hope that nobody adds any important code to
-dw_mci_pltfm_suspend().  The other alternative would be make
-dw_mci_pltfm_suspend() exported or call it indirectly through
-dw_mci_pltfm_pmops, both of which seem slightly worse.
-
--Doug
+Kevin
