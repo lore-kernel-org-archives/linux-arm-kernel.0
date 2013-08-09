@@ -1,43 +1,112 @@
-From: myron.stowe@gmail.com (Myron Stowe)
-Date: Fri, 9 Aug 2013 12:12:24 -0600
-Subject: Linux Plumbers ACPI/PM, PCI Microconference
-Message-ID: <CAL-B5D1-CPNcOzjHx4ej5SenawvDqwC4Hef5oDkoxCb9Dz5dUw@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 9 Aug 2013 20:16:41 +0200
+Subject: [PATCH 3/7] pinctrl: imx1 core driver
+In-Reply-To: <20130805092952.GO26614@pengutronix.de>
+References: <1375439907-10462-1-git-send-email-mpa@pengutronix.de>
+ <1375439907-10462-4-git-send-email-mpa@pengutronix.de>
+ <20130805092952.GO26614@pengutronix.de>
+Message-ID: <20130809181641.GI13664@s25.your-server.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Time is passing quickly and there are still a few topic areas that we
-would like discussed during the microconference but still do not have
-any proposals/knowledgable speakers for.
+On Mon, Aug 05, 2013 at 11:29:52AM +0200, Sascha Hauer wrote:
+> On Fri, Aug 02, 2013 at 12:38:23PM +0200, Markus Pargmann wrote:
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  drivers/pinctrl/Kconfig             |   5 +
+> >  drivers/pinctrl/Makefile            |   1 +
+> >  drivers/pinctrl/pinctrl-imx1-core.c | 667 ++++++++++++++++++++++++++++++++++++
+> >  drivers/pinctrl/pinctrl-imx1.h      |  23 ++
+> >  4 files changed, 696 insertions(+)
+> >  create mode 100644 drivers/pinctrl/pinctrl-imx1-core.c
+> >  create mode 100644 drivers/pinctrl/pinctrl-imx1.h
+> > 
+> > +static int imx1_pinctrl_parse_groups(struct device_node *np,
+> > +				    struct imx_pin_group *grp,
+> > +				    struct imx_pinctrl_soc_info *info,
+> > +				    u32 index)
+> > +{
+> > +	int size;
+> > +	const __be32 *list;
+> > +	int i;
+> > +	u32 config;
+> > +
+> > +	dev_dbg(info->dev, "group(%d): %s\n", index, np->name);
+> > +
+> > +	/* Initialise group */
+> > +	grp->name = np->name;
+> > +
+> > +	/*
+> > +	 * the binding format is fsl,pins = <PIN_FUNC_ID CONFIG ...>,
+> > +	 * do sanity check and calculate pins number
+> > +	 */
+> > +	list = of_get_property(np, "fsl,pins", &size);
+> > +	/* we do not check return since it's safe node passed down */
+> > +	if (!size || size % 12) {
+> > +		dev_notice(info->dev, "Not a valid fsl,pins property (%s)\n",
+> > +				np->name);
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	grp->npins = size / 12;
+> > +	grp->pins = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
+> > +				GFP_KERNEL);
+> > +	grp->mux_mode = devm_kzalloc(info->dev,
+> > +				grp->npins * sizeof(unsigned int), GFP_KERNEL);
+> > +	grp->configs = devm_kzalloc(info->dev,
+> > +				grp->npins * sizeof(unsigned long), GFP_KERNEL);
+> 
+> I know this is copied from the existing imx pinctrl driver, but normally
+> we check for allocation failures.
 
-For the following people I'm specifically picking on: Are you going to
-plumbers, would you be willing to cover the following areas?  If you
-are not going, do you know someone who is and could cover?
+Yes, I added allocation checks.
 
-Yinghai: host bridge hot-plug - what has been accomplished to date and
-what still remains to be done?
+> 
+> Also I find it very irritating that you allocate three arrays of
+> integers instead of a single array of a struct type. I know the pinctrl
+> framework forces you to pass an array of pin numbers (which is quite
+> horrible for drivers to handle, who came up with the idea that a pin is
+> a number instead of some struct pointer which can be attached data to?)
 
-Mika: Thunderbolt activities?
+Fixed, using new imx1_pin structs now.
 
-Jiang Liu, Gu Zheng: Would you be willing to cover your recent efforts
-with PCI device (hot-plug) reference counting?
+> 
+> > +	for (i = 0; i < grp->npins; i++) {
+> > +		grp->pins[i] = be32_to_cpu(*list++);
+> > +		grp->mux_mode[i] = be32_to_cpu(*list++);
+> > +
+> > +		config = be32_to_cpu(*list++);
+> > +		grp->configs[i] = config;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> 
+> [...]
+> 
+> > +
+> > +	for_each_child_of_node(np, child) {
+> > +		func->groups[i] = child->name;
+> > +		grp = &info->groups[grp_index++];
+> > +		ret = imx1_pinctrl_parse_groups(child, grp, info, i++);
+> > +		if (ret)
+> > +			return ret;
+> 
+> This is one thing which nags me in the imx pinctrl driver aswell. Once
+> you made a single mistake in a single pinctrl group in the devicetree
+> you will never see the error message because the whole pinctrl driver
+> bails out leaving the serial driver with the console unusable. Wouldn't
+> it be possible to continue here instead of bailing out?
 
-Russel, Rob, Stephen, Thomas, Jason, Thierry: ARM - especially any
-PCI(e) ideosynchronicies along with ARM's IOMMU arch and how that
-relates to PCI.
+Yes, it is possible. I changed it to continue if ret != -ENOMEM.
 
-Alex Williamson: you want/need to cover any of the following - PCI
-secondary bus resets; pci_is_pcie() - Not just for PCIe capabilities;
-I/O port pci-sysfs resource files (fix or remove)?
+Thanks,
 
-Of course anyone else is free to propose something or sign up for
-covering one of the proposed topics listed at
-http://wiki.linuxplumbersconf.org/2013:pci_subsystem
+Markus
 
-
-The instructions for submitting proposals should be at:
-
-http://www.linuxplumbersconf.org/2013/submitting-topic/
-
-The Microconference link is at:
-
-http://wiki.linuxplumbersconf.org/2013:pci_subsystem
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
