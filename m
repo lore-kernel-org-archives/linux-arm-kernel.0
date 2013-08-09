@@ -1,42 +1,34 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 9 Aug 2013 11:08:09 -0600
-Subject: [PATCH] PCI: mvebu: make Marvell PCIe driver depend on OF
-In-Reply-To: <1376044550-30572-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1376044550-30572-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130809170809.GB29690@google.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 9 Aug 2013 22:39:42 +0530
+Subject: [PATCH 35/35] cpufreq: tegra: use
+ cpufreq_table_validate_and_show()
+In-Reply-To: <5205167F.1070906@wwwdotorg.org>
+References: <cover.1375964117.git.viresh.kumar@linaro.org>
+ <568f3dbd414b050bb2319d960fb5044a5aed8ee3.1375964117.git.viresh.kumar@linaro.org>
+ <5203BCDD.40809@wwwdotorg.org>
+ <CAKohpomr8kwDitAFD7FKvHo3zNWz8qT5bkd3yOVEnC_k16o=Dw@mail.gmail.com>
+ <CAKohpo=Gy7D2LYmdFU1p+eL-nMoPE18YXWvE2M8t-fb-a5HBgg@mail.gmail.com>
+ <5205167F.1070906@wwwdotorg.org>
+Message-ID: <CAKohponQDAqHiRD7Aw5Wk6fEE-d8H=Svg0oBRyb9SKGdqYxGhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 12:35:50PM +0200, Thomas Petazzoni wrote:
-> The Marvell PCIe host controller driver is heavily tied to Device Tree
-> APIs, and can only be used on platforms where the Device Tree is
-> used. Therefore, it should "depends on OF" to avoid build failures on
-> !OF configurations.
-> 
-> Reported-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-> Bjorn, you can take this one through your tree. Either for 3.11 or
-> 3.12, at your preference.
+On 9 August 2013 21:49, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/08/2013 10:04 PM, Viresh Kumar wrote:
+>> On 8 August 2013 21:37, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>>> Its useless and the correct routine isn't called at all :) .. I will add that
+>>> additional patch and send it to you and will get this change out of this
+>>> commit.
+>>
+>> The two commits look like this now attached too in case you want
+>> to test:
+>
+> I'd be happy to test, but those changes cause build failures on top of
+> next-20130809. Which other patches do I need to apply first?
 
-Applied to pci/misc for v3.12, thanks!
+None.. You applied all three attached patches? I have given it a try
+on my side now and it worked without any issues..
 
-> ---
->  drivers/pci/host/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index 1184ff6..e5ba4eb 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -4,6 +4,7 @@ menu "PCI host controller drivers"
->  config PCI_MVEBU
->  	bool "Marvell EBU PCIe controller"
->  	depends on ARCH_MVEBU || ARCH_KIRKWOOD
-> +	depends on OF
->  
->  config PCIE_DW
->  	bool
-> -- 
-> 1.8.1.2
-> 
+Just pushed out a branch for you as well:
+
+https://git.linaro.org/gitweb?p=people/vireshk/linux.git;a=shortlog;h=refs/heads/tegra-test
