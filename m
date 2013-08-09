@@ -1,40 +1,31 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 08 Aug 2013 22:35:34 -0700
-Subject: [PATCH] ARM: OMAP4: clock: Lock PLLs in the right sequence
-In-Reply-To: <alpine.DEB.2.02.1308090345340.32157@utopia.booyaka.com>
-References: <1375956851-842-1-git-send-email-rnayak@ti.com>
- <20130809011820.5348.78407@quantum>
- <alpine.DEB.2.02.1308090345340.32157@utopia.booyaka.com>
-Message-ID: <20130809053534.5348.29850@quantum>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 09 Aug 2013 15:49:06 +1000
+Subject: [PATCHv8 04/10] of: pci: add registry of MSI chips
+In-Reply-To: <1376000268-18397-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1376000268-18397-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1376000268-18397-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1376027346.32100.8.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Paul Walmsley (2013-08-08 20:47:02)
-> Hi Mike,
+On Fri, 2013-08-09 at 00:17 +0200, Thomas Petazzoni wrote:
 > 
-> On Thu, 8 Aug 2013, Mike Turquette wrote:
-> 
-> > Quoting Rajendra Nayak (2013-08-08 03:14:11)
-> > > On OMAP4 we have clk_set_rate()s being done for a few
-> > > DPLL clock nodes, as part of the clock init code, since
-> > > the bootloaders no longer locks these DPLLs.
-> > ...
-> > > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> > 
-> > Taken into clk-next. Thanks for the fix. Besides the annoying prints is
-> > there a functional regression fixed by this? If so I can take into
-> > clk-fixes as needed.
-> 
-> It's best if I take this patch upstream.  That way, potential merge 
-> conflicts are avoided, since I might have other changes to 
-> arch/arm/mach-omap2/cclock44xx_data.c to send upstream at the same time.
+> +#if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
+> +int of_pci_msi_chip_add(struct msi_chip *chip);
+> +void of_pci_msi_chip_remove(struct msi_chip *chip);
+> +struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node
+> *of_node);
+> +#else
+> +static inline int of_pci_msi_chip_add(struct msi_chip *chip) { return
+> -EINVAL; }
+> +static inline void of_pci_msi_chip_remove(struct msi_chip *chip) { }
 
-No problem. I had not yet published it to clk-next so this causes no
-issue.
+Missing a ; at the end of the above line... breaks the build of
+CONFIG_PCI_MSI is not set.
 
-Regards,
-Mike
-
-> 
-> 
-> - Paul
+> +static inline struct msi_chip *
+> +of_pci_find_msi_chip_by_node(struct device_node *of_node) { return
+> NULL };
+> +#endif
+> +
+>  #endif
