@@ -1,62 +1,93 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 09 Aug 2013 18:49:26 +0900
-Subject: [PATCH 09/14] ARM: shmobile: Rename to sh7372_init_early()
+Date: Fri, 09 Aug 2013 18:49:36 +0900
+Subject: [PATCH 10/14] ARM: shmobile: Rename to emev2_init_early(),
+ use smp_set_ops()
 In-Reply-To: <20130809094748.6530.16511.sendpatchset@w520>
 References: <20130809094748.6530.16511.sendpatchset@w520>
-Message-ID: <20130809094926.6530.46771.sendpatchset@w520>
+Message-ID: <20130809094936.6530.31840.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Rename sh7372_add_early_device_dt() into sh7372_init_early()
-and make it static since we have no sh7372 DT reference board
-code. Also, in case of DT we do not use any early console or
-early timers, so get rid of early platform stuff and early
-console for the DT case.
+Rename emev2_init_delay() into emev2_init_early()
+to make the function name show that more than just
+delay setup will happen.
+
+Also, instead of specifying the smp ops in DT_MACHINE
+convert the EMEV2 SoC code to install the smp ops
+from emev2_init_early().
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/include/mach/sh7372.h |    1 -
- arch/arm/mach-shmobile/setup-sh7372.c        |   10 ++--------
- 2 files changed, 2 insertions(+), 9 deletions(-)
+ arch/arm/mach-shmobile/board-kzm9d-reference.c |    3 +--
+ arch/arm/mach-shmobile/board-kzm9d.c           |    3 +--
+ arch/arm/mach-shmobile/include/mach/emev2.h    |    2 +-
+ arch/arm/mach-shmobile/setup-emev2.c           |    8 +++++---
+ 4 files changed, 8 insertions(+), 8 deletions(-)
 
---- 0007/arch/arm/mach-shmobile/include/mach/sh7372.h
-+++ work/arch/arm/mach-shmobile/include/mach/sh7372.h	2013-08-08 15:46:38.000000000 +0900
-@@ -63,7 +63,6 @@ extern void sh7372_map_io(void);
- extern void sh7372_earlytimer_init(void);
- extern void sh7372_add_early_devices(void);
- extern void sh7372_add_standard_devices(void);
--extern void sh7372_add_early_devices_dt(void);
- extern void sh7372_clock_init(void);
- extern void sh7372_pinmux_init(void);
- extern void sh7372_pm_init(void);
---- 0007/arch/arm/mach-shmobile/setup-sh7372.c
-+++ work/arch/arm/mach-shmobile/setup-sh7372.c	2013-08-08 15:48:51.000000000 +0900
-@@ -1135,15 +1135,9 @@ void __init sh7372_add_early_devices(voi
+--- 0001/arch/arm/mach-shmobile/board-kzm9d-reference.c
++++ work/arch/arm/mach-shmobile/board-kzm9d-reference.c	2013-08-08 16:18:34.000000000 +0900
+@@ -38,9 +38,8 @@ static const char *kzm9d_boards_compat_d
+ };
  
- #ifdef CONFIG_USE_OF
+ DT_MACHINE_START(KZM9D_DT, "kzm9d")
+-	.smp		= smp_ops(emev2_smp_ops),
+ 	.map_io		= emev2_map_io,
+-	.init_early	= emev2_init_delay,
++	.init_early	= emev2_init_early,
+ 	.init_machine	= kzm9d_add_standard_devices,
+ 	.init_late	= shmobile_init_late,
+ 	.dt_compat	= kzm9d_boards_compat_dt,
+--- 0001/arch/arm/mach-shmobile/board-kzm9d.c
++++ work/arch/arm/mach-shmobile/board-kzm9d.c	2013-08-08 16:18:17.000000000 +0900
+@@ -83,9 +83,8 @@ static const char *kzm9d_boards_compat_d
+ };
  
--void __init sh7372_add_early_devices_dt(void)
-+static void __init sh7372_init_early(void)
- {
- 	shmobile_setup_delay(800, 1, 3); /* Cortex-A8 @ 800MHz */
--
--	early_platform_add_devices(sh7372_early_devices,
--				   ARRAY_SIZE(sh7372_early_devices));
--
--	/* setup early console here as well */
--	shmobile_setup_console();
+ DT_MACHINE_START(KZM9D_DT, "kzm9d")
+-	.smp		= smp_ops(emev2_smp_ops),
+ 	.map_io		= emev2_map_io,
+-	.init_early	= emev2_init_delay,
++	.init_early	= emev2_init_early,
+ 	.init_machine	= kzm9d_add_standard_devices,
+ 	.init_late	= shmobile_init_late,
+ 	.dt_compat	= kzm9d_boards_compat_dt,
+--- 0001/arch/arm/mach-shmobile/include/mach/emev2.h
++++ work/arch/arm/mach-shmobile/include/mach/emev2.h	2013-08-08 16:17:57.000000000 +0900
+@@ -2,7 +2,7 @@
+ #define __ASM_EMEV2_H__
+ 
+ extern void emev2_map_io(void);
+-extern void emev2_init_delay(void);
++extern void emev2_init_early(void);
+ extern void emev2_add_standard_devices(void);
+ extern void emev2_clock_init(void);
+ 
+--- 0001/arch/arm/mach-shmobile/setup-emev2.c
++++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-08-08 16:17:47.000000000 +0900
+@@ -190,9 +190,12 @@ void __init emev2_add_standard_devices(v
+ 	emev2_register_pmu();
  }
  
- static const char *sh7372_boards_compat_dt[] __initdata = {
-@@ -1153,7 +1147,7 @@ static const char *sh7372_boards_compat_
+-void __init emev2_init_delay(void)
++void __init emev2_init_early(void)
+ {
+ 	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
++#ifdef CONFIG_SMP
++	smp_set_ops(&emev2_smp_ops);
++#endif
+ }
  
- DT_MACHINE_START(SH7372_DT, "Generic SH7372 (Flattened Device Tree)")
- 	.map_io		= sh7372_map_io,
--	.init_early	= sh7372_add_early_devices_dt,
-+	.init_early	= sh7372_init_early,
- 	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= sh7372_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
+ #ifdef CONFIG_USE_OF
+@@ -203,9 +206,8 @@ static const char *emev2_boards_compat_d
+ };
+ 
+ DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
+-	.smp		= smp_ops(emev2_smp_ops),
+ 	.map_io		= emev2_map_io,
+-	.init_early	= emev2_init_delay,
++	.init_early	= emev2_init_early,
+ 	.dt_compat	= emev2_boards_compat_dt,
+ MACHINE_END
+ 
