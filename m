@@ -1,43 +1,47 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri,  9 Aug 2013 07:30:13 -0700
-Subject: [PATCH 2/3] KVM: ARM: Get rid of KVM_HPAGE_ defines
-In-Reply-To: <1376021239-10532-1-git-send-email-christoffer.dall@linaro.org>
-References: <1376021239-10532-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1376058613-26400-1-git-send-email-christoffer.dall@linaro.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 9 Aug 2013 15:30:39 +0100
+Subject: [RFC PATCH] ARM: add workaround for ambiguous C99 stdint.h types
+In-Reply-To: <CAKv+Gu9TMDdyvZ=1fqRQQq_7Sz7hxWBbHqnF_mbVhh5uqJgTJg@mail.gmail.com>
+References: <1376033802-12826-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20130809141424.GC3977@localhost.localdomain>
+ <CAKv+Gu9TMDdyvZ=1fqRQQq_7Sz7hxWBbHqnF_mbVhh5uqJgTJg@mail.gmail.com>
+Message-ID: <20130809143039.GD3977@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The KVM_HPAGE_DEFINES are a little artificial on ARM, since the huge
-page size is statically defined at compile time and there is only a
-single huge page size.
+On Fri, Aug 09, 2013 at 04:18:30PM +0200, Ard Biesheuvel wrote:
+> On 9 August 2013 16:14, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Fri, Aug 09, 2013 at 09:36:42AM +0200, Ard Biesheuvel wrote:
+> 
+> [...]
+> 
+> > Somebody else might have the opposite problem to ARM, so I'm doubtful
+> > about whether it's safe to do this for all arches.  The arch maintainers
+> > would have to comment on that.  This looks ugly in an otherwise generic
+> > header.
+> >
+> 
+> This is actually under arch/arm so that should not be a problem. In
+> fact, it's a copy of asm-generic/types.h with just the #defines added.
 
-Now when the main kvm code relying on these defines has been moved to
-the x86 specific part of the world, we can get rid of these.
+Duh.  Misread your patch, sorry about that.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
+> > (As a cosmetic thing, you can lose the #ifdefs.  #undef doesn't trigger
+> > an error of the specified macro doesn't already exist.)
+> >
+> 
+> I am aware of that, but I think it is cleaner not to pollute the
+> namespace if the defines weren't there to begin with.
 
-[Resending this because the KVM list filter caught the subject of the
-previous message due to the letter X]
+Ah, I see what you mean.  Yes, that makes sense.  I'd read the #ifdefs
+as just being there to avoid redefinition errors.
 
- arch/arm/include/asm/kvm_host.h |    5 -----
- 1 file changed, 5 deletions(-)
+I'll leave the thread for other people to comment, but this looks like
+a reasonable thing to do for now.
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 7d22517..e45a74b 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -38,11 +38,6 @@
- 
- #define KVM_VCPU_MAX_FEATURES 1
- 
--/* We don't currently support large pages. */
--#define KVM_HPAGE_GFN_SHIFT(x)	0
--#define KVM_NR_PAGE_SIZES	1
--#define KVM_PAGES_PER_HPAGE(x)	(1UL<<31)
--
- #include <kvm/arm_vgic.h>
- 
- struct kvm_vcpu;
--- 
-1.7.10.4
+Because the kernel is not a hosted C environment, we shouldn't be including
+any foreign headers which care about the distinction, except for GCC's own
+headers like arm_neon.h.
+
+Cheers
+---Dave
