@@ -1,30 +1,52 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 09 Aug 2013 14:50:11 +0400
-Subject: =?UTF-8?B?UmU6IFByb3Bvc2FsOiBJMkMgZGV2aWNlIHBvd2VyIChXYXM6IGh3bW9uOiAo?=
- =?UTF-8?B?bG05MCkgQWRkIHBvd2VyIGNvbnRyb2wp?=
-In-Reply-To: <20130809102757.GT6427@sirena.org.uk>
-References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
- <1376027820.695103970@f416.i.mail.ru>
- <20130809102757.GT6427@sirena.org.uk>
-Message-ID: <1376045411.585130456@f141.i.mail.ru>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 09 Aug 2013 13:51:00 +0300
+Subject: [PATCH 3/3] usb: host: delete chipidea dependency
+In-Reply-To: <1375432662-32018-4-git-send-email-peter.chen@freescale.com>
+References: <1375432662-32018-1-git-send-email-peter.chen@freescale.com>
+ <1375432662-32018-4-git-send-email-peter.chen@freescale.com>
+Message-ID: <87siyjb0iz.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, Aug 09, 2013 at 09:57:00AM +0400, Alexander Shiyan wrote:
-> 
-> > Instead of adding the support of regulators in each device, let's think about
-> > whether it is possible to create a global regulator for any device on the I2C bus.
-> 
-> > I see it like this:
-> > We add an extra field in the i2c_board_info structure "power_name" and handle
-> > it in the i2c_device_{probe/remove} functions.
-> 
-> This would need to be an array of supplies, relatively few devices need
-> only a single power supply.  This is also not something that should be
-> handled in I2C, power is not something that's uniquely needed by devices
-> on an I2C bus.
+Peter Chen <peter.chen@freescale.com> writes:
 
-Additional regulators can be handled in the driver, or "parent"-scheme can
-be used. Is not it?
+> Now, chipidea host has already depended on USB_EHCI_HCD
+>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 
----
+Alan, what do you think?
+
+> ---
+>  drivers/usb/host/Kconfig |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index cf521d6..b548554 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -63,7 +63,7 @@ config USB_EHCI_HCD
+>  
+>  config USB_EHCI_ROOT_HUB_TT
+>  	bool "Root Hub Transaction Translators"
+> -	depends on USB_EHCI_HCD || USB_CHIPIDEA_HOST
+> +	depends on USB_EHCI_HCD
+>  	---help---
+>  	  Some EHCI chips have vendor-specific extensions to integrate
+>  	  transaction translators, so that no OHCI or UHCI companion
+> @@ -75,7 +75,7 @@ config USB_EHCI_ROOT_HUB_TT
+>  
+>  config USB_EHCI_TT_NEWSCHED
+>  	bool "Improved Transaction Translator scheduling"
+> -	depends on USB_EHCI_HCD || USB_CHIPIDEA_HOST
+> +	depends on USB_EHCI_HCD
+>  	default y
+>  	---help---
+>  	  This changes the periodic scheduling code to fill more of the low
+> -- 
+> 1.7.0.4
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
