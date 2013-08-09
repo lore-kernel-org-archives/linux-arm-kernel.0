@@ -1,43 +1,56 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 9 Aug 2013 19:46:00 +0800
-Subject: [PATCH v14 11/12] usb: chipidea: udc: misuse flag
- CI_HDRC_REGS_SHARED and CI_HDRC_PULLUP_ON_VBUS
-In-Reply-To: <874nazathc.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
- <1375432445-31918-12-git-send-email-peter.chen@freescale.com>
- <874nazathc.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20130809114559.GC24763@shlinux1.ap.freescale.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 9 Aug 2013 09:44:27 -0400
+Subject: [PATCHv8 04/10] of: pci: add registry of MSI chips
+In-Reply-To: <1376027346.32100.8.camel@pasglop>
+References: <1376000268-18397-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1376000268-18397-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1376027346.32100.8.camel@pasglop>
+Message-ID: <20130809134427.GC25111@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 04:23:11PM +0300, Alexander Shishkin wrote:
-> Peter Chen <peter.chen@freescale.com> writes:
+On Fri, Aug 09, 2013 at 03:49:06PM +1000, Benjamin Herrenschmidt wrote:
+> On Fri, 2013-08-09 at 00:17 +0200, Thomas Petazzoni wrote:
+> > 
+> > +#if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
+> > +int of_pci_msi_chip_add(struct msi_chip *chip);
+> > +void of_pci_msi_chip_remove(struct msi_chip *chip);
+> > +struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node
+> > *of_node);
+> > +#else
+> > +static inline int of_pci_msi_chip_add(struct msi_chip *chip) { return
+> > -EINVAL; }
+> > +static inline void of_pci_msi_chip_remove(struct msi_chip *chip) { }
 > 
-> > CI_HDRC_REGS_SHARED stands for the controller registers is shared
-> > with other USB drivers, if all USB drivers are at chipidea/, it doesn't
-> > needed to set.
+> Missing a ; at the end of the above line... breaks the build of
+> CONFIG_PCI_MSI is not set.
 > 
-> We still have the msm driver that uses REGS_SHARED.
-> 
+> > +static inline struct msi_chip *
+> > +of_pci_find_msi_chip_by_node(struct device_node *of_node) { return
+> > NULL };
+> > +#endif
+> > +
+> >  #endif
 
-Yes, I have considered it. At udc interrupt handler, the REGS_SHARED
-is still used. The msm set both CI_HDRC_REGS_SHARED and CI_HDRC_PULLUP_ON_VBUS.
+Reproduced, fixed and builds clean !CONFIG_OF and !CONFIG_PCI_MSI with:
 
-> > CI_HDRC_PULLUP_ON_VBUS stands for pullup dp when the vbus is on. This
-> > flag doesn't need to set if the vbus is always on for gadget
-> > since dp has always pulled up after the gadget has initialized.
-> 
-> Didn't we agree at some point to get rid of this flag altogether once we
-> have proper VBUS detection?
-
-Yes, we can delete it now, the reason why I haven't remove it is:
-I met some use cases that the vbus is always on recently,
-no connection/disconnection. Eg, the USB audio device connects
-to Apple Sound machine, the vbus is the power of the device system.
-
-I checked the code just now again, we can cover such kind of case.
-
--- 
-
-Best Regards,
-Peter Chen
+---------------->8----------------
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index 29631eb..9f69507 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -19,10 +19,11 @@ int of_pci_msi_chip_add(struct msi_chip *chip);
+ void of_pci_msi_chip_remove(struct msi_chip *chip);
+ struct msi_chip *of_pci_find_msi_chip_by_node(struct device_node *of_node);
+ #else
+-static inline int of_pci_msi_chip_add(struct msi_chip *chip) { return -EINVAL; }
+-static inline void of_pci_msi_chip_remove(struct msi_chip *chip) { }
++static inline int
++of_pci_msi_chip_add(struct msi_chip *chip) { return -EINVAL; };
++static inline void of_pci_msi_chip_remove(struct msi_chip *chip) { };
+ static inline struct msi_chip *
+-of_pci_find_msi_chip_by_node(struct device_node *of_node) { return NULL };
++of_pci_find_msi_chip_by_node(struct device_node *of_node) { return NULL; };
+ #endif
+ 
+ #endif
