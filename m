@@ -1,51 +1,81 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 9 Aug 2013 15:37:12 -0400
-Subject: [PATCH v2 4/6] ARM: mm: LPAE: Correct virt_to_phys patching for
- 64 bit physical addresses
-In-Reply-To: <51FD56D4.5020705@ti.com>
-References: <1375289086-5315-1-git-send-email-santosh.shilimkar@ti.com>
- <1375289086-5315-5-git-send-email-santosh.shilimkar@ti.com>
- <alpine.LFD.2.03.1308022156120.14472@syhkavp.arg> <51FCFBE1.5090000@ti.com>
- <20130803140544.GB23006@n2100.arm.linux.org.uk>
- <20130803140948.GC23006@n2100.arm.linux.org.uk> <51FD56D4.5020705@ti.com>
-Message-ID: <520544E8.8040809@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 9 Aug 2013 20:44:34 +0100
+Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu audio
+ subsystem
+In-Reply-To: <20130809182516.GT23006@n2100.arm.linux.org.uk>
+References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
+ <20130809091953.GO6427@sirena.org.uk> <5204B7A6.9050907@gmail.com>
+ <20130809094340.GO23006@n2100.arm.linux.org.uk>
+ <5204CC04.4000401@gmail.com> <20130809113940.GY6427@sirena.org.uk>
+ <20130809130932.GS23006@n2100.arm.linux.org.uk>
+ <20130809180058.GM6427@sirena.org.uk>
+ <20130809182516.GT23006@n2100.arm.linux.org.uk>
+Message-ID: <20130809194434.GP6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Fri, Aug 09, 2013 at 07:25:16PM +0100, Russell King - ARM Linux wrote:
 
-On Saturday 03 August 2013 03:15 PM, Santosh Shilimkar wrote:
-> On Saturday 03 August 2013 10:09 AM, Russell King - ARM Linux wrote:
->> On Sat, Aug 03, 2013 at 03:05:44PM +0100, Russell King - ARM Linux wrote:
->>> On Sat, Aug 03, 2013 at 06:17:29PM +0530, Sricharan R wrote:
->>>>   I started with this kind of augmenting with the immediate operand
->>>>   while starting V2. But the problem was, we do the runtime patching twice.
->>>
->>> It might be much better to do this only once, and instead of having the
->>> early code overwrite the page table in use, create a new page table with
->>> all the correct page table entries in and switch to that.
->>
-> The twice patching approach was taken obviously from the last discussion
-> where you suggested to avoid too many changes to the existing patching
-> code on Cyril's proposal. And the idea was obvious to delay the patching
-> as late as machine code initialization so that it easy to patch and maintain.
->  
->> Note: we still need to do a certain amount of modification of the existing
->> page table so that we _can_ perform such a switch on all our CPUs - that
->> is, ensuring that the region for flushing the CPU caches on processors
->> which need it is properly mapped.
->>
-> We probably need some more guidance on this approach. Last attempt was
-> more or less removing the early patching code and operating directly
-> on pv_offset variable to start with. And then in late code patching
-> the stub itself were built to operate on pv_offsets. You didn't like
-> that approach so to ensure that we follow your idea properly some
-> more explanation would help.
-> 
-Considering the $subject patch is now more or less sorted out, I
-would like to hear on your idea about one time patching.
+> Sigh, you completely miss the point.
 
-Thanks
+> What all three of us are ultimately after is a DT description for the
+> kirkwood stuff which covers all its use cases.  The use case which all
+> three of us have in common is the Cubox, which is the one which needs
+> the spdif stuff to work.
 
-Regards,
-Santosh
+I think I get what needs to be done well enough, I'm not sure that
+matches up with what people are wanting the results to look like but
+that's another story.
+
+> Now, what you've said to date is:
+
+> 1. you want kirkwood to use DPCM.
+
+Yes.
+
+> 2. you want kirkwood using people to use the simple card stuff with the
+>    kirkwood driver you want to use DPCM.
+
+No.  What I'm saying is that if your end goal is a binding for cards
+that works for absolutely anything then it should be handled by the
+simple card driver since that's what it's there for.   There's no
+requirement to do things that way though, certainly not in a first pass.
+
+> To make it work with DPCM, we first need to know what DPCM requires,
+> which means we either have to have the knowledge of DPCM and/or have a
+> working implementation.  We don't have either of those yet.
+
+> So, I again state plainly that what you're asking is for people to come
+> up with a DT description for a DPCM implementation when we haven't yet
+> got a working DPCM implementation, even without DT.
+
+> It is this which I assert is a completely rediculous request at this
+> moment in time for the reasons stated in my previous email and repeated
+> in this email.
+
+I'm not sure I said that anyone need do anything right this very minute?  
+
+In any case since the binding that pulls everything together into the
+audio subsystem is supposed to be separate to the bindings for the
+bindings for individual components it should be possible to proceed with
+those if someone wants to do that (as in the patch under discussion) and
+add the bits to tie things together later.
+
+If someone wants to it should also be possible to convert the existing
+platforms without S/PDIF support over to DT, providing you don't mind
+changing the code once the DPCM and S/PDIF support is added and a bit of
+thought is put into where the S/PDIF output will fit into the bindings.
+Since DPCM is a Linux internal thing it shouldn't have any impact on the
+bindings.
+
+But like I say there's no need to do anything in particular immediately.
+The patch under discussion seems basically fine for what it covers,
+modulo the fairly minor things Sebastian identified, and can be built on
+later.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130809/b0376bfa/attachment.sig>
