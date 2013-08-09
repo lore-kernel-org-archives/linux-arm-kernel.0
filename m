@@ -1,194 +1,77 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 09 Aug 2013 11:35:20 +0200
-Subject: [PATCH v9 04/16] iommu/exynos: allocate lv2 page table from own
- slab
-In-Reply-To: <20130809175156.c7ffc68b865e4bca48ef47dd@samsung.com>
-References: <002801ce941a$fb6369e0$f22a3da0$@samsung.com>
- <2101296.S6JDU5igl3@flatron>
- <20130809175156.c7ffc68b865e4bca48ef47dd@samsung.com>
-Message-ID: <12183506.4f14O99EfL@amdc1227>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Aug 2013 10:30:32 +0100
+Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu
+ audio subsystem
+In-Reply-To: <20130809110623.7bb3e7ad@armhf>
+References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
+ <20130809110623.7bb3e7ad@armhf>
+Message-ID: <20130809093032.GM23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 of August 2013 17:51:56 Cho KyongHo wrote:
-> On Fri, 09 Aug 2013 09:55:30 +0200, Tomasz Figa wrote:
-> > Hi KyongHo,
-> > 
-> > On Friday 09 of August 2013 14:58:49 Cho KyongHo wrote:
-> > > On Thu, 08 Aug 2013 16:00:18 +0200, Tomasz Figa wrote:
-> > > > On Thursday 08 of August 2013 18:38:04 Cho KyongHo wrote:
-> > > > > Since kmalloc() does not guarantee that the allignment of 1KiB
-> > > > > when
-> > > > > it
-> > > > > allocates 1KiB, it is required to allocate lv2 page table from
-> > > > > own
-> > > > > slab that guarantees alignment of 1KiB
-> > > > > 
-> > > > > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> > > > > ---
-> > > > > 
-> > > > >  drivers/iommu/exynos-iommu.c |   24 ++++++++++++++++++++----
-> > > > >  1 files changed, 20 insertions(+), 4 deletions(-)
-> > > > > 
-> > > > > diff --git a/drivers/iommu/exynos-iommu.c
-> > > > > b/drivers/iommu/exynos-iommu.c index d90e6fa..a318049 100644
-> > > > > --- a/drivers/iommu/exynos-iommu.c
-> > > > > +++ b/drivers/iommu/exynos-iommu.c
-> > > > > @@ -100,6 +100,8 @@
-> > > > > 
-> > > > >  #define REG_PB1_SADDR		0x054
-> > > > >  #define REG_PB1_EADDR		0x058
-> > > > > 
-> > > > > +static struct kmem_cache *lv2table_kmem_cache;
-> > > > > +
-> > > > > 
-> > > > >  static unsigned long *section_entry(unsigned long *pgtable,
-> > > > >  unsigned
-> > > > > 
-> > > > > long iova) {
-> > > > > 
-> > > > >  	return pgtable + lv1ent_offset(iova);
-> > > > > 
-> > > > > @@ -765,7 +767,8 @@ static void
-> > > > > exynos_iommu_domain_destroy(struct
-> > > > > iommu_domain *domain)
-> > > > > 
-> > > > >  	for (i = 0; i < NUM_LV1ENTRIES; i++)
-> > > > >  	
-> > > > >  		if (lv1ent_page(priv->pgtable + i))
-> > > > > 
-> > > > > -			kfree(__va(lv2table_base(priv->pgtable + i)));
-> > > > > +			kmem_cache_free(lv2table_kmem_cache,
-> > > > > +					__va(lv2table_base(priv->pgtable +
-> > 
-> > i)));
-> > 
-> > > > >  	free_pages((unsigned long)priv->pgtable, 2);
-> > > > >  	free_pages((unsigned long)priv->lv2entcnt, 1);
-> > > > > 
-> > > > > @@ -861,7 +864,7 @@ static unsigned long *alloc_lv2entry(unsigned
-> > > > > long
-> > > > > *sent, unsigned long iova, if (lv1ent_fault(sent)) {
-> > > > > 
-> > > > >  		unsigned long *pent;
-> > > > > 
-> > > > > -		pent = kzalloc(LV2TABLE_SIZE, GFP_ATOMIC);
-> > > > > +		pent = kmem_cache_zalloc(lv2table_kmem_cache, GFP_ATOMIC);
-> > > > > 
-> > > > >  		BUG_ON((unsigned long)pent & (LV2TABLE_SIZE - 1));
-> > > > >  		if (!pent)
-> > > > >  		
-> > > > >  			return ERR_PTR(-ENOMEM);
-> > > > > 
-> > > > > @@ -881,7 +884,7 @@ static int lv1set_section(unsigned long
-> > > > > *sent,
-> > > > > phys_addr_t paddr, short *pgcnt)
-> > > > > 
-> > > > >  	if (lv1ent_page(sent)) {
-> > > > >  	
-> > > > >  		BUG_ON(*pgcnt != NUM_LV2ENTRIES);
-> > > > > 
-> > > > > -		kfree(page_entry(sent, 0));
-> > > > > +		kmem_cache_free(lv2table_kmem_cache, page_entry(sent, 0));
-> > > > > 
-> > > > >  		*pgcnt = 0;
-> > > > >  	
-> > > > >  	}
-> > > > > 
-> > > > > @@ -1082,10 +1085,23 @@ static int __init exynos_iommu_init(void)
-> > > > > 
-> > > > >  {
-> > > > >  
-> > > > >  	int ret;
-> > > > > 
-> > > > > +	lv2table_kmem_cache =
-> > > > > kmem_cache_create("exynos-iommu-lv2table",
-> > > > > +				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
-> > > > > +	if (!lv2table_kmem_cache) {
-> > > > > +		pr_err("%s: Failed to create kmem cache\n", __func__);
-> > > > > +		return -ENOMEM;
-> > > > > +	}
-> > > > > +
-> > > > > 
-> > > > >  	ret = platform_driver_register(&exynos_sysmmu_driver);
-> > > > >  	
-> > > > >  	if (ret == 0)
-> > > > > 
-> > > > > -		bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
-> > > > > +		ret = bus_set_iommu(&platform_bus_type,
-> > 
-> > &exynos_iommu_ops);
-> > 
-> > > > > +
-> > > > > +	if (ret) {
-> > > > > +		pr_err("%s: Failed to register exynos-iommu driver.\n",
-> > > > > +								__func__);
-> > > > > +		kmem_cache_destroy(lv2table_kmem_cache);
-> > > > > +	}
-> > > > 
-> > > > What about making the return value handling here cleaner? For 
-example:
-> > > > 	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
-> > > > 	
-> > > > 				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
-> > > > 	
-> > > > 	if (!lv2table_kmem_cache) {
-> > > > 	
-> > > > 		...
-> > > > 		return -ENOMEM;
-> > > > 	
-> > > > 	}
-> > > > 	
-> > > > 	ret = platform_driver_register(&exynos_sysmmu_driver);
-> > > > 	if (ret) {
-> > > > 	
-> > > > 		...
-> > > > 		goto err_destroy_kmem_cache;
-> > > > 	
-> > > > 	}
-> > > > 	
-> > > > 	ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
-> > > > 	if (ret) {
-> > > > 	
-> > > > 		...
-> > > > 		goto err_platform_unregister;
-> > > > 	
-> > > > 	}
-> > > > 	
-> > > > 	return 0;
-> > > > 
-> > > > err_platform_unregister:
-> > > > 	...
-> > > > 
-> > > > err_destroy_kmem_cache:
-> > > > 	...
-> > > > 	return ret;
-> > > > 
-> > > > }
-> > > 
-> > > Thank you for suggestion.
-> > > I think you are worrying about missing the information who makes
-> > > 'ret'
-> > > non-zero.
-> > 
-> > Oh, this is a valid point, but it was more a nitpick about the coding
-> > style. Single path error handling (with goto) is widely used in the
-> > kernel in cases when more than one thing has to be undone and so I
-> > suggested this method of error handling here as well.
-> > 
-> > > Ok. I will process it separately.
-> > 
-> > Since this patch adds most of the error handling to this function, I
-> > think it should be fine to do it as a part of this patch.
+On Fri, Aug 09, 2013 at 11:06:23AM +0200, Jean-Francois Moine wrote:
+> On Fri, 09 Aug 2013 10:23:50 +0200
+> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+> > we need at least two more compatibles for the audio controller found on
+> > Dove and Kirkwood respectively. This is how we are going to distinguish
+> > those two, e.g. Kirkwood has SPDIF in which Dove hasn't.
 > 
-> I meant 'separately' that checking all return values each.
-> I think it can be simpler without goto.
->
-> There are just 2 cases to rollback previous changes in that function.
+> Sebastian,
+> 
+> s/has/hasn't & s/hasn't/has
 
-It might end up with less lines, but having roll back in single place is 
-more readable. That's why it's the preferred error handling way in Linux 
-kernel, if you have more than one action to undo on your error path.
+No, you're both wrong.
 
-Best regards,
-Tomasz
+Some Kirkwood has SPDIF recording and playback.  There are those audio
+blocks which have just I2S capture and playback.  There are those which
+have I2S capture and playback, and SPDIF playback.  There are those which
+have both I2S and SPDIF for both capture and playback.  The only one I
+haven't yet seen is SPDIF capture without playback.
+
+> On Fri, 26 Jul 2013 10:21:56 +0100 Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > On Fri, Jul 26, 2013 at 11:09:13AM +0200, Jean-Francois Moine wrote:
+> > > The A510 documentation uses the names "DCO PLL" for the internal clock
+> > > and "AU_EXTCLK" for the external clock. So, what about "dcopll" and
+> > > "extclk"?
+> > 
+> > Stop naming them according to their source.  Their _consumer_ names
+> > not _source_ names.
+> 
+> But Russell did not tell clearly which name could be the best.
+> 
+> BTW, as we are naming the clocks, the 'clk' in "xxxclk" seems redondant...
+
+"extclk" follows what's in the data sheet - the exact name of it is
+"AU_EXTCLK".  Since we already know that this is the audio unit from
+the struct device, the "AU_" part is redundant.  The input name for
+the internal clock is not given, instead they talk about where it
+comes from (it's producer) so your choice of "internal" is fine.
+
+Take a moment to think about it: if you call it "dcoclk" then what
+happens on a future SoC if it's not connected to the dcoclk anymore?
+
+> I don't think that we need any reference to the codec here. The glue is
+> done by the audio device. For example, using the (soon?) extended
+> simple audio card:
+> 
+> 	spdif: spdif {
+> 		compatible = "linux,spdif-dit";
+> 	};
+> 	sound {
+> 		compatible = "linux,simple-audio";
+> 		audio-controller = <&i2s1>;
+> 		audio-codec = <&spdif>;
+> 		codec-dai-name = "dit-hifi";
+> 	};
+
+As I understand the way DPCM works, that isn't going to work for this
+case.  For DPCM as per Liam's example, it's going to require the audio
+controller to be bound to the dummy codec, and a dummy platform/dai
+bound to the SPDIF codec.  You then use DAPM routing to connect the
+SPDIF codec to the appropriate CPU DAI output stream.
+
+So the above "simple" implementation won't do - it can't be used to
+specify two DAI links, and it can't specify the DAPM routing between
+them.
+
+This will be another challenge to solve in DT!
