@@ -1,50 +1,85 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 9 Aug 2013 09:48:29 -0700
-Subject: [PATCH v5 2/4] mmc: dw_mmc: Add exynos resume_noirq callback to
- clear WAKEUP_INT
-In-Reply-To: <CAOMZO5DZ=aJsOvTyrKL=57_jGMGQX8k3mDamgXqnF-9Ou2fpAg@mail.gmail.com>
-References: <1375825071-20922-1-git-send-email-dianders@chromium.org>
- <1376066000-5495-1-git-send-email-dianders@chromium.org>
- <1376066000-5495-3-git-send-email-dianders@chromium.org>
- <CAOMZO5DZ=aJsOvTyrKL=57_jGMGQX8k3mDamgXqnF-9Ou2fpAg@mail.gmail.com>
-Message-ID: <CAD=FV=WxCpqX+23i_Q4_swKWqieNdcZ_sa0bxrcpUnr4vA+pGA@mail.gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 9 Aug 2013 18:57:06 +0200
+Subject: [RFC 1/1] drm/pl111: Initial drm/kms driver for pl111
+In-Reply-To: <CAF6AEGu68ntQDSueQJmAM1KSsSA86j98GDEf8wOPbZKjECw99Q@mail.gmail.com>
+References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>
+ <1374772648-19151-2-git-send-email-tom.cooksey@arm.com>
+ <CAF6AEGvGG1-4k-3_YHQ2ES6JEb-V-Xuicc8gfw9rPWze5JUEDg@mail.gmail.com>
+ <20130807164651.GY22035@phenom.ffwll.local>
+ <520515b0.88b70e0a.3ecd.1004SMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAF6AEGu68ntQDSueQJmAM1KSsSA86j98GDEf8wOPbZKjECw99Q@mail.gmail.com>
+Message-ID: <20130809165706.GC31670@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio,
+On Fri, Aug 09, 2013 at 12:34:55PM -0400, Rob Clark wrote:
+> On Fri, Aug 9, 2013 at 12:15 PM, Tom Cooksey <tom.cooksey@arm.com> wrote:
+> >> > fwiw, this is at least different from how other drivers do triple
+> >> > (or > double) buffering.  In other drivers (intel, omap, and
+> >> > msm/freedreno, that I know of, maybe others too) the xorg driver
+> >> > dri2 bits implement the double buffering (ie. send flip event back
+> >> > to client immediately and queue up the flip and call page-flip
+> >> > after the pageflip event back from kernel.
+> >> >
+> >> > I'm not saying not to do it this way, I guess I'd like to hear
+> >> > what other folks think.  I kinda prefer doing this in userspace
+> >> > as it keeps the kernel bits simpler (plus it would then work
+> >> > properly on exynosdrm or other kms drivers).
+> >>
+> >> Yeah, if this is just a sw queue then I don't think it makes sense
+> >> to have it in the kernel. Afaik the current pageflip interface drm
+> >> exposes allows one oustanding flip only, and you _must_ wait for
+> >> the flip complete event before you can submit the second one.
+> >
+> > Right, I'll have a think about this. I think our idea was to issue
+> > enough page-flips into the kernel to make sure that any process
+> > scheduling latencies on a heavily loaded system don't cause us to
+> > miss a v_sync deadline. At the moment we issue the page flip from DRI2
+> > schedule_swap. If we were to move that to the page flip event handler
+> > of the previous page-flip, we're potentially adding in extra latency.
+> >
+> > I.e. Currently we have:
+> >
+> > DRI2SwapBuffers
+> >  - drm_mode_page_flip to buffer B
+> > DRI2SwapBuffers
+> >  - drm_mode_page_flip to buffer A (gets queued in kernel)
+> > ...
+> > v_sync! (at this point buffer B is scanned out)
+> >  - release buffer A's KDS resource/signal buffer A's fence
+> >     - queued GPU job to render next frame to buffer A scheduled on HW
+> > ...
+> > GPU interrupt! (at this point buffer A is ready to be scanned out)
+> >  - release buffer A's KDS resource/signal buffer A's fence
+> >     - second page flip executed, buffer A's address written to scanout
+> >       register, takes effect on next v_sync.
+> >
+> >
+> > So in the above, after X receives the second DRI2SwapBuffers, it
+> > doesn't need to get scheduled again for the next frame to be both
+> > rendered by the GPU and issued to the display for scanout.
+> 
+> well, this is really only an issue if you are so loaded that you don't
+> get a chance to schedule for ~16ms.. which is pretty long time.  If
+> you are triple buffering, it should not end up in the critical path
+> (since the gpu already has the 3rd buffer to start on the next frame).
+>  And, well, if you do it all in the kernel you probably need to toss
+> things over to a workqueue anyways.
 
-Thanks for your review.
+Just a quick comment on the kernel flip queue issue.
 
-On Fri, Aug 9, 2013 at 9:41 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Fri, Aug 9, 2013 at 1:33 PM, Doug Anderson <dianders@chromium.org> wrote:
->
->> +#else
->> +#define dw_mci_exynos_suspend          NULL
->> +#define dw_mci_exynos_resume           NULL
->> +#define dw_mci_exynos_resume_noirq     NULL
->> +#endif /* CONFIG_PM_SLEEP */
->
-> You could avoid this else block if you use 'static SIMPLE_DEV_PM_OPS' below.
->
->> +
->>  static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
->>  {
->>         /*
->> @@ -187,13 +234,20 @@ static int dw_mci_exynos_probe(struct platform_device *pdev)
->>         return dw_mci_pltfm_register(pdev, drv_data);
->>  }
->>
->> +const struct dev_pm_ops dw_mci_exynos_pmops = {
->> +       SET_SYSTEM_SLEEP_PM_OPS(dw_mci_exynos_suspend, dw_mci_exynos_resume)
->> +       .resume_noirq = dw_mci_exynos_resume_noirq,
->> +       .thaw_noirq = dw_mci_exynos_resume_noirq,
->> +       .restore_noirq = dw_mci_exynos_resume_noirq,
->> +};
->
-> static SIMPLE_DEV_PM_OPS(dw_mci_exynos_pmops, dw_mci_exynos_suspend,
->  dw_mci_exynos_resume ) ;
+16 ms scheduling latency sounds awful but totally doable with a less than
+stellar ddx driver going into limbo land and so preventing your single
+threaded X from doing more useful stuff. Is this really the linux
+scheduler being stupid?
 
-The big problem is that SIMPLE_DEV_PM_OPS() doesn't take a "_noirq"
-parameters.  Do you know of one that does?
-
--Doug
+At least my impression was that the hw/kernel flip queue is to save power
+so that you can queue up a few frames and everything goes to sleep for
+half a second or so (at 24fps or whatever movie your showing). Needing to
+schedule 5 frames ahead with pageflips under load is just guaranteed to
+result in really horrible interactivity and so awful user experience ...
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
