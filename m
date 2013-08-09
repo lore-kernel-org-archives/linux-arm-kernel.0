@@ -1,73 +1,76 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  8 Aug 2013 20:53:08 -0700
-Subject: [PATCH] ARM: KVM: Fix unaligned unmap_range leak
-Message-ID: <1376020388-9880-1-git-send-email-christoffer.dall@linaro.org>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Fri, 09 Aug 2013 13:01:33 +0900
+Subject: [PATCH v9 01/16] iommu/exynos: do not include removed header
+In-Reply-To: <21505674.fdNgPGp76O@amdc1227>
+References: <002501ce941a$e3d87f40$ab897dc0$@samsung.com>
+ <21505674.fdNgPGp76O@amdc1227>
+Message-ID: <20130809130133.fea18aa350c831ece07188e3@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The unmap_range function did not properly cover the case when the start
-address was not aligned to PMD_SIZE or PUD_SIZE and an entire pte table
-or pmd table was cleared, causing us to leak memory when incrementing
-the addr.
+On Thu, 08 Aug 2013 15:42:24 +0200, Tomasz Figa wrote:
+> Hi KyongHo,
+> 
+> On Thursday 08 of August 2013 18:37:25 Cho KyongHo wrote:
+> > This commit remove <mach/sysmmu.h> which is removed.
+> 
+> I would prefer a more meaningful commit message, something among following 
+> lines:
+> 
+> 8<---
+> Commit 25e9d28d92 (ARM: EXYNOS: remove system mmu initialization from 
+> exynos tree) removed arch/arm/mach-exynos/mach/sysmmu.h header without 
+> removing remaining use of it from exynos-iommu driver, thus causing a 
+> compilation error.
+> 
+> This patch fixes the error by removing respective include line from exynos-
+> iommu.c.
+> --->8
+> 
 
-The fix is to always move onto the next page table entry boundary
-instead of adding the full size of the VA range covered by the
-corresponding table level entry.
+Ok.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/kvm/mmu.c |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+> Also a sentence explaining why linux/kernel.h header must be included would 
+> be nice.
+> 
+> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> 
+> Please note that as far as I'm aware of, tags should be made using western 
+> name writing convention, i.e. starting with first name.
+> 
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index ca6bea4..80a83ec 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -132,37 +132,37 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
- 	pmd_t *pmd;
- 	pte_t *pte;
- 	unsigned long long addr = start, end = start + size;
--	u64 range;
-+	u64 next;
- 
- 	while (addr < end) {
- 		pgd = pgdp + pgd_index(addr);
- 		pud = pud_offset(pgd, addr);
- 		if (pud_none(*pud)) {
--			addr += PUD_SIZE;
-+			addr = pud_addr_end(addr, end);
- 			continue;
- 		}
- 
- 		pmd = pmd_offset(pud, addr);
- 		if (pmd_none(*pmd)) {
--			addr += PMD_SIZE;
-+			addr = pmd_addr_end(addr, end);
- 			continue;
- 		}
- 
- 		pte = pte_offset_kernel(pmd, addr);
- 		clear_pte_entry(kvm, pte, addr);
--		range = PAGE_SIZE;
-+		next = addr + PAGE_SIZE;
- 
- 		/* If we emptied the pte, walk back up the ladder */
- 		if (pte_empty(pte)) {
- 			clear_pmd_entry(kvm, pmd, addr);
--			range = PMD_SIZE;
-+			next = pmd_addr_end(addr, end);
- 			if (pmd_empty(pmd)) {
- 				clear_pud_entry(kvm, pud, addr);
--				range = PUD_SIZE;
-+				next = pud_addr_end(addr, end);
- 			}
- 		}
- 
--		addr += range;
-+		addr = next;
- 	}
- }
- 
--- 
-1.7.10.4
+Oh, I didn't think that the order of family/given names are the matter.
+I don't care about changing the order.
+
+Thanks.
+
+KyongHo.
+
+> Best regards,
+> Tomasz
+> 
+> > ---
+> >  drivers/iommu/exynos-iommu.c |    3 +--
+> >  1 files changed, 1 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> > index 3f32d64..233f382 100644
+> > --- a/drivers/iommu/exynos-iommu.c
+> > +++ b/drivers/iommu/exynos-iommu.c
+> > @@ -12,6 +12,7 @@
+> >  #define DEBUG
+> >  #endif
+> > 
+> > +#include <linux/kernel.h>
+> >  #include <linux/io.h>
+> >  #include <linux/interrupt.h>
+> >  #include <linux/platform_device.h>
+> > @@ -29,8 +30,6 @@
+> >  #include <asm/cacheflush.h>
+> >  #include <asm/pgtable.h>
+> > 
+> > -#include <mach/sysmmu.h>
+> > -
+> >  /* We does not consider super section mapping (16MB) */
+> >  #define SECT_ORDER 20
+> >  #define LPAGE_ORDER 16
