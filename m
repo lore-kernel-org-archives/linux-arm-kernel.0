@@ -1,54 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 9 Aug 2013 15:37:24 -0700
-Subject: [PATCH 2/2] power: arm64: Add DTS entry for APM X-Gene reboot
- driver.
-In-Reply-To: <20130809213116.GE12638@lizard.sbx05730.santaca.wayport.net>
-References: <1372797539-13111-1-git-send-email-lho@apm.com>
- <1372797539-13111-2-git-send-email-lho@apm.com>
- <1372797539-13111-3-git-send-email-lho@apm.com>
- <20130809213116.GE12638@lizard.sbx05730.santaca.wayport.net>
-Message-ID: <CAOesGMj-chSDsA7YT5GFAyoxPw43LOjbmnQUqo14nxJV_88GcA@mail.gmail.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Fri, 9 Aug 2013 17:41:28 -0500
+Subject: [PATCHv2] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <52055867.9000602@wwwdotorg.org>
+References: <1375735392-6836-1-git-send-email-dinguyen@altera.com>
+ <5203FC1A.3090903@wwwdotorg.org> <1375993920.22740.9.camel@linux-builds1>
+ <5204017A.1040607@wwwdotorg.org> <1375995281.22740.16.camel@linux-builds1>
+ <520409F2.1090906@wwwdotorg.org> <1376003457.22740.25.camel@linux-builds1>
+ <52055867.9000602@wwwdotorg.org>
+Message-ID: <1376088088.14580.4.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 9, 2013 at 2:31 PM, Anton Vorontsov <anton@enomsg.org> wrote:
-> On Tue, Jul 02, 2013 at 02:38:59PM -0600, Loc Ho wrote:
->> power: arm64: Add DTS entry for APM X-Gene reboot driver.
->>
->> Signed-off-by: Loc Ho <lho@apm.com>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
->> ---
->
-> I've applied patch 1/2 to battery-2.6.git tree. I need an ack from ARM
-> maintainers to grab this together with the first one.
->
->>  arch/arm64/boot/dts/apm-storm.dtsi |    6 ++++++
->>  1 files changed, 6 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
->> index d37d736..e686919 100644
->> --- a/arch/arm64/boot/dts/apm-storm.dtsi
->> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
->> @@ -178,6 +178,12 @@
->>                       };
->>               };
->>
->> +                reboot at 0x17000014 {
->> +                        compatible = "apm,xgene-reboot";
->> +                        reg = <0x0 0x17000014 0x0 0x100>;
->> +                        mask = <0x1>;
->> +                };
->
-> There should be tabs instead of whitespaces.
+On Fri, 2013-08-09 at 15:00 -0600, Stephen Warren wrote:
+> On 08/08/2013 05:10 PM, Dinh Nguyen wrote:
+> > On Thu, 2013-08-08 at 15:13 -0600, Stephen Warren wrote:
+> ...
+> >> Why is there a need to directly represent the divider anywhere? The
+> >> driver can find the rate of the input clock, and I assume it knows what
+> >> rate it wants the clock to run at, so can't it calculate the divider
+> >> based on those two pieces of information?
+> > 
+> > CC: Chris Ball
+> >>
+> >> Or, does the driver really not know what rate it wants the clock to be
+> >> after the internal divider? If not, then I think that *rate* should be
+> >> recorded in DT, not the divider to obtain that rate.
+> >>
+> > 
+> > I believe that this is the case, that the driver does not know what rate
+> > it will clock the SD card at. I think internally we did have a "bus_hz"
+> > in DT a while back. I guess I don't really understand why it would be
+> > better to have a *rate* DT entry instead of a fixed-divider entry?
+> 
+> The value of the divider depends on two things:
+> 
+> 1) Input clock rate.
+> 2) Desired rate after applying the internal divider.
+> 
+> The input clock rate may vary, either between SoCs the IP is integrated
+> into, or even at run-time perhaps base on clk_set_rate() etc.
+> 
+> If the MMC driver knows the clock rate it wants to run at, it can
+> calculate the divider easily; it can automatically adjust to any input
+> clock that its environment may provide.
+> 
+> If the MMC driver is simply told "use this divider", that's encoding
+> assumptions about the rate of the input clock which might not be valid;.
+> Encoding the desire clock rate within the MMC HW block allows the
+> divider to be calculated based on the actual environment.
 
-Binding is undocumented, as far as I can tell. Please add
-documentation of this under Documentation/devicetree/bindings.
+Thanks Stephen. That makes sense.
 
-In particular, the 'mask' property is nonstandard and it needs to be
-documented what part of the reboot controller hardware it is
-describing.
+Chris, Jaehoon, and Seungwon, do you have any inputs? If not I will go
+down the path of have the "bus-hz" in the DTS node for the clock rate of
+the CIU clock. Then I would also make the same change to dw_mmc-exynos
+but would need your help on what the rate would be.
 
+For SOCFPGA, its 12.5 MHZ.
 
+Thanks,
 
--Olof
+Dinh
+> 
