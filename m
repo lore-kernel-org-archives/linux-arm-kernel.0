@@ -1,21 +1,150 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 9 Aug 2013 08:27:03 -0300
-Subject: [PATCH 1/1] ARM: dtsi: imx6qdl-sabresd: Add USB host 1 VBUS
- regulator
-In-Reply-To: <20130809080540.GA23876@shlinux1.ap.freescale.net>
-References: <1376007824-16325-1-git-send-email-peter.chen@freescale.com>
- <CAOMZO5AXprz7MsxmyWB_nH8pc0GX3sbcZUtDqEVkf0W9myBbxA@mail.gmail.com>
- <20130809080540.GA23876@shlinux1.ap.freescale.net>
-Message-ID: <CAOMZO5BfLTG-8QAou-=m+bM_JL79wv_exedRbbh3hgB12WBWtw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 9 Aug 2013 07:32:15 -0400
+Subject: [PATCH v5 3/3] ARM: dts: mvebu: Introduce a new compatible
+ string for mv64xxx-i2c
+In-Reply-To: <20130809091336.GA2848@localhost>
+References: <1376039158-1896-1-git-send-email-gregory.clement@free-electrons.com>
+ <1376039158-1896-4-git-send-email-gregory.clement@free-electrons.com>
+ <20130809091336.GA2848@localhost>
+Message-ID: <20130809113215.GO8204@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 9, 2013 at 5:05 AM, Peter Chen <peter.chen@freescale.com> wrote:
+Ezequiel,
 
-> Thanks, Fabio. What's the rule for adding gpio function for pinctrl
-> at dts? At pinctrl_hog or the device's pinctrl group?
+On Fri, Aug 09, 2013 at 06:13:37AM -0300, Ezequiel Garcia wrote:
+> (Sending to devicetree)
 
-pinctrl_hog, as each board may have a different gpio to turn on the regulator.
+As an FYI?  I already responded to Mark Rutland's request for the
+binding doc to be updated (that it was this patch, already merged into
+mvebu/dt).  I also asked him if everything looked ok to him and he said
+yes.
 
-The pinctrl group is used for group of pins that control a peripheral,
-such as spi, uart, mmc, etc.
+Is there something else you're looking for with this patch?
+
+confused,
+
+Jason.
+
+> On Fri, Aug 09, 2013 at 11:05:58AM +0200, Gregory CLEMENT wrote:
+> > The mv64xxx-i2c embedded in the Armada XP have a new feature to
+> > offload i2c transaction. This new version of the IP come also with
+> > some errata. This lead to the introduction to a another compatible
+> > string.
+> > 
+> > This commit split the i2c information into armada-370.dtsi and
+> > armada-xp.dtsi. Most of the data remains the same and stay in the
+> > common file Armada-370-xp.dtsi. With this new feature the size of the
+> > registers are bigger for Armada XP and the new compatible string is
+> > used.
+> > 
+> > The Device Tree binding documentation is updated accordingly.
+> > 
+> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > ---
+> >  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 13 ++++++++++++-
+> >  arch/arm/boot/dts/armada-370-xp.dtsi                  |  2 --
+> >  arch/arm/boot/dts/armada-370.dtsi                     |  8 ++++++++
+> >  arch/arm/boot/dts/armada-xp.dtsi                      | 10 ++++++++++
+> >  4 files changed, 30 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > index a1ee681..c5dd952 100644
+> > --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > @@ -4,7 +4,8 @@
+> >  Required properties :
+> >  
+> >   - reg             : Offset and length of the register set for the device
+> > - - compatible      : Should be "marvell,mv64xxx-i2c"
+> > + - compatible      : Should be "marvell,mv64xxx-i2c" and "marvell,mv7230-i2c"
+> > +for controller which support the I2C Transaction Generator
+> >   - interrupts      : The interrupt number
+> >  
+> >  Optional properties :
+> > @@ -20,3 +21,13 @@ Examples:
+> >  		interrupts = <29>;
+> >  		clock-frequency = <100000>;
+> >  	};
+> > +
+> > +For a controller which support the I2C Transaction Generator:
+> > +
+> > +	i2c at 11000 {
+> > +		compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+> > +		reg = <0x11000 0x100>;
+> > +		compatible = "marvell,mv64xxx-i2c";
+> > +		interrupts = <29>;
+> > +		clock-frequency = <100000>;
+> > +	};
+> > diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> > index 90b1176..d8b24c9 100644
+> > --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> > +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> > @@ -121,7 +121,6 @@
+> >  
+> >  			i2c0: i2c at 11000 {
+> >  				compatible = "marvell,mv64xxx-i2c";
+> > -				reg = <0x11000 0x20>;
+> >  				#address-cells = <1>;
+> >  				#size-cells = <0>;
+> >  				interrupts = <31>;
+> > @@ -132,7 +131,6 @@
+> >  
+> >  			i2c1: i2c at 11100 {
+> >  				compatible = "marvell,mv64xxx-i2c";
+> > -				reg = <0x11100 0x20>;
+> >  				#address-cells = <1>;
+> >  				#size-cells = <0>;
+> >  				interrupts = <32>;
+> > diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> > index fa3dfc6..0e2eefa 100644
+> > --- a/arch/arm/boot/dts/armada-370.dtsi
+> > +++ b/arch/arm/boot/dts/armada-370.dtsi
+> > @@ -155,6 +155,14 @@
+> >  				};
+> >  			};
+> >  
+> > +			i2c0: i2c at 11000 {
+> > +				reg = <0x11000 0x20>;
+> > +			};
+> > +
+> > +			i2c1: i2c at 11100 {
+> > +				reg = <0x11100 0x20>;
+> > +			};
+> > +
+> >  			usb at 50000 {
+> >  				clocks = <&coreclk 0>;
+> >  			};
+> > diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> > index 416eb94..e1f2547 100644
+> > --- a/arch/arm/boot/dts/armada-xp.dtsi
+> > +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> > @@ -138,6 +138,16 @@
+> >  				};
+> >  			};
+> >  
+> > +			i2c0: i2c at 11000 {
+> > +				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+> > +				reg = <0x11000 0x100>;
+> > +			};
+> > +
+> > +			i2c1: i2c at 11100 {
+> > +				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+> > +				reg = <0x11100 0x100>;
+> > +			};
+> > +
+> >  			usb at 50000 {
+> >  				clocks = <&gateclk 18>;
+> >  			};
+> > -- 
+> > 1.8.1.2
+> > 
+> 
+> -- 
+> Ezequiel Garc?a, Free Electrons
+> Embedded Linux, Kernel and Android Engineering
+> http://free-electrons.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
