@@ -1,37 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 9 Aug 2013 11:18:42 +0100
-Subject: [alsa-devel] [PATCH v4 1/1] ASoc: kirkwood: add DT support to
- the mvebu audio subsystem
-In-Reply-To: <5204BF06.3060806@metafoo.de>
-References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
- <20130809091953.GO6427@sirena.org.uk> <5204B7A6.9050907@gmail.com>
- <5204BF06.3060806@metafoo.de>
-Message-ID: <20130809101842.GR6427@sirena.org.uk>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Fri,  9 Aug 2013 15:35:14 +0530
+Subject: [PATCH] ARM: EXYNOS: Set 64-bit DMA mask for EXYNOS5250
+Message-ID: <1376042714-26513-1-git-send-email-tushar.behera@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 12:05:58PM +0200, Lars-Peter Clausen wrote:
-> On 08/09/2013 11:34 AM, Sebastian Hesselbarth wrote:
+When LPAE is enabled, we need to set 64bit DMA mask bits.
 
-> > I do understand there may be SoCs requiring sophisticated extra audio
-> > nodes, but Marvell SoCs don't. I prefer having a single node for the
-> > i2s controller *and* exploit the audio subsystem properties from that.
+Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+---
+Based on v3.11-rc4.
 
-> It's not about SoCs, it's about the board. The audio fabric on a board can
-> easily get complex enough to require its own driver. Speakers, mics, jacks
-> and jack detection, external amplifiers, bluetooth, baseband, multiple
-> CODECs. That's what the audio node describes.
+ arch/arm/mach-exynos/mach-exynos5-dt.c |   26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-Exactly - as I said earlier on this week the issue is that in many cases
-there is enough going on in audio system design to make the PCB an
-interesting bit of hardware that's worth describing in the device tree.
-
-To repeat what I said before *please* go back and check the list
-archives, we've been through this several times.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130809/657a714d/attachment.sig>
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index f874b77..2217631 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -14,6 +14,7 @@
+ #include <linux/memblock.h>
+ #include <linux/io.h>
+ #include <linux/clocksource.h>
++#include <linux/dma-mapping.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <mach/regs-pmu.h>
+@@ -23,6 +24,26 @@
+ 
+ #include "common.h"
+ 
++static u64 dma_mask64 = DMA_BIT_MASK(64);
++
++static int exynos5250_platform_notifier(struct notifier_block *nb,
++				  unsigned long event, void *__dev)
++{
++	struct device *dev = __dev;
++
++	if (event != BUS_NOTIFY_ADD_DEVICE)
++		return NOTIFY_DONE;
++
++	dev->dma_mask = &dma_mask64;
++	dev->coherent_dma_mask = DMA_BIT_MASK(64);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block exynos5250_platform_nb = {
++	.notifier_call = exynos5250_platform_notifier,
++};
++
+ static void __init exynos5_dt_machine_init(void)
+ {
+ 	struct device_node *i2c_np;
+@@ -47,6 +68,11 @@ static void __init exynos5_dt_machine_init(void)
+ 		}
+ 	}
+ 
++	if (config_enabled(CONFIG_ARM_LPAE) &&
++			of_machine_is_compatible("samsung,exynos5250"))
++		bus_register_notifier(&platform_bus_type,
++				&exynos5250_platform_nb);
++
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-- 
+1.7.9.5
