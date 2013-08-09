@@ -1,21 +1,86 @@
 From: chanho61.park@samsung.com (Chanho Park)
-Date: Fri, 09 Aug 2013 20:11:32 +0900
-Subject: [PATCH-RESEND 0/2] Support device_prep_dma_sg for pl330
-Message-ID: <1376046694-2638-1-git-send-email-chanho61.park@samsung.com>
+Date: Fri, 09 Aug 2013 20:11:33 +0900
+Subject: [PATCH-RESEND 1/2] dma: pl330: split off common code to give back
+ descriptors
+In-Reply-To: <1376046694-2638-1-git-send-email-chanho61.park@samsung.com>
+References: <1376046694-2638-1-git-send-email-chanho61.park@samsung.com>
+Message-ID: <1376046694-2638-2-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset support device_prep_dma_sg functionality for pl330 dmaengine
-driver. The prep_dma_sg function prepares descriptors to transfer between src
-and dest memory which consists of scatter/gather list. The patchset contains
-code clean-up to eliminate duplications.
+This patch adds __pl330_giveback_descs which give back descriptors when fails
+allocating descriptors. It requires to eliminate duplication for
+pl330_prep_dma_sg which will be added later.
 
-Chanho Park (2):
-  dma: pl330: split off common code to give back descriptors
-  dma: pl330: add pl330_prep_dma_sg to transfer from sglist to sglist
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+Acked-by : Jassi Brar <jassisinghbrar@gmail.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/dma/pl330.c |   38 +++++++++++++++++++++++---------------
+ 1 file changed, 23 insertions(+), 15 deletions(-)
 
- drivers/dma/pl330.c |  209 ++++++++++++++++++++++++++++++++++++++-------------
- 1 file changed, 157 insertions(+), 52 deletions(-)
-
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 4ad13eb..ebc2af9 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2814,6 +2814,28 @@ pl330_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dst,
+ 	return &desc->txd;
+ }
+ 
++static void __pl330_giveback_desc(struct dma_pl330_dmac *pdmac,
++				  struct dma_pl330_desc *first)
++{
++	unsigned long flags;
++	struct dma_pl330_desc *desc;
++
++	if (!first)
++		return;
++
++	spin_lock_irqsave(&pdmac->pool_lock, flags);
++
++	while (!list_empty(&first->node)) {
++		desc = list_entry(first->node.next,
++				struct dma_pl330_desc, node);
++		list_move_tail(&desc->node, &pdmac->desc_pool);
++	}
++
++	list_move_tail(&first->node, &pdmac->desc_pool);
++
++	spin_unlock_irqrestore(&pdmac->pool_lock, flags);
++}
++
+ static struct dma_async_tx_descriptor *
+ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 		unsigned int sg_len, enum dma_transfer_direction direction,
+@@ -2822,7 +2844,6 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	struct dma_pl330_desc *first, *desc = NULL;
+ 	struct dma_pl330_chan *pch = to_pchan(chan);
+ 	struct scatterlist *sg;
+-	unsigned long flags;
+ 	int i;
+ 	dma_addr_t addr;
+ 
+@@ -2842,20 +2863,7 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 			dev_err(pch->dmac->pif.dev,
+ 				"%s:%d Unable to fetch desc\n",
+ 				__func__, __LINE__);
+-			if (!first)
+-				return NULL;
+-
+-			spin_lock_irqsave(&pdmac->pool_lock, flags);
+-
+-			while (!list_empty(&first->node)) {
+-				desc = list_entry(first->node.next,
+-						struct dma_pl330_desc, node);
+-				list_move_tail(&desc->node, &pdmac->desc_pool);
+-			}
+-
+-			list_move_tail(&first->node, &pdmac->desc_pool);
+-
+-			spin_unlock_irqrestore(&pdmac->pool_lock, flags);
++			__pl330_giveback_desc(pdmac, first);
+ 
+ 			return NULL;
+ 		}
 -- 
 1.7.9.5
