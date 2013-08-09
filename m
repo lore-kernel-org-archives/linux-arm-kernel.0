@@ -1,71 +1,50 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Fri, 9 Aug 2013 22:32:57 +0800
-Subject: [PATCH 06/12] dma: mmp_pdma: make the controller a DMA provider
-In-Reply-To: <5204EA60.4060502@gmail.com>
-References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
- <1375870770-14263-7-git-send-email-zonque@gmail.com>
- <201308071812.15420.arnd@arndb.de> <5204EA60.4060502@gmail.com>
-Message-ID: <CAMj5Bkj5PmvdOV307PSpXvTomJsad_7G91X-UFxYJ2KukcqX6g@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 9 Aug 2013 10:34:58 -0400 (EDT)
+Subject: [PATCH 3/3] usb: host: delete chipidea dependency
+In-Reply-To: <87siyjb0iz.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <Pine.LNX.4.44L0.1308091034330.1405-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 9, 2013 at 9:10 PM, Daniel Mack <zonque@gmail.com> wrote:
-> On 07.08.2013 18:12, Arnd Bergmann wrote:
->> On Wednesday 07 August 2013, Daniel Mack wrote:
->>> +    if (op->dev.of_node) {
->>> +            mmp_pdma_info.dma_cap = pdev->device.cap_mask;
->>> +
->>> +            /* Device-tree DMA controller registration */
->>> +            ret = of_dma_controller_register(op->dev.of_node,
->>> +                                             of_dma_simple_xlate,
->>> +                                             &mmp_pdma_info);
->>
->> of_dma_simple_xlate can not be used if there is a chance that multiple instances
->> of the same dma engine, or multiple different DMA engines are present in the
->> system. I generally advise against using it.
->>
->> Please have a look at the changes that Zhangfei Gao proposed in
->> http://comments.gmane.org/gmane.linux.ports.arm.kernel/249077
->> and see if you can do the same here.
->
-> I had another look at that and Zhangfei's case is not really applicable
-> to mine, unfortunately.
->
-> In his case, one specific out of many channels has to be used, depending
-> on the first argument of the phandle. In my case though, the pdma
-> controller may just take any of its channels, and just assign the
-> correct DMA request to it.
+On Fri, 9 Aug 2013, Alexander Shishkin wrote:
 
-Dear Daniel
+> Peter Chen <peter.chen@freescale.com> writes:
+> 
+> > Now, chipidea host has already depended on USB_EHCI_HCD
+> >
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> 
+> Alan, what do you think?
+> 
+> > ---
+> >  drivers/usb/host/Kconfig |    4 ++--
+> >  1 files changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> > index cf521d6..b548554 100644
+> > --- a/drivers/usb/host/Kconfig
+> > +++ b/drivers/usb/host/Kconfig
+> > @@ -63,7 +63,7 @@ config USB_EHCI_HCD
+> >  
+> >  config USB_EHCI_ROOT_HUB_TT
+> >  	bool "Root Hub Transaction Translators"
+> > -	depends on USB_EHCI_HCD || USB_CHIPIDEA_HOST
+> > +	depends on USB_EHCI_HCD
+> >  	---help---
+> >  	  Some EHCI chips have vendor-specific extensions to integrate
+> >  	  transaction translators, so that no OHCI or UHCI companion
+> > @@ -75,7 +75,7 @@ config USB_EHCI_ROOT_HUB_TT
+> >  
+> >  config USB_EHCI_TT_NEWSCHED
+> >  	bool "Improved Transaction Translator scheduling"
+> > -	depends on USB_EHCI_HCD || USB_CHIPIDEA_HOST
+> > +	depends on USB_EHCI_HCD
+> >  	default y
+> >  	---help---
+> >  	  This changes the periodic scheduling code to fill more of the low
+> > -- 
+> > 1.7.0.4
 
-Though any physical channel is workable, the virtual channel does not.
-Each device has to set specific request line.
+I approve.  Getting rid of dependencies is good.
 
-pdma.c
-chan->drcmr = cfg->slave_id;
-nand.c
-  conf.slave_id = info->drcmr_dat;
-
-The specific virtual channel can be directly specificied by request line.
-While pdma.c choose the free physical channel inside, which is
-transparent to client.
-
-It should be same.
-
-Thanks
-
->
-> So if I provide a private xlate function, I need a way to obtain *any*
-> of the channels in my instance. Open-coding that is not easily possible,
-> as I need to hold the dmaengine's local dma_list_mutex for that.
->
-> I have to dig deeper here, but if anyone has a hint, please let me know :)
->
->
-> Daniel
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Alan Stern
