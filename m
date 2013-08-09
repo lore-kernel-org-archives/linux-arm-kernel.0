@@ -1,65 +1,99 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 09 Aug 2013 17:02:02 +0200
-Subject: [PATCH v9 07/16] iommu/exynos: support for device tree
-In-Reply-To: <CAL_JsqKM_YP0Cj3Uo7TeCVcKcbzzsuK3yxTSn6pG8qGFOnZAiA@mail.gmail.com>
-References: <002b01ce941b$160a88a0$421f99e0$@samsung.com>
- <20130809153730.83d3a5ba419def5424bcbb0e@samsung.com>
- <CAL_JsqKM_YP0Cj3Uo7TeCVcKcbzzsuK3yxTSn6pG8qGFOnZAiA@mail.gmail.com>
-Message-ID: <33568604.vCtP4hvQ1q@amdc1227>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 9 Aug 2013 08:05:43 -0700
+Subject: [PATCH v4 2/4] mmc: dw_mmc: Add exynos resume_noirq callback to
+ clear WAKEUP_INT
+In-Reply-To: <001901ce9505$04483820$0cd8a860$%jun@samsung.com>
+References: <1373470926-19314-1-git-send-email-dianders@chromium.org>
+ <1375825071-20922-1-git-send-email-dianders@chromium.org>
+ <1375825071-20922-3-git-send-email-dianders@chromium.org>
+ <001901ce9505$04483820$0cd8a860$%jun@samsung.com>
+Message-ID: <CAD=FV=U3LD-PmEeiNzh0F6Wb2efc==kn_=mTNjwVfB52-phSDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 of August 2013 08:28:09 Rob Herring wrote:
-> On Fri, Aug 9, 2013 at 1:37 AM, Cho KyongHo <pullip.cho@samsung.com> 
-wrote:
-> > On Fri, 09 Aug 2013 00:41:25 +0200, Tomasz Figa wrote:
-> >> Hi KyongHo,
-> >> 
-> >> On Thursday 08 of August 2013 18:38:49 Cho KyongHo wrote:
-> >> > This commit adds device tree support for System MMU.
-> >> > This also include the following changes and enhancements:
-> >> > 
-> >> > * use managed device helper functions.
-> >> > Simplyfies System MMU device driver.
-> >> > 
-> >> > * use only a single clock descriptor.
-> >> > System MMU device descriptor is seperate if it is imposible to make
-> >> > a single clock descriptor to make a device descriptor for a group of
-> >> > System MMUs.
-> >> > 
-> >> > * removed dbgname member from sysmmu_drvdata structure.
-> >> > debugging kernel message for a System MMU is distinguisheable with
-> >> > the
-> >> > name of device descroptors.
-> >> 
-> >> Please put all these three changes in separate patches. This patch is
-> >> hard to review with all the changes mixed together...
-> 
-> Agreed.
-> 
-> > Ok.
-> > 
-> >> In addition, I believe this is the patch that should be adding device
-> >> tree binding documentation, not the 6/16 one, as this is where
-> >> actually support for this binding gets added to the kernel.
-> > 
-> > Oh, I didn't know that devicetree binding description and
-> > implementation need to be in the same patch.
-> > I will do as you advised.
-> 
-> Actually, I prefer the binding docs be separate patches. The reason
-> being so we can get closer to having them in a separate repository.
-> Also, then the binding can be acked separately from the kernel
-> implementation using the binding.
+Seungwon,
 
-OK. This is a good point. So maybe let's fully define this order to be as 
-following (and have first best practice for the DT binding best practices 
-that need to be defined):
+On Fri, Aug 9, 2013 at 6:33 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> On Wed, August 07, 2013, Doug Anderson wrote:
+>> If the WAKEUP_INT is asserted at wakeup and not cleared, we'll end up
+>> looping around forever.  This has been seen to happen on exynos5420
+>> silicon despite the fact that we haven't enabled any wakeup events due
+>> to a silicon errata.  It is safe to do on all exynos variants.
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> ---
+>> Changes in v4:
+>> - Take Seungwon's suggestion and don't add any dw_mmc-pltfm code.
+>>
+>> Changes in v3:
+>> - Add freeze/thaw and poweroff/restore noirq entries.
+>>
+>> Changes in v2:
+>> - Use suspend_noirq as per James Hogan.
+>>
+>>  drivers/mmc/host/dw_mmc-exynos.c | 51 ++++++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 49 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+>> index 866edef..0c1f192 100644
+>> --- a/drivers/mmc/host/dw_mmc-exynos.c
+>> +++ b/drivers/mmc/host/dw_mmc-exynos.c
+>> @@ -30,6 +30,7 @@
+>>  #define SDMMC_CLKSEL_TIMING(x, y, z) (SDMMC_CLKSEL_CCLK_SAMPLE(x) |  \
+>>                                       SDMMC_CLKSEL_CCLK_DRIVE(y) |    \
+>>                                       SDMMC_CLKSEL_CCLK_DIVIDER(z))
+>> +#define SDMMC_CLKSEL_WAKEUP_INT              BIT(11)
+>>
+>>  #define EXYNOS4210_FIXED_CIU_CLK_DIV 2
+>>  #define EXYNOS4412_FIXED_CIU_CLK_DIV 4
+>> @@ -100,6 +101,30 @@ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
+>>       return 0;
+>>  }
+>>
+>> +/**
+>> + * dw_mci_exynos_resume_noirq - Exynos-specific resume code
+>> + *
+>> + * On exynos5420 there is a silicon errata that will sometimes leave the
+>> + * WAKEUP_INT bit in the CLKSEL register asserted.  This bit is 1 to indicate
+>> + * that it fired and we can clear it by writing a 1 back.  Clear it to prevent
+>> + * interrupts from going off constantly.
+>> + *
+>> + * We run this code on all exynos variants because it doesn't hurt and the bug
+>> + * may be more widespread than just exynos5420.
+> I guess just above comment can be removed. (Not be widespread)
+> Updating the origin value of CLKSEL looks like no harm while SDMMC_CLKSEL_WAKEUP_INT is cleared.
 
-Bindings documentation should be added with a separate patch, before any 
-user of these bindings is introduced.
+OK, no problem.  I'll clean up the comment next time revision.
 
-What do you think?
 
-Best regards,
-Tomasz
+>> -module_platform_driver(dw_mci_exynos_pltfm_driver);
+>> +static int __init dw_mci_exynos_init(void)
+>> +{
+>> +     /* Add a "noirq" resume to platform pmops */
+>> +     memcpy(&dw_mci_exynos_pmops, &dw_mci_pltfm_pmops,
+>> +            sizeof(dw_mci_exynos_pmops));
+>> +     WARN_ON(dw_mci_exynos_pmops.resume_noirq ||
+>> +             dw_mci_exynos_pmops.thaw_noirq ||
+>> +             dw_mci_exynos_pmops.restore_noirq);
+>> +     dw_mci_exynos_pmops.resume_noirq = dw_mci_exynos_resume_noirq;
+>> +     dw_mci_exynos_pmops.thaw_noirq = dw_mci_exynos_resume_noirq;
+>> +     dw_mci_exynos_pmops.restore_noirq = dw_mci_exynos_resume_noirq;
+>
+> If CONFIG_PM_SLEEP is not defined, we don't need to add it.
+> And also, instead of reusing dw_mci_pltfm_pmops, how about defining dw_mci_exynos_pmops's own?
+> Of course, suspend/resume will not different with dw_mci_pltfm* just now.
+> But specific code for exynos would be added soon.
+
+
+Whoops!  ...of course this should be conditional on CONFIG_PM_SLEEP.
+Thank you for catching.
+
+I spent a bit of time debating whether I should make my own structure
+or do a copy like this.  It felt like a bit of a toss up to me, but
+I'm happy to do it the other way.  I will call dw_mci_suspend(host)
+directly and assume hope that nobody adds any important code to
+dw_mci_pltfm_suspend().  The other alternative would be make
+dw_mci_pltfm_suspend() exported or call it indirectly through
+dw_mci_pltfm_pmops, both of which seem slightly worse.
+
+-Doug
