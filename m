@@ -1,56 +1,187 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 09 Aug 2013 23:37:56 +0200
-Subject: Linux Plumbers ACPI/PM, PCI Microconference
-In-Reply-To: <CAL-B5D1-CPNcOzjHx4ej5SenawvDqwC4Hef5oDkoxCb9Dz5dUw@mail.gmail.com>
-References: <CAL-B5D1-CPNcOzjHx4ej5SenawvDqwC4Hef5oDkoxCb9Dz5dUw@mail.gmail.com>
-Message-ID: <19119445.uFrsn6yGJd@vostro.rjw.lan>
+From: anton@enomsg.org (Anton Vorontsov)
+Date: Fri, 9 Aug 2013 14:28:50 -0700
+Subject: [PATCH 1/2] power: Add APM X-Gene system reboot driver
+In-Reply-To: <1372797539-13111-2-git-send-email-lho@apm.com>
+References: <1372797539-13111-1-git-send-email-lho@apm.com>
+ <1372797539-13111-2-git-send-email-lho@apm.com>
+Message-ID: <20130809212849.GD12638@lizard.sbx05730.santaca.wayport.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, August 09, 2013 12:12:24 PM Myron Stowe wrote:
-> Time is passing quickly and there are still a few topic areas that we
-> would like discussed during the microconference but still do not have
-> any proposals/knowledgable speakers for.
+On Tue, Jul 02, 2013 at 02:38:58PM -0600, Loc Ho wrote:
+> power: Add APM X-Gene SoC system reboot driver. This driver handles only
+> system reboot. System shutdown is board specific and can be handled by board
+> driver or GPIO based shutdown driver.
 > 
-> For the following people I'm specifically picking on: Are you going to
-> plumbers, would you be willing to cover the following areas?  If you
-> are not going, do you know someone who is and could cover?
-> 
-> Yinghai: host bridge hot-plug - what has been accomplished to date and
-> what still remains to be done?
-> 
-> Mika: Thunderbolt activities?
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+> ---
 
-That falls under my hotplug topic (that's been submitted already).
+The patch looks great, thanks for it! Just a few minor issues I noticed...
 
-> Jiang Liu, Gu Zheng: Would you be willing to cover your recent efforts
-> with PCI device (hot-plug) reference counting?
+>  drivers/power/reset/Kconfig        |    7 +++
+>  drivers/power/reset/Makefile       |    1 +
+>  drivers/power/reset/xgene-reboot.c |  101 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 109 insertions(+), 0 deletions(-)
+>  create mode 100755 drivers/power/reset/xgene-reboot.c
 > 
-> Russel, Rob, Stephen, Thomas, Jason, Thierry: ARM - especially any
-> PCI(e) ideosynchronicies along with ARM's IOMMU arch and how that
-> relates to PCI.
-> 
-> Alex Williamson: you want/need to cover any of the following - PCI
-> secondary bus resets; pci_is_pcie() - Not just for PCIe capabilities;
-> I/O port pci-sysfs resource files (fix or remove)?
-> 
-> Of course anyone else is free to propose something or sign up for
-> covering one of the proposed topics listed at
-> http://wiki.linuxplumbersconf.org/2013:pci_subsystem
-> 
-> 
-> The instructions for submitting proposals should be at:
-> 
-> http://www.linuxplumbersconf.org/2013/submitting-topic/
-> 
-> The Microconference link is at:
-> 
-> http://wiki.linuxplumbersconf.org/2013:pci_subsystem
+> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> index 349e9ae..c41a7de 100644
+> --- a/drivers/power/reset/Kconfig
+> +++ b/drivers/power/reset/Kconfig
+> @@ -37,3 +37,10 @@ config POWER_RESET_VEXPRESS
+>  	help
+>  	  Power off and reset support for the ARM Ltd. Versatile
+>  	  Express boards.
+> +
+> +config POWER_RESET_XGENE
+> +        bool
+> +	default y if ARM64
 
-Yes, everyone, if you are going to attend the LPC and have a topic for
-discussion during the ACPI/PM+PCI uconf, please submit a proposal.
+This is not good. You don't want to select the driver for all ARM64
+builds. I changed it to 'depends on' and made the driver optionally
+selectable.
 
-We should be able to accommodate 7-8 30-minutes slots.
+> +        depends on POWER_RESET	
+> +        help
+> +          Reboot support for the APM SoC X-Gene Eval boards.
 
-Thanks,
-Rafael
+Some whitespace issues here...
+
+> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+> index 372807f..e75d54c 100644
+> --- a/drivers/power/reset/Makefile
+> +++ b/drivers/power/reset/Makefile
+> @@ -2,3 +2,4 @@ obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
+> +obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
+> diff --git a/drivers/power/reset/xgene-reboot.c b/drivers/power/reset/xgene-reboot.c
+> new file mode 100755
+
+Executable bit on the source file?..
+
+> index 0000000..e6e4178
+> --- /dev/null
+> +++ b/drivers/power/reset/xgene-reboot.c
+> @@ -0,0 +1,101 @@
+> +/*
+> + * xgene-reboot.c - AppliedMicro X-Gene SoC Reboot Driver
+
+No need for the file name in the file itself.
+
+> + *
+> + * Copyright (c) 2013, Applied Micro Circuits Corporation
+> + * Author: Feng Kan <fkan@apm.com>
+> + * Author: Loc Ho <lho@apm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+> + * MA 02111-1307 USA
+> + *
+> + * This driver provides system reboot functionality for APM X-Gene SoC.
+> + * For system shutdown, this is board specify. If a board designer
+> + * implements GPIO shutdown, use the gpio-poweroff.c driver.
+> + *
+> + */
+> +#include <linux/io.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/stat.h>
+> +#include <linux/slab.h>
+> +#include <asm/system_misc.h>
+> +
+> +struct xgene_reboot_context {
+> +	struct platform_device *pdev;
+> +	void *csr;
+> +	u32 mask;
+> +};
+> +
+> +static struct xgene_reboot_context *xgene_restart_ctx;
+> +
+> +static void xgene_restart(char str, const char *cmd)
+> +{
+> +	struct xgene_reboot_context *ctx = xgene_restart_ctx;
+> +	unsigned long timeout;
+> +
+> +	/* Issue the reboot */
+> +	if (ctx)
+> +		writel(ctx->mask, ctx->csr);
+> +
+> +	timeout = jiffies + HZ;
+> +	while (time_before(jiffies, timeout))
+> +		cpu_relax();
+> +
+> +	dev_emerg(&ctx->pdev->dev, "Unable to restart system\n");
+> +}
+> +
+> +static int xgene_reboot_probe(struct platform_device *pdev)
+> +{
+> +	struct xgene_reboot_context *ctx;
+> +
+> +	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
+> +	if (ctx == NULL) {
+
+!ctx is shorter
+
+> +		dev_err(&pdev->dev, "out of memory for context\n");
+> +		return -ENODEV;
+> +	}
+> +	ctx->csr = of_iomap(pdev->dev.of_node, 0);
+> +	if (ctx->csr == NULL) {
+> +		devm_kfree(&pdev->dev, ctx);
+> +		dev_err(&pdev->dev, "can not map resource\n");
+> +		return -ENODEV;
+> +	}
+> +	if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
+> +		ctx->mask = 0xFFFFFFFF;
+> +	ctx->pdev = pdev;
+> +	arm_pm_restart = xgene_restart;
+> +	xgene_restart_ctx = ctx;
+> +
+> +	return 0;
+> +}
+> +
+> +static struct of_device_id xgene_reboot_of_match[] = {
+> +	{ .compatible = "apm,xgene-reboot" },
+> +	{}
+> +};
+> +
+> +static struct platform_driver xgene_reboot_driver = {
+> +	.probe = xgene_reboot_probe,
+> +	.driver = {
+> +		.name = "xgene-reboot",
+> +		.of_match_table = xgene_reboot_of_match,
+> +	},
+> +};
+> +
+> +static int __init xgene_reboot_init(void)
+> +{
+> +	return platform_driver_register(&xgene_reboot_driver);
+> +}
+> +device_initcall(xgene_reboot_init);
+> -- 
+> 1.5.5
+
+Wow! This is an ancient git release, 5 years old. Just saying... :)
+
+Anyways, I fixed all the nits and applied the patch to the battery-2.6.git
+tree.
+
+Thanks!
+
+Anton
