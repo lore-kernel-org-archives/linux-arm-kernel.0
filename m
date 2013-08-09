@@ -1,48 +1,65 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 10 Aug 2013 00:50:15 +0200
-Subject: [PATCH 00/20] ARM: pxa: move core and drivers to dmaengine
-In-Reply-To: <1375889649-14638-1-git-send-email-zonque@gmail.com> (Daniel
- Mack's message of "Wed, 7 Aug 2013 17:33:49 +0200")
-References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
-Message-ID: <87zjsqzdg8.fsf@free.fr>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 09 Aug 2013 16:58:18 -0600
+Subject: [PATCHv2] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <1376088088.14580.4.camel@linux-builds1>
+References: <1375735392-6836-1-git-send-email-dinguyen@altera.com>
+ <5203FC1A.3090903@wwwdotorg.org> <1375993920.22740.9.camel@linux-builds1>
+ <5204017A.1040607@wwwdotorg.org> <1375995281.22740.16.camel@linux-builds1>
+ <520409F2.1090906@wwwdotorg.org> <1376003457.22740.25.camel@linux-builds1>
+ <52055867.9000602@wwwdotorg.org> <1376088088.14580.4.camel@linux-builds1>
+Message-ID: <5205740A.50206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack <zonque@gmail.com> writes:
+On 08/09/2013 04:41 PM, Dinh Nguyen wrote:
+> On Fri, 2013-08-09 at 15:00 -0600, Stephen Warren wrote:
+>> On 08/08/2013 05:10 PM, Dinh Nguyen wrote:
+>>> On Thu, 2013-08-08 at 15:13 -0600, Stephen Warren wrote:
+>> ...
+>>>> Why is there a need to directly represent the divider anywhere? The
+>>>> driver can find the rate of the input clock, and I assume it knows what
+>>>> rate it wants the clock to run at, so can't it calculate the divider
+>>>> based on those two pieces of information?
+>>>
+>>> CC: Chris Ball
+>>>>
+>>>> Or, does the driver really not know what rate it wants the clock to be
+>>>> after the internal divider? If not, then I think that *rate* should be
+>>>> recorded in DT, not the divider to obtain that rate.
+>>>>
+>>>
+>>> I believe that this is the case, that the driver does not know what rate
+>>> it will clock the SD card at. I think internally we did have a "bus_hz"
+>>> in DT a while back. I guess I don't really understand why it would be
+>>> better to have a *rate* DT entry instead of a fixed-divider entry?
+>>
+>> The value of the divider depends on two things:
+>>
+>> 1) Input clock rate.
+>> 2) Desired rate after applying the internal divider.
+>>
+>> The input clock rate may vary, either between SoCs the IP is integrated
+>> into, or even at run-time perhaps base on clk_set_rate() etc.
+>>
+>> If the MMC driver knows the clock rate it wants to run at, it can
+>> calculate the divider easily; it can automatically adjust to any input
+>> clock that its environment may provide.
+>>
+>> If the MMC driver is simply told "use this divider", that's encoding
+>> assumptions about the rate of the input clock which might not be valid;.
+>> Encoding the desire clock rate within the MMC HW block allows the
+>> divider to be calculated based on the actual environment.
+> 
+> Thanks Stephen. That makes sense.
+> 
+> Chris, Jaehoon, and Seungwon, do you have any inputs? If not I will go
+> down the path of have the "bus-hz" in the DTS node for the clock rate of
+> the CIU clock. Then I would also make the same change to dw_mmc-exynos
+> but would need your help on what the rate would be.
+> 
+> For SOCFPGA, its 12.5 MHZ.
 
->  * camera driver:
->      I started the transition, but I'm not sure how much sense that
->      makes without access to the hardware. I'd much appreciate if
->      anyone could volunteer for this piece; I'll happily share what
->      I got so far. Sascha, Sachin, Guennadi?
-Hi Daniel,
-
-Do you mean this driver ? :
-drivers/media/platform/soc_camera/pxa_camera.c
-
-In that case I might help. But before I can do that, I have to be convinced that
-dmaengine can deal with this driver. I'm thinking in particular of :
- - "hot running DMA" queuing
- - multiple DMA channel synchronization (ie. 3 channel sync)
-
-All that is described in there :
-  Documentation/video4linux/pxa_camera.txt
-
-If someone with dmaengine knowledge could have a look at pxa_camera.txt (maybe
-Vinod ?) and tell me that dma_engine framework fullfills the 2 requirements,
-then I'll be happy to help.
-
-One minor point though is that I'm working on pxa27x. If the serie is not
-compatible in a way with pxa27x, I won't be able to do anything.
-
-Another point I'd like to know, is what is the performance penalty in using
-dmaengine, and do you have any figures ?
-
-Lastly, they was debug information to debug descriptors chaining, channel
-statuses, requestors. I didn't see where these had gone, could you point me to
-the right file ?
-
-Cheers.
-
--- 
-Robert
+I'm not sure "bus-hz" is the right name; it's not clear from that name
+that it refers to an internal clock inside the MMC controller rather
+than the SD bus out to the card itself. Perhaps "controller-clock-hz" or
+something like that?
