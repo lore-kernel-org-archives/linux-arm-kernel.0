@@ -1,57 +1,48 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Fri, 9 Aug 2013 15:10:27 +0530
-Subject: [PATCHv2 5/5] ARM: dts: Add dt binding documentation for exynos
- rotator
-In-Reply-To: <1376034053-31910-6-git-send-email-chanho61.park@samsung.com>
-References: <1376034053-31910-1-git-send-email-chanho61.park@samsung.com>
- <1376034053-31910-6-git-send-email-chanho61.park@samsung.com>
-Message-ID: <CAK9yfHzQ+vfsdYU-HZrmW5LbU7+ME-qF-xqZk+dx6AS_CKkgzQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Aug 2013 10:43:40 +0100
+Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu
+ audio subsystem
+In-Reply-To: <5204B7A6.9050907@gmail.com>
+References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
+ <20130809091953.GO6427@sirena.org.uk> <5204B7A6.9050907@gmail.com>
+Message-ID: <20130809094340.GO23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanho,
-
-On 9 August 2013 13:10, Chanho Park <chanho61.park@samsung.com> wrote:
-> This patch describes each nodes of rotator and specifies a example how to bind
-> it.
+On Fri, Aug 09, 2013 at 11:34:30AM +0200, Sebastian Hesselbarth wrote:
+> Mark,
 >
-> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> Cc: Thomas Abraham <thomas.abraham@linaro.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Inki Dae <inki.dae@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  .../devicetree/bindings/gpu/samsung-rotator.txt    |   26 ++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpu/samsung-rotator.txt
+> I do understand there may be SoCs requiring sophisticated extra audio
+> nodes, but Marvell SoCs don't. I prefer having a single node for the
+> i2s controller *and* exploit the audio subsystem properties from that.
 >
-> diff --git a/Documentation/devicetree/bindings/gpu/samsung-rotator.txt b/Documentation/devicetree/bindings/gpu/samsung-rotator.txt
-> new file mode 100644
-> index 0000000..31ee7b5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpu/samsung-rotator.txt
-> @@ -0,0 +1,26 @@
-> +* Samsung Image Rotator
-> +
-> +Required properties:
-> +  - compatible : value should be following:
+> For Marvell audio, we only need a single node for all three ASoC
+> drivers. No other subsystem _requires_ you to have extra nodes for
+> it's needs. If you can provide interrupts, just have an interrupt-
+> controller property. If you can provide clocks, you can link to that
+> very node - no virtual device node required. Even for media they
+> do not insist on a virtual node but they do have generic properties
+> you can exploit.
 
-This should be "should be one of the following:"
+Certainly from the "DT is a hardware description" you are completely
+correct.  The audio controller _should_ link directly to the codec,
+because that's how the hardware is wired.  Remember though that there
+are two outputs from the audio controller (please, call it audio
+controller, not I2S controller) so you need to specify which of those
+two outputs the "codec" is connected to.
 
-> +       (a) "samsung,exynos4210-rotator" for Rotator IP in Exynos4210
-> +       (b) "samsung,exynos4212-rotator" for Rotator IP in Exynos4212/4412
-> +       (c) "samsung,exynos5250-rotator" for Rotator IP in Exynos5250
-> +
-> +  - reg : Physical base address of the IP registers and length of memory
-> +         mapped region.
-> +
-> +  - interrupts : Interrupt number of Rotator
-> +
-> +  - clocks : Clock number described in Documentations/devicetree/binding/clock.
+I would say that's required irrespective of whether or not we have a
+virtual node to aggregate the stuff together for ASoC's purposes (which
+should not be part of the DT hardware description - it can be part of
+the "software" configuration though.)
 
-The path has several typos. Instead you can simply mention
-clocks : from common clock binding: handle to rotator clock.
+We may be able to have kirkwood-i2s.c (which I plan to rename to
+mvebu-audio.c) automatically generate the snd_soc_card stuff from the
+audio controller node.  Given that we need a more complex description
+than the "simple" thing for DPCM, that might be overall the best
+solution in any case (maybe calling out to a library which can be
+shared between CPU DAI drivers to do this.)
 
--- 
-With warm regards,
-Sachin
+Note that we do have another case not yet in tree, which is DRM, but
+this case is different from that, because ASoC can cope with components
+with independent initialisation.
