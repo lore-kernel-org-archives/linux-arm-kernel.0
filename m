@@ -1,141 +1,38 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 09 Aug 2013 11:18:27 +0200
-Subject: [PATCH v5 3/3] ARM: dts: mvebu: Introduce a new compatible string
- for mv64xxx-i2c
-In-Reply-To: <20130809091336.GA2848@localhost>
-References: <1376039158-1896-1-git-send-email-gregory.clement@free-electrons.com>
- <1376039158-1896-4-git-send-email-gregory.clement@free-electrons.com>
- <20130809091336.GA2848@localhost>
-Message-ID: <5204B3E3.5010106@free-electrons.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 9 Aug 2013 11:18:43 +0200
+Subject: [PATCH] ARM: omap2: Use a consistent AM33XX SoC option description
+In-Reply-To: <1375997528-396-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1375997528-396-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <CABxcv=keV2Jf4gDwF477a9Msk6b-RgDBcxK1QyhchWffbKAoXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2013 11:13, Ezequiel Garcia wrote:
-> (Sending to devicetree)
+On Thu, Aug 8, 2013 at 11:32 PM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> Fix the option description to match the other TI SoCs.
+> This is just a cosmetic change.
+>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/mach-omap2/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 76170dd..56021c6 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -64,7 +64,7 @@ config SOC_OMAP5
+>         select ARM_ERRATA_798181 if SMP
+>
+>  config SOC_AM33XX
+> -       bool "AM33XX support"
+> +       bool "TI AM33XX"
+>         depends on ARCH_MULTI_V7
+>         select ARCH_OMAP2PLUS
+>         select ARM_CPU_SUSPEND if PM
+> --
+> 1.8.1.5
+>
+>
 
-As written in the cover letter this patch was already taken,
-so I am not sure you have to send it again on the devicetree
-mailing list, they have enough traffic I think.
-
-> 
-> On Fri, Aug 09, 2013 at 11:05:58AM +0200, Gregory CLEMENT wrote:
->> The mv64xxx-i2c embedded in the Armada XP have a new feature to
->> offload i2c transaction. This new version of the IP come also with
->> some errata. This lead to the introduction to a another compatible
->> string.
->>
->> This commit split the i2c information into armada-370.dtsi and
->> armada-xp.dtsi. Most of the data remains the same and stay in the
->> common file Armada-370-xp.dtsi. With this new feature the size of the
->> registers are bigger for Armada XP and the new compatible string is
->> used.
->>
->> The Device Tree binding documentation is updated accordingly.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 13 ++++++++++++-
->>  arch/arm/boot/dts/armada-370-xp.dtsi                  |  2 --
->>  arch/arm/boot/dts/armada-370.dtsi                     |  8 ++++++++
->>  arch/arm/boot/dts/armada-xp.dtsi                      | 10 ++++++++++
->>  4 files changed, 30 insertions(+), 3 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
->> index a1ee681..c5dd952 100644
->> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
->> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
->> @@ -4,7 +4,8 @@
->>  Required properties :
->>  
->>   - reg             : Offset and length of the register set for the device
->> - - compatible      : Should be "marvell,mv64xxx-i2c"
->> + - compatible      : Should be "marvell,mv64xxx-i2c" and "marvell,mv7230-i2c"
->> +for controller which support the I2C Transaction Generator
->>   - interrupts      : The interrupt number
->>  
->>  Optional properties :
->> @@ -20,3 +21,13 @@ Examples:
->>  		interrupts = <29>;
->>  		clock-frequency = <100000>;
->>  	};
->> +
->> +For a controller which support the I2C Transaction Generator:
->> +
->> +	i2c at 11000 {
->> +		compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
->> +		reg = <0x11000 0x100>;
->> +		compatible = "marvell,mv64xxx-i2c";
->> +		interrupts = <29>;
->> +		clock-frequency = <100000>;
->> +	};
->> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
->> index 90b1176..d8b24c9 100644
->> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
->> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
->> @@ -121,7 +121,6 @@
->>  
->>  			i2c0: i2c at 11000 {
->>  				compatible = "marvell,mv64xxx-i2c";
->> -				reg = <0x11000 0x20>;
->>  				#address-cells = <1>;
->>  				#size-cells = <0>;
->>  				interrupts = <31>;
->> @@ -132,7 +131,6 @@
->>  
->>  			i2c1: i2c at 11100 {
->>  				compatible = "marvell,mv64xxx-i2c";
->> -				reg = <0x11100 0x20>;
->>  				#address-cells = <1>;
->>  				#size-cells = <0>;
->>  				interrupts = <32>;
->> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
->> index fa3dfc6..0e2eefa 100644
->> --- a/arch/arm/boot/dts/armada-370.dtsi
->> +++ b/arch/arm/boot/dts/armada-370.dtsi
->> @@ -155,6 +155,14 @@
->>  				};
->>  			};
->>  
->> +			i2c0: i2c at 11000 {
->> +				reg = <0x11000 0x20>;
->> +			};
->> +
->> +			i2c1: i2c at 11100 {
->> +				reg = <0x11100 0x20>;
->> +			};
->> +
->>  			usb at 50000 {
->>  				clocks = <&coreclk 0>;
->>  			};
->> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
->> index 416eb94..e1f2547 100644
->> --- a/arch/arm/boot/dts/armada-xp.dtsi
->> +++ b/arch/arm/boot/dts/armada-xp.dtsi
->> @@ -138,6 +138,16 @@
->>  				};
->>  			};
->>  
->> +			i2c0: i2c at 11000 {
->> +				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
->> +				reg = <0x11000 0x100>;
->> +			};
->> +
->> +			i2c1: i2c at 11100 {
->> +				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
->> +				reg = <0x11100 0x100>;
->> +			};
->> +
->>  			usb at 50000 {
->>  				clocks = <&gateclk 18>;
->>  			};
->> -- 
->> 1.8.1.2
->>
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Reviewed-by: Javier Martinez Canillas <javier@dowhile0.org>
