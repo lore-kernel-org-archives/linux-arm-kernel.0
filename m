@@ -1,77 +1,111 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 09 Aug 2013 18:50:10 +0900
-Subject: [PATCH 13/14] ARM: shmobile: Rename to r8a7778_init_early()
+Date: Fri, 09 Aug 2013 18:50:21 +0900
+Subject: [PATCH 14/14] ARM: shmobile: Rename to sh73a0_init_early(),
+ use smp_set_ops()
 In-Reply-To: <20130809094748.6530.16511.sendpatchset@w520>
 References: <20130809094748.6530.16511.sendpatchset@w520>
-Message-ID: <20130809095010.6530.87879.sendpatchset@w520>
+Message-ID: <20130809095021.6530.8841.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Rename r8a7778_init_delay() into r8a7778_init_early()
+Rename sh73a0_init_delay() into sh73a0_init_early()
 to make the function name show that more than just
-delay setup may happen in the future.
+delay setup will happen.
+
+Also, instead of specifying the smp ops in DT_MACHINE
+convert the sh73a0 SoC code to install the smp ops
+from sh73a0_init_early().
+
+The sh73a0_add_early_devices() function also gets
+updated to call sh73a0_init_early(). This way the
+smp ops will be installed in both DT and C cases.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/board-bockw-reference.c |    2 +-
- arch/arm/mach-shmobile/board-bockw.c           |    2 +-
- arch/arm/mach-shmobile/include/mach/r8a7778.h  |    2 +-
- arch/arm/mach-shmobile/setup-r8a7778.c         |    4 ++--
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/mach-shmobile/board-kzm9g-reference.c |    3 +--
+ arch/arm/mach-shmobile/board-kzm9g.c           |    1 -
+ arch/arm/mach-shmobile/include/mach/sh73a0.h   |    2 +-
+ arch/arm/mach-shmobile/setup-sh73a0.c          |   11 +++++++----
+ 4 files changed, 9 insertions(+), 8 deletions(-)
 
---- 0001/arch/arm/mach-shmobile/board-bockw-reference.c
-+++ work/arch/arm/mach-shmobile/board-bockw-reference.c	2013-08-09 17:21:15.000000000 +0900
-@@ -54,7 +54,7 @@ static const char *bockw_boards_compat_d
+--- 0011/arch/arm/mach-shmobile/board-kzm9g-reference.c
++++ work/arch/arm/mach-shmobile/board-kzm9g-reference.c	2013-08-09 17:44:10.000000000 +0900
+@@ -54,9 +54,8 @@ static const char *kzm9g_boards_compat_d
  };
  
- DT_MACHINE_START(BOCKW_DT, "bockw")
--	.init_early	= r8a7778_init_delay,
-+	.init_early	= r8a7778_init_early,
- 	.init_irq	= r8a7778_init_irq_dt,
- 	.init_machine	= bockw_init,
- 	.dt_compat	= bockw_boards_compat_dt,
---- 0001/arch/arm/mach-shmobile/board-bockw.c
-+++ work/arch/arm/mach-shmobile/board-bockw.c	2013-08-09 17:21:01.000000000 +0900
-@@ -276,7 +276,7 @@ static const char *bockw_boards_compat_d
+ DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
+-	.smp		= smp_ops(sh73a0_smp_ops),
+ 	.map_io		= sh73a0_map_io,
+-	.init_early	= sh73a0_init_delay,
++	.init_early	= sh73a0_init_early,
+ 	.init_machine	= kzm_init,
+ 	.dt_compat	= kzm9g_boards_compat_dt,
+ MACHINE_END
+--- 0001/arch/arm/mach-shmobile/board-kzm9g.c
++++ work/arch/arm/mach-shmobile/board-kzm9g.c	2013-08-09 17:44:01.000000000 +0900
+@@ -904,7 +904,6 @@ static const char *kzm9g_boards_compat_d
  };
  
- DT_MACHINE_START(BOCKW_DT, "bockw")
--	.init_early	= r8a7778_init_delay,
-+	.init_early	= r8a7778_init_early,
- 	.init_irq	= r8a7778_init_irq_dt,
- 	.init_machine	= bockw_init,
- 	.dt_compat	= bockw_boards_compat_dt,
---- 0001/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ work/arch/arm/mach-shmobile/include/mach/r8a7778.h	2013-08-09 17:21:43.000000000 +0900
-@@ -26,7 +26,7 @@ extern void r8a7778_add_ether_device(str
- extern void r8a7778_add_dt_devices(void);
+ DT_MACHINE_START(KZM9G_DT, "kzm9g")
+-	.smp		= smp_ops(sh73a0_smp_ops),
+ 	.map_io		= sh73a0_map_io,
+ 	.init_early	= sh73a0_add_early_devices,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+--- 0010/arch/arm/mach-shmobile/include/mach/sh73a0.h
++++ work/arch/arm/mach-shmobile/include/mach/sh73a0.h	2013-08-09 17:42:03.000000000 +0900
+@@ -71,7 +71,7 @@ enum {
+ #define SH73A0_PINT0_IRQ(irq) ((irq) + 700)
+ #define SH73A0_PINT1_IRQ(irq) ((irq) + 732)
  
- extern void r8a7778_init_late(void);
--extern void r8a7778_init_delay(void);
-+extern void r8a7778_init_early(void);
- extern void r8a7778_init_irq_dt(void);
- extern void r8a7778_clock_init(void);
- extern void r8a7778_init_irq_extpin(int irlm);
---- 0001/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7778.c	2013-08-09 17:20:46.000000000 +0900
-@@ -368,7 +368,7 @@ void __init r8a7778_init_irq_extpin(int
- 			&irqpin_platform_data, sizeof(irqpin_platform_data));
+-extern void sh73a0_init_delay(void);
++extern void sh73a0_init_early(void);
+ extern void sh73a0_init_irq(void);
+ extern void sh73a0_map_io(void);
+ extern void sh73a0_earlytimer_init(void);
+--- 0011/arch/arm/mach-shmobile/setup-sh73a0.c
++++ work/arch/arm/mach-shmobile/setup-sh73a0.c	2013-08-09 17:43:43.000000000 +0900
+@@ -919,9 +919,12 @@ void __init sh73a0_add_standard_devices(
+ 			    ARRAY_SIZE(sh73a0_late_devices));
  }
  
--void __init r8a7778_init_delay(void)
-+void __init r8a7778_init_early(void)
+-void __init sh73a0_init_delay(void)
++void __init sh73a0_init_early(void)
  {
- 	shmobile_setup_delay(800, 1, 3); /* Cortex-A9 @ 800MHz */
+ 	shmobile_setup_delay(1196, 44, 46); /* Cortex-A9 @ 1196MHz */
++#ifdef CONFIG_SMP
++	smp_set_ops(&sh73a0_smp_ops);
++#endif
  }
-@@ -404,7 +404,7 @@ static const char *r8a7778_compat_dt[] _
+ 
+ /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
+@@ -929,7 +932,6 @@ void __init __weak sh73a0_register_twd(v
+ 
+ void __init sh73a0_earlytimer_init(void)
+ {
+-	sh73a0_init_delay();
+ 	sh73a0_clock_init();
+ 	shmobile_earlytimer_init();
+ 	sh73a0_register_twd();
+@@ -937,6 +939,8 @@ void __init sh73a0_earlytimer_init(void)
+ 
+ void __init sh73a0_add_early_devices(void)
+ {
++	sh73a0_init_early();
++
+ 	early_platform_add_devices(sh73a0_devices_dt,
+ 				   ARRAY_SIZE(sh73a0_devices_dt));
+ 	early_platform_add_devices(sh73a0_early_devices,
+@@ -954,9 +958,8 @@ static const char *sh73a0_boards_compat_
  };
  
- DT_MACHINE_START(R8A7778_DT, "Generic R8A7778 (Flattened Device Tree)")
--	.init_early	= r8a7778_init_delay,
-+	.init_early	= r8a7778_init_early,
- 	.init_irq	= r8a7778_init_irq_dt,
- 	.dt_compat	= r8a7778_compat_dt,
- 	.init_late      = r8a7778_init_late,
+ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
+-	.smp		= smp_ops(sh73a0_smp_ops),
+ 	.map_io		= sh73a0_map_io,
+-	.init_early	= sh73a0_init_delay,
++	.init_early	= sh73a0_init_early,
+ 	.dt_compat	= sh73a0_boards_compat_dt,
+ MACHINE_END
+ #endif /* CONFIG_USE_OF */
