@@ -1,248 +1,133 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Fri, 09 Aug 2013 13:15:20 +0900
-Subject: [PATCH v9 03/16] iommu/exynos: fix page table maintenance
-In-Reply-To: <1516548.d7oQuzQS7g@amdc1227>
-References: <002701ce941a$eecebdb0$cc6c3910$@samsung.com>
- <1516548.d7oQuzQS7g@amdc1227>
-Message-ID: <20130809131520.270b7be7454b1862b146e592@samsung.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 08 Aug 2013 21:53:49 -0700
+Subject: [PATCH v6 0/5] clk: implement remuxing during set_rate
+In-Reply-To: <1375097102-28892-1-git-send-email-james.hogan@imgtec.com>
+References: <1375097102-28892-1-git-send-email-james.hogan@imgtec.com>
+Message-ID: <20130809045349.5348.29829@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 08 Aug 2013 15:54:50 +0200, Tomasz Figa wrote:
-> On Thursday 08 of August 2013 18:37:43 Cho KyongHo wrote:
-> > This prevents allocating lv2 page table for the lv1 page table entry
->   ^ What this is this this about? :)
+Quoting James Hogan (2013-07-29 04:24:57)
+> This patchset adds support for automatic selection of the best parent
+> for a clock mux, i.e. the one which can provide the closest clock rate
+> to that requested. It can be disabled by a new CLK_SET_RATE_NO_REPARENT
+> flag (which is set for all uses of clk_register_mux().
 > 
-As you might indicate, 'this' means this patch :)
+> This works by way of adding a new op, determine_rate, similar to
+> round_rate but with an extra parameter to allow the clock driver to
+> optionally select a different parent clock. This is used in
+> clk_calc_new_rates to decide whether to initiate a set_parent operation.
 
-> > that already has 1MB page mapping. In addition, changed to BUG_ON
-> > instead of returning -EADDRINUSE.
-> 
-> The change mentioned in last sentence should be a separate patch.
-> 
-Ok :)
+Hi James,
 
-> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> > ---
-> >  drivers/iommu/exynos-iommu.c |   68
-> > ++++++++++++++++++++++++----------------- 1 files changed, 40
-> > insertions(+), 28 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> > index d545a25..d90e6fa 100644
-> > --- a/drivers/iommu/exynos-iommu.c
-> > +++ b/drivers/iommu/exynos-iommu.c
-> > @@ -52,11 +52,11 @@
-> >  #define lv2ent_large(pent) ((*(pent) & 3) == 1)
-> > 
-> >  #define section_phys(sent) (*(sent) & SECT_MASK)
-> > -#define section_offs(iova) ((iova) & 0xFFFFF)
-> > +#define section_offs(iova) ((iova) & ~SECT_MASK)
-> >  #define lpage_phys(pent) (*(pent) & LPAGE_MASK)
-> > -#define lpage_offs(iova) ((iova) & 0xFFFF)
-> > +#define lpage_offs(iova) ((iova) & ~LPAGE_MASK)
-> >  #define spage_phys(pent) (*(pent) & SPAGE_MASK)
-> > -#define spage_offs(iova) ((iova) & 0xFFF)
-> > +#define spage_offs(iova) ((iova) & ~SPAGE_MASK)
-> > 
-> >  #define lv1ent_offset(iova) ((iova) >> SECT_ORDER)
-> >  #define lv2ent_offset(iova) (((iova) & 0xFF000) >> SPAGE_ORDER)
-> > @@ -856,13 +856,15 @@ finish:
-> >  static unsigned long *alloc_lv2entry(unsigned long *sent, unsigned long
-> > iova, short *pgcounter)
-> >  {
-> > +	BUG_ON(lv1ent_section(sent));
-> 
-> Is this condition really a critical one, to the point that the system 
-> should not continue execution?
-> 
-Discussed with Grant. He thought that creating mapping on a valid mapping
-is just a BUG and I finally agreed with him. Is there a case that the condition
-in BUG_ON is true intentionally?
+I'm performing some testing on this series now. If I don't spot any
+regressions than I'll take it into clk-next. Thanks a lot for the rework
+you've done.
 
-> > +
-> >  	if (lv1ent_fault(sent)) {
-> >  		unsigned long *pent;
-> > 
-> >  		pent = kzalloc(LV2TABLE_SIZE, GFP_ATOMIC);
-> >  		BUG_ON((unsigned long)pent & (LV2TABLE_SIZE - 1));
-> >  		if (!pent)
-> > -			return NULL;
-> > +			return ERR_PTR(-ENOMEM);
-> > 
-> >  		*sent = mk_lv1ent_page(__pa(pent));
-> >  		*pgcounter = NUM_LV2ENTRIES;
-> > @@ -875,15 +877,11 @@ static unsigned long *alloc_lv2entry(unsigned long
-> > *sent, unsigned long iova,
-> > 
-> >  static int lv1set_section(unsigned long *sent, phys_addr_t paddr, short
-> > *pgcnt) {
-> > -	if (lv1ent_section(sent))
-> > -		return -EADDRINUSE;
-> > +	BUG_ON(lv1ent_section(sent));
-> 
-> Ditto.
-> 
-> >  	if (lv1ent_page(sent)) {
-> > -		if (*pgcnt != NUM_LV2ENTRIES)
-> > -			return -EADDRINUSE;
-> > -
-> > +		BUG_ON(*pgcnt != NUM_LV2ENTRIES);
-> 
-> Ditto.
-> 
-> >  		kfree(page_entry(sent, 0));
-> > -
-> >  		*pgcnt = 0;
-> >  	}
-> > 
-> > @@ -894,24 +892,24 @@ static int lv1set_section(unsigned long *sent,
-> > phys_addr_t paddr, short *pgcnt) return 0;
-> >  }
-> > 
-> > +static void clear_page_table(unsigned long *ent, int n)
-> > +{
-> > +	if (n > 0)
-> > +		memset(ent, 0, sizeof(*ent) * n);
-> > +}
-> 
-> I don't see the point of creating this function. It seems to be used only 
-> once, in addition with a constant as n, so the check for n > 0 is 
-> unnecessary.
-> 
-> And even if there is a need for this change, it should be done in separate 
-> patch, as this one is not about stylistic changes, but fixing page table 
-> maintenance (at least based on your commit message).
-> 
+I think that work on re-muxing is not yet complete. There are still
+unresolved issues about picking "best parents", and likely some other
+loose ends. We can fix those up later.
 
-I know what you are concerning about.
-It was introduced in v8 patches to recover previous fault entries before
-returning -EADDRINUSE. It is still remained though "return -EADDRINUSE"
-is changed into BUG_ON().
-I also think that it needs to be removed.
+Regards,
+Mike
 
-> >  static int lv2set_page(unsigned long *pent, phys_addr_t paddr, size_t
-> > size, short *pgcnt)
-> >  {
-> >  	if (size == SPAGE_SIZE) {
-> > -		if (!lv2ent_fault(pent))
-> > -			return -EADDRINUSE;
-> > -
-> > +		BUG_ON(!lv2ent_fault(pent));
 > 
-> Ditto.
+> Changes in v6:
 > 
-> >  		*pent = mk_lv2ent_spage(paddr);
-> >  		pgtable_flush(pent, pent + 1);
-> >  		*pgcnt -= 1;
-> >  	} else { /* size == LPAGE_SIZE */
-> >  		int i;
-> >  		for (i = 0; i < SPAGES_PER_LPAGE; i++, pent++) {
-> > -			if (!lv2ent_fault(pent)) {
-> > -				memset(pent, 0, sizeof(*pent) * i);
-> > -				return -EADDRINUSE;
-> > -			}
-> > -
-> > +			BUG_ON(!lv2ent_fault(pent));
+> * Rebased on v3.11-rc1.
+> * Added changes to samsung/clk-exynos-audss.c, zynq/clkc.c.
 > 
-> Ditto.
+> Changes in v5:
 > 
-> >  			*pent = mk_lv2ent_lpage(paddr);
-> >  		}
-> >  		pgtable_flush(pent - SPAGES_PER_LPAGE, pent);
-> > @@ -944,17 +942,16 @@ static int exynos_iommu_map(struct iommu_domain
-> > *domain, unsigned long iova, pent = alloc_lv2entry(entry, iova,
-> >  					&priv->lv2entcnt[lv1ent_offset(iova)]);
-> > 
-> > -		if (!pent)
-> > -			ret = -ENOMEM;
-> > +		if (IS_ERR(pent))
-> > +			ret = PTR_ERR(pent);
-> >  		else
-> >  			ret = lv2set_page(pent, paddr, size,
-> >  					&priv->lv2entcnt[lv1ent_offset(iova)]);
-> >  	}
-> > 
-> > -	if (ret) {
-> > -		pr_debug("%s: Failed to map iova 0x%lx/0x%x bytes\n",
-> > -							__func__, iova, size);
-> > -	}
-> > +	if (ret)
-> > +		pr_err("%s: Failed(%d) to map 0x%#x bytes @ %#lx\n",
-> > +			__func__, ret, size, iova);
-> > 
-> >  	spin_unlock_irqrestore(&priv->pgtablelock, flags);
-> > 
-> > @@ -968,6 +965,7 @@ static size_t exynos_iommu_unmap(struct iommu_domain
-> > *domain, struct sysmmu_drvdata *data;
-> >  	unsigned long flags;
-> >  	unsigned long *ent;
-> > +	size_t err_pgsize;
-> > 
-> >  	BUG_ON(priv->pgtable == NULL);
-> > 
-> > @@ -976,7 +974,10 @@ static size_t exynos_iommu_unmap(struct iommu_domain
-> > *domain, ent = section_entry(priv->pgtable, iova);
-> > 
-> >  	if (lv1ent_section(ent)) {
-> > -		BUG_ON(size < SECT_SIZE);
-> > +		if (WARN_ON(size < SECT_SIZE)) {
-> > +			err_pgsize = SECT_SIZE;
-> > +			goto err;
-> > +		}
-> > 
-> >  		*ent = 0;
-> >  		pgtable_flush(ent, ent + 1);
-> > @@ -1008,9 +1009,12 @@ static size_t exynos_iommu_unmap(struct
-> > iommu_domain *domain, }
-> > 
-> >  	/* lv1ent_large(ent) == true here */
-> > -	BUG_ON(size < LPAGE_SIZE);
-> > +	if (WARN_ON(size < LPAGE_SIZE)) {
-> > +		err_pgsize = LPAGE_SIZE;
-> > +		goto err;
-> > +	}
-> > 
-> > -	memset(ent, 0, sizeof(*ent) * SPAGES_PER_LPAGE);
-> > +	clear_page_table(ent, SPAGES_PER_LPAGE);
+> * Rebased on latest clk-next ("clk: tegra: Use common of_clk_init
+>   function")
+> * Updated clock hardware characteristics table in documentation.
 > 
-> This seems to be the only use of the introduced clear_page_table() 
-> function. Is there a need to replace the memset with it?
+> Changes in v4:
 > 
-
-Agree.
-
-> >  	pgtable_flush(ent, ent + SPAGES_PER_LPAGE);
-> > 
-> >  	size = LPAGE_SIZE;
-> > @@ -1023,8 +1027,16 @@ done:
-> >  		sysmmu_tlb_invalidate_entry(data->dev, iova);
-> >  	spin_unlock_irqrestore(&priv->lock, flags);
-> > 
-> > -
-> >  	return size;
-> > +err:
-> > +	spin_unlock_irqrestore(&priv->pgtablelock, flags);
-> > +
-> > +	pr_err("%s: Failed due to size(%#x) @ %#lx is"\
-> > +		" smaller than page size %#x\n",
-> > +		__func__, size, iova, err_pgsize);
-> > +
-> > +	return 0;
-> > +
+> * rebased on clk-next ("clk: sun5i: Add compatibles for Allwinner A13").
+> * replace __clk_set_parent_no_recalc with __clk_set_parent.
+> * never pass NULL to determine_rate's best_parent_clk parameter, and
+>   slight refactor of __clk_round_rate to use local copy of clk->parent.
+> * a few new comments around use of clk::new_child.
+> * new patch (patch 2) split out of patch 3 to avoid having to declare
+>   static __clk_set_parent() at the top of clk.c, and to ease readability
+>   of patch 3.
 > 
-> nit: Stray blank line.
+> Changes in v3:
 > 
-Oh. I didn't catch that.
-
-Thanks.
-
-KyongHo
-
-> Best regards,
-> Tomasz
+> * rebased on v3.10-rc1.
+> * remove double underscore prefix from clk_get_parent_by_index()
+> * store new_parent_index in struct clk too (calculated from
+>   clk_fetch_parent_index, and passed through __clk_set_parent_no_recalc
+>   to __clk_set_parent).
+> * allow determine_rate to satisfy recalc_rate check in __clk_init.
+> * rename/invert CLK_SET_RATE_REMUX to CLK_SET_RATE_NO_REPARENT and move
+>   to patch 3.
+> * patch 3: add CLK_SET_RATE_NO_REPARENT flag to all callers of
+>   clk_register_mux. If you don't mind your clocks being reparented in
+>   response to set_rate please let me know and I'll drop the relevant
+>   portion of the patch.
 > 
-> >  }
-> > 
-> >  static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain
-> > *domain,
+> Changes in v2:
+> 
+> I've moved the mux determine_rate implementation into a core helper, but
+> I haven't pushed it fully into the core, as I think it just wouldn't
+> work correctly for more complex clocks, e.g. if you (theoretically) had
+> a combined mux and divide, you'd want to intercept the determine_rate
+> and ask for a larger rate from the parent clocks, then return the
+> divided rate. This should be possible by wrapping the mux determine_rate
+> helper.
+> 
+> Patch 1 still exports the __clk_get_parent_by_index as it seems like it
+> might be a useful thing for clock implementations to have access to if
+> they ever wanted to do something more fancy with changing clock parents.
+> 
+> I haven't made any attempt to implement the atomic set_parent+set_rate
+> as I don't have hardware that could take proper advantage of it, but it
+> shouldn't be too difficult for others to implement if they wanted since
+> they're fairly close to one another (in clk_change_rate()).
+> 
+> * switched to using new determine_rate op rather than adding an argument
+>   to round_rate.
+> * moved mux implementation into a single helper which should be usable
+>   from more complex clocks which can mux.
+> * rewrite main implementation so that no changes are made until after
+>   the PRE notifications have been sent, and in a way that should ensure
+>   correct notifications without duplicates, and I think should be safe
+>   in the event of a notification failing.
+> * various tidy ups and fixes.
+> 
+> James Hogan (5):
+>   clk: abstract parent cache
+>   clk: move some parent related functions upwards
+>   clk: add support for clock reparent on set_rate
+>   clk: add CLK_SET_RATE_NO_REPARENT flag
+>   clk: clk-mux: implement remuxing on set_rate
+> 
+>  Documentation/clk.txt                  |  46 ++--
+>  arch/arm/mach-imx/clk.h                |   5 +-
+>  drivers/clk/clk-mux.c                  |   1 +
+>  drivers/clk/clk.c                      | 420 +++++++++++++++++++++------------
+>  drivers/clk/mmp/clk-mmp2.c             |  39 ++-
+>  drivers/clk/mmp/clk-pxa168.c           |  40 ++--
+>  drivers/clk/mmp/clk-pxa910.c           |  31 ++-
+>  drivers/clk/mxs/clk.h                  |   4 +-
+>  drivers/clk/samsung/clk-exynos-audss.c |   6 +-
+>  drivers/clk/samsung/clk.h              |   2 +-
+>  drivers/clk/spear/spear1310_clock.c    | 179 +++++++-------
+>  drivers/clk/spear/spear1340_clock.c    |  97 ++++----
+>  drivers/clk/spear/spear3xx_clock.c     |  57 +++--
+>  drivers/clk/spear/spear6xx_clock.c     |  35 +--
+>  drivers/clk/sunxi/clk-sunxi.c          |   3 +-
+>  drivers/clk/tegra/clk-tegra114.c       |  36 ++-
+>  drivers/clk/tegra/clk-tegra20.c        |   6 +-
+>  drivers/clk/tegra/clk-tegra30.c        |  33 ++-
+>  drivers/clk/versatile/clk-vexpress.c   |   4 +-
+>  drivers/clk/zynq/clkc.c                |  86 ++++---
+>  include/linux/clk-private.h            |   3 +
+>  include/linux/clk-provider.h           |  12 +
+>  22 files changed, 692 insertions(+), 453 deletions(-)
+> 
+> -- 
+> 1.8.1.2
