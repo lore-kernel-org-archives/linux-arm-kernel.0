@@ -1,56 +1,73 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 9 Aug 2013 09:22:25 +0200
-Subject: [PATCH] ARM: pxa: make pwm driver module_platform_driver
-In-Reply-To: <1375981237-7167-1-git-send-email-mikedunn@newsguy.com>
-References: <1375981237-7167-1-git-send-email-mikedunn@newsguy.com>
-Message-ID: <201308090922.26194.marex@denx.de>
+From: wni@nvidia.com (Wei Ni)
+Date: Fri, 9 Aug 2013 15:23:31 +0800
+Subject: [PATCH v2 1/3] hwmon: (lm90) Add power control
+In-Reply-To: <20130808110136.GA6427@sirena.org.uk>
+References: <1375944991-29182-1-git-send-email-wni@nvidia.com>
+ <1375944991-29182-2-git-send-email-wni@nvidia.com>
+ <20130808110136.GA6427@sirena.org.uk>
+Message-ID: <520498F3.8030101@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mike Dunn,
+On 08/08/2013 07:01 PM, Mark Brown wrote:
+> * PGP Signed by an unknown key
+> 
+> On Thu, Aug 08, 2013 at 02:56:29PM +0800, Wei Ni wrote:
+> 
+>> +	mutex_lock(&data->update_lock);
+>> +
+>> +	if (is_enable)
+>> +		ret = regulator_enable(data->lm90_reg);
+>> +	else
+>> +		ret = regulator_disable(data->lm90_reg);
+>> +
+>> +	if (ret < 0)
+>> +		dev_err(&client->dev,
+>> +			"Error in %s rail vdd, error %d\n",
+>> +			(is_enable) ? "enabling" : "disabling", ret);
+>> +	else
+>> +		dev_info(&client->dev, "success in %s rail vdd\n",
+>> +			 (is_enable) ? "enabling" : "disabling");
+>> +
+>> +	mutex_unlock(&data->update_lock);
+> 
+> Two things here.  One is that it's not clear what this lokc is
+> protecting since the only thing in the locked region is the regulator
+> operation and that is thread safe.  The other thing is that I'm not
+> seeing anthing that ensures that enables and disables are matched -
+> regulators are reference counted so two enables need two disables.
+> 
+>> +	data->lm90_reg = regulator_get(&client->dev, "vdd");
+>> +	if (IS_ERR_OR_NULL(data->lm90_reg)) {
+> 
+> NULL is a valid regulator, use IS_ERR().
+> 
+>> +		if (PTR_ERR(data->lm90_reg) == -ENODEV)
+>> +			dev_info(&client->dev,
+>> +				 "No regulator found for vdd. Assuming vdd is always powered.");
+>> +		else
+>> +			dev_warn(&client->dev,
+>> +				 "Error [%ld] in getting the regulator handle for vdd.\n",
+>> +				 PTR_ERR(data->lm90_reg));
+> 
+> You shouldn't just be ignoring errors here, though there are deployment
+> difficulties with making sure a stub regulator is provided.  These
+> should be getting easier after the next merge window, the stubs will be
+> being tweaked slightly to have an "assume it's there" option even when
 
-> Commit 76abbdde2d95a3807d0dc6bf9f84d03d0dbd4f3d
-> 
->     pwm: Add sysfs interface
-> 
-> causes a kernel oops due to a null pointer dereference on pxa platforms. 
-> This happens because the class added by the patch is registered in a
-> subsys_initcall (initcall4), but the pxa pwm driver is registered in
-> arch_initcall (initcall3). If the class is not registered before the
-> driver probe function runs, the oops occurs in device_add() when the
-> uninitialized pointers in struct class are dereferenced.  I don't see a
-> reason that the driver must be an arch_initcall, so this patch makes it a
-> regular module_platform_driver (initcall6), preventing the oops.
-> 
-> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
-> ---
->  drivers/pwm/pwm-pxa.c | 12 +-----------
->  1 file changed, 1 insertion(+), 11 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
-> index dc97175..a4d2164 100644
-> --- a/drivers/pwm/pwm-pxa.c
-> +++ b/drivers/pwm/pwm-pxa.c
-> @@ -182,16 +182,6 @@ static struct platform_driver pwm_driver = {
->  	.id_table	= pwm_id_table,
->  };
-> 
-> -static int __init pwm_init(void)
-> -{
-> -	return platform_driver_register(&pwm_driver);
-> -}
-> -arch_initcall(pwm_init);
-> -
-> -static void __exit pwm_exit(void)
-> -{
-> -	platform_driver_unregister(&pwm_driver);
-> -}
-> -module_exit(pwm_exit);
-> +module_platform_driver(pwm_driver);
-> 
->  MODULE_LICENSE("GPL v2");
+Oh, really, could you show me the patch, I wish to take a look :)
 
-Acked-by: Marek Vasut <marex@denx.de>
+Wei.
 
-Best regards,
-Marek Vasut
+> regulators are used.  Especially in cases with device tree you should be
+> paying attention to -EPROBE_DEFER, that will accurately reflect if a
+> regulator is present but not loaded yet.
+> 
+> That said if you *are* going to do this you should request the
+> regulator using devm_regulator_get_optional(), this is intended to
+> support things that don't need regulators (though that's not the case
+> here).
+> 
+> * Unknown Key
+> * 0x7EA229BD
+> 
