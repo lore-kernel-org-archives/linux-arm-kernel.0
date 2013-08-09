@@ -1,42 +1,35 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 9 Aug 2013 12:30:20 +0200
-Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu
- audio subsystem [OT]
-In-Reply-To: <20130809094340.GO23006@n2100.arm.linux.org.uk>
-References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
- <20130809091953.GO6427@sirena.org.uk> <5204B7A6.9050907@gmail.com>
- <20130809094340.GO23006@n2100.arm.linux.org.uk>
-Message-ID: <20130809123020.70907621@armhf>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri,  9 Aug 2013 12:35:50 +0200
+Subject: [PATCH] PCI: mvebu: make Marvell PCIe driver depend on OF
+Message-ID: <1376044550-30572-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Aug 2013 10:43:40 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+The Marvell PCIe host controller driver is heavily tied to Device Tree
+APIs, and can only be used on platforms where the Device Tree is
+used. Therefore, it should "depends on OF" to avoid build failures on
+!OF configurations.
 
-> Note that we do have another case not yet in tree, which is DRM, but
-> this case is different from that, because ASoC can cope with components
-> with independent initialisation.
+Reported-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Bjorn, you can take this one through your tree. Either for 3.11 or
+3.12, at your preference.
+---
+ drivers/pci/host/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-No sure!
-
-Sometimes, with the tda998x in HDMI mode, I get a black screen on my TV
-set. And, surprise, when I start the audio (playing something with
-vlc), the image appears!
-
-I dumped all (known) registers in the audio and video subsystems
-(tda998x, dove lcd, kirkwood audio), and there is no difference between
-normal display and black screen. So, some audio event should interact
-with the HDMI display.
-
-I don't think that the problem comes from the TV set, because, when
-there is a black screen, turning the TV off/on never makes it display
-normally again. Rebooting the cubox also lets the black screen.
-Only powering off/on the cubox could change the display back to normal.
-
-Now, playing some audio stream gives me immediately a normal display.
-
-Any idea?
-
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index 1184ff6..e5ba4eb 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -4,6 +4,7 @@ menu "PCI host controller drivers"
+ config PCI_MVEBU
+ 	bool "Marvell EBU PCIe controller"
+ 	depends on ARCH_MVEBU || ARCH_KIRKWOOD
++	depends on OF
+ 
+ config PCIE_DW
+ 	bool
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.8.1.2
