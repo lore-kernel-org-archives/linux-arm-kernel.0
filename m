@@ -1,68 +1,88 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 9 Aug 2013 16:01:42 +0200
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <20130731205034.GA17615@obsidianresearch.com>
-References: <51DD88A4.1030506@keymile.com> <20130731100359.3e789236@skate>
- <51F8CA44.4080802@keymile.com> <20130731110045.2dc84981@skate>
- <20130731205034.GA17615@obsidianresearch.com>
-Message-ID: <20130809140140.GA14990@ulmo>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 9 Aug 2013 15:03:04 +0100
+Subject: [RFC PATCH] types.h: use GCC supplied typedefs if appropriate
+In-Reply-To: <CAKv+Gu99fC1n8sZCx7XykGEFsOjvSFcewvxZDMzspiu4dJmNbQ@mail.gmail.com>
+References: <1375960010-4214-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20130808174304.GA2356@localhost.localdomain>
+ <CAKv+Gu99fC1n8sZCx7XykGEFsOjvSFcewvxZDMzspiu4dJmNbQ@mail.gmail.com>
+Message-ID: <20130809140304.GB3977@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 31, 2013 at 02:50:34PM -0600, Jason Gunthorpe wrote:
-> On Wed, Jul 31, 2013 at 11:00:45AM +0200, Thomas Petazzoni wrote:
+On Fri, Aug 09, 2013 at 08:39:45AM +0200, Ard Biesheuvel wrote:
+> Hi Dave,
 > 
-> > > Actually, the main reason for trying to use this driver was because I 
-> > > wanted to model a PCIe *device* within the device tree, so to expose its 
-> > > GPIOs and IRQs to be referenced (through phandles) from other device 
-> > > tree nodes. The way I understand it, turns out this is not the way to 
-> > > go, as PCI/PCIe are essentially enumerated busses, so you're not 
-> > > supposed to -and it's not a trivial task to- put any information about 
-> > > real devices within the device tree.
-> > > Do you have any suggestion about that?
-> > 
-> > Indeed, PCI/PCIe devices are enumerated dynamically, so they are not
-> > listed in the Device Tree, so there's no way to "attach" more
-> > information to them.
-> > 
-> > Device Tree people, any suggestion about the above question?
+> On 8 August 2013 19:43, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Thu, Aug 08, 2013 at 01:06:50PM +0200, Ard Biesheuvel wrote:
+> >> GCC supplies a set of builtin defines that are meant to be used in the typedefs
+> >> for types such as uint8_t, uint16_t etc. In fact, this is exactly what the
+> >> stdint.h header does (of which GCC supplies its own version for freestanding
+> >> builds). So in stdint.h, the types are defined as
+> >>
+> >> typedef __UINT16_TYPE__ uint16_t
+> >> typedef __UINT32_TYPE__ uint32_t
+> >>
+> >> However, types.h in the kernel contains its own type definitions for these
+> >> stdint.h types, and these do not depend on the GCC builtins.
+> >>
+> >> In the ARM world, both bare metal and glibc targeted versions of GCC are
+> >> supported for building the kernel, and unfortunately, these do not agree on the
+> >> definition of __UINT32_TYPE__ (likewise for __INT32_TYPE__ and __UINTPTR_TYPE__)
+> >> - bare metal uses 'long unsigned int'
+> >> - glibc GCC uses 'unsigned int'
+> >>
+> >> The result of this is that, while it is perfectly feasible in principle to
+> >> support code that includes 'stdint.h' by compiling with -ffreestanding, (such as
+> >> code using NEON intrinsics, whose header 'arm_neon.h' includes 'stdint.h'), in
+> >> practice this breaks because we may end up with conflicting type definitions for
+> >> uint32_t (and uintptr_t) depending on whether you are using bare metal GCC or
+> >> glibc GCC.
+> >>
+> >> Arguably, this is a GCC issue because a) it does not pick up on the fact that
+> >> 'typedef unsigned int uint32_t' and 'typedef long unsigned int uint32_t' are not
+> >> in fact conflicting or b) it maintains this trivial difference between bare
+> >> metal and glibc targeted build configs.
+> >>
+> >> However, even if I am aware that stdint.h support or matters related to it may
+> >> be controversial subjects, fixing it in the kernel is not /that/ obtrusive, and
+> >> solves matters for older GCCs as well, hence this RFC patch.
+> >
+> > This should go to LKML and linux-arch: if this change is no problem for
+> > ARM, that doesn't mean that no other arch would be affected.
+> >
 > 
-> No, that isn't true.
+> I agree, but I thought I'd test the waters here first ...
 > 
-> Device tree can include the discovered PCI devices, you have to use
-> the special reg encoding and all that weirdness, but it does work. The
-> of_node will be attached to the struct pci device automatically.
+> > There are probably a few non-portable assumptions about the underlying
+> > type of uint32_t floating about, particularly under drivers/ (use
+> > of this type with printk would be the classic case).
+> >
 > 
-> On server/etc DT platforms the firmware will do PCI discovery and
-> resource assignment then dump all those results into DT for the OS to
-> reference.
-> 
-> This is a major reason why we wanted to see the standard PCI DT be
-> used for Marvell/etc, the existing infrastructure for this is
-> valuable.
-> 
-> AFAIK, Thierry has tested this on tegra, and I am doing it on Kirkwood
-> (though not yet with the new driver).
-> 
-> It is useful for exactly the reason stated - you can describe GPIOs,
-> I2C busses, etc, etc in DT and then upon load of the PCI driver engage
-> the DT code to populate and connect all that downstream
-> infrastructure.
+> I did a quick test, and it actually triggers some errors on an
+> allmodconfig 'make modules build'
+> - Some caused by warnings promoted to errors by -Werror
+> - Some by forward declarations and definitions using u32 in one place
+> and uint32_t in the other
 
-Obviously this doesn't work in general purpose systems because the PCI
-hierarchy needs to be hardcoded in the DT. If you start adding and
-removing PCI devices that will likely change the hierarchy and break
-this matching of PCI device to DT node.
+yeugh.  Ideally, u32 and uint32_t would have the same underlying type,
+so changing just one of them is likely to cause headaches, but changing
+the other causes headaches too...
 
-It's quite unlikely to have a need to hook up GPIOs or IRQs via DT in a
-general purpose system, though, so I don't really see that being a big
-problem.
+> - And then a host of warnings originating all over the tree where
+> uint32_t and u32 or unsigned int have been used interchangeably.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130809/52a28f3e/attachment.sig>
+Hmmm, that's the kind of thing I was concerned about.
+
+> I don't think it is feasible to fix all of this, so I am going to
+> abandon this effort.
+> In the particular case I am addressing (NEON intrinsics), there is a
+> workaround possible which is to override the builtin definitions of
+> __[U]INT32_TYPE__ and __UINTPTR_TYPE__ to those the kernel uses before
+> including anything that includes stdint.h
+
+If that works.  Do we not get problems with a conflict between the
+type of the GCC builtin functions used by arm_neon.h, and our definition
+of __UINT32_TYPE__ etc.?
+
+Cheers
+---Dave
