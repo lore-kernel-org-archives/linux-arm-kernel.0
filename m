@@ -1,169 +1,404 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 9 Aug 2013 10:11:50 -0500
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <87pptndbtj.fsf@kernel.org>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
- <52038E88.2050604@ti.com> <5203B336.90102@ti.com> <5203C211.7040207@ti.com>
- <87iozfga1t.fsf@kernel.org> <52040E67.4050402@ti.com>
- <87pptndbtj.fsf@kernel.org>
-Message-ID: <520506B6.7060806@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Aug 2013 16:14:10 +0100
+Subject: [PATCH v6 1/4] clk: hi3xxx: add clock support
+In-Reply-To: <1374813135-16238-2-git-send-email-haojian.zhuang@linaro.org>
+References: <1374813135-16238-1-git-send-email-haojian.zhuang@linaro.org>
+ <1374813135-16238-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20130809151410.GQ27325@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 06:04 PM, Kevin Hilman wrote:
-> Nishanth Menon <nm@ti.com> writes:
+On Fri, Jul 26, 2013 at 05:32:12AM +0100, Haojian Zhuang wrote:
+> Add clock support with device tree on Hisilicon SoC.
 >
->> On 08/08/2013 04:14 PM, Kevin Hilman wrote:
->>> Dave Gerlach <d-gerlach@ti.com> writes:
->>>
->>>> On 08/08/2013 10:03 AM, Santosh Shilimkar wrote:
->>>>> $subject and patch don't match.
->>>>>
->>>>> On Thursday 08 August 2013 08:26 AM, Nishanth Menon wrote:
->>>>>> On 08/08/2013 03:45 AM, Russ Dill wrote:
->>>>>>>      In reference to
->>>>>>> the M3 handling it, the M3 wouldn't know which devices have a driver
->>>>>>> bound and which don't.
->>>>>> Does it need to? M3 firmware can pretty much define "I will force
->>>>>> the device into low power state, and if the drivers dont handle
->>>>>> things properly, fix the darned driver". M3 behavior should be
->>>>>> considered as a "hardware" as far as Linux running on MPU is
->>>>>> concerned, and firmware helps change the behavior by accounting for
->>>>>> SoC quirks. *if* we have ability to handle this in the firmware,
->>>>>> there is no need to carry this in Linux.
->>>>>>
->>>>> I agree with Nishant. I don't like this patch and IIRC, I gave same
->>>>> comment in the last version. Linux need not know about all such firmware
->>>>> quirks. Also all these M3 specific stuff, should be done somewhere
->>>>> else. Probably having a small M3 driver won't be a bad idea.
->>>>
->>>> I am not opposed to doing it this way and letting the M3 firmware
->>>> handle idling these modules, however the one concern raised in the
->>>> last series is that an approach that does not acknowledge drivers will
->>>> hide driver PM bugs. I suppose as long as I make sure to document that
->>>> the devices are being idled by the M3 firmware this may not be an
->>>> issue. I will look into implementing this.
->>>
->>> No, please don't start idling devices in firmware that are otherwise
->>> managed by Linux.  Keep the firmware simple and dumb.  Linux is managing
->>> these devices, it should manage their bugs too.
->>
->>>
->>> This is not just about idling devices.  This is about handling broken IP
->>> blocks whose power-on reset state does not allow the the powerdomain to
->>> reach its target state.  That's just bad hardware design.
->>
->> Right, this is where M3 can help -> provide a consistent state for
->> linux kernel to work with. by the fact that we want to keep majority
->> of the power code inside master CPU, we are just letting M3 help us
->> with nothing major at all..
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> ---
+>  .../devicetree/bindings/clock/hisilicon.txt        |  66 ++++
+>  drivers/clk/Makefile                               |   1 +
+>  drivers/clk/clk-hi3xxx.c                           | 398 +++++++++++++++++++++
+>  3 files changed, 465 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/hisilicon.txt
+>  create mode 100644 drivers/clk/clk-hi3xxx.c
 >
-> heh, I would say HW design bugs like this are more than "nothing major
-> at all." :)
->
->> tiny stuff like these can help "fix" the hardware design quirks by
->> hiding it behind the firmware and modifying the hardware behavior.
->
-> I disagree here.  I'm a firmware minimalist, and hiding bugs like this
-> in the firmware is wrong when Linux is otherwise managing these devices.
-> It also imposes criteria on the firmware of future SoCs that doesn't
-> belong there either.  IMO, the only stuff the firmware should do is what
-> Linux *cannot* do.
->
-> Remember, this only needs to happen when there isn't a driver for these
-> devices.  Should we communicate to the firmware that the OS has no
-> driver, so please enable the hack?  I think not.
+> diff --git a/Documentation/devicetree/bindings/clock/hisilicon.txt b/Documentation/devicetree/bindings/clock/hisilicon.txt
+> new file mode 100644
+> index 0000000..5d7a220
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/hisilicon.txt
+> @@ -0,0 +1,66 @@
+> +Device Tree Clock bindings for arch-hi3xxx
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +Required properties for mux clocks:
+> + - compatible : Shall be "hisilicon,hi3620-clk-mux".
+> + - clocks : shall be the input parent clock phandle for the clock. This should
+> +       be the reference clock.
+> + - clock-output-names : shall be reference name.
+> + - #clock-cells : from common clock binding; shall be set to 0.
+> + - clkmux-reg : array of mux register offset & mask bits
 
-My view is that the M3 should *ignore* the presence/existence of MPU's 
-drivers. M3 will do whatever to force the system to go to suspend once 
-notified - this saves us the prehistoric perpetual trouble when drivers 
-have bugs (which get exposed in weird usage scenarios) in production 
-systems, we dont get any hardware help to fix them up while attempting 
-low power states and system never really hits low power state. This was 
-always because OMAP and it's derivatives have been "democratic" in power 
-management - if every hardware block achieves proper state, then we 
-achieve a system-wide low power state.
+Offset from what base address? There's no reg property listed, the
+binding document doesn't refer to a container, and the example doesn't
+show one.
 
->
->> I know it breaks the purity of role, but as the
->> next evolution, we might want to consider M3 something like an
->> "accelerator" for power management activity.. (not saying it is that
->> fast.. but conceptually).
->
-> Yes, it breaks the purity of role, and makes it hard to maintain and
-> extend to future SoCs.  As a maintainer, that's a red flag.  IMO, the
-> roles need to be kept clear.  The M3 manages some devices and the
-> interconnect that MPU/Linux cannot, the rest are managed by Linux.
+Do these offsets within the parent's address space vary, or is a known
+set of clocks a known offsets always going to exist?
 
-suspend is a very controlled state as against cpuidle where driver 
-knowledge is necessary and in fact mandatory. drivers are supposed to 
-release their resources - and even though we test the hell out of them, 
-we do have paths untrodden when it comes to production systems.
+If all the clocks are a component of a parent block of IP, is that
+parent block not better described as a provider of multiple clocks?
 
-I think the insight we have about the hardware make us(linux folks) want 
-to own the decision making process on the master MPU - I mean, 
-*nobody*(including me) wants to trust a "firmware" - that word is almost 
-synonymous with "unspeakable horror".
+> + - clkmux-table : array of mux select bits
+> +
+> +Required properties for Hi3620 gate clocks:
+> + - compatible : Shall be "hisilicon,hi3620-clk-gate".
+> + - clocks : shall be the input parent clock phandle for the clock. This should
+> +       be the reference clock.
+> + - clock-output-names : shall be reference name.
+> + - #clock-cells : from common clock binding; shall be set to 0.
+> + - hi3620-clkgate : array of enable register offset & enable bits
+> + - hi3620-clkreset : array of reset register offset & enable bits
 
-If on the other hand, we had a non-programmable hardware which would 
-force all systems to achieve off mode (imagine having a PRCM which was 
-really capable of doing it), we would have probably not had to deal with 
-those pesky "stuck-in-transition" and other variants of issues (where 
-MPU went to low power state, but core refused to go down - resulting in 
-200mA+ power instead of the <1mA we expected to see).
+Similarly, offset from where?
 
-I consider M3 to power management similar to what Neon is to ARM. I 
-mean, I would even love a PMIC which is completely reprogrammable (where 
-I could define the registers in s/w)!
+> +
+> +Required properties for clock divider:
+> + - compatible : Shall be "hisilicon,hi3620-clk-div".
+> + - clocks : shall be the input parent clock phandle for the clock. This should
+> +       be the reference clock.
+> + - clock-output-names : shall be reference name.
+> + - #clock-cells : from common clock binding; shall be set to 0.
+> + - #clkdiv-table-cells : the number of parameters after phandle in
+> +   clkdiv-table property.
+> + - clkdiv-table : list of value that are used to configure clock
+> +   divider. They're value of phandle, index & divider value.
 
-My personal thought is that (if possible):
-a) we should try to make the source firmware visible to everyone who has 
-a stake on it.
-b) If (a) is possible, then we should see how we can consider M3 as an 
-extension to Linux power strategy, rather than a "necessary burden" to 
-carry around.
+I'm having some difficulty understanding what the properties above
+actually represent.
 
-In this particular case. (a) is done see [1]. So, why not (b)? A synergy 
-does not necessarily mean "purity of role" is broken. it is just another 
-way of doing the job.
+> + - clkdiv : array of divider register offset & mask bits.
 
-While, I personally dont think [1] is public enough, we can try to work 
-through those current constraints to ensure everything is synergistic.
+Offset from...?
 
-in other words, this is not a "Graphics" or "Multimedia" or even few 
-"BIOS" kind of "hidden firmware you cannot do anything about" scenario - 
-here, *we* have the choice.
+> +
+> +Required properties for gate clocks:
+> + - compatible : Shall be "hisilicon,clk-gate".
+> + - clocks : shall be the input parent clock phandle for the clock. This should
+> +       be the reference clock.
+> + - clock-output-names : shall be reference name.
+> + - #clock-cells : from common clock binding; shall be set to 0.
+> + - clkgate-inverted : bool value. True means that set-to-disable.
 
-[1] http://arago-project.org/git/projects/?p=am33x-cm3.git;a=summary
->
->>> That being said, IMO, the kernel (specifically omap_device) should
->>> handle this, and it should be rather easy to do in the omap_device layer
->>> and keep the SoC suspend/resume core code simple and ignorant of these
->>> "quirks."
->>>
->>> AFAICT, there's no reason these quirks need to be dealt with immediatly
->>> on suspend.  A slight delay should be fine, as long as it's before the
->>> next suspend/idle attempt, right?
->>>
->>> Given that, what we need to do (and by we, I mean you) is to flag all
->>> broken IP blocks, and let omap_device handle them in a suspend/resume
->>> notifier (c.f. register_pm_notifier() and PM_POST_SUSPEND.)
->>
->> yes - that is the alternate that comes to mind.
->
-> In the earlier reviews of this series (many months ago now), I
-> complained about the presence of this device specific handling in the
-> core MPU PM code.  I'm somewhat troubled by the fact that nobody explored
-> alternatives that so easily come to mind.
+Is that a generic property, or only valid for hisilicon,clk-gate?
 
-Just spoke to Dave in person a few mins back, and he is going to go 
-through all the previous mail chains and attempt to be thorough again - 
-seems like going through a written list of pending actions completely 
-missed many key aspects of prior reviews :). Apologies on this.
+> +
+> +For example:
+> +       timclk1: clkgate at 38 {
+> +               compatible = "hisilicon,clk-gate";
+> +               #clock-cells = <0>;
+> +               clocks = <&refclk_timer1>;
+> +               clock-output-names = "timclk1";
+> +               clkgate-inverted;
+> +               clkgate = <0 18>;
+> +       };
+> +
+> +       dtable: clkdiv at 0 {
+> +               #clkdiv-table-cells = <2>;
+> +       };
+> +
+> +       div_cfgaxi: clkdiv at 2 {
+> +               compatible = "hisilicon,hi3620-clk-div";
+> +               #clock-cells = <0>;
+> +               clocks = <&div_shareaxi>;
+> +               clock-output-names = "cfgAXI_div";
+> +               clkdiv-table = <&dtable 0x01 2>;
+> +               clkdiv = <0x100 0x60>;
+> +       };
 
+[...]
 
--- 
-Regards,
-Nishanth Menon
+> +static const struct of_device_id hi3xxx_of_match[] = {
+> +       { .compatible = "hisilicon,sctrl" },
+> +};
+
+This parent wasn't mentioned in the binding. Is it documented elsewhere?
+
+> +
+> +static void __iomem __init *hi3xxx_init_clocks(struct device_node *np)
+> +{
+> +       struct device_node *parent;
+> +       const struct of_device_id *match;
+> +       void __iomem *ret = NULL;
+> +
+> +       parent = of_get_parent(np);
+> +       if (!parent) {
+> +               pr_warn("Can't find parent node of these clocks\n");
+> +               goto out;
+
+>From out you only seem to return. Why not just return?
+
+Does this leave the of_node refcounts balanced? (as a more general
+question, does most code?).
+
+> +       }
+> +       match = of_match_node(hi3xxx_of_match, parent);
+> +       if (!match) {
+> +               pr_warn("Can't find the right parent\n");
+> +               goto out;
+
+Why not just return?
+
+> +       }
+> +
+> +       if (!hi3xxx_clk_base) {
+> +               ret = of_iomap(parent, 0);
+> +               WARN_ON(!ret);
+> +               hi3xxx_clk_base = ret;
+> +       } else {
+> +               ret = hi3xxx_clk_base;
+
+Necessarily, ret = NULL in this case.
+
+Why not rearrange the whole block:
+
+	if (!hi3xx_clk_base)
+		return NULL;
+	
+	/*
+	 * do stuff assuming hi3xx_clk_base here
+	 */
+
+Even better, the mapping of the registers should be centralised and done
+at the start - no need to fail repeatedly for each child. You already
+seemed to have a compatible string for the parent node...
+
+[...]
+
+> +static void __init hi3620_clkgate_setup(struct device_node *np)
+> +{
+> +       struct hi3620_periclk *pclk;
+> +       struct clk_init_data *init;
+> +       struct clk *clk;
+> +       const char *clk_name, *name, **parent_names;
+> +       u32 rdata[2], gdata[2];
+> +       void __iomem *base;
+> +
+> +       base = hi3xxx_init_clocks(np);
+> +       if (!base)
+> +               return;
+> +
+> +       if (of_property_read_string(np, "clock-output-names", &clk_name))
+> +               return;
+> +       if (of_property_read_u32_array(np, "hi3620-clkgate",
+> +                                      &gdata[0], 2))
+> +               return;
+> +
+> +       /* gate only has the fixed parent */
+> +       parent_names = kzalloc(sizeof(char *), GFP_KERNEL);
+> +       if (!parent_names)
+> +               return;
+> +       parent_names[0] = of_clk_get_parent_name(np, 0);
+
+It seems odd to allocate a single pointer, surely there has to be a
+better way? Could this single pointer not be stored in a wrapper of
+clk_init_data?
+
+Is it possible for of_clk_get_parent_name to fail?
+
+> +
+> +       pclk = kzalloc(sizeof(*pclk), GFP_KERNEL);
+> +       if (!pclk)
+> +               goto err_pclk;
+> +
+> +       init = kzalloc(sizeof(*init), GFP_KERNEL);
+> +       if (!init)
+> +               goto err_init;
+> +       init->name = kstrdup(clk_name, GFP_KERNEL);
+
+You're happy to refer to the parent name embedded in the dt, but kstrdup
+the child name?
+
+> +       init->ops = &hi3620_clkgate_ops;
+> +       init->flags = CLK_SET_RATE_PARENT;
+> +       init->parent_names = parent_names;
+> +       init->num_parents = 1;
+> +
+> +       if (!of_property_read_u32_array(np, "hi3620-clkreset",
+> +                                       &rdata[0], 2)) {
+> +               pclk->reset = base + rdata[0];
+> +               pclk->rbits = rdata[1];
+> +       }
+> +       pclk->enable = base + gdata[0];
+> +       pclk->ebits = gdata[1];
+> +       pclk->lock = &hi3xxx_clk_lock;
+> +       pclk->hw.init = init;
+> +
+> +       clk = clk_register(NULL, &pclk->hw);
+> +       if (IS_ERR(clk))
+> +               goto err_clk;
+> +       if (!of_property_read_string(np, "clock-names", &name))
+> +               clk_register_clkdev(clk, name, NULL);
+> +       of_clk_add_provider(np, of_clk_src_simple_get, clk);
+> +       return;
+> +err_clk:
+> +       kfree(init);
+> +err_init:
+> +       kfree(pclk);
+> +err_pclk:
+> +       kfree(parent_names);
+> +}
+> +CLK_OF_DECLARE(hi3620_gate, "hisilicon,hi3620-clk-gate", hi3620_clkgate_setup)
+> +
+> +static int __init hi3xxx_parse_mux(struct device_node *np,
+> +                                  u8 *num_parents,
+> +                                  u32 *table)
+> +{
+> +       int i, cnt, ret;
+> +
+> +       /* get the count of items in mux */
+> +       for (i = 0, cnt = 0; ; i++, cnt++) {
+> +               /* parent's #clock-cells property is always 0 */
+> +               if (!of_parse_phandle(np, "clocks", i))
+> +                       break;
+> +       }
+
+Remove the references to cnt in this loop. Afterwards add:
+
+	cnt = i;
+
+> +
+> +       for (i = 0; i < cnt; i++) {
+> +               if (!of_clk_get_parent_name(np, i))
+> +                       return -ENOENT;
+> +       }
+> +       *num_parents = cnt;
+> +       table = kzalloc(sizeof(u32 *) * cnt, GFP_KERNEL);
+> +       if (!table)
+> +               return -ENOMEM;
+> +       ret = of_property_read_u32_array(np, "clkmux-table",
+> +                                        table, cnt);
+> +       if (ret)
+> +               goto err;
+> +       return 0;
+> +err:
+> +       kfree(table);
+> +       return ret;
+
+The err case is only used at the end of the function. Why not:
+
+        if (!ret)
+                return 0;
+
+        kfree(table);
+        return ret;
+
+[...]
+
+> +static void __init hs_clkgate_setup(struct device_node *np)
+> +{
+> +       struct clk *clk;
+> +       const char *clk_name, **parent_names, *name;
+> +       unsigned long flags = 0;
+> +       u32 data[2];
+> +       void __iomem *base;
+> +
+> +       base = hi3xxx_init_clocks(np);
+> +       if (!base)
+> +               return;
+> +       if (of_property_read_string(np, "clock-output-names", &clk_name))
+> +               return;
+> +       if (of_property_read_u32_array(np, "clkgate",
+> +                                      &data[0], 2))
+> +               return;
+> +       if (of_property_read_bool(np, "clkgate-inverted"))
+> +               flags = CLK_GATE_SET_TO_DISABLE;
+> +       /* gate only has the fixed parent */
+> +       parent_names = kzalloc(sizeof(char *), GFP_KERNEL);
+> +       if (!parent_names)
+> +               return;
+> +       parent_names[0] = of_clk_get_parent_name(np, 0);
+> +
+> +       clk = clk_register_gate(NULL, clk_name, parent_names[0], 0,
+> +                               base + data[0], (u8)data[1], flags,
+> +                               &hi3xxx_clk_lock);
+> +       if (IS_ERR(clk))
+> +               goto err;
+> +       if (!of_property_read_string(np, "clock-names", &name))
+> +               clk_register_clkdev(clk, name, NULL);
+> +       of_clk_add_provider(np, of_clk_src_simple_get, clk);
+> +       return;
+> +err:
+> +       kfree(parent_names);
+
+Why shift the err case out of line if it's only referred to once?
+
+> +}
+> +CLK_OF_DECLARE(hs_gate, "hisilicon,clk-gate", hs_clkgate_setup)
+> +
+> +void __init hi3620_clkdiv_setup(struct device_node *np)
+> +{
+> +       struct clk *clk;
+> +       const char *clk_name, **parent_names;
+> +       struct clk_div_table *table;
+> +       unsigned int table_num;
+> +       int i;
+> +       u32 data[2];
+> +       u8 shift, width;
+> +       const char *propname = "clkdiv-table";
+> +       const char *cellname = "#clkdiv-table-cells";
+> +       struct of_phandle_args div_table;
+> +       void __iomem *reg, *base;
+> +
+> +       base = hi3xxx_init_clocks(np);
+> +       if (!base)
+> +               return;
+> +
+> +       if (of_property_read_string(np, "clock-output-names", &clk_name))
+> +               return;
+> +       if (of_property_read_u32_array(np, "clkdiv", &data[0], 2))
+> +               return;
+> +
+> +       /*process the div_table*/
+> +       for (i = 0; ; i++) {
+> +               if (of_parse_phandle_with_args(np, propname, cellname,
+> +                                              i, &div_table))
+> +                       break;
+> +       }
+> +
+> +       /*table ends with <0, 0>, so plus one to table_num*/
+> +       table_num = i + 1;
+
+That certainly wasn't described in the binding (and the example doesn't
+match).
+
+> +
+> +       table = kzalloc(sizeof(struct clk_div_table) * table_num, GFP_KERNEL);
+> +       if (!table)
+> +               return ;
+
+Unnecessary space.
+
+> +
+> +       for (i = 0; ; i++) {
+> +               if (of_parse_phandle_with_args(np, propname, cellname,
+> +                                              i, &div_table))
+> +                       break;
+> +
+> +               table[i].val = div_table.args[0];
+> +               table[i].div = div_table.args[1];
+> +       }
+> +
+> +       /* gate only has the fixed parent */
+> +       parent_names = kzalloc(sizeof(char *), GFP_KERNEL);
+> +       if (!parent_names)
+> +               goto err_par;
+> +       parent_names[0] = of_clk_get_parent_name(np, 0);
+
+Similarly to my earlier comment, I suspect there's a better way of
+handling this.
+
+Thanks,
+Mark.
