@@ -1,77 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Aug 2013 10:30:32 +0100
-Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu
- audio subsystem
-In-Reply-To: <20130809110623.7bb3e7ad@armhf>
-References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
- <20130809110623.7bb3e7ad@armhf>
-Message-ID: <20130809093032.GM23006@n2100.arm.linux.org.uk>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri, 9 Aug 2013 15:10:27 +0530
+Subject: [PATCHv2 5/5] ARM: dts: Add dt binding documentation for exynos
+ rotator
+In-Reply-To: <1376034053-31910-6-git-send-email-chanho61.park@samsung.com>
+References: <1376034053-31910-1-git-send-email-chanho61.park@samsung.com>
+ <1376034053-31910-6-git-send-email-chanho61.park@samsung.com>
+Message-ID: <CAK9yfHzQ+vfsdYU-HZrmW5LbU7+ME-qF-xqZk+dx6AS_CKkgzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 11:06:23AM +0200, Jean-Francois Moine wrote:
-> On Fri, 09 Aug 2013 10:23:50 +0200
-> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
-> > we need at least two more compatibles for the audio controller found on
-> > Dove and Kirkwood respectively. This is how we are going to distinguish
-> > those two, e.g. Kirkwood has SPDIF in which Dove hasn't.
-> 
-> Sebastian,
-> 
-> s/has/hasn't & s/hasn't/has
+Hi Chanho,
 
-No, you're both wrong.
+On 9 August 2013 13:10, Chanho Park <chanho61.park@samsung.com> wrote:
+> This patch describes each nodes of rotator and specifies a example how to bind
+> it.
+>
+> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Inki Dae <inki.dae@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  .../devicetree/bindings/gpu/samsung-rotator.txt    |   26 ++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpu/samsung-rotator.txt
+>
+> diff --git a/Documentation/devicetree/bindings/gpu/samsung-rotator.txt b/Documentation/devicetree/bindings/gpu/samsung-rotator.txt
+> new file mode 100644
+> index 0000000..31ee7b5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpu/samsung-rotator.txt
+> @@ -0,0 +1,26 @@
+> +* Samsung Image Rotator
+> +
+> +Required properties:
+> +  - compatible : value should be following:
 
-Some Kirkwood has SPDIF recording and playback.  There are those audio
-blocks which have just I2S capture and playback.  There are those which
-have I2S capture and playback, and SPDIF playback.  There are those which
-have both I2S and SPDIF for both capture and playback.  The only one I
-haven't yet seen is SPDIF capture without playback.
+This should be "should be one of the following:"
 
-> On Fri, 26 Jul 2013 10:21:56 +0100 Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Fri, Jul 26, 2013 at 11:09:13AM +0200, Jean-Francois Moine wrote:
-> > > The A510 documentation uses the names "DCO PLL" for the internal clock
-> > > and "AU_EXTCLK" for the external clock. So, what about "dcopll" and
-> > > "extclk"?
-> > 
-> > Stop naming them according to their source.  Their _consumer_ names
-> > not _source_ names.
-> 
-> But Russell did not tell clearly which name could be the best.
-> 
-> BTW, as we are naming the clocks, the 'clk' in "xxxclk" seems redondant...
+> +       (a) "samsung,exynos4210-rotator" for Rotator IP in Exynos4210
+> +       (b) "samsung,exynos4212-rotator" for Rotator IP in Exynos4212/4412
+> +       (c) "samsung,exynos5250-rotator" for Rotator IP in Exynos5250
+> +
+> +  - reg : Physical base address of the IP registers and length of memory
+> +         mapped region.
+> +
+> +  - interrupts : Interrupt number of Rotator
+> +
+> +  - clocks : Clock number described in Documentations/devicetree/binding/clock.
 
-"extclk" follows what's in the data sheet - the exact name of it is
-"AU_EXTCLK".  Since we already know that this is the audio unit from
-the struct device, the "AU_" part is redundant.  The input name for
-the internal clock is not given, instead they talk about where it
-comes from (it's producer) so your choice of "internal" is fine.
+The path has several typos. Instead you can simply mention
+clocks : from common clock binding: handle to rotator clock.
 
-Take a moment to think about it: if you call it "dcoclk" then what
-happens on a future SoC if it's not connected to the dcoclk anymore?
-
-> I don't think that we need any reference to the codec here. The glue is
-> done by the audio device. For example, using the (soon?) extended
-> simple audio card:
-> 
-> 	spdif: spdif {
-> 		compatible = "linux,spdif-dit";
-> 	};
-> 	sound {
-> 		compatible = "linux,simple-audio";
-> 		audio-controller = <&i2s1>;
-> 		audio-codec = <&spdif>;
-> 		codec-dai-name = "dit-hifi";
-> 	};
-
-As I understand the way DPCM works, that isn't going to work for this
-case.  For DPCM as per Liam's example, it's going to require the audio
-controller to be bound to the dummy codec, and a dummy platform/dai
-bound to the SPDIF codec.  You then use DAPM routing to connect the
-SPDIF codec to the appropriate CPU DAI output stream.
-
-So the above "simple" implementation won't do - it can't be used to
-specify two DAI links, and it can't specify the DAPM routing between
-them.
-
-This will be another challenge to solve in DT!
+-- 
+With warm regards,
+Sachin
