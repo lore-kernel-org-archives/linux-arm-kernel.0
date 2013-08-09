@@ -1,85 +1,78 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  9 Aug 2013 11:05:57 +0200
-Subject: [PATCH v5 2/3] i2c-mv64xxx: Fix timing issue on Armada XP (errata
- FE-8471889)
-In-Reply-To: <1376039158-1896-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1376039158-1896-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1376039158-1896-3-git-send-email-gregory.clement@free-electrons.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 9 Aug 2013 16:56:45 +0800
+Subject: [PATCH] mtd: atmel_nand: use the new ONFI parameters,
+ ecc_strength_ds & ecc_step_ds
+Message-ID: <1376038605-11157-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the Armada XP (mv78230, mv78260 and mv78460) have a silicon issue
-in the I2C controller which violate the i2c repeated start
-timing. The I2C standard requires a minimum of 4.7us for the repeated
-start condition whereas the I2C controller of the Armada XP this time
-is 2.9us.
+commit d99650181 (mtd: get the ECC info from the parameter page for ONFI nand)
+will get ecc_strength_ds and ecc_step_ds during ONFI detecting.
+So we can use them directly and remove our own get_onfi_ecc_param function.
 
-So this patch adds a 5us delay for the start case only if the
-the compatible i2c-mv78230 is set.
-
-Based on the initals patches from Zbigniew Bodek
-
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Zbigniew Bodek <zbb@semihalf.com>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
- drivers/i2c/busses/i2c-mv64xxx.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/atmel_nand.c |   36 ++++--------------------------------
+ 1 file changed, 4 insertions(+), 32 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-index 406d9c6..a78d7ee 100644
---- a/drivers/i2c/busses/i2c-mv64xxx.c
-+++ b/drivers/i2c/busses/i2c-mv64xxx.c
-@@ -24,6 +24,7 @@
- #include <linux/of_i2c.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-+#include <linux/delay.h>
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 0e365da..162161b 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -1062,30 +1062,6 @@ static void atmel_pmecc_core_init(struct mtd_info *mtd)
+ }
  
- #define MV64XXX_I2C_ADDR_ADDR(val)			((val & 0x7f) << 1)
- #define MV64XXX_I2C_BAUD_DIV_N(val)			(val & 0x7)
-@@ -147,6 +148,8 @@ struct mv64xxx_i2c_data {
- 	struct i2c_msg		*msg;
- 	struct i2c_adapter	adapter;
- 	bool			offload_enabled;
-+/* 5us delay in order to avoid repeated start timing violation */
-+	bool			errata_delay;
- };
+ /*
+- * Get ECC requirement in ONFI parameters, returns -1 if ONFI
+- * parameters is not supported.
+- * return 0 if success to get the ECC requirement.
+- */
+-static int get_onfi_ecc_param(struct nand_chip *chip,
+-		int *ecc_bits, int *sector_size)
+-{
+-	*ecc_bits = *sector_size = 0;
+-
+-	if (chip->onfi_params.ecc_bits == 0xff)
+-		/* TODO: the sector_size and ecc_bits need to be find in
+-		 * extended ecc parameter, currently we don't support it.
+-		 */
+-		return -1;
+-
+-	*ecc_bits = chip->onfi_params.ecc_bits;
+-
+-	/* The default sector size (ecc codeword size) is 512 */
+-	*sector_size = 512;
+-
+-	return 0;
+-}
+-
+-/*
+  * Get ecc requirement from ONFI parameters ecc requirement.
+  * If pmecc-cap, pmecc-sector-size in DTS are not specified, this function
+  * will set them according to ONFI ecc requirement. Otherwise, use the
+@@ -1096,19 +1072,15 @@ static int pmecc_choose_ecc(struct atmel_nand_host *host,
+ 		int *cap, int *sector_size)
+ {
+ 	/* Get ECC requirement from ONFI parameters */
+-	*cap = *sector_size = 0;
+ 	if (host->nand_chip.onfi_version) {
+-		if (!get_onfi_ecc_param(&host->nand_chip, cap, sector_size))
+-			dev_info(host->dev, "ONFI params, minimum required ECC: %d bits in %d bytes\n",
++		*cap = host->nand_chip.ecc_strength_ds;
++		*sector_size = host->nand_chip.ecc_step_ds;
++		dev_info(host->dev, "ONFI params, minimum required ECC: %d bits in %d bytes\n",
+ 				*cap, *sector_size);
+-		else
+-			dev_info(host->dev, "NAND chip ECC reqirement is in Extended ONFI parameter, we don't support yet.\n");
+ 	} else {
+-		dev_info(host->dev, "NAND chip is not ONFI compliant, assume ecc_bits is 2 in 512 bytes");
+-	}
+-	if (*cap == 0 && *sector_size == 0) {
+ 		*cap = 2;
+ 		*sector_size = 512;
++		dev_info(host->dev, "NAND chip is not ONFI compliant, assume ecc_bits is 2 in 512 bytes");
+ 	}
  
- static struct mv64xxx_i2c_regs mv64xxx_i2c_regs_mv64xxx = {
-@@ -450,6 +453,9 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
- 			/* Setup for the next message */
- 			mv64xxx_i2c_prepare_for_io(drv_data, drv_data->msgs);
- 		}
-+		if (drv_data->errata_delay)
-+			udelay(5);
-+
- 		/*
- 		 * We're never at the start of the message here, and by this
- 		 * time it's already too late to do any protocol mangling.
-@@ -509,6 +515,9 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
- 		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_STOP,
- 			drv_data->reg_base + drv_data->reg_offsets.control);
- 		drv_data->block = 0;
-+		if (drv_data->errata_delay)
-+			udelay(5);
-+
- 		wake_up(&drv_data->waitq);
- 		break;
- 
-@@ -781,10 +790,12 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
- 
- 	/*
- 	 * For controllers embedded in new SoCs activate the
--	 * Transaction Generator support.
-+	 * Transaction Generator support and the errata fix.
- 	 */
--	if (of_device_is_compatible(np, "marvell,mv78230-i2c"))
-+	if (of_device_is_compatible(np, "marvell,mv78230-i2c")) {
- 		drv_data->offload_enabled = true;
-+		drv_data->errata_delay = true;
-+	}
- 
- out:
- 	return rc;
+ 	/* If dts file doesn't specify then use the one in ONFI parameters */
 -- 
-1.8.1.2
+1.7.9.5
