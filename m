@@ -1,41 +1,78 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 09 Aug 2013 08:45:10 +0200
-Subject: [PATCHv8 08/10] ARM: mvebu: the MPIC now provides MSI controller
- features
-In-Reply-To: <1376000268-18397-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri, 09 Aug 2013 08:45:48 +0200
+Subject: [PATCHv8 10/10] ARM: mvebu: link PCIe controllers to the MSI
+ controller
+In-Reply-To: <1376000268-18397-11-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1376000268-18397-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1376000268-18397-9-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <52048FF6.6030904@free-electrons.com>
+ <1376000268-18397-11-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5204901C.5000708@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/08/2013 00:17, Thomas Petazzoni wrote:
-> Adds the 'msi-controller' property to the main interrupt controller
-> Device Tree node, to indicate that it can now behave as a MSI
-> controller.
+> This commit adjusts the Armada 370 and Armada XP PCIe controllers
+> Device Tree informations to reference their MSI controller. In the
+> case of this platform, the MSI controller is implemented by the MPIC.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
 > Tested-by: Daniel Price <daniel.price@gmail.com>
-
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 > ---
->  arch/arm/boot/dts/armada-370-xp.dtsi | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/armada-370.dtsi        | 1 +
+>  arch/arm/boot/dts/armada-xp-mv78230.dtsi | 1 +
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 1 +
+>  arch/arm/boot/dts/armada-xp-mv78460.dtsi | 1 +
+>  4 files changed, 4 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 90b1176..ac0bbc0 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -56,6 +56,7 @@
->  				#interrupt-cells = <1>;
->  				#size-cells = <1>;
->  				interrupt-controller;
-> +				msi-controller;
->  			};
+> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> index fa3dfc6..a60018d 100644
+> --- a/arch/arm/boot/dts/armada-370.dtsi
+> +++ b/arch/arm/boot/dts/armada-370.dtsi
+> @@ -178,6 +178,7 @@
+>  				#address-cells = <3>;
+>  				#size-cells = <2>;
 >  
->  			coherency-fabric at 20200 {
+> +				msi-parent = <&mpic>;
+>  				bus-range = <0x00 0xff>;
+>  
+>  				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
+> diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+> index f8eaa38..4a9a305 100644
+> --- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+> @@ -91,6 +91,7 @@
+>  #address-cells = <3>;
+>  #size-cells = <2>;
+>  
+> +				msi-parent = <&mpic>;
+>  				bus-range = <0x00 0xff>;
+>  
+>  				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
+> diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+> index 2d9335d..dd23e96 100644
+> --- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+> @@ -111,6 +111,7 @@
+>  				#address-cells = <3>;
+>  				#size-cells = <2>;
+>  
+> +				msi-parent = <&mpic>;
+>  				bus-range = <0x00 0xff>;
+>  
+>  				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
+> diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+> index c7b1f4d..77db2bc 100644
+> --- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+> @@ -127,6 +127,7 @@
+>  				#address-cells = <3>;
+>  				#size-cells = <2>;
+>  
+> +				msi-parent = <&mpic>;
+>  				bus-range = <0x00 0xff>;
+>  
+>  				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
 > 
 
 
