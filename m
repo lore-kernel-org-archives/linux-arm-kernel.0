@@ -1,68 +1,58 @@
 From: roy.franz@linaro.org (Roy Franz)
-Date: Fri,  9 Aug 2013 16:26:06 -0700
-Subject: [PATCH 05/16] rename __get_map() to efi_get_memory_map(),
- add parameter to optionally return mmap key. The mmap key is required
- to exit EFI boot services,
- and allows efi_get_memory_map() to be used for getting final memory map.
+Date: Fri,  9 Aug 2013 16:26:07 -0700
+Subject: [PATCH 06/16] Enforce minimum alignment of 1 page on allocations. The
+ efi_high_alloc() and efi_low_alloc() functions use the EFI_ALLOCATE_ADDRESS
+ option to the EFI function allocate_pages(),
+ which requires a minimum of page alignment, and rejects all other requests.
 In-Reply-To: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
 References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
-Message-ID: <1376090777-20090-6-git-send-email-roy.franz@linaro.org>
+Message-ID: <1376090777-20090-7-git-send-email-roy.franz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The existing code could fail to allocate depending
+on allocation size, as although repeated allocation
+attempts were made, none were guaranteed to be page
+aligned.
+
+
+
 Signed-off-by: Roy Franz <roy.franz@linaro.org>
 ---
- drivers/firmware/efi/efi-stub-helper.c |   17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+ drivers/firmware/efi/efi-stub-helper.c |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
-index 40cd16e..1d0a079 100644
+index 1d0a079..647b3ba 100644
 --- a/drivers/firmware/efi/efi-stub-helper.c
 +++ b/drivers/firmware/efi/efi-stub-helper.c
-@@ -46,10 +46,11 @@ static void efi_printk(efi_system_table_t *sys_table_arg, char *str)
- }
- 
- 
--static efi_status_t __get_map(efi_system_table_t *sys_table_arg,
--			      efi_memory_desc_t **map,
--			      unsigned long *map_size,
--			      unsigned long *desc_size)
-+static efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
-+				       efi_memory_desc_t **map,
-+				       unsigned long *map_size,
-+				       unsigned long *desc_size,
-+				       unsigned long *key_ptr)
- {
- 	efi_memory_desc_t *m = NULL;
- 	efi_status_t status;
-@@ -77,6 +78,8 @@ again:
- 
- 	if (status != EFI_SUCCESS)
- 		efi_call_phys1(sys_table_arg->boottime->free_pool, m);
-+	if (key_ptr && status == EFI_SUCCESS)
-+		*key_ptr = key;
- 
- fail:
- 	*map = m;
-@@ -97,7 +100,8 @@ static efi_status_t efi_high_alloc(efi_system_table_t *sys_table_arg,
- 	u64 max_addr = 0;
- 	int i;
- 
--	status = __get_map(sys_table_arg, &map, &map_size, &desc_size);
-+	status = efi_get_memory_map(sys_table_arg, &map, &map_size, &desc_size,
-+				    NULL);
+@@ -105,6 +105,13 @@ static efi_status_t efi_high_alloc(efi_system_table_t *sys_table_arg,
  	if (status != EFI_SUCCESS)
  		goto fail;
  
-@@ -175,7 +179,8 @@ static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
- 	unsigned long nr_pages;
- 	int i;
- 
--	status = __get_map(sys_table_arg, &map, &map_size, &desc_size);
-+	status = efi_get_memory_map(sys_table_arg, &map, &map_size, &desc_size,
-+				    NULL);
++	/* Enforce minimum alignment that EFI requires when requesting
++	 * a specific address.  We are doing page-based allocations,
++	 * so we must be aligned to a page.
++	 */
++	if (align < EFI_PAGE_SIZE)
++		align = EFI_PAGE_SIZE;
++
+ 	nr_pages = round_up(size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
+ again:
+ 	for (i = 0; i < map_size / desc_size; i++) {
+@@ -184,6 +191,13 @@ static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
  	if (status != EFI_SUCCESS)
  		goto fail;
  
++	/* Enforce minimum alignment that EFI requires when requesting
++	 * a specific address.  We are doing page-based allocations,
++	 * so we must be aligned to a page.
++	 */
++	if (align < EFI_PAGE_SIZE)
++		align = EFI_PAGE_SIZE;
++
+ 	nr_pages = round_up(size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
+ 	for (i = 0; i < map_size / desc_size; i++) {
+ 		efi_memory_desc_t *desc;
 -- 
 1.7.10.4
