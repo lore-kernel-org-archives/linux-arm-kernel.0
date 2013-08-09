@@ -1,83 +1,56 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 09 Aug 2013 08:45:48 +0200
-Subject: [PATCHv8 10/10] ARM: mvebu: link PCIe controllers to the MSI
- controller
-In-Reply-To: <1376000268-18397-11-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1376000268-18397-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1376000268-18397-11-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5204901C.5000708@free-electrons.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 9 Aug 2013 09:22:25 +0200
+Subject: [PATCH] ARM: pxa: make pwm driver module_platform_driver
+In-Reply-To: <1375981237-7167-1-git-send-email-mikedunn@newsguy.com>
+References: <1375981237-7167-1-git-send-email-mikedunn@newsguy.com>
+Message-ID: <201308090922.26194.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2013 00:17, Thomas Petazzoni wrote:
-> This commit adjusts the Armada 370 and Armada XP PCIe controllers
-> Device Tree informations to reference their MSI controller. In the
-> case of this platform, the MSI controller is implemented by the MPIC.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Tested-by: Daniel Price <daniel.price@gmail.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Dear Mike Dunn,
 
+> Commit 76abbdde2d95a3807d0dc6bf9f84d03d0dbd4f3d
+> 
+>     pwm: Add sysfs interface
+> 
+> causes a kernel oops due to a null pointer dereference on pxa platforms. 
+> This happens because the class added by the patch is registered in a
+> subsys_initcall (initcall4), but the pxa pwm driver is registered in
+> arch_initcall (initcall3). If the class is not registered before the
+> driver probe function runs, the oops occurs in device_add() when the
+> uninitialized pointers in struct class are dereferenced.  I don't see a
+> reason that the driver must be an arch_initcall, so this patch makes it a
+> regular module_platform_driver (initcall6), preventing the oops.
+> 
+> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
 > ---
->  arch/arm/boot/dts/armada-370.dtsi        | 1 +
->  arch/arm/boot/dts/armada-xp-mv78230.dtsi | 1 +
->  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 1 +
->  arch/arm/boot/dts/armada-xp-mv78460.dtsi | 1 +
->  4 files changed, 4 insertions(+)
+>  drivers/pwm/pwm-pxa.c | 12 +-----------
+>  1 file changed, 1 insertion(+), 11 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> index fa3dfc6..a60018d 100644
-> --- a/arch/arm/boot/dts/armada-370.dtsi
-> +++ b/arch/arm/boot/dts/armada-370.dtsi
-> @@ -178,6 +178,7 @@
->  				#address-cells = <3>;
->  				#size-cells = <2>;
->  
-> +				msi-parent = <&mpic>;
->  				bus-range = <0x00 0xff>;
->  
->  				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
-> diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> index f8eaa38..4a9a305 100644
-> --- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-> @@ -91,6 +91,7 @@
->  #address-cells = <3>;
->  #size-cells = <2>;
->  
-> +				msi-parent = <&mpic>;
->  				bus-range = <0x00 0xff>;
->  
->  				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
-> diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-> index 2d9335d..dd23e96 100644
-> --- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-> @@ -111,6 +111,7 @@
->  				#address-cells = <3>;
->  				#size-cells = <2>;
->  
-> +				msi-parent = <&mpic>;
->  				bus-range = <0x00 0xff>;
->  
->  				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
-> diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-> index c7b1f4d..77db2bc 100644
-> --- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-> @@ -127,6 +127,7 @@
->  				#address-cells = <3>;
->  				#size-cells = <2>;
->  
-> +				msi-parent = <&mpic>;
->  				bus-range = <0x00 0xff>;
->  
->  				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
+> diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
+> index dc97175..a4d2164 100644
+> --- a/drivers/pwm/pwm-pxa.c
+> +++ b/drivers/pwm/pwm-pxa.c
+> @@ -182,16 +182,6 @@ static struct platform_driver pwm_driver = {
+>  	.id_table	= pwm_id_table,
+>  };
 > 
+> -static int __init pwm_init(void)
+> -{
+> -	return platform_driver_register(&pwm_driver);
+> -}
+> -arch_initcall(pwm_init);
+> -
+> -static void __exit pwm_exit(void)
+> -{
+> -	platform_driver_unregister(&pwm_driver);
+> -}
+> -module_exit(pwm_exit);
+> +module_platform_driver(pwm_driver);
+> 
+>  MODULE_LICENSE("GPL v2");
 
+Acked-by: Marek Vasut <marex@denx.de>
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best regards,
+Marek Vasut
