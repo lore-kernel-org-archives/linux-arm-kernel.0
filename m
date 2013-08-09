@@ -1,48 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 9 Aug 2013 23:08:45 +0200
-Subject: [PATCH 06/12] dma: mmp_pdma: make the controller a DMA provider
-In-Reply-To: <CAMj5Bkj5PmvdOV307PSpXvTomJsad_7G91X-UFxYJ2KukcqX6g@mail.gmail.com>
-References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
- <5204EA60.4060502@gmail.com>
- <CAMj5Bkj5PmvdOV307PSpXvTomJsad_7G91X-UFxYJ2KukcqX6g@mail.gmail.com>
-Message-ID: <201308092308.45922.arnd@arndb.de>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 09 Aug 2013 23:37:56 +0200
+Subject: Linux Plumbers ACPI/PM, PCI Microconference
+In-Reply-To: <CAL-B5D1-CPNcOzjHx4ej5SenawvDqwC4Hef5oDkoxCb9Dz5dUw@mail.gmail.com>
+References: <CAL-B5D1-CPNcOzjHx4ej5SenawvDqwC4Hef5oDkoxCb9Dz5dUw@mail.gmail.com>
+Message-ID: <19119445.uFrsn6yGJd@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 August 2013, zhangfei gao wrote:
-> On Fri, Aug 9, 2013 at 9:10 PM, Daniel Mack <zonque@gmail.com> wrote:
-> > On 07.08.2013 18:12, Arnd Bergmann wrote:
-
-> >
-> > I had another look at that and Zhangfei's case is not really applicable
-> > to mine, unfortunately.
-> >
-> > In his case, one specific out of many channels has to be used, depending
-> > on the first argument of the phandle. In my case though, the pdma
-> > controller may just take any of its channels, and just assign the
-> > correct DMA request to it.
-
-This should still be fine since your driver can keep track of which
-channels are currently in use. The locking can be done inside of the
-dmaengine core, but you might have to retry if the channel is getting
-acquired between your lookup and the lock.
-
-> Though any physical channel is workable, the virtual channel does not.
-> Each device has to set specific request line.
+On Friday, August 09, 2013 12:12:24 PM Myron Stowe wrote:
+> Time is passing quickly and there are still a few topic areas that we
+> would like discussed during the microconference but still do not have
+> any proposals/knowledgable speakers for.
 > 
-> pdma.c
-> chan->drcmr = cfg->slave_id;
-> nand.c
->   conf.slave_id = info->drcmr_dat;
+> For the following people I'm specifically picking on: Are you going to
+> plumbers, would you be willing to cover the following areas?  If you
+> are not going, do you know someone who is and could cover?
 > 
-> The specific virtual channel can be directly specificied by request line.
-> While pdma.c choose the free physical channel inside, which is
-> transparent to client.
+> Yinghai: host bridge hot-plug - what has been accomplished to date and
+> what still remains to be done?
+> 
+> Mika: Thunderbolt activities?
 
-It is a bug to override the slave_id value from the dma slave driver when
-using dma_request_slave_channel, and the dmaengine driver should not allow
-that. The slave_config function should only be used to set the configuration
-parts that the slave driver knows about, which does not include the
-slave_id in this case (since there is no platform data).
+That falls under my hotplug topic (that's been submitted already).
 
-	Arnd
+> Jiang Liu, Gu Zheng: Would you be willing to cover your recent efforts
+> with PCI device (hot-plug) reference counting?
+> 
+> Russel, Rob, Stephen, Thomas, Jason, Thierry: ARM - especially any
+> PCI(e) ideosynchronicies along with ARM's IOMMU arch and how that
+> relates to PCI.
+> 
+> Alex Williamson: you want/need to cover any of the following - PCI
+> secondary bus resets; pci_is_pcie() - Not just for PCIe capabilities;
+> I/O port pci-sysfs resource files (fix or remove)?
+> 
+> Of course anyone else is free to propose something or sign up for
+> covering one of the proposed topics listed at
+> http://wiki.linuxplumbersconf.org/2013:pci_subsystem
+> 
+> 
+> The instructions for submitting proposals should be at:
+> 
+> http://www.linuxplumbersconf.org/2013/submitting-topic/
+> 
+> The Microconference link is at:
+> 
+> http://wiki.linuxplumbersconf.org/2013:pci_subsystem
+
+Yes, everyone, if you are going to attend the LPC and have a topic for
+discussion during the ACPI/PM+PCI uconf, please submit a proposal.
+
+We should be able to accommodate 7-8 30-minutes slots.
+
+Thanks,
+Rafael
