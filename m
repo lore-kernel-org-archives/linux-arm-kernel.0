@@ -1,53 +1,59 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 09 Aug 2013 11:45:11 -0700
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <3a4049f6-aad6-4730-86e3-210afbc3836b@DB9EHSMHS028.ehs.local>
-References: <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
- <51F99747.4060901@linaro.org>
- <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
- <51FA9AE8.1060004@linaro.org>
- <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
- <51FA9F54.3060704@linaro.org>
- <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
- <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
- <20130809172757.GD14845@codeaurora.org>
- <3a4049f6-aad6-4730-86e3-210afbc3836b@DB9EHSMHS028.ehs.local>
-Message-ID: <520538B7.8050306@codeaurora.org>
+From: cdaudt@gmail.com (Christian Daudt)
+Date: Fri, 9 Aug 2013 11:49:42 -0700
+Subject: [PATCH v2] ARM: DT: binding fixup to align with
+ vendor-prefixes.txt
+In-Reply-To: <CAA-5wcDOv+ru+4QiDbEZr-SP90xHSh1bq+ifdVxOsOnid1komg@mail.gmail.com>
+References: <1375482479-15732-1-git-send-email-csd@broadcom.com>
+ <51FFCC42.6040300@wwwdotorg.org> <5200407A.4010407@broadcom.com>
+ <520079DB.5090309@wwwdotorg.org> <52016D44.7060808@broadcom.com>
+ <520514C4.5020007@wwwdotorg.org>
+ <CAA-5wcDOv+ru+4QiDbEZr-SP90xHSh1bq+ifdVxOsOnid1komg@mail.gmail.com>
+Message-ID: <CAA-5wcAEUkX=n-WAi28JFUxQ44cuyUKW3b1PGVpukyqKRF9bDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/13 10:48, S?ren Brinkmann wrote:
-> On Fri, Aug 09, 2013 at 10:27:57AM -0700, Stephen Boyd wrote:
->> On 08/09, Daniel Lezcano wrote:
->>> yes, but at least the broadcast mechanism should send an IPI to cpu0 to
->>> wake it up, no ? As Stephen stated this kind of configuration should has
->>> never been tested before so the tick broadcast code is not handling this
->>> case properly IMHO.
->>>
->> If you have a per-cpu tick device that isn't suffering from
->> FEAT_C3_STOP why wouldn't you use that for the tick versus a
->> per-cpu tick device that has FEAT_C3_STOP? It sounds like there
->> is a bug in the preference logic or you should boost the rating
->> of the arm global timer above the twd. Does this patch help? It
->> should make the arm global timer the tick device and whatever the
->> cadence timer you have into the broadcast device.
-> I'm not sure I'm getting this right. But neither the cadence_ttc nor the
-> arm_global_timer have the FEAT_C3_STOP flag set. So, shouldn't they be
-> treated equally even with your change?
+[resend in plain-text]
 
-The cadence_ttc is a global clockevent, i.e. the irq can interrupt any
-CPU, and it has a rating of 200. The arm global timer is a per-cpu
-clockevent with a rating of 300. The TWD is a per-cpu clockevent with a
-rating of 350. Because the arm global timer is rated higher than the
-cadence_ttc but less than the TWD the arm global timer will fill in the
-broadcast spot and the TWD will fill in the tick position. We really
-want the arm global timer to fill in the tick position and the
-cadence_ttc to fill in the broadcast spot (although the cadence_ttc
-should never be needed because the arm global timer doesn't need help in
-deep idle states).
 
-Unless I got lost in all the combinations of tests you've done so far?
+On 2013-08-09 9:11 AM, "Stephen Warren" <swarren@wwwdotorg.org> wrote:
+>
+> On 08/06/2013 03:40 PM, Christian Daudt wrote:
+> > On 13-08-05 09:21 PM, Stephen Warren wrote:
+> >>>>>    Required root node property:
+> >>>>>    -compatible = "bcm,bcm11351";
+> >>>>> +compatible = "brcm,bcm11351";
+> >>>> In a patch of mine that deprecated a property, Mark wondered if it
+> >>>> would
+> >>>> make sense to mention the old deprecated DT content simply to document
+> >>>> that it existed, so that old DTs would still make sense when checking
+> >>>> the documentation. I wonder if the same argument applies to this patch?
+> >>> I would think the opposite. Deprecated items should be dropped from
+> >>> documentation. They are in the code (for a holdover period) but clearly
+> >>> marked as deprecated. No one should be extending the life of these, and
+> >>> adding documentation on it is a step in the wrong direction of making it
+> >>> easier for it to linger beyond what it should.
+> >> The deprecated stuff will have to be fully documented once the DT schema
+> >> validation is in place...
+> >>
+> > This deprecated code should be short lived, given that in actual fact it
+> > is actually quite unnecessary since no boards exist that rely on it.
+>
+> Is this patch for v3.11-rc* or v3.12?
+>
+I'm guessing it's too late for 3.11 at this point.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> If it's for v3.12, then I see that v3.11 will be released with a variety
+> of users of the old compatible values, hence the old compatible value is
+> an ABI, and hence we should continue to support and document it (as
+> deprecated).
+>
+I think whether bindings automatically become ABI at kernel release is
+still an open topic. And as I mentioned in this case we are the only
+ones affected and we don't have a problem with the change.
+But if that's the case then there's no point to this patch. I'll just
+add bcm to vendor-prefixes and be done with it.
+I'm okay either way. Just need to know what direction to take asap so
+I can stop telling devs to keep changing back and forth...
+
+Thanks,
+csd
