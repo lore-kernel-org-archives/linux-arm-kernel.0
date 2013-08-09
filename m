@@ -1,58 +1,51 @@
 From: roy.franz@linaro.org (Roy Franz)
-Date: Fri,  9 Aug 2013 16:26:07 -0700
-Subject: [PATCH 06/16] Enforce minimum alignment of 1 page on allocations. The
- efi_high_alloc() and efi_low_alloc() functions use the EFI_ALLOCATE_ADDRESS
- option to the EFI function allocate_pages(),
- which requires a minimum of page alignment, and rejects all other requests.
+Date: Fri,  9 Aug 2013 16:26:08 -0700
+Subject: [PATCH 07/16] Allow efi_free() to be called with size of 0,
+ and do nothing in that case.
 In-Reply-To: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
 References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
-Message-ID: <1376090777-20090-7-git-send-email-roy.franz@linaro.org>
+Message-ID: <1376090777-20090-8-git-send-email-roy.franz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The existing code could fail to allocate depending
-on allocation size, as although repeated allocation
-attempts were made, none were guaranteed to be page
-aligned.
-
-
+Make efi_free() safely callable with size of 0, similar to free() being
+callable with NULL pointers.
+Remove size checks that this makes redundant.  This also avoids some
+size checks in the ARM EFI stub code that will be added as well.
 
 Signed-off-by: Roy Franz <roy.franz@linaro.org>
 ---
- drivers/firmware/efi/efi-stub-helper.c |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/x86/boot/compressed/eboot.c       |    3 +--
+ drivers/firmware/efi/efi-stub-helper.c |    3 +++
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
+diff --git a/arch/x86/boot/compressed/eboot.c b/arch/x86/boot/compressed/eboot.c
+index f44ef2f..bcfdcc2 100644
+--- a/arch/x86/boot/compressed/eboot.c
++++ b/arch/x86/boot/compressed/eboot.c
+@@ -537,8 +537,7 @@ struct boot_params *make_boot_params(void *handle, efi_system_table_t *_table)
+ 
+ 	return boot_params;
+ fail2:
+-	if (options_size)
+-		efi_free(sys_table, options_size, hdr->cmd_line_ptr);
++	efi_free(sys_table, options_size, hdr->cmd_line_ptr);
+ fail:
+ 	efi_free(sys_table, 0x4000, (unsigned long)boot_params);
+ 	return NULL;
 diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
-index 1d0a079..647b3ba 100644
+index 647b3ba..c45e287 100644
 --- a/drivers/firmware/efi/efi-stub-helper.c
 +++ b/drivers/firmware/efi/efi-stub-helper.c
-@@ -105,6 +105,13 @@ static efi_status_t efi_high_alloc(efi_system_table_t *sys_table_arg,
- 	if (status != EFI_SUCCESS)
- 		goto fail;
+@@ -253,6 +253,9 @@ static void efi_free(efi_system_table_t *sys_table_arg, unsigned long size,
+ {
+ 	unsigned long nr_pages;
  
-+	/* Enforce minimum alignment that EFI requires when requesting
-+	 * a specific address.  We are doing page-based allocations,
-+	 * so we must be aligned to a page.
-+	 */
-+	if (align < EFI_PAGE_SIZE)
-+		align = EFI_PAGE_SIZE;
++	if (!size)
++		return;
 +
  	nr_pages = round_up(size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
- again:
- 	for (i = 0; i < map_size / desc_size; i++) {
-@@ -184,6 +191,13 @@ static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
- 	if (status != EFI_SUCCESS)
- 		goto fail;
- 
-+	/* Enforce minimum alignment that EFI requires when requesting
-+	 * a specific address.  We are doing page-based allocations,
-+	 * so we must be aligned to a page.
-+	 */
-+	if (align < EFI_PAGE_SIZE)
-+		align = EFI_PAGE_SIZE;
-+
- 	nr_pages = round_up(size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
- 	for (i = 0; i < map_size / desc_size; i++) {
- 		efi_memory_desc_t *desc;
+ 	efi_call_phys2(sys_table_arg->boottime->free_pages, addr, nr_pages);
+ }
 -- 
 1.7.10.4
