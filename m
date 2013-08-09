@@ -1,261 +1,223 @@
 From: tom.cooksey@arm.com (Tom Cooksey)
-Date: Fri, 9 Aug 2013 17:15:33 +0100
-Subject: [RFC 1/1] drm/pl111: Initial drm/kms driver for pl111
-In-Reply-To: <20130807164651.GY22035@phenom.ffwll.local>
-References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>
- <1374772648-19151-2-git-send-email-tom.cooksey@arm.com>
- <CAF6AEGvGG1-4k-3_YHQ2ES6JEb-V-Xuicc8gfw9rPWze5JUEDg@mail.gmail.com>
- <20130807164651.GY22035@phenom.ffwll.local>
-Message-ID: <000501ce951b$acc91d00$065b5700$@cooksey@arm.com>
+Date: Fri, 9 Aug 2013 17:15:46 +0100
+Subject: [RFC 0/1] drm/pl111: Initial drm/kms driver for pl111
+In-Reply-To: <CAF6AEGtq-azZAxD+2OKz=Tg48bYAphBqGn033iWVZ-DjHA216A@mail.gmail.com>
+References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>	<CAF6AEGtspnhSGNM4_QQubVfOkZ1Gh1-Z3iyHOLBPVWuqRy81ew@mail.gmail.com>	<51f29ccd.f014b40a.34cc.ffffca2aSMTPIN_ADDED_BROKEN@mx.google.com>	<CAF6AEGvFPGueM_LHVij9KFzM6NJySHCzmaLstuzZkK5GwP+6gQ@mail.gmail.com>	<51ffdc7e.06b8b40a.2cc8.0fe0SMTPIN_ADDED_BROKEN@mx.google.com>	<CAF6AEGsyKk_G-R-OX_YcgYFDgTEmCy9Vf2LV1pAOV0452QKSww@mail.gmail.com>	<5200deb3.0b24b40a.3b26.ffffbadeSMTPIN_ADDED_BROKEN@mx.google.com>	<CAF6AEGvXcpTKrTjhvrycLqab6F9QP5fAk0ZEWxJ-WvE==PiPsA@mail.gmail.com>	<52010257.245fc20a.6ff8.1cfdSMTPIN_ADDED_BROKEN@mx.google.com>	<CAF6AEGsDA8qdShWdYQRqQ0Czn4mLAe-FoADjZdRFcbeWGGe8Hg@mail.gmail.com>	<52013482.e107c20a.27f9.ffffa718SMTPIN_ADDED_BROKEN@mx.google.com>	<CAF6AEGtaYJfJ4WBddbtyE9P8odXOYvJXLsreMwXMLCBOsfXy7w@mail.gmail.com>	<520284d6.07300f0a.72a4.1623SMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAF6AEGtq-azZAxD+2OKz=Tg48bYAphBqGn033iWVZ-DjHA216A@mail.gmail.com>
+Message-ID: <000601ce951b$b4dc11a0$1e9434e0$@cooksey@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel, Rob.
 
-Thank you both for your reviews - greatly appreciated!
-
-> > > Known issues:
-> > >  * It still includes code to use KDS, which is not going upstream.
-> >
-> > review's on <http://lists.freedesktop.org/archives/dri-devel/2013-
-> > July/042462.html> can't hurt
-> >
-> > although you might consider submitting a reduced functionality driver
-> > w/ KDS bits removed in the mean time.. then when the fence stuff is
-> > merged it is just an incremental patch rather than a whole driver ;-)
+> > Turning to DRM/KMS, it seems the supported formats of a plane can be
+> > queried using drm_mode_get_plane. However, there doesn't seem to be a
+> > way to query the supported formats of a crtc? If display HW only
+> > supports scanning out from a single buffer (like pl111 does), I think
+> > it won't have any planes and a fb can only be set on the crtc. In
+> > which case, how should user-space query which pixel formats that crtc
+> > supports?
 > 
-> Yeah, I think the KDS bits and comments need to go first before
-> merginge.
+> it is exposed for drm plane's.  What is missing is to expose the
+> primary-plane associated with the crtc.
 
-Right, as I expected really. Though as I said we'll probably wait for
-fences to land and switch over to that before asking for it to be
-merged. A pl111 KMS driver with neither KDS nor implicit fences is 
-useless to us. Having said that, if someone else would have a use for
-a fence/KDS-less pl111 KMS driver, please let me know!
+Cool - so a patch which adds a way to query the what formats a crtc
+supports would be welcome?
+
+What about a way to query the stride alignment constraints?
+
+Presumably using the drm_mode_get_property mechanism would be the
+right way to implement that?
 
 
-
-> > > +/*
-> > > + * Number of flips allowed in flight at any one time. Any more
-> > > + * flips requested beyond this value will cause the caller to 
-> > > + * block until earlier flips have completed.
-> > > + *
-> > > + * For performance reasons, this must be greater than the number
-> > > + * of buffers used in the rendering pipeline. Note that the 
-> > > + * rendering pipeline can contain different types of buffer, e.g.:
-> > > + * - 2 final framebuffers
-> > > + * - >2 geometry buffers for GPU use-cases
-> > > + * - >2 vertex buffers for GPU use-cases
-> > > + *
-> > > + * For example, a system using 5 geometry buffers could have 5
-> > > + * flips in flight, and so NR_FLIPS_IN_FLIGHT_THRESHOLD must be 
-> > > + * 5 or greater.
-> > > + *
-> > > + * Whilst there may be more intermediate buffers (such as
-> > > + * vertex/geometry) than final framebuffers, KDS is used to 
-> > > + * ensure that GPU rendering waits for the next off-screen 
-> > > + * buffer, so it doesn't overwrite an on-screen buffer and 
-> > > + * produce tearing.
-> > > + */
-> > > +
+> > As with v4l2, DRM doesn't appear to have a way to query the stride
+> > constraints? Assuming there is a way to query the stride constraints,
+> > there also isn't a way to specify them when creating a buffer with
+> > DRM, though perhaps the existing pitch parameter of
+> > drm_mode_create_dumb could be used to allow user-space to pass in a
+> > minimum stride as well as receive the allocated stride?
 > >
-> > fwiw, this is at least different from how other drivers do triple
-> > (or > double) buffering.  In other drivers (intel, omap, and
-> > msm/freedreno, that I know of, maybe others too) the xorg driver
-> > dri2 bits implement the double buffering (ie. send flip event back
-> > to client immediately and queue up the flip and call page-flip
-> > after the pageflip event back from kernel.
-> >
-> > I'm not saying not to do it this way, I guess I'd like to hear
-> > what other folks think.  I kinda prefer doing this in userspace 
-> > as it keeps the kernel bits simpler (plus it would then work 
-> > properly on exynosdrm or other kms drivers).
 > 
-> Yeah, if this is just a sw queue then I don't think it makes sense
-> to have it in the kernel. Afaik the current pageflip interface drm
-> exposes allows one oustanding flip only, and you _must_ wait for
-> the flip complete event before you can submit the second one.
+> well, you really shouldn't be using create_dumb..  you should have a
+> userspace piece that is specific to the drm driver, and knows how to
+> use that driver's gem allocate ioctl.
 
-Right, I'll have a think about this. I think our idea was to issue
-enough page-flips into the kernel to make sure that any process
-scheduling latencies on a heavily loaded system don't cause us to
-miss a v_sync deadline. At the moment we issue the page flip from DRI2
-schedule_swap. If we were to move that to the page flip event handler
-of the previous page-flip, we're potentially adding in extra latency.
+Sorry, why does this need a driver-specific allocation function? It's
+just a display controller driver and I just want to allocate a scan-
+out buffer - all I'm asking is for the display controller driver to
+use a minimum stride alignment so I can export the buffer and use
+another device to fill it with data.
 
-I.e. Currently we have:
+The whole point is to be able to allocate the buffer in such a way
+that another device can access it. So the driver _can't_ use a
+special, device specific format, nor can it allocate it from a
+private memory pool because doing so would preclude it from being
+shared with another device.
 
-DRI2SwapBuffers
- - drm_mode_page_flip to buffer B
-DRI2SwapBuffers
- - drm_mode_page_flip to buffer A (gets queued in kernel)
-...
-v_sync! (at this point buffer B is scanned out)
- - release buffer A's KDS resource/signal buffer A's fence
-    - queued GPU job to render next frame to buffer A scheduled on HW
-...
-GPU interrupt! (at this point buffer A is ready to be scanned out)
- - release buffer A's KDS resource/signal buffer A's fence
-    - second page flip executed, buffer A's address written to scanout
-      register, takes effect on next v_sync.
+That other device doesn't need to be a GPU wither, it could just as
+easily be a camera/ISP or video decoder.
 
 
-So in the above, after X receives the second DRI2SwapBuffers, it
-doesn't need to get scheduled again for the next frame to be both
-rendered by the GPU and issued to the display for scanout.
 
-
-If we were to move to a user-space queue, I think we have something
-like this:
-
-DRI2SwapBuffers
- - drm_mode_page_flip to buffer B
-DRI2SwapBuffers
- - queue page flip to buffer A in DDX
-...
-v_sync! (at this point buffer B is scanned out)
- - release buffer A's KDS resource/signal buffer A's fence
-    - queued GPU job to render next frame to buffer A scheduled on HW
- - Send page flip event to X
-...
-GPU interrupt! (at this point buffer A is ready to be scanned out)
- - Release buffer A's KDS resource/signal buffer A's fence - but nothing
-   is waiting on it....
-...
-X gets scheduled, runs page flip handler
- - drm_mode_page_flip to buffer A
-   - buffer A's address written to scanout register, takes effect on
-     next v_sync.
-
-
-So here, X must get scheduled again after processing the second
-DRI2SwapBuffers in order to have the next frame displayed. This
-increases the likely-hood that we're not able to write the address of
-buffer A to the display HW's scan-out buffer in time to catch the next
-v_sync, especially on a loaded system.
-
-Anyway, I think that's our rational for keeping the queue in kernel
-space, but I don't see there's much value in queuing more than 2 page
-flips in kernel space.
-
-> Ofc if your hardware as a hw-based flip queue (maybe even with frame
-> targets) that's a different matter, but currently we don't have a drm
-> interface to expose this. I'd say for merging the basic driver first we
-> should go with the existing simple pageflip semantics.
-
-Sure - I think it would mean slightly increased jank, but probably
-something we can address later.
-
-
-> > > +enum pl111_bo_type {
-> > > +       PL111_BOT_DMA,
-> > > +       PL111_BOT_SHM
-> > > +};
-> > > +
-> > > +struct pl111_gem_bo_dma {
-> > > +       dma_addr_t fb_dev_addr;
-> > > +       void *fb_cpu_addr;
-> > > +};
-> > > +
-> > > +struct pl111_gem_bo_shm {
-> > > +       struct page **pages;
-> > > +       dma_addr_t *dma_addrs;
-> > > +};
-> > > +
-> > > +struct pl111_gem_bo {
-> > > +       struct drm_gem_object gem_object;
-> > > +       enum pl111_bo_type type;
-> > > +       union {
-> > > +               struct pl111_gem_bo_dma dma;
-> > > +               struct pl111_gem_bo_shm shm;
-> > > +       } backing_data;
-> > > +       struct drm_framebuffer *fb;
+> >> > So presumably you're talking about a GPU driver being the exporter
+> >> > here? If so, how could the GPU driver do these kind of tricks on
+> >> > memory shared with another device?
+> >>
+> >> Yes, that is gpu-as-exporter.  If someone else is allocating
+> >> buffers, it is up to them to do these tricks or not.  Probably 
+> >> there is a pretty good chance that if you aren't a GPU you don't 
+> >> need those sort of tricks for fast allocation of transient upload 
+> >> buffers, staging textures, temporary pixmaps, etc.  Ie. I don't 
+> >> really think a v4l camera or video decoder would benefit from that 
+> >> sort of optimization.
 > >
-> > this is at least a bit odd.. normally the fb has ref to the bo(s) and
-> > not the other way around.  And the same bo could be referenced by
-> > multiple fb's which would kinda fall down with this approach.
+> > Right - but none of those are really buffers you'd want to export
 > 
-> I'd say that's just backwards, framebuffers are created from backing
-> storage objects (which for a gem based driver is a gem object), not the
-> other way round. What's this exactly used for?
+> > with dma_buf to share with another device are they? In which case, 
+> > why not just have dma_buf figure out the constraints and allocate 
+> > the memory?
+>
+> maybe not.. but (a) you don't necessarily know at creation time if it
+> is going to be exported (maybe you know if it is definitely not going
+> to be exported, but the converse is not true),
 
-Yup.
+I can't actually think of an example where you would not know if a
+buffer was going to be exported or not at allocation time? Do you have
+a case in mind?
 
- 
-> > > +static void vsync_worker(struct work_struct *work)
-> > > +{
-> > > +       struct pl111_drm_flip_resource *flip_res;
-> > > +       struct pl111_gem_bo *bo;
-> > > +       struct pl111_drm_crtc *pl111_crtc;
-> > > +       struct drm_device *dev;
-> > > +       int flips_in_flight;
-> > > +       flip_res =
-> > > +               container_of(work, struct pl111_drm_flip_resource,
-> > > +                            vsync_work);
-> > > +
-> > > +       pl111_crtc = to_pl111_crtc(flip_res->crtc);
-> > > +       dev = pl111_crtc->crtc.dev;
-> > > +
-> > > +       DRM_DEBUG_KMS("DRM Finalizing flip_res=%p\n", flip_res);
-> > > +
-> > > +       bo = PL111_BO_FROM_FRAMEBUFFER(flip_res->fb);
-> > > +#ifdef CONFIG_DMA_SHARED_BUFFER_USES_KDS
-> > > +       if (flip_res->worker_release_kds == true) {
-> > > +               spin_lock(&pl111_crtc->current_displaying_lock);
-> > > +               release_kds_resource_and_display(flip_res);
-> > > +               spin_unlock(&pl111_crtc->current_displaying_lock);
-> > > +       }
-> > > +#endif
-> > > +       /* Release DMA buffer on this flip */
-> > > +       if (bo->gem_object.export_dma_buf != NULL)
-> > > +               dma_buf_put(bo->gem_object.export_dma_buf);
+Regardless, you'd certainly have to know if a buffer will be exported
+pretty quickly, before it's used so that you can import it into
+whatever devices are going to access it. Otherwise if it gets
+allocated before you export it, the allocation won't satisfy the
+constraints of the other devices which will need to access it and
+importing will fail. Assuming of course deferred allocation of the
+backing pages as discussed earlier in the thread.
+
+
+
+> and (b) there isn't
+> really any reason to special case the allocation in the driver because
+> it is going to be exported.
+
+Not sure I follow you here? Surely you absolutely have to special-case
+the allocation if the buffer is to be exported because you have to
+take the other devices' constraints into account when you allocate? Or
+do you mean you don't need to special-case the GEM buffer object
+creation, only the allocation of the backing pages? Though I'm not
+sure how that distinction is useful - at the end of the day, you need
+to special-case allocation of the backing pages.
+
+
+> helpers that can be used by simple drivers, yes.  Forcing the way the
+> buffer is allocated, for sure not.  Currently, for example, there is
+> no issue to export a buffer allocated from stolen-mem.
+
+Where stolen-mem is the PC-world's version of a carveout? I.e. A chunk
+of memory reserved at boot for the GPU which the OS can't touch? I
+guess I view such memory as accessible to all media devices on the 
+system and as such, needs to be managed by a central allocator which
+dma_buf can use to allocate from.
+
+I guess if that stolen-mem is managed by a single device then in
+essence that device becomes the central allocator you have to use to
+be able to allocate from that stolen mem?
+
+
+> > If a driver needs to allocate memory in a special way for a
+> > particular device, I can't really imagine how it would be able 
+> > to share that buffer with another device using dma_buf? I guess 
+> > a driver is likely to need some magic voodoo to configure access 
+> > to the buffer for its device, but surely that would be done by 
+> > the dma_mapping framework when dma_buf_map happens?
 > >
-> > I think you just want to unref the outgoing bo, and let it drop the
-> > dmabuf ref when the file ref of the imported bo goes.  Or actually,
-> > it would be better to hold/drop ref's to the fb, rather than the bo.
-> > At least this will make things simpler if you ever have multi-planar
-> > support.
 > 
-> Drivers have no business frobbing around the dma-buf refcount of
-> imported objects imo, at least if they use all the standard drm 
-> prime infrastructure. And if they're bugs they need to be fixed 
-> there, not in drivers.
+> if, what it has to configure actually manages to fit in the
+> dma-mapping framework
 
-Good point. I guess the fb holds a ref on the bo and the bo holds a
-ref on the imported dma_buf. Don't know what this was for...
+But if it doesn't, surely that's an issue which needs to be addressed
+in the dma_mapping framework or else you won't be able to import
+buffers for use by that device anyway?
 
 
-> > > +       BUG_ON(bo->type != PL111_BOT_DMA);
+> anyways, where the pages come from has nothing to do with whether a
+> buffer can be shared or not
+
+Sure, but where they are located in physical memory really does
+matter.
+
+
+> >> At any rate, for both xorg and wayland/gbm, you know when a buffer
+> >> is going to be a scanout buffer.  What I'd recommend is define a 
+> >> small userspace API that your customers (the SoC vendors) implement
+> >> to allocate a scanout buffer and hand you back a dmabuf fd.  That 
+> >> could be used both for x11 and for gbm.  Inputs should be requested
+> >> width/height and format.  And outputs pitch plus dmabuf fd.
+> >>
+> >> (Actually you might even just want to use gbm as your starting
+> >> point. You could probably just use gbm from xf86-video-armsoc for
+> >> allocation, to have one thing that works for both wayland and x11.
+> >> Scanout and cursor buffers should go to vendor/SoC specific fxn, 
+> >> rest can be allocated from mali kernel driver.)
 > >
-> > umm, no BUG_ON() is not really a good way to validate userspace
-> > input..
+> > What does that buy us over just using drm_mode_create_dumb on the
+> > display's DRM driver?
 > 
-> Yep.
+> well, for example, if there was actually some hw w/ omap's dss + mali,
+> you could actually have mali render transparently to tiled buffers
+> which could be scanned out rotated.  Which would not be possible w/
+> dumb buffers.
 
-:-D
+Why not? As you said earlier, the format is defined when you setup the
+fb with drm_mode_fb_cmd2. If you wanted to share the buffer between
+devices, you have to be explicit about what format that buffer is in,
+so you'd have to add an entry to drm_fourcc.h for the tiled format.
+
+So userspace queries what formats the GPU DRM supports and what
+formats the OMAP DSS DRM supports, selects the tiled format and then 
+uses drm_mode_create_dumb to allocate a buffer of the correct size and
+sets the appropriate drm_fourcc.h enum value when creating an fb for
+that buffer. Or have I missed something?
 
 
-> > > +
-> > > +       switch ((char)(mode_cmd->pixel_format & 0xFF)) {
-> > > +       case 'Y':
-> > > +       case 'U':
-> > > +       case 'V':
-> > > +       case 'N':
-> > > +       case 'T':
+
+> >> >> For example, on omapdrm, the SCANOUT flag does nothing on omap4+
+> >> >> (where phys contig is not required for scanout), but causes CMA
+> >> >> (dma_alloc_*()) to be used on omap3.  Userspace doesn't care.
+> >> >> It just knows that it wants to be able to scanout that particular
+> >> >> buffer.
+> >> >
+> >> > I think that's the idea? The omap3's allocator driver would use
+> >> > contiguous memory when it detects the SCANOUT flag whereas the
+> >> > omap4 allocator driver wouldn't have to. No complex negotiation
+> >> > of constraints - it just "knows".
+> >> >
+> >>
+> >> well, it is same allocating driver in both cases (although maybe
+> >> that is unimportant).  The "it" that just knows it wants to scanout 
+> >> is userspace.  The "it" that just knows that scanout translates to
+> >> contiguous (or not) is the kernel.  Perhaps we are saying the same
+> >> thing ;-)
 > >
-> > perhaps we should instead add a drm_format_is_yuv().. or you could
-> > (ab)use drm_fb_get_bpp_depth()..
+> > Yeah - I think we are... so what's the issue with having a per-SoC
+> > allocation driver again?
+> >
 > 
-> Yeah, I think a new drm_format_is_yuv is asked-for here. Now the bigger
-> question is why you need this, since the drm core should filter out
-> formats not in your list of supported ones. Or at least it should ...
+> In a way the display driver is a per-SoC allocator.  But not
+> necessarily the *central* allocator for everything.  Ie. no need for
+> display driver to allocate vertex buffers for a separate gpu driver,
+> and that sort of thing.
 
-Probably unnecessary belts & braces. I'll see if I can find some DRM
-test which tries to create an fb using a yuv format and see where, if
-anywhere, it gets rejected.
+Again, I'm only talking about allocating buffers which will be shared
+between different devices. At no point have I mentioned the allocation
+of buffers which aren't to be shared between devices. Sorry if that's
+not been clear.
 
+So for buffers which are to be shared between devices, your suggesting
+that the display driver is the per-SoC allocator? But as I say, and
+how this thread got started, the same display driver can be used on
+different SoCs, so having _it_ be the central allocator isn't ideal.
+Though this is our current solution and why we're "abusing" the dumb 
+buffer allocation functions. :-)
 
-Thanks again!!
 
 
 Cheers,
