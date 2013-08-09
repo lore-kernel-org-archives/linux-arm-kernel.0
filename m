@@ -1,190 +1,263 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 09 Aug 2013 09:12:55 -0700
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <520506B6.7060806@ti.com> (Nishanth Menon's message of "Fri, 9
- Aug 2013 10:11:50 -0500")
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
- <52038E88.2050604@ti.com> <5203B336.90102@ti.com>
- <5203C211.7040207@ti.com> <87iozfga1t.fsf@kernel.org>
- <52040E67.4050402@ti.com> <87pptndbtj.fsf@kernel.org>
- <520506B6.7060806@ti.com>
-Message-ID: <87wqnu9720.fsf@kernel.org>
+From: tom.cooksey@arm.com (Tom Cooksey)
+Date: Fri, 9 Aug 2013 17:15:33 +0100
+Subject: [RFC 1/1] drm/pl111: Initial drm/kms driver for pl111
+In-Reply-To: <20130807164651.GY22035@phenom.ffwll.local>
+References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>
+ <1374772648-19151-2-git-send-email-tom.cooksey@arm.com>
+ <CAF6AEGvGG1-4k-3_YHQ2ES6JEb-V-Xuicc8gfw9rPWze5JUEDg@mail.gmail.com>
+ <20130807164651.GY22035@phenom.ffwll.local>
+Message-ID: <000501ce951b$acc91d00$065b5700$@cooksey@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+Hi Daniel, Rob.
 
-> On 08/08/2013 06:04 PM, Kevin Hilman wrote:
->> Nishanth Menon <nm@ti.com> writes:
->>
->>> On 08/08/2013 04:14 PM, Kevin Hilman wrote:
->>>> Dave Gerlach <d-gerlach@ti.com> writes:
->>>>
->>>>> On 08/08/2013 10:03 AM, Santosh Shilimkar wrote:
->>>>>> $subject and patch don't match.
->>>>>>
->>>>>> On Thursday 08 August 2013 08:26 AM, Nishanth Menon wrote:
->>>>>>> On 08/08/2013 03:45 AM, Russ Dill wrote:
->>>>>>>>      In reference to
->>>>>>>> the M3 handling it, the M3 wouldn't know which devices have a driver
->>>>>>>> bound and which don't.
->>>>>>> Does it need to? M3 firmware can pretty much define "I will force
->>>>>>> the device into low power state, and if the drivers dont handle
->>>>>>> things properly, fix the darned driver". M3 behavior should be
->>>>>>> considered as a "hardware" as far as Linux running on MPU is
->>>>>>> concerned, and firmware helps change the behavior by accounting for
->>>>>>> SoC quirks. *if* we have ability to handle this in the firmware,
->>>>>>> there is no need to carry this in Linux.
->>>>>>>
->>>>>> I agree with Nishant. I don't like this patch and IIRC, I gave same
->>>>>> comment in the last version. Linux need not know about all such firmware
->>>>>> quirks. Also all these M3 specific stuff, should be done somewhere
->>>>>> else. Probably having a small M3 driver won't be a bad idea.
->>>>>
->>>>> I am not opposed to doing it this way and letting the M3 firmware
->>>>> handle idling these modules, however the one concern raised in the
->>>>> last series is that an approach that does not acknowledge drivers will
->>>>> hide driver PM bugs. I suppose as long as I make sure to document that
->>>>> the devices are being idled by the M3 firmware this may not be an
->>>>> issue. I will look into implementing this.
->>>>
->>>> No, please don't start idling devices in firmware that are otherwise
->>>> managed by Linux.  Keep the firmware simple and dumb.  Linux is managing
->>>> these devices, it should manage their bugs too.
->>>
->>>>
->>>> This is not just about idling devices.  This is about handling broken IP
->>>> blocks whose power-on reset state does not allow the the powerdomain to
->>>> reach its target state.  That's just bad hardware design.
->>>
->>> Right, this is where M3 can help -> provide a consistent state for
->>> linux kernel to work with. by the fact that we want to keep majority
->>> of the power code inside master CPU, we are just letting M3 help us
->>> with nothing major at all..
->>
->> heh, I would say HW design bugs like this are more than "nothing major
->> at all." :)
->>
->>> tiny stuff like these can help "fix" the hardware design quirks by
->>> hiding it behind the firmware and modifying the hardware behavior.
->>
->> I disagree here.  I'm a firmware minimalist, and hiding bugs like this
->> in the firmware is wrong when Linux is otherwise managing these devices.
->> It also imposes criteria on the firmware of future SoCs that doesn't
->> belong there either.  IMO, the only stuff the firmware should do is what
->> Linux *cannot* do.
->>
->> Remember, this only needs to happen when there isn't a driver for these
->> devices.  Should we communicate to the firmware that the OS has no
->> driver, so please enable the hack?  I think not.
->
-> My view is that the M3 should *ignore* the presence/existence of MPU's
-> drivers. M3 will do whatever to force the system to go to suspend once
-> notified - this saves us the prehistoric perpetual trouble when
-> drivers have bugs (which get exposed in weird usage scenarios) in
-> production systems, we dont get any hardware help to fix them up while
-> attempting low power states and system never really hits low power
-> state. This was always because OMAP and it's derivatives have been
-> "democratic" in power management - if every hardware block achieves
-> proper state, then we achieve a system-wide low power state.
->
->>
->>> I know it breaks the purity of role, but as the
->>> next evolution, we might want to consider M3 something like an
->>> "accelerator" for power management activity.. (not saying it is that
->>> fast.. but conceptually).
->>
->> Yes, it breaks the purity of role, and makes it hard to maintain and
->> extend to future SoCs.  As a maintainer, that's a red flag.  IMO, the
->> roles need to be kept clear.  The M3 manages some devices and the
->> interconnect that MPU/Linux cannot, the rest are managed by Linux.
->
-> suspend is a very controlled state as against cpuidle where driver
-> knowledge is necessary and in fact mandatory. drivers are supposed to
-> release their resources - and even though we test the hell out of
-> them, we do have paths untrodden when it comes to production systems.
+Thank you both for your reviews - greatly appreciated!
 
-Since folks don't seem to care about idle for AM33xx (starting with the
-hw designers, from what I can tell), you have the luxury of thinking
-only about suspend, where firmware can be heavy handed and force things
-into submission.  Unfortunately, with cpuidle, life is not that easy and
-you have to have cooperation of the device drivers.  Coordinating that
-with firmware is not so simple, to put it mildly.
+> > > Known issues:
+> > >  * It still includes code to use KDS, which is not going upstream.
+> >
+> > review's on <http://lists.freedesktop.org/archives/dri-devel/2013-
+> > July/042462.html> can't hurt
+> >
+> > although you might consider submitting a reduced functionality driver
+> > w/ KDS bits removed in the mean time.. then when the fence stuff is
+> > merged it is just an incremental patch rather than a whole driver ;-)
+> 
+> Yeah, I think the KDS bits and comments need to go first before
+> merginge.
 
-Any SW/firmware design that does not account for *both* static PM
-(suspend/resume) and dynamic PM (runtime PM + CPUidle) is not long-term
-maintainable, and thus ready for mainline IMO.  (BTW, this is another
-theme from previous reviews of this series.)
+Right, as I expected really. Though as I said we'll probably wait for
+fences to land and switch over to that before asking for it to be
+merged. A pl111 KMS driver with neither KDS nor implicit fences is 
+useless to us. Having said that, if someone else would have a use for
+a fence/KDS-less pl111 KMS driver, please let me know!
 
-> I think the insight we have about the hardware make us(linux folks)
-> want to own the decision making process on the master MPU - I mean,
-> *nobody*(including me) wants to trust a "firmware" - that word is
-> almost synonymous with "unspeakable horror".
->
-> If on the other hand, we had a non-programmable hardware which would
-> force all systems to achieve off mode (imagine having a PRCM which was
-> really capable of doing it), we would have probably not had to deal
-> with those pesky "stuck-in-transition" and other variants of issues
-> (where MPU went to low power state, but core refused to go down -
-> resulting in 200mA+ power instead of the <1mA we expected to see).
->
-> I consider M3 to power management similar to what Neon is to ARM. I
-> mean, I would even love a PMIC which is completely reprogrammable
-> (where I could define the registers in s/w)!
->
-> My personal thought is that (if possible):
-> a) we should try to make the source firmware visible to everyone who
-> has a stake on it.
-> b) If (a) is possible, then we should see how we can consider M3 as an
-> extension to Linux power strategy, rather than a "necessary burden" to
-> carry around.
->
-> In this particular case. (a) is done see [1]. So, why not (b)? A
-> synergy does not necessarily mean "purity of role" is broken. it is
-> just another way of doing the job.
->
-> While, I personally dont think [1] is public enough, we can try to
-> work through those current constraints to ensure everything is
-> synergistic.
->
-> in other words, this is not a "Graphics" or "Multimedia" or even few
-> "BIOS" kind of "hidden firmware you cannot do anything about" scenario
-> - 
-> here, *we* have the choice.
->
-> [1] http://arago-project.org/git/projects/?p=am33x-cm3.git;a=summary
->>
->>>> That being said, IMO, the kernel (specifically omap_device) should
->>>> handle this, and it should be rather easy to do in the omap_device layer
->>>> and keep the SoC suspend/resume core code simple and ignorant of these
->>>> "quirks."
->>>>
->>>> AFAICT, there's no reason these quirks need to be dealt with immediatly
->>>> on suspend.  A slight delay should be fine, as long as it's before the
->>>> next suspend/idle attempt, right?
->>>>
->>>> Given that, what we need to do (and by we, I mean you) is to flag all
->>>> broken IP blocks, and let omap_device handle them in a suspend/resume
->>>> notifier (c.f. register_pm_notifier() and PM_POST_SUSPEND.)
->>>
->>> yes - that is the alternate that comes to mind.
->>
->> In the earlier reviews of this series (many months ago now), I
->> complained about the presence of this device specific handling in the
->> core MPU PM code.  I'm somewhat troubled by the fact that nobody explored
->> alternatives that so easily come to mind.
->
-> Just spoke to Dave in person a few mins back, and he is going to go
-> through all the previous mail chains and attempt to be thorough again
-> - 
-> seems like going through a written list of pending actions completely
-> missed many key aspects of prior reviews :). Apologies on this.
 
-Thanks.
 
-Since he's inherited this series Dave gets a get out of jail free
-card... this time.  Next time, I expect I might be grumpier.
+> > > +/*
+> > > + * Number of flips allowed in flight at any one time. Any more
+> > > + * flips requested beyond this value will cause the caller to 
+> > > + * block until earlier flips have completed.
+> > > + *
+> > > + * For performance reasons, this must be greater than the number
+> > > + * of buffers used in the rendering pipeline. Note that the 
+> > > + * rendering pipeline can contain different types of buffer, e.g.:
+> > > + * - 2 final framebuffers
+> > > + * - >2 geometry buffers for GPU use-cases
+> > > + * - >2 vertex buffers for GPU use-cases
+> > > + *
+> > > + * For example, a system using 5 geometry buffers could have 5
+> > > + * flips in flight, and so NR_FLIPS_IN_FLIGHT_THRESHOLD must be 
+> > > + * 5 or greater.
+> > > + *
+> > > + * Whilst there may be more intermediate buffers (such as
+> > > + * vertex/geometry) than final framebuffers, KDS is used to 
+> > > + * ensure that GPU rendering waits for the next off-screen 
+> > > + * buffer, so it doesn't overwrite an on-screen buffer and 
+> > > + * produce tearing.
+> > > + */
+> > > +
+> >
+> > fwiw, this is at least different from how other drivers do triple
+> > (or > double) buffering.  In other drivers (intel, omap, and
+> > msm/freedreno, that I know of, maybe others too) the xorg driver
+> > dri2 bits implement the double buffering (ie. send flip event back
+> > to client immediately and queue up the flip and call page-flip
+> > after the pageflip event back from kernel.
+> >
+> > I'm not saying not to do it this way, I guess I'd like to hear
+> > what other folks think.  I kinda prefer doing this in userspace 
+> > as it keeps the kernel bits simpler (plus it would then work 
+> > properly on exynosdrm or other kms drivers).
+> 
+> Yeah, if this is just a sw queue then I don't think it makes sense
+> to have it in the kernel. Afaik the current pageflip interface drm
+> exposes allows one oustanding flip only, and you _must_ wait for
+> the flip complete event before you can submit the second one.
 
-Kevin
+Right, I'll have a think about this. I think our idea was to issue
+enough page-flips into the kernel to make sure that any process
+scheduling latencies on a heavily loaded system don't cause us to
+miss a v_sync deadline. At the moment we issue the page flip from DRI2
+schedule_swap. If we were to move that to the page flip event handler
+of the previous page-flip, we're potentially adding in extra latency.
+
+I.e. Currently we have:
+
+DRI2SwapBuffers
+ - drm_mode_page_flip to buffer B
+DRI2SwapBuffers
+ - drm_mode_page_flip to buffer A (gets queued in kernel)
+...
+v_sync! (at this point buffer B is scanned out)
+ - release buffer A's KDS resource/signal buffer A's fence
+    - queued GPU job to render next frame to buffer A scheduled on HW
+...
+GPU interrupt! (at this point buffer A is ready to be scanned out)
+ - release buffer A's KDS resource/signal buffer A's fence
+    - second page flip executed, buffer A's address written to scanout
+      register, takes effect on next v_sync.
+
+
+So in the above, after X receives the second DRI2SwapBuffers, it
+doesn't need to get scheduled again for the next frame to be both
+rendered by the GPU and issued to the display for scanout.
+
+
+If we were to move to a user-space queue, I think we have something
+like this:
+
+DRI2SwapBuffers
+ - drm_mode_page_flip to buffer B
+DRI2SwapBuffers
+ - queue page flip to buffer A in DDX
+...
+v_sync! (at this point buffer B is scanned out)
+ - release buffer A's KDS resource/signal buffer A's fence
+    - queued GPU job to render next frame to buffer A scheduled on HW
+ - Send page flip event to X
+...
+GPU interrupt! (at this point buffer A is ready to be scanned out)
+ - Release buffer A's KDS resource/signal buffer A's fence - but nothing
+   is waiting on it....
+...
+X gets scheduled, runs page flip handler
+ - drm_mode_page_flip to buffer A
+   - buffer A's address written to scanout register, takes effect on
+     next v_sync.
+
+
+So here, X must get scheduled again after processing the second
+DRI2SwapBuffers in order to have the next frame displayed. This
+increases the likely-hood that we're not able to write the address of
+buffer A to the display HW's scan-out buffer in time to catch the next
+v_sync, especially on a loaded system.
+
+Anyway, I think that's our rational for keeping the queue in kernel
+space, but I don't see there's much value in queuing more than 2 page
+flips in kernel space.
+
+> Ofc if your hardware as a hw-based flip queue (maybe even with frame
+> targets) that's a different matter, but currently we don't have a drm
+> interface to expose this. I'd say for merging the basic driver first we
+> should go with the existing simple pageflip semantics.
+
+Sure - I think it would mean slightly increased jank, but probably
+something we can address later.
+
+
+> > > +enum pl111_bo_type {
+> > > +       PL111_BOT_DMA,
+> > > +       PL111_BOT_SHM
+> > > +};
+> > > +
+> > > +struct pl111_gem_bo_dma {
+> > > +       dma_addr_t fb_dev_addr;
+> > > +       void *fb_cpu_addr;
+> > > +};
+> > > +
+> > > +struct pl111_gem_bo_shm {
+> > > +       struct page **pages;
+> > > +       dma_addr_t *dma_addrs;
+> > > +};
+> > > +
+> > > +struct pl111_gem_bo {
+> > > +       struct drm_gem_object gem_object;
+> > > +       enum pl111_bo_type type;
+> > > +       union {
+> > > +               struct pl111_gem_bo_dma dma;
+> > > +               struct pl111_gem_bo_shm shm;
+> > > +       } backing_data;
+> > > +       struct drm_framebuffer *fb;
+> >
+> > this is at least a bit odd.. normally the fb has ref to the bo(s) and
+> > not the other way around.  And the same bo could be referenced by
+> > multiple fb's which would kinda fall down with this approach.
+> 
+> I'd say that's just backwards, framebuffers are created from backing
+> storage objects (which for a gem based driver is a gem object), not the
+> other way round. What's this exactly used for?
+
+Yup.
+
+ 
+> > > +static void vsync_worker(struct work_struct *work)
+> > > +{
+> > > +       struct pl111_drm_flip_resource *flip_res;
+> > > +       struct pl111_gem_bo *bo;
+> > > +       struct pl111_drm_crtc *pl111_crtc;
+> > > +       struct drm_device *dev;
+> > > +       int flips_in_flight;
+> > > +       flip_res =
+> > > +               container_of(work, struct pl111_drm_flip_resource,
+> > > +                            vsync_work);
+> > > +
+> > > +       pl111_crtc = to_pl111_crtc(flip_res->crtc);
+> > > +       dev = pl111_crtc->crtc.dev;
+> > > +
+> > > +       DRM_DEBUG_KMS("DRM Finalizing flip_res=%p\n", flip_res);
+> > > +
+> > > +       bo = PL111_BO_FROM_FRAMEBUFFER(flip_res->fb);
+> > > +#ifdef CONFIG_DMA_SHARED_BUFFER_USES_KDS
+> > > +       if (flip_res->worker_release_kds == true) {
+> > > +               spin_lock(&pl111_crtc->current_displaying_lock);
+> > > +               release_kds_resource_and_display(flip_res);
+> > > +               spin_unlock(&pl111_crtc->current_displaying_lock);
+> > > +       }
+> > > +#endif
+> > > +       /* Release DMA buffer on this flip */
+> > > +       if (bo->gem_object.export_dma_buf != NULL)
+> > > +               dma_buf_put(bo->gem_object.export_dma_buf);
+> >
+> > I think you just want to unref the outgoing bo, and let it drop the
+> > dmabuf ref when the file ref of the imported bo goes.  Or actually,
+> > it would be better to hold/drop ref's to the fb, rather than the bo.
+> > At least this will make things simpler if you ever have multi-planar
+> > support.
+> 
+> Drivers have no business frobbing around the dma-buf refcount of
+> imported objects imo, at least if they use all the standard drm 
+> prime infrastructure. And if they're bugs they need to be fixed 
+> there, not in drivers.
+
+Good point. I guess the fb holds a ref on the bo and the bo holds a
+ref on the imported dma_buf. Don't know what this was for...
+
+
+> > > +       BUG_ON(bo->type != PL111_BOT_DMA);
+> >
+> > umm, no BUG_ON() is not really a good way to validate userspace
+> > input..
+> 
+> Yep.
+
+:-D
+
+
+> > > +
+> > > +       switch ((char)(mode_cmd->pixel_format & 0xFF)) {
+> > > +       case 'Y':
+> > > +       case 'U':
+> > > +       case 'V':
+> > > +       case 'N':
+> > > +       case 'T':
+> >
+> > perhaps we should instead add a drm_format_is_yuv().. or you could
+> > (ab)use drm_fb_get_bpp_depth()..
+> 
+> Yeah, I think a new drm_format_is_yuv is asked-for here. Now the bigger
+> question is why you need this, since the drm core should filter out
+> formats not in your list of supported ones. Or at least it should ...
+
+Probably unnecessary belts & braces. I'll see if I can find some DRM
+test which tries to create an fb using a yuv format and see where, if
+anywhere, it gets rejected.
+
+
+Thanks again!!
+
+
+Cheers,
+
+Tom
