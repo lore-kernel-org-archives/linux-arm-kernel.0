@@ -1,28 +1,82 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 9 Aug 2013 16:42:34 +1000
-Subject: [PATCH 0/6] hwrng: OMAP: Updates for OMAP RNG module
-In-Reply-To: <1375714043-23407-1-git-send-email-lokeshvutla@ti.com>
-References: <1375714043-23407-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <20130809064234.GB23834@gondor.apana.org.au>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 09 Aug 2013 08:44:00 +0200
+Subject: [PATCHv8 05/10] irqchip: armada-370-xp: properly request resources
+In-Reply-To: <1376000268-18397-6-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1376000268-18397-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1376000268-18397-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <52048FB0.1070204@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 08:17:17PM +0530, Lokesh Vutla wrote:
-> This patch series adds support for OMAP4 version of RNG module.
-> This module produce a 64 bit random number and also allows to
-> de tune FROs when repeated pattern is coming out of FROs.
-> This series also has few fixes for the driver.
+On 09/08/2013 00:17, Thomas Petazzoni wrote:
+> Instead of using of_iomap(), we now use of_address_to_resource(),
+> request_mem_region() and ioremap(). This allows the corresponding I/O
+> regions to be properly requested and visible in /proc/iomem.
 > 
-> Lokesh Vutla (6):
->   hwrng: OMAP: Use module_platform_driver macro
->   hwrng: OMAP: Convert to devm_kzalloc()
->   hwrng: OMAP: Remove duplicated function call
->   hwrng: OMAP: Add device tree support
->   ARM: OMAP2+: Only manually add hwmod data when DT not used.
->   hwrng: OMAP: Add OMAP4 TRNG support
+> The main motivation for this change is that the introduction of the
+> MSI support requires us to get the physical address of the main
+> interrupt controller registers, so we will need the corresponding
+> 'struct resource' anyway.
+> 
+> We also take this opportunity to change a panic() to BUG_ON(), in
+> order to be consistent with the rest of the driver.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Tested-by: Daniel Price <daniel.price@gmail.com>
 
-All applied.  Thanks!
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+> ---
+>  drivers/irqchip/irq-armada-370-xp.c | 20 ++++++++++++++++----
+>  1 file changed, 16 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+> index bb328a3..26adc74 100644
+> --- a/drivers/irqchip/irq-armada-370-xp.c
+> +++ b/drivers/irqchip/irq-armada-370-xp.c
+> @@ -248,12 +248,25 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
+>  static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+>  					     struct device_node *parent)
+>  {
+> +	struct resource main_int_res, per_cpu_int_res;
+>  	u32 control;
+>  
+> -	main_int_base = of_iomap(node, 0);
+> -	per_cpu_int_base = of_iomap(node, 1);
+> +	BUG_ON(of_address_to_resource(node, 0, &main_int_res));
+> +	BUG_ON(of_address_to_resource(node, 1, &per_cpu_int_res));
+>  
+> +	BUG_ON(!request_mem_region(main_int_res.start,
+> +				   resource_size(&main_int_res),
+> +				   node->full_name));
+> +	BUG_ON(!request_mem_region(per_cpu_int_res.start,
+> +				   resource_size(&per_cpu_int_res),
+> +				   node->full_name));
+> +
+> +	main_int_base = ioremap(main_int_res.start,
+> +				resource_size(&main_int_res));
+>  	BUG_ON(!main_int_base);
+> +
+> +	per_cpu_int_base = ioremap(per_cpu_int_res.start,
+> +				   resource_size(&per_cpu_int_res));
+>  	BUG_ON(!per_cpu_int_base);
+>  
+>  	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
+> @@ -262,8 +275,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+>  		irq_domain_add_linear(node, (control >> 2) & 0x3ff,
+>  				&armada_370_xp_mpic_irq_ops, NULL);
+>  
+> -	if (!armada_370_xp_mpic_domain)
+> -		panic("Unable to add Armada_370_Xp MPIC irq domain (DT)\n");
+> +	BUG_ON(!armada_370_xp_mpic_domain);
+>  
+>  	irq_set_default_host(armada_370_xp_mpic_domain);
+>  
+> 
+
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
