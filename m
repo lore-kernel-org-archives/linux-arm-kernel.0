@@ -1,34 +1,37 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 09 Aug 2013 09:37:40 +0200
-Subject: [PATCH RESEND] can: mcp251x: Replace power callbacks with
- regulator API
-In-Reply-To: <1375963227-6468-1-git-send-email-shc_work@mail.ru>
-References: <1375963227-6468-1-git-send-email-shc_work@mail.ru>
-Message-ID: <52049C44.6030902@pengutronix.de>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Fri, 09 Aug 2013 16:40:48 +0900
+Subject: [PATCHv2 0/5] device tree support for exynos rotator
+Message-ID: <1376034053-31910-1-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 02:00 PM, Alexander Shiyan wrote:
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/mach-pxa/icontrol.c         |  3 --
->  arch/arm/mach-pxa/zeus.c             | 46 ++++++++++----------
+This patchset includes device tree support for rotator of exynos4210/4x12/5250.
+Unfortunately, each of them has slightly different limitations of image size.
+The rotator can support several image formats(RGB888/555, YCbCr422/420_2/3p).
+For convinience, however, exynos drm rotator driver only support RGB888 and
+YCbCr420 2-Plane formats. For example, the exynos4210 has 16k x 16k maximum size
+. But rest of them has 8k x 8k. In addition, RGB888 X/Y pixel size of exynos5250
+should be multiple of 2. But others are multiple of 4.
+Thus, we should define different compatibles and limit tables for each chipsets.
 
-What's pxa's status of DT conversion? Do you (still) accept patches to
-board files?
+Changes from v1:
+ - Added exynos5250 binding.
+ - Move limit table into driver code from DT-nodes
 
-Marc
+Chanho Park (5):
+  drm/exynos: add device tree support for rotator
+  ARM: dts: Add rotator node for exynos4210
+  ARM: dts: Add rotator node for exynos4x12
+  ARM: dts: Add rotator node for exynos5250
+  ARM: dts: Add dt binding documentation for exynos rotator
+
+ .../devicetree/bindings/gpu/samsung-rotator.txt    |   26 +++++
+ arch/arm/boot/dts/exynos4.dtsi                     |    9 ++
+ arch/arm/boot/dts/exynos4x12.dtsi                  |    4 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |    9 ++
+ drivers/gpu/drm/exynos/exynos_drm_rotator.c        |  109 +++++++++++++++-----
+ 5 files changed, 129 insertions(+), 28 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpu/samsung-rotator.txt
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130809/1e24b0f3/attachment.sig>
+1.7.9.5
