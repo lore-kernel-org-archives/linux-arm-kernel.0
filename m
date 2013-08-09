@@ -1,47 +1,54 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Fri, 9 Aug 2013 17:35:19 -0500
-Subject: [RFC PATCH] ARM: smp_twd: Fix twd_get_clock() to get clock from dts
- or clock framework
-Message-ID: <1376087720-14539-1-git-send-email-dinguyen@altera.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 9 Aug 2013 15:37:24 -0700
+Subject: [PATCH 2/2] power: arm64: Add DTS entry for APM X-Gene reboot
+ driver.
+In-Reply-To: <20130809213116.GE12638@lizard.sbx05730.santaca.wayport.net>
+References: <1372797539-13111-1-git-send-email-lho@apm.com>
+ <1372797539-13111-2-git-send-email-lho@apm.com>
+ <1372797539-13111-3-git-send-email-lho@apm.com>
+ <20130809213116.GE12638@lizard.sbx05730.santaca.wayport.net>
+Message-ID: <CAOesGMj-chSDsA7YT5GFAyoxPw43LOjbmnQUqo14nxJV_88GcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Fri, Aug 9, 2013 at 2:31 PM, Anton Vorontsov <anton@enomsg.org> wrote:
+> On Tue, Jul 02, 2013 at 02:38:59PM -0600, Loc Ho wrote:
+>> power: arm64: Add DTS entry for APM X-Gene reboot driver.
+>>
+>> Signed-off-by: Loc Ho <lho@apm.com>
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+>> ---
+>
+> I've applied patch 1/2 to battery-2.6.git tree. I need an ack from ARM
+> maintainers to grab this together with the first one.
+>
+>>  arch/arm64/boot/dts/apm-storm.dtsi |    6 ++++++
+>>  1 files changed, 6 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+>> index d37d736..e686919 100644
+>> --- a/arch/arm64/boot/dts/apm-storm.dtsi
+>> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
+>> @@ -178,6 +178,12 @@
+>>                       };
+>>               };
+>>
+>> +                reboot at 0x17000014 {
+>> +                        compatible = "apm,xgene-reboot";
+>> +                        reg = <0x0 0x17000014 0x0 0x100>;
+>> +                        mask = <0x1>;
+>> +                };
+>
+> There should be tabs instead of whitespaces.
 
-Some platforms have a clock for the smp_twd that goes through a fixed
-divider. Registering this smp_twd clocks is done by calling
-clk_register_fixed_factor().
+Binding is undocumented, as far as I can tell. Please add
+documentation of this under Documentation/devicetree/bindings.
 
-Fix up twd_get_clock() so that it can get the clock from the device
-tree node or clk_register_fixed_factor().
+In particular, the 'mask' property is nonstandard and it needs to be
+documented what part of the reboot controller hardware it is
+describing.
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Cc: Viresh Kumar <viresh.linux@gmail.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-CC: Russell King <linux@arm.linux.org.uk>
-Cc: spear-devel at list.st.com
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/kernel/smp_twd.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 2595620..643b226 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -244,7 +244,10 @@ static void twd_get_clock(struct device_node *np)
- 
- 	if (np)
- 		twd_clk = of_clk_get(np, 0);
--	else
-+
-+	/* Some platforms do not register the smp_twd clock in the device */
-+	/* node of the twd timer. */
-+	if (IS_ERR(twd_clk))	
- 		twd_clk = clk_get_sys("smp_twd", NULL);
- 
- 	if (IS_ERR(twd_clk)) {
--- 
-1.7.9.5
+
+-Olof
