@@ -1,71 +1,74 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 08 Aug 2013 18:18:20 -0700
-Subject: [PATCH] ARM: OMAP4: clock: Lock PLLs in the right sequence
-In-Reply-To: <1375956851-842-1-git-send-email-rnayak@ti.com>
-References: <1375956851-842-1-git-send-email-rnayak@ti.com>
-Message-ID: <20130809011820.5348.78407@quantum>
+Date: Thu, 08 Aug 2013 18:18:46 -0700
+Subject: [PATCH] clk: samsung: Staticise non-exported symbols for PLLs
+In-Reply-To: <1375959983-2690-1-git-send-email-broonie@kernel.org>
+References: <1375959983-2690-1-git-send-email-broonie@kernel.org>
+Message-ID: <20130809011846.5348.36623@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rajendra Nayak (2013-08-08 03:14:11)
-> On OMAP4 we have clk_set_rate()s being done for a few
-> DPLL clock nodes, as part of the clock init code, since
-> the bootloaders no longer locks these DPLLs.
-...
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Quoting Mark Brown (2013-08-08 04:06:23)
+> From: Mark Brown <broonie@linaro.org>
+> 
+> These symbols are not used outside the files they are defined in so do
+> not need to be in the global namespace and they aren't declared so sparse
+> warns.
+> 
+> Signed-off-by: Mark Brown <broonie@linaro.org>
 
-Taken into clk-next. Thanks for the fix. Besides the annoying prints is
-there a functional regression fixed by this? If so I can take into
-clk-fixes as needed.
+Hi Mark,
 
-I haven't spent much time thinking about this, but I wonder if
-representing the DPLLs as proper mux clocks with multiple parents coming
-in would have helped here? Right now the DPLL implementation sort of
-manages the mux bits behind the clock framework's back, right?
+Sachin already submitted a patch for this two days back. I've pushed
+this out to my public git tree just now so it should land in the next
+linux-next.
 
 Regards,
 Mike
 
 > ---
->  arch/arm/mach-omap2/cclock44xx_data.c |   20 ++++++++++++--------
->  1 file changed, 12 insertions(+), 8 deletions(-)
+>  drivers/clk/samsung/clk-exynos4.c    | 2 +-
+>  drivers/clk/samsung/clk-exynos5250.c | 2 +-
+>  drivers/clk/samsung/clk-exynos5420.c | 2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-> index 88e37a4..1d5b529 100644
-> --- a/arch/arm/mach-omap2/cclock44xx_data.c
-> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
-> @@ -1707,6 +1707,18 @@ int __init omap4xxx_clk_init(void)
->         omap2_clk_disable_autoidle_all();
+> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+> index 68f9a4a..fec319d 100644
+> --- a/drivers/clk/samsung/clk-exynos4.c
+> +++ b/drivers/clk/samsung/clk-exynos4.c
+> @@ -984,7 +984,7 @@ static __initdata struct of_device_id ext_clk_match[] = {
+>         {},
+>  };
 >  
->         /*
-> +        * A set rate of ABE DPLL inturn triggers a set rate of USB DPLL
-> +        * when its in bypass. So always lock USB before ABE DPLL.
-> +        */
-> +       /*
-> +        * Lock USB DPLL on OMAP4 devices so that the L3INIT power
-> +        * domain can transition to retention state when not in use.
-> +        */
-> +       rc = clk_set_rate(&dpll_usb_ck, OMAP4_DPLL_USB_DEFFREQ);
-> +       if (rc)
-> +               pr_err("%s: failed to configure USB DPLL!\n", __func__);
-> +
-> +       /*
->          * On OMAP4460 the ABE DPLL fails to turn on if in idle low-power
->          * state when turning the ABE clock domain. Workaround this by
->          * locking the ABE DPLL on boot.
-> @@ -1718,13 +1730,5 @@ int __init omap4xxx_clk_init(void)
->         if (rc)
->                 pr_err("%s: failed to configure ABE DPLL!\n", __func__);
+> -struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
+> +static struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
+>         [apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
+>                 APLL_CON0, "fout_apll", NULL),
+>         [mpll] = PLL_A(pll_35xx, fout_mpll, "fout_mpll", "fin_pll",
+> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+> index df3628c..5865cef 100644
+> --- a/drivers/clk/samsung/clk-exynos5250.c
+> +++ b/drivers/clk/samsung/clk-exynos5250.c
+> @@ -517,7 +517,7 @@ static __initdata struct samsung_pll_rate_table epll_24mhz_tbl[] = {
+>         { },
+>  };
 >  
-> -       /*
-> -        * Lock USB DPLL on OMAP4 devices so that the L3INIT power
-> -        * domain can transition to retention state when not in use.
-> -        */
-> -       rc = clk_set_rate(&dpll_usb_ck, OMAP4_DPLL_USB_DEFFREQ);
-> -       if (rc)
-> -               pr_err("%s: failed to configure USB DPLL!\n", __func__);
-> -
->         return 0;
->  }
+> -struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
+> +static struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
+>         [apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
+>                 APLL_CON0, "fout_apll", NULL),
+>         [mpll] = PLL_A(pll_35xx, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index ca352695..872e13d 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -727,7 +727,7 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>         GATE(smmu_mscl2, "smmu_mscl2", "aclk400_mscl", GATE_IP_MSCL, 10, 0, 0),
+>  };
+>  
+> -struct __initdata samsung_pll_clock exynos5420_plls[nr_plls] = {
+> +static struct __initdata samsung_pll_clock exynos5420_plls[nr_plls] = {
+>         [apll] = PLL(pll_2550, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
+>                 APLL_CON0, NULL),
+>         [cpll] = PLL(pll_2550, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
 > -- 
-> 1.7.9.5
+> 1.8.4.rc1
