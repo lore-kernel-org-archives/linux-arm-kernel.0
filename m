@@ -1,57 +1,37 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 09 Aug 2013 19:08:07 +0900
-Subject: [PATCH 02/02] ARM: shmobile: Add r8a7790 CA15 CPU cores and APMU as
- DTS
-In-Reply-To: <20130809100744.10827.62207.sendpatchset@w520>
-References: <20130809100744.10827.62207.sendpatchset@w520>
-Message-ID: <20130809100807.10827.89924.sendpatchset@w520>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 9 Aug 2013 11:18:42 +0100
+Subject: [alsa-devel] [PATCH v4 1/1] ASoc: kirkwood: add DT support to
+ the mvebu audio subsystem
+In-Reply-To: <5204BF06.3060806@metafoo.de>
+References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
+ <20130809091953.GO6427@sirena.org.uk> <5204B7A6.9050907@gmail.com>
+ <5204BF06.3060806@metafoo.de>
+Message-ID: <20130809101842.GR6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Fri, Aug 09, 2013 at 12:05:58PM +0200, Lars-Peter Clausen wrote:
+> On 08/09/2013 11:34 AM, Sebastian Hesselbarth wrote:
 
-Add CA15 CPU cores to r8a7790 for a total of 4 x CA15
-and also add an APMU node for SMP power management.
+> > I do understand there may be SoCs requiring sophisticated extra audio
+> > nodes, but Marvell SoCs don't. I prefer having a single node for the
+> > i2s controller *and* exploit the audio subsystem properties from that.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+> It's not about SoCs, it's about the board. The audio fabric on a board can
+> easily get complex enough to require its own driver. Speakers, mics, jacks
+> and jack detection, external amplifiers, bluetooth, baseband, multiple
+> CODECs. That's what the audio node describes.
 
- arch/arm/boot/dts/r8a7790.dtsi |   27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+Exactly - as I said earlier on this week the issue is that in many cases
+there is enough going on in audio system design to make the PCB an
+interesting bit of hardware that's worth describing in the device tree.
 
---- 0001/arch/arm/boot/dts/r8a7790.dtsi
-+++ work/arch/arm/boot/dts/r8a7790.dtsi	2013-08-07 20:14:31.000000000 +0900
-@@ -24,6 +24,33 @@
- 			reg = <0>;
- 			clock-frequency = <1300000000>;
- 		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+			clock-frequency = <1300000000>;
-+		};
-+
-+		cpu2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <2>;
-+			clock-frequency = <1300000000>;
-+		};
-+
-+		cpu3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <3>;
-+			clock-frequency = <1300000000>;
-+		};
-+	};
-+
-+	apmu at e6152000 {
-+		compatible = "renesas,r8a7790-apmu", "renesas,apmu";
-+		reg = <0 0xe6152000 0 0x88>;
-+		cpus = <&cpu0 &cpu1 &cpu2 &cpu3>;
- 	};
- 
- 	gic: interrupt-controller at f1001000 {
+To repeat what I said before *please* go back and check the list
+archives, we've been through this several times.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130809/657a714d/attachment.sig>
