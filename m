@@ -1,177 +1,34 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 09 Aug 2013 16:00:13 +0300
-Subject: [PATCH v14 04/12] usb: chipidea: otg: Add otg file used to access
- otgsc
-In-Reply-To: <1375432445-31918-5-git-send-email-peter.chen@freescale.com>
-References: <1375432445-31918-1-git-send-email-peter.chen@freescale.com>
- <1375432445-31918-5-git-send-email-peter.chen@freescale.com>
-Message-ID: <87d2pnaujm.fsf@ashishki-desk.ger.corp.intel.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 09 Aug 2013 15:03:47 +0200
+Subject: [PATCH 13/20] ASoC: pxa: pxa-ssp: add DT bindings
+In-Reply-To: <20130808132000.GD6427@sirena.org.uk>
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <1375889649-14638-14-git-send-email-zonque@gmail.com>
+ <20130807164039.GM6427@sirena.org.uk> <5203676F.6090708@gmail.com>
+ <20130808132000.GD6427@sirena.org.uk>
+Message-ID: <5204E8B3.5060605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Chen <peter.chen@freescale.com> writes:
+On 08.08.2013 15:20, Mark Brown wrote:
+> On Thu, Aug 08, 2013 at 11:39:59AM +0200, Daniel Mack wrote:
+> 
+>> Then, we should also allocate the DMA channel from the upstream device
+>> and pass it down to the DAI. But then again, the pxa-pcm-lib needs some
+>> rework, as it's currently in charge of obtaining and releasing the channel.
+> 
+>> I wanted to postpone that issue until the rest of the series has settled
+>> and limit changes to the bare minimum for now. Does that sound feasible?
+> 
+> Yup, the big problem here is the whole DT as ABI thing - what happens in
+> the code isn't so important but the DT is supposed to be stable.  Or we
+> could decide that this is one of the cases that's unstable in which case
+> we should probably flag it up in the DT binding document if nothing else.
+> 
 
-> This file is mainly used to access otgsc currently, it may
-> add otg related things in the future.
->
-> Tested-by: Marek Vasut <marex@denx.de>
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/chipidea/Makefile |    2 +-
->  drivers/usb/chipidea/bits.h   |   10 ++++++++
->  drivers/usb/chipidea/core.c   |    3 +-
->  drivers/usb/chipidea/otg.c    |   50 +++++++++++++++++++++++++++++++++++++++++
->  drivers/usb/chipidea/otg.h    |   19 +++++++++++++++
->  5 files changed, 82 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> index 6cf5f68..a99d980 100644
-> --- a/drivers/usb/chipidea/Makefile
-> +++ b/drivers/usb/chipidea/Makefile
-> @@ -2,7 +2,7 @@ ccflags-$(CONFIG_USB_CHIPIDEA_DEBUG) := -DDEBUG
->  
->  obj-$(CONFIG_USB_CHIPIDEA)		+= ci_hdrc.o
->  
-> -ci_hdrc-y				:= core.o
-> +ci_hdrc-y				:= core.o otg.o
->  ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
->  ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
->  ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
-> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-> index aefa026..dd0cf9e 100644
-> --- a/drivers/usb/chipidea/bits.h
-> +++ b/drivers/usb/chipidea/bits.h
-> @@ -79,11 +79,21 @@
->  #define OTGSC_ASVIS	      BIT(18)
->  #define OTGSC_BSVIS	      BIT(19)
->  #define OTGSC_BSEIS	      BIT(20)
-> +#define OTGSC_1MSIS	      BIT(21)
-> +#define OTGSC_DPIS	      BIT(22)
->  #define OTGSC_IDIE	      BIT(24)
->  #define OTGSC_AVVIE	      BIT(25)
->  #define OTGSC_ASVIE	      BIT(26)
->  #define OTGSC_BSVIE	      BIT(27)
->  #define OTGSC_BSEIE	      BIT(28)
-> +#define OTGSC_1MSIE	      BIT(29)
-> +#define OTGSC_DPIE	      BIT(30)
-> +#define OTGSC_INT_EN_BITS	(OTGSC_IDIE | OTGSC_AVVIE | OTGSC_ASVIE \
-> +				| OTGSC_BSVIE | OTGSC_BSEIE | OTGSC_1MSIE \
-> +				| OTGSC_DPIE)
-> +#define OTGSC_INT_STATUS_BITS	(OTGSC_IDIS | OTGSC_AVVIS | OTGSC_ASVIS	\
-> +				| OTGSC_BSVIS | OTGSC_BSEIS | OTGSC_1MSIS \
-> +				| OTGSC_DPIS)
->  
->  /* USBMODE */
->  #define USBMODE_CM            (0x03UL <<  0)
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index 26f6599..a4be8a5 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -72,6 +72,7 @@
->  #include "bits.h"
->  #include "host.h"
->  #include "debug.h"
-> +#include "otg.h"
->  
->  /* Controller register map */
->  static uintptr_t ci_regs_nolpm[] = {
-> @@ -530,7 +531,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
->  		goto stop;
->  
->  	if (ci->is_otg)
-> -		hw_write(ci, OP_OTGSC, OTGSC_IDIE, OTGSC_IDIE);
-> +		ci_hdrc_otg_init(ci);
->  
->  	ret = dbg_create_files(ci);
->  	if (!ret)
-> diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-> new file mode 100644
-> index 0000000..abefb4d
-> --- /dev/null
-> +++ b/drivers/usb/chipidea/otg.c
-> @@ -0,0 +1,50 @@
-> +/*
-> + * otg.c - ChipIdea USB IP core OTG driver
-> + *
-> + * Copyright (C) 2013 Freescale Semiconductor, Inc.
-> + *
-> + * Author: Peter Chen
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/*
-> + * This file mainly handles otgsc register, it may include OTG operation
-> + * in the future.
-> + */
-> +
-> +#include <linux/usb/otg.h>
-> +#include <linux/usb/gadget.h>
-> +#include <linux/usb/chipidea.h>
-> +
-> +#include "ci.h"
-> +#include "bits.h"
+Alright, I agreee. It's not much code that was needed to add support for
+what I proposed, so I added a patch for that to my queue. Thanks for the
+heads-up.
 
-You don't include otg.h here, which makes sparse think that you wanted
-these functions to be static.
 
-> +
-> +void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-> +{
-> +	/* Only clear request bits */
-> +	hw_write(ci, OP_OTGSC, OTGSC_INT_STATUS_BITS, bits);
-> +}
-> +
-> +void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-> +{
-> +	hw_write(ci, OP_OTGSC, bits, bits);
-> +}
-> +
-> +void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-> +{
-> +	hw_write(ci, OP_OTGSC, bits, 0);
-> +}
-
-These functions look like they would be better off as static inlines in
-otg.h than here.
-
-> +
-> +/**
-> + * ci_hdrc_otg_init - initialize otgsc bits
-> + * ci: the controller
-> + */
-> +int ci_hdrc_otg_init(struct ci_hdrc *ci)
-> +{
-> +	ci_enable_otg_interrupt(ci, OTGSC_IDIE);
-> +
-> +	return 0;
-> +}
-> diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
-> new file mode 100644
-> index 0000000..f24ec37
-> --- /dev/null
-> +++ b/drivers/usb/chipidea/otg.h
-> @@ -0,0 +1,19 @@
-> +/*
-> + * Copyright (C) 2013 Freescale Semiconductor, Inc.
-> + *
-> + * Author: Peter Chen
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __DRIVERS_USB_CHIPIDEA_OTG_H
-> +#define __DRIVERS_USB_CHIPIDEA_OTG_H
-> +
-> +int ci_hdrc_otg_init(struct ci_hdrc *ci);
-> +void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits);
-> +void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
-> +void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits);
-> +
-> +#endif /* __DRIVERS_USB_CHIPIDEA_OTG_H */
-> -- 
-> 1.7.0.4
+Daniel
