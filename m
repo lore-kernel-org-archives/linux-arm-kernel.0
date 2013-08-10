@@ -1,84 +1,167 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 10 Aug 2013 12:56:19 +0200
-Subject: [PATCH 00/20] ARM: pxa: move core and drivers to dmaengine
-In-Reply-To: <87zjsqzdg8.fsf@free.fr>
-References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
- <87zjsqzdg8.fsf@free.fr>
-Message-ID: <52061C53.4050905@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 10 Aug 2013 13:06:01 +0200
+Subject: [PATCH v6 09/11] clk: mmp: parse clock from dts
+In-Reply-To: <20130809160401.GU27325@e106331-lin.cambridge.arm.com>
+References: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
+ <1374833133-21119-10-git-send-email-haojian.zhuang@gmail.com>
+ <20130809160401.GU27325@e106331-lin.cambridge.arm.com>
+Message-ID: <2492085.mx8aBrGksJ@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Hi Mark, Haojian,
 
-On 10.08.2013 00:50, Robert Jarzmik wrote:
-> Daniel Mack <zonque@gmail.com> writes:
+On Friday 09 of August 2013 17:04:01 Mark Rutland wrote:
+> On Fri, Jul 26, 2013 at 11:05:31AM +0100, Haojian Zhuang wrote:
+> > Parse clock information from DTS file for mach-mmp.
+> > 
+> > Changelog:
+> > v6:
+> > 1. Remove marvell string from properties in clock driver.
+> > 2. Append document for clock binding device tree.
+> > 3. Use apbc to replace apbcp. Since the main difference is register
+> > base.
+> > 
+> > v5:
+> > 1. Replace clk_register_mux() by clk_register_mux_table().
+> > 
+> > Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> > ---
+> > 
+> >  .../devicetree/bindings/clock/mmp-clock.txt        |  51 ++++
+> >  arch/arm/mach-mmp/mmp-dt.c                         |   2 +
+> >  drivers/clk/mmp/Makefile                           |   2 +-
+> >  drivers/clk/mmp/clk-mmp.c                          | 300
+> >  +++++++++++++++++++++ 4 files changed, 354 insertions(+), 1
+> >  deletion(-)
+> >  create mode 100644
+> >  Documentation/devicetree/bindings/clock/mmp-clock.txt create mode
+> >  100644 drivers/clk/mmp/clk-mmp.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/mmp-clock.txt
+> > b/Documentation/devicetree/bindings/clock/mmp-clock.txt new file mode
+> > 100644
+> > index 0000000..5fe52a2
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/clock/mmp-clock.txt
+> > @@ -0,0 +1,51 @@
+> > +Device Tree Clock bindings for arch-mmp
+> > +
+> > +This binding uses the common clock binding[1].
+> > +
+> > +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > +
 > 
->>  * camera driver:
->>      I started the transition, but I'm not sure how much sense that
->>      makes without access to the hardware. I'd much appreciate if
->>      anyone could volunteer for this piece; I'll happily share what
->>      I got so far. Sascha, Sachin, Guennadi?
-> Hi Daniel,
+> Are these used somewhere already?
+
+Hmm? Are you asking about the generic clock bindings or I didn't get your 
+question right? They are supposed to be used (and they are used) whenever 
+clocks are involved.
+
+> > +Required properties for fixed rate clocks:
+> > +  - compatible : should be "marvell,mmp-fixed-clkrate".
+> > +  - clocks : should be the input parent clock phandle for the clock.
+> > This +       should be the reference clock.
+> > +  - clock-output-names : should be reference name.
+> > +  - #clock-cells : from common clock binding; should be set to 0.
+> > +  - clock-frequency : frequency of the fixed rate clock
 > 
-> Do you mean this driver ? :
-> drivers/media/platform/soc_camera/pxa_camera.c
-
-Yes, exactly.
-
-> In that case I might help. But before I can do that, I have to be convinced that
-> dmaengine can deal with this driver. I'm thinking in particular of :
->  - "hot running DMA" queuing
->  - multiple DMA channel synchronization (ie. 3 channel sync)
+> Why is "fixed-clock" not good enough?
 > 
-> All that is described in there :
->   Documentation/video4linux/pxa_camera.txt
+> This doesn't seem to describe anything more, and there's nothing
+> additional in the driver...
 
-Yes, I've seen that, and while the documentation about all that is
-excellent, I lack an explanation why things are so complicated for this
-application, and why a simple cyclic DMA approach does not suffice here.
-I'm sure there's a reason though.
++1
 
-There might be need to teach the dmaengine core more functionality, but
-in order to do that, we first need to understand the exact requirements.
+> > +
+> > +Required properties for fixed factor clocks:
+> > +  - compatible : should be "marvell,mmp-fixed-clkfactor".
+> > +  - clocks : should be the input parent clock phandle for the clock.
+> > This +       should be the reference clock.
+> > +  - clock-output-names : should be reference name.
+> > +  - #clock-cells : from common clock binding; should be set to 0.
+> 
+> The code seems to use an additional property not described here
+> (mmp-fixed-factor). What does that represent?
+> 
+> Why not "fixed-factor-clock"?
 
-> If someone with dmaengine knowledge could have a look at pxa_camera.txt (maybe
-> Vinod ?) and tell me that dma_engine framework fullfills the 2 requirements,
-> then I'll be happy to help.
++1
 
-Yes, Vinod and and Dan are certainly the best ones to comment on that I
-think.
+> > +
+> > +Required properties for mux clocks:
+> > +  - compatible : should be "marvell,mmp-clkmux".
+> > +  - clocks : should be the input parent clock phandle for the clock.
+> > This +       should be the reference clock.
+> > +  - clock-output-names : should be reference name.
+> > +  - #clock-cells : from common clock binding; should be set to 0.
+> > +  - mmp-clk-reg : mux register offset & mask bits.
+> 
+> Offset from where? There's no reg, no container's described and there's
+> no example.
 
-> One minor point though is that I'm working on pxa27x. If the serie is not
-> compatible in a way with pxa27x, I won't be able to do anything.
++1
 
-No, it should work just fine on pxa27x.
+> > +  - mmp-clk-sel : array of mux select bits
+> > +
+> > +Required properties for divider clocks:
+> > +  - compatible : should be "marvell,mmp-apmu-clkdiv".
+> > +  - clocks : should be the input parent clock phandle for the clock.
+> > This +       should be the reference clock.
+> > +  - clock-output-names : should be reference name.
+> > +  - #clock-cells : from common clock binding; should be set to 0.
+> > +  - mmp-clk-reg : divider register offset & mask bits.
+> 
+> Similar comments to those above. This is also a fixed-factor-clock, no?
 
-> Another point I'd like to know, is what is the performance penalty in using
-> dmaengine, and do you have any figures ?
+This looks like a clock with configurable divisor for me, but again, why 
+not use the standard divider clock here?
 
-The DMA transfers themselves certainly perform equally well, and the
-framework is just a thin layer. Where would you expect performance penalty?
+Best regards,
+Tomasz
 
-> Lastly, they was debug information to debug descriptors chaining, channel
-> statuses, requestors. I didn't see where these had gone, could you point me to
-> the right file ?
-
-Such a debug interface is not part of the mmp-pdma implementation at
-this point, and the core doesn't have a generic debugfs feature either.
-If you need that, we'd have to add it back.
-
-FWIW, I attached my work-in-progress patch for this driver which just
-does some basic dmaengine preparations. Be aware that this does not even
-compile, it's really just a snapshot.
-
-
-Thanks,
-Daniel
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-drivers-media-platform-soc_camera-pxa_camera.c-DMAEN.patch
-Type: text/x-patch
-Size: 13827 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130810/d527dc67/attachment-0001.bin>
+> > +
+> > +Required properties for gate clocks:
+> > +  - compatible : should be "marvell,mmp-apbc-clk".
+> > +  - clocks : should be the input parent clock phandle for the clock.
+> > This +       should be the reference clock.
+> > +  - clock-output-names : should be reference name.
+> > +  - #clock-cells : from common clock binding; should be set to 0.
+> > +  - mmp-clk-reg : gate register offset & mask bits.
+> 
+> Offset from where?
+> 
+> > +
+> > +Optional properties for gate clocks:
+> > +  - mmp-clk-delay : delay between enabling function clock and apb
+> > clock
+> Units?
+> 
+> > +  - mmp-apbc-power-ctrl : enable apbc power control bit
+> 
+> Is this a boolean or the offset of the bit offset?
+> 
+> > +
+> 
+> > +For example:
+> Missing example?
+> 
+> [...]
+> 
+> > +static const struct of_device_id mmp_of_match[] = {
+> > +       { .compatible = "marvell,mmp-mpmu", .data = (void *)MMP_MPMU,
+> > }, +       { .compatible = "marvell,mmp-apmu", .data = (void
+> > *)MMP_APMU, }, +       { .compatible = "marvell,mmp-apbc", .data =
+> > (void *)MMP_APBC, }, +       { .compatible = "marvell,mmp-apbcp",
+> > .data = (void *)MMP_APBCP, }, +       { .compatible = "mrvl,apb-bus",
+> > .data = (void *)MMP_APB, }, +};
+> 
+> Not documented?
+> 
+> Thanks,
+> Mark.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
