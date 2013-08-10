@@ -1,72 +1,111 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 10 Aug 2013 14:34:21 +0200
-Subject: [PATCH v6 09/11] clk: mmp: parse clock from dts
-In-Reply-To: <20130810123123.GA18085@e106331-lin.cambridge.arm.com>
-References: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
- <2492085.mx8aBrGksJ@flatron>
- <20130810123123.GA18085@e106331-lin.cambridge.arm.com>
-Message-ID: <2736667.dYaoNLt50m@flatron>
+From: robdclark@gmail.com (Rob Clark)
+Date: Sat, 10 Aug 2013 08:30:20 -0400
+Subject: [RFC 1/1] drm/pl111: Initial drm/kms driver for pl111
+In-Reply-To: <5205277e.84320f0a.1cdf.ffff8816SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>
+ <1374772648-19151-2-git-send-email-tom.cooksey@arm.com>
+ <CAF6AEGvGG1-4k-3_YHQ2ES6JEb-V-Xuicc8gfw9rPWze5JUEDg@mail.gmail.com>
+ <20130807164651.GY22035@phenom.ffwll.local>
+ <520515b0.88b70e0a.3ecd.1004SMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAF6AEGu68ntQDSueQJmAM1KSsSA86j98GDEf8wOPbZKjECw99Q@mail.gmail.com>
+ <20130809165706.GC31670@phenom.ffwll.local>
+ <5205277e.84320f0a.1cdf.ffff8816SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <CAF6AEGuPHB1HRUjQ4WUTp9mWKGh6frSc1JfFF5TEoN_DN33qqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 10 of August 2013 13:31:23 Mark Rutland wrote:
-> On Sat, Aug 10, 2013 at 12:06:01PM +0100, Tomasz Figa wrote:
-> > Hi Mark, Haojian,
-> > 
-> > On Friday 09 of August 2013 17:04:01 Mark Rutland wrote:
-> > > On Fri, Jul 26, 2013 at 11:05:31AM +0100, Haojian Zhuang wrote:
-> > > > Parse clock information from DTS file for mach-mmp.
-> > > > 
-> > > > Changelog:
-> > > > v6:
-> > > > 1. Remove marvell string from properties in clock driver.
-> > > > 2. Append document for clock binding device tree.
-> > > > 3. Use apbc to replace apbcp. Since the main difference is
-> > > > register
-> > > > base.
-> > > > 
-> > > > v5:
-> > > > 1. Replace clk_register_mux() by clk_register_mux_table().
-> > > > 
-> > > > Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> > > > ---
-> > > > 
-> > > >  .../devicetree/bindings/clock/mmp-clock.txt        |  51 ++++
-> > > >  arch/arm/mach-mmp/mmp-dt.c                         |   2 +
-> > > >  drivers/clk/mmp/Makefile                           |   2 +-
-> > > >  drivers/clk/mmp/clk-mmp.c                          | 300
-> > > >  +++++++++++++++++++++ 4 files changed, 354 insertions(+), 1
-> > > >  deletion(-)
-> > > >  create mode 100644
-> > > >  Documentation/devicetree/bindings/clock/mmp-clock.txt create mode
-> > > >  100644 drivers/clk/mmp/clk-mmp.c
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/clock/mmp-clock.txt
-> > > > b/Documentation/devicetree/bindings/clock/mmp-clock.txt new file
-> > > > mode
-> > > > 100644
-> > > > index 0000000..5fe52a2
-> > > > --- /dev/null
-> > > > +++ b/Documentation/devicetree/bindings/clock/mmp-clock.txt
-> > > > @@ -0,0 +1,51 @@
-> > > > +Device Tree Clock bindings for arch-mmp
-> > > > +
-> > > > +This binding uses the common clock binding[1].
-> > > > +
-> > > > +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > > > +
-> > > 
-> > > Are these used somewhere already?
-> > 
-> > Hmm? Are you asking about the generic clock bindings or I didn't get
-> > your question right? They are supposed to be used (and they are used)
-> > whenever clocks are involved.
-> 
-> Sorry, I meant are there any dts out there using these specific
-> bindings? I wasn't sure how far upstream the series was, and wanted to
-> make sure this hadn't gone upstream before I managed to reply.
+On Fri, Aug 9, 2013 at 1:31 PM, Tom Cooksey <tom.cooksey@arm.com> wrote:
+>> > > So in the above, after X receives the second DRI2SwapBuffers, it
+>> > > doesn't need to get scheduled again for the next frame to be both
+>> > > rendered by the GPU and issued to the display for scanout.
+>> >
+>> > well, this is really only an issue if you are so loaded that you
+>> > don't get a chance to schedule for ~16ms.. which is pretty long time.
+>
+> Yes - it really is 16ms (minus interrupt/workqueue latency) isn't it?
+> Hmmm, that does sound very long. Will try out some experiments and see.
+>
 
-OK, sorry for the noise then.
+yeah
 
-Best regards,
-Tomasz
+>
+>> > If you are triple buffering, it should not end up in the critical
+>> > path (since the gpu already has the 3rd buffer to start on the next
+>> > frame). And, well, if you do it all in the kernel you probably need
+>> > to toss things over to a workqueue anyways.
+>>
+>> Just a quick comment on the kernel flip queue issue.
+>>
+>> 16 ms scheduling latency sounds awful but totally doable with a less
+>> than stellar ddx driver going into limbo land and so preventing your
+>> single threaded X from doing more useful stuff. Is this really the
+>> linux scheduler being stupid?
+>
+> Ahahhaaa!! Yes!!! Really good point. We generally don't have 2D HW and
+> so rely on pixman to perform all 2D operations which does indeed tie
+> up that thread for fairly long periods of time.
+>
+> We've had internal discussions about introducing a thread (gulp) in
+> the DDX to off-load drawing operations to. I think we were all a bit
+> scared by that idea though.
+>
+
+thread does sound a bit scary.. it probably could be done if you treat
+it like a virtual cpu and have WaitMarker or PrepareAccess for sw
+fallbacks synchronize properly..
+
+I bet you'd be much better off just making non-scanout pixmaps cached
+and doing cache sync ops when needed for dri2 buffers.  Sw fallbacks
+on uncached buffers probably aren't exactly the hot ticket.
+
+>
+> BTW: I wasn't suggesting it was the linux scheduler being stupid, just
+> that there is sometimes lots of contention over the CPU cores and X
+> is just one thread among many wanting to run.
+>
+>
+>> At least my impression was that the hw/kernel flip queue is to save
+>> power so that you can queue up a few frames and everything goes to
+>> sleep for half a second or so (at 24fps or whatever movie your
+>> showing). Needing to schedule 5 frames ahead with pageflips under
+>> load is just guaranteed to result in really horrible interactivity
+>> and so awful user experience
+>
+> Agreed. There's always a tradeoff between tolerance to variable frame
+> rendering time/system latency (lot of buffers) and UI latency (few
+> buffers).
+>
+> As a side note, video playback is one use-case for explicit sync
+> objects which implicit/buffer-based sync doesn't handle: Queue up lots
+> of video frames for display, but mark those "display buffer"
+> operations as depending on explicit sync objects which get signalled
+> by the audio clock. Not sure Android actually does that yet though.
+> Anyway, off topic.
+>
+
+w/ dmafence, rather than explicit fences, I suppose you could add some
+way to queue the buffer to the audio device and have the audio device
+signal the fence.  I suppose it does sound a bit funny for ALSA to
+have a DMA_BUF_AV_SYNC ioctl for this sort of case?
+
+I don't think there is anything like it in EGL, but there is
+oml_sync_control extension for more precise control of presentation
+time.  But this is all implemented in userspace and doesn't really
+work out w/ >double buffering.  This is part of the reason for the
+timing information in vblank events.  Of course it doesn't have any
+tie in to audio subsystem, but in practice this really shouldn't be
+needed.  Audio samples are either rendered at a very predictable rate,
+or sound like sh** with lots of pops and cut outs.
+
+BR,
+-R
+
+>
+> Cheers,
+>
+> Tom
+>
+>
+>
+>
+>
