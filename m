@@ -1,79 +1,49 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 10 Aug 2013 16:49:28 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzNdIEFSTTogSW50cm9kdWNlIGF0b21pYyBNTUlPIGNs?=
- =?UTF-8?B?ZWFyL3NldA==?=
-In-Reply-To: <1376138582-7550-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1376138582-7550-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1376138582-7550-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1376138968.556911297@f376.i.mail.ru>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Sat, 10 Aug 2013 13:50:15 +0100
+Subject: [PATCH v4 2/2] i2c: designware: add two optional property
+ tx/rx-fifo-size
+In-Reply-To: <1374844938-25505-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1374844938-25505-1-git-send-email-zhangfei.gao@linaro.org>
+ <1374844938-25505-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20130810125015.GB18085@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Some SoC have MMIO regions that are shared across orthogonal
-> subsystems. This commit implements a possible solution for the
-> thread-safe access of such regions through a spinlock-protected API
-> with clear-set semantics.
+On Fri, Jul 26, 2013 at 02:22:18PM +0100, Zhangfei Gao wrote:
+> Some platform can not get fifo-size info form register DW_IC_COMP_PARAM_1.
+
+s/form/from/
+
+Why can they not get info from the register? Is it not implemented, or
+buggy? It would be nice to mention why.
+
+> Give chance to update rx-fifo-size and tx-fifo-size if provided in dts.
 > 
-> Concurrent access is protected with a single spinlock for the
-> entire MMIO address space. While this protects shared-registers,
-> it also serializes access to unrelated/unshared registers.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Acked-by: Baruch Siach <baruch@tkos.co.il>
 > ---
->  arch/arm/include/asm/io.h |  5 +++++
->  arch/arm/kernel/io.c      | 24 ++++++++++++++++++++++++
->  2 files changed, 29 insertions(+)
+>  .../devicetree/bindings/i2c/i2c-designware.txt     |    7 +++++++
+>  drivers/i2c/busses/i2c-designware-platdrv.c        |    3 +++
+>  2 files changed, 10 insertions(+)
 > 
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index d070741..c84658d 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -36,6 +36,11 @@
->  #define isa_bus_to_virt phys_to_virt
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-designware.txt b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+> index 7fd7fa2..af0bf8f 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+> @@ -6,6 +6,11 @@ Required properties :
+>   - reg : Offset and length of the register set for the device
+>   - interrupts : <IRQ> where IRQ is the interrupt number.
 >  
->  /*
-> + * Atomic MMIO-wide IO clear/set
-> + */
-> +extern void atomic_io_clear_set(void __iomem *reg, u32 clear, u32 set);
+> +Optional properties:
 > +
-> +/*
->   * Generic IO read/write.  These perform native-endian accesses.  Note
->   * that some architectures will want to re-define __raw_{read,write}w.
->   */
-> diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
-> index dcd5b4d..3ab8201 100644
-> --- a/arch/arm/kernel/io.c
-> +++ b/arch/arm/kernel/io.c
-> @@ -1,6 +1,30 @@
->  #include <linux/export.h>
->  #include <linux/types.h>
->  #include <linux/io.h>
-> +#include <linux/spinlock.h>
-> +
-> +static DEFINE_SPINLOCK(__io_lock);
-> +
-> +/*
-> + * Some platforms have MMIO regions that are shared across orthogonal
-> + * subsystems. This API implements thread-safe access to such regions
-> + * through a spinlock-protected API with clear-set semantics.
-> + *
-> + * Concurrent access is protected with a single spinlock for the entire MMIO
-> + * address space. While this protects shared-registers, it also serializes
-> + * access to unrelated/unshared registers.
-> + *
-> + * Using this API on frequently accessed registers in performance-critical
-> + * paths is not recommended, as the spinlock used by this API would become
-> + * highly contended.
-> + */
-> +void atomic_io_clear_set(void __iomem *reg, u32 clear, u32 set)
-> +{
-> +	spin_lock(&__io_lock);
-> +	writel((readl(reg) & ~clear) | set, reg);
-> +	spin_unlock(&__io_lock);
-> +}
-> +EXPORT_SYMBOL(atomic_io_clear_set);
+> + - rx-fifo-size : 1 cell, Rx fifo size
+> + - tx-fifo-size : 1 cell, Tx fifo size
 
-So, one lock is used to all possible registers?
-Seems a regmap-mmio can be used for such access.
+Units? I assume these are in bytes?
 
----
+It would be nice to mention in the bidning when you need these
+properties (i.e. only hwen you can't figure it out from
+DW_IC_COMP_PARAM_1 becase ________.
+
+Thanks,
+Mark.
