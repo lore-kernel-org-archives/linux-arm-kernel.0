@@ -1,111 +1,38 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 10 Aug 2013 11:09:28 -0300
-Subject: [PATCH 1/3] ARM: Introduce atomic MMIO clear/set
-In-Reply-To: <20130810140237.GB3080@localhost>
-References: <1376138582-7550-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1376138582-7550-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <1376138968.556911297@f376.i.mail.ru>
- <20130810140237.GB3080@localhost>
-Message-ID: <20130810140927.GC3080@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Sat, 10 Aug 2013 15:13:43 +0100
+Subject: [PATCH 1/2] ARM: dts: AM4372: cpu(s) node per latest binding
+In-Reply-To: <ffa2f76fcac54bfe76c234ffce0394fd2c25fe52.1375450395.git.afzal@ti.com>
+References: <ffa2f76fcac54bfe76c234ffce0394fd2c25fe52.1375450395.git.afzal@ti.com>
+Message-ID: <20130810141342.GD18085@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 10, 2013 at 11:02:38AM -0300, Ezequiel Garcia wrote:
-> On Sat, Aug 10, 2013 at 04:49:28PM +0400, Alexander Shiyan wrote:
-> > > Some SoC have MMIO regions that are shared across orthogonal
-> > > subsystems. This commit implements a possible solution for the
-> > > thread-safe access of such regions through a spinlock-protected API
-> > > with clear-set semantics.
-> > > 
-> > > Concurrent access is protected with a single spinlock for the
-> > > entire MMIO address space. While this protects shared-registers,
-> > > it also serializes access to unrelated/unshared registers.
-> > > 
-> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > ---
-> > >  arch/arm/include/asm/io.h |  5 +++++
-> > >  arch/arm/kernel/io.c      | 24 ++++++++++++++++++++++++
-> > >  2 files changed, 29 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> > > index d070741..c84658d 100644
-> > > --- a/arch/arm/include/asm/io.h
-> > > +++ b/arch/arm/include/asm/io.h
-> > > @@ -36,6 +36,11 @@
-> > >  #define isa_bus_to_virt phys_to_virt
-> > >  
-> > >  /*
-> > > + * Atomic MMIO-wide IO clear/set
-> > > + */
-> > > +extern void atomic_io_clear_set(void __iomem *reg, u32 clear, u32 set);
-> > > +
-> > > +/*
-> > >   * Generic IO read/write.  These perform native-endian accesses.  Note
-> > >   * that some architectures will want to re-define __raw_{read,write}w.
-> > >   */
-> > > diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
-> > > index dcd5b4d..3ab8201 100644
-> > > --- a/arch/arm/kernel/io.c
-> > > +++ b/arch/arm/kernel/io.c
-> > > @@ -1,6 +1,30 @@
-> > >  #include <linux/export.h>
-> > >  #include <linux/types.h>
-> > >  #include <linux/io.h>
-> > > +#include <linux/spinlock.h>
-> > > +
-> > > +static DEFINE_SPINLOCK(__io_lock);
-> > > +
-> > > +/*
-> > > + * Some platforms have MMIO regions that are shared across orthogonal
-> > > + * subsystems. This API implements thread-safe access to such regions
-> > > + * through a spinlock-protected API with clear-set semantics.
-> > > + *
-> > > + * Concurrent access is protected with a single spinlock for the entire MMIO
-> > > + * address space. While this protects shared-registers, it also serializes
-> > > + * access to unrelated/unshared registers.
-> > > + *
-> > > + * Using this API on frequently accessed registers in performance-critical
-> > > + * paths is not recommended, as the spinlock used by this API would become
-> > > + * highly contended.
-> > > + */
-> > > +void atomic_io_clear_set(void __iomem *reg, u32 clear, u32 set)
-> > > +{
-> > > +	spin_lock(&__io_lock);
-> > > +	writel((readl(reg) & ~clear) | set, reg);
-> > > +	spin_unlock(&__io_lock);
-> > > +}
-> > > +EXPORT_SYMBOL(atomic_io_clear_set);
-> > 
-> > So, one lock is used to all possible registers?
-> > Seems a regmap-mmio can be used for such access.
-> > 
+On Fri, Aug 02, 2013 at 02:46:13PM +0100, Afzal Mohammed wrote:
+> Update AM4372 cpu node to the latest cpus/cpu bindings for ARM.
 > 
-> Thanks for the hint! Quite frankly, I wasn't familiar with regmap-mmio.
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/boot/dts/am4372.dtsi |    4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> However, after reading some code, I fail to see how that helps in this case.
-> 
-> Note that we need to access the *same* MMIO address from completely
-> different (and unrelated) drivers, such as watchdog and clocksource.
-> 
-> So I wonder who would "own" the regmap descriptor, and how does the other
-> one gets aware of that descriptor?
-> 
-> In addition given we can use orion_wdt (originally meant for mach-kirkwood)
-> to support mvebu SoC watchdog, we need to sort this out in a completely
-> multiplatform capable way.
-> 
-> Ideas?
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index ddc1df7..4635e7f 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -22,8 +22,12 @@
+>  	};
+>  
+>  	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+>  		cpu at 0 {
+>  			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			reg = <0>;
+>  		};
+>  	};
+>  
 
-Answering myself...
+This looks sane to me:
 
-How about using drivers/mfd/syscon.c to create the regmap owner for the shared
-register (TIMER_CTRL in this case, but others might appear) ?
-
-Or adding a new mfd implementation if syscon does not fit ?
-
-Does this sound like an overkill ?
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Acked-by: Mark Rutland <mark.rutland@arm.com>
