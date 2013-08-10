@@ -1,181 +1,43 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 10 Aug 2013 13:09:56 +0200
-Subject: [PATCH v2] N900: add device tree
-In-Reply-To: <20130801234355.GA15611@amd.pavel.ucw.cz>
-References: <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
- <20130617111031.GQ20992@atomide.com>
- <20130701211753.GC15318@amd.pavel.ucw.cz>
- <20130704171939.GA27374@blackmetal.musicnaut.iki.fi>
- <20130704202145.GB10752@amd.pavel.ucw.cz>
- <20130704203256.GB27374@blackmetal.musicnaut.iki.fi>
- <20130713121709.GC16473@amd.pavel.ucw.cz>
- <20130714222819.GB3296@blackmetal.musicnaut.iki.fi>
- <20130728134409.GB5382@amd.pavel.ucw.cz>
- <20130801234355.GA15611@amd.pavel.ucw.cz>
-Message-ID: <20130810110955.GA11437@amd.pavel.ucw.cz>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 10 Aug 2013 12:12:31 +0100
+Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu audio
+ subsystem
+In-Reply-To: <20130810093137.GV23006@n2100.arm.linux.org.uk>
+References: <20130809094340.GO23006@n2100.arm.linux.org.uk>
+ <5204CC04.4000401@gmail.com> <20130809113940.GY6427@sirena.org.uk>
+ <20130809130932.GS23006@n2100.arm.linux.org.uk>
+ <20130809180058.GM6427@sirena.org.uk>
+ <20130809182516.GT23006@n2100.arm.linux.org.uk>
+ <20130809194434.GP6427@sirena.org.uk>
+ <20130809203847.GU23006@n2100.arm.linux.org.uk>
+ <20130809234209.GQ6427@sirena.org.uk>
+ <20130810093137.GV23006@n2100.arm.linux.org.uk>
+Message-ID: <20130810111231.GR6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2013-08-02 01:43:55, Pavel Machek wrote:
-> On Sun 2013-07-28 15:44:09, Pavel Machek wrote:
-> > On Mon 2013-07-15 01:28:19, Aaro Koskinen wrote:
-> > > Hi,
-> > > 
-> > > On Sat, Jul 13, 2013 at 02:17:09PM +0200, Pavel Machek wrote:
-> > > > 
-> > > > This adds device tree with neccessary support to boot with functional
-> > > > video (on both emulator and real N900 device).
-> > > > 
-> > > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > > 
-> > > You can also add:
-> > > 
-> > > Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> > 
-> > Benoit, could you apply this? Tony said you are doing dts changes, and
-> > the patch seems to be ready.
-> 
-> Tony, Benoit was apparently abducted by aliens or something. Is there
-> chance you could take the patch?
+On Sat, Aug 10, 2013 at 10:31:37AM +0100, Russell King - ARM Linux wrote:
 
-Hello, is there anybody out there?
+> Right, so what you're proposing is to come up with a DT description for
+> the existing stuff, and then have to change (or at the very least augment)
+> that description later when the DPCM stuff goes in.
 
-There's nice and simple patch enabling device tree on n900, it is even
-reviewed by Aaro, and it is neither applied nor are negative comments
-coming? ...for a month...?
+> What should be done is to sort out DPCM, get that working and then sort out
+> the DT side of it, so that everyone gets only one transition to DT, not a
+> transition to a half-baked stop-gap DT and then have to go through another
+> round of DT changes.  "Because we can" is not a good enough reason not to
+> get this sorted properly.
 
-Tony also seen the patch and comment was "Benoit takes these", so I
-assume it looks basically ok. 
-
-Benoit, you are supposed to maintain device tree for omap2. 
-
-[I wonder if this is clean-enough cause for "trivial in resubmit
-mode?]
-								Pavel
----
-
-This adds device tree with neccessary support to boot with functional
-video (on both emulator and real N900 device).
-
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-
----
-
->From v1: Aaro wants just GPLv2, so I did that. I re-enabled parts that
-can be enabled on 3.10, and tested it on that kernel.
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f0895c5..1950aed 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -141,6 +141,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-devkit8000.dtb \
- 	omap3-beagle-xm.dtb \
- 	omap3-evm.dtb \
-+	omap3-n900.dtb \
- 	omap3-tobi.dtb \
- 	omap3-igep0020.dtb \
- 	omap3-igep0030.dtb \
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-new file mode 100644
-index 0000000..fb461bf
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -0,0 +1,92 @@
-+/*
-+ * Copyright (C) 2013 Pavel Machek <pavel@ucw.cz>
-+ * Copyright 2013 Aaro Koskinen <aaro.koskinen@iki.fi>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+
-+/include/ "omap34xx.dtsi"
-+
-+/ {
-+	model = "Nokia N900";
-+	compatible = "nokia,omap3-n900", "ti,omap3";
-+
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&vcc>;
-+		};
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>; /* 256 MB */
-+	};
-+
-+};
-+
-+&i2c1 {
-+	clock-frequency = <2200000>;
-+
-+	twl: twl at 48 {
-+		reg = <0x48>;
-+		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-+		interrupt-parent = <&intc>;
-+	};
-+};
-+
-+/include/ "twl4030.dtsi"
-+
-+&twl_gpio {
-+	ti,pullups	= <0x0>;
-+	ti,pulldowns	= <0x03ff3f>; /* BIT(0..5) | BIT(8..17) */
-+};
-+
-+&i2c2 {
-+	clock-frequency = <400000>;
-+};
-+
-+&i2c3 {
-+	clock-frequency = <100000>;
-+};
-+
-+&mmc1 {
-+	status = "disabled";
-+};
-+
-+&mmc2 {
-+	status = "disabled";
-+};
-+
-+&mmc3 {
-+	status = "disabled";
-+};
-+
-+&mcspi1 {
-+	// For some reason, touchscreen is neccessary for screen to work at 
-+	// all on real hw. It works well without it on emulator.
-+	//
-+	// Also... order in the device tree actually matters here.
-+	tsc2005 at 0 {
-+		compatible = "tsc2005";
-+		spi-max-frequency = <6000000>;
-+		reg = <0>;
-+	};
-+	mipid at 2 {
-+		compatible = "acx565akm";
-+		spi-max-frequency = <6000000>;
-+		reg = <2>;
-+		// turbo_mode = 0,
-+		// cs_per_word = 0
-+	};
-+};
-+
-+&usb_otg_hs {
-+	interface-type = <0>;
-+	usb-phy = <&usb2_phy>;
-+	mode = <2>;
-+	power = <50>;
-+};
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Since we know what the hardware physically looks like we should be able
+to write a DT binding which can be stable for both before and after the
+DPCM transition.  The bindings would have to be truly awful to require a
+rewrite here and as with all the DMA wrapper drivers if parts of DPCM
+that don't reflect actual hardware are appearing in the DT we're doing
+something wrong.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130810/e02a5778/attachment.sig>
