@@ -1,46 +1,67 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 10 Aug 2013 12:51:51 +0400
-Subject: [PATCH 2/2] ARM: dts: imx27-phytec-phycore-som: Enable AUDMUX
-In-Reply-To: <1376124711-27167-1-git-send-email-shc_work@mail.ru>
-References: <1376124711-27167-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1376124711-27167-2-git-send-email-shc_work@mail.ru>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 10 Aug 2013 11:16:19 +0200
+Subject: [PATCH v4 1/1] ASoc: kirkwood: add DT support to the mvebu
+ audio subsystem
+In-Reply-To: <20130809110623.7bb3e7ad@armhf>
+References: <20130808132201.2610aef3@armhf> <5204A716.6070507@gmail.com>
+ <20130809110623.7bb3e7ad@armhf>
+Message-ID: <20130810111619.3444fda5@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch adds AUDMUX routing for Phytec PCM-038 module.
-This route i.MX SSI0 (Port 1) to the slave port 4 where MC13783
-codec interface is connected.
+Dear Jean-Francois Moine,
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx27-phytec-phycore-som.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+On Fri, 9 Aug 2013 11:06:23 +0200, Jean-Francois Moine wrote:
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-index aa70ad7..4ec402c 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-@@ -21,6 +21,21 @@
- 	};
- };
- 
-+&audmux {
-+	status = "okay";
-+
-+	/* SSI0 <=> PINS_4 (MC13783 Audio) */
-+	ssi0 {
-+		fsl,audmux-port = <0>;
-+		fsl,port-config = <0xcb205000>;
-+	};
-+
-+	pins4 {
-+		fsl,audmux-port = <2>;
-+		fsl,port-config = <0x00001000>;
-+	};
-+};
-+
- &cspi1 {
- 	fsl,spi-num-chipselects = <1>;
- 	cs-gpios = <&gpio4 28 0>;
+> > we need at least two more compatibles for the audio controller found on
+> > Dove and Kirkwood respectively. This is how we are going to distinguish
+> > those two, e.g. Kirkwood has SPDIF in which Dove hasn't.
+> 
+> Sebastian,
+> 
+> s/has/hasn't & s/hasn't/has
+> 
+> Are 2 compatibles enough, i.e. "mvebu-audio" and "mbevu-audio-spdif"?
+
+Or:
+
+	marvell,kirkwood-audio
+	marvell,dove-audio
+
+> > Also, we have used "marvell" as prefix for a long time. I know there has
+> > been discussion about the stock ticker appreviation, has there been any
+> > decision on that already?
+> 
+> Don't know, but, sure, there are still a lot of "mrvl".
+
+Yes, but they are being converted over to 'marvell', I've seen some
+patches posted. Also, as per
+Documentation/devicetree/bindings/vendor-prefixes.txt, 'marvell' is the
+right prefix for Marvell compatible strings.
+
+
+> > Also we will need some phandle reference to the audio codec here. As
+> > this property is ongoing work in ASoC core, I suggest we wait for it
+> > and propose a binding afterwards.
+> 
+> I don't think that we need any reference to the codec here. The glue is
+> done by the audio device. For example, using the (soon?) extended
+> simple audio card:
+
+Have you looked at the Samsung DT bindings for audio:
+
+        sound {
+                compatible = "samsung,smdk-wm8994";
+
+                samsung,i2s-controller = <&i2s0>;
+                samsung,audio-codec = <&wm8994>;
+        };
+
+it definitely has a codec phandle reference here.
+
+Thomas
 -- 
-1.8.1.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
