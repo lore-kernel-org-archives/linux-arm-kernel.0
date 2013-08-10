@@ -1,62 +1,73 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 10 Aug 2013 19:43:08 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzNdIEFSTTogSW50cm9kdWNlIGF0b21pYyBNTUlPIGNs?=
- =?UTF-8?B?ZWFyL3NldA==?=
-In-Reply-To: <20130810140927.GC3080@localhost>
-References: <1376138582-7550-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130810140237.GB3080@localhost> <20130810140927.GC3080@localhost>
-Message-ID: <1376149388.716003514@f150.i.mail.ru>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sat, 10 Aug 2013 17:25:53 +0200
+Subject: [PATCH] arch/arm/mach-pxa/stargate2.c: use ARRAY_AND_SIZE consistently
+Message-ID: <1376148353-9699-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Sat, Aug 10, 2013 at 11:02:38AM -0300, Ezequiel Garcia wrote:
-> > On Sat, Aug 10, 2013 at 04:49:28PM +0400, Alexander Shiyan wrote:
-> > > > Some SoC have MMIO regions that are shared across orthogonal
-> > > > subsystems. This commit implements a possible solution for the
-> > > > thread-safe access of such regions through a spinlock-protected API
-> > > > with clear-set semantics.
-> > > > 
-> > > > Concurrent access is protected with a single spinlock for the
-> > > > entire MMIO address space. While this protects shared-registers,
-> > > > it also serializes access to unrelated/unshared registers.
-[...]
-> > > > +void atomic_io_clear_set(void __iomem *reg, u32 clear, u32 set)
-> > > > +{
-> > > > +	spin_lock(&__io_lock);
-> > > > +	writel((readl(reg) & ~clear) | set, reg);
-> > > > +	spin_unlock(&__io_lock);
-> > > > +}
-> > > > +EXPORT_SYMBOL(atomic_io_clear_set);
-> > > 
-> > > So, one lock is used to all possible registers?
-> > > Seems a regmap-mmio can be used for such access.
-> > > 
-> > 
-> > Thanks for the hint! Quite frankly, I wasn't familiar with regmap-mmio.
-> > 
-> > However, after reading some code, I fail to see how that helps in this case.
-> > 
-> > Note that we need to access the *same* MMIO address from completely
-> > different (and unrelated) drivers, such as watchdog and clocksource.
-> > 
-> > So I wonder who would "own" the regmap descriptor, and how does the other
-> > one gets aware of that descriptor?
-> > 
-> > In addition given we can use orion_wdt (originally meant for mach-kirkwood)
-> > to support mvebu SoC watchdog, we need to sort this out in a completely
-> > multiplatform capable way.
-> > 
-> > Ideas?
-> 
-> Answering myself...
-> 
-> How about using drivers/mfd/syscon.c to create the regmap owner for the shared
-> register (TIMER_CTRL in this case, but others might appear) ?
-> 
-> Or adding a new mfd implementation if syscon does not fit ?
-> 
-> Does this sound like an overkill ?
+From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Yes, syscon is designed especially for such cases.
+Because ARRAY_AND_SIZE changes the apparent arity of a function, if it is
+used for one call to a given function, it would be better, if possible, to
+use it for all of them.
+
+The semantic patch that fixes this problem is as follows:
+(http://coccinelle.lip6.fr/)
+
+// <smpl>
+@call@
+identifier f;
+expression e;
+expression list[n] es;
+@@
+
+f(es,ARRAY_AND_SIZE(e),...)
+
+@@
+expression e;
+identifier call.f;
+expression list[call.n] ess;
+@@
+
+f(ess,
+- e,ARRAY_SIZE(e)
++ ARRAY_AND_SIZE(e)
+  ,...)
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
+ arch/arm/mach-pxa/stargate2.c |   11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
+index 62aea3e..ee7a42e 100644
+--- a/arch/arm/mach-pxa/stargate2.c
++++ b/arch/arm/mach-pxa/stargate2.c
+@@ -608,12 +608,10 @@ static void __init imote2_init(void)
+ 
+ 	imote2_stargate2_init();
+ 
+-	platform_add_devices(imote2_devices, ARRAY_SIZE(imote2_devices));
++	platform_add_devices(ARRAY_AND_SIZE(imote2_devices));
+ 
+-	i2c_register_board_info(0, imote2_i2c_board_info,
+-				ARRAY_SIZE(imote2_i2c_board_info));
+-	i2c_register_board_info(1, imote2_pwr_i2c_board_info,
+-				ARRAY_SIZE(imote2_pwr_i2c_board_info));
++	i2c_register_board_info(0, ARRAY_AND_SIZE(imote2_i2c_board_info));
++	i2c_register_board_info(1, ARRAY_AND_SIZE(imote2_pwr_i2c_board_info));
+ 
+ 	pxa_set_mci_info(&imote2_mci_platform_data);
+ 	pxa_set_udc_info(&imote2_udc_info);
+@@ -990,8 +988,7 @@ static void __init stargate2_init(void)
+ 	platform_add_devices(ARRAY_AND_SIZE(stargate2_devices));
+ 
+ 	i2c_register_board_info(0, ARRAY_AND_SIZE(stargate2_i2c_board_info));
+-	i2c_register_board_info(1, stargate2_pwr_i2c_board_info,
+-				ARRAY_SIZE(stargate2_pwr_i2c_board_info));
++	i2c_register_board_info(1, ARRAY_AND_SIZE(stargate2_pwr_i2c_board_info));
+ 
+ 	pxa_set_mci_info(&stargate2_mci_platform_data);
+ 
