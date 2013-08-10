@@ -1,201 +1,89 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Sat, 10 Aug 2013 13:04:33 +0530
-Subject: [PATCH V2] USB: EHCI: make ehci-w90X900 a separate driver
-In-Reply-To: <1372347109-5563-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1372347109-5563-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1376120073-30502-1-git-send-email-manjunath.goudar@linaro.org>
+Date: Sat, 10 Aug 2013 13:07:30 +0530
+Subject: [PATCH V4 0/6] USB: OHCI: more bus glues as separate modules
+In-Reply-To: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1376120256-9244-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the W90X900(W90P910) on-chip host controller driver from
-ehci-hcd host code so that it can be built as a separate driver module.
+These patches are for separating the SOC On-Chip ohci host controller
+from ohci-hcd host code into its own driver module.
 This work is part of enabling multi-platform kernels on ARM;
-however, note that other changes are still needed before W90X900(W90P910)
-can be booted with a multi-platform kernel
-
-and an ehci driver that only works on one of them.
-
-With the infrastructure added by Alan Stern in patch 3e0232039
-"USB: EHCI: prepare to make ehci-hcd a library module", we can
-avoid this problem by turning a bus glue into a separate
-module, as we do here for the w90X900 bus glue.
-
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Wan ZongShun <mcuos.com@gmail.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg KH <greg@kroah.com>
-Cc: linux-usb at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
+it would be nice to have in 3.12.
 
 V2:
--Arranged  #include's in alphabetical order.
--Replaced "w90p910" by "w90x900" because it is supports
- all series of w90x900.
+  In patch 5/6 and 6/6:
+  -Set non-standard fields in hc_driver manually, rather than
+   relying on an expanded struct ohci_driver_overrides.
+  -Save orig_ohci_hub_control and orig_ohci_hub_status_data rather than
+   relying on ohci_hub_control and hub_status_data being exported.
 
- drivers/usb/host/Kconfig        |    2 +-
- drivers/usb/host/Makefile       |    1 +
- drivers/usb/host/ehci-hcd.c     |    5 ---
- drivers/usb/host/ehci-w90x900.c |   85 ++++++++++++++++-----------------------
- 4 files changed, 37 insertions(+), 56 deletions(-)
+  In patch 1/6 to 4/6
+  -ohci_setup() has been removed because it is called in .reset member
+   of the ohci_hc_driver structure.
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index ba52912..7bc598b 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -244,7 +244,7 @@ config USB_EHCI_MV
- 	  SoCs, see USB_EHCI_HCD_ORION for those.
+V3:
+ In patch 5/6 and 6/6:
+ -ohci_setup() has been removed because it is called in .reset member
+  of the ohci_hc_driver structure.
+
+ In patch 5/6:
+ -The ohci_restart() function is not required in  current scenario,
+  only discarding connection state of integrated transceivers is sufficient,
+  for this directly handling ohci->hc_control.
+
+ In patch 2/6 :
+ -rewritten if (config->otg || config->rwc) block statements into
+  two separate 'if blocks' to handle below scenarios
+  1. config->otg set scenario.
+  2. if any of these (config->otg, config->rwc) are set, this
+     scenario should be handled only after ohci_setup()
  
- config USB_W90X900_EHCI
--	bool "W90X900(W90P910) EHCI support"
-+	tristate "W90X900(W90P910) EHCI support"
- 	depends on ARCH_W90X900
- 	---help---
- 		Enables support for the W90X900 USB controller
-diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 7664db8..28adb3f 100644
---- a/drivers/usb/host/Makefile
-+++ b/drivers/usb/host/Makefile
-@@ -35,6 +35,7 @@ obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
- obj-$(CONFIG_USB_EHCI_MSM)	+= ehci-msm.o
- obj-$(CONFIG_USB_EHCI_TEGRA)	+= ehci-tegra.o
- obj-$(CONFIG_USB_EHCI_MV)       += ehci-mv.o
-+obj-$(CONFIG_USB_W90X900_EHCI)	+= ehci-w90x900.o
- 
- obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
- obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index 5717dcd..4a5644e 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1249,11 +1249,6 @@ MODULE_LICENSE ("GPL");
- #define XILINX_OF_PLATFORM_DRIVER	ehci_hcd_xilinx_of_driver
- #endif
- 
--#ifdef CONFIG_USB_W90X900_EHCI
--#include "ehci-w90x900.c"
--#define	PLATFORM_DRIVER		ehci_hcd_w90x900_driver
--#endif
--
- #ifdef CONFIG_USB_OCTEON_EHCI
- #include "ehci-octeon.c"
- #define PLATFORM_DRIVER		ehci_octeon_driver
-diff --git a/drivers/usb/host/ehci-w90x900.c b/drivers/usb/host/ehci-w90x900.c
-index 59e0e24..4d6631d 100644
---- a/drivers/usb/host/ehci-w90x900.c
-+++ b/drivers/usb/host/ehci-w90x900.c
-@@ -11,13 +11,28 @@
-  *
-  */
- 
-+#include <linux/dma-mapping.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
-+#include <linux/usb.h>
-+#include <linux/usb/hcd.h>
-+
-+#include "ehci.h"
- 
- /* enable phy0 and phy1 for w90p910 */
- #define	ENPHY		(0x01<<8)
- #define PHY0_CTR	(0xA4)
- #define PHY1_CTR	(0xA8)
- 
-+#define DRIVER_DESC "EHCI w90x900 driver"
-+
-+static const char hcd_name[] = "ehci-w90x900 ";
-+
-+static struct hc_driver __read_mostly ehci_w90x900_hc_driver;
-+
- static int usb_w90x900_probe(const struct hc_driver *driver,
- 		      struct platform_device *pdev)
- {
-@@ -99,54 +114,6 @@ void usb_w90x900_remove(struct usb_hcd *hcd, struct platform_device *pdev)
- 	usb_put_hcd(hcd);
- }
- 
--static const struct hc_driver ehci_w90x900_hc_driver = {
--	.description = hcd_name,
--	.product_desc = "Nuvoton w90x900 EHCI Host Controller",
--	.hcd_priv_size = sizeof(struct ehci_hcd),
--
--	/*
--	 * generic hardware linkage
--	 */
--	.irq = ehci_irq,
--	.flags = HCD_USB2|HCD_MEMORY,
--
--	/*
--	 * basic lifecycle operations
--	 */
--	.reset = ehci_setup,
--	.start = ehci_run,
--
--	.stop = ehci_stop,
--	.shutdown = ehci_shutdown,
--
--	/*
--	 * managing i/o requests and associated device resources
--	 */
--	.urb_enqueue = ehci_urb_enqueue,
--	.urb_dequeue = ehci_urb_dequeue,
--	.endpoint_disable = ehci_endpoint_disable,
--	.endpoint_reset = ehci_endpoint_reset,
--
--	/*
--	 * scheduling support
--	 */
--	.get_frame_number = ehci_get_frame,
--
--	/*
--	 * root hub support
--	 */
--	.hub_status_data = ehci_hub_status_data,
--	.hub_control = ehci_hub_control,
--#ifdef	CONFIG_PM
--	.bus_suspend = ehci_bus_suspend,
--	.bus_resume = ehci_bus_resume,
--#endif
--	.relinquish_port	= ehci_relinquish_port,
--	.port_handed_over	= ehci_port_handed_over,
--
--	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
--};
--
- static int ehci_w90x900_probe(struct platform_device *pdev)
- {
- 	if (usb_disabled())
-@@ -173,7 +140,25 @@ static struct platform_driver ehci_hcd_w90x900_driver = {
- 	},
- };
- 
-+static int __init ehci_w90X900_init(void)
-+{
-+	if (usb_disabled())
-+		return -ENODEV;
-+
-+	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+
-+	ehci_init_driver(&ehci_w90x900_hc_driver, NULL);
-+	return platform_driver_register(&ehci_hcd_w90x900_driver);
-+}
-+module_init(ehci_w90X900_init);
-+
-+static void __exit ehci_w90X900_cleanup(void)
-+{
-+	platform_driver_unregister(&ehci_hcd_w90x900_driver);
-+}
-+module_exit(ehci_w90X900_cleanup);
-+
-+MODULE_DESCRIPTION(DRIVER_DESC);
- MODULE_AUTHOR("Wan ZongShun <mcuos.com@gmail.com>");
--MODULE_DESCRIPTION("w90p910 usb ehci driver!");
--MODULE_LICENSE("GPL");
- MODULE_ALIAS("platform:w90p910-ehci");
-+MODULE_LICENSE("GPL v2");
+In patch 1/6 and 4/6:
+  No change.
+
+V4:
+ In patch 1/6 and 4/6:
+  No change.
+
+ In patch 2/6 :
+ -usb_remove_hcd() function is required a valid clock that is what
+  omap_ohci_clock_power(0) is called after hcd shutdown.
+
+ In patch 3/6 :
+ -V3 modification revert back, only ohci->regs setting write()
+  function has been removed because ohci->regs doesn't get set until
+  usb_add_hcd.
+
+ In patch 5/6 :
+ - Removed extra space after "tristate".
+ - Removed extra space between function name  and '(' characters.
+ - MODULE_ALIAS line moved to last statement of ohci-at91 file.
+
+ In patch 6/6 :
+ - Removed extra space before the '='.
+ - Moved  /* forward definitions */ line before the declarations of functions.
+
+
+Manjunath Goudar (6):
+  USB: OHCI: make ohci-exynos a separate driver
+  USB: OHCI: make ohci-omap a separate driver
+  USB: OHCI: make ohci-omap3 a separate driver
+  USB: OHCI: make ohci-spear a separate driver
+  USB: OHCI: make ohci-at91 a separate driver
+  USB: OHCI: make ohci-s3c2410 a separate driver
+
+ drivers/usb/host/Kconfig        |   30 ++++++-
+ drivers/usb/host/Makefile       |    6 ++
+ drivers/usb/host/ohci-at91.c    |  153 ++++++++++++++++-------------------
+ drivers/usb/host/ohci-exynos.c  |  167 ++++++++++++++++-----------------------
+ drivers/usb/host/ohci-hcd.c     |  108 -------------------------
+ drivers/usb/host/ohci-omap.c    |  156 +++++++++++++-----------------------
+ drivers/usb/host/ohci-omap3.c   |  118 +++++++++------------------
+ drivers/usb/host/ohci-s3c2410.c |  128 +++++++++++++-----------------
+ drivers/usb/host/ohci-spear.c   |  140 +++++++++++++-------------------
+ 9 files changed, 374 insertions(+), 632 deletions(-)
+
 -- 
 1.7.9.5
