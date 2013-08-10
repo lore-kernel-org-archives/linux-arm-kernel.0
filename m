@@ -1,99 +1,50 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 10 Aug 2013 11:02:38 -0300
-Subject: [PATCH 1/3] ARM: Introduce atomic MMIO clear/set
-In-Reply-To: <1376138968.556911297@f376.i.mail.ru>
-References: <1376138582-7550-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1376138582-7550-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <1376138968.556911297@f376.i.mail.ru>
-Message-ID: <20130810140237.GB3080@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Sat, 10 Aug 2013 15:08:27 +0100
+Subject: [PATCH v3 2/2] i2c: imx: Add Vybrid VF610 I2C controller support
+In-Reply-To: <1375418648-22760-2-git-send-email-b35083@freescale.com>
+References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
+ <1375418648-22760-2-git-send-email-b35083@freescale.com>
+Message-ID: <20130810140827.GC18085@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 10, 2013 at 04:49:28PM +0400, Alexander Shiyan wrote:
-> > Some SoC have MMIO regions that are shared across orthogonal
-> > subsystems. This commit implements a possible solution for the
-> > thread-safe access of such regions through a spinlock-protected API
-> > with clear-set semantics.
-> > 
-> > Concurrent access is protected with a single spinlock for the
-> > entire MMIO address space. While this protects shared-registers,
-> > it also serializes access to unrelated/unshared registers.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  arch/arm/include/asm/io.h |  5 +++++
-> >  arch/arm/kernel/io.c      | 24 ++++++++++++++++++++++++
-> >  2 files changed, 29 insertions(+)
-> > 
-> > diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> > index d070741..c84658d 100644
-> > --- a/arch/arm/include/asm/io.h
-> > +++ b/arch/arm/include/asm/io.h
-> > @@ -36,6 +36,11 @@
-> >  #define isa_bus_to_virt phys_to_virt
-> >  
-> >  /*
-> > + * Atomic MMIO-wide IO clear/set
-> > + */
-> > +extern void atomic_io_clear_set(void __iomem *reg, u32 clear, u32 set);
-> > +
-> > +/*
-> >   * Generic IO read/write.  These perform native-endian accesses.  Note
-> >   * that some architectures will want to re-define __raw_{read,write}w.
-> >   */
-> > diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
-> > index dcd5b4d..3ab8201 100644
-> > --- a/arch/arm/kernel/io.c
-> > +++ b/arch/arm/kernel/io.c
-> > @@ -1,6 +1,30 @@
-> >  #include <linux/export.h>
-> >  #include <linux/types.h>
-> >  #include <linux/io.h>
-> > +#include <linux/spinlock.h>
-> > +
-> > +static DEFINE_SPINLOCK(__io_lock);
-> > +
-> > +/*
-> > + * Some platforms have MMIO regions that are shared across orthogonal
-> > + * subsystems. This API implements thread-safe access to such regions
-> > + * through a spinlock-protected API with clear-set semantics.
-> > + *
-> > + * Concurrent access is protected with a single spinlock for the entire MMIO
-> > + * address space. While this protects shared-registers, it also serializes
-> > + * access to unrelated/unshared registers.
-> > + *
-> > + * Using this API on frequently accessed registers in performance-critical
-> > + * paths is not recommended, as the spinlock used by this API would become
-> > + * highly contended.
-> > + */
-> > +void atomic_io_clear_set(void __iomem *reg, u32 clear, u32 set)
-> > +{
-> > +	spin_lock(&__io_lock);
-> > +	writel((readl(reg) & ~clear) | set, reg);
-> > +	spin_unlock(&__io_lock);
-> > +}
-> > +EXPORT_SYMBOL(atomic_io_clear_set);
+On Fri, Aug 02, 2013 at 05:44:08AM +0100, Jingchang Lu wrote:
+>   Add Freescale Vybrid VF610 I2C controller support to
+> imx I2C driver framework.
+>   Some operation is different from imx I2C controller.
+> The register offset, the i2c clock divider value table,
+> the module enabling(I2CR_IEN) which is just invert with imx,
+> and the interrupt flag(I2SR) clearing opcode is w1c on VF610
+> but w0c on imx.
 > 
-> So, one lock is used to all possible registers?
-> Seems a regmap-mmio can be used for such access.
+> Signed-off-by: Jason Jin <Jason.jin@freescale.com>
+> Signed-off-by: Xiaochun Li <b41219@freescale.com>
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> ---
+> changes in v3:
+>   Using struct naming the i2c clock {div, regval} pair.
+>   Using address shift handling registers address difference.
 > 
+> changes in v2:
+>   Fix building section mismatch(es) warning.
+> 
+>  drivers/i2c/busses/i2c-imx.c | 146 ++++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 122 insertions(+), 24 deletions(-)
 
-Thanks for the hint! Quite frankly, I wasn't familiar with regmap-mmio.
+[...]
 
-However, after reading some code, I fail to see how that helps in this case.
+> @@ -145,6 +233,7 @@ MODULE_DEVICE_TABLE(platform, imx_i2c_devtype);
+>  static const struct of_device_id i2c_imx_dt_ids[] = {
+>         { .compatible = "fsl,imx1-i2c", .data = &imx_i2c_devtype[IMX1_I2C], },
+>         { .compatible = "fsl,imx21-i2c", .data = &imx_i2c_devtype[IMX21_I2C], },
+> +       { .compatible = "fsl,vf610-i2c", .data = &imx_i2c_devtype[VF610_I2C], },
+>         { /* sentinel */ }
+>  };
 
-Note that we need to access the *same* MMIO address from completely
-different (and unrelated) drivers, such as watchdog and clocksource.
 
-So I wonder who would "own" the regmap descriptor, and how does the other
-one gets aware of that descriptor?
+That string doesn't seem to be documented anywhere (from a quick grep of
+Documentation/devicetree), and there's no binding update included
+here. It would be nice for that to be fixed :)
 
-In addition given we can use orion_wdt (originally meant for mach-kirkwood)
-to support mvebu SoC watchdog, we need to sort this out in a completely
-multiplatform capable way.
-
-Ideas?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Thanks,
+Mark.
