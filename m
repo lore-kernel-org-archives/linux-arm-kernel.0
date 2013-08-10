@@ -1,30 +1,35 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 10 Aug 2013 18:52:21 +0200
-Subject: [PATCH v2 07/11] dma: mmp_pdma: remove duplicate assignment
+Date: Sat, 10 Aug 2013 18:52:23 +0200
+Subject: [PATCH v2 09/11] dma: mmp_pdma: implement DMA_PAUSE and DMA_RESUME
 In-Reply-To: <1376153545-14361-1-git-send-email-zonque@gmail.com>
 References: <1376153545-14361-1-git-send-email-zonque@gmail.com>
-Message-ID: <1376153545-14361-8-git-send-email-zonque@gmail.com>
+Message-ID: <1376153545-14361-10-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA_SLAVE is currently set twice.
+This is needed at least for audio operation.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- drivers/dma/mmp_pdma.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/dma/mmp_pdma.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index 493f59c..d7ccc90 100644
+index 579f79a..7a0956b 100644
 --- a/drivers/dma/mmp_pdma.c
 +++ b/drivers/dma/mmp_pdma.c
-@@ -882,7 +882,6 @@ static int mmp_pdma_probe(struct platform_device *op)
- 
- 	dma_cap_set(DMA_SLAVE, pdev->device.cap_mask);
- 	dma_cap_set(DMA_MEMCPY, pdev->device.cap_mask);
--	dma_cap_set(DMA_SLAVE, pdev->device.cap_mask);
- 	pdev->device.dev = &op->dev;
- 	pdev->device.device_alloc_chan_resources = mmp_pdma_alloc_chan_resources;
- 	pdev->device.device_free_chan_resources = mmp_pdma_free_chan_resources;
+@@ -659,6 +659,12 @@ static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
+ 		if (cfg->slave_id)
+ 			chan->drcmr = cfg->slave_id;
+ 		break;
++	case DMA_PAUSE:
++		disable_chan(chan->phy);
++		break;
++	case DMA_RESUME:
++		start_pending_queue(chan);
++		break;
+ 	default:
+ 		return -ENOSYS;
+ 	}
 -- 
 1.8.3.1
