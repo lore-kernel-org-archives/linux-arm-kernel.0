@@ -1,167 +1,181 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 10 Aug 2013 13:06:01 +0200
-Subject: [PATCH v6 09/11] clk: mmp: parse clock from dts
-In-Reply-To: <20130809160401.GU27325@e106331-lin.cambridge.arm.com>
-References: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
- <1374833133-21119-10-git-send-email-haojian.zhuang@gmail.com>
- <20130809160401.GU27325@e106331-lin.cambridge.arm.com>
-Message-ID: <2492085.mx8aBrGksJ@flatron>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 10 Aug 2013 13:09:56 +0200
+Subject: [PATCH v2] N900: add device tree
+In-Reply-To: <20130801234355.GA15611@amd.pavel.ucw.cz>
+References: <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
+ <20130617111031.GQ20992@atomide.com>
+ <20130701211753.GC15318@amd.pavel.ucw.cz>
+ <20130704171939.GA27374@blackmetal.musicnaut.iki.fi>
+ <20130704202145.GB10752@amd.pavel.ucw.cz>
+ <20130704203256.GB27374@blackmetal.musicnaut.iki.fi>
+ <20130713121709.GC16473@amd.pavel.ucw.cz>
+ <20130714222819.GB3296@blackmetal.musicnaut.iki.fi>
+ <20130728134409.GB5382@amd.pavel.ucw.cz>
+ <20130801234355.GA15611@amd.pavel.ucw.cz>
+Message-ID: <20130810110955.GA11437@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark, Haojian,
-
-On Friday 09 of August 2013 17:04:01 Mark Rutland wrote:
-> On Fri, Jul 26, 2013 at 11:05:31AM +0100, Haojian Zhuang wrote:
-> > Parse clock information from DTS file for mach-mmp.
+On Fri 2013-08-02 01:43:55, Pavel Machek wrote:
+> On Sun 2013-07-28 15:44:09, Pavel Machek wrote:
+> > On Mon 2013-07-15 01:28:19, Aaro Koskinen wrote:
+> > > Hi,
+> > > 
+> > > On Sat, Jul 13, 2013 at 02:17:09PM +0200, Pavel Machek wrote:
+> > > > 
+> > > > This adds device tree with neccessary support to boot with functional
+> > > > video (on both emulator and real N900 device).
+> > > > 
+> > > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > > 
+> > > You can also add:
+> > > 
+> > > Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 > > 
-> > Changelog:
-> > v6:
-> > 1. Remove marvell string from properties in clock driver.
-> > 2. Append document for clock binding device tree.
-> > 3. Use apbc to replace apbcp. Since the main difference is register
-> > base.
-> > 
-> > v5:
-> > 1. Replace clk_register_mux() by clk_register_mux_table().
-> > 
-> > Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> > ---
-> > 
-> >  .../devicetree/bindings/clock/mmp-clock.txt        |  51 ++++
-> >  arch/arm/mach-mmp/mmp-dt.c                         |   2 +
-> >  drivers/clk/mmp/Makefile                           |   2 +-
-> >  drivers/clk/mmp/clk-mmp.c                          | 300
-> >  +++++++++++++++++++++ 4 files changed, 354 insertions(+), 1
-> >  deletion(-)
-> >  create mode 100644
-> >  Documentation/devicetree/bindings/clock/mmp-clock.txt create mode
-> >  100644 drivers/clk/mmp/clk-mmp.c
-> > 
-> > diff --git a/Documentation/devicetree/bindings/clock/mmp-clock.txt
-> > b/Documentation/devicetree/bindings/clock/mmp-clock.txt new file mode
-> > 100644
-> > index 0000000..5fe52a2
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/mmp-clock.txt
-> > @@ -0,0 +1,51 @@
-> > +Device Tree Clock bindings for arch-mmp
-> > +
-> > +This binding uses the common clock binding[1].
-> > +
-> > +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +
+> > Benoit, could you apply this? Tony said you are doing dts changes, and
+> > the patch seems to be ready.
 > 
-> Are these used somewhere already?
+> Tony, Benoit was apparently abducted by aliens or something. Is there
+> chance you could take the patch?
 
-Hmm? Are you asking about the generic clock bindings or I didn't get your 
-question right? They are supposed to be used (and they are used) whenever 
-clocks are involved.
+Hello, is there anybody out there?
 
-> > +Required properties for fixed rate clocks:
-> > +  - compatible : should be "marvell,mmp-fixed-clkrate".
-> > +  - clocks : should be the input parent clock phandle for the clock.
-> > This +       should be the reference clock.
-> > +  - clock-output-names : should be reference name.
-> > +  - #clock-cells : from common clock binding; should be set to 0.
-> > +  - clock-frequency : frequency of the fixed rate clock
-> 
-> Why is "fixed-clock" not good enough?
-> 
-> This doesn't seem to describe anything more, and there's nothing
-> additional in the driver...
+There's nice and simple patch enabling device tree on n900, it is even
+reviewed by Aaro, and it is neither applied nor are negative comments
+coming? ...for a month...?
 
-+1
+Tony also seen the patch and comment was "Benoit takes these", so I
+assume it looks basically ok. 
 
-> > +
-> > +Required properties for fixed factor clocks:
-> > +  - compatible : should be "marvell,mmp-fixed-clkfactor".
-> > +  - clocks : should be the input parent clock phandle for the clock.
-> > This +       should be the reference clock.
-> > +  - clock-output-names : should be reference name.
-> > +  - #clock-cells : from common clock binding; should be set to 0.
-> 
-> The code seems to use an additional property not described here
-> (mmp-fixed-factor). What does that represent?
-> 
-> Why not "fixed-factor-clock"?
+Benoit, you are supposed to maintain device tree for omap2. 
 
-+1
+[I wonder if this is clean-enough cause for "trivial in resubmit
+mode?]
+								Pavel
+---
 
-> > +
-> > +Required properties for mux clocks:
-> > +  - compatible : should be "marvell,mmp-clkmux".
-> > +  - clocks : should be the input parent clock phandle for the clock.
-> > This +       should be the reference clock.
-> > +  - clock-output-names : should be reference name.
-> > +  - #clock-cells : from common clock binding; should be set to 0.
-> > +  - mmp-clk-reg : mux register offset & mask bits.
-> 
-> Offset from where? There's no reg, no container's described and there's
-> no example.
+This adds device tree with neccessary support to boot with functional
+video (on both emulator and real N900 device).
 
-+1
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 
-> > +  - mmp-clk-sel : array of mux select bits
-> > +
-> > +Required properties for divider clocks:
-> > +  - compatible : should be "marvell,mmp-apmu-clkdiv".
-> > +  - clocks : should be the input parent clock phandle for the clock.
-> > This +       should be the reference clock.
-> > +  - clock-output-names : should be reference name.
-> > +  - #clock-cells : from common clock binding; should be set to 0.
-> > +  - mmp-clk-reg : divider register offset & mask bits.
-> 
-> Similar comments to those above. This is also a fixed-factor-clock, no?
+---
 
-This looks like a clock with configurable divisor for me, but again, why 
-not use the standard divider clock here?
+>From v1: Aaro wants just GPLv2, so I did that. I re-enabled parts that
+can be enabled on 3.10, and tested it on that kernel.
 
-Best regards,
-Tomasz
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f0895c5..1950aed 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -141,6 +141,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-devkit8000.dtb \
+ 	omap3-beagle-xm.dtb \
+ 	omap3-evm.dtb \
++	omap3-n900.dtb \
+ 	omap3-tobi.dtb \
+ 	omap3-igep0020.dtb \
+ 	omap3-igep0030.dtb \
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+new file mode 100644
+index 0000000..fb461bf
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -0,0 +1,92 @@
++/*
++ * Copyright (C) 2013 Pavel Machek <pavel@ucw.cz>
++ * Copyright 2013 Aaro Koskinen <aaro.koskinen@iki.fi>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/dts-v1/;
++
++/include/ "omap34xx.dtsi"
++
++/ {
++	model = "Nokia N900";
++	compatible = "nokia,omap3-n900", "ti,omap3";
++
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&vcc>;
++		};
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x10000000>; /* 256 MB */
++	};
++
++};
++
++&i2c1 {
++	clock-frequency = <2200000>;
++
++	twl: twl at 48 {
++		reg = <0x48>;
++		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
++		interrupt-parent = <&intc>;
++	};
++};
++
++/include/ "twl4030.dtsi"
++
++&twl_gpio {
++	ti,pullups	= <0x0>;
++	ti,pulldowns	= <0x03ff3f>; /* BIT(0..5) | BIT(8..17) */
++};
++
++&i2c2 {
++	clock-frequency = <400000>;
++};
++
++&i2c3 {
++	clock-frequency = <100000>;
++};
++
++&mmc1 {
++	status = "disabled";
++};
++
++&mmc2 {
++	status = "disabled";
++};
++
++&mmc3 {
++	status = "disabled";
++};
++
++&mcspi1 {
++	// For some reason, touchscreen is neccessary for screen to work at 
++	// all on real hw. It works well without it on emulator.
++	//
++	// Also... order in the device tree actually matters here.
++	tsc2005 at 0 {
++		compatible = "tsc2005";
++		spi-max-frequency = <6000000>;
++		reg = <0>;
++	};
++	mipid at 2 {
++		compatible = "acx565akm";
++		spi-max-frequency = <6000000>;
++		reg = <2>;
++		// turbo_mode = 0,
++		// cs_per_word = 0
++	};
++};
++
++&usb_otg_hs {
++	interface-type = <0>;
++	usb-phy = <&usb2_phy>;
++	mode = <2>;
++	power = <50>;
++};
 
-> > +
-> > +Required properties for gate clocks:
-> > +  - compatible : should be "marvell,mmp-apbc-clk".
-> > +  - clocks : should be the input parent clock phandle for the clock.
-> > This +       should be the reference clock.
-> > +  - clock-output-names : should be reference name.
-> > +  - #clock-cells : from common clock binding; should be set to 0.
-> > +  - mmp-clk-reg : gate register offset & mask bits.
-> 
-> Offset from where?
-> 
-> > +
-> > +Optional properties for gate clocks:
-> > +  - mmp-clk-delay : delay between enabling function clock and apb
-> > clock
-> Units?
-> 
-> > +  - mmp-apbc-power-ctrl : enable apbc power control bit
-> 
-> Is this a boolean or the offset of the bit offset?
-> 
-> > +
-> 
-> > +For example:
-> Missing example?
-> 
-> [...]
-> 
-> > +static const struct of_device_id mmp_of_match[] = {
-> > +       { .compatible = "marvell,mmp-mpmu", .data = (void *)MMP_MPMU,
-> > }, +       { .compatible = "marvell,mmp-apmu", .data = (void
-> > *)MMP_APMU, }, +       { .compatible = "marvell,mmp-apbc", .data =
-> > (void *)MMP_APBC, }, +       { .compatible = "marvell,mmp-apbcp",
-> > .data = (void *)MMP_APBCP, }, +       { .compatible = "mrvl,apb-bus",
-> > .data = (void *)MMP_APB, }, +};
-> 
-> Not documented?
-> 
-> Thanks,
-> Mark.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
