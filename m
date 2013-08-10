@@ -1,30 +1,38 @@
-From: wharms@bfs.de (walter harms)
-Date: Sat, 10 Aug 2013 19:49:46 +0200
-Subject: [PATCH] arch/arm/mach-pxa/stargate2.c: use ARRAY_AND_SIZE
- consistently
-In-Reply-To: <1376148738.2083.17.camel@joe-AO722>
-References: <1376148353-9699-1-git-send-email-Julia.Lawall@lip6.fr>
- <1376148738.2083.17.camel@joe-AO722>
-Message-ID: <52067D3A.2090505@bfs.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 10 Aug 2013 23:47:25 +0400
+Subject: [PATCH] ARM: KVM: Simplify tracepoint text
+In-Reply-To: <1376019686-19301-1-git-send-email-christoffer.dall@linaro.org>
+References: <1376019686-19301-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <520698CD.2070904@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello.
 
+On 08/09/2013 07:41 AM, Christoffer Dall wrote:
 
-Am 10.08.2013 17:32, schrieb Joe Perches:
-> On Sat, 2013-08-10 at 17:25 +0200, Julia Lawall wrote:
->> From: Julia Lawall <Julia.Lawall@lip6.fr>
->>
->> Because ARRAY_AND_SIZE changes the apparent arity of a function, if it is
->> used for one call to a given function, it would be better, if possible, to
->> use it for all of them.
-> 
-> I think it'd be better to remove ARRAY_AND_SIZE instead.
-> 
+> The tracepoint for kvm_guest_fault was extremely long, make it a
+> slightly bit shorter.
 
-+1
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>   arch/arm/kvm/trace.h |    7 +++----
+>   1 file changed, 3 insertions(+), 4 deletions(-)
 
-:)
+> diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
+> index a8e73ed..8cbaea2 100644
+> --- a/arch/arm/kvm/trace.h
+> +++ b/arch/arm/kvm/trace.h
+> @@ -59,10 +59,9 @@ TRACE_EVENT(kvm_guest_fault,
+>   		__entry->ipa			= ipa;
+>   	),
+>
+> -	TP_printk("guest fault at PC %#08lx (hxfar %#08lx, "
+> -		  "ipa %#16llx, hsr %#08lx",
+> -		  __entry->vcpu_pc, __entry->hxfar,
+> -		  __entry->ipa, __entry->hsr)
+> +	TP_printk("ipa 0x%llx, hsr 0x%#08lx, hxfar 0x%#08lx, pc 0x%#08lx",
 
-re,
- wh
+    "0x" and "#" are redundant, they mean the same thing, hexadecimal prefix.
+
+WBR, Sergei
