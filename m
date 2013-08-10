@@ -1,36 +1,560 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 10 Aug 2013 19:05:09 +0200
-Subject: [PATCH 0/2] ARM: dts: AM33XX: node definition cleanups
-Message-ID: <1376154311-10184-1-git-send-email-javier.martinez@collabora.co.uk>
+Date: Sat, 10 Aug 2013 19:05:11 +0200
+Subject: [PATCH 2/2] ARM: dts: AM33XX: don't redefine OCP bus and device nodes
+In-Reply-To: <1376154311-10184-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1376154311-10184-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1376154311-10184-3-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The On Chip Peripherals (OCP) device node is a simplified
+representation of the AM33XX SoC interconnect. An OCP dev
+node is already defined in the am33xx.dtsi Device Tree
+source file included by am33xx based boards so there is
+no need to redefe this on each board DT file.
 
-While reviewing the submission of a DT file for a new board
-based on the am3352 SoC, I noticed that am33xx*.dts files needed
-some cleanups. All am33xx based board files redefine device nodes
-that are already defined in the included am33xx.dtsi file.
+Also, the OCP and IP modules directly connected to it are SoC
+internal details that is better to keep outside of board files.
 
-This not only makes the DTS harder to maintain without any benefit
-but also leaks SoC internal details to board files such as how the
-OCP interconnect is modeled (currently just a flat representation)
-and the addresses of some IP modules that are part of the SoC and
-are not going to change from board to board.
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ arch/arm/boot/dts/am335x-bone.dts  |   41 ++---
+ arch/arm/boot/dts/am335x-evm.dts   |  322 ++++++++++++++++++------------------
+ arch/arm/boot/dts/am335x-evmsk.dts |  116 +++++++-------
+ 3 files changed, 236 insertions(+), 243 deletions(-)
 
-This patch-set cleans these board files and is composed of the
-following patches:
-
-[PATCH 1/2] ARM: dts: AM33XX: use pinmux node defined in included
-[PATCH 2/2] ARM: dts: AM33XX: don't redefine OCP bus and device
-
-NOTE: I don't own any of these am33xx based boards so I was only
-able to build test the changes. However I compared the generated
-dtb before and after the changes and the disassembled DTS with
-dtc -I dtb -O dts foo.dtb > bar.dts are identical.
-
-Even though the binary dtb is the same and there shouldn't be
-any visible changes, boot testing will be highly appreciated.
-
-Thanks a lot and best regards,
-Javier
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index f0d53fe..721cad2 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -24,28 +24,6 @@
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+ 	};
+ 
+-	ocp {
+-		uart0: serial at 44e09000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&uart0_pins>;
+-
+-			status = "okay";
+-		};
+-
+-		i2c0: i2c at 44e0b000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c0_pins>;
+-
+-			status = "okay";
+-			clock-frequency = <400000>;
+-
+-			tps: tps at 24 {
+-				reg = <0x24>;
+-			};
+-
+-		};
+-	};
+-
+ 	leds {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&user_leds_s0>;
+@@ -168,6 +146,25 @@
+ 	};
+ };
+ 
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins>;
++
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins>;
++
++	status = "okay";
++	clock-frequency = <400000>;
++
++	tps: tps at 24 {
++		reg = <0x24>;
++	};
++};
++
+ /include/ "tps65217.dtsi"
+ 
+ &tps {
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index 565b15c..a7b1dbd 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -24,168 +24,6 @@
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+ 	};
+ 
+-	ocp {
+-		uart0: serial at 44e09000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&uart0_pins>;
+-
+-			status = "okay";
+-		};
+-
+-		i2c0: i2c at 44e0b000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c0_pins>;
+-
+-			status = "okay";
+-			clock-frequency = <400000>;
+-
+-			tps: tps at 2d {
+-				reg = <0x2d>;
+-			};
+-		};
+-
+-		i2c1: i2c at 4802a000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c1_pins>;
+-
+-			status = "okay";
+-			clock-frequency = <100000>;
+-
+-			lis331dlh: lis331dlh at 18 {
+-				compatible = "st,lis331dlh", "st,lis3lv02d";
+-				reg = <0x18>;
+-				Vdd-supply = <&lis3_reg>;
+-				Vdd_IO-supply = <&lis3_reg>;
+-
+-				st,click-single-x;
+-				st,click-single-y;
+-				st,click-single-z;
+-				st,click-thresh-x = <10>;
+-				st,click-thresh-y = <10>;
+-				st,click-thresh-z = <10>;
+-				st,irq1-click;
+-				st,irq2-click;
+-				st,wakeup-x-lo;
+-				st,wakeup-x-hi;
+-				st,wakeup-y-lo;
+-				st,wakeup-y-hi;
+-				st,wakeup-z-lo;
+-				st,wakeup-z-hi;
+-				st,min-limit-x = <120>;
+-				st,min-limit-y = <120>;
+-				st,min-limit-z = <140>;
+-				st,max-limit-x = <550>;
+-				st,max-limit-y = <550>;
+-				st,max-limit-z = <750>;
+-			};
+-
+-			tsl2550: tsl2550 at 39 {
+-				compatible = "taos,tsl2550";
+-				reg = <0x39>;
+-			};
+-
+-			tmp275: tmp275 at 48 {
+-				compatible = "ti,tmp275";
+-				reg = <0x48>;
+-			};
+-		};
+-
+-		elm: elm at 48080000 {
+-			status = "okay";
+-		};
+-
+-		epwmss0: epwmss at 48300000 {
+-			status = "okay";
+-
+-			ecap0: ecap at 48300100 {
+-				status = "okay";
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&ecap0_pins>;
+-			};
+-		};
+-
+-		gpmc: gpmc at 50000000 {
+-			status = "okay";
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&nandflash_pins_s0>;
+-			ranges = <0 0 0x08000000 0x10000000>;	/* CS0: NAND */
+-			nand at 0,0 {
+-				reg = <0 0 0>; /* CS0, offset 0 */
+-				nand-bus-width = <8>;
+-				ti,nand-ecc-opt = "bch8";
+-				gpmc,device-nand = "true";
+-				gpmc,device-width = <1>;
+-				gpmc,sync-clk-ps = <0>;
+-				gpmc,cs-on-ns = <0>;
+-				gpmc,cs-rd-off-ns = <44>;
+-				gpmc,cs-wr-off-ns = <44>;
+-				gpmc,adv-on-ns = <6>;
+-				gpmc,adv-rd-off-ns = <34>;
+-				gpmc,adv-wr-off-ns = <44>;
+-				gpmc,we-on-ns = <0>;
+-				gpmc,we-off-ns = <40>;
+-				gpmc,oe-on-ns = <0>;
+-				gpmc,oe-off-ns = <54>;
+-				gpmc,access-ns = <64>;
+-				gpmc,rd-cycle-ns = <82>;
+-				gpmc,wr-cycle-ns = <82>;
+-				gpmc,wait-on-read = "true";
+-				gpmc,wait-on-write = "true";
+-				gpmc,bus-turnaround-ns = <0>;
+-				gpmc,cycle2cycle-delay-ns = <0>;
+-				gpmc,clk-activation-ns = <0>;
+-				gpmc,wait-monitoring-ns = <0>;
+-				gpmc,wr-access-ns = <40>;
+-				gpmc,wr-data-mux-bus-ns = <0>;
+-
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				elm_id = <&elm>;
+-
+-				/* MTD partition table */
+-				partition at 0 {
+-					label = "SPL1";
+-					reg = <0x00000000 0x000020000>;
+-				};
+-
+-				partition at 1 {
+-					label = "SPL2";
+-					reg = <0x00020000 0x00020000>;
+-				};
+-
+-				partition at 2 {
+-					label = "SPL3";
+-					reg = <0x00040000 0x00020000>;
+-				};
+-
+-				partition at 3 {
+-					label = "SPL4";
+-					reg = <0x00060000 0x00020000>;
+-				};
+-
+-				partition at 4 {
+-					label = "U-boot";
+-					reg = <0x00080000 0x001e0000>;
+-				};
+-
+-				partition at 5 {
+-					label = "environment";
+-					reg = <0x00260000 0x00020000>;
+-				};
+-
+-				partition at 6 {
+-					label = "Kernel";
+-					reg = <0x00280000 0x00500000>;
+-				};
+-
+-				partition at 7 {
+-					label = "File-System";
+-					reg = <0x00780000 0x0F880000>;
+-				};
+-			};
+-		};
+-	};
+-
+ 	vbat: fixedregulator at 0 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vbat";
+@@ -376,6 +214,166 @@
+ 	};
+ };
+ 
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins>;
++
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins>;
++
++	status = "okay";
++	clock-frequency = <400000>;
++
++	tps: tps at 2d {
++		reg = <0x2d>;
++	};
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
++
++	status = "okay";
++	clock-frequency = <100000>;
++
++	lis331dlh: lis331dlh at 18 {
++		compatible = "st,lis331dlh", "st,lis3lv02d";
++		reg = <0x18>;
++		Vdd-supply = <&lis3_reg>;
++		Vdd_IO-supply = <&lis3_reg>;
++
++		st,click-single-x;
++		st,click-single-y;
++		st,click-single-z;
++		st,click-thresh-x = <10>;
++		st,click-thresh-y = <10>;
++		st,click-thresh-z = <10>;
++		st,irq1-click;
++		st,irq2-click;
++		st,wakeup-x-lo;
++		st,wakeup-x-hi;
++		st,wakeup-y-lo;
++		st,wakeup-y-hi;
++		st,wakeup-z-lo;
++		st,wakeup-z-hi;
++		st,min-limit-x = <120>;
++		st,min-limit-y = <120>;
++		st,min-limit-z = <140>;
++		st,max-limit-x = <550>;
++		st,max-limit-y = <550>;
++		st,max-limit-z = <750>;
++	};
++
++	tsl2550: tsl2550 at 39 {
++		compatible = "taos,tsl2550";
++		reg = <0x39>;
++	};
++
++	tmp275: tmp275 at 48 {
++		compatible = "ti,tmp275";
++		reg = <0x48>;
++	};
++};
++
++&elm {
++	status = "okay";
++};
++
++&epwmss0 {
++	status = "okay";
++
++	ecap0: ecap at 48300100 {
++		status = "okay";
++		pinctrl-names = "default";
++		pinctrl-0 = <&ecap0_pins>;
++	};
++};
++
++&gpmc {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&nandflash_pins_s0>;
++	ranges = <0 0 0x08000000 0x10000000>;	/* CS0: NAND */
++	nand at 0,0 {
++		reg = <0 0 0>; /* CS0, offset 0 */
++		nand-bus-width = <8>;
++		ti,nand-ecc-opt = "bch8";
++		gpmc,device-nand = "true";
++		gpmc,device-width = <1>;
++		gpmc,sync-clk-ps = <0>;
++		gpmc,cs-on-ns = <0>;
++		gpmc,cs-rd-off-ns = <44>;
++		gpmc,cs-wr-off-ns = <44>;
++		gpmc,adv-on-ns = <6>;
++		gpmc,adv-rd-off-ns = <34>;
++		gpmc,adv-wr-off-ns = <44>;
++		gpmc,we-on-ns = <0>;
++		gpmc,we-off-ns = <40>;
++		gpmc,oe-on-ns = <0>;
++		gpmc,oe-off-ns = <54>;
++		gpmc,access-ns = <64>;
++		gpmc,rd-cycle-ns = <82>;
++		gpmc,wr-cycle-ns = <82>;
++		gpmc,wait-on-read = "true";
++		gpmc,wait-on-write = "true";
++		gpmc,bus-turnaround-ns = <0>;
++		gpmc,cycle2cycle-delay-ns = <0>;
++		gpmc,clk-activation-ns = <0>;
++		gpmc,wait-monitoring-ns = <0>;
++		gpmc,wr-access-ns = <40>;
++		gpmc,wr-data-mux-bus-ns = <0>;
++
++		#address-cells = <1>;
++		#size-cells = <1>;
++		elm_id = <&elm>;
++
++		/* MTD partition table */
++		partition at 0 {
++			label = "SPL1";
++			reg = <0x00000000 0x000020000>;
++		};
++
++		partition at 1 {
++			label = "SPL2";
++			reg = <0x00020000 0x00020000>;
++		};
++
++		partition at 2 {
++			label = "SPL3";
++			reg = <0x00040000 0x00020000>;
++		};
++
++		partition at 3 {
++			label = "SPL4";
++			reg = <0x00060000 0x00020000>;
++		};
++
++		partition at 4 {
++			label = "U-boot";
++			reg = <0x00080000 0x001e0000>;
++		};
++
++		partition at 5 {
++			label = "environment";
++			reg = <0x00260000 0x00020000>;
++		};
++
++		partition at 6 {
++			label = "Kernel";
++			reg = <0x00280000 0x00500000>;
++		};
++
++		partition at 7 {
++			label = "File-System";
++			reg = <0x00780000 0x0F880000>;
++		};
++	};
++};
++
+ #include "tps65910.dtsi"
+ 
+ &tps {
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index a0afb10..d3e8ed2 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -30,65 +30,6 @@
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+ 	};
+ 
+-	ocp {
+-		uart0: serial at 44e09000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&uart0_pins>;
+-
+-			status = "okay";
+-		};
+-
+-		i2c0: i2c at 44e0b000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c0_pins>;
+-
+-			status = "okay";
+-			clock-frequency = <400000>;
+-
+-			tps: tps at 2d {
+-				reg = <0x2d>;
+-			};
+-
+-			lis331dlh: lis331dlh at 18 {
+-				compatible = "st,lis331dlh", "st,lis3lv02d";
+-				reg = <0x18>;
+-				Vdd-supply = <&lis3_reg>;
+-				Vdd_IO-supply = <&lis3_reg>;
+-
+-				st,click-single-x;
+-				st,click-single-y;
+-				st,click-single-z;
+-				st,click-thresh-x = <10>;
+-				st,click-thresh-y = <10>;
+-				st,click-thresh-z = <10>;
+-				st,irq1-click;
+-				st,irq2-click;
+-				st,wakeup-x-lo;
+-				st,wakeup-x-hi;
+-				st,wakeup-y-lo;
+-				st,wakeup-y-hi;
+-				st,wakeup-z-lo;
+-				st,wakeup-z-hi;
+-				st,min-limit-x = <120>;
+-				st,min-limit-y = <120>;
+-				st,min-limit-z = <140>;
+-				st,max-limit-x = <550>;
+-				st,max-limit-y = <550>;
+-				st,max-limit-z = <750>;
+-			};
+-		};
+-
+-		epwmss2: epwmss at 48304000 {
+-			status = "okay";
+-
+-			ecap2: ecap at 48304100 {
+-				status = "okay";
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&ecap2_pins>;
+-			};
+-		};
+-	};
+-
+ 	vbat: fixedregulator at 0 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vbat";
+@@ -304,6 +245,63 @@
+ 	};
+ };
+ 
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins>;
++
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins>;
++
++	status = "okay";
++	clock-frequency = <400000>;
++
++	tps: tps at 2d {
++		reg = <0x2d>;
++	};
++
++	lis331dlh: lis331dlh at 18 {
++		compatible = "st,lis331dlh", "st,lis3lv02d";
++		reg = <0x18>;
++		Vdd-supply = <&lis3_reg>;
++		Vdd_IO-supply = <&lis3_reg>;
++
++		st,click-single-x;
++		st,click-single-y;
++		st,click-single-z;
++		st,click-thresh-x = <10>;
++		st,click-thresh-y = <10>;
++		st,click-thresh-z = <10>;
++		st,irq1-click;
++		st,irq2-click;
++		st,wakeup-x-lo;
++		st,wakeup-x-hi;
++		st,wakeup-y-lo;
++		st,wakeup-y-hi;
++		st,wakeup-z-lo;
++		st,wakeup-z-hi;
++		st,min-limit-x = <120>;
++		st,min-limit-y = <120>;
++		st,min-limit-z = <140>;
++		st,max-limit-x = <550>;
++		st,max-limit-y = <550>;
++		st,max-limit-z = <750>;
++	};
++};
++
++&epwmss2 {
++	status = "okay";
++
++	ecap2: ecap at 48304100 {
++		status = "okay";
++		pinctrl-names = "default";
++		pinctrl-0 = <&ecap2_pins>;
++	};
++};
++
+ #include "tps65910.dtsi"
+ 
+ &tps {
+-- 
+1.7.7.6
