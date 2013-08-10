@@ -1,125 +1,62 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 10 Aug 2013 11:27:19 -0300
-Subject: [PATCH v2 2/2] ARM: kirkwood: Add basic suspend-to-RAM support
-In-Reply-To: <1376144839-1985-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1376144839-1985-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1376144839-1985-3-git-send-email-ezequiel.garcia@free-electrons.com>
+From: dsd@laptop.org (Daniel Drake)
+Date: Sat, 10 Aug 2013 08:57:27 -0600
+Subject: [PATCH v6 09/11] clk: mmp: parse clock from dts
+In-Reply-To: <1374833133-21119-10-git-send-email-haojian.zhuang@gmail.com>
+References: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
+ <1374833133-21119-10-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <CAMLZHHRwW9fodM4poVL=OK47NU2-_PCfpHHfM2crBMefw+Uy2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implements suspend-to-RAM support in a standby-like fashion:
-when the SoC enters suspend state the memory PM units are disabled,
-the DDR is set in self-refresh mode, and the CPU is set in WFI.
+Hi Haojian,
 
-Signed-off-by: Simon Guinot <sguinot@lacie.com>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
-Changes from v1:
+I just stumbed upon this mail... I see that I have done some similar
+work in my recent patches. Maybe you could CC me in future when we are
+duplicating efforts.
 
-  * Removed clock gating. Each peripheral is in charge of implementing
-    a proper suspend/resume path, including gateable clock handling.
+On Fri, Jul 26, 2013 at 4:05 AM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> Parse clock information from DTS file for mach-mmp.
+>
+> Changelog:
+> v6:
+> 1. Remove marvell string from properties in clock driver.
+> 2. Append document for clock binding device tree.
+> 3. Use apbc to replace apbcp. Since the main difference is register
+> base.
 
- arch/arm/mach-kirkwood/Makefile                   |  1 +
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  2 +
- arch/arm/mach-kirkwood/pm.c                       | 69 +++++++++++++++++++++++
- 3 files changed, 72 insertions(+)
- create mode 100644 arch/arm/mach-kirkwood/pm.c
+If one replaces the other then why are both still present in the patch?
+I think all these clock type acronyms deserve a quick comment
+explaining what they are.
 
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index 937d4e1..788db9c 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -1,4 +1,5 @@
- obj-y				+= common.o pcie.o
-+obj-$(CONFIG_PM)		+= pm.o
- obj-$(CONFIG_KIRKWOOD_LEGACY)	+= irq.o mpp.o
- obj-$(CONFIG_MACH_D2NET_V2)		+= d2net_v2-setup.o lacie_v2-common.o
- obj-$(CONFIG_MACH_NET2BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
-diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-index 91242c9..8b9d1c9 100644
---- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-+++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-@@ -78,4 +78,6 @@
- #define CGC_TDM			(1 << 20)
- #define CGC_RESERVED		(0x6 << 21)
- 
-+#define MEMORY_PM_CTRL		(BRIDGE_VIRT_BASE + 0x118)
-+
- #endif
-diff --git a/arch/arm/mach-kirkwood/pm.c b/arch/arm/mach-kirkwood/pm.c
-new file mode 100644
-index 0000000..364734c
---- /dev/null
-+++ b/arch/arm/mach-kirkwood/pm.c
-@@ -0,0 +1,69 @@
-+/*
-+ * Power Management driver for Marvell Kirkwood SoCs
-+ *
-+ * Copyright (C) 2013 Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-+ * Copyright (C) 2010 Simon Guinot <sguinot@lacie.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License,
-+ * version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/suspend.h>
-+#include <linux/io.h>
-+#include <mach/bridge-regs.h>
-+
-+static void __iomem *ddr_operation_base;
-+
-+static void kirkwood_suspend_mem(void)
-+{
-+	u32 mem_pm_ctrl;
-+
-+	mem_pm_ctrl = readl(MEMORY_PM_CTRL);
-+
-+	/* Set peripherals to low-power mode */
-+	writel_relaxed(~0, MEMORY_PM_CTRL);
-+
-+	/* Set DDR in self-refresh */
-+	writel_relaxed(0x7, ddr_operation_base);
-+
-+	/*
-+	 * Set CPU in wait-for-interrupt state.
-+	 * This disables the CPU core clocks,
-+	 * the array clocks, and also the L2 controller.
-+	 */
-+	cpu_do_idle();
-+
-+	writel_relaxed(mem_pm_ctrl, MEMORY_PM_CTRL);
-+}
-+
-+static int kirkwood_suspend_enter(suspend_state_t state)
-+{
-+	switch (state) {
-+	case PM_SUSPEND_MEM:
-+		kirkwood_suspend_mem();
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+	return 0;
-+}
-+
-+static const struct platform_suspend_ops kirkwood_suspend_ops = {
-+	.enter = kirkwood_suspend_enter,
-+	.valid = suspend_valid_only_mem,
-+};
-+
-+static int __init kirkwood_pm_init(void)
-+{
-+	ddr_operation_base = ioremap(DDR_OPERATION_BASE, 4);
-+	suspend_set_ops(&kirkwood_suspend_ops);
-+	return 0;
-+}
-+arch_initcall(kirkwood_pm_init);
--- 
-1.8.1.5
+> +Required properties for divider clocks:
+> +  - compatible : should be "marvell,mmp-apmu-clkdiv".
+> +  - clocks : should be the input parent clock phandle for the clock. This
+> +       should be the reference clock.
+> +  - clock-output-names : should be reference name.
+> +  - #clock-cells : from common clock binding; should be set to 0.
+> +  - mmp-clk-reg : divider register offset & mask bits.
+
+I think you should use the standard 'reg' property for providing
+register offets, and then other properties (with better names) for
+other info that needs to be supplied e.g. mask.
+
+I see that your implementation here moves away from using the existing
+code in clk-apmu.c and instead just uses clk-divider directly. That
+might make sense, but your new DTS does not reimplement many of the
+static APMU clocks that were previously implemented (e.g. ccic, sdh in
+clk-mmp2.c). Why is this?
+
+> +Required properties for gate clocks:
+> +  - compatible : should be "marvell,mmp-apbc-clk".
+> +  - clocks : should be the input parent clock phandle for the clock. This
+> +       should be the reference clock.
+> +  - clock-output-names : should be reference name.
+> +  - #clock-cells : from common clock binding; should be set to 0.
+> +  - mmp-clk-reg : gate register offset & mask bits.
+
+mmp-clk-reg contains two elements, I guess. But the second element is
+not used in your driver for mmp-apbc-clk.
+
+Thanks
+Daniel
