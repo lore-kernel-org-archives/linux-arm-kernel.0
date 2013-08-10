@@ -1,109 +1,36 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 10 Aug 2013 18:52:24 +0200
-Subject: [PATCH v2 10/11] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <1376153545-14361-1-git-send-email-zonque@gmail.com>
-References: <1376153545-14361-1-git-send-email-zonque@gmail.com>
-Message-ID: <1376153545-14361-11-git-send-email-zonque@gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sat, 10 Aug 2013 19:05:09 +0200
+Subject: [PATCH 0/2] ARM: dts: AM33XX: node definition cleanups
+Message-ID: <1376154311-10184-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to report the channel's residue, we have to memorize the first
-dma buffer position when the channel is configured.
+Hi,
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- drivers/dma/mmp_pdma.c | 39 +++++++++++++++++++++++++++++++++++++--
- 1 file changed, 37 insertions(+), 2 deletions(-)
+While reviewing the submission of a DT file for a new board
+based on the am3352 SoC, I noticed that am33xx*.dts files needed
+some cleanups. All am33xx based board files redefine device nodes
+that are already defined in the included am33xx.dtsi file.
 
-diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index 7a0956b..ab0303b 100644
---- a/drivers/dma/mmp_pdma.c
-+++ b/drivers/dma/mmp_pdma.c
-@@ -28,8 +28,8 @@
- #define DALGN		0x00a0
- #define DINT		0x00f0
- #define DDADR		0x0200
--#define DSADR		0x0204
--#define DTADR		0x0208
-+#define DSADR(n)	(0x0204 + ((n) << 4))
-+#define DTADR(n)	(0x0208 + ((n) << 4))
- #define DCMD		0x020c
- 
- #define DCSR_RUN	(1 << 31)	/* Run Bit (read / write) */
-@@ -97,6 +97,13 @@ struct mmp_pdma_chan {
- 	struct dma_async_tx_descriptor desc;
- 	struct mmp_pdma_phy *phy;
- 	enum dma_transfer_direction dir;
-+	/*
-+	 * We memorize the original start address of the first descriptor as
-+	 * well as the original total length so we can later determine the
-+	 * channel's residue.
-+	 */
-+	dma_addr_t start_addr;
-+	u32 total_len;
- 
- 	/* channel's basic info */
- 	struct tasklet_struct tasklet;
-@@ -470,6 +477,13 @@ mmp_pdma_prep_memcpy(struct dma_chan *dchan,
- 		chan->dcmd |= DCMD_BURST32;
- 	}
- 
-+	if (chan->dir == DMA_MEM_TO_DEV)
-+		chan->start_addr = dma_src;
-+	else
-+		chan->start_addr = dma_dst;
-+
-+	chan->total_len = len;
-+
- 	do {
- 		/* Allocate the link descriptor from DMA pool */
- 		new = mmp_pdma_alloc_descriptor(chan);
-@@ -541,11 +555,17 @@ mmp_pdma_prep_slave_sg(struct dma_chan *dchan, struct scatterlist *sgl,
- 		return NULL;
- 
- 	chan->byte_align = false;
-+	chan->total_len = 0;
- 
- 	for_each_sg(sgl, sg, sg_len, i) {
- 		addr = sg_dma_address(sg);
- 		avail = sg_dma_len(sgl);
- 
-+		if (!first)
-+			chan->start_addr = addr;
-+
-+		chan->total_len += avail;
-+
- 		do {
- 			len = min_t(size_t, avail, PDMA_MAX_DESC_BYTES);
- 			if (addr & 0x7)
-@@ -672,6 +692,20 @@ static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
- 	return ret;
- }
- 
-+static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan)
-+{
-+	u32 curr, done;
-+
-+	if (chan->dir == DMA_DEV_TO_MEM)
-+		curr = readl(chan->phy->base + DTADR(chan->phy->idx));
-+	else
-+		curr = readl(chan->phy->base + DSADR(chan->phy->idx));
-+
-+	done = curr - chan->start_addr;
-+
-+	return chan->total_len - done;
-+}
-+
- static enum dma_status mmp_pdma_tx_status(struct dma_chan *dchan,
- 			dma_cookie_t cookie, struct dma_tx_state *txstate)
- {
-@@ -681,6 +715,7 @@ static enum dma_status mmp_pdma_tx_status(struct dma_chan *dchan,
- 
- 	spin_lock_irqsave(&chan->desc_lock, flags);
- 	ret = dma_cookie_status(dchan, cookie, txstate);
-+	txstate->residue = mmp_pdma_residue(chan);
- 	spin_unlock_irqrestore(&chan->desc_lock, flags);
- 
- 	return ret;
--- 
-1.8.3.1
+This not only makes the DTS harder to maintain without any benefit
+but also leaks SoC internal details to board files such as how the
+OCP interconnect is modeled (currently just a flat representation)
+and the addresses of some IP modules that are part of the SoC and
+are not going to change from board to board.
+
+This patch-set cleans these board files and is composed of the
+following patches:
+
+[PATCH 1/2] ARM: dts: AM33XX: use pinmux node defined in included
+[PATCH 2/2] ARM: dts: AM33XX: don't redefine OCP bus and device
+
+NOTE: I don't own any of these am33xx based boards so I was only
+able to build test the changes. However I compared the generated
+dtb before and after the changes and the disassembled DTS with
+dtc -I dtb -O dts foo.dtb > bar.dts are identical.
+
+Even though the binary dtb is the same and there shouldn't be
+any visible changes, boot testing will be highly appreciated.
+
+Thanks a lot and best regards,
+Javier
