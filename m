@@ -1,51 +1,52 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 10 Aug 2013 18:52:14 +0200
-Subject: [PATCH v2 00/11] dma: pdma: some patches needed for PXA DT
- environments
-Message-ID: <1376153545-14361-1-git-send-email-zonque@gmail.com>
+Date: Sat, 10 Aug 2013 18:52:15 +0200
+Subject: [PATCH v2 01/11] dma: mmp_pdma: factor out DRCMR register calculation
+In-Reply-To: <1376153545-14361-1-git-send-email-zonque@gmail.com>
+References: <1376153545-14361-1-git-send-email-zonque@gmail.com>
+Message-ID: <1376153545-14361-2-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is v2 of my series to add more features to the pdma driver.
+The exact same calculation is done twice, so let's factor it out to a
+macro.
 
-Changes from v1 -> v2:
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ drivers/dma/mmp_pdma.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
- - drop the two patches from Xiang Wang that are already applied to
-   Vinod's next branch
- - add another patch to cleanup the unlocking path in lookup_phy(),
-   as suggested by Ezequiel
- - provide an own xlate function rather than using
-   of_dma_simple_xlate(), as suggested by Arnd
-
-
-There's still an open topic with the DALGN flag, as Xiang Wang pointed
-out. According to him, there's a chance we need an alternative way of
-forcing the driver into byte-align mode, but that can still be done in
-an additional patch later.
-
-
-Thanks,
-Daniel
-
-
-
-Daniel Mack (11):
-  dma: mmp_pdma: factor out DRCMR register calculation
-  dma: mmp_pdma: refactor unlocking path in lookup_phy()
-  dma: mmp_pdma: fix maximum transfer length
-  dma: mmp_pdma: add filter function
-  dma: mmp_pdma: make the controller a DMA provider
-  dma: mmp_pdma: print the number of channels at probe time
-  dma: mmp_pdma: remove duplicate assignment
-  dma: mmp_pdma: add support for byte-aligned transfers
-  dma: mmp_pdma: implement DMA_PAUSE and DMA_RESUME
-  dma: mmp_pdma: add support for residue reporting
-  dma: mmp_pdma: add support for cyclic DMA descriptors
-
- drivers/dma/mmp_pdma.c       | 265 ++++++++++++++++++++++++++++++++++++++++---
- include/linux/dma/mmp-pdma.h |  15 +++
- 2 files changed, 264 insertions(+), 16 deletions(-)
- create mode 100644 include/linux/dma/mmp-pdma.h
-
+diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
+index 2844eaf..8d6aae3 100644
+--- a/drivers/dma/mmp_pdma.c
++++ b/drivers/dma/mmp_pdma.c
+@@ -47,6 +47,8 @@
+ #define DCSR_CMPST	(1 << 10)       /* The Descriptor Compare Status */
+ #define DCSR_EORINTR	(1 << 9)        /* The end of Receive */
+ 
++#define DRCMR(n)	((((n) < 64) ? 0x0100 : 0x1100) + \
++				 (((n) & 0x3f) << 2))
+ #define DRCMR_MAPVLD	(1 << 7)	/* Map Valid (read / write) */
+ #define DRCMR_CHLNUM	0x1f		/* mask for Channel Number (read / write) */
+ 
+@@ -143,8 +145,7 @@ static void enable_chan(struct mmp_pdma_phy *phy)
+ 	if (!phy->vchan)
+ 		return;
+ 
+-	reg = phy->vchan->drcmr;
+-	reg = (((reg) < 64) ? 0x0100 : 0x1100) + (((reg) & 0x3f) << 2);
++	reg = DRCMR(phy->vchan->drcmr);
+ 	writel(DRCMR_MAPVLD | phy->idx, phy->base + reg);
+ 
+ 	reg = (phy->idx << 2) + DCSR;
+@@ -258,8 +259,7 @@ static void mmp_pdma_free_phy(struct mmp_pdma_chan *pchan)
+ 		return;
+ 
+ 	/* clear the channel mapping in DRCMR */
+-	reg = pchan->phy->vchan->drcmr;
+-	reg = ((reg < 64) ? 0x0100 : 0x1100) + ((reg & 0x3f) << 2);
++	reg = DRCMR(pchan->phy->vchan->drcmr);
+ 	writel(0, pchan->phy->base + reg);
+ 
+ 	spin_lock_irqsave(&pdev->phy_lock, flags);
 -- 
 1.8.3.1
