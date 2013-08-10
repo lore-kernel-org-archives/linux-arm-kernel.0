@@ -1,112 +1,111 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 10 Aug 2013 16:09:25 +0200
-Subject: [PATCH] ARM: document the use of NEON in kernel mode
-In-Reply-To: <20130810133439.GA7843@glitch>
-References: <1376050869-29255-1-git-send-email-ard.biesheuvel@linaro.org>
- <20130810133439.GA7843@glitch>
-Message-ID: <CAKv+Gu_cxs8KmBCYWzf-RK5K4aJF6-kv_ozbd4Q7ogpLOLVTxA@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 10 Aug 2013 11:09:28 -0300
+Subject: [PATCH 1/3] ARM: Introduce atomic MMIO clear/set
+In-Reply-To: <20130810140237.GB3080@localhost>
+References: <1376138582-7550-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1376138582-7550-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1376138968.556911297@f376.i.mail.ru>
+ <20130810140237.GB3080@localhost>
+Message-ID: <20130810140927.GC3080@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 August 2013 15:34, Domenico Andreoli <cavokz@gmail.com> wrote:
-> Hi Ard!
->
+On Sat, Aug 10, 2013 at 11:02:38AM -0300, Ezequiel Garcia wrote:
+> On Sat, Aug 10, 2013 at 04:49:28PM +0400, Alexander Shiyan wrote:
+> > > Some SoC have MMIO regions that are shared across orthogonal
+> > > subsystems. This commit implements a possible solution for the
+> > > thread-safe access of such regions through a spinlock-protected API
+> > > with clear-set semantics.
+> > > 
+> > > Concurrent access is protected with a single spinlock for the
+> > > entire MMIO address space. While this protects shared-registers,
+> > > it also serializes access to unrelated/unshared registers.
+> > > 
+> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > ---
+> > >  arch/arm/include/asm/io.h |  5 +++++
+> > >  arch/arm/kernel/io.c      | 24 ++++++++++++++++++++++++
+> > >  2 files changed, 29 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> > > index d070741..c84658d 100644
+> > > --- a/arch/arm/include/asm/io.h
+> > > +++ b/arch/arm/include/asm/io.h
+> > > @@ -36,6 +36,11 @@
+> > >  #define isa_bus_to_virt phys_to_virt
+> > >  
+> > >  /*
+> > > + * Atomic MMIO-wide IO clear/set
+> > > + */
+> > > +extern void atomic_io_clear_set(void __iomem *reg, u32 clear, u32 set);
+> > > +
+> > > +/*
+> > >   * Generic IO read/write.  These perform native-endian accesses.  Note
+> > >   * that some architectures will want to re-define __raw_{read,write}w.
+> > >   */
+> > > diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
+> > > index dcd5b4d..3ab8201 100644
+> > > --- a/arch/arm/kernel/io.c
+> > > +++ b/arch/arm/kernel/io.c
+> > > @@ -1,6 +1,30 @@
+> > >  #include <linux/export.h>
+> > >  #include <linux/types.h>
+> > >  #include <linux/io.h>
+> > > +#include <linux/spinlock.h>
+> > > +
+> > > +static DEFINE_SPINLOCK(__io_lock);
+> > > +
+> > > +/*
+> > > + * Some platforms have MMIO regions that are shared across orthogonal
+> > > + * subsystems. This API implements thread-safe access to such regions
+> > > + * through a spinlock-protected API with clear-set semantics.
+> > > + *
+> > > + * Concurrent access is protected with a single spinlock for the entire MMIO
+> > > + * address space. While this protects shared-registers, it also serializes
+> > > + * access to unrelated/unshared registers.
+> > > + *
+> > > + * Using this API on frequently accessed registers in performance-critical
+> > > + * paths is not recommended, as the spinlock used by this API would become
+> > > + * highly contended.
+> > > + */
+> > > +void atomic_io_clear_set(void __iomem *reg, u32 clear, u32 set)
+> > > +{
+> > > +	spin_lock(&__io_lock);
+> > > +	writel((readl(reg) & ~clear) | set, reg);
+> > > +	spin_unlock(&__io_lock);
+> > > +}
+> > > +EXPORT_SYMBOL(atomic_io_clear_set);
+> > 
+> > So, one lock is used to all possible registers?
+> > Seems a regmap-mmio can be used for such access.
+> > 
+> 
+> Thanks for the hint! Quite frankly, I wasn't familiar with regmap-mmio.
+> 
+> However, after reading some code, I fail to see how that helps in this case.
+> 
+> Note that we need to access the *same* MMIO address from completely
+> different (and unrelated) drivers, such as watchdog and clocksource.
+> 
+> So I wonder who would "own" the regmap descriptor, and how does the other
+> one gets aware of that descriptor?
+> 
+> In addition given we can use orion_wdt (originally meant for mach-kirkwood)
+> to support mvebu SoC watchdog, we need to sort this out in a completely
+> multiplatform capable way.
+> 
+> Ideas?
 
-Ciao!
+Answering myself...
 
-> On Fri, Aug 09, 2013 at 02:21:09PM +0200, Ard Biesheuvel wrote:
+How about using drivers/mfd/syscon.c to create the regmap owner for the shared
+register (TIMER_CTRL in this case, but others might appear) ?
 
-[...]
+Or adding a new mfd implementation if syscon does not fit ?
 
->> +If latency is a concern, it is possible to put back to back calls to
->> +kernel_neon_end() and kernel_neon_begin() in places in your code where none of
->> +the NEON registers are live. (Additional calls to kernel_neon_begin() should be
->> +reasonably cheap if no context switch occurred in the meantime)
->
-> I don't understand. How latency concerns could be relieved with scattering
-> non-NEON code with calls to kernel_neon_end() and kernel_neon_begin()?
->
+Does this sound like an overkill ?
 
-The idea is that by doing something like
-
-kernel_neon_begin();
-... use the NEON for a very long time ...
-kernel_neon_end();
-
-can in some cases be changed to
-
-kernel_neon_begin();
-... use the NEON for not so long a time ...
-kernel_neon_end();
-kernel_neon_begin();
-... use the NEON for not so long a time ...
-kernel_neon_end();
-
-Note that kernel_neon_end() re-enables preemption (in the
-CONFIG_PREEMPT case) which triggers a context switch if a higher
-priority task is pending.
-The point I am trying to make is that
-a) the second call to kernel_neon_begin() is not as costly as the
-first one if in fact no context switch occurred,
-b) you should only put this in places where clobbering the NEON
-registers is allowable (i.e., no NEON registers are live)
-
-> I expect such NEON code would be rather at leaves of the call trees,
-> so there should not be so many functions called with disabled preemption
-> from within a NEON critical section, right?
->
-
-The point is that the NEON code itself runs with preemption disabled,
-and may take some time to complete, so you can trade some speed for
-lower latency by releasing and re-acquiring the NEON unit more often
-(but only in places where you can tolerate losing your NEON register
-contents).
-
-> Definitively I don't know the complexity of code that could benefit
-> from NEON.
->
-
-On Cortex-A15, I saw:
-- 60% speedup in xor_blocks
-- 400% speedup in RAID6
-- 50% speedup in AES (CTR and XTS-encrypt modes, and potentially CCMP)
-
-so there is definitely a case for NEON in the kernel.
-
-[...]
-
-
->> +NEON assembler
->> +--------------
->> +NEON assembler is supported with no additional caveats as long as the rules
->> +above are followed.
->> +
->> +
->> +NEON code generated by GCC
->> +--------------------------
->> +The GCC option -ftree-vectorize (implied by -O3) tries to exploit implicit
->> +parallelism, and generates NEON code from ordinary C source code. This is fully
->> +supported as long as the rules above are followed.
->
-> It's not clear to me the purpose of this paragraph.
->
-
-The purpose of the document is to explain how kernel mode NEON is
-intended to be used. In order to cover as many potential use cases as
-possible, this paragraph is included to explain that not only explicit
-NEON like assembler or intrinsics can be used, but also implicit NEON
-like the code GCC generates in some cases.
-
-> That -O3 should be not used anywhere in the kernel except for those units
-> already built with -mfpu=neon -mfloat-abi=softfp?
->
-
-People may have valid reasons for preferring -O3 in some places. They
-should just be aware that combining -O3 with -mfpu=neon can result in
-NEON code turning up anywhere, not just in the places where intrinsics
-or (inline) assembler were used.
-
-[...]
-
-Regards,
-Ard.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
