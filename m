@@ -1,68 +1,88 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 10 Aug 2013 10:49:58 +0400
-Subject: [PATCH] ARM: dts: imx27-phytec-phycore-rdk: Add DT nodes for camera
- module
-Message-ID: <1376117398-19080-1-git-send-email-shc_work@mail.ru>
+Date: Sat, 10 Aug 2013 11:33:57 +0400
+Subject: [PATCH v2] video: imxfb: Fix retrieve values from DT
+Message-ID: <1376120037-23777-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds PCA9536 device on first I2C bus (this device is
-used on camera addon module to enable CSI bus muxing) and GPIO to
-enable camera interface for Phytec PCM-970 RDK.
+Display settings should be retrieved from "display" node, not from
+root fb node. This patch fix this bug.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 31 ++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/video/imxfb.c | 26 ++++++++++++++------------
+ 1 file changed, 14 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-index 0fc6551..e93c968 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-@@ -12,6 +12,25 @@
- / {
- 	model = "Phytec pcm970";
- 	compatible = "phytec,imx27-pcm970", "phytec,imx27-pcm038", "fsl,imx27";
-+
-+	cameramux: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "CAM_MUX";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		enable-active-high;
-+		gpio = <&camgpio 0 0>;
-+		vin-supply = <&csi_en>;
-+	};
-+
-+	csi_en: fixedregulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "CSI_EN";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio2 24 0>;
-+		vin-supply = <&vcam_reg>;
-+	};
- };
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 38733ac..8e104c4 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -753,12 +753,12 @@ static int imxfb_resume(struct platform_device *dev)
+ #define imxfb_resume	NULL
+ #endif
  
- &cspi1 {
-@@ -19,6 +38,18 @@
- 	cs-gpios = <&gpio4 28 0>, <&gpio4 27 0>;
- };
+-static int imxfb_init_fbinfo(struct platform_device *pdev)
++static int imxfb_init_fbinfo(struct platform_device *pdev,
++			     struct device_node *np)
+ {
+ 	struct imx_fb_platform_data *pdata = pdev->dev.platform_data;
+ 	struct fb_info *info = dev_get_drvdata(&pdev->dev);
+ 	struct imxfb_info *fbi = info->par;
+-	struct device_node *np;
  
-+&i2c1 {
-+	clock-frequency = <400000>;
-+	status = "okay";
+ 	pr_debug("%s\n",__func__);
+ 
+@@ -799,7 +799,6 @@ static int imxfb_init_fbinfo(struct platform_device *pdev)
+ 		fbi->lcd_power			= pdata->lcd_power;
+ 		fbi->backlight_power		= pdata->backlight_power;
+ 	} else {
+-		np = pdev->dev.of_node;
+ 		info->var.grayscale = of_property_read_bool(np,
+ 						"cmap-greyscale");
+ 		fbi->cmap_inverse = of_property_read_bool(np, "cmap-inverse");
+@@ -858,6 +857,7 @@ static int imxfb_of_read_mode(struct device *dev, struct device_node *np,
+ 
+ static int imxfb_probe(struct platform_device *pdev)
+ {
++	struct device_node *display_np = NULL;
+ 	struct imxfb_info *fbi;
+ 	struct fb_info *info;
+ 	struct imx_fb_platform_data *pdata;
+@@ -887,7 +887,17 @@ static int imxfb_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, info);
+ 
+-	ret = imxfb_init_fbinfo(pdev);
++	if (pdev->dev.of_node) {
++		display_np = of_parse_phandle(pdev->dev.of_node, "display", 0);
++		if (!display_np) {
++			dev_err(&pdev->dev,
++				"No display defined in devicetree\n");
++			ret = -EINVAL;
++			goto failed_init;
++		}
++	}
 +
-+	camgpio: pca9536 at 41 {
-+		compatible = "nxp,pca9536";
-+		reg = <0x41>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+};
-+
- &sdhci2 {
- 	bus-width = <4>;
- 	cd-gpios = <&gpio3 29 0>;
++	ret = imxfb_init_fbinfo(pdev, display_np);
+ 	if (ret < 0)
+ 		goto failed_init;
+ 
+@@ -898,16 +908,8 @@ static int imxfb_probe(struct platform_device *pdev)
+ 		fbi->mode = pdata->mode;
+ 		fbi->num_modes = pdata->num_modes;
+ 	} else {
+-		struct device_node *display_np;
+ 		fb_mode = NULL;
+ 
+-		display_np = of_parse_phandle(pdev->dev.of_node, "display", 0);
+-		if (!display_np) {
+-			dev_err(&pdev->dev, "No display defined in devicetree\n");
+-			ret = -EINVAL;
+-			goto failed_of_parse;
+-		}
+-
+ 		/*
+ 		 * imxfb does not support more modes, we choose only the native
+ 		 * mode.
 -- 
 1.8.1.5
