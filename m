@@ -1,33 +1,54 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 10 Aug 2013 18:52:17 +0200
-Subject: [PATCH v2 03/11] dma: mmp_pdma: fix maximum transfer length
+Date: Sat, 10 Aug 2013 18:52:16 +0200
+Subject: [PATCH v2 02/11] dma: mmp_pdma: refactor unlocking path in
+ lookup_phy()
 In-Reply-To: <1376153545-14361-1-git-send-email-zonque@gmail.com>
 References: <1376153545-14361-1-git-send-email-zonque@gmail.com>
-Message-ID: <1376153545-14361-4-git-send-email-zonque@gmail.com>
+Message-ID: <1376153545-14361-3-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no reason for limiting the maximum transfer length to 0x1000.
-Take the actual bit mask instead; the PDMA is able to transfer chunks of
-up to SZ_8K - 1.
+As suggested by Ezequiel Garc?a, release the spinlock at the end of the
+function only, and use a goto for the control flow.
+
+Just a minor cleanup.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- drivers/dma/mmp_pdma.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/dma/mmp_pdma.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index f253695..9d6410e 100644
+index 8d6aae3..f253695 100644
 --- a/drivers/dma/mmp_pdma.c
 +++ b/drivers/dma/mmp_pdma.c
-@@ -71,7 +71,7 @@
- #define DCMD_LENGTH	0x01fff		/* length mask (max = 8K - 1) */
+@@ -220,7 +220,7 @@ static struct mmp_pdma_phy *lookup_phy(struct mmp_pdma_chan *pchan)
+ {
+ 	int prio, i;
+ 	struct mmp_pdma_device *pdev = to_mmp_pdma_dev(pchan->chan.device);
+-	struct mmp_pdma_phy *phy;
++	struct mmp_pdma_phy *phy, *found = NULL;
+ 	unsigned long flags;
  
- #define PDMA_ALIGNMENT		3
--#define PDMA_MAX_DESC_BYTES	0x1000
-+#define PDMA_MAX_DESC_BYTES	DCMD_LENGTH
+ 	/*
+@@ -239,14 +239,15 @@ static struct mmp_pdma_phy *lookup_phy(struct mmp_pdma_chan *pchan)
+ 			phy = &pdev->phy[i];
+ 			if (!phy->vchan) {
+ 				phy->vchan = pchan;
+-				spin_unlock_irqrestore(&pdev->phy_lock, flags);
+-				return phy;
++				found = phy;
++				goto out_unlock;
+ 			}
+ 		}
+ 	}
  
- struct mmp_pdma_desc_hw {
- 	u32 ddadr;	/* Points to the next descriptor + flags */
++out_unlock:
+ 	spin_unlock_irqrestore(&pdev->phy_lock, flags);
+-	return NULL;
++	return found;
+ }
+ 
+ static void mmp_pdma_free_phy(struct mmp_pdma_chan *pchan)
 -- 
 1.8.3.1
