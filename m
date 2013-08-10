@@ -1,52 +1,99 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 10 Aug 2013 18:52:15 +0200
-Subject: [PATCH v2 01/11] dma: mmp_pdma: factor out DRCMR register calculation
+Date: Sat, 10 Aug 2013 18:52:18 +0200
+Subject: [PATCH v2 04/11] dma: mmp_pdma: add filter function
 In-Reply-To: <1376153545-14361-1-git-send-email-zonque@gmail.com>
 References: <1376153545-14361-1-git-send-email-zonque@gmail.com>
-Message-ID: <1376153545-14361-2-git-send-email-zonque@gmail.com>
+Message-ID: <1376153545-14361-5-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exact same calculation is done twice, so let's factor it out to a
-macro.
+PXA peripherals need to obtain specific DMA request ids which will
+eventually be stored in the DRCMR register.
+
+Currently, clients are expected to store that number inside the slave
+config block as slave_id, which is unfortunately incompatible with the
+way DMA resources are handled in DT environments.
+
+This patch adds a filter function which stores the filter parameter
+passed in by of-dma.c into the channel's drcmr register.
+
+For backward compatability, cfg->slave_id is still used if set to
+a non-zero value.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- drivers/dma/mmp_pdma.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/dma/mmp_pdma.c       | 21 ++++++++++++++++++++-
+ include/linux/dma/mmp-pdma.h | 15 +++++++++++++++
+ 2 files changed, 35 insertions(+), 1 deletion(-)
+ create mode 100644 include/linux/dma/mmp-pdma.h
 
 diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index 2844eaf..8d6aae3 100644
+index 9d6410e..9dda27e 100644
 --- a/drivers/dma/mmp_pdma.c
 +++ b/drivers/dma/mmp_pdma.c
-@@ -47,6 +47,8 @@
- #define DCSR_CMPST	(1 << 10)       /* The Descriptor Compare Status */
- #define DCSR_EORINTR	(1 << 9)        /* The end of Receive */
+@@ -19,6 +19,7 @@
+ #include <linux/dmapool.h>
+ #include <linux/of_device.h>
+ #include <linux/of.h>
++#include <linux/dma/mmp-pdma.h>
  
-+#define DRCMR(n)	((((n) < 64) ? 0x0100 : 0x1100) + \
-+				 (((n) & 0x3f) << 2))
- #define DRCMR_MAPVLD	(1 << 7)	/* Map Valid (read / write) */
- #define DRCMR_CHLNUM	0x1f		/* mask for Channel Number (read / write) */
+ #include "dmaengine.h"
  
-@@ -143,8 +145,7 @@ static void enable_chan(struct mmp_pdma_phy *phy)
- 	if (!phy->vchan)
- 		return;
+@@ -634,8 +635,13 @@ static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
+ 			chan->dcmd |= DCMD_BURST32;
  
--	reg = phy->vchan->drcmr;
--	reg = (((reg) < 64) ? 0x0100 : 0x1100) + (((reg) & 0x3f) << 2);
-+	reg = DRCMR(phy->vchan->drcmr);
- 	writel(DRCMR_MAPVLD | phy->idx, phy->base + reg);
+ 		chan->dir = cfg->direction;
+-		chan->drcmr = cfg->slave_id;
+ 		chan->dev_addr = addr;
++		/* FIXME: drivers should be ported over to use the filter
++		 * function. Once that's done, the following two lines can
++		 * be removed.
++		 */
++		if (cfg->slave_id)
++			chan->drcmr = cfg->slave_id;
+ 		break;
+ 	default:
+ 		return -ENOSYS;
+@@ -884,6 +890,19 @@ static struct platform_driver mmp_pdma_driver = {
+ 	.remove		= mmp_pdma_remove,
+ };
  
- 	reg = (phy->idx << 2) + DCSR;
-@@ -258,8 +259,7 @@ static void mmp_pdma_free_phy(struct mmp_pdma_chan *pchan)
- 		return;
++bool mmp_pdma_filter_fn(struct dma_chan *chan, void *param)
++{
++	struct mmp_pdma_chan *c = to_mmp_pdma_chan(chan);
++
++	if (chan->device->dev->driver != &mmp_pdma_driver.driver)
++		return false;
++
++	c->drcmr = *(unsigned int *) param;
++
++	return true;
++}
++EXPORT_SYMBOL_GPL(mmp_pdma_filter_fn);
++
+ module_platform_driver(mmp_pdma_driver);
  
- 	/* clear the channel mapping in DRCMR */
--	reg = pchan->phy->vchan->drcmr;
--	reg = ((reg < 64) ? 0x0100 : 0x1100) + ((reg & 0x3f) << 2);
-+	reg = DRCMR(pchan->phy->vchan->drcmr);
- 	writel(0, pchan->phy->base + reg);
- 
- 	spin_lock_irqsave(&pdev->phy_lock, flags);
+ MODULE_DESCRIPTION("MARVELL MMP Periphera DMA Driver");
+diff --git a/include/linux/dma/mmp-pdma.h b/include/linux/dma/mmp-pdma.h
+new file mode 100644
+index 0000000..2dc9b2b
+--- /dev/null
++++ b/include/linux/dma/mmp-pdma.h
+@@ -0,0 +1,15 @@
++#ifndef _MMP_PDMA_H_
++#define _MMP_PDMA_H_
++
++struct dma_chan;
++
++#ifdef CONFIG_MMP_PDMA
++bool mmp_pdma_filter_fn(struct dma_chan *chan, void *param);
++#else
++static inline bool mmp_pdma_filter_fn(struct dma_chan *chan, void *param)
++{
++	return false;
++}
++#endif
++
++#endif /* _MMP_PDMA_H_ */
 -- 
 1.8.3.1
