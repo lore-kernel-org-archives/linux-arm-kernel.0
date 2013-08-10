@@ -1,93 +1,188 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 10 Aug 2013 18:52:19 +0200
-Subject: [PATCH v2 05/11] dma: mmp_pdma: make the controller a DMA provider
+Date: Sat, 10 Aug 2013 18:52:25 +0200
+Subject: [PATCH v2 11/11] dma: mmp_pdma: add support for cyclic DMA descriptors
 In-Reply-To: <1376153545-14361-1-git-send-email-zonque@gmail.com>
 References: <1376153545-14361-1-git-send-email-zonque@gmail.com>
-Message-ID: <1376153545-14361-6-git-send-email-zonque@gmail.com>
+Message-ID: <1376153545-14361-12-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes the mmp_pdma controller able to provide DMA resources
-in DT environments by providing an dma xlate function.
-
-of_dma_simple_xlate() isn't used here, because if fails to handle
-multiple different DMA engines or several instances of the same
-controller. Instead, a private implementation is provided that makes use
-of the newly introduced dma_get_slave_channel() call.
+Provide a callback to prepare cyclic DMA transfers.
+This is for instance needed for audio channel transport.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- drivers/dma/mmp_pdma.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+ drivers/dma/mmp_pdma.c | 116 ++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 115 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index 9dda27e..0ec5c21 100644
+index ab0303b..eba9d2d 100644
 --- a/drivers/dma/mmp_pdma.c
 +++ b/drivers/dma/mmp_pdma.c
-@@ -18,6 +18,7 @@
- #include <linux/platform_data/mmp_dma.h>
- #include <linux/dmapool.h>
- #include <linux/of_device.h>
-+#include <linux/of_dma.h>
- #include <linux/of.h>
- #include <linux/dma/mmp-pdma.h>
+@@ -97,6 +97,8 @@ struct mmp_pdma_chan {
+ 	struct dma_async_tx_descriptor desc;
+ 	struct mmp_pdma_phy *phy;
+ 	enum dma_transfer_direction dir;
++	struct mmp_pdma_desc_sw *cyclic_first;	/* first desc_sw if channel
++						 * is in cyclic mode */
+ 	/*
+ 	 * We memorize the original start address of the first descriptor as
+ 	 * well as the original total length so we can later determine the
+@@ -531,6 +533,8 @@ mmp_pdma_prep_memcpy(struct dma_chan *dchan,
+ 	new->desc.ddadr = DDADR_STOP;
+ 	new->desc.dcmd |= DCMD_ENDIRQEN;
  
-@@ -784,6 +785,39 @@ static struct of_device_id mmp_pdma_dt_ids[] = {
- };
- MODULE_DEVICE_TABLE(of, mmp_pdma_dt_ids);
++	chan->cyclic_first = NULL;
++
+ 	return &first->async_tx;
  
-+static struct dma_chan *mmp_pdma_dma_xlate(struct of_phandle_args *dma_spec,
-+					   struct of_dma *ofdma)
-+{
-+	struct mmp_pdma_device *d = ofdma->of_dma_data;
-+	struct dma_chan *chan, *candidate;
+ fail:
+@@ -612,6 +616,96 @@ mmp_pdma_prep_slave_sg(struct dma_chan *dchan, struct scatterlist *sgl,
+ 	new->desc.ddadr = DDADR_STOP;
+ 	new->desc.dcmd |= DCMD_ENDIRQEN;
+ 
++	chan->dir = dir;
++	chan->cyclic_first = NULL;
 +
-+retry:
-+	candidate = NULL;
++	return &first->async_tx;
 +
-+	/* walk the list of channels registered with the current instance and
-+	 * find one that is currently unused */
-+	list_for_each_entry(chan, &d->device.channels, device_node)
-+		if (chan->client_count == 0) {
-+			candidate = chan;
-+			break;
-+		}
-+
-+	if (!candidate)
-+		return NULL;
-+
-+	/* dma_get_slave_channel will return NULL if we lost a race between
-+	 * the lookup and the reservation */
-+	chan = dma_get_slave_channel(candidate);
-+
-+	if (chan) {
-+		struct mmp_pdma_chan *c = to_mmp_pdma_chan(chan);
-+		c->drcmr = dma_spec->args[0];
-+		return chan;
-+	}
-+
-+	goto retry;
++fail:
++	if (first)
++		mmp_pdma_free_desc_list(chan, &first->tx_list);
++	return NULL;
 +}
 +
- static int mmp_pdma_probe(struct platform_device *op)
- {
- 	struct mmp_pdma_device *pdev;
-@@ -870,6 +904,16 @@ static int mmp_pdma_probe(struct platform_device *op)
- 		return ret;
- 	}
- 
-+	if (op->dev.of_node) {
-+		/* Device-tree DMA controller registration */
-+		ret = of_dma_controller_register(op->dev.of_node,
-+						 mmp_pdma_dma_xlate, pdev);
-+		if (ret < 0) {
-+			dev_err(&op->dev, "of_dma_controller_register failed\n");
-+			return ret;
-+		}
++static struct dma_async_tx_descriptor *mmp_pdma_prep_dma_cyclic(
++	struct dma_chan *dchan, dma_addr_t buf_addr, size_t len,
++	size_t period_len, enum dma_transfer_direction direction,
++	unsigned long flags, void *context)
++{
++	struct mmp_pdma_chan *chan;
++	struct mmp_pdma_desc_sw *first = NULL, *prev = NULL, *new;
++	dma_addr_t dma_src, dma_dst;
++
++	if (!dchan || !len || !period_len)
++		return NULL;
++
++	/* the buffer length must be a multiple of period_len */
++	if (len % period_len != 0)
++		return NULL;
++
++	if (period_len > PDMA_MAX_DESC_BYTES)
++		return NULL;
++
++	chan = to_mmp_pdma_chan(dchan);
++
++	switch (direction) {
++	case DMA_MEM_TO_DEV:
++		dma_src = buf_addr;
++		dma_dst = chan->dev_addr;
++		break;
++	case DMA_DEV_TO_MEM:
++		dma_dst = buf_addr;
++		dma_src = chan->dev_addr;
++		break;
++	default:
++		dev_err(chan->dev, "Unsupported direction for cyclic DMA\n");
++		return NULL;
 +	}
 +
- 	dev_info(pdev->device.dev, "initialized\n");
- 	return 0;
- }
++	chan->start_addr = buf_addr;
++	chan->total_len = len;
++	chan->dir = direction;
++
++	do {
++		/* Allocate the link descriptor from DMA pool */
++		new = mmp_pdma_alloc_descriptor(chan);
++		if (!new) {
++			dev_err(chan->dev, "no memory for desc\n");
++			goto fail;
++		}
++
++		new->desc.dcmd = chan->dcmd | DCMD_ENDIRQEN |
++					(DCMD_LENGTH & period_len);
++		new->desc.dsadr = dma_src;
++		new->desc.dtadr = dma_dst;
++
++		if (!first)
++			first = new;
++		else
++			prev->desc.ddadr = new->async_tx.phys;
++
++		new->async_tx.cookie = 0;
++		async_tx_ack(&new->async_tx);
++
++		prev = new;
++		len -= period_len;
++
++		if (chan->dir == DMA_MEM_TO_DEV)
++			dma_src += period_len;
++		else
++			dma_dst += period_len;
++
++		/* Insert the link descriptor to the LD ring */
++		list_add_tail(&new->node, &first->tx_list);
++	} while (len);
++
++	first->async_tx.flags = flags; /* client is in control of this ack */
++	first->async_tx.cookie = -EBUSY;
++
++	/* make the cyclic link */
++	new->desc.ddadr = first->async_tx.phys;
++	chan->cyclic_first = first;
++
+ 	return &first->async_tx;
+ 
+ fail:
+@@ -747,8 +841,25 @@ static void dma_do_tasklet(unsigned long data)
+ 	LIST_HEAD(chain_cleanup);
+ 	unsigned long flags;
+ 
+-	/* submit pending list; callback for each desc; free desc */
++	if (chan->cyclic_first) {
++		dma_async_tx_callback cb = NULL;
++		void *cb_data = NULL;
++
++		spin_lock_irqsave(&chan->desc_lock, flags);
++		desc = chan->cyclic_first;
++		cb = desc->async_tx.callback;
++		cb_data = desc->async_tx.callback_param;
++		spin_unlock_irqrestore(&chan->desc_lock, flags);
++
++		start_pending_queue(chan);
+ 
++		if (cb)
++			cb(cb_data);
++
++		return;
++	}
++
++	/* submit pending list; callback for each desc; free desc */
+ 	spin_lock_irqsave(&chan->desc_lock, flags);
+ 
+ 	/* update the cookie if we have some descriptors to cleanup */
+@@ -781,6 +892,7 @@ static void dma_do_tasklet(unsigned long data)
+ 
+ 		/* Remove from the list of transactions */
+ 		list_del(&desc->node);
++
+ 		/* Run the link descriptor callback function */
+ 		if (txd->callback)
+ 			txd->callback(txd->callback_param);
+@@ -938,12 +1050,14 @@ static int mmp_pdma_probe(struct platform_device *op)
+ 
+ 	dma_cap_set(DMA_SLAVE, pdev->device.cap_mask);
+ 	dma_cap_set(DMA_MEMCPY, pdev->device.cap_mask);
++	dma_cap_set(DMA_CYCLIC, pdev->device.cap_mask);
+ 	pdev->device.dev = &op->dev;
+ 	pdev->device.device_alloc_chan_resources = mmp_pdma_alloc_chan_resources;
+ 	pdev->device.device_free_chan_resources = mmp_pdma_free_chan_resources;
+ 	pdev->device.device_tx_status = mmp_pdma_tx_status;
+ 	pdev->device.device_prep_dma_memcpy = mmp_pdma_prep_memcpy;
+ 	pdev->device.device_prep_slave_sg = mmp_pdma_prep_slave_sg;
++	pdev->device.device_prep_dma_cyclic = mmp_pdma_prep_dma_cyclic;
+ 	pdev->device.device_issue_pending = mmp_pdma_issue_pending;
+ 	pdev->device.device_control = mmp_pdma_control;
+ 	pdev->device.copy_align = PDMA_ALIGNMENT;
 -- 
 1.8.3.1
