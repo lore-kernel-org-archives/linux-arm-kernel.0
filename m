@@ -1,45 +1,57 @@
-From: joe@perches.com (Joe Perches)
-Date: Sat, 10 Aug 2013 08:59:46 -0700
-Subject: [PATCH] arch/arm/mach-pxa/stargate2.c: use ARRAY_AND_SIZE
- consistently
-In-Reply-To: <alpine.DEB.2.02.1308101735060.2076@localhost6.localdomain6>
-References: <1376148353-9699-1-git-send-email-Julia.Lawall@lip6.fr>
- <1376148738.2083.17.camel@joe-AO722>
- <alpine.DEB.2.02.1308101735060.2076@localhost6.localdomain6>
-Message-ID: <1376150386.2083.26.camel@joe-AO722>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 10 Aug 2013 18:00:19 +0200
+Subject: [PATCH v2 2/2] ARM: kirkwood: Add basic suspend-to-RAM support
+In-Reply-To: <20130810152011.GD3080@localhost>
+References: <1376144839-1985-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1376144839-1985-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130810150115.GB12476@lunn.ch> <20130810152011.GD3080@localhost>
+Message-ID: <20130810160019.GC12476@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2013-08-10 at 17:38 +0200, Julia Lawall wrote:
-> On Sat, 10 Aug 2013, Joe Perches wrote:
-> > On Sat, 2013-08-10 at 17:25 +0200, Julia Lawall wrote:
-> > > From: Julia Lawall <Julia.Lawall@lip6.fr>
-> > > Because ARRAY_AND_SIZE changes the apparent arity of a function, if it is
-> > > used for one call to a given function, it would be better, if possible, to
-> > > use it for all of them.
-> > I think it'd be better to remove ARRAY_AND_SIZE instead.
+> > > +static int __init kirkwood_pm_init(void)
+> > > +{
+> > > +	ddr_operation_base = ioremap(DDR_OPERATION_BASE, 4);
+> > > +	suspend_set_ops(&kirkwood_suspend_ops);
+> > > +	return 0;
+> > > +}
+> > > +arch_initcall(kirkwood_pm_init);
+> > 
+> > Hi Ezequiel
+> > 
+> > Does this work on a multi arch kernel? Should kirkwood_pm_init() be
+> > checking it is actually running on a kirkwood? Or call
+> > kirkwood_pm_init() from kirkwood_dt_init()?
+> > 
 > 
-> I can do that, if it is wanted, but there are over 200 uses, and I think 
-> it is a little bit positive in that it ensures that the array is passed 
-> along with its own size.
+> Oh, right... I think you already mentioned this. Sorry, forgot about
+> this completely.
+> 
+> On the other side, kirkwood is not multiplatform-enabled yet, right?
+> So there's no way this can produce any build error.
 
-Maybe, but if it's generally accepted that it's useful,
-and I'm a little dubious because it does hide argument
-count in functions where it's used, the 6 #defines should
-be centralized in kernel.h
+Kirkwood is not currently multiplatform, but there is nothing i know
+of which will break when we do become multi-platform. I've been
+keeping an eye out for such issues, and made sure that cpuidle,
+cpufreq, etc are multiplatform safe. I think Thomas removed the last
+blocker for DT based boards going multiplatform when PCI moved to DT.
+So i don't want to add something now, which i know will break with
+multiplatform. Lets do it the right way now.
 
-$ git grep "define.*ARRAY_AND_SIZE"
-arch/arm/mach-kirkwood/common.h:#define ARRAY_AND_SIZE(x)       (x), ARRAY_SIZE(x)
-arch/arm/mach-mmp/common.h:#define ARRAY_AND_SIZE(x)    (x), ARRAY_SIZE(x)
-arch/arm/mach-pxa/generic.h:#define ARRAY_AND_SIZE(x)   (x), ARRAY_SIZE(x)
-arch/arm/mach-ux500/db8500-regs.h:#define ARRAY_AND_SIZE(x)     (x), ARRAY_SIZE(x)
-drivers/pinctrl/pinctrl-lantiq.h:#define ARRAY_AND_SIZE(x)      (x), ARRAY_SIZE(x)
-sound/soc/pxa/mioa701_wm9713.c:#define ARRAY_AND_SIZE(x)        (x), ARRAY_SIZE(x)
+> > Another issue is that the ddr_operation_base should probably be
+> > accessed using your atomic_io_set_clear() function, since it is used
+> > by the cpuidle drivers as well.
+> > 
+> 
+> I think this is not needed. Both cpuidle suspend core code disables
+> IRQ before entering any of the suspend or cpuidle states.
 
-A small counter-argument against using ARRAY_AND_SIZE:
+I've no idea how PM works, so i cannot say if its safe or not...
+> 
+> BTW, do you think the approach of *not* messing with clocks is ok?
 
-clkdev_add_table has 60+ uses, only 6 of those with
-ARRAY_AND_SIZE.
+That is correct. The drivers should be disabling clocks, were they can
+be disabled. We know kirkwood ethernet is broken and we cannot
+"easily" disable its clock.
 
-I think it makes it difficult to do some cocinelle/spatch
-transform on clkdev_add_table.
+	 Andrew
