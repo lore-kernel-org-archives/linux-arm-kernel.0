@@ -1,207 +1,164 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Sat, 10 Aug 2013 13:46:30 +0200
-Subject: [PATCH v2] N900: add device tree
-In-Reply-To: <20130810110955.GA11437@amd.pavel.ucw.cz>
-References: <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
- <20130617111031.GQ20992@atomide.com>
- <20130701211753.GC15318@amd.pavel.ucw.cz>
- <20130704171939.GA27374@blackmetal.musicnaut.iki.fi>
- <20130704202145.GB10752@amd.pavel.ucw.cz>
- <20130704203256.GB27374@blackmetal.musicnaut.iki.fi>
- <20130713121709.GC16473@amd.pavel.ucw.cz>
- <20130714222819.GB3296@blackmetal.musicnaut.iki.fi>
- <20130728134409.GB5382@amd.pavel.ucw.cz>
- <20130801234355.GA15611@amd.pavel.ucw.cz>
- <20130810110955.GA11437@amd.pavel.ucw.cz>
-Message-ID: <CAAfyv34w1e+sAuB==-+Pj2gOO1auVNQgawcNC1Z4QfeqchRh3g@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 10 Aug 2013 14:16:48 +0200
+Subject: [GIT PULL] Samsung PWM support cleanup
+In-Reply-To: <520173EF.1040808@samsung.com>
+References: <3573853.gDiLaTfgOu@flatron> <520173EF.1040808@samsung.com>
+Message-ID: <2197909.dzUDYPGiF0@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi Kukjin,
 
-On Sat, Aug 10, 2013 at 1:09 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> On Fri 2013-08-02 01:43:55, Pavel Machek wrote:
->> On Sun 2013-07-28 15:44:09, Pavel Machek wrote:
->> > On Mon 2013-07-15 01:28:19, Aaro Koskinen wrote:
->> > > Hi,
->> > >
->> > > On Sat, Jul 13, 2013 at 02:17:09PM +0200, Pavel Machek wrote:
->> > > >
->> > > > This adds device tree with neccessary support to boot with functional
->> > > > video (on both emulator and real N900 device).
->> > > >
->> > > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
->> > >
->> > > You can also add:
->> > >
->> > > Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
->> >
->> > Benoit, could you apply this? Tony said you are doing dts changes, and
->> > the patch seems to be ready.
->>
->> Tony, Benoit was apparently abducted by aliens or something. Is there
->> chance you could take the patch?
->
-> Hello, is there anybody out there?
->
-> There's nice and simple patch enabling device tree on n900, it is even
-> reviewed by Aaro, and it is neither applied nor are negative comments
-> coming? ...for a month...?
-Same for gta04 (omap3 based device) [1].
-It was send upstream 2 times and second time there is no reply from 1.3.2013.
->
-> Tony also seen the patch and comment was "Benoit takes these", so I
-> assume it looks basically ok.
->
-> Benoit, you are supposed to maintain device tree for omap2.
->
-> [I wonder if this is clean-enough cause for "trivial in resubmit
-> mode?]
->                                                                 Pavel
-> ---
->
-> This adds device tree with neccessary support to boot with functional
-> video (on both emulator and real N900 device).
->
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
->
-> ---
->
-> From v1: Aaro wants just GPLv2, so I did that. I re-enabled parts that
-> can be enabled on 3.10, and tested it on that kernel.
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index f0895c5..1950aed 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -141,6 +141,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
->         omap3-devkit8000.dtb \
->         omap3-beagle-xm.dtb \
->         omap3-evm.dtb \
-> +       omap3-n900.dtb \
->         omap3-tobi.dtb \
->         omap3-igep0020.dtb \
->         omap3-igep0030.dtb \
-> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> new file mode 100644
-> index 0000000..fb461bf
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-n900.dts
-> @@ -0,0 +1,92 @@
-> +/*
-> + * Copyright (C) 2013 Pavel Machek <pavel@ucw.cz>
-> + * Copyright 2013 Aaro Koskinen <aaro.koskinen@iki.fi>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +/include/ "omap34xx.dtsi"
-> +
-> +/ {
-> +       model = "Nokia N900";
-> +       compatible = "nokia,omap3-n900", "ti,omap3";
-> +
-> +       cpus {
-> +               cpu at 0 {
-> +                       cpu0-supply = <&vcc>;
-> +               };
-> +       };
-> +
-> +       memory {
-> +               device_type = "memory";
-> +               reg = <0x80000000 0x10000000>; /* 256 MB */
-> +       };
-> +
-> +};
-> +
-> +&i2c1 {
-> +       clock-frequency = <2200000>;
-> +
-> +       twl: twl at 48 {
-> +               reg = <0x48>;
-> +               interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-> +               interrupt-parent = <&intc>;
-> +       };
-> +};
-> +
-> +/include/ "twl4030.dtsi"
-> +
-> +&twl_gpio {
-> +       ti,pullups      = <0x0>;
-> +       ti,pulldowns    = <0x03ff3f>; /* BIT(0..5) | BIT(8..17) */
-> +};
-> +
-> +&i2c2 {
-> +       clock-frequency = <400000>;
-> +};
-> +
-> +&i2c3 {
-> +       clock-frequency = <100000>;
-> +};
-> +
-> +&mmc1 {
-> +       status = "disabled";
-> +};
-> +
-> +&mmc2 {
-> +       status = "disabled";
-> +};
-> +
-> +&mmc3 {
-> +       status = "disabled";
-> +};
-> +
-> +&mcspi1 {
-> +       // For some reason, touchscreen is neccessary for screen to work at
-> +       // all on real hw. It works well without it on emulator.
-> +       //
-> +       // Also... order in the device tree actually matters here.
-> +       tsc2005 at 0 {
-> +               compatible = "tsc2005";
-> +               spi-max-frequency = <6000000>;
-> +               reg = <0>;
-> +       };
-> +       mipid at 2 {
-> +               compatible = "acx565akm";
-> +               spi-max-frequency = <6000000>;
-> +               reg = <2>;
-> +               // turbo_mode = 0,
-> +               // cs_per_word = 0
-> +       };
-> +};
-> +
-> +&usb_otg_hs {
-> +       interface-type = <0>;
-> +       usb-phy = <&usb2_phy>;
-> +       mode = <2>;
-> +       power = <50>;
-> +};
->
-> --
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Wednesday 07 of August 2013 07:08:47 Kukjin Kim wrote:
+> On 08/06/13 08:32, Tomasz Figa wrote:
+> > Hi Olof, Arnd,
+> > 
+> > Here is the Samsung PWM cleanup series for you. Particular patches of
+> > the> 
+> > series involve following modifications:
+> >   1) fixing up few things in samsung_pwm_timer clocksource driver,
+> >   2) moving remaining Samsung platforms to the new clocksource driver,
+> >   3) removing old clocksource driver,
+> >   4) adding new multiplatform- and DT-aware PWM driver,
+> >   5) moving all Samsung platforms to use the new PWM driver,
+> >   6) removing old PWM driver,
+> >   7) removing all PWM-related code that is not used anymore.
+> > 
+> > This is my first pull request ever, so I hope I haven't screwed up
+> > anything. ;)
+> > 
+> > Best regards,
+> > Tomasz
+> > 
+> > The following changes since commit 
+c095ba7224d8edc71dcef0d655911399a8bd4a3f:
+> >    Linux 3.11-rc4 (2013-08-04 13:46:46 -0700)
+> > 
+> > are available in the git repository at:
+> >    git://github.com/tom3q/linux.git v3.12-next/pwm-cleanup
+> > 
+> > for you to fetch changes up to 
+519e8e0da7509fcc71c12bcd3a681bb62770f692:
+> >    ARM: SAMSUNG: Remove plat/regs-timer.h header (2013-08-06 01:21:55
+> >    +0200)> 
+> > ----------------------------------------------------------------
+> > 
+> > Tomasz Figa (20):
+> >        clocksource: samsung_pwm_timer: Do not request PWM mem region
+> >        clocksource: samsung_pwm_timer: Correct definition of
+> >        AUTORELOAD bit
+> >        clocksource: samsung_pwm_timer: Cache clocksource register
+> >        address
+> >        clocksource: samsung_pwm_timer: Do not use clocksource_mmio
+> >        clocksource: samsung_pwm_timer: Handle suspend/resume correctly
+> >        ARM: SAMSUNG: Unify base address definitions of timer block
+> >        ARM: SAMSUNG: Add new PWM platform device
+> >        ARM: SAMSUNG: Set PWM platform data
+> >        ARM: SAMSUNG: Move all platforms to new clocksource driver
+> >        ARM: SAMSUNG: Remove old samsung-time driver
+> >        ARM: SAMSUNG: Remove unused PWM timer IRQ chip code
+> >        pwm: samsung: Rename to pwm-samsung-legacy
+> >        pwm: Add new pwm-samsung driver
+> >        ARM: SAMSUNG: Rework private data handling in dev-backlight
+> >        ARM: SAMSUNG: Modify board files to use new PWM platform device
+> >        pwm: Remove superseded pwm-samsung-legacy driver
+> >        ARM: SAMSUNG: Remove old PWM timer platform devices
+> >        ARM: SAMSUNG: Remove pwm-clock infrastructure
+> >        ARM: SAMSUNG: Remove remaining uses of plat/regs-timer.h header
+> >        ARM: SAMSUNG: Remove plat/regs-timer.h header
+> >   
+> >   arch/arm/Kconfig                                   |  11 +-
+> >   arch/arm/mach-s3c24xx/Kconfig                      |   6 -
+> >   arch/arm/mach-s3c24xx/clock-s3c2410.c              |   1 -
+> >   arch/arm/mach-s3c24xx/clock-s3c2412.c              |   1 -
+> >   arch/arm/mach-s3c24xx/clock-s3c2416.c              |   2 -
+> >   arch/arm/mach-s3c24xx/clock-s3c2443.c              |   2 -
+> >   arch/arm/mach-s3c24xx/common.c                     |  27 +
+> >   arch/arm/mach-s3c24xx/include/mach/map.h           |   2 +
+> >   arch/arm/mach-s3c24xx/mach-h1940.c                 |   4 +-
+> >   arch/arm/mach-s3c24xx/mach-rx1950.c                |   5 +-
+> >   arch/arm/mach-s3c64xx/Kconfig                      |   2 -
+> >   arch/arm/mach-s3c64xx/clock.c                      |   2 -
+> >   arch/arm/mach-s3c64xx/common.c                     |  32 +-
+> >   arch/arm/mach-s3c64xx/include/mach/irqs.h          |   8 -
+> >   arch/arm/mach-s3c64xx/include/mach/map.h           |   1 +
+> >   arch/arm/mach-s3c64xx/irq-pm.c                     |   2 -
+> >   arch/arm/mach-s3c64xx/mach-crag6410.c              |   4 +-
+> >   arch/arm/mach-s3c64xx/mach-hmt.c                   |   4 +-
+> >   arch/arm/mach-s3c64xx/mach-smartq.c                |   4 +-
+> >   arch/arm/mach-s3c64xx/mach-smdk6410.c              |   5 +-
+> >   arch/arm/mach-s5p64x0/Kconfig                      |   2 -
+> >   arch/arm/mach-s5p64x0/clock-s5p6440.c              |   2 -
+> >   arch/arm/mach-s5p64x0/clock-s5p6450.c              |   2 -
+> >   arch/arm/mach-s5p64x0/common.c                     |  27 +
+> >   arch/arm/mach-s5p64x0/include/mach/irqs.h          |   2 -
+> >   arch/arm/mach-s5p64x0/include/mach/map.h           |   1 +
+> >   arch/arm/mach-s5p64x0/mach-smdk6440.c              |   5 +-
+> >   arch/arm/mach-s5p64x0/mach-smdk6450.c              |   5 +-
+> >   arch/arm/mach-s5p64x0/pm.c                         |   3 -
+> >   arch/arm/mach-s5pc100/Kconfig                      |   1 -
+> >   arch/arm/mach-s5pc100/clock.c                      |   2 -
+> >   arch/arm/mach-s5pc100/common.c                     |  28 +
+> >   arch/arm/mach-s5pc100/include/mach/irqs.h          |   2 -
+> >   arch/arm/mach-s5pc100/include/mach/map.h           |   1 +
+> >   arch/arm/mach-s5pc100/mach-smdkc100.c              |   5 +-
+> >   arch/arm/mach-s5pv210/Kconfig                      |   1 -
+> >   arch/arm/mach-s5pv210/clock.c                      |   1 -
+> >   arch/arm/mach-s5pv210/common.c                     |  28 +
+> >   arch/arm/mach-s5pv210/include/mach/irqs.h          |   2 -
+> >   arch/arm/mach-s5pv210/include/mach/map.h           |   1 +
+> >   arch/arm/mach-s5pv210/mach-smdkv210.c              |   5 +-
+> >   arch/arm/mach-s5pv210/pm.c                         |  10 -
+> >   arch/arm/plat-samsung/Kconfig                      |  14 -
+> >   arch/arm/plat-samsung/Makefile                     |   3 -
+> >   arch/arm/plat-samsung/dev-backlight.c              |  61 +-
+> >   arch/arm/plat-samsung/devs.c                       |  42 +-
+> >   arch/arm/plat-samsung/include/plat/clock.h         |   4 -
+> >   arch/arm/plat-samsung/include/plat/devs.h          |   1 +
+> >   arch/arm/plat-samsung/include/plat/irq-vic-timer.h |  13 -
+> >   arch/arm/plat-samsung/include/plat/irqs.h          |   9 -
+> >   arch/arm/plat-samsung/include/plat/pwm-clock.h     |  81 ---
+> >   arch/arm/plat-samsung/include/plat/pwm-core.h      |  22 +
+> >   arch/arm/plat-samsung/include/plat/regs-timer.h    | 124 ----
+> >   arch/arm/plat-samsung/include/plat/samsung-time.h  |  23 -
+> >   arch/arm/plat-samsung/irq-vic-timer.c              |  98 ---
+> >   arch/arm/plat-samsung/pwm-clock.c                  | 474
+> >   --------------
+> >   arch/arm/plat-samsung/s5p-irq.c                    |   4 -
+> >   arch/arm/plat-samsung/samsung-time.c               | 394
+> >   ------------
+> >   drivers/clocksource/Kconfig                        |   1 -
+> >   drivers/clocksource/samsung_pwm_timer.c            | 108 ++--
+> >   drivers/pwm/pwm-samsung.c                          | 709
+> >   ++++++++++++++------- 61 files changed, 786 insertions(+), 1660
+> >   deletions(-)
+> >   delete mode 100644
+> >   arch/arm/plat-samsung/include/plat/irq-vic-timer.h
+> >   delete mode 100644 arch/arm/plat-samsung/include/plat/pwm-clock.h
+> >   create mode 100644 arch/arm/plat-samsung/include/plat/pwm-core.h
+> >   delete mode 100644 arch/arm/plat-samsung/include/plat/regs-timer.h
+> >   delete mode 100644 arch/arm/plat-samsung/irq-vic-timer.c
+> >   delete mode 100644 arch/arm/plat-samsung/pwm-clock.c
+> >   delete mode 100644 arch/arm/plat-samsung/samsung-time.c
+> 
+> Just note that I also have pulled into samsung tree because of
+> dependency with others, this will be pulled directly by Olof though.
 
-[1] - https://lkml.org/lkml/2013/3/1/526
+Have you already pulled this into your tree? There was a patch[1] that was 
+posted for 3.11 at the time this series was merged in your for-next 
+branch, before it got dropped, that fixed one found build issue that I 
+missed.
 
-marek
+In the end the series got dropped, that patch was not applied and I forgot 
+about this issue. This was caught by Andrew Bresticker after I already 
+sent my pull request.
 
--- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
+According to Olof, he hasn't pulled this yet and you don't seem to have it 
+in your public tree either, so we could either drop this pull request and 
+send another one with the fixup patch squashed or apply the fixup patch 
+separately on top of this. What do you think?
 
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+Best regads,
+Tomasz
+
+[1] https://patchwork.kernel.org/patch/2787271/
