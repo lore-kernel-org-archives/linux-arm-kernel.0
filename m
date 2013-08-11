@@ -1,89 +1,58 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 11 Aug 2013 22:05:04 +0200
-Subject: [PATCH 00/20] ARM: pxa: move core and drivers to dmaengine
-References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
- <87zjsqzdg8.fsf@free.fr> <52061C53.4050905@gmail.com>
-Message-ID: <874nawyowf.fsf@free.fr>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 11 Aug 2013 14:45:09 -0700
+Subject: [PATCH 1/2] ARM: dts: Change dw-apb-timer-osc and
+ dw-apb-timer-sp to just dw-apb-timer
+In-Reply-To: <1374723797-22169-1-git-send-email-dinguyen@altera.com>
+References: <1374723797-22169-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20130811214509.GA26757@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack <zonque@gmail.com> writes:
-> Hi Robert,
+On Wed, Jul 24, 2013 at 10:43:16PM -0500, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> "dw-apb-timer-osc" and "dw-apb-timer-sp" are the same implementation of the
+> DW APB timer, just fed by different clocks.
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> CC: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> CC: Jamie Iles <jamie@jamieiles.com>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Pavel Machek <pavel@denx.de>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  Documentation/devicetree/bindings/rtc/dw-apb.txt |   21 +++----------------
+>  arch/arm/boot/dts/rk3066a.dtsi                   |    6 +++---
+>  arch/arm/boot/dts/socfpga.dtsi                   |   24 +++++++++++-----------
+>  arch/arm/boot/dts/socfpga_cyclone5.dts           |    8 ++++----
+>  arch/arm/boot/dts/socfpga_vt.dts                 |    8 ++++----
+>  5 files changed, 26 insertions(+), 41 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/dw-apb.txt b/Documentation/devicetree/bindings/rtc/dw-apb.txt
+> index eb2327b..0a1020e 100644
+> --- a/Documentation/devicetree/bindings/rtc/dw-apb.txt
+> +++ b/Documentation/devicetree/bindings/rtc/dw-apb.txt
+> @@ -1,7 +1,7 @@
+>  * Designware APB timer
+>  
+>  Required properties:
+> -- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc"
+> +- compatible: "snps,dw-apb-timer"
+>  - reg: physical base address of the controller and length of memory mapped
+>    region.
+>  - interrupts: IRQ line for the timer.
 
-We might reduce the thread broadcast, I don't think these many people care about
-pxa camera specifics, and its DMA constraints.
+Here's a classic example of where we will eventually need to keep the ABI. You
+can add a comment that the preferred compatible value is the new one, but the
+old ones still need to be handled by the drivers, and shouldn't be removed.
+
+That is, of course, if people are happy with the current binding and want to
+keep it instead of revising it before declaring it locked in.
 
 
->> All that is described in there :
->>   Documentation/video4linux/pxa_camera.txt
->
-> Yes, I've seen that, and while the documentation about all that is
-> excellent, I lack an explanation why things are so complicated for this
-> application, and why a simple cyclic DMA approach does not suffice here.
-> I'm sure there's a reason though.
-Well, I think there is a good one.
-The current video4linux flow, for video capture, is :
- 1) userland prepares buffers (ie. dma transfers are prepared, one sg list for
- each "image" or "frame")
- 2) userland queues buffers (no hardware operation)
- 3) userland starts the capture
- 4) userland poll for each frame end
-   a) When a frame is finished, userland unqueues it
-      => no overwrite of this frame is possible anymore
-   b) Userland treats is (might be sent to storage, or compressed, ...)
-   c) Userland requeues it (while other frame is being DMAed)
-
-Moreover, it should be assumed that waiting for a "end of DMA transfer" before
-requeuing the next one (ie. "cold queuing" instead of "hot queueing") will imply
-the miss of the next frame start, and one frame will be missed.
-
-With a cyclic DMA, if I understand dmaengine correctly, step 4a. is not
-posssible (ie. if userland is slow enough, the frame will be overwritten without
-userland knowing it, and while userland is handling it).
-
-> There might be need to teach the dmaengine core more functionality, but
-> in order to do that, we first need to understand the exact requirements.
-The first one that comes to my mind is :
- - enable to submit a transfer to a running channel, the same one that served a
- previous transfer :
-   => this will guarantee ordering of DMA transfers
-   => this will guarantee no DMA stops if 2 or more buffers are queued
-   => this will try to chain this transfer to the last one queued on the channel
-   => if by bad luck the "miss window is hit", ie. the DMA finishes while the
-   chaining was being done, restart the DMA on its stop
-
->> Another point I'd like to know, is what is the performance penalty in using
->> dmaengine, and do you have any figures ?
-> The DMA transfers themselves certainly perform equally well, and the
-> framework is just a thin layer. Where would you expect performance penalty?
-
-Well, last time I had a look (in [1]), I think I remember having a 3% penalty
-on SD card transfers (pxamci driver, mioa701 board, transcend 16Go SD card). 
-
-It's been a while and my memory is a bit fuzzy about it. The loss I had at the
-time was in queuing/unqueuing the DMA requests IIRC.
-
->> Lastly, they was debug information to debug descriptors chaining, channel
->> statuses, requestors. I didn't see where these had gone, could you point me to
->> the right file ?
->
-> Such a debug interface is not part of the mmp-pdma implementation at
-> this point, and the core doesn't have a generic debugfs feature either.
-> If you need that, we'd have to add it back.
-Well, I use that. It's not vital for DMA to work of course, but it's very nice
-to have when you mess with DMA transfers :)
-
-> FWIW, I attached my work-in-progress patch for this driver which just
-> does some basic dmaengine preparations. Be aware that this does not even
-> compile, it's really just a snapshot.
-OK, cool. Once the dmaengine stuff is clearer in my mind, and if "hot
-submitting" is already possible in dmaengine, it shouldn't be that hard to
-convert.
-
-Cheers.
-
--- 
-Robert
-
-[1]
-http://archive.arm.linux.org.uk/lurker/message/20090517.194809.b18c79c8.en.html
+-Olof
