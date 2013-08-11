@@ -1,10 +1,10 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun, 11 Aug 2013 18:51:42 +0200
-Subject: [PATCH 1/16] sound/soc/pxa/mioa701_wm9713.c: Avoid using
+Date: Sun, 11 Aug 2013 18:51:44 +0200
+Subject: [PATCH 3/16] arch/arm/mach-ux500/cpu-db8500.c: Avoid using
  ARRAY_AND_SIZE(e) as a function argument
 In-Reply-To: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1376239917-15594-2-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1376239917-15594-4-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -32,24 +32,20 @@ Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 ---
 Not compiled.
 
- sound/soc/pxa/mioa701_wm9713.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/sound/soc/pxa/mioa701_wm9713.c b/sound/soc/pxa/mioa701_wm9713.c
-index 97b711e..20fdce6 100644
---- a/sound/soc/pxa/mioa701_wm9713.c
-+++ b/sound/soc/pxa/mioa701_wm9713.c
-@@ -133,10 +133,11 @@ static int mioa701_wm9713_init(struct snd_soc_pcm_runtime *rtd)
- 	unsigned short reg;
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 12eee81..a73bb3d 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -157,7 +157,8 @@ static void __init db8500_add_gpios(struct device *parent)
+ 		.supports_sleepmode = true,
+ 	};
  
- 	/* Add mioa701 specific widgets */
--	snd_soc_dapm_new_controls(dapm, ARRAY_AND_SIZE(mioa701_dapm_widgets));
-+	snd_soc_dapm_new_controls(dapm, mioa701_dapm_widgets,
-+				  ARRAY_SIZE(mioa701_dapm_widgets));
- 
- 	/* Set up mioa701 specific audio path audio_mapnects */
--	snd_soc_dapm_add_routes(dapm, ARRAY_AND_SIZE(audio_map));
-+	snd_soc_dapm_add_routes(dapm, audio_map, ARRAY_SIZE(audio_map));
- 
- 	/* Prepare GPIO8 for rear speaker amplifier */
- 	reg = codec->driver->read(codec, AC97_GPIO_CFG);
+-	dbx500_add_gpios(parent, ARRAY_AND_SIZE(db8500_gpio_base),
++	dbx500_add_gpios(parent, db8500_gpio_base,
++			 ARRAY_SIZE(db8500_gpio_base),
+ 			 IRQ_DB8500_GPIO0, &pdata);
+ 	dbx500_add_pinctrl(parent, "pinctrl-db8500", U8500_PRCMU_BASE);
+ }
