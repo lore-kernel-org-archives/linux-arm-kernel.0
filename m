@@ -1,79 +1,153 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun, 11 Aug 2013 18:51:57 +0200
-Subject: [PATCH 16/16] arch/arm/mach-pxa/stargate2.c: Avoid using
- ARRAY_AND_SIZE(e) as a function argument
-In-Reply-To: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1376239917-15594-17-git-send-email-Julia.Lawall@lip6.fr>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 11 Aug 2013 19:59:14 +0200
+Subject: [PATCH 02/18] dmaengine: PL08x: Add support for different offset of
+ CONFIG register
+In-Reply-To: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
+References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1376243970-6489-3-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <Julia.Lawall@lip6.fr>
+Some variants of PL08x (namely PL080S, found in Samsung S3C64xx SoCs)
+have CONFIG register at different offset. This patch makes the driver
+use offset from vendor data struct.
 
-Replace ARRAY_AND_SIZE(e) in function argument position to avoid hiding the
-arity of the called function.
-
-The semantic match that makes this change is as follows:
-(http://coccinelle.lip6.fr/)
-
-// <smpl>
-@@
-expression e,f;
-@@
-
-f(...,
-- ARRAY_AND_SIZE(e)
-+ e,ARRAY_SIZE(e)
-  ,...)
-// </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 ---
-Not compiled.
+ drivers/dma/amba-pl08x.c | 30 ++++++++++++++++++------------
+ 1 file changed, 18 insertions(+), 12 deletions(-)
 
- arch/arm/mach-pxa/stargate2.c |   13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
-index 62aea3e..adacedd 100644
---- a/arch/arm/mach-pxa/stargate2.c
-+++ b/arch/arm/mach-pxa/stargate2.c
-@@ -406,7 +406,8 @@ static struct i2c_pxa_platform_data i2c_pdata = {
- static void __init imote2_stargate2_init(void)
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 6a12392..2538e05 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -102,6 +102,7 @@ struct pl08x_driver_data;
+  *	missing
+  */
+ struct vendor_data {
++	u8 config_offset;
+ 	u8 channels;
+ 	bool dualmaster;
+ 	bool nomadik;
+@@ -145,6 +146,7 @@ struct pl08x_bus_data {
+ struct pl08x_phy_chan {
+ 	unsigned int id;
+ 	void __iomem *base;
++	void __iomem *reg_config;
+ 	spinlock_t lock;
+ 	struct pl08x_dma_chan *serving;
+ 	bool locked;
+@@ -334,7 +336,7 @@ static int pl08x_phy_channel_busy(struct pl08x_phy_chan *ch)
  {
+ 	unsigned int val;
  
--	pxa2xx_mfp_config(ARRAY_AND_SIZE(sg2_im2_unified_pin_config));
-+	pxa2xx_mfp_config(sg2_im2_unified_pin_config,
-+			  ARRAY_SIZE(sg2_im2_unified_pin_config));
+-	val = readl(ch->base + PL080_CH_CONFIG);
++	val = readl(ch->reg_config);
+ 	return val & PL080_CONFIG_ACTIVE;
+ }
  
- 	pxa_set_ffuart_info(NULL);
- 	pxa_set_btuart_info(NULL);
-@@ -604,7 +605,7 @@ static struct platform_device *imote2_devices[] = {
+@@ -373,7 +375,7 @@ static void pl08x_start_next_txd(struct pl08x_dma_chan *plchan)
+ 	writel(lli->dst, phychan->base + PL080_CH_DST_ADDR);
+ 	writel(lli->lli, phychan->base + PL080_CH_LLI);
+ 	writel(lli->cctl, phychan->base + PL080_CH_CONTROL);
+-	writel(txd->ccfg, phychan->base + PL080_CH_CONFIG);
++	writel(txd->ccfg, phychan->reg_config);
  
- static void __init imote2_init(void)
+ 	/* Enable the DMA channel */
+ 	/* Do not access config register until channel shows as disabled */
+@@ -381,11 +383,11 @@ static void pl08x_start_next_txd(struct pl08x_dma_chan *plchan)
+ 		cpu_relax();
+ 
+ 	/* Do not access config register until channel shows as inactive */
+-	val = readl(phychan->base + PL080_CH_CONFIG);
++	val = readl(phychan->reg_config);
+ 	while ((val & PL080_CONFIG_ACTIVE) || (val & PL080_CONFIG_ENABLE))
+-		val = readl(phychan->base + PL080_CH_CONFIG);
++		val = readl(phychan->reg_config);
+ 
+-	writel(val | PL080_CONFIG_ENABLE, phychan->base + PL080_CH_CONFIG);
++	writel(val | PL080_CONFIG_ENABLE, phychan->reg_config);
+ }
+ 
+ /*
+@@ -404,9 +406,9 @@ static void pl08x_pause_phy_chan(struct pl08x_phy_chan *ch)
+ 	int timeout;
+ 
+ 	/* Set the HALT bit and wait for the FIFO to drain */
+-	val = readl(ch->base + PL080_CH_CONFIG);
++	val = readl(ch->reg_config);
+ 	val |= PL080_CONFIG_HALT;
+-	writel(val, ch->base + PL080_CH_CONFIG);
++	writel(val, ch->reg_config);
+ 
+ 	/* Wait for channel inactive */
+ 	for (timeout = 1000; timeout; timeout--) {
+@@ -423,9 +425,9 @@ static void pl08x_resume_phy_chan(struct pl08x_phy_chan *ch)
+ 	u32 val;
+ 
+ 	/* Clear the HALT bit */
+-	val = readl(ch->base + PL080_CH_CONFIG);
++	val = readl(ch->reg_config);
+ 	val &= ~PL080_CONFIG_HALT;
+-	writel(val, ch->base + PL080_CH_CONFIG);
++	writel(val, ch->reg_config);
+ }
+ 
+ /*
+@@ -437,12 +439,12 @@ static void pl08x_resume_phy_chan(struct pl08x_phy_chan *ch)
+ static void pl08x_terminate_phy_chan(struct pl08x_driver_data *pl08x,
+ 	struct pl08x_phy_chan *ch)
  {
--	pxa2xx_mfp_config(ARRAY_AND_SIZE(imote2_pin_config));
-+	pxa2xx_mfp_config(imote2_pin_config, ARRAY_SIZE(imote2_pin_config));
+-	u32 val = readl(ch->base + PL080_CH_CONFIG);
++	u32 val = readl(ch->reg_config);
  
- 	imote2_stargate2_init();
+ 	val &= ~(PL080_CONFIG_ENABLE | PL080_CONFIG_ERR_IRQ_MASK |
+ 	         PL080_CONFIG_TC_IRQ_MASK);
  
-@@ -983,13 +984,15 @@ static void __init stargate2_init(void)
- 	   prior to connecting the MFP stuff up. */
- 	__raw_writel(__raw_readl(MECR) & ~MECR_NOS, MECR);
+-	writel(val, ch->base + PL080_CH_CONFIG);
++	writel(val, ch->reg_config);
  
--	pxa2xx_mfp_config(ARRAY_AND_SIZE(stargate2_pin_config));
-+	pxa2xx_mfp_config(stargate2_pin_config,
-+			  ARRAY_SIZE(stargate2_pin_config));
+ 	writel(1 << ch->id, pl08x->base + PL080_ERR_CLEAR);
+ 	writel(1 << ch->id, pl08x->base + PL080_TC_CLEAR);
+@@ -1952,6 +1954,7 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
  
- 	imote2_stargate2_init();
+ 		ch->id = i;
+ 		ch->base = pl08x->base + PL080_Cx_BASE(i);
++		ch->reg_config = ch->base + vd->config_offset;
+ 		spin_lock_init(&ch->lock);
  
--	platform_add_devices(ARRAY_AND_SIZE(stargate2_devices));
-+	platform_add_devices(stargate2_devices, ARRAY_SIZE(stargate2_devices));
+ 		/*
+@@ -1962,7 +1965,7 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+ 		if (vd->nomadik) {
+ 			u32 val;
  
--	i2c_register_board_info(0, ARRAY_AND_SIZE(stargate2_i2c_board_info));
-+	i2c_register_board_info(0, stargate2_i2c_board_info,
-+				ARRAY_SIZE(stargate2_i2c_board_info));
- 	i2c_register_board_info(1, stargate2_pwr_i2c_board_info,
- 				ARRAY_SIZE(stargate2_pwr_i2c_board_info));
+-			val = readl(ch->base + PL080_CH_CONFIG);
++			val = readl(ch->reg_config);
+ 			if (val & (PL080N_CONFIG_ITPROT | PL080N_CONFIG_SECPROT)) {
+ 				dev_info(&adev->dev, "physical channel %d reserved for secure access only\n", i);
+ 				ch->locked = true;
+@@ -2043,17 +2046,20 @@ out_no_pl08x:
  
+ /* PL080 has 8 channels and the PL080 have just 2 */
+ static struct vendor_data vendor_pl080 = {
++	.config_offset = PL080_CH_CONFIG,
+ 	.channels = 8,
+ 	.dualmaster = true,
+ };
+ 
+ static struct vendor_data vendor_nomadik = {
++	.config_offset = PL080_CH_CONFIG,
+ 	.channels = 8,
+ 	.dualmaster = true,
+ 	.nomadik = true,
+ };
+ 
+ static struct vendor_data vendor_pl081 = {
++	.config_offset = PL080_CH_CONFIG,
+ 	.channels = 2,
+ 	.dualmaster = false,
+ };
+-- 
+1.8.3.2
