@@ -1,29 +1,46 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Sun, 11 Aug 2013 07:48:18 +0200 (CEST)
-Subject: [PATCH] arch/arm/mach-pxa/stargate2.c: use ARRAY_AND_SIZE
- consistently
-In-Reply-To: <20130810223338.GM5502@mwanda>
-References: <1376148353-9699-1-git-send-email-Julia.Lawall@lip6.fr>
- <20130810223338.GM5502@mwanda>
-Message-ID: <alpine.DEB.2.02.1308110745030.2072@localhost6.localdomain6>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Sat, 10 Aug 2013 23:09:21 -0700
+Subject: [PATCH 0/4] mtd: gpmi: support two nand chips at most
+In-Reply-To: <1371197185-27491-1-git-send-email-b32955@freescale.com>
+References: <1371197185-27491-1-git-send-email-b32955@freescale.com>
+Message-ID: <20130811060921.GB16906@norris.computersforpeace.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 11 Aug 2013, Dan Carpenter wrote:
+On Fri, Jun 14, 2013 at 04:06:21PM +0800, Huang Shijie wrote:
+> Current gpmi-nand driver only supports one chips. But we may meet
+> some embarrassing situation, such as Micron MT29F32G08QAA.
+> This nand chip has two DIEs internally. Each die has its own chip select pin,
+> so this chip acts as two nand chips.
+> 
+> If we only scan one chip, we may find that we only get 2G for this chip,
+> but in actually, this chip's size is 4G.
+> 
+> So scan two chips by default.
+> 
+> In order to support two nand chips, we have to do the following:
+>    1.) We only have one dma channel now, so decouple the chip select
+>       from the DMA channel, We can use the dma 0 to access all the nand chips.
+> 
+>    2.) fix the wrong method of checking the ready/busy status.
+>       In the imx6, all the ready/busy pins are binding together, we
+>       should check ready/busy status of chip 0 for the all the chips. 
+> 
+> Tested this patch set with MT29F32G08QAA.
+> 
+> 
+> Huang Shijie (4):
+>   mtd: gpmi: decouple the chip select from the DMA channel
+>   mtd: gpmi: use DMA channel 0 for all the nand chips
+>   mtd: gpmi: scan two nand chips
+>   mtd: gpmi: imx6: fix the wrong method for checking ready/busy
+> 
+>  drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   14 ++++++++++++++
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    7 +++----
+>  drivers/mtd/nand/gpmi-nand/gpmi-regs.h |    3 +++
+>  3 files changed, 20 insertions(+), 4 deletions(-)
 
-> ARRAY_AND_SIZE() macro is horrible, and I would like it if it were
-> removed.  What I meant before was just that probably people will
-> probably complain if we try to remove it.
+What's the status on this patch set? It doesn't look like it got merged.
+Do you have any testing for this? It looks sane enough to me.
 
-Well, I could either wait for someone to defend it, or send a patch 
-getting rid of it and see what happens...  I can't see what could go wrong 
-with
-
-f(...,
-- ARRAY_AND_SIZE(e)
-+ e, ARRAY_SIZE(e)
-  , ...)
-
-so it should be an easy patch to create.
-
-julia
+Brian
