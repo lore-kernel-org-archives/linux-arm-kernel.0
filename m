@@ -1,43 +1,25 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 12 Aug 2013 01:03:19 +0200
-Subject: [PATCH 17/18] spi: s3c64xx: Always select S3C64XX_PL080 when
- ARCH_S3C64XX is enabled
-In-Reply-To: <20130811191140.GI6427@sirena.org.uk>
-References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
- <1376243970-6489-18-git-send-email-tomasz.figa@gmail.com>
- <20130811191140.GI6427@sirena.org.uk>
-Message-ID: <2033369.1oHkX7kdGa@flatron>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 11 Aug 2013 16:07:05 -0700
+Subject: [GIT PULL] Samsung-fixes-2 for v3.11
+In-Reply-To: <51FFE30A.5040800@samsung.com>
+References: <51FFE30A.5040800@samsung.com>
+Message-ID: <20130811230705.GD26757@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Sunday 11 of August 2013 20:11:40 Mark Brown wrote:
-> On Sun, Aug 11, 2013 at 07:59:29PM +0200, Tomasz Figa wrote:
-> > @@ -366,7 +366,7 @@ config SPI_S3C24XX_FIQ
-> > 
-> >  config SPI_S3C64XX
-> >  
-> >  	tristate "Samsung S3C64XX series type SPI"
-> >  	depends on (ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5P64X0 ||
-> >  	ARCH_EXYNOS)> 
-> > -	select S3C64XX_DMA if ARCH_S3C64XX && !S3C64XX_PL080
-> > +	select S3C64XX_PL080 if ARCH_S3C64XX
-> > 
-> >  	help
-> >  	
-> >  	  SPI driver for Samsung S3C64XX and newer SoCs.
+On Tue, Aug 06, 2013 at 02:38:18AM +0900, Kukjin Kim wrote:
+> The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
 > 
-> Do we need the select here (or should we have other selects for the
-> Exynos SoCs)?
+>   Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
+> 
+> are available in the git repository at:
+> 
 
-The driver would build fine without this symbol selected, but since it 
-relies on availability of DMA, it doesn't make too much sense to build it 
-this way. This kind of selects makes kernel configuration more user 
-friendly IMHO.
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-fixes-2
+> 
 
-Possibly adding appropriate selects (PL330) for s5p* and exynos could make 
-sense.
+Pulled.
 
-Best regards,
-Tomasz
+
+-Olof
