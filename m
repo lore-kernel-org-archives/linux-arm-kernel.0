@@ -1,10 +1,10 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun, 11 Aug 2013 18:51:54 +0200
-Subject: [PATCH 13/16] arch/arm/mach-pxa/hx4700.c: Avoid using
- ARRAY_AND_SIZE(e) as a function argument
+Date: Sun, 11 Aug 2013 18:51:56 +0200
+Subject: [PATCH 15/16] arch/arm/mach-kirkwood: Avoid using ARRAY_AND_SIZE(e)
+ as a function argument
 In-Reply-To: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1376239917-15594-14-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1376239917-15594-16-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -32,39 +32,36 @@ Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 ---
 Not compiled.
 
- arch/arm/mach-pxa/hx4700.c |   13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
+ arch/arm/mach-kirkwood/openrd-setup.c    |    3 ++-
+ arch/arm/mach-kirkwood/rd88f6281-setup.c |    4 +++-
+ 2 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index 133109e..8cac0a8 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -866,9 +866,9 @@ static void __init hx4700_init(void)
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+index 6a6eb54..e5cf841 100644
+--- a/arch/arm/mach-kirkwood/openrd-setup.c
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -158,7 +158,8 @@ static void __init openrd_init(void)
+ 	kirkwood_mpp_conf(openrd_mpp_config);
  
- 	PCFR = PCFR_GPR_EN | PCFR_OPDE;
+ 	kirkwood_uart0_init();
+-	kirkwood_nand_init(ARRAY_AND_SIZE(openrd_nand_parts), 25);
++	kirkwood_nand_init(openrd_nand_parts, ARRAY_SIZE(openrd_nand_parts),
++			   25);
  
--	pxa2xx_mfp_config(ARRAY_AND_SIZE(hx4700_pin_config));
-+	pxa2xx_mfp_config(hx4700_pin_config, ARRAY_SIZE(hx4700_pin_config));
- 	gpio_set_wake(GPIO12_HX4700_ASIC3_IRQ, 1);
--	ret = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
-+	ret = gpio_request_array(global_gpios, ARRAY_SIZE(global_gpios));
- 	if (ret)
- 		pr_err ("hx4700: Failed to request GPIOs.\n");
+ 	kirkwood_ehci_init();
  
-@@ -882,10 +882,13 @@ static void __init hx4700_init(void)
- 	pxa_set_ficp_info(&ficp_info);
- 	pxa27x_set_i2c_power_info(NULL);
- 	pxa_set_i2c_info(NULL);
--	i2c_register_board_info(0, ARRAY_AND_SIZE(i2c_board_info));
--	i2c_register_board_info(1, ARRAY_AND_SIZE(pi2c_board_info));
-+	i2c_register_board_info(0, i2c_board_info,
-+				ARRAY_SIZE(i2c_board_info));
-+	i2c_register_board_info(1, pi2c_board_info,
-+				ARRAY_SIZE(pi2c_board_info));
- 	pxa2xx_set_spi_info(2, &pxa_ssp2_master_info);
--	spi_register_board_info(ARRAY_AND_SIZE(tsc2046_board_info));
-+	spi_register_board_info(tsc2046_board_info,
-+				ARRAY_SIZE(tsc2046_board_info));
+diff --git a/arch/arm/mach-kirkwood/rd88f6281-setup.c b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+index d242231..5154bd2 100644
+--- a/arch/arm/mach-kirkwood/rd88f6281-setup.c
++++ b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+@@ -87,7 +87,9 @@ static void __init rd88f6281_init(void)
+ 	kirkwood_init();
+ 	kirkwood_mpp_conf(rd88f6281_mpp_config);
  
- 	gpio_set_value(GPIO71_HX4700_ASIC3_nRESET, 0);
- 	mdelay(10);
+-	kirkwood_nand_init(ARRAY_AND_SIZE(rd88f6281_nand_parts), 25);
++	kirkwood_nand_init(rd88f6281_nand_parts,
++			   ARRAY_SIZE(rd88f6281_nand_parts),
++			   25);
+ 	kirkwood_ehci_init();
+ 
+ 	kirkwood_ge00_init(&rd88f6281_ge00_data);
