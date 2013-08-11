@@ -1,29 +1,37 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 11 Aug 2013 11:53:38 +0200
-Subject: [PATCH 0/2] i2c: davinci: Couple of patches to make i2c usable
- on Keystone SOCs
-In-Reply-To: <52054C7E.70108@ti.com>
-References: <1374712099-32095-1-git-send-email-santosh.shilimkar@ti.com>
- <52054C7E.70108@ti.com>
-Message-ID: <20130811095337.GA3796@the-dreams.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sun, 11 Aug 2013 18:31:57 +0800
+Subject: [GIT PULL] pxa dt binding for v3.12
+Message-ID: <CAN1soZx5Ax1jq3psJXwnHozBP6jA9Y3ziRL=go=bP5k2ds=thg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 04:09:34PM -0400, Santosh Shilimkar wrote:
-> Wolfram, Sekhar, 
-> 
-> On Wednesday 24 July 2013 08:28 PM, Santosh Shilimkar wrote:
-> > Keystone SOCs uses the same I2C IP as available on DaVinci SOCs. These
-> > couple of patches makes it possible to select the I2C_DAVINCI on
-> > Keystone SOCs.
-> > 
-> > Cc: Sekhar Nori <nsekhar@ti.com>
-> > Cc: Wolfram Sang <wsa@the-dreams.de>
-> > 
-> > Santosh Shilimkar (2):
-> >   i2c: davinci: remove useless mach/hardware include
-> >   i2c: davinci: Allow i2c driver available for keystone platforms
-> > 
-> Who is queuing up these patches ?
+Hi Olof & Arnd,
 
-I can pick them. Do they depend on something?
+Here's the pull request from pxa git tree.
+
+Regards
+Haojian
+
+The following changes since commit c095ba7224d8edc71dcef0d655911399a8bd4a3f:
+
+  Linux 3.11-rc4 (2013-08-04 13:46:46 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git tags/pxa-dt
+
+for you to fetch changes up to 781c8603856c9e8b37f1348cdb9a5685910a7225:
+
+  ARM: pxa: DTS: override gpio node in pxa3xx.dtsi (2013-08-11 17:50:27 +0800)
+
+----------------------------------------------------------------
+dt binding for gpio-pxa
+
+----------------------------------------------------------------
+Daniel Mack (2):
+      ARM: pxa: fix DT auxdata for pxa3xx-gpio
+      ARM: pxa: DTS: override gpio node in pxa3xx.dtsi
+
+ arch/arm/boot/dts/pxa3xx.dtsi | 11 +++++++++++
+ arch/arm/mach-pxa/pxa-dt.c    |  2 +-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
