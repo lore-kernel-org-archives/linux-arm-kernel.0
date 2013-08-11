@@ -1,31 +1,70 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 11 Aug 2013 12:05:40 +0100
-Subject: [alsa-devel] [PATCH 1/3] ASoC: bt-sco: enable OF support
-In-Reply-To: <CAGsJ_4y1JoPtXinAvaohDQF_4+DizNYh1jy+iYymypgeZfapKA@mail.gmail.com>
-References: <1374041536-27643-1-git-send-email-Baohua.Song@csr.com>
- <20130717084039.GA15981@e106331-lin.cambridge.arm.com>
- <20130717094718.GE22506@sirena.org.uk>
- <CAGsJ_4w3fS=vzZmeJOxhKO1TdL9d6pgbrjtzfPugOSOprLV+nw@mail.gmail.com>
- <20130806170430.GL6427@sirena.org.uk>
- <CAGsJ_4xhkdNTKr6KBPMMPVfi7+NP+WHq2+_V545An6J+c6E7ug@mail.gmail.com>
- <20130807144628.GC6427@sirena.org.uk>
- <CAGsJ_4y1JoPtXinAvaohDQF_4+DizNYh1jy+iYymypgeZfapKA@mail.gmail.com>
-Message-ID: <20130811110540.GW6427@sirena.org.uk>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Sun, 11 Aug 2013 19:04:28 +0800
+Subject: [PATCH v2 1/4] iio: at91: fix adc_clk overflow
+In-Reply-To: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
+References: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1376219071-29946-2-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 04:41:57PM +0800, Barry Song wrote:
+The adc_clk variable is currently defined using a 32-bits unsigned integer,
+which will overflow under some very valid range of operations.
 
-> it is fine. but it seems we are not easy to achieve this goal as we
-> actually want to do that at uart or tty core instead of specific uart
-> driver instance.
+Such overflow will occur if, for example, the parent clock is set to a
+20MHz frequency and the ADC startup time is larger than 215ns.
 
-Yes, this is one of the problems with DT - it forces things to be solved
-in a full and complete fashion since it defines ABI.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130811/cd7a9959/attachment.sig>
+To fix this, introduce an intermediate variable holding the clock rate
+in kHz.
+
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+v1 --> v2:
+  refined the commit message.
+
+ drivers/iio/adc/at91_adc.c |   11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+index b6db6a0..9cf8ab5 100644
+--- a/drivers/iio/adc/at91_adc.c
++++ b/drivers/iio/adc/at91_adc.c
+@@ -582,7 +582,7 @@ static const struct iio_info at91_adc_info = {
+ 
+ static int at91_adc_probe(struct platform_device *pdev)
+ {
+-	unsigned int prsc, mstrclk, ticks, adc_clk, shtim;
++	unsigned int prsc, mstrclk, ticks, adc_clk, adc_clk_khz, shtim;
+ 	int ret;
+ 	struct iio_dev *idev;
+ 	struct at91_adc_state *st;
+@@ -680,6 +680,7 @@ static int at91_adc_probe(struct platform_device *pdev)
+ 	 */
+ 	mstrclk = clk_get_rate(st->clk);
+ 	adc_clk = clk_get_rate(st->adc_clk);
++	adc_clk_khz = adc_clk / 1000;
+ 	prsc = (mstrclk / (2 * adc_clk)) - 1;
+ 
+ 	if (!st->startup_time) {
+@@ -693,15 +694,15 @@ static int at91_adc_probe(struct platform_device *pdev)
+ 	 * defined in the electrical characteristics of the board, divided by 8.
+ 	 * The formula thus is : Startup Time = (ticks + 1) * 8 / ADC Clock
+ 	 */
+-	ticks = round_up((st->startup_time * adc_clk /
+-			  1000000) - 1, 8) / 8;
++	ticks = round_up((st->startup_time * adc_clk_khz /
++			  1000) - 1, 8) / 8;
+ 	/*
+ 	 * a minimal Sample and Hold Time is necessary for the ADC to guarantee
+ 	 * the best converted final value between two channels selection
+ 	 * The formula thus is : Sample and Hold Time = (shtim + 1) / ADCClock
+ 	 */
+-	shtim = round_up((st->sample_hold_time * adc_clk /
+-			  1000000) - 1, 1);
++	shtim = round_up((st->sample_hold_time * adc_clk_khz /
++			  1000) - 1, 1);
+ 
+ 	reg = AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL;
+ 	reg |= AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP;
+-- 
+1.7.10
