@@ -1,62 +1,73 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 11 Aug 2013 02:33:29 +0200
-Subject: [PATCH 2/3] spi: s3c64xx: Do not request CS GPIO on subsequent calls
- to .setup()
-In-Reply-To: <1376181210-14599-1-git-send-email-tomasz.figa@gmail.com>
-References: <1376181210-14599-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1376181210-14599-2-git-send-email-tomasz.figa@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 11 Aug 2013 02:55:07 +0200
+Subject: OMAP device tree maintainance (was Re: [PATCH v2] N900: add device
+ tree)
+In-Reply-To: <alpine.LNX.2.00.1308102226220.32627@pobox.suse.cz>
+References: <20130704171939.GA27374@blackmetal.musicnaut.iki.fi>
+ <20130704202145.GB10752@amd.pavel.ucw.cz>
+ <20130704203256.GB27374@blackmetal.musicnaut.iki.fi>
+ <20130713121709.GC16473@amd.pavel.ucw.cz>
+ <20130714222819.GB3296@blackmetal.musicnaut.iki.fi>
+ <20130728134409.GB5382@amd.pavel.ucw.cz>
+ <20130801234355.GA15611@amd.pavel.ucw.cz>
+ <20130810110955.GA11437@amd.pavel.ucw.cz>
+ <CAAfyv34w1e+sAuB==-+Pj2gOO1auVNQgawcNC1Z4QfeqchRh3g@mail.gmail.com>
+ <alpine.LNX.2.00.1308102226220.32627@pobox.suse.cz>
+Message-ID: <20130811005507.GA29513@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Comments in linux/spi/spi.h and observed behavior show that .setup()
-callback can be called multiple times without corresponding calls to
-.cleanup(), what was incorrectly assumed by spi-s3c64xx driver, leading
-to failures trying to request CS GPIO multiple times.
+Hi!
 
-This patch modifies the behavior of spi-s3c64xx driver to request CS
-GPIO only on first call to .setup() after last .cleanup().
+> > [I wonder if this is clean-enough cause for "trivial in resubmit
+> > mode?]
+> 
+> On Sat, 10 Aug 2013, Belisko Marek wrote:
+> 
+> > Same for gta04 (omap3 based device) [1].
+> > It was send upstream 2 times and second time there is no reply from 1.3.2013.
+> 
+> Hi guys,
+> 
+> once I am able to match signoffs in the patches to MAINTAINERS, I can take 
+> those through trivial.git in "re-transmission mode" (or feeeding those 
+> thgough akpm si an option as well).
+> 
+> Please just send the patches to me in a new thread properly with all the 
+> Acks/Signoffs, and mark those appropriately (i.e. maintainer that would 
+> normally push this upstream desurfaced).
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- drivers/spi/spi-s3c64xx.c | 23 ++++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
+Mail sent (just to you, to keep mail volume down).
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 1be162c..597dc2f 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -1068,20 +1068,21 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
- 		return -ENODEV;
- 	}
+I noticed two non-delivery reports in my INBOX; seems Benoit
+disappeared rather permanently:
+
+...
+If you do so, please include this problem report. You can
+delete your own text from the attached returned message.
  
--	/* Request gpio only if cs line is asserted by gpio pins */
--	if (sdd->cs_gpio) {
--		err = gpio_request_one(cs->line, GPIOF_OUT_INIT_HIGH,
--				       dev_name(&spi->dev));
--		if (err) {
--			dev_err(&spi->dev,
--				"Failed to get /CS gpio [%d]: %d\n",
--				cs->line, err);
--			goto err_gpio_req;
-+	if (!spi_get_ctldata(spi)) {
-+		/* Request gpio only if cs line is asserted by gpio pins */
-+		if (sdd->cs_gpio) {
-+			err = gpio_request_one(cs->line, GPIOF_OUT_INIT_HIGH,
-+					dev_name(&spi->dev));
-+			if (err) {
-+				dev_err(&spi->dev,
-+					"Failed to get /CS gpio [%d]: %d\n",
-+					cs->line, err);
-+				goto err_gpio_req;
-+			}
- 		}
--	}
+                   The mail system
  
--	if (!spi_get_ctldata(spi))
- 		spi_set_ctldata(spi, cs);
-+	}
+<b-cousson@ti.com>: host cluster5.us.messagelabs.com[216.82.250.99]
+said: 550   
+    Invalid recipient <b-cousson@ti.com> (#5.1.1) (in reply to RCPT TO
+    command)
  
- 	sci = sdd->cntrlr_info;
- 
+
+...so maybe MAINTAINERS file will need fixing?
+
+OMAP DEVICE TREE SUPPORT
+M:      Beno?t Cousson <b-cousson@ti.com>
+M:      Tony Lindgren <tony@atomide.com>
+L:      linux-omap at vger.kernel.org
+L:      devicetree at vger.kernel.org
+S:      Maintained
+F:      arch/arm/boot/dts/*omap*
+F:      arch/arm/boot/dts/*am3*
+
+:-(. Thanks,
+									Pavel
+
 -- 
-1.8.3.2
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
