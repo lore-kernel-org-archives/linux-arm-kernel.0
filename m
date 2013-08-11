@@ -1,40 +1,27 @@
-From: wharms@bfs.de (walter harms)
-Date: Sun, 11 Aug 2013 09:34:40 +0200
-Subject: [PATCH] arch/arm/mach-pxa/stargate2.c: use ARRAY_AND_SIZE
- consistently
-In-Reply-To: <alpine.DEB.2.02.1308110745030.2072@localhost6.localdomain6>
-References: <1376148353-9699-1-git-send-email-Julia.Lawall@lip6.fr>
- <20130810223338.GM5502@mwanda>
- <alpine.DEB.2.02.1308110745030.2072@localhost6.localdomain6>
-Message-ID: <52073E90.2030008@bfs.de>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sun, 11 Aug 2013 15:52:32 -0400
+Subject: [PATCH 0/4] mtd: gpmi: support two nand chips at most
+In-Reply-To: <20130811060921.GB16906@norris.computersforpeace.net>
+References: <1371197185-27491-1-git-send-email-b32955@freescale.com>
+ <20130811060921.GB16906@norris.computersforpeace.net>
+Message-ID: <20130811195230.GA28172@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Aug 10, 2013 at 11:09:21PM -0700, Brian Norris wrote:
+> On Fri, Jun 14, 2013 at 04:06:21PM +0800, Huang Shijie wrote:
+> > 
+> >  drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   14 ++++++++++++++
+> >  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    7 +++----
+> >  drivers/mtd/nand/gpmi-nand/gpmi-regs.h |    3 +++
+> >  3 files changed, 20 insertions(+), 4 deletions(-)
+> 
+> What's the status on this patch set? It doesn't look like it got merged.
+> Do you have any testing for this? It looks sane enough to me.
+
+Please ignore this patch set. I find a better solution to fix this
+issue. I will send a new version of this patch set when it is ready.
 
 
-Am 11.08.2013 07:48, schrieb Julia Lawall:
-> On Sun, 11 Aug 2013, Dan Carpenter wrote:
-> 
->> ARRAY_AND_SIZE() macro is horrible, and I would like it if it were
->> removed.  What I meant before was just that probably people will
->> probably complain if we try to remove it.
-> 
-> Well, I could either wait for someone to defend it, or send a patch 
-> getting rid of it and see what happens...  I can't see what could go wrong 
-> with
-> 
-> f(...,
-> - ARRAY_AND_SIZE(e)
-> + e, ARRAY_SIZE(e)
->   , ...)
-> 
-> so it should be an easy patch to create.
-> 
-
-
-if it is not to much work, send a patch to get rid of it.
-It seems all agree that the disadvantages outweighs it
-advantages.
-
-just my 2 cents,
- wh
+thanks
+Huang Shijie
