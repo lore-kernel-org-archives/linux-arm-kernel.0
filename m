@@ -1,70 +1,31 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Sun, 11 Aug 2013 19:04:28 +0800
-Subject: [PATCH v2 1/4] iio: at91: fix adc_clk overflow
-In-Reply-To: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
-References: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1376219071-29946-2-git-send-email-josh.wu@atmel.com>
+Date: Sun, 11 Aug 2013 19:04:27 +0800
+Subject: [PATCH v2 0/4] iio: at91: Add touch screen support in at91 adc
+Message-ID: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The adc_clk variable is currently defined using a 32-bits unsigned integer,
-which will overflow under some very valid range of operations.
+This patch series will add touch screen support for at91 adc driver.
+To enable touch screen you need add the touch screen related dt properties.
 
-Such overflow will occur if, for example, the parent clock is set to a
-20MHz frequency and the ADC startup time is larger than 215ns.
-
-To fix this, introduce an intermediate variable holding the clock rate
-in kHz.
-
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
 v1 --> v2:
-  refined the commit message.
+  1. use multiple compatible string for different ADC IP.
+  2. drop the patch that add the adc-clock in dt since we will move to clock
+     common framework.
+  3. don't expose the driver configuration to dt. Such like sample period,
+     pen detect debounce time and etc.
+  4. add a new dt parameter: ts-pressure-threshold.
 
- drivers/iio/adc/at91_adc.c |   11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+Josh Wu (4):
+  iio: at91: fix adc_clk overflow
+  iio: at91: Use different prescal, startup mask in MR for different IP
+  iio: at91: ADC start-up time calculation changed since at91sam9x5
+  iio: at91: introduce touch screen support in iio adc driver
 
-diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-index b6db6a0..9cf8ab5 100644
---- a/drivers/iio/adc/at91_adc.c
-+++ b/drivers/iio/adc/at91_adc.c
-@@ -582,7 +582,7 @@ static const struct iio_info at91_adc_info = {
- 
- static int at91_adc_probe(struct platform_device *pdev)
- {
--	unsigned int prsc, mstrclk, ticks, adc_clk, shtim;
-+	unsigned int prsc, mstrclk, ticks, adc_clk, adc_clk_khz, shtim;
- 	int ret;
- 	struct iio_dev *idev;
- 	struct at91_adc_state *st;
-@@ -680,6 +680,7 @@ static int at91_adc_probe(struct platform_device *pdev)
- 	 */
- 	mstrclk = clk_get_rate(st->clk);
- 	adc_clk = clk_get_rate(st->adc_clk);
-+	adc_clk_khz = adc_clk / 1000;
- 	prsc = (mstrclk / (2 * adc_clk)) - 1;
- 
- 	if (!st->startup_time) {
-@@ -693,15 +694,15 @@ static int at91_adc_probe(struct platform_device *pdev)
- 	 * defined in the electrical characteristics of the board, divided by 8.
- 	 * The formula thus is : Startup Time = (ticks + 1) * 8 / ADC Clock
- 	 */
--	ticks = round_up((st->startup_time * adc_clk /
--			  1000000) - 1, 8) / 8;
-+	ticks = round_up((st->startup_time * adc_clk_khz /
-+			  1000) - 1, 8) / 8;
- 	/*
- 	 * a minimal Sample and Hold Time is necessary for the ADC to guarantee
- 	 * the best converted final value between two channels selection
- 	 * The formula thus is : Sample and Hold Time = (shtim + 1) / ADCClock
- 	 */
--	shtim = round_up((st->sample_hold_time * adc_clk /
--			  1000000) - 1, 1);
-+	shtim = round_up((st->sample_hold_time * adc_clk_khz /
-+			  1000) - 1, 1);
- 
- 	reg = AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL;
- 	reg |= AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP;
+ .../devicetree/bindings/arm/atmel-adc.txt          |   10 +-
+ arch/arm/mach-at91/include/mach/at91_adc.h         |   41 +-
+ drivers/iio/adc/at91_adc.c                         |  468 ++++++++++++++++++--
+ 3 files changed, 479 insertions(+), 40 deletions(-)
+
 -- 
 1.7.10
