@@ -1,35 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 11 Aug 2013 23:49:16 +0200
-Subject: [PATCH] clk: ux500: Remove BML8580 clock
-Message-ID: <1376257756-23575-1-git-send-email-linus.walleij@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 11 Aug 2013 14:51:12 -0700
+Subject: [RFC PATCH] ARM: dma: default ZONE_DMA to y if ARM_LPAE
+In-Reply-To: <1374843951-1615-1-git-send-email-will.deacon@arm.com>
+References: <1374843951-1615-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20130811215112.GB26757@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lee Jones <lee.jones@linaro.org>
+On Fri, Jul 26, 2013 at 02:05:51PM +0100, Will Deacon wrote:
+> On systems running with LPAE enabled, DMA masters capable only of 32-bit
+> addressing require ZONE_DMA to be set. Given the proliferation of such
+> masters, and the tendency to re-use existing system IP with newer
+> processors, this patch defaults ZONE_DMA to y if ARM_LPAE, rather than
+> force each SoC to select it individually.
+> 
+> Cc: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 82f06982..7fede35 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -192,6 +192,7 @@ config ARCH_MAY_HAVE_PC_FDC
+>  
+>  config ZONE_DMA
+>  	bool
+> +	default y if ARM_LPAE
 
-There is no mention of the PRCMU_BML8580CLK in any of the Design
-Specifications for the chips supported in Mainline. In fact, where it
-is incorrectly used in the u8540 clock definition driver it would
-have the side effect of using the incorrect clock management address
-([PRCM_BML8580CLK_MGT] 0x108 instead of the correct value 0x04C).
+I guess you could bikeshed over this vs selecting it from ARM_LPAE, but either
+way gets the work done. I don't have a preference.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/clk/ux500/u8540_clk.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Acked-by: Olof Johansson <olof@lixom.net>
 
-diff --git a/drivers/clk/ux500/u8540_clk.c b/drivers/clk/ux500/u8540_clk.c
-index f262588..20c8add 100644
---- a/drivers/clk/ux500/u8540_clk.c
-+++ b/drivers/clk/ux500/u8540_clk.c
-@@ -83,7 +83,7 @@ void u8540_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
- 	clk_register_clkdev(clk, NULL, "lcd");
- 	clk_register_clkdev(clk, "lcd", "mcde");
- 
--	clk = clk_reg_prcmu_opp_gate("bmlclk", NULL, PRCMU_BML8580CLK,
-+	clk = clk_reg_prcmu_opp_gate("bmlclk", NULL, PRCMU_BMLCLK,
- 				CLK_IS_ROOT);
- 	clk_register_clkdev(clk, NULL, "bml");
- 
--- 
-1.8.1.4
+..for Russell's patch tracker?
+
+
+-Olof
