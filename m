@@ -1,32 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 11 Aug 2013 23:19:23 +0100
-Subject: [RFC PATCH] ARM: dma: default ZONE_DMA to y if ARM_LPAE
-In-Reply-To: <CAOesGMgvU4Vxg1vwnvjUp3fEHbWDYc1mKTvCyaE4zQOfMr_2sw@mail.gmail.com>
-References: <1374843951-1615-1-git-send-email-will.deacon@arm.com>
- <20130811215112.GB26757@quad.lixom.net>
- <20130811220541.GZ23006@n2100.arm.linux.org.uk>
- <CAOesGMgvU4Vxg1vwnvjUp3fEHbWDYc1mKTvCyaE4zQOfMr_2sw@mail.gmail.com>
-Message-ID: <20130811221923.GA23006@n2100.arm.linux.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 12 Aug 2013 01:03:19 +0200
+Subject: [PATCH 17/18] spi: s3c64xx: Always select S3C64XX_PL080 when
+ ARCH_S3C64XX is enabled
+In-Reply-To: <20130811191140.GI6427@sirena.org.uk>
+References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
+ <1376243970-6489-18-git-send-email-tomasz.figa@gmail.com>
+ <20130811191140.GI6427@sirena.org.uk>
+Message-ID: <2033369.1oHkX7kdGa@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 11, 2013 at 03:14:26PM -0700, Olof Johansson wrote:
-> On Sun, Aug 11, 2013 at 3:05 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> 
-> > No.  As I keep telling people, go look at my dma-mask patches and stop
-> > papering over this problem.
-> 
-> Ah, yes, I'm going through email backlog. The DMA mask series will
-> definitely cover this in a better way.
-> 
-> This is a minimal patch that could be suitable for -stable backport.
-> If we care about that -- I'm sure people can just amend their configs
-> where needed.
+Hi Mark,
 
-Well, it's not a regression, it's something which has never worked.  In
-my mind, that isn't really -stable material - stable is for stuff that
-was either working and has been broken or for security stuff.
+On Sunday 11 of August 2013 20:11:40 Mark Brown wrote:
+> On Sun, Aug 11, 2013 at 07:59:29PM +0200, Tomasz Figa wrote:
+> > @@ -366,7 +366,7 @@ config SPI_S3C24XX_FIQ
+> > 
+> >  config SPI_S3C64XX
+> >  
+> >  	tristate "Samsung S3C64XX series type SPI"
+> >  	depends on (ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5P64X0 ||
+> >  	ARCH_EXYNOS)> 
+> > -	select S3C64XX_DMA if ARCH_S3C64XX && !S3C64XX_PL080
+> > +	select S3C64XX_PL080 if ARCH_S3C64XX
+> > 
+> >  	help
+> >  	
+> >  	  SPI driver for Samsung S3C64XX and newer SoCs.
+> 
+> Do we need the select here (or should we have other selects for the
+> Exynos SoCs)?
 
-Having all your system memory above 4G _and_ having 32-bit DMA masks is
-something which never worked.
+The driver would build fine without this symbol selected, but since it 
+relies on availability of DMA, it doesn't make too much sense to build it 
+this way. This kind of selects makes kernel configuration more user 
+friendly IMHO.
+
+Possibly adding appropriate selects (PL330) for s5p* and exynos could make 
+sense.
+
+Best regards,
+Tomasz
