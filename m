@@ -1,57 +1,32 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Sun, 11 Aug 2013 13:50:24 +0200
-Subject: [PATCH v2] N900: add device tree
-In-Reply-To: <alpine.LNX.2.00.1308102226220.32627@pobox.suse.cz>
-References: <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
- <20130617111031.GQ20992@atomide.com> <20130701211753.GC15318@amd.pavel.ucw.cz>
- <20130704171939.GA27374@blackmetal.musicnaut.iki.fi>
- <20130704202145.GB10752@amd.pavel.ucw.cz>
- <20130704203256.GB27374@blackmetal.musicnaut.iki.fi>
- <20130713121709.GC16473@amd.pavel.ucw.cz>
- <20130714222819.GB3296@blackmetal.musicnaut.iki.fi>
- <20130728134409.GB5382@amd.pavel.ucw.cz>
- <20130801234355.GA15611@amd.pavel.ucw.cz>
- <20130810110955.GA11437@amd.pavel.ucw.cz>
- <CAAfyv34w1e+sAuB==-+Pj2gOO1auVNQgawcNC1Z4QfeqchRh3g@mail.gmail.com>
- <alpine.LNX.2.00.1308102226220.32627@pobox.suse.cz>
-Message-ID: <CAAwP0s3uNQ0Mp_QDdPuu4ThQW+cT3F6x62gkU1ku9fWUAtXLHg@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Sun, 11 Aug 2013 13:53:10 +0200
+Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
+In-Reply-To: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <52077B26.1010103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 10, 2013 at 10:29 PM, Jiri Kosina <jkosina@suse.cz> wrote:
-> On Sat, 10 Aug 2013, Pavel Machek wrote:
->
->> [I wonder if this is clean-enough cause for "trivial in resubmit
->> mode?]
->
-> On Sat, 10 Aug 2013, Belisko Marek wrote:
->
->> Same for gta04 (omap3 based device) [1].
->> It was send upstream 2 times and second time there is no reply from 1.3.2013.
->
-> Hi guys,
->
-> once I am able to match signoffs in the patches to MAINTAINERS, I can take
-> those through trivial.git in "re-transmission mode" (or feeeding those
-> thgough akpm si an option as well).
->
-> Please just send the patches to me in a new thread properly with all the
-> Acks/Signoffs, and mark those appropriately (i.e. maintainer that would
-> normally push this upstream desurfaced).
->
+Hi Dave,
 
-Hi folks,
+Thanks a lot for your work on this.
 
-I noticed that you are using Benoit older emails address
-(b-cousson at ti.com) which no longer exists instead of his new email
-address (benoit.cousson at linaro.org). So, it may be possible that
-Benoit have not even been getting your patches.
+On 06.08.2013 19:49, Dave Gerlach wrote:
+> This is the third version of the patch series for adding basic suspend-resume
+> support for AM33XX, previously submitted by Vaibhav Bedia. This patchset 
+> is based on 3.11-rc4 and depends on a forthcoming patchset from Suman Anna
+> that adds mailbox support for the wkup_m3. The patches at [1], [2], and [3] are 
+> required for the pm code to properly suspend and resume.
 
-I'll send a patch to MAINTAINERS updating Benoit's email address so
-get_maintainer.pl will stop lying.
+I applied your set and the one from Suman Anna, and with musb disabled
+and the firmware built from the sources you referenced, I'm able to put
+a custom AM33xx based board to suspend.
 
-Jiri, is ok if I send this patch to you? I guess this falls into the
-trivial group.
+The problem I currently face is that I can't make the board resume, as
+neither UART0 nor GPIO0 seem to work as wakeup source.
 
-Thanks a lot and best regards,
-Javier
+Which wakeup source did you use in your tests?
+
+
+Thanks,
+Daniel
