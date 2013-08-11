@@ -1,34 +1,51 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Sun, 11 Aug 2013 15:04:26 +0530
-Subject: [PATCH v2 0/4] GPIO DT support for da850
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EADAFCF@DBDE04.ent.ti.com>
-References: <1371203020-15092-1-git-send-email-avinashphilip@ti.com>
- <518397C60809E147AF5323E0420B992E3EADAFCF@DBDE04.ent.ti.com>
-Message-ID: <CA+V-a8sNPMbQjh8uxhQ=aOgo4ZfmaKXoOnRsuurzEeWzBKW8WA@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Sun, 11 Aug 2013 17:51:22 +0800
+Subject: [PATCH 5/5] ARM: pxa: DTS: override gpio node in pxa3xx.dtsi
+In-Reply-To: <1373555877-29887-6-git-send-email-zonque@gmail.com>
+References: <1373555877-29887-1-git-send-email-zonque@gmail.com>
+ <1373555877-29887-6-git-send-email-zonque@gmail.com>
+Message-ID: <CAD6h2NS8Uyn=YCwg0OoWLmnP8g2ckxDQ_Jhgcu1oejw7xZ9T6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+On 11 July 2013 23:17, Daniel Mack <zonque@gmail.com> wrote:
+> The gpio controller node inherited from pxa2xx.dtsi won't work for
+> pxa3xx SoCs, so let's override it in pxa3xx.dtsi.
+>
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/boot/dts/pxa3xx.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
+> index f9d92da..83bb0ef 100644
+> --- a/arch/arm/boot/dts/pxa3xx.dtsi
+> +++ b/arch/arm/boot/dts/pxa3xx.dtsi
+> @@ -28,5 +28,16 @@
+>                         marvell,intc-priority;
+>                         marvell,intc-nr-irqs = <56>;
+>                 };
+> +
+> +               gpio: gpio at 40e00000 {
+> +                       compatible = "intel,pxa3xx-gpio";
+> +                       reg = <0x40e00000 0x10000>;
+> +                       interrupt-names = "gpio0", "gpio1", "gpio_mux";
+> +                       interrupts = <8 9 10>;
+> +                       gpio-controller;
+> +                       #gpio-cells = <0x2>;
+> +                       interrupt-controller;
+> +                       #interrupt-cells = <0x2>;
+> +               };
+>         };
+>  };
+> --
+> 1.8.1.4
+>
 
-On Fri, Jun 14, 2013 at 3:50 PM, Philip, Avinash <avinashphilip@ti.com> wrote:
-> On Fri, Jun 14, 2013 at 15:13:36, Philip, Avinash wrote:
->> With conversion of GPIO davinci driver to platform driver, gpio-davinci driver
->> can support DT boot.
->> This patch series
->> - adds dt binding support for gpio-davinci.
->> - da850 dt support goio.
->>
->> This patch series is based on Linux 3.10-rc4 and is availabel at [1].
->>
->> 1. https://github.com/avinashphilip/am335x_linux/tree/linux_davinci_v3.10_soc_gpio_v310-rc4
->
->
-> This patch series has dependency on [PATCH v2 0/7] Convert GPIO Davinci to platform driver
->
-> https://lkml.org/lkml/2013/6/14/120
->
-What is the status of this patch series is any one taking care of it or
-else I can take care of review comments and repost them.
+Applied.
 
-Regards,
---Prabhakar Lad
+Regards
+Haojian
