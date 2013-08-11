@@ -1,34 +1,37 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 11 Aug 2013 19:59:28 +0200
-Subject: [PATCH 16/18] clk: samsung: s3c64xx: Remove clock aliases of old DMA
- driver
+Date: Sun, 11 Aug 2013 19:59:29 +0200
+Subject: [PATCH 17/18] spi: s3c64xx: Always select S3C64XX_PL080 when
+ ARCH_S3C64XX is enabled
 In-Reply-To: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
 References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1376243970-6489-17-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1376243970-6489-18-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the old DMA driver got removed, these aliases are no longer
-necessary.
+The legacy S3C64xx DMA driver has been removed, DMA support on
+S3C64xx is provided only by the generic PL08x driver.
+
+This patch modifies the Kconfig entry of spi-s3c64xx driver, which
+relies on availability of DMA, to always select the S3C64XX_PL080
+symbol.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- drivers/clk/samsung/clk-s3c64xx.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/spi/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
-index 79ee9a6..dd47a83 100644
---- a/drivers/clk/samsung/clk-s3c64xx.c
-+++ b/drivers/clk/samsung/clk-s3c64xx.c
-@@ -331,9 +331,7 @@ static struct samsung_clock_alias s3c64xx_clock_aliases[] = {
- 	ALIAS(HCLK_HSMMC1, "s3c-sdhci.1", "mmc_busclk.0"),
- 	ALIAS(HCLK_HSMMC0, "s3c-sdhci.0", "hsmmc"),
- 	ALIAS(HCLK_HSMMC0, "s3c-sdhci.0", "mmc_busclk.0"),
--	ALIAS(HCLK_DMA1, NULL, "dma1"),
- 	ALIAS(HCLK_DMA1, "dma-pl080s.1", "apb_pclk"),
--	ALIAS(HCLK_DMA0, NULL, "dma0"),
- 	ALIAS(HCLK_DMA0, "dma-pl080s.0", "apb_pclk"),
- 	ALIAS(HCLK_CAMIF, "s3c-camif", "camif"),
- 	ALIAS(HCLK_LCD, "s3c-fb", "lcd"),
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 241a049..a13867e 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -366,7 +366,7 @@ config SPI_S3C24XX_FIQ
+ config SPI_S3C64XX
+ 	tristate "Samsung S3C64XX series type SPI"
+ 	depends on (ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_EXYNOS)
+-	select S3C64XX_DMA if ARCH_S3C64XX && !S3C64XX_PL080
++	select S3C64XX_PL080 if ARCH_S3C64XX
+ 	help
+ 	  SPI driver for Samsung S3C64XX and newer SoCs.
+ 
 -- 
 1.8.3.2
