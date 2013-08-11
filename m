@@ -1,31 +1,55 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 11 Aug 2013 08:54:43 -0700
-Subject: SCSI bus failures with qemu-arm in kernel 3.8+
-Message-ID: <5207B3C3.9080508@roeck-us.net>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sun, 11 Aug 2013 18:51:42 +0200
+Subject: [PATCH 1/16] sound/soc/pxa/mioa701_wm9713.c: Avoid using
+ ARRAY_AND_SIZE(e) as a function argument
+In-Reply-To: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1376239917-15594-2-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-trying to boot arm versatile images with qemu results in the following error
-if I try to boot with a disk image.
+Replace ARRAY_AND_SIZE(e) in function argument position to avoid hiding the
+arity of the called function.
 
-      sym0: <895a> rev 0x0 at pci 0000:00:0d.0 irq 92
-      sym0: SCSI BUS has been reset.
-      scsi0 : sym-2.2.3
-      [...]
-      scsi 0:0:0:0: ABORT operation started
-      scsi 0:0:0:0: ABORT operation timed-out.
-      [...]
+The semantic match that makes this change is as follows:
+(http://coccinelle.lip6.fr/)
 
-Yocto's 3.8 kernel images work, upstream kernels 3.8 and later fail
-(I did not check if/how earlier kernels are affected).
+// <smpl>
+@@
+expression e,f;
+@@
 
-Tracking this down shows that the problem is known and has been fixed with
-commit 351d1339 (arm: add dummy swizzle for versatile with qemu) in the
-Yocto 3.8 kernel at git://git.yoctoproject.org/linux-yocto-3.8.
+f(...,
+- ARRAY_AND_SIZE(e)
++ e,ARRAY_SIZE(e)
+  ,...)
+// </smpl>
 
-Would it be possible to submit this patch for inclusion into affected upstream kernels ?
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Thanks,
-Guenter
+---
+Not compiled.
+
+ sound/soc/pxa/mioa701_wm9713.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/pxa/mioa701_wm9713.c b/sound/soc/pxa/mioa701_wm9713.c
+index 97b711e..20fdce6 100644
+--- a/sound/soc/pxa/mioa701_wm9713.c
++++ b/sound/soc/pxa/mioa701_wm9713.c
+@@ -133,10 +133,11 @@ static int mioa701_wm9713_init(struct snd_soc_pcm_runtime *rtd)
+ 	unsigned short reg;
+ 
+ 	/* Add mioa701 specific widgets */
+-	snd_soc_dapm_new_controls(dapm, ARRAY_AND_SIZE(mioa701_dapm_widgets));
++	snd_soc_dapm_new_controls(dapm, mioa701_dapm_widgets,
++				  ARRAY_SIZE(mioa701_dapm_widgets));
+ 
+ 	/* Set up mioa701 specific audio path audio_mapnects */
+-	snd_soc_dapm_add_routes(dapm, ARRAY_AND_SIZE(audio_map));
++	snd_soc_dapm_add_routes(dapm, audio_map, ARRAY_SIZE(audio_map));
+ 
+ 	/* Prepare GPIO8 for rear speaker amplifier */
+ 	reg = codec->driver->read(codec, AC97_GPIO_CFG);
