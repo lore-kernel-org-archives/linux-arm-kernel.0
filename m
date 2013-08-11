@@ -1,37 +1,32 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 11 Aug 2013 19:59:30 +0200
-Subject: [PATCH 18/18] ASoC: Samsung: Always select S3C64XX_PL080 when
- ARCH_S3C64XX is enabled
+Date: Sun, 11 Aug 2013 19:59:26 +0200
+Subject: [PATCH 14/18] clk: samsung: s3c64xx: Add aliases for DMA clocks
 In-Reply-To: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
 References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1376243970-6489-19-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1376243970-6489-15-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The legacy S3C64xx DMA driver has been removed, DMA support on
-S3C64xx is provided only by the generic PL08x driver.
-
-This patch modifies the Kconfig entry of Samsung ASoC subsystem, which
-relies on availability of DMA, to always select the S3C64XX_PL080
-symbol.
+This patch adds clkdev aliases for clocks used by PL08x DMA driver.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- sound/soc/samsung/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/samsung/clk-s3c64xx.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 55b514d..5b5be90 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -1,7 +1,7 @@
- config SND_SOC_SAMSUNG
- 	tristate "ASoC support for Samsung"
- 	depends on PLAT_SAMSUNG
--	select S3C64XX_DMA if ARCH_S3C64XX && !S3C64XX_PL080
-+	select S3C64XX_PL080 if ARCH_S3C64XX
- 	select S3C2410_DMA if ARCH_S3C24XX
- 	help
- 	  Say Y or M if you want to add support for codecs attached to
+diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
+index eeda567..79ee9a6 100644
+--- a/drivers/clk/samsung/clk-s3c64xx.c
++++ b/drivers/clk/samsung/clk-s3c64xx.c
+@@ -332,7 +332,9 @@ static struct samsung_clock_alias s3c64xx_clock_aliases[] = {
+ 	ALIAS(HCLK_HSMMC0, "s3c-sdhci.0", "hsmmc"),
+ 	ALIAS(HCLK_HSMMC0, "s3c-sdhci.0", "mmc_busclk.0"),
+ 	ALIAS(HCLK_DMA1, NULL, "dma1"),
++	ALIAS(HCLK_DMA1, "dma-pl080s.1", "apb_pclk"),
+ 	ALIAS(HCLK_DMA0, NULL, "dma0"),
++	ALIAS(HCLK_DMA0, "dma-pl080s.0", "apb_pclk"),
+ 	ALIAS(HCLK_CAMIF, "s3c-camif", "camif"),
+ 	ALIAS(HCLK_LCD, "s3c-fb", "lcd"),
+ 	ALIAS(PCLK_SPI1, "s3c6410-spi.1", "spi"),
 -- 
 1.8.3.2
