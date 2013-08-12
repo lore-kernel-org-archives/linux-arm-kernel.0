@@ -1,45 +1,64 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 12 Aug 2013 17:18:09 +0200
-Subject: [PATCH] pinctrl: at91: choose appropriate handler for level
- interrupts
-In-Reply-To: <CACRpkdaGdgLeYrahv0qAJJjL3S2aiZeVwRVUtNcDqQgL3_mQkA@mail.gmail.com>
-References: <1374331893-16009-1-git-send-email-b.brezillon@overkiz.com>
- <CACRpkdaGdgLeYrahv0qAJJjL3S2aiZeVwRVUtNcDqQgL3_mQkA@mail.gmail.com>
-Message-ID: <5208FCB1.9080009@atmel.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 12 Aug 2013 11:21:29 -0400
+Subject: [PATCH 1/2] power: Add APM X-Gene system reboot driver
+In-Reply-To: <20130809212849.GD12638@lizard.sbx05730.santaca.wayport.net>
+References: <1372797539-13111-1-git-send-email-lho@apm.com>
+ <1372797539-13111-2-git-send-email-lho@apm.com>
+ <20130809212849.GD12638@lizard.sbx05730.santaca.wayport.net>
+Message-ID: <5208FD79.4070307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/07/2013 17:42, Linus Walleij :
-> On Sat, Jul 20, 2013 at 4:51 PM, Boris BREZILLON
-> <b.brezillon@overkiz.com> wrote:
->
->> The current implementation handle both edge and level interrupts with the
->> 'handle_simple_irq' handler.
+On 08/09/2013 05:28 PM, Anton Vorontsov wrote:
+> On Tue, Jul 02, 2013 at 02:38:58PM -0600, Loc Ho wrote:
+>> power: Add APM X-Gene SoC system reboot driver. This driver handles only
+>> system reboot. System shutdown is board specific and can be handled by board
+>> driver or GPIO based shutdown driver.
 >>
->> Level interrupts are active as long as the pin stays at the configured
->> level (low or high). In this case we have to use 'handle_level_irq' which
->> mask the interrupt until the handle has treated it.
+>> Signed-off-by: Loc Ho <lho@apm.com>
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+>> ---
+> 
+> The patch looks great, thanks for it! Just a few minor issues I noticed...
+> 
+>>  drivers/power/reset/Kconfig        |    7 +++
+>>  drivers/power/reset/Makefile       |    1 +
+>>  drivers/power/reset/xgene-reboot.c |  101 ++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 109 insertions(+), 0 deletions(-)
+>>  create mode 100755 drivers/power/reset/xgene-reboot.c
 >>
->> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->
-> Nicolas/Jean-Christophe: any opinion on this patch?
+>> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+>> index 349e9ae..c41a7de 100644
+>> --- a/drivers/power/reset/Kconfig
+>> +++ b/drivers/power/reset/Kconfig
+>> @@ -37,3 +37,10 @@ config POWER_RESET_VEXPRESS
+>>  	help
+>>  	  Power off and reset support for the ARM Ltd. Versatile
+>>  	  Express boards.
+>> +
+>> +config POWER_RESET_XGENE
+>> +        bool
+>> +	default y if ARM64
+> 
+> This is not good. You don't want to select the driver for all ARM64
+> builds. I changed it to 'depends on' and made the driver optionally
+> selectable.
 
-Back online:
+I thought the desired default was to have a single arm64 kernel binary that
+could run on all platforms.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+>> +        depends on POWER_RESET	
+>> +        help
+>> +          Reboot support for the APM SoC X-Gene Eval boards.
 
-(maybe too late though)
+[...]
 
-Thanks for fixing this.
-
-Bye,
-
-> I am tempted to just apply it and see if you react to it :-)
->
-> Yours,
-> Linus Walleij
->
-
+Thanks,
+Christopher
 
 -- 
-Nicolas Ferre
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
