@@ -1,95 +1,54 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 12 Aug 2013 09:03:15 -0700
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <20130809172757.GD14845@codeaurora.org>
-References: <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
- <51F99747.4060901@linaro.org>
- <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
- <51FA9AE8.1060004@linaro.org>
- <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
- <51FA9F54.3060704@linaro.org>
- <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
- <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
- <20130809172757.GD14845@codeaurora.org>
-Message-ID: <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 12 Aug 2013 13:06:17 -0300
+Subject: [RFC PATCH] imx: video: staging: Add HDMI support to imx-drm
+ driver
+In-Reply-To: <52069F7C.9050600@prisktech.co.nz>
+References: <1375645673-18237-1-git-send-email-linux@prisktech.co.nz>
+ <CAOMZO5CGpdD-iSVBc_dCvCFPXnRuP8PEBRi=xUEcOGwNubX3GQ@mail.gmail.com>
+ <52069F7C.9050600@prisktech.co.nz>
+Message-ID: <CAOMZO5C43-wD65xHrenEbiD=6z-1+Mro95MOJELUhrqcTYABXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 10:27:57AM -0700, Stephen Boyd wrote:
-> On 08/09, Daniel Lezcano wrote:
-> > 
-> > yes, but at least the broadcast mechanism should send an IPI to cpu0 to
-> > wake it up, no ? As Stephen stated this kind of configuration should has
-> > never been tested before so the tick broadcast code is not handling this
-> > case properly IMHO.
-> > 
-> 
-> If you have a per-cpu tick device that isn't suffering from
-> FEAT_C3_STOP why wouldn't you use that for the tick versus a
-> per-cpu tick device that has FEAT_C3_STOP? It sounds like there
-> is a bug in the preference logic or you should boost the rating
-> of the arm global timer above the twd. Does this patch help? It
-> should make the arm global timer the tick device and whatever the
-> cadence timer you have into the broadcast device.
+Hi Tony,
 
-I finally got to test your patch. Unfortunately, it makes the system
-hang even earlier:
+On Sat, Aug 10, 2013 at 5:15 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
 
-	Starting kernel ...
-	
-	Uncompressing Linux... done, booting the kernel.
-	[    0.000000] Booting Linux on physical CPU 0x0
-	[    0.000000] Linux version 3.11.0-rc3-00002-g391ac9b (sorenb at xsjandreislx) (gcc version 4.7.2 (Sourcery CodeBench Lite 2012.09-104) ) #98 SMP PREEMPT Mon Aug 12 08:59:34 PDT 2013
-	[    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=18c5387d
-	[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-	[    0.000000] Machine: Xilinx Zynq Platform, model: Zynq ZC706 Development Board
-	[    0.000000] bootconsole [earlycon0] enabled
-	[    0.000000] cma: CMA: reserved 16 MiB at 2e800000
-	[    0.000000] Memory policy: ECC disabled, Data cache writealloc
-	[    0.000000] PERCPU: Embedded 9 pages/cpu @c149c000 s14720 r8192 d13952 u36864
-	[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 260624
-	[    0.000000] Kernel command line: console=ttyPS0,115200 earlyprintk
-	[    0.000000] PID hash table entries: 4096 (order: 2, 16384 bytes)
-	[    0.000000] Dentry cache hash table entries: 131072 (order: 7, 524288 bytes)
-	[    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144 bytes)
-	[    0.000000] Memory: 1004928K/1048576K available (4891K kernel code, 307K rwdata, 1564K rodata, 338K init, 5699K bss, 43648K reserved, 270336K highmem)
-	[    0.000000] Virtual kernel memory layout:
-	[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-	[    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-	[    0.000000]     vmalloc : 0xf0000000 - 0xff000000   ( 240 MB)
-	[    0.000000]     lowmem  : 0xc0000000 - 0xef800000   ( 760 MB)
-	[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-	[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-	[    0.000000]       .text : 0xc0008000 - 0xc0656128   (6457 kB)
-	[    0.000000]       .init : 0xc0657000 - 0xc06ab980   ( 339 kB)
-	[    0.000000]       .data : 0xc06ac000 - 0xc06f8c20   ( 308 kB)
-	[    0.000000]        .bss : 0xc06f8c20 - 0xc0c89aa4   (5700 kB)
-	[    0.000000] Preemptible hierarchical RCU implementation.
-	[    0.000000]  RCU lockdep checking is enabled.
-	[    0.000000]  Additional per-CPU info printed with stalls.
-	[    0.000000]  RCU restricting CPUs from NR_CPUS=4 to nr_cpu_ids=2.
-	[    0.000000] NR_IRQS:16 nr_irqs:16 16
-	[    0.000000] slcr mapped to f0004000
-	[    0.000000] Zynq clock init
-	[    0.000000] sched_clock: 32 bits at 333MHz, resolution 3ns, wraps every 12884ms
-	[    0.000000] ttc0 #0 at f0006000, irq=43
-	[    0.000000] Console: colour dummy device 80x30
-	[    0.000000] Lock dependency validator: Copyright (c) 2006 Red Hat, Inc., Ingo Molnar
-	[    0.000000] ... MAX_LOCKDEP_SUBCLASSES:  8
-	[    0.000000] ... MAX_LOCK_DEPTH:          48
-	[    0.000000] ... MAX_LOCKDEP_KEYS:        8191
-	[    0.000000] ... CLASSHASH_SIZE:          4096
-	[    0.000000] ... MAX_LOCKDEP_ENTRIES:     16384
-	[    0.000000] ... MAX_LOCKDEP_CHAINS:      32768
-	[    0.000000] ... CHAINHASH_SIZE:          16384
-	[    0.000000]  memory used by lock dependency info: 3695 kB
-	[    0.000000]  per task-struct memory footprint: 1152 bytes
-	[    0.057541] Calibrating delay loop... 1325.46 BogoMIPS (lpj=6627328)
-	[    0.100248] pid_max: default: 32768 minimum: 301
-	[    0.103294] Mount-cache hash table entries: 512
-	[    0.114364] CPU: Testing write buffer coherency: ok
-	[    0.114513] ftrace: allocating 16143 entries in 48 pages
-	[    0.155012] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> Thanks for the review.. Most of this is expected. I hadn't spent a lot of
+> time tidying up or 'formalizing' the patch, but I will tidy up the comments
+> you made.
+>
+> Three problem's I have noticed with the driver are:
+>
+> 1) If I start the system with no output connected, then connect the hdmi,
+> the framebuffer is initialized in 1024x768, but the connector/encoder is in
+> 1920x1080 (as per the video= kernel param).
+>
+> 2) The PLL fails to lock several times during startup, but always seems to
+> be ok to initialize the actually requested mode.
+>
+> 3) EDID reading fails occassionally for no obvious reason. Powering down the
+> Wandboard (sometimes several times) and it comes right.
 
+Could it be that the DDC pull-up resistors are out of spec on Wandboard?
 
-	S?ren
+According to this datasheet (Table 3) :
+http://www.nxp.com/documents/data_sheet/PCA9507.pdf
+
+the SDA/SCL pull ups should be between 1.5k - 2.0k.
+
+On Wandboard these pullups are 2.2k.
+
+>
+> Once I get all this sorted out, and the code tidied up properly I will send
+> a 'proper' patch.
+
+Understood.
+
+Even though the three issues are still present, IMHO is still worth
+submitting your patch, as the drivers in 'staging' directory are known
+to be in initial development phase.
+
+Regards,
+
+Fabio Estevam
