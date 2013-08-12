@@ -1,34 +1,65 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 12 Aug 2013 10:19:16 +0200
-Subject: [PATCHv3 07/10] pinctrl: sunxi: Add Allwinner A31 pins set
-In-Reply-To: <1375609657-15434-8-git-send-email-maxime.ripard@free-electrons.com>
-References: <1375609657-15434-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375609657-15434-8-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130812081916.GL2911@lukather>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 12 Aug 2013 10:19:13 +0200
+Subject: [PATCH 06/20] tty: serial: pxa: remove old cruft
+In-Reply-To: <1375889649-14638-7-git-send-email-zonque@gmail.com>
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <1375889649-14638-7-git-send-email-zonque@gmail.com>
+Message-ID: <52089A81.6080800@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Greg,
 
-On Sun, Aug 04, 2013 at 11:47:34AM +0200, Maxime Ripard wrote:
-> The Allwinner A31 SoC uses the same IP than the one found in the
-> A10/A13, with only different pins. Add the pins and the associated
-> functions found in the A31.
+This patch can be merged independently of all others. Could you queue it
+up for 3.12 please?
 
-I'd like this to be in 3.12 if it's okay for you. Do you have any
-comments on it?
 
 Thanks,
-Maxime
+Daniel
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130812/529ab321/attachment.sig>
+
+On 07.08.2013 17:33, Daniel Mack wrote:
+> This #if-0'd block wouldn't compile, so let's dispose it.
+> 
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+>  drivers/tty/serial/pxa.c | 25 -------------------------
+>  1 file changed, 25 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
+> index 05f504e..cc6d539 100644
+> --- a/drivers/tty/serial/pxa.c
+> +++ b/drivers/tty/serial/pxa.c
+> @@ -332,31 +332,6 @@ static void serial_pxa_break_ctl(struct uart_port *port, int break_state)
+>  	spin_unlock_irqrestore(&up->port.lock, flags);
+>  }
+>  
+> -#if 0
+> -static void serial_pxa_dma_init(struct pxa_uart *up)
+> -{
+> -	up->rxdma =
+> -		pxa_request_dma(up->name, DMA_PRIO_LOW, pxa_receive_dma, up);
+> -	if (up->rxdma < 0)
+> -		goto out;
+> -	up->txdma =
+> -		pxa_request_dma(up->name, DMA_PRIO_LOW, pxa_transmit_dma, up);
+> -	if (up->txdma < 0)
+> -		goto err_txdma;
+> -	up->dmadesc = kmalloc(4 * sizeof(pxa_dma_desc), GFP_KERNEL);
+> -	if (!up->dmadesc)
+> -		goto err_alloc;
+> -
+> -	/* ... */
+> -err_alloc:
+> -	pxa_free_dma(up->txdma);
+> -err_rxdma:
+> -	pxa_free_dma(up->rxdma);
+> -out:
+> -	return;
+> -}
+> -#endif
+> -
+>  static int serial_pxa_startup(struct uart_port *port)
+>  {
+>  	struct uart_pxa_port *up = (struct uart_pxa_port *)port;
+> 
