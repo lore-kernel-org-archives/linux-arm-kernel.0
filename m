@@ -1,74 +1,66 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Mon, 12 Aug 2013 18:25:15 +0530
-Subject: [PATCH V2] MFD: Make VEXPRESS MFD controller depends on VEXPRESS
- systems
-In-Reply-To: <1375592514-14213-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1375592514-14213-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1376312115-10326-1-git-send-email-manjunath.goudar@linaro.org>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Mon, 12 Aug 2013 12:56:07 +0000
+Subject: =?gb2312?B?tPC4tDogW1BBVENIIHYzIDIvMl0gaTJjOiBpbXg6IEFkZCBWeWJyaWQgVkY2?=
+ =?gb2312?Q?10_I2C_controller_support?=
+In-Reply-To: <20130810140827.GC18085@e106331-lin.cambridge.arm.com>
+References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
+ <1375418648-22760-2-git-send-email-b35083@freescale.com>,
+ <20130810140827.GC18085@e106331-lin.cambridge.arm.com>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E851FE7AC@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a of_find_node_by_phandle() and of_get_next_parent()
-function declaration dependence on"#ifdef CONFIG_OF" in "include/linux/of.h"
-else part return inline dummy implementations (returning NULL). Without
-this patch,build system can lead to issues. This was discovered during
-randconfig testing,in which VEXPRESS_CONFIG was enabled w/o CONFIG_OF
-being enabled,leading to the following error:
 
-CC      drivers/mfd/vexpress-config.o
-drivers/mfd/vexpress-config.c: In function ?__vexpress_config_func_get?:
-drivers/mfd/vexpress-config.c:117:4: error: implicit declaration of function
-?of_find_node_by_phandle? [-Werror=implicit-function-declaration]
-    bridge_node = of_find_node_by_phandle(
-    ^
-drivers/mfd/vexpress-config.c:117:16: warning: assignment makes pointer from
-integer without a cast [enabled by default]
-    bridge_node = of_find_node_by_phandle(
+________________________________________
+>???: Mark Rutland [mark.rutland at arm.com]
+>????: 2013?8?10? 22:08
+>???: Lu Jingchang-B35083
+>??: wsa at the-dreams.de; Estevam Fabio-R49496; Li Xiaochun-B41219; s.hauer at pengutronix.de; linux-i2c at vger.kernel.org; Jin Zhengxiong-R64188; shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org
+>??: Re: [PATCH v3 2/2] i2c: imx: Add Vybrid VF610 I2C controller support
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Deepak Saxena <dsaxena@linaro.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Lee Jones <lee.jones@linaro.org>
+>On Fri, Aug 02, 2013 at 05:44:08AM +0100, Jingchang Lu wrote:
+>>   Add Freescale Vybrid VF610 I2C controller support to
+>> imx I2C driver framework.
+>>   Some operation is different from imx I2C controller.
+>> The register offset, the i2c clock divider value table,
+>> the module enabling(I2CR_IEN) which is just invert with imx,
+>> and the interrupt flag(I2SR) clearing opcode is w1c on VF610
+>> but w0c on imx.
+>>
+>> Signed-off-by: Jason Jin <Jason.jin@freescale.com>
+>> Signed-off-by: Xiaochun Li <b41219@freescale.com>
+>> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+>> ---
+>> changes in v3:
+>>   Using struct naming the i2c clock {div, regval} pair.
+>>  Using address shift handling registers address difference.
+>>
+>> changes in v2:
+>>   Fix building section mismatch(es) warning.
+>>
+>>  drivers/i2c/busses/i2c-imx.c | 146 ++++++++++++++++++++++++++++++++++++-------
+>>  1 file changed, 122 insertions(+), 24 deletions(-)
 
-V2:
- -Made of_find_node_by_phandle() and of_get_next_parent() function declaration
-  dependence on"#ifdef CONFIG_OF" in "include/linux/of.h" instead of Kconfig
-  dependence setting in V1 patch and else part return inline dummy implementations
-  (returning NULL) to fix the above randconfig error.
----
- include/linux/of.h | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+>[...]
 
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 90a8811..4be252a 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -196,10 +196,22 @@ static inline struct device_node *of_find_matching_node(
- #define for_each_matching_node_and_match(dn, matches, match) \
- 	for (dn = of_find_matching_node_and_match(NULL, matches, match); \
- 	     dn; dn = of_find_matching_node_and_match(dn, matches, match))
--extern struct device_node *of_find_node_by_path(const char *path);
-+
-+#ifdef CONFIG_OF
- extern struct device_node *of_find_node_by_phandle(phandle handle);
--extern struct device_node *of_get_parent(const struct device_node *node);
- extern struct device_node *of_get_next_parent(struct device_node *node);
-+#else
-+static inline struct device_node *of_find_node_by_phandle(phandle handle)
-+{
-+	return NULL;
-+}
-+static inline struct device_node *of_get_next_parent(struct device_node *node)
-+{
-+	return NULL;
-+}
-+#endif
-+extern struct device_node *of_find_node_by_path(const char *path);
-+extern struct device_node *of_get_parent(const struct device_node *node);
- extern struct device_node *of_get_next_child(const struct device_node *node,
- 					     struct device_node *prev);
- extern struct device_node *of_get_next_available_child(
--- 
-1.8.1.2
+>> @@ -145,6 +233,7 @@ MODULE_DEVICE_TABLE(platform, imx_i2c_devtype);
+>>  static const struct of_device_id i2c_imx_dt_ids[] = {
+>>         { .compatible = "fsl,imx1-i2c", .data = &imx_i2c_devtype[IMX1_I2C], },
+>>         { .compatible = "fsl,imx21-i2c", .data = &imx_i2c_devtype[IMX21_I2C], },
+>> +       { .compatible = "fsl,vf610-i2c", .data = &imx_i2c_devtype[VF610_I2C], },
+>>         { /* sentinel */ }
+>>  };
+
+
+>That string doesn't seem to be documented anywhere (from a quick grep of
+>Documentation/devicetree), and there's no binding update included
+>here. It would be nice for that to be fixed :)
+[Lu Jingchang]
+The binding string for i2c-imx driver in Documentation/devicetree/bindings/i2c/i2c-imx.txt use a wildcard format
+of "- compatible : Should be "fsl,<chip>-i2c" " for device using this driver. Neither fsl,imx1-i2c nor fsl,imx21-i2c
+is described in the binding document. So I just leave the vf610 i2c compatible with this. 
+Thanks.
+
+
+Best Regards,
+Jingchang
