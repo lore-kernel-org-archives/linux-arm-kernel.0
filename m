@@ -1,78 +1,40 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 12 Aug 2013 14:09:01 -0300
-Subject: [PATCH 1/3] ARM: Introduce atomic MMIO clear/set
-In-Reply-To: <520910DA.4000203@gmail.com>
-References: <1376138582-7550-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130810140237.GB3080@localhost> <20130810140927.GC3080@localhost>
- <1376149388.716003514@f150.i.mail.ru>
- <20130810155552.GB17936@localhost>
- <20130812154646.GA5460@localhost> <520910DA.4000203@gmail.com>
-Message-ID: <20130812170900.GA7198@localhost>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 12 Aug 2013 10:08:47 -0700
+Subject: [PATCH v2] ARM: KVM: Simplify tracepoint text
+Message-ID: <1376327327-29381-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
+The tracepoint for kvm_guest_fault was extremely long, make it a
+slightly bit shorter.
 
-On Mon, Aug 12, 2013 at 06:44:10PM +0200, Sebastian Hesselbarth wrote:
-> On 08/12/13 17:46, Ezequiel Garcia wrote:
-> >> Indeed, syscon looks like a nice match for this use case.
-> >> (although it still looks like an overkill to me).
-> >>
-> >> I've been trying to implement a working solution based in syscon but I'm
-> >> unable to overcome an issue.
-> >>
-> >> The problem is that we need the register/regmap to initialize the clocksource
-> >> driver for this machine (aka the timer). Of course, this happens at a
-> >> *very* early point, way before the syscon driver is available... :-(
-> >>
-> >> Maybe someone has an idea?
-> >
-> > Sebastian, Russell: I can't find the previous mail where you proposed
-> > this solution to address the shared register issue between Kirkwood's
-> > watchdog and clocksource.
-> 
-> Russell first mentioned an atomic modify function here:
-> http://archive.arm.linux.org.uk/lurker/message/20130618.113606.d7d4fe4b.en.html
-> 
+Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
 
-Thanks a lot for finding this thread. I see we all just went through the
-same line of reasoning.
+Changelog[v1 -> v2]:
+ - Remove redundant 0x prefixes
 
-> 
-> The pro of a generic atomic clear/set is that we can use it
-> very early, on all platforms, and from totally unrelated
-> drivers. As you already mentioned, using syscon from timers will
-> get us into into trouble, because it has not been registered.
-> 
+ arch/arm/kvm/trace.h |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-Yes, indeed.
-
-> > Do you think trying to use a regmap could be better (given we can
-> > sort out the problem explained above)?
-> 
-> Given the small number of registers we need to protect and especially
-> for using it in timers, I'd prefer your proposal. Otherwise, I guess,
-> we would have to mimic mfd/syscon for time-orion and time-armada-370-xp
-> and make wdt-orion depend on it. I doubt we can make any use of
-> mfd/syscon for the timer use case.
-> 
-
-Then I think we all agree here. Just to confirm:
-
-  * The proposed API is almost exactly the one proposed by Russell
-    in the mail you just mentioned:
-    http://archive.arm.linux.org.uk/lurker/message/20130618.113606.d7d4fe4b.en.html
-
-  * Linus Walleij suggested mfd/syscon, but Russell, Mark and Linus
-    itself seem to agree it's more heavy-weight than necessary.
-    http://archive.arm.linux.org.uk/lurker/message/20130618.151116.712407e0.en.html
-    http://archive.arm.linux.org.uk/lurker/message/20130618.183359.a6184b7f.en.html
-    http://archive.arm.linux.org.uk/lurker/message/20130618.152300.bffa038f.en.html
-
-The only open question is: given there's nothing arch-dependent in this
-mechanism, should we keep this in arch/arm/kernel? And if not, where
-should we move this?
+diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
+index a8e73ed..b1d640f 100644
+--- a/arch/arm/kvm/trace.h
++++ b/arch/arm/kvm/trace.h
+@@ -59,10 +59,9 @@ TRACE_EVENT(kvm_guest_fault,
+ 		__entry->ipa			= ipa;
+ 	),
+ 
+-	TP_printk("guest fault at PC %#08lx (hxfar %#08lx, "
+-		  "ipa %#16llx, hsr %#08lx",
+-		  __entry->vcpu_pc, __entry->hxfar,
+-		  __entry->ipa, __entry->hsr)
++	TP_printk("ipa %#llx, hsr %#08lx, hxfar %#08lx, pc %#08lx",
++		  __entry->ipa, __entry->hsr,
++		  __entry->hxfar, __entry->vcpu_pc)
+ );
+ 
+ TRACE_EVENT(kvm_irq_line,
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.7.10.4
