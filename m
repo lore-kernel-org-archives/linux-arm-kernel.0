@@ -1,31 +1,33 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 12 Aug 2013 21:58:30 +0200
-Subject: [PATCH 9/16] arch/arm/mach-pxa/mioa701.c: Avoid using
- ARRAY_AND_SIZE(e) as a function argument
-In-Reply-To: <1376239917-15594-10-git-send-email-Julia.Lawall@lip6.fr> (Julia
- Lawall's message of "Sun, 11 Aug 2013 18:51:50 +0200")
-References: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
- <1376239917-15594-10-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <87r4dyy93t.fsf@free.fr>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 12 Aug 2013 16:00:28 -0400
+Subject: [PATCH 6/9] ARM: dove: update dove_defconfig with SI5351, PCI,
+ and xHCI
+In-Reply-To: <1376333215-12885-7-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376333215-12885-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130812200028.GV25111@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Julia Lawall <Julia.Lawall@lip6.fr> writes:
+On Mon, Aug 12, 2013 at 08:46:52PM +0200, Sebastian Hesselbarth wrote:
+> This adds SI5351 clock driver found on the SolidRun CuBox, PCI driver
+> and USB 3.0 xHCI driver found on the Globalscale D3Plug to dove_defconfig.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/configs/dove_defconfig |    4 ++++
+>  1 file changed, 4 insertions(+)
 
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
->
-> Replace ARRAY_AND_SIZE(e) in function argument position to avoid hiding the
-> arity of the called function.
+Applied to mvebu/defconfig
 
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+thx,
 
-As a side I'm curious why this change didn't touch also :
-sound/soc/pxa/mioa701_wm9713.c
-
-If it does, this ack stands as well for the other file (with removal of the
-#define in mioa701_wm9713.c).
-
-Cheers.
-
---
-Robert
+Jason.
