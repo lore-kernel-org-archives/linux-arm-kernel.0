@@ -1,45 +1,67 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Aug 2013 08:04:44 +0200
-Subject: [PATCH v6] linux,stdout-path helper
-In-Reply-To: <1375706445-15375-1-git-send-email-s.hauer@pengutronix.de>
-References: <1375706445-15375-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130812060444.GI26614@pengutronix.de>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 12 Aug 2013 12:14:26 +0800
+Subject: [PATCH 1/2] ARM: dtsi: imx6qdl-sabresd: Add USB host 1 VBUS regulator
+Message-ID: <1376280867-3259-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+We enabled USB host 1, so host 1's vbus should be on to let
+host 1 work.
 
-Given that we have Robs Ack, can you take this series?
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi |   25 ++++++++++++++++++-------
+ 1 files changed, 18 insertions(+), 7 deletions(-)
 
-Sascha
-
-On Mon, Aug 05, 2013 at 02:40:43PM +0200, Sascha Hauer wrote:
-> The following adds a helper for matching the linux,stdout-path property
-> in the chosen node and makes use of it in the i.MX serial
-> 
-> This is a series originally created by me. It was hijacked and then abandoned
-> by Jean-Christophe for v5. I reverted the changes by Jean-Christophe since
-> they introduced changes to the devicetree binding. Instead I'd like to have
-> the existing binding implemented first before changing it.
-> 
-> Sascha
-> 
-> changes since v5:
-> - reverted changes from v4
-> - parse linux,stdoutpath property in of_alias_scan as suggested by Grant
-> changes since v4:
-> - add option support and check stdout-path too
-> changes since v3:
-> - move code from separate files to drivers/of/base.c and include/linux/of.h
-> changes since v2:
-> - move helper to OF core and make it independent of serial devices
-> changes since v1:
-> - move it out of the i.MX serial driver and make it generic for serial devices.
-> 
-> 
-
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 61b8959..b4db3f7 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -34,6 +34,15 @@
+ 			enable-active-high;
+ 		};
+ 
++		reg_usb_h1_vbus: usb_h1_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb_h1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio1 29 0>;
++			enable-active-high;
++		};
++
+ 		reg_audio: wm8962_supply {
+ 			compatible = "regulator-fixed";
+ 			regulator-name = "wm8962-supply";
+@@ -188,13 +197,14 @@
+ 	hog {
+ 		pinctrl_hog: hoggrp {
+ 			fsl,pins = <
+-				MX6QDL_PAD_GPIO_4__GPIO1_IO04   0x80000000
+-				MX6QDL_PAD_GPIO_5__GPIO1_IO05   0x80000000
+-				MX6QDL_PAD_NANDF_D0__GPIO2_IO00 0x80000000
+-				MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x80000000
+-				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x80000000
+-				MX6QDL_PAD_NANDF_D3__GPIO2_IO03 0x80000000
+-				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x130b0
++				MX6QDL_PAD_GPIO_4__GPIO1_IO04   	0x80000000
++				MX6QDL_PAD_GPIO_5__GPIO1_IO05   	0x80000000
++				MX6QDL_PAD_NANDF_D0__GPIO2_IO00 	0x80000000
++				MX6QDL_PAD_NANDF_D1__GPIO2_IO01 	0x80000000
++				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 	0x80000000
++				MX6QDL_PAD_NANDF_D3__GPIO2_IO03 	0x80000000
++				MX6QDL_PAD_GPIO_0__CCM_CLKO1    	0x130b0
++				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29	0x80000000
+ 			>;
+ 		};
+ 	};
+@@ -228,6 +238,7 @@
+ };
+ 
+ &usbh1 {
++	vbus-supply = <&reg_usb_h1_vbus>;
+ 	status = "okay";
+ };
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.1
