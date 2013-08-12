@@ -1,162 +1,164 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 12 Aug 2013 09:22:47 +0800
-Subject: [PATCH v15 01/13] usb: chipidea: move vbus regulator operation to core
+Date: Mon, 12 Aug 2013 09:22:50 +0800
+Subject: [PATCH v15 04/13] usb: chipidea: otg: Add otg file used to access
+ otgsc
 In-Reply-To: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
 References: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1376270579-13493-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <1376270579-13493-5-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vbus regulator is a common element for USB vbus operation,
-So, move it from glue layer to core.
+This file is mainly used to access otgsc currently, it may
+add otg related things in the future.
 
 Tested-by: Marek Vasut <marex@denx.de>
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci_hdrc_imx.c |   26 ++------------------------
- drivers/usb/chipidea/core.c        |   23 +++++++++++++++++++++++
- include/linux/usb/chipidea.h       |    1 +
- 3 files changed, 26 insertions(+), 24 deletions(-)
+ drivers/usb/chipidea/Makefile |    2 +-
+ drivers/usb/chipidea/bits.h   |   10 ++++++++++
+ drivers/usb/chipidea/core.c   |    3 ++-
+ drivers/usb/chipidea/otg.c    |   35 +++++++++++++++++++++++++++++++++++
+ drivers/usb/chipidea/otg.h    |   32 ++++++++++++++++++++++++++++++++
+ 5 files changed, 80 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index 35008e3..bd1fe25 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -19,7 +19,6 @@
- #include <linux/dma-mapping.h>
- #include <linux/usb/chipidea.h>
- #include <linux/clk.h>
--#include <linux/regulator/consumer.h>
+diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+index 6cf5f68..a99d980 100644
+--- a/drivers/usb/chipidea/Makefile
++++ b/drivers/usb/chipidea/Makefile
+@@ -2,7 +2,7 @@ ccflags-$(CONFIG_USB_CHIPIDEA_DEBUG) := -DDEBUG
  
- #include "ci.h"
- #include "ci_hdrc_imx.h"
-@@ -31,7 +30,6 @@ struct ci_hdrc_imx_data {
- 	struct usb_phy *phy;
- 	struct platform_device *ci_pdev;
- 	struct clk *clk;
--	struct regulator *reg_vbus;
- };
+ obj-$(CONFIG_USB_CHIPIDEA)		+= ci_hdrc.o
  
- static const struct usbmisc_ops *usbmisc_ops;
-@@ -134,20 +132,6 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 		goto err_clk;
- 	}
+-ci_hdrc-y				:= core.o
++ci_hdrc-y				:= core.o otg.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
+ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
+diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
+index aefa026..dd0cf9e 100644
+--- a/drivers/usb/chipidea/bits.h
++++ b/drivers/usb/chipidea/bits.h
+@@ -79,11 +79,21 @@
+ #define OTGSC_ASVIS	      BIT(18)
+ #define OTGSC_BSVIS	      BIT(19)
+ #define OTGSC_BSEIS	      BIT(20)
++#define OTGSC_1MSIS	      BIT(21)
++#define OTGSC_DPIS	      BIT(22)
+ #define OTGSC_IDIE	      BIT(24)
+ #define OTGSC_AVVIE	      BIT(25)
+ #define OTGSC_ASVIE	      BIT(26)
+ #define OTGSC_BSVIE	      BIT(27)
+ #define OTGSC_BSEIE	      BIT(28)
++#define OTGSC_1MSIE	      BIT(29)
++#define OTGSC_DPIE	      BIT(30)
++#define OTGSC_INT_EN_BITS	(OTGSC_IDIE | OTGSC_AVVIE | OTGSC_ASVIE \
++				| OTGSC_BSVIE | OTGSC_BSEIE | OTGSC_1MSIE \
++				| OTGSC_DPIE)
++#define OTGSC_INT_STATUS_BITS	(OTGSC_IDIS | OTGSC_AVVIS | OTGSC_ASVIS	\
++				| OTGSC_BSVIS | OTGSC_BSEIS | OTGSC_1MSIS \
++				| OTGSC_DPIS)
  
--	/* we only support host now, so enable vbus here */
--	data->reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
--	if (!IS_ERR(data->reg_vbus)) {
--		ret = regulator_enable(data->reg_vbus);
--		if (ret) {
--			dev_err(&pdev->dev,
--				"Failed to enable vbus regulator, err=%d\n",
--				ret);
--			goto err_clk;
--		}
--	} else {
--		data->reg_vbus = NULL;
--	}
--
- 	pdata.phy = data->phy;
- 
- 	if (!pdev->dev.dma_mask)
-@@ -160,7 +144,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 		if (ret) {
- 			dev_err(&pdev->dev,
- 				"usbmisc init failed, ret=%d\n", ret);
--			goto err;
-+			goto err_clk;
- 		}
- 	}
- 
-@@ -172,7 +156,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev,
- 			"Can't register ci_hdrc platform device, err=%d\n",
- 			ret);
--		goto err;
-+		goto err_clk;
- 	}
- 
- 	if (usbmisc_ops && usbmisc_ops->post) {
-@@ -193,9 +177,6 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 
- disable_device:
- 	ci_hdrc_remove_device(data->ci_pdev);
--err:
--	if (data->reg_vbus)
--		regulator_disable(data->reg_vbus);
- err_clk:
- 	clk_disable_unprepare(data->clk);
- 	return ret;
-@@ -208,9 +189,6 @@ static int ci_hdrc_imx_remove(struct platform_device *pdev)
- 	pm_runtime_disable(&pdev->dev);
- 	ci_hdrc_remove_device(data->ci_pdev);
- 
--	if (data->reg_vbus)
--		regulator_disable(data->reg_vbus);
--
- 	if (data->phy)
- 		usb_phy_shutdown(data->phy);
- 
+ /* USBMODE */
+ #define USBMODE_CM            (0x03UL <<  0)
 diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 3126c03..26f6599 100644
+index 26f6599..a4be8a5 100644
 --- a/drivers/usb/chipidea/core.c
 +++ b/drivers/usb/chipidea/core.c
-@@ -65,6 +65,7 @@
- #include <linux/usb/chipidea.h>
- #include <linux/usb/of.h>
- #include <linux/phy.h>
-+#include <linux/regulator/consumer.h>
+@@ -72,6 +72,7 @@
+ #include "bits.h"
+ #include "host.h"
+ #include "debug.h"
++#include "otg.h"
  
- #include "ci.h"
- #include "udc.h"
-@@ -342,6 +343,24 @@ static irqreturn_t ci_irq(int irq, void *data)
- 	return ret;
- }
+ /* Controller register map */
+ static uintptr_t ci_regs_nolpm[] = {
+@@ -530,7 +531,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 		goto stop;
  
-+static int ci_get_platdata(struct device *dev,
-+		struct ci_hdrc_platform_data *platdata)
+ 	if (ci->is_otg)
+-		hw_write(ci, OP_OTGSC, OTGSC_IDIE, OTGSC_IDIE);
++		ci_hdrc_otg_init(ci);
+ 
+ 	ret = dbg_create_files(ci);
+ 	if (!ret)
+diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+new file mode 100644
+index 0000000..999a085
+--- /dev/null
++++ b/drivers/usb/chipidea/otg.c
+@@ -0,0 +1,35 @@
++/*
++ * otg.c - ChipIdea USB IP core OTG driver
++ *
++ * Copyright (C) 2013 Freescale Semiconductor, Inc.
++ *
++ * Author: Peter Chen
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/*
++ * This file mainly handles otgsc register, it may include OTG operation
++ * in the future.
++ */
++
++#include <linux/usb/otg.h>
++#include <linux/usb/gadget.h>
++#include <linux/usb/chipidea.h>
++
++#include "ci.h"
++#include "bits.h"
++#include "otg.h"
++
++/**
++ * ci_hdrc_otg_init - initialize otgsc bits
++ * ci: the controller
++ */
++int ci_hdrc_otg_init(struct ci_hdrc *ci)
 +{
-+	/* Get the vbus regulator */
-+	platdata->reg_vbus = devm_regulator_get(dev, "vbus");
-+	if (PTR_ERR(platdata->reg_vbus) == -EPROBE_DEFER) {
-+		return -EPROBE_DEFER;
-+	} else if (PTR_ERR(platdata->reg_vbus) == -ENODEV) {
-+		platdata->reg_vbus = NULL; /* no vbus regualator is needed */
-+	} else if (IS_ERR(platdata->reg_vbus)) {
-+		dev_err(dev, "Getting regulator error: %ld\n",
-+			PTR_ERR(platdata->reg_vbus));
-+		return PTR_ERR(platdata->reg_vbus);
-+	}
++	ci_enable_otg_interrupt(ci, OTGSC_IDIE);
 +
 +	return 0;
 +}
+diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
+new file mode 100644
+index 0000000..376eaee
+--- /dev/null
++++ b/drivers/usb/chipidea/otg.h
+@@ -0,0 +1,32 @@
++/*
++ * Copyright (C) 2013 Freescale Semiconductor, Inc.
++ *
++ * Author: Peter Chen
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
- static DEFINE_IDA(ci_ida);
- 
- struct platform_device *ci_hdrc_add_device(struct device *dev,
-@@ -351,6 +370,10 @@ struct platform_device *ci_hdrc_add_device(struct device *dev,
- 	struct platform_device *pdev;
- 	int id, ret;
- 
-+	ret = ci_get_platdata(dev, platdata);
-+	if (ret)
-+		return ERR_PTR(ret);
++#ifndef __DRIVERS_USB_CHIPIDEA_OTG_H
++#define __DRIVERS_USB_CHIPIDEA_OTG_H
 +
- 	id = ida_simple_get(&ci_ida, 0, 0, GFP_KERNEL);
- 	if (id < 0)
- 		return ERR_PTR(id);
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 2562994..ce4e1aa 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -24,6 +24,7 @@ struct ci_hdrc_platform_data {
- #define CI_HDRC_CONTROLLER_RESET_EVENT		0
- #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
- 	void	(*notify_event) (struct ci_hdrc *ci, unsigned event);
-+	struct regulator	*reg_vbus;
- };
- 
- /* Default offset of capability registers */
++static inline void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits)
++{
++	/* Only clear request bits */
++	hw_write(ci, OP_OTGSC, OTGSC_INT_STATUS_BITS, bits);
++}
++
++static inline void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
++{
++	hw_write(ci, OP_OTGSC, bits, bits);
++}
++
++static inline void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
++{
++	hw_write(ci, OP_OTGSC, bits, 0);
++}
++
++int ci_hdrc_otg_init(struct ci_hdrc *ci);
++
++#endif /* __DRIVERS_USB_CHIPIDEA_OTG_H */
 -- 
 1.7.1
