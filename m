@@ -1,34 +1,95 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 12 Aug 2013 12:51:39 -0400
-Subject: [PATCH 1/2] Convert power recovery pin to a fixed regulator
-In-Reply-To: <20130811182444.GG6427@sirena.org.uk>
-References: <1376231210-6484-1-git-send-email-jm@lentin.co.uk>
- <1376231210-6484-2-git-send-email-jm@lentin.co.uk>
- <20130811182444.GG6427@sirena.org.uk>
-Message-ID: <20130812165139.GM25111@titan.lakedaemon.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 12 Aug 2013 18:53:10 +0200
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <52090C0A.2000105@codeaurora.org>
+References: <51F97CE3.9030306@linaro.org>
+ <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
+ <51F99747.4060901@linaro.org>
+ <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
+ <51FA9AE8.1060004@linaro.org>
+ <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
+ <51FA9F54.3060704@linaro.org>
+ <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
+ <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
+ <20130809172757.GD14845@codeaurora.org> <5208BEC4.7090700@linaro.org>
+ <52090C0A.2000105@codeaurora.org>
+Message-ID: <520912F6.402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 11, 2013 at 07:24:44PM +0100, Mark Brown wrote:
-> On Sun, Aug 11, 2013 at 03:26:49PM +0100, Jamie Lentin wrote:
-> > dnskw_gpio_register() is broken, and probably has been for a while,
-> > since dnskw_init() is called too early to register GPIOs. Instead use a
-> > fixed regulator to turn the pin high, which knows to defer the
-> > registration until later.
+On 08/12/2013 06:23 PM, Stephen Boyd wrote:
+> On 08/12/13 03:53, Daniel Lezcano wrote:
+>> On 08/09/2013 07:27 PM, Stephen Boyd wrote:
+>>> On 08/09, Daniel Lezcano wrote:
+>>>> yes, but at least the broadcast mechanism should send an IPI to cpu0 to
+>>>> wake it up, no ? As Stephen stated this kind of configuration should has
+>>>> never been tested before so the tick broadcast code is not handling this
+>>>> case properly IMHO.
+>>>>
+>>> If you have a per-cpu tick device that isn't suffering from
+>>> FEAT_C3_STOP why wouldn't you use that for the tick versus a
+>>> per-cpu tick device that has FEAT_C3_STOP? It sounds like there
+>>> is a bug in the preference logic or you should boost the rating
+>>> of the arm global timer above the twd. Does this patch help? It
+>>> should make the arm global timer the tick device and whatever the
+>>> cadence timer you have into the broadcast device.
+>>>
+>>> ---8<----
+>>> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+>>> index 218bcb5..d3539e5 100644
+>>> --- a/kernel/time/tick-broadcast.c
+>>> +++ b/kernel/time/tick-broadcast.c
+>>> @@ -77,6 +77,9 @@ static bool tick_check_broadcast_device(struct clock_event_device *curdev,
+>>>  	    !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
+>>>  		return false;
+>>>  
+>>> +	if (cpumask_equal(newdev->cpumask, cpumask_of(smp_processor_id())))
+>>> +		return false;
+>> Yes, that makes sense to prevent local timer devices to be a broadcast one.
+>>
+>> In the case of the arm global timer, each cpu will register their timer,
+>> so the test will be ok but is it possible the cpu0 registers the timers
+>> for the other cpus ?
 > 
-> So, this is really abuse of the regulator API since it knows how to set
-> a GPIO.  Perhaps the reset controller might be a better fit, or pinctrl
-> defaults?
+> As far as I know every tick device has to be registered on the CPU that
+> it will be used on. See tick_check_percpu().
 
-I vote for the reset controller.
+Ah, ok I see. Thx for the pointer.
 
-Jamie, I'm taking the deletion part of both of these patches since it
-didn't work any way and it's the last holdout of DT platform code in
-kirkwood.
+>>>  	return !curdev || newdev->rating > curdev->rating;
+>>>  }
+>>>  
+>>> diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
+>>> index 64522ec..1628b9f 100644
+>>> --- a/kernel/time/tick-common.c
+>>> +++ b/kernel/time/tick-common.c
+>>> @@ -245,6 +245,15 @@ static bool tick_check_preferred(struct clock_event_device *curdev,
+>>>  	}
+>>>  
+>>>  	/*
+>>> +	 * Prefer tick devices that don't suffer from FEAT_C3_STOP
+>>> +	 * regardless of their rating
+>>> +	 */
+>>> +	if (curdev && cpumask_equal(curdev->cpumask, newdev->cpumask) &&
+>>> +	    !(newdev->features & CLOCK_EVT_FEAT_C3STOP) &&
+>>> +	    (curdev->features & CLOCK_EVT_FEAT_C3STOP))
+>>> +		return true;
+>> That sounds reasonable, but what is the acceptable gap between the
+>> ratings ? I am wondering if there isn't too much heuristic in the tick
+>> code...
+> 
+> Yes I wonder if we should just change the ratings of the clockevents.
+> But it feels to me like the rating should only matter if the two are
+> equal in features. Otherwise we can use the features to determine what
+> we want.
 
-Once you get the DT node nailed down for the reset pin, just submit it
-by itself.
+Is it desirable for real time system ? (I am not expert in this area, so
+may be this question has no sense :)
 
-thx,
 
-Jason.
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
