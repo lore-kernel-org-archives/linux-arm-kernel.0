@@ -1,37 +1,36 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Mon, 12 Aug 2013 15:37:50 +0530
-Subject: [PATCH V4 4/4] ARM: dts: Enable sound support on smdk5420
-In-Reply-To: <1376302070-1877-1-git-send-email-padma.v@samsung.com>
-References: <1376302070-1877-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1376302070-1877-5-git-send-email-padma.v@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 12 Aug 2013 11:07:28 +0100
+Subject: [PATCH 17/18] spi: s3c64xx: Always select S3C64XX_PL080 when
+ ARCH_S3C64XX is enabled
+In-Reply-To: <2033369.1oHkX7kdGa@flatron>
+References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
+ <1376243970-6489-18-git-send-email-tomasz.figa@gmail.com>
+ <20130811191140.GI6427@sirena.org.uk> <2033369.1oHkX7kdGa@flatron>
+Message-ID: <20130812100728.GL6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables i2s0 and sound support on smdk5420.
+On Mon, Aug 12, 2013 at 01:03:19AM +0200, Tomasz Figa wrote:
+> On Sunday 11 of August 2013 20:11:40 Mark Brown wrote:
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- arch/arm/boot/dts/exynos5420-smdk5420.dts |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+> > Do we need the select here (or should we have other selects for the
+> > Exynos SoCs)?
 
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index a898b3f..b1b745c 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -139,4 +139,14 @@
- 		};
- 	};
- 
-+	i2s0: i2s at 03830000 {
-+		status = "okay";
-+	};
-+
-+	sound {
-+		compatible = "samsung,smdk-wm8994";
-+
-+		samsung,i2s-controller = <&i2s0>;
-+		samsung,audio-codec = <&wm8994>;
-+	};
- };
--- 
-1.7.4.4
+> The driver would build fine without this symbol selected, but since it 
+> relies on availability of DMA, it doesn't make too much sense to build it 
+> this way. This kind of selects makes kernel configuration more user 
+> friendly IMHO.
+
+> Possibly adding appropriate selects (PL330) for s5p* and exynos could make 
+> sense.
+
+Right.  On these SoCs it's probably worth doing it in the arch/arm code
+rather than for every device using the controller though, it's the same
+DMA controller for everything.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130812/881733fb/attachment.sig>
