@@ -1,40 +1,14 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 12 Aug 2013 13:19:18 -0500
-Subject: [PATCH v3 08/12] dma: edma: Add one more required slot to MAX
- slots
-In-Reply-To: <20130812133111.GZ6427@sirena.org.uk>
-References: <1375719297-12871-1-git-send-email-joelf@ti.com>
- <1375719297-12871-9-git-send-email-joelf@ti.com> <52087921.8040101@ti.com>
- <20130812133111.GZ6427@sirena.org.uk>
-Message-ID: <52092726.7030505@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 12 Aug 2013 13:40:19 -0600
+Subject: [PATCH V3 0/8] ARM: tegra: support LP1 suspend mode
+In-Reply-To: <1376300407-14750-1-git-send-email-josephl@nvidia.com>
+References: <1376300407-14750-1-git-send-email-josephl@nvidia.com>
+Message-ID: <52093A23.3040008@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2013 08:31 AM, Mark Brown wrote:
-> On Mon, Aug 12, 2013 at 11:26:49AM +0530, Sekhar Nori wrote:
-> 
->> No need for a separate patch for this, just do this in the patch where
->> you include the two linked sets.
-> 
-> Can you guys please think about the CC lists you're using for these
-> patch serieses?  I've certainly no interest in random patches to the
-> DaVinci DMA controllers, and I suspect the same is true for most of the
-> people on the CC list.
-> 
+On 08/12/2013 03:39 AM, Joseph Lo wrote:
+> This series adds the support of LP1 suspend mode for Tegra.
 
-Sorry. I was actually getting a sense of this. What I did initially was
-I copied the CC list from last years work on the same series hoping that
-it would be a complete mail chain. Bad judgement on my part.
-I should have paid more attention to Mark's rants about his inbox
-getting spammed with this series in those old threads ;)
-
-I guess moving forward I will use get_maintainer.pl and refine my
-git-send scripts with only interested folks. Any words of advice on when
-to and when not to CC someone remotely connected to a series is welcome.
-
-@Sekhar, let's keep only linux-omap, linux-davinci and few other
-interested folks on the CC chain for the rest of review on the series.
-
-Thanks,
-
--Joel
+I have applied patches 1-7 to Tegra's for-3.12/soc and path 8 to Tegra's
+for-3.12/dt branch.
