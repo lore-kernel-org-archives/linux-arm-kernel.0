@@ -1,85 +1,48 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 12 Aug 2013 10:22:34 +0100
-Subject: [PATCH 16/16] arch/arm/mach-pxa/stargate2.c: Avoid using
- ARRAY_AND_SIZE(e) as a function argument
-In-Reply-To: <1376239917-15594-17-git-send-email-Julia.Lawall@lip6.fr>
-References: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
- <1376239917-15594-17-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <5208A95A.70606@kernel.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Aug 2013 01:24:31 -0700
+Subject: [PATCH v3 0/9] DRA7xx core support
+In-Reply-To: <5208835A.6000506@ti.com>
+References: <1375633657-6835-1-git-send-email-rnayak@ti.com>
+ <5208835A.6000506@ti.com>
+Message-ID: <20130812082431.GI7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/13 17:51, Julia Lawall wrote:
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
+* Rajendra Nayak <rnayak@ti.com> [130811 23:47]:
+> On Sunday 04 August 2013 09:57 PM, Rajendra Nayak wrote:
+> > Changes in v3:
+> > -1- Dropped some clock/dpll framework builds for dra7
+> > -2- Added all instances of IPs in dtsi file
+> > -3- dtsi does a 'disabled' by default and dts enables as needed
+> > -4- soc_is_dra7xx() based on DT compatible instead of using ID code
+> > 
+> > Changes in v2:
+> > -1- Fixed minor changelog details
+> > -2- Dropped the SRAM support patch since we need to move to drivers/misc/sram.c
+> > -3- Added DTS update patches to this series which were earlier posted as
+> > part of the data series (Since they don't have much objections as against the
+> > other in-kernel data files)
+> > -4- Updated the EVM dts file with pin config details for uart/mcspi and i2c
+> > 
+> > DRA7xx based SoCs' are high-performance, infotainment application devices,
+> > based on enhanced OMAP architecture integrated on a 28nm
+> > technology.
+> > 
+> > The DRA7xx family is composed of DRA75x and DRA74x devices.
+> > The current device for which the patches add support is the
+> > DRA752 SoC.
+> > 
+> > Most of the core IPs are similar to those found on the OMAP5
+> > devices, including the dual cortex-A15 based MPU subsystem,
+> > which has helped quite some reuse from existing OMAP5 support.
+> > 
+> > This series contains only core support patches and none of
+> > the PRCM and hwmod data needed for the device to boot.
 > 
-> Replace ARRAY_AND_SIZE(e) in function argument position to avoid hiding the
-> arity of the called function.
-> 
-> The semantic match that makes this change is as follows:
-> (http://coccinelle.lip6.fr/)
-> 
-> // <smpl>
-> @@
-> expression e,f;
-> @@
-> 
-> f(...,
-> - ARRAY_AND_SIZE(e)
-> + e,ARRAY_SIZE(e)
->   ,...)
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-Acked-by: Jonathan Cameron <jic23@kernel.org>
+> Tony, any chance of this series making it to 3.12?
 
-Thanks,
-> 
-> ---
-> Not compiled.
-> 
->  arch/arm/mach-pxa/stargate2.c |   13 ++++++++-----
->  1 file changed, 8 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
-> index 62aea3e..adacedd 100644
-> --- a/arch/arm/mach-pxa/stargate2.c
-> +++ b/arch/arm/mach-pxa/stargate2.c
-> @@ -406,7 +406,8 @@ static struct i2c_pxa_platform_data i2c_pdata = {
->  static void __init imote2_stargate2_init(void)
->  {
->  
-> -	pxa2xx_mfp_config(ARRAY_AND_SIZE(sg2_im2_unified_pin_config));
-> +	pxa2xx_mfp_config(sg2_im2_unified_pin_config,
-> +			  ARRAY_SIZE(sg2_im2_unified_pin_config));
->  
->  	pxa_set_ffuart_info(NULL);
->  	pxa_set_btuart_info(NULL);
-> @@ -604,7 +605,7 @@ static struct platform_device *imote2_devices[] = {
->  
->  static void __init imote2_init(void)
->  {
-> -	pxa2xx_mfp_config(ARRAY_AND_SIZE(imote2_pin_config));
-> +	pxa2xx_mfp_config(imote2_pin_config, ARRAY_SIZE(imote2_pin_config));
->  
->  	imote2_stargate2_init();
->  
-> @@ -983,13 +984,15 @@ static void __init stargate2_init(void)
->  	   prior to connecting the MFP stuff up. */
->  	__raw_writel(__raw_readl(MECR) & ~MECR_NOS, MECR);
->  
-> -	pxa2xx_mfp_config(ARRAY_AND_SIZE(stargate2_pin_config));
-> +	pxa2xx_mfp_config(stargate2_pin_config,
-> +			  ARRAY_SIZE(stargate2_pin_config));
->  
->  	imote2_stargate2_init();
->  
-> -	platform_add_devices(ARRAY_AND_SIZE(stargate2_devices));
-> +	platform_add_devices(stargate2_devices, ARRAY_SIZE(stargate2_devices));
->  
-> -	i2c_register_board_info(0, ARRAY_AND_SIZE(stargate2_i2c_board_info));
-> +	i2c_register_board_info(0, stargate2_i2c_board_info,
-> +				ARRAY_SIZE(stargate2_i2c_board_info));
->  	i2c_register_board_info(1, stargate2_pwr_i2c_board_info,
->  				ARRAY_SIZE(stargate2_pwr_i2c_board_info));
->  
-> 
+Looks OK to me, want to do a pull request against -rc5 for me?
+
+Regards,
+
+Tony
