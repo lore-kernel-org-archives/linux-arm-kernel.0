@@ -1,98 +1,78 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Mon, 12 Aug 2013 18:07:44 +0100
-Subject: [PATCH] ARM: shmobile: Shared APMU SMP support code
-In-Reply-To: <20130807224510.9832.38560.sendpatchset@w520>
-References: <20130807224510.9832.38560.sendpatchset@w520>
-Message-ID: <52091660.5030201@arm.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 12 Aug 2013 14:09:01 -0300
+Subject: [PATCH 1/3] ARM: Introduce atomic MMIO clear/set
+In-Reply-To: <520910DA.4000203@gmail.com>
+References: <1376138582-7550-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130810140237.GB3080@localhost> <20130810140927.GC3080@localhost>
+ <1376149388.716003514@f150.i.mail.ru>
+ <20130810155552.GB17936@localhost>
+ <20130812154646.GA5460@localhost> <520910DA.4000203@gmail.com>
+Message-ID: <20130812170900.GA7198@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/13 23:45, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+Sebastian,
+
+On Mon, Aug 12, 2013 at 06:44:10PM +0200, Sebastian Hesselbarth wrote:
+> On 08/12/13 17:46, Ezequiel Garcia wrote:
+> >> Indeed, syscon looks like a nice match for this use case.
+> >> (although it still looks like an overkill to me).
+> >>
+> >> I've been trying to implement a working solution based in syscon but I'm
+> >> unable to overcome an issue.
+> >>
+> >> The problem is that we need the register/regmap to initialize the clocksource
+> >> driver for this machine (aka the timer). Of course, this happens at a
+> >> *very* early point, way before the syscon driver is available... :-(
+> >>
+> >> Maybe someone has an idea?
+> >
+> > Sebastian, Russell: I can't find the previous mail where you proposed
+> > this solution to address the shared register issue between Kirkwood's
+> > watchdog and clocksource.
 > 
-> Introduce shared APMU SMP code for mach-shmobile. Both SMP boot up
-> and CPU Hotplug is supported. DT is used for configuration of the
-> APMU hardware block, as the following r8a73a4 example shows:
+> Russell first mentioned an atomic modify function here:
+> http://archive.arm.linux.org.uk/lurker/message/20130618.113606.d7d4fe4b.en.html
 > 
->        apmu at e6152000 {
->                compatible = "renesas,r8a73a4-apmu", "renesas,apmu";
->                reg = <0 0xe6152000 0 0x88>;
->                cpus = <&cpu0 &cpu1 &cpu2 &cpu3>;
->        };
+
+Thanks a lot for finding this thread. I see we all just went through the
+same line of reasoning.
+
 > 
-This is introducing a new DT binding which needs to be documented. Also
-you need to cc devicetree mailing list in case you need to add new
-bindings. But I think you should not require this new binding.
-
-> The code is designed around CONFIG_NR_CPUS and should in theory support
-> any number of APMUs. At this point only the APMU that includes the
-> boot CPU is enabled - this to prevent non-deterministic scheduling on
-> upstream in case of multi-cluster hardware with varying performance.
->  
-I couldn't understand this patch completely but I believe you are
-trying to solve multi-cluster power management and in your own custom
-way.
-
-But there are 2 ways to handle this in a generic way:
-1. If Linux runs in non-secure mode, you need to use PSCI.
-   You can refer Calxeda platform for reference[1]
-2. If Linux runs in secure mode, you need to use MPCM
-   You can refer Vexpress CA15_CA7/TC2 platform for reference[2]
-
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
+> The pro of a generic atomic clear/set is that we can use it
+> very early, on all platforms, and from totally unrelated
+> drivers. As you already mentioned, using syscon from timers will
+> get us into into trouble, because it has not been registered.
 > 
->  Written against renesas.git renesas-devel-20130806v4 and
->  [PATCH 00/05] ARM: shmobile: Yet another SMP series
->  [PATCH 00/02] ARM: shmobile: Rename to r8a73a4/r8a7790_init_early()
+
+Yes, indeed.
+
+> > Do you think trying to use a regmap could be better (given we can
+> > sort out the problem explained above)?
 > 
->  arch/arm/mach-shmobile/include/mach/common.h |    5 
->  arch/arm/mach-shmobile/platsmp-apmu.c        |  197 ++++++++++++++++++++++++++
->  2 files changed, 202 insertions(+)
+> Given the small number of registers we need to protect and especially
+> for using it in timers, I'd prefer your proposal. Otherwise, I guess,
+> we would have to mimic mfd/syscon for time-orion and time-armada-370-xp
+> and make wdt-orion depend on it. I doubt we can make any use of
+> mfd/syscon for the timer use case.
 > 
-[...]
 
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +/* nicked from arch/arm/mach-exynos/hotplug.c */
-> +static inline void cpu_enter_lowpower_a15(void)
-> +{
-> +	unsigned int v;
-> +
-> +	asm volatile(
-> +	"       mrc     p15, 0, %0, c1, c0, 0\n"
-> +	"       bic     %0, %0, %1\n"
-> +	"       mcr     p15, 0, %0, c1, c0, 0\n"
-> +	: "=&r" (v)
-> +	: "Ir" (CR_C)
-> +	: "cc");
-> +
-> +	flush_cache_louis();
-> +
-> +	asm volatile(
-> +	/*
-> +	 * Turn off coherency
-> +	 */
-> +	"       mrc     p15, 0, %0, c1, c0, 1\n"
-> +	"       bic     %0, %0, %1\n"
-> +	"       mcr     p15, 0, %0, c1, c0, 1\n"
-> +	: "=&r" (v)
-> +	: "Ir" (0x40)
-> +	: "cc");
-> +
-> +	isb();
-> +	dsb();
-> +}
+Then I think we all agree here. Just to confirm:
 
-This sequences exactly matches the power-down sequence for CA15/A7.
-(implemented in [2]). Unless your platform needs a different sequence,
-you can re-use the code. Nico was trying to consolidate the power-down
-sequence for all ARM Cortex-A15/A7 implementations[3].
+  * The proposed API is almost exactly the one proposed by Russell
+    in the mail you just mentioned:
+    http://archive.arm.linux.org.uk/lurker/message/20130618.113606.d7d4fe4b.en.html
 
-Regards,
-Sudeep
+  * Linus Walleij suggested mfd/syscon, but Russell, Mark and Linus
+    itself seem to agree it's more heavy-weight than necessary.
+    http://archive.arm.linux.org.uk/lurker/message/20130618.151116.712407e0.en.html
+    http://archive.arm.linux.org.uk/lurker/message/20130618.183359.a6184b7f.en.html
+    http://archive.arm.linux.org.uk/lurker/message/20130618.152300.bffa038f.en.html
 
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/187130.html
-[2]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/184372.html
-[3] http://www.spinics.net/lists/arm-kernel/msg260472.html
+The only open question is: given there's nothing arch-dependent in this
+mechanism, should we keep this in arch/arm/kernel? And if not, where
+should we move this?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
