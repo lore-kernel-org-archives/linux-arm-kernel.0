@@ -1,23 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 12 Aug 2013 15:35:24 +0800
-Subject: [PATCH 08/35] cpufreq: cpufreq-cpu0: use
- cpufreq_table_validate_and_show()
-In-Reply-To: <59d56d7aea5dfb69bc7bda0c40529d3ef15efcab.1375964117.git.viresh.kumar@linaro.org>
-References: <cover.1375964117.git.viresh.kumar@linaro.org>
- <59d56d7aea5dfb69bc7bda0c40529d3ef15efcab.1375964117.git.viresh.kumar@linaro.org>
-Message-ID: <20130812073522.GC25061@S2101-09.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Aug 2013 00:36:55 -0700
+Subject: [PATCH v2] N900: add device tree
+In-Reply-To: <alpine.LNX.2.00.1308102226220.32627@pobox.suse.cz>
+References: <20130704171939.GA27374@blackmetal.musicnaut.iki.fi>
+ <20130704202145.GB10752@amd.pavel.ucw.cz>
+ <20130704203256.GB27374@blackmetal.musicnaut.iki.fi>
+ <20130713121709.GC16473@amd.pavel.ucw.cz>
+ <20130714222819.GB3296@blackmetal.musicnaut.iki.fi>
+ <20130728134409.GB5382@amd.pavel.ucw.cz>
+ <20130801234355.GA15611@amd.pavel.ucw.cz>
+ <20130810110955.GA11437@amd.pavel.ucw.cz>
+ <CAAfyv34w1e+sAuB==-+Pj2gOO1auVNQgawcNC1Z4QfeqchRh3g@mail.gmail.com>
+ <alpine.LNX.2.00.1308102226220.32627@pobox.suse.cz>
+Message-ID: <20130812073654.GE7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 07:18:10PM +0530, Viresh Kumar wrote:
-> Lets use cpufreq_table_validate_and_show() instead of calling
-> cpufreq_frequency_table_cpuinfo() and cpufreq_frequency_table_get_attr().
+* Jiri Kosina <jkosina@suse.cz> [130810 13:36]:
+> On Sat, 10 Aug 2013, Pavel Machek wrote:
 > 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > [I wonder if this is clean-enough cause for "trivial in resubmit
+> > mode?]
+> 
+> On Sat, 10 Aug 2013, Belisko Marek wrote:
+> 
+> > Same for gta04 (omap3 based device) [1].
+> > It was send upstream 2 times and second time there is no reply from 1.3.2013.
+> 
+> Hi guys,
+> 
+> once I am able to match signoffs in the patches to MAINTAINERS, I can take 
+> those through trivial.git in "re-transmission mode" (or feeeding those 
+> thgough akpm si an option as well).
+> 
+> Please just send the patches to me in a new thread properly with all the 
+> Acks/Signoffs, and mark those appropriately (i.e. maintainer that would 
+> normally push this upstream desurfaced).
 
-I'm not copied on the patch that introduces function
-cpufreq_table_validate_and_show().  So if it does the right/equivalent
-thing, for cpufreq-cpu0 and imx6q-cpufreq:
+Sorry for the delays, I think Benoit is still on vacation. Plus the
+non-functioning email address issue certainly does not help..
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Anyways, let's just let Benoit queue these to avoid pointless merge
+conflicts with the .dts files as discussed several times earlier.
+
+Regards,
+
+Tony
