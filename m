@@ -1,82 +1,157 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 12 Aug 2013 20:46:46 +0200
-Subject: [PATCH 0/9] ARM: dove: DT PCIe support
-Message-ID: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Mon, 12 Aug 2013 20:46:49 +0200
+Subject: [PATCH 3/9] PCI: mvebu: remove subsys_initcall
+In-Reply-To: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1376333215-12885-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds support for the PCIe controllers found on Marvell
-Dove SoCs. It depends on mvebu-pci patches sent by Thomas Petazzoni.
-Also, it adds support for the Globalscale D3Plug - a Dove based board
-comprising a USB3.0 dual port controller and a mini-PCIe port. The
-mini-PCIe port has not been tested, but USB controller and attached
-USB stick has been detected.
+This removes the subsys_initcall from the driver and converts it to
+a normal platform_driver. Also, drvdata is set and a remove functions
+is added to disable the clock and free resources.
 
-The patch set can be separated into two main parts and should be
-taken by the respective maintainers. First five patches belong to
-PCI driver for MVEBU SoCs, while last four patches are Marvell Dove
-related. It is based on (unstable) mvebu/for-next branch with MSI
-patches applied and will be rebased on request.
-
-Devicetree and Doc MLs are not Cc'ed for the driver-only patches,
-PCI ML and maintainer are not Cc'ed for the Dove-only patches.
-
-Patches 1 and 2 fix some minor issues with pci-mvebu by moving
-clk_prepare_enable before accessing any controller registers and
-counting sucessfully registered ports only.
-
-Patch 3 converts pci-mvebu from subsys_initcall registration to
-normal platform driver registration to allow it to fail with
-EPROBE_DEFER later.
-
-Patch 4 adds DT parsing for reset (PERST#) GPIO pins and delay to
-wait for PCIe devices after reset de-assertion.
-
-Patch 5 finally adds a compatible to pci-mvebu for Dove SoCs.
-
-Patch 6 updates dove_defconfig with some useful options for the
-Si5351 i2c clock generator found on SolidRun CuBox, PCIe driver,
-and USB3.0 xHCI driver.
-
-Patches 7 and 8 add PCIe controller nodes to Dove SoC DT and
-add support for the Globalscale D3Plug where this patches have
-been tested on.
-
-Patch 8 finally removes legacy PCIe driver init and clock
-gate workarounds from DT based Dove init.
-
-Sebastian Hesselbarth (9):
-  PCI: mvebu: move clock enable before register access
-  PCI: mvebu: increment nports only for registered ports
-  PCI: mvebu: remove subsys_initcall
-  PCI: mvebu: add support for reset on GPIO
-  PCI: mvebu: add support for Marvell Dove SoCs
-  ARM: dove: update dove_defconfig with SI5351, PCI, and xHCI
-  ARM: dove: add PCIe controllers to SoC DT
-  ARM: dove: add initial DT file for Globalscale D3Plug
-  ARM: dove: remove legacy pcie and clock init
-
- .../devicetree/bindings/pci/mvebu-pci.txt          |    3 +
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/dove-d3plug.dts                  |  103 ++++++++++++++++++
- arch/arm/boot/dts/dove.dtsi                        |   54 ++++++++++
- arch/arm/configs/dove_defconfig                    |    4 +
- arch/arm/mach-dove/board-dt.c                      |   29 -----
- drivers/pci/host/Kconfig                           |    2 +-
- drivers/pci/host/pci-mvebu.c                       |  113 +++++++++++++-------
- 8 files changed, 241 insertions(+), 68 deletions(-)
- create mode 100644 arch/arm/boot/dts/dove-d3plug.dts
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Olof Johansson <olof@lixom.net>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-pci at vger.kernel.org
+---
+ drivers/pci/host/pci-mvebu.c |   46 +++++++++++++++++++++++++-----------------
+ 1 file changed, 27 insertions(+), 19 deletions(-)
+
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 0a359d7..2370b59 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -165,7 +165,7 @@ static void mvebu_pcie_set_local_dev_nr(struct mvebu_pcie_port *port, int nr)
+  * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
+  * WIN[0-3] -> DRAM bank[0-3]
+  */
+-static void __init mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
++static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
+ {
+ 	const struct mbus_dram_target_info *dram;
+ 	u32 size;
+@@ -217,7 +217,7 @@ static void __init mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
+ 	       port->base + PCIE_BAR_CTRL_OFF(1));
+ }
+ 
+-static void __init mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
++static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
+ {
+ 	u16 cmd;
+ 	u32 mask;
+@@ -628,7 +628,7 @@ static struct pci_ops mvebu_pcie_ops = {
+ 	.write = mvebu_pcie_wr_conf,
+ };
+ 
+-static int __init mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
++static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+ {
+ 	struct mvebu_pcie *pcie = sys_to_pcie(sys);
+ 	int i;
+@@ -647,7 +647,7 @@ static int __init mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+ 	return 1;
+ }
+ 
+-static int __init mvebu_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
++static int mvebu_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+ {
+ 	struct of_irq oirq;
+ 	int ret;
+@@ -704,7 +704,7 @@ resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+ 		return start;
+ }
+ 
+-static void __init mvebu_pcie_enable(struct mvebu_pcie *pcie)
++static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+ {
+ 	struct hw_pci hw;
+ 
+@@ -727,10 +727,8 @@ static void __init mvebu_pcie_enable(struct mvebu_pcie *pcie)
+  * <...> property for one that matches the given port/lane. Once
+  * found, maps it.
+  */
+-static void __iomem * __init
+-mvebu_pcie_map_registers(struct platform_device *pdev,
+-			 struct device_node *np,
+-			 struct mvebu_pcie_port *port)
++static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
++		      struct device_node *np, struct mvebu_pcie_port *port)
+ {
+ 	struct resource regs;
+ 	int ret = 0;
+@@ -786,7 +784,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
+ 	return -ENOENT;
+ }
+ 
+-static void __init mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
++static void mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
+ {
+ 	struct device_node *msi_node;
+ 
+@@ -801,7 +799,7 @@ static void __init mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
+ 		pcie->msi->dev = &pcie->pdev->dev;
+ }
+ 
+-static int __init mvebu_pcie_probe(struct platform_device *pdev)
++static int mvebu_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct mvebu_pcie *pcie;
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -814,6 +812,7 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	pcie->pdev = pdev;
++	platform_set_drvdata(pdev, pcie);
+ 
+ 	/* Get the PCIe memory and I/O aperture */
+ 	mvebu_mbus_get_pcie_mem_aperture(&pcie->mem);
+@@ -939,6 +938,20 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int mvebu_pcie_remove(struct platform_device *pdev)
++{
++	struct mvebu_pcie *pcie = platform_get_drvdata(pdev);
++	struct mvebu_pcie_port *port = &pcie->ports[0];
++	int i;
++
++	for (i = 0; i < pcie->nports; i++, port++) {
++		clk_disable_unprepare(port->clk);
++		kfree(port->name);
++	}
++
++	return 0;
++}
++
+ static const struct of_device_id mvebu_pcie_of_match_table[] = {
+ 	{ .compatible = "marvell,armada-xp-pcie", },
+ 	{ .compatible = "marvell,armada-370-pcie", },
+@@ -954,15 +967,10 @@ static struct platform_driver mvebu_pcie_driver = {
+ 		.of_match_table =
+ 		   of_match_ptr(mvebu_pcie_of_match_table),
+ 	},
++	.probe = mvebu_pcie_probe,
++	.remove = mvebu_pcie_remove,
+ };
+-
+-static int __init mvebu_pcie_init(void)
+-{
+-	return platform_driver_probe(&mvebu_pcie_driver,
+-				     mvebu_pcie_probe);
+-}
+-
+-subsys_initcall(mvebu_pcie_init);
++module_platform_driver(mvebu_pcie_driver);
+ 
+ MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
+ MODULE_DESCRIPTION("Marvell EBU PCIe driver");
 -- 
 1.7.10.4
