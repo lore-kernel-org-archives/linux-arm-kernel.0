@@ -1,42 +1,63 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Mon, 12 Aug 2013 22:46:38 +0200
-Subject: [PATCH] usb: gadget: at91_udc: add usb_clk for transition to
- common clk framework
-In-Reply-To: <20130812180851.GF27954@radagast>
-References: <1375337885-2684-1-git-send-email-b.brezillon@overkiz.com>
- <5208E881.3030205@atmel.com> <20130812180851.GF27954@radagast>
-Message-ID: <520949AE.6080207@overkiz.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Mon, 12 Aug 2013 22:49:24 +0200
+Subject: [PATCH 1/16 v2] sound/soc/pxa/mioa701_wm9713.c: Avoid using
+ ARRAY_AND_SIZE(e) as a function argument
+Message-ID: <1376340564-7975-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Felipe
+From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-On 12/08/2013 20:08, Felipe Balbi wrote:
-> On Mon, Aug 12, 2013 at 03:52:01PM +0200, Nicolas Ferre wrote:
->> On 01/08/2013 08:18, Boris BREZILLON :
->>> The AT91 PMC (Power Management Controller) provides an USB clock used by
->>> USB Full Speed host (ohci) and USB Full Speed device (udc).
->>> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
->>> This configuration was formely done in mach-at91/clock.c, but this
->>> implementation will be removed when moving to common clk framework.
->>>
->>> This patch adds support for usb clock retrieval and configuration, and is
->>> backward compatible with the current at91 clk implementation (if usb clk
->>> is not found, it does not configure/enable it).
->>>
->>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> I don't have the original, where is it ? Was it not Cced to linux-usb ?
-> Can someone resend with Nicolas' Acked-by in place ?
->
-This mail was sent to linux-usb at vger.kernel.org and to you (balbi at ti.com).
-It may have been filtered.
+Replace ARRAY_AND_SIZE(e) in function argument position to avoid hiding the
+arity of the called function.
 
-Anyway, you asked me to rework the 2nd version (which I did).
+At the suggestion of Robert Jarzmik, this additionally removes the
+definition of ARRAY_AND_SIZE, which is not used elsewhere in the file.
 
-I think it's better to review the 3rd one 
-(https://lkml.org/lkml/2013/8/2/102).
+The semantic match that makes this change is as follows:
+(http://coccinelle.lip6.fr/)
 
-Best Regards,
+// <smpl>
+@@
+expression e,f;
+@@
 
-Boris
+f(...,
+- ARRAY_AND_SIZE(e)
++ e,ARRAY_SIZE(e)
+  ,...)
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+---
+Not compiled.
+v2 removes the definition of ARRAY_AND_SIZE.
+
+diff --git a/sound/soc/pxa/mioa701_wm9713.c b/sound/soc/pxa/mioa701_wm9713.c
+index 97b711e..bbea778 100644
+--- a/sound/soc/pxa/mioa701_wm9713.c
++++ b/sound/soc/pxa/mioa701_wm9713.c
+@@ -56,8 +56,6 @@
+ #include "pxa2xx-ac97.h"
+ #include "../codecs/wm9713.h"
+ 
+-#define ARRAY_AND_SIZE(x)	(x), ARRAY_SIZE(x)
+-
+ #define AC97_GPIO_PULL		0x58
+ 
+ /* Use GPIO8 for rear speaker amplifier */
+@@ -133,10 +131,11 @@ static int mioa701_wm9713_init(struct snd_soc_pcm_runtime *rtd)
+ 	unsigned short reg;
+ 
+ 	/* Add mioa701 specific widgets */
+-	snd_soc_dapm_new_controls(dapm, ARRAY_AND_SIZE(mioa701_dapm_widgets));
++	snd_soc_dapm_new_controls(dapm, mioa701_dapm_widgets,
++				  ARRAY_SIZE(mioa701_dapm_widgets));
+ 
+ 	/* Set up mioa701 specific audio path audio_mapnects */
+-	snd_soc_dapm_add_routes(dapm, ARRAY_AND_SIZE(audio_map));
++	snd_soc_dapm_add_routes(dapm, audio_map, ARRAY_SIZE(audio_map));
+ 
+ 	/* Prepare GPIO8 for rear speaker amplifier */
+ 	reg = codec->driver->read(codec, AC97_GPIO_CFG);
