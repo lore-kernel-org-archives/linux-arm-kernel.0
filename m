@@ -1,139 +1,112 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Mon, 12 Aug 2013 16:21:48 +0900
-Subject: [PATCH v5 2/4] mmc: dw_mmc: Add exynos resume_noirq callback to
- clear WAKEUP_INT
-In-Reply-To: <1376066000-5495-3-git-send-email-dianders@chromium.org>
-References: <1375825071-20922-1-git-send-email-dianders@chromium.org>
- <1376066000-5495-1-git-send-email-dianders@chromium.org>
- <1376066000-5495-3-git-send-email-dianders@chromium.org>
-Message-ID: <000e01ce972c$9be7d4a0$d3b77de0$%jun@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 12 Aug 2013 15:29:59 +0800
+Subject: [PATCH 1/2] ARM: dts: mxs: add pinctrl header files to be able
+ to use symbolic names in dts
+In-Reply-To: <1375967472-7755-2-git-send-email-LW@KARO-electronics.de>
+References: <1375967472-7755-1-git-send-email-LW@KARO-electronics.de>
+ <1375967472-7755-2-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20130812072957.GB25061@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug,
-Looks good to me except for minor comment.
-
-On Sat, August 10, 2013, Doug Anderson wrote:
-> If the WAKEUP_INT is asserted at wakeup and not cleared, we'll end up
-> looping around forever.  This has been seen to happen on exynos5420
-> silicon despite the fact that we haven't enabled any wakeup events due
-> to a silicon errata.  It is safe to do on all exynos variants.
+On Thu, Aug 08, 2013 at 03:11:11PM +0200, Lothar Wa?mann wrote:
 > 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+
+Can we make the subject a little abbreviated and have it elaborated
+in commit log?
+
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 > ---
-> Changes in v5:
-> - Cleaned up dw_mci_exynos_resume_noirq() comment as per Seungwon.
-> - Don't memcpy dev_pm_ops structure, define a new one.
+>  include/dt-bindings/pinctrl/mx23.h |  333 ++++++++++++++++++++++++
+>  include/dt-bindings/pinctrl/mx28.h |  506 ++++++++++++++++++++++++++++++++++++
+>  include/dt-bindings/pinctrl/mxs.h  |   31 +++
+>  3 files changed, 870 insertions(+), 0 deletions(-)
+>  create mode 100644 include/dt-bindings/pinctrl/mx23.h
+>  create mode 100644 include/dt-bindings/pinctrl/mx28.h
+>  create mode 100644 include/dt-bindings/pinctrl/mxs.h
+
+For definitions that are used by DTS only, I think it's fine to have
+them in arch/arm/boot/dts, e.g. arch/arm/boot/dts/imx23-pinctrl.h.
+I would only put those that are shared between kernel and device tree
+into include/dt-bindings.
+
 > 
-> Changes in v4:
-> - Take Seungwon's suggestion and don't add any dw_mmc-pltfm code.
-> 
-> Changes in v3:
-> - Add freeze/thaw and poweroff/restore noirq entries.
-> 
-> Changes in v2:
-> - Use suspend_noirq as per James Hogan.
-> 
->  drivers/mmc/host/dw_mmc-exynos.c | 56 +++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 55 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-> index 866edef..7d88583 100644
-> --- a/drivers/mmc/host/dw_mmc-exynos.c
-> +++ b/drivers/mmc/host/dw_mmc-exynos.c
-> @@ -30,6 +30,7 @@
->  #define SDMMC_CLKSEL_TIMING(x, y, z)	(SDMMC_CLKSEL_CCLK_SAMPLE(x) |	\
->  					SDMMC_CLKSEL_CCLK_DRIVE(y) |	\
->  					SDMMC_CLKSEL_CCLK_DIVIDER(z))
-> +#define SDMMC_CLKSEL_WAKEUP_INT		BIT(11)
-> 
->  #define EXYNOS4210_FIXED_CIU_CLK_DIV	2
->  #define EXYNOS4412_FIXED_CIU_CLK_DIV	4
-> @@ -100,6 +101,52 @@ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
->  	return 0;
->  }
-> 
-> +#ifdef CONFIG_PM_SLEEP
+> diff --git a/include/dt-bindings/pinctrl/mx23.h b/include/dt-bindings/pinctrl/mx23.h
+> new file mode 100644
+> index 0000000..a31c969
+> --- /dev/null
+> +++ b/include/dt-bindings/pinctrl/mx23.h
+> @@ -0,0 +1,333 @@
 > +/*
-> + * TODO: we should probably disable the clock to the card in the suspend path.
-In suspend, clock is gated, isn't it?
-Rather, no comment looks better, if intention is not clear.
-
-Thanks,
-Seungwon Jeon
-
-> + */
-> +static int dw_mci_exynos_suspend(struct device *dev)
-> +{
-> +	struct dw_mci *host = dev_get_drvdata(dev);
-> +
-> +	return dw_mci_suspend(host);
-> +}
-> +
-> +static int dw_mci_exynos_resume(struct device *dev)
-> +{
-> +	struct dw_mci *host = dev_get_drvdata(dev);
-> +
-> +	return dw_mci_resume(host);
-> +}
-> +
-> +/**
-> + * dw_mci_exynos_resume_noirq - Exynos-specific resume code
+> + * Header providing constants for i.MX23 pinctrl bindings.
 > + *
-> + * On exynos5420 there is a silicon errata that will sometimes leave the
-> + * WAKEUP_INT bit in the CLKSEL register asserted.  This bit is 1 to indicate
-> + * that it fired and we can clear it by writing a 1 back.  Clear it to prevent
-> + * interrupts from going off constantly.
+> + * Copyright (C) 2013 Lothar Wa?mann <LW@KARO-electronics.de>
 > + *
-> + * We run this code on all exynos variants because it doesn't hurt.
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
 > + */
 > +
-> +static int dw_mci_exynos_resume_noirq(struct device *dev)
-> +{
-> +	struct dw_mci *host = dev_get_drvdata(dev);
-> +	u32 clksel;
+> +#ifndef __DT_BINDINGS_MX23_PINCTRL_H__
+> +#define __DT_BINDINGS_MX23_PINCTRL_H__
 > +
-> +	clksel = mci_readl(host, CLKSEL);
-> +	if (clksel & SDMMC_CLKSEL_WAKEUP_INT)
-> +		mci_writel(host, CLKSEL, clksel);
+> +#include "mxs.h"
 > +
-> +	return 0;
-> +}
-> +#else
-> +#define dw_mci_exynos_suspend		NULL
-> +#define dw_mci_exynos_resume		NULL
-> +#define dw_mci_exynos_resume_noirq	NULL
-> +#endif /* CONFIG_PM_SLEEP */
+> +#define MX23_PAD_GPMI_D00__GPMI_D00			0x0000
+
+With defining macros for these constants, we can clean up them from
+Documentation/devicetree/bindings/pinctrl/fsl,mxs-pinctrl.txt.
+
+<snip>
+
+> diff --git a/include/dt-bindings/pinctrl/mxs.h b/include/dt-bindings/pinctrl/mxs.h
+> new file mode 100644
+> index 0000000..c6da987
+> --- /dev/null
+> +++ b/include/dt-bindings/pinctrl/mxs.h
+> @@ -0,0 +1,31 @@
+> +/*
+> + * Header providing constants for i.MX28 pinctrl bindings.
+> + *
+> + * Copyright (C) 2013 Lothar Wa?mann <LW@KARO-electronics.de>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
 > +
->  static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
->  {
->  	/*
-> @@ -187,13 +234,20 @@ static int dw_mci_exynos_probe(struct platform_device *pdev)
->  	return dw_mci_pltfm_register(pdev, drv_data);
->  }
+> +#ifndef __DT_BINDINGS_MXS_PINCTRL_H__
+> +#define __DT_BINDINGS_MXS_PINCTRL_H__
+> +
+> +/* fsl,drive-strength property */
+> +#define MXS_DRIVE_4mA		0
+> +#define MXS_DRIVE_8mA		1
+> +#define MXS_DRIVE_12mA		2
+> +#define MXS_DRIVE_16mA		3
+> +
+> +/* fsl,voltage property */
+> +#define MXS_VOLTAGE_LOW		0
+> +#define MXS_VOLTAGE_HIGH	1
+> +
+> +/* fsl,pull-up property */
+> +#define MXS_PULL_DISABLE	0
+> +#define MXS_PULL_ENABLE		1
+
+You're adding these without moving the existing DTS files to use them.
+We do not want to see that new entries use these macro while the
+existing ones keep using numbers.  So either we do not have macros for
+them or we use macros for all of them.
+
+Shawn
+
+> +
+> +#endif /* __DT_BINDINGS_MXS_PINCTRL_H__ */
+> -- 
+> 1.7.2.5
 > 
-> +const struct dev_pm_ops dw_mci_exynos_pmops = {
-> +	SET_SYSTEM_SLEEP_PM_OPS(dw_mci_exynos_suspend, dw_mci_exynos_resume)
-> +	.resume_noirq = dw_mci_exynos_resume_noirq,
-> +	.thaw_noirq = dw_mci_exynos_resume_noirq,
-> +	.restore_noirq = dw_mci_exynos_resume_noirq,
-> +};
-> +
->  static struct platform_driver dw_mci_exynos_pltfm_driver = {
->  	.probe		= dw_mci_exynos_probe,
->  	.remove		= __exit_p(dw_mci_pltfm_remove),
->  	.driver		= {
->  		.name		= "dwmmc_exynos",
->  		.of_match_table	= dw_mci_exynos_match,
-> -		.pm		= &dw_mci_pltfm_pmops,
-> +		.pm		= &dw_mci_exynos_pmops,
->  	},
->  };
-> 
-> --
-> 1.8.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
