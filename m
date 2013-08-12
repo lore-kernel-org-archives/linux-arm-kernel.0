@@ -1,104 +1,36 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 12 Aug 2013 10:37:18 +0200
-Subject: [PATCH 5/5] ARM: pxa: ssp: add pxa_ssp_request_of()
-In-Reply-To: <1376296638-19804-1-git-send-email-zonque@gmail.com>
-References: <1376296638-19804-1-git-send-email-zonque@gmail.com>
-Message-ID: <1376296638-19804-6-git-send-email-zonque@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 12 Aug 2013 16:37:35 +0800
+Subject: [PATCH 1/2] ARM: dts: i.MX27: Disable AUDMUX in the template
+In-Reply-To: <1376124711-27167-1-git-send-email-shc_work@mail.ru>
+References: <1376124711-27167-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20130812083733.GJ25061@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a function to lookup ssp devices from device tree. This way, users
-can reference the ssp devices in order to register to them.
+On Sat, Aug 10, 2013 at 12:51:50PM +0400, Alexander Shiyan wrote:
+> AUDMUX expects additional parameters to be configured correctly,
+> so turn it off into a template.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- arch/arm/plat-pxa/ssp.c    | 25 +++++++++++++++++++++++++
- include/linux/pxa2xx_ssp.h | 11 +++++++++++
- 2 files changed, 36 insertions(+)
+Applied both, thanks.
 
-diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
-index f266135..c83f27b 100644
---- a/arch/arm/plat-pxa/ssp.c
-+++ b/arch/arm/plat-pxa/ssp.c
-@@ -62,6 +62,30 @@ struct ssp_device *pxa_ssp_request(int port, const char *label)
- }
- EXPORT_SYMBOL(pxa_ssp_request);
- 
-+struct ssp_device *pxa_ssp_request_of(const struct device_node *of_node,
-+				      const char *label)
-+{
-+	struct ssp_device *ssp = NULL;
-+
-+	mutex_lock(&ssp_lock);
-+
-+	list_for_each_entry(ssp, &ssp_list, node) {
-+		if (ssp->of_node == of_node && ssp->use_count == 0) {
-+			ssp->use_count++;
-+			ssp->label = label;
-+			break;
-+		}
-+	}
-+
-+	mutex_unlock(&ssp_lock);
-+
-+	if (&ssp->node == &ssp_list)
-+		return NULL;
-+
-+	return ssp;
-+}
-+EXPORT_SYMBOL(pxa_ssp_request_of);
-+
- void pxa_ssp_free(struct ssp_device *ssp)
- {
- 	mutex_lock(&ssp_lock);
-@@ -185,6 +209,7 @@ static int pxa_ssp_probe(struct platform_device *pdev)
- 	}
- 
- 	ssp->use_count = 0;
-+	ssp->of_node = dev->of_node;
- 
- 	mutex_lock(&ssp_lock);
- 	list_add(&ssp->node, &ssp_list);
-diff --git a/include/linux/pxa2xx_ssp.h b/include/linux/pxa2xx_ssp.h
-index 467cc63..4944420 100644
---- a/include/linux/pxa2xx_ssp.h
-+++ b/include/linux/pxa2xx_ssp.h
-@@ -21,6 +21,8 @@
- 
- #include <linux/list.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+
- 
- /*
-  * SSP Serial Port Registers
-@@ -190,6 +192,8 @@ struct ssp_device {
- 	int		irq;
- 	int		drcmr_rx;
- 	int		drcmr_tx;
-+
-+	struct device_node	*of_node;
- };
- 
- /**
-@@ -218,11 +222,18 @@ static inline u32 pxa_ssp_read_reg(struct ssp_device *dev, u32 reg)
- #ifdef CONFIG_ARCH_PXA
- struct ssp_device *pxa_ssp_request(int port, const char *label);
- void pxa_ssp_free(struct ssp_device *);
-+struct ssp_device *pxa_ssp_request_of(const struct device_node *of_node,
-+				      const char *label);
- #else
- static inline struct ssp_device *pxa_ssp_request(int port, const char *label)
- {
- 	return NULL;
- }
-+static inline struct ssp_device *pxa_ssp_request_of(const struct device_node *n,
-+						    const char *name)
-+{
-+	return NULL;
-+}
- static inline void pxa_ssp_free(struct ssp_device *ssp) {}
- #endif
- 
--- 
-1.8.3.1
+> ---
+>  arch/arm/boot/dts/imx27.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> index 76cd89f..c037c22 100644
+> --- a/arch/arm/boot/dts/imx27.dtsi
+> +++ b/arch/arm/boot/dts/imx27.dtsi
+> @@ -300,6 +300,7 @@
+>  				reg = <0x10016000 0x1000>;
+>  				clocks = <&clks 0>;
+>  				clock-names = "audmux";
+> +				status = "disabled";
+>  			};
+>  
+>  			cspi3: cspi at 10017000 {
+> -- 
+> 1.8.1.5
+> 
