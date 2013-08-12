@@ -1,69 +1,87 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 12 Aug 2013 12:17:57 -0700
-Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
- module registers and APIs
-In-Reply-To: <52055733.70808@ti.com> (Dave Gerlach's message of "Fri, 9 Aug
- 2013 15:55:15 -0500")
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
- <5203A0BC.8060205@ti.com> <5203C457.80301@ti.com>
- <20130809051146.GB7656@atomide.com> <52055733.70808@ti.com>
-Message-ID: <87y586pvkq.fsf@kernel.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 12 Aug 2013 15:20:14 -0400
+Subject: [PATCH v3 5/6] clocksource: armada-370-xp: Fix device-tree binding
+In-Reply-To: <1376335016-16400-6-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1376335016-16400-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1376335016-16400-6-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130812192014.GT25111@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Gerlach <d-gerlach@ti.com> writes:
+On Mon, Aug 12, 2013 at 04:16:55PM -0300, Ezequiel Garcia wrote:
+> This commit fixes the DT binding for the Armada 370/XP SoC timer.
+> The previous "marvell,armada-370-xp-timer" compatible is removed and
+> two new compatible strings are introduced: "marvell,armada-xp-timer"
+> and "marvell,armada-370-timer".
+> 
+> The rationale behind this change is that the Armada 370 SoC and the
+> Armada XP SoC timers are not really compatible:
+> 
+>   * Armada 370 has no 25 MHz fixed timer.
+> 
+>   * Armada XP cannot work properly without such 25 MHz fixed timer
+>     as doing otherwise leads to using a clocksource whose frequency
+>     varies when doing cpufreq frequency changes.
+> 
+> This commit also removes the "marvell,timer-25Mhz" property, given
+> it's now meaningless.
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  .../bindings/timer/marvell,armada-370-xp-timer.txt | 27 ++++++++++++++++++----
+>  1 file changed, 22 insertions(+), 5 deletions(-)
 
-> On 08/09/2013 12:11 AM, Tony Lindgren wrote:
->> * Dave Gerlach <d-gerlach@ti.com> [130808 09:23]:
->>> On 08/08/2013 08:44 AM, Santosh Shilimkar wrote:
->>>> Lets address the above better. I don't see a need of 8 functions
->>>> exported doing one or 2 register writes.
->>>>
->>>> Look M3 based handling is going to be there on future SOCs
->>>> as well and this kind of handling of IPC is very short cited.
->>>>
->>>
->>> The idea here was to move all control module register accesses into
->>> one file in planning of implementing a driver for the control module
->>> itself in the future.
->>>
->>>> Probably we should have a separate driver for M3 in linux which
->>>> can have all this local code instead of all these exports.
->>>
->>> The wkup_m3 code has been moved to a small driver found in patch 8
->>> of this series, would it better to move this code there rather than
->>> with the rest of the control module code?
->>
->> Please make everything you can into regular device drivers.
->>
->> We still have some dependencies to mach-omap2 code for PRCM
->> for example, but we're trying to get all that to live in
->> drivers.
->>
->> So for new pieces, let's not add further dependencies to
->> complicate moving things to drivers.
->>
->> Regards,
->>
->> Tony
->>
->
-> Ok I will go ahead and pull the control module code that handles IPC
-> into the wkup_m3 driver. 
+As there are no native DT-booting Marvell products in the wild yet,
 
-Any control module register access still needs to stay in control.c.
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-> The wkup_m3.c file is still present in mach-omap2 as the right
-> location for it wasn't decided in the last RFC. Any thoughts on a good
-> location for it?
+thx,
 
-I raised this also in earlier reviews, but don't remember the if it was
-answered... 
+Jason.
 
-Why can't we handle the wkup_m3 using remoteproc/rpmsg instead of
-creating another little driver that duplicates communication with the
-M3.  Note also that the firmware load part would also be provided by
-remoteproc/rpmsg.
-
-Kevin
+> 
+> diff --git a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+> index 3638112..4c453b2 100644
+> --- a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+> +++ b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+> @@ -2,14 +2,31 @@ Marvell Armada 370 and Armada XP Timers
+>  ---------------------------------------
+>  
+>  Required properties:
+> -- compatible: Should be "marvell,armada-370-xp-timer"
+> +- compatible: Should be either "marvell,armada-370-timer" or
+> +  "marvell,armada-xp-timer" as appropriate.
+>  - interrupts: Should contain the list of Global Timer interrupts and
+>    then local timer interrupts
+>  - reg: Should contain location and length for timers register. First
+>    pair for the Global Timer registers, second pair for the
+>    local/private timers.
+> -- clocks: clock driving the timer hardware
+> +- clocks: clock driving the timer hardware, only required for
+> +  "marvell,armada-370-timer";
+>  
+> -Optional properties:
+> -- marvell,timer-25Mhz: Tells whether the Global timer supports the 25
+> -  Mhz fixed mode (available on Armada XP and not on Armada 370)
+> +Examples:
+> +
+> +- Armada 370:
+> +
+> +	timer {
+> +		compatible = "marvell,armada-370-timer";
+> +		reg = <0x20300 0x30>, <0x21040 0x30>;
+> +		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
+> +		clocks = <&coreclk 2>;
+> +	};
+> +
+> +- Armada XP:
+> +
+> +	timer {
+> +		compatible = "marvell,armada-xp-timer";
+> +		reg = <0x20300 0x30>, <0x21040 0x30>;
+> +		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
+> +	};
+> -- 
+> 1.8.1.5
+> 
