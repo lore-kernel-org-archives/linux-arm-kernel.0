@@ -1,58 +1,113 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 12 Aug 2013 17:58:28 +0100
-Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <20130812160835.GE25995@mudshark.cambridge.arm.com>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
- <51FF8E84.7000108@arm.com>
- <20130807014536.GF15579@mudshark.cambridge.arm.com>
- <20130812135903.GC25995@mudshark.cambridge.arm.com>
- <20130812160835.GE25995@mudshark.cambridge.arm.com>
-Message-ID: <52091434.3020700@arm.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 12 Aug 2013 18:59:53 +0200
+Subject: =?UTF-8?B?562U5aSNOg==?= [PATCH v3 2/2] i2c: imx: Add Vybrid
+ VF610 I2C controller support
+In-Reply-To: <20130812164354.GF27165@e106331-lin.cambridge.arm.com>
+References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
+ <B56CDBE15CE27145A4B77D2D24263E851FE7AC@039-SN1MPN1-004.039d.mgd.msft.net>
+ <20130812164354.GF27165@e106331-lin.cambridge.arm.com>
+Message-ID: <1672769.GMC6E5TsBH@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Monday 12 of August 2013 17:43:54 Mark Rutland wrote:
+> [Adding other devicetree maintainers to Cc]
+> 
+> On Mon, Aug 12, 2013 at 01:56:07PM +0100, Lu Jingchang-B35083 wrote:
+> > ________________________________________
+> > 
+> > >???: Mark Rutland [mark.rutland at arm.com]
+> > >????: 2013?8?10? 22:08
+> > >???: Lu Jingchang-B35083
+> > >??: wsa at the-dreams.de; Estevam Fabio-R49496; Li Xiaochun-B41219;
+> > >s.hauer at pengutronix.de; linux-i2c at vger.kernel.org; Jin
+> > >Zhengxiong-R64188; shawn.guo at linaro.org;
+> > >linux-arm-kernel at lists.infradead.org ??: Re: [PATCH v3 2/2] i2c:
+> > >imx: Add Vybrid VF610 I2C controller support> >
+> > >On Fri, Aug 02, 2013 at 05:44:08AM +0100, Jingchang Lu wrote:
+> > >>   Add Freescale Vybrid VF610 I2C controller support to
+> > >> 
+> > >> imx I2C driver framework.
+> > >> 
+> > >>   Some operation is different from imx I2C controller.
+> > >> 
+> > >> The register offset, the i2c clock divider value table,
+> > >> the module enabling(I2CR_IEN) which is just invert with imx,
+> > >> and the interrupt flag(I2SR) clearing opcode is w1c on VF610
+> > >> but w0c on imx.
+> > >> 
+> > >> Signed-off-by: Jason Jin <Jason.jin@freescale.com>
+> > >> Signed-off-by: Xiaochun Li <b41219@freescale.com>
+> > >> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> > >> ---
+> > >> 
+> > >> changes in v3:
+> > >>   Using struct naming the i2c clock {div, regval} pair.
+> > >>  
+> > >>  Using address shift handling registers address difference.
+> > >> 
+> > >> changes in v2:
+> > >>   Fix building section mismatch(es) warning.
+> > >>  
+> > >>  drivers/i2c/busses/i2c-imx.c | 146
+> > >>  ++++++++++++++++++++++++++++++++++++------- 1 file changed, 122
+> > >>  insertions(+), 24 deletions(-)
+> > >
+> > >[...]
+> > >
+> > >> @@ -145,6 +233,7 @@ MODULE_DEVICE_TABLE(platform, imx_i2c_devtype);
+> > >> 
+> > >>  static const struct of_device_id i2c_imx_dt_ids[] = {
+> > >>  
+> > >>         { .compatible = "fsl,imx1-i2c", .data =
+> > >>         &imx_i2c_devtype[IMX1_I2C], },
+> > >>         { .compatible = "fsl,imx21-i2c", .data =
+> > >>         &imx_i2c_devtype[IMX21_I2C], },> >> 
+> > >> +       { .compatible = "fsl,vf610-i2c", .data =
+> > >> &imx_i2c_devtype[VF610_I2C], },> >> 
+> > >>         { /* sentinel */ }
+> > >>  
+> > >>  };
+> > >
+> > >That string doesn't seem to be documented anywhere (from a quick grep
+> > >of Documentation/devicetree), and there's no binding update included
+> > >here. It would be nice for that to be fixed :)
+> > 
+> > [Lu Jingchang]
+> > The binding string for i2c-imx driver in
+> > Documentation/devicetree/bindings/i2c/i2c-imx.txt use a wildcard
+> > format of "- compatible : Should be "fsl,<chip>-i2c" " for device
+> > using this driver. Neither fsl,imx1-i2c nor fsl,imx21-i2c is
+> > described in the binding document. So I just leave the vf610 i2c
+> > compatible with this.
+> I'm not a big fan on wildcards in bindings, as it leaves people free to
+> put anything in and claim it's a documented binding, and makes it far
+> harder for an os to actually implement drivers for said binding, as
+> there's no canonical reference for the set of valid variations.
+> 
+> Obviously there is some precedent, but I'm not sure it's something we
+> want to stick with, and we can prevent it my updating the documentation
+> now.
+> 
+> Does anyone else have an opinion?
 
-On 12/08/13 17:08, Will Deacon wrote:
-> [replying to self]
->
-> On Mon, Aug 12, 2013 at 02:59:03PM +0100, Will Deacon wrote:
->> So, I just tried to test this patch but I'm getting issues when enabling CCI
->> with mainline:
->>
->>
->> ARM Versatile Express Boot Monitor
->> Version:    V5.1.5
->> Build Date: Jul 24 2012
->> Daughterboard Site 1: V2P-CA15 Cortex A15
->> Daughterboard Site 2: V2P-CA15_A7 Cortex A15
->> Running boot script from flash - BOOTSCRIPT
->> Loaded kernel - linuxtc2
->> Booting kernel @ 0x80008000
->> Command line 'ip=dhcp root=/dev/nfs nfsroot=10.1.203.36:/exports/linaro-13.06,tcp rw console=ttyAMA0,38400 mem=2G loglevel=9 user_debug=31 earlyprintk debug'
->> ATAGs @ 0x80000100
->>
->>
->> Fatal Error: Unhandled Exception - Undefined
->>
->>
->> We're exploding *really* early, and I have no idea why. If I remove CCI from
->> the equation (either in the kernel or the device-tree), then I can boot as
->> per usual.
->
-> Turns out my .dtb has gone over some limit and appended dtb corrupts the
-> kernel image. Removing some random nodes got things working again.
->
+In case of Samsung platforms we decided to always use the name of first 
+SoC in which given IP appeared and list all compatible SoCs in binding 
+documentation. This is IMHO the most consistent way, as there is no 
+confusion about IP versions (not always listed in documentation, not even 
+saying about unavailable documentation) or potential problems with new 
+SoCs matching the wildcard, but having different IP.
 
-Just saw your mail. I haven't run into this one before. But looks like 
-you've figured out what the problem was.
+In this particular case, the <chip> wildcard can be easily transformed 
+into a non-wildcard binding, by listing all supported <chip> values, i.e. 
+adding following text to binding documentation:
 
-Let me know if you hit any issues with testing / using the CCI PMU.
+8<--
+The <chip> can be one of:
+ - imx1 - for i.MX1 and compatible SoCs,
+ - imx21 - for i.MX21 and compatible SoCs,
+ - vf610 - for Vybrid VF610 and compatible SoCs.
+-->8
 
-Thanks for picking this up.
-
-Punit
-
-> Will
->
->
+Best regards,
+Tomasz
