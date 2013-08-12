@@ -1,47 +1,39 @@
-From: liam.r.girdwood@linux.intel.com (Liam Girdwood)
-Date: Mon, 12 Aug 2013 08:40:15 +0100
-Subject: [alsa-devel] [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM
- links between	codec and cpu DAI
-In-Reply-To: <20130810211342.GX23006@n2100.arm.linux.org.uk>
-References: <E1V641A-0004lv-DM@rmk-PC.arm.linux.org.uk>
- <20130805112733.GY9858@sirena.org.uk>
- <20130805113310.GU23006@n2100.arm.linux.org.uk>
- <20130805144054.GE9858@sirena.org.uk>
- <20130805145644.GV23006@n2100.arm.linux.org.uk>
- <20130805203202.GX23006@n2100.arm.linux.org.uk>
- <20130805220639.GB26637@sirena.org.uk>
- <20130805233015.GY23006@n2100.arm.linux.org.uk>
- <20130806133206.GA6427@sirena.org.uk>
- <20130810161123.GW23006@n2100.arm.linux.org.uk>
- <20130810211342.GX23006@n2100.arm.linux.org.uk>
-Message-ID: <1376293215.2385.32.camel@loki>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 12 Aug 2013 15:49:03 +0800
+Subject: [PATCH] pinctrl: i.MX: Make more robust against devicetree errors
+In-Reply-To: <1376050854-3303-1-git-send-email-s.hauer@pengutronix.de>
+References: <1376050854-3303-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20130812074901.GD25061@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2013-08-10 at 22:13 +0100, Russell King - ARM Linux wrote:
-> On Sat, Aug 10, 2013 at 05:11:23PM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Aug 06, 2013 at 02:32:06PM +0100, Mark Brown wrote:
-> > > On Tue, Aug 06, 2013 at 12:30:15AM +0100, Russell King - ARM Linux wrote:
-> > > 
-> > > > I put it to you that DPCM in mainline is incomplete and nonfunctional
-> > > > as it currently stands.  Moreover, it requires either those who know
-> > > > that code to continue to develop it, or someone else who understands
-> > > > the direction that this code is supposed to go picks up to complete it.
-> > > 
-> > > I'd be most distressed if it were far off working; it's close enough to
-> > > the out of tree code I've worked with and I know there were drivers in
-> > > progress when it was submitted.  We've certainly had at least one bug
-> > > fix from the out of tree users, I'd be surprised if we had anything more
-> > > substantial than bitrot in the current code.
-> > 
-> > Right, so, I've looked at this again today, and I've sort-of got it
-> > working.
+On Fri, Aug 09, 2013 at 02:20:49PM +0200, Sascha Hauer wrote:
+> When there is something wrong with pinctrl in the i.MX devicetree
+> files this usually means the i.MX pinctrl driver bails out completely.
+> In this case even the console is nonfunctional since it can't get
+> the pins. Enabling earlyprintk isn't very helpful since the driver
+> only prints that something is wrong, but not what is wrong.
 > 
-> I'm not so sure about that:
+> With this series the i.MX pinctrl driver continues on errors so that
+> the system stays working and only the erroneous pinctrl groups fail
+> later. Also the error messages are supplemented with the offending
+> devicetree node to give a clue what went wrong.
+> 
+> Sascha
+> 
+> ----------------------------------------------------------------
+> Sascha Hauer (5):
+>       pinctrl: imx: make error messages more informative
+>       pinctrl: imx: Catch no fsl,pins property
+>       pinctrl: imx: do not fail when parsing a group fails
+>       pinctrl: imx: do not fail when parsing a function fails
+>       pinctrl: imx: Use struct type for pins
 
-Russell, I'm just back from holiday now and have done a quick re test on
-Haswell. I can see the correct DAPM path and DPCM state as expected for
-Haswell, but let me get through my Inbox today and I'll see where we
-have some differences tomorrow.
+For the series,
 
-Liam 
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+> 
+>  drivers/pinctrl/pinctrl-imx.c | 95 ++++++++++++++++++++-----------------------
+>  drivers/pinctrl/pinctrl-imx.h | 36 +++++++++-------
+>  2 files changed, 64 insertions(+), 67 deletions(-)
