@@ -1,36 +1,70 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 12 Aug 2013 14:12:36 +0100
-Subject: [PATCH V4 1/4] ARM: dts: exynos5420: add i2s controllers
-In-Reply-To: <3916118.YsNJ4NTaJS@amdc1227>
-References: <1376302070-1877-1-git-send-email-padma.v@samsung.com>
- <21180092.af8YMiXtjc@amdc1227>
- <20130812113447.GW6427@sirena.org.uk> <3916118.YsNJ4NTaJS@amdc1227>
-Message-ID: <20130812131235.GX6427@sirena.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 12 Aug 2013 15:16:52 +0200
+Subject: [PATCH v2 0/3] ARM/ARM64 architected timer updates
+In-Reply-To: <5200BB7D.3020501@arm.com>
+References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <51FB7CB8.6080103@arm.com> <51FB8081.6040501@linaro.org>
+ <51FB81FB.3060709@arm.com> <51FBA21D.5010308@linaro.org>
+ <51FFD1DF.9000907@arm.com> <5200AF41.7090405@linaro.org>
+ <5200BB7D.3020501@arm.com>
+Message-ID: <5208E044.7020306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 01:41:23PM +0200, Tomasz Figa wrote:
-> On Monday 12 of August 2013 12:34:48 Mark Brown wrote:
+On 08/06/2013 11:01 AM, Sudeep KarkadaNagesha wrote:
+> On 06/08/13 09:09, Daniel Lezcano wrote:
+>> On 08/05/2013 06:25 PM, Sudeep KarkadaNagesha wrote:
+>>> Hi Daniel,
+>>>
+>>> On 02/08/13 13:12, Daniel Lezcano wrote:
+>>>> On 08/02/2013 11:55 AM, Sudeep KarkadaNagesha wrote:
+>>>>> On 02/08/13 10:48, Daniel Lezcano wrote:
+>>>>>> On 08/02/2013 11:32 AM, Sudeep KarkadaNagesha wrote:
+>>>>>>> Hi Daniel,
+>>>>>>>
+>>>>>>> On 22/07/13 12:21, Sudeep KarkadaNagesha wrote:
+>>>>>>>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>>>>>>>>
+>>>>>>>> This patch series adds support to configure the rate and enable the event
+>>>>>>>> stream for architected timer. Since the timer control register is reset to
+>>>>>>>> zero on warm boot, CPU PM notifier is added to re-initialse it.
+>>>>>>>>
+>>>>>>> This series is required to support TC2 cpuidle.
+>>>>>>> It will be good if you can review and get this in for v3.12
+>>>>>>
+>>>>>> So do you want me to take the series through my tree ?
+>>>>>>
+>>>>> Yes I believe it has to go through your(ARM specific clocksource?) tree,
+>>>>> but currently there's a conflict with another bug fix(that should come
+>>>>> from rmk as -rc fix)
+>>>>> (Commit ab8d46c0 "ARM: 7788/1: elf: fix lpae hwcap feature reporting in
+>>>>> proc/cpuinfo" in rmk -fixes)
+>>>>
+>>>> IMO, you should rebase this patch on top of tips/core, I will apply the
+>>>> series and when the rmk fix hits this branch (through tips/urgent), that
+>>>> will be up to the maintainer to resolve this conflict.
+>>>>
+>>>
+>>> The fix with which this series was conflicting is already in v3.11-rc4
+>>> So can I send pull request based on v3.11-rc4 or if you prefer any
+>>> particular tree, can you provide details please ?
+>>
+>> Ok, I will ping Thomas to update the tips/core branch to 3.11-rc4.
+>>
+> Thanks Daniel, will send pull request once it's updated.
 
-> > I'd expect that to interact badly with the pinmuxing - unless the device
-> > is disabled it'll try to grab its pins on probe which is not going to be
-> > a good idea unless it is actually wired up for use in the system.  Or is
-> > there some other mechanism for handling that?
+Sudeep,
 
-> Ah, good point. Now I wonder whether pinctrl nodes shouldn't be considered 
-> board-specific and specified in board-level dts instead?
+please send the PR, I will deal with it and send Thomas the PR later.
 
-It seems a bit cleaner to use the current mechanism in that it stops the
-device appearing at all and hence repeated efforts to probe, plus a
-simple enable is less error prone, the way these SoCs are designed you
-don't have to pick which pinmux is in use for most of the IPs.  Where
-there are multiple options it does seem like a good approach though.
+Thanks
+  -- Daniel
 
-Tastes may differ though.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130812/80389ac4/attachment-0001.sig>
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
