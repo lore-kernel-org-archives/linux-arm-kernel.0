@@ -1,69 +1,82 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 12 Aug 2013 20:46:51 +0200
-Subject: [PATCH 5/9] PCI: mvebu: add support for Marvell Dove SoCs
-In-Reply-To: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1376333215-12885-6-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Mon, 12 Aug 2013 20:46:46 +0200
+Subject: [PATCH 0/9] ARM: dove: DT PCIe support
+Message-ID: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a compatible for the PCIe controller found on Marvell
-Dove SoCs. Binding documentation and Kconfig entry are also updated.
+This patch set adds support for the PCIe controllers found on Marvell
+Dove SoCs. It depends on mvebu-pci patches sent by Thomas Petazzoni.
+Also, it adds support for the Globalscale D3Plug - a Dove based board
+comprising a USB3.0 dual port controller and a mini-PCIe port. The
+mini-PCIe port has not been tested, but USB controller and attached
+USB stick has been detected.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+The patch set can be separated into two main parts and should be
+taken by the respective maintainers. First five patches belong to
+PCI driver for MVEBU SoCs, while last four patches are Marvell Dove
+related. It is based on (unstable) mvebu/for-next branch with MSI
+patches applied and will be rebased on request.
+
+Devicetree and Doc MLs are not Cc'ed for the driver-only patches,
+PCI ML and maintainer are not Cc'ed for the Dove-only patches.
+
+Patches 1 and 2 fix some minor issues with pci-mvebu by moving
+clk_prepare_enable before accessing any controller registers and
+counting sucessfully registered ports only.
+
+Patch 3 converts pci-mvebu from subsys_initcall registration to
+normal platform driver registration to allow it to fail with
+EPROBE_DEFER later.
+
+Patch 4 adds DT parsing for reset (PERST#) GPIO pins and delay to
+wait for PCIe devices after reset de-assertion.
+
+Patch 5 finally adds a compatible to pci-mvebu for Dove SoCs.
+
+Patch 6 updates dove_defconfig with some useful options for the
+Si5351 i2c clock generator found on SolidRun CuBox, PCIe driver,
+and USB3.0 xHCI driver.
+
+Patches 7 and 8 add PCIe controller nodes to Dove SoC DT and
+add support for the Globalscale D3Plug where this patches have
+been tested on.
+
+Patch 8 finally removes legacy PCIe driver init and clock
+gate workarounds from DT based Dove init.
+
+Sebastian Hesselbarth (9):
+  PCI: mvebu: move clock enable before register access
+  PCI: mvebu: increment nports only for registered ports
+  PCI: mvebu: remove subsys_initcall
+  PCI: mvebu: add support for reset on GPIO
+  PCI: mvebu: add support for Marvell Dove SoCs
+  ARM: dove: update dove_defconfig with SI5351, PCI, and xHCI
+  ARM: dove: add PCIe controllers to SoC DT
+  ARM: dove: add initial DT file for Globalscale D3Plug
+  ARM: dove: remove legacy pcie and clock init
+
+ .../devicetree/bindings/pci/mvebu-pci.txt          |    3 +
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/dove-d3plug.dts                  |  103 ++++++++++++++++++
+ arch/arm/boot/dts/dove.dtsi                        |   54 ++++++++++
+ arch/arm/configs/dove_defconfig                    |    4 +
+ arch/arm/mach-dove/board-dt.c                      |   29 -----
+ drivers/pci/host/Kconfig                           |    2 +-
+ drivers/pci/host/pci-mvebu.c                       |  113 +++++++++++++-------
+ 8 files changed, 241 insertions(+), 68 deletions(-)
+ create mode 100644 arch/arm/boot/dts/dove-d3plug.dts
 ---
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Olof Johansson <olof@lixom.net>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: devicetree at vger.kernel.org
 Cc: linux-doc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-pci at vger.kernel.org
----
- Documentation/devicetree/bindings/pci/mvebu-pci.txt |    1 +
- drivers/pci/host/Kconfig                            |    2 +-
- drivers/pci/host/pci-mvebu.c                        |    1 +
- 3 files changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-index f2fa261..cf470a9 100644
---- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-@@ -5,6 +5,7 @@ Mandatory properties:
- - compatible: one of the following values:
-     marvell,armada-370-pcie
-     marvell,armada-xp-pcie
-+    marvell,dove-pcie
-     marvell,kirkwood-pcie
- - #address-cells, set to <3>
- - #size-cells, set to <2>
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 1184ff6..492eec9 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -3,7 +3,7 @@ menu "PCI host controller drivers"
- 
- config PCI_MVEBU
- 	bool "Marvell EBU PCIe controller"
--	depends on ARCH_MVEBU || ARCH_KIRKWOOD
-+	depends on ARCH_MVEBU || ARCH_DOVE || ARCH_KIRKWOOD
- 
- config PCIE_DW
- 	bool
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index bdad4d4..b204c1d 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -986,6 +986,7 @@ static int mvebu_pcie_remove(struct platform_device *pdev)
- static const struct of_device_id mvebu_pcie_of_match_table[] = {
- 	{ .compatible = "marvell,armada-xp-pcie", },
- 	{ .compatible = "marvell,armada-370-pcie", },
-+	{ .compatible = "marvell,dove-pcie", },
- 	{ .compatible = "marvell,kirkwood-pcie", },
- 	{},
- };
 -- 
 1.7.10.4
