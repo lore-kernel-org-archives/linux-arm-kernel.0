@@ -1,53 +1,107 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 12 Aug 2013 06:03:29 +0300
-Subject: [Linux-Xtensa] Re: [PATCH] time: sched_clock: fix integer overflow
-In-Reply-To: <20130729055939.GK5161@tarshish>
-References: <232c026d1b8d2556679aea56cf77a6811f9a96c5.1374054369.git.baruch@tkos.co.il>
- <20130729055939.GK5161@tarshish>
-Message-ID: <20130812030329.GB6440@tarshish>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 12 Aug 2013 09:22:46 +0800
+Subject: [PATCH v15 00/13] Add tested id switch and vbus connect detect
+ support for Chipidea
+Message-ID: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, John,
+This patchset adds tested otg id switch function and vbus connect
+and disconnect detection for chipidea driver. And fix kinds of 
+bugs found at chipidea drivers after enabling id and vbus detection.
 
-On Mon, Jul 29, 2013 at 08:59:39AM +0300, Baruch Siach wrote:
-> On Wed, Jul 17, 2013 at 12:46:53PM +0300, Baruch Siach wrote:
-> > The expression '(1 << 32)' happens to evaluate as 0 on ARM, but it evaluates as
-> > 1 on xtensa and x86_64. This zeros sched_clock_mask, and breaks sched_clock().
-> > Set the type of 1 to 'unsigned long long' to get the value we need.
-> 
-> Ping? -rc3 is out, and this bug (which currently breaks xtensa) is not fixed 
-> yet. Please consider applying.
+This patch are fully tested at imx6 sabresd and imx28evk platform by me.
+Besides, marek tested it on two STMP3780-based boards (not yet mainline)
+and two MX28-based boards.
 
-Sorry to bother again, but -rc5 is here and xtensa sched_clock is still 
-broken.
+My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
 
-baruch
+Changes for v15:
+- Mark otgsc API as static line, and move them to otg.h [4/13]
+- Remove some redundant comments [6/13]
+- Fix some typos [8/13]
+- Retire flag CI_HDRC_PULLUP_ON_VBUS [12/13] [13/13]
 
-> > Reported-by: Max Filippov <jcmvbkbc@gmail.com>
-> > Tested-by: Max Filippov <jcmvbkbc@gmail.com>
-> > Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > ---
-> >  kernel/time/sched_clock.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
-> > index a326f27..0b479a6 100644
-> > --- a/kernel/time/sched_clock.c
-> > +++ b/kernel/time/sched_clock.c
-> > @@ -121,7 +121,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
-> >  	BUG_ON(bits > 32);
-> >  	WARN_ON(!irqs_disabled());
-> >  	read_sched_clock = read;
-> > -	sched_clock_mask = (1 << bits) - 1;
-> > +	sched_clock_mask = (1ULL << bits) - 1;
-> >  	cd.rate = rate;
-> >  
-> >  	/* calculate the mult/shift to convert counter ticks to ns. */
-> > -- 
+Changes for v14:
+- This patchset is based on below recent chipidea patches and newest
+usb-next, it can decrease rebase effort.
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Fabio Estevam (3):
+  chipidea: ci_hdrc_imx: Remove unused variable 'res'
+  chipidea: core: Move hw_phymode_configure() into probe
+  chipidea: Remove previous MODULE_ALIAS
+
+Lothar Wabmann (3):
+  usb: chipidea: improve kconfig 2.0
+  usb: chipidea: don't clobber return value of ci_role_start()
+  usb: chipidea: ci_hdrc_imx: remove an unsolicited module_put() call
+    from ci_hdrc_imx_remove()
+
+Peter Chen (1):
+  usb: chipidea: fix the build error with randconfig
+
+- [Michael comments]: move vbus operation to core, and squash two vbus
+patches. [1/12], [2/12]
+- [Michael comments]: move out non vbus and non id related patches. [14/14 at v13]
+
+Chagnes for v13:
+- Add Tested-by: Marek Vasut <marex@denx.de>
+- [Sascha's comments]: Add return value check for devm_regulator_get. [3/14]
+- [Marc's comments]: Change timeout usage at hw_wait_reg. [11/14]
+- [Alex's comments]: Using platdata flag to indicate dual role but not 
+OTG controller. [7/14]
+
+Changes for v12:
+- Rebased greg's usb-next tree (3.10.0-rc7+)
+- Split more small patches for single function and fix.
+
+Peter Chen (12):
+  usb: chipidea: move vbus regulator operation to core
+  usb: chipidea: host: add vbus regulator control
+  usb: chipidea: udc: otg_set_peripheral is useless for some chipidea
+    users
+  usb: chipidea: otg: Add otg file used to access otgsc
+  usb: chipidea: Add role init and destory APIs
+  usb: chipidea: add flag CI_HDRC_DUAL_ROLE_NOT_OTG
+  usb: chipidea: disable all interrupts and clear all interrupts status
+  usb: chipidea: move otg relate things to otg file
+  usb: chipidea: add vbus interrupt handler
+  usb: chipidea: add wait vbus lower than OTGSC_BSV before role starts
+  usb: chipidea: udc: misuse flag CI_HDRC_REGS_SHARED and
+    CI_HDRC_PULLUP_ON_VBUS
+  usb: chipidea: udc: .pullup is valid when vbus is on at
+    CI_HDRC_PULLUP_ON_VBUS
+
+Peter Chen (13):
+  usb: chipidea: move vbus regulator operation to core
+  usb: chipidea: host: add vbus regulator control
+  usb: chipidea: udc: otg_set_peripheral is useless for some chipidea
+    users
+  usb: chipidea: otg: Add otg file used to access otgsc
+  usb: chipidea: Add role init and destroy APIs
+  usb: chipidea: add flag CI_HDRC_DUAL_ROLE_NOT_OTG
+  usb: chipidea: disable all interrupts and clear all interrupts status
+  usb: chipidea: move otg related things to otg file
+  usb: chipidea: add vbus interrupt handler
+  usb: chipidea: add wait vbus lower than OTGSC_BSV before role starts
+  usb: chipidea: udc: misuse flag CI_HDRC_REGS_SHARED and
+    CI_HDRC_PULLUP_ON_VBUS
+  usb: chipidea: retire flag CI_HDRC_PULLUP_ON_VBUS
+  usb: chipidea: udc: .pullup is valid only when vbus is there
+
+ drivers/usb/chipidea/Makefile      |    2 +-
+ drivers/usb/chipidea/bits.h        |   10 ++
+ drivers/usb/chipidea/ci.h          |    8 ++
+ drivers/usb/chipidea/ci_hdrc_imx.c |   27 +-----
+ drivers/usb/chipidea/ci_hdrc_msm.c |    1 -
+ drivers/usb/chipidea/core.c        |  183 +++++++++++++++++++++++++-----------
+ drivers/usb/chipidea/host.c        |   30 ++++++-
+ drivers/usb/chipidea/host.h        |    6 +
+ drivers/usb/chipidea/otg.c         |  120 +++++++++++++++++++++++
+ drivers/usb/chipidea/otg.h         |   35 +++++++
+ drivers/usb/chipidea/udc.c         |   78 ++++++++++------
+ drivers/usb/chipidea/udc.h         |    6 +
+ include/linux/usb/chipidea.h       |    7 +-
+ 13 files changed, 401 insertions(+), 112 deletions(-)
+ create mode 100644 drivers/usb/chipidea/otg.c
+ create mode 100644 drivers/usb/chipidea/otg.h
