@@ -1,60 +1,85 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 12 Aug 2013 17:40:01 +0800
-Subject: [PATCH V3 2/8] ARM: tegra: config the polarity of the request of sys
- clock
+Date: Mon, 12 Aug 2013 17:40:00 +0800
+Subject: [PATCH V3 1/8] ARM: tegra: add common resume handling code for LP1
+ resuming
 In-Reply-To: <1376300407-14750-1-git-send-email-josephl@nvidia.com>
 References: <1376300407-14750-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1376300407-14750-3-git-send-email-josephl@nvidia.com>
+Message-ID: <1376300407-14750-2-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When suspending to LP1 mode, the SYSCLK will be clock gated. And different
-board may have different polarity of the request of SYSCLK, this patch
-configure the polarity from the DT for the board.
+Add support to the Tegra CPU reset vector to detect whether the CPU is
+resuming from LP1 suspend state. If it is, branch to the LP1-specific
+resume code.
+
+When Tegra enters the LP1 suspend state, the SDRAM controller is placed
+into a self-refresh state. For this reason, we must place the LP1 resume
+code into IRAM, so that it is accessible before SDRAM access has been
+re-enabled.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V3:
 * no change
 V2:
-* s/inverts/polarity/
+* update the commit message
+* move the define of IRAM_CODE_AREA to iomap.h
+* move the THUMB marco code before the 'bx' instruction
 ---
- arch/arm/mach-tegra/pmc.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/mach-tegra/iomap.h         |  2 ++
+ arch/arm/mach-tegra/reset-handler.S | 13 +++++++++++++
+ arch/arm/mach-tegra/reset.c         |  2 ++
+ 3 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-index 8345fcd..03e6405 100644
---- a/arch/arm/mach-tegra/pmc.c
-+++ b/arch/arm/mach-tegra/pmc.c
-@@ -27,6 +27,8 @@
- #include "pmc.h"
- #include "sleep.h"
+diff --git a/arch/arm/mach-tegra/iomap.h b/arch/arm/mach-tegra/iomap.h
+index 399fbca..f2bdcb4 100644
+--- a/arch/arm/mach-tegra/iomap.h
++++ b/arch/arm/mach-tegra/iomap.h
+@@ -24,6 +24,8 @@
+ #define TEGRA_IRAM_BASE			0x40000000
+ #define TEGRA_IRAM_SIZE			SZ_256K
  
-+#define TEGRA_POWER_SYSCLK_POLARITY	(1 << 10)  /* sys clk polarity */
-+#define TEGRA_POWER_SYSCLK_OE		(1 << 11)  /* system clock enable */
- #define TEGRA_POWER_EFFECT_LP0		(1 << 14)  /* LP0 when CPU pwr gated */
- #define TEGRA_POWER_CPU_PWRREQ_POLARITY	(1 << 15)  /* CPU pwr req polarity */
- #define TEGRA_POWER_CPU_PWRREQ_OE	(1 << 16)  /* CPU pwr req enable */
-@@ -238,6 +240,20 @@ void tegra_pmc_suspend_init(void)
- 	reg = tegra_pmc_readl(PMC_CTRL);
- 	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
- 	tegra_pmc_writel(reg, PMC_CTRL);
++#define TEGRA_IRAM_CODE_AREA		(TEGRA_IRAM_BASE + SZ_4K)
 +
-+	reg = tegra_pmc_readl(PMC_CTRL);
-+
-+	if (!pmc_pm_data.sysclkreq_high)
-+		reg |= TEGRA_POWER_SYSCLK_POLARITY;
-+	else
-+		reg &= ~TEGRA_POWER_SYSCLK_POLARITY;
-+
-+	/* configure the output polarity while the request is tristated */
-+	tegra_pmc_writel(reg, PMC_CTRL);
-+
-+	/* now enable the request */
-+	reg |= TEGRA_POWER_SYSCLK_OE;
-+	tegra_pmc_writel(reg, PMC_CTRL);
- }
+ #define TEGRA_HOST1X_BASE		0x50000000
+ #define TEGRA_HOST1X_SIZE		0x24000
+ 
+diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+index 34614bd..f527b2c 100644
+--- a/arch/arm/mach-tegra/reset-handler.S
++++ b/arch/arm/mach-tegra/reset-handler.S
+@@ -182,6 +182,19 @@ after_errata:
+ 1:
  #endif
  
++	/* Waking up from LP1? */
++	ldr	r8, [r12, #RESET_DATA(MASK_LP1)]
++	tst	r8, r11				@ if in_lp1
++	beq	__is_not_lp1
++	cmp	r10, #0
++	bne	__die				@ only CPU0 can be here
++	ldr	lr, [r12, #RESET_DATA(STARTUP_LP1)]
++	cmp	lr, #0
++	bleq	__die				@ no LP1 startup handler
++ THUMB(	add	lr, lr, #1 )			@ switch to Thumb mode
++	bx	lr
++__is_not_lp1:
++
+ 	/* Waking up from LP2? */
+ 	ldr	r9, [r12, #RESET_DATA(MASK_LP2)]
+ 	tst	r9, r11				@ if in_lp2
+diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
+index 1ac434e..fd0bbf8 100644
+--- a/arch/arm/mach-tegra/reset.c
++++ b/arch/arm/mach-tegra/reset.c
+@@ -81,6 +81,8 @@ void __init tegra_cpu_reset_handler_init(void)
+ #endif
+ 
+ #ifdef CONFIG_PM_SLEEP
++	__tegra_cpu_reset_handler_data[TEGRA_RESET_STARTUP_LP1] =
++		TEGRA_IRAM_CODE_AREA;
+ 	__tegra_cpu_reset_handler_data[TEGRA_RESET_STARTUP_LP2] =
+ 		virt_to_phys((void *)tegra_resume);
+ #endif
 -- 
 1.8.3.4
