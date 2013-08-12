@@ -1,82 +1,25 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 12 Aug 2013 16:40:44 -0500
-Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
- module registers and APIs
-In-Reply-To: <87y586pvkq.fsf@kernel.org>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
- <5203A0BC.8060205@ti.com> <5203C457.80301@ti.com>
- <20130809051146.GB7656@atomide.com> <52055733.70808@ti.com>
- <87y586pvkq.fsf@kernel.org>
-Message-ID: <5209565C.7090508@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 12 Aug 2013 22:40:50 +0100
+Subject: [PATCH 1/16 v2] sound/soc/pxa/mioa701_wm9713.c: Avoid using
+ ARRAY_AND_SIZE(e) as a function argument
+In-Reply-To: <1376340564-7975-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1376340564-7975-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20130812214050.GI6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2013 02:17 PM, Kevin Hilman wrote:
-> Dave Gerlach <d-gerlach@ti.com> writes:
->
->> On 08/09/2013 12:11 AM, Tony Lindgren wrote:
->>> * Dave Gerlach <d-gerlach@ti.com> [130808 09:23]:
->>>> On 08/08/2013 08:44 AM, Santosh Shilimkar wrote:
->>>>> Lets address the above better. I don't see a need of 8 functions
->>>>> exported doing one or 2 register writes.
->>>>>
->>>>> Look M3 based handling is going to be there on future SOCs
->>>>> as well and this kind of handling of IPC is very short cited.
->>>>>
->>>>
->>>> The idea here was to move all control module register accesses into
->>>> one file in planning of implementing a driver for the control module
->>>> itself in the future.
->>>>
->>>>> Probably we should have a separate driver for M3 in linux which
->>>>> can have all this local code instead of all these exports.
->>>>
->>>> The wkup_m3 code has been moved to a small driver found in patch 8
->>>> of this series, would it better to move this code there rather than
->>>> with the rest of the control module code?
->>>
->>> Please make everything you can into regular device drivers.
->>>
->>> We still have some dependencies to mach-omap2 code for PRCM
->>> for example, but we're trying to get all that to live in
->>> drivers.
->>>
->>> So for new pieces, let's not add further dependencies to
->>> complicate moving things to drivers.
->>>
->>> Regards,
->>>
->>> Tony
->>>
->>
->> Ok I will go ahead and pull the control module code that handles IPC
->> into the wkup_m3 driver.
->
-> Any control module register access still needs to stay in control.c.
->
->> The wkup_m3.c file is still present in mach-omap2 as the right
->> location for it wasn't decided in the last RFC. Any thoughts on a good
->> location for it?
->
-> I raised this also in earlier reviews, but don't remember the if it was
-> answered...
->
-> Why can't we handle the wkup_m3 using remoteproc/rpmsg instead of
-> creating another little driver that duplicates communication with the
-> M3.  Note also that the firmware load part would also be provided by
-> remoteproc/rpmsg.
+On Mon, Aug 12, 2013 at 10:49:24PM +0200, Julia Lawall wrote:
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
+> 
+> Replace ARRAY_AND_SIZE(e) in function argument position to avoid hiding the
+> arity of the called function.
 
-Looping Suman Anna who handled the IPC patches this patch set is based 
-on top of...
-
-For the wkup_m3, the mailbox isn't used in a traditional manner. It's 
-only used with a dummy write to trigger an interrupt from the A8 to the 
-M3 and then communication happens in IPC registers within the control 
-module. No messages are actually sent through the mailbox in either 
-direction so that's why it was done this way rather than bring in full 
-support for the mailbox.
-
->
-> Kevin
->
+What is the difference between this and the patch I applied the other
+day?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130812/838d071a/attachment.sig>
