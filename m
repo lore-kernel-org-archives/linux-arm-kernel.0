@@ -1,104 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Aug 2013 12:44:02 +0100
-Subject: [PATCH v2 8/8] ARM: DRA7: dts: Add the dts files for dra7 SoC
- and dra7-evm board
-In-Reply-To: <1375183546-12758-9-git-send-email-rnayak@ti.com>
-References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
- <1375183546-12758-9-git-send-email-rnayak@ti.com>
-Message-ID: <20130812114402.GB6616@e106331-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 12 Aug 2013 12:45:20 +0100
+Subject: [PATCH 0/4] iommu: arm smmu: driver updates for 3.12
+In-Reply-To: <1375294888-10826-1-git-send-email-will.deacon@arm.com>
+References: <1375294888-10826-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20130812114520.GB25995@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 12:25:46PM +0100, Rajendra Nayak wrote:
-> From: R Sricharan <r.sricharan@ti.com>
->
-> Add minimal device tree source needed for DRA7 based SoCs.
-> Also add a board dts file for the dra7-evm (based on dra752)
-> which contains 1.5G of memory with 1G interleaved and 512MB
-> non-interleaved. Also added in the board file are pin configuration
-> details for i2c, mcspi and uart devices on board.
->
-> Signed-off-by: R Sricharan <r.sricharan@ti.com>
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> ---
->  arch/arm/boot/dts/Makefile     |    3 +-
->  arch/arm/boot/dts/dra7-evm.dts |  163 ++++++++++++++
->  arch/arm/boot/dts/dra7.dtsi    |  488 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 653 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/dra7-evm.dts
->  create mode 100644 arch/arm/boot/dts/dra7.dtsi
+Hi Joerg,
 
-[...]
+On Wed, Jul 31, 2013 at 07:21:24PM +0100, Will Deacon wrote:
+> Here's a set of small drivers updates to the ARM SMMU driver that went
+> in during the merge window. The main changes are:
+> 
+>  - Removal of a broken big-endian special case when setting the pgd
+>  - Better error reporting when running with a single, combined IRQ line
+>  - Removing the dynamic use of VMIDs for stage-1 mappings. This is basically
+>    to make life easier for hypervisors, who apparently have a hard life
+>    if guest OSs allocate their own VMIDs
+>  - Simplification of the VMID/ASID allocation scheme based on the fact
+>    that we're just trying to assign one ID per context-bank.
+> 
+> I've tested these patches with an AArch32 MMU-500 model and not seen any
+> problems running stage-1 DMA transactions through the SMMU.
 
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> new file mode 100644
-> index 0000000..8a0c08e
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -0,0 +1,488 @@
-> +/*
-> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + * Based on "omap4.dtsi"
-> + */
-> +
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +       compatible = "ti,dra7xx";
-> +       interrupt-parent = <&gic>;
-> +
-> +       aliases {
-> +               serial0 = &uart1;
-> +               serial1 = &uart2;
-> +               serial2 = &uart3;
-> +               serial3 = &uart4;
-> +               serial4 = &uart5;
-> +               serial5 = &uart6;
-> +       };
-> +
-> +       cpus {
-> +               cpu at 0 {
-> +                       compatible = "arm,cortex-a15";
-> +                       timer {
-> +                               compatible = "arm,armv7-timer";
-> +                               /*
-> +                                * PPI secure/nonsecure IRQ,
-> +                                * active low level-sensitive
-> +                                */
-> +                               interrupts = <1 13 0x308>,
-> +                                            <1 14 0x308>;
-> +                               clock-frequency = <6144000>;
-> +                       };
-> +               };
-
-The cpu nodes should have a reg matching their unit-address, and a
-device_type = "cpu".
-
-The timer nodes should *not* be under the CPU nodes. They should be
-under under the root node. I realise that it makes intuitive sense to
-describe per-cpu resources this way, but that's not the way the bindings
-are intended to be used (does thei DT even work?).
-
-No virtual/hypervisor interrupts?
-
-Do you really need the clock-frequency property? It's far preferrable to
-have your bootloader do the right thing and program CNTFRQ with the
-correct value.
-
-> +
-> +       gic: interrupt-controller at 48211000 {
-> +               compatible = "arm,cortex-a15-gic";
-> +               interrupt-controller;
-> +               #interrupt-cells = <3>;
-> +               reg = <0x48211000 0x1000>,
-> +                     <0x48212000 0x1000>;
-
-Similarly, no GICH/GICV registers?
+Could you queue these for 3.12 please?
 
 Thanks,
-Mark.
+
+Will
