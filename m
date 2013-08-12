@@ -1,53 +1,79 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 12 Aug 2013 09:43:42 -0700
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <52091014.3040301@codeaurora.org>
-References: <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
- <51FA9F54.3060704@linaro.org>
- <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
- <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
- <20130809172757.GD14845@codeaurora.org>
- <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
- <52090B43.9090000@codeaurora.org>
- <b246ae2f-4841-4bc0-80b3-0bd65269b83f@CH1EHSMHS039.ehs.local>
- <52091014.3040301@codeaurora.org>
-Message-ID: <70974708-d076-4123-a62a-f5d18e7b145c@CH1EHSMHS007.ehs.local>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Aug 2013 17:43:54 +0100
+Subject: =?utf-8?B?562U5aSNOiBbUEFUQw==?=
+ =?utf-8?Q?H?= v3 2/2] i2c: imx: Add Vybrid VF610 I2C controller
+ support
+In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E851FE7AC@039-SN1MPN1-004.039d.mgd.msft.net>
+References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
+ <1375418648-22760-2-git-send-email-b35083@freescale.com>
+ <20130810140827.GC18085@e106331-lin.cambridge.arm.com>
+ <B56CDBE15CE27145A4B77D2D24263E851FE7AC@039-SN1MPN1-004.039d.mgd.msft.net>
+Message-ID: <20130812164354.GF27165@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 09:40:52AM -0700, Stephen Boyd wrote:
-> On 08/12/13 09:24, S?ren Brinkmann wrote:
-> > On Mon, Aug 12, 2013 at 09:20:19AM -0700, Stephen Boyd wrote:
-> >> On 08/12/13 09:03, S?ren Brinkmann wrote:
-> >>> On Fri, Aug 09, 2013 at 10:27:57AM -0700, Stephen Boyd wrote:
-> >>>> On 08/09, Daniel Lezcano wrote:
-> >>>>> yes, but at least the broadcast mechanism should send an IPI to cpu0 to
-> >>>>> wake it up, no ? As Stephen stated this kind of configuration should has
-> >>>>> never been tested before so the tick broadcast code is not handling this
-> >>>>> case properly IMHO.
-> >>>>>
-> >>>> If you have a per-cpu tick device that isn't suffering from
-> >>>> FEAT_C3_STOP why wouldn't you use that for the tick versus a
-> >>>> per-cpu tick device that has FEAT_C3_STOP? It sounds like there
-> >>>> is a bug in the preference logic or you should boost the rating
-> >>>> of the arm global timer above the twd. Does this patch help? It
-> >>>> should make the arm global timer the tick device and whatever the
-> >>>> cadence timer you have into the broadcast device.
-> >>> I finally got to test your patch. Unfortunately, it makes the system
-> >>> hang even earlier:
-> >> Sorry it had a bug depending on the registration order. Can you try this
-> >> one (tabs are probably spaces, sorry)? I will go read through this
-> >> thread to see if we already covered the registration order.
-> > What is the base for your patch? I based my GT enable patch on 3.11-rc3
-> > and for consistency in our debugging, I didn't move it elsewhere since.
-> > Your patch doesn't apply cleanly on it. I see if I can work it out, just
-> > let me know if it depends on something not available in 3.11-rc3.
+[Adding other devicetree maintainers to Cc]
+
+On Mon, Aug 12, 2013 at 01:56:07PM +0100, Lu Jingchang-B35083 wrote:
 > 
-> I applied this on 3.11-rc4. I don't think anything has changed there
-> between rc3 and rc4. so you're probably running into the whitespace problem.
+> ________________________________________
+> >???: Mark Rutland [mark.rutland at arm.com]
+> >????: 2013?8?10? 22:08
+> >???: Lu Jingchang-B35083
+> >??: wsa at the-dreams.de; Estevam Fabio-R49496; Li Xiaochun-B41219; s.hauer at pengutronix.de; linux-i2c at vger.kernel.org; Jin Zhengxiong-R64188; shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org
+> >??: Re: [PATCH v3 2/2] i2c: imx: Add Vybrid VF610 I2C controller support
+> 
+> >On Fri, Aug 02, 2013 at 05:44:08AM +0100, Jingchang Lu wrote:
+> >>   Add Freescale Vybrid VF610 I2C controller support to
+> >> imx I2C driver framework.
+> >>   Some operation is different from imx I2C controller.
+> >> The register offset, the i2c clock divider value table,
+> >> the module enabling(I2CR_IEN) which is just invert with imx,
+> >> and the interrupt flag(I2SR) clearing opcode is w1c on VF610
+> >> but w0c on imx.
+> >>
+> >> Signed-off-by: Jason Jin <Jason.jin@freescale.com>
+> >> Signed-off-by: Xiaochun Li <b41219@freescale.com>
+> >> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> >> ---
+> >> changes in v3:
+> >>   Using struct naming the i2c clock {div, regval} pair.
+> >>  Using address shift handling registers address difference.
+> >>
+> >> changes in v2:
+> >>   Fix building section mismatch(es) warning.
+> >>
+> >>  drivers/i2c/busses/i2c-imx.c | 146 ++++++++++++++++++++++++++++++++++++-------
+> >>  1 file changed, 122 insertions(+), 24 deletions(-)
+> 
+> >[...]
+> 
+> >> @@ -145,6 +233,7 @@ MODULE_DEVICE_TABLE(platform, imx_i2c_devtype);
+> >>  static const struct of_device_id i2c_imx_dt_ids[] = {
+> >>         { .compatible = "fsl,imx1-i2c", .data = &imx_i2c_devtype[IMX1_I2C], },
+> >>         { .compatible = "fsl,imx21-i2c", .data = &imx_i2c_devtype[IMX21_I2C], },
+> >> +       { .compatible = "fsl,vf610-i2c", .data = &imx_i2c_devtype[VF610_I2C], },
+> >>         { /* sentinel */ }
+> >>  };
+> 
+> 
+> >That string doesn't seem to be documented anywhere (from a quick grep of
+> >Documentation/devicetree), and there's no binding update included
+> >here. It would be nice for that to be fixed :)
+> [Lu Jingchang]
+> The binding string for i2c-imx driver in Documentation/devicetree/bindings/i2c/i2c-imx.txt use a wildcard format
+> of "- compatible : Should be "fsl,<chip>-i2c" " for device using this driver. Neither fsl,imx1-i2c nor fsl,imx21-i2c
+> is described in the binding document. So I just leave the vf610 i2c compatible with this. 
 
-That or the scissors are my problem. I never worked with scissors and it
-looks kinda odd what happened when I am'ed the patch. Anyway, I just
-manually merged it in.
+I'm not a big fan on wildcards in bindings, as it leaves people free to
+put anything in and claim it's a documented binding, and makes it far
+harder for an os to actually implement drivers for said binding, as
+there's no canonical reference for the set of valid variations.
 
-	S?ren
+Obviously there is some precedent, but I'm not sure it's something we
+want to stick with, and we can prevent it my updating the documentation
+now.
+
+Does anyone else have an opinion?
+
+Mark.
