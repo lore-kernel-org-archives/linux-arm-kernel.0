@@ -1,38 +1,88 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 12 Aug 2013 19:02:20 +0200
-Subject: [PATCH V4 1/4] ARM: dts: exynos5420: add i2s controllers
-In-Reply-To: <20130812131235.GX6427@sirena.org.uk>
-References: <1376302070-1877-1-git-send-email-padma.v@samsung.com>
- <3916118.YsNJ4NTaJS@amdc1227> <20130812131235.GX6427@sirena.org.uk>
-Message-ID: <1427610.pB8BGbMKTL@flatron>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 12 Aug 2013 19:02:39 +0200
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <9b07d8a3-b650-4147-b952-9bcfc1172c51@VA3EHSMHS025.ehs.local>
+References: <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
+ <51FA9F54.3060704@linaro.org>
+ <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
+ <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
+ <20130809172757.GD14845@codeaurora.org>
+ <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
+ <52090B43.9090000@codeaurora.org>
+ <d36fc2db-1189-4c6a-9bc4-0ac2e29eaa1b@AM1EHSMHS009.ehs.local>
+ <5209120D.1010701@linaro.org>
+ <9b07d8a3-b650-4147-b952-9bcfc1172c51@VA3EHSMHS025.ehs.local>
+Message-ID: <5209152F.5020307@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 of August 2013 14:12:36 Mark Brown wrote:
-> On Mon, Aug 12, 2013 at 01:41:23PM +0200, Tomasz Figa wrote:
-> > On Monday 12 of August 2013 12:34:48 Mark Brown wrote:
-> > > I'd expect that to interact badly with the pinmuxing - unless the
-> > > device is disabled it'll try to grab its pins on probe which is not
-> > > going to be a good idea unless it is actually wired up for use in
-> > > the system.  Or is there some other mechanism for handling that?
-> > 
-> > Ah, good point. Now I wonder whether pinctrl nodes shouldn't be
-> > considered board-specific and specified in board-level dts instead?
+On 08/12/2013 06:53 PM, S?ren Brinkmann wrote:
+> On Mon, Aug 12, 2013 at 06:49:17PM +0200, Daniel Lezcano wrote:
+>> On 08/12/2013 06:32 PM, S?ren Brinkmann wrote:
+>>> On Mon, Aug 12, 2013 at 09:20:19AM -0700, Stephen Boyd wrote:
+>>>> On 08/12/13 09:03, S?ren Brinkmann wrote:
+>>>>> On Fri, Aug 09, 2013 at 10:27:57AM -0700, Stephen Boyd wrote:
+>>>>>> On 08/09, Daniel Lezcano wrote:
+>>>>>>> yes, but at least the broadcast mechanism should send an IPI to cpu0 to
+>>>>>>> wake it up, no ? As Stephen stated this kind of configuration should has
+>>>>>>> never been tested before so the tick broadcast code is not handling this
+>>>>>>> case properly IMHO.
+>>>>>>>
+>>>>>> If you have a per-cpu tick device that isn't suffering from
+>>>>>> FEAT_C3_STOP why wouldn't you use that for the tick versus a
+>>>>>> per-cpu tick device that has FEAT_C3_STOP? It sounds like there
+>>>>>> is a bug in the preference logic or you should boost the rating
+>>>>>> of the arm global timer above the twd. Does this patch help? It
+>>>>>> should make the arm global timer the tick device and whatever the
+>>>>>> cadence timer you have into the broadcast device.
+>>>>> I finally got to test your patch. Unfortunately, it makes the system
+>>>>> hang even earlier:
+>>>>
+>>>> Sorry it had a bug depending on the registration order. Can you try this
+>>>> one (tabs are probably spaces, sorry)? I will go read through this
+>>>> thread to see if we already covered the registration order.
+>>>
+>>> That did it! Booted straight into the system. 
+>>
+>> Good news :)
+>>
+>>> The broadcast device is
+>>> the TTC instead of GT, now.
+>>>
+>>> 	Tick Device: mode:     1
+>>> 	Broadcast device
+>>> 	Clock Event Device: ttc_clockevent
+>>> 	 max_delta_ns:   1207932479
+>>> 	 min_delta_ns:   18432
+>>> 	 mult:           233015
+>>> 	 shift:          32
+>>> 	 mode:           1
+>>> 	 next_event:     9223372036854775807 nsecs
+>>> 	 set_next_event: ttc_set_next_event
+>>> 	 set_mode:       ttc_set_mode
+>>> 	 event_handler:  tick_handle_oneshot_broadcast
+>>> 	 retries:        0
+>>> 	
+>>> 	tick_broadcast_mask: 00000000
+>>> 	tick_broadcast_oneshot_mask: 00000000
+>>
+>> At the first glance, the timer broadcast usage is not set, right ? Can
+>> you try with the cpuidle flag even if it is not needed ?
 > 
-> It seems a bit cleaner to use the current mechanism in that it stops the
-> device appearing at all and hence repeated efforts to probe, plus a
-> simple enable is less error prone, the way these SoCs are designed you
-> don't have to pick which pinmux is in use for most of the IPs.  Where
-> there are multiple options it does seem like a good approach though.
-> 
-> Tastes may differ though.
+> It's actually present. I have a clean 3.11-rc3 and the only changes are
+> my patch to enable the GT and Stephen's fix.
+> The cpuidle stats show both idle states being used.
 
-Right, if this SoC has only one pinmux setting for this IP, then it's 
-fine.
+Ah, right. The tick_broadcast_mask is not set because the arm global
+timer has not the CLOCK_EVT_FEAT_C3STOP feature flag set.
 
-Padmavathi, this was the only issue I spotted, so have my:
+Thanks
+  -- Daniel
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-Best regards,
-Tomasz
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
