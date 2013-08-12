@@ -1,157 +1,50 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 12 Aug 2013 20:46:49 +0200
-Subject: [PATCH 3/9] PCI: mvebu: remove subsys_initcall
+Date: Mon, 12 Aug 2013 20:46:52 +0200
+Subject: [PATCH 6/9] ARM: dove: update dove_defconfig with SI5351, PCI,
+ and xHCI
 In-Reply-To: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1376333215-12885-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1376333215-12885-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the subsys_initcall from the driver and converts it to
-a normal platform_driver. Also, drvdata is set and a remove functions
-is added to disable the clock and free resources.
+This adds SI5351 clock driver found on the SolidRun CuBox, PCI driver
+and USB 3.0 xHCI driver found on the Globalscale D3Plug to dove_defconfig.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Olof Johansson <olof@lixom.net>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-pci at vger.kernel.org
 ---
- drivers/pci/host/pci-mvebu.c |   46 +++++++++++++++++++++++++-----------------
- 1 file changed, 27 insertions(+), 19 deletions(-)
+ arch/arm/configs/dove_defconfig |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 0a359d7..2370b59 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -165,7 +165,7 @@ static void mvebu_pcie_set_local_dev_nr(struct mvebu_pcie_port *port, int nr)
-  * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
-  * WIN[0-3] -> DRAM bank[0-3]
-  */
--static void __init mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
-+static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
- {
- 	const struct mbus_dram_target_info *dram;
- 	u32 size;
-@@ -217,7 +217,7 @@ static void __init mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
- 	       port->base + PCIE_BAR_CTRL_OFF(1));
- }
- 
--static void __init mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
-+static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
- {
- 	u16 cmd;
- 	u32 mask;
-@@ -628,7 +628,7 @@ static struct pci_ops mvebu_pcie_ops = {
- 	.write = mvebu_pcie_wr_conf,
- };
- 
--static int __init mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
-+static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- {
- 	struct mvebu_pcie *pcie = sys_to_pcie(sys);
- 	int i;
-@@ -647,7 +647,7 @@ static int __init mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- 	return 1;
- }
- 
--static int __init mvebu_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
-+static int mvebu_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
- {
- 	struct of_irq oirq;
- 	int ret;
-@@ -704,7 +704,7 @@ resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 		return start;
- }
- 
--static void __init mvebu_pcie_enable(struct mvebu_pcie *pcie)
-+static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
- {
- 	struct hw_pci hw;
- 
-@@ -727,10 +727,8 @@ static void __init mvebu_pcie_enable(struct mvebu_pcie *pcie)
-  * <...> property for one that matches the given port/lane. Once
-  * found, maps it.
-  */
--static void __iomem * __init
--mvebu_pcie_map_registers(struct platform_device *pdev,
--			 struct device_node *np,
--			 struct mvebu_pcie_port *port)
-+static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
-+		      struct device_node *np, struct mvebu_pcie_port *port)
- {
- 	struct resource regs;
- 	int ret = 0;
-@@ -786,7 +784,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
- 	return -ENOENT;
- }
- 
--static void __init mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
-+static void mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
- {
- 	struct device_node *msi_node;
- 
-@@ -801,7 +799,7 @@ static void __init mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
- 		pcie->msi->dev = &pcie->pdev->dev;
- }
- 
--static int __init mvebu_pcie_probe(struct platform_device *pdev)
-+static int mvebu_pcie_probe(struct platform_device *pdev)
- {
- 	struct mvebu_pcie *pcie;
- 	struct device_node *np = pdev->dev.of_node;
-@@ -814,6 +812,7 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	pcie->pdev = pdev;
-+	platform_set_drvdata(pdev, pcie);
- 
- 	/* Get the PCIe memory and I/O aperture */
- 	mvebu_mbus_get_pcie_mem_aperture(&pcie->mem);
-@@ -939,6 +938,20 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int mvebu_pcie_remove(struct platform_device *pdev)
-+{
-+	struct mvebu_pcie *pcie = platform_get_drvdata(pdev);
-+	struct mvebu_pcie_port *port = &pcie->ports[0];
-+	int i;
-+
-+	for (i = 0; i < pcie->nports; i++, port++) {
-+		clk_disable_unprepare(port->clk);
-+		kfree(port->name);
-+	}
-+
-+	return 0;
-+}
-+
- static const struct of_device_id mvebu_pcie_of_match_table[] = {
- 	{ .compatible = "marvell,armada-xp-pcie", },
- 	{ .compatible = "marvell,armada-370-pcie", },
-@@ -954,15 +967,10 @@ static struct platform_driver mvebu_pcie_driver = {
- 		.of_match_table =
- 		   of_match_ptr(mvebu_pcie_of_match_table),
- 	},
-+	.probe = mvebu_pcie_probe,
-+	.remove = mvebu_pcie_remove,
- };
--
--static int __init mvebu_pcie_init(void)
--{
--	return platform_driver_probe(&mvebu_pcie_driver,
--				     mvebu_pcie_probe);
--}
--
--subsys_initcall(mvebu_pcie_init);
-+module_platform_driver(mvebu_pcie_driver);
- 
- MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
- MODULE_DESCRIPTION("Marvell EBU PCIe driver");
+diff --git a/arch/arm/configs/dove_defconfig b/arch/arm/configs/dove_defconfig
+index 4364eff..1101054 100644
+--- a/arch/arm/configs/dove_defconfig
++++ b/arch/arm/configs/dove_defconfig
+@@ -13,6 +13,9 @@ CONFIG_ARCH_DOVE=y
+ CONFIG_MACH_DOVE_DB=y
+ CONFIG_MACH_CM_A510=y
+ CONFIG_MACH_DOVE_DT=y
++CONFIG_PCI=y
++CONFIG_PCI_MSI=y
++CONFIG_PCI_MVEBU=y
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+@@ -78,6 +81,7 @@ CONFIG_SPI_ORION=y
+ CONFIG_THERMAL=y
+ CONFIG_DOVE_THERMAL=y
+ CONFIG_USB=y
++CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_ROOT_HUB_TT=y
+ CONFIG_USB_STORAGE=y
 -- 
 1.7.10.4
