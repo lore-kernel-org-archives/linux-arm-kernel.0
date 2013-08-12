@@ -1,64 +1,57 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 12 Aug 2013 11:21:29 -0400
-Subject: [PATCH 1/2] power: Add APM X-Gene system reboot driver
-In-Reply-To: <20130809212849.GD12638@lizard.sbx05730.santaca.wayport.net>
-References: <1372797539-13111-1-git-send-email-lho@apm.com>
- <1372797539-13111-2-git-send-email-lho@apm.com>
- <20130809212849.GD12638@lizard.sbx05730.santaca.wayport.net>
-Message-ID: <5208FD79.4070307@codeaurora.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 12 Aug 2013 16:34:22 +0100
+Subject: [GIT PULL] ARM: TC2: CPU idle big.LITTLE driver
+Message-ID: <20130812153422.GA6426@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/2013 05:28 PM, Anton Vorontsov wrote:
-> On Tue, Jul 02, 2013 at 02:38:58PM -0600, Loc Ho wrote:
->> power: Add APM X-Gene SoC system reboot driver. This driver handles only
->> system reboot. System shutdown is board specific and can be handled by board
->> driver or GPIO based shutdown driver.
->>
->> Signed-off-by: Loc Ho <lho@apm.com>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
->> ---
-> 
-> The patch looks great, thanks for it! Just a few minor issues I noticed...
-> 
->>  drivers/power/reset/Kconfig        |    7 +++
->>  drivers/power/reset/Makefile       |    1 +
->>  drivers/power/reset/xgene-reboot.c |  101 ++++++++++++++++++++++++++++++++++++
->>  3 files changed, 109 insertions(+), 0 deletions(-)
->>  create mode 100755 drivers/power/reset/xgene-reboot.c
->>
->> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
->> index 349e9ae..c41a7de 100644
->> --- a/drivers/power/reset/Kconfig
->> +++ b/drivers/power/reset/Kconfig
->> @@ -37,3 +37,10 @@ config POWER_RESET_VEXPRESS
->>  	help
->>  	  Power off and reset support for the ARM Ltd. Versatile
->>  	  Express boards.
->> +
->> +config POWER_RESET_XGENE
->> +        bool
->> +	default y if ARM64
-> 
-> This is not good. You don't want to select the driver for all ARM64
-> builds. I changed it to 'depends on' and made the driver optionally
-> selectable.
+Hi Olof, Kevin,
 
-I thought the desired default was to have a single arm64 kernel binary that
-could run on all platforms.
+please pull this patch series that provides a CPU idle driver for the vexpress
+TC2 testchip, and it is a stepping stone towards an ARM unified CPU idle driver
+based on the MCPM framework.
 
-> 
->> +        depends on POWER_RESET	
->> +        help
->> +          Reboot support for the APM SoC X-Gene Eval boards.
+Series is based against this pull request from Pawel which is a strict
+dependency and they must be merged in order:
 
-[...]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/190067.html
 
-Thanks,
-Christopher
+Thanks !!
+Lorenzo
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+The following changes since commit 2d6746c48076fd56619f11cdd5c74656ea8cde48:
+
+  ARM: vexpress/TC2: implement PM suspend method (2013-08-12 10:59:13 +0100)
+
+are available in the git repository at:
+
+  git://linux-arm.org/linux-2.6-lp.git tags/cpuidle-bL
+
+for you to fetch changes up to 04c40064928d3a1eb50e4ea3883765b9cfcb0f73:
+
+  cpuidle: big.LITTLE: vexpress-TC2 CPU idle driver (2013-08-12 10:59:14 +0100)
+
+----------------------------------------------------------------
+This patch series contains:
+
+- GIC driver update to add a method to disable the GIC CPU IF
+- TC2 MCPM update to add GIC CPU disabling to suspend method
+- TC2 CPU idle big.LITTLE driver
+
+----------------------------------------------------------------
+Lorenzo Pieralisi (2):
+      ARM: vexpress: tc2: disable GIC CPU IF in tc2_pm_suspend
+      cpuidle: big.LITTLE: vexpress-TC2 CPU idle driver
+
+Nicolas Pitre (1):
+      drivers: irq-chip: irq-gic: introduce gic_cpu_if_down()
+
+ MAINTAINERS                          |   9 ++
+ arch/arm/mach-vexpress/tc2_pm.c      |   2 +
+ drivers/cpuidle/Kconfig              |  10 ++
+ drivers/cpuidle/Makefile             |   1 +
+ drivers/cpuidle/cpuidle-big_little.c | 209 +++++++++++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic.c            |   6 +
+ include/linux/irqchip/arm-gic.h      |   1 +
+ 7 files changed, 238 insertions(+)
+ create mode 100644 drivers/cpuidle/cpuidle-big_little.c
