@@ -1,20 +1,39 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 12 Aug 2013 11:08:05 -0700
-Subject: [PATCH 06/20] tty: serial: pxa: remove old cruft
-In-Reply-To: <52089A81.6080800@gmail.com>
-References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
- <1375889649-14638-7-git-send-email-zonque@gmail.com>
- <52089A81.6080800@gmail.com>
-Message-ID: <20130812180805.GA13077@kroah.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 12 Aug 2013 13:08:51 -0500
+Subject: [PATCH] usb: gadget: at91_udc: add usb_clk for transition to
+ common clk framework
+In-Reply-To: <5208E881.3030205@atmel.com>
+References: <1375337885-2684-1-git-send-email-b.brezillon@overkiz.com>
+ <5208E881.3030205@atmel.com>
+Message-ID: <20130812180851.GF27954@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 10:19:13AM +0200, Daniel Mack wrote:
-> Hi Greg,
+On Mon, Aug 12, 2013 at 03:52:01PM +0200, Nicolas Ferre wrote:
+> On 01/08/2013 08:18, Boris BREZILLON :
+> >The AT91 PMC (Power Management Controller) provides an USB clock used by
+> >USB Full Speed host (ohci) and USB Full Speed device (udc).
+> >The usb drivers (ohci and udc) must configure this clock to 48Mhz.
+> >This configuration was formely done in mach-at91/clock.c, but this
+> >implementation will be removed when moving to common clk framework.
+> >
+> >This patch adds support for usb clock retrieval and configuration, and is
+> >backward compatible with the current at91 clk implementation (if usb clk
+> >is not found, it does not configure/enable it).
+> >
+> >Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 > 
-> This patch can be merged independently of all others. Could you queue it
-> up for 3.12 please?
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Will do.
+I don't have the original, where is it ? Was it not Cced to linux-usb ?
+Can someone resend with Nicolas' Acked-by in place ?
 
-greg k-h
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130812/5aa45466/attachment.sig>
