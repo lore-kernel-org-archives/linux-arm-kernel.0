@@ -1,58 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 12 Aug 2013 13:24:46 -0600
-Subject: [PATCH V3 4/8] ARM: tegra: add common LP1 suspend support
-In-Reply-To: <1376300407-14750-5-git-send-email-josephl@nvidia.com>
-References: <1376300407-14750-1-git-send-email-josephl@nvidia.com>
- <1376300407-14750-5-git-send-email-josephl@nvidia.com>
-Message-ID: <5209367E.10900@wwwdotorg.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 12 Aug 2013 12:29:14 -0700
+Subject: [GIT PULL] Samsung-fixes-2 for v3.11
+In-Reply-To: <51FFE30A.5040800@samsung.com> (Kukjin Kim's message of "Tue, 06
+ Aug 2013 02:38:18 +0900")
+References: <51FFE30A.5040800@samsung.com>
+Message-ID: <87ob92pv1x.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2013 03:40 AM, Joseph Lo wrote:
-> The LP1 suspending mode on Tegra means CPU rail off, devices and PLLs are
-> clock gated and SDRAM in self-refresh mode. That means the low level LP1
-> suspending and resuming code couldn't be run on DRAM and the CPU must
-> switch to the always on clock domain (a.k.a. CLK_M 12MHz oscillator). And
-> the system clock (SCLK) would be switched to CLK_S, a 32KHz oscillator.
-> The LP1 low level handling code need to be moved to IRAM area first. And
-> marking the LP1 mask for indicating the Tegra device is in LP1. The CPU
-> power timer needs to be re-calculated based on 32KHz that was originally
-> based on PCLK.
-> 
-> When resuming from LP1, the LP1 reset handler will resume PLLs and then
-> put DRAM to normal mode. Then jumping to the "tegra_resume" that will
-> restore full context before back to kernel. The "tegra_resume" handler
-> was expected to be found in PMC_SCRATCH41 register.
-> 
-> This is common LP1 procedures for Tegra, so we do these jobs mainly in
-> this patch:
-> * moving LP1 low level handling code to IRAM
-> * marking LP1 mask
-> * copying the physical address of "tegra_resume" to PMC_SCRATCH41
-> * re-calculate the CPU power timer based on 32KHz
-> 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
-> V3:
-> * using a "#define" of IRAM_CODE to replace original static variable
+Kukjin Kim <kgene.kim@samsung.com> writes:
 
-I didn't mean change the variable to a define, but rather simply to use
-the IO_ADDRESS() define instead of any new define. i.e.:
+> The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
+>
+>   Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-fixes-2
+>
+> for you to fetch changes up to 35f8550c8f27968af94ba5235cc611e3b6d86981:
+>
+>   ARM: SAMSUNG: fix to support for missing cpu specific map_io
+> (2013-07-30 13:30:57 +0900)
 
-> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+In the future, please send arm-soc pull request to arm at kernel.org also,
+this makes filtering easier when non-Arnd/Olof folks (like me) are helping.
 
-> +#define IRAM_CODE IO_ADDRESS(TEGRA_IRAM_CODE_AREA)
+Thanks,
 
-... just don't add that, and ...
-
-> +static void tegra_suspend_enter_lp1(void)
-> +{
-> +	tegra_pmc_suspend();
-> +
-> +	/* copy the reset vector & SDRAM shutdown code into IRAM */
-> +	memcpy(iram_save_addr, IRAM_CODE, iram_save_size);
-> +	memcpy(IRAM_CODE, tegra_lp1_iram.start_addr, iram_save_size);
-
-... and s/IRAM_CODE/IO_ADDRESS(TEGRA_IRAM_CODE_AREA)/ in that code.
-
-I'll make that fixup when applying these patches.
+Kevin
