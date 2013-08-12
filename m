@@ -1,90 +1,95 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 12 Aug 2013 12:10:26 +0530
-Subject: [PATCH v3 0/9] DRA7xx core support
-In-Reply-To: <1375633657-6835-1-git-send-email-rnayak@ti.com>
-References: <1375633657-6835-1-git-send-email-rnayak@ti.com>
-Message-ID: <5208835A.6000506@ti.com>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Mon, 12 Aug 2013 12:16:54 +0530
+Subject: [PATCH V5 0/6]USB: OHCI: more bus glues as separate modules
+In-Reply-To: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1376290020-26253-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 04 August 2013 09:57 PM, Rajendra Nayak wrote:
-> Changes in v3:
-> -1- Dropped some clock/dpll framework builds for dra7
-> -2- Added all instances of IPs in dtsi file
-> -3- dtsi does a 'disabled' by default and dts enables as needed
-> -4- soc_is_dra7xx() based on DT compatible instead of using ID code
-> 
-> Changes in v2:
-> -1- Fixed minor changelog details
-> -2- Dropped the SRAM support patch since we need to move to drivers/misc/sram.c
-> -3- Added DTS update patches to this series which were earlier posted as
-> part of the data series (Since they don't have much objections as against the
-> other in-kernel data files)
-> -4- Updated the EVM dts file with pin config details for uart/mcspi and i2c
-> 
-> DRA7xx based SoCs' are high-performance, infotainment application devices,
-> based on enhanced OMAP architecture integrated on a 28nm
-> technology.
-> 
-> The DRA7xx family is composed of DRA75x and DRA74x devices.
-> The current device for which the patches add support is the
-> DRA752 SoC.
-> 
-> Most of the core IPs are similar to those found on the OMAP5
-> devices, including the dual cortex-A15 based MPU subsystem,
-> which has helped quite some reuse from existing OMAP5 support.
-> 
-> This series contains only core support patches and none of
-> the PRCM and hwmod data needed for the device to boot.
+These patches are for separating the SOC On-Chip ohci host controller
+from ohci-hcd host code into its own driver module.
+This work is part of enabling multi-platform kernels on ARM;
+it would be nice to have in 3.12.
 
-Tony, any chance of this series making it to 3.12?
+V2:
+  In patch 5/6 and 6/6:
+  -Set non-standard fields in hc_driver manually, rather than
+   relying on an expanded struct ohci_driver_overrides.
+  -Save orig_ohci_hub_control and orig_ohci_hub_status_data rather than
+   relying on ohci_hub_control and hub_status_data being exported.
 
-regards,
-Rajendra
+  In patch 1/6 to 4/6
+  -ohci_setup() has been removed because it is called in .reset member
+   of the ohci_hc_driver structure.
 
-> 
-> The bootloader support for the platform is already available
-> in mainline u-boot.
-> 
-> The patches posted in this series are available at:
-> git://github.com/rrnayak/linux.git for-3.12/dra-core-v3
-> 
-> The patches (including the ones for in-kernel data) which boot
-> on dra7xx evm are available at:
-> t://github.com/rrnayak/linux.git out-of-tree/dra-integrated-v3
-> 
-> R Sricharan (8):
->   ARM: DRA7: Reuse all of PRCM and MPUSS SMP infra
->   ARM: DRA7: Reuse io tables and add a new .init_early
->   ARM: DRA7: Resue the clocksource, clockevent support
->   ARM: DRA7: board-generic: Add basic DT support
->   ARM: DRA7: Kconfig: Make ARCH_NR_GPIO default to 512
->   ARM: DRA7: dts: Add the dts files for dra7 SoC and dra7-evm board
->   ARM: DRA7: id: Add cpu detection support for DRA7xx based SoCs'
->   ARM: DRA7: Add the build support in omap2plus
-> 
-> Rajendra Nayak (1):
->   ARM: DRA7: hwmod: Reuse the soc_ops used for OMAP4/5
-> 
->  .../devicetree/bindings/arm/omap/omap.txt          |    3 +
->  arch/arm/Kconfig                                   |    2 +-
->  arch/arm/boot/dts/Makefile                         |    3 +-
->  arch/arm/boot/dts/dra7-evm.dts                     |  140 +++++
->  arch/arm/boot/dts/dra7.dtsi                        |  567 ++++++++++++++++++++
->  arch/arm/configs/omap2plus_defconfig               |    1 +
->  arch/arm/mach-omap1/include/mach/soc.h             |    1 +
->  arch/arm/mach-omap2/Kconfig                        |   12 +-
->  arch/arm/mach-omap2/Makefile                       |    6 +
->  arch/arm/mach-omap2/board-generic.c                |   18 +
->  arch/arm/mach-omap2/common.h                       |    1 +
->  arch/arm/mach-omap2/id.c                           |    4 +-
->  arch/arm/mach-omap2/io.c                           |   20 +-
->  arch/arm/mach-omap2/omap54xx.h                     |    4 +
->  arch/arm/mach-omap2/omap_hwmod.c                   |    2 +-
->  arch/arm/mach-omap2/soc.h                          |   17 +
->  arch/arm/mach-omap2/timer.c                        |    3 +-
->  arch/arm/plat-omap/Kconfig                         |    2 +-
->  18 files changed, 795 insertions(+), 11 deletions(-)
->  create mode 100644 arch/arm/boot/dts/dra7-evm.dts
->  create mode 100644 arch/arm/boot/dts/dra7.dtsi
-> 
+V3:
+ In patch 5/6 and 6/6:
+ -ohci_setup() has been removed because it is called in .reset member
+  of the ohci_hc_driver structure.
+
+ In patch 5/6:
+ -The ohci_restart() function is not required in  current scenario,
+  only discarding connection state of integrated transceivers is sufficient,
+  for this directly handling ohci->hc_control.
+
+ In patch 2/6 :
+ -rewritten if (config->otg || config->rwc) block statements into
+  two separate 'if blocks' to handle below scenarios
+  1. config->otg set scenario.
+  2. if any of these (config->otg, config->rwc) are set, this
+     scenario should be handled only after ohci_setup()
+ 
+In patch 1/6 and 4/6:
+  No change.
+
+V4:
+ In patch 1/6 and 4/6:
+  No change.
+
+ In patch 2/6 :
+ -usb_remove_hcd() function is required a valid clock that is what
+  omap_ohci_clock_power(0) is called after hcd shutdown.
+
+ In patch 3/6 :
+ -V3 modification revert back, only ohci->regs setting write()
+  function has been removed because ohci->regs doesn't get set until
+  usb_add_hcd.
+
+ In patch 5/6 :
+ - Removed extra space after "tristate".
+ - Removed extra space between function name  and '(' characters.
+ - MODULE_ALIAS line moved to last statement of ohci-at91 file.
+
+ In patch 6/6 :
+ - Removed extra space before the '='.
+ - Moved  /* forward definitions */ line before the declarations of functions.
+
+V5:
+ In patch 1/6 to 5/6
+  - No change.
+ 
+ In patch 6/6:
+  - String "s3cxxxx" is replaced by "s3c2410".
+
+Manjunath Goudar (6):
+  USB: OHCI: make ohci-exynos a separate driver
+  USB: OHCI: make ohci-omap a separate driver
+  USB: OHCI: make ohci-omap3 a separate driver
+  USB: OHCI: make ohci-spear a separate driver
+  USB: OHCI: make ohci-at91 a separate driver
+  USB: OHCI: make ohci-s3c2410 a separate driver
+
+ drivers/usb/host/Kconfig        |   30 ++++++-
+ drivers/usb/host/Makefile       |    6 ++
+ drivers/usb/host/ohci-at91.c    |  153 ++++++++++++++++-------------------
+ drivers/usb/host/ohci-exynos.c  |  167 ++++++++++++++++-----------------------
+ drivers/usb/host/ohci-hcd.c     |  108 -------------------------
+ drivers/usb/host/ohci-omap.c    |  156 +++++++++++++-----------------------
+ drivers/usb/host/ohci-omap3.c   |  118 +++++++++------------------
+ drivers/usb/host/ohci-s3c2410.c |  128 +++++++++++++-----------------
+ drivers/usb/host/ohci-spear.c   |  140 +++++++++++++-------------------
+ 9 files changed, 374 insertions(+), 632 deletions(-)
+
+-- 
+1.7.9.5
