@@ -1,185 +1,170 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 12 Aug 2013 18:56:55 +0000
-Subject: [PATCH v3 09/12] dma: edma: Implement multiple linked sets for
- continuity
-In-Reply-To: <1375719297-12871-10-git-send-email-joelf@ti.com>
-References: <1375719297-12871-1-git-send-email-joelf@ti.com>
- <1375719297-12871-10-git-send-email-joelf@ti.com>
-Message-ID: <52092FF7.7040508@ti.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Mon, 12 Aug 2013 14:32:18 +0100
+Subject: [PATCH v3 1/3] drivers: clocksource: configure event stream for
+ ARM arch timer
+In-Reply-To: <1374745537-30389-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374492082-13686-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1374745537-30389-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <5208E3E2.4010505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 August 2013 04:14 PM, Joel Fernandes wrote:
-> Here we implement splitting up of the total MAX number of slots
-> available for a channel into 2 cyclically linked sets. Transfer
-> completion Interrupts are enabled on both linked sets and respective
-> handler recycles them on completion to process the next linked set.
-> Both linked sets are cyclically linked to each other to ensure
-> continuity of DMA operations. Interrupt handlers execute asynchronously
-> to the EDMA events and recycles the linked sets at the right time,
-> as a result EDMA is not blocked or dependent on interrupts and DMA
-> continues till the end of the SG-lists without any interruption.
+On 25/07/13 10:45, Sudeep KarkadaNagesha wrote:
+> From: Will Deacon <will.deacon@arm.com>
 > 
-> Suggested-by: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> The ARM architected timer can generate events (used for waking up
+> CPUs executing the wfe instruction) at a frequency represented as a
+> power-of-2 divisor of the clock rate.
+> 
+> This patch configures the event stream, aiming for a period of 100us
+> between events. This can be used to implement wfe-based timeouts for
+> userspace locking implementations.
+> 
+> This patch also adds the hwcaps for the same, so that userspace can
+> detect this feature.
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  drivers/dma/edma.c |  157 +++++++++++++++++++++++++++++++++++++++-------------
->  1 file changed, 118 insertions(+), 39 deletions(-)
+>  arch/arm/include/asm/arch_timer.h    | 6 ++++--
+>  arch/arm/include/uapi/asm/hwcap.h    | 1 +
+>  arch/arm/kernel/setup.c              | 1 +
+>  arch/arm64/include/asm/arch_timer.h  | 6 +++---
+>  drivers/clocksource/arm_arch_timer.c | 9 ++++++++-
+>  include/clocksource/arm_arch_timer.h | 2 ++
+>  6 files changed, 19 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-> index df50a04..70923a2 100644
-> --- a/drivers/dma/edma.c
-> +++ b/drivers/dma/edma.c
-> @@ -48,6 +48,7 @@
+> ------------>8---------------------
+> 
+> Hi,
+> 
+> This version adds the hwcaps for publishing the event stream feature to the
+> userspace.
+> 
+Hi Catalin,
+
+If you are OK with this patch, can I have your ACK ?
+
+Regards,
+Sudeep
+
+> This patch is now rebased on rmk's fixes branch as it conflicts with ab8d46c0 
+> "ARM: 7788/1: elf: fix lpae hwcap feature reporting in proc/cpuinfo"
+> 
+> Regards,
+> Sudeep
+> 
+> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+> index e406d57..8963877 100644
+> --- a/arch/arm/include/asm/arch_timer.h
+> +++ b/arch/arm/include/asm/arch_timer.h
+> @@ -89,16 +89,18 @@ static inline u64 arch_counter_get_cntvct(void)
+>  	return cval;
+>  }
 >  
->  /* Max of 16 segments per channel to conserve PaRAM slots */
->  #define MAX_NR_SG		16
-> +#define MAX_NR_LS		(MAX_NR_SG >> 1)
->  #define EDMA_MAX_SLOTS		(MAX_NR_SG+1)
->  #define EDMA_DESCRIPTORS	16
+> -static inline void arch_counter_set_user_access(void)
+> +static inline void arch_counter_set_user_access(int divider)
+>  {
+>  	u32 cntkctl;
 >  
-> @@ -57,6 +58,7 @@ struct edma_desc {
->  	int				absync;
->  	int				pset_nr;
->  	int				total_processed;
-> +	int				next_setup_linkset;
->  	struct edmacc_param		pset[0];
+>  	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
+>  
+>  	/* disable user access to everything */
+> -	cntkctl &= ~((3 << 8) | (7 << 0));
+> +	cntkctl &= ~((3 << 8) | (0xf << 4) | (3 << 0));
+> +	cntkctl |= (divider << 4) | (1 << 2);
+>  
+>  	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
+> +	elf_hwcap |= HWCAP_EVTSTRM;
+>  }
+>  #endif
+>  
+> diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
+> index 6d34d08..7dcc10d 100644
+> --- a/arch/arm/include/uapi/asm/hwcap.h
+> +++ b/arch/arm/include/uapi/asm/hwcap.h
+> @@ -26,5 +26,6 @@
+>  #define HWCAP_VFPD32	(1 << 19)	/* set if VFP has 32 regs (not 16) */
+>  #define HWCAP_IDIV	(HWCAP_IDIVA | HWCAP_IDIVT)
+>  #define HWCAP_LPAE	(1 << 20)
+> +#define HWCAP_EVTSTRM	(1 << 21)
+>  
+>  #endif /* _UAPI__ASMARM_HWCAP_H */
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 96286cb..5191956 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -973,6 +973,7 @@ static const char *hwcap_str[] = {
+>  	"idivt",
+>  	"vfpd32",
+>  	"lpae",
+> +	"evtstrm",
+>  	NULL
 >  };
 >  
-> @@ -140,7 +142,9 @@ static void edma_execute(struct edma_chan *echan)
->  	struct edma_desc *edesc;
->  	struct device *dev = echan->vchan.chan.device->dev;
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index 98abd47..8c1e42f 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -97,16 +97,16 @@ static inline u32 arch_timer_get_cntfrq(void)
+>  	return val;
+>  }
 >  
-> -	int i, j, total_left, total_process;
-> +	int i, total_left, total_link_set;
-> +	int ls_cur_off, ls_next_off, slot_off;
-> +	struct edmacc_param tmp_param;
+> -static inline void arch_counter_set_user_access(void)
+> +static inline void arch_counter_set_user_access(int divider)
+>  {
+>  	u32 cntkctl;
 >  
->  	/* If either we processed all psets or we're still not started */
->  	if (!echan->edesc ||
-> @@ -159,48 +163,121 @@ static void edma_execute(struct edma_chan *echan)
+>  	/* Disable user access to the timers and the physical counter. */
+>  	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
+> -	cntkctl &= ~((3 << 8) | (1 << 0));
+> +	cntkctl &= ~((3 << 8) | (0xf << 4) | (1 << 0));
 >  
->  	/* Find out how many left */
->  	total_left = edesc->pset_nr - edesc->total_processed;
-> -	total_process = total_left > MAX_NR_SG ? MAX_NR_SG : total_left;
-> -
-> -
-> -	/* Write descriptor PaRAM set(s) */
-> -	for (i = 0; i < total_process; i++) {
-> -		j = i + edesc->total_processed;
-> -		edma_write_slot(echan->slot[i], &edesc->pset[j]);
-> -		dev_dbg(echan->vchan.chan.device->dev,
-> -			"\n pset[%d]:\n"
-> -			"  chnum\t%d\n"
-> -			"  slot\t%d\n"
-> -			"  opt\t%08x\n"
-> -			"  src\t%08x\n"
-> -			"  dst\t%08x\n"
-> -			"  abcnt\t%08x\n"
-> -			"  ccnt\t%08x\n"
-> -			"  bidx\t%08x\n"
-> -			"  cidx\t%08x\n"
-> -			"  lkrld\t%08x\n",
-> -			j, echan->ch_num, echan->slot[i],
-> -			edesc->pset[j].opt,
-> -			edesc->pset[j].src,
-> -			edesc->pset[j].dst,
-> -			edesc->pset[j].a_b_cnt,
-> -			edesc->pset[j].ccnt,
-> -			edesc->pset[j].src_dst_bidx,
-> -			edesc->pset[j].src_dst_cidx,
-> -			edesc->pset[j].link_bcntrld);
-> -		/* Link to the previous slot if not the last set */
-> -		if (i != (total_process - 1))
-
-> +	total_link_set = total_left > MAX_NR_LS ? MAX_NR_LS : total_left;
-
-The name you gave here sounds like this is defining total number of
-linked PaRAM sets. Rather this is actually tracking the number of PaRAM
-sets (slots) in current linked set, correct? Then may be just call it
-'nslots' or even 'num_slots'? There are just too many variables with
-"total" prefix to keep track of in this function!
-
+>  	/* Enable user access to the virtual counter and frequency. */
+> -	cntkctl |= (1 << 1);
+> +	cntkctl |= (divider << 4) | (1 << 2) | (1 << 1);
+>  	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+>  }
+>  
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index ffadd83..6301ee5 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -125,6 +125,8 @@ static int arch_timer_set_next_event_phys(unsigned long evt,
+>  
+>  static int arch_timer_setup(struct clock_event_device *clk)
+>  {
+> +	int evt_stream_div, pos;
 > +
-> +	/* First time, setup 2 cyclically linked sets, each containing half
-> +	   the slots allocated for this channel */
-> +	if (edesc->total_processed == 0) {
-
-We dont need to check for this case for every DMA_COMPLETE interrupt.
-May be move the initial setup to another function called from
-edma_issue_pending()?
-
-> +		for (i = 0; i < total_link_set; i++) {
-> +			edma_write_slot(echan->slot[i+1], &edesc->pset[i]);
+>  	clk->features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_C3STOP;
+>  	clk->name = "arch_sys_timer";
+>  	clk->rating = 450;
+> @@ -153,7 +155,12 @@ static int arch_timer_setup(struct clock_event_device *clk)
+>  			enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
+>  	}
+>  
+> -	arch_counter_set_user_access();
+> +	/* Find the closest power of two to the divisor */
+> +	evt_stream_div = arch_timer_rate / ARCH_TIMER_EVT_STREAM_FREQ;
+> +	pos = fls(evt_stream_div);
+> +	if (pos > 1 && !(evt_stream_div & (1 << (pos - 2))))
+> +		pos--;
+> +	arch_counter_set_user_access(min(pos, 15));
+>  
+>  	return 0;
+>  }
+> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+> index c463ce9..24dc140 100644
+> --- a/include/clocksource/arm_arch_timer.h
+> +++ b/include/clocksource/arm_arch_timer.h
+> @@ -29,6 +29,8 @@
+>  #define ARCH_TIMER_PHYS_ACCESS		0
+>  #define ARCH_TIMER_VIRT_ACCESS		1
+>  
+> +#define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
 > +
-> +			if (i != total_link_set - 1) {
-> +				edma_link(echan->slot[i+1], echan->slot[i+2]);
-> +				dump_pset(echan, echan->slot[i+1],
-> +					  edesc->pset, i);
-> +			}
-> +		}
-> +
-> +		edesc->total_processed += total_link_set;
-> +
-> +		total_left = edesc->pset_nr - edesc->total_processed;
-> +
-> +		total_link_set = total_left > MAX_NR_LS ?
-> +				 MAX_NR_LS : total_left;
-> +
-> +		if (total_link_set) {
-> +			/* Don't setup interrupt for first linked set for cases
-> +			   where total pset_nr is strictly within MAX_NR size */
-
-See Documentation/CodingStyle for multi-line commenting style.
-
-> +			if (total_left > total_link_set)
-> +				edma_enable_interrupt(echan->slot[i]);
-> +
-> +			/* Setup link between linked set 0 to set 1 */
->  			edma_link(echan->slot[i], echan->slot[i+1]);
-> -		/* Final pset links to the dummy pset */
-> -		else
-> +
-> +			dump_pset(echan, echan->slot[i], edesc->pset, i-1);
-> +
-> +			/* Write out linked set 1 */
-> +			for (; i < total_link_set + MAX_NR_LS; i++) {
-> +				edma_write_slot(echan->slot[i+1],
-> +						&edesc->pset[i]);
-> +
-> +				if (i != total_link_set + MAX_NR_LS - 1) {
-> +					edma_link(echan->slot[i+1],
-> +						  echan->slot[i+2]);
-> +					dump_pset(echan, echan->slot[i+1],
-> +						  edesc->pset, i);
-> +				}
-> +			}
-> +
-> +			edesc->total_processed += total_link_set;
-> +			total_left = edesc->pset_nr - edesc->total_processed;
-
-There is way too much duplication of code here mainly because you
-decided not to loop twice in the course of setting up the two linked
-sets. Can you use a loop instead?
-
-> +
-> +			if (total_left)
-> +				/* Setup a link from linked set 1 to set 0 */
-> +				edma_link(echan->slot[i], echan->slot[1]);
-
-If you have more SGs to service at the end of setting up the two linked
-sets, you should stop right there and wait for CPU to recycle the linked
-sets. Right now you are setup for re-DMAing old data.
-
-You wont hit this issue in testing because you have setup an interrupt
-for LS0 and that will most likely service before LS1 completes but we
-cannot rely on that timing.
-
-Just link to dummy at end of LS1 to stall the DMA and wait for the
-completion handler to come-in and restart the DMA after recycling LS0.
-
-I haven't reviewed rest of the patch. Lets make sure we have a common
-understanding here.
-
-Thanks,
-Sekhar
+>  #ifdef CONFIG_ARM_ARCH_TIMER
+>  
+>  extern u32 arch_timer_get_rate(void);
+> 
