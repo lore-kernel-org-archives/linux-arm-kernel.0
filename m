@@ -1,73 +1,23 @@
-From: agnel.joel@gmail.com (Joel Fernandes)
-Date: Sun, 11 Aug 2013 23:29:33 -0500
-Subject: [PATCH v3 02/12] ARM: edma: Don't clear EMR of channel in
- edma_stop
-In-Reply-To: <5208639F.8070406@ti.com>
-References: <1375719297-12871-1-git-send-email-joelf@ti.com>
- <1375719297-12871-3-git-send-email-joelf@ti.com>
- <520385D3.1060408@ti.com> <5208639F.8070406@ti.com>
-Message-ID: <CAD=GYpa75vqz120O2McxTXsPCWFb+RsO+7dZ4WRNQJgb3W=E=A@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 11 Aug 2013 21:38:46 -0700 (PDT)
+Subject: [PATCH v5] net: Add MOXA ART SoCs ethernet driver
+In-Reply-To: <1375961694-5375-1-git-send-email-jonas.jensen@gmail.com>
+References: <1375349968-16059-1-git-send-email-jonas.jensen@gmail.com>
+ <1375961694-5375-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <20130811.213846.2022624715665927428.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 11, 2013 at 11:25 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On 8/8/2013 5:19 PM, Sekhar Nori wrote:
->> On Monday 05 August 2013 09:44 PM, Joel Fernandes wrote:
->>> We certainly don't want error conditions to be cleared any other
->>> place but the EDMA error handler, as this will make us 'forget'
->>> about missed events we might need to know errors have occurred.
->>>
->>> This fixes a race condition where the EMR was being cleared
->>> by the transfer completion interrupt handler.
->>>
->>> Basically, what was happening was:
->>>
->>>             Missed event
->>>              |
->>>              |
->>>              V
->>> SG1-SG2-SG3-Null
->>>          \
->>>           \__TC Interrupt (Almost same time as ARM is executing
->>> TC interrupt handler, an event got missed and also forgotten
->>> by clearing the EMR).
->>>
->>> This causes the following  problems:
->>>
->>> 1.
->>> If error interrupt is also pending and TC interrupt clears the EMR
->>> by calling edma_stop as has been observed in the edma_callback function,
->>> the ARM will execute the error interrupt even though the EMR is clear.
->>> As a result, the  dma_ccerr_handler returns IRQ_NONE. If this happens
->>> enough number of times, IRQ subsystem disables the interrupt thinking
->>> its spurious which makes error handler never execute again.
->>>
->>> 2.
->>> Also even if error handler doesn't return IRQ_NONE, the removing of EMR
->>> removes the knowledge about which channel had a missed event, and thus
->>> a manual trigger on such channels cannot be performed.
->>>
->>> The EMR is ultimately being cleared by the Error interrupt handler
->>> once it is handled so we remove code that does it in edma_stop and
->>> allow it to happen there.
->>>
->>> Signed-off-by: Joel Fernandes <joelf@ti.com>
->>
->> Queuing this for v3.11 fixes. While committing, I changed the headline
->> to remove capitalization and made it more readable by removing register
->> level details. The new headline is:
->>
->> ARM: edma: don't clear missed events in edma_stop()
->
-> Forgot to ask, should this be tagged for stable? IOW, how serious is
-> this race in current kernel (without the entire series applied)? I have
-> never observed it myself - so please provide details how easy/difficult
-> it is to hit this condition.
+From: Jonas Jensen <jonas.jensen@gmail.com>
+Date: Thu,  8 Aug 2013 13:34:54 +0200
 
-The race was uncovered by recent EDMA patch series, So this patch can
-go in for next kernel release as such, I am not aware of any other DMA
-user that maybe uncovering the race condition.
+> The MOXA UC-711X hardware(s) has an ethernet controller that seem
+> to be developed internally. The IC used is "RTL8201CP".
+> 
+> Since there is no public documentation, this driver is mostly the
+> one published by MOXA that has been heavily cleaned up / ported
+> from linux 2.6.9.
+> 
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 
-Thanks,
-
--Joel
+Applied to net-next, thanks.
