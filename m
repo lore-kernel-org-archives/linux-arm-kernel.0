@@ -1,43 +1,34 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 11 Aug 2013 20:41:49 -0700
-Subject: [PATCH] ARM: KVM: Simplify tracepoint text
-In-Reply-To: <520698CD.2070904@cogentembedded.com>
-References: <1376019686-19301-1-git-send-email-christoffer.dall@linaro.org>
- <520698CD.2070904@cogentembedded.com>
-Message-ID: <20130812034149.GA5003@cbox>
+Date: Sun, 11 Aug 2013 21:12:57 -0700
+Subject: [GIT PULL] KVM/ARM Fixes for 3.11
+Message-ID: <1376280781-6539-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 10, 2013 at 11:47:25PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 08/09/2013 07:41 AM, Christoffer Dall wrote:
-> 
-> >The tracepoint for kvm_guest_fault was extremely long, make it a
-> >slightly bit shorter.
-> 
-> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >---
-> >  arch/arm/kvm/trace.h |    7 +++----
-> >  1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> >diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
-> >index a8e73ed..8cbaea2 100644
-> >--- a/arch/arm/kvm/trace.h
-> >+++ b/arch/arm/kvm/trace.h
-> >@@ -59,10 +59,9 @@ TRACE_EVENT(kvm_guest_fault,
-> >  		__entry->ipa			= ipa;
-> >  	),
-> >
-> >-	TP_printk("guest fault at PC %#08lx (hxfar %#08lx, "
-> >-		  "ipa %#16llx, hsr %#08lx",
-> >-		  __entry->vcpu_pc, __entry->hxfar,
-> >-		  __entry->ipa, __entry->hsr)
-> >+	TP_printk("ipa 0x%llx, hsr 0x%#08lx, hxfar 0x%#08lx, pc 0x%#08lx",
-> 
->    "0x" and "#" are redundant, they mean the same thing, hexadecimal prefix.
-> 
-Duh, indeed, nicely spotted.  I'll respin.
+The following changes since commit e769ece3b129698d2b09811a6f6d304e4eaa8c29:
 
-Thanks,
--Christoffer
+  KVM: s390: fix pfmf non-quiescing control handling (2013-07-29 09:02:30 +0200)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-fixes-3.11
+
+for you to fetch changes up to 2184a60de26b94bc5a88de3e5a960ef9ff54ba5a:
+
+  KVM: ARM: Squash len warning (2013-08-11 21:03:39 -0700)
+
+----------------------------------------------------------------
+Christoffer Dall (3):
+      ARM: KVM: Fix 64-bit coprocessor handling
+      ARM: KVM: Fix unaligned unmap_range leak
+      KVM: ARM: Squash len warning
+
+Marc Zyngier (1):
+      arm64: KVM: fix 2-level page tables unmapping
+
+ arch/arm/kvm/coproc.c     |   26 +++++++++++++++++++-------
+ arch/arm/kvm/coproc.h     |    3 +++
+ arch/arm/kvm/coproc_a15.c |    6 +++++-
+ arch/arm/kvm/mmio.c       |    3 ++-
+ arch/arm/kvm/mmu.c        |   36 +++++++++++++++---------------------
+ 5 files changed, 44 insertions(+), 30 deletions(-)
