@@ -1,29 +1,22 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 12 Aug 2013 11:22:07 +0800
-Subject: [PATCH 1/1] arm: imx: Kconfig: select syscon for mx25
-In-Reply-To: <20130812050126.GA25061@S2101-09.ap.freescale.net>
-References: <1375947809-11694-1-git-send-email-peter.chen@freescale.com>
- <20130812050126.GA25061@S2101-09.ap.freescale.net>
-Message-ID: <20130812032206.GA22626@shlinux1.ap.freescale.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 12 Aug 2013 13:29:56 +0800
+Subject: [PATCH v2] dmaengine: sirf: add PM entries for sleep and runtime
+In-Reply-To: <1375177474-27583-1-git-send-email-Baohua.Song@csr.com>
+References: <1375177474-27583-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <CAGsJ_4xPhq3B1vcKy8peGyEsFPF7mSt3H-EW3Ne7qesStFO_9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 01:01:28PM +0800, Shawn Guo wrote:
-> I prefer to use uppercase for "ARM:" in subject.
-> 
-> On Thu, Aug 08, 2013 at 03:43:29PM +0800, Peter Chen wrote:
-> > We need to use syscon to map one register region for several
-> > devices, eg, usb non-core register for all usb devices.
-> 
-> So we're changing usb non-core controller to be a syscon?
-> 
+2013/7/30 Barry Song <21cnbao@gmail.com>:
+> this patch adds PM ops entries in sirf-dma drivers, so that this
+> driver can support suspend/resume, hibernation and runtime PM.
+>
+> while suspending, sirf-dma will lose all registers, so we save
+> them at suspend and restore in resume for active channels.
+>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
 
-Please forget this patch.
+ping Vinod.
 
-Sascha suggested another patch avoiding using syscon, and changing
-binding.
-
--- 
-
-Best Regards,
-Peter Chen
+-barry
