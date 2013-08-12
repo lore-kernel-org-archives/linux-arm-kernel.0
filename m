@@ -1,286 +1,146 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Aug 2013 16:50:16 +0100
-Subject: [RESEND PATCH 2/4] ARM: msm: Re-organize platsmp to make it
- extensible
-In-Reply-To: <1375409725-22004-3-git-send-email-rvaswani@codeaurora.org>
-References: <1375409725-22004-1-git-send-email-rvaswani@codeaurora.org>
- <1375409725-22004-3-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <20130812155016.GC27165@e106331-lin.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 12 Aug 2013 10:00:04 -0600
+Subject: [PATCH V4] ARM: tegra: disable LP2 cpuidle state if PCIe is enabled
+Message-ID: <1376323204-25952-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Stephen Warren <swarren@nvidia.com>
 
-Apologies for the long delay for review on this.
+Tegra20 HW appears to have a bug such that PCIe device interrupts,
+whether they are legacy IRQs or MSI, are lost when LP2 is enabled. To
+work around this, simply disable LP2 if any PCIe devices with interrupts
+are present. Detect this via the IRQ domain map operation. This is
+slightly over-conservative; if a device with an interrupt is present but
+the driver does not actually use them, LP2 will still be disabled.
+However, this is a reasonable trade-off which enables a simpler
+workaround.
 
-I really like the direction this is going, but I have some qualms with
-the implementation.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Tested-by: Thierry Reding <treding@nvidia.com>
+Acked-by: Thierry Reding <treding@nvidia.com>
+---
+v4: Add missing tegra-cpuidle.h, re-write commit description. Add acks.
 
-On Fri, Aug 02, 2013 at 03:15:23AM +0100, Rohit Vaswani wrote:
-> This makes it easy to add SMP support for new targets
-> by adding cpus property and the release sequence.
-> We add the enable-method property for the cpus property to
-> specify which release sequence to use.
-> While at it, add the 8660 cpus bindings to make SMP work.
-> 
-> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
-> ---
->  Documentation/devicetree/bindings/arm/cpus.txt     |  6 ++
->  Documentation/devicetree/bindings/arm/msm/scss.txt | 15 ++++
->  arch/arm/boot/dts/msm8660-surf.dts                 | 23 +++++-
->  arch/arm/mach-msm/platsmp.c                        | 94 +++++++++++++++++-----
->  4 files changed, 115 insertions(+), 23 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/msm/scss.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index f32494d..327aad2 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -44,6 +44,12 @@ For the ARM architecture every CPU node must contain the following properties:
->  		"marvell,mohawk"
->  		"marvell,xsc3"
->  		"marvell,xscale"
-> +		"qcom,scorpion"
-> +- enable-method: Specifies the method used to enable or take the secondary cores
-> +		 out of reset. This allows different reset sequence for
-> +		 different types of cpus.
-> +		 This should be one of:
-> +		 "qcom,scss"
+v3: Only disable LP2 if a PCIe device that requests an interrupt is
+actually present. This prevents the loss of power-saving when the WAR
+isn't required.
+---
+ arch/arm/mach-tegra/cpuidle-tegra20.c | 12 ++++++++++++
+ arch/arm/mach-tegra/cpuidle.c         | 10 ++++++++++
+ arch/arm/mach-tegra/cpuidle.h         |  1 +
+ drivers/pci/host/pci-tegra.c          |  5 +++++
+ include/linux/tegra-cpuidle.h         | 19 +++++++++++++++++++
+ 5 files changed, 47 insertions(+)
+ create mode 100644 include/linux/tegra-cpuidle.h
 
-While I'd certainly like to see a move to using enable-method for
-32-bit, I think this needs a bit more thought:
-
-What does "qcom,scss" mean, precisely? It seems to be that we poke some
-registers in a "qcom,scss" device. I think we need to document
-enable-methods *very* carefully (and we need to do that for 64-bit as
-well with psci), as it's very likely there'll be subtle
-incompatibilities between platforms, especially if firmware is involved.
-We should try to leaves as little room for error as possible.
-
-I don't want to see this devolve into meaning "whatever the Linux driver
-for this happens to do at the current point in time", as that just leads
-to breakage as we have no clear distinction between actual requirements
-and implementation details.
-
-Given we already have platforms without an enable-method, we can't make
-it a required property either -- those platforms are already booting by
-figuring out an enable method from the platform's compatible string.
-
-With PSCI, enable-method also implies a method for disabling a
-particular CPU, so it would be nice for the description to cover this.
-
->  
->  Example:
->  
-> diff --git a/Documentation/devicetree/bindings/arm/msm/scss.txt b/Documentation/devicetree/bindings/arm/msm/scss.txt
-> new file mode 100644
-> index 0000000..21c3e26
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/msm/scss.txt
-> @@ -0,0 +1,15 @@
-> +* SCSS - Scorpion Sub-system
-> +
-> +Properties
-> +
-> +- compatible : Should contain "qcom,scss".
-> +
-> +- reg: Specifies the base address for the SCSS registers used for
-> +       booting up secondary cores.
-> +
-> +Example:
-> +
-> +	scss at 902000 {
-> +		compatible = "qcom,scss";
-> +		reg = <0x00902000 0x2000>;
-> +	};
-> diff --git a/arch/arm/boot/dts/msm8660-surf.dts b/arch/arm/boot/dts/msm8660-surf.dts
-> index cdc010e..203e51a 100644
-> --- a/arch/arm/boot/dts/msm8660-surf.dts
-> +++ b/arch/arm/boot/dts/msm8660-surf.dts
-> @@ -7,6 +7,22 @@
->  	compatible = "qcom,msm8660-surf", "qcom,msm8660";
->  	interrupt-parent = <&intc>;
->  
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "qcom,scorpion";
-> +		device_type = "cpu";
-> +		enable-method = "qcom,scss";
-> +
-> +		cpu at 0 {
-> +			reg = <0>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			reg = <1>;
-> +		};
-> +	};
-> +
-
-I *really* like moving the common properties out into the /cpus node --
-ePAPR suggests it, it's less error prone, and it takes up less space.
-However, I'm not sure our generic/arch code handles it properly, and I
-think we need to audit that before we can start writing dts that depend
-on it. I'd be happy to be wrong here if anyone can correct me. :)
-
-We probably need to factor out the way we read properties for cpu nodes,
-falling back to ones present in /cpus if not present. There's already a
-lot of pain getting the node for a logical (rather than physical) cpu
-id.
-
-Sudeep recently factored out finding the cpu node for a logical cpu id
-[1,2] in generic code with a per-arch callback, it shouldn't be too hard
-to have shims around that to read (optionally) common properties.
-
-[...]
-
-> -static void prepare_cold_cpu(unsigned int cpu)
-> +static int scorpion_release_secondary(void)
->  {
-> -	int ret;
-> -	ret = scm_set_boot_addr(virt_to_phys(secondary_startup),
-> -				SCM_FLAG_COLDBOOT_CPU1);
-> -	if (ret == 0) {
-> -		void __iomem *sc1_base_ptr;
-> -		sc1_base_ptr = ioremap_nocache(0x00902000, SZ_4K*2);
-> -		if (sc1_base_ptr) {
-> -			writel(0, sc1_base_ptr + VDD_SC1_ARRAY_CLAMP_GFS_CTL);
-> -			writel(0, sc1_base_ptr + SCSS_CPU1CORE_RESET);
-> -			writel(3, sc1_base_ptr + SCSS_DBG_STATUS_CORE_PWRDUP);
-> -			iounmap(sc1_base_ptr);
-> -		}
-> -	} else
-> -		printk(KERN_DEBUG "Failed to set secondary core boot "
-> -				  "address\n");
-> +	void __iomem *sc1_base_ptr;
-> +	struct device_node *dn = NULL;
-> +
-> +	dn = of_find_compatible_node(dn, NULL, "qcom,scss");
-> +	if (!dn) {
-> +		pr_err("%s: Missing scss node in device tree\n", __func__);
-> +		return -ENXIO;
-> +	}
-> +
-> +	sc1_base_ptr = of_iomap(dn, 0);
-> +	if (sc1_base_ptr) {
-> +		writel_relaxed(0, sc1_base_ptr + VDD_SC1_ARRAY_CLAMP_GFS_CTL);
-> +		writel_relaxed(0, sc1_base_ptr + SCSS_CPU1CORE_RESET);
-> +		writel_relaxed(3, sc1_base_ptr + SCSS_DBG_STATUS_CORE_PWRDUP);
-> +		mb();
-> +		iounmap(sc1_base_ptr);
-
-Does this boot *all* secondary CPUs directly into the kernel? Is that
-safe (e.g. if the kernel supports fewer CPUs than are physically
-present)?
-
-Is this a one-time thing, or are we able to dynamically hotplug CPUs? If
-the latter, the map/unmap looks odd to me.
-
-> +	} else {
-> +		return -ENOMEM;
-> +	}
-> +
-> +	return 0;
->  }
->  
-> -static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +static DEFINE_PER_CPU(int, cold_boot_done);
-> +
-> +static void boot_cold_cpu(unsigned int cpu)
->  {
-> -	static int cold_boot_done;
-> +	const char *enable_method;
-> +	struct device_node *dn = NULL;
->  
-> -	/* Only need to bring cpu out of reset this way once */
-> -	if (cold_boot_done == false) {
-> -		prepare_cold_cpu(cpu);
-> -		cold_boot_done = true;
-> +	dn = of_find_node_by_name(dn, "cpus");
-> +	if (!dn) {
-> +		pr_err("%s: Missing node cpus in device tree\n", __func__);
-> +		return;
->  	}
->  
-> +	enable_method = of_get_property(dn, "enable-method", NULL);
-
-Please factor this out from the platform code.
-
-If we're going to use enable-method, it should be decoupled from
-platform code -- common code should parse it to find the appropriate
-handler. Also, we *must* support having an enable-method per-cpu as KVM
-does for PSCI (though I definitely would like support for shared
-properties as mentioned above).
-
-> +	if (!enable_method) {
-> +			pr_err("%s: cpus node is missing enable-method property\n",
-> +					__func__);
-> +	} else if (!strcmp(enable_method, "qcom,scss")) {
-> +		if (per_cpu(cold_boot_done, cpu) == false) {
-> +			scorpion_release_secondary();
-> +			per_cpu(cold_boot_done, cpu) = true;
-> +		}
-> +	} else {
-> +		pr_err("%s: Invalid enable-method property: %s\n",
-> +				__func__, enable_method);
-> +	}
-> +}
-> +
-> +static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> +	boot_cold_cpu(cpu);
-> +
->  	/*
->  	 * set synchronisation state between this boot processor
->  	 * and the secondary one
-> @@ -118,8 +148,28 @@ static void __init msm_smp_init_cpus(void)
->  		set_cpu_possible(i, true);
->  }
->  
-> +static const int cold_boot_flags[] __initconst = {
-> +	0,
-> +	SCM_FLAG_COLDBOOT_CPU1,
-> +};
-
-So we only ever support booting two CPUs?
-
-Is the mapping of MPIDR to register bits arbitrary? Or do we know what
-they would be for four CPUs, four clusters, and beyond?
-
-> +
->  static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
->  {
-> +	int cpu, map;
-> +	unsigned int flags = 0;
-> +
-> +	for_each_present_cpu(cpu) {
-> +		map = cpu_logical_map(cpu);
-> +		if (map > ARRAY_SIZE(cold_boot_flags)) {
-> +			set_cpu_present(cpu, false);
-> +			__WARN();
-> +			continue;
-> +		}
-> +		flags |= cold_boot_flags[map];
-
-It's a shame that this leaves a window where some CPUs seem bootable,
-but aren't (though I can't offer a better way of handling this given we
-have dts without enable-method properties).
-
-> +	}
-> +
-> +	if (scm_set_boot_addr(virt_to_phys(secondary_startup), flags))
-> +		pr_warn("Failed to set CPU boot address\n");
->  }
->  
->  struct smp_operations msm_smp_ops __initdata = {
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-
-Thanks,
-Mark
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/184150.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/189619.html
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
+index 706aa42..b82dcae 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra20.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
+@@ -211,6 +211,18 @@ static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
+ }
+ #endif
+ 
++/*
++ * Tegra20 HW appears to have a bug such that PCIe device interrupts, whether
++ * they are legacy IRQs or MSI, are lost when LP2 is enabled. To work around
++ * this, simply disable LP2 if the PCI driver and DT node are both enabled.
++ */
++void tegra20_cpuidle_pcie_irqs_in_use(void)
++{
++	pr_info_once(
++		"Disabling cpuidle LP2 state, since PCIe IRQs are in use\n");
++	tegra_idle_driver.states[1].disabled = true;
++}
++
+ int __init tegra20_cpuidle_init(void)
+ {
+ 	return cpuidle_register(&tegra_idle_driver, cpu_possible_mask);
+diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
+index e85973c..0961dfc 100644
+--- a/arch/arm/mach-tegra/cpuidle.c
++++ b/arch/arm/mach-tegra/cpuidle.c
+@@ -44,3 +44,13 @@ void __init tegra_cpuidle_init(void)
+ 		break;
+ 	}
+ }
++
++void tegra_cpuidle_pcie_irqs_in_use(void)
++{
++	switch (tegra_chip_id) {
++	case TEGRA20:
++		if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
++			tegra20_cpuidle_pcie_irqs_in_use();
++		break;
++	}
++}
+diff --git a/arch/arm/mach-tegra/cpuidle.h b/arch/arm/mach-tegra/cpuidle.h
+index 9ec2c1a..c017dab 100644
+--- a/arch/arm/mach-tegra/cpuidle.h
++++ b/arch/arm/mach-tegra/cpuidle.h
+@@ -19,6 +19,7 @@
+ 
+ #ifdef CONFIG_CPU_IDLE
+ int tegra20_cpuidle_init(void);
++void tegra20_cpuidle_pcie_irqs_in_use(void);
+ int tegra30_cpuidle_init(void);
+ int tegra114_cpuidle_init(void);
+ void tegra_cpuidle_init(void);
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index ad95c40..7356741 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -41,6 +41,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/sizes.h>
+ #include <linux/slab.h>
++#include <linux/tegra-cpuidle.h>
+ #include <linux/tegra-powergate.h>
+ #include <linux/vmalloc.h>
+ #include <linux/regulator/consumer.h>
+@@ -636,6 +637,8 @@ static int tegra_pcie_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
+ {
+ 	struct tegra_pcie *pcie = sys_to_pcie(pdev->bus->sysdata);
+ 
++	tegra_cpuidle_pcie_irqs_in_use();
++
+ 	return pcie->irq;
+ }
+ 
+@@ -1221,6 +1224,8 @@ static int tegra_msi_map(struct irq_domain *domain, unsigned int irq,
+ 	irq_set_chip_data(irq, domain->host_data);
+ 	set_irq_flags(irq, IRQF_VALID);
+ 
++	tegra_cpuidle_pcie_irqs_in_use();
++
+ 	return 0;
+ }
+ 
+diff --git a/include/linux/tegra-cpuidle.h b/include/linux/tegra-cpuidle.h
+new file mode 100644
+index 0000000..dda3647
+--- /dev/null
++++ b/include/linux/tegra-cpuidle.h
+@@ -0,0 +1,19 @@
++/*
++ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++
++#ifndef __LINUX_TEGRA_CPUIDLE_H__
++#define __LINUX_TEGRA_CPUIDLE_H__
++
++void tegra_cpuidle_pcie_irqs_in_use(void);
++
++#endif
+-- 
+1.8.1.5
