@@ -1,8 +1,9 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 12 Aug 2013 09:20:19 -0700
+Date: Mon, 12 Aug 2013 09:23:38 -0700
 Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
-References: <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
+In-Reply-To: <5208BEC4.7090700@linaro.org>
+References: <51F97CE3.9030306@linaro.org>
+ <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
  <51F99747.4060901@linaro.org>
  <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
  <51FA9AE8.1060004@linaro.org>
@@ -10,14 +11,13 @@ References: <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
  <51FA9F54.3060704@linaro.org>
  <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
  <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
- <20130809172757.GD14845@codeaurora.org>
- <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
-Message-ID: <52090B43.9090000@codeaurora.org>
+ <20130809172757.GD14845@codeaurora.org> <5208BEC4.7090700@linaro.org>
+Message-ID: <52090C0A.2000105@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/13 09:03, S?ren Brinkmann wrote:
-> On Fri, Aug 09, 2013 at 10:27:57AM -0700, Stephen Boyd wrote:
+On 08/12/13 03:53, Daniel Lezcano wrote:
+> On 08/09/2013 07:27 PM, Stephen Boyd wrote:
 >> On 08/09, Daniel Lezcano wrote:
 >>> yes, but at least the broadcast mechanism should send an IPI to cpu0 to
 >>> wake it up, no ? As Stephen stated this kind of configuration should has
@@ -31,58 +31,54 @@ On 08/12/13 09:03, S?ren Brinkmann wrote:
 >> of the arm global timer above the twd. Does this patch help? It
 >> should make the arm global timer the tick device and whatever the
 >> cadence timer you have into the broadcast device.
-> I finally got to test your patch. Unfortunately, it makes the system
-> hang even earlier:
+>>
+>> ---8<----
+>> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+>> index 218bcb5..d3539e5 100644
+>> --- a/kernel/time/tick-broadcast.c
+>> +++ b/kernel/time/tick-broadcast.c
+>> @@ -77,6 +77,9 @@ static bool tick_check_broadcast_device(struct clock_event_device *curdev,
+>>  	    !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
+>>  		return false;
+>>  
+>> +	if (cpumask_equal(newdev->cpumask, cpumask_of(smp_processor_id())))
+>> +		return false;
+> Yes, that makes sense to prevent local timer devices to be a broadcast one.
+>
+> In the case of the arm global timer, each cpu will register their timer,
+> so the test will be ok but is it possible the cpu0 registers the timers
+> for the other cpus ?
 
-Sorry it had a bug depending on the registration order. Can you try this
-one (tabs are probably spaces, sorry)? I will go read through this
-thread to see if we already covered the registration order.
+As far as I know every tick device has to be registered on the CPU that
+it will be used on. See tick_check_percpu().
 
----8<----
-diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-index 218bcb5..d3539e5 100644
---- a/kernel/time/tick-broadcast.c
-+++ b/kernel/time/tick-broadcast.c
-@@ -77,6 +77,9 @@ static bool tick_check_broadcast_device(struct clock_event_device *curdev,
-            !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
-                return false;
- 
-+       if (cpumask_equal(newdev->cpumask, cpumask_of(smp_processor_id())))
-+               return false;
-+
-        return !curdev || newdev->rating > curdev->rating;
- }
- 
-diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
-index 64522ec..dd08f3b 100644
---- a/kernel/time/tick-common.c
-+++ b/kernel/time/tick-common.c
-@@ -244,12 +244,22 @@ static bool tick_check_preferred(struct clock_event_device *curdev,
-                        return false;
-        }
- 
-+       if (!curdev)
-+               return true;
-+
-+       /* Always prefer a tick device that doesn't suffer from FEAT_C3STOP */
-+       if (!(newdev->features & CLOCK_EVT_FEAT_C3STOP) &&
-+            (curdev->features & CLOCK_EVT_FEAT_C3STOP))
-+               return true;
-+       if ((newdev->features & CLOCK_EVT_FEAT_C3STOP) &&
-+           !(curdev->features & CLOCK_EVT_FEAT_C3STOP))
-+               return false;
-+
-        /*
-         * Use the higher rated one, but prefer a CPU local device with a lower
-         * rating than a non-CPU local device
-         */
--       return !curdev ||
--               newdev->rating > curdev->rating ||
-+       return newdev->rating > curdev->rating ||
-               !cpumask_equal(curdev->cpumask, newdev->cpumask);
- }
- 
+>
+>>  	return !curdev || newdev->rating > curdev->rating;
+>>  }
+>>  
+>> diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
+>> index 64522ec..1628b9f 100644
+>> --- a/kernel/time/tick-common.c
+>> +++ b/kernel/time/tick-common.c
+>> @@ -245,6 +245,15 @@ static bool tick_check_preferred(struct clock_event_device *curdev,
+>>  	}
+>>  
+>>  	/*
+>> +	 * Prefer tick devices that don't suffer from FEAT_C3_STOP
+>> +	 * regardless of their rating
+>> +	 */
+>> +	if (curdev && cpumask_equal(curdev->cpumask, newdev->cpumask) &&
+>> +	    !(newdev->features & CLOCK_EVT_FEAT_C3STOP) &&
+>> +	    (curdev->features & CLOCK_EVT_FEAT_C3STOP))
+>> +		return true;
+> That sounds reasonable, but what is the acceptable gap between the
+> ratings ? I am wondering if there isn't too much heuristic in the tick
+> code...
 
+Yes I wonder if we should just change the ratings of the clockevents.
+But it feels to me like the rating should only matter if the two are
+equal in features. Otherwise we can use the features to determine what
+we want.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
