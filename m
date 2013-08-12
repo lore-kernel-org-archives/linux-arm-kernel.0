@@ -1,29 +1,30 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 12 Aug 2013 14:30:58 +0200
-Subject: [PATCH 0/4] Add sound in SAM9x5 DTS
-Message-ID: <1376310662-20003-1-git-send-email-richard.genoud@gmail.com>
+Date: Mon, 12 Aug 2013 14:30:59 +0200
+Subject: [PATCH 1/4] ARM: AT91: DTS: sam9x5: add SSC DMA parameters
+In-Reply-To: <1376310662-20003-1-git-send-email-richard.genoud@gmail.com>
+References: <1376310662-20003-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1376310662-20003-2-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the sam9x5-wm8731 machine driver has been merged, we have now to add
-the device tree nodes...
-And here they are !
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+ arch/arm/boot/dts/at91sam9x5.dtsi |    3 +++
+ 1 file changed, 3 insertions(+)
 
-(Based on next-20130812)
-Tested on at91sam9g35-ek
-
-[I didn't add the DT list, as far as there's no new binding, we don't
-have to bother themi, right ?]
-
-Richard Genoud (4):
-  ARM: AT91: DTS: sam9x5: add SSC DMA parameters
-  ARM: AT91: DTS: sam9x5ek: add WM8731 codec
-  ARM: AT91: DTS: sam9x5ek: enable SSC
-  ARM: AT91: DTS: sam9x5ek: add sound configuration
-
- arch/arm/boot/dts/at91sam9x5.dtsi   |    3 +++
- arch/arm/boot/dts/at91sam9x5ek.dtsi |   24 ++++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
-
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 57d45f5..cf78ac0 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -542,6 +542,9 @@
+ 				compatible = "atmel,at91sam9g45-ssc";
+ 				reg = <0xf0010000 0x4000>;
+ 				interrupts = <28 IRQ_TYPE_LEVEL_HIGH 5>;
++				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(13)>,
++				       <&dma0 1 AT91_DMA_CFG_PER_ID(14)>;
++				dma-names = "tx", "rx";
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+ 				status = "disabled";
 -- 
 1.7.10.4
