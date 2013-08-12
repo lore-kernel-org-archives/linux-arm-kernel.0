@@ -1,74 +1,162 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 12 Aug 2013 09:53:49 -0700
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <5209120D.1010701@linaro.org>
-References: <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
- <51FA9F54.3060704@linaro.org>
- <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
- <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
- <20130809172757.GD14845@codeaurora.org>
- <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
- <52090B43.9090000@codeaurora.org>
- <d36fc2db-1189-4c6a-9bc4-0ac2e29eaa1b@AM1EHSMHS009.ehs.local>
- <5209120D.1010701@linaro.org>
-Message-ID: <9b07d8a3-b650-4147-b952-9bcfc1172c51@VA3EHSMHS025.ehs.local>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 12 Aug 2013 12:55:23 -0400 (EDT)
+Subject: Build error: versatile express
+In-Reply-To: <20130812124801.GB2823@localhost.localdomain>
+References: <20130812124801.GB2823@localhost.localdomain>
+Message-ID: <alpine.LFD.2.03.1308121125420.14472@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 06:49:17PM +0200, Daniel Lezcano wrote:
-> On 08/12/2013 06:32 PM, S?ren Brinkmann wrote:
-> > On Mon, Aug 12, 2013 at 09:20:19AM -0700, Stephen Boyd wrote:
-> >> On 08/12/13 09:03, S?ren Brinkmann wrote:
-> >>> On Fri, Aug 09, 2013 at 10:27:57AM -0700, Stephen Boyd wrote:
-> >>>> On 08/09, Daniel Lezcano wrote:
-> >>>>> yes, but at least the broadcast mechanism should send an IPI to cpu0 to
-> >>>>> wake it up, no ? As Stephen stated this kind of configuration should has
-> >>>>> never been tested before so the tick broadcast code is not handling this
-> >>>>> case properly IMHO.
-> >>>>>
-> >>>> If you have a per-cpu tick device that isn't suffering from
-> >>>> FEAT_C3_STOP why wouldn't you use that for the tick versus a
-> >>>> per-cpu tick device that has FEAT_C3_STOP? It sounds like there
-> >>>> is a bug in the preference logic or you should boost the rating
-> >>>> of the arm global timer above the twd. Does this patch help? It
-> >>>> should make the arm global timer the tick device and whatever the
-> >>>> cadence timer you have into the broadcast device.
-> >>> I finally got to test your patch. Unfortunately, it makes the system
-> >>> hang even earlier:
-> >>
-> >> Sorry it had a bug depending on the registration order. Can you try this
-> >> one (tabs are probably spaces, sorry)? I will go read through this
-> >> thread to see if we already covered the registration order.
-> > 
-> > That did it! Booted straight into the system. 
-> 
-> Good news :)
-> 
-> > The broadcast device is
-> > the TTC instead of GT, now.
-> > 
-> > 	Tick Device: mode:     1
-> > 	Broadcast device
-> > 	Clock Event Device: ttc_clockevent
-> > 	 max_delta_ns:   1207932479
-> > 	 min_delta_ns:   18432
-> > 	 mult:           233015
-> > 	 shift:          32
-> > 	 mode:           1
-> > 	 next_event:     9223372036854775807 nsecs
-> > 	 set_next_event: ttc_set_next_event
-> > 	 set_mode:       ttc_set_mode
-> > 	 event_handler:  tick_handle_oneshot_broadcast
-> > 	 retries:        0
-> > 	
-> > 	tick_broadcast_mask: 00000000
-> > 	tick_broadcast_oneshot_mask: 00000000
-> 
-> At the first glance, the timer broadcast usage is not set, right ? Can
-> you try with the cpuidle flag even if it is not needed ?
+On Mon, 12 Aug 2013, Dave Martin wrote:
 
-It's actually present. I have a clean 3.11-rc3 and the only changes are
-my patch to enable the GT and Stephen's fix.
-The cpuidle stats show both idle states being used.
+> On Mon, Aug 12, 2013 at 11:28:04AM +0100, Russell King - ARM Linux wrote:
+> > arch/arm/mach-vexpress/tc2_pm.c: In function 'tc2_pm_down.clone.0':
+> > arch/arm/mach-vexpress/tc2_pm.c:200:1: error: fp cannot be used in asm here
+> > 
+> > This is caused by the assembly code in this file clobbering R11, which
+> > is incompatible with having CONFIG_FRAME_POINTER=y.
+> 
+> Is there any reason not to fix this just by pushing/popping r11 inside
+> the asm and removing it from the clobber list?
 
-	S?ren
+That's most likely the best fix.  What about this?
+
+---- >8
+
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
+Date: Mon, 12 Aug 2013 12:47:13 -0400
+Subject: [PATCH] ARM: vexpress/MCPM: fix cache disable sequence when
+ CONFIG_FRAME_POINTER=y
+
+If CONFIG_FRAME_POINTER=y we hget the following error:
+
+arch/arm/mach-vexpress/tc2_pm.c: In function 'tc2_pm_down':
+arch/arm/mach-vexpress/tc2_pm.c:200:1: error: fp cannot be used in asm here
+
+Let's fix that by explicitly preserving r11 on the stack and removing it
+from the clobber list.
+
+Reported-by: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+
+diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+index 85fffa702f..3a6384c6c4 100644
+--- a/arch/arm/mach-vexpress/dcscb.c
++++ b/arch/arm/mach-vexpress/dcscb.c
+@@ -144,8 +144,13 @@ static void dcscb_power_down(void)
+ 		 * Let's do it in the safest possible way i.e. with
+ 		 * no memory access within the following sequence
+ 		 * including to the stack.
++		 *
++		 * Note: fp is preserved to the stack explicitly prior doing
++		 * this since adding it to the clobber list is incompatible
++		 * with having CONFIG_FRAME_POINTER=y.
+ 		 */
+ 		asm volatile(
++		"str	fp, [sp, #-4]! \n\t"
+ 		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+ 		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+ 		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+@@ -156,9 +161,10 @@ static void dcscb_power_down(void)
+ 		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+ 		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+ 		"isb	\n\t"
+-		"dsb	"
++		"dsb	\n\t"
++		"ldr	fp, [sp], #4"
+ 		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+-		      "r9","r10","r11","lr","memory");
++		      "r9","r10","lr","memory");
+ 
+ 		/*
+ 		 * This is a harmless no-op.  On platforms with a real
+@@ -182,6 +188,7 @@ static void dcscb_power_down(void)
+ 		 * Let's do it in the safest possible way as above.
+ 		 */
+ 		asm volatile(
++		"str	fp, [sp, #-4]! \n\t"
+ 		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+ 		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+ 		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+@@ -192,9 +199,10 @@ static void dcscb_power_down(void)
+ 		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+ 		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+ 		"isb	\n\t"
+-		"dsb	"
++		"dsb	\n\t"
++		"ldr	fp, [sp], #4"
+ 		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+-		      "r9","r10","r11","lr","memory");
++		      "r9","r10","lr","memory");
+ 	}
+ 
+ 	__mcpm_cpu_down(cpu, cluster);
+diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+index dfb55d45b6..9419b1550a 100644
+--- a/arch/arm/mach-vexpress/tc2_pm.c
++++ b/arch/arm/mach-vexpress/tc2_pm.c
+@@ -139,8 +139,13 @@ static void tc2_pm_down(u64 residency)
+ 		 * Let's do it in the safest possible way i.e. with
+ 		 * no memory access within the following sequence
+ 		 * including the stack.
++		 *
++		 * Note: fp is preserved to the stack explicitly prior doing
++		 * this since adding it to the clobber list is incompatible
++		 * with having CONFIG_FRAME_POINTER=y.
+ 		 */
+ 		asm volatile(
++		"str	fp, [sp, #-4]! \n\t"
+ 		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+ 		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+ 		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+@@ -151,9 +156,10 @@ static void tc2_pm_down(u64 residency)
+ 		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+ 		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+ 		"isb	\n\t"
+-		"dsb	"
++		"dsb	\n\t"
++		"ldr	fp, [sp], #4"
+ 		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+-		      "r9","r10","r11","lr","memory");
++		      "r9","r10","lr","memory");
+ 
+ 		cci_disable_port_by_cpu(mpidr);
+ 
+@@ -174,6 +180,7 @@ static void tc2_pm_down(u64 residency)
+ 		 * Let's do it in the safest possible way as above.
+ 		 */
+ 		asm volatile(
++		"str	fp, [sp, #-4]! \n\t"
+ 		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+ 		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+ 		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+@@ -184,9 +191,10 @@ static void tc2_pm_down(u64 residency)
+ 		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+ 		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+ 		"isb	\n\t"
+-		"dsb	"
++		"dsb	\n\t"
++		"ldr	fp, [sp], #4"
+ 		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+-		      "r9","r10","r11","lr","memory");
++		      "r9","r10","lr","memory");
+ 	}
+ 
+ 	__mcpm_cpu_down(cpu, cluster);
+
+
+> 
+> Since there are no "m" constraints or similar, there should be no
+> implicit references to fp or sp inside the asm which would be disrupted
+> by that.
+> 
+> We could #ifdef it on CONFIG_FRAME_POINTER, but that probably just
+> uglifies the code for no real benefit.
+> 
+> 
+> FRAME_POINTER depends on !THUMB2_KERNEL, so we shouldn't hit the same
+> issue with r7 in Thumb-2.
+> 
+> Cheers
+> ---Dave
+> 
