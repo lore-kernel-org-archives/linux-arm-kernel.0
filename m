@@ -1,36 +1,43 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 12 Aug 2013 09:22:59 +0800
-Subject: [PATCH v15 13/13] usb: chipidea: udc: .pullup is valid only when vbus
- is there
-In-Reply-To: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
-References: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1376270579-13493-14-git-send-email-peter.chen@freescale.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 11 Aug 2013 20:41:49 -0700
+Subject: [PATCH] ARM: KVM: Simplify tracepoint text
+In-Reply-To: <520698CD.2070904@cogentembedded.com>
+References: <1376019686-19301-1-git-send-email-christoffer.dall@linaro.org>
+ <520698CD.2070904@cogentembedded.com>
+Message-ID: <20130812034149.GA5003@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For chipidea, the IP must know vbus before the controller
-begins to run. So the .pullup should only be called when
-the vbus is there.
+On Sat, Aug 10, 2013 at 11:47:25PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 08/09/2013 07:41 AM, Christoffer Dall wrote:
+> 
+> >The tracepoint for kvm_guest_fault was extremely long, make it a
+> >slightly bit shorter.
+> 
+> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >---
+> >  arch/arm/kvm/trace.h |    7 +++----
+> >  1 file changed, 3 insertions(+), 4 deletions(-)
+> 
+> >diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
+> >index a8e73ed..8cbaea2 100644
+> >--- a/arch/arm/kvm/trace.h
+> >+++ b/arch/arm/kvm/trace.h
+> >@@ -59,10 +59,9 @@ TRACE_EVENT(kvm_guest_fault,
+> >  		__entry->ipa			= ipa;
+> >  	),
+> >
+> >-	TP_printk("guest fault at PC %#08lx (hxfar %#08lx, "
+> >-		  "ipa %#16llx, hsr %#08lx",
+> >-		  __entry->vcpu_pc, __entry->hxfar,
+> >-		  __entry->ipa, __entry->hsr)
+> >+	TP_printk("ipa 0x%llx, hsr 0x%#08lx, hxfar 0x%#08lx, pc 0x%#08lx",
+> 
+>    "0x" and "#" are redundant, they mean the same thing, hexadecimal prefix.
+> 
+Duh, indeed, nicely spotted.  I'll respin.
 
-Tested-by: Marek Vasut <marex@denx.de>
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/chipidea/udc.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 90c3572..6b4c2f2 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -1511,6 +1511,9 @@ static int ci_udc_pullup(struct usb_gadget *_gadget, int is_on)
- {
- 	struct ci_hdrc *ci = container_of(_gadget, struct ci_hdrc, gadget);
- 
-+	if (!ci->vbus_active)
-+		return -EOPNOTSUPP;
-+
- 	if (is_on)
- 		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
- 	else
--- 
-1.7.1
+Thanks,
+-Christoffer
