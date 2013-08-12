@@ -1,49 +1,32 @@
-From: arm-kernel@ml.breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Mon, 12 Aug 2013 22:03:01 +0200
-Subject: [PATCH 2/2 v2] arm: Allow forced irq threading
-In-Reply-To: <alpine.LFD.2.02.1302142256520.22263@ionos>
-References: <20130214205204.109023136@linutronix.de>
- <20130214205304.993009840@linutronix.de>
- <20130214214931.GK17833@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1302142256520.22263@ionos>
-Message-ID: <20130812200301.GB4181@breakpoint.cc>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 12 Aug 2013 16:04:52 -0400
+Subject: [PATCH 7/9] ARM: dove: add PCIe controllers to SoC DT
+In-Reply-To: <1376333215-12885-8-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376333215-12885-8-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130812200452.GW25111@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Gleixner <tglx@linutronix.de>
-
-All timer interrupts and the perf interrupt are marked NO_THREAD, so
-its safe to allow forced interrupt threading.
-
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
-On Thu, Feb 14, 2013 at 11:04:48PM +0100, Thomas Gleixner wrote:
-> On Thu, 14 Feb 2013, Russell King - ARM Linux wrote:
+On Mon, Aug 12, 2013 at 08:46:53PM +0200, Sebastian Hesselbarth wrote:
+> This adds a node for the pcie controllers found on Dove SoCs to the
+> SoC DT include.
 > 
-> > What effect does this have on IRQ latency, particularly on the slower CPUs?
-> 
-> It does not affect anything unless you add "threadirqs" to the kernel
-> command line. This command line argument puts the kernel into forced
-> irq threading mode. Otherwise it just works as now.
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/boot/dts/dove.dtsi |   54 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
 
-I reposted the patch since it no longer applies clean on v3.11-rc5. From what
-tglx explained, I don't think there are any outstanding issues, are there?
+patches 7-9 applied to mvebu/dove_mbus since the dependencies are
+cleaner that way.
 
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+thx,
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 43594d5..405e4c0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -20,6 +20,7 @@ config ARM
- 	select GENERIC_STRNCPY_FROM_USER
- 	select GENERIC_STRNLEN_USER
- 	select HARDIRQS_SW_RESEND
-+	select IRQ_FORCED_THREADING
- 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
- 	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_SECCOMP_FILTER
--- 
-1.8.4.rc1
+Jason.
