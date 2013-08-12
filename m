@@ -1,43 +1,131 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 12 Aug 2013 10:42:40 +0200
-Subject: [PATCH 4/5] ASoC: pxa: pxa-ssp: set dma filter data from startup hook
+Date: Mon, 12 Aug 2013 10:42:38 +0200
+Subject: [PATCH 2/5] ASoC: pxa: pxa-ssp: add DT bindings
 In-Reply-To: <1376296961-20564-1-git-send-email-zonque@gmail.com>
 References: <1376296961-20564-1-git-send-email-zonque@gmail.com>
-Message-ID: <1376296961-20564-5-git-send-email-zonque@gmail.com>
+Message-ID: <1376296961-20564-3-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new dmaengine implementation, the filter_data parameter has
-to be set earlier, from pxa_ssp_startup().
+The pxa ssp DAI acts as a user of a pxa ssp port, and needs an
+appropriate 'port' phandle in DT to reference the upstream.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
-Acked-by: Mark Brown <broonie@linaro.org>
 ---
- sound/soc/pxa/pxa-ssp.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/sound/mrvl,pxa-ssp.txt     | 28 ++++++++++++++++
+ sound/soc/pxa/pxa-ssp.c                            | 37 ++++++++++++++++++----
+ 2 files changed, 59 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt
 
+diff --git a/Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt b/Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt
+new file mode 100644
+index 0000000..74c9ba6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt
+@@ -0,0 +1,28 @@
++Marvell PXA SSP CPU DAI bindings
++
++Required properties:
++
++	compatible	Must be "mrvl,pxa-ssp-dai"
++	port		A phandle reference to a PXA ssp upstream device
++
++Example:
++
++	/* upstream device */
++
++	ssp0: ssp at 41000000 {
++		compatible = "mrvl,pxa3xx-ssp";
++		reg = <0x41000000 0x40>;
++		interrupts = <24>;
++		clock-names = "pxa27x-ssp.0";
++		dmas = <&dma 13
++			&dma 14>;
++		dma-names = "rx", "tx";
++	};
++
++	/* DAI as user */
++
++	ssp_dai0: ssp_dai at 0 {
++		compatible = "mrvl,pxa-ssp-dai";
++		port = <&ssp0>;
++	};
++
 diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
-index c0dcc35..a3119a0 100644
+index 6f4dd75..19296f2 100644
 --- a/sound/soc/pxa/pxa-ssp.c
 +++ b/sound/soc/pxa/pxa-ssp.c
-@@ -84,7 +84,6 @@ static void pxa_ssp_disable(struct ssp_device *ssp)
- static void pxa_ssp_set_dma_params(struct ssp_device *ssp, int width4,
- 			int out, struct snd_dmaengine_dai_dma_data *dma)
- {
--	dma->filter_data = out ? &ssp->drcmr_tx : &ssp->drcmr_rx;
- 	dma->addr_width = width4 ? DMA_SLAVE_BUSWIDTH_4_BYTES :
- 				   DMA_SLAVE_BUSWIDTH_2_BYTES;
- 	dma->maxburst = 16;
-@@ -107,6 +106,10 @@ static int pxa_ssp_startup(struct snd_pcm_substream *substream,
- 	dma = kzalloc(sizeof(struct snd_dmaengine_dai_dma_data), GFP_KERNEL);
- 	if (!dma)
- 		return -ENOMEM;
-+
-+	dma->filter_data = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
-+				&ssp->drcmr_tx : &ssp->drcmr_rx;
-+
- 	snd_soc_dai_set_dma_data(cpu_dai, substream, dma);
+@@ -21,6 +21,7 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/pxa2xx_ssp.h>
++#include <linux/of.h>
  
- 	return ret;
+ #include <asm/irq.h>
+ 
+@@ -719,6 +720,7 @@ static int pxa_ssp_trigger(struct snd_pcm_substream *substream, int cmd,
+ 
+ static int pxa_ssp_probe(struct snd_soc_dai *dai)
+ {
++	struct device *dev = dai->dev;
+ 	struct ssp_priv *priv;
+ 	int ret;
+ 
+@@ -726,10 +728,26 @@ static int pxa_ssp_probe(struct snd_soc_dai *dai)
+ 	if (!priv)
+ 		return -ENOMEM;
+ 
+-	priv->ssp = pxa_ssp_request(dai->id + 1, "SoC audio");
+-	if (priv->ssp == NULL) {
+-		ret = -ENODEV;
+-		goto err_priv;
++	if (dev->of_node) {
++		struct device_node *ssp_handle;
++
++		ssp_handle = of_parse_phandle(dev->of_node, "port", 0);
++		if (!ssp_handle) {
++			dev_err(dev, "unable to get 'port' phandle\n");
++			return -ENODEV;
++		}
++
++		priv->ssp = pxa_ssp_request_of(ssp_handle, "SoC audio");
++		if (priv->ssp == NULL) {
++			ret = -ENODEV;
++			goto err_priv;
++		}
++	} else {
++		priv->ssp = pxa_ssp_request(dai->id + 1, "SoC audio");
++		if (priv->ssp == NULL) {
++			ret = -ENODEV;
++			goto err_priv;
++		}
+ 	}
+ 
+ 	priv->dai_fmt = (unsigned int) -1;
+@@ -798,6 +816,12 @@ static const struct snd_soc_component_driver pxa_ssp_component = {
+ 	.name		= "pxa-ssp",
+ };
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id pxa_ssp_of_ids[] = {
++	{ .compatible = "mrvl,pxa-ssp-dai" },
++};
++#endif
++
+ static int asoc_ssp_probe(struct platform_device *pdev)
+ {
+ 	return snd_soc_register_component(&pdev->dev, &pxa_ssp_component,
+@@ -812,8 +836,9 @@ static int asoc_ssp_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver asoc_ssp_driver = {
+ 	.driver = {
+-			.name = "pxa-ssp-dai",
+-			.owner = THIS_MODULE,
++		.name = "pxa-ssp-dai",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(pxa_ssp_of_ids),
+ 	},
+ 
+ 	.probe = asoc_ssp_probe,
 -- 
 1.8.3.1
