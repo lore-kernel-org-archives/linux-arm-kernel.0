@@ -1,42 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Aug 2013 17:08:35 +0100
-Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <20130812135903.GC25995@mudshark.cambridge.arm.com>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
- <51FF8E84.7000108@arm.com>
- <20130807014536.GF15579@mudshark.cambridge.arm.com>
- <20130812135903.GC25995@mudshark.cambridge.arm.com>
-Message-ID: <20130812160835.GE25995@mudshark.cambridge.arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 12 Aug 2013 18:08:46 +0200
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
+References: <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
+ <51F99747.4060901@linaro.org>
+ <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
+ <51FA9AE8.1060004@linaro.org>
+ <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
+ <51FA9F54.3060704@linaro.org>
+ <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
+ <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
+ <20130809172757.GD14845@codeaurora.org>
+ <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
+Message-ID: <5209088E.20404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[replying to self]
+On 08/12/2013 06:03 PM, S?ren Brinkmann wrote:
+> On Fri, Aug 09, 2013 at 10:27:57AM -0700, Stephen Boyd wrote:
+>> On 08/09, Daniel Lezcano wrote:
+>>>
+>>> yes, but at least the broadcast mechanism should send an IPI to cpu0 to
+>>> wake it up, no ? As Stephen stated this kind of configuration should has
+>>> never been tested before so the tick broadcast code is not handling this
+>>> case properly IMHO.
+>>>
+>>
+>> If you have a per-cpu tick device that isn't suffering from
+>> FEAT_C3_STOP why wouldn't you use that for the tick versus a
+>> per-cpu tick device that has FEAT_C3_STOP? It sounds like there
+>> is a bug in the preference logic or you should boost the rating
+>> of the arm global timer above the twd. Does this patch help? It
+>> should make the arm global timer the tick device and whatever the
+>> cadence timer you have into the broadcast device.
+> 
+> I finally got to test your patch. Unfortunately, it makes the system
+> hang even earlier:
 
-On Mon, Aug 12, 2013 at 02:59:03PM +0100, Will Deacon wrote:
-> So, I just tried to test this patch but I'm getting issues when enabling CCI
-> with mainline:
-> 
-> 
-> ARM Versatile Express Boot Monitor
-> Version:    V5.1.5
-> Build Date: Jul 24 2012
-> Daughterboard Site 1: V2P-CA15 Cortex A15
-> Daughterboard Site 2: V2P-CA15_A7 Cortex A15
-> Running boot script from flash - BOOTSCRIPT
-> Loaded kernel - linuxtc2
-> Booting kernel @ 0x80008000
-> Command line 'ip=dhcp root=/dev/nfs nfsroot=10.1.203.36:/exports/linaro-13.06,tcp rw console=ttyAMA0,38400 mem=2G loglevel=9 user_debug=31 earlyprintk debug'
-> ATAGs @ 0x80000100
-> 
-> 
-> Fatal Error: Unhandled Exception - Undefined
-> 
-> 
-> We're exploding *really* early, and I have no idea why. If I remove CCI from
-> the equation (either in the kernel or the device-tree), then I can boot as
-> per usual.
+[ ... ]
 
-Turns out my .dtb has gone over some limit and appended dtb corrupts the
-kernel image. Removing some random nodes got things working again.
+Can you boot with maxcpus=1 and then give the result of timer_list ?
 
-Will
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
