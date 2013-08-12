@@ -1,34 +1,66 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 11 Aug 2013 21:13:01 -0700
-Subject: [PATCH 4/4] KVM: ARM: Squash len warning
-In-Reply-To: <1376280781-6539-1-git-send-email-christoffer.dall@linaro.org>
-References: <1376280781-6539-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1376280781-6539-5-git-send-email-christoffer.dall@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 12 Aug 2013 09:55:03 +0530
+Subject: [PATCH v3 02/12] ARM: edma: Don't clear EMR of channel in
+ edma_stop
+In-Reply-To: <520385D3.1060408@ti.com>
+References: <1375719297-12871-1-git-send-email-joelf@ti.com>
+ <1375719297-12871-3-git-send-email-joelf@ti.com> <520385D3.1060408@ti.com>
+Message-ID: <5208639F.8070406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'len' variable was declared an unsigned and then checked for less
-than 0, which results in warnings on some compilers.  Since len is
-assigned an int, make it an int.
+On 8/8/2013 5:19 PM, Sekhar Nori wrote:
+> On Monday 05 August 2013 09:44 PM, Joel Fernandes wrote:
+>> We certainly don't want error conditions to be cleared any other
+>> place but the EDMA error handler, as this will make us 'forget'
+>> about missed events we might need to know errors have occurred.
+>>
+>> This fixes a race condition where the EMR was being cleared
+>> by the transfer completion interrupt handler.
+>>
+>> Basically, what was happening was:
+>>
+>>             Missed event
+>>              |
+>>              |
+>>              V
+>> SG1-SG2-SG3-Null
+>>          \
+>>           \__TC Interrupt (Almost same time as ARM is executing
+>> TC interrupt handler, an event got missed and also forgotten
+>> by clearing the EMR).
+>>
+>> This causes the following  problems:
+>>
+>> 1.
+>> If error interrupt is also pending and TC interrupt clears the EMR
+>> by calling edma_stop as has been observed in the edma_callback function,
+>> the ARM will execute the error interrupt even though the EMR is clear.
+>> As a result, the  dma_ccerr_handler returns IRQ_NONE. If this happens
+>> enough number of times, IRQ subsystem disables the interrupt thinking
+>> its spurious which makes error handler never execute again.
+>>
+>> 2.
+>> Also even if error handler doesn't return IRQ_NONE, the removing of EMR
+>> removes the knowledge about which channel had a missed event, and thus
+>> a manual trigger on such channels cannot be performed.
+>>
+>> The EMR is ultimately being cleared by the Error interrupt handler
+>> once it is handled so we remove code that does it in edma_stop and
+>> allow it to happen there.
+>>
+>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> 
+> Queuing this for v3.11 fixes. While committing, I changed the headline
+> to remove capitalization and made it more readable by removing register
+> level details. The new headline is:
+> 
+> ARM: edma: don't clear missed events in edma_stop()
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/kvm/mmio.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Forgot to ask, should this be tagged for stable? IOW, how serious is
+this race in current kernel (without the entire series applied)? I have
+never observed it myself - so please provide details how easy/difficult
+it is to hit this condition.
 
-diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-index b8e06b7..0c25d94 100644
---- a/arch/arm/kvm/mmio.c
-+++ b/arch/arm/kvm/mmio.c
-@@ -63,7 +63,8 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
- static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		      struct kvm_exit_mmio *mmio)
- {
--	unsigned long rt, len;
-+	unsigned long rt;
-+	int len;
- 	bool is_write, sign_extend;
- 
- 	if (kvm_vcpu_dabt_isextabt(vcpu)) {
--- 
-1.7.10.4
+Thanks,
+Sekhar
