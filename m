@@ -1,27 +1,74 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 12 Aug 2013 11:17:21 +0200
-Subject: [alsa-devel] [PATCH 5/5] ASoC: pxa: add DT bindings for pxa2xx-pcm
-In-Reply-To: <5208A424.70704@metafoo.de>
-References: <1376296961-20564-1-git-send-email-zonque@gmail.com>
- <1376296961-20564-6-git-send-email-zonque@gmail.com>
- <5208A424.70704@metafoo.de>
-Message-ID: <5208A821.6060604@gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 12 Aug 2013 15:26:53 +0800
+Subject: [PATCH 1/2] arm: mach-imx: Move anatop related from board file to
+ anatop driver
+Message-ID: <1376292414-22922-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.08.2013 11:00, Lars-Peter Clausen wrote:
-> On 08/12/2013 10:42 AM, Daniel Mack wrote:
->> The bindings do not carry any resources, as the module only registers
->> the ASoC platform driver.
->>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> 
-> As this is just a virtual device (and Linux specific) it shouldn't be in the 
-> devicetree. Usually when using devicetree you'd register the PCM device from 
-> the CPU DAI driver. Take a look at how other platforms (e.g. tegra) do this.
+Move anatop related (For USB) from board file to anatop driver
 
-Ok, then please ignore this one for now.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ arch/arm/mach-imx/anatop.c     |    4 +++-
+ arch/arm/mach-imx/common.h     |    1 -
+ arch/arm/mach-imx/mach-imx6q.c |    5 -----
+ 3 files changed, 3 insertions(+), 7 deletions(-)
 
-
-Thanks,
-Daniel
+diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+index f7efabe..71f1a08 100644
+--- a/arch/arm/mach-imx/anatop.c
++++ b/arch/arm/mach-imx/anatop.c
+@@ -115,7 +115,7 @@ void imx_anatop_post_resume(void)
+ 	imx_anatop_enable_weak2p5(false);
+ }
+ 
+-void imx_anatop_usb_chrg_detect_disable(void)
++static void imx_anatop_usb_chrg_detect_disable(void)
+ {
+ 	regmap_write(anatop, ANADIG_USB1_CHRG_DETECT,
+ 		BM_ANADIG_USB_CHRG_DETECT_EN_B
+@@ -157,4 +157,6 @@ void __init imx_anatop_init(void)
+ 	 */
+ 	imx_anatop_pu_enable(true);
+ 	imx_gpc_xpu_enable();
++
++	imx_anatop_usb_chrg_detect_disable();
+ }
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 558e95f..df1d7b0 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -136,7 +136,6 @@ extern void imx_gpc_xpu_enable(void);
+ extern void imx_anatop_init(void);
+ extern void imx_anatop_pre_suspend(void);
+ extern void imx_anatop_post_resume(void);
+-extern void imx_anatop_usb_chrg_detect_disable(void);
+ extern u32 imx_anatop_get_digprog(void);
+ extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
+ extern void imx6q_set_chicken_bit(void);
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index e04abe9..846731d 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -185,10 +185,6 @@ static void __init imx6q_1588_init(void)
+ 		pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
+ 
+ }
+-static void __init imx6q_usb_init(void)
+-{
+-	imx_anatop_usb_chrg_detect_disable();
+-}
+ 
+ static void __init imx6q_init_machine(void)
+ {
+@@ -198,7 +194,6 @@ static void __init imx6q_init_machine(void)
+ 
+ 	imx_anatop_init();
+ 	imx6q_pm_init();
+-	imx6q_usb_init();
+ 	imx6q_1588_init();
+ }
+ 
+-- 
+1.7.1
