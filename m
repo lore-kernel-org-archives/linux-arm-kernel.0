@@ -1,23 +1,44 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 11 Aug 2013 21:38:46 -0700 (PDT)
-Subject: [PATCH v5] net: Add MOXA ART SoCs ethernet driver
-In-Reply-To: <1375961694-5375-1-git-send-email-jonas.jensen@gmail.com>
-References: <1375349968-16059-1-git-send-email-jonas.jensen@gmail.com>
- <1375961694-5375-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <20130811.213846.2022624715665927428.davem@davemloft.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 12 Aug 2013 13:01:28 +0800
+Subject: [PATCH 1/1] arm: imx: Kconfig: select syscon for mx25
+In-Reply-To: <1375947809-11694-1-git-send-email-peter.chen@freescale.com>
+References: <1375947809-11694-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130812050126.GA25061@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonas Jensen <jonas.jensen@gmail.com>
-Date: Thu,  8 Aug 2013 13:34:54 +0200
+I prefer to use uppercase for "ARM:" in subject.
 
-> The MOXA UC-711X hardware(s) has an ethernet controller that seem
-> to be developed internally. The IC used is "RTL8201CP".
-> 
-> Since there is no public documentation, this driver is mostly the
-> one published by MOXA that has been heavily cleaned up / ported
-> from linux 2.6.9.
-> 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+On Thu, Aug 08, 2013 at 03:43:29PM +0800, Peter Chen wrote:
+> We need to use syscon to map one register region for several
+> devices, eg, usb non-core register for all usb devices.
 
-Applied to net-next, thanks.
+So we're changing usb non-core controller to be a syscon?
+
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  arch/arm/mach-imx/Kconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index f546560..5bb21fe 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -109,6 +109,7 @@ config SOC_IMX25
+>  	select COMMON_CLK
+>  	select CPU_ARM926T
+>  	select MXC_AVIC
+> +	select MFD_SYSCON
+
+Please sort it alphabetically.
+
+Shawn
+
+>  
+>  config SOC_IMX27
+>  	bool
+> -- 
+> 1.7.1
+> 
+> 
