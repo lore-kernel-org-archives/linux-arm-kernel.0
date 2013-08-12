@@ -1,88 +1,44 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 12 Aug 2013 18:51:31 -0300
-Subject: [PATCH v2 1/2] ARM: feroceon: Add suspend/resume operation
-In-Reply-To: <1376144839-1985-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1376144839-1985-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1376144839-1985-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130812215130.GA7851@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Aug 2013 23:12:50 +0100
+Subject: [Qemu-devel] SCSI bus failures with qemu-arm in kernel 3.8+
+In-Reply-To: <CAFEAcA_0kzS=Z5oTxrr=B74wjf1x=M6dXwH7Fcgf77Pca90Gjw@mail.gmail.com>
+References: <5207B3C3.9080508@roeck-us.net>
+ <20130811220450.GY23006@n2100.arm.linux.org.uk> <52082EF8.10005@roeck-us.net>
+ <CAFEAcA94ygwRPSsfxs3DvOcTZbdafLiEHys94FG4aXUx+A1t=A@mail.gmail.com>
+ <20130812164548.GE23006@n2100.arm.linux.org.uk>
+ <CAFEAcA97PuORg920f-A_8rvCgBq=k5Y=0W6m2Nv8nnzjY19Utg@mail.gmail.com>
+ <20130812200628.GG23006@n2100.arm.linux.org.uk>
+ <CAFEAcA9BA7zfaO1J5zVaEcG-AgOo6dyiew08-o2eObuBe-KWig@mail.gmail.com>
+ <20130812212149.GH23006@n2100.arm.linux.org.uk>
+ <CAFEAcA_0kzS=Z5oTxrr=B74wjf1x=M6dXwH7Fcgf77Pca90Gjw@mail.gmail.com>
+Message-ID: <20130812221250.GI23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-On Sat, Aug 10, 2013 at 11:27:18AM -0300, Ezequiel Garcia wrote:
-> Add support for suspend/resume operations. The implemented procedures
-> are identical to the ones for ARM926.
+On Mon, Aug 12, 2013 at 10:36:17PM +0100, Peter Maydell wrote:
+> On this point, yes. Equivalent bit from the PB926 TRM:
+> http://infocenter.arm.com/help/topic/com.arm.doc.dui0224i/Cacdijji.html
 > 
-> Cc: Assaf Hoffman <hoffman@marvell.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/Kconfig            |  2 +-
->  arch/arm/mm/proc-feroceon.S | 26 ++++++++++++++++++++++++++
->  2 files changed, 27 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 98538e1..c57b437 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -2198,7 +2198,7 @@ source "kernel/power/Kconfig"
->  
->  config ARCH_SUSPEND_POSSIBLE
->  	depends on !ARCH_S5PC100
-> -	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
-> +	depends on CPU_ARM920T || CPU_ARM926T || CPU_FEROCEON || CPU_SA1100 || \
->  		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE || CPU_MOHAWK
->  	def_bool y
->  
-> diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
-> index d5146b9..db79b62 100644
-> --- a/arch/arm/mm/proc-feroceon.S
-> +++ b/arch/arm/mm/proc-feroceon.S
-> @@ -514,6 +514,32 @@ ENTRY(cpu_feroceon_set_pte_ext)
->  #endif
->  	mov	pc, lr
->  
-> +/* Suspend/resume support: taken from arch/arm/mm/proc-arm926.S */
-> +.globl	cpu_feroceon_suspend_size
-> +.equ	cpu_feroceon_suspend_size, 4 * 3
-> +#ifdef CONFIG_ARM_CPU_SUSPEND
-> +ENTRY(cpu_feroceon_do_suspend)
-> +	stmfd	sp!, {r4 - r6, lr}
-> +	mrc	p15, 0, r4, c13, c0, 0	@ PID
-> +	mrc	p15, 0, r5, c3, c0, 0	@ Domain ID
-> +	mrc	p15, 0, r6, c1, c0, 0	@ Control register
-> +	stmia	r0, {r4 - r6}
-> +	ldmfd	sp!, {r4 - r6, pc}
-> +ENDPROC(cpu_feroceon_do_suspend)
-> +
-> +ENTRY(cpu_feroceon_do_resume)
-> +	mov	ip, #0
-> +	mcr	p15, 0, ip, c8, c7, 0	@ invalidate I+D TLBs
-> +	mcr	p15, 0, ip, c7, c7, 0	@ invalidate I+D caches
-> +	ldmia	r0, {r4 - r6}
-> +	mcr	p15, 0, r4, c13, c0, 0	@ PID
-> +	mcr	p15, 0, r5, c3, c0, 0	@ Domain ID
-> +	mcr	p15, 0, r1, c2, c0, 0	@ TTB address
-> +	mov	r0, r6			@ control register
-> +	b	cpu_resume_mmu
-> +ENDPROC(cpu_feroceon_do_resume)
-> +#endif
-> +
->  	.type	__feroceon_setup, #function
->  __feroceon_setup:
->  	mov	r0, #0
-> -- 
-> 1.8.1.5
-> 
+> (There are differences between the PCI controllers on
+> the different boards. Differences I know of are:
+>  * size of the three memory mapped regions
+>  * whether the top bits of the PCI address come from the top
+>    or bottom of the IMAP* registers
+> I believe (based on some experimentation and an educated guess)
+> that these both changed at the same point, but some of the board
+> TRMs claim to be part one way part the other, presumably due to
+> copy and paste error. In particular PB1176's TRM has a mangled
+> description of the IMAP* registers which didn't match what the
+> h/w actually did in my testing.)
 
-Any comments for this one?
+Bah, updated TRMs since my version.
 
-If this is OK, then I'd like to add it in the tracking system
-to be merged in either v3.12 or v3.13, and be able to introduce
-suspend/resume later.
+Right, so if I've traced everything correctly, this should work:
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+        /*
+         * Slot INTA    INTB    INTC    INTD
+         *  31  PCI1    PCI2    PCI3    PCI0
+         *  30  PCI0    PCI1    PCI2    PCI3
+         *  29  PCI3    PCI0    PCI1    PCI2
+         */
+        return IRQ_SIC_PCI0 + ((slot + 2 + pin - 1) & 3);
