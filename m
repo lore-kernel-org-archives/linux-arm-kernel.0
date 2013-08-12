@@ -1,71 +1,185 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Mon, 12 Aug 2013 14:27:47 +0100
-Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
-Message-ID: <5208E2D3.7060005@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 12 Aug 2013 18:56:55 +0000
+Subject: [PATCH v3 09/12] dma: edma: Implement multiple linked sets for
+ continuity
+In-Reply-To: <1375719297-12871-10-git-send-email-joelf@ti.com>
+References: <1375719297-12871-1-git-send-email-joelf@ti.com>
+ <1375719297-12871-10-git-send-email-joelf@ti.com>
+Message-ID: <52092FF7.7040508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+On Monday 05 August 2013 04:14 PM, Joel Fernandes wrote:
+> Here we implement splitting up of the total MAX number of slots
+> available for a channel into 2 cyclically linked sets. Transfer
+> completion Interrupts are enabled on both linked sets and respective
+> handler recycles them on completion to process the next linked set.
+> Both linked sets are cyclically linked to each other to ensure
+> continuity of DMA operations. Interrupt handlers execute asynchronously
+> to the EDMA events and recycles the linked sets at the right time,
+> as a result EDMA is not blocked or dependent on interrupts and DMA
+> continues till the end of the SG-lists without any interruption.
+> 
+> Suggested-by: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> ---
+>  drivers/dma/edma.c |  157 +++++++++++++++++++++++++++++++++++++++-------------
+>  1 file changed, 118 insertions(+), 39 deletions(-)
+> 
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index df50a04..70923a2 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -48,6 +48,7 @@
+>  
+>  /* Max of 16 segments per channel to conserve PaRAM slots */
+>  #define MAX_NR_SG		16
+> +#define MAX_NR_LS		(MAX_NR_SG >> 1)
+>  #define EDMA_MAX_SLOTS		(MAX_NR_SG+1)
+>  #define EDMA_DESCRIPTORS	16
+>  
+> @@ -57,6 +58,7 @@ struct edma_desc {
+>  	int				absync;
+>  	int				pset_nr;
+>  	int				total_processed;
+> +	int				next_setup_linkset;
+>  	struct edmacc_param		pset[0];
+>  };
+>  
+> @@ -140,7 +142,9 @@ static void edma_execute(struct edma_chan *echan)
+>  	struct edma_desc *edesc;
+>  	struct device *dev = echan->vchan.chan.device->dev;
+>  
+> -	int i, j, total_left, total_process;
+> +	int i, total_left, total_link_set;
+> +	int ls_cur_off, ls_next_off, slot_off;
+> +	struct edmacc_param tmp_param;
+>  
+>  	/* If either we processed all psets or we're still not started */
+>  	if (!echan->edesc ||
+> @@ -159,48 +163,121 @@ static void edma_execute(struct edma_chan *echan)
+>  
+>  	/* Find out how many left */
+>  	total_left = edesc->pset_nr - edesc->total_processed;
+> -	total_process = total_left > MAX_NR_SG ? MAX_NR_SG : total_left;
+> -
+> -
+> -	/* Write descriptor PaRAM set(s) */
+> -	for (i = 0; i < total_process; i++) {
+> -		j = i + edesc->total_processed;
+> -		edma_write_slot(echan->slot[i], &edesc->pset[j]);
+> -		dev_dbg(echan->vchan.chan.device->dev,
+> -			"\n pset[%d]:\n"
+> -			"  chnum\t%d\n"
+> -			"  slot\t%d\n"
+> -			"  opt\t%08x\n"
+> -			"  src\t%08x\n"
+> -			"  dst\t%08x\n"
+> -			"  abcnt\t%08x\n"
+> -			"  ccnt\t%08x\n"
+> -			"  bidx\t%08x\n"
+> -			"  cidx\t%08x\n"
+> -			"  lkrld\t%08x\n",
+> -			j, echan->ch_num, echan->slot[i],
+> -			edesc->pset[j].opt,
+> -			edesc->pset[j].src,
+> -			edesc->pset[j].dst,
+> -			edesc->pset[j].a_b_cnt,
+> -			edesc->pset[j].ccnt,
+> -			edesc->pset[j].src_dst_bidx,
+> -			edesc->pset[j].src_dst_cidx,
+> -			edesc->pset[j].link_bcntrld);
+> -		/* Link to the previous slot if not the last set */
+> -		if (i != (total_process - 1))
 
-  Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+> +	total_link_set = total_left > MAX_NR_LS ? MAX_NR_LS : total_left;
 
-are available in the git repository at:
+The name you gave here sounds like this is defining total number of
+linked PaRAM sets. Rather this is actually tracking the number of PaRAM
+sets (slots) in current linked set, correct? Then may be just call it
+'nslots' or even 'num_slots'? There are just too many variables with
+"total" prefix to keep track of in this function!
 
-  git://linux-arm.org/linux-skn.git cpu_of_node
+> +
+> +	/* First time, setup 2 cyclically linked sets, each containing half
+> +	   the slots allocated for this channel */
+> +	if (edesc->total_processed == 0) {
 
-for you to fetch changes up to 9e9e26dde91f22635c87d0e45f3938b5ded96f0d:
+We dont need to check for this case for every DMA_COMPLETE interrupt.
+May be move the initial setup to another function called from
+edma_issue_pending()?
 
-  cpufreq: pmac32-cpufreq: remove device tree parsing for cpu nodes
-(2013-08-12 10:22:29 +0100)
+> +		for (i = 0; i < total_link_set; i++) {
+> +			edma_write_slot(echan->slot[i+1], &edesc->pset[i]);
+> +
+> +			if (i != total_link_set - 1) {
+> +				edma_link(echan->slot[i+1], echan->slot[i+2]);
+> +				dump_pset(echan, echan->slot[i+1],
+> +					  edesc->pset, i);
+> +			}
+> +		}
+> +
+> +		edesc->total_processed += total_link_set;
+> +
+> +		total_left = edesc->pset_nr - edesc->total_processed;
+> +
+> +		total_link_set = total_left > MAX_NR_LS ?
+> +				 MAX_NR_LS : total_left;
+> +
+> +		if (total_link_set) {
+> +			/* Don't setup interrupt for first linked set for cases
+> +			   where total pset_nr is strictly within MAX_NR size */
 
-----------------------------------------------------------------
-Sudeep KarkadaNagesha (16):
-  of: add support for retrieving cpu node for a given logical cpu index
-  ARM: DT/kernel: define ARM specific arch_match_cpu_phys_id
-  driver/core: cpu: initialize of_node in cpu's device struture
-  of/device: add helper to get cpu device node from logical cpu index
-  ARM: topology: remove hwid/MPIDR dependency from cpu_capacity
-  ARM: mvebu: remove device tree parsing for cpu nodes
-  drivers/bus: arm-cci: avoid parsing DT for cpu device nodes
-  cpufreq: imx6q-cpufreq: remove device tree parsing for cpu nodes
-  cpufreq: cpufreq-cpu0: remove device tree parsing for cpu nodes
-  cpufreq: highbank-cpufreq: remove device tree parsing for cpu nodes
-  cpufreq: spear-cpufreq: remove device tree parsing for cpu nodes
-  cpufreq: kirkwood-cpufreq: remove device tree parsing for cpu nodes
-  cpufreq: arm_big_little: remove device tree parsing for cpu nodes
-  cpufreq: maple-cpufreq: remove device tree parsing for cpu nodes
-  cpufreq: pmac64-cpufreq: remove device tree parsing for cpu nodes
-  cpufreq: pmac32-cpufreq: remove device tree parsing for cpu nodes
+See Documentation/CodingStyle for multi-line commenting style.
 
- arch/arm/kernel/devtree.c           |  5 +++++
- arch/arm/kernel/topology.c          | 61
-+++++++++++++++++++------------------------------------------
- arch/arm/mach-imx/mach-imx6q.c      |  3 +--
- arch/arm/mach-mvebu/platsmp.c       | 52
-++++++++++++++++++++++++----------------------------
- drivers/base/cpu.c                  |  2 ++
- drivers/bus/arm-cci.c               | 28 +++++++---------------------
- drivers/cpufreq/arm_big_little_dt.c | 40
-++++++++++++++--------------------------
- drivers/cpufreq/cpufreq-cpu0.c      | 23 ++++-------------------
- drivers/cpufreq/highbank-cpufreq.c  | 18 ++++++------------
- drivers/cpufreq/imx6q-cpufreq.c     |  4 +---
- drivers/cpufreq/kirkwood-cpufreq.c  |  8 +++++---
- drivers/cpufreq/maple-cpufreq.c     | 23 +++--------------------
- drivers/cpufreq/pmac32-cpufreq.c    |  5 +++--
- drivers/cpufreq/pmac64-cpufreq.c    | 47
-+++++++++++------------------------------------
- drivers/cpufreq/spear-cpufreq.c     |  4 ++--
- drivers/of/base.c                   | 73
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/cpu.h                 |  1 +
- include/linux/of.h                  |  6 ++++++
- include/linux/of_device.h           | 15 +++++++++++++++
- 19 files changed, 202 insertions(+), 216 deletions(-)
+> +			if (total_left > total_link_set)
+> +				edma_enable_interrupt(echan->slot[i]);
+> +
+> +			/* Setup link between linked set 0 to set 1 */
+>  			edma_link(echan->slot[i], echan->slot[i+1]);
+> -		/* Final pset links to the dummy pset */
+> -		else
+> +
+> +			dump_pset(echan, echan->slot[i], edesc->pset, i-1);
+> +
+> +			/* Write out linked set 1 */
+> +			for (; i < total_link_set + MAX_NR_LS; i++) {
+> +				edma_write_slot(echan->slot[i+1],
+> +						&edesc->pset[i]);
+> +
+> +				if (i != total_link_set + MAX_NR_LS - 1) {
+> +					edma_link(echan->slot[i+1],
+> +						  echan->slot[i+2]);
+> +					dump_pset(echan, echan->slot[i+1],
+> +						  edesc->pset, i);
+> +				}
+> +			}
+> +
+> +			edesc->total_processed += total_link_set;
+> +			total_left = edesc->pset_nr - edesc->total_processed;
 
+There is way too much duplication of code here mainly because you
+decided not to loop twice in the course of setting up the two linked
+sets. Can you use a loop instead?
 
-PS: This patch series is reviewed and acknowledged @
+> +
+> +			if (total_left)
+> +				/* Setup a link from linked set 1 to set 0 */
+> +				edma_link(echan->slot[i], echan->slot[1]);
 
-v1: https://lkml.org/lkml/2013/7/15/128
-v2: https://lkml.org/lkml/2013/7/17/341
-v3: https://lkml.org/lkml/2013/7/22/219
+If you have more SGs to service at the end of setting up the two linked
+sets, you should stop right there and wait for CPU to recycle the linked
+sets. Right now you are setup for re-DMAing old data.
+
+You wont hit this issue in testing because you have setup an interrupt
+for LS0 and that will most likely service before LS1 completes but we
+cannot rely on that timing.
+
+Just link to dummy at end of LS1 to stall the DMA and wait for the
+completion handler to come-in and restart the DMA after recycling LS0.
+
+I haven't reviewed rest of the patch. Lets make sure we have a common
+understanding here.
+
+Thanks,
+Sekhar
