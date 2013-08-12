@@ -1,49 +1,36 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 12 Aug 2013 14:11:41 +0100
-Subject: [PATCH V2] MFD: Make VEXPRESS MFD controller depends on
- VEXPRESS systems
-In-Reply-To: <1376312115-10326-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1375592514-14213-1-git-send-email-manjunath.goudar@linaro.org>
- <1376312115-10326-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1376313101.13400.2.camel@hornet>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 12 Aug 2013 14:12:36 +0100
+Subject: [PATCH V4 1/4] ARM: dts: exynos5420: add i2s controllers
+In-Reply-To: <3916118.YsNJ4NTaJS@amdc1227>
+References: <1376302070-1877-1-git-send-email-padma.v@samsung.com>
+ <21180092.af8YMiXtjc@amdc1227>
+ <20130812113447.GW6427@sirena.org.uk> <3916118.YsNJ4NTaJS@amdc1227>
+Message-ID: <20130812131235.GX6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-08-12 at 13:55 +0100, Manjunath Goudar wrote:
-> This patch adds a of_find_node_by_phandle() and of_get_next_parent()
-> function declaration dependence on"#ifdef CONFIG_OF" in "include/linux/of.h"
-> else part return inline dummy implementations (returning NULL). Without
-> this patch,build system can lead to issues. This was discovered during
-> randconfig testing,in which VEXPRESS_CONFIG was enabled w/o CONFIG_OF
-> being enabled,leading to the following error:
-> 
-> CC      drivers/mfd/vexpress-config.o
-> drivers/mfd/vexpress-config.c: In function ?__vexpress_config_func_get?:
-> drivers/mfd/vexpress-config.c:117:4: error: implicit declaration of function
-> ?of_find_node_by_phandle? [-Werror=implicit-function-declaration]
->     bridge_node = of_find_node_by_phandle(
->     ^
-> drivers/mfd/vexpress-config.c:117:16: warning: assignment makes pointer from
-> integer without a cast [enabled by default]
->     bridge_node = of_find_node_by_phandle(
-> 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Deepak Saxena <dsaxena@linaro.org>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> 
-> V2:
->  -Made of_find_node_by_phandle() and of_get_next_parent() function declaration
->   dependence on"#ifdef CONFIG_OF" in "include/linux/of.h" instead of Kconfig
->   dependence setting in V1 patch and else part return inline dummy implementations
->   (returning NULL) to fix the above randconfig error.
-> ---
->  include/linux/of.h | 16 ++++++++++++++--
->  1 file changed, 14 insertions(+), 2 deletions(-)
+On Mon, Aug 12, 2013 at 01:41:23PM +0200, Tomasz Figa wrote:
+> On Monday 12 of August 2013 12:34:48 Mark Brown wrote:
 
-It's all cool, but the subject line doesn't make any sense now, does
-it? ;-) As in: it's not a vexpress- nor mfd-related patch any more.
+> > I'd expect that to interact badly with the pinmuxing - unless the device
+> > is disabled it'll try to grab its pins on probe which is not going to be
+> > a good idea unless it is actually wired up for use in the system.  Or is
+> > there some other mechanism for handling that?
 
-Pawel
+> Ah, good point. Now I wonder whether pinctrl nodes shouldn't be considered 
+> board-specific and specified in board-level dts instead?
+
+It seems a bit cleaner to use the current mechanism in that it stops the
+device appearing at all and hence repeated efforts to probe, plus a
+simple enable is less error prone, the way these SoCs are designed you
+don't have to pick which pinmux is in use for most of the IPs.  Where
+there are multiple options it does seem like a good approach though.
+
+Tastes may differ though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130812/80389ac4/attachment-0001.sig>
