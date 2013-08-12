@@ -1,27 +1,38 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 12 Aug 2013 22:31:20 +0530
-Subject: [PATCH 35/35] cpufreq: tegra: use
- cpufreq_table_validate_and_show()
-In-Reply-To: <52090E67.1080703@wwwdotorg.org>
-References: <cover.1375964117.git.viresh.kumar@linaro.org>
- <568f3dbd414b050bb2319d960fb5044a5aed8ee3.1375964117.git.viresh.kumar@linaro.org>
- <5203BCDD.40809@wwwdotorg.org>
- <CAKohpomr8kwDitAFD7FKvHo3zNWz8qT5bkd3yOVEnC_k16o=Dw@mail.gmail.com>
- <CAKohpo=Gy7D2LYmdFU1p+eL-nMoPE18YXWvE2M8t-fb-a5HBgg@mail.gmail.com>
- <5205167F.1070906@wwwdotorg.org>
- <CAKohponQDAqHiRD7Aw5Wk6fEE-d8H=Svg0oBRyb9SKGdqYxGhw@mail.gmail.com>
- <52056842.8060109@wwwdotorg.org>
- <CAKohpon=j=NANLQzYuBdoFVLxQzETy5JDu2vORaAgK3NuEpeAg@mail.gmail.com>
- <52090E67.1080703@wwwdotorg.org>
-Message-ID: <CAKohpom4WsD_BSSGEbtmGR3JRzPXx9j1exM7CagwOXZ=0GZnGw@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 12 Aug 2013 19:02:20 +0200
+Subject: [PATCH V4 1/4] ARM: dts: exynos5420: add i2s controllers
+In-Reply-To: <20130812131235.GX6427@sirena.org.uk>
+References: <1376302070-1877-1-git-send-email-padma.v@samsung.com>
+ <3916118.YsNJ4NTaJS@amdc1227> <20130812131235.GX6427@sirena.org.uk>
+Message-ID: <1427610.pB8BGbMKTL@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 August 2013 22:03, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> It's in defconfig OK; I think the driver simply isn't initializing since
-> some of the clocks it requests don't exist. I'll have our clock driver
-> author look into it. In the meantime, I assume that your change is
-> likely fine.
+On Monday 12 of August 2013 14:12:36 Mark Brown wrote:
+> On Mon, Aug 12, 2013 at 01:41:23PM +0200, Tomasz Figa wrote:
+> > On Monday 12 of August 2013 12:34:48 Mark Brown wrote:
+> > > I'd expect that to interact badly with the pinmuxing - unless the
+> > > device is disabled it'll try to grab its pins on probe which is not
+> > > going to be a good idea unless it is actually wired up for use in
+> > > the system.  Or is there some other mechanism for handling that?
+> > 
+> > Ah, good point. Now I wonder whether pinctrl nodes shouldn't be
+> > considered board-specific and specified in board-level dts instead?
+> 
+> It seems a bit cleaner to use the current mechanism in that it stops the
+> device appearing at all and hence repeated efforts to probe, plus a
+> simple enable is less error prone, the way these SoCs are designed you
+> don't have to pick which pinmux is in use for most of the IPs.  Where
+> there are multiple options it does seem like a good approach though.
+> 
+> Tastes may differ though.
 
-I wasn't' talking about your driver but cpufreq_stats.. That is disabled
-by default with your defconfig.
+Right, if this SoC has only one pinmux setting for this IP, then it's 
+fine.
+
+Padmavathi, this was the only issue I spotted, so have my:
+
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+
+Best regards,
+Tomasz
