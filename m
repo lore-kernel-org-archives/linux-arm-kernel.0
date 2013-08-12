@@ -1,42 +1,161 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 12 Aug 2013 10:02:40 -0400
-Subject: [PATCH V3 RFC 00/16]  EFI stub for ARM
-In-Reply-To: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
-References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
-Message-ID: <1376316160.32237.17.camel@t520.redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Aug 2013 15:14:10 +0100
+Subject: [PATCHv3 3/4] clk: sunxi: Add A31 clocks support
+In-Reply-To: <1375735381-18214-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1375735381-18214-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375735381-18214-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130812141410.GB27165@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-08-09 at 16:26 -0700, Roy Franz wrote:
-> * Change FDT memory allocation to retry with a larger allocation if
->   first educated guess is inadequate.
+[Adding devicetree list to Cc]
 
-With this change, it looks like you no longer free the original cmdline
-and fdt memory. The current flow looks like:
+Hi,
 
-  retry:
-     allocate_memory_for_expanded_fdt
-     get_memory_map
-     if (update_fdt() fails) {
-        free new_fdt and memory_map
-        goto retry
-     }
+On Mon, Aug 05, 2013 at 09:43:00PM +0100, Maxime Ripard wrote:
+> The A31 has a mostly different clock set compared to the other older
+> SoCs currently supported in the Allwinner clock driver.
+> 
+> Add support for the basic useful clocks. The other ones will come in
+> eventually.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt  |   6 +
+>  .../bindings/clock/sunxi/sun6i-a31-gates.txt       |  83 ++++++++++++++
+>  drivers/clk/sunxi/clk-sunxi.c                      | 124 +++++++++++++++++++++
+>  3 files changed, 213 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index b24de10..c383d12 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -8,6 +8,7 @@ Required properties:
+>  - compatible : shall be one of the following:
+>         "allwinner,sun4i-osc-clk" - for a gatable oscillator
+>         "allwinner,sun4i-pll1-clk" - for the main PLL clock
+> +       "allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
+>         "allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
+>         "allwinner,sun4i-axi-clk" - for the AXI clock
+>         "allwinner,sun4i-axi-gates-clk" - for the AXI gates
+> @@ -15,6 +16,8 @@ Required properties:
+>         "allwinner,sun4i-ahb-gates-clk" - for the AHB gates on A10
+>         "allwinner,sun5i-a13-ahb-gates-clk" - for the AHB gates on A13
+>         "allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
+> +       "allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
+> +       "allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+>         "allwinner,sun4i-apb0-clk" - for the APB0 clock
+>         "allwinner,sun4i-apb0-gates-clk" - for the APB0 gates on A10
+>         "allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
+> @@ -24,6 +27,9 @@ Required properties:
+>         "allwinner,sun4i-apb1-gates-clk" - for the APB1 gates on A10
+>         "allwinner,sun5i-a13-apb1-gates-clk" - for the APB1 gates on A13
+>         "allwinner,sun5i-a10s-apb1-gates-clk" - for the APB1 gates on A10s
+> +       "allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
+> +       "allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
+> +       "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+> 
+>  Required properties for all clocks:
+>  - reg : shall be the control register address for the clock.
 
-So, this keeps the original fdt around and uses it as a starting point
-for newly allocated expanded fdt. You don't know if the new fdt is big
-enough until update_fdt() succeeds. But at that point, you already wrote
-the efi-runtime-mmap property with the memory_map still having the
-original cmdline and fdt in it.
+This looks sensible, but I have a couple of questions below:
 
-I think you should be able to have an expand_fdt() function which bumps
-the fdt size and uses the current fdt as the starting point instead of
-the original fdt. That way you can free the original fdt on the first
-iteration and free the original cmdline as soon as it is successfully
-written. Then the last thing you do if get the memory_map and write it.
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt b/Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
+> new file mode 100644
+> index 0000000..fe44932
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
+> @@ -0,0 +1,83 @@
+> +Gate clock outputs
+> +------------------
+> +
+> +  * AHB1 gates ("allwinner,sun6i-a31-ahb1-gates-clk")
+> +
+> +    MIPI DSI                                   1
+> +
+> +    SS                                         5
+> +    DMA                                                6
+> +
+> +    MMC0                                       8
+> +    MMC1                                       9
+> +    MMC2                                       10
+> +    MMC3                                       11
+> +
+> +    NAND1                                      12
+> +    NAND0                                      13
+> +    SDRAM                                      14
+> +
+> +    GMAC                                       17
+> +    TS                                         18
+> +    HSTIMER                                    19
+> +    SPI0                                       20
+> +    SPI1                                       21
+> +    SPI2                                       22
+> +    SPI3                                       23
+> +    USB_OTG                                    24
+> +
+> +    EHCI0                                      26
+> +    EHCI1                                      27
+> +
+> +    OHCI0                                      29
+> +    OHCI1                                      30
+> +    OHCI2                                      31
+> +    VE                                         32
+> +
+> +    LCD0                                       36
+> +    LCD1                                       37
+> +
+> +    CSI                                                40
+> +
+> +    HDMI                                       43
+> +    DE_BE0                                     44
+> +    DE_BE1                                     45
+> +    DE_FE1                                     46
+> +    DE_FE1                                     47
+> +
+> +    MP                                         50
+> +
+> +    GPU                                                52
+> +
+> +    DEU0                                       55
+> +    DEU1                                       56
+> +    DRC0                                       57
+> +    DRC1                                       58
+> +
+> +  * APB1 gates ("allwinner,sun6i-a31-apb1-gates-clk")
+> +
+> +    CODEC                                      0
+> +
+> +    DIGITAL MIC                                        4
+> +    PIO                                                5
+> +
+> +    DAUDIO0                                    12
+> +    DAUDIO1                                    13
+> +
+> +  * APB2 gates ("allwinner,sun6i-a31-apb2-gates-clk")
+> +
+> +    I2C0                                       0
+> +    I2C1                                       1
+> +    I2C2                                       2
+> +    I2C3                                       3
+> +
+> +    UART0                                      16
+> +    UART1                                      17
+> +    UART2                                      18
+> +    UART3                                      19
+> +    UART4                                      20
+> +    UART5                                      21
+> +
 
---Mark
+Are those the specific names of the clock outputs, or just what they're
+wired to on the A31? I noticed the a13 gate bindings mentioned a clock
+called MALI400, which seemed awfully specific, but I don't have a
+datasheet handy.
 
+Does the binding cover all clocks (even if the driver doesn't yet
+support them)? Is there any reason we can't document those clock names
+and associated IDs in the binding now even if we can't yet drive them?
 
-
-        
-     
+Thanks,
+Mark.
