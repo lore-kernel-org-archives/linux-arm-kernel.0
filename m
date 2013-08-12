@@ -1,77 +1,35 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 12 Aug 2013 15:47:55 +0530
-Subject: [PATCH v3] arm: omap5: dts: add palmas-usb node
-In-Reply-To: <1373979037-27587-1-git-send-email-balbi@ti.com>
-References: <1373979037-27587-1-git-send-email-balbi@ti.com>
-Message-ID: <1376302675-15795-1-git-send-email-kishon@ti.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Mon, 12 Aug 2013 15:48:41 +0530
+Subject: [PATCH 0/2] Move comon DMA nodes to exynos5.dtsi and
+In-Reply-To: <1373458449-19039-1-git-send-email-padma.v@samsung.com>
+References: <1373458449-19039-1-git-send-email-padma.v@samsung.com>
+Message-ID: <CAAgF-BfjqF-1TcWbZ_nw9Kqrg-xr0H6uMu+u=9N=gaOoq_G2Yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felipe Balbi <balbi@ti.com>
+Hi Kukjin,
 
-Without this node, there will be no palmas
-driver to notify dwc3 that a cable has
-been connected and, without that, dwc3
-will never initialize.
+Any comment on this patch set?
+If not can you take into your tree?
 
-[ kishon at ti.com : fix vbus-supply value after SMPS10 is modeled as 2 regulators]
+Thanks
+Padma
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
-Change from v2:
-fix vbus-supply value after SMPS10 is modeled as 2 regulators. This is needed
-after SMPS10 is modeled as 2 regulators.
-[1] models SMPS10 as 2 regulators.
-[2] splits the SMPS10 node into two to represent the 2 regulators.
-
-[1] -> http://comments.gmane.org/gmane.linux.kernel/1542521
-[2] -> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg93779.html
-
- arch/arm/boot/dts/omap5-uevm.dts |   10 ++++++++++
- arch/arm/boot/dts/omap5.dtsi     |    2 +-
- 2 files changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-index 08b7267..51a4acc 100644
---- a/arch/arm/boot/dts/omap5-uevm.dts
-+++ b/arch/arm/boot/dts/omap5-uevm.dts
-@@ -272,6 +272,11 @@
- 		interrupt-controller;
- 		#interrupt-cells = <2>;
- 
-+		extcon_usb3: palmas_usb {
-+			compatible = "ti,palmas-usb";
-+			ti,wakeup;
-+		};
-+
- 		palmas_pmic {
- 			compatible = "ti,palmas-pmic";
- 			interrupt-parent = <&palmas>;
-@@ -450,6 +455,11 @@
- 	phys = <0 &hsusb2_phy &hsusb3_phy>;
- };
- 
-+&usb3 {
-+	extcon = <&extcon_usb3>;
-+	vbus-supply = <&smps10_out1_reg>;
-+};
-+
- &mcspi1 {
- 
- };
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 4e41409..1659246 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -634,7 +634,7 @@
- 			ti,type = <2>;
- 		};
- 
--		omap_dwc3 at 4a020000 {
-+		usb3: omap_dwc3 at 4a020000 {
- 			compatible = "ti,dwc3";
- 			ti,hwmods = "usb_otg_ss";
- 			reg = <0x4a020000 0x10000>;
--- 
-1.7.10.4
+On Wed, Jul 10, 2013 at 5:44 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
+> Exynos5250 and Exynos5420 has 4 DMA controllers in common. So this patch
+> set moved the common nodes to exynos.dtsi keeping the clk info seperate
+> for both the platforms. Exynos5420 has a separate DMA controller for audio
+> IPs. So this patch set also adds the ADMA node on Exynos5420.
+>
+> Padmavathi Venna (2):
+>   ARM: dts: Move the common DMA controller nodes to exynos5.dtsi
+>   ARM: dts: Add DMA controller node info on Exynos5420.
+>
+>  arch/arm/boot/dts/exynos5.dtsi    |   44 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5250.dtsi |   30 -------------------------
+>  arch/arm/boot/dts/exynos5420.dtsi |   33 +++++++++++++++++++++++++++
+>  3 files changed, 77 insertions(+), 30 deletions(-)
+>
+> --
+> 1.7.4.4
+>
