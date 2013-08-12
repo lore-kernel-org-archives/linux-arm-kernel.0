@@ -1,41 +1,64 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 13 Aug 2013 01:49:53 +0200
-Subject: [PATCH 10/18] spi: s3c64xx: Do not require legacy DMA API in case
- of S3C64XX
-In-Reply-To: <20130812233641.GL6427@sirena.org.uk>
-References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
- <1376243970-6489-11-git-send-email-tomasz.figa@gmail.com>
- <20130812233641.GL6427@sirena.org.uk>
-Message-ID: <2472314.6b8DcBdcjO@flatron>
+From: joelf@ti.com (Joel Fernandes)
+Date: Mon, 12 Aug 2013 18:55:48 -0500
+Subject: [PATCH v3 01/12] dma: edma: Setup parameters to DMA MAX_NR_SG
+ at a time
+In-Reply-To: <52088B8B.9040000@ti.com>
+References: <1375719297-12871-1-git-send-email-joelf@ti.com>
+ <1375719297-12871-2-git-send-email-joelf@ti.com> <52088B8B.9040000@ti.com>
+Message-ID: <52097604.7010503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 of August 2013 00:36:41 Mark Brown wrote:
-> On Sun, Aug 11, 2013 at 07:59:22PM +0200, Tomasz Figa wrote:
-> > With support for amba-pl08x driver, on S3C64xx the generic DMA engine
-> > API can be used instead of the private s3c-dma interface.
+Dropped quite a few from the CC list...
+
+On 08/12/2013 02:15 AM, Sekhar Nori wrote:
+> On Monday 05 August 2013 09:44 PM, Joel Fernandes wrote:
+>> Changes are made here for configuring existing parameters to support
+>> DMA'ing them out in batches as needed.
+>>
+>> Also allocate as many as slots as needed by the SG list, but not more
+>> than MAX_NR_SG. Then these slots will be reused accordingly.
+>> For ex, if MAX_NR_SG=10, and number of SG entries is 40, still only
+>> 10 slots will be allocated to DMA the entire SG list of size 40.
+>>
+>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>> ---
+>>  drivers/dma/edma.c |   14 +++++++++++---
+>>  1 file changed, 11 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+>> index 5f3e532..7b0853c 100644
+>> --- a/drivers/dma/edma.c
+>> +++ b/drivers/dma/edma.c
+>> @@ -222,9 +222,9 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+>>  	enum dma_slave_buswidth dev_width;
+>>  	u32 burst;
+>>  	struct scatterlist *sg;
+>> -	int i;
+>>  	int acnt, bcnt, ccnt, src, dst, cidx;
+>>  	int src_bidx, dst_bidx, src_cidx, dst_cidx;
+>> +	int i, num_slots_needed;
 > 
-> I'm still getting issues for SPI with this:
+> 'nslots' is more to my liking. Better keep variable names short.
 > 
-> [   50.952845] s3c64xx-spi s3c6410-spi.0: Failed to get RX DMA channel
-> [   50.953520] spi_master spi0: failed to prepare transfer hardware
+>>  
+>>  	if (unlikely(!echan || !sgl || !sg_len))
+>>  		return NULL;
+>> @@ -262,8 +262,11 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+>>  
+>>  	edesc->pset_nr = sg_len;
+>>  
+>> -	for_each_sg(sgl, sg, sg_len, i) {
+>> -		/* Allocate a PaRAM slot, if needed */
+>> +	/* Allocate a PaRAM slot, if needed */
+>> +
+>> +	num_slots_needed = sg_len > MAX_NR_SG ? MAX_NR_SG : sg_len;
 > 
-> when I test (with -next with this series applied on top), this is from
-> the first transfer that tries to DMA - there's actually no RX data.  No
-> errors are reported by the DMA controller itself.  I'm also getting
-> crashes setting up the audio DMA while derferencecing the channel.
-> 
-> This is without DT - are there any hookups missing because of that?
+> nslots = min(MAX_NR_SG, sg_len);
 
-Hmm, strange.
+I agree the original naming was quite long. I would rather using
+something more descriptive though than nslots. How does slots_needed sound?
 
-I've been testing this without any significant patches, like PWM, CCF or 
-DT support, just everything from the branch I pointed to and some board-
-specific patches to help in debugging.
+Thanks,
 
-Anyway, this is the exact branch I've been using:
-
-git://github.com/tom3q/linux.git v3.12-pl080-devel
-
-Best regards,
-Tomasz
+-Joel
