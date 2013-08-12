@@ -1,36 +1,39 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 12 Aug 2013 10:37:14 +0200
-Subject: [PATCH 1/5] ARM: pxa: ssp: remove unnecessary warning on kzalloc()
- failure
-In-Reply-To: <1376296638-19804-1-git-send-email-zonque@gmail.com>
-References: <1376296638-19804-1-git-send-email-zonque@gmail.com>
-Message-ID: <1376296638-19804-2-git-send-email-zonque@gmail.com>
+Date: Mon, 12 Aug 2013 10:37:13 +0200
+Subject: [PATCH 0/5] ARM: pxa: ssp: prepare for devicetree usage
+Message-ID: <1376296638-19804-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The memory subsystem will already complain loudly enough in such cases.
+Hi Haojian,
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- arch/arm/plat-pxa/ssp.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+this is an excerpt of my pxa-dma patches that can be merged
+independantly.
 
-diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
-index 8e11e96..f746b6a 100644
---- a/arch/arm/plat-pxa/ssp.c
-+++ b/arch/arm/plat-pxa/ssp.c
-@@ -80,10 +80,9 @@ static int pxa_ssp_probe(struct platform_device *pdev)
- 	int ret = 0;
- 
- 	ssp = kzalloc(sizeof(struct ssp_device), GFP_KERNEL);
--	if (ssp == NULL) {
--		dev_err(&pdev->dev, "failed to allocate memory");
-+	if (ssp == NULL)
- 		return -ENOMEM;
--	}
-+
- 	ssp->pdev = pdev;
- 
- 	ssp->clk = clk_get(&pdev->dev, NULL);
+In contrast to what I already posted, this one contains a patch to make
+ssp ports lookups from device nodes possible. As described in the
+Documentation, users of ssp ports just reference the upstream by phandle.
+
+The rest of the dma conversion will take more time anyway, so let's
+better merge it step by step.
+
+
+Thanks,
+Daniel
+
+
+Daniel Mack (5):
+  ARM: pxa: ssp: remove unnecessary warning on kzalloc() failure
+  ARM: pxa: ssp: add shortcut for &pdev->dev
+  ARM: pxa: ssp: add DT bindings
+  ARM: pxa: ssp: use devm_ functions
+  ARM: pxa: ssp: add pxa_ssp_request_of()
+
+ .../devicetree/bindings/serial/mrvl,pxa-ssp.txt    |  65 ++++++++
+ arch/arm/plat-pxa/ssp.c                            | 174 ++++++++++++++-------
+ include/linux/pxa2xx_ssp.h                         |  11 ++
+ 3 files changed, 193 insertions(+), 57 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/mrvl,pxa-ssp.txt
+
 -- 
 1.8.3.1
