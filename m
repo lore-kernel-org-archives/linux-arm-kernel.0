@@ -1,105 +1,56 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 12 Aug 2013 09:22:56 +0800
-Subject: [PATCH v15 10/13] usb: chipidea: add wait vbus lower than OTGSC_BSV
- before role starts
+Date: Mon, 12 Aug 2013 09:22:57 +0800
+Subject: [PATCH v15 11/13] usb: chipidea: udc: misuse flag CI_HDRC_REGS_SHARED
+ and CI_HDRC_PULLUP_ON_VBUS
 In-Reply-To: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
 References: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1376270579-13493-11-git-send-email-peter.chen@freescale.com>
+Message-ID: <1376270579-13493-12-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the gadget role starts, we need to make sure the vbus is lower
-than OTGSC_BSV, or there will be an vbus interrupt since we use
-B_SESSION_VALID as vbus interrupt to indicate connect and disconnect.
-When the host role starts, it may not be useful to wait vbus to lower
-than OTGSC_BSV, but it can indicate some hardware problems like the
-vbus is still higher than OTGSC_BSV after we disconnect to host some
-time later (5000 milliseconds currently), which is obvious not correct.
+CI_HDRC_REGS_SHARED stands for the controller registers is shared
+with other USB drivers, if all USB drivers are at chipidea/, it doesn't
+needed to set.
+CI_HDRC_PULLUP_ON_VBUS stands for pullup dp when the vbus is on. This
+flag doesn't need to set if the vbus is always on for gadget
+since dp has always pulled up after the gadget has initialized.
+
+So, the current code seems to misuse this two flags.
+- When the gadget initializes, the controller doesn't need to run if
+it depends on vbus (CI_HDRC_PULLUP_ON_VBUS), it does not
+relate to shared register.
+- When the gadget starts (load one gadget module), the controller
+can run if vbus is on (CI_HDRC_PULLUP_ON_VBUS), it also does not
+relate to shared register.
 
 Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci.h   |    3 +++
- drivers/usb/chipidea/core.c |   32 ++++++++++++++++++++++++++++++++
- drivers/usb/chipidea/otg.c  |    4 ++++
- 3 files changed, 39 insertions(+), 0 deletions(-)
+ drivers/usb/chipidea/udc.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index 3160363..1c94fc5 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -308,4 +308,7 @@ int hw_port_test_set(struct ci_hdrc *ci, u8 mode);
- 
- u8 hw_port_test_get(struct ci_hdrc *ci);
- 
-+int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
-+				u32 value, unsigned int timeout_ms);
-+
- #endif	/* __DRIVERS_USB_CHIPIDEA_CI_H */
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index ec0bb11..cfeae3c 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -294,6 +294,38 @@ int hw_device_reset(struct ci_hdrc *ci, u32 mode)
- 	return 0;
- }
- 
-+/**
-+ * hw_wait_reg: wait the register value
-+ *
-+ * Sometimes, it needs to wait register value before going on.
-+ * Eg, when switch to device mode, the vbus value should be lower
-+ * than OTGSC_BSV before connects to host.
-+ *
-+ * @ci: the controller
-+ * @reg: register index
-+ * @mask: mast bit
-+ * @value: the bit value to wait
-+ * @timeout_ms: timeout in millisecond
-+ *
-+ * This function returns an error code if timeout
-+ */
-+int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
-+				u32 value, unsigned int timeout_ms)
-+{
-+	unsigned long elapse = jiffies + msecs_to_jiffies(timeout_ms);
-+
-+	while (hw_read(ci, reg, mask) != value) {
-+		if (time_after(jiffies, elapse)) {
-+			dev_err(ci->dev, "timeout waiting for %08x in %d\n",
-+					mask, reg);
-+			return -ETIMEDOUT;
-+		}
-+		msleep(20);
-+	}
-+
-+	return 0;
-+}
-+
- static irqreturn_t ci_irq(int irq, void *data)
- {
- 	struct ci_hdrc *ci = data;
-diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-index 7f37484..39bd7ec 100644
---- a/drivers/usb/chipidea/otg.c
-+++ b/drivers/usb/chipidea/otg.c
-@@ -52,6 +52,7 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
- 		usb_gadget_vbus_disconnect(&ci->gadget);
- }
- 
-+#define CI_VBUS_STABLE_TIMEOUT_MS 5000
- static void ci_handle_id_switch(struct ci_hdrc *ci)
- {
- 	enum ci_role role = ci_otg_role(ci);
-@@ -61,6 +62,9 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
- 			ci_role(ci)->name, ci->roles[role]->name);
- 
- 		ci_role_stop(ci);
-+		/* wait vbus lower than OTGSC_BSV */
-+		hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
-+				CI_VBUS_STABLE_TIMEOUT_MS);
- 		ci_role_start(ci, role);
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index c70ce38..45abf4d 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -1637,8 +1637,7 @@ static int ci_udc_start(struct usb_gadget *gadget,
+ 	pm_runtime_get_sync(&ci->gadget.dev);
+ 	if (ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS) {
+ 		if (ci->vbus_active) {
+-			if (ci->platdata->flags & CI_HDRC_REGS_SHARED)
+-				hw_device_reset(ci, USBMODE_CM_DC);
++			hw_device_reset(ci, USBMODE_CM_DC);
+ 		} else {
+ 			pm_runtime_put_sync(&ci->gadget.dev);
+ 			goto done;
+@@ -1801,7 +1800,7 @@ static int udc_start(struct ci_hdrc *ci)
+ 		}
  	}
- }
+ 
+-	if (!(ci->platdata->flags & CI_HDRC_REGS_SHARED)) {
++	if (!(ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS)) {
+ 		retval = hw_device_reset(ci, USBMODE_CM_DC);
+ 		if (retval)
+ 			goto put_transceiver;
 -- 
 1.7.1
