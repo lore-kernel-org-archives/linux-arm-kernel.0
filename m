@@ -1,87 +1,58 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 12 Aug 2013 15:20:14 -0400
-Subject: [PATCH v3 5/6] clocksource: armada-370-xp: Fix device-tree binding
-In-Reply-To: <1376335016-16400-6-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1376335016-16400-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1376335016-16400-6-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130812192014.GT25111@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 12 Aug 2013 13:24:46 -0600
+Subject: [PATCH V3 4/8] ARM: tegra: add common LP1 suspend support
+In-Reply-To: <1376300407-14750-5-git-send-email-josephl@nvidia.com>
+References: <1376300407-14750-1-git-send-email-josephl@nvidia.com>
+ <1376300407-14750-5-git-send-email-josephl@nvidia.com>
+Message-ID: <5209367E.10900@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 04:16:55PM -0300, Ezequiel Garcia wrote:
-> This commit fixes the DT binding for the Armada 370/XP SoC timer.
-> The previous "marvell,armada-370-xp-timer" compatible is removed and
-> two new compatible strings are introduced: "marvell,armada-xp-timer"
-> and "marvell,armada-370-timer".
+On 08/12/2013 03:40 AM, Joseph Lo wrote:
+> The LP1 suspending mode on Tegra means CPU rail off, devices and PLLs are
+> clock gated and SDRAM in self-refresh mode. That means the low level LP1
+> suspending and resuming code couldn't be run on DRAM and the CPU must
+> switch to the always on clock domain (a.k.a. CLK_M 12MHz oscillator). And
+> the system clock (SCLK) would be switched to CLK_S, a 32KHz oscillator.
+> The LP1 low level handling code need to be moved to IRAM area first. And
+> marking the LP1 mask for indicating the Tegra device is in LP1. The CPU
+> power timer needs to be re-calculated based on 32KHz that was originally
+> based on PCLK.
 > 
-> The rationale behind this change is that the Armada 370 SoC and the
-> Armada XP SoC timers are not really compatible:
+> When resuming from LP1, the LP1 reset handler will resume PLLs and then
+> put DRAM to normal mode. Then jumping to the "tegra_resume" that will
+> restore full context before back to kernel. The "tegra_resume" handler
+> was expected to be found in PMC_SCRATCH41 register.
 > 
->   * Armada 370 has no 25 MHz fixed timer.
+> This is common LP1 procedures for Tegra, so we do these jobs mainly in
+> this patch:
+> * moving LP1 low level handling code to IRAM
+> * marking LP1 mask
+> * copying the physical address of "tegra_resume" to PMC_SCRATCH41
+> * re-calculate the CPU power timer based on 32KHz
 > 
->   * Armada XP cannot work properly without such 25 MHz fixed timer
->     as doing otherwise leads to using a clocksource whose frequency
->     varies when doing cpufreq frequency changes.
-> 
-> This commit also removes the "marvell,timer-25Mhz" property, given
-> it's now meaningless.
-> 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
 > ---
->  .../bindings/timer/marvell,armada-370-xp-timer.txt | 27 ++++++++++++++++++----
->  1 file changed, 22 insertions(+), 5 deletions(-)
+> V3:
+> * using a "#define" of IRAM_CODE to replace original static variable
 
-As there are no native DT-booting Marvell products in the wild yet,
+I didn't mean change the variable to a define, but rather simply to use
+the IO_ADDRESS() define instead of any new define. i.e.:
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
 
-thx,
+> +#define IRAM_CODE IO_ADDRESS(TEGRA_IRAM_CODE_AREA)
 
-Jason.
+... just don't add that, and ...
 
-> 
-> diff --git a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-> index 3638112..4c453b2 100644
-> --- a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-> +++ b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-> @@ -2,14 +2,31 @@ Marvell Armada 370 and Armada XP Timers
->  ---------------------------------------
->  
->  Required properties:
-> -- compatible: Should be "marvell,armada-370-xp-timer"
-> +- compatible: Should be either "marvell,armada-370-timer" or
-> +  "marvell,armada-xp-timer" as appropriate.
->  - interrupts: Should contain the list of Global Timer interrupts and
->    then local timer interrupts
->  - reg: Should contain location and length for timers register. First
->    pair for the Global Timer registers, second pair for the
->    local/private timers.
-> -- clocks: clock driving the timer hardware
-> +- clocks: clock driving the timer hardware, only required for
-> +  "marvell,armada-370-timer";
->  
-> -Optional properties:
-> -- marvell,timer-25Mhz: Tells whether the Global timer supports the 25
-> -  Mhz fixed mode (available on Armada XP and not on Armada 370)
-> +Examples:
+> +static void tegra_suspend_enter_lp1(void)
+> +{
+> +	tegra_pmc_suspend();
 > +
-> +- Armada 370:
-> +
-> +	timer {
-> +		compatible = "marvell,armada-370-timer";
-> +		reg = <0x20300 0x30>, <0x21040 0x30>;
-> +		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
-> +		clocks = <&coreclk 2>;
-> +	};
-> +
-> +- Armada XP:
-> +
-> +	timer {
-> +		compatible = "marvell,armada-xp-timer";
-> +		reg = <0x20300 0x30>, <0x21040 0x30>;
-> +		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
-> +	};
-> -- 
-> 1.8.1.5
-> 
+> +	/* copy the reset vector & SDRAM shutdown code into IRAM */
+> +	memcpy(iram_save_addr, IRAM_CODE, iram_save_size);
+> +	memcpy(IRAM_CODE, tegra_lp1_iram.start_addr, iram_save_size);
+
+... and s/IRAM_CODE/IO_ADDRESS(TEGRA_IRAM_CODE_AREA)/ in that code.
+
+I'll make that fixup when applying these patches.
