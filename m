@@ -1,107 +1,86 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 12 Aug 2013 09:22:46 +0800
-Subject: [PATCH v15 00/13] Add tested id switch and vbus connect detect
- support for Chipidea
-Message-ID: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
+Date: Mon, 12 Aug 2013 09:22:48 +0800
+Subject: [PATCH v15 02/13] usb: chipidea: host: add vbus regulator control
+In-Reply-To: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
+References: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <1376270579-13493-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds tested otg id switch function and vbus connect
-and disconnect detection for chipidea driver. And fix kinds of 
-bugs found at chipidea drivers after enabling id and vbus detection.
+For boards which have board level vbus control (eg, through gpio), we
+need to vbus operation according to below rules:
+- For host, we need open vbus before start hcd, and close it
+after remove hcd.
+- For otg, the vbus needs to be on/off when usb role switches.
+When the host roles begins, it opens vbus; when the host role
+finishes, it closes vbus.
 
-This patch are fully tested at imx6 sabresd and imx28evk platform by me.
-Besides, marek tested it on two STMP3780-based boards (not yet mainline)
-and two MX28-based boards.
+We put vbus operation to host as host is the only vbus user,
+When we are at host mode, the vbus is on, when we are not at
+host mode, vbus should be off.
 
-My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
+Tested-by: Marek Vasut <marex@denx.de>
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ drivers/usb/chipidea/host.c |   23 ++++++++++++++++++++++-
+ 1 files changed, 22 insertions(+), 1 deletions(-)
 
-Changes for v15:
-- Mark otgsc API as static line, and move them to otg.h [4/13]
-- Remove some redundant comments [6/13]
-- Fix some typos [8/13]
-- Retire flag CI_HDRC_PULLUP_ON_VBUS [12/13] [13/13]
-
-Changes for v14:
-- This patchset is based on below recent chipidea patches and newest
-usb-next, it can decrease rebase effort.
-
-Fabio Estevam (3):
-  chipidea: ci_hdrc_imx: Remove unused variable 'res'
-  chipidea: core: Move hw_phymode_configure() into probe
-  chipidea: Remove previous MODULE_ALIAS
-
-Lothar Wabmann (3):
-  usb: chipidea: improve kconfig 2.0
-  usb: chipidea: don't clobber return value of ci_role_start()
-  usb: chipidea: ci_hdrc_imx: remove an unsolicited module_put() call
-    from ci_hdrc_imx_remove()
-
-Peter Chen (1):
-  usb: chipidea: fix the build error with randconfig
-
-- [Michael comments]: move vbus operation to core, and squash two vbus
-patches. [1/12], [2/12]
-- [Michael comments]: move out non vbus and non id related patches. [14/14 at v13]
-
-Chagnes for v13:
-- Add Tested-by: Marek Vasut <marex@denx.de>
-- [Sascha's comments]: Add return value check for devm_regulator_get. [3/14]
-- [Marc's comments]: Change timeout usage at hw_wait_reg. [11/14]
-- [Alex's comments]: Using platdata flag to indicate dual role but not 
-OTG controller. [7/14]
-
-Changes for v12:
-- Rebased greg's usb-next tree (3.10.0-rc7+)
-- Split more small patches for single function and fix.
-
-Peter Chen (12):
-  usb: chipidea: move vbus regulator operation to core
-  usb: chipidea: host: add vbus regulator control
-  usb: chipidea: udc: otg_set_peripheral is useless for some chipidea
-    users
-  usb: chipidea: otg: Add otg file used to access otgsc
-  usb: chipidea: Add role init and destory APIs
-  usb: chipidea: add flag CI_HDRC_DUAL_ROLE_NOT_OTG
-  usb: chipidea: disable all interrupts and clear all interrupts status
-  usb: chipidea: move otg relate things to otg file
-  usb: chipidea: add vbus interrupt handler
-  usb: chipidea: add wait vbus lower than OTGSC_BSV before role starts
-  usb: chipidea: udc: misuse flag CI_HDRC_REGS_SHARED and
-    CI_HDRC_PULLUP_ON_VBUS
-  usb: chipidea: udc: .pullup is valid when vbus is on at
-    CI_HDRC_PULLUP_ON_VBUS
-
-Peter Chen (13):
-  usb: chipidea: move vbus regulator operation to core
-  usb: chipidea: host: add vbus regulator control
-  usb: chipidea: udc: otg_set_peripheral is useless for some chipidea
-    users
-  usb: chipidea: otg: Add otg file used to access otgsc
-  usb: chipidea: Add role init and destroy APIs
-  usb: chipidea: add flag CI_HDRC_DUAL_ROLE_NOT_OTG
-  usb: chipidea: disable all interrupts and clear all interrupts status
-  usb: chipidea: move otg related things to otg file
-  usb: chipidea: add vbus interrupt handler
-  usb: chipidea: add wait vbus lower than OTGSC_BSV before role starts
-  usb: chipidea: udc: misuse flag CI_HDRC_REGS_SHARED and
-    CI_HDRC_PULLUP_ON_VBUS
-  usb: chipidea: retire flag CI_HDRC_PULLUP_ON_VBUS
-  usb: chipidea: udc: .pullup is valid only when vbus is there
-
- drivers/usb/chipidea/Makefile      |    2 +-
- drivers/usb/chipidea/bits.h        |   10 ++
- drivers/usb/chipidea/ci.h          |    8 ++
- drivers/usb/chipidea/ci_hdrc_imx.c |   27 +-----
- drivers/usb/chipidea/ci_hdrc_msm.c |    1 -
- drivers/usb/chipidea/core.c        |  183 +++++++++++++++++++++++++-----------
- drivers/usb/chipidea/host.c        |   30 ++++++-
- drivers/usb/chipidea/host.h        |    6 +
- drivers/usb/chipidea/otg.c         |  120 +++++++++++++++++++++++
- drivers/usb/chipidea/otg.h         |   35 +++++++
- drivers/usb/chipidea/udc.c         |   78 ++++++++++------
- drivers/usb/chipidea/udc.h         |    6 +
- include/linux/usb/chipidea.h       |    7 +-
- 13 files changed, 401 insertions(+), 112 deletions(-)
- create mode 100644 drivers/usb/chipidea/otg.c
- create mode 100644 drivers/usb/chipidea/otg.h
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 40d0fda..e94e52b 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -24,6 +24,7 @@
+ #include <linux/usb.h>
+ #include <linux/usb/hcd.h>
+ #include <linux/usb/chipidea.h>
++#include <linux/regulator/consumer.h>
+ 
+ #include "../host/ehci.h"
+ 
+@@ -64,9 +65,19 @@ static int host_start(struct ci_hdrc *ci)
+ 	ehci->caps = ci->hw_bank.cap;
+ 	ehci->has_hostpc = ci->hw_bank.lpm;
+ 
++	if (ci->platdata->reg_vbus) {
++		ret = regulator_enable(ci->platdata->reg_vbus);
++		if (ret) {
++			dev_err(ci->dev,
++				"Failed to enable vbus regulator, ret=%d\n",
++				ret);
++			goto put_hcd;
++		}
++	}
++
+ 	ret = usb_add_hcd(hcd, 0, 0);
+ 	if (ret)
+-		usb_put_hcd(hcd);
++		goto disable_reg;
+ 	else
+ 		ci->hcd = hcd;
+ 
+@@ -74,6 +85,14 @@ static int host_start(struct ci_hdrc *ci)
+ 		hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS, USBMODE_CI_SDIS);
+ 
+ 	return ret;
++
++disable_reg:
++	regulator_disable(ci->platdata->reg_vbus);
++
++put_hcd:
++	usb_put_hcd(hcd);
++
++	return ret;
+ }
+ 
+ static void host_stop(struct ci_hdrc *ci)
+@@ -82,6 +101,8 @@ static void host_stop(struct ci_hdrc *ci)
+ 
+ 	usb_remove_hcd(hcd);
+ 	usb_put_hcd(hcd);
++	if (ci->platdata->reg_vbus)
++		regulator_disable(ci->platdata->reg_vbus);
+ }
+ 
+ int ci_hdrc_host_init(struct ci_hdrc *ci)
+-- 
+1.7.1
