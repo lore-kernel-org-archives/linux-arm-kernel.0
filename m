@@ -1,91 +1,116 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 12 Aug 2013 20:46:53 +0200
-Subject: [PATCH 7/9] ARM: dove: add PCIe controllers to SoC DT
-In-Reply-To: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1376333215-12885-8-git-send-email-sebastian.hesselbarth@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 12 Aug 2013 18:51:37 +0000
+Subject: [PATCH] ARM: kirkwood: fix DT building and update defconfig
+In-Reply-To: <1376231210-6484-3-git-send-email-jm@lentin.co.uk>
+References: <1376231210-6484-3-git-send-email-jm@lentin.co.uk>
+Message-ID: <1376333497-28352-1-git-send-email-jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a node for the pcie controllers found on Dove SoCs to the
-SoC DT include.
+commit
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/boot/dts/dove.dtsi |   54 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+  844703c ARM: kirkwood: Remove all remaining trace of DNS-320/325 platform code
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index d42b323..499abad 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -44,6 +44,60 @@
- 			  MBUS_ID(0x03, 0x01) 0 0xc8000000 0x0100000   /* CESA SRAM  1M */
- 			  MBUS_ID(0x0d, 0x00) 0 0xf0000000 0x0100000>; /* PMU  SRAM  1M */
+removed the last kirkwood DT/platform board in kirkwood_defconfig, this
+triggered a rescan of the config symbols, the result of which breaks the
+build because KIRKWOOD_DT does not select OF_IRQ.
+
+This commit fixes the regression and updates the defconfig to
+explicitly enable SERIAL_OF_PLATFORM and KIRWOOD_DT.
+
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+Note: I switch the one remaining DT board to 'depends on' so that once it's
+removed, KIRKWOOD_DT will still be in the defconfig.  With 'select', the board
+is there, but not KIRKWOOD_DT as it's implied.
+
+ arch/arm/configs/kirkwood_defconfig | 17 ++++-------------
+ arch/arm/mach-kirkwood/Kconfig      |  3 ++-
+ 2 files changed, 6 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
+index d9ea71f..e3f667a 100644
+--- a/arch/arm/configs/kirkwood_defconfig
++++ b/arch/arm/configs/kirkwood_defconfig
+@@ -10,25 +10,18 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_ARCH_KIRKWOOD=y
+ CONFIG_MACH_D2NET_V2=y
+-CONFIG_MACH_DB88F6281_BP=y
+-CONFIG_MACH_DOCKSTAR=y
+-CONFIG_MACH_ESATA_SHEEVAPLUG=y
+-CONFIG_MACH_GURUPLUG=y
+-CONFIG_MACH_INETSPACE_V2=y
+-CONFIG_MACH_MV88F6281GTW_GE=y
+ CONFIG_MACH_NET2BIG_V2=y
+ CONFIG_MACH_NET5BIG_V2=y
+-CONFIG_MACH_NETSPACE_MAX_V2=y
+-CONFIG_MACH_NETSPACE_V2=y
+ CONFIG_MACH_OPENRD_BASE=y
+ CONFIG_MACH_OPENRD_CLIENT=y
+ CONFIG_MACH_OPENRD_ULTIMATE=y
+ CONFIG_MACH_RD88F6192_NAS=y
+ CONFIG_MACH_RD88F6281=y
+-CONFIG_MACH_SHEEVAPLUG=y
+ CONFIG_MACH_T5325=y
+ CONFIG_MACH_TS219=y
+ CONFIG_MACH_TS41X=y
++CONFIG_ARCH_KIRKWOOD_DT=y
++CONFIG_MACH_MV88F6281GTW_GE_DT=y
+ # CONFIG_CPU_FEROCEON_OLD_ID is not set
+ CONFIG_PCI_MVEBU=y
+ CONFIG_PREEMPT=y
+@@ -76,7 +69,6 @@ CONFIG_ATA=y
+ CONFIG_SATA_AHCI=y
+ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+-CONFIG_MII=y
+ CONFIG_NET_DSA_MV88E6123_61_65=y
+ CONFIG_MV643XX_ETH=y
+ CONFIG_MARVELL_PHY=y
+@@ -101,7 +93,6 @@ CONFIG_SPI_ORION=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+ CONFIG_THERMAL=y
+-CONFIG_KIRKWOOD_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
+ CONFIG_HID_DRAGONRISE=y
+@@ -162,12 +153,12 @@ CONFIG_NLS_CODEPAGE_850=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_NLS_ISO8859_2=y
+ CONFIG_NLS_UTF8=y
+-CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_INFO=y
+ CONFIG_DEBUG_FS=y
++CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+ # CONFIG_SCHED_DEBUG is not set
+ # CONFIG_DEBUG_PREEMPT is not set
+-CONFIG_DEBUG_INFO=y
+ # CONFIG_FTRACE is not set
+ CONFIG_DEBUG_USER=y
+ CONFIG_DEBUG_LL=y
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 94540d5..fe8319a 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -93,6 +93,7 @@ comment "Device tree entries"
+ config ARCH_KIRKWOOD_DT
+ 	bool "Marvell Kirkwood Flattened Device Tree"
+ 	select KIRKWOOD_CLK
++	select OF_IRQ
+ 	select ORION_IRQCHIP
+ 	select ORION_TIMER
+ 	select POWER_SUPPLY
+@@ -107,7 +108,7 @@ config ARCH_KIRKWOOD_DT
  
-+		pcie: pcie-controller {
-+			compatible = "marvell,dove-pcie";
-+			status = "disabled";
-+			device_type = "pci";
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+
-+			msi-parent = <&intc>;
-+			bus-range = <0x00 0xff>;
-+
-+			ranges = <0x82000000 0x0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x2000
-+			          0x82000000 0x0 0x80000 MBUS_ID(0xf0, 0x01) 0x80000 0 0x2000
-+				  0x82000000 0x1 0x0 MBUS_ID(0x04, 0xe8) 0 1 0   /* Port 0.0 Mem */
-+				  0x81000000 0x1 0x0 MBUS_ID(0x04, 0xe0) 0 1 0   /* Port 0.0 I/O */
-+				  0x82000000 0x2 0x0 MBUS_ID(0x08, 0xe8) 0 1 0   /* Port 1.0 Mem */
-+				  0x81000000 0x2 0x0 MBUS_ID(0x08, 0xe0) 0 1 0>; /* Port 1.0 I/O */
-+
-+			pcie-port at 0 {
-+				device_type = "pci";
-+				status = "disabled";
-+				assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
-+				reg = <0x0800 0 0 0 0>;
-+				clocks = <&gate_clk 4>;
-+				marvell,pcie-port = <0>;
-+
-+				#address-cells = <3>;
-+				#size-cells = <2>;
-+				ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0
-+				          0x81000000 0 0 0x81000000 0x1 0 1 0>;
-+
-+				#interrupt-cells = <1>;
-+				interrupt-map-mask = <0 0 0 0>;
-+				interrupt-map = <0 0 0 0 &intc 16>;
-+			};
-+
-+			pcie-port at 1 {
-+				device_type = "pci";
-+				status = "disabled";
-+				assigned-addresses = <0x82002800 0 0x80000 0 0x2000>;
-+				reg = <0x1000 0 0 0 0>;
-+				clocks = <&gate_clk 5>;
-+				marvell,pcie-port = <1>;
-+
-+				#address-cells = <3>;
-+				#size-cells = <2>;
-+				ranges = <0x82000000 0 0 0x82000000 0x2 0 1 0
-+				          0x81000000 0 0 0x81000000 0x2 0 1 0>;
-+
-+				#interrupt-cells = <1>;
-+				interrupt-map-mask = <0 0 0 0>;
-+				interrupt-map = <0 0 0 0 &intc 18>;
-+			};
-+		};
-+
- 		internal-regs {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
+ config MACH_MV88F6281GTW_GE_DT
+ 	bool "Marvell 88F6281 GTW GE Board (Flattened Device Tree)"
+-	select ARCH_KIRKWOOD_DT
++	depends on ARCH_KIRKWOOD_DT
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell 88F6281 GTW GE Board (Flattened Device Tree).
 -- 
-1.7.10.4
+1.8.3.2
