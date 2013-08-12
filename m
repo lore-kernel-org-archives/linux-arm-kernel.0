@@ -1,124 +1,73 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 12 Aug 2013 20:46:50 +0200
-Subject: [PATCH 4/9] PCI: mvebu: add support for reset on GPIO
+Date: Mon, 12 Aug 2013 20:46:55 +0200
+Subject: [PATCH 9/9] ARM: dove: remove legacy pcie and clock init
 In-Reply-To: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1376333215-12885-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1376333215-12885-10-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a check for DT passed reset-gpios property and deasserts/
-asserts reset pin on probe/remove with configurable delay. Corresponding
-binding documentation is also updated.
+With DT support for PCIe controllers on Dove, we can now remove the
+legacy pcie init and the last remaining clock workaround for its clocks.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-pci at vger.kernel.org
 ---
- .../devicetree/bindings/pci/mvebu-pci.txt          |    2 ++
- drivers/pci/host/pci-mvebu.c                       |   33 +++++++++++++++++++-
- 2 files changed, 34 insertions(+), 1 deletion(-)
+ arch/arm/mach-dove/board-dt.c |   29 -----------------------------
+ 1 file changed, 29 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-index 638673a..f2fa261 100644
---- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-@@ -76,6 +76,8 @@ and the following optional properties:
- - marvell,pcie-lane: the physical PCIe lane number, for ports having
-   multiple lanes. If this property is not found, we assume that the
-   value is 0.
-+- reset-gpios: optional gpio to PERST#
-+- reset-delay-ms: delay in ms to wait after reset de-assertion
+diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
+index 1efbe1d..9a116d7 100644
+--- a/arch/arm/mach-dove/board-dt.c
++++ b/arch/arm/mach-dove/board-dt.c
+@@ -23,28 +23,6 @@
+ #include <plat/irq.h>
+ #include "common.h"
  
- Example:
+-/*
+- * There are still devices that doesn't even know about DT,
+- * get clock gates here and add a clock lookup.
+- */
+-static void __init dove_legacy_clk_init(void)
+-{
+-	struct device_node *np = of_find_compatible_node(NULL, NULL,
+-					 "marvell,dove-gating-clock");
+-	struct of_phandle_args clkspec;
+-
+-	clkspec.np = np;
+-	clkspec.args_count = 1;
+-
+-	clkspec.args[0] = CLOCK_GATING_BIT_PCIE0;
+-	orion_clkdev_add("0", "pcie",
+-			 of_clk_get_from_provider(&clkspec));
+-
+-	clkspec.args[0] = CLOCK_GATING_BIT_PCIE1;
+-	orion_clkdev_add("1", "pcie",
+-			 of_clk_get_from_provider(&clkspec));
+-}
+-
+ static void __init dove_dt_time_init(void)
+ {
+ 	of_clk_init(NULL);
+@@ -59,13 +37,6 @@ static void __init dove_dt_init(void)
+ 	tauros2_init(0);
+ #endif
+ 	BUG_ON(mvebu_mbus_dt_init());
+-
+-	/* Setup clocks for legacy devices */
+-	dove_legacy_clk_init();
+-
+-	/* Internal devices not ported to DT yet */
+-	dove_pcie_init(1, 1);
+-
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
  
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 2370b59..bdad4d4 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -9,14 +9,17 @@
- #include <linux/kernel.h>
- #include <linux/pci.h>
- #include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/gpio.h>
- #include <linux/module.h>
- #include <linux/mbus.h>
- #include <linux/msi.h>
- #include <linux/slab.h>
- #include <linux/platform_device.h>
- #include <linux/of_address.h>
--#include <linux/of_pci.h>
- #include <linux/of_irq.h>
-+#include <linux/of_gpio.h>
-+#include <linux/of_pci.h>
- #include <linux/of_platform.h>
- 
- /*
-@@ -126,6 +129,9 @@ struct mvebu_pcie_port {
- 	unsigned int io_target;
- 	unsigned int io_attr;
- 	struct clk *clk;
-+	int reset_gpio;
-+	int reset_active_low;
-+	char *reset_name;
- 	struct mvebu_sw_pci_bridge bridge;
- 	struct device_node *dn;
- 	struct mvebu_pcie *pcie;
-@@ -856,6 +862,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 
- 	for_each_child_of_node(pdev->dev.of_node, child) {
- 		struct mvebu_pcie_port *port = &pcie->ports[pcie->nports];
-+		enum of_gpio_flags flags;
- 
- 		if (!of_device_is_available(child))
- 			continue;
-@@ -896,6 +903,25 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 			continue;
- 		}
- 
-+		port->reset_gpio = of_get_named_gpio_flags(child,
-+						   "reset-gpios", 0, &flags);
-+		if (gpio_is_valid(port->reset_gpio)) {
-+			u32 reset_mdelay = 20;
-+			port->reset_active_low = flags & OF_GPIO_ACTIVE_LOW;
-+			port->reset_name = kasprintf(GFP_KERNEL,
-+				     "pcie%d.%d-reset", port->port, port->lane);
-+			ret = devm_gpio_request_one(&pdev->dev,
-+			    port->reset_gpio, GPIOF_DIR_OUT, port->reset_name);
-+			if (ret)
-+				return ret;
-+			gpio_set_value(port->reset_gpio,
-+				       (port->reset_active_low) ? 1 : 0);
-+
-+			of_property_read_u32(child, "reset-delay-ms",
-+					     &reset_mdelay);
-+			mdelay(reset_mdelay);
-+		}
-+
- 		port->clk = of_clk_get_by_name(child, NULL);
- 		if (IS_ERR(port->clk)) {
- 			dev_err(&pdev->dev, "PCIe%d.%d: cannot get clock\n",
-@@ -945,6 +971,11 @@ static int mvebu_pcie_remove(struct platform_device *pdev)
- 	int i;
- 
- 	for (i = 0; i < pcie->nports; i++, port++) {
-+		if (gpio_is_valid(port->reset_gpio)) {
-+			gpio_set_value(port->reset_gpio,
-+			       (port->reset_active_low) ? 0 : 1);
-+			kfree(port->reset_name);
-+		}
- 		clk_disable_unprepare(port->clk);
- 		kfree(port->name);
- 	}
 -- 
 1.7.10.4
