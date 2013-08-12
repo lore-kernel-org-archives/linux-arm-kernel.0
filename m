@@ -1,74 +1,80 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Mon, 12 Aug 2013 09:54:25 +0100
-Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
-In-Reply-To: <5203BE15.2040506@arm.com>
-References: <52012049.7060605@arm.com>	<5203AE82.5080203@arm.com>
- <CAL_JsqKwHtW4qBkXq=FmOmCrN35Oe+HuDbG=u9BwK8Aas2Paww@mail.gmail.com>
- <5203BE15.2040506@arm.com>
-Message-ID: <5208A2C1.7080503@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 12 Aug 2013 16:54:36 +0800
+Subject: [PATCH 1/2] ARM: dtsi: imx6qdl-sabresd: Add USB host 1 VBUS
+ regulator
+In-Reply-To: <1376280867-3259-1-git-send-email-peter.chen@freescale.com>
+References: <1376280867-3259-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130812085434.GK25061@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/13 16:49, Sudeep KarkadaNagesha wrote:
-> On 08/08/13 16:27, Rob Herring wrote:
->> On Thu, Aug 8, 2013 at 9:43 AM, Sudeep KarkadaNagesha
->> <Sudeep.KarkadaNagesha@arm.com> wrote:
->>> Hi Rob,
->>>
->>> On 06/08/13 17:11, Sudeep KarkadaNagesha wrote:
->>>> Hi Rob,
->>>>
->>>> The following changes since commit c095ba7224d8edc71dcef0d655911399a8bd4a3f:
->>>>
->>>>   Linux 3.11-rc4 (2013-08-04 13:46:46 -0700)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   git://linux-arm.org/linux-skn.git cpu_ofnode_dt
->>>>
->>>> for you to fetch changes up to d7b5133478afd9e66a338d3125bc37b9a250ef66:
->>>>
->>>>   of/device: add helper to get cpu device node from logical cpu index
->>>> (2013-08-06 16:37:15 +0100)
->>>>
->>>
->>> I was not sure whom to send pull request(you or Grant).
->>> This needs to be pulled in and present in linux-next before I can send
->>> the updates in SoC and cpufreq which depends on this.
->>
->> With necessary acks, you don't need send these to 3 maintainers. I
->> would suggest you send the whole series to cpufreq maintainers to
->> merge rather than have them try to manage 2 dependent branches.
->>
->> Also, something landing in linux-next has no bearing on the process.
->> If you do have dependent branches in another tree, then you need to
->> insure with that maintainer that the branch is stable and inform the
->> 2nd maintainer of the dependency on the branch.
->>
+On Mon, Aug 12, 2013 at 12:14:26PM +0800, Peter Chen wrote:
+> We enabled USB host 1, so host 1's vbus should be on to let
+> host 1 work.
 > 
-> Thanks Rob for clarifying.
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi |   25 ++++++++++++++++++-------
+>  1 files changed, 18 insertions(+), 7 deletions(-)
 > 
-> Hi Rafael,
-> 
-> The complete series[1] was reviewed and acknowledged by appropriate
-> maintainers.
-> 
-> Since most of the changes are CPUFreq clean-ups, would you take the
-> complete series through your tree ?
-> 
-> On which branch(bleeding-edge or linux-next) on [2] do I need to base my
-> pull request ?
-Hi Rafael,
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> index 61b8959..b4db3f7 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> @@ -34,6 +34,15 @@
+>  			enable-active-high;
+>  		};
+>  
+> +		reg_usb_h1_vbus: usb_h1_vbus {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "usb_h1_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio1 29 0>;
+> +			enable-active-high;
+> +		};
+> +
+>  		reg_audio: wm8962_supply {
+>  			compatible = "regulator-fixed";
+>  			regulator-name = "wm8962-supply";
+> @@ -188,13 +197,14 @@
+>  	hog {
+>  		pinctrl_hog: hoggrp {
+>  			fsl,pins = <
+> -				MX6QDL_PAD_GPIO_4__GPIO1_IO04   0x80000000
+> -				MX6QDL_PAD_GPIO_5__GPIO1_IO05   0x80000000
+> -				MX6QDL_PAD_NANDF_D0__GPIO2_IO00 0x80000000
+> -				MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x80000000
+> -				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x80000000
+> -				MX6QDL_PAD_NANDF_D3__GPIO2_IO03 0x80000000
+> -				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x130b0
+> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04   	0x80000000
+> +				MX6QDL_PAD_GPIO_5__GPIO1_IO05   	0x80000000
+> +				MX6QDL_PAD_NANDF_D0__GPIO2_IO00 	0x80000000
+> +				MX6QDL_PAD_NANDF_D1__GPIO2_IO01 	0x80000000
+> +				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 	0x80000000
+> +				MX6QDL_PAD_NANDF_D3__GPIO2_IO03 	0x80000000
+> +				MX6QDL_PAD_GPIO_0__CCM_CLKO1    	0x130b0
+> +				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29	0x80000000
 
-Can you please let which know which branch do you prefer to base the my
-request on ?
+It's not worth to change so many lines of code only for getting the
+indentation aligned.  I fixed it up and manually applied both patches,
+as they do not apply on my imx/dt branch.
 
-Regards,
-Sudeep
+Shawn
 
+>  			>;
+>  		};
+>  	};
+> @@ -228,6 +238,7 @@
+>  };
+>  
+>  &usbh1 {
+> +	vbus-supply = <&reg_usb_h1_vbus>;
+>  	status = "okay";
+>  };
+>  
+> -- 
+> 1.7.1
 > 
-> [1]
-> http://archive.arm.linux.org.uk/lurker/message/20130722.113211.b5e3bc2a.fr.html
-> 
-> [2] git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git
 > 
