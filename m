@@ -1,41 +1,42 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon, 12 Aug 2013 14:44:07 +0530
-Subject: [PATCH 9/9] clk: s3c64xx: Fix incorrect placement of __initdata
-In-Reply-To: <1376298847-21828-1-git-send-email-sachin.kamat@linaro.org>
-References: <1376298847-21828-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1376298847-21828-9-git-send-email-sachin.kamat@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 12 Aug 2013 15:07:01 +0530
+Subject: [PATCH] arm: omap5: dts: split SMPS10 dt node
+Message-ID: <1376300221-15172-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__initdata should be placed between the variable name and equal
-sign for the variable to be placed in the intended section.
+SMPS10 has two outputs OUT1 and OUT2. Hence SMPS10 is modeled as
+two regulators. The dt node is split to reflect it.
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/clk/samsung/clk-s3c64xx.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/omap5-uevm.dts |   13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
-index eeda567..7d2c842 100644
---- a/drivers/clk/samsung/clk-s3c64xx.c
-+++ b/drivers/clk/samsung/clk-s3c64xx.c
-@@ -65,7 +65,7 @@ enum s3c64xx_plls {
-  * List of controller registers to be saved and restored during
-  * a suspend/resume cycle.
-  */
--static __initdata unsigned long s3c64xx_clk_regs[] = {
-+static unsigned long s3c64xx_clk_regs[] __initdata = {
- 	APLL_LOCK,
- 	MPLL_LOCK,
- 	EPLL_LOCK,
-@@ -82,7 +82,7 @@ static __initdata unsigned long s3c64xx_clk_regs[] = {
- 	SCLK_GATE,
- };
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index 65d7b60..05b9b12 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -334,9 +334,18 @@
+ 					ti,smps-range = <0x80>;
+ 				};
  
--static __initdata unsigned long s3c6410_clk_regs[] = {
-+static unsigned long s3c6410_clk_regs[] __initdata = {
- 	CLK_SRC2,
- 	MEM0_GATE,
- };
+-				smps10_reg: smps10 {
++				smps10_out2_reg: smps10_out2 {
+ 					/* VBUS_5V_OTG */
+-					regulator-name = "smps10";
++					regulator-name = "smps10_out2";
++					regulator-min-microvolt = <5000000>;
++					regulator-max-microvolt = <5000000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				smps10_out1_reg: smps10_out1 {
++					/* VBUS_5V_OTG */
++					regulator-name = "smps10_out1";
+ 					regulator-min-microvolt = <5000000>;
+ 					regulator-max-microvolt = <5000000>;
+ 					regulator-always-on;
 -- 
-1.7.9.5
+1.7.10.4
