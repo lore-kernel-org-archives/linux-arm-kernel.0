@@ -1,65 +1,85 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 12 Aug 2013 10:19:13 +0200
-Subject: [PATCH 06/20] tty: serial: pxa: remove old cruft
-In-Reply-To: <1375889649-14638-7-git-send-email-zonque@gmail.com>
-References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
- <1375889649-14638-7-git-send-email-zonque@gmail.com>
-Message-ID: <52089A81.6080800@gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 12 Aug 2013 10:22:34 +0100
+Subject: [PATCH 16/16] arch/arm/mach-pxa/stargate2.c: Avoid using
+ ARRAY_AND_SIZE(e) as a function argument
+In-Reply-To: <1376239917-15594-17-git-send-email-Julia.Lawall@lip6.fr>
+References: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1376239917-15594-17-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <5208A95A.70606@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-
-This patch can be merged independently of all others. Could you queue it
-up for 3.12 please?
-
+On 08/11/13 17:51, Julia Lawall wrote:
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
+> 
+> Replace ARRAY_AND_SIZE(e) in function argument position to avoid hiding the
+> arity of the called function.
+> 
+> The semantic match that makes this change is as follows:
+> (http://coccinelle.lip6.fr/)
+> 
+> // <smpl>
+> @@
+> expression e,f;
+> @@
+> 
+> f(...,
+> - ARRAY_AND_SIZE(e)
+> + e,ARRAY_SIZE(e)
+>   ,...)
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Acked-by: Jonathan Cameron <jic23@kernel.org>
 
 Thanks,
-Daniel
-
-
-On 07.08.2013 17:33, Daniel Mack wrote:
-> This #if-0'd block wouldn't compile, so let's dispose it.
 > 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
 > ---
->  drivers/tty/serial/pxa.c | 25 -------------------------
->  1 file changed, 25 deletions(-)
+> Not compiled.
 > 
-> diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
-> index 05f504e..cc6d539 100644
-> --- a/drivers/tty/serial/pxa.c
-> +++ b/drivers/tty/serial/pxa.c
-> @@ -332,31 +332,6 @@ static void serial_pxa_break_ctl(struct uart_port *port, int break_state)
->  	spin_unlock_irqrestore(&up->port.lock, flags);
->  }
->  
-> -#if 0
-> -static void serial_pxa_dma_init(struct pxa_uart *up)
-> -{
-> -	up->rxdma =
-> -		pxa_request_dma(up->name, DMA_PRIO_LOW, pxa_receive_dma, up);
-> -	if (up->rxdma < 0)
-> -		goto out;
-> -	up->txdma =
-> -		pxa_request_dma(up->name, DMA_PRIO_LOW, pxa_transmit_dma, up);
-> -	if (up->txdma < 0)
-> -		goto err_txdma;
-> -	up->dmadesc = kmalloc(4 * sizeof(pxa_dma_desc), GFP_KERNEL);
-> -	if (!up->dmadesc)
-> -		goto err_alloc;
-> -
-> -	/* ... */
-> -err_alloc:
-> -	pxa_free_dma(up->txdma);
-> -err_rxdma:
-> -	pxa_free_dma(up->rxdma);
-> -out:
-> -	return;
-> -}
-> -#endif
-> -
->  static int serial_pxa_startup(struct uart_port *port)
+>  arch/arm/mach-pxa/stargate2.c |   13 ++++++++-----
+>  1 file changed, 8 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
+> index 62aea3e..adacedd 100644
+> --- a/arch/arm/mach-pxa/stargate2.c
+> +++ b/arch/arm/mach-pxa/stargate2.c
+> @@ -406,7 +406,8 @@ static struct i2c_pxa_platform_data i2c_pdata = {
+>  static void __init imote2_stargate2_init(void)
 >  {
->  	struct uart_pxa_port *up = (struct uart_pxa_port *)port;
+>  
+> -	pxa2xx_mfp_config(ARRAY_AND_SIZE(sg2_im2_unified_pin_config));
+> +	pxa2xx_mfp_config(sg2_im2_unified_pin_config,
+> +			  ARRAY_SIZE(sg2_im2_unified_pin_config));
+>  
+>  	pxa_set_ffuart_info(NULL);
+>  	pxa_set_btuart_info(NULL);
+> @@ -604,7 +605,7 @@ static struct platform_device *imote2_devices[] = {
+>  
+>  static void __init imote2_init(void)
+>  {
+> -	pxa2xx_mfp_config(ARRAY_AND_SIZE(imote2_pin_config));
+> +	pxa2xx_mfp_config(imote2_pin_config, ARRAY_SIZE(imote2_pin_config));
+>  
+>  	imote2_stargate2_init();
+>  
+> @@ -983,13 +984,15 @@ static void __init stargate2_init(void)
+>  	   prior to connecting the MFP stuff up. */
+>  	__raw_writel(__raw_readl(MECR) & ~MECR_NOS, MECR);
+>  
+> -	pxa2xx_mfp_config(ARRAY_AND_SIZE(stargate2_pin_config));
+> +	pxa2xx_mfp_config(stargate2_pin_config,
+> +			  ARRAY_SIZE(stargate2_pin_config));
+>  
+>  	imote2_stargate2_init();
+>  
+> -	platform_add_devices(ARRAY_AND_SIZE(stargate2_devices));
+> +	platform_add_devices(stargate2_devices, ARRAY_SIZE(stargate2_devices));
+>  
+> -	i2c_register_board_info(0, ARRAY_AND_SIZE(stargate2_i2c_board_info));
+> +	i2c_register_board_info(0, stargate2_i2c_board_info,
+> +				ARRAY_SIZE(stargate2_i2c_board_info));
+>  	i2c_register_board_info(1, stargate2_pwr_i2c_board_info,
+>  				ARRAY_SIZE(stargate2_pwr_i2c_board_info));
+>  
 > 
