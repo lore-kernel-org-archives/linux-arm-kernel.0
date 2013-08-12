@@ -1,38 +1,49 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Mon, 12 Aug 2013 14:06:08 +0100
-Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
-In-Reply-To: <1518689.GpqxbJSNzp@vostro.rjw.lan>
-References: <52012049.7060605@arm.com> <9018175.9tpCBfEqqk@vostro.rjw.lan>
- <5208D816.5080705@arm.com> <1518689.GpqxbJSNzp@vostro.rjw.lan>
-Message-ID: <5208DDC0.9020601@arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 12 Aug 2013 14:11:41 +0100
+Subject: [PATCH V2] MFD: Make VEXPRESS MFD controller depends on
+ VEXPRESS systems
+In-Reply-To: <1376312115-10326-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1375592514-14213-1-git-send-email-manjunath.goudar@linaro.org>
+ <1376312115-10326-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1376313101.13400.2.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/13 14:13, Rafael J. Wysocki wrote:
-> On Monday, August 12, 2013 01:41:58 PM Sudeep KarkadaNagesha wrote:
->> Hi Rafael,
->>
->> On 12/08/13 12:51, Rafael J. Wysocki wrote:
->>> On Monday, August 12, 2013 02:33:32 PM Viresh Kumar wrote:
->>>> On 12 August 2013 14:24, Sudeep KarkadaNagesha
->>>> <Sudeep.KarkadaNagesha@arm.com> wrote:
->>>>> Can you please let which know which branch do you prefer to base the my
->>>>> request on ?
->>>>
->>>> Unless you have any dependencies, you must rebase on latest RC..
->>>
->>> Yes, preferably 3.11-rc5.
->>>
->>> If there are any dependencies on linux-next material, please let me know.
->>>
->>
->> It doesn't have any functional dependencies, however I just found out
->> now that there's a conflict with today's linux-next branch(tag:
->> next-20130812)
+On Mon, 2013-08-12 at 13:55 +0100, Manjunath Goudar wrote:
+> This patch adds a of_find_node_by_phandle() and of_get_next_parent()
+> function declaration dependence on"#ifdef CONFIG_OF" in "include/linux/of.h"
+> else part return inline dummy implementations (returning NULL). Without
+> this patch,build system can lead to issues. This was discovered during
+> randconfig testing,in which VEXPRESS_CONFIG was enabled w/o CONFIG_OF
+> being enabled,leading to the following error:
 > 
-> That's not a big deal.
+> CC      drivers/mfd/vexpress-config.o
+> drivers/mfd/vexpress-config.c: In function ?__vexpress_config_func_get?:
+> drivers/mfd/vexpress-config.c:117:4: error: implicit declaration of function
+> ?of_find_node_by_phandle? [-Werror=implicit-function-declaration]
+>     bridge_node = of_find_node_by_phandle(
+>     ^
+> drivers/mfd/vexpress-config.c:117:16: warning: assignment makes pointer from
+> integer without a cast [enabled by default]
+>     bridge_node = of_find_node_by_phandle(
 > 
-Thanks Rafael, in that case I will send the pull request based on 3.11-rc5
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Deepak Saxena <dsaxena@linaro.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> 
+> V2:
+>  -Made of_find_node_by_phandle() and of_get_next_parent() function declaration
+>   dependence on"#ifdef CONFIG_OF" in "include/linux/of.h" instead of Kconfig
+>   dependence setting in V1 patch and else part return inline dummy implementations
+>   (returning NULL) to fix the above randconfig error.
+> ---
+>  include/linux/of.h | 16 ++++++++++++++--
+>  1 file changed, 14 insertions(+), 2 deletions(-)
 
-Regards,
-Sudeep
+It's all cool, but the subject line doesn't make any sense now, does
+it? ;-) As in: it's not a vexpress- nor mfd-related patch any more.
+
+Pawel
