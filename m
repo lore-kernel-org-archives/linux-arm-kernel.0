@@ -1,65 +1,41 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Aug 2013 18:28:44 +0100
-Subject: [GIT PULL] Barrier updates for 3.12
-Message-ID: <20130812172843.GH25995@mudshark.cambridge.arm.com>
+Date: Mon, 12 Aug 2013 18:31:55 +0100
+Subject: [GIT PULL] Cacheflush updates for 3.12
+Message-ID: <20130812173155.GI25995@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hello again,
 
-Please pull the following barriers updates for 3.12. This series gives a
-notable performance boost in hackbench benchmarks, and facilitates the use
-of {non,inner}-shareable maintenance and memory barrier operations within
-the kernel.
-
-Cheers,
+Please pull the following user-cacheflush updates for 3.12. This series both
+improves performance of cacheflush-heavy workloads (i.e. browser benchmarks)
+and also addresses a DoS issue on non-preemptible systems.
 
 Will
 
 --->8
 
-The following changes since commit c095ba7224d8edc71dcef0d655911399a8bd4a3f:
+The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
 
-  Linux 3.11-rc4 (2013-08-04 13:46:46 -0700)
+  Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/barriers
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/cacheflush
 
-for you to fetch changes up to 6af396a6b6c698eb3834184518fc9a59bc22c817:
+for you to fetch changes up to d3065541b5a95e5d0ef37e0dc8ada80fd1fba963:
 
-  ARM: cacheflush: use -ishst dsb variant for ensuring flush completion (2013-08-12 12:25:46 +0100)
+  ARM: cacheflush: don't bother rounding to nearest vma (2013-07-22 10:49:00 +0100)
 
 ----------------------------------------------------------------
-Will Deacon (12):
-      ARM: mm: remove redundant dsb() prior to range TLB invalidation
-      ARM: tlb: don't perform inner-shareable invalidation for local TLB ops
-      ARM: tlb: don't bother with barriers for branch predictor maintenance
-      ARM: tlb: don't perform inner-shareable invalidation for local BP ops
-      ARM: barrier: allow options to be passed to memory barrier instructions
-      ARM: tlb: reduce scope of barrier domains for TLB invalidation
-      ARM: mm: use inner-shareable barriers for TLB and user cache operations
-      ARM: spinlock: use inner-shareable dsb variant prior to sev instruction
-      ARM: kvm: use inner-shareable barriers after TLB flushing
-      ARM: mcpm: use -st dsb option prior to sev instructions
-      ARM: l2x0: use -st dsb option for ordering writel_relaxed with unlock
-      ARM: cacheflush: use -ishst dsb variant for ensuring flush completion
+Will Deacon (4):
+      ARM: entry: allow ARM-private syscalls to be restarted
+      ARM: cacheflush: split user cache-flushing into interruptible chunks
+      ARM: cacheflush: don't round address range up to nearest page
+      ARM: cacheflush: don't bother rounding to nearest vma
 
- arch/arm/common/mcpm_head.S       |   2 +-
- arch/arm/common/vlock.S           |   4 ++--
- arch/arm/include/asm/assembler.h  |   4 ++--
- arch/arm/include/asm/barrier.h    |  32 ++++++++++++++++----------------
- arch/arm/include/asm/cacheflush.h |   2 +-
- arch/arm/include/asm/spinlock.h   |   2 +-
- arch/arm/include/asm/switch_to.h  |  10 ++++++++++
- arch/arm/include/asm/tlbflush.h   | 181 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------------------------------
- arch/arm/kernel/smp_tlb.c         |  10 +++++-----
- arch/arm/kvm/init.S               |   2 +-
- arch/arm/kvm/interrupts.S         |   4 ++--
- arch/arm/mm/cache-l2x0.c          |   2 +-
- arch/arm/mm/cache-v7.S            |   4 ++--
- arch/arm/mm/context.c             |   7 +------
- arch/arm/mm/dma-mapping.c         |   1 -
- arch/arm/mm/proc-v7.S             |   2 +-
- arch/arm/mm/tlb-v7.S              |   8 ++++----
- 17 files changed, 199 insertions(+), 78 deletions(-)
+ arch/arm/include/asm/cacheflush.h  |  3 +--
+ arch/arm/include/asm/thread_info.h | 11 +++++++++++
+ arch/arm/kernel/entry-common.S     |  4 ++--
+ arch/arm/kernel/traps.c            | 64 +++++++++++++++++++++++++++++++++++++++++++++++++---------------
+ 4 files changed, 63 insertions(+), 19 deletions(-)
