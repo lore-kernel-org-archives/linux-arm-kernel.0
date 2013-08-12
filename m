@@ -1,34 +1,113 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 12 Aug 2013 14:54:39 +0100
-Subject: [PATCH 06/22] ARM: dts: bcm281xx: Remove '0x's from BCM11351 DTS
- file
-In-Reply-To: <CAGFynZ-+UoML32ecX4nSGAaFJXqQpdq+D8j7GqJSKhxsE7w=9A@mail.gmail.com>
-References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-6-git-send-email-lee.jones@linaro.org>
- <51EDAC90.6010108@broadcom.com> <20130723075309.GE26801@laptop>
- <CAGFynZ-+UoML32ecX4nSGAaFJXqQpdq+D8j7GqJSKhxsE7w=9A@mail.gmail.com>
-Message-ID: <20130812135439.GF13851@lee--X1>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 12 Aug 2013 15:55:28 +0200
+Subject: [PATCH v2] USB: ohci-at91: add usb_clk for transition to common
+ clk framework
+In-Reply-To: <1375376953-22823-1-git-send-email-b.brezillon@overkiz.com>
+References: <1375376953-22823-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <5208E950.3050205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 08 Aug 2013, Christian Daudt wrote:
+On 01/08/2013 19:09, Boris BREZILLON :
+> The AT91 PMC (Power Management Controller) provides an USB clock used by
+> USB Full Speed host (ohci) and USB Full Speed device (udc).
+> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
+> This configuration was formely done in mach-at91/clock.c, but this
+> implementation will be removed when moving to common clk framework.
+>
+> This patch adds support for usb clock retrieval and configuration, and is
+> backward compatible with the current at91 clk implementation (if usb clk
+> is not found, it does not configure/enable it).
+>
+> Changes since v1:
+>   - use IS_ENABLED(CONFIG_COMMON_CLK) to isolate new at91 clk support
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-> Hi Lee,
->  I had to change some of the lines in the dts files you modified, so
-> I've added your mods. This patch:
-> https://lkml.org/lkml/2013/8/8/477
-> 
-> includes your changes to bcm11351.dtsi and bcm11351-brt.dts. Not sure
-> where your patch is at this point, but I just wanted to point that
-> out.
+Well, for this v2 as well:
 
-I haven't done anything with that patch yet, but I'd prefer they
-stayed separate to be honest. If you make your changes and ensure
-they're in an upstream tree (and let me know which one), I'll rebase
-my patches on top of that tree.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+(even if it is too late)
+
+Bye,
+
+
+> ---
+>   drivers/usb/host/ohci-at91.c |   23 +++++++++++++++++++++--
+>   1 file changed, 21 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index 9677f68..db60048 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -31,8 +31,8 @@
+>   #define at91_for_each_port(index)	\
+>   		for ((index) = 0; (index) < AT91_MAX_USBH_PORTS; (index)++)
+>
+> -/* interface and function clocks; sometimes also an AHB clock */
+> -static struct clk *iclk, *fclk, *hclk;
+> +/* interface, function and usb clocks; sometimes also an AHB clock */
+> +static struct clk *iclk, *fclk, *uclk, *hclk;
+>   static int clocked;
+>
+>   extern int usb_disabled(void);
+> @@ -41,6 +41,10 @@ extern int usb_disabled(void);
+>
+>   static void at91_start_clock(void)
+>   {
+> +	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+> +		clk_set_rate(uclk, 48000000);
+> +		clk_prepare_enable(uclk);
+> +	}
+>   	clk_prepare_enable(hclk);
+>   	clk_prepare_enable(iclk);
+>   	clk_prepare_enable(fclk);
+> @@ -52,6 +56,8 @@ static void at91_stop_clock(void)
+>   	clk_disable_unprepare(fclk);
+>   	clk_disable_unprepare(iclk);
+>   	clk_disable_unprepare(hclk);
+> +	if (IS_ENABLED(CONFIG_COMMON_CLK))
+> +		clk_disable_unprepare(uclk);
+>   	clocked = 0;
+>   }
+>
+> @@ -162,6 +168,14 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>   		retval = PTR_ERR(hclk);
+>   		goto err5;
+>   	}
+> +	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+> +		uclk = clk_get(&pdev->dev, "usb_clk");
+> +		if (IS_ERR(uclk)) {
+> +			dev_err(&pdev->dev, "failed to get uclk\n");
+> +			retval = PTR_ERR(uclk);
+> +			goto err6;
+> +		}
+> +	}
+>
+>   	at91_start_hc(pdev);
+>   	ohci_hcd_init(hcd_to_ohci(hcd));
+> @@ -173,6 +187,9 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>   	/* Error handling */
+>   	at91_stop_hc(pdev);
+>
+> +	if (IS_ENABLED(CONFIG_COMMON_CLK))
+> +		clk_put(uclk);
+> + err6:
+>   	clk_put(hclk);
+>    err5:
+>   	clk_put(fclk);
+> @@ -212,6 +229,8 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
+>   	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+>   	usb_put_hcd(hcd);
+>
+> +	if (IS_ENABLED(CONFIG_COMMON_CLK))
+> +		clk_put(uclk);
+>   	clk_put(hclk);
+>   	clk_put(fclk);
+>   	clk_put(iclk);
+>
+
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Nicolas Ferre
