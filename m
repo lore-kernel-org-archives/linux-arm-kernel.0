@@ -1,49 +1,233 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 12 Aug 2013 09:17:28 -0700
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <5209088E.20404@linaro.org>
-References: <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
- <51FA9AE8.1060004@linaro.org>
- <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
- <51FA9F54.3060704@linaro.org>
- <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
- <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
- <20130809172757.GD14845@codeaurora.org>
- <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
- <5209088E.20404@linaro.org>
-Message-ID: <ca0a49c2-37c8-4ff8-bc02-22158633d469@TX2EHSMHS012.ehs.local>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Aug 2013 17:19:52 +0100
+Subject: [PATCH 3/4] ARM: msm: Add SMP support for 8960
+In-Reply-To: <1375409725-22004-4-git-send-email-rvaswani@codeaurora.org>
+References: <1375409725-22004-1-git-send-email-rvaswani@codeaurora.org>
+ <1375409725-22004-4-git-send-email-rvaswani@codeaurora.org>
+Message-ID: <20130812161952.GD27165@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 06:08:46PM +0200, Daniel Lezcano wrote:
-> On 08/12/2013 06:03 PM, S?ren Brinkmann wrote:
-> > On Fri, Aug 09, 2013 at 10:27:57AM -0700, Stephen Boyd wrote:
-> >> On 08/09, Daniel Lezcano wrote:
-> >>>
-> >>> yes, but at least the broadcast mechanism should send an IPI to cpu0 to
-> >>> wake it up, no ? As Stephen stated this kind of configuration should has
-> >>> never been tested before so the tick broadcast code is not handling this
-> >>> case properly IMHO.
-> >>>
-> >>
-> >> If you have a per-cpu tick device that isn't suffering from
-> >> FEAT_C3_STOP why wouldn't you use that for the tick versus a
-> >> per-cpu tick device that has FEAT_C3_STOP? It sounds like there
-> >> is a bug in the preference logic or you should boost the rating
-> >> of the arm global timer above the twd. Does this patch help? It
-> >> should make the arm global timer the tick device and whatever the
-> >> cadence timer you have into the broadcast device.
-> > 
-> > I finally got to test your patch. Unfortunately, it makes the system
-> > hang even earlier:
+On Fri, Aug 02, 2013 at 03:15:24AM +0100, Rohit Vaswani wrote:
+> Add the cpus bindings and the Krait release sequence
+> to make SMP work for MSM8960
 > 
-> [ ... ]
+> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+> ---
+>  Documentation/devicetree/bindings/arm/cpus.txt     |  2 +
+>  Documentation/devicetree/bindings/arm/msm/kpss.txt | 16 ++++++
+>  arch/arm/boot/dts/msm8960-cdp.dts                  | 22 +++++++++
+>  arch/arm/mach-msm/platsmp.c                        | 57 ++++++++++++++++++++++
+>  arch/arm/mach-msm/scm-boot.h                       |  8 +--
+>  5 files changed, 102 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/msm/kpss.txt
 > 
-> Can you boot with maxcpus=1 and then give the result of timer_list ?
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index 327aad2..1132eac 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -45,11 +45,13 @@ For the ARM architecture every CPU node must contain the following properties:
+>  		"marvell,xsc3"
+>  		"marvell,xscale"
+>  		"qcom,scorpion"
+> +		"qcom,krait"
+>  - enable-method: Specifies the method used to enable or take the secondary cores
+>  		 out of reset. This allows different reset sequence for
+>  		 different types of cpus.
+>  		 This should be one of:
+>  		 "qcom,scss"
+> +		 "qcom,kpssv1"
 
-That doesn't seem to help anymore. It hangs too. Same picture w/ and w/o
-'maxcpus', except for
-	[    0.000000] Kernel command line: console=ttyPS0,115200 earlyprintk maxcpus=1
+Hopefully (though this series implies otherwise) we won't have an
+explosion of enable-methods. We haven't listed any common ones yet (e.g.
+PSCI), and both this and qcom,scss are "poke some cpu-specific
+registers".
 
+I take it by the "v1" suffix you're expecting more variation here?
 
-	S?ren
+>  
+>  Example:
+>  
+> diff --git a/Documentation/devicetree/bindings/arm/msm/kpss.txt b/Documentation/devicetree/bindings/arm/msm/kpss.txt
+> new file mode 100644
+> index 0000000..7272340
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/msm/kpss.txt
+> @@ -0,0 +1,16 @@
+> +* KPSS - Krait Processor Sub-system
+> +
+> +Properties
+> +
+> +- compatible : Should contain "qcom,kpss".
+> +
+> +- reg: Specifies the base address for the KPSS registers used for
+> +       booting up secondary cores.
+> +
+> +Example:
+> +
+> +	kpss at 2088000 {
+> +		compatible = "qcom,kpss";
+> +		reg = <0x02088000 0x1000
+> +			0x02098000 0x2000>;
+> +	};
+
+What's the secondary bank of registers? The binding only mentions one...
+
+Is this a register bank per-cpu? There's no linkage to CPU ID, which
+means that handling logical mapping is going to get quite painful.
+
+For the vaguely standard "spin-table" enable-method, the address to poke
+(cpu-release-addr) may be stored inside a specific cpu node. Following
+that style may make more sense here, unless the kpss hardware is used
+for anything more than processor hotplug.
+
+We could have the cpu node refer to the specific kpss/register combo,
+which would also allow for future expansion if the kpss unit is
+per-cluster:
+
+/ {
+	cpus {
+		device_type = "cpu";
+		compatible = "qcom,krait";
+		enable-method = "qcom,kpssv1";
+
+		cpu at 0 {
+			reg = <0>;
+			qcom,kpss-reg = <&kpss 1>; /* reg[1] in kpss */
+		};
+
+		cpu at 1 {
+			reg = <1>;
+			qcom,kpss-reg = <&kpss 0>; /* reg[0] in kpss */
+		};
+	}
+
+	kpss: kpss at 2088000 {
+		compatible = "qcom,kpss";
+		reg = <0x02088000 0x1000>,
+		      <0x02098000 0x2000>;
+	};
+}
+
+> diff --git a/arch/arm/boot/dts/msm8960-cdp.dts b/arch/arm/boot/dts/msm8960-cdp.dts
+> index db2060c..8c82d5e 100644
+> --- a/arch/arm/boot/dts/msm8960-cdp.dts
+> +++ b/arch/arm/boot/dts/msm8960-cdp.dts
+> @@ -7,6 +7,22 @@
+>  	compatible = "qcom,msm8960-cdp", "qcom,msm8960";
+>  	interrupt-parent = <&intc>;
+>  
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "qcom,krait";
+> +		device_type = "cpu";
+> +		enable-method = "qcom,kpssv1";
+> +
+> +		cpu at 0 {
+> +			reg = <0>;
+> +		};
+> +
+> +		cpu at 1 {
+> +			reg = <1>;
+> +		};
+> +	};
+
+Similarly to my comments on the first patch, I like making properties
+shared, but we *need* to have common infrastructure before we can do
+things this way.
+
+> +
+>  	intc: interrupt-controller at 2000000 {
+>  		compatible = "qcom,msm-qgic2";
+>  		interrupt-controller;
+> @@ -37,6 +53,12 @@
+>  		reg = <0xfd510000 0x4000>;
+>  	};
+>  
+> +	kpss at 2088000 {
+> +		compatible = "qcom,kpss";
+> +		reg = <0x02088000 0x1000
+> +			0x02098000 0x2000>;
+> +	};
+> +
+>  	serial at 16440000 {
+>  		compatible = "qcom,msm-hsuart", "qcom,msm-uart";
+>  		reg = <0x16440000 0x1000>,
+> diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+> index 17022e0..82eb079 100644
+> --- a/arch/arm/mach-msm/platsmp.c
+> +++ b/arch/arm/mach-msm/platsmp.c
+> @@ -74,6 +74,56 @@ static int scorpion_release_secondary(void)
+>  	return 0;
+>  }
+>  
+> +static int msm8960_release_secondary(unsigned int cpu)
+> +{
+> +	void __iomem *reg;
+> +	struct device_node *dn = NULL;
+> +
+> +	if (cpu == 0 || cpu >= num_possible_cpus())
+> +		return -EINVAL;
+
+We seem to describe a reg bank for CPU0. Is this check because we don't
+(yet) have a way of hotplugging CPU0 off? Is CPU0 special in that
+regard?
+
+> +
+> +	dn = of_find_compatible_node(dn, NULL, "qcom,kpss");
+> +	if (!dn) {
+> +		pr_err("%s : Missing kpss node from device tree\n", __func__);
+> +		return -ENXIO;
+> +	}
+> +
+> +	reg = of_iomap(dn, cpu);
+
+That doesn't handle logical id mapping.
+
+> +	if (!reg)
+> +		return -ENOMEM;
+> +
+> +	pr_debug("Starting secondary CPU %d\n", cpu);
+> +
+> +	/* Turn on CPU Rail */
+> +	writel_relaxed(0xA4, reg+0x1014);
+
+Symbolic names for registers please.
+
+[...]
+
+> @@ -151,6 +206,8 @@ static void __init msm_smp_init_cpus(void)
+>  static const int cold_boot_flags[] __initconst = {
+>  	0,
+>  	SCM_FLAG_COLDBOOT_CPU1,
+> +	SCM_FLAG_COLDBOOT_CPU2,
+> +	SCM_FLAG_COLDBOOT_CPU3,
+>  };
+>  
+>  static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
+> diff --git a/arch/arm/mach-msm/scm-boot.h b/arch/arm/mach-msm/scm-boot.h
+> index 7be32ff..6aabb24 100644
+> --- a/arch/arm/mach-msm/scm-boot.h
+> +++ b/arch/arm/mach-msm/scm-boot.h
+> @@ -13,9 +13,11 @@
+>  #define __MACH_SCM_BOOT_H
+>  
+>  #define SCM_BOOT_ADDR			0x1
+> -#define SCM_FLAG_COLDBOOT_CPU1		0x1
+> -#define SCM_FLAG_WARMBOOT_CPU1		0x2
+> -#define SCM_FLAG_WARMBOOT_CPU0		0x4
+> +#define SCM_FLAG_COLDBOOT_CPU1		0x01
+> +#define SCM_FLAG_COLDBOOT_CPU2		0x08
+> +#define SCM_FLAG_COLDBOOT_CPU3		0x20
+> +#define SCM_FLAG_WARMBOOT_CPU0		0x04
+> +#define SCM_FLAG_WARMBOOT_CPU1		0x02
+
+Is there any obvious sequencing for these values?
+
+How will they be extended in future for more CPUs/clusters?
+
+Do we possibly need this information in DT?
+
+Thanks,
+Mark.
