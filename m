@@ -1,50 +1,51 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 12 Aug 2013 18:08:46 +0200
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
-References: <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
- <51F99747.4060901@linaro.org>
- <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
- <51FA9AE8.1060004@linaro.org>
- <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
- <51FA9F54.3060704@linaro.org>
- <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
- <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
- <20130809172757.GD14845@codeaurora.org>
- <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
-Message-ID: <5209088E.20404@linaro.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 12 Aug 2013 09:09:43 -0700
+Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <CA+Bv8XabqNkQzjD93kQZvjdozxjAntNRkY3uCOv0n05UzJ=Zug@mail.gmail.com>
+ (Russ Dill's message of "Fri, 9 Aug 2013 15:28:37 -0700")
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
+ <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
+ <52038E88.2050604@ti.com> <5203B336.90102@ti.com>
+ <5203C211.7040207@ti.com> <87iozfga1t.fsf@kernel.org>
+ <52040E67.4050402@ti.com> <87pptndbtj.fsf@kernel.org>
+ <520506B6.7060806@ti.com> <87wqnu9720.fsf@kernel.org>
+ <52051A9B.1060606@ti.com> <87bo5661sv.fsf@kernel.org>
+ <CA+Bv8XabqNkQzjD93kQZvjdozxjAntNRkY3uCOv0n05UzJ=Zug@mail.gmail.com>
+Message-ID: <87haeuvqk8.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2013 06:03 PM, S?ren Brinkmann wrote:
-> On Fri, Aug 09, 2013 at 10:27:57AM -0700, Stephen Boyd wrote:
->> On 08/09, Daniel Lezcano wrote:
->>>
->>> yes, but at least the broadcast mechanism should send an IPI to cpu0 to
->>> wake it up, no ? As Stephen stated this kind of configuration should has
->>> never been tested before so the tick broadcast code is not handling this
->>> case properly IMHO.
->>>
->>
->> If you have a per-cpu tick device that isn't suffering from
->> FEAT_C3_STOP why wouldn't you use that for the tick versus a
->> per-cpu tick device that has FEAT_C3_STOP? It sounds like there
->> is a bug in the preference logic or you should boost the rating
->> of the arm global timer above the twd. Does this patch help? It
->> should make the arm global timer the tick device and whatever the
->> cadence timer you have into the broadcast device.
-> 
-> I finally got to test your patch. Unfortunately, it makes the system
-> hang even earlier:
+Hi Russ,
 
-[ ... ]
+Russ Dill <russ.dill@gmail.com> writes:
 
-Can you boot with maxcpus=1 and then give the result of timer_list ?
+[...]
 
+> I was taking a look at this situation, figuring that the
+> suspend/resume callbacks in omap_device might be the right place to do
+> it, and came across this:
+>
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=72bb6f9b51c82c820ddef892455a85b115460904
+>
+> Under what situations would the driver callbacks be present if probe
+> fails? I'm looking at really_probe in drivers/base/dd.c, and if probe
+> fails, dev->driver is set to NULL. What was the condition this was
+> protecting against?
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+The static suspend/resume methods for PM domains don't check for
+dev->driver.  (c.f. device_resume_noirq()), so during system suspend,
+the PM domain callbacks are called whether or not there is a driver.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+A simlar fix could've been done by checking for the existence of
+dev->driver (and maybe that's a better solution), but I chose the latter
+so omap_device has a finer grained track of the driver status.
+
+> Also, by modifying _od_suspend_noirq, can we force idle unbound omap
+> device? Would we need a new omap_hwmod flag to check which devices
+> should be force idled if no driver is bound?
+
+I suppose you could, but that would probably mask driver bugs where the
+driver is not properly runtime suspending itself before being removed.
+
+Kevin
