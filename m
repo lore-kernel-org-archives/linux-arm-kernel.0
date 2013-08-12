@@ -1,46 +1,210 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 12 Aug 2013 09:24:57 -0700
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <52090B43.9090000@codeaurora.org>
-References: <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
- <51FA9AE8.1060004@linaro.org>
- <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
- <51FA9F54.3060704@linaro.org>
- <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
- <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
- <20130809172757.GD14845@codeaurora.org>
- <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
- <52090B43.9090000@codeaurora.org>
-Message-ID: <b246ae2f-4841-4bc0-80b3-0bd65269b83f@CH1EHSMHS039.ehs.local>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Aug 2013 17:39:05 +0100
+Subject: [RESEND PATCH 4/4] ARM: msm: Add support for 8974 SMP
+In-Reply-To: <1375409725-22004-5-git-send-email-rvaswani@codeaurora.org>
+References: <1375409725-22004-1-git-send-email-rvaswani@codeaurora.org>
+ <1375409725-22004-5-git-send-email-rvaswani@codeaurora.org>
+Message-ID: <20130812163905.GE27165@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 09:20:19AM -0700, Stephen Boyd wrote:
-> On 08/12/13 09:03, S?ren Brinkmann wrote:
-> > On Fri, Aug 09, 2013 at 10:27:57AM -0700, Stephen Boyd wrote:
-> >> On 08/09, Daniel Lezcano wrote:
-> >>> yes, but at least the broadcast mechanism should send an IPI to cpu0 to
-> >>> wake it up, no ? As Stephen stated this kind of configuration should has
-> >>> never been tested before so the tick broadcast code is not handling this
-> >>> case properly IMHO.
-> >>>
-> >> If you have a per-cpu tick device that isn't suffering from
-> >> FEAT_C3_STOP why wouldn't you use that for the tick versus a
-> >> per-cpu tick device that has FEAT_C3_STOP? It sounds like there
-> >> is a bug in the preference logic or you should boost the rating
-> >> of the arm global timer above the twd. Does this patch help? It
-> >> should make the arm global timer the tick device and whatever the
-> >> cadence timer you have into the broadcast device.
-> > I finally got to test your patch. Unfortunately, it makes the system
-> > hang even earlier:
+On Fri, Aug 02, 2013 at 03:15:25AM +0100, Rohit Vaswani wrote:
+> Add the cpus bindings and the Kraitv2 release sequence
+> to make SMP work for 2 cores on MSM8974.
 > 
-> Sorry it had a bug depending on the registration order. Can you try this
-> one (tabs are probably spaces, sorry)? I will go read through this
-> thread to see if we already covered the registration order.
+> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+> ---
+>  Documentation/devicetree/bindings/arm/cpus.txt |  1 +
+>  arch/arm/boot/dts/msm8974.dts                  | 23 ++++++++
+>  arch/arm/mach-msm/board-dt-8974.c              |  3 +
+>  arch/arm/mach-msm/platsmp.c                    | 79 ++++++++++++++++++++++++++
+>  4 files changed, 106 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index 1132eac..7c3c677 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -52,6 +52,7 @@ For the ARM architecture every CPU node must contain the following properties:
+>  		 This should be one of:
+>  		 "qcom,scss"
+>  		 "qcom,kpssv1"
+> +		 "qcom,kpssv2"
 
-What is the base for your patch? I based my GT enable patch on 3.11-rc3
-and for consistency in our debugging, I didn't move it elsewhere since.
-Your patch doesn't apply cleanly on it. I see if I can work it out, just
-let me know if it depends on something not available in 3.11-rc3.
+I guess I should've looked at the whole series before responding, that
+answers my prior question about what variation we expect.
 
-	S?ren
+>  
+>  Example:
+>  
+> diff --git a/arch/arm/boot/dts/msm8974.dts b/arch/arm/boot/dts/msm8974.dts
+> index c31c097..ef35a9b 100644
+> --- a/arch/arm/boot/dts/msm8974.dts
+> +++ b/arch/arm/boot/dts/msm8974.dts
+> @@ -7,6 +7,22 @@
+>  	compatible = "qcom,msm8974";
+>  	interrupt-parent = <&intc>;
+>  
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "qcom,krait";
+> +		device_type = "cpu";
+> +		enable-method = "qcom,kpssv2";
+> +
+> +		cpu at 0 {
+> +			reg = <0>;
+> +		};
+> +
+> +		cpu at 1 {
+> +			reg = <1>;
+> +		};
+> +	};
+> +
+>  	intc: interrupt-controller at f9000000 {
+>  		compatible = "qcom,msm-qgic2";
+>  		interrupt-controller;
+> @@ -23,4 +39,11 @@
+>  			     <1 1 0xf08>;
+>  		clock-frequency = <19200000>;
+>  	};
+> +
+> +	kpss at f9012000 {
+> +		compatible = "qcom,kpss";
+> +		reg = <0xf9012000 0x1000>,
+> +		      <0xf9088000 0x1000>,
+> +		      <0xf9098000 0x1000>;
+> +	};
+
+In the previous examples, the number of CPUs was equal to the number of
+kpss reg values. Why does it differ here. Either:
+
+* We always have the extra regsiter here, and it should be described
+  even if we don't use it.
+
+* It's a different hardware block, and needs a more specific
+  compatible string.
+
+Eitehr way this strengthens my feeling that we need to define the linkage
+from a CPU to the portion of the kpss which affects it.
+
+>  };
+> diff --git a/arch/arm/mach-msm/board-dt-8974.c b/arch/arm/mach-msm/board-dt-8974.c
+> index d7f84f2..06119f9 100644
+> --- a/arch/arm/mach-msm/board-dt-8974.c
+> +++ b/arch/arm/mach-msm/board-dt-8974.c
+> @@ -13,11 +13,14 @@
+>  #include <linux/of_platform.h>
+>  #include <asm/mach/arch.h>
+>  
+> +#include "common.h"
+> +
+>  static const char * const msm8974_dt_match[] __initconst = {
+>  	"qcom,msm8974",
+>  	NULL
+>  };
+>  
+>  DT_MACHINE_START(MSM8974_DT, "Qualcomm MSM (Flattened Device Tree)")
+> +	.smp = smp_ops(msm_smp_ops),
+>  	.dt_compat = msm8974_dt_match,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+> index 82eb079..0fdae69 100644
+> --- a/arch/arm/mach-msm/platsmp.c
+> +++ b/arch/arm/mach-msm/platsmp.c
+> @@ -124,6 +124,80 @@ static int msm8960_release_secondary(unsigned int cpu)
+>  	return 0;
+>  }
+>  
+> +static int msm8974_release_secondary(unsigned int cpu)
+> +{
+> +	void __iomem *reg;
+> +	void __iomem *l2_saw_base;
+> +	struct device_node *dn = NULL;
+> +	unsigned apc_pwr_gate_ctl = 0x14;
+> +	unsigned reg_val;
+> +
+> +	if (cpu == 0 || cpu >= num_possible_cpus())
+> +		return -EINVAL;
+> +
+> +	dn = of_find_compatible_node(dn, NULL, "qcom,kpss");
+> +	if (!dn) {
+> +		pr_err("%s : Missing kpss node from device tree\n", __func__);
+> +		return -ENXIO;
+> +	}
+> +
+> +	reg = of_iomap(dn, cpu+1);
+
+This looks very fishy given the prior patch being one off from this.
+why is reg[0] now different?
+
+> +	if (!reg)
+> +		return -ENOMEM;
+> +
+> +	pr_debug("Starting secondary CPU %d\n", cpu);
+> +
+> +	/* Turn on the BHS, turn off LDO Bypass and power down LDO */
+> +	reg_val =  0x403f0001;
+
+Magic number?
+
+> +	writel_relaxed(reg_val, reg + apc_pwr_gate_ctl);
+> +
+> +	/* complete the above write before the delay */
+> +	mb();
+
+Use writel?
+
+> +	/* wait for the bhs to settle */
+> +	udelay(1);
+> +
+> +	/* Turn on BHS segments */
+> +	reg_val |= 0x3f << 1;
+> +	writel_relaxed(reg_val, reg + apc_pwr_gate_ctl);
+> +
+> +	/* complete the above write before the delay */
+> +	mb();
+
+Use writel again?
+
+> +	 /* wait for the bhs to settle */
+> +	udelay(1);
+> +
+> +	/* Finally turn on the bypass so that BHS supplies power */
+> +	reg_val |= 0x3f << 8;
+> +	writel_relaxed(reg_val, reg + apc_pwr_gate_ctl);
+> +
+> +	/* enable max phases */
+> +	l2_saw_base = of_iomap(dn, 0);
+> +	if (!l2_saw_base) {
+> +		return -ENOMEM;
+> +	}
+
+What? 
+
+You've just lost your only reference to the mapping in reg.
+
+Why do you not do this at the start, before poking everything else? Even
+better, do it at probe time and fail once rather than for each CPU you
+have no chance of bringing up.
+
+[...]
+>  static void boot_cold_cpu(unsigned int cpu)
+> @@ -151,6 +225,11 @@ static void boot_cold_cpu(unsigned int cpu)
+>  			msm8960_release_secondary(cpu);
+>  			per_cpu(cold_boot_done, cpu) = true;
+>  		}
+> +	} else if (!strcmp(enable_method, "qcom,kpssv2")) {
+> +		if (per_cpu(cold_boot_done, cpu) == false) {
+> +			msm8974_release_secondary(cpu);
+> +			per_cpu(cold_boot_done, cpu) = true;
+> +		}
+>  	} else {
+>  		pr_err("%s: Invalid enable-method property: %s\n",
+>  				__func__, enable_method);
+
+The enable-method parsing really should be moved out to common code. We
+could make it scan the enable-method if a machine has no smp ops (which
+is more general than the PSCI fallback that's been suggested before).
+
+Thanks,
+Mark.
