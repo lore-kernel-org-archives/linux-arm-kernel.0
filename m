@@ -1,52 +1,38 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 12 Aug 2013 08:55:53 -0300
-Subject: [PATCH 2/2] ARM: imx: Re-select CONFIG_SND_SOC_IMX_MC13783 option
-In-Reply-To: <1376308553-2824-1-git-send-email-festevam@gmail.com>
-References: <1376308553-2824-1-git-send-email-festevam@gmail.com>
-Message-ID: <1376308553-2824-2-git-send-email-festevam@gmail.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 12 Aug 2013 13:57:04 +0200
+Subject: [PATCH 1/2] ARM: dts: Change dw-apb-timer-osc and
+ dw-apb-timer-sp to just dw-apb-timer
+In-Reply-To: <20130811214509.GA26757@quad.lixom.net>
+References: <1374723797-22169-1-git-send-email-dinguyen@altera.com>
+ <20130811214509.GA26757@quad.lixom.net>
+Message-ID: <20130812115703.GA27616@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Commit 02502da45 (ASoC: imx-mc13783: Depend on ARCH_ARM) caused the selection of
-CONFIG_SND_SOC_IMX_MC13783 to be impossible due to a wrong dependency, which
-caused CONFIG_SND_SOC_IMX_MC13783 to be removed after the defconfigs cleanups.
+> > index eb2327b..0a1020e 100644
+> > --- a/Documentation/devicetree/bindings/rtc/dw-apb.txt
+> > +++ b/Documentation/devicetree/bindings/rtc/dw-apb.txt
+> > @@ -1,7 +1,7 @@
+> >  * Designware APB timer
+> >  
+> >  Required properties:
+> > -- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc"
+> > +- compatible: "snps,dw-apb-timer"
+> >  - reg: physical base address of the controller and length of memory mapped
+> >    region.
+> >  - interrupts: IRQ line for the timer.
+> 
+> Here's a classic example of where we will eventually need to keep the ABI. You
+> can add a comment that the preferred compatible value is the new one, but the
+> old ones still need to be handled by the drivers, and shouldn't be removed.
+> 
+> That is, of course, if people are happy with the current binding and want to
+> keep it instead of revising it before declaring it locked in.
 
-The original selection problem has been fixed by 9f19de649f (ASoC: imx-mc13783:
-Make SND_SOC_IMX_MC13783 visible again), so it is possible to select 
-CONFIG_SND_SOC_IMX_MC13783 again as originally done.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-
- arch/arm/configs/imx_v4_v5_defconfig | 1 +
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 2 files changed, 2 insertions(+)
-
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index 6cc94a7..e958ebe 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -146,6 +146,7 @@ CONFIG_SND_SOC_MX27VIS_AIC32X4=y
- CONFIG_SND_SOC_PHYCORE_AC97=y
- CONFIG_SND_SOC_EUKREA_TLV320=y
- CONFIG_SND_SOC_IMX_SGTL5000=y
-+CONFIG_SND_SOC_IMX_MC13783=y
- CONFIG_USB_HID=m
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index c2c024f..402f282 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -188,6 +188,7 @@ CONFIG_SND_SOC_PHYCORE_AC97=y
- CONFIG_SND_SOC_EUKREA_TLV320=y
- CONFIG_SND_SOC_IMX_WM8962=y
- CONFIG_SND_SOC_IMX_SGTL5000=y
-+CONFIG_SND_SOC_IMX_MC13783=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
+The first -sp / -osc separation was bad idea from the start. It would
+be better if we could get rid of it.
+									Pavel
 -- 
-1.8.1.2
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
