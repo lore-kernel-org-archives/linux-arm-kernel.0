@@ -1,17 +1,14 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 12 Aug 2013 20:46:48 +0200
-Subject: [PATCH 2/9] PCI: mvebu: increment nports only for registered ports
+Date: Mon, 12 Aug 2013 20:46:51 +0200
+Subject: [PATCH 5/9] PCI: mvebu: add support for Marvell Dove SoCs
 In-Reply-To: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1376333215-12885-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1376333215-12885-6-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The number of ports is probed by counting the number of available child nodes.
-Later on, the registration of a port can fail and cause a mismatch between
-the ->nports counter and registered ports. This patch modifies the counting
-strategy, to make ->nports represent the number of registered ports instead
-of the number of available childs.
+This patch adds a compatible for the PCIe controller found on Marvell
+Dove SoCs. Binding documentation and Kconfig entry are also updated.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -20,51 +17,53 @@ Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-pci at vger.kernel.org
 ---
- drivers/pci/host/pci-mvebu.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ Documentation/devicetree/bindings/pci/mvebu-pci.txt |    1 +
+ drivers/pci/host/Kconfig                            |    2 +-
+ drivers/pci/host/pci-mvebu.c                        |    1 +
+ 3 files changed, 3 insertions(+), 1 deletion(-)
 
+diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+index f2fa261..cf470a9 100644
+--- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
++++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+@@ -5,6 +5,7 @@ Mandatory properties:
+ - compatible: one of the following values:
+     marvell,armada-370-pcie
+     marvell,armada-xp-pcie
++    marvell,dove-pcie
+     marvell,kirkwood-pcie
+ - #address-cells, set to <3>
+ - #size-cells, set to <2>
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index 1184ff6..492eec9 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -3,7 +3,7 @@ menu "PCI host controller drivers"
+ 
+ config PCI_MVEBU
+ 	bool "Marvell EBU PCIe controller"
+-	depends on ARCH_MVEBU || ARCH_KIRKWOOD
++	depends on ARCH_MVEBU || ARCH_DOVE || ARCH_KIRKWOOD
+ 
+ config PCIE_DW
+ 	bool
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index d5fe674..0a359d7 100644
+index bdad4d4..b204c1d 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -842,21 +842,21 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	i = 0;
- 	for_each_child_of_node(pdev->dev.of_node, child) {
- 		if (!of_device_is_available(child))
- 			continue;
--		pcie->nports++;
-+		i++;
- 	}
- 
--	pcie->ports = devm_kzalloc(&pdev->dev, pcie->nports *
-+	pcie->ports = devm_kzalloc(&pdev->dev, i *
- 				   sizeof(struct mvebu_pcie_port),
- 				   GFP_KERNEL);
- 	if (!pcie->ports)
- 		return -ENOMEM;
- 
--	i = 0;
- 	for_each_child_of_node(pdev->dev.of_node, child) {
--		struct mvebu_pcie_port *port = &pcie->ports[i];
-+		struct mvebu_pcie_port *port = &pcie->ports[pcie->nports];
- 
- 		if (!of_device_is_available(child))
- 			continue;
-@@ -929,7 +929,7 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- 		port->dn = child;
- 		spin_lock_init(&port->conf_lock);
- 		mvebu_sw_pci_bridge_init(port);
--		i++;
-+		pcie->nports++;
- 	}
- 
- 	mvebu_pcie_msi_enable(pcie);
+@@ -986,6 +986,7 @@ static int mvebu_pcie_remove(struct platform_device *pdev)
+ static const struct of_device_id mvebu_pcie_of_match_table[] = {
+ 	{ .compatible = "marvell,armada-xp-pcie", },
+ 	{ .compatible = "marvell,armada-370-pcie", },
++	{ .compatible = "marvell,dove-pcie", },
+ 	{ .compatible = "marvell,kirkwood-pcie", },
+ 	{},
+ };
 -- 
 1.7.10.4
