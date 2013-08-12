@@ -1,61 +1,89 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Mon, 12 Aug 2013 15:37:47 +0530
-Subject: [PATCH V4 1/4] ARM: dts: exynos5420: add i2s controllers
+Date: Mon, 12 Aug 2013 15:37:48 +0530
+Subject: [PATCH V4 2/4] ARM: dts: Add i2c bus 1 and it's audio codec child node
+ on smdk5420
 In-Reply-To: <1376302070-1877-1-git-send-email-padma.v@samsung.com>
 References: <1376302070-1877-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1376302070-1877-2-git-send-email-padma.v@samsung.com>
+Message-ID: <1376302070-1877-3-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Bresticker <abrestic@chromium.org>
+This patch adds i2c bus 1 and wm8994 codec node on i2c bus1 and the
+required regulator supplies and properties on smdk5420 board.
 
-This adds device-tree bindings for the i2s controllers on Exynos 5420.
-
-Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-Reviewed-on: https://gerrit.chromium.org/gerrit/57713
 ---
- arch/arm/boot/dts/exynos5420.dtsi |   32 ++++++++++++++++++++++++++++++++
- 1 files changed, 32 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/exynos5420-smdk5420.dts |   62 +++++++++++++++++++++++++++++
+ 1 files changed, 62 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index d2fdb87..8d57369 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -242,4 +242,36 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2c3_bus>;
+diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+index d05de7a..1ef7e2e 100644
+--- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
++++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+@@ -68,4 +68,66 @@
+ 			bus-width = <4>;
+ 		};
  	};
 +
-+	i2s_0: i2s at 03830000 {
-+		compatible = "samsung,exynos5420-i2s";
-+		dmas = <&adma 0
-+			&adma 2
-+			&adma 1>;
-+		dma-names = "tx", "rx", "tx-sec";
-+		clocks = <&clock_audss EXYNOS_I2S_BUS>,
-+			<&clock_audss EXYNOS_I2S_BUS>,
-+			<&clock_audss EXYNOS_SCLK_I2S>;
-+		clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2s0_bus>;
-+		status = "disabled";
++	fixed-regulators {
++		compatible = "simple-bus";
++
++		avdd2: fixed-regulator-0 {
++			compatible = "regulator-fixed";
++			regulator-name = "avdd2-supply";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			regulator-always-on;
++		};
++
++		cpvdd: fixed-regulator-1 {
++			compatible = "regulator-fixed";
++			regulator-name = "cpvdd-supply";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			regulator-always-on;
++		};
++
++		dbvdd: fixed-regulator-2 {
++			compatible = "regulator-fixed";
++			regulator-name = "dbvdd-supply";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++
++		spkvdd: fixed-regulator-3 {
++			compatible = "regulator-fixed";
++			regulator-name = "spkvdd-supply";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++		};
 +	};
 +
-+	i2s_1: i2s at 12D60000 {
-+		clocks = <&clock 275>, <&clock 138>;
-+		clock-names = "iis", "i2s_opclk0";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2s1_bus>;
-+		status = "disabled";
-+	};
++	i2c at 12C70000 {
++		status = "okay";
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-max-bus-freq = <20000>;
 +
-+	i2s_2: i2s at 12D70000 {
-+		clocks = <&clock 276>, <&clock 139>;
-+		clock-names = "iis", "i2s_opclk0";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2s2_bus>;
-+		status = "disabled";
++		eeprom at 51 {
++			compatible = "samsung,s524ad0xd1";
++			reg = <0x51>;
++		};
++
++		wm8994: wm8994 at 1a {
++			compatible = "wlf,wm8994";
++			reg = <0x1a>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			AVDD2-supply = <&avdd2>;
++			CPVDD-supply = <&cpvdd>;
++			DBVDD-supply = <&dbvdd>;
++			SPKVDD1-supply = <&spkvdd>;
++			SPKVDD2-supply = <&spkvdd>;
++		};
 +	};
 +
  };
