@@ -1,107 +1,99 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 12 Aug 2013 15:52:01 +0200
-Subject: [PATCH] usb: gadget: at91_udc: add usb_clk for transition to
- common clk framework
-In-Reply-To: <1375337885-2684-1-git-send-email-b.brezillon@overkiz.com>
-References: <1375337885-2684-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <5208E881.3030205@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Aug 2013 14:54:27 +0100
+Subject: [PATCH 3/4] clk: sunxi: Add A31 clocks support
+In-Reply-To: <5208DCB7.9070103@elopez.com.ar>
+References: <1375195462-19566-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375195462-19566-4-git-send-email-maxime.ripard@free-electrons.com>
+ <20130812125357.GD6616@e106331-lin.cambridge.arm.com>
+ <5208DCB7.9070103@elopez.com.ar>
+Message-ID: <20130812135427.GA27165@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2013 08:18, Boris BREZILLON :
-> The AT91 PMC (Power Management Controller) provides an USB clock used by
-> USB Full Speed host (ohci) and USB Full Speed device (udc).
-> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
-> This configuration was formely done in mach-at91/clock.c, but this
-> implementation will be removed when moving to common clk framework.
->
-> This patch adds support for usb clock retrieval and configuration, and is
-> backward compatible with the current at91 clk implementation (if usb clk
-> is not found, it does not configure/enable it).
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+On Mon, Aug 12, 2013 at 02:01:43PM +0100, Emilio L?pez wrote:
+> El 12/08/13 09:53, Mark Rutland escribi?:
+> > On Tue, Jul 30, 2013 at 03:44:21PM +0100, Maxime Ripard wrote:
+> >> The A31 has a mostly different clock set compared to the other older
+> >> SoCs currently supported in the Allwinner clock driver.
+> >>
+> >> Add support for the basic useful clocks. The other ones will come in
+> >> eventually.
+> >>
+> >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> ---
+> >>  drivers/clk/sunxi/clk-sunxi.c | 120 ++++++++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 120 insertions(+)
+> >>
+> > 
+> > [...]
+> > 
+> >> @@ -420,6 +516,10 @@ static const __initconst struct of_device_id clk_factors_match[] = {
+> >>  		.data = &sun4i_pll1_data,
+> >>  	},
+> >>  	{
+> >> +		.compatible = "allwinner,sun6i-pll1-clk",
+> >> +		.data = &sun6i_pll1_data,
+> >> +	},
+> >> +	{
+> >>  		.compatible = "allwinner,sun4i-apb1-clk",
+> >>  		.data = &sun4i_apb1_data,
+> >>  	},
+> >> @@ -440,6 +540,10 @@ static const __initconst struct of_device_id clk_div_match[] = {
+> >>  		.compatible = "allwinner,sun4i-apb0-clk",
+> >>  		.data = &sun4i_apb0_data,
+> >>  	},
+> >> +	{
+> >> +		.compatible = "allwinner,sun6i-apb2-div-clk",
+> >> +		.data = &sun6i_apb2_div_data,
+> >> +	},
+> >>  	{}
+> >>  };
+> >>  
+> >> @@ -453,6 +557,10 @@ static const __initconst struct of_device_id clk_mux_match[] = {
+> >>  		.compatible = "allwinner,sun4i-apb1-mux-clk",
+> >>  		.data = &sun4i_apb1_mux_data,
+> >>  	},
+> >> +	{
+> >> +		.compatible = "allwinner,sun6i-ahb1-mux-clk",
+> >> +		.data = &sun6i_ahb1_mux_data,
+> >> +	},
+> >>  	{}
+> >>  };
+> >>  
+> >> @@ -471,6 +579,10 @@ static const __initconst struct of_device_id clk_gates_match[] = {
+> >>  		.data = &sun5i_a13_ahb_gates_data,
+> >>  	},
+> >>  	{
+> >> +		.compatible = "allwinner,sun6i-a31-ahb1-gates-clk",
+> >> +		.data = &sun6i_a31_ahb1_gates_data,
+> >> +	},
+> >> +	{
+> >>  		.compatible = "allwinner,sun4i-apb0-gates-clk",
+> >>  		.data = &sun4i_apb0_gates_data,
+> >>  	},
+> >> @@ -486,6 +598,14 @@ static const __initconst struct of_device_id clk_gates_match[] = {
+> >>  		.compatible = "allwinner,sun5i-a13-apb1-gates-clk",
+> >>  		.data = &sun5i_a13_apb1_gates_data,
+> >>  	},
+> >> +	{
+> >> +		.compatible = "allwinner,sun6i-a31-apb1-gates-clk",
+> >> +		.data = &sun6i_a31_apb1_gates_data,
+> >> +	},
+> >> +	{
+> >> +		.compatible = "allwinner,sun6i-a31-apb2-gates-clk",
+> >> +		.data = &sun6i_a31_apb2_gates_data,
+> >> +	},
+> >>  	{}
+> >>  };
+> > 
+> > Could you please document these new strings? I assume they follow the
+> > general conventions of sunxi clocks thus far and the strings can just be
+> > appended to the lists in the existing binding document.
+> 
+> I believe they have been documented already on the latest version of
+> this patchset (v3 at the time of speaking)
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Indeed they are, and they look fine. Apologies for the noise.
 
-> ---
->   drivers/usb/gadget/at91_udc.c |   17 ++++++++++++++++-
->   drivers/usb/gadget/at91_udc.h |    2 +-
->   2 files changed, 17 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-> index fce8e4e..ae06585 100644
-> --- a/drivers/usb/gadget/at91_udc.c
-> +++ b/drivers/usb/gadget/at91_udc.c
-> @@ -870,6 +870,11 @@ static void clk_on(struct at91_udc *udc)
->   	if (udc->clocked)
->   		return;
->   	udc->clocked = 1;
-> +
-> +	if (!IS_ERR(udc->uclk)) {
-> +		clk_set_rate(udc->uclk, 48000000);
-> +		clk_prepare_enable(udc->uclk);
-> +	}
->   	clk_prepare_enable(udc->iclk);
->   	clk_prepare_enable(udc->fclk);
->   }
-> @@ -882,6 +887,8 @@ static void clk_off(struct at91_udc *udc)
->   	udc->gadget.speed = USB_SPEED_UNKNOWN;
->   	clk_disable_unprepare(udc->fclk);
->   	clk_disable_unprepare(udc->iclk);
-> +	if (!IS_ERR(udc->uclk))
-> +		clk_disable_unprepare(udc->uclk);
->   }
->
->   /*
-> @@ -1774,10 +1781,10 @@ static int at91udc_probe(struct platform_device *pdev)
->   	/* get interface and function clocks */
->   	udc->iclk = clk_get(dev, "udc_clk");
->   	udc->fclk = clk_get(dev, "udpck");
-> +	udc->uclk = clk_get(dev, "usb_clk");
->   	if (IS_ERR(udc->iclk) || IS_ERR(udc->fclk)) {
->   		DBG("clocks missing\n");
->   		retval = -ENODEV;
-> -		/* NOTE: we "know" here that refcounts on these are NOPs */
->   		goto fail1;
->   	}
->
-> @@ -1851,6 +1858,12 @@ fail3:
->   fail2:
->   	free_irq(udc->udp_irq, udc);
->   fail1:
-> +	if (!IS_ERR(udc->uclk))
-> +		clk_put(udc->uclk);
-> +	if (!IS_ERR(udc->fclk))
-> +		clk_put(udc->fclk);
-> +	if (!IS_ERR(udc->iclk))
-> +		clk_put(udc->iclk);
->   	iounmap(udc->udp_baseaddr);
->   fail0a:
->   	if (cpu_is_at91rm9200())
-> @@ -1894,6 +1907,8 @@ static int __exit at91udc_remove(struct platform_device *pdev)
->
->   	clk_put(udc->iclk);
->   	clk_put(udc->fclk);
-> +	if (!IS_ERR(udc->uclk))
-> +		clk_put(udc->uclk);
->
->   	return 0;
->   }
-> diff --git a/drivers/usb/gadget/at91_udc.h b/drivers/usb/gadget/at91_udc.h
-> index e647d1c..0175246 100644
-> --- a/drivers/usb/gadget/at91_udc.h
-> +++ b/drivers/usb/gadget/at91_udc.h
-> @@ -126,7 +126,7 @@ struct at91_udc {
->   	unsigned			active_suspend:1;
->   	u8				addr;
->   	struct at91_udc_data		board;
-> -	struct clk			*iclk, *fclk;
-> +	struct clk			*iclk, *fclk, *uclk;
->   	struct platform_device		*pdev;
->   	struct proc_dir_entry		*pde;
->   	void __iomem			*udp_baseaddr;
->
-
-
--- 
-Nicolas Ferre
+Thanks,
+Mark.
