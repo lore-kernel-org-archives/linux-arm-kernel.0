@@ -1,39 +1,23 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 12 Aug 2013 13:44:39 -0400
-Subject: [PATCHv9 00/10] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <520916E0.5030404@wwwdotorg.org>
-References: <1376080035-29344-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130812163723.GK25111@titan.lakedaemon.net>
- <520916E0.5030404@wwwdotorg.org>
-Message-ID: <20130812174439.GO25111@titan.lakedaemon.net>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 12 Aug 2013 18:48:09 +0100
+Subject: [Qemu-devel] SCSI bus failures with qemu-arm in kernel 3.8+
+In-Reply-To: <20130812164548.GE23006@n2100.arm.linux.org.uk>
+References: <5207B3C3.9080508@roeck-us.net>
+ <20130811220450.GY23006@n2100.arm.linux.org.uk>
+ <52082EF8.10005@roeck-us.net>
+ <CAFEAcA94ygwRPSsfxs3DvOcTZbdafLiEHys94FG4aXUx+A1t=A@mail.gmail.com>
+ <20130812164548.GE23006@n2100.arm.linux.org.uk>
+Message-ID: <CAFEAcA_=TKdvonBaVUSdSn=-ncXRxJN6DsROU+_2UJuCk-bvsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 11:09:52AM -0600, Stephen Warren wrote:
-> On 08/12/2013 10:37 AM, Jason Cooper wrote:
-> > Thomas,
-> > 
-> > Whole series applied as follows:
-> > 
-> > +---+ mvebu/msi_pci (1-4,7)
-> >     |
-> >     +---+---+ mvebu/msi_irq (5,6)
-> >             |
-> >             +---+---+ mvebu/msi_mvebu (8-10)
-> > 
-> > mvebu/msi_pci built successfully with Randy's config for x86_64.
-> > 
-> > Thierry, I've tagged mvebu/msi_pci.  Unless it all falls apart in -next,
-> > those commit-id's won't change from what will be in arm-soc.
-> 
-> So, the branch still isn't stable, hence I shouldn't use it as a
-> baseline to apply Thierry's PCIe patches?
+On 12 August 2013 17:45, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> In other words, if you have the circuit diagrams or other documentation
+> which definitively identifies the wiring, then please send it to me.
 
-It's as stable as I can make it.  I've tested it for all known build
-regressions (discovered in -next), and I see no reason to change it.
-Anything needing fixed after today, I'll append the fix to it's HEAD if
-appropriate.
+I've just checked and the schematics are provided on the CDROM
+"Versatile Family Product Support CD" (version 3.0) which I
+think we shipped a copy of with every board...
 
-thx,
-
-Jason.
+-- PMM
