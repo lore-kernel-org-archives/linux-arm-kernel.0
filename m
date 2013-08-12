@@ -1,61 +1,32 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 12 Aug 2013 17:04:10 +0530
-Subject: [GIT PULL] DRA7xx core support
-Message-ID: <5208C832.2060007@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 12 Aug 2013 12:34:48 +0100
+Subject: [PATCH V4 1/4] ARM: dts: exynos5420: add i2s controllers
+In-Reply-To: <21180092.af8YMiXtjc@amdc1227>
+References: <1376302070-1877-1-git-send-email-padma.v@samsung.com>
+ <1376302070-1877-2-git-send-email-padma.v@samsung.com>
+ <21180092.af8YMiXtjc@amdc1227>
+Message-ID: <20130812113447.GW6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Mon, Aug 12, 2013 at 01:14:20PM +0200, Tomasz Figa wrote:
+> On Monday 12 of August 2013 15:37:47 Padmavathi Venna wrote:
 
-Heres the pull request for the dra7xx core support patches.
+> > +	i2s_0: i2s at 03830000 {
+> > +		status = "disabled";
 
-The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+> If a node does not require any board-specific properties for the device to 
+> operate properly, there is no point in disabling it, just to add a single 
+> status property at board level.
 
-  Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
-
-are available in the git repository at:
-
-  git://github.com/rrnayak/linux.git tags/dra7-core-support-v3
-
-for you to fetch changes up to 41f2119b3037e50482cb14eaa39e6b5c52113fb5:
-
-  ARM: DRA7: Add the build support in omap2plus (2013-08-12 15:25:38 +0530)
-
-----------------------------------------------------------------
-DRA7xx based SoC core support
-
-----------------------------------------------------------------
-R Sricharan (8):
-      ARM: DRA7: Reuse all of PRCM and MPUSS SMP infra
-      ARM: DRA7: Reuse io tables and add a new .init_early
-      ARM: DRA7: Resue the clocksource, clockevent support
-      ARM: DRA7: board-generic: Add basic DT support
-      ARM: DRA7: Kconfig: Make ARCH_NR_GPIO default to 512
-      ARM: DRA7: dts: Add the dts files for dra7 SoC and dra7-evm board
-      ARM: DRA7: id: Add cpu detection support for DRA7xx based SoCs'
-      ARM: DRA7: Add the build support in omap2plus
-
-Rajendra Nayak (1):
-      ARM: DRA7: hwmod: Reuse the soc_ops used for OMAP4/5
-
- .../devicetree/bindings/arm/omap/omap.txt          |    3 +
- arch/arm/Kconfig                                   |    2 +-
- arch/arm/boot/dts/Makefile                         |    3 +-
- arch/arm/boot/dts/dra7-evm.dts                     |  140 +++++
- arch/arm/boot/dts/dra7.dtsi                        |  567 ++++++++++++++++++++
- arch/arm/configs/omap2plus_defconfig               |    1 +
- arch/arm/mach-omap1/include/mach/soc.h             |    1 +
- arch/arm/mach-omap2/Kconfig                        |   12 +-
- arch/arm/mach-omap2/Makefile                       |    6 +
- arch/arm/mach-omap2/board-generic.c                |   18 +
- arch/arm/mach-omap2/common.h                       |    1 +
- arch/arm/mach-omap2/id.c                           |    4 +-
- arch/arm/mach-omap2/io.c                           |   20 +-
- arch/arm/mach-omap2/omap54xx.h                     |    4 +
- arch/arm/mach-omap2/omap_hwmod.c                   |    2 +-
- arch/arm/mach-omap2/soc.h                          |   17 +
- arch/arm/mach-omap2/timer.c                        |    3 +-
- arch/arm/plat-omap/Kconfig                         |    2 +-
- 18 files changed, 795 insertions(+), 11 deletions(-)
- create mode 100644 arch/arm/boot/dts/dra7-evm.dts
- create mode 100644 arch/arm/boot/dts/dra7.dtsi
+I'd expect that to interact badly with the pinmuxing - unless the device
+is disabled it'll try to grab its pins on probe which is not going to be
+a good idea unless it is actually wired up for use in the system.  Or is
+there some other mechanism for handling that?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130812/b14ff50a/attachment.sig>
