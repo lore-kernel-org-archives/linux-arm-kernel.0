@@ -1,161 +1,41 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Aug 2013 15:14:10 +0100
-Subject: [PATCHv3 3/4] clk: sunxi: Add A31 clocks support
-In-Reply-To: <1375735381-18214-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1375735381-18214-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375735381-18214-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130812141410.GB27165@e106331-lin.cambridge.arm.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Mon, 12 Aug 2013 09:17:05 -0500
+Subject: [PATCH 1/3] ARM: dts: mxs: set dcp to "disabled" by default
+In-Reply-To: <21000.53151.841177.378797@ipc1.ka-ro>
+References: <1375968629-10091-1-git-send-email-LW@KARO-electronics.de>
+ <1375968629-10091-2-git-send-email-LW@KARO-electronics.de>
+ <20130812110523.GD25292@S2101-09.ap.freescale.net>
+ <21000.53151.841177.378797@ipc1.ka-ro>
+Message-ID: <73E20626-6771-4F37-BE65-8AA0D49FA94D@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding devicetree list to Cc]
 
-Hi,
+On Aug 12, 2013, at 7:05 AM, Lothar Wa?mann wrote:
 
-On Mon, Aug 05, 2013 at 09:43:00PM +0100, Maxime Ripard wrote:
-> The A31 has a mostly different clock set compared to the other older
-> SoCs currently supported in the Allwinner clock driver.
+> Hi,
 > 
-> Add support for the basic useful clocks. The other ones will come in
-> eventually.
+> Shawn Guo writes:
+>> On Thu, Aug 08, 2013 at 03:30:27PM +0200, Lothar Wa?mann wrote:
+>>> Reintroduce 'status = "disabled"' for the dcp node that was dropped by
+>>> commit 519d8b1a "Added support for Freescale's DCP co-processor".
+>> 
+>> For IP blocks that do not have pins to be routed on boards, it should be
+>> fine to have it enabled in <soc>.dtsi.
+>> 
+> That means that when a new driver is added, it will start wasting
+> resources on all board using that SoC unless the board maintainers
+> explicitly disable that driver in DTB.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt  |   6 +
->  .../bindings/clock/sunxi/sun6i-a31-gates.txt       |  83 ++++++++++++++
->  drivers/clk/sunxi/clk-sunxi.c                      | 124 +++++++++++++++++++++
->  3 files changed, 213 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index b24de10..c383d12 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -8,6 +8,7 @@ Required properties:
->  - compatible : shall be one of the following:
->         "allwinner,sun4i-osc-clk" - for a gatable oscillator
->         "allwinner,sun4i-pll1-clk" - for the main PLL clock
-> +       "allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
->         "allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
->         "allwinner,sun4i-axi-clk" - for the AXI clock
->         "allwinner,sun4i-axi-gates-clk" - for the AXI gates
-> @@ -15,6 +16,8 @@ Required properties:
->         "allwinner,sun4i-ahb-gates-clk" - for the AHB gates on A10
->         "allwinner,sun5i-a13-ahb-gates-clk" - for the AHB gates on A13
->         "allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
-> +       "allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
-> +       "allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
->         "allwinner,sun4i-apb0-clk" - for the APB0 clock
->         "allwinner,sun4i-apb0-gates-clk" - for the APB0 gates on A10
->         "allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
-> @@ -24,6 +27,9 @@ Required properties:
->         "allwinner,sun4i-apb1-gates-clk" - for the APB1 gates on A10
->         "allwinner,sun5i-a13-apb1-gates-clk" - for the APB1 gates on A13
->         "allwinner,sun5i-a10s-apb1-gates-clk" - for the APB1 gates on A10s
-> +       "allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
-> +       "allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
-> +       "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
-> 
->  Required properties for all clocks:
->  - reg : shall be the control register address for the clock.
+> I would prefer things to be the other way:
+> New drivers (no matter whether for chip-internal or external hardware)
+> should require to be explicitly enabled for those platforms on which
+> they are being used.
 
-This looks sensible, but I have a couple of questions below:
+But that enablement should be in the kernel and not the device tree.  The device tree is describing the HW, if the DCP exists and is usable w/o an external IO than by default it should be enabled in the SoC .dts
 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt b/Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
-> new file mode 100644
-> index 0000000..fe44932
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
-> @@ -0,0 +1,83 @@
-> +Gate clock outputs
-> +------------------
-> +
-> +  * AHB1 gates ("allwinner,sun6i-a31-ahb1-gates-clk")
-> +
-> +    MIPI DSI                                   1
-> +
-> +    SS                                         5
-> +    DMA                                                6
-> +
-> +    MMC0                                       8
-> +    MMC1                                       9
-> +    MMC2                                       10
-> +    MMC3                                       11
-> +
-> +    NAND1                                      12
-> +    NAND0                                      13
-> +    SDRAM                                      14
-> +
-> +    GMAC                                       17
-> +    TS                                         18
-> +    HSTIMER                                    19
-> +    SPI0                                       20
-> +    SPI1                                       21
-> +    SPI2                                       22
-> +    SPI3                                       23
-> +    USB_OTG                                    24
-> +
-> +    EHCI0                                      26
-> +    EHCI1                                      27
-> +
-> +    OHCI0                                      29
-> +    OHCI1                                      30
-> +    OHCI2                                      31
-> +    VE                                         32
-> +
-> +    LCD0                                       36
-> +    LCD1                                       37
-> +
-> +    CSI                                                40
-> +
-> +    HDMI                                       43
-> +    DE_BE0                                     44
-> +    DE_BE1                                     45
-> +    DE_FE1                                     46
-> +    DE_FE1                                     47
-> +
-> +    MP                                         50
-> +
-> +    GPU                                                52
-> +
-> +    DEU0                                       55
-> +    DEU1                                       56
-> +    DRC0                                       57
-> +    DRC1                                       58
-> +
-> +  * APB1 gates ("allwinner,sun6i-a31-apb1-gates-clk")
-> +
-> +    CODEC                                      0
-> +
-> +    DIGITAL MIC                                        4
-> +    PIO                                                5
-> +
-> +    DAUDIO0                                    12
-> +    DAUDIO1                                    13
-> +
-> +  * APB2 gates ("allwinner,sun6i-a31-apb2-gates-clk")
-> +
-> +    I2C0                                       0
-> +    I2C1                                       1
-> +    I2C2                                       2
-> +    I2C3                                       3
-> +
-> +    UART0                                      16
-> +    UART1                                      17
-> +    UART2                                      18
-> +    UART3                                      19
-> +    UART4                                      20
-> +    UART5                                      21
-> +
+- k
 
-Are those the specific names of the clock outputs, or just what they're
-wired to on the A31? I noticed the a13 gate bindings mentioned a clock
-called MALI400, which seemed awfully specific, but I don't have a
-datasheet handy.
-
-Does the binding cover all clocks (even if the driver doesn't yet
-support them)? Is there any reason we can't document those clock names
-and associated IDs in the binding now even if we can't yet drive them?
-
-Thanks,
-Mark.
+--
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
