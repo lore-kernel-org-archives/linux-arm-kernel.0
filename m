@@ -1,61 +1,73 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 12 Aug 2013 13:18:45 +0200
-Subject: [PATCH V4 0/4]  Add i2s nodes on Exynos5420 and enable sound
- support on sdmk5420
-In-Reply-To: <1376302070-1877-1-git-send-email-padma.v@samsung.com>
-References: <1376302070-1877-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1563060.2xzTKrBOxD@amdc1227>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 12 Aug 2013 11:22:36 +0530
+Subject: [PATCH v3 07/12] dma: edma: Add function to dump a PaRAM set
+ from PaRAM
+In-Reply-To: <1375719297-12871-8-git-send-email-joelf@ti.com>
+References: <1375719297-12871-1-git-send-email-joelf@ti.com>
+ <1375719297-12871-8-git-send-email-joelf@ti.com>
+Message-ID: <52087824.60002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Padmavathi,
+On Monday 05 August 2013 09:44 PM, Joel Fernandes wrote:
+> Previously, such a dump function was used but it wasn't reading
+> from the PaRAM, rather just from a edmacc_param structure, we
+> add a helpful function for debugging that directly reads from
+> the PaRAM and gives the current state correctly (including links
+> and interrupt information).
+> 
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
 
-On Monday 12 of August 2013 15:37:46 Padmavathi Venna wrote:
-> Changes since V3:
-> 	- used existent fixed-clock binding for registering oscillator clock
-> 	  as fixed rate clock as pointed by Tomasz Figa
-> 	- Made some changes in wm8994 regulator nodes as suggested by Tomasz
-> Figa - Separated out only adding i2s nodes and enabling sound support on
-> smdk5420 into different patch set as they are dependent on on some of
-> already posted but not yet merged i2c, dwmmc, dma and audss clock
-> controller patches on Kukjin for-next branch.
-> 
-> Changes since V2:
->         - Separated out driver side changes and dts changes in two
->           patch sets
->         - Added proper names for wm8994 regulators as commented by Mark
->         - Moved common i2s nodes into the exynos5.dtsi
->         - Added clock info in wm8994 node as requested by Mark.
->         - Registered the 16.9MHz oscillator clock as fixed clock in the
->           machine file. Right now no user of this clock but as Mark
-> requested to add mclk info in wm8994 node, I added this part.
-> 
-> This patch set is dependent on the following i2c, dma and audio subsystem
-> clk controller patches.
-> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/20077
-> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/20661
-> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/20668
-> 
-> This patch set is made based on Kukjin Kim for-next branch.
-> 
-> 
-> Andrew Bresticker (1):
->   ARM: dts: exynos5420: add i2s controllers
-> 
-> Padmavathi Venna (3):
->   ARM: dts: Add i2c bus 1 and it's audio codec child node on smdk5420
->   ARM: dts: Add osc clock node on smdk5420.
->   ARM: dts: Enable sound support on smdk5420
-> 
->  arch/arm/boot/dts/exynos5420-smdk5420.dts |   81
-> +++++++++++++++++++++++++++++ arch/arm/boot/dts/exynos5420.dtsi        
-> |   32 +++++++++++
->  2 files changed, 113 insertions(+), 0 deletions(-)
+You should convert existing instances of PaRAM set dump to use this new
+function along with introducing it.
 
-Except the node status misuse that I commented on in patches 1/4 and 4/4, 
-looks good to me:
+Thanks,
+Sekhar
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-
-Best regards,
-Tomasz
+> ---
+>  drivers/dma/edma.c |   31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+> 
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index 080d669..a242269 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -102,6 +102,37 @@ static void edma_desc_free(struct virt_dma_desc *vdesc)
+>  	kfree(container_of(vdesc, struct edma_desc, vdesc));
+>  }
+>  
+> +static inline void dump_pset(struct edma_chan *echan, int slot,
+> +		     struct edmacc_param *pset_unused, int pset_idx)
+> +{
+> +	struct edmacc_param pset_local, *pset;
+> +	pset = &pset_local;
+> +
+> +	edma_read_slot(slot, pset);
+> +
+> +	dev_dbg(echan->vchan.chan.device->dev,
+> +		"\n pset[%d]:\n"
+> +		"  chnum\t%d\n"
+> +		"  slot\t%d\n"
+> +		"  opt\t%08x\n"
+> +		"  src\t%08x\n"
+> +		"  dst\t%08x\n"
+> +		"  abcnt\t%08x\n"
+> +		"  ccnt\t%08x\n"
+> +		"  bidx\t%08x\n"
+> +		"  cidx\t%08x\n"
+> +		"  lkrld\t%08x\n",
+> +		pset_idx, echan->ch_num, slot,
+> +		pset[0].opt,
+> +		pset[0].src,
+> +		pset[0].dst,
+> +		pset[0].a_b_cnt,
+> +		pset[0].ccnt,
+> +		pset[0].src_dst_bidx,
+> +		pset[0].src_dst_cidx,
+> +		pset[0].link_bcntrld);
+> +}
+> +
+>  /* Dispatch a queued descriptor to the controller (caller holds lock) */
+>  static void edma_execute(struct edma_chan *echan)
+>  {
+> 
