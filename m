@@ -1,71 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 12 Aug 2013 17:23:35 -0600
-Subject: =?UTF-8?B?562U5aSNOiBbUEFUQ0ggdjMgMi8yXSBpMmM6IGlteDogQWRkIFY=?=
- =?UTF-8?B?eWJyaWQgVkY2MTAgSTJDIGNvbnRyb2xsZXIgc3VwcG9ydA==?=
-In-Reply-To: <20130812164354.GF27165@e106331-lin.cambridge.arm.com>
-References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
- <1375418648-22760-2-git-send-email-b35083@freescale.com>
- <20130810140827.GC18085@e106331-lin.cambridge.arm.com>
- <B56CDBE15CE27145A4B77D2D24263E851FE7AC@039-SN1MPN1-004.039d.mgd.msft.net>
- <20130812164354.GF27165@e106331-lin.cambridge.arm.com>
-Message-ID: <52096E77.4040003@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 13 Aug 2013 00:36:41 +0100
+Subject: [PATCH 10/18] spi: s3c64xx: Do not require legacy DMA API in
+ case of S3C64XX
+In-Reply-To: <1376243970-6489-11-git-send-email-tomasz.figa@gmail.com>
+References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
+ <1376243970-6489-11-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <20130812233641.GL6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2013 10:43 AM, Mark Rutland wrote:
-> [Adding other devicetree maintainers to Cc]
-> 
-> On Mon, Aug 12, 2013 at 01:56:07PM +0100, Lu Jingchang-B35083 wrote:
->>
->> ________________________________________
->>> ???: Mark Rutland [mark.rutland at arm.com]
->>> ????: 2013?8?10? 22:08
->>> ???: Lu Jingchang-B35083
->>> ??: wsa at the-dreams.de; Estevam Fabio-R49496; Li Xiaochun-B41219; s.hauer at pengutronix.de; linux-i2c at vger.kernel.org; Jin Zhengxiong-R64188; shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org
->>> ??: Re: [PATCH v3 2/2] i2c: imx: Add Vybrid VF610 I2C controller support
->>
->>> On Fri, Aug 02, 2013 at 05:44:08AM +0100, Jingchang Lu wrote:
->>>>   Add Freescale Vybrid VF610 I2C controller support to
->>>> imx I2C driver framework.
->>>>   Some operation is different from imx I2C controller.
->>>> The register offset, the i2c clock divider value table,
->>>> the module enabling(I2CR_IEN) which is just invert with imx,
->>>> and the interrupt flag(I2SR) clearing opcode is w1c on VF610
->>>> but w0c on imx.
+On Sun, Aug 11, 2013 at 07:59:22PM +0200, Tomasz Figa wrote:
+> With support for amba-pl08x driver, on S3C64xx the generic DMA engine
+> API can be used instead of the private s3c-dma interface.
 
->>>>  static const struct of_device_id i2c_imx_dt_ids[] = {
->>>>         { .compatible = "fsl,imx1-i2c", .data = &imx_i2c_devtype[IMX1_I2C], },
->>>>         { .compatible = "fsl,imx21-i2c", .data = &imx_i2c_devtype[IMX21_I2C], },
->>>> +       { .compatible = "fsl,vf610-i2c", .data = &imx_i2c_devtype[VF610_I2C], },
->>>
->>> That string doesn't seem to be documented anywhere (from a quick grep of
->>> Documentation/devicetree), and there's no binding update included
->>> here. It would be nice for that to be fixed :)
->>
->> [Lu Jingchang]
->> The binding string for i2c-imx driver in Documentation/devicetree/bindings/i2c/i2c-imx.txt use a wildcard format
->> of "- compatible : Should be "fsl,<chip>-i2c" " for device using this driver. Neither fsl,imx1-i2c nor fsl,imx21-i2c
->> is described in the binding document. So I just leave the vf610 i2c compatible with this. 
-> 
-> I'm not a big fan on wildcards in bindings, as it leaves people free to
-> put anything in and claim it's a documented binding, and makes it far
-> harder for an os to actually implement drivers for said binding, as
-> there's no canonical reference for the set of valid variations.
-> 
-> Obviously there is some precedent, but I'm not sure it's something we
-> want to stick with, and we can prevent it my updating the documentation
-> now.
-> 
-> Does anyone else have an opinion?
+I'm still getting issues for SPI with this:
 
-I suppose technically we should list out every exact string in the
-binding, but it's a little annoying to have to update the binding doc
-every time a new chip comes out (and I expect that'll happen more and
-more!) just to add a new compatible value since all the differences are
-known internally to the driver and don't impact the binding...
+[   50.952845] s3c64xx-spi s3c6410-spi.0: Failed to get RX DMA channel
+[   50.953520] spi_master spi0: failed to prepare transfer hardware
 
-Kumar's idea could be a reasonable compromise, although I guess it
-doesn't technically cover the case of there being 10 chips, each of
-which has *some* new/different IP block, yet some IP blocks not changing
-in every chip, and hence drivers might only directly binding to 5 of the
-10 possible compatible values in some cases...
+when I test (with -next with this series applied on top), this is from
+the first transfer that tries to DMA - there's actually no RX data.  No
+errors are reported by the DMA controller itself.  I'm also getting
+crashes setting up the audio DMA while derferencecing the channel.
+
+This is without DT - are there any hookups missing because of that?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/8a2b0c80/attachment.sig>
