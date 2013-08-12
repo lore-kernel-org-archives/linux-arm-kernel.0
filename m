@@ -1,50 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 11 Aug 2013 16:39:10 -0700
-Subject: [GIT PULL] drop unused omap defines for v3.12 merge window
-In-Reply-To: <20130807110812.GK7656@atomide.com>
-References: <20130807110812.GK7656@atomide.com>
-Message-ID: <20130811233910.GG26757@quad.lixom.net>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 12 Aug 2013 00:26:49 +0000
+Subject: [PATCH 0/2] i2c: davinci: Couple of patches to make i2c usable
+ on Keystone SOCs
+In-Reply-To: <20130811095337.GA3796@the-dreams.de>
+References: <1374712099-32095-1-git-send-email-santosh.shilimkar@ti.com>
+ <52054C7E.70108@ti.com>,<20130811095337.GA3796@the-dreams.de>
+Message-ID: <448912EABC71F84BBCADFD3C67C4BE5285C5D1@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+khilman]
+(Sorry for top posting ..)
 
-Since Kevin is stepping up and helping out with arm-soc, please restart
-sending these to arm at kernel.org. I probably don't favor that behavior
-by handling the pull requests in my inbox first though...
+No dependency so feel free to pick and merge them appropriately.
 
+Regards,
+Santosh
+________________________________________
+From: Wolfram Sang [wsa at the-dreams.de]
+Sent: Sunday, August 11, 2013 5:53 AM
+To: Shilimkar, Santosh
+Cc: Nori, Sekhar; linux-i2c at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH 0/2] i2c: davinci: Couple of patches to make i2c usable on Keystone SOCs
 
-On Wed, Aug 07, 2013 at 04:08:12AM -0700, Tony Lindgren wrote:
-> The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
-> 
->   Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.12/cleanup-unused-defines
-> 
-> for you to fetch changes up to dc46c79043a85624c78993919615abf743565ff5:
-> 
->   Merge tag 'for-v3.11-rc/omap-fixes-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.12/cleanup (2013-07-31 01:12:49 -0700)
+On Fri, Aug 09, 2013 at 04:09:34PM -0400, Santosh Shilimkar wrote:
+> Wolfram, Sekhar,
+>
+> On Wednesday 24 July 2013 08:28 PM, Santosh Shilimkar wrote:
+> > Keystone SOCs uses the same I2C IP as available on DaVinci SOCs. These
+> > couple of patches makes it possible to select the I2C_DAVINCI on
+> > Keystone SOCs.
+> >
+> > Cc: Sekhar Nori <nsekhar@ti.com>
+> > Cc: Wolfram Sang <wsa@the-dreams.de>
+> >
+> > Santosh Shilimkar (2):
+> >   i2c: davinci: remove useless mach/hardware include
+> >   i2c: davinci: Allow i2c driver available for keystone platforms
+> >
+> Who is queuing up these patches ?
 
-[...]
-
-> So, for the few, the masochistic, out there who wish to continue
-> developing TI PRCM code, I would ask that you resurrect any
-> additionally-needed macros from these commits, rather than writing
-> them manually.  Purely for the sake of a pleasant atavism, perhaps; the
-> way one appreciates a used bookstore, or a video rental store...
-
-Betamax or Video 2000?
-
-But yes, very much available as a revert or in older checkouts if needed
-in the future.
-
->  12 files changed, 10853 deletions(-)
-
-beer_credit++;
-
-Nice cleanup. Pulled.
-
-
--Olof
+I can pick them. Do they depend on something?
