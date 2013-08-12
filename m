@@ -1,53 +1,32 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 12 Aug 2013 13:57:13 +0530
-Subject: [PATCH v3 0/9] DRA7xx core support
-In-Reply-To: <20130812082431.GI7656@atomide.com>
-References: <1375633657-6835-1-git-send-email-rnayak@ti.com>
- <5208835A.6000506@ti.com> <20130812082431.GI7656@atomide.com>
-Message-ID: <52089C61.20001@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 12 Aug 2013 10:27:49 +0200
+Subject: [PATCHv3 5/9] pinctrl: sunxi: Fix inconsistent indentation
+In-Reply-To: <1375610330-18185-6-git-send-email-maxime.ripard@free-electrons.com>
+References: <1375610330-18185-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375610330-18185-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130812082749.GM2911@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 August 2013 01:54 PM, Tony Lindgren wrote:
-> * Rajendra Nayak <rnayak@ti.com> [130811 23:47]:
->> On Sunday 04 August 2013 09:57 PM, Rajendra Nayak wrote:
->>> Changes in v3:
->>> -1- Dropped some clock/dpll framework builds for dra7
->>> -2- Added all instances of IPs in dtsi file
->>> -3- dtsi does a 'disabled' by default and dts enables as needed
->>> -4- soc_is_dra7xx() based on DT compatible instead of using ID code
->>>
->>> Changes in v2:
->>> -1- Fixed minor changelog details
->>> -2- Dropped the SRAM support patch since we need to move to drivers/misc/sram.c
->>> -3- Added DTS update patches to this series which were earlier posted as
->>> part of the data series (Since they don't have much objections as against the
->>> other in-kernel data files)
->>> -4- Updated the EVM dts file with pin config details for uart/mcspi and i2c
->>>
->>> DRA7xx based SoCs' are high-performance, infotainment application devices,
->>> based on enhanced OMAP architecture integrated on a 28nm
->>> technology.
->>>
->>> The DRA7xx family is composed of DRA75x and DRA74x devices.
->>> The current device for which the patches add support is the
->>> DRA752 SoC.
->>>
->>> Most of the core IPs are similar to those found on the OMAP5
->>> devices, including the dual cortex-A15 based MPU subsystem,
->>> which has helped quite some reuse from existing OMAP5 support.
->>>
->>> This series contains only core support patches and none of
->>> the PRCM and hwmod data needed for the device to boot.
->>
->> Tony, any chance of this series making it to 3.12?
-> 
-> Looks OK to me, want to do a pull request against -rc5 for me?
+Hi Linus,
 
-Sure, will do. Thanks.
+On Sun, Aug 04, 2013 at 11:58:46AM +0200, Maxime Ripard wrote:
+> Some pin functions in the array were not indented like the other
+> functions in this array. Fix this.
 
-> 
-> Regards,
-> 
-> Tony
-> 
+Could you please take this trivial patch for 3.12?
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130812/c28f231d/attachment.sig>
