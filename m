@@ -1,79 +1,90 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Aug 2013 08:38:06 +0200
-Subject: [RFC PATCH 1/3] of: provide a binding for the 'fixed-link'
- property
-In-Reply-To: <1373902450-11857-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1373902450-11857-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1373902450-11857-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130812063806.GD2324@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 12 Aug 2013 12:10:26 +0530
+Subject: [PATCH v3 0/9] DRA7xx core support
+In-Reply-To: <1375633657-6835-1-git-send-email-rnayak@ti.com>
+References: <1375633657-6835-1-git-send-email-rnayak@ti.com>
+Message-ID: <5208835A.6000506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 15, 2013 at 05:34:08PM +0200, Thomas Petazzoni wrote:
-> Some Ethernet MACs have a "fixed link", and are not connected to a
-> normal MDIO-managed PHY device. For those situations, a Device Tree
-> binding allows to describe a "fixed link", as a "fixed-link" property
-> of the Ethernet device Device Tree node.
+On Sunday 04 August 2013 09:57 PM, Rajendra Nayak wrote:
+> Changes in v3:
+> -1- Dropped some clock/dpll framework builds for dra7
+> -2- Added all instances of IPs in dtsi file
+> -3- dtsi does a 'disabled' by default and dts enables as needed
+> -4- soc_is_dra7xx() based on DT compatible instead of using ID code
 > 
-> This patch adds:
+> Changes in v2:
+> -1- Fixed minor changelog details
+> -2- Dropped the SRAM support patch since we need to move to drivers/misc/sram.c
+> -3- Added DTS update patches to this series which were earlier posted as
+> part of the data series (Since they don't have much objections as against the
+> other in-kernel data files)
+> -4- Updated the EVM dts file with pin config details for uart/mcspi and i2c
 > 
->  * A documentation for the Device Tree property "fixed-link".
+> DRA7xx based SoCs' are high-performance, infotainment application devices,
+> based on enhanced OMAP architecture integrated on a 28nm
+> technology.
 > 
->  * A of_phy_register_fixed_link() OF helper, which provided an OF node
->    that contains a "fixed-link" property, registers the corresponding
->    fixed PHY.
+> The DRA7xx family is composed of DRA75x and DRA74x devices.
+> The current device for which the patches add support is the
+> DRA752 SoC.
 > 
->  * Removes the warning on the of_phy_connect_fixed_link() that says
->    new drivers should not use it, since Grant Likely indicated that
->    this "fixed-link" property is indeed the way to go.
+> Most of the core IPs are similar to those found on the OMAP5
+> devices, including the dual cortex-A15 based MPU subsystem,
+> which has helped quite some reuse from existing OMAP5 support.
 > 
+> This series contains only core support patches and none of
+> the PRCM and hwmod data needed for the device to boot.
 
-Any progress with this series?
+Tony, any chance of this series making it to 3.12?
 
-We have more and more boards here with exactly the same problem as
-Thomas has. For reasons stated below I don't like this binding, but
-still it would solve my problem.
+regards,
+Rajendra
 
-
-> +Fixed link Device Tree binding
-> +------------------------------
-> +
-> +Some Ethernet MACs have a "fixed link", and are not connected to a
-> +normal MDIO-managed PHY device. For those situations, a Device Tree
-> +binding allows to describe a "fixed link".
-> +
-> +Such a fixed link situation is described within an Ethernet device
-> +Device Tree node using a 'fixed-link' property, composed of 5
-> +elements:
-> +
-> + 1. A fake PHY ID, which must be unique accross all fixed-link PHYs in
-> +    the system.
-> + 2. The duplex (1 for full-duplex, 0 for half-duplex)
-> + 3. The speed (10, 100, 1000)
-> + 4. The pause setting (1 for enabled, 0 for disabled)
-> + 5. The asym pause setting (1 for enabled, 0 for disabled)
-> +
-> +Example:
-> +
-> +ethernet at 0 {
-> +	...
-> +	fixed-link = <1 1 1000 0 0>;
-> +	...
-> +};
-
-I must say I don't like this binding at all for two reasons.
-
-First the positional arguments make it impossible to add optional
-arguments to the link.
-
-Second the other side of the link is most likely a switch. Once this
-switch has its own node in the devicetree it seems like having a phandle
-to the switch here would be better.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> The bootloader support for the platform is already available
+> in mainline u-boot.
+> 
+> The patches posted in this series are available at:
+> git://github.com/rrnayak/linux.git for-3.12/dra-core-v3
+> 
+> The patches (including the ones for in-kernel data) which boot
+> on dra7xx evm are available at:
+> t://github.com/rrnayak/linux.git out-of-tree/dra-integrated-v3
+> 
+> R Sricharan (8):
+>   ARM: DRA7: Reuse all of PRCM and MPUSS SMP infra
+>   ARM: DRA7: Reuse io tables and add a new .init_early
+>   ARM: DRA7: Resue the clocksource, clockevent support
+>   ARM: DRA7: board-generic: Add basic DT support
+>   ARM: DRA7: Kconfig: Make ARCH_NR_GPIO default to 512
+>   ARM: DRA7: dts: Add the dts files for dra7 SoC and dra7-evm board
+>   ARM: DRA7: id: Add cpu detection support for DRA7xx based SoCs'
+>   ARM: DRA7: Add the build support in omap2plus
+> 
+> Rajendra Nayak (1):
+>   ARM: DRA7: hwmod: Reuse the soc_ops used for OMAP4/5
+> 
+>  .../devicetree/bindings/arm/omap/omap.txt          |    3 +
+>  arch/arm/Kconfig                                   |    2 +-
+>  arch/arm/boot/dts/Makefile                         |    3 +-
+>  arch/arm/boot/dts/dra7-evm.dts                     |  140 +++++
+>  arch/arm/boot/dts/dra7.dtsi                        |  567 ++++++++++++++++++++
+>  arch/arm/configs/omap2plus_defconfig               |    1 +
+>  arch/arm/mach-omap1/include/mach/soc.h             |    1 +
+>  arch/arm/mach-omap2/Kconfig                        |   12 +-
+>  arch/arm/mach-omap2/Makefile                       |    6 +
+>  arch/arm/mach-omap2/board-generic.c                |   18 +
+>  arch/arm/mach-omap2/common.h                       |    1 +
+>  arch/arm/mach-omap2/id.c                           |    4 +-
+>  arch/arm/mach-omap2/io.c                           |   20 +-
+>  arch/arm/mach-omap2/omap54xx.h                     |    4 +
+>  arch/arm/mach-omap2/omap_hwmod.c                   |    2 +-
+>  arch/arm/mach-omap2/soc.h                          |   17 +
+>  arch/arm/mach-omap2/timer.c                        |    3 +-
+>  arch/arm/plat-omap/Kconfig                         |    2 +-
+>  18 files changed, 795 insertions(+), 11 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/dra7-evm.dts
+>  create mode 100644 arch/arm/boot/dts/dra7.dtsi
+> 
