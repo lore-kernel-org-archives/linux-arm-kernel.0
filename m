@@ -1,164 +1,40 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 12 Aug 2013 09:22:50 +0800
-Subject: [PATCH v15 04/13] usb: chipidea: otg: Add otg file used to access
- otgsc
+Date: Mon, 12 Aug 2013 09:22:49 +0800
+Subject: [PATCH v15 03/13] usb: chipidea: udc: otg_set_peripheral is useless
+ for some chipidea users
 In-Reply-To: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
 References: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1376270579-13493-5-git-send-email-peter.chen@freescale.com>
+Message-ID: <1376270579-13493-4-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This file is mainly used to access otgsc currently, it may
-add otg related things in the future.
+It is useless at below cases:
+- If we implement both usb host and device at chipidea driver.
+- If we don't need phy->otg.
 
 Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/Makefile |    2 +-
- drivers/usb/chipidea/bits.h   |   10 ++++++++++
- drivers/usb/chipidea/core.c   |    3 ++-
- drivers/usb/chipidea/otg.c    |   35 +++++++++++++++++++++++++++++++++++
- drivers/usb/chipidea/otg.h    |   32 ++++++++++++++++++++++++++++++++
- 5 files changed, 80 insertions(+), 2 deletions(-)
+ drivers/usb/chipidea/udc.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-index 6cf5f68..a99d980 100644
---- a/drivers/usb/chipidea/Makefile
-+++ b/drivers/usb/chipidea/Makefile
-@@ -2,7 +2,7 @@ ccflags-$(CONFIG_USB_CHIPIDEA_DEBUG) := -DDEBUG
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index e475fcd..116c762 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -1805,7 +1805,12 @@ static int udc_start(struct ci_hdrc *ci)
+ 	if (ci->transceiver) {
+ 		retval = otg_set_peripheral(ci->transceiver->otg,
+ 						&ci->gadget);
+-		if (retval)
++		/*
++		 * If we implement all USB functions using chipidea drivers,
++		 * it doesn't need to call above API, meanwhile, if we only
++		 * use gadget function, calling above API is useless.
++		 */
++		if (retval && retval != -ENOTSUPP)
+ 			goto put_transceiver;
+ 	}
  
- obj-$(CONFIG_USB_CHIPIDEA)		+= ci_hdrc.o
- 
--ci_hdrc-y				:= core.o
-+ci_hdrc-y				:= core.o otg.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
-diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-index aefa026..dd0cf9e 100644
---- a/drivers/usb/chipidea/bits.h
-+++ b/drivers/usb/chipidea/bits.h
-@@ -79,11 +79,21 @@
- #define OTGSC_ASVIS	      BIT(18)
- #define OTGSC_BSVIS	      BIT(19)
- #define OTGSC_BSEIS	      BIT(20)
-+#define OTGSC_1MSIS	      BIT(21)
-+#define OTGSC_DPIS	      BIT(22)
- #define OTGSC_IDIE	      BIT(24)
- #define OTGSC_AVVIE	      BIT(25)
- #define OTGSC_ASVIE	      BIT(26)
- #define OTGSC_BSVIE	      BIT(27)
- #define OTGSC_BSEIE	      BIT(28)
-+#define OTGSC_1MSIE	      BIT(29)
-+#define OTGSC_DPIE	      BIT(30)
-+#define OTGSC_INT_EN_BITS	(OTGSC_IDIE | OTGSC_AVVIE | OTGSC_ASVIE \
-+				| OTGSC_BSVIE | OTGSC_BSEIE | OTGSC_1MSIE \
-+				| OTGSC_DPIE)
-+#define OTGSC_INT_STATUS_BITS	(OTGSC_IDIS | OTGSC_AVVIS | OTGSC_ASVIS	\
-+				| OTGSC_BSVIS | OTGSC_BSEIS | OTGSC_1MSIS \
-+				| OTGSC_DPIS)
- 
- /* USBMODE */
- #define USBMODE_CM            (0x03UL <<  0)
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 26f6599..a4be8a5 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -72,6 +72,7 @@
- #include "bits.h"
- #include "host.h"
- #include "debug.h"
-+#include "otg.h"
- 
- /* Controller register map */
- static uintptr_t ci_regs_nolpm[] = {
-@@ -530,7 +531,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		goto stop;
- 
- 	if (ci->is_otg)
--		hw_write(ci, OP_OTGSC, OTGSC_IDIE, OTGSC_IDIE);
-+		ci_hdrc_otg_init(ci);
- 
- 	ret = dbg_create_files(ci);
- 	if (!ret)
-diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-new file mode 100644
-index 0000000..999a085
---- /dev/null
-+++ b/drivers/usb/chipidea/otg.c
-@@ -0,0 +1,35 @@
-+/*
-+ * otg.c - ChipIdea USB IP core OTG driver
-+ *
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Peter Chen
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * This file mainly handles otgsc register, it may include OTG operation
-+ * in the future.
-+ */
-+
-+#include <linux/usb/otg.h>
-+#include <linux/usb/gadget.h>
-+#include <linux/usb/chipidea.h>
-+
-+#include "ci.h"
-+#include "bits.h"
-+#include "otg.h"
-+
-+/**
-+ * ci_hdrc_otg_init - initialize otgsc bits
-+ * ci: the controller
-+ */
-+int ci_hdrc_otg_init(struct ci_hdrc *ci)
-+{
-+	ci_enable_otg_interrupt(ci, OTGSC_IDIE);
-+
-+	return 0;
-+}
-diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
-new file mode 100644
-index 0000000..376eaee
---- /dev/null
-+++ b/drivers/usb/chipidea/otg.h
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Peter Chen
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __DRIVERS_USB_CHIPIDEA_OTG_H
-+#define __DRIVERS_USB_CHIPIDEA_OTG_H
-+
-+static inline void ci_clear_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-+{
-+	/* Only clear request bits */
-+	hw_write(ci, OP_OTGSC, OTGSC_INT_STATUS_BITS, bits);
-+}
-+
-+static inline void ci_enable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-+{
-+	hw_write(ci, OP_OTGSC, bits, bits);
-+}
-+
-+static inline void ci_disable_otg_interrupt(struct ci_hdrc *ci, u32 bits)
-+{
-+	hw_write(ci, OP_OTGSC, bits, 0);
-+}
-+
-+int ci_hdrc_otg_init(struct ci_hdrc *ci);
-+
-+#endif /* __DRIVERS_USB_CHIPIDEA_OTG_H */
 -- 
 1.7.1
