@@ -1,39 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 13 Aug 2013 00:46:03 +0100
-Subject: [PATCH V4 1/4] ASoC: Samsung: I2S: Add quirks as driver data in
- I2S
-In-Reply-To: <52096D4A.5070903@wwwdotorg.org>
-References: <1376300994-1679-1-git-send-email-padma.v@samsung.com>
- <1376300994-1679-2-git-send-email-padma.v@samsung.com>
- <52096871.4030703@wwwdotorg.org>
- <20130812231327.GK6427@sirena.org.uk>
- <52096D4A.5070903@wwwdotorg.org>
-Message-ID: <20130812234603.GM6427@sirena.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 13 Aug 2013 01:49:53 +0200
+Subject: [PATCH 10/18] spi: s3c64xx: Do not require legacy DMA API in case
+ of S3C64XX
+In-Reply-To: <20130812233641.GL6427@sirena.org.uk>
+References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
+ <1376243970-6489-11-git-send-email-tomasz.figa@gmail.com>
+ <20130812233641.GL6427@sirena.org.uk>
+Message-ID: <2472314.6b8DcBdcjO@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 05:18:34PM -0600, Stephen Warren wrote:
-> On 08/12/2013 05:13 PM, Mark Brown wrote:
+On Tuesday 13 of August 2013 00:36:41 Mark Brown wrote:
+> On Sun, Aug 11, 2013 at 07:59:22PM +0200, Tomasz Figa wrote:
+> > With support for amba-pl08x driver, on S3C64xx the generic DMA engine
+> > API can be used instead of the private s3c-dma interface.
+> 
+> I'm still getting issues for SPI with this:
+> 
+> [   50.952845] s3c64xx-spi s3c6410-spi.0: Failed to get RX DMA channel
+> [   50.953520] spi_master spi0: failed to prepare transfer hardware
+> 
+> when I test (with -next with this series applied on top), this is from
+> the first transfer that tries to DMA - there's actually no RX data.  No
+> errors are reported by the DMA controller itself.  I'm also getting
+> crashes setting up the audio DMA while derferencecing the channel.
+> 
+> This is without DT - are there any hookups missing because of that?
 
-> >> (although I dare say that at least samsung,supports-rstclr should
-> >> be modified to use the new reset controller bindings)
+Hmm, strange.
 
-> > Really?  That doesn't seem terribly sane - I had thought that was
-> > for bodging resets on the side of things that don't normally have
-> > them or need board specific logic.  Also note that this is actually
-> > a magic register write done to reset the IP on some specific IPs.
+I've been testing this without any significant patches, like PWM, CCF or 
+DT support, just everything from the branch I pointed to and some board-
+specific patches to help in debugging.
 
-> I believe that's exactly what the reset subsystem and associated DT
-> bindings were designed for.
+Anyway, this is the exact branch I've been using:
 
-That seems...  interesting.  It seems like this is fairly core device
-functionality I'd expect the driver to just be able to understand;  the
-main thing this property was doing was deciding if the reset was needed.
-I'm not sure I see the benefit here?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/90b207b2/attachment.sig>
+git://github.com/tom3q/linux.git v3.12-pl080-devel
+
+Best regards,
+Tomasz
