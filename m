@@ -1,20 +1,31 @@
-From: arm-kernel@ml.breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Mon, 12 Aug 2013 21:52:55 +0200
-Subject: [patch 1/2] arm: Mark pmu interupt IRQF_NO_THREAD
-In-Reply-To: <20130215095153.GA11145@mudshark.cambridge.arm.com>
-References: <20130214205204.109023136@linutronix.de>
- <20130214205304.923585891@linutronix.de>
- <20130215095153.GA11145@mudshark.cambridge.arm.com>
-Message-ID: <20130812195255.GA4181@breakpoint.cc>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 12 Aug 2013 21:58:30 +0200
+Subject: [PATCH 9/16] arch/arm/mach-pxa/mioa701.c: Avoid using
+ ARRAY_AND_SIZE(e) as a function argument
+In-Reply-To: <1376239917-15594-10-git-send-email-Julia.Lawall@lip6.fr> (Julia
+ Lawall's message of "Sun, 11 Aug 2013 18:51:50 +0200")
+References: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1376239917-15594-10-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <87r4dyy93t.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 09:51:53AM +0000, Will Deacon wrote:
-> Yup, we certainly don't want these to be threaded! Cheers, I'll add this to
-> my perf queue.
+Julia Lawall <Julia.Lawall@lip6.fr> writes:
 
-I don't see this in v3.10. Is there a problem with this patch?
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
+>
+> Replace ARRAY_AND_SIZE(e) in function argument position to avoid hiding the
+> arity of the called function.
 
-> Will
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Sebastian
+As a side I'm curious why this change didn't touch also :
+sound/soc/pxa/mioa701_wm9713.c
+
+If it does, this ack stands as well for the other file (with removal of the
+#define in mioa701_wm9713.c).
+
+Cheers.
+
+--
+Robert
