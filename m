@@ -1,65 +1,38 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Mon, 12 Aug 2013 15:19:54 +0530
-Subject: [PATCH V4 4/4] ARM: dts: Change i2s compatible string on exynos5250
-In-Reply-To: <1376300994-1679-1-git-send-email-padma.v@samsung.com>
-References: <1376300994-1679-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1376300994-1679-5-git-send-email-padma.v@samsung.com>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Mon, 12 Aug 2013 15:29:45 +0530
+Subject: Kexec: BE kernel on ARM VE TC2
+In-Reply-To: <20130808215034.GE19383@mudshark.cambridge.arm.com>
+References: <CALicx6ueLxCFCeun1grdtcC21HSkCDfenLWOSfuoSJnhx9GZ6w@mail.gmail.com>
+ <20130808215034.GE19383@mudshark.cambridge.arm.com>
+Message-ID: <CALicx6sjPOBRVVOQGOt4CgRCPg+4eOhwmrGC=ZjpZg+LGSvDrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes quirks from i2s node and change the i2s
-compatible names.
+On Fri, Aug 9, 2013 at 3:20 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Aug 05, 2013 at 01:12:17PM +0100, Vijay Kilari wrote:
+>> Hi Will,
+>>
+>> I am trying to make kexec work on BE kernel on ARM VE TC2.
+>>
+>> First, to make KEXEC work with SMP on ARM VE TC2 board,
+>> I set nr_cpus=2 (i.e boot only A15's) this works with LE kernel.
+>
+> Interesting, is this with a mainline kernel? I don't see how SMP kexec can
+> work on TC2 without additional patches to park the secondary cores safely.
+>
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- arch/arm/boot/dts/exynos5.dtsi    |    4 ++--
- arch/arm/boot/dts/exynos5250.dtsi |    5 +----
- 2 files changed, 3 insertions(+), 6 deletions(-)
+Yes, it is our internal kernel based on 3.10.3. I have not made any changes
+related to this. I found that booting only 2 CPU's works
+and I continue to check Kdump and other features on top of this.
 
-diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-index aae2fa1..309894e 100644
---- a/arch/arm/boot/dts/exynos5.dtsi
-+++ b/arch/arm/boot/dts/exynos5.dtsi
-@@ -115,7 +115,7 @@
- 	};
- 
- 	i2s1: i2s at 12D60000 {
--		compatible = "samsung,i2s-v5";
-+		compatible = "samsung,s3c6410-i2s";
- 		reg = <0x12D60000 0x100>;
- 		dmas = <&pdma1 12
- 			&pdma1 11>;
-@@ -123,7 +123,7 @@
- 	};
- 
- 	i2s2: i2s at 12D70000 {
--		compatible = "samsung,i2s-v5";
-+		compatible = "samsung,s3c6410-i2s";
- 		reg = <0x12D70000 0x100>;
- 		dmas = <&pdma0 12
- 			&pdma0 11>;
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index f941d52..ac5f5a1 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -405,7 +405,7 @@
- 	};
- 
- 	i2s0: i2s at 03830000 {
--		compatible = "samsung,i2s-v5";
-+		compatible = "samsung,s5pv210-i2s";
- 		dmas = <&pdma0 10
- 			&pdma0 9
- 			&pdma0 8>;
-@@ -414,9 +414,6 @@
- 			<&clock_audss EXYNOS_I2S_BUS>,
- 			<&clock_audss EXYNOS_SCLK_I2S>;
- 		clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
--		samsung,supports-6ch;
--		samsung,supports-rstclr;
--		samsung,supports-secdai;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2s0_bus>;
- 	};
--- 
-1.7.4.4
+However with Big Endian, I see that Kexec is not stable. I suspect
+that UART is the issue. because playing around with some printk and delays
+make it work. Any help? I plan to reset pl011 before kexec softreset.
+But could not find any register to reset complete pl011 uart.
+I will try to reset/clear IMSC, ICR and CR registers of pl011 and check.
+
+Note: On Kexec with CONFIG_KEXEC_JUMP disabled, the softreboot happens
+without resetting/shutdown of any devices
+
+
+> Will
