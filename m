@@ -1,70 +1,71 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 12 Aug 2013 15:16:52 +0200
-Subject: [PATCH v2 0/3] ARM/ARM64 architected timer updates
-In-Reply-To: <5200BB7D.3020501@arm.com>
-References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <51FB7CB8.6080103@arm.com> <51FB8081.6040501@linaro.org>
- <51FB81FB.3060709@arm.com> <51FBA21D.5010308@linaro.org>
- <51FFD1DF.9000907@arm.com> <5200AF41.7090405@linaro.org>
- <5200BB7D.3020501@arm.com>
-Message-ID: <5208E044.7020306@linaro.org>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Mon, 12 Aug 2013 14:27:47 +0100
+Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
+Message-ID: <5208E2D3.7060005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/2013 11:01 AM, Sudeep KarkadaNagesha wrote:
-> On 06/08/13 09:09, Daniel Lezcano wrote:
->> On 08/05/2013 06:25 PM, Sudeep KarkadaNagesha wrote:
->>> Hi Daniel,
->>>
->>> On 02/08/13 13:12, Daniel Lezcano wrote:
->>>> On 08/02/2013 11:55 AM, Sudeep KarkadaNagesha wrote:
->>>>> On 02/08/13 10:48, Daniel Lezcano wrote:
->>>>>> On 08/02/2013 11:32 AM, Sudeep KarkadaNagesha wrote:
->>>>>>> Hi Daniel,
->>>>>>>
->>>>>>> On 22/07/13 12:21, Sudeep KarkadaNagesha wrote:
->>>>>>>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>>>>>>>
->>>>>>>> This patch series adds support to configure the rate and enable the event
->>>>>>>> stream for architected timer. Since the timer control register is reset to
->>>>>>>> zero on warm boot, CPU PM notifier is added to re-initialse it.
->>>>>>>>
->>>>>>> This series is required to support TC2 cpuidle.
->>>>>>> It will be good if you can review and get this in for v3.12
->>>>>>
->>>>>> So do you want me to take the series through my tree ?
->>>>>>
->>>>> Yes I believe it has to go through your(ARM specific clocksource?) tree,
->>>>> but currently there's a conflict with another bug fix(that should come
->>>>> from rmk as -rc fix)
->>>>> (Commit ab8d46c0 "ARM: 7788/1: elf: fix lpae hwcap feature reporting in
->>>>> proc/cpuinfo" in rmk -fixes)
->>>>
->>>> IMO, you should rebase this patch on top of tips/core, I will apply the
->>>> series and when the rmk fix hits this branch (through tips/urgent), that
->>>> will be up to the maintainer to resolve this conflict.
->>>>
->>>
->>> The fix with which this series was conflicting is already in v3.11-rc4
->>> So can I send pull request based on v3.11-rc4 or if you prefer any
->>> particular tree, can you provide details please ?
->>
->> Ok, I will ping Thomas to update the tips/core branch to 3.11-rc4.
->>
-> Thanks Daniel, will send pull request once it's updated.
+The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
 
-Sudeep,
+  Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
 
-please send the PR, I will deal with it and send Thomas the PR later.
+are available in the git repository at:
 
-Thanks
-  -- Daniel
+  git://linux-arm.org/linux-skn.git cpu_of_node
+
+for you to fetch changes up to 9e9e26dde91f22635c87d0e45f3938b5ded96f0d:
+
+  cpufreq: pmac32-cpufreq: remove device tree parsing for cpu nodes
+(2013-08-12 10:22:29 +0100)
+
+----------------------------------------------------------------
+Sudeep KarkadaNagesha (16):
+  of: add support for retrieving cpu node for a given logical cpu index
+  ARM: DT/kernel: define ARM specific arch_match_cpu_phys_id
+  driver/core: cpu: initialize of_node in cpu's device struture
+  of/device: add helper to get cpu device node from logical cpu index
+  ARM: topology: remove hwid/MPIDR dependency from cpu_capacity
+  ARM: mvebu: remove device tree parsing for cpu nodes
+  drivers/bus: arm-cci: avoid parsing DT for cpu device nodes
+  cpufreq: imx6q-cpufreq: remove device tree parsing for cpu nodes
+  cpufreq: cpufreq-cpu0: remove device tree parsing for cpu nodes
+  cpufreq: highbank-cpufreq: remove device tree parsing for cpu nodes
+  cpufreq: spear-cpufreq: remove device tree parsing for cpu nodes
+  cpufreq: kirkwood-cpufreq: remove device tree parsing for cpu nodes
+  cpufreq: arm_big_little: remove device tree parsing for cpu nodes
+  cpufreq: maple-cpufreq: remove device tree parsing for cpu nodes
+  cpufreq: pmac64-cpufreq: remove device tree parsing for cpu nodes
+  cpufreq: pmac32-cpufreq: remove device tree parsing for cpu nodes
+
+ arch/arm/kernel/devtree.c           |  5 +++++
+ arch/arm/kernel/topology.c          | 61
++++++++++++++++++++------------------------------------------
+ arch/arm/mach-imx/mach-imx6q.c      |  3 +--
+ arch/arm/mach-mvebu/platsmp.c       | 52
+++++++++++++++++++++++++----------------------------
+ drivers/base/cpu.c                  |  2 ++
+ drivers/bus/arm-cci.c               | 28 +++++++---------------------
+ drivers/cpufreq/arm_big_little_dt.c | 40
+++++++++++++++--------------------------
+ drivers/cpufreq/cpufreq-cpu0.c      | 23 ++++-------------------
+ drivers/cpufreq/highbank-cpufreq.c  | 18 ++++++------------
+ drivers/cpufreq/imx6q-cpufreq.c     |  4 +---
+ drivers/cpufreq/kirkwood-cpufreq.c  |  8 +++++---
+ drivers/cpufreq/maple-cpufreq.c     | 23 +++--------------------
+ drivers/cpufreq/pmac32-cpufreq.c    |  5 +++--
+ drivers/cpufreq/pmac64-cpufreq.c    | 47
++++++++++++------------------------------------
+ drivers/cpufreq/spear-cpufreq.c     |  4 ++--
+ drivers/of/base.c                   | 73
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/cpu.h                 |  1 +
+ include/linux/of.h                  |  6 ++++++
+ include/linux/of_device.h           | 15 +++++++++++++++
+ 19 files changed, 202 insertions(+), 216 deletions(-)
 
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+PS: This patch series is reviewed and acknowledged @
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+v1: https://lkml.org/lkml/2013/7/15/128
+v2: https://lkml.org/lkml/2013/7/17/341
+v3: https://lkml.org/lkml/2013/7/22/219
