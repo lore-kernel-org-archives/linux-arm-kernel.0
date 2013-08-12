@@ -1,31 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Aug 2013 12:45:20 +0100
-Subject: [PATCH 0/4] iommu: arm smmu: driver updates for 3.12
-In-Reply-To: <1375294888-10826-1-git-send-email-will.deacon@arm.com>
-References: <1375294888-10826-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20130812114520.GB25995@mudshark.cambridge.arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 12 Aug 2013 08:55:52 -0300
+Subject: [PATCH 1/2] ARM: imx: Remove CONFIG_USB_PHY selection from defconfig
+Message-ID: <1376308553-2824-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Wed, Jul 31, 2013 at 07:21:24PM +0100, Will Deacon wrote:
-> Here's a set of small drivers updates to the ARM SMMU driver that went
-> in during the merge window. The main changes are:
-> 
->  - Removal of a broken big-endian special case when setting the pgd
->  - Better error reporting when running with a single, combined IRQ line
->  - Removing the dynamic use of VMIDs for stage-1 mappings. This is basically
->    to make life easier for hypervisors, who apparently have a hard life
->    if guest OSs allocate their own VMIDs
->  - Simplification of the VMID/ASID allocation scheme based on the fact
->    that we're just trying to assign one ID per context-bank.
-> 
-> I've tested these patches with an AArch32 MMU-500 model and not seen any
-> problems running stage-1 DMA transactions through the SMMU.
+Since commit 052a11d1 (usb: phy: make PHY driver selection possible by 
+controller drivers), CONFIG_USB_PHY is selected via drivers/usb/phy/Kconfig, so
+there is no need to select it via defconfig anymore.
 
-Could you queue these for 3.12 please?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 -
+ arch/arm/configs/mxs_defconfig       | 1 -
+ 2 files changed, 2 deletions(-)
 
-Thanks,
-
-Will
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 577f054..c2c024f 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -194,7 +194,6 @@ CONFIG_USB_EHCI_MXC=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+-CONFIG_USB_PHY=y
+ CONFIG_NOP_USB_XCEIV=y
+ CONFIG_USB_MXS_PHY=y
+ CONFIG_MMC=y
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index 4555c02..a9fb093 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -116,7 +116,6 @@ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+-CONFIG_USB_PHY=y
+ CONFIG_USB_MXS_PHY=y
+ CONFIG_MMC=y
+ CONFIG_MMC_UNSAFE_RESUME=y
+-- 
+1.8.1.2
