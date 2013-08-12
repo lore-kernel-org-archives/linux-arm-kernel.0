@@ -1,61 +1,58 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 12 Aug 2013 17:40:02 +0800
-Subject: [PATCH V3 3/8] clk: tegra114: add LP1 suspend/resume support
+Date: Mon, 12 Aug 2013 17:40:01 +0800
+Subject: [PATCH V3 2/8] ARM: tegra: config the polarity of the request of sys
+ clock
 In-Reply-To: <1376300407-14750-1-git-send-email-josephl@nvidia.com>
 References: <1376300407-14750-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1376300407-14750-4-git-send-email-josephl@nvidia.com>
+Message-ID: <1376300407-14750-3-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the system suspends to LP1, the CPU clock source is switched to
-CLK_M (12MHz Oscillator) during suspend/resume flow. The CPU clock
-source is controlled by the CCLKG_BURST_POLICY register, and hence this
-register must be restored during LP1 resume.
+When suspending to LP1 mode, the SYSCLK will be clock gated. And different
+board may have different polarity of the request of SYSCLK, this patch
+configure the polarity from the DT for the board.
 
-Cc: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V3:
-* move the CCLKG burst policy resume code to tegra_cpu_car_ops
+* no change
 V2:
-* update the commit message
+* s/inverts/polarity/
 ---
- drivers/clk/tegra/clk-tegra114.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-tegra/pmc.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-index f74ed19..806d803 100644
---- a/drivers/clk/tegra/clk-tegra114.c
-+++ b/drivers/clk/tegra/clk-tegra114.c
-@@ -293,6 +293,8 @@
- #ifdef CONFIG_PM_SLEEP
- static struct cpu_clk_suspend_context {
- 	u32 clk_csite_src;
-+	u32 cclkg_burst;
-+	u32 cclkg_divider;
- } tegra114_cpu_clk_sctx;
- #endif
+diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+index 8345fcd..03e6405 100644
+--- a/arch/arm/mach-tegra/pmc.c
++++ b/arch/arm/mach-tegra/pmc.c
+@@ -27,6 +27,8 @@
+ #include "pmc.h"
+ #include "sleep.h"
  
-@@ -2155,12 +2157,22 @@ static void tegra114_cpu_clock_suspend(void)
- 	tegra114_cpu_clk_sctx.clk_csite_src =
- 				readl(clk_base + CLK_SOURCE_CSITE);
- 	writel(3 << 30, clk_base + CLK_SOURCE_CSITE);
++#define TEGRA_POWER_SYSCLK_POLARITY	(1 << 10)  /* sys clk polarity */
++#define TEGRA_POWER_SYSCLK_OE		(1 << 11)  /* system clock enable */
+ #define TEGRA_POWER_EFFECT_LP0		(1 << 14)  /* LP0 when CPU pwr gated */
+ #define TEGRA_POWER_CPU_PWRREQ_POLARITY	(1 << 15)  /* CPU pwr req polarity */
+ #define TEGRA_POWER_CPU_PWRREQ_OE	(1 << 16)  /* CPU pwr req enable */
+@@ -238,6 +240,20 @@ void tegra_pmc_suspend_init(void)
+ 	reg = tegra_pmc_readl(PMC_CTRL);
+ 	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
+ 	tegra_pmc_writel(reg, PMC_CTRL);
 +
-+	tegra114_cpu_clk_sctx.cclkg_burst =
-+				readl(clk_base + CCLKG_BURST_POLICY);
-+	tegra114_cpu_clk_sctx.cclkg_divider =
-+				readl(clk_base + CCLKG_BURST_POLICY + 4);
- }
- 
- static void tegra114_cpu_clock_resume(void)
- {
- 	writel(tegra114_cpu_clk_sctx.clk_csite_src,
- 					clk_base + CLK_SOURCE_CSITE);
++	reg = tegra_pmc_readl(PMC_CTRL);
 +
-+	writel(tegra114_cpu_clk_sctx.cclkg_burst,
-+					clk_base + CCLKG_BURST_POLICY);
-+	writel(tegra114_cpu_clk_sctx.cclkg_divider,
-+					clk_base + CCLKG_BURST_POLICY + 4);
++	if (!pmc_pm_data.sysclkreq_high)
++		reg |= TEGRA_POWER_SYSCLK_POLARITY;
++	else
++		reg &= ~TEGRA_POWER_SYSCLK_POLARITY;
++
++	/* configure the output polarity while the request is tristated */
++	tegra_pmc_writel(reg, PMC_CTRL);
++
++	/* now enable the request */
++	reg |= TEGRA_POWER_SYSCLK_OE;
++	tegra_pmc_writel(reg, PMC_CTRL);
  }
  #endif
  
