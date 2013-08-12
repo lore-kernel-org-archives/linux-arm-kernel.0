@@ -1,146 +1,95 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 12 Aug 2013 10:00:04 -0600
-Subject: [PATCH V4] ARM: tegra: disable LP2 cpuidle state if PCIe is enabled
-Message-ID: <1376323204-25952-1-git-send-email-swarren@wwwdotorg.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 12 Aug 2013 09:03:15 -0700
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <20130809172757.GD14845@codeaurora.org>
+References: <15e19315-ce88-4d3c-bad9-0a37d9e52f6b@CO1EHSMHS007.ehs.local>
+ <51F99747.4060901@linaro.org>
+ <a48f159a-e88c-42fa-b76b-662302d3a585@AM1EHSMHS003.ehs.local>
+ <51FA9AE8.1060004@linaro.org>
+ <1c83c081-60c6-49e3-a85c-f64dd5be0e60@CH1EHSMHS030.ehs.local>
+ <51FA9F54.3060704@linaro.org>
+ <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
+ <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
+ <20130809172757.GD14845@codeaurora.org>
+Message-ID: <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Fri, Aug 09, 2013 at 10:27:57AM -0700, Stephen Boyd wrote:
+> On 08/09, Daniel Lezcano wrote:
+> > 
+> > yes, but at least the broadcast mechanism should send an IPI to cpu0 to
+> > wake it up, no ? As Stephen stated this kind of configuration should has
+> > never been tested before so the tick broadcast code is not handling this
+> > case properly IMHO.
+> > 
+> 
+> If you have a per-cpu tick device that isn't suffering from
+> FEAT_C3_STOP why wouldn't you use that for the tick versus a
+> per-cpu tick device that has FEAT_C3_STOP? It sounds like there
+> is a bug in the preference logic or you should boost the rating
+> of the arm global timer above the twd. Does this patch help? It
+> should make the arm global timer the tick device and whatever the
+> cadence timer you have into the broadcast device.
 
-Tegra20 HW appears to have a bug such that PCIe device interrupts,
-whether they are legacy IRQs or MSI, are lost when LP2 is enabled. To
-work around this, simply disable LP2 if any PCIe devices with interrupts
-are present. Detect this via the IRQ domain map operation. This is
-slightly over-conservative; if a device with an interrupt is present but
-the driver does not actually use them, LP2 will still be disabled.
-However, this is a reasonable trade-off which enables a simpler
-workaround.
+I finally got to test your patch. Unfortunately, it makes the system
+hang even earlier:
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
-Tested-by: Thierry Reding <treding@nvidia.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
----
-v4: Add missing tegra-cpuidle.h, re-write commit description. Add acks.
+	Starting kernel ...
+	
+	Uncompressing Linux... done, booting the kernel.
+	[    0.000000] Booting Linux on physical CPU 0x0
+	[    0.000000] Linux version 3.11.0-rc3-00002-g391ac9b (sorenb at xsjandreislx) (gcc version 4.7.2 (Sourcery CodeBench Lite 2012.09-104) ) #98 SMP PREEMPT Mon Aug 12 08:59:34 PDT 2013
+	[    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=18c5387d
+	[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+	[    0.000000] Machine: Xilinx Zynq Platform, model: Zynq ZC706 Development Board
+	[    0.000000] bootconsole [earlycon0] enabled
+	[    0.000000] cma: CMA: reserved 16 MiB at 2e800000
+	[    0.000000] Memory policy: ECC disabled, Data cache writealloc
+	[    0.000000] PERCPU: Embedded 9 pages/cpu @c149c000 s14720 r8192 d13952 u36864
+	[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 260624
+	[    0.000000] Kernel command line: console=ttyPS0,115200 earlyprintk
+	[    0.000000] PID hash table entries: 4096 (order: 2, 16384 bytes)
+	[    0.000000] Dentry cache hash table entries: 131072 (order: 7, 524288 bytes)
+	[    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144 bytes)
+	[    0.000000] Memory: 1004928K/1048576K available (4891K kernel code, 307K rwdata, 1564K rodata, 338K init, 5699K bss, 43648K reserved, 270336K highmem)
+	[    0.000000] Virtual kernel memory layout:
+	[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+	[    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+	[    0.000000]     vmalloc : 0xf0000000 - 0xff000000   ( 240 MB)
+	[    0.000000]     lowmem  : 0xc0000000 - 0xef800000   ( 760 MB)
+	[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+	[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+	[    0.000000]       .text : 0xc0008000 - 0xc0656128   (6457 kB)
+	[    0.000000]       .init : 0xc0657000 - 0xc06ab980   ( 339 kB)
+	[    0.000000]       .data : 0xc06ac000 - 0xc06f8c20   ( 308 kB)
+	[    0.000000]        .bss : 0xc06f8c20 - 0xc0c89aa4   (5700 kB)
+	[    0.000000] Preemptible hierarchical RCU implementation.
+	[    0.000000]  RCU lockdep checking is enabled.
+	[    0.000000]  Additional per-CPU info printed with stalls.
+	[    0.000000]  RCU restricting CPUs from NR_CPUS=4 to nr_cpu_ids=2.
+	[    0.000000] NR_IRQS:16 nr_irqs:16 16
+	[    0.000000] slcr mapped to f0004000
+	[    0.000000] Zynq clock init
+	[    0.000000] sched_clock: 32 bits at 333MHz, resolution 3ns, wraps every 12884ms
+	[    0.000000] ttc0 #0 at f0006000, irq=43
+	[    0.000000] Console: colour dummy device 80x30
+	[    0.000000] Lock dependency validator: Copyright (c) 2006 Red Hat, Inc., Ingo Molnar
+	[    0.000000] ... MAX_LOCKDEP_SUBCLASSES:  8
+	[    0.000000] ... MAX_LOCK_DEPTH:          48
+	[    0.000000] ... MAX_LOCKDEP_KEYS:        8191
+	[    0.000000] ... CLASSHASH_SIZE:          4096
+	[    0.000000] ... MAX_LOCKDEP_ENTRIES:     16384
+	[    0.000000] ... MAX_LOCKDEP_CHAINS:      32768
+	[    0.000000] ... CHAINHASH_SIZE:          16384
+	[    0.000000]  memory used by lock dependency info: 3695 kB
+	[    0.000000]  per task-struct memory footprint: 1152 bytes
+	[    0.057541] Calibrating delay loop... 1325.46 BogoMIPS (lpj=6627328)
+	[    0.100248] pid_max: default: 32768 minimum: 301
+	[    0.103294] Mount-cache hash table entries: 512
+	[    0.114364] CPU: Testing write buffer coherency: ok
+	[    0.114513] ftrace: allocating 16143 entries in 48 pages
+	[    0.155012] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
 
-v3: Only disable LP2 if a PCIe device that requests an interrupt is
-actually present. This prevents the loss of power-saving when the WAR
-isn't required.
----
- arch/arm/mach-tegra/cpuidle-tegra20.c | 12 ++++++++++++
- arch/arm/mach-tegra/cpuidle.c         | 10 ++++++++++
- arch/arm/mach-tegra/cpuidle.h         |  1 +
- drivers/pci/host/pci-tegra.c          |  5 +++++
- include/linux/tegra-cpuidle.h         | 19 +++++++++++++++++++
- 5 files changed, 47 insertions(+)
- create mode 100644 include/linux/tegra-cpuidle.h
 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-index 706aa42..b82dcae 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra20.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-@@ -211,6 +211,18 @@ static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
- }
- #endif
- 
-+/*
-+ * Tegra20 HW appears to have a bug such that PCIe device interrupts, whether
-+ * they are legacy IRQs or MSI, are lost when LP2 is enabled. To work around
-+ * this, simply disable LP2 if the PCI driver and DT node are both enabled.
-+ */
-+void tegra20_cpuidle_pcie_irqs_in_use(void)
-+{
-+	pr_info_once(
-+		"Disabling cpuidle LP2 state, since PCIe IRQs are in use\n");
-+	tegra_idle_driver.states[1].disabled = true;
-+}
-+
- int __init tegra20_cpuidle_init(void)
- {
- 	return cpuidle_register(&tegra_idle_driver, cpu_possible_mask);
-diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
-index e85973c..0961dfc 100644
---- a/arch/arm/mach-tegra/cpuidle.c
-+++ b/arch/arm/mach-tegra/cpuidle.c
-@@ -44,3 +44,13 @@ void __init tegra_cpuidle_init(void)
- 		break;
- 	}
- }
-+
-+void tegra_cpuidle_pcie_irqs_in_use(void)
-+{
-+	switch (tegra_chip_id) {
-+	case TEGRA20:
-+		if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
-+			tegra20_cpuidle_pcie_irqs_in_use();
-+		break;
-+	}
-+}
-diff --git a/arch/arm/mach-tegra/cpuidle.h b/arch/arm/mach-tegra/cpuidle.h
-index 9ec2c1a..c017dab 100644
---- a/arch/arm/mach-tegra/cpuidle.h
-+++ b/arch/arm/mach-tegra/cpuidle.h
-@@ -19,6 +19,7 @@
- 
- #ifdef CONFIG_CPU_IDLE
- int tegra20_cpuidle_init(void);
-+void tegra20_cpuidle_pcie_irqs_in_use(void);
- int tegra30_cpuidle_init(void);
- int tegra114_cpuidle_init(void);
- void tegra_cpuidle_init(void);
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index ad95c40..7356741 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -41,6 +41,7 @@
- #include <linux/platform_device.h>
- #include <linux/sizes.h>
- #include <linux/slab.h>
-+#include <linux/tegra-cpuidle.h>
- #include <linux/tegra-powergate.h>
- #include <linux/vmalloc.h>
- #include <linux/regulator/consumer.h>
-@@ -636,6 +637,8 @@ static int tegra_pcie_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
- {
- 	struct tegra_pcie *pcie = sys_to_pcie(pdev->bus->sysdata);
- 
-+	tegra_cpuidle_pcie_irqs_in_use();
-+
- 	return pcie->irq;
- }
- 
-@@ -1221,6 +1224,8 @@ static int tegra_msi_map(struct irq_domain *domain, unsigned int irq,
- 	irq_set_chip_data(irq, domain->host_data);
- 	set_irq_flags(irq, IRQF_VALID);
- 
-+	tegra_cpuidle_pcie_irqs_in_use();
-+
- 	return 0;
- }
- 
-diff --git a/include/linux/tegra-cpuidle.h b/include/linux/tegra-cpuidle.h
-new file mode 100644
-index 0000000..dda3647
---- /dev/null
-+++ b/include/linux/tegra-cpuidle.h
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ */
-+
-+#ifndef __LINUX_TEGRA_CPUIDLE_H__
-+#define __LINUX_TEGRA_CPUIDLE_H__
-+
-+void tegra_cpuidle_pcie_irqs_in_use(void);
-+
-+#endif
--- 
-1.8.1.5
+	S?ren
