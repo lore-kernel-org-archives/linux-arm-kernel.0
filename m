@@ -1,30 +1,38 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 12 Aug 2013 13:38:18 -0400
-Subject: [PATCH 2/2] Remove all remaining trace of DNS-320/325 platform
- code
-In-Reply-To: <1376231210-6484-3-git-send-email-jm@lentin.co.uk>
-References: <1376231210-6484-1-git-send-email-jm@lentin.co.uk>
- <1376231210-6484-3-git-send-email-jm@lentin.co.uk>
-Message-ID: <20130812173818.GN25111@titan.lakedaemon.net>
+Date: Mon, 12 Aug 2013 13:44:39 -0400
+Subject: [PATCHv9 00/10] MSI support for Marvell EBU PCIe driver
+In-Reply-To: <520916E0.5030404@wwwdotorg.org>
+References: <1376080035-29344-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130812163723.GK25111@titan.lakedaemon.net>
+ <520916E0.5030404@wwwdotorg.org>
+Message-ID: <20130812174439.GO25111@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 11, 2013 at 03:26:50PM +0100, Jamie Lentin wrote:
-> No platform code left now, so remove all references to it.
+On Mon, Aug 12, 2013 at 11:09:52AM -0600, Stephen Warren wrote:
+> On 08/12/2013 10:37 AM, Jason Cooper wrote:
+> > Thomas,
+> > 
+> > Whole series applied as follows:
+> > 
+> > +---+ mvebu/msi_pci (1-4,7)
+> >     |
+> >     +---+---+ mvebu/msi_irq (5,6)
+> >             |
+> >             +---+---+ mvebu/msi_mvebu (8-10)
+> > 
+> > mvebu/msi_pci built successfully with Randy's config for x86_64.
+> > 
+> > Thierry, I've tagged mvebu/msi_pci.  Unless it all falls apart in -next,
+> > those commit-id's won't change from what will be in arm-soc.
 > 
-> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
-> ---
->  arch/arm/configs/kirkwood_defconfig  |  1 -
->  arch/arm/mach-kirkwood/Kconfig       |  8 --------
->  arch/arm/mach-kirkwood/Makefile      |  1 -
->  arch/arm/mach-kirkwood/board-dnskw.c | 21 ---------------------
->  arch/arm/mach-kirkwood/board-dt.c    |  3 ---
->  arch/arm/mach-kirkwood/common.h      |  6 ------
->  6 files changed, 40 deletions(-)
->  delete mode 100644 arch/arm/mach-kirkwood/board-dnskw.c
+> So, the branch still isn't stable, hence I shouldn't use it as a
+> baseline to apply Thierry's PCIe patches?
 
-Applied to mvebu/boards without patch #1.  Added a note to the commit re
-the reset gpio never working.
+It's as stable as I can make it.  I've tested it for all known build
+regressions (discovered in -next), and I see no reason to change it.
+Anything needing fixed after today, I'll append the fix to it's HEAD if
+appropriate.
 
 thx,
 
