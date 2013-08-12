@@ -1,89 +1,32 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 12 Aug 2013 14:54:54 -0600
-Subject: [PATCH 0/9] ARM: dove: DT PCIe support
-In-Reply-To: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CAErSpo6p1r=g8s-XYOJSNXJm3p18ZF9BYA4KM6_5F4=539wFwQ@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 12 Aug 2013 21:58:53 +0100
+Subject: SCSI bus failures with qemu-arm in kernel 3.8+
+In-Reply-To: <52093133.9050306@windriver.com>
+References: <5207B3C3.9080508@roeck-us.net>
+ <20130811220450.GY23006@n2100.arm.linux.org.uk>
+ <52082EF8.10005@roeck-us.net> <52093133.9050306@windriver.com>
+Message-ID: <CAFEAcA--pjr8fqH6MdTr5P64PhteeJA=HXfAXFhPJ0ctQGpf_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 12:46 PM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
-> This patch set adds support for the PCIe controllers found on Marvell
-> Dove SoCs. It depends on mvebu-pci patches sent by Thomas Petazzoni.
-> Also, it adds support for the Globalscale D3Plug - a Dove based board
-> comprising a USB3.0 dual port controller and a mini-PCIe port. The
-> mini-PCIe port has not been tested, but USB controller and attached
-> USB stick has been detected.
+On 12 August 2013 20:02, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
 >
-> The patch set can be separated into two main parts and should be
-> taken by the respective maintainers. First five patches belong to
-> PCI driver for MVEBU SoCs, while last four patches are Marvell Dove
-> related. It is based on (unstable) mvebu/for-next branch with MSI
-> patches applied and will be rebased on request.
->
-> Devicetree and Doc MLs are not Cc'ed for the driver-only patches,
-> PCI ML and maintainer are not Cc'ed for the Dove-only patches.
->
-> Patches 1 and 2 fix some minor issues with pci-mvebu by moving
-> clk_prepare_enable before accessing any controller registers and
-> counting sucessfully registered ports only.
->
-> Patch 3 converts pci-mvebu from subsys_initcall registration to
-> normal platform driver registration to allow it to fail with
-> EPROBE_DEFER later.
->
-> Patch 4 adds DT parsing for reset (PERST#) GPIO pins and delay to
-> wait for PCIe devices after reset de-assertion.
->
-> Patch 5 finally adds a compatible to pci-mvebu for Dove SoCs.
+> If I recall correctly, I'd showed the patch to Russell at the time (via
+> IRC, I believe) and he'd told me essentially the same thing as the above
+> paragraph, which is why I didn't put it in the patch system, and why the
+> commit log of the yocto patch (http://goo.gl/riEZXY) reads as it does
+> (i.e. it is unclear what the real swizzle is).
 
-I'm happy to merge patches 1-5 for v3.12 if you like, given acks from Thomas.
+That patch reads like "make the kernel work with old (pre 1.5)
+QEMU behaviour" (where every IRQ for every PCI card was always
+IRQ27). I'm committing to making QEMU continue to support that
+for backward compatibility, as well as to "work like hardware"
+(our autodetect hack is based on what the kernel writes to
+PCI_INTERRUPT_LINE), so in that sense it's a stable and well
+defined[*] thing to write to, but for mainline I imagine the
+kernel will want to just go for the 'work on real h/w' approach.
 
-> Patch 6 updates dove_defconfig with some useful options for the
-> Si5351 i2c clock generator found on SolidRun CuBox, PCIe driver,
-> and USB3.0 xHCI driver.
->
-> Patches 7 and 8 add PCIe controller nodes to Dove SoC DT and
-> add support for the Globalscale D3Plug where this patches have
-> been tested on.
->
-> Patch 8 finally removes legacy PCIe driver init and clock
-> gate workarounds from DT based Dove init.
->
-> Sebastian Hesselbarth (9):
->   PCI: mvebu: move clock enable before register access
->   PCI: mvebu: increment nports only for registered ports
->   PCI: mvebu: remove subsys_initcall
->   PCI: mvebu: add support for reset on GPIO
->   PCI: mvebu: add support for Marvell Dove SoCs
->   ARM: dove: update dove_defconfig with SI5351, PCI, and xHCI
->   ARM: dove: add PCIe controllers to SoC DT
->   ARM: dove: add initial DT file for Globalscale D3Plug
->   ARM: dove: remove legacy pcie and clock init
->
->  .../devicetree/bindings/pci/mvebu-pci.txt          |    3 +
->  arch/arm/boot/dts/Makefile                         |    1 +
->  arch/arm/boot/dts/dove-d3plug.dts                  |  103 ++++++++++++++++++
->  arch/arm/boot/dts/dove.dtsi                        |   54 ++++++++++
->  arch/arm/configs/dove_defconfig                    |    4 +
->  arch/arm/mach-dove/board-dt.c                      |   29 -----
->  drivers/pci/host/Kconfig                           |    2 +-
->  drivers/pci/host/pci-mvebu.c                       |  113 +++++++++++++-------
->  8 files changed, 241 insertions(+), 68 deletions(-)
->  create mode 100644 arch/arm/boot/dts/dove-d3plug.dts
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-pci at vger.kernel.org
-> --
-> 1.7.10.4
->
+[*] by which I mean "not written down outside the QEMU source
+code but I will write it up if you need it" :-)
+
+-- PMM
