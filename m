@@ -1,669 +1,884 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 12 Aug 2013 10:42:39 +0200
-Subject: [PATCH 3/5] ASoC: pxa: use snd_dmaengine_dai_dma_data
+Date: Mon, 12 Aug 2013 10:42:37 +0200
+Subject: [PATCH 1/5] ALSA: move dmaengine implementation from ASoC to ALSA core
 In-Reply-To: <1376296961-20564-1-git-send-email-zonque@gmail.com>
 References: <1376296961-20564-1-git-send-email-zonque@gmail.com>
-Message-ID: <1376296961-20564-4-git-send-email-zonque@gmail.com>
+Message-ID: <1376296961-20564-2-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use snd_dmaengine_dai_dma_data for passing the dma parameters from
-clients to the pxa pcm lib. This does no functional change, it's just an
-intermedia step to migrate the pxa bits over to dmaengine.
+For the PXA DMA rework, we need the generic dmaengine implementation
+that currently lives in sound/soc for standalone (non-ASoC) AC'97
+support.
 
-The calculation of dcmd is a transition hack which will be removed again
-in a later patch. It's just there to make the transition more readable.
+Move it to sound/core, and rename the Kconfig symbol.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
-Acked-by: Mark Brown <broonie@linaro.org>
 ---
- include/sound/pxa2xx-lib.h  |  7 -----
- sound/arm/pxa2xx-ac97.c     | 26 ++++++++++--------
- sound/arm/pxa2xx-pcm-lib.c  | 52 +++++++++++++++++++++++++++++------
- sound/arm/pxa2xx-pcm.c      |  5 +++-
- sound/arm/pxa2xx-pcm.h      |  6 ++--
- sound/soc/pxa/mmp-pcm.c     |  8 ++++--
- sound/soc/pxa/mmp-sspa.c    | 12 +++++---
- sound/soc/pxa/pxa-ssp.c     | 36 ++++++++----------------
- sound/soc/pxa/pxa2xx-ac97.c | 67 +++++++++++++++++++++++----------------------
- sound/soc/pxa/pxa2xx-i2s.c  | 28 +++++++++----------
- sound/soc/pxa/pxa2xx-pcm.c  |  8 ++++--
- 11 files changed, 142 insertions(+), 113 deletions(-)
+ sound/core/Kconfig            |   3 +
+ sound/core/Makefile           |   3 +
+ sound/core/pcm_dmaengine.c    | 367 ++++++++++++++++++++++++++++++++++++++++++
+ sound/soc/Kconfig             |   5 +-
+ sound/soc/Makefile            |   4 -
+ sound/soc/omap/Kconfig        |   2 +-
+ sound/soc/pxa/Kconfig         |   2 +-
+ sound/soc/soc-dmaengine-pcm.c | 367 ------------------------------------------
+ sound/soc/spear/Kconfig       |   2 +-
+ 9 files changed, 377 insertions(+), 378 deletions(-)
+ create mode 100644 sound/core/pcm_dmaengine.c
+ delete mode 100644 sound/soc/soc-dmaengine-pcm.c
 
-diff --git a/include/sound/pxa2xx-lib.h b/include/sound/pxa2xx-lib.h
-index 2fd3d25..56e818e 100644
---- a/include/sound/pxa2xx-lib.h
-+++ b/include/sound/pxa2xx-lib.h
-@@ -6,13 +6,6 @@
+diff --git a/sound/core/Kconfig b/sound/core/Kconfig
+index c0c2f57..94ce1c4 100644
+--- a/sound/core/Kconfig
++++ b/sound/core/Kconfig
+@@ -6,6 +6,9 @@ config SND_PCM
+ 	tristate
+ 	select SND_TIMER
  
- /* PCM */
- 
--struct pxa2xx_pcm_dma_params {
--	char *name;			/* stream identifier */
--	u32 dcmd;			/* DMA descriptor dcmd field */
--	volatile u32 *drcmr;		/* the DMA request channel to use */
--	u32 dev_addr;			/* device physical address for DMA */
--};
--
- extern int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 				struct snd_pcm_hw_params *params);
- extern int __pxa2xx_pcm_hw_free(struct snd_pcm_substream *substream);
-diff --git a/sound/arm/pxa2xx-ac97.c b/sound/arm/pxa2xx-ac97.c
-index ce431e6..5066a37 100644
---- a/sound/arm/pxa2xx-ac97.c
-+++ b/sound/arm/pxa2xx-ac97.c
-@@ -14,12 +14,14 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/dmaengine.h>
- 
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/ac97_codec.h>
- #include <sound/initval.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include <mach/regs-ac97.h>
- #include <mach/audio.h>
-@@ -41,20 +43,20 @@ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
- 	.reset	= pxa2xx_ac97_reset,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_out = {
--	.name			= "AC97 PCM out",
--	.dev_addr		= __PREG(PCDR),
--	.drcmr			= &DRCMR(12),
--	.dcmd			= DCMD_INCSRCADDR | DCMD_FLOWTRG |
--				  DCMD_BURST32 | DCMD_WIDTH4,
-+static unsigned long pxa2xx_ac97_pcm_out_req = 12;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_out = {
-+	.addr		= __PREG(PCDR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.maxburst	= 32,
-+	.filter_data	= &pxa2xx_ac97_pcm_out_req,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_in = {
--	.name			= "AC97 PCM in",
--	.dev_addr		= __PREG(PCDR),
--	.drcmr			= &DRCMR(11),
--	.dcmd			= DCMD_INCTRGADDR | DCMD_FLOWSRC |
--				  DCMD_BURST32 | DCMD_WIDTH4,
-+static unsigned long pxa2xx_ac97_pcm_in_req = 11;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_in = {
-+	.addr		= __PREG(PCDR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.maxburst	= 32,
-+	.filter_data	= &pxa2xx_ac97_pcm_in_req,
- };
- 
- static struct snd_pcm *pxa2xx_ac97_pcm;
-diff --git a/sound/arm/pxa2xx-pcm-lib.c b/sound/arm/pxa2xx-pcm-lib.c
-index 823359e..a61d7a9 100644
---- a/sound/arm/pxa2xx-pcm-lib.c
-+++ b/sound/arm/pxa2xx-pcm-lib.c
-@@ -7,11 +7,13 @@
- #include <linux/slab.h>
- #include <linux/module.h>
- #include <linux/dma-mapping.h>
-+#include <linux/dmaengine.h>
- 
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/pcm_params.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include <mach/dma.h>
- 
-@@ -43,6 +45,35 @@ int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 	size_t period = params_period_bytes(params);
- 	pxa_dma_desc *dma_desc;
- 	dma_addr_t dma_buff_phys, next_desc_phys;
-+	u32 dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
++config SND_DMAENGINE_PCM
++	bool
 +
-+	/* temporary transition hack */
-+	switch (rtd->params->addr_width) {
-+	case DMA_SLAVE_BUSWIDTH_1_BYTE:
-+		dcmd |= DCMD_WIDTH1;
+ config SND_HWDEP
+ 	tristate
+ 
+diff --git a/sound/core/Makefile b/sound/core/Makefile
+index 43d4117..5e890cf 100644
+--- a/sound/core/Makefile
++++ b/sound/core/Makefile
+@@ -13,6 +13,8 @@ snd-$(CONFIG_SND_JACK)	  += jack.o
+ snd-pcm-objs := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
+ 		pcm_memory.o
+ 
++snd-pcm-dmaengine-objs := pcm_dmaengine.o
++
+ snd-page-alloc-y := memalloc.o
+ snd-page-alloc-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
+ 
+@@ -30,6 +32,7 @@ obj-$(CONFIG_SND_TIMER)		+= snd-timer.o
+ obj-$(CONFIG_SND_HRTIMER)	+= snd-hrtimer.o
+ obj-$(CONFIG_SND_RTCTIMER)	+= snd-rtctimer.o
+ obj-$(CONFIG_SND_PCM)		+= snd-pcm.o snd-page-alloc.o
++obj-$(CONFIG_SND_DMAENGINE_PCM)	+= snd-pcm-dmaengine.o
+ obj-$(CONFIG_SND_RAWMIDI)	+= snd-rawmidi.o
+ 
+ obj-$(CONFIG_SND_OSSEMUL)	+= oss/
+diff --git a/sound/core/pcm_dmaengine.c b/sound/core/pcm_dmaengine.c
+new file mode 100644
+index 0000000..aa924d9
+--- /dev/null
++++ b/sound/core/pcm_dmaengine.c
+@@ -0,0 +1,367 @@
++/*
++ *  Copyright (C) 2012, Analog Devices Inc.
++ *	Author: Lars-Peter Clausen <lars@metafoo.de>
++ *
++ *  Based on:
++ *	imx-pcm-dma-mx2.c, Copyright 2009 Sascha Hauer <s.hauer@pengutronix.de>
++ *	mxs-pcm.c, Copyright (C) 2011 Freescale Semiconductor, Inc.
++ *	ep93xx-pcm.c, Copyright (C) 2006 Lennert Buytenhek <buytenh@wantstofly.org>
++ *		      Copyright (C) 2006 Applied Data Systems
++ *
++ *  This program is free software; you can redistribute it and/or modify it
++ *  under  the terms of the GNU General  Public License as published by the
++ *  Free Software Foundation;  either version 2 of the License, or (at your
++ *  option) any later version.
++ *
++ *  You should have received a copy of the GNU General Public License along
++ *  with this program; if not, write to the Free Software Foundation, Inc.,
++ *  675 Mass Ave, Cambridge, MA 02139, USA.
++ *
++ */
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/dmaengine.h>
++#include <linux/slab.h>
++#include <sound/pcm.h>
++#include <sound/pcm_params.h>
++#include <sound/soc.h>
++
++#include <sound/dmaengine_pcm.h>
++
++struct dmaengine_pcm_runtime_data {
++	struct dma_chan *dma_chan;
++	dma_cookie_t cookie;
++
++	unsigned int pos;
++};
++
++static inline struct dmaengine_pcm_runtime_data *substream_to_prtd(
++	const struct snd_pcm_substream *substream)
++{
++	return substream->runtime->private_data;
++}
++
++struct dma_chan *snd_dmaengine_pcm_get_chan(struct snd_pcm_substream *substream)
++{
++	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
++
++	return prtd->dma_chan;
++}
++EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_get_chan);
++
++/**
++ * snd_hwparams_to_dma_slave_config - Convert hw_params to dma_slave_config
++ * @substream: PCM substream
++ * @params: hw_params
++ * @slave_config: DMA slave config
++ *
++ * This function can be used to initialize a dma_slave_config from a substream
++ * and hw_params in a dmaengine based PCM driver implementation.
++ */
++int snd_hwparams_to_dma_slave_config(const struct snd_pcm_substream *substream,
++	const struct snd_pcm_hw_params *params,
++	struct dma_slave_config *slave_config)
++{
++	enum dma_slave_buswidth buswidth;
++
++	switch (params_format(params)) {
++	case SNDRV_PCM_FORMAT_S8:
++		buswidth = DMA_SLAVE_BUSWIDTH_1_BYTE;
 +		break;
-+	case DMA_SLAVE_BUSWIDTH_2_BYTES:
-+		dcmd |= DCMD_WIDTH2;
++	case SNDRV_PCM_FORMAT_S16_LE:
++		buswidth = DMA_SLAVE_BUSWIDTH_2_BYTES;
 +		break;
-+	case DMA_SLAVE_BUSWIDTH_4_BYTES:
-+		dcmd |= DCMD_WIDTH4;
++	case SNDRV_PCM_FORMAT_S18_3LE:
++	case SNDRV_PCM_FORMAT_S20_3LE:
++	case SNDRV_PCM_FORMAT_S24_LE:
++	case SNDRV_PCM_FORMAT_S32_LE:
++		buswidth = DMA_SLAVE_BUSWIDTH_4_BYTES;
 +		break;
 +	default:
-+		/* can't happen */
-+		break;
++		return -EINVAL;
 +	}
 +
-+	switch (rtd->params->maxburst) {
-+	case 8:
-+		dcmd |= DCMD_BURST8;
-+		break;
-+	case 16:
-+		dcmd |= DCMD_BURST16;
-+		break;
-+	case 32:
-+		dcmd |= DCMD_BURST32;
-+		break;
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
++		slave_config->direction = DMA_MEM_TO_DEV;
++		slave_config->dst_addr_width = buswidth;
++	} else {
++		slave_config->direction = DMA_DEV_TO_MEM;
++		slave_config->src_addr_width = buswidth;
 +	}
- 
- 	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
- 	runtime->dma_bytes = totsize;
-@@ -55,14 +86,14 @@ int __pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 		dma_desc->ddadr = next_desc_phys;
- 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
- 			dma_desc->dsadr = dma_buff_phys;
--			dma_desc->dtadr = rtd->params->dev_addr;
-+			dma_desc->dtadr = rtd->params->addr;
- 		} else {
--			dma_desc->dsadr = rtd->params->dev_addr;
-+			dma_desc->dsadr = rtd->params->addr;
- 			dma_desc->dtadr = dma_buff_phys;
- 		}
- 		if (period > totsize)
- 			period = totsize;
--		dma_desc->dcmd = rtd->params->dcmd | period | DCMD_ENDIRQEN;
-+		dma_desc->dcmd = dcmd | period | DCMD_ENDIRQEN;
- 		dma_desc++;
- 		dma_buff_phys += period;
- 	} while (totsize -= period);
-@@ -76,8 +107,10 @@ int __pxa2xx_pcm_hw_free(struct snd_pcm_substream *substream)
- {
- 	struct pxa2xx_runtime_data *rtd = substream->runtime->private_data;
- 
--	if (rtd && rtd->params && rtd->params->drcmr)
--		*rtd->params->drcmr = 0;
-+	if (rtd && rtd->params && rtd->params->filter_data) {
-+		unsigned long req = *(unsigned long *) rtd->params->filter_data;
-+		DRCMR(req) = 0;
++
++	slave_config->device_fc = false;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(snd_hwparams_to_dma_slave_config);
++
++/**
++ * snd_dmaengine_pcm_set_config_from_dai_data() - Initializes a dma slave config
++ *  using DAI DMA data.
++ * @substream: PCM substream
++ * @dma_data: DAI DMA data
++ * @slave_config: DMA slave configuration
++ *
++ * Initializes the {dst,src}_addr, {dst,src}_maxburst, {dst,src}_addr_width and
++ * slave_id fields of the DMA slave config from the same fields of the DAI DMA
++ * data struct. The src and dst fields will be initialized depending on the
++ * direction of the substream. If the substream is a playback stream the dst
++ * fields will be initialized, if it is a capture stream the src fields will be
++ * initialized. The {dst,src}_addr_width field will only be initialized if the
++ * addr_width field of the DAI DMA data struct is not equal to
++ * DMA_SLAVE_BUSWIDTH_UNDEFINED.
++ */
++void snd_dmaengine_pcm_set_config_from_dai_data(
++	const struct snd_pcm_substream *substream,
++	const struct snd_dmaengine_dai_dma_data *dma_data,
++	struct dma_slave_config *slave_config)
++{
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
++		slave_config->dst_addr = dma_data->addr;
++		slave_config->dst_maxburst = dma_data->maxburst;
++		if (dma_data->addr_width != DMA_SLAVE_BUSWIDTH_UNDEFINED)
++			slave_config->dst_addr_width = dma_data->addr_width;
++	} else {
++		slave_config->src_addr = dma_data->addr;
++		slave_config->src_maxburst = dma_data->maxburst;
++		if (dma_data->addr_width != DMA_SLAVE_BUSWIDTH_UNDEFINED)
++			slave_config->src_addr_width = dma_data->addr_width;
 +	}
- 
- 	snd_pcm_set_runtime_buffer(substream, NULL);
- 	return 0;
-@@ -136,6 +169,7 @@ EXPORT_SYMBOL(pxa2xx_pcm_pointer);
- int __pxa2xx_pcm_prepare(struct snd_pcm_substream *substream)
- {
- 	struct pxa2xx_runtime_data *prtd = substream->runtime->private_data;
-+	unsigned long req;
- 
- 	if (!prtd || !prtd->params)
- 		return 0;
-@@ -146,7 +180,8 @@ int __pxa2xx_pcm_prepare(struct snd_pcm_substream *substream)
- 	DCSR(prtd->dma_ch) &= ~DCSR_RUN;
- 	DCSR(prtd->dma_ch) = 0;
- 	DCMD(prtd->dma_ch) = 0;
--	*prtd->params->drcmr = prtd->dma_ch | DRCMR_MAPVLD;
-+	req = *(unsigned long *) prtd->params->filter_data;
-+	DRCMR(req) = prtd->dma_ch | DRCMR_MAPVLD;
- 
- 	return 0;
- }
-@@ -155,7 +190,6 @@ EXPORT_SYMBOL(__pxa2xx_pcm_prepare);
- void pxa2xx_pcm_dma_irq(int dma_ch, void *dev_id)
- {
- 	struct snd_pcm_substream *substream = dev_id;
--	struct pxa2xx_runtime_data *rtd = substream->runtime->private_data;
- 	int dcsr;
- 
- 	dcsr = DCSR(dma_ch);
-@@ -164,8 +198,8 @@ void pxa2xx_pcm_dma_irq(int dma_ch, void *dev_id)
- 	if (dcsr & DCSR_ENDINTR) {
- 		snd_pcm_period_elapsed(substream);
- 	} else {
--		printk(KERN_ERR "%s: DMA error on channel %d (DCSR=%#x)\n",
--			rtd->params->name, dma_ch, dcsr);
-+		printk(KERN_ERR "DMA error on channel %d (DCSR=%#x)\n",
-+			dma_ch, dcsr);
- 		snd_pcm_stream_lock(substream);
- 		snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
- 		snd_pcm_stream_unlock(substream);
-diff --git a/sound/arm/pxa2xx-pcm.c b/sound/arm/pxa2xx-pcm.c
-index 26422a3..69a2455 100644
---- a/sound/arm/pxa2xx-pcm.c
-+++ b/sound/arm/pxa2xx-pcm.c
-@@ -11,8 +11,11 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/dmaengine.h>
 +
- #include <sound/core.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include "pxa2xx-pcm.h"
- 
-@@ -40,7 +43,7 @@ static int pxa2xx_pcm_open(struct snd_pcm_substream *substream)
- 
- 	rtd->params = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) ?
- 		      client->playback_params : client->capture_params;
--	ret = pxa_request_dma(rtd->params->name, DMA_PRIO_LOW,
-+	ret = pxa_request_dma("dma", DMA_PRIO_LOW,
- 			      pxa2xx_pcm_dma_irq, substream);
- 	if (ret < 0)
- 		goto err2;
-diff --git a/sound/arm/pxa2xx-pcm.h b/sound/arm/pxa2xx-pcm.h
-index 65f86b5..2a8fc08 100644
---- a/sound/arm/pxa2xx-pcm.h
-+++ b/sound/arm/pxa2xx-pcm.h
-@@ -13,14 +13,14 @@
- 
- struct pxa2xx_runtime_data {
- 	int dma_ch;
--	struct pxa2xx_pcm_dma_params *params;
-+	struct snd_dmaengine_dai_dma_data *params;
- 	pxa_dma_desc *dma_desc_array;
- 	dma_addr_t dma_desc_array_phys;
- };
- 
- struct pxa2xx_pcm_client {
--	struct pxa2xx_pcm_dma_params *playback_params;
--	struct pxa2xx_pcm_dma_params *capture_params;
-+	struct snd_dmaengine_dai_dma_data *playback_params;
-+	struct snd_dmaengine_dai_dma_data *capture_params;
- 	int (*startup)(struct snd_pcm_substream *);
- 	void (*shutdown)(struct snd_pcm_substream *);
- 	int (*prepare)(struct snd_pcm_substream *);
-diff --git a/sound/soc/pxa/mmp-pcm.c b/sound/soc/pxa/mmp-pcm.c
-index 5d57e07..9a97843 100644
---- a/sound/soc/pxa/mmp-pcm.c
-+++ b/sound/soc/pxa/mmp-pcm.c
-@@ -17,6 +17,8 @@
- #include <linux/dmaengine.h>
- #include <linux/platform_data/dma-mmp_tdma.h>
- #include <linux/platform_data/mmp_audio.h>
-+#include <linux/dmaengine.h>
++	slave_config->slave_id = dma_data->slave_id;
++}
++EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_set_config_from_dai_data);
 +
- #include <sound/pxa2xx-lib.h>
- #include <sound/core.h>
- #include <sound/pcm.h>
-@@ -67,7 +69,7 @@ static int mmp_pcm_hw_params(struct snd_pcm_substream *substream,
- {
- 	struct dma_chan *chan = snd_dmaengine_pcm_get_chan(substream);
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct pxa2xx_pcm_dma_params *dma_params;
-+	struct snd_dmaengine_dai_dma_data *dma_params;
- 	struct dma_slave_config slave_config;
- 	int ret;
- 
-@@ -80,10 +82,10 @@ static int mmp_pcm_hw_params(struct snd_pcm_substream *substream,
- 		return ret;
- 
- 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
--		slave_config.dst_addr     = dma_params->dev_addr;
-+		slave_config.dst_addr     = dma_params->addr;
- 		slave_config.dst_maxburst = 4;
- 	} else {
--		slave_config.src_addr	  = dma_params->dev_addr;
-+		slave_config.src_addr	  = dma_params->addr;
- 		slave_config.src_maxburst = 4;
- 	}
- 
-diff --git a/sound/soc/pxa/mmp-sspa.c b/sound/soc/pxa/mmp-sspa.c
-index 62142ce..84f1e9e 100644
---- a/sound/soc/pxa/mmp-sspa.c
-+++ b/sound/soc/pxa/mmp-sspa.c
-@@ -27,12 +27,15 @@
- #include <linux/slab.h>
- #include <linux/pxa2xx_ssp.h>
- #include <linux/io.h>
-+#include <linux/dmaengine.h>
++static void dmaengine_pcm_dma_complete(void *arg)
++{
++	struct snd_pcm_substream *substream = arg;
++	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
 +
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/initval.h>
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- #include "mmp-sspa.h"
++	prtd->pos += snd_pcm_lib_period_bytes(substream);
++	if (prtd->pos >= snd_pcm_lib_buffer_bytes(substream))
++		prtd->pos = 0;
++
++	snd_pcm_period_elapsed(substream);
++}
++
++static int dmaengine_pcm_prepare_and_submit(struct snd_pcm_substream *substream)
++{
++	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
++	struct dma_chan *chan = prtd->dma_chan;
++	struct dma_async_tx_descriptor *desc;
++	enum dma_transfer_direction direction;
++	unsigned long flags = DMA_CTRL_ACK;
++
++	direction = snd_pcm_substream_to_dma_direction(substream);
++
++	if (!substream->runtime->no_period_wakeup)
++		flags |= DMA_PREP_INTERRUPT;
++
++	prtd->pos = 0;
++	desc = dmaengine_prep_dma_cyclic(chan,
++		substream->runtime->dma_addr,
++		snd_pcm_lib_buffer_bytes(substream),
++		snd_pcm_lib_period_bytes(substream), direction, flags);
++
++	if (!desc)
++		return -ENOMEM;
++
++	desc->callback = dmaengine_pcm_dma_complete;
++	desc->callback_param = substream;
++	prtd->cookie = dmaengine_submit(desc);
++
++	return 0;
++}
++
++/**
++ * snd_dmaengine_pcm_trigger - dmaengine based PCM trigger implementation
++ * @substream: PCM substream
++ * @cmd: Trigger command
++ *
++ * Returns 0 on success, a negative error code otherwise.
++ *
++ * This function can be used as the PCM trigger callback for dmaengine based PCM
++ * driver implementations.
++ */
++int snd_dmaengine_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
++{
++	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
++	int ret;
++
++	switch (cmd) {
++	case SNDRV_PCM_TRIGGER_START:
++		ret = dmaengine_pcm_prepare_and_submit(substream);
++		if (ret)
++			return ret;
++		dma_async_issue_pending(prtd->dma_chan);
++		break;
++	case SNDRV_PCM_TRIGGER_RESUME:
++	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
++		dmaengine_resume(prtd->dma_chan);
++		break;
++	case SNDRV_PCM_TRIGGER_SUSPEND:
++	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
++		dmaengine_pause(prtd->dma_chan);
++		break;
++	case SNDRV_PCM_TRIGGER_STOP:
++		dmaengine_terminate_all(prtd->dma_chan);
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_trigger);
++
++/**
++ * snd_dmaengine_pcm_pointer_no_residue - dmaengine based PCM pointer implementation
++ * @substream: PCM substream
++ *
++ * This function is deprecated and should not be used by new drivers, as its
++ * results may be unreliable.
++ */
++snd_pcm_uframes_t snd_dmaengine_pcm_pointer_no_residue(struct snd_pcm_substream *substream)
++{
++	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
++	return bytes_to_frames(substream->runtime, prtd->pos);
++}
++EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_pointer_no_residue);
++
++/**
++ * snd_dmaengine_pcm_pointer - dmaengine based PCM pointer implementation
++ * @substream: PCM substream
++ *
++ * This function can be used as the PCM pointer callback for dmaengine based PCM
++ * driver implementations.
++ */
++snd_pcm_uframes_t snd_dmaengine_pcm_pointer(struct snd_pcm_substream *substream)
++{
++	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
++	struct dma_tx_state state;
++	enum dma_status status;
++	unsigned int buf_size;
++	unsigned int pos = 0;
++
++	status = dmaengine_tx_status(prtd->dma_chan, prtd->cookie, &state);
++	if (status == DMA_IN_PROGRESS || status == DMA_PAUSED) {
++		buf_size = snd_pcm_lib_buffer_bytes(substream);
++		if (state.residue > 0 && state.residue <= buf_size)
++			pos = buf_size - state.residue;
++	}
++
++	return bytes_to_frames(substream->runtime, pos);
++}
++EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_pointer);
++
++/**
++ * snd_dmaengine_pcm_request_channel - Request channel for the dmaengine PCM
++ * @filter_fn: Filter function used to request the DMA channel
++ * @filter_data: Data passed to the DMA filter function
++ *
++ * Returns NULL or the requested DMA channel.
++ *
++ * This function request a DMA channel for usage with dmaengine PCM.
++ */
++struct dma_chan *snd_dmaengine_pcm_request_channel(dma_filter_fn filter_fn,
++	void *filter_data)
++{
++	dma_cap_mask_t mask;
++
++	dma_cap_zero(mask);
++	dma_cap_set(DMA_SLAVE, mask);
++	dma_cap_set(DMA_CYCLIC, mask);
++
++	return dma_request_channel(mask, filter_fn, filter_data);
++}
++EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_request_channel);
++
++/**
++ * snd_dmaengine_pcm_open - Open a dmaengine based PCM substream
++ * @substream: PCM substream
++ * @chan: DMA channel to use for data transfers
++ *
++ * Returns 0 on success, a negative error code otherwise.
++ *
++ * The function should usually be called from the pcm open callback. Note that
++ * this function will use private_data field of the substream's runtime. So it
++ * is not availabe to your pcm driver implementation.
++ */
++int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
++	struct dma_chan *chan)
++{
++	struct dmaengine_pcm_runtime_data *prtd;
++	int ret;
++
++	if (!chan)
++		return -ENXIO;
++
++	ret = snd_pcm_hw_constraint_integer(substream->runtime,
++					    SNDRV_PCM_HW_PARAM_PERIODS);
++	if (ret < 0)
++		return ret;
++
++	prtd = kzalloc(sizeof(*prtd), GFP_KERNEL);
++	if (!prtd)
++		return -ENOMEM;
++
++	prtd->dma_chan = chan;
++
++	substream->runtime->private_data = prtd;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_open);
++
++/**
++ * snd_dmaengine_pcm_open_request_chan - Open a dmaengine based PCM substream and request channel
++ * @substream: PCM substream
++ * @filter_fn: Filter function used to request the DMA channel
++ * @filter_data: Data passed to the DMA filter function
++ *
++ * Returns 0 on success, a negative error code otherwise.
++ *
++ * This function will request a DMA channel using the passed filter function and
++ * data. The function should usually be called from the pcm open callback. Note
++ * that this function will use private_data field of the substream's runtime. So
++ * it is not availabe to your pcm driver implementation.
++ */
++int snd_dmaengine_pcm_open_request_chan(struct snd_pcm_substream *substream,
++	dma_filter_fn filter_fn, void *filter_data)
++{
++	return snd_dmaengine_pcm_open(substream,
++		    snd_dmaengine_pcm_request_channel(filter_fn, filter_data));
++}
++EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_open_request_chan);
++
++/**
++ * snd_dmaengine_pcm_close - Close a dmaengine based PCM substream
++ * @substream: PCM substream
++ */
++int snd_dmaengine_pcm_close(struct snd_pcm_substream *substream)
++{
++	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
++
++	kfree(prtd);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_close);
++
++/**
++ * snd_dmaengine_pcm_release_chan_close - Close a dmaengine based PCM substream and release channel
++ * @substream: PCM substream
++ *
++ * Releases the DMA channel associated with the PCM substream.
++ */
++int snd_dmaengine_pcm_close_release_chan(struct snd_pcm_substream *substream)
++{
++	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
++
++	dma_release_channel(prtd->dma_chan);
++
++	return snd_dmaengine_pcm_close(substream);
++}
++EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_close_release_chan);
++
++MODULE_LICENSE("GPL");
+diff --git a/sound/soc/Kconfig b/sound/soc/Kconfig
+index 45eeaa9..5138b84 100644
+--- a/sound/soc/Kconfig
++++ b/sound/soc/Kconfig
+@@ -26,12 +26,9 @@ if SND_SOC
+ config SND_SOC_AC97_BUS
+ 	bool
  
- /*
-@@ -40,7 +43,7 @@
-  */
- struct sspa_priv {
- 	struct ssp_device *sspa;
--	struct pxa2xx_pcm_dma_params *dma_params;
-+	struct snd_dmaengine_dai_dma_data *dma_params;
- 	struct clk *audio_clk;
- 	struct clk *sysclk;
- 	int dai_fmt;
-@@ -266,7 +269,7 @@ static int mmp_sspa_hw_params(struct snd_pcm_substream *substream,
- 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
- 	struct sspa_priv *sspa_priv = snd_soc_dai_get_drvdata(dai);
- 	struct ssp_device *sspa = sspa_priv->sspa;
--	struct pxa2xx_pcm_dma_params *dma_params;
-+	struct snd_dmaengine_dai_dma_data *dma_params;
- 	u32 sspa_ctrl;
+-config SND_SOC_DMAENGINE_PCM
+-	bool
+-
+ config SND_SOC_GENERIC_DMAENGINE_PCM
+ 	bool
+-	select SND_SOC_DMAENGINE_PCM
++	select SND_DMAENGINE_PCM
  
- 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-@@ -309,7 +312,7 @@ static int mmp_sspa_hw_params(struct snd_pcm_substream *substream,
- 	}
+ # All the supported SoCs
+ source "sound/soc/atmel/Kconfig"
+diff --git a/sound/soc/Makefile b/sound/soc/Makefile
+index bc02614..61a64d2 100644
+--- a/sound/soc/Makefile
++++ b/sound/soc/Makefile
+@@ -1,10 +1,6 @@
+ snd-soc-core-objs := soc-core.o soc-dapm.o soc-jack.o soc-cache.o soc-utils.o
+ snd-soc-core-objs += soc-pcm.o soc-compress.o soc-io.o
  
- 	dma_params = &sspa_priv->dma_params[substream->stream];
--	dma_params->dev_addr = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
-+	dma_params->addr = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
- 				(sspa->phys_base + SSPA_TXD) :
- 				(sspa->phys_base + SSPA_RXD);
- 	snd_soc_dai_set_dma_data(cpu_dai, substream, dma_params);
-@@ -425,7 +428,8 @@ static int asoc_mmp_sspa_probe(struct platform_device *pdev)
- 		return -ENOMEM;
+-ifneq ($(CONFIG_SND_SOC_DMAENGINE_PCM),)
+-snd-soc-core-objs += soc-dmaengine-pcm.o
+-endif
+-
+ ifneq ($(CONFIG_SND_SOC_GENERIC_DMAENGINE_PCM),)
+ snd-soc-core-objs += soc-generic-dmaengine-pcm.o
+ endif
+diff --git a/sound/soc/omap/Kconfig b/sound/soc/omap/Kconfig
+index 9f5d55e..accd0ff 100644
+--- a/sound/soc/omap/Kconfig
++++ b/sound/soc/omap/Kconfig
+@@ -1,7 +1,7 @@
+ config SND_OMAP_SOC
+ 	tristate "SoC Audio for the Texas Instruments OMAP chips"
+ 	depends on ARCH_OMAP && DMA_OMAP
+-	select SND_SOC_DMAENGINE_PCM
++	select SND_DMAENGINE_PCM
  
- 	priv->dma_params = devm_kzalloc(&pdev->dev,
--			2 * sizeof(struct pxa2xx_pcm_dma_params), GFP_KERNEL);
-+			2 * sizeof(struct snd_dmaengine_dai_dma_data),
-+			GFP_KERNEL);
- 	if (priv->dma_params == NULL)
- 		return -ENOMEM;
- 
-diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
-index 19296f2..c0dcc35 100644
---- a/sound/soc/pxa/pxa-ssp.c
-+++ b/sound/soc/pxa/pxa-ssp.c
-@@ -22,6 +22,7 @@
- #include <linux/io.h>
- #include <linux/pxa2xx_ssp.h>
- #include <linux/of.h>
-+#include <linux/dmaengine.h>
- 
- #include <asm/irq.h>
- 
-@@ -31,9 +32,9 @@
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include <mach/hardware.h>
--#include <mach/dma.h>
- 
- #include "../../arm/pxa2xx-pcm.h"
- #include "pxa-ssp.h"
-@@ -80,27 +81,14 @@ static void pxa_ssp_disable(struct ssp_device *ssp)
- 	__raw_writel(sscr0, ssp->mmio_base + SSCR0);
- }
- 
--struct pxa2xx_pcm_dma_data {
--	struct pxa2xx_pcm_dma_params params;
--	char name[20];
+ config SND_OMAP_SOC_DMIC
+ 	tristate
+diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
+index b358094..4db74a0 100644
+--- a/sound/soc/pxa/Kconfig
++++ b/sound/soc/pxa/Kconfig
+@@ -11,7 +11,7 @@ config SND_PXA2XX_SOC
+ config SND_MMP_SOC
+ 	bool "Soc Audio for Marvell MMP chips"
+ 	depends on ARCH_MMP
+-	select SND_SOC_DMAENGINE_PCM
++	select SND_DMAENGINE_PCM
+ 	select SND_ARM
+ 	help
+ 	  Say Y if you want to add support for codecs attached to
+diff --git a/sound/soc/soc-dmaengine-pcm.c b/sound/soc/soc-dmaengine-pcm.c
+deleted file mode 100644
+index aa924d9..0000000
+--- a/sound/soc/soc-dmaengine-pcm.c
++++ /dev/null
+@@ -1,367 +0,0 @@
+-/*
+- *  Copyright (C) 2012, Analog Devices Inc.
+- *	Author: Lars-Peter Clausen <lars@metafoo.de>
+- *
+- *  Based on:
+- *	imx-pcm-dma-mx2.c, Copyright 2009 Sascha Hauer <s.hauer@pengutronix.de>
+- *	mxs-pcm.c, Copyright (C) 2011 Freescale Semiconductor, Inc.
+- *	ep93xx-pcm.c, Copyright (C) 2006 Lennert Buytenhek <buytenh@wantstofly.org>
+- *		      Copyright (C) 2006 Applied Data Systems
+- *
+- *  This program is free software; you can redistribute it and/or modify it
+- *  under  the terms of the GNU General  Public License as published by the
+- *  Free Software Foundation;  either version 2 of the License, or (at your
+- *  option) any later version.
+- *
+- *  You should have received a copy of the GNU General Public License along
+- *  with this program; if not, write to the Free Software Foundation, Inc.,
+- *  675 Mass Ave, Cambridge, MA 02139, USA.
+- *
+- */
+-#include <linux/module.h>
+-#include <linux/init.h>
+-#include <linux/dmaengine.h>
+-#include <linux/slab.h>
+-#include <sound/pcm.h>
+-#include <sound/pcm_params.h>
+-#include <sound/soc.h>
+-
+-#include <sound/dmaengine_pcm.h>
+-
+-struct dmaengine_pcm_runtime_data {
+-	struct dma_chan *dma_chan;
+-	dma_cookie_t cookie;
+-
+-	unsigned int pos;
 -};
 -
- static void pxa_ssp_set_dma_params(struct ssp_device *ssp, int width4,
--			int out, struct pxa2xx_pcm_dma_params *dma_data)
-+			int out, struct snd_dmaengine_dai_dma_data *dma)
- {
--	struct pxa2xx_pcm_dma_data *dma;
+-static inline struct dmaengine_pcm_runtime_data *substream_to_prtd(
+-	const struct snd_pcm_substream *substream)
+-{
+-	return substream->runtime->private_data;
+-}
 -
--	dma = container_of(dma_data, struct pxa2xx_pcm_dma_data, params);
+-struct dma_chan *snd_dmaengine_pcm_get_chan(struct snd_pcm_substream *substream)
+-{
+-	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
 -
--	snprintf(dma->name, 20, "SSP%d PCM %s %s", ssp->port_id,
--			width4 ? "32-bit" : "16-bit", out ? "out" : "in");
+-	return prtd->dma_chan;
+-}
+-EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_get_chan);
 -
--	dma->params.name = dma->name;
--	dma->params.drcmr = &DRCMR(out ? ssp->drcmr_tx : ssp->drcmr_rx);
--	dma->params.dcmd = (out ? (DCMD_INCSRCADDR | DCMD_FLOWTRG) :
--				  (DCMD_INCTRGADDR | DCMD_FLOWSRC)) |
--			(width4 ? DCMD_WIDTH4 : DCMD_WIDTH2) | DCMD_BURST16;
--	dma->params.dev_addr = ssp->phys_base + SSDR;
-+	dma->filter_data = out ? &ssp->drcmr_tx : &ssp->drcmr_rx;
-+	dma->addr_width = width4 ? DMA_SLAVE_BUSWIDTH_4_BYTES :
-+				   DMA_SLAVE_BUSWIDTH_2_BYTES;
-+	dma->maxburst = 16;
-+	dma->addr = ssp->phys_base + SSDR;
- }
+-/**
+- * snd_hwparams_to_dma_slave_config - Convert hw_params to dma_slave_config
+- * @substream: PCM substream
+- * @params: hw_params
+- * @slave_config: DMA slave config
+- *
+- * This function can be used to initialize a dma_slave_config from a substream
+- * and hw_params in a dmaengine based PCM driver implementation.
+- */
+-int snd_hwparams_to_dma_slave_config(const struct snd_pcm_substream *substream,
+-	const struct snd_pcm_hw_params *params,
+-	struct dma_slave_config *slave_config)
+-{
+-	enum dma_slave_buswidth buswidth;
+-
+-	switch (params_format(params)) {
+-	case SNDRV_PCM_FORMAT_S8:
+-		buswidth = DMA_SLAVE_BUSWIDTH_1_BYTE;
+-		break;
+-	case SNDRV_PCM_FORMAT_S16_LE:
+-		buswidth = DMA_SLAVE_BUSWIDTH_2_BYTES;
+-		break;
+-	case SNDRV_PCM_FORMAT_S18_3LE:
+-	case SNDRV_PCM_FORMAT_S20_3LE:
+-	case SNDRV_PCM_FORMAT_S24_LE:
+-	case SNDRV_PCM_FORMAT_S32_LE:
+-		buswidth = DMA_SLAVE_BUSWIDTH_4_BYTES;
+-		break;
+-	default:
+-		return -EINVAL;
+-	}
+-
+-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+-		slave_config->direction = DMA_MEM_TO_DEV;
+-		slave_config->dst_addr_width = buswidth;
+-	} else {
+-		slave_config->direction = DMA_DEV_TO_MEM;
+-		slave_config->src_addr_width = buswidth;
+-	}
+-
+-	slave_config->device_fc = false;
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(snd_hwparams_to_dma_slave_config);
+-
+-/**
+- * snd_dmaengine_pcm_set_config_from_dai_data() - Initializes a dma slave config
+- *  using DAI DMA data.
+- * @substream: PCM substream
+- * @dma_data: DAI DMA data
+- * @slave_config: DMA slave configuration
+- *
+- * Initializes the {dst,src}_addr, {dst,src}_maxburst, {dst,src}_addr_width and
+- * slave_id fields of the DMA slave config from the same fields of the DAI DMA
+- * data struct. The src and dst fields will be initialized depending on the
+- * direction of the substream. If the substream is a playback stream the dst
+- * fields will be initialized, if it is a capture stream the src fields will be
+- * initialized. The {dst,src}_addr_width field will only be initialized if the
+- * addr_width field of the DAI DMA data struct is not equal to
+- * DMA_SLAVE_BUSWIDTH_UNDEFINED.
+- */
+-void snd_dmaengine_pcm_set_config_from_dai_data(
+-	const struct snd_pcm_substream *substream,
+-	const struct snd_dmaengine_dai_dma_data *dma_data,
+-	struct dma_slave_config *slave_config)
+-{
+-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+-		slave_config->dst_addr = dma_data->addr;
+-		slave_config->dst_maxburst = dma_data->maxburst;
+-		if (dma_data->addr_width != DMA_SLAVE_BUSWIDTH_UNDEFINED)
+-			slave_config->dst_addr_width = dma_data->addr_width;
+-	} else {
+-		slave_config->src_addr = dma_data->addr;
+-		slave_config->src_maxburst = dma_data->maxburst;
+-		if (dma_data->addr_width != DMA_SLAVE_BUSWIDTH_UNDEFINED)
+-			slave_config->src_addr_width = dma_data->addr_width;
+-	}
+-
+-	slave_config->slave_id = dma_data->slave_id;
+-}
+-EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_set_config_from_dai_data);
+-
+-static void dmaengine_pcm_dma_complete(void *arg)
+-{
+-	struct snd_pcm_substream *substream = arg;
+-	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
+-
+-	prtd->pos += snd_pcm_lib_period_bytes(substream);
+-	if (prtd->pos >= snd_pcm_lib_buffer_bytes(substream))
+-		prtd->pos = 0;
+-
+-	snd_pcm_period_elapsed(substream);
+-}
+-
+-static int dmaengine_pcm_prepare_and_submit(struct snd_pcm_substream *substream)
+-{
+-	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
+-	struct dma_chan *chan = prtd->dma_chan;
+-	struct dma_async_tx_descriptor *desc;
+-	enum dma_transfer_direction direction;
+-	unsigned long flags = DMA_CTRL_ACK;
+-
+-	direction = snd_pcm_substream_to_dma_direction(substream);
+-
+-	if (!substream->runtime->no_period_wakeup)
+-		flags |= DMA_PREP_INTERRUPT;
+-
+-	prtd->pos = 0;
+-	desc = dmaengine_prep_dma_cyclic(chan,
+-		substream->runtime->dma_addr,
+-		snd_pcm_lib_buffer_bytes(substream),
+-		snd_pcm_lib_period_bytes(substream), direction, flags);
+-
+-	if (!desc)
+-		return -ENOMEM;
+-
+-	desc->callback = dmaengine_pcm_dma_complete;
+-	desc->callback_param = substream;
+-	prtd->cookie = dmaengine_submit(desc);
+-
+-	return 0;
+-}
+-
+-/**
+- * snd_dmaengine_pcm_trigger - dmaengine based PCM trigger implementation
+- * @substream: PCM substream
+- * @cmd: Trigger command
+- *
+- * Returns 0 on success, a negative error code otherwise.
+- *
+- * This function can be used as the PCM trigger callback for dmaengine based PCM
+- * driver implementations.
+- */
+-int snd_dmaengine_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+-{
+-	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
+-	int ret;
+-
+-	switch (cmd) {
+-	case SNDRV_PCM_TRIGGER_START:
+-		ret = dmaengine_pcm_prepare_and_submit(substream);
+-		if (ret)
+-			return ret;
+-		dma_async_issue_pending(prtd->dma_chan);
+-		break;
+-	case SNDRV_PCM_TRIGGER_RESUME:
+-	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+-		dmaengine_resume(prtd->dma_chan);
+-		break;
+-	case SNDRV_PCM_TRIGGER_SUSPEND:
+-	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+-		dmaengine_pause(prtd->dma_chan);
+-		break;
+-	case SNDRV_PCM_TRIGGER_STOP:
+-		dmaengine_terminate_all(prtd->dma_chan);
+-		break;
+-	default:
+-		return -EINVAL;
+-	}
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_trigger);
+-
+-/**
+- * snd_dmaengine_pcm_pointer_no_residue - dmaengine based PCM pointer implementation
+- * @substream: PCM substream
+- *
+- * This function is deprecated and should not be used by new drivers, as its
+- * results may be unreliable.
+- */
+-snd_pcm_uframes_t snd_dmaengine_pcm_pointer_no_residue(struct snd_pcm_substream *substream)
+-{
+-	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
+-	return bytes_to_frames(substream->runtime, prtd->pos);
+-}
+-EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_pointer_no_residue);
+-
+-/**
+- * snd_dmaengine_pcm_pointer - dmaengine based PCM pointer implementation
+- * @substream: PCM substream
+- *
+- * This function can be used as the PCM pointer callback for dmaengine based PCM
+- * driver implementations.
+- */
+-snd_pcm_uframes_t snd_dmaengine_pcm_pointer(struct snd_pcm_substream *substream)
+-{
+-	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
+-	struct dma_tx_state state;
+-	enum dma_status status;
+-	unsigned int buf_size;
+-	unsigned int pos = 0;
+-
+-	status = dmaengine_tx_status(prtd->dma_chan, prtd->cookie, &state);
+-	if (status == DMA_IN_PROGRESS || status == DMA_PAUSED) {
+-		buf_size = snd_pcm_lib_buffer_bytes(substream);
+-		if (state.residue > 0 && state.residue <= buf_size)
+-			pos = buf_size - state.residue;
+-	}
+-
+-	return bytes_to_frames(substream->runtime, pos);
+-}
+-EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_pointer);
+-
+-/**
+- * snd_dmaengine_pcm_request_channel - Request channel for the dmaengine PCM
+- * @filter_fn: Filter function used to request the DMA channel
+- * @filter_data: Data passed to the DMA filter function
+- *
+- * Returns NULL or the requested DMA channel.
+- *
+- * This function request a DMA channel for usage with dmaengine PCM.
+- */
+-struct dma_chan *snd_dmaengine_pcm_request_channel(dma_filter_fn filter_fn,
+-	void *filter_data)
+-{
+-	dma_cap_mask_t mask;
+-
+-	dma_cap_zero(mask);
+-	dma_cap_set(DMA_SLAVE, mask);
+-	dma_cap_set(DMA_CYCLIC, mask);
+-
+-	return dma_request_channel(mask, filter_fn, filter_data);
+-}
+-EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_request_channel);
+-
+-/**
+- * snd_dmaengine_pcm_open - Open a dmaengine based PCM substream
+- * @substream: PCM substream
+- * @chan: DMA channel to use for data transfers
+- *
+- * Returns 0 on success, a negative error code otherwise.
+- *
+- * The function should usually be called from the pcm open callback. Note that
+- * this function will use private_data field of the substream's runtime. So it
+- * is not availabe to your pcm driver implementation.
+- */
+-int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
+-	struct dma_chan *chan)
+-{
+-	struct dmaengine_pcm_runtime_data *prtd;
+-	int ret;
+-
+-	if (!chan)
+-		return -ENXIO;
+-
+-	ret = snd_pcm_hw_constraint_integer(substream->runtime,
+-					    SNDRV_PCM_HW_PARAM_PERIODS);
+-	if (ret < 0)
+-		return ret;
+-
+-	prtd = kzalloc(sizeof(*prtd), GFP_KERNEL);
+-	if (!prtd)
+-		return -ENOMEM;
+-
+-	prtd->dma_chan = chan;
+-
+-	substream->runtime->private_data = prtd;
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_open);
+-
+-/**
+- * snd_dmaengine_pcm_open_request_chan - Open a dmaengine based PCM substream and request channel
+- * @substream: PCM substream
+- * @filter_fn: Filter function used to request the DMA channel
+- * @filter_data: Data passed to the DMA filter function
+- *
+- * Returns 0 on success, a negative error code otherwise.
+- *
+- * This function will request a DMA channel using the passed filter function and
+- * data. The function should usually be called from the pcm open callback. Note
+- * that this function will use private_data field of the substream's runtime. So
+- * it is not availabe to your pcm driver implementation.
+- */
+-int snd_dmaengine_pcm_open_request_chan(struct snd_pcm_substream *substream,
+-	dma_filter_fn filter_fn, void *filter_data)
+-{
+-	return snd_dmaengine_pcm_open(substream,
+-		    snd_dmaengine_pcm_request_channel(filter_fn, filter_data));
+-}
+-EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_open_request_chan);
+-
+-/**
+- * snd_dmaengine_pcm_close - Close a dmaengine based PCM substream
+- * @substream: PCM substream
+- */
+-int snd_dmaengine_pcm_close(struct snd_pcm_substream *substream)
+-{
+-	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
+-
+-	kfree(prtd);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_close);
+-
+-/**
+- * snd_dmaengine_pcm_release_chan_close - Close a dmaengine based PCM substream and release channel
+- * @substream: PCM substream
+- *
+- * Releases the DMA channel associated with the PCM substream.
+- */
+-int snd_dmaengine_pcm_close_release_chan(struct snd_pcm_substream *substream)
+-{
+-	struct dmaengine_pcm_runtime_data *prtd = substream_to_prtd(substream);
+-
+-	dma_release_channel(prtd->dma_chan);
+-
+-	return snd_dmaengine_pcm_close(substream);
+-}
+-EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_close_release_chan);
+-
+-MODULE_LICENSE("GPL");
+diff --git a/sound/soc/spear/Kconfig b/sound/soc/spear/Kconfig
+index 3567d73..0a53053 100644
+--- a/sound/soc/spear/Kconfig
++++ b/sound/soc/spear/Kconfig
+@@ -1,6 +1,6 @@
+ config SND_SPEAR_SOC
+ 	tristate
+-	select SND_SOC_DMAENGINE_PCM
++	select SND_DMAENGINE_PCM
  
- static int pxa_ssp_startup(struct snd_pcm_substream *substream,
-@@ -108,7 +96,7 @@ static int pxa_ssp_startup(struct snd_pcm_substream *substream,
- {
- 	struct ssp_priv *priv = snd_soc_dai_get_drvdata(cpu_dai);
- 	struct ssp_device *ssp = priv->ssp;
--	struct pxa2xx_pcm_dma_data *dma;
-+	struct snd_dmaengine_dai_dma_data *dma;
- 	int ret = 0;
- 
- 	if (!cpu_dai->active) {
-@@ -116,10 +104,10 @@ static int pxa_ssp_startup(struct snd_pcm_substream *substream,
- 		pxa_ssp_disable(ssp);
- 	}
- 
--	dma = kzalloc(sizeof(struct pxa2xx_pcm_dma_data), GFP_KERNEL);
-+	dma = kzalloc(sizeof(struct snd_dmaengine_dai_dma_data), GFP_KERNEL);
- 	if (!dma)
- 		return -ENOMEM;
--	snd_soc_dai_set_dma_data(cpu_dai, substream, &dma->params);
-+	snd_soc_dai_set_dma_data(cpu_dai, substream, dma);
- 
- 	return ret;
- }
-@@ -560,7 +548,7 @@ static int pxa_ssp_hw_params(struct snd_pcm_substream *substream,
- 	u32 sspsp;
- 	int width = snd_pcm_format_physical_width(params_format(params));
- 	int ttsa = pxa_ssp_read_reg(ssp, SSTSA) & 0xf;
--	struct pxa2xx_pcm_dma_params *dma_data;
-+	struct snd_dmaengine_dai_dma_data *dma_data;
- 
- 	dma_data = snd_soc_dai_get_dma_data(cpu_dai, substream);
- 
-diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
-index 1475515..f1059d9 100644
---- a/sound/soc/pxa/pxa2xx-ac97.c
-+++ b/sound/soc/pxa/pxa2xx-ac97.c
-@@ -14,15 +14,16 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/dmaengine.h>
- 
- #include <sound/core.h>
- #include <sound/ac97_codec.h>
- #include <sound/soc.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include <mach/hardware.h>
- #include <mach/regs-ac97.h>
--#include <mach/dma.h>
- #include <mach/audio.h>
- 
- #include "pxa2xx-ac97.h"
-@@ -48,44 +49,44 @@ static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
- 	.reset	= pxa2xx_ac97_cold_reset,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_stereo_out = {
--	.name			= "AC97 PCM Stereo out",
--	.dev_addr		= __PREG(PCDR),
--	.drcmr			= &DRCMR(12),
--	.dcmd			= DCMD_INCSRCADDR | DCMD_FLOWTRG |
--				  DCMD_BURST32 | DCMD_WIDTH4,
-+static unsigned long pxa2xx_ac97_pcm_stereo_in_req = 12;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_stereo_in = {
-+	.addr		= __PREG(PCDR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.maxburst	= 32,
-+	.filter_data	= &pxa2xx_ac97_pcm_stereo_in_req,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_stereo_in = {
--	.name			= "AC97 PCM Stereo in",
--	.dev_addr		= __PREG(PCDR),
--	.drcmr			= &DRCMR(11),
--	.dcmd			= DCMD_INCTRGADDR | DCMD_FLOWSRC |
--				  DCMD_BURST32 | DCMD_WIDTH4,
-+static unsigned long pxa2xx_ac97_pcm_stereo_out_req = 11;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_stereo_out = {
-+	.addr		= __PREG(PCDR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.maxburst	= 32,
-+	.filter_data	= &pxa2xx_ac97_pcm_stereo_out_req,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_aux_mono_out = {
--	.name			= "AC97 Aux PCM (Slot 5) Mono out",
--	.dev_addr		= __PREG(MODR),
--	.drcmr			= &DRCMR(10),
--	.dcmd			= DCMD_INCSRCADDR | DCMD_FLOWTRG |
--				  DCMD_BURST16 | DCMD_WIDTH2,
-+static unsigned long pxa2xx_ac97_pcm_aux_mono_out_req = 10;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_aux_mono_out = {
-+	.addr		= __PREG(MODR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_2_BYTES,
-+	.maxburst	= 16,
-+	.filter_data	= &pxa2xx_ac97_pcm_aux_mono_out_req,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_aux_mono_in = {
--	.name			= "AC97 Aux PCM (Slot 5) Mono in",
--	.dev_addr		= __PREG(MODR),
--	.drcmr			= &DRCMR(9),
--	.dcmd			= DCMD_INCTRGADDR | DCMD_FLOWSRC |
--				  DCMD_BURST16 | DCMD_WIDTH2,
-+static unsigned long pxa2xx_ac97_pcm_aux_mono_in_req = 9;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_aux_mono_in = {
-+	.addr		= __PREG(MODR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_2_BYTES,
-+	.maxburst	= 16,
-+	.filter_data	= &pxa2xx_ac97_pcm_aux_mono_in_req,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_ac97_pcm_mic_mono_in = {
--	.name			= "AC97 Mic PCM (Slot 6) Mono in",
--	.dev_addr		= __PREG(MCDR),
--	.drcmr			= &DRCMR(8),
--	.dcmd			= DCMD_INCTRGADDR | DCMD_FLOWSRC |
--				  DCMD_BURST16 | DCMD_WIDTH2,
-+static unsigned long pxa2xx_ac97_pcm_aux_mic_mono_req = 8;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_mic_mono_in = {
-+	.addr		= __PREG(MCDR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_2_BYTES,
-+	.maxburst	= 16,
-+	.filter_data	= &pxa2xx_ac97_pcm_aux_mic_mono_req,
- };
- 
- #ifdef CONFIG_PM
-@@ -119,7 +120,7 @@ static int pxa2xx_ac97_hw_params(struct snd_pcm_substream *substream,
- 				 struct snd_pcm_hw_params *params,
- 				 struct snd_soc_dai *cpu_dai)
- {
--	struct pxa2xx_pcm_dma_params *dma_data;
-+	struct snd_dmaengine_dai_dma_data *dma_data;
- 
- 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
- 		dma_data = &pxa2xx_ac97_pcm_stereo_out;
-@@ -135,7 +136,7 @@ static int pxa2xx_ac97_hw_aux_params(struct snd_pcm_substream *substream,
- 				     struct snd_pcm_hw_params *params,
- 				     struct snd_soc_dai *cpu_dai)
- {
--	struct pxa2xx_pcm_dma_params *dma_data;
-+	struct snd_dmaengine_dai_dma_data *dma_data;
- 
- 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
- 		dma_data = &pxa2xx_ac97_pcm_aux_mono_out;
-diff --git a/sound/soc/pxa/pxa2xx-i2s.c b/sound/soc/pxa/pxa2xx-i2s.c
-index f7ca716..d5340a0 100644
---- a/sound/soc/pxa/pxa2xx-i2s.c
-+++ b/sound/soc/pxa/pxa2xx-i2s.c
-@@ -23,9 +23,9 @@
- #include <sound/initval.h>
- #include <sound/soc.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include <mach/hardware.h>
--#include <mach/dma.h>
- #include <mach/audio.h>
- 
- #include "pxa2xx-i2s.h"
-@@ -82,20 +82,20 @@ static struct pxa_i2s_port pxa_i2s;
- static struct clk *clk_i2s;
- static int clk_ena = 0;
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_i2s_pcm_stereo_out = {
--	.name			= "I2S PCM Stereo out",
--	.dev_addr		= __PREG(SADR),
--	.drcmr			= &DRCMR(3),
--	.dcmd			= DCMD_INCSRCADDR | DCMD_FLOWTRG |
--				  DCMD_BURST32 | DCMD_WIDTH4,
-+static unsigned long pxa2xx_i2s_pcm_stereo_out_req = 3;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_i2s_pcm_stereo_out = {
-+	.addr		= __PREG(SADR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.maxburst	= 32,
-+	.filter_data	= &pxa2xx_i2s_pcm_stereo_out_req,
- };
- 
--static struct pxa2xx_pcm_dma_params pxa2xx_i2s_pcm_stereo_in = {
--	.name			= "I2S PCM Stereo in",
--	.dev_addr		= __PREG(SADR),
--	.drcmr			= &DRCMR(2),
--	.dcmd			= DCMD_INCTRGADDR | DCMD_FLOWSRC |
--				  DCMD_BURST32 | DCMD_WIDTH4,
-+static unsigned long pxa2xx_i2s_pcm_stereo_in_req = 2;
-+static struct snd_dmaengine_dai_dma_data pxa2xx_i2s_pcm_stereo_in = {
-+	.addr		= __PREG(SADR),
-+	.addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	.maxburst	= 32,
-+	.filter_data	= &pxa2xx_i2s_pcm_stereo_in_req,
- };
- 
- static int pxa2xx_i2s_startup(struct snd_pcm_substream *substream,
-@@ -163,7 +163,7 @@ static int pxa2xx_i2s_hw_params(struct snd_pcm_substream *substream,
- 				struct snd_pcm_hw_params *params,
- 				struct snd_soc_dai *dai)
- {
--	struct pxa2xx_pcm_dma_params *dma_data;
-+	struct snd_dmaengine_dai_dma_data *dma_data;
- 
- 	BUG_ON(IS_ERR(clk_i2s));
- 	clk_prepare_enable(clk_i2s);
-diff --git a/sound/soc/pxa/pxa2xx-pcm.c b/sound/soc/pxa/pxa2xx-pcm.c
-index ecff116..0aa2d69 100644
---- a/sound/soc/pxa/pxa2xx-pcm.c
-+++ b/sound/soc/pxa/pxa2xx-pcm.c
-@@ -12,10 +12,12 @@
- 
- #include <linux/dma-mapping.h>
- #include <linux/module.h>
-+#include <linux/dmaengine.h>
- 
- #include <sound/core.h>
- #include <sound/soc.h>
- #include <sound/pxa2xx-lib.h>
-+#include <sound/dmaengine_pcm.h>
- 
- #include "../../arm/pxa2xx-pcm.h"
- 
-@@ -25,7 +27,7 @@ static int pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 	struct snd_pcm_runtime *runtime = substream->runtime;
- 	struct pxa2xx_runtime_data *prtd = runtime->private_data;
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct pxa2xx_pcm_dma_params *dma;
-+	struct snd_dmaengine_dai_dma_data *dma;
- 	int ret;
- 
- 	dma = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
-@@ -39,7 +41,7 @@ static int pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 	 * with different params */
- 	if (prtd->params == NULL) {
- 		prtd->params = dma;
--		ret = pxa_request_dma(prtd->params->name, DMA_PRIO_LOW,
-+		ret = pxa_request_dma("name", DMA_PRIO_LOW,
- 			      pxa2xx_pcm_dma_irq, substream);
- 		if (ret < 0)
- 			return ret;
-@@ -47,7 +49,7 @@ static int pxa2xx_pcm_hw_params(struct snd_pcm_substream *substream,
- 	} else if (prtd->params != dma) {
- 		pxa_free_dma(prtd->dma_ch);
- 		prtd->params = dma;
--		ret = pxa_request_dma(prtd->params->name, DMA_PRIO_LOW,
-+		ret = pxa_request_dma("name", DMA_PRIO_LOW,
- 			      pxa2xx_pcm_dma_irq, substream);
- 		if (ret < 0)
- 			return ret;
+ config SND_SPEAR_SPDIF_OUT
+ 	tristate
 -- 
 1.8.3.1
