@@ -1,32 +1,116 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Mon, 12 Aug 2013 22:24:59 +0200 (CEST)
-Subject: [PATCH 9/16] arch/arm/mach-pxa/mioa701.c: Avoid using
- ARRAY_AND_SIZE(e) as a function argument
-In-Reply-To: <87r4dyy93t.fsf@free.fr>
-References: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
- <1376239917-15594-10-git-send-email-Julia.Lawall@lip6.fr>
- <87r4dyy93t.fsf@free.fr>
-Message-ID: <alpine.DEB.2.02.1308122224430.2128@localhost6.localdomain6>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 12 Aug 2013 22:42:43 +0200
+Subject: [PATCH] usb: gadget: at91_udc: add usb_clk for transition to
+ common clk framework
+In-Reply-To: <5208E881.3030205@atmel.com>
+References: <1375337885-2684-1-git-send-email-b.brezillon@overkiz.com>
+ <5208E881.3030205@atmel.com>
+Message-ID: <520948C3.7060008@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Aug 2013, Robert Jarzmik wrote:
+Hello Nicolas,
 
-> Julia Lawall <Julia.Lawall@lip6.fr> writes:
-> 
-> > From: Julia Lawall <Julia.Lawall@lip6.fr>
-> >
-> > Replace ARRAY_AND_SIZE(e) in function argument position to avoid hiding the
-> > arity of the called function.
-> 
-> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> 
-> As a side I'm curious why this change didn't touch also :
-> sound/soc/pxa/mioa701_wm9713.c
-> 
-> If it does, this ack stands as well for the other file (with removal of the
-> #define in mioa701_wm9713.c).
-
-I'll check.  Thanks for the feedback.
-
-julia
+On 12/08/2013 15:52, Nicolas Ferre wrote:
+> On 01/08/2013 08:18, Boris BREZILLON :
+>> The AT91 PMC (Power Management Controller) provides an USB clock used by
+>> USB Full Speed host (ohci) and USB Full Speed device (udc).
+>> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
+>> This configuration was formely done in mach-at91/clock.c, but this
+>> implementation will be removed when moving to common clk framework.
+>>
+>> This patch adds support for usb clock retrieval and configuration, 
+>> and is
+>> backward compatible with the current at91 clk implementation (if usb clk
+>> is not found, it does not configure/enable it).
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+Is there a reason you acked this version but not the 3rd one 
+(https://lkml.org/lkml/2013/8/2/102).
+>> ---
+>>   drivers/usb/gadget/at91_udc.c |   17 ++++++++++++++++-
+>>   drivers/usb/gadget/at91_udc.h |    2 +-
+>>   2 files changed, 17 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/usb/gadget/at91_udc.c 
+>> b/drivers/usb/gadget/at91_udc.c
+>> index fce8e4e..ae06585 100644
+>> --- a/drivers/usb/gadget/at91_udc.c
+>> +++ b/drivers/usb/gadget/at91_udc.c
+>> @@ -870,6 +870,11 @@ static void clk_on(struct at91_udc *udc)
+>>       if (udc->clocked)
+>>           return;
+>>       udc->clocked = 1;
+>> +
+>> +    if (!IS_ERR(udc->uclk)) {
+>> +        clk_set_rate(udc->uclk, 48000000);
+>> +        clk_prepare_enable(udc->uclk);
+>> +    }
+>>       clk_prepare_enable(udc->iclk);
+>>       clk_prepare_enable(udc->fclk);
+>>   }
+>> @@ -882,6 +887,8 @@ static void clk_off(struct at91_udc *udc)
+>>       udc->gadget.speed = USB_SPEED_UNKNOWN;
+>>       clk_disable_unprepare(udc->fclk);
+>>       clk_disable_unprepare(udc->iclk);
+>> +    if (!IS_ERR(udc->uclk))
+>> +        clk_disable_unprepare(udc->uclk);
+>>   }
+>>
+>>   /*
+>> @@ -1774,10 +1781,10 @@ static int at91udc_probe(struct 
+>> platform_device *pdev)
+>>       /* get interface and function clocks */
+>>       udc->iclk = clk_get(dev, "udc_clk");
+>>       udc->fclk = clk_get(dev, "udpck");
+>> +    udc->uclk = clk_get(dev, "usb_clk");
+>>       if (IS_ERR(udc->iclk) || IS_ERR(udc->fclk)) {
+>>           DBG("clocks missing\n");
+>>           retval = -ENODEV;
+>> -        /* NOTE: we "know" here that refcounts on these are NOPs */
+>>           goto fail1;
+>>       }
+>>
+>> @@ -1851,6 +1858,12 @@ fail3:
+>>   fail2:
+>>       free_irq(udc->udp_irq, udc);
+>>   fail1:
+>> +    if (!IS_ERR(udc->uclk))
+>> +        clk_put(udc->uclk);
+>> +    if (!IS_ERR(udc->fclk))
+>> +        clk_put(udc->fclk);
+>> +    if (!IS_ERR(udc->iclk))
+>> +        clk_put(udc->iclk);
+>>       iounmap(udc->udp_baseaddr);
+>>   fail0a:
+>>       if (cpu_is_at91rm9200())
+>> @@ -1894,6 +1907,8 @@ static int __exit at91udc_remove(struct 
+>> platform_device *pdev)
+>>
+>>       clk_put(udc->iclk);
+>>       clk_put(udc->fclk);
+>> +    if (!IS_ERR(udc->uclk))
+>> +        clk_put(udc->uclk);
+>>
+>>       return 0;
+>>   }
+>> diff --git a/drivers/usb/gadget/at91_udc.h 
+>> b/drivers/usb/gadget/at91_udc.h
+>> index e647d1c..0175246 100644
+>> --- a/drivers/usb/gadget/at91_udc.h
+>> +++ b/drivers/usb/gadget/at91_udc.h
+>> @@ -126,7 +126,7 @@ struct at91_udc {
+>>       unsigned            active_suspend:1;
+>>       u8                addr;
+>>       struct at91_udc_data        board;
+>> -    struct clk            *iclk, *fclk;
+>> +    struct clk            *iclk, *fclk, *uclk;
+>>       struct platform_device        *pdev;
+>>       struct proc_dir_entry        *pde;
+>>       void __iomem            *udp_baseaddr;
+>>
+>
+>
