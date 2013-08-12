@@ -1,68 +1,101 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Aug 2013 14:59:03 +0100
-Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <20130807014536.GF15579@mudshark.cambridge.arm.com>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
- <51FF8E84.7000108@arm.com>
- <20130807014536.GF15579@mudshark.cambridge.arm.com>
-Message-ID: <20130812135903.GC25995@mudshark.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 12 Aug 2013 14:59:31 +0100
+Subject: [PATCH v3 3/3] cpuidle: big.LITTLE: vexpress-TC2 CPU idle driver
+In-Reply-To: <5204F28E.1050204@linaro.org>
+References: <1375875813-13358-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1375875813-13358-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <5203C098.9000701@linaro.org>
+ <20130808161826.GB3742@e102568-lin.cambridge.arm.com>
+ <5204F28E.1050204@linaro.org>
+Message-ID: <20130812135930.GA21780@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 02:45:36AM +0100, Will Deacon wrote:
-> On Mon, Aug 05, 2013 at 12:37:40PM +0100, Punit Agrawal wrote:
-> > On 23/07/13 10:19, Punit Agrawal wrote:
-> > > The CCI PMU can profile bus transactions at the master and slave
-> > > interfaces of the CCI. The PMU can be used to observe an aggregated view
-> > > of the bus traffic between the various components connected to the CCI.
-> > >
-> > > Extend the existing CCI driver to support the PMU by registering a perf
-> > > backend for it.
-> > >
-> > > Document the device tree binding to describe the CCI PMU.
-> > >
-> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Cc: Nicolas Pitre <nico@linaro.org>
-> > > Cc: Dave Martin <dave.martin@linaro.org>
-> > > Cc: Rob Herring <rob.herring@calxeda.com>
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > > Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> > > Reviewed-by: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > >   Documentation/devicetree/bindings/arm/cci.txt |   38 ++
-> > >   drivers/bus/arm-cci.c                         |  642 +++++++++++++++++++++++++
-> > >   2 files changed, 680 insertions(+)
-> > >
+On Fri, Aug 09, 2013 at 02:45:50PM +0100, Daniel Lezcano wrote:
+> On 08/08/2013 06:18 PM, Lorenzo Pieralisi wrote:
+> > On Thu, Aug 08, 2013 at 05:00:24PM +0100, Daniel Lezcano wrote:
+> >> On 08/07/2013 01:43 PM, Lorenzo Pieralisi wrote:
+> >>> The big.LITTLE architecture is composed of two clusters of cpus. One cluster
+> >>> contains less powerful but more energy efficient processors and the other
+> >>> cluster groups the powerful but energy-intensive cpus.
+> >>>
+> >>> The TC2 testchip implements two clusters of CPUs (A7 and A15 clusters in
+> >>> a big.LITTLE configuration) connected through a CCI interconnect that manages
+> >>> coherency of their respective L2 caches and intercluster distributed
+> >>> virtual memory messages (DVM).
+> >>>
+> >>> TC2 testchip integrates a power controller that manages cores resets, wake-up
+> >>> IRQs and cluster low-power states. Power states are managed at cluster
+> >>> level, which means that voltage is removed from a cluster iff all cores
+> >>> in a cluster are in a wfi state. Single cores can enter a reset state
+> >>> which is identical to wfi in terms of power consumption but simplifies the
+> >>> way cluster states are entered.
+> >>>
+> >>> This patch provides a multiple driver CPU idle implementation for TC2
+> >>> which paves the way for a generic big.LITTLE idle driver for all
+> >>> upcoming big.LITTLE based systems on chip.
+> >>>
+> >>> The driver relies on the MCPM infrastructure to coordinate and manage
+> >>> core power states; in particular MCPM allows to suspend specific cores
+> >>> and hides the CPUs coordination required to shut-down clusters of CPUs.
+> >>>
+> >>> Power down sequences for the respective clusters are implemented in the
+> >>> MCPM TC2 backend, with all code needed to clean caches and exit coherency.
+> >>>
+> >>> The multiple driver CPU idle infrastructure allows to define different
+> >>> C-states for big and little cores, determined at boot by checking the
+> >>> part id of the possible CPUs and initializing the respective logical
+> >>> masks in the big and little drivers.
+> >>>
+> >>> Current big.little systems are composed of A7 and A15 clusters, as
+> >>> implemented in TC2, but in the future that may change and the driver
+> >>> will have evolve to retrieve what is a 'big' cpu and what is a 'little'
+> >>> cpu in order to build the correct topology.
+> >>>
+> >>> Cc: Kevin Hilman <khilman@linaro.org>
+> >>> Cc: Amit Kucheria <amit.kucheria@linaro.org>
+> >>> Cc: Olof Johansson <olof@lixom.net>
+> >>> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> >>> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> >>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>> ---
+> >>
+> >> A nit below :/
+> >>
+> >> [ ... ]
+> >>
+> >>> +
+> >>> +static struct cpuidle_driver bl_idle_big_driver = {
+> >>> +	.name = "big_idle",
+> >>> +	.owner = THIS_MODULE,
+> >>> +	.states[0] = ARM_CPUIDLE_WFI_STATE,
+> >>> +	.states[1] = {
+> >>> +		.enter			= bl_enter_powerdown,
+> >>> +
+> >>> +		.exit_latency		= 500,
+> >>
+> >> Extra line between enter and exit_latency.
 > > 
-> > It's been 2 rc's since this patch was posted. If there are no objections 
-> > would you be ok to take this patch via your tree?
+> > Gah, not anymore :)
+> > 
+> > Other than that, is it ready to go ? If nobody complains I have planned
+> > to send a pull request early next week, as soon as a stable branch for
+> > TC2 MCPM gets in arm-soc.
 > 
-> Sure. I'm currently travelling at the moment, so I'll try and get this done
-> as soon as I'm back.
+> 
+> It sounds good to me.
 
-So, I just tried to test this patch but I'm getting issues when enabling CCI
-with mainline:
+Ok. Olof, Kevin, I prepared a pull request based on top of:
 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/190067.html
 
-ARM Versatile Express Boot Monitor
-Version:    V5.1.5
-Build Date: Jul 24 2012
-Daughterboard Site 1: V2P-CA15 Cortex A15
-Daughterboard Site 2: V2P-CA15_A7 Cortex A15
-Running boot script from flash - BOOTSCRIPT
-Loaded kernel - linuxtc2
-Booting kernel @ 0x80008000
-Command line 'ip=dhcp root=/dev/nfs nfsroot=10.1.203.36:/exports/linaro-13.06,tcp rw console=ttyAMA0,38400 mem=2G loglevel=9 user_debug=31 earlyprintk debug'
-ATAGs @ 0x80000100
+we probably need to fix a simple niggle in that code,
 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/191303.html
 
-Fatal Error: Unhandled Exception - Undefined
+do you want me to wait for it before asking to pull, or I can send a PR
+straight away and we will deal with conflicts (if any) later ?
 
-
-We're exploding *really* early, and I have no idea why. If I remove CCI from
-the equation (either in the kernel or the device-tree), then I can boot as
-per usual.
-
-Any ideas? Do I need to enable something in the TC2 board firmware?
-
-Will
+Thanks,
+Lorenzo
