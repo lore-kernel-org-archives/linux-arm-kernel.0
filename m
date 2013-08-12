@@ -1,39 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 12 Aug 2013 15:49:03 +0800
-Subject: [PATCH] pinctrl: i.MX: Make more robust against devicetree errors
-In-Reply-To: <1376050854-3303-1-git-send-email-s.hauer@pengutronix.de>
-References: <1376050854-3303-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130812074901.GD25061@S2101-09.ap.freescale.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 12 Aug 2013 13:19:32 +0530
+Subject: [PATCH 08/35] cpufreq: cpufreq-cpu0: use
+ cpufreq_table_validate_and_show()
+In-Reply-To: <20130812073522.GC25061@S2101-09.ap.freescale.net>
+References: <cover.1375964117.git.viresh.kumar@linaro.org>
+ <59d56d7aea5dfb69bc7bda0c40529d3ef15efcab.1375964117.git.viresh.kumar@linaro.org>
+ <20130812073522.GC25061@S2101-09.ap.freescale.net>
+Message-ID: <CAKohpomRmEbHp0UMmNcrM815WS6fnBMfdoJRQY_dwZ5fW1SB_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 02:20:49PM +0200, Sascha Hauer wrote:
-> When there is something wrong with pinctrl in the i.MX devicetree
-> files this usually means the i.MX pinctrl driver bails out completely.
-> In this case even the console is nonfunctional since it can't get
-> the pins. Enabling earlyprintk isn't very helpful since the driver
-> only prints that something is wrong, but not what is wrong.
-> 
-> With this series the i.MX pinctrl driver continues on errors so that
-> the system stays working and only the erroneous pinctrl groups fail
-> later. Also the error messages are supplemented with the offending
-> devicetree node to give a clue what went wrong.
-> 
-> Sascha
-> 
-> ----------------------------------------------------------------
-> Sascha Hauer (5):
->       pinctrl: imx: make error messages more informative
->       pinctrl: imx: Catch no fsl,pins property
->       pinctrl: imx: do not fail when parsing a group fails
->       pinctrl: imx: do not fail when parsing a function fails
->       pinctrl: imx: Use struct type for pins
+On 12 August 2013 13:05, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Thu, Aug 08, 2013 at 07:18:10PM +0530, Viresh Kumar wrote:
+>> Lets use cpufreq_table_validate_and_show() instead of calling
+>> cpufreq_frequency_table_cpuinfo() and cpufreq_frequency_table_get_attr().
+>>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>
+> I'm not copied on the patch that introduces function
+> cpufreq_table_validate_and_show().  So if it does the right/equivalent
+> thing, for cpufreq-cpu0 and imx6q-cpufreq:
 
-For the series,
+You better check it :)
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+https://lkml.org/lkml/2013/8/8/266
 
-> 
->  drivers/pinctrl/pinctrl-imx.c | 95 ++++++++++++++++++++-----------------------
->  drivers/pinctrl/pinctrl-imx.h | 36 +++++++++-------
->  2 files changed, 64 insertions(+), 67 deletions(-)
+I wasn't probably following the right way for sending mails as I was expecting
+people to look at these patches over list..
+
+In the next series with 44 patch I tried to fix this issue. And so cc'd people
+on cover-letter and the important patch they must check.
+
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+Thanks.
