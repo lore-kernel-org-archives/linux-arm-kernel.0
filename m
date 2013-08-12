@@ -1,60 +1,167 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 12 Aug 2013 13:22:49 -0700
-Subject: [PATCH V2] USB: OHCI: make ohci-nxp a separate driver
-In-Reply-To: <1376120655-31149-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1372585818-8441-1-git-send-email-manjunath.goudar@linaro.org>
- <1376120655-31149-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <20130812202249.GA26423@kroah.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 12 Aug 2013 13:23:47 -0700
+Subject: [PATCH v1 03/14] clk: Add of_clk_match() for device drivers
+In-Reply-To: <1374713022-6049-4-git-send-email-sboyd@codeaurora.org>
+References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
+ <1374713022-6049-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130812202347.5348.76490@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 10, 2013 at 01:14:15PM +0530, Manjunath Goudar wrote:
-> Separate the OHCI NXP host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM.
+Quoting Stephen Boyd (2013-07-24 17:43:31)
+> In similar fashion as of_regulator_match() add an of_clk_match()
+> function that finds an initializes clock init_data structs from
+> devicetree. Drivers should use this API to find clocks that their
+> device is providing and then iterate over their match table
+> registering the clocks with the init data parsed.
 > 
-> Many place function name and struct name started with usb,
-> current scenario replaced usb with ohci for proper naming.
-> 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: linux-usb at vger.kernel.org
-> 
-> V2:
->   - Directive check NXP_PLATFORM_DRIVER block has been removed.
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Stephen,
+
+In general I like this approach. Writing real device drivers for clock
+controllers is The Right Way and of_clk_match helps.
+
+Am I reading this correctly that the base register addresses/offsets for
+the clock nodes still come from C files? For example I still see
+pll8_desc defining reg stuff in drivers/clk/msm/gcc-8960.c.
+
+What do you think about fetching this data from DT? My thinking here is
+that the definition of that PLL structure would be in C, as would all of
+the control logic. But any per-clock data whatsoever should live in DTS.
+This means the clock data you supply in the DTS files in patches #9 and
+#10 would have base addresses or offsets per-clock. I think this echoes
+Mark R's concerns as well.
+
+In the future if new chips have more of that type of PLL it would not
+require changes to your clock driver, only new DTS data for the new
+chip.
+
+I could have that wrong though, there is a fair amount of indirection in
+this series...
+
+Regards,
+Mike
+
 > ---
->  drivers/usb/host/Kconfig    |    8 +++
->  drivers/usb/host/Makefile   |    1 +
->  drivers/usb/host/ohci-hcd.c |   18 -------
->  drivers/usb/host/ohci-nxp.c |  124 +++++++++++++++++--------------------------
->  4 files changed, 58 insertions(+), 93 deletions(-)
-
-Also failed to apply:
-
-checking file drivers/usb/host/Kconfig
-Hunk #1 FAILED at 398.
-1 out of 1 hunk FAILED
-checking file drivers/usb/host/Makefile
-Hunk #1 FAILED at 50.
-1 out of 1 hunk FAILED
-checking file drivers/usb/host/ohci-hcd.c
-Hunk #1 succeeded at 1212 with fuzz 1 (offset 18 lines).
-Hunk #2 succeeded at 1349 with fuzz 1 (offset 53 lines).
-Hunk #3 FAILED at 1309.
-Hunk #4 FAILED at 1357.
-2 out of 4 hunks FAILED
-checking file drivers/usb/host/ohci-nxp.c
-
-{sigh}
-
-That's why I required a senior Linaro developer to approve these
-patches.  You just wasted a bunch of my time, and it was obvious that no
-one else actually tried these patches out, as they can't even be
-applied!
-
-Deepak, come on, you know better :(
-
-greg k-h
+>  drivers/clk/clk.c            | 64 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clk-provider.h | 16 +++++++++++
+>  2 files changed, 80 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index ea8e951b..1e3e0db 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2289,4 +2289,68 @@ err:
+>         return -ENOMEM;
+>  }
+>  EXPORT_SYMBOL_GPL(of_init_clk_data);
+> +
+> +/**
+> + * of_clk_match() - Scan and match clock providers from the DT node of a device
+> + * @dev: device initializing clock providers
+> + * @matches: match table of clocks
+> + * @num_matches: number of entries in @matches
+> + *
+> + * This function uses a match table specified by the clock driver to parse
+> + * clock init data from the device tree. @dev is expected to be a device with
+> + * a 'clocks' child node containing a set of child nodes, each providing the
+> + * init data for one clock. The data parsed from a child node will be matched
+> + * to a clock based on the child node's name. Note that the match table is
+> + * modified in place.
+> + *
+> + * Returns the number of matches found or a negative error code on failure.
+> + */
+> +int of_clk_match(struct device *dev, struct of_clk_match *matches,
+> +                int num_matches)
+> +{
+> +       int count = 0;
+> +       int err, i;
+> +       struct device_node *np, *clocks;
+> +       struct clk_init_data *init;
+> +
+> +       clocks = of_find_node_by_name(dev->of_node, "clocks");
+> +       if (!clocks)
+> +               return -EINVAL;
+> +
+> +       for (i = 0; i < num_matches; i++) {
+> +               struct of_clk_match *match = &matches[i];
+> +               match->init_data = NULL;
+> +               match->of_node = NULL;
+> +       }
+> +
+> +       for_each_available_child_of_node(clocks, np) {
+> +               for (i = 0; i < num_matches; i++) {
+> +                       struct of_clk_match *match = &matches[i];
+> +                       if (match->of_node)
+> +                               continue;
+> +
+> +                       if (strcmp(match->name, np->name))
+> +                               continue;
+> +
+> +                       init = devm_kzalloc(dev, sizeof(*init), GFP_KERNEL);
+> +                       if (!init)
+> +                               return -ENOMEM;
+> +
+> +                       err = of_init_clk_data(np, init);
+> +                       if (err) {
+> +                               dev_err(dev,
+> +                                       "failed to parse DT for clock %s\n",
+> +                                       np->name);
+> +                               return err;
+> +                       }
+> +                       match->of_node = np;
+> +                       match->init_data = init;
+> +                       count++;
+> +                       break;
+> +               }
+> +       }
+> +
+> +       return count;
+> +}
+> +EXPORT_SYMBOL_GPL(of_clk_match);
+>  #endif
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 18d6362..484f8ad 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -461,6 +461,13 @@ struct clk_onecell_data {
+>                 __used __section(__clk_of_table)                \
+>                 = { .compatible = compat, .data = fn };
+>  
+> +struct of_clk_match {
+> +       const char *name;
+> +       void *driver_data;
+> +       struct clk_init_data *init_data;
+> +       struct device_node *of_node;
+> +};
+> +
+>  #ifdef CONFIG_OF
+>  int of_clk_add_provider(struct device_node *np,
+>                         struct clk *(*clk_src_get)(struct of_phandle_args *args,
+> @@ -475,6 +482,9 @@ const char *of_clk_get_parent_name(struct device_node *np, int index);
+>  void of_clk_init(const struct of_device_id *matches);
+>  int of_init_clk_data(struct device_node *np, struct clk_init_data *init);
+>  
+> +int of_clk_match(struct device *dev, struct of_clk_match *matches,
+> +                int num_matches);
+> +
+>  #else /* !CONFIG_OF */
+>  
+>  static inline int of_clk_add_provider(struct device_node *np,
+> @@ -508,6 +518,12 @@ of_init_clk_data(struct device_node *np, struct clk_init_data *init)
+>  {
+>         return 0;
+>  }
+> +static inline int
+> +of_clk_match(struct device *dev, struct of_clk_match *matches, int num_matches)
+> +{
+> +
+> +       return 0;
+> +}
+>  #endif /* CONFIG_OF */
+>  #endif /* CONFIG_COMMON_CLK */
+>  #endif /* CLK_PROVIDER_H */
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
