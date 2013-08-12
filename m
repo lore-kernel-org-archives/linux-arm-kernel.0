@@ -1,24 +1,50 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 12 Aug 2013 11:27:52 -0700
-Subject: [PATCH v4 23/31] serial: mpc512x: setup the PSC FIFO clock as well
-In-Reply-To: <1375821851-31609-24-git-send-email-gsi@denx.de>
-References: <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1375821851-31609-1-git-send-email-gsi@denx.de>
- <1375821851-31609-24-git-send-email-gsi@denx.de>
-Message-ID: <20130812182752.GC20233@kroah.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 12 Aug 2013 19:29:42 +0100
+Subject: [PATCH 1/3] ARM: Introduce atomic MMIO clear/set
+In-Reply-To: <1376138582-7550-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1376138582-7550-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1376138582-7550-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130812182942.GA28695@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 10:44:03PM +0200, Gerhard Sittig wrote:
-> prepare and enable the FIFO clock upon PSC FIFO initialization,
-> check for and propagage errors when enabling the PSC FIFO clock,
-> disable and unprepare the FIFO clock upon PSC FIFO uninitialization,
-> remove the pre-enable workaround from the platform's clock driver
+On Sat, Aug 10, 2013 at 01:43:00PM +0100, Ezequiel Garcia wrote:
+> Some SoC have MMIO regions that are shared across orthogonal
+> subsystems. This commit implements a possible solution for the
+> thread-safe access of such regions through a spinlock-protected API
+> with clear-set semantics.
 > 
-> devm_{get,put}_clk() doesn't apply here, as the SoC provides a
-> single FIFO component which is shared among several PSC components,
-> thus the FIFO isn't associated with a device (while the PSCs are)
+> Concurrent access is protected with a single spinlock for the
+> entire MMIO address space. While this protects shared-registers,
+> it also serializes access to unrelated/unshared registers.
 > 
-> Signed-off-by: Gerhard Sittig <gsi@denx.de>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+[...]
+
+> +void atomic_io_clear_set(void __iomem *reg, u32 clear, u32 set)
+> +{
+> +	spin_lock(&__io_lock);
+> +	writel((readl(reg) & ~clear) | set, reg);
+> +	spin_unlock(&__io_lock);
+> +}
+
+I appreciate that you've lifted this code from a previous driver, but this
+doesn't really make any sense to me. The spin_unlock operation is
+essentially a store to normal, cacheable memory, whilst the writel is an
+__iowmb followed by a store to device memory.
+
+This means that you don't have ordering guarantees between the two accesses
+outside of the CPU, potentially giving you:
+
+	spin_lock(&__io_lock);
+	spin_unlock(&__io_lock);
+	writel((readl(reg) & ~clear) | set, reg);
+
+which is probably not what you want.
+
+I suggest adding an iowmb after the writel if you really need this ordering
+to be enforced (but this may have a significant performance impact,
+depending on your SoC).
+
+Will
