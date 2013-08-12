@@ -1,47 +1,43 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 12 Aug 2013 15:14:07 -0400
-Subject: [PATCH 15/16] arch/arm/mach-kirkwood: Avoid using
- ARRAY_AND_SIZE(e) as a function argument
-In-Reply-To: <1376239917-15594-16-git-send-email-Julia.Lawall@lip6.fr>
-References: <1376239917-15594-1-git-send-email-Julia.Lawall@lip6.fr>
- <1376239917-15594-16-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20130812191407.GS25111@titan.lakedaemon.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 12 Aug 2013 16:16:51 -0300
+Subject: [PATCH v3 1/6] clocksource: armada-370-xp: Use BIT()
+In-Reply-To: <1376335016-16400-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1376335016-16400-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1376335016-16400-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 11, 2013 at 06:51:56PM +0200, Julia Lawall wrote:
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> Replace ARRAY_AND_SIZE(e) in function argument position to avoid hiding the
-> arity of the called function.
-> 
-> The semantic match that makes this change is as follows:
-> (http://coccinelle.lip6.fr/)
-> 
-> // <smpl>
-> @@
-> expression e,f;
-> @@
-> 
-> f(...,
-> - ARRAY_AND_SIZE(e)
-> + e,ARRAY_SIZE(e)
->   ,...)
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> ---
-> Not compiled.
+This is a purely cosmetic commit: we replace hardcoded values that
+representing bits by BIT(), which is slightly more readable.
 
-compiled fine on arm.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/clocksource/time-armada-370-xp.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
->  arch/arm/mach-kirkwood/openrd-setup.c    |    3 ++-
->  arch/arm/mach-kirkwood/rd88f6281-setup.c |    4 +++-
->  2 files changed, 5 insertions(+), 2 deletions(-)
-
-Applied to mvebu/boards
-
-thx,
-
-Jason.
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index 847cab6..ed584ec 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -36,13 +36,13 @@
+  * Timer block registers.
+  */
+ #define TIMER_CTRL_OFF		0x0000
+-#define  TIMER0_EN		 0x0001
+-#define  TIMER0_RELOAD_EN	 0x0002
+-#define  TIMER0_25MHZ            0x0800
++#define  TIMER0_EN		 BIT(0)
++#define  TIMER0_RELOAD_EN	 BIT(1)
++#define  TIMER0_25MHZ            BIT(11)
+ #define  TIMER0_DIV(div)         ((div) << 19)
+-#define  TIMER1_EN		 0x0004
+-#define  TIMER1_RELOAD_EN	 0x0008
+-#define  TIMER1_25MHZ            0x1000
++#define  TIMER1_EN		 BIT(2)
++#define  TIMER1_RELOAD_EN	 BIT(3)
++#define  TIMER1_25MHZ            BIT(12)
+ #define  TIMER1_DIV(div)         ((div) << 22)
+ #define TIMER_EVENTS_STATUS	0x0004
+ #define  TIMER0_CLR_MASK         (~0x1)
+-- 
+1.8.1.5
