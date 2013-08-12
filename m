@@ -1,73 +1,75 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 12 Aug 2013 16:16:56 -0300
-Subject: [PATCH v3 6/6] ARM: mvebu: Fix the Armada 370/XP timer compatible
- strings
+Date: Mon, 12 Aug 2013 16:16:55 -0300
+Subject: [PATCH v3 5/6] clocksource: armada-370-xp: Fix device-tree binding
 In-Reply-To: <1376335016-16400-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1376335016-16400-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1376335016-16400-7-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1376335016-16400-6-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "marvell,armada-370-xp-timer" compatible string, together with
-the "marvell,timer-25Mhz" property are deprecated and should be
-removed from current DT.
+This commit fixes the DT binding for the Armada 370/XP SoC timer.
+The previous "marvell,armada-370-xp-timer" compatible is removed and
+two new compatible strings are introduced: "marvell,armada-xp-timer"
+and "marvell,armada-370-timer".
 
-Instead, the timer DT nodes are now required to have an appropriate
-compatible string, which should be either "marvell,armada-370-timer"
-or "marvell,armada-xp-timer", depending on SoC.
+The rationale behind this change is that the Armada 370 SoC and the
+Armada XP SoC timers are not really compatible:
 
-The clock property is now required only for Armada 370 so move it accordingly.
+  * Armada 370 has no 25 MHz fixed timer.
 
+  * Armada XP cannot work properly without such 25 MHz fixed timer
+    as doing otherwise leads to using a clocksource whose frequency
+    varies when doing cpufreq frequency changes.
+
+This commit also removes the "marvell,timer-25Mhz" property, given
+it's now meaningless.
+
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi | 2 --
- arch/arm/boot/dts/armada-370.dtsi    | 5 +++++
- arch/arm/boot/dts/armada-xp.dtsi     | 2 +-
- 3 files changed, 6 insertions(+), 3 deletions(-)
+ .../bindings/timer/marvell,armada-370-xp-timer.txt | 27 ++++++++++++++++++----
+ 1 file changed, 22 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 90b1176..442c84e 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -81,10 +81,8 @@
- 			};
+diff --git a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+index 3638112..4c453b2 100644
+--- a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
++++ b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+@@ -2,14 +2,31 @@ Marvell Armada 370 and Armada XP Timers
+ ---------------------------------------
  
- 			timer at 20300 {
--				compatible = "marvell,armada-370-xp-timer";
- 				reg = <0x20300 0x30>, <0x21040 0x30>;
- 				interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
--				clocks = <&coreclk 2>;
- 			};
+ Required properties:
+-- compatible: Should be "marvell,armada-370-xp-timer"
++- compatible: Should be either "marvell,armada-370-timer" or
++  "marvell,armada-xp-timer" as appropriate.
+ - interrupts: Should contain the list of Global Timer interrupts and
+   then local timer interrupts
+ - reg: Should contain location and length for timers register. First
+   pair for the Global Timer registers, second pair for the
+   local/private timers.
+-- clocks: clock driving the timer hardware
++- clocks: clock driving the timer hardware, only required for
++  "marvell,armada-370-timer";
  
- 			sata at a0000 {
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index fa3dfc6..f166367 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -104,6 +104,11 @@
- 				interrupts = <91>;
- 			};
- 
-+			timer at 20300 {
-+				compatible = "marvell,armada-370-timer";
-+				clocks = <&coreclk 2>;
-+			};
+-Optional properties:
+-- marvell,timer-25Mhz: Tells whether the Global timer supports the 25
+-  Mhz fixed mode (available on Armada XP and not on Armada 370)
++Examples:
 +
- 			coreclk: mvebu-sar at 18230 {
- 				compatible = "marvell,armada-370-core-clock";
- 				reg = <0x18230 0x08>;
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 416eb94..549151e 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -62,7 +62,7 @@
- 			};
- 
- 			timer at 20300 {
--				marvell,timer-25Mhz;
-+				compatible = "marvell,armada-xp-timer";
- 			};
- 
- 			coreclk: mvebu-sar at 18230 {
++- Armada 370:
++
++	timer {
++		compatible = "marvell,armada-370-timer";
++		reg = <0x20300 0x30>, <0x21040 0x30>;
++		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
++		clocks = <&coreclk 2>;
++	};
++
++- Armada XP:
++
++	timer {
++		compatible = "marvell,armada-xp-timer";
++		reg = <0x20300 0x30>, <0x21040 0x30>;
++		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
++	};
 -- 
 1.8.1.5
