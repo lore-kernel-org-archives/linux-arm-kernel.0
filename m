@@ -1,193 +1,79 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon, 12 Aug 2013 11:53:22 +0530
-Subject: [PATCH] ARM: DT: Exynos: fix number of interrupt-cells in mct node
-In-Reply-To: <CANuQgHH+nebJf4HPrsWPLECyvWO8OGJj=YeDG4GQAmLHM8GrPw@mail.gmail.com>
-References: <1371220886-11616-1-git-send-email-chander.kashyap@linaro.org>
- <CANuQgHH+nebJf4HPrsWPLECyvWO8OGJj=YeDG4GQAmLHM8GrPw@mail.gmail.com>
-Message-ID: <CANuQgHEq3QA_zE1axnXqCdv8RLXHTfv3wVn59gHSk3jEPtLiXQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 12 Aug 2013 11:54:11 +0530
+Subject: [PATCH v3 02/12] ARM: edma: Don't clear EMR of channel in
+ edma_stop
+In-Reply-To: <CAD=GYpa75vqz120O2McxTXsPCWFb+RsO+7dZ4WRNQJgb3W=E=A@mail.gmail.com>
+References: <1375719297-12871-1-git-send-email-joelf@ti.com>
+ <1375719297-12871-3-git-send-email-joelf@ti.com> <520385D3.1060408@ti.com>
+ <5208639F.8070406@ti.com>
+ <CAD=GYpa75vqz120O2McxTXsPCWFb+RsO+7dZ4WRNQJgb3W=E=A@mail.gmail.com>
+Message-ID: <52087F8B.1080002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping
+On Monday 12 August 2013 09:59 AM, Joel Fernandes wrote:
+> On Sun, Aug 11, 2013 at 11:25 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> On 8/8/2013 5:19 PM, Sekhar Nori wrote:
+>>> On Monday 05 August 2013 09:44 PM, Joel Fernandes wrote:
+>>>> We certainly don't want error conditions to be cleared any other
+>>>> place but the EDMA error handler, as this will make us 'forget'
+>>>> about missed events we might need to know errors have occurred.
+>>>>
+>>>> This fixes a race condition where the EMR was being cleared
+>>>> by the transfer completion interrupt handler.
+>>>>
+>>>> Basically, what was happening was:
+>>>>
+>>>>             Missed event
+>>>>              |
+>>>>              |
+>>>>              V
+>>>> SG1-SG2-SG3-Null
+>>>>          \
+>>>>           \__TC Interrupt (Almost same time as ARM is executing
+>>>> TC interrupt handler, an event got missed and also forgotten
+>>>> by clearing the EMR).
+>>>>
+>>>> This causes the following  problems:
+>>>>
+>>>> 1.
+>>>> If error interrupt is also pending and TC interrupt clears the EMR
+>>>> by calling edma_stop as has been observed in the edma_callback function,
+>>>> the ARM will execute the error interrupt even though the EMR is clear.
+>>>> As a result, the  dma_ccerr_handler returns IRQ_NONE. If this happens
+>>>> enough number of times, IRQ subsystem disables the interrupt thinking
+>>>> its spurious which makes error handler never execute again.
+>>>>
+>>>> 2.
+>>>> Also even if error handler doesn't return IRQ_NONE, the removing of EMR
+>>>> removes the knowledge about which channel had a missed event, and thus
+>>>> a manual trigger on such channels cannot be performed.
+>>>>
+>>>> The EMR is ultimately being cleared by the Error interrupt handler
+>>>> once it is handled so we remove code that does it in edma_stop and
+>>>> allow it to happen there.
+>>>>
+>>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>>>
+>>> Queuing this for v3.11 fixes. While committing, I changed the headline
+>>> to remove capitalization and made it more readable by removing register
+>>> level details. The new headline is:
+>>>
+>>> ARM: edma: don't clear missed events in edma_stop()
+>>
+>> Forgot to ask, should this be tagged for stable? IOW, how serious is
+>> this race in current kernel (without the entire series applied)? I have
+>> never observed it myself - so please provide details how easy/difficult
+>> it is to hit this condition.
+> 
+> The race was uncovered by recent EDMA patch series, So this patch can
+> go in for next kernel release as such, I am not aware of any other DMA
+> user that maybe uncovering the race condition.
 
-On 23 July 2013 15:17, Chander Kashyap <chander.kashyap@linaro.org> wrote:
-> ping.
->
-> On 14 June 2013 20:11, Chander Kashyap <chander.kashyap@linaro.org> wrote:
->> Two cells were used to specify interrupts in mct node, while second cell
->> always remains unused. Hence use only one cell.
->> Suggested by Tomasz Figa.
->>
->> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->> ---
->>  arch/arm/boot/dts/exynos4210.dtsi |   19 +++++++++----------
->>  arch/arm/boot/dts/exynos4212.dtsi |   19 +++++++++----------
->>  arch/arm/boot/dts/exynos4412.dtsi |   23 +++++++++++------------
->>  arch/arm/boot/dts/exynos5250.dtsi |   19 +++++++++----------
->>  4 files changed, 38 insertions(+), 42 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
->> index 54710de..ad50010 100644
->> --- a/arch/arm/boot/dts/exynos4210.dtsi
->> +++ b/arch/arm/boot/dts/exynos4210.dtsi
->> @@ -52,23 +52,22 @@
->>                 compatible = "samsung,exynos4210-mct";
->>                 reg = <0x10050000 0x800>;
->>                 interrupt-controller;
->> -               #interrups-cells = <2>;
->> +               #interrups-cells = <1>;
->>                 interrupt-parent = <&mct_map>;
->> -               interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
->> -                            <4 0>, <5 0>;
->> +               interrupts = <0>, <1>, <2>, <3>, <4>, <5>;
->>                 clocks = <&clock 3>, <&clock 344>;
->>                 clock-names = "fin_pll", "mct";
->>
->>                 mct_map: mct-map {
->> -                       #interrupt-cells = <2>;
->> +                       #interrupt-cells = <1>;
->>                         #address-cells = <0>;
->>                         #size-cells = <0>;
->> -                       interrupt-map = <0x0 0 &gic 0 57 0>,
->> -                                       <0x1 0 &gic 0 69 0>,
->> -                                       <0x2 0 &combiner 12 6>,
->> -                                       <0x3 0 &combiner 12 7>,
->> -                                       <0x4 0 &gic 0 42 0>,
->> -                                       <0x5 0 &gic 0 48 0>;
->> +                       interrupt-map = <0 &gic 0 57 0>,
->> +                                       <1 &gic 0 69 0>,
->> +                                       <2 &combiner 12 6>,
->> +                                       <3 &combiner 12 7>,
->> +                                       <4 &gic 0 42 0>,
->> +                                       <5 &gic 0 48 0>;
->>                 };
->>         };
->>
->> diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
->> index c0f60f4..ba9ada1 100644
->> --- a/arch/arm/boot/dts/exynos4212.dtsi
->> +++ b/arch/arm/boot/dts/exynos4212.dtsi
->> @@ -39,21 +39,20 @@
->>                 compatible = "samsung,exynos4412-mct";
->>                 reg = <0x10050000 0x800>;
->>                 interrupt-controller;
->> -               #interrups-cells = <2>;
->> +               #interrups-cells = <1>;
->>                 interrupt-parent = <&mct_map>;
->> -               interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
->> -                            <4 0>, <5 0>;
->> +               interrupts = <0>, <1>, <2>, <3>, <4>, <5>;
->>
->>                 mct_map: mct-map {
->> -                       #interrupt-cells = <2>;
->> +                       #interrupt-cells = <>;
->>                         #address-cells = <0>;
->>                         #size-cells = <0>;
->> -                       interrupt-map = <0x0 0 &gic 0 57 0>,
->> -                                       <0x1 0 &combiner 12 5>,
->> -                                       <0x2 0 &combiner 12 6>,
->> -                                       <0x3 0 &combiner 12 7>,
->> -                                       <0x4 0 &gic 1 12 0>,
->> -                                       <0x5 0 &gic 1 12 0>;
->> +                       interrupt-map = <0 &gic 0 57 0>,
->> +                                       <1 &combiner 12 5>,
->> +                                       <2 &combiner 12 6>,
->> +                                       <3 &combiner 12 7>,
->> +                                       <4 &gic 1 12 0>,
->> +                                       <5 &gic 1 12 0>;
->>                 };
->>         };
->>  };
->> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
->> index 270b389..a680de7 100644
->> --- a/arch/arm/boot/dts/exynos4412.dtsi
->> +++ b/arch/arm/boot/dts/exynos4412.dtsi
->> @@ -39,25 +39,24 @@
->>                 compatible = "samsung,exynos4412-mct";
->>                 reg = <0x10050000 0x800>;
->>                 interrupt-controller;
->> -               #interrups-cells = <2>;
->> +               #interrups-cells = <1>;
->>                 interrupt-parent = <&mct_map>;
->> -               interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
->> -                            <4 0>, <5 0>, <6 0>, <7 0>;
->> +               interrupts = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>;
->>                 clocks = <&clock 3>, <&clock 344>;
->>                 clock-names = "fin_pll", "mct";
->>
->>                 mct_map: mct-map {
->> -                       #interrupt-cells = <2>;
->> +                       #interrupt-cells = <1>;
->>                         #address-cells = <0>;
->>                         #size-cells = <0>;
->> -                       interrupt-map = <0x0 0 &gic 0 57 0>,
->> -                                       <0x1 0 &combiner 12 5>,
->> -                                       <0x2 0 &combiner 12 6>,
->> -                                       <0x3 0 &combiner 12 7>,
->> -                                       <0x4 0 &gic 1 12 0>,
->> -                                       <0x5 0 &gic 1 12 0>,
->> -                                       <0x6 0 &gic 1 12 0>,
->> -                                       <0x7 0 &gic 1 12 0>;
->> +                       interrupt-map = <0 &gic 0 57 0>,
->> +                                       <1 &combiner 12 5>,
->> +                                       <2 &combiner 12 6>,
->> +                                       <3 &combiner 12 7>,
->> +                                       <4 &gic 1 12 0>,
->> +                                       <5 &gic 1 12 0>,
->> +                                       <6 &gic 1 12 0>,
->> +                                       <7 &gic 1 12 0>;
->>                 };
->>         };
->>
->> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
->> index a7cf3f5..4e633ef 100644
->> --- a/arch/arm/boot/dts/exynos5250.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->> @@ -94,23 +94,22 @@
->>                 compatible = "samsung,exynos4210-mct";
->>                 reg = <0x101C0000 0x800>;
->>                 interrupt-controller;
->> -               #interrups-cells = <2>;
->> +               #interrups-cells = <1>;
->>                 interrupt-parent = <&mct_map>;
->> -               interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
->> -                            <4 0>, <5 0>;
->> +               interrupts = <0>, <1>, <2>, <3>, <4>, <5>;
->>                 clocks = <&clock 1>, <&clock 335>;
->>                 clock-names = "fin_pll", "mct";
->>
->>                 mct_map: mct-map {
->> -                       #interrupt-cells = <2>;
->> +                       #interrupt-cells = <1>;
->>                         #address-cells = <0>;
->>                         #size-cells = <0>;
->> -                       interrupt-map = <0x0 0 &combiner 23 3>,
->> -                                       <0x1 0 &combiner 23 4>,
->> -                                       <0x2 0 &combiner 25 2>,
->> -                                       <0x3 0 &combiner 25 3>,
->> -                                       <0x4 0 &gic 0 120 0>,
->> -                                       <0x5 0 &gic 0 121 0>;
->> +                       interrupt-map = <0 &combiner 23 3>,
->> +                                       <1 &combiner 23 4>,
->> +                                       <2 &combiner 25 2>,
->> +                                       <3 &combiner 25 3>,
->> +                                       <4 &gic 0 120 0>,
->> +                                       <5 &gic 0 121 0>;
->>                 };
->>         };
->>
->> --
->> 1.7.9.5
->>
->
->
->
-> --
-> with warm regards,
-> Chander Kashyap
+Okay, I wont queue for -rc then. If Vinod wants to take this along with
+rest of the series, you can add my:
 
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-
--- 
-with warm regards,
-Chander Kashyap
+Thanks,
+Sekhar
