@@ -1,89 +1,34 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 12 Aug 2013 12:18:06 +0530
-Subject: [PATCH 2/2] ARM: dts: AM4372: add few nodes
-In-Reply-To: <20130810142317.GE18085@e106331-lin.cambridge.arm.com>
-References: <ffa2f76fcac54bfe76c234ffce0394fd2c25fe52.1375450395.git.afzal@ti.com>
- <6f0f838176ab93aac8dab4c3ab9d9f95a3027ff7.1375450395.git.afzal@ti.com>
- <51FCEE60.7080809@ti.com> <51FF335D.4050803@ti.com>
- <20130810142317.GE18085@e106331-lin.cambridge.arm.com>
-Message-ID: <52088526.90004@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 12 Aug 2013 12:24:01 +0530
+Subject: [PATCH V5 0/6]USB: OHCI: more bus glues as separate modules
+In-Reply-To: <1376290020-26253-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+ <1376290020-26253-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <CAKohpo=k3z5yPXHzGtizE0_Yc4N-DefBjeRShLMYOAVdQ89r8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Saturday 10 August 2013 07:53 PM, Mark Rutland wrote:
-
->>>> +		mac: ethernet at 4a100000 {
->>>> +			compatible = "ti,am4372-cpsw","ti,cpsw";
-
-> One point worth mentioning is that the "ti,am4372-cpsw" string isn't
-> documented. Will the "ti,am4372-cpsw" binding definitely be a superset
-> of the "ti,cpsw" binding, and if you were to take the DT as of this
-> patch, and attempt to use it with a future kernel, can you guarantee
-> it'll work?
-
-"ti,am4372-cpsw" was not documented as OMAP DT maintainer didn't prefer 
-documenting only for a new compatible.
-
-For the only patch on this file that went into mainline, in that series 
-actually I had posted patches to document "ti,am4372-*", but as 
-maintainer didn't agree, it was discarded [A].
-
-Regarding whether "ti,am4372-cpsw" would be a superset of "ti,cpsw", 
-information I have (am4372 is in pre silicon stage) is that it is a 
-reuse from am335x ("ti,cpsw" should have been named "ti,am3352-cpsw" or 
-something like that, but nothing can be done now) with minor changes and 
-all existing functionalities available, Mugunthan can shed more light on 
-this, Mugunthan ?
-
-As mentioned at other places in the thread, for cpsw, only a few 
-properties to prevent hwmod code crash was added. I am sure that 
-currently added properties for cpsw will not make driver functional this 
-Kernel version (if this goes in) or future versions. To make driver work 
-additional properties are required.
-
->>> There are many other parameters which are missed here.
->>
->> Reason has been mentioned in the commit message, quoting relevant here
->> again,
+On 12 August 2013 12:16, Manjunath Goudar <manjunath.goudar@linaro.org> wrote:
+> V5:
+>  In patch 1/6 to 5/6
+>   - No change.
 >
-> Actually, as you've marked the nodes disabled, it's probably fine. But
-> worth considering as properties are added...
+>  In patch 6/6:
+>   - String "s3cxxxx" is replaced by "s3c2410".
 
-There were two factors that was considered while adding cpsw node
-1. DT as an ABI
-2. While adding DT node, whether all existing required properties has to 
-be added
+In such cases its better to just send only one patch and that can be
+done by pasting your patch as a reply to earlier review..
 
-Regarding 1 - DT would not make driver work for this Kernel version and 
-also for not any newer Kernel version, I believe this does not go 
-against DT an an ABI, although in a negative sense. To make driver work 
-more DT properties would have to be added.
+Also, In the version log mention recent changes first, as people
+are more interested in them.. So, it should be like:
 
-Regarding 2 - Currently, I believe most required & optional properties 
-in bindings are defined w.r.t driver (bringing in a Linux attachment). 
-If DT is only a hardware description, required & optional properties 
-should correspond to something that are a must for hardware to work and 
-additional features that can be used respectively. In that sense 
-interrupts property for many of the peripherals would have to be 
-considered optional, as it is possible to work in polling mode. And 
-would it be practical for DT in most of the cases to be a complete 
-hardware description ?, as to completely describe hardware, we may need 
-to have a large amount of properties that may not be relevant to 
-software. If requirement is only that DT should describe hardware that 
-is relevant for software (this would bring in a software dependency for 
-DT), required property for one software may not be required for another 
-piece of software or may be an optional property (like in the case of 
-interrupts as explained above).
+V4->V5
+...
 
-So conclusion arrived within me was that as long as properties are not 
-modified, but only added and as long as it does not go against DT as an 
-ABI, it is ok.
+V3->V4
+...
 
-I would like to hear from DT maintainers what the approach should be.
+V2->V3
+...
 
-Regards
-Afzal
-
-[A] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg89408.html
+...
