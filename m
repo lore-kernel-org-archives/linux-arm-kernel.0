@@ -1,35 +1,97 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Mon, 12 Aug 2013 15:48:41 +0530
-Subject: [PATCH 0/2] Move comon DMA nodes to exynos5.dtsi and
-In-Reply-To: <1373458449-19039-1-git-send-email-padma.v@samsung.com>
-References: <1373458449-19039-1-git-send-email-padma.v@samsung.com>
-Message-ID: <CAAgF-BfjqF-1TcWbZ_nw9Kqrg-xr0H6uMu+u=9N=gaOoq_G2Yw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 12 Aug 2013 12:30:42 +0200
+Subject: [PATCH 4/9] clk: armada-370: Fix incorrect placement of
+ __initconst
+In-Reply-To: <1376298847-21828-4-git-send-email-sachin.kamat@linaro.org>
+References: <1376298847-21828-1-git-send-email-sachin.kamat@linaro.org>
+ <1376298847-21828-4-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <5208B952.5030400@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On 12/08/2013 11:14, Sachin Kamat wrote:
+> __initconst should be placed between the variable name and equal
+> sign for the variable to be placed in the intended section.
 
-Any comment on this patch set?
-If not can you take into your tree?
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Thanks
-Padma
+> 
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> ---
+>  drivers/clk/mvebu/armada-370.c |   14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
+> index 079960e..fc777bd 100644
+> --- a/drivers/clk/mvebu/armada-370.c
+> +++ b/drivers/clk/mvebu/armada-370.c
+> @@ -32,13 +32,13 @@
+>  
+>  enum { A370_CPU_TO_NBCLK, A370_CPU_TO_HCLK, A370_CPU_TO_DRAMCLK };
+>  
+> -static const struct coreclk_ratio __initconst a370_coreclk_ratios[] = {
+> +static const struct coreclk_ratio a370_coreclk_ratios[] __initconst = {
+>  	{ .id = A370_CPU_TO_NBCLK, .name = "nbclk" },
+>  	{ .id = A370_CPU_TO_HCLK, .name = "hclk" },
+>  	{ .id = A370_CPU_TO_DRAMCLK, .name = "dramclk" },
+>  };
+>  
+> -static const u32 __initconst a370_tclk_freqs[] = {
+> +static const u32 a370_tclk_freqs[] __initconst = {
+>  	16600000,
+>  	20000000,
+>  };
+> @@ -52,7 +52,7 @@ static u32 __init a370_get_tclk_freq(void __iomem *sar)
+>  	return a370_tclk_freqs[tclk_freq_select];
+>  }
+>  
+> -static const u32 __initconst a370_cpu_freqs[] = {
+> +static const u32 a370_cpu_freqs[] __initconst = {
+>  	400000000,
+>  	533000000,
+>  	667000000,
+> @@ -78,7 +78,7 @@ static u32 __init a370_get_cpu_freq(void __iomem *sar)
+>  	return cpu_freq;
+>  }
+>  
+> -static const int __initconst a370_nbclk_ratios[32][2] = {
+> +static const int a370_nbclk_ratios[32][2] __initconst = {
+>  	{0, 1}, {1, 2}, {2, 2}, {2, 2},
+>  	{1, 2}, {1, 2}, {1, 1}, {2, 3},
+>  	{0, 1}, {1, 2}, {2, 4}, {0, 1},
+> @@ -89,7 +89,7 @@ static const int __initconst a370_nbclk_ratios[32][2] = {
+>  	{0, 1}, {0, 1}, {0, 1}, {0, 1},
+>  };
+>  
+> -static const int __initconst a370_hclk_ratios[32][2] = {
+> +static const int a370_hclk_ratios[32][2] __initconst = {
+>  	{0, 1}, {1, 2}, {2, 6}, {2, 3},
+>  	{1, 3}, {1, 4}, {1, 2}, {2, 6},
+>  	{0, 1}, {1, 6}, {2, 10}, {0, 1},
+> @@ -100,7 +100,7 @@ static const int __initconst a370_hclk_ratios[32][2] = {
+>  	{0, 1}, {0, 1}, {0, 1}, {0, 1},
+>  };
+>  
+> -static const int __initconst a370_dramclk_ratios[32][2] = {
+> +static const int a370_dramclk_ratios[32][2] __initconst = {
+>  	{0, 1}, {1, 2}, {2, 3}, {2, 3},
+>  	{1, 3}, {1, 2}, {1, 2}, {2, 6},
+>  	{0, 1}, {1, 3}, {2, 5}, {0, 1},
+> @@ -152,7 +152,7 @@ CLK_OF_DECLARE(a370_core_clk, "marvell,armada-370-core-clock",
+>   * Clock Gating Control
+>   */
+>  
+> -static const struct clk_gating_soc_desc __initconst a370_gating_desc[] = {
+> +static const struct clk_gating_soc_desc a370_gating_desc[] __initconst = {
+>  	{ "audio", NULL, 0, 0 },
+>  	{ "pex0_en", NULL, 1, 0 },
+>  	{ "pex1_en", NULL,  2, 0 },
+> 
 
-On Wed, Jul 10, 2013 at 5:44 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
-> Exynos5250 and Exynos5420 has 4 DMA controllers in common. So this patch
-> set moved the common nodes to exynos.dtsi keeping the clk info seperate
-> for both the platforms. Exynos5420 has a separate DMA controller for audio
-> IPs. So this patch set also adds the ADMA node on Exynos5420.
->
-> Padmavathi Venna (2):
->   ARM: dts: Move the common DMA controller nodes to exynos5.dtsi
->   ARM: dts: Add DMA controller node info on Exynos5420.
->
->  arch/arm/boot/dts/exynos5.dtsi    |   44 +++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos5250.dtsi |   30 -------------------------
->  arch/arm/boot/dts/exynos5420.dtsi |   33 +++++++++++++++++++++++++++
->  3 files changed, 77 insertions(+), 30 deletions(-)
->
-> --
-> 1.7.4.4
->
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
