@@ -1,56 +1,116 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 12 Aug 2013 09:22:57 +0800
-Subject: [PATCH v15 11/13] usb: chipidea: udc: misuse flag CI_HDRC_REGS_SHARED
- and CI_HDRC_PULLUP_ON_VBUS
+Date: Mon, 12 Aug 2013 09:22:58 +0800
+Subject: [PATCH v15 12/13] usb: chipidea: retire flag CI_HDRC_PULLUP_ON_VBUS
 In-Reply-To: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
 References: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1376270579-13493-12-git-send-email-peter.chen@freescale.com>
+Message-ID: <1376270579-13493-13-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CI_HDRC_REGS_SHARED stands for the controller registers is shared
-with other USB drivers, if all USB drivers are at chipidea/, it doesn't
-needed to set.
-CI_HDRC_PULLUP_ON_VBUS stands for pullup dp when the vbus is on. This
-flag doesn't need to set if the vbus is always on for gadget
-since dp has always pulled up after the gadget has initialized.
+Currently, the controller only runs when the ci->vbus_active is true.
+So the flag CI_HDRC_PULLUP_ON_VBUS is useless no longer.
+If the user doesn't have otgsc, he/she needs to change ci_handle_vbus_change
+to update ci->vbus_active.
 
-So, the current code seems to misuse this two flags.
-- When the gadget initializes, the controller doesn't need to run if
-it depends on vbus (CI_HDRC_PULLUP_ON_VBUS), it does not
-relate to shared register.
-- When the gadget starts (load one gadget module), the controller
-can run if vbus is on (CI_HDRC_PULLUP_ON_VBUS), it also does not
-relate to shared register.
-
-Tested-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/udc.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+ drivers/usb/chipidea/ci_hdrc_imx.c |    1 -
+ drivers/usb/chipidea/ci_hdrc_msm.c |    1 -
+ drivers/usb/chipidea/udc.c         |   24 ++++++------------------
+ include/linux/usb/chipidea.h       |    1 -
+ 4 files changed, 6 insertions(+), 21 deletions(-)
 
+diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+index bd1fe25..ab3e74a 100644
+--- a/drivers/usb/chipidea/ci_hdrc_imx.c
++++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+@@ -91,7 +91,6 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 		.name		= "ci_hdrc_imx",
+ 		.capoffset	= DEF_CAPOFFSET,
+ 		.flags		= CI_HDRC_REQUIRE_TRANSCEIVER |
+-				  CI_HDRC_PULLUP_ON_VBUS |
+ 				  CI_HDRC_DISABLE_STREAMING,
+ 	};
+ 	int ret;
+diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
+index fb657ef..2d51d85 100644
+--- a/drivers/usb/chipidea/ci_hdrc_msm.c
++++ b/drivers/usb/chipidea/ci_hdrc_msm.c
+@@ -49,7 +49,6 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
+ 	.name			= "ci_hdrc_msm",
+ 	.flags			= CI_HDRC_REGS_SHARED |
+ 				  CI_HDRC_REQUIRE_TRANSCEIVER |
+-				  CI_HDRC_PULLUP_ON_VBUS |
+ 				  CI_HDRC_DISABLE_STREAMING,
+ 
+ 	.notify_event		= ci_hdrc_msm_notify_event,
 diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index c70ce38..45abf4d 100644
+index 45abf4d..90c3572 100644
 --- a/drivers/usb/chipidea/udc.c
 +++ b/drivers/usb/chipidea/udc.c
-@@ -1637,8 +1637,7 @@ static int ci_udc_start(struct usb_gadget *gadget,
+@@ -1448,9 +1448,6 @@ static int ci_udc_vbus_session(struct usb_gadget *_gadget, int is_active)
+ 	unsigned long flags;
+ 	int gadget_ready = 0;
+ 
+-	if (!(ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS))
+-		return -EOPNOTSUPP;
+-
+ 	spin_lock_irqsave(&ci->lock, flags);
+ 	ci->vbus_active = is_active;
+ 	if (ci->driver)
+@@ -1635,13 +1632,11 @@ static int ci_udc_start(struct usb_gadget *gadget,
+ 
+ 	ci->driver = driver;
  	pm_runtime_get_sync(&ci->gadget.dev);
- 	if (ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS) {
- 		if (ci->vbus_active) {
--			if (ci->platdata->flags & CI_HDRC_REGS_SHARED)
--				hw_device_reset(ci, USBMODE_CM_DC);
-+			hw_device_reset(ci, USBMODE_CM_DC);
- 		} else {
- 			pm_runtime_put_sync(&ci->gadget.dev);
- 			goto done;
-@@ -1801,7 +1800,7 @@ static int udc_start(struct ci_hdrc *ci)
+-	if (ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS) {
+-		if (ci->vbus_active) {
+-			hw_device_reset(ci, USBMODE_CM_DC);
+-		} else {
+-			pm_runtime_put_sync(&ci->gadget.dev);
+-			goto done;
+-		}
++	if (ci->vbus_active) {
++		hw_device_reset(ci, USBMODE_CM_DC);
++	} else {
++		pm_runtime_put_sync(&ci->gadget.dev);
++		goto done;
+ 	}
+ 
+ 	retval = hw_device_state(ci, ci->ep0out->qh.dma);
+@@ -1664,8 +1659,7 @@ static int ci_udc_stop(struct usb_gadget *gadget,
+ 
+ 	spin_lock_irqsave(&ci->lock, flags);
+ 
+-	if (!(ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS) ||
+-			ci->vbus_active) {
++	if (ci->vbus_active) {
+ 		hw_device_state(ci, 0);
+ 		if (ci->platdata->notify_event)
+ 			ci->platdata->notify_event(ci,
+@@ -1800,12 +1794,6 @@ static int udc_start(struct ci_hdrc *ci)
  		}
  	}
  
--	if (!(ci->platdata->flags & CI_HDRC_REGS_SHARED)) {
-+	if (!(ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS)) {
- 		retval = hw_device_reset(ci, USBMODE_CM_DC);
- 		if (retval)
- 			goto put_transceiver;
+-	if (!(ci->platdata->flags & CI_HDRC_PULLUP_ON_VBUS)) {
+-		retval = hw_device_reset(ci, USBMODE_CM_DC);
+-		if (retval)
+-			goto put_transceiver;
+-	}
+-
+ 	if (ci->transceiver) {
+ 		retval = otg_set_peripheral(ci->transceiver->otg,
+ 						&ci->gadget);
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 10a607c..7d39967 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -18,7 +18,6 @@ struct ci_hdrc_platform_data {
+ 	unsigned long	 flags;
+ #define CI_HDRC_REGS_SHARED		BIT(0)
+ #define CI_HDRC_REQUIRE_TRANSCEIVER	BIT(1)
+-#define CI_HDRC_PULLUP_ON_VBUS		BIT(2)
+ #define CI_HDRC_DISABLE_STREAMING	BIT(3)
+ 	/*
+ 	 * Only set it when DCCPARAMS.DC==1 and DCCPARAMS.HC==1,
 -- 
 1.7.1
