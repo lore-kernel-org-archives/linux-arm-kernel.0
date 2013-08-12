@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 12 Aug 2013 12:31:07 +0200
-Subject: [PATCH 5/9] clk: armada-xp: Fix incorrect placement of __initconst
-In-Reply-To: <1376298847-21828-5-git-send-email-sachin.kamat@linaro.org>
+Date: Mon, 12 Aug 2013 12:31:50 +0200
+Subject: [PATCH 6/9] clk: dove: Fix incorrect placement of __initconst
+In-Reply-To: <1376298847-21828-6-git-send-email-sachin.kamat@linaro.org>
 References: <1376298847-21828-1-git-send-email-sachin.kamat@linaro.org>
- <1376298847-21828-5-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <5208B96B.5030109@free-electrons.com>
+ <1376298847-21828-6-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <5208B996.60504@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,67 +18,61 @@ Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 > Cc: Gregory Clement <gregory.clement@free-electrons.com>
 > ---
->  drivers/clk/mvebu/armada-xp.c |   12 ++++++------
+>  drivers/clk/mvebu/dove.c |   12 ++++++------
 >  1 file changed, 6 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/clk/mvebu/armada-xp.c b/drivers/clk/mvebu/armada-xp.c
-> index 13b62ce..9922c44 100644
-> --- a/drivers/clk/mvebu/armada-xp.c
-> +++ b/drivers/clk/mvebu/armada-xp.c
-> @@ -40,7 +40,7 @@
+> diff --git a/drivers/clk/mvebu/dove.c b/drivers/clk/mvebu/dove.c
+> index 79d7aed..38aee1e 100644
+> --- a/drivers/clk/mvebu/dove.c
+> +++ b/drivers/clk/mvebu/dove.c
+> @@ -74,12 +74,12 @@
 >  
->  enum { AXP_CPU_TO_NBCLK, AXP_CPU_TO_HCLK, AXP_CPU_TO_DRAMCLK };
+>  enum { DOVE_CPU_TO_L2, DOVE_CPU_TO_DDR };
 >  
-> -static const struct coreclk_ratio __initconst axp_coreclk_ratios[] = {
-> +static const struct coreclk_ratio axp_coreclk_ratios[] __initconst = {
->  	{ .id = AXP_CPU_TO_NBCLK, .name = "nbclk" },
->  	{ .id = AXP_CPU_TO_HCLK, .name = "hclk" },
->  	{ .id = AXP_CPU_TO_DRAMCLK, .name = "dramclk" },
-> @@ -52,7 +52,7 @@ static u32 __init axp_get_tclk_freq(void __iomem *sar)
->  	return 250000000;
+> -static const struct coreclk_ratio __initconst dove_coreclk_ratios[] = {
+> +static const struct coreclk_ratio dove_coreclk_ratios[] __initconst = {
+>  	{ .id = DOVE_CPU_TO_L2, .name = "l2clk", },
+>  	{ .id = DOVE_CPU_TO_DDR, .name = "ddrclk", }
+>  };
+>  
+> -static const u32 __initconst dove_tclk_freqs[] = {
+> +static const u32 dove_tclk_freqs[] __initconst = {
+>  	166666667,
+>  	125000000,
+>  	0, 0
+> @@ -92,7 +92,7 @@ static u32 __init dove_get_tclk_freq(void __iomem *sar)
+>  	return dove_tclk_freqs[opt];
 >  }
 >  
-> -static const u32 __initconst axp_cpu_freqs[] = {
-> +static const u32 axp_cpu_freqs[] __initconst = {
+> -static const u32 __initconst dove_cpu_freqs[] = {
+> +static const u32 dove_cpu_freqs[] __initconst = {
+>  	0, 0, 0, 0, 0,
 >  	1000000000,
->  	1066000000,
->  	1200000000,
-> @@ -89,7 +89,7 @@ static u32 __init axp_get_cpu_freq(void __iomem *sar)
->  	return cpu_freq;
+>  	933333333, 933333333,
+> @@ -111,12 +111,12 @@ static u32 __init dove_get_cpu_freq(void __iomem *sar)
+>  	return dove_cpu_freqs[opt];
 >  }
 >  
-> -static const int __initconst axp_nbclk_ratios[32][2] = {
-> +static const int axp_nbclk_ratios[32][2] __initconst = {
->  	{0, 1}, {1, 2}, {2, 2}, {2, 2},
->  	{1, 2}, {1, 2}, {1, 1}, {2, 3},
->  	{0, 1}, {1, 2}, {2, 4}, {0, 1},
-> @@ -100,7 +100,7 @@ static const int __initconst axp_nbclk_ratios[32][2] = {
->  	{0, 1}, {0, 1}, {0, 1}, {0, 1},
+> -static const int __initconst dove_cpu_l2_ratios[8][2] = {
+> +static const int dove_cpu_l2_ratios[8][2] __initconst = {
+>  	{ 1, 1 }, { 0, 1 }, { 1, 2 }, { 0, 1 },
+>  	{ 1, 3 }, { 0, 1 }, { 1, 4 }, { 0, 1 }
 >  };
 >  
-> -static const int __initconst axp_hclk_ratios[32][2] = {
-> +static const int axp_hclk_ratios[32][2] __initconst = {
->  	{0, 1}, {1, 2}, {2, 6}, {2, 3},
->  	{1, 3}, {1, 4}, {1, 2}, {2, 6},
->  	{0, 1}, {1, 6}, {2, 10}, {0, 1},
-> @@ -111,7 +111,7 @@ static const int __initconst axp_hclk_ratios[32][2] = {
->  	{0, 1}, {0, 1}, {0, 1}, {0, 1},
->  };
->  
-> -static const int __initconst axp_dramclk_ratios[32][2] = {
-> +static const int axp_dramclk_ratios[32][2] __initconst = {
->  	{0, 1}, {1, 2}, {2, 3}, {2, 3},
->  	{1, 3}, {1, 2}, {1, 2}, {2, 6},
->  	{0, 1}, {1, 3}, {2, 5}, {0, 1},
-> @@ -169,7 +169,7 @@ CLK_OF_DECLARE(axp_core_clk, "marvell,armada-xp-core-clock",
+> -static const int __initconst dove_cpu_ddr_ratios[16][2] = {
+> +static const int dove_cpu_ddr_ratios[16][2] __initconst = {
+>  	{ 1, 1 }, { 0, 1 }, { 1, 2 }, { 2, 5 },
+>  	{ 1, 3 }, { 0, 1 }, { 1, 4 }, { 0, 1 },
+>  	{ 1, 5 }, { 0, 1 }, { 1, 6 }, { 0, 1 },
+> @@ -164,7 +164,7 @@ CLK_OF_DECLARE(dove_core_clk, "marvell,dove-core-clock", dove_coreclk_init);
 >   * Clock Gating Control
 >   */
 >  
-> -static const struct clk_gating_soc_desc __initconst axp_gating_desc[] = {
-> +static const struct clk_gating_soc_desc axp_gating_desc[] __initconst = {
->  	{ "audio", NULL, 0, 0 },
->  	{ "ge3", NULL, 1, 0 },
->  	{ "ge2", NULL,  2, 0 },
+> -static const struct clk_gating_soc_desc __initconst dove_gating_desc[] = {
+> +static const struct clk_gating_soc_desc dove_gating_desc[] __initconst = {
+>  	{ "usb0", NULL, 0, 0 },
+>  	{ "usb1", NULL, 1, 0 },
+>  	{ "ge",	"gephy", 2, 0 },
 > 
 
 
