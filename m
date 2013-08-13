@@ -1,67 +1,43 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 13 Aug 2013 15:28:31 +0530
-Subject: [PATCH 1/2] extcon: palmas: Added a new compatible type *ti,
- palmas-usb-vid*
-In-Reply-To: <520A0257.1080903@samsung.com>
-References: <1376302675-15795-1-git-send-email-kishon@ti.com>
- <1376372241-15573-1-git-send-email-kishon@ti.com>
- <520A0257.1080903@samsung.com>
-Message-ID: <520A0347.701@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 13 Aug 2013 11:59:41 +0200
+Subject: [PATCH 4/9] PCI: mvebu: add support for reset on GPIO
+In-Reply-To: <20130813103030.1e4156a1@skate>
+References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376333215-12885-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130813080956.GE9316@ulmo> <20130813103030.1e4156a1@skate>
+Message-ID: <20130813095941.GB30913@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 August 2013 03:24 PM, Chanwoo Choi wrote:
-> Hi Kishon,
+On Tue, Aug 13, 2013 at 10:30:30AM +0200, Thomas Petazzoni wrote:
+> Dear Thierry Reding,
 > 
-> On 08/13/2013 02:37 PM, Kishon Vijay Abraham I wrote:
->> The Palmas device contains only a USB VID detector, so added a
->> compatible type *ti,palmas-usb-vid*. Dint remove the existing compatible
->> types for backward compatibility.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  Documentation/devicetree/bindings/extcon/extcon-twl.txt |    3 ++-
->>  drivers/extcon/extcon-palmas.c                          |    1 +
->>  2 files changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/extcon/extcon-twl.txt b/Documentation/devicetree/bindings/extcon/extcon-twl.txt
->> index 58f531a..5be4afc 100644
->> --- a/Documentation/devicetree/bindings/extcon/extcon-twl.txt
->> +++ b/Documentation/devicetree/bindings/extcon/extcon-twl.txt
->> @@ -2,7 +2,8 @@ EXTCON FOR TWL CHIPS
->>  
->>  PALMAS USB COMPARATOR
->>  Required Properties:
->> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
->> + - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb" or
->> +   "ti,palmas-usb-vid".
->>   - vbus-supply : phandle to the regulator device tree node.
->>  
->>  Optional Properties:
->> diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
->> index b752a0a..4f83fae 100644
->> --- a/drivers/extcon/extcon-palmas.c
->> +++ b/drivers/extcon/extcon-palmas.c
->> @@ -223,6 +223,7 @@ static int palmas_usb_remove(struct platform_device *pdev)
->>  
->>  static struct of_device_id of_palmas_match_tbl[] = {
->>  	{ .compatible = "ti,palmas-usb", },
->> +	{ .compatible = "ti,palmas-usb-vid", },
->>  	{ .compatible = "ti,twl6035-usb", },
->>  	{ /* end */ }
->>  };
->>
+> On Tue, 13 Aug 2013 10:09:56 +0200, Thierry Reding wrote:
 > 
-> This patch has a conflict. You have to always implement patch on extcon branch
-> including latest patch. You need to resend v2 patch based on extcon-next branch.
+> > > +- reset-gpios: optional gpio to PERST#
+> > > +- reset-delay-ms: delay in ms to wait after reset de-assertion
+> > 
+> > I remember some recent discussion about this, and we now have this reset
+> > framework, so perhaps it makes more sense to use the reset binding for
+> > this? Cc'ing Stephen (as part of the device tree bindings maintainers
+> > team) who was involved in that recent reset bindings discussion.
 > 
-> 'extcon-twl.txt' is renamed as 'extcon-palmas.txt' on following patch:
-> http://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/commit/?h=extcon-next&id=80d644b297dc26c5126858555044edef76f4ffe8
-> 
-> And, 'vbus-supply' phandle was removed on following patch:
-> http://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/commit/?h=extcon-next&id=26ece4f0b7d2264282d9077d1843ff1e98189b6c
+> I also thought about this, but the reset framework seems to be designed
+> for "reset controller" IPs, i.e special IPs that are controlling reset
+> signals. Looking at Documentation/devicetree/bindings/reset/reset.txt,
+> I'm not sure to see how this would apply to GPIO-controlled reset
+> signals.
 
-Alright. I'll send the patch shortly.
+Search for:
 
-Thanks
-Kishon
+[PATCH v10] reset: Add driver for gpio-controlled reset pins
+
+Which aims to be a solution for what you need here.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
