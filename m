@@ -1,37 +1,66 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Mon, 12 Aug 2013 17:01:11 -0700
-Subject: [PATCH 15/16] Add EFI stub for ARM
-In-Reply-To: <1376319113.32237.23.camel@t520.redhat.com>
-References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <1376090777-20090-16-git-send-email-roy.franz@linaro.org>
- <1376319113.32237.23.camel@t520.redhat.com>
-Message-ID: <CAFECyb_0gmOFB4ZWi_dmNjfG2Gyc=3x==LgJ_J97meabAAjstw@mail.gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Mon, 12 Aug 2013 19:19:58 -0500
+Subject: [PATCH v3 01/12] dma: edma: Setup parameters to DMA MAX_NR_SG
+ at a time
+In-Reply-To: <52097604.7010503@ti.com>
+References: <1375719297-12871-1-git-send-email-joelf@ti.com>
+ <1375719297-12871-2-git-send-email-joelf@ti.com> <52088B8B.9040000@ti.com>
+ <52097604.7010503@ti.com>
+Message-ID: <52097BAE.3010103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 7:51 AM, Mark Salter <msalter@redhat.com> wrote:
-> On Fri, 2013-08-09 at 16:26 -0700, Roy Franz wrote:
->> +static int relocate_kernel(efi_system_table_t *sys_table,
->> +                          unsigned long *zimage_addr,
->> +                          unsigned long zimage_size,
->> +                          unsigned long min_addr, unsigned long max_addr)
->> +{
->> +       /* Get current address of kernel. */
->> +       unsigned long cur_zimage_addr = *zimage_addr;
->> +       unsigned long new_addr = 0;
->> +
->> +       efi_status_t status;
->> +
->> +       if (!zimage_addr || !zimage_size)
->> +               return EFI_INVALID_PARAMETER;
->> +
->
-> This parameter check is too late. You already used zimage_addr to
-> initialize cur_zimage_addr.
->
-> --Mark
->
+On 08/12/2013 06:55 PM, Joel Fernandes wrote:
+> Dropped quite a few from the CC list...
+> 
+> On 08/12/2013 02:15 AM, Sekhar Nori wrote:
+>> On Monday 05 August 2013 09:44 PM, Joel Fernandes wrote:
+>>> Changes are made here for configuring existing parameters to support
+>>> DMA'ing them out in batches as needed.
+>>>
+>>> Also allocate as many as slots as needed by the SG list, but not more
+>>> than MAX_NR_SG. Then these slots will be reused accordingly.
+>>> For ex, if MAX_NR_SG=10, and number of SG entries is 40, still only
+>>> 10 slots will be allocated to DMA the entire SG list of size 40.
+>>>
+>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>>> ---
+>>>  drivers/dma/edma.c |   14 +++++++++++---
+>>>  1 file changed, 11 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+>>> index 5f3e532..7b0853c 100644
+>>> --- a/drivers/dma/edma.c
+>>> +++ b/drivers/dma/edma.c
+>>> @@ -222,9 +222,9 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+>>>  	enum dma_slave_buswidth dev_width;
+>>>  	u32 burst;
+>>>  	struct scatterlist *sg;
+>>> -	int i;
+>>>  	int acnt, bcnt, ccnt, src, dst, cidx;
+>>>  	int src_bidx, dst_bidx, src_cidx, dst_cidx;
+>>> +	int i, num_slots_needed;
+>>
+>> 'nslots' is more to my liking. Better keep variable names short.
+>>
+>>>  
+>>>  	if (unlikely(!echan || !sgl || !sg_len))
+>>>  		return NULL;
+>>> @@ -262,8 +262,11 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+>>>  
+>>>  	edesc->pset_nr = sg_len;
+>>>  
+>>> -	for_each_sg(sgl, sg, sg_len, i) {
+>>> -		/* Allocate a PaRAM slot, if needed */
+>>> +	/* Allocate a PaRAM slot, if needed */
+>>> +
+>>> +	num_slots_needed = sg_len > MAX_NR_SG ? MAX_NR_SG : sg_len;
+>>
+>> nslots = min(MAX_NR_SG, sg_len);
+> 
+> I agree the original naming was quite long. I would rather using
+> something more descriptive though than nslots. How does slots_needed sound?
 
-Thanks - I'll fix this in the next version.
+Sorry for the noise, nslots is fine and I've changed it to the same.
 
-Roy
+-Joel
