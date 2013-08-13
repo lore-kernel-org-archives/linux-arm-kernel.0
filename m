@@ -1,67 +1,152 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 13 Aug 2013 14:30:20 +0200
-Subject: [GIT PULL] clocksource/clockevents : arch_timer memory mapped
- support
-In-Reply-To: <51FB7196.6060809@linaro.org>
-References: <51FB7196.6060809@linaro.org>
-Message-ID: <520A26DC.9020005@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 13 Aug 2013 08:00:23 -0500
+Subject: [PATCH v5 2/3] drivers: of: add initialization code for dma
+ reserved memory
+In-Reply-To: <52089E23.1090406@samsung.com>
+References: <1376049119-12655-1-git-send-email-m.szyprowski@samsung.com>
+ <1376049119-12655-3-git-send-email-m.szyprowski@samsung.com>
+ <CAL_JsqJLv-dUb=64vP+OeP8=Usw7=r6RKqJAXCSPryCFGZ89_w@mail.gmail.com>
+ <52089E23.1090406@samsung.com>
+Message-ID: <CAL_JsqJR_mdCiA8knd3COuZ=DcpuAtdzsCy8tAPMSMq67m=SAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/2013 10:45 AM, Daniel Lezcano wrote:
-> The following changes since commit 07862c1cd6675cde2dd4bd64e64d704ea2185b79:
-> 
->   ARM: clocksource: Add support for MOXA ART SoCs (2013-07-18 15:27:47
-> +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/dlezcano/clockevents.git
-> timers/clockevents-next
-> 
-> for you to fetch changes up to 220069945b298d3998c6598b081c466dca259929:
-> 
->   clocksource: arch_timer: Add support for memory mapped timers
-> (2013-08-01 01:13:37 +0200)
-> ----------------------------------------------------------------
-> 
-> This series contains some trivial fixes for the moxart driver:
-> documentation updates and a missing header file.
-> 
-> It also provides the arch_timer memory mapped support.
+On Mon, Aug 12, 2013 at 3:34 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
+>
+>
+> On 8/10/2013 7:33 PM, Rob Herring wrote:
+>>
+>> On Fri, Aug 9, 2013 at 6:51 AM, Marek Szyprowski
+>> <m.szyprowski@samsung.com> wrote:
+>> > Add device tree support for contiguous and reserved memory regions
+>> > defined in device tree. Initialization is done in 2 steps. First, the
+>> > memory is reserved, what happens very early when only flattened device
+>>
+>> s/what/which/
+>>
+>> > tree is available. Then on device initialization the corresponding cma
+>> > and reserved regions are assigned to each device structure.
+>>
+>> What this commit message does not tell me is why does the reservation
+>> have to happen before the fdt is unflattened? It would greatly
+>> simplify the code if it didn't.
+>
+>
+> Large memory blocks can be RELIABLY reserved only during early boot. This
+> must happen before the whole memory management subsystem is initialized,
+> because we need to ensure that the given contiguous blocks are not yet
+> allocated by kernel. Also it must happen before kernel mappings for the
+> whole low memory are created, to ensure that there will be no mappings
+> (for reserved blocks) or mapping with special properties can be created
+> (for CMA blocks). This all happens before device tree structures are
+> unflattened, so we need to get reserved memory layout directly from fdt.
+>
 
-ping ?
-
-> ----------------------------------------------------------------
-> Jonas Jensen (3):
->       ARM: clocksource: moxart: documentation: Fix device tree bindings
-> document
->       ARM: clocksource: moxart: Add bitops.h include
->       ARM: clocksource: moxart: documentation: Update device tree
-> bindings document
-> 
-> Stephen Boyd (5):
->       clocksource: arch_timer: Make register accessors less error-prone
->       clocksource: arch_timer: Pass clock event to set_mode callback
->       Documentation: Add memory mapped ARM architected timer binding
->       clocksource: arch_timer: Push the read/write wrappers deeper
->       clocksource: arch_timer: Add support for memory mapped timers
-> 
->  .../devicetree/bindings/arm/arch_timer.txt         |   59 ++-
->  .../bindings/timer/moxa,moxart-timer.txt           |    6 +-
->  arch/arm/include/asm/arch_timer.h                  |   14 +-
->  arch/arm64/include/asm/arch_timer.h                |   23 +-
->  drivers/clocksource/arm_arch_timer.c               |  446
-> +++++++++++++++++---
->  drivers/clocksource/moxart_timer.c                 |    1 +
->  include/clocksource/arm_arch_timer.h               |   10 +-
->  7 files changed, 459 insertions(+), 100 deletions(-)
-> 
+Okay. Just making sure.
 
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>> > +       } else if (depth == 2 && my_depth == 1 &&
+>> > +           strcmp(uname, "reserved-memory") == 0) {
+>> > +               prop = of_get_flat_dt_prop(node, "#size-cells", NULL);
+>> > +               if (prop)
+>> > +                       size_cells = be32_to_cpup(prop);
+>> > +
+>> > +               prop = of_get_flat_dt_prop(node, "#address-cells",
+>> > NULL);
+>> > +               if (prop)
+>> > +                       addr_cells = be32_to_cpup(prop);
+>>
+>> I think we should just require these be the same size as the memory
+>> node which would be dt_root_*_cells.
+>>
+>> I'm fine with moving this into drivers/of/fdt.c if that simplifies things.
+>
+>
+> dt_root_*_cells are global variables, so its not a problem to get access to
+> them. However I wonder how can we ensure that user/device tree creator will
+> set #size-cells/#address-cells to the same values as for root memory node?
+> Would it be enough to state that in binding documentation? If so then the
+> reserved memory code can skip parsing them and use dt_root_*_cells directly,
+> what will simplify the code.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Yes, just add a note to the binding that the cell sizes are the same
+as the memory node.
+
+>> > +
+>> > +               my_depth = depth;
+>> > +               /* scan next node */
+>> > +               return 0;
+>> > +       } else if (depth != 3 && my_depth != 2) {
+>> > +               /* scan next node */
+>> > +               return 0;
+>> > +       } else if (depth < my_depth) {
+>> > +               /* break scan now */
+>> > +               return 1;
+>> > +       }
+>>
+>> This code bothers me and is hard to follow. I don't think trying to
+>> use of_scan_flat_dt is the right approach here. What you really want
+>> here is check for reserved-memory node under the memory node and then
+>> scan each child node. This could all be done from
+>> early_init_dt_scan_memory.
+>
+>
+> early_init_dt_scan_memory() is also called from of_scan_flat_dt() and
+> it also implements similar state machine to parse fdt. The only
+> difference is the fact that "memory" is a direct child of root node,
+> so the state machine is much simpler (there is no need to parse
+> /memory/reserved-memory path).
+>
+
+If you have already found the memory node, then why find it again? I
+don't think the existing scan functions handle anything but top-level
+nodes very well. So doing something like this from
+early_init_dt_scan_memory() is what I was thinking. It is a very rough
+sketch:
+
+// find the reserved-memory node
+for (ndepth = 0, off = fdt_next_node(blob, parent_offset, &ndepth);
+    (off >= 0) && (ndepth > 0);
+    off = fdt_next_node(blob, off, &ndepth)) {
+    if (ndepth == 1) {
+        name = fdt_get_name(blob, off, 0), off);
+        if (strcmp(name, "reserved-memory") == 0) {
+             parent_offset = off;
+             break; // found
+    }
+}
+
+// find the child nodes
+for (ndepth = 0, off = fdt_next_node(blob, parent_offset, &ndepth);
+    (off >= 0) && (ndepth == 1);
+    off = fdt_next_node(blob, off, &ndepth)) {
+    // now handle each child
+}
+
+These could probably be further refined with some loop iterator macros.
+
+>> > +       name = kbasename(node->full_name);
+>> > +       for (i = 0; i < reserved_mem_count; i++)
+>> > +               if (strcmp(name, reserved_mem[i].name) == 0)
+>> > +                       return &reserved_mem[i];
+>> > +       return NULL;
+>>
+>> Matching against a struct device_node pointer would be more common way
+>> to match. So it would be good to update reserved_mem with a
+>> device_node ptr when we unflatten the DT.
+>
+>
+> I wonder if it really makes sense. To get device_node ptr I will need to
+> scan /memody/reserved-memory node and match all its children BY NAME
+> with the structures parsed from FDT (stored in reserved_mem array). Then
+> I will need to iterate again for each device node with memory-region
+> property to find the needed entry. Names are unique, IMHO they can serve
+> as a key for matching structures between FDT and regular, unflattened DT.
+
+You are iterating multiple times using a string match versus iterating
+once more and then doing a pointer match. However, it is not really
+performance critical and is fine for now.
+
+Rob
