@@ -1,99 +1,114 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 13 Aug 2013 10:58:15 -0400
-Subject: [RFC 1/1] drm/pl111: Initial drm/kms driver for pl111
-In-Reply-To: <520a4435.070a0e0a.4fce.ffff9731SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <1374772648-19151-1-git-send-email-tom.cooksey@arm.com>
- <1374772648-19151-2-git-send-email-tom.cooksey@arm.com>
- <CAF6AEGvGG1-4k-3_YHQ2ES6JEb-V-Xuicc8gfw9rPWze5JUEDg@mail.gmail.com>
- <20130807164651.GY22035@phenom.ffwll.local>
- <520515b0.88b70e0a.3ecd.1004SMTPIN_ADDED_BROKEN@mx.google.com>
- <CAF6AEGu68ntQDSueQJmAM1KSsSA86j98GDEf8wOPbZKjECw99Q@mail.gmail.com>
- <20130809165706.GC31670@phenom.ffwll.local>
- <520a4435.070a0e0a.4fce.ffff9731SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <CAF6AEGvOLwon=8jJGY6oTZ_E8+bH9RC1kHrbb+XuBCyEXEDO2Q@mail.gmail.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Tue, 13 Aug 2013 09:59:00 -0500
+Subject: [PATCH] phy: micrel: Add definitions for common Micrel PHY registers
+In-Reply-To: <1376405940-17141-1-git-send-email-dinguyen@altera.com>
+References: <1376405940-17141-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1376405940-17141-2-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 10:35 AM, Tom Cooksey <tom.cooksey@arm.com> wrote:
->> > > > So in the above, after X receives the second DRI2SwapBuffers, it
->> > > > doesn't need to get scheduled again for the next frame to be both
->> > > > rendered by the GPU and issued to the display for scanout.
->> > >
->> > > well, this is really only an issue if you are so loaded that you
->> > > don't get a chance to schedule for ~16ms.. which is pretty long
->> > > time.
->>
->> Yes - it really is 16ms (minus interrupt/workqueue latency) isn't it?
->> Hmmm, that does sound very long. Will try out some experiments and see.
->
-> We're looking at moving the flip queue into the DDX driver, however
-> it's not as straight-forward as I thought. With the current design,
-> all rate-limiting happens on the client side. So even if you only have
-> double buffering, using KDS you can queue up as many asynchronous
-> GPU-render/scan-out pairs as you want. It's up to EGL in the client
-> application to figure out there's a lot of frames in-flight and so
-> should probably block the application's render thread in
-> eglSwapBuffers to let the GPU and/or display catch up a bit.
->
-> If we only allow a single outstanding page-flip job in DRM, there'd be
-> a race if we returned a buffer to the client which had an outstanding
-> page-flip queued up in the DDX: The client could issue a render job to
-> the buffer just as the DDX processed the page-flip from the queue,
-> making the scan-out block until the GPU rendered the next frame. It
-> would also mean the previous frame would have been lost as it never
-> got scanned out before the GPU rendered the next-next frame to it.
+From: Dinh Nguyen <dinguyen@altera.com>
 
-You wouldn't unconditionally send the swap-done event to the client
-when the queue is "full".  (Well, for omap and msm, the queue depth is
-1, for triple buffer.. I think usually you don't want to do more than
-triple buffer.)  The client would never get a buffer that wasn't
-already done being scanned out, so there shouldn't be a race.
+Add defines for common Micrel PHY setups so that other platforms
+can use them. Update imx61 and sama5 hardware to use the micrel_phy.h
+PHY defines.
 
-Basically, in DDX, when you get a ScheduleSwap, there are two cases:
-1) you are still waiting for previous page-flip event from kernel, in
-which case you queue the swap and don't immediately send the event
-back to the client.  When the previous page flip completes, you
-schedule the new one and then send back the event to the client.
-2) you are not waiting for a previous page-flip, in which case you
-schedule the new page-flip and send the event to the client.
+Also add support for the KSZ9021RLRN PHY.
 
-(I hope that is clear.. I suppose maybe a picture here would help, but
-sadly I don't have anything handy)
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: David S. Miller <davem@davemloft.net>
+CC: Andrew Victor <linux@maxim.org.za>
+CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: netdev at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/mach-at91/board-dt-sama5.c |   17 ++++++-----------
+ arch/arm/mach-imx/mach-imx6q.c      |   13 ++++++++-----
+ include/linux/micrel_phy.h          |    6 ++++++
+ 3 files changed, 20 insertions(+), 16 deletions(-)
 
-The potential drawback is that the client doesn't necessarily have any
-control over double vs triple buffering.  In omap ddx I solved this by
-adding a special attachment point that the client could request to
-tell the DDX that it wanted to triple buffer.  But the upside is that
-you never need to worry about a modeset when there is more than one
-flip pending.
-
-BR,
--R
-
-> So instead, I think we'll have to block (suspend?) a client in
-> ScheduleSwap if the next buffer it would obtain with DRI2GetBuffers
-> has an outstanding page-flip in the user-space queue. We then wake
-> the client up again _after_ we get the page-flip event for the
-> previous page flip and have issued the page-flip to the next buffer
-> to the DRM. That way the DRM display driver has already registered its
-> intention to use the buffer with KDS before the client ever gets hold
-> of it.
->
-> Note: I say KDS here, but I assume the same issues will apply on any
-> implicit buffer-based synchronization. I.e. dma-fence.
->
-> It's not really a problem I don't think, but mention it to see if you
-> can see a reason why the above wouldn't work before we go and
-> implement it - it's a fairly big change to the DDX. Can you see any
-> issues with it? PrepareAccess gets interesting...
->
->
->
-> Cheers,
->
-> Tom
->
->
->
->
->
+diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+index ad95f6a..bf00d15 100644
+--- a/arch/arm/mach-at91/board-dt-sama5.c
++++ b/arch/arm/mach-at91/board-dt-sama5.c
+@@ -42,20 +42,15 @@ static int ksz9021rn_phy_fixup(struct phy_device *phy)
+ {
+ 	int value;
+ 
+-#define GMII_RCCPSR	260
+-#define GMII_RRDPSR	261
+-#define GMII_ERCR	11
+-#define GMII_ERDWR	12
+-
+ 	/* Set delay values */
+-	value = GMII_RCCPSR | 0x8000;
+-	phy_write(phy, GMII_ERCR, value);
++	value = MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW | 0x8000;
++	phy_write(phy, MICREL_KSZ9021_EXTREG_CTRL, value);
+ 	value = 0xF2F4;
+-	phy_write(phy, GMII_ERDWR, value);
+-	value = GMII_RRDPSR | 0x8000;
+-	phy_write(phy, GMII_ERCR, value);
++	phy_write(phy, MICREL_KSZ9021_EXTREG_DATA_WRITE, value);
++	value = MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW | 0x8000;
++	phy_write(phy, MICREL_KSZ9021_EXTREG_CTRL, value);
+ 	value = 0x2222;
+-	phy_write(phy, GMII_ERDWR, value);
++	phy_write(phy, MICREL_KSZ9021_EXTREG_DATA_WRITE, value);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 7be13f8..c8d7814 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -103,13 +103,16 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
+ {
+ 	if (IS_BUILTIN(CONFIG_PHYLIB)) {
+ 		/* min rx data delay */
+-		phy_write(phydev, 0x0b, 0x8105);
+-		phy_write(phydev, 0x0c, 0x0000);
++		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
++			0x8000 | MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW);
++		phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0x0000);
+ 
+ 		/* max rx/tx clock delay, min rx/tx control delay */
+-		phy_write(phydev, 0x0b, 0x8104);
+-		phy_write(phydev, 0x0c, 0xf0f0);
+-		phy_write(phydev, 0x0b, 0x104);
++		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
++			0x8000 | MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW);
++		phy_write(phydev, MICREL_KSZ9021_EXTREG_DATA_WRITE, 0xf0f0);
++		phy_write(phydev, MICREL_KSZ9021_EXTREG_CTRL,
++			MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW);
+ 	}
+ 
+ 	return 0;
+diff --git a/include/linux/micrel_phy.h b/include/linux/micrel_phy.h
+index 8752dbb..ad05ce6 100644
+--- a/include/linux/micrel_phy.h
++++ b/include/linux/micrel_phy.h
+@@ -17,6 +17,7 @@
+ 
+ #define PHY_ID_KSZ8873MLL	0x000e7237
+ #define PHY_ID_KSZ9021		0x00221610
++#define PHY_ID_KSZ9021RLRN	0x00221611
+ #define PHY_ID_KS8737		0x00221720
+ #define PHY_ID_KSZ8021		0x00221555
+ #define PHY_ID_KSZ8031		0x00221556
+@@ -35,4 +36,9 @@
+ /* struct phy_device dev_flags definitions */
+ #define MICREL_PHY_50MHZ_CLK	0x00000001
+ 
++#define MICREL_KSZ9021_EXTREG_CTRL	0xB
++#define MICREL_KSZ9021_EXTREG_DATA_WRITE	0xC
++#define MICREL_KSZ9021_RGMII_CLK_CTRL_PAD_SCEW	0x104
++#define MICREL_KSZ9021_RGMII_RX_DATA_PAD_SCEW	0x105
++
+ #endif /* _MICREL_PHY_H */
+-- 
+1.7.9.5
