@@ -1,10 +1,10 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 13 Aug 2013 16:43:31 +0100
-Subject: [PATCH 14/22] ARM: dts: Remove '0x's from OMAP3 IGEP0030 DTS file
-In-Reply-To: <1374490361-25769-14-git-send-email-lee.jones@linaro.org>
+Date: Tue, 13 Aug 2013 16:44:00 +0100
+Subject: [PATCH 13/22] ARM: dts: Remove '0x's from OMAP3 IGEP0020 DTS file
+In-Reply-To: <1374490361-25769-13-git-send-email-lee.jones@linaro.org>
 References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-14-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130813154331.GF15278@lee--X1>
+ <1374490361-25769-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130813154400.GG15278@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,14 +19,14 @@ On Mon, 22 Jul 2013, Lee Jones wrote:
 > Cc: linux-omap at vger.kernel.org
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  arch/arm/boot/dts/omap3-igep0030.dts | 8 ++++----
+>  arch/arm/boot/dts/omap3-igep0020.dts | 8 ++++----
 >  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
-> index 644d0538..f628200 100644
-> --- a/arch/arm/boot/dts/omap3-igep0030.dts
-> +++ b/arch/arm/boot/dts/omap3-igep0030.dts
-> @@ -74,19 +74,19 @@
+> diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
+> index e8c4828..f7a8122 100644
+> --- a/arch/arm/boot/dts/omap3-igep0020.dts
+> +++ b/arch/arm/boot/dts/omap3-igep0020.dts
+> @@ -99,19 +99,19 @@
 >  			label = "SPL";
 >  			reg = <0 0x100000>;
 >  		};
