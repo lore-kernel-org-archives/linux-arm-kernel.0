@@ -1,28 +1,150 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 13 Aug 2013 12:19:43 +0100
-Subject: [PATCH] ARM: Update SMP_ON_UP code to detect A9MPCore with 1 CPU
- devices
-In-Reply-To: <52092AA5.3090005@ti.com>
-References: <1375381033-13220-1-git-send-email-santosh.shilimkar@ti.com>
- <51FBC610.9030900@arm.com> <51FBCEC3.4030207@ti.com>
- <51FBD42A.9040901@arm.com>
- <20130802154857.GD5292@mudshark.cambridge.arm.com>
- <52092AA5.3090005@ti.com>
-Message-ID: <20130813111943.GE30280@mudshark.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 13 Aug 2013 12:25:49 +0100
+Subject: [PATCHv5 18/31] CLK: DT: add support for set-rate-parent flag
+In-Reply-To: <1375460751-23676-19-git-send-email-t-kristo@ti.com>
+References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
+ <1375460751-23676-19-git-send-email-t-kristo@ti.com>
+Message-ID: <20130813112548.GM27165@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 07:34:13PM +0100, Santosh Shilimkar wrote:
-> On Friday 02 August 2013 11:48 AM, Will Deacon wrote:
-> > I think this an A9-specific register, which reads as 0 on UP A9 and reads as
-> > some form of PERIPH_BASE for SMP parts. The issue I have is when PERIPH_BASE
-> > is zero.
-> > 
-> What do we do here ? Should we document this in the code and proceed ?
-> Mostly there is no platform with PERIPH_BASE = 0, so its should be fine but
-> I am open for any other alternative.
+On Fri, Aug 02, 2013 at 05:25:37PM +0100, Tero Kristo wrote:
+> Adding set-rate-parent to clock node now allows a node to forward
+> clk_set_rate request to its parent clock.
 
-The only other alternative I can think of is forcing people to have
-CONFIG_SMP=n, but that blows away single zImage for your platform.
+Why do you need this?
 
-Will
+Is this a description of the hardware, or configuration for Linux?
+It feels like the latter, which shouldn't really be in DT.
+
+I'm not that familiar with the internals of the clock framework, and
+don't understand the implications of this.
+
+If this is necessary, the bindings need to be updated.
+
+Mike, thoughts?
+
+Mark.
+
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>  drivers/clk/clk-divider.c      |    6 +++++-
+>  drivers/clk/clk-fixed-factor.c |    6 +++++-
+>  drivers/clk/clk-gate.c         |    8 ++++++--
+>  drivers/clk/clk-mux.c          |    6 +++++-
+>  4 files changed, 21 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index ff24ec2..01d967f 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -388,6 +388,7 @@ void of_divider_clk_setup(struct device_node *node)
+>  	u32 mask = 0;
+>  	u32 shift = 0;
+>  	struct clk_div_table *table;
+> +	u32 flags = 0;
+>  
+>  	of_property_read_string(node, "clock-output-names", &clk_name);
+>  
+> @@ -418,12 +419,15 @@ void of_divider_clk_setup(struct device_node *node)
+>  	if (of_property_read_bool(node, "hiword-mask"))
+>  		clk_divider_flags |= CLK_DIVIDER_HIWORD_MASK;
+>  
+> +	if (of_property_read_bool(node, "set-rate-parent"))
+> +		flags |= CLK_SET_RATE_PARENT;
+> +
+>  	table = of_clk_get_div_table(node);
+>  	if (IS_ERR(table))
+>  		return;
+>  
+>  	clk = _register_divider(NULL, clk_name,
+> -			parent_name, 0,
+> +			parent_name, flags,
+>  			reg, (u8) shift, mask,
+>  			clk_divider_flags, table,
+>  			NULL);
+> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+> index 9ff7d51..30aa121 100644
+> --- a/drivers/clk/clk-fixed-factor.c
+> +++ b/drivers/clk/clk-fixed-factor.c
+> @@ -107,6 +107,7 @@ void __init of_fixed_factor_clk_setup(struct device_node *node)
+>  	const char *clk_name = node->name;
+>  	const char *parent_name;
+>  	u32 div, mult;
+> +	u32 flags = 0;
+>  
+>  	if (of_property_read_u32(node, "clock-div", &div)) {
+>  		pr_err("%s Fixed factor clock <%s> must have a clock-div property\n",
+> @@ -123,7 +124,10 @@ void __init of_fixed_factor_clk_setup(struct device_node *node)
+>  	of_property_read_string(node, "clock-output-names", &clk_name);
+>  	parent_name = of_clk_get_parent_name(node, 0);
+>  
+> -	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
+> +	if (of_property_read_bool(node, "set-rate-parent"))
+> +		flags |= CLK_SET_RATE_PARENT;
+> +
+> +	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, flags,
+>  					mult, div);
+>  	if (!IS_ERR(clk))
+>  		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+> index cd595ec..0be25b9 100644
+> --- a/drivers/clk/clk-gate.c
+> +++ b/drivers/clk/clk-gate.c
+> @@ -176,6 +176,7 @@ void of_gate_clk_setup(struct device_node *node)
+>  	const char *parent_name;
+>  	u8 clk_gate_flags = 0;
+>  	u32 bit_idx = 0;
+> +	u32 flags = 0;
+>  
+>  	of_property_read_string(node, "clock-output-names", &clk_name);
+>  
+> @@ -195,8 +196,11 @@ void of_gate_clk_setup(struct device_node *node)
+>  	if (of_property_read_bool(node, "hiword-mask"))
+>  		clk_gate_flags |= CLK_GATE_HIWORD_MASK;
+>  
+> -	clk = clk_register_gate(NULL, clk_name, parent_name, 0, reg, (u8) bit_idx,
+> -			clk_gate_flags, NULL);
+> +	if (of_property_read_bool(node, "set-rate-parent"))
+> +		flags |= CLK_SET_RATE_PARENT;
+> +
+> +	clk = clk_register_gate(NULL, clk_name, parent_name, flags, reg,
+> +			(u8) bit_idx, clk_gate_flags, NULL);
+>  
+>  	if (!IS_ERR(clk))
+>  		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+> index 4751bce..890ddbf 100644
+> --- a/drivers/clk/clk-mux.c
+> +++ b/drivers/clk/clk-mux.c
+> @@ -184,6 +184,7 @@ void of_mux_clk_setup(struct device_node *node)
+>  	u8 clk_mux_flags = 0;
+>  	u32 mask = 0;
+>  	u32 shift = 0;
+> +	u32 flags = 0;
+>  
+>  	of_property_read_string(node, "clock-output-names", &clk_name);
+>  
+> @@ -219,8 +220,11 @@ void of_mux_clk_setup(struct device_node *node)
+>  	if (of_property_read_bool(node, "hiword-mask"))
+>  		clk_mux_flags |= CLK_MUX_HIWORD_MASK;
+>  
+> +	if (of_property_read_bool(node, "set-rate-parent"))
+> +		flags |= CLK_SET_RATE_PARENT;
+> +
+>  	clk = clk_register_mux_table(NULL, clk_name, parent_names, num_parents,
+> -			0, reg, (u8) shift, mask, clk_mux_flags,
+> +			flags, reg, (u8) shift, mask, clk_mux_flags,
+>  			NULL, NULL);
+>  
+>  	if (!IS_ERR(clk))
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
