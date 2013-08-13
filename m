@@ -1,175 +1,72 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Tue, 13 Aug 2013 16:06:15 +0200
-Subject: [PATCH v3] N900: add device tree
-In-Reply-To: <20130813133636.GA12364@amd.pavel.ucw.cz>
-References: <20130614055629.GM8164@atomide.com>
- <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
- <20130617111031.GQ20992@atomide.com>
- <20130701211753.GC15318@amd.pavel.ucw.cz>
- <20130704171939.GA27374@blackmetal.musicnaut.iki.fi>
- <20130704202145.GB10752@amd.pavel.ucw.cz>
- <20130704203256.GB27374@blackmetal.musicnaut.iki.fi>
- <20130713121709.GC16473@amd.pavel.ucw.cz>
- <CAAwP0s18PNn10q5qrzgi4Vz9t31AYuwBSthjE=rSdRb0FG0CFQ@mail.gmail.com>
- <520A0F5B.5080502@baylibre.com> <20130813133636.GA12364@amd.pavel.ucw.cz>
-Message-ID: <520A3D57.1020906@baylibre.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 13 Aug 2013 16:07:14 +0200
+Subject: [PATCH v3 0/6] Armada 370/XP clocksource fixes
+In-Reply-To: <20130813140509.GA2359@localhost>
+References: <1376335016-16400-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <520A2679.1040307@linaro.org> <20130813140509.GA2359@localhost>
+Message-ID: <520A3D92.20006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/08/2013 15:36, Pavel Machek wrote:
-> Hi!
->
->> I finally got released by the aliens. It took longer than expected
->> and beside a small scar on the back of my neck, I feel pretty OK.
->
-> Scars on neck sound scary...
->
->> The order should not matter at all in DT, it should be a static
->> representation of the HW, so there is probably something wrong in
->> the code that make the device creation order important.
->
-> I understand that there's something wrong with the code, but it turned
-> out not to be easy to debug. Yes, it will have to be debugged some
-> day, but it happens with old code, too, so it is actually orthogonal
-> to device tree.
->
->> Beside my comments and the ones from Javier, it looks good.
->> If you can repost ASAP, I'll take it right after.
->> It will be the first one in the list.
->
-> Thanks, here you go.
+On 08/13/2013 04:05 PM, Ezequiel Garcia wrote:
+> On Tue, Aug 13, 2013 at 02:28:41PM +0200, Daniel Lezcano wrote:
+>> On 08/12/2013 09:16 PM, Ezequiel Garcia wrote:
+>>> This small patchset fixes a somewhat minor issue found in the clocksource
+>>> driver for Armada 370/XP SoC.
+>>>
+>>> On one side the Armada 370 SoC has no 25 MHz fixed timer.
+>>> On the other side the Armada XP SoC cannot work properly without such 25 MHz
+>>> fixed timer selected, because otherwise the base clock frequency would vary
+>>> when doing cpufreq frequency changes.
+>>>
+>>> Therefore we can consider the SoCs as not being compatible, being better to
+>>> have two compatible strings, one for each SoC. The previous compatible and
+>>> its behavior has been removed, considering there are no DT-enabled boards
+>>> in use in the field.
+>>>
+>>> In addition, CLOCKSOURCE_OF_DECLARE is used to simplify the initialization.
+>>>
+>>> This patchset is based on v3.11-rc4. Also, to ease maintainer's task this
+>>> is based on these two patches which are in linux-next:
+>>>
+>>>   commit be14114934545f52be2ffddbe401ba0951007c59
+>>>   Author: Stephen Boyd <sboyd@codeaurora.org>
+>>>   "clocksource: time-armada-370-xp: Divorce from local timer API"
+>>>
+>>>   commit 4047c794ae18c467a5ea987265238186bc253f61
+>>>   Author: Stephen Boyd <sboyd@codeaurora.org>
+>>>   "clocksource: time-armada-370-xp: Fix sparse warning"
+>>
+>> Your patchset does not apply to my tree for timers/core
+>>
+>> These two patches described above are in the ARM tree, not available in
+>> the timers/core tree.
+>>
+>> The correct submission path for these would have been through timers/urgent:
+>>
+>> timers/urgent -> v3.11-rcX -> arm-soc
+>>                            -> timers/core
+>>
+>> Or alternatively if it depends on material in arm-soc, a pull request
+>> based in a v3.11-rcX where Olof and I can pull from.
+>>
+>> I guess you have to rebase your patchset on top of timers/core.
+>>
+> 
+> Sure. I'll just send this patchset on top of timers/core.
 
-Thanks. I've just applied it after adding the prefix "ARM: dts:" to the 
-subject.
+Ok, thx.
 
-Regards,
-Benoit
+> I guess it was just a silly thing to base this on top of those
+> two patches.
+> 
+> Thanks,
+> 
 
-> 								Pavel
->
-> ---
->
-> This adds device tree with neccessary support to boot with functional
-> video (on both emulator and real N900 device).
->
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
->
-> ---
->
->  From v1: Aaro wants just GPLv2, so I did that. I re-enabled parts that
-> can be enabled on 3.10, and tested it on that kernel.
->
->  From v2: spelling, improved comments. Tested on 3.11-rc (0ed4402).
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index a0f2365..c48b1ef 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -162,6 +162,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
->   	omap3-devkit8000.dtb \
->   	omap3-beagle-xm.dtb \
->   	omap3-evm.dtb \
-> +	omap3-n900.dtb \
->   	omap3-tobi.dtb \
->   	omap3-igep0020.dtb \
->   	omap3-igep0030.dtb \
-> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> new file mode 100644
-> index 0000000..7ff90f8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-n900.dts
-> @@ -0,0 +1,92 @@
-> +/*
-> + * Copyright (C) 2013 Pavel Machek <pavel@ucw.cz>
-> + * Copyright 2013 Aaro Koskinen <aaro.koskinen@iki.fi>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 (or later) as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "omap34xx.dtsi"
-> +
-> +/ {
-> +	model = "Nokia N900";
-> +	compatible = "nokia,omap3-n900", "ti,omap3";
-> +
-> +	cpus {
-> +		cpu at 0 {
-> +			cpu0-supply = <&vcc>;
-> +		};
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x80000000 0x10000000>; /* 256 MB */
-> +	};
-> +
-> +};
-> +
-> +&i2c1 {
-> +	clock-frequency = <2200000>;
-> +
-> +	twl: twl at 48 {
-> +		reg = <0x48>;
-> +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-> +		interrupt-parent = <&intc>;
-> +	};
-> +};
-> +
-> +#include "twl4030.dtsi"
-> +
-> +&twl_gpio {
-> +	ti,pullups	= <0x0>;
-> +	ti,pulldowns	= <0x03ff3f>; /* BIT(0..5) | BIT(8..17) */
-> +};
-> +
-> +&i2c2 {
-> +	clock-frequency = <400000>;
-> +};
-> +
-> +&i2c3 {
-> +	clock-frequency = <100000>;
-> +};
-> +
-> +&mmc1 {
-> +	status = "disabled";
-> +};
-> +
-> +&mmc2 {
-> +	status = "disabled";
-> +};
-> +
-> +&mmc3 {
-> +	status = "disabled";
-> +};
-> +
-> +&mcspi1 {
-> +	/*
-> +	 * For some reason, touchscreen is necessary for screen to work at
-> +	 * all on real hw. It works well without it on emulator.
-> +	 *
-> +	 * Also... order in the device tree actually matters here.
-> +	 */
-> +	tsc2005 at 0 {
-> +		compatible = "tsc2005";
-> +		spi-max-frequency = <6000000>;
-> +		reg = <0>;
-> +	};
-> +	mipid at 2 {
-> +		compatible = "acx565akm";
-> +		spi-max-frequency = <6000000>;
-> +		reg = <2>;
-> +	};
-> +};
-> +
-> +&usb_otg_hs {
-> +	interface-type = <0>;
-> +	usb-phy = <&usb2_phy>;
-> +	mode = <2>;
-> +	power = <50>;
-> +};
->
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
