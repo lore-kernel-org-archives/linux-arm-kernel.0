@@ -1,66 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Aug 2013 10:58:30 +0100
-Subject: [PATCHv2 1/9] ARM: kirkwood: convert d2net_v2 to DT
-In-Reply-To: <1375369655-1310-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375369655-1310-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130813095830.GI27165@e106331-lin.cambridge.arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 13 Aug 2013 15:28:31 +0530
+Subject: [PATCH 1/2] extcon: palmas: Added a new compatible type *ti,
+ palmas-usb-vid*
+In-Reply-To: <520A0257.1080903@samsung.com>
+References: <1376302675-15795-1-git-send-email-kishon@ti.com>
+ <1376372241-15573-1-git-send-email-kishon@ti.com>
+ <520A0257.1080903@samsung.com>
+Message-ID: <520A0347.701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Aug 01, 2013 at 04:07:27PM +0100, Thomas Petazzoni wrote:
-> This commit completely converts the d2net_v2 Kirkwood board to use a
-> Device Tree representation.
+On Tuesday 13 August 2013 03:24 PM, Chanwoo Choi wrote:
+> Hi Kishon,
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/Makefile              |   1 +
->  arch/arm/boot/dts/kirkwood-d2net-v2.dts | 231 ++++++++++++++++++++++++++++++++
->  arch/arm/mach-kirkwood/Kconfig          |   7 -
->  arch/arm/mach-kirkwood/Makefile         |   2 +-
->  arch/arm/mach-kirkwood/d2net_v2-setup.c | 231 --------------------------------
->  5 files changed, 233 insertions(+), 239 deletions(-)
->  create mode 100644 arch/arm/boot/dts/kirkwood-d2net-v2.dts
->  delete mode 100644 arch/arm/mach-kirkwood/d2net_v2-setup.c
+> On 08/13/2013 02:37 PM, Kishon Vijay Abraham I wrote:
+>> The Palmas device contains only a USB VID detector, so added a
+>> compatible type *ti,palmas-usb-vid*. Dint remove the existing compatible
+>> types for backward compatibility.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/extcon/extcon-twl.txt |    3 ++-
+>>  drivers/extcon/extcon-palmas.c                          |    1 +
+>>  2 files changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/extcon/extcon-twl.txt b/Documentation/devicetree/bindings/extcon/extcon-twl.txt
+>> index 58f531a..5be4afc 100644
+>> --- a/Documentation/devicetree/bindings/extcon/extcon-twl.txt
+>> +++ b/Documentation/devicetree/bindings/extcon/extcon-twl.txt
+>> @@ -2,7 +2,8 @@ EXTCON FOR TWL CHIPS
+>>  
+>>  PALMAS USB COMPARATOR
+>>  Required Properties:
+>> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
+>> + - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb" or
+>> +   "ti,palmas-usb-vid".
+>>   - vbus-supply : phandle to the regulator device tree node.
+>>  
+>>  Optional Properties:
+>> diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
+>> index b752a0a..4f83fae 100644
+>> --- a/drivers/extcon/extcon-palmas.c
+>> +++ b/drivers/extcon/extcon-palmas.c
+>> @@ -223,6 +223,7 @@ static int palmas_usb_remove(struct platform_device *pdev)
+>>  
+>>  static struct of_device_id of_palmas_match_tbl[] = {
+>>  	{ .compatible = "ti,palmas-usb", },
+>> +	{ .compatible = "ti,palmas-usb-vid", },
+>>  	{ .compatible = "ti,twl6035-usb", },
+>>  	{ /* end */ }
+>>  };
+>>
 > 
+> This patch has a conflict. You have to always implement patch on extcon branch
+> including latest patch. You need to resend v2 patch based on extcon-next branch.
+> 
+> 'extcon-twl.txt' is renamed as 'extcon-palmas.txt' on following patch:
+> http://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/commit/?h=extcon-next&id=80d644b297dc26c5126858555044edef76f4ffe8
+> 
+> And, 'vbus-supply' phandle was removed on following patch:
+> http://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/commit/?h=extcon-next&id=26ece4f0b7d2264282d9077d1843ff1e98189b6c
 
-[...]
+Alright. I'll send the patch shortly.
 
-> +       regulators {
-> +               compatible = "simple-bus";
-> +               pinctrl-0 = <&pmx_sata_power>;
-> +               pinctrl-names = "default";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-
-That's not really a simple-bus if there's no mapping to the parent's
-address space (and it represents a completely different concept of
-address).
-
-Could you explain what the pinctrl's doing here? I couldn't see what
-code would be handling that given the node will get probed as a
-simple-bus and the regulator-fixed binding doesn't mention anything
-about the parent node.
-
-> +
-> +               sata0_power: regulator at 1 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <1>;
-
-Do we even need the unit-address?
-
-> +                       regulator-name = "SATA0 Power";
-> +                       regulator-min-microvolt = <5000000>;
-> +                       regulator-max-microvolt = <5000000>;
-> +                       enable-active-high;
-> +                       regulator-always-on;
-> +                       regulator-boot-on;
-> +                       gpio = <&gpio0 16 0>;
-> +               };
-> +       };
-> +};
-
-Thanks,
-Mark.
+Thanks
+Kishon
