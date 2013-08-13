@@ -1,31 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 13 Aug 2013 12:11:17 +0100
-Subject: [patch 1/2] arm: Mark pmu interupt IRQF_NO_THREAD
-In-Reply-To: <20130812195255.GA4181@breakpoint.cc>
-References: <20130214205204.109023136@linutronix.de>
- <20130214205304.923585891@linutronix.de>
- <20130215095153.GA11145@mudshark.cambridge.arm.com>
- <20130812195255.GA4181@breakpoint.cc>
-Message-ID: <20130813111117.GB30280@mudshark.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 13 Aug 2013 13:12:23 +0200
+Subject: [RFC 0/3] ARM: Allow PCI host drivers to be unloaded
+Message-ID: <1376392346-14127-1-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 08:52:55PM +0100, Sebastian Andrzej Siewior wrote:
-> On Fri, Feb 15, 2013 at 09:51:53AM +0000, Will Deacon wrote:
-> > Yup, we certainly don't want these to be threaded! Cheers, I'll add this to
-> > my perf queue.
-> 
-> I don't see this in v3.10. Is there a problem with this patch?
+Hi,
 
-Nope, I was just waiting for the discussion to die down around the kconfig
-change in the second patch.
+This is a set of experimental patches that allow ARM PCI host drivers to
+be unloaded. The first two patches enhance the ARM core PCI code with
+functions to tear down fixed PCI I/O mappings and unregister a PCI host
+bridge. The third patch uses the new functionality to allow the Tegra
+PCIe driver to unbind from a device.
 
-Probably best to submit both to Russell's patch system[1], with my ack on
-this one:
+I'm sending this as an RFC because, while I've been able to successfully
+unbind and rebind the Tegra PCIe driver and verifying that a NIC
+connected via PCIe still works after each new probe, I haven't fully
+investigated yet whether there may be memory leaks due to missing
+cleanup.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Thierry
 
-Will
+Thierry Reding (3):
+  ARM: Allow unmapping of fixed PCI I/O mappings
+  ARM: Introduce pci_common_exit()
+  PCI: tegra: Support driver unbinding
 
-[1] Add a "KernelVersion: 3.11-rc5" line to the patch, then git send-email
-    it to patches at arm.linux.org.uk.
+ arch/arm/include/asm/io.h       |  1 +
+ arch/arm/include/asm/mach/pci.h |  6 ++++++
+ arch/arm/kernel/bios32.c        | 29 ++++++++++++++++++++++++++---
+ arch/arm/mm/ioremap.c           |  6 ++++++
+ drivers/pci/host/pci-tegra.c    | 37 ++++++++++++++++++++++++++++++++++++-
+ 5 files changed, 75 insertions(+), 4 deletions(-)
+
+-- 
+1.8.3.4
