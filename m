@@ -1,43 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 13 Aug 2013 14:40:35 -0400
-Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
- module registers and APIs
-In-Reply-To: <CA+Bv8Xbg9v4zRy-EJPsxwCdwpSy50V8SjwQfmAvVxiCR=6mYBw@mail.gmail.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
- <5203A0BC.8060205@ti.com> <5203C457.80301@ti.com>
- <20130809051146.GB7656@atomide.com> <52055733.70808@ti.com>
- <87y586pvkq.fsf@kernel.org> <5209565C.7090508@ti.com>
- <87d2phpsu1.fsf@kernel.org> <520A4BE7.7090603@ti.com>
- <87wqnplg1n.fsf@kernel.org> <520A785C.3000304@ti.com>
- <CA+Bv8Xbg9v4zRy-EJPsxwCdwpSy50V8SjwQfmAvVxiCR=6mYBw@mail.gmail.com>
-Message-ID: <520A7DA3.5010907@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 13 Aug 2013 11:42:48 -0700
+Subject: [PATCH v1 09/14] clk: msm: Add support for MSM8960's global
+ clock controller (GCC)
+In-Reply-To: <20130813142411.4443.85003@quantum>
+References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
+ <1374713022-6049-10-git-send-email-sboyd@codeaurora.org>
+ <20130808170015.GE27325@e106331-lin.cambridge.arm.com>
+ <20130813050334.GE14845@codeaurora.org>
+ <20130813142411.4443.85003@quantum>
+Message-ID: <20130813184248.GG14845@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 August 2013 02:30 PM, Russ Dill wrote:
->>>> ARM world is also moving towards that by standardizing some of these
->>>> through (read PSCI) and thats the way to go in general.
->>>
->>> Agreed, but I'm not sure (yet) about enforcing PSCI on legacy platforms
->>> that don't support it natively.  Are you saying that the AM33xx firmware
->>> should be converted to be PSCI compliant?  Admittedly, I haven't read
->>> the PSCI spec closely, but I'm wondering if the current role splitting
->>> between MPU and M3 fits well with PSCI.
->>>
->> I didn't mean for the AM3XXX specifically because its current job is rather
->> very limited. i.e suspend. My concern is that IPC is not viewed as
->> an option for power management controllers like M3 which can abstract
->> all the hardware gory details and export a simpled interface for OS
->> in form of PSCI/ACPI.
+On 08/13, Mike Turquette wrote:
+> Quoting Stephen Boyd (2013-08-12 22:03:34)
+> > The clock controller is hardware and the number of clock outputs
+> > is fixed. Isn't all hardware fixed until you start talking about
+> > FPGAs? The next minor revision of the clock controller may add
+> > more clocks or remove clocks from that base design, but otherwise
+> > the two are 90% the same and generally software compatible. It
+> > isn't until we start a new generation of chips that we make major
+> > changes to the design. Is that loose enough to qualify?
+> > 
+> > These bindings attempt to follow the regulator bindings. With
+> > regulators there is a node for each regulator and we describe
+> > physical characteristics of those regulators within the nodes but
+> > we don't describe the software interface (bits, masks, shifts,
+> > etc). I imagine we could extend these clock nodes to describe
+> > physical characteristics such as min/max frequency or if the
+> > bootloader has left the clocks on. Right now we're using the
+> > nodes to describe what types of clocks there are and how the
+> > clock tree is layed out.
+> > 
+> > Or perhaps you're talking about clock sharing? We share the clock
+> > controller with multiple masters (processors running other OSes)
+> > and the partitioning of the clocks is mostly predefined. We just
+> > won't use some clocks because they're reserved for other
+> > processors. They're still part of the same clock controller
+> > hardware block but we don't want to control them on Linux because
+> > we'll trample over other processors and most likely hang the
+> > system. I wonder how this would work for hexagon and krait both
+> > running linux on the same SoC. If all DT says is that there is a
+> > gcc here at this address how are we supposed to know that we
+> > shouldn't use some clock? 
 > 
-> The IPC between the M3 and the A8 on the am335x is just a pair of
-> notification mechanisms (one from the A8, mailbox, and one from the
-> M3, sev) and a set of 8 32 bit registers. The 8 32 bit registers are
-> just a scratchpad and have no access rules or functionality beyond
-> being a scratchpad. How complicated do we want to make this?
+> Do Krait and Hexagon have the same register map? On the ARM SoCs I am
+> familiar with the masters have differing views of register addresses for
+> the same peripherals and hardware blocks. So you couldn't use the same
+> DTS in a straightforward way if this is true for your system.
 > 
-Exactly what I mean as well.
 
-Regards,
-Santosh
+They both have the same view of the register map.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
