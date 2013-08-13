@@ -1,47 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 Aug 2013 08:18:00 +0200
-Subject: [PATCH 2/2] ARM: dts: imx6q: add quirky select input for
- USB_OTG_ID
-In-Reply-To: <20130808012700.GA26546@shlinux1.ap.freescale.net>
-References: <1375330924-27384-1-git-send-email-shawn.guo@linaro.org>
- <1375330924-27384-2-git-send-email-shawn.guo@linaro.org>
- <CACRpkdb5caZkqweDF5Sr6z3ikYZENP58ot5GpL8Eer2pdB8YCw@mail.gmail.com>
- <20130808012700.GA26546@shlinux1.ap.freescale.net>
-Message-ID: <CACRpkdYTMTiPkEO66eNeZg+8w41Ag8pUJh4d61jv=7uM8-fqqQ@mail.gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 13 Aug 2013 14:58:42 +0800
+Subject: [PATCH V3 4/8] ARM: tegra: add common LP1 suspend support
+In-Reply-To: <5209367E.10900@wwwdotorg.org>
+References: <1376300407-14750-1-git-send-email-josephl@nvidia.com>
+ <1376300407-14750-5-git-send-email-josephl@nvidia.com>
+ <5209367E.10900@wwwdotorg.org>
+Message-ID: <1376377122.18689.252.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 8, 2013 at 3:27 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Wed, Aug 07, 2013 at 08:34:05PM +0200, Linus Walleij wrote:
->> On Thu, Aug 1, 2013 at 6:22 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->>
->> > For some reason, the select input of pin function USB_OTG_ID is not
->> > implemented via a regular select input register but using the bit
->> > USB_OTG_ID_ SEL (shift 13) of IOMUXC_GPR1 register (offset 0x4).
->> >
->> > As per the workaround for such quirk implemented in pinctrl driver,
->> > we need to compose the input_val cell as below.
->> >
->> >         31     23      15      7        0
->> >         | 0xff | shift | width | select |
->> >
->> > Thus, we have 0xff0d0100 for MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID and
->> > 0xff0d0101 for MX6QDL_PAD_GPIO_1__USB_OTG_ID in input_val cell.
->> >
->> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->>
->> This does not apply on top of my "devel" branch in the pinctrl tree.
->>
->> Could you respin this on top of devel and resend?
->>
->> Or do I need some other patch(es) for this to apply?
->
-> Sorry for not making this clear.  Due to the changes happened on IMX
-> tree, we will have to queue this one for 3.13 merge window through IMX
-> tree, after driver change hits mainline.  In short, I will take care of
-> the merge of this patch.
+On Tue, 2013-08-13 at 03:24 +0800, Stephen Warren wrote:
+> On 08/12/2013 03:40 AM, Joseph Lo wrote:
+> > The LP1 suspending mode on Tegra means CPU rail off, devices and PLLs are
+> > clock gated and SDRAM in self-refresh mode. That means the low level LP1
+> > suspending and resuming code couldn't be run on DRAM and the CPU must
+> > switch to the always on clock domain (a.k.a. CLK_M 12MHz oscillator). And
+> > the system clock (SCLK) would be switched to CLK_S, a 32KHz oscillator.
+> > The LP1 low level handling code need to be moved to IRAM area first. And
+> > marking the LP1 mask for indicating the Tegra device is in LP1. The CPU
+> > power timer needs to be re-calculated based on 32KHz that was originally
+> > based on PCLK.
+> > 
+> > When resuming from LP1, the LP1 reset handler will resume PLLs and then
+> > put DRAM to normal mode. Then jumping to the "tegra_resume" that will
+> > restore full context before back to kernel. The "tegra_resume" handler
+> > was expected to be found in PMC_SCRATCH41 register.
+> > 
+> > This is common LP1 procedures for Tegra, so we do these jobs mainly in
+> > this patch:
+> > * moving LP1 low level handling code to IRAM
+> > * marking LP1 mask
+> > * copying the physical address of "tegra_resume" to PMC_SCRATCH41
+> > * re-calculate the CPU power timer based on 32KHz
+> > 
+> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> > ---
+> > V3:
+> > * using a "#define" of IRAM_CODE to replace original static variable
+> 
+> I didn't mean change the variable to a define, but rather simply to use
+> the IO_ADDRESS() define instead of any new define. i.e.:
+> 
+> > diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+> 
+> > +#define IRAM_CODE IO_ADDRESS(TEGRA_IRAM_CODE_AREA)
+> 
+> ... just don't add that, and ...
+> 
+> > +static void tegra_suspend_enter_lp1(void)
+> > +{
+> > +	tegra_pmc_suspend();
+> > +
+> > +	/* copy the reset vector & SDRAM shutdown code into IRAM */
+> > +	memcpy(iram_save_addr, IRAM_CODE, iram_save_size);
+> > +	memcpy(IRAM_CODE, tegra_lp1_iram.start_addr, iram_save_size);
+> 
+> ... and s/IRAM_CODE/IO_ADDRESS(TEGRA_IRAM_CODE_AREA)/ in that code.
+> 
+> I'll make that fixup when applying these patches.
+OK. Thanks.
 
-OK Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Joseph
