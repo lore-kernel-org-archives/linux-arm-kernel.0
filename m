@@ -1,27 +1,39 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 13 Aug 2013 11:19:10 -0600
-Subject: [PATCH v2 0/5] ARM: dove: DT PCIe support
-In-Reply-To: <20130813140130.GA25111@titan.lakedaemon.net>
-References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130813140130.GA25111@titan.lakedaemon.net>
-Message-ID: <CAErSpo7DnfQBzoSX+rh6A0QrPO3Z3cjD=8ajZiFwKH0MBTG4og@mail.gmail.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Tue, 13 Aug 2013 18:29:43 +0100
+Subject: [PATCH v3 5/6] drivers: clocksource: enable hwcaps for event stream
+ on ARM arch timer
+In-Reply-To: <1376414984-14182-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376414984-14182-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1376414984-14182-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 8:01 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> Bjorn,
->
-> On Tue, Aug 13, 2013 at 02:25:19PM +0200, Sebastian Hesselbarth wrote:
->> This patch set adds support for the PCIe controllers found on Marvell
->> Dove SoCs. It depends on mvebu-pci patches sent by Thomas Petazzoni.
->
-> Well, when it rains, it pours.  If this series looks good to you, I'll
-> go ahead and add it on top of Thomas' patches.
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Yep, that's fine with me.  I consider the stuff in drivers/pci/host/
-as basically arch code that is collected as a convenience for code
-sharing.  I can't test it, and I can only evaluate it as far as
-looking for the most obvious things related to use of core PCI
-interfaces.
+This patch enables hwcap definition to the users for event stream
+feature on ARM architected timers.
 
-Bjorn
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+---
+ drivers/clocksource/arm_arch_timer.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 6301ee5..05d1e13 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -162,6 +162,9 @@ static int arch_timer_setup(struct clock_event_device *clk)
+ 		pos--;
+ 	arch_counter_set_user_access(min(pos, 15));
+ 
++	/* enable hwcap definition to the users for event stream feature */
++	arch_timer_set_hwcap_evtstrm();
++
+ 	return 0;
+ }
+ 
+-- 
+1.8.1.2
