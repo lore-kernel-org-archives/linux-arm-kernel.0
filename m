@@ -1,91 +1,64 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 13 Aug 2013 07:29:26 -0700
-Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
- module registers and APIs
-In-Reply-To: <5209565C.7090508@ti.com> (Dave Gerlach's message of "Mon, 12 Aug
- 2013 16:40:44 -0500")
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
- <5203A0BC.8060205@ti.com> <5203C457.80301@ti.com>
- <20130809051146.GB7656@atomide.com> <52055733.70808@ti.com>
- <87y586pvkq.fsf@kernel.org> <5209565C.7090508@ti.com>
-Message-ID: <87d2phpsu1.fsf@kernel.org>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 13 Aug 2013 16:30:16 +0200
+Subject: Zynq clk fixes
+In-Reply-To: <20130726222501.7598.33060@quantum>
+References: <51F26716.6030701@monstr.eu> <20130726200703.7598.86150@quantum>
+ <a76b3a5d-dadc-43b3-87ee-3c65258c15d7@CO1EHSMHS029.ehs.local>
+ <20130726222501.7598.33060@quantum>
+Message-ID: <520A42F8.9050108@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Gerlach <d-gerlach@ti.com> writes:
+Hi Mike,
 
-> On 08/12/2013 02:17 PM, Kevin Hilman wrote:
->> Dave Gerlach <d-gerlach@ti.com> writes:
->>
->>> On 08/09/2013 12:11 AM, Tony Lindgren wrote:
->>>> * Dave Gerlach <d-gerlach@ti.com> [130808 09:23]:
->>>>> On 08/08/2013 08:44 AM, Santosh Shilimkar wrote:
->>>>>> Lets address the above better. I don't see a need of 8 functions
->>>>>> exported doing one or 2 register writes.
->>>>>>
->>>>>> Look M3 based handling is going to be there on future SOCs
->>>>>> as well and this kind of handling of IPC is very short cited.
->>>>>>
->>>>>
->>>>> The idea here was to move all control module register accesses into
->>>>> one file in planning of implementing a driver for the control module
->>>>> itself in the future.
->>>>>
->>>>>> Probably we should have a separate driver for M3 in linux which
->>>>>> can have all this local code instead of all these exports.
->>>>>
->>>>> The wkup_m3 code has been moved to a small driver found in patch 8
->>>>> of this series, would it better to move this code there rather than
->>>>> with the rest of the control module code?
+On 07/27/2013 12:25 AM, Mike Turquette wrote:
+> Quoting S?ren Brinkmann (2013-07-26 14:11:52)
+>> On Fri, Jul 26, 2013 at 01:07:03PM -0700, Mike Turquette wrote:
+>>> Quoting Michal Simek (2013-07-26 05:09:58)
+>>>> Hi Mike, [cc: Arnd and Olof]
 >>>>
->>>> Please make everything you can into regular device drivers.
+>>>> Soren has found two bug fixes in zynq clk code.
+>>>> Can you please add these two patches to your tree?
+>>>> Will be great if you can add them to v3.11.
 >>>>
->>>> We still have some dependencies to mach-omap2 code for PRCM
->>>> for example, but we're trying to get all that to live in
->>>> drivers.
->>>>
->>>> So for new pieces, let's not add further dependencies to
->>>> complicate moving things to drivers.
->>>>
->>>> Regards,
->>>>
->>>> Tony
->>>>
+>>>> Arnd, Olof: I expect that all these clock changes should go through Mike.
+>>>> If I am wrong please let me know.
 >>>
->>> Ok I will go ahead and pull the control module code that handles IPC
->>> into the wkup_m3 driver.
+>>> Looks right to me. Do these fix regressions in the current -rc cycle?
 >>
->> Any control module register access still needs to stay in control.c.
->>
->>> The wkup_m3.c file is still present in mach-omap2 as the right
->>> location for it wasn't decided in the last RFC. Any thoughts on a good
->>> location for it?
->>
->> I raised this also in earlier reviews, but don't remember the if it was
->> answered...
->>
->> Why can't we handle the wkup_m3 using remoteproc/rpmsg instead of
->> creating another little driver that duplicates communication with the
->> M3.  Note also that the firmware load part would also be provided by
->> remoteproc/rpmsg.
->
-> Looping Suman Anna who handled the IPC patches this patch set is based
-> on top of...
->
-> For the wkup_m3, the mailbox isn't used in a traditional manner. It's
-> only used with a dummy write to trigger an interrupt from the A8 to
-> the M3 and then communication happens in IPC registers within the
-> control module. No messages are actually sent through the mailbox in
-> either direction so that's why it was done this way rather than bring
-> in full support for the mailbox.
+>> I doubt there are real regressions. But since it's still early in
+>> the release cycle and the driver was added in this merge window, I'd prefer
+>> having it hit a release kernel with these fixes included.
+> 
+> I've taken these into clk-fixes and added the following to the changelog
+> for each patch:
+> 
+> "This does not fix a specific regression but the clock driver was merged
+> for 3.11-rc1, so best to fix the known bugs before the release."
 
-I don't believe remoteproc/rpmsg forces you to use the mailbox for
-communication, and can use other IPC mechanisms.  This still sounds
-cleaner than reinventing remoteproc/rpmsg because of slight variations.
+Can you please tell me where you have added these two patches?
+      clk/zynq/clkc: Add dedicated spinlock for the SWDT
+      clk/zynq/clkc: Add CLK_SET_RATE_PARENT flag to ethernet muxes
 
-The linux way is to use and extend what is already there, and if it's
-extended to the breaking point, then make a case for why something new
-is needed.
+I can't see them in clk-fixes branch (this branch is pretty obsolete).
+http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=summary
 
-Kevin
+Thanks,
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/a5eb9a6a/attachment.sig>
