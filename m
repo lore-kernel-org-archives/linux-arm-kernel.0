@@ -1,43 +1,25 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Tue, 13 Aug 2013 14:40:30 +0200
-Subject: [PATCH] usb: musb dsps: fix pdev cast in suspend/resume
-Message-ID: <1376397630-26863-1-git-send-email-zonque@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 13 Aug 2013 13:44:40 +0100
+Subject: [PATCH V4 0/4] Add i2s support on smdk5420
+In-Reply-To: <1376300994-1679-1-git-send-email-padma.v@samsung.com>
+References: <1376300994-1679-1-git-send-email-padma.v@samsung.com>
+Message-ID: <20130813124440.GX6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dsps_suspend() and dsps_resume() are called with the device that has the
-glue assigned as drvdata. Using dev->parent seems wrong and causes a
-NULL pointer exception on an AM33xx board.
+On Mon, Aug 12, 2013 at 03:19:50PM +0530, Padmavathi Venna wrote:
+> Samsung has different versions of I2S introduced in different
+> platforms. Each version has some new support added for multichannel,
+> secondary fifo, s/w reset control, internal mux for rclk src clk and
+> tdm support. Each newly added change has a quirk. So this patch adds
+> all the required quirks as driver data and based on compatible string
+> from dtsi fetches the quirks. This also adds i2s support on exynos5420.
 
-The code was introduced by commit c68bb4c6 ("usb: musb: dsps: control
-module handling (quirk)") but I wonder whether it was ever used.
-
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- drivers/usb/musb/musb_dsps.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
-index 5233804..f20218e 100644
---- a/drivers/usb/musb/musb_dsps.c
-+++ b/drivers/usb/musb/musb_dsps.c
-@@ -692,7 +692,7 @@ static int dsps_remove(struct platform_device *pdev)
- #ifdef CONFIG_PM_SLEEP
- static int dsps_suspend(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev->parent);
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct dsps_glue *glue = platform_get_drvdata(pdev);
- 	const struct dsps_musb_wrapper *wrp = glue->wrp;
- 	int i;
-@@ -705,7 +705,7 @@ static int dsps_suspend(struct device *dev)
- 
- static int dsps_resume(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev->parent);
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct dsps_glue *glue = platform_get_drvdata(pdev);
- 	const struct dsps_musb_wrapper *wrp = glue->wrp;
- 	int i;
--- 
-1.8.3.1
+Applied all these, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/2b18da26/attachment.sig>
