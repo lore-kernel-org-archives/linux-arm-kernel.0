@@ -1,463 +1,140 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Aug 2013 17:13:14 +0100
-Subject: [PATCH 2/8] clk: keystone: Add gate control clock driver
-In-Reply-To: <1375719147-7578-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
- <1375719147-7578-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130813161314.GR27165@e106331-lin.cambridge.arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 13 Aug 2013 09:19:16 -0700
+Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
+ module registers and APIs
+In-Reply-To: <520A4BE7.7090603@ti.com> (Santosh Shilimkar's message of "Tue,
+ 13 Aug 2013 11:08:23 -0400")
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
+ <5203A0BC.8060205@ti.com> <5203C457.80301@ti.com>
+ <20130809051146.GB7656@atomide.com> <52055733.70808@ti.com>
+ <87y586pvkq.fsf@kernel.org> <5209565C.7090508@ti.com>
+ <87d2phpsu1.fsf@kernel.org> <520A4BE7.7090603@ti.com>
+Message-ID: <87wqnplg1n.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding dt maintainers]
++ Ohad
 
-On Mon, Aug 05, 2013 at 05:12:21PM +0100, Santosh Shilimkar wrote:
-> Add the driver for the clock gate control which uses PSC (Power Sleep
-> Controller) IP on Keystone 2 based SOCs. It is responsible for enabling and
-> disabling of the clocks for different IPs present in the SoC.
-> 
-> Cc: Mike Turquette <mturquette@linaro.org>
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  .../devicetree/bindings/clock/keystone-gate.txt    |   30 ++
->  drivers/clk/keystone/gate.c                        |  306 ++++++++++++++++++++
->  include/linux/clk/keystone.h                       |    1 +
->  3 files changed, 337 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/keystone-gate.txt
->  create mode 100644 drivers/clk/keystone/gate.c
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/keystone-gate.txt b/Documentation/devicetree/bindings/clock/keystone-gate.txt
-> new file mode 100644
-> index 0000000..40afef5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/keystone-gate.txt
-> @@ -0,0 +1,30 @@
-> +Binding for Keystone gate control driver which uses PSC controller IP.
-> +
-> +This binding uses the common clock binding[1].
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Required properties:
-> +- compatible : shall be "keystone,psc-clk".
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Similarly to my comments on patch 1, this should probably be something
-more like "ti,keystone-psc-clock"
+> On Tuesday 13 August 2013 10:29 AM, Kevin Hilman wrote:
+>> Dave Gerlach <d-gerlach@ti.com> writes:
+>> 
+>>> On 08/12/2013 02:17 PM, Kevin Hilman wrote:
+>>>> Dave Gerlach <d-gerlach@ti.com> writes:
+>>>>
+>>>>> On 08/09/2013 12:11 AM, Tony Lindgren wrote:
+>>>>>> * Dave Gerlach <d-gerlach@ti.com> [130808 09:23]:
+>>>>>>> On 08/08/2013 08:44 AM, Santosh Shilimkar wrote:
+>>>>>>>> Lets address the above better. I don't see a need of 8 functions
+>>>>>>>> exported doing one or 2 register writes.
+>>>>>>>>
+>>>>>>>> Look M3 based handling is going to be there on future SOCs
+>>>>>>>> as well and this kind of handling of IPC is very short cited.
+>>>>>>>>
+>>>>>>>
+>>>>>>> The idea here was to move all control module register accesses into
+>>>>>>> one file in planning of implementing a driver for the control module
+>>>>>>> itself in the future.
+>>>>>>>
+>>>>>>>> Probably we should have a separate driver for M3 in linux which
+>>>>>>>> can have all this local code instead of all these exports.
+>>>>>>>
+>>>>>>> The wkup_m3 code has been moved to a small driver found in patch 8
+>>>>>>> of this series, would it better to move this code there rather than
+>>>>>>> with the rest of the control module code?
+>>>>>>
+>>>>>> Please make everything you can into regular device drivers.
+>>>>>>
+>>>>>> We still have some dependencies to mach-omap2 code for PRCM
+>>>>>> for example, but we're trying to get all that to live in
+>>>>>> drivers.
+>>>>>>
+>>>>>> So for new pieces, let's not add further dependencies to
+>>>>>> complicate moving things to drivers.
+>>>>>>
+>>>>>> Regards,
+>>>>>>
+>>>>>> Tony
+>>>>>>
+>>>>>
+>>>>> Ok I will go ahead and pull the control module code that handles IPC
+>>>>> into the wkup_m3 driver.
+>>>>
+>>>> Any control module register access still needs to stay in control.c.
+>>>>
+>>>>> The wkup_m3.c file is still present in mach-omap2 as the right
+>>>>> location for it wasn't decided in the last RFC. Any thoughts on a good
+>>>>> location for it?
+>>>>
+>>>> I raised this also in earlier reviews, but don't remember the if it was
+>>>> answered...
+>>>>
+>>>> Why can't we handle the wkup_m3 using remoteproc/rpmsg instead of
+>>>> creating another little driver that duplicates communication with the
+>>>> M3.  Note also that the firmware load part would also be provided by
+>>>> remoteproc/rpmsg.
+>>>
+>>> Looping Suman Anna who handled the IPC patches this patch set is based
+>>> on top of...
+>>>
+>>> For the wkup_m3, the mailbox isn't used in a traditional manner. It's
+>>> only used with a dummy write to trigger an interrupt from the A8 to
+>>> the M3 and then communication happens in IPC registers within the
+>>> control module. No messages are actually sent through the mailbox in
+>>> either direction so that's why it was done this way rather than bring
+>>> in full support for the mailbox.
+>> 
+>> I don't believe remoteproc/rpmsg forces you to use the mailbox for
+>> communication, and can use other IPC mechanisms.  This still sounds
+>> cleaner than reinventing remoteproc/rpmsg because of slight variations.
+>> 
+>> The linux way is to use and extend what is already there, and if it's
+>> extended to the breaking point, then make a case for why something new
+>> is needed.
+>> 
+> While I agree to re-use frameworks, am strongly against use of IPC for
+> the power management which is time sensitive. 
 
-> +- #clock-cells : from common clock binding; shall be set to 0.
-> +- clocks : parent clock phandle
-> +- reg :        psc address address space
-> +
-> +Optional properties:
-> +- clock-output-names : From common clock binding to override the
-> +                       default output clock name
-> +- status : "enabled" if clock is always enabled
+Maybe I'm misunderstanding what you mean by IPC, but I'm not sure how
+you can be against IPC here.  Communication with M3 requires it.
 
-Huh? This is a standard property, for which ePAPR defines "okay",
-"disabled", "fail", and "fail-sss", and not "enabled". This also doesn't
-seem to follow the standard meaning judging by the code.
+The only question is what framework to use: create a new wkup_m3 driver
+which creates yet another set of IPC APIs as well as a seprate firmware
+load path?  Or reuse remoteproc/rpmsg which provides both.
 
-It looks like this could be a boolean property
-("clock-always-enabled"?), but that assumes it's necessary.
+> Imagine a scenario where
+> ACPI is asked to go through remoteproc/ipc for talking to firmware.
+> If it takes 10 to 15 uS just to send a command to firmware to change
+> some control, that just tells something is not right and thats what
+> IPC will do.
 
-Why do you need this?
+Sounds like what you're saying is that remoteproc/rpmsg will be too slow
+for this?  Is there any evidence of that?  Even if it is slow, it sounds
+like a perfect opportuntity to enhance it.
 
-> +- lpsc : lpsc module id, if not set defaults to zero
+Also, if speed is that much of a concern concern here, I wonder why
+there's a 500msec timeout in in the communication between MPU and M3 in
+the current code.
 
-What's that needed for? Are there multiple clocks sharing a common
-register bank?
+> ARM world is also moving towards that by standardizing some of these
+> through (read PSCI) and thats the way to go in general. 
 
-> +- pd : power domain number, if not set defaults to zero (always ON)
+Agreed, but I'm not sure (yet) about enforcing PSCI on legacy platforms
+that don't support it natively.  Are you saying that the AM33xx firmware
+should be converted to be PSCI compliant?  Admittedly, I haven't read
+the PSCI spec closely, but I'm wondering if the current role splitting
+between MPU and M3 fits well with PSCI. 
 
-Please don't use abbreviations unnecessarily. "power-domain-id" or
-similar would be far better. What exactly does this represent? Does the
-clock IP itself handle power domains, or is there some external unit
-that controls power domains?
+> Specifically for this series, I am also against having tons of exports
+> and all of that should be extracted properly but remoteproc is not
+> going to be the way. Firmware download has to happen much earlier(ROM
+> path) so thats not the requirement where we could have used the
+> remoteproc firmware download feature.
 
-> +- gpsc : gpsc number, if not set defaults to zero
+At least for AM33xx, I don't see any requirement that firmware download
+happens early (or at all.)  PM will simply be disabled until firmware is
+available (and running.)
 
-How does that interact with the lpsc property? When are these necessary?
-
-> +
-> +Example:
-> +       clock {
-> +               #clock-cells = <0>;
-> +               compatible = "keystone,psc-clk";
-> +               clocks = <&chipclk3>;
-> +               clock-output-names = "debugss_trc";
-> +               reg = <0x02350000 4096>;
-> +               lpsc = <5>;
-> +               pd = <1>;
-> +       };
-> diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
-> new file mode 100644
-> index 0000000..72ac478
-> --- /dev/null
-> +++ b/drivers/clk/keystone/gate.c
-> @@ -0,0 +1,306 @@
-> +/*
-> + * Clock driver for Keystone 2 based devices
-> + *
-> + * Copyright (C) 2013 Texas Instruments.
-> + *     Murali Karicheri <m-karicheri2@ti.com>
-> + *     Santosh Shilimkar <santosh.shilimkar@ti.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +#include <linux/clk.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/slab.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of.h>
-> +#include <linux/module.h>
-> +
-> +/* PSC register offsets */
-> +#define PTCMD                  0x120
-> +#define PTSTAT                 0x128
-> +#define PDSTAT                 0x200
-> +#define PDCTL                  0x300
-> +#define MDSTAT                 0x800
-> +#define MDCTL                  0xa00
-> +
-> +/* PSC module states */
-> +#define PSC_STATE_SWRSTDISABLE 0
-> +#define PSC_STATE_SYNCRST      1
-> +#define PSC_STATE_DISABLE      2
-> +#define PSC_STATE_ENABLE       3
-> +
-> +#define MDSTAT_STATE_MASK      0x3f
-> +#define MDSTAT_MCKOUT          BIT(12)
-> +#define PDSTAT_STATE_MASK      0x1f
-> +#define MDCTL_FORCE            BIT(31)
-> +#define MDCTL_LRESET           BIT(8)
-> +#define PDCTL_NEXT             BIT(0)
-> +
-> +/* PSC flags. Disable state is SwRstDisable */
-> +#define PSC_SWRSTDISABLE       BIT(0)
-> +/* Force module state transtition */
-> +#define PSC_FORCE              BIT(1)
-> +/* Keep module in local reset */
-> +#define PSC_LRESET             BIT(2)
-> +#define NUM_GPSC               2
-> +#define REG_OFFSET             4
-> +
-> +/**
-> + * struct clk_psc_data - PSC data
-> + * @base: Base address for a PSC
-> + * @flags: framework flags
-> + * @lpsc: Is it local PSC
-> + * @gpsc: Is it global PSC
-> + * @domain: PSC domain
-> + *
-> + */
-> +struct clk_psc_data {
-> +       void __iomem *base;
-> +       u32     flags;
-> +       u32     psc_flags;
-> +       u8      lpsc;
-> +       u8      gpsc;
-> +       u8      domain;
-> +};
-> +
-> +/**
-> + * struct clk_psc - PSC clock structure
-> + * @hw: clk_hw for the psc
-> + * @psc_data: PSC driver specific data
-> + * @lock: Spinlock used by the driver
-> + */
-> +struct clk_psc {
-> +       struct clk_hw hw;
-> +       struct clk_psc_data *psc_data;
-> +       spinlock_t *lock;
-> +};
-> +
-> +struct reg_psc {
-> +       u32 phy_base;
-> +       u32 size;
-> +       void __iomem *io_base;
-> +};
-> +
-> +static struct reg_psc psc_addr[NUM_GPSC];
-> +static DEFINE_SPINLOCK(psc_lock);
-> +
-> +#define to_clk_psc(_hw) container_of(_hw, struct clk_psc, hw)
-> +
-> +static void psc_config(void __iomem *psc_base, unsigned int domain,
-> +               unsigned int id, bool enable, u32 flags)
-> +{
-> +       u32 ptcmd, pdstat, pdctl, mdstat, mdctl, next_state;
-> +
-> +       if (enable)
-> +               next_state = PSC_STATE_ENABLE;
-> +       else if (flags & PSC_SWRSTDISABLE)
-> +               next_state = PSC_STATE_SWRSTDISABLE;
-> +       else
-> +               next_state = PSC_STATE_DISABLE;
-> +
-> +       mdctl = readl(psc_base + MDCTL + REG_OFFSET * id);
-> +       mdctl &= ~MDSTAT_STATE_MASK;
-> +       mdctl |= next_state;
-> +       if (flags & PSC_FORCE)
-> +               mdctl |= MDCTL_FORCE;
-> +       if (flags & PSC_LRESET)
-> +               mdctl &= ~MDCTL_LRESET;
-> +       writel(mdctl, psc_base + MDCTL + REG_OFFSET * id);
-> +
-> +       pdstat = readl(psc_base + PDSTAT + REG_OFFSET * domain);
-> +       if (!(pdstat & PDSTAT_STATE_MASK)) {
-> +               pdctl = readl(psc_base + PDCTL + REG_OFFSET * domain);
-> +               pdctl |= PDCTL_NEXT;
-> +               writel(pdctl, psc_base + PDCTL + REG_OFFSET * domain);
-> +       }
-> +
-> +       ptcmd = 1 << domain;
-> +       writel(ptcmd, psc_base + PTCMD);
-> +       while ((readl(psc_base + PTSTAT) >> domain) & 1)
-> +               ;
-> +
-> +       do {
-> +               mdstat = readl(psc_base + MDSTAT + REG_OFFSET * id);
-> +       } while (!((mdstat & MDSTAT_STATE_MASK) == next_state));
-> +}
-> +
-> +static int keystone_clk_is_enabled(struct clk_hw *hw)
-> +{
-> +       struct clk_psc *psc = to_clk_psc(hw);
-> +       struct clk_psc_data *data = psc->psc_data;
-> +       u32 mdstat = readl(data->base + MDSTAT + REG_OFFSET * data->lpsc);
-> +
-> +       return (mdstat & MDSTAT_MCKOUT) ? 1 : 0;
-> +}
-> +
-> +static int keystone_clk_enable(struct clk_hw *hw)
-> +{
-> +       struct clk_psc *psc = to_clk_psc(hw);
-> +       struct clk_psc_data *data = psc->psc_data;
-> +       unsigned long flags = 0;
-> +
-> +       if (psc->lock)
-> +               spin_lock_irqsave(psc->lock, flags);
-> +
-> +       psc_config(data->base, data->domain, data->lpsc, 1, data->psc_flags);
-> +
-> +       if (psc->lock)
-> +               spin_unlock_irqrestore(psc->lock, flags);
-> +
-> +       return 0;
-> +}
-> +
-> +static void keystone_clk_disable(struct clk_hw *hw)
-> +{
-> +       struct clk_psc *psc = to_clk_psc(hw);
-> +       struct clk_psc_data *data = psc->psc_data;
-> +       unsigned long flags = 0;
-> +
-> +       if (psc->lock)
-> +               spin_lock_irqsave(psc->lock, flags);
-> +
-> +       psc_config(data->base, data->domain, data->lpsc, 0, data->psc_flags);
-> +
-> +       if (psc->lock)
-> +               spin_unlock_irqrestore(psc->lock, flags);
-> +}
-> +
-> +static const struct clk_ops clk_psc_ops = {
-> +       .enable = keystone_clk_enable,
-> +       .disable = keystone_clk_disable,
-> +       .is_enabled = keystone_clk_is_enabled,
-> +};
-> +
-> +/**
-> + * clk_register_psc - register psc clock
-> + * @dev: device that is registering this clock
-> + * @name: name of this clock
-> + * @parent_name: name of clock's parent
-> + * @psc_data: platform data to configure this clock
-> + * @lock: spinlock used by this clock
-> + */
-> +static struct clk *clk_register_psc(struct device *dev,
-> +                       const char *name,
-> +                       const char *parent_name,
-> +                       struct clk_psc_data *psc_data,
-> +                       spinlock_t *lock)
-> +{
-> +       struct clk_init_data init;
-> +       struct clk_psc *psc;
-> +       struct clk *clk;
-> +
-> +       psc = kzalloc(sizeof(*psc), GFP_KERNEL);
-> +       if (!psc)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       init.name = name;
-> +       init.ops = &clk_psc_ops;
-> +       init.flags = psc_data->flags;
-> +       init.parent_names = (parent_name ? &parent_name : NULL);
-
-Is &parent_name not a pointer to a pointer on the stack? Is this only
-used once?
-
-> +       init.num_parents = (parent_name ? 1 : 0);
-> +
-> +       psc->psc_data = psc_data;
-> +       psc->lock = lock;
-> +       psc->hw.init = &init;
-
-That's definitely a pointer to some data on the stack, and that seems to
-be kept around. Is this only used for one-time initialisation, or might
-it be used later?
-
-> +
-> +       clk = clk_register(NULL, &psc->hw);
-> +       if (IS_ERR(clk))
-> +               kfree(psc);
-> +
-> +       return clk;
-> +}
-> +
-> +/**
-> + * of_psc_clk_init - initialize psc clock through DT
-> + * @node: device tree node for this clock
-> + * @lock: spinlock used by this clock
-> + */
-> +static void __init of_psc_clk_init(struct device_node *node, spinlock_t *lock)
-> +{
-> +       const char *parent_name, *status = NULL, *base_flags = NULL;
-> +       struct clk_psc_data *data;
-> +       const char *clk_name = node->name;
-> +       u32 gpsc = 0, lpsc = 0, pd = 0;
-> +       struct resource res;
-> +       struct clk *clk;
-> +       int rc;
-> +
-> +       data = kzalloc(sizeof(*data), GFP_KERNEL);
-> +       WARN_ON(!data);
-
-Does that not mean things will blow up later? return now?
-
-> +
-> +       if (of_address_to_resource(node, 0, &res)) {
-> +               pr_err("psc_clk_init - no reg property defined\n");
-> +               goto out;
-> +       }
-> +
-> +       of_property_read_u32(node, "gpsc", &gpsc);
-> +       of_property_read_u32(node, "lpsc", &lpsc);
-> +       of_property_read_u32(node, "pd", &pd);
-> +
-> +       if (gpsc >= NUM_GPSC) {
-> +               pr_err("psc_clk_init - no reg property defined\n");
-
-Wrong error message.
-
-> +               goto out;
-> +       }
-> +
-> +       of_property_read_string(node,
-> +                       "clock-output-names", &clk_name);
-> +       parent_name = of_clk_get_parent_name(node, 0);
-> +       WARN_ON(!parent_name);
-
-Do you require the parent name? If so you need to fail gracefully, if
-not you don't need the WARN_ON (perhaps a pr_warn would be better?).
-
-> +
-> +       /* Expected that same phy_base is used for all psc clocks of
-> +        * a give gpsc. So ioremap is done only once.
-> +        */
-
-So these clocks are all components of a larger IP block? It might make
-more sense to describe the containing block, with the actual clocks as
-sub-nodes (or if the set of clocks for the containing block is known,
-just the containing block).
-
-> +       if (psc_addr[gpsc].phy_base) {
-> +               if (psc_addr[gpsc].phy_base != res.start) {
-> +                       pr_err("Different psc base for same GPSC\n");
-> +                       goto out;
-> +               }
-> +       } else {
-> +               psc_addr[gpsc].phy_base = res.start;
-> +               psc_addr[gpsc].io_base =
-> +                       ioremap(res.start, resource_size(&res));
-> +       }
-> +
-> +       WARN_ON(!psc_addr[gpsc].io_base);
-
-Surely things will blow up later if that's the case? return here instead?
-
-> +       data->base = psc_addr[gpsc].io_base;
-> +       data->lpsc = lpsc;
-> +       data->gpsc = gpsc;
-> +       data->domain = pd;
-> +
-> +       if (of_property_read_bool(node, "ti,psc-lreset"))
-> +               data->psc_flags |= PSC_LRESET;
-> +       if (of_property_read_bool(node, "ti,psc-force"))
-> +               data->psc_flags |= PSC_FORCE;
-
-Neither of these were defined in the binding, and they don't appear to
-have been inherited form another binding. What are they for? Why are
-they needed?
-
-> +
-> +       clk = clk_register_psc(NULL, clk_name, parent_name,
-> +                               data, lock);
-> +
-> +       if (clk) {
-> +               of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +
-> +               rc = of_property_read_string(node, "status", &status);
-> +               if (status && !strcmp(status, "enabled"))
-> +                       clk_prepare_enable(clk);
-> +               return;
-> +       }
-
-As mentioned above, this abuses the standard status property, and it's
-not clear why this is necessary.
-
-Thanks,
-Mark.
-
-> +       pr_err("psc_clk_init - error registering psc clk %s\n", node->name);
-> +out:
-> +       kfree(data);
-> +       return;
-> +}
-> +
-> +/**
-> + * of_keystone_psc_clk_init - initialize psc clock through DT
-> + * @node: device tree node for this clock
-> + */
-> +void __init of_keystone_psc_clk_init(struct device_node *node)
-> +{
-> +       of_psc_clk_init(node, &psc_lock);
-> +}
-> +EXPORT_SYMBOL_GPL(of_keystone_psc_clk_init);
-> +CLK_OF_DECLARE(keystone_gate_clk, "keystone,psc-clk", of_keystone_psc_clk_init);
-> diff --git a/include/linux/clk/keystone.h b/include/linux/clk/keystone.h
-> index 1ade95d..7b3e154 100644
-> --- a/include/linux/clk/keystone.h
-> +++ b/include/linux/clk/keystone.h
-> @@ -14,5 +14,6 @@
->  #define __LINUX_CLK_KEYSTONE_H_
-> 
->  extern void of_keystone_pll_clk_init(struct device_node *node);
-> +extern void of_keystone_psc_clk_init(struct device_node *node);
-> 
->  #endif /* __LINUX_CLK_KEYSTONE_H_ */
-> --
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Kevin
