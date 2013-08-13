@@ -1,34 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 13 Aug 2013 14:10:58 -0600
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 13 Aug 2013 15:17:57 -0500
 Subject: [PATCHv3] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <1376423915.3167.2.camel@linux-builds1>
+In-Reply-To: <520A92D2.2090208@wwwdotorg.org>
 References: <1376322589-17606-1-git-send-email-dinguyen@altera.com>
  <520A8E71.4090508@wwwdotorg.org> <1376423915.3167.2.camel@linux-builds1>
-Message-ID: <520A92D2.2090208@wwwdotorg.org>
+ <520A92D2.2090208@wwwdotorg.org>
+Message-ID: <1376425077.3167.6.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2013 01:58 PM, Dinh Nguyen wrote:
-> On Tue, 2013-08-13 at 13:52 -0600, Stephen Warren wrote:
->> On 08/12/2013 09:49 AM, dinguyen at altera.com wrote:
->>> From: Dinh Nguyen <dinguyen@altera.com>
->>>
->>> Add bindings for SD/MMC for SOCFPGA.
->>> Add "syscon" to the "altr,sys-mgr" binding.
-
->>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
->>
->>>  		sysmgr at ffd08000 {
->>> -				compatible = "altr,sys-mgr";
->>> +				compatible = "altr,sys-mgr", "syscon";
->>
->> That seems like an unrelated change?
+On Tue, 2013-08-13 at 14:10 -0600, Stephen Warren wrote:
+> On 08/13/2013 01:58 PM, Dinh Nguyen wrote:
+> > On Tue, 2013-08-13 at 13:52 -0600, Stephen Warren wrote:
+> >> On 08/12/2013 09:49 AM, dinguyen at altera.com wrote:
+> >>> From: Dinh Nguyen <dinguyen@altera.com>
+> >>>
+> >>> Add bindings for SD/MMC for SOCFPGA.
+> >>> Add "syscon" to the "altr,sys-mgr" binding.
 > 
-> This patch is to enable SD/MMC for SOCFPGA. The "syscon" is needed in
-> dw_mmc-socfpga.c as the clock phases for the SD IP is controlled by
-> registers in "altr,sys-mgr".
+> >>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> >>
+> >>>  		sysmgr at ffd08000 {
+> >>> -				compatible = "altr,sys-mgr";
+> >>> +				compatible = "altr,sys-mgr", "syscon";
+> >>
+> >> That seems like an unrelated change?
+> > 
+> > This patch is to enable SD/MMC for SOCFPGA. The "syscon" is needed in
+> > dw_mmc-socfpga.c as the clock phases for the SD IP is controlled by
+> > registers in "altr,sys-mgr".
+> 
+> But nothing in the dwmmc nodes refers to the syscon node, so how can the
+> syscon driver possibly provide services to the MMC driver; the MMC
+> driver won't be able to find it. I hope there's no back-door assumption
+> that some syscon exists, and that there's only one of them...
 
-But nothing in the dwmmc nodes refers to the syscon node, so how can the
-syscon driver possibly provide services to the MMC driver; the MMC
-driver won't be able to find it. I hope there's no back-door assumption
-that some syscon exists, and that there's only one of them...
+In dw_mmc-socfpga.c:
+
+priv->sysreg = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
+
+then, uses regmap_write() to set the correct values from
+ "altr,dw-mshc-sdr-timing".
+
+This was a suggestion from Arnd. It seems that this part of patch is
+causing alot of confusion, I should just split the patches out?
+
+Dinh
+
+> 
