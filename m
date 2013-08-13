@@ -1,62 +1,29 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 13 Aug 2013 19:02:48 +0530
-Subject: [PATCH V2 35/35] cpufreq: tegra: Covert to light weight
- ->target_index() routine
+Date: Tue, 13 Aug 2013 19:16:00 +0530
+Subject: [PATCH V2 00/35] CPUFreq: Implement light weight ->target(): for
+ 3.13
 In-Reply-To: <cover.1376392602.git.viresh.kumar@linaro.org>
 References: <cover.1376392602.git.viresh.kumar@linaro.org>
-Message-ID: <8becd7a6b5383426e35e89d108dbc9bb8ee17655.1376392602.git.viresh.kumar@linaro.org>
+Message-ID: <CAKohpo=-PWt23aLiVW3MxU6gZ-_Db=QKYaaKO-f+e+u8hirpJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch converts existing .target() to newly defined light weight
-.target_index() routine for this driver.
+On 13 August 2013 19:02, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> Currently prototype of cpufreq_drivers target routines is:
+>
+> int target(struct cpufreq_policy *policy, unsigned int target_freq,
+>         unsigned int relation);
+>
+> And most of the drivers call cpufreq_frequency_table_target() to get a valid
+> index of their frequency table which is closest to the target_freq. And they
+> don't use target_freq and relation after it.
 
-CPUFreq core will call cpufreq_frequency_table_target() before calling this
-routine and will pass index to it.
+I just came to know from a friend that I have written "covert" instead of
+"convert" in subjects of all the patches.
 
-Cc: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/tegra-cpufreq.c | 12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
+Will fix it in my repo for now.
 
-diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
-index affb294..ee2cf8f3 100644
---- a/drivers/cpufreq/tegra-cpufreq.c
-+++ b/drivers/cpufreq/tegra-cpufreq.c
-@@ -150,11 +150,8 @@ static unsigned long tegra_cpu_highest_speed(void)
- 	return rate;
- }
- 
--static int tegra_target(struct cpufreq_policy *policy,
--		       unsigned int target_freq,
--		       unsigned int relation)
-+static int tegra_target(struct cpufreq_policy *policy, unsigned int index)
- {
--	unsigned int idx;
- 	unsigned int freq;
- 	int ret = 0;
- 
-@@ -165,10 +162,7 @@ static int tegra_target(struct cpufreq_policy *policy,
- 		goto out;
- 	}
- 
--	cpufreq_frequency_table_target(policy, freq_table, target_freq,
--		relation, &idx);
--
--	freq = freq_table[idx].frequency;
-+	freq = freq_table[index].frequency;
- 
- 	target_cpu_speed[policy->cpu] = freq;
- 
-@@ -234,7 +228,7 @@ static int tegra_cpu_exit(struct cpufreq_policy *policy)
- 
- static struct cpufreq_driver tegra_cpufreq_driver = {
- 	.verify		= cpufreq_generic_frequency_table_verify,
--	.target		= tegra_target,
-+	.target_index	= tegra_target,
- 	.get		= tegra_getspeed,
- 	.init		= tegra_cpu_init,
- 	.exit		= tegra_cpu_exit,
--- 
-1.7.12.rc2.18.g61b472e
+Thanks Sudeep :)
+
+--
+viresh
