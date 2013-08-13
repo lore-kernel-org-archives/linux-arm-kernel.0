@@ -1,45 +1,112 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 13 Aug 2013 12:30:04 +0100
-Subject: [Qemu-devel] SCSI bus failures with qemu-arm in kernel 3.8+
-In-Reply-To: <1376383051.2737.20@driftwood>
-References: <20130812164548.GE23006@n2100.arm.linux.org.uk>
- <1376383051.2737.20@driftwood>
-Message-ID: <20130813113004.GJ23006@n2100.arm.linux.org.uk>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 13 Aug 2013 13:37:07 +0200
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <520A0E1C.5000306@ti.com>
+References: <20130720220006.GA7977@kroah.com> <20130731061538.GC13289@radagast>
+ <520A0E1C.5000306@ti.com>
+Message-ID: <2034985.S0danJZqk4@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 03:37:31AM -0500, Rob Landley wrote:
-> Because working with old and new qemu, like it used to before everybody  
-> fiddled with it to not actually match hardware nobody _has_, is  
-> definitely not an interesting goal.
+On Tuesday 13 of August 2013 16:14:44 Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Wednesday 31 July 2013 11:45 AM, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Wed, Jul 31, 2013 at 11:14:32AM +0530, Kishon Vijay Abraham I wrote:
+> >>>>>>> IMHO we need a lookup method for PHYs, just like for clocks,
+> >>>>>>> regulators, PWMs or even i2c busses because there are complex
+> >>>>>>> cases
+> >>>>>>> when passing just a name using platform data will not work. I
+> >>>>>>> would
+> >>>>>>> second what Stephen said [1] and define a structure doing things
+> >>>>>>> in a
+> >>>>>>> DT-like way.
+> >>>>>>> 
+> >>>>>>> Example;
+> >>>>>>> 
+> >>>>>>> [platform code]
+> >>>>>>> 
+> >>>>>>> static const struct phy_lookup my_phy_lookup[] = {
+> >>>>>>> 
+> >>>>>>> 	PHY_LOOKUP("s3c-hsotg.0", "otg", "samsung-usbphy.1", "phy.2"),
+> >>>>>> 
+> >>>>>> The only problem here is that if *PLATFORM_DEVID_AUTO* is used
+> >>>>>> while
+> >>>>>> creating the device, the ids in the device name would change and
+> >>>>>> PHY_LOOKUP wont be useful.
+> >>>>> 
+> >>>>> I don't think this is a problem. All the existing lookup methods
+> >>>>> already
+> >>>>> use ID to identify devices (see regulators, clkdev, PWMs, i2c,
+> >>>>> ...). You
+> >>>>> can simply add a requirement that the ID must be assigned manually,
+> >>>>> without using PLATFORM_DEVID_AUTO to use PHY lookup.
+> >>>> 
+> >>>> And I'm saying that this idea, of using a specific name and id, is
+> >>>> frought with fragility and will break in the future in various ways
+> >>>> when
+> >>>> devices get added to systems, making these strings constantly have
+> >>>> to be
+> >>>> kept up to date with different board configurations.
+> >>>> 
+> >>>> People, NEVER, hardcode something like an id.  The fact that this
+> >>>> happens today with the clock code, doesn't make it right, it makes
+> >>>> the
+> >>>> clock code wrong.  Others have already said that this is wrong there
+> >>>> as
+> >>>> well, as systems change and dynamic ids get used more and more.
+> >>>> 
+> >>>> Let's not repeat the same mistakes of the past just because we
+> >>>> refuse to
+> >>>> learn from them...
+> >>>> 
+> >>>> So again, the "find a phy by a string" functions should be removed,
+> >>>> the
+> >>>> device id should be automatically created by the phy core just to
+> >>>> make
+> >>>> things unique in sysfs, and no driver code should _ever_ be reliant
+> >>>> on
+> >>>> the number that is being created, and the pointer to the phy
+> >>>> structure
+> >>>> should be used everywhere instead.
+> >>>> 
+> >>>> With those types of changes, I will consider merging this subsystem,
+> >>>> but
+> >>>> without them, sorry, I will not.
+> >>> 
+> >>> I'll agree with Greg here, the very fact that we see people trying to
+> >>> add a requirement of *NOT* using PLATFORM_DEVID_AUTO already points
+> >>> to a
+> >>> big problem in the framework.
+> >>> 
+> >>> The fact is that if we don't allow PLATFORM_DEVID_AUTO we will end up
+> >>> adding similar infrastructure to the driver themselves to make sure
+> >>> we
+> >>> don't end up with duplicate names in sysfs in case we have multiple
+> >>> instances of the same IP in the SoC (or several of the same PCIe
+> >>> card).
+> >>> I really don't want to go back to that.
+> >> 
+> >> If we are using PLATFORM_DEVID_AUTO, then I dont see any way we can
+> >> give the correct binding information to the PHY framework. I think we
+> >> can drop having this non-dt support in PHY framework? I see only one
+> >> platform (OMAP3) going to be needing this non-dt support and we can
+> >> use the USB PHY library for it.> 
+> > you shouldn't drop support for non-DT platform, in any case we lived
+> > without DT (and still do) for years. Gotta find a better way ;-)
+> 
+> hmm..
+> 
+> how about passing the device names of PHY in platform data of the
+> controller? It should be deterministic as the PHY framework assigns its
+> own id and we *don't* want to add any requirement that the ID must be
+> assigned manually without using PLATFORM_DEVID_AUTO. We can get rid of
+> *phy_init_data* in the v10 patch series.
 
-It appears that people *do* have the hardware.
+What about slightly altering the concept of v9 to pass a pointer to struct 
+device instead of device name inside phy_init_data?
 
-What is also "not interesting" is to have bugs reported, I state that I
-won't fix it unless we know what the hardware is supposed to be, and
-then for everything to go quiet, and qemu to have patches put in to
-"work around" the problem.
-
-Software emulators are exactly that: they are software.  They contain
-bugs, just like any other bit of software.  With the lack of clear
-documentation about the hardware, and comments in the code written by
-ARM Ltd when this stuff was first created, the only thing which can
-be taken as definitive is the comments, which is exactly what I did.
-
-Then to have people using qemu report that something is broken - sorry,
-but software emulation doesn't matter in that regard.  Especially when
-we've had reports that "the kernel is broken" wrt timers and it turns
-out to be a bug in qemu not emulating them correctly.  Think about it -
-how do we know whether the kernel is buggy or the software emulation is
-buggy.  Without going back to the hardware or pointing at documentation,
-we can't answer that question.  So it's safer to leave things as-is.
-
-It seems that the documentation over the years from ARM Ltd has improved
-to the point that it is now possible to figure out some of the details,
-if you're prepared to spend a lot of time finding it in the latest
-documentation and tracing circuit diagrams.  (ARMs documentation site is
-pretty horrid to find documents on.)
-
-Well, that has now finally happened, so we can be finally be confident
-what the correct answer is to this.  This is all something which should
-have happened yonks ago.
+Best regards,
+Tomasz
