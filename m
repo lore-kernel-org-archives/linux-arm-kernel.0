@@ -1,75 +1,37 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 12 Aug 2013 19:05:33 -0500
-Subject: [PATCH v3 01/12] dma: edma: Setup parameters to DMA MAX_NR_SG
- at a time
-In-Reply-To: <52088B8B.9040000@ti.com>
-References: <1375719297-12871-1-git-send-email-joelf@ti.com>
- <1375719297-12871-2-git-send-email-joelf@ti.com> <52088B8B.9040000@ti.com>
-Message-ID: <5209784D.8080502@ti.com>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Mon, 12 Aug 2013 17:01:11 -0700
+Subject: [PATCH 15/16] Add EFI stub for ARM
+In-Reply-To: <1376319113.32237.23.camel@t520.redhat.com>
+References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
+ <1376090777-20090-16-git-send-email-roy.franz@linaro.org>
+ <1376319113.32237.23.camel@t520.redhat.com>
+Message-ID: <CAFECyb_0gmOFB4ZWi_dmNjfG2Gyc=3x==LgJ_J97meabAAjstw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Responding to other comments in this post,
-
-On 08/12/2013 02:15 AM, Sekhar Nori wrote:
-
-[..]
->>  	if (unlikely(!echan || !sgl || !sg_len))
->>  		return NULL;
->> @@ -262,8 +262,11 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
->>  
->>  	edesc->pset_nr = sg_len;
->>  
->> -	for_each_sg(sgl, sg, sg_len, i) {
->> -		/* Allocate a PaRAM slot, if needed */
->> +	/* Allocate a PaRAM slot, if needed */
+On Mon, Aug 12, 2013 at 7:51 AM, Mark Salter <msalter@redhat.com> wrote:
+> On Fri, 2013-08-09 at 16:26 -0700, Roy Franz wrote:
+>> +static int relocate_kernel(efi_system_table_t *sys_table,
+>> +                          unsigned long *zimage_addr,
+>> +                          unsigned long zimage_size,
+>> +                          unsigned long min_addr, unsigned long max_addr)
+>> +{
+>> +       /* Get current address of kernel. */
+>> +       unsigned long cur_zimage_addr = *zimage_addr;
+>> +       unsigned long new_addr = 0;
 >> +
->> +	num_slots_needed = sg_len > MAX_NR_SG ? MAX_NR_SG : sg_len;
-> 
-> nslots = min(MAX_NR_SG, sg_len);
-
-Changed to this, with the +1
-
-> 
+>> +       efi_status_t status;
 >> +
->> +	for (i = 0; i < num_slots_needed; i++) {
->>  		if (echan->slot[i] < 0) {
->>  			echan->slot[i] =
->>  				edma_alloc_slot(EDMA_CTLR(echan->ch_num),
->> @@ -273,6 +276,10 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
->>  				return NULL;
->>  			}
->>  		}
->> +	}
+>> +       if (!zimage_addr || !zimage_size)
+>> +               return EFI_INVALID_PARAMETER;
 >> +
->> +	/* Configure PaRAM sets for each SG */
->> +	for_each_sg(sgl, sg, sg_len, i) {
->>  
->>  		acnt = dev_width;
->>  
->> @@ -330,6 +337,7 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
->>  		/* Configure A or AB synchronized transfers */
->>  		if (edesc->absync)
->>  			edesc->pset[i].opt |= SYNCDIM;
->> +
-> 
-> Random extra newline.
+>
+> This parameter check is too late. You already used zimage_addr to
+> initialize cur_zimage_addr.
+>
+> --Mark
+>
 
-Removing..
+Thanks - I'll fix this in the next version.
 
-> 
-> The patch as such is fine, but I dont think it makes lot of sense
-> standalone. This needs to be merged into the patch where you actually
-> handle the entire SG list in batches.
-
-I think it does actually, this patch just takes care of preparing the
-param set list correctly and allocating slots. It doesn't the actual DMA
-or take part in the algorithm. As a result, the patch can be reused
-incase in future the main algorithm is rewritten in a subsequent series.
-Further this patch was reused straight from old implementation so it
-proved to be useful being a separate patch last time. I also plan to
-rewrite just this functionality in the future.
-
-Thanks,
-
--Joel
+Roy
