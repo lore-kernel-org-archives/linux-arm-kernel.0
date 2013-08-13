@@ -1,46 +1,33 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Tue, 13 Aug 2013 15:20:11 -0700
-Subject: [PATCH v4 3/4] ARM: dts: add AM33XX vdd core opp50 suspend for AM335X
- GP EVM.
-In-Reply-To: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
-References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
-Message-ID: <1376432412-8509-4-git-send-email-Russ.Dill@ti.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 13 Aug 2013 15:46:27 -0700
+Subject: arm-soc: Xilinx Zynq DT changes for v3.12
+In-Reply-To: <520A47C3.5000106@monstr.eu> (Michal Simek's message of "Tue, 13
+ Aug 2013 16:50:43 +0200")
+References: <520A47C3.5000106@monstr.eu>
+Message-ID: <87r4dxfbuk.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hebbar, Gururaja <gururaja.hebbar@ti.com>
+Hi Michal,
 
-This adds a sleep and wake sequence to set the VDD core voltage to the
-OPP50 level, 0.950V. This saves power during suspend. The sequences are
-specific to the EVM layout and PMIC, the TPS65910. The sequences
-are written out by the Cortex-M3.
+Michal Simek <monstr@monstr.eu> writes:
 
-Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
-Signed-off-by: Russ Dill <Russ.Dill@ti.com>
----
- arch/arm/boot/dts/am335x-evm.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+> Hi Arnd and Olof,
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 3aee1a4..81ce169 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -166,6 +166,16 @@
- 			status = "okay";
- 			clock-frequency = <400000>;
- 
-+			/* Set OPP50 (0.95V) for VDD core */
-+			sleep_sequence = /bits/ 8 <
-+				0x02 0x2d 0x25 0x1f /* Set VDD2 to 0.95V */
-+			>;
-+
-+			/* Set OPP100 (1.10V) for VDD core */
-+			wake_sequence = /bits/ 8 <
-+				0x02 0x2d 0x25 0x2b /* Set VDD2 to 1.1V */
-+			>;
-+
- 			tps: tps at 2d {
- 				reg = <0x2d>;
- 			};
--- 
-1.8.3.2
+I'm now helping out with arm-soc maintenance as well, and am on the
+arm at kernel.org alias, so thanks for Cc'ing it.
+
+> please pull this simple DT change to your tree.
+
+Pulled into next/dt.
+
+In the future, it makes things simpler for us if you base on older -rc
+releases where possible (c.f. similar request by Olof[1].)  In this
+case, it was trivial for me to rebase it onto -rc1 so I've done that
+before applying.
+
+Thanks,
+
+Kevin
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/189115.html
