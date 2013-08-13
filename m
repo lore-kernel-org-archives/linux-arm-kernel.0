@@ -1,76 +1,281 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 13 Aug 2013 11:43:14 -0300
-Subject: [PATCH v4 5/6] clocksource: armada-370-xp: Fix device-tree binding
-In-Reply-To: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1376404995-24548-6-git-send-email-ezequiel.garcia@free-electrons.com>
+From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
+Date: Tue, 13 Aug 2013 20:15:30 +0530
+Subject: [PATCH] AArch64: Add single-step and breakpoint handler hooks
+In-Reply-To: <20130813113253.GF30280@mudshark.cambridge.arm.com>
+References: <1375769526-3526-1-git-send-email-sandeepa.prabhu@linaro.org>
+ <20130813113253.GF30280@mudshark.cambridge.arm.com>
+Message-ID: <CA+b37P11oFTo8SHWMB8ijy__sqj5HXBPXWd-svkTK3bPTeARuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit fixes the DT binding for the Armada 370/XP SoC timer.
-The previous "marvell,armada-370-xp-timer" compatible is removed and
-two new compatible strings are introduced: "marvell,armada-xp-timer"
-and "marvell,armada-370-timer".
+On 13 August 2013 17:02, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Aug 06, 2013 at 07:12:06AM +0100, Sandeepa Prabhu wrote:
+>> AArch64 Single Steping and Breakpoint debug exceptions will be
+>> used by multiple debug framworks like kprobes & kgdb.
+>>
+>> This patch implements the hooks for those frameworks to register
+>> their own handlers for handling breakpoint and single step events.
+>>
+>> Reworked the debug exception handler in entry.S: do_dbg to
+>> pass the correct break/step address to the handlers, i.e. FAR_EL1 if
+>> exception is watchpoint, ELR_EL1 for all other debug exceptions.
+>>
+>> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+>> Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/debug-monitors.h |  20 +++++++
+>>  arch/arm64/kernel/debug-monitors.c      | 102 +++++++++++++++++++++++++++++++-
+>>  arch/arm64/kernel/entry.S               |   6 +-
+>>  3 files changed, 124 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+>> index a2232d0..aff3a76 100644
+>> --- a/arch/arm64/include/asm/debug-monitors.h
+>> +++ b/arch/arm64/include/asm/debug-monitors.h
+>> @@ -16,6 +16,8 @@
+>>  #ifndef __ASM_DEBUG_MONITORS_H
+>>  #define __ASM_DEBUG_MONITORS_H
+>>
+>> +#include <linux/list.h>
+>> +
+>>  #ifdef __KERNEL__
+>>
+>>  #define      DBG_ESR_EVT(x)          (((x) >> 27) & 0x7)
+>> @@ -62,6 +64,24 @@ struct task_struct;
+>>
+>>  #define DBG_ARCH_ID_RESERVED 0       /* In case of ptrace ABI updates. */
+>>
+>> +struct step_hook {
+>> +     struct list_head node;
+>> +     int (*fn)(struct pt_regs *regs, unsigned int insn, unsigned long addr);
+>> +};
+>
+> Shouldn't that be esr instead of insn?
+Right, I will change it to esr in next version of the patch.
 
-The rationale behind this change is that the Armada 370 SoC and the
-Armada XP SoC timers are not really compatible:
+>
+>> +void register_step_hook(struct step_hook *hook);
+>> +void unregister_step_hook(struct step_hook *hook);
+>> +
+>> +struct break_hook {
+>> +     struct list_head node;
+>> +     u32 esr_magic;
+>
+> There's nothing magic about it. esr_val instead?
+Hmm, I will incorporate this change as well.
 
-  * Armada 370 has no 25 MHz fixed timer.
+>
+>> +     u32 esr_mask;
+>> +     int (*fn)(struct pt_regs *regs, unsigned int insn, unsigned long addr);
+>> +};
+>> +
+>> +void register_break_hook(struct break_hook *hook);
+>> +void unregister_break_hook(struct break_hook *hook);
+>> +
+>>  u8 debug_monitors_arch(void);
+>>
+>>  void enable_debug_monitors(enum debug_el el);
+>> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+>> index cbfacf7..2846327 100644
+>> --- a/arch/arm64/kernel/debug-monitors.c
+>> +++ b/arch/arm64/kernel/debug-monitors.c
+>> @@ -188,6 +188,54 @@ static void clear_regs_spsr_ss(struct pt_regs *regs)
+>>       regs->pstate = spsr;
+>>  }
+>>
+>> +/* EL1 Single Step Handler hooks */
+>> +static LIST_HEAD(step_hook);
+>> +static DEFINE_RAW_SPINLOCK(step_lock);
+>> +
+>> +void register_step_hook(struct step_hook *hook)
+>> +{
+>> +     unsigned long flags;
+>> +
+>> +     raw_spin_lock_irqsave(&step_lock, flags);
+>> +     list_add(&hook->node, &step_hook);
+>> +     raw_spin_unlock_irqrestore(&step_lock, flags);
+>> +}
+>> +
+>> +void unregister_step_hook(struct step_hook *hook)
+>> +{
+>> +     unsigned long flags;
+>> +
+>> +     raw_spin_lock_irqsave(&step_lock, flags);
+>> +     list_del(&hook->node);
+>> +     raw_spin_unlock_irqrestore(&step_lock, flags);
+>> +}
+>
+> Why do you need to disable IRQs during these operations?
+The linked list needs locking mechanism to protect while getting
+accessed/updated from multiple CPUs.
+These API will 'never' be called from interrupt context, so I can
+convert to spin_lock() variant.
 
-  * Armada XP cannot work properly without such 25 MHz fixed timer
-    as doing otherwise leads to using a clocksource whose frequency
-    varies when doing cpufreq frequency changes.
+>
+>> +/*
+>> + * Call registered single step handers
+>> + * There is no Syndrome info to check for determining the handler.
+>> + * So we call all the registered handlers, until the right handler is
+>> + * found which returns zero.
+>> + */
+>> +static int call_step_hook(struct pt_regs *regs,
+>> +             unsigned int esr, unsigned long addr)
+>> +{
+>> +     struct step_hook *hook;
+>> +     unsigned long flags;
+>> +
+>> +     raw_spin_lock_irqsave(&step_lock, flags);
+>> +     list_for_each_entry(hook, &step_hook, node)     {
+>> +             raw_spin_unlock_irqrestore(&step_lock, flags);
+>
+> Is this safe? Can't you stask the function pointer and break out of the loop
+> when you find it instead?
+Unlike breakpoints, single step does not provide ESR value to be
+specified, so there is no way to decide which handler to call. So the
+implementation is to call all the registered handlers, and individual
+subsystem (kgdb,kprobes) handlers are in turn responsible for
+validating and handling it (so we do not break out of loop). Any
+concerns with this scheme?
 
-This commit also removes the "marvell,timer-25Mhz" property, given
-it's now meaningless.
+well, accessing "hook->fn(regs, esr, addr)" without a spin_lock is not
+safe with multiple CPU. The safe way is to execute the hook function
+with spin-lock held. I will rework this in next version.
 
-Cc: devicetree at vger.kernel.org
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- .../bindings/timer/marvell,armada-370-xp-timer.txt | 27 ++++++++++++++++++----
- 1 file changed, 22 insertions(+), 5 deletions(-)
+>
+>> +             if (hook->fn(regs, esr, addr) == 0)
+>> +                     return 0;
+>> +
+>> +             raw_spin_lock_irqsave(&step_lock, flags);
+>> +     }
+>> +     raw_spin_unlock_irqrestore(&step_lock, flags);
+>> +
+>> +     return 1;
+>> +}
+>> +
+>>  static int single_step_handler(unsigned long addr, unsigned int esr,
+>>                              struct pt_regs *regs)
+>>  {
+>> @@ -215,8 +263,11 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+>>                */
+>>               user_rewind_single_step(current);
+>>       } else {
+>> -             /* TODO: route to KGDB */
+>> -             pr_warning("Unexpected kernel single-step exception at EL1\n");
+>> +             /* Call single step handlers for kgdb/kprobes */
+>> +             if (call_step_hook(regs, addr, esr) == 0)
+>> +                     return 0;
+>> +
+>> +             pr_warn("unexpected single step exception at %lx!\n", addr);
+>>               /*
+>>                * Re-enable stepping since we know that we will be
+>>                * returning to regs.
+>> @@ -227,11 +278,56 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+>>       return 0;
+>>  }
+>>
+>> +
+>> +static LIST_HEAD(break_hook);
+>> +static DEFINE_RAW_SPINLOCK(break_lock);
+>> +
+>> +void register_break_hook(struct break_hook *hook)
+>> +{
+>> +     unsigned long flags;
+>> +
+>> +     raw_spin_lock_irqsave(&break_lock, flags);
+>> +     list_add(&hook->node, &break_hook);
+>> +     raw_spin_unlock_irqrestore(&break_lock, flags);
+>> +}
+>> +
+>> +void unregister_break_hook(struct break_hook *hook)
+>> +{
+>> +     unsigned long flags;
+>> +
+>> +     raw_spin_lock_irqsave(&break_lock, flags);
+>> +     list_del(&hook->node);
+>> +     raw_spin_unlock_irqrestore(&break_lock, flags);
+>> +}
+>> +
+>> +static int call_break_hook(struct pt_regs *regs,
+>> +             unsigned int esr, unsigned long addr)
+>> +{
+>> +     struct break_hook *hook;
+>> +     unsigned long flags;
+>> +     int (*fn)(struct pt_regs *regs,
+>> +             unsigned int esr, unsigned long addr) = NULL;
+>> +
+>> +     raw_spin_lock_irqsave(&break_lock, flags);
+>> +     list_for_each_entry(hook, &break_hook, node)
+>> +             if ((esr & hook->esr_mask) == hook->esr_magic)
+>> +                     fn = hook->fn;
+>> +     raw_spin_unlock_irqrestore(&break_lock, flags);
+>
+> That's better! (although I'm still unsure about the interrupts).
+>
+>> +     return fn ? fn(regs, esr, addr) : 1;
+>> +}
+>> +
+>>  static int brk_handler(unsigned long addr, unsigned int esr,
+>>                      struct pt_regs *regs)
+>>  {
+>>       siginfo_t info;
+>>
+>> +     /* Call single step handlers for kgdb/kprobes */
+>> +     if (call_break_hook(regs, esr, addr) == 0)
+>> +             return 0;
+>> +
+>> +     pr_warn("unexpected brk exception at %lx, esr=0x%x\n", addr, esr);
+>> +
+>>       if (!user_mode(regs))
+>>               return -EFAULT;
+>>
+>> @@ -291,7 +387,7 @@ static int __init debug_traps_init(void)
+>>       hook_debug_fault_code(DBG_ESR_EVT_HWSS, single_step_handler, SIGTRAP,
+>>                             TRAP_HWBKPT, "single-step handler");
+>>       hook_debug_fault_code(DBG_ESR_EVT_BRK, brk_handler, SIGTRAP,
+>> -                           TRAP_BRKPT, "ptrace BRK handler");
+>> +                           TRAP_BRKPT, "AArch64 BRK handler");
+>
+> Why change this name?
+The brk_handler will be generic handler for multiple mechanisms like
+kgdb/kprobes, not just ptrace, so the name should reflect that.
 
-diff --git a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-index 3638112..4c453b2 100644
---- a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-@@ -2,14 +2,31 @@ Marvell Armada 370 and Armada XP Timers
- ---------------------------------------
- 
- Required properties:
--- compatible: Should be "marvell,armada-370-xp-timer"
-+- compatible: Should be either "marvell,armada-370-timer" or
-+  "marvell,armada-xp-timer" as appropriate.
- - interrupts: Should contain the list of Global Timer interrupts and
-   then local timer interrupts
- - reg: Should contain location and length for timers register. First
-   pair for the Global Timer registers, second pair for the
-   local/private timers.
--- clocks: clock driving the timer hardware
-+- clocks: clock driving the timer hardware, only required for
-+  "marvell,armada-370-timer";
- 
--Optional properties:
--- marvell,timer-25Mhz: Tells whether the Global timer supports the 25
--  Mhz fixed mode (available on Armada XP and not on Armada 370)
-+Examples:
-+
-+- Armada 370:
-+
-+	timer {
-+		compatible = "marvell,armada-370-timer";
-+		reg = <0x20300 0x30>, <0x21040 0x30>;
-+		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
-+		clocks = <&coreclk 2>;
-+	};
-+
-+- Armada XP:
-+
-+	timer {
-+		compatible = "marvell,armada-xp-timer";
-+		reg = <0x20300 0x30>, <0x21040 0x30>;
-+		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
-+	};
--- 
-1.8.1.5
+>
+>>       return 0;
+>>  }
+>>  arch_initcall(debug_traps_init);
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index 6ad781b..e7350bd 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -288,8 +288,12 @@ el1_dbg:
+>>       /*
+>>        * Debug exception handling
+>>        */
+>> +     mrs     x25, far_el1                    //far for watchpt
+>
+> Useless comment. How about: "// Watchpoint location"?
+Sounds good, I will change it to "// Watchpoint location"
+
+>
+>> +     cmp     x24, #ESR_EL1_EC_WATCHPT_EL1
+>> +     csel    x0, x25, x22, eq        //addr: x25->far_el1, x22->elr_el1
+>> +     b.ge    do_dbg
+>>       tbz     x24, #0, el1_inv                // EL1 only
+>
+> I'd rather you left the tbz as the first instruction in el1_dbg, then you
+> can also lose the b.ge.
+well, my understanding is that the tbz check is needed only for
+Exception Class < 0x35 as per debug spec. If this is true, and if tbz
+is first instruction, it fails for breakpoint (EC=0x3A) case and call
+el1_inv to panic instead of routing to do_debug_exception. I am not
+sure if we can optimize the code further to eliminate this one
+branching as well.
+
+>
+> Finally, I don't see the need for this patch until we have something like
+> kprobes or kgdb, so I'd rather hold off merging this additional support code
+> until we have a user for it.
+>
+> Cheers,
+>
+> Will
