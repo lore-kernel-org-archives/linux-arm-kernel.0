@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 13 Aug 2013 19:02:22 +0530
-Subject: [PATCH V2 09/35] cpufreq: davinci: Covert to light weight
+Date: Tue, 13 Aug 2013 19:02:23 +0530
+Subject: [PATCH V2 10/35] cpufreq: dbx500: Covert to light weight
  ->target_index() routine
 In-Reply-To: <cover.1376392602.git.viresh.kumar@linaro.org>
 References: <cover.1376392602.git.viresh.kumar@linaro.org>
-Message-ID: <85dcef4ab5e76cc011f09804c5472dff8ccd3d48.1376392602.git.viresh.kumar@linaro.org>
+Message-ID: <79809d6e1f6f78cec69aa44103c09a81839301e8.1376392602.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,55 +14,50 @@ This patch converts existing .target() to newly defined light weight
 CPUFreq core will call cpufreq_frequency_table_target() before calling this
 routine and will pass index to it.
 
-Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/davinci-cpufreq.c | 16 +++-------------
+ drivers/cpufreq/dbx500-cpufreq.c | 16 +++-------------
  1 file changed, 3 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/cpufreq/davinci-cpufreq.c b/drivers/cpufreq/davinci-cpufreq.c
-index 33e9460..822100b 100644
---- a/drivers/cpufreq/davinci-cpufreq.c
-+++ b/drivers/cpufreq/davinci-cpufreq.c
-@@ -68,28 +68,18 @@ static unsigned int davinci_getspeed(unsigned int cpu)
- 	return clk_get_rate(cpufreq.armclk) / 1000;
- }
+diff --git a/drivers/cpufreq/dbx500-cpufreq.c b/drivers/cpufreq/dbx500-cpufreq.c
+index 7e2f9c0..28deaf0 100644
+--- a/drivers/cpufreq/dbx500-cpufreq.c
++++ b/drivers/cpufreq/dbx500-cpufreq.c
+@@ -20,23 +20,13 @@ static struct cpufreq_frequency_table *freq_table;
+ static struct clk *armss_clk;
  
--static int davinci_target(struct cpufreq_policy *policy,
--				unsigned int target_freq, unsigned int relation)
-+static int davinci_target(struct cpufreq_policy *policy, unsigned int idx)
+ static int dbx500_cpufreq_target(struct cpufreq_policy *policy,
+-				unsigned int target_freq,
+-				unsigned int relation)
++				unsigned int index)
  {
- 	int ret = 0;
--	unsigned int idx;
  	struct cpufreq_freqs freqs;
- 	struct davinci_cpufreq_config *pdata = cpufreq.dev->platform_data;
- 	struct clk *armclk = cpufreq.armclk;
+-	unsigned int idx;
+ 	int ret;
  
- 	freqs.old = davinci_getspeed(0);
--	freqs.new = clk_round_rate(armclk, target_freq * 1000) / 1000;
--
--	if (freqs.old == freqs.new)
--		return ret;
-+	freqs.new = pdata->freq_table[idx].frequency;
- 
- 	dev_dbg(cpufreq.dev, "transition: %u --> %u\n", freqs.old, freqs.new);
- 
--	ret = cpufreq_frequency_table_target(policy, pdata->freq_table,
--						freqs.new, relation, &idx);
--	if (ret)
+-	/* Lookup the next frequency */
+-	if (cpufreq_frequency_table_target(policy, freq_table, target_freq,
+-					relation, &idx))
 -		return -EINVAL;
 -
- 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+ 	freqs.old = policy->cur;
+-	freqs.new = freq_table[idx].frequency;
+-
+-	if (freqs.old == freqs.new)
+-		return 0;
++	freqs.new = freq_table[index].frequency;
  
- 	/* if moving to higher frequency, up the voltage beforehand */
-@@ -160,7 +150,7 @@ static int davinci_cpu_init(struct cpufreq_policy *policy)
- static struct cpufreq_driver davinci_driver = {
- 	.flags		= CPUFREQ_STICKY,
- 	.verify		= davinci_verify_speed,
--	.target		= davinci_target,
-+	.target_index	= davinci_target,
- 	.get		= davinci_getspeed,
- 	.init		= davinci_cpu_init,
- 	.exit		= cpufreq_generic_exit,
+ 	/* pre-change notification */
+ 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+@@ -104,7 +94,7 @@ static int dbx500_cpufreq_init(struct cpufreq_policy *policy)
+ static struct cpufreq_driver dbx500_cpufreq_driver = {
+ 	.flags  = CPUFREQ_STICKY | CPUFREQ_CONST_LOOPS,
+ 	.verify = cpufreq_generic_frequency_table_verify,
+-	.target = dbx500_cpufreq_target,
++	.target_index = dbx500_cpufreq_target,
+ 	.get    = dbx500_cpufreq_getspeed,
+ 	.init   = dbx500_cpufreq_init,
+ 	.name   = "DBX500",
 -- 
 1.7.12.rc2.18.g61b472e
