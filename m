@@ -1,144 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Aug 2013 12:14:49 +0100
-Subject: [PATCHv5 16/31] CLK: TI: DRA7: Add APLL support
-In-Reply-To: <1375460751-23676-17-git-send-email-t-kristo@ti.com>
-References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
- <1375460751-23676-17-git-send-email-t-kristo@ti.com>
-Message-ID: <20130813111449.GL27165@e106331-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 13 Aug 2013 12:15:12 +0100
+Subject: Kexec: BE kernel on ARM VE TC2
+In-Reply-To: <CALicx6sjPOBRVVOQGOt4CgRCPg+4eOhwmrGC=ZjpZg+LGSvDrg@mail.gmail.com>
+References: <CALicx6ueLxCFCeun1grdtcC21HSkCDfenLWOSfuoSJnhx9GZ6w@mail.gmail.com>
+ <20130808215034.GE19383@mudshark.cambridge.arm.com>
+ <CALicx6sjPOBRVVOQGOt4CgRCPg+4eOhwmrGC=ZjpZg+LGSvDrg@mail.gmail.com>
+Message-ID: <20130813111512.GC30280@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 05:25:35PM +0100, Tero Kristo wrote:
-> From: Keerthy <j-keerthy@ti.com>
+On Mon, Aug 12, 2013 at 10:59:45AM +0100, Vijay Kilari wrote:
+> On Fri, Aug 9, 2013 at 3:20 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Aug 05, 2013 at 01:12:17PM +0100, Vijay Kilari wrote:
+> >> I am trying to make kexec work on BE kernel on ARM VE TC2.
+> >>
+> >> First, to make KEXEC work with SMP on ARM VE TC2 board,
+> >> I set nr_cpus=2 (i.e boot only A15's) this works with LE kernel.
+> >
+> > Interesting, is this with a mainline kernel? I don't see how SMP kexec can
+> > work on TC2 without additional patches to park the secondary cores safely.
+> >
 > 
-> The patch adds support for DRA7 PCIe APLL. The APLL
-> sources the optional functional clocks for PCIe module.
-> 
-> APLL stands for Analog PLL. This is different when comapred
-> with DPLL meaning Digital PLL, the phase detection is done
-> using an analog circuit.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  .../devicetree/bindings/clock/ti/apll.txt          |   32 +++
->  arch/arm/mach-omap2/clock.h                        |    1 -
->  drivers/clk/ti/Makefile                            |    2 +-
->  drivers/clk/ti/apll.c                              |  209 ++++++++++++++++++++
->  include/linux/clk/ti.h                             |    2 +
->  5 files changed, 244 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/ti/apll.txt
->  create mode 100644 drivers/clk/ti/apll.c
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/ti/apll.txt b/Documentation/devicetree/bindings/clock/ti/apll.txt
-> new file mode 100644
-> index 0000000..f7a82e9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/ti/apll.txt
-> @@ -0,0 +1,32 @@
-> +Binding for Texas Instruments APLL clock.
-> +
-> +This binding uses the common clock binding[1].  It assumes a
-> +register-mapped APLL with usually two selectable input clocks
-> +(reference clock and bypass clock), with analog phase locked
-> +loop logic for multiplying the input clock to a desired output
-> +clock. This clock also typically supports different operation
-> +modes (locked, low power stop etc.) APLL mostly behaves like
-> +a subtype of a DPLL [2], although a simplified one at that.
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +[2] Documentation/devicetree/bindings/clock/ti/dpll.txt
-> +
-> +Required properties:
-> +- compatible : shall be "ti,dra7-apll-clock"
-> +- #clock-cells : from common clock binding; shall be set to 0.
-> +- clocks : link phandles of parent clocks (clk-ref and clk-bypass)
-> +- reg : array of register base addresses for controlling the APLL:
-> +       reg[0] = control register
-> +       reg[1] = idle status register
+> Yes, it is our internal kernel based on 3.10.3. I have not made any changes
+> related to this. I found that booting only 2 CPU's works
+> and I continue to check Kdump and other features on top of this.
 
-Using reg-names is likely a good idea here.
+I think 2 CPUs is working by fluke. Try kexecing a Thumb kernel from an ARM
+kernel.
 
-> +- ti,clk-ref : link phandle for the reference clock
-> +- ti,clk-bypass : link phandle for the bypass clock
+> However with Big Endian, I see that Kexec is not stable. I suspect
+> that UART is the issue. because playing around with some printk and delays
+> make it work. Any help? I plan to reset pl011 before kexec softreset.
+> But could not find any register to reset complete pl011 uart.
+> I will try to reset/clear IMSC, ICR and CR registers of pl011 and check.
 
-You don't need this. Use the clocks and clock-names properties.
+Wait are you trying to kexec a BE kernel from an LE kernel? That would be
+similar to the Thumb/ARM case I mentioned above. A better starting point
+would be to try UP kernels and get that working first, since we already know
+that SMP kexec is broken on TC2.
 
-[...]
-
-> +static int dra7_apll_enable(struct clk_hw *hw)
-> +{
-> +       struct clk_hw_omap *clk = to_clk_hw_omap(hw);
-> +       int r = 0, i = 0;
-> +       struct dpll_data *ad;
-> +       const char *clk_name;
-> +       u8 state = 1;
-> +       u32 v;
-> +
-> +       ad = clk->dpll_data;
-> +       if (!ad)
-> +               return -EINVAL;
-> +
-> +       clk_name = __clk_get_name(clk->hw.clk);
-> +
-> +       state <<= __ffs(ad->idlest_mask);
-> +
-> +       /* Check is already locked */
-> +       if ((__raw_readl(ad->idlest_reg) & ad->idlest_mask) == state)
-> +               return r;
-
-Why __raw_readl rather than raw_readl?
-
-> +
-> +       v = __raw_readl(ad->control_reg);
-> +       v &= ~ad->enable_mask;
-> +       v |= APLL_FORCE_LOCK << __ffs(ad->enable_mask);
-> +       __raw_writel(v, ad->control_reg);
-
-Why not raw_writel? Do you not need the rmb() provided by writel, here
-or anywhere else?
-
-[...]
-
-> +void __init of_dra7_apll_setup(struct device_node *node)
-> +{
-> +       const struct clk_ops *ops;
-> +       struct clk *clk;
-> +       const char *clk_name = node->name;
-> +       int num_parents;
-> +       const char **parent_names = NULL;
-> +       struct of_phandle_args clkspec;
-> +       u8 apll_flags = 0;
-> +       struct dpll_data *ad;
-> +       u32 idlest_mask = 0x1;
-> +       u32 autoidle_mask = 0x3;
-> +       int i;
-> +
-> +       ops = &apll_ck_ops;
-> +       ad = kzalloc(sizeof(*ad), GFP_KERNEL);
-> +       if (!ad) {
-> +               pr_err("%s: could not allocate dpll_data\n", __func__);
-> +               return;
-> +       }
-> +
-> +       of_property_read_string(node, "clock-output-names", &clk_name);
-> +
-> +       num_parents = of_clk_get_parent_count(node);
-> +       if (num_parents < 1) {
-> +               pr_err("%s: omap dpll %s must have parent(s)\n",
-> +                      __func__, node->name);
-> +               goto cleanup;
-> +       }
-> +
-> +       parent_names = kzalloc(sizeof(char *) * num_parents, GFP_KERNEL);
-> +
-> +       for (i = 0; i < num_parents; i++)
-> +               parent_names[i] = of_clk_get_parent_name(node, i);
-> +
-> +       clkspec.np = of_parse_phandle(node, "ti,clk-ref", 0);
-> +       ad->clk_ref = of_clk_get_from_provider(&clkspec);
-
-Use clocks, clock-names, and of_clk_get_by_name().
-
-Thanks,
-Mark.
+Will
