@@ -1,55 +1,37 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 13 Aug 2013 07:59:39 -0700
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <CA+Bv8Xb8cy-=ESE4nWOCub=aw7KFrOgEgzfdGUd1TqDJ0ZR_Gg@mail.gmail.com>
- (Russ Dill's message of "Tue, 13 Aug 2013 00:43:09 -0700")
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <CA+Bv8Xb8cy-=ESE4nWOCub=aw7KFrOgEgzfdGUd1TqDJ0ZR_Gg@mail.gmail.com>
-Message-ID: <87zjslocv8.fsf@kernel.org>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 13 Aug 2013 07:59:55 -0700
+Subject: [PATCH] ARM: signal: sigreturn_codes should be endian neutral to
+ work in BE8
+In-Reply-To: <20130813123315.GD2823@localhost.localdomain>
+References: <1376377931-2262-1-git-send-email-victor.kamensky@linaro.org>
+ <20130813121245.GK23006@n2100.arm.linux.org.uk>
+ <20130813123315.GD2823@localhost.localdomain>
+Message-ID: <CAA3XUr0xyV4JzK+YtmVuvDipL00Bn=1RKizUjQj9xr8RBMtZ-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russ Dill <russ.dill@gmail.com> writes:
-
-> On Tue, Aug 6, 2013 at 10:49 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
-
-[...]
-
->> +static int wkup_m3_probe(struct platform_device *pdev)
->> +{
->> +       int irq, ret = 0;
->> +       struct resource *mem;
->> +
->> +       pm_runtime_enable(&pdev->dev);
->> +
->> +       ret = pm_runtime_get_sync(&pdev->dev);
->> +       if (IS_ERR_VALUE(ret)) {
->> +               dev_err(&pdev->dev, "pm_runtime_get_sync() failed\n");
->> +               return ret;
->> +       }
->> +
->> +       irq = platform_get_irq(pdev, 0);
->> +       if (!irq) {
->> +               dev_err(wkup_m3->dev, "no irq resource\n");
+On 13 August 2013 05:33, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Tue, Aug 13, 2013 at 01:12:45PM +0100, Russell King - ARM Linux wrote:
+>> On Tue, Aug 13, 2013 at 12:12:11AM -0700, Victor Kamensky wrote:
+>> > In case of BE8 kernel data is in BE order whereas code stays in LE
+>> > order. sigreturn_codes array initializer need to use macros from
+>> > <asm/opcodes.h> to setup instructions code in endian neutral way.
+>> >
+>> > Problem was discovered during ltp testing of BE system: all rt_sig*
+>> > tests failed. Tested against the same tests in both BE and LE modes.
+>>
+>> It might make more sense to move these into a .S file actually.
 >
-> &pdev->dev
+> That would make sense.  Since the kernel assumes v4, I think we can
+> assume sufficiently Thumb-capable tools that all these instructions can
+> be assembled directly without needing magic numbers.
 >
->> +               ret = -ENXIO;
->> +               goto err;
->> +       }
->> +
->> +       mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +       if (!mem) {
->> +               dev_err(wkup_m3->dev, "no memory resource\n");
->
-> &pdev->dev
+> Then the swabbing should be correct in vmlinux with no extra effort.
 
-For future reference, when reviewing, please trim to only relevant
-content/context, especially on large patches so maintainers/reviewers do
-not have to find 2 one-line comments in a huge amount of irrelevant
-context.
+Ok, I will try to redo this with .S file.
 
 Thanks,
+Victor
 
-Kevin
+> Cheers
+> ---Dave
