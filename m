@@ -1,54 +1,84 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 13 Aug 2013 11:25:35 +0200
-Subject: [PATCH 3/9] PCI: mvebu: remove subsys_initcall
-In-Reply-To: <20130813080639.GD9316@ulmo>
-References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376333215-12885-4-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130813091959.784b44f0@skate> <20130813080639.GD9316@ulmo>
-Message-ID: <5209FB8F.8000506@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 13 Aug 2013 10:46:29 +0100
+Subject: [PATCH v2 8/8] ARM: DRA7: dts: Add the dts files for dra7 SoC
+ and dra7-evm board
+In-Reply-To: <5209DF2F.5040409@ti.com>
+References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
+ <1375183546-12758-9-git-send-email-rnayak@ti.com>
+ <20130812114402.GB6616@e106331-lin.cambridge.arm.com>
+ <5209DF2F.5040409@ti.com>
+Message-ID: <20130813094629.GH27165@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/13 10:06, Thierry Reding wrote:
-> On Tue, Aug 13, 2013 at 09:19:59AM +0200, Thomas Petazzoni wrote:
->> On Mon, 12 Aug 2013 20:46:49 +0200, Sebastian Hesselbarth wrote:
->>> This removes the subsys_initcall from the driver and converts it to
->>> a normal platform_driver. Also, drvdata is set and a remove functions
->>> is added to disable the clock and free resources.
->>>
->>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>
->> I'm OK with this, just a comment below.
->>
->>> +static int mvebu_pcie_remove(struct platform_device *pdev)
->>> +{
->>> +	struct mvebu_pcie *pcie = platform_get_drvdata(pdev);
->>> +	struct mvebu_pcie_port *port = &pcie->ports[0];
->>> +	int i;
->>> +
->>> +	for (i = 0; i < pcie->nports; i++, port++) {
->>> +		clk_disable_unprepare(port->clk);
->>> +		kfree(port->name);
->>> +	}
->>> +
->>> +	return 0;
->>> +}
->>
->> I believe the ->remove() part is quite useless. The driver is a 'bool'
->> in Kconfig, so it cannot be compiled as a module, and I'm not sure
->> there a way to remove the platform device that corresponds to the PCIe
->> controller.
->
-> There is. You can write the device's name to the driver's unbind file in
-> sysfs. What I ended up doing for Tegra was not to provide a .remove() at
-> all and set the struct device_driver's .suppress_bind_attrs to true.
+[Adding Marc to Cc]
+
+On Tue, Aug 13, 2013 at 08:24:31AM +0100, Rajendra Nayak wrote:
+> []..
+> 
+> >> +
+> >> +       cpus {
+> >> +               cpu at 0 {
+> >> +                       compatible = "arm,cortex-a15";
+> >> +                       timer {
+> >> +                               compatible = "arm,armv7-timer";
+> >> +                               /*
+> >> +                                * PPI secure/nonsecure IRQ,
+> >> +                                * active low level-sensitive
+> >> +                                */
+> >> +                               interrupts = <1 13 0x308>,
+> >> +                                            <1 14 0x308>;
+> >> +                               clock-frequency = <6144000>;
+> >> +                       };
+> >> +               };
+> >
+> > The cpu nodes should have a reg matching their unit-address, and a
+> > device_type = "cpu".
+> >
+> > The timer nodes should *not* be under the CPU nodes. They should be
+> > under under the root node. I realise that it makes intuitive sense to
+> > describe per-cpu resources this way, but that's not the way the bindings
+> > are intended to be used (does thei DT even work?).
+> >
+> > No virtual/hypervisor interrupts?
+> 
+> Mark, all valid points. I just updated the patch to include all the missing
+> interrupts and registers for timer and gic and moved the timer node out as
+> its supposed to be.
+
+Great!
+
+> 
+> >
+> > Do you really need the clock-frequency property? It's far preferrable to
+> > have your bootloader do the right thing and program CNTFRQ with the
+> > correct value.
+> 
+> I kept the clock-frequency property since our bootloader does not handle this
+> and I am not sure if its a good idea to have the dependency on bootloader
+> to do this.
+
+There is precedent for handling it this way, but it would be far nicer
+to fix the bootloader to set CNTFRQ. For one thing it's only writeable
+from the secure side, so a host os can't fix it up for guests that might
+depend on it rather than dt. I realise it's not necessarily as simple as
+it sounds to fix that up, however.
+
 [...]
-> That said, I agree with Thomas that it's not useful (and potentially
-> even dangerous) to add the .remove() at this point in time.
 
-Thierry, Thomas,
+> +       timer {
+> +               compatible = "arm,armv7-timer";
+> +               /* PPI secure/nonsecure IRQ */
 
-I will not introduce the .remove and set .suppress_bind_attrs = true as
-Thierry suggested.
+The comment's now stale, and I don't think it's necessary - the binding
+defines the order these are in.
 
-Sebastian
+> +               interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
+> +                            <GIC_PPI 14 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
+> +                            <GIC_PPI 11 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
+> +                            <GIC_PPI 10 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>;
+> +               clock-frequency = <6144000>;
+> +       };
+
+Thanks,
+Mark.
