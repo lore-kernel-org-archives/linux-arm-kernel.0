@@ -1,180 +1,64 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 13 Aug 2013 11:52:27 +0100
-Subject: Build error: versatile express
-In-Reply-To: <alpine.LFD.2.03.1308121125420.14472@syhkavp.arg>
-References: <20130812124801.GB2823@localhost.localdomain>
- <alpine.LFD.2.03.1308121125420.14472@syhkavp.arg>
-Message-ID: <20130813105227.GC2823@localhost.localdomain>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 13 Aug 2013 12:59:40 +0200
+Subject: [PATCH 4/9] PCI: mvebu: add support for reset on GPIO
+In-Reply-To: <520A0D1D.4050609@gmail.com>
+References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376333215-12885-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130813080956.GE9316@ulmo> <20130813103030.1e4156a1@skate>
+ <20130813100348.GA28762@ulmo> <520A0D1D.4050609@gmail.com>
+Message-ID: <1376391580.4039.8.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 12:55:23PM -0400, Nicolas Pitre wrote:
-> On Mon, 12 Aug 2013, Dave Martin wrote:
-> 
-> > On Mon, Aug 12, 2013 at 11:28:04AM +0100, Russell King - ARM Linux wrote:
-> > > arch/arm/mach-vexpress/tc2_pm.c: In function 'tc2_pm_down.clone.0':
-> > > arch/arm/mach-vexpress/tc2_pm.c:200:1: error: fp cannot be used in asm here
-> > > 
-> > > This is caused by the assembly code in this file clobbering R11, which
-> > > is incompatible with having CONFIG_FRAME_POINTER=y.
-> > 
-> > Is there any reason not to fix this just by pushing/popping r11 inside
-> > the asm and removing it from the clobber list?
-> 
-> That's most likely the best fix.  What about this?
+Hi Sebastian,
 
-Were we replacing these instances with the macro, or is that still in
-flight?
+Am Dienstag, den 13.08.2013, 12:40 +0200 schrieb Sebastian Hesselbarth:
+> On 08/13/13 12:03, Thierry Reding wrote:
+> > On Tue, Aug 13, 2013 at 10:30:30AM +0200, Thomas Petazzoni wrote:
+> >> Dear Thierry Reding,
+> >>
+> >> On Tue, 13 Aug 2013 10:09:56 +0200, Thierry Reding wrote:
+> >>
+> >>>> +- reset-gpios: optional gpio to PERST#
+> >>>> +- reset-delay-ms: delay in ms to wait after reset de-assertion
+> >>>
+> >>> I remember some recent discussion about this, and we now have this reset
+> >>> framework, so perhaps it makes more sense to use the reset binding for
+> >>> this? Cc'ing Stephen (as part of the device tree bindings maintainers
+> >>> team) who was involved in that recent reset bindings discussion.
+> >>
+> >> I also thought about this, but the reset framework seems to be designed
+> >> for "reset controller" IPs, i.e special IPs that are controlling reset
+> >> signals. Looking at Documentation/devicetree/bindings/reset/reset.txt,
+> >> I'm not sure to see how this would apply to GPIO-controlled reset
+> >> signals.
+> >
+> > See:
+> >
+> > 	http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg36900.html
+> >
+> > which seems to have carried over to this at some point:
+> >
+> > 	http://www.spinics.net/lists/devicetree/msg00521.html
+> >
+> > Some of the messages in between I can't find in any archive, sorry.
+> 
+> Thierry, Sascha,
+> 
+> thanks for the input. Flipping through the above discussion, I guess
+> using "reset-gpios" and "reset-delay-us" should be fine?
+> 
+> I can also remove the delay property for now, as I cannot find a final
+> conclusion about the configurable delay.
 
-Anyway, if useful:
+Yes, I'm in favor of using 'reset-gpios'. If we can agree on this
+binding, I'll add support to the reset framework core.
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> In the driver, I will stick to bare gpiolib and wait for gpio-reset
+> driver to become available. Currently, we don't have sophisticated
+> reset handling in pci-mvebu anyway.
 
-Cheers
----Dave
+Sounds good to me.
 
-> 
-> ---- >8
-> 
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Date: Mon, 12 Aug 2013 12:47:13 -0400
-> Subject: [PATCH] ARM: vexpress/MCPM: fix cache disable sequence when
->  CONFIG_FRAME_POINTER=y
-> 
-> If CONFIG_FRAME_POINTER=y we hget the following error:
-> 
-> arch/arm/mach-vexpress/tc2_pm.c: In function 'tc2_pm_down':
-> arch/arm/mach-vexpress/tc2_pm.c:200:1: error: fp cannot be used in asm here
-> 
-> Let's fix that by explicitly preserving r11 on the stack and removing it
-> from the clobber list.
-> 
-> Reported-by: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> 
-> diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-> index 85fffa702f..3a6384c6c4 100644
-> --- a/arch/arm/mach-vexpress/dcscb.c
-> +++ b/arch/arm/mach-vexpress/dcscb.c
-> @@ -144,8 +144,13 @@ static void dcscb_power_down(void)
->  		 * Let's do it in the safest possible way i.e. with
->  		 * no memory access within the following sequence
->  		 * including to the stack.
-> +		 *
-> +		 * Note: fp is preserved to the stack explicitly prior doing
-> +		 * this since adding it to the clobber list is incompatible
-> +		 * with having CONFIG_FRAME_POINTER=y.
->  		 */
->  		asm volatile(
-> +		"str	fp, [sp, #-4]! \n\t"
->  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
->  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-> @@ -156,9 +161,10 @@ static void dcscb_power_down(void)
->  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
->  		"isb	\n\t"
-> -		"dsb	"
-> +		"dsb	\n\t"
-> +		"ldr	fp, [sp], #4"
->  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-> -		      "r9","r10","r11","lr","memory");
-> +		      "r9","r10","lr","memory");
->  
->  		/*
->  		 * This is a harmless no-op.  On platforms with a real
-> @@ -182,6 +188,7 @@ static void dcscb_power_down(void)
->  		 * Let's do it in the safest possible way as above.
->  		 */
->  		asm volatile(
-> +		"str	fp, [sp, #-4]! \n\t"
->  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
->  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-> @@ -192,9 +199,10 @@ static void dcscb_power_down(void)
->  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
->  		"isb	\n\t"
-> -		"dsb	"
-> +		"dsb	\n\t"
-> +		"ldr	fp, [sp], #4"
->  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-> -		      "r9","r10","r11","lr","memory");
-> +		      "r9","r10","lr","memory");
->  	}
->  
->  	__mcpm_cpu_down(cpu, cluster);
-> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-> index dfb55d45b6..9419b1550a 100644
-> --- a/arch/arm/mach-vexpress/tc2_pm.c
-> +++ b/arch/arm/mach-vexpress/tc2_pm.c
-> @@ -139,8 +139,13 @@ static void tc2_pm_down(u64 residency)
->  		 * Let's do it in the safest possible way i.e. with
->  		 * no memory access within the following sequence
->  		 * including the stack.
-> +		 *
-> +		 * Note: fp is preserved to the stack explicitly prior doing
-> +		 * this since adding it to the clobber list is incompatible
-> +		 * with having CONFIG_FRAME_POINTER=y.
->  		 */
->  		asm volatile(
-> +		"str	fp, [sp, #-4]! \n\t"
->  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
->  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-> @@ -151,9 +156,10 @@ static void tc2_pm_down(u64 residency)
->  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
->  		"isb	\n\t"
-> -		"dsb	"
-> +		"dsb	\n\t"
-> +		"ldr	fp, [sp], #4"
->  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-> -		      "r9","r10","r11","lr","memory");
-> +		      "r9","r10","lr","memory");
->  
->  		cci_disable_port_by_cpu(mpidr);
->  
-> @@ -174,6 +180,7 @@ static void tc2_pm_down(u64 residency)
->  		 * Let's do it in the safest possible way as above.
->  		 */
->  		asm volatile(
-> +		"str	fp, [sp, #-4]! \n\t"
->  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
->  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-> @@ -184,9 +191,10 @@ static void tc2_pm_down(u64 residency)
->  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
->  		"isb	\n\t"
-> -		"dsb	"
-> +		"dsb	\n\t"
-> +		"ldr	fp, [sp], #4"
->  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-> -		      "r9","r10","r11","lr","memory");
-> +		      "r9","r10","lr","memory");
->  	}
->  
->  	__mcpm_cpu_down(cpu, cluster);
-> 
-> 
-> > 
-> > Since there are no "m" constraints or similar, there should be no
-> > implicit references to fp or sp inside the asm which would be disrupted
-> > by that.
-> > 
-> > We could #ifdef it on CONFIG_FRAME_POINTER, but that probably just
-> > uglifies the code for no real benefit.
-> > 
-> > 
-> > FRAME_POINTER depends on !THUMB2_KERNEL, so we shouldn't hit the same
-> > issue with r7 in Thumb-2.
-> > 
-> > Cheers
-> > ---Dave
-> > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+regards
+Philipp
