@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 13 Aug 2013 19:02:27 +0530
-Subject: [PATCH V2 14/35] cpufreq: ia64: Covert to light weight
+Date: Tue, 13 Aug 2013 19:02:29 +0530
+Subject: [PATCH V2 16/35] cpufreq: kirkwood: Covert to light weight
  ->target_index() routine
 In-Reply-To: <cover.1376392602.git.viresh.kumar@linaro.org>
 References: <cover.1376392602.git.viresh.kumar@linaro.org>
-Message-ID: <68f0e910b21a30610a0b3823c469922962ef187c.1376392602.git.viresh.kumar@linaro.org>
+Message-ID: <9dd618d939eccf2588a2cc0f1d161c6fb1e2d6f1.1376392602.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,53 +14,55 @@ This patch converts existing .target() to newly defined light weight
 CPUFreq core will call cpufreq_frequency_table_target() before calling this
 routine and will pass index to it.
 
-Cc: Tony Luck <tony.luck@intel.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/ia64-acpi-cpufreq.c | 21 +++------------------
- 1 file changed, 3 insertions(+), 18 deletions(-)
+ drivers/cpufreq/kirkwood-cpufreq.c | 19 +++----------------
+ 1 file changed, 3 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/cpufreq/ia64-acpi-cpufreq.c b/drivers/cpufreq/ia64-acpi-cpufreq.c
-index b958bdb..371c63d 100644
---- a/drivers/cpufreq/ia64-acpi-cpufreq.c
-+++ b/drivers/cpufreq/ia64-acpi-cpufreq.c
-@@ -227,26 +227,11 @@ acpi_cpufreq_get (
- static int
- acpi_cpufreq_target (
- 	struct cpufreq_policy   *policy,
--	unsigned int target_freq,
--	unsigned int relation)
-+	unsigned int index)
- {
--	struct cpufreq_acpi_io *data = acpi_io_data[policy->cpu];
--	unsigned int next_state = 0;
--	unsigned int result = 0;
--
--	pr_debug("acpi_cpufreq_setpolicy\n");
--
--	result = cpufreq_frequency_table_target(policy,
--			data->freq_table, target_freq, relation, &next_state);
--	if (result)
--		return (result);
--
--	result = processor_set_freq(data, policy, next_state);
--
--	return (result);
-+	return processor_set_freq(acpi_io_data[policy->cpu], policy, index);
+diff --git a/drivers/cpufreq/kirkwood-cpufreq.c b/drivers/cpufreq/kirkwood-cpufreq.c
+index 9018c4d..d0d107a 100644
+--- a/drivers/cpufreq/kirkwood-cpufreq.c
++++ b/drivers/cpufreq/kirkwood-cpufreq.c
+@@ -55,8 +55,8 @@ static unsigned int kirkwood_cpufreq_get_cpu_frequency(unsigned int cpu)
+ 	return kirkwood_freq_table[0].frequency;
  }
  
+-static void kirkwood_cpufreq_set_cpu_state(struct cpufreq_policy *policy,
+-		unsigned int index)
++static int kirkwood_cpufreq_target(struct cpufreq_policy *policy,
++			    unsigned int index)
+ {
+ 	struct cpufreq_freqs freqs;
+ 	unsigned int state = kirkwood_freq_table[index].driver_data;
+@@ -100,19 +100,6 @@ static void kirkwood_cpufreq_set_cpu_state(struct cpufreq_policy *policy,
+ 		local_irq_enable();
+ 	}
+ 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+-};
 -
- static int
- acpi_cpufreq_cpu_init (
- 	struct cpufreq_policy   *policy)
-@@ -380,7 +365,7 @@ acpi_cpufreq_cpu_exit (
+-static int kirkwood_cpufreq_target(struct cpufreq_policy *policy,
+-			    unsigned int target_freq,
+-			    unsigned int relation)
+-{
+-	unsigned int index = 0;
+-
+-	if (cpufreq_frequency_table_target(policy, kirkwood_freq_table,
+-				target_freq, relation, &index))
+-		return -EINVAL;
+-
+-	kirkwood_cpufreq_set_cpu_state(policy, index);
  
- static struct cpufreq_driver acpi_cpufreq_driver = {
- 	.verify 	= cpufreq_generic_frequency_table_verify,
--	.target 	= acpi_cpufreq_target,
-+	.target_index	= acpi_cpufreq_target,
- 	.get 		= acpi_cpufreq_get,
- 	.init		= acpi_cpufreq_cpu_init,
- 	.exit		= acpi_cpufreq_cpu_exit,
+ 	return 0;
+ }
+@@ -130,7 +117,7 @@ static int kirkwood_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ static struct cpufreq_driver kirkwood_cpufreq_driver = {
+ 	.get	= kirkwood_cpufreq_get_cpu_frequency,
+ 	.verify	= cpufreq_generic_frequency_table_verify,
+-	.target	= kirkwood_cpufreq_target,
++	.target_index = kirkwood_cpufreq_target,
+ 	.init	= kirkwood_cpufreq_cpu_init,
+ 	.exit	= cpufreq_generic_exit,
+ 	.name	= "kirkwood-cpufreq",
 -- 
 1.7.12.rc2.18.g61b472e
