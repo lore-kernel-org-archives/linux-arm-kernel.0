@@ -1,128 +1,71 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 13 Aug 2013 09:06:30 +0200
-Subject: [PATCH] usb: gadget: at91_udc: add usb_clk for transition to
- common clk framework
-In-Reply-To: <520948C3.7060008@overkiz.com>
-References: <1375337885-2684-1-git-send-email-b.brezillon@overkiz.com>
- <5208E881.3030205@atmel.com> <520948C3.7060008@overkiz.com>
-Message-ID: <5209DAF6.9020601@atmel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 13 Aug 2013 09:11:06 +0200
+Subject: [PATCH 1/9] PCI: mvebu: move clock enable before register access
+In-Reply-To: <1376333215-12885-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376333215-12885-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130813091106.326c562a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2013 22:42, boris brezillon :
-> Hello Nicolas,
->
-> On 12/08/2013 15:52, Nicolas Ferre wrote:
->> On 01/08/2013 08:18, Boris BREZILLON :
->>> The AT91 PMC (Power Management Controller) provides an USB clock used by
->>> USB Full Speed host (ohci) and USB Full Speed device (udc).
->>> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
->>> This configuration was formely done in mach-at91/clock.c, but this
->>> implementation will be removed when moving to common clk framework.
->>>
->>> This patch adds support for usb clock retrieval and configuration,
->>> and is
->>> backward compatible with the current at91 clk implementation (if usb clk
->>> is not found, it does not configure/enable it).
->>>
->>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>
-> Is there a reason you acked this version but not the 3rd one
-> (https://lkml.org/lkml/2013/8/2/102).
+Dear Sebastian Hesselbarth,
 
-No, only flow of emails while getting back online ;-)
+On Mon, 12 Aug 2013 20:46:47 +0200, Sebastian Hesselbarth wrote:
 
-Bye,
+> +		port->clk = of_clk_get_by_name(child, NULL);
+> +		if (IS_ERR(port->clk)) {
+> +			dev_err(&pdev->dev, "PCIe%d.%d: cannot get clock\n",
+> +			       port->port, port->lane);
+> +			iounmap(port->base);
 
->>> ---
->>>    drivers/usb/gadget/at91_udc.c |   17 ++++++++++++++++-
->>>    drivers/usb/gadget/at91_udc.h |    2 +-
->>>    2 files changed, 17 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/usb/gadget/at91_udc.c
->>> b/drivers/usb/gadget/at91_udc.c
->>> index fce8e4e..ae06585 100644
->>> --- a/drivers/usb/gadget/at91_udc.c
->>> +++ b/drivers/usb/gadget/at91_udc.c
->>> @@ -870,6 +870,11 @@ static void clk_on(struct at91_udc *udc)
->>>        if (udc->clocked)
->>>            return;
->>>        udc->clocked = 1;
->>> +
->>> +    if (!IS_ERR(udc->uclk)) {
->>> +        clk_set_rate(udc->uclk, 48000000);
->>> +        clk_prepare_enable(udc->uclk);
->>> +    }
->>>        clk_prepare_enable(udc->iclk);
->>>        clk_prepare_enable(udc->fclk);
->>>    }
->>> @@ -882,6 +887,8 @@ static void clk_off(struct at91_udc *udc)
->>>        udc->gadget.speed = USB_SPEED_UNKNOWN;
->>>        clk_disable_unprepare(udc->fclk);
->>>        clk_disable_unprepare(udc->iclk);
->>> +    if (!IS_ERR(udc->uclk))
->>> +        clk_disable_unprepare(udc->uclk);
->>>    }
->>>
->>>    /*
->>> @@ -1774,10 +1781,10 @@ static int at91udc_probe(struct
->>> platform_device *pdev)
->>>        /* get interface and function clocks */
->>>        udc->iclk = clk_get(dev, "udc_clk");
->>>        udc->fclk = clk_get(dev, "udpck");
->>> +    udc->uclk = clk_get(dev, "usb_clk");
->>>        if (IS_ERR(udc->iclk) || IS_ERR(udc->fclk)) {
->>>            DBG("clocks missing\n");
->>>            retval = -ENODEV;
->>> -        /* NOTE: we "know" here that refcounts on these are NOPs */
->>>            goto fail1;
->>>        }
->>>
->>> @@ -1851,6 +1858,12 @@ fail3:
->>>    fail2:
->>>        free_irq(udc->udp_irq, udc);
->>>    fail1:
->>> +    if (!IS_ERR(udc->uclk))
->>> +        clk_put(udc->uclk);
->>> +    if (!IS_ERR(udc->fclk))
->>> +        clk_put(udc->fclk);
->>> +    if (!IS_ERR(udc->iclk))
->>> +        clk_put(udc->iclk);
->>>        iounmap(udc->udp_baseaddr);
->>>    fail0a:
->>>        if (cpu_is_at91rm9200())
->>> @@ -1894,6 +1907,8 @@ static int __exit at91udc_remove(struct
->>> platform_device *pdev)
->>>
->>>        clk_put(udc->iclk);
->>>        clk_put(udc->fclk);
->>> +    if (!IS_ERR(udc->uclk))
->>> +        clk_put(udc->uclk);
->>>
->>>        return 0;
->>>    }
->>> diff --git a/drivers/usb/gadget/at91_udc.h
->>> b/drivers/usb/gadget/at91_udc.h
->>> index e647d1c..0175246 100644
->>> --- a/drivers/usb/gadget/at91_udc.h
->>> +++ b/drivers/usb/gadget/at91_udc.h
->>> @@ -126,7 +126,7 @@ struct at91_udc {
->>>        unsigned            active_suspend:1;
->>>        u8                addr;
->>>        struct at91_udc_data        board;
->>> -    struct clk            *iclk, *fclk;
->>> +    struct clk            *iclk, *fclk, *uclk;
->>>        struct platform_device        *pdev;
->>>        struct proc_dir_entry        *pde;
->>>        void __iomem            *udp_baseaddr;
->>>
->>
->>
->
->
+You shouldn't iounmap() here in case of error, since the register
+mapping hasn't been done yet.
 
+> +			port->haslink = 0;
+> +			continue;
+> +		}
+> +		clk_prepare_enable(port->clk);
 
+Nitpick, an empty new line between the closing } and the
+clk_prepare_enable() line would be nice.
+
+> +
+>  		port->base = mvebu_pcie_map_registers(pdev, child, port);
+>  		if (!port->base) {
+>  			dev_err(&pdev->dev, "PCIe%d.%d: cannot map registers\n",
+> @@ -916,22 +926,9 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+>  				 port->port, port->lane);
+
+and maybe here you could unprepare+release the clock if we haven't
+managed to remap registers?
+
+>  		}
+>  
+> -		port->clk = of_clk_get_by_name(child, NULL);
+> -		if (IS_ERR(port->clk)) {
+> -			dev_err(&pdev->dev, "PCIe%d.%d: cannot get clock\n",
+> -			       port->port, port->lane);
+> -			iounmap(port->base);
+> -			port->haslink = 0;
+> -			continue;
+> -		}
+> -
+>  		port->dn = child;
+> -
+> -		clk_prepare_enable(port->clk);
+>  		spin_lock_init(&port->conf_lock);
+> -
+>  		mvebu_sw_pci_bridge_init(port);
+> -
+>  		i++;
+>  	}
+>  
+
+Thanks!
+
+Thomas
 -- 
-Nicolas Ferre
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
