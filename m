@@ -1,56 +1,37 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 13 Aug 2013 22:01:17 +0200
-Subject: [PATCH 0/3] cpufreq: sa11x0: cleanups for 3.13
-In-Reply-To: <cover.1376392060.git.viresh.kumar@linaro.org>
-References: <cover.1376392060.git.viresh.kumar@linaro.org>
-Message-ID: <1437762.edDpfxPldn@vostro.rjw.lan>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 13 Aug 2013 13:52:17 -0600
+Subject: [PATCHv3] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <1376322589-17606-1-git-send-email-dinguyen@altera.com>
+References: <1376322589-17606-1-git-send-email-dinguyen@altera.com>
+Message-ID: <520A8E71.4090508@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 13, 2013 07:01:04 PM Viresh Kumar wrote:
-> Hi Rafael/Russell,
+On 08/12/2013 09:49 AM, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> These patches would be part of this patchset finally, sending it separately as I
-> didn't wanted to send other patches in that series..
-> 
-> https://lkml.org/lkml/2013/8/10/48
-> 
-> (Above series was rebased over https://lkml.org/lkml/2013/8/8/263 and hence this
-> patchset too)..
-> 
-> These first exposes frequency table and then uses cpufreq generic routines
-> (which uses exposed table) instead of its own .verify() routine.
-> 
-> Later I will send another patch that would be part of this series:
-> 
-> http://lkml.org/lkml/2013/8/12/406
-> 
-> (I need to send that series again today and so not sending that patch twice,
-> once here and then in that series)..
-> 
-> All these patches are pushed here with all dependencies:
-> 
-> https://git.linaro.org/gitweb?p=people/vireshk/linux.git;a=shortlog;h=refs/heads/for-v3.13
+> Add bindings for SD/MMC for SOCFPGA.
+> Add "syscon" to the "altr,sys-mgr" binding.
 
-Are the three patches in this series prerequisite for the big target_index
-one?  If so, I think they can go into 3.12 actually, if they are ACKed by the
-appropriate platform maintainers.
+> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
 
-> Viresh Kumar (3):
->   cpufreq: sa11x0: Expose frequency table
->   cpufreq: sa11x0: let cpufreq core initialize struct policy fields
->   cpufreq: sa11x0: Use generic cpufreq routines
-> 
->  arch/arm/mach-sa1100/generic.c   | 65 +++++++++++++---------------------------
->  arch/arm/mach-sa1100/generic.h   |  2 +-
->  drivers/cpufreq/sa1100-cpufreq.c |  9 +++---
->  drivers/cpufreq/sa1110-cpufreq.c |  9 +++---
->  4 files changed, 30 insertions(+), 55 deletions(-)
+I think it's reasonable to define one binding as being based on another
+plus some additions, so, the binding,
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-Thanks,
-Rafael
+> +Example:
+> +	dwmmc0 at ff704000 {
+> +		compatible = "altr,socfpga-dw-mshc", "snps,dw-mshc";
+> +		altr,dw-mshc-sdr-timing = <0 3>;
+> +	};
 
+It'd be nice to provide a complete example though, rather than only
+including the properties that this binding adds to the base binding.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+
+>  		sysmgr at ffd08000 {
+> -				compatible = "altr,sys-mgr";
+> +				compatible = "altr,sys-mgr", "syscon";
+
+That seems like an unrelated change?
