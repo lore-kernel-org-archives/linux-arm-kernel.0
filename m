@@ -1,33 +1,44 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 13 Aug 2013 09:31:04 -0400
-Subject: [PATCH] ARM: Update SMP_ON_UP code to detect A9MPCore with 1
- CPU devices
-In-Reply-To: <20130813111943.GE30280@mudshark.cambridge.arm.com>
-References: <1375381033-13220-1-git-send-email-santosh.shilimkar@ti.com>
- <51FBC610.9030900@arm.com> <51FBCEC3.4030207@ti.com>
- <51FBD42A.9040901@arm.com> <20130802154857.GD5292@mudshark.cambridge.arm.com>
- <52092AA5.3090005@ti.com> <20130813111943.GE30280@mudshark.cambridge.arm.com>
-Message-ID: <520A3518.3030301@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 13 Aug 2013 19:01:04 +0530
+Subject: [PATCH 0/3] cpufreq: sa11x0: cleanups for 3.13
+Message-ID: <cover.1376392060.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 August 2013 07:19 AM, Will Deacon wrote:
-> On Mon, Aug 12, 2013 at 07:34:13PM +0100, Santosh Shilimkar wrote:
->> On Friday 02 August 2013 11:48 AM, Will Deacon wrote:
->>> I think this an A9-specific register, which reads as 0 on UP A9 and reads as
->>> some form of PERIPH_BASE for SMP parts. The issue I have is when PERIPH_BASE
->>> is zero.
->>>
->> What do we do here ? Should we document this in the code and proceed ?
->> Mostly there is no platform with PERIPH_BASE = 0, so its should be fine but
->> I am open for any other alternative.
-> 
-> The only other alternative I can think of is forcing people to have
-> CONFIG_SMP=n, but that blows away single zImage for your platform.
-> 
-Yep which surely we don't want considering after so much effort we
-have it working first place. How about going ahead with assumption
-that PERIPH_BASE = 0 case doesn't work.
+Hi Rafael/Russell,
 
-Regards,
-Santosh
+These patches would be part of this patchset finally, sending it separately as I
+didn't wanted to send other patches in that series..
+
+https://lkml.org/lkml/2013/8/10/48
+
+(Above series was rebased over https://lkml.org/lkml/2013/8/8/263 and hence this
+patchset too)..
+
+These first exposes frequency table and then uses cpufreq generic routines
+(which uses exposed table) instead of its own .verify() routine.
+
+Later I will send another patch that would be part of this series:
+
+http://lkml.org/lkml/2013/8/12/406
+
+(I need to send that series again today and so not sending that patch twice,
+once here and then in that series)..
+
+All these patches are pushed here with all dependencies:
+
+https://git.linaro.org/gitweb?p=people/vireshk/linux.git;a=shortlog;h=refs/heads/for-v3.13
+
+Viresh Kumar (3):
+  cpufreq: sa11x0: Expose frequency table
+  cpufreq: sa11x0: let cpufreq core initialize struct policy fields
+  cpufreq: sa11x0: Use generic cpufreq routines
+
+ arch/arm/mach-sa1100/generic.c   | 65 +++++++++++++---------------------------
+ arch/arm/mach-sa1100/generic.h   |  2 +-
+ drivers/cpufreq/sa1100-cpufreq.c |  9 +++---
+ drivers/cpufreq/sa1110-cpufreq.c |  9 +++---
+ 4 files changed, 30 insertions(+), 55 deletions(-)
+
+-- 
+1.7.12.rc2.18.g61b472e
