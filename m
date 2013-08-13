@@ -1,59 +1,40 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 13 Aug 2013 15:43:46 +0800
-Subject: [PATCH] input: qt1070: add power management ops
-Message-ID: <1376379826-28808-1-git-send-email-voice.shen@atmel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 13 Aug 2013 09:58:31 +0200
+Subject: [PATCH 1/9] PCI: mvebu: move clock enable before register access
+In-Reply-To: <1376333215-12885-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376333215-12885-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130813075830.GC9316@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add power management ops for qt1070, it maybe a wakeup source
+On Mon, Aug 12, 2013 at 08:46:47PM +0200, Sebastian Hesselbarth wrote:
+[...]
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+[...]
+> @@ -897,6 +897,16 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+>  			continue;
+>  		}
+>  
+> +		port->clk = of_clk_get_by_name(child, NULL);
+> +		if (IS_ERR(port->clk)) {
+> +			dev_err(&pdev->dev, "PCIe%d.%d: cannot get clock\n",
+> +			       port->port, port->lane);
+> +			iounmap(port->base);
+> +			port->haslink = 0;
+> +			continue;
+> +		}
+> +		clk_prepare_enable(port->clk);
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
- drivers/input/keyboard/qt1070.c |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+I see that this was already wrong previously, but since you're changing
+the line anyway you should probably also check for failure of the
+clk_prepare_enable() call and error out if it can't be prepare/enabled.
 
-diff --git a/drivers/input/keyboard/qt1070.c b/drivers/input/keyboard/qt1070.c
-index 42b773b..deefe5a 100644
---- a/drivers/input/keyboard/qt1070.c
-+++ b/drivers/input/keyboard/qt1070.c
-@@ -243,6 +243,30 @@ static int qt1070_remove(struct i2c_client *client)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int qt1070_suspend(struct device *dev)
-+{
-+	struct qt1070_data *data = dev_get_drvdata(dev);
-+
-+	if (device_may_wakeup(dev))
-+		enable_irq_wake(data->irq);
-+
-+	return 0;
-+}
-+
-+static int qt1070_resume(struct device *dev)
-+{
-+	struct qt1070_data *data = dev_get_drvdata(dev);
-+
-+	if (device_may_wakeup(dev))
-+		disable_irq_wake(data->irq);
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(qt1070_pm_ops, qt1070_suspend, qt1070_resume);
-+
- static const struct i2c_device_id qt1070_id[] = {
- 	{ "qt1070", 0 },
- 	{ },
-@@ -253,6 +277,7 @@ static struct i2c_driver qt1070_driver = {
- 	.driver	= {
- 		.name	= "qt1070",
- 		.owner	= THIS_MODULE,
-+		.pm	= &qt1070_pm_ops,
- 	},
- 	.id_table	= qt1070_id,
- 	.probe		= qt1070_probe,
--- 
-1.7.9.5
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/91abbf9d/attachment.sig>
