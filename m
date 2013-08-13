@@ -1,55 +1,67 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 13 Aug 2013 14:25:19 +0200
-Subject: [PATCH v2 0/5] ARM: dove: DT PCIe support
-Message-ID: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Tue, 13 Aug 2013 14:25:21 +0200
+Subject: [PATCH v2 2/5] PCI: mvebu: increment nports only for registered ports
+In-Reply-To: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1376396724-32048-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds support for the PCIe controllers found on Marvell
-Dove SoCs. It depends on mvebu-pci patches sent by Thomas Petazzoni.
-The ARM Dove related patches have already been taken by Jason Cooper
-and have been removed from v2 of this patch set. Changelog is added
-to the individual patch emails.
+The number of ports is probed by counting the number of available child nodes.
+Later on, the registration of a port can fail and cause a mismatch between
+the ->nports counter and registered ports. This patch modifies the counting
+strategy, to make ->nports represent the number of registered ports instead
+of the number of available childs.
 
-Patches 1 and 2 fix some minor issues with pci-mvebu by moving
-clk_prepare_enable before accessing any controller registers and
-counting sucessfully registered ports only.
-
-Patch 3 converts pci-mvebu from subsys_initcall registration to
-normal platform driver registration to allow it to fail with
-EPROBE_DEFER later.
-
-Patch 4 adds DT parsing for reset (PERST#) GPIO pins and delay to
-wait for PCIe devices after reset de-assertion.
-
-Patch 5 finally adds a compatible to pci-mvebu for Dove SoCs.
-
-[Patch 6-9 have already been taken by Jason Cooper]
-
-Sebastian Hesselbarth (5):
-  PCI: mvebu: move clock enable before register access
-  PCI: mvebu: increment nports only for registered ports
-  PCI: mvebu: remove subsys_initcall
-  PCI: mvebu: add support for reset on GPIO
-  PCI: mvebu: add support for Marvell Dove SoCs
-
- .../devicetree/bindings/pci/mvebu-pci.txt          |    7 ++
- drivers/pci/host/Kconfig                           |    2 +-
- drivers/pci/host/pci-mvebu.c                       |   99 +++++++++++++-------
- 3 files changed, 71 insertions(+), 37 deletions(-)
-
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
+Changelog:
+v1->v2:
+- also use 'i' as iterator during port parsing and assign at the end of
+  probing (Reported by Thomas Pettazoni)
+
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-pci at vger.kernel.org
+---
+ drivers/pci/host/pci-mvebu.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 1533fda..d2e9ae7 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -842,13 +842,14 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	i = 0;
+ 	for_each_child_of_node(pdev->dev.of_node, child) {
+ 		if (!of_device_is_available(child))
+ 			continue;
+-		pcie->nports++;
++		i++;
+ 	}
+ 
+-	pcie->ports = devm_kzalloc(&pdev->dev, pcie->nports *
++	pcie->ports = devm_kzalloc(&pdev->dev, i *
+ 				   sizeof(struct mvebu_pcie_port),
+ 				   GFP_KERNEL);
+ 	if (!pcie->ports)
+@@ -934,8 +935,8 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 		i++;
+ 	}
+ 
++	pcie->nports = i;
+ 	mvebu_pcie_msi_enable(pcie);
+-
+ 	mvebu_pcie_enable(pcie);
+ 
+ 	return 0;
 -- 
 1.7.10.4
