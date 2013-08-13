@@ -1,57 +1,77 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 13 Aug 2013 11:42:48 -0700
-Subject: [PATCH v1 09/14] clk: msm: Add support for MSM8960's global
- clock controller (GCC)
-In-Reply-To: <20130813142411.4443.85003@quantum>
-References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
- <1374713022-6049-10-git-send-email-sboyd@codeaurora.org>
- <20130808170015.GE27325@e106331-lin.cambridge.arm.com>
- <20130813050334.GE14845@codeaurora.org>
- <20130813142411.4443.85003@quantum>
-Message-ID: <20130813184248.GG14845@codeaurora.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 13 Aug 2013 13:44:23 -0500
+Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
+In-Reply-To: <520A536C.3030600@arm.com>
+References: <5208E2D3.7060005@arm.com> <3356439.a21MloFP7n@vostro.rjw.lan>
+ <520A536C.3030600@arm.com>
+Message-ID: <CAL_JsqJdGXuTmb2kgBwgmRYGs9f92-dsawDXSXjmJW8cwjFVQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13, Mike Turquette wrote:
-> Quoting Stephen Boyd (2013-08-12 22:03:34)
-> > The clock controller is hardware and the number of clock outputs
-> > is fixed. Isn't all hardware fixed until you start talking about
-> > FPGAs? The next minor revision of the clock controller may add
-> > more clocks or remove clocks from that base design, but otherwise
-> > the two are 90% the same and generally software compatible. It
-> > isn't until we start a new generation of chips that we make major
-> > changes to the design. Is that loose enough to qualify?
-> > 
-> > These bindings attempt to follow the regulator bindings. With
-> > regulators there is a node for each regulator and we describe
-> > physical characteristics of those regulators within the nodes but
-> > we don't describe the software interface (bits, masks, shifts,
-> > etc). I imagine we could extend these clock nodes to describe
-> > physical characteristics such as min/max frequency or if the
-> > bootloader has left the clocks on. Right now we're using the
-> > nodes to describe what types of clocks there are and how the
-> > clock tree is layed out.
-> > 
-> > Or perhaps you're talking about clock sharing? We share the clock
-> > controller with multiple masters (processors running other OSes)
-> > and the partitioning of the clocks is mostly predefined. We just
-> > won't use some clocks because they're reserved for other
-> > processors. They're still part of the same clock controller
-> > hardware block but we don't want to control them on Linux because
-> > we'll trample over other processors and most likely hang the
-> > system. I wonder how this would work for hexagon and krait both
-> > running linux on the same SoC. If all DT says is that there is a
-> > gcc here at this address how are we supposed to know that we
-> > shouldn't use some clock? 
-> 
-> Do Krait and Hexagon have the same register map? On the ARM SoCs I am
-> familiar with the masters have differing views of register addresses for
-> the same peripherals and hardware blocks. So you couldn't use the same
-> DTS in a straightforward way if this is true for your system.
-> 
+On Tue, Aug 13, 2013 at 10:40 AM, Sudeep KarkadaNagesha
+<Sudeep.KarkadaNagesha@arm.com> wrote:
+> Adding PowerPC list
+>
+> On 13/08/13 14:00, Rafael J. Wysocki wrote:
+>> On Monday, August 12, 2013 02:27:47 PM Sudeep KarkadaNagesha wrote:
+>>> The following changes since commit
+>>> d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+>>>
+>>> Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>> git://linux-arm.org/linux-skn.git cpu_of_node
 
-They both have the same view of the register map.
+[snip]
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+>> All error/warnings:
+>>
+>> warning: (MPC836x_RDK && MTD_NAND_FSL_ELBC && MTD_NAND_FSL_UPM)
+>> selects FSL_LBC which has unmet direct dependencies (FSL_SOC)
+>> warning: (MPC836x_RDK && MTD_NAND_FSL_ELBC && MTD_NAND_FSL_UPM)
+>> selects FSL_LBC which has unmet direct dependencies (FSL_SOC)
+>> In file included from arch/powerpc/include/asm/kvm_para.h:26:0, from
+>> include/uapi/linux/kvm_para.h:26, from include/linux/kvm_para.h:4,
+>> from include/linux/kvm_host.h:30, from
+>> arch/powerpc/kernel/asm-offsets.c:53:
+>> include/linux/of.h:269:28: error: conflicting types for
+>>'of_get_cpu_node'
+>> extern struct device_node *of_get_cpu_node(int cpu); ^ In file
+>> included from include/linux/of.h:139:0, from
+>> arch/powerpc/include/asm/kvm_para.h:26, from
+>> include/uapi/linux/kvm_para.h:26, from include/linux/kvm_para.h:4,
+>> from include/linux/kvm_host.h:30, from
+>> arch/powerpc/kernel/asm-offsets.c:53:
+>> arch/powerpc/include/asm/prom.h:47:21: note: previous declaration
+>> of 'of_get_cpu_node' was here
+>> struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
+>> ^ make[2]: *** [arch/powerpc/kernel/asm-offsets.s] Error 1 make[2]:
+>> Target `__build' not remade because of errors. make[1]: ***
+>> [prepare0] Error 2 make[1]: Target `prepare' not remade because of
+>> errors. make: *** [sub-make] Error 2
+>>
+>
+> There seems to be conflict in the new function "of_get_cpu_node" added.
+> PowerPC also defines the same function name. Further microblaze and
+> openrisc declares it(can be removed) but doesn't define it.
+> To fix this:
+> 1. I can rename the newly added function to something different like
+>    `of_get_cpunode` or
+> 2. If of_* namespace should be used by only OF/FDT and not by any
+>    architecture specific code, then the arch specific version can be
+>    renamed to some thing like arch_of_get_cpu_node.
+>    Also most of the calls to arch specific function can be moved to
+>    generic code.
+>
+> Let me know your thoughts.
+
+It is up to Rafael if he is willing/able to rebase his tree, but I
+would drop this series until this is sorted out. I think the new
+common function should be and can be generalized to work for powerpc.
+It would need to make reg property optional and pass in the device
+node to the arch specific function.
+
+A short term solution would be just to make the function "#ifndef CONFIG_PPC".
+
+Rob
