@@ -1,10 +1,10 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 13 Aug 2013 16:42:29 +0100
-Subject: [PATCH 17/22] ARM: dts: Remove '0x's from OMAP4 DTS file
-In-Reply-To: <1374490361-25769-17-git-send-email-lee.jones@linaro.org>
+Date: Tue, 13 Aug 2013 16:42:48 +0100
+Subject: [PATCH 16/22] ARM: dts: Remove '0x's from OMAP3430 SDP DTS file
+In-Reply-To: <1374490361-25769-16-git-send-email-lee.jones@linaro.org>
 References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-17-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130813154229.GC15278@lee--X1>
+ <1374490361-25769-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130813154248.GD15278@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,22 +19,80 @@ On Mon, 22 Jul 2013, Lee Jones wrote:
 > Cc: linux-omap at vger.kernel.org
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  arch/arm/boot/dts/omap4.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/omap3430-sdp.dts | 22 +++++++++++-----------
+>  1 file changed, 11 insertions(+), 11 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index 22d9f2b..45708e1 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -56,7 +56,7 @@
->  		cache-level = <2>;
->  	};
->  
-> -	local-timer at 0x48240600 {
-> +	local-timer at 48240600 {
->  		compatible = "arm,cortex-a9-twd-timer";
->  		reg = <0x48240600 0x20>;
->  		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_HIGH)>;
+> diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
+> index e2249bc..281914e 100644
+> --- a/arch/arm/boot/dts/omap3430-sdp.dts
+> +++ b/arch/arm/boot/dts/omap3430-sdp.dts
+> @@ -84,15 +84,15 @@
+>  			label = "bootloader-nor";
+>  			reg = <0 0x40000>;
+>  		};
+> -		partition at 0x40000 {
+> +		partition at 40000 {
+>  			label = "params-nor";
+>  			reg = <0x40000 0x40000>;
+>  		};
+> -		partition at 0x80000 {
+> +		partition at 80000 {
+>  			label = "kernel-nor";
+>  			reg = <0x80000 0x200000>;
+>  		};
+> -		partition at 0x280000 {
+> +		partition at 280000 {
+>  			label = "filesystem-nor";
+>  			reg = <0x240000 0x7d80000>;
+>  		};
+> @@ -125,19 +125,19 @@
+>  			label = "xloader-nand";
+>  			reg = <0 0x80000>;
+>  		};
+> -		partition at 0x80000 {
+> +		partition at 80000 {
+>  			label = "bootloader-nand";
+>  			reg = <0x80000 0x140000>;
+>  		};
+> -		partition at 0x1c0000 {
+> +		partition at 1c0000 {
+>  			label = "params-nand";
+>  			reg = <0x1c0000 0xc0000>;
+>  		};
+> -		partition at 0x280000 {
+> +		partition at 280000 {
+>  			label = "kernel-nand";
+>  			reg = <0x280000 0x500000>;
+>  		};
+> -		partition at 0x780000 {
+> +		partition at 780000 {
+>  			label = "filesystem-nand";
+>  			reg = <0x780000 0x7880000>;
+>  		};
+> @@ -170,19 +170,19 @@
+>  			label = "xloader-onenand";
+>  			reg = <0 0x80000>;
+>  		};
+> -		partition at 0x80000 {
+> +		partition at 80000 {
+>  			label = "bootloader-onenand";
+>  			reg = <0x80000 0x40000>;
+>  		};
+> -		partition at 0xc0000 {
+> +		partition at c0000 {
+>  			label = "params-onenand";
+>  			reg = <0xc0000 0x20000>;
+>  		};
+> -		partition at 0xe0000 {
+> +		partition at e0000 {
+>  			label = "kernel-onenand";
+>  			reg = <0xe0000 0x200000>;
+>  		};
+> -		partition at 0x2e0000 {
+> +		partition at 2e0000 {
+>  			label = "filesystem-onenand";
+>  			reg = <0x2e0000 0xfd20000>;
+>  		};
 
 -- 
 Lee Jones
