@@ -1,94 +1,107 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 13 Aug 2013 11:43:12 -0300
-Subject: [PATCH v4 3/6] clocksource: armada-370-xp: Use CLOCKSOURCE_OF_DECLARE
+Date: Tue, 13 Aug 2013 11:43:13 -0300
+Subject: [PATCH v4 4/6] clocksource: armada-370-xp: Introduce new compatibles
 In-Reply-To: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1376404995-24548-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1376404995-24548-5-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is almost cosmetic: we achieve a bit of consistency with
-other clocksource drivers by using the CLOCKSOURCE_OF_DECLARE
-macro for the boilerplate code.
+The Armada XP SoC clocksource driver cannot work without the 25 MHz
+fixed timer. Therefore it's appropriate to introduce a new compatible
+string and use it to set the 25 MHz fixed timer.
+
+The 'marvell,timer-25MHz' property will be marked as deprecated.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/mach-mvebu/armada-370-xp.c      |  4 ++--
- drivers/clocksource/time-armada-370-xp.c |  6 +++---
- include/linux/time-armada-370-xp.h       | 18 ------------------
- 3 files changed, 5 insertions(+), 23 deletions(-)
- delete mode 100644 include/linux/time-armada-370-xp.h
+ drivers/clocksource/time-armada-370-xp.c | 54 +++++++++++++++++++++++---------
+ 1 file changed, 39 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 97cbb80..4ea03ad 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -18,7 +18,7 @@
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
- #include <linux/io.h>
--#include <linux/time-armada-370-xp.h>
-+#include <linux/clocksource.h>
- #include <linux/dma-mapping.h>
- #include <linux/mbus.h>
- #include <asm/hardware/cache-l2x0.h>
-@@ -69,7 +69,7 @@ static void __init armada_370_xp_mbus_init(void)
- static void __init armada_370_xp_timer_and_clk_init(void)
- {
- 	of_clk_init(NULL);
--	armada_370_xp_timer_init();
-+	clocksource_of_init();
- 	coherency_init();
- 	armada_370_xp_mbus_init();
- #ifdef CONFIG_CACHE_L2X0
 diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index 78ddf6a..a6405eb 100644
+index a6405eb..8db4517 100644
 --- a/drivers/clocksource/time-armada-370-xp.c
 +++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -212,13 +212,11 @@ static struct local_timer_ops armada_370_xp_local_timer_ops __cpuinitdata = {
+@@ -13,6 +13,19 @@
+  *
+  * Timer 0 is used as free-running clocksource, while timer 1 is
+  * used as clock_event_device.
++ *
++ * ---
++ * Clocksource driver for Armada 370 and Armada XP SoC.
++ * This driver implements one compatible string for each SoC, given
++ * each has its own characteristics:
++ *
++ *   * Armada 370 has no 25 MHz fixed timer.
++ *
++ *   * Armada XP cannot work properly without such 25 MHz fixed timer as
++ *     doing otherwise leads to using a clocksource whose frequency varies
++ *     when doing cpufreq frequency changes.
++ *
++ * See Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+  */
+ 
+ #include <linux/init.h>
+@@ -212,7 +225,7 @@ static struct local_timer_ops armada_370_xp_local_timer_ops __cpuinitdata = {
  	.stop	=  armada_370_xp_timer_stop,
  };
  
--void __init armada_370_xp_timer_init(void)
-+static void __init armada_370_xp_timer_init(struct device_node *np)
+-static void __init armada_370_xp_timer_init(struct device_node *np)
++static void __init armada_370_xp_timer_common_init(struct device_node *np)
  {
  	u32 clr = 0, set = 0;
--	struct device_node *np;
  	int res;
- 
--	np = of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-timer");
- 	timer_base = of_iomap(np, 0);
+@@ -221,20 +234,10 @@ static void __init armada_370_xp_timer_init(struct device_node *np)
  	WARN_ON(!timer_base);
  	local_base = of_iomap(np, 1);
-@@ -290,3 +288,5 @@ void __init armada_370_xp_timer_init(void)
+ 
+-	if (of_find_property(np, "marvell,timer-25Mhz", NULL)) {
+-		/* The fixed 25MHz timer is available so let's use it */
++	if (timer25Mhz)
+ 		set = TIMER0_25MHZ;
+-		timer_clk = 25000000;
+-	} else {
+-		unsigned long rate = 0;
+-		struct clk *clk = of_clk_get(np, 0);
+-		WARN_ON(IS_ERR(clk));
+-		rate =  clk_get_rate(clk);
+-		timer_clk = rate / TIMER_DIVIDER;
+-
++	else
+ 		clr = TIMER0_25MHZ;
+-		timer25Mhz = false;
+-	}
+ 	timer_ctrl_clrset(clr, set);
+ 	local_timer_ctrl_clrset(clr, set);
+ 
+@@ -288,5 +291,26 @@ static void __init armada_370_xp_timer_init(struct device_node *np)
  #endif
  	}
  }
-+CLOCKSOURCE_OF_DECLARE(armada_370_xp, "marvell,armada-370-xp-timer",
-+		       armada_370_xp_timer_init);
-diff --git a/include/linux/time-armada-370-xp.h b/include/linux/time-armada-370-xp.h
-deleted file mode 100644
-index dfdfdc0..0000000
---- a/include/linux/time-armada-370-xp.h
-+++ /dev/null
-@@ -1,18 +0,0 @@
--/*
-- * Marvell Armada 370/XP SoC timer handling.
-- *
-- * Copyright (C) 2012 Marvell
-- *
-- * Lior Amsalem <alior@marvell.com>
-- * Gregory CLEMENT <gregory.clement@free-electrons.com>
-- * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-- *
-- */
--#ifndef __TIME_ARMADA_370_XPPRCMU_H
--#define __TIME_ARMADA_370_XPPRCMU_H
--
--#include <linux/init.h>
--
--void __init armada_370_xp_timer_init(void);
--
--#endif
+-CLOCKSOURCE_OF_DECLARE(armada_370_xp, "marvell,armada-370-xp-timer",
+-		       armada_370_xp_timer_init);
++
++static void __init armada_xp_timer_init(struct device_node *np)
++{
++	/* The fixed 25MHz timer is required, timer25Mhz is true by default */
++	timer_clk = 25000000;
++
++	armada_370_xp_timer_common_init(np);
++}
++CLOCKSOURCE_OF_DECLARE(armada_xp, "marvell,armada-xp-timer",
++		       armada_xp_timer_init);
++
++static void __init armada_370_timer_init(struct device_node *np)
++{
++	struct clk *clk = of_clk_get(np, 0);
++
++	WARN_ON(IS_ERR(clk));
++	timer_clk = clk_get_rate(clk) / TIMER_DIVIDER;
++	timer25Mhz = false;
++
++	armada_370_xp_timer_common_init(np);
++}
++CLOCKSOURCE_OF_DECLARE(armada_370, "marvell,armada-370-timer",
++		       armada_370_timer_init);
 -- 
 1.8.1.5
