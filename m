@@ -1,42 +1,27 @@
-From: nico@linaro.org (Nicolas Pitre)
-Date: Tue, 13 Aug 2013 11:50:17 -0400 (EDT)
-Subject: Build error: versatile express
-In-Reply-To: <20130813105227.GC2823@localhost.localdomain>
-References: <20130812124801.GB2823@localhost.localdomain>
- <alpine.LFD.2.03.1308121125420.14472@syhkavp.arg>
- <20130813105227.GC2823@localhost.localdomain>
-Message-ID: <alpine.LFD.2.03.1308131148380.14472@syhkavp.arg>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 13 Aug 2013 17:51:38 +0200
+Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
+In-Reply-To: <520A51B0.3010805@ti.com>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <52077B26.1010103@gmail.com> <5209307F.9000701@ti.com>
+ <520A28E5.9030304@gmail.com> <520A51B0.3010805@ti.com>
+Message-ID: <520A560A.80609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Aug 2013, Dave Martin wrote:
+On 13.08.2013 17:33, Dave Gerlach wrote:
+> On 08/13/2013 07:39 AM, Daniel Mack wrote:
 
-> On Mon, Aug 12, 2013 at 12:55:23PM -0400, Nicolas Pitre wrote:
-> > On Mon, 12 Aug 2013, Dave Martin wrote:
-> > 
-> > > On Mon, Aug 12, 2013 at 11:28:04AM +0100, Russell King - ARM Linux wrote:
-> > > > arch/arm/mach-vexpress/tc2_pm.c: In function 'tc2_pm_down.clone.0':
-> > > > arch/arm/mach-vexpress/tc2_pm.c:200:1: error: fp cannot be used in asm here
-> > > > 
-> > > > This is caused by the assembly code in this file clobbering R11, which
-> > > > is incompatible with having CONFIG_FRAME_POINTER=y.
-> > > 
-> > > Is there any reason not to fix this just by pushing/popping r11 inside
-> > > the asm and removing it from the clobber list?
-> > 
-> > That's most likely the best fix.  What about this?
+>> ... but traffic on UART0 won't cause a resume.
+>>
 > 
-> Were we replacing these instances with the macro, or is that still in
-> flight?
+> It looks like you are using no_console_suspend? UART0 does not work as a 
+> wakeup source with this option set.
 
-I've updated the macro patch accordingly.  I prefer to submit that one 
-separately.
-
-> Anyway, if useful:
-> 
-> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-
-Thanks.
+Meh. Sorry, I didn't think about that possibility. Indeed, without that
+option, it does resume. Now I can search for the reason why other wakeup
+sources won't work yet, but that shouldn't bother you.
 
 
-Nicolas
+Thanks again,
+Daniel
