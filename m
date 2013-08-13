@@ -1,43 +1,133 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 13 Aug 2013 11:59:41 +0200
-Subject: [PATCH 4/9] PCI: mvebu: add support for reset on GPIO
-In-Reply-To: <20130813103030.1e4156a1@skate>
-References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376333215-12885-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130813080956.GE9316@ulmo> <20130813103030.1e4156a1@skate>
-Message-ID: <20130813095941.GB30913@pengutronix.de>
+From: poeschel@lemonage.de (Lars Poeschel)
+Date: Tue, 13 Aug 2013 11:52:52 +0200
+Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
+In-Reply-To: <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
+References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
+ <CACxGe6uNJNMdZ1HYGgCtLM2t2TWGCR6btjOHVmP=vDXXvvFfRg@mail.gmail.com>
+ <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
+Message-ID: <201308131152.52648.poeschel@lemonage.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 10:30:30AM +0200, Thomas Petazzoni wrote:
-> Dear Thierry Reding,
-> 
-> On Tue, 13 Aug 2013 10:09:56 +0200, Thierry Reding wrote:
-> 
-> > > +- reset-gpios: optional gpio to PERST#
-> > > +- reset-delay-ms: delay in ms to wait after reset de-assertion
+Am Mittwoch, 31. Juli 2013, 01:44:53 schrieb Linus Walleij:
+> On Tue, Jul 30, 2013 at 6:30 AM, Grant Likely <grant.likely@linaro.org> 
+wrote:
+> > On Mon, Jul 29, 2013 at 6:36 AM, Linus Walleij 
+<linus.walleij@linaro.org> wrote:
+> >> To solve this dilemma, perform an interrupt consistency check
+> >> when adding a GPIO chip: if the chip is both gpio-controller and
+> >> interrupt-controller, walk all children of the device tree,
+> >> check if these in turn reference the interrupt-controller, and
+> >> if they do, loop over the interrupts used by that child and
+> >> perform gpio_reques() and gpio_direction_input() on these,
+> >> making them unreachable from the GPIO side.
 > > 
-> > I remember some recent discussion about this, and we now have this reset
-> > framework, so perhaps it makes more sense to use the reset binding for
-> > this? Cc'ing Stephen (as part of the device tree bindings maintainers
-> > team) who was involved in that recent reset bindings discussion.
+> > Ugh, that's pretty awful, and it doesn't actually solve the root
+> > problem of the GPIO and IRQ subsystems not cooperating. It's also a
+> > very DT-centric solution even though we're going to see the exact same
+> > issue on ACPI machines.
 > 
-> I also thought about this, but the reset framework seems to be designed
-> for "reset controller" IPs, i.e special IPs that are controlling reset
-> signals. Looking at Documentation/devicetree/bindings/reset/reset.txt,
-> I'm not sure to see how this would apply to GPIO-controlled reset
-> signals.
+> The problem is that the patches for OMAP that I applied
+> and now have had to revert solves it in an even uglier way,
+> leading to breaking boards, as was noticed.
+> 
+> The approach in this patch has the potential to actually
+> work without regressing a bunch of boards...
 
-Search for:
+I fully agree. I spent many time understanding the problem and reading 
+mails to see what happend so far. This is by far the best way to solve the 
+problem that was proposed until now. I support that approach.
+ 
+> Whether this is a problem in ACPI or not remains to be seen,
+> but I'm not sure about that. Device trees allows for a GPIO line
+> to be used as an interrupt source and GPIO line orthogonally,
+> and that is the root of this problem. Does ACPI have the same
+> problem, or does it impose natural restrictions on such use
+> cases?
 
-[PATCH v10] reset: Add driver for gpio-controlled reset pins
+Is requesting GPIOs directly common in the ACPI world? Does ACPI allow to 
+use GPIOs for interrupts?
+And even if ACPI had the same problems than device tree, finding a common 
+solution seems very difficult to me.
+I also prefer Linus' way here. This can be fixes in gpiolib for the device 
+tree path and this is ok.
 
-Which aims to be a solution for what you need here.
+> > We have to solve the problem in a better way than that.
 
-Sascha
+Linus asked for real solutions more than once. Can anybody propose a better 
+way ?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> >> This has the following undesired effects:
+> >> 
+> >> - The GPIOlib subsystem is not aware that the line is in use
+> >> 
+> >>   and willingly lets some other consumer perform gpio_request()
+> >>   on it, leading to a complex resource conflict if it occurs.
+> > 
+> > If a gpio line is being both requested as a gpio and used as an
+> > interrupt line, then either a) it's a bug, or b) the gpio line needs
+> > to be used as input only so it is compatible with irq usage. b) should
+> > be supportable.
+> 
+> Yes this is what I'm saying too I think...
+> 
+> The bug in (a) manifested itself in the OMAP patch with
+> no real solution in sight.
+> 
+> >> - The GPIO debugfs file claims this GPIO line is "free".
+> > 
+> > Surely we can fix this. I still don't see a problem of having the
+> > controller request the gpio when it is claimed as an irq if we can get
+> > around the problem of another user performing a /valid/ request on the
+> > same GPIO line. The solution may be to have a special form of request
+> > or flag that allows it to be shared.
+> 
+> I don't see how sharing works here, or how another user,
+> i.e. another one than the user wanting to recieve the IRQ,
+> can validly request such a line? What would the usecase for
+> that valid request be?
+
+I also don't see the usecase for that. Sure, that can be done, but it is of 
+no use. If it shows, that someone really needs this, it can be implemented 
+later.
+
+> Basically I believe these two things need to be exclusive in
+> the DT world:
+> 
+> A: request_irq(a resource passed from "interrupts");
+>      -> core implicitly performs gpio_request()
+>          gpio_direction_input()
+> 
+> B: gpio_request(a resource passed from "gpios");
+>      gpio_direction_input()
+>      request_irq(gpio_to_irq())
+> 
+> Never both. And IIUC that was what happened in the
+> OMAP case.
+
+ACK.
+ 
+> >> - The line direction of the interrupt GPIO line is not
+> >> 
+> >>   explicitly set as input, even though it is obvious that such
+> >>   a line need to be set up in this way, often making the system
+> >>   depend on boot-on defaults for this kind of settings.
+> > 
+> > Should also be solvable if the gpio request problem is solved.
+> 
+> Agreed...
+
+To push the discussion a bit further, I took Linus patch and extended it so 
+that it can be tested now on real world hardware. I tested it on my device 
+tree enabled board and it works fine here. Refer to [1], [2] for version 2 
+of the patch.
+It completely scans the device tree for interrupt-controller users of the 
+gpio_chip in question. It requests the needed gpios and sets them as input.
+If the gpio_chip is removed, it also frees the gpio lines.
+Folks please help testing!
+
+Thanks,
+Lars
+
+[1] http://marc.info/?l=linux-kernel&m=137638745909335&w=2
+[2] https://patchwork.kernel.org/patch/2843525/
