@@ -1,39 +1,38 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Tue, 13 Aug 2013 23:56:13 +0200
-Subject: [PATCH v2 00/11] dma: pdma: some patches needed for PXA DT
- environments
-In-Reply-To: <201308102325.16609.arnd@arndb.de>
-References: <1376153545-14361-1-git-send-email-zonque@gmail.com>
- <201308102325.16609.arnd@arndb.de>
-Message-ID: <520AAB7D.1050506@gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 13 Aug 2013 15:17:37 -0700
+Subject: [GIT PULL v2] msm cleanups for v3.12
+In-Reply-To: <1375916792-24408-1-git-send-email-davidb@codeaurora.org> (David
+ Brown's message of "Wed, 7 Aug 2013 16:06:32 -0700")
+References: <1375909096-22088-1-git-send-email-davidb@codeaurora.org>
+ <1375916792-24408-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <87eh9xgrr2.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.08.2013 23:25, Arnd Bergmann wrote:
-> On Saturday 10 August 2013, Daniel Mack wrote:
->> This is v2 of my series to add more features to the pdma driver.
->>
->> Changes from v1 -> v2:
->>
->>  - drop the two patches from Xiang Wang that are already applied to
->>    Vinod's next branch
->>  - add another patch to cleanup the unlocking path in lookup_phy(),
->>    as suggested by Ezequiel
->>  - provide an own xlate function rather than using
->>    of_dma_simple_xlate(), as suggested by Arnd
->>
->>
->> There's still an open topic with the DALGN flag, as Xiang Wang pointed
->> out. According to him, there's a chance we need an alternative way of
->> forcing the driver into byte-align mode, but that can still be done in
->> an additional patch later.
->>
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
+David Brown <davidb@codeaurora.org> writes:
 
-Vinod, Dan, are you fine with this series as well?
+> The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
+>
+>   Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-cleanup3-for-3.12
+>
+> for you to fetch changes up to 3294a7e7c3a55bb4eb9d98b0af5643a7ea44afe1:
+>
+>   ARM: msm: Only compile io.c on platforms that use it (2013-08-06 11:18:04 -0700)
+>
+> ----------------------------------------------------------------
+> General cleanups for MSM for 3.12
+>
+> This is a series of cleanups to the MSM code.  These are a healthy
+> start to bringing the MSM code closer to the state of current ARM code
+> and getting more of it ready for conversion to devicetree.
 
+Pulled.
 
-Thanks,
-Daniel
+Thanks for the nice cleanups and getting closer to multi-platform
+support.
+
+Kevin
