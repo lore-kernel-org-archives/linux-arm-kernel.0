@@ -1,161 +1,480 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 13 Aug 2013 14:18:04 -0400
-Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
- module registers and APIs
-In-Reply-To: <87wqnplg1n.fsf@kernel.org>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
- <5203A0BC.8060205@ti.com> <5203C457.80301@ti.com>
- <20130809051146.GB7656@atomide.com> <52055733.70808@ti.com>
- <87y586pvkq.fsf@kernel.org> <5209565C.7090508@ti.com>
- <87d2phpsu1.fsf@kernel.org> <520A4BE7.7090603@ti.com>
- <87wqnplg1n.fsf@kernel.org>
-Message-ID: <520A785C.3000304@ti.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Tue, 13 Aug 2013 19:29:20 +0100
+Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
+In-Reply-To: <520A536C.3030600@arm.com>
+References: <5208E2D3.7060005@arm.com> <3356439.a21MloFP7n@vostro.rjw.lan>
+ <520A536C.3030600@arm.com>
+Message-ID: <520A7B00.8060405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 August 2013 12:19 PM, Kevin Hilman wrote:
-> + Ohad
+On 13/08/13 16:40, Sudeep KarkadaNagesha wrote:
+> Adding PowerPC list
 > 
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> 
->> On Tuesday 13 August 2013 10:29 AM, Kevin Hilman wrote:
->>> Dave Gerlach <d-gerlach@ti.com> writes:
+> On 13/08/13 14:00, Rafael J. Wysocki wrote:
+>> On Monday, August 12, 2013 02:27:47 PM Sudeep KarkadaNagesha wrote:
+>>> The following changes since commit
+>>> d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
 >>>
->>>> On 08/12/2013 02:17 PM, Kevin Hilman wrote:
->>>>> Dave Gerlach <d-gerlach@ti.com> writes:
->>>>>
->>>>>> On 08/09/2013 12:11 AM, Tony Lindgren wrote:
->>>>>>> * Dave Gerlach <d-gerlach@ti.com> [130808 09:23]:
->>>>>>>> On 08/08/2013 08:44 AM, Santosh Shilimkar wrote:
->>>>>>>>> Lets address the above better. I don't see a need of 8 functions
->>>>>>>>> exported doing one or 2 register writes.
->>>>>>>>>
->>>>>>>>> Look M3 based handling is going to be there on future SOCs
->>>>>>>>> as well and this kind of handling of IPC is very short cited.
->>>>>>>>>
->>>>>>>>
->>>>>>>> The idea here was to move all control module register accesses into
->>>>>>>> one file in planning of implementing a driver for the control module
->>>>>>>> itself in the future.
->>>>>>>>
->>>>>>>>> Probably we should have a separate driver for M3 in linux which
->>>>>>>>> can have all this local code instead of all these exports.
->>>>>>>>
->>>>>>>> The wkup_m3 code has been moved to a small driver found in patch 8
->>>>>>>> of this series, would it better to move this code there rather than
->>>>>>>> with the rest of the control module code?
->>>>>>>
->>>>>>> Please make everything you can into regular device drivers.
->>>>>>>
->>>>>>> We still have some dependencies to mach-omap2 code for PRCM
->>>>>>> for example, but we're trying to get all that to live in
->>>>>>> drivers.
->>>>>>>
->>>>>>> So for new pieces, let's not add further dependencies to
->>>>>>> complicate moving things to drivers.
->>>>>>>
->>>>>>> Regards,
->>>>>>>
->>>>>>> Tony
->>>>>>>
->>>>>>
->>>>>> Ok I will go ahead and pull the control module code that handles IPC
->>>>>> into the wkup_m3 driver.
->>>>>
->>>>> Any control module register access still needs to stay in control.c.
->>>>>
->>>>>> The wkup_m3.c file is still present in mach-omap2 as the right
->>>>>> location for it wasn't decided in the last RFC. Any thoughts on a good
->>>>>> location for it?
->>>>>
->>>>> I raised this also in earlier reviews, but don't remember the if it was
->>>>> answered...
->>>>>
->>>>> Why can't we handle the wkup_m3 using remoteproc/rpmsg instead of
->>>>> creating another little driver that duplicates communication with the
->>>>> M3.  Note also that the firmware load part would also be provided by
->>>>> remoteproc/rpmsg.
->>>>
->>>> Looping Suman Anna who handled the IPC patches this patch set is based
->>>> on top of...
->>>>
->>>> For the wkup_m3, the mailbox isn't used in a traditional manner. It's
->>>> only used with a dummy write to trigger an interrupt from the A8 to
->>>> the M3 and then communication happens in IPC registers within the
->>>> control module. No messages are actually sent through the mailbox in
->>>> either direction so that's why it was done this way rather than bring
->>>> in full support for the mailbox.
+>>> Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
 >>>
->>> I don't believe remoteproc/rpmsg forces you to use the mailbox for
->>> communication, and can use other IPC mechanisms.  This still sounds
->>> cleaner than reinventing remoteproc/rpmsg because of slight variations.
+>>> are available in the git repository at:
 >>>
->>> The linux way is to use and extend what is already there, and if it's
->>> extended to the breaking point, then make a case for why something new
->>> is needed.
+>>> git://linux-arm.org/linux-skn.git cpu_of_node
 >>>
->> While I agree to re-use frameworks, am strongly against use of IPC for
->> the power management which is time sensitive. 
+>>> for you to fetch changes up to
+>>> 9e9e26dde91f22635c87d0e45f3938b5ded96f0d:
+>>>
+>>> cpufreq: pmac32-cpufreq: remove device tree parsing for cpu nodes 
+>>> (2013-08-12 10:22:29 +0100)
+>>>
+>>> ---------------------------------------------------------------- 
+>>> Sudeep KarkadaNagesha (16): of: add support for retrieving cpu node
+>>> for a given logical cpu index ARM: DT/kernel: define ARM specific
+>>> arch_match_cpu_phys_id driver/core: cpu: initialize of_node in
+>>> cpu's device struture of/device: add helper to get cpu device node
+>>> from logical cpu index ARM: topology: remove hwid/MPIDR dependency
+>>> from cpu_capacity ARM: mvebu: remove device tree parsing for cpu
+>>> nodes drivers/bus: arm-cci: avoid parsing DT for cpu device nodes 
+>>> cpufreq: imx6q-cpufreq: remove device tree parsing for cpu nodes 
+>>> cpufreq: cpufreq-cpu0: remove device tree parsing for cpu nodes 
+>>> cpufreq: highbank-cpufreq: remove device tree parsing for cpu
+>>> nodes cpufreq: spear-cpufreq: remove device tree parsing for cpu
+>>> nodes cpufreq: kirkwood-cpufreq: remove device tree parsing for cpu
+>>> nodes cpufreq: arm_big_little: remove device tree parsing for cpu
+>>> nodes cpufreq: maple-cpufreq: remove device tree parsing for cpu
+>>> nodes cpufreq: pmac64-cpufreq: remove device tree parsing for cpu
+>>> nodes cpufreq: pmac32-cpufreq: remove device tree parsing for cpu
+>>> nodes
+>>>
+>>> arch/arm/kernel/devtree.c           |  5 +++++ 
+>>> arch/arm/kernel/topology.c          | 61 
+>>> +++++++++++++++++++------------------------------------------ 
+>>> arch/arm/mach-imx/mach-imx6q.c      |  3 +-- 
+>>> arch/arm/mach-mvebu/platsmp.c       | 52 
+>>> ++++++++++++++++++++++++---------------------------- 
+>>> drivers/base/cpu.c                  |  2 ++ drivers/bus/arm-cci.c
+>>> | 28 +++++++--------------------- 
+>>> drivers/cpufreq/arm_big_little_dt.c | 40 
+>>> ++++++++++++++-------------------------- 
+>>> drivers/cpufreq/cpufreq-cpu0.c      | 23 ++++------------------- 
+>>> drivers/cpufreq/highbank-cpufreq.c  | 18 ++++++------------ 
+>>> drivers/cpufreq/imx6q-cpufreq.c     |  4 +--- 
+>>> drivers/cpufreq/kirkwood-cpufreq.c  |  8 +++++--- 
+>>> drivers/cpufreq/maple-cpufreq.c     | 23 +++-------------------- 
+>>> drivers/cpufreq/pmac32-cpufreq.c    |  5 +++-- 
+>>> drivers/cpufreq/pmac64-cpufreq.c    | 47 
+>>> +++++++++++------------------------------------ 
+>>> drivers/cpufreq/spear-cpufreq.c     |  4 ++-- drivers/of/base.c
+>>> | 73 
+>>> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>>>
+>>>
+> include/linux/cpu.h                 |  1 +
+>>> include/linux/of.h                  |  6 ++++++ 
+>>> include/linux/of_device.h           | 15 +++++++++++++++ 19 files
+>>> changed, 202 insertions(+), 216 deletions(-)
+>>>
+>>>
+>>> PS: This patch series is reviewed and acknowledged @
+>>>
+>>> v1: https://lkml.org/lkml/2013/7/15/128 v2:
+>>> https://lkml.org/lkml/2013/7/17/341 v3:
+>>> https://lkml.org/lkml/2013/7/22/219
+>>
+>> Pulled, thanks!
+>>
+> Hi Rob, Rafael,
 > 
-> Maybe I'm misunderstanding what you mean by IPC, but I'm not sure how
-> you can be against IPC here.  Communication with M3 requires it.
->
-> The only question is what framework to use: create a new wkup_m3 driver
-> which creates yet another set of IPC APIs as well as a seprate firmware
-> load path?  Or reuse remoteproc/rpmsg which provides both.
->
-I mean Linux IPC layers. 
- 
->> Imagine a scenario where
->> ACPI is asked to go through remoteproc/ipc for talking to firmware.
->> If it takes 10 to 15 uS just to send a command to firmware to change
->> some control, that just tells something is not right and thats what
->> IPC will do.
+> On 13/08/13 15:16, kbuild test robot wrote:> tree:
+> git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git
+> bleeding-edge
+>> head:   0d4bcb5dc7d3040c0ce7572ea30ab9e5d9455bfa commit:
+>> 7939ff8d991de2c0b15064e76ee549a6df5ae67f [151/204] of: add
+>> support for retrieving cpu node for a given logical cpu index
+>> config: make ARCH=powerpc allmodconfig
+>>
+>> All error/warnings:
+>>
+>> warning: (MPC836x_RDK && MTD_NAND_FSL_ELBC && MTD_NAND_FSL_UPM)
+>> selects FSL_LBC which has unmet direct dependencies (FSL_SOC)
+>> warning: (MPC836x_RDK && MTD_NAND_FSL_ELBC && MTD_NAND_FSL_UPM)
+>> selects FSL_LBC which has unmet direct dependencies (FSL_SOC)
+>> In file included from arch/powerpc/include/asm/kvm_para.h:26:0, from
+>> include/uapi/linux/kvm_para.h:26, from include/linux/kvm_para.h:4, 
+>> from include/linux/kvm_host.h:30, from
+>> arch/powerpc/kernel/asm-offsets.c:53:
+>> include/linux/of.h:269:28: error: conflicting types for
+>> 'of_get_cpu_node'
+>> extern struct device_node *of_get_cpu_node(int cpu); ^ In file
+>> included from include/linux/of.h:139:0, from
+>> arch/powerpc/include/asm/kvm_para.h:26, from
+>> include/uapi/linux/kvm_para.h:26, from include/linux/kvm_para.h:4, 
+>> from include/linux/kvm_host.h:30, from
+>> arch/powerpc/kernel/asm-offsets.c:53: 
+>> arch/powerpc/include/asm/prom.h:47:21: note: previous declaration
+>> of 'of_get_cpu_node' was here
+>> struct device_node *of_get_cpu_node(int cpu, unsigned int *thread); 
+>> ^ make[2]: *** [arch/powerpc/kernel/asm-offsets.s] Error 1 make[2]:
+>> Target `__build' not remade because of errors. make[1]: ***
+>> [prepare0] Error 2 make[1]: Target `prepare' not remade because of
+>> errors. make: *** [sub-make] Error 2
+>>
 > 
-> Sounds like what you're saying is that remoteproc/rpmsg will be too slow
-> for this?  Is there any evidence of that?  Even if it is slow, it sounds
-> like a perfect opportuntity to enhance it.
->
-Well 10's uS is fine for the pure IPC kind of messaging. The numbers were
-measured on Linux OMAP IPC stack for different purpose.
- 
-> Also, if speed is that much of a concern concern here, I wonder why
-> there's a 500msec timeout in in the communication between MPU and M3 in
-> the current code.
+> There seems to be conflict in the new function "of_get_cpu_node" added.
+> PowerPC also defines the same function name. Further microblaze and
+> openrisc declares it(can be removed) but doesn't define it.
+> To fix this:
+> 1. I can rename the newly added function to something different like
+>    `of_get_cpunode` or
+> 2. If of_* namespace should be used by only OF/FDT and not by any
+>    architecture specific code, then the arch specific version can be
+>    renamed to some thing like arch_of_get_cpu_node.
+>    Also most of the calls to arch specific function can be moved to
+>    generic code.
 > 
->> ARM world is also moving towards that by standardizing some of these
->> through (read PSCI) and thats the way to go in general. 
-> 
-> Agreed, but I'm not sure (yet) about enforcing PSCI on legacy platforms
-> that don't support it natively.  Are you saying that the AM33xx firmware
-> should be converted to be PSCI compliant?  Admittedly, I haven't read
-> the PSCI spec closely, but I'm wondering if the current role splitting
-> between MPU and M3 fits well with PSCI. 
->
-I didn't mean for the AM3XXX specifically because its current job is rather
-very limited. i.e suspend. My concern is that IPC is not viewed as
-an option for power management controllers like M3 which can abstract
-all the hardware gory details and export a simpled interface for OS
-in form of PSCI/ACPI. 
+> Let me know your thoughts.
 
->> Specifically for this series, I am also against having tons of exports
->> and all of that should be extracted properly but remoteproc is not
->> going to be the way. Firmware download has to happen much earlier(ROM
->> path) so thats not the requirement where we could have used the
->> remoteproc firmware download feature.
-> 
-> At least for AM33xx, I don't see any requirement that firmware download
-> happens early (or at all.)  PM will simply be disabled until firmware is
-> available (and running.)
-> 
-Thats because its role is pretty much limited. The point was mainly from
-general PM firmware download strategy and not specifically for this
-one device.
+Hi Benjamin,
 
-I just wanted to be sure that we will do all of this for AM3XXX and expect
-the future SOCs to follow that model where M3 would have more prominent
-role and more and more hardware sequencing for HLOS.
+I don't understand completely the use of ibm,ppc-interrupt-server#s and
+its implications on generic of_get_cpu_node implementation.
+I see the PPC specific definition of of_get_cpu_node uses thread id only
+in 2 instances. Based on that, I have tried to move all the other
+instances to use generic definition.
 
-Regards,
-Santosh
+Let me know if the idea is correct.
+
+---->8--------
+
+diff --git a/arch/powerpc/include/asm/prom.h
+b/arch/powerpc/include/asm/prom.h
+index 42ee294..b48bbfe 100644
+--- a/arch/powerpc/include/asm/prom.h
++++ b/arch/powerpc/include/asm/prom.h
+@@ -44,7 +44,7 @@ void of_parse_dma_window(struct device_node *dn, const
+void *dma_window_prop,
+ extern void kdump_move_device_tree(void);
+
+ /* CPU OF node matching */
+-struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
++struct device_node *arch_of_get_cpu_node_by_tid(int cpu, unsigned int
+*thread);
+
+ #ifdef CONFIG_NUMA
+ extern int of_node_to_nid(struct device_node *device);
+diff --git a/arch/powerpc/kernel/cacheinfo.c
+b/arch/powerpc/kernel/cacheinfo.c
+index 9262cf2..c60eef9 100644
+--- a/arch/powerpc/kernel/cacheinfo.c
++++ b/arch/powerpc/kernel/cacheinfo.c
+@@ -434,7 +434,7 @@ static struct cache
+*cache_chain_instantiate(unsigned int cpu_id)
+
+ 	pr_debug("creating cache object(s) for CPU %i\n", cpu_id);
+
+-	cpu_node = of_get_cpu_node(cpu_id, NULL);
++	cpu_node = of_get_cpu_node(cpu_id);
+ 	WARN_ONCE(!cpu_node, "no OF node found for CPU %i\n", cpu_id);
+ 	if (!cpu_node)
+ 		goto out;
+@@ -764,7 +764,7 @@ static struct cache *cache_lookup_by_cpu(unsigned
+int cpu_id)
+ 	struct device_node *cpu_node;
+ 	struct cache *cache;
+
+-	cpu_node = of_get_cpu_node(cpu_id, NULL);
++	cpu_node = of_get_cpu_node(cpu_id);
+ 	WARN_ONCE(!cpu_node, "no OF node found for CPU %i\n", cpu_id);
+ 	if (!cpu_node)
+ 		return NULL;
+diff --git a/arch/powerpc/kernel/prom.c b/arch/powerpc/kernel/prom.c
+index af09e32..fe48a70 100644
+--- a/arch/powerpc/kernel/prom.c
++++ b/arch/powerpc/kernel/prom.c
+@@ -33,6 +33,7 @@
+ #include <linux/irq.h>
+ #include <linux/memblock.h>
+ #include <linux/of.h>
++#include <linux/cpu.h>
+
+ #include <asm/prom.h>
+ #include <asm/rtas.h>
+@@ -834,15 +835,23 @@ static int __init prom_reconfig_setup(void)
+ __initcall(prom_reconfig_setup);
+ #endif
+
++bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
++{
++	return phys_id == get_hard_smp_processor_id(cpu);
++}
++
+ /* Find the device node for a given logical cpu number, also returns
+the cpu
+  * local thread number (index in ibm,interrupt-server#s) if relevant and
+  * asked for (non NULL)
+  */
+-struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
++struct device_node *arch_of_get_cpunode_by_tid(int cpu, unsigned int
+*thread)
+ {
+ 	int hardid;
+ 	struct device_node *np;
+
++	if (thread == NULL)
++		return of_get_cpu_node(cpu);
++
+ 	hardid = get_hard_smp_processor_id(cpu);
+
+ 	for_each_node_by_type(np, "cpu") {
+@@ -855,14 +864,9 @@ struct device_node *of_get_cpu_node(int cpu,
+unsigned int *thread)
+ 		intserv = of_get_property(np, "ibm,ppc-interrupt-server#s",
+ 				&plen);
+ 		if (intserv == NULL) {
+-			const u32 *reg = of_get_property(np, "reg", NULL);
+-			if (reg == NULL)
+-				continue;
+-			if (*reg == hardid) {
+-				if (thread)
+-					*thread = 0;
+-				return np;
+-			}
++			np = of_get_cpu_node(cpu);
++			*thread = 0;
++			return np;
+ 		} else {
+ 			plen /= sizeof(u32);
+ 			for (t = 0; t < plen; t++) {
+@@ -876,7 +880,6 @@ struct device_node *of_get_cpu_node(int cpu,
+unsigned int *thread)
+ 	}
+ 	return NULL;
+ }
+-EXPORT_SYMBOL(of_get_cpu_node);
+
+ #if defined(CONFIG_DEBUG_FS) && defined(DEBUG)
+ static struct debugfs_blob_wrapper flat_dt_blob;
+diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
+index 38b0ba6..cc0e3a27 100644
+--- a/arch/powerpc/kernel/smp.c
++++ b/arch/powerpc/kernel/smp.c
+@@ -560,7 +560,7 @@ int cpu_to_core_id(int cpu)
+ 	const int *reg;
+ 	int id = -1;
+
+-	np = of_get_cpu_node(cpu, NULL);
++	np = of_get_cpu_node(cpu);
+ 	if (!np)
+ 		goto out;
+
+@@ -598,7 +598,7 @@ static struct device_node *cpu_to_l2cache(int cpu)
+ 	if (!cpu_present(cpu))
+ 		return NULL;
+
+-	np = of_get_cpu_node(cpu, NULL);
++	np = of_get_cpu_node(cpu);
+ 	if (np == NULL)
+ 		return NULL;
+
+diff --git a/arch/powerpc/mm/numa.c b/arch/powerpc/mm/numa.c
+index 5850798..4b06158 100644
+--- a/arch/powerpc/mm/numa.c
++++ b/arch/powerpc/mm/numa.c
+@@ -520,7 +520,7 @@ static int of_drconf_to_nid_single(struct
+of_drconf_cell *drmem,
+ static int numa_setup_cpu(unsigned long lcpu)
+ {
+ 	int nid = 0;
+-	struct device_node *cpu = of_get_cpu_node(lcpu, NULL);
++	struct device_node *cpu = of_get_cpu_node(lcpu);
+
+ 	if (!cpu) {
+ 		WARN_ON(1);
+@@ -699,7 +699,7 @@ static int __init parse_numa_properties(void)
+ 		struct device_node *cpu;
+ 		int nid;
+
+-		cpu = of_get_cpu_node(i, NULL);
++		cpu = of_get_cpu_node(i);
+ 		BUG_ON(!cpu);
+ 		nid = of_node_to_nid_single(cpu);
+ 		of_node_put(cpu);
+diff --git a/arch/powerpc/platforms/44x/currituck.c
+b/arch/powerpc/platforms/44x/currituck.c
+index 7f1b71a..84eb64e 100644
+--- a/arch/powerpc/platforms/44x/currituck.c
++++ b/arch/powerpc/platforms/44x/currituck.c
+@@ -98,7 +98,7 @@ static void smp_ppc47x_setup_cpu(int cpu)
+
+ static int smp_ppc47x_kick_cpu(int cpu)
+ {
+-	struct device_node *cpunode = of_get_cpu_node(cpu, NULL);
++	struct device_node *cpunode = of_get_cpu_node(cpu);
+ 	const u64 *spin_table_addr_prop;
+ 	u32 *spin_table;
+ 	extern void start_secondary_47x(void);
+diff --git a/arch/powerpc/platforms/44x/iss4xx.c
+b/arch/powerpc/platforms/44x/iss4xx.c
+index 4241bc8..8195456 100644
+--- a/arch/powerpc/platforms/44x/iss4xx.c
++++ b/arch/powerpc/platforms/44x/iss4xx.c
+@@ -88,7 +88,7 @@ static void smp_iss4xx_setup_cpu(int cpu)
+
+ static int smp_iss4xx_kick_cpu(int cpu)
+ {
+-	struct device_node *cpunode = of_get_cpu_node(cpu, NULL);
++	struct device_node *cpunode = of_get_cpu_node(cpu);
+ 	const u64 *spin_table_addr_prop;
+ 	u32 *spin_table;
+ 	extern void start_secondary_47x(void);
+diff --git a/arch/powerpc/platforms/85xx/smp.c
+b/arch/powerpc/platforms/85xx/smp.c
+index 5ced4f5..e32c532 100644
+--- a/arch/powerpc/platforms/85xx/smp.c
++++ b/arch/powerpc/platforms/85xx/smp.c
+@@ -156,7 +156,7 @@ static int smp_85xx_kick_cpu(int nr)
+
+ 	pr_debug("smp_85xx_kick_cpu: kick CPU #%d\n", nr);
+
+-	np = of_get_cpu_node(nr, NULL);
++	np = of_get_cpu_node(nr);
+ 	cpu_rel_addr = of_get_property(np, "cpu-release-addr", NULL);
+
+ 	if (cpu_rel_addr == NULL) {
+diff --git a/arch/powerpc/platforms/cell/cbe_regs.c
+b/arch/powerpc/platforms/cell/cbe_regs.c
+index 1428d58..a055b74 100644
+--- a/arch/powerpc/platforms/cell/cbe_regs.c
++++ b/arch/powerpc/platforms/cell/cbe_regs.c
+@@ -182,7 +182,7 @@ static struct device_node *cbe_get_be_node(int cpu_id)
+ 			return np;
+
+ 		for (i=0; i<len; i++)
+-			if (of_find_node_by_phandle(cpu_handle[i]) ==
+of_get_cpu_node(cpu_id, NULL))
++			if (of_find_node_by_phandle(cpu_handle[i]) == of_get_cpu_node(cpu_id))
+ 				return np;
+ 	}
+
+@@ -240,7 +240,8 @@ void __init cbe_regs_init(void)
+
+ 	/* Build local fast map of CPUs */
+ 	for_each_possible_cpu(i) {
+-		cbe_thread_map[i].cpu_node = of_get_cpu_node(i, &thread_id);
++		cbe_thread_map[i].cpu_node =
++				arch_of_get_cpunode_by_tid(i, &thread_id);
+ 		cbe_thread_map[i].be_node = cbe_get_be_node(i);
+ 		cbe_thread_map[i].thread_id = thread_id;
+ 	}
+diff --git a/arch/powerpc/platforms/wsp/ics.c
+b/arch/powerpc/platforms/wsp/ics.c
+index 2d3b1dd..b83bc2e 100644
+--- a/arch/powerpc/platforms/wsp/ics.c
++++ b/arch/powerpc/platforms/wsp/ics.c
+@@ -137,7 +137,7 @@ void cpus_on_chip(int chip_id, cpumask_t *mask,
+cpumask_t *ret)
+
+ 	cpumask_clear(ret);
+ 	for_each_cpu(cpu, mask) {
+-		cpu_dn = of_get_cpu_node(cpu, NULL);
++		cpu_dn = of_get_cpu_node(cpu);
+ 		if (!cpu_dn)
+ 			continue;
+
+@@ -649,7 +649,7 @@ static void __init wsp_ics_set_default_server(void)
+ 	u32 hwid;
+
+ 	/* Find the server number for the boot cpu. */
+-	np = of_get_cpu_node(boot_cpuid, NULL);
++	np = of_get_cpu_node(boot_cpuid);
+ 	BUG_ON(!np);
+
+ 	hwid = get_hard_smp_processor_id(boot_cpuid);
+diff --git a/arch/powerpc/platforms/wsp/smp.c
+b/arch/powerpc/platforms/wsp/smp.c
+index 332a18b..2abe794 100644
+--- a/arch/powerpc/platforms/wsp/smp.c
++++ b/arch/powerpc/platforms/wsp/smp.c
+@@ -40,7 +40,7 @@ int smp_a2_kick_cpu(int nr)
+ 	if (nr < 0 || nr >= NR_CPUS)
+ 		return -ENOENT;
+
+-	np = of_get_cpu_node(nr, &thr_idx);
++	np = arch_of_get_cpunode_by_tid(nr, &thr_idx);
+ 	if (!np)
+ 		return -ENODEV;
+
+diff --git a/arch/powerpc/platforms/wsp/wsp.c
+b/arch/powerpc/platforms/wsp/wsp.c
+index d25cc96..43a17a2 100644
+--- a/arch/powerpc/platforms/wsp/wsp.c
++++ b/arch/powerpc/platforms/wsp/wsp.c
+@@ -90,7 +90,7 @@ void wsp_halt(void)
+ 	struct device_node *mine;
+ 	struct device_node *me;
+
+-	me = of_get_cpu_node(smp_processor_id(), NULL);
++	me = of_get_cpu_node(smp_processor_id());
+ 	mine = scom_find_parent(me);
+
+ 	/* This will halt all the A2s but not power off the chip */
+diff --git a/arch/powerpc/sysdev/xics/xics-common.c
+b/arch/powerpc/sysdev/xics/xics-common.c
+index 9049d9f..d16082f 100644
+--- a/arch/powerpc/sysdev/xics/xics-common.c
++++ b/arch/powerpc/sysdev/xics/xics-common.c
+@@ -53,7 +53,7 @@ void xics_update_irq_servers(void)
+ 	u32 hcpuid;
+
+ 	/* Find the server numbers for the boot cpu. */
+-	np = of_get_cpu_node(boot_cpuid, NULL);
++	np = of_get_cpu_node(boot_cpuid);
+ 	BUG_ON(!np);
+
+ 	hcpuid = get_hard_smp_processor_id(boot_cpuid);
+diff --git a/drivers/cpufreq/pasemi-cpufreq.c
+b/drivers/cpufreq/pasemi-cpufreq.c
+index b704da4..692755f 100644
+--- a/drivers/cpufreq/pasemi-cpufreq.c
++++ b/drivers/cpufreq/pasemi-cpufreq.c
+@@ -149,7 +149,7 @@ static int pas_cpufreq_cpu_init(struct
+cpufreq_policy *policy)
+ 	struct device_node *cpu, *dn;
+ 	int err = -ENODEV;
+
+-	cpu = of_get_cpu_node(policy->cpu, NULL);
++	cpu = of_get_cpu_node(policy->cpu);
+
+ 	if (!cpu)
+ 		goto out;
+diff --git a/drivers/cpufreq/ppc-corenet-cpufreq.c
+b/drivers/cpufreq/ppc-corenet-cpufreq.c
+index 3cae452..64fb70a 100644
+--- a/drivers/cpufreq/ppc-corenet-cpufreq.c
++++ b/drivers/cpufreq/ppc-corenet-cpufreq.c
+@@ -150,7 +150,7 @@ static int corenet_cpufreq_cpu_init(struct
+cpufreq_policy *policy)
+ 	struct cpu_data *data;
+ 	unsigned int cpu = policy->cpu;
+
+-	np = of_get_cpu_node(cpu, NULL);
++	np = of_get_cpu_node(cpu);
+ 	if (!np)
+ 		return -ENODEV;
+
+diff --git a/drivers/cpufreq/ppc_cbe_cpufreq.c
+b/drivers/cpufreq/ppc_cbe_cpufreq.c
+index 5936f8d..0700445 100644
+--- a/drivers/cpufreq/ppc_cbe_cpufreq.c
++++ b/drivers/cpufreq/ppc_cbe_cpufreq.c
+@@ -75,7 +75,7 @@ static int cbe_cpufreq_cpu_init(struct cpufreq_policy
+*policy)
+ 	int i, cur_pmode;
+ 	struct device_node *cpu;
+
+-	cpu = of_get_cpu_node(policy->cpu, NULL);
++	cpu = of_get_cpu_node(policy->cpu);
+
+ 	if (!cpu)
+ 		return -ENODEV;
