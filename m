@@ -1,84 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Aug 2013 10:46:29 +0100
-Subject: [PATCH v2 8/8] ARM: DRA7: dts: Add the dts files for dra7 SoC
- and dra7-evm board
-In-Reply-To: <5209DF2F.5040409@ti.com>
-References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
- <1375183546-12758-9-git-send-email-rnayak@ti.com>
- <20130812114402.GB6616@e106331-lin.cambridge.arm.com>
- <5209DF2F.5040409@ti.com>
-Message-ID: <20130813094629.GH27165@e106331-lin.cambridge.arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 13 Aug 2013 18:54:31 +0900
+Subject: [PATCH 1/2] extcon: palmas: Added a new compatible type
+ *ti,palmas-usb-vid*
+In-Reply-To: <1376372241-15573-1-git-send-email-kishon@ti.com>
+References: <1376302675-15795-1-git-send-email-kishon@ti.com>
+ <1376372241-15573-1-git-send-email-kishon@ti.com>
+Message-ID: <520A0257.1080903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding Marc to Cc]
+Hi Kishon,
 
-On Tue, Aug 13, 2013 at 08:24:31AM +0100, Rajendra Nayak wrote:
-> []..
+On 08/13/2013 02:37 PM, Kishon Vijay Abraham I wrote:
+> The Palmas device contains only a USB VID detector, so added a
+> compatible type *ti,palmas-usb-vid*. Dint remove the existing compatible
+> types for backward compatibility.
 > 
-> >> +
-> >> +       cpus {
-> >> +               cpu at 0 {
-> >> +                       compatible = "arm,cortex-a15";
-> >> +                       timer {
-> >> +                               compatible = "arm,armv7-timer";
-> >> +                               /*
-> >> +                                * PPI secure/nonsecure IRQ,
-> >> +                                * active low level-sensitive
-> >> +                                */
-> >> +                               interrupts = <1 13 0x308>,
-> >> +                                            <1 14 0x308>;
-> >> +                               clock-frequency = <6144000>;
-> >> +                       };
-> >> +               };
-> >
-> > The cpu nodes should have a reg matching their unit-address, and a
-> > device_type = "cpu".
-> >
-> > The timer nodes should *not* be under the CPU nodes. They should be
-> > under under the root node. I realise that it makes intuitive sense to
-> > describe per-cpu resources this way, but that's not the way the bindings
-> > are intended to be used (does thei DT even work?).
-> >
-> > No virtual/hypervisor interrupts?
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  Documentation/devicetree/bindings/extcon/extcon-twl.txt |    3 ++-
+>  drivers/extcon/extcon-palmas.c                          |    1 +
+>  2 files changed, 3 insertions(+), 1 deletion(-)
 > 
-> Mark, all valid points. I just updated the patch to include all the missing
-> interrupts and registers for timer and gic and moved the timer node out as
-> its supposed to be.
-
-Great!
-
+> diff --git a/Documentation/devicetree/bindings/extcon/extcon-twl.txt b/Documentation/devicetree/bindings/extcon/extcon-twl.txt
+> index 58f531a..5be4afc 100644
+> --- a/Documentation/devicetree/bindings/extcon/extcon-twl.txt
+> +++ b/Documentation/devicetree/bindings/extcon/extcon-twl.txt
+> @@ -2,7 +2,8 @@ EXTCON FOR TWL CHIPS
+>  
+>  PALMAS USB COMPARATOR
+>  Required Properties:
+> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
+> + - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb" or
+> +   "ti,palmas-usb-vid".
+>   - vbus-supply : phandle to the regulator device tree node.
+>  
+>  Optional Properties:
+> diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
+> index b752a0a..4f83fae 100644
+> --- a/drivers/extcon/extcon-palmas.c
+> +++ b/drivers/extcon/extcon-palmas.c
+> @@ -223,6 +223,7 @@ static int palmas_usb_remove(struct platform_device *pdev)
+>  
+>  static struct of_device_id of_palmas_match_tbl[] = {
+>  	{ .compatible = "ti,palmas-usb", },
+> +	{ .compatible = "ti,palmas-usb-vid", },
+>  	{ .compatible = "ti,twl6035-usb", },
+>  	{ /* end */ }
+>  };
 > 
-> >
-> > Do you really need the clock-frequency property? It's far preferrable to
-> > have your bootloader do the right thing and program CNTFRQ with the
-> > correct value.
-> 
-> I kept the clock-frequency property since our bootloader does not handle this
-> and I am not sure if its a good idea to have the dependency on bootloader
-> to do this.
 
-There is precedent for handling it this way, but it would be far nicer
-to fix the bootloader to set CNTFRQ. For one thing it's only writeable
-from the secure side, so a host os can't fix it up for guests that might
-depend on it rather than dt. I realise it's not necessarily as simple as
-it sounds to fix that up, however.
+This patch has a conflict. You have to always implement patch on extcon branch
+including latest patch. You need to resend v2 patch based on extcon-next branch.
 
-[...]
+'extcon-twl.txt' is renamed as 'extcon-palmas.txt' on following patch:
+http://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/commit/?h=extcon-next&id=80d644b297dc26c5126858555044edef76f4ffe8
 
-> +       timer {
-> +               compatible = "arm,armv7-timer";
-> +               /* PPI secure/nonsecure IRQ */
-
-The comment's now stale, and I don't think it's necessary - the binding
-defines the order these are in.
-
-> +               interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 14 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 11 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 10 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>;
-> +               clock-frequency = <6144000>;
-> +       };
+And, 'vbus-supply' phandle was removed on following patch:
+http://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/commit/?h=extcon-next&id=26ece4f0b7d2264282d9077d1843ff1e98189b6c
 
 Thanks,
-Mark.
+Chanwoo Choi
