@@ -1,62 +1,42 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 13 Aug 2013 14:28:41 +0200
-Subject: [PATCH v3 0/6] Armada 370/XP clocksource fixes
-In-Reply-To: <1376335016-16400-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1376335016-16400-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <520A2679.1040307@linaro.org>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 13 Aug 2013 14:42:51 +0200
+Subject: [GIT PULL]: CPUFreq: ARM Fixes for 3.12
+In-Reply-To: <CAKohponyLTUn_Sonstw_oOLZ+S+x9e3UH0JaZbkLaQfX-9zmWw@mail.gmail.com>
+References: <CAKohponyLTUn_Sonstw_oOLZ+S+x9e3UH0JaZbkLaQfX-9zmWw@mail.gmail.com>
+Message-ID: <1439792.4fKVxGE7CH@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2013 09:16 PM, Ezequiel Garcia wrote:
-> This small patchset fixes a somewhat minor issue found in the clocksource
-> driver for Armada 370/XP SoC.
+On Monday, August 12, 2013 12:03:39 PM Viresh Kumar wrote:
+> Hi Rafael,
 > 
-> On one side the Armada 370 SoC has no 25 MHz fixed timer.
-> On the other side the Armada XP SoC cannot work properly without such 25 MHz
-> fixed timer selected, because otherwise the base clock frequency would vary
-> when doing cpufreq frequency changes.
+> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
 > 
-> Therefore we can consider the SoCs as not being compatible, being better to
-> have two compatible strings, one for each SoC. The previous compatible and
-> its behavior has been removed, considering there are no DT-enabled boards
-> in use in the field.
+>   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
 > 
-> In addition, CLOCKSOURCE_OF_DECLARE is used to simplify the initialization.
+> are available in the git repository at:
 > 
-> This patchset is based on v3.11-rc4. Also, to ease maintainer's task this
-> is based on these two patches which are in linux-next:
+>   git://git.linaro.org/people/vireshk/linux.git cpufreq-fixes
 > 
->   commit be14114934545f52be2ffddbe401ba0951007c59
->   Author: Stephen Boyd <sboyd@codeaurora.org>
->   "clocksource: time-armada-370-xp: Divorce from local timer API"
+> for you to fetch changes up to 45e12086263a53f16b489fc7f4f8f6348a688661:
 > 
->   commit 4047c794ae18c467a5ea987265238186bc253f61
->   Author: Stephen Boyd <sboyd@codeaurora.org>
->   "clocksource: time-armada-370-xp: Fix sparse warning"
+>   cpufreq: fix EXYNOS drivers selection (2013-08-12 12:00:21 +0530)
+> 
+> ----------------------------------------------------------------
+> Amit Daniel Kachhap (1):
+>       cpufreq: exynos5440: Fix to skip when new frequency same as current
+> 
+> Bartlomiej Zolnierkiewicz (1):
+>       cpufreq: fix EXYNOS drivers selection
+> 
+>  drivers/cpufreq/Kconfig.arm          | 36 ++++++++++++++++++++++++------------
+>  drivers/cpufreq/exynos-cpufreq.c     |  1 -
+>  drivers/cpufreq/exynos-cpufreq.h     | 21 +++++++++++++++++++++
+>  drivers/cpufreq/exynos5440-cpufreq.c |  3 +++
+>  4 files changed, 48 insertions(+), 13 deletions(-)
 
-Your patchset does not apply to my tree for timers/core
+Pulled, thanks Viresh!
 
-These two patches described above are in the ARM tree, not available in
-the timers/core tree.
+I assume this is 3.12 material?
 
-The correct submission path for these would have been through timers/urgent:
-
-timers/urgent -> v3.11-rcX -> arm-soc
-                           -> timers/core
-
-Or alternatively if it depends on material in arm-soc, a pull request
-based in a v3.11-rcX where Olof and I can pull from.
-
-I guess you have to rebase your patchset on top of timers/core.
-
-Thanks
-  -- Daniel
-
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Rafael
