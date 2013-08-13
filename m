@@ -1,25 +1,76 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 13 Aug 2013 13:44:40 +0100
-Subject: [PATCH V4 0/4] Add i2s support on smdk5420
-In-Reply-To: <1376300994-1679-1-git-send-email-padma.v@samsung.com>
-References: <1376300994-1679-1-git-send-email-padma.v@samsung.com>
-Message-ID: <20130813124440.GX6427@sirena.org.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 13 Aug 2013 15:00:44 +0200
+Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
+In-Reply-To: <5208E2D3.7060005@arm.com>
+References: <5208E2D3.7060005@arm.com>
+Message-ID: <3356439.a21MloFP7n@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 03:19:50PM +0530, Padmavathi Venna wrote:
-> Samsung has different versions of I2S introduced in different
-> platforms. Each version has some new support added for multichannel,
-> secondary fifo, s/w reset control, internal mux for rclk src clk and
-> tdm support. Each newly added change has a quirk. So this patch adds
-> all the required quirks as driver data and based on compatible string
-> from dtsi fetches the quirks. This also adds i2s support on exynos5420.
+On Monday, August 12, 2013 02:27:47 PM Sudeep KarkadaNagesha wrote:
+> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+> 
+>   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://linux-arm.org/linux-skn.git cpu_of_node
+> 
+> for you to fetch changes up to 9e9e26dde91f22635c87d0e45f3938b5ded96f0d:
+> 
+>   cpufreq: pmac32-cpufreq: remove device tree parsing for cpu nodes
+> (2013-08-12 10:22:29 +0100)
+> 
+> ----------------------------------------------------------------
+> Sudeep KarkadaNagesha (16):
+>   of: add support for retrieving cpu node for a given logical cpu index
+>   ARM: DT/kernel: define ARM specific arch_match_cpu_phys_id
+>   driver/core: cpu: initialize of_node in cpu's device struture
+>   of/device: add helper to get cpu device node from logical cpu index
+>   ARM: topology: remove hwid/MPIDR dependency from cpu_capacity
+>   ARM: mvebu: remove device tree parsing for cpu nodes
+>   drivers/bus: arm-cci: avoid parsing DT for cpu device nodes
+>   cpufreq: imx6q-cpufreq: remove device tree parsing for cpu nodes
+>   cpufreq: cpufreq-cpu0: remove device tree parsing for cpu nodes
+>   cpufreq: highbank-cpufreq: remove device tree parsing for cpu nodes
+>   cpufreq: spear-cpufreq: remove device tree parsing for cpu nodes
+>   cpufreq: kirkwood-cpufreq: remove device tree parsing for cpu nodes
+>   cpufreq: arm_big_little: remove device tree parsing for cpu nodes
+>   cpufreq: maple-cpufreq: remove device tree parsing for cpu nodes
+>   cpufreq: pmac64-cpufreq: remove device tree parsing for cpu nodes
+>   cpufreq: pmac32-cpufreq: remove device tree parsing for cpu nodes
+> 
+>  arch/arm/kernel/devtree.c           |  5 +++++
+>  arch/arm/kernel/topology.c          | 61
+> +++++++++++++++++++------------------------------------------
+>  arch/arm/mach-imx/mach-imx6q.c      |  3 +--
+>  arch/arm/mach-mvebu/platsmp.c       | 52
+> ++++++++++++++++++++++++----------------------------
+>  drivers/base/cpu.c                  |  2 ++
+>  drivers/bus/arm-cci.c               | 28 +++++++---------------------
+>  drivers/cpufreq/arm_big_little_dt.c | 40
+> ++++++++++++++--------------------------
+>  drivers/cpufreq/cpufreq-cpu0.c      | 23 ++++-------------------
+>  drivers/cpufreq/highbank-cpufreq.c  | 18 ++++++------------
+>  drivers/cpufreq/imx6q-cpufreq.c     |  4 +---
+>  drivers/cpufreq/kirkwood-cpufreq.c  |  8 +++++---
+>  drivers/cpufreq/maple-cpufreq.c     | 23 +++--------------------
+>  drivers/cpufreq/pmac32-cpufreq.c    |  5 +++--
+>  drivers/cpufreq/pmac64-cpufreq.c    | 47
+> +++++++++++------------------------------------
+>  drivers/cpufreq/spear-cpufreq.c     |  4 ++--
+>  drivers/of/base.c                   | 73
+> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/cpu.h                 |  1 +
+>  include/linux/of.h                  |  6 ++++++
+>  include/linux/of_device.h           | 15 +++++++++++++++
+>  19 files changed, 202 insertions(+), 216 deletions(-)
+> 
+> 
+> PS: This patch series is reviewed and acknowledged @
+> 
+> v1: https://lkml.org/lkml/2013/7/15/128
+> v2: https://lkml.org/lkml/2013/7/17/341
+> v3: https://lkml.org/lkml/2013/7/22/219
 
-Applied all these, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/2b18da26/attachment.sig>
+Pulled, thanks!
