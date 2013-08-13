@@ -1,156 +1,180 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Aug 2013 11:50:42 +0100
-Subject: [PATCHv5 02/31] CLK: TI: Add DPLL clock support
-In-Reply-To: <1375460751-23676-3-git-send-email-t-kristo@ti.com>
-References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
- <1375460751-23676-3-git-send-email-t-kristo@ti.com>
-Message-ID: <20130813105042.GJ27165@e106331-lin.cambridge.arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 13 Aug 2013 11:52:27 +0100
+Subject: Build error: versatile express
+In-Reply-To: <alpine.LFD.2.03.1308121125420.14472@syhkavp.arg>
+References: <20130812124801.GB2823@localhost.localdomain>
+ <alpine.LFD.2.03.1308121125420.14472@syhkavp.arg>
+Message-ID: <20130813105227.GC2823@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Aug 12, 2013 at 12:55:23PM -0400, Nicolas Pitre wrote:
+> On Mon, 12 Aug 2013, Dave Martin wrote:
+> 
+> > On Mon, Aug 12, 2013 at 11:28:04AM +0100, Russell King - ARM Linux wrote:
+> > > arch/arm/mach-vexpress/tc2_pm.c: In function 'tc2_pm_down.clone.0':
+> > > arch/arm/mach-vexpress/tc2_pm.c:200:1: error: fp cannot be used in asm here
+> > > 
+> > > This is caused by the assembly code in this file clobbering R11, which
+> > > is incompatible with having CONFIG_FRAME_POINTER=y.
+> > 
+> > Is there any reason not to fix this just by pushing/popping r11 inside
+> > the asm and removing it from the clobber list?
+> 
+> That's most likely the best fix.  What about this?
 
-On Fri, Aug 02, 2013 at 05:25:21PM +0100, Tero Kristo wrote:
-> The OMAP clock driver now supports DPLL clock type. This patch also
-> adds support for DT DPLL nodes.
->
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  .../devicetree/bindings/clock/ti/dpll.txt          |   70 +++
->  arch/arm/mach-omap2/clock.h                        |  144 +-----
->  arch/arm/mach-omap2/clock3xxx.h                    |    2 -
->  drivers/clk/Makefile                               |    1 +
->  drivers/clk/ti/Makefile                            |    3 +
->  drivers/clk/ti/dpll.c                              |  488 ++++++++++++++++++++
->  include/linux/clk/ti.h                             |  164 +++++++
->  7 files changed, 727 insertions(+), 145 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/ti/dpll.txt
->  create mode 100644 drivers/clk/ti/Makefile
->  create mode 100644 drivers/clk/ti/dpll.c
->  create mode 100644 include/linux/clk/ti.h
->
-> diff --git a/Documentation/devicetree/bindings/clock/ti/dpll.txt b/Documentation/devicetree/bindings/clock/ti/dpll.txt
-> new file mode 100644
-> index 0000000..dcd6e63
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/ti/dpll.txt
-> @@ -0,0 +1,70 @@
-> +Binding for Texas Instruments DPLL clock.
-> +
-> +This binding uses the common clock binding[1].  It assumes a
-> +register-mapped DPLL with usually two selectable input clocks
-> +(reference clock and bypass clock), with digital phase locked
-> +loop logic for multiplying the input clock to a desired output
-> +clock. This clock also typically supports different operation
-> +modes (locked, low power stop etc.) This binding has several
-> +sub-types, which effectively result in slightly different setup
-> +for the actual DPLL clock.
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Required properties:
-> +- compatible : shall be one of:
-> +               "ti,omap4-dpll-x2-clock",
-> +               "ti,omap3-dpll-clock",
-> +               "ti,omap3-dpll-core-clock",
-> +               "ti,omap3-dpll-per-clock",
-> +               "ti,omap3-dpll-per-j-type-clock",
-> +               "ti,omap4-dpll-clock",
-> +               "ti,omap4-dpll-core-clock",
-> +               "ti,omap4-dpll-m4xen-clock",
-> +               "ti,omap4-dpll-j-type-clock",
-> +               "ti,omap4-dpll-no-gate-clock",
-> +               "ti,omap4-dpll-no-gate-j-type-clock",
-> +
-> +- #clock-cells : from common clock binding; shall be set to 0.
-> +- clocks : link phandles of parent clocks (clk-ref and clk-bypass)
+Were we replacing these instances with the macro, or is that still in
+flight?
 
-It might be a good idea to use clock-names to clarify which clocks are
-present (I notice your examples contain only one clock input).
+Anyway, if useful:
 
-> +- reg : array of register base addresses for controlling the DPLL (some
-> +  of these can also be left as NULL):
-> +       reg[0] = control register
-> +       reg[1] = idle status register
-> +       reg[2] = autoidle register
-> +       reg[3] = multiplier / divider set register
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 
-Are all of these always present? Using reg-names seems sensible here.
+Cheers
+---Dave
 
-> +- ti,clk-ref : link phandle for the reference clock
-> +- ti,clk-bypass : link phandle for the bypass clock
-
-You already have these in clocks, why do you need them again here?
-
-> +
-> +Optional properties:
-> +- ti,modes : available modes for the DPLL
-
-Huh? What type is that property? What does it mean?
-
-> +- ti,recal-en-bit : recalibration enable bit
-> +- ti,recal-st-bit : recalibration status bit
-> +- ti,auto-recal-bit : auto recalibration enable bit
-
-These seem rather low-level, but I see other clock bindings are doing
-similar things. When are these needed, and why? What type are they?
-
-> +- ti,clkdm-name : clockdomain name for the DPLL
-
-Could you elaborate on what this is for? What constitutes a valid name?
-
-I'm not sure a string is the best way to define the linkage of several
-elements to a domain...
-
-> +
-> +Examples:
-> +       dpll_core_ck: dpll_core_ck at 44e00490 {
-> +               #clock-cells = <0>;
-> +               compatible = "ti,omap4-dpll-core-clock";
-> +               clocks = <&sys_clkin_ck>;
-> +               reg = <0x44e00490 0x4>, <0x44e0045c 0x4>, <0x0 0x4>,
-> +                               <0x44e00468 0x4>;
-> +               ti,clk-ref = <&sys_clkin_ck>;
-> +               ti,clk-bypass = <&sys_clkin_ck>;
-
-Huh? Why aren't these both in the clocks property?
-
-[...]
-
-> +static inline void __iomem *get_dt_register(struct device_node *node,
-> +                                           int index)
-> +{
-> +       u32 val;
-> +
-> +       of_property_read_u32_index(node, "reg", 2 * index, &val);
-> +       if (val)
-> +               return of_iomap(node, index);
-> +       else
-> +               return NULL;
-
-NAK. Use reg-names to handle registers being optional.
-
-[...]
-
-> +       clkspec.np = of_parse_phandle(node, "ti,clk-ref", 0);
-> +       dd->clk_ref = of_clk_get_from_provider(&clkspec);
-> +       if (IS_ERR(dd->clk_ref)) {
-> +               pr_err("%s: ti,clk-ref for %s not found\n", __func__,
-> +                      clk_name);
-> +               goto cleanup;
-> +       }
-> +
-> +       clkspec.np = of_parse_phandle(node, "ti,clk-bypass", 0);
-> +       dd->clk_bypass = of_clk_get_from_provider(&clkspec);
-> +       if (IS_ERR(dd->clk_bypass)) {
-> +               pr_err("%s: ti,clk-bypass for %s not found\n", __func__,
-> +                      clk_name);
-> +               goto cleanup;
-> +       }
-
-You can get these from the standard clocks property. Don't do this.
-
-Look at of_clk_get_by_name().
-
-Thanks,
-Mark.
+> 
+> ---- >8
+> 
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Date: Mon, 12 Aug 2013 12:47:13 -0400
+> Subject: [PATCH] ARM: vexpress/MCPM: fix cache disable sequence when
+>  CONFIG_FRAME_POINTER=y
+> 
+> If CONFIG_FRAME_POINTER=y we hget the following error:
+> 
+> arch/arm/mach-vexpress/tc2_pm.c: In function 'tc2_pm_down':
+> arch/arm/mach-vexpress/tc2_pm.c:200:1: error: fp cannot be used in asm here
+> 
+> Let's fix that by explicitly preserving r11 on the stack and removing it
+> from the clobber list.
+> 
+> Reported-by: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> 
+> diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+> index 85fffa702f..3a6384c6c4 100644
+> --- a/arch/arm/mach-vexpress/dcscb.c
+> +++ b/arch/arm/mach-vexpress/dcscb.c
+> @@ -144,8 +144,13 @@ static void dcscb_power_down(void)
+>  		 * Let's do it in the safest possible way i.e. with
+>  		 * no memory access within the following sequence
+>  		 * including to the stack.
+> +		 *
+> +		 * Note: fp is preserved to the stack explicitly prior doing
+> +		 * this since adding it to the clobber list is incompatible
+> +		 * with having CONFIG_FRAME_POINTER=y.
+>  		 */
+>  		asm volatile(
+> +		"str	fp, [sp, #-4]! \n\t"
+>  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+>  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+> @@ -156,9 +161,10 @@ static void dcscb_power_down(void)
+>  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+>  		"isb	\n\t"
+> -		"dsb	"
+> +		"dsb	\n\t"
+> +		"ldr	fp, [sp], #4"
+>  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+> -		      "r9","r10","r11","lr","memory");
+> +		      "r9","r10","lr","memory");
+>  
+>  		/*
+>  		 * This is a harmless no-op.  On platforms with a real
+> @@ -182,6 +188,7 @@ static void dcscb_power_down(void)
+>  		 * Let's do it in the safest possible way as above.
+>  		 */
+>  		asm volatile(
+> +		"str	fp, [sp, #-4]! \n\t"
+>  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+>  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+> @@ -192,9 +199,10 @@ static void dcscb_power_down(void)
+>  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+>  		"isb	\n\t"
+> -		"dsb	"
+> +		"dsb	\n\t"
+> +		"ldr	fp, [sp], #4"
+>  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+> -		      "r9","r10","r11","lr","memory");
+> +		      "r9","r10","lr","memory");
+>  	}
+>  
+>  	__mcpm_cpu_down(cpu, cluster);
+> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+> index dfb55d45b6..9419b1550a 100644
+> --- a/arch/arm/mach-vexpress/tc2_pm.c
+> +++ b/arch/arm/mach-vexpress/tc2_pm.c
+> @@ -139,8 +139,13 @@ static void tc2_pm_down(u64 residency)
+>  		 * Let's do it in the safest possible way i.e. with
+>  		 * no memory access within the following sequence
+>  		 * including the stack.
+> +		 *
+> +		 * Note: fp is preserved to the stack explicitly prior doing
+> +		 * this since adding it to the clobber list is incompatible
+> +		 * with having CONFIG_FRAME_POINTER=y.
+>  		 */
+>  		asm volatile(
+> +		"str	fp, [sp, #-4]! \n\t"
+>  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+>  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+> @@ -151,9 +156,10 @@ static void tc2_pm_down(u64 residency)
+>  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+>  		"isb	\n\t"
+> -		"dsb	"
+> +		"dsb	\n\t"
+> +		"ldr	fp, [sp], #4"
+>  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+> -		      "r9","r10","r11","lr","memory");
+> +		      "r9","r10","lr","memory");
+>  
+>  		cci_disable_port_by_cpu(mpidr);
+>  
+> @@ -174,6 +180,7 @@ static void tc2_pm_down(u64 residency)
+>  		 * Let's do it in the safest possible way as above.
+>  		 */
+>  		asm volatile(
+> +		"str	fp, [sp, #-4]! \n\t"
+>  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+>  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+> @@ -184,9 +191,10 @@ static void tc2_pm_down(u64 residency)
+>  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+>  		"isb	\n\t"
+> -		"dsb	"
+> +		"dsb	\n\t"
+> +		"ldr	fp, [sp], #4"
+>  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+> -		      "r9","r10","r11","lr","memory");
+> +		      "r9","r10","lr","memory");
+>  	}
+>  
+>  	__mcpm_cpu_down(cpu, cluster);
+> 
+> 
+> > 
+> > Since there are no "m" constraints or similar, there should be no
+> > implicit references to fp or sp inside the asm which would be disrupted
+> > by that.
+> > 
+> > We could #ifdef it on CONFIG_FRAME_POINTER, but that probably just
+> > uglifies the code for no real benefit.
+> > 
+> > 
+> > FRAME_POINTER depends on !THUMB2_KERNEL, so we shouldn't hit the same
+> > issue with r7 in Thumb-2.
+> > 
+> > Cheers
+> > ---Dave
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
