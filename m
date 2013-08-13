@@ -1,149 +1,60 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Tue, 13 Aug 2013 16:07:45 -0300
-Subject: [PATCH] ARM: sunxi: dt: Add device tree for Mele A1000
-Message-ID: <1376420865-4650-1-git-send-email-emilio@elopez.com.ar>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 13 Aug 2013 12:11:05 -0700
+Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
+ module registers and APIs
+In-Reply-To: <CA+Bv8Xbg9v4zRy-EJPsxwCdwpSy50V8SjwQfmAvVxiCR=6mYBw@mail.gmail.com>
+ (Russ Dill's message of "Tue, 13 Aug 2013 11:30:40 -0700")
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
+ <5203A0BC.8060205@ti.com> <5203C457.80301@ti.com>
+ <20130809051146.GB7656@atomide.com> <52055733.70808@ti.com>
+ <87y586pvkq.fsf@kernel.org> <5209565C.7090508@ti.com>
+ <87d2phpsu1.fsf@kernel.org> <520A4BE7.7090603@ti.com>
+ <87wqnplg1n.fsf@kernel.org> <520A785C.3000304@ti.com>
+ <CA+Bv8Xbg9v4zRy-EJPsxwCdwpSy50V8SjwQfmAvVxiCR=6mYBw@mail.gmail.com>
+Message-ID: <87bo51jtiu.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a device tree usable on Mele A1000 (and A2000, as it
-apparently is the same device except for the case). This device features
-one UART port, Ethernet, an AXP209 PMU on i2c0 and two user configurable
-LEDs.
+Russ Dill <russ.dill@gmail.com> writes:
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
+>>>> ARM world is also moving towards that by standardizing some of these
+>>>> through (read PSCI) and thats the way to go in general.
+>>>
+>>> Agreed, but I'm not sure (yet) about enforcing PSCI on legacy platforms
+>>> that don't support it natively.  Are you saying that the AM33xx firmware
+>>> should be converted to be PSCI compliant?  Admittedly, I haven't read
+>>> the PSCI spec closely, but I'm wondering if the current role splitting
+>>> between MPU and M3 fits well with PSCI.
+>>>
+>> I didn't mean for the AM3XXX specifically because its current job is rather
+>> very limited. i.e suspend. My concern is that IPC is not viewed as
+>> an option for power management controllers like M3 which can abstract
+>> all the hardware gory details and export a simpled interface for OS
+>> in form of PSCI/ACPI.
+>
+> The IPC between the M3 and the A8 on the am335x is just a pair of
+> notification mechanisms (one from the A8, mailbox, and one from the
+> M3, sev) and a set of 8 32 bit registers. The 8 32 bit registers are
+> just a scratchpad and have no access rules or functionality beyond
+> being a scratchpad. How complicated do we want to make this?
 
-This has been tested by arokux on #linux-sunxi in Freenode and found to 
-work correctly.
+The OMAP IPC between the MPU and DSP (read: any other remote processor)
+is just a mailbox and some shared memory.  No complicated, and works
+with remoteproc/rpmsg.
 
- arch/arm/boot/dts/Makefile            |   1 +
- arch/arm/boot/dts/sun4i-a10-a1000.dts | 106 ++++++++++++++++++++++++++++++++++
- 2 files changed, 107 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun4i-a10-a1000.dts
+What's more complicated? reusing existing frameworks or re-inventing
+them?  Don't forget that "simple" drivers rarely stay that way.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 641b3c9..3fd3919 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -206,6 +206,7 @@ dtb-$(CONFIG_ARCH_STI)+= stih415-b2000.dtb \
- 	stih415-b2020.dtb \
- 	stih416-b2020.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += \
-+	sun4i-a10-a1000.dtb \
- 	sun4i-a10-cubieboard.dtb \
- 	sun4i-a10-mini-xplus.dtb \
- 	sun4i-a10-hackberry.dtb \
-diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-new file mode 100644
-index 0000000..304a38e
---- /dev/null
-+++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-@@ -0,0 +1,106 @@
-+/*
-+ * Copyright 2013 Emilio L?pez
-+ *
-+ * Emilio L?pez <emilio@elopez.com.ar>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "sun4i-a10.dtsi"
-+
-+/ {
-+	model = "Mele A1000";
-+	compatible = "mele,a1000", "allwinner,sun4i-a10";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		bootargs = "earlyprintk console=ttyS0,115200";
-+	};
-+
-+	soc at 01c20000 {
-+		emac: ethernet at 01c0b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&emac_pins_a>;
-+			phy = <&phy1>;
-+			status = "okay";
-+		};
-+
-+		mdio at 01c0b080 {
-+			phy-supply = <&reg_emac_3v3>;
-+			status = "okay";
-+
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+
-+		pinctrl at 01c20800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&a1000_hogs>;
-+
-+			a1000_hogs: hogs at 0 {
-+				allwinner,pins = "PH15";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			led_pins_a1000: led_pins at 0 {
-+				allwinner,pins = "PH10", "PH20";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <1>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
-+		uart0: serial at 01c28000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_a1000>;
-+
-+		red {
-+			label = "a1000:red:usr";
-+			gpios = <&pio 7 10 0>;
-+		};
-+
-+		blue {
-+			label = "a1000:blue:usr";
-+			gpios = <&pio 7 20 0>;
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_emac_3v3: emac-3v3 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "emac-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			enable-active-high;
-+			gpio = <&pio 7 15 0>;
-+		};
-+	};
-+};
--- 
-1.8.3.4
+Also, this is not a hard stance on my part.  I just need to be
+convinced.  
+
+The fact is that there are existing frameworks for doing what is being
+proposed here.  Either use the existing frameworks, or make a technical
+argument based on why those frameworks are not a good fit (ideally,
+after having tried to use those frameworks.)
+
+Once again, I'm pretty sure I mentioned this in earlier reviews of this
+series.
+
+Kevin
