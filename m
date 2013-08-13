@@ -1,49 +1,49 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 13 Aug 2013 16:56:51 +0530
-Subject: [PATCH v2] extcon: palmas: Added a new compatible type *ti,
- palmas-usb-vid*
-Message-ID: <1376393211-23145-1-git-send-email-kishon@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 13 Aug 2013 13:28:49 +0200
+Subject: [PATCH 7/9] ARM: dove: add PCIe controllers to SoC DT
+In-Reply-To: <20130812200452.GW25111@titan.lakedaemon.net>
+References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376333215-12885-8-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130812200452.GW25111@titan.lakedaemon.net>
+Message-ID: <520A1871.4000501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Palmas device contains only a USB VID detector, so added a
-compatible type *ti,palmas-usb-vid*. Dint remove the existing compatible
-types for backward compatibility.
+On 08/12/13 22:04, Jason Cooper wrote:
+> On Mon, Aug 12, 2013 at 08:46:53PM +0200, Sebastian Hesselbarth wrote:
+>> This adds a node for the pcie controllers found on Dove SoCs to the
+>> SoC DT include.
+>>
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> ---
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Andrew Lunn <andrew@lunn.ch>
+>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Cc: linux-kernel at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> ---
+>>   arch/arm/boot/dts/dove.dtsi |   54 +++++++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 54 insertions(+)
+>
+> patches 7-9 applied to mvebu/dove_mbus since the dependencies are
+> cleaner that way.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Jason,
+
+I will have to slightly modify the reset-gpio property names and that
+requires a fixup patch for patch 8. Can you still squash it or do you
+need a proper patch?
+
+Sebastian
+
 ---
-Changes from v1:
-rebased on extcon-next
 
- Documentation/devicetree/bindings/extcon/extcon-palmas.txt |    3 ++-
- drivers/extcon/extcon-palmas.c                             |    1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/extcon/extcon-palmas.txt b/Documentation/devicetree/bindings/extcon/extcon-palmas.txt
-index 7dab6a8..dc5fab3 100644
---- a/Documentation/devicetree/bindings/extcon/extcon-palmas.txt
-+++ b/Documentation/devicetree/bindings/extcon/extcon-palmas.txt
-@@ -2,7 +2,8 @@ EXTCON FOR PALMAS/TWL CHIPS
- 
- PALMAS USB COMPARATOR
- Required Properties:
-- - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
-+ - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb" or
-+   "ti,palmas-usb-vid".
- 
- Optional Properties:
-  - ti,wakeup : To enable the wakeup comparator in probe
-diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
-index 89fdd05..9672f31 100644
---- a/drivers/extcon/extcon-palmas.c
-+++ b/drivers/extcon/extcon-palmas.c
-@@ -268,6 +268,7 @@ static const struct dev_pm_ops palmas_pm_ops = {
- 
- static struct of_device_id of_palmas_match_tbl[] = {
- 	{ .compatible = "ti,palmas-usb", },
-+	{ .compatible = "ti,palmas-usb-vid", },
- 	{ .compatible = "ti,twl6035-usb", },
- 	{ /* end */ }
- };
--- 
-1.7.10.4
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: d3plug-dts.diff
+Type: text/x-patch
+Size: 404 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/424c82b2/attachment.bin>
