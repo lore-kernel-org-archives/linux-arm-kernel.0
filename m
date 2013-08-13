@@ -1,56 +1,64 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 13 Aug 2013 10:01:30 -0400
-Subject: [PATCH v2 0/5] ARM: dove: DT PCIe support
-In-Reply-To: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130813140130.GA25111@titan.lakedaemon.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 13 Aug 2013 11:05:10 -0300
+Subject: [PATCH v3 0/6] Armada 370/XP clocksource fixes
+In-Reply-To: <520A2679.1040307@linaro.org>
+References: <1376335016-16400-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <520A2679.1040307@linaro.org>
+Message-ID: <20130813140509.GA2359@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn,
-
-On Tue, Aug 13, 2013 at 02:25:19PM +0200, Sebastian Hesselbarth wrote:
-> This patch set adds support for the PCIe controllers found on Marvell
-> Dove SoCs. It depends on mvebu-pci patches sent by Thomas Petazzoni.
-
-Well, when it rains, it pours.  If this series looks good to you, I'll
-go ahead and add it on top of Thomas' patches.
-
-> The ARM Dove related patches have already been taken by Jason Cooper
-> and have been removed from v2 of this patch set. Changelog is added
-> to the individual patch emails.
+On Tue, Aug 13, 2013 at 02:28:41PM +0200, Daniel Lezcano wrote:
+> On 08/12/2013 09:16 PM, Ezequiel Garcia wrote:
+> > This small patchset fixes a somewhat minor issue found in the clocksource
+> > driver for Armada 370/XP SoC.
+> > 
+> > On one side the Armada 370 SoC has no 25 MHz fixed timer.
+> > On the other side the Armada XP SoC cannot work properly without such 25 MHz
+> > fixed timer selected, because otherwise the base clock frequency would vary
+> > when doing cpufreq frequency changes.
+> > 
+> > Therefore we can consider the SoCs as not being compatible, being better to
+> > have two compatible strings, one for each SoC. The previous compatible and
+> > its behavior has been removed, considering there are no DT-enabled boards
+> > in use in the field.
+> > 
+> > In addition, CLOCKSOURCE_OF_DECLARE is used to simplify the initialization.
+> > 
+> > This patchset is based on v3.11-rc4. Also, to ease maintainer's task this
+> > is based on these two patches which are in linux-next:
+> > 
+> >   commit be14114934545f52be2ffddbe401ba0951007c59
+> >   Author: Stephen Boyd <sboyd@codeaurora.org>
+> >   "clocksource: time-armada-370-xp: Divorce from local timer API"
+> > 
+> >   commit 4047c794ae18c467a5ea987265238186bc253f61
+> >   Author: Stephen Boyd <sboyd@codeaurora.org>
+> >   "clocksource: time-armada-370-xp: Fix sparse warning"
 > 
-> Patches 1 and 2 fix some minor issues with pci-mvebu by moving
-> clk_prepare_enable before accessing any controller registers and
-> counting sucessfully registered ports only.
+> Your patchset does not apply to my tree for timers/core
 > 
-> Patch 3 converts pci-mvebu from subsys_initcall registration to
-> normal platform driver registration to allow it to fail with
-> EPROBE_DEFER later.
+> These two patches described above are in the ARM tree, not available in
+> the timers/core tree.
 > 
-> Patch 4 adds DT parsing for reset (PERST#) GPIO pins and delay to
-> wait for PCIe devices after reset de-assertion.
+> The correct submission path for these would have been through timers/urgent:
 > 
-> Patch 5 finally adds a compatible to pci-mvebu for Dove SoCs.
+> timers/urgent -> v3.11-rcX -> arm-soc
+>                            -> timers/core
 > 
-> [Patch 6-9 have already been taken by Jason Cooper]
-
-These were the dts files.
-
-> Sebastian Hesselbarth (5):
->   PCI: mvebu: move clock enable before register access
->   PCI: mvebu: increment nports only for registered ports
->   PCI: mvebu: remove subsys_initcall
->   PCI: mvebu: add support for reset on GPIO
->   PCI: mvebu: add support for Marvell Dove SoCs
+> Or alternatively if it depends on material in arm-soc, a pull request
+> based in a v3.11-rcX where Olof and I can pull from.
 > 
->  .../devicetree/bindings/pci/mvebu-pci.txt          |    7 ++
->  drivers/pci/host/Kconfig                           |    2 +-
->  drivers/pci/host/pci-mvebu.c                       |   99 +++++++++++++-------
->  3 files changed, 71 insertions(+), 37 deletions(-)
+> I guess you have to rebase your patchset on top of timers/core.
+> 
 
-Should be pretty isolated.
+Sure. I'll just send this patchset on top of timers/core.
 
-thx,
+I guess it was just a silly thing to base this on top of those
+two patches.
 
-Jason.
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
