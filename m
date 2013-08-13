@@ -1,33 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 13 Aug 2013 13:18:13 +0100
-Subject: [PATCH v2] dmaengine: sirf: add PM entries for sleep and runtime
-In-Reply-To: <20130813113200.GE32147@intel.com>
-References: <1375177474-27583-1-git-send-email-Baohua.Song@csr.com>
- <20130813113200.GE32147@intel.com>
-Message-ID: <20130813121813.GL23006@n2100.arm.linux.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 13 Aug 2013 14:25:20 +0200
+Subject: [PATCH v2 1/5] PCI: mvebu: move clock enable before register access
+In-Reply-To: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1376396724-32048-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 05:02:00PM +0530, Vinod Koul wrote:
-> On Tue, Jul 30, 2013 at 05:44:34PM +0800, Barry Song wrote:
-> > this patch adds PM ops entries in sirf-dma drivers, so that this
-> > driver can support suspend/resume, hibernation and runtime PM.
-> > 
-> > while suspending, sirf-dma will lose all registers, so we save
-> > them at suspend and restore in resume for active channels.
-> > 
-> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> > Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
-> Applied, thanks
-> 
-> Although putting runtime_get/put in submit and callback would be much more
-> better than alloc/free implementation
+The clock passed to PCI controller found on MVEBU SoCs may come from a
+clock gate. This requires the clock to be enabled before any registers
+are accessed. Therefore, move the clock enable before register iomap to
+ensure it is enabled.
 
-When the prepare/submit is called from non-process context, the runtime
-API tends to complain, so it's not that easy.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Changelog:
+v1->v2:
+- remove iounmap, add clk_disable_unprepare on failure
+  (Reported by Thomas Pettazoni)
 
-Also you can end up in situations which cause lockdep to complain,
-especially when some of the runtime stuff calls out to an i2c controller
-which then uses the dmaengine, but the dma engine also calls out to the
-runtime api.  (I don't rememeber the exact details, I just remember having
-to drop the runtime API from such places in the past.)
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-pci at vger.kernel.org
+---
+ drivers/pci/host/pci-mvebu.c |   25 ++++++++++++-------------
+ 1 file changed, 12 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 6aa0daf..1533fda 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -897,10 +897,22 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 			continue;
+ 		}
+ 
++		port->clk = of_clk_get_by_name(child, NULL);
++		if (IS_ERR(port->clk)) {
++			dev_err(&pdev->dev, "PCIe%d.%d: cannot get clock\n",
++			       port->port, port->lane);
++			continue;
++		}
++
++		ret = clk_prepare_enable(port->clk);
++		if (ret)
++			continue;
++
+ 		port->base = mvebu_pcie_map_registers(pdev, child, port);
+ 		if (!port->base) {
+ 			dev_err(&pdev->dev, "PCIe%d.%d: cannot map registers\n",
+ 				port->port, port->lane);
++			clk_disable_unprepare(port->clk);
+ 			continue;
+ 		}
+ 
+@@ -916,22 +928,9 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 				 port->port, port->lane);
+ 		}
+ 
+-		port->clk = of_clk_get_by_name(child, NULL);
+-		if (IS_ERR(port->clk)) {
+-			dev_err(&pdev->dev, "PCIe%d.%d: cannot get clock\n",
+-			       port->port, port->lane);
+-			iounmap(port->base);
+-			port->haslink = 0;
+-			continue;
+-		}
+-
+ 		port->dn = child;
+-
+-		clk_prepare_enable(port->clk);
+ 		spin_lock_init(&port->conf_lock);
+-
+ 		mvebu_sw_pci_bridge_init(port);
+-
+ 		i++;
+ 	}
+ 
+-- 
+1.7.10.4
