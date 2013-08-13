@@ -1,67 +1,50 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 13 Aug 2013 10:06:40 +0200
-Subject: [PATCH 3/9] PCI: mvebu: remove subsys_initcall
-In-Reply-To: <20130813091959.784b44f0@skate>
+Date: Tue, 13 Aug 2013 10:09:56 +0200
+Subject: [PATCH 4/9] PCI: mvebu: add support for reset on GPIO
+In-Reply-To: <1376333215-12885-5-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376333215-12885-4-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130813091959.784b44f0@skate>
-Message-ID: <20130813080639.GD9316@ulmo>
+ <1376333215-12885-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130813080956.GE9316@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 09:19:59AM +0200, Thomas Petazzoni wrote:
-> Dear Sebastian Hesselbarth,
+On Mon, Aug 12, 2013 at 08:46:50PM +0200, Sebastian Hesselbarth wrote:
+> This patch adds a check for DT passed reset-gpios property and deasserts/
+> asserts reset pin on probe/remove with configurable delay. Corresponding
+> binding documentation is also updated.
 > 
-> On Mon, 12 Aug 2013 20:46:49 +0200, Sebastian Hesselbarth wrote:
-> > This removes the subsys_initcall from the driver and converts it to
-> > a normal platform_driver. Also, drvdata is set and a remove functions
-> > is added to disable the clock and free resources.
-> > 
-> > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-doc at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-pci at vger.kernel.org
+> ---
+>  .../devicetree/bindings/pci/mvebu-pci.txt          |    2 ++
+>  drivers/pci/host/pci-mvebu.c                       |   33 +++++++++++++++++++-
+>  2 files changed, 34 insertions(+), 1 deletion(-)
 > 
-> I'm OK with this, just a comment below.
-> 
-> > +static int mvebu_pcie_remove(struct platform_device *pdev)
-> > +{
-> > +	struct mvebu_pcie *pcie = platform_get_drvdata(pdev);
-> > +	struct mvebu_pcie_port *port = &pcie->ports[0];
-> > +	int i;
-> > +
-> > +	for (i = 0; i < pcie->nports; i++, port++) {
-> > +		clk_disable_unprepare(port->clk);
-> > +		kfree(port->name);
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> 
-> I believe the ->remove() part is quite useless. The driver is a 'bool'
-> in Kconfig, so it cannot be compiled as a module, and I'm not sure
-> there a way to remove the platform device that corresponds to the PCIe
-> controller.
+> diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> index 638673a..f2fa261 100644
+> --- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> @@ -76,6 +76,8 @@ and the following optional properties:
+>  - marvell,pcie-lane: the physical PCIe lane number, for ports having
+>    multiple lanes. If this property is not found, we assume that the
+>    value is 0.
+> +- reset-gpios: optional gpio to PERST#
+> +- reset-delay-ms: delay in ms to wait after reset de-assertion
 
-There is. You can write the device's name to the driver's unbind file in
-sysfs. What I ended up doing for Tegra was not to provide a .remove() at
-all and set the struct device_driver's .suppress_bind_attrs to true.
-
-Those two things combined should make it impossible to unbind the device
-from the driver.
-
-> And even if there was, then it would still not work because as far as I
-> know, the ARM PCI core doesn't provide functions to 'unregister' PCI
-> controllers, so it would keep pointers to functions located in the
-> driver, which would cause nasty things when unloading the module.
-
-I did some initial work to support driver unbinding (in order to support
-module unloading) on Tegra and things look pretty promising. The ARM PCI
-code would need something like pci_common_exit() to make sure there are
-no leaks.
-
-Unfortunately I can't seem to find that branch anymore, so I will have
-to reconstruct it from memory...
-
-That said, I agree with Thomas that it's not useful (and potentially
-even dangerous) to add the .remove() at this point in time.
+I remember some recent discussion about this, and we now have this reset
+framework, so perhaps it makes more sense to use the reset binding for
+this? Cc'ing Stephen (as part of the device tree bindings maintainers
+team) who was involved in that recent reset bindings discussion.
 
 Thierry
 -------------- next part --------------
@@ -70,4 +53,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/9c9556dc/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/1383a882/attachment.sig>
