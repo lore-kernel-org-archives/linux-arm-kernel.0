@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 13 Aug 2013 19:02:28 +0530
-Subject: [PATCH V2 15/35] cpufreq: imx6q: Covert to light weight
+Date: Tue, 13 Aug 2013 19:02:33 +0530
+Subject: [PATCH V2 20/35] cpufreq: omap: Covert to light weight
  ->target_index() routine
 In-Reply-To: <cover.1376392602.git.viresh.kumar@linaro.org>
 References: <cover.1376392602.git.viresh.kumar@linaro.org>
-Message-ID: <217701887d98cb7b71b91a095c9ca30cb35d95b4.1376392602.git.viresh.kumar@linaro.org>
+Message-ID: <a82b707c2329408eee93683ebab2386df16f6d7f.1376392602.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,56 +14,67 @@ This patch converts existing .target() to newly defined light weight
 CPUFreq core will call cpufreq_frequency_table_target() before calling this
 routine and will pass index to it.
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/imx6q-cpufreq.c | 17 ++---------------
- 1 file changed, 2 insertions(+), 15 deletions(-)
+ drivers/cpufreq/omap-cpufreq.c | 31 +++----------------------------
+ 1 file changed, 3 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index 81d1727..f6f877c 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -39,30 +39,17 @@ static unsigned int imx6q_get_speed(unsigned int cpu)
- 	return clk_get_rate(arm_clk) / 1000;
+diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
+index 48020b5..69bf7d8 100644
+--- a/drivers/cpufreq/omap-cpufreq.c
++++ b/drivers/cpufreq/omap-cpufreq.c
+@@ -51,40 +51,15 @@ static unsigned int omap_getspeed(unsigned int cpu)
+ 	return rate;
  }
  
--static int imx6q_set_target(struct cpufreq_policy *policy,
--			    unsigned int target_freq, unsigned int relation)
-+static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+-static int omap_target(struct cpufreq_policy *policy,
+-		       unsigned int target_freq,
+-		       unsigned int relation)
++static int omap_target(struct cpufreq_policy *policy, unsigned int index)
  {
+-	unsigned int i;
+ 	int r, ret = 0;
  	struct cpufreq_freqs freqs;
  	struct opp *opp;
- 	unsigned long freq_hz, volt, volt_old;
--	unsigned int index;
- 	int ret;
+ 	unsigned long freq, volt = 0, volt_old = 0, tol = 0;
  
--	ret = cpufreq_frequency_table_target(policy, freq_table, target_freq,
--					     relation, &index);
--	if (ret) {
--		dev_err(cpu_dev, "failed to match target frequency %d: %d\n",
--			target_freq, ret);
--		return ret;
+-	if (!freq_table) {
+-		dev_err(mpu_dev, "%s: cpu%d: no freq table!\n", __func__,
+-				policy->cpu);
+-		return -EINVAL;
 -	}
 -
- 	freqs.new = freq_table[index].frequency;
- 	freq_hz = freqs.new * 1000;
- 	freqs.old = clk_get_rate(arm_clk) / 1000;
- 
--	if (freqs.old == freqs.new)
--		return 0;
+-	ret = cpufreq_frequency_table_target(policy, freq_table, target_freq,
+-			relation, &i);
+-	if (ret) {
+-		dev_dbg(mpu_dev, "%s: cpu%d: no freq match for %d(ret=%d)\n",
+-			__func__, policy->cpu, target_freq, ret);
+-		return ret;
+-	}
+-	freqs.new = freq_table[i].frequency;
+-	if (!freqs.new) {
+-		dev_err(mpu_dev, "%s: cpu%d: no match for freq %d\n", __func__,
+-			policy->cpu, target_freq);
+-		return -EINVAL;
+-	}
 -
- 	rcu_read_lock();
- 	opp = opp_find_freq_ceil(cpu_dev, &freq_hz);
- 	if (IS_ERR(opp)) {
-@@ -187,7 +174,7 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
+ 	freqs.old = omap_getspeed(policy->cpu);
+-
+-	if (freqs.old == freqs.new && policy->cur == freqs.new)
+-		return ret;
++	freqs.new = freq_table[index].frequency;
  
- static struct cpufreq_driver imx6q_cpufreq_driver = {
- 	.verify = cpufreq_generic_frequency_table_verify,
--	.target = imx6q_set_target,
-+	.target_index = imx6q_set_target,
- 	.get = imx6q_get_speed,
- 	.init = imx6q_cpufreq_init,
- 	.exit = cpufreq_generic_exit,
+ 	freq = freqs.new * 1000;
+ 	ret = clk_round_rate(mpu_clk, freq);
+@@ -223,7 +198,7 @@ static int omap_cpu_exit(struct cpufreq_policy *policy)
+ static struct cpufreq_driver omap_driver = {
+ 	.flags		= CPUFREQ_STICKY,
+ 	.verify		= cpufreq_generic_frequency_table_verify,
+-	.target		= omap_target,
++	.target_index	= omap_target,
+ 	.get		= omap_getspeed,
+ 	.init		= omap_cpu_init,
+ 	.exit		= omap_cpu_exit,
 -- 
 1.7.12.rc2.18.g61b472e
