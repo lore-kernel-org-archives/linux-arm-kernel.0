@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 13 Aug 2013 19:02:18 +0530
-Subject: [PATCH V2 05/35] cpufreq: at32ap: Covert to light weight
+Date: Tue, 13 Aug 2013 19:02:19 +0530
+Subject: [PATCH V2 06/35] cpufreq: blackfin: Covert to light weight
  ->target_index() routine
 In-Reply-To: <cover.1376392602.git.viresh.kumar@linaro.org>
 References: <cover.1376392602.git.viresh.kumar@linaro.org>
-Message-ID: <1e8023313384685c4f5488b5249423b066e8c133.1376392602.git.viresh.kumar@linaro.org>
+Message-ID: <57b9c4fa9e22a22debe96f00d868745f8fdaa104.1376392602.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,68 +14,60 @@ This patch converts existing .target() to newly defined light weight
 CPUFreq core will call cpufreq_frequency_table_target() before calling this
 routine and will pass index to it.
 
-Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+Cc: Steven Miao <realmz6@gmail.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/at32ap-cpufreq.c | 23 +++++------------------
- 1 file changed, 5 insertions(+), 18 deletions(-)
+ drivers/cpufreq/blackfin-cpufreq.c | 17 ++++-------------
+ 1 file changed, 4 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/cpufreq/at32ap-cpufreq.c b/drivers/cpufreq/at32ap-cpufreq.c
-index 788f7e7..2e964a7 100644
---- a/drivers/cpufreq/at32ap-cpufreq.c
-+++ b/drivers/cpufreq/at32ap-cpufreq.c
-@@ -35,25 +35,12 @@ static unsigned int at32_get_speed(unsigned int cpu)
- static unsigned int	ref_freq;
- static unsigned long	loops_per_jiffy_ref;
+diff --git a/drivers/cpufreq/blackfin-cpufreq.c b/drivers/cpufreq/blackfin-cpufreq.c
+index 48888cf..b343c7b 100644
+--- a/drivers/cpufreq/blackfin-cpufreq.c
++++ b/drivers/cpufreq/blackfin-cpufreq.c
+@@ -127,14 +127,11 @@ unsigned long cpu_set_cclk(int cpu, unsigned long new)
+ }
+ #endif
  
--static int at32_set_target(struct cpufreq_policy *policy,
--			  unsigned int target_freq,
--			  unsigned int relation)
-+static int at32_set_target(struct cpufreq_policy *policy, unsigned int index)
+-static int bfin_target(struct cpufreq_policy *policy,
+-			unsigned int target_freq, unsigned int relation)
++static int bfin_target(struct cpufreq_policy *policy, unsigned int index)
  {
+ #ifndef CONFIG_BF60x
+ 	unsigned int plldiv;
+ #endif
+-	unsigned int index;
+-	unsigned long cclk_hz;
  	struct cpufreq_freqs freqs;
--	long freq;
--
--	/* Convert target_freq from kHz to Hz */
--	freq = clk_round_rate(cpuclk, target_freq * 1000);
--
--	/* Check if policy->min <= new_freq <= policy->max */
--	if(freq < (policy->min * 1000) || freq > (policy->max * 1000))
+ 	static unsigned long lpj_ref;
+ 	static unsigned int  lpj_ref_freq;
+@@ -144,17 +141,11 @@ static int bfin_target(struct cpufreq_policy *policy,
+ 	cycles_t cycles;
+ #endif
+ 
+-	if (cpufreq_frequency_table_target(policy, bfin_freq_table, target_freq,
+-				relation, &index))
 -		return -EINVAL;
 -
--	pr_debug("cpufreq: requested frequency %u Hz\n", target_freq * 1000);
+-	cclk_hz = bfin_freq_table[index].frequency;
+-
+ 	freqs.old = bfin_getfreq_khz(0);
+-	freqs.new = cclk_hz;
++	freqs.new = bfin_freq_table[index].frequency;
  
- 	freqs.old = at32_get_speed(0);
--	freqs.new = (freq + 500) / 1000;
--	freqs.flags = 0;
-+	freqs.new = freq_table[index].frequency;
+ 	pr_debug("cpufreq: changing cclk to %lu; target = %u, oldfreq = %u\n",
+-			cclk_hz, target_freq, freqs.old);
++			freqs.new, freqs.new, freqs.old);
  
- 	if (!ref_freq) {
- 		ref_freq = freqs.old;
-@@ -64,13 +51,13 @@ static int at32_set_target(struct cpufreq_policy *policy,
- 	if (freqs.old < freqs.new)
- 		boot_cpu_data.loops_per_jiffy = cpufreq_scale(
- 				loops_per_jiffy_ref, ref_freq, freqs.new);
--	clk_set_rate(cpuclk, freq);
-+	clk_set_rate(cpuclk, freqs.new * 1000);
- 	if (freqs.new < freqs.old)
- 		boot_cpu_data.loops_per_jiffy = cpufreq_scale(
- 				loops_per_jiffy_ref, ref_freq, freqs.new);
- 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+ 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+ #ifndef CONFIG_BF60x
+@@ -210,7 +201,7 @@ static int __bfin_cpu_init(struct cpufreq_policy *policy)
  
--	pr_debug("cpufreq: set frequency %lu Hz\n", freq);
-+	pr_debug("cpufreq: set frequency %lu Hz\n", freqs.new * 1000);
- 
- 	return 0;
- }
-@@ -143,7 +130,7 @@ static struct cpufreq_driver at32_driver = {
- 	.name		= "at32ap",
- 	.init		= at32_cpufreq_driver_init,
- 	.verify		= cpufreq_generic_frequency_table_verify,
--	.target		= at32_set_target,
-+	.target_index	= at32_set_target,
- 	.get		= at32_get_speed,
- 	.flags		= CPUFREQ_STICKY,
- };
+ static struct cpufreq_driver bfin_driver = {
+ 	.verify = cpufreq_generic_frequency_table_verify,
+-	.target = bfin_target,
++	.target_index = bfin_target,
+ 	.get = bfin_getfreq_khz,
+ 	.init = __bfin_cpu_init,
+ 	.exit = cpufreq_generic_exit,
 -- 
 1.7.12.rc2.18.g61b472e
