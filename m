@@ -1,52 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Aug 2013 01:10:03 -0700
-Subject: [PATCH 1/3] misc: Add crossbar driver
-In-Reply-To: <51F0240F.3050507@ti.com>
-References: <51E83A4F.5080904@ti.com>
- <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
- <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com>
- <51EFFBE1.4090505@ti.com> <51F0031B.1050307@ti.com>
- <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
- <51F0223E.4050008@ti.com> <51F0240F.3050507@ti.com>
-Message-ID: <20130813081003.GU7656@atomide.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 13 Aug 2013 10:30:30 +0200
+Subject: [PATCH 4/9] PCI: mvebu: add support for reset on GPIO
+In-Reply-To: <20130813080956.GE9316@ulmo>
+References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376333215-12885-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130813080956.GE9316@ulmo>
+Message-ID: <20130813103030.1e4156a1@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [130724 12:06]:
-> On Wednesday 24 July 2013 02:51 PM, Nishanth Menon wrote:
-> > On 07/24/2013 01:43 PM, Sricharan R wrote:
-> >> On Wednesday 24 July 2013 10:17 PM, Nishanth Menon wrote:
-> >>> On 07/24/2013 11:38 AM, Santosh Shilimkar wrote:
-> >>>> On Wednesday 24 July 2013 12:08 PM, Nishanth Menon wrote:
-> >>>>> That said, maybe a intermediate pinctrl approach might be more pragmatic and less theoretically flexible.
-> >>>>> an option might be to "statically allocate" default number of interrupts to a domain - example:
-> >>>>> * GIC IRQ 72->78 allotted to UARTs
-> >>>>> * pinctrl mapping provided for those but only 6 can be used (rest are marked status="disabled" as default) at any given time (choice of pinctrl option determines GIC interrupt line to use)
-> >>>>> * All modules will have a pinctrl definition to have a mapping - to avoid bootloader overriding default cross bar setting in ways un-expected by kernel.
-> >>>>>
-> >>>>> Does that sound fair trade off?
-> >>>> This sounds better. That way we can get all the devices in the DT at least.
-> >>>
-> >>> Fair enough - if Linus and Tony are still ok with this approach to the problem, seeing a patch series with the effect would be beneficial.
-> >>>
-> >>   Ok, i will use this idea of certain number interrupts to groups.
-> >> Yes on DRA7XX, we have about 160 gic lines and 320 irq crossbar device inputs contending for it.
-> >> 1:2 and fully arbitrary.  But will we be really exhausting them ?
-> >>
-> > Depends on how we allocate :). The default arbitary allocation can be made more logical in your series ofcourse :).
-> > 
-> I would just most logical peripherals rather than providing every single
-> IP connected to cross bar. Otherwise we will end up wth hwmod like
-> scenario where now started removing the unused stuff because of
-> maintenance and loc issues ;-)
+Dear Thierry Reding,
 
-Sorry for the delay on this, I think the best way to set this up
-is as a separate drivers/irqchip controller. Then just map the
-configured interrupts for the board with interrupt-map and
-interrupt-map-mask binding. No need to stuff all the SoC specific
-maps to the .dts, just the ones used for the board.
+On Tue, 13 Aug 2013 10:09:56 +0200, Thierry Reding wrote:
 
-Regards,
+> > +- reset-gpios: optional gpio to PERST#
+> > +- reset-delay-ms: delay in ms to wait after reset de-assertion
+> 
+> I remember some recent discussion about this, and we now have this reset
+> framework, so perhaps it makes more sense to use the reset binding for
+> this? Cc'ing Stephen (as part of the device tree bindings maintainers
+> team) who was involved in that recent reset bindings discussion.
 
-Tony
- 
+I also thought about this, but the reset framework seems to be designed
+for "reset controller" IPs, i.e special IPs that are controlling reset
+signals. Looking at Documentation/devicetree/bindings/reset/reset.txt,
+I'm not sure to see how this would apply to GPIO-controlled reset
+signals.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
