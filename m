@@ -1,59 +1,31 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Tue, 13 Aug 2013 14:39:01 +0200
-Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <5209307F.9000701@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <52077B26.1010103@gmail.com> <5209307F.9000701@ti.com>
-Message-ID: <520A28E5.9030304@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 13 Aug 2013 14:50:57 +0200
+Subject: [GIT-PULL] cpuidle fixes for 3.12
+In-Reply-To: <5208ADC9.2050309@linaro.org>
+References: <5208ADC9.2050309@linaro.org>
+Message-ID: <3149998.TPa4L6F06A@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-On 12.08.2013 20:59, Dave Gerlach wrote:
-> On 08/11/2013 06:53 AM, Daniel Mack wrote:
-
->> The problem I currently face is that I can't make the board resume, as
->> neither UART0 nor GPIO0 seem to work as wakeup source.
+On Monday, August 12, 2013 11:41:29 AM Daniel Lezcano wrote:
+> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
 > 
-> Did you apply the other patches that are mentioned besides Suman's 
-> series? The board will hang while suspending without these.
+> Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+> 
+> are available in the git repository at:
+> 
+> git://git.linaro.org/people/dlezcano/linux.git cpuidle/arm-next
+> 
+> for you to fetch changes up to 75d6137da195a1e059e1c814cb95635e168f85c0:
+> 
+> cpuidle: kirkwood: Make kirkwood_cpuidle_remove function static
+> (2013-08-12 11:28:50 +0200)
+> 
+> This series fixes some compilation issues:
+> 
+> * for SH, a parameter is missing for the cpuidle_register function
+> * for Calxeda, an _iomem annotation is missing for scu_base_addr variable
+> * for kirkwood, a static declaration is missing for the
+> kirkwood_cpuidle_remove function
 
-Yes. However, just to make sure you referenced the correct patches - on
-top of yours an Suman's set, I have:
-
-  [PATCH 1/2] ARM: OMAP2+: hwmod: rt address space index for DT
-  [PATCH 2/2] ARM: OMAP2+: hwmod: AM335x: fix cpgmac address space
-  [PATCH 1/2] ARM: dts: add AM33XX EDMA support
-
-The last one seems somewhat unrelated though.
-
-However, I see an issue with the musb dsps glue. With the usb controller
-disabled in DT, I also had to remove the usb_otg_hs entry from
-am33xx_mod[] (pm33xx.c). When the usb controller is _enabled_, I get an
-instant NULL pointer exception due to a rather obvious bug. I'll send
-out a patch right now.
-
-When I send the board to suspend (with USB disabled), the power
-consumption drops significantly, and the output is:
-
-# echo mem > /sys/power/state
-[   93.001937] PM: Syncing filesystems ... done.
-[   93.033591] Freezing user space processes ... (elapsed 0.002 seconds)
-done.
-[   93.048532] Freezing remaining freezable tasks ... (elapsed 0.002
-seconds) done.
-[   93.059277] PM: Sending message for entering DeepSleep mode
-[   93.085368] PM: suspend of devices complete after 15.070 msecs
-[   93.096671] PM: late suspend of devices complete after 5.122 msecs
-[   93.108853] PM: noirq suspend of devices complete after 5.647 msecs
-
-
-... but traffic on UART0 won't cause a resume.
-
-
-I'll dig a little deeper now, but if you have any idea, please let me know.
-
-
-Thanks,
-Daniel
+Pulled, thanks Daniel!
