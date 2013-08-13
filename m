@@ -1,27 +1,25 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Tue, 13 Aug 2013 17:51:38 +0200
-Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <520A51B0.3010805@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <52077B26.1010103@gmail.com> <5209307F.9000701@ti.com>
- <520A28E5.9030304@gmail.com> <520A51B0.3010805@ti.com>
-Message-ID: <520A560A.80609@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 13 Aug 2013 11:53:13 -0400 (EDT)
+Subject: [Git pull request] fix to the vexpress/mcpm branch
+In-Reply-To: <alpine.LFD.2.03.1308121428080.14472@syhkavp.arg>
+References: <alpine.LFD.2.03.1308121428080.14472@syhkavp.arg>
+Message-ID: <alpine.LFD.2.03.1308131151110.14472@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.08.2013 17:33, Dave Gerlach wrote:
-> On 08/13/2013 07:39 AM, Daniel Mack wrote:
+On Mon, 12 Aug 2013, Nicolas Pitre wrote:
 
->> ... but traffic on UART0 won't cause a resume.
->>
 > 
-> It looks like you are using no_console_suspend? UART0 does not work as a 
-> wakeup source with this option set.
+> Please pull the following:
+> 
+> 	git://git.linaro.org/people/nico/linux mcpm+tc2
+> 
+> which will update your vexpress/mcpm branch with one additional commit 
+> fixing the build issue with CONFIG_FRAME_POINTER reported by RMK.  This 
+> commit's SHA1 is 95fbdc9cf542.
 
-Meh. Sorry, I didn't think about that possibility. Indeed, without that
-option, it does resume. Now I can search for the reason why other wakeup
-sources won't work yet, but that shouldn't bother you.
+If you didn't pull this yet, this commit is now 2d61241eb3 as I added 
+Dave Martin's reviewed-by tag.
 
 
-Thanks again,
-Daniel
+Nicolas
