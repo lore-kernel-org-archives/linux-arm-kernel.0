@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 13 Aug 2013 19:02:38 +0530
-Subject: [PATCH V2 25/35] cpufreq: ppc: Covert to light weight
+Date: Tue, 13 Aug 2013 19:02:25 +0530
+Subject: [PATCH V2 12/35] cpufreq: elanfreq: Covert to light weight
  ->target_index() routine
 In-Reply-To: <cover.1376392602.git.viresh.kumar@linaro.org>
 References: <cover.1376392602.git.viresh.kumar@linaro.org>
-Message-ID: <d0f9214845aaa33dee88462f46ce6d873a089277.1376392602.git.viresh.kumar@linaro.org>
+Message-ID: <0a825b2230fe4609d1d50b9e18515ab983867232.1376392602.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,86 +16,70 @@ routine and will pass index to it.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/ppc-corenet-cpufreq.c | 15 ++++-----------
- drivers/cpufreq/ppc_cbe_cpufreq.c     | 12 ++----------
- 2 files changed, 6 insertions(+), 21 deletions(-)
+ drivers/cpufreq/elanfreq.c | 34 +++-------------------------------
+ 1 file changed, 3 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/cpufreq/ppc-corenet-cpufreq.c b/drivers/cpufreq/ppc-corenet-cpufreq.c
-index befd489..243a396 100644
---- a/drivers/cpufreq/ppc-corenet-cpufreq.c
-+++ b/drivers/cpufreq/ppc-corenet-cpufreq.c
-@@ -253,27 +253,20 @@ static int __exit corenet_cpufreq_cpu_exit(struct cpufreq_policy *policy)
+diff --git a/drivers/cpufreq/elanfreq.c b/drivers/cpufreq/elanfreq.c
+index fe7053c..0d133a7 100644
+--- a/drivers/cpufreq/elanfreq.c
++++ b/drivers/cpufreq/elanfreq.c
+@@ -105,20 +105,8 @@ static unsigned int elanfreq_get_cpu_frequency(unsigned int cpu)
  }
  
- static int corenet_cpufreq_target(struct cpufreq_policy *policy,
--		unsigned int target_freq, unsigned int relation)
-+		unsigned int index)
+ 
+-/**
+- *	elanfreq_set_cpu_frequency: Change the CPU core frequency
+- *	@cpu: cpu number
+- *	@freq: frequency in kHz
+- *
+- *	This function takes a frequency value and changes the CPU frequency
+- *	according to this. Note that the frequency has to be checked by
+- *	elanfreq_validatespeed() for correctness!
+- *
+- *	There is no return value.
+- */
+-
+-static void elanfreq_set_cpu_state(struct cpufreq_policy *policy,
+-		unsigned int state)
++static int elanfreq_target(struct cpufreq_policy *policy,
++			    unsigned int state)
  {
- 	struct cpufreq_freqs freqs;
--	unsigned int new;
- 	struct clk *parent;
- 	int ret;
- 	struct cpu_data *data = per_cpu(cpu_data, policy->cpu);
+ 	struct cpufreq_freqs    freqs;
  
--	cpufreq_frequency_table_target(policy, data->table,
--			target_freq, relation, &new);
+@@ -162,25 +150,9 @@ static void elanfreq_set_cpu_state(struct cpufreq_policy *policy,
+ 	local_irq_enable();
+ 
+ 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+-};
 -
--	if (policy->cur == data->table[new].frequency)
--		return 0;
 -
- 	freqs.old = policy->cur;
--	freqs.new = data->table[new].frequency;
-+	freqs.new = data->table[index].frequency;
+-static int elanfreq_target(struct cpufreq_policy *policy,
+-			    unsigned int target_freq,
+-			    unsigned int relation)
+-{
+-	unsigned int newstate = 0;
+-
+-	if (cpufreq_frequency_table_target(policy, &elanfreq_table[0],
+-				target_freq, relation, &newstate))
+-		return -EINVAL;
+-
+-	elanfreq_set_cpu_state(policy, newstate);
  
- 	mutex_lock(&cpufreq_lock);
- 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
- 
--	parent = of_clk_get(data->parent, data->table[new].driver_data);
-+	parent = of_clk_get(data->parent, data->table[index].driver_data);
- 	ret = clk_set_parent(data->clk, parent);
- 	if (ret)
- 		freqs.new = freqs.old;
-@@ -290,7 +283,7 @@ static struct cpufreq_driver ppc_corenet_cpufreq_driver = {
- 	.init		= corenet_cpufreq_cpu_init,
- 	.exit		= __exit_p(corenet_cpufreq_cpu_exit),
- 	.verify		= cpufreq_generic_frequency_table_verify,
--	.target		= corenet_cpufreq_target,
-+	.target_index	= corenet_cpufreq_target,
- 	.get		= corenet_cpufreq_get_speed,
- 	.attr		= cpufreq_generic_attr,
- };
-diff --git a/drivers/cpufreq/ppc_cbe_cpufreq.c b/drivers/cpufreq/ppc_cbe_cpufreq.c
-index 38540d1..52f707d 100644
---- a/drivers/cpufreq/ppc_cbe_cpufreq.c
-+++ b/drivers/cpufreq/ppc_cbe_cpufreq.c
-@@ -129,18 +129,10 @@ static int cbe_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ 	return 0;
  }
- 
- static int cbe_cpufreq_target(struct cpufreq_policy *policy,
--			      unsigned int target_freq,
--			      unsigned int relation)
-+			      unsigned int cbe_pmode_new)
- {
- 	int rc;
- 	struct cpufreq_freqs freqs;
--	unsigned int cbe_pmode_new;
 -
--	cpufreq_frequency_table_target(policy,
--				       cbe_freqs,
--				       target_freq,
--				       relation,
--				       &cbe_pmode_new);
- 
- 	freqs.old = policy->cur;
- 	freqs.new = cbe_freqs[cbe_pmode_new].frequency;
-@@ -164,7 +156,7 @@ static int cbe_cpufreq_target(struct cpufreq_policy *policy,
- 
- static struct cpufreq_driver cbe_cpufreq_driver = {
+-
+ /*
+  *	Module init and exit code
+  */
+@@ -238,7 +210,7 @@ __setup("elanfreq=", elanfreq_setup);
+ static struct cpufreq_driver elanfreq_driver = {
+ 	.get		= elanfreq_get_cpu_frequency,
  	.verify		= cpufreq_generic_frequency_table_verify,
--	.target		= cbe_cpufreq_target,
-+	.target_index	= cbe_cpufreq_target,
- 	.init		= cbe_cpufreq_cpu_init,
+-	.target		= elanfreq_target,
++	.target_index	= elanfreq_target,
+ 	.init		= elanfreq_cpu_init,
  	.exit		= cpufreq_generic_exit,
- 	.name		= "cbe-cpufreq",
+ 	.name		= "elanfreq",
 -- 
 1.7.12.rc2.18.g61b472e
