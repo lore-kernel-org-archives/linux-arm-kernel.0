@@ -1,78 +1,46 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Tue, 13 Aug 2013 10:37:13 -0700
-Subject: [PATCH 16/16] Add config EFI_STUB for ARM to Kconfig
-In-Reply-To: <20130813131857.GE2823@localhost.localdomain>
-References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <1376090777-20090-17-git-send-email-roy.franz@linaro.org>
- <20130813131857.GE2823@localhost.localdomain>
-Message-ID: <CAFECyb8m=5kExhusmepcebyUyBN5R9f7Kjah8NzXJ26Pmo=MNA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 13 Aug 2013 19:48:40 +0200
+Subject: [PATCH v4 0/6] Armada 370/XP clocksource fixes
+In-Reply-To: <20130813165223.GC25111@titan.lakedaemon.net>
+References: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <520A5D58.10902@linaro.org> <20130813165223.GC25111@titan.lakedaemon.net>
+Message-ID: <520A7178.3040100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 6:18 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Fri, Aug 09, 2013 at 04:26:17PM -0700, Roy Franz wrote:
->> Signed-off-by: Roy Franz <roy.franz@linaro.org>
->> ---
->>  arch/arm/Kconfig |   11 +++++++++++
->>  1 file changed, 11 insertions(+)
+On 08/13/2013 06:52 PM, Jason Cooper wrote:
+> Daniel,
+> 
+> On Tue, Aug 13, 2013 at 06:22:48PM +0200, Daniel Lezcano wrote:
+>> On 08/13/2013 04:43 PM, Ezequiel Garcia wrote:
+>>> This small patchset fixes a somewhat minor issue found in the clocksource
+>>> driver for Armada 370/XP SoC.
+>>>
+>>> On one side the Armada 370 SoC has no 25 MHz fixed timer.
+>>> On the other side the Armada XP SoC cannot work properly without such 25 MHz
+>>> fixed timer selected, because otherwise the base clock frequency would vary
+>>> when doing cpufreq frequency changes.
+>>>
+>>> Therefore we can consider the SoCs as not being compatible, being better to
+>>> have two compatible strings, one for each SoC. The previous compatible and
+>>> its behavior has been removed, considering there are no DT-enabled boards
+>>> in use in the field.
+>>>
+>>> In addition, CLOCKSOURCE_OF_DECLARE is used to simplify the initialization.
+>>>
+>>> This patchset is based on tip/timers/core.
+>>>
 >>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 43594d5..8607d03 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -1805,6 +1805,17 @@ config UACCESS_WITH_MEMCPY
->>         However, if the CPU data cache is using a write-allocate mode,
->>         this option is unlikely to provide any performance gain.
->>
->> +config EFI_STUB
->> +     bool "EFI stub support"
->> +     depends on EFI
->
-> && !CPU_BIG_ENDIAN, in case you didn't get around to that.
->
-> Sooner or later, someone may try to fix that, so there should be a
-> comment somewhere explaining what is broken for BE.
->
-> Either in efi-stub.c or in the commit message accompanying this patch, I
-> guess.
->
-EFI will be !CPU_BIG_ENDIAN, so we will get the dependency
-transitively through EFI.
-That said, I think it may be better to have both be explicitly
-!CPU_BIG_ENDIAN, as even
-though the underlying reasons are the same (EFI services calls being
-little endian), both
-the stub and runtime services would need to be fixed to enable the
-stub to run in BE mode.
-I'll make this explicit in the stub Kconfig, and add a comment by the
-PE/COFF magic number
-regarding the LE requirement.
+>> Applied to my tree as 3.12 material.
+> 
+> Did you take patch #6 as well?
 
-Thanks,
-Roy
+Yes. Not good ?
 
 
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-
-> Cheers
-> ---Dave
->
->> +     ---help---
->> +       This kernel feature allows a zImage to be loaded directly
->> +       by EFI firmware without the use of a bootloader.  A PE/COFF
->> +       header is added to the zImage in a way that makes the binary
->> +       both a Linux zImage and an PE/COFF executable that can be
->> +       executed directly by EFI firmware.
->> +       See Documentation/efi-stub.txt for more information.
->> +
->>  config SECCOMP
->>       bool
->>       prompt "Enable seccomp to safely compute untrusted bytecode"
->> --
->> 1.7.10.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
