@@ -1,180 +1,94 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 13 Aug 2013 11:43:11 -0300
-Subject: [PATCH v4 2/6] clocksource: armada-370-xp: Simplify TIMER_CTRL
- register access
+Date: Tue, 13 Aug 2013 11:43:12 -0300
+Subject: [PATCH v4 3/6] clocksource: armada-370-xp: Use CLOCKSOURCE_OF_DECLARE
 In-Reply-To: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1376404995-24548-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1376404995-24548-4-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit creates two functions to access the TIMER_CTRL register:
-one for global one for the per-cpu. This makes the code much more
-readable. In addition, since the TIMER_CTRL register is also used for
-watchdog, this is preparation work for future thread-safe improvements.
+This is almost cosmetic: we achieve a bit of consistency with
+other clocksource drivers by using the CLOCKSOURCE_OF_DECLARE
+macro for the boilerplate code.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/clocksource/time-armada-370-xp.c | 69 ++++++++++++++------------------
- 1 file changed, 30 insertions(+), 39 deletions(-)
+ arch/arm/mach-mvebu/armada-370-xp.c      |  4 ++--
+ drivers/clocksource/time-armada-370-xp.c |  6 +++---
+ include/linux/time-armada-370-xp.h       | 18 ------------------
+ 3 files changed, 5 insertions(+), 23 deletions(-)
+ delete mode 100644 include/linux/time-armada-370-xp.h
 
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+index 97cbb80..4ea03ad 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.c
++++ b/arch/arm/mach-mvebu/armada-370-xp.c
+@@ -18,7 +18,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ #include <linux/io.h>
+-#include <linux/time-armada-370-xp.h>
++#include <linux/clocksource.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/mbus.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -69,7 +69,7 @@ static void __init armada_370_xp_mbus_init(void)
+ static void __init armada_370_xp_timer_and_clk_init(void)
+ {
+ 	of_clk_init(NULL);
+-	armada_370_xp_timer_init();
++	clocksource_of_init();
+ 	coherency_init();
+ 	armada_370_xp_mbus_init();
+ #ifdef CONFIG_CACHE_L2X0
 diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index ab22873..78ddf6a 100644
+index 78ddf6a..a6405eb 100644
 --- a/drivers/clocksource/time-armada-370-xp.c
 +++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -71,6 +71,18 @@ static u32 ticks_per_jiffy;
+@@ -212,13 +212,11 @@ static struct local_timer_ops armada_370_xp_local_timer_ops __cpuinitdata = {
+ 	.stop	=  armada_370_xp_timer_stop,
+ };
  
- static struct clock_event_device __percpu **percpu_armada_370_xp_evt;
- 
-+static void timer_ctrl_clrset(u32 clr, u32 set)
-+{
-+	writel((readl(timer_base + TIMER_CTRL_OFF) & ~clr) | set,
-+		timer_base + TIMER_CTRL_OFF);
-+}
-+
-+static void local_timer_ctrl_clrset(u32 clr, u32 set)
-+{
-+	writel((readl(local_base + TIMER_CTRL_OFF) & ~clr) | set,
-+		local_base + TIMER_CTRL_OFF);
-+}
-+
- static u32 notrace armada_370_xp_read_sched_clock(void)
+-void __init armada_370_xp_timer_init(void)
++static void __init armada_370_xp_timer_init(struct device_node *np)
  {
- 	return ~readl(timer_base + TIMER0_VAL_OFF);
-@@ -83,7 +95,6 @@ static int
- armada_370_xp_clkevt_next_event(unsigned long delta,
- 				struct clock_event_device *dev)
- {
--	u32 u;
- 	/*
- 	 * Clear clockevent timer interrupt.
- 	 */
-@@ -97,11 +108,8 @@ armada_370_xp_clkevt_next_event(unsigned long delta,
- 	/*
- 	 * Enable the timer.
- 	 */
--	u = readl(local_base + TIMER_CTRL_OFF);
--	u = ((u & ~TIMER0_RELOAD_EN) | TIMER0_EN |
--	     TIMER0_DIV(TIMER_DIVIDER_SHIFT));
--	writel(u, local_base + TIMER_CTRL_OFF);
--
-+	local_timer_ctrl_clrset(TIMER0_RELOAD_EN,
-+				TIMER0_EN | TIMER0_DIV(TIMER_DIVIDER_SHIFT));
- 	return 0;
- }
- 
-@@ -109,8 +117,6 @@ static void
- armada_370_xp_clkevt_mode(enum clock_event_mode mode,
- 			  struct clock_event_device *dev)
- {
--	u32 u;
--
- 	if (mode == CLOCK_EVT_MODE_PERIODIC) {
- 
- 		/*
-@@ -122,18 +128,14 @@ armada_370_xp_clkevt_mode(enum clock_event_mode mode,
- 		/*
- 		 * Enable timer.
- 		 */
--
--		u = readl(local_base + TIMER_CTRL_OFF);
--
--		writel((u | TIMER0_EN | TIMER0_RELOAD_EN |
--			TIMER0_DIV(TIMER_DIVIDER_SHIFT)),
--			local_base + TIMER_CTRL_OFF);
-+		local_timer_ctrl_clrset(0, TIMER0_RELOAD_EN |
-+					   TIMER0_EN |
-+					   TIMER0_DIV(TIMER_DIVIDER_SHIFT));
- 	} else {
- 		/*
- 		 * Disable timer.
- 		 */
--		u = readl(local_base + TIMER_CTRL_OFF);
--		writel(u & ~TIMER0_EN, local_base + TIMER_CTRL_OFF);
-+		local_timer_ctrl_clrset(TIMER0_EN, 0);
- 
- 		/*
- 		 * ACK pending timer interrupt.
-@@ -169,18 +171,18 @@ static irqreturn_t armada_370_xp_timer_interrupt(int irq, void *dev_id)
-  */
- static int __cpuinit armada_370_xp_timer_setup(struct clock_event_device *evt)
- {
--	u32 u;
-+	u32 clr = 0, set = 0;
- 	int cpu = smp_processor_id();
- 
- 	/* Use existing clock_event for cpu 0 */
- 	if (!smp_processor_id())
- 		return 0;
- 
--	u = readl(local_base + TIMER_CTRL_OFF);
- 	if (timer25Mhz)
--		writel(u | TIMER0_25MHZ, local_base + TIMER_CTRL_OFF);
-+		set = TIMER0_25MHZ;
- 	else
--		writel(u & ~TIMER0_25MHZ, local_base + TIMER_CTRL_OFF);
-+		clr = TIMER0_25MHZ;
-+	local_timer_ctrl_clrset(clr, set);
- 
- 	evt->name		= armada_370_xp_clkevt.name;
- 	evt->irq		= armada_370_xp_clkevt.irq;
-@@ -212,7 +214,7 @@ static struct local_timer_ops armada_370_xp_local_timer_ops __cpuinitdata = {
- 
- void __init armada_370_xp_timer_init(void)
- {
--	u32 u;
-+	u32 clr = 0, set = 0;
- 	struct device_node *np;
+ 	u32 clr = 0, set = 0;
+-	struct device_node *np;
  	int res;
  
-@@ -223,29 +225,20 @@ void __init armada_370_xp_timer_init(void)
- 
- 	if (of_find_property(np, "marvell,timer-25Mhz", NULL)) {
- 		/* The fixed 25MHz timer is available so let's use it */
--		u = readl(local_base + TIMER_CTRL_OFF);
--		writel(u | TIMER0_25MHZ,
--		       local_base + TIMER_CTRL_OFF);
--		u = readl(timer_base + TIMER_CTRL_OFF);
--		writel(u | TIMER0_25MHZ,
--		       timer_base + TIMER_CTRL_OFF);
-+		set = TIMER0_25MHZ;
- 		timer_clk = 25000000;
- 	} else {
- 		unsigned long rate = 0;
- 		struct clk *clk = of_clk_get(np, 0);
- 		WARN_ON(IS_ERR(clk));
- 		rate =  clk_get_rate(clk);
--		u = readl(local_base + TIMER_CTRL_OFF);
--		writel(u & ~(TIMER0_25MHZ),
--		       local_base + TIMER_CTRL_OFF);
--
--		u = readl(timer_base + TIMER_CTRL_OFF);
--		writel(u & ~(TIMER0_25MHZ),
--		       timer_base + TIMER_CTRL_OFF);
--
- 		timer_clk = rate / TIMER_DIVIDER;
-+
-+		clr = TIMER0_25MHZ;
- 		timer25Mhz = false;
+-	np = of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-timer");
+ 	timer_base = of_iomap(np, 0);
+ 	WARN_ON(!timer_base);
+ 	local_base = of_iomap(np, 1);
+@@ -290,3 +288,5 @@ void __init armada_370_xp_timer_init(void)
+ #endif
  	}
-+	timer_ctrl_clrset(clr, set);
-+	local_timer_ctrl_clrset(clr, set);
- 
- 	/*
- 	 * We use timer 0 as clocksource, and private(local) timer 0
-@@ -267,10 +260,8 @@ void __init armada_370_xp_timer_init(void)
- 	writel(0xffffffff, timer_base + TIMER0_VAL_OFF);
- 	writel(0xffffffff, timer_base + TIMER0_RELOAD_OFF);
- 
--	u = readl(timer_base + TIMER_CTRL_OFF);
+ }
++CLOCKSOURCE_OF_DECLARE(armada_370_xp, "marvell,armada-370-xp-timer",
++		       armada_370_xp_timer_init);
+diff --git a/include/linux/time-armada-370-xp.h b/include/linux/time-armada-370-xp.h
+deleted file mode 100644
+index dfdfdc0..0000000
+--- a/include/linux/time-armada-370-xp.h
++++ /dev/null
+@@ -1,18 +0,0 @@
+-/*
+- * Marvell Armada 370/XP SoC timer handling.
+- *
+- * Copyright (C) 2012 Marvell
+- *
+- * Lior Amsalem <alior@marvell.com>
+- * Gregory CLEMENT <gregory.clement@free-electrons.com>
+- * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+- *
+- */
+-#ifndef __TIME_ARMADA_370_XPPRCMU_H
+-#define __TIME_ARMADA_370_XPPRCMU_H
 -
--	writel((u | TIMER0_EN | TIMER0_RELOAD_EN |
--		TIMER0_DIV(TIMER_DIVIDER_SHIFT)), timer_base + TIMER_CTRL_OFF);
-+	timer_ctrl_clrset(0, TIMER0_EN | TIMER0_RELOAD_EN |
-+			     TIMER0_DIV(TIMER_DIVIDER_SHIFT));
- 
- 	clocksource_mmio_init(timer_base + TIMER0_VAL_OFF,
- 			      "armada_370_xp_clocksource",
+-#include <linux/init.h>
+-
+-void __init armada_370_xp_timer_init(void);
+-
+-#endif
 -- 
 1.8.1.5
