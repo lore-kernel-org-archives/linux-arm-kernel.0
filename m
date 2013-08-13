@@ -1,36 +1,97 @@
-From: russ.dill@gmail.com (Russ Dill)
-Date: Tue, 13 Aug 2013 11:30:40 -0700
-Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
- module registers and APIs
-In-Reply-To: <520A785C.3000304@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
- <5203A0BC.8060205@ti.com> <5203C457.80301@ti.com>
- <20130809051146.GB7656@atomide.com> <52055733.70808@ti.com>
- <87y586pvkq.fsf@kernel.org> <5209565C.7090508@ti.com>
- <87d2phpsu1.fsf@kernel.org> <520A4BE7.7090603@ti.com>
- <87wqnplg1n.fsf@kernel.org> <520A785C.3000304@ti.com>
-Message-ID: <CA+Bv8Xbg9v4zRy-EJPsxwCdwpSy50V8SjwQfmAvVxiCR=6mYBw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 13 Aug 2013 20:33:39 +0200
+Subject: [RFC PATCH] ARM: add workaround for ambiguous C99 stdint.h types
+In-Reply-To: <1376033802-12826-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1376033802-12826-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu94LrgT8wbEp0Syw92t0JOyyvKV4yBDa=t6kqznLyUN5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> ARM world is also moving towards that by standardizing some of these
->>> through (read PSCI) and thats the way to go in general.
->>
->> Agreed, but I'm not sure (yet) about enforcing PSCI on legacy platforms
->> that don't support it natively.  Are you saying that the AM33xx firmware
->> should be converted to be PSCI compliant?  Admittedly, I haven't read
->> the PSCI spec closely, but I'm wondering if the current role splitting
->> between MPU and M3 fits well with PSCI.
->>
-> I didn't mean for the AM3XXX specifically because its current job is rather
-> very limited. i.e suspend. My concern is that IPC is not viewed as
-> an option for power management controllers like M3 which can abstract
-> all the hardware gory details and export a simpled interface for OS
-> in form of PSCI/ACPI.
+Kinda-acked-by Dave Martin, anyone else care to comment?
 
-The IPC between the M3 and the A8 on the am335x is just a pair of
-notification mechanisms (one from the A8, mailbox, and one from the
-M3, sev) and a set of 8 32 bit registers. The 8 32 bit registers are
-just a scratchpad and have no access rules or functionality beyond
-being a scratchpad. How complicated do we want to make this?
+On 9 August 2013 09:36, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
+> unambiguous on ARM as you would expect. For the types below, there is a
+> difference on ARM between GCC built for bare metal ARM, GCC built for glibc
+> and the kernel itself, which results in build errors if you try to build with
+> -ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
+> in order to use NEON intrinsics)
+>
+> As the typedefs for these types in 'stdint.h' are based on builtin defines
+> supplied by GCC, we can tweak these to align with the kernel's idea of those
+> types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
+> source file (provided that -ffreestanding is used).
+>
+>                    int32_t         uint32_t               uintptr_t
+> bare metal GCC     long            unsigned long          unsigned long
+> glibc GCC          int             unsigned int           unsigned int
+> kernel             int             unsigned int           unsigned long
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>
+> Hi all,
+>
+> This is another, less obtrusive way of handling the problem for which I
+> previously sent an RFC patch 'types.h: use GCC supplied typedefs if appropriate'
+> In this case, only source files that in fact include stdint.h and are being
+> built for ARM should be affected.
+>
+> Regards,
+> --
+> Ard.
+>
+>
+>  arch/arm/include/asm/types.h | 40 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+>  create mode 100644 arch/arm/include/asm/types.h
+>
+> diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
+> new file mode 100644
+> index 0000000..976ac31
+> --- /dev/null
+> +++ b/arch/arm/include/asm/types.h
+> @@ -0,0 +1,40 @@
+> +#ifndef _ASM_TYPES_H
+> +#define _ASM_TYPES_H
+> +
+> +#include <asm-generic/int-ll64.h>
+> +
+> +/*
+> + * The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
+> + * unambiguous on ARM as you would expect. For the types below, there is a
+> + * difference on ARM between GCC built for bare metal ARM, GCC built for glibc
+> + * and the kernel itself, which results in build errors if you try to build with
+> + * -ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
+> + * in order to use NEON intrinsics)
+> + *
+> + * As the typedefs for these types in 'stdint.h' are based on builtin defines
+> + * supplied by GCC, we can tweak these to align with the kernel's idea of those
+> + * types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
+> + * source file (provided that -ffreestanding is used).
+> + *
+> + *                    int32_t         uint32_t               uintptr_t
+> + * bare metal GCC     long            unsigned long          unsigned long
+> + * glibc GCC          int             unsigned int           unsigned int
+> + * kernel             int             unsigned int           unsigned long
+> + */
+> +
+> +#ifdef __INT32__TYPE__
+> +#undef __INT32__TYPE__
+> +#define __INT32__TYPE__                int
+> +#endif
+> +
+> +#ifdef __UINT32__TYPE__
+> +#undef __UINT32__TYPE__
+> +#define __UINT32__TYPE__       unsigned int
+> +#endif
+> +
+> +#ifdef __UINTPTR_TYPE__
+> +#undef __UINTPTR_TYPE__
+> +#define __UINTPTR_TYPE__       unsigned long
+> +#endif
+> +
+> +#endif /* _ASM_TYPES_H */
+> --
+> 1.8.1.2
+>
