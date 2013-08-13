@@ -1,29 +1,59 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 13 Aug 2013 19:16:00 +0530
-Subject: [PATCH V2 00/35] CPUFreq: Implement light weight ->target(): for
- 3.13
-In-Reply-To: <cover.1376392602.git.viresh.kumar@linaro.org>
-References: <cover.1376392602.git.viresh.kumar@linaro.org>
-Message-ID: <CAKohpo=-PWt23aLiVW3MxU6gZ-_Db=QKYaaKO-f+e+u8hirpJQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 13 Aug 2013 09:48:50 -0400
+Subject: [PATCH 7/9] ARM: dove: add PCIe controllers to SoC DT
+In-Reply-To: <520A1871.4000501@gmail.com>
+References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376333215-12885-8-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130812200452.GW25111@titan.lakedaemon.net>
+ <520A1871.4000501@gmail.com>
+Message-ID: <20130813134850.GZ25111@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 August 2013 19:02, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Currently prototype of cpufreq_drivers target routines is:
->
-> int target(struct cpufreq_policy *policy, unsigned int target_freq,
->         unsigned int relation);
->
-> And most of the drivers call cpufreq_frequency_table_target() to get a valid
-> index of their frequency table which is closest to the target_freq. And they
-> don't use target_freq and relation after it.
+On Tue, Aug 13, 2013 at 01:28:49PM +0200, Sebastian Hesselbarth wrote:
+> On 08/12/13 22:04, Jason Cooper wrote:
+> >On Mon, Aug 12, 2013 at 08:46:53PM +0200, Sebastian Hesselbarth wrote:
+> >>This adds a node for the pcie controllers found on Dove SoCs to the
+> >>SoC DT include.
+> >>
+> >>Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> >>---
+> >>Cc: Russell King <linux@arm.linux.org.uk>
+> >>Cc: Jason Cooper <jason@lakedaemon.net>
+> >>Cc: Andrew Lunn <andrew@lunn.ch>
+> >>Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> >>Cc: linux-kernel at vger.kernel.org
+> >>Cc: linux-arm-kernel at lists.infradead.org
+> >>---
+> >>  arch/arm/boot/dts/dove.dtsi |   54 +++++++++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 54 insertions(+)
+> >
+> >patches 7-9 applied to mvebu/dove_mbus since the dependencies are
+> >cleaner that way.
+> 
+> Jason,
+> 
+> I will have to slightly modify the reset-gpio property names and that
+> requires a fixup patch for patch 8. Can you still squash it or do you
+> need a proper patch?
+...
+> diff --git a/arch/arm/boot/dts/dove-d3plug.dts b/arch/arm/boot/dts/dove-d3plug.dts
+> index ead90eb..f5f59bb 100644
+> --- a/arch/arm/boot/dts/dove-d3plug.dts
+> +++ b/arch/arm/boot/dts/dove-d3plug.dts
+> @@ -91,7 +91,7 @@
+>  	pcie-port at 0 {
+>  		status = "okay";
+>  		reset-gpios = <&gpio0 26 1>;
+> -		reset-delay-ms = <20>;
+> +		reset-delay-us = <20000>;
+>  		pinctrl-0 = <&pmx_camera_gpio>;
+>  		pinctrl-names = "default";
+>  	};
 
-I just came to know from a friend that I have written "covert" instead of
-"convert" in subjects of all the patches.
+Squashed into 'ARM: dove: add initial DT file for Globalscale D3Plug' in
+mvebu/dove_mbus-dt
 
-Will fix it in my repo for now.
+thx,
 
-Thanks Sudeep :)
-
---
-viresh
+Jason.
