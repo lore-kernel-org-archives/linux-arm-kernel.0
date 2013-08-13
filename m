@@ -1,30 +1,34 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 13 Aug 2013 13:10:02 -0700 (PDT)
-Subject: [PATCH 12/18] ARM: s3c64xx: Add support for DMA using generic
- amba-pl08x driver
-In-Reply-To: <20130813175251.GC6427@sirena.org.uk>
-References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
- <1376243970-6489-13-git-send-email-tomasz.figa@gmail.com>
- <20130813175251.GC6427@sirena.org.uk>
-Message-ID: <4262768.VLqddFvVic@flatron>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 13 Aug 2013 14:10:58 -0600
+Subject: [PATCHv3] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <1376423915.3167.2.camel@linux-builds1>
+References: <1376322589-17606-1-git-send-email-dinguyen@altera.com>
+ <520A8E71.4090508@wwwdotorg.org> <1376423915.3167.2.camel@linux-builds1>
+Message-ID: <520A92D2.2090208@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 of August 2013 18:52:51 Mark Brown wrote:
-> On Sun, Aug 11, 2013 at 07:59:24PM +0200, Tomasz Figa wrote:
-> > +#define pl330_filter pl08x_filter_id
+On 08/13/2013 01:58 PM, Dinh Nguyen wrote:
+> On Tue, 2013-08-13 at 13:52 -0600, Stephen Warren wrote:
+>> On 08/12/2013 09:49 AM, dinguyen at altera.com wrote:
+>>> From: Dinh Nguyen <dinguyen@altera.com>
+>>>
+>>> Add bindings for SD/MMC for SOCFPGA.
+>>> Add "syscon" to the "altr,sys-mgr" binding.
+
+>>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+>>
+>>>  		sysmgr at ffd08000 {
+>>> -				compatible = "altr,sys-mgr";
+>>> +				compatible = "altr,sys-mgr", "syscon";
+>>
+>> That seems like an unrelated change?
 > 
-> So, this is pretty fun and probably not going to play too nicely for
-> multiplatform kernels...
+> This patch is to enable SD/MMC for SOCFPGA. The "syscon" is needed in
+> dw_mmc-socfpga.c as the clock phases for the SD IP is controlled by
+> registers in "altr,sys-mgr".
 
-Yes, this is really funny and only shows the brokenness of current channel 
-filtering mechanism used in DMA engine subsystem. Fortunately this is 
-quite irrelevant to multiplatform kernels, because no users of it will be 
-compiled in, since it's used only for legacy (non-DT) channel filtering.
-
-Anyway, I would happily redesign and rewrite the DMA engine channel 
-matching completely to make it much more sane, but I guess I would need an 
-ack from Vinod and Dan to do it.
-
-Best regards,
-Tomasz
+But nothing in the dwmmc nodes refers to the syscon node, so how can the
+syscon driver possibly provide services to the MMC driver; the MMC
+driver won't be able to find it. I hope there's no back-door assumption
+that some syscon exists, and that there's only one of them...
