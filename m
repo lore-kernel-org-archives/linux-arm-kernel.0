@@ -1,58 +1,181 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 13 Aug 2013 22:29:43 +0200
-Subject: [PATCH v2 4/5] PCI: mvebu: add support for reset on GPIO
-In-Reply-To: <1376396724-32048-5-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376396724-32048-5-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130813222943.46fdacff@skate>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 13 Aug 2013 22:30:01 +0200
+Subject: [PATCH] ARM: sunxi: dt: Add device tree for Mele A1000
+In-Reply-To: <1376420865-4650-1-git-send-email-emilio@elopez.com.ar>
+References: <1376420865-4650-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20130813203001.GC28819@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian Hesselbarth,
+Hi Emilio,
 
-On Tue, 13 Aug 2013 14:25:23 +0200, Sebastian Hesselbarth wrote:
-
-> +		port->reset_gpio = of_get_named_gpio_flags(child,
-> +						   "reset-gpios", 0, &flags);
-> +		if (gpio_is_valid(port->reset_gpio)) {
-> +			u32 reset_udelay = 20000;
+On Tue, Aug 13, 2013 at 04:07:45PM -0300, Emilio L?pez wrote:
+> This adds a device tree usable on Mele A1000 (and A2000, as it
+> apparently is the same device except for the case). This device features
+> one UART port, Ethernet, an AXP209 PMU on i2c0 and two user configurable
+> LEDs.
+> 
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> ---
+> 
+> This has been tested by arokux on #linux-sunxi in Freenode and found to 
+> work correctly.
+>
+>  arch/arm/boot/dts/Makefile            |   1 +
+>  arch/arm/boot/dts/sun4i-a10-a1000.dts | 106 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 107 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun4i-a10-a1000.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 641b3c9..3fd3919 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -206,6 +206,7 @@ dtb-$(CONFIG_ARCH_STI)+= stih415-b2000.dtb \
+>  	stih415-b2020.dtb \
+>  	stih416-b2020.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += \
+> +	sun4i-a10-a1000.dtb \
+>  	sun4i-a10-cubieboard.dtb \
+>  	sun4i-a10-mini-xplus.dtb \
+>  	sun4i-a10-hackberry.dtb \
+> diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> new file mode 100644
+> index 0000000..304a38e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> @@ -0,0 +1,106 @@
+> +/*
+> + * Copyright 2013 Emilio L?pez
+> + *
+> + * Emilio L?pez <emilio@elopez.com.ar>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
 > +
-> +			port->reset_active_low = flags & OF_GPIO_ACTIVE_LOW;
-> +			port->reset_name = kasprintf(GFP_KERNEL,
-> +				     "pcie%d.%d-reset", port->port, port->lane);
-> +			of_property_read_u32(child, "reset-delay-us",
-> +					     &reset_udelay);
+> +/dts-v1/;
+> +/include/ "sun4i-a10.dtsi"
 > +
-> +			ret = devm_gpio_request_one(&pdev->dev,
-> +			    port->reset_gpio, GPIOF_DIR_OUT, port->reset_name);
-> +			if (ret) {
-> +				if (ret == -EPROBE_DEFER)
-> +					return ret;
-> +				continue;
-> +			}
+> +/ {
+> +	model = "Mele A1000";
+> +	compatible = "mele,a1000", "allwinner,sun4i-a10";
 > +
-> +			gpio_set_value(port->reset_gpio,
-> +				       (port->reset_active_low) ? 1 : 0);
-> +			udelay(reset_udelay);
-> +		}
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "earlyprintk console=ttyS0,115200";
+> +	};
 
-Sorry for raising this only now, but I think I would have preferred to
-see this reset-gpios handling be moved into a separate sub-function.
-The loop initializing each PCIe interface is already quite large, and I
-believe moving this reset-gpios thing to a sub-function would have made
-sense.
+That's not quite useful anymore now that we have a DT-aware bootloader,
+I'd remove it.
 
-But well, the patches have been applied, and we can always adjust this
-with a followup patch.
+> +
+> +	soc at 01c20000 {
+> +		emac: ethernet at 01c0b000 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&emac_pins_a>;
+> +			phy = <&phy1>;
+> +			status = "okay";
+> +		};
+> +
+> +		mdio at 01c0b080 {
+> +			phy-supply = <&reg_emac_3v3>;
+> +			status = "okay";
+> +
+> +			phy1: ethernet-phy at 1 {
+> +				reg = <1>;
+> +			};
+> +		};
+> +
+> +		pinctrl at 01c20800 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&a1000_hogs>;
+> +
+> +			a1000_hogs: hogs at 0 {
+> +				allwinner,pins = "PH15";
+> +				allwinner,function = "gpio_out";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <0>;
+> +			};
 
-Jason, have you re-created your for-next branch with all those patches?
-I'd like to give them a test if possible.
+Why using the hog pins here? I don't think you require it anymore, just
+grab the pinctrl node from the regulator, it should work, right?
+
+> +
+> +			led_pins_a1000: led_pins at 0 {
+> +				allwinner,pins = "PH10", "PH20";
+> +				allwinner,function = "gpio_out";
+> +				allwinner,drive = <1>;
+
+Do you really need the extra 10 mA here?
+
+> +				allwinner,pull = <0>;
+> +			};
+> +		};
+> +
+> +		uart0: serial at 01c28000 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&uart0_pins_a>;
+> +			status = "okay";
+> +		};
+> +
+> +		i2c0: i2c at 01c2ac00 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c0_pins_a>;
+> +			status = "okay";
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led_pins_a1000>;
+> +
+> +		red {
+> +			label = "a1000:red:usr";
+> +			gpios = <&pio 7 10 0>;
+> +		};
+> +
+> +		blue {
+> +			label = "a1000:blue:usr";
+> +			gpios = <&pio 7 20 0>;
+> +		};
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +
+> +		reg_emac_3v3: emac-3v3 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "emac-3v3";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			enable-active-high;
+> +			gpio = <&pio 7 15 0>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.8.3.4
+> 
 
 Thanks!
+Maxime
 
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/eb6377c4/attachment.sig>
