@@ -1,59 +1,66 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Tue, 13 Aug 2013 15:26:10 +0530
-Subject: [PATCH 1/3] misc: Add crossbar driver
-In-Reply-To: <20130813081003.GU7656@atomide.com>
-References: <51E83A4F.5080904@ti.com>
- <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
- <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com> <51EFFBE1.4090505@ti.com>
- <51F0031B.1050307@ti.com> <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
- <51F0223E.4050008@ti.com> <51F0240F.3050507@ti.com>
- <20130813081003.GU7656@atomide.com>
-Message-ID: <520A02BA.4090805@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 13 Aug 2013 10:58:30 +0100
+Subject: [PATCHv2 1/9] ARM: kirkwood: convert d2net_v2 to DT
+In-Reply-To: <1375369655-1310-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375369655-1310-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130813095830.GI27165@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi,
 
-On Tuesday 13 August 2013 01:40 PM, Tony Lindgren wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130724 12:06]:
->> On Wednesday 24 July 2013 02:51 PM, Nishanth Menon wrote:
->>> On 07/24/2013 01:43 PM, Sricharan R wrote:
->>>> On Wednesday 24 July 2013 10:17 PM, Nishanth Menon wrote:
->>>>> On 07/24/2013 11:38 AM, Santosh Shilimkar wrote:
->>>>>> On Wednesday 24 July 2013 12:08 PM, Nishanth Menon wrote:
->>>>>>> That said, maybe a intermediate pinctrl approach might be more pragmatic and less theoretically flexible.
->>>>>>> an option might be to "statically allocate" default number of interrupts to a domain - example:
->>>>>>> * GIC IRQ 72->78 allotted to UARTs
->>>>>>> * pinctrl mapping provided for those but only 6 can be used (rest are marked status="disabled" as default) at any given time (choice of pinctrl option determines GIC interrupt line to use)
->>>>>>> * All modules will have a pinctrl definition to have a mapping - to avoid bootloader overriding default cross bar setting in ways un-expected by kernel.
->>>>>>>
->>>>>>> Does that sound fair trade off?
->>>>>> This sounds better. That way we can get all the devices in the DT at least.
->>>>> Fair enough - if Linus and Tony are still ok with this approach to the problem, seeing a patch series with the effect would be beneficial.
->>>>>
->>>>   Ok, i will use this idea of certain number interrupts to groups.
->>>> Yes on DRA7XX, we have about 160 gic lines and 320 irq crossbar device inputs contending for it.
->>>> 1:2 and fully arbitrary.  But will we be really exhausting them ?
->>>>
->>> Depends on how we allocate :). The default arbitary allocation can be made more logical in your series ofcourse :).
->>>
->> I would just most logical peripherals rather than providing every single
->> IP connected to cross bar. Otherwise we will end up wth hwmod like
->> scenario where now started removing the unused stuff because of
->> maintenance and loc issues ;-)
-> Sorry for the delay on this, I think the best way to set this up
-> is as a separate drivers/irqchip controller. Then just map the
-> configured interrupts for the board with interrupt-map and
-> interrupt-map-mask binding. No need to stuff all the SoC specific
-> maps to the .dts, just the ones used for the board.
->
-> Regards,
->
-> Tony
->  
- Initially irqchip was discussed, but we also have a DMA crossbar
- to map the dma-requests. Since both irq/dma crossbars should be handled,
- pinctrl was suggested as the appropriate place to handle this.
+On Thu, Aug 01, 2013 at 04:07:27PM +0100, Thomas Petazzoni wrote:
+> This commit completely converts the d2net_v2 Kirkwood board to use a
+> Device Tree representation.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/Makefile              |   1 +
+>  arch/arm/boot/dts/kirkwood-d2net-v2.dts | 231 ++++++++++++++++++++++++++++++++
+>  arch/arm/mach-kirkwood/Kconfig          |   7 -
+>  arch/arm/mach-kirkwood/Makefile         |   2 +-
+>  arch/arm/mach-kirkwood/d2net_v2-setup.c | 231 --------------------------------
+>  5 files changed, 233 insertions(+), 239 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-d2net-v2.dts
+>  delete mode 100644 arch/arm/mach-kirkwood/d2net_v2-setup.c
+> 
 
-Regards,
- Sricharan
+[...]
+
+> +       regulators {
+> +               compatible = "simple-bus";
+> +               pinctrl-0 = <&pmx_sata_power>;
+> +               pinctrl-names = "default";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+
+That's not really a simple-bus if there's no mapping to the parent's
+address space (and it represents a completely different concept of
+address).
+
+Could you explain what the pinctrl's doing here? I couldn't see what
+code would be handling that given the node will get probed as a
+simple-bus and the regulator-fixed binding doesn't mention anything
+about the parent node.
+
+> +
+> +               sata0_power: regulator at 1 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <1>;
+
+Do we even need the unit-address?
+
+> +                       regulator-name = "SATA0 Power";
+> +                       regulator-min-microvolt = <5000000>;
+> +                       regulator-max-microvolt = <5000000>;
+> +                       enable-active-high;
+> +                       regulator-always-on;
+> +                       regulator-boot-on;
+> +                       gpio = <&gpio0 16 0>;
+> +               };
+> +       };
+> +};
+
+Thanks,
+Mark.
