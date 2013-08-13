@@ -1,196 +1,118 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 13 Aug 2013 16:50:43 +0530
-Subject: [PATCH v2 2/2] dmaengine: Add hisilicon k3 DMA engine driver
-In-Reply-To: <1372423153-6742-3-git-send-email-zhangfei.gao@linaro.org>
-References: <1372423153-6742-1-git-send-email-zhangfei.gao@linaro.org>
- <1372423153-6742-3-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <20130813112043.GB32147@intel.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 13 Aug 2013 17:35:20 +0530
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <2034985.S0danJZqk4@amdc1227>
+References: <20130720220006.GA7977@kroah.com>
+ <20130731061538.GC13289@radagast> <520A0E1C.5000306@ti.com>
+ <2034985.S0danJZqk4@amdc1227>
+Message-ID: <520A2100.6000709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 28, 2013 at 08:39:13PM +0800, Zhangfei Gao wrote:
-> Add dmaengine driver for hisilicon k3 platform based on virt_dma
+On Tuesday 13 August 2013 05:07 PM, Tomasz Figa wrote:
+> On Tuesday 13 of August 2013 16:14:44 Kishon Vijay Abraham I wrote:
+>> Hi,
+>>
+>> On Wednesday 31 July 2013 11:45 AM, Felipe Balbi wrote:
+>>> Hi,
+>>>
+>>> On Wed, Jul 31, 2013 at 11:14:32AM +0530, Kishon Vijay Abraham I wrote:
+>>>>>>>>> IMHO we need a lookup method for PHYs, just like for clocks,
+>>>>>>>>> regulators, PWMs or even i2c busses because there are complex
+>>>>>>>>> cases
+>>>>>>>>> when passing just a name using platform data will not work. I
+>>>>>>>>> would
+>>>>>>>>> second what Stephen said [1] and define a structure doing things
+>>>>>>>>> in a
+>>>>>>>>> DT-like way.
+>>>>>>>>>
+>>>>>>>>> Example;
+>>>>>>>>>
+>>>>>>>>> [platform code]
+>>>>>>>>>
+>>>>>>>>> static const struct phy_lookup my_phy_lookup[] = {
+>>>>>>>>>
+>>>>>>>>> 	PHY_LOOKUP("s3c-hsotg.0", "otg", "samsung-usbphy.1", "phy.2"),
+>>>>>>>>
+>>>>>>>> The only problem here is that if *PLATFORM_DEVID_AUTO* is used
+>>>>>>>> while
+>>>>>>>> creating the device, the ids in the device name would change and
+>>>>>>>> PHY_LOOKUP wont be useful.
+>>>>>>>
+>>>>>>> I don't think this is a problem. All the existing lookup methods
+>>>>>>> already
+>>>>>>> use ID to identify devices (see regulators, clkdev, PWMs, i2c,
+>>>>>>> ...). You
+>>>>>>> can simply add a requirement that the ID must be assigned manually,
+>>>>>>> without using PLATFORM_DEVID_AUTO to use PHY lookup.
+>>>>>>
+>>>>>> And I'm saying that this idea, of using a specific name and id, is
+>>>>>> frought with fragility and will break in the future in various ways
+>>>>>> when
+>>>>>> devices get added to systems, making these strings constantly have
+>>>>>> to be
+>>>>>> kept up to date with different board configurations.
+>>>>>>
+>>>>>> People, NEVER, hardcode something like an id.  The fact that this
+>>>>>> happens today with the clock code, doesn't make it right, it makes
+>>>>>> the
+>>>>>> clock code wrong.  Others have already said that this is wrong there
+>>>>>> as
+>>>>>> well, as systems change and dynamic ids get used more and more.
+>>>>>>
+>>>>>> Let's not repeat the same mistakes of the past just because we
+>>>>>> refuse to
+>>>>>> learn from them...
+>>>>>>
+>>>>>> So again, the "find a phy by a string" functions should be removed,
+>>>>>> the
+>>>>>> device id should be automatically created by the phy core just to
+>>>>>> make
+>>>>>> things unique in sysfs, and no driver code should _ever_ be reliant
+>>>>>> on
+>>>>>> the number that is being created, and the pointer to the phy
+>>>>>> structure
+>>>>>> should be used everywhere instead.
+>>>>>>
+>>>>>> With those types of changes, I will consider merging this subsystem,
+>>>>>> but
+>>>>>> without them, sorry, I will not.
+>>>>>
+>>>>> I'll agree with Greg here, the very fact that we see people trying to
+>>>>> add a requirement of *NOT* using PLATFORM_DEVID_AUTO already points
+>>>>> to a
+>>>>> big problem in the framework.
+>>>>>
+>>>>> The fact is that if we don't allow PLATFORM_DEVID_AUTO we will end up
+>>>>> adding similar infrastructure to the driver themselves to make sure
+>>>>> we
+>>>>> don't end up with duplicate names in sysfs in case we have multiple
+>>>>> instances of the same IP in the SoC (or several of the same PCIe
+>>>>> card).
+>>>>> I really don't want to go back to that.
+>>>>
+>>>> If we are using PLATFORM_DEVID_AUTO, then I dont see any way we can
+>>>> give the correct binding information to the PHY framework. I think we
+>>>> can drop having this non-dt support in PHY framework? I see only one
+>>>> platform (OMAP3) going to be needing this non-dt support and we can
+>>>> use the USB PHY library for it.> 
+>>> you shouldn't drop support for non-DT platform, in any case we lived
+>>> without DT (and still do) for years. Gotta find a better way ;-)
+>>
+>> hmm..
+>>
+>> how about passing the device names of PHY in platform data of the
+>> controller? It should be deterministic as the PHY framework assigns its
+>> own id and we *don't* want to add any requirement that the ID must be
+>> assigned manually without using PLATFORM_DEVID_AUTO. We can get rid of
+>> *phy_init_data* in the v10 patch series.
 > 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Tested-by: Kai Yang <jean.yangkai@huawei.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
+> What about slightly altering the concept of v9 to pass a pointer to struct 
+> device instead of device name inside phy_init_data?
 
-> +#define DRIVER_NAME		"k3-dma"
-> +#define DMA_ALIGN		3
-> +#define DMA_MAX_SIZE		0x1ffc
-> +
-> +#define INT_STAT		0x00
-> +#define INT_TC1			0x04
-> +#define INT_ERR1		0x0c
-> +#define INT_ERR2		0x10
-> +#define INT_TC1_MASK		0x18
-> +#define INT_ERR1_MASK		0x20
-> +#define INT_ERR2_MASK		0x24
-> +#define INT_TC1_RAW		0x600
-> +#define INT_ERR1_RAW		0x608
-> +#define INT_ERR2_RAW		0x610
-> +#define CH_PRI			0x688
-> +#define CH_STAT			0x690
-> +#define CX_CUR_CNT		0x704
-> +#define CX_LLI			0x800
-> +#define CX_CNT			0x810
-> +#define CX_SRC			0x814
-> +#define CX_DST			0x818
-> +#define CX_CONFIG		0x81c
-> +#define AXI_CONFIG		0x820
-> +#define DEF_AXI_CONFIG		0x201201
-> +
-> +#define CX_LLI_CHAIN_EN		0x2
-> +#define CCFG_EN			0x1
-> +#define CCFG_MEM2PER		(0x1 << 2)
-> +#define CCFG_PER2MEM		(0x2 << 2)
-> +#define CCFG_SRCINCR		(0x1 << 31)
-> +#define CCFG_DSTINCR		(0x1 << 30)
-I see these are not namespace aptly and can collide..
+The problem is device might be created very late. (For example in omap4, usb2
+phy device gets created when ocp2scp bus is probed). And we have to pass the
+init data in board file.
 
-> +static int k3_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> +	unsigned long arg)
-> +{
-> +	struct k3_dma_chan *c = to_k3_chan(chan);
-> +	struct k3_dma_dev *d = to_k3_dma(chan->device);
-> +	struct dma_slave_config *cfg = (void *)arg;
-> +	struct k3_dma_phy *p = NULL;
-> +	unsigned long flags;
-> +	u32 maxburst = 0, val = 0;
-> +	enum dma_slave_buswidth width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
-> +	LIST_HEAD(head);
-> +
-> +	if (c)
-> +		p = c->phy;
-> +
-> +	switch (cmd) {
-> +	case DMA_SLAVE_CONFIG:
-> +		if (cfg == NULL)
-> +			return -EINVAL;
-> +		c->dir = cfg->direction;
-> +		if (c->dir == DMA_DEV_TO_MEM) {
-> +			c->ccfg = CCFG_DSTINCR;
-> +			c->dev_addr = cfg->src_addr;
-> +			maxburst = cfg->src_maxburst;
-> +			width = cfg->src_addr_width;
-> +		} else if (c->dir == DMA_MEM_TO_DEV) {
-> +			c->ccfg = CCFG_SRCINCR;
-> +			c->dev_addr = cfg->dst_addr;
-> +			maxburst = cfg->dst_maxburst;
-> +			width = cfg->dst_addr_width;
-> +		}
-> +		switch (width) {
-> +		case DMA_SLAVE_BUSWIDTH_1_BYTE:
-> +			val = 0;
-> +			break;
-> +		case DMA_SLAVE_BUSWIDTH_2_BYTES:
-> +			val = 1;
-> +			break;
-> +		case DMA_SLAVE_BUSWIDTH_4_BYTES:
-> +			val = 2;
-> +			break;
-> +		case DMA_SLAVE_BUSWIDTH_8_BYTES:
-> +			val = 3;
-DMA_SLAVE_BUSWIDTHS are 1, 2, 4, 8...
-so if you can do val = ffs(width) as well?
-
-
-> +	case DMA_PAUSE:
-> +		dev_dbg(d->slave.dev, "vchan %p: pause\n", &c->vc);
-> +		if (c->status == DMA_IN_PROGRESS) {
-> +			c->status = DMA_PAUSED;
-> +			if (p) {
-> +				k3_dma_pause_dma(p, false);
-> +			} else {
-> +				spin_lock(&d->lock);
-> +				list_del_init(&c->node);
-> +				spin_unlock(&d->lock);
-> +			}
-why do we need the else part here?
-
-> +		}
-> +		break;
-> +
-> +	case DMA_RESUME:
-> +		dev_dbg(d->slave.dev, "vchan %p: resume\n", &c->vc);
-> +		spin_lock_irqsave(&c->vc.lock, flags);
-> +		if (c->status == DMA_PAUSED) {
-> +			c->status = DMA_IN_PROGRESS;
-> +			if (p) {
-> +				k3_dma_pause_dma(p, true);
-> +			} else if (!list_empty(&c->vc.desc_issued)) {
-> +				spin_lock(&d->lock);
-> +				list_add_tail(&c->node, &d->chan_pending);
-> +				spin_unlock(&d->lock);
-> +			}
-ditto?
-
-> +		}
-> +		spin_unlock_irqrestore(&c->vc.lock, flags);
-> +		break;
-> +	default:
-> +		return -ENXIO;
-> +	}
-> +	return 0;
-> +}
-> +
-
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int k3_dma_pltfm_suspend(struct device *dev)
-> +{
-> +	struct k3_dma_dev *d = dev_get_drvdata(dev);
-> +	u32 stat = 0;
-> +
-> +	stat = k3_dma_get_chan_stat(d);
-> +	if (stat) {
-> +		dev_warn(d->slave.dev,
-> +			"chan %d is running fail to suspend\n", stat);
-> +		return -1;
-> +	}
-> +	k3_dma_enable_dma(d, false);
-> +	clk_disable_unprepare(d->clk);
-> +	return 0;
-> +}
-> +
-> +static int k3_dma_pltfm_resume(struct device *dev)
-> +{
-> +	struct k3_dma_dev *d = dev_get_drvdata(dev);
-> +	int ret = 0;
-> +
-> +	ret = clk_prepare_enable(d->clk);
-> +	if (ret < 0) {
-> +		dev_err(d->slave.dev, "clk_prepare_enable failed: %d\n", ret);
-> +		return -EINVAL;
-> +	}
-> +	k3_dma_enable_dma(d, true);
-> +	return 0;
-> +}
-> +#else
-> +#define k3_dma_pltfm_suspend	NULL
-> +#define k3_dma_pltfm_resume	NULL
-> +#endif /* CONFIG_PM_SLEEP */
-you dont need #ifdef here, then whats the use of SIMPLE_DEV_PM_OPS below?
-> +
-> +SIMPLE_DEV_PM_OPS(k3_dma_pltfm_pmops, k3_dma_pltfm_suspend, k3_dma_pltfm_resume);
-pltfm... can we skip this or use platform, plat...
-> +
-> +static struct platform_driver k3_pdma_driver = {
-> +	.driver		= {
-> +		.name	= DRIVER_NAME,
-> +		.owner  = THIS_MODULE,
-> +		.pm	= &k3_dma_pltfm_pmops,
-> +		.of_match_table = k3_pdma_dt_ids,
-> +	},
-> +	.probe		= k3_dma_probe,
-> +	.remove		= k3_dma_remove,
-> +};
-> +
-> +module_platform_driver(k3_pdma_driver);
-> +
-> +MODULE_DESCRIPTION("Hisilicon k3 DMA Driver");
-> +MODULE_LICENSE("GPL v2");
-MODULE_ALIAS?
-
-~Vinod
+Thanks
+Kishon
