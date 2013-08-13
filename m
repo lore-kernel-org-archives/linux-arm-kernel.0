@@ -1,24 +1,22 @@
 From: msalter@redhat.com (Mark Salter)
-Date: Tue, 13 Aug 2013 09:56:29 -0400
-Subject: [PATCH 02/16] Add system pointer argument to shared EFI stub
- related functions so they no longer use global system table pointer as they
- did when part of eboot.c. This code is now shared, so using a global
- variable as part of the interface is not that nice. Also, by avoiding any
- global variables in the ARM EFI stub, this allows the code to be position
- independent without requiring GOT fixups.
-In-Reply-To: <1376090777-20090-3-git-send-email-roy.franz@linaro.org>
+Date: Tue, 13 Aug 2013 09:56:20 -0400
+Subject: [PATCH 01/16] Move common EFI stub code from x86 arch code to
+ common location
+In-Reply-To: <1376090777-20090-2-git-send-email-roy.franz@linaro.org>
 References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <1376090777-20090-3-git-send-email-roy.franz@linaro.org>
-Message-ID: <1376402189.27484.13.camel@t520.redhat.com>
+ <1376090777-20090-2-git-send-email-roy.franz@linaro.org>
+Message-ID: <1376402180.27484.12.camel@t520.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 2013-08-09 at 16:26 -0700, Roy Franz wrote:
+> No code changes made, just moving functions from x86 arch directory
+> to common location.
+> Code is shared using #include, similar to how decompression code
+> is shared among architectures.
+> 
 > Signed-off-by: Roy Franz <roy.franz@linaro.org>
 > ---
->  arch/x86/boot/compressed/eboot.c       |   38 +++++++------
->  drivers/firmware/efi/efi-stub-helper.c |   96 +++++++++++++++++---------------
->  2 files changed, 72 insertions(+), 62 deletions(-)
 
 Tested on arm64.
 
