@@ -1,54 +1,38 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 13 Aug 2013 14:49:16 -0400
-Subject: [PATCH v2 0/5] ARM: dove: DT PCIe support
-In-Reply-To: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130813184916.GG25111@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 13 Aug 2013 19:55:47 +0100
+Subject: [PATCH 10/18] spi: s3c64xx: Do not require legacy DMA API in
+ case of S3C64XX
+In-Reply-To: <2472314.6b8DcBdcjO@flatron>
+References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
+ <1376243970-6489-11-git-send-email-tomasz.figa@gmail.com>
+ <20130812233641.GL6427@sirena.org.uk> <2472314.6b8DcBdcjO@flatron>
+Message-ID: <20130813185547.GD6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 02:25:19PM +0200, Sebastian Hesselbarth wrote:
-> This patch set adds support for the PCIe controllers found on Marvell
-> Dove SoCs. It depends on mvebu-pci patches sent by Thomas Petazzoni.
-> The ARM Dove related patches have already been taken by Jason Cooper
-> and have been removed from v2 of this patch set. Changelog is added
-> to the individual patch emails.
-> 
-> Patches 1 and 2 fix some minor issues with pci-mvebu by moving
-> clk_prepare_enable before accessing any controller registers and
-> counting sucessfully registered ports only.
-> 
-> Patch 3 converts pci-mvebu from subsys_initcall registration to
-> normal platform driver registration to allow it to fail with
-> EPROBE_DEFER later.
-> 
-> Patch 4 adds DT parsing for reset (PERST#) GPIO pins and delay to
-> wait for PCIe devices after reset de-assertion.
-> 
-> Patch 5 finally adds a compatible to pci-mvebu for Dove SoCs.
-> 
-> [Patch 6-9 have already been taken by Jason Cooper]
-> 
-> Sebastian Hesselbarth (5):
->   PCI: mvebu: move clock enable before register access
->   PCI: mvebu: increment nports only for registered ports
->   PCI: mvebu: remove subsys_initcall
->   PCI: mvebu: add support for reset on GPIO
->   PCI: mvebu: add support for Marvell Dove SoCs
-> 
->  .../devicetree/bindings/pci/mvebu-pci.txt          |    7 ++
->  drivers/pci/host/Kconfig                           |    2 +-
->  drivers/pci/host/pci-mvebu.c                       |   99 +++++++++++++-------
->  3 files changed, 71 insertions(+), 37 deletions(-)
+On Tue, Aug 13, 2013 at 01:49:53AM +0200, Tomasz Figa wrote:
 
-Ok, whole series applied to mvebu/dove_pcie-mbus-dt, which depends on
-mvebu/boards, mvebu/mbus_dt, and mvebu/msi_mvebu.
+> I've been testing this without any significant patches, like PWM, CCF or 
+> DT support, just everything from the branch I pointed to and some board-
+> specific patches to help in debugging.
 
-sigh... if this branch makes it in, I'll be amazed*.  And someone will
-owe me a stiff drink.  Well, I'll take a drink in either case. :-P
+Done some more digging.  It's not failing the first time it requests the
+channel, it's failing sometime later on (after we've been running for a
+while but when we've had a substantial idle period).  However it is the
+first time we're actually intending to use the channel, previously to
+this the transfers would always be too small to trigger DMA.  I'm not
+sure that's relevant though as we're not getting far enough to actually
+request the channel.
 
-thx,
-
-Jason.
-
-* because of the intricate dependencies, the changes are fine.
+I'm still debugging what's going on here - the basic refcounting all
+looks OK in the SPI driver, I can see it requesting and releasing with
+the refcounts all going back to zero in the DMA driver as expected but
+when we come back to the device later on dmaengine is deciding the
+device is unavailable quite early on in the process.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/f958a0e0/attachment.sig>
