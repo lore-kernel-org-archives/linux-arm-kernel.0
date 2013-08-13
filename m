@@ -1,60 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 13 Aug 2013 17:26:40 -0400
-Subject: [PATCH v2 4/5] PCI: mvebu: add support for reset on GPIO
-In-Reply-To: <20130813222943.46fdacff@skate>
-References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376396724-32048-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130813222943.46fdacff@skate>
-Message-ID: <20130813212640.GK25111@titan.lakedaemon.net>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 13 Aug 2013 23:56:13 +0200
+Subject: [PATCH v2 00/11] dma: pdma: some patches needed for PXA DT
+ environments
+In-Reply-To: <201308102325.16609.arnd@arndb.de>
+References: <1376153545-14361-1-git-send-email-zonque@gmail.com>
+ <201308102325.16609.arnd@arndb.de>
+Message-ID: <520AAB7D.1050506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 10:29:43PM +0200, Thomas Petazzoni wrote:
-> Dear Sebastian Hesselbarth,
+On 10.08.2013 23:25, Arnd Bergmann wrote:
+> On Saturday 10 August 2013, Daniel Mack wrote:
+>> This is v2 of my series to add more features to the pdma driver.
+>>
+>> Changes from v1 -> v2:
+>>
+>>  - drop the two patches from Xiang Wang that are already applied to
+>>    Vinod's next branch
+>>  - add another patch to cleanup the unlocking path in lookup_phy(),
+>>    as suggested by Ezequiel
+>>  - provide an own xlate function rather than using
+>>    of_dma_simple_xlate(), as suggested by Arnd
+>>
+>>
+>> There's still an open topic with the DALGN flag, as Xiang Wang pointed
+>> out. According to him, there's a chance we need an alternative way of
+>> forcing the driver into byte-align mode, but that can still be done in
+>> an additional patch later.
+>>
 > 
-> On Tue, 13 Aug 2013 14:25:23 +0200, Sebastian Hesselbarth wrote:
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> > +		port->reset_gpio = of_get_named_gpio_flags(child,
-> > +						   "reset-gpios", 0, &flags);
-> > +		if (gpio_is_valid(port->reset_gpio)) {
-> > +			u32 reset_udelay = 20000;
-> > +
-> > +			port->reset_active_low = flags & OF_GPIO_ACTIVE_LOW;
-> > +			port->reset_name = kasprintf(GFP_KERNEL,
-> > +				     "pcie%d.%d-reset", port->port, port->lane);
-> > +			of_property_read_u32(child, "reset-delay-us",
-> > +					     &reset_udelay);
-> > +
-> > +			ret = devm_gpio_request_one(&pdev->dev,
-> > +			    port->reset_gpio, GPIOF_DIR_OUT, port->reset_name);
-> > +			if (ret) {
-> > +				if (ret == -EPROBE_DEFER)
-> > +					return ret;
-> > +				continue;
-> > +			}
-> > +
-> > +			gpio_set_value(port->reset_gpio,
-> > +				       (port->reset_active_low) ? 1 : 0);
-> > +			udelay(reset_udelay);
-> > +		}
-> 
-> Sorry for raising this only now, but I think I would have preferred to
-> see this reset-gpios handling be moved into a separate sub-function.
-> The loop initializing each PCIe interface is already quite large, and I
-> believe moving this reset-gpios thing to a sub-function would have made
-> sense.
-> 
-> But well, the patches have been applied, and we can always adjust this
-> with a followup patch.
 
-The branch this is in will be the last PR, so if the patch is reworked
-by tomorrow, I'll just replace it.
+Vinod, Dan, are you fine with this series as well?
 
-> Jason, have you re-created your for-next branch with all those patches?
-> I'd like to give them a test if possible.
 
-Yep.  Give it a go.
-
-thx,
-
-Jason.
+Thanks,
+Daniel
