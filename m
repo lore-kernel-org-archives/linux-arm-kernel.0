@@ -1,26 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 13 Aug 2013 13:13:25 -0600
-Subject: [PATCH 1/2] extcon: palmas: Added a new compatible type *ti,
- palmas-usb-vid*
-In-Reply-To: <1376372241-15573-1-git-send-email-kishon@ti.com>
-References: <1376302675-15795-1-git-send-email-kishon@ti.com>
- <1376372241-15573-1-git-send-email-kishon@ti.com>
-Message-ID: <520A8555.10401@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 13 Aug 2013 15:26:14 -0400
+Subject: [PATCH v4 6/6] ARM: mvebu: Fix the Armada 370/XP timer
+ compatible strings
+In-Reply-To: <1376404995-24548-7-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1376404995-24548-7-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130813192614.GI25111@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2013 11:37 PM, Kishon Vijay Abraham I wrote:
-> The Palmas device contains only a USB VID detector, so added a
-> compatible type *ti,palmas-usb-vid*. Dint remove the existing compatible
+On Tue, Aug 13, 2013 at 11:43:15AM -0300, Ezequiel Garcia wrote:
+> The "marvell,armada-370-xp-timer" compatible string, together with
+> the "marvell,timer-25Mhz" property are deprecated and should be
+> removed from current DT.
+> 
+> Instead, the timer DT nodes are now required to have an appropriate
+> compatible string, which should be either "marvell,armada-370-timer"
+> or "marvell,armada-xp-timer", depending on SoC.
+> 
+> The clock property is now required only for Armada 370 so move it accordingly.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-370-xp.dtsi | 2 --
+>  arch/arm/boot/dts/armada-370.dtsi    | 5 +++++
+>  arch/arm/boot/dts/armada-xp.dtsi     | 2 +-
+>  3 files changed, 6 insertions(+), 3 deletions(-)
 
-s/Dint/Didn't/
+Applied to mvebu/dt
 
-> diff --git a/Documentation/devicetree/bindings/extcon/extcon-twl.txt b/Documentation/devicetree/bindings/extcon/extcon-twl.txt
+thx,
 
->  PALMAS USB COMPARATOR
->  Required Properties:
-> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
-> + - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb" or
-> +   "ti,palmas-usb-vid".
-
-So are ti,palmas-usb and ti,twl6035-usb full EHCI controllers then?
+Jason.
