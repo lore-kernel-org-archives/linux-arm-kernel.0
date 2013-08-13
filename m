@@ -1,113 +1,73 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Aug 2013 01:01:59 -0700
-Subject: [PATCH v2 00/13] ARM: OMAP2+: AM43x PRCM support
-In-Reply-To: <cover.1375443858.git.afzal@ti.com>
-References: <cover.1375443858.git.afzal@ti.com>
-Message-ID: <20130813080159.GT7656@atomide.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 13 Aug 2013 10:06:40 +0200
+Subject: [PATCH 3/9] PCI: mvebu: remove subsys_initcall
+In-Reply-To: <20130813091959.784b44f0@skate>
+References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376333215-12885-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130813091959.784b44f0@skate>
+Message-ID: <20130813080639.GD9316@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul & Benoit,
+On Tue, Aug 13, 2013 at 09:19:59AM +0200, Thomas Petazzoni wrote:
+> Dear Sebastian Hesselbarth,
+> 
+> On Mon, 12 Aug 2013 20:46:49 +0200, Sebastian Hesselbarth wrote:
+> > This removes the subsys_initcall from the driver and converts it to
+> > a normal platform_driver. Also, drvdata is set and a remove functions
+> > is added to disable the clock and free resources.
+> > 
+> > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> 
+> I'm OK with this, just a comment below.
+> 
+> > +static int mvebu_pcie_remove(struct platform_device *pdev)
+> > +{
+> > +	struct mvebu_pcie *pcie = platform_get_drvdata(pdev);
+> > +	struct mvebu_pcie_port *port = &pcie->ports[0];
+> > +	int i;
+> > +
+> > +	for (i = 0; i < pcie->nports; i++, port++) {
+> > +		clk_disable_unprepare(port->clk);
+> > +		kfree(port->name);
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> 
+> I believe the ->remove() part is quite useless. The driver is a 'bool'
+> in Kconfig, so it cannot be compiled as a module, and I'm not sure
+> there a way to remove the platform device that corresponds to the PCIe
+> controller.
 
-Does this series look OK to you guys to queue or ack?
+There is. You can write the device's name to the driver's unbind file in
+sysfs. What I ended up doing for Tegra was not to provide a .remove() at
+all and set the struct device_driver's .suppress_bind_attrs to true.
 
-* Afzal Mohammed <afzal@ti.com> [130802 06:42]:
-> Hi,
-> 
-> AM43x PRCM support (excluding clock tree) is being added with this
-> series. AM43x reuses most of the IP's from AM335x, as that is the
-> case, much of the AM335x hwmod data is reused.
-> 
-> I am aware that this series adds around +1K lines to platform. We in
-> TI, here are making efforts to clean platform code gradually and keep
-> to minumum the code being added to support new SoC's. Please note that
-> this SoC support series has positive diffstat of just above 1K only.
-> This compared to last SoC that was supported in OMAP family during
-> last merge window is way less (this is only around 1/8th postive
-> diffstat of it). Clock data is not added in this series, instead
-> directly clock tree in DT with driver would be used, this is a work in
-> progress. And as seen from recent OMAP clock tree DT conversion
-> series, there are serious efforts ongoing to that end. Also we will
-> start working on moving hwmod away from platform folders. In addition,
-> recently there was a PRCM cleanup by Rajendra Nayak that removed near
-> to 11K lines.
-> 
-> Considering the above facts, I request the maintainers to consider
-> this series for the next merge window.
-> 
-> Currently there is no public TRM available for AM43x.
-> 
-> Hwmod database of AM335x is reused by moving common elements to a new
-> array (most of AM335x IP's are present in AM43x) and keeping separate
-> arrays for elements that are specific only to either one of AM335x or
-> AM43x. And in the cases where relevant IP is present in both that has
-> difference in details like CLKCTRL register offsets, it is being
-> updated at runtime based on the SoC detected.
-> 
-> Powerdomain & Clockdomain data has been added separately as it was not
-> giving much advantage reusing AM335x ones (runtime updates required
-> was getting too ugly). But as AM43x PRCM functionality is similar to
-> OMAP4, power domain, clock domain & hwmod operations are reused from
-> OMAP4.
-> 
-> A single header file has been added to provide all AM43x PRCM defines.
-> 
-> Here sequencewise, initially AM335x hwmod is modified to have it's
-> fields get updated at runtime (wherever element is shared and has
-> some difference with AM43x). Then power domain, clock domain for AM43x
-> is added and finally AM335x hwmod database is updated with AM43x
-> specifics.
-> 
-> This series is being developed with additional clock tree changes that
-> are being DT'fied.
-> 
-> Additional DTS changes (posted separate from this series) are also
-> required for hwmod to get register target address space as most of
-> AM335x hwmod address space details has been recently cleaned up and
-> moved to DTS.
-> 
-> Regards
-> Afzal
-> 
-> Afzal Mohammed (8):
->   ARM: OMAP2+: hwmod: AM335x: prepare for AM43x reuse
->   ARM: OMAP2+: hwmod: AMx3: runtime AM335x handling
->   ARM: OMAP2+: hwmod: AMx3: remove common static fields
->   ARM: OMAP2+: PRCM: AM43x definitions
->   ARM: OMAP2+: hwmod: AMx3: runtime AM43x handling
->   ARM: OMAP2+: hwmod: AM43x operations
->   ARM: OMAP2+: AM43x: PRCM kbuild
->   ARM: OMAP2+: hwmod: AM43x: new w.r.t AM335x
-> 
-> Ambresh K (3):
->   ARM: OMAP2+: PM: AM43x powerdomain data
->   ARM: OMAP2+: CM: AM43x clockdomain data
->   ARM: OMAP2+: AM43x PRCM init
-> 
-> Ankur Kishore (1):
->   ARM: OMAP2+: CM: cm_inst offset s16->u16
-> 
-> Vaibhav Bedia (1):
->   ARM: OMAP2+: CM: reintroduce SW_SLEEP for OMAP4
-> 
->  arch/arm/mach-omap2/Makefile                |    5 +-
->  arch/arm/mach-omap2/clockdomain.h           |    4 +-
->  arch/arm/mach-omap2/clockdomains43xx_data.c |  199 ++++++++
->  arch/arm/mach-omap2/cm33xx.c                |   30 +-
->  arch/arm/mach-omap2/cm33xx.h                |   28 +-
->  arch/arm/mach-omap2/cminst44xx.c            |   58 ++-
->  arch/arm/mach-omap2/cminst44xx.h            |   25 +-
->  arch/arm/mach-omap2/io.c                    |    6 +
->  arch/arm/mach-omap2/omap_hwmod.c            |    8 +
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c  |  691 +++++++++++++++++++++++----
->  arch/arm/mach-omap2/powerdomain.h           |    1 +
->  arch/arm/mach-omap2/powerdomains43xx_data.c |  145 ++++++
->  arch/arm/mach-omap2/prcm43xx.h              |  141 ++++++
->  13 files changed, 1198 insertions(+), 143 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/clockdomains43xx_data.c
->  create mode 100644 arch/arm/mach-omap2/powerdomains43xx_data.c
->  create mode 100644 arch/arm/mach-omap2/prcm43xx.h
-> 
-> -- 
-> 1.7.9.5
-> 
+Those two things combined should make it impossible to unbind the device
+from the driver.
+
+> And even if there was, then it would still not work because as far as I
+> know, the ARM PCI core doesn't provide functions to 'unregister' PCI
+> controllers, so it would keep pointers to functions located in the
+> driver, which would cause nasty things when unloading the module.
+
+I did some initial work to support driver unbinding (in order to support
+module unloading) on Tegra and things look pretty promising. The ARM PCI
+code would need something like pci_common_exit() to make sure there are
+no leaks.
+
+Unfortunately I can't seem to find that branch anymore, so I will have
+to reconstruct it from memory...
+
+That said, I agree with Thomas that it's not useful (and potentially
+even dangerous) to add the .remove() at this point in time.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/9c9556dc/attachment-0001.sig>
