@@ -1,31 +1,43 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 13 Aug 2013 14:50:57 +0200
-Subject: [GIT-PULL] cpuidle fixes for 3.12
-In-Reply-To: <5208ADC9.2050309@linaro.org>
-References: <5208ADC9.2050309@linaro.org>
-Message-ID: <3149998.TPa4L6F06A@vostro.rjw.lan>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 13 Aug 2013 14:40:30 +0200
+Subject: [PATCH] usb: musb dsps: fix pdev cast in suspend/resume
+Message-ID: <1376397630-26863-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 12, 2013 11:41:29 AM Daniel Lezcano wrote:
-> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
-> 
-> Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
-> 
-> are available in the git repository at:
-> 
-> git://git.linaro.org/people/dlezcano/linux.git cpuidle/arm-next
-> 
-> for you to fetch changes up to 75d6137da195a1e059e1c814cb95635e168f85c0:
-> 
-> cpuidle: kirkwood: Make kirkwood_cpuidle_remove function static
-> (2013-08-12 11:28:50 +0200)
-> 
-> This series fixes some compilation issues:
-> 
-> * for SH, a parameter is missing for the cpuidle_register function
-> * for Calxeda, an _iomem annotation is missing for scu_base_addr variable
-> * for kirkwood, a static declaration is missing for the
-> kirkwood_cpuidle_remove function
+dsps_suspend() and dsps_resume() are called with the device that has the
+glue assigned as drvdata. Using dev->parent seems wrong and causes a
+NULL pointer exception on an AM33xx board.
 
-Pulled, thanks Daniel!
+The code was introduced by commit c68bb4c6 ("usb: musb: dsps: control
+module handling (quirk)") but I wonder whether it was ever used.
+
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ drivers/usb/musb/musb_dsps.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+index 5233804..f20218e 100644
+--- a/drivers/usb/musb/musb_dsps.c
++++ b/drivers/usb/musb/musb_dsps.c
+@@ -692,7 +692,7 @@ static int dsps_remove(struct platform_device *pdev)
+ #ifdef CONFIG_PM_SLEEP
+ static int dsps_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev->parent);
++	struct platform_device *pdev = to_platform_device(dev);
+ 	struct dsps_glue *glue = platform_get_drvdata(pdev);
+ 	const struct dsps_musb_wrapper *wrp = glue->wrp;
+ 	int i;
+@@ -705,7 +705,7 @@ static int dsps_suspend(struct device *dev)
+ 
+ static int dsps_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev->parent);
++	struct platform_device *pdev = to_platform_device(dev);
+ 	struct dsps_glue *glue = platform_get_drvdata(pdev);
+ 	const struct dsps_musb_wrapper *wrp = glue->wrp;
+ 	int i;
+-- 
+1.8.3.1
