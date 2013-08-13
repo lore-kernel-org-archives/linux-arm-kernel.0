@@ -1,61 +1,59 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Mon, 12 Aug 2013 18:13:09 -0700
-Subject: [PATCH V3 RFC 00/16] EFI stub for ARM
-In-Reply-To: <1376316160.32237.17.camel@t520.redhat.com>
-References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <1376316160.32237.17.camel@t520.redhat.com>
-Message-ID: <CAFECyb93p3Wct9DWYAzhU2cU1J=F6sN=67Vw3ofXFa8wW0EKrw@mail.gmail.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Tue, 13 Aug 2013 11:29:47 +0900
+Subject: [PATCH v3 0/5] ARM: tegra: support for Trusted Foundations
+Message-ID: <1376360992-1508-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 7:02 AM, Mark Salter <msalter@redhat.com> wrote:
-> On Fri, 2013-08-09 at 16:26 -0700, Roy Franz wrote:
->> * Change FDT memory allocation to retry with a larger allocation if
->>   first educated guess is inadequate.
->
-> With this change, it looks like you no longer free the original cmdline
-> and fdt memory. The current flow looks like:
->
->   retry:
->      allocate_memory_for_expanded_fdt
->      get_memory_map
->      if (update_fdt() fails) {
->         free new_fdt and memory_map
->         goto retry
->      }
->
-> So, this keeps the original fdt around and uses it as a starting point
-> for newly allocated expanded fdt. You don't know if the new fdt is big
-> enough until update_fdt() succeeds. But at that point, you already wrote
-> the efi-runtime-mmap property with the memory_map still having the
-> original cmdline and fdt in it.
->
-> I think you should be able to have an expand_fdt() function which bumps
-> the fdt size and uses the current fdt as the starting point instead of
-> the original fdt. That way you can free the original fdt on the first
-> iteration and free the original cmdline as soon as it is successfully
-> written. Then the last thing you do if get the memory_map and write it.
->
-> --Mark
+This is the long-overdue third version of this series, hopefully addressing the 
+suggestions received in v2.
 
-Hi Mark,
+Since I could confirm that the SMC interface used by Trusted Foundations is not 
+Tegra-specific, I have moved core TF support into arch/arm/firmware as a 
+proposal to consolidate all implementations of Tomasz Figa's firmware interface 
+into that directory.
 
-I think this will work with the current FDT fields that are being set
-by the stub.  In earlier
-versions, I was also updating the reserved memory map using
-fdt_add_mem_rsv(), so
-iteratively updating the device tree wouldn't work. The reserved
-regions would change,
-and so the repeated updates would cause there to be repeated and
-incorrect reserved regions.
-I'm inclined to leave it as is, which should correctly update the
-device tree even if methods like
-fdt_add_mem_rsv() are used, with the tradeoff being there will be a
-few more memory regions
-for the kernel to free when it processes the EFI memory map.  The
-kernel already needs to process
-the EFI memory map to free the buffers use to load the kernel and
-initrd, so these buffers will get freed, just not
-by the stub.
+Changes from v2:
+- Moved core TF support into arch/arm/firmware
+- Added TF version number in DT bindings
+- Cleaned TF registration code
+- Tegra kernel now fails if TF is declared in the device tree but support
+  is not compiled in
+- Tegra kernel now fails if attempt to set CPU reset vector through secure
+  monitor returned an error
+- Moved update to tegra_defconfig into its own patch
 
-Roy
+Alexandre Courbot (5):
+  ARM: add basic Trusted Foundations support
+  ARM: tegra: add support for Trusted Foundations
+  ARM: tegra: split setting of CPU reset handler
+  ARM: tegra: set CPU reset handler with firmware op
+  ARM: tegra: support Trusted Foundations by default
+
+ .../arm/firmware/tl,trusted-foundations.txt        | 16 ++++++
+ Documentation/devicetree/bindings/arm/tegra.txt    |  5 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm/Kconfig                                   |  2 +
+ arch/arm/Makefile                                  |  1 +
+ arch/arm/configs/tegra_defconfig                   |  1 +
+ arch/arm/firmware/Kconfig                          | 22 ++++++++
+ arch/arm/firmware/Makefile                         |  1 +
+ arch/arm/firmware/trusted_foundations.c            | 58 ++++++++++++++++++++++
+ arch/arm/include/asm/trusted_foundations.h         | 36 ++++++++++++++
+ arch/arm/mach-tegra/Kconfig                        |  1 +
+ arch/arm/mach-tegra/Makefile                       |  1 +
+ arch/arm/mach-tegra/common.c                       |  2 +
+ arch/arm/mach-tegra/firmware.c                     | 41 +++++++++++++++
+ arch/arm/mach-tegra/firmware.h                     | 19 +++++++
+ arch/arm/mach-tegra/reset.c                        | 40 +++++++++++----
+ 16 files changed, 236 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+ create mode 100644 arch/arm/firmware/Kconfig
+ create mode 100644 arch/arm/firmware/Makefile
+ create mode 100644 arch/arm/firmware/trusted_foundations.c
+ create mode 100644 arch/arm/include/asm/trusted_foundations.h
+ create mode 100644 arch/arm/mach-tegra/firmware.c
+ create mode 100644 arch/arm/mach-tegra/firmware.h
+
+-- 
+1.8.3.4
