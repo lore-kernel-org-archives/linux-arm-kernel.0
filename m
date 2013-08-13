@@ -1,56 +1,52 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 13 Aug 2013 10:09:56 +0200
-Subject: [PATCH 4/9] PCI: mvebu: add support for reset on GPIO
-In-Reply-To: <1376333215-12885-5-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376333215-12885-5-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130813080956.GE9316@ulmo>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 Aug 2013 01:10:03 -0700
+Subject: [PATCH 1/3] misc: Add crossbar driver
+In-Reply-To: <51F0240F.3050507@ti.com>
+References: <51E83A4F.5080904@ti.com>
+ <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
+ <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com>
+ <51EFFBE1.4090505@ti.com> <51F0031B.1050307@ti.com>
+ <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
+ <51F0223E.4050008@ti.com> <51F0240F.3050507@ti.com>
+Message-ID: <20130813081003.GU7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 08:46:50PM +0200, Sebastian Hesselbarth wrote:
-> This patch adds a check for DT passed reset-gpios property and deasserts/
-> asserts reset pin on probe/remove with configurable delay. Corresponding
-> binding documentation is also updated.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-pci at vger.kernel.org
-> ---
->  .../devicetree/bindings/pci/mvebu-pci.txt          |    2 ++
->  drivers/pci/host/pci-mvebu.c                       |   33 +++++++++++++++++++-
->  2 files changed, 34 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-> index 638673a..f2fa261 100644
-> --- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-> @@ -76,6 +76,8 @@ and the following optional properties:
->  - marvell,pcie-lane: the physical PCIe lane number, for ports having
->    multiple lanes. If this property is not found, we assume that the
->    value is 0.
-> +- reset-gpios: optional gpio to PERST#
-> +- reset-delay-ms: delay in ms to wait after reset de-assertion
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [130724 12:06]:
+> On Wednesday 24 July 2013 02:51 PM, Nishanth Menon wrote:
+> > On 07/24/2013 01:43 PM, Sricharan R wrote:
+> >> On Wednesday 24 July 2013 10:17 PM, Nishanth Menon wrote:
+> >>> On 07/24/2013 11:38 AM, Santosh Shilimkar wrote:
+> >>>> On Wednesday 24 July 2013 12:08 PM, Nishanth Menon wrote:
+> >>>>> That said, maybe a intermediate pinctrl approach might be more pragmatic and less theoretically flexible.
+> >>>>> an option might be to "statically allocate" default number of interrupts to a domain - example:
+> >>>>> * GIC IRQ 72->78 allotted to UARTs
+> >>>>> * pinctrl mapping provided for those but only 6 can be used (rest are marked status="disabled" as default) at any given time (choice of pinctrl option determines GIC interrupt line to use)
+> >>>>> * All modules will have a pinctrl definition to have a mapping - to avoid bootloader overriding default cross bar setting in ways un-expected by kernel.
+> >>>>>
+> >>>>> Does that sound fair trade off?
+> >>>> This sounds better. That way we can get all the devices in the DT at least.
+> >>>
+> >>> Fair enough - if Linus and Tony are still ok with this approach to the problem, seeing a patch series with the effect would be beneficial.
+> >>>
+> >>   Ok, i will use this idea of certain number interrupts to groups.
+> >> Yes on DRA7XX, we have about 160 gic lines and 320 irq crossbar device inputs contending for it.
+> >> 1:2 and fully arbitrary.  But will we be really exhausting them ?
+> >>
+> > Depends on how we allocate :). The default arbitary allocation can be made more logical in your series ofcourse :).
+> > 
+> I would just most logical peripherals rather than providing every single
+> IP connected to cross bar. Otherwise we will end up wth hwmod like
+> scenario where now started removing the unused stuff because of
+> maintenance and loc issues ;-)
 
-I remember some recent discussion about this, and we now have this reset
-framework, so perhaps it makes more sense to use the reset binding for
-this? Cc'ing Stephen (as part of the device tree bindings maintainers
-team) who was involved in that recent reset bindings discussion.
+Sorry for the delay on this, I think the best way to set this up
+is as a separate drivers/irqchip controller. Then just map the
+configured interrupts for the board with interrupt-map and
+interrupt-map-mask binding. No need to stuff all the SoC specific
+maps to the .dts, just the ones used for the board.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/1383a882/attachment.sig>
+Regards,
+
+Tony
+ 
