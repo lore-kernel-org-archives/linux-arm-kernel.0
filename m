@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 13 Aug 2013 19:02:29 +0530
-Subject: [PATCH V2 16/35] cpufreq: kirkwood: Covert to light weight
+Date: Tue, 13 Aug 2013 19:02:30 +0530
+Subject: [PATCH V2 17/35] cpufreq: longhaul: Covert to light weight
  ->target_index() routine
 In-Reply-To: <cover.1376392602.git.viresh.kumar@linaro.org>
 References: <cover.1376392602.git.viresh.kumar@linaro.org>
-Message-ID: <9dd618d939eccf2588a2cc0f1d161c6fb1e2d6f1.1376392602.git.viresh.kumar@linaro.org>
+Message-ID: <65691d6e5ef6f37f54774a5f33c30cbe43bed042.1376392602.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,55 +14,46 @@ This patch converts existing .target() to newly defined light weight
 CPUFreq core will call cpufreq_frequency_table_target() before calling this
 routine and will pass index to it.
 
-Cc: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/kirkwood-cpufreq.c | 19 +++----------------
- 1 file changed, 3 insertions(+), 16 deletions(-)
+ drivers/cpufreq/longhaul.c | 13 ++-----------
+ 1 file changed, 2 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/cpufreq/kirkwood-cpufreq.c b/drivers/cpufreq/kirkwood-cpufreq.c
-index 9018c4d..d0d107a 100644
---- a/drivers/cpufreq/kirkwood-cpufreq.c
-+++ b/drivers/cpufreq/kirkwood-cpufreq.c
-@@ -55,8 +55,8 @@ static unsigned int kirkwood_cpufreq_get_cpu_frequency(unsigned int cpu)
- 	return kirkwood_freq_table[0].frequency;
- }
+diff --git a/drivers/cpufreq/longhaul.c b/drivers/cpufreq/longhaul.c
+index 57d7b02..e566776 100644
+--- a/drivers/cpufreq/longhaul.c
++++ b/drivers/cpufreq/longhaul.c
+@@ -626,21 +626,12 @@ static void longhaul_setup_voltagescaling(void)
  
--static void kirkwood_cpufreq_set_cpu_state(struct cpufreq_policy *policy,
--		unsigned int index)
-+static int kirkwood_cpufreq_target(struct cpufreq_policy *policy,
-+			    unsigned int index)
+ 
+ static int longhaul_target(struct cpufreq_policy *policy,
+-			    unsigned int target_freq, unsigned int relation)
++			    unsigned int table_index)
  {
- 	struct cpufreq_freqs freqs;
- 	unsigned int state = kirkwood_freq_table[index].driver_data;
-@@ -100,19 +100,6 @@ static void kirkwood_cpufreq_set_cpu_state(struct cpufreq_policy *policy,
- 		local_irq_enable();
- 	}
- 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
--};
--
--static int kirkwood_cpufreq_target(struct cpufreq_policy *policy,
--			    unsigned int target_freq,
--			    unsigned int relation)
--{
--	unsigned int index = 0;
--
--	if (cpufreq_frequency_table_target(policy, kirkwood_freq_table,
--				target_freq, relation, &index))
+-	unsigned int table_index = 0;
+ 	unsigned int i;
+ 	unsigned int dir = 0;
+ 	u8 vid, current_vid;
+ 
+-	if (cpufreq_frequency_table_target(policy, longhaul_table, target_freq,
+-				relation, &table_index))
 -		return -EINVAL;
 -
--	kirkwood_cpufreq_set_cpu_state(policy, index);
+-	/* Don't set same frequency again */
+-	if (longhaul_index == table_index)
+-		return 0;
+-
+ 	if (!can_scale_voltage)
+ 		longhaul_setstate(policy, table_index);
+ 	else {
+@@ -920,7 +911,7 @@ static int longhaul_cpu_init(struct cpufreq_policy *policy)
  
- 	return 0;
- }
-@@ -130,7 +117,7 @@ static int kirkwood_cpufreq_cpu_init(struct cpufreq_policy *policy)
- static struct cpufreq_driver kirkwood_cpufreq_driver = {
- 	.get	= kirkwood_cpufreq_get_cpu_frequency,
+ static struct cpufreq_driver longhaul_driver = {
  	.verify	= cpufreq_generic_frequency_table_verify,
--	.target	= kirkwood_cpufreq_target,
-+	.target_index = kirkwood_cpufreq_target,
- 	.init	= kirkwood_cpufreq_cpu_init,
+-	.target	= longhaul_target,
++	.target_index = longhaul_target,
+ 	.get	= longhaul_get,
+ 	.init	= longhaul_cpu_init,
  	.exit	= cpufreq_generic_exit,
- 	.name	= "kirkwood-cpufreq",
 -- 
 1.7.12.rc2.18.g61b472e
