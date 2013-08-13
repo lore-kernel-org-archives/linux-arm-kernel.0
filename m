@@ -1,77 +1,54 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 13 Aug 2013 13:44:23 -0500
-Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
-In-Reply-To: <520A536C.3030600@arm.com>
-References: <5208E2D3.7060005@arm.com> <3356439.a21MloFP7n@vostro.rjw.lan>
- <520A536C.3030600@arm.com>
-Message-ID: <CAL_JsqJdGXuTmb2kgBwgmRYGs9f92-dsawDXSXjmJW8cwjFVQQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 13 Aug 2013 14:49:16 -0400
+Subject: [PATCH v2 0/5] ARM: dove: DT PCIe support
+In-Reply-To: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130813184916.GG25111@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 10:40 AM, Sudeep KarkadaNagesha
-<Sudeep.KarkadaNagesha@arm.com> wrote:
-> Adding PowerPC list
->
-> On 13/08/13 14:00, Rafael J. Wysocki wrote:
->> On Monday, August 12, 2013 02:27:47 PM Sudeep KarkadaNagesha wrote:
->>> The following changes since commit
->>> d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
->>>
->>> Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
->>>
->>> are available in the git repository at:
->>>
->>> git://linux-arm.org/linux-skn.git cpu_of_node
+On Tue, Aug 13, 2013 at 02:25:19PM +0200, Sebastian Hesselbarth wrote:
+> This patch set adds support for the PCIe controllers found on Marvell
+> Dove SoCs. It depends on mvebu-pci patches sent by Thomas Petazzoni.
+> The ARM Dove related patches have already been taken by Jason Cooper
+> and have been removed from v2 of this patch set. Changelog is added
+> to the individual patch emails.
+> 
+> Patches 1 and 2 fix some minor issues with pci-mvebu by moving
+> clk_prepare_enable before accessing any controller registers and
+> counting sucessfully registered ports only.
+> 
+> Patch 3 converts pci-mvebu from subsys_initcall registration to
+> normal platform driver registration to allow it to fail with
+> EPROBE_DEFER later.
+> 
+> Patch 4 adds DT parsing for reset (PERST#) GPIO pins and delay to
+> wait for PCIe devices after reset de-assertion.
+> 
+> Patch 5 finally adds a compatible to pci-mvebu for Dove SoCs.
+> 
+> [Patch 6-9 have already been taken by Jason Cooper]
+> 
+> Sebastian Hesselbarth (5):
+>   PCI: mvebu: move clock enable before register access
+>   PCI: mvebu: increment nports only for registered ports
+>   PCI: mvebu: remove subsys_initcall
+>   PCI: mvebu: add support for reset on GPIO
+>   PCI: mvebu: add support for Marvell Dove SoCs
+> 
+>  .../devicetree/bindings/pci/mvebu-pci.txt          |    7 ++
+>  drivers/pci/host/Kconfig                           |    2 +-
+>  drivers/pci/host/pci-mvebu.c                       |   99 +++++++++++++-------
+>  3 files changed, 71 insertions(+), 37 deletions(-)
 
-[snip]
+Ok, whole series applied to mvebu/dove_pcie-mbus-dt, which depends on
+mvebu/boards, mvebu/mbus_dt, and mvebu/msi_mvebu.
 
->> All error/warnings:
->>
->> warning: (MPC836x_RDK && MTD_NAND_FSL_ELBC && MTD_NAND_FSL_UPM)
->> selects FSL_LBC which has unmet direct dependencies (FSL_SOC)
->> warning: (MPC836x_RDK && MTD_NAND_FSL_ELBC && MTD_NAND_FSL_UPM)
->> selects FSL_LBC which has unmet direct dependencies (FSL_SOC)
->> In file included from arch/powerpc/include/asm/kvm_para.h:26:0, from
->> include/uapi/linux/kvm_para.h:26, from include/linux/kvm_para.h:4,
->> from include/linux/kvm_host.h:30, from
->> arch/powerpc/kernel/asm-offsets.c:53:
->> include/linux/of.h:269:28: error: conflicting types for
->>'of_get_cpu_node'
->> extern struct device_node *of_get_cpu_node(int cpu); ^ In file
->> included from include/linux/of.h:139:0, from
->> arch/powerpc/include/asm/kvm_para.h:26, from
->> include/uapi/linux/kvm_para.h:26, from include/linux/kvm_para.h:4,
->> from include/linux/kvm_host.h:30, from
->> arch/powerpc/kernel/asm-offsets.c:53:
->> arch/powerpc/include/asm/prom.h:47:21: note: previous declaration
->> of 'of_get_cpu_node' was here
->> struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
->> ^ make[2]: *** [arch/powerpc/kernel/asm-offsets.s] Error 1 make[2]:
->> Target `__build' not remade because of errors. make[1]: ***
->> [prepare0] Error 2 make[1]: Target `prepare' not remade because of
->> errors. make: *** [sub-make] Error 2
->>
->
-> There seems to be conflict in the new function "of_get_cpu_node" added.
-> PowerPC also defines the same function name. Further microblaze and
-> openrisc declares it(can be removed) but doesn't define it.
-> To fix this:
-> 1. I can rename the newly added function to something different like
->    `of_get_cpunode` or
-> 2. If of_* namespace should be used by only OF/FDT and not by any
->    architecture specific code, then the arch specific version can be
->    renamed to some thing like arch_of_get_cpu_node.
->    Also most of the calls to arch specific function can be moved to
->    generic code.
->
-> Let me know your thoughts.
+sigh... if this branch makes it in, I'll be amazed*.  And someone will
+owe me a stiff drink.  Well, I'll take a drink in either case. :-P
 
-It is up to Rafael if he is willing/able to rebase his tree, but I
-would drop this series until this is sorted out. I think the new
-common function should be and can be generalized to work for powerpc.
-It would need to make reg property optional and pass in the device
-node to the arch specific function.
+thx,
 
-A short term solution would be just to make the function "#ifndef CONFIG_PPC".
+Jason.
 
-Rob
+* because of the intricate dependencies, the changes are fine.
