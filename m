@@ -1,25 +1,26 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 13 Aug 2013 14:25:23 +0200
-Subject: [PATCH v2 4/5] PCI: mvebu: add support for reset on GPIO
+Date: Tue, 13 Aug 2013 14:25:22 +0200
+Subject: [PATCH v2 3/5] PCI: mvebu: remove subsys_initcall
 In-Reply-To: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1376396724-32048-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1376396724-32048-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a check for DT passed reset-gpios property and deasserts/
-asserts reset pin on probe/remove with configurable delay. Corresponding
-binding documentation is also updated.
+This removes the subsys_initcall from the driver and converts it to
+a normal platform_driver. Also, drvdata is set and a remove functions
+is added to disable the clock and free resources. As pci driver removal
+currently is not supported, set .suppress_bind_attrs to permit unbinding.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Changelog:
 v1->v2:
-- use reset API compatible bindings (Reported by Kumar Gala and Thierry
-  Reding)
-- add gpio properties to DT examples (Reported by Kumar Gala)
-- only fail (return) on EPROBE_DEFER and skip port parsing otherwise
-- use us delay instead of ms delay
+- do not add .remove and set .suppress_bind_attrs to permit currently
+  unsupported driver unloading/unbinding (Reported by Thierry Reding and
+  Thomas Petazzoni)
+- Note: I left the platform_set_drvdata(), as we will require that later
+  for device removal.
 
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Jason Cooper <jason@lakedaemon.net>
@@ -27,112 +28,121 @@ Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-pci at vger.kernel.org
 ---
- .../devicetree/bindings/pci/mvebu-pci.txt          |    6 ++++
- drivers/pci/host/pci-mvebu.c                       |   33 +++++++++++++++++++-
- 2 files changed, 38 insertions(+), 1 deletion(-)
+ drivers/pci/host/pci-mvebu.c |   33 ++++++++++++++-------------------
+ 1 file changed, 14 insertions(+), 19 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-index 638673a..8bb3245 100644
---- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-@@ -76,6 +76,8 @@ and the following optional properties:
- - marvell,pcie-lane: the physical PCIe lane number, for ports having
-   multiple lanes. If this property is not found, we assume that the
-   value is 0.
-+- reset-gpios: optional gpio to PERST#
-+- reset-delay-us: delay in us to wait after reset de-assertion
- 
- Example:
- 
-@@ -138,6 +140,10 @@ pcie-controller {
- 		interrupt-map = <0 0 0 0 &mpic 58>;
- 		marvell,pcie-port = <0>;
- 		marvell,pcie-lane = <0>;
-+		/* low-active PERST# reset on GPIO 25 */
-+		reset-gpios = <&gpio0 25 1>;
-+		/* wait 20ms for device settle after reset deassertion */
-+		reset-delay-us = <20000>;
- 		clocks = <&gateclk 5>;
- 		status = "disabled";
- 	};
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index bd7092a..a9ad4b3 100644
+index d2e9ae7..bd7092a 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -9,14 +9,17 @@
- #include <linux/kernel.h>
- #include <linux/pci.h>
- #include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/gpio.h>
- #include <linux/module.h>
- #include <linux/mbus.h>
- #include <linux/msi.h>
- #include <linux/slab.h>
- #include <linux/platform_device.h>
- #include <linux/of_address.h>
--#include <linux/of_pci.h>
- #include <linux/of_irq.h>
-+#include <linux/of_gpio.h>
-+#include <linux/of_pci.h>
- #include <linux/of_platform.h>
+@@ -165,7 +165,7 @@ static void mvebu_pcie_set_local_dev_nr(struct mvebu_pcie_port *port, int nr)
+  * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
+  * WIN[0-3] -> DRAM bank[0-3]
+  */
+-static void __init mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
++static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
+ {
+ 	const struct mbus_dram_target_info *dram;
+ 	u32 size;
+@@ -217,7 +217,7 @@ static void __init mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
+ 	       port->base + PCIE_BAR_CTRL_OFF(1));
+ }
  
- /*
-@@ -126,6 +129,9 @@ struct mvebu_pcie_port {
- 	unsigned int io_target;
- 	unsigned int io_attr;
- 	struct clk *clk;
-+	int reset_gpio;
-+	int reset_active_low;
-+	char *reset_name;
- 	struct mvebu_sw_pci_bridge bridge;
- 	struct device_node *dn;
+-static void __init mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
++static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
+ {
+ 	u16 cmd;
+ 	u32 mask;
+@@ -628,7 +628,7 @@ static struct pci_ops mvebu_pcie_ops = {
+ 	.write = mvebu_pcie_wr_conf,
+ };
+ 
+-static int __init mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
++static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+ {
+ 	struct mvebu_pcie *pcie = sys_to_pcie(sys);
+ 	int i;
+@@ -647,7 +647,7 @@ static int __init mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+ 	return 1;
+ }
+ 
+-static int __init mvebu_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
++static int mvebu_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+ {
+ 	struct of_irq oirq;
+ 	int ret;
+@@ -704,7 +704,7 @@ resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+ 		return start;
+ }
+ 
+-static void __init mvebu_pcie_enable(struct mvebu_pcie *pcie)
++static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+ {
+ 	struct hw_pci hw;
+ 
+@@ -727,10 +727,8 @@ static void __init mvebu_pcie_enable(struct mvebu_pcie *pcie)
+  * <...> property for one that matches the given port/lane. Once
+  * found, maps it.
+  */
+-static void __iomem * __init
+-mvebu_pcie_map_registers(struct platform_device *pdev,
+-			 struct device_node *np,
+-			 struct mvebu_pcie_port *port)
++static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
++		      struct device_node *np, struct mvebu_pcie_port *port)
+ {
+ 	struct resource regs;
+ 	int ret = 0;
+@@ -786,7 +784,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
+ 	return -ENOENT;
+ }
+ 
+-static void __init mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
++static void mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
+ {
+ 	struct device_node *msi_node;
+ 
+@@ -801,7 +799,7 @@ static void __init mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
+ 		pcie->msi->dev = &pcie->pdev->dev;
+ }
+ 
+-static int __init mvebu_pcie_probe(struct platform_device *pdev)
++static int mvebu_pcie_probe(struct platform_device *pdev)
+ {
  	struct mvebu_pcie *pcie;
-@@ -857,6 +863,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 	i = 0;
- 	for_each_child_of_node(pdev->dev.of_node, child) {
- 		struct mvebu_pcie_port *port = &pcie->ports[i];
-+		enum of_gpio_flags flags;
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -814,6 +812,7 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
- 		if (!of_device_is_available(child))
- 			continue;
-@@ -897,6 +904,30 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 			continue;
- 		}
+ 	pcie->pdev = pdev;
++	platform_set_drvdata(pdev, pcie);
  
-+		port->reset_gpio = of_get_named_gpio_flags(child,
-+						   "reset-gpios", 0, &flags);
-+		if (gpio_is_valid(port->reset_gpio)) {
-+			u32 reset_udelay = 20000;
-+
-+			port->reset_active_low = flags & OF_GPIO_ACTIVE_LOW;
-+			port->reset_name = kasprintf(GFP_KERNEL,
-+				     "pcie%d.%d-reset", port->port, port->lane);
-+			of_property_read_u32(child, "reset-delay-us",
-+					     &reset_udelay);
-+
-+			ret = devm_gpio_request_one(&pdev->dev,
-+			    port->reset_gpio, GPIOF_DIR_OUT, port->reset_name);
-+			if (ret) {
-+				if (ret == -EPROBE_DEFER)
-+					return ret;
-+				continue;
-+			}
-+
-+			gpio_set_value(port->reset_gpio,
-+				       (port->reset_active_low) ? 1 : 0);
-+			udelay(reset_udelay);
-+		}
-+
- 		port->clk = of_clk_get_by_name(child, NULL);
- 		if (IS_ERR(port->clk)) {
- 			dev_err(&pdev->dev, "PCIe%d.%d: cannot get clock\n",
+ 	/* Get the PCIe memory and I/O aperture */
+ 	mvebu_mbus_get_pcie_mem_aperture(&pcie->mem);
+@@ -956,16 +955,12 @@ static struct platform_driver mvebu_pcie_driver = {
+ 		.name = "mvebu-pcie",
+ 		.of_match_table =
+ 		   of_match_ptr(mvebu_pcie_of_match_table),
++		/* driver unloading/unbinding currently not supported */
++		.suppress_bind_attrs = true,
+ 	},
++	.probe = mvebu_pcie_probe,
+ };
+-
+-static int __init mvebu_pcie_init(void)
+-{
+-	return platform_driver_probe(&mvebu_pcie_driver,
+-				     mvebu_pcie_probe);
+-}
+-
+-subsys_initcall(mvebu_pcie_init);
++module_platform_driver(mvebu_pcie_driver);
+ 
+ MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
+ MODULE_DESCRIPTION("Marvell EBU PCIe driver");
 -- 
 1.7.10.4
