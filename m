@@ -1,55 +1,92 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 13 Aug 2013 12:40:29 +0200
-Subject: [PATCH 4/9] PCI: mvebu: add support for reset on GPIO
-In-Reply-To: <20130813100348.GA28762@ulmo>
-References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376333215-12885-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130813080956.GE9316@ulmo> <20130813103030.1e4156a1@skate>
- <20130813100348.GA28762@ulmo>
-Message-ID: <520A0D1D.4050609@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 13 Aug 2013 16:14:44 +0530
+Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
+In-Reply-To: <20130731061538.GC13289@radagast>
+References: <20130720220006.GA7977@kroah.com> <3839600.WiC1OLF35o@flatron>
+ <51EBC0F5.70601@ti.com> <9748041.Qq1fWJBg6D@flatron>
+ <20130721154653.GG16598@kroah.com> <20130730071106.GC16441@radagast>
+ <51F8A440.8010803@ti.com> <20130731061538.GC13289@radagast>
+Message-ID: <520A0E1C.5000306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/13 12:03, Thierry Reding wrote:
-> On Tue, Aug 13, 2013 at 10:30:30AM +0200, Thomas Petazzoni wrote:
->> Dear Thierry Reding,
->>
->> On Tue, 13 Aug 2013 10:09:56 +0200, Thierry Reding wrote:
->>
->>>> +- reset-gpios: optional gpio to PERST#
->>>> +- reset-delay-ms: delay in ms to wait after reset de-assertion
+Hi,
+
+On Wednesday 31 July 2013 11:45 AM, Felipe Balbi wrote:
+> Hi,
+> 
+> On Wed, Jul 31, 2013 at 11:14:32AM +0530, Kishon Vijay Abraham I wrote:
+>>>>>>> IMHO we need a lookup method for PHYs, just like for clocks,
+>>>>>>> regulators, PWMs or even i2c busses because there are complex cases
+>>>>>>> when passing just a name using platform data will not work. I would
+>>>>>>> second what Stephen said [1] and define a structure doing things in a
+>>>>>>> DT-like way.
+>>>>>>>
+>>>>>>> Example;
+>>>>>>>
+>>>>>>> [platform code]
+>>>>>>>
+>>>>>>> static const struct phy_lookup my_phy_lookup[] = {
+>>>>>>>
+>>>>>>> 	PHY_LOOKUP("s3c-hsotg.0", "otg", "samsung-usbphy.1", "phy.2"),
+>>>>>>
+>>>>>> The only problem here is that if *PLATFORM_DEVID_AUTO* is used while
+>>>>>> creating the device, the ids in the device name would change and
+>>>>>> PHY_LOOKUP wont be useful.
+>>>>>
+>>>>> I don't think this is a problem. All the existing lookup methods already 
+>>>>> use ID to identify devices (see regulators, clkdev, PWMs, i2c, ...). You 
+>>>>> can simply add a requirement that the ID must be assigned manually, 
+>>>>> without using PLATFORM_DEVID_AUTO to use PHY lookup.
+>>>>
+>>>> And I'm saying that this idea, of using a specific name and id, is
+>>>> frought with fragility and will break in the future in various ways when
+>>>> devices get added to systems, making these strings constantly have to be
+>>>> kept up to date with different board configurations.
+>>>>
+>>>> People, NEVER, hardcode something like an id.  The fact that this
+>>>> happens today with the clock code, doesn't make it right, it makes the
+>>>> clock code wrong.  Others have already said that this is wrong there as
+>>>> well, as systems change and dynamic ids get used more and more.
+>>>>
+>>>> Let's not repeat the same mistakes of the past just because we refuse to
+>>>> learn from them...
+>>>>
+>>>> So again, the "find a phy by a string" functions should be removed, the
+>>>> device id should be automatically created by the phy core just to make
+>>>> things unique in sysfs, and no driver code should _ever_ be reliant on
+>>>> the number that is being created, and the pointer to the phy structure
+>>>> should be used everywhere instead.
+>>>>
+>>>> With those types of changes, I will consider merging this subsystem, but
+>>>> without them, sorry, I will not.
 >>>
->>> I remember some recent discussion about this, and we now have this reset
->>> framework, so perhaps it makes more sense to use the reset binding for
->>> this? Cc'ing Stephen (as part of the device tree bindings maintainers
->>> team) who was involved in that recent reset bindings discussion.
+>>> I'll agree with Greg here, the very fact that we see people trying to
+>>> add a requirement of *NOT* using PLATFORM_DEVID_AUTO already points to a
+>>> big problem in the framework.
+>>>
+>>> The fact is that if we don't allow PLATFORM_DEVID_AUTO we will end up
+>>> adding similar infrastructure to the driver themselves to make sure we
+>>> don't end up with duplicate names in sysfs in case we have multiple
+>>> instances of the same IP in the SoC (or several of the same PCIe card).
+>>> I really don't want to go back to that.
 >>
->> I also thought about this, but the reset framework seems to be designed
->> for "reset controller" IPs, i.e special IPs that are controlling reset
->> signals. Looking at Documentation/devicetree/bindings/reset/reset.txt,
->> I'm not sure to see how this would apply to GPIO-controlled reset
->> signals.
->
-> See:
->
-> 	http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg36900.html
->
-> which seems to have carried over to this at some point:
->
-> 	http://www.spinics.net/lists/devicetree/msg00521.html
->
-> Some of the messages in between I can't find in any archive, sorry.
+>> If we are using PLATFORM_DEVID_AUTO, then I dont see any way we can give the
+>> correct binding information to the PHY framework. I think we can drop having
+>> this non-dt support in PHY framework? I see only one platform (OMAP3) going to
+>> be needing this non-dt support and we can use the USB PHY library for it.
+> 
+> you shouldn't drop support for non-DT platform, in any case we lived
+> without DT (and still do) for years. Gotta find a better way ;-)
 
-Thierry, Sascha,
+hmm..
 
-thanks for the input. Flipping through the above discussion, I guess
-using "reset-gpios" and "reset-delay-us" should be fine?
+how about passing the device names of PHY in platform data of the controller?
+It should be deterministic as the PHY framework assigns its own id and we
+*don't* want to add any requirement that the ID must be assigned manually
+without using PLATFORM_DEVID_AUTO. We can get rid of *phy_init_data* in the v10
+patch series.
 
-I can also remove the delay property for now, as I cannot find a final
-conclusion about the configurable delay.
-
-In the driver, I will stick to bare gpiolib and wait for gpio-reset
-driver to become available. Currently, we don't have sophisticated
-reset handling in pci-mvebu anyway.
-
-Sebastian
+Thanks
+Kishon
+> 
