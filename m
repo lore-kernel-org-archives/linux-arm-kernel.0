@@ -1,59 +1,25 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 13 Aug 2013 09:48:50 -0400
-Subject: [PATCH 7/9] ARM: dove: add PCIe controllers to SoC DT
-In-Reply-To: <520A1871.4000501@gmail.com>
-References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376333215-12885-8-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130812200452.GW25111@titan.lakedaemon.net>
- <520A1871.4000501@gmail.com>
-Message-ID: <20130813134850.GZ25111@titan.lakedaemon.net>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 13 Aug 2013 09:56:29 -0400
+Subject: [PATCH 02/16] Add system pointer argument to shared EFI stub
+ related functions so they no longer use global system table pointer as they
+ did when part of eboot.c. This code is now shared, so using a global
+ variable as part of the interface is not that nice. Also, by avoiding any
+ global variables in the ARM EFI stub, this allows the code to be position
+ independent without requiring GOT fixups.
+In-Reply-To: <1376090777-20090-3-git-send-email-roy.franz@linaro.org>
+References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
+ <1376090777-20090-3-git-send-email-roy.franz@linaro.org>
+Message-ID: <1376402189.27484.13.camel@t520.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 01:28:49PM +0200, Sebastian Hesselbarth wrote:
-> On 08/12/13 22:04, Jason Cooper wrote:
-> >On Mon, Aug 12, 2013 at 08:46:53PM +0200, Sebastian Hesselbarth wrote:
-> >>This adds a node for the pcie controllers found on Dove SoCs to the
-> >>SoC DT include.
-> >>
-> >>Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> >>---
-> >>Cc: Russell King <linux@arm.linux.org.uk>
-> >>Cc: Jason Cooper <jason@lakedaemon.net>
-> >>Cc: Andrew Lunn <andrew@lunn.ch>
-> >>Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> >>Cc: linux-kernel at vger.kernel.org
-> >>Cc: linux-arm-kernel at lists.infradead.org
-> >>---
-> >>  arch/arm/boot/dts/dove.dtsi |   54 +++++++++++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 54 insertions(+)
-> >
-> >patches 7-9 applied to mvebu/dove_mbus since the dependencies are
-> >cleaner that way.
-> 
-> Jason,
-> 
-> I will have to slightly modify the reset-gpio property names and that
-> requires a fixup patch for patch 8. Can you still squash it or do you
-> need a proper patch?
-...
-> diff --git a/arch/arm/boot/dts/dove-d3plug.dts b/arch/arm/boot/dts/dove-d3plug.dts
-> index ead90eb..f5f59bb 100644
-> --- a/arch/arm/boot/dts/dove-d3plug.dts
-> +++ b/arch/arm/boot/dts/dove-d3plug.dts
-> @@ -91,7 +91,7 @@
->  	pcie-port at 0 {
->  		status = "okay";
->  		reset-gpios = <&gpio0 26 1>;
-> -		reset-delay-ms = <20>;
-> +		reset-delay-us = <20000>;
->  		pinctrl-0 = <&pmx_camera_gpio>;
->  		pinctrl-names = "default";
->  	};
+On Fri, 2013-08-09 at 16:26 -0700, Roy Franz wrote:
+> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+> ---
+>  arch/x86/boot/compressed/eboot.c       |   38 +++++++------
+>  drivers/firmware/efi/efi-stub-helper.c |   96 +++++++++++++++++---------------
+>  2 files changed, 72 insertions(+), 62 deletions(-)
 
-Squashed into 'ARM: dove: add initial DT file for Globalscale D3Plug' in
-mvebu/dove_mbus-dt
+Tested on arm64.
 
-thx,
-
-Jason.
+Acked-by: Mark Salter <msalter@redhat.com>
