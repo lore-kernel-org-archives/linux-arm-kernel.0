@@ -1,66 +1,247 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Aug 2013 12:30:11 +0100
-Subject: [PATCHv5 22/31] CLK: TI: add interface clock support for OMAP3
-In-Reply-To: <1375460751-23676-23-git-send-email-t-kristo@ti.com>
-References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
- <1375460751-23676-23-git-send-email-t-kristo@ti.com>
-Message-ID: <20130813113010.GN27165@e106331-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 13 Aug 2013 12:32:53 +0100
+Subject: [PATCH] AArch64: Add single-step and breakpoint handler hooks
+In-Reply-To: <1375769526-3526-1-git-send-email-sandeepa.prabhu@linaro.org>
+References: <1375769526-3526-1-git-send-email-sandeepa.prabhu@linaro.org>
+Message-ID: <20130813113253.GF30280@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 02, 2013 at 05:25:41PM +0100, Tero Kristo wrote:
-> OMAP3 has interface clocks in addition to functional clocks, which
-> require special handling for the autoidle and idle status register
-> offsets mainly.
+On Tue, Aug 06, 2013 at 07:12:06AM +0100, Sandeepa Prabhu wrote:
+> AArch64 Single Steping and Breakpoint debug exceptions will be
+> used by multiple debug framworks like kprobes & kgdb.
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> This patch implements the hooks for those frameworks to register
+> their own handlers for handling breakpoint and single step events.
+> 
+> Reworked the debug exception handler in entry.S: do_dbg to
+> pass the correct break/step address to the handlers, i.e. FAR_EL1 if
+> exception is watchpoint, ELR_EL1 for all other debug exceptions.
+> 
+> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+> Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
 > ---
->  .../devicetree/bindings/clock/ti/interface.txt     |   45 +++++++++
->  arch/arm/mach-omap2/clock.h                        |    6 --
->  drivers/clk/ti/Makefile                            |    2 +-
->  drivers/clk/ti/interface.c                         |  105 ++++++++++++++++++++
->  include/linux/clk/ti.h                             |    7 ++
->  5 files changed, 158 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/ti/interface.txt
->  create mode 100644 drivers/clk/ti/interface.c
+>  arch/arm64/include/asm/debug-monitors.h |  20 +++++++
+>  arch/arm64/kernel/debug-monitors.c      | 102 +++++++++++++++++++++++++++++++-
+>  arch/arm64/kernel/entry.S               |   6 +-
+>  3 files changed, 124 insertions(+), 4 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/ti/interface.txt b/Documentation/devicetree/bindings/clock/ti/interface.txt
-> new file mode 100644
-> index 0000000..8b09ae7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/ti/interface.txt
-> @@ -0,0 +1,45 @@
-> +Binding for Texas Instruments interface clock.
+> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+> index a2232d0..aff3a76 100644
+> --- a/arch/arm64/include/asm/debug-monitors.h
+> +++ b/arch/arm64/include/asm/debug-monitors.h
+> @@ -16,6 +16,8 @@
+>  #ifndef __ASM_DEBUG_MONITORS_H
+>  #define __ASM_DEBUG_MONITORS_H
+>  
+> +#include <linux/list.h>
 > +
-> +This binding uses the common clock binding[1]. This clock is
-> +quite much similar to the basic gate-clock [2], however,
-> +it supports a number of additional features, including
-> +companion clock finding (match corresponding functional gate
-> +clock) and hardware autoidle enable / disable.
+>  #ifdef __KERNEL__
+>  
+>  #define	DBG_ESR_EVT(x)		(((x) >> 27) & 0x7)
+> @@ -62,6 +64,24 @@ struct task_struct;
+>  
+>  #define DBG_ARCH_ID_RESERVED	0	/* In case of ptrace ABI updates. */
+>  
+> +struct step_hook {
+> +	struct list_head node;
+> +	int (*fn)(struct pt_regs *regs, unsigned int insn, unsigned long addr);
+> +};
+
+Shouldn't that be esr instead of insn?
+
+> +void register_step_hook(struct step_hook *hook);
+> +void unregister_step_hook(struct step_hook *hook);
 > +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +[2] Documentation/devicetree/bindings/clock/gate-clock.txt
+> +struct break_hook {
+> +	struct list_head node;
+> +	u32 esr_magic;
+
+There's nothing magic about it. esr_val instead?
+
+> +	u32 esr_mask;
+> +	int (*fn)(struct pt_regs *regs, unsigned int insn, unsigned long addr);
+> +};
 > +
-> +Required properties:
-> +- compatible : shall be "ti,interface-clock"
-
-It might make sense to be more specific: "ti,omap3-interface-clock".
-
-> +- #clock-cells : from common clock binding; shall be set to 0
-> +- clocks : link to phandle of parent clock
-> +- reg : base address for the control register
+> +void register_break_hook(struct break_hook *hook);
+> +void unregister_break_hook(struct break_hook *hook);
 > +
-> +Optional properties:
-> +- ti,enable-bit : bit shift for the bit enabling/disabling the clock
-> +		  (default 0)
-> +- ti,iclk-no-wait : flag for selecting non-waiting hw-ops
-> +- ti,iclk-hsotgusb : flag for selecting hsotgusb hw-ops
-> +- ti,iclk-dss : flag for selecting DSS interface clock hw-ops
-> +- ti,iclk-ssi : flag for selecting SSI interface clock hw-ops
-> +- ti,am35xx-clk : flag for selecting AM35xx interface clock hw-ops
+>  u8 debug_monitors_arch(void);
+>  
+>  void enable_debug_monitors(enum debug_el el);
+> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+> index cbfacf7..2846327 100644
+> --- a/arch/arm64/kernel/debug-monitors.c
+> +++ b/arch/arm64/kernel/debug-monitors.c
+> @@ -188,6 +188,54 @@ static void clear_regs_spsr_ss(struct pt_regs *regs)
+>  	regs->pstate = spsr;
+>  }
+>  
+> +/* EL1 Single Step Handler hooks */
+> +static LIST_HEAD(step_hook);
+> +static DEFINE_RAW_SPINLOCK(step_lock);
+> +
+> +void register_step_hook(struct step_hook *hook)
+> +{
+> +	unsigned long flags;
+> +
+> +	raw_spin_lock_irqsave(&step_lock, flags);
+> +	list_add(&hook->node, &step_hook);
+> +	raw_spin_unlock_irqrestore(&step_lock, flags);
+> +}
+> +
+> +void unregister_step_hook(struct step_hook *hook)
+> +{
+> +	unsigned long flags;
+> +
+> +	raw_spin_lock_irqsave(&step_lock, flags);
+> +	list_del(&hook->node);
+> +	raw_spin_unlock_irqrestore(&step_lock, flags);
+> +}
 
-I think these should be selected based on the compatible string. They're
-mutually exclusive, and incompatible.
+Why do you need to disable IRQs during these operations?
 
-Thanks,
-Mark.
+> +/*
+> + * Call registered single step handers
+> + * There is no Syndrome info to check for determining the handler.
+> + * So we call all the registered handlers, until the right handler is
+> + * found which returns zero.
+> + */
+> +static int call_step_hook(struct pt_regs *regs,
+> +		unsigned int esr, unsigned long addr)
+> +{
+> +	struct step_hook *hook;
+> +	unsigned long flags;
+> +
+> +	raw_spin_lock_irqsave(&step_lock, flags);
+> +	list_for_each_entry(hook, &step_hook, node)	{
+> +		raw_spin_unlock_irqrestore(&step_lock, flags);
+
+Is this safe? Can't you stask the function pointer and break out of the loop
+when you find it instead?
+
+> +		if (hook->fn(regs, esr, addr) == 0)
+> +			return 0;
+> +
+> +		raw_spin_lock_irqsave(&step_lock, flags);
+> +	}
+> +	raw_spin_unlock_irqrestore(&step_lock, flags);
+> +
+> +	return 1;
+> +}
+> +
+>  static int single_step_handler(unsigned long addr, unsigned int esr,
+>  			       struct pt_regs *regs)
+>  {
+> @@ -215,8 +263,11 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+>  		 */
+>  		user_rewind_single_step(current);
+>  	} else {
+> -		/* TODO: route to KGDB */
+> -		pr_warning("Unexpected kernel single-step exception at EL1\n");
+> +		/* Call single step handlers for kgdb/kprobes */
+> +		if (call_step_hook(regs, addr, esr) == 0)
+> +			return 0;
+> +
+> +		pr_warn("unexpected single step exception at %lx!\n", addr);
+>  		/*
+>  		 * Re-enable stepping since we know that we will be
+>  		 * returning to regs.
+> @@ -227,11 +278,56 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+>  	return 0;
+>  }
+>  
+> +
+> +static LIST_HEAD(break_hook);
+> +static DEFINE_RAW_SPINLOCK(break_lock);
+> +
+> +void register_break_hook(struct break_hook *hook)
+> +{
+> +	unsigned long flags;
+> +
+> +	raw_spin_lock_irqsave(&break_lock, flags);
+> +	list_add(&hook->node, &break_hook);
+> +	raw_spin_unlock_irqrestore(&break_lock, flags);
+> +}
+> +
+> +void unregister_break_hook(struct break_hook *hook)
+> +{
+> +	unsigned long flags;
+> +
+> +	raw_spin_lock_irqsave(&break_lock, flags);
+> +	list_del(&hook->node);
+> +	raw_spin_unlock_irqrestore(&break_lock, flags);
+> +}
+> +
+> +static int call_break_hook(struct pt_regs *regs,
+> +		unsigned int esr, unsigned long addr)
+> +{
+> +	struct break_hook *hook;
+> +	unsigned long flags;
+> +	int (*fn)(struct pt_regs *regs,
+> +		unsigned int esr, unsigned long addr) = NULL;
+> +
+> +	raw_spin_lock_irqsave(&break_lock, flags);
+> +	list_for_each_entry(hook, &break_hook, node)
+> +		if ((esr & hook->esr_mask) == hook->esr_magic)
+> +			fn = hook->fn;
+> +	raw_spin_unlock_irqrestore(&break_lock, flags);
+
+That's better! (although I'm still unsure about the interrupts).
+
+> +	return fn ? fn(regs, esr, addr) : 1;
+> +}
+> +
+>  static int brk_handler(unsigned long addr, unsigned int esr,
+>  		       struct pt_regs *regs)
+>  {
+>  	siginfo_t info;
+>  
+> +	/* Call single step handlers for kgdb/kprobes */
+> +	if (call_break_hook(regs, esr, addr) == 0)
+> +		return 0;
+> +
+> +	pr_warn("unexpected brk exception at %lx, esr=0x%x\n", addr, esr);
+> +
+>  	if (!user_mode(regs))
+>  		return -EFAULT;
+>  
+> @@ -291,7 +387,7 @@ static int __init debug_traps_init(void)
+>  	hook_debug_fault_code(DBG_ESR_EVT_HWSS, single_step_handler, SIGTRAP,
+>  			      TRAP_HWBKPT, "single-step handler");
+>  	hook_debug_fault_code(DBG_ESR_EVT_BRK, brk_handler, SIGTRAP,
+> -			      TRAP_BRKPT, "ptrace BRK handler");
+> +			      TRAP_BRKPT, "AArch64 BRK handler");
+
+Why change this name?
+
+>  	return 0;
+>  }
+>  arch_initcall(debug_traps_init);
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 6ad781b..e7350bd 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -288,8 +288,12 @@ el1_dbg:
+>  	/*
+>  	 * Debug exception handling
+>  	 */
+> +	mrs	x25, far_el1			//far for watchpt
+
+Useless comment. How about: "// Watchpoint location"?
+
+> +	cmp	x24, #ESR_EL1_EC_WATCHPT_EL1
+> +	csel	x0, x25, x22, eq	//addr: x25->far_el1, x22->elr_el1
+> +	b.ge	do_dbg
+>  	tbz	x24, #0, el1_inv		// EL1 only
+
+I'd rather you left the tbz as the first instruction in el1_dbg, then you
+can also lose the b.ge.
+
+Finally, I don't see the need for this patch until we have something like
+kprobes or kgdb, so I'd rather hold off merging this additional support code
+until we have a user for it.
+
+Cheers,
+
+Will
