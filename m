@@ -1,38 +1,149 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 13 Aug 2013 19:55:47 +0100
-Subject: [PATCH 10/18] spi: s3c64xx: Do not require legacy DMA API in
- case of S3C64XX
-In-Reply-To: <2472314.6b8DcBdcjO@flatron>
-References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
- <1376243970-6489-11-git-send-email-tomasz.figa@gmail.com>
- <20130812233641.GL6427@sirena.org.uk> <2472314.6b8DcBdcjO@flatron>
-Message-ID: <20130813185547.GD6427@sirena.org.uk>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Tue, 13 Aug 2013 16:07:45 -0300
+Subject: [PATCH] ARM: sunxi: dt: Add device tree for Mele A1000
+Message-ID: <1376420865-4650-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 01:49:53AM +0200, Tomasz Figa wrote:
+This adds a device tree usable on Mele A1000 (and A2000, as it
+apparently is the same device except for the case). This device features
+one UART port, Ethernet, an AXP209 PMU on i2c0 and two user configurable
+LEDs.
 
-> I've been testing this without any significant patches, like PWM, CCF or 
-> DT support, just everything from the branch I pointed to and some board-
-> specific patches to help in debugging.
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
 
-Done some more digging.  It's not failing the first time it requests the
-channel, it's failing sometime later on (after we've been running for a
-while but when we've had a substantial idle period).  However it is the
-first time we're actually intending to use the channel, previously to
-this the transfers would always be too small to trigger DMA.  I'm not
-sure that's relevant though as we're not getting far enough to actually
-request the channel.
+This has been tested by arokux on #linux-sunxi in Freenode and found to 
+work correctly.
 
-I'm still debugging what's going on here - the basic refcounting all
-looks OK in the SPI driver, I can see it requesting and releasing with
-the refcounts all going back to zero in the DMA driver as expected but
-when we come back to the device later on dmaengine is deciding the
-device is unavailable quite early on in the process.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/f958a0e0/attachment.sig>
+ arch/arm/boot/dts/Makefile            |   1 +
+ arch/arm/boot/dts/sun4i-a10-a1000.dts | 106 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 107 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun4i-a10-a1000.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 641b3c9..3fd3919 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -206,6 +206,7 @@ dtb-$(CONFIG_ARCH_STI)+= stih415-b2000.dtb \
+ 	stih415-b2020.dtb \
+ 	stih416-b2020.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += \
++	sun4i-a10-a1000.dtb \
+ 	sun4i-a10-cubieboard.dtb \
+ 	sun4i-a10-mini-xplus.dtb \
+ 	sun4i-a10-hackberry.dtb \
+diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+new file mode 100644
+index 0000000..304a38e
+--- /dev/null
++++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+@@ -0,0 +1,106 @@
++/*
++ * Copyright 2013 Emilio L?pez
++ *
++ * Emilio L?pez <emilio@elopez.com.ar>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "sun4i-a10.dtsi"
++
++/ {
++	model = "Mele A1000";
++	compatible = "mele,a1000", "allwinner,sun4i-a10";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		bootargs = "earlyprintk console=ttyS0,115200";
++	};
++
++	soc at 01c20000 {
++		emac: ethernet at 01c0b000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&emac_pins_a>;
++			phy = <&phy1>;
++			status = "okay";
++		};
++
++		mdio at 01c0b080 {
++			phy-supply = <&reg_emac_3v3>;
++			status = "okay";
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
++
++		pinctrl at 01c20800 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&a1000_hogs>;
++
++			a1000_hogs: hogs at 0 {
++				allwinner,pins = "PH15";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			led_pins_a1000: led_pins at 0 {
++				allwinner,pins = "PH10", "PH20";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <1>;
++				allwinner,pull = <0>;
++			};
++		};
++
++		uart0: serial at 01c28000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
++			status = "okay";
++		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_a1000>;
++
++		red {
++			label = "a1000:red:usr";
++			gpios = <&pio 7 10 0>;
++		};
++
++		blue {
++			label = "a1000:blue:usr";
++			gpios = <&pio 7 20 0>;
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++
++		reg_emac_3v3: emac-3v3 {
++			compatible = "regulator-fixed";
++			regulator-name = "emac-3v3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			enable-active-high;
++			gpio = <&pio 7 15 0>;
++		};
++	};
++};
+-- 
+1.8.3.4
