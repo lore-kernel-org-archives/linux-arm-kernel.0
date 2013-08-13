@@ -1,15 +1,14 @@
 From: chanho61.park@samsung.com (Chanho Park)
-Date: Tue, 13 Aug 2013 14:12:59 +0900
-Subject: [PATCHv3 4/4] ARM: dts: Add rotator node for exynos5250
+Date: Tue, 13 Aug 2013 14:12:57 +0900
+Subject: [PATCHv3 2/4] ARM: dts: Add rotator node for exynos4210
 In-Reply-To: <1376370779-26930-1-git-send-email-chanho61.park@samsung.com>
 References: <1376370779-26930-1-git-send-email-chanho61.park@samsung.com>
-Message-ID: <1376370779-26930-5-git-send-email-chanho61.park@samsung.com>
+Message-ID: <1376370779-26930-3-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a rotator node for exynos5250. It has different align value of
-image size compared with any other chips. So, we should define new compatible
-for the exynos5250.
+This patch adds a rotator node for exynos4210. The exynos4210 has different
+limitation of image size compared with later chips.
 
 Signed-off-by: Chanho Park <chanho61.park@samsung.com>
 Cc: Thomas Abraham <thomas.abraham@linaro.org>
@@ -17,27 +16,27 @@ Cc: Kukjin Kim <kgene.kim@samsung.com>
 Cc: Inki Dae <inki.dae@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/boot/dts/exynos5250.dtsi |    8 ++++++++
+ arch/arm/boot/dts/exynos4.dtsi |    8 ++++++++
  1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 6f356ce..f579546 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -570,6 +570,14 @@
- 		};
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 597cfcf..baa3e56 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -243,6 +243,14 @@
+ 		status = "disabled";
  	};
  
-+	rotator at 11C00000 {
-+		compatible = "samsung,exynos5250-rotator";
-+		reg = <0x11C00000 0x1000>;
-+		interrupts = <0 84 0>;
-+		clocks = <&clock 269>;
++	rotator at 12810000 {
++		compatible = "samsung,exynos4210-rotator";
++		reg = <0x12810000 0x1000>;
++		interrupts = <0 83 0>;
++		clocks = <&clock 278>;
 +		clock-names = "rotator";
 +	};
 +
- 	gsc_0:  gsc at 0x13e00000 {
- 		compatible = "samsung,exynos5-gsc";
- 		reg = <0x13e00000 0x1000>;
+ 	mfc: codec at 13400000 {
+ 		compatible = "samsung,mfc-v5";
+ 		reg = <0x13400000 0x10000>;
 -- 
 1.7.9.5
