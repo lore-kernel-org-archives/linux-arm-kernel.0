@@ -1,31 +1,64 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 13 Aug 2013 10:12:59 +0100
-Subject: [Qemu-devel] SCSI bus failures with qemu-arm in kernel 3.8+
-In-Reply-To: <1376383051.2737.20@driftwood>
-References: <20130812164548.GE23006@n2100.arm.linux.org.uk>
- <1376383051.2737.20@driftwood>
-Message-ID: <CAFEAcA_KJwzefBH0St2vbGd9gaWsVL9jdrGRBJU9wx2-kuo1vA@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 13 Aug 2013 11:19:01 +0200
+Subject: [PATCH 4/9] PCI: mvebu: add support for reset on GPIO
+In-Reply-To: <BA285A30-3E38-4F7A-BD5E-3271AD1A46BE@codeaurora.org>
+References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376333215-12885-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <BA285A30-3E38-4F7A-BD5E-3271AD1A46BE@codeaurora.org>
+Message-ID: <5209FA05.6090702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 August 2013 09:37, Rob Landley <rob@landley.net> wrote:
-> Peter says he knows somebody who knows somebody who dug some instance of
-> this hardware out of some landfill or something.
+[Added DT maintainers directly for a question below]
 
-No, I personally myself had the hardware. Really.
+On 08/13/13 02:56, Kumar Gala wrote:
+> On Aug 12, 2013, at 1:46 PM, Sebastian Hesselbarth wrote:
+>
+>> This patch adds a check for DT passed reset-gpios property and deasserts/
+>> asserts reset pin on probe/remove with configurable delay. Corresponding
+>> binding documentation is also updated.
+>>
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+[...]
+>> diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+>> index 638673a..f2fa261 100644
+>> --- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+>> +++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+>> @@ -76,6 +76,8 @@ and the following optional properties:
+>> - marvell,pcie-lane: the physical PCIe lane number, for ports having
+>>    multiple lanes. If this property is not found, we assume that the
+>>    value is 0.
+>> +- reset-gpios: optional gpio to PERST#
+>> +- reset-delay-ms: delay in ms to wait after reset de-assertion
+>
+> Both of these should probably be marvell,reset...
 
-> Me, I want to get something that works on new qemu _and_ last year's
-> qemu, and that's what I got.
+Kumar,
 
-Note that in general hoping that current mainline kernel will
-always work with ancient QEMU is a losing proposition -- it is
-always possible that a kernel improvement will trigger a latent
-model bug in QEMU. (To pick a random example, some while ago fixes
-to how the kernel dealt with BGR and RGB pixel formats on the
-versatile board broke QEMU because we weren't modelling it right;
-that was just a QEMU bug for which the fix is "get a newer QEMU".)
+as Thomas already mentioned, non-prefixed "foo-gpios" are quite common.
+As reset gpios are likely to be common among SoC pci controller setups,
+I though I'd stick with the non-prefixed property. But I have no strong
+opinion about it - but let's see how DT jurisdiction will vote :)
 
-The back-compat in the PCI code is so that the older kernels (2.6.x)
-will continue to work, which is not quite the same thing.
+> Does reset-delay-ms vary per board? I can't remember where the
+discussion got to about configuration info.
 
--- PMM
+Hmm, for Dove SoC, I only have one board to test - but the driver
+currently is for 4 different SoCs. I just did some quick evaluation
+of the reset delay required to bring up the device on the D3Plug.
+Using 10ms was too short, 20ms worked.
+
+I guess there will be other SoC/boards requiring different delays
+but I am fine with hardcoded 20ms and re-introduce reset-delay property
+only if it is really required. The driver's default is 20ms anyway.
+
+>>
+>> Example:
+>
+> It's usually good to update example to show all optional properties.
+
+Ok, will add the properties to one of the example ports.
+
+Thanks,
+
+Sebastian
