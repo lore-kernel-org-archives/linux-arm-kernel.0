@@ -1,31 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 13 Aug 2013 11:11:23 +0100
-Subject: [PATCH 1/16 v2] sound/soc/pxa/mioa701_wm9713.c: Avoid using
- ARRAY_AND_SIZE(e) as a function argument
-In-Reply-To: <alpine.DEB.2.02.1308130652080.1997@localhost6.localdomain6>
-References: <1376340564-7975-1-git-send-email-Julia.Lawall@lip6.fr>
- <20130812214050.GI6427@sirena.org.uk>
- <alpine.DEB.2.02.1308130652080.1997@localhost6.localdomain6>
-Message-ID: <20130813101123.GP6427@sirena.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 13 Aug 2013 12:40:29 +0200
+Subject: [PATCH 4/9] PCI: mvebu: add support for reset on GPIO
+In-Reply-To: <20130813100348.GA28762@ulmo>
+References: <1376333215-12885-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376333215-12885-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130813080956.GE9316@ulmo> <20130813103030.1e4156a1@skate>
+ <20130813100348.GA28762@ulmo>
+Message-ID: <520A0D1D.4050609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 06:52:56AM +0200, Julia Lawall wrote:
-> On Mon, 12 Aug 2013, Mark Brown wrote:
+On 08/13/13 12:03, Thierry Reding wrote:
+> On Tue, Aug 13, 2013 at 10:30:30AM +0200, Thomas Petazzoni wrote:
+>> Dear Thierry Reding,
+>>
+>> On Tue, 13 Aug 2013 10:09:56 +0200, Thierry Reding wrote:
+>>
+>>>> +- reset-gpios: optional gpio to PERST#
+>>>> +- reset-delay-ms: delay in ms to wait after reset de-assertion
+>>>
+>>> I remember some recent discussion about this, and we now have this reset
+>>> framework, so perhaps it makes more sense to use the reset binding for
+>>> this? Cc'ing Stephen (as part of the device tree bindings maintainers
+>>> team) who was involved in that recent reset bindings discussion.
+>>
+>> I also thought about this, but the reset framework seems to be designed
+>> for "reset controller" IPs, i.e special IPs that are controlling reset
+>> signals. Looking at Documentation/devicetree/bindings/reset/reset.txt,
+>> I'm not sure to see how this would apply to GPIO-controlled reset
+>> signals.
+>
+> See:
+>
+> 	http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg36900.html
+>
+> which seems to have carried over to this at some point:
+>
+> 	http://www.spinics.net/lists/devicetree/msg00521.html
+>
+> Some of the messages in between I can't find in any archive, sorry.
 
-> > What is the difference between this and the patch I applied the other
-> > day?
+Thierry, Sascha,
 
-> Sorry, it should have also removed the local definition of ARRAY_AND_SIZE?  
-> I thought that was in the commit message.
+thanks for the input. Flipping through the above discussion, I guess
+using "reset-gpios" and "reset-delay-us" should be fine?
 
-It was, sorry - to be hoenst I didn't read beyond the first paragraph
-since I'd already applied the patch.  If a patch has been applied you
-should really send incremental updates rather than resending the patch.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/08652c2d/attachment.sig>
+I can also remove the delay property for now, as I cannot find a final
+conclusion about the configurable delay.
+
+In the driver, I will stick to bare gpiolib and wait for gpio-reset
+driver to become available. Currently, we don't have sophisticated
+reset handling in pci-mvebu anyway.
+
+Sebastian
