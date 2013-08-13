@@ -1,53 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 13 Aug 2013 16:44:25 +0100
-Subject: [PATCH 12/22] ARM: dts: Remove '0x's from OMAP2420 H4 DTS file
-In-Reply-To: <1374490361-25769-12-git-send-email-lee.jones@linaro.org>
-References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-12-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130813154425.GH15278@lee--X1>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 13 Aug 2013 17:44:26 +0200
+Subject: [PATCH v2] usb: musb dsps: fix pdev cast in suspend/resume
+Message-ID: <1376408666-20075-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony, Benoit,
+dsps_suspend() and dsps_resume() are called with the device that has the
+glue assigned as drvdata. Using dev->parent seems wrong and causes a
+NULL pointer exception on an AM33xx board.
 
-Poke
+The code was introduced by commit c68bb4c6 ("usb: musb: dsps: control
+module handling (quirk)") but I wonder whether it was ever used.
 
-On Mon, 22 Jul 2013, Lee Jones wrote:
+As suggested by Felipe, this patch gets rid of the platform_device
+access entirely by using dev_get_drvdata().
 
-> Cc: Beno?t Cousson <b-cousson@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: linux-omap at vger.kernel.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/boot/dts/omap2420-h4.dts | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap2420-h4.dts b/arch/arm/boot/dts/omap2420-h4.dts
-> index 224c08f..34cdecb 100644
-> --- a/arch/arm/boot/dts/omap2420-h4.dts
-> +++ b/arch/arm/boot/dts/omap2420-h4.dts
-> @@ -50,15 +50,15 @@
->  			label = "bootloader";
->  			reg = <0 0x20000>;
->  		};
-> -		partition at 0x20000 {
-> +		partition at 20000 {
->  			label = "params";
->  			reg = <0x20000 0x20000>;
->  		};
-> -		partition at 0x40000 {
-> +		partition at 40000 {
->  			label = "kernel";
->  			reg = <0x40000 0x200000>;
->  		};
-> -		partition at 0x240000 {
-> +		partition at 240000 {
->  			label = "file-system";
->  			reg = <0x240000 0x3dc0000>;
->  		};
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ drivers/usb/musb/musb_dsps.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+index 5233804..16e36a3 100644
+--- a/drivers/usb/musb/musb_dsps.c
++++ b/drivers/usb/musb/musb_dsps.c
+@@ -692,8 +692,7 @@ static int dsps_remove(struct platform_device *pdev)
+ #ifdef CONFIG_PM_SLEEP
+ static int dsps_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev->parent);
+-	struct dsps_glue *glue = platform_get_drvdata(pdev);
++	struct dsps_glue *glue = dev_get_drvdata(dev);
+ 	const struct dsps_musb_wrapper *wrp = glue->wrp;
+ 	int i;
+ 
+@@ -705,8 +704,7 @@ static int dsps_suspend(struct device *dev)
+ 
+ static int dsps_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev->parent);
+-	struct dsps_glue *glue = platform_get_drvdata(pdev);
++	struct dsps_glue *glue = dev_get_drvdata(dev);
+ 	const struct dsps_musb_wrapper *wrp = glue->wrp;
+ 	int i;
+ 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.3.1
