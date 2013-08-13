@@ -1,63 +1,128 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 13 Aug 2013 14:58:42 +0800
-Subject: [PATCH V3 4/8] ARM: tegra: add common LP1 suspend support
-In-Reply-To: <5209367E.10900@wwwdotorg.org>
-References: <1376300407-14750-1-git-send-email-josephl@nvidia.com>
- <1376300407-14750-5-git-send-email-josephl@nvidia.com>
- <5209367E.10900@wwwdotorg.org>
-Message-ID: <1376377122.18689.252.camel@jlo-ubuntu-64.nvidia.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 13 Aug 2013 09:06:30 +0200
+Subject: [PATCH] usb: gadget: at91_udc: add usb_clk for transition to
+ common clk framework
+In-Reply-To: <520948C3.7060008@overkiz.com>
+References: <1375337885-2684-1-git-send-email-b.brezillon@overkiz.com>
+ <5208E881.3030205@atmel.com> <520948C3.7060008@overkiz.com>
+Message-ID: <5209DAF6.9020601@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-08-13 at 03:24 +0800, Stephen Warren wrote:
-> On 08/12/2013 03:40 AM, Joseph Lo wrote:
-> > The LP1 suspending mode on Tegra means CPU rail off, devices and PLLs are
-> > clock gated and SDRAM in self-refresh mode. That means the low level LP1
-> > suspending and resuming code couldn't be run on DRAM and the CPU must
-> > switch to the always on clock domain (a.k.a. CLK_M 12MHz oscillator). And
-> > the system clock (SCLK) would be switched to CLK_S, a 32KHz oscillator.
-> > The LP1 low level handling code need to be moved to IRAM area first. And
-> > marking the LP1 mask for indicating the Tegra device is in LP1. The CPU
-> > power timer needs to be re-calculated based on 32KHz that was originally
-> > based on PCLK.
-> > 
-> > When resuming from LP1, the LP1 reset handler will resume PLLs and then
-> > put DRAM to normal mode. Then jumping to the "tegra_resume" that will
-> > restore full context before back to kernel. The "tegra_resume" handler
-> > was expected to be found in PMC_SCRATCH41 register.
-> > 
-> > This is common LP1 procedures for Tegra, so we do these jobs mainly in
-> > this patch:
-> > * moving LP1 low level handling code to IRAM
-> > * marking LP1 mask
-> > * copying the physical address of "tegra_resume" to PMC_SCRATCH41
-> > * re-calculate the CPU power timer based on 32KHz
-> > 
-> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> > ---
-> > V3:
-> > * using a "#define" of IRAM_CODE to replace original static variable
-> 
-> I didn't mean change the variable to a define, but rather simply to use
-> the IO_ADDRESS() define instead of any new define. i.e.:
-> 
-> > diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-> 
-> > +#define IRAM_CODE IO_ADDRESS(TEGRA_IRAM_CODE_AREA)
-> 
-> ... just don't add that, and ...
-> 
-> > +static void tegra_suspend_enter_lp1(void)
-> > +{
-> > +	tegra_pmc_suspend();
-> > +
-> > +	/* copy the reset vector & SDRAM shutdown code into IRAM */
-> > +	memcpy(iram_save_addr, IRAM_CODE, iram_save_size);
-> > +	memcpy(IRAM_CODE, tegra_lp1_iram.start_addr, iram_save_size);
-> 
-> ... and s/IRAM_CODE/IO_ADDRESS(TEGRA_IRAM_CODE_AREA)/ in that code.
-> 
-> I'll make that fixup when applying these patches.
-OK. Thanks.
+On 12/08/2013 22:42, boris brezillon :
+> Hello Nicolas,
+>
+> On 12/08/2013 15:52, Nicolas Ferre wrote:
+>> On 01/08/2013 08:18, Boris BREZILLON :
+>>> The AT91 PMC (Power Management Controller) provides an USB clock used by
+>>> USB Full Speed host (ohci) and USB Full Speed device (udc).
+>>> The usb drivers (ohci and udc) must configure this clock to 48Mhz.
+>>> This configuration was formely done in mach-at91/clock.c, but this
+>>> implementation will be removed when moving to common clk framework.
+>>>
+>>> This patch adds support for usb clock retrieval and configuration,
+>>> and is
+>>> backward compatible with the current at91 clk implementation (if usb clk
+>>> is not found, it does not configure/enable it).
+>>>
+>>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>
+> Is there a reason you acked this version but not the 3rd one
+> (https://lkml.org/lkml/2013/8/2/102).
 
-Joseph
+No, only flow of emails while getting back online ;-)
+
+Bye,
+
+>>> ---
+>>>    drivers/usb/gadget/at91_udc.c |   17 ++++++++++++++++-
+>>>    drivers/usb/gadget/at91_udc.h |    2 +-
+>>>    2 files changed, 17 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/usb/gadget/at91_udc.c
+>>> b/drivers/usb/gadget/at91_udc.c
+>>> index fce8e4e..ae06585 100644
+>>> --- a/drivers/usb/gadget/at91_udc.c
+>>> +++ b/drivers/usb/gadget/at91_udc.c
+>>> @@ -870,6 +870,11 @@ static void clk_on(struct at91_udc *udc)
+>>>        if (udc->clocked)
+>>>            return;
+>>>        udc->clocked = 1;
+>>> +
+>>> +    if (!IS_ERR(udc->uclk)) {
+>>> +        clk_set_rate(udc->uclk, 48000000);
+>>> +        clk_prepare_enable(udc->uclk);
+>>> +    }
+>>>        clk_prepare_enable(udc->iclk);
+>>>        clk_prepare_enable(udc->fclk);
+>>>    }
+>>> @@ -882,6 +887,8 @@ static void clk_off(struct at91_udc *udc)
+>>>        udc->gadget.speed = USB_SPEED_UNKNOWN;
+>>>        clk_disable_unprepare(udc->fclk);
+>>>        clk_disable_unprepare(udc->iclk);
+>>> +    if (!IS_ERR(udc->uclk))
+>>> +        clk_disable_unprepare(udc->uclk);
+>>>    }
+>>>
+>>>    /*
+>>> @@ -1774,10 +1781,10 @@ static int at91udc_probe(struct
+>>> platform_device *pdev)
+>>>        /* get interface and function clocks */
+>>>        udc->iclk = clk_get(dev, "udc_clk");
+>>>        udc->fclk = clk_get(dev, "udpck");
+>>> +    udc->uclk = clk_get(dev, "usb_clk");
+>>>        if (IS_ERR(udc->iclk) || IS_ERR(udc->fclk)) {
+>>>            DBG("clocks missing\n");
+>>>            retval = -ENODEV;
+>>> -        /* NOTE: we "know" here that refcounts on these are NOPs */
+>>>            goto fail1;
+>>>        }
+>>>
+>>> @@ -1851,6 +1858,12 @@ fail3:
+>>>    fail2:
+>>>        free_irq(udc->udp_irq, udc);
+>>>    fail1:
+>>> +    if (!IS_ERR(udc->uclk))
+>>> +        clk_put(udc->uclk);
+>>> +    if (!IS_ERR(udc->fclk))
+>>> +        clk_put(udc->fclk);
+>>> +    if (!IS_ERR(udc->iclk))
+>>> +        clk_put(udc->iclk);
+>>>        iounmap(udc->udp_baseaddr);
+>>>    fail0a:
+>>>        if (cpu_is_at91rm9200())
+>>> @@ -1894,6 +1907,8 @@ static int __exit at91udc_remove(struct
+>>> platform_device *pdev)
+>>>
+>>>        clk_put(udc->iclk);
+>>>        clk_put(udc->fclk);
+>>> +    if (!IS_ERR(udc->uclk))
+>>> +        clk_put(udc->uclk);
+>>>
+>>>        return 0;
+>>>    }
+>>> diff --git a/drivers/usb/gadget/at91_udc.h
+>>> b/drivers/usb/gadget/at91_udc.h
+>>> index e647d1c..0175246 100644
+>>> --- a/drivers/usb/gadget/at91_udc.h
+>>> +++ b/drivers/usb/gadget/at91_udc.h
+>>> @@ -126,7 +126,7 @@ struct at91_udc {
+>>>        unsigned            active_suspend:1;
+>>>        u8                addr;
+>>>        struct at91_udc_data        board;
+>>> -    struct clk            *iclk, *fclk;
+>>> +    struct clk            *iclk, *fclk, *uclk;
+>>>        struct platform_device        *pdev;
+>>>        struct proc_dir_entry        *pde;
+>>>        void __iomem            *udp_baseaddr;
+>>>
+>>
+>>
+>
+>
+
+
+-- 
+Nicolas Ferre
