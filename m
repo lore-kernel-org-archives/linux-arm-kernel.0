@@ -1,108 +1,27 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 13 Aug 2013 11:08:23 -0400
-Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
- module registers and APIs
-In-Reply-To: <87d2phpsu1.fsf@kernel.org>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
- <5203A0BC.8060205@ti.com> <5203C457.80301@ti.com>
- <20130809051146.GB7656@atomide.com> <52055733.70808@ti.com>
- <87y586pvkq.fsf@kernel.org> <5209565C.7090508@ti.com>
- <87d2phpsu1.fsf@kernel.org>
-Message-ID: <520A4BE7.7090603@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 13 Aug 2013 11:11:23 -0400
+Subject: [PATCH v2 0/5] ARM: dove: DT PCIe support
+In-Reply-To: <20130813140130.GA25111@titan.lakedaemon.net>
+References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130813140130.GA25111@titan.lakedaemon.net>
+Message-ID: <20130813151123.GB25111@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 August 2013 10:29 AM, Kevin Hilman wrote:
-> Dave Gerlach <d-gerlach@ti.com> writes:
+On Tue, Aug 13, 2013 at 10:01:30AM -0400, Jason Cooper wrote:
+> Bjorn,
 > 
->> On 08/12/2013 02:17 PM, Kevin Hilman wrote:
->>> Dave Gerlach <d-gerlach@ti.com> writes:
->>>
->>>> On 08/09/2013 12:11 AM, Tony Lindgren wrote:
->>>>> * Dave Gerlach <d-gerlach@ti.com> [130808 09:23]:
->>>>>> On 08/08/2013 08:44 AM, Santosh Shilimkar wrote:
->>>>>>> Lets address the above better. I don't see a need of 8 functions
->>>>>>> exported doing one or 2 register writes.
->>>>>>>
->>>>>>> Look M3 based handling is going to be there on future SOCs
->>>>>>> as well and this kind of handling of IPC is very short cited.
->>>>>>>
->>>>>>
->>>>>> The idea here was to move all control module register accesses into
->>>>>> one file in planning of implementing a driver for the control module
->>>>>> itself in the future.
->>>>>>
->>>>>>> Probably we should have a separate driver for M3 in linux which
->>>>>>> can have all this local code instead of all these exports.
->>>>>>
->>>>>> The wkup_m3 code has been moved to a small driver found in patch 8
->>>>>> of this series, would it better to move this code there rather than
->>>>>> with the rest of the control module code?
->>>>>
->>>>> Please make everything you can into regular device drivers.
->>>>>
->>>>> We still have some dependencies to mach-omap2 code for PRCM
->>>>> for example, but we're trying to get all that to live in
->>>>> drivers.
->>>>>
->>>>> So for new pieces, let's not add further dependencies to
->>>>> complicate moving things to drivers.
->>>>>
->>>>> Regards,
->>>>>
->>>>> Tony
->>>>>
->>>>
->>>> Ok I will go ahead and pull the control module code that handles IPC
->>>> into the wkup_m3 driver.
->>>
->>> Any control module register access still needs to stay in control.c.
->>>
->>>> The wkup_m3.c file is still present in mach-omap2 as the right
->>>> location for it wasn't decided in the last RFC. Any thoughts on a good
->>>> location for it?
->>>
->>> I raised this also in earlier reviews, but don't remember the if it was
->>> answered...
->>>
->>> Why can't we handle the wkup_m3 using remoteproc/rpmsg instead of
->>> creating another little driver that duplicates communication with the
->>> M3.  Note also that the firmware load part would also be provided by
->>> remoteproc/rpmsg.
->>
->> Looping Suman Anna who handled the IPC patches this patch set is based
->> on top of...
->>
->> For the wkup_m3, the mailbox isn't used in a traditional manner. It's
->> only used with a dummy write to trigger an interrupt from the A8 to
->> the M3 and then communication happens in IPC registers within the
->> control module. No messages are actually sent through the mailbox in
->> either direction so that's why it was done this way rather than bring
->> in full support for the mailbox.
+> On Tue, Aug 13, 2013 at 02:25:19PM +0200, Sebastian Hesselbarth wrote:
+> > This patch set adds support for the PCIe controllers found on Marvell
+> > Dove SoCs. It depends on mvebu-pci patches sent by Thomas Petazzoni.
 > 
-> I don't believe remoteproc/rpmsg forces you to use the mailbox for
-> communication, and can use other IPC mechanisms.  This still sounds
-> cleaner than reinventing remoteproc/rpmsg because of slight variations.
-> 
-> The linux way is to use and extend what is already there, and if it's
-> extended to the breaking point, then make a case for why something new
-> is needed.
-> 
-While I agree to re-use frameworks, am strongly against use of IPC for
-the power management which is time sensitive. Imagine a scenario where
-ACPI is asked to go through remoteproc/ipc for talking to firmware.
-If it takes 10 to 15 uS just to send a command to firmware to change
-some control, that just tells something is not right and thats what
-IPC will do.
+> Well, when it rains, it pours.  If this series looks good to you, I'll
+> go ahead and add it on top of Thomas' patches.
 
-ARM world is also moving towards that by standardizing some of these
-through (read PSCI) and thats the way to go in general. Specifically
-for this series, I am also against having tons of exports and all
-of that should be extracted properly but remoteproc is not going
-to be the way. Firmware download has to happen much earlier(ROM
-path) so thats not the requirement where we could have used the
-remoteproc firmware download feature.
+And I can confirm, this series definitely depends on mvebu/boards,
+mvebu/mbus_dt, and mvebu/msi_mvebu (which, in turn, depends on
+mvebu/msi_irq and mvebu/msi_pci).
 
-Regards,
-Santosh
+thx,
+
+Jason.
