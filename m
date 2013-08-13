@@ -1,38 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 13 Aug 2013 09:42:28 -0600
-Subject: [PATCH V4 1/4] ASoC: Samsung: I2S: Add quirks as driver data
- in I2S
-In-Reply-To: <20130812234603.GM6427@sirena.org.uk>
-References: <1376300994-1679-1-git-send-email-padma.v@samsung.com>
- <1376300994-1679-2-git-send-email-padma.v@samsung.com>
- <52096871.4030703@wwwdotorg.org> <20130812231327.GK6427@sirena.org.uk>
- <52096D4A.5070903@wwwdotorg.org> <20130812234603.GM6427@sirena.org.uk>
-Message-ID: <520A53E4.309@wwwdotorg.org>
+From: nico@linaro.org (Nicolas Pitre)
+Date: Tue, 13 Aug 2013 11:50:17 -0400 (EDT)
+Subject: Build error: versatile express
+In-Reply-To: <20130813105227.GC2823@localhost.localdomain>
+References: <20130812124801.GB2823@localhost.localdomain>
+ <alpine.LFD.2.03.1308121125420.14472@syhkavp.arg>
+ <20130813105227.GC2823@localhost.localdomain>
+Message-ID: <alpine.LFD.2.03.1308131148380.14472@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2013 05:46 PM, Mark Brown wrote:
-> On Mon, Aug 12, 2013 at 05:18:34PM -0600, Stephen Warren wrote:
->> On 08/12/2013 05:13 PM, Mark Brown wrote:
-> 
->>>> (although I dare say that at least samsung,supports-rstclr
->>>> should be modified to use the new reset controller bindings)
-> 
->>> Really?  That doesn't seem terribly sane - I had thought that
->>> was for bodging resets on the side of things that don't
->>> normally have them or need board specific logic.  Also note
->>> that this is actually a magic register write done to reset the
->>> IP on some specific IPs.
-> 
->> I believe that's exactly what the reset subsystem and associated
->> DT bindings were designed for.
-> 
-> That seems...  interesting.  It seems like this is fairly core
-> device functionality I'd expect the driver to just be able to
-> understand;  the main thing this property was doing was deciding if
-> the reset was needed. I'm not sure I see the benefit here?
+On Tue, 13 Aug 2013, Dave Martin wrote:
 
-Sorry, I'm confused here. In this case, the reset is something
-internal to the IP module, not sourced by an external reset
-controller, so there's no need to involve the reset controller
-bindings or subsystem.
+> On Mon, Aug 12, 2013 at 12:55:23PM -0400, Nicolas Pitre wrote:
+> > On Mon, 12 Aug 2013, Dave Martin wrote:
+> > 
+> > > On Mon, Aug 12, 2013 at 11:28:04AM +0100, Russell King - ARM Linux wrote:
+> > > > arch/arm/mach-vexpress/tc2_pm.c: In function 'tc2_pm_down.clone.0':
+> > > > arch/arm/mach-vexpress/tc2_pm.c:200:1: error: fp cannot be used in asm here
+> > > > 
+> > > > This is caused by the assembly code in this file clobbering R11, which
+> > > > is incompatible with having CONFIG_FRAME_POINTER=y.
+> > > 
+> > > Is there any reason not to fix this just by pushing/popping r11 inside
+> > > the asm and removing it from the clobber list?
+> > 
+> > That's most likely the best fix.  What about this?
+> 
+> Were we replacing these instances with the macro, or is that still in
+> flight?
+
+I've updated the macro patch accordingly.  I prefer to submit that one 
+separately.
+
+> Anyway, if useful:
+> 
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+Thanks.
+
+
+Nicolas
