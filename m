@@ -1,64 +1,59 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 13 Aug 2013 11:46:24 -0400
-Subject: [PATCH V3 RFC 00/16] EFI stub for ARM
-In-Reply-To: <CAFECyb93p3Wct9DWYAzhU2cU1J=F6sN=67Vw3ofXFa8wW0EKrw@mail.gmail.com>
-References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <1376316160.32237.17.camel@t520.redhat.com>
- <CAFECyb93p3Wct9DWYAzhU2cU1J=F6sN=67Vw3ofXFa8wW0EKrw@mail.gmail.com>
-Message-ID: <1376408784.27484.26.camel@t520.redhat.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 13 Aug 2013 09:48:40 -0600
+Subject: =?UTF-8?B?562U5aSNOiBbUEFUQ0ggdjMgMi8yXSBpMmM6IGlteDogQWRkIFY=?=
+ =?UTF-8?B?eWJyaWQgVkY2MTAgSTJDIGNvbnRyb2xsZXIgc3VwcG9ydA==?=
+In-Reply-To: <20130813074620.GR26614@pengutronix.de>
+References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
+ <1375418648-22760-2-git-send-email-b35083@freescale.com>
+ <20130810140827.GC18085@e106331-lin.cambridge.arm.com>
+ <B56CDBE15CE27145A4B77D2D24263E851FE7AC@039-SN1MPN1-004.039d.mgd.msft.net>
+ <20130812164354.GF27165@e106331-lin.cambridge.arm.com>
+ <52096E77.4040003@wwwdotorg.org> <20130813074620.GR26614@pengutronix.de>
+Message-ID: <520A5558.708@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-08-12 at 18:13 -0700, Roy Franz wrote:
-> On Mon, Aug 12, 2013 at 7:02 AM, Mark Salter <msalter@redhat.com> wrote:
-> > On Fri, 2013-08-09 at 16:26 -0700, Roy Franz wrote:
-> >> * Change FDT memory allocation to retry with a larger allocation if
-> >>   first educated guess is inadequate.
-> >
-> > With this change, it looks like you no longer free the original cmdline
-> > and fdt memory. The current flow looks like:
-> >
-> >   retry:
-> >      allocate_memory_for_expanded_fdt
-> >      get_memory_map
-> >      if (update_fdt() fails) {
-> >         free new_fdt and memory_map
-> >         goto retry
-> >      }
-> >
-> > So, this keeps the original fdt around and uses it as a starting point
-> > for newly allocated expanded fdt. You don't know if the new fdt is big
-> > enough until update_fdt() succeeds. But at that point, you already wrote
-> > the efi-runtime-mmap property with the memory_map still having the
-> > original cmdline and fdt in it.
-> >
-> > I think you should be able to have an expand_fdt() function which bumps
-> > the fdt size and uses the current fdt as the starting point instead of
-> > the original fdt. That way you can free the original fdt on the first
-> > iteration and free the original cmdline as soon as it is successfully
-> > written. Then the last thing you do if get the memory_map and write it.
-> >
-> > --Mark
+On 08/13/2013 01:46 AM, s.hauer at pengutronix.de wrote:
+> On Mon, Aug 12, 2013 at 05:23:35PM -0600, Stephen Warren wrote:
+>> On 08/12/2013 10:43 AM, Mark Rutland wrote:
+>>>> The binding string for i2c-imx driver in Documentation/devicetree/bindings/i2c/i2c-imx.txt use a wildcard format
+>>>> of "- compatible : Should be "fsl,<chip>-i2c" " for device using this driver. Neither fsl,imx1-i2c nor fsl,imx21-i2c
+>>>> is described in the binding document. So I just leave the vf610 i2c compatible with this. 
+>>>
+>>> I'm not a big fan on wildcards in bindings, as it leaves people free to
+>>> put anything in and claim it's a documented binding, and makes it far
+>>> harder for an os to actually implement drivers for said binding, as
+>>> there's no canonical reference for the set of valid variations.
+>>>
+>>> Obviously there is some precedent, but I'm not sure it's something we
+>>> want to stick with, and we can prevent it my updating the documentation
+>>> now.
+>>>
+>>> Does anyone else have an opinion?
+>>
+>> I suppose technically we should list out every exact string in the
+>> binding, but it's a little annoying to have to update the binding doc
+>> every time a new chip comes out (and I expect that'll happen more and
+>> more!) just to add a new compatible value since all the differences are
+>> known internally to the driver and don't impact the binding...
 > 
-> Hi Mark,
+> We would only have to update the the docs when an incompatible SoC comes
+> out. For this particular driver this would be all marked with a star:
 > 
-> I think this will work with the current FDT fields that are being set
-> by the stub.  In earlier
-> versions, I was also updating the reserved memory map using
-> fdt_add_mem_rsv(), so
-> iteratively updating the device tree wouldn't work. The reserved
-> regions would change,
-> and so the repeated updates would cause there to be repeated and
-> incorrect reserved regions.
-> I'm inclined to leave it as is, which should correctly update the
-> device tree even if methods like
-> fdt_add_mem_rsv() are used, with the tradeoff being there will be a
-> few more memory regions
-> for the kernel to free when it processes the EFI memory map.  The
-> kernel already needs to process
-> the EFI memory map to free the buffers use to load the kernel and
-> initrd, so these buffers will get freed, just not
-> by the stub.
+> * i.MX1
+> * i.MX21
+>   i.MX25
+>   i.MX27
+>   i.MX31
+>   i.MX35
+>   i.MX51
+>   i.MX53
+>   i.MX6
+> * Vybrid
 > 
+> That's not too many updates to the binding docs since 2001.
+> (The SPI core changed with nearly every SoC version though)
 
-Got it. Thanks for the explanation.
+So, the SPI core changed its HW implementation, or changed its
+SW-visible interface? If the latter, then you need a separate compatible
+value for each, which was my point.
