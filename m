@@ -1,66 +1,48 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 13 Aug 2013 10:33:04 -0500
-Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <520A28E5.9030304@gmail.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <52077B26.1010103@gmail.com> <5209307F.9000701@ti.com>
- <520A28E5.9030304@gmail.com>
-Message-ID: <520A51B0.3010805@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 13 Aug 2013 10:37:53 -0500
+Subject: [PATCH] usb: musb dsps: fix pdev cast in suspend/resume
+In-Reply-To: <1376397630-26863-1-git-send-email-zonque@gmail.com>
+References: <1376397630-26863-1-git-send-email-zonque@gmail.com>
+Message-ID: <20130813153738.GJ27954@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2013 07:39 AM, Daniel Mack wrote:
-> Hi Dave,
->
-> On 12.08.2013 20:59, Dave Gerlach wrote:
->> On 08/11/2013 06:53 AM, Daniel Mack wrote:
->
->>> The problem I currently face is that I can't make the board resume, as
->>> neither UART0 nor GPIO0 seem to work as wakeup source.
->>
->> Did you apply the other patches that are mentioned besides Suman's
->> series? The board will hang while suspending without these.
->
-> Yes. However, just to make sure you referenced the correct patches - on
-> top of yours an Suman's set, I have:
->
->    [PATCH 1/2] ARM: OMAP2+: hwmod: rt address space index for DT
->    [PATCH 2/2] ARM: OMAP2+: hwmod: AM335x: fix cpgmac address space
->    [PATCH 1/2] ARM: dts: add AM33XX EDMA support
->
-> The last one seems somewhat unrelated though.
->
-> However, I see an issue with the musb dsps glue. With the usb controller
-> disabled in DT, I also had to remove the usb_otg_hs entry from
-> am33xx_mod[] (pm33xx.c). When the usb controller is _enabled_, I get an
-> instant NULL pointer exception due to a rather obvious bug. I'll send
-> out a patch right now.
->
-> When I send the board to suspend (with USB disabled), the power
-> consumption drops significantly, and the output is:
->
-> # echo mem > /sys/power/state
-> [   93.001937] PM: Syncing filesystems ... done.
-> [   93.033591] Freezing user space processes ... (elapsed 0.002 seconds)
-> done.
-> [   93.048532] Freezing remaining freezable tasks ... (elapsed 0.002
-> seconds) done.
-> [   93.059277] PM: Sending message for entering DeepSleep mode
-> [   93.085368] PM: suspend of devices complete after 15.070 msecs
-> [   93.096671] PM: late suspend of devices complete after 5.122 msecs
-> [   93.108853] PM: noirq suspend of devices complete after 5.647 msecs
->
->
-> ... but traffic on UART0 won't cause a resume.
->
+On Tue, Aug 13, 2013 at 02:40:30PM +0200, Daniel Mack wrote:
+> dsps_suspend() and dsps_resume() are called with the device that has the
+> glue assigned as drvdata. Using dev->parent seems wrong and causes a
+> NULL pointer exception on an AM33xx board.
+> 
+> The code was introduced by commit c68bb4c6 ("usb: musb: dsps: control
+> module handling (quirk)") but I wonder whether it was ever used.
+> 
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+>  drivers/usb/musb/musb_dsps.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+> index 5233804..f20218e 100644
+> --- a/drivers/usb/musb/musb_dsps.c
+> +++ b/drivers/usb/musb/musb_dsps.c
+> @@ -692,7 +692,7 @@ static int dsps_remove(struct platform_device *pdev)
+>  #ifdef CONFIG_PM_SLEEP
+>  static int dsps_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev->parent);
+> +	struct platform_device *pdev = to_platform_device(dev);
+>  	struct dsps_glue *glue = platform_get_drvdata(pdev);
 
-It looks like you are using no_console_suspend? UART0 does not work as a 
-wakeup source with this option set.
+actually, can you get rid of the platform_device access here ? The
+following should work:
 
->
-> I'll dig a little deeper now, but if you have any idea, please let me know.
->
->
-> Thanks,
-> Daniel
->
+	struct dsps_glue *glue = dev_get_drvdata(dev);
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130813/498c8e60/attachment-0001.sig>
