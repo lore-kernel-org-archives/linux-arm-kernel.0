@@ -1,43 +1,55 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 14 Aug 2013 17:42:41 +0100
-Subject: [PATCH 1/3] ARM: Correct BUG() assembly to ensure it is
- endian-agnostic
-In-Reply-To: <1376498563-8146-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1376498563-8146-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1376498563-8146-2-git-send-email-ben.dooks@codethink.co.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 14 Aug 2013 10:18:54 -0700
+Subject: [PATCH] KVM: ARM: ignore guest L2 cache control SMCs on Highbank
+ and OMAP
+In-Reply-To: <abf9b3ef779ce43b1912bf9e3deea522@www.loen.fr>
+References: <1376472125-23350-1-git-send-email-andre.przywara@calxeda.com>
+ <c8a1944576151990b3315183acee02be@www.loen.fr>
+ <CAFEAcA8jgn9V1ANXXTsA_099BcsbC5NHPEMRh6=Rz1g8EDgBHA@mail.gmail.com>
+ <abf9b3ef779ce43b1912bf9e3deea522@www.loen.fr>
+Message-ID: <20130814171854.GA11390@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently BUG() uses .word or .hword to create the necessary illegal
-instructions. However if we are building BE8 then these get swapped
-by the linker into different illegal instructions in the text.
+On Wed, Aug 14, 2013 at 11:30:03AM +0100, Marc Zyngier wrote:
+> On 2013-08-14 11:22, Peter Maydell wrote:
+> > On 14 August 2013 10:32, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> On 2013-08-14 10:22, Andre Przywara wrote:
+> >
+> >>> +static int kvm_ignore_l2x0_call(struct kvm_vcpu *vcpu)
+> >>> +{
+> >>> +     unsigned long fn_nr = *vcpu_reg(vcpu, 12) & ~((u32) 0);
+> >>> +
+> >>> +     if (fn_nr == 0x102) {
+> >>> +             kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+> >>> +             return 1;
+> >>> +     }
+> >>> +
+> >>> +     return 0;
+> >>> +}
+> >>
+> >> And what if I run mach-foo which uses r12 to request bar services 
+> >> from
+> >> secure mode? Is it safe to ignore it? We need something much better 
+> >> than
+> >> just testing random registers to guess what the guest wants.
+> >
+> > Definitely. This needs to be addressed via the kernel providing
+> > some mechanism so that userspace and/or a KVM-specific bit
+> > of 'firmware' running in the guest VM can handle the SMC
+> > calls the guest tries to make, because it's totally board
+> > specific.
+> 
+> Right. We're in violent agreement here.
+> 
+> What I can imagine is some kind of feature bit that would cause an exit 
+> all the way to userspace, letting QEMU handle the call.
+> 
+> That would be simple enough to implement, I believe. At least on the 
+> kernel side.
+> 
+How would we distinguish between a PSCI call that the kernel should
+support and a call to secure firmware that needs to be forwarded to
+QEMU?  Is this simply a binary config at VM creation time?
 
-Change to using .inst and .inst.w to create the instructions and mark
-them as instructions so that the linker acts correctly.
-
-Fixes issue reported by Dave Martin <Dave.Martin@arm.com>
-
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
- arch/arm/include/asm/bug.h |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-index 7af5c6c..b95da52 100644
---- a/arch/arm/include/asm/bug.h
-+++ b/arch/arm/include/asm/bug.h
-@@ -12,10 +12,10 @@
-  */
- #ifdef CONFIG_THUMB2_KERNEL
- #define BUG_INSTR_VALUE 0xde02
--#define BUG_INSTR_TYPE ".hword "
-+#define BUG_INSTR_TYPE ".inst.w "
- #else
- #define BUG_INSTR_VALUE 0xe7f001f2
--#define BUG_INSTR_TYPE ".word "
-+#define BUG_INSTR_TYPE ".inst "
- #endif
- 
- 
--- 
-1.7.10.4
+-Christoffer
