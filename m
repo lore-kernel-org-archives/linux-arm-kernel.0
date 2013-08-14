@@ -1,49 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 14 Aug 2013 15:43:40 -0600
-Subject: [RFC 3/3] PCI: tegra: Support driver unbinding
-In-Reply-To: <1376392346-14127-4-git-send-email-treding@nvidia.com>
-References: <1376392346-14127-1-git-send-email-treding@nvidia.com>
- <1376392346-14127-4-git-send-email-treding@nvidia.com>
-Message-ID: <520BFA0C.5070001@wwwdotorg.org>
+From: behanw@converseincode.com (behanw at converseincode.com)
+Date: Wed, 14 Aug 2013 17:37:41 -0400
+Subject: [PATCH] ARM: LLVMLinux: Change "extern inline" to "gnu_inline" in ARM
+ ftrace.h
+In-Reply-To: <1376516261-2071-1-git-send-email-behanw@converseincode.com>
+References: <1376516261-2071-1-git-send-email-behanw@converseincode.com>
+Message-ID: <1376516261-2071-2-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2013 05:12 AM, Thierry Reding wrote:
-> Implement the platform driver's .remove() callback to free all resources
-> allocated during driver setup and call pci_common_exit() to cleanup ARM
-> specific datastructures. Unmap the fixed PCI I/O mapping by calling the
-> new pci_iounmap_io() function in the new .teardown() callback.
-> 
-> Finally, no longer set the .suppress_bind_attrs field to true to allow
-> the driver to unbind from a device.
+From: Mark Charlebois <charlebm@gmail.com>
 
-> +static int tegra_pcie_remove(struct platform_device *pdev)
-> +{
-> +	struct tegra_pcie *pcie = platform_get_drvdata(pdev);
-> +	struct tegra_pcie_bus *bus, *tmp;
-> +	int err;
-> +
-> +	pci_common_exit(&pcie->sys);
-> +
-> +	list_for_each_entry_safe(bus, tmp, &pcie->busses, list) {
-> +		vunmap(bus->area->addr);
-> +		kfree(bus);
-> +	}
-> +
-> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +		err = tegra_pcie_disable_msi(pcie);
-> +		if (err < 0)
-> +			return err;
-> +	}
+With compilers which follow the C99 standard (like modern versions of gcc and
+clang), "extern inline" does the wrong thing (emits code for an externally
+linkable version of the inline function). In this case using the gnu_inline
+attribute makes inline do the right thing on gcc and on clang.
 
-Wouldn't it make sense to do that as early as possible in the function,
-to make sure that no MSI accidentally fires after some of the cleanup
-has already happened?
+Signed-off-by: Mark Charlebois <charlebm@gmail.com>
+Signed-off-by: Behan Webster <behanw@converseincode.com>
+---
+ arch/arm/include/asm/ftrace.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> +
-> +	err = tegra_pcie_put_resources(pcie);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	return 0;
-> +}
+diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+index f89515a..fb7fdc4 100644
+--- a/arch/arm/include/asm/ftrace.h
++++ b/arch/arm/include/asm/ftrace.h
+@@ -45,7 +45,8 @@ void *return_address(unsigned int);
+ 
+ #else
+ 
+-extern inline void *return_address(unsigned int level)
++extern inline __attribute__((gnu_inline))
++void *return_address(unsigned int level)
+ {
+ 	return NULL;
+ }
+-- 
+1.8.1.2
