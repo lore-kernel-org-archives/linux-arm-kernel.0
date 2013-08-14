@@ -1,70 +1,49 @@
-From: B44344@freescale.com (Arpit Goel)
-Date: Wed, 14 Aug 2013 12:33:55 +0530
-Subject: [PATCH v2 2/2] Convert PowerPC macro spin_event_timeout() to
- architecture independent macro
-In-Reply-To: <1376463835-13040-1-git-send-email-B44344@freescale.com>
-References: <1376463835-13040-1-git-send-email-B44344@freescale.com>
-Message-ID: <1376463835-13040-3-git-send-email-B44344@freescale.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 14 Aug 2013 00:23:28 -0700
+Subject: [GIT 00/19 v2] Renesas ARM based SoC pinmux updates for v3.12
+In-Reply-To: <cover.1374625203.git.horms+renesas@verge.net.au>
+References: <cover.1374625203.git.horms+renesas@verge.net.au>
+Message-ID: <20130814072328.GA30577@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch ports PowerPC implementation of spin_event_timeout() for generic
-use. Architecture specific implementation can be added to asm/delay.h, which
-will override the generic linux implementation.
+On Wed, Jul 24, 2013 at 09:32:14AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
+> 
+> please consider the following pinmux updates for v3.12.
+> 
+> Difference with v1 of this pull-request:
+> * Remove bogus i2c portions of the first patch of the series.
+> * Correct addressing mode used in dts of the first patch of the series.
+> * Removal of egg from face: wip
+> 
+> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+> 
+>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pinmux-for-v3.12
 
-Signed-off-by: Arpit Goel <B44344@freescale.com>
----
- include/linux/delay.h | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+Pulled, but I noticed this. Can you please follow up with bindings revisit in
+time for 3.12 final (i.e. if we need to take it after merge window that's
+probably OK):
 
-diff --git a/include/linux/delay.h b/include/linux/delay.h
-index a6ecb34..2ee7fa8 100644
---- a/include/linux/delay.h
-+++ b/include/linux/delay.h
-@@ -52,4 +52,44 @@ static inline void ssleep(unsigned int seconds)
- 	msleep(seconds * 1000);
- }
- 
-+#ifndef spin_event_timeout
-+/**
-+ * spin_event_timeout - spin until a condition gets true or a timeout elapses
-+ * @condition: a C expression to evalate
-+ * @timeout: timeout, in microseconds
-+ * @delay: the number of microseconds to delay between each evaluation of
-+ *         @condition
-+ *
-+ * The process spins until the condition evaluates to true (non-zero) or the
-+ * timeout elapses.  The return value of this macro is the value of
-+ * @condition when the loop terminates. This allows you to determine the cause
-+ * of the loop terminates.  If the return value is zero, then you know a
-+ * timeout has occurred.
-+ *
-+ * This primary purpose of this macro is to poll on a hardware register
-+ * until a status bit changes.  The timeout ensures that the loop still
-+ * terminates even if the bit never changes.  The delay is for devices that
-+ * need a delay in between successive reads.
-+ *
-+ * gcc will optimize out the if-statement if @delay is a constant.
-+ *
-+ * This is copied from PowerPC based spin_event_timeout() implementation
-+ * and modified for generic usecase.
-+ */
-+#define spin_event_timeout(condition, timeout, delay)		\
-+({								\
-+	typeof(condition) __ret;				\
-+	unsigned long __loops = usecs_to_jiffies(timeout);	\
-+	unsigned long __start = jiffies;			\
-+	while (!(__ret = (condition)) &&			\
-+		time_before(jiffies, __start + __loops + 1))	\
-+		if (delay)					\
-+			udelay(delay);				\
-+		else						\
-+			schedule();				\
-+	if (!__ret)						\
-+		__ret = (condition);				\
-+	__ret;							\
-+})
-+#endif
- #endif /* defined(_LINUX_DELAY_H) */
--- 
-1.8.1.4
+        pfc: pfc at e6060000 {                                                     
+                compatible = "renesas,pfc-r8a7790";                             
+                reg = <0 0xe6060000 0 0x250>;                                   
+                #gpio-range-cells = <3>;                                        
+        };                                                                      
+                                                                                                               
+        sdhi0: sdhi at ee100000 {                                                  
+                compatible = "renesas,r8a7790-sdhi"; 
+
+
+I.e. different ordering on the compatible values looks a bit uncoordinated.
+
+I resolved the conflicts by inserting the entries alphabetically; most
+DTS files are ordered by address instead of alphabetically, but I stuck
+to the current norm per-file.
+
+
+-Olof
