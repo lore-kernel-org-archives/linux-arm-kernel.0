@@ -1,23 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Aug 2013 21:36:40 +0200
-Subject: [PATCH 11/35] cpufreq: dbx500: use
- cpufreq_table_validate_and_show()
-In-Reply-To: <e343e827df7be24f11ecdaf849f2874bf1ba4b24.1375964117.git.viresh.kumar@linaro.org>
-References: <cover.1375964117.git.viresh.kumar@linaro.org>
- <e343e827df7be24f11ecdaf849f2874bf1ba4b24.1375964117.git.viresh.kumar@linaro.org>
-Message-ID: <CACRpkda29WcHePh00w_7N3B1OtGh=-i=1_PyB4MNhy=YJ-nxyg@mail.gmail.com>
+From: dsd@laptop.org (Daniel Drake)
+Date: Wed, 14 Aug 2013 13:37:45 -0600
+Subject: [PATCH v6 07/11] ARM: mmp: move timer registers into driver
+In-Reply-To: <1374833133-21119-8-git-send-email-haojian.zhuang@gmail.com>
+References: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
+ <1374833133-21119-8-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <CAMLZHHQHkyFBan93kpDBNw==htC-VW0nCjv-TOBkkMWn0LFpyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 8, 2013 at 3:48 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-
-> Lets use cpufreq_table_validate_and_show() instead of calling
-> cpufreq_frequency_table_cpuinfo() and cpufreq_frequency_table_get_attr().
+On Fri, Jul 26, 2013 at 4:05 AM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> Move the definition of timer registers into timer-mmp driver.
+> And map timer registers in driver.
 >
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Reviewed-by: Daniel Drake <dsd@laptop.org>
 
-Yours,
-Linus Walleij
+Again, the commit message could better explain the "why". I guess this
+is to reduce drivers/* independence on mach/ includes, which must be
+eliminated for multiplatform build support.
+
+Daniel
