@@ -1,54 +1,95 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Wed, 14 Aug 2013 10:17:34 +0100
-Subject: [PATCH v3 0/6] ARM/ARM64 architected timer updates
-In-Reply-To: <520B490A.4090109@linaro.org>
-References: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376414984-14182-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <520B490A.4090109@linaro.org>
-Message-ID: <520B4B2E.1040700@arm.com>
+Date: Wed, 14 Aug 2013 10:23:02 +0100
+Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
+In-Reply-To: <1974929.8mIZF44QnT@vostro.rjw.lan>
+References: <5208E2D3.7060005@arm.com> <520A536C.3030600@arm.com>
+ <CAL_JsqJdGXuTmb2kgBwgmRYGs9f92-dsawDXSXjmJW8cwjFVQQ@mail.gmail.com>
+ <1974929.8mIZF44QnT@vostro.rjw.lan>
+Message-ID: <520B4C76.8020900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/13 10:08, Daniel Lezcano wrote:
-> On 08/13/2013 07:29 PM, Sudeep KarkadaNagesha wrote:
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+On 13/08/13 20:45, Rafael J. Wysocki wrote:
+> On Tuesday, August 13, 2013 01:44:23 PM Rob Herring wrote:
+>> On Tue, Aug 13, 2013 at 10:40 AM, Sudeep KarkadaNagesha
+>> <Sudeep.KarkadaNagesha@arm.com> wrote:
+>>> Adding PowerPC list
+>>>
+>>> On 13/08/13 14:00, Rafael J. Wysocki wrote:
+>>>> On Monday, August 12, 2013 02:27:47 PM Sudeep KarkadaNagesha wrote:
+>>>>> The following changes since commit
+>>>>> d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+>>>>>
+>>>>> Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+>>>>>
+>>>>> are available in the git repository at:
+>>>>>
+>>>>> git://linux-arm.org/linux-skn.git cpu_of_node
 >>
->> This patch series adds support to configure the rate and enable the
->> event stream for architected timer. The event streams can be used to
->> impose a timeout on a WFE, to safeguard against any programming error
->> in case an expected event is not generated or even to implement
->> wfe-based timeouts for userspace locking implementations.
+>> [snip]
 >>
->> Since the timer control register is reset to zero on warm boot, CPU
->> PM notifier is added to re-initialize it.
+>>>> All error/warnings:
+>>>>
+>>>> warning: (MPC836x_RDK && MTD_NAND_FSL_ELBC && MTD_NAND_FSL_UPM)
+>>>> selects FSL_LBC which has unmet direct dependencies (FSL_SOC)
+>>>> warning: (MPC836x_RDK && MTD_NAND_FSL_ELBC && MTD_NAND_FSL_UPM)
+>>>> selects FSL_LBC which has unmet direct dependencies (FSL_SOC)
+>>>> In file included from arch/powerpc/include/asm/kvm_para.h:26:0, from
+>>>> include/uapi/linux/kvm_para.h:26, from include/linux/kvm_para.h:4,
+>>>> from include/linux/kvm_host.h:30, from
+>>>> arch/powerpc/kernel/asm-offsets.c:53:
+>>>> include/linux/of.h:269:28: error: conflicting types for
+>>>> 'of_get_cpu_node'
+>>>> extern struct device_node *of_get_cpu_node(int cpu); ^ In file
+>>>> included from include/linux/of.h:139:0, from
+>>>> arch/powerpc/include/asm/kvm_para.h:26, from
+>>>> include/uapi/linux/kvm_para.h:26, from include/linux/kvm_para.h:4,
+>>>> from include/linux/kvm_host.h:30, from
+>>>> arch/powerpc/kernel/asm-offsets.c:53:
+>>>> arch/powerpc/include/asm/prom.h:47:21: note: previous declaration
+>>>> of 'of_get_cpu_node' was here
+>>>> struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
+>>>> ^ make[2]: *** [arch/powerpc/kernel/asm-offsets.s] Error 1 make[2]:
+>>>> Target `__build' not remade because of errors. make[1]: ***
+>>>> [prepare0] Error 2 make[1]: Target `prepare' not remade because of
+>>>> errors. make: *** [sub-make] Error 2
+>>>>
+>>>
+>>> There seems to be conflict in the new function "of_get_cpu_node" added.
+>>> PowerPC also defines the same function name. Further microblaze and
+>>> openrisc declares it(can be removed) but doesn't define it.
+>>> To fix this:
+>>> 1. I can rename the newly added function to something different like
+>>>    `of_get_cpunode` or
+>>> 2. If of_* namespace should be used by only OF/FDT and not by any
+>>>    architecture specific code, then the arch specific version can be
+>>>    renamed to some thing like arch_of_get_cpu_node.
+>>>    Also most of the calls to arch specific function can be moved to
+>>>    generic code.
+>>>
+>>> Let me know your thoughts.
+>>
+>> It is up to Rafael if he is willing/able to rebase his tree, but I
+>> would drop this series until this is sorted out.
 > 
-> It does not apply to my tree.
+> Yeah, I've just done that.
 > 
-> Against which tree is this patchset ? Who is supposed to take it ?
-> 
-As I had mentioned in previous version, because of the conflict, I had
-to rebase it on 3.11-rc4
+Thanks Rafael, sorry for the trouble. I didn't expect of_* name-space to
+be used in ARCH specific code.
 
->> Changes v2->v3:
->> 1. Moved ARM and ARM64 changes into separate patches
->> 2. Added native hwcaps definations(ARM/ARM64) and compat-specific
->>    definitions(ARM64) to the users for the event stream feature. 
+>> I think the new common function should be and can be generalized to work for
+>> powerpc.
+>> It would need to make reg property optional and pass in the device
+>> node to the arch specific function.
+>>
+>> A short term solution would be just to make the function "#ifndef CONFIG_PPC".
 > 
-> Ok, we have the choice:
->  1. split the patchset into arch/arm changes and drivers/clocksource
->  2. I ack the patchset and Olof/Kevin take it
->  3. Olof/Kevin ack the patchset and I take it in my tree.
+> I wouldn't do that, it's almost guaranteed to be messy going forward.
 > 
-> This is really becoming fuzzy.
->
-I am not sure if we need to split it. It would get too messy because of
-dependencies. Once we have ACKs from all the corresponding maintainers,
-it can go through one of the tree.
+> I'd go for 1 above personally.
 
-> If you want a maintainer to take a patchset you have to send an email
-> --to him and --cc mailing list and others concerned by the patchset.
-> 
-Ok understood.
+Even though it's easier approach, I would go for fixing PPC and converge
+at generic of_get_cpu_node implementation if possible.
 
 Regards,
 Sudeep
