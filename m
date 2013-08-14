@@ -1,51 +1,29 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 14 Aug 2013 10:33:33 +0200
-Subject: [GIT PULL] at91: fixes for 3.11 #1
-Message-ID: <1376469213-30981-1-git-send-email-nicolas.ferre@atmel.com>
+From: ruslan.bilovol@ti.com (Ruslan Bilovol)
+Date: Wed, 14 Aug 2013 11:35:46 +0300
+Subject: [PATCH v2 0/2] omap4/twl6030: typical connection to omap4 as a
+ separate dtsi file
+Message-ID: <1376469348-10797-1-git-send-email-ruslan.bilovol@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Hello,
 
-This is the first (late) fixes pull-reqest for AT91. I would understand if
-you refuse it because we are already at -rc5 ;-) ...
+There is no functional changes between v1 and v2 - just
+added the patch for omap4-var-som - Uri Yosef confirmed
+this board have the same connection of OMAP4<->TWL6030 as
+SDP4430 board
 
-On the other hand, the line count is very low and all patches are pretty
-obvious.
+Ruslan Bilovol (2):
+  arm: dts: twl6030: typical connection to omap4 as a separate dtsi
+    file
+  arm: dts: omap4: configure connection to PMIC on Variscite's SOM
 
-Thanks, best regards,
-
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
-
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
-
-for you to fetch changes up to a57603ca2871ee0773b00839c1ea35c4a2d3eeb0:
-
-  ARM: at91/DT: fix at91sam9n12ek memory node (2013-08-14 09:56:31 +0200)
-
-----------------------------------------------------------------
-Device tree related fixes:
-- USB host numbering for 9x5 which was preventing from using all ports
-- a missing UART (not USART) clock lookup table was preventing from using
-  them on 9x5
-- too large amount of memory was specified for 9n12ek
-
-----------------------------------------------------------------
-Boris BREZILLON (1):
-      ARM: at91: add missing uart clocks DT entries
-
-Nicolas Ferre (2):
-      ARM: at91/DT: at91sam9x5ek: fix USB host property to enable port C
-      ARM: at91/DT: fix at91sam9n12ek memory node
-
- arch/arm/boot/dts/at91sam9n12ek.dts | 4 ++--
- arch/arm/boot/dts/at91sam9x5ek.dtsi | 5 +++--
- arch/arm/mach-at91/at91sam9x5.c     | 2 ++
- 3 files changed, 7 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   21 +---------------
+ arch/arm/boot/dts/omap4-sdp.dts           |   21 +---------------
+ arch/arm/boot/dts/omap4-var-som.dts       |    1 +
+ arch/arm/boot/dts/twl6030_omap4.dtsi      |   38 +++++++++++++++++++++++++++++
+ 4 files changed, 41 insertions(+), 40 deletions(-)
+ create mode 100644 arch/arm/boot/dts/twl6030_omap4.dtsi
 
 -- 
-Nicolas Ferre
+1.7.9.5
