@@ -1,97 +1,120 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 Aug 2013 14:13:22 -0500
-Subject: [PATCH 1/2] DMA: fix AMBA PL08x driver issue with 64bit DMA
- address type
-In-Reply-To: <20130814130026.GS23006@n2100.arm.linux.org.uk>
-References: <1376484729-11826-1-git-send-email-andre.przywara@linaro.org>
- <1376484729-11826-2-git-send-email-andre.przywara@linaro.org>
- <20130814130026.GS23006@n2100.arm.linux.org.uk>
-Message-ID: <CAL_JsqLRtRvPyFagLLaRAjciiur=qVKmt2v7q5MPtEGuDske4Q@mail.gmail.com>
+From: russ.dill@gmail.com (Russ Dill)
+Date: Wed, 14 Aug 2013 12:16:38 -0700
+Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
+ module registers and APIs
+In-Reply-To: <520BBDF6.1070103@ti.com>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
+ <5203A0BC.8060205@ti.com> <5203C457.80301@ti.com>
+ <20130809051146.GB7656@atomide.com> <52055733.70808@ti.com>
+ <87y586pvkq.fsf@kernel.org> <5209565C.7090508@ti.com>
+ <87d2phpsu1.fsf@kernel.org> <520A4BE7.7090603@ti.com>
+ <87wqnplg1n.fsf@kernel.org> <520A785C.3000304@ti.com>
+ <CA+Bv8Xbg9v4zRy-EJPsxwCdwpSy50V8SjwQfmAvVxiCR=6mYBw@mail.gmail.com>
+ <87bo51jtiu.fsf@kernel.org> <520BBDF6.1070103@ti.com>
+Message-ID: <CA+Bv8XaVxUaqgEn7wHQiW4-=gPrDJUuZv+BSMMbn78YqkvWN_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 8:00 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> NAK.
-
-This patch has nothing to do with dma masks or your dma mask series.
-The code deals with bus alignment and cleans up the code to do
-alignment operations in a sane way compared to modulo operator. The
-only thing 64-bit dma_addr_t did was expose crap code.
-
-Perhaps bus_addr_offset needs a better name to indicate it is dealing
-with bus alignment rather than bus address offset.
-
-Rob
-
-> On Wed, Aug 14, 2013 at 02:52:08PM +0200, Andre Przywara wrote:
->> In Rob's recent pull request the patch
->>       ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
->> promotes dma_addr_t to 64bit, which breaks compilation of the
->> AMBA PL08x DMA driver.
->> GCC has no function for the 64bit/8bit modulo operation.
->> Looking more closely the divisor can only be 1, 2 or 4, so the full
->> featured '%' modulo operation is overkill and can be replaced by
->> simple bit masking.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
->> ---
->>  drivers/dma/amba-pl08x.c | 16 ++++++++++------
->>  1 file changed, 10 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
->> index 06fe45c..29e1cf9 100644
->> --- a/drivers/dma/amba-pl08x.c
->> +++ b/drivers/dma/amba-pl08x.c
->> @@ -286,6 +286,11 @@ static inline struct pl08x_txd *to_pl08x_txd(struct dma_async_tx_descriptor *tx)
->>       return container_of(tx, struct pl08x_txd, vd.tx);
->>  }
->>
->> +static int bus_addr_offset(struct pl08x_bus_data *bus)
->> +{
->> +     return bus->addr & (bus->buswidth - 1);
->> +}
->> +
->>  /*
->>   * Mux handling.
->>   *
->> @@ -886,8 +891,8 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
->>                               return 0;
->>                       }
->>
->> -                     if ((bd.srcbus.addr % bd.srcbus.buswidth) ||
->> -                                     (bd.dstbus.addr % bd.dstbus.buswidth)) {
->> +                     if (bus_addr_offset(&bd.srcbus) ||
->> +                                     bus_addr_offset(&bd.dstbus)) {
->>                               dev_err(&pl08x->adev->dev,
->>                                       "%s src & dst address must be aligned to src"
->>                                       " & dst width if peripheral is flow controller",
->> @@ -908,9 +913,8 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
->>                */
->>               if (bd.remainder < mbus->buswidth)
->>                       early_bytes = bd.remainder;
->> -             else if ((mbus->addr) % (mbus->buswidth)) {
->> -                     early_bytes = mbus->buswidth - (mbus->addr) %
->> -                             (mbus->buswidth);
->> +             else if (bus_addr_offset(mbus)) {
->> +                     early_bytes = mbus->buswidth - bus_addr_offset(mbus);
->>                       if ((bd.remainder - early_bytes) < mbus->buswidth)
->>                               early_bytes = bd.remainder;
->>               }
->> @@ -928,7 +932,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
->>                        * Master now aligned
->>                        * - if slave is not then we must set its width down
->>                        */
->> -                     if (sbus->addr % sbus->buswidth) {
->> +                     if (bus_addr_offset(sbus)) {
->>                               dev_dbg(&pl08x->adev->dev,
->>                                       "%s set down bus width to one byte\n",
->>                                       __func__);
->> --
->> 1.7.12.1
->>
+On Wed, Aug 14, 2013 at 10:27 AM, Suman Anna <s-anna@ti.com> wrote:
+> Kevin, Santosh, Dave, Russ,
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> On 08/13/2013 02:11 PM, Kevin Hilman wrote:
+>> Russ Dill <russ.dill@gmail.com> writes:
+>>
+>>>>>> ARM world is also moving towards that by standardizing some of these
+>>>>>> through (read PSCI) and thats the way to go in general.
+>>>>>
+>>>>> Agreed, but I'm not sure (yet) about enforcing PSCI on legacy platforms
+>>>>> that don't support it natively.  Are you saying that the AM33xx firmware
+>>>>> should be converted to be PSCI compliant?  Admittedly, I haven't read
+>>>>> the PSCI spec closely, but I'm wondering if the current role splitting
+>>>>> between MPU and M3 fits well with PSCI.
+>>>>>
+>>>> I didn't mean for the AM3XXX specifically because its current job is rather
+>>>> very limited. i.e suspend. My concern is that IPC is not viewed as
+>>>> an option for power management controllers like M3 which can abstract
+>>>> all the hardware gory details and export a simpled interface for OS
+>>>> in form of PSCI/ACPI.
+>>>
+>>> The IPC between the M3 and the A8 on the am335x is just a pair of
+>>> notification mechanisms (one from the A8, mailbox, and one from the
+>>> M3, sev) and a set of 8 32 bit registers. The 8 32 bit registers are
+>>> just a scratchpad and have no access rules or functionality beyond
+>>> being a scratchpad. How complicated do we want to make this?
+>>
+>> The OMAP IPC between the MPU and DSP (read: any other remote processor)
+>> is just a mailbox and some shared memory.  No complicated, and works
+>> with remoteproc/rpmsg.
+>
+> I had to catch up on all the threads before I responded, but here are my
+> notes regarding using remoteproc/rpmsg infrastructure for WkupM3. It
+> definitely brings in lot more complexity than what's present today. The
+> WkupM3 in AM335x does not have the same feature set as the Cortex-M3s
+> used within the IPU in OMAP4+ SoCs. It does not have an MMU and
+> peripheral accesses seems to be limited to just those in L4_Wkup domain.
+>
+> A lot actually depends on whether the WkupM3 can use DDR. I am not sure
+> if there are any restrictions on WkupM3 from where it could run the code
+> or access data from. From what I can gather from the TRM (there's no big
+> separate chapter on WkupM3), it has just 16K UMEM and a 8K DMEM, and its
+> not much. The current firmware is loaded directly into the WkupM3's
+> internal UMem space and a check is being performed to make sure the
+> firmware is less than  16K, so that it can fit into UMem.
+
+Even if the WkupM3 could access DMEM, it would defeat the whole
+purpose of using it, as it lives to do things like enable VTP, but the
+EMIF clocks into bypass, turn off the power domain the EMIF is
+contained in, etc.
+
+> The remoteproc infrastructure is currently tied closely with the
+> virtio/rpmsg framework, and the boot requires that there are virtio
+> devices present in the resource table from the firmware image. The rpmsg
+> shared memory buffers are currently kinda fixed (512 buffers of 512
+> bytes each) and requires 3 pages just for the vring structures for this
+> many buffers. So, if there are restrictions on DDR access, then this
+> pretty much rules out remoteproc/rpmsg infrastructure.
+>
+> If the DDR access is ok, then there are other challenges that needs to
+> be met. The current firmware definitely requires the addition of the
+> resource table and the lower level code for handling the virtio_ring
+> transport for receiving messages. It would also need its own remoteproc
+> driver for handling the firmware binary format and the signalling
+> required to trigger the rpmsg buffer processing. The firmware binary
+> format needs to be adapted to something that this driver would
+> understand. It definitely doesn't look like ELF currently, so something
+> on the lines of ste_modem_rproc needs to be done. Also, the
+> remoteproc/rpmsg infrastructure can support multiple vring transport
+> channels between the processor, and depending on how many are supported,
+> we either need to exchange the vq_id (like OMAP remoteproc), or process
+> the known virtqueues always (like DA8xx remoteproc). The former requires
+> that a message payload is used, and mandates the usage of the IPC data
+> registers in the control module given that WkupM3 on AM335 cannot access
+> any mailbox registers. Any usage of IPC data registers depends on where
+> we do it. If all the accesses were to be done within
+> mach-omap2/control.c, then there is no easy way for using this API from
+> drivers/remoteproc, until we have the control module driver. I do feel
+> that this needs to be done within the wkup_m3 driver currently. This
+> would be no different to the crossbar driver example on DRA7, which also
+> has to deal with registers in Control module. The IPC data registers do
+> not have any associated interrupts by itself, so just making this a
+> standalone driver is also not possible. Also, the dependencies with
+> using the omap_device API for dealing with the hard reset lines needs to
+> be dealt with.
+>
+> The current communication uses the IPC data registers, and sometimes
+> uses them as plain status registers. There's certain registers used for
+> sharing status, version etc which are shared by both the processors.
+> Using rpmsg would require communicating every single message, and if
+> there were to be some shared variables to be used simultaneously, then
+> this has to be exchanged through a new remoteproc resource type.
+>
+> One additional aspect is that the current remoteproc core does not have
+> the necessary runtime pm support, but in general the approach would be
+> to treat the remoteprocs as true slave devices. I would imagine the
+> driver core to put the remoteprocs into reset state, after asking them
+> to save their context during suspend.
+>
+> regards
+> Suman
+>
