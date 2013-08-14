@@ -1,26 +1,34 @@
 From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Wed, 14 Aug 2013 18:23:04 +0100
-Subject: [PATCH Resend 0/3] trivial fixes relating to !CONFIG_OF
-Message-ID: <1376500987-12797-1-git-send-email-jonathan.austin@arm.com>
+Date: Wed, 14 Aug 2013 18:23:07 +0100
+Subject: [PATCH Resend 3/3] ARM: arch_timer: Add missing include for of_*
+ functions
+In-Reply-To: <1376500987-12797-1-git-send-email-jonathan.austin@arm.com>
+References: <1376500987-12797-1-git-send-email-jonathan.austin@arm.com>
+Message-ID: <1376500987-12797-4-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contains 3 trivial fixes picked up along the path of building
-kernels without CONFIG_OF enabled. They're things likely to break randconfig
-builds, etc, if not fixed up.
+The arch timer code uses a bunch of of_* functions that are defined in
+linux/of.h. Currently this header is not included and the functions are
+available elsewise. This fixes that for correctness.
 
-[I'm resending these including the clocksource maintainers as suggested by
-Daniel Lezcano]
-
-Jonathan Austin (3):
-  PSCI: add missing dependency on CONFIG_OF for PSCI.
-  clocksource: Add missing dependency on CONFIG_OF for ARM_ARCH_TIMER
-  ARM: arch_timer: Add missing include for of_* functions
-
- arch/arm/Kconfig                     |    1 +
- drivers/clocksource/Kconfig          |    3 ++-
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+---
  drivers/clocksource/arm_arch_timer.c |    1 +
- 3 files changed, 4 insertions(+), 1 deletion(-)
+ 1 file changed, 1 insertion(+)
 
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index ffadd83..857a196 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -15,6 +15,7 @@
+ #include <linux/cpu.h>
+ #include <linux/clockchips.h>
+ #include <linux/interrupt.h>
++#include <linux/of.h>
+ #include <linux/of_irq.h>
+ #include <linux/io.h>
+ 
 -- 
 1.7.9.5
