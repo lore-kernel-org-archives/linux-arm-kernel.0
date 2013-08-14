@@ -1,40 +1,40 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Wed, 14 Aug 2013 18:23:06 +0100
-Subject: [PATCH Resend 2/3] clocksource: Add missing dependency on CONFIG_OF
- for ARM_ARCH_TIMER
-In-Reply-To: <1376500987-12797-1-git-send-email-jonathan.austin@arm.com>
-References: <1376500987-12797-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <1376500987-12797-3-git-send-email-jonathan.austin@arm.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Wed, 14 Aug 2013 10:24:21 -0700
+Subject: Tegra baseline test results for v3.11-rc5
+Message-ID: <520BBD45.7090708@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialisation of the ARM Arch timer requires data from the DT. There is no
-fallback initialisation method and hence selecting ARM_ARCH_TIMER without OF
-makes little sense.
+Here are some basic Tegra test results for Linux v3.11-rc5.
+Logs and other details at:
 
-Furthermore, doing so causes a build error because the of_* stubs for
-!CONFIG_OF do not extend to all of the functions being used by this driver,
-and will not be extended unless there are valid use-cases for them to be
-(this is not a valid case).
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.11-rc5/20130811183105/
 
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
----
- drivers/clocksource/Kconfig |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index b7b9b04..4348902 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -72,7 +72,8 @@ config CLKSRC_DBX500_PRCMU_SCHED_CLOCK
- 
- config ARM_ARCH_TIMER
- 	bool
--	select CLKSRC_OF if OF
-+	depends on OF
-+	select CLKSRC_OF
- 
- config ARM_GLOBAL_TIMER
- 	bool
--- 
-1.7.9.5
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.11-rc4 (c095ba7224d8edc71dcef0d655911399a8bd4a3f)):
+    text     data      bss    total  kernel
+    +628       +8        0     +636  multi_v7_defconfig
+    +588       -8        0     +580  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.11-rc4 (c095ba7224d8edc71dcef0d655911399a8bd4a3f))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
+         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
