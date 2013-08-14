@@ -1,39 +1,110 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 14 Aug 2013 10:14:18 -0400
-Subject: [GIT PULL] ARM: mvebu: fixes-non-critical for v3.12
-Message-ID: <20130814141418.GC32395@titan.lakedaemon.net>
+From: george.cherian@ti.com (George Cherian)
+Date: Wed, 14 Aug 2013 19:46:36 +0530
+Subject: [PATCH v3] arm: dts: AM43x: Add usb DT nodes for AM4372
+In-Reply-To: <1373444082-4169-1-git-send-email-george.cherian@ti.com>
+References: <1373444082-4169-1-git-send-email-george.cherian@ti.com>
+Message-ID: <520B9144.5000701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
++Benoit
+  If you dont have any comments, can you take this for 3.12?
 
-Not too many fixes popped up this time around, so this is all that
-accumulated.
+Regards
+-George
 
-thx,
+On 7/10/2013 1:44 PM, George Cherian wrote:
 
-Jason.
+> This patch adds
+> 	- HS USB nodes
+> 	- phy nodes
+> 	- usb control module nodes.
+>
+> Signed-off-by: George Cherian <george.cherian@ti.com>
+> ---
+>
+> changes from v2
+> change synopsis to snps
+> use simple node names
+> add both USB and PHY instances
+> add usbctrl node
+>
+> changes from v1
+> renamed synopsis to snps
+> removed flag tx-fifo-resize
+>
+>   arch/arm/boot/dts/am4372.dtsi | 58 +++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 58 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index ddc1df7..37f196f 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -64,5 +64,63 @@
+>   			compatible = "ti,am4372-counter32k","ti,omap-counter32k";
+>   			reg = <0x44e86000 0x40>;
+>   		};
+> +
+> +		phy1: usbphy1 {
+> +			compatible = "ti,am4372-usb2";
+> +			#phy-cells = <0>;
+> +			id = <0>;
+> +			status = "disabled";
+> +		};
+> +
+> +		phy2: usbphy2 {
+> +			compatible = "ti,am4372-usb2";
+> +			#phy-cells = <0>;
+> +			id = <1>;
+> +			status = "disabled";
+> +		};
+> +
+> +		usbctrl: omap-control-usb at 44e10620 {
+> +			compatible = "ti,omap-control-usb";
+> +			reg = <0x44e10620 0x10>;
+> +			reg-names = "control_dev_conf";
+> +			ti,type = <3>;
+> +			status = "disabled";
+> +		};
+> +
+> +		usb1: am4372_dwc3 at 48380000 {
+> +			status = "disabled";
+> +			compatible = "ti,am4372-dwc3";
+> +			reg = <0x48380000 0x200>;
+> +			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			utmi-mode = <1>;
+> +			ranges;
+> +			dwc3 at 48390000 {
+> +				compatible = "snps,dwc3";
+> +				reg = <0x48390000 0xd000>;
+> +				interrupts = <GIC_SPI  168 IRQ_TYPE_LEVEL_HIGH>;
+> +				phys = <&phy1>;
+> +				phy-names = "am4372-usb1";
+> +			};
+> +		};
+> +
+> +		usb2: am4372_dwc3 at 483c0000 {
+> +			status = "disabled";
+> +			compatible = "ti,am4372-dwc3";
+> +			reg = <0x483c0000 0x200>;
+> +			interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			utmi-mode = <1>;
+> +			ranges;
+> +			dwc3 at 483d0000 {
+> +				compatible = "snps,dwc3";
+> +				reg = <0x483d0000 0xd000>;
+> +				interrupts = <GIC_SPI  174 IRQ_TYPE_LEVEL_HIGH>;
+> +				phys = <&phy2>;
+> +				phy-names = "am4372-usb2";
+> +			};
+> +		};
+>   	};
+>   };
 
-The following changes since commit 2746a7c272a3242f919fa2fd5a5f2d9f8a41173a:
 
-  ARM: dove: fix missing __init section of dove_mpp_gpio_mode (2013-07-25 15:22:17 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/fixes-non-3.12-2
-
-for you to fetch changes up to 35faad2a1563b3d4dc983a82ac41033fe053870c:
-
-  ARM: dts: Fix memory node in skeleton64.dtsi (2013-08-07 16:33:50 +0000)
-
-----------------------------------------------------------------
-mvebu fixes-non-critical for v3.12 (round 2)
-
- - fix the memory node (2 by 2) in skeleton64.dtsi
-
-----------------------------------------------------------------
-Stepan Moskovchenko (1):
-      ARM: dts: Fix memory node in skeleton64.dtsi
-
- arch/arm/boot/dts/skeleton64.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+-- 
+-George
