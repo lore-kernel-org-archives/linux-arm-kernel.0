@@ -1,25 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Aug 2013 23:07:02 -0700
-Subject: [GIT PULL] Samsung PWM support cleanup
-In-Reply-To: <3516906.8u5IrARqm7@flatron>
-References: <3516906.8u5IrARqm7@flatron>
-Message-ID: <20130814060702.GH16635@quad.lixom.net>
+Date: Tue, 13 Aug 2013 23:17:34 -0700
+Subject: arm-soc: Xilinx Zynq DT changes for v3.12
+In-Reply-To: <520B1A89.8080704@monstr.eu>
+References: <520A47C3.5000106@monstr.eu> <87r4dxfbuk.fsf@kernel.org>
+ <87ioz9dt1c.fsf@kernel.org> <520B1A89.8080704@monstr.eu>
+Message-ID: <CAOesGMiT3Vw9_YKu86ve2NH-h_ZD+nrVDe94Rtqh6DcAf9gCUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 11:16:35PM +0200, Tomasz Figa wrote:
-> Dear ARM SoC maintainers,
-> 
-> The following changes since commit 
-> c095ba7224d8edc71dcef0d655911399a8bd4a3f:
-> 
->   Linux 3.11-rc4 (2013-08-04 13:46:46 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/tom3q/linux.git tags/v3.12-pwm-cleanup-for-olof
+On Tue, Aug 13, 2013 at 10:50 PM, Michal Simek <monstr@monstr.eu> wrote:
 
-Thanks, applied.
+> I wasn't aware about using earlier -rc. The last information I got
+> is that these trees should be based on Linux -rc (or tagged if you like) version.
+> I will keep this in my mind and will use earlier versions in the next pull requests.
+
+Yes, the request to not always go with the latest -rc is new for this
+release cycle, so we're generally not pushing back and enforcing it,
+just asking nicely :)
+
+However, since Kevin just got up to speed at the same time, he might
+have been of the impression that it's something we've been asking for
+in the past. :)
+
+The reason for asking is that if we keep getting new and different
+-rcs as bases for merge requests, the history starts to look like a
+lot of merge-backs from upstream, when there's rarely a real need for
+being based on such a new -rc.  Still, it's not a big deal, and we've
+been doing it that way now for a couple of years, but I think we could
+avoid some of it without causing anyone more work (once they're used
+to it :).
+
+> It is just one single patch and I believe you have to use rc5
+> and resolve that all conflicts anyway that's why it is just question
+> of time when you have to deal with it.
+
+Ah, I saw that there was a branch included from the zynq tree and
+figured this was in it. I'll let Kevin handle the merge so it's up to
+him if he prefers to rebase back or just merge it in with -rc5.
 
 
 -Olof
