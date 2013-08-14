@@ -1,142 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 Aug 2013 07:53:02 -0500
-Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
-In-Reply-To: <520B5584.7030608@arm.com>
-References: <5208E2D3.7060005@arm.com> <3356439.a21MloFP7n@vostro.rjw.lan>
- <520A536C.3030600@arm.com> <520A7B00.8060405@arm.com>
- <1376428024.4255.14.camel@pasglop> <520B5584.7030608@arm.com>
-Message-ID: <520B7DAE.3060501@gmail.com>
+From: andre.przywara@linaro.org (Andre Przywara)
+Date: Wed, 14 Aug 2013 14:52:09 +0200
+Subject: [PATCH 2/2] DMA: fix printk warning in AMBA PL08x DMA driver
+In-Reply-To: <1376484729-11826-1-git-send-email-andre.przywara@linaro.org>
+References: <1376484729-11826-1-git-send-email-andre.przywara@linaro.org>
+Message-ID: <1376484729-11826-3-git-send-email-andre.przywara@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2013 05:01 AM, Sudeep KarkadaNagesha wrote:
-> On 13/08/13 22:07, Benjamin Herrenschmidt wrote:
->> On Tue, 2013-08-13 at 19:29 +0100, Sudeep KarkadaNagesha wrote:
->>> I don't understand completely the use of ibm,ppc-interrupt-server#s and
->>> its implications on generic of_get_cpu_node implementation.
->>> I see the PPC specific definition of of_get_cpu_node uses thread id only
->>> in 2 instances. Based on that, I have tried to move all the other
->>> instances to use generic definition.
->>>
->>> Let me know if the idea is correct.
->>
->> No. The device-tree historically only represents cores, not HW threads, so
->> it makes sense to retrieve also the thread number corresponding to the CPU.
->>
-> Ok
-> 
->> However, the mechanism to represent HW threads in the device-tree is currently
->> somewhat platform specific (the ibm,ppc-interrupt-server#s).
-> I see most of the callers pass NULL to thread id argument except 2
-> instances in entire tree. If that's the case why can't we move to use
-> generic of_get_cpu_node in most of those cases and have PPC specific
-> implementation for the ones using thread id.
-> 
->>
->> So what you could do for now is:
->>
->>  - Have a generic version that always returns 0 as the thread, which is weak
-> I would prefer to move to generic of_get_cpu_node where ever possible
-> and rename the function that takes thread id rather than making generic
-> one weak.
-> 
->>
->>  - powerpc keeps its own implementation
-> How about only in cases where it needs thread_id.
-> 
->>
->>  - Start a discussion on the bindings (if not already there) to define threads
->> in a better way at which point the generic function can be updated.
->>
-> I am not sure if we need to define any new bindings. Excerpts from ePAPR
-> (v1.1):
-> "3.7.1 General Properties of CPU nodes
-> The value of "reg" is a <prop-encoded-array> that defines a unique
-> CPU/thread id for the CPU/threads represented by the CPU node.
-> If a CPU supports more than one thread (i.e. multiple streams of
-> execution) the reg property is an array with 1 element per thread. The
-> #address-cells on the /cpus node specifies how many cells each element
-> of the array takes. Software can determine the number of threads by
-> dividing the size of reg by the parent node's #address-cells."
-> 
-> And this is exactly in agreement to what's implemented in the generic
-> of_get_cpu_node:
-> 
-> for_each_child_of_node(cpus, cpun) {
->         if (of_node_cmp(cpun->type, "cpu"))
->                 continue;
->         cell = of_get_property(cpun, "reg", &prop_len);
->         if (!cell) {
->                 pr_warn("%s: missing reg property\n", cpun->full_name);
->                 continue;
->         }
->         prop_len /= sizeof(*cell);
->         while (prop_len) {
->                 hwid = of_read_number(cell, ac);
->                 prop_len -= ac;
->                 if (arch_match_cpu_phys_id(cpu, hwid))
->                         return cpun;
->         }
-> }
+In Rob's recent pull request the patch
+	ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
+promotes dma_addr_t to 64bit, so printk generates a warning about
+an incorrect type. Fix this by casting it to u64 and using %llx.
+Fixing long lines on the way.
 
-How about something like this:
+Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
+---
+ drivers/dma/amba-pl08x.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-for_each_child_of_node(cpus, cpun) {
-        if (of_node_cmp(cpun->type, "cpu"))
-                continue;
-
-	if (arch_of_get_cpu_node(cpun, thread))
-		return cpun;
-
-        cell = of_get_property(cpun, "reg", &prop_len);
-        if (!cell) {
-                pr_warn("%s: missing reg property\n", cpun->full_name);
-                continue;
-        }
-        prop_len /= sizeof(*cell);
-        while (prop_len) {
-                hwid = of_read_number(cell, ac);
-                prop_len -= ac;
-                if (arch_match_cpu_phys_id(cpu, hwid))
-       	                return cpun;
-        }
-}
-
-For PPC:
-
-arch_of_get_cpu_node()
-{
-        const u32 *intserv;
-        unsigned int plen, t;
-
-        /* Check for ibm,ppc-interrupt-server#s. */
-        intserv = of_get_property(np, "ibm,ppc-interrupt-server#s",
-                                &plen);
-        if (!intserv)
-		return false;
-
-	hardid = get_hard_smp_processor_id(cpu);
-
-        plen /= sizeof(u32);
-        for (t = 0; t < plen; t++) {
-                 if (hardid == intserv[t]) {
-                         if (thread)
-                                  *thread = t;
-                         return true;
-                 }
-        }
-	return false;
-}
-
-> 
-> Yes this doesn't cover the historical "ibm,ppc-interrupt-server#s", for
-> which we can have PPC specific wrapper above the generic one i.e. get
-> the cpu node and then parse for thread id under custom property.
-> 
-> Let me know your thoughts.
-> 
-> Regards,
-> Sudeep
-> 
-> 
-> 
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 29e1cf9..ae19618 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -850,10 +850,13 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+ 
+ 		pl08x_choose_master_bus(&bd, &mbus, &sbus, cctl);
+ 
+-		dev_vdbg(&pl08x->adev->dev, "src=0x%08x%s/%u dst=0x%08x%s/%u len=%zu\n",
+-			bd.srcbus.addr, cctl & PL080_CONTROL_SRC_INCR ? "+" : "",
++		dev_vdbg(&pl08x->adev->dev,
++			"src=0x%08llx%s/%u dst=0x%08llx%s/%u len=%zu\n",
++			(u64)bd.srcbus.addr,
++			cctl & PL080_CONTROL_SRC_INCR ? "+" : "",
+ 			bd.srcbus.buswidth,
+-			bd.dstbus.addr, cctl & PL080_CONTROL_DST_INCR ? "+" : "",
++			(u64)bd.dstbus.addr,
++			cctl & PL080_CONTROL_DST_INCR ? "+" : "",
+ 			bd.dstbus.buswidth,
+ 			bd.remainder);
+ 		dev_vdbg(&pl08x->adev->dev, "mbus=%s sbus=%s\n",
+-- 
+1.7.12.1
