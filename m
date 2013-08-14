@@ -1,32 +1,33 @@
-From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
-Date: Wed, 14 Aug 2013 10:00:33 +0200
-Subject: [PATCH V2 05/35] cpufreq: at32ap: Covert to light weight
- ->target_index() routine
-In-Reply-To: <1e8023313384685c4f5488b5249423b066e8c133.1376392602.git.viresh.kumar@linaro.org>
-References: <cover.1376392602.git.viresh.kumar@linaro.org>
- <1e8023313384685c4f5488b5249423b066e8c133.1376392602.git.viresh.kumar@linaro.org>
-Message-ID: <20130814080033.GA8540@samfundet.no>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 14 Aug 2013 01:00:45 -0700
+Subject: [GIT] Second Round of Renesas ARM based SoC fixes for v3.12
+In-Reply-To: <cover.1375345067.git.horms+renesas@verge.net.au>
+References: <cover.1375345067.git.horms+renesas@verge.net.au>
+Message-ID: <20130814080045.GE30577@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Tue 13 Aug 2013 19:02:18 +0530 or thereabout, Viresh Kumar wrote:
-> This patch converts existing .target() to newly defined light weight
-> .target_index() routine for this driver.
+On Thu, Aug 01, 2013 at 05:27:15PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
-> CPUFreq core will call cpufreq_frequency_table_target() before calling this
-> routine and will pass index to it.
+> please consider this second round of Renesas ARM based SoC fixes for v3.12.
 > 
-> Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> It is based on the first round of Renesas ARM based SoC fixes for v3.12,
+> /renesas-fixes-for-v3.12, which I have already send a pull-request for.
+> 
+> The following changes since commit 93d8a6fbe69a629a7bb37bb546699a5c49963dc5:
+> 
+>   ARM: shmobile: r8a7740: Fix TPU clock name (2013-07-19 11:12:35 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes2-for-v3.12
+> 
+> for you to fetch changes up to ab40900b70dc31a64f23b1b4dbb0917afb039775:
+> 
+>   ARM: shmobile: armadillo800eva-reference: fix compiler warning (2013-07-23 10:35:33 +0900)
 
-Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+Pulled.
 
-> ---
->  drivers/cpufreq/at32ap-cpufreq.c | 23 +++++------------------
->  1 file changed, 5 insertions(+), 18 deletions(-)
 
-<snipp diff>
-
--- 
-mvh
-Hans-Christian Egtvedt
+-Olof
