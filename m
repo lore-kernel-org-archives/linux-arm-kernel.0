@@ -1,30 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 14 Aug 2013 01:21:38 -0700
-Subject: [GIT 00/14] Second round of Renesas ARM based SoC cleanups for
- v3.12
-In-Reply-To: <cover.1375344714.git.horms+renesas@verge.net.au>
-References: <cover.1375344714.git.horms+renesas@verge.net.au>
-Message-ID: <20130814082138.GA516@quad.lixom.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 14 Aug 2013 10:25:27 +0200
+Subject: [PATCH V4 0/4] Add i2s support on smdk5420
+In-Reply-To: <20130813124440.GX6427@sirena.org.uk>
+References: <1376300994-1679-1-git-send-email-padma.v@samsung.com>
+ <20130813124440.GX6427@sirena.org.uk>
+Message-ID: <6538092.D4LPomiMyc@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 01, 2013 at 05:26:14PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
+On Tuesday 13 of August 2013 13:44:40 Mark Brown wrote:
+> On Mon, Aug 12, 2013 at 03:19:50PM +0530, Padmavathi Venna wrote:
+> > Samsung has different versions of I2S introduced in different
+> > platforms. Each version has some new support added for multichannel,
+> > secondary fifo, s/w reset control, internal mux for rclk src clk and
+> > tdm support. Each newly added change has a quirk. So this patch adds
+> > all the required quirks as driver data and based on compatible string
+> > from dtsi fetches the quirks. This also adds i2s support on
+> > exynos5420.
 > 
-> Please consider this second round of Renesas ARM based SoC cleanups for
-> v3.12.
-> 
-> This pull-request is based on a merge of renesas-tpu-pwm-for-v3.12,
-> renesas-backlight-for-v3.12 and renesas-soc-for-v3.12, each of which
-> I have previously sent a pull-request for, in order to provide
-> the pre-requisite code that that is being removed or cleaned up.
+> Applied all these, thanks.
 
-Hm, I'm a little sad to see the added circular dependency here. It would have
-been very nice if the patches could be organized such that it would have been
-avoided.
+Hmm, this series looks good to me too, except one thing. What about the 
+bisection breakage introduced by the hole between patches 1/4 and 4/4 
+(after the list of supported compatible changes in the driver and before 
+respective dts files are updated)?
 
-I'll probably pull this in as a new next/* branch, but if you can avoid these
-next release cycle without it complicating things too much that'd be awesome.
-
-
--Olof
+Best regards,
+Tomasz
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130814/8e85ba14/attachment.sig>
