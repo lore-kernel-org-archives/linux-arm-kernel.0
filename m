@@ -1,84 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Aug 2013 23:44:24 -0700
-Subject: [PATCH v6 2/4] ARM: debug: support debug ll on hisilicon soc
-In-Reply-To: <1374813135-16238-3-git-send-email-haojian.zhuang@linaro.org>
-References: <1374813135-16238-1-git-send-email-haojian.zhuang@linaro.org>
- <1374813135-16238-3-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20130814064424.GI19951@quad.lixom.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 14 Aug 2013 12:51:57 +0800
+Subject: [PATCH 2/2] arm: mach-imx: anatop: add two APIs for USB driver
+In-Reply-To: <20130814063236.GA31141@S2101-09.ap.freescale.net>
+References: <1376292414-22922-1-git-send-email-peter.chen@freescale.com>
+ <1376292414-22922-2-git-send-email-peter.chen@freescale.com>
+ <20130814034754.GD16915@S2101-09.ap.freescale.net>
+ <20130814035005.GA30404@shlinux1.ap.freescale.net>
+ <20130814063236.GA31141@S2101-09.ap.freescale.net>
+Message-ID: <20130814045154.GA29959@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-
-On Fri, Jul 26, 2013 at 12:32:13PM +0800, Haojian Zhuang wrote:
-> Support UART0 debug ll on hisilicon Hi3620 SoC.
+On Wed, Aug 14, 2013 at 02:32:38PM +0800, Shawn Guo wrote:
+> On Wed, Aug 14, 2013 at 11:50:07AM +0800, Peter Chen wrote:
+> > > > +void imx_anatop_usb1_disconnect_line(bool enable)
+> > > > +{
+> > > > +	if (enable)
+> > > > +		regmap_write(anatop, ANADIG_USB1_LOOPBACK,
+> > > > +			BM_ANADIG_USB1_LOOPBACK_UTMI_DIG_TST1 |
+> > > > +				BM_ANADIG_USB1_LOOPBACK_TSTI_TX_EN);
+> > > > +	else
+> > > > +		regmap_write(anatop, ANADIG_USB1_LOOPBACK, 0);
+> > > > +}
+> > > > +EXPORT_SYMBOL(imx_anatop_usb1_disconnect_line);
+> > > > +
+> > > > +void imx_anatop_set_stop_mode_config(bool enable)
+> > > > +{
+> > > > +	regmap_write(anatop, ANADIG_ANA_MISC0 +
+> > > > +		(enable ? REG_SET : REG_CLR),
+> > > > +			BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG);
+> > > > +}
+> > > > +EXPORT_SYMBOL(imx_anatop_set_stop_mode_config);
+> > > > +
+> > > 
+> > > Where do you want to call these two functions from?
+> > > 
+> > 
+> > From USB driver, the usb driver is possible built as module.
 > 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> I do not think it's appropriate have device driver directly call into
+> platform level functions.
 
-By the way, I ended up doing two fixups:
+Will do it like thermal and regulator driver, please forget it.
 
-> ---
->  arch/arm/Kconfig.debug             | 15 +++++++++++++++
->  arch/arm/include/debug/hisilicon.S | 30 ++++++++++++++++++++++++++++++
->  2 files changed, 45 insertions(+)
->  create mode 100644 arch/arm/include/debug/hisilicon.S
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index e401a76..289a248 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -272,6 +272,20 @@ choice
->  		  Say Y here if you want the debug print routines to direct
->  		  their output to UART1 serial port on KEYSTONE2 devices.
->  
-> +	config DEBUG_HI3620_UART
-> +		bool "Hisilicon HI3620 Debug UART"
-> +		depends on ARCH_HI3xxx
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on HI3620 UART.
-> +
-> +	config DEBUG_HI3716_UART
-> +		bool "Hisilicon Hi3716 Debug UART"
-> +		depends on ARCH_HI3xxx
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on HI3716 UART.
-> +
->  	config DEBUG_MMP_UART2
+-- 
 
-These are out of alphabetical order, not good. I moved them up right before
-highbank where they should be.
-
-> diff --git a/arch/arm/include/debug/hisilicon.S b/arch/arm/include/debug/hisilicon.S
-> new file mode 100644
-> index 0000000..47ad019
-> --- /dev/null
-> +++ b/arch/arm/include/debug/hisilicon.S
-> @@ -0,0 +1,30 @@
-> +/*
-> + * Early serial output macro for Hisilicon SoC
-> + *
-> + * Copyright (C) 2012-2013 Hisilicon Technologies Co., Ltd.
-> + * Copyright (C) 2012-2013 Linaro Ltd.
-> + *
-> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#if defined(CONFIG_DEBUG_HI3620_UART)
-> +#define HS_UART_PHYS_BASE	0xfcb00000
-> +#define HS_UART_VIRT_BASE	0xfeb00000
-> +#elif defined(CONFIG_DEBUG_HI3716_UART)
-> +#define HS_UART_PHYS_BASE	0xf8b00000
-> +#define HS_UART_VIRT_BASE	0xfeb00000
-> +#endif
-
-HS_UART_VIRT_BASE is the same, so I moved it outside the ifdef.
-
-
--Olof
+Best Regards,
+Peter Chen
