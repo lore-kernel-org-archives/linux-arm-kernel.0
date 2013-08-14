@@ -1,41 +1,34 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 14 Aug 2013 11:11:49 +0300
-Subject: [PATCH 3/4] ARM: dts: omap4-panda: Provide USB PHY clock
-In-Reply-To: <1374676356-31286-4-git-send-email-rogerq@ti.com>
-References: <1374676356-31286-1-git-send-email-rogerq@ti.com>
- <1374676356-31286-4-git-send-email-rogerq@ti.com>
-Message-ID: <520B3BC5.4080409@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 14 Aug 2013 01:12:42 -0700
+Subject: [GIT PULL 0/2] Renesas ARM based SoC boards cleanups for v3.12
+In-Reply-To: <cover.1375842006.git.horms+renesas@verge.net.au>
+References: <cover.1375842006.git.horms+renesas@verge.net.au>
+Message-ID: <20130814081242.GJ30577@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Benoit
+On Wed, Aug 07, 2013 at 01:36:37PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
+> 
+> please consider these Renesas ARM based SoC boards cleanups for v3.12.
+> 
+> This pull-request is based on renesas-boards-for-v3.12,
+> which I have previously sent a pull-request for.
+> 
+> I have separated these cleanups from those that I included
+> in renesas-cleanup3-for-v3.12 as there are different dependencies
+> involved and this approach seemed simpler somehow.
+> 
+> 
+> The following changes since commit f79d68da510bf1b95beff4d556b78d06801f11dc:
+> 
+>   ARM: shmobile: ape6evm: add SDHI interfaces (2013-07-25 14:46:38 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards-cleanup-for-v3.12
 
-On 07/24/2013 05:32 PM, Roger Quadros wrote:
-> The USB PHY gets its clock from AUXCLK3. Provide this
-> information.
-> 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->  arch/arm/boot/dts/omap4-panda-common.dtsi |    8 ++------
->  1 files changed, 2 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> index faa95b5..dd793ca 100644
-> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> @@ -99,12 +99,8 @@
->  		compatible = "usb-nop-xceiv";
->  		reset-supply = <&hsusb1_reset>;
->  		vcc-supply = <&hsusb1_power>;
-> -	/**
-> -	 * FIXME:
-> -	 * put the right clock phandle here when available
-> -	 *	clocks = <&auxclk3>;
-> -	 *	clock-names = "main_clk";
-> -	 */
-> +		clocks = <&auxclk3_ck>;
-> +		clock-names = "main_clk";
->  		clock-frequency = <19200000>;
->  	};
->  };
-> 
+Pulled, thanks. FWIW, this could have been baked into boards2.
+
+
+-Olof
