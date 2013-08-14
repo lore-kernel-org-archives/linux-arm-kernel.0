@@ -1,37 +1,29 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 14 Aug 2013 10:08:25 -0600
-Subject: [PATCH 1/2] extcon: palmas: Added a new compatible type *ti,
- palmas-usb-vid*
-In-Reply-To: <520B14A1.8030809@ti.com>
-References: <1376302675-15795-1-git-send-email-kishon@ti.com>
- <1376372241-15573-1-git-send-email-kishon@ti.com>
- <520A8555.10401@wwwdotorg.org> <520B14A1.8030809@ti.com>
-Message-ID: <520BAB79.3000202@wwwdotorg.org>
+Date: Wed, 14 Aug 2013 10:09:43 -0600
+Subject: [PATCH] mmc: dw_mmc-exynos: Common bindings for dw-mshc timing
+In-Reply-To: <20130814052940.GC16635@quad.lixom.net>
+References: <1376002520-7461-1-git-send-email-dinguyen@altera.com>
+ <52096C75.1030305@wwwdotorg.org> <20130814052940.GC16635@quad.lixom.net>
+Message-ID: <520BABC7.8010100@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2013 11:24 PM, Kishon Vijay Abraham I wrote:
-> Hi,
+On 08/13/2013 11:29 PM, Olof Johansson wrote:
+> On Mon, Aug 12, 2013 at 05:15:01PM -0600, Stephen Warren wrote:
+>> On 08/08/2013 04:55 PM, dinguyen at altera.com wrote:
+>>> From: Dinh Nguyen <dinguyen@altera.com>
+>>>
+>>> Remove the "samsung" in "samsung,dw-mshc-ciu-div", "samsung,dw-mshc-sdr-timing",
+>>> and "samsung,dw-mshc-ddr-timing". These characteristics are not applicable to
+>>> just Samsung platforms, but to any platform that uses the Synopsis SD/MMC IP.
+>>
+>> But the properties aren't globally standard; they apply specifically
+>> anywhere that this particular Synopsis IP is present. As such, I think
+>> at least a "synopsis," prefix is warranted.
 > 
-> On Wednesday 14 August 2013 12:43 AM, Stephen Warren wrote:
->> On 08/12/2013 11:37 PM, Kishon Vijay Abraham I wrote:
->>> The Palmas device contains only a USB VID detector, so added a
->>> compatible type *ti,palmas-usb-vid*. Dint remove the existing compatible
->>
->> s/Dint/Didn't/
->>
->>> diff --git a/Documentation/devicetree/bindings/extcon/extcon-twl.txt b/Documentation/devicetree/bindings/extcon/extcon-twl.txt
->>
->>>  PALMAS USB COMPARATOR
->>>  Required Properties:
->>> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
->>> + - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb" or
->>> +   "ti,palmas-usb-vid".
->>
->> So are ti,palmas-usb and ti,twl6035-usb full EHCI controllers then?
-> 
-> No. I thought I shouldn't remove those if someone is already using those
-> compatible value.
+> A prefix is only really needed when a vendor is making a vendor-specific
+> extension on a shared binding. Since the whole binding is
+> synopsis-specific, I don't think there's need for a prefix here.
 
-Sigh. Perhaps it's best to be consistent with the existing bad naming
-then:-(
+Oh! That definitely isn't the rule that's been applied before; I've been
+asked to add "nvidia," prefixes to properties in entirely custom bindings...
