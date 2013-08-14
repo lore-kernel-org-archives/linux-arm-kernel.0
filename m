@@ -1,73 +1,75 @@
 From: Russ.Dill@ti.com (Russ Dill)
-Date: Wed, 14 Aug 2013 15:21:20 -0700
-Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
-In-Reply-To: <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
+Date: Wed, 14 Aug 2013 15:21:52 -0700
+Subject: [PATCH v4 2/4] ARM: dts: add AM33XX vdd core opp50 suspend for
+ Beaglebone.
+In-Reply-To: <520B4708.3040108@ti.com>
 References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
- <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
-Message-ID: <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
+ <1376432412-8509-3-git-send-email-Russ.Dill@ti.com>
+ <520B4708.3040108@ti.com>
+Message-ID: <CA+Bv8XbomTL_fC7fRt6ohV2WeVxTvK0bxmtGhHm6BJU64REpbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 6:38 AM, Jan L?bbe <jlu@pengutronix.de> wrote:
-> On Tue, 2013-08-13 at 15:20 -0700, Russ Dill wrote:
->> The purpose and method of executing these sequences is left up to each
->> platform. In the case of the am33xx, the CM3 firmware writes out the
->> simple I2C sequences.
+On Wed, Aug 14, 2013 at 1:59 AM, Gururaja Hebbar <gururaja.hebbar@ti.com> wrote:
+> On 8/14/2013 3:50 AM, Russ Dill wrote:
+>> Changes since v1:
+>> * Rebased onto new am335x PM branch
 >>
->> Each sequence is a series of I2C write commands. The first byte is the
->> length of the write, the second byte the I2C device to address, and
->> the following bytes are the message.
->
->>         /* Set OPP100 (1.10V) for VDD core */
->>         wake_sequence = /bits/ 8 <
->>                 0x02 0x2d 0x25 0x2b /* Set VDD2 to 1.1V */
->>         >;
+>> This adds a sleep and wake sequence to set the VDD core voltage to the
+>> OPP50 level, 0.950V. This saves power during suspend. The sequences are
+>> specific to the Beaglebone layout and PMIC, the TPS65217. The sequences
+>> are written out by the Cortex-M3.
 >>
->>         tps: tps at 2d {
->>                 reg = <0x2d>;
->>         };
+>> Signed-off-by: Russ Dill <Russ.Dill@ti.com>
+>> ---
+>>  arch/arm/boot/dts/am335x-bone.dts | 25 ++++++++++++++++++++++++-
+>>  1 file changed, 24 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+>> index 444b4ed..3f6528d 100644
+>> --- a/arch/arm/boot/dts/am335x-bone.dts
+>> +++ b/arch/arm/boot/dts/am335x-bone.dts
+>> @@ -127,10 +127,33 @@
+>>                       status = "okay";
+>>                       clock-frequency = <400000>;
+>>
+>> +                     /* Set OPP50 (0.95V) for VDD core */
+>> +                     sleep_sequence = /bits/ 8 <
 >
->> In the above example, the sequence "0x25 0x1f" is written to the I2C
->> device at address 0x2d (the TPS65910 PMIC). The PMIC interprets that
->> as a write to a register at address 0x25.
->
->> I'd really like to get some feedback on the devicetree bindings.
->
-> Shouldn't the TPS driver know how to generate this sequence? It seems
-> fragile to do voltage adjustments behind the back of the regulator
-> framework and the TPS driver. The wake-sequence values should match the
-> (in-memory) regulator configuration on resume (which may have been
-> changed by DVFS).
+> For user readability, can you mention the PMIC used here as a comment?
 
-The sequence is both PMIC specific and board specific. Additionally,
-the PMICs used aren't am335x specific. It would be nice to have the
-regulator framework and the driver write all this out, but the
-sequence is written out by the Cortex-M3 processor running some PM
-firmware. Even if the code was changed to run on the A8, it'd have to
-run from a small piece of SRAM.
+Sounds like a good modification, will do.
 
-As far as DVFS, I'm not aware of any DVFS implementations that muck
-with VDD CORE.
-
-> The CM3 driver needs to figure out where the core regulator is connected
-> using using either DT or the regulator framework and ask the TPS (via a
-> new interface) for register writes for sleep/wake sequences. Then those
-> sequences will actually match the correct voltages configured using
-> DT/DVFS.
-
-That seems like it'd add a lot of complexity to the regulator
-subsystem, as well as all the PMIC and other I2C regulators that any
-users of these device tree properties may end up using for not a lot
-of gain. There would be two separate code paths for any used
-I2C regulator or PMIC for setting voltages.
-
-> Regards,
-> Jan
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>> +                             0x02 0x24 0x0b 0x6d /* Password unlock 1 */
+>> +                             0x02 0x24 0x10 0x02 /* Set DCDC3 to 0.95V */
+>> +                             0x02 0x24 0x0b 0x6d /* Password unlock 2 */
+>> +                             0x02 0x24 0x10 0x02 /* Set DCDC3 to 0.95V */
+>> +                             0x02 0x24 0x0b 0x6c /* Password unlock 1 */
+>> +                             0x02 0x24 0x11 0x86 /* Apply DCDC changes */
+>> +                             0x02 0x24 0x0b 0x6c /* Password unlock 2 */
+>> +                             0x02 0x24 0x11 0x86 /* Apply DCDC changes */
+>> +                     >;
+>> +
+>> +                     /* Set OPP100 (1.10V) for VDD core */
+>> +                     wake_sequence = /bits/ 8 <
+>> +                             0x02 0x24 0x0b 0x6d /* Password unlock 1 */
+>> +                             0x02 0x24 0x10 0x08 /* Set DCDC3 to 1.1V */
+>> +                             0x02 0x24 0x0b 0x6d /* Password unlock 2 */
+>> +                             0x02 0x24 0x10 0x08 /* Set DCDC3 to 1.1V */
+>> +                             0x02 0x24 0x0b 0x6c /* Password unlock 1 */
+>> +                             0x02 0x24 0x11 0x86 /* Apply DCDC changes */
+>> +                             0x02 0x24 0x0b 0x6c /* Password unlock 2 */
+>> +                             0x02 0x24 0x11 0x86 /* Apply DCDC changes */
+>> +                     >;
+>> +
+>>                       tps: tps at 24 {
+>>                               reg = <0x24>;
+>>                       };
+>> -
+>>               };
+>>       };
+>>
+>>
 >
 >
 > _______________________________________________
