@@ -1,26 +1,45 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 14 Aug 2013 16:20:09 -0400 (EDT)
-Subject: [PATCHv3 2/5] arm64: factor out spin-table boot method
-In-Reply-To: <CAOesGMhOgYL0_M7HS1CUqG0mfg3Oa_E5MNyzs2pnfVCd2PRAUw@mail.gmail.com>
-References: <1376497228-20543-1-git-send-email-mark.rutland@arm.com>
- <1376497228-20543-3-git-send-email-mark.rutland@arm.com>
- <CAOesGMhOgYL0_M7HS1CUqG0mfg3Oa_E5MNyzs2pnfVCd2PRAUw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.03.1308141616340.14472@syhkavp.arg>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 14 Aug 2013 16:21:10 -0400
+Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.12
+Message-ID: <20130814202109.GI13964@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Aug 2013, Olof Johansson wrote:
+Arnd, Olof,
 
-> On Wed, Aug 14, 2013 at 9:20 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > With PSCI (and possibly other future boot methods), we can bring CPUs
-> 
-> That's a loaded statement.  :) What's being planned besides PSCI in
-> the future? I thought PSCI was going to be mandated on all (new) arm64
-> platforms?
-
-Please let's get real.  PSCI is a "recommendation" spec.  It requires 
-either a HYP or secure mode in the hardware which some vendors might 
-decide not to implement.
+Praise to $diety, this one is easy ;-)
 
 
-Nicolas
+The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
+
+  Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/defconfig-3.12
+
+for you to fetch changes up to 697004aebfd847374f401dc852d2f2e107aa3096:
+
+  ARM: dove: update dove_defconfig with SI5351, PCI, and xHCI (2013-08-12 19:57:38 +0000)
+
+----------------------------------------------------------------
+mvebu defconfig changes for v3.12
+
+ - kirkwood: add i2c devices, ext4, r8169
+ - mvebu: gpio-keys, input event
+ - dove: SI5351, PCI, xHCI
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Kirkwood: update defconfig for used i2c devices, EXT4 FS, r8169
+
+Sebastian Hesselbarth (1):
+      ARM: dove: update dove_defconfig with SI5351, PCI, and xHCI
+
+Thomas Petazzoni (1):
+      ARM: mvebu: add gpio-keys and input event support in defconfig
+
+ arch/arm/configs/dove_defconfig     |  4 ++++
+ arch/arm/configs/kirkwood_defconfig | 10 +++++++++-
+ arch/arm/configs/mvebu_defconfig    |  2 ++
+ 3 files changed, 15 insertions(+), 1 deletion(-)
