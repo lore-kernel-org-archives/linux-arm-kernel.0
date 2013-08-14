@@ -1,63 +1,59 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 14 Aug 2013 18:50:09 +0530
-Subject: [PATCH 2/3] ARM: OMAP2+: Add support to parse optional clk info
- from DT
-In-Reply-To: <CAGo_u6rfXpU1Wzn+oXqpAezNNtFb9pk=9RZxodGtBbZXVy+yJA@mail.gmail.com>
-References: <1374560679-14666-1-git-send-email-rnayak@ti.com>
- <1374560679-14666-3-git-send-email-rnayak@ti.com>
- <CAGo_u6rfXpU1Wzn+oXqpAezNNtFb9pk=9RZxodGtBbZXVy+yJA@mail.gmail.com>
-Message-ID: <520B8409.5000708@ti.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Wed, 14 Aug 2013 14:21:44 +0100
+Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
+In-Reply-To: <1376480227.4255.66.camel@pasglop>
+References: <5208E2D3.7060005@arm.com> <3356439.a21MloFP7n@vostro.rjw.lan>
+ <520A536C.3030600@arm.com> <520A7B00.8060405@arm.com>
+ <1376428024.4255.14.camel@pasglop> <520B5584.7030608@arm.com>
+ <1376480227.4255.66.camel@pasglop>
+Message-ID: <520B8468.7050307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 August 2013 06:18 PM, Nishanth Menon wrote:
-> Hi Rajendra,
+On 14/08/13 12:37, Benjamin Herrenschmidt wrote:
+> On Wed, 2013-08-14 at 11:01 +0100, Sudeep KarkadaNagesha wrote:
+>> Yes this doesn't cover the historical "ibm,ppc-interrupt-server#s",
+>> for
+>> which we can have PPC specific wrapper above the generic one i.e. get
+>> the cpu node and then parse for thread id under custom property.
 > 
-> On Tue, Jul 23, 2013 at 1:24 AM, Rajendra Nayak <rnayak@ti.com> wrote:
-> [..]
->> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
->> index 12fa589..e5c804b 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->> @@ -805,6 +805,65 @@ static int _init_interface_clks(struct omap_hwmod *oh)
->>         return ret;
->>  }
->>
->> +static const char **_parse_opt_clks_dt(struct omap_hwmod *oh,
->> +                                      struct device_node *np,
->> +                                      int *opt_clks_cnt)
->> +{
->> +       int i, clks_cnt;
->> +       const char *clk_name;
->> +       const char **opt_clk_names;
->> +
->> +       clks_cnt = of_property_count_strings(np, "clock-names");
->> +       if (!clks_cnt)
->> +               return NULL;
->> +
->> +       opt_clk_names = kzalloc(sizeof(char *)*clks_cnt, GFP_KERNEL);
->> +       if (!opt_clk_names)
->> +               return NULL;
->> +
->> +       for (i = 0; i < clks_cnt; i++) {
->> +               of_property_read_string_index(np, "clock-names", i, &clk_name);
->> +               if (!strcmp(clk_name, "fck"))
-> 
-> Could we instead parse for names that are "optional,role_name" instead
-> of assuming anything other than fck is optional clocks?
+> A wrapper is wrong. I don't want to have to have all ppc callers to use
+> a different function.
+Ok.
 
-you mean look for anything with optional,*? because the role names would change.
+On the side note the main intention of this patch series[1] is to avoid
+calling of_get_cpu_node function once CPU devices are registered. It
+initialises the of_node in all the cpu devices using this function when
+registering the CPU device. It can be retrieved from cpu_dev->of_node.
+So direct users of of_get_cpu_node can be reduced to avoid unnecessary
+parsing of DT to find cpu node.
 
 > 
->> +                       continue;
->> +               opt_clks_cnt++;
->> +               opt_clk_names[i] = clk_name;
->> +       }
->> +       return opt_clk_names;
->> +}
->> +
-> [...]
-> --
-> Regards,
-> Nishanth Menon
+> As I said, just make a generic one that returns a thread ID, ie, same
+> signature as the powerpc one. Make it weak, we can override it in
+> powerpc-land,
+IMO, making generic definition which adhere to the ePAPR specification
+as weak is not so clean.
+
+> or we can move the ibm,ppc-interrupt-server#s handling
+> into the generic one, it won't hurt, but leave the thread_id return
+> there, it doesn't hurt it will come in handy in a few cases without
+> causing code duplication.
 > 
+
+IMO moving of handling ibm,ppc-interrupt-server#s to generic code under
+#ifdef CONFIG_PPC seems to be cleaner approach than weak definitation.
+
+As per my understanding each thread is a different logical cpu.
+Each logical cpu is mapped to unique physical id(either present in reg
+field or legacy ibm,ppc-interrupt-server#s field). So given a logical
+cpu id we can get the cpu node corresponding to it.
+Looking @ smp_setup_cpu_maps in arch/powerpc/kernel/setup-common.c
+and the comment in the same file: "This implementation only supports
+power of 2 number of threads.." the thread id id is implicit in the
+logical cpu id. Do we need to fetch that from DT ?
+
+Regards,
+Sudeep
+
+[1] https://lkml.org/lkml/2013/7/22/219
