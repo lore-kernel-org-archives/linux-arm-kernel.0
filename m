@@ -1,112 +1,34 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 14 Aug 2013 08:58:25 -0500
-Subject: [PATCH 2/3] ARM: OMAP2+: Add support to parse optional clk info
- from DT
-In-Reply-To: <20130814134904.GC13141@e106331-lin.cambridge.arm.com>
-References: <1374560679-14666-1-git-send-email-rnayak@ti.com>
- <1374560679-14666-3-git-send-email-rnayak@ti.com>
- <CAGo_u6rfXpU1Wzn+oXqpAezNNtFb9pk=9RZxodGtBbZXVy+yJA@mail.gmail.com>
- <520B8409.5000708@ti.com> <520B88A0.6080806@ti.com>
- <20130814134904.GC13141@e106331-lin.cambridge.arm.com>
-Message-ID: <520B8D01.1040205@ti.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 14 Aug 2013 16:58:05 +0300
+Subject: [PATCH 1/9] usb: phy: nop: Add gpio_reset to platform data
+In-Reply-To: <1376488693-31659-1-git-send-email-rogerq@ti.com>
+References: <1376488693-31659-1-git-send-email-rogerq@ti.com>
+Message-ID: <1376488693-31659-2-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2013 08:49 AM, Mark Rutland wrote:
-> [Adding Mike Turquette and dt maintainers]
->
-> On Wed, Aug 14, 2013 at 02:39:44PM +0100, Nishanth Menon wrote:
->> On 08/14/2013 08:20 AM, Rajendra Nayak wrote:
->>> On Wednesday 14 August 2013 06:18 PM, Nishanth Menon wrote:
->>>> Hi Rajendra,
->>>>
->>>> On Tue, Jul 23, 2013 at 1:24 AM, Rajendra Nayak <rnayak@ti.com> wrote:
->>>> [..]
->>>>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
->>>>> index 12fa589..e5c804b 100644
->>>>> --- a/arch/arm/mach-omap2/omap_hwmod.c
->>>>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->>>>> @@ -805,6 +805,65 @@ static int _init_interface_clks(struct omap_hwmod *oh)
->>>>>           return ret;
->>>>>    }
->>>>>
->>>>> +static const char **_parse_opt_clks_dt(struct omap_hwmod *oh,
->>>>> +                                      struct device_node *np,
->>>>> +                                      int *opt_clks_cnt)
->>>>> +{
->>>>> +       int i, clks_cnt;
->>>>> +       const char *clk_name;
->>>>> +       const char **opt_clk_names;
->>>>> +
->>>>> +       clks_cnt = of_property_count_strings(np, "clock-names");
->>>>> +       if (!clks_cnt)
->>>>> +               return NULL;
->>>>> +
->>>>> +       opt_clk_names = kzalloc(sizeof(char *)*clks_cnt, GFP_KERNEL);
->>>>> +       if (!opt_clk_names)
->>>>> +               return NULL;
->>>>> +
->>>>> +       for (i = 0; i < clks_cnt; i++) {
->>>>> +               of_property_read_string_index(np, "clock-names", i, &clk_name);
->>>>> +               if (!strcmp(clk_name, "fck"))
->>>>
->>>> Could we instead parse for names that are "optional,role_name" instead
->>>> of assuming anything other than fck is optional clocks?
->>>
->>> you mean look for anything with optional,*? because the role names would change.
->>>
->>
->> yes. the idea being, we now have a meaning to the clock name - there are
->> two types of clocks here.. functional and optional, we *might* have
->> facility to add interface clock(we dont know interface clock handling
->> yet, but something in the future).. we might increase the support for
->> number of functional clocks.. it might help to keep the format such that
->> it is a "bit extendable".
->
-> I completely disagree. The only things that should appear in clock-names
-> are the names of the clock inputs that appear in the manual for the
-> device. The driver should know which ones are optional, as that's a
-> fixed property of the IP and the way the driver uses it.
->
-> You should not be embedding additional semantics in name properties.
+The GPIO number of the RESET line can be passed to the
+driver using the gpio_reset member.
 
-we use an level of abstraction called omap_device and hwmod to allow 
-devices to use a generic pm_runtime. drivers for specific blocks dont 
-normally need to know about the clocks to deal with. This allows maximum 
-reuse consider concept is generic enough.
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ include/linux/usb/nop-usb-xceiv.h |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-The traditional way of dealing with this has been to encode the *names* 
-*inside* hwmod!!! which is obviously the wrong way to deal with with 
-clock nodes in dts.
-
-This series moves away from that approach - which is good. Now, the 
-question is:
-
-clocks-names = "....."  is not sufficient to indicate a list of clocks 
-of different functions
-
-3 types of clocks may exist for OMAP h/w blocks:
-a) functional clock (1 usually, but we are starting to see multiple 
-fclks). this drives the actual functionality
-b) optional clocks - additional clocks such as debounce clock etc. - 
-there can be n such clocks
-c) interface clocks - this drives the register interface on the bus.  - 
-there can be n such clocks and additional headaches for interface - 
-currently embedded inside hwmod.
-
-you could do:
-A) embedd in the sematics of the name
-clock-names="fck", "optional,role1",  "optional,role2";
-clocks= <&clk_a>, <&clk_x>, <&clk_y>;
-OR:
-B) embedd in the property name
-optional-clock-names="optional,role1",  "optional,role2";
-optional-clocks=<&clk_x>, <&clk_y>;
-functional-clock-names="fck";
-functional-clocks=<&clk_a>;
-
-are you suggesting (b) here?
-
+diff --git a/include/linux/usb/nop-usb-xceiv.h b/include/linux/usb/nop-usb-xceiv.h
+index 148d351..1e57acb 100644
+--- a/include/linux/usb/nop-usb-xceiv.h
++++ b/include/linux/usb/nop-usb-xceiv.h
+@@ -9,7 +9,9 @@ struct nop_usb_xceiv_platform_data {
+ 
+ 	/* if set fails with -EPROBE_DEFER if can't get regulator */
+ 	unsigned int needs_vcc:1;
+-	unsigned int needs_reset:1;
++	unsigned int needs_reset:1; /* Deprecated */
++
++	int gpio_reset;
+ };
+ 
+ #if defined(CONFIG_NOP_USB_XCEIV) || (defined(CONFIG_NOP_USB_XCEIV_MODULE) && defined(MODULE))
 -- 
-Regards,
-Nishanth Menon
+1.7.4.1
