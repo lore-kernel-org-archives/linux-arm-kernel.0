@@ -1,92 +1,113 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Aug 2013 16:23:47 +0100
-Subject: [PATCH] ARM64: KVM: Fix =?UTF-8?Q?coherent=5Ficache=5Fguest?=
- =?UTF-8?Q?=5Fpage=28=29=20for=20host=20with=20external=20L=33-cache=2E?=
-In-Reply-To: <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
-References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
- <f8917fe8409b1fae634c7de45e34d4a7@www.loen.fr>
- <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
-Message-ID: <5d2d3ae495c27873661c5c2fbdcc19b6@www.loen.fr>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Aug 2013 16:26:21 +0100
+Subject: [PATCH v4 5/6] clocksource: armada-370-xp: Fix device-tree binding
+In-Reply-To: <1376404995-24548-6-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1376404995-24548-6-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130814152621.GA18868@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-08-14 15:22, Anup Patel wrote:
-> On Wed, Aug 14, 2013 at 5:34 PM, Marc Zyngier <marc.zyngier@arm.com> 
-> wrote:
->> Hi Pranav,
->>
->> On 2013-08-14 12:47, Pranavkumar Sawargaonkar wrote:
->>> Systems with large external L3-cache (few MBs), might have dirty
->>> content belonging to the guest page in L3-cache. To tackle this,
->>> we need to flush such dirty content from d-cache so that guest
->>> will see correct contents of guest page when guest MMU is disabled.
->>>
->>> The patch fixes coherent_icache_guest_page() for external L3-cache.
->>>
->>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>> ---
->>>  arch/arm64/include/asm/kvm_mmu.h |    2 ++
->>>  1 file changed, 2 insertions(+)
->>>
->>> diff --git a/arch/arm64/include/asm/kvm_mmu.h
->>> b/arch/arm64/include/asm/kvm_mmu.h
->>> index efe609c..5129038 100644
->>> --- a/arch/arm64/include/asm/kvm_mmu.h
->>> +++ b/arch/arm64/include/asm/kvm_mmu.h
->>> @@ -123,6 +123,8 @@ static inline void
->>> coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
->>>       if (!icache_is_aliasing()) {            /* PIPT */
->>>               unsigned long hva = gfn_to_hva(kvm, gfn);
->>>               flush_icache_range(hva, hva + PAGE_SIZE);
->>> +             /* Flush d-cache for systems with external caches. */
->>> +             __flush_dcache_area((void *) hva, PAGE_SIZE);
->>>       } else if (!icache_is_aivivt()) {       /* non ASID-tagged 
->>> VIVT */
->>>               /* any kind of VIPT cache */
->>>               __flush_icache_all();
->>
->> [adding Will to the discussion as we talked about this in the past]
->>
->> That's definitely an issue, but I'm not sure the fix is to hit the 
->> data
->> cache on each page mapping. It looks overkill.
->>
->> Wouldn't it be enough to let userspace do the cache cleaning? 
->> kvmtools
->> knows which bits of the guest memory have been touched, and can do a 
->> "DC
->> DVAC" on this region.
->
-> It seems a bit unnatural to have cache cleaning is user-space. I am 
-> sure
-> other architectures don't have such cache cleaning in user-space for 
-> KVM.
+Hi,
 
-Well, we have it on AArch64. Why would we blindly nuke the whole cache 
-if we can do the right thing, efficiently, on the right range?
+On Tue, Aug 13, 2013 at 03:43:14PM +0100, Ezequiel Garcia wrote:
+> This commit fixes the DT binding for the Armada 370/XP SoC timer.
+> The previous "marvell,armada-370-xp-timer" compatible is removed and
+> two new compatible strings are introduced: "marvell,armada-xp-timer"
+> and "marvell,armada-370-timer".
+> 
+> The rationale behind this change is that the Armada 370 SoC and the
+> Armada XP SoC timers are not really compatible:
+> 
+>   * Armada 370 has no 25 MHz fixed timer.
+> 
+>   * Armada XP cannot work properly without such 25 MHz fixed timer
+>     as doing otherwise leads to using a clocksource whose frequency
+>     varies when doing cpufreq frequency changes.
+> 
+> This commit also removes the "marvell,timer-25Mhz" property, given
+> it's now meaningless.
 
->> The alternative is do it in the kernel before running any vcpu - but
->> that's not very nice either (have to clean the whole of the guest
->> memory, which makes a full dcache clean more appealing).
->
-> Actually, cleaning full d-cache by set/way upon first run of VCPU was
-> our second option but current approach seemed very simple hence
-> we went for this.
->
-> If more people vote for full d-cache clean upon first run of VCPU 
-> then
-> we should revise this patch.
+Given we have a mechanism already for handling this, I'm not sure. The
+new binding certainly looks nicer (and if there's no-one using it, then
+migrating makes sense), but I still have concerns about it. From the
+description of the problem, and a look at the driver, the timer hardware
+actually has (at least) two clock inputs:
 
-That sounds a lot better than randomly flushing the dcache for no good 
-reason. Most of the time, your MMU will be ON, and only the initial 
-text/data loaded from userspace is at risk.
+(a) Wired to a fixed 25MHz clock on the XP, but not described.
+    Not wired to anything on the 370?
 
-But the userspace version sounds definitely better, and I'd like you to 
-evaluate it before going the kernel way.
+(b) Wired to the CPU clock on the XP?
+    Wired to some external clock on the 370.
+
+If that's the case, this should be described, even if we can't use that
+information right now. (a) can be a 25MHz fixed-clock on the XP, and
+just not described on the 370. We can use clock-names to handle the
+optional presence of any input clock.
+
+Having separate compatible strings may still make sense, but I'd prefer
+to understand the hardware better first. Not having full visibility over
+a piece of hardware at review stage is precisely why we get into a mess
+trying to change bindings later.
 
 Thanks,
+Mark.
 
-         M.
--- 
-Fast, cheap, reliable. Pick two.
+> 
+> Cc: devicetree at vger.kernel.org
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  .../bindings/timer/marvell,armada-370-xp-timer.txt | 27 ++++++++++++++++++----
+>  1 file changed, 22 insertions(+), 5 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+> index 3638112..4c453b2 100644
+> --- a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+> +++ b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+> @@ -2,14 +2,31 @@ Marvell Armada 370 and Armada XP Timers
+>  ---------------------------------------
+>  
+>  Required properties:
+> -- compatible: Should be "marvell,armada-370-xp-timer"
+> +- compatible: Should be either "marvell,armada-370-timer" or
+> +  "marvell,armada-xp-timer" as appropriate.
+>  - interrupts: Should contain the list of Global Timer interrupts and
+>    then local timer interrupts
+>  - reg: Should contain location and length for timers register. First
+>    pair for the Global Timer registers, second pair for the
+>    local/private timers.
+> -- clocks: clock driving the timer hardware
+> +- clocks: clock driving the timer hardware, only required for
+> +  "marvell,armada-370-timer";
+>  
+> -Optional properties:
+> -- marvell,timer-25Mhz: Tells whether the Global timer supports the 25
+> -  Mhz fixed mode (available on Armada XP and not on Armada 370)
+> +Examples:
+> +
+> +- Armada 370:
+> +
+> +	timer {
+> +		compatible = "marvell,armada-370-timer";
+> +		reg = <0x20300 0x30>, <0x21040 0x30>;
+> +		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
+> +		clocks = <&coreclk 2>;
+> +	};
+> +
+> +- Armada XP:
+> +
+> +	timer {
+> +		compatible = "marvell,armada-xp-timer";
+> +		reg = <0x20300 0x30>, <0x21040 0x30>;
+> +		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
+> +	};
+> -- 
+> 1.8.1.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
