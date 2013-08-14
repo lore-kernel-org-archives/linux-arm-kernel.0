@@ -1,53 +1,26 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 14 Aug 2013 15:35:49 -0600
-Subject: [PATCH v3 1/5] ARM: add basic Trusted Foundations support
-In-Reply-To: <1376360992-1508-2-git-send-email-acourbot@nvidia.com>
-References: <1376360992-1508-1-git-send-email-acourbot@nvidia.com>
- <1376360992-1508-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <520BF835.5080309@wwwdotorg.org>
+From: behanw@converseincode.com (behanw at converseincode.com)
+Date: Wed, 14 Aug 2013 17:37:40 -0400
+Subject: [PATCH] Fix extern inline in ftrace.h for ARM
+Message-ID: <1376516261-2071-1-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2013 08:29 PM, Alexandre Courbot wrote:
-> Trusted Foundations is a TrustZone-based secure monitor for ARM that
-> can be invoked  using a consistent smc-based API on all supported
-> platforms. This patch adds initial basic support for Trusted
-> Foundations using the ARM firmware API. Current features are limited
-> to the ability to boot secondary processors.
+From: Behan Webster <behanw@converseincode.com>
 
-> diff --git a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+The LLVMLinux Project is working to be able to build the Linux kernel with
+clang/LLVM. With the release of LLVM 3.3 clang is now able to compile the Linux
+kernel with a number of small patches (available from the LLVMLinux git repo).
 
-> +Trusted Foundations
-> +
-> +Boards that use the Trusted Foundations secure monitor can signal its
-> +presence by declaring a node compatible with "tl,trusted-foundations"
-> +(the name and location of the node does not matter).
-> +
-> +Required properties:
-> +- compatible : "tl,trusted-foundations"
+This patch removes the use of "extern inline" from the ftrace code for ARM.
+This same work has already been completed for ftrace on x86.  Amongst other
+things this patch is required in order to have the Linux kernel to be able to
+be compiled with both gcc and clang.
 
-> +- version : Must contain the version number string of the Trusted Foundation
-> +	firmware.
+Mark Charlebois (1):
+  ARM: LLVMLinux: Change "extern inline" to "gnu_inline" in ARM ftrace.h
 
-Can the version be queried at run-time from the firmware itself?
+ arch/arm/include/asm/ftrace.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-If not, I wonder if we shouldn't instead encode the version number into
-the compatible value.
-
-Some comments on the exact format of the version property would be
-useful; from the example I assume it's "%02d.%02d" % (major_ver, minor_ver)?
-
-> diff --git a/arch/arm/firmware/Kconfig b/arch/arm/firmware/Kconfig
-
-> +config ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
-> +	bool
-
-Shouldn't that be "config ARCH_SUPPORTS_FIRMWARE", since presumably in
-the future there will be more entries in the menu, and hence we want the
-menu to appear if any of those entries are useful?
-
-> +
-> +menu "Firmware options"
-> +	depends on ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
-
-Or perhaps that comment is more appropriate for that "depends".
+-- 
+1.8.1.2
