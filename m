@@ -1,36 +1,40 @@
-From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
-Date: Wed, 14 Aug 2013 17:17:12 +0530
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host with
- external L3-cache.
-Message-ID: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 14 Aug 2013 07:53:28 -0400
+Subject: [PATCH v2 4/5] PCI: mvebu: add support for reset on GPIO
+In-Reply-To: <520B4CEE.2050508@gmail.com>
+References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376396724-32048-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130814090715.GA2084@ulmo> <520B4CEE.2050508@gmail.com>
+Message-ID: <20130814115328.GA32395@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Systems with large external L3-cache (few MBs), might have dirty
-content belonging to the guest page in L3-cache. To tackle this,
-we need to flush such dirty content from d-cache so that guest
-will see correct contents of guest page when guest MMU is disabled.
+On Wed, Aug 14, 2013 at 11:25:02AM +0200, Sebastian Hesselbarth wrote:
+> On 08/14/2013 11:07 AM, Thierry Reding wrote:
+> >On Tue, Aug 13, 2013 at 02:25:23PM +0200, Sebastian Hesselbarth wrote:
+> >[...]
+> >>diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> >[...]
+> >>@@ -897,6 +904,30 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+> >[...]
+> >>+			u32 reset_udelay = 20000;
+> >[...]
+> >>+			udelay(reset_udelay);
+> >
+> >udelay(20000) is probably not a good idea. You should probably use
+> >something like usleep_range() or msleep() here. Also see:
+> >
+> >	Documentation/timers/timers-howto.txt
+> 
+> Thierry,
+> 
+> thanks for mentioning this. I clearly got distracted from ms to us
+> switch due to the different reset API convention. As the delay will
+> be most likely 10ms+, we should change the above to
+> msleep(reset_udelay/1000) instead.
 
-The patch fixes coherent_icache_guest_page() for external L3-cache.
+I'll just go ahead and fix this up locally.  No need to resend.
 
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
----
- arch/arm64/include/asm/kvm_mmu.h |    2 ++
- 1 file changed, 2 insertions(+)
+thx,
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index efe609c..5129038 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -123,6 +123,8 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
- 	if (!icache_is_aliasing()) {		/* PIPT */
- 		unsigned long hva = gfn_to_hva(kvm, gfn);
- 		flush_icache_range(hva, hva + PAGE_SIZE);
-+		/* Flush d-cache for systems with external caches. */
-+		__flush_dcache_area((void *) hva, PAGE_SIZE);
- 	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
- 		/* any kind of VIPT cache */
- 		__flush_icache_all();
--- 
-1.7.9.5
+Jason.
