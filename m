@@ -1,32 +1,104 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 14 Aug 2013 12:49:38 +0200
-Subject: [PATCH v9 03/16] iommu/exynos: fix page table maintenance
-In-Reply-To: <CANEJEGu1ponghpfvyUsQX16+TZWUV+0KXJ7AehjXpju2N_H+Ew@mail.gmail.com>
-References: <002701ce941a$eecebdb0$cc6c3910$@samsung.com>
- <1516548.d7oQuzQS7g@amdc1227>
- <CANEJEGu1ponghpfvyUsQX16+TZWUV+0KXJ7AehjXpju2N_H+Ew@mail.gmail.com>
-Message-ID: <20130814104938.GF4491@8bytes.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 14 Aug 2013 12:51:09 +0200
+Subject: [PATCH v3 0/6] ARM/ARM64 architected timer updates
+In-Reply-To: <520B4B2E.1040700@arm.com>
+References: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376414984-14182-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <520B490A.4090109@linaro.org> <520B4B2E.1040700@arm.com>
+Message-ID: <520B611D.8060500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 11:28:44AM -0700, Grant Grundler wrote:
-> I can't speak to the previous BUG_ON(). I believe the EADDRESSINUSE
-> failures could be either WARN_ON or BUG_ON.   This condition is
-> clearly a bug in the generic IOMMU allocator and I think that's why
-> KyongHo Cho used BUG_ON.
+On 08/14/2013 11:17 AM, Sudeep KarkadaNagesha wrote:
+> On 14/08/13 10:08, Daniel Lezcano wrote:
+>> On 08/13/2013 07:29 PM, Sudeep KarkadaNagesha wrote:
+>>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>>>
+>>> This patch series adds support to configure the rate and enable the
+>>> event stream for architected timer. The event streams can be used to
+>>> impose a timeout on a WFE, to safeguard against any programming error
+>>> in case an expected event is not generated or even to implement
+>>> wfe-based timeouts for userspace locking implementations.
+>>>
+>>> Since the timer control register is reset to zero on warm boot, CPU
+>>> PM notifier is added to re-initialize it.
+>>
+>> It does not apply to my tree.
+>>
+>> Against which tree is this patchset ? Who is supposed to take it ?
+>>
+> As I had mentioned in previous version, because of the conflict, I had
+> to rebase it on 3.11-rc4
+
+
+dlezcano at mai:~/Work/src/clockevents$ git show
+commit c095ba7224d8edc71dcef0d655911399a8bd4a3f
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Sun Aug 4 13:46:46 2013 -0700
+
+    Linux 3.11-rc4
+
+diff --git a/Makefile b/Makefile
+index 95a8e55..f93d4f7 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
+ VERSION = 3
+ PATCHLEVEL = 11
+ SUBLEVEL = 0
+-EXTRAVERSION = -rc3
++EXTRAVERSION = -rc4
+ NAME = Linux for Workgroups
+
+ # *DOCUMENTATION*
+
+
+dlezcano at mai:~/Work/src/clockevents$ git am -s arch_timer
+
+Applying: ARM/ARM64: arch_timer: add macros for bits in control register
+Applying: drivers: clocksource: configure event stream for ARM arch timer
+Applying: ARM: arch_timer: configure and enable event stream
+Applying: ARM64: arch_timer: configure and enable event stream
+Applying: drivers: clocksource: add CPU PM notifier for ARM architected
+timer
+error: patch failed: drivers/clocksource/arm_arch_timer.c:160
+error: drivers/clocksource/arm_arch_timer.c: patch does not apply
+Patch failed at 0005 drivers: clocksource: add CPU PM notifier for ARM
+architected timer
+When you have resolved this problem run "git am --resolved".
+If you would prefer to skip this patch, instead run "git am --skip".
+To restore the original branch and stop patching run "git am --abort".
+
+
+>>> Changes v2->v3:
+>>> 1. Moved ARM and ARM64 changes into separate patches
+>>> 2. Added native hwcaps definations(ARM/ARM64) and compat-specific
+>>>    definitions(ARM64) to the users for the event stream feature. 
+>>
+>> Ok, we have the choice:
+>>  1. split the patchset into arch/arm changes and drivers/clocksource
+>>  2. I ack the patchset and Olof/Kevin take it
+>>  3. Olof/Kevin ack the patchset and I take it in my tree.
+>>
+>> This is really becoming fuzzy.
+>>
+> I am not sure if we need to split it. It would get too messy because of
+> dependencies. Once we have ACKs from all the corresponding maintainers,
+> it can go through one of the tree.
 > 
-> Handing out duplicate addresses will generally lead to some sort of
-> data corruption or other fault depending on how robust the underlying
-> device drivers are written.  So my preference is a BUG_ON to
-> immediately flag this condition instead of hoping a device driver will
-> correctly handling the dma mapping failure (Some do, most currently
-> don't).
+>> If you want a maintainer to take a patchset you have to send an email
+>> --to him and --cc mailing list and others concerned by the patchset.
+>>
+> Ok understood.
 > 
-> WARN_ON() + return -EADDRESSINUSE would be a good alternative.
-
-Even if it is a real BUG condition, I don't think it is worth to stop
-execution at this point. It makes debugging harder and the system less
-reliable. I prefer to go with the WARN_ON and an error return value.
+> Regards,
+> Sudeep
+> 
 
 
-	Joerg
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
