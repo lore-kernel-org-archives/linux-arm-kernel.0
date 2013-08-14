@@ -1,121 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Aug 2013 10:03:48 +0100
-Subject: [PATCH v3 1/6] ARM/ARM64: =?UTF-8?Q?arch=5Ftimer=3A=20add=20m?=
- =?UTF-8?Q?acros=20for=20bits=20in=20control=20register?=
-In-Reply-To: <520B44CF.6040403@linaro.org>
-References: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376414984-14182-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376414984-14182-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <520B44CF.6040403@linaro.org>
-Message-ID: <6071c584a32b1a5f80923818a477a719@www.loen.fr>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Wed, 14 Aug 2013 13:05:52 +0400
+Subject: [PATCH 2/3] ARM: dts: i.MX51: Add one more I2C2 pinmux entry
+In-Reply-To: <1376471153-3452-1-git-send-email-shc_work@mail.ru>
+References: <1376471153-3452-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1376471153-3452-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+This adds one more I2C2 alternate pinmux entry.
+GPIO1_2 <=> SCL
+GPIO1_3 <=> SDA
 
-On 2013-08-14 09:50, Daniel Lezcano wrote:
-> On 08/13/2013 07:29 PM, Sudeep KarkadaNagesha wrote:
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> Add macros to describe the bitfields in the ARM architected timer
->> control register to make code easy to understand.
->>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Reviewed-by: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->> ---
->>  arch/arm/include/asm/arch_timer.h    |  9 +++++++--
->>  arch/arm64/include/asm/arch_timer.h  | 12 ++++++++----
->>  include/clocksource/arm_arch_timer.h |  8 ++++++++
->>  3 files changed, 23 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/arch_timer.h 
->> b/arch/arm/include/asm/arch_timer.h
->> index e406d57..9ef74da 100644
->> --- a/arch/arm/include/asm/arch_timer.h
->> +++ b/arch/arm/include/asm/arch_timer.h
->> @@ -95,8 +95,13 @@ static inline void 
->> arch_counter_set_user_access(void)
->>
->>  	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
->>
->> -	/* disable user access to everything */
->> -	cntkctl &= ~((3 << 8) | (7 << 0));
->> +	/* Disable user access to both physical/virtual counters/timers. 
->> */
->> +	/* Also disable virtual event stream */
->> +	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
->> +			| ARCH_TIMER_USR_VT_ACCESS_EN
->> +			| ARCH_TIMER_VIRT_EVT_EN
->> +			| ARCH_TIMER_USR_VCT_ACCESS_EN
->> +			| ARCH_TIMER_USR_PCT_ACCESS_EN);
->>
->>  	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
->>  }
->> diff --git a/arch/arm64/include/asm/arch_timer.h 
->> b/arch/arm64/include/asm/arch_timer.h
->> index 98abd47..00b09d0 100644
->> --- a/arch/arm64/include/asm/arch_timer.h
->> +++ b/arch/arm64/include/asm/arch_timer.h
->> @@ -101,12 +101,16 @@ static inline void 
->> arch_counter_set_user_access(void)
->>  {
->>  	u32 cntkctl;
->>
->> -	/* Disable user access to the timers and the physical counter. */
->>  	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
->> -	cntkctl &= ~((3 << 8) | (1 << 0));
->>
->> -	/* Enable user access to the virtual counter and frequency. */
->> -	cntkctl |= (1 << 1);
->> +	/* Disable user access to the timers and the physical counter. */
->> +	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
->> +			| ARCH_TIMER_USR_VT_ACCESS_EN
->> +			| ARCH_TIMER_USR_PCT_ACCESS_EN);
->> +
->> +	/* Enable user access to the virtual counter. */
->> +	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
->> +
->>  	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
->>  }
->
-> Before doing those changes, I suggest you kill 
-> include/asm/arch_timer.h
-> header file and move the functions directly in the arm_arch_timer.c 
-> as
-> they are only used by it.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/boot/dts/imx51.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-How do you suggest to proceed? Having #ifdefs in arm_arch_timer.c to 
-cope with the inline assembly functions present in both arm and arm64 
-include files? Doesn't seem much of a progress to me...
-
->> diff --git a/include/clocksource/arm_arch_timer.h 
->> b/include/clocksource/arm_arch_timer.h
->> index c463ce9..551f7e9 100644
->> --- a/include/clocksource/arm_arch_timer.h
->> +++ b/include/clocksource/arm_arch_timer.h
->> @@ -29,6 +29,14 @@
->>  #define ARCH_TIMER_PHYS_ACCESS		0
->>  #define ARCH_TIMER_VIRT_ACCESS		1
->>
->> +#define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter 
->> */
->> +#define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
->> +#define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
->> +#define ARCH_TIMER_EVT_TRIGGER_SHIFT	(4)
->> +#define ARCH_TIMER_EVT_TRIGGER_MASK	(0xF << 
->> ARCH_TIMER_EVT_TRIGGER_SHIFT)
->> +#define ARCH_TIMER_USR_VT_ACCESS_EN	(1 << 8) /* virtual timer 
->> registers */
->> +#define ARCH_TIMER_USR_PT_ACCESS_EN	(1 << 9) /* physical timer 
->> registers */
->> +
->>  #ifdef CONFIG_ARM_ARCH_TIMER
->>
->>  extern u32 arch_timer_get_rate(void);
->>
-
-         M.
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 6d8f94a..a85abb4 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -622,6 +622,13 @@
+ 				MX51_PAD_EIM_D24__I2C2_SDA 0x400001ed
+ 			>;
+ 		};
++
++		pinctrl_i2c2_3: i2c2grp-3 {
++			fsl,pins = <
++				MX51_PAD_GPIO1_2__I2C2_SCL 0x400001ed
++				MX51_PAD_GPIO1_3__I2C2_SDA 0x400001ed
++			>;
++		};
+ 	};
+ 
+ 	ipu_disp1 {
 -- 
-Fast, cheap, reliable. Pick two.
+1.8.1.5
