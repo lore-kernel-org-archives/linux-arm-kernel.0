@@ -1,41 +1,68 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 14 Aug 2013 13:45:20 +0530
-Subject: [PATCH v2 09/11] dma: mmp_pdma: implement DMA_PAUSE and DMA_RESUME
-In-Reply-To: <1376153545-14361-10-git-send-email-zonque@gmail.com>
-References: <1376153545-14361-1-git-send-email-zonque@gmail.com>
- <1376153545-14361-10-git-send-email-zonque@gmail.com>
-Message-ID: <20130814081520.GJ32147@intel.com>
+From: gururaja.hebbar@ti.com (Gururaja Hebbar)
+Date: Wed, 14 Aug 2013 14:29:52 +0530
+Subject: [PATCH v4 2/4] ARM: dts: add AM33XX vdd core opp50 suspend for
+ Beaglebone.
+In-Reply-To: <1376432412-8509-3-git-send-email-Russ.Dill@ti.com>
+References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
+ <1376432412-8509-3-git-send-email-Russ.Dill@ti.com>
+Message-ID: <520B4708.3040108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 10, 2013 at 06:52:23PM +0200, Daniel Mack wrote:
-> This is needed at least for audio operation.
+On 8/14/2013 3:50 AM, Russ Dill wrote:
+> Changes since v1:
+> * Rebased onto new am335x PM branch
 > 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> This adds a sleep and wake sequence to set the VDD core voltage to the
+> OPP50 level, 0.950V. This saves power during suspend. The sequences are
+> specific to the Beaglebone layout and PMIC, the TPS65217. The sequences
+> are written out by the Cortex-M3.
+> 
+> Signed-off-by: Russ Dill <Russ.Dill@ti.com>
 > ---
->  drivers/dma/mmp_pdma.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  arch/arm/boot/dts/am335x-bone.dts | 25 ++++++++++++++++++++++++-
+>  1 file changed, 24 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-> index 579f79a..7a0956b 100644
-> --- a/drivers/dma/mmp_pdma.c
-> +++ b/drivers/dma/mmp_pdma.c
-> @@ -659,6 +659,12 @@ static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
->  		if (cfg->slave_id)
->  			chan->drcmr = cfg->slave_id;
->  		break;
-> +	case DMA_PAUSE:
-> +		disable_chan(chan->phy);
-> +		break;
-> +	case DMA_RESUME:
-> +		start_pending_queue(chan);
-This is your usual start_pending ops. The meaning of pause and resume is NOT to
-drop current descriptor and start from next one. You need to start from where
-you had left off.
+> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+> index 444b4ed..3f6528d 100644
+> --- a/arch/arm/boot/dts/am335x-bone.dts
+> +++ b/arch/arm/boot/dts/am335x-bone.dts
+> @@ -127,10 +127,33 @@
+>  			status = "okay";
+>  			clock-frequency = <400000>;
+>  
+> +			/* Set OPP50 (0.95V) for VDD core */
+> +			sleep_sequence = /bits/ 8 <
 
-The way I see in this driver you are going to pick next descriptor and since
-usage is audio, imply loss of audio in puase-resume case.
+For user readability, can you mention the PMIC used here as a comment?
 
-You need to resume here, not start next one
-
-~Vinod
+> +				0x02 0x24 0x0b 0x6d /* Password unlock 1 */
+> +				0x02 0x24 0x10 0x02 /* Set DCDC3 to 0.95V */
+> +				0x02 0x24 0x0b 0x6d /* Password unlock 2 */
+> +				0x02 0x24 0x10 0x02 /* Set DCDC3 to 0.95V */
+> +				0x02 0x24 0x0b 0x6c /* Password unlock 1 */
+> +				0x02 0x24 0x11 0x86 /* Apply DCDC changes */
+> +				0x02 0x24 0x0b 0x6c /* Password unlock 2 */
+> +				0x02 0x24 0x11 0x86 /* Apply DCDC changes */
+> +			>;
+> +
+> +			/* Set OPP100 (1.10V) for VDD core */
+> +			wake_sequence = /bits/ 8 <
+> +				0x02 0x24 0x0b 0x6d /* Password unlock 1 */
+> +				0x02 0x24 0x10 0x08 /* Set DCDC3 to 1.1V */
+> +				0x02 0x24 0x0b 0x6d /* Password unlock 2 */
+> +				0x02 0x24 0x10 0x08 /* Set DCDC3 to 1.1V */
+> +				0x02 0x24 0x0b 0x6c /* Password unlock 1 */
+> +				0x02 0x24 0x11 0x86 /* Apply DCDC changes */
+> +				0x02 0x24 0x0b 0x6c /* Password unlock 2 */
+> +				0x02 0x24 0x11 0x86 /* Apply DCDC changes */
+> +			>;
+> +
+>  			tps: tps at 24 {
+>  				reg = <0x24>;
+>  			};
+> -
+>  		};
+>  	};
+>  
+> 
