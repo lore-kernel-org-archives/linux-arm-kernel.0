@@ -1,93 +1,83 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 14 Aug 2013 07:43:11 +0200
-Subject: arm-soc: Xilinx Zynq cleanups for v3.12
-In-Reply-To: <20130814050145.4443.97433@quantum>
-References: <520A47C7.4050000@monstr.eu> <87y585dve9.fsf@kernel.org>
- <20130814050145.4443.97433@quantum>
-Message-ID: <520B18EF.6030905@monstr.eu>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 14 Aug 2013 11:50:07 +0800
+Subject: [PATCH 2/2] arm: mach-imx: anatop: add two APIs for USB driver
+In-Reply-To: <20130814034754.GD16915@S2101-09.ap.freescale.net>
+References: <1376292414-22922-1-git-send-email-peter.chen@freescale.com>
+ <1376292414-22922-2-git-send-email-peter.chen@freescale.com>
+ <20130814034754.GD16915@S2101-09.ap.freescale.net>
+Message-ID: <20130814035005.GA30404@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2013 07:01 AM, Mike Turquette wrote:
-> Quoting Kevin Hilman (2013-08-13 16:27:10)
->> + Mike Turquette
->>
->> Michal Simek <monstr@monstr.eu> writes:
->>
->>> Hi Arnd and Olof,
->>
->> I'm helping out with arm-soc maintenance now too and I'm on the
->> arm at kernel.org alias, thanks for Cc'ing it.
->>
->>> please pull these cleanup patches to your tree.
->>>
->>> Thanks,
->>> Michal
->>>
->>> The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
->>>
->>>   Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>   git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.12
->>>
->>> for you to fetch changes up to 060968ff9fa1a56b22cc2454906a233d302b1bd2:
->>>
->>>   arm: zynq: hotplug: Remove unreachable code (2013-08-13 16:09:12 +0200)
->>>
->>> ----------------------------------------------------------------
->>> arm: Xilinx Zynq cleanup patches for v3.12
->>>
->>> This branch contains these fixes:
->>> - SLCR cleanup
->>> - 2 minor zynq pll fixes
->>> - Hotplug cleanup
->>>
->>> ----------------------------------------------------------------
->>> Soren Brinkmann (6):
->>>       arm: zynq: slcr: Remove redundant header #includes
->>>       arm: zynq: slcr: Clean up #defines
->>>       arm: zynq: slcr: Use read-modify-write for register writes
->>>       clk/zynq/pll: Fix documentation for PLL register function
->>>       clk/zynq/pll: Use #defines for fbdiv min/max values
->>
->> These drivers/clk changes should go through the clock maintainer Mike
->> Turquette.  Could you split them out into a separate pull request?
->>
->> Alternatively, if Mike is confident there won't be any conflicts with
->> his tree, I'll happily merge them through arm-soc with his ack.
+On Wed, Aug 14, 2013 at 11:47:56AM +0800, Shawn Guo wrote:
+> On Mon, Aug 12, 2013 at 03:26:54PM +0800, Peter Chen wrote:
+> > imx_anatop_usb1_disconnect_line is used to disconnect dp/dm between
+> > PHY and controller, after that, the controller always gets SE0
+> > for the status of dp/dm, it is not any wakeup signal for controller.
+> > It is used to avoid unknown interrupt due to dp/dm is floading
+> > after the USB PHY is no powered when there is no vbus supplied.
+> > 
+> > imx_anatop_set_stop_mode_config is used to keep internal regualtor on
+> > when the system enters suspend mode, it will increase power consumption,
+> > we only enable it when the user enables USB wakeup (default is off).
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  arch/arm/mach-imx/anatop.c |   22 ++++++++++++++++++++++
+> >  arch/arm/mach-imx/common.h |    2 ++
+> >  2 files changed, 24 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+> > index 71f1a08..7f96bbc 100644
+> > --- a/arch/arm/mach-imx/anatop.c
+> > +++ b/arch/arm/mach-imx/anatop.c
+> > @@ -26,6 +26,7 @@
+> >  #define ANADIG_ANA_MISC0	0x150
+> >  #define ANADIG_ANA_MISC2	0x170
+> >  #define ANADIG_USB1_CHRG_DETECT	0x1b0
+> > +#define ANADIG_USB1_LOOPBACK	0x1e0
+> >  #define ANADIG_USB2_CHRG_DETECT	0x210
+> >  #define ANADIG_DIGPROG		0x260
+> >  
+> > @@ -34,6 +35,8 @@
+> >  #define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	0x1000
+> >  #define BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B	0x80000
+> >  #define BM_ANADIG_USB_CHRG_DETECT_EN_B		0x100000
+> > +#define BM_ANADIG_USB1_LOOPBACK_UTMI_DIG_TST1	0x00000004
+> > +#define BM_ANADIG_USB1_LOOPBACK_TSTI_TX_EN	0x00000020
+> >  
+> >  #define ANADIG_ANA_MISC2_REG1_STEP_OFFSET	26
+> >  #define ANADIG_ANA_MISC2_REG_STEP_MASK		0x3
+> > @@ -142,6 +145,25 @@ u32 imx_anatop_get_digprog(void)
+> >  	return digprog;
+> >  }
+> >  
+> > +void imx_anatop_usb1_disconnect_line(bool enable)
+> > +{
+> > +	if (enable)
+> > +		regmap_write(anatop, ANADIG_USB1_LOOPBACK,
+> > +			BM_ANADIG_USB1_LOOPBACK_UTMI_DIG_TST1 |
+> > +				BM_ANADIG_USB1_LOOPBACK_TSTI_TX_EN);
+> > +	else
+> > +		regmap_write(anatop, ANADIG_USB1_LOOPBACK, 0);
+> > +}
+> > +EXPORT_SYMBOL(imx_anatop_usb1_disconnect_line);
+> > +
+> > +void imx_anatop_set_stop_mode_config(bool enable)
+> > +{
+> > +	regmap_write(anatop, ANADIG_ANA_MISC0 +
+> > +		(enable ? REG_SET : REG_CLR),
+> > +			BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG);
+> > +}
+> > +EXPORT_SYMBOL(imx_anatop_set_stop_mode_config);
+> > +
 > 
-> This is my bad. I updated the clk-fixes branch this morning and then got
-> distracted and never sent the request to Linus.
+> Where do you want to call these two functions from?
 > 
-> Wait for it ... done.
-> 
-> Ok so the two clk patches will hopefully be pulled for -rc6.
 
-These two clk patches in this pull request are different than that 2 patches
-which should go to this kernel version and which you correctly added
-to pull request to Linus.
-
-Mike: Are you ok to add these 2 patches to mainline via arm-soc tree?
-Both changes are cosmetic. If not, I will separate this pull request.
-
-Thanks,
-Michal
-
+>From USB driver, the usb driver is possible built as module.
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130814/19bdf2af/attachment-0001.sig>
+Best Regards,
+Peter Chen
