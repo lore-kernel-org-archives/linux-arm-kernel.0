@@ -1,70 +1,52 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 14 Aug 2013 07:50:01 +0200
-Subject: arm-soc: Xilinx Zynq DT changes for v3.12
-In-Reply-To: <87ioz9dt1c.fsf@kernel.org>
-References: <520A47C3.5000106@monstr.eu> <87r4dxfbuk.fsf@kernel.org>
- <87ioz9dt1c.fsf@kernel.org>
-Message-ID: <520B1A89.8080704@monstr.eu>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Wed, 14 Aug 2013 11:21:40 +0530
+Subject: [PATCH V4 1/4] ARM: dts: exynos5420: add i2s controllers
+In-Reply-To: <1427610.pB8BGbMKTL@flatron>
+References: <1376302070-1877-1-git-send-email-padma.v@samsung.com>
+ <3916118.YsNJ4NTaJS@amdc1227> <20130812131235.GX6427@sirena.org.uk>
+ <1427610.pB8BGbMKTL@flatron>
+Message-ID: <CAAgF-BcXDeLiOMA-S-TSNEGG1hMyCyNTJCyEwmb=SO5waOsu5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2013 02:18 AM, Kevin Hilman wrote:
-> Kevin Hilman <khilman@linaro.org> writes:
-> 
->> Hi Michal,
+Hi Tomasz,
+
+On Mon, Aug 12, 2013 at 10:32 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On Monday 12 of August 2013 14:12:36 Mark Brown wrote:
+>> On Mon, Aug 12, 2013 at 01:41:23PM +0200, Tomasz Figa wrote:
+>> > On Monday 12 of August 2013 12:34:48 Mark Brown wrote:
+>> > > I'd expect that to interact badly with the pinmuxing - unless the
+>> > > device is disabled it'll try to grab its pins on probe which is not
+>> > > going to be a good idea unless it is actually wired up for use in
+>> > > the system.  Or is there some other mechanism for handling that?
+>> >
+>> > Ah, good point. Now I wonder whether pinctrl nodes shouldn't be
+>> > considered board-specific and specified in board-level dts instead?
 >>
->> Michal Simek <monstr@monstr.eu> writes:
+>> It seems a bit cleaner to use the current mechanism in that it stops the
+>> device appearing at all and hence repeated efforts to probe, plus a
+>> simple enable is less error prone, the way these SoCs are designed you
+>> don't have to pick which pinmux is in use for most of the IPs.  Where
+>> there are multiple options it does seem like a good approach though.
 >>
->>> Hi Arnd and Olof,
->>
->> I'm now helping out with arm-soc maintenance as well, and am on the
->> arm at kernel.org alias, so thanks for Cc'ing it.
->>
->>> please pull this simple DT change to your tree.
->>
->> Pulled into next/dt.
->>
->> In the future, it makes things simpler for us if you base on older -rc
->> releases where possible (c.f. similar request by Olof[1].)  In this
->> case, it was trivial for me to rebase it onto -rc1 so I've done that
->> before applying.
-> 
-> Looking closer (thanks to Olof), since your tree is already in
-> linux-next, my rebasing this would cause problems in -next, so I can't
-> rebase it.
+>> Tastes may differ though.
+>
+> Right, if this SoC has only one pinmux setting for this IP, then it's
+> fine.
 
-That's correct but as you probably noticed this branch is not merged
-to linux-next. (Only arm-next branch is added there). I want ask Stephen
-for removing this branch anyway.
+Yes. This IP has only default pin configuration.
 
-> 
-> Either you can rebase it to an earlier -rc (preferred), or I can pull in
-> -rc5 into next/dt (which is currently causing an unrelated conflict
-> which I'll have to deal with tomorrow.)
+>
+> Padmavathi, this was the only issue I spotted, so have my:
+>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-I wasn't aware about using earlier -rc. The last information I got
-is that these trees should be based on Linux -rc (or tagged if you like) version.
-I will keep this in my mind and will use earlier versions in the next pull requests.
+Thanks for your review.
 
-It is just one single patch and I believe you have to use rc5
-and resolve that all conflicts anyway that's why it is just question
-of time when you have to deal with it.
+>
+> Best regards,
+> Tomasz
+>
 
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130814/e0093f9b/attachment.sig>
+Best Regards,
+Padma
