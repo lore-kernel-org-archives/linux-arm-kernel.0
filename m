@@ -1,41 +1,96 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 14 Aug 2013 08:23:35 +0530
-Subject: [PATCH v2] dmaengine: sirf: add PM entries for sleep and runtime
-In-Reply-To: <CAGsJ_4yPgXhUO65tAyU4ngMRUzqa6uZWqEM2NoD-HWy9DL-rnQ@mail.gmail.com>
-References: <1375177474-27583-1-git-send-email-Baohua.Song@csr.com>
- <20130813113200.GE32147@intel.com>
- <CAGsJ_4yPgXhUO65tAyU4ngMRUzqa6uZWqEM2NoD-HWy9DL-rnQ@mail.gmail.com>
-Message-ID: <20130814025335.GI32147@intel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 14 Aug 2013 11:47:56 +0800
+Subject: [PATCH 2/2] arm: mach-imx: anatop: add two APIs for USB driver
+In-Reply-To: <1376292414-22922-2-git-send-email-peter.chen@freescale.com>
+References: <1376292414-22922-1-git-send-email-peter.chen@freescale.com>
+ <1376292414-22922-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130814034754.GD16915@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 10:22:15AM +0800, Barry Song wrote:
-> 2013/8/13 Vinod Koul <vinod.koul@intel.com>
+On Mon, Aug 12, 2013 at 03:26:54PM +0800, Peter Chen wrote:
+> imx_anatop_usb1_disconnect_line is used to disconnect dp/dm between
+> PHY and controller, after that, the controller always gets SE0
+> for the status of dp/dm, it is not any wakeup signal for controller.
+> It is used to avoid unknown interrupt due to dp/dm is floading
+> after the USB PHY is no powered when there is no vbus supplied.
 > 
-> > On Tue, Jul 30, 2013 at 05:44:34PM +0800, Barry Song wrote:
-> > > this patch adds PM ops entries in sirf-dma drivers, so that this
-> > > driver can support suspend/resume, hibernation and runtime PM.
-> > >
-> > > while suspending, sirf-dma will lose all registers, so we save
-> > > them at suspend and restore in resume for active channels.
-> > >
-> > > Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> > > Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
-> > Applied, thanks
-> >
-> > Although putting runtime_get/put in submit and callback would be much more
-> > better than alloc/free implementation
-> >
-> > i do agree. i did want to make the runtime pm happen in submit and finish
-> callback. then i found it was buggy. and we need more work to make it
-> really stable, then i moved to runtime PM with more coarse accuracy. that
-> will lose some power saving. but i think we can have increased patches for
-> that if we measure and find dma power consumption is large.
-> BTW, where is the active dmaengine tree located  in now? it seems that
-> https://git.kernel.org/cgit/linux/kernel/git/djbw/dmaengine.git/ is not
-> active for a long time.
-mine is at git.infradead.org/users/vkoul/slave-dma.git
+> imx_anatop_set_stop_mode_config is used to keep internal regualtor on
+> when the system enters suspend mode, it will increase power consumption,
+> we only enable it when the user enables USB wakeup (default is off).
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  arch/arm/mach-imx/anatop.c |   22 ++++++++++++++++++++++
+>  arch/arm/mach-imx/common.h |    2 ++
+>  2 files changed, 24 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+> index 71f1a08..7f96bbc 100644
+> --- a/arch/arm/mach-imx/anatop.c
+> +++ b/arch/arm/mach-imx/anatop.c
+> @@ -26,6 +26,7 @@
+>  #define ANADIG_ANA_MISC0	0x150
+>  #define ANADIG_ANA_MISC2	0x170
+>  #define ANADIG_USB1_CHRG_DETECT	0x1b0
+> +#define ANADIG_USB1_LOOPBACK	0x1e0
+>  #define ANADIG_USB2_CHRG_DETECT	0x210
+>  #define ANADIG_DIGPROG		0x260
+>  
+> @@ -34,6 +35,8 @@
+>  #define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	0x1000
+>  #define BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B	0x80000
+>  #define BM_ANADIG_USB_CHRG_DETECT_EN_B		0x100000
+> +#define BM_ANADIG_USB1_LOOPBACK_UTMI_DIG_TST1	0x00000004
+> +#define BM_ANADIG_USB1_LOOPBACK_TSTI_TX_EN	0x00000020
+>  
+>  #define ANADIG_ANA_MISC2_REG1_STEP_OFFSET	26
+>  #define ANADIG_ANA_MISC2_REG_STEP_MASK		0x3
+> @@ -142,6 +145,25 @@ u32 imx_anatop_get_digprog(void)
+>  	return digprog;
+>  }
+>  
+> +void imx_anatop_usb1_disconnect_line(bool enable)
+> +{
+> +	if (enable)
+> +		regmap_write(anatop, ANADIG_USB1_LOOPBACK,
+> +			BM_ANADIG_USB1_LOOPBACK_UTMI_DIG_TST1 |
+> +				BM_ANADIG_USB1_LOOPBACK_TSTI_TX_EN);
+> +	else
+> +		regmap_write(anatop, ANADIG_USB1_LOOPBACK, 0);
+> +}
+> +EXPORT_SYMBOL(imx_anatop_usb1_disconnect_line);
+> +
+> +void imx_anatop_set_stop_mode_config(bool enable)
+> +{
+> +	regmap_write(anatop, ANADIG_ANA_MISC0 +
+> +		(enable ? REG_SET : REG_CLR),
+> +			BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG);
+> +}
+> +EXPORT_SYMBOL(imx_anatop_set_stop_mode_config);
+> +
 
-Dan seem busy so he acks patches and I carry them
+Where do you want to call these two functions from?
 
-~Vinod
+Shawn
+
+>  void __init imx_anatop_init(void)
+>  {
+>  	anatop = syscon_regmap_lookup_by_compatible("fsl,imx6q-anatop");
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> index df1d7b0..dcb3305 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -137,6 +137,8 @@ extern void imx_anatop_init(void);
+>  extern void imx_anatop_pre_suspend(void);
+>  extern void imx_anatop_post_resume(void);
+>  extern u32 imx_anatop_get_digprog(void);
+> +extern void imx_anatop_usb1_disconnect_line(bool);
+> +extern void imx_anatop_set_stop_mode_config(bool);
+>  extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
+>  extern void imx6q_set_chicken_bit(void);
+>  
+> -- 
+> 1.7.1
+> 
+> 
