@@ -1,84 +1,47 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 14 Aug 2013 11:19:21 -0400 (EDT)
-Subject: Kexec: BE kernel on ARM VE TC2
-In-Reply-To: <CALicx6uKhd0z=81G68VvTjBpPy=vwK3tgK8zk11dpu34N=YyYA@mail.gmail.com>
-References: <CALicx6ueLxCFCeun1grdtcC21HSkCDfenLWOSfuoSJnhx9GZ6w@mail.gmail.com>
- <20130808215034.GE19383@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1308131851300.14472@syhkavp.arg>
- <CALicx6uKhd0z=81G68VvTjBpPy=vwK3tgK8zk11dpu34N=YyYA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.03.1308141026210.14472@syhkavp.arg>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 14 Aug 2013 08:20:17 -0700
+Subject: arm-soc: Xilinx Zynq DT changes for v3.12
+In-Reply-To: <CAOesGMiT3Vw9_YKu86ve2NH-h_ZD+nrVDe94Rtqh6DcAf9gCUw@mail.gmail.com>
+ (Olof Johansson's message of "Tue, 13 Aug 2013 23:17:34 -0700")
+References: <520A47C3.5000106@monstr.eu> <87r4dxfbuk.fsf@kernel.org>
+ <87ioz9dt1c.fsf@kernel.org> <520B1A89.8080704@monstr.eu>
+ <CAOesGMiT3Vw9_YKu86ve2NH-h_ZD+nrVDe94Rtqh6DcAf9gCUw@mail.gmail.com>
+Message-ID: <871u5w5mfi.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Aug 2013, Vijay Kilari wrote:
+Olof Johansson <olof@lixom.net> writes:
 
-> On Wed, Aug 14, 2013 at 4:22 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> > On Thu, 8 Aug 2013, Will Deacon wrote:
-> >
-> >> On Mon, Aug 05, 2013 at 01:12:17PM +0100, Vijay Kilari wrote:
-> >> > Hi Will,
-> >> >
-> >> > I am trying to make kexec work on BE kernel on ARM VE TC2.
-> >> >
-> >> > First, to make KEXEC work with SMP on ARM VE TC2 board,
-> >> > I set nr_cpus=2 (i.e boot only A15's) this works with LE kernel.
-> >>
-> >> Interesting, is this with a mainline kernel? I don't see how SMP kexec can
-> >> work on TC2 without additional patches to park the secondary cores safely.
-> >
-> > BTW those patches are available in linux-next at the moment.
-> 
-> Thanks for this info.
-> I see that MCPM, TC2_PM & SPC configuration needs to be enabled to have
-> TC2 power management. However MCPM also depends on CCI configuration
-> to register smps ops.
-> In my config, I dont have CCI config enabled
+> On Tue, Aug 13, 2013 at 10:50 PM, Michal Simek <monstr@monstr.eu> wrote:
+>
+>> I wasn't aware about using earlier -rc. The last information I got
+>> is that these trees should be based on Linux -rc (or tagged if you like) version.
+>> I will keep this in my mind and will use earlier versions in the next pull requests.
+>
+> Yes, the request to not always go with the latest -rc is new for this
+> release cycle, so we're generally not pushing back and enforcing it,
+> just asking nicely :)
+>
+> However, since Kevin just got up to speed at the same time, he might
+> have been of the impression that it's something we've been asking for
+> in the past. :)
+>
+> The reason for asking is that if we keep getting new and different
+> -rcs as bases for merge requests, the history starts to look like a
+> lot of merge-backs from upstream, when there's rarely a real need for
+> being based on such a new -rc.  Still, it's not a big deal, and we've
+> been doing it that way now for a couple of years, but I think we could
+> avoid some of it without causing anyone more work (once they're used
+> to it :).
+>
+>> It is just one single patch and I believe you have to use rc5
+>> and resolve that all conflicts anyway that's why it is just question
+>> of time when you have to deal with it.
+>
+> Ah, I saw that there was a branch included from the zynq tree and
+> figured this was in it. I'll let Kevin handle the merge so it's up to
+> him if he prefers to rebase back or just merge it in with -rc5.
 
-You do need CCI support in addition to all the above.  Managing CPUs on 
-TC2 is serious business !
+I'll take care of the merge with -rc5 this time.
 
-> Can you please suggest right configuration to be enabled and also dts 
-> configuration for SPC, CCI to enable TC2 power mgmt.
-
-You need the following pieces of firmware:
-
-mbb_v311.ebf or later in MB/HBI0190D/ and proper reference to it in 
-MB/HBI0190D/board.txt.
-
-dbb_v110.ebf or later in SITE1/HBI0249A/. The file 
-SITE1/HBI0249A/board.txt must have a proper reference to that file,
-as well as the following values in the "[SCC REGISTERS]" section:
-
-SCC: 0x700 0x0032F003
-
-Most important here is to have bits 12 through 15 set to 1.
-
-Those firmware files should be available on ARM's web site.
-
-You also need to have the following sections in your device tree source 
-file:
-
-- SPC/SCC
-
-  Depending on the flavor of the patch you have, this is either 
-  spc at 7fff0000 or scc at 7fff0000.  You should look for either 
-  vexpress-spc.txt or vexpress-scc.txt in 
-  Documentation/devicetree/bindings/arm/ and use the example therein.
-
-- CCI
-
-  You need a CCI section as examplified in 
-  Documentation/devicetree/bindings/arm/cci.txt.
-
-> Also I am using u-boot. Do I need to use UEFI/firmware to enable TC2 power mgmt?
-
-No.  I'm using U-Boot as well.
-
-> I remember, some time back, I have tried linaro tracking git and
-> failed to boot my board
-
-This is most likely because of the above firmware settings and device 
-tree requirements.
-
-
-Nicolas
+Kevin
