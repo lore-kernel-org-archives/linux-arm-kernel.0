@@ -1,87 +1,147 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 14 Aug 2013 15:10:58 +0530
-Subject: [PATCH v2 8/8] ARM: DRA7: dts: Add the dts files for dra7 SoC
- and dra7-evm board
-In-Reply-To: <c20a9bef34091a7d996e946b13285fe8@www.loen.fr>
-References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
- <1375183546-12758-9-git-send-email-rnayak@ti.com>
- <20130812114402.GB6616@e106331-lin.cambridge.arm.com>
- <5209DF2F.5040409@ti.com>
- <20130813094629.GH27165@e106331-lin.cambridge.arm.com>
- <c20a9bef34091a7d996e946b13285fe8@www.loen.fr>
-Message-ID: <520B50AA.6050101@ti.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 14 Aug 2013 18:44:08 +0900
+Subject: [PATCH 1/2] ARM: dts: Move the common DMA controller nodes to
+ exynos5.dtsi
+In-Reply-To: <1373458449-19039-2-git-send-email-padma.v@samsung.com>
+References: <1373458449-19039-1-git-send-email-padma.v@samsung.com>
+ <1373458449-19039-2-git-send-email-padma.v@samsung.com>
+Message-ID: <110401ce98d2$d304e2f0$790ea8d0$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 August 2013 03:35 PM, Marc Zyngier wrote:
-> On 2013-08-13 10:46, Mark Rutland wrote:
->> [Adding Marc to Cc]
->>
->> On Tue, Aug 13, 2013 at 08:24:31AM +0100, Rajendra Nayak wrote:
->>> []..
->>>
->>> >> +
->>> >> +       cpus {
->>> >> +               cpu at 0 {
->>> >> +                       compatible = "arm,cortex-a15";
->>> >> +                       timer {
->>> >> +                               compatible = "arm,armv7-timer";
->>> >> +                               /*
->>> >> +                                * PPI secure/nonsecure IRQ,
->>> >> +                                * active low level-sensitive
->>> >> +                                */
->>> >> +                               interrupts = <1 13 0x308>,
->>> >> +                                            <1 14 0x308>;
->>> >> +                               clock-frequency = <6144000>;
->>> >> +                       };
->>> >> +               };
->>> >
->>> > The cpu nodes should have a reg matching their unit-address, and a
->>> > device_type = "cpu".
->>> >
->>> > The timer nodes should *not* be under the CPU nodes. They should be
->>> > under under the root node. I realise that it makes intuitive sense to
->>> > describe per-cpu resources this way, but that's not the way the bindings
->>> > are intended to be used (does thei DT even work?).
->>> >
->>> > No virtual/hypervisor interrupts?
->>>
->>> Mark, all valid points. I just updated the patch to include all the missing
->>> interrupts and registers for timer and gic and moved the timer node out as
->>> its supposed to be.
->>
->> Great!
->>
->>>
->>> >
->>> > Do you really need the clock-frequency property? It's far preferrable to
->>> > have your bootloader do the right thing and program CNTFRQ with the
->>> > correct value.
->>>
->>> I kept the clock-frequency property since our bootloader does not handle this
->>> and I am not sure if its a good idea to have the dependency on bootloader
->>> to do this.
->>
->> There is precedent for handling it this way, but it would be far nicer
->> to fix the bootloader to set CNTFRQ. For one thing it's only writeable
->> from the secure side, so a host os can't fix it up for guests that might
->> depend on it rather than dt. I realise it's not necessarily as simple as
->> it sounds to fix that up, however.
+Padmavathi Venna wrote:
 > 
-> Indeed, having the wrong CNTFRQ in the host has the unfortunate effect of propagating the crap into the guests.
+> exynos5250 and exynos5420 has 4 DMA controllers in common. So this patch
+> moves these nodes to common file keeping the dma controllers clk info in
+> the exynos5250 dtsi file.
 > 
-> While this can be worked around for Linux guests (you have to hack the DT passed to the guests, which is very unpleasant at best and varies from one host to another), there is nothing you can do for non-DT guests.
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5.dtsi    |   44
+> +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5250.dtsi |   30 -------------------------
+>  2 files changed, 44 insertions(+), 30 deletions(-)
 > 
-> So please, fix it in your firmware/boot-ROM while it is still time.
+> diff --git a/arch/arm/boot/dts/exynos5.dtsi
+> b/arch/arm/boot/dts/exynos5.dtsi
+> index f65e124..cac35c8 100644
+> --- a/arch/arm/boot/dts/exynos5.dtsi
+> +++ b/arch/arm/boot/dts/exynos5.dtsi
+> @@ -50,6 +50,50 @@
+>  		interrupts = <1 9 0xf04>;
+>  	};
+> 
+> +	amba {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "arm,amba-bus";
+> +		interrupt-parent = <&gic>;
+> +		ranges;
+> +
+> +		pdma0: pdma at 121A0000 {
+> +			compatible = "arm,pl330", "arm,primecell";
+> +			reg = <0x121A0000 0x1000>;
+> +			interrupts = <0 34 0>;
+> +			#dma-cells = <1>;
+> +			#dma-channels = <8>;
+> +			#dma-requests = <32>;
+> +		};
+> +
+> +		pdma1: pdma at 121B0000 {
+> +			compatible = "arm,pl330", "arm,primecell";
+> +			reg = <0x121B0000 0x1000>;
+> +			interrupts = <0 35 0>;
+> +			#dma-cells = <1>;
+> +			#dma-channels = <8>;
+> +			#dma-requests = <32>;
+> +		};
+> +
+> +		mdma0: mdma at 10800000 {
+> +			compatible = "arm,pl330", "arm,primecell";
+> +			reg = <0x10800000 0x1000>;
+> +			interrupts = <0 33 0>;
+> +			#dma-cells = <1>;
+> +			#dma-channels = <8>;
+> +			#dma-requests = <1>;
+> +		};
+> +
+> +		mdma1: mdma at 11C10000 {
+> +			compatible = "arm,pl330", "arm,primecell";
+> +			reg = <0x11C10000 0x1000>;
+> +			interrupts = <0 124 0>;
+> +			#dma-cells = <1>;
+> +			#dma-channels = <8>;
+> +			#dma-requests = <1>;
+> +		};
+> +	};
+> +
+>  	dwmmc_0: dwmmc0 at 12200000 {
+>  		compatible = "samsung,exynos5250-dw-mshc";
+>  		interrupts = <0 75 0>;
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> b/arch/arm/boot/dts/exynos5250.dtsi
+> index 41cd625..3a474c4 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -511,54 +511,24 @@
+>  	};
+> 
+>  	amba {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+> -		compatible = "arm,amba-bus";
+> -		interrupt-parent = <&gic>;
+> -		ranges;
+> -
+>  		pdma0: pdma at 121A0000 {
+> -			compatible = "arm,pl330", "arm,primecell";
+> -			reg = <0x121A0000 0x1000>;
+> -			interrupts = <0 34 0>;
+>  			clocks = <&clock 275>;
+>  			clock-names = "apb_pclk";
+> -			#dma-cells = <1>;
+> -			#dma-channels = <8>;
+> -			#dma-requests = <32>;
+>  		};
+> 
+>  		pdma1: pdma at 121B0000 {
+> -			compatible = "arm,pl330", "arm,primecell";
+> -			reg = <0x121B0000 0x1000>;
+> -			interrupts = <0 35 0>;
+>  			clocks = <&clock 276>;
+>  			clock-names = "apb_pclk";
+> -			#dma-cells = <1>;
+> -			#dma-channels = <8>;
+> -			#dma-requests = <32>;
+>  		};
+> 
+>  		mdma0: mdma at 10800000 {
+> -			compatible = "arm,pl330", "arm,primecell";
+> -			reg = <0x10800000 0x1000>;
+> -			interrupts = <0 33 0>;
+>  			clocks = <&clock 271>;
+>  			clock-names = "apb_pclk";
+> -			#dma-cells = <1>;
+> -			#dma-channels = <8>;
+> -			#dma-requests = <1>;
+>  		};
+> 
+>  		mdma1: mdma at 11C10000 {
+> -			compatible = "arm,pl330", "arm,primecell";
+> -			reg = <0x11C10000 0x1000>;
+> -			interrupts = <0 124 0>;
+>  			clocks = <&clock 271>;
+>  			clock-names = "apb_pclk";
+> -			#dma-cells = <1>;
+> -			#dma-channels = <8>;
+> -			#dma-requests = <1>;
+>  		};
+>  	};
+> 
+> --
+> 1.7.4.4
 
-Marc, makes sense. Turns out our bootROM (for dra7) does not do this today but does have an api to do it.
-So while we figure how to do this some place else, I will go ahead and drop this from dt for now.
-Thanks for the review.
+NAK, because the dmac addresses are different on upcoming exynos5 and there
+are 2-mdma and only one pdma. So this change can make more complicated.
 
-regards,
-Rajendra
-
-> 
-> Thanks,
-> 
->         M.
+- Kukjin
