@@ -1,227 +1,51 @@
-From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Wed, 14 Aug 2013 15:43:12 -0700
-Subject: [RESEND PATCH 4/4] ARM: msm: Add support for 8974 SMP
-In-Reply-To: <856E36A2-4203-41B5-B5D5-26F22F2FAFCF@codeaurora.org>
-References: <1375409725-22004-1-git-send-email-rvaswani@codeaurora.org>
- <1375409725-22004-5-git-send-email-rvaswani@codeaurora.org>
- <856E36A2-4203-41B5-B5D5-26F22F2FAFCF@codeaurora.org>
-Message-ID: <520C0800.3090700@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Aug 2013 23:43:53 +0100
+Subject: [PATCH V2] ARM: allow DEBUG_UNCOMPRESS for Tegra
+In-Reply-To: <520BF6F5.5090303@wwwdotorg.org>
+References: <1375379471-15615-1-git-send-email-swarren@wwwdotorg.org>
+ <520BF6F5.5090303@wwwdotorg.org>
+Message-ID: <20130814224353.GZ23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/2/2013 8:46 AM, Kumar Gala wrote:
-> On Aug 1, 2013, at 9:15 PM, Rohit Vaswani wrote:
->
->> Add the cpus bindings and the Kraitv2 release sequence
->> to make SMP work for 2 cores on MSM8974.
->>
->> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
->> ---
->> Documentation/devicetree/bindings/arm/cpus.txt |  1 +
->> arch/arm/boot/dts/msm8974.dts                  | 23 ++++++++
->> arch/arm/mach-msm/board-dt-8974.c              |  3 +
->> arch/arm/mach-msm/platsmp.c                    | 79 ++++++++++++++++++++++++++
->> 4 files changed, 106 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
->> index 1132eac..7c3c677 100644
->> --- a/Documentation/devicetree/bindings/arm/cpus.txt
->> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
->> @@ -52,6 +52,7 @@ For the ARM architecture every CPU node must contain the following properties:
->> 		 This should be one of:
->> 		 "qcom,scss"
->> 		 "qcom,kpssv1"
->> +		 "qcom,kpssv2"
->>
->> Example:
->>
->> diff --git a/arch/arm/boot/dts/msm8974.dts b/arch/arm/boot/dts/msm8974.dts
->> index c31c097..ef35a9b 100644
->> --- a/arch/arm/boot/dts/msm8974.dts
->> +++ b/arch/arm/boot/dts/msm8974.dts
->> @@ -7,6 +7,22 @@
->> 	compatible = "qcom,msm8974";
->> 	interrupt-parent = <&intc>;
->>
->> +	cpus {
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		compatible = "qcom,krait";
->> +		device_type = "cpu";
->> +		enable-method = "qcom,kpssv2";
->> +
->> +		cpu at 0 {
->> +			reg = <0>;
->> +		};
->> +
->> +		cpu at 1 {
->> +			reg = <1>;
->> +		};
-> Any reason not to have all 4 cores?
->
->> +	};
->> +
->> 	intc: interrupt-controller at f9000000 {
->> 		compatible = "qcom,msm-qgic2";
->> 		interrupt-controller;
->> @@ -23,4 +39,11 @@
->> 			     <1 1 0xf08>;
->> 		clock-frequency = <19200000>;
->> 	};
->> +
->> +	kpss at f9012000 {
->> +		compatible = "qcom,kpss";
->> +		reg = <0xf9012000 0x1000>,
->> +		      <0xf9088000 0x1000>,
->> +		      <0xf9098000 0x1000>;
-> we should probably have regnmaes to go along with this.
->
-> Also this doesn't really match the binding spec, as you've included the L2 register, we should cleanup the binding spec to be more precise.
-Its part of the Krait Processor Sub-System. I will add the reg-names to 
-clear this up.
+On Wed, Aug 14, 2013 at 03:30:29PM -0600, Stephen Warren wrote:
+> On 08/01/2013 11:51 AM, Stephen Warren wrote:
+> > From: Stephen Warren <swarren@nvidia.com>
+> > 
+> > DEBUG_UNCOMPRESS was previously disallowed for Tegra due to tegra.S's
+> > use of global data that was not linked into the decompressor. Solve this
+> > by declaring this symbol in tegra.S when it is being built into the
+> > decompressor. For the kernel proper, leave the declaration in
+> > mach-tegra/common.c as explained in the comment.
+> > 
+> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > ---
+> > v2: Don't select DEBUG_UNCOMPRESS with DEBUG_TEGRA_UART unless
+> >     !ZBOOT_ROM. Add notes on ZBOOT_ROM to comment.
+> > 
+> > Russell, I assume this should go in through the ARM patch tracker. Or,
+> > do you want me to take it through the Tegra tree?
+> 
+> Russell, I put this patch into the ARM patch tracker a while back. I
+> assume it's something you plan to take, or should I put it into the
+> Tegra tree? Thanks.
 
->
->> +	};
->> };
->> diff --git a/arch/arm/mach-msm/board-dt-8974.c b/arch/arm/mach-msm/board-dt-8974.c
->> index d7f84f2..06119f9 100644
->> --- a/arch/arm/mach-msm/board-dt-8974.c
->> +++ b/arch/arm/mach-msm/board-dt-8974.c
->> @@ -13,11 +13,14 @@
->> #include <linux/of_platform.h>
->> #include <asm/mach/arch.h>
->>
->> +#include "common.h"
->> +
->> static const char * const msm8974_dt_match[] __initconst = {
->> 	"qcom,msm8974",
->> 	NULL
->> };
->>
->> DT_MACHINE_START(MSM8974_DT, "Qualcomm MSM (Flattened Device Tree)")
->> +	.smp = smp_ops(msm_smp_ops),
->> 	.dt_compat = msm8974_dt_match,
->> MACHINE_END
->> diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
->> index 82eb079..0fdae69 100644
->> --- a/arch/arm/mach-msm/platsmp.c
->> +++ b/arch/arm/mach-msm/platsmp.c
->> @@ -124,6 +124,80 @@ static int msm8960_release_secondary(unsigned int cpu)
->> 	return 0;
->> }
->>
->> +static int msm8974_release_secondary(unsigned int cpu)
->> +{
->> +	void __iomem *reg;
->> +	void __iomem *l2_saw_base;
->> +	struct device_node *dn = NULL;
->> +	unsigned apc_pwr_gate_ctl = 0x14;
->> +	unsigned reg_val;
->> +
->> +	if (cpu == 0 || cpu >= num_possible_cpus())
->> +		return -EINVAL;
->> +
->> +	dn = of_find_compatible_node(dn, NULL, "qcom,kpss");
->> +	if (!dn) {
->> +		pr_err("%s : Missing kpss node from device tree\n", __func__);
->> +		return -ENXIO;
->> +	}
->> +
->> +	reg = of_iomap(dn, cpu+1);
->> +	if (!reg)
->> +		return -ENOMEM;
->> +
->> +	pr_debug("Starting secondary CPU %d\n", cpu);
->> +
->> +	/* Turn on the BHS, turn off LDO Bypass and power down LDO */
->> +	reg_val =  0x403f0001;
->> +	writel_relaxed(reg_val, reg + apc_pwr_gate_ctl);
->> +
->> +	/* complete the above write before the delay */
->> +	mb();
->> +	/* wait for the bhs to settle */
->> +	udelay(1);
->> +
->> +	/* Turn on BHS segments */
->> +	reg_val |= 0x3f << 1;
->> +	writel_relaxed(reg_val, reg + apc_pwr_gate_ctl);
->> +
->> +	/* complete the above write before the delay */
->> +	mb();
->> +	 /* wait for the bhs to settle */
->> +	udelay(1);
->> +
->> +	/* Finally turn on the bypass so that BHS supplies power */
->> +	reg_val |= 0x3f << 8;
->> +	writel_relaxed(reg_val, reg + apc_pwr_gate_ctl);
->> +
->> +	/* enable max phases */
->> +	l2_saw_base = of_iomap(dn, 0);
->> +	if (!l2_saw_base) {
->> +		return -ENOMEM;
->> +	}
->> +	writel_relaxed(0x10003, l2_saw_base + 0x1c);
->> +	mb();
->> +	udelay(50);
->> +
->> +	iounmap(l2_saw_base);
->> +
->> +	writel_relaxed(0x021, reg+0x04);
->> +	mb();
->> +	udelay(2);
->> +
->> +	writel_relaxed(0x020, reg+0x04);
->> +	mb();
->> +	udelay(2);
->> +
->> +	writel_relaxed(0x000, reg+0x04);
->> +	mb();
->> +
->> +	writel_relaxed(0x080, reg+0x04);
->> +	mb();
->> +
->> +	iounmap(reg);
->> +	return 0;
->> +}
->> +
->> static DEFINE_PER_CPU(int, cold_boot_done);
->>
->> static void boot_cold_cpu(unsigned int cpu)
->> @@ -151,6 +225,11 @@ static void boot_cold_cpu(unsigned int cpu)
->> 			msm8960_release_secondary(cpu);
->> 			per_cpu(cold_boot_done, cpu) = true;
->> 		}
->> +	} else if (!strcmp(enable_method, "qcom,kpssv2")) {
->> +		if (per_cpu(cold_boot_done, cpu) == false) {
->> +			msm8974_release_secondary(cpu);
-> same comment as on the 8960 patch.
->
->> +			per_cpu(cold_boot_done, cpu) = true;
->> +		}
->> 	} else {
->> 		pr_err("%s: Invalid enable-method property: %s\n",
->> 				__func__, enable_method);
->> -- 
->> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
->> hosted by The Linux Foundation
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> --
-> Employee of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I haven't applied it yet because it doesn't apply to the branch it needs
+to (that being the debug choice cleanup):
 
+Patching 7806/1...
+git apply --whitespace=fix -p1 --index --check > /tmp/pdb.12252 2>&1 exited with non-zero status: 256
+error: patch failed: arch/arm/Kconfig.debug:1052
+error: arch/arm/Kconfig.debug: patch does not apply
 
-Thanks,
-Rohit Vaswani
+Not even with gnu patch:
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
+patching file arch/arm/Kconfig.debug
+Hunk #1 FAILED at 1052.
+1 out of 1 hunk FAILED -- saving rejects to file arch/arm/Kconfig.debug.rej
+patching file arch/arm/include/debug/tegra.S
+
+This is because at the moment, that branch is based before other
+changes which have gone in during the -rcs, namely b6992fa9a7.  It
+needs that branch rebased before it can be applied.  I'll get to it
+eventually.
