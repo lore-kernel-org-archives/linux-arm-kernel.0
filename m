@@ -1,26 +1,36 @@
-From: joro@8bytes.org ('Joerg Roedel')
-Date: Wed, 14 Aug 2013 15:15:49 +0200
-Subject: [PATCH 2/2] iommu/exynos: Follow kernel coding style for
- __sysmmu_enable return type
-In-Reply-To: <003101ce89ed$52317330$f6945990$@samsung.com>
-References: <1374766502-14823-1-git-send-email-a.motakis@virtualopensystems.com>
- <1374766502-14823-2-git-send-email-a.motakis@virtualopensystems.com>
- <003101ce89ed$52317330$f6945990$@samsung.com>
-Message-ID: <20130814131547.GA5889@8bytes.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 14 Aug 2013 10:17:47 -0300
+Subject: [PATCH v2 1/2] ARM: imx_v6_v7_defconfig: Remove CONFIG_USB_PHY
+ selection
+Message-ID: <1376486268-31599-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KyongHo,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Fri, Jul 26, 2013 at 07:46:01PM +0900, Cho KyongHo wrote:
-> __sysmmu_enable() must return 1 if it is called with the same page table.
-> I have fixed it exynos_iommu_attach_device() to always return zero on success
-> in the next patchset which I will post today.
-> 
-> Thank you.
+Since commit 052a11d1 (usb: phy: make PHY driver selection possible by
+controller drivers), CONFIG_USB_PHY is selected via drivers/usb/phy/Kconfig, so
+there is no need to select it via defconfig anymore.
 
-When you are fine with these patches please put them on-top of your
-patch-set when you re-submit. I will take them from there then.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Split it in two patches
 
+ arch/arm/configs/imx_v6_v7_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-	Joerg
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 5d488c2..402f282 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -195,7 +195,6 @@ CONFIG_USB_EHCI_MXC=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+-CONFIG_USB_PHY=y
+ CONFIG_NOP_USB_XCEIV=y
+ CONFIG_USB_MXS_PHY=y
+ CONFIG_MMC=y
+-- 
+1.8.1.2
