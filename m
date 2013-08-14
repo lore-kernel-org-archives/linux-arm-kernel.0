@@ -1,57 +1,44 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 14 Aug 2013 07:48:24 -0500
-Subject: [PATCH 2/3] ARM: OMAP2+: Add support to parse optional clk info
- from DT
-In-Reply-To: <1374560679-14666-3-git-send-email-rnayak@ti.com>
-References: <1374560679-14666-1-git-send-email-rnayak@ti.com>
- <1374560679-14666-3-git-send-email-rnayak@ti.com>
-Message-ID: <CAGo_u6rfXpU1Wzn+oXqpAezNNtFb9pk=9RZxodGtBbZXVy+yJA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Aug 2013 13:49:04 +0100
+Subject: [Qemu-devel] SCSI bus failures with qemu-arm in kernel 3.8+
+In-Reply-To: <CAFEAcA8u_c=seOQ+y44H2Vpefyx4EisiZ-ZqBxuPsyoYjCt3vQ@mail.gmail.com>
+References: <20130812164548.GE23006@n2100.arm.linux.org.uk>
+ <CAFEAcA97PuORg920f-A_8rvCgBq=k5Y=0W6m2Nv8nnzjY19Utg@mail.gmail.com>
+ <20130812200628.GG23006@n2100.arm.linux.org.uk>
+ <CAFEAcA9BA7zfaO1J5zVaEcG-AgOo6dyiew08-o2eObuBe-KWig@mail.gmail.com>
+ <20130812212149.GH23006@n2100.arm.linux.org.uk>
+ <CAFEAcA_0kzS=Z5oTxrr=B74wjf1x=M6dXwH7Fcgf77Pca90Gjw@mail.gmail.com>
+ <20130812221250.GI23006@n2100.arm.linux.org.uk>
+ <20130812230408.GA4420@roeck-us.net>
+ <20130814103346.GN23006@n2100.arm.linux.org.uk>
+ <CAFEAcA8u_c=seOQ+y44H2Vpefyx4EisiZ-ZqBxuPsyoYjCt3vQ@mail.gmail.com>
+Message-ID: <20130814124904.GQ23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
+On Wed, Aug 14, 2013 at 01:44:44PM +0100, Peter Maydell wrote:
+> On 14 August 2013 11:33, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Aug 12, 2013 at 04:04:08PM -0700, Guenter Roeck wrote:
+> >> Hacked diff is below. Can I write that up as clean patch and submit it,
+> >> or do we need a test on real hardware ?
+> >
+> > Well, if we want to ensure that it is really correct, the sensible thing
+> > to do is to try it on real hardware, otherwise we're risking yet another
+> > change to this.
+> >
+> > Earlier in this thread, some people said that they have the hardware, so
+> > it shouldn't be that difficult to get it tested on real stuff.
+> 
+> Yes, I definitely think we should test on the hardware before we
+> land yet another change to this PCI code that hasn't really been
+> thoroughly tested on anything. I have the board/backplane on my
+> desk but it'll be later in the week before I can do the testing
+> (currently still messing with uboot config to get it to actually
+> boot a kernel).
 
-On Tue, Jul 23, 2013 at 1:24 AM, Rajendra Nayak <rnayak@ti.com> wrote:
-[..]
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 12fa589..e5c804b 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -805,6 +805,65 @@ static int _init_interface_clks(struct omap_hwmod *oh)
->         return ret;
->  }
->
-> +static const char **_parse_opt_clks_dt(struct omap_hwmod *oh,
-> +                                      struct device_node *np,
-> +                                      int *opt_clks_cnt)
-> +{
-> +       int i, clks_cnt;
-> +       const char *clk_name;
-> +       const char **opt_clk_names;
-> +
-> +       clks_cnt = of_property_count_strings(np, "clock-names");
-> +       if (!clks_cnt)
-> +               return NULL;
-> +
-> +       opt_clk_names = kzalloc(sizeof(char *)*clks_cnt, GFP_KERNEL);
-> +       if (!opt_clk_names)
-> +               return NULL;
-> +
-> +       for (i = 0; i < clks_cnt; i++) {
-> +               of_property_read_string_index(np, "clock-names", i, &clk_name);
-> +               if (!strcmp(clk_name, "fck"))
+Realview or Versatile?  I still need to sort out Realview.
 
-Could we instead parse for names that are "optional,role_name" instead
-of assuming anything other than fck is optional clocks?
-
-> +                       continue;
-> +               opt_clks_cnt++;
-> +               opt_clk_names[i] = clk_name;
-> +       }
-> +       return opt_clk_names;
-> +}
-> +
-[...]
---
-Regards,
-Nishanth Menon
+The alternative is - I have both the Realview EB and Versatile PB926
+here, but no backplane (it wasn't deemed to be necessary for me to
+have such a thing.)  If someone wants to donate a backplane...
