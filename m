@@ -1,55 +1,57 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 14 Aug 2013 10:34:52 -0700
+Date: Wed, 14 Aug 2013 10:37:53 -0700
 Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
  with external L3-cache.
-In-Reply-To: <09ec55dcde7961d4774a5239dd9a1184@www.loen.fr>
+In-Reply-To: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
 References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
- <f8917fe8409b1fae634c7de45e34d4a7@www.loen.fr>
- <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
- <5d2d3ae495c27873661c5c2fbdcc19b6@www.loen.fr>
- <CAFEAcA_d-rtiJoAZhGN=cggzakJ5QzU6Upg1GUSBgUOSuqPZoQ@mail.gmail.com>
- <09ec55dcde7961d4774a5239dd9a1184@www.loen.fr>
-Message-ID: <20130814173452.GD11390@cbox>
+Message-ID: <20130814173753.GE11390@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 04:49:24PM +0100, Marc Zyngier wrote:
-> On 2013-08-14 16:35, Peter Maydell wrote:
-> > On 14 August 2013 16:23, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >> On 2013-08-14 15:22, Anup Patel wrote:
-> >>> It seems a bit unnatural to have cache cleaning is user-space. I am
-> >>> sure
-> >>> other architectures don't have such cache cleaning in user-space 
-> >>> for
-> >>> KVM.
-> >>
-> >> Well, we have it on AArch64. Why would we blindly nuke the whole 
-> >> cache
-> >> if we can do the right thing, efficiently, on the right range?
-> >
-> > When exactly would userspace have to care about the cache?
+On Wed, Aug 14, 2013 at 05:17:12PM +0530, Pranavkumar Sawargaonkar wrote:
+> Systems with large external L3-cache (few MBs), might have dirty
+> content belonging to the guest page in L3-cache. To tackle this,
+> we need to flush such dirty content from d-cache so that guest
+> will see correct contents of guest page when guest MMU is disabled.
 > 
-> Only for the initial payload, I'd expect. Unless I've missed something 
-> more crucial?
+> The patch fixes coherent_icache_guest_page() for external L3-cache.
+> 
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_mmu.h |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index efe609c..5129038 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -123,6 +123,8 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+>  	if (!icache_is_aliasing()) {		/* PIPT */
+>  		unsigned long hva = gfn_to_hva(kvm, gfn);
+>  		flush_icache_range(hva, hva + PAGE_SIZE);
+> +		/* Flush d-cache for systems with external caches. */
 
-What happens if the page is swapped out, is the kernel guaranteed to
-flush it all the way to RAM when it swaps it back in, or would KVM have
-to take care of that?
+This comment is nowhere near explanatory enough for someone who comes by
+later and tries to figure out why we're flushing the dcache on every
+page we swap in under given circumstances.  Yes, you can do git blame,
+until you modify the line for some other reason and it just becomes a
+pain.
 
-> 
-> > This patch isn't exactly clear about the circumstances. I
-> > think you'd need a really strong reason for not dealing with
-> > this in the kernel -- in general userspace KVM tools don't
-> > otherwise have to deal with cache maintenance at all.
-> 
-> I believe we *could* do it in the kernel, just at the expense of a lot 
-> more CPU cycles.
-> 
-> A possible alternative would be to use HCR.DC, but I need to have a 
-> look and see what it breaks...
-> 
-Could we flush the cache when we fault in pages only if the guest has
-the MMU disabled and trap if the guest disabled the MMU and flush the
-whole outer dcache at that point in time?
+> +		__flush_dcache_area((void *) hva, PAGE_SIZE);
 
--Christoffer
+eh, why is this only relevant for a non-aliasing icache?  In fact, this
+does not seem to be icache related at all, but rather instruction-stream
+to dcache related, which would warrant either a rename of the function
+to something more generic or a separate function.
+
+>  	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
+>  		/* any kind of VIPT cache */
+>  		__flush_icache_all();
+> -- 
+> 1.7.9.5
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
