@@ -1,46 +1,106 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Aug 2013 16:49:24 +0100
-Subject: [PATCH] ARM64: KVM: Fix =?UTF-8?Q?coherent=5Ficache=5Fguest?=
- =?UTF-8?Q?=5Fpage=28=29=20for=20host=20with=20external=20L=33-cache=2E?=
-In-Reply-To: <CAFEAcA_d-rtiJoAZhGN=cggzakJ5QzU6Upg1GUSBgUOSuqPZoQ@mail.gmail.com>
-References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
- <f8917fe8409b1fae634c7de45e34d4a7@www.loen.fr>
- <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
- <5d2d3ae495c27873661c5c2fbdcc19b6@www.loen.fr>
- <CAFEAcA_d-rtiJoAZhGN=cggzakJ5QzU6Upg1GUSBgUOSuqPZoQ@mail.gmail.com>
-Message-ID: <09ec55dcde7961d4774a5239dd9a1184@www.loen.fr>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 14 Aug 2013 23:50:16 +0800
+Subject: [PATCH v6 2/4] ARM: debug: support debug ll on hisilicon soc
+In-Reply-To: <20130814154641.GW23006@n2100.arm.linux.org.uk>
+References: <1374813135-16238-1-git-send-email-haojian.zhuang@linaro.org>
+ <1374813135-16238-3-git-send-email-haojian.zhuang@linaro.org>
+ <20130814064424.GI19951@quad.lixom.net>
+ <CAD6h2NS+DW1+iyD4ucNjoLiXqCbFKmW6QYwS7=oUfm0nq7LEdw@mail.gmail.com>
+ <20130814154641.GW23006@n2100.arm.linux.org.uk>
+Message-ID: <CAD6h2NQbeAK=EOB5pfewjMEWL=XRvvhYFzRqKy+qUausAc0few@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-08-14 16:35, Peter Maydell wrote:
-> On 14 August 2013 16:23, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 2013-08-14 15:22, Anup Patel wrote:
->>> It seems a bit unnatural to have cache cleaning is user-space. I am
->>> sure
->>> other architectures don't have such cache cleaning in user-space 
->>> for
->>> KVM.
+On 14 August 2013 23:46, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Aug 14, 2013 at 11:32:18PM +0800, Haojian Zhuang wrote:
+>> On 14 August 2013 14:44, Olof Johansson <olof@lixom.net> wrote:
+>> > Hi,
+>> >
+>> >
+>> > On Fri, Jul 26, 2013 at 12:32:13PM +0800, Haojian Zhuang wrote:
+>> >> Support UART0 debug ll on hisilicon Hi3620 SoC.
+>> >>
+>> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> >
+>> > By the way, I ended up doing two fixups:
+>> >
+>> >> ---
+>> >>  arch/arm/Kconfig.debug             | 15 +++++++++++++++
+>> >>  arch/arm/include/debug/hisilicon.S | 30 ++++++++++++++++++++++++++++++
+>> >>  2 files changed, 45 insertions(+)
+>> >>  create mode 100644 arch/arm/include/debug/hisilicon.S
+>> >>
+>> >> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> >> index e401a76..289a248 100644
+>> >> --- a/arch/arm/Kconfig.debug
+>> >> +++ b/arch/arm/Kconfig.debug
+>> >> @@ -272,6 +272,20 @@ choice
+>> >>                 Say Y here if you want the debug print routines to direct
+>> >>                 their output to UART1 serial port on KEYSTONE2 devices.
+>> >>
+>> >> +     config DEBUG_HI3620_UART
+>> >> +             bool "Hisilicon HI3620 Debug UART"
+>> >> +             depends on ARCH_HI3xxx
+>> >> +             help
+>> >> +               Say Y here if you want kernel low-level debugging support
+>> >> +               on HI3620 UART.
+>> >> +
+>> >> +     config DEBUG_HI3716_UART
+>> >> +             bool "Hisilicon Hi3716 Debug UART"
+>> >> +             depends on ARCH_HI3xxx
+>> >> +             help
+>> >> +               Say Y here if you want kernel low-level debugging support
+>> >> +               on HI3716 UART.
+>> >> +
+>> >>       config DEBUG_MMP_UART2
+>> >
+>> > These are out of alphabetical order, not good. I moved them up right before
+>> > highbank where they should be.
+>> >
+>> >> diff --git a/arch/arm/include/debug/hisilicon.S b/arch/arm/include/debug/hisilicon.S
+>> >> new file mode 100644
+>> >> index 0000000..47ad019
+>> >> --- /dev/null
+>> >> +++ b/arch/arm/include/debug/hisilicon.S
+>> >> @@ -0,0 +1,30 @@
+>> >> +/*
+>> >> + * Early serial output macro for Hisilicon SoC
+>> >> + *
+>> >> + * Copyright (C) 2012-2013 Hisilicon Technologies Co., Ltd.
+>> >> + * Copyright (C) 2012-2013 Linaro Ltd.
+>> >> + *
+>> >> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> >> + *
+>> >> + * This program is free software; you can redistribute it and/or modify
+>> >> + * it under the terms of the GNU General Public License version 2 as
+>> >> + * published by the Free Software Foundation.
+>> >> +*/
+>> >> +
+>> >> +#if defined(CONFIG_DEBUG_HI3620_UART)
+>> >> +#define HS_UART_PHYS_BASE    0xfcb00000
+>> >> +#define HS_UART_VIRT_BASE    0xfeb00000
+>> >> +#elif defined(CONFIG_DEBUG_HI3716_UART)
+>> >> +#define HS_UART_PHYS_BASE    0xf8b00000
+>> >> +#define HS_UART_VIRT_BASE    0xfeb00000
+>> >> +#endif
+>> >
+>> > HS_UART_VIRT_BASE is the same, so I moved it outside the ifdef.
+>> >
+>> >
+>> > -Olof
 >>
->> Well, we have it on AArch64. Why would we blindly nuke the whole 
->> cache
->> if we can do the right thing, efficiently, on the right range?
+>> Thanks a lot.
 >
-> When exactly would userspace have to care about the cache?
+> Please send me a patch against the debug cleanup stuff which you can
+> find in my tree (commit daf6d46c2467253af457b326e3299ea431dc2a94)
+> so that I don't have to go back over this stuff after the next merge
+> window to fix all the stuff people haven't noticed being queued for
+> the upcoming merge window.
+>
+> Thanks.
 
-Only for the initial payload, I'd expect. Unless I've missed something 
-more crucial?
+Sure. I'll send the new patch based on your tree.
 
-> This patch isn't exactly clear about the circumstances. I
-> think you'd need a really strong reason for not dealing with
-> this in the kernel -- in general userspace KVM tools don't
-> otherwise have to deal with cache maintenance at all.
-
-I believe we *could* do it in the kernel, just at the expense of a lot 
-more CPU cycles.
-
-A possible alternative would be to use HCR.DC, but I need to have a 
-look and see what it breaks...
-
-         M.
--- 
-Fast, cheap, reliable. Pick two.
+Regards
+Haojian
