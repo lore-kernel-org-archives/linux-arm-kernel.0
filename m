@@ -1,40 +1,54 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 14 Aug 2013 16:30:55 +0900
-Subject: [GIT PULL] Samsung PWM support cleanup
-In-Reply-To: <CAOesGMhUncZmuuptZ3dU4UjVmvjKNb+GJqhwNwvYuUM=R3LwqA@mail.gmail.com>
-References: <3516906.8u5IrARqm7@flatron>
- <20130814060702.GH16635@quad.lixom.net> <109a01ce98bd$1843cae0$48cb60a0$@org>
- <CAOesGMhUncZmuuptZ3dU4UjVmvjKNb+GJqhwNwvYuUM=R3LwqA@mail.gmail.com>
-Message-ID: <10a701ce98c0$36afd980$a40f8c80$@org>
+Date: Wed, 14 Aug 2013 16:32:11 +0900
+Subject: [GIT PULL] Samsung-fixes-2 for v3.11
+In-Reply-To: <CAOesGMini9xy5AjVzQinvGS3c2eA9dcPYRJxKf0R0z84FUSHGg@mail.gmail.com>
+References: <51FFE30A.5040800@samsung.com> <87ob92pv1x.fsf@kernel.org>
+ <10a101ce98bd$c004bd20$400e3760$@org>
+ <CAOesGMini9xy5AjVzQinvGS3c2eA9dcPYRJxKf0R0z84FUSHGg@mail.gmail.com>
+Message-ID: <10a801ce98c0$64064b80$2c12e280$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Olof Johansson wrote:
 > 
-> On Wed, Aug 14, 2013 at 12:08 AM, Kukjin Kim <kgene@kernel.org> wrote:
-> > Olof Johansson wrote:
+> On Wed, Aug 14, 2013 at 12:13 AM, Kukjin Kim <kgene@kernel.org> wrote:
+> > Kevin Hilman wrote:
 > >>
-> >> On Tue, Aug 13, 2013 at 11:16:35PM +0200, Tomasz Figa wrote:
-> >> > Dear ARM SoC maintainers,
-> >> >
+> >> Kukjin Kim <kgene.kim@samsung.com> writes:
+> >>
 > >> > The following changes since commit
-> >> > c095ba7224d8edc71dcef0d655911399a8bd4a3f:
+> >> 5ae90d8e467e625e447000cb4335c4db973b1095:
 > >> >
-> >> >   Linux 3.11-rc4 (2013-08-04 13:46:46 -0700)
+> >> >   Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
 > >> >
 > >> > are available in the git repository at:
 > >> >
-> >> >   git://github.com/tom3q/linux.git tags/v3.12-pwm-cleanup-for-olof
+> >> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-
+> samsung.git
+> >> > tags/samsung-fixes-2
+> >> >
+> >> > for you to fetch changes up to
+> 35f8550c8f27968af94ba5235cc611e3b6d86981:
+> >> >
+> >> >   ARM: SAMSUNG: fix to support for missing cpu specific map_io
+> >> > (2013-07-30 13:30:57 +0900)
 > >>
-> >> Thanks, applied.
+> >> In the future, please send arm-soc pull request to arm at kernel.org also,
+> >> this makes filtering easier when non-Arnd/Olof folks (like me) are
+> > helping.
 > >>
-> > Same here, this will be merged into samsung tree because of dependency.
+> > OK, it's not difficult, BTW I'm not sure what the difference of
+> > linux-arm-kernel ml and arm(at)kernel.org.
 > 
-> What's the dependency? If it's just two patches (which I think it is),
-> just send me your acks on them and we can apply them on top instead.
+> arm at kernel.org goes to Arnd, Kevin, Russel and myself. I think there
+> might be one or two more people on there, but in general it's
+> arm-soc+arm maintainers.
 > 
-Yeah if there are two patches, I can. But there are another dependent series
-such as "[PATCH v2 0/8] Common Clock Framework support for Samsung S3C64xx"
-from Tomasz. So I'd like to merge that into the samsung tree.
+> We haven't wanted to add it to MAINTAINERS since we want to keep the
+> traffic mostly to the pull requests of platform maintainers, and not
+> as a cc of patch postings, to keep the traffic volume manageable. :)
+> 
+OK, I see.
 
-- Kukjin
+Thanks,
+Kukjin
