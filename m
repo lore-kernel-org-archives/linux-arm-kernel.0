@@ -1,44 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Aug 2013 13:49:04 +0100
-Subject: [Qemu-devel] SCSI bus failures with qemu-arm in kernel 3.8+
-In-Reply-To: <CAFEAcA8u_c=seOQ+y44H2Vpefyx4EisiZ-ZqBxuPsyoYjCt3vQ@mail.gmail.com>
-References: <20130812164548.GE23006@n2100.arm.linux.org.uk>
- <CAFEAcA97PuORg920f-A_8rvCgBq=k5Y=0W6m2Nv8nnzjY19Utg@mail.gmail.com>
- <20130812200628.GG23006@n2100.arm.linux.org.uk>
- <CAFEAcA9BA7zfaO1J5zVaEcG-AgOo6dyiew08-o2eObuBe-KWig@mail.gmail.com>
- <20130812212149.GH23006@n2100.arm.linux.org.uk>
- <CAFEAcA_0kzS=Z5oTxrr=B74wjf1x=M6dXwH7Fcgf77Pca90Gjw@mail.gmail.com>
- <20130812221250.GI23006@n2100.arm.linux.org.uk>
- <20130812230408.GA4420@roeck-us.net>
- <20130814103346.GN23006@n2100.arm.linux.org.uk>
- <CAFEAcA8u_c=seOQ+y44H2Vpefyx4EisiZ-ZqBxuPsyoYjCt3vQ@mail.gmail.com>
-Message-ID: <20130814124904.GQ23006@n2100.arm.linux.org.uk>
+From: menon.nishanth@gmail.com (menon.nishanth at gmail.com)
+Date: Wed, 14 Aug 2013 07:50:43 -0500
+Subject: [PATCH 1/3] ARM: OMAP2+: Add support to parse 'main_clk' info
+ from DT
+In-Reply-To: <1374560679-14666-2-git-send-email-rnayak@ti.com>
+References: <1374560679-14666-1-git-send-email-rnayak@ti.com>
+ <1374560679-14666-2-git-send-email-rnayak@ti.com>
+Message-ID: <CAGo_u6rkRX=Wt-516BgG5eQ=w9tGBYN7Pb+gVF51xCr1FrEStw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 01:44:44PM +0100, Peter Maydell wrote:
-> On 14 August 2013 11:33, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Aug 12, 2013 at 04:04:08PM -0700, Guenter Roeck wrote:
-> >> Hacked diff is below. Can I write that up as clean patch and submit it,
-> >> or do we need a test on real hardware ?
-> >
-> > Well, if we want to ensure that it is really correct, the sensible thing
-> > to do is to try it on real hardware, otherwise we're risking yet another
-> > change to this.
-> >
-> > Earlier in this thread, some people said that they have the hardware, so
-> > it shouldn't be that difficult to get it tested on real stuff.
-> 
-> Yes, I definitely think we should test on the hardware before we
-> land yet another change to this PCI code that hasn't really been
-> thoroughly tested on anything. I have the board/backplane on my
-> desk but it'll be later in the week before I can do the testing
-> (currently still messing with uboot config to get it to actually
-> boot a kernel).
+Hi Rajendra,
+On Tue, Jul 23, 2013 at 1:24 AM, Rajendra Nayak <rnayak@ti.com> wrote:
 
-Realview or Versatile?  I still need to sort out Realview.
+[...]
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 5cc5123..12fa589 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -2381,12 +2386,10 @@ static void __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data)
+>                          oh->name);
+>
+>                 /* Extract the IO space from device tree blob */
+> -               if (!of_have_populated_dt())
+> +               if (!np)
+>                         return;
+>
+> -               np = of_dev_hwmod_lookup(of_find_node_by_name(NULL, "ocp"), oh);
+> -               if (np)
+> -                       va_start = of_iomap(np, 0);
+> +               va_start = of_iomap(np, 0);
 
-The alternative is - I have both the Realview EB and Versatile PB926
-here, but no backplane (it wasn't deemed to be necessary for me to
-have such a thing.)  If someone wants to donate a backplane...
+This hunk needs a rebase with 3.11-rc5
+due to commit 130142d91467e8a07f3a863db369225a89e84d75
+(ARM: OMAP2+: hwmod: rt address space index for DT)
+
+>         } else {
+>                 va_start = ioremap(mem->pa_start, mem->pa_end - mem->pa_start);
+>         }
+
+[...]
