@@ -1,29 +1,25 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Aug 2013 22:58:00 -0700
-Subject: [Git pull request] fix to the vexpress/mcpm branch
-In-Reply-To: <alpine.LFD.2.03.1308121428080.14472@syhkavp.arg>
-References: <alpine.LFD.2.03.1308121428080.14472@syhkavp.arg>
-Message-ID: <20130814055800.GG16635@quad.lixom.net>
+Date: Tue, 13 Aug 2013 23:07:02 -0700
+Subject: [GIT PULL] Samsung PWM support cleanup
+In-Reply-To: <3516906.8u5IrARqm7@flatron>
+References: <3516906.8u5IrARqm7@flatron>
+Message-ID: <20130814060702.GH16635@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nico,
-
-On Mon, Aug 12, 2013 at 02:37:54PM -0400, Nicolas Pitre wrote:
+On Tue, Aug 13, 2013 at 11:16:35PM +0200, Tomasz Figa wrote:
+> Dear ARM SoC maintainers,
 > 
-> Please pull the following:
+> The following changes since commit 
+> c095ba7224d8edc71dcef0d655911399a8bd4a3f:
 > 
-> 	git://git.linaro.org/people/nico/linux mcpm+tc2
+>   Linux 3.11-rc4 (2013-08-04 13:46:46 -0700)
 > 
-> which will update your vexpress/mcpm branch with one additional commit 
-> fixing the build issue with CONFIG_FRAME_POINTER reported by RMK.  This 
-> commit's SHA1 is 95fbdc9cf542.
+> are available in the git repository at:
+> 
+>   git://github.com/tom3q/linux.git tags/v3.12-pwm-cleanup-for-olof
 
-So, I just replaced my branch with the one from Pawel, and the topmost patch
-in your branch seems to no longer apply.
-
-Would you mind rebasing on top of vexpress/mcpm in the arm-soc tree? You
-can just send us the patch directly, no need to do a pull request for it.
+Thanks, applied.
 
 
 -Olof
