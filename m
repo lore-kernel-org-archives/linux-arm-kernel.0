@@ -1,10 +1,10 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Wed, 14 Aug 2013 11:11:16 +0200
-Subject: [PATCH 12/29] sound/soc/samsung/ac97.c: simplify use of
+Date: Wed, 14 Aug 2013 11:11:29 +0200
+Subject: [PATCH 25/29] drivers/spi/spi-sirf.c: simplify use of
  devm_ioremap_resource
 In-Reply-To: <1376471493-22215-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1376471493-22215-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1376471493-22215-13-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1376471493-22215-26-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,30 +37,31 @@ identifier l;
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- sound/soc/samsung/ac97.c |    7 +------
+ drivers/spi/spi-sirf.c |    7 +------
  1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/sound/soc/samsung/ac97.c b/sound/soc/samsung/ac97.c
-index 2dd623f..c732df9 100644
---- a/sound/soc/samsung/ac97.c
-+++ b/sound/soc/samsung/ac97.c
-@@ -404,18 +404,13 @@ static int s3c_ac97_probe(struct platform_device *pdev)
- 		return -ENXIO;
- 	}
+diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
+index 62c92c3..546fae2 100644
+--- a/drivers/spi/spi-sirf.c
++++ b/drivers/spi/spi-sirf.c
+@@ -588,12 +588,6 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, master);
+ 	sspi = spi_master_get_devdata(master);
  
 -	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 -	if (!mem_res) {
--		dev_err(&pdev->dev, "Unable to get register resource\n");
--		return -ENXIO;
+-		dev_err(&pdev->dev, "Unable to get IO resource\n");
+-		ret = -ENODEV;
+-		goto free_master;
 -	}
--
- 	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
- 	if (!irq_res) {
- 		dev_err(&pdev->dev, "AC97 IRQ not provided!\n");
- 		return -ENXIO;
+ 	master->num_chipselect = num_cs;
+ 
+ 	for (i = 0; i < master->num_chipselect; i++) {
+@@ -620,6 +614,7 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 		}
  	}
  
 +	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	s3c_ac97.regs = devm_ioremap_resource(&pdev->dev, mem_res);
- 	if (IS_ERR(s3c_ac97.regs))
- 		return PTR_ERR(s3c_ac97.regs);
+ 	sspi->base = devm_ioremap_resource(&pdev->dev, mem_res);
+ 	if (IS_ERR(sspi->base)) {
+ 		ret = PTR_ERR(sspi->base);
