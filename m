@@ -1,29 +1,36 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 14 Aug 2013 21:37:07 +1000
-Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
-In-Reply-To: <520B5584.7030608@arm.com>
-References: <5208E2D3.7060005@arm.com> <3356439.a21MloFP7n@vostro.rjw.lan>
- <520A536C.3030600@arm.com> <520A7B00.8060405@arm.com>
- <1376428024.4255.14.camel@pasglop> <520B5584.7030608@arm.com>
-Message-ID: <1376480227.4255.66.camel@pasglop>
+From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
+Date: Wed, 14 Aug 2013 17:15:05 +0530
+Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host with
+ external L3-cache.
+Message-ID: <1376480706-18642-1-git-send-email-pranavkumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-08-14 at 11:01 +0100, Sudeep KarkadaNagesha wrote:
-> Yes this doesn't cover the historical "ibm,ppc-interrupt-server#s",
-> for
-> which we can have PPC specific wrapper above the generic one i.e. get
-> the cpu node and then parse for thread id under custom property.
+Systems with large external L3-cache (few MBs), might have dirty
+content belonging to the guest page in L3-cache. To tackle this,
+we need to flush such dirty content from d-cache so that guest
+will see correct contents of guest page when guest MMU is disabled.
 
-A wrapper is wrong. I don't want to have to have all ppc callers to use
-a different function.
+The patch fixes coherent_icache_guest_page() for external L3-cache.
 
-As I said, just make a generic one that returns a thread ID, ie, same
-signature as the powerpc one. Make it weak, we can override it in
-powerpc-land, or we can move the ibm,ppc-interrupt-server#s handling
-into the generic one, it won't hurt, but leave the thread_id return
-there, it doesn't hurt it will come in handy in a few cases without
-causing code duplication.
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+---
+ arch/arm64/include/asm/kvm_mmu.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Cheers,
-Ben.
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index efe609c..5129038 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -123,6 +123,8 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+ 	if (!icache_is_aliasing()) {		/* PIPT */
+ 		unsigned long hva = gfn_to_hva(kvm, gfn);
+ 		flush_icache_range(hva, hva + PAGE_SIZE);
++		/* Flush d-cache for systems with external caches. */
++		__flush_dcache_area((void *) hva, PAGE_SIZE);
+ 	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
+ 		/* any kind of VIPT cache */
+ 		__flush_icache_all();
+-- 
+1.7.9.5
