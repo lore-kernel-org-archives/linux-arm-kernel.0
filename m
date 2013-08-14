@@ -1,88 +1,26 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Wed, 14 Aug 2013 11:01:40 +0100
-Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
-In-Reply-To: <1376428024.4255.14.camel@pasglop>
-References: <5208E2D3.7060005@arm.com> <3356439.a21MloFP7n@vostro.rjw.lan>
- <520A536C.3030600@arm.com> <520A7B00.8060405@arm.com>
- <1376428024.4255.14.camel@pasglop>
-Message-ID: <520B5584.7030608@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 14 Aug 2013 11:03:14 +0100
+Subject: [PATCH V4 0/4] Add i2s support on smdk5420
+In-Reply-To: <6538092.D4LPomiMyc@flatron>
+References: <1376300994-1679-1-git-send-email-padma.v@samsung.com>
+ <20130813124440.GX6427@sirena.org.uk> <6538092.D4LPomiMyc@flatron>
+Message-ID: <20130814100314.GN6427@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/08/13 22:07, Benjamin Herrenschmidt wrote:
-> On Tue, 2013-08-13 at 19:29 +0100, Sudeep KarkadaNagesha wrote:
->> I don't understand completely the use of ibm,ppc-interrupt-server#s and
->> its implications on generic of_get_cpu_node implementation.
->> I see the PPC specific definition of of_get_cpu_node uses thread id only
->> in 2 instances. Based on that, I have tried to move all the other
->> instances to use generic definition.
->>
->> Let me know if the idea is correct.
-> 
-> No. The device-tree historically only represents cores, not HW threads, so
-> it makes sense to retrieve also the thread number corresponding to the CPU.
-> 
-Ok
+On Wed, Aug 14, 2013 at 10:25:27AM +0200, Tomasz Figa wrote:
 
-> However, the mechanism to represent HW threads in the device-tree is currently
-> somewhat platform specific (the ibm,ppc-interrupt-server#s).
-I see most of the callers pass NULL to thread id argument except 2
-instances in entire tree. If that's the case why can't we move to use
-generic of_get_cpu_node in most of those cases and have PPC specific
-implementation for the ones using thread id.
+> Hmm, this series looks good to me too, except one thing. What about the 
+> bisection breakage introduced by the hole between patches 1/4 and 4/4 
+> (after the list of supported compatible changes in the driver and before 
+> respective dts files are updated)?
 
-> 
-> So what you could do for now is:
-> 
->  - Have a generic version that always returns 0 as the thread, which is weak
-I would prefer to move to generic of_get_cpu_node where ever possible
-and rename the function that takes thread id rather than making generic
-one weak.
-
-> 
->  - powerpc keeps its own implementation
-How about only in cases where it needs thread_id.
-
-> 
->  - Start a discussion on the bindings (if not already there) to define threads
-> in a better way at which point the generic function can be updated.
-> 
-I am not sure if we need to define any new bindings. Excerpts from ePAPR
-(v1.1):
-"3.7.1 General Properties of CPU nodes
-The value of "reg" is a <prop-encoded-array> that defines a unique
-CPU/thread id for the CPU/threads represented by the CPU node.
-If a CPU supports more than one thread (i.e. multiple streams of
-execution) the reg property is an array with 1 element per thread. The
-#address-cells on the /cpus node specifies how many cells each element
-of the array takes. Software can determine the number of threads by
-dividing the size of reg by the parent node's #address-cells."
-
-And this is exactly in agreement to what's implemented in the generic
-of_get_cpu_node:
-
-for_each_child_of_node(cpus, cpun) {
-        if (of_node_cmp(cpun->type, "cpu"))
-                continue;
-        cell = of_get_property(cpun, "reg", &prop_len);
-        if (!cell) {
-                pr_warn("%s: missing reg property\n", cpun->full_name);
-                continue;
-        }
-        prop_len /= sizeof(*cell);
-        while (prop_len) {
-                hwid = of_read_number(cell, ac);
-                prop_len -= ac;
-                if (arch_match_cpu_phys_id(cpu, hwid))
-                        return cpun;
-        }
-}
-
-Yes this doesn't cover the historical "ibm,ppc-interrupt-server#s", for
-which we can have PPC specific wrapper above the generic one i.e. get
-the cpu node and then parse for thread id under custom property.
-
-Let me know your thoughts.
-
-Regards,
-Sudeep
+It's annoying but relatively localised and obvious rather than the cross
+tree stuff that happens so frequently with these platforms.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130814/525e0a3c/attachment.sig>
