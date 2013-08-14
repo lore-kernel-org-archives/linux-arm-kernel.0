@@ -1,45 +1,68 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Aug 2013 23:48:30 -0700
-Subject: [PATCH v6 3/4] ARM: hi3xxx: add board support with device tree
-In-Reply-To: <1374813135-16238-4-git-send-email-haojian.zhuang@linaro.org>
-References: <1374813135-16238-1-git-send-email-haojian.zhuang@linaro.org>
- <1374813135-16238-4-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20130814064830.GJ19951@quad.lixom.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 14 Aug 2013 08:52:17 +0200
+Subject: [PATCH] input: qt1070: add power management ops
+In-Reply-To: <1376379826-28808-1-git-send-email-voice.shen@atmel.com>
+References: <1376379826-28808-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <520B2921.3000906@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 13/08/2013 09:43, Bo Shen :
+> Add power management ops for qt1070, it maybe a wakeup source
+>
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
 
-On Fri, Jul 26, 2013 at 12:32:14PM +0800, Haojian Zhuang wrote:
-> Add board support with device tree for Hisilicon Hi36xx/Hi37xx platform.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-How about a defconfig for build coverage, or enabling this platform in
-multi_v7_defconfig?
+> ---
+>   drivers/input/keyboard/qt1070.c |   25 +++++++++++++++++++++++++
+>   1 file changed, 25 insertions(+)
+>
+> diff --git a/drivers/input/keyboard/qt1070.c b/drivers/input/keyboard/qt1070.c
+> index 42b773b..deefe5a 100644
+> --- a/drivers/input/keyboard/qt1070.c
+> +++ b/drivers/input/keyboard/qt1070.c
+> @@ -243,6 +243,30 @@ static int qt1070_remove(struct i2c_client *client)
+>   	return 0;
+>   }
+>
+> +#ifdef CONFIG_PM_SLEEP
+> +static int qt1070_suspend(struct device *dev)
+> +{
+> +	struct qt1070_data *data = dev_get_drvdata(dev);
+> +
+> +	if (device_may_wakeup(dev))
+> +		enable_irq_wake(data->irq);
+> +
+> +	return 0;
+> +}
+> +
+> +static int qt1070_resume(struct device *dev)
+> +{
+> +	struct qt1070_data *data = dev_get_drvdata(dev);
+> +
+> +	if (device_may_wakeup(dev))
+> +		disable_irq_wake(data->irq);
+> +
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(qt1070_pm_ops, qt1070_suspend, qt1070_resume);
+> +
+>   static const struct i2c_device_id qt1070_id[] = {
+>   	{ "qt1070", 0 },
+>   	{ },
+> @@ -253,6 +277,7 @@ static struct i2c_driver qt1070_driver = {
+>   	.driver	= {
+>   		.name	= "qt1070",
+>   		.owner	= THIS_MODULE,
+> +		.pm	= &qt1070_pm_ops,
+>   	},
+>   	.id_table	= qt1070_id,
+>   	.probe		= qt1070_probe,
+>
 
-> diff --git a/arch/arm/mach-hi3xxx/Kconfig b/arch/arm/mach-hi3xxx/Kconfig
-> new file mode 100644
-> index 0000000..a991dee
-> --- /dev/null
-> +++ b/arch/arm/mach-hi3xxx/Kconfig
-> @@ -0,0 +1,13 @@
-> +config ARCH_HI3xxx
-> +	bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
-> +	select ARM_AMBA
-> +	select ARM_GIC
-> +	select CACHE_L2X0
-> +	select CACHE_PL310
 
-No other platforms select CACHE_PL310 even if they have them.
-
-> +	select CLKSRC_OF
-> +	select PINCTRL
-> +	select PINCTRL_SINGLE
-> +	select SERIAL_AMBA_PL011
-> +	select SERIAL_AMBA_PL011_CONSOLE
-
-It's not common to select the serial drivers here, only a couple of other
-platforms do.
-
-
-
--Olof
+-- 
+Nicolas Ferre
