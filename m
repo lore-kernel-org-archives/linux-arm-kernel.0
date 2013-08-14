@@ -1,37 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 14 Aug 2013 00:55:52 -0700
-Subject: [PATCH 0/5] Renesas ARM-based SoC board updates for v3.12
-In-Reply-To: <20130805013916.GB28465@verge.net.au>
-References: <cover.1375174556.git.horms+renesas@verge.net.au>
- <20130804203131.GD15602@quad.lixom.net>
- <20130805013916.GB28465@verge.net.au>
-Message-ID: <20130814075552.GD30577@quad.lixom.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 14 Aug 2013 09:00:26 +0100
+Subject: [PATCH 12/22] ARM: dts: Remove '0x's from OMAP2420 H4 DTS file
+In-Reply-To: <520B353F.40106@baylibre.com>
+References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
+ <1374490361-25769-12-git-send-email-lee.jones@linaro.org>
+ <20130813154425.GH15278@lee--X1>
+ <20130814073000.GW7656@atomide.com> <520B353F.40106@baylibre.com>
+Message-ID: <20130814080026.GA4046@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 10:39:16AM +0900, Simon Horman wrote:
-> On Sun, Aug 04, 2013 at 01:31:31PM -0700, Olof Johansson wrote:
-> > On Tue, Jul 30, 2013 at 06:00:41PM +0900, Simon Horman wrote:
-> > > Hi Olof, Hi Arnd,
-> > > 
-> > > please consider these Renesas ARM-based SoC board updates for v3.12.
-> > > This pull-request is based on renesas-soc-for-v3.12 which I have previously
-> > > sent a pull-request for.
-> > > 
-> > > The following changes since commit 81b9d5351fa96caad4accc6711bc1b9342927d4a:
-> > > 
-> > >   ARM: shmobile: Setup r8a7790 arch timer based on MD pins (2013-07-17 14:26:56 +0900)
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git boards
-> > 
-> > Hi, can I get a tag for this please?
+> >Looks like Benoit's new email address is bcousson at baylibre.com.
+> >Probably best for Benoit to pick these to avoid merge conflicts.
+
+Ah nice, thanks Tony.
+
+> I've just applied the 7 following patches. Let me know if I missed
+> something.
 > 
-> Sorry for not posing that the first time around.
-> It is renesas-boards-for-v3.12.
+> 6b9fa1b ARM: dts: Remove '0x's from OMAP5 DTS file
+> 79390b8 ARM: dts: Remove '0x's from OMAP4 DTS file
+> dd60fef ARM: dts: Remove '0x's from OMAP3430 SDP DTS file
+> bfef1cb ARM: dts: Remove '0x's from OMAP3 DTS file
+> 5f547ac ARM: dts: Remove '0x's from OMAP3 IGEP0030 DTS file
+> 27939fc ARM: dts: Remove '0x's from OMAP3 IGEP0020 DTS file
+> 62eb4d1 ARM: dts: Remove '0x's from OMAP2420 H4 DTS file
 
-Pulled.
+Nope, looks good. Thanks Benoit.
 
-
--Olof
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
