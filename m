@@ -1,74 +1,70 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 14 Aug 2013 18:12:49 -0500
-Subject: [PATCH 10/10] crypto: omap-aes: Switch to PIO mode in probe function
-In-Reply-To: <1376521969-16807-1-git-send-email-joelf@ti.com>
-References: <1376521969-16807-1-git-send-email-joelf@ti.com>
-Message-ID: <1376521969-16807-11-git-send-email-joelf@ti.com>
+Date: Wed, 14 Aug 2013 18:12:39 -0500
+Subject: [PATCH 00/10] crypto: omap-aes: DMA and PIO mode improvements
+Message-ID: <1376521969-16807-1-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In cases where requesting for DMA channels fails for some reason, or channel
-numbers are not provided in DT or platform data, we switch to PIO-only mode
-also checking if platform provides IRQ numbers and interrupt register offsets
-in DT and platform data. All dma-only paths are avoided in this mode.
+This patch series is a rewrite of the DMA portion of omap-aes driver
+and also adds support for PIO mode. Both these modes, give better
+performance than before.
 
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
- drivers/crypto/omap-aes.c |   28 +++++++++++++++++++++++-----
- 1 file changed, 23 insertions(+), 5 deletions(-)
+Earlier, only a single SG was used for DMA purpose, and the SG-list
+passed from the crypto layer was being copied and DMA'd one entry at
+a time. This turns out to be quite inefficient, so we replace it with
+much simpler code that directly passes the SG-list from crypto to the
+DMA layer.
 
-diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index 54f2729..34e3b77 100644
---- a/drivers/crypto/omap-aes.c
-+++ b/drivers/crypto/omap-aes.c
-@@ -1074,7 +1074,7 @@ static int omap_aes_probe(struct platform_device *pdev)
- 	struct omap_aes_dev *dd;
- 	struct crypto_alg *algp;
- 	struct resource res;
--	int err = -ENOMEM, i, j;
-+	int err = -ENOMEM, i, j, irq = -1;
- 	u32 reg;
- 
- 	dd = kzalloc(sizeof(struct omap_aes_dev), GFP_KERNEL);
-@@ -1118,8 +1118,23 @@ static int omap_aes_probe(struct platform_device *pdev)
- 	tasklet_init(&dd->queue_task, omap_aes_queue_task, (unsigned long)dd);
- 
- 	err = omap_aes_dma_init(dd);
--	if (err)
--		goto err_dma;
-+	if (err && AES_REG_IRQ_STATUS(dd) && AES_REG_IRQ_ENABLE(dd)) {
-+		dd->pio_only = 1;
-+
-+		irq = platform_get_irq(pdev, 0);
-+		if (irq < 0) {
-+			dev_err(dev, "can't get IRQ resource\n");
-+			goto err_irq;
-+		}
-+
-+		err = request_irq(irq, omap_aes_irq, 0,
-+				dev_name(dev), dd);
-+		if (err) {
-+			dev_err(dev, "Unable to grab omap-aes IRQ\n");
-+			goto err_irq;
-+		}
-+	}
-+
- 
- 	INIT_LIST_HEAD(&dd->list);
- 	spin_lock(&list_lock);
-@@ -1147,8 +1162,11 @@ err_algs:
- 		for (j = dd->pdata->algs_info[i].registered - 1; j >= 0; j--)
- 			crypto_unregister_alg(
- 					&dd->pdata->algs_info[i].algs_list[j]);
--	omap_aes_dma_cleanup(dd);
--err_dma:
-+	if (dd->pio_only)
-+		free_irq(irq, dd);
-+	else
-+		omap_aes_dma_cleanup(dd);
-+err_irq:
- 	tasklet_kill(&dd->done_task);
- 	tasklet_kill(&dd->queue_task);
- 	pm_runtime_disable(dev);
+We also add PIO mode support to the driver, and switch to PIO mode
+whenever the DMA channel allocation is not available. This is only for
+OMAP4 platform will work on any platform on which IRQ information is
+populated.
+
+Tests performed on am33xx and omap4 SoCs , notice the 50% perf improvement
+for large 8K blocks:
+
+Sample run on am33xx (beaglebone):
+With DMA rewrite:
+[   26.410052] test 0 (128 bit key, 16 byte blocks): 4318 operations in 1 seconds (69088 bytes)
+[   27.414314] test 1 (128 bit key, 64 byte blocks): 4360 operations in 1 seconds (279040 bytes)
+[   28.414406] test 2 (128 bit key, 256 byte blocks): 3609 operations in 1 seconds (923904 bytes)
+[   29.414410] test 3 (128 bit key, 1024 byte blocks): 3418 operations in 1 seconds (3500032 bytes)
+[   30.414510] test 4 (128 bit key, 8192 byte blocks): 1766 operations in 1 seconds (14467072 bytes)
+
+Without DMA rewrite:
+[   31.920519] test 0 (128 bit key, 16 byte blocks): 4417 operations in 1 seconds (70672 bytes)
+[   32.925997] test 1 (128 bit key, 64 byte blocks): 4221 operations in 1 seconds (270144 bytes)
+[   33.926194] test 2 (128 bit key, 256 byte blocks): 3528 operations in 1 seconds (903168 bytes)
+[   34.926225] test 3 (128 bit key, 1024 byte blocks): 3281 operations in 1 seconds (3359744 bytes)
+[   35.926385] test 4 (128 bit key, 8192 byte blocks): 1460 operations in 1 seconds (11960320 bytes)
+
+With PIO mode, note the tremndous boost in performance for small blocks there:
+[   27.294905] test 0 (128 bit key, 16 byte blocks): 20585 operations in 1 seconds (329360 bytes)
+[   28.302282] test 1 (128 bit key, 64 byte blocks): 8106 operations in 1 seconds (518784 bytes)
+[   29.302374] test 2 (128 bit key, 256 byte blocks): 2359 operations in 1 seconds (603904 bytes)
+[   30.302575] test 3 (128 bit key, 1024 byte blocks): 605 operations in 1 seconds (619520 bytes)
+[   31.303781] test 4 (128 bit key, 8192 byte blocks): 79 operations in 1 seconds (647168 bytes)
+
+Future work in this direction would be to dynamically change between
+PIO/DMA mode based on the block size.
+
+Joel Fernandes (10):
+  crypto: scatterwalk:  Add support for calculating number of SG
+    elements
+  crypto: omap-aes: Add useful debug macros
+  crypto: omap-aes: Populate number of SG elements
+  crypto: omap-aes: Simplify DMA usage by using direct SGs
+  crypto: omap-aes: Sync SG before DMA operation
+  crypto: omap-aes: Remove previously used intermediate buffers
+  crypto: omap-aes: Add IRQ info and helper macros
+  crypto: omap-aes: PIO mode: Add IRQ handler and walk SGs
+  crypto: omap-aes: PIO mode: platform data for OMAP4 and trigger it
+  crypto: omap-aes: Switch to PIO mode in probe function
+
+ crypto/scatterwalk.c         |   22 +++
+ drivers/crypto/omap-aes.c    |  400 ++++++++++++++++++++----------------------
+ include/crypto/scatterwalk.h |    2 +
+ 3 files changed, 217 insertions(+), 207 deletions(-)
+
 -- 
 1.7.9.5
