@@ -1,51 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Aug 2013 18:41:09 +0200
-Subject: [PATCH 3/4] pinctrl: Add support for additional dynamic states
-In-Reply-To: <51F6E657.2060802@wwwdotorg.org>
-References: <20130716090310.5541.36777.stgit@localhost>
- <20130716090536.5541.36289.stgit@localhost>
- <51E70953.1000601@wwwdotorg.org>
- <20130718072034.GO7656@atomide.com>
- <51E8401E.8040705@wwwdotorg.org>
- <20130719072927.GY7656@atomide.com>
- <51E98AEC.5000802@wwwdotorg.org>
- <20130729090524.GY7656@atomide.com>
- <51F6E657.2060802@wwwdotorg.org>
-Message-ID: <CACRpkdZXFv4JFek9SV1n=7gw0sLAeA_xxC1D+_OMLQyLYtXLvA@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 14 Aug 2013 17:41:49 +0100
+Subject: [PATCH v3 07/10] xen: introduce XENMEM_get_dma_buf and
+ xen_put_dma_buf
+In-Reply-To: <20130809155050.GA8462@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1308051503190.4893@kaball.uk.xensource.com>
+ <1375720256-8014-7-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130809153606.GD5637@phenom.dumpdata.com>
+ <20130809155050.GA8462@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1308141740400.4470@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 12:01 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Fri, 9 Aug 2013, Konrad Rzeszutek Wilk wrote:
+> > > +struct xen_get_dma_buf {
+> > > +    /*
+> > > +     * [IN] Details of memory extents to be exchanged (GMFN bases).
+> > > +     * Note that @in.address_bits is ignored and unused.
+> > 
+> > Ohhhh, why? What if the user wants to be it under 2G?
+> 
+> Looking a bit more at the code revealed that we stick that in the
+> @out.address_bits
+> > 
+> > > +     */
+> > > +    struct xen_memory_reservation in;
+> > > +
+> > > +    /*
+> > > +     * [IN/OUT] Details of new memory extents.
+> > > +     * We require that:
+> > > +     *  1. @in.domid == @out.domid
+> > > +     *  2. @in.nr_extents  << @in.extent_order == 
+> > > +     *     @out.nr_extents << @out.extent_order
+> > > +     *  3. @in.extent_start and @out.extent_start lists must not overlap
+> > > +     *  4. @out.extent_start lists GPFN bases to be populated
+> > > +     *  5. @out.extent_start is overwritten with allocated GMFN bases
+> 
+> .. which you should document, otherwise the hypervisor might try to give
+> you pages under 2^0..
 
-> I was thinking more about people writing the device trees that define
-> these states; they need to explicitly make the choice re: overlapping
-> states or independent states. We should not plan to obsolete any current
-> usage of overlapping states since that will mean an incompatible change
-> to the DT ABI (deprecate yes so that no more usage is added, but the
-> kernel should still support the old way).
+Yes, you are right. I'll add a note about out.address_bits.
 
-This is another reason to not group and encode explicitly the pins
-that remain unchanged during state transitions.
 
-I prefer that either:
+> > > +     */
+> > > +    struct xen_memory_reservation out;
+> > > +
+> > > +    /*
+> > > +     * [OUT] Number of input extents that were successfully exchanged:
+> > > +     *  1. The first @nr_exchanged input extents were successfully
+> > > +     *     deallocated.
+> > > +     *  2. The corresponding first entries in the output extent list correctly
+> > > +     *     indicate the GMFNs that were successfully exchanged.
+> > > +     *  3. All other input and output extents are untouched.
+> > > +     *  4. If not all input exents are exchanged then the return code of this
+> > > +     *     command will be non-zero.
+> > > +     *  5. THIS FIELD MUST BE INITIALISED TO ZERO BY THE CALLER!
+> 
+> as this says the initial value is zero.
 
-- when we build up the state containers in the subsystem,
- we identify overlapping pins and encode them in the state
- container somehow
-
-or:
-
-- when transitioning from state A -> state B we identify
- ovelapping pins or groups of pins and do not touch them
- by making calls down to the driver ->free() and ->request()
- callback pair.
-
-or:
-
-the pinctrl-single.c driver in it's callbacks like ->enable()
-->disable(), ->request(), ->free() internally short cuts from
-its knowledge of such pin shortcuts and no other drivers
-are affected (nor helped) by this optimization.
-
-Yours,
-Linus Walleij
+This is referring to nr_exchanged.
