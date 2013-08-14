@@ -1,105 +1,41 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 14 Aug 2013 10:50:23 +0200
-Subject: [PATCH v3 1/6] ARM/ARM64: arch_timer: add macros for bits in
- control register
-In-Reply-To: <1376414984-14182-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376414984-14182-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376414984-14182-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <520B44CF.6040403@linaro.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 14 Aug 2013 13:45:20 +0530
+Subject: [PATCH v2 09/11] dma: mmp_pdma: implement DMA_PAUSE and DMA_RESUME
+In-Reply-To: <1376153545-14361-10-git-send-email-zonque@gmail.com>
+References: <1376153545-14361-1-git-send-email-zonque@gmail.com>
+ <1376153545-14361-10-git-send-email-zonque@gmail.com>
+Message-ID: <20130814081520.GJ32147@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2013 07:29 PM, Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+On Sat, Aug 10, 2013 at 06:52:23PM +0200, Daniel Mack wrote:
+> This is needed at least for audio operation.
 > 
-> Add macros to describe the bitfields in the ARM architected timer
-> control register to make code easy to understand.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
 > ---
->  arch/arm/include/asm/arch_timer.h    |  9 +++++++--
->  arch/arm64/include/asm/arch_timer.h  | 12 ++++++++----
->  include/clocksource/arm_arch_timer.h |  8 ++++++++
->  3 files changed, 23 insertions(+), 6 deletions(-)
+>  drivers/dma/mmp_pdma.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-> index e406d57..9ef74da 100644
-> --- a/arch/arm/include/asm/arch_timer.h
-> +++ b/arch/arm/include/asm/arch_timer.h
-> @@ -95,8 +95,13 @@ static inline void arch_counter_set_user_access(void)
->  
->  	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
->  
-> -	/* disable user access to everything */
-> -	cntkctl &= ~((3 << 8) | (7 << 0));
-> +	/* Disable user access to both physical/virtual counters/timers. */
-> +	/* Also disable virtual event stream */
-> +	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
-> +			| ARCH_TIMER_USR_VT_ACCESS_EN
-> +			| ARCH_TIMER_VIRT_EVT_EN
-> +			| ARCH_TIMER_USR_VCT_ACCESS_EN
-> +			| ARCH_TIMER_USR_PCT_ACCESS_EN);
->  
->  	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
->  }
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index 98abd47..00b09d0 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -101,12 +101,16 @@ static inline void arch_counter_set_user_access(void)
->  {
->  	u32 cntkctl;
->  
-> -	/* Disable user access to the timers and the physical counter. */
->  	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
-> -	cntkctl &= ~((3 << 8) | (1 << 0));
->  
-> -	/* Enable user access to the virtual counter and frequency. */
-> -	cntkctl |= (1 << 1);
-> +	/* Disable user access to the timers and the physical counter. */
-> +	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
-> +			| ARCH_TIMER_USR_VT_ACCESS_EN
-> +			| ARCH_TIMER_USR_PCT_ACCESS_EN);
-> +
-> +	/* Enable user access to the virtual counter. */
-> +	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
-> +
->  	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
->  }
+> diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
+> index 579f79a..7a0956b 100644
+> --- a/drivers/dma/mmp_pdma.c
+> +++ b/drivers/dma/mmp_pdma.c
+> @@ -659,6 +659,12 @@ static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
+>  		if (cfg->slave_id)
+>  			chan->drcmr = cfg->slave_id;
+>  		break;
+> +	case DMA_PAUSE:
+> +		disable_chan(chan->phy);
+> +		break;
+> +	case DMA_RESUME:
+> +		start_pending_queue(chan);
+This is your usual start_pending ops. The meaning of pause and resume is NOT to
+drop current descriptor and start from next one. You need to start from where
+you had left off.
 
-Before doing those changes, I suggest you kill include/asm/arch_timer.h
-header file and move the functions directly in the arm_arch_timer.c as
-they are only used by it.
+The way I see in this driver you are going to pick next descriptor and since
+usage is audio, imply loss of audio in puase-resume case.
 
-> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-> index c463ce9..551f7e9 100644
-> --- a/include/clocksource/arm_arch_timer.h
-> +++ b/include/clocksource/arm_arch_timer.h
-> @@ -29,6 +29,14 @@
->  #define ARCH_TIMER_PHYS_ACCESS		0
->  #define ARCH_TIMER_VIRT_ACCESS		1
->  
-> +#define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter */
-> +#define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
-> +#define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
-> +#define ARCH_TIMER_EVT_TRIGGER_SHIFT	(4)
-> +#define ARCH_TIMER_EVT_TRIGGER_MASK	(0xF << ARCH_TIMER_EVT_TRIGGER_SHIFT)
-> +#define ARCH_TIMER_USR_VT_ACCESS_EN	(1 << 8) /* virtual timer registers */
-> +#define ARCH_TIMER_USR_PT_ACCESS_EN	(1 << 9) /* physical timer registers */
-> +
->  #ifdef CONFIG_ARM_ARCH_TIMER
->  
->  extern u32 arch_timer_get_rate(void);
-> 
+You need to resume here, not start next one
 
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+~Vinod
