@@ -1,157 +1,52 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Wed, 14 Aug 2013 14:27:36 +0100
-Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
-In-Reply-To: <520B7DAE.3060501@gmail.com>
-References: <5208E2D3.7060005@arm.com> <3356439.a21MloFP7n@vostro.rjw.lan>
- <520A536C.3030600@arm.com> <520A7B00.8060405@arm.com>
- <1376428024.4255.14.camel@pasglop> <520B5584.7030608@arm.com>
- <520B7DAE.3060501@gmail.com>
-Message-ID: <520B85C8.5030908@arm.com>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Wed, 14 Aug 2013 15:38:00 +0200
+Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
+In-Reply-To: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
+References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
+Message-ID: <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/13 13:53, Rob Herring wrote:
-> On 08/14/2013 05:01 AM, Sudeep KarkadaNagesha wrote:
->> On 13/08/13 22:07, Benjamin Herrenschmidt wrote:
->>> On Tue, 2013-08-13 at 19:29 +0100, Sudeep KarkadaNagesha wrote:
->>>> I don't understand completely the use of ibm,ppc-interrupt-server#s and
->>>> its implications on generic of_get_cpu_node implementation.
->>>> I see the PPC specific definition of of_get_cpu_node uses thread id only
->>>> in 2 instances. Based on that, I have tried to move all the other
->>>> instances to use generic definition.
->>>>
->>>> Let me know if the idea is correct.
->>>
->>> No. The device-tree historically only represents cores, not HW threads, so
->>> it makes sense to retrieve also the thread number corresponding to the CPU.
->>>
->> Ok
->>
->>> However, the mechanism to represent HW threads in the device-tree is currently
->>> somewhat platform specific (the ibm,ppc-interrupt-server#s).
->> I see most of the callers pass NULL to thread id argument except 2
->> instances in entire tree. If that's the case why can't we move to use
->> generic of_get_cpu_node in most of those cases and have PPC specific
->> implementation for the ones using thread id.
->>
->>>
->>> So what you could do for now is:
->>>
->>>  - Have a generic version that always returns 0 as the thread, which is weak
->> I would prefer to move to generic of_get_cpu_node where ever possible
->> and rename the function that takes thread id rather than making generic
->> one weak.
->>
->>>
->>>  - powerpc keeps its own implementation
->> How about only in cases where it needs thread_id.
->>
->>>
->>>  - Start a discussion on the bindings (if not already there) to define threads
->>> in a better way at which point the generic function can be updated.
->>>
->> I am not sure if we need to define any new bindings. Excerpts from ePAPR
->> (v1.1):
->> "3.7.1 General Properties of CPU nodes
->> The value of "reg" is a <prop-encoded-array> that defines a unique
->> CPU/thread id for the CPU/threads represented by the CPU node.
->> If a CPU supports more than one thread (i.e. multiple streams of
->> execution) the reg property is an array with 1 element per thread. The
->> #address-cells on the /cpus node specifies how many cells each element
->> of the array takes. Software can determine the number of threads by
->> dividing the size of reg by the parent node's #address-cells."
->>
->> And this is exactly in agreement to what's implemented in the generic
->> of_get_cpu_node:
->>
->> for_each_child_of_node(cpus, cpun) {
->>         if (of_node_cmp(cpun->type, "cpu"))
->>                 continue;
->>         cell = of_get_property(cpun, "reg", &prop_len);
->>         if (!cell) {
->>                 pr_warn("%s: missing reg property\n", cpun->full_name);
->>                 continue;
->>         }
->>         prop_len /= sizeof(*cell);
->>         while (prop_len) {
->>                 hwid = of_read_number(cell, ac);
->>                 prop_len -= ac;
->>                 if (arch_match_cpu_phys_id(cpu, hwid))
->>                         return cpun;
->>         }
->> }
+On Tue, 2013-08-13 at 15:20 -0700, Russ Dill wrote:
+> The purpose and method of executing these sequences is left up to each
+> platform. In the case of the am33xx, the CM3 firmware writes out the
+> simple I2C sequences.
 > 
-> How about something like this:
-> 
-> for_each_child_of_node(cpus, cpun) {
->         if (of_node_cmp(cpun->type, "cpu"))
->                 continue;
-> 
-> 	if (arch_of_get_cpu_node(cpun, thread))
-> 		return cpun;
-> 
->         cell = of_get_property(cpun, "reg", &prop_len);
->         if (!cell) {
->                 pr_warn("%s: missing reg property\n", cpun->full_name);
->                 continue;
->         }
->         prop_len /= sizeof(*cell);
->         while (prop_len) {
->                 hwid = of_read_number(cell, ac);
->                 prop_len -= ac;
->                 if (arch_match_cpu_phys_id(cpu, hwid))
->        	                return cpun;
->         }
-> }
-> 
-> For PPC:
-> 
-> arch_of_get_cpu_node()
-> {
->         const u32 *intserv;
->         unsigned int plen, t;
-> 
->         /* Check for ibm,ppc-interrupt-server#s. */
->         intserv = of_get_property(np, "ibm,ppc-interrupt-server#s",
->                                 &plen);
->         if (!intserv)
-> 		return false;
-> 
-> 	hardid = get_hard_smp_processor_id(cpu);
-> 
->         plen /= sizeof(u32);
->         for (t = 0; t < plen; t++) {
->                  if (hardid == intserv[t]) {
->                          if (thread)
->                                   *thread = t;
->                          return true;
->                  }
->         }
-> 	return false;
-> }
-> 
+> Each sequence is a series of I2C write commands. The first byte is the
+> length of the write, the second byte the I2C device to address, and
+> the following bytes are the message.
 
-Sorry responded to earlier mail before seeing this. This approach looks
-good, but we still need to have thread id as argument which should be fine.
+>         /* Set OPP100 (1.10V) for VDD core */
+>         wake_sequence = /bits/ 8 <
+>                 0x02 0x2d 0x25 0x2b /* Set VDD2 to 1.1V */
+>         >;
+> 
+>         tps: tps at 2d {
+>                 reg = <0x2d>;
+>         };
 
-But as per my understanding on how logical cpu<->hard proccessor id is
-setup, the thread_id is implicit in the logical cpu id making it
-unnecessary to depend on DT each time.
+> In the above example, the sequence "0x25 0x1f" is written to the I2C
+> device at address 0x2d (the TPS65910 PMIC). The PMIC interprets that
+> as a write to a register at address 0x25.
+
+> I'd really like to get some feedback on the devicetree bindings. 
+
+Shouldn't the TPS driver know how to generate this sequence? It seems
+fragile to do voltage adjustments behind the back of the regulator
+framework and the TPS driver. The wake-sequence values should match the
+(in-memory) regulator configuration on resume (which may have been
+changed by DVFS).
+
+The CM3 driver needs to figure out where the core regulator is connected
+using using either DT or the regulator framework and ask the TPS (via a
+new interface) for register writes for sleep/wake sequences. Then those
+sequences will actually match the correct voltages configured using
+DT/DVFS.
 
 Regards,
-Sudeep
-
->>
->> Yes this doesn't cover the historical "ibm,ppc-interrupt-server#s", for
->> which we can have PPC specific wrapper above the generic one i.e. get
->> the cpu node and then parse for thread id under custom property.
->>
->> Let me know your thoughts.
->>
->> Regards,
->> Sudeep
->>
->>
->>
-> 
-> 
+Jan
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
