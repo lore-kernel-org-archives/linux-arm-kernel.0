@@ -1,24 +1,29 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 14 Aug 2013 15:14:06 +0200
-Subject: [PATCH 0/3] cpufreq: sa11x0: cleanups for 3.13
-In-Reply-To: <CAKohpokOmv+CcL61dzkMgTNxY5rKb4A863CUAX_Jav4KyHF3DA@mail.gmail.com>
-References: <cover.1376392060.git.viresh.kumar@linaro.org>
- <1437762.edDpfxPldn@vostro.rjw.lan>
- <CAKohpokOmv+CcL61dzkMgTNxY5rKb4A863CUAX_Jav4KyHF3DA@mail.gmail.com>
-Message-ID: <1472734.1FogUomyWU@vostro.rjw.lan>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Aug 2013 14:00:19 +0100
+Subject: [PATCH 0/2] DMA: AMBA PL08x DMA driver fixes due to
+ ARCH_DMA_ADDR_T_64BIT
+In-Reply-To: <1376484729-11826-1-git-send-email-andre.przywara@linaro.org>
+References: <1376484729-11826-1-git-send-email-andre.przywara@linaro.org>
+Message-ID: <20130814130018.GR23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 14, 2013 07:56:44 AM Viresh Kumar wrote:
-> On 14 August 2013 01:31, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> > On Tuesday, August 13, 2013 07:01:04 PM Viresh Kumar wrote:
+On Wed, Aug 14, 2013 at 02:52:07PM +0200, Andre Przywara wrote:
+> Rob's recent pull request (Highbank fixes for 3.12) promoted the
+> dma_addr_t to 64bit:
+> commit ac072f427a4266b28a948c67a97a8c46f49b662d
+> Author: Rob Herring <rob.herring@calxeda.com>
+> Date:   Tue Aug 13 15:55:07 2013 -0500
 > 
-> > Are the three patches in this series prerequisite for the big target_index
-> > one?  If so, I think they can go into 3.12 actually, if they are ACKed by the
-> > appropriate platform maintainers.
-> 
-> Yes, but they depend on cpufreq_table_validate_and_show() which
-> will also go in 3.13 and so these will be made part of that series in
-> future..
+>     ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
+>     
+> Unfortunately this breaks the AMBA PL08x driver.
+> Fixes are pretty easy: replacing modulo with AND and fix printk
+> format types.
 
-OK
+I thought I effectively said no to that patch, and told Rob to go and look
+at my patch series.
+
+Your patch series is wrong to fix this.  We're just piling more bad fixes
+on top of a bug in the generic parts of the kernel.  Please stop this
+madness.
