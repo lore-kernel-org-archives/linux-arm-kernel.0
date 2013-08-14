@@ -1,154 +1,160 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 14 Aug 2013 10:25:14 -0400 (EDT)
-Subject: [Git pull request] fix to the vexpress/mcpm branch
-In-Reply-To: <20130814055800.GG16635@quad.lixom.net>
-References: <alpine.LFD.2.03.1308121428080.14472@syhkavp.arg>
- <20130814055800.GG16635@quad.lixom.net>
-Message-ID: <alpine.LFD.2.03.1308141018140.14472@syhkavp.arg>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Wed, 14 Aug 2013 16:34:51 +0200
+Subject: [PATCH v3] arm: dts: AM43x: Add usb DT nodes for AM4372
+In-Reply-To: <520B9144.5000701@ti.com>
+References: <1373444082-4169-1-git-send-email-george.cherian@ti.com>
+ <520B9144.5000701@ti.com>
+Message-ID: <520B958B.1000900@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Aug 2013, Olof Johansson wrote:
++ Roger
 
-> Hi Nico,
-> 
-> On Mon, Aug 12, 2013 at 02:37:54PM -0400, Nicolas Pitre wrote:
-> > 
-> > Please pull the following:
-> > 
-> > 	git://git.linaro.org/people/nico/linux mcpm+tc2
-> > 
-> > which will update your vexpress/mcpm branch with one additional commit 
-> > fixing the build issue with CONFIG_FRAME_POINTER reported by RMK.  This 
-> > commit's SHA1 is 95fbdc9cf542.
-> 
-> So, I just replaced my branch with the one from Pawel, and the topmost patch
-> in your branch seems to no longer apply.
+Hi George,
 
-Weird.  It still applies perfectly here.
+Yes, I had some comment about the "ti'type" in Roger's series that will 
+be applicable here as well.
 
-Here's the patch nevertheless.  Please apply ASAP as Lorenzo wishes to 
-base his next pull request on top of this.
 
------ >8
+On 14/08/2013 16:16, George Cherian wrote:
+> +Benoit
+>   If you dont have any comments, can you take this for 3.12?
+>
+> Regards
+> -George
+>
+> On 7/10/2013 1:44 PM, George Cherian wrote:
+>
+>> This patch adds
+>>     - HS USB nodes
+>>     - phy nodes
+>>     - usb control module nodes.
+>>
+>> Signed-off-by: George Cherian <george.cherian@ti.com>
+>> ---
+>>
+>> changes from v2
+>> change synopsis to snps
+>> use simple node names
+>> add both USB and PHY instances
+>> add usbctrl node
+>>
+>> changes from v1
+>> renamed synopsis to snps
+>> removed flag tx-fifo-resize
+>>
+>>   arch/arm/boot/dts/am4372.dtsi | 58
+>> +++++++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 58 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/am4372.dtsi
+>> b/arch/arm/boot/dts/am4372.dtsi
+>> index ddc1df7..37f196f 100644
+>> --- a/arch/arm/boot/dts/am4372.dtsi
+>> +++ b/arch/arm/boot/dts/am4372.dtsi
+>> @@ -64,5 +64,63 @@
+>>               compatible = "ti,am4372-counter32k","ti,omap-counter32k";
+>>               reg = <0x44e86000 0x40>;
+>>           };
+>> +
+>> +        phy1: usbphy1 {
+>> +            compatible = "ti,am4372-usb2";
 
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
-Date: Mon, 12 Aug 2013 12:47:13 -0400
-Subject: [PATCH] ARM: vexpress/MCPM: fix cache disable sequence when CONFIG_FRAME_POINTER=y
+That's not a very good name for a phy? It looks like a usb module.
 
-If CONFIG_FRAME_POINTER=y we hget the following error:
+The bindings specify only ti,omap-usb2 or ti,omap-usb3 for USB2 or USB3.
+I guess it should be one of them and potentially the binding should be 
+updated with ti,omap-usb2-phy and ti,omap-usb3-phy names while we can 
+still do it.
 
-arch/arm/mach-vexpress/tc2_pm.c: In function 'tc2_pm_down':
-arch/arm/mach-vexpress/tc2_pm.c:200:1: error: fp cannot be used in asm here
+>> +            #phy-cells = <0>;
+>> +            id = <0>;
+>> +            status = "disabled";
+>> +        };
+>> +
+>> +        phy2: usbphy2 {
 
-Let's fix that by explicitly preserving r11 on the stack and removing it
-from the clobber list.
+Why do you need a different node name here? It should be a generic name 
+to identify the function, so usbphy or usb-phy seems good enough.
 
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
+>> +            compatible = "ti,am4372-usb2";
+>> +            #phy-cells = <0>;
+>> +            id = <1>;
+>> +            status = "disabled";
+>> +        };
+>> +
+>> +        usbctrl: omap-control-usb at 44e10620 {
+>> +            compatible = "ti,omap-control-usb";
+>> +            reg = <0x44e10620 0x10>;
+>> +            reg-names = "control_dev_conf";
+>> +            ti,type = <3>;
+>> +            status = "disabled";
+>> +        };
+>> +
+>> +        usb1: am4372_dwc3 at 48380000 {
+>> +            status = "disabled";
+>> +            compatible = "ti,am4372-dwc3";
+>> +            reg = <0x48380000 0x200>;
+>> +            interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
+>> +            #address-cells = <1>;
+>> +            #size-cells = <1>;
+>> +            utmi-mode = <1>;
+>> +            ranges;
 
-diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-index 85fffa702f..3a6384c6c4 100644
---- a/arch/arm/mach-vexpress/dcscb.c
-+++ b/arch/arm/mach-vexpress/dcscb.c
-@@ -144,8 +144,13 @@ static void dcscb_power_down(void)
- 		 * Let's do it in the safest possible way i.e. with
- 		 * no memory access within the following sequence
- 		 * including to the stack.
-+		 *
-+		 * Note: fp is preserved to the stack explicitly prior doing
-+		 * this since adding it to the clobber list is incompatible
-+		 * with having CONFIG_FRAME_POINTER=y.
- 		 */
- 		asm volatile(
-+		"str	fp, [sp, #-4]! \n\t"
- 		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
- 		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
- 		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-@@ -156,9 +161,10 @@ static void dcscb_power_down(void)
- 		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
- 		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
- 		"isb	\n\t"
--		"dsb	"
-+		"dsb	\n\t"
-+		"ldr	fp, [sp], #4"
- 		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
--		      "r9","r10","r11","lr","memory");
-+		      "r9","r10","lr","memory");
- 
- 		/*
- 		 * This is a harmless no-op.  On platforms with a real
-@@ -182,6 +188,7 @@ static void dcscb_power_down(void)
- 		 * Let's do it in the safest possible way as above.
- 		 */
- 		asm volatile(
-+		"str	fp, [sp, #-4]! \n\t"
- 		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
- 		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
- 		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-@@ -192,9 +199,10 @@ static void dcscb_power_down(void)
- 		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
- 		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
- 		"isb	\n\t"
--		"dsb	"
-+		"dsb	\n\t"
-+		"ldr	fp, [sp], #4"
- 		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
--		      "r9","r10","r11","lr","memory");
-+		      "r9","r10","lr","memory");
- 	}
- 
- 	__mcpm_cpu_down(cpu, cluster);
-diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-index ddd97dd4e9..2b7c93a724 100644
---- a/arch/arm/mach-vexpress/tc2_pm.c
-+++ b/arch/arm/mach-vexpress/tc2_pm.c
-@@ -150,8 +150,13 @@ static void tc2_pm_down(u64 residency)
- 		 * Let's do it in the safest possible way i.e. with
- 		 * no memory access within the following sequence
- 		 * including the stack.
-+		 *
-+		 * Note: fp is preserved to the stack explicitly prior doing
-+		 * this since adding it to the clobber list is incompatible
-+		 * with having CONFIG_FRAME_POINTER=y.
- 		 */
- 		asm volatile(
-+		"str	fp, [sp, #-4]! \n\t"
- 		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
- 		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
- 		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-@@ -162,9 +167,10 @@ static void tc2_pm_down(u64 residency)
- 		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
- 		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
- 		"isb	\n\t"
--		"dsb	"
-+		"dsb	\n\t"
-+		"ldr	fp, [sp], #4"
- 		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
--		      "r9","r10","r11","lr","memory");
-+		      "r9","r10","lr","memory");
- 
- 		cci_disable_port_by_cpu(mpidr);
- 
-@@ -185,6 +191,7 @@ static void tc2_pm_down(u64 residency)
- 		 * Let's do it in the safest possible way as above.
- 		 */
- 		asm volatile(
-+		"str	fp, [sp, #-4]! \n\t"
- 		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
- 		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
- 		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-@@ -195,9 +202,10 @@ static void tc2_pm_down(u64 residency)
- 		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
- 		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
- 		"isb	\n\t"
--		"dsb	"
-+		"dsb	\n\t"
-+		"ldr	fp, [sp], #4"
- 		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
--		      "r9","r10","r11","lr","memory");
-+		      "r9","r10","lr","memory");
- 	}
- 
- 	__mcpm_cpu_down(cpu, cluster);
+A blank line here will be nice.
+
+>> +            dwc3 at 48390000 {
+>> +                compatible = "snps,dwc3";
+>> +                reg = <0x48390000 0xd000>;
+>> +                interrupts = <GIC_SPI  168 IRQ_TYPE_LEVEL_HIGH>;
+>> +                phys = <&phy1>;
+>> +                phy-names = "am4372-usb1";
+
+What is the purpose of the phy-names? Is it relevant to add the SoC name 
+in something that usually, at least for the clocks and IRQs, is IP specific?
+
+The current documentation does not explain it and does not support phys 
+property either.
+
+   synopsys DWC3 CORE
+
+   DWC3- USB3 CONTROLLER
+
+   Required properties:
+    - compatible: must be "synopsys,dwc3"
+    - reg : Address and length of the register set for the device
+    - interrupts: Interrupts used by the dwc3 controller.
+    - usb-phy : array of phandle for the PHY device
+
+Is there some binding update ongoing for 3.12?
+
+>> +            };
+>> +        };
+>> +
+>> +        usb2: am4372_dwc3 at 483c0000 {
+>> +            status = "disabled";
+>> +            compatible = "ti,am4372-dwc3";
+>> +            reg = <0x483c0000 0x200>;
+>> +            interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
+>> +            #address-cells = <1>;
+>> +            #size-cells = <1>;
+>> +            utmi-mode = <1>;
+>> +            ranges;
+
+A blank line here will be nice.
+
+>> +            dwc3 at 483d0000 {
+>> +                compatible = "snps,dwc3";
+>> +                reg = <0x483d0000 0xd000>;
+>> +                interrupts = <GIC_SPI  174 IRQ_TYPE_LEVEL_HIGH>;
+>> +                phys = <&phy2>;
+>> +                phy-names = "am4372-usb2";
+>> +            };
+>> +        };
+>>       };
+>>   };
+>
+>
+
+Regards,
+Benoit
