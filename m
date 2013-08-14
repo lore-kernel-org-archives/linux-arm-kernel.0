@@ -1,23 +1,56 @@
-From: arm-kernel@ml.breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Wed, 14 Aug 2013 11:52:10 +0200
-Subject: [patch 1/2] arm: Mark pmu interupt IRQF_NO_THREAD
-In-Reply-To: <20130813111117.GB30280@mudshark.cambridge.arm.com>
-References: <20130214205204.109023136@linutronix.de>
- <20130214205304.923585891@linutronix.de>
- <20130215095153.GA11145@mudshark.cambridge.arm.com>
- <20130812195255.GA4181@breakpoint.cc>
- <20130813111117.GB30280@mudshark.cambridge.arm.com>
-Message-ID: <20130814095210.GD1825@breakpoint.cc>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 14 Aug 2013 10:58:34 +0100
+Subject: [PATCH] ARM: dts: Enable USB hub on Arndale
+Message-ID: <1376474314-32491-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 12:11:17PM +0100, Will Deacon wrote:
-> Probably best to submit both to Russell's patch system[1], with my ack on
-> this one:
+From: Mark Brown <broonie@linaro.org>
 
-Okay, will do. Thanks.
+The Arndale has a SMSC USB3503 connected in hardware only mode like a PHY,
+support it using the usb-nop-xceiv binding.
 
-> 
-> Will
+Note that due to a regrettable decision to use a regulator to represent
+the reset signal this uses a fixed voltage regulator to do that, there
+is a plan to use the reset controller binding once that is merged so it
+does not seem worthwhile to fix the usb-nop-xceiv driver at this point.
 
-Sebastian
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+
+This doesn't 100% work right now since we don't yet have a solution to
+ensure that this gets started after the USB controller but those
+modifications are small (or can be done at runtime with module loading).
+
+ arch/arm/boot/dts/exynos5250-arndale.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+index 96d528d..e477e23 100644
+--- a/arch/arm/boot/dts/exynos5250-arndale.dts
++++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+@@ -539,4 +539,22 @@
+ 	rtc {
+ 		status = "okay";
+ 	};
++
++	usb_hub_bus {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		// SMSC USB3503 connected in hardware only mode as a PHY
++		usb_hub: usb_hub {
++			compatible = "smsc,usb3503a";
++
++			reset-gpios = <&gpx3 5 1>;
++			connect-gpios = <&gpd1 7 1>;
++		};
++	};
++
++	usb at 12110000 {
++		usb-phy = <&usb2_phy>;
++	};
+ };
+-- 
+1.8.4.rc2
