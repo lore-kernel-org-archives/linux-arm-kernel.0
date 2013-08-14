@@ -1,103 +1,82 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 14 Aug 2013 16:31:40 -0700
-Subject: [PATCH] KVM: ARM: ignore guest L2 cache control SMCs on Highbank
- and OMAP
-In-Reply-To: <520BFF0D.9050303@calxeda.com>
-References: <1376472125-23350-1-git-send-email-andre.przywara@calxeda.com>
- <CAL_Jsq+vGd7+pw6YX0YNHO5rVSoiHCHbtXXdZ-3grnEcAOc38Q@mail.gmail.com>
- <520BE673.9010801@calxeda.com> <20130814204302.GA8837@cbox>
- <520BFF0D.9050303@calxeda.com>
-Message-ID: <20130814233140.GB17695@cbox>
+From: joelf@ti.com (Joel Fernandes)
+Date: Wed, 14 Aug 2013 18:30:47 -0500
+Subject: [PATCH 00/10] crypto: omap-aes: DMA and PIO mode improvements
+In-Reply-To: <1376521969-16807-1-git-send-email-joelf@ti.com>
+References: <1376521969-16807-1-git-send-email-joelf@ti.com>
+Message-ID: <520C1327.8090607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 12:05:01AM +0200, Andre Przywara wrote:
-> On 08/14/2013 10:43 PM, Christoffer Dall wrote:
-> >On Wed, Aug 14, 2013 at 10:20:03PM +0200, Andre Przywara wrote:
-> >>On 08/14/2013 08:54 PM, Rob Herring wrote:
-> >>>On Wed, Aug 14, 2013 at 4:22 AM, Andre Przywara
-> >>><andre.przywara@calxeda.com> wrote:
-> >>>>Guest kernels with CONFIG_L2X0 set (for instance Highbank or OMAP4)
-> >>>>will trigger SMCs to handle the L2 cache controller (PL310).
-> >>>>This will currently inject #UNDEFs and eventually stop the guest.
-> >>>>
-> >>>>We don't need explicit L2 cache controller handling on A15s anymore,
-> >>>>so it is safe to simply ignore these calls and proceed with the next
-> >>>>instruction.
-> >>>>
-> >>>>Signed-off-by: Andre Przywara <andre.przywara@calxeda.com>
-> >>>>---
-> >>>>  arch/arm/kvm/handle_exit.c | 20 ++++++++++++++++++++
-> >>>>  1 file changed, 20 insertions(+)
-> >>>
-> >>>At least for highbank, we can fix this in the kernel:
-> >>
-> >>Yes, and we should do. But that won't fix older guest kernels, say
-> >>Ubuntu 12.10 or the like. And I think this is a use case for
-> >>virtualization, so we need both, guest and host fix.
-> >>
-> >Agreed, but we need a more generic solution for the secure call
-> >handling.  I've created a backlog item in Linaro's JIRA (CARD-801) for
-> >this work, let's see how quickly we can get it approved and put on the
-> >roadmap.
+On 08/14/2013 06:12 PM, Joel Fernandes wrote:
+> This patch series is a rewrite of the DMA portion of omap-aes driver
+> and also adds support for PIO mode. Both these modes, give better
+> performance than before.
 > 
-> So I did some research already, I am not sure we can wait until Jira
-> is ready ;-)
-
-This is not a quick-and-dirty sort of fix, but something we need to fix
-properly.
-
-> I'd opt for something like this:
-
-I'm  confused: are you giving us a list of choices or are you listing
-the work items that you think we need to do?
-
-> 1. Allow userland to let the kernel ignore all smc's. That's low
-> overhead, easy to implement and would cover Highbank and Broadcom,
-> which do only L2 cache controller handling via smc.
-
-Hmmm, it's low overhead, but we still need to come up with an API for
-this (perhaps it's a vcpu feature), but might be abused.  Again, I think
-this would be solved in a more generic approach - see Peter's suggestion
-on the discussion of the patch.
-
-> 2. Think about how to handle TI Keystone and Qualcomm MSM, which do
-> secondary cores bringup via smc's. Do we need to support this or can
-> we demand PSCI support? If I got this correctly, a PSCI node in the
-> DTB overrides any platform smp_ops, so injecting PSCI should avoid
-> those smc's on those two platforms.
-
-Yes, and this is only relevant if you want to run those kinds of guests.
-If the dominating use case is mach-virt, isn't all of this sort of moot?
-
-> 3. Agree on whether we support PSCI via smc. I think we abandoned
-> this with 24a7f67 (ARM: KVM: Don't handle PSCI calls via SMC), so do
-> we really want to re-introduce it?
-
-I don't see any reason to introduce that right now, but I certainly
-don't want to build an infrastructure around SMC handling that makes it
-hard or impossible to handle guests that do PSCI calls.
-
-> 4. Dig through all this OMAP smc code to decide what we really want
-> to emulate and whether we need to: Maybe we can safely ignore this
-> since it is for OMAP4 with A9s or lower only.
-> If there is a need to emulate, fold this into one ioctl which also
-> enables the ignore-all case.
+> Earlier, only a single SG was used for DMA purpose, and the SG-list
+> passed from the crypto layer was being copied and DMA'd one entry at
+> a time. This turns out to be quite inefficient, so we replace it with
+> much simpler code that directly passes the SG-list from crypto to the
+> DMA layer.
 > 
-
-I don't want to dig through any OMAP smc code, no.  Why are we talking
-about supporting these arcane guest kernels?  Is this not only a problem
-for a few recent kernels that have multiplatform support and some other
-combination of configs enabled and disregard info in the DT?
-
-> I am not sure whether it is a wise decision to pull _all_ SMC
-> handling unconditionally into userland, since that would separate
-> the source of the SMCs (the kernel) and their emulation.
+> We also add PIO mode support to the driver, and switch to PIO mode
+> whenever the DMA channel allocation is not available. This is only for
+> OMAP4 platform will work on any platform on which IRQ information is
+> populated.
 > 
-Hmmm... The source of the SMCs is the guest software, and the only
-reasons to keep it in the host kernel would be performance or the
-requirement to perform privileged operation on the host cpu to emulate
-the smc.  The latter may be the case, but I want to get a clearer
-picture of which cases we're trying to support here exactly, and why.
+> Tests performed on am33xx and omap4 SoCs , notice the 50% perf improvement
 
--Christoffer
+Just correcting, this is more like 35% not 50% when using DMA.
+
+Thanks,
+
+-Joel
+
+
+
+
+
+> for large 8K blocks:
+> 
+> Sample run on am33xx (beaglebone):
+> With DMA rewrite:
+> [   26.410052] test 0 (128 bit key, 16 byte blocks): 4318 operations in 1 seconds (69088 bytes)
+> [   27.414314] test 1 (128 bit key, 64 byte blocks): 4360 operations in 1 seconds (279040 bytes)
+> [   28.414406] test 2 (128 bit key, 256 byte blocks): 3609 operations in 1 seconds (923904 bytes)
+> [   29.414410] test 3 (128 bit key, 1024 byte blocks): 3418 operations in 1 seconds (3500032 bytes)
+> [   30.414510] test 4 (128 bit key, 8192 byte blocks): 1766 operations in 1 seconds (14467072 bytes)
+> 
+> Without DMA rewrite:
+> [   31.920519] test 0 (128 bit key, 16 byte blocks): 4417 operations in 1 seconds (70672 bytes)
+> [   32.925997] test 1 (128 bit key, 64 byte blocks): 4221 operations in 1 seconds (270144 bytes)
+> [   33.926194] test 2 (128 bit key, 256 byte blocks): 3528 operations in 1 seconds (903168 bytes)
+> [   34.926225] test 3 (128 bit key, 1024 byte blocks): 3281 operations in 1 seconds (3359744 bytes)
+> [   35.926385] test 4 (128 bit key, 8192 byte blocks): 1460 operations in 1 seconds (11960320 bytes)
+> 
+> With PIO mode, note the tremndous boost in performance for small blocks there:
+> [   27.294905] test 0 (128 bit key, 16 byte blocks): 20585 operations in 1 seconds (329360 bytes)
+> [   28.302282] test 1 (128 bit key, 64 byte blocks): 8106 operations in 1 seconds (518784 bytes)
+> [   29.302374] test 2 (128 bit key, 256 byte blocks): 2359 operations in 1 seconds (603904 bytes)
+> [   30.302575] test 3 (128 bit key, 1024 byte blocks): 605 operations in 1 seconds (619520 bytes)
+> [   31.303781] test 4 (128 bit key, 8192 byte blocks): 79 operations in 1 seconds (647168 bytes)
+> 
+> Future work in this direction would be to dynamically change between
+> PIO/DMA mode based on the block size.
+> 
+> Joel Fernandes (10):
+>   crypto: scatterwalk:  Add support for calculating number of SG
+>     elements
+>   crypto: omap-aes: Add useful debug macros
+>   crypto: omap-aes: Populate number of SG elements
+>   crypto: omap-aes: Simplify DMA usage by using direct SGs
+>   crypto: omap-aes: Sync SG before DMA operation
+>   crypto: omap-aes: Remove previously used intermediate buffers
+>   crypto: omap-aes: Add IRQ info and helper macros
+>   crypto: omap-aes: PIO mode: Add IRQ handler and walk SGs
+>   crypto: omap-aes: PIO mode: platform data for OMAP4 and trigger it
+>   crypto: omap-aes: Switch to PIO mode in probe function
+> 
+>  crypto/scatterwalk.c         |   22 +++
+>  drivers/crypto/omap-aes.c    |  400 ++++++++++++++++++++----------------------
+>  include/crypto/scatterwalk.h |    2 +
+>  3 files changed, 217 insertions(+), 207 deletions(-)
+> 
