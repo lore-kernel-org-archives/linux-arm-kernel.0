@@ -1,83 +1,27 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 14 Aug 2013 17:37:05 +0200
-Subject: [PATCH] ARM: ARMv7-M: implement restart routine common to all v7-M
- machines
-Message-ID: <1376494625-25496-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 14 Aug 2013 16:41:12 +0100
+Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
+ with external L3-cache.
+In-Reply-To: <19553bad1c8427526f6e9a87d605ade3@www.loen.fr>
+References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
+ <f8917fe8409b1fae634c7de45e34d4a7@www.loen.fr>
+ <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
+ <38A6DD0E-5639-43BB-8318-32D59923E309@suse.de>
+ <19553bad1c8427526f6e9a87d605ade3@www.loen.fr>
+Message-ID: <CAFEAcA_Sexa36nq8r2YsuPptcKFcKytfwGEYi+xm-DO+3j1iSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/include/asm/v7m.h   | 12 ++++++++++++
- arch/arm/kernel/Makefile     |  2 +-
- arch/arm/kernel/common-v7m.c | 19 +++++++++++++++++++
- 3 files changed, 32 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/kernel/common-v7m.c
+On 14 August 2013 16:34, Marc Zyngier <maz@misterjones.org> wrote:
+> When userspace loads the kernel into memory, the kernel is not flushed
+> to RAM, and may sit in the L3 cache if the cache is big enough. You
+> end-up executing garbage... My proposed fix is to let kvmtool do the
+> flushing, as we have userspace cache management operations for this
+> exact purpose.
 
-diff --git a/arch/arm/include/asm/v7m.h b/arch/arm/include/asm/v7m.h
-index fa88d09..615781c 100644
---- a/arch/arm/include/asm/v7m.h
-+++ b/arch/arm/include/asm/v7m.h
-@@ -15,6 +15,10 @@
- 
- #define V7M_SCB_VTOR			0x08
- 
-+#define V7M_SCB_AIRCR			0x0c
-+#define V7M_SCB_AIRCR_VECTKEY			(0x05fa << 16)
-+#define V7M_SCB_AIRCR_SYSRESETREQ		(1 << 2)
-+
- #define V7M_SCB_SCR			0x10
- #define V7M_SCB_SCR_SLEEPDEEP			(1 << 2)
- 
-@@ -42,3 +46,11 @@
-  */
- #define EXC_RET_STACK_MASK			0x00000004
- #define EXC_RET_THREADMODE_PROCESSSTACK		0xfffffffd
-+
-+#ifndef __ASSEMBLY__
-+
-+enum reboot_mode;
-+
-+void armv7m_restart(enum reboot_mode mode, const char *cmd);
-+
-+#endif /* __ASSEMBLY__ */
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 86d10dd..688b8be 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -24,7 +24,7 @@ obj-$(CONFIG_ATAGS_PROC)	+= atags_proc.o
- obj-$(CONFIG_DEPRECATED_PARAM_STRUCT) += atags_compat.o
- 
- ifeq ($(CONFIG_CPU_V7M),y)
--obj-y		+= entry-v7m.o
-+obj-y		+= entry-v7m.o common-v7m.o
- else
- obj-y		+= entry-armv.o
- endif
-diff --git a/arch/arm/kernel/common-v7m.c b/arch/arm/kernel/common-v7m.c
-new file mode 100644
-index 0000000..4d2cba9
---- /dev/null
-+++ b/arch/arm/kernel/common-v7m.c
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (C) 2013 Uwe Kleine-Koenig for Pengutronix
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+#include <linux/io.h>
-+#include <linux/reboot.h>
-+#include <asm/barrier.h>
-+#include <asm/v7m.h>
-+
-+void armv7m_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	dsb();
-+	__raw_writel(V7M_SCB_AIRCR_VECTKEY | V7M_SCB_AIRCR_SYSRESETREQ,
-+			BASEADDR_V7M_SCB + V7M_SCB_AIRCR);
-+	dsb();
-+}
--- 
-1.8.4.rc0
+Why does this issue only apply to the loaded kernel and not to
+the zero bytes in the rest of RAM? I know executing zeroes
+isn't a very useful thing to do but it should be a well defined
+thing.
+
+-- PMM
