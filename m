@@ -1,68 +1,125 @@
-From: gururaja.hebbar@ti.com (Gururaja Hebbar)
-Date: Wed, 14 Aug 2013 14:29:52 +0530
-Subject: [PATCH v4 2/4] ARM: dts: add AM33XX vdd core opp50 suspend for
- Beaglebone.
-In-Reply-To: <1376432412-8509-3-git-send-email-Russ.Dill@ti.com>
-References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
- <1376432412-8509-3-git-send-email-Russ.Dill@ti.com>
-Message-ID: <520B4708.3040108@ti.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 14 Aug 2013 13:49:37 +0530
+Subject: [PATCH v2 10/11] dma: mmp_pdma: add support for residue reporting
+In-Reply-To: <1376153545-14361-11-git-send-email-zonque@gmail.com>
+References: <1376153545-14361-1-git-send-email-zonque@gmail.com>
+ <1376153545-14361-11-git-send-email-zonque@gmail.com>
+Message-ID: <20130814081937.GK32147@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/14/2013 3:50 AM, Russ Dill wrote:
-> Changes since v1:
-> * Rebased onto new am335x PM branch
+On Sat, Aug 10, 2013 at 06:52:24PM +0200, Daniel Mack wrote:
+> In order to report the channel's residue, we have to memorize the first
+> dma buffer position when the channel is configured.
 > 
-> This adds a sleep and wake sequence to set the VDD core voltage to the
-> OPP50 level, 0.950V. This saves power during suspend. The sequences are
-> specific to the Beaglebone layout and PMIC, the TPS65217. The sequences
-> are written out by the Cortex-M3.
-> 
-> Signed-off-by: Russ Dill <Russ.Dill@ti.com>
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
 > ---
->  arch/arm/boot/dts/am335x-bone.dts | 25 ++++++++++++++++++++++++-
->  1 file changed, 24 insertions(+), 1 deletion(-)
+>  drivers/dma/mmp_pdma.c | 39 +++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 37 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> index 444b4ed..3f6528d 100644
-> --- a/arch/arm/boot/dts/am335x-bone.dts
-> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> @@ -127,10 +127,33 @@
->  			status = "okay";
->  			clock-frequency = <400000>;
+> diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
+> index 7a0956b..ab0303b 100644
+> --- a/drivers/dma/mmp_pdma.c
+> +++ b/drivers/dma/mmp_pdma.c
+> @@ -28,8 +28,8 @@
+>  #define DALGN		0x00a0
+>  #define DINT		0x00f0
+>  #define DDADR		0x0200
+> -#define DSADR		0x0204
+> -#define DTADR		0x0208
+> +#define DSADR(n)	(0x0204 + ((n) << 4))
+> +#define DTADR(n)	(0x0208 + ((n) << 4))
+>  #define DCMD		0x020c
 >  
-> +			/* Set OPP50 (0.95V) for VDD core */
-> +			sleep_sequence = /bits/ 8 <
+>  #define DCSR_RUN	(1 << 31)	/* Run Bit (read / write) */
+> @@ -97,6 +97,13 @@ struct mmp_pdma_chan {
+>  	struct dma_async_tx_descriptor desc;
+>  	struct mmp_pdma_phy *phy;
+>  	enum dma_transfer_direction dir;
+> +	/*
+> +	 * We memorize the original start address of the first descriptor as
+> +	 * well as the original total length so we can later determine the
+> +	 * channel's residue.
+> +	 */
+> +	dma_addr_t start_addr;
+> +	u32 total_len;
+well instead of rembering two values and doing two computations runtime, you can store
+last_addr = start_addr + total_len;
 
-For user readability, can you mention the PMIC used here as a comment?
+then calculate
+	residue = last_addr - dma_poistion;
 
-> +				0x02 0x24 0x0b 0x6d /* Password unlock 1 */
-> +				0x02 0x24 0x10 0x02 /* Set DCDC3 to 0.95V */
-> +				0x02 0x24 0x0b 0x6d /* Password unlock 2 */
-> +				0x02 0x24 0x10 0x02 /* Set DCDC3 to 0.95V */
-> +				0x02 0x24 0x0b 0x6c /* Password unlock 1 */
-> +				0x02 0x24 0x11 0x86 /* Apply DCDC changes */
-> +				0x02 0x24 0x0b 0x6c /* Password unlock 2 */
-> +				0x02 0x24 0x11 0x86 /* Apply DCDC changes */
-> +			>;
-> +
-> +			/* Set OPP100 (1.10V) for VDD core */
-> +			wake_sequence = /bits/ 8 <
-> +				0x02 0x24 0x0b 0x6d /* Password unlock 1 */
-> +				0x02 0x24 0x10 0x08 /* Set DCDC3 to 1.1V */
-> +				0x02 0x24 0x0b 0x6d /* Password unlock 2 */
-> +				0x02 0x24 0x10 0x08 /* Set DCDC3 to 1.1V */
-> +				0x02 0x24 0x0b 0x6c /* Password unlock 1 */
-> +				0x02 0x24 0x11 0x86 /* Apply DCDC changes */
-> +				0x02 0x24 0x0b 0x6c /* Password unlock 2 */
-> +				0x02 0x24 0x11 0x86 /* Apply DCDC changes */
-> +			>;
-> +
->  			tps: tps at 24 {
->  				reg = <0x24>;
->  			};
-> -
->  		};
->  	};
+Neverthless, this is okay too, so am going to apply this one..
+
+~Vinod
 >  
+>  	/* channel's basic info */
+>  	struct tasklet_struct tasklet;
+> @@ -470,6 +477,13 @@ mmp_pdma_prep_memcpy(struct dma_chan *dchan,
+>  		chan->dcmd |= DCMD_BURST32;
+>  	}
+>  
+> +	if (chan->dir == DMA_MEM_TO_DEV)
+> +		chan->start_addr = dma_src;
+> +	else
+> +		chan->start_addr = dma_dst;
+> +
+> +	chan->total_len = len;
+> +
+>  	do {
+>  		/* Allocate the link descriptor from DMA pool */
+>  		new = mmp_pdma_alloc_descriptor(chan);
+> @@ -541,11 +555,17 @@ mmp_pdma_prep_slave_sg(struct dma_chan *dchan, struct scatterlist *sgl,
+>  		return NULL;
+>  
+>  	chan->byte_align = false;
+> +	chan->total_len = 0;
+>  
+>  	for_each_sg(sgl, sg, sg_len, i) {
+>  		addr = sg_dma_address(sg);
+>  		avail = sg_dma_len(sgl);
+>  
+> +		if (!first)
+> +			chan->start_addr = addr;
+> +
+> +		chan->total_len += avail;
+> +
+>  		do {
+>  			len = min_t(size_t, avail, PDMA_MAX_DESC_BYTES);
+>  			if (addr & 0x7)
+> @@ -672,6 +692,20 @@ static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
+>  	return ret;
+>  }
+>  
+> +static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan)
+> +{
+> +	u32 curr, done;
+> +
+> +	if (chan->dir == DMA_DEV_TO_MEM)
+> +		curr = readl(chan->phy->base + DTADR(chan->phy->idx));
+> +	else
+> +		curr = readl(chan->phy->base + DSADR(chan->phy->idx));
+> +
+> +	done = curr - chan->start_addr;
+> +
+> +	return chan->total_len - done;
+simpler logic:
+store the 
+> +}
+> +
+>  static enum dma_status mmp_pdma_tx_status(struct dma_chan *dchan,
+>  			dma_cookie_t cookie, struct dma_tx_state *txstate)
+>  {
+> @@ -681,6 +715,7 @@ static enum dma_status mmp_pdma_tx_status(struct dma_chan *dchan,
+>  
+>  	spin_lock_irqsave(&chan->desc_lock, flags);
+>  	ret = dma_cookie_status(dchan, cookie, txstate);
+> +	txstate->residue = mmp_pdma_residue(chan);
+>  	spin_unlock_irqrestore(&chan->desc_lock, flags);
+>  
+>  	return ret;
+> -- 
+> 1.8.3.1
 > 
+
+-- 
