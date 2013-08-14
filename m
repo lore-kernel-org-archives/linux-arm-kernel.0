@@ -1,41 +1,34 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 14 Aug 2013 13:44:44 +0100
-Subject: [Qemu-devel] SCSI bus failures with qemu-arm in kernel 3.8+
-In-Reply-To: <20130814103346.GN23006@n2100.arm.linux.org.uk>
-References: <52082EF8.10005@roeck-us.net>
- <CAFEAcA94ygwRPSsfxs3DvOcTZbdafLiEHys94FG4aXUx+A1t=A@mail.gmail.com>
- <20130812164548.GE23006@n2100.arm.linux.org.uk>
- <CAFEAcA97PuORg920f-A_8rvCgBq=k5Y=0W6m2Nv8nnzjY19Utg@mail.gmail.com>
- <20130812200628.GG23006@n2100.arm.linux.org.uk>
- <CAFEAcA9BA7zfaO1J5zVaEcG-AgOo6dyiew08-o2eObuBe-KWig@mail.gmail.com>
- <20130812212149.GH23006@n2100.arm.linux.org.uk>
- <CAFEAcA_0kzS=Z5oTxrr=B74wjf1x=M6dXwH7Fcgf77Pca90Gjw@mail.gmail.com>
- <20130812221250.GI23006@n2100.arm.linux.org.uk>
- <20130812230408.GA4420@roeck-us.net>
- <20130814103346.GN23006@n2100.arm.linux.org.uk>
-Message-ID: <CAFEAcA8u_c=seOQ+y44H2Vpefyx4EisiZ-ZqBxuPsyoYjCt3vQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Aug 2013 13:46:43 +0100
+Subject: [v2 rebased 1/2] dma: mmp_pdma: add support for residue reporting
+In-Reply-To: <1376483121-11306-1-git-send-email-zonque@gmail.com>
+References: <1376483121-11306-1-git-send-email-zonque@gmail.com>
+Message-ID: <20130814124643.GP23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 August 2013 11:33, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Aug 12, 2013 at 04:04:08PM -0700, Guenter Roeck wrote:
->> Hacked diff is below. Can I write that up as clean patch and submit it,
->> or do we need a test on real hardware ?
->
-> Well, if we want to ensure that it is really correct, the sensible thing
-> to do is to try it on real hardware, otherwise we're risking yet another
-> change to this.
->
-> Earlier in this thread, some people said that they have the hardware, so
-> it shouldn't be that difficult to get it tested on real stuff.
+On Wed, Aug 14, 2013 at 02:25:20PM +0200, Daniel Mack wrote:
+> In order to report the channel's residue, we have to memorize the first
+> dma buffer position when the channel is configured.
 
-Yes, I definitely think we should test on the hardware before we
-land yet another change to this PCI code that hasn't really been
-thoroughly tested on anything. I have the board/backplane on my
-desk but it'll be later in the week before I can do the testing
-(currently still messing with uboot config to get it to actually
-boot a kernel).
+This is actually broken, and I'm surprised that Vinod even suggested it.
 
-thanks
--- PMM
+Think about what happens with a scatter-gather list where the addresses
+of each element really are scattered in memory.  Let's say that the
+N'th element is at a lower address than the first element, and we're on
+that N'th element.  What happens when curr is less than chan->start_addr
+here:
+
+> +static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan)
+> +{
+> +	u32 curr, done;
+> +
+> +	if (chan->dir == DMA_DEV_TO_MEM)
+> +		curr = readl(chan->phy->base + DTADR(chan->phy->idx));
+> +	else
+> +		curr = readl(chan->phy->base + DSADR(chan->phy->idx));
+> +
+> +	done = curr - chan->start_addr;
+> +
+> +	return chan->total_len - done;
+> +}
