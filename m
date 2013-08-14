@@ -1,36 +1,40 @@
 From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Wed, 14 Aug 2013 18:23:05 +0100
-Subject: [PATCH Resend 1/3] PSCI: add missing dependency on CONFIG_OF for PSCI.
+Date: Wed, 14 Aug 2013 18:23:06 +0100
+Subject: [PATCH Resend 2/3] clocksource: Add missing dependency on CONFIG_OF
+ for ARM_ARCH_TIMER
 In-Reply-To: <1376500987-12797-1-git-send-email-jonathan.austin@arm.com>
 References: <1376500987-12797-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <1376500987-12797-2-git-send-email-jonathan.austin@arm.com>
+Message-ID: <1376500987-12797-3-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PSCI initialisation depends on data found in the DT. Without this the
-including PSCI support makes little sense, and furthermore the of_* stub
-functions aren't broad enough to ensure that this builds without CONFIG_OF.
+Initialisation of the ARM Arch timer requires data from the DT. There is no
+fallback initialisation method and hence selecting ARM_ARCH_TIMER without OF
+makes little sense.
 
-As there is little enthusiasm for extending these stubs without useful use-cases
-(of which this is *not* an example) this patch prevents building of PSCI
-without CONFIG_OF.
+Furthermore, doing so causes a build error because the of_* stubs for
+!CONFIG_OF do not extend to all of the functions being used by this driver,
+and will not be extended unless there are valid use-cases for them to be
+(this is not a valid case).
 
 Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
 ---
- arch/arm/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/Kconfig |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ba412e0..972ec25 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1577,6 +1577,7 @@ config HOTPLUG_CPU
- config ARM_PSCI
- 	bool "Support for the ARM Power State Coordination Interface (PSCI)"
- 	depends on CPU_V7
-+	depends on CONFIG_OF
- 	help
- 	  Say Y here if you want Linux to communicate with system firmware
- 	  implementing the PSCI specification for CPU-centric power
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index b7b9b04..4348902 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -72,7 +72,8 @@ config CLKSRC_DBX500_PRCMU_SCHED_CLOCK
+ 
+ config ARM_ARCH_TIMER
+ 	bool
+-	select CLKSRC_OF if OF
++	depends on OF
++	select CLKSRC_OF
+ 
+ config ARM_GLOBAL_TIMER
+ 	bool
 -- 
 1.7.9.5
