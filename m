@@ -1,90 +1,43 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 14 Aug 2013 11:48:04 -0500
-Subject: [PATCHv4 3/3] mmc: dw_mmc: Use phandle to get SDR timing values from
- sys-mgr
-In-Reply-To: <1376498884-9199-1-git-send-email-dinguyen@altera.com>
-References: <1376498884-9199-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1376498884-9199-3-git-send-email-dinguyen@altera.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 14 Aug 2013 17:42:43 +0100
+Subject: [PATCH 3/3] ARM: kdgb: use <asm/opcodes.h> for data to be assembled
+ as intruction
+In-Reply-To: <1376498563-8146-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1376498563-8146-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1376498563-8146-4-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+The arch_kgdb_breakpoint() function uses an inline assembly directive
+to assemble a specific instruction using .word. This means the linker
+will not treat is as an instruction, and therefore incorrectly swap
+the endian-ness if running BE8.
 
-Update the driver to get the system manager node from a phandle. Also, the
-driver can get the correct clock value from the common clock API, thus the
-"altr,dw-mshc-ciu-div" binding is not needed at all.
-
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Cc: Jaehoon Chung <jh80.chung@samsung.com>
-Cc: Seungwon Jeon <tgih.jun@samsung.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: devicetree at vger.kernel.org
-Cc: linux-mmc at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- drivers/mmc/host/dw_mmc-socfpga.c |   14 +++-----------
- 1 file changed, 3 insertions(+), 11 deletions(-)
+ arch/arm/include/asm/kgdb.h |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/dw_mmc-socfpga.c b/drivers/mmc/host/dw_mmc-socfpga.c
-index 14b5961..73b4440 100644
---- a/drivers/mmc/host/dw_mmc-socfpga.c
-+++ b/drivers/mmc/host/dw_mmc-socfpga.c
-@@ -31,7 +31,6 @@
+diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
+index 48066ce..0a9d5dd 100644
+--- a/arch/arm/include/asm/kgdb.h
++++ b/arch/arm/include/asm/kgdb.h
+@@ -11,6 +11,7 @@
+ #define __ARM_KGDB_H__
  
- /* SOCFPGA implementation specific driver private data */
- struct dw_mci_socfpga_priv_data {
--	u8	ciu_div; /* card interface unit divisor */
- 	u32	hs_timing; /* bitmask for CIU clock phase shift */
- 	struct regmap   *sysreg; /* regmap for system manager register */
- };
-@@ -39,6 +38,7 @@ struct dw_mci_socfpga_priv_data {
- static int dw_mci_socfpga_priv_init(struct dw_mci *host)
+ #include <linux/ptrace.h>
++#include <asm/opcodes.h>
+ 
+ /*
+  * GDB assumes that we're a user process being debugged, so
+@@ -41,7 +42,7 @@
+ 
+ static inline void arch_kgdb_breakpoint(void)
  {
- 	struct dw_mci_socfpga_priv_data *priv;
-+	struct device_node *np = host->dev->of_node;
- 
- 	priv = devm_kzalloc(host->dev, sizeof(*priv), GFP_KERNEL);
- 	if (!priv) {
-@@ -46,9 +46,9 @@ static int dw_mci_socfpga_priv_init(struct dw_mci *host)
- 		return -ENOMEM;
- 	}
- 
--	priv->sysreg = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
-+	priv->sysreg = syscon_regmap_lookup_by_phandle(np, "altr,sysmgr");
- 	if (IS_ERR(priv->sysreg)) {
--		dev_err(host->dev, "regmap for altr,sys-mgr lookup failed.\n");
-+		dev_err(host->dev, "No sysmgr phandle specified!\n");
- 		return PTR_ERR(priv->sysreg);
- 	}
- 	host->priv = priv;
-@@ -64,8 +64,6 @@ static int dw_mci_socfpga_setup_clock(struct dw_mci *host)
- 	regmap_write(priv->sysreg, SYSMGR_SDMMCGRP_CTRL_OFFSET,
- 		priv->hs_timing);
- 	clk_prepare_enable(host->ciu_clk);
--
--	host->bus_hz /= (priv->ciu_div + 1);
- 	return 0;
+-	asm(".word 0xe7ffdeff");
++	asm(__inst_arm(0xe7ffdeff));
  }
  
-@@ -82,14 +80,8 @@ static int dw_mci_socfpga_parse_dt(struct dw_mci *host)
- 	struct dw_mci_socfpga_priv_data *priv = host->priv;
- 	struct device_node *np = host->dev->of_node;
- 	u32 timing[2];
--	u32 div = 0;
- 	int ret;
- 
--	ret = of_property_read_u32(np, "altr,dw-mshc-ciu-div", &div);
--	if (ret)
--		dev_info(host->dev, "No dw-mshc-ciu-div specified, assuming 1");
--	priv->ciu_div = div;
--
- 	ret = of_property_read_u32_array(np,
- 			"altr,dw-mshc-sdr-timing", timing, 2);
- 	if (ret)
+ extern void kgdb_handle_bus_error(void);
 -- 
-1.7.9.5
+1.7.10.4
