@@ -1,167 +1,42 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 14 Aug 2013 16:28:34 +0100
-Subject: [Git pull request] fix to the vexpress/mcpm branch
-In-Reply-To: <alpine.LFD.2.03.1308141018140.14472@syhkavp.arg>
-References: <alpine.LFD.2.03.1308121428080.14472@syhkavp.arg>
- <20130814055800.GG16635@quad.lixom.net>
- <alpine.LFD.2.03.1308141018140.14472@syhkavp.arg>
-Message-ID: <20130814152834.GA7242@e102568-lin.cambridge.arm.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 14 Aug 2013 23:30:48 +0800
+Subject: [PATCH 2/5] ARM: pxa: ssp: add shortcut for &pdev->dev
+In-Reply-To: <5209F619.4000503@gmail.com>
+References: <1376296638-19804-1-git-send-email-zonque@gmail.com>
+ <1376296638-19804-3-git-send-email-zonque@gmail.com>
+ <20130812103834.GO6427@sirena.org.uk> <5208BBE5.5050306@gmail.com>
+ <20130812104652.GP6427@sirena.org.uk> <5208BDEB.6070900@gmail.com>
+ <5209F619.4000503@gmail.com>
+Message-ID: <CAD6h2NTXDrOFXeYApgt5bSC=yHbYrozeTpf7B6ea94Hu_HWwNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 03:25:14PM +0100, Nicolas Pitre wrote:
-> On Tue, 13 Aug 2013, Olof Johansson wrote:
-> 
-> > Hi Nico,
-> > 
-> > On Mon, Aug 12, 2013 at 02:37:54PM -0400, Nicolas Pitre wrote:
-> > > 
-> > > Please pull the following:
-> > > 
-> > > 	git://git.linaro.org/people/nico/linux mcpm+tc2
-> > > 
-> > > which will update your vexpress/mcpm branch with one additional commit 
-> > > fixing the build issue with CONFIG_FRAME_POINTER reported by RMK.  This 
-> > > commit's SHA1 is 95fbdc9cf542.
-> > 
-> > So, I just replaced my branch with the one from Pawel, and the topmost patch
-> > in your branch seems to no longer apply.
-> 
-> Weird.  It still applies perfectly here.
-> 
-> Here's the patch nevertheless.  Please apply ASAP as Lorenzo wishes to 
-> base his next pull request on top of this.
+On 13 August 2013 17:02, Daniel Mack <zonque@gmail.com> wrote:
+> On 12.08.2013 12:50, Daniel Mack wrote:
+>> On 12.08.2013 12:46, Mark Brown wrote:
+>>> On Mon, Aug 12, 2013 at 12:41:41PM +0200, Daniel Mack wrote:
+>>>> I actually thought Haojian would pick them, but I see there's a build
+>>>> dependency. So it might make sense if you take them instead.
+>>>
+>>> They didn't obviously touch arch/arm
+>>
+>> Well yes, *this* series does:
+>>
+>>  .../devicetree/bindings/serial/mrvl,pxa-ssp.txt    |  65 ++++++++
+>>  arch/arm/plat-pxa/ssp.c                            | 174
+>> ++++++++++++++-------
+>>  include/linux/pxa2xx_ssp.h                         |  11 ++
+>>
+>> I posted two series, one is for arch/arm and one is for sound/soc/pxa.
+>> But as they have a dependency via pxa_ssp_request_of(), I'd actually
+>> prefer if you took all of them.
+>
+> Haojian, could you give your Ack on this procedure?
+>
+>
+> Thanks,
+> Daniel
+>
+>
 
-Thanks Nico. For the records, I applied your patch against arm-soc
-vexpress/mcpm and my pull request for the CPUidle driver still applies
-cleanly on top of that branch, so there should not be anything to do on
-my side, but I am here if anything goes wrong.
-
-Lorenzo
-
-> 
-> ----- >8
-> 
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Date: Mon, 12 Aug 2013 12:47:13 -0400
-> Subject: [PATCH] ARM: vexpress/MCPM: fix cache disable sequence when CONFIG_FRAME_POINTER=y
-> 
-> If CONFIG_FRAME_POINTER=y we hget the following error:
-> 
-> arch/arm/mach-vexpress/tc2_pm.c: In function 'tc2_pm_down':
-> arch/arm/mach-vexpress/tc2_pm.c:200:1: error: fp cannot be used in asm here
-> 
-> Let's fix that by explicitly preserving r11 on the stack and removing it
-> from the clobber list.
-> 
-> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> 
-> diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-> index 85fffa702f..3a6384c6c4 100644
-> --- a/arch/arm/mach-vexpress/dcscb.c
-> +++ b/arch/arm/mach-vexpress/dcscb.c
-> @@ -144,8 +144,13 @@ static void dcscb_power_down(void)
->  		 * Let's do it in the safest possible way i.e. with
->  		 * no memory access within the following sequence
->  		 * including to the stack.
-> +		 *
-> +		 * Note: fp is preserved to the stack explicitly prior doing
-> +		 * this since adding it to the clobber list is incompatible
-> +		 * with having CONFIG_FRAME_POINTER=y.
->  		 */
->  		asm volatile(
-> +		"str	fp, [sp, #-4]! \n\t"
->  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
->  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-> @@ -156,9 +161,10 @@ static void dcscb_power_down(void)
->  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
->  		"isb	\n\t"
-> -		"dsb	"
-> +		"dsb	\n\t"
-> +		"ldr	fp, [sp], #4"
->  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-> -		      "r9","r10","r11","lr","memory");
-> +		      "r9","r10","lr","memory");
->  
->  		/*
->  		 * This is a harmless no-op.  On platforms with a real
-> @@ -182,6 +188,7 @@ static void dcscb_power_down(void)
->  		 * Let's do it in the safest possible way as above.
->  		 */
->  		asm volatile(
-> +		"str	fp, [sp, #-4]! \n\t"
->  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
->  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-> @@ -192,9 +199,10 @@ static void dcscb_power_down(void)
->  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
->  		"isb	\n\t"
-> -		"dsb	"
-> +		"dsb	\n\t"
-> +		"ldr	fp, [sp], #4"
->  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-> -		      "r9","r10","r11","lr","memory");
-> +		      "r9","r10","lr","memory");
->  	}
->  
->  	__mcpm_cpu_down(cpu, cluster);
-> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-> index ddd97dd4e9..2b7c93a724 100644
-> --- a/arch/arm/mach-vexpress/tc2_pm.c
-> +++ b/arch/arm/mach-vexpress/tc2_pm.c
-> @@ -150,8 +150,13 @@ static void tc2_pm_down(u64 residency)
->  		 * Let's do it in the safest possible way i.e. with
->  		 * no memory access within the following sequence
->  		 * including the stack.
-> +		 *
-> +		 * Note: fp is preserved to the stack explicitly prior doing
-> +		 * this since adding it to the clobber list is incompatible
-> +		 * with having CONFIG_FRAME_POINTER=y.
->  		 */
->  		asm volatile(
-> +		"str	fp, [sp, #-4]! \n\t"
->  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
->  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-> @@ -162,9 +167,10 @@ static void tc2_pm_down(u64 residency)
->  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
->  		"isb	\n\t"
-> -		"dsb	"
-> +		"dsb	\n\t"
-> +		"ldr	fp, [sp], #4"
->  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-> -		      "r9","r10","r11","lr","memory");
-> +		      "r9","r10","lr","memory");
->  
->  		cci_disable_port_by_cpu(mpidr);
->  
-> @@ -185,6 +191,7 @@ static void tc2_pm_down(u64 residency)
->  		 * Let's do it in the safest possible way as above.
->  		 */
->  		asm volatile(
-> +		"str	fp, [sp, #-4]! \n\t"
->  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
->  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
-> @@ -195,9 +202,10 @@ static void tc2_pm_down(u64 residency)
->  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
->  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
->  		"isb	\n\t"
-> -		"dsb	"
-> +		"dsb	\n\t"
-> +		"ldr	fp, [sp], #4"
->  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
-> -		      "r9","r10","r11","lr","memory");
-> +		      "r9","r10","lr","memory");
->  	}
->  
->  	__mcpm_cpu_down(cpu, cluster);
-> 
-> 
-> 
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
