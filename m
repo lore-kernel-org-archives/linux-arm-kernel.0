@@ -1,83 +1,43 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 14 Aug 2013 11:50:07 +0800
-Subject: [PATCH 2/2] arm: mach-imx: anatop: add two APIs for USB driver
-In-Reply-To: <20130814034754.GD16915@S2101-09.ap.freescale.net>
-References: <1376292414-22922-1-git-send-email-peter.chen@freescale.com>
- <1376292414-22922-2-git-send-email-peter.chen@freescale.com>
- <20130814034754.GD16915@S2101-09.ap.freescale.net>
-Message-ID: <20130814035005.GA30404@shlinux1.ap.freescale.net>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Wed, 14 Aug 2013 11:16:35 +0530
+Subject: Kexec: BE kernel on ARM VE TC2
+In-Reply-To: <alpine.LFD.2.03.1308131851300.14472@syhkavp.arg>
+References: <CALicx6ueLxCFCeun1grdtcC21HSkCDfenLWOSfuoSJnhx9GZ6w@mail.gmail.com>
+ <20130808215034.GE19383@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1308131851300.14472@syhkavp.arg>
+Message-ID: <CALicx6uKhd0z=81G68VvTjBpPy=vwK3tgK8zk11dpu34N=YyYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 11:47:56AM +0800, Shawn Guo wrote:
-> On Mon, Aug 12, 2013 at 03:26:54PM +0800, Peter Chen wrote:
-> > imx_anatop_usb1_disconnect_line is used to disconnect dp/dm between
-> > PHY and controller, after that, the controller always gets SE0
-> > for the status of dp/dm, it is not any wakeup signal for controller.
-> > It is used to avoid unknown interrupt due to dp/dm is floading
-> > after the USB PHY is no powered when there is no vbus supplied.
-> > 
-> > imx_anatop_set_stop_mode_config is used to keep internal regualtor on
-> > when the system enters suspend mode, it will increase power consumption,
-> > we only enable it when the user enables USB wakeup (default is off).
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  arch/arm/mach-imx/anatop.c |   22 ++++++++++++++++++++++
-> >  arch/arm/mach-imx/common.h |    2 ++
-> >  2 files changed, 24 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
-> > index 71f1a08..7f96bbc 100644
-> > --- a/arch/arm/mach-imx/anatop.c
-> > +++ b/arch/arm/mach-imx/anatop.c
-> > @@ -26,6 +26,7 @@
-> >  #define ANADIG_ANA_MISC0	0x150
-> >  #define ANADIG_ANA_MISC2	0x170
-> >  #define ANADIG_USB1_CHRG_DETECT	0x1b0
-> > +#define ANADIG_USB1_LOOPBACK	0x1e0
-> >  #define ANADIG_USB2_CHRG_DETECT	0x210
-> >  #define ANADIG_DIGPROG		0x260
-> >  
-> > @@ -34,6 +35,8 @@
-> >  #define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	0x1000
-> >  #define BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B	0x80000
-> >  #define BM_ANADIG_USB_CHRG_DETECT_EN_B		0x100000
-> > +#define BM_ANADIG_USB1_LOOPBACK_UTMI_DIG_TST1	0x00000004
-> > +#define BM_ANADIG_USB1_LOOPBACK_TSTI_TX_EN	0x00000020
-> >  
-> >  #define ANADIG_ANA_MISC2_REG1_STEP_OFFSET	26
-> >  #define ANADIG_ANA_MISC2_REG_STEP_MASK		0x3
-> > @@ -142,6 +145,25 @@ u32 imx_anatop_get_digprog(void)
-> >  	return digprog;
-> >  }
-> >  
-> > +void imx_anatop_usb1_disconnect_line(bool enable)
-> > +{
-> > +	if (enable)
-> > +		regmap_write(anatop, ANADIG_USB1_LOOPBACK,
-> > +			BM_ANADIG_USB1_LOOPBACK_UTMI_DIG_TST1 |
-> > +				BM_ANADIG_USB1_LOOPBACK_TSTI_TX_EN);
-> > +	else
-> > +		regmap_write(anatop, ANADIG_USB1_LOOPBACK, 0);
-> > +}
-> > +EXPORT_SYMBOL(imx_anatop_usb1_disconnect_line);
-> > +
-> > +void imx_anatop_set_stop_mode_config(bool enable)
-> > +{
-> > +	regmap_write(anatop, ANADIG_ANA_MISC0 +
-> > +		(enable ? REG_SET : REG_CLR),
-> > +			BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG);
-> > +}
-> > +EXPORT_SYMBOL(imx_anatop_set_stop_mode_config);
-> > +
-> 
-> Where do you want to call these two functions from?
-> 
+On Wed, Aug 14, 2013 at 4:22 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Thu, 8 Aug 2013, Will Deacon wrote:
+>
+>> On Mon, Aug 05, 2013 at 01:12:17PM +0100, Vijay Kilari wrote:
+>> > Hi Will,
+>> >
+>> > I am trying to make kexec work on BE kernel on ARM VE TC2.
+>> >
+>> > First, to make KEXEC work with SMP on ARM VE TC2 board,
+>> > I set nr_cpus=2 (i.e boot only A15's) this works with LE kernel.
+>>
+>> Interesting, is this with a mainline kernel? I don't see how SMP kexec can
+>> work on TC2 without additional patches to park the secondary cores safely.
+>
+> BTW those patches are available in linux-next at the moment.
 
->From USB driver, the usb driver is possible built as module.
+Thanks for this info.
+I see that MCPM, TC2_PM & SPC configuration needs to be enabled to have
+TC2 power management. However MCPM also depends on CCI configuration
+to register smps ops.
+In my config, I dont have CCI config enabled
 
--- 
+Can you please suggest right configuration to be enabled and also dts
+configuration
+for SPC, CCI to enable TC2 power mgmt.
 
-Best Regards,
-Peter Chen
+Also I am using u-boot. Do I need to use UEFI/firmware to enable TC2 power mgmt?
+I remember, some time back, I have tried linaro tracking git and
+failed to boot my board
+>
+>
+> Nicolas
