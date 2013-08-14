@@ -1,50 +1,27 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 13 Aug 2013 22:01:01 -0500
-Subject: [GIT PULL] Highbank fixes for 3.12
-Message-ID: <520AF2ED.9030900@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 14 Aug 2013 11:29:21 +0800
+Subject: =?utf-8?B?562U5aSNOiBbUEFUQw==?= =?utf-8?Q?H?= v3 2/2] i2c: imx:
+ Add Vybrid VF610 I2C controller support
+In-Reply-To: <20130813161214.GV26614@pengutronix.de>
+References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
+ <1375418648-22760-2-git-send-email-b35083@freescale.com>
+ <20130810140827.GC18085@e106331-lin.cambridge.arm.com>
+ <B56CDBE15CE27145A4B77D2D24263E851FE7AC@039-SN1MPN1-004.039d.mgd.msft.net>
+ <20130812164354.GF27165@e106331-lin.cambridge.arm.com>
+ <52096E77.4040003@wwwdotorg.org>
+ <20130813074620.GR26614@pengutronix.de>
+ <520A5558.708@wwwdotorg.org>
+ <20130813161214.GV26614@pengutronix.de>
+Message-ID: <20130814032812.GB16915@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin, Olof,
+On Tue, Aug 13, 2013 at 06:12:14PM +0200, s.hauer at pengutronix.de wrote:
+> I vote for having the exact SoC revision in the binding documentation
+> rather than wildcards or references to the list of i.MX SoCs. Otherwise
+> only the driver code gives a clue that the i2c driver matches imx1-i2c,
+> imx21-i2c and vf610-i2c, but not imx31-i2c.
 
-Please pull highbank updates for 3.12.
++1
 
-There's one trivial core ARM code change in the series to allow a
-DMA_ZONE size of 4GB. I believe this should not conflict with Russell's
-DMA mask series.
-
-Rob
-
-The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
-
-  Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
-
-are available in the git repository at:
-
-  git://sources.calxeda.com/kernel/linux.git
-tags/highbank-lpae-fixes-for-3.12
-
-for you to fetch changes up to ce3ec1d61c5ed6af3ceaace6f57acd588c41b4d6:
-
-  ARM: highbank: fix debug uart virtual address for LPAE (2013-08-13
-20:50:16 -0500)
-
-----------------------------------------------------------------
-A set of fixes for highbank to enable LPAE and selecting of necesssary
-ARM errata.
-
-----------------------------------------------------------------
-Rob Herring (6):
-      ARM: use phys_addr_t for DMA zone sizes
-      ARM: highbank: enable DMA zone for LPAE
-      ARM: highbank: select ARCH_HAS_HOLES_MEMORYMODEL
-      ARM: highbank: select required errata work-arounds
-      ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
-      ARM: highbank: fix debug uart virtual address for LPAE
-
- arch/arm/include/asm/mach/arch.h  | 2 +-
- arch/arm/include/debug/highbank.S | 2 +-
- arch/arm/mach-highbank/Kconfig    | 6 ++++++
- arch/arm/mach-highbank/highbank.c | 3 +++
- arch/arm/mm/init.c                | 2 +-
- 5 files changed, 12 insertions(+), 3 deletions(-)
+Shawn
