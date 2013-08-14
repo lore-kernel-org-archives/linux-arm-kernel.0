@@ -1,34 +1,23 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 14 Aug 2013 15:28:10 -0400
-Subject: [GIT PULL] ARM: mvebu: soc changes for v3.12
-Message-ID: <20130814192810.GF13964@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 14 Aug 2013 21:36:40 +0200
+Subject: [PATCH 11/35] cpufreq: dbx500: use
+ cpufreq_table_validate_and_show()
+In-Reply-To: <e343e827df7be24f11ecdaf849f2874bf1ba4b24.1375964117.git.viresh.kumar@linaro.org>
+References: <cover.1375964117.git.viresh.kumar@linaro.org>
+ <e343e827df7be24f11ecdaf849f2874bf1ba4b24.1375964117.git.viresh.kumar@linaro.org>
+Message-ID: <CACRpkda29WcHePh00w_7N3B1OtGh=-i=1_PyB4MNhy=YJ-nxyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Thu, Aug 8, 2013 at 3:48 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
+> Lets use cpufreq_table_validate_and_show() instead of calling
+> cpufreq_frequency_table_cpuinfo() and cpufreq_frequency_table_get_attr().
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/soc-3.12
-
-for you to fetch changes up to a7160b7eaf2d914e1b552807b9d13acf23b47293:
-
-  ARM: mach-mvebu: remove redundant DT parsing and validation (2013-08-09 13:02:51 +0000)
-
-----------------------------------------------------------------
-mvebu soc changes for v3.12
-
- - mvebu
-    - cleanup redundant code
-
-----------------------------------------------------------------
-Sudeep KarkadaNagesha (1):
-      ARM: mach-mvebu: remove redundant DT parsing and validation
-
- arch/arm/mach-mvebu/platsmp.c | 19 +------------------
- 1 file changed, 1 insertion(+), 18 deletions(-)
+Yours,
+Linus Walleij
