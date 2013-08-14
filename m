@@ -1,76 +1,52 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 14 Aug 2013 18:12:41 -0500
-Subject: [PATCH 02/10] crypto: omap-aes: Add useful debug macros
+Date: Wed, 14 Aug 2013 18:12:46 -0500
+Subject: [PATCH 07/10] crypto: omap-aes: Add IRQ info and helper macros
 In-Reply-To: <1376521969-16807-1-git-send-email-joelf@ti.com>
 References: <1376521969-16807-1-git-send-email-joelf@ti.com>
-Message-ID: <1376521969-16807-3-git-send-email-joelf@ti.com>
+Message-ID: <1376521969-16807-8-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When DEBUG is enabled, these macros can be used to print variables
-in integer and hex format, and clearly display which registers,
-offsets and values are being read/written , including printing the
-names of the offsets and their values.
+Add IRQ information to pdata and helper macros. These are
+required for PIO-mode support.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/crypto/omap-aes.c |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ drivers/crypto/omap-aes.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index ee15b0f..3838e0a 100644
+index 71da52b..c057eac 100644
 --- a/drivers/crypto/omap-aes.c
 +++ b/drivers/crypto/omap-aes.c
-@@ -15,6 +15,14 @@
+@@ -82,6 +82,10 @@
  
- #define pr_fmt(fmt) "%s: " fmt, __func__
+ #define AES_REG_LENGTH_N(x)		(0x54 + ((x) * 0x04))
  
-+#ifdef DEBUG
-+#define prn(num) printk(#num "=%d\n", num)
-+#define prx(num) printk(#num "=%x\n", num)
-+#else
-+#define prn(num) do { } while (0)
-+#define prx(num)  do { } while (0)
-+#endif
-+
- #include <linux/err.h>
- #include <linux/module.h>
- #include <linux/init.h>
-@@ -172,13 +180,35 @@ struct omap_aes_dev {
- static LIST_HEAD(dev_list);
- static DEFINE_SPINLOCK(list_lock);
++#define AES_REG_IRQ_STATUS(dd)         ((dd)->pdata->irq_status_ofs)
++#define AES_REG_IRQ_ENABLE(dd)         ((dd)->pdata->irq_enable_ofs)
++#define AES_REG_IRQ_DATA_IN            BIT(1)
++#define AES_REG_IRQ_DATA_OUT           BIT(2)
+ #define DEFAULT_TIMEOUT		(5*HZ)
  
-+#ifdef DEBUG
-+#define omap_aes_read(dd, offset)					\
-+	do {								\
-+		omap_aes_read_1(dd, offset);				\
-+		pr_debug("omap_aes_read(" #offset ")\n");		\
-+	} while (0)
-+
-+static inline u32 omap_aes_read_1(struct omap_aes_dev *dd, u32 offset)
-+#else
- static inline u32 omap_aes_read(struct omap_aes_dev *dd, u32 offset)
-+#endif
- {
- 	return __raw_readl(dd->io_base + offset);
- }
+ #define FLAGS_MODE_MASK		0x000f
+@@ -127,6 +131,8 @@ struct omap_aes_pdata {
+ 	u32		data_ofs;
+ 	u32		rev_ofs;
+ 	u32		mask_ofs;
++	u32             irq_enable_ofs;
++	u32             irq_status_ofs;
  
-+#ifdef DEBUG
-+#define omap_aes_write(dd, offset, value)				\
-+	do {								\
-+		pr_debug("omap_aes_write(" #offset "=%x) value=%d\n",	\
-+			 offset, value);				\
-+		omap_aes_write_1(dd, offset, value);			\
-+	} while (0)
-+
-+static inline void omap_aes_write_1(struct omap_aes_dev *dd, u32 offset,
-+				  u32 value)
-+#else
- static inline void omap_aes_write(struct omap_aes_dev *dd, u32 offset,
- 				  u32 value)
-+#endif
- {
- 	__raw_writel(value, dd->io_base + offset);
- }
+ 	u32		dma_enable_in;
+ 	u32		dma_enable_out;
+@@ -846,6 +852,8 @@ static const struct omap_aes_pdata omap_aes_pdata_omap4 = {
+ 	.data_ofs	= 0x60,
+ 	.rev_ofs	= 0x80,
+ 	.mask_ofs	= 0x84,
++	.irq_status_ofs = 0x8c,
++	.irq_enable_ofs = 0x90,
+ 	.dma_enable_in	= BIT(5),
+ 	.dma_enable_out	= BIT(6),
+ 	.major_mask	= 0x0700,
 -- 
 1.7.9.5
