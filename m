@@ -1,42 +1,20 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 14 Aug 2013 14:32:38 +0800
-Subject: [PATCH 2/2] arm: mach-imx: anatop: add two APIs for USB driver
-In-Reply-To: <20130814035005.GA30404@shlinux1.ap.freescale.net>
-References: <1376292414-22922-1-git-send-email-peter.chen@freescale.com>
- <1376292414-22922-2-git-send-email-peter.chen@freescale.com>
- <20130814034754.GD16915@S2101-09.ap.freescale.net>
- <20130814035005.GA30404@shlinux1.ap.freescale.net>
-Message-ID: <20130814063236.GA31141@S2101-09.ap.freescale.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 13 Aug 2013 23:39:16 -0700
+Subject: [PATCH v6 2/4] ARM: debug: support debug ll on hisilicon soc
+In-Reply-To: <1374813135-16238-3-git-send-email-haojian.zhuang@linaro.org>
+References: <1374813135-16238-1-git-send-email-haojian.zhuang@linaro.org>
+ <1374813135-16238-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20130814063916.GH19951@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 11:50:07AM +0800, Peter Chen wrote:
-> > > +void imx_anatop_usb1_disconnect_line(bool enable)
-> > > +{
-> > > +	if (enable)
-> > > +		regmap_write(anatop, ANADIG_USB1_LOOPBACK,
-> > > +			BM_ANADIG_USB1_LOOPBACK_UTMI_DIG_TST1 |
-> > > +				BM_ANADIG_USB1_LOOPBACK_TSTI_TX_EN);
-> > > +	else
-> > > +		regmap_write(anatop, ANADIG_USB1_LOOPBACK, 0);
-> > > +}
-> > > +EXPORT_SYMBOL(imx_anatop_usb1_disconnect_line);
-> > > +
-> > > +void imx_anatop_set_stop_mode_config(bool enable)
-> > > +{
-> > > +	regmap_write(anatop, ANADIG_ANA_MISC0 +
-> > > +		(enable ? REG_SET : REG_CLR),
-> > > +			BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG);
-> > > +}
-> > > +EXPORT_SYMBOL(imx_anatop_set_stop_mode_config);
-> > > +
-> > 
-> > Where do you want to call these two functions from?
-> > 
+On Fri, Jul 26, 2013 at 12:32:13PM +0800, Haojian Zhuang wrote:
+> Support UART0 debug ll on hisilicon Hi3620 SoC.
 > 
-> From USB driver, the usb driver is possible built as module.
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-I do not think it's appropriate have device driver directly call into
-platform level functions.
 
-Shawn
+Applied, thanks.
+
+
+-Olof
