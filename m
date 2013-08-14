@@ -1,29 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 14 Aug 2013 10:09:43 -0600
-Subject: [PATCH] mmc: dw_mmc-exynos: Common bindings for dw-mshc timing
-In-Reply-To: <20130814052940.GC16635@quad.lixom.net>
-References: <1376002520-7461-1-git-send-email-dinguyen@altera.com>
- <52096C75.1030305@wwwdotorg.org> <20130814052940.GC16635@quad.lixom.net>
-Message-ID: <520BABC7.8010100@wwwdotorg.org>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 14 Aug 2013 18:15:51 +0200
+Subject: [v2 rebased 1/2] dma: mmp_pdma: add support for residue reporting
+In-Reply-To: <20130814124643.GP23006@n2100.arm.linux.org.uk>
+References: <1376483121-11306-1-git-send-email-zonque@gmail.com>
+ <20130814124643.GP23006@n2100.arm.linux.org.uk>
+Message-ID: <520BAD37.1070404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2013 11:29 PM, Olof Johansson wrote:
-> On Mon, Aug 12, 2013 at 05:15:01PM -0600, Stephen Warren wrote:
->> On 08/08/2013 04:55 PM, dinguyen at altera.com wrote:
->>> From: Dinh Nguyen <dinguyen@altera.com>
->>>
->>> Remove the "samsung" in "samsung,dw-mshc-ciu-div", "samsung,dw-mshc-sdr-timing",
->>> and "samsung,dw-mshc-ddr-timing". These characteristics are not applicable to
->>> just Samsung platforms, but to any platform that uses the Synopsis SD/MMC IP.
->>
->> But the properties aren't globally standard; they apply specifically
->> anywhere that this particular Synopsis IP is present. As such, I think
->> at least a "synopsis," prefix is warranted.
+On 14.08.2013 14:46, Russell King - ARM Linux wrote:
+> On Wed, Aug 14, 2013 at 02:25:20PM +0200, Daniel Mack wrote:
+>> In order to report the channel's residue, we have to memorize the first
+>> dma buffer position when the channel is configured.
 > 
-> A prefix is only really needed when a vendor is making a vendor-specific
-> extension on a shared binding. Since the whole binding is
-> synopsis-specific, I don't think there's need for a prefix here.
+> This is actually broken, and I'm surprised that Vinod even suggested it.
+> 
+> Think about what happens with a scatter-gather list where the addresses
+> of each element really are scattered in memory.  Let's say that the
+> N'th element is at a lower address than the first element, and we're on
+> that N'th element.  What happens when curr is less than chan->start_addr
+> here:
 
-Oh! That definitely isn't the rule that's been applied before; I've been
-asked to add "nvidia," prefixes to properties in entirely custom bindings...
+Yes, you're right of course.
+
+Then, we have no other chance than walking the list of all linked
+descriptors. I just implemented this and it works. That approach also
+saves us to memorize the start_addr in the channel struct.
+
+I'll resend both patches - could you have another look?
+
+
+Thanks,
+Daniel
