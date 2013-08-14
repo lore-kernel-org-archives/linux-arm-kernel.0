@@ -1,36 +1,41 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 14 Aug 2013 21:50:18 +0200
-Subject: [PATCH] ARM: integrator: Make sure INTEGRATOR_AP depends on PCI
-Message-ID: <1376509818-22163-1-git-send-email-joro@8bytes.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 14 Aug 2013 23:54:48 +0400
+Subject: [PATCH Resend 1/3] PSCI: add missing dependency on CONFIG_OF
+ for PSCI.
+In-Reply-To: <1376500987-12797-2-git-send-email-jonathan.austin@arm.com>
+References: <1376500987-12797-1-git-send-email-jonathan.austin@arm.com>
+ <1376500987-12797-2-git-send-email-jonathan.austin@arm.com>
+Message-ID: <520BE088.5060109@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add this dependency to the Kconfig file to fix the following
-build error when CONFIG_INTEGRATOR_AP is set but CONFIG_PCI
-is not:
+Hello.
 
-  LD      init/built-in.o
-arch/arm/mach-integrator/built-in.o: In function `ap_map_io':
-integrator_cp.c:(.init.text+0x570): undefined reference to `pci_v3_early_init'
-make[1]: *** [vmlinux] Error 1
-make: *** [sub-make] Error 2
+On 08/14/2013 09:23 PM, Jonathan Austin wrote:
 
-Signed-off-by: Joerg Roedel <joro@8bytes.org>
----
- arch/arm/mach-integrator/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+> The PSCI initialisation depends on data found in the DT. Without this the
+> including PSCI support makes little sense, and furthermore the of_* stub
+> functions aren't broad enough to ensure that this builds without CONFIG_OF.
 
-diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
-index abeff25..be16569 100644
---- a/arch/arm/mach-integrator/Kconfig
-+++ b/arch/arm/mach-integrator/Kconfig
-@@ -9,6 +9,7 @@ config ARCH_INTEGRATOR_AP
- 	select SERIAL_AMBA_PL010
- 	select SERIAL_AMBA_PL010_CONSOLE
- 	select SOC_BUS
-+	depends on PCI
- 	help
- 	  Include support for the ARM(R) Integrator/AP and
- 	  Integrator/PP2 platforms.
--- 
-1.7.9.5
+> As there is little enthusiasm for extending these stubs without useful use-cases
+> (of which this is *not* an example) this patch prevents building of PSCI
+> without CONFIG_OF.
+
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+> ---
+>   arch/arm/Kconfig |    1 +
+>   1 file changed, 1 insertion(+)
+
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index ba412e0..972ec25 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1577,6 +1577,7 @@ config HOTPLUG_CPU
+>   config ARM_PSCI
+>   	bool "Support for the ARM Power State Coordination Interface (PSCI)"
+>   	depends on CPU_V7
+> +	depends on CONFIG_OF
+
+    I think you meant just OF. :-)
+
+WBR, Sergei
