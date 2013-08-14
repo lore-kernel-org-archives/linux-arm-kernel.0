@@ -1,68 +1,26 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 14 Aug 2013 08:52:17 +0200
-Subject: [PATCH] input: qt1070: add power management ops
-In-Reply-To: <1376379826-28808-1-git-send-email-voice.shen@atmel.com>
-References: <1376379826-28808-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <520B2921.3000906@atmel.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 13 Aug 2013 23:56:10 -0700
+Subject: [PATCH 1/2] arm: prima2: pm: enable rtc alarm0 and alarm1 as
+ wakeup source
+In-Reply-To: <1375175273-14067-1-git-send-email-Baohua.Song@csr.com>
+References: <1375175273-14067-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <20130814065610.GK19951@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/08/2013 09:43, Bo Shen :
-> Add power management ops for qt1070, it maybe a wakeup source
->
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+On Tue, Jul 30, 2013 at 05:07:52PM +0800, Barry Song wrote:
+> From: Xianglong Du <Xianglong.Du@csr.com>
+> 
+> this patch also enables RTC alarm as wakeup source after system suspends
+> 
+> Signed-off-by: Xianglong Du <Xianglong.Du@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Please mind your punctuation (Capital letters and periods at ends of sentences)
 
-> ---
->   drivers/input/keyboard/qt1070.c |   25 +++++++++++++++++++++++++
->   1 file changed, 25 insertions(+)
->
-> diff --git a/drivers/input/keyboard/qt1070.c b/drivers/input/keyboard/qt1070.c
-> index 42b773b..deefe5a 100644
-> --- a/drivers/input/keyboard/qt1070.c
-> +++ b/drivers/input/keyboard/qt1070.c
-> @@ -243,6 +243,30 @@ static int qt1070_remove(struct i2c_client *client)
->   	return 0;
->   }
->
-> +#ifdef CONFIG_PM_SLEEP
-> +static int qt1070_suspend(struct device *dev)
-> +{
-> +	struct qt1070_data *data = dev_get_drvdata(dev);
-> +
-> +	if (device_may_wakeup(dev))
-> +		enable_irq_wake(data->irq);
-> +
-> +	return 0;
-> +}
-> +
-> +static int qt1070_resume(struct device *dev)
-> +{
-> +	struct qt1070_data *data = dev_get_drvdata(dev);
-> +
-> +	if (device_may_wakeup(dev))
-> +		disable_irq_wake(data->irq);
-> +
-> +	return 0;
-> +}
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(qt1070_pm_ops, qt1070_suspend, qt1070_resume);
-> +
->   static const struct i2c_device_id qt1070_id[] = {
->   	{ "qt1070", 0 },
->   	{ },
-> @@ -253,6 +277,7 @@ static struct i2c_driver qt1070_driver = {
->   	.driver	= {
->   		.name	= "qt1070",
->   		.owner	= THIS_MODULE,
-> +		.pm	= &qt1070_pm_ops,
->   	},
->   	.id_table	= qt1070_id,
->   	.probe		= qt1070_probe,
->
+Also, we tend to prefer ARM: as the prefix instead of arm:.
+
+Fixed up the above, and applied the patch.
 
 
--- 
-Nicolas Ferre
+-Olof
