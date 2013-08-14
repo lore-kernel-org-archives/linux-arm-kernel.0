@@ -1,39 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 14 Aug 2013 12:27:20 +0100
-Subject: [RFC][PATCH 1/2] ARM64: add cpu topology definition
-In-Reply-To: <20130729095400.GB32383@mudshark.cambridge.arm.com>
-References: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
- <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
- <20130729095400.GB32383@mudshark.cambridge.arm.com>
-Message-ID: <20130814112720.GB43445@MacBook-Pro.local>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 14 Aug 2013 11:27:09 +0000
+Subject: [PATCH v3 5/5] ARM: davinci: serial: platform code cleanup
+In-Reply-To: <51ED0534.2080408@ti.com>
+References: <1371633342-1210-1-git-send-email-prakash.pm@ti.com>
+ <1371633342-1210-6-git-send-email-prakash.pm@ti.com>
+ <51ED0534.2080408@ti.com>
+Message-ID: <520B698D.60203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 29, 2013 at 10:54:01AM +0100, Will Deacon wrote:
-> On Mon, Jul 29, 2013 at 10:46:06AM +0100, Vincent Guittot wrote:
-> > On 27 July 2013 12:42, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > > Power aware scheduling needs the cpu topology information to improve the
-> > > cpu scheduler decision making.
-> > 
-> > It's not only power aware scheduling. The scheduler already uses
-> > topology and cache sharing when  CONFIG_SCHED_MC and/or
-> > CONFIG_SCHED_SMT are enable. So you should also add these configs for
-> > arm64 so the scheduler can use it
-> 
-> ... except that the architecture doesn't define what the AFF fields in MPIDR
-> really represent. Using them to make key scheduling decisions relating to
-> cache proximity seems pretty risky to me, especially given the track record
-> we've seen already on AArch32 silicon. It's a convenient register if it
-> contains the data we want it to contain, but we need to force ourselves to
-> come to terms with reality here and simply use it as an identifier for a
-> CPU.
-> 
-> Can't we just use the device-tree to represent this topological data for
-> arm64? Lorenzo has been working on bindings in this area.
+Hi Prakash,
 
-Catching up on email after holiday - I agree with Will here, we should
-use DT for representing the topology (or ACPI) and not rely on the MPIDR
-value.
+On Monday 22 July 2013 10:11 AM, Sekhar Nori wrote:
+> On Wednesday 19 June 2013 02:45 PM, Manjunathappa, Prakash wrote:
+>> 1) "struct davinci_uart_config" is introduced to specify
+>>    UART ports brought out or enabled on the board. But
+>>    none of the boards use them for that purpose, so clean
+>>    it up.
+>> 2) Have pointer to platform device as a argument for
+>>    davinci_serial_init(), no need of serial_dev in
+>>    struct soc_info now.
+>> 3) No need of davinci_serial_setup_clk(), not called from
+>>    multiple places, hence reduce function call overhead.
+> 
+> 1) and 2) are related but 3) can be moved into a different patch - this
+> patch will otherwise be doing too many things (hint for that is a vague
+> headline and too many items to list in description)
+> 
+> Can you respin just this patch based on v3.12/soc branch of my tree?
 
--- 
-Catalin
+Since I did not get a response to this and the window for v3.12 is
+closing fast, I went ahead and did the split myself. Here is the result:
+
+https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/log/?h=v3.12/soc
+
+Thanks,
+Sekhar
