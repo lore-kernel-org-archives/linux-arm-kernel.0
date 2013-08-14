@@ -1,93 +1,100 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 14 Aug 2013 17:43:22 +0100
-Subject: [PATCH v3 07/10] xen: introduce XENMEM_get_dma_buf and
- xen_put_dma_buf
-In-Reply-To: <20130809153606.GD5637@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1308051503190.4893@kaball.uk.xensource.com>
- <1375720256-8014-7-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130809153606.GD5637@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1308141719480.4470@kaball.uk.xensource.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Wed, 14 Aug 2013 17:44:01 +0100
+Subject: [PATCH] ARM: ARMv7-M: implement restart routine common to all
+ v7-M machines
+In-Reply-To: <1376494625-25496-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1376494625-25496-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <520BB3D1.1050205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Aug 2013, Konrad Rzeszutek Wilk wrote:
-> > + * requested. The new pages are going to be "pinned": it's guaranteed
-> > + * that their p2m mapping won't be changed until explicitly "unpinned".
-> 
-> What if you try to balloon them out? What happens then? Does that
-> unpin them automatically?
-> 
-> What if I use said "pin" page for grants? Can they be shared with another
-> guest?
+On 14/08/13 16:37, Uwe Kleine-K?nig wrote:
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-I'll mention that only normal guest r/w memory can be pinned.
+Do we get a commit message? ;)
 
+> ---
+>   arch/arm/include/asm/v7m.h   | 12 ++++++++++++
+>   arch/arm/kernel/Makefile     |  2 +-
+>   arch/arm/kernel/common-v7m.c | 19 +++++++++++++++++++
+>   3 files changed, 32 insertions(+), 1 deletion(-)
+>   create mode 100644 arch/arm/kernel/common-v7m.c
+>
+> diff --git a/arch/arm/include/asm/v7m.h b/arch/arm/include/asm/v7m.h
+> index fa88d09..615781c 100644
+> --- a/arch/arm/include/asm/v7m.h
+> +++ b/arch/arm/include/asm/v7m.h
+> @@ -15,6 +15,10 @@
+>
+>   #define V7M_SCB_VTOR			0x08
+>
+> +#define V7M_SCB_AIRCR			0x0c
+> +#define V7M_SCB_AIRCR_VECTKEY			(0x05fa << 16)
+> +#define V7M_SCB_AIRCR_SYSRESETREQ		(1 << 2)
+> +
 
-> > + * If return code is zero then @out.extent_list provides the MFNs of the
-> > + * newly-allocated memory.  Returns zero on complete success, otherwise
-> > + * a negative error code.
-> 
-> Ahem. Which ones? I know you didn't like the existing grant code b/c it
-> returned some general error. Would it make sense to say which are ones
-> are expected?
+These all look good, happy with the names too.
+>   #define V7M_SCB_SCR			0x10
+>   #define V7M_SCB_SCR_SLEEPDEEP			(1 << 2)
+>
+> @@ -42,3 +46,11 @@
+>    */
+>   #define EXC_RET_STACK_MASK			0x00000004
+>   #define EXC_RET_THREADMODE_PROCESSSTACK		0xfffffffd
+> +
+> +#ifndef __ASSEMBLY__
+> +
+> +enum reboot_mode;
 
-I'll do that.
+Certainly worth introducing what the plans for this are in the long run 
+- but I suspect the commit message might have contained that info?
 
+> +
+> +void armv7m_restart(enum reboot_mode mode, const char *cmd);
+> +
+> +#endif /* __ASSEMBLY__ */
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index 86d10dd..688b8be 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -24,7 +24,7 @@ obj-$(CONFIG_ATAGS_PROC)	+= atags_proc.o
+>   obj-$(CONFIG_DEPRECATED_PARAM_STRUCT) += atags_compat.o
+>
+>   ifeq ($(CONFIG_CPU_V7M),y)
+> -obj-y		+= entry-v7m.o
+> +obj-y		+= entry-v7m.o common-v7m.o
+>   else
+>   obj-y		+= entry-armv.o
+>   endif
+> diff --git a/arch/arm/kernel/common-v7m.c b/arch/arm/kernel/common-v7m.c
+> new file mode 100644
+> index 0000000..4d2cba9
+> --- /dev/null
+> +++ b/arch/arm/kernel/common-v7m.c
 
-> > + * On complete success then always @nr_exchanged == @in.nr_extents.  On
-> > + * partial success @nr_exchanged indicates how much work was done.
-> 
-> And no error?
-> > + */
-> > +struct xen_get_dma_buf {
-> > +    /*
-> > +     * [IN] Details of memory extents to be exchanged (GMFN bases).
-> > +     * Note that @in.address_bits is ignored and unused.
-> 
-> Ohhhh, why? What if the user wants to be it under 2G?
+Is this really the right place for such a function? My immediate thought 
+is that such a thing belongs in proc-v7m.S
 
-As per the other email, that goes in out.address_bits. I'll add a note.
+Is this fitting in to a an existing framework or pattern that I'm missing?
 
-
-> > +     */
-> > +    struct xen_memory_reservation in;
-> > +
-> > +    /*
-> > +     * [IN/OUT] Details of new memory extents.
-> > +     * We require that:
-> > +     *  1. @in.domid == @out.domid
-> > +     *  2. @in.nr_extents  << @in.extent_order == 
-> > +     *     @out.nr_extents << @out.extent_order
-> > +     *  3. @in.extent_start and @out.extent_start lists must not overlap
-> > +     *  4. @out.extent_start lists GPFN bases to be populated
-> > +     *  5. @out.extent_start is overwritten with allocated GMFN bases
-> > +     */
-> > +    struct xen_memory_reservation out;
-> > +
-> > +    /*
-> > +     * [OUT] Number of input extents that were successfully exchanged:
-> > +     *  1. The first @nr_exchanged input extents were successfully
-> > +     *     deallocated.
-> > +     *  2. The corresponding first entries in the output extent list correctly
-> > +     *     indicate the GMFNs that were successfully exchanged.
-> > +     *  3. All other input and output extents are untouched.
-> > +     *  4. If not all input exents are exchanged then the return code of this
-> > +     *     command will be non-zero.
-> > +     *  5. THIS FIELD MUST BE INITIALISED TO ZERO BY THE CALLER!
-> > +     */
-> > +    xen_ulong_t nr_exchanged;
-> > +};
-> > +DEFINE_GUEST_HANDLE_STRUCT(xen_get_dma_buf);
-> > +
-> > +#define XENMEM_put_dma_buf             27
-> > +/*
-> > + * XENMEM_put_dma_buf unpins a set of pages, previously pinned by
-> > + * XENMEM_get_dma_buf. After this call the p2m mapping of the pages can
-> > + * be transparently changed by the hypervisor, as usual. The pages are
-> > + * still accessible from the guest.
-> 
-> I don't understand what 'pinned' means. What is a 'pinned' page versus
-> a normal page? Is this like the pagetables which must be _RO?
-
-A pinned page is just a normal page that the hypervisor promises is
-going to keep having the same machine address until unpinned.
+> @@ -0,0 +1,19 @@
+> +/*
+> + * Copyright (C) 2013 Uwe Kleine-Koenig for Pengutronix
+> + *
+> + * This program is free software; you can redistribute it and/or modify it under
+> + * the terms of the GNU General Public License version 2 as published by the
+> + * Free Software Foundation.
+> + */
+> +#include <linux/io.h>
+> +#include <linux/reboot.h>
+> +#include <asm/barrier.h>
+> +#include <asm/v7m.h>
+> +
+> +void armv7m_restart(enum reboot_mode mode, const char *cmd)
+> +{
+> +	dsb();
+> +	__raw_writel(V7M_SCB_AIRCR_VECTKEY | V7M_SCB_AIRCR_SYSRESETREQ,
+> +			BASEADDR_V7M_SCB + V7M_SCB_AIRCR);
+> +	dsb();
+> +}
+>
