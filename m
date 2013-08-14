@@ -1,40 +1,99 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 14 Aug 2013 07:53:28 -0400
-Subject: [PATCH v2 4/5] PCI: mvebu: add support for reset on GPIO
-In-Reply-To: <520B4CEE.2050508@gmail.com>
-References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376396724-32048-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130814090715.GA2084@ulmo> <520B4CEE.2050508@gmail.com>
-Message-ID: <20130814115328.GA32395@titan.lakedaemon.net>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Wed, 14 Aug 2013 17:34:22 +0530
+Subject: [PATCH V2] ARM: dts: Add DMA controller node info on Exynos5420.
+Message-ID: <1376481862-9578-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 11:25:02AM +0200, Sebastian Hesselbarth wrote:
-> On 08/14/2013 11:07 AM, Thierry Reding wrote:
-> >On Tue, Aug 13, 2013 at 02:25:23PM +0200, Sebastian Hesselbarth wrote:
-> >[...]
-> >>diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> >[...]
-> >>@@ -897,6 +904,30 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
-> >[...]
-> >>+			u32 reset_udelay = 20000;
-> >[...]
-> >>+			udelay(reset_udelay);
-> >
-> >udelay(20000) is probably not a good idea. You should probably use
-> >something like usleep_range() or msleep() here. Also see:
-> >
-> >	Documentation/timers/timers-howto.txt
-> 
-> Thierry,
-> 
-> thanks for mentioning this. I clearly got distracted from ms to us
-> switch due to the different reset API convention. As the delay will
-> be most likely 10ms+, we should change the above to
-> msleep(reset_udelay/1000) instead.
+This patch adds dma controller node info on Exynos5420.
 
-I'll just go ahead and fix this up locally.  No need to resend.
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+---
 
-thx,
+Changes since V1:
+	- In V1, dma node common stuff was added in common exynos5.dtsi file. 
+	  This was removed as per Kukjin comment and added in exynos5420.dtsi.
 
-Jason.
+This patch is dependent on audss clk controller patches that were
+posted in the below link.
+http://www.spinics.net/lists/linux-samsung-soc/msg20253.html
+
+ arch/arm/boot/dts/exynos5420.dtsi |   63 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 63 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 9e90d1e..23cfea4 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -126,6 +126,69 @@
+ 		interrupts = <0 47 0>;
+ 	};
+ 
++	amba {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "arm,amba-bus";
++		interrupt-parent = <&gic>;
++		ranges;
++
++		pdma0: pdma at 121A0000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x121A0000 0x1000>;
++			interrupts = <0 34 0>;
++			clocks = <&clock 362>;
++			clock-names = "apb_pclk";
++			#dma-cells = <1>;
++			#dma-channels = <8>;
++			#dma-requests = <32>;
++		};
++
++		pdma1: pdma at 121B0000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x121B0000 0x1000>;
++			interrupts = <0 35 0>;
++			clocks = <&clock 363>;
++			clock-names = "apb_pclk";
++			#dma-cells = <1>;
++			#dma-channels = <8>;
++			#dma-requests = <32>;
++		};
++
++		mdma0: mdma at 10800000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x10800000 0x1000>;
++			interrupts = <0 33 0>;
++			clocks = <&clock 473>;
++			clock-names = "apb_pclk";
++			#dma-cells = <1>;
++			#dma-channels = <8>;
++			#dma-requests = <1>;
++		};
++
++		mdma1: mdma at 11C10000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x11C10000 0x1000>;
++			interrupts = <0 124 0>;
++			clocks = <&clock 442>;
++			clock-names = "apb_pclk";
++			#dma-cells = <1>;
++			#dma-channels = <8>;
++			#dma-requests = <1>;
++		};
++
++		adma: adma at 03880000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x03880000 0x1000>;
++			interrupts = <0 110 0>;
++			clocks = <&clock_audss EXYNOS_ADMA>;
++			clock-names = "apb_pclk";
++			#dma-cells = <1>;
++			#dma-channels = <6>;
++			#dma-requests = <16>;
++		};
++	};
++
+ 	serial at 12C00000 {
+ 		clocks = <&clock 257>, <&clock 128>;
+ 		clock-names = "uart", "clk_uart_baud0";
+-- 
+1.7.4.4
