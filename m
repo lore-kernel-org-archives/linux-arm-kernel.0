@@ -1,56 +1,88 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 14 Aug 2013 10:58:34 +0100
-Subject: [PATCH] ARM: dts: Enable USB hub on Arndale
-Message-ID: <1376474314-32491-1-git-send-email-broonie@kernel.org>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Wed, 14 Aug 2013 11:01:40 +0100
+Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
+In-Reply-To: <1376428024.4255.14.camel@pasglop>
+References: <5208E2D3.7060005@arm.com> <3356439.a21MloFP7n@vostro.rjw.lan>
+ <520A536C.3030600@arm.com> <520A7B00.8060405@arm.com>
+ <1376428024.4255.14.camel@pasglop>
+Message-ID: <520B5584.7030608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On 13/08/13 22:07, Benjamin Herrenschmidt wrote:
+> On Tue, 2013-08-13 at 19:29 +0100, Sudeep KarkadaNagesha wrote:
+>> I don't understand completely the use of ibm,ppc-interrupt-server#s and
+>> its implications on generic of_get_cpu_node implementation.
+>> I see the PPC specific definition of of_get_cpu_node uses thread id only
+>> in 2 instances. Based on that, I have tried to move all the other
+>> instances to use generic definition.
+>>
+>> Let me know if the idea is correct.
+> 
+> No. The device-tree historically only represents cores, not HW threads, so
+> it makes sense to retrieve also the thread number corresponding to the CPU.
+> 
+Ok
 
-The Arndale has a SMSC USB3503 connected in hardware only mode like a PHY,
-support it using the usb-nop-xceiv binding.
+> However, the mechanism to represent HW threads in the device-tree is currently
+> somewhat platform specific (the ibm,ppc-interrupt-server#s).
+I see most of the callers pass NULL to thread id argument except 2
+instances in entire tree. If that's the case why can't we move to use
+generic of_get_cpu_node in most of those cases and have PPC specific
+implementation for the ones using thread id.
 
-Note that due to a regrettable decision to use a regulator to represent
-the reset signal this uses a fixed voltage regulator to do that, there
-is a plan to use the reset controller binding once that is merged so it
-does not seem worthwhile to fix the usb-nop-xceiv driver at this point.
+> 
+> So what you could do for now is:
+> 
+>  - Have a generic version that always returns 0 as the thread, which is weak
+I would prefer to move to generic of_get_cpu_node where ever possible
+and rename the function that takes thread id rather than making generic
+one weak.
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
+> 
+>  - powerpc keeps its own implementation
+How about only in cases where it needs thread_id.
 
-This doesn't 100% work right now since we don't yet have a solution to
-ensure that this gets started after the USB controller but those
-modifications are small (or can be done at runtime with module loading).
+> 
+>  - Start a discussion on the bindings (if not already there) to define threads
+> in a better way at which point the generic function can be updated.
+> 
+I am not sure if we need to define any new bindings. Excerpts from ePAPR
+(v1.1):
+"3.7.1 General Properties of CPU nodes
+The value of "reg" is a <prop-encoded-array> that defines a unique
+CPU/thread id for the CPU/threads represented by the CPU node.
+If a CPU supports more than one thread (i.e. multiple streams of
+execution) the reg property is an array with 1 element per thread. The
+#address-cells on the /cpus node specifies how many cells each element
+of the array takes. Software can determine the number of threads by
+dividing the size of reg by the parent node's #address-cells."
 
- arch/arm/boot/dts/exynos5250-arndale.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+And this is exactly in agreement to what's implemented in the generic
+of_get_cpu_node:
 
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index 96d528d..e477e23 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -539,4 +539,22 @@
- 	rtc {
- 		status = "okay";
- 	};
-+
-+	usb_hub_bus {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		// SMSC USB3503 connected in hardware only mode as a PHY
-+		usb_hub: usb_hub {
-+			compatible = "smsc,usb3503a";
-+
-+			reset-gpios = <&gpx3 5 1>;
-+			connect-gpios = <&gpd1 7 1>;
-+		};
-+	};
-+
-+	usb at 12110000 {
-+		usb-phy = <&usb2_phy>;
-+	};
- };
--- 
-1.8.4.rc2
+for_each_child_of_node(cpus, cpun) {
+        if (of_node_cmp(cpun->type, "cpu"))
+                continue;
+        cell = of_get_property(cpun, "reg", &prop_len);
+        if (!cell) {
+                pr_warn("%s: missing reg property\n", cpun->full_name);
+                continue;
+        }
+        prop_len /= sizeof(*cell);
+        while (prop_len) {
+                hwid = of_read_number(cell, ac);
+                prop_len -= ac;
+                if (arch_match_cpu_phys_id(cpu, hwid))
+                        return cpun;
+        }
+}
+
+Yes this doesn't cover the historical "ibm,ppc-interrupt-server#s", for
+which we can have PPC specific wrapper above the generic one i.e. get
+the cpu node and then parse for thread id under custom property.
+
+Let me know your thoughts.
+
+Regards,
+Sudeep
