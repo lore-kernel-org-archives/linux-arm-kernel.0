@@ -1,77 +1,73 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 14 Aug 2013 18:29:16 -0500
-Subject: [PATCHv2 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
-In-Reply-To: <1376522956-14960-1-git-send-email-dinguyen@altera.com>
-References: <1376522956-14960-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1376522956-14960-2-git-send-email-dinguyen@altera.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 14 Aug 2013 16:29:58 -0700
+Subject: [PATCH 02/10] crypto: omap-aes: Add useful debug macros
+In-Reply-To: <1376521969-16807-3-git-send-email-joelf@ti.com>
+References: <1376521969-16807-1-git-send-email-joelf@ti.com>
+ <1376521969-16807-3-git-send-email-joelf@ti.com>
+Message-ID: <1376522998.1949.118.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Wed, 2013-08-14 at 18:12 -0500, Joel Fernandes wrote:
+> When DEBUG is enabled, these macros can be used to print variables
+> in integer and hex format, and clearly display which registers,
+> offsets and values are being read/written , including printing the
+> names of the offsets and their values.
+[]
+> diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
+[]
+> @@ -15,6 +15,14 @@
+>  
+>  #define pr_fmt(fmt) "%s: " fmt, __func__
+>  
+> +#ifdef DEBUG
+> +#define prn(num) printk(#num "=%d\n", num)
+> +#define prx(num) printk(#num "=%x\n", num)
 
-The read_sched_clock should return the ~value because the clock is a
-countdown implementation. read_sched_clock() should be the same as
-__apbt_read_clocksource().
+pr_debug?
 
-If a separate timer for the sched_clock exist, then read_sched_clock()
-will return an incorrect value. The (sched_io_base + 0x4) needs to be in
-the function for both cases.
+> +#else
+> +#define prn(num) do { } while (0)
+> +#define prx(num)  do { } while (0)
+> +#endif
+[]
+> @@ -172,13 +180,35 @@ struct omap_aes_dev {
+>  static LIST_HEAD(dev_list);
+>  static DEFINE_SPINLOCK(list_lock);
+>  
+> +#ifdef DEBUG
+> +#define omap_aes_read(dd, offset)					\
+> +	do {								\
+> +		omap_aes_read_1(dd, offset);				\
+> +		pr_debug("omap_aes_read(" #offset ")\n");		\
+> +	} while (0)
+> +
+> +static inline u32 omap_aes_read_1(struct omap_aes_dev *dd, u32 offset)
+> +#else
+>  static inline u32 omap_aes_read(struct omap_aes_dev *dd, u32 offset)
+> +#endif
+>  {
+>  	return __raw_readl(dd->io_base + offset);
+>  }
+>  
+> +#ifdef DEBUG
+> +#define omap_aes_write(dd, offset, value)				\
+> +	do {								\
+> +		pr_debug("omap_aes_write(" #offset "=%x) value=%d\n",	\
+> +			 offset, value);				\
+> +		omap_aes_write_1(dd, offset, value);			\
+> +	} while (0)
+> +
+> +static inline void omap_aes_write_1(struct omap_aes_dev *dd, u32 offset,
+> +				  u32 value)
+> +#else
+>  static inline void omap_aes_write(struct omap_aes_dev *dd, u32 offset,
+>  				  u32 value)
+> +#endif
+>  {
+>  	__raw_writel(value, dd->io_base + offset);
+>  }
 
-Maintain backwards compatibility for "dw-apb-timer-sp" and
-"dw-apb-timer-osc".
+Umm, yuck?
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Acked-by: Jamie Iles <jamie@jamieiles.com>
-CC: Rob Herring <rob.herring@calxeda.com>
-CC: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-CC: Jamie Iles <jamie@jamieiles.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Pavel Machek <pavel@denx.de>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: linux-arm-kernel at lists.infradead.org
-
-v2:
-- Maintain backwards compatibility for "dw-apb-timer-sp" and
-  "dw-apb-timer-osc".
----
- drivers/clocksource/dw_apb_timer_of.c |    9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-index 4cbae4f..72ce4bb 100644
---- a/drivers/clocksource/dw_apb_timer_of.c
-+++ b/drivers/clocksource/dw_apb_timer_of.c
-@@ -102,18 +102,17 @@ static void add_clocksource(struct device_node *source_timer)
- 	 * timer is found. sched_io_base then points to the current_value
- 	 * register of the clocksource timer.
- 	 */
--	sched_io_base = iobase + 0x04;
-+	sched_io_base = iobase;
- 	sched_rate = rate;
- }
- 
- static u32 read_sched_clock(void)
- {
--	return __raw_readl(sched_io_base);
-+	return ~__raw_readl(sched_io_base + 0x4);
- }
- 
- static const struct of_device_id sptimer_ids[] __initconst = {
- 	{ .compatible = "picochip,pc3x2-rtc" },
--	{ .compatible = "snps,dw-apb-timer-sp" },
- 	{ /* Sentinel */ },
- };
- 
-@@ -153,4 +152,6 @@ static void __init dw_apb_timer_init(struct device_node *timer)
- 	num_called++;
- }
- CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
--CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer-osc", dw_apb_timer_init);
-+CLOCKSOURCE_OF_DECLARE(apb_timer_osc, "snps,dw-apb-timer-osc", dw_apb_timer_init);
-+CLOCKSOURCE_OF_DECLARE(apb_timer_sp, "snps,dw-apb-timer-sp", dw_apb_timer_init);
-+CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer", dw_apb_timer_init);
--- 
-1.7.9.5
+Is there any real value in read_1 and write_1?
