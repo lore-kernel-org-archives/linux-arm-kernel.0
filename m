@@ -1,38 +1,62 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 14 Aug 2013 13:05:52 +0400
-Subject: [PATCH 2/3] ARM: dts: i.MX51: Add one more I2C2 pinmux entry
+Date: Wed, 14 Aug 2013 13:05:53 +0400
+Subject: [PATCH 3/3] ARM: dts: i.MX51: Separate TXD/RXD and RTS/CTS pinmux
+ entries for UARTs
 In-Reply-To: <1376471153-3452-1-git-send-email-shc_work@mail.ru>
 References: <1376471153-3452-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1376471153-3452-2-git-send-email-shc_work@mail.ru>
+Message-ID: <1376471153-3452-3-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds one more I2C2 alternate pinmux entry.
-GPIO1_2 <=> SCL
-GPIO1_3 <=> SDA
+RTS/CTS pins can be used for different purposes, so create separate
+definitions for these pins.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx51.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/imx51-babbage.dts |  2 +-
+ arch/arm/boot/dts/imx51.dtsi        | 10 ++++++++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 1d337d9..899f1ce 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -252,7 +252,7 @@
+ 
+ &uart1 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_uart1_1>;
++	pinctrl-0 = <&pinctrl_uart1_1 &pinctrl_uart1_rtscts1>;
+ 	fsl,uart-has-rtscts;
+ 	status = "okay";
+ };
 diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 6d8f94a..a85abb4 100644
+index a85abb4..f8fa106 100644
 --- a/arch/arm/boot/dts/imx51.dtsi
 +++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -622,6 +622,13 @@
- 				MX51_PAD_EIM_D24__I2C2_SDA 0x400001ed
- 			>;
- 		};
-+
-+		pinctrl_i2c2_3: i2c2grp-3 {
-+			fsl,pins = <
-+				MX51_PAD_GPIO1_2__I2C2_SCL 0x400001ed
-+				MX51_PAD_GPIO1_3__I2C2_SDA 0x400001ed
+@@ -747,6 +747,11 @@
+ 			fsl,pins = <
+ 				MX51_PAD_UART1_RXD__UART1_RXD 0x1c5
+ 				MX51_PAD_UART1_TXD__UART1_TXD 0x1c5
 +			>;
 +		};
- 	};
- 
- 	ipu_disp1 {
++
++		pinctrl_uart1_rtscts1: uart1rtscts-1 {
++			fsl,pins = <
+ 				MX51_PAD_UART1_RTS__UART1_RTS 0x1c5
+ 				MX51_PAD_UART1_CTS__UART1_CTS 0x1c5
+ 			>;
+@@ -767,6 +772,11 @@
+ 			fsl,pins = <
+ 				MX51_PAD_EIM_D25__UART3_RXD 0x1c5
+ 				MX51_PAD_EIM_D26__UART3_TXD 0x1c5
++			>;
++		};
++
++		pinctrl_uart3_rtscts1: uart3rtscts-1 {
++			fsl,pins = <
+ 				MX51_PAD_EIM_D27__UART3_RTS 0x1c5
+ 				MX51_PAD_EIM_D24__UART3_CTS 0x1c5
+ 			>;
 -- 
 1.8.1.5
