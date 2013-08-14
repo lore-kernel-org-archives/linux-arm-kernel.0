@@ -1,55 +1,55 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 14 Aug 2013 16:58:10 +0300
-Subject: [PATCH 6/9] ARM: dts: omap4-panda: Use reset-gpios for hsusb1_reset
+Date: Wed, 14 Aug 2013 16:58:12 +0300
+Subject: [PATCH 8/9] ARM: dts: omap3-beagle: Make USB host pin naming
+ consistent
 In-Reply-To: <1376488693-31659-1-git-send-email-rogerq@ti.com>
 References: <1376488693-31659-1-git-send-email-rogerq@ti.com>
-Message-ID: <1376488693-31659-7-git-send-email-rogerq@ti.com>
+Message-ID: <1376488693-31659-9-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We no longer need to model the RESET line as a regulator since
-the USB phy-nop driver accepts "reset-gpios" property.
+Use a common naming scheme "mode0name.modename flags" for the
+USB host pins to be consistent.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap4-panda-common.dtsi |   18 +-----------------
- 1 files changed, 1 insertions(+), 17 deletions(-)
+ arch/arm/boot/dts/omap3-beagle.dts |   24 ++++++++++++------------
+ 1 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index faa95b5..cf2b518 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -60,22 +60,6 @@
- 			"AFMR", "Line In";
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index a6dcc71..30f51f4 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -90,18 +90,18 @@
+ 
+ 	hsusbb2_pins: pinmux_hsusbb2_pins {
+ 		pinctrl-single,pins = <
+-			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* usbb2_ulpitll_clk.usbb1_ulpiphy_clk */
+-			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* usbb2_ulpitll_clk.usbb1_ulpiphy_stp */
+-			0x5c4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dir */
+-			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_nxt */
+-			0x5c8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat0 */
+-			0x5cA (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat1 */
+-			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat2 */
+-			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat3 */
+-			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat4 */
+-			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat5 */
+-			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat6 */
+-			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* usbb2_ulpitll_clk.usbb1_ulpiphy_dat7 */
++			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
++			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
++			0x5c4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
++			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
++			0x5c8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
++			0x5cA (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
++			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
++			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
++			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
++			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
++			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
++			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
+ 		>;
  	};
  
--	/*
--	 * Temp hack: Need to be replaced with the proper gpio-controlled
--	 * reset driver as soon it will be merged.
--	 * http://thread.gmane.org/gmane.linux.drivers.devicetree/36830
--	 */
--	/* HS USB Port 1 RESET */
--	hsusb1_reset: hsusb1_reset_reg {
--		compatible = "regulator-fixed";
--		regulator-name = "hsusb1_reset";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		gpio = <&gpio2 30 0>;	/* gpio_62 */
--		startup-delay-us = <70000>;
--		enable-active-high;
--	};
--
- 	/* HS USB Port 1 Power */
- 	hsusb1_power: hsusb1_power_reg {
- 		compatible = "regulator-fixed";
-@@ -97,7 +81,7 @@
- 	/* HS USB Host PHY on PORT 1 */
- 	hsusb1_phy: hsusb1_phy {
- 		compatible = "usb-nop-xceiv";
--		reset-supply = <&hsusb1_reset>;
-+		reset-gpios = <&gpio2 30 0>;   /* gpio_62 */
- 		vcc-supply = <&hsusb1_power>;
- 	/**
- 	 * FIXME:
 -- 
 1.7.4.1
