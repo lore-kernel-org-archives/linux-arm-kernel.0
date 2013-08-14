@@ -1,147 +1,74 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 14 Aug 2013 18:44:08 +0900
-Subject: [PATCH 1/2] ARM: dts: Move the common DMA controller nodes to
- exynos5.dtsi
-In-Reply-To: <1373458449-19039-2-git-send-email-padma.v@samsung.com>
+Date: Wed, 14 Aug 2013 18:45:28 +0900
+Subject: [PATCH 2/2] ARM: dts: Add DMA controller node info on Exynos5420.
+In-Reply-To: <1373458449-19039-3-git-send-email-padma.v@samsung.com>
 References: <1373458449-19039-1-git-send-email-padma.v@samsung.com>
- <1373458449-19039-2-git-send-email-padma.v@samsung.com>
-Message-ID: <110401ce98d2$d304e2f0$790ea8d0$@org>
+ <1373458449-19039-3-git-send-email-padma.v@samsung.com>
+Message-ID: <110501ce98d3$0288bc40$079a34c0$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Padmavathi Venna wrote:
 > 
-> exynos5250 and exynos5420 has 4 DMA controllers in common. So this patch
-> moves these nodes to common file keeping the dma controllers clk info in
-> the exynos5250 dtsi file.
+> Exynos5420 has one separate DMA controller for I2S0 and PCM0. This patch
+> adds the same node on exynos5420 dtsi and adds the DMA clk info for the
+> remaining DMA controllers.
 > 
 > Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 > ---
->  arch/arm/boot/dts/exynos5.dtsi    |   44
-> +++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos5250.dtsi |   30 -------------------------
->  2 files changed, 44 insertions(+), 30 deletions(-)
+>  arch/arm/boot/dts/exynos5420.dtsi |   33
++++++++++++++++++++++++++++++++++
+>  1 files changed, 33 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/exynos5.dtsi
-> b/arch/arm/boot/dts/exynos5.dtsi
-> index f65e124..cac35c8 100644
-> --- a/arch/arm/boot/dts/exynos5.dtsi
-> +++ b/arch/arm/boot/dts/exynos5.dtsi
-> @@ -50,6 +50,50 @@
->  		interrupts = <1 9 0xf04>;
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
+> b/arch/arm/boot/dts/exynos5420.dtsi
+> index a84f5f1..7035a4b 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -137,6 +137,39 @@
+>  		interrupts = <0 47 0>;
 >  	};
 > 
 > +	amba {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "arm,amba-bus";
-> +		interrupt-parent = <&gic>;
-> +		ranges;
-> +
 > +		pdma0: pdma at 121A0000 {
-> +			compatible = "arm,pl330", "arm,primecell";
-> +			reg = <0x121A0000 0x1000>;
-> +			interrupts = <0 34 0>;
-> +			#dma-cells = <1>;
-> +			#dma-channels = <8>;
-> +			#dma-requests = <32>;
+> +			clocks = <&clock 362>;
+> +			clock-names = "apb_pclk";
 > +		};
 > +
 > +		pdma1: pdma at 121B0000 {
-> +			compatible = "arm,pl330", "arm,primecell";
-> +			reg = <0x121B0000 0x1000>;
-> +			interrupts = <0 35 0>;
-> +			#dma-cells = <1>;
-> +			#dma-channels = <8>;
-> +			#dma-requests = <32>;
+> +			clocks = <&clock 363>;
+> +			clock-names = "apb_pclk";
 > +		};
 > +
 > +		mdma0: mdma at 10800000 {
-> +			compatible = "arm,pl330", "arm,primecell";
-> +			reg = <0x10800000 0x1000>;
-> +			interrupts = <0 33 0>;
-> +			#dma-cells = <1>;
-> +			#dma-channels = <8>;
-> +			#dma-requests = <1>;
+> +			clocks = <&clock 473>;
+> +			clock-names = "apb_pclk";
 > +		};
 > +
 > +		mdma1: mdma at 11C10000 {
+> +			clocks = <&clock 442>;
+> +			clock-names = "apb_pclk";
+> +		};
+> +
+> +		adma: adma at 03880000 {
 > +			compatible = "arm,pl330", "arm,primecell";
-> +			reg = <0x11C10000 0x1000>;
-> +			interrupts = <0 124 0>;
+> +			reg = <0x03880000 0x1000>;
+> +			interrupts = <0 110 0>;
+> +			clocks = <&clock_audss EXYNOS_ADMA>;
+> +			clock-names = "apb_pclk";
 > +			#dma-cells = <1>;
-> +			#dma-channels = <8>;
-> +			#dma-requests = <1>;
+> +			#dma-channels = <6>;
+> +			#dma-requests = <16>;
 > +		};
 > +	};
 > +
->  	dwmmc_0: dwmmc0 at 12200000 {
->  		compatible = "samsung,exynos5250-dw-mshc";
->  		interrupts = <0 75 0>;
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
-> b/arch/arm/boot/dts/exynos5250.dtsi
-> index 41cd625..3a474c4 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -511,54 +511,24 @@
->  	};
-> 
->  	amba {
-> -		#address-cells = <1>;
-> -		#size-cells = <1>;
-> -		compatible = "arm,amba-bus";
-> -		interrupt-parent = <&gic>;
-> -		ranges;
-> -
->  		pdma0: pdma at 121A0000 {
-> -			compatible = "arm,pl330", "arm,primecell";
-> -			reg = <0x121A0000 0x1000>;
-> -			interrupts = <0 34 0>;
->  			clocks = <&clock 275>;
->  			clock-names = "apb_pclk";
-> -			#dma-cells = <1>;
-> -			#dma-channels = <8>;
-> -			#dma-requests = <32>;
->  		};
-> 
->  		pdma1: pdma at 121B0000 {
-> -			compatible = "arm,pl330", "arm,primecell";
-> -			reg = <0x121B0000 0x1000>;
-> -			interrupts = <0 35 0>;
->  			clocks = <&clock 276>;
->  			clock-names = "apb_pclk";
-> -			#dma-cells = <1>;
-> -			#dma-channels = <8>;
-> -			#dma-requests = <32>;
->  		};
-> 
->  		mdma0: mdma at 10800000 {
-> -			compatible = "arm,pl330", "arm,primecell";
-> -			reg = <0x10800000 0x1000>;
-> -			interrupts = <0 33 0>;
->  			clocks = <&clock 271>;
->  			clock-names = "apb_pclk";
-> -			#dma-cells = <1>;
-> -			#dma-channels = <8>;
-> -			#dma-requests = <1>;
->  		};
-> 
->  		mdma1: mdma at 11C10000 {
-> -			compatible = "arm,pl330", "arm,primecell";
-> -			reg = <0x11C10000 0x1000>;
-> -			interrupts = <0 124 0>;
->  			clocks = <&clock 271>;
->  			clock-names = "apb_pclk";
-> -			#dma-cells = <1>;
-> -			#dma-channels = <8>;
-> -			#dma-requests = <1>;
->  		};
->  	};
-> 
+>  	serial at 12C00000 {
+>  		clocks = <&clock 257>, <&clock 128>;
+>  		clock-names = "uart", "clk_uart_baud0";
 > --
 > 1.7.4.4
 
-NAK, because the dmac addresses are different on upcoming exynos5 and there
-are 2-mdma and only one pdma. So this change can make more complicated.
+See my comments on 1st patch and you need to re-spin for dmac on exynos5420.
 
-- Kukjin
+Thanks,
+Kukjin
