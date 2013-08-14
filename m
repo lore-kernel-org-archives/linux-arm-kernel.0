@@ -1,21 +1,60 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 14 Aug 2013 14:00:11 +0530
-Subject: [PATCH v2 09/11] dma: mmp_pdma: implement DMA_PAUSE and DMA_RESUME
-In-Reply-To: <520B478E.7020606@gmail.com>
-References: <1376153545-14361-1-git-send-email-zonque@gmail.com>
- <1376153545-14361-10-git-send-email-zonque@gmail.com>
- <20130814081520.GJ32147@intel.com> <520B478E.7020606@gmail.com>
-Message-ID: <20130814083011.GM32147@intel.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Wed, 14 Aug 2013 09:16:22 +0000
+Subject: [PATCH 25/29] drivers/spi/spi-sirf.c: simplify use of
+ devm_ioremap_resource
+In-Reply-To: <1376471493-22215-26-git-send-email-Julia.Lawall@lip6.fr>
+References: <1376471493-22215-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1376471493-22215-26-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <5EB3BFCD089AD643B9BB63439F5FD5E9012A3BCC66@SHAASIEXM01.ASIA.ROOT.PRI>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 11:02:06AM +0200, Daniel Mack wrote:
-> On 14.08.2013 10:15, Vinod Koul wrote:
-> > On Sat, Aug 10, 2013 at 06:52:23PM +0200, Daniel Mack wrote:
+> -----Original Message-----
+> From: Julia Lawall [mailto:Julia.Lawall at lip6.fr]
+> Sent: Wednesday, August 14, 2013 5:11 PM
+> To: Barry Song
+> Cc: kernel-janitors at vger.kernel.org; Mark Brown;
+> linux-arm-kernel at lists.infradead.org; linux-spi at vger.kernel.org;
+> linux-kernel at vger.kernel.org
+> Subject: [PATCH 25/29] drivers/spi/spi-sirf.c: simplify use of
+> devm_ioremap_resource
 > 
-> Ah, ok. Thanks for the review. Can you just omit that one and take the
-> rest of the patches? Pause and resume is something I can take care of in
-> a separate patch then, and it should hold off the other changes IMO.
-It shouldnt & it hasnt!
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
+> 
+> Remove unneeded error handling on the result of a call to
+> platform_get_resource when the value is passed to devm_ioremap_resource.
+> 
+> Move the call to platform_get_resource adjacent to the call to
+> devm_ioremap_resource to make the connection between them more clear.
+> 
+> A simplified version of the semantic patch that makes this change is as
+> follows: (http://coccinelle.lip6.fr/)
+> 
+> // <smpl>
+> @@
+> expression pdev,res,n,e,e1;
+> expression ret != 0;
+> identifier l;
+> @@
+> 
+> - res = platform_get_resource(pdev, IORESOURCE_MEM, n);
+>   ... when != res
+> - if (res == NULL) { ... \(goto l;\|return ret;\) }
+>   ... when != res
+> + res = platform_get_resource(pdev, IORESOURCE_MEM, n);
+>   e = devm_ioremap_resource(e1, res);
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-~Vinod
+Acked-by: Barry Song <Baohua.Song@csr.com>
+
+> 
+> ---
+>  drivers/spi/spi-sirf.c |    7 +------
+>  1 file changed, 1 insertion(+), 6 deletions(-)
+ 
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
