@@ -1,62 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Aug 2013 00:30:01 -0700
-Subject: [PATCH 12/22] ARM: dts: Remove '0x's from OMAP2420 H4 DTS file
-In-Reply-To: <20130813154425.GH15278@lee--X1>
-References: <1374490361-25769-1-git-send-email-lee.jones@linaro.org>
- <1374490361-25769-12-git-send-email-lee.jones@linaro.org>
- <20130813154425.GH15278@lee--X1>
-Message-ID: <20130814073000.GW7656@atomide.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 14 Aug 2013 16:30:55 +0900
+Subject: [GIT PULL] Samsung PWM support cleanup
+In-Reply-To: <CAOesGMhUncZmuuptZ3dU4UjVmvjKNb+GJqhwNwvYuUM=R3LwqA@mail.gmail.com>
+References: <3516906.8u5IrARqm7@flatron>
+ <20130814060702.GH16635@quad.lixom.net> <109a01ce98bd$1843cae0$48cb60a0$@org>
+ <CAOesGMhUncZmuuptZ3dU4UjVmvjKNb+GJqhwNwvYuUM=R3LwqA@mail.gmail.com>
+Message-ID: <10a701ce98c0$36afd980$a40f8c80$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lee Jones <lee.jones@linaro.org> [130813 08:51]:
-> Tony, Benoit,
+Olof Johansson wrote:
 > 
-> Poke
-
-Looks like Benoit's new email address is bcousson at baylibre.com.
-Probably best for Benoit to pick these to avoid merge conflicts.
-
-Regards,
-
-Tony
- 
-> On Mon, 22 Jul 2013, Lee Jones wrote:
+> On Wed, Aug 14, 2013 at 12:08 AM, Kukjin Kim <kgene@kernel.org> wrote:
+> > Olof Johansson wrote:
+> >>
+> >> On Tue, Aug 13, 2013 at 11:16:35PM +0200, Tomasz Figa wrote:
+> >> > Dear ARM SoC maintainers,
+> >> >
+> >> > The following changes since commit
+> >> > c095ba7224d8edc71dcef0d655911399a8bd4a3f:
+> >> >
+> >> >   Linux 3.11-rc4 (2013-08-04 13:46:46 -0700)
+> >> >
+> >> > are available in the git repository at:
+> >> >
+> >> >   git://github.com/tom3q/linux.git tags/v3.12-pwm-cleanup-for-olof
+> >>
+> >> Thanks, applied.
+> >>
+> > Same here, this will be merged into samsung tree because of dependency.
 > 
-> > Cc: Beno?t Cousson <b-cousson@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: linux-omap at vger.kernel.org
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/omap2420-h4.dts | 6 +++---
-> >  1 file changed, 3 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/omap2420-h4.dts b/arch/arm/boot/dts/omap2420-h4.dts
-> > index 224c08f..34cdecb 100644
-> > --- a/arch/arm/boot/dts/omap2420-h4.dts
-> > +++ b/arch/arm/boot/dts/omap2420-h4.dts
-> > @@ -50,15 +50,15 @@
-> >  			label = "bootloader";
-> >  			reg = <0 0x20000>;
-> >  		};
-> > -		partition at 0x20000 {
-> > +		partition at 20000 {
-> >  			label = "params";
-> >  			reg = <0x20000 0x20000>;
-> >  		};
-> > -		partition at 0x40000 {
-> > +		partition at 40000 {
-> >  			label = "kernel";
-> >  			reg = <0x40000 0x200000>;
-> >  		};
-> > -		partition at 0x240000 {
-> > +		partition at 240000 {
-> >  			label = "file-system";
-> >  			reg = <0x240000 0x3dc0000>;
-> >  		};
+> What's the dependency? If it's just two patches (which I think it is),
+> just send me your acks on them and we can apply them on top instead.
 > 
-> -- 
-> Lee Jones
-> Linaro ST-Ericsson Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Yeah if there are two patches, I can. But there are another dependent series
+such as "[PATCH v2 0/8] Common Clock Framework support for Samsung S3C64xx"
+from Tomasz. So I'd like to merge that into the samsung tree.
+
+- Kukjin
