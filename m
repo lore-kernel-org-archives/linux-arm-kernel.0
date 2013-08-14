@@ -1,53 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Aug 2013 21:05:09 +0200
-Subject: [PATCH] pinctrl: improve warning messages
-In-Reply-To: <520BB19E.8040901@wwwdotorg.org>
-References: <1376497533-32303-1-git-send-email-linus.walleij@linaro.org>
- <520BB19E.8040901@wwwdotorg.org>
-Message-ID: <CACRpkdbZZP3qowmR4djoPrNq0VnsR3ukoqLDyEC1oRFehfg74A@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 14 Aug 2013 15:10:11 -0400
+Subject: [GIT PULL 1/2] ARM: mvebu: MSI/PCI changes for v3.12
+Message-ID: <20130814191011.GD13964@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 6:34 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/14/2013 10:25 AM, Linus Walleij wrote:
+Arnd, Olof,
 
->>                       dev_err(pctldev->dev,
->> -                             "could not request pin %d on device %s\n",
->> -                             pins[i], pinctrl_dev_get_name(pctldev));
->> +                             "could not request pin %d from group %s on "
->> +                             "device %s\n",
->> +                             pins[i], gname, pinctrl_dev_get_name(pctldev));
->
-> I think it'd be useful to print the pin name rather than pin number here.
+This branch is a dependency for both the mvebu MSI series (2/2 in this
+thread), and Thierry Reding's patch series coming to you from Stephen
+Warren.
 
-Fixed it.
+thx,
 
->> @@ -486,6 +499,16 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
->>                       desc->mux_setting = NULL;
->>                       /* And release the pin */
->>                       pin_free(pctldev, pins[i], NULL);
->> +             } else {
->> +                     const char *gname;
->> +
->> +                     gname = pctlops->get_group_name(pctldev,
->> +                                             setting->data.mux.group);
->> +                     dev_warn(pctldev->dev,
->> +                              "not freeing pin %d as part of deactivating "
->> +                              "group %s - it is already used for some other "
->> +                              "setting",
->> +                              pins[i], gname);
->>               }
->>       }
->
-> I think that will only happen if one of the pinmux_enabling_setting
-> prints already happened. Is it worth adding this one?
+Jason.
 
-It happens at two very distinct places in the run path, disabling a setting
-may appear at a totally different place in the dmesg so I think so.
 
-It's just below the just added code that will avoid free:ing a pin if some
-other setting is muxing it, so it's this print I was talking about
-with Sonic.
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
-Yours,
-Linus Walleij
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/msi-3.12
+
+for you to fetch changes up to 6a4324ebf5cf412d55fd1ea259d4dd29fb8f90e8:
+
+  PCI: msi: add default MSI operations for !HAVE_GENERIC_HARDIRQS platforms (2013-08-13 15:16:30 +0000)
+
+----------------------------------------------------------------
+mvebu msi pci changes for v3.12
+
+ - introduce support for MSI on PCI
+ - fix s390 build breakage when !HAVE_GENERIC_HARDIRQS
+
+NOTE: This branch is a dependency for changes going though arm-soc from both
+Thomas Petazzoni and Thierry Reding.
+
+----------------------------------------------------------------
+Thierry Reding (1):
+      PCI: Introduce new MSI chip infrastructure
+
+Thomas Petazzoni (5):
+      PCI: use weak functions for MSI arch-specific functions
+      PCI: remove ARCH_SUPPORTS_MSI kconfig option
+      of: pci: add registry of MSI chips
+      ARM: pci: add ->add_bus() and ->remove_bus() hooks to hw_pci
+      PCI: msi: add default MSI operations for !HAVE_GENERIC_HARDIRQS platforms
+
+ arch/arm/Kconfig                |  1 -
+ arch/arm/include/asm/mach/pci.h |  4 ++
+ arch/arm/kernel/bios32.c        | 16 ++++++++
+ arch/ia64/Kconfig               |  1 -
+ arch/mips/Kconfig               |  2 -
+ arch/mips/include/asm/pci.h     |  5 ---
+ arch/powerpc/Kconfig            |  1 -
+ arch/powerpc/include/asm/pci.h  |  5 ---
+ arch/s390/Kconfig               |  1 -
+ arch/s390/include/asm/pci.h     |  4 --
+ arch/sparc/Kconfig              |  1 -
+ arch/tile/Kconfig               |  1 -
+ arch/x86/Kconfig                |  1 -
+ arch/x86/include/asm/pci.h      | 30 ---------------
+ arch/x86/kernel/x86_init.c      | 24 ++++++++++++
+ drivers/of/of_pci.c             | 45 ++++++++++++++++++++++
+ drivers/pci/Kconfig             |  4 --
+ drivers/pci/msi.c               | 85 ++++++++++++++++++++++++++++++-----------
+ drivers/pci/probe.c             |  1 +
+ include/linux/msi.h             | 21 +++++++++-
+ include/linux/of_pci.h          | 12 ++++++
+ include/linux/pci.h             |  1 +
+ 22 files changed, 185 insertions(+), 81 deletions(-)
