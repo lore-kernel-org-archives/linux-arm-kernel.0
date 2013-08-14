@@ -1,31 +1,105 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 14 Aug 2013 16:45:10 +0800
-Subject: [PATCH] phy: micrel: Add definitions for common Micrel PHY
- registers
-In-Reply-To: <20130814.005154.348348186882819546.davem@davemloft.net>
-References: <1376405940-17141-1-git-send-email-dinguyen@altera.com>
- <20130814051743.GG16915@S2101-09.ap.freescale.net>
- <20130814.005154.348348186882819546.davem@davemloft.net>
-Message-ID: <20130814084508.GD31141@S2101-09.ap.freescale.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 14 Aug 2013 10:50:23 +0200
+Subject: [PATCH v3 1/6] ARM/ARM64: arch_timer: add macros for bits in
+ control register
+In-Reply-To: <1376414984-14182-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376414984-14182-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376414984-14182-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <520B44CF.6040403@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 12:51:54AM -0700, David Miller wrote:
-> From: Shawn Guo <shawn.guo@linaro.org>
-> Date: Wed, 14 Aug 2013 13:17:46 +0800
+On 08/13/2013 07:29 PM, Sudeep KarkadaNagesha wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 > 
-> > On Tue, Aug 13, 2013 at 09:58:59AM -0500, dinguyen at altera.com wrote:
-> >> From: Dinh Nguyen <dinguyen@altera.com>
-> >> 
-> >> Hi Shawn,
-> >> 
-> >> Can you apply this patch to your tree for 3.12?
-> >> 
-> > 
-> > I need David's Ack to send the patch through IMX tree.
+> Add macros to describe the bitfields in the ARM architected timer
+> control register to make code easy to understand.
 > 
-> Acked-by: David S. Miller <davem@davemloft.net>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> ---
+>  arch/arm/include/asm/arch_timer.h    |  9 +++++++--
+>  arch/arm64/include/asm/arch_timer.h  | 12 ++++++++----
+>  include/clocksource/arm_arch_timer.h |  8 ++++++++
+>  3 files changed, 23 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+> index e406d57..9ef74da 100644
+> --- a/arch/arm/include/asm/arch_timer.h
+> +++ b/arch/arm/include/asm/arch_timer.h
+> @@ -95,8 +95,13 @@ static inline void arch_counter_set_user_access(void)
+>  
+>  	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
+>  
+> -	/* disable user access to everything */
+> -	cntkctl &= ~((3 << 8) | (7 << 0));
+> +	/* Disable user access to both physical/virtual counters/timers. */
+> +	/* Also disable virtual event stream */
+> +	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
+> +			| ARCH_TIMER_USR_VT_ACCESS_EN
+> +			| ARCH_TIMER_VIRT_EVT_EN
+> +			| ARCH_TIMER_USR_VCT_ACCESS_EN
+> +			| ARCH_TIMER_USR_PCT_ACCESS_EN);
+>  
+>  	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
+>  }
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index 98abd47..00b09d0 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -101,12 +101,16 @@ static inline void arch_counter_set_user_access(void)
+>  {
+>  	u32 cntkctl;
+>  
+> -	/* Disable user access to the timers and the physical counter. */
+>  	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
+> -	cntkctl &= ~((3 << 8) | (1 << 0));
+>  
+> -	/* Enable user access to the virtual counter and frequency. */
+> -	cntkctl |= (1 << 1);
+> +	/* Disable user access to the timers and the physical counter. */
+> +	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
+> +			| ARCH_TIMER_USR_VT_ACCESS_EN
+> +			| ARCH_TIMER_USR_PCT_ACCESS_EN);
+> +
+> +	/* Enable user access to the virtual counter. */
+> +	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
+> +
+>  	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+>  }
 
-Okay, applied with David's ACK.
+Before doing those changes, I suggest you kill include/asm/arch_timer.h
+header file and move the functions directly in the arm_arch_timer.c as
+they are only used by it.
 
-Shawn
+> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+> index c463ce9..551f7e9 100644
+> --- a/include/clocksource/arm_arch_timer.h
+> +++ b/include/clocksource/arm_arch_timer.h
+> @@ -29,6 +29,14 @@
+>  #define ARCH_TIMER_PHYS_ACCESS		0
+>  #define ARCH_TIMER_VIRT_ACCESS		1
+>  
+> +#define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter */
+> +#define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
+> +#define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
+> +#define ARCH_TIMER_EVT_TRIGGER_SHIFT	(4)
+> +#define ARCH_TIMER_EVT_TRIGGER_MASK	(0xF << ARCH_TIMER_EVT_TRIGGER_SHIFT)
+> +#define ARCH_TIMER_USR_VT_ACCESS_EN	(1 << 8) /* virtual timer registers */
+> +#define ARCH_TIMER_USR_PT_ACCESS_EN	(1 << 9) /* physical timer registers */
+> +
+>  #ifdef CONFIG_ARM_ARCH_TIMER
+>  
+>  extern u32 arch_timer_get_rate(void);
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
