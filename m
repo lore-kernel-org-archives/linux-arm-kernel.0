@@ -1,35 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 14 Aug 2013 10:04:41 +0200
-Subject: [PATCH v2] ARM: sunxi: dt: Add device tree for Mele A1000
-In-Reply-To: <1376435901-6617-1-git-send-email-emilio@elopez.com.ar>
-References: <20130813203001.GC28819@lukather>
- <1376435901-6617-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20130814080441.GD28819@lukather>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 14 Aug 2013 01:04:05 -0700
+Subject: [GIT PULL 0/4] Renesas ARM based SoC defconfig updates for v3.12
+In-Reply-To: <cover.1375842392.git.horms+renesas@verge.net.au>
+References: <cover.1375842392.git.horms+renesas@verge.net.au>
+Message-ID: <20130814080405.GF30577@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 08:18:21PM -0300, Emilio L?pez wrote:
-> This adds a device tree usable on Mele A1000 (and A2000, as it
-> apparently is the same device except for the case). This device features
-> one UART port, Ethernet, an AXP209 PMU on i2c0 and two user configurable
-> LEDs.
+On Wed, Aug 07, 2013 at 01:23:55PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> please consider these Renesas ARM based SoC defconfig updates for v3.12.
+> 
+> 
+> In relation to adding a new defconfig I would like to note that Magnus and
+> I are aware of your ongoing requests to reduce the number of shmobile
+> defconfigs and that we are making progress on that front in two ways:
+> 
+> * Two boards, and their defconfigs were scheduled for removal in v3.11
+>   and a further two boards and their defconfigs are scheduled for removal
+>   in v3.12.
+> 
+>   For reference the boards are: ap5evb, bonito, ag5evm and kota2
+> 
+> * More importantly, we are making significant progress towards being
+>   able to use multiplatform and thus consolidate most if not all
+>   of the shmobile defconfigs into either a single shmobile defconfig
+>   or a more generic ARM defconfig.
+> 
+>   The removal of the boards mentioned above helps this process
+>   by removing the need to update as much code. In particular code
+>   which we have limited or no access to hardware to test.
+> 
+>   The main remaining barrier here is common clocks which I current
+>   expect to take a few more release cycles to get in order.
+> 
+> 
+> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+> 
+>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v3.12
 
-Applied with a minor fix to the soc node address on my sunxi/dt-for-3.12
-branch.
+Pulled. Looking forward to the removals. :)
 
-Thanks,
-Maxime
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130814/bcbfefa0/attachment.sig>
+-Olof
