@@ -1,24 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 14 Aug 2013 11:57:46 +0800
-Subject: [PATCH 2/2] ARM: imx: Re-select CONFIG_SND_SOC_IMX_MC13783 option
-In-Reply-To: <1376308553-2824-2-git-send-email-festevam@gmail.com>
-References: <1376308553-2824-1-git-send-email-festevam@gmail.com>
- <1376308553-2824-2-git-send-email-festevam@gmail.com>
-Message-ID: <20130814035744.GF16915@S2101-09.ap.freescale.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 14 Aug 2013 10:12:31 +0530
+Subject: [PATCH v2 0/4] GPIO DT support for da850
+In-Reply-To: <CA+V-a8sNPMbQjh8uxhQ=aOgo4ZfmaKXoOnRsuurzEeWzBKW8WA@mail.gmail.com>
+References: <1371203020-15092-1-git-send-email-avinashphilip@ti.com>
+ <518397C60809E147AF5323E0420B992E3EADAFCF@DBDE04.ent.ti.com>
+ <CA+V-a8sNPMbQjh8uxhQ=aOgo4ZfmaKXoOnRsuurzEeWzBKW8WA@mail.gmail.com>
+Message-ID: <520B0AB7.1070700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 08:55:53AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Commit 02502da45 (ASoC: imx-mc13783: Depend on ARCH_ARM) caused the selection of
-> CONFIG_SND_SOC_IMX_MC13783 to be impossible due to a wrong dependency, which
-> caused CONFIG_SND_SOC_IMX_MC13783 to be removed after the defconfigs cleanups.
-> 
-> The original selection problem has been fixed by 9f19de649f (ASoC: imx-mc13783:
-> Make SND_SOC_IMX_MC13783 visible again), so it is possible to select 
-> CONFIG_SND_SOC_IMX_MC13783 again as originally done.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Prabhakar,
 
-Applied, thanks
+On 8/11/2013 3:04 PM, Prabhakar Lad wrote:
+> Hi Sekhar,
+> 
+> On Fri, Jun 14, 2013 at 3:50 PM, Philip, Avinash <avinashphilip@ti.com> wrote:
+>> On Fri, Jun 14, 2013 at 15:13:36, Philip, Avinash wrote:
+>>> With conversion of GPIO davinci driver to platform driver, gpio-davinci driver
+>>> can support DT boot.
+>>> This patch series
+>>> - adds dt binding support for gpio-davinci.
+>>> - da850 dt support goio.
+>>>
+>>> This patch series is based on Linux 3.10-rc4 and is availabel at [1].
+>>>
+>>> 1. https://github.com/avinashphilip/am335x_linux/tree/linux_davinci_v3.10_soc_gpio_v310-rc4
+>>
+>>
+>> This patch series has dependency on [PATCH v2 0/7] Convert GPIO Davinci to platform driver
+>>
+>> https://lkml.org/lkml/2013/6/14/120
+>>
+> What is the status of this patch series is any one taking care of it or
+> else I can take care of review comments and repost them.
+
+Avinash is not working for TI anymore. It will be great if you can take
+this up.
+
+Thanks,
+Sekhar
