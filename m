@@ -1,78 +1,52 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Wed, 14 Aug 2013 19:52:29 +0530
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Wed, 14 Aug 2013 15:23:23 +0100
 Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
  with external L3-cache.
-In-Reply-To: <f8917fe8409b1fae634c7de45e34d4a7@www.loen.fr>
+In-Reply-To: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
 References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
- <f8917fe8409b1fae634c7de45e34d4a7@www.loen.fr>
-Message-ID: <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
+Message-ID: <520B92DB.5070708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 5:34 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Hi Pranav,
->
-> On 2013-08-14 12:47, Pranavkumar Sawargaonkar wrote:
->> Systems with large external L3-cache (few MBs), might have dirty
->> content belonging to the guest page in L3-cache. To tackle this,
->> we need to flush such dirty content from d-cache so that guest
->> will see correct contents of guest page when guest MMU is disabled.
->>
->> The patch fixes coherent_icache_guest_page() for external L3-cache.
->>
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->> ---
->>  arch/arm64/include/asm/kvm_mmu.h |    2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/kvm_mmu.h
->> b/arch/arm64/include/asm/kvm_mmu.h
->> index efe609c..5129038 100644
->> --- a/arch/arm64/include/asm/kvm_mmu.h
->> +++ b/arch/arm64/include/asm/kvm_mmu.h
->> @@ -123,6 +123,8 @@ static inline void
->> coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
->>       if (!icache_is_aliasing()) {            /* PIPT */
->>               unsigned long hva = gfn_to_hva(kvm, gfn);
->>               flush_icache_range(hva, hva + PAGE_SIZE);
->> +             /* Flush d-cache for systems with external caches. */
->> +             __flush_dcache_area((void *) hva, PAGE_SIZE);
->>       } else if (!icache_is_aivivt()) {       /* non ASID-tagged VIVT */
->>               /* any kind of VIPT cache */
->>               __flush_icache_all();
->
-> [adding Will to the discussion as we talked about this in the past]
->
-> That's definitely an issue, but I'm not sure the fix is to hit the data
-> cache on each page mapping. It looks overkill.
->
-> Wouldn't it be enough to let userspace do the cache cleaning? kvmtools
-> knows which bits of the guest memory have been touched, and can do a "DC
-> DVAC" on this region.
+On 14/08/13 12:47, Pranavkumar Sawargaonkar wrote:
+> Systems with large external L3-cache (few MBs), might have dirty
+> content belonging to the guest page in L3-cache. To tackle this,
+> we need to flush such dirty content from d-cache so that guest
+> will see correct contents of guest page when guest MMU is disabled.
+> 
+> The patch fixes coherent_icache_guest_page() for external L3-cache.
+> 
 
-It seems a bit unnatural to have cache cleaning is user-space. I am sure
-other architectures don't have such cache cleaning in user-space for KVM.
+I don't understand KVM but the commit message caught my attention.
 
->
-> The alternative is do it in the kernel before running any vcpu - but
-> that's not very nice either (have to clean the whole of the guest
-> memory, which makes a full dcache clean more appealing).
+You are referring to clean the external/outer L3 cache but using
+internal cache maintenance APIs. You should be using outer_cache APIs if
+you really intend to do outer cache maintenance ?
+Is the external/outer L3 cache not unified ?
 
-Actually, cleaning full d-cache by set/way upon first run of VCPU was
-our second option but current approach seemed very simple hence
-we went for this.
+Or did you mean to flush d-cache to the point of coherency(external L3
+in your case)? If so it's not clear from the commit log.
 
-If more people vote for full d-cache clean upon first run of VCPU then
-we should revise this patch.
+Regards,
+Sudeep
 
->
->          M.
-> --
-> Fast, cheap, reliable. Pick two.
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
-
---Anup
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_mmu.h |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index efe609c..5129038 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -123,6 +123,8 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+>  	if (!icache_is_aliasing()) {		/* PIPT */
+>  		unsigned long hva = gfn_to_hva(kvm, gfn);
+>  		flush_icache_range(hva, hva + PAGE_SIZE);
+> +		/* Flush d-cache for systems with external caches. */
+> +		__flush_dcache_area((void *) hva, PAGE_SIZE);
+>  	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
+>  		/* any kind of VIPT cache */
+>  		__flush_icache_all();
+> 
