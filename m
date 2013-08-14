@@ -1,33 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Aug 2013 22:37:32 +0200
-Subject: [PATCH 4/5] pinctrl: imx: do not fail when parsing a function
- fails
-In-Reply-To: <1376050854-3303-5-git-send-email-s.hauer@pengutronix.de>
-References: <1376050854-3303-1-git-send-email-s.hauer@pengutronix.de>
- <1376050854-3303-5-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CACRpkdaFNNtEbCx2AKXuFW0MPFtkwkY9WOxUkmxJaAx0aDP11w@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 14 Aug 2013 22:40:13 +0200
+Subject: [PATCH] mmc: omap_hsmmc: get capabilities from DT
+Message-ID: <1376512813-27892-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 9, 2013 at 2:20 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+When used in DT mode, the omap hsmmc driver has to take capabilites
+given in DT by calling mmc_of_parse().
 
-> When parsing a function fails this is no reason to make the whole
-> driver fail. Just continue with the next function.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-(...)
-> -       for_each_child_of_node(np, child) {
-> -               ret = imx_pinctrl_parse_functions(child, info, i++);
-> -               if (ret) {
-> -                       dev_err(&pdev->dev, "failed to parse function\n");
-> -                       return ret;
-> -               }
-> -       }
-> +       for_each_child_of_node(np, child)
-> +               imx_pinctrl_parse_functions(child, info, i++);
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ drivers/mmc/host/omap_hsmmc.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-But is there a reason to stop printing an error message
-about it?
-
-Yours,
-Linus Walleij
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 1865321..31337c1 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1907,7 +1907,15 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 	if (mmc_slot(host).nonremovable)
+ 		mmc->caps |= MMC_CAP_NONREMOVABLE;
+ 
+-	mmc->pm_caps = mmc_slot(host).pm_caps;
++	if (pdev->dev.of_node) {
++		ret = mmc_of_parse(mmc);
++		if (ret < 0) {
++			dev_err(&pdev->dev, "mmc_of_parse() failed: %d\n", ret);
++			goto err_irq;
++		}
++	} else {
++		mmc->pm_caps = mmc_slot(host).pm_caps;
++	}
+ 
+ 	omap_hsmmc_conf_bus_power(host);
+ 
+-- 
+1.8.3.1
