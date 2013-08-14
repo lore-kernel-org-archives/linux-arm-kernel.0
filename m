@@ -1,26 +1,29 @@
-From: dsd@laptop.org (Daniel Drake)
-Date: Wed, 14 Aug 2013 15:26:29 -0600
-Subject: [PATCH v6 01/11] irqchip: move mmp irq driver
-In-Reply-To: <1374833133-21119-2-git-send-email-haojian.zhuang@gmail.com>
-References: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
- <1374833133-21119-2-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <CAMLZHHTeKN7N6AsgTySE0QLHBv8yq-00C31iue_swusXnG6=uA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 14 Aug 2013 15:30:29 -0600
+Subject: [PATCH V2] ARM: allow DEBUG_UNCOMPRESS for Tegra
+In-Reply-To: <1375379471-15615-1-git-send-email-swarren@wwwdotorg.org>
+References: <1375379471-15615-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <520BF6F5.5090303@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series affects 3 different subsystems: irqchip,
-clocksource, clk. It's not clear from your submission who you are
-expecting to review/merge this. Unless there is some prior agreement,
-maybe it would be easier and clearer to divide this up by subsystem.
-There doesn't seem to be any overlap/dependencies between the 3 parts.
+On 08/01/2013 11:51 AM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> DEBUG_UNCOMPRESS was previously disallowed for Tegra due to tegra.S's
+> use of global data that was not linked into the decompressor. Solve this
+> by declaring this symbol in tegra.S when it is being built into the
+> decompressor. For the kernel proper, leave the declaration in
+> mach-tegra/common.c as explained in the comment.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> v2: Don't select DEBUG_UNCOMPRESS with DEBUG_TEGRA_UART unless
+>     !ZBOOT_ROM. Add notes on ZBOOT_ROM to comment.
+> 
+> Russell, I assume this should go in through the ARM patch tracker. Or,
+> do you want me to take it through the Tegra tree?
 
-On Fri, Jul 26, 2013 at 4:05 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> Move irq-mmp driver from mach-mmp directory into irqchip directory.
-
-Might be worth a 1-line commit message, explaining the motivation
-here: moving hardware support from arch/arm to drivers/
-
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-
-Reviewed-by: Daniel Drake <dsd@laptop.org>
+Russell, I put this patch into the ARM patch tracker a while back. I
+assume it's something you plan to take, or should I put it into the
+Tegra tree? Thanks.
