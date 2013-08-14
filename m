@@ -1,24 +1,97 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 14 Aug 2013 20:10:28 +0100
-Subject: [PATCH 1/16 v2] sound/soc/pxa/mioa701_wm9713.c: Avoid using
- ARRAY_AND_SIZE(e) as a function argument
-In-Reply-To: <1376340564-7975-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1376340564-7975-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20130814191028.GP2401@sirena.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 14 Aug 2013 14:13:22 -0500
+Subject: [PATCH 1/2] DMA: fix AMBA PL08x driver issue with 64bit DMA
+ address type
+In-Reply-To: <20130814130026.GS23006@n2100.arm.linux.org.uk>
+References: <1376484729-11826-1-git-send-email-andre.przywara@linaro.org>
+ <1376484729-11826-2-git-send-email-andre.przywara@linaro.org>
+ <20130814130026.GS23006@n2100.arm.linux.org.uk>
+Message-ID: <CAL_JsqLRtRvPyFagLLaRAjciiur=qVKmt2v7q5MPtEGuDske4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 10:49:24PM +0200, Julia Lawall wrote:
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> Replace ARRAY_AND_SIZE(e) in function argument position to avoid hiding the
-> arity of the called function.
+On Wed, Aug 14, 2013 at 8:00 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> NAK.
 
-Applied the incremental bit of this, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130814/627dcb9a/attachment.sig>
+This patch has nothing to do with dma masks or your dma mask series.
+The code deals with bus alignment and cleans up the code to do
+alignment operations in a sane way compared to modulo operator. The
+only thing 64-bit dma_addr_t did was expose crap code.
+
+Perhaps bus_addr_offset needs a better name to indicate it is dealing
+with bus alignment rather than bus address offset.
+
+Rob
+
+> On Wed, Aug 14, 2013 at 02:52:08PM +0200, Andre Przywara wrote:
+>> In Rob's recent pull request the patch
+>>       ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
+>> promotes dma_addr_t to 64bit, which breaks compilation of the
+>> AMBA PL08x DMA driver.
+>> GCC has no function for the 64bit/8bit modulo operation.
+>> Looking more closely the divisor can only be 1, 2 or 4, so the full
+>> featured '%' modulo operation is overkill and can be replaced by
+>> simple bit masking.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
+>> ---
+>>  drivers/dma/amba-pl08x.c | 16 ++++++++++------
+>>  1 file changed, 10 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+>> index 06fe45c..29e1cf9 100644
+>> --- a/drivers/dma/amba-pl08x.c
+>> +++ b/drivers/dma/amba-pl08x.c
+>> @@ -286,6 +286,11 @@ static inline struct pl08x_txd *to_pl08x_txd(struct dma_async_tx_descriptor *tx)
+>>       return container_of(tx, struct pl08x_txd, vd.tx);
+>>  }
+>>
+>> +static int bus_addr_offset(struct pl08x_bus_data *bus)
+>> +{
+>> +     return bus->addr & (bus->buswidth - 1);
+>> +}
+>> +
+>>  /*
+>>   * Mux handling.
+>>   *
+>> @@ -886,8 +891,8 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+>>                               return 0;
+>>                       }
+>>
+>> -                     if ((bd.srcbus.addr % bd.srcbus.buswidth) ||
+>> -                                     (bd.dstbus.addr % bd.dstbus.buswidth)) {
+>> +                     if (bus_addr_offset(&bd.srcbus) ||
+>> +                                     bus_addr_offset(&bd.dstbus)) {
+>>                               dev_err(&pl08x->adev->dev,
+>>                                       "%s src & dst address must be aligned to src"
+>>                                       " & dst width if peripheral is flow controller",
+>> @@ -908,9 +913,8 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+>>                */
+>>               if (bd.remainder < mbus->buswidth)
+>>                       early_bytes = bd.remainder;
+>> -             else if ((mbus->addr) % (mbus->buswidth)) {
+>> -                     early_bytes = mbus->buswidth - (mbus->addr) %
+>> -                             (mbus->buswidth);
+>> +             else if (bus_addr_offset(mbus)) {
+>> +                     early_bytes = mbus->buswidth - bus_addr_offset(mbus);
+>>                       if ((bd.remainder - early_bytes) < mbus->buswidth)
+>>                               early_bytes = bd.remainder;
+>>               }
+>> @@ -928,7 +932,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
+>>                        * Master now aligned
+>>                        * - if slave is not then we must set its width down
+>>                        */
+>> -                     if (sbus->addr % sbus->buswidth) {
+>> +                     if (bus_addr_offset(sbus)) {
+>>                               dev_dbg(&pl08x->adev->dev,
+>>                                       "%s set down bus width to one byte\n",
+>>                                       __func__);
+>> --
+>> 1.7.12.1
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
