@@ -1,100 +1,53 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Aug 2013 21:02:46 +0200
-Subject: [PATCH v2] pinctrl: improve warning messages
-Message-ID: <1376506966-11623-1-git-send-email-linus.walleij@linaro.org>
+Date: Wed, 14 Aug 2013 21:05:09 +0200
+Subject: [PATCH] pinctrl: improve warning messages
+In-Reply-To: <520BB19E.8040901@wwwdotorg.org>
+References: <1376497533-32303-1-git-send-email-linus.walleij@linaro.org>
+ <520BB19E.8040901@wwwdotorg.org>
+Message-ID: <CACRpkdbZZP3qowmR4djoPrNq0VnsR3ukoqLDyEC1oRFehfg74A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Print out the affected group name on activation of pin mux
-settings, and warn if you cannot free a pin that should have
-been part of a certain setting.
+On Wed, Aug 14, 2013 at 6:34 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/14/2013 10:25 AM, Linus Walleij wrote:
 
-ChangeLog v1->v2:
-- Also print the pin name in the error messages.
+>>                       dev_err(pctldev->dev,
+>> -                             "could not request pin %d on device %s\n",
+>> -                             pins[i], pinctrl_dev_get_name(pctldev));
+>> +                             "could not request pin %d from group %s on "
+>> +                             "device %s\n",
+>> +                             pins[i], gname, pinctrl_dev_get_name(pctldev));
+>
+> I think it'd be useful to print the pin name rather than pin number here.
 
-Cc: Sonic Zhang <sonic.zhang@analog.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinmux.c | 41 +++++++++++++++++++++++++++++++++++------
- 1 file changed, 35 insertions(+), 6 deletions(-)
+Fixed it.
 
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index 5f51588..9d144a2 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -400,10 +400,14 @@ int pinmux_enable_setting(struct pinctrl_setting const *setting)
- 	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
- 				      &pins, &num_pins);
- 	if (ret) {
-+		const char *gname;
-+
- 		/* errors only affect debug data, so just warn */
-+		gname = pctlops->get_group_name(pctldev,
-+						setting->data.mux.group);
- 		dev_warn(pctldev->dev,
--			 "could not get pins for group selector %d\n",
--			 setting->data.mux.group);
-+			 "could not get pins for group %s\n",
-+			 gname);
- 		num_pins = 0;
- 	}
- 
-@@ -411,9 +415,18 @@ int pinmux_enable_setting(struct pinctrl_setting const *setting)
- 	for (i = 0; i < num_pins; i++) {
- 		ret = pin_request(pctldev, pins[i], setting->dev_name, NULL);
- 		if (ret) {
-+			const char *gname;
-+			const char *pname;
-+
-+			desc = pin_desc_get(pctldev, pins[i]);
-+			pname = desc ? desc->name : "non-existing";
-+			gname = pctlops->get_group_name(pctldev,
-+						setting->data.mux.group);
- 			dev_err(pctldev->dev,
--				"could not request pin %d on device %s\n",
--				pins[i], pinctrl_dev_get_name(pctldev));
-+				"could not request pin %d (%s) from group %s "
-+				" on device %s\n",
-+				pins[i], pname, gname,
-+				pinctrl_dev_get_name(pctldev));
- 			goto err_pin_request;
- 		}
- 	}
-@@ -466,10 +479,14 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
- 	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
- 				      &pins, &num_pins);
- 	if (ret) {
-+		const char *gname;
-+
- 		/* errors only affect debug data, so just warn */
-+		gname = pctlops->get_group_name(pctldev,
-+						setting->data.mux.group);
- 		dev_warn(pctldev->dev,
--			 "could not get pins for group selector %d\n",
--			 setting->data.mux.group);
-+			 "could not get pins for group %s\n",
-+			 gname);
- 		num_pins = 0;
- 	}
- 
-@@ -486,6 +503,18 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
- 			desc->mux_setting = NULL;
- 			/* And release the pin */
- 			pin_free(pctldev, pins[i], NULL);
-+		} else {
-+			const char *gname;
-+			const char *pname;
-+
-+			pname = desc ? desc->name : "non-existing";
-+			gname = pctlops->get_group_name(pctldev,
-+						setting->data.mux.group);
-+			dev_warn(pctldev->dev,
-+				 "not freeing pin %d (%s) as part of "
-+				 "deactivating group %s - it is already "
-+				 "used for some other setting",
-+				 pins[i], pname, gname);
- 		}
- 	}
- 
--- 
-1.8.1.4
+>> @@ -486,6 +499,16 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
+>>                       desc->mux_setting = NULL;
+>>                       /* And release the pin */
+>>                       pin_free(pctldev, pins[i], NULL);
+>> +             } else {
+>> +                     const char *gname;
+>> +
+>> +                     gname = pctlops->get_group_name(pctldev,
+>> +                                             setting->data.mux.group);
+>> +                     dev_warn(pctldev->dev,
+>> +                              "not freeing pin %d as part of deactivating "
+>> +                              "group %s - it is already used for some other "
+>> +                              "setting",
+>> +                              pins[i], gname);
+>>               }
+>>       }
+>
+> I think that will only happen if one of the pinmux_enabling_setting
+> prints already happened. Is it worth adding this one?
+
+It happens at two very distinct places in the run path, disabling a setting
+may appear at a totally different place in the dmesg so I think so.
+
+It's just below the just added code that will avoid free:ing a pin if some
+other setting is muxing it, so it's this print I was talking about
+with Sonic.
+
+Yours,
+Linus Walleij
