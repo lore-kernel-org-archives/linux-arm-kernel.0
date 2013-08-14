@@ -1,47 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Aug 2013 21:47:16 +0200
-Subject: [RFC PATCH] ARM: smp_twd: Fix twd_get_clock() to get clock from
- dts or clock framework
-In-Reply-To: <1376087720-14539-1-git-send-email-dinguyen@altera.com>
-References: <1376087720-14539-1-git-send-email-dinguyen@altera.com>
-Message-ID: <CACRpkdb3C4FScyChR2TyZUpbNnhfArE+CDRWYj1iKsQtZy94tg@mail.gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 14 Aug 2013 21:50:18 +0200
+Subject: [PATCH] ARM: integrator: Make sure INTEGRATOR_AP depends on PCI
+Message-ID: <1376509818-22163-1-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 10, 2013 at 12:35 AM,  <dinguyen@altera.com> wrote:
+Add this dependency to the Kconfig file to fix the following
+build error when CONFIG_INTEGRATOR_AP is set but CONFIG_PCI
+is not:
 
-> From: Dinh Nguyen <dinguyen@altera.com>
->
-> Some platforms have a clock for the smp_twd that goes through a fixed
-> divider. Registering this smp_twd clocks is done by calling
-> clk_register_fixed_factor().
->
-> Fix up twd_get_clock() so that it can get the clock from the device
-> tree node or clk_register_fixed_factor().
->
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-(...)
->         if (np)
->                 twd_clk = of_clk_get(np, 0);
-> -       else
-> +
-> +       /* Some platforms do not register the smp_twd clock in the device */
-> +       /* node of the twd timer. */
-> +       if (IS_ERR(twd_clk))
->                 twd_clk = clk_get_sys("smp_twd", NULL);
+  LD      init/built-in.o
+arch/arm/mach-integrator/built-in.o: In function `ap_map_io':
+integrator_cp.c:(.init.text+0x570): undefined reference to `pci_v3_early_init'
+make[1]: *** [vmlinux] Error 1
+make: *** [sub-make] Error 2
 
-NACK.
+Signed-off-by: Joerg Roedel <joro@8bytes.org>
+---
+ arch/arm/mach-integrator/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-The patch commit message and the patch itself does not match.
-This has nothing to do with using fixed factor or whatever.
-
-What it wants to do is use clk_get_sys() in case of_clk_get() fails,
-so DT clocks take precedence.
-
-But this patch is buggy. If you have only platform data, and boot
-without device tree, np will be NULL, and twd_clk will also be
-NULL and thus clk_get_sys() will not execute and the system
-is bugged up.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+index abeff25..be16569 100644
+--- a/arch/arm/mach-integrator/Kconfig
++++ b/arch/arm/mach-integrator/Kconfig
+@@ -9,6 +9,7 @@ config ARCH_INTEGRATOR_AP
+ 	select SERIAL_AMBA_PL010
+ 	select SERIAL_AMBA_PL010_CONSOLE
+ 	select SOC_BUS
++	depends on PCI
+ 	help
+ 	  Include support for the ARM(R) Integrator/AP and
+ 	  Integrator/PP2 platforms.
+-- 
+1.7.9.5
