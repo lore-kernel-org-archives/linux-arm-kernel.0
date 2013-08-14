@@ -1,26 +1,44 @@
-From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Wed, 14 Aug 2013 17:37:40 -0400
-Subject: [PATCH] Fix extern inline in ftrace.h for ARM
-Message-ID: <1376516261-2071-1-git-send-email-behanw@converseincode.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 14 Aug 2013 15:38:05 -0600
+Subject: [PATCH v3 2/5] ARM: tegra: add support for Trusted Foundations
+In-Reply-To: <1376360992-1508-3-git-send-email-acourbot@nvidia.com>
+References: <1376360992-1508-1-git-send-email-acourbot@nvidia.com>
+ <1376360992-1508-3-git-send-email-acourbot@nvidia.com>
+Message-ID: <520BF8BD.7050706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Behan Webster <behanw@converseincode.com>
+On 08/12/2013 08:29 PM, Alexandre Courbot wrote:
+> Register the firmware operations for Trusted Foundations if the device
+> tree indicates it is active on the device.
 
-The LLVMLinux Project is working to be able to build the Linux kernel with
-clang/LLVM. With the release of LLVM 3.3 clang is now able to compile the Linux
-kernel with a number of small patches (available from the LLVMLinux git repo).
+> diff --git a/arch/arm/mach-tegra/firmware.c b/arch/arm/mach-tegra/firmware.c
 
-This patch removes the use of "extern inline" from the ftrace code for ARM.
-This same work has already been completed for ftrace on x86.  Amongst other
-things this patch is required in order to have the Linux kernel to be able to
-be compiled with both gcc and clang.
+> +void __init tegra_init_firmware(void)
+> +{
+> +	struct device_node *node;
+> +
+> +	if (!of_have_populated_dt())
+> +		return;
 
-Mark Charlebois (1):
-  ARM: LLVMLinux: Change "extern inline" to "gnu_inline" in ARM ftrace.h
+That's never false on Tegra, at least upstream.
 
- arch/arm/include/asm/ftrace.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> +	node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
+> +	if (node) {
+> +		const char *tf_version;
+> +		int err;
+> +
+> +		err = of_property_read_string(node, "version", &tf_version);
+> +		if (err != 0) {
+> +			pr_crit("Cannot read Trusted Foundation version: %d\n",
+> +				err);
+> +			BUG();
+> +		} else {
+> +			register_trusted_foundations(tf_version);
+> +		}
+> +	}
+> +}
 
--- 
-1.8.1.2
+I think most/all of that function will be common across all SoCs that
+support the TF monitor. I think you want to move the code into
+register_trusted_foundations() (or a function that calls that) in patch 1?
