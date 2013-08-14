@@ -1,183 +1,79 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 14 Aug 2013 20:35:02 +0530
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <2128883.KpgODjXPJQ@flatron>
-References: <20130720220006.GA7977@kroah.com> <520A2100.6000709@ti.com>
- <520AB0F0.8010106@gmail.com> <2128883.KpgODjXPJQ@flatron>
-Message-ID: <520B9C9E.8010002@ti.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 14 Aug 2013 17:06:17 +0200
+Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
+ with external L3-cache.
+In-Reply-To: <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
+References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
+ <f8917fe8409b1fae634c7de45e34d4a7@www.loen.fr>
+ <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
+Message-ID: <38A6DD0E-5639-43BB-8318-32D59923E309@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Wednesday 14 August 2013 04:34 AM, Tomasz Figa wrote:
-> On Wednesday 14 of August 2013 00:19:28 Sylwester Nawrocki wrote:
->> W dniu 2013-08-13 14:05, Kishon Vijay Abraham I pisze:
->>> On Tuesday 13 August 2013 05:07 PM, Tomasz Figa wrote:
->>>> On Tuesday 13 of August 2013 16:14:44 Kishon Vijay Abraham I wrote:
->>>>> On Wednesday 31 July 2013 11:45 AM, Felipe Balbi wrote:
->>>>>> On Wed, Jul 31, 2013 at 11:14:32AM +0530, Kishon Vijay Abraham I 
-> wrote:
->>>>>>>>>>>> IMHO we need a lookup method for PHYs, just like for clocks,
->>>>>>>>>>>> regulators, PWMs or even i2c busses because there are complex
->>>>>>>>>>>> cases
->>>>>>>>>>>> when passing just a name using platform data will not work. I
->>>>>>>>>>>> would
->>>>>>>>>>>> second what Stephen said [1] and define a structure doing
->>>>>>>>>>>> things
->>>>>>>>>>>> in a
->>>>>>>>>>>> DT-like way.
->>>>>>>>>>>>
->>>>>>>>>>>> Example;
->>>>>>>>>>>>
->>>>>>>>>>>> [platform code]
->>>>>>>>>>>>
->>>>>>>>>>>> static const struct phy_lookup my_phy_lookup[] = {
->>>>>>>>>>>>
->>>>>>>>>>>> 	PHY_LOOKUP("s3c-hsotg.0", "otg", "samsung-usbphy.1",
->>>>>>>>>>>> 	"phy.2"),
->>>>>>>>>>>
->>>>>>>>>>> The only problem here is that if *PLATFORM_DEVID_AUTO* is used
->>>>>>>>>>> while
->>>>>>>>>>> creating the device, the ids in the device name would change
->>>>>>>>>>> and
->>>>>>>>>>> PHY_LOOKUP wont be useful.
->>>>>>>>>>
->>>>>>>>>> I don't think this is a problem. All the existing lookup
->>>>>>>>>> methods
->>>>>>>>>> already
->>>>>>>>>> use ID to identify devices (see regulators, clkdev, PWMs, i2c,
->>>>>>>>>> ...). You
->>>>>>>>>> can simply add a requirement that the ID must be assigned
->>>>>>>>>> manually,
->>>>>>>>>> without using PLATFORM_DEVID_AUTO to use PHY lookup.
->>>>>>>>>
->>>>>>>>> And I'm saying that this idea, of using a specific name and id,
->>>>>>>>> is
->>>>>>>>> frought with fragility and will break in the future in various
->>>>>>>>> ways
->>>>>>>>> when
->>>>>>>>> devices get added to systems, making these strings constantly
->>>>>>>>> have
->>>>>>>>> to be
->>>>>>>>> kept up to date with different board configurations.
->>>>>>>>>
->>>>>>>>> People, NEVER, hardcode something like an id.  The fact that
->>>>>>>>> this
->>>>>>>>> happens today with the clock code, doesn't make it right, it
->>>>>>>>> makes
->>>>>>>>> the
->>>>>>>>> clock code wrong.  Others have already said that this is wrong
->>>>>>>>> there
->>>>>>>>> as
->>>>>>>>> well, as systems change and dynamic ids get used more and more.
->>>>>>>>>
->>>>>>>>> Let's not repeat the same mistakes of the past just because we
->>>>>>>>> refuse to
->>>>>>>>> learn from them...
->>>>>>>>>
->>>>>>>>> So again, the "find a phy by a string" functions should be
->>>>>>>>> removed,
->>>>>>>>> the
->>>>>>>>> device id should be automatically created by the phy core just
->>>>>>>>> to
->>>>>>>>> make
->>>>>>>>> things unique in sysfs, and no driver code should _ever_ be
->>>>>>>>> reliant
->>>>>>>>> on
->>>>>>>>> the number that is being created, and the pointer to the phy
->>>>>>>>> structure
->>>>>>>>> should be used everywhere instead.
->>>>>>>>>
->>>>>>>>> With those types of changes, I will consider merging this
->>>>>>>>> subsystem,
->>>>>>>>> but
->>>>>>>>> without them, sorry, I will not.
->>>>>>>>
->>>>>>>> I'll agree with Greg here, the very fact that we see people
->>>>>>>> trying to
->>>>>>>> add a requirement of *NOT* using PLATFORM_DEVID_AUTO already
->>>>>>>> points
->>>>>>>> to a big problem in the framework.
->>>>>>>>
->>>>>>>> The fact is that if we don't allow PLATFORM_DEVID_AUTO we will
->>>>>>>> end up
->>>>>>>> adding similar infrastructure to the driver themselves to make
->>>>>>>> sure
->>>>>>>> we
->>>>>>>> don't end up with duplicate names in sysfs in case we have
->>>>>>>> multiple
->>>>>>>> instances of the same IP in the SoC (or several of the same PCIe
->>>>>>>> card).
->>>>>>>> I really don't want to go back to that.
->>>>>>>
->>>>>>> If we are using PLATFORM_DEVID_AUTO, then I dont see any way we
->>>>>>> can
->>>>>>> give the correct binding information to the PHY framework. I think
->>>>>>> we
->>>>>>> can drop having this non-dt support in PHY framework? I see only
->>>>>>> one
->>>>>>> platform (OMAP3) going to be needing this non-dt support and we
->>>>>>> can
->>>>>>> use the USB PHY library for it.>
->>>>>>
->>>>>> you shouldn't drop support for non-DT platform, in any case we
->>>>>> lived
->>>>>> without DT (and still do) for years. Gotta find a better way ;-)
->>>>>
->>>>> hmm..
->>>>>
->>>>> how about passing the device names of PHY in platform data of the
->>>>> controller? It should be deterministic as the PHY framework assigns
->>>>> its
->>>>> own id and we *don't* want to add any requirement that the ID must
->>>>> be
->>>>> assigned manually without using PLATFORM_DEVID_AUTO. We can get rid
->>>>> of
->>>>> *phy_init_data* in the v10 patch series.
->>
->> OK, so the PHY device name would have a fixed part, passed as
->> platform data of the controller and a variable part appended
->> by the PHY core, depending on the number of registered PHYs ?
->>
->> Then same PHY names would be passed as the PHY provider driver's
->> platform data ?
->>
->> Then if there are 2 instances of the above (same names in platform
->> data) how would be determined which PHY controller is linked to
->> which PHY supplier ?
->>
->> I guess you want each device instance to have different PHY device
->> names already in platform data ? That might work. We probably will
->> be focused mostly on DT anyway. It seem without DT we are trying
->> to find some layer that would allow us to couple relevant devices
->> and overcome driver core inconvenience that it provides to means
->> to identify specific devices in advance. :) Your proposal sounds
->> reasonable, however I might be missing some details or corner cases.
->>
->>>> What about slightly altering the concept of v9 to pass a pointer to
->>>> struct device instead of device name inside phy_init_data?
->>
->> As Felipe said, we don't want to pass pointers in platform_data
->> to/from random subsystems. We pass data, passing pointers would
->> be a total mess IMHO.
-> 
-> Well, this is a total mess anyway... I don't really get the point of using 
-> PLATFORM_DEVID_AUTO. The only thing that comes to my mind is that you can 
-> use it if you don't care about the ID and so it can be assigned 
-> automatically.
-> 
-> However my understanding of the device ID is that it was supposed to 
-> provide a way to identify multiple instances of identical devices in a 
-> reliable way, to solve problems like the one we are trying to solve 
-> here...
-> 
-> So maybe let's stop solving an already solved problem and just state that 
-> you need to explicitly assign device ID to use this framework?
+On 14.08.2013, at 16:22, Anup Patel wrote:
 
-Felipe,
-Can we have it the way I had in my v10 patch series till we find a better way?
-I think this *non-dt* stuff shouldn't be blocking as most of the users are dt only?
+> On Wed, Aug 14, 2013 at 5:34 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Hi Pranav,
+>> 
+>> On 2013-08-14 12:47, Pranavkumar Sawargaonkar wrote:
+>>> Systems with large external L3-cache (few MBs), might have dirty
+>>> content belonging to the guest page in L3-cache. To tackle this,
+>>> we need to flush such dirty content from d-cache so that guest
+>>> will see correct contents of guest page when guest MMU is disabled.
+>>> 
+>>> The patch fixes coherent_icache_guest_page() for external L3-cache.
+>>> 
+>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>>> ---
+>>> arch/arm64/include/asm/kvm_mmu.h |    2 ++
+>>> 1 file changed, 2 insertions(+)
+>>> 
+>>> diff --git a/arch/arm64/include/asm/kvm_mmu.h
+>>> b/arch/arm64/include/asm/kvm_mmu.h
+>>> index efe609c..5129038 100644
+>>> --- a/arch/arm64/include/asm/kvm_mmu.h
+>>> +++ b/arch/arm64/include/asm/kvm_mmu.h
+>>> @@ -123,6 +123,8 @@ static inline void
+>>> coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+>>>      if (!icache_is_aliasing()) {            /* PIPT */
+>>>              unsigned long hva = gfn_to_hva(kvm, gfn);
+>>>              flush_icache_range(hva, hva + PAGE_SIZE);
+>>> +             /* Flush d-cache for systems with external caches. */
+>>> +             __flush_dcache_area((void *) hva, PAGE_SIZE);
+>>>      } else if (!icache_is_aivivt()) {       /* non ASID-tagged VIVT */
+>>>              /* any kind of VIPT cache */
+>>>              __flush_icache_all();
+>> 
+>> [adding Will to the discussion as we talked about this in the past]
+>> 
+>> That's definitely an issue, but I'm not sure the fix is to hit the data
+>> cache on each page mapping. It looks overkill.
+>> 
+>> Wouldn't it be enough to let userspace do the cache cleaning? kvmtools
+>> knows which bits of the guest memory have been touched, and can do a "DC
+>> DVAC" on this region.
+> 
+> It seems a bit unnatural to have cache cleaning is user-space. I am sure
+> other architectures don't have such cache cleaning in user-space for KVM.
 
-Thanks
-Kishon
+Not sure I understand at which point you really need to make things coherent here. When you assign a new ASID because there could be stale cache entries left from an old ASID run? Can't you just flush all caches when you overrun your ASID allocator?
+
+> 
+>> 
+>> The alternative is do it in the kernel before running any vcpu - but
+>> that's not very nice either (have to clean the whole of the guest
+>> memory, which makes a full dcache clean more appealing).
+> 
+> Actually, cleaning full d-cache by set/way upon first run of VCPU was
+> our second option but current approach seemed very simple hence
+> we went for this.
+> 
+> If more people vote for full d-cache clean upon first run of VCPU then
+> we should revise this patch.
+
+Is there any difference in performance between the 2 approaches?
+
+
+Alex
