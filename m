@@ -1,42 +1,91 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 14 Aug 2013 23:30:48 +0800
-Subject: [PATCH 2/5] ARM: pxa: ssp: add shortcut for &pdev->dev
-In-Reply-To: <5209F619.4000503@gmail.com>
-References: <1376296638-19804-1-git-send-email-zonque@gmail.com>
- <1376296638-19804-3-git-send-email-zonque@gmail.com>
- <20130812103834.GO6427@sirena.org.uk> <5208BBE5.5050306@gmail.com>
- <20130812104652.GP6427@sirena.org.uk> <5208BDEB.6070900@gmail.com>
- <5209F619.4000503@gmail.com>
-Message-ID: <CAD6h2NTXDrOFXeYApgt5bSC=yHbYrozeTpf7B6ea94Hu_HWwNg@mail.gmail.com>
+Date: Wed, 14 Aug 2013 23:32:18 +0800
+Subject: [PATCH v6 2/4] ARM: debug: support debug ll on hisilicon soc
+In-Reply-To: <20130814064424.GI19951@quad.lixom.net>
+References: <1374813135-16238-1-git-send-email-haojian.zhuang@linaro.org>
+ <1374813135-16238-3-git-send-email-haojian.zhuang@linaro.org>
+ <20130814064424.GI19951@quad.lixom.net>
+Message-ID: <CAD6h2NS+DW1+iyD4ucNjoLiXqCbFKmW6QYwS7=oUfm0nq7LEdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 August 2013 17:02, Daniel Mack <zonque@gmail.com> wrote:
-> On 12.08.2013 12:50, Daniel Mack wrote:
->> On 12.08.2013 12:46, Mark Brown wrote:
->>> On Mon, Aug 12, 2013 at 12:41:41PM +0200, Daniel Mack wrote:
->>>> I actually thought Haojian would pick them, but I see there's a build
->>>> dependency. So it might make sense if you take them instead.
->>>
->>> They didn't obviously touch arch/arm
+On 14 August 2013 14:44, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
+>
+>
+> On Fri, Jul 26, 2013 at 12:32:13PM +0800, Haojian Zhuang wrote:
+>> Support UART0 debug ll on hisilicon Hi3620 SoC.
 >>
->> Well yes, *this* series does:
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>
+> By the way, I ended up doing two fixups:
+>
+>> ---
+>>  arch/arm/Kconfig.debug             | 15 +++++++++++++++
+>>  arch/arm/include/debug/hisilicon.S | 30 ++++++++++++++++++++++++++++++
+>>  2 files changed, 45 insertions(+)
+>>  create mode 100644 arch/arm/include/debug/hisilicon.S
 >>
->>  .../devicetree/bindings/serial/mrvl,pxa-ssp.txt    |  65 ++++++++
->>  arch/arm/plat-pxa/ssp.c                            | 174
->> ++++++++++++++-------
->>  include/linux/pxa2xx_ssp.h                         |  11 ++
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index e401a76..289a248 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -272,6 +272,20 @@ choice
+>>                 Say Y here if you want the debug print routines to direct
+>>                 their output to UART1 serial port on KEYSTONE2 devices.
 >>
->> I posted two series, one is for arch/arm and one is for sound/soc/pxa.
->> But as they have a dependency via pxa_ssp_request_of(), I'd actually
->> prefer if you took all of them.
+>> +     config DEBUG_HI3620_UART
+>> +             bool "Hisilicon HI3620 Debug UART"
+>> +             depends on ARCH_HI3xxx
+>> +             help
+>> +               Say Y here if you want kernel low-level debugging support
+>> +               on HI3620 UART.
+>> +
+>> +     config DEBUG_HI3716_UART
+>> +             bool "Hisilicon Hi3716 Debug UART"
+>> +             depends on ARCH_HI3xxx
+>> +             help
+>> +               Say Y here if you want kernel low-level debugging support
+>> +               on HI3716 UART.
+>> +
+>>       config DEBUG_MMP_UART2
 >
-> Haojian, could you give your Ack on this procedure?
+> These are out of alphabetical order, not good. I moved them up right before
+> highbank where they should be.
+>
+>> diff --git a/arch/arm/include/debug/hisilicon.S b/arch/arm/include/debug/hisilicon.S
+>> new file mode 100644
+>> index 0000000..47ad019
+>> --- /dev/null
+>> +++ b/arch/arm/include/debug/hisilicon.S
+>> @@ -0,0 +1,30 @@
+>> +/*
+>> + * Early serial output macro for Hisilicon SoC
+>> + *
+>> + * Copyright (C) 2012-2013 Hisilicon Technologies Co., Ltd.
+>> + * Copyright (C) 2012-2013 Linaro Ltd.
+>> + *
+>> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +#if defined(CONFIG_DEBUG_HI3620_UART)
+>> +#define HS_UART_PHYS_BASE    0xfcb00000
+>> +#define HS_UART_VIRT_BASE    0xfeb00000
+>> +#elif defined(CONFIG_DEBUG_HI3716_UART)
+>> +#define HS_UART_PHYS_BASE    0xf8b00000
+>> +#define HS_UART_VIRT_BASE    0xfeb00000
+>> +#endif
+>
+> HS_UART_VIRT_BASE is the same, so I moved it outside the ifdef.
 >
 >
-> Thanks,
-> Daniel
->
->
+> -Olof
 
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+Thanks a lot.
+
+Regards
+Haojian
