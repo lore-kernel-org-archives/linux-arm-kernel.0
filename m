@@ -1,72 +1,48 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Wed, 14 Aug 2013 20:05:32 +0530
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
- with external L3-cache.
-In-Reply-To: <520B92DB.5070708@arm.com>
-References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
- <520B92DB.5070708@arm.com>
-Message-ID: <CAAhSdy2NPaCWPc-TJ8AVhwmDUT+eWXOGbF2Dm+v781pYTQBhCg@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 14 Aug 2013 07:41:04 -0700
+Subject: [Qemu-devel] SCSI bus failures with qemu-arm in kernel 3.8+
+In-Reply-To: <CAFEAcA8u_c=seOQ+y44H2Vpefyx4EisiZ-ZqBxuPsyoYjCt3vQ@mail.gmail.com>
+References: <52082EF8.10005@roeck-us.net>
+ <CAFEAcA94ygwRPSsfxs3DvOcTZbdafLiEHys94FG4aXUx+A1t=A@mail.gmail.com>
+ <20130812164548.GE23006@n2100.arm.linux.org.uk>
+ <CAFEAcA97PuORg920f-A_8rvCgBq=k5Y=0W6m2Nv8nnzjY19Utg@mail.gmail.com>
+ <20130812200628.GG23006@n2100.arm.linux.org.uk>
+ <CAFEAcA9BA7zfaO1J5zVaEcG-AgOo6dyiew08-o2eObuBe-KWig@mail.gmail.com>
+ <20130812212149.GH23006@n2100.arm.linux.org.uk>
+ <CAFEAcA_0kzS=Z5oTxrr=B74wjf1x=M6dXwH7Fcgf77Pca90Gjw@mail.gmail.com>
+ <20130812221250.GI23006@n2100.arm.linux.org.uk>
+ <20130812230408.GA4420@roeck-us.net>
+ <20130814103346.GN23006@n2100.arm.linux.org.uk>
+ <CAFEAcA8u_c=seOQ+y44H2Vpefyx4EisiZ-ZqBxuPsyoYjCt3vQ@mail.gmail.com>
+Message-ID: <520B9700.7010105@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 7:53 PM, Sudeep KarkadaNagesha
-<Sudeep.KarkadaNagesha@arm.com> wrote:
-> On 14/08/13 12:47, Pranavkumar Sawargaonkar wrote:
->> Systems with large external L3-cache (few MBs), might have dirty
->> content belonging to the guest page in L3-cache. To tackle this,
->> we need to flush such dirty content from d-cache so that guest
->> will see correct contents of guest page when guest MMU is disabled.
+On 08/14/2013 05:44 AM, Peter Maydell wrote:
+> On 14 August 2013 11:33, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Mon, Aug 12, 2013 at 04:04:08PM -0700, Guenter Roeck wrote:
+>>> Hacked diff is below. Can I write that up as clean patch and submit it,
+>>> or do we need a test on real hardware ?
 >>
->> The patch fixes coherent_icache_guest_page() for external L3-cache.
+>> Well, if we want to ensure that it is really correct, the sensible thing
+>> to do is to try it on real hardware, otherwise we're risking yet another
+>> change to this.
 >>
+>> Earlier in this thread, some people said that they have the hardware, so
+>> it shouldn't be that difficult to get it tested on real stuff.
 >
-> I don't understand KVM but the commit message caught my attention.
->
-> You are referring to clean the external/outer L3 cache but using
-> internal cache maintenance APIs. You should be using outer_cache APIs if
-> you really intend to do outer cache maintenance ?
-> Is the external/outer L3 cache not unified ?
->
-> Or did you mean to flush d-cache to the point of coherency(external L3
-> in your case)? If so it's not clear from the commit log.
+> Yes, I definitely think we should test on the hardware before we
+> land yet another change to this PCI code that hasn't really been
+> thoroughly tested on anything. I have the board/backplane on my
 
-Yes, we mean to flush d-cache to the point of coherency (which in our
-case is external L3-cache).
+Agreed.
 
-The patch description is more in-terms of KVM virtualization but, we
-can certainly add more details.
+> desk but it'll be later in the week before I can do the testing
+> (currently still messing with uboot config to get it to actually
+> boot a kernel).
+>
 
->
-> Regards,
-> Sudeep
->
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->> ---
->>  arch/arm64/include/asm/kvm_mmu.h |    2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
->> index efe609c..5129038 100644
->> --- a/arch/arm64/include/asm/kvm_mmu.h
->> +++ b/arch/arm64/include/asm/kvm_mmu.h
->> @@ -123,6 +123,8 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
->>       if (!icache_is_aliasing()) {            /* PIPT */
->>               unsigned long hva = gfn_to_hva(kvm, gfn);
->>               flush_icache_range(hva, hva + PAGE_SIZE);
->> +             /* Flush d-cache for systems with external caches. */
->> +             __flush_dcache_area((void *) hva, PAGE_SIZE);
->>       } else if (!icache_is_aivivt()) {       /* non ASID-tagged VIVT */
->>               /* any kind of VIPT cache */
->>               __flush_icache_all();
->>
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+That would be great. Thanks a lot for your help!
 
-Regards,
-Anup
+Guenter
