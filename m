@@ -1,111 +1,38 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 14 Aug 2013 16:43:12 +0200
-Subject: [PATCH v3] Documentation: dt: bindings: TI WiLink modules
-In-Reply-To: <1375215668-29171-1-git-send-email-coelho@ti.com>
-References: <1375215668-29171-1-git-send-email-coelho@ti.com>
-Message-ID: <520B9780.5000007@baylibre.com>
+From: arm-kernel@ml.breakpoint.cc (Sebastian Andrzej Siewior)
+Date: Wed, 14 Aug 2013 16:43:57 +0200
+Subject: [PATCH 2/2 v3] arm: Allow forced irq threading
+In-Reply-To: <520B5725.7000907@ti.com>
+References: <20130214205204.109023136@linutronix.de>
+ <20130214205304.993009840@linutronix.de>
+ <20130214214931.GK17833@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1302142256520.22263@ionos>
+ <20130812200301.GB4181@breakpoint.cc> <520B5725.7000907@ti.com>
+Message-ID: <20130814144357.GA4269@breakpoint.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Luca,
+From: Thomas Gleixner <tglx@linutronix.de>
 
-On 30/07/2013 22:21, Luciano Coelho wrote:
-> Add device tree bindings documentation for the TI WiLink modules.
-> Currently only the WLAN part of the WiLink6, WiLink7 and WiLink8
-> modules is supported.
->
-> Signed-off-by: Luciano Coelho <coelho@ti.com>
-> ---
->
-> In v3, use IRQ_TYPE_LEVEL_HIGH in the example, as suggested by Laurent.
->
->   .../devicetree/bindings/net/wireless/ti-wilink.txt | 68 ++++++++++++++++++++++
->   1 file changed, 68 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
->
-> diff --git a/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt b/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
-> new file mode 100644
-> index 0000000..aafebb1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/wireless/ti-wilink.txt
-> @@ -0,0 +1,68 @@
-> +TI WiLink Wireless Modules Device Tree Bindings
-> +===============================================
-> +
-> +The WiLink modules provide wireless connectivity, such as WLAN,
-> +Bluetooth, FM and NFC.
-> +
-> +There are several different modules available, which can be grouped by
-> +their generation: WiLink6, WiLink7 and WiLink8.  WiLink4 is not
-> +currently supported with device tree.
-> +
-> +Currently, only the WLAN portion of the modules is supported with
-> +device tree.
-> +
-> +Required properties:
-> +--------------------
-> +
-> +- compatible: should be "ti,wilink6", "ti,wilink7" or "ti,wilink8"
-> +- interrupt-parent: the interrupt controller
-> +- interrupts: out-of-band WLAN interrupt
-> +	See the interrupt controller's bindings documentation for
-> +	detailed definition.
-> +
-> +Optional properties:
-> +--------------------
-> +
-> +- clocks: list of clocks needed by the chip as follows:
-> +
-> +  refclock: the internal WLAN reference clock frequency (required for
-> +	WiLink6 and WiLink7; not used for WiLink8).
-> +
-> +  tcxoclock: the internal WLAN TCXO clock frequency (required for
-> +	WiLink7 not used for WiLink6 and WiLink8).
-> +
-> +  The clocks must be defined and named accordingly.  For example:
-> +
-> +  clocks = <&refclock>
-> +  clock-names = "refclock";
-> +
-> +  refclock: refclock {
-> +		     compatible = "ti,wilink-clock";
-> +		     #clock-cells = <0>;
-> +		     clock-frequency = <38400000>;
-> +	};
-> +
-> +  Some modules that contain the WiLink chip provide clocks in the
-> +  module itself.  In this case, we define a "ti,wilink-clock" as shown
-> +  above.  But any other clock could in theory be used, so the proper
-> +  clock definition should be used.
-> +
-> +
-> +Example:
-> +--------
-> +
-> +Example definition that can be used in OMAP4 Panda:
-> +
-> +wlan {
-> +	compatible = "ti,wilink6";
-> +	interrupt-parent = <&gpio2>;
-> +	interrupts = <21 IRQ_TYPE_LEVEL_HIGH>;	/* gpio line 53 */
-> +	clocks = <&refclock>;
-> +	clock-names = "refclock";
-> +
-> +	refclock: refclock {
-> +		compatible = "ti,wilink-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <38400000>;
-> +	};
-> +};
+All timer interrupts and the perf interrupt are marked NO_THREAD, so
+its safe to allow forced interrupt threading.
 
-Everything looks good beside the location of the wlan node...
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-It should not float at the root of the device tree. It is physically 
-attached to a SDIO bus and thus must be a child of the MMC controller 
-for a proper HW representation. That's moreover the best way to handle 
-properly the dependency between the MMC controller and the wilink driver.
-
-Please note that this is easier do say than to do :-)
-
-Regards,
-Benoit
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 43594d5..6858b3a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -52,6 +52,7 @@ config ARM
+ 	select HAVE_REGS_AND_STACK_ACCESS_API
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select HAVE_UID16
++	select IRQ_FORCED_THREADING
+ 	select KTIME_SCALAR
+ 	select PERF_USE_VMALLOC
+ 	select RTC_LIB
+-- 
+1.8.4.rc1
