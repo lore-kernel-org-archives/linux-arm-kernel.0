@@ -1,70 +1,41 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 14 Aug 2013 18:12:39 -0500
-Subject: [PATCH 00/10] crypto: omap-aes: DMA and PIO mode improvements
-Message-ID: <1376521969-16807-1-git-send-email-joelf@ti.com>
+Date: Wed, 14 Aug 2013 18:12:44 -0500
+Subject: [PATCH 05/10] crypto: omap-aes: Sync SG before DMA operation
+In-Reply-To: <1376521969-16807-1-git-send-email-joelf@ti.com>
+References: <1376521969-16807-1-git-send-email-joelf@ti.com>
+Message-ID: <1376521969-16807-6-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is a rewrite of the DMA portion of omap-aes driver
-and also adds support for PIO mode. Both these modes, give better
-performance than before.
+Earlier functions that did a similar sync are replaced by
+the dma_sync_sg_* which can operate on entire SG list.
 
-Earlier, only a single SG was used for DMA purpose, and the SG-list
-passed from the crypto layer was being copied and DMA'd one entry at
-a time. This turns out to be quite inefficient, so we replace it with
-much simpler code that directly passes the SG-list from crypto to the
-DMA layer.
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
+ drivers/crypto/omap-aes.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-We also add PIO mode support to the driver, and switch to PIO mode
-whenever the DMA channel allocation is not available. This is only for
-OMAP4 platform will work on any platform on which IRQ information is
-populated.
-
-Tests performed on am33xx and omap4 SoCs , notice the 50% perf improvement
-for large 8K blocks:
-
-Sample run on am33xx (beaglebone):
-With DMA rewrite:
-[   26.410052] test 0 (128 bit key, 16 byte blocks): 4318 operations in 1 seconds (69088 bytes)
-[   27.414314] test 1 (128 bit key, 64 byte blocks): 4360 operations in 1 seconds (279040 bytes)
-[   28.414406] test 2 (128 bit key, 256 byte blocks): 3609 operations in 1 seconds (923904 bytes)
-[   29.414410] test 3 (128 bit key, 1024 byte blocks): 3418 operations in 1 seconds (3500032 bytes)
-[   30.414510] test 4 (128 bit key, 8192 byte blocks): 1766 operations in 1 seconds (14467072 bytes)
-
-Without DMA rewrite:
-[   31.920519] test 0 (128 bit key, 16 byte blocks): 4417 operations in 1 seconds (70672 bytes)
-[   32.925997] test 1 (128 bit key, 64 byte blocks): 4221 operations in 1 seconds (270144 bytes)
-[   33.926194] test 2 (128 bit key, 256 byte blocks): 3528 operations in 1 seconds (903168 bytes)
-[   34.926225] test 3 (128 bit key, 1024 byte blocks): 3281 operations in 1 seconds (3359744 bytes)
-[   35.926385] test 4 (128 bit key, 8192 byte blocks): 1460 operations in 1 seconds (11960320 bytes)
-
-With PIO mode, note the tremndous boost in performance for small blocks there:
-[   27.294905] test 0 (128 bit key, 16 byte blocks): 20585 operations in 1 seconds (329360 bytes)
-[   28.302282] test 1 (128 bit key, 64 byte blocks): 8106 operations in 1 seconds (518784 bytes)
-[   29.302374] test 2 (128 bit key, 256 byte blocks): 2359 operations in 1 seconds (603904 bytes)
-[   30.302575] test 3 (128 bit key, 1024 byte blocks): 605 operations in 1 seconds (619520 bytes)
-[   31.303781] test 4 (128 bit key, 8192 byte blocks): 79 operations in 1 seconds (647168 bytes)
-
-Future work in this direction would be to dynamically change between
-PIO/DMA mode based on the block size.
-
-Joel Fernandes (10):
-  crypto: scatterwalk:  Add support for calculating number of SG
-    elements
-  crypto: omap-aes: Add useful debug macros
-  crypto: omap-aes: Populate number of SG elements
-  crypto: omap-aes: Simplify DMA usage by using direct SGs
-  crypto: omap-aes: Sync SG before DMA operation
-  crypto: omap-aes: Remove previously used intermediate buffers
-  crypto: omap-aes: Add IRQ info and helper macros
-  crypto: omap-aes: PIO mode: Add IRQ handler and walk SGs
-  crypto: omap-aes: PIO mode: platform data for OMAP4 and trigger it
-  crypto: omap-aes: Switch to PIO mode in probe function
-
- crypto/scatterwalk.c         |   22 +++
- drivers/crypto/omap-aes.c    |  400 ++++++++++++++++++++----------------------
- include/crypto/scatterwalk.h |    2 +
- 3 files changed, 217 insertions(+), 207 deletions(-)
-
+diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
+index 9104a7f..df2f867 100644
+--- a/drivers/crypto/omap-aes.c
++++ b/drivers/crypto/omap-aes.c
+@@ -499,6 +499,8 @@ static int omap_aes_crypt_dma(struct crypto_tfm *tfm,
+ 	struct dma_slave_config cfg;
+ 	int ret;
+ 
++	dma_sync_sg_for_device(dd->dev, dd->in_sg, in_sg_len, DMA_TO_DEVICE);
++
+ 	memset(&cfg, 0, sizeof(cfg));
+ 
+ 	cfg.src_addr = dd->phys_base + AES_REG_DATA_N(dd, 0);
+@@ -686,6 +688,8 @@ static void omap_aes_done_task(unsigned long data)
+ 
+ 	pr_debug("enter done_task\n");
+ 
++	dma_sync_sg_for_cpu(dd->dev, dd->in_sg, dd->in_sg_len, DMA_FROM_DEVICE);
++
+ 	omap_aes_crypt_dma_stop(dd);
+ 	omap_aes_finish_req(dd, 0);
+ 	omap_aes_handle_queue(dd, NULL);
 -- 
 1.7.9.5
