@@ -1,43 +1,38 @@
 From: dinguyen@altera.com (Dinh Nguyen)
-Date: Wed, 14 Aug 2013 09:57:54 -0500
-Subject: [PATCH] arm: socfpga: Fix incorrect sdmmc clock name
-In-Reply-To: <20130814054810.GF16635@quad.lixom.net>
-References: <1376322134-17408-1-git-send-email-dinguyen@altera.com>
- <20130814054810.GF16635@quad.lixom.net>
-Message-ID: <1376492274.8715.2.camel@linux-builds1>
+Date: Wed, 14 Aug 2013 09:58:19 -0500
+Subject: [PATCH] phy: micrel: Add definitions for common Micrel PHY
+ registers
+In-Reply-To: <20130814084508.GD31141@S2101-09.ap.freescale.net>
+References: <1376405940-17141-1-git-send-email-dinguyen@altera.com>
+ <20130814051743.GG16915@S2101-09.ap.freescale.net>
+ <20130814.005154.348348186882819546.davem@davemloft.net>
+ <20130814084508.GD31141@S2101-09.ap.freescale.net>
+Message-ID: <1376492299.8715.3.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-08-13 at 22:48 -0700, Olof Johansson wrote:
-> On Mon, Aug 12, 2013 at 10:42:14AM -0500, dinguyen at altera.com wrote:
-> > From: Dinh Nguyen <dinguyen@altera.com>
+On Wed, 2013-08-14 at 16:45 +0800, Shawn Guo wrote:
+> On Wed, Aug 14, 2013 at 12:51:54AM -0700, David Miller wrote:
+> > From: Shawn Guo <shawn.guo@linaro.org>
+> > Date: Wed, 14 Aug 2013 13:17:46 +0800
 > > 
-> > The SD/MMC clock is named "sdmmc_clk", and NOT "mmc_clk".
+> > > On Tue, Aug 13, 2013 at 09:58:59AM -0500, dinguyen at altera.com wrote:
+> > >> From: Dinh Nguyen <dinguyen@altera.com>
+> > >> 
+> > >> Hi Shawn,
+> > >> 
+> > >> Can you apply this patch to your tree for 3.12?
+> > >> 
+> > > 
+> > > I need David's Ack to send the patch through IMX tree.
 > > 
-> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > CC: Arnd Bergmann <arnd@arndb.de>
-> > CC: Olof Johansson <olof@lixom.net>
-> > Cc: Pavel Machek <pavel@denx.de>
-> > Cc: linux-arm-kernel at lists.infradead.org
+> > Acked-by: David S. Miller <davem@davemloft.net>
 > 
-> Hi Dinh,
-> 
-> Do you want this applied in fixes for 3.11? If so, can you give me a oneliner
-> on what the impact here is? mmc doesn't come up at all, or something more
-> subtle?
-
-Hi Olof,
-
-No, this is go into 3.12 as I am still working on the bindings for
-SD/MMC.
-
-The oneliner: "The SD/MMC driver was intermittently not coming up
-because it was not able to get the correct clock."
+> Okay, applied with David's ACK.
 
 Thanks,
+
 Dinh
 > 
-> 
-> -Olof
+> Shawn
 > 
