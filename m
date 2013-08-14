@@ -1,35 +1,52 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 14 Aug 2013 09:25:02 -0700
-Subject: [PATCH v6 2/4] ARM: debug: support debug ll on hisilicon soc
-In-Reply-To: <20130814154443.GV23006@n2100.arm.linux.org.uk>
-References: <1374813135-16238-1-git-send-email-haojian.zhuang@linaro.org>
- <1374813135-16238-3-git-send-email-haojian.zhuang@linaro.org>
- <20130814063916.GH19951@quad.lixom.net>
- <20130814154443.GV23006@n2100.arm.linux.org.uk>
-Message-ID: <20130814162502.GA16491@quad.lixom.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 14 Aug 2013 10:34:38 -0600
+Subject: [PATCH] pinctrl: improve warning messages
+In-Reply-To: <1376497533-32303-1-git-send-email-linus.walleij@linaro.org>
+References: <1376497533-32303-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <520BB19E.8040901@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 04:44:44PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Aug 13, 2013 at 11:39:16PM -0700, Olof Johansson wrote:
-> > On Fri, Jul 26, 2013 at 12:32:13PM +0800, Haojian Zhuang wrote:
-> > > Support UART0 debug ll on hisilicon Hi3620 SoC.
-> > > 
-> > > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> > 
-> > 
-> > Applied, thanks.
-> 
-> Applied without reference to my debug cleanup series which has been
-> sitting in linux-next for ages?
-> 
-> Whatever happened to encouraging people to do things in a manner
-> compatible with the cleanups we're trying to do?
+On 08/14/2013 10:25 AM, Linus Walleij wrote:
+> Print out the affected group name on activation of pin mux
+> settings, and warn if you cannot free a pin that should have
+> been part of a certain setting.
 
-I quite frankly forgot that this was pending for 3.12 in your tree.
+> diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
 
-Thanks for catching this, I'll revert the patch in arm-soc and let it go
-in through yours on top of your cleanups.
+> @@ -411,9 +415,14 @@ int pinmux_enable_setting(struct pinctrl_setting const *setting)
+>  	for (i = 0; i < num_pins; i++) {
+>  		ret = pin_request(pctldev, pins[i], setting->dev_name, NULL);
+>  		if (ret) {
+> +			const char *gname;
+> +
+> +			gname = pctlops->get_group_name(pctldev,
+> +						setting->data.mux.group);
+>  			dev_err(pctldev->dev,
+> -				"could not request pin %d on device %s\n",
+> -				pins[i], pinctrl_dev_get_name(pctldev));
+> +				"could not request pin %d from group %s on "
+> +				"device %s\n",
+> +				pins[i], gname, pinctrl_dev_get_name(pctldev));
 
+I think it'd be useful to print the pin name rather than pin number here.
 
--Olof
+> @@ -486,6 +499,16 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
+>  			desc->mux_setting = NULL;
+>  			/* And release the pin */
+>  			pin_free(pctldev, pins[i], NULL);
+> +		} else {
+> +			const char *gname;
+> +
+> +			gname = pctlops->get_group_name(pctldev,
+> +						setting->data.mux.group);
+> +			dev_warn(pctldev->dev,
+> +				 "not freeing pin %d as part of deactivating "
+> +				 "group %s - it is already used for some other "
+> +				 "setting",
+> +				 pins[i], gname);
+>  		}
+>  	}
+
+I think that will only happen if one of the pinmux_enabling_setting
+prints already happened. Is it worth adding this one?
