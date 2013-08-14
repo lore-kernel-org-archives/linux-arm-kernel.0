@@ -1,160 +1,72 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 14 Aug 2013 16:34:51 +0200
-Subject: [PATCH v3] arm: dts: AM43x: Add usb DT nodes for AM4372
-In-Reply-To: <520B9144.5000701@ti.com>
-References: <1373444082-4169-1-git-send-email-george.cherian@ti.com>
- <520B9144.5000701@ti.com>
-Message-ID: <520B958B.1000900@baylibre.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Wed, 14 Aug 2013 20:05:32 +0530
+Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
+ with external L3-cache.
+In-Reply-To: <520B92DB.5070708@arm.com>
+References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
+ <520B92DB.5070708@arm.com>
+Message-ID: <CAAhSdy2NPaCWPc-TJ8AVhwmDUT+eWXOGbF2Dm+v781pYTQBhCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Roger
-
-Hi George,
-
-Yes, I had some comment about the "ti'type" in Roger's series that will 
-be applicable here as well.
-
-
-On 14/08/2013 16:16, George Cherian wrote:
-> +Benoit
->   If you dont have any comments, can you take this for 3.12?
->
-> Regards
-> -George
->
-> On 7/10/2013 1:44 PM, George Cherian wrote:
->
->> This patch adds
->>     - HS USB nodes
->>     - phy nodes
->>     - usb control module nodes.
+On Wed, Aug 14, 2013 at 7:53 PM, Sudeep KarkadaNagesha
+<Sudeep.KarkadaNagesha@arm.com> wrote:
+> On 14/08/13 12:47, Pranavkumar Sawargaonkar wrote:
+>> Systems with large external L3-cache (few MBs), might have dirty
+>> content belonging to the guest page in L3-cache. To tackle this,
+>> we need to flush such dirty content from d-cache so that guest
+>> will see correct contents of guest page when guest MMU is disabled.
 >>
->> Signed-off-by: George Cherian <george.cherian@ti.com>
+>> The patch fixes coherent_icache_guest_page() for external L3-cache.
+>>
+>
+> I don't understand KVM but the commit message caught my attention.
+>
+> You are referring to clean the external/outer L3 cache but using
+> internal cache maintenance APIs. You should be using outer_cache APIs if
+> you really intend to do outer cache maintenance ?
+> Is the external/outer L3 cache not unified ?
+>
+> Or did you mean to flush d-cache to the point of coherency(external L3
+> in your case)? If so it's not clear from the commit log.
+
+Yes, we mean to flush d-cache to the point of coherency (which in our
+case is external L3-cache).
+
+The patch description is more in-terms of KVM virtualization but, we
+can certainly add more details.
+
+>
+> Regards,
+> Sudeep
+>
+>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
 >> ---
+>>  arch/arm64/include/asm/kvm_mmu.h |    2 ++
+>>  1 file changed, 2 insertions(+)
 >>
->> changes from v2
->> change synopsis to snps
->> use simple node names
->> add both USB and PHY instances
->> add usbctrl node
+>> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+>> index efe609c..5129038 100644
+>> --- a/arch/arm64/include/asm/kvm_mmu.h
+>> +++ b/arch/arm64/include/asm/kvm_mmu.h
+>> @@ -123,6 +123,8 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+>>       if (!icache_is_aliasing()) {            /* PIPT */
+>>               unsigned long hva = gfn_to_hva(kvm, gfn);
+>>               flush_icache_range(hva, hva + PAGE_SIZE);
+>> +             /* Flush d-cache for systems with external caches. */
+>> +             __flush_dcache_area((void *) hva, PAGE_SIZE);
+>>       } else if (!icache_is_aivivt()) {       /* non ASID-tagged VIVT */
+>>               /* any kind of VIPT cache */
+>>               __flush_icache_all();
 >>
->> changes from v1
->> renamed synopsis to snps
->> removed flag tx-fifo-resize
->>
->>   arch/arm/boot/dts/am4372.dtsi | 58
->> +++++++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 58 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/am4372.dtsi
->> b/arch/arm/boot/dts/am4372.dtsi
->> index ddc1df7..37f196f 100644
->> --- a/arch/arm/boot/dts/am4372.dtsi
->> +++ b/arch/arm/boot/dts/am4372.dtsi
->> @@ -64,5 +64,63 @@
->>               compatible = "ti,am4372-counter32k","ti,omap-counter32k";
->>               reg = <0x44e86000 0x40>;
->>           };
->> +
->> +        phy1: usbphy1 {
->> +            compatible = "ti,am4372-usb2";
-
-That's not a very good name for a phy? It looks like a usb module.
-
-The bindings specify only ti,omap-usb2 or ti,omap-usb3 for USB2 or USB3.
-I guess it should be one of them and potentially the binding should be 
-updated with ti,omap-usb2-phy and ti,omap-usb3-phy names while we can 
-still do it.
-
->> +            #phy-cells = <0>;
->> +            id = <0>;
->> +            status = "disabled";
->> +        };
->> +
->> +        phy2: usbphy2 {
-
-Why do you need a different node name here? It should be a generic name 
-to identify the function, so usbphy or usb-phy seems good enough.
-
->> +            compatible = "ti,am4372-usb2";
->> +            #phy-cells = <0>;
->> +            id = <1>;
->> +            status = "disabled";
->> +        };
->> +
->> +        usbctrl: omap-control-usb at 44e10620 {
->> +            compatible = "ti,omap-control-usb";
->> +            reg = <0x44e10620 0x10>;
->> +            reg-names = "control_dev_conf";
->> +            ti,type = <3>;
->> +            status = "disabled";
->> +        };
->> +
->> +        usb1: am4372_dwc3 at 48380000 {
->> +            status = "disabled";
->> +            compatible = "ti,am4372-dwc3";
->> +            reg = <0x48380000 0x200>;
->> +            interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
->> +            #address-cells = <1>;
->> +            #size-cells = <1>;
->> +            utmi-mode = <1>;
->> +            ranges;
-
-A blank line here will be nice.
-
->> +            dwc3 at 48390000 {
->> +                compatible = "snps,dwc3";
->> +                reg = <0x48390000 0xd000>;
->> +                interrupts = <GIC_SPI  168 IRQ_TYPE_LEVEL_HIGH>;
->> +                phys = <&phy1>;
->> +                phy-names = "am4372-usb1";
-
-What is the purpose of the phy-names? Is it relevant to add the SoC name 
-in something that usually, at least for the clocks and IRQs, is IP specific?
-
-The current documentation does not explain it and does not support phys 
-property either.
-
-   synopsys DWC3 CORE
-
-   DWC3- USB3 CONTROLLER
-
-   Required properties:
-    - compatible: must be "synopsys,dwc3"
-    - reg : Address and length of the register set for the device
-    - interrupts: Interrupts used by the dwc3 controller.
-    - usb-phy : array of phandle for the PHY device
-
-Is there some binding update ongoing for 3.12?
-
->> +            };
->> +        };
->> +
->> +        usb2: am4372_dwc3 at 483c0000 {
->> +            status = "disabled";
->> +            compatible = "ti,am4372-dwc3";
->> +            reg = <0x483c0000 0x200>;
->> +            interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
->> +            #address-cells = <1>;
->> +            #size-cells = <1>;
->> +            utmi-mode = <1>;
->> +            ranges;
-
-A blank line here will be nice.
-
->> +            dwc3 at 483d0000 {
->> +                compatible = "snps,dwc3";
->> +                reg = <0x483d0000 0xd000>;
->> +                interrupts = <GIC_SPI  174 IRQ_TYPE_LEVEL_HIGH>;
->> +                phys = <&phy2>;
->> +                phy-names = "am4372-usb2";
->> +            };
->> +        };
->>       };
->>   };
 >
 >
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 Regards,
-Benoit
+Anup
