@@ -1,41 +1,39 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 14 Aug 2013 10:59:22 +0530
-Subject: [PATCH V2 00/35] CPUFreq: Implement light weight ->target(): for
- 3.13
-In-Reply-To: <cover.1376392602.git.viresh.kumar@linaro.org>
-References: <cover.1376392602.git.viresh.kumar@linaro.org>
-Message-ID: <CAKohpo=Kg9+68_aOpt-=YgNUvT_Srvgpd9t629X7DenrngNrKQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 13 Aug 2013 22:29:40 -0700
+Subject: [PATCH] mmc: dw_mmc-exynos: Common bindings for dw-mshc timing
+In-Reply-To: <52096C75.1030305@wwwdotorg.org>
+References: <1376002520-7461-1-git-send-email-dinguyen@altera.com>
+ <52096C75.1030305@wwwdotorg.org>
+Message-ID: <20130814052940.GC16635@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 August 2013 19:02, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Currently prototype of cpufreq_drivers target routines is:
->
-> int target(struct cpufreq_policy *policy, unsigned int target_freq,
->         unsigned int relation);
->
-> And most of the drivers call cpufreq_frequency_table_target() to get a valid
-> index of their frequency table which is closest to the target_freq. And they
-> don't use target_freq and relation after it.
->
-> So, it makes sense to just do this work in cpufreq core before calling
-> cpufreq_frequency_table_target() and simply pass index instead. But this can be
-> done only with drivers which expose their frequency table with cpufreq core. For
-> others we need to stick with the old prototype of target() until those drivers
-> are converted to expose frequency tables.
->
-> There are 7 drivers after this patchset which still use the heavy weight
-> version, i.e. target() and 44 drivers have adopted this new approach, i.e.
-> target_index().
->
-> Once those 7 drivers are also moved to use .target_index(), .target() will be
-> removed completely.
+On Mon, Aug 12, 2013 at 05:15:01PM -0600, Stephen Warren wrote:
+> On 08/08/2013 04:55 PM, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Remove the "samsung" in "samsung,dw-mshc-ciu-div", "samsung,dw-mshc-sdr-timing",
+> > and "samsung,dw-mshc-ddr-timing". These characteristics are not applicable to
+> > just Samsung platforms, but to any platform that uses the Synopsis SD/MMC IP.
+> 
+> But the properties aren't globally standard; they apply specifically
+> anywhere that this particular Synopsis IP is present. As such, I think
+> at least a "synopsis," prefix is warranted.
 
-At a quick look at the status of drivers using target_index() it looks there is
-scope of more optimizations around that part..
+A prefix is only really needed when a vendor is making a vendor-specific
+extension on a shared binding. Since the whole binding is
+synopsis-specific, I don't think there's need for a prefix here.
 
-We can actually get rid of cpufreq_notify_transition() from those cpufreq
-drivers and do that in core.. And that would cut down size of ->target_index()
-routines even more :)
+> And the driver should probably support both the old and new property
+> names for backwards-compatibility?
 
-I will give it a try soon.
+Yes, that sounds appropriate if the binding is considered stable and
+otherwise good.
+
+The alternative is to have everybody just use the samsung,*
+properties. There's nothing wrong with that per se, besides the fact
+that if it had been caught when creating the binding, there should have
+been no prefix and the properties should have been common.
+
+
+-Olof
