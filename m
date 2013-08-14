@@ -1,120 +1,115 @@
-From: russ.dill@gmail.com (Russ Dill)
-Date: Wed, 14 Aug 2013 12:16:38 -0700
-Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
- module registers and APIs
-In-Reply-To: <520BBDF6.1070103@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
- <5203A0BC.8060205@ti.com> <5203C457.80301@ti.com>
- <20130809051146.GB7656@atomide.com> <52055733.70808@ti.com>
- <87y586pvkq.fsf@kernel.org> <5209565C.7090508@ti.com>
- <87d2phpsu1.fsf@kernel.org> <520A4BE7.7090603@ti.com>
- <87wqnplg1n.fsf@kernel.org> <520A785C.3000304@ti.com>
- <CA+Bv8Xbg9v4zRy-EJPsxwCdwpSy50V8SjwQfmAvVxiCR=6mYBw@mail.gmail.com>
- <87bo51jtiu.fsf@kernel.org> <520BBDF6.1070103@ti.com>
-Message-ID: <CA+Bv8XaVxUaqgEn7wHQiW4-=gPrDJUuZv+BSMMbn78YqkvWN_w@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 14 Aug 2013 15:17:38 -0400
+Subject: [PATCHv3 2/5] arm64: factor out spin-table boot method
+In-Reply-To: <alpine.LFD.2.03.1308141416580.14472@syhkavp.arg>
+References: <1376497228-20543-1-git-send-email-mark.rutland@arm.com>
+ <1376497228-20543-3-git-send-email-mark.rutland@arm.com>
+ <520BC88A.5080207@ti.com> <alpine.LFD.2.03.1308141416580.14472@syhkavp.arg>
+Message-ID: <520BD7D2.8020608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 10:27 AM, Suman Anna <s-anna@ti.com> wrote:
-> Kevin, Santosh, Dave, Russ,
->
-> On 08/13/2013 02:11 PM, Kevin Hilman wrote:
->> Russ Dill <russ.dill@gmail.com> writes:
->>
->>>>>> ARM world is also moving towards that by standardizing some of these
->>>>>> through (read PSCI) and thats the way to go in general.
->>>>>
->>>>> Agreed, but I'm not sure (yet) about enforcing PSCI on legacy platforms
->>>>> that don't support it natively.  Are you saying that the AM33xx firmware
->>>>> should be converted to be PSCI compliant?  Admittedly, I haven't read
->>>>> the PSCI spec closely, but I'm wondering if the current role splitting
->>>>> between MPU and M3 fits well with PSCI.
->>>>>
->>>> I didn't mean for the AM3XXX specifically because its current job is rather
->>>> very limited. i.e suspend. My concern is that IPC is not viewed as
->>>> an option for power management controllers like M3 which can abstract
->>>> all the hardware gory details and export a simpled interface for OS
->>>> in form of PSCI/ACPI.
+On Wednesday 14 August 2013 02:21 PM, Nicolas Pitre wrote:
+> On Wed, 14 Aug 2013, Santosh Shilimkar wrote:
+> 
+>> On Wednesday 14 August 2013 12:20 PM, Mark Rutland wrote:
+>>> The arm64 kernel has an internal holding pen, which is necessary for
+>>> some systems where we can't bring CPUs online individually and must hold
+>>> multiple CPUs in a safe area until the kernel is able to handle them.
+>>> The current SMP infrastructure for arm64 is closely coupled to this
+>>> holding pen, and alternative boot methods must launch CPUs into the pen,
+>>> where they sit before they are launched into the kernel proper.
 >>>
->>> The IPC between the M3 and the A8 on the am335x is just a pair of
->>> notification mechanisms (one from the A8, mailbox, and one from the
->>> M3, sev) and a set of 8 32 bit registers. The 8 32 bit registers are
->>> just a scratchpad and have no access rules or functionality beyond
->>> being a scratchpad. How complicated do we want to make this?
+>>> With PSCI (and possibly other future boot methods), we can bring CPUs
+>>> online individually, and need not perform the secondary_holding_pen
+>>> dance. Instead, this patch factors the holding pen management code out
+>>> to the spin-table boot method code, as it is the only boot method
+>>> requiring the pen.
+>>>
+>>> A new entry point for secondaries, secondary_entry is added for other
+>>> boot methods to use, which bypasses the holding pen and its associated
+>>> overhead when bringing CPUs online. The smp.pen.text section is also
+>>> removed, as the pen can live in head.text without problem.
+>>>
+>>> The smp_operations structure is extended with two new functions,
+>>> cpu_boot and cpu_postboot, for bringing a cpu into the kernel and
+>>> performing any post-boot cleanup required by a bootmethod (e.g.
+>>> resetting the secondary_holding_pen_release to INVALID_HWID).
+>>> Documentation is added for smp_operations.
+>>>
+>>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> ---
 >>
->> The OMAP IPC between the MPU and DSP (read: any other remote processor)
->> is just a mailbox and some shared memory.  No complicated, and works
->> with remoteproc/rpmsg.
->
-> I had to catch up on all the threads before I responded, but here are my
-> notes regarding using remoteproc/rpmsg infrastructure for WkupM3. It
-> definitely brings in lot more complexity than what's present today. The
-> WkupM3 in AM335x does not have the same feature set as the Cortex-M3s
-> used within the IPU in OMAP4+ SoCs. It does not have an MMU and
-> peripheral accesses seems to be limited to just those in L4_Wkup domain.
->
-> A lot actually depends on whether the WkupM3 can use DDR. I am not sure
-> if there are any restrictions on WkupM3 from where it could run the code
-> or access data from. From what I can gather from the TRM (there's no big
-> separate chapter on WkupM3), it has just 16K UMEM and a 8K DMEM, and its
-> not much. The current firmware is loaded directly into the WkupM3's
-> internal UMem space and a check is being performed to make sure the
-> firmware is less than  16K, so that it can fit into UMem.
+>> [..]
+>>> diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
+>>> index 5fecffc..87af6bb 100644
+>>> --- a/arch/arm64/kernel/smp_spin_table.c
+>>> +++ b/arch/arm64/kernel/smp_spin_table.c
 
-Even if the WkupM3 could access DMEM, it would defeat the whole
-purpose of using it, as it lives to do things like enable VTP, but the
-EMIF clocks into bypass, turn off the power domain the EMIF is
-contained in, etc.
 
-> The remoteproc infrastructure is currently tied closely with the
-> virtio/rpmsg framework, and the boot requires that there are virtio
-> devices present in the resource table from the firmware image. The rpmsg
-> shared memory buffers are currently kinda fixed (512 buffers of 512
-> bytes each) and requires 3 pages just for the vring structures for this
-> many buffers. So, if there are restrictions on DDR access, then this
-> pretty much rules out remoteproc/rpmsg infrastructure.
->
-> If the DDR access is ok, then there are other challenges that needs to
-> be met. The current firmware definitely requires the addition of the
-> resource table and the lower level code for handling the virtio_ring
-> transport for receiving messages. It would also need its own remoteproc
-> driver for handling the firmware binary format and the signalling
-> required to trigger the rpmsg buffer processing. The firmware binary
-> format needs to be adapted to something that this driver would
-> understand. It definitely doesn't look like ELF currently, so something
-> on the lines of ste_modem_rproc needs to be done. Also, the
-> remoteproc/rpmsg infrastructure can support multiple vring transport
-> channels between the processor, and depending on how many are supported,
-> we either need to exchange the vq_id (like OMAP remoteproc), or process
-> the known virtqueues always (like DA8xx remoteproc). The former requires
-> that a message payload is used, and mandates the usage of the IPC data
-> registers in the control module given that WkupM3 on AM335 cannot access
-> any mailbox registers. Any usage of IPC data registers depends on where
-> we do it. If all the accesses were to be done within
-> mach-omap2/control.c, then there is no easy way for using this API from
-> drivers/remoteproc, until we have the control module driver. I do feel
-> that this needs to be done within the wkup_m3 driver currently. This
-> would be no different to the crossbar driver example on DRA7, which also
-> has to deal with registers in Control module. The IPC data registers do
-> not have any associated interrupts by itself, so just making this a
-> standalone driver is also not possible. Also, the dependencies with
-> using the omap_device API for dealing with the hard reset lines needs to
-> be dealt with.
->
-> The current communication uses the IPC data registers, and sometimes
-> uses them as plain status registers. There's certain registers used for
-> sharing status, version etc which are shared by both the processors.
-> Using rpmsg would require communicating every single message, and if
-> there were to be some shared variables to be used simultaneously, then
-> this has to be exchanged through a new remoteproc resource type.
->
-> One additional aspect is that the current remoteproc core does not have
-> the necessary runtime pm support, but in general the approach would be
-> to treat the remoteprocs as true slave devices. I would imagine the
-> driver core to put the remoteprocs into reset state, after asking them
-> to save their context during suspend.
->
-> regards
-> Suman
->
+>>> @@ -59,8 +82,60 @@ static int smp_spin_table_cpu_prepare(unsigned int cpu)
+>>>  	return 0;
+>>>  }
+>>>  
+>>> +static int smp_spin_table_cpu_boot(unsigned int cpu)
+>>> +{
+>>> +	unsigned long timeout;
+>>> +
+>>> +	/*
+>>> +	 * Set synchronisation state between this boot processor
+>>> +	 * and the secondary one
+>>> +	 */
+>>> +	raw_spin_lock(&boot_lock);
+>>> +
+>>> +	/*
+>>> +	 * Update the pen release flag.
+>>> +	 */
+>>> +	write_pen_release(cpu_logical_map(cpu));
+>>> +
+>>> +	/*
+>>> +	 * Send an event, causing the secondaries to read pen_release.
+>>> +	 */
+>>> +	sev();
+>>> +
+>>> +	timeout = jiffies + (1 * HZ);
+>>> +	while (time_before(jiffies, timeout)) {
+>>> +		if (secondary_holding_pen_release == INVALID_HWID)
+>>> +			break;
+>>> +		udelay(10);
+>>> +	}
+>>> +
+>>> +	/*
+>>> +	 * Now the secondary core is starting up let it run its
+>>> +	 * calibrations, then wait for it to finish
+>>> +	 */
+>>> +	raw_spin_unlock(&boot_lock);
+>>> +
+>>> +	return secondary_holding_pen_release != INVALID_HWID ? -ENOSYS : 0;
+>>> +}
+>>> +
+>>> +void smp_spin_table_cpu_postboot(void)
+>>> +{
+>>> +	/*
+>>> +	 * Let the primary processor know we're out of the pen.
+>>> +	 */
+>>> +	write_pen_release(INVALID_HWID);
+>>> +
+>>> +	/*
+>>> +	 * Synchronise with the boot thread.
+>>> +	 */
+>>> +	raw_spin_lock(&boot_lock);
+>>> +	raw_spin_unlock(&boot_lock);
+>>> +}
+>>> +
+>> I was just wonderring whether we can absrtact the synchronization
+>> further out of spin_table and psci method. At least the lock
+>> synchronization is common and needed in both cases.
+> 
+> Why?  This synchronization looks rather useless to me.
+> 
+I thought it was needed one always. If it is useless then
+no concerns.
+
+Regards,
+Santosh
