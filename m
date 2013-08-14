@@ -1,38 +1,93 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Aug 2013 22:34:02 -0700
-Subject: [GIT PULL] pxa dt binding for v3.12
-In-Reply-To: <87haetfag9.fsf@kernel.org>
-References: <CAN1soZx5Ax1jq3psJXwnHozBP6jA9Y3ziRL=go=bP5k2ds=thg@mail.gmail.com>
- <87haetfag9.fsf@kernel.org>
-Message-ID: <20130814053402.GE16635@quad.lixom.net>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 14 Aug 2013 07:43:11 +0200
+Subject: arm-soc: Xilinx Zynq cleanups for v3.12
+In-Reply-To: <20130814050145.4443.97433@quantum>
+References: <520A47C7.4050000@monstr.eu> <87y585dve9.fsf@kernel.org>
+ <20130814050145.4443.97433@quantum>
+Message-ID: <520B18EF.6030905@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 04:16:38PM -0700, Kevin Hilman wrote:
-> Haojian Zhuang <haojian.zhuang@gmail.com> writes:
+On 08/14/2013 07:01 AM, Mike Turquette wrote:
+> Quoting Kevin Hilman (2013-08-13 16:27:10)
+>> + Mike Turquette
+>>
+>> Michal Simek <monstr@monstr.eu> writes:
+>>
+>>> Hi Arnd and Olof,
+>>
+>> I'm helping out with arm-soc maintenance now too and I'm on the
+>> arm at kernel.org alias, thanks for Cc'ing it.
+>>
+>>> please pull these cleanup patches to your tree.
+>>>
+>>> Thanks,
+>>> Michal
+>>>
+>>> The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
+>>>
+>>>   Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.12
+>>>
+>>> for you to fetch changes up to 060968ff9fa1a56b22cc2454906a233d302b1bd2:
+>>>
+>>>   arm: zynq: hotplug: Remove unreachable code (2013-08-13 16:09:12 +0200)
+>>>
+>>> ----------------------------------------------------------------
+>>> arm: Xilinx Zynq cleanup patches for v3.12
+>>>
+>>> This branch contains these fixes:
+>>> - SLCR cleanup
+>>> - 2 minor zynq pll fixes
+>>> - Hotplug cleanup
+>>>
+>>> ----------------------------------------------------------------
+>>> Soren Brinkmann (6):
+>>>       arm: zynq: slcr: Remove redundant header #includes
+>>>       arm: zynq: slcr: Clean up #defines
+>>>       arm: zynq: slcr: Use read-modify-write for register writes
+>>>       clk/zynq/pll: Fix documentation for PLL register function
+>>>       clk/zynq/pll: Use #defines for fbdiv min/max values
+>>
+>> These drivers/clk changes should go through the clock maintainer Mike
+>> Turquette.  Could you split them out into a separate pull request?
+>>
+>> Alternatively, if Mike is confident there won't be any conflicts with
+>> his tree, I'll happily merge them through arm-soc with his ack.
 > 
-> > Hi Olof & Arnd,
+> This is my bad. I updated the clk-fixes branch this morning and then got
+> distracted and never sent the request to Linus.
 > 
-> I'm also helping out with arm-soc maintenance now.  In the future,
-> please be sure to Cc arm at kernel.org on pull requests for ease of
-> filtering, so we don't miss anything.
+> Wait for it ... done.
 > 
-> > Here's the pull request from pxa git tree.
-> 
-> Pulled into next/dt.
-> 
-> In the future, it makes things simpler for us if you base on older -rc
-> releases wherever possible (c.f. similar request by Olof[1].)  In this
-> case, it was trivial for me to rebase it onto -rc1 so I've done that
-> before applying.
+> Ok so the two clk patches will hopefully be pulled for -rc6.
 
-We talked about this over IRC, but just for others education: Be careful when
-you rebase, since platform maintainers have downstream users too, and some of
-their trees are in linux-next. PXA isn't included there so this seemed ok to
-do.
+These two clk patches in this pull request are different than that 2 patches
+which should go to this kernel version and which you correctly added
+to pull request to Linus.
 
-This is something we might want to bring up at the arm summit, I'll think about
-it a bit more and propose a topic on the list.
+Mike: Are you ok to add these 2 patches to mainline via arm-soc tree?
+Both changes are cosmetic. If not, I will separate this pull request.
+
+Thanks,
+Michal
 
 
--Olof
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130814/19bdf2af/attachment-0001.sig>
