@@ -1,20 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Aug 2013 23:56:44 -0700
-Subject: [PATCH 2/2] arm: prima2: pm: drop redundant postcore_initcall
-In-Reply-To: <1375175273-14067-2-git-send-email-Baohua.Song@csr.com>
-References: <1375175273-14067-1-git-send-email-Baohua.Song@csr.com>
- <1375175273-14067-2-git-send-email-Baohua.Song@csr.com>
-Message-ID: <20130814065644.GL19951@quad.lixom.net>
+From: B44344@freescale.com (Arpit Goel)
+Date: Wed, 14 Aug 2013 12:33:53 +0530
+Subject: [PATCH v2 0/2] Make PPC macro spin_event_timeout() architecture
+ independent
+Message-ID: <1376463835-13040-1-git-send-email-B44344@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 05:07:53PM +0800, Barry Song wrote:
-> This will delete some redundant calling of sirfsoc_of_pwrc_init() and
-> sirfsoc_memc_init() for non-CSR platforms if we use multi-platform.
-> 
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+This patch-set moves USECS_PER_JIFFY to architecture timex.h from architecture
+specific C files. Patch-set further uses this to make PPC macro
+spin_event_timeout() architecture independent. This change enables drivers to
+use spin_event_timeout() even in non-PowerPC based SoC's.
 
-Applied, thanks.
+This patchset has been compiled for ARM, PowerPC and x86.
 
--Olof
+Patch[1/2] : Moves USECS_PER_JIFFY to architecture specific timex.h files from
+	     architecture specific C files.
+
+Patch[2/2] : Converts PPC macro spin_event_timeout() in architecture independent
+	     macro.
+
+Changes in v2:
+	Patch[1/2] Adds USEC_PER_JIFFY to linux/timex.h
+	Patch[2/2] uses usecs_to_jiffies for conversion
+
+Arpit Goel (2):
+  Make USECS_PER_JIFFY available for generic use
+  Convert PowerPC macro spin_event_timeout() to architecture independent
+    macro
+
+ arch/arm/include/asm/timex.h      |  2 ++
+ arch/arm/kernel/time.c            |  3 ---
+ arch/m32r/include/asm/timex.h     |  2 ++
+ arch/m32r/kernel/time.c           |  3 ---
+ arch/m68k/hp300/time.c            |  4 +---
+ arch/m68k/include/asm/timex.h     |  2 ++
+ arch/s390/include/asm/timex.h     |  2 ++
+ arch/s390/kernel/time.c           |  2 --
+ arch/sparc/include/asm/timex_32.h |  2 ++
+ arch/sparc/include/asm/timex_64.h |  2 ++
+ arch/sparc/kernel/pcic.c          |  1 -
+ include/linux/delay.h             | 40 +++++++++++++++++++++++++++++++++++++++
+ include/linux/timex.h             |  5 +++++
+ 13 files changed, 58 insertions(+), 12 deletions(-)
+
+-- 
+1.8.1.4
