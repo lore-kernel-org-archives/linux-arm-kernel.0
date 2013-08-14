@@ -1,66 +1,88 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 Aug 2013 13:50:52 -0500
-Subject: [GIT PULL] Highbank fixes for 3.12
-In-Reply-To: <87li4445tj.fsf@kernel.org>
-References: <520AF2ED.9030900@gmail.com>
-	<87li4445tj.fsf@kernel.org>
-Message-ID: <CAL_Jsq+4hpsCM5aNt60+Oe5=Mt1SWrAwskahS+JbXYuHRRcMuw@mail.gmail.com>
+Date: Wed, 14 Aug 2013 13:54:20 -0500
+Subject: [PATCH] KVM: ARM: ignore guest L2 cache control SMCs on Highbank
+ and OMAP
+In-Reply-To: <1376472125-23350-1-git-send-email-andre.przywara@calxeda.com>
+References: <1376472125-23350-1-git-send-email-andre.przywara@calxeda.com>
+Message-ID: <CAL_Jsq+vGd7+pw6YX0YNHO5rVSoiHCHbtXXdZ-3grnEcAOc38Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 11:04 AM, Kevin Hilman <khilman@linaro.org> wrote:
-> Hi Rob,
+On Wed, Aug 14, 2013 at 4:22 AM, Andre Przywara
+<andre.przywara@calxeda.com> wrote:
+> Guest kernels with CONFIG_L2X0 set (for instance Highbank or OMAP4)
+> will trigger SMCs to handle the L2 cache controller (PL310).
+> This will currently inject #UNDEFs and eventually stop the guest.
 >
-> Rob Herring <robherring2@gmail.com> writes:
+> We don't need explicit L2 cache controller handling on A15s anymore,
+> so it is safe to simply ignore these calls and proceed with the next
+> instruction.
 >
->> Kevin, Olof,
->>
->> Please pull highbank updates for 3.12.
->>
->> There's one trivial core ARM code change in the series to allow a
->> DMA_ZONE size of 4GB. I believe this should not conflict with Russell's
->> DMA mask series.
->>
->> Rob
->>
->> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
->>
->>   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
->>
->> are available in the git repository at:
->>
->>   git://sources.calxeda.com/kernel/linux.git
->> tags/highbank-lpae-fixes-for-3.12
->>
->> for you to fetch changes up to ce3ec1d61c5ed6af3ceaace6f57acd588c41b4d6:
->>
->>   ARM: highbank: fix debug uart virtual address for LPAE (2013-08-13
->> 20:50:16 -0500)
->>
->> ----------------------------------------------------------------
->> A set of fixes for highbank to enable LPAE and selecting of necesssary
->> ARM errata.
->>
->> ----------------------------------------------------------------
->> Rob Herring (6):
->>       ARM: use phys_addr_t for DMA zone sizes
->>       ARM: highbank: enable DMA zone for LPAE
->>       ARM: highbank: select ARCH_HAS_HOLES_MEMORYMODEL
->>       ARM: highbank: select required errata work-arounds
->>       ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
+> Signed-off-by: Andre Przywara <andre.przywara@calxeda.com>
+> ---
+>  arch/arm/kvm/handle_exit.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+
+At least for highbank, we can fix this in the kernel:
+
+diff --git a/arch/arm/mach-highbank/highbank.c
+b/arch/arm/mach-highbank/highbank.c
+index 1894dcf..b5d0375 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -77,8 +77,10 @@ static void __init highbank_init_irq(void)
+ {
+        irqchip_init();
+
+-       if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
+-               highbank_scu_map_io();
++       if (!of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
++               return;
++
++       highbank_scu_map_io();
+
+ #ifdef CONFIG_CACHE_L2X0
+        /* Enable PL310 L2 Cache controller */
+
 >
-> This one seems to have broken the AMBA PL08x DMA driver, and is still
-> objected to by Russell, so I'll drop this one for now.
-
-Exynos does the same selection, but I guess it is not multi-platform
-though and doesn't select ARM_AMBA.
-
->>       ARM: highbank: fix debug uart virtual address for LPAE
+> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+> index df4c82d..2cbe6a0 100644
+> --- a/arch/arm/kvm/handle_exit.c
+> +++ b/arch/arm/kvm/handle_exit.c
+> @@ -50,8 +50,28 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>         return 1;
+>  }
 >
-> The rest look OK and I can pull them if the rest are OK without the
-> objectionable one.  Let me know if that's OK, or you prefer to wait for
-> resolution.
-
-Yes, I'm fine with dropping this one for now.
-
-Rob
+> +/*
+> + * OMAP4 and Highbank machines do a SMC call to handle the L2 cache
+> + * controller. They put 0x102 in r12 to request this functionality.
+> + * This is not needed on A15s, so we can safely ignore it in KVM guests.
+> + */
+> +static int kvm_ignore_l2x0_call(struct kvm_vcpu *vcpu)
+> +{
+> +       unsigned long fn_nr = *vcpu_reg(vcpu, 12) & ~((u32) 0);
+> +
+> +       if (fn_nr == 0x102) {
+> +               kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+> +               return 1;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+>  static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+> +       if (kvm_ignore_l2x0_call(vcpu))
+> +               return 1;
+> +
+>         kvm_inject_undefined(vcpu);
+>         return 1;
+>  }
+> --
+> 1.7.12.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
