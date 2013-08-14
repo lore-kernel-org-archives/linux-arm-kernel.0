@@ -1,34 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Aug 2013 13:46:43 +0100
-Subject: [v2 rebased 1/2] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <1376483121-11306-1-git-send-email-zonque@gmail.com>
-References: <1376483121-11306-1-git-send-email-zonque@gmail.com>
-Message-ID: <20130814124643.GP23006@n2100.arm.linux.org.uk>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 14 Aug 2013 07:48:24 -0500
+Subject: [PATCH 2/3] ARM: OMAP2+: Add support to parse optional clk info
+ from DT
+In-Reply-To: <1374560679-14666-3-git-send-email-rnayak@ti.com>
+References: <1374560679-14666-1-git-send-email-rnayak@ti.com>
+ <1374560679-14666-3-git-send-email-rnayak@ti.com>
+Message-ID: <CAGo_u6rfXpU1Wzn+oXqpAezNNtFb9pk=9RZxodGtBbZXVy+yJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 02:25:20PM +0200, Daniel Mack wrote:
-> In order to report the channel's residue, we have to memorize the first
-> dma buffer position when the channel is configured.
+Hi Rajendra,
 
-This is actually broken, and I'm surprised that Vinod even suggested it.
-
-Think about what happens with a scatter-gather list where the addresses
-of each element really are scattered in memory.  Let's say that the
-N'th element is at a lower address than the first element, and we're on
-that N'th element.  What happens when curr is less than chan->start_addr
-here:
-
-> +static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan)
+On Tue, Jul 23, 2013 at 1:24 AM, Rajendra Nayak <rnayak@ti.com> wrote:
+[..]
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 12fa589..e5c804b 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -805,6 +805,65 @@ static int _init_interface_clks(struct omap_hwmod *oh)
+>         return ret;
+>  }
+>
+> +static const char **_parse_opt_clks_dt(struct omap_hwmod *oh,
+> +                                      struct device_node *np,
+> +                                      int *opt_clks_cnt)
 > +{
-> +	u32 curr, done;
+> +       int i, clks_cnt;
+> +       const char *clk_name;
+> +       const char **opt_clk_names;
 > +
-> +	if (chan->dir == DMA_DEV_TO_MEM)
-> +		curr = readl(chan->phy->base + DTADR(chan->phy->idx));
-> +	else
-> +		curr = readl(chan->phy->base + DSADR(chan->phy->idx));
+> +       clks_cnt = of_property_count_strings(np, "clock-names");
+> +       if (!clks_cnt)
+> +               return NULL;
 > +
-> +	done = curr - chan->start_addr;
+> +       opt_clk_names = kzalloc(sizeof(char *)*clks_cnt, GFP_KERNEL);
+> +       if (!opt_clk_names)
+> +               return NULL;
 > +
-> +	return chan->total_len - done;
+> +       for (i = 0; i < clks_cnt; i++) {
+> +               of_property_read_string_index(np, "clock-names", i, &clk_name);
+> +               if (!strcmp(clk_name, "fck"))
+
+Could we instead parse for names that are "optional,role_name" instead
+of assuming anything other than fck is optional clocks?
+
+> +                       continue;
+> +               opt_clks_cnt++;
+> +               opt_clk_names[i] = clk_name;
+> +       }
+> +       return opt_clk_names;
 > +}
+> +
+[...]
+--
+Regards,
+Nishanth Menon
