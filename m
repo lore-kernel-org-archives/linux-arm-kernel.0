@@ -1,68 +1,37 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 14 Aug 2013 09:04:24 -0700
-Subject: [GIT PULL] Highbank fixes for 3.12
-In-Reply-To: <520AF2ED.9030900@gmail.com> (Rob Herring's message of "Tue, 13
- Aug 2013 22:01:01 -0500")
-References: <520AF2ED.9030900@gmail.com>
-Message-ID: <87li4445tj.fsf@kernel.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 14 Aug 2013 10:08:25 -0600
+Subject: [PATCH 1/2] extcon: palmas: Added a new compatible type *ti,
+ palmas-usb-vid*
+In-Reply-To: <520B14A1.8030809@ti.com>
+References: <1376302675-15795-1-git-send-email-kishon@ti.com>
+ <1376372241-15573-1-git-send-email-kishon@ti.com>
+ <520A8555.10401@wwwdotorg.org> <520B14A1.8030809@ti.com>
+Message-ID: <520BAB79.3000202@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On 08/13/2013 11:24 PM, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Wednesday 14 August 2013 12:43 AM, Stephen Warren wrote:
+>> On 08/12/2013 11:37 PM, Kishon Vijay Abraham I wrote:
+>>> The Palmas device contains only a USB VID detector, so added a
+>>> compatible type *ti,palmas-usb-vid*. Dint remove the existing compatible
+>>
+>> s/Dint/Didn't/
+>>
+>>> diff --git a/Documentation/devicetree/bindings/extcon/extcon-twl.txt b/Documentation/devicetree/bindings/extcon/extcon-twl.txt
+>>
+>>>  PALMAS USB COMPARATOR
+>>>  Required Properties:
+>>> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
+>>> + - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb" or
+>>> +   "ti,palmas-usb-vid".
+>>
+>> So are ti,palmas-usb and ti,twl6035-usb full EHCI controllers then?
+> 
+> No. I thought I shouldn't remove those if someone is already using those
+> compatible value.
 
-Rob Herring <robherring2@gmail.com> writes:
-
-> Kevin, Olof,
->
-> Please pull highbank updates for 3.12.
->
-> There's one trivial core ARM code change in the series to allow a
-> DMA_ZONE size of 4GB. I believe this should not conflict with Russell's
-> DMA mask series.
->
-> Rob
->
-> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
->
->   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
->
-> are available in the git repository at:
->
->   git://sources.calxeda.com/kernel/linux.git
-> tags/highbank-lpae-fixes-for-3.12
->
-> for you to fetch changes up to ce3ec1d61c5ed6af3ceaace6f57acd588c41b4d6:
->
->   ARM: highbank: fix debug uart virtual address for LPAE (2013-08-13
-> 20:50:16 -0500)
->
-> ----------------------------------------------------------------
-> A set of fixes for highbank to enable LPAE and selecting of necesssary
-> ARM errata.
->
-> ----------------------------------------------------------------
-> Rob Herring (6):
->       ARM: use phys_addr_t for DMA zone sizes
->       ARM: highbank: enable DMA zone for LPAE
->       ARM: highbank: select ARCH_HAS_HOLES_MEMORYMODEL
->       ARM: highbank: select required errata work-arounds
->       ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
-
-This one seems to have broken the AMBA PL08x DMA driver, and is still
-objected to by Russell, so I'll drop this one for now.
-
->       ARM: highbank: fix debug uart virtual address for LPAE
-
-The rest look OK and I can pull them if the rest are OK without the
-objectionable one.  Let me know if that's OK, or you prefer to wait for
-resolution.
-
-Kevin
-
-
->  arch/arm/include/asm/mach/arch.h  | 2 +-
->  arch/arm/include/debug/highbank.S | 2 +-
->  arch/arm/mach-highbank/Kconfig    | 6 ++++++
->  arch/arm/mach-highbank/highbank.c | 3 +++
->  arch/arm/mm/init.c                | 2 +-
->  5 files changed, 12 insertions(+), 3 deletions(-)
+Sigh. Perhaps it's best to be consistent with the existing bad naming
+then:-(
