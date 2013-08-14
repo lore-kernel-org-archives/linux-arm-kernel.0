@@ -1,184 +1,167 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 14 Aug 2013 17:27:15 +0200
-Subject: [PATCH 2/9] usb: phy: nop: Don't use regulator framework for
- RESET line
-In-Reply-To: <1376488693-31659-3-git-send-email-rogerq@ti.com>
-References: <1376488693-31659-1-git-send-email-rogerq@ti.com>
- <1376488693-31659-3-git-send-email-rogerq@ti.com>
-Message-ID: <1376494035.3994.24.camel@pizza.hi.pengutronix.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 14 Aug 2013 16:28:34 +0100
+Subject: [Git pull request] fix to the vexpress/mcpm branch
+In-Reply-To: <alpine.LFD.2.03.1308141018140.14472@syhkavp.arg>
+References: <alpine.LFD.2.03.1308121428080.14472@syhkavp.arg>
+ <20130814055800.GG16635@quad.lixom.net>
+ <alpine.LFD.2.03.1308141018140.14472@syhkavp.arg>
+Message-ID: <20130814152834.GA7242@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
-
-Am Mittwoch, den 14.08.2013, 16:58 +0300 schrieb Roger Quadros:
-> Modelling the RESET line as a regulator supply wasn't a good idea
-> as it kind of abuses the regulator framework and also makes adaptation
-> code more complex.
+On Wed, Aug 14, 2013 at 03:25:14PM +0100, Nicolas Pitre wrote:
+> On Tue, 13 Aug 2013, Olof Johansson wrote:
 > 
-> Instead, manage the RESET gpio line directly in the driver. Update
-> the device tree binding information.
+> > Hi Nico,
+> > 
+> > On Mon, Aug 12, 2013 at 02:37:54PM -0400, Nicolas Pitre wrote:
+> > > 
+> > > Please pull the following:
+> > > 
+> > > 	git://git.linaro.org/people/nico/linux mcpm+tc2
+> > > 
+> > > which will update your vexpress/mcpm branch with one additional commit 
+> > > fixing the build issue with CONFIG_FRAME_POINTER reported by RMK.  This 
+> > > commit's SHA1 is 95fbdc9cf542.
+> > 
+> > So, I just replaced my branch with the one from Pawel, and the topmost patch
+> > in your branch seems to no longer apply.
 > 
-> This also makes us easy to migrate to a dedicated GPIO RESET controller
-> whenever it becomes available.
+> Weird.  It still applies perfectly here.
 > 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Here's the patch nevertheless.  Please apply ASAP as Lorenzo wishes to 
+> base his next pull request on top of this.
 
-using the reset-gpios property
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Thanks Nico. For the records, I applied your patch against arm-soc
+vexpress/mcpm and my pull request for the CPUidle driver still applies
+cleanly on top of that branch, so there should not be anything to do on
+my side, but I am here if anything goes wrong.
 
-> ---
->  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |    7 +--
->  drivers/usb/phy/phy-nop.c                          |   48 ++++++++++++--------
->  2 files changed, 32 insertions(+), 23 deletions(-)
+Lorenzo
+
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-> index d7e2726..5535f3b 100644
-> --- a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-> @@ -15,7 +15,7 @@ Optional properties:
+> ----- >8
+> 
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Date: Mon, 12 Aug 2013 12:47:13 -0400
+> Subject: [PATCH] ARM: vexpress/MCPM: fix cache disable sequence when CONFIG_FRAME_POINTER=y
+> 
+> If CONFIG_FRAME_POINTER=y we hget the following error:
+> 
+> arch/arm/mach-vexpress/tc2_pm.c: In function 'tc2_pm_down':
+> arch/arm/mach-vexpress/tc2_pm.c:200:1: error: fp cannot be used in asm here
+> 
+> Let's fix that by explicitly preserving r11 on the stack and removing it
+> from the clobber list.
+> 
+> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> 
+> diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+> index 85fffa702f..3a6384c6c4 100644
+> --- a/arch/arm/mach-vexpress/dcscb.c
+> +++ b/arch/arm/mach-vexpress/dcscb.c
+> @@ -144,8 +144,13 @@ static void dcscb_power_down(void)
+>  		 * Let's do it in the safest possible way i.e. with
+>  		 * no memory access within the following sequence
+>  		 * including to the stack.
+> +		 *
+> +		 * Note: fp is preserved to the stack explicitly prior doing
+> +		 * this since adding it to the clobber list is incompatible
+> +		 * with having CONFIG_FRAME_POINTER=y.
+>  		 */
+>  		asm volatile(
+> +		"str	fp, [sp, #-4]! \n\t"
+>  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+>  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+> @@ -156,9 +161,10 @@ static void dcscb_power_down(void)
+>  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+>  		"isb	\n\t"
+> -		"dsb	"
+> +		"dsb	\n\t"
+> +		"ldr	fp, [sp], #4"
+>  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+> -		      "r9","r10","r11","lr","memory");
+> +		      "r9","r10","lr","memory");
 >  
->  - vcc-supply: phandle to the regulator that provides RESET to the PHY.
->  
-> -- reset-supply: phandle to the regulator that provides power to the PHY.
-> +- reset-gpios: Should specify the GPIO for reset.
->
->  Example:
->  
-> @@ -25,10 +25,9 @@ Example:
->  		clocks = <&osc 0>;
->  		clock-names = "main_clk";
->  		vcc-supply = <&hsusb1_vcc_regulator>;
-> -		reset-supply = <&hsusb1_reset_regulator>;
-> +		reset-gpios = <&gpio1 7>;
-
-Yes, although the example should probably include GPIO_ACTIVE_LOW or
-GPIO_ACTIVE_HIGH flags.
-
->  	};
->  
->  hsusb1_phy is a NOP USB PHY device that gets its clock from an oscillator
->  and expects that clock to be configured to 19.2MHz by the NOP PHY driver.
-> -hsusb1_vcc_regulator provides power to the PHY and hsusb1_reset_regulator
-> -controls RESET.
-> +hsusb1_vcc_regulator provides power to the PHY and GPIO 7 controls RESET.
-> diff --git a/drivers/usb/phy/phy-nop.c b/drivers/usb/phy/phy-nop.c
-> index 55445e5d..af5e1a6 100644
-> --- a/drivers/usb/phy/phy-nop.c
-> +++ b/drivers/usb/phy/phy-nop.c
-> @@ -35,6 +35,9 @@
->  #include <linux/clk.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/of.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/gpio.h>
-> +#include <linux/delay.h>
->  
->  struct nop_usb_xceiv {
->  	struct usb_phy phy;
-> @@ -42,6 +45,7 @@ struct nop_usb_xceiv {
->  	struct clk *clk;
->  	struct regulator *vcc;
->  	struct regulator *reset;
-> +	int gpio_reset;
->  };
->  
->  static struct platform_device *pd;
-> @@ -70,6 +74,15 @@ static int nop_set_suspend(struct usb_phy *x, int suspend)
->  	return 0;
->  }
->  
-> +static void nop_gpio_reset(int gpio, int state)
-> +{
-> +	if (gpio_is_valid(gpio))
-> +		gpio_set_value(gpio, state);
-> +
-> +	if (state)
-> +		usleep_range(10000, 20000);
-> +}
-> +
->  static int nop_init(struct usb_phy *phy)
->  {
->  	struct nop_usb_xceiv *nop = dev_get_drvdata(phy->dev);
-> @@ -82,11 +95,8 @@ static int nop_init(struct usb_phy *phy)
->  	if (!IS_ERR(nop->clk))
->  		clk_enable(nop->clk);
->  
-> -	if (!IS_ERR(nop->reset)) {
-> -		/* De-assert RESET */
-> -		if (regulator_enable(nop->reset))
-> -			dev_err(phy->dev, "Failed to de-assert reset\n");
-> -	}
-> +	/* De-assert RESET */
-> +	nop_gpio_reset(nop->gpio_reset, 1);
->  
->  	return 0;
->  }
-> @@ -95,11 +105,8 @@ static void nop_shutdown(struct usb_phy *phy)
->  {
->  	struct nop_usb_xceiv *nop = dev_get_drvdata(phy->dev);
->  
-> -	if (!IS_ERR(nop->reset)) {
-> -		/* Assert RESET */
-> -		if (regulator_disable(nop->reset))
-> -			dev_err(phy->dev, "Failed to assert reset\n");
-> -	}
-> +	/* Assert RESET */
-> +	nop_gpio_reset(nop->gpio_reset, 0);
->  
->  	if (!IS_ERR(nop->clk))
->  		clk_disable(nop->clk);
-> @@ -148,7 +155,6 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
->  	int err;
->  	u32 clk_rate = 0;
->  	bool needs_vcc = false;
-> -	bool needs_reset = false;
->  
->  	nop = devm_kzalloc(&pdev->dev, sizeof(*nop), GFP_KERNEL);
->  	if (!nop)
-> @@ -166,13 +172,15 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
->  			clk_rate = 0;
->  
->  		needs_vcc = of_property_read_bool(node, "vcc-supply");
-> -		needs_reset = of_property_read_bool(node, "reset-supply");
-> +		nop->gpio_reset = of_get_named_gpio(node, "reset-gpios", 0);
-
-I'd suggest to use of_get_named_gpio_flags to also obtain the polarity
-from the flags.
-
-> +		if (nop->gpio_reset == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
->  
->  	} else if (pdata) {
->  		type = pdata->type;
->  		clk_rate = pdata->clk_rate;
->  		needs_vcc = pdata->needs_vcc;
-> -		needs_reset = pdata->needs_reset;
-> +		nop->gpio_reset = pdata->gpio_reset;
+>  		/*
+>  		 * This is a harmless no-op.  On platforms with a real
+> @@ -182,6 +188,7 @@ static void dcscb_power_down(void)
+>  		 * Let's do it in the safest possible way as above.
+>  		 */
+>  		asm volatile(
+> +		"str	fp, [sp, #-4]! \n\t"
+>  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+>  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+> @@ -192,9 +199,10 @@ static void dcscb_power_down(void)
+>  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+>  		"isb	\n\t"
+> -		"dsb	"
+> +		"dsb	\n\t"
+> +		"ldr	fp, [sp], #4"
+>  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+> -		      "r9","r10","r11","lr","memory");
+> +		      "r9","r10","lr","memory");
 >  	}
 >  
->  	nop->clk = devm_clk_get(&pdev->dev, "main_clk");
-> @@ -205,12 +213,14 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
->  			return -EPROBE_DEFER;
+>  	__mcpm_cpu_down(cpu, cluster);
+> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+> index ddd97dd4e9..2b7c93a724 100644
+> --- a/arch/arm/mach-vexpress/tc2_pm.c
+> +++ b/arch/arm/mach-vexpress/tc2_pm.c
+> @@ -150,8 +150,13 @@ static void tc2_pm_down(u64 residency)
+>  		 * Let's do it in the safest possible way i.e. with
+>  		 * no memory access within the following sequence
+>  		 * including the stack.
+> +		 *
+> +		 * Note: fp is preserved to the stack explicitly prior doing
+> +		 * this since adding it to the clobber list is incompatible
+> +		 * with having CONFIG_FRAME_POINTER=y.
+>  		 */
+>  		asm volatile(
+> +		"str	fp, [sp, #-4]! \n\t"
+>  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+>  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+> @@ -162,9 +167,10 @@ static void tc2_pm_down(u64 residency)
+>  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+>  		"isb	\n\t"
+> -		"dsb	"
+> +		"dsb	\n\t"
+> +		"ldr	fp, [sp], #4"
+>  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+> -		      "r9","r10","r11","lr","memory");
+> +		      "r9","r10","lr","memory");
+>  
+>  		cci_disable_port_by_cpu(mpidr);
+>  
+> @@ -185,6 +191,7 @@ static void tc2_pm_down(u64 residency)
+>  		 * Let's do it in the safest possible way as above.
+>  		 */
+>  		asm volatile(
+> +		"str	fp, [sp, #-4]! \n\t"
+>  		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+>  		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+> @@ -195,9 +202,10 @@ static void tc2_pm_down(u64 residency)
+>  		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+>  		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+>  		"isb	\n\t"
+> -		"dsb	"
+> +		"dsb	\n\t"
+> +		"ldr	fp, [sp], #4"
+>  		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+> -		      "r9","r10","r11","lr","memory");
+> +		      "r9","r10","lr","memory");
 >  	}
 >  
-> -	nop->reset = devm_regulator_get(&pdev->dev, "reset");
-> -	if (IS_ERR(nop->reset)) {
-> -		dev_dbg(&pdev->dev, "Error getting reset regulator: %ld\n",
-> -					PTR_ERR(nop->reset));
-> -		if (needs_reset)
-> -			return -EPROBE_DEFER;
-> +	if (gpio_is_valid(nop->gpio_reset)) {
-> +		err = devm_gpio_request_one(dev, nop->gpio_reset,
-> +					    GPIOF_OUT_INIT_HIGH, dev_name(dev));
-> +		if (err) {
-> +			dev_err(dev, "Error requesting RESET GPIO %d\n",
-> +					nop->gpio_reset);
-> +			return err;
-> +		}
->  	}
->  
->  	nop->dev		= &pdev->dev;
-
-regards
-Philipp
+>  	__mcpm_cpu_down(cpu, cluster);
+> 
+> 
+> 
