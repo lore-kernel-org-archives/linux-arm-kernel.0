@@ -1,46 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Aug 2013 14:57:55 +0100
-Subject: [PATCH 2/3] ARM: OMAP2+: Add support to parse optional clk
- info from DT
-In-Reply-To: <20130814134904.GC13141@e106331-lin.cambridge.arm.com>
-References: <1374560679-14666-1-git-send-email-rnayak@ti.com>
- <1374560679-14666-3-git-send-email-rnayak@ti.com>
- <CAGo_u6rfXpU1Wzn+oXqpAezNNtFb9pk=9RZxodGtBbZXVy+yJA@mail.gmail.com>
- <520B8409.5000708@ti.com> <520B88A0.6080806@ti.com>
- <20130814134904.GC13141@e106331-lin.cambridge.arm.com>
-Message-ID: <20130814135755.GC25647@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 14 Aug 2013 09:05:04 -0500
+Subject: [PATCH 0/2] DMA: AMBA PL08x DMA driver fixes due to
+ ARCH_DMA_ADDR_T_64BIT
+In-Reply-To: <20130814130018.GR23006@n2100.arm.linux.org.uk>
+References: <1376484729-11826-1-git-send-email-andre.przywara@linaro.org>
+ <20130814130018.GR23006@n2100.arm.linux.org.uk>
+Message-ID: <CAL_Jsq+=axr91_1Qzhku2DLE8MmkyPZtCyHUj0WOG4x+tqWK8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 02:49:04PM +0100, Mark Rutland wrote:
-> [Adding Mike Turquette and dt maintainers]
-> 
-> On Wed, Aug 14, 2013 at 02:39:44PM +0100, Nishanth Menon wrote:
-> > yes. the idea being, we now have a meaning to the clock name - there are 
-> > two types of clocks here.. functional and optional, we *might* have 
-> > facility to add interface clock(we dont know interface clock handling 
-> > yet, but something in the future).. we might increase the support for 
-> > number of functional clocks.. it might help to keep the format such that 
-> > it is a "bit extendable".
-> 
-> I completely disagree. The only things that should appear in clock-names
-> are the names of the clock inputs that appear in the manual for the
-> device. The driver should know which ones are optional, as that's a
-> fixed property of the IP and the way the driver uses it.
-> 
-> You should not be embedding additional semantics in name properties.
+On Wed, Aug 14, 2013 at 8:00 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Aug 14, 2013 at 02:52:07PM +0200, Andre Przywara wrote:
+>> Rob's recent pull request (Highbank fixes for 3.12) promoted the
+>> dma_addr_t to 64bit:
+>> commit ac072f427a4266b28a948c67a97a8c46f49b662d
+>> Author: Rob Herring <rob.herring@calxeda.com>
+>> Date:   Tue Aug 13 15:55:07 2013 -0500
+>>
+>>     ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
+>>
+>> Unfortunately this breaks the AMBA PL08x driver.
+>> Fixes are pretty easy: replacing modulo with AND and fix printk
+>> format types.
+>
+> I thought I effectively said no to that patch, and told Rob to go and look
+> at my patch series.
 
-Agreed.  I've been on at people about this for years, and every time they
-go off and do something else, it ultimately ends up coming back to bite
-them.  Clock names _are_ the clock input names as far as device drivers
-are concerned, and nothing else.
+I thought you only objected to doing this unconditionally for all
+LPAE, so I made it highbank specific like exynos is.
 
-If there are optional clocks, then the driver should be doing as Mark
-says - the driver should try to get them, and if it fails to get them
-then they're quite simply not provided by the platform.  If there are
-optional clocks which the device driver does not know about (or even
-need to know about) then that too should not be a problem - the driver
-just doesn't have to touch them.
-
-If they're optional, but required for the device to function, then the
-driver should get them and control them as necessary.
+Rob
