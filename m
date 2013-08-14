@@ -1,60 +1,30 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 14 Aug 2013 17:21:48 +0900
-Subject: [PATCH V6 1/4] ARM: dts: Add DP PHY node to exynos5250.dtsi
-In-Reply-To: <003e01ce7c7a$e519a300$af4ce900$@samsung.com>
-References: <003e01ce7c7a$e519a300$af4ce900$@samsung.com>
-Message-ID: <10ab01ce98c7$522567a0$f67036e0$@org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 14 Aug 2013 01:21:38 -0700
+Subject: [GIT 00/14] Second round of Renesas ARM based SoC cleanups for
+ v3.12
+In-Reply-To: <cover.1375344714.git.horms+renesas@verge.net.au>
+References: <cover.1375344714.git.horms+renesas@verge.net.au>
+Message-ID: <20130814082138.GA516@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jingoo Han wrote:
+On Thu, Aug 01, 2013 at 05:26:14PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
-> Add PHY provider node for the DP PHY.
+> Please consider this second round of Renesas ARM based SoC cleanups for
+> v3.12.
 > 
-> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
+> This pull-request is based on a merge of renesas-tpu-pwm-for-v3.12,
+> renesas-backlight-for-v3.12 and renesas-soc-for-v3.12, each of which
+> I have previously sent a pull-request for, in order to provide
+> the pre-requisite code that that is being removed or cleaned up.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Hm, I'm a little sad to see the added circular dependency here. It would have
+been very nice if the patches could be organized such that it would have been
+avoided.
 
-Thanks,
-Kukjin
+I'll probably pull this in as a new next/* branch, but if you can avoid these
+next release cycle without it complicating things too much that'd be awesome.
 
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi |   13 ++++++++-----
->  1 file changed, 8 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
-> b/arch/arm/boot/dts/exynos5250.dtsi
-> index fc9fb3d..c326c06 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -616,6 +616,12 @@
->  		interrupts = <0 94 0>;
->  	};
-> 
-> +	dp_phy: video-phy at 10040720 {
-> +		compatible = "samsung,exynos5250-dp-video-phy";
-> +		reg = <0x10040720 4>;
-> +		#phy-cells = <0>;
-> +	};
-> +
->  	dp-controller {
->  		compatible = "samsung,exynos5-dp";
->  		reg = <0x145b0000 0x1000>;
-> @@ -623,11 +629,8 @@
->  		interrupt-parent = <&combiner>;
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -
-> -		dptx-phy {
-> -			reg = <0x10040720>;
-> -			samsung,enable-mask = <1>;
-> -		};
-> +		phys = <&dp_phy>;
-> +		phy-names = "dp";
->  	};
-> 
->  	fimd {
-> --
-> 1.7.10.4
+
+-Olof
