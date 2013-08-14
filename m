@@ -1,92 +1,87 @@
-From: andre.przywara@linaro.org (Andre Przywara)
-Date: Wed, 14 Aug 2013 11:39:21 +0200
-Subject: [PATCH] KVM: ARM: ignore guest L2 cache control SMCs on Highbank
- and OMAP
-In-Reply-To: <c8a1944576151990b3315183acee02be@www.loen.fr>
-References: <1376472125-23350-1-git-send-email-andre.przywara@calxeda.com>
- <c8a1944576151990b3315183acee02be@www.loen.fr>
-Message-ID: <520B5049.3020803@linaro.org>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 14 Aug 2013 15:10:58 +0530
+Subject: [PATCH v2 8/8] ARM: DRA7: dts: Add the dts files for dra7 SoC
+ and dra7-evm board
+In-Reply-To: <c20a9bef34091a7d996e946b13285fe8@www.loen.fr>
+References: <1375183546-12758-1-git-send-email-rnayak@ti.com>
+ <1375183546-12758-9-git-send-email-rnayak@ti.com>
+ <20130812114402.GB6616@e106331-lin.cambridge.arm.com>
+ <5209DF2F.5040409@ti.com>
+ <20130813094629.GH27165@e106331-lin.cambridge.arm.com>
+ <c20a9bef34091a7d996e946b13285fe8@www.loen.fr>
+Message-ID: <520B50AA.6050101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2013 11:32 AM, Marc Zyngier wrote:
-> On 2013-08-14 10:22, Andre Przywara wrote:
->> Guest kernels with CONFIG_L2X0 set (for instance Highbank or OMAP4)
->> will trigger SMCs to handle the L2 cache controller (PL310).
->> This will currently inject #UNDEFs and eventually stop the guest.
+On Tuesday 13 August 2013 03:35 PM, Marc Zyngier wrote:
+> On 2013-08-13 10:46, Mark Rutland wrote:
+>> [Adding Marc to Cc]
 >>
->> We don't need explicit L2 cache controller handling on A15s anymore,
->> so it is safe to simply ignore these calls and proceed with the next
->> instruction.
+>> On Tue, Aug 13, 2013 at 08:24:31AM +0100, Rajendra Nayak wrote:
+>>> []..
+>>>
+>>> >> +
+>>> >> +       cpus {
+>>> >> +               cpu at 0 {
+>>> >> +                       compatible = "arm,cortex-a15";
+>>> >> +                       timer {
+>>> >> +                               compatible = "arm,armv7-timer";
+>>> >> +                               /*
+>>> >> +                                * PPI secure/nonsecure IRQ,
+>>> >> +                                * active low level-sensitive
+>>> >> +                                */
+>>> >> +                               interrupts = <1 13 0x308>,
+>>> >> +                                            <1 14 0x308>;
+>>> >> +                               clock-frequency = <6144000>;
+>>> >> +                       };
+>>> >> +               };
+>>> >
+>>> > The cpu nodes should have a reg matching their unit-address, and a
+>>> > device_type = "cpu".
+>>> >
+>>> > The timer nodes should *not* be under the CPU nodes. They should be
+>>> > under under the root node. I realise that it makes intuitive sense to
+>>> > describe per-cpu resources this way, but that's not the way the bindings
+>>> > are intended to be used (does thei DT even work?).
+>>> >
+>>> > No virtual/hypervisor interrupts?
+>>>
+>>> Mark, all valid points. I just updated the patch to include all the missing
+>>> interrupts and registers for timer and gic and moved the timer node out as
+>>> its supposed to be.
 >>
->> Signed-off-by: Andre Przywara <andre.przywara@calxeda.com>
->
-> Hold on.
->
-> Are you trying to run A9 guests on KVM? Sorry, but that's not a
-> supported mode of operation just yet.
-
-No, I don't. I just run guests with kernels that would support A9 also. 
-If you select Highbank in your .config, you will get CACHE_L2X0 and the 
-kernel will do SMCs - regardless of the CPU you are running on. Those 
-SMCs are ignored by the firmware on Midway.
-
-I agree that the proper solution would be to detect at run-time in the 
-(guest) kernel whether you actually need the PL310 handling, but for the 
-time being and to support older kernels we will need this fix.
-
-For me this fixes "qemu -machine midway --enable-kvm".
-
-Regards,
-Andre.
-
->
-> So, until we have a proper framework to deal with multiple CPUs, the
-> only valid configuration is A15-on-A15.
->
->> ---
->>   arch/arm/kvm/handle_exit.c | 20 ++++++++++++++++++++
->>   1 file changed, 20 insertions(+)
+>> Great!
 >>
->> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
->> index df4c82d..2cbe6a0 100644
->> --- a/arch/arm/kvm/handle_exit.c
->> +++ b/arch/arm/kvm/handle_exit.c
->> @@ -50,8 +50,28 @@ static int handle_hvc(struct kvm_vcpu *vcpu,
->> struct kvm_run *run)
->>   	return 1;
->>   }
+>>>
+>>> >
+>>> > Do you really need the clock-frequency property? It's far preferrable to
+>>> > have your bootloader do the right thing and program CNTFRQ with the
+>>> > correct value.
+>>>
+>>> I kept the clock-frequency property since our bootloader does not handle this
+>>> and I am not sure if its a good idea to have the dependency on bootloader
+>>> to do this.
 >>
->> +/*
->> + * OMAP4 and Highbank machines do a SMC call to handle the L2 cache
->> + * controller. They put 0x102 in r12 to request this functionality.
->> + * This is not needed on A15s, so we can safely ignore it in KVM
->> guests.
->> + */
->> +static int kvm_ignore_l2x0_call(struct kvm_vcpu *vcpu)
->> +{
->> +	unsigned long fn_nr = *vcpu_reg(vcpu, 12) & ~((u32) 0);
->> +
->> +	if (fn_nr == 0x102) {
->> +		kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
->> +		return 1;
->> +	}
->> +
->> +	return 0;
->> +}
->
-> And what if I run mach-foo which uses r12 to request bar services from
-> secure mode? Is it safe to ignore it? We need something much better than
-> just testing random registers to guess what the guest wants.
->
->>   static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>   {
->> +	if (kvm_ignore_l2x0_call(vcpu))
->> +		return 1;
->> +
->>   	kvm_inject_undefined(vcpu);
->>   	return 1;
->>   }
->
->           M.
->
+>> There is precedent for handling it this way, but it would be far nicer
+>> to fix the bootloader to set CNTFRQ. For one thing it's only writeable
+>> from the secure side, so a host os can't fix it up for guests that might
+>> depend on it rather than dt. I realise it's not necessarily as simple as
+>> it sounds to fix that up, however.
+> 
+> Indeed, having the wrong CNTFRQ in the host has the unfortunate effect of propagating the crap into the guests.
+> 
+> While this can be worked around for Linux guests (you have to hack the DT passed to the guests, which is very unpleasant at best and varies from one host to another), there is nothing you can do for non-DT guests.
+> 
+> So please, fix it in your firmware/boot-ROM while it is still time.
+
+Marc, makes sense. Turns out our bootROM (for dra7) does not do this today but does have an api to do it.
+So while we figure how to do this some place else, I will go ahead and drop this from dt for now.
+Thanks for the review.
+
+regards,
+Rajendra
+
+> 
+> Thanks,
+> 
+>         M.
