@@ -1,40 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Aug 2013 17:23:18 +0100
-Subject: [v3 1/2] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <1376497189-21298-1-git-send-email-zonque@gmail.com>
-References: <1376497189-21298-1-git-send-email-zonque@gmail.com>
-Message-ID: <20130814162318.GX23006@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 14 Aug 2013 09:25:02 -0700
+Subject: [PATCH v6 2/4] ARM: debug: support debug ll on hisilicon soc
+In-Reply-To: <20130814154443.GV23006@n2100.arm.linux.org.uk>
+References: <1374813135-16238-1-git-send-email-haojian.zhuang@linaro.org>
+ <1374813135-16238-3-git-send-email-haojian.zhuang@linaro.org>
+ <20130814063916.GH19951@quad.lixom.net>
+ <20130814154443.GV23006@n2100.arm.linux.org.uk>
+Message-ID: <20130814162502.GA16491@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 06:19:48PM +0200, Daniel Mack wrote:
-> +static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan)
-> +{
-> +	struct mmp_pdma_desc_sw *sw;
-> +	u32 curr, done = 0;
-> +
-> +	if (chan->dir == DMA_DEV_TO_MEM)
-> +		curr = readl(chan->phy->base + DTADR(chan->phy->idx));
-> +	else
-> +		curr = readl(chan->phy->base + DSADR(chan->phy->idx));
-> +
-> +	list_for_each_entry(sw, &chan->chain_running, node) {
-> +		u32 start;
-> +		u32 len = sw->desc.dcmd & DCMD_LENGTH;
-> +
-> +		if (chan->dir == DMA_DEV_TO_MEM)
-> +			start = sw->desc.dtadr;
-> +		else
-> +			start = sw->desc.dsadr;
-> +
-> +		if (curr >= start && curr <= (start + len)) {
-> +			done += curr - start;
-> +			break;
-> +		}
-> +
-> +		done += len;
-> +	}
-> +
-> +	return chan->total_len - done;
+On Wed, Aug 14, 2013 at 04:44:44PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Aug 13, 2013 at 11:39:16PM -0700, Olof Johansson wrote:
+> > On Fri, Jul 26, 2013 at 12:32:13PM +0800, Haojian Zhuang wrote:
+> > > Support UART0 debug ll on hisilicon Hi3620 SoC.
+> > > 
+> > > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> > 
+> > 
+> > Applied, thanks.
+> 
+> Applied without reference to my debug cleanup series which has been
+> sitting in linux-next for ages?
+> 
+> Whatever happened to encouraging people to do things in a manner
+> compatible with the cleanups we're trying to do?
 
-Yep, that should be sufficient.  Thanks for fixing that.
+I quite frankly forgot that this was pending for 3.12 in your tree.
+
+Thanks for catching this, I'll revert the patch in arm-soc and let it go
+in through yours on top of your cleanups.
+
+
+-Olof
