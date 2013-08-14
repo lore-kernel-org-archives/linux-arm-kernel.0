@@ -1,117 +1,112 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 14 Aug 2013 16:58:13 +0300
-Subject: [PATCH 9/9] ARM: dts: omap3-beagle-xm: Add USB Host support
-In-Reply-To: <1376488693-31659-1-git-send-email-rogerq@ti.com>
-References: <1376488693-31659-1-git-send-email-rogerq@ti.com>
-Message-ID: <1376488693-31659-10-git-send-email-rogerq@ti.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 14 Aug 2013 08:58:25 -0500
+Subject: [PATCH 2/3] ARM: OMAP2+: Add support to parse optional clk info
+ from DT
+In-Reply-To: <20130814134904.GC13141@e106331-lin.cambridge.arm.com>
+References: <1374560679-14666-1-git-send-email-rnayak@ti.com>
+ <1374560679-14666-3-git-send-email-rnayak@ti.com>
+ <CAGo_u6rfXpU1Wzn+oXqpAezNNtFb9pk=9RZxodGtBbZXVy+yJA@mail.gmail.com>
+ <520B8409.5000708@ti.com> <520B88A0.6080806@ti.com>
+ <20130814134904.GC13141@e106331-lin.cambridge.arm.com>
+Message-ID: <520B8D01.1040205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide RESET GPIO and Power regulator for the USB PHY,
-the USB Host port mode and the PHY device for the controller.
-Also provide pin multiplexer information for USB host pins.
+On 08/14/2013 08:49 AM, Mark Rutland wrote:
+> [Adding Mike Turquette and dt maintainers]
+>
+> On Wed, Aug 14, 2013 at 02:39:44PM +0100, Nishanth Menon wrote:
+>> On 08/14/2013 08:20 AM, Rajendra Nayak wrote:
+>>> On Wednesday 14 August 2013 06:18 PM, Nishanth Menon wrote:
+>>>> Hi Rajendra,
+>>>>
+>>>> On Tue, Jul 23, 2013 at 1:24 AM, Rajendra Nayak <rnayak@ti.com> wrote:
+>>>> [..]
+>>>>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+>>>>> index 12fa589..e5c804b 100644
+>>>>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>>>>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>>>>> @@ -805,6 +805,65 @@ static int _init_interface_clks(struct omap_hwmod *oh)
+>>>>>           return ret;
+>>>>>    }
+>>>>>
+>>>>> +static const char **_parse_opt_clks_dt(struct omap_hwmod *oh,
+>>>>> +                                      struct device_node *np,
+>>>>> +                                      int *opt_clks_cnt)
+>>>>> +{
+>>>>> +       int i, clks_cnt;
+>>>>> +       const char *clk_name;
+>>>>> +       const char **opt_clk_names;
+>>>>> +
+>>>>> +       clks_cnt = of_property_count_strings(np, "clock-names");
+>>>>> +       if (!clks_cnt)
+>>>>> +               return NULL;
+>>>>> +
+>>>>> +       opt_clk_names = kzalloc(sizeof(char *)*clks_cnt, GFP_KERNEL);
+>>>>> +       if (!opt_clk_names)
+>>>>> +               return NULL;
+>>>>> +
+>>>>> +       for (i = 0; i < clks_cnt; i++) {
+>>>>> +               of_property_read_string_index(np, "clock-names", i, &clk_name);
+>>>>> +               if (!strcmp(clk_name, "fck"))
+>>>>
+>>>> Could we instead parse for names that are "optional,role_name" instead
+>>>> of assuming anything other than fck is optional clocks?
+>>>
+>>> you mean look for anything with optional,*? because the role names would change.
+>>>
+>>
+>> yes. the idea being, we now have a meaning to the clock name - there are
+>> two types of clocks here.. functional and optional, we *might* have
+>> facility to add interface clock(we dont know interface clock handling
+>> yet, but something in the future).. we might increase the support for
+>> number of functional clocks.. it might help to keep the format such that
+>> it is a "bit extendable".
+>
+> I completely disagree. The only things that should appear in clock-names
+> are the names of the clock inputs that appear in the manual for the
+> device. The driver should know which ones are optional, as that's a
+> fixed property of the IP and the way the driver uses it.
+>
+> You should not be embedding additional semantics in name properties.
 
-We also relocate omap3_pmx_core pin definations so that they
-are close to omap3_pmx_wkup pin definations.
+we use an level of abstraction called omap_device and hwmod to allow 
+devices to use a generic pm_runtime. drivers for specific blocks dont 
+normally need to know about the clocks to deal with. This allows maximum 
+reuse consider concept is generic enough.
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/boot/dts/omap3-beagle-xm.dts |   65 ++++++++++++++++++++++++++++-----
- 1 files changed, 56 insertions(+), 9 deletions(-)
+The traditional way of dealing with this has been to encode the *names* 
+*inside* hwmod!!! which is obviously the wrong way to deal with with 
+clock nodes in dts.
 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index afdb164..41df447 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -69,6 +69,23 @@
- 		};
- 
- 	};
-+
-+	/* HS USB Port 2 Power */
-+	hsusb2_power: hsusb2_power_reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "hsusb2_vbus";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
-+		startup-delay-us = <70000>;
-+	};
-+
-+	/* HS USB Host PHY on PORT 2 */
-+	hsusb2_phy: hsusb2_phy {
-+		compatible = "usb-nop-xceiv";
-+		reset-gpios = <&gpio5 19 0>; /* gpio_147 */
-+		vcc-supply = <&hsusb2_power>;
-+	};
- };
- 
- &omap3_pmx_wkup {
-@@ -79,6 +96,37 @@
- 	};
- };
- 
-+&omap3_pmx_core {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+			&hsusbb2_pins
-+	>;
-+
-+	uart3_pins: pinmux_uart3_pins {
-+		pinctrl-single,pins = <
-+			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
-+			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx OUTPUT | MODE0 */
-+		>;
-+	};
-+
-+	hsusbb2_pins: pinmux_hsusbb2_pins {
-+		pinctrl-single,pins = <
-+			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-+			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-+			0x5c4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-+			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
-+			0x5c8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-+			0x5cA (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
-+			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
-+			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
-+			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
-+			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
-+			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
-+			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
-+		>;
-+	};
-+};
-+
- &i2c1 {
- 	clock-frequency = <2600000>;
- 
-@@ -148,15 +196,6 @@
- 	power = <50>;
- };
- 
--&omap3_pmx_core {
--	uart3_pins: pinmux_uart3_pins {
--		pinctrl-single,pins = <
--			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
--			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx OUTPUT | MODE0 */
--		>;
--	};
--};
--
- &uart3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart3_pins>;
-@@ -166,3 +205,11 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&gpio1_pins>;
- };
-+
-+&usbhshost {
-+	port2-mode = "ehci-phy";
-+};
-+
-+&usbhsehci {
-+	phys = <0 &hsusb2_phy>;
-+};
+This series moves away from that approach - which is good. Now, the 
+question is:
+
+clocks-names = "....."  is not sufficient to indicate a list of clocks 
+of different functions
+
+3 types of clocks may exist for OMAP h/w blocks:
+a) functional clock (1 usually, but we are starting to see multiple 
+fclks). this drives the actual functionality
+b) optional clocks - additional clocks such as debounce clock etc. - 
+there can be n such clocks
+c) interface clocks - this drives the register interface on the bus.  - 
+there can be n such clocks and additional headaches for interface - 
+currently embedded inside hwmod.
+
+you could do:
+A) embedd in the sematics of the name
+clock-names="fck", "optional,role1",  "optional,role2";
+clocks= <&clk_a>, <&clk_x>, <&clk_y>;
+OR:
+B) embedd in the property name
+optional-clock-names="optional,role1",  "optional,role2";
+optional-clocks=<&clk_x>, <&clk_y>;
+functional-clock-names="fck";
+functional-clocks=<&clk_a>;
+
+are you suggesting (b) here?
+
 -- 
-1.7.4.1
+Regards,
+Nishanth Menon
