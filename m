@@ -1,27 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 14 Aug 2013 11:29:21 +0800
-Subject: =?utf-8?B?562U5aSNOiBbUEFUQw==?= =?utf-8?Q?H?= v3 2/2] i2c: imx:
- Add Vybrid VF610 I2C controller support
-In-Reply-To: <20130813161214.GV26614@pengutronix.de>
-References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
- <1375418648-22760-2-git-send-email-b35083@freescale.com>
- <20130810140827.GC18085@e106331-lin.cambridge.arm.com>
- <B56CDBE15CE27145A4B77D2D24263E851FE7AC@039-SN1MPN1-004.039d.mgd.msft.net>
- <20130812164354.GF27165@e106331-lin.cambridge.arm.com>
- <52096E77.4040003@wwwdotorg.org>
- <20130813074620.GR26614@pengutronix.de>
- <520A5558.708@wwwdotorg.org>
- <20130813161214.GV26614@pengutronix.de>
-Message-ID: <20130814032812.GB16915@S2101-09.ap.freescale.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 14 Aug 2013 08:23:35 +0530
+Subject: [PATCH v2] dmaengine: sirf: add PM entries for sleep and runtime
+In-Reply-To: <CAGsJ_4yPgXhUO65tAyU4ngMRUzqa6uZWqEM2NoD-HWy9DL-rnQ@mail.gmail.com>
+References: <1375177474-27583-1-git-send-email-Baohua.Song@csr.com>
+ <20130813113200.GE32147@intel.com>
+ <CAGsJ_4yPgXhUO65tAyU4ngMRUzqa6uZWqEM2NoD-HWy9DL-rnQ@mail.gmail.com>
+Message-ID: <20130814025335.GI32147@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 06:12:14PM +0200, s.hauer at pengutronix.de wrote:
-> I vote for having the exact SoC revision in the binding documentation
-> rather than wildcards or references to the list of i.MX SoCs. Otherwise
-> only the driver code gives a clue that the i2c driver matches imx1-i2c,
-> imx21-i2c and vf610-i2c, but not imx31-i2c.
+On Wed, Aug 14, 2013 at 10:22:15AM +0800, Barry Song wrote:
+> 2013/8/13 Vinod Koul <vinod.koul@intel.com>
+> 
+> > On Tue, Jul 30, 2013 at 05:44:34PM +0800, Barry Song wrote:
+> > > this patch adds PM ops entries in sirf-dma drivers, so that this
+> > > driver can support suspend/resume, hibernation and runtime PM.
+> > >
+> > > while suspending, sirf-dma will lose all registers, so we save
+> > > them at suspend and restore in resume for active channels.
+> > >
+> > > Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> > > Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
+> > Applied, thanks
+> >
+> > Although putting runtime_get/put in submit and callback would be much more
+> > better than alloc/free implementation
+> >
+> > i do agree. i did want to make the runtime pm happen in submit and finish
+> callback. then i found it was buggy. and we need more work to make it
+> really stable, then i moved to runtime PM with more coarse accuracy. that
+> will lose some power saving. but i think we can have increased patches for
+> that if we measure and find dma power consumption is large.
+> BTW, where is the active dmaengine tree located  in now? it seems that
+> https://git.kernel.org/cgit/linux/kernel/git/djbw/dmaengine.git/ is not
+> active for a long time.
+mine is at git.infradead.org/users/vkoul/slave-dma.git
 
-+1
+Dan seem busy so he acks patches and I carry them
 
-Shawn
+~Vinod
