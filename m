@@ -1,25 +1,44 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 14 Aug 2013 09:38:11 +0200
-Subject: [PATCH] ARM: at91: add missing uart clocks DT entries
-In-Reply-To: <52027B6A.6020306@interlog.com>
-References: <1375892984-2835-1-git-send-email-b.brezillon@overkiz.com>
- <52027B6A.6020306@interlog.com>
-Message-ID: <520B33E3.6030907@atmel.com>
+Date: Wed, 14 Aug 2013 09:43:59 +0200
+Subject: [PATCH 1/1] ARM: at91: at91sam9260: add missing pinctrl-names
+ on mmc
+In-Reply-To: <1373882719-9940-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1373882719-9940-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <520B353F.9070605@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2013 18:52, Douglas Gilbert :
-> On 13-08-07 12:29 PM, Boris BREZILLON wrote:
->> Add clocks to clock lookup table for uart DT entries.
->>
->> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> Tested-by: Douglas Gilbert <dgilbert@interlog.com>
+On 15/07/2013 12:05, Jean-Christophe PLAGNIOL-VILLARD :
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>   arch/arm/boot/dts/at91sam9260.dtsi | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> index c7ccbcb..56ee828 100644
+> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> @@ -572,6 +572,7 @@
+>   				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
+>   				#address-cells = <1>;
+>   				#size-cells = <0>;
+> +				pinctrl-names = "default";
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Ok, but there is no pinctrl property in this node: maybe it would be 
+good to have a default entry for this.
 
-And stacked on at91-3.11-fixes. I will send it upstream soon (we will 
-see if it is accepted for 3.11...).
+It is then overloaded in arch/arm/boot/dts/animeo_ip.dts for instance...
 
-Thanks, bye,
+Can you please add one?
+
+Bye,
+
+>   				status = "disabled";
+>   			};
+>
+>
+
+
 -- 
 Nicolas Ferre
