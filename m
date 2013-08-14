@@ -1,71 +1,66 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 14 Aug 2013 11:36:47 -0700
-Subject: [PATCH] KVM: ARM: ignore guest L2 cache control SMCs on Highbank
- and OMAP
-In-Reply-To: <CAFEAcA-a0R-aLy0CXVv4HeLXDR5n8ONoPEDOJDh6dvZcwX6rTA@mail.gmail.com>
-References: <1376472125-23350-1-git-send-email-andre.przywara@calxeda.com>
- <c8a1944576151990b3315183acee02be@www.loen.fr>
- <CAFEAcA8jgn9V1ANXXTsA_099BcsbC5NHPEMRh6=Rz1g8EDgBHA@mail.gmail.com>
- <abf9b3ef779ce43b1912bf9e3deea522@www.loen.fr>
- <20130814171854.GA11390@cbox>
- <CAFEAcA9i59sm2pnX8YRsPsvHeuEiyNOS6yKLG3yoMBrJZz0V0Q@mail.gmail.com>
- <20130814181327.GG11390@cbox>
- <CAFEAcA-a0R-aLy0CXVv4HeLXDR5n8ONoPEDOJDh6dvZcwX6rTA@mail.gmail.com>
-Message-ID: <20130814183647.GJ11390@cbox>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 14 Aug 2013 13:50:52 -0500
+Subject: [GIT PULL] Highbank fixes for 3.12
+In-Reply-To: <87li4445tj.fsf@kernel.org>
+References: <520AF2ED.9030900@gmail.com>
+	<87li4445tj.fsf@kernel.org>
+Message-ID: <CAL_Jsq+4hpsCM5aNt60+Oe5=Mt1SWrAwskahS+JbXYuHRRcMuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 07:22:07PM +0100, Peter Maydell wrote:
-> On 14 August 2013 19:13, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > On Wed, Aug 14, 2013 at 07:01:05PM +0100, Peter Maydell wrote:
-> >> If we make the kernel just restart the guest inside its
-> >> firmware blob without reflecting the SMC out to userspace
-> >> are we going to regret it later?
-> >
-> > Are you suggesting that we'd load the secure firmware inside the guest
-> > in a separate address space somehow and just let it execute the binary?
-> > That won't work without considerable emulation efforts in the kernel to
-> > support the privileged operations right?  What if the secure firmware
-> > does something SoC-specific that KVM will never know about, but QEMU
-> > would, then there's still the need for some 'backdoor' out to QEMU.
-> 
-> No, the suggestion is that the 'firmware' blob is a specifically
-> written thing to work with QEMU/KVM, so it supports the right
-> entry points but is written to work within a slightly odd
-> environment where:
->  * the kernel supports an emulated MVBAR
->  * SMC causes us to redirect the guest so it enters as per
->    the MVBAR, but in EL1, not EL3
->  * the "firmware" blob does whatever is necessary before
->    returning from the SMC
+On Wed, Aug 14, 2013 at 11:04 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> Hi Rob,
+>
+> Rob Herring <robherring2@gmail.com> writes:
+>
+>> Kevin, Olof,
+>>
+>> Please pull highbank updates for 3.12.
+>>
+>> There's one trivial core ARM code change in the series to allow a
+>> DMA_ZONE size of 4GB. I believe this should not conflict with Russell's
+>> DMA mask series.
+>>
+>> Rob
+>>
+>> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+>>
+>>   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://sources.calxeda.com/kernel/linux.git
+>> tags/highbank-lpae-fixes-for-3.12
+>>
+>> for you to fetch changes up to ce3ec1d61c5ed6af3ceaace6f57acd588c41b4d6:
+>>
+>>   ARM: highbank: fix debug uart virtual address for LPAE (2013-08-13
+>> 20:50:16 -0500)
+>>
+>> ----------------------------------------------------------------
+>> A set of fixes for highbank to enable LPAE and selecting of necesssary
+>> ARM errata.
+>>
+>> ----------------------------------------------------------------
+>> Rob Herring (6):
+>>       ARM: use phys_addr_t for DMA zone sizes
+>>       ARM: highbank: enable DMA zone for LPAE
+>>       ARM: highbank: select ARCH_HAS_HOLES_MEMORYMODEL
+>>       ARM: highbank: select required errata work-arounds
+>>       ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
+>
+> This one seems to have broken the AMBA PL08x DMA driver, and is still
+> objected to by Russell, so I'll drop this one for now.
 
-ok, I see.
+Exynos does the same selection, but I guess it is not multi-platform
+though and doesn't select ARM_AMBA.
 
-> 
-> There is obviously no insulation between the guest kernel and the
-> firmware blob in this scenario, but if we're not actually trying
-> to emulate secure mode, just deal somehow with a handful of API
-> calls, that should be fine.
+>>       ARM: highbank: fix debug uart virtual address for LPAE
+>
+> The rest look OK and I can pull them if the rest are OK without the
+> objectionable one.  Let me know if that's OK, or you prefer to wait for
+> resolution.
 
-Well, we could load the firmware in memory that we only ever map in
-Stage-2 mappings when we execute the special firmware blob, which would
-at least prevent the guest kernel from mocking with the firmware code.
-Sort of like an emulated secure physical memory region.
+Yes, I'm fine with dropping this one for now.
 
-> 
-> (This is an idea I've floated before, based partly on what the
-> current QEMU OMAP3 emulation does. The advantage from my point of
-> view is that it keeps the details of what the SMC entrypoints
-> are supposed to do out of QEMU and in the board-specific blob.)
-> 
-
-The clear advantage is that it keeps the code out of QEMU.  The downside
-is a potentially more complicated development environment (you're sort
-writing a small OS here, and you can't really reuse existing secure
-firmwares because the environment is special, right?) where having the
-emulation simply integrated in QEMU makes it a nice debuggable piece of
-user space code.
-
-Hmmm....
-
--Christoffer
+Rob
