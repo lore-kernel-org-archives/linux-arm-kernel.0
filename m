@@ -1,30 +1,36 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 14 Aug 2013 16:08:36 +0900
-Subject: [GIT PULL] Samsung PWM support cleanup
-In-Reply-To: <20130814060702.GH16635@quad.lixom.net>
-References: <3516906.8u5IrARqm7@flatron>
- <20130814060702.GH16635@quad.lixom.net>
-Message-ID: <109a01ce98bd$1843cae0$48cb60a0$@org>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Wed, 14 Aug 2013 00:08:53 -0700
+Subject: [PATCH v2 0/1] ARM: signal: sigreturn_codes should be endian neutral
+ to work in BE8
+Message-ID: <1376464134-23029-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> 
-> On Tue, Aug 13, 2013 at 11:16:35PM +0200, Tomasz Figa wrote:
-> > Dear ARM SoC maintainers,
-> >
-> > The following changes since commit
-> > c095ba7224d8edc71dcef0d655911399a8bd4a3f:
-> >
-> >   Linux 3.11-rc4 (2013-08-04 13:46:46 -0700)
-> >
-> > are available in the git repository at:
-> >
-> >   git://github.com/tom3q/linux.git tags/v3.12-pwm-cleanup-for-olof
-> 
-> Thanks, applied.
-> 
-Same here, this will be merged into samsung tree because of dependency.
+This is second version of patch that fixes rt_sig* ltp failures
+in case of big endian V7 kernel. It make sigreturn_codes snippets
+endian neutral. In this version of the patch problem is fixed by
+using separate .S file with snippets written with regular asm
+mnemonic. With such change compiler/linker take care of all needed
+byteswaps in case of BE8 mode.
 
-Thanks,
-Kukjin
+This approach was suggested on the following thread:
+
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/191543.html
+
+Changes were tested on V7 in both BE and LE modes
+
+Changes from v1:
+  Use separate .S file rather than <asm/opcodes.h> instruction
+  byteswaping macros
+
+Victor Kamensky (1):
+  ARM: signal: sigreturn_codes should be endian neutral to work in BE8
+
+ arch/arm/kernel/Makefile          |  3 +-
+ arch/arm/kernel/signal.c          | 29 +++---------------
+ arch/arm/kernel/sigreturn_codes.S | 64 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 70 insertions(+), 26 deletions(-)
+ create mode 100644 arch/arm/kernel/sigreturn_codes.S
+
+-- 
+1.8.1.4
