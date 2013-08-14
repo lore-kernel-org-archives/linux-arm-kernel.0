@@ -1,65 +1,91 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Aug 2013 17:20:28 +0100
-Subject: [PATCHv3 5/5] arm64: add PSCI CPU_OFF-based hotplug support
-In-Reply-To: <1376497228-20543-1-git-send-email-mark.rutland@arm.com>
-References: <1376497228-20543-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1376497228-20543-6-git-send-email-mark.rutland@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 14 Aug 2013 18:25:33 +0200
+Subject: [PATCH] pinctrl: improve warning messages
+Message-ID: <1376497533-32303-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for using PSCI CPU_OFF calls for CPU hotplug.
-With this code it is possible to hot unplug CPUs with "psci" as their
-boot-method, as long as there's an appropriate cpu_off function id
-specified in the psci node.
+Print out the affected group name on activation of pin mux
+settings, and warn if you cannot free a pin that should have
+been part of a certain setting.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Sonic Zhang <sonic.zhang@analog.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm64/kernel/smp_psci.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ drivers/pinctrl/pinmux.c | 35 +++++++++++++++++++++++++++++------
+ 1 file changed, 29 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kernel/smp_psci.c b/arch/arm64/kernel/smp_psci.c
-index 20499bc..e9e5890 100644
---- a/arch/arm64/kernel/smp_psci.c
-+++ b/arch/arm64/kernel/smp_psci.c
-@@ -47,9 +47,39 @@ static int smp_psci_cpu_boot(unsigned int cpu)
- 	return err;
- }
+diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+index 5f51588..008f965 100644
+--- a/drivers/pinctrl/pinmux.c
++++ b/drivers/pinctrl/pinmux.c
+@@ -400,10 +400,14 @@ int pinmux_enable_setting(struct pinctrl_setting const *setting)
+ 	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
+ 				      &pins, &num_pins);
+ 	if (ret) {
++		const char *gname;
++
+ 		/* errors only affect debug data, so just warn */
++		gname = pctlops->get_group_name(pctldev,
++						setting->data.mux.group);
+ 		dev_warn(pctldev->dev,
+-			 "could not get pins for group selector %d\n",
+-			 setting->data.mux.group);
++			 "could not get pins for group %s\n",
++			 gname);
+ 		num_pins = 0;
+ 	}
  
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int smp_psci_cpu_disable(unsigned int cpu)
-+{
-+	/* Fail early if we don't have CPU_OFF support */
-+	if (!psci_ops.cpu_off)
-+		return -EOPNOTSUPP;
-+	return 0;
-+}
+@@ -411,9 +415,14 @@ int pinmux_enable_setting(struct pinctrl_setting const *setting)
+ 	for (i = 0; i < num_pins; i++) {
+ 		ret = pin_request(pctldev, pins[i], setting->dev_name, NULL);
+ 		if (ret) {
++			const char *gname;
 +
-+static void smp_psci_cpu_die(unsigned int cpu)
-+{
-+	int ret;
-+	/*
-+	 * There are no known implementations of PSCI actually using the
-+	 * power state field, pass a sensible default for now.
-+	 */
-+	struct psci_power_state state = {
-+		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-+	};
++			gname = pctlops->get_group_name(pctldev,
++						setting->data.mux.group);
+ 			dev_err(pctldev->dev,
+-				"could not request pin %d on device %s\n",
+-				pins[i], pinctrl_dev_get_name(pctldev));
++				"could not request pin %d from group %s on "
++				"device %s\n",
++				pins[i], gname, pinctrl_dev_get_name(pctldev));
+ 			goto err_pin_request;
+ 		}
+ 	}
+@@ -466,10 +475,14 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
+ 	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
+ 				      &pins, &num_pins);
+ 	if (ret) {
++		const char *gname;
 +
-+	ret = psci_ops.cpu_off(state);
+ 		/* errors only affect debug data, so just warn */
++		gname = pctlops->get_group_name(pctldev,
++						setting->data.mux.group);
+ 		dev_warn(pctldev->dev,
+-			 "could not get pins for group selector %d\n",
+-			 setting->data.mux.group);
++			 "could not get pins for group %s\n",
++			 gname);
+ 		num_pins = 0;
+ 	}
+ 
+@@ -486,6 +499,16 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
+ 			desc->mux_setting = NULL;
+ 			/* And release the pin */
+ 			pin_free(pctldev, pins[i], NULL);
++		} else {
++			const char *gname;
 +
-+	pr_crit("psci: unable to power off CPU%u (%d)\n", cpu, ret);
-+}
-+#endif
-+
- const struct smp_operations smp_psci_ops = {
- 	.name		= "psci",
- 	.cpu_init	= smp_psci_cpu_init,
- 	.cpu_prepare	= smp_psci_cpu_prepare,
- 	.cpu_boot	= smp_psci_cpu_boot,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_disable	= smp_psci_cpu_disable,
-+	.cpu_die	= smp_psci_cpu_die,
-+#endif
- };
++			gname = pctlops->get_group_name(pctldev,
++						setting->data.mux.group);
++			dev_warn(pctldev->dev,
++				 "not freeing pin %d as part of deactivating "
++				 "group %s - it is already used for some other "
++				 "setting",
++				 pins[i], gname);
+ 		}
+ 	}
+ 
 -- 
-1.8.1.1
+1.8.1.4
