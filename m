@@ -1,41 +1,39 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 14 Aug 2013 10:12:31 +0530
-Subject: [PATCH v2 0/4] GPIO DT support for da850
-In-Reply-To: <CA+V-a8sNPMbQjh8uxhQ=aOgo4ZfmaKXoOnRsuurzEeWzBKW8WA@mail.gmail.com>
-References: <1371203020-15092-1-git-send-email-avinashphilip@ti.com>
- <518397C60809E147AF5323E0420B992E3EADAFCF@DBDE04.ent.ti.com>
- <CA+V-a8sNPMbQjh8uxhQ=aOgo4ZfmaKXoOnRsuurzEeWzBKW8WA@mail.gmail.com>
-Message-ID: <520B0AB7.1070700@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 13 Aug 2013 21:46:45 -0700
+Subject: [GIT PULL] Reset controller changes for 3.12
+In-Reply-To: <1375100171.4223.10.camel@pizza.hi.pengutronix.de>
+References: <1375100171.4223.10.camel@pizza.hi.pengutronix.de>
+Message-ID: <20130814044645.GA16635@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar,
+Hi Phillip,
 
-On 8/11/2013 3:04 PM, Prabhakar Lad wrote:
-> Hi Sekhar,
+On Mon, Jul 29, 2013 at 02:16:11PM +0200, Philipp Zabel wrote:
+> Hi Olof,
 > 
-> On Fri, Jun 14, 2013 at 3:50 PM, Philip, Avinash <avinashphilip@ti.com> wrote:
->> On Fri, Jun 14, 2013 at 15:13:36, Philip, Avinash wrote:
->>> With conversion of GPIO davinci driver to platform driver, gpio-davinci driver
->>> can support DT boot.
->>> This patch series
->>> - adds dt binding support for gpio-davinci.
->>> - da850 dt support goio.
->>>
->>> This patch series is based on Linux 3.10-rc4 and is availabel at [1].
->>>
->>> 1. https://github.com/avinashphilip/am335x_linux/tree/linux_davinci_v3.10_soc_gpio_v310-rc4
->>
->>
->> This patch series has dependency on [PATCH v2 0/7] Convert GPIO Davinci to platform driver
->>
->> https://lkml.org/lkml/2013/6/14/120
->>
-> What is the status of this patch series is any one taking care of it or
-> else I can take care of review comments and repost them.
+> with the cosmetic issues pointed out by Ben and Sylwester fixed in the
+> gpio-reset driver, the following changes since commit
+> 5ae90d8e467e625e447000cb4335c4db973b1095:
+> 
+>   Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/pza/linux.git reset/for_v3.12
+> 
+> for you to fetch changes up to f4d36f8a5166405154c638c1e49e253f2f017dd7:
+> 
+>   reset: allow drivers to request probe deferral (2013-07-29 14:03:40
+> +0200)
 
-Avinash is not working for TI anymore. It will be great if you can take
-this up.
+I'm not going to pull this for 3.12 -- or at least not at this
+time. There's still too much active discussion on whether we even want
+this, and the only existing reset driver so far is the one that isn't
+really needed (i.e. the gpio one).
 
-Thanks,
-Sekhar
+I'd prefer to wait until we have one that actually is needed, and that
+can't be described using gpios like we already have for a long time.
+
+
+-Olof
