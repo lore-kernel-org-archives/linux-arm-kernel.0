@@ -1,67 +1,41 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Wed, 14 Aug 2013 16:00:16 +0530
-Subject: [PATCH] ARM: dts: Enable USB hub on Arndale
-In-Reply-To: <1376474314-32491-1-git-send-email-broonie@kernel.org>
-References: <1376474314-32491-1-git-send-email-broonie@kernel.org>
-Message-ID: <CAHbNUh2WTiRtvvUnqa7NSvRgZ22XdaEMb57w2umF5Jfhf_yohg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 14 Aug 2013 11:30:15 +0100
+Subject: [Git pull request] fix to the vexpress/mcpm branch
+In-Reply-To: <20130814055800.GG16635@quad.lixom.net>
+References: <alpine.LFD.2.03.1308121428080.14472@syhkavp.arg>
+ <20130814055800.GG16635@quad.lixom.net>
+Message-ID: <20130814103015.GA28080@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 August 2013 15:28, Mark Brown <broonie@kernel.org> wrote:
-> From: Mark Brown <broonie@linaro.org>
->
-> The Arndale has a SMSC USB3503 connected in hardware only mode like a PHY,
-> support it using the usb-nop-xceiv binding.
->
-> Note that due to a regrettable decision to use a regulator to represent
-> the reset signal this uses a fixed voltage regulator to do that, there
-> is a plan to use the reset controller binding once that is merged so it
-> does not seem worthwhile to fix the usb-nop-xceiv driver at this point.
->
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->
-> This doesn't 100% work right now since we don't yet have a solution to
-> ensure that this gets started after the USB controller but those
-> modifications are small (or can be done at runtime with module loading).
->
->  arch/arm/boot/dts/exynos5250-arndale.dts | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-> index 96d528d..e477e23 100644
-> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
-> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-> @@ -539,4 +539,22 @@
->         rtc {
->                 status = "okay";
->         };
-> +
-> +       usb_hub_bus {
-> +               compatible = "simple-bus";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               // SMSC USB3503 connected in hardware only mode as a PHY
-> +               usb_hub: usb_hub {
-> +                       compatible = "smsc,usb3503a";
-> +
-> +                       reset-gpios = <&gpx3 5 1>;
-> +                       connect-gpios = <&gpd1 7 1>;
-> +               };
-> +       };
-> +
+Hi Olof,
 
+On Wed, Aug 14, 2013 at 06:58:00AM +0100, Olof Johansson wrote:
+> Hi Nico,
+> 
+> On Mon, Aug 12, 2013 at 02:37:54PM -0400, Nicolas Pitre wrote:
+> > 
+> > Please pull the following:
+> > 
+> > 	git://git.linaro.org/people/nico/linux mcpm+tc2
+> > 
+> > which will update your vexpress/mcpm branch with one additional commit 
+> > fixing the build issue with CONFIG_FRAME_POINTER reported by RMK.  This 
+> > commit's SHA1 is 95fbdc9cf542.
+> 
+> So, I just replaced my branch with the one from Pawel, and the topmost patch
+> in your branch seems to no longer apply.
+> 
+> Would you mind rebasing on top of vexpress/mcpm in the arm-soc tree? You
+> can just send us the patch directly, no need to do a pull request for it.
 
-> +       usb at 12110000 {
-> +               usb-phy = <&usb2_phy>;
-> +       };
+Just as a heads-up, if Nico's fix is applied to vexpress/mcpm before this
+series is pulled (it is based on top of Pawel's changes ie vexpress/mcpm)
 
-ehci-s5p driver doesn't use 'usb-phy' property to find the PHY driver,
-hence this is not required.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/191369.html
 
-Without this change,
-Tested-by: Tushar Behera <tushar.behera@linaro.org>
+the series above might not apply cleanly. Conflict is minor but might be there.
+Please let me know how you want me to handle this.
 
--- 
-Tushar Behera
+Thanks,
+Lorenzo
