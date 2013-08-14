@@ -1,33 +1,83 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 14 Aug 2013 11:07:24 +0200
-Subject: [PATCH v2 4/5] PCI: mvebu: add support for reset on GPIO
-In-Reply-To: <1376396724-32048-5-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376396724-32048-5-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130814090715.GA2084@ulmo>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 14 Aug 2013 11:08:26 +0200
+Subject: [PATCH v3 0/6] ARM/ARM64 architected timer updates
+In-Reply-To: <1376414984-14182-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376414984-14182-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <520B490A.4090109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 02:25:23PM +0200, Sebastian Hesselbarth wrote:
-[...]
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-[...]
-> @@ -897,6 +904,30 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
-[...]
-> +			u32 reset_udelay = 20000;
-[...]
-> +			udelay(reset_udelay);
+On 08/13/2013 07:29 PM, Sudeep KarkadaNagesha wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> This patch series adds support to configure the rate and enable the
+> event stream for architected timer. The event streams can be used to
+> impose a timeout on a WFE, to safeguard against any programming error
+> in case an expected event is not generated or even to implement
+> wfe-based timeouts for userspace locking implementations.
+> 
+> Since the timer control register is reset to zero on warm boot, CPU
+> PM notifier is added to re-initialize it.
 
-udelay(20000) is probably not a good idea. You should probably use
-something like usleep_range() or msleep() here. Also see:
+It does not apply to my tree.
 
-	Documentation/timers/timers-howto.txt
+Against which tree is this patchset ? Who is supposed to take it ?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130814/60f5504d/attachment.sig>
+> Changes v2->v3:
+> 1. Moved ARM and ARM64 changes into separate patches
+> 2. Added native hwcaps definations(ARM/ARM64) and compat-specific
+>    definitions(ARM64) to the users for the event stream feature. 
+
+Ok, we have the choice:
+ 1. split the patchset into arch/arm changes and drivers/clocksource
+ 2. I ack the patchset and Olof/Kevin take it
+ 3. Olof/Kevin ack the patchset and I take it in my tree.
+
+This is really becoming fuzzy.
+
+If you want a maintainer to take a patchset you have to send an email
+--to him and --cc mailing list and others concerned by the patchset.
+
+
+> Changes v1->v2:
+> 1. Saved event stream divider value on cold reset path and re-used it
+>    in CPU PM notifier instead of calculating every time.
+> 2. Rebased on v3.11-rc2(to avoid conflicts with __cpuinit* deletion)
+> 3. Dropped "ARM/ARM64: arch_timer: remove __cpuinit attribute for
+>    arch_counter_set_user_access"(already done as part of __cpuinit*
+>    deletion)
+> 
+> Regards,
+> Sudeep
+> 
+> 
+> Sudeep KarkadaNagesha (5):
+>   ARM/ARM64: arch_timer: add macros for bits in control register
+>   ARM: arch_timer: configure and enable event stream
+>   ARM64: arch_timer: configure and enable event stream
+>   drivers: clocksource: enable hwcaps for event stream on ARM arch timer
+>   drivers: clocksource: add CPU PM notifier for ARM architected timer
+> 
+> Will Deacon (1):
+>   drivers: clocksource: configure event stream for ARM arch timer
+> 
+>  arch/arm/include/asm/arch_timer.h    | 18 +++++++++++---
+>  arch/arm/include/uapi/asm/hwcap.h    |  1 +
+>  arch/arm/kernel/setup.c              |  1 +
+>  arch/arm64/include/asm/arch_timer.h  | 22 +++++++++++++----
+>  arch/arm64/include/asm/hwcap.h       |  4 ++-
+>  arch/arm64/include/uapi/asm/hwcap.h  |  1 +
+>  arch/arm64/kernel/setup.c            |  1 +
+>  drivers/clocksource/arm_arch_timer.c | 48 +++++++++++++++++++++++++++++++++++-
+>  include/clocksource/arm_arch_timer.h | 10 ++++++++
+>  9 files changed, 96 insertions(+), 10 deletions(-)
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
