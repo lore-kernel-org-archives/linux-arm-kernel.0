@@ -1,58 +1,35 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 14 Aug 2013 11:23:26 +0200
-Subject: [PATCH v3 1/6] ARM/ARM64: arch_timer: add macros for bits in
- control register
-In-Reply-To: <6071c584a32b1a5f80923818a477a719@www.loen.fr>
-References: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376414984-14182-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376414984-14182-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <520B44CF.6040403@linaro.org> <6071c584a32b1a5f80923818a477a719@www.loen.fr>
-Message-ID: <520B4C8E.1010808@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 14 Aug 2013 11:25:02 +0200
+Subject: [PATCH v2 4/5] PCI: mvebu: add support for reset on GPIO
+In-Reply-To: <20130814090715.GA2084@ulmo>
+References: <1376396724-32048-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376396724-32048-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130814090715.GA2084@ulmo>
+Message-ID: <520B4CEE.2050508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2013 11:03 AM, Marc Zyngier wrote:
-> Hi Daniel,
+On 08/14/2013 11:07 AM, Thierry Reding wrote:
+> On Tue, Aug 13, 2013 at 02:25:23PM +0200, Sebastian Hesselbarth wrote:
+> [...]
+>> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> [...]
+>> @@ -897,6 +904,30 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+> [...]
+>> +			u32 reset_udelay = 20000;
+> [...]
+>> +			udelay(reset_udelay);
+>
+> udelay(20000) is probably not a good idea. You should probably use
+> something like usleep_range() or msleep() here. Also see:
+>
+> 	Documentation/timers/timers-howto.txt
 
-[ ... ]
+Thierry,
 
->>> --- a/arch/arm64/include/asm/arch_timer.h
->>> +++ b/arch/arm64/include/asm/arch_timer.h
->>> @@ -101,12 +101,16 @@ static inline void
->>> arch_counter_set_user_access(void)
->>>  {
->>>      u32 cntkctl;
->>>
->>> -    /* Disable user access to the timers and the physical counter. */
->>>      asm volatile("mrs    %0, cntkctl_el1" : "=r" (cntkctl));
->>> -    cntkctl &= ~((3 << 8) | (1 << 0));
->>>
->>> -    /* Enable user access to the virtual counter and frequency. */
->>> -    cntkctl |= (1 << 1);
->>> +    /* Disable user access to the timers and the physical counter. */
->>> +    cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
->>> +            | ARCH_TIMER_USR_VT_ACCESS_EN
->>> +            | ARCH_TIMER_USR_PCT_ACCESS_EN);
->>> +
->>> +    /* Enable user access to the virtual counter. */
->>> +    cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
->>> +
->>>      asm volatile("msr    cntkctl_el1, %0" : : "r" (cntkctl));
->>>  }
->>
->> Before doing those changes, I suggest you kill include/asm/arch_timer.h
->> header file and move the functions directly in the arm_arch_timer.c as
->> they are only used by it.
-> 
-> How do you suggest to proceed? Having #ifdefs in arm_arch_timer.c to
-> cope with the inline assembly functions present in both arm and arm64
-> include files? Doesn't seem much of a progress to me...
+thanks for mentioning this. I clearly got distracted from ms to us
+switch due to the different reset API convention. As the delay will
+be most likely 10ms+, we should change the above to
+msleep(reset_udelay/1000) instead.
 
-I understand, this is arguable.
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Sebastian
