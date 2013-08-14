@@ -1,41 +1,71 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 14 Aug 2013 23:54:48 +0400
-Subject: [PATCH Resend 1/3] PSCI: add missing dependency on CONFIG_OF
- for PSCI.
-In-Reply-To: <1376500987-12797-2-git-send-email-jonathan.austin@arm.com>
-References: <1376500987-12797-1-git-send-email-jonathan.austin@arm.com>
- <1376500987-12797-2-git-send-email-jonathan.austin@arm.com>
-Message-ID: <520BE088.5060109@cogentembedded.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 14 Aug 2013 12:55:24 -0700
+Subject: [GIT PULL] Highbank fixes for 3.12
+In-Reply-To: <CAL_Jsq+4hpsCM5aNt60+Oe5=Mt1SWrAwskahS+JbXYuHRRcMuw@mail.gmail.com>
+ (Rob Herring's message of "Wed, 14 Aug 2013 13:50:52 -0500")
+References: <520AF2ED.9030900@gmail.com> <87li4445tj.fsf@kernel.org>
+ <CAL_Jsq+4hpsCM5aNt60+Oe5=Mt1SWrAwskahS+JbXYuHRRcMuw@mail.gmail.com>
+Message-ID: <877gfom4ib.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Rob Herring <robherring2@gmail.com> writes:
 
-On 08/14/2013 09:23 PM, Jonathan Austin wrote:
+> On Wed, Aug 14, 2013 at 11:04 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Hi Rob,
+>>
+>> Rob Herring <robherring2@gmail.com> writes:
+>>
+>>> Kevin, Olof,
+>>>
+>>> Please pull highbank updates for 3.12.
+>>>
+>>> There's one trivial core ARM code change in the series to allow a
+>>> DMA_ZONE size of 4GB. I believe this should not conflict with Russell's
+>>> DMA mask series.
+>>>
+>>> Rob
+>>>
+>>> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+>>>
+>>>   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://sources.calxeda.com/kernel/linux.git
+>>> tags/highbank-lpae-fixes-for-3.12
+>>>
+>>> for you to fetch changes up to ce3ec1d61c5ed6af3ceaace6f57acd588c41b4d6:
+>>>
+>>>   ARM: highbank: fix debug uart virtual address for LPAE (2013-08-13
+>>> 20:50:16 -0500)
+>>>
+>>> ----------------------------------------------------------------
+>>> A set of fixes for highbank to enable LPAE and selecting of necesssary
+>>> ARM errata.
+>>>
+>>> ----------------------------------------------------------------
+>>> Rob Herring (6):
+>>>       ARM: use phys_addr_t for DMA zone sizes
+>>>       ARM: highbank: enable DMA zone for LPAE
+>>>       ARM: highbank: select ARCH_HAS_HOLES_MEMORYMODEL
+>>>       ARM: highbank: select required errata work-arounds
+>>>       ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
+>>
+>> This one seems to have broken the AMBA PL08x DMA driver, and is still
+>> objected to by Russell, so I'll drop this one for now.
+>
+> Exynos does the same selection, but I guess it is not multi-platform
+> though and doesn't select ARM_AMBA.
+>
+>>>       ARM: highbank: fix debug uart virtual address for LPAE
+>>
+>> The rest look OK and I can pull them if the rest are OK without the
+>> objectionable one.  Let me know if that's OK, or you prefer to wait for
+>> resolution.
+>
+> Yes, I'm fine with dropping this one for now.
 
-> The PSCI initialisation depends on data found in the DT. Without this the
-> including PSCI support makes little sense, and furthermore the of_* stub
-> functions aren't broad enough to ensure that this builds without CONFIG_OF.
+OK, dropped that one and applied the rest.
 
-> As there is little enthusiasm for extending these stubs without useful use-cases
-> (of which this is *not* an example) this patch prevents building of PSCI
-> without CONFIG_OF.
-
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-> ---
->   arch/arm/Kconfig |    1 +
->   1 file changed, 1 insertion(+)
-
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index ba412e0..972ec25 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1577,6 +1577,7 @@ config HOTPLUG_CPU
->   config ARM_PSCI
->   	bool "Support for the ARM Power State Coordination Interface (PSCI)"
->   	depends on CPU_V7
-> +	depends on CONFIG_OF
-
-    I think you meant just OF. :-)
-
-WBR, Sergei
+Kevin
