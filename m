@@ -1,58 +1,24 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 14 Aug 2013 14:01:33 +0100
-Subject: [PATCH v3 09/10] swiotlb-xen: support autotranslate guests
-In-Reply-To: <20130809154558.GG5637@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1308051503190.4893@kaball.uk.xensource.com>
- <1375720256-8014-9-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130809154558.GG5637@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1308141348540.4470@kaball.uk.xensource.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 14 Aug 2013 15:14:06 +0200
+Subject: [PATCH 0/3] cpufreq: sa11x0: cleanups for 3.13
+In-Reply-To: <CAKohpokOmv+CcL61dzkMgTNxY5rKb4A863CUAX_Jav4KyHF3DA@mail.gmail.com>
+References: <cover.1376392060.git.viresh.kumar@linaro.org>
+ <1437762.edDpfxPldn@vostro.rjw.lan>
+ <CAKohpokOmv+CcL61dzkMgTNxY5rKb4A863CUAX_Jav4KyHF3DA@mail.gmail.com>
+Message-ID: <1472734.1FogUomyWU@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Aug 2013, Konrad Rzeszutek Wilk wrote:
-> > @@ -193,9 +315,10 @@ retry:
-> >  	/*
-> >  	 * Get IO TLB memory from any location.
-> >  	 */
-> > -	if (early)
-> > +	if (early) {
-> >  		xen_io_tlb_start = alloc_bootmem_pages(PAGE_ALIGN(bytes));
-> > -	else {
-> > +		xen_dma_seg = alloc_bootmem(sizeof(struct xen_dma_info) * NR_DMA_SEGS);
+On Wednesday, August 14, 2013 07:56:44 AM Viresh Kumar wrote:
+> On 14 August 2013 01:31, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> > On Tuesday, August 13, 2013 07:01:04 PM Viresh Kumar wrote:
 > 
-> So what if the user over-wrote the size of the SWITOLB? Meaning the nslabs is different?
-> Won't that blow up in  xen_swiotlb_fixup if we try to dereference past the array?
-
-The definition of NR_DMA_SEGS is:
-
-#define NR_DMA_SEGS  ((xen_io_tlb_nslabs + IO_TLB_SEGSIZE - 1) / IO_TLB_SEGSIZE)
-
-xen_io_tlb_nslabs is calculated from io_tlb_nslabs.
-
-If the user increases io_tlb_nslabs, then xen_io_tlb_nslabs and
-NR_DMA_SEGS are also going to be bigger.
-
-
-> > @@ -351,14 +477,15 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
-> >  	 * we can safely return the device addr and not worry about bounce
-> >  	 * buffering it.
-> >  	 */
-> > -	if (dma_capable(dev, dev_addr, size) &&
-> > +	if (!xen_feature(XENFEAT_auto_translated_physmap) &&
-> > +	    dma_capable(dev, dev_addr, size) &&
-> >  	    !range_straddles_page_boundary(phys, size) && !swiotlb_force)
-> >  		return dev_addr;
-> >  
-> >  	/*
-> >  	 * Oh well, have to allocate and map a bounce buffer.
-> >  	 */
-> > -	map = swiotlb_tbl_map_single(dev, start_dma_addr, phys, size, dir);
-> > +	map = swiotlb_tbl_map_single(dev, xen_dma_seg[0].dma_addr, phys, size, dir);
+> > Are the three patches in this series prerequisite for the big target_index
+> > one?  If so, I think they can go into 3.12 actually, if they are ACKed by the
+> > appropriate platform maintainers.
 > 
-> That [0] really deserves a comment.
+> Yes, but they depend on cpufreq_table_validate_and_show() which
+> will also go in 3.13 and so these will be made part of that series in
+> future..
 
-xen_dma_seg[0].dma_addr corresponds exactly to start_dma_addr, the first
-machine address of the swiotlb buffer.
-I think that reason why we pass the dma address of the first slab is
-that we want to allocate the bounce buffer from any of the slabs in
-io_tlb_start-io_tlb_end.
+OK
