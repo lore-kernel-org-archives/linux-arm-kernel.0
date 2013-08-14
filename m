@@ -1,68 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Aug 2013 23:54:28 +0100
-Subject: [PATCH v6 2/4] ARM: debug: support debug ll on hisilicon soc
-In-Reply-To: <20130814162502.GA16491@quad.lixom.net>
-References: <1374813135-16238-1-git-send-email-haojian.zhuang@linaro.org>
- <1374813135-16238-3-git-send-email-haojian.zhuang@linaro.org>
- <20130814063916.GH19951@quad.lixom.net>
- <20130814154443.GV23006@n2100.arm.linux.org.uk>
- <20130814162502.GA16491@quad.lixom.net>
-Message-ID: <20130814225428.GB23006@n2100.arm.linux.org.uk>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 15 Aug 2013 08:57:30 +1000
+Subject: [GIT PULL] DT/core: cpu_ofnode updates for v3.12
+In-Reply-To: <520B8468.7050307@arm.com>
+References: <5208E2D3.7060005@arm.com> <3356439.a21MloFP7n@vostro.rjw.lan>
+ <520A536C.3030600@arm.com> <520A7B00.8060405@arm.com>
+ <1376428024.4255.14.camel@pasglop> <520B5584.7030608@arm.com>
+ <1376480227.4255.66.camel@pasglop> <520B8468.7050307@arm.com>
+Message-ID: <1376521050.4255.82.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 09:25:02AM -0700, Olof Johansson wrote:
-> On Wed, Aug 14, 2013 at 04:44:44PM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Aug 13, 2013 at 11:39:16PM -0700, Olof Johansson wrote:
-> > > On Fri, Jul 26, 2013 at 12:32:13PM +0800, Haojian Zhuang wrote:
-> > > > Support UART0 debug ll on hisilicon Hi3620 SoC.
-> > > > 
-> > > > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> > > 
-> > > 
-> > > Applied, thanks.
-> > 
-> > Applied without reference to my debug cleanup series which has been
-> > sitting in linux-next for ages?
-> > 
-> > Whatever happened to encouraging people to do things in a manner
-> > compatible with the cleanups we're trying to do?
+On Wed, 2013-08-14 at 14:21 +0100, Sudeep KarkadaNagesha wrote:
+> IMO moving of handling ibm,ppc-interrupt-server#s to generic code
+> under
+> #ifdef CONFIG_PPC seems to be cleaner approach than weak definitation.
 > 
-> I quite frankly forgot that this was pending for 3.12 in your tree.
-> 
-> Thanks for catching this, I'll revert the patch in arm-soc and let it go
-> in through yours on top of your cleanups.
+> As per my understanding each thread is a different logical cpu.
+> Each logical cpu is mapped to unique physical id(either present in reg
+> field or legacy ibm,ppc-interrupt-server#s field). So given a logical
+> cpu id we can get the cpu node corresponding to it.
+> Looking @ smp_setup_cpu_maps in arch/powerpc/kernel/setup-common.c
+> and the comment in the same file: "This implementation only supports
+> power of 2 number of threads.." the thread id id is implicit in the
+> logical cpu id. Do we need to fetch that from DT ?
 
-Has this been pushed out yet?  I'm getting this new conflict:
+I don't want those parsing routines to make those assumptions. We have
+changed our logical numbering in the past and may again.
 
-++<<<<<<< HEAD
-++=======
-+       default "debug/keystone.S" if DEBUG_KEYSTONE_UART0 || \
-+                                     DEBUG_KEYSTONE_UART1
-+       default "debug/msm.S" if DEBUG_MSM_UART1 || \
-+                                DEBUG_MSM_UART2 || \
-+                                DEBUG_MSM_UART3 || \
-+                                DEBUG_MSM8660_UART || \
-+                                DEBUG_MSM8960_UART
-+       default "debug/mvebu.S" if DEBUG_MVEBU_UART || \
-+                                  DEBUG_MVEBU_UART_ALTERNATE
-+       default "debug/mxs.S" if DEBUG_IMX23_UART || DEBUG_IMX28_UART
-+       default "debug/nomadik.S" if DEBUG_NOMADIK_UART
-+       default "debug/nspire.S" if     DEBUG_NSPIRE_CX_UART || \
-+                                       DEBUG_NSPIRE_CLASSIC_UART
-++>>>>>>> arm-soc/for-next
-
-This seems to be due to the addition of MSM here.  If stuff like this
-is going to go through arm-soc, I'm going to make no guarantees of
-getting this stuff anywhere close to being correct for the next merge
-window, because its too complicated to deal with properly in git
-merges.
-
-Also:
-
-CONFLICT (delete/modify): arch/arm/include/debug/highbank.S deleted in HEAD and modified in arm-soc/for-next. Version arm-soc/for-next of arch/arm/include/debug/highbank.S left in tree.
-
-which seems to be a change in the virtual address of the port.  This
-one is particularly nasty because it needs to be moved to a completely
-different file and therefore is not git rerere'able.  Does it have any
-dependencies?
+Cheers,
+Ben.
