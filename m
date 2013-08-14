@@ -1,36 +1,51 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 14 Aug 2013 10:25:27 +0200
-Subject: [PATCH V4 0/4] Add i2s support on smdk5420
-In-Reply-To: <20130813124440.GX6427@sirena.org.uk>
-References: <1376300994-1679-1-git-send-email-padma.v@samsung.com>
- <20130813124440.GX6427@sirena.org.uk>
-Message-ID: <6538092.D4LPomiMyc@flatron>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 14 Aug 2013 10:33:33 +0200
+Subject: [GIT PULL] at91: fixes for 3.11 #1
+Message-ID: <1376469213-30981-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 of August 2013 13:44:40 Mark Brown wrote:
-> On Mon, Aug 12, 2013 at 03:19:50PM +0530, Padmavathi Venna wrote:
-> > Samsung has different versions of I2S introduced in different
-> > platforms. Each version has some new support added for multichannel,
-> > secondary fifo, s/w reset control, internal mux for rclk src clk and
-> > tdm support. Each newly added change has a quirk. So this patch adds
-> > all the required quirks as driver data and based on compatible string
-> > from dtsi fetches the quirks. This also adds i2s support on
-> > exynos5420.
-> 
-> Applied all these, thanks.
+Arnd, Olof, Kevin,
 
-Hmm, this series looks good to me too, except one thing. What about the 
-bisection breakage introduced by the hole between patches 1/4 and 4/4 
-(after the list of supported compatible changes in the driver and before 
-respective dts files are updated)?
+This is the first (late) fixes pull-reqest for AT91. I would understand if
+you refuse it because we are already at -rc5 ;-) ...
 
-Best regards,
-Tomasz
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130814/8e85ba14/attachment.sig>
+On the other hand, the line count is very low and all patches are pretty
+obvious.
+
+Thanks, best regards,
+
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-fixes
+
+for you to fetch changes up to a57603ca2871ee0773b00839c1ea35c4a2d3eeb0:
+
+  ARM: at91/DT: fix at91sam9n12ek memory node (2013-08-14 09:56:31 +0200)
+
+----------------------------------------------------------------
+Device tree related fixes:
+- USB host numbering for 9x5 which was preventing from using all ports
+- a missing UART (not USART) clock lookup table was preventing from using
+  them on 9x5
+- too large amount of memory was specified for 9n12ek
+
+----------------------------------------------------------------
+Boris BREZILLON (1):
+      ARM: at91: add missing uart clocks DT entries
+
+Nicolas Ferre (2):
+      ARM: at91/DT: at91sam9x5ek: fix USB host property to enable port C
+      ARM: at91/DT: fix at91sam9n12ek memory node
+
+ arch/arm/boot/dts/at91sam9n12ek.dts | 4 ++--
+ arch/arm/boot/dts/at91sam9x5ek.dtsi | 5 +++--
+ arch/arm/mach-at91/at91sam9x5.c     | 2 ++
+ 3 files changed, 7 insertions(+), 4 deletions(-)
+
+-- 
+Nicolas Ferre
