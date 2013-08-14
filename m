@@ -1,39 +1,107 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Wed, 14 Aug 2013 16:57:00 +0100
-Subject: [PATCH] ARM64: KVM: Fix =?UTF-8?Q?coherent=5Ficache=5Fguest?=
- =?UTF-8?Q?=5Fpage=28=29=20for=20host=20with=20external=20L=33-cache=2E?=
-In-Reply-To: <CAFEAcA_Sexa36nq8r2YsuPptcKFcKytfwGEYi+xm-DO+3j1iSw@mail.gmail.com>
-References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
- <f8917fe8409b1fae634c7de45e34d4a7@www.loen.fr>
- <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
- <38A6DD0E-5639-43BB-8318-32D59923E309@suse.de>
- <19553bad1c8427526f6e9a87d605ade3@www.loen.fr>
- <CAFEAcA_Sexa36nq8r2YsuPptcKFcKytfwGEYi+xm-DO+3j1iSw@mail.gmail.com>
-Message-ID: <394887c7adffc3a3df0733329a9b5fb3@www.loen.fr>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 14 Aug 2013 15:58:48 +0000 (UTC)
+Subject: OMAP baseline test results for v3.11-rc4
+Message-ID: <alpine.DEB.2.02.1308141554400.24247@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-08-14 16:41, Peter Maydell wrote:
-> On 14 August 2013 16:34, Marc Zyngier <maz@misterjones.org> wrote:
->> When userspace loads the kernel into memory, the kernel is not 
->> flushed
->> to RAM, and may sit in the L3 cache if the cache is big enough. You
->> end-up executing garbage... My proposed fix is to let kvmtool do the
->> flushing, as we have userspace cache management operations for this
->> exact purpose.
->
-> Why does this issue only apply to the loaded kernel and not to
-> the zero bytes in the rest of RAM? I know executing zeroes
-> isn't a very useful thing to do but it should be a well defined
-> thing.
 
-Good point, and not quite sure just yet. Probably we get a zeroed, 
-clean page?
+Here are some basic OMAP test results for Linux v3.11-rc4.
+Logs and other details at:
 
-Anup, can you elaborate on how your L3 cache behaves?
+    http://www.pwsan.com/omap/testlogs/test_v3.11-rc4/20130814082546/
 
-Thanks,
+I'm sorry to report that my second OMAP5912 OSK has bitten the dust.  So 
+until I can get my hands on another one, I won't be able to boot-test that 
+platform any more.  If anyone out there happens to have one that they 
+aren't using, I'd gladly take it.
 
-         M.
--- 
-Who you jivin' with that Cosmik Debris?
+In terms of v3.11-rc, I -rc5 should boot again on that board now that the 
+GPIO reverts are in.  The early -rc1 and -rc2 boot "failures" were due to 
+a validation script issue here.  -rc3 and -rc4 were legitimately broken.
+
+
+Test summary
+------------
+
+Build: uImage:
+    Pass (14/14): n800_multi_omap2xxx, n800_only_a, omap1_defconfig,
+                  omap1_defconfig_1510innovator_only,
+                  omap1_defconfig_5912osk_only, omap2plus_defconfig,
+                  omap2plus_defconfig_2430sdp_only,
+                  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+                  omap2plus_defconfig_omap2_4_only,
+                  omap2plus_defconfig_omap3_4_only,
+                  rmk_omap3430_ldp_allnoconfig,
+                  rmk_omap3430_ldp_oldconfig,
+                  rmk_omap4430_sdp_allnoconfig
+
+Build: uImage+dtb:
+    Pass ( 3/ 3): am33xx_only/am335x-bone,
+                  omap2plus_defconfig/omap4-panda,
+                  omap2plus_defconfig/omap4-panda-es
+
+Build: zImage:
+    Pass ( 1/ 1): omap2plus_defconfig
+
+Boot to userspace:
+    skip ( 1/ 1): 5912osk
+    Pass (10/10): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
+                  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+                  am335xbonelt, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 2/ 6): 2430sdp, 4430es2panda
+    Pass ( 4/ 6): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    FAIL ( 3/ 6): 2430sdp, 4430es2panda, 4460pandaes
+    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 37xxevm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 2/ 4): 4430es2panda, 4460pandaes
+    Pass ( 2/ 4): 3530es3beagle, 37xxevm
+
+PM: chip off via dynamic idle:
+    FAIL ( 2/ 4): 4430es2panda, 4460pandaes
+    Pass ( 2/ 4): 3530es3beagle, 37xxevm
+
+
+vmlinux object size
+(delta in bytes from test_v3.11-rc3 
+(5ae90d8e467e625e447000cb4335c4db973b1095)):
+   text     data      bss    total  kernel
+   +480       -8      +32     +504  n800_multi_omap2xxx
+   +544       -8      +32     +568  n800_only_a
+   +592      +24       +8     +624  omap1_defconfig
+   +564        0       +8     +572  omap1_defconfig_1510innovator_only
+  +1588       -8       +8    +1588  omap1_defconfig_5912osk_only
+  +1036      +48        0    +1084  omap2plus_defconfig
+   +844        0        0     +844  omap2plus_defconfig_2430sdp_only
+   +520      -16        0     +504  omap2plus_defconfig_cpupm
+   +916      +80        0     +996  omap2plus_defconfig_no_pm
+   +972      +48        0    +1020  omap2plus_defconfig_omap2_4_only
+  +1036      +48        0    +1084  omap2plus_defconfig_omap3_4_only
+   +612        0      +56     +668  rmk_omap3430_ldp_allnoconfig
+   +612        0       +8     +620  rmk_omap3430_ldp_oldconfig
+   +556       -8     +120     +668  rmk_omap4430_sdp_allnoconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.11-rc3 
+(5ae90d8e467e625e447000cb4335c4db973b1095))
+  avail  rsrvd   high  freed  board          kconfig
+    -4k     4k      .      .  2420n800       n800_only_a
+    -4k     4k      .      .  3517evm        omap2plus_defconfig
+    -4k     4k      .      .  3530es3beagle  omap2plus_defconfig
+    -4k     4k      .      .  3730beaglexm   omap2plus_defconfig
+    -4k     4k      .      .  37xxevm        omap2plus_defconfig
+    -4k     4k      .      .  4430es2panda   omap2plus_defconfig
+    -4k     4k      .      .  4460pandaes    omap2plus_defconfig
+    -4k     4k      .      .  am335xbone     am33xx_only
+    -4k     4k      .      .  am335xbonelt   am33xx_only
