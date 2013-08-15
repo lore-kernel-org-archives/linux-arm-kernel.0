@@ -1,22 +1,60 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 15 Aug 2013 09:51:22 +0100
-Subject: [PATCH] KVM: ARM: ignore guest L2 cache control SMCs on Highbank
- and OMAP
-In-Reply-To: <20130814204302.GA8837@cbox>
-References: <1376472125-23350-1-git-send-email-andre.przywara@calxeda.com>
- <CAL_Jsq+vGd7+pw6YX0YNHO5rVSoiHCHbtXXdZ-3grnEcAOc38Q@mail.gmail.com>
- <520BE673.9010801@calxeda.com> <20130814204302.GA8837@cbox>
-Message-ID: <CAFEAcA_+8cNtTKPj=FiKL3CukrUGCAKnjoepLkHHKhVBXM95fw@mail.gmail.com>
+From: b18965@freescale.com (Alison Wang)
+Date: Thu, 15 Aug 2013 16:01:49 +0800
+Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for Vybrid
+ VF610 platform
+Message-ID: <1376553714-25922-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 August 2013 21:43, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> Agreed, but we need a more generic solution for the secure call
-> handling.  I've created a backlog item in Linaro's JIRA (CARD-801) for
-> this work, let's see how quickly we can get it approved and put on the
-> roadmap.
+This series contain DCU framebuffer driver for Freescale Vybrid VF610 platform.
 
-FYI, here's my sketch from last year of what I had in mind:
-http://lists.gnu.org/archive/html/qemu-devel/2012-05/msg03012.html
+The Display Controller Unit (DCU) module is a system master that
+fetches graphics stored in internal or external memory and displays
+them on a TFT LCD panel. A wide range of panel sizes is supported
+and the timing of the interface signals is highly configurable.
+Graphics are read directly from memory and then blended in real-time,
+which allows for dynamic content creation with minimal CPU intervention.
 
--- PMM
+The features:
+(1) Full RGB888 output to TFT LCD panel.
+(2) For the current LCD panel, WQVGA "480x272" is tested.
+(3) Blending of each pixel using up to 4 source layers dependent on size of panel.
+(4) Each graphic layer can be placed with one pixel resolution in either axis.
+(5) Each graphic layer support RGB565 and RGB888 direct colors without alpha channel
+and BGRA8888 direct colors with an alpha channel.
+(6) Each graphic layer support alpha blending with 8-bit resolution.
+
+Changes in v3:
+- Correct DCU_MODE_BLEND_ITER macro definition.
+- Remove hardcode panel description in the driver. Use the videomode helpers to get the relevant data from devicetree.
+- Correct the wrong indentation.
+- Use dev_* for printing messages in drivers.
+- Change calc_div_ratio() to fsl_dcu_calc_div(), and rewrite this function.
+- Use devm_request_irq() instead of request_irq().
+- Drop useless code.
+- Increase the layers number to the maximum 6.
+- Use dma_alloc_writecombine() instead of dma_alloc_coherent().
+- Use runtime PM.
+
+Changes in v2:
+- Add a document for DCU framebuffer driver under Documentation/devicetree/bindings/fb/.
+
+----------------------------------------------------------------
+Alison Wang (5):
+      ARM: dts: vf610: Add DCU and TCON nodes
+      ARM: dts: vf610-twr: Enable DCU and TCON devices
+      ARM: clk: vf610: Add DCU and TCON clock support
+      fb: Add DCU framebuffer driver for Vybrid VF610 platform
+      Documentation: DT: Add DCU framebuffer driver
+
+ Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt |   67 +++++
+ arch/arm/boot/dts/vf610-twr.dts                     |   32 +++
+ arch/arm/boot/dts/vf610.dtsi                        |   19 +-
+ arch/arm/mach-imx/clk-vf610.c                       |    5 +
+ drivers/video/Kconfig                               |   10 +
+ drivers/video/Makefile                              |    1 +
+ drivers/video/fsl-dcu-fb.c                          | 1095 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/vf610-clock.h             |    3 +-
+ 8 files changed, 1230 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt
+ create mode 100644 drivers/video/fsl-dcu-fb.c
