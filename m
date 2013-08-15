@@ -1,86 +1,48 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 15 Aug 2013 12:10:47 +0100
-Subject: [PATCH v4 03/10] arm: make SWIOTLB available
-In-Reply-To: <alpine.DEB.2.02.1308151200580.4470@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1308151200580.4470@kaball.uk.xensource.com>
-Message-ID: <1376565054-24153-3-git-send-email-stefano.stabellini@eu.citrix.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 15 Aug 2013 13:13:52 +0200
+Subject: [RFC PATCH] pwm: atmel-pwm: add pwm controller driver
+In-Reply-To: <51D523FD.7040409@atmel.com>
+References: <1371804355-8071-1-git-send-email-voice.shen@atmel.com>
+ <51D523FD.7040409@atmel.com>
+Message-ID: <20130815111351.GA14418@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU_HELPER is needed because SWIOTLB calls iommu_is_span_boundary,
-provided by lib/iommu_helper.c.
+On Thu, Jul 04, 2013 at 03:27:57PM +0800, Bo Shen wrote:
+> Hi All,
+> 
+> On 6/21/2013 16:45, Bo Shen wrote:
+> >add atmel pwm controller driver based on PWM framework
+> >
+> >this is basic function implementation of pwm controller
+> >it can work with pwm based led and backlight
+> >
+> >Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> >---
+> >  .../devicetree/bindings/pwm/atmel-pwm.txt          |   19 ++
+> >  drivers/pwm/Kconfig                                |    9 +
+> >  drivers/pwm/Makefile                               |    1 +
+> >  drivers/pwm/pwm-atmel.c                            |  326 ++++++++++++++++++++
+> >  4 files changed, 355 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+> >  create mode 100644 drivers/pwm/pwm-atmel.c
+> 
+> Does this patch can be applied? If yes, I will send out the formal
+> patch without RFC in subject. If no, please help review this patch
+> and give your comments.
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-CC: will.deacon at arm.com
-CC: linux at arm.linux.org.uk
+Hi,
 
+Sorry I seem to have completely missed this. Can you please resend the
+patch to my new email address and Cc linux-pwm at vger.kernel.org. That
+will make sure that I see and can review it.
 
-Changes in v3:
-- dma_capable: do not treat dma_mask as a limit;
-- remove SWIOTLB dependency on NEED_SG_DMA_LENGTH.
----
- arch/arm/Kconfig                   |    6 ++++++
- arch/arm/include/asm/dma-mapping.h |   30 ++++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ba412e0..c0bfb33 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1832,6 +1832,12 @@ config CC_STACKPROTECTOR
- 	  neutralized via a kernel panic.
- 	  This feature requires gcc version 4.2 or above.
- 
-+config SWIOTLB
-+	def_bool y
-+
-+config IOMMU_HELPER
-+	def_bool SWIOTLB
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 5b579b9..5b8eef9 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -86,6 +86,36 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
- }
- #endif
- 
-+static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-+{
-+	unsigned int offset = paddr & ~PAGE_MASK;
-+	return pfn_to_dma(dev, paddr >> PAGE_SHIFT) + offset;
-+}
-+
-+static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
-+{
-+	unsigned int offset = dev_addr & ~PAGE_MASK;
-+	return (dma_to_pfn(dev, dev_addr) << PAGE_SHIFT) + offset;
-+}
-+
-+static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
-+{
-+	u64 limit, mask = *dev->dma_mask;
-+
-+	limit = (mask + 1) & ~mask;
-+	if (limit && size > limit)
-+		return 0;
-+
-+	if ((addr | (addr + size - 1)) & ~mask)
-+		return 0;
-+
-+	return 1;
-+}
-+
-+static inline void dma_mark_clean(void *addr, size_t size)
-+{
-+}
-+
- /*
-  * DMA errors are defined by all-bits-set in the DMA address.
-  */
--- 
-1.7.2.5
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130815/ea7bd4ee/attachment.sig>
