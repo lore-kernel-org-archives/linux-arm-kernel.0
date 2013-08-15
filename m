@@ -1,77 +1,58 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 15 Aug 2013 17:14:45 -0400
-Subject: [PATCH 1/3] misc: Add crossbar driver
-In-Reply-To: <CACRpkdYeo1y-HhftkRWgwyq8o-NVuJ978Uq+ON880LHhUxC=hg@mail.gmail.com>
-References: <51E83A4F.5080904@ti.com>
- <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
- <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com> <51EFFBE1.4090505@ti.com>
- <51F0031B.1050307@ti.com> <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
- <51F0223E.4050008@ti.com> <51F0240F.3050507@ti.com>
- <20130813081003.GU7656@atomide.com> <520A02BA.4090805@ti.com>
- <CACRpkda+m82PYJsExLM6JLsLa8-bVhdvy_r_+-uKfVT2NG7Cbg@mail.gmail.com>
- <520D398D.9040806@ti.com>
- <CACRpkdYeo1y-HhftkRWgwyq8o-NVuJ978Uq+ON880LHhUxC=hg@mail.gmail.com>
-Message-ID: <520D44C5.6080205@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Aug 2013 22:15:15 +0100
+Subject: [PATCH 1/2] DMA: fix AMBA PL08x driver issue with 64bit DMA
+ address type
+In-Reply-To: <520D430E.2050803@linaro.org>
+References: <1376484729-11826-1-git-send-email-andre.przywara@linaro.org>
+ <1376484729-11826-2-git-send-email-andre.przywara@linaro.org>
+ <20130814130026.GS23006@n2100.arm.linux.org.uk>
+ <CAL_JsqLRtRvPyFagLLaRAjciiur=qVKmt2v7q5MPtEGuDske4Q@mail.gmail.com>
+ <520D430E.2050803@linaro.org>
+Message-ID: <20130815211515.GF23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 August 2013 04:51 PM, Linus Walleij wrote:
-> On Thu, Aug 15, 2013 at 10:26 PM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->> On Thursday 15 August 2013 04:01 PM, Linus Walleij wrote:
->>> On Tue, Aug 13, 2013 at 11:56 AM, Sricharan R <r.sricharan@ti.com> wrote:
->>>
->>>>  Initially irqchip was discussed, but we also have a DMA crossbar
->>>>  to map the dma-requests. Since both irq/dma crossbars should be handled,
->>>>  pinctrl was suggested as the appropriate place to handle this.
->>>
->>> I think it is better to use irqchip.
->>>
->> Did you happen to read the thread why irqchip is in-appropriate
->> for such an IP.
-> 
-> Sorry I don't understand what thread that is... can you point me there?
-> My previous statement on this issue what this:
-> http://marc.info/?l=linux-kernel&m=137442541628641&w=2
-> 
-It was discussed in couple of threads but the main point was the
-need of a link needed for the irqchip.
-
->> As I said earlier, an IRQ-chip always need a
->> real IRQ link (even for the chained one) to the primary irqchip.
+On Thu, Aug 15, 2013 at 11:07:26PM +0200, Andre Przywara wrote:
+> On 08/14/2013 09:13 PM, Rob Herring wrote:
+>> On Wed, Aug 14, 2013 at 8:00 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> NAK.
 >>
->> This IP is just dummy IP makes the connections for the primary
->> irqchip(read GIC). And its use only limited to make the
->> connection between the peripheral IRQ event to the GIC IRQ line.
->>
->> I don't see how you can make this happen with an irqchip
->> infrastructure.
-> 
-> I think my post above describes this.
-> 
-Sorry for being dumb but I don't think cascaded irqchip examples
-like GPIO and cross-bars are same. If you take an example of
-GPIO irqchip, it always have a physical connection even if it
-is 1 IRQ line for (32 logical/sparse IRQs). That goes with
-other MFD examples too.
+>> This patch has nothing to do with dma masks or your dma mask series.
+>> The code deals with bus alignment and cleans up the code to do
+>> alignment operations in a sane way compared to modulo operator. The
+>> only thing 64-bit dma_addr_t did was expose crap code.
+>
+> I agree. Actually I'd see the DMA mask thing just as an opportunity to  
+> fix this code, not as the reason. I guess there are gazillions of  
+> drivers in the ARM world which have problems with any address related  
+> variable being bigger than 32bit, and those should all be fixed 
+> eventually.
 
-So may be I am still missing something in your proposal.
+No they shouldn't.  If the DMA address registers are 32-bit, then the
+DMA engine can *only* handle 32-bit addresses.
 
->>> I don't see any way to really abstract this pretty simple crossbar
->>> for reuse across subsystems.
->>>
->> This exactly the reason, i am against idea of over-engineering the
->> simple IP whose only job is to make the physical wire connection
->> in software where as this is generally done in RTL by default on
->> most of the SOCs.
-> 
-> Well, it was made accessible by software, and if someone has a
-> usecase that requires this do be done dynamically, i.e. not just
-> being set up by firmware and never touched, and that use case
-> is valid, then I guess we need to do something...
-> 
-> I think it was mentioned in the thread that there is really such
-> a usecase?
-> 
-Actually there is no practical usecase but one but one can manufacture
-it ;-)
+That's partly the point of my patch set: if the DMA registers are 32-bit,
+then the device driver should set a 32-bit DMA mask to tell the rest of
+the kernel that this driver only supports 32-bit addresses.
+
+If DMA bus addresses of 0-4G translates to memory in the range (say) of
+4G-8G physical, and you have memory in the region of 4G-8G, then that
+should work.  At the moment, it doesn't - and that's what those patches
+address.
+
+The fact that the PL08x driver was ending up with DMA addresses in the
+4G-8G range is a bug.  DMA addresses after mapping are supposed to be
+the _exact_ value you program into the hardware.  If that value is not,
+then the DMA API is buggy for that platform.
+
+That all said, yes this patch is mostly fine, except:
+
+>>>> +static int bus_addr_offset(struct pl08x_bus_data *bus)
+>>>> +{
+>>>> +     return bus->addr & (bus->buswidth - 1);
+>>>> +}
+
+that this is a poor name for this function - and we don't need it because
+we have a generic form of this - IS_ALIGNED().  Is there any reason to
+re-code what's already provided?
