@@ -1,85 +1,49 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Thu, 15 Aug 2013 15:02:42 +0800
-Subject: [PATCH v3 1/2] dmaengine: add interface of dma_get_slave_channel
-In-Reply-To: <1376550163-30145-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1376550163-30145-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1376550163-30145-2-git-send-email-zhangfei.gao@linaro.org>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 15 Aug 2013 02:02:43 -0500
+Subject: [PATCH 00/10] crypto: omap-aes: DMA and PIO mode improvements
+In-Reply-To: <520C6E0A.8030505@samsung.com>
+References: <1376521969-16807-1-git-send-email-joelf@ti.com>
+ <520C1327.8090607@ti.com> <520C6E0A.8030505@samsung.com>
+Message-ID: <520C7D13.8060900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suggested by Arnd, add dma_get_slave_channel interface
-Dma host driver could get specific channel specificied by request line, rather than filter.
+On 08/15/2013 12:58 AM, Dmitry Kasatkin wrote:
+> On 15/08/13 02:30, Joel Fernandes wrote:
+>> On 08/14/2013 06:12 PM, Joel Fernandes wrote:
+>>> This patch series is a rewrite of the DMA portion of omap-aes driver
+>>> and also adds support for PIO mode. Both these modes, give better
+>>> performance than before.
+>>>
+>>> Earlier, only a single SG was used for DMA purpose, and the SG-list
+>>> passed from the crypto layer was being copied and DMA'd one entry at
+>>> a time. This turns out to be quite inefficient, so we replace it with
+>>> much simpler code that directly passes the SG-list from crypto to the
+>>> DMA layer.
+>>>
+>>> We also add PIO mode support to the driver, and switch to PIO mode
+>>> whenever the DMA channel allocation is not available. This is only for
+>>> OMAP4 platform will work on any platform on which IRQ information is
+>>> populated.
+>>>
+>>> Tests performed on am33xx and omap4 SoCs , notice the 50% perf improvement
+>> Just correcting, this is more like 35% not 50% when using DMA.
+> 
+> Hmm :)
+> 
+> 1766/1460 = ~20%
 
-host example:
-static struct dma_chan *xx_of_dma_simple_xlate(struct of_phandle_args *dma_spec,
-		struct of_dma *ofdma)
-{
-	struct xx_dma_dev *d = ofdma->of_dma_data;
-	unsigned int request = dma_spec->args[0];
+Yes sorry, I messed the cover letter up. If I resend the series again,
+I'll update this number.
 
-	if (request > d->dma_requests)
-		return NULL;
+On OMAP4 though, I saw 2800 ops/sec vs 1800 ops/sec which is around 50%
+so it depends on SoC and DMA controller. OMAP4 uses SDMA while AM335x
+uses EDMA.
 
-	return dma_get_slave_channel(&(d->chans[request].vc.chan));
-}
+Also with very large blocks, this improvement will be much higher as we
+will not be doing all the intermediate copy but I haven't tested with
+such large blocks.
 
-probe:
-of_dma_controller_register((&op->dev)->of_node, xx_of_dma_simple_xlate, d);
+Thanks,
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/dma/dmaengine.c   |   25 +++++++++++++++++++++++++
- include/linux/dmaengine.h |    1 +
- 2 files changed, 26 insertions(+)
-
-diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-index 9e56745..38dd8c3 100644
---- a/drivers/dma/dmaengine.c
-+++ b/drivers/dma/dmaengine.c
-@@ -504,6 +504,31 @@ static struct dma_chan *private_candidate(const dma_cap_mask_t *mask,
- }
- 
- /**
-+ * dma_request_channel - try to get specific channel exclusively
-+ * @chan: target channel
-+ */
-+struct dma_chan *dma_get_slave_channel(struct dma_chan *chan)
-+{
-+	int err = -EBUSY;
-+
-+	/* lock against __dma_request_channel */
-+	mutex_lock(&dma_list_mutex);
-+
-+	if (chan->client_count == 0) {
-+		err = dma_chan_get(chan);
-+		if (err)
-+			pr_debug("%s: failed to get %s: (%d)\n",
-+				__func__, dma_chan_name(chan), err);
-+	} else
-+		chan = NULL;
-+
-+	mutex_unlock(&dma_list_mutex);
-+
-+	return chan;
-+}
-+EXPORT_SYMBOL_GPL(dma_get_slave_channel);
-+
-+/**
-  * dma_request_channel - try to allocate an exclusive channel
-  * @mask: capabilities that the channel must satisfy
-  * @fn: optional callback to disposition available channels
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index cb286b1..c271608 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -995,6 +995,7 @@ int dma_async_device_register(struct dma_device *device);
- void dma_async_device_unregister(struct dma_device *device);
- void dma_run_dependencies(struct dma_async_tx_descriptor *tx);
- struct dma_chan *dma_find_channel(enum dma_transaction_type tx_type);
-+struct dma_chan *dma_get_slave_channel(struct dma_chan *chan);
- struct dma_chan *net_dma_find_channel(void);
- #define dma_request_channel(mask, x, y) __dma_request_channel(&(mask), x, y)
- #define dma_request_slave_channel_compat(mask, x, y, dev, name) \
--- 
-1.7.9.5
+-Joel
