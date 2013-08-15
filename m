@@ -1,80 +1,43 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 15 Aug 2013 08:57:53 +0100
-Subject: [ARM ATTEND] Trustzone-based security solution for ARM Linux
-In-Reply-To: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
-References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
-Message-ID: <520C8A01.2070808@codethink.co.uk>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Thu, 15 Aug 2013 10:00:40 +0200
+Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
+In-Reply-To: <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
+References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
+ <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
+ <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
+Message-ID: <1376553640.3889.70.camel@coredoba.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/08/13 04:44, Barry Song wrote:
-> For the moment, there is strong markting requirement from
-> IVI(In-Vehicle Infotainment) or mobile to use ARM Trustzone. We take
-> IVI as an example, Auto requires security enviorment to access CAN bus
-> and other car busses. Auto requires security enviorment to show
-> rearview/surround view from cameras and play alert audio. on the other
-> hand, IVI system is generically working as a video streaming sink and
-> HDMI sink instead of a source. To support HDCP and widevine, we need
-> to make sure private keys and video buffers are only visible to
-> security mode. With CAN stack, video playback backend and more tasks,
-> generically it requires a multi-task RTOS running in security mode
-> parallel with Linux in non-security mode.
+On Wed, 2013-08-14 at 15:21 -0700, Russ Dill wrote:
+> > The CM3 driver needs to figure out where the core regulator is connected
+> > using using either DT or the regulator framework and ask the TPS (via a
+> > new interface) for register writes for sleep/wake sequences. Then those
+> > sequences will actually match the correct voltages configured using
+> > DT/DVFS.
+> 
+> That seems like it'd add a lot of complexity to the regulator
+> subsystem, as well as all the PMIC and other I2C regulators that any
+> users of these device tree properties may end up using for not a lot
+> of gain. There would be two separate code paths for any used
+> I2C regulator or PMIC for setting voltages.
 
-Personally, I just don't trust anything that is running on the main cpu
-not to get compromised in some form. There has been too little thought
-put in to securing these devices.
+Yes, it would be additional complexity, but it would avoid duplicating
+information which is already in the DT (location&address of the PMIC,
+type of pmic) and in the kernel (how to program voltages for a given
+regulator). As DT is supposed to describe the hardware, duplicate
+information should be unnecessary.
 
-> Linux is a generic purpose OS with UI and all kinds of software, but
-> we need to make sure even the Linux is ROOTed, RTOS in security mode
-> is still active. We are able to find some opensource projects like
-> SafeG[1], Multivisor[2], SierraVisor[3], but it turns out that ARM
-> Linux has no rich support for this kind of architecture:
-> 1. hypervisor running in monitor mode
-> 2. RTOS running in security mode
-> 3. Linux running in non-security mode
->
-> So the point is that we need generic support for this, especially for
-> IVI and other markets which want Trustzone technology a lot and have
-> complex user scenarios.
-> 1. Dispatch FIQ to security, dispatch IRQ to Linux, for this case, FIQ
-> is not permitted to happen on Linux
-> 2. IPC support for communication between RTOS in security mode and
-> Linux in non-security mode, as we need to communicate rich commands
-> and buffers
-> 3. as some CPU time is stolen by security mode, so the scheduler need
-> to get this for load balance
+One different way to look at this is that the CM3 firmware is a separate
+consumer of the DT. DT being OS-indepentent, the CM3 firmware should be
+able to get all the information it needs from the DT (maybe with help
+from the CM3 driver).
 
-With information being passed to the RTOS from the non-secure OS adds
-a method of attacking the secure world.
-
-> For IPC, RPMsg is kind of popular for commucating cross HMP. For
-> example, OMAP uses it as the IPC between M3 and A9; XilinX uses it as
-> IPC between two A9, one with FreeRTOS, the other one with Linux; ST-E
-> uses it to connect ARM with modem MCU. So we are also considering the
-> possibility to involve RPMsg as the backend for communication between
-> RTOS in security mode and Linux in non-security mode. then we get much
-> benefit from virtio, and some drivers will be usable directly.
->
-> So for this topic, I want a presentation session with about 5 slides
-> to show the high-level architecture and requirement for a real and
-> complex Trustzone user case. Hoping we can get some rich support from
-> Linux for this architecture.
->
-> On the other hand, if people can discuss Android mainlining project
-> more, i like much. for the moment, most Android patches have been
-> mainlined, but we still need to maintain both branches as there are
-> rebased patches from Google. So i want to get input about best
-> pratice.
->
-> [1]SafeG (Safety Gate):
-> http://www.toppers.jp/en/safeg.html
-> [2]Green Hills Multivisor:
-> http://www.ghs.com/products/rtos/integrity_virtualization.html
-> [3]SierraVisor:
-> http://www.openvirtualization.org/
-
-
+Regards,
+Jan 
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
