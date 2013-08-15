@@ -1,55 +1,72 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 15 Aug 2013 10:58:43 +0100
-Subject: Build error: versatile express
-In-Reply-To: <alpine.LFD.2.03.1308131148380.14472@syhkavp.arg>
-References: <20130812124801.GB2823@localhost.localdomain>
- <alpine.LFD.2.03.1308121125420.14472@syhkavp.arg>
- <20130813105227.GC2823@localhost.localdomain>
- <alpine.LFD.2.03.1308131148380.14472@syhkavp.arg>
-Message-ID: <20130815095836.GA2562@localhost.localdomain>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Thu, 15 Aug 2013 11:01:30 +0100
+Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
+In-Reply-To: <520C06CA.3060406@gmail.com>
+References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
+ <2CD735CE-3FCF-4AB5-89C0-D813ECD19F11@codeaurora.org>
+ <520C06CA.3060406@gmail.com>
+Message-ID: <520CA6FA.8020401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 11:50:17AM -0400, Nicolas Pitre wrote:
-> On Tue, 13 Aug 2013, Dave Martin wrote:
-> 
-> > On Mon, Aug 12, 2013 at 12:55:23PM -0400, Nicolas Pitre wrote:
-> > > On Mon, 12 Aug 2013, Dave Martin wrote:
-> > > 
-> > > > On Mon, Aug 12, 2013 at 11:28:04AM +0100, Russell King - ARM Linux wrote:
-> > > > > arch/arm/mach-vexpress/tc2_pm.c: In function 'tc2_pm_down.clone.0':
-> > > > > arch/arm/mach-vexpress/tc2_pm.c:200:1: error: fp cannot be used in asm here
-> > > > > 
-> > > > > This is caused by the assembly code in this file clobbering R11, which
-> > > > > is incompatible with having CONFIG_FRAME_POINTER=y.
-> > > > 
-> > > > Is there any reason not to fix this just by pushing/popping r11 inside
-> > > > the asm and removing it from the clobber list?
-> > > 
-> > > That's most likely the best fix.  What about this?
-> > 
-> > Were we replacing these instances with the macro, or is that still in
-> > flight?
-> 
-> I've updated the macro patch accordingly.  I prefer to submit that one 
-> separately.
+Hi Rob,
 
-OK, sounds good
+On 14/08/13 23:38, Rob Herring wrote:
+> On 08/14/2013 04:03 PM, Kumar Gala wrote:
+>>
+>> On Jul 23, 2013, at 4:19 AM, Punit Agrawal wrote:
+>>
+>>> The CCI PMU can profile bus transactions at the master and slave
+>>> interfaces of the CCI. The PMU can be used to observe an aggregated view
+>>> of the bus traffic between the various components connected to the CCI.
+>>>
+>>> Extend the existing CCI driver to support the PMU by registering a perf
+>>> backend for it.
+>>>
+>>> Document the device tree binding to describe the CCI PMU.
+>>>
+>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Cc: Nicolas Pitre <nico@linaro.org>
+>>> Cc: Dave Martin <dave.martin@linaro.org>
+>>> Cc: Rob Herring <rob.herring@calxeda.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>>> Reviewed-by: Will Deacon <will.deacon@arm.com>
+>>> ---
+>>> Documentation/devicetree/bindings/arm/cci.txt |   38 ++
+>>> drivers/bus/arm-cci.c                         |  642 +++++++++++++++++++++++++
+>>> 2 files changed, 680 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
+>>> index 92d36e2..5bc95e5 100644
+>>> --- a/Documentation/devicetree/bindings/arm/cci.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/cci.txt
+>
+> [snip]
+>
+>>> +
+>>> +		- interrupts:
+>>> +			Usage: required
+>>> +			Value type: <prop-encoded-array>
+>>> +			Definition: comma-separated list of unique PMU
+>>> +				    interrupts
+>>
+>> What is the list of interrupts related to, should there be an associated interrupts-names
+>
+> No, interrupt-names is optional, but you are correct that what function
+> each interrupt is for must be defined.
+>
 
-Cheers
----Dave
+I'll update the bindings documentation to describe the function of 
+interrupts.
 
-> 
-> > Anyway, if useful:
-> > 
-> > Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-> 
-> Thanks.
-> 
-> 
-> Nicolas
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks for the comments.
+
+Punit
+
+> Rob
+>
+>
+>
+>
+>
