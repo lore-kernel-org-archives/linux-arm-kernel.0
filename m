@@ -1,49 +1,48 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 15 Aug 2013 09:21:53 -0600
-Subject: [RFC 3/3] PCI: tegra: Support driver unbinding
-In-Reply-To: <20130815103452.GA13740@ulmo>
-References: <1376392346-14127-1-git-send-email-treding@nvidia.com>
- <1376392346-14127-4-git-send-email-treding@nvidia.com>
- <520BFA0C.5070001@wwwdotorg.org> <20130815103452.GA13740@ulmo>
-Message-ID: <520CF211.6060003@wwwdotorg.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 15 Aug 2013 17:22:14 +0200
+Subject: [PATCH 00/20] ARM: pxa: move core and drivers to dmaengine
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <87zjsqzdg8.fsf@free.fr> <52061C53.4050905@gmail.com>
+ <20130814100010.GO32147@intel.com>
+Message-ID: <8761v7nfmh.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2013 04:34 AM, Thierry Reding wrote:
-> On Wed, Aug 14, 2013 at 03:43:40PM -0600, Stephen Warren wrote:
->> On 08/13/2013 05:12 AM, Thierry Reding wrote:
->>> Implement the platform driver's .remove() callback to free all
->>> resources allocated during driver setup and call
->>> pci_common_exit() to cleanup ARM specific datastructures. Unmap
->>> the fixed PCI I/O mapping by calling the new pci_iounmap_io()
->>> function in the new .teardown() callback.
->>> 
->>> Finally, no longer set the .suppress_bind_attrs field to true
->>> to allow the driver to unbind from a device.
->> 
->>> +static int tegra_pcie_remove(struct platform_device *pdev) +{ 
->>> +	struct tegra_pcie *pcie = platform_get_drvdata(pdev); +
->>> struct tegra_pcie_bus *bus, *tmp; +	int err; + +
->>> pci_common_exit(&pcie->sys); + +	list_for_each_entry_safe(bus,
->>> tmp, &pcie->busses, list) { +		vunmap(bus->area->addr); +
->>> kfree(bus); +	} + +	if (IS_ENABLED(CONFIG_PCI_MSI)) { +		err =
->>> tegra_pcie_disable_msi(pcie); +		if (err < 0) +			return err; +
->>> }
->> 
->> Wouldn't it make sense to do that as early as possible in the
->> function, to make sure that no MSI accidentally fires after some
->> of the cleanup has already happened?
-> 
-> I don't think that's strictly necessary in this case. After the
-> call to pci_common_exit() there are no PCI devices left, there's
-> not even a bus left. All MSI users should have cleaned up after
-> themselves.
-> 
-> Given that I thought it more useful to mirror the setup done in
-> .probe() to make it clearer what's being undone (and potentially
-> what's missing).
+Vinod Koul <vinod.koul@intel.com> writes:
+>> Yes, Vinod and and Dan are certainly the best ones to comment on that I
+>> think.
+> I read the file esp the "DMA flow" and "DMA hot chaining timeslice issue". I can
+> say with "properly" implemented dmaengine driver this is very much doable.
+Great.
+>
+>
+> Have you guys read: Documentation/dmaengine.txt?
+Yes. I had not understood the "hot chaining" was implied in it, but now I
+understand it is part of it, and at the discretion of the slave engine driver.
 
-That makes sense SW-wise, but what about mis-behaving HW that triggers
-an MSI even when it's been told not to? I assume that
-tegra_pcie_disable_msi() unrequests the IRQ, hence solves that
-problem, if done early enough.
+> So for "hot chaning" it would work as follows:
+>
+> Client, allocates and channel and prepares the descriptors A B & C
+> Client (video), submits buffer A, Buffer B. Both are queued by dma driver
+> Client calls dma_async_issue_pending
+> DMA driver will start Buffer A. It gets the completetion for A and then Starts
+> B. It will invoke callbakc for A.
+>
+> If you submit C, and invoke dma_async_issue_pending(), C is queued
+> On B completetion, the DMA driver will start C and invoke callback for B.
+>
+> If B completes before C is submitted, after submit and invoking
+> dma_async_issue_pending(), the C buffer will be queued and started.
+OK, that settles it then. The API allows hot chaining, and if I understand
+Daniel's driver properly, he already thought about it (in
+append_pending_queue()).
+
+I have some homework now Daniel, I'll send you my work to include into your
+patch serie for the review, and my tests of your patches.
+
+I need a bit of time (1 or 2 weeks), because of holidays, for my patch.
+
+Cheers.
+
+-- 
+Robert
