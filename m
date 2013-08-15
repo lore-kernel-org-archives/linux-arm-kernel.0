@@ -1,143 +1,106 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Aug 2013 09:31:28 +0100
-Subject: [PATCH] ARM64: KVM: Fix =?UTF-8?Q?coherent=5Ficache=5Fguest?=
- =?UTF-8?Q?=5Fpage=28=29=20for=20host=20with=20external=20L=33-cache=2E?=
-In-Reply-To: <CAAhSdy3-+tJ34QQgieifo931pfGoYt3RAqr8OkVtkxO6jgGdHQ@mail.gmail.com>
-References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
- <f8917fe8409b1fae634c7de45e34d4a7@www.loen.fr>
- <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
- <da83e967f5a266ca28ee54638a4a9be9@www.loen.fr>
- <CAAhSdy3-+tJ34QQgieifo931pfGoYt3RAqr8OkVtkxO6jgGdHQ@mail.gmail.com>
-Message-ID: <3ebe469fcf451cc7396dd2a5d3f01272@www.loen.fr>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 15 Aug 2013 16:36:04 +0800
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Trustzone-based security
+ solution for ARM Linux
+In-Reply-To: <CABb+yY3CoL2i2FOXUthbv4isUYLV-cOSbHi2wwUz9KwXVNYhyA@mail.gmail.com>
+References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
+ <20130815042812.GA8968@kroah.com>
+ <CABb+yY1YKGkAeb-8GbadUoV5g54iCdrYGnD_VSpaNmtfXXhpyA@mail.gmail.com>
+ <CAGsJ_4yZ7Rf7UV-1u3cG_V9mrtCWD=LYBeuKQaz0SWLYoHhwwg@mail.gmail.com>
+ <CABb+yY3CoL2i2FOXUthbv4isUYLV-cOSbHi2wwUz9KwXVNYhyA@mail.gmail.com>
+Message-ID: <CAGsJ_4zGpOV3AJHX+=v0wGB_Vrc3em0ArjUDFvH7J1EOnxh1UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-08-15 07:26, Anup Patel wrote:
-> Hi Marc,
->
-> On Thu, Aug 15, 2013 at 10:22 AM, Marc Zyngier <marc.zyngier@arm.com> 
-> wrote:
->> Hi Anup,
->>
->>
->> On 2013-08-14 15:22, Anup Patel wrote:
->>>
->>> On Wed, Aug 14, 2013 at 5:34 PM, Marc Zyngier 
->>> <marc.zyngier@arm.com>
->>> wrote:
->>>>
->>>> Hi Pranav,
->>>>
->>>> On 2013-08-14 12:47, Pranavkumar Sawargaonkar wrote:
+2013/8/15 Jassi Brar <jassisinghbrar@gmail.com>:
+> On Thu, Aug 15, 2013 at 1:15 PM, Barry Song <21cnbao@gmail.com> wrote:
+>> 2013/8/15 Jassi Brar <jassisinghbrar@gmail.com>:
+>>> On Thu, Aug 15, 2013 at 9:58 AM, Greg KH <greg@kroah.com> wrote:
+>>>> On Thu, Aug 15, 2013 at 11:44:30AM +0800, Barry Song wrote:
+>>>>> For the moment, there is strong markting requirement from
+>>>>> IVI(In-Vehicle Infotainment) or mobile to use ARM Trustzone. We take
+>>>>> IVI as an example, Auto requires security enviorment to access CAN bus
+>>>>> and other car busses. Auto requires security enviorment to show
+>>>>> rearview/surround view from cameras and play alert audio. on the other
+>>>>> hand, IVI system is generically working as a video streaming sink and
+>>>>> HDMI sink instead of a source. To support HDCP and widevine, we need
+>>>>> to make sure private keys and video buffers are only visible to
+>>>>> security mode. With CAN stack, video playback backend and more tasks,
+>>>>> generically it requires a multi-task RTOS running in security mode
+>>>>> parallel with Linux in non-security mode.
 >>>>>
->>>>> Systems with large external L3-cache (few MBs), might have dirty
->>>>> content belonging to the guest page in L3-cache. To tackle this,
->>>>> we need to flush such dirty content from d-cache so that guest
->>>>> will see correct contents of guest page when guest MMU is 
->>>>> disabled.
->>>>>
->>>>> The patch fixes coherent_icache_guest_page() for external 
->>>>> L3-cache.
->>>>>
->>>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>>>> ---
->>>>>  arch/arm64/include/asm/kvm_mmu.h |    2 ++
->>>>>  1 file changed, 2 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm64/include/asm/kvm_mmu.h
->>>>> b/arch/arm64/include/asm/kvm_mmu.h
->>>>> index efe609c..5129038 100644
->>>>> --- a/arch/arm64/include/asm/kvm_mmu.h
->>>>> +++ b/arch/arm64/include/asm/kvm_mmu.h
->>>>> @@ -123,6 +123,8 @@ static inline void
->>>>> coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
->>>>>       if (!icache_is_aliasing()) {            /* PIPT */
->>>>>               unsigned long hva = gfn_to_hva(kvm, gfn);
->>>>>               flush_icache_range(hva, hva + PAGE_SIZE);
->>>>> +             /* Flush d-cache for systems with external caches. 
->>>>> */
->>>>> +             __flush_dcache_area((void *) hva, PAGE_SIZE);
->>>>>       } else if (!icache_is_aivivt()) {       /* non ASID-tagged 
->>>>> VIVT */
->>>>>               /* any kind of VIPT cache */
->>>>>               __flush_icache_all();
+>>>>> Linux is a generic purpose OS with UI and all kinds of software, but
+>>>>> we need to make sure even the Linux is ROOTed, RTOS in security mode
+>>>>> is still active. We are able to find some opensource projects like
+>>>>> SafeG[1], Multivisor[2], SierraVisor[3], but it turns out that ARM
+>>>>> Linux has no rich support for this kind of architecture:
+>>>>> 1. hypervisor running in monitor mode
+>>>>> 2. RTOS running in security mode
+>>>>> 3. Linux running in non-security mode
 >>>>
+>>>> "Linux" is just a kernel, not a whole operating system :)
 >>>>
->>>> [adding Will to the discussion as we talked about this in the 
->>>> past]
->>>>
->>>> That's definitely an issue, but I'm not sure the fix is to hit the 
->>>> data
->>>> cache on each page mapping. It looks overkill.
->>>>
->>>> Wouldn't it be enough to let userspace do the cache cleaning? 
->>>> kvmtools
->>>> knows which bits of the guest memory have been touched, and can do 
->>>> a "DC
->>>> DVAC" on this region.
->>>
->>>
->>> It seems a bit unnatural to have cache cleaning is user-space. I am 
->>> sure
->>> other architectures don't have such cache cleaning in user-space 
->>> for KVM.
->>>
->>>>
->>>> The alternative is do it in the kernel before running any vcpu - 
->>>> but
->>>> that's not very nice either (have to clean the whole of the guest
->>>> memory, which makes a full dcache clean more appealing).
->>>
->>>
->>> Actually, cleaning full d-cache by set/way upon first run of VCPU 
->>> was
->>> our second option but current approach seemed very simple hence
->>> we went for this.
->>>
->>> If more people vote for full d-cache clean upon first run of VCPU 
->>> then
->>> we should revise this patch.
+>>>> Anyway, why can't Linux be the RTOS kernel as well?  What are the
+>>>> requirements for that kernel that Linux does not currently meet?
 >>
+>> we will run rtos+linux instead of linux+linux. typically, Auto
+>> industry has long history to use rtos. on the other hand, we need to
+>> boot the rtos very fast in hundreds of milliseconds to make sure
+>> rearview, early audio have been ready.
 >>
->> Can you please give the attached patch a spin on your HW? I've 
->> boot-tested
->> it on a model, but of course I can't really verify that it fixes 
->> your issue.
+> Why do you think optimized linux can't boot up in "hundereds of millisecs"?
+
+yes. i think linux can boot up in "hundereds of millisecs" if we do
+decrease the drivers, refine our drivers and don't mount a big
+filesystem running on slow storage.
+but just like linux has a strong eco-system, auto has strong auto
+eco-system. even we put linux+linux, our customers will replace the
+backend linux by its own rtos.
+
+>
+>>>>
+>>> Yes, in fact at least during development Linux usually runs in Secure mode.
+>>> Ideally I would love to see 2 instances of Linux running - one inrs
+>>> NonSecure mode and another in Secure mode, getting capabilities via 2
+>>> corresponding DTBs reflecting the h/w partitioning done by the TZ.
 >>
->> As far as I can see, it should fix it without any additional 
->> flushing.
+>> not real. i think there are similar users in linux already. at least
+>> omap and exynos have some chip specific codes like omap-smc.S,
+>> sleep34xx.S, exynos-smc.S and so on.
 >>
->> Please let me know how it goes.
+> ... and there are socs that has TZ but don't implement SMC (yet).
 >
-> HCR_EL2.DC=1 means all memory access for Stage1 MMU off are
-> treated as "Normal Non-shareable, Inner Write-Back Write-Allocate,
-> Outer Write-Back Write-Allocate memory"
->
-> HCR_EL2.DC=0 means all memory access for Stage1 MMU off are
-> treated as "Strongly-ordered device memory"
->
-> Now if Guest/VM access hardware MMIO devices directly (such as
-> VGIC CPU interface) with MMU off then MMIO devices will be
-> accessed as normal memory when HCR_EL2.DC=1.
+yes. that is because they don't need.
+markting input for automotive industry requires TZ. without it, we
+still need other replacement like NoC firewall. TZ turns out to the
+best one integrated well in ARM SoC.
 
-I don't think so. Stage-2 still applies, and should force MMIO to be 
-accessed as device memory.
 
-> The HCR_EL2.DC=1 makes sense only if we have all software
-> emulated devices for Guest/VM which is not true for KVM ARM or
-> KVM ARM64 because we use VGIC.
->
-> IMHO, this patch enforces incorrect memory attribute for Guest/VM
-> when Stage1 MMU is off.
+>> and i have explained why we don't use linux+linux.
+>>
+>>>
+>>>>
+>>>>> 3. as some CPU time is stolen by security mode, so the scheduler need
+>>>>> to get this for load balance
+>>>>
+>>>> Does the kernel know this time is gone?  Or is it not aware of it (like
+>>>> MSIs on x86?)
+>>>>
+>>> The TrustedOS could share time on the same cpu as the UnTrustedOS or
+>>> be assigned a dedicated cpu on an MP.
+>>
+>> no. TrustedOS will not hold a whole CPU and we don't put a whole core
+>> to RTOS as it has low CPU loading.
+>>
+>  If by "we" you mean you and your device, I can understand. Otherwise
+> please have a look at some TZ whitepaper. It is possible to run in AMP
+> mode where SecureOS has dedicated cpu core(s).
 
-See above. My understanding is that HCR.DC controls the default output 
-of Stage-1, and Stage-2 overrides still apply.
+yes. i do agree. i saw xilinx zynq has a mode, "CPU0 with freertos
++CPU1 with linux". but i talked with xilinx guys, even some xilinx
+guys think it is not flexible enough.
 
-> Nevertheless, we will still try your patch.
+anyway, this arch is not ok to me and my devices. this is a waster of
+cpu resource.
 
-Thanks.
-
-         M.
--- 
-Fast, cheap, reliable. Pick two.
+-barry
