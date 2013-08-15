@@ -1,45 +1,57 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 15 Aug 2013 20:20:26 +0200
-Subject: [PATCH v2] ARM: ARMv7-M: implement restart routine common to all
- v7-M machines
-In-Reply-To: <520CF8B1.20609@arm.com>
-References: <1376581536-14742-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <520CF8B1.20609@arm.com>
-Message-ID: <20130815182026.GI30496@pengutronix.de>
+From: greg@kroah.com (Greg KH)
+Date: Thu, 15 Aug 2013 11:26:00 -0700
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Trustzone-based security
+ solution for ARM Linux
+In-Reply-To: <CAKv+Gu8_65EkDkn6-W1NKZSs9P8KOxfFNzFNXq0Eqm5dMYGxwQ@mail.gmail.com>
+References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
+ <20130815042812.GA8968@kroah.com>
+ <CABb+yY1YKGkAeb-8GbadUoV5g54iCdrYGnD_VSpaNmtfXXhpyA@mail.gmail.com>
+ <CAGsJ_4yZ7Rf7UV-1u3cG_V9mrtCWD=LYBeuKQaz0SWLYoHhwwg@mail.gmail.com>
+ <20130815080532.GB7080@kroah.com>
+ <CAKv+Gu9mOxoTsK5g-GX2Khvu0FSUBZRCL0Jw6F6vrMG=fNfy1Q@mail.gmail.com>
+ <20130815155652.GB14792@kroah.com>
+ <CAKv+Gu8_65EkDkn6-W1NKZSs9P8KOxfFNzFNXq0Eqm5dMYGxwQ@mail.gmail.com>
+Message-ID: <20130815182600.GA22567@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
-
-On Thu, Aug 15, 2013 at 04:50:09PM +0100, Jonathan Austin wrote:
-> On 15/08/13 16:45, Uwe Kleine-K?nig wrote:
-> >The newly introduced function is to be used as .restart callback for
-> >ARMv7-M machines. The used register is architecturally defined, so it
-> >should work for all M-class machines.
-> >
-> >Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> >---
-> >
-> >Changes since v1, sent with Message-Id:
-> >1376494625-25496-1-git-send-email-u.kleine-koenig at pengutronix.de:
-> >
-> >  - add a more verbose change log
-> >  - rename arch/arm/kernel/common-v7m.c to arch/arm/kernel/v7m.c
+On Thu, Aug 15, 2013 at 07:41:46PM +0200, Ard Biesheuvel wrote:
+> > I'm not pretending they are the same thing, but I am wanting to know how
+> > Linux doesn't work for either of those requirements, as I want to see
+> > Linux be the solution for this "trusted" kernel as well.
 > >
 > 
-> Thanks Uwe, this looks good now - assuming Russell's happy with
-> arch/arm/kernel/v7m.c :)
-I'd like to get this patch, the efm32-clk patch (Message-Id:
-1376510693-12491-1-git-send-email-u.kleine-koenig at pengutronix.de) and
-the patch introducing the efm32 platform (Message-Id:
-1376552964-16296-1-git-send-email-u.kleine-koenig at pengutronix.de) merged
-for 3.12. So assuming you are OK with this change I'd like to let the
-arm-soc people pull the three patches from a single branch. For that I'd
-like to have you ack.
+> For the former case, there is the assumption (or misconception) that
+> Linux cannot deliver the boot speed or bounded worst case response
+> time requirements imposed by things like software defined radio.
 
-Best regards
-Uwe
+So, what can we do to address this?  Technically I think Linux can
+handle this just fine, as others have pointed out it is used in these
+situations.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Also, there is the existing codebase of RTOS hosted CAN stacks etc,
+> that have been certified by the [automotive] customer and are moved
+> from a dedicated MCU into the application CPU as a cost saving
+> measure. This means that even if Linux does fit the bill in principle,
+> many will still have no choice other than to go with non-Linux.
+
+That's their decision, which is fine.  Getting the Linux CAN stack
+"certified" might be a good goal for a manufacturer who wants to ship
+Linux for this type of system, although we all know how much those
+things really matter when it comes to technical issues :)
+
+> For the latter case, it depends on the compatibility of Linux with the
+> restricted secure world environment, most notably the secure memory.
+> 256k of on chip SRAM is sufficient to do plenty of interesting things
+> in the secure world, but sadly, running Linux is not one of them. (I
+> know PoP DDR is considered to be secure memory by some vendors as
+> well, but its application is not as widespread in the automotive
+> world)
+
+Ah, yeah, 256K of ram might be tough to slim Linux down to, but system
+sizes keep increasing, so those limitations might be resolved soon
+without us having to do anything...
+
+thanks,
+
+greg k-h
