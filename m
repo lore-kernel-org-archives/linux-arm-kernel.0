@@ -1,44 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Aug 2013 22:11:47 +0200
-Subject: [PATCH 5/5] pinctrl: imx: Use struct type for pins
-In-Reply-To: <20130815050842.GF26614@pengutronix.de>
-References: <1376050854-3303-1-git-send-email-s.hauer@pengutronix.de>
- <1376050854-3303-6-git-send-email-s.hauer@pengutronix.de>
- <CACRpkdZk4jz3dg6aoZqsMT5VXJUQxwrZOyAVLCU3UsExAXChAA@mail.gmail.com>
- <20130815050842.GF26614@pengutronix.de>
-Message-ID: <CACRpkdZ6Ba=54cc036G34NJdpEhCXiCQpFnKi_eZFXumQSkeog@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 15 Aug 2013 16:26:53 -0400
+Subject: [PATCH 1/3] misc: Add crossbar driver
+In-Reply-To: <CACRpkda+m82PYJsExLM6JLsLa8-bVhdvy_r_+-uKfVT2NG7Cbg@mail.gmail.com>
+References: <51E83A4F.5080904@ti.com>
+ <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
+ <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com> <51EFFBE1.4090505@ti.com>
+ <51F0031B.1050307@ti.com> <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
+ <51F0223E.4050008@ti.com> <51F0240F.3050507@ti.com>
+ <20130813081003.GU7656@atomide.com> <520A02BA.4090805@ti.com>
+ <CACRpkda+m82PYJsExLM6JLsLa8-bVhdvy_r_+-uKfVT2NG7Cbg@mail.gmail.com>
+Message-ID: <520D398D.9040806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 7:08 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Wed, Aug 14, 2013 at 10:41:20PM +0200, Linus Walleij wrote:
->> On Fri, Aug 9, 2013 at 2:20 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->>
->> > The i.MX pinctrl driver uses 5 different arrays for storing the
->> > informations for pins. This requires five allocations. Instead,
->> > use a struct type which is more cache friendly, readable and
->> > requires less allocations. One array of integers is still needed
->> > since the pinctrl framework forces us to maintain it.
->> > This also adds checks whether the allocations are succesful which
->> > were missing.
->> >
->> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->>
->> Hm appears to be dependent on 4/5 so can't apply this one
->> in isolation ... but it looks good.
->>
->> Would be nice to have a handshake from Shawn and/or Dong
->> on these patches BTW.
+On Thursday 15 August 2013 04:01 PM, Linus Walleij wrote:
+> On Tue, Aug 13, 2013 at 11:56 AM, Sricharan R <r.sricharan@ti.com> wrote:
+> 
+>>  Initially irqchip was discussed, but we also have a DMA crossbar
+>>  to map the dma-requests. Since both irq/dma crossbars should be handled,
+>>  pinctrl was suggested as the appropriate place to handle this.
+> 
+> I think it is better to use irqchip.
 >
-> What do you mean with handshake? Shawn acked the series.
+Did you happen to read the thread why irqchip is in-appropriate
+for such an IP. As I said earlier, an IRQ-chip always need a
+real IRQ link (even for the chained one) to the primary irqchip.
 
-Oh he did? I just haven't seen that message ... I have to look
-around.
+This IP is just dummy IP makes the connections for the primary
+irqchip(read GIC). And its use only limited to make the
+connection between the peripheral IRQ event to the GIC IRQ line.
 
-But hm, 5/5 still does not apply cleanly after applying 4/5,
-I guess I have some alien patch in the pinctrl tree that you
-don't have, can you try to create a rebased version of this
-one patch on to of my "devel" branch?
+I don't see how you can make this happen with an irqchip
+infrastructure.
 
-Yours,
-Linus Walleij
+If you have a idea to make that work, we can go with that
+since for time being we can ignore the DMA event related need
+of this IP.
+ 
+> For DMA there is already an arbiter mechanism for arbitration of
+> virtual channels over physical channels, this is not much different,
+> the DMA might need some different tweaking but should be solved
+> in that subsystem I think.
+>
+Sure. The IP won't be limited to DMA and IRQ lines but any other events
+like gpio etc in future.
+ 
+> I don't see any way to really abstract this pretty simple crossbar
+> for reuse across subsystems.
+> 
+This exactly the reason, i am against idea of over-engineering the
+simple IP whose only job is to make the physical wire connection
+in software where as this is generally done in RTL by default on
+most of the SOCs.
+
+Regards,
+Santosh
