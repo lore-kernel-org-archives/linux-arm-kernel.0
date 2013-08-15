@@ -1,37 +1,25 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Aug 2013 13:59:06 +0100
-Subject: [PATCH v8 0/2] TWL6030, TWL6032 GPADC driver
-In-Reply-To: <520CB566.2050201@kernel.org>
-References: <1374758813-6539-1-git-send-email-oleksandr.kozaruk@ti.com>
- <20130815091216.GB28366@e106331-lin.cambridge.arm.com>
- <520CB566.2050201@kernel.org>
-Message-ID: <20130815125906.GA32421@e106331-lin.cambridge.arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 15 Aug 2013 15:12:26 +0200
+Subject: [PATCH v10] i2c: exynos5: add High Speed I2C controller driver
+In-Reply-To: <3925484.kHD24rQYyy@amdc1227>
+References: <1354021236-28596-2-git-send-email-ch.naveen@samsung.com>
+ <1371638905-30633-1-git-send-email-ch.naveen@samsung.com>
+ <3925484.kHD24rQYyy@amdc1227>
+Message-ID: <20130815131226.GI17155@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 12:03:02PM +0100, Jonathan Cameron wrote:
+On Mon, Jul 01, 2013 at 12:25:19PM +0200, Tomasz Figa wrote:
+> Hi Naveen,
 > 
-> >> The changes to the original driver:
-> >> - device tree adaptation;
-> > 
-> > I couldn't see a binding document in this series or in mainline. Have I
-> > looked in the wrong places?
-> 
-> Nothing explicit supplied, but does it need one given it is doing only
-> iio bindings (bindings/iio/iio-bindings.txt)
-> plus twl child bindings
-> (bindings/mfd/twl-family.txt)
+> Looks mostly good, but see some comments inline.
 
-Every binding needs to be documented.
+Ping?
 
-> 
-> If it does, I guess absolutely everything does, then fair enough!
-> I guess that would make sense as there is no way for someone writing
-> a device tree to know that there is nothing else to be specified.
-
-Yup, that's why. Also, Linux isn't necessarily the only consumer, and
-other consumers shouldn't need to read Linux code to figure out how a
-particular binding is supposed to look.
-
-Cheers,
-Mark.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130815/56ba78df/attachment.sig>
