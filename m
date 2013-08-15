@@ -1,41 +1,70 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 15 Aug 2013 23:31:58 +0400
-Subject: [PATCH v4 5/5] ARM: davinci: da850: add OF_DEV_AUXDATA entry
- for eth0.
-In-Reply-To: <1376546497-26931-6-git-send-email-prabhakar.csengg@gmail.com>
-References: <1376546497-26931-1-git-send-email-prabhakar.csengg@gmail.com>
- <1376546497-26931-6-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <520D2CAE.3090501@cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Aug 2013 21:43:29 +0200
+Subject: [PATCH] pinctrl: add includes and ifdefs for non-DT builds
+Message-ID: <1376595809-7053-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Commit e81c8f18afc4fdd6e34d8c83814b8b5134dbb30f
+"pinctrl: pinconf-generic: add generic APIs for mapping pinctrl node"
+Added function prototypes with implicit dependencies
+on other header files causing build warnings like this:
 
-On 15-08-2013 10:01, Lad, Prabhakar wrote:
+In file included from
+arch/arm/mach-ux500/board-mop500-pins.c:12:0:
+include/linux/pinctrl/pinconf-generic.h:142:3:
+warning: 'struct device_node' declared inside parameter list [enabled
+by default]
+   unsigned *reserved_maps, unsigned *num_maps);
+   ^
+include/linux/pinctrl/pinconf-generic.h:142:3:
+warning: its scope is only this definition or declaration, which is
+probably not what you want [enabled by default]
+include/linux/pinctrl/pinconf-generic.h:142:3:
+warning: 'struct pinctrl_dev' declared inside parameter list [enabled
+by default]
+include/linux/pinctrl/pinconf-generic.h:145:3:
+warning: 'struct device_node' declared inside parameter list [enabled
+by default]
+   unsigned *num_maps);
+   ^
+Let's just add ifdefs for non-DT systems (the actual code is
+already ifdefed) and #include <linux/device.h> to get the
+most important structs and forward-declare the pinctrl
+core structs.
 
-> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+Reported-by: Olof Johansson <olof@lixom.net>
+Cc: Laxman Dewangan <ldewangan@nvidia.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ include/linux/pinctrl/pinconf-generic.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-> Add OF_DEV_AUXDATA for eth0  driver in da850 board dt
-> file to use emac clock.
-
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-[...]
-
-> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-> index d172563..caa9202 100644
-> --- a/arch/arm/mach-davinci/da8xx-dt.c
-> +++ b/arch/arm/mach-davinci/da8xx-dt.c
-> @@ -44,6 +44,9 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
->   	OF_DEV_AUXDATA("ns16550a", 0x01d0c000, "serial8250.1", NULL),
->   	OF_DEV_AUXDATA("ns16550a", 0x01d0d000, "serial8250.2", NULL),
->   	OF_DEV_AUXDATA("ti,davinci_mdio", 0x01e24000, "davinci_mdio.0", NULL),
-> +	OF_DEV_AUXDATA("ti,davinci-dm6467-emac", 0x01e20000, "davinci_emac.1",
-> +		       NULL),
-> +
-
-    Empty line hardly needed here.
-
->   	{}
->   };
-
-WBR, Sergei
+diff --git a/include/linux/pinctrl/pinconf-generic.h b/include/linux/pinctrl/pinconf-generic.h
+index a472b93..83f5179 100644
+--- a/include/linux/pinctrl/pinconf-generic.h
++++ b/include/linux/pinctrl/pinconf-generic.h
+@@ -137,12 +137,21 @@ static inline unsigned long pinconf_to_config_packed(enum pin_config_param param
+ 	return PIN_CONF_PACKED(param, argument);
+ }
+ 
++#ifdef CONFIG_OF
++
++#include <linux/device.h>
++struct pinctrl_dev;
++struct pinctrl_map;
++
+ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+ 		struct device_node *np, struct pinctrl_map **map,
+ 		unsigned *reserved_maps, unsigned *num_maps);
+ int pinconf_generic_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 		struct device_node *np_config, struct pinctrl_map **map,
+ 		unsigned *num_maps);
++
++#endif
++
+ #endif /* CONFIG_GENERIC_PINCONF */
+ 
+ #endif /* __LINUX_PINCTRL_PINCONF_GENERIC_H */
+-- 
+1.8.1.4
