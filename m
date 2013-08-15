@@ -1,54 +1,53 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 15 Aug 2013 15:43:14 +0200
-Subject: [PATCH 2/5] ASoC: pxa: pxa-ssp: add DT bindings
-In-Reply-To: <20130815133925.GA30073@sirena.org.uk>
-References: <1376296961-20564-1-git-send-email-zonque@gmail.com>
- <1376296961-20564-3-git-send-email-zonque@gmail.com>
- <20130815103358.GY2401@sirena.org.uk> <520CB2B3.9050804@gmail.com>
- <20130815133925.GA30073@sirena.org.uk>
-Message-ID: <520CDAF2.7010101@gmail.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Thu, 15 Aug 2013 14:51:15 +0100
+Subject: [PATCH Resend 1/3] PSCI: add missing dependency on CONFIG_OF
+ for PSCI.
+In-Reply-To: <520BE088.5060109@cogentembedded.com>
+References: <1376500987-12797-1-git-send-email-jonathan.austin@arm.com>
+ <1376500987-12797-2-git-send-email-jonathan.austin@arm.com>
+ <520BE088.5060109@cogentembedded.com>
+Message-ID: <520CDCD3.8010505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.08.2013 15:39, Mark Brown wrote:
-> On Thu, Aug 15, 2013 at 12:51:31PM +0200, Daniel Mack wrote:
-> 
->> Hmm, and you don't like the approach either of having upstream ports and
->> assign users to it via phandles?
-> 
-> I don't know what that means, sorry.
+Hi Sergei,
 
-Well, we have the 'real' devices registered in DT like this:
+On 14/08/13 20:54, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 08/14/2013 09:23 PM, Jonathan Austin wrote:
+>
+>> The PSCI initialisation depends on data found in the DT. Without this the
+>> including PSCI support makes little sense, and furthermore the of_* stub
+>> functions aren't broad enough to ensure that this builds without CONFIG_OF.
+>
+>> As there is little enthusiasm for extending these stubs without useful use-cases
+>> (of which this is *not* an example) this patch prevents building of PSCI
+>> without CONFIG_OF.
+>
+>> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+>> ---
+>>    arch/arm/Kconfig |    1 +
+>>    1 file changed, 1 insertion(+)
+>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index ba412e0..972ec25 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -1577,6 +1577,7 @@ config HOTPLUG_CPU
+>>    config ARM_PSCI
+>>    	bool "Support for the ARM Power State Coordination Interface (PSCI)"
+>>    	depends on CPU_V7
+>> +	depends on CONFIG_OF
+>
+>      I think you meant just OF. :-)
+>
 
-        ssp0: ssp at 41000000 {
-                compatible = "mrvl,pxa3xx-ssp";
-                reg = <0x41000000 0x40>;
-                interrupts = <24>;
-                clock-names = "pxa27x-ssp.0";
-                dmas = <&dma 13
-                        &dma 14>;
-                dma-names = "rx", "tx";
-        };
+Yikes, sure did.
 
-And users, in that case, a ssp DAI, just reference a port like so:
+Thanks.
+Jonny
 
-        ssp_dai0: ssp_dai at 0 {
-                compatible = "mrvl,pxa-ssp-dai";
-                port = <&ssp0>;
-        };
-
-Is that something we can live with?
-
-
->> Also note that the last patch in that series ("ASoC: pxa: add DT
->> bindings for pxa2xx-pcm") can be omitted, as Lars pointed out. I'll have
->> to care for a proper solution at some point.
-> 
-> I applied it since we were already adding a dummy device for the DAI.  I
-> can revert it if this work without that.
-
-I'll send a cleanup patch once I have a better solution.
-
-
-
-Daniel
+> WBR, Sergei
+>
+>
