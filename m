@@ -1,28 +1,39 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 15 Aug 2013 14:00:42 -0500
-Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <520C9AEA.6030507@arm.com>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
- <2CD735CE-3FCF-4AB5-89C0-D813ECD19F11@codeaurora.org>
- <520C9AEA.6030507@arm.com>
-Message-ID: <9E753731-852D-4F04-931B-112B589D9FFB@codeaurora.org>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu, 15 Aug 2013 22:18:08 +0300
+Subject: [PATCH 0/2] ARM: OMAP: fix USB regression on Nokia boards
+In-Reply-To: <1375808776-14975-1-git-send-email-aaro.koskinen@iki.fi>
+References: <1375808776-14975-1-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20130815191808.GA3067@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On Aug 15, 2013, at 4:10 AM, Punit Agrawal wrote:
+On Tue, Aug 06, 2013 at 08:06:14PM +0300, Aaro Koskinen wrote:
+> USB subsystem changes broke the USB peripheral/gadget on N800, N810 and
+> RX-51/N900 during the merge window. We need to fix this in board files. I
+> tested all these with 3.11-rc4 + g_ether + ssh.
 
->> What is the list of interrupts related to, should there be an associated interrupts-names
->> 
+Ping?
+
+A.
+
+> Aaro Koskinen (1):
+>   ARM: OMAP: rx51: change musb mode to OTG
 > 
-> For the CCI PMU, each interrupt signal corresponds to the overflow of a performance counter.
+> Daniel Mack (1):
+>   ARM: omap2: fix musb usage for n8x0
 > 
-> Here again, I was trying to be robust in the face of differing hardware configurations - specially the scenario where multiple interrupt lines from the CCI PMU are tied together to generate a single interrupt to the CPU.
-
-Even in the case of multiple interrupt lines tied together, why wouldn't you still specify each interrupt specifier and they all just be the same and thus the interrupt appears to be shared ?
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>  arch/arm/mach-omap2/board-n8x0.c | 4 ----
+>  arch/arm/mach-omap2/board-rx51.c | 2 +-
+>  arch/arm/mach-omap2/usb-musb.c   | 5 +----
+>  3 files changed, 2 insertions(+), 9 deletions(-)
+> 
+> -- 
+> 1.8.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
