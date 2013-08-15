@@ -1,74 +1,89 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 15 Aug 2013 13:50:44 -0700
-Subject: [Qemu-devel] SCSI bus failures with qemu-arm in kernel 3.8+
-In-Reply-To: <CAFEAcA_MyJPwo6Gd_dxeWM5q5-7MYqR6-rrePusFzYaGGckWJQ@mail.gmail.com>
-References: <5207B3C3.9080508@roeck-us.net>
- <20130811220450.GY23006@n2100.arm.linux.org.uk>
- <52082EF8.10005@roeck-us.net>
- <CAFEAcA94ygwRPSsfxs3DvOcTZbdafLiEHys94FG4aXUx+A1t=A@mail.gmail.com>
- <20130813034054.GA18218@roeck-us.net>
- <CAFEAcA_-S8z6ZMr8TMPvkcTyyCSMOj1DExVsY4JDQjRXDU5WGw@mail.gmail.com>
- <20130815175428.GA18580@roeck-us.net>
- <CAFEAcA_MyJPwo6Gd_dxeWM5q5-7MYqR6-rrePusFzYaGGckWJQ@mail.gmail.com>
-Message-ID: <20130815205044.GA21599@roeck-us.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 15 Aug 2013 15:51:39 -0500
+Subject: [GIT PULL] Highbank fixes for 3.12
+In-Reply-To: <87txirm1zv.fsf@kernel.org>
+References: <520AF2ED.9030900@gmail.com> <87li4445tj.fsf@kernel.org>
+ <CAL_Jsq+4hpsCM5aNt60+Oe5=Mt1SWrAwskahS+JbXYuHRRcMuw@mail.gmail.com>
+ <877gfom4ib.fsf@kernel.org> <87txirm1zv.fsf@kernel.org>
+Message-ID: <520D3F5B.60207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 07:05:22PM +0100, Peter Maydell wrote:
-> On 15 August 2013 18:54, Guenter Roeck <linux@roeck-us.net> wrote:
-> > On Thu, Aug 15, 2013 at 05:45:42PM +0100, Peter Maydell wrote:
-> >> On 13 August 2013 04:40, Guenter Roeck <linux@roeck-us.net> wrote:
-> >> > Patch tested and working with qemu 1.5.2, using the configuration file
-> >> > from the yocto project. Patch applied on top of kernel version 3.11-rc5.
-> >>
-> >> OK, I tested this on PB926+PCI backplane hardware, and it is
-> >> definitely better than current mainline, in that the test USB
-> >> card that I have no longer causes the kernel to generate this sort of
-> >> backtrace:
-> >>
-> > Do you mean my patch fixes the traceback below as a side effect ?
-> > Would be great ... it would be one more reason to get it applied.
+On 08/15/2013 10:01 AM, Kevin Hilman wrote:
+> Kevin Hilman <khilman@linaro.org> writes:
 > 
-> Yes, exactly -- the kernel currently has the wrong irq mapping,
-> which causes the traceback (ie h/w asserts irq 93 but the kernel
-> is listening on something else). That the patch fixes this confirms
-> that it is the behaviour of hardware as well as of QEMU.
+>> Rob Herring <robherring2@gmail.com> writes:
+>>
+>>> On Wed, Aug 14, 2013 at 11:04 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>>>> Hi Rob,
+>>>>
+>>>> Rob Herring <robherring2@gmail.com> writes:
+>>>>
+>>>>> Kevin, Olof,
+>>>>>
+>>>>> Please pull highbank updates for 3.12.
+>>>>>
+>>>>> There's one trivial core ARM code change in the series to allow a
+>>>>> DMA_ZONE size of 4GB. I believe this should not conflict with Russell's
+>>>>> DMA mask series.
+>>>>>
+>>>>> Rob
+>>>>>
+>>>>> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+>>>>>
+>>>>>   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+>>>>>
+>>>>> are available in the git repository at:
+>>>>>
+>>>>>   git://sources.calxeda.com/kernel/linux.git
+>>>>> tags/highbank-lpae-fixes-for-3.12
+>>>>>
+>>>>> for you to fetch changes up to ce3ec1d61c5ed6af3ceaace6f57acd588c41b4d6:
+>>>>>
+>>>>>   ARM: highbank: fix debug uart virtual address for LPAE (2013-08-13
+>>>>> 20:50:16 -0500)
+>>>>>
+>>>>> ----------------------------------------------------------------
+>>>>> A set of fixes for highbank to enable LPAE and selecting of necesssary
+>>>>> ARM errata.
+>>>>>
+>>>>> ----------------------------------------------------------------
+>>>>> Rob Herring (6):
+>>>>>       ARM: use phys_addr_t for DMA zone sizes
+>>>>>       ARM: highbank: enable DMA zone for LPAE
+>>>>>       ARM: highbank: select ARCH_HAS_HOLES_MEMORYMODEL
+>>>>>       ARM: highbank: select required errata work-arounds
+>>>>>       ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
+>>>>
+>>>> This one seems to have broken the AMBA PL08x DMA driver, and is still
+>>>> objected to by Russell, so I'll drop this one for now.
+>>>
+>>> Exynos does the same selection, but I guess it is not multi-platform
+>>> though and doesn't select ARM_AMBA.
+>>>
+>>>>>       ARM: highbank: fix debug uart virtual address for LPAE
+>>>>
+>>>> The rest look OK and I can pull them if the rest are OK without the
+>>>> objectionable one.  Let me know if that's OK, or you prefer to wait for
+>>>> resolution.
+>>>
+>>> Yes, I'm fine with dropping this one for now.
+>>
+>> OK, dropped that one and applied the rest.
 > 
-> >> However it still doesn't seem to reliably detect the USB harddisk
-> >> plugged into the card, so I think there may be further issues, possibly
-> >> some subset of those Arnd identified and fixed with this patch:
-> >> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/93397
-> >>
-> > Does it get better if you apply Arnd's patch ?
-> 
-> Arnd's patch is ancient and won't apply as is (due to intervening
-> changes and also because some of the things it fixes were fixed
-> in later patches); I'm currently trying to extract the relevant parts.
-> 
-> If you want you can confirm that I/O port PCI access is broken on
-> QEMU too -- disable CONFIG_SCSI_SYM53C8XX_MMIO so
-> the driver uses PCI IO rather than MMIO and you'll see QEMU's
-> SCSI device doesn't work any more.
-> 
-> >> so I'd like to continue testing.
-> >>
-> >> The other thing this patch should (IMHO) have is the
-> >> line in pci_versatile_setup() which tells QEMU that the
-> >> kernel really does expect hardware-like behaviour:
-> 
-> >> (Without this line QEMU will guess whether the kernel is broken
-> >> or not and will get it right most but not necessarily all of the time.)
-> >>
-> > Might make sense, but I think it should be a separate patch.
-> 
-> It needs to go in the same patch, because a kernel with the fixed
-> irq remapping must also tell QEMU it is fixed; if you split the
-> two then at the point between the two patches the kernel is
-> broken for bisection purposes.
-> 
-Thinking about it - is that really true ? My image with the patch applied
-works just fine under qemu 1.5.2, and unless I am missing something it won't
-work with qemu 1.4 anyway. So what exactly is broken ?
+> OK, with 2 of the 5 patches still having problems/objections, and the
+> one causing a new build warning, I've backed out this branch
+> from for-next.
 
-Thanks,
-Guenter
+Wow, that went well. Sorry about that.
+
+> Could you just respin a branch with the first 3 patches and the fix
+> folded in?  I know I requested the opposite on IRC, but having a new
+> pull request allows me to include your signed tag on the whole bit
+> instead of me having to manually massage the branch and merge without a
+> signed tag.
+
+Will do. I've got another patch to add and will see if I can get pl081
+issue sorted out in the next few days.
+
+Rob
