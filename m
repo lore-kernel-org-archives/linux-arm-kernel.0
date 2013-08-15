@@ -1,48 +1,75 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 15 Aug 2013 17:22:14 +0200
-Subject: [PATCH 00/20] ARM: pxa: move core and drivers to dmaengine
-References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
- <87zjsqzdg8.fsf@free.fr> <52061C53.4050905@gmail.com>
- <20130814100010.GO32147@intel.com>
-Message-ID: <8761v7nfmh.fsf@free.fr>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 15 Aug 2013 16:22:38 +0100
+Subject: [PATCH 1/2] Documentation: devicetree: arm: cpus/cpu nodes
+ bindings updates
+In-Reply-To: <520CE665.8060907@gmail.com>
+References: <1376559743-31848-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1376559743-31848-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <520CE665.8060907@gmail.com>
+Message-ID: <20130815152238.GF17839@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul <vinod.koul@intel.com> writes:
->> Yes, Vinod and and Dan are certainly the best ones to comment on that I
->> think.
-> I read the file esp the "DMA flow" and "DMA hot chaining timeslice issue". I can
-> say with "properly" implemented dmaengine driver this is very much doable.
-Great.
->
->
-> Have you guys read: Documentation/dmaengine.txt?
-Yes. I had not understood the "hot chaining" was implied in it, but now I
-understand it is part of it, and at the discretion of the slave engine driver.
+[adding Andrew, Gregory and Thomas to check the Marvell compatible names]
 
-> So for "hot chaning" it would work as follows:
->
-> Client, allocates and channel and prepares the descriptors A B & C
-> Client (video), submits buffer A, Buffer B. Both are queued by dma driver
-> Client calls dma_async_issue_pending
-> DMA driver will start Buffer A. It gets the completetion for A and then Starts
-> B. It will invoke callbakc for A.
->
-> If you submit C, and invoke dma_async_issue_pending(), C is queued
-> On B completetion, the DMA driver will start C and invoke callback for B.
->
-> If B completes before C is submitted, after submit and invoking
-> dma_async_issue_pending(), the C buffer will be queued and started.
-OK, that settles it then. The API allows hot chaining, and if I understand
-Daniel's driver properly, he already thought about it (in
-append_pending_queue()).
+On Thu, Aug 15, 2013 at 03:32:05PM +0100, Rob Herring wrote:
+> On 08/15/2013 04:42 AM, Lorenzo Pieralisi wrote:
+> > In order to extend the current cpu nodes bindings to newer CPUs
+> > inclusive of AArch64 and to update support for older ARM CPUs this
+> > patch updates device tree documentation for the cpu nodes bindings.
+> > 
+> > Main changes:
+> >     - adds 64-bit bindings
+> >     - define usage of #address-cells
+> >     - defines behaviour on pre and post v7 uniprocessor systems
+> >     - adds ARM 11MPcore specific reg property definition
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/cpus.txt | 424 ++++++++++++++++++++++---
+> >  1 file changed, 377 insertions(+), 47 deletions(-)
+> > 
+> 
+> The binding looks mostly fine to me.
+> 
+> [snip]
+> 
+> > +			    "faraday,fa526"
+> > +			    "intel,sa110"
+> > +			    "intel,sa1100"
+> > +			    "marvell,feroceon"
+> > +			    "marvell,mohawk"
+> > +			    "marvell,pj4"
+> > +			    "marvell,sheeva-v7"
+> > +			    "marvell,xsc3"
+> > +			    "marvell,xscale"
+> 
+> Better make sure the Marvell folks are happy with these. We don't need
+> another rename here. I'm too annoyed with all the renames to pay attention.
 
-I have some homework now Daniel, I'll send you my work to include into your
-patch serie for the review, and my tests of your patches.
+Ok, I will verify that, I copied maintainers in.
 
-I need a bit of time (1 or 2 weeks), because of holidays, for my patch.
+On a side note I have just noticed that last cycle some dts were merged in the
+kernel with cpu nodes that are not compliant (not picking on anyone,
+eg am4372.dtsi).
+Please prevent this from happening from now onwards, really please.
 
-Cheers.
+> > +
+> > +Example 4 (ARM Cortex-A57 64-bit system running OS in AArch64):
+> > +
+> 
+> Going back to my comments that the dtb can't be dependent on the OS,
+> these 2 examples don't make sense.
 
--- 
-Robert
+Gah, my bad sorry, I missed the examples while removing dependency on the OS
+from the bindings.
+
+> > +
+> > +Example 5 (ARM Cortex-A57 64-bit system running OS in AArch32):
+> 
+> This example should be removed.
+
+Yes, consider it done, see above.
+
+Thanks,
+Lorenzo
