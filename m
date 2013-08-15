@@ -1,5 +1,5 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 15 Aug 2013 16:22:18 +0800
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 15 Aug 2013 10:24:41 +0200
 Subject: [Ksummit-2013-discuss] [ARM ATTEND] Trustzone-based security
  solution for ARM Linux
 In-Reply-To: <20130815080532.GB7080@kroah.com>
@@ -8,41 +8,18 @@ References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
  <CABb+yY1YKGkAeb-8GbadUoV5g54iCdrYGnD_VSpaNmtfXXhpyA@mail.gmail.com>
  <CAGsJ_4yZ7Rf7UV-1u3cG_V9mrtCWD=LYBeuKQaz0SWLYoHhwwg@mail.gmail.com>
  <20130815080532.GB7080@kroah.com>
-Message-ID: <CAGsJ_4xCFVy5mXPReULzH4cY_f+mVOK-vkp2eMOyBoNz836LqA@mail.gmail.com>
+Message-ID: <CAKv+Gu9mOxoTsK5g-GX2Khvu0FSUBZRCL0Jw6F6vrMG=fNfy1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/8/15 Greg KH <greg@kroah.com>:
+On 15 August 2013 10:05, Greg KH <greg@kroah.com> wrote:
 > On Thu, Aug 15, 2013 at 03:45:13PM +0800, Barry Song wrote:
 >> 2013/8/15 Jassi Brar <jassisinghbrar@gmail.com>:
 >> > On Thu, Aug 15, 2013 at 9:58 AM, Greg KH <greg@kroah.com> wrote:
 >> >> On Thu, Aug 15, 2013 at 11:44:30AM +0800, Barry Song wrote:
->> >>> For the moment, there is strong markting requirement from
->> >>> IVI(In-Vehicle Infotainment) or mobile to use ARM Trustzone. We take
->> >>> IVI as an example, Auto requires security enviorment to access CAN bus
->> >>> and other car busses. Auto requires security enviorment to show
->> >>> rearview/surround view from cameras and play alert audio. on the other
->> >>> hand, IVI system is generically working as a video streaming sink and
->> >>> HDMI sink instead of a source. To support HDCP and widevine, we need
->> >>> to make sure private keys and video buffers are only visible to
->> >>> security mode. With CAN stack, video playback backend and more tasks,
->> >>> generically it requires a multi-task RTOS running in security mode
->> >>> parallel with Linux in non-security mode.
->> >>>
->> >>> Linux is a generic purpose OS with UI and all kinds of software, but
->> >>> we need to make sure even the Linux is ROOTed, RTOS in security mode
->> >>> is still active. We are able to find some opensource projects like
->> >>> SafeG[1], Multivisor[2], SierraVisor[3], but it turns out that ARM
->> >>> Linux has no rich support for this kind of architecture:
->> >>> 1. hypervisor running in monitor mode
->> >>> 2. RTOS running in security mode
->> >>> 3. Linux running in non-security mode
->> >>
->> >> "Linux" is just a kernel, not a whole operating system :)
->> >>
->> >> Anyway, why can't Linux be the RTOS kernel as well?  What are the
->> >> requirements for that kernel that Linux does not currently meet?
->>
+
+[...]]
+
 >> we will run rtos+linux instead of linux+linux. typically, Auto
 >> industry has long history to use rtos. on the other hand, we need to
 >> boot the rtos very fast in hundreds of milliseconds to make sure
@@ -52,30 +29,21 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > that fast, and solves the rearview/early audio issue just fine (I've
 > seen it demoed), so please don't think that Linux can't do this.
 >
-
-i think my key point is it doesn't really matter whether linux or rtos
-will work as backend, my key point is that we need one OS running in
-security mode, the other one running in non-security mode. if linux is
-good enough, linux can be the RTOS of backend.
-
-i believe linux can do early audio/rearview well as CSR has delivered
-this kind of solution already with some ugly hacking in kernel. it is
-not easy to upstream them.
-
-we have product lines for camera and auto, camera has used non-linux
-RTOS not linux for a long term, so we need to re-use codes of ISP as
-many as possible. BTW, Auto industry customers don't like putting CAN
-stack to linux as they have a long history without linux, they are
-using Auto RTOS.
-
-
 > Again, what is the requirements of this RTOS that prevent you from using
 > Linux instead in that "secure" part of the chip?  What do we need to
 > change in order to meet this need?
-
-if we have linux+linux, we need same changes in linux as well.
-
 >
+
+In my experience, there are two similar yet different use cases:
+- the desire to co-host a RTOS on the CPU next to Linux, to perform
+real-time tasks like software defined radio, fast boot times etc.
+- the desire to secure devices using TrustZone, without putting a full
+fledged kernel on the secure side due to memory constraints (note that
+in many designs, the only secure memory is the on-SoC SRAM)
+
+As the requirements are almost orthogonal, we should not pretend they
+are the same thing.
+
 >> > Yes, in fact at least during development Linux usually runs in Secure mode.
 >> > Ideally I would love to see 2 instances of Linux running - one in
 >> > NonSecure mode and another in Secure mode, getting capabilities via 2
@@ -93,10 +61,6 @@ if we have linux+linux, we need same changes in linux as well.
 > of a number of companies that will sell you Linux for that very
 > application, so you could just buy it from someone else if you don't
 > want to build it yourself :)
-
-let's just ignore the issue whether backend should be linux or another
-rtos as that doesn't change my requirement about linux :-)
-
 >
 >> >>> 3. as some CPU time is stolen by security mode, so the scheduler need
 >> >>> to get this for load balance
@@ -115,20 +79,12 @@ rtos as that doesn't change my requirement about linux :-)
 > How will it be told that it just lost an amount of time?  How is that
 > loss of time supposed to affect the scheduler?  What do you expect the
 > scheduler to do in response to this loss?
-
-i think in kvm and xen, we need to implement a callback to tell linux
-about stolen time. but now we just trap into security, we need to tell
-linux as well.
-
-stolen time will affect the "power" of the core, so affect the loading
-which is equal with loading/power. after time is stolen, power will be
-less, so with same linux loading, the core with stolen time will
-result in more actual loading as its power is lower, scheduler will
-know it and balance linux tasks.
-
 >
 > thanks,
 >
 > greg k-h
-
--barry
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
