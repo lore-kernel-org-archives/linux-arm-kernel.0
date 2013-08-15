@@ -1,86 +1,122 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 15 Aug 2013 08:01:56 -0700
-Subject: [GIT PULL] Highbank fixes for 3.12
-In-Reply-To: <877gfom4ib.fsf@kernel.org> (Kevin Hilman's message of "Wed, 14
- Aug 2013 12:55:24 -0700")
-References: <520AF2ED.9030900@gmail.com> <87li4445tj.fsf@kernel.org>
- <CAL_Jsq+4hpsCM5aNt60+Oe5=Mt1SWrAwskahS+JbXYuHRRcMuw@mail.gmail.com>
- <877gfom4ib.fsf@kernel.org>
-Message-ID: <87txirm1zv.fsf@kernel.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 15 Aug 2013 16:09:39 +0100
+Subject: [PATCH 2/3] ARM: fix BUG() detection
+In-Reply-To: <1376498563-8146-3-git-send-email-ben.dooks@codethink.co.uk>
+References: <1376498563-8146-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1376498563-8146-3-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130815150939.GC4103@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@linaro.org> writes:
+On Wed, Aug 14, 2013 at 05:42:42PM +0100, Ben Dooks wrote:
+> The detection of the instruction used by BUG() did not take into account
+> the differences in endian-ness between instruction and data. Change the
+> code to use the relevant helpers in <asm/opcodes.h> to translate the
+> endian-ness of the instructions.
+> 
+> Fixes issue reported by Dave Martin <Dave.Martin@arm.com>
 
-> Rob Herring <robherring2@gmail.com> writes:
->
->> On Wed, Aug 14, 2013 at 11:04 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>> Hi Rob,
->>>
->>> Rob Herring <robherring2@gmail.com> writes:
->>>
->>>> Kevin, Olof,
->>>>
->>>> Please pull highbank updates for 3.12.
->>>>
->>>> There's one trivial core ARM code change in the series to allow a
->>>> DMA_ZONE size of 4GB. I believe this should not conflict with Russell's
->>>> DMA mask series.
->>>>
->>>> Rob
->>>>
->>>> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
->>>>
->>>>   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   git://sources.calxeda.com/kernel/linux.git
->>>> tags/highbank-lpae-fixes-for-3.12
->>>>
->>>> for you to fetch changes up to ce3ec1d61c5ed6af3ceaace6f57acd588c41b4d6:
->>>>
->>>>   ARM: highbank: fix debug uart virtual address for LPAE (2013-08-13
->>>> 20:50:16 -0500)
->>>>
->>>> ----------------------------------------------------------------
->>>> A set of fixes for highbank to enable LPAE and selecting of necesssary
->>>> ARM errata.
->>>>
->>>> ----------------------------------------------------------------
->>>> Rob Herring (6):
->>>>       ARM: use phys_addr_t for DMA zone sizes
->>>>       ARM: highbank: enable DMA zone for LPAE
->>>>       ARM: highbank: select ARCH_HAS_HOLES_MEMORYMODEL
->>>>       ARM: highbank: select required errata work-arounds
->>>>       ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
->>>
->>> This one seems to have broken the AMBA PL08x DMA driver, and is still
->>> objected to by Russell, so I'll drop this one for now.
->>
->> Exynos does the same selection, but I guess it is not multi-platform
->> though and doesn't select ARM_AMBA.
->>
->>>>       ARM: highbank: fix debug uart virtual address for LPAE
->>>
->>> The rest look OK and I can pull them if the rest are OK without the
->>> objectionable one.  Let me know if that's OK, or you prefer to wait for
->>> resolution.
->>
->> Yes, I'm fine with dropping this one for now.
->
-> OK, dropped that one and applied the rest.
+It probably makes sense to fold this with the preceding patch.
 
-OK, with 2 of the 5 patches still having problems/objections, and the
-one causing a new build warning, I've backed out this branch
-from for-next.
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  arch/arm/include/asm/bug.h |   10 ++++++----
+>  arch/arm/kernel/traps.c    |    8 +++++---
+>  2 files changed, 11 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+> index b95da52..b274bde 100644
+> --- a/arch/arm/include/asm/bug.h
+> +++ b/arch/arm/include/asm/bug.h
+> @@ -2,6 +2,8 @@
+>  #define _ASMARM_BUG_H
+>  
+>  #include <linux/linkage.h>
+> +#include <linux/types.h>
+> +#include <asm/opcodes.h>
+>  
+>  #ifdef CONFIG_BUG
+>  
+> @@ -12,10 +14,10 @@
+>   */
+>  #ifdef CONFIG_THUMB2_KERNEL
+>  #define BUG_INSTR_VALUE 0xde02
+> -#define BUG_INSTR_TYPE ".inst.w "
+> +#define BUG_INSTR(__value) __inst_thumb16(__value)
+>  #else
+>  #define BUG_INSTR_VALUE 0xe7f001f2
+> -#define BUG_INSTR_TYPE ".inst "
+> +#define BUG_INSTR(__value) __inst_arm(__value)
+>  #endif
 
-Could you just respin a branch with the first 3 patches and the fix
-folded in?  I know I requested the opposite on IRC, but having a new
-pull request allows me to include your signed tag on the whole bit
-instead of me having to manually massage the branch and merge without a
-signed tag.
+Looks OK.  You could make things a bit less verbose by
 
-Thanks,
+	#define BUG_INSTR __inst_thumb16(BUG_INSTR_VALUE)
+#else
+...
+	#define BUG_INSTR __inst_arm(BUG_INSTR_VALUE)
 
-Kevin
+>  
+>  
+> @@ -33,7 +35,7 @@
+>  
+>  #define __BUG(__file, __line, __value)				\
+>  do {								\
+> -	asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n"	\
+> +	asm volatile("1:\t" BUG_INSTR(__value) "\n"  \
+>  		".pushsection .rodata.str, \"aMS\", %progbits, 1\n" \
+>  		"2:\t.asciz " #__file "\n" 			\
+>  		".popsection\n" 				\
+> @@ -48,7 +50,7 @@ do {								\
+>  
+>  #define __BUG(__file, __line, __value)				\
+>  do {								\
+> -	asm volatile(BUG_INSTR_TYPE #__value);			\
+> +	asm volatile(BUG_INSTR(__value) "\n");			\
+>  	unreachable();						\
+>  } while (0)
+>  #endif  /* CONFIG_DEBUG_BUGVERBOSE */
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index cb67b04..ae2d828 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -344,15 +344,17 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
+>  int is_valid_bugaddr(unsigned long pc)
+>  {
+>  #ifdef CONFIG_THUMB2_KERNEL
+> -	unsigned short bkpt;
+> +	u16 bkpt;
+> +	u16 insn = __opcode_to_mem_thumb16(BUG_INSTR_VALUE);
+>  #else
+> -	unsigned long bkpt;
+> +	u32 bkpt;
+> +	u32 insn = __opcode_to_mem_arm(BUG_INSTR_VALUE);
+>  #endif
+>  
+>  	if (probe_kernel_address((unsigned *)pc, bkpt))
+
+Hmm, the (unsigned *) actually looks weird here now I look at it.
+
+probe_kernel_address does (__force typeof(bkpt) __user *) on it anyway,
+so I guess that's harmless.  void * might make more sense, though this
+patch may not be the place to fix it.
+
+Cheers
+---Dave
+
+>  		return 0;
+>  
+> -	return bkpt == BUG_INSTR_VALUE;
+> +	return bkpt == insn;
+>  }
+>  
+>  #endif
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
