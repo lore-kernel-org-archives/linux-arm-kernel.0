@@ -1,35 +1,68 @@
 From: b18965@freescale.com (Alison Wang)
-Date: Thu, 15 Aug 2013 16:01:51 +0800
-Subject: [PATCH v3 2/5] ARM: dts: vf610-twr: Enable DCU and TCON devices
+Date: Thu, 15 Aug 2013 16:01:54 +0800
+Subject: [PATCH v3 5/5] Documentation: DT: Add DCU framebuffer driver
 In-Reply-To: <1376553714-25922-1-git-send-email-b18965@freescale.com>
 References: <1376553714-25922-1-git-send-email-b18965@freescale.com>
-Message-ID: <1376553714-25922-3-git-send-email-b18965@freescale.com>
+Message-ID: <1376553714-25922-6-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables DCU and TCON devices for Vybrid VF610 TOWER board.
+This patch adds the document for DCU framebuffer driver under
+Documentation/devicetree/bindings/fb/.
 
 Signed-off-by: Alison Wang <b18965@freescale.com>
 ---
-Changes in v3: Add panel description in devicetree.
-Changes in v2: None
+Changes in v3: Add display node description
+Changes in v2: New
 
- arch/arm/boot/dts/vf610-twr.dts | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ .../devicetree/bindings/fb/fsl-dcu-fb.txt          | 67 ++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index b3905f5..82c03fe 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -36,6 +36,34 @@
- 
- };
- 
-+&dcu0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_dcu0_1>;
+diff --git a/Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt b/Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt
+new file mode 100644
+index 0000000..d0d50dd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt
+@@ -0,0 +1,67 @@
++* Freescale Display Control Unit (DCU)
++
++Required properties:
++- compatible: Should be "fsl,vf610-dcu". Supported chips include
++  Vybrid VF610.
++- reg: Address and length of the register set for DCU.
++- interrupts: Should contain DCU interrupts.
++- clocks: From common clock binding: handle to DCU clock.
++- clock-names: From common clock binding: Shall be "dcu".
++- tcon-controller: The phandle of TCON controller.
++- display: The phandle to display node.
++
++For the DCU initialization, we read data from TCON node.
++Required properties for TCON:
++- compatible: Should be "fsl,vf610-tcon". Supported chips include
++  Vybrid VF610.
++- reg: Address and length of the register set for TCON.
++- clocks: From common clock binding: handle to TCON clock.
++- clock-names: From common clock binding: Shall be "tcon".
++
++* display node
++
++Required properties:
++- bits-per-pixel: <24> for RGB888.
++
++Required sub-node:
++- display-timings: Refer to binding doc display-timing.txt for details.
++
++Examples:
++
++dcu0: dcu at 40058000 {
++	compatible = "fsl,vf610-dcu";
++	reg = <0x40058000 0x1200>;
++	interrupts = <0 30 0x04>;
++	clocks = <&clks VF610_CLK_DCU0>;
++	clock-names = "dcu";
++	tcon-controller = <&tcon0>;
 +	display = <&display>;
-+	status = "okay";
 +
 +	display: display at 0 {
 +		bits-per-pixel = <24>;
@@ -53,19 +86,11 @@ index b3905f5..82c03fe 100644
 +	};
 +};
 +
- &fec0 {
- 	phy-mode = "rmii";
- 	pinctrl-names = "default";
-@@ -50,6 +78,10 @@
- 	status = "okay";
- };
- 
-+&tcon0 {
-+	status = "okay";
++tcon0: tcon at 4003d000 {
++	compatible = "fsl,vf610-tcon";
++	reg = <0x4003d000 0x1000>;
++	clocks = <&clks VF610_CLK_TCON0>;
++	clock-names = "tcon";
 +};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1_1>;
 -- 
 1.8.0
