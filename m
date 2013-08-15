@@ -1,89 +1,65 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 15 Aug 2013 15:51:39 -0500
-Subject: [GIT PULL] Highbank fixes for 3.12
-In-Reply-To: <87txirm1zv.fsf@kernel.org>
-References: <520AF2ED.9030900@gmail.com> <87li4445tj.fsf@kernel.org>
- <CAL_Jsq+4hpsCM5aNt60+Oe5=Mt1SWrAwskahS+JbXYuHRRcMuw@mail.gmail.com>
- <877gfom4ib.fsf@kernel.org> <87txirm1zv.fsf@kernel.org>
-Message-ID: <520D3F5B.60207@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Aug 2013 22:51:50 +0200
+Subject: [PATCH 1/3] misc: Add crossbar driver
+In-Reply-To: <520D398D.9040806@ti.com>
+References: <51E83A4F.5080904@ti.com>
+ <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
+ <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com>
+ <51EFFBE1.4090505@ti.com> <51F0031B.1050307@ti.com>
+ <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
+ <51F0223E.4050008@ti.com> <51F0240F.3050507@ti.com>
+ <20130813081003.GU7656@atomide.com> <520A02BA.4090805@ti.com>
+ <CACRpkda+m82PYJsExLM6JLsLa8-bVhdvy_r_+-uKfVT2NG7Cbg@mail.gmail.com>
+ <520D398D.9040806@ti.com>
+Message-ID: <CACRpkdYeo1y-HhftkRWgwyq8o-NVuJ978Uq+ON880LHhUxC=hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2013 10:01 AM, Kevin Hilman wrote:
-> Kevin Hilman <khilman@linaro.org> writes:
-> 
->> Rob Herring <robherring2@gmail.com> writes:
+On Thu, Aug 15, 2013 at 10:26 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> On Thursday 15 August 2013 04:01 PM, Linus Walleij wrote:
+>> On Tue, Aug 13, 2013 at 11:56 AM, Sricharan R <r.sricharan@ti.com> wrote:
 >>
->>> On Wed, Aug 14, 2013 at 11:04 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>>> Hi Rob,
->>>>
->>>> Rob Herring <robherring2@gmail.com> writes:
->>>>
->>>>> Kevin, Olof,
->>>>>
->>>>> Please pull highbank updates for 3.12.
->>>>>
->>>>> There's one trivial core ARM code change in the series to allow a
->>>>> DMA_ZONE size of 4GB. I believe this should not conflict with Russell's
->>>>> DMA mask series.
->>>>>
->>>>> Rob
->>>>>
->>>>> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
->>>>>
->>>>>   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
->>>>>
->>>>> are available in the git repository at:
->>>>>
->>>>>   git://sources.calxeda.com/kernel/linux.git
->>>>> tags/highbank-lpae-fixes-for-3.12
->>>>>
->>>>> for you to fetch changes up to ce3ec1d61c5ed6af3ceaace6f57acd588c41b4d6:
->>>>>
->>>>>   ARM: highbank: fix debug uart virtual address for LPAE (2013-08-13
->>>>> 20:50:16 -0500)
->>>>>
->>>>> ----------------------------------------------------------------
->>>>> A set of fixes for highbank to enable LPAE and selecting of necesssary
->>>>> ARM errata.
->>>>>
->>>>> ----------------------------------------------------------------
->>>>> Rob Herring (6):
->>>>>       ARM: use phys_addr_t for DMA zone sizes
->>>>>       ARM: highbank: enable DMA zone for LPAE
->>>>>       ARM: highbank: select ARCH_HAS_HOLES_MEMORYMODEL
->>>>>       ARM: highbank: select required errata work-arounds
->>>>>       ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
->>>>
->>>> This one seems to have broken the AMBA PL08x DMA driver, and is still
->>>> objected to by Russell, so I'll drop this one for now.
->>>
->>> Exynos does the same selection, but I guess it is not multi-platform
->>> though and doesn't select ARM_AMBA.
->>>
->>>>>       ARM: highbank: fix debug uart virtual address for LPAE
->>>>
->>>> The rest look OK and I can pull them if the rest are OK without the
->>>> objectionable one.  Let me know if that's OK, or you prefer to wait for
->>>> resolution.
->>>
->>> Yes, I'm fine with dropping this one for now.
+>>>  Initially irqchip was discussed, but we also have a DMA crossbar
+>>>  to map the dma-requests. Since both irq/dma crossbars should be handled,
+>>>  pinctrl was suggested as the appropriate place to handle this.
 >>
->> OK, dropped that one and applied the rest.
-> 
-> OK, with 2 of the 5 patches still having problems/objections, and the
-> one causing a new build warning, I've backed out this branch
-> from for-next.
+>> I think it is better to use irqchip.
+>>
+> Did you happen to read the thread why irqchip is in-appropriate
+> for such an IP.
 
-Wow, that went well. Sorry about that.
+Sorry I don't understand what thread that is... can you point me there?
+My previous statement on this issue what this:
+http://marc.info/?l=linux-kernel&m=137442541628641&w=2
 
-> Could you just respin a branch with the first 3 patches and the fix
-> folded in?  I know I requested the opposite on IRC, but having a new
-> pull request allows me to include your signed tag on the whole bit
-> instead of me having to manually massage the branch and merge without a
-> signed tag.
+> As I said earlier, an IRQ-chip always need a
+> real IRQ link (even for the chained one) to the primary irqchip.
+>
+> This IP is just dummy IP makes the connections for the primary
+> irqchip(read GIC). And its use only limited to make the
+> connection between the peripheral IRQ event to the GIC IRQ line.
+>
+> I don't see how you can make this happen with an irqchip
+> infrastructure.
 
-Will do. I've got another patch to add and will see if I can get pl081
-issue sorted out in the next few days.
+I think my post above describes this.
 
-Rob
+>> I don't see any way to really abstract this pretty simple crossbar
+>> for reuse across subsystems.
+>>
+> This exactly the reason, i am against idea of over-engineering the
+> simple IP whose only job is to make the physical wire connection
+> in software where as this is generally done in RTL by default on
+> most of the SOCs.
+
+Well, it was made accessible by software, and if someone has a
+usecase that requires this do be done dynamically, i.e. not just
+being set up by firmware and never touched, and that use case
+is valid, then I guess we need to do something...
+
+I think it was mentioned in the thread that there is really such
+a usecase?
+
+Yours,
+Linus Walleij
