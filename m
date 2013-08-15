@@ -1,122 +1,128 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Thu, 15 Aug 2013 11:56:09 +0530
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
- with external L3-cache.
-In-Reply-To: <da83e967f5a266ca28ee54638a4a9be9@www.loen.fr>
-References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
- <f8917fe8409b1fae634c7de45e34d4a7@www.loen.fr>
- <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
- <da83e967f5a266ca28ee54638a4a9be9@www.loen.fr>
-Message-ID: <CAAhSdy3-+tJ34QQgieifo931pfGoYt3RAqr8OkVtkxO6jgGdHQ@mail.gmail.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Thu, 15 Aug 2013 08:32:34 +0200
+Subject: [PATCH v3 3/5] ARM: bcm4760: Add system timer
+In-Reply-To: <20130815003038.GB27999@codeaurora.org>
+References: <20130814221043.528864175@gmail.com>
+ <20130814221237.695587612@gmail.com>
+ <20130815003038.GB27999@codeaurora.org>
+Message-ID: <20130815063234.GA23217@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Wed, Aug 14, 2013 at 05:30:38PM -0700, Stephen Boyd wrote:
+> On 08/15, Domenico Andreoli wrote:
+> > +
+> > +static inline void __iomem *to_load(struct bcm4760_timer *timer)
+> > +{
+> > +	return timer->base + TIMER_LOAD_OFFSET;
+> > +}
+> > +
+> > +static inline void __iomem *to_control(struct bcm4760_timer *timer)
+> > +{
+> > +	return timer->base + TIMER_CONTROL_OFFSET;
+> > +}
+> > +
+> > +static inline void __iomem *to_intclr(struct bcm4760_timer *timer)
+> > +{
+> > +	return timer->base + TIMER_INTCLR_OFFSET;
+> > +}
+> > +
+> > +static inline void __iomem *to_ris(struct bcm4760_timer *timer)
+> > +{
+> > +	return timer->base + TIMER_RIS_OFFSET;
+> > +}
+> > +
+> > +static inline void __iomem *to_mis(struct bcm4760_timer *timer)
+> > +{
+> > +	return timer->base + TIMER_MIS_OFFSET;
+> > +}
+> 
+> Style Nit: This is new. Usually people either make a
+> <my_driver>_{readl,writel}() function that takes the struct and
+> an offset or they just add the offset directly in their
+> readl/writel calls. Can you do that? Probably save some lines of
+> code.
 
-On Thu, Aug 15, 2013 at 10:22 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Hi Anup,
->
->
-> On 2013-08-14 15:22, Anup Patel wrote:
->>
->> On Wed, Aug 14, 2013 at 5:34 PM, Marc Zyngier <marc.zyngier@arm.com>
->> wrote:
->>>
->>> Hi Pranav,
->>>
->>> On 2013-08-14 12:47, Pranavkumar Sawargaonkar wrote:
->>>>
->>>> Systems with large external L3-cache (few MBs), might have dirty
->>>> content belonging to the guest page in L3-cache. To tackle this,
->>>> we need to flush such dirty content from d-cache so that guest
->>>> will see correct contents of guest page when guest MMU is disabled.
->>>>
->>>> The patch fixes coherent_icache_guest_page() for external L3-cache.
->>>>
->>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>>> ---
->>>>  arch/arm64/include/asm/kvm_mmu.h |    2 ++
->>>>  1 file changed, 2 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/include/asm/kvm_mmu.h
->>>> b/arch/arm64/include/asm/kvm_mmu.h
->>>> index efe609c..5129038 100644
->>>> --- a/arch/arm64/include/asm/kvm_mmu.h
->>>> +++ b/arch/arm64/include/asm/kvm_mmu.h
->>>> @@ -123,6 +123,8 @@ static inline void
->>>> coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
->>>>       if (!icache_is_aliasing()) {            /* PIPT */
->>>>               unsigned long hva = gfn_to_hva(kvm, gfn);
->>>>               flush_icache_range(hva, hva + PAGE_SIZE);
->>>> +             /* Flush d-cache for systems with external caches. */
->>>> +             __flush_dcache_area((void *) hva, PAGE_SIZE);
->>>>       } else if (!icache_is_aivivt()) {       /* non ASID-tagged VIVT */
->>>>               /* any kind of VIPT cache */
->>>>               __flush_icache_all();
->>>
->>>
->>> [adding Will to the discussion as we talked about this in the past]
->>>
->>> That's definitely an issue, but I'm not sure the fix is to hit the data
->>> cache on each page mapping. It looks overkill.
->>>
->>> Wouldn't it be enough to let userspace do the cache cleaning? kvmtools
->>> knows which bits of the guest memory have been touched, and can do a "DC
->>> DVAC" on this region.
->>
->>
->> It seems a bit unnatural to have cache cleaning is user-space. I am sure
->> other architectures don't have such cache cleaning in user-space for KVM.
->>
->>>
->>> The alternative is do it in the kernel before running any vcpu - but
->>> that's not very nice either (have to clean the whole of the guest
->>> memory, which makes a full dcache clean more appealing).
->>
->>
->> Actually, cleaning full d-cache by set/way upon first run of VCPU was
->> our second option but current approach seemed very simple hence
->> we went for this.
->>
->> If more people vote for full d-cache clean upon first run of VCPU then
->> we should revise this patch.
->
->
-> Can you please give the attached patch a spin on your HW? I've boot-tested
-> it on a model, but of course I can't really verify that it fixes your issue.
->
-> As far as I can see, it should fix it without any additional flushing.
->
-> Please let me know how it goes.
+yes, sure.
 
-HCR_EL2.DC=1 means all memory access for Stage1 MMU off are
-treated as "Normal Non-shareable, Inner Write-Back Write-Allocate,
-Outer Write-Back Write-Allocate memory"
+> 
+> > +static irqreturn_t bcm4760_timer_interrupt(int irq, void *dev_id)
+> > +{
+> > +	struct bcm4760_timer *timer = dev_id;
+> > +	void (*event_handler)(struct clock_event_device *);
+> > +
+> > +	/* check the (masked) interrupt status */
+> > +	if (!readl_relaxed(to_mis(timer)))
+> > +		return IRQ_NONE;
+> > +
+> > +	/* clear the timer interrupt */
+> > +	writel_relaxed(1, to_intclr(timer));
+> > +
+> > +	event_handler = ACCESS_ONCE(timer->evt.event_handler);
+> > +	if (event_handler)
+> > +		event_handler(&timer->evt);
+> 
+> This is unfortunate. Do you have a pending timer interrupt left
+> by the bootloader?
 
-HCR_EL2.DC=0 means all memory access for Stage1 MMU off are
-treated as "Strongly-ordered device memory"
+Do you mean that if no interrupts are expected beween the irq request and
+the call clockevents_config_and_register(), I can assume event_handler is
+always set?
 
-Now if Guest/VM access hardware MMIO devices directly (such as
-VGIC CPU interface) with MMU off then MMIO devices will be
-accessed as normal memory when HCR_EL2.DC=1.
+> 
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static void __init bcm4760_init_time(struct device_node *node)
+> > +{
+> > +	void __iomem *base;
+> > +	u32 freq = 24000000;
+> 
+> Why have freq in the DT binding at all then?
 
-The HCR_EL2.DC=1 makes sense only if we have all software
-emulated devices for Guest/VM which is not true for KVM ARM or
-KVM ARM64 because we use VGIC.
+To get an HW address and remap it at runtime, I guess. I copied it but
+would also prefer to use DT only where really needed.
 
-IMHO, this patch enforces incorrect memory attribute for Guest/VM
-when Stage1 MMU is off.
+> 
+> > +	int irq;
+> > +	struct bcm4760_timer *timer;
+> > +
+> > +	base = of_iomap(node, 0);
+> > +	if (!base)
+> > +		panic("Can't remap timer registers");
+> > +
+> > +	timer = kzalloc(sizeof(*timer), GFP_KERNEL);
+> > +	if (!timer)
+> > +		panic("Can't allocate timer struct\n");
+> > +
+> > +	irq = irq_of_parse_and_map(node, 0);
+> > +	if (irq <= 0)
+> > +		panic("Can't parse timer IRQ");
+> > +
+> > +	timer->base = base;
+> > +	timer->evt.name = node->name;
+> > +	timer->evt.rating = 300;
+> > +	timer->evt.features = CLOCK_EVT_FEAT_ONESHOT;
+> > +	timer->evt.set_mode = bcm4760_timer_set_mode;
+> > +	timer->evt.set_next_event = bcm4760_timer_set_next_event;
+> > +	timer->evt.cpumask = cpumask_of(0);
+> > +	timer->act.name = node->name;
+> > +	timer->act.flags = IRQF_TIMER | IRQF_SHARED;
+> > +	timer->act.dev_id = timer;
+> > +	timer->act.handler = bcm4760_timer_interrupt;
+> > +
+> > +	if (setup_irq(irq, &timer->act))
+> > +		panic("Can't set up timer IRQ\n");
+> > +
+> > +	clockevents_config_and_register(&timer->evt, freq, 0xf, 0xffffffff);
+> 
+> If you switch this registration and the setup_irq() call you
+> shouldn't need the ACCESS_ONCE() and that check in the irq handler.
+> Please switch the order and or clear the interrupt before
+> registering the clockevent and remove the checks in the interrupt
+> handler.
 
-Nevertheless, we will still try your patch.
+got it. Thank you.
 
->
-> Thanks,
->
->
->         M.
-> --
-> Fast, cheap, reliable. Pick two.
-
-Regards,
-Anup
+Domenico
