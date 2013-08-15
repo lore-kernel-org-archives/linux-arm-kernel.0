@@ -1,164 +1,93 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Thu, 15 Aug 2013 13:54:28 +0800
-Subject: [PATCH v2 2/2] dmaengine: Add hisilicon k3 DMA engine driver
-In-Reply-To: <20130813112043.GB32147@intel.com>
-References: <1372423153-6742-1-git-send-email-zhangfei.gao@linaro.org>
- <1372423153-6742-3-git-send-email-zhangfei.gao@linaro.org>
- <20130813112043.GB32147@intel.com>
-Message-ID: <CAMj5Bki0H+=0wQY39+jDw4nAEq5wEq3V3yri9xpNRxQ2GRwPbA@mail.gmail.com>
+From: d.kasatkin@samsung.com (Dmitry Kasatkin)
+Date: Thu, 15 Aug 2013 08:58:34 +0300
+Subject: [PATCH 00/10] crypto: omap-aes: DMA and PIO mode improvements
+In-Reply-To: <520C1327.8090607@ti.com>
+References: <1376521969-16807-1-git-send-email-joelf@ti.com>
+ <520C1327.8090607@ti.com>
+Message-ID: <520C6E0A.8030505@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 7:20 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Fri, Jun 28, 2013 at 08:39:13PM +0800, Zhangfei Gao wrote:
->> Add dmaengine driver for hisilicon k3 platform based on virt_dma
+On 15/08/13 02:30, Joel Fernandes wrote:
+> On 08/14/2013 06:12 PM, Joel Fernandes wrote:
+>> This patch series is a rewrite of the DMA portion of omap-aes driver
+>> and also adds support for PIO mode. Both these modes, give better
+>> performance than before.
 >>
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> Tested-by: Kai Yang <jean.yangkai@huawei.com>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->> ---
->
->> +#define DRIVER_NAME          "k3-dma"
->> +#define DMA_ALIGN            3
->> +#define DMA_MAX_SIZE         0x1ffc
->> +
->> +#define INT_STAT             0x00
->> +#define INT_TC1                      0x04
->> +#define INT_ERR1             0x0c
->> +#define INT_ERR2             0x10
->> +#define INT_TC1_MASK         0x18
->> +#define INT_ERR1_MASK                0x20
->> +#define INT_ERR2_MASK                0x24
->> +#define INT_TC1_RAW          0x600
->> +#define INT_ERR1_RAW         0x608
->> +#define INT_ERR2_RAW         0x610
->> +#define CH_PRI                       0x688
->> +#define CH_STAT                      0x690
->> +#define CX_CUR_CNT           0x704
->> +#define CX_LLI                       0x800
->> +#define CX_CNT                       0x810
->> +#define CX_SRC                       0x814
->> +#define CX_DST                       0x818
->> +#define CX_CONFIG            0x81c
->> +#define AXI_CONFIG           0x820
->> +#define DEF_AXI_CONFIG               0x201201
->> +
->> +#define CX_LLI_CHAIN_EN              0x2
->> +#define CCFG_EN                      0x1
->> +#define CCFG_MEM2PER         (0x1 << 2)
->> +#define CCFG_PER2MEM         (0x2 << 2)
->> +#define CCFG_SRCINCR         (0x1 << 31)
->> +#define CCFG_DSTINCR         (0x1 << 30)
-> I see these are not namespace aptly and can collide..
-OK,
-How about change name to
-#define CX_CFG                 0x81c
+>> Earlier, only a single SG was used for DMA purpose, and the SG-list
+>> passed from the crypto layer was being copied and DMA'd one entry at
+>> a time. This turns out to be quite inefficient, so we replace it with
+>> much simpler code that directly passes the SG-list from crypto to the
+>> DMA layer.
+>>
+>> We also add PIO mode support to the driver, and switch to PIO mode
+>> whenever the DMA channel allocation is not available. This is only for
+>> OMAP4 platform will work on any platform on which IRQ information is
+>> populated.
+>>
+>> Tests performed on am33xx and omap4 SoCs , notice the 50% perf improvement
+> Just correcting, this is more like 35% not 50% when using DMA.
 
-#define CX_CFG_EN              0x1
-#define CX_CFG_MEM2PER         (0x1 << 2)
-~
+Hmm :)
 
->> +             switch (width) {
->> +             case DMA_SLAVE_BUSWIDTH_1_BYTE:
->> +                     val = 0;
->> +                     break;
->> +             case DMA_SLAVE_BUSWIDTH_2_BYTES:
->> +                     val = 1;
->> +                     break;
->> +             case DMA_SLAVE_BUSWIDTH_4_BYTES:
->> +                     val = 2;
->> +                     break;
->> +             case DMA_SLAVE_BUSWIDTH_8_BYTES:
->> +                     val = 3;
-> DMA_SLAVE_BUSWIDTHS are 1, 2, 4, 8...
-> so if you can do val = ffs(width) as well?
-
-Good idea, will use __ffs(width) here.
+1766/1460 = ~20%
 
 >
+> Thanks,
 >
->> +     case DMA_PAUSE:
->> +             dev_dbg(d->slave.dev, "vchan %p: pause\n", &c->vc);
->> +             if (c->status == DMA_IN_PROGRESS) {
->> +                     c->status = DMA_PAUSED;
->> +                     if (p) {
->> +                             k3_dma_pause_dma(p, false);
->> +                     } else {
->> +                             spin_lock(&d->lock);
->> +                             list_del_init(&c->node);
->> +                             spin_unlock(&d->lock);
->> +                     }
-> why do we need the else part here?
-Since asynchronous mode is supported.
-Desc is submitted to list but may not get physical channel to run.
-
+> -Joel
 >
->> +
->> +#ifdef CONFIG_PM_SLEEP
->> +static int k3_dma_pltfm_suspend(struct device *dev)
->> +{
->> +     struct k3_dma_dev *d = dev_get_drvdata(dev);
->> +     u32 stat = 0;
->> +
->> +     stat = k3_dma_get_chan_stat(d);
->> +     if (stat) {
->> +             dev_warn(d->slave.dev,
->> +                     "chan %d is running fail to suspend\n", stat);
->> +             return -1;
->> +     }
->> +     k3_dma_enable_dma(d, false);
->> +     clk_disable_unprepare(d->clk);
->> +     return 0;
->> +}
->> +
->> +static int k3_dma_pltfm_resume(struct device *dev)
->> +{
->> +     struct k3_dma_dev *d = dev_get_drvdata(dev);
->> +     int ret = 0;
->> +
->> +     ret = clk_prepare_enable(d->clk);
->> +     if (ret < 0) {
->> +             dev_err(d->slave.dev, "clk_prepare_enable failed: %d\n", ret);
->> +             return -EINVAL;
->> +     }
->> +     k3_dma_enable_dma(d, true);
->> +     return 0;
->> +}
->> +#else
->> +#define k3_dma_pltfm_suspend NULL
->> +#define k3_dma_pltfm_resume  NULL
->> +#endif /* CONFIG_PM_SLEEP */
-> you dont need #ifdef here, then whats the use of SIMPLE_DEV_PM_OPS below?
-Yes.
-
->> +
->> +SIMPLE_DEV_PM_OPS(k3_dma_pltfm_pmops, k3_dma_pltfm_suspend, k3_dma_pltfm_resume);
-> pltfm... can we skip this or use platform, plat...
-Got it.
-
->> +
->> +static struct platform_driver k3_pdma_driver = {
->> +     .driver         = {
->> +             .name   = DRIVER_NAME,
->> +             .owner  = THIS_MODULE,
->> +             .pm     = &k3_dma_pltfm_pmops,
->> +             .of_match_table = k3_pdma_dt_ids,
->> +     },
->> +     .probe          = k3_dma_probe,
->> +     .remove         = k3_dma_remove,
->> +};
->> +
->> +module_platform_driver(k3_pdma_driver);
->> +
->> +MODULE_DESCRIPTION("Hisilicon k3 DMA Driver");
->> +MODULE_LICENSE("GPL v2");
-> MODULE_ALIAS?
-
-OK.
 >
-> ~Vinod
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>> for large 8K blocks:
+>>
+>> Sample run on am33xx (beaglebone):
+>> With DMA rewrite:
+>> [   26.410052] test 0 (128 bit key, 16 byte blocks): 4318 operations in 1 seconds (69088 bytes)
+>> [   27.414314] test 1 (128 bit key, 64 byte blocks): 4360 operations in 1 seconds (279040 bytes)
+>> [   28.414406] test 2 (128 bit key, 256 byte blocks): 3609 operations in 1 seconds (923904 bytes)
+>> [   29.414410] test 3 (128 bit key, 1024 byte blocks): 3418 operations in 1 seconds (3500032 bytes)
+>> [   30.414510] test 4 (128 bit key, 8192 byte blocks): 1766 operations in 1 seconds (14467072 bytes)
+>>
+>> Without DMA rewrite:
+>> [   31.920519] test 0 (128 bit key, 16 byte blocks): 4417 operations in 1 seconds (70672 bytes)
+>> [   32.925997] test 1 (128 bit key, 64 byte blocks): 4221 operations in 1 seconds (270144 bytes)
+>> [   33.926194] test 2 (128 bit key, 256 byte blocks): 3528 operations in 1 seconds (903168 bytes)
+>> [   34.926225] test 3 (128 bit key, 1024 byte blocks): 3281 operations in 1 seconds (3359744 bytes)
+>> [   35.926385] test 4 (128 bit key, 8192 byte blocks): 1460 operations in 1 seconds (11960320 bytes)
+>>
+>> With PIO mode, note the tremndous boost in performance for small blocks there:
+>> [   27.294905] test 0 (128 bit key, 16 byte blocks): 20585 operations in 1 seconds (329360 bytes)
+>> [   28.302282] test 1 (128 bit key, 64 byte blocks): 8106 operations in 1 seconds (518784 bytes)
+>> [   29.302374] test 2 (128 bit key, 256 byte blocks): 2359 operations in 1 seconds (603904 bytes)
+>> [   30.302575] test 3 (128 bit key, 1024 byte blocks): 605 operations in 1 seconds (619520 bytes)
+>> [   31.303781] test 4 (128 bit key, 8192 byte blocks): 79 operations in 1 seconds (647168 bytes)
+>>
+>> Future work in this direction would be to dynamically change between
+>> PIO/DMA mode based on the block size.
+>>
+>> Joel Fernandes (10):
+>>   crypto: scatterwalk:  Add support for calculating number of SG
+>>     elements
+>>   crypto: omap-aes: Add useful debug macros
+>>   crypto: omap-aes: Populate number of SG elements
+>>   crypto: omap-aes: Simplify DMA usage by using direct SGs
+>>   crypto: omap-aes: Sync SG before DMA operation
+>>   crypto: omap-aes: Remove previously used intermediate buffers
+>>   crypto: omap-aes: Add IRQ info and helper macros
+>>   crypto: omap-aes: PIO mode: Add IRQ handler and walk SGs
+>>   crypto: omap-aes: PIO mode: platform data for OMAP4 and trigger it
+>>   crypto: omap-aes: Switch to PIO mode in probe function
+>>
+>>  crypto/scatterwalk.c         |   22 +++
+>>  drivers/crypto/omap-aes.c    |  400 ++++++++++++++++++++----------------------
+>>  include/crypto/scatterwalk.h |    2 +
+>>  3 files changed, 217 insertions(+), 207 deletions(-)
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-crypto" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
