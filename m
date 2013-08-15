@@ -1,71 +1,34 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 15 Aug 2013 13:18:20 +0300
-Subject: [PATCH v2 0/9] USB: phy: phy-nop: Manage RESET GPIO in the driver
-Message-ID: <1376561909-4406-1-git-send-email-rogerq@ti.com>
+Date: Thu, 15 Aug 2013 13:18:21 +0300
+Subject: [PATCH v2 1/9] usb: phy: nop: Add gpio_reset to platform data
+In-Reply-To: <1376561909-4406-1-git-send-email-rogerq@ti.com>
+References: <1376561909-4406-1-git-send-email-rogerq@ti.com>
+Message-ID: <1376561909-4406-2-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The GPIO number of the RESET line can be passed to the
+driver using the gpio_reset member.
 
-Modelling the RESET line as a regulator supply wasn't a good idea
-as it abuses the regulator framework and makes adaptation
-code/data more complex.
-
-Instead, manage the RESET gpio line directly in the driver.
-
-This also makes us easy to migrate to a dedicated GPIO RESET controller
-whenever it becomes available. As of now, it doesn't seem to be making
-it into 3.12.
-
-*NOTE:* As there are changes to platform data, Patch 1 needs to be shared
-between the arm-soc tree and usb tree.
-
-Patch 1 is available at repo
-	git://github.com/rogerq/linux.git
-in branch
-	phy-reset-common
-
-Patch 2 contains the phy-nop driver changes
-Patches 3 and 4 adapt legacy boot code to the phy-nop driver changes.
-Patches 5, 6 and 7 adapt DT data to the binding changes.
-Patch 8 is cleanup of omap3-beagle DT.
-Patch 9 adds USB host support to omap3-beagle-xm using the new binding.
-
-Patches are based on v3.11-rc5.
-Tested leacy boot on omap3-beagle and omap3-beagle-xm
-Tested DT boot on omap3-beagle, omap3-beagle-xm and omap4-panda-es
-
-v2:
-- Added RESET GPIO polarity feature
-- Changed to gpio_set_value_cansleep()
-
-cheers,
--roger
-
+Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
-Roger Quadros (9):
-  usb: phy: nop: Add gpio_reset to platform data
-  usb: phy: nop: Don't use regulator framework for RESET line
-  ARM: OMAP2+: omap-usb-host: Get rid of platform_data from struct
-    usbhs_phy_data
-  ARM: OMAP2+: usb-host: Adapt to USB phy-nop RESET line changes
-  ARM: dts: omap3-beagle: Use reset-gpios for hsusb2_reset
-  ARM: dts: omap4-panda: Use reset-gpios for hsusb1_reset
-  ARM: dts: omap5-uevm: Use reset-gpios for hsusb2_reset
-  ARM: dts: omap3-beagle: Make USB host pin naming consistent
-  ARM: dts: omap3-beagle-xm: Add USB Host support
+ include/linux/usb/nop-usb-xceiv.h |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
- .../devicetree/bindings/usb/usb-nop-xceiv.txt      |    7 +-
- arch/arm/boot/dts/omap3-beagle-xm.dts              |   65 +++++++++++++++---
- arch/arm/boot/dts/omap3-beagle.dts                 |   37 ++++-------
- arch/arm/boot/dts/omap4-panda-common.dtsi          |   18 +-----
- arch/arm/boot/dts/omap5-uevm.dts                   |   13 +---
- arch/arm/mach-omap2/board-omap3beagle.c            |    6 --
- arch/arm/mach-omap2/usb-host.c                     |   18 +++---
- arch/arm/mach-omap2/usb.h                          |    1 -
- drivers/usb/phy/phy-nop.c                          |   71 ++++++++++++++-----
- include/linux/usb/nop-usb-xceiv.h                  |    4 +-
- 10 files changed, 138 insertions(+), 102 deletions(-)
-
+diff --git a/include/linux/usb/nop-usb-xceiv.h b/include/linux/usb/nop-usb-xceiv.h
+index 148d351..1e57acb 100644
+--- a/include/linux/usb/nop-usb-xceiv.h
++++ b/include/linux/usb/nop-usb-xceiv.h
+@@ -9,7 +9,9 @@ struct nop_usb_xceiv_platform_data {
+ 
+ 	/* if set fails with -EPROBE_DEFER if can't get regulator */
+ 	unsigned int needs_vcc:1;
+-	unsigned int needs_reset:1;
++	unsigned int needs_reset:1; /* Deprecated */
++
++	int gpio_reset;
+ };
+ 
+ #if defined(CONFIG_NOP_USB_XCEIV) || (defined(CONFIG_NOP_USB_XCEIV_MODULE) && defined(MODULE))
 -- 
 1.7.4.1
