@@ -1,78 +1,72 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 15 Aug 2013 19:41:46 +0200
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 15 Aug 2013 18:43:15 +0100
 Subject: [Ksummit-2013-discuss] [ARM ATTEND] Trustzone-based security
  solution for ARM Linux
-In-Reply-To: <20130815155652.GB14792@kroah.com>
+In-Reply-To: <520CFBDE.4000408@wwwdotorg.org>
 References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
  <20130815042812.GA8968@kroah.com>
- <CABb+yY1YKGkAeb-8GbadUoV5g54iCdrYGnD_VSpaNmtfXXhpyA@mail.gmail.com>
- <CAGsJ_4yZ7Rf7UV-1u3cG_V9mrtCWD=LYBeuKQaz0SWLYoHhwwg@mail.gmail.com>
- <20130815080532.GB7080@kroah.com>
- <CAKv+Gu9mOxoTsK5g-GX2Khvu0FSUBZRCL0Jw6F6vrMG=fNfy1Q@mail.gmail.com>
- <20130815155652.GB14792@kroah.com>
-Message-ID: <CAKv+Gu8_65EkDkn6-W1NKZSs9P8KOxfFNzFNXq0Eqm5dMYGxwQ@mail.gmail.com>
+ <CAGsJ_4w2hOgsOB=ZYmWqm7tM+pL6=UMR1fG++A+rdAReJzFSjw@mail.gmail.com>
+ <520CFBDE.4000408@wwwdotorg.org>
+Message-ID: <20130815174307.GA17245@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 August 2013 17:56, Greg KH <greg@kroah.com> wrote:
->
-> On Thu, Aug 15, 2013 at 10:24:41AM +0200, Ard Biesheuvel wrote:
-> > On 15 August 2013 10:05, Greg KH <greg@kroah.com> wrote:
-> > > On Thu, Aug 15, 2013 at 03:45:13PM +0800, Barry Song wrote:
-> > >> 2013/8/15 Jassi Brar <jassisinghbrar@gmail.com>:
-> > >> > On Thu, Aug 15, 2013 at 9:58 AM, Greg KH <greg@kroah.com> wrote:
-> > >> >> On Thu, Aug 15, 2013 at 11:44:30AM +0800, Barry Song wrote:
-> >
-> > [...]]
-> >
-> > >> we will run rtos+linux instead of linux+linux. typically, Auto
-> > >> industry has long history to use rtos. on the other hand, we need to
-> > >> boot the rtos very fast in hundreds of milliseconds to make sure
-> > >> rearview, early audio have been ready.
-> > >
-> > > But Linux is a RTOS, and a really good one at that.  Linux already boots
-> > > that fast, and solves the rearview/early audio issue just fine (I've
-> > > seen it demoed), so please don't think that Linux can't do this.
-> > >
-> > > Again, what is the requirements of this RTOS that prevent you from using
-> > > Linux instead in that "secure" part of the chip?  What do we need to
-> > > change in order to meet this need?
-> > >
-> >
-> > In my experience, there are two similar yet different use cases:
-> > - the desire to co-host a RTOS on the CPU next to Linux, to perform
-> > real-time tasks like software defined radio, fast boot times etc.
-> > - the desire to secure devices using TrustZone, without putting a full
-> > fledged kernel on the secure side due to memory constraints (note that
-> > in many designs, the only secure memory is the on-SoC SRAM)
-> >
-> > As the requirements are almost orthogonal, we should not pretend they
-> > are the same thing.
->
-> I'm not pretending they are the same thing, but I am wanting to know how
-> Linux doesn't work for either of those requirements, as I want to see
-> Linux be the solution for this "trusted" kernel as well.
->
+On Thu, Aug 15, 2013 at 10:03:42AM -0600, Stephen Warren wrote:
+> On 08/15/2013 01:36 AM, Barry Song wrote:
+> > 2013/8/15 Greg KH <greg@kroah.com>:
+> >> On Thu, Aug 15, 2013 at 11:44:30AM +0800, Barry Song wrote:
+> >>> For the moment, there is strong markting requirement from
+> >>> IVI(In-Vehicle Infotainment) or mobile to use ARM Trustzone. We take
+> >>> IVI as an example, Auto requires security enviorment to access CAN bus
+> >>> and other car busses. Auto requires security enviorment to show
+> >>> rearview/surround view from cameras and play alert audio. on the other
+> >>> hand, IVI system is generically working as a video streaming sink and
+> >>> HDMI sink instead of a source. To support HDCP and widevine, we need
+> >>> to make sure private keys and video buffers are only visible to
+> >>> security mode. With CAN stack, video playback backend and more tasks,
+> >>> generically it requires a multi-task RTOS running in security mode
+> >>> parallel with Linux in non-security mode.
+> >>>
+> >>> Linux is a generic purpose OS with UI and all kinds of software, but
+> >>> we need to make sure even the Linux is ROOTed, RTOS in security mode
+> >>> is still active. We are able to find some opensource projects like
+> >>> SafeG[1], Multivisor[2], SierraVisor[3], but it turns out that ARM
+> >>> Linux has no rich support for this kind of architecture:
+> >>> 1. hypervisor running in monitor mode
+> >>> 2. RTOS running in security mode
+> >>> 3. Linux running in non-security mode
+> >>
+> >> "Linux" is just a kernel, not a whole operating system :)
+> > 
+> > do agree. but  i am not saying i want linux kernel to do all these
+> > things. i just want kernel is able to integrate into the system.
+> > 
+> >>
+> >> Anyway, why can't Linux be the RTOS kernel as well?  What are the
+> >> requirements for that kernel that Linux does not currently meet?
+> >>
+> >>> So the point is that we need generic support for this, especially for
+> >>> IVI and other markets which want Trustzone technology a lot and have
+> >>> complex user scenarios.
+> >>> 1. Dispatch FIQ to security, dispatch IRQ to Linux, for this case, FIQ
+> >>> is not permitted to happen on Linux
+> >>
+> >> Isn't that up to the hardware?  Nothing that Linux can do about that.
+> > 
+> > right. but linux need to assign interrupts to right group in GIC
+> > hardware. now it doesn't care.
+> 
+> I strongly hope that whatever is the secure OS is setting up these
+> routings, and the HW prevents the non-secure OS from modifying them and
+> hence never attempts to. Otherwise, the non-secure OS is able to affect
+> the functioning of the secure OS, which seems like a bad thing.
 
-For the former case, there is the assumption (or misconception) that
-Linux cannot deliver the boot speed or bounded worst case response
-time requirements imposed by things like software defined radio. Also,
-there is the existing codebase of RTOS hosted CAN stacks etc, that
-have been certified by the [automotive] customer and are moved from a
-dedicated MCU into the application CPU as a cost saving measure. This
-means that even if Linux does fit the bill in principle, many will
-still have no choice other than to go with non-Linux.
+Typically, the master controls are hard-wired for Secure-only access in
+hardware: so assigning GIC interrupts to groups is something the secure
+OS/firmware has to take care of.
 
-For the latter case, it depends on the compatibility of Linux with the
-restricted secure world environment, most notably the secure memory.
-256k of on chip SRAM is sufficient to do plenty of interesting things
-in the secure world, but sadly, running Linux is not one of them. (I
-know PoP DDR is considered to be secure memory by some vendors as
-well, but its application is not as widespread in the automotive
-world)
+Of course, if Linux is acting as secure OS, it might have to understand
+what controls exist and to do some of that configuration itself.
 
-
-Regards,
-
---
-Ard.
+Cheers
+---Dave
