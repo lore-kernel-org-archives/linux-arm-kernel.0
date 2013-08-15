@@ -1,90 +1,78 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 15 Aug 2013 13:40:47 -0400
-Subject: [PATCH] arm64: Expand arm64 image header
-In-Reply-To: <CAFECyb-B0X1bXLs-Q=rX7tY5GZiNASZZDP97ZLT9LSk_vSKS=Q@mail.gmail.com>
-References: <1376521800-967-1-git-send-email-roy.franz@linaro.org>
- <1376539080.26173.23.camel@t520.redhat.com>
- <CAFECyb-B0X1bXLs-Q=rX7tY5GZiNASZZDP97ZLT9LSk_vSKS=Q@mail.gmail.com>
-Message-ID: <1376588447.26173.28.camel@t520.redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 15 Aug 2013 19:41:46 +0200
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Trustzone-based security
+ solution for ARM Linux
+In-Reply-To: <20130815155652.GB14792@kroah.com>
+References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
+ <20130815042812.GA8968@kroah.com>
+ <CABb+yY1YKGkAeb-8GbadUoV5g54iCdrYGnD_VSpaNmtfXXhpyA@mail.gmail.com>
+ <CAGsJ_4yZ7Rf7UV-1u3cG_V9mrtCWD=LYBeuKQaz0SWLYoHhwwg@mail.gmail.com>
+ <20130815080532.GB7080@kroah.com>
+ <CAKv+Gu9mOxoTsK5g-GX2Khvu0FSUBZRCL0Jw6F6vrMG=fNfy1Q@mail.gmail.com>
+ <20130815155652.GB14792@kroah.com>
+Message-ID: <CAKv+Gu8_65EkDkn6-W1NKZSs9P8KOxfFNzFNXq0Eqm5dMYGxwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-08-15 at 08:49 -0700, Roy Franz wrote:
-> On Wed, Aug 14, 2013 at 8:58 PM, Mark Salter <msalter@redhat.com> wrote:
-> > On Wed, 2013-08-14 at 16:10 -0700, Roy Franz wrote:
-> >> Expand the arm64 image header to allow for co-existance with
-> >> PE/COFF header required by the EFI stub.  The PE/COFF format
-> >> requires the "MZ" header to be at offset 0, and the offset
-> >> to the PE/COFF header to be at offset 0x3c.  The image
-> >> header is expanded to allow 2 instructions at the beginning
-> >> to accommodate a benign intruction at offset 0 that includes
-> >> the "MZ" header, a magic number, and the offset to the PE/COFF
-> >> header.
-> >>
-> >>
-> >> Signed-off-by: Roy Franz <roy.franz@linaro.org>
-> >> ---
-> >>  Documentation/arm64/booting.txt |   16 +++++++++++++---
-> >>  arch/arm64/kernel/head.S        |    8 ++++++++
-> >>  2 files changed, 21 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> >> index 9c4d388..5273c4d 100644
-> >> --- a/Documentation/arm64/booting.txt
-> >> +++ b/Documentation/arm64/booting.txt
-> >> @@ -68,13 +68,23 @@ Image target is available instead.
-> >>
-> >>  Requirement: MANDATORY
-> >>
-> >> -The decompressed kernel image contains a 32-byte header as follows:
-> >> +The decompressed kernel image contains a 64-byte header as follows:
-> >>
-> >> -  u32 magic  = 0x14000008;   /* branch to stext, little-endian */
-> >> -  u32 res0   = 0;            /* reserved */
-> >> +  u32 code0;                 /* Executable code */
-> >> +  u32 code1;                 /* Executable code */
-> >>    u64 text_offset;           /* Image load offset */
-> >> +  u64 res0   = 0;            /* reserved */
-> >>    u64 res1   = 0;            /* reserved */
-> >>    u64 res2   = 0;            /* reserved */
-> >> +  u64 res3   = 0;            /* reserved */
-> >> +  u64 res4   = 0;            /* reserved */
-> >> +  u32 magic  = 0x644d5241;   /* Magic number, little endian, "ARM\x64" */
-> >> +  u32 res5 = 0;                      /* reserved */
-> >> +
-> >> +
-> >> +Header notes:
-> >> +
-> >> +- code0/code1 are responsible for branching to stext.
+On 15 August 2013 17:56, Greg KH <greg@kroah.com> wrote:
+>
+> On Thu, Aug 15, 2013 at 10:24:41AM +0200, Ard Biesheuvel wrote:
+> > On 15 August 2013 10:05, Greg KH <greg@kroah.com> wrote:
+> > > On Thu, Aug 15, 2013 at 03:45:13PM +0800, Barry Song wrote:
+> > >> 2013/8/15 Jassi Brar <jassisinghbrar@gmail.com>:
+> > >> > On Thu, Aug 15, 2013 at 9:58 AM, Greg KH <greg@kroah.com> wrote:
+> > >> >> On Thu, Aug 15, 2013 at 11:44:30AM +0800, Barry Song wrote:
 > >
-> > Do we really want to change the already documented image header? Any
-> > existing bootloaders which check the magic number would stop working.
-> > In my preliminary patches to add an efi stub, I avoid that by making
-> > an Image.efi which is an Image file with pe/coff header prepended. I
-> > could easily switch to using the above header change, but wanted to
-> > point out an alternative that doesn't change the already established
-> > header.
+> > [...]]
 > >
-> > --Mark
+> > >> we will run rtos+linux instead of linux+linux. typically, Auto
+> > >> industry has long history to use rtos. on the other hand, we need to
+> > >> boot the rtos very fast in hundreds of milliseconds to make sure
+> > >> rearview, early audio have been ready.
+> > >
+> > > But Linux is a RTOS, and a really good one at that.  Linux already boots
+> > > that fast, and solves the rearview/early audio issue just fine (I've
+> > > seen it demoed), so please don't think that Linux can't do this.
+> > >
+> > > Again, what is the requirements of this RTOS that prevent you from using
+> > > Linux instead in that "secure" part of the chip?  What do we need to
+> > > change in order to meet this need?
+> > >
 > >
-> 
-> Hi Mark,
-> 
->    Yes, we do want to make the change, as one the goals is to have a
-> single binary format, not multiple formats.  This was discussed fairly
-> extensively at LCE, and I think my patch represents the consensus on
-> how the EFI stub should be integrated.
-> Also, since it is early enough in the arm64 development this should be
-> a relatively easy time to make it.  I don't think that the current
-> magic number is checked in the current UEFI loader, as the image boots
-> fine with either header.  If the current ARM64 loaders don't check the
-> magic number, then they will work with either format, since the entry
-> point is the same.
-> 
-> Roy
+> > In my experience, there are two similar yet different use cases:
+> > - the desire to co-host a RTOS on the CPU next to Linux, to perform
+> > real-time tasks like software defined radio, fast boot times etc.
+> > - the desire to secure devices using TrustZone, without putting a full
+> > fledged kernel on the secure side due to memory constraints (note that
+> > in many designs, the only secure memory is the on-SoC SRAM)
+> >
+> > As the requirements are almost orthogonal, we should not pretend they
+> > are the same thing.
+>
+> I'm not pretending they are the same thing, but I am wanting to know how
+> Linux doesn't work for either of those requirements, as I want to see
+> Linux be the solution for this "trusted" kernel as well.
+>
 
-That's fine. I wasn't at LCE, so I just wanted to avoid doubt and point
-out the alternative. Either way works for the main part of the efi stub
-so I'm okay with whatever uncompressed image header is used.
+For the former case, there is the assumption (or misconception) that
+Linux cannot deliver the boot speed or bounded worst case response
+time requirements imposed by things like software defined radio. Also,
+there is the existing codebase of RTOS hosted CAN stacks etc, that
+have been certified by the [automotive] customer and are moved from a
+dedicated MCU into the application CPU as a cost saving measure. This
+means that even if Linux does fit the bill in principle, many will
+still have no choice other than to go with non-Linux.
 
---Mark
+For the latter case, it depends on the compatibility of Linux with the
+restricted secure world environment, most notably the secure memory.
+256k of on chip SRAM is sufficient to do plenty of interesting things
+in the secure world, but sadly, running Linux is not one of them. (I
+know PoP DDR is considered to be secure memory by some vendors as
+well, but its application is not as widespread in the automotive
+world)
+
+
+Regards,
+
+--
+Ard.
