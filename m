@@ -1,35 +1,37 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 15 Aug 2013 13:46:12 +0100
-Subject: [PATCH 0/3] of: add update device node status via cmdline feature
-In-Reply-To: <520CCB70.8090908@gmail.com>
-References: <1376564133-11286-1-git-send-email-b29396@freescale.com>
- <520CCB70.8090908@gmail.com>
-Message-ID: <CACxGe6tdvdFsAHjEZK8fuHNEgV+JW8K2GfLN0gD3HfSopb4Kfw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Aug 2013 13:59:06 +0100
+Subject: [PATCH v8 0/2] TWL6030, TWL6032 GPADC driver
+In-Reply-To: <520CB566.2050201@kernel.org>
+References: <1374758813-6539-1-git-send-email-oleksandr.kozaruk@ti.com>
+ <20130815091216.GB28366@e106331-lin.cambridge.arm.com>
+ <520CB566.2050201@kernel.org>
+Message-ID: <20130815125906.GA32421@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 1:37 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 08/15/2013 05:55 AM, Dong Aisheng wrote:
->> We meet some boards having a lot of pin conflicts between different devices,
->> only one of them can be enabled to run at one time.
->>
->> e.g. imx6q sabreauto board, i2c, spi, weim, flexcan, uart and etc involved
->> with pin conflict.
->>
->> Instead of changing dts manually or adding a lot dts files according to
->> different device availability, we provide feature to dynamically update the
->> device node status via command line, then those devices involved with
->> pin conflict can be enabled or disabled dynamically.
->>
->> It's conveniently to use and can save a lot dts board files, also can
->> permenantly fix the pin conflicts issue.
->
-> This doesn't scale either with updating of lots devices or when the next
-> person comes along and wants to edit another property.
->
-> This is something u-boot is perfectly capable of handling and updating
-> status is something lots of boards already do.
+On Thu, Aug 15, 2013 at 12:03:02PM +0100, Jonathan Cameron wrote:
+> 
+> >> The changes to the original driver:
+> >> - device tree adaptation;
+> > 
+> > I couldn't see a binding document in this series or in mainline. Have I
+> > looked in the wrong places?
+> 
+> Nothing explicit supplied, but does it need one given it is doing only
+> iio bindings (bindings/iio/iio-bindings.txt)
+> plus twl child bindings
+> (bindings/mfd/twl-family.txt)
 
-+1
+Every binding needs to be documented.
 
-g.
+> 
+> If it does, I guess absolutely everything does, then fair enough!
+> I guess that would make sense as there is no way for someone writing
+> a device tree to know that there is nothing else to be specified.
+
+Yup, that's why. Also, Linux isn't necessarily the only consumer, and
+other consumers shouldn't need to read Linux code to figure out how a
+particular binding is supposed to look.
+
+Cheers,
+Mark.
