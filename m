@@ -1,82 +1,131 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 15 Aug 2013 11:25:23 -0500
-Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <520C9AEA.6030507@arm.com>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
- <2CD735CE-3FCF-4AB5-89C0-D813ECD19F11@codeaurora.org>
- <520C9AEA.6030507@arm.com>
-Message-ID: <ADB3A138-838D-4437-853A-ABFCB0B32FAB@codeaurora.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 15 Aug 2013 13:27:52 -0300
+Subject: [PATCH v4 5/6] clocksource: armada-370-xp: Fix device-tree binding
+In-Reply-To: <20130814152621.GA18868@e106331-lin.cambridge.arm.com>
+References: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1376404995-24548-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130814152621.GA18868@e106331-lin.cambridge.arm.com>
+Message-ID: <20130815162751.GA2403@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mark,
 
-On Aug 15, 2013, at 4:10 AM, Punit Agrawal wrote:
+Thanks a lot for reviewing this.
 
-> Hi Kumar,
+On Wed, Aug 14, 2013 at 04:26:21PM +0100, Mark Rutland wrote:
 > 
-> Thanks for a review of the bindings.
+> On Tue, Aug 13, 2013 at 03:43:14PM +0100, Ezequiel Garcia wrote:
+> > This commit fixes the DT binding for the Armada 370/XP SoC timer.
+> > The previous "marvell,armada-370-xp-timer" compatible is removed and
+> > two new compatible strings are introduced: "marvell,armada-xp-timer"
+> > and "marvell,armada-370-timer".
+> > 
+> > The rationale behind this change is that the Armada 370 SoC and the
+> > Armada XP SoC timers are not really compatible:
+> > 
+> >   * Armada 370 has no 25 MHz fixed timer.
+> > 
+> >   * Armada XP cannot work properly without such 25 MHz fixed timer
+> >     as doing otherwise leads to using a clocksource whose frequency
+> >     varies when doing cpufreq frequency changes.
+> > 
+> > This commit also removes the "marvell,timer-25Mhz" property, given
+> > it's now meaningless.
 > 
-> On 14/08/13 22:03, Kumar Gala wrote:
->> 
->> On Jul 23, 2013, at 4:19 AM, Punit Agrawal wrote:
->> 
->>> The CCI PMU can profile bus transactions at the master and slave
->>> interfaces of the CCI. The PMU can be used to observe an aggregated view
->>> of the bus traffic between the various components connected to the CCI.
->>> 
->>> Extend the existing CCI driver to support the PMU by registering a perf
->>> backend for it.
->>> 
->>> Document the device tree binding to describe the CCI PMU.
->>> 
->>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Cc: Nicolas Pitre <nico@linaro.org>
->>> Cc: Dave Martin <dave.martin@linaro.org>
->>> Cc: Rob Herring <rob.herring@calxeda.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->>> Reviewed-by: Will Deacon <will.deacon@arm.com>
->>> ---
->>> Documentation/devicetree/bindings/arm/cci.txt |   38 ++
->>> drivers/bus/arm-cci.c                         |  642 +++++++++++++++++++++++++
->>> 2 files changed, 680 insertions(+)
->>> 
->>> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
->>> index 92d36e2..5bc95e5 100644
->>> --- a/Documentation/devicetree/bindings/arm/cci.txt
->>> +++ b/Documentation/devicetree/bindings/arm/cci.txt
->>> @@ -79,6 +79,34 @@ specific to ARM.
->>> 				    corresponding interface programming
->>> 				    registers.
->>> 
->>> +	- CCI PMU node
->>> +
->>> +		Node name must be "pmu".
->>> +		Parent node must be CCI interconnect node.
->>> +
->>> +		A CCI pmu node must contain the following properties:
->>> +
->>> +		- compatible
->>> +			Usage: required
->>> +			Value type: <string>
->>> +			Definition: must be set to one of
->>> +				    "arm,cci-400-pmu"
->>> +				    "arm,cci-400-pmu,rev0"
->>> +				    "arm,cci-400-pmu,rev1"
->> 
->> Do you really mean only one?  Seems like ""arm,cci-400-pmu,rev0", "arm,cci-400-pmu" would be valid.
->> 
+> Given we have a mechanism already for handling this, I'm not sure. The
+> new binding certainly looks nicer (and if there's no-one using it, then
+> migrating makes sense), but I still have concerns about it. From the
+> description of the problem, and a look at the driver, the timer hardware
+> actually has (at least) two clock inputs:
 > 
-> Hmm... yes both would be valid. But...
+> (a) Wired to a fixed 25MHz clock on the XP, but not described.
+>     Not wired to anything on the 370?
 > 
-> The event numbering scheme changed between Rev 0 and Rev 1 of the CCI. If the revision is specified then it is used to get the event ranges to validate the events. If not, i.e., "arm,cci-400-pmu" is used, then the driver tries to find the the revision by reading the peripheral id registers.
+> (b) Wired to the CPU clock on the XP?
+>     Wired to some external clock on the 370.
 > 
-> I was trying to make the bindings robust in the face of change in behaviour between different revisons of the IP.
 
-If there is a periph id register why bother with the device tree having different version info in it?
+Mmm.. I don't think the above describes the situation.
 
-- k
+> If that's the case, this should be described, even if we can't use that
+> information right now. (a) can be a 25MHz fixed-clock on the XP, and
+> just not described on the 370. We can use clock-names to handle the
+> optional presence of any input clock.
+> 
+> Having separate compatible strings may still make sense, but I'd prefer
+> to understand the hardware better first. Not having full visibility over
+> a piece of hardware at review stage is precisely why we get into a mess
+> trying to change bindings later.
+> 
 
+I agree completely, let me try to describe the hardware better then.
+
+First of all let's consider Armada 370 and Armada XP as not compatible,
+they are different hardwares from my point of view.
+
+Armada 370
+----------
+
+A single clock source is available for timer and watchdog counters:
+
+Timer and watchdog counters decrement rate is a configurable ratio
+of the L2/coherency fabric clock. The current clocksource driver
+implementation chooses an abritrary ratio.
+
+So, for this hardware the DT binding proposed in this patch is, IMO, accurate:
+
+timer {
+	compatible = "marvell,armada-370-timer";
+	reg = ...
+	interrupts = ...
+	clocks = <&coreclk 2>; /*  L2/coherency fabric clock  */
+};
+
+Armada XP
+---------
+
+Two clock sources are available for timer and watchdog counters:
+
+Just as explained for the Armada 370, the timer and watchdog counters decrement
+rate is a configurable ratio of the L2/coherency fabric clock.
+The current clocksource driver implementation chooses an abritrary ratio.
+
+In addition to this, both timer and watchdog counter rate can be configured
+to use an (internal) 25 MHz fixed clock.
+
+However, and as explained in this patchset, using the letter fixed clock is in
+practice the only choice. Once CPUFreq support is implemented for the
+Armada XP SoC the L2/coherency fabric clock will change its rate, and handling
+such change will be problematic.
+
+For this reason, the DT binding proposed is:
+
+timer {
+	compatible = "marvell,armada-xp-timer";
+	reg = ...
+	interrupts = ...
+};
+
+Maybe the most accurate representation would be something like this...
+
+timer {
+	compatible = "marvell,armada-xp-timer";
+	reg = ...
+	interrupts = ...
+	clocks = ... /* either 25 MHz fixed clock
+	              * or L2/coherency fabric clock */
+};
+
+... adding a clock property to represent the actual clock source,
+but I think such property can be added later on top of the current
+patchset.
+
+In other words, from my point of view, the current proposal is fine,
+and represents the hardware in the best way possible.
+
+Of course, I'm open to discussion. What do you think?
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
