@@ -1,268 +1,51 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Thu, 15 Aug 2013 18:09:40 +0100
-Subject: [RFC PATCH 4/4] of: move of_get_cpu_node implementation to DT core
- library
-In-Reply-To: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Date: Thu, 15 Aug 2013 18:09:36 +0100
+Subject: [RFC PATCH 0/4] DT: move of_get_cpu_node from PPC to DT core
+In-Reply-To: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1376586580-5409-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-This patch moves the generalized implementation of of_get_cpu_node from
-PowerPC to DT core library, thereby adding support for retrieving cpu
-node for a given logical cpu index on any architecture.
+Hi,
 
-The CPU subsystem can now use this function to assign of_node in the
-cpu device while registering CPUs.
+This series needs to be prepended with the original series[1][2][3]
+Except the first patch in the original series(which is merged into this
+as last patch), there is no other change(apart from function signature)
+I am posting only this part for feedback separately for review as the
+original series is already reviewed. Once this part is review and aknowledged
+I will combine the complete series and post it.
 
-It is recommended to use these helper function only in pre-SMP/early
-initialisation stages to retrieve CPU device node pointers in logical
-ordering. Once the cpu devices are registered, it can be retrieved easily
-from cpu device of_node which avoids unnecessary parsing and matching.
+Hi Rob,
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
----
- arch/powerpc/include/asm/prom.h |  3 --
- arch/powerpc/kernel/prom.c      | 55 ------------------------
- drivers/of/base.c               | 94 +++++++++++++++++++++++++++++++++++++++++
- include/linux/cpu.h             |  1 +
- include/linux/of.h              |  7 +++
- 5 files changed, 102 insertions(+), 58 deletions(-)
+Since the compatible 'ibm,ppc-interrupt-server#s' is one-off and for
+historical reasons, if future architectures are adhering to ePAPR,
+IMO having a weak definition of arch_of_cpu_get_node as you suggested
+could lead to it's misuse in future. So I didn't take that approach.
 
-diff --git a/arch/powerpc/include/asm/prom.h b/arch/powerpc/include/asm/prom.h
-index bc2da15..ac204e0 100644
---- a/arch/powerpc/include/asm/prom.h
-+++ b/arch/powerpc/include/asm/prom.h
-@@ -43,9 +43,6 @@ void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
- 
- extern void kdump_move_device_tree(void);
- 
--/* CPU OF node matching */
--struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
--
- /* cache lookup */
- struct device_node *of_find_next_cache_node(struct device_node *np);
- 
-diff --git a/arch/powerpc/kernel/prom.c b/arch/powerpc/kernel/prom.c
-index 594c9f9..1c14cd4 100644
---- a/arch/powerpc/kernel/prom.c
-+++ b/arch/powerpc/kernel/prom.c
-@@ -870,61 +870,6 @@ bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
- 	return (int)phys_id == get_hard_smp_processor_id(cpu);
- }
- 
--static bool __of_find_n_match_cpu_property(struct device_node *cpun,
--			const char *prop_name, int cpu, unsigned int *thread)
--{
--	const __be32 *cell;
--	int ac, prop_len, tid;
--	u64 hwid;
--
--	ac = of_n_addr_cells(cpun);
--	cell = of_get_property(cpun, prop_name, &prop_len);
--	if (!cell)
--		return false;
--	prop_len /= sizeof(*cell);
--	for (tid = 0; tid < prop_len; tid++) {
--		hwid = of_read_number(cell, ac);
--		if (arch_match_cpu_phys_id(cpu, hwid)) {
--			if (thread)
--				*thread = tid;
--			return true;
--		}
--	}
--	return false;
--}
--
--/* Find the device node for a given logical cpu number, also returns the cpu
-- * local thread number (index in ibm,interrupt-server#s) if relevant and
-- * asked for (non NULL)
-- */
--struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
--{
--	struct device_node *cpun, *cpus;
--
--	cpus = of_find_node_by_path("/cpus");
--	if (!cpus) {
--		pr_warn("Missing cpus node, bailing out\n");
--		return NULL;
--	}
--
--	for_each_child_of_node(cpus, cpun) {
--		if (of_node_cmp(cpun->type, "cpu"))
--			continue;
--
--		/* Check for ibm,ppc-interrupt-server#s. If it doesn't exist
--		 * fallback to "reg" property and assume no threads
--		 */
--		if (__of_find_n_match_cpu_property(cpun,
--				"ibm,ppc-interrupt-server#s", cpu, thread))
--			return cpun;
--
--		if (__of_find_n_match_cpu_property(cpun, "reg", cpu, thread))
--			return cpun;
--	}
--	return NULL;
--}
--EXPORT_SYMBOL(of_get_cpu_node);
--
- #if defined(CONFIG_DEBUG_FS) && defined(DEBUG)
- static struct debugfs_blob_wrapper flat_dt_blob;
- 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 5c54279..d088e45 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -18,6 +18,7 @@
-  *      2 of the License, or (at your option) any later version.
-  */
- #include <linux/ctype.h>
-+#include <linux/cpu.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/spinlock.h>
-@@ -230,6 +231,99 @@ const void *of_get_property(const struct device_node *np, const char *name,
- }
- EXPORT_SYMBOL(of_get_property);
- 
-+/*
-+ * arch_match_cpu_phys_id - Match the given logical CPU and physical id
-+ *
-+ * @cpu: logical index of a cpu
-+ * @phys_id: physical identifier of a cpu
-+ *
-+ * CPU logical to physical index mapping is architecture specific.
-+ * However this __weak function provides a default match of physical
-+ * id to logical cpu index.
-+ *
-+ * Returns true if the physical identifier and the logical index correspond
-+ * to the same cpu, false otherwise.
-+ */
-+bool __weak arch_match_cpu_phys_id(int cpu, u64 phys_id)
-+{
-+	return (u32)phys_id == cpu;
-+}
-+
-+/**
-+ * Checks if the given "prop_name" property holds the physical id of the
-+ * core/thread corresponding to the logical cpu 'cpu'. If 'thread' is not
-+ * NULL, local thread number within the core is returned in it.
-+ */
-+static bool __of_find_n_match_cpu_property(struct device_node *cpun,
-+			const char *prop_name, int cpu, unsigned int *thread)
-+{
-+	const __be32 *cell;
-+	int ac, prop_len, tid;
-+	u64 hwid;
-+
-+	ac = of_n_addr_cells(cpun);
-+	cell = of_get_property(cpun, prop_name, &prop_len);
-+	if (!cell)
-+		return false;
-+	prop_len /= sizeof(*cell);
-+	for (tid = 0; tid < prop_len; tid++) {
-+		hwid = of_read_number(cell, ac);
-+		if (arch_match_cpu_phys_id(cpu, hwid)) {
-+			if (thread)
-+				*thread = tid;
-+			return true;
-+		}
-+	}
-+	return false;
-+}
-+
-+/**
-+ * of_get_cpu_node - Get device node associated with the given logical CPU
-+ *
-+ * @cpu: CPU number(logical index) for which device node is required
-+ * @thread: if not NULL, local thread number within the physical core is
-+ *          returned
-+ *
-+ * The main purpose of this function is to retrieve the device node for the
-+ * given logical CPU index. It should be used to initialize the of_node in
-+ * cpu device. Once of_node in cpu device is populated, all the further
-+ * references can use that instead.
-+ *
-+ * CPU logical to physical index mapping is architecture specific and is built
-+ * before booting secondary cores. This function uses arch_match_cpu_phys_id
-+ * which can be overridden by architecture specific implementation.
-+ *
-+ * Returns a node pointer for the logical cpu if found, else NULL.
-+ */
-+struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
-+{
-+	struct device_node *cpun, *cpus;
-+
-+	cpus = of_find_node_by_path("/cpus");
-+	if (!cpus) {
-+		pr_warn("Missing cpus node, bailing out\n");
-+		return NULL;
-+	}
-+
-+	for_each_child_of_node(cpus, cpun) {
-+		if (of_node_cmp(cpun->type, "cpu"))
-+			continue;
-+#ifdef CONFIG_PPC
-+		/* Check for historical "ibm,ppc-interrupt-server#s" property
-+		 * for thread ids on PowerPC. If it doesn't exist fallback to
-+		 * standard "reg" property.
-+		 */
-+		if (__of_find_n_match_cpu_property(cpun,
-+				"ibm,ppc-interrupt-server#s", cpu, thread))
-+			return cpun;
-+#endif
-+		if (__of_find_n_match_cpu_property(cpun, "reg", cpu, thread))
-+			return cpun;
-+	}
-+	return NULL;
-+}
-+EXPORT_SYMBOL(of_get_cpu_node);
-+
- /** Checks if the given "compat" string matches one of the strings in
-  * the device's "compatible" property
-  */
-diff --git a/include/linux/cpu.h b/include/linux/cpu.h
-index ab0eade..3dfed2b 100644
---- a/include/linux/cpu.h
-+++ b/include/linux/cpu.h
-@@ -28,6 +28,7 @@ struct cpu {
- extern int register_cpu(struct cpu *cpu, int num);
- extern struct device *get_cpu_device(unsigned cpu);
- extern bool cpu_is_hotpluggable(unsigned cpu);
-+extern bool arch_match_cpu_phys_id(int cpu, u64 phys_id);
- 
- extern int cpu_add_dev_attr(struct device_attribute *attr);
- extern void cpu_remove_dev_attr(struct device_attribute *attr);
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 1fd08ca..c0bb2f1 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -266,6 +266,7 @@ extern int of_device_is_available(const struct device_node *device);
- extern const void *of_get_property(const struct device_node *node,
- 				const char *name,
- 				int *lenp);
-+extern struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
- #define for_each_property_of_node(dn, pp) \
- 	for (pp = dn->properties; pp != NULL; pp = pp->next)
- 
-@@ -459,6 +460,12 @@ static inline const void *of_get_property(const struct device_node *node,
- 	return NULL;
- }
- 
-+static inline struct device_node *of_get_cpu_node(int cpu,
-+					unsigned int *thread)
-+{
-+	return NULL;
-+}
-+
- static inline int of_property_read_u64(const struct device_node *np,
- 				       const char *propname, u64 *out_value)
- {
+Regards,
+Sudeep
+
+Sudeep KarkadaNagesha (4):
+  microblaze: remove undefined of_get_cpu_node declaration
+  openrisc: remove undefined of_get_cpu_node declaration
+  powerpc: refactor of_get_cpu_node to support other architectures
+  of: move of_get_cpu_node implementation to DT core library
+
+ arch/microblaze/include/asm/prom.h |  3 --
+ arch/openrisc/include/asm/prom.h   |  3 --
+ arch/powerpc/include/asm/prom.h    |  3 --
+ arch/powerpc/kernel/prom.c         | 43 +----------------
+ drivers/of/base.c                  | 94 ++++++++++++++++++++++++++++++++++++++
+ include/linux/cpu.h                |  1 +
+ include/linux/of.h                 |  7 +++
+ 7 files changed, 104 insertions(+), 50 deletions(-)
+
 -- 
 1.8.1.2
+
+[1] https://lkml.org/lkml/2013/7/15/128
+[2] https://lkml.org/lkml/2013/7/17/341
+[3] https://lkml.org/lkml/2013/7/22/219
