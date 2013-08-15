@@ -1,39 +1,144 @@
-From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
-Date: Thu, 15 Aug 2013 11:31:37 +0530
-Subject: [PATCH v4 5/5] ARM: davinci: da850: add OF_DEV_AUXDATA entry for eth0.
-In-Reply-To: <1376546497-26931-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1376546497-26931-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <1376546497-26931-6-git-send-email-prabhakar.csengg@gmail.com>
+From: d.kasatkin@samsung.com (Dmitry Kasatkin)
+Date: Thu, 15 Aug 2013 09:23:18 +0300
+Subject: [PATCH 02/10] crypto: omap-aes: Add useful debug macros
+In-Reply-To: <520C472D.8000904@ti.com>
+References: <1376521969-16807-1-git-send-email-joelf@ti.com>
+ <1376521969-16807-3-git-send-email-joelf@ti.com>
+ <1376522998.1949.118.camel@joe-AO722> <520C156D.2090003@ti.com>
+ <1376527636.1949.120.camel@joe-AO722> <520C472D.8000904@ti.com>
+Message-ID: <520C73D6.3010904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+On 15/08/13 06:12, Joel Fernandes wrote:
+> On 08/14/2013 07:47 PM, Joe Perches wrote:
+>> On Wed, 2013-08-14 at 18:40 -0500, Joel Fernandes wrote:
+>>> On 08/14/2013 06:29 PM, Joe Perches wrote:
+>>>> On Wed, 2013-08-14 at 18:12 -0500, Joel Fernandes wrote:
+>>>>> When DEBUG is enabled, these macros can be used to print variables
+>>>>> in integer and hex format, and clearly display which registers,
+>>>>> offsets and values are being read/written , including printing the
+>>>>> names of the offsets and their values.
+>>>> []
+>>>>> diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
+>>>> []
+>>>>> @@ -15,6 +15,14 @@
+>>>>>  
+>>>>>  #define pr_fmt(fmt) "%s: " fmt, __func__
+>>>>>  
+>>>>> +#ifdef DEBUG
+>>>>> +#define prn(num) printk(#num "=%d\n", num)
+>>>>> +#define prx(num) printk(#num "=%x\n", num)
+>>>> pr_debug?
+>>> Sure, can change that.
+>>>
+>>>>> +#else
+>>>>> +#define prn(num) do { } while (0)
+>>>>> +#define prx(num)  do { } while (0)
+>>>>> +#endif
+>>>> []
+>>>>> @@ -172,13 +180,35 @@ struct omap_aes_dev {
+>>>>>  static LIST_HEAD(dev_list);
+>>>>>  static DEFINE_SPINLOCK(list_lock);
+>>>>>  
+>>>>> +#ifdef DEBUG
+>>>>> +#define omap_aes_read(dd, offset)					\
+>>>>> +	do {								\
+>>>>> +		omap_aes_read_1(dd, offset);				\
+>>>>> +		pr_debug("omap_aes_read(" #offset ")\n");		\
+>>>>> +	} while (0)
+>>>>> +
+>>>>> +static inline u32 omap_aes_read_1(struct omap_aes_dev *dd, u32 offset)
+>>>>> +#else
+>>>>>  static inline u32 omap_aes_read(struct omap_aes_dev *dd, u32 offset)
+>>>>> +#endif
+>>>>>  {
+>>>>>  	return __raw_readl(dd->io_base + offset);
+>>>>>  }
+>>>>>  
+>>>>> +#ifdef DEBUG
+>>>>> +#define omap_aes_write(dd, offset, value)				\
+>>>>> +	do {								\
+>>>>> +		pr_debug("omap_aes_write(" #offset "=%x) value=%d\n",	\
+>>>>> +			 offset, value);				\
+>>>>> +		omap_aes_write_1(dd, offset, value);			\
+>>>>> +	} while (0)
+>>>>> +
+>>>>> +static inline void omap_aes_write_1(struct omap_aes_dev *dd, u32 offset,
+>>>>> +				  u32 value)
+>>>>> +#else
+>>>>>  static inline void omap_aes_write(struct omap_aes_dev *dd, u32 offset,
+>>>>>  				  u32 value)
+>>>>> +#endif
+>>>>>  {
+>>>>>  	__raw_writel(value, dd->io_base + offset);
+>>>>>  }
+>>>> Umm, yuck?
+>>>>
+>>>> Is there any real value in read_1 and write_1?
+>>> Can you be more descriptive? There is a lot of value in them for debug
+>>> to show clearly sequence of read/writes. Moreover, they are no-op'd when
+>>> DEBUG is disabled.
+>> pr_debug is no-op'd when DEBUG is not #defined.
+>> so just use a single
+>>
+>> omap_aes_write(...)
+>> {
+>> 	pr_debug(...)
+>> 	__raw_writel(...);
+>> }
+> Actually this doesn't work, as the pr_debug cannot print the name of the
+> offset as my original patch set does using "#offset".
+>
+> There are many places where named offsets are used to pass to
+> read/write, and this macro helps to visually see which offset is being
+> written to by name.
+>
+> So the original patch would stand in its current form except for a small
+> rewrite of the write debug part of it as follows to be cleaner getting
+> rid of the _1. For the read , we still need it as we need to return the
+> value from a function which cannot be done in a macro.
+>
+> So the new patch would look something like this:
+>
+> #ifdef DEBUG
+> #define omap_aes_read(dd, offset)                                      \
+>                 omap_aes_read_1(dd, offset);                           \
+>                 pr_debug("omap_aes_read(" #offset ")\n");
+> static inline u32 omap_aes_read_1(struct omap_aes_dev *dd, u32 offset)
+> #else
+> static inline u32 omap_aes_read(struct omap_aes_dev *dd, u32 offset)
+> #endif
+> {
+>         return __raw_readl(dd->io_base + offset);
+> }
 
-Add OF_DEV_AUXDATA for eth0  driver in da850 board dt
-file to use emac clock.
+Bellow version "write" looks much more readable - never re-define
+function signature by macro.
+Above should be similar as well...
 
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- Changes for V2: none
- Changes for V3: none
- Changes for v4: none
+> #ifdef DEBUG
+> #define omap_aes_write(dd, offset, value)                              \
+>         do {                                                           \
+>                 pr_debug("omap_aes_write(" #offset "=%x) value=%d\n",  \
+>                          offset, value);                               \
+>                 __raw_writel(value, dd->io_base + offset);             \
+>         } while (0)
+> #else
+> static inline void omap_aes_write(struct omap_aes_dev *dd, u32 offset,
+>                                   u32 value)
+> {
+>         __raw_writel(value, dd->io_base + offset);
+> }
+> #endif
 
- arch/arm/mach-davinci/da8xx-dt.c |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index d172563..caa9202 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -44,6 +44,9 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ns16550a", 0x01d0c000, "serial8250.1", NULL),
- 	OF_DEV_AUXDATA("ns16550a", 0x01d0d000, "serial8250.2", NULL),
- 	OF_DEV_AUXDATA("ti,davinci_mdio", 0x01e24000, "davinci_mdio.0", NULL),
-+	OF_DEV_AUXDATA("ti,davinci-dm6467-emac", 0x01e20000, "davinci_emac.1",
-+		       NULL),
-+
- 	{}
- };
- 
--- 
-1.7.9.5
+>
+>
+> Thanks,
+>
+> -Joel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-crypto" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
