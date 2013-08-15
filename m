@@ -1,102 +1,81 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Thu, 15 Aug 2013 16:08:57 +0800
-Subject: [v3 1/2] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <520C4E98.6020001@gmail.com>
-References: <1376497189-21298-1-git-send-email-zonque@gmail.com>
- <CADApbegKj=AMGx4OFOBVsyk71BGis97Gw9QM_-0EsNi90pS+Hw@mail.gmail.com>
- <520C4E98.6020001@gmail.com>
-Message-ID: <CADApbejtvXvgF8jpQAyrbY3Yr=XkBech5D6fCEM+yMj8DRRY9w@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 15 Aug 2013 13:47:07 +0530
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Trustzone-based security
+ solution for ARM Linux
+In-Reply-To: <CAGsJ_4yZ7Rf7UV-1u3cG_V9mrtCWD=LYBeuKQaz0SWLYoHhwwg@mail.gmail.com>
+References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
+ <20130815042812.GA8968@kroah.com>
+ <CABb+yY1YKGkAeb-8GbadUoV5g54iCdrYGnD_VSpaNmtfXXhpyA@mail.gmail.com>
+ <CAGsJ_4yZ7Rf7UV-1u3cG_V9mrtCWD=LYBeuKQaz0SWLYoHhwwg@mail.gmail.com>
+Message-ID: <CABb+yY3CoL2i2FOXUthbv4isUYLV-cOSbHi2wwUz9KwXVNYhyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 11:44 AM, Daniel Mack <zonque@gmail.com> wrote:
-> Hi Chao,
+On Thu, Aug 15, 2013 at 1:15 PM, Barry Song <21cnbao@gmail.com> wrote:
+> 2013/8/15 Jassi Brar <jassisinghbrar@gmail.com>:
+>> On Thu, Aug 15, 2013 at 9:58 AM, Greg KH <greg@kroah.com> wrote:
+>>> On Thu, Aug 15, 2013 at 11:44:30AM +0800, Barry Song wrote:
+>>>> For the moment, there is strong markting requirement from
+>>>> IVI(In-Vehicle Infotainment) or mobile to use ARM Trustzone. We take
+>>>> IVI as an example, Auto requires security enviorment to access CAN bus
+>>>> and other car busses. Auto requires security enviorment to show
+>>>> rearview/surround view from cameras and play alert audio. on the other
+>>>> hand, IVI system is generically working as a video streaming sink and
+>>>> HDMI sink instead of a source. To support HDCP and widevine, we need
+>>>> to make sure private keys and video buffers are only visible to
+>>>> security mode. With CAN stack, video playback backend and more tasks,
+>>>> generically it requires a multi-task RTOS running in security mode
+>>>> parallel with Linux in non-security mode.
+>>>>
+>>>> Linux is a generic purpose OS with UI and all kinds of software, but
+>>>> we need to make sure even the Linux is ROOTed, RTOS in security mode
+>>>> is still active. We are able to find some opensource projects like
+>>>> SafeG[1], Multivisor[2], SierraVisor[3], but it turns out that ARM
+>>>> Linux has no rich support for this kind of architecture:
+>>>> 1. hypervisor running in monitor mode
+>>>> 2. RTOS running in security mode
+>>>> 3. Linux running in non-security mode
+>>>
+>>> "Linux" is just a kernel, not a whole operating system :)
+>>>
+>>> Anyway, why can't Linux be the RTOS kernel as well?  What are the
+>>> requirements for that kernel that Linux does not currently meet?
 >
-> On 15.08.2013 03:57, Chao Xie wrote:
->> On Thu, Aug 15, 2013 at 12:19 AM, Daniel Mack <zonque@gmail.com> wrote:
+> we will run rtos+linux instead of linux+linux. typically, Auto
+> industry has long history to use rtos. on the other hand, we need to
+> boot the rtos very fast in hundreds of milliseconds to make sure
+> rearview, early audio have been ready.
 >
->>> +static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan)
->>> +{
->>> +       struct mmp_pdma_desc_sw *sw;
->>> +       u32 curr, done = 0;
->>> +
->>> +       if (chan->dir == DMA_DEV_TO_MEM)
->>> +               curr = readl(chan->phy->base + DTADR(chan->phy->idx));
->>> +       else
->>> +               curr = readl(chan->phy->base + DSADR(chan->phy->idx));
->>> +
->>> +       list_for_each_entry(sw, &chan->chain_running, node) {
->>> +               u32 start;
->>> +               u32 len = sw->desc.dcmd & DCMD_LENGTH;
->>> +
->>> +               if (chan->dir == DMA_DEV_TO_MEM)
->>> +                       start = sw->desc.dtadr;
->>> +               else
->>> +                       start = sw->desc.dsadr;
->>> +
->>> +               if (curr >= start && curr <= (start + len)) {
->>> +                       done += curr - start;
->>> +                       break;
->>> +               }
->>> +
->>> +               done += len;
->>> +       }
->>> +
->>> +       return chan->total_len - done;
->>> +}
->>> +
+Why do you think optimized linux can't boot up in "hundereds of millisecs"?
+
+>>>
+>> Yes, in fact at least during development Linux usually runs in Secure mode.
+>> Ideally I would love to see 2 instances of Linux running - one in
+>> NonSecure mode and another in Secure mode, getting capabilities via 2
+>> corresponding DTBs reflecting the h/w partitioning done by the TZ.
+>
+> not real. i think there are similar users in linux already. at least
+> omap and exynos have some chip specific codes like omap-smc.S,
+> sleep34xx.S, exynos-smc.S and so on.
+>
+... and there are socs that has TZ but don't implement SMC (yet).
+
+> and i have explained why we don't use linux+linux.
+>
 >>
->> It seems that you will get all the residue bytes in the channel.
->> For DMA transfer, user may submit many trasaction.
->> The transaction will be composed by mutiple desctiptors. So it means
->> that chan->chain_running includes
->> the descriptors from all ongoing transactions.
->> When user try to get the tx_status, user will pass the cookie to
->> identify which transaction it want to get the status.
->> So for mmp_pdma_residue, it need care about the cookie, and find out
->> the transaction, then calculate the residue bytes.
+>>>
+>>>> 3. as some CPU time is stolen by security mode, so the scheduler need
+>>>> to get this for load balance
+>>>
+>>> Does the kernel know this time is gone?  Or is it not aware of it (like
+>>> MSIs on x86?)
+>>>
+>> The TrustedOS could share time on the same cpu as the UnTrustedOS or
+>> be assigned a dedicated cpu on an MP.
 >
-> Ok, right.
+> no. TrustedOS will not hold a whole CPU and we don't put a whole core
+> to RTOS as it has low CPU loading.
 >
->> The orignal driver has a issue, it will assign cookie for all
->> descriptors, not the transaction. I think that need to be changed.
->
-> Not necessarily. If all the linked descriptors are assigned the same
-> cookie, we can as well just walk all entries in chain_running and ignore
-> the ones that don't match the cookie we're looking for,
->
-
-In the function mmp_pdma_tx_submit
-It will assign cookie for every descriptors by
-list_for_each_entry(child, &desc->tx_list, node) {
-                cookie = dma_cookie_assign(&child->async_tx);
-        }
-So not all the descriptors in same transaction will share same cookie.
-
-> The problem with your proposed approach is that the driver will
-> currently dispose desc->tx_list via list_splice_tail_init() once the
-> transaction has been submitted, so we can't access it later. But what I
-> have in mind should work equally well. I'll post an updated patch later.
->
-The desc->tx_list will be linked to chain_running, so in chain_running, you can
-still get the mmp_pdma_desc_sw.
-So there are two ways
-1. When user submit a transaction, only the first descriptor will be
-assgined the cookie, and
-you can check chan->completed_cookie for whether the transaction is
-done or not. For the
-residue bytes, you can go through chain_running, and find out the last
-descriptor for the
-transaction by comparing the cookie. Then you can tell the residue bytes.
-For all the desriptors in the chain_running, only the descriptor has
-non-zero cookie
-is the first descriptor of the transaction.
-
-2. Assign cookie for all the desriptors in same transaction, and
-record the first one, and last one.
-Then you can calculate the residue bytes too.
-
->
-> Thanks for the review,
-> Daniel
->
+ If by "we" you mean you and your device, I can understand. Otherwise
+please have a look at some TZ whitepaper. It is possible to run in AMP
+mode where SecureOS has dedicated cpu core(s).
