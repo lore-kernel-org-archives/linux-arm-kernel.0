@@ -1,45 +1,38 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 15 Aug 2013 11:48:52 +0200
-Subject: =?utf-8?B?562U5aSNOiBbUEFUQw==?= =?utf-8?Q?H?= v3 2/2] i2c: imx:
- Add Vybrid VF610 I2C controller support
-In-Reply-To: <20130813161214.GV26614@pengutronix.de>
-References: <1375418648-22760-1-git-send-email-b35083@freescale.com>
- <1375418648-22760-2-git-send-email-b35083@freescale.com>
- <20130810140827.GC18085@e106331-lin.cambridge.arm.com>
- <B56CDBE15CE27145A4B77D2D24263E851FE7AC@039-SN1MPN1-004.039d.mgd.msft.net>
- <20130812164354.GF27165@e106331-lin.cambridge.arm.com>
- <52096E77.4040003@wwwdotorg.org>
- <20130813074620.GR26614@pengutronix.de>
- <520A5558.708@wwwdotorg.org>
- <20130813161214.GV26614@pengutronix.de>
-Message-ID: <20130815094850.GB2987@katana>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 15 Aug 2013 17:57:05 +0800
+Subject: [ARM ATTEND] CSR Maintainer, ARM Trustzone discussions
+In-Reply-To: <CACxGe6soQ6i_bJQooAN8tX=ek41ZHB4WD_CEBSohXJsXaGutxw@mail.gmail.com>
+References: <CAGsJ_4yboebTYeZMtb26oQWX5VN8UPGzxNNc7GW+zJGa8OHWMg@mail.gmail.com>
+ <CACxGe6soQ6i_bJQooAN8tX=ek41ZHB4WD_CEBSohXJsXaGutxw@mail.gmail.com>
+Message-ID: <CAGsJ_4y6LhcrSpLZoJ7bGQ39QoY28G224RpKDU-o3_k9ETX60A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2013/8/15 Grant Likely <grant.likely@secretlab.ca>:
+> Hi Barry,
+>
+> Unfortunately we've hit our limit for numbers so we can't add Binghua
+> to the invite list yet. We can check again in a week or so to see if
+> anything has changed.
 
-> I vote for having the exact SoC revision in the binding documentation
-> rather than wildcards or references to the list of i.MX SoCs. Otherwise
-> only the driver code gives a clue that the i2c driver matches imx1-i2c,
-> imx21-i2c and vf610-i2c, but not imx31-i2c.
+ok, waiting for your good news :-)
 
-Dunno if I got all right, so adding my 2 cents:
+>
+> g.
+>
+>
+> On Thu, Aug 15, 2013 at 3:18 AM, Barry Song <21cnbao@gmail.com> wrote:
+>> Hi,
+>> I have received invitation letter and confirmed my attendance. I also
+>> want to nominate Binghua Duan <Binghua.Duan@csr.com> to attend this
+>> meeting as well.
+>> we have an very important topic we want to request a presentation
+>> session and discuss with you about Trustzone-based virtualization
+>> solution for IVI and secure video playback.
+>> I will have another mail to talk about the topic in detail, but in
+>> this mail, I am just nominating Binghua Duan who is taking a key role
+>> of CSR Linux Group to get a place for the summit too.
+>>
+>> -barry
 
-Yes to adding each SoC to the binding docs. No to adding each SoC to the
-driver as a seperate 'compatible' entry if not really needed to
-distinguish IP versions. I mean imx31 should have two compatible entries
-anyhow, one for imx31 and one for imx21 as fallback, no?
-
-That all being said: Unless somebody objects, I'll pick the most recent
-VF610 series today and leave the doc fixup for later.
-
-Thanks,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130815/bc41abc3/attachment.sig>
+-barry
