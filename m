@@ -1,124 +1,27 @@
-From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
-Date: Thu, 15 Aug 2013 14:09:57 +0530
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
- with external L3-cache.
-In-Reply-To: <da83e967f5a266ca28ee54638a4a9be9@www.loen.fr>
-References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
- <f8917fe8409b1fae634c7de45e34d4a7@www.loen.fr>
- <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
- <da83e967f5a266ca28ee54638a4a9be9@www.loen.fr>
-Message-ID: <CAAHg+HiYK-kEp6=XTd89UMDOuMyvqgbMm4iDHmvDV7owHga8ug@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 15 Aug 2013 10:42:59 +0200
+Subject: [PATCH] ARM: new platform for Energy Micro's EFM32 Cortex-M3 SoCs
+In-Reply-To: <1376552964-16296-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1376552964-16296-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20130815084259.GG30496@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hello,
 
-On 15 August 2013 10:22, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Hi Anup,
->
->
-> On 2013-08-14 15:22, Anup Patel wrote:
->>
->> On Wed, Aug 14, 2013 at 5:34 PM, Marc Zyngier <marc.zyngier@arm.com>
->> wrote:
->>>
->>> Hi Pranav,
->>>
->>> On 2013-08-14 12:47, Pranavkumar Sawargaonkar wrote:
->>>>
->>>> Systems with large external L3-cache (few MBs), might have dirty
->>>> content belonging to the guest page in L3-cache. To tackle this,
->>>> we need to flush such dirty content from d-cache so that guest
->>>> will see correct contents of guest page when guest MMU is disabled.
->>>>
->>>> The patch fixes coherent_icache_guest_page() for external L3-cache.
->>>>
->>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>>> ---
->>>>  arch/arm64/include/asm/kvm_mmu.h |    2 ++
->>>>  1 file changed, 2 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/include/asm/kvm_mmu.h
->>>> b/arch/arm64/include/asm/kvm_mmu.h
->>>> index efe609c..5129038 100644
->>>> --- a/arch/arm64/include/asm/kvm_mmu.h
->>>> +++ b/arch/arm64/include/asm/kvm_mmu.h
->>>> @@ -123,6 +123,8 @@ static inline void
->>>> coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
->>>>       if (!icache_is_aliasing()) {            /* PIPT */
->>>>               unsigned long hva = gfn_to_hva(kvm, gfn);
->>>>               flush_icache_range(hva, hva + PAGE_SIZE);
->>>> +             /* Flush d-cache for systems with external caches. */
->>>> +             __flush_dcache_area((void *) hva, PAGE_SIZE);
->>>>       } else if (!icache_is_aivivt()) {       /* non ASID-tagged VIVT */
->>>>               /* any kind of VIPT cache */
->>>>               __flush_icache_all();
->>>
->>>
->>> [adding Will to the discussion as we talked about this in the past]
->>>
->>> That's definitely an issue, but I'm not sure the fix is to hit the data
->>> cache on each page mapping. It looks overkill.
->>>
->>> Wouldn't it be enough to let userspace do the cache cleaning? kvmtools
->>> knows which bits of the guest memory have been touched, and can do a "DC
->>> DVAC" on this region.
->>
->>
->> It seems a bit unnatural to have cache cleaning is user-space. I am sure
->> other architectures don't have such cache cleaning in user-space for KVM.
->>
->>>
->>> The alternative is do it in the kernel before running any vcpu - but
->>> that's not very nice either (have to clean the whole of the guest
->>> memory, which makes a full dcache clean more appealing).
->>
->>
->> Actually, cleaning full d-cache by set/way upon first run of VCPU was
->> our second option but current approach seemed very simple hence
->> we went for this.
->>
->> If more people vote for full d-cache clean upon first run of VCPU then
->> we should revise this patch.
->
->
-> Can you please give the attached patch a spin on your HW? I've boot-tested
-> it on a model, but of course I can't really verify that it fixes your issue.
->
-> As far as I can see, it should fix it without any additional flushing.
->
-> Please let me know how it goes.
->
-> Thanks,
->
->
->         M.
-> --
-> Fast, cheap, reliable. Pick two.
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+I forgot to mention that this patch depends on the following patches:
 
-Surely we will try this patch.
+ - ARM: ARMv7-M: implement restart routine common to all v7-M machines
+   sent with Message-Id: 1376494305-24270-1-git-send-email-u.kleine-koenig at pengutronix.de; and
+ - clk: new driver for efm32 SoC
+   sent with Message-Id: 1376510693-12491-1-git-send-email-u.kleine-koenig at pengutronix.de
 
-Just to add few more points to this discussion :
+So in the unlikely case you are already happy with this patch, it needs
+some coordination to go in.
 
-Actually we are already flushing d-cache in "coherent_icache_guest_page"
-by calling flush_icache_range.
+Best regards
+Uwe
 
-Now in my patch i am doing same thing one more time by calling
-__flush_dcache_area just below flush_icache_range.
-
-Main difference between d-cache flushing in above two routines is :
-flush_icache_range is flushing d-cache by point of unification (dc     cvau) and
- __flush_dcache_area is flushing that by point of coherency (dc      civac).
-
-Now since second routine is doing it by coherency it is making L3C to
-be coherent and sync changes with immediate effect and solving the
-issue.
-
-Thanks,
-Pranav
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
