@@ -1,135 +1,39 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Thu, 15 Aug 2013 18:09:39 +0100
-Subject: [RFC PATCH 3/4] powerpc: refactor of_get_cpu_node to support other
- architectures
-In-Reply-To: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1376586580-5409-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 15 Aug 2013 18:20:01 +0100
+Subject: [GIT PULL] CCI PMU driver for 3.12
+In-Reply-To: <87haeskn1o.fsf@kernel.org>
+References: <20130812172447.GG25995@mudshark.cambridge.arm.com>
+ <87haeskn1o.fsf@kernel.org>
+Message-ID: <20130815172001.GB1784@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+Hi Kevin,
 
-Currently different drivers requiring to access cpu device node are
-parsing the device tree themselves. Since the ordering in the DT need
-not match the logical cpu ordering, the parsing logic needs to consider
-that. However, this has resulted in lots of code duplication and in some
-cases even incorrect logic.
+On Wed, Aug 14, 2013 at 09:57:55PM +0100, Kevin Hilman wrote:
+> Will Deacon <will.deacon@arm.com> writes:
+> >
+> > Please can you pull the following perf update for 3.12? I was hoping to have
+> > some unwinding improvements too, but I've not had a chance to complete that
+> > work, so it's just the single patch from Punit to add support for the PMU
+> > driver on the CCI.
+> >
+> > Apologies for sending this post -rc5, but I've been travelling for the past
+> > week and had some issues testing the driver myself. If you're snowed under,
+> > feel free to queue this for 3.13 instead.
+> 
+> I'd like to see a reviewed-by or acked-by from a DT maintainer before
+> pulling this.
 
-It's better to consolidate them by adding support for getting cpu
-device node for a given logical cpu index in DT core library. However
-logical to physical index mapping can be architecture specific.
+That's fair enough; they've been quiet on the iterations of this patch so
+far. However, it looks like a conversation has kicked off on the back of
+this pull request:
 
-PowerPC has it's own implementation to get the cpu node for a given
-logical index.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/192192.html
 
-This patch refactors the current implementation of of_get_cpu_node.
-This in preparation to move the implementation to DT core library.
-It separates out the logical to physical mapping so that a default
-matching of the physical id to the logical cpu index can be added
-when moved to common code. Architecture specific code can override it.
+so I'll wait for that to settle down, then I'll send you another pull (which
+I suspect you will want to delay until 3.13).
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
----
- arch/powerpc/kernel/prom.c | 70 ++++++++++++++++++++++++++++------------------
- 1 file changed, 43 insertions(+), 27 deletions(-)
+Cheers,
 
-diff --git a/arch/powerpc/kernel/prom.c b/arch/powerpc/kernel/prom.c
-index eb23ac9..594c9f9 100644
---- a/arch/powerpc/kernel/prom.c
-+++ b/arch/powerpc/kernel/prom.c
-@@ -865,45 +865,61 @@ static int __init prom_reconfig_setup(void)
- __initcall(prom_reconfig_setup);
- #endif
- 
-+bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
-+{
-+	return (int)phys_id == get_hard_smp_processor_id(cpu);
-+}
-+
-+static bool __of_find_n_match_cpu_property(struct device_node *cpun,
-+			const char *prop_name, int cpu, unsigned int *thread)
-+{
-+	const __be32 *cell;
-+	int ac, prop_len, tid;
-+	u64 hwid;
-+
-+	ac = of_n_addr_cells(cpun);
-+	cell = of_get_property(cpun, prop_name, &prop_len);
-+	if (!cell)
-+		return false;
-+	prop_len /= sizeof(*cell);
-+	for (tid = 0; tid < prop_len; tid++) {
-+		hwid = of_read_number(cell, ac);
-+		if (arch_match_cpu_phys_id(cpu, hwid)) {
-+			if (thread)
-+				*thread = tid;
-+			return true;
-+		}
-+	}
-+	return false;
-+}
-+
- /* Find the device node for a given logical cpu number, also returns the cpu
-  * local thread number (index in ibm,interrupt-server#s) if relevant and
-  * asked for (non NULL)
-  */
- struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
- {
--	int hardid;
--	struct device_node *np;
-+	struct device_node *cpun, *cpus;
- 
--	hardid = get_hard_smp_processor_id(cpu);
-+	cpus = of_find_node_by_path("/cpus");
-+	if (!cpus) {
-+		pr_warn("Missing cpus node, bailing out\n");
-+		return NULL;
-+	}
- 
--	for_each_node_by_type(np, "cpu") {
--		const u32 *intserv;
--		unsigned int plen, t;
-+	for_each_child_of_node(cpus, cpun) {
-+		if (of_node_cmp(cpun->type, "cpu"))
-+			continue;
- 
- 		/* Check for ibm,ppc-interrupt-server#s. If it doesn't exist
- 		 * fallback to "reg" property and assume no threads
- 		 */
--		intserv = of_get_property(np, "ibm,ppc-interrupt-server#s",
--				&plen);
--		if (intserv == NULL) {
--			const u32 *reg = of_get_property(np, "reg", NULL);
--			if (reg == NULL)
--				continue;
--			if (*reg == hardid) {
--				if (thread)
--					*thread = 0;
--				return np;
--			}
--		} else {
--			plen /= sizeof(u32);
--			for (t = 0; t < plen; t++) {
--				if (hardid == intserv[t]) {
--					if (thread)
--						*thread = t;
--					return np;
--				}
--			}
--		}
-+		if (__of_find_n_match_cpu_property(cpun,
-+				"ibm,ppc-interrupt-server#s", cpu, thread))
-+			return cpun;
-+
-+		if (__of_find_n_match_cpu_property(cpun, "reg", cpu, thread))
-+			return cpun;
- 	}
- 	return NULL;
- }
--- 
-1.8.1.2
+Will
