@@ -1,44 +1,25 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 15 Aug 2013 09:00:37 +0800
-Subject: [RFC][PATCH 1/2] ARM64: add cpu topology definition
-In-Reply-To: <20130814112720.GB43445@MacBook-Pro.local>
-References: <1374921728-9007-1-git-send-email-hanjun.guo@linaro.org>
- <CAKfTPtBpo41LJ3V8TB8YwudwqpURuA2u_Lvu4KYVK=qSs+gFuQ@mail.gmail.com>
- <20130729095400.GB32383@mudshark.cambridge.arm.com>
- <20130814112720.GB43445@MacBook-Pro.local>
-Message-ID: <520C2835.6050001@linaro.org>
+From: bevenson@melinkcorp.com (Bryan Evenson)
+Date: Wed, 14 Aug 2013 21:41:55 -0400
+Subject: at91: watchdog: Can't get watchdog to trigger
+Message-ID: <91586D499ADFD74FBCFB8425266A5DE40153ADC7E586@pluto.melinkcorp.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-8-14 19:27, Catalin Marinas wrote:
-> On Mon, Jul 29, 2013 at 10:54:01AM +0100, Will Deacon wrote:
->> On Mon, Jul 29, 2013 at 10:46:06AM +0100, Vincent Guittot wrote:
->>> On 27 July 2013 12:42, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->>>> Power aware scheduling needs the cpu topology information to improve the
->>>> cpu scheduler decision making.
->>>
->>> It's not only power aware scheduling. The scheduler already uses
->>> topology and cache sharing when  CONFIG_SCHED_MC and/or
->>> CONFIG_SCHED_SMT are enable. So you should also add these configs for
->>> arm64 so the scheduler can use it
->>
->> ... except that the architecture doesn't define what the AFF fields in MPIDR
->> really represent. Using them to make key scheduling decisions relating to
->> cache proximity seems pretty risky to me, especially given the track record
->> we've seen already on AArch32 silicon. It's a convenient register if it
->> contains the data we want it to contain, but we need to force ourselves to
->> come to terms with reality here and simply use it as an identifier for a
->> CPU.
->>
->> Can't we just use the device-tree to represent this topological data for
->> arm64? Lorenzo has been working on bindings in this area.
-> 
-> Catching up on email after holiday - I agree with Will here, we should
-> use DT for representing the topology (or ACPI) and not rely on the MPIDR
-> value.
-> 
+All,
 
-Ok, I'm working on the ACPI part now, Thanks for your comments.
+I am using Atmel's stable branch of the Linux kernel (https://github.com/linux4sam/linux-at91.git, branch linux-3.6.9-at91, back at commit 5fe012d4aee98ef82df66e6763882c735902ed0f) on a AT91SAM9G25 based board.  I am having issues getting the watchdog to trigger with this version of the kernel.
 
-Regards
-Hanjun
+First, I've verified that the watchdog is enabled in the bootstrap and U-Boot.  I see the line:
+
+at91sam9_wdt: enabled (heartbeat=15 sec, nowayout=0)
+
+during boot showing that the watchdog is enabled.  I've tried triggering the watchdog by writing a single character to it from the command line (echo "0" > /dev/watchdog) and by using the two watchdog sample applications under Documentation/watchdog.  In every case I see the line:
+
+watchdog watchdog0: watchdog did not stop!
+
+But the board does not reset.  Just to make sure, I also set CONFIG_WATCHDOG_NOWAYOUT in the kernel configuration and I still have the same results.
+
+I have my kernel configuration and the device tree files for my build over at https://github.com/evensonbryan/at91sam9g25-dt.git.  Other than the device tree files and the configuration, I have not made any kernel modifications.  What do I have setup wrong?
+
+Thanks,
+Bryan
