@@ -1,75 +1,38 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 15 Aug 2013 16:22:38 +0100
-Subject: [PATCH 1/2] Documentation: devicetree: arm: cpus/cpu nodes
- bindings updates
-In-Reply-To: <520CE665.8060907@gmail.com>
-References: <1376559743-31848-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1376559743-31848-2-git-send-email-lorenzo.pieralisi@arm.com>
- <520CE665.8060907@gmail.com>
-Message-ID: <20130815152238.GF17839@e102568-lin.cambridge.arm.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 15 Aug 2013 17:30:44 +0200
+Subject: [PATCH 00/20] ARM: pxa: move core and drivers to dmaengine
+In-Reply-To: <8761v7nfmh.fsf@free.fr>
+References: <1375889649-14638-1-git-send-email-zonque@gmail.com>
+ <87zjsqzdg8.fsf@free.fr> <52061C53.4050905@gmail.com>
+ <20130814100010.GO32147@intel.com> <8761v7nfmh.fsf@free.fr>
+Message-ID: <520CF424.2060004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding Andrew, Gregory and Thomas to check the Marvell compatible names]
+On 15.08.2013 17:22, Robert Jarzmik wrote:
+> Vinod Koul <vinod.koul@intel.com> writes:
 
-On Thu, Aug 15, 2013 at 03:32:05PM +0100, Rob Herring wrote:
-> On 08/15/2013 04:42 AM, Lorenzo Pieralisi wrote:
-> > In order to extend the current cpu nodes bindings to newer CPUs
-> > inclusive of AArch64 and to update support for older ARM CPUs this
-> > patch updates device tree documentation for the cpu nodes bindings.
-> > 
-> > Main changes:
-> >     - adds 64-bit bindings
-> >     - define usage of #address-cells
-> >     - defines behaviour on pre and post v7 uniprocessor systems
-> >     - adds ARM 11MPcore specific reg property definition
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/cpus.txt | 424 ++++++++++++++++++++++---
-> >  1 file changed, 377 insertions(+), 47 deletions(-)
-> > 
+>> If you submit C, and invoke dma_async_issue_pending(), C is queued
+>> On B completetion, the DMA driver will start C and invoke callback for B.
+>>
+>> If B completes before C is submitted, after submit and invoking
+>> dma_async_issue_pending(), the C buffer will be queued and started.
+> OK, that settles it then. The API allows hot chaining, and if I understand
+> Daniel's driver properly, he already thought about it (in
+> append_pending_queue()).
+
+Just for the records: it's not my driver :) I just added some functions
+recently to make it work in DT and audio environments.
+
+> I have some homework now Daniel, I'll send you my work to include into your
+> patch serie for the review, and my tests of your patches.
 > 
-> The binding looks mostly fine to me.
-> 
-> [snip]
-> 
-> > +			    "faraday,fa526"
-> > +			    "intel,sa110"
-> > +			    "intel,sa1100"
-> > +			    "marvell,feroceon"
-> > +			    "marvell,mohawk"
-> > +			    "marvell,pj4"
-> > +			    "marvell,sheeva-v7"
-> > +			    "marvell,xsc3"
-> > +			    "marvell,xscale"
-> 
-> Better make sure the Marvell folks are happy with these. We don't need
-> another rename here. I'm too annoyed with all the renames to pay attention.
+> I need a bit of time (1 or 2 weeks), because of holidays, for my patch.
 
-Ok, I will verify that, I copied maintainers in.
+Great, thanks a lot. I extracted some of the patches of my set to
+individual trees so they can be merged for 3.12. I'll rebase my series
+once 3.12-rc1 is released.
 
-On a side note I have just noticed that last cycle some dts were merged in the
-kernel with cpu nodes that are not compliant (not picking on anyone,
-eg am4372.dtsi).
-Please prevent this from happening from now onwards, really please.
 
-> > +
-> > +Example 4 (ARM Cortex-A57 64-bit system running OS in AArch64):
-> > +
-> 
-> Going back to my comments that the dtb can't be dependent on the OS,
-> these 2 examples don't make sense.
-
-Gah, my bad sorry, I missed the examples while removing dependency on the OS
-from the bindings.
-
-> > +
-> > +Example 5 (ARM Cortex-A57 64-bit system running OS in AArch32):
-> 
-> This example should be removed.
-
-Yes, consider it done, see above.
-
-Thanks,
-Lorenzo
+Many thanks for your help,
+Daniel
