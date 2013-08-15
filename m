@@ -1,42 +1,40 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Thu, 15 Aug 2013 18:09:37 +0100
-Subject: [RFC PATCH 1/4] microblaze: remove undefined of_get_cpu_node
- declaration
+Date: Thu, 15 Aug 2013 18:09:38 +0100
+Subject: [RFC PATCH 2/4] openrisc: remove undefined of_get_cpu_node declaration
 In-Reply-To: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
  <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1376586580-5409-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1376586580-5409-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
 This patch removes the declaration of the function 'of_get_cpu_node'
-which is not defined for microblaze. This is in preparation to move
+which is not defined for openrisc. This is in preparation to move
 it's definition from PPC to DT common code.
 
-Michal Simek says: "it was just there because Microblaze
-was based on powerpc code"
+Again it could be there as it was originally copied from powerpc.
 
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-Cc: Michal Simek <monstr@monstr.eu>
+Cc: Jonas Bonn <jonas@southpole.se>
 ---
- arch/microblaze/include/asm/prom.h | 3 ---
+ arch/openrisc/include/asm/prom.h | 3 ---
  1 file changed, 3 deletions(-)
 
-diff --git a/arch/microblaze/include/asm/prom.h b/arch/microblaze/include/asm/prom.h
-index 20c5e8e..9977816 100644
---- a/arch/microblaze/include/asm/prom.h
-+++ b/arch/microblaze/include/asm/prom.h
-@@ -50,9 +50,6 @@ void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
+diff --git a/arch/openrisc/include/asm/prom.h b/arch/openrisc/include/asm/prom.h
+index bbb34e5..eb59bfe 100644
+--- a/arch/openrisc/include/asm/prom.h
++++ b/arch/openrisc/include/asm/prom.h
+@@ -44,9 +44,6 @@ void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
  
  extern void kdump_move_device_tree(void);
  
 -/* CPU OF node matching */
 -struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
 -
- #endif /* __ASSEMBLY__ */
- #endif /* __KERNEL__ */
+ /* Get the MAC address */
+ extern const void *of_get_mac_address(struct device_node *np);
  
 -- 
 1.8.1.2
