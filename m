@@ -1,38 +1,55 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 15 Aug 2013 17:57:05 +0800
-Subject: [ARM ATTEND] CSR Maintainer, ARM Trustzone discussions
-In-Reply-To: <CACxGe6soQ6i_bJQooAN8tX=ek41ZHB4WD_CEBSohXJsXaGutxw@mail.gmail.com>
-References: <CAGsJ_4yboebTYeZMtb26oQWX5VN8UPGzxNNc7GW+zJGa8OHWMg@mail.gmail.com>
- <CACxGe6soQ6i_bJQooAN8tX=ek41ZHB4WD_CEBSohXJsXaGutxw@mail.gmail.com>
-Message-ID: <CAGsJ_4y6LhcrSpLZoJ7bGQ39QoY28G224RpKDU-o3_k9ETX60A@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 15 Aug 2013 10:58:43 +0100
+Subject: Build error: versatile express
+In-Reply-To: <alpine.LFD.2.03.1308131148380.14472@syhkavp.arg>
+References: <20130812124801.GB2823@localhost.localdomain>
+ <alpine.LFD.2.03.1308121125420.14472@syhkavp.arg>
+ <20130813105227.GC2823@localhost.localdomain>
+ <alpine.LFD.2.03.1308131148380.14472@syhkavp.arg>
+Message-ID: <20130815095836.GA2562@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/8/15 Grant Likely <grant.likely@secretlab.ca>:
-> Hi Barry,
->
-> Unfortunately we've hit our limit for numbers so we can't add Binghua
-> to the invite list yet. We can check again in a week or so to see if
-> anything has changed.
+On Tue, Aug 13, 2013 at 11:50:17AM -0400, Nicolas Pitre wrote:
+> On Tue, 13 Aug 2013, Dave Martin wrote:
+> 
+> > On Mon, Aug 12, 2013 at 12:55:23PM -0400, Nicolas Pitre wrote:
+> > > On Mon, 12 Aug 2013, Dave Martin wrote:
+> > > 
+> > > > On Mon, Aug 12, 2013 at 11:28:04AM +0100, Russell King - ARM Linux wrote:
+> > > > > arch/arm/mach-vexpress/tc2_pm.c: In function 'tc2_pm_down.clone.0':
+> > > > > arch/arm/mach-vexpress/tc2_pm.c:200:1: error: fp cannot be used in asm here
+> > > > > 
+> > > > > This is caused by the assembly code in this file clobbering R11, which
+> > > > > is incompatible with having CONFIG_FRAME_POINTER=y.
+> > > > 
+> > > > Is there any reason not to fix this just by pushing/popping r11 inside
+> > > > the asm and removing it from the clobber list?
+> > > 
+> > > That's most likely the best fix.  What about this?
+> > 
+> > Were we replacing these instances with the macro, or is that still in
+> > flight?
+> 
+> I've updated the macro patch accordingly.  I prefer to submit that one 
+> separately.
 
-ok, waiting for your good news :-)
+OK, sounds good
 
->
-> g.
->
->
-> On Thu, Aug 15, 2013 at 3:18 AM, Barry Song <21cnbao@gmail.com> wrote:
->> Hi,
->> I have received invitation letter and confirmed my attendance. I also
->> want to nominate Binghua Duan <Binghua.Duan@csr.com> to attend this
->> meeting as well.
->> we have an very important topic we want to request a presentation
->> session and discuss with you about Trustzone-based virtualization
->> solution for IVI and secure video playback.
->> I will have another mail to talk about the topic in detail, but in
->> this mail, I am just nominating Binghua Duan who is taking a key role
->> of CSR Linux Group to get a place for the summit too.
->>
->> -barry
+Cheers
+---Dave
 
--barry
+> 
+> > Anyway, if useful:
+> > 
+> > Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> 
+> Thanks.
+> 
+> 
+> Nicolas
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
