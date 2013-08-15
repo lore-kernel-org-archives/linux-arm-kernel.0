@@ -1,78 +1,49 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Thu, 15 Aug 2013 16:13:33 +0100
-Subject: [PATCH v3 03/16] driver/core: cpu: initialize of_node in cpu's
- device struture
-In-Reply-To: <1804645.BcbkbcfKAA@flatron>
-References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1804645.BcbkbcfKAA@flatron>
-Message-ID: <520CF01D.4020309@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 15 Aug 2013 09:21:53 -0600
+Subject: [RFC 3/3] PCI: tegra: Support driver unbinding
+In-Reply-To: <20130815103452.GA13740@ulmo>
+References: <1376392346-14127-1-git-send-email-treding@nvidia.com>
+ <1376392346-14127-4-git-send-email-treding@nvidia.com>
+ <520BFA0C.5070001@wwwdotorg.org> <20130815103452.GA13740@ulmo>
+Message-ID: <520CF211.6060003@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/08/13 12:35, Tomasz Figa wrote:
-> Hi Sudeep,
+On 08/15/2013 04:34 AM, Thierry Reding wrote:
+> On Wed, Aug 14, 2013 at 03:43:40PM -0600, Stephen Warren wrote:
+>> On 08/13/2013 05:12 AM, Thierry Reding wrote:
+>>> Implement the platform driver's .remove() callback to free all
+>>> resources allocated during driver setup and call
+>>> pci_common_exit() to cleanup ARM specific datastructures. Unmap
+>>> the fixed PCI I/O mapping by calling the new pci_iounmap_io()
+>>> function in the new .teardown() callback.
+>>> 
+>>> Finally, no longer set the .suppress_bind_attrs field to true
+>>> to allow the driver to unbind from a device.
+>> 
+>>> +static int tegra_pcie_remove(struct platform_device *pdev) +{ 
+>>> +	struct tegra_pcie *pcie = platform_get_drvdata(pdev); +
+>>> struct tegra_pcie_bus *bus, *tmp; +	int err; + +
+>>> pci_common_exit(&pcie->sys); + +	list_for_each_entry_safe(bus,
+>>> tmp, &pcie->busses, list) { +		vunmap(bus->area->addr); +
+>>> kfree(bus); +	} + +	if (IS_ENABLED(CONFIG_PCI_MSI)) { +		err =
+>>> tegra_pcie_disable_msi(pcie); +		if (err < 0) +			return err; +
+>>> }
+>> 
+>> Wouldn't it make sense to do that as early as possible in the
+>> function, to make sure that no MSI accidentally fires after some
+>> of the cleanup has already happened?
 > 
-> On Monday 22 of July 2013 12:32:14 Sudeep KarkadaNagesha wrote:
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> CPUs are also registered as devices but the of_node in these cpu
->> devices are not initialized. Currently different drivers requiring
->> to access cpu device node are parsing the nodes themselves and
->> initialising the of_node in cpu device.
->>
->> The of_node in all the cpu devices needs to be initialized properly
->> and at one place. The best place to update this is CPU subsystem
->> driver when registering the cpu devices.
->>
->> The OF/DT core library now provides of_get_cpu_node to retrieve a cpu
->> device node for a given logical index by abstracting the architecture
->> specific details.
->>
->> This patch uses of_get_cpu_node to assign of_node when registering the
->> cpu devices.
->>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Acked-by: Rob Herring <rob.herring@calxeda.com>
->> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->> ---
->>  drivers/base/cpu.c | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
->> index 4c358bc..ea51c6d 100644
->> --- a/drivers/base/cpu.c
->> +++ b/drivers/base/cpu.c
->> @@ -14,6 +14,7 @@
->>  #include <linux/slab.h>
->>  #include <linux/percpu.h>
->>  #include <linux/acpi.h>
->> +#include <linux/of.h>
->>
->>  #include "base.h"
->>
->> @@ -289,6 +290,7 @@ int register_cpu(struct cpu *cpu, int num)
->>  	cpu->dev.release = cpu_device_release;
->>  	cpu->dev.offline_disabled = !cpu->hotpluggable;
->>  	cpu->dev.offline = !cpu_online(num);
->> +	cpu->dev.of_node = of_get_cpu_node(num);
+> I don't think that's strictly necessary in this case. After the
+> call to pci_common_exit() there are no PCI devices left, there's
+> not even a bus left. All MSI users should have cleaned up after
+> themselves.
 > 
-> Aha, so this would be the only place where of_get_cpu_node() gets called, 
-> so the parsing would be done only once and then any code that needs CPU DT 
-> node would just simply grab it from CPU dev. Fair enough.
-> 
-> Not sure if this makes the need for such helper to be globally available 
-> in of/base.c, but I guess this won't hurt.
-> 
-Ah, you found it out yourself. Sorry responded to your earlier mail.
-Yes but there may be uses cases which need cpu of_node before CPUs get
-registered. I believe PATCH 4-6 in the series is good examples as why we
-need this helper to be global.
+> Given that I thought it more useful to mirror the setup done in
+> .probe() to make it clearer what's being undone (and potentially
+> what's missing).
 
-Move over now we need to extend support to PowerPC where DT is scanned
-needlessly always to fetch cpu of_node. Of course they need to fix it,
-use cpu->of_node instead.
-
-Regards,
-Sudeep
+That makes sense SW-wise, but what about mis-behaving HW that triggers
+an MSI even when it's been told not to? I assume that
+tegra_pcie_disable_msi() unrequests the IRQ, hence solves that
+problem, if done early enough.
