@@ -1,74 +1,44 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 15 Aug 2013 19:05:22 +0100
-Subject: [Qemu-devel] SCSI bus failures with qemu-arm in kernel 3.8+
-In-Reply-To: <20130815175428.GA18580@roeck-us.net>
-References: <5207B3C3.9080508@roeck-us.net>
- <20130811220450.GY23006@n2100.arm.linux.org.uk>
- <52082EF8.10005@roeck-us.net>
- <CAFEAcA94ygwRPSsfxs3DvOcTZbdafLiEHys94FG4aXUx+A1t=A@mail.gmail.com>
- <20130813034054.GA18218@roeck-us.net>
- <CAFEAcA_-S8z6ZMr8TMPvkcTyyCSMOj1DExVsY4JDQjRXDU5WGw@mail.gmail.com>
- <20130815175428.GA18580@roeck-us.net>
-Message-ID: <CAFEAcA_MyJPwo6Gd_dxeWM5q5-7MYqR6-rrePusFzYaGGckWJQ@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 15 Aug 2013 20:12:05 +0200
+Subject: [v3 1/2] dma: mmp_pdma: add support for residue reporting
+In-Reply-To: <CADApbejtvXvgF8jpQAyrbY3Yr=XkBech5D6fCEM+yMj8DRRY9w@mail.gmail.com>
+References: <1376497189-21298-1-git-send-email-zonque@gmail.com>
+ <CADApbegKj=AMGx4OFOBVsyk71BGis97Gw9QM_-0EsNi90pS+Hw@mail.gmail.com>
+ <520C4E98.6020001@gmail.com>
+ <CADApbejtvXvgF8jpQAyrbY3Yr=XkBech5D6fCEM+yMj8DRRY9w@mail.gmail.com>
+Message-ID: <520D19F5.7050406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 August 2013 18:54, Guenter Roeck <linux@roeck-us.net> wrote:
-> On Thu, Aug 15, 2013 at 05:45:42PM +0100, Peter Maydell wrote:
->> On 13 August 2013 04:40, Guenter Roeck <linux@roeck-us.net> wrote:
->> > Patch tested and working with qemu 1.5.2, using the configuration file
->> > from the yocto project. Patch applied on top of kernel version 3.11-rc5.
->>
->> OK, I tested this on PB926+PCI backplane hardware, and it is
->> definitely better than current mainline, in that the test USB
->> card that I have no longer causes the kernel to generate this sort of
->> backtrace:
->>
-> Do you mean my patch fixes the traceback below as a side effect ?
-> Would be great ... it would be one more reason to get it applied.
+On 15.08.2013 10:08, Chao Xie wrote:
+> In the function mmp_pdma_tx_submit
+> It will assign cookie for every descriptors by
+> list_for_each_entry(child, &desc->tx_list, node) {
+>                 cookie = dma_cookie_assign(&child->async_tx);
+>         }
+> So not all the descriptors in same transaction will share same cookie.
 
-Yes, exactly -- the kernel currently has the wrong irq mapping,
-which causes the traceback (ie h/w asserts irq 93 but the kernel
-is listening on something else). That the patch fixes this confirms
-that it is the behaviour of hardware as well as of QEMU.
+Hmm, yes. You're right. However, I see quite some more issues with the
+driver as it stands, especially due to assumptions that are made for
+multiple transactions on one channel.
 
->> However it still doesn't seem to reliably detect the USB harddisk
->> plugged into the card, so I think there may be further issues, possibly
->> some subset of those Arnd identified and fixed with this patch:
->> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/93397
->>
-> Does it get better if you apply Arnd's patch ?
+For example, let's think about two transactions with multiple
+descriptors each, and both transactions are present in the chain_running
+list. Each transaction has the ENDIRQEN bit set on the last descriptor only.
 
-Arnd's patch is ancient and won't apply as is (due to intervening
-changes and also because some of the things it fixes were fixed
-in later patches); I'm currently trying to extract the relevant parts.
+Currently, when an interrupt is caught, the code will only look at the
+very last entry in the running list and complete its cookie, and then
+dispose the entire running chain. Hence, the other transaction's cookie
+will never complete. Even worse: as an interrupt will always be for the
+first descriptor in the chain with the ENDIRQEN bit set, we complete the
+second transaction that is in fact still running (and call the
+completion handler for it), while we don't do exactly that for the first
+one.
 
-If you want you can confirm that I/O port PCI access is broken on
-QEMU too -- disable CONFIG_SCSI_SYM53C8XX_MMIO so
-the driver uses PCI IO rather than MMIO and you'll see QEMU's
-SCSI device doesn't work any more.
+Am I right with the above or do I make faulty assumptions? I'll think
+about how the driver can be changed in order to fix this, but it will be
+more invasive than I thought.
 
->> so I'd like to continue testing.
->>
->> The other thing this patch should (IMHO) have is the
->> line in pci_versatile_setup() which tells QEMU that the
->> kernel really does expect hardware-like behaviour:
 
->> (Without this line QEMU will guess whether the kernel is broken
->> or not and will get it right most but not necessarily all of the time.)
->>
-> Might make sense, but I think it should be a separate patch.
-
-It needs to go in the same patch, because a kernel with the fixed
-irq remapping must also tell QEMU it is fixed; if you split the
-two then at the point between the two patches the kernel is
-broken for bisection purposes.
-
-> If I understand correctly, my patch fixes the SCSI problem.
-> Is that correct ? If so, can we get it applied to mainline ?
-
-I'd rather get to a point where I have the hardware definitely
-completely working first. There's no real hurry, this has been
-broken for months and months.
-
--- PMM
+Thanks for sharing your ideas,
+Daniel
