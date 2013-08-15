@@ -1,52 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Aug 2013 16:42:34 +0100
-Subject: [PATCH] ARM64: KVM: Fix =?UTF-8?Q?coherent=5Ficache=5Fguest?=
- =?UTF-8?Q?=5Fpage=28=29=20for=20host=20with=20external=20L=33-cache=2E?=
-In-Reply-To: <CAAHg+HiYK-kEp6=XTd89UMDOuMyvqgbMm4iDHmvDV7owHga8ug@mail.gmail.com>
-References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
- <f8917fe8409b1fae634c7de45e34d4a7@www.loen.fr>
- <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
- <da83e967f5a266ca28ee54638a4a9be9@www.loen.fr>
- <CAAHg+HiYK-kEp6=XTd89UMDOuMyvqgbMm4iDHmvDV7owHga8ug@mail.gmail.com>
-Message-ID: <d2a468fedde1db5aa7b9eb832ae9af0f@www.loen.fr>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 15 Aug 2013 10:43:37 -0500
+Subject: dma_unmap causing issues with __get_free_pages
+In-Reply-To: <20130815115545.GD25647@n2100.arm.linux.org.uk>
+References: <520C84DF.5050707@ti.com>
+ <20130815115545.GD25647@n2100.arm.linux.org.uk>
+Message-ID: <520CF729.3030704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pranav,
+Hi Russell,
 
-On 2013-08-15 09:39, Pranavkumar Sawargaonkar wrote:
+On 08/15/2013 06:55 AM, Russell King - ARM Linux wrote:
+> On Thu, Aug 15, 2013 at 02:35:59AM -0500, Joel Fernandes wrote:
+>> Hi,
+>>
+>> I'm having some trouble with using the dma_map/unmap API.
+>>
+>> On unmapping a particular page using dma_unmap, it seems that the
+>> PG_dcache_clean flag is set in the page->flags. This is set by the
+>> following statement in __dma_page_dev_to_cpu function in
+>> arch/arm/mm/dma-mapping.c
+>>                 set_bit(PG_dcache_clean, &page->flags);
+>>
+>> Due to this, on any subsequent page allocations using __get_free_pages,
+>> the following BUG gets triggered.
+> 
+> Are you calling dma_unmap() after the page has been freed?
+> 
+>> What is correct way to fix this? Why does the page allocator think its a
+>> BAD page descriptor after the unmap?
+> 
+> Well, on free, this is done:
+> 
+>         if (page->flags & PAGE_FLAGS_CHECK_AT_PREP)
+>                 page->flags &= ~PAGE_FLAGS_CHECK_AT_PREP;
+> 
+> which clears PG_arch_1.  On allocation:
+> 
+>         if (unlikely(page_mapcount(page) |
+>                 (page->mapping != NULL)  |
+>                 (atomic_read(&page->_count) != 0)  |
+>                 (page->flags & PAGE_FLAGS_CHECK_AT_PREP) |
+>                 (mem_cgroup_bad_page_check(page)))) {
+>                 bad_page(page);
+>                 return 1;
+>         }
+> 
+> As PG_arch_1 is part of the PAGE_FLAGS_CHECK_AT_PREP mask, this means that
+> when a page is freed, it has PG_arch_1 cleared.  Therefore, if on allocation
+> the page now has this bit set, it means that something touched the page
+> after it was freed.  Quite simply, the page was freed while still being
+> in use.  That's very bad and needs fixing.
+> 
 
-[...]
+Absolutely you nailed it! I was doing alloc, map, free, unmap, changed
+this to alloc, map, unmap, free and its working fine now and I learnt a
+thing or 2 about page->flags. Thanks!
 
-> Just to add few more points to this discussion :
->
-> Actually we are already flushing d-cache in 
-> "coherent_icache_guest_page"
-> by calling flush_icache_range.
->
-> Now in my patch i am doing same thing one more time by calling
-> __flush_dcache_area just below flush_icache_range.
->
-> Main difference between d-cache flushing in above two routines is :
-> flush_icache_range is flushing d-cache by point of unification (dc
-> cvau) and
->  __flush_dcache_area is flushing that by point of coherency (dc      
-> civac).
->
-> Now since second routine is doing it by coherency it is making L3C to
-> be coherent and sync changes with immediate effect and solving the
-> issue.
-
-I understand that. What I object to is that always cleaning to PoC is 
-expensive (both in terms of latency and energy), and doing so for each 
-page, long after the MMU has been enabled feels like a great loss of 
-performance.
-
-My gut feeling is that a single clean operation at startup time 
-(whether it is from the kernel or userspace) would be a lot better.
-
-Thanks,
-
-         M.
--- 
-Fast, cheap, reliable. Pick two.
+-Joel
