@@ -1,72 +1,29 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 15 Aug 2013 11:01:30 +0100
-Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <520C06CA.3060406@gmail.com>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
- <2CD735CE-3FCF-4AB5-89C0-D813ECD19F11@codeaurora.org>
- <520C06CA.3060406@gmail.com>
-Message-ID: <520CA6FA.8020401@arm.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Thu, 15 Aug 2013 12:03:02 +0100
+Subject: [PATCH v8 0/2] TWL6030, TWL6032 GPADC driver
+In-Reply-To: <20130815091216.GB28366@e106331-lin.cambridge.arm.com>
+References: <1374758813-6539-1-git-send-email-oleksandr.kozaruk@ti.com>
+ <20130815091216.GB28366@e106331-lin.cambridge.arm.com>
+Message-ID: <520CB566.2050201@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
-On 14/08/13 23:38, Rob Herring wrote:
-> On 08/14/2013 04:03 PM, Kumar Gala wrote:
->>
->> On Jul 23, 2013, at 4:19 AM, Punit Agrawal wrote:
->>
->>> The CCI PMU can profile bus transactions at the master and slave
->>> interfaces of the CCI. The PMU can be used to observe an aggregated view
->>> of the bus traffic between the various components connected to the CCI.
->>>
->>> Extend the existing CCI driver to support the PMU by registering a perf
->>> backend for it.
->>>
->>> Document the device tree binding to describe the CCI PMU.
->>>
->>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Cc: Nicolas Pitre <nico@linaro.org>
->>> Cc: Dave Martin <dave.martin@linaro.org>
->>> Cc: Rob Herring <rob.herring@calxeda.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->>> Reviewed-by: Will Deacon <will.deacon@arm.com>
->>> ---
->>> Documentation/devicetree/bindings/arm/cci.txt |   38 ++
->>> drivers/bus/arm-cci.c                         |  642 +++++++++++++++++++++++++
->>> 2 files changed, 680 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
->>> index 92d36e2..5bc95e5 100644
->>> --- a/Documentation/devicetree/bindings/arm/cci.txt
->>> +++ b/Documentation/devicetree/bindings/arm/cci.txt
->
-> [snip]
->
->>> +
->>> +		- interrupts:
->>> +			Usage: required
->>> +			Value type: <prop-encoded-array>
->>> +			Definition: comma-separated list of unique PMU
->>> +				    interrupts
->>
->> What is the list of interrupts related to, should there be an associated interrupts-names
->
-> No, interrupt-names is optional, but you are correct that what function
-> each interrupt is for must be defined.
->
+>> The changes to the original driver:
+>> - device tree adaptation;
+> 
+> I couldn't see a binding document in this series or in mainline. Have I
+> looked in the wrong places?
 
-I'll update the bindings documentation to describe the function of 
-interrupts.
+Nothing explicit supplied, but does it need one given it is doing only
+iio bindings (bindings/iio/iio-bindings.txt)
+plus twl child bindings
+(bindings/mfd/twl-family.txt)
 
-Thanks for the comments.
+If it does, I guess absolutely everything does, then fair enough!
+I guess that would make sense as there is no way for someone writing
+a device tree to know that there is nothing else to be specified.
 
-Punit
+Thanks,
 
-> Rob
->
->
->
->
->
+Jonathan
