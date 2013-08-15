@@ -1,93 +1,50 @@
-From: d.kasatkin@samsung.com (Dmitry Kasatkin)
-Date: Thu, 15 Aug 2013 08:58:34 +0300
-Subject: [PATCH 00/10] crypto: omap-aes: DMA and PIO mode improvements
-In-Reply-To: <520C1327.8090607@ti.com>
-References: <1376521969-16807-1-git-send-email-joelf@ti.com>
- <520C1327.8090607@ti.com>
-Message-ID: <520C6E0A.8030505@samsung.com>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Thu, 15 Aug 2013 11:31:32 +0530
+Subject: [PATCH v4 0/5] ARM: davinci: da850: add ethernet driver DT support
+Message-ID: <1376546497-26931-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/08/13 02:30, Joel Fernandes wrote:
-> On 08/14/2013 06:12 PM, Joel Fernandes wrote:
->> This patch series is a rewrite of the DMA portion of omap-aes driver
->> and also adds support for PIO mode. Both these modes, give better
->> performance than before.
->>
->> Earlier, only a single SG was used for DMA purpose, and the SG-list
->> passed from the crypto layer was being copied and DMA'd one entry at
->> a time. This turns out to be quite inefficient, so we replace it with
->> much simpler code that directly passes the SG-list from crypto to the
->> DMA layer.
->>
->> We also add PIO mode support to the driver, and switch to PIO mode
->> whenever the DMA channel allocation is not available. This is only for
->> OMAP4 platform will work on any platform on which IRQ information is
->> populated.
->>
->> Tests performed on am33xx and omap4 SoCs , notice the 50% perf improvement
-> Just correcting, this is more like 35% not 50% when using DMA.
+From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
 
-Hmm :)
+This patch set enables Ethernet support through device tree model.
+This patch set enables mii interface only and is being tested to boot via
+rootfs. The rmii phy is present on the i2c gpio expander chip (UI board)
+for which yet support needs to be added, once the DT support for the chip
+is enabled, enabling rmii will be subsequnet patch.
 
-1766/1460 = ~20%
+Changes for v2:
+1: Enabled mdio device.
+2: Fixed clock lookup.
 
->
-> Thanks,
->
-> -Joel
->
->
->
->
->
->> for large 8K blocks:
->>
->> Sample run on am33xx (beaglebone):
->> With DMA rewrite:
->> [   26.410052] test 0 (128 bit key, 16 byte blocks): 4318 operations in 1 seconds (69088 bytes)
->> [   27.414314] test 1 (128 bit key, 64 byte blocks): 4360 operations in 1 seconds (279040 bytes)
->> [   28.414406] test 2 (128 bit key, 256 byte blocks): 3609 operations in 1 seconds (923904 bytes)
->> [   29.414410] test 3 (128 bit key, 1024 byte blocks): 3418 operations in 1 seconds (3500032 bytes)
->> [   30.414510] test 4 (128 bit key, 8192 byte blocks): 1766 operations in 1 seconds (14467072 bytes)
->>
->> Without DMA rewrite:
->> [   31.920519] test 0 (128 bit key, 16 byte blocks): 4417 operations in 1 seconds (70672 bytes)
->> [   32.925997] test 1 (128 bit key, 64 byte blocks): 4221 operations in 1 seconds (270144 bytes)
->> [   33.926194] test 2 (128 bit key, 256 byte blocks): 3528 operations in 1 seconds (903168 bytes)
->> [   34.926225] test 3 (128 bit key, 1024 byte blocks): 3281 operations in 1 seconds (3359744 bytes)
->> [   35.926385] test 4 (128 bit key, 8192 byte blocks): 1460 operations in 1 seconds (11960320 bytes)
->>
->> With PIO mode, note the tremndous boost in performance for small blocks there:
->> [   27.294905] test 0 (128 bit key, 16 byte blocks): 20585 operations in 1 seconds (329360 bytes)
->> [   28.302282] test 1 (128 bit key, 64 byte blocks): 8106 operations in 1 seconds (518784 bytes)
->> [   29.302374] test 2 (128 bit key, 256 byte blocks): 2359 operations in 1 seconds (603904 bytes)
->> [   30.302575] test 3 (128 bit key, 1024 byte blocks): 605 operations in 1 seconds (619520 bytes)
->> [   31.303781] test 4 (128 bit key, 8192 byte blocks): 79 operations in 1 seconds (647168 bytes)
->>
->> Future work in this direction would be to dynamically change between
->> PIO/DMA mode based on the block size.
->>
->> Joel Fernandes (10):
->>   crypto: scatterwalk:  Add support for calculating number of SG
->>     elements
->>   crypto: omap-aes: Add useful debug macros
->>   crypto: omap-aes: Populate number of SG elements
->>   crypto: omap-aes: Simplify DMA usage by using direct SGs
->>   crypto: omap-aes: Sync SG before DMA operation
->>   crypto: omap-aes: Remove previously used intermediate buffers
->>   crypto: omap-aes: Add IRQ info and helper macros
->>   crypto: omap-aes: PIO mode: Add IRQ handler and walk SGs
->>   crypto: omap-aes: PIO mode: platform data for OMAP4 and trigger it
->>   crypto: omap-aes: Switch to PIO mode in probe function
->>
->>  crypto/scatterwalk.c         |   22 +++
->>  drivers/crypto/omap-aes.c    |  400 ++++++++++++++++++++----------------------
->>  include/crypto/scatterwalk.h |    2 +
->>  3 files changed, 217 insertions(+), 207 deletions(-)
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-crypto" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+Changes for v3:
+1: Fixed review comments pointed out by Sekhar.
+
+Changes for v4:
+1: Fixed review comments pointed out by Sekhar.
+2: Dropped patch v3 6/6 (https://patchwork.kernel.org/patch/2768361/)
+   Which depends on adding GPIO DT node, will address it once GPIO support is added.
+3: Rebased the patches on [1]
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/log/?h=v3.12/soc
+
+Lad, Prabhakar (5):
+  ARM: davinci: fix clock lookup for mdio device
+  ARM: davinci: da850: add DT node for mdio device
+  ARM: davinci: da850: add OF_DEV_AUXDATA entry for mdio.
+  ARM: davinci: da850: add DT node for eth0.
+  ARM: davinci: da850: add OF_DEV_AUXDATA entry for eth0.
+
+ arch/arm/boot/dts/da850-evm.dts       |   11 +++++++++
+ arch/arm/boot/dts/da850.dtsi          |   43 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/da830.c         |    1 +
+ arch/arm/mach-davinci/da850.c         |    1 +
+ arch/arm/mach-davinci/da8xx-dt.c      |    4 +++
+ arch/arm/mach-davinci/devices-da8xx.c |    8 ++----
+ arch/arm/mach-davinci/dm365.c         |    3 +--
+ arch/arm/mach-davinci/dm644x.c        |    3 +--
+ arch/arm/mach-davinci/dm646x.c        |    3 +--
+ 9 files changed, 65 insertions(+), 12 deletions(-)
+
+-- 
+1.7.9.5
