@@ -1,180 +1,272 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 15 Aug 2013 13:50:43 +0200
-Subject: [PATCH 00/18] ARM: s3c64xx: Let amba-pl08x driver handle DMA
-In-Reply-To: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
-References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <59851253.P5uJVeRAXe@flatron>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 15 Aug 2013 12:52:27 +0100
+Subject: [PATCH v3 1/5] ARM: add basic Trusted Foundations support
+In-Reply-To: <1376360992-1508-2-git-send-email-acourbot@nvidia.com>
+References: <1376360992-1508-1-git-send-email-acourbot@nvidia.com>
+ <1376360992-1508-2-git-send-email-acourbot@nvidia.com>
+Message-ID: <20130815115227.GC2562@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Aug 13, 2013 at 11:29:48AM +0900, Alexandre Courbot wrote:
+> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+> can be invoked  using a consistent smc-based API on all supported
+> platforms. This patch adds initial basic support for Trusted
+> Foundations using the ARM firmware API. Current features are limited
+> to the ability to boot secondary processors.
+> 
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> ---
+>  .../arm/firmware/tl,trusted-foundations.txt        | 16 ++++++
+>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+>  arch/arm/Kconfig                                   |  2 +
+>  arch/arm/Makefile                                  |  1 +
+>  arch/arm/firmware/Kconfig                          | 22 ++++++++
+>  arch/arm/firmware/Makefile                         |  1 +
+>  arch/arm/firmware/trusted_foundations.c            | 58 ++++++++++++++++++++++
+>  arch/arm/include/asm/trusted_foundations.h         | 36 ++++++++++++++
+>  8 files changed, 137 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+>  create mode 100644 arch/arm/firmware/Kconfig
+>  create mode 100644 arch/arm/firmware/Makefile
+>  create mode 100644 arch/arm/firmware/trusted_foundations.c
+>  create mode 100644 arch/arm/include/asm/trusted_foundations.h
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+> new file mode 100644
+> index 0000000..2609f78
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+> @@ -0,0 +1,16 @@
+> +Trusted Foundations
+> +
+> +Boards that use the Trusted Foundations secure monitor can signal its
+> +presence by declaring a node compatible with "tl,trusted-foundations"
+> +(the name and location of the node does not matter).
 
-[Ccing maintainers and other people responsible for spear, lpc32xx and 
-versatile platforms]
+We shouldn't encougrage people to arrange DT nodes at random.
 
-On Sunday 11 of August 2013 19:59:12 Tomasz Figa wrote:
-> This is first non-RFC version of my patches extending support of
-> amba-pl08x DMA engine driver to PL080S DMA engine (PL080 modified by
-> Samsung) found in Samsung S3C64xx SoCs.
-> 
-> Due to changes scattered across different areas of kernel, patches are
-> based on merged 3 branches:
->  - for-next of Kgene's Samsung tree,
->  - clk-next of Mike's clock tree,
->  - next of Vinod's slave DMA tree.
-> 
-> To ease testing I have prepared a branch in my private tree for anyone
-> willing to check the patches out:
-> 	git://github.com/tom3q/linux.git v3.12-pl080
-> 
-> Dependencies (already applied in my branch):
->  - for patches 14 and 16 - CCF-based clock driver for s3c64xx.
-> 
-> Some of the patches not related to the amba-pl08x driver itself
-> can be likely applied into appropriate trees separately, namely:
->  - 09/18 - ASoC: Samsung: Do not queue cyclic buffers multiple times,
->  - 14/18 - clk: samsung: s3c64xx: Add aliases for DMA clocks.
-> 
-> After patch 14/18, both old and new DMA drivers can be supported on
-> S3C64xx, depending on Kconfig options. Patches 15-18 remove the old
-> driver leaving support only for the generic pl08x driver. Feel free to
-> drop those patches for now if we want more testing, but I don't suspect
-> any problems.
-> 
-> On S3C64xx-based Mini6410 and SMDK6410 boards, with I2S audio
-> playback and capture (including full duplex operation) and also SPI
-> using spidev:
-> 
-> Tested-by: Tomasz Figa <tomasz.figa@gmail.com>
+Unless there's a good reason not to, this should just be a child
+of /, with the meaning that the firmware is callable (at least to
+the point of discoverability) on all CPUs.
 
-It would be nice if patches from this series touching the PL08x driver 
-(01-08) could be tested on other platforms that have this DMA controller 
-as well, to make sure I did not break anything. Unfortunately I do not 
-have any board based on any of them.
+The meaning of the node should be left unspecified if it is in any
+other location.
 
-Best regards,
-Tomasz
+This is the convention already adopted for things like arm,psci (though
+to be fair, the arm,psci binding documentation fails to mention that
+also -- nonetheless, the node is placed in /).
 
-> Changes since RFC v2:
->  - Added clkdev lookups to old clock driver.
->  - Added patches removing the old DMA driver and any remaining code
->    needed by it.
->  - Fixed DMA support for SPI.
->  - Added a word about PL080S to amba-pl08x.c file header.
->  - Changed definition of LLI words from enums to macros.
->  - Extended debugging messages to handle PL080S variant as well.
->  - Little cleanup of LLI dumping code.
->  - Added check for peripheral flow control, which is unsupported by
->    PL080S to dma_set_runtime_config.
->  - Corrected transfer size mask of PL080S.
+> +
+> +Required properties:
+> +- compatible : "tl,trusted-foundations"
+> +- version : Must contain the version number string of the Trusted Foundation
+> +	firmware.
+
+Are you sure there is no low-level way to probe vendor and version info?
+If there is, then the DT should describe nothing except the fact that
+the probe interface exists.
+
+I also worry that two integrations on different SoCs might have the
+same version number, yet still be different due to vendor-specific
+features and options.
+
+> +
+> +Example:
+> +	firmware {
+> +		compatible = "tl,trusted-foundations";
+> +		version = "02.08";
+> +	};
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 366ce9b..20d61f3 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -63,6 +63,7 @@ ste	ST-Ericsson
+>  stericsson	ST-Ericsson
+>  toumaz	Toumaz
+>  ti	Texas Instruments
+> +tl	Trusted Logic
+>  toshiba	Toshiba Corporation
+>  v3	V3 Semiconductor
+>  via	VIA Technologies, Inc.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 43594d5..7fbe800 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1074,6 +1074,8 @@ config ARM_TIMER_SP804
+>  	select CLKSRC_MMIO
+>  	select CLKSRC_OF if OF
+>  
+> +source "arch/arm/firmware/Kconfig"
+> +
+>  source arch/arm/mm/Kconfig
+>  
+>  config ARM_NR_BANKS
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 6fd2cea..a48de17 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -267,6 +267,7 @@ core-$(CONFIG_KVM_ARM_HOST) 	+= arch/arm/kvm/
+>  core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
+>  core-y				+= arch/arm/net/
+>  core-y				+= arch/arm/crypto/
+> +core-y				+= arch/arm/firmware/
+>  core-y				+= $(machdirs) $(platdirs)
+>  
+>  drivers-$(CONFIG_OPROFILE)      += arch/arm/oprofile/
+> diff --git a/arch/arm/firmware/Kconfig b/arch/arm/firmware/Kconfig
+> new file mode 100644
+> index 0000000..ad0eb6c
+> --- /dev/null
+> +++ b/arch/arm/firmware/Kconfig
+> @@ -0,0 +1,22 @@
+> +config ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
+> +	bool
+> +
+> +menu "Firmware options"
+> +	depends on ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
+> +
+> +config TRUSTED_FOUNDATIONS
+> +	bool "Trusted Foundations secure monitor support"
+> +	depends on ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
+> +	help
+> +	  Some devices are booted with the Trusted Foundations secure monitor
+> +	  active, requiring some core operations to be performed by the secure
+> +	  monitor instead of the kernel.
+> +
+> +	  This option allows the kernel to invoke the secure monitor whenever
+> +	  required on devices using Trusted Foundations.
+> +
+> +	  Devices using Trusted Foundations should pass a device tree containing
+> +	  a node compatible with "tl,trusted-foundations" to signal the presence
+> +	  of the secure monitor.
+> +
+> +endmenu
+> diff --git a/arch/arm/firmware/Makefile b/arch/arm/firmware/Makefile
+> new file mode 100644
+> index 0000000..a71f165
+> --- /dev/null
+> +++ b/arch/arm/firmware/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_TRUSTED_FOUNDATIONS)	+= trusted_foundations.o
+> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+> new file mode 100644
+> index 0000000..051482d
+> --- /dev/null
+> +++ b/arch/arm/firmware/trusted_foundations.c
+> @@ -0,0 +1,58 @@
+> +/*
+> + * Trusted Foundations support for ARM CPUs
+> + *
+> + * Copyright (c) 2013, NVIDIA Corporation.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/of.h>
+> +#include <asm/firmware.h>
+> +
+> +#define TF_SET_CPU_BOOT_ADDR_SMC 0xfffff200
+> +
+
+Better to use __naked instead of an explicit attribute.
+
+> +static void __attribute__((naked)) tf_generic_smc(u32 type, u32 subtype,
+> +							u32 arg)
+> +{
+> +	asm volatile(
+> +		".arch_extension	sec\n\t"
+> +		"stmfd	sp!, {r4 - r11, lr}\n\t"
+> +		__asmeq("%0", "r0")
+> +		__asmeq("%1", "r1")
+> +		__asmeq("%2", "r2")
+> +		"mov	r3, #0\n\t"
+> +		"mov	r4, #0\n\t"
+> +		"smc	#0\n\t"
+> +		"ldmfd	sp!, {r4 - r11, pc}"
+> +		:
+> +		: "r" (type), "r" (subtype), "r" (arg)
+> +		: "memory");
+> +}
+> +
+> +static int tf_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+> +{
+> +	tf_generic_smc(TF_SET_CPU_BOOT_ADDR_SMC, boot_addr, 0);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct firmware_ops trusted_foundations_ops = {
+> +	.set_cpu_boot_addr = tf_set_cpu_boot_addr,
+> +};
+> +
+> +void register_trusted_foundations(const char *version)
+> +{
+> +	/* we are not using version information for now since currently
+> +	 * supported SMCs are compatible with all TF releases */
+
+I think it would be wise at least to sanity-check the version,
+even if there's only one major version supported for now.
+
+> +	register_firmware_ops(&trusted_foundations_ops);
+> +}
+> diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
+> new file mode 100644
+> index 0000000..d187905
+> --- /dev/null
+> +++ b/arch/arm/include/asm/trusted_foundations.h
+> @@ -0,0 +1,36 @@
+> +/*
+> + * Copyright (c) 2013, NVIDIA Corporation.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + */
+> +
+> +#ifndef __ASM_ARM_TRUSTED_FOUNDATIONS_H
+> +#define __ASM_ARM_TRUSTED_FOUNDATIONS_H
+> +
+> +#include <linux/kconfig.h>
+> +#include <linux/printk.h>
+> +#include <asm/bug.h>
+> +
+> +#if IS_ENABLED(CONFIG_TRUSTED_FOUNDATIONS)
+> +
+> +void register_trusted_foundations(const char *version);
+> +
+> +#else
+> +
+> +static inline void register_trusted_foundations(const char *version)
+> +{
+> +	pr_crit("No support for Trusted Foundations, stopping...\n");
+> +	BUG();
+> +}
+> +
+> +#endif /* IS_ENABLED(CONFIG_TRUSTED_FOUNDATIONS) */
+> +
+> +#endif
+> -- 
+> 1.8.3.4
 > 
-> Changes since RFC v1:
->  - Returned to original way of storing quirks as booleans, as suggested
->    by Russell, Linus and Arnd.
->  - Added reg_config field to pl08x_phy_chan struct, which stores
->    variant-specific address of channel config register, as suggested
->    by Russell.
->  - Simplified handling of extended maximum transfer size of PL080S
->    (no more conditional passing of 0 as length to pl08x_cctl_bits()).
->  - Reworked LLI handling in the driver to stop casting arbitrary memory
->    to a struct and allow different word count of LLI entry, as suggested
-> by Linus.
->  - Removed AMBA ID override from S3C64xx PL080 initialization code.
->  - Fixed brokenness of Samsung DMA wrapper API, which caused cyclic
-> buffers to be queued multiple times when DMA engine is used.
->  - Included patch adding clock aliases for DMA engines (depends on
->    Common Clock Framework driver for S3C64xx).
->  - Fixed several minor stylistic issues.
 > 
-> For reference, here is the original description of the series:
-> 
-> One of the biggest roadblocks on the way of S3C64xx to DeviceTree
-> support is its DMA driver, which is completely platform-specific and
-> provides private API (s3c-dma), not even saying that its design is
-> completely against multiplatform-awareness.
-> 
-> The DMA controller present on this SoC series is a custom variant
-> of ARM PrimeCell PL080 modified by Samsung to add some extra features.
-> It is mostly compatible with original PL080, except:
->  - CH_CONTROL2 register is added between CH_CONTROL and CH_CONFIG,
->  - offset of CH_CONFIG register is different,
->  - transfer size field is moved from CH_CONTROL to CH_CONTROL2,
->  - transfer size field is extended to 24 bits, allowing much bigger
->      single transfer,
->  - LLI consists of one more word, to account for CH_CONTROL2 register.
-> 
-> Since all the rest is fully compatible with standard PL080 there is no
-> point in having separate driver just for this single variant, so I
-> decided to look into adding support for it to the amba-pl08x driver.
-> 
-> There was already some attempt to achieve this before, but this was
-> before Russel's big rework of the driver to use virtual channels,
-> making the old patches being not much of use.
-> 
-> This RFC series is a proof of concept that I managed to make during last
-> days of hacking. Except one patch adding clkdev lookup to clock driver
-> (which is being replaced with a CCF-compliant driver ATM), this is
-> enough to get memcpy and slave transfers to work on S3C64xx.
-> 
-> I have tested this on Mini6410 and SMDK6410 boards using dmatest for
-> memcpy and Samsung I2S with madplay/aplay for slave transfers.
-> Unfortunately I do not have access to other platforms with PL08x so
-> I could not test for any regressions introduced on them.
-> 
-> Credits for two patches go to Alban Bedel, who made a series fixing this
-> driver to make it usable with audio drivers. I rebased his patches on
-> top of mine and corrected coding style a bit.
-> 
-> OK, that's all. Any comments are welcome. Feel free to start throwing
-> eggs and tomatoes if you find this awful, but I won't be upset if I get
-> some Tested-by or Acked-by as well. ;)
-> 
-> Alban Bedel (2):
->   dmaengine: PL08x: Fix reading the byte count in cctl
->   dmaengine: PL08x: Add cyclic transfer support
-> 
-> Tomasz Figa (16):
->   dmaengine: PL08x: Refactor pl08x_getbytes_chan() to lower indentation
->   dmaengine: PL08x: Add support for different offset of CONFIG register
->   dmaengine: PL08x: Rework LLI handling to be less fragile
->   dmaengine: PL08x: Move LLI dumping code into separate function
->   dmaengine: PL08x: Add support for PL080S variant
->   dmaengine: PL08x: Add support for different maximum transfer size
->   ASoC: Samsung: Do not queue cyclic buffers multiple times
->   spi: s3c64xx: Do not require legacy DMA API in case of S3C64XX
->   ASoC: Samsung: Do not require legacy DMA API in case of S3C64XX
->   ARM: s3c64xx: Add support for DMA using generic amba-pl08x driver
->   ARM: s3c64xx: clock: Add clkdev lookup for DMA clocks
->   clk: samsung: s3c64xx: Add aliases for DMA clocks
->   ARM: s3c64xx: Remove legacy DMA driver
->   clk: samsung: s3c64xx: Remove clock aliases of old DMA driver
->   spi: s3c64xx: Always select S3C64XX_PL080 when ARCH_S3C64XX is enabled
-> ASoC: Samsung: Always select S3C64XX_PL080 when ARCH_S3C64XX is enabled
-> 
->  arch/arm/Kconfig                         |   1 +
->  arch/arm/mach-s3c64xx/Kconfig            |   7 +-
->  arch/arm/mach-s3c64xx/Makefile           |   2 +-
->  arch/arm/mach-s3c64xx/clock.c            |  28 +-
->  arch/arm/mach-s3c64xx/common.h           |   5 +
->  arch/arm/mach-s3c64xx/dma.c              | 753
-> -------------------------------
-> arch/arm/mach-s3c64xx/include/mach/dma.h | 144 ++----
->  arch/arm/mach-s3c64xx/pl080.c            | 244 ++++++++++
->  arch/arm/plat-samsung/devs.c             |   6 +-
->  arch/arm/plat-samsung/s3c-dma-ops.c      |  13 +-
->  drivers/clk/samsung/clk-s3c64xx.c        |   4 +-
->  drivers/dma/amba-pl08x.c                 | 501 ++++++++++++++------
->  drivers/spi/Kconfig                      |   2 +-
->  include/linux/amba/pl080.h               |   1 +
->  sound/soc/samsung/Kconfig                |   2 +-
->  sound/soc/samsung/dma.c                  |   7 +
->  16 files changed, 705 insertions(+), 1015 deletions(-)
->  delete mode 100644 arch/arm/mach-s3c64xx/dma.c
->  create mode 100644 arch/arm/mach-s3c64xx/pl080.c
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130815/44bc996f/attachment.sig>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
