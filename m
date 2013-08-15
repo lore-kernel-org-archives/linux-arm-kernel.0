@@ -1,39 +1,140 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 15 Aug 2013 07:08:42 +0200
-Subject: [PATCH 5/5] pinctrl: imx: Use struct type for pins
-In-Reply-To: <CACRpkdZk4jz3dg6aoZqsMT5VXJUQxwrZOyAVLCU3UsExAXChAA@mail.gmail.com>
-References: <1376050854-3303-1-git-send-email-s.hauer@pengutronix.de>
- <1376050854-3303-6-git-send-email-s.hauer@pengutronix.de>
- <CACRpkdZk4jz3dg6aoZqsMT5VXJUQxwrZOyAVLCU3UsExAXChAA@mail.gmail.com>
-Message-ID: <20130815050842.GF26614@pengutronix.de>
+From: joelf@ti.com (Joel Fernandes)
+Date: Wed, 14 Aug 2013 22:12:45 -0500
+Subject: [PATCH 02/10] crypto: omap-aes: Add useful debug macros
+In-Reply-To: <1376527636.1949.120.camel@joe-AO722>
+References: <1376521969-16807-1-git-send-email-joelf@ti.com>
+ <1376521969-16807-3-git-send-email-joelf@ti.com>
+ <1376522998.1949.118.camel@joe-AO722> <520C156D.2090003@ti.com>
+ <1376527636.1949.120.camel@joe-AO722>
+Message-ID: <520C472D.8000904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 10:41:20PM +0200, Linus Walleij wrote:
-> On Fri, Aug 9, 2013 at 2:20 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On 08/14/2013 07:47 PM, Joe Perches wrote:
+> On Wed, 2013-08-14 at 18:40 -0500, Joel Fernandes wrote:
+>> On 08/14/2013 06:29 PM, Joe Perches wrote:
+>>> On Wed, 2013-08-14 at 18:12 -0500, Joel Fernandes wrote:
+>>>> When DEBUG is enabled, these macros can be used to print variables
+>>>> in integer and hex format, and clearly display which registers,
+>>>> offsets and values are being read/written , including printing the
+>>>> names of the offsets and their values.
+>>> []
+>>>> diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
+>>> []
+>>>> @@ -15,6 +15,14 @@
+>>>>  
+>>>>  #define pr_fmt(fmt) "%s: " fmt, __func__
+>>>>  
+>>>> +#ifdef DEBUG
+>>>> +#define prn(num) printk(#num "=%d\n", num)
+>>>> +#define prx(num) printk(#num "=%x\n", num)
+>>>
+>>> pr_debug?
+>>
+>> Sure, can change that.
+>>
+>>>> +#else
+>>>> +#define prn(num) do { } while (0)
+>>>> +#define prx(num)  do { } while (0)
+>>>> +#endif
+>>> []
+>>>> @@ -172,13 +180,35 @@ struct omap_aes_dev {
+>>>>  static LIST_HEAD(dev_list);
+>>>>  static DEFINE_SPINLOCK(list_lock);
+>>>>  
+>>>> +#ifdef DEBUG
+>>>> +#define omap_aes_read(dd, offset)					\
+>>>> +	do {								\
+>>>> +		omap_aes_read_1(dd, offset);				\
+>>>> +		pr_debug("omap_aes_read(" #offset ")\n");		\
+>>>> +	} while (0)
+>>>> +
+>>>> +static inline u32 omap_aes_read_1(struct omap_aes_dev *dd, u32 offset)
+>>>> +#else
+>>>>  static inline u32 omap_aes_read(struct omap_aes_dev *dd, u32 offset)
+>>>> +#endif
+>>>>  {
+>>>>  	return __raw_readl(dd->io_base + offset);
+>>>>  }
+>>>>  
+>>>> +#ifdef DEBUG
+>>>> +#define omap_aes_write(dd, offset, value)				\
+>>>> +	do {								\
+>>>> +		pr_debug("omap_aes_write(" #offset "=%x) value=%d\n",	\
+>>>> +			 offset, value);				\
+>>>> +		omap_aes_write_1(dd, offset, value);			\
+>>>> +	} while (0)
+>>>> +
+>>>> +static inline void omap_aes_write_1(struct omap_aes_dev *dd, u32 offset,
+>>>> +				  u32 value)
+>>>> +#else
+>>>>  static inline void omap_aes_write(struct omap_aes_dev *dd, u32 offset,
+>>>>  				  u32 value)
+>>>> +#endif
+>>>>  {
+>>>>  	__raw_writel(value, dd->io_base + offset);
+>>>>  }
+>>>
+>>> Umm, yuck?
+>>>
+>>> Is there any real value in read_1 and write_1?
+>>
+>> Can you be more descriptive? There is a lot of value in them for debug
+>> to show clearly sequence of read/writes. Moreover, they are no-op'd when
+>> DEBUG is disabled.
 > 
-> > The i.MX pinctrl driver uses 5 different arrays for storing the
-> > informations for pins. This requires five allocations. Instead,
-> > use a struct type which is more cache friendly, readable and
-> > requires less allocations. One array of integers is still needed
-> > since the pinctrl framework forces us to maintain it.
-> > This also adds checks whether the allocations are succesful which
-> > were missing.
-> >
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> pr_debug is no-op'd when DEBUG is not #defined.
+> so just use a single
 > 
-> Hm appears to be dependent on 4/5 so can't apply this one
-> in isolation ... but it looks good.
-> 
-> Would be nice to have a handshake from Shawn and/or Dong
-> on these patches BTW.
+> omap_aes_write(...)
+> {
+> 	pr_debug(...)
+> 	__raw_writel(...);
+> }
 
-What do you mean with handshake? Shawn acked the series.
+Actually this doesn't work, as the pr_debug cannot print the name of the
+offset as my original patch set does using "#offset".
 
-Sascha
+There are many places where named offsets are used to pass to
+read/write, and this macro helps to visually see which offset is being
+written to by name.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+So the original patch would stand in its current form except for a small
+rewrite of the write debug part of it as follows to be cleaner getting
+rid of the _1. For the read , we still need it as we need to return the
+value from a function which cannot be done in a macro.
+
+So the new patch would look something like this:
+
+#ifdef DEBUG
+#define omap_aes_read(dd, offset)                                      \
+                omap_aes_read_1(dd, offset);                           \
+                pr_debug("omap_aes_read(" #offset ")\n");
+static inline u32 omap_aes_read_1(struct omap_aes_dev *dd, u32 offset)
+#else
+static inline u32 omap_aes_read(struct omap_aes_dev *dd, u32 offset)
+#endif
+{
+        return __raw_readl(dd->io_base + offset);
+}
+
+#ifdef DEBUG
+#define omap_aes_write(dd, offset, value)                              \
+        do {                                                           \
+                pr_debug("omap_aes_write(" #offset "=%x) value=%d\n",  \
+                         offset, value);                               \
+                __raw_writel(value, dd->io_base + offset);             \
+        } while (0)
+#else
+static inline void omap_aes_write(struct omap_aes_dev *dd, u32 offset,
+                                  u32 value)
+{
+        __raw_writel(value, dd->io_base + offset);
+}
+#endif
+
+
+
+Thanks,
+
+-Joel
