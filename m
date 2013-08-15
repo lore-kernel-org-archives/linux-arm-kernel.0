@@ -1,60 +1,38 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 15 Aug 2013 10:43:37 -0500
-Subject: dma_unmap causing issues with __get_free_pages
-In-Reply-To: <20130815115545.GD25647@n2100.arm.linux.org.uk>
-References: <520C84DF.5050707@ti.com>
- <20130815115545.GD25647@n2100.arm.linux.org.uk>
-Message-ID: <520CF729.3030704@ti.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 15 Aug 2013 08:44:56 -0700
+Subject: [PATCH v6 2/4] ARM: debug: support debug ll on hisilicon soc
+In-Reply-To: <CAOesGMhyv6oT3Mk48NHPz-s8XSWhrE7_ig5qpB1vQW2x9c4GhA@mail.gmail.com>
+ (Olof Johansson's message of "Wed, 14 Aug 2013 16:03:44 -0700")
+References: <1374813135-16238-1-git-send-email-haojian.zhuang@linaro.org>
+ <1374813135-16238-3-git-send-email-haojian.zhuang@linaro.org>
+ <20130814063916.GH19951@quad.lixom.net>
+ <20130814154443.GV23006@n2100.arm.linux.org.uk>
+ <20130814162502.GA16491@quad.lixom.net>
+ <20130814225428.GB23006@n2100.arm.linux.org.uk>
+ <CAOesGMhyv6oT3Mk48NHPz-s8XSWhrE7_ig5qpB1vQW2x9c4GhA@mail.gmail.com>
+Message-ID: <87ioz7m007.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Olof Johansson <olof@lixom.net> writes:
 
-On 08/15/2013 06:55 AM, Russell King - ARM Linux wrote:
-> On Thu, Aug 15, 2013 at 02:35:59AM -0500, Joel Fernandes wrote:
->> Hi,
->>
->> I'm having some trouble with using the dma_map/unmap API.
->>
->> On unmapping a particular page using dma_unmap, it seems that the
->> PG_dcache_clean flag is set in the page->flags. This is set by the
->> following statement in __dma_page_dev_to_cpu function in
->> arch/arm/mm/dma-mapping.c
->>                 set_bit(PG_dcache_clean, &page->flags);
->>
->> Due to this, on any subsequent page allocations using __get_free_pages,
->> the following BUG gets triggered.
-> 
-> Are you calling dma_unmap() after the page has been freed?
-> 
->> What is correct way to fix this? Why does the page allocator think its a
->> BAD page descriptor after the unmap?
-> 
-> Well, on free, this is done:
-> 
->         if (page->flags & PAGE_FLAGS_CHECK_AT_PREP)
->                 page->flags &= ~PAGE_FLAGS_CHECK_AT_PREP;
-> 
-> which clears PG_arch_1.  On allocation:
-> 
->         if (unlikely(page_mapcount(page) |
->                 (page->mapping != NULL)  |
->                 (atomic_read(&page->_count) != 0)  |
->                 (page->flags & PAGE_FLAGS_CHECK_AT_PREP) |
->                 (mem_cgroup_bad_page_check(page)))) {
->                 bad_page(page);
->                 return 1;
->         }
-> 
-> As PG_arch_1 is part of the PAGE_FLAGS_CHECK_AT_PREP mask, this means that
-> when a page is freed, it has PG_arch_1 cleared.  Therefore, if on allocation
-> the page now has this bit set, it means that something touched the page
-> after it was freed.  Quite simply, the page was freed while still being
-> in use.  That's very bad and needs fixing.
-> 
+> On Wed, Aug 14, 2013 at 3:54 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+[...]
 
-Absolutely you nailed it! I was doing alloc, map, free, unmap, changed
-this to alloc, map, unmap, free and its working fine now and I learnt a
-thing or 2 about page->flags. Thanks!
+>> CONFLICT (delete/modify): arch/arm/include/debug/highbank.S deleted
+>> in HEAD and modified in arm-soc/for-next. Version arm-soc/for-next
+>> of arch/arm/include/debug/highbank.S left in tree.
+>>
+>> which seems to be a change in the virtual address of the port.  This
+>> one is particularly nasty because it needs to be moved to a completely
+>> different file and therefore is not git rerere'able.  Does it have any
+>> dependencies?
+>
+> I don't think so, we can likely move that patch over to your tree
+> instead and drop it from arm-soc.
 
--Joel
+The highbank change is now dropped from arm-soc and needs to be be
+rebased/reworked on your tree.
+
+Kevin
