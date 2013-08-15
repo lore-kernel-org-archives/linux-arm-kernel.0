@@ -1,60 +1,82 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 15 Aug 2013 18:22:29 +0200
-Subject: [PATCH v2 1/8] usb: phy: omap-control: Get rid of platform data
-In-Reply-To: <1376572512-9561-2-git-send-email-rogerq@ti.com>
-References: <1376572512-9561-1-git-send-email-rogerq@ti.com>
- <1376572512-9561-2-git-send-email-rogerq@ti.com>
-Message-ID: <20130815162229.GA10982@linutronix.de>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 15 Aug 2013 11:25:23 -0500
+Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
+In-Reply-To: <520C9AEA.6030507@arm.com>
+References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
+ <2CD735CE-3FCF-4AB5-89C0-D813ECD19F11@codeaurora.org>
+ <520C9AEA.6030507@arm.com>
+Message-ID: <ADB3A138-838D-4437-853A-ABFCB0B32FAB@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros | 2013-08-15 16:15:05 [+0300]:
 
->diff --git a/drivers/usb/phy/phy-omap-control.c b/drivers/usb/phy/phy-omap-control.c
->index a4dda8e..3b9ee83 100644
->--- a/drivers/usb/phy/phy-omap-control.c
->+++ b/drivers/usb/phy/phy-omap-control.c
->@@ -197,8 +197,13 @@ static int omap_control_usb_probe(struct platform_device *pdev)
-> {
-> 	struct resource	*res;
-> 	struct device_node *np = pdev->dev.of_node;
->-	struct omap_control_usb_platform_data *pdata =
->-			dev_get_platdata(&pdev->dev);
->+
->+	if (np) {
->+		of_property_read_u32(np, "ti,type", &control_usb->type);
->+	} else {
->+		/* We only support DT boot */
->+		return -ENODEV;
->+	}
+On Aug 15, 2013, at 4:10 AM, Punit Agrawal wrote:
 
-what about
-    if (!nop)
-        return -EINVAL;
-
-> 	control_usb = devm_kzalloc(&pdev->dev, sizeof(*control_usb),
-> 		GFP_KERNEL);
->@@ -207,15 +212,6 @@ static int omap_control_usb_probe(struct platform_device *pdev)
-> 		return -ENOMEM;
-> 	}
+> Hi Kumar,
 > 
->-	if (np) {
->-		of_property_read_u32(np, "ti,type", &control_usb->type);
-
-and here you shift the property to the left and remove the other lines.
-But then you wanted to remove that ti,type thingy but I guess this will
-be part of another patch then. Since you can't do everything in one
-patch, it is okay.
-
->-	} else if (pdata) {
->-		control_usb->type = pdata->type;
->-	} else {
->-		dev_err(&pdev->dev, "no pdata present\n");
->-		return -EINVAL;
->-	}
->-
-> 	control_usb->dev	= &pdev->dev;
+> Thanks for a review of the bindings.
 > 
-> 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+> On 14/08/13 22:03, Kumar Gala wrote:
+>> 
+>> On Jul 23, 2013, at 4:19 AM, Punit Agrawal wrote:
+>> 
+>>> The CCI PMU can profile bus transactions at the master and slave
+>>> interfaces of the CCI. The PMU can be used to observe an aggregated view
+>>> of the bus traffic between the various components connected to the CCI.
+>>> 
+>>> Extend the existing CCI driver to support the PMU by registering a perf
+>>> backend for it.
+>>> 
+>>> Document the device tree binding to describe the CCI PMU.
+>>> 
+>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Cc: Nicolas Pitre <nico@linaro.org>
+>>> Cc: Dave Martin <dave.martin@linaro.org>
+>>> Cc: Rob Herring <rob.herring@calxeda.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>>> Reviewed-by: Will Deacon <will.deacon@arm.com>
+>>> ---
+>>> Documentation/devicetree/bindings/arm/cci.txt |   38 ++
+>>> drivers/bus/arm-cci.c                         |  642 +++++++++++++++++++++++++
+>>> 2 files changed, 680 insertions(+)
+>>> 
+>>> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
+>>> index 92d36e2..5bc95e5 100644
+>>> --- a/Documentation/devicetree/bindings/arm/cci.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/cci.txt
+>>> @@ -79,6 +79,34 @@ specific to ARM.
+>>> 				    corresponding interface programming
+>>> 				    registers.
+>>> 
+>>> +	- CCI PMU node
+>>> +
+>>> +		Node name must be "pmu".
+>>> +		Parent node must be CCI interconnect node.
+>>> +
+>>> +		A CCI pmu node must contain the following properties:
+>>> +
+>>> +		- compatible
+>>> +			Usage: required
+>>> +			Value type: <string>
+>>> +			Definition: must be set to one of
+>>> +				    "arm,cci-400-pmu"
+>>> +				    "arm,cci-400-pmu,rev0"
+>>> +				    "arm,cci-400-pmu,rev1"
+>> 
+>> Do you really mean only one?  Seems like ""arm,cci-400-pmu,rev0", "arm,cci-400-pmu" would be valid.
+>> 
+> 
+> Hmm... yes both would be valid. But...
+> 
+> The event numbering scheme changed between Rev 0 and Rev 1 of the CCI. If the revision is specified then it is used to get the event ranges to validate the events. If not, i.e., "arm,cci-400-pmu" is used, then the driver tries to find the the revision by reading the peripheral id registers.
+> 
+> I was trying to make the bindings robust in the face of change in behaviour between different revisons of the IP.
 
-Sebastian
+If there is a periph id register why bother with the device tree having different version info in it?
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
