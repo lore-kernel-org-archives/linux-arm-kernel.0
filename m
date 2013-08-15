@@ -1,54 +1,73 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Thu, 15 Aug 2013 11:29:19 +0800
-Subject: [PATCH 10/29] drivers/watchdog/nuc900_wdt.c: simplify use of
- devm_ioremap_resource
-In-Reply-To: <520C482F.5090806@roeck-us.net>
-References: <1376471493-22215-1-git-send-email-Julia.Lawall@lip6.fr>
- <1376471493-22215-11-git-send-email-Julia.Lawall@lip6.fr>
- <520C482F.5090806@roeck-us.net>
-Message-ID: <CAKT61h9DCnJZkgi4O6jq41tfd1mS2bZm9vEu=RfvXk_0EWfObQ@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 15 Aug 2013 05:44:24 +0200
+Subject: [v3 1/2] dma: mmp_pdma: add support for residue reporting
+In-Reply-To: <CADApbegKj=AMGx4OFOBVsyk71BGis97Gw9QM_-0EsNi90pS+Hw@mail.gmail.com>
+References: <1376497189-21298-1-git-send-email-zonque@gmail.com>
+ <CADApbegKj=AMGx4OFOBVsyk71BGis97Gw9QM_-0EsNi90pS+Hw@mail.gmail.com>
+Message-ID: <520C4E98.6020001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/8/15 Guenter Roeck <linux@roeck-us.net>:
-> On 08/14/2013 02:11 AM, Julia Lawall wrote:
->>
->> From: Julia Lawall <Julia.Lawall@lip6.fr>
->>
->> Remove unneeded error handling on the result of a call to
->> platform_get_resource when the value is passed to devm_ioremap_resource.
->>
->> A simplified version of the semantic patch that makes this change is as
->> follows: (http://coccinelle.lip6.fr/)
->>
->> // <smpl>
->> @@
->> expression pdev,res,n,e,e1;
->> expression ret != 0;
->> identifier l;
->> @@
->>
->> - res = platform_get_resource(pdev, IORESOURCE_MEM, n);
->>    ... when != res
->> - if (res == NULL) { ... \(goto l;\|return ret;\) }
->>    ... when != res
->> + res = platform_get_resource(pdev, IORESOURCE_MEM, n);
->>    e = devm_ioremap_resource(e1, res);
->> // </smpl>
->>
->> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
->>
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Hi Chao,
 
-Acked-by: Wan Zongshun <mcuos.com@gmail.com>
+On 15.08.2013 03:57, Chao Xie wrote:
+> On Thu, Aug 15, 2013 at 12:19 AM, Daniel Mack <zonque@gmail.com> wrote:
 
-Thanks for your patch.
+>> +static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan)
+>> +{
+>> +       struct mmp_pdma_desc_sw *sw;
+>> +       u32 curr, done = 0;
+>> +
+>> +       if (chan->dir == DMA_DEV_TO_MEM)
+>> +               curr = readl(chan->phy->base + DTADR(chan->phy->idx));
+>> +       else
+>> +               curr = readl(chan->phy->base + DSADR(chan->phy->idx));
+>> +
+>> +       list_for_each_entry(sw, &chan->chain_running, node) {
+>> +               u32 start;
+>> +               u32 len = sw->desc.dcmd & DCMD_LENGTH;
+>> +
+>> +               if (chan->dir == DMA_DEV_TO_MEM)
+>> +                       start = sw->desc.dtadr;
+>> +               else
+>> +                       start = sw->desc.dsadr;
+>> +
+>> +               if (curr >= start && curr <= (start + len)) {
+>> +                       done += curr - start;
+>> +                       break;
+>> +               }
+>> +
+>> +               done += len;
+>> +       }
+>> +
+>> +       return chan->total_len - done;
+>> +}
+>> +
+> 
+> It seems that you will get all the residue bytes in the channel.
+> For DMA transfer, user may submit many trasaction.
+> The transaction will be composed by mutiple desctiptors. So it means
+> that chan->chain_running includes
+> the descriptors from all ongoing transactions.
+> When user try to get the tx_status, user will pass the cookie to
+> identify which transaction it want to get the status.
+> So for mmp_pdma_residue, it need care about the cookie, and find out
+> the transaction, then calculate the residue bytes.
 
->
->
+Ok, right.
+
+> The orignal driver has a issue, it will assign cookie for all
+> descriptors, not the transaction. I think that need to be changed.
+
+Not necessarily. If all the linked descriptors are assigned the same
+cookie, we can as well just walk all entries in chain_running and ignore
+the ones that don't match the cookie we're looking for,
+
+The problem with your proposed approach is that the driver will
+currently dispose desc->tx_list via list_splice_tail_init() once the
+transaction has been submitted, so we can't access it later. But what I
+have in mind should work equally well. I'll post an updated patch later.
 
 
-
--- 
-Wan ZongShun.
-www.mcuos.com
+Thanks for the review,
+Daniel
