@@ -1,58 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Aug 2013 22:15:15 +0100
-Subject: [PATCH 1/2] DMA: fix AMBA PL08x driver issue with 64bit DMA
- address type
-In-Reply-To: <520D430E.2050803@linaro.org>
-References: <1376484729-11826-1-git-send-email-andre.przywara@linaro.org>
- <1376484729-11826-2-git-send-email-andre.przywara@linaro.org>
- <20130814130026.GS23006@n2100.arm.linux.org.uk>
- <CAL_JsqLRtRvPyFagLLaRAjciiur=qVKmt2v7q5MPtEGuDske4Q@mail.gmail.com>
- <520D430E.2050803@linaro.org>
-Message-ID: <20130815211515.GF23006@n2100.arm.linux.org.uk>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 15 Aug 2013 22:49:05 +0100
+Subject: [Qemu-devel] SCSI bus failures with qemu-arm in kernel 3.8+
+In-Reply-To: <20130815205044.GA21599@roeck-us.net>
+References: <5207B3C3.9080508@roeck-us.net>
+ <20130811220450.GY23006@n2100.arm.linux.org.uk>
+ <52082EF8.10005@roeck-us.net>
+ <CAFEAcA94ygwRPSsfxs3DvOcTZbdafLiEHys94FG4aXUx+A1t=A@mail.gmail.com>
+ <20130813034054.GA18218@roeck-us.net>
+ <CAFEAcA_-S8z6ZMr8TMPvkcTyyCSMOj1DExVsY4JDQjRXDU5WGw@mail.gmail.com>
+ <20130815175428.GA18580@roeck-us.net>
+ <CAFEAcA_MyJPwo6Gd_dxeWM5q5-7MYqR6-rrePusFzYaGGckWJQ@mail.gmail.com>
+ <20130815205044.GA21599@roeck-us.net>
+Message-ID: <CAFEAcA-ALD+dDWAB+Rd1V+TXQLYGe-qRKC0uFUP0Bt2SGfKDRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 11:07:26PM +0200, Andre Przywara wrote:
-> On 08/14/2013 09:13 PM, Rob Herring wrote:
->> On Wed, Aug 14, 2013 at 8:00 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> NAK.
+On 15 August 2013 21:50, Guenter Roeck <linux@roeck-us.net> wrote:
+> On Thu, Aug 15, 2013 at 07:05:22PM +0100, Peter Maydell wrote:
+>> It needs to go in the same patch, because a kernel with the fixed
+>> irq remapping must also tell QEMU it is fixed; if you split the
+>> two then at the point between the two patches the kernel is
+>> broken for bisection purposes.
 >>
->> This patch has nothing to do with dma masks or your dma mask series.
->> The code deals with bus alignment and cleans up the code to do
->> alignment operations in a sane way compared to modulo operator. The
->> only thing 64-bit dma_addr_t did was expose crap code.
->
-> I agree. Actually I'd see the DMA mask thing just as an opportunity to  
-> fix this code, not as the reason. I guess there are gazillions of  
-> drivers in the ARM world which have problems with any address related  
-> variable being bigger than 32bit, and those should all be fixed 
-> eventually.
+> Thinking about it - is that really true ? My image with the
+> patch applied works just fine under qemu 1.5.2, and unless
+> I am missing something it won't work with qemu 1.4 anyway.
+> So what exactly is broken ?
 
-No they shouldn't.  If the DMA address registers are 32-bit, then the
-DMA engine can *only* handle 32-bit addresses.
+You're OK unless the kernel happens to pick the same interrupt
+number to write to PCI_INTERRUPT_LINE as one of the previous
+broken kernel versions did (in which case QEMU will incorrectly
+assume you're a broken kernel). This can't happen with the way
+the kernel is currently picking interrupt numbers (ie with a
+straightforward relationship between h/w irqs and values written),
+but as I understand from Arnd there is a plan to move to a
+different approach ("sparse irqs") at which point this won't hold:
+http://lists.gnu.org/archive/html/qemu-devel/2013-03/msg04579.html
+So it's better for the kernel to make sure it gets the
+behaviour it wants rather than getting unpleasant surprises
+later.
 
-That's partly the point of my patch set: if the DMA registers are 32-bit,
-then the device driver should set a 32-bit DMA mask to tell the rest of
-the kernel that this driver only supports 32-bit addresses.
-
-If DMA bus addresses of 0-4G translates to memory in the range (say) of
-4G-8G physical, and you have memory in the region of 4G-8G, then that
-should work.  At the moment, it doesn't - and that's what those patches
-address.
-
-The fact that the PL08x driver was ending up with DMA addresses in the
-4G-8G range is a bug.  DMA addresses after mapping are supposed to be
-the _exact_ value you program into the hardware.  If that value is not,
-then the DMA API is buggy for that platform.
-
-That all said, yes this patch is mostly fine, except:
-
->>>> +static int bus_addr_offset(struct pl08x_bus_data *bus)
->>>> +{
->>>> +     return bus->addr & (bus->buswidth - 1);
->>>> +}
-
-that this is a poor name for this function - and we don't need it because
-we have a generic form of this - IS_ALIGNED().  Is there any reason to
-re-code what's already provided?
+-- PMM
