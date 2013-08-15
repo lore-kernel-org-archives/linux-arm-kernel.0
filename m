@@ -1,51 +1,28 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 15 Aug 2013 11:44:26 -0700
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Trustzone-based security
- solution for ARM Linux
-In-Reply-To: <20130815183319.GE23006@n2100.arm.linux.org.uk>
-References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
- <20130815042812.GA8968@kroah.com>
- <CABb+yY1YKGkAeb-8GbadUoV5g54iCdrYGnD_VSpaNmtfXXhpyA@mail.gmail.com>
- <CAGsJ_4yZ7Rf7UV-1u3cG_V9mrtCWD=LYBeuKQaz0SWLYoHhwwg@mail.gmail.com>
- <20130815080532.GB7080@kroah.com>
- <CAKv+Gu9mOxoTsK5g-GX2Khvu0FSUBZRCL0Jw6F6vrMG=fNfy1Q@mail.gmail.com>
- <20130815155652.GB14792@kroah.com>
- <CAKv+Gu8_65EkDkn6-W1NKZSs9P8KOxfFNzFNXq0Eqm5dMYGxwQ@mail.gmail.com>
- <20130815182600.GA22567@kroah.com>
- <20130815183319.GE23006@n2100.arm.linux.org.uk>
-Message-ID: <20130815184426.GA23581@kroah.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 15 Aug 2013 14:00:42 -0500
+Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
+In-Reply-To: <520C9AEA.6030507@arm.com>
+References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
+ <2CD735CE-3FCF-4AB5-89C0-D813ECD19F11@codeaurora.org>
+ <520C9AEA.6030507@arm.com>
+Message-ID: <9E753731-852D-4F04-931B-112B589D9FFB@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 07:33:19PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 15, 2013 at 11:26:00AM -0700, Greg KH wrote:
-> > That's their decision, which is fine.  Getting the Linux CAN stack
-> > "certified" might be a good goal for a manufacturer who wants to ship
-> > Linux for this type of system, although we all know how much those
-> > things really matter when it comes to technical issues :)
+
+On Aug 15, 2013, at 4:10 AM, Punit Agrawal wrote:
+
+>> What is the list of interrupts related to, should there be an associated interrupts-names
+>> 
 > 
-> If response times matter, and you're relying on software to produce
-> those response times, then you really need to look at threaded IRQs.
-> The standard Linux interrupt model sucks, especially if you have USB
-> enabled.
+> For the CCI PMU, each interrupt signal corresponds to the overflow of a performance counter.
+> 
+> Here again, I was trying to be robust in the face of differing hardware configurations - specially the scenario where multiple interrupt lines from the CCI PMU are tied together to generate a single interrupt to the CPU.
 
-Using USB withing a "trusted OS" situation isn't very wise for a number
-of reasons :)
+Even in the case of multiple interrupt lines tied together, why wouldn't you still specify each interrupt specifier and they all just be the same and thus the interrupt appears to be shared ?
 
-There is work happening on making USB host controllers use threaded
-interrups, the first round of changes just went into the usb-next branch
-in linux-next, and will show up in 3.12.  It reduces the overhead of USB
-on ARM systems by a measurable ammount.  There are more patches coming
-for this as well to fix up other related issues, and USB host
-controllers.
+- k
 
-> I'm still seeing upwards of 2.6ms servicing times for USB keyboards
-> and nice, which given that they are just a set of keys and a position
-> sensor is totally crazy.
-
-USB is not exactly a low-latency protocol.  A lot happens for just those
-"key press" packets to make it to the machine.
-
-thanks,
-
-greg k-h
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
