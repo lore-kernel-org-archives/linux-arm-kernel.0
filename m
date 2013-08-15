@@ -1,21 +1,45 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 15 Aug 2013 12:08:38 -0400
-Subject: [PATCHv2 0/2] dma: mv_xor: big endian support
-In-Reply-To: <20130815180044.224b14ea@skate>
-References: <1375112534-748-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130815180044.224b14ea@skate>
-Message-ID: <20130815160838.GO13964@titan.lakedaemon.net>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Thu, 15 Aug 2013 18:09:54 +0200
+Subject: [PATCH 1/2] extcon: palmas: Added a new compatible type *ti,
+ palmas-usb-vid*
+In-Reply-To: <520B14A1.8030809@ti.com>
+References: <1376302675-15795-1-git-send-email-kishon@ti.com>
+ <1376372241-15573-1-git-send-email-kishon@ti.com>
+ <520A8555.10401@wwwdotorg.org> <520B14A1.8030809@ti.com>
+Message-ID: <520CFD52.4060103@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 06:00:44PM +0200, Thomas Petazzoni wrote:
-> Jason, Andrew, Gregory, as the Marvell EBU maintainers, it would be
-> great if you could give your Acked-by and/or Tested-by on those patches.
+Hi Kishon,
 
-Ahh, yes.  I thought these had been accepted.  If you're waiting for us,
+On 14/08/2013 07:24, Kishon Vijay Abraham I wrote:
+> Hi,
+>
+> On Wednesday 14 August 2013 12:43 AM, Stephen Warren wrote:
+>> On 08/12/2013 11:37 PM, Kishon Vijay Abraham I wrote:
+>>> The Palmas device contains only a USB VID detector, so added a
+>>> compatible type *ti,palmas-usb-vid*. Dint remove the existing compatible
+>>
+>> s/Dint/Didn't/
+>>
+>>> diff --git a/Documentation/devicetree/bindings/extcon/extcon-twl.txt b/Documentation/devicetree/bindings/extcon/extcon-twl.txt
+>>
+>>>   PALMAS USB COMPARATOR
+>>>   Required Properties:
+>>> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
+>>> + - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb" or
+>>> +   "ti,palmas-usb-vid".
+>>
+>> So are ti,palmas-usb and ti,twl6035-usb full EHCI controllers then?
+>
+> No. I thought I shouldn't remove those if someone is already using those
+> compatible value.
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Well, I think we still have a short period of time where we can clean 
+some badly defined bindings before it is really too late.
 
-thx,
+Both kernel and DTS are still in sync for the moment, so changing both 
+at the same time should be safe.
 
-Jason.
+Regards,
+Benoit
