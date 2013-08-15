@@ -1,65 +1,71 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 15 Aug 2013 11:09:04 +0100
-Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <ABE5FFA6-8709-4E8F-A726-27C1154157F0@codeaurora.org>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
- <520BF152.1020704@wwwdotorg.org>
- <56FE58B8-1619-4CDF-A5E6-89CE6F51E96C@codeaurora.org>
- <520BF2E1.8070805@wwwdotorg.org>
- <ABE5FFA6-8709-4E8F-A726-27C1154157F0@codeaurora.org>
-Message-ID: <520CA8C0.4080008@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 15 Aug 2013 13:18:20 +0300
+Subject: [PATCH v2 0/9] USB: phy: phy-nop: Manage RESET GPIO in the driver
+Message-ID: <1376561909-4406-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/13 22:16, Kumar Gala wrote:
->
-> On Aug 14, 2013, at 4:13 PM, Stephen Warren wrote:
->
->> On 08/14/2013 03:09 PM, Kumar Gala wrote:
->>>
->>> On Aug 14, 2013, at 4:06 PM, Stephen Warren wrote:
->>>
->>>> On 07/23/2013 03:19 AM, Punit Agrawal wrote:
->>>>> The CCI PMU can profile bus transactions at the master and slave
->>>>> interfaces of the CCI. The PMU can be used to observe an aggregated view
->>>>> of the bus traffic between the various components connected to the CCI.
->>>>>
->>>>> Extend the existing CCI driver to support the PMU by registering a perf
->>>>> backend for it.
->>>>>
->>>>> Document the device tree binding to describe the CCI PMU.
->>>>
->>>>> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
->>>>
->>>>> +	- CCI PMU node
->>>>> +
->>>>> +		Node name must be "pmu".
->>>>
->>>> I don't think the binding should require the node to have a particular
->>>> name; node names shouldn't be interpret/used/relied-upon by drivers.
->>>
->>> While I agree with that, we should be aiming for some convention and consistency with node names.
->>
->> Sure. Should there be a Documentation/devictree/bindings/node-names that
->> lists common node names for people to use? Either way though, I still
->> think this is an aspect of authoring the *.dts file, not an aspect of
->> the DT binding? After all, what if there were more than one CCI so they
->> needed to be named pmu at 0, pmu at 1, etc.?
->
-> Agreed, I was thinking a bindings/node-names would be a good idea.
->
-> I'm guessing 99% of people copy either from the example in the binding of an existing .dts file.  So while I agree the binding shouldn't require a node name be a specific thing as part of the spec, we as reviewers should try to ensure consistency in examples or .dts files.
->
+Hi,
 
-Based on the comments so far, I will change the bindings documentation 
-submitted with this patch to remove the requirement for a particular 
-node name for CCI PMU.
+Modelling the RESET line as a regulator supply wasn't a good idea
+as it abuses the regulator framework and makes adaptation
+code/data more complex.
 
-As it is, this is not required by the driver but was only done for 
-consistency.
+Instead, manage the RESET gpio line directly in the driver.
 
-Cheers,
-Punit
+This also makes us easy to migrate to a dedicated GPIO RESET controller
+whenever it becomes available. As of now, it doesn't seem to be making
+it into 3.12.
 
-> - k
->
+*NOTE:* As there are changes to platform data, Patch 1 needs to be shared
+between the arm-soc tree and usb tree.
+
+Patch 1 is available at repo
+	git://github.com/rogerq/linux.git
+in branch
+	phy-reset-common
+
+Patch 2 contains the phy-nop driver changes
+Patches 3 and 4 adapt legacy boot code to the phy-nop driver changes.
+Patches 5, 6 and 7 adapt DT data to the binding changes.
+Patch 8 is cleanup of omap3-beagle DT.
+Patch 9 adds USB host support to omap3-beagle-xm using the new binding.
+
+Patches are based on v3.11-rc5.
+Tested leacy boot on omap3-beagle and omap3-beagle-xm
+Tested DT boot on omap3-beagle, omap3-beagle-xm and omap4-panda-es
+
+v2:
+- Added RESET GPIO polarity feature
+- Changed to gpio_set_value_cansleep()
+
+cheers,
+-roger
+
+---
+Roger Quadros (9):
+  usb: phy: nop: Add gpio_reset to platform data
+  usb: phy: nop: Don't use regulator framework for RESET line
+  ARM: OMAP2+: omap-usb-host: Get rid of platform_data from struct
+    usbhs_phy_data
+  ARM: OMAP2+: usb-host: Adapt to USB phy-nop RESET line changes
+  ARM: dts: omap3-beagle: Use reset-gpios for hsusb2_reset
+  ARM: dts: omap4-panda: Use reset-gpios for hsusb1_reset
+  ARM: dts: omap5-uevm: Use reset-gpios for hsusb2_reset
+  ARM: dts: omap3-beagle: Make USB host pin naming consistent
+  ARM: dts: omap3-beagle-xm: Add USB Host support
+
+ .../devicetree/bindings/usb/usb-nop-xceiv.txt      |    7 +-
+ arch/arm/boot/dts/omap3-beagle-xm.dts              |   65 +++++++++++++++---
+ arch/arm/boot/dts/omap3-beagle.dts                 |   37 ++++-------
+ arch/arm/boot/dts/omap4-panda-common.dtsi          |   18 +-----
+ arch/arm/boot/dts/omap5-uevm.dts                   |   13 +---
+ arch/arm/mach-omap2/board-omap3beagle.c            |    6 --
+ arch/arm/mach-omap2/usb-host.c                     |   18 +++---
+ arch/arm/mach-omap2/usb.h                          |    1 -
+ drivers/usb/phy/phy-nop.c                          |   71 ++++++++++++++-----
+ include/linux/usb/nop-usb-xceiv.h                  |    4 +-
+ 10 files changed, 138 insertions(+), 102 deletions(-)
+
+-- 
+1.7.4.1
