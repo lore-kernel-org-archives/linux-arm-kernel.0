@@ -1,197 +1,49 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 15 Aug 2013 13:18:22 +0300
-Subject: [PATCH v2 2/9] usb: phy: nop: Don't use regulator framework for RESET
- line
+Date: Thu, 15 Aug 2013 13:18:24 +0300
+Subject: [PATCH v2 4/9] ARM: OMAP2+: usb-host: Adapt to USB phy-nop RESET line
+ changes
 In-Reply-To: <1376561909-4406-1-git-send-email-rogerq@ti.com>
 References: <1376561909-4406-1-git-send-email-rogerq@ti.com>
-Message-ID: <1376561909-4406-3-git-send-email-rogerq@ti.com>
+Message-ID: <1376561909-4406-5-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modelling the RESET line as a regulator supply wasn't a good idea
-as it kind of abuses the regulator framework and also makes adaptation
-code more complex.
-
-Instead, manage the RESET gpio line directly in the driver. Update
-the device tree binding information.
-
-This also makes us easy to migrate to a dedicated GPIO RESET controller
-whenever it becomes available.
+The USB phy-nop nop driver expects the RESET line information
+to be sent as a GPIO number via platform data. Adapt to that.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- .../devicetree/bindings/usb/usb-nop-xceiv.txt      |    7 +-
- drivers/usb/phy/phy-nop.c                          |   71 ++++++++++++++-----
- 2 files changed, 55 insertions(+), 23 deletions(-)
+ arch/arm/mach-omap2/usb-host.c |   11 +----------
+ 1 files changed, 1 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-index d7e2726..1bd37fa 100644
---- a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-@@ -15,7 +15,7 @@ Optional properties:
+diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
+index 1626801..4528b40 100644
+--- a/arch/arm/mach-omap2/usb-host.c
++++ b/arch/arm/mach-omap2/usb-host.c
+@@ -460,8 +460,7 @@ int usbhs_init_phys(struct usbhs_phy_data *phy, int num_phys)
+ 		memset(&nop_pdata, 0, sizeof(nop_pdata));
+ 		if (gpio_is_valid(phy->vcc_gpio))
+ 			nop_pdata.needs_vcc = true;
+-		if (gpio_is_valid(phy->reset_gpio))
+-			nop_pdata.needs_reset = true;
++		nop_pdata.gpio_reset = phy->reset_gpio;
+ 		nop_pdata.type = USB_PHY_TYPE_USB2;
  
- - vcc-supply: phandle to the regulator that provides RESET to the PHY.
+ 		/* create a NOP PHY device */
+@@ -483,14 +482,6 @@ int usbhs_init_phys(struct usbhs_phy_data *phy, int num_phys)
  
--- reset-supply: phandle to the regulator that provides power to the PHY.
-+- reset-gpios: Should specify the GPIO for reset.
+ 		usb_bind_phy("ehci-omap.0", phy->port - 1, phy_id);
  
- Example:
- 
-@@ -25,10 +25,9 @@ Example:
- 		clocks = <&osc 0>;
- 		clock-names = "main_clk";
- 		vcc-supply = <&hsusb1_vcc_regulator>;
--		reset-supply = <&hsusb1_reset_regulator>;
-+		reset-gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
- 	};
- 
- hsusb1_phy is a NOP USB PHY device that gets its clock from an oscillator
- and expects that clock to be configured to 19.2MHz by the NOP PHY driver.
--hsusb1_vcc_regulator provides power to the PHY and hsusb1_reset_regulator
--controls RESET.
-+hsusb1_vcc_regulator provides power to the PHY and GPIO 7 controls RESET.
-diff --git a/drivers/usb/phy/phy-nop.c b/drivers/usb/phy/phy-nop.c
-index 55445e5d..1f88c32 100644
---- a/drivers/usb/phy/phy-nop.c
-+++ b/drivers/usb/phy/phy-nop.c
-@@ -35,6 +35,9 @@
- #include <linux/clk.h>
- #include <linux/regulator/consumer.h>
- #include <linux/of.h>
-+#include <linux/of_gpio.h>
-+#include <linux/gpio.h>
-+#include <linux/delay.h>
- 
- struct nop_usb_xceiv {
- 	struct usb_phy phy;
-@@ -42,6 +45,8 @@ struct nop_usb_xceiv {
- 	struct clk *clk;
- 	struct regulator *vcc;
- 	struct regulator *reset;
-+	int gpio_reset;
-+	bool reset_active_low;
- };
- 
- static struct platform_device *pd;
-@@ -70,6 +75,23 @@ static int nop_set_suspend(struct usb_phy *x, int suspend)
- 	return 0;
- }
- 
-+static void nop_reset_set(struct nop_usb_xceiv *nop, int asserted)
-+{
-+	int value;
-+
-+	if (!gpio_is_valid(nop->gpio_reset))
-+		return;
-+
-+	value = asserted;
-+	if (nop->reset_active_low)
-+		value = !value;
-+
-+	gpio_set_value_cansleep(nop->gpio_reset, value);
-+
-+	if (!asserted)
-+		usleep_range(10000, 20000);
-+}
-+
- static int nop_init(struct usb_phy *phy)
- {
- 	struct nop_usb_xceiv *nop = dev_get_drvdata(phy->dev);
-@@ -82,11 +104,8 @@ static int nop_init(struct usb_phy *phy)
- 	if (!IS_ERR(nop->clk))
- 		clk_enable(nop->clk);
- 
--	if (!IS_ERR(nop->reset)) {
--		/* De-assert RESET */
--		if (regulator_enable(nop->reset))
--			dev_err(phy->dev, "Failed to de-assert reset\n");
--	}
-+	/* De-assert RESET */
-+	nop_reset_set(nop, 0);
- 
- 	return 0;
- }
-@@ -95,11 +114,8 @@ static void nop_shutdown(struct usb_phy *phy)
- {
- 	struct nop_usb_xceiv *nop = dev_get_drvdata(phy->dev);
- 
--	if (!IS_ERR(nop->reset)) {
--		/* Assert RESET */
--		if (regulator_disable(nop->reset))
--			dev_err(phy->dev, "Failed to assert reset\n");
--	}
-+	/* Assert RESET */
-+	nop_reset_set(nop, 1);
- 
- 	if (!IS_ERR(nop->clk))
- 		clk_disable(nop->clk);
-@@ -148,7 +164,6 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
- 	int err;
- 	u32 clk_rate = 0;
- 	bool needs_vcc = false;
--	bool needs_reset = false;
- 
- 	nop = devm_kzalloc(&pdev->dev, sizeof(*nop), GFP_KERNEL);
- 	if (!nop)
-@@ -159,20 +174,28 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
- 	if (!nop->phy.otg)
- 		return -ENOMEM;
- 
-+	nop->reset_active_low = true;	/* default behaviour */
-+
- 	if (dev->of_node) {
- 		struct device_node *node = dev->of_node;
-+		enum of_gpio_flags flags;
- 
- 		if (of_property_read_u32(node, "clock-frequency", &clk_rate))
- 			clk_rate = 0;
- 
- 		needs_vcc = of_property_read_bool(node, "vcc-supply");
--		needs_reset = of_property_read_bool(node, "reset-supply");
-+		nop->gpio_reset = of_get_named_gpio_flags(node, "reset-gpios",
-+								0, &flags);
-+		if (nop->gpio_reset == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+
-+		nop->reset_active_low = flags & OF_GPIO_ACTIVE_LOW;
- 
- 	} else if (pdata) {
- 		type = pdata->type;
- 		clk_rate = pdata->clk_rate;
- 		needs_vcc = pdata->needs_vcc;
--		needs_reset = pdata->needs_reset;
-+		nop->gpio_reset = pdata->gpio_reset;
- 	}
- 
- 	nop->clk = devm_clk_get(&pdev->dev, "main_clk");
-@@ -205,12 +228,22 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
- 			return -EPROBE_DEFER;
- 	}
- 
--	nop->reset = devm_regulator_get(&pdev->dev, "reset");
--	if (IS_ERR(nop->reset)) {
--		dev_dbg(&pdev->dev, "Error getting reset regulator: %ld\n",
--					PTR_ERR(nop->reset));
--		if (needs_reset)
--			return -EPROBE_DEFER;
-+	if (gpio_is_valid(nop->gpio_reset)) {
-+		unsigned long gpio_flags;
-+
-+		/* Assert RESET */
-+		if (nop->reset_active_low)
-+			gpio_flags = GPIOF_OUT_INIT_HIGH;
-+		else
-+			gpio_flags = GPIOF_OUT_INIT_LOW;
-+
-+		err = devm_gpio_request_one(dev, nop->gpio_reset,
-+						gpio_flags, dev_name(dev));
-+		if (err) {
-+			dev_err(dev, "Error requesting RESET GPIO %d\n",
-+					nop->gpio_reset);
-+			return err;
-+		}
- 	}
- 
- 	nop->dev		= &pdev->dev;
+-		/* Do we need RESET regulator ? */
+-		if (gpio_is_valid(phy->reset_gpio)) {
+-			scnprintf(rail_name, MAX_STR,
+-					"hsusb%d_reset", phy->port);
+-			usbhs_add_regulator(rail_name, phy_id, "reset",
+-						phy->reset_gpio, 1);
+-		}
+-
+ 		/* Do we need VCC regulator ? */
+ 		if (gpio_is_valid(phy->vcc_gpio)) {
+ 			scnprintf(rail_name, MAX_STR, "hsusb%d_vcc", phy->port);
 -- 
 1.7.4.1
