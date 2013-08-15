@@ -1,117 +1,24 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 15 Aug 2013 13:18:29 +0300
-Subject: [PATCH v2 9/9] ARM: dts: omap3-beagle-xm: Add USB Host support
-In-Reply-To: <1376561909-4406-1-git-send-email-rogerq@ti.com>
-References: <1376561909-4406-1-git-send-email-rogerq@ti.com>
-Message-ID: <1376561909-4406-10-git-send-email-rogerq@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 15 Aug 2013 11:33:58 +0100
+Subject: [PATCH 2/5] ASoC: pxa: pxa-ssp: add DT bindings
+In-Reply-To: <1376296961-20564-3-git-send-email-zonque@gmail.com>
+References: <1376296961-20564-1-git-send-email-zonque@gmail.com>
+ <1376296961-20564-3-git-send-email-zonque@gmail.com>
+Message-ID: <20130815103358.GY2401@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide RESET GPIO and Power regulator for the USB PHY,
-the USB Host port mode and the PHY device for the controller.
-Also provide pin multiplexer information for USB host pins.
+On Mon, Aug 12, 2013 at 10:42:38AM +0200, Daniel Mack wrote:
+> The pxa ssp DAI acts as a user of a pxa ssp port, and needs an
+> appropriate 'port' phandle in DT to reference the upstream.
 
-We also relocate omap3_pmx_core pin definations so that they
-are close to omap3_pmx_wkup pin definations.
-
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/boot/dts/omap3-beagle-xm.dts |   65 ++++++++++++++++++++++++++++-----
- 1 files changed, 56 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index afdb164..b081f5a 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -69,6 +69,23 @@
- 		};
- 
- 	};
-+
-+	/* HS USB Port 2 Power */
-+	hsusb2_power: hsusb2_power_reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "hsusb2_vbus";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
-+		startup-delay-us = <70000>;
-+	};
-+
-+	/* HS USB Host PHY on PORT 2 */
-+	hsusb2_phy: hsusb2_phy {
-+		compatible = "usb-nop-xceiv";
-+		reset-gpios = <&gpio5 19 GPIO_ACTIVE_LOW>; /* gpio_147 */
-+		vcc-supply = <&hsusb2_power>;
-+	};
- };
- 
- &omap3_pmx_wkup {
-@@ -79,6 +96,37 @@
- 	};
- };
- 
-+&omap3_pmx_core {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+			&hsusbb2_pins
-+	>;
-+
-+	uart3_pins: pinmux_uart3_pins {
-+		pinctrl-single,pins = <
-+			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
-+			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx OUTPUT | MODE0 */
-+		>;
-+	};
-+
-+	hsusbb2_pins: pinmux_hsusbb2_pins {
-+		pinctrl-single,pins = <
-+			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-+			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-+			0x5c4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-+			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
-+			0x5c8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-+			0x5cA (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
-+			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
-+			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
-+			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
-+			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
-+			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
-+			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
-+		>;
-+	};
-+};
-+
- &i2c1 {
- 	clock-frequency = <2600000>;
- 
-@@ -148,15 +196,6 @@
- 	power = <50>;
- };
- 
--&omap3_pmx_core {
--	uart3_pins: pinmux_uart3_pins {
--		pinctrl-single,pins = <
--			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
--			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx OUTPUT | MODE0 */
--		>;
--	};
--};
--
- &uart3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart3_pins>;
-@@ -166,3 +205,11 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&gpio1_pins>;
- };
-+
-+&usbhshost {
-+	port2-mode = "ehci-phy";
-+};
-+
-+&usbhsehci {
-+	phys = <0 &hsusb2_phy>;
-+};
--- 
-1.7.4.1
+I've applied this and the rest of the series though I'm not really that
+happy about having a binding for the DAI in the DT since there's at best
+tenouous hardware there.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130815/f096104b/attachment.sig>
