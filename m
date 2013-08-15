@@ -1,387 +1,66 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 16 Aug 2013 11:06:50 -0700
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
- with external L3-cache.
-In-Reply-To: <20130816175034.GE20246@cbox>
-References: <CAAhSdy3WwZcLW6s05mV=Mn8=w8TcubTdYrgNqAChqiHxXC53eg@mail.gmail.com>
- <747a0675165da4ef147bbda4e140549b@www.loen.fr>
- <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
- <5935339137684ecf90dd484cc5739548@www.loen.fr>
- <20130815165344.GA3853@cbox>
- <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
- <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
- <20130816171912.GB20246@cbox>
- <CAAhSdy2bk6Ou=326cYJW2wKvm9pffbRRmO2ABFwF9dmqwWdKqQ@mail.gmail.com>
- <20130816175034.GE20246@cbox>
-Message-ID: <20130816180650.GF20246@cbox>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Thu, 15 Aug 2013 14:50:24 -0500
+Subject: [PATCH RFC 0/3] Add support for the System Power Management Interface
+ (SPMI)
+Message-ID: <cover.1376596224.git.joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 10:50:34AM -0700, Christoffer Dall wrote:
-> On Fri, Aug 16, 2013 at 11:12:08PM +0530, Anup Patel wrote:
-> > On Fri, Aug 16, 2013 at 10:49 PM, Christoffer Dall
-> > <christoffer.dall@linaro.org> wrote:
-> > > On Fri, Aug 16, 2013 at 12:27:55PM +0530, Anup Patel wrote:
-> > >> On Fri, Aug 16, 2013 at 10:32 AM, Anup Patel <anup@brainfault.org> wrote:
-> > >> > On Thu, Aug 15, 2013 at 10:23 PM, Christoffer Dall
-> > >> > <christoffer.dall@linaro.org> wrote:
-> > >> >> On Thu, Aug 15, 2013 at 04:37:27PM +0100, Marc Zyngier wrote:
-> > >> >>> On 2013-08-15 16:13, Anup Patel wrote:
-> > >> >>> > Hi Marc,
-> > >> >>> >
-> > >> >>> > On Thu, Aug 15, 2013 at 8:17 PM, Marc Zyngier <marc.zyngier@arm.com>
-> > >> >>> > wrote:
-> > >> >>> >> On 2013-08-15 14:31, Anup Patel wrote:
-> > >> >>> >>>
-> > >> >>> >>> On Thu, Aug 15, 2013 at 2:01 PM, Marc Zyngier
-> > >> >>> >>> <marc.zyngier@arm.com>
-> > >> >>> >>> wrote:
-> > >> >>> >>>>
-> > >> >>> >>>> On 2013-08-15 07:26, Anup Patel wrote:
-> > >> >>> >>>>>
-> > >> >>> >>>>>
-> > >> >>> >>>>> Hi Marc,
-> > >> >>> >>>>>
-> > >> >>> >>>>> On Thu, Aug 15, 2013 at 10:22 AM, Marc Zyngier
-> > >> >>> >>>>> <marc.zyngier@arm.com>
-> > >> >>> >>>>> wrote:
-> > >> >>> >>>>>>
-> > >> >>> >>>>>>
-> > >> >>> >>>>>> Hi Anup,
-> > >> >>> >>>>>>
-> > >> >>> >>>>>>
-> > >> >>> >>>>>> On 2013-08-14 15:22, Anup Patel wrote:
-> > >> >>> >>>>>>>
-> > >> >>> >>>>>>>
-> > >> >>> >>>>>>>
-> > >> >>> >>>>>>> On Wed, Aug 14, 2013 at 5:34 PM, Marc Zyngier
-> > >> >>> >>>>>>> <marc.zyngier@arm.com>
-> > >> >>> >>>>>>> wrote:
-> > >> >>> >>>>>>>>
-> > >> >>> >>>>>>>>
-> > >> >>> >>>>>>>>
-> > >> >>> >>>>>>>> Hi Pranav,
-> > >> >>> >>>>>>>>
-> > >> >>> >>>>>>>> On 2013-08-14 12:47, Pranavkumar Sawargaonkar wrote:
-> > >> >>> >>>>>>>>>
-> > >> >>> >>>>>>>>>
-> > >> >>> >>>>>>>>>
-> > >> >>> >>>>>>>>> Systems with large external L3-cache (few MBs), might have
-> > >> >>> >>>>>>>>> dirty
-> > >> >>> >>>>>>>>> content belonging to the guest page in L3-cache. To tackle
-> > >> >>> >>>>>>>>> this,
-> > >> >>> >>>>>>>>> we need to flush such dirty content from d-cache so that
-> > >> >>> >>>>>>>>> guest
-> > >> >>> >>>>>>>>> will see correct contents of guest page when guest MMU is
-> > >> >>> >>>>>>>>> disabled.
-> > >> >>> >>>>>>>>>
-> > >> >>> >>>>>>>>> The patch fixes coherent_icache_guest_page() for external
-> > >> >>> >>>>>>>>> L3-cache.
-> > >> >>> >>>>>>>>>
-> > >> >>> >>>>>>>>> Signed-off-by: Pranavkumar Sawargaonkar
-> > >> >>> >>>>>>>>> <pranavkumar@linaro.org>
-> > >> >>> >>>>>>>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> > >> >>> >>>>>>>>> ---
-> > >> >>> >>>>>>>>>  arch/arm64/include/asm/kvm_mmu.h |    2 ++
-> > >> >>> >>>>>>>>>  1 file changed, 2 insertions(+)
-> > >> >>> >>>>>>>>>
-> > >> >>> >>>>>>>>> diff --git a/arch/arm64/include/asm/kvm_mmu.h
-> > >> >>> >>>>>>>>> b/arch/arm64/include/asm/kvm_mmu.h
-> > >> >>> >>>>>>>>> index efe609c..5129038 100644
-> > >> >>> >>>>>>>>> --- a/arch/arm64/include/asm/kvm_mmu.h
-> > >> >>> >>>>>>>>> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> > >> >>> >>>>>>>>> @@ -123,6 +123,8 @@ static inline void
-> > >> >>> >>>>>>>>> coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
-> > >> >>> >>>>>>>>>       if (!icache_is_aliasing()) {            /* PIPT */
-> > >> >>> >>>>>>>>>               unsigned long hva = gfn_to_hva(kvm, gfn);
-> > >> >>> >>>>>>>>>               flush_icache_range(hva, hva + PAGE_SIZE);
-> > >> >>> >>>>>>>>> +             /* Flush d-cache for systems with external
-> > >> >>> >>>>>>>>> caches. */
-> > >> >>> >>>>>>>>> +             __flush_dcache_area((void *) hva, PAGE_SIZE);
-> > >> >>> >>>>>>>>>       } else if (!icache_is_aivivt()) {       /* non
-> > >> >>> >>>>>>>>> ASID-tagged
-> > >> >>> >>>>>>>>> VIVT
-> > >> >>> >>>>>>>>> */
-> > >> >>> >>>>>>>>>               /* any kind of VIPT cache */
-> > >> >>> >>>>>>>>>               __flush_icache_all();
-> > >> >>> >>>>>>>>
-> > >> >>> >>>>>>>>
-> > >> >>> >>>>>>>>
-> > >> >>> >>>>>>>>
-> > >> >>> >>>>>>>> [adding Will to the discussion as we talked about this in the
-> > >> >>> >>>>>>>> past]
-> > >> >>> >>>>>>>>
-> > >> >>> >>>>>>>> That's definitely an issue, but I'm not sure the fix is to hit
-> > >> >>> >>>>>>>> the
-> > >> >>> >>>>>>>> data
-> > >> >>> >>>>>>>> cache on each page mapping. It looks overkill.
-> > >> >>> >>>>>>>>
-> > >> >>> >>>>>>>> Wouldn't it be enough to let userspace do the cache cleaning?
-> > >> >>> >>>>>>>> kvmtools
-> > >> >>> >>>>>>>> knows which bits of the guest memory have been touched, and
-> > >> >>> >>>>>>>> can do a
-> > >> >>> >>>>>>>> "DC
-> > >> >>> >>>>>>>> DVAC" on this region.
-> > >> >>> >>>>>>>
-> > >> >>> >>>>>>>
-> > >> >>> >>>>>>>
-> > >> >>> >>>>>>>
-> > >> >>> >>>>>>> It seems a bit unnatural to have cache cleaning is user-space.
-> > >> >>> >>>>>>> I am
-> > >> >>> >>>>>>> sure
-> > >> >>> >>>>>>> other architectures don't have such cache cleaning in
-> > >> >>> >>>>>>> user-space for
-> > >> >>> >>>>>>> KVM.
-> > >> >>> >>>>>>>
-> > >> >>> >>>>>>>>
-> > >> >>> >>>>>>>> The alternative is do it in the kernel before running any vcpu
-> > >> >>> >>>>>>>> - but
-> > >> >>> >>>>>>>> that's not very nice either (have to clean the whole of the
-> > >> >>> >>>>>>>> guest
-> > >> >>> >>>>>>>> memory, which makes a full dcache clean more appealing).
-> > >> >>> >>>>>>>
-> > >> >>> >>>>>>>
-> > >> >>> >>>>>>>
-> > >> >>> >>>>>>>
-> > >> >>> >>>>>>> Actually, cleaning full d-cache by set/way upon first run of
-> > >> >>> >>>>>>> VCPU was
-> > >> >>> >>>>>>> our second option but current approach seemed very simple hence
-> > >> >>> >>>>>>> we went for this.
-> > >> >>> >>>>>>>
-> > >> >>> >>>>>>> If more people vote for full d-cache clean upon first run of
-> > >> >>> >>>>>>> VCPU then
-> > >> >>> >>>>>>> we should revise this patch.
-> > >> >>> >>>>>>
-> > >> >>> >>>>>>
-> > >> >>> >>>>>>
-> > >> >>> >>>>>>
-> > >> >>> >>>>>> Can you please give the attached patch a spin on your HW? I've
-> > >> >>> >>>>>> boot-tested
-> > >> >>> >>>>>> it on a model, but of course I can't really verify that it fixes
-> > >> >>> >>>>>> your
-> > >> >>> >>>>>> issue.
-> > >> >>> >>>>>>
-> > >> >>> >>>>>> As far as I can see, it should fix it without any additional
-> > >> >>> >>>>>> flushing.
-> > >> >>> >>>>>>
-> > >> >>> >>>>>> Please let me know how it goes.
-> > >> >>> >>>>>
-> > >> >>> >>>>>
-> > >> >>> >>>>>
-> > >> >>> >>>>> HCR_EL2.DC=1 means all memory access for Stage1 MMU off are
-> > >> >>> >>>>> treated as "Normal Non-shareable, Inner Write-Back
-> > >> >>> >>>>> Write-Allocate,
-> > >> >>> >>>>> Outer Write-Back Write-Allocate memory"
-> > >> >>> >>>>>
-> > >> >>> >>>>> HCR_EL2.DC=0 means all memory access for Stage1 MMU off are
-> > >> >>> >>>>> treated as "Strongly-ordered device memory"
-> > >> >>> >>>>>
-> > >> >>> >>>>> Now if Guest/VM access hardware MMIO devices directly (such as
-> > >> >>> >>>>> VGIC CPU interface) with MMU off then MMIO devices will be
-> > >> >>> >>>>> accessed as normal memory when HCR_EL2.DC=1.
-> > >> >>> >>>>
-> > >> >>> >>>>
-> > >> >>> >>>>
-> > >> >>> >>>> I don't think so. Stage-2 still applies, and should force MMIO to
-> > >> >>> >>>> be
-> > >> >>> >>>> accessed as device memory.
-> > >> >>> >>>>
-> > >> >>> >>>>
-> > >> >>> >>>>> The HCR_EL2.DC=1 makes sense only if we have all software
-> > >> >>> >>>>> emulated devices for Guest/VM which is not true for KVM ARM or
-> > >> >>> >>>>> KVM ARM64 because we use VGIC.
-> > >> >>> >>>>>
-> > >> >>> >>>>> IMHO, this patch enforces incorrect memory attribute for Guest/VM
-> > >> >>> >>>>> when Stage1 MMU is off.
-> > >> >>> >>>>
-> > >> >>> >>>>
-> > >> >>> >>>>
-> > >> >>> >>>> See above. My understanding is that HCR.DC controls the default
-> > >> >>> >>>> output of
-> > >> >>> >>>> Stage-1, and Stage-2 overrides still apply.
-> > >> >>> >>>
-> > >> >>> >>>
-> > >> >>> >>> You had mentioned that PAGE_S2_DEVICE attribute was redundant
-> > >> >>> >>> and wanted guest to decide the memory attribute. In other words,
-> > >> >>> >>> you
-> > >> >>> >>> did not want to enforce any memory attribute in Stage2.
-> > >> >>> >>>
-> > >> >>> >>> Please refer to this patch
-> > >> >>> >>> https://patchwork.kernel.org/patch/2543201/
-> > >> >>> >>
-> > >> >>> >>
-> > >> >>> >> This patch has never been merged. If you carry on following the
-> > >> >>> >> discussion,
-> > >> >>> >> you will certainly notice it was dropped for a very good reason:
-> > >> >>> >> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-May/005827.html
-> > >> >>> >>
-> > >> >>> >> So Stage-2 memory attributes are used, they are not going away, and
-> > >> >>> >> they are
-> > >> >>> >> essential to the patch I sent this morning.
-> > >> >>> >>
-> > >> >>> >>
-> > >> >>> >>         M.
-> > >> >>> >> --
-> > >> >>> >> Fast, cheap, reliable. Pick two.
-> > >> >>> >
-> > >> >>> > HCR_EL2.DC=1 will break Guest/VM bootloader/firmware if the Guest/VM
-> > >> >>> > is
-> > >> >>> > provided a DMA-capable device in pass-through mode. The reason being
-> > >> >>> > bootloader/firmware typically don't enable MMU and such
-> > >> >>> > bootloader/firmware
-> > >> >>> > will programme a pass-through DMA-capable device without any flushes
-> > >> >>> > to
-> > >> >>> > guest RAM (because it has not enabled MMU).
-> > >> >>> >
-> > >> >>> > A good example of such a device would be SATA AHCI controller given
-> > >> >>> > to a
-> > >> >>> > Guest/VM as direct access (using SystemMMU) and Guest
-> > >> >>> > bootloader/firmware
-> > >> >>> > accessing this SATA AHCI controller to load kernel images from SATA
-> > >> >>> > disk.
-> > >> >>> > In this situation, we will have to hack Guest bootloader/firmware
-> > >> >>> > AHCI driver to
-> > >> >>> > explicitly flushes to Guest RAM (because have HCR_EL2.DC=1).
-> > >> >>>
-> > >> >>> OK. So *that* looks like a valid argument against HCR_EL2.DC==1. Out of
-> > >> >>> curiosity: is that a made up example or something you actually have?
-> > >> >>>
-> > >> >>> Back to square one:
-> > >> >>> Can you please benchmark the various cache cleaning options (global at
-> > >> >>> startup time, per-page on S2 translation fault, and user-space)?
-> > >> >>>
-> > >> >> Eh, why is this a more valid argument than the vgic?  The device
-> > >> >> passthrough Stage-2 mappings would still have the Stage-2 memory
-> > >> >> attributes to configure that memory region as device memory.  Why is it
-> > >> >> relevant if the device is DMA-capable in this context?
-> > >> >>
-> > >> >> -Christoffer
-> > >> >
-> > >> > Most ARM bootloader/firmware run with MMU off hence, they will not do
-> > >> > explicit cache flushes when programming DMA-capable device. Now If
-> > >> > HCR_EL2.DC=1 then Guest RAM updates done by bootloader/firmware
-> > >> > will not be visible to DMA-capable device.
-> > >> >
-> > >> > --Anup
-> > >>
-> > >> The approach of flushing d-cache by set/way upon first run of VCPU will
-> > >> not work because for set/way operations ARM ARM says: "For set/way
-> > >> operations, and for All (entire cache) operations, the point is defined to be
-> > >> to the next level of caching". In other words, set/way operations work upto
-> > >> point of unification.
-> > >>
-> > >> Also, Guest Linux already does __flush_dcache_all() from __cpu_setup()
-> > >> at bootup time which does not work for us when L3-cache is enabled so,
-> > >> there is no point is adding one more __flush_dcache_all() upon first run of
-> > >> VCPU in KVM ARM64.
-> > >
-> > > When did anyone suggest using a cache cleaning method that doesn't apply
-> > > to this case.  I'm a little confused about your comment here.
-> > 
-> > Please refer last reply from Marc Z where he says:
-> > "Can you please benchmark the various cache cleaning options (global at
-> > startup time, per-page on S2 translation fault, and user-space)?".
-> > 
-> > Rather doing __flush_dcache_range() on each page in
-> > coherent_icache_guest_page() we could also flush entire d-cache upon
-> > first VCPU run. This only issue in flushing d-cache upon first VCPU run
-> > is that we cannot flush d-cache by set/way because as per ARM ARM
-> > all operations by set/way are upto PoU and not PoC. In presence of
-> > L3-Cache we need to flush d-cache upto PoC so we have to use
-> > __flush_dache_range()
-> > 
-> > >
-> > >>
-> > >> IMHO, we are left with following options:
-> > >> 1. Flush all RAM regions of VCPU using __flush_dcache_range()
-> > >>     upon first run of VCPU
-> > >
-> > > We could do that, but we have to ensure that no other memory regions can
-> > > be added later.  Is this the case?  I don't remember.
-> > 
-> > Yes, memory regions being added later be problem for this option.
-> > 
-> > >
-> > >> 2. Implement outer-cache framework for ARM64 and flush all
-> > >>     caches + outer cache (i.e. L3-cache) upon first run of VCPU
-> > >
-> > > What's the difference between (2) and (1)?
-> > 
-> > Linux ARM (i.e. 32-bit port) has a framework for having outer
-> > caches (i.e. caches that are not part of the CPU but exist as
-> > separate entity between CPU and Memory for performance
-> > improvement). Using this framework we can flush all CPU caches
-> > and outer cache.
-> > 
-> 
-> And we don't have such a framework in arm64?  But __flush_dcache_range
-> does nevertheless flush outer caches as well?
-> 
-> > >
-> > >> 3. Use an alternate version of flush_icache_range() which will
-> > >>     flush d-cache by PoC instead of PoU. We can also ensure
-> > >>     that coherent_icache_guest_page() function will be called
-> > >>     upon Stage2 prefetch aborts only.
-> > >>
-> > >
-> > > I'm sorry, but I'm not following this discussion.  Are we not mixing a
-> > > discussion along two different axis here?  As I see it there are two
-> > > separate issues:
-> > >
-> > >  (A) When/Where to flush the memory regions
-> > >  (B) How to flush the memory regions, including the hardware method and
-> > >      the kernel software engineering aspect.
-> > 
-> > Discussion here is about getting KVM ARM64 working in-presence
-> > of an external L3-cache (i.e. not part of CPU). Before starting a VCPU
-> > user-space typically loads images to guest RAM so, in-presence of
-> > huge L3-cache (few MBs). When the VCPU starts running some of the
-> > contents guest RAM will be still in L3-cache and VCPU runs with
-> > MMU off (i.e. cacheing off) hence VCPU will bypass L3-cache and
-> > see incorrect contents. To solve this problem we need to flush the
-> > guest RAM contents before they are accessed by first time by VCPU.
-> > 
-> ok, I'm with you that far.
-> 
-> But is it also not true that we need to decide between:
-> 
->   A.1: Flush the entire guest RAM before running the VCPU
->   A.2: Flush the pages as we fault them in
-> 
-> And (independently):
-> 
->   B.1: Use __flush_dcache_range
->   B.2: Use something else + outer cache framework for arm64
->   B.3: Use flush_icache_range
-> 
-> Or do these all interleave somehow?  If so, I don't understand why.  Can
-> you help?
-> 
-Oh, I think I understand your point now.  You mean if we use
-flush_cache_all before we run the vcpu, then it's not sufficient?  I
-assumed we would simply be using __flush_dcache_area for the guest RAM
-regions which would flush to PoC.
+The System Power Management Interface (SPMI) is a high-speed,
+low-latency, bi-directional, two-wire serial bus suitable for real-time
+control of voltage and frequency scaled multi-core application
+processors and its power management of auxiliary components. SPMI
+obsoletes a number of legacy, custom point-to-point interfaces and
+provides a low pin count, high-speed control bus for up to 4 Master and
+16 Slave devices.
 
-For the record, I think we need a solution that also covers the case
-where a memory region is registered later, and I therefore prefer having
-this functionality in the stage-2 fault handler, where we are already
-taking care of similar issues (like your patch suggested).
+SPMI is specified by the MIPI (Mobile Industry Process Interface)
+Alliance [1].
 
-Especially if we can limit ourselves to doing so when the guest MMU is
-disabled, then I really think this is going to be the least overhead and
-measuring the performance of this penalty vs. at first CPU execution is
-a bit overkill IMHO, since we are only talking about boot time for any
-reasonable guest (which would run with the MMU enabled for real
-workloads presumeably).
+Introduced in this patchset are the core SPMI bus components, as well an
+implementation of an SPMI controller, the "PMIC arbiter", which is used
+on several Qualcomm SoCs to communicate with off-chip Power Management
+ICs (PMICs).  Notably missing from this patchset is an implementation of
+a spmi device/slave driver, which is still forthcoming.  With this
+patchset in it's current state, it is possible to perform register
+accesses to a slave via debugfs.
 
-The only caveat is the previously discussed issue if user space loads
-code after the first VCPU execution, and only user space would know if
-that happens, which would argue for user space doing the cleaning...
-Hmmm.
+[1]: http://www.mipi.org/specifications/system-power-management-interface
 
-I also still have my worries about swapping, since user space is free to
-map guest RAM as non-executable.
+Josh Cartwright (1):
+  spmi: document the PMIC arbiter SPMI bindings
 
-Did I miss anything here?
+Kenneth Heitke (2):
+  spmi: Linux driver framework for SPMI
+  spmi: Add MSM PMIC Arbiter SPMI controller
 
--Christoffer
+ .../devicetree/bindings/spmi/spmi-pmic-arb.txt     |  26 +
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/of/Kconfig                                 |   6 +
+ drivers/of/Makefile                                |   1 +
+ drivers/of/of_spmi.c                               |  74 +++
+ drivers/spmi/Kconfig                               |  24 +
+ drivers/spmi/Makefile                              |   9 +
+ drivers/spmi/spmi-dbgfs.c                          | 591 +++++++++++++++++++++
+ drivers/spmi/spmi-dbgfs.h                          |  37 ++
+ drivers/spmi/spmi-pmic-arb.c                       | 499 +++++++++++++++++
+ drivers/spmi/spmi.c                                | 449 ++++++++++++++++
+ include/linux/mod_devicetable.h                    |   8 +
+ include/linux/of_spmi.h                            |  37 ++
+ include/linux/spmi.h                               | 337 ++++++++++++
+ 15 files changed, 2101 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spmi/spmi-pmic-arb.txt
+ create mode 100644 drivers/of/of_spmi.c
+ create mode 100644 drivers/spmi/Kconfig
+ create mode 100644 drivers/spmi/Makefile
+ create mode 100644 drivers/spmi/spmi-dbgfs.c
+ create mode 100644 drivers/spmi/spmi-dbgfs.h
+ create mode 100644 drivers/spmi/spmi-pmic-arb.c
+ create mode 100644 drivers/spmi/spmi.c
+ create mode 100644 include/linux/of_spmi.h
+ create mode 100644 include/linux/spmi.h
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
