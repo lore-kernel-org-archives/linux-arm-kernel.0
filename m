@@ -1,144 +1,87 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Thu, 15 Aug 2013 15:27:24 +0100
-Subject: [PATCH] ARM: ARMv7-M: implement restart routine common to all
- v7-M machines
-In-Reply-To: <20130814180133.GE30496@pengutronix.de>
-References: <1376494625-25496-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <520BB3D1.1050205@arm.com> <20130814180133.GE30496@pengutronix.de>
-Message-ID: <520CE54C.4000004@arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 15 Aug 2013 07:30:30 -0700
+Subject: arm-soc: Xilinx Zynq cleanups for v3.12
+In-Reply-To: <20130815031608.4443.32831@quantum> (Mike Turquette's message of
+ "Wed, 14 Aug 2013 20:16:08 -0700")
+References: <520A47C7.4050000@monstr.eu> <87y585dve9.fsf@kernel.org>
+ <20130814050145.4443.97433@quantum> <520B18EF.6030905@monstr.eu>
+ <20130815031608.4443.32831@quantum>
+Message-ID: <87eh9vni0p.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/13 19:01, Uwe Kleine-K?nig wrote:
-> On Wed, Aug 14, 2013 at 05:44:01PM +0100, Jonathan Austin wrote:
->> On 14/08/13 16:37, Uwe Kleine-K?nig wrote:
->>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->>
->> Do we get a commit message? ;)
-> You did see the Subject line? I guess you did and it's not enough to
-> understand it. The new function is used as .restart member of
-> {DT_,}MACHINE_START.
+Mike Turquette <mturquette@linaro.org> writes:
+
+> Quoting Michal Simek (2013-08-13 22:43:11)
+>> On 08/14/2013 07:01 AM, Mike Turquette wrote:
+>> > Quoting Kevin Hilman (2013-08-13 16:27:10)
+>> >> + Mike Turquette
+>> >>
+>> >> Michal Simek <monstr@monstr.eu> writes:
+>> >>
+>> >>> Hi Arnd and Olof,
+>> >>
+>> >> I'm helping out with arm-soc maintenance now too and I'm on the
+>> >> arm at kernel.org alias, thanks for Cc'ing it.
+>> >>
+>> >>> please pull these cleanup patches to your tree.
+>> >>>
+>> >>> Thanks,
+>> >>> Michal
+>> >>>
+>> >>> The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
+>> >>>
+>> >>>   Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+>> >>>
+>> >>> are available in the git repository at:
+>> >>>
+>> >>>   git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.12
+>> >>>
+>> >>> for you to fetch changes up to 060968ff9fa1a56b22cc2454906a233d302b1bd2:
+>> >>>
+>> >>>   arm: zynq: hotplug: Remove unreachable code (2013-08-13 16:09:12 +0200)
+>> >>>
+>> >>> ----------------------------------------------------------------
+>> >>> arm: Xilinx Zynq cleanup patches for v3.12
+>> >>>
+>> >>> This branch contains these fixes:
+>> >>> - SLCR cleanup
+>> >>> - 2 minor zynq pll fixes
+>> >>> - Hotplug cleanup
+>> >>>
+>> >>> ----------------------------------------------------------------
+>> >>> Soren Brinkmann (6):
+>> >>>       arm: zynq: slcr: Remove redundant header #includes
+>> >>>       arm: zynq: slcr: Clean up #defines
+>> >>>       arm: zynq: slcr: Use read-modify-write for register writes
+>> >>>       clk/zynq/pll: Fix documentation for PLL register function
+>> >>>       clk/zynq/pll: Use #defines for fbdiv min/max values
+>> >>
+>> >> These drivers/clk changes should go through the clock maintainer Mike
+>> >> Turquette.  Could you split them out into a separate pull request?
+>> >>
+>> >> Alternatively, if Mike is confident there won't be any conflicts with
+>> >> his tree, I'll happily merge them through arm-soc with his ack.
+>> > 
+>> > This is my bad. I updated the clk-fixes branch this morning and then got
+>> > distracted and never sent the request to Linus.
+>> > 
+>> > Wait for it ... done.
+>> > 
+>> > Ok so the two clk patches will hopefully be pulled for -rc6.
+>> 
+>> These two clk patches in this pull request are different than that 2 patches
+>> which should go to this kernel version and which you correctly added
+>> to pull request to Linus.
+>> 
+>> Mike: Are you ok to add these 2 patches to mainline via arm-soc tree?
+>> Both changes are cosmetic. If not, I will separate this pull request.
 >
+> Oops. Well it's good to get the fixes merged anyways. I'm still taking
+> patches towards 3.12 so it would be better for me to take them in. Can
+> you rebase them on top of clk-next and send me a pull request?
 
-Yea, I saw it but think it is always useful to have the commit message!
+... and then resend $SUBJECT pull request to arm at kernel.org without the
+drivers/clk changes.  Thanks.
 
->>
->>> ---
->>>   arch/arm/include/asm/v7m.h   | 12 ++++++++++++
->>>   arch/arm/kernel/Makefile     |  2 +-
->>>   arch/arm/kernel/common-v7m.c | 19 +++++++++++++++++++
->>>   3 files changed, 32 insertions(+), 1 deletion(-)
->>>   create mode 100644 arch/arm/kernel/common-v7m.c
->>>
->>> diff --git a/arch/arm/include/asm/v7m.h b/arch/arm/include/asm/v7m.h
->>> index fa88d09..615781c 100644
->>> --- a/arch/arm/include/asm/v7m.h
->>> +++ b/arch/arm/include/asm/v7m.h
->>> @@ -15,6 +15,10 @@
->>>
->>>   #define V7M_SCB_VTOR			0x08
->>>
->>> +#define V7M_SCB_AIRCR			0x0c
->>> +#define V7M_SCB_AIRCR_VECTKEY			(0x05fa << 16)
->>> +#define V7M_SCB_AIRCR_SYSRESETREQ		(1 << 2)
->>> +
->>
->> These all look good, happy with the names too.
->>>   #define V7M_SCB_SCR			0x10
->>>   #define V7M_SCB_SCR_SLEEPDEEP			(1 << 2)
->>>
->>> @@ -42,3 +46,11 @@
->>>    */
->>>   #define EXC_RET_STACK_MASK			0x00000004
->>>   #define EXC_RET_THREADMODE_PROCESSSTACK		0xfffffffd
->>> +
->>> +#ifndef __ASSEMBLY__
->>> +
->>> +enum reboot_mode;
->>
->> Certainly worth introducing what the plans for this are in the long
->> run - but I suspect the commit message might have contained that
->> info?
->>
->>> +
->>> +void armv7m_restart(enum reboot_mode mode, const char *cmd);
->>> +
->>> +#endif /* __ASSEMBLY__ */
->>> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
->>> index 86d10dd..688b8be 100644
->>> --- a/arch/arm/kernel/Makefile
->>> +++ b/arch/arm/kernel/Makefile
->>> @@ -24,7 +24,7 @@ obj-$(CONFIG_ATAGS_PROC)	+= atags_proc.o
->>>   obj-$(CONFIG_DEPRECATED_PARAM_STRUCT) += atags_compat.o
->>>
->>>   ifeq ($(CONFIG_CPU_V7M),y)
->>> -obj-y		+= entry-v7m.o
->>> +obj-y		+= entry-v7m.o common-v7m.o
->>>   else
->>>   obj-y		+= entry-armv.o
->>>   endif
->>> diff --git a/arch/arm/kernel/common-v7m.c b/arch/arm/kernel/common-v7m.c
->>> new file mode 100644
->>> index 0000000..4d2cba9
->>> --- /dev/null
->>> +++ b/arch/arm/kernel/common-v7m.c
->>
->> Is this really the right place for such a function? My immediate
->> thought is that such a thing belongs in proc-v7m.S
->>
->> Is this fitting in to a an existing framework or pattern that I'm missing?
-> proc-v7m.S doesn't work as my function is coded in C :-)
-
-Well, what you have at the moment is in C, but it certainly could be 
-asm, might even be easier to read as asm ;)
-
-That said, everyone else uses C, so there should be a place for it to go...
-
->
-> Here are some other restart functions with the file they are defined in:
->
-> davinci_restart   | arch/arm/mach-davinci/devices.c
-> exynos4_restart   | arch/arm/mach-exynos/common.c
-> highbank_restart  | arch/arm/mach-highbank/system.c
-> mxc_restart       | arch/arm/mach-imx/system.c
-> omap3xxx_restart  | arch/arm/mach-omap2/omap3-restart.c
-> pxa_restart       | arch/arm/mach-pxa/reset.c
-> versatile_restart | arch/arm/mach-versatile/core.c
->
-> at91 doesn't seem to have a restart function.
->
-> Hmm, I'm still happy with arch/arm/kernel/common-v7m.c.
-
-What else might go in that file in time? It certainly breaks the pattern 
-we see above - but then this is architectural not machine defined in V7M 
-so that also makes sense...
-
-How about arch/arm/kernel/v7m.c instead?
-
-
->
->>> @@ -0,0 +1,19 @@
->>> +/*
->>> + * Copyright (C) 2013 Uwe Kleine-Koenig for Pengutronix
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify it under
->>> + * the terms of the GNU General Public License version 2 as published by the
->>> + * Free Software Foundation.
->>> + */
->>> +#include <linux/io.h>
->>> +#include <linux/reboot.h>
->>> +#include <asm/barrier.h>
->>> +#include <asm/v7m.h>
->>> +
->>> +void armv7m_restart(enum reboot_mode mode, const char *cmd)
->>> +{
->>> +	dsb();
->>> +	__raw_writel(V7M_SCB_AIRCR_VECTKEY | V7M_SCB_AIRCR_SYSRESETREQ,
->>> +			BASEADDR_V7M_SCB + V7M_SCB_AIRCR);
-
-Are we definitely okay to ignore that reboot_mode value? I'm not sure 
-what I would expect REBOOT_GPIO to mean in this case? or even the 
-difference between REBOOT_SOFT? I think it looks like we can (certainly 
-other people do!)
-
-Jonny
+Kevin
