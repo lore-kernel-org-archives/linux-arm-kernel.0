@@ -1,74 +1,14 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 15 Aug 2013 13:35:37 +0200
-Subject: [PATCH v3 03/16] driver/core: cpu: initialize of_node in cpu's
- device struture
-In-Reply-To: <1374492747-13879-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1374069984-20567-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1374492747-13879-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1804645.BcbkbcfKAA@flatron>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Aug 2013 12:41:50 +0100
+Subject: Build error: kvm/reset.c
+Message-ID: <20130815114150.GC23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+Last night's omap4430-sdp randconfig failed with this error in the KVM code:
 
-On Monday 22 of July 2013 12:32:14 Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> 
-> CPUs are also registered as devices but the of_node in these cpu
-> devices are not initialized. Currently different drivers requiring
-> to access cpu device node are parsing the nodes themselves and
-> initialising the of_node in cpu device.
-> 
-> The of_node in all the cpu devices needs to be initialized properly
-> and at one place. The best place to update this is CPU subsystem
-> driver when registering the cpu devices.
-> 
-> The OF/DT core library now provides of_get_cpu_node to retrieve a cpu
-> device node for a given logical index by abstracting the architecture
-> specific details.
-> 
-> This patch uses of_get_cpu_node to assign of_node when registering the
-> cpu devices.
-> 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> ---
->  drivers/base/cpu.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
-> index 4c358bc..ea51c6d 100644
-> --- a/drivers/base/cpu.c
-> +++ b/drivers/base/cpu.c
-> @@ -14,6 +14,7 @@
->  #include <linux/slab.h>
->  #include <linux/percpu.h>
->  #include <linux/acpi.h>
-> +#include <linux/of.h>
-> 
->  #include "base.h"
-> 
-> @@ -289,6 +290,7 @@ int register_cpu(struct cpu *cpu, int num)
->  	cpu->dev.release = cpu_device_release;
->  	cpu->dev.offline_disabled = !cpu->hotpluggable;
->  	cpu->dev.offline = !cpu_online(num);
-> +	cpu->dev.of_node = of_get_cpu_node(num);
+arch/arm/kvm/reset.c:43:2: error: unknown field 'irq' specified in initializer
 
-Aha, so this would be the only place where of_get_cpu_node() gets called, 
-so the parsing would be done only once and then any code that needs CPU DT 
-node would just simply grab it from CPU dev. Fair enough.
+Configs etc at http://www.arm.linux.org.uk/developer/build/
 
-Not sure if this makes the need for such helper to be globally available 
-in of/base.c, but I guess this won't hurt.
-
-Best regards,
-Tomasz
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130815/6b418564/attachment.sig>
+Tree is my tip plus arm-soc tip plus Linus' tip.
