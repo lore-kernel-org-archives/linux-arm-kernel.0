@@ -1,37 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Aug 2013 19:33:19 +0100
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Trustzone-based security
- solution for ARM Linux
-In-Reply-To: <20130815182600.GA22567@kroah.com>
-References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
- <20130815042812.GA8968@kroah.com>
- <CABb+yY1YKGkAeb-8GbadUoV5g54iCdrYGnD_VSpaNmtfXXhpyA@mail.gmail.com>
- <CAGsJ_4yZ7Rf7UV-1u3cG_V9mrtCWD=LYBeuKQaz0SWLYoHhwwg@mail.gmail.com>
- <20130815080532.GB7080@kroah.com>
- <CAKv+Gu9mOxoTsK5g-GX2Khvu0FSUBZRCL0Jw6F6vrMG=fNfy1Q@mail.gmail.com>
- <20130815155652.GB14792@kroah.com>
- <CAKv+Gu8_65EkDkn6-W1NKZSs9P8KOxfFNzFNXq0Eqm5dMYGxwQ@mail.gmail.com>
- <20130815182600.GA22567@kroah.com>
-Message-ID: <20130815183319.GE23006@n2100.arm.linux.org.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 15 Aug 2013 11:39:04 -0700
+Subject: [Qemu-devel] SCSI bus failures with qemu-arm in kernel 3.8+
+In-Reply-To: <CAFEAcA_MyJPwo6Gd_dxeWM5q5-7MYqR6-rrePusFzYaGGckWJQ@mail.gmail.com>
+References: <5207B3C3.9080508@roeck-us.net>
+ <20130811220450.GY23006@n2100.arm.linux.org.uk>
+ <52082EF8.10005@roeck-us.net>
+ <CAFEAcA94ygwRPSsfxs3DvOcTZbdafLiEHys94FG4aXUx+A1t=A@mail.gmail.com>
+ <20130813034054.GA18218@roeck-us.net>
+ <CAFEAcA_-S8z6ZMr8TMPvkcTyyCSMOj1DExVsY4JDQjRXDU5WGw@mail.gmail.com>
+ <20130815175428.GA18580@roeck-us.net>
+ <CAFEAcA_MyJPwo6Gd_dxeWM5q5-7MYqR6-rrePusFzYaGGckWJQ@mail.gmail.com>
+Message-ID: <20130815183904.GA4067@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 11:26:00AM -0700, Greg KH wrote:
-> That's their decision, which is fine.  Getting the Linux CAN stack
-> "certified" might be a good goal for a manufacturer who wants to ship
-> Linux for this type of system, although we all know how much those
-> things really matter when it comes to technical issues :)
+On Thu, Aug 15, 2013 at 07:05:22PM +0100, Peter Maydell wrote:
+> On 15 August 2013 18:54, Guenter Roeck <linux@roeck-us.net> wrote:
+> > On Thu, Aug 15, 2013 at 05:45:42PM +0100, Peter Maydell wrote:
+> >> On 13 August 2013 04:40, Guenter Roeck <linux@roeck-us.net> wrote:
+> >> > Patch tested and working with qemu 1.5.2, using the configuration file
+> >> > from the yocto project. Patch applied on top of kernel version 3.11-rc5.
+> >>
+> >> OK, I tested this on PB926+PCI backplane hardware, and it is
+> >> definitely better than current mainline, in that the test USB
+> >> card that I have no longer causes the kernel to generate this sort of
+> >> backtrace:
+> >>
+> > Do you mean my patch fixes the traceback below as a side effect ?
+> > Would be great ... it would be one more reason to get it applied.
+> 
+> Yes, exactly -- the kernel currently has the wrong irq mapping,
+> which causes the traceback (ie h/w asserts irq 93 but the kernel
+> is listening on something else). That the patch fixes this confirms
+> that it is the behaviour of hardware as well as of QEMU.
+> 
+> >> However it still doesn't seem to reliably detect the USB harddisk
+> >> plugged into the card, so I think there may be further issues, possibly
+> >> some subset of those Arnd identified and fixed with this patch:
+> >> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/93397
+> >>
+> > Does it get better if you apply Arnd's patch ?
+> 
+> Arnd's patch is ancient and won't apply as is (due to intervening
+> changes and also because some of the things it fixes were fixed
+> in later patches); I'm currently trying to extract the relevant parts.
+> 
+> If you want you can confirm that I/O port PCI access is broken on
+> QEMU too -- disable CONFIG_SCSI_SYM53C8XX_MMIO so
+> the driver uses PCI IO rather than MMIO and you'll see QEMU's
+> SCSI device doesn't work any more.
+> 
+> >> so I'd like to continue testing.
+> >>
+> >> The other thing this patch should (IMHO) have is the
+> >> line in pci_versatile_setup() which tells QEMU that the
+> >> kernel really does expect hardware-like behaviour:
+> 
+> >> (Without this line QEMU will guess whether the kernel is broken
+> >> or not and will get it right most but not necessarily all of the time.)
+> >>
+> > Might make sense, but I think it should be a separate patch.
+> 
+> It needs to go in the same patch, because a kernel with the fixed
+> irq remapping must also tell QEMU it is fixed; if you split the
+> two then at the point between the two patches the kernel is
+> broken for bisection purposes.
+> 
+> > If I understand correctly, my patch fixes the SCSI problem.
+> > Is that correct ? If so, can we get it applied to mainline ?
+> 
+> I'd rather get to a point where I have the hardware definitely
+> completely working first. There's no real hurry, this has been
+> broken for months and months.
+> 
+Ok with me, if it doesn't get lost.
 
-If response times matter, and you're relying on software to produce
-those response times, then you really need to look at threaded IRQs.
-The standard Linux interrupt model sucks, especially if you have USB
-enabled.
+Until it gets fixed, arm status on 3.10 kernels will show as "failed"
+for qemu test runs.
 
-I'm still seeing upwards of 2.6ms servicing times for USB keyboards
-and nice, which given that they are just a set of keys and a position
-sensor is totally crazy.
-
-The alternative is we need to throw out the idea that IRQs should be
-disabled when servicing hard interrupts and have real interrupt
-priorities, where we can nest quicker interrupt handling inside the
-slow stuff.
+Thanks,
+Guenter
