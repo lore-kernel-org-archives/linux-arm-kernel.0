@@ -1,58 +1,62 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 15 Aug 2013 12:10:46 +0100
-Subject: [PATCH v4 02/10] swiotlb-xen: replace dma_length with sg_dma_len()
- macro
+Date: Thu, 15 Aug 2013 12:10:48 +0100
+Subject: [PATCH v4 04/10] arm: introduce a global dma_ops pointer
 In-Reply-To: <alpine.DEB.2.02.1308151200580.4470@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1308151200580.4470@kaball.uk.xensource.com>
-Message-ID: <1376565054-24153-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1376565054-24153-4-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-swiotlb-xen has an implicit dependency on CONFIG_NEED_SG_DMA_LENGTH.
-Remove it by replacing dma_length with sg_dma_len.
+Initially set dma_ops to arm_dma_ops.
+
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- drivers/xen/swiotlb-xen.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+CC: will.deacon at arm.com
+CC: linux at arm.linux.org.uk
 
-diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-index aadffcf..1b2277c 100644
---- a/drivers/xen/swiotlb-xen.c
-+++ b/drivers/xen/swiotlb-xen.c
-@@ -506,13 +506,13 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
- 				   to do proper error handling. */
- 				xen_swiotlb_unmap_sg_attrs(hwdev, sgl, i, dir,
- 							   attrs);
--				sgl[0].dma_length = 0;
-+				sg_dma_len(sgl) = 0;
- 				return DMA_ERROR_CODE;
- 			}
- 			sg->dma_address = xen_phys_to_bus(map);
- 		} else
- 			sg->dma_address = dev_addr;
--		sg->dma_length = sg->length;
-+		sg_dma_len(sg) = sg->length;
- 	}
- 	return nelems;
- }
-@@ -533,7 +533,7 @@ xen_swiotlb_unmap_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
- 	BUG_ON(dir == DMA_NONE);
+
+Changes in v3:
+-  keep using arm_dma_ops in dmabounce.
+---
+ arch/arm/include/asm/dma-mapping.h |    3 ++-
+ arch/arm/mm/dma-mapping.c          |    3 +++
+ 2 files changed, 5 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index 5b8eef9..5c130bc 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -12,6 +12,7 @@
+ #include <asm/memory.h>
  
- 	for_each_sg(sgl, sg, nelems, i)
--		xen_unmap_single(hwdev, sg->dma_address, sg->dma_length, dir);
-+		xen_unmap_single(hwdev, sg->dma_address, sg_dma_len(sg), dir);
+ #define DMA_ERROR_CODE	(~0)
++extern struct dma_map_ops *dma_ops;
+ extern struct dma_map_ops arm_dma_ops;
+ extern struct dma_map_ops arm_coherent_dma_ops;
  
- }
- EXPORT_SYMBOL_GPL(xen_swiotlb_unmap_sg_attrs);
-@@ -555,7 +555,7 @@ xen_swiotlb_sync_sg(struct device *hwdev, struct scatterlist *sgl,
- 
- 	for_each_sg(sgl, sg, nelems, i)
- 		xen_swiotlb_sync_single(hwdev, sg->dma_address,
--					sg->dma_length, dir, target);
-+					sg_dma_len(sg), dir, target);
+@@ -19,7 +20,7 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+ {
+ 	if (dev && dev->archdata.dma_ops)
+ 		return dev->archdata.dma_ops;
+-	return &arm_dma_ops;
++	return dma_ops;
  }
  
- void
+ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 7f9b179..870b12c 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -141,6 +141,9 @@ struct dma_map_ops arm_dma_ops = {
+ };
+ EXPORT_SYMBOL(arm_dma_ops);
+ 
++struct dma_map_ops *dma_ops = &arm_dma_ops;
++EXPORT_SYMBOL(dma_ops);
++
+ static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+ 	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs);
+ static void arm_coherent_dma_free(struct device *dev, size_t size, void *cpu_addr,
 -- 
 1.7.2.5
