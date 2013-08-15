@@ -1,49 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Aug 2013 12:55:45 +0100
-Subject: dma_unmap causing issues with __get_free_pages
-In-Reply-To: <520C84DF.5050707@ti.com>
-References: <520C84DF.5050707@ti.com>
-Message-ID: <20130815115545.GD25647@n2100.arm.linux.org.uk>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 15 Aug 2013 14:13:40 +0200
+Subject: [PATCH v5 1/3] i2c-mv64xxx: Add I2C Transaction Generator support
+In-Reply-To: <1376039158-1896-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1376039158-1896-1-git-send-email-gregory.clement@free-electrons.com>
+ <1376039158-1896-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130815121340.GB17155@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 02:35:59AM -0500, Joel Fernandes wrote:
-> Hi,
-> 
-> I'm having some trouble with using the dma_map/unmap API.
-> 
-> On unmapping a particular page using dma_unmap, it seems that the
-> PG_dcache_clean flag is set in the page->flags. This is set by the
-> following statement in __dma_page_dev_to_cpu function in
-> arch/arm/mm/dma-mapping.c
->                 set_bit(PG_dcache_clean, &page->flags);
-> 
-> Due to this, on any subsequent page allocations using __get_free_pages,
-> the following BUG gets triggered.
 
-Are you calling dma_unmap() after the page has been freed?
+> +	if ((msg->flags & I2C_M_RD) == 0) {
+> +		for (i = 0; i < 4 && i < msg->len; i++)
+> +			data_reg_lo = data_reg_lo |
+> +					(msg->buf[i] << ((i & 0x3) * 8));
+> +
+> +		for (i = 4; i < 8 && i < msg->len; i++)
+> +			data_reg_hi = data_reg_hi |
+> +					(msg->buf[i] << ((i & 0x3) * 8));
 
-> What is correct way to fix this? Why does the page allocator think its a
-> BAD page descriptor after the unmap?
+Same comment as in the last version: What about be32_to_cpu and friends
+instead of the loops (here and later)?
 
-Well, on free, this is done:
-
-        if (page->flags & PAGE_FLAGS_CHECK_AT_PREP)
-                page->flags &= ~PAGE_FLAGS_CHECK_AT_PREP;
-
-which clears PG_arch_1.  On allocation:
-
-        if (unlikely(page_mapcount(page) |
-                (page->mapping != NULL)  |
-                (atomic_read(&page->_count) != 0)  |
-                (page->flags & PAGE_FLAGS_CHECK_AT_PREP) |
-                (mem_cgroup_bad_page_check(page)))) {
-                bad_page(page);
-                return 1;
-        }
-
-As PG_arch_1 is part of the PAGE_FLAGS_CHECK_AT_PREP mask, this means that
-when a page is freed, it has PG_arch_1 cleared.  Therefore, if on allocation
-the page now has this bit set, it means that something touched the page
-after it was freed.  Quite simply, the page was freed while still being
-in use.  That's very bad and needs fixing.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130815/4b3717e9/attachment.sig>
