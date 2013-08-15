@@ -1,44 +1,45 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 15 Aug 2013 20:12:05 +0200
-Subject: [v3 1/2] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <CADApbejtvXvgF8jpQAyrbY3Yr=XkBech5D6fCEM+yMj8DRRY9w@mail.gmail.com>
-References: <1376497189-21298-1-git-send-email-zonque@gmail.com>
- <CADApbegKj=AMGx4OFOBVsyk71BGis97Gw9QM_-0EsNi90pS+Hw@mail.gmail.com>
- <520C4E98.6020001@gmail.com>
- <CADApbejtvXvgF8jpQAyrbY3Yr=XkBech5D6fCEM+yMj8DRRY9w@mail.gmail.com>
-Message-ID: <520D19F5.7050406@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 15 Aug 2013 20:20:26 +0200
+Subject: [PATCH v2] ARM: ARMv7-M: implement restart routine common to all
+ v7-M machines
+In-Reply-To: <520CF8B1.20609@arm.com>
+References: <1376581536-14742-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <520CF8B1.20609@arm.com>
+Message-ID: <20130815182026.GI30496@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.08.2013 10:08, Chao Xie wrote:
-> In the function mmp_pdma_tx_submit
-> It will assign cookie for every descriptors by
-> list_for_each_entry(child, &desc->tx_list, node) {
->                 cookie = dma_cookie_assign(&child->async_tx);
->         }
-> So not all the descriptors in same transaction will share same cookie.
+Hello Russell,
 
-Hmm, yes. You're right. However, I see quite some more issues with the
-driver as it stands, especially due to assumptions that are made for
-multiple transactions on one channel.
+On Thu, Aug 15, 2013 at 04:50:09PM +0100, Jonathan Austin wrote:
+> On 15/08/13 16:45, Uwe Kleine-K?nig wrote:
+> >The newly introduced function is to be used as .restart callback for
+> >ARMv7-M machines. The used register is architecturally defined, so it
+> >should work for all M-class machines.
+> >
+> >Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> >---
+> >
+> >Changes since v1, sent with Message-Id:
+> >1376494625-25496-1-git-send-email-u.kleine-koenig at pengutronix.de:
+> >
+> >  - add a more verbose change log
+> >  - rename arch/arm/kernel/common-v7m.c to arch/arm/kernel/v7m.c
+> >
+> 
+> Thanks Uwe, this looks good now - assuming Russell's happy with
+> arch/arm/kernel/v7m.c :)
+I'd like to get this patch, the efm32-clk patch (Message-Id:
+1376510693-12491-1-git-send-email-u.kleine-koenig at pengutronix.de) and
+the patch introducing the efm32 platform (Message-Id:
+1376552964-16296-1-git-send-email-u.kleine-koenig at pengutronix.de) merged
+for 3.12. So assuming you are OK with this change I'd like to let the
+arm-soc people pull the three patches from a single branch. For that I'd
+like to have you ack.
 
-For example, let's think about two transactions with multiple
-descriptors each, and both transactions are present in the chain_running
-list. Each transaction has the ENDIRQEN bit set on the last descriptor only.
+Best regards
+Uwe
 
-Currently, when an interrupt is caught, the code will only look at the
-very last entry in the running list and complete its cookie, and then
-dispose the entire running chain. Hence, the other transaction's cookie
-will never complete. Even worse: as an interrupt will always be for the
-first descriptor in the chain with the ENDIRQEN bit set, we complete the
-second transaction that is in fact still running (and call the
-completion handler for it), while we don't do exactly that for the first
-one.
-
-Am I right with the above or do I make faulty assumptions? I'll think
-about how the driver can be changed in order to fix this, but it will be
-more invasive than I thought.
-
-
-Thanks for sharing your ideas,
-Daniel
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
