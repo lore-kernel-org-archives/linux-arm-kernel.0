@@ -1,39 +1,42 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Thu, 15 Aug 2013 22:18:08 +0300
-Subject: [PATCH 0/2] ARM: OMAP: fix USB regression on Nokia boards
-In-Reply-To: <1375808776-14975-1-git-send-email-aaro.koskinen@iki.fi>
-References: <1375808776-14975-1-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <20130815191808.GA3067@blackmetal.musicnaut.iki.fi>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 15 Aug 2013 21:20:44 +0200
+Subject: [PATCH v2 2/4] iio: at91: Use different prescal, startup mask in
+ MR for different IP
+In-Reply-To: <1376219071-29946-3-git-send-email-josh.wu@atmel.com>
+References: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
+ <1376219071-29946-3-git-send-email-josh.wu@atmel.com>
+Message-ID: <20130815192044.GD12162@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Josh,
 
-On Tue, Aug 06, 2013 at 08:06:14PM +0300, Aaro Koskinen wrote:
-> USB subsystem changes broke the USB peripheral/gadget on N800, N810 and
-> RX-51/N900 during the merge window. We need to fix this in board files. I
-> tested all these with 3.11-rc4 + g_ether + ssh.
+On Sun, Aug 11, 2013 at 07:04:29PM +0800, Josh Wu wrote:
+> For at91 boards, there are different IPs for adc. Different IPs has
+> different STARTUP & PRESCAL mask in ADC_MR.
+> 
+> This patch introduce the multiple compatible string for those
+> different IPs.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-Ping?
+Overall it looks like the right ways, but I think we can take it a step
+further.
 
-A.
+I'd drop at least the atmel,adc-drdy-mask, atmel,adc-num-channels,
+atmel,adc-status-register, atmel,adc-trigger-register properties (and
+probably the triggers as well description as well).
 
-> Aaro Koskinen (1):
->   ARM: OMAP: rx51: change musb mode to OTG
-> 
-> Daniel Mack (1):
->   ARM: omap2: fix musb usage for n8x0
-> 
->  arch/arm/mach-omap2/board-n8x0.c | 4 ----
->  arch/arm/mach-omap2/board-rx51.c | 2 +-
->  arch/arm/mach-omap2/usb-musb.c   | 5 +----
->  3 files changed, 2 insertions(+), 9 deletions(-)
-> 
-> -- 
-> 1.8.3.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130815/5a870082/attachment.sig>
