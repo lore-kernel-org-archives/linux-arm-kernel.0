@@ -1,96 +1,25 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 15 Aug 2013 15:08:21 +0100
-Subject: [ARM ATTEND] Trustzone-based security solution for ARM Linux
-In-Reply-To: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
-References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
-Message-ID: <20130815140817.GA4103@localhost.localdomain>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 15 Aug 2013 16:15:54 +0200
+Subject: [PATCH 1/8] i2c: imx: use struct representing i2c clk{div, val}
+ pair
+In-Reply-To: <1375866343-2074-1-git-send-email-b35083@freescale.com>
+References: <1375866343-2074-1-git-send-email-b35083@freescale.com>
+Message-ID: <20130815141554.GL17155@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 11:44:30AM +0800, Barry Song wrote:
-> For the moment, there is strong markting requirement from
-> IVI(In-Vehicle Infotainment) or mobile to use ARM Trustzone. We take
-> IVI as an example, Auto requires security enviorment to access CAN bus
-> and other car busses. Auto requires security enviorment to show
-> rearview/surround view from cameras and play alert audio. on the other
-> hand, IVI system is generically working as a video streaming sink and
-> HDMI sink instead of a source. To support HDCP and widevine, we need
-> to make sure private keys and video buffers are only visible to
-> security mode. With CAN stack, video playback backend and more tasks,
-> generically it requires a multi-task RTOS running in security mode
-> parallel with Linux in non-security mode.
+On Wed, Aug 07, 2013 at 05:05:36PM +0800, Jingchang Lu wrote:
+> using struct representing the i2c clk{div, val} pair would
+> make the i2c_clk_div array more clear.
 > 
-> Linux is a generic purpose OS with UI and all kinds of software, but
-> we need to make sure even the Linux is ROOTed, RTOS in security mode
-> is still active. We are able to find some opensource projects like
-> SafeG[1], Multivisor[2], SierraVisor[3], but it turns out that ARM
-> Linux has no rich support for this kind of architecture:
-> 1. hypervisor running in monitor mode
-> 2. RTOS running in security mode
-> 3. Linux running in non-security mode
-> 
-> So the point is that we need generic support for this, especially for
-> IVI and other markets which want Trustzone technology a lot and have
-> complex user scenarios.
-> 1. Dispatch FIQ to security, dispatch IRQ to Linux, for this case, FIQ
-> is not permitted to happen on Linux
-> 2. IPC support for communication between RTOS in security mode and
-> Linux in non-security mode, as we need to communicate rich commands
-> and buffers
-> 3. as some CPU time is stolen by security mode, so the scheduler need
-> to get this for load balance
-> 
-> For IPC, RPMsg is kind of popular for commucating cross HMP. For
-> example, OMAP uses it as the IPC between M3 and A9; XilinX uses it as
-> IPC between two A9, one with FreeRTOS, the other one with Linux; ST-E
-> uses it to connect ARM with modem MCU. So we are also considering the
-> possibility to involve RPMsg as the backend for communication between
-> RTOS in security mode and Linux in non-security mode. then we get much
-> benefit from virtio, and some drivers will be usable directly.
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
 
-Needless to say, there are multiple proprietary blobs out there which
-do much what you describe, though these are closed and locked down.
+Applied series to for-next, thanks! Please use --cover-letter next time.
 
-
-As others have said, the Secure World is just another execution space,
-so there's no technical reason not to have some FOSS running in there,
-be it an RTOS, uClinux or Linux.
-
-However, the ways in which resources can be shared between the Secure
-World and Normal World are inflexible compared with the kind of sharing
-you get from a normal hypervisor.  The Secure World doesn't have any
-true virtualisation capabilities.
-
-
-The real challenge would be getting sufficiently open hardware, with
-sufficient documentation, and/or finding a friendly hardware vendor who
-can be persuaded of the merits of supporting or investing in an open
-solution.  The rest is "just software".
-
-Cheers
----Dave
-
-> So for this topic, I want a presentation session with about 5 slides
-> to show the high-level architecture and requirement for a real and
-> complex Trustzone user case. Hoping we can get some rich support from
-> Linux for this architecture.
-> 
-> On the other hand, if people can discuss Android mainlining project
-> more, i like much. for the moment, most Android patches have been
-> mainlined, but we still need to maintain both branches as there are
-> rebased patches from Google. So i want to get input about best
-> pratice.
-> 
-> [1]SafeG (Safety Gate):
-> http://www.toppers.jp/en/safeg.html
-> [2]Green Hills Multivisor:
-> http://www.ghs.com/products/rtos/integrity_virtualization.html
-> [3]SierraVisor:
-> http://www.openvirtualization.org/
-> 
-> -barry
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130815/5ff52d7b/attachment.sig>
