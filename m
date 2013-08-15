@@ -1,109 +1,77 @@
-From: andre.przywara@linaro.org (Andre Przywara)
-Date: Thu, 15 Aug 2013 23:07:26 +0200
-Subject: [PATCH 1/2] DMA: fix AMBA PL08x driver issue with 64bit DMA
- address type
-In-Reply-To: <CAL_JsqLRtRvPyFagLLaRAjciiur=qVKmt2v7q5MPtEGuDske4Q@mail.gmail.com>
-References: <1376484729-11826-1-git-send-email-andre.przywara@linaro.org>
- <1376484729-11826-2-git-send-email-andre.przywara@linaro.org>
- <20130814130026.GS23006@n2100.arm.linux.org.uk>
- <CAL_JsqLRtRvPyFagLLaRAjciiur=qVKmt2v7q5MPtEGuDske4Q@mail.gmail.com>
-Message-ID: <520D430E.2050803@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 15 Aug 2013 17:14:45 -0400
+Subject: [PATCH 1/3] misc: Add crossbar driver
+In-Reply-To: <CACRpkdYeo1y-HhftkRWgwyq8o-NVuJ978Uq+ON880LHhUxC=hg@mail.gmail.com>
+References: <51E83A4F.5080904@ti.com>
+ <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
+ <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com> <51EFFBE1.4090505@ti.com>
+ <51F0031B.1050307@ti.com> <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
+ <51F0223E.4050008@ti.com> <51F0240F.3050507@ti.com>
+ <20130813081003.GU7656@atomide.com> <520A02BA.4090805@ti.com>
+ <CACRpkda+m82PYJsExLM6JLsLa8-bVhdvy_r_+-uKfVT2NG7Cbg@mail.gmail.com>
+ <520D398D.9040806@ti.com>
+ <CACRpkdYeo1y-HhftkRWgwyq8o-NVuJ978Uq+ON880LHhUxC=hg@mail.gmail.com>
+Message-ID: <520D44C5.6080205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2013 09:13 PM, Rob Herring wrote:
-> On Wed, Aug 14, 2013 at 8:00 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> NAK.
->
-> This patch has nothing to do with dma masks or your dma mask series.
-> The code deals with bus alignment and cleans up the code to do
-> alignment operations in a sane way compared to modulo operator. The
-> only thing 64-bit dma_addr_t did was expose crap code.
-
-I agree. Actually I'd see the DMA mask thing just as an opportunity to 
-fix this code, not as the reason. I guess there are gazillions of 
-drivers in the ARM world which have problems with any address related 
-variable being bigger than 32bit, and those should all be fixed eventually.
-
-> Perhaps bus_addr_offset needs a better name to indicate it is dealing
-> with bus alignment rather than bus address offset.
-
-Actually my first patch version called this function 
-unaligned_bus_addr(), but this was rather odd with the one non-boolean 
-usage of it - where it actually wants to know the offset.
-
-Regards,
-Andre.
-
->> On Wed, Aug 14, 2013 at 02:52:08PM +0200, Andre Przywara wrote:
->>> In Rob's recent pull request the patch
->>>        ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
->>> promotes dma_addr_t to 64bit, which breaks compilation of the
->>> AMBA PL08x DMA driver.
->>> GCC has no function for the 64bit/8bit modulo operation.
->>> Looking more closely the divisor can only be 1, 2 or 4, so the full
->>> featured '%' modulo operation is overkill and can be replaced by
->>> simple bit masking.
+On Thursday 15 August 2013 04:51 PM, Linus Walleij wrote:
+> On Thu, Aug 15, 2013 at 10:26 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> On Thursday 15 August 2013 04:01 PM, Linus Walleij wrote:
+>>> On Tue, Aug 13, 2013 at 11:56 AM, Sricharan R <r.sricharan@ti.com> wrote:
 >>>
->>> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
->>> ---
->>>   drivers/dma/amba-pl08x.c | 16 ++++++++++------
->>>   1 file changed, 10 insertions(+), 6 deletions(-)
+>>>>  Initially irqchip was discussed, but we also have a DMA crossbar
+>>>>  to map the dma-requests. Since both irq/dma crossbars should be handled,
+>>>>  pinctrl was suggested as the appropriate place to handle this.
 >>>
->>> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
->>> index 06fe45c..29e1cf9 100644
->>> --- a/drivers/dma/amba-pl08x.c
->>> +++ b/drivers/dma/amba-pl08x.c
->>> @@ -286,6 +286,11 @@ static inline struct pl08x_txd *to_pl08x_txd(struct dma_async_tx_descriptor *tx)
->>>        return container_of(tx, struct pl08x_txd, vd.tx);
->>>   }
+>>> I think it is better to use irqchip.
 >>>
->>> +static int bus_addr_offset(struct pl08x_bus_data *bus)
->>> +{
->>> +     return bus->addr & (bus->buswidth - 1);
->>> +}
->>> +
->>>   /*
->>>    * Mux handling.
->>>    *
->>> @@ -886,8 +891,8 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
->>>                                return 0;
->>>                        }
->>>
->>> -                     if ((bd.srcbus.addr % bd.srcbus.buswidth) ||
->>> -                                     (bd.dstbus.addr % bd.dstbus.buswidth)) {
->>> +                     if (bus_addr_offset(&bd.srcbus) ||
->>> +                                     bus_addr_offset(&bd.dstbus)) {
->>>                                dev_err(&pl08x->adev->dev,
->>>                                        "%s src & dst address must be aligned to src"
->>>                                        " & dst width if peripheral is flow controller",
->>> @@ -908,9 +913,8 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
->>>                 */
->>>                if (bd.remainder < mbus->buswidth)
->>>                        early_bytes = bd.remainder;
->>> -             else if ((mbus->addr) % (mbus->buswidth)) {
->>> -                     early_bytes = mbus->buswidth - (mbus->addr) %
->>> -                             (mbus->buswidth);
->>> +             else if (bus_addr_offset(mbus)) {
->>> +                     early_bytes = mbus->buswidth - bus_addr_offset(mbus);
->>>                        if ((bd.remainder - early_bytes) < mbus->buswidth)
->>>                                early_bytes = bd.remainder;
->>>                }
->>> @@ -928,7 +932,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
->>>                         * Master now aligned
->>>                         * - if slave is not then we must set its width down
->>>                         */
->>> -                     if (sbus->addr % sbus->buswidth) {
->>> +                     if (bus_addr_offset(sbus)) {
->>>                                dev_dbg(&pl08x->adev->dev,
->>>                                        "%s set down bus width to one byte\n",
->>>                                        __func__);
->>> --
->>> 1.7.12.1
->>>
+>> Did you happen to read the thread why irqchip is in-appropriate
+>> for such an IP.
+> 
+> Sorry I don't understand what thread that is... can you point me there?
+> My previous statement on this issue what this:
+> http://marc.info/?l=linux-kernel&m=137442541628641&w=2
+> 
+It was discussed in couple of threads but the main point was the
+need of a link needed for the irqchip.
+
+>> As I said earlier, an IRQ-chip always need a
+>> real IRQ link (even for the chained one) to the primary irqchip.
 >>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> This IP is just dummy IP makes the connections for the primary
+>> irqchip(read GIC). And its use only limited to make the
+>> connection between the peripheral IRQ event to the GIC IRQ line.
+>>
+>> I don't see how you can make this happen with an irqchip
+>> infrastructure.
+> 
+> I think my post above describes this.
+> 
+Sorry for being dumb but I don't think cascaded irqchip examples
+like GPIO and cross-bars are same. If you take an example of
+GPIO irqchip, it always have a physical connection even if it
+is 1 IRQ line for (32 logical/sparse IRQs). That goes with
+other MFD examples too.
+
+So may be I am still missing something in your proposal.
+
+>>> I don't see any way to really abstract this pretty simple crossbar
+>>> for reuse across subsystems.
+>>>
+>> This exactly the reason, i am against idea of over-engineering the
+>> simple IP whose only job is to make the physical wire connection
+>> in software where as this is generally done in RTL by default on
+>> most of the SOCs.
+> 
+> Well, it was made accessible by software, and if someone has a
+> usecase that requires this do be done dynamically, i.e. not just
+> being set up by firmware and never touched, and that use case
+> is valid, then I guess we need to do something...
+> 
+> I think it was mentioned in the thread that there is really such
+> a usecase?
+> 
+Actually there is no practical usecase but one but one can manufacture
+it ;-)
