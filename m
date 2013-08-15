@@ -1,62 +1,96 @@
-From: Jonathan.Austin@arm.com (Jonathan Austin)
-Date: Thu, 15 Aug 2013 15:01:49 +0100
-Subject: [PATCH Resend 1/3] PSCI: add missing dependency on CONFIG_OF
- for PSCI.
-In-Reply-To: <1376500987-12797-2-git-send-email-jonathan.austin@arm.com>
-References: <1376500987-12797-1-git-send-email-jonathan.austin@arm.com>
- <1376500987-12797-2-git-send-email-jonathan.austin@arm.com>
-Message-ID: <520CDF4D.6050702@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 15 Aug 2013 15:08:21 +0100
+Subject: [ARM ATTEND] Trustzone-based security solution for ARM Linux
+In-Reply-To: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
+References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
+Message-ID: <20130815140817.GA4103@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/13 18:23, Jonathan Austin wrote:
-> The PSCI initialisation depends on data found in the DT. Without this the
-> including PSCI support makes little sense, and furthermore the of_* stub
-> functions aren't broad enough to ensure that this builds without CONFIG_OF.
->
-> As there is little enthusiasm for extending these stubs without useful use-cases
-> (of which this is *not* an example) this patch prevents building of PSCI
-> without CONFIG_OF.
->
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-> ---
->   arch/arm/Kconfig |    1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index ba412e0..972ec25 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1577,6 +1577,7 @@ config HOTPLUG_CPU
->   config ARM_PSCI
->       bool "Support for the ARM Power State Coordination Interface (PSCI)"
->       depends on CPU_V7
-> +     depends on CONFIG_OF
->       help
->         Say Y here if you want Linux to communicate with system firmware
->         implementing the PSCI specification for CPU-centric power
->
+On Thu, Aug 15, 2013 at 11:44:30AM +0800, Barry Song wrote:
+> For the moment, there is strong markting requirement from
+> IVI(In-Vehicle Infotainment) or mobile to use ARM Trustzone. We take
+> IVI as an example, Auto requires security enviorment to access CAN bus
+> and other car busses. Auto requires security enviorment to show
+> rearview/surround view from cameras and play alert audio. on the other
+> hand, IVI system is generically working as a video streaming sink and
+> HDMI sink instead of a source. To support HDCP and widevine, we need
+> to make sure private keys and video buffers are only visible to
+> security mode. With CAN stack, video playback backend and more tasks,
+> generically it requires a multi-task RTOS running in security mode
+> parallel with Linux in non-security mode.
+> 
+> Linux is a generic purpose OS with UI and all kinds of software, but
+> we need to make sure even the Linux is ROOTed, RTOS in security mode
+> is still active. We are able to find some opensource projects like
+> SafeG[1], Multivisor[2], SierraVisor[3], but it turns out that ARM
+> Linux has no rich support for this kind of architecture:
+> 1. hypervisor running in monitor mode
+> 2. RTOS running in security mode
+> 3. Linux running in non-security mode
+> 
+> So the point is that we need generic support for this, especially for
+> IVI and other markets which want Trustzone technology a lot and have
+> complex user scenarios.
+> 1. Dispatch FIQ to security, dispatch IRQ to Linux, for this case, FIQ
+> is not permitted to happen on Linux
+> 2. IPC support for communication between RTOS in security mode and
+> Linux in non-security mode, as we need to communicate rich commands
+> and buffers
+> 3. as some CPU time is stolen by security mode, so the scheduler need
+> to get this for load balance
+> 
+> For IPC, RPMsg is kind of popular for commucating cross HMP. For
+> example, OMAP uses it as the IPC between M3 and A9; XilinX uses it as
+> IPC between two A9, one with FreeRTOS, the other one with Linux; ST-E
+> uses it to connect ARM with modem MCU. So we are also considering the
+> possibility to involve RPMsg as the backend for communication between
+> RTOS in security mode and Linux in non-security mode. then we get much
+> benefit from virtio, and some drivers will be usable directly.
 
-As Sergei pointed out, this should just be OF not CONFIG_OF....
+Needless to say, there are multiple proprietary blobs out there which
+do much what you describe, though these are closed and locked down.
 
-------8<-------
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 43594d5..f004de7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1577,6 +1577,7 @@ config HOTPLUG_CPU
- config ARM_PSCI
-        bool "Support for the ARM Power State Coordination Interface (PSCI)"
-        depends on CPU_V7
-+       depends on OF
-        help
-          Say Y here if you want Linux to communicate with system firmware
-          implementing the PSCI specification for CPU-centric power
+As others have said, the Secure World is just another execution space,
+so there's no technical reason not to have some FOSS running in there,
+be it an RTOS, uClinux or Linux.
 
----->8---------------
+However, the ways in which resources can be shared between the Secure
+World and Normal World are inflexible compared with the kind of sharing
+you get from a normal hypervisor.  The Secure World doesn't have any
+true virtualisation capabilities.
 
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
 
-ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
-ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
+The real challenge would be getting sufficiently open hardware, with
+sufficient documentation, and/or finding a friendly hardware vendor who
+can be persuaded of the merits of supporting or investing in an open
+solution.  The rest is "just software".
+
+Cheers
+---Dave
+
+> So for this topic, I want a presentation session with about 5 slides
+> to show the high-level architecture and requirement for a real and
+> complex Trustzone user case. Hoping we can get some rich support from
+> Linux for this architecture.
+> 
+> On the other hand, if people can discuss Android mainlining project
+> more, i like much. for the moment, most Android patches have been
+> mainlined, but we still need to maintain both branches as there are
+> rebased patches from Google. So i want to get input about best
+> pratice.
+> 
+> [1]SafeG (Safety Gate):
+> http://www.toppers.jp/en/safeg.html
+> [2]Green Hills Multivisor:
+> http://www.ghs.com/products/rtos/integrity_virtualization.html
+> [3]SierraVisor:
+> http://www.openvirtualization.org/
+> 
+> -barry
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
