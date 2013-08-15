@@ -1,73 +1,97 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Aug 2013 05:44:52 +0100
+Date: Thu, 15 Aug 2013 05:52:53 +0100
 Subject: [PATCH] ARM64: KVM: Fix =?UTF-8?Q?coherent=5Ficache=5Fguest?=
  =?UTF-8?Q?=5Fpage=28=29=20for=20host=20with=20external=20L=33-cache=2E?=
-In-Reply-To: <20130814173452.GD11390@cbox>
+In-Reply-To: <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
 References: <1376480832-18705-1-git-send-email-pranavkumar@linaro.org>
  <f8917fe8409b1fae634c7de45e34d4a7@www.loen.fr>
  <CAAhSdy2TctgKk7m48S7jUCMr2dkDoeyT-r=-SMX+_Ce-sUimYA@mail.gmail.com>
- <5d2d3ae495c27873661c5c2fbdcc19b6@www.loen.fr>
- <CAFEAcA_d-rtiJoAZhGN=cggzakJ5QzU6Upg1GUSBgUOSuqPZoQ@mail.gmail.com>
- <09ec55dcde7961d4774a5239dd9a1184@www.loen.fr> <20130814173452.GD11390@cbox>
-Message-ID: <b86f212351d39fc308bd91fcbc733ec8@www.loen.fr>
+Message-ID: <da83e967f5a266ca28ee54638a4a9be9@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-08-14 18:34, Christoffer Dall wrote:
-> On Wed, Aug 14, 2013 at 04:49:24PM +0100, Marc Zyngier wrote:
->> On 2013-08-14 16:35, Peter Maydell wrote:
->> > On 14 August 2013 16:23, Marc Zyngier <marc.zyngier@arm.com> 
->> wrote:
->> >> On 2013-08-14 15:22, Anup Patel wrote:
->> >>> It seems a bit unnatural to have cache cleaning is user-space. I 
->> am
->> >>> sure
->> >>> other architectures don't have such cache cleaning in user-space
->> >>> for
->> >>> KVM.
->> >>
->> >> Well, we have it on AArch64. Why would we blindly nuke the whole
->> >> cache
->> >> if we can do the right thing, efficiently, on the right range?
->> >
->> > When exactly would userspace have to care about the cache?
+Hi Anup,
+
+On 2013-08-14 15:22, Anup Patel wrote:
+> On Wed, Aug 14, 2013 at 5:34 PM, Marc Zyngier <marc.zyngier@arm.com> 
+> wrote:
+>> Hi Pranav,
 >>
->> Only for the initial payload, I'd expect. Unless I've missed 
->> something
->> more crucial?
+>> On 2013-08-14 12:47, Pranavkumar Sawargaonkar wrote:
+>>> Systems with large external L3-cache (few MBs), might have dirty
+>>> content belonging to the guest page in L3-cache. To tackle this,
+>>> we need to flush such dirty content from d-cache so that guest
+>>> will see correct contents of guest page when guest MMU is disabled.
+>>>
+>>> The patch fixes coherent_icache_guest_page() for external L3-cache.
+>>>
+>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>>> ---
+>>>  arch/arm64/include/asm/kvm_mmu.h |    2 ++
+>>>  1 file changed, 2 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/include/asm/kvm_mmu.h
+>>> b/arch/arm64/include/asm/kvm_mmu.h
+>>> index efe609c..5129038 100644
+>>> --- a/arch/arm64/include/asm/kvm_mmu.h
+>>> +++ b/arch/arm64/include/asm/kvm_mmu.h
+>>> @@ -123,6 +123,8 @@ static inline void
+>>> coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+>>>       if (!icache_is_aliasing()) {            /* PIPT */
+>>>               unsigned long hva = gfn_to_hva(kvm, gfn);
+>>>               flush_icache_range(hva, hva + PAGE_SIZE);
+>>> +             /* Flush d-cache for systems with external caches. */
+>>> +             __flush_dcache_area((void *) hva, PAGE_SIZE);
+>>>       } else if (!icache_is_aivivt()) {       /* non ASID-tagged 
+>>> VIVT */
+>>>               /* any kind of VIPT cache */
+>>>               __flush_icache_all();
+>>
+>> [adding Will to the discussion as we talked about this in the past]
+>>
+>> That's definitely an issue, but I'm not sure the fix is to hit the 
+>> data
+>> cache on each page mapping. It looks overkill.
+>>
+>> Wouldn't it be enough to let userspace do the cache cleaning? 
+>> kvmtools
+>> knows which bits of the guest memory have been touched, and can do a 
+>> "DC
+>> DVAC" on this region.
 >
-> What happens if the page is swapped out, is the kernel guaranteed to
-> flush it all the way to RAM when it swaps it back in, or would KVM 
-> have
-> to take care of that?
-
-I'd expect the kernel to deal with it, otherwise you'd hit the wrong 
-data each time you swap in a page in any userspace process.
-
+> It seems a bit unnatural to have cache cleaning is user-space. I am 
+> sure
+> other architectures don't have such cache cleaning in user-space for 
+> KVM.
+>
 >>
->> > This patch isn't exactly clear about the circumstances. I
->> > think you'd need a really strong reason for not dealing with
->> > this in the kernel -- in general userspace KVM tools don't
->> > otherwise have to deal with cache maintenance at all.
->>
->> I believe we *could* do it in the kernel, just at the expense of a 
->> lot
->> more CPU cycles.
->>
->> A possible alternative would be to use HCR.DC, but I need to have a
->> look and see what it breaks...
->>
-> Could we flush the cache when we fault in pages only if the guest has
-> the MMU disabled and trap if the guest disabled the MMU and flush the
-> whole outer dcache at that point in time?
+>> The alternative is do it in the kernel before running any vcpu - but
+>> that's not very nice either (have to clean the whole of the guest
+>> memory, which makes a full dcache clean more appealing).
+>
+> Actually, cleaning full d-cache by set/way upon first run of VCPU was
+> our second option but current approach seemed very simple hence
+> we went for this.
+>
+> If more people vote for full d-cache clean upon first run of VCPU 
+> then
+> we should revise this patch.
 
-We don't need to trap the disabling of the MMU. If the guest does that, 
-it *must* have flushed its cache to RAM already. Otherwise, it is 
-utterly broken, virtualization or not.
+Can you please give the attached patch a spin on your HW? I've 
+boot-tested it on a model, but of course I can't really verify that it 
+fixes your issue.
 
-What the guest doesn't expect is the initial data to sit in the cache 
-while it hasn't set the MMU on just yet. I may have a patch for that.
+As far as I can see, it should fix it without any additional flushing.
+
+Please let me know how it goes.
+
+Thanks,
 
          M.
 -- 
 Fast, cheap, reliable. Pick two.
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: 0001-arm64-KVM-let-the-guest-access-cacheable-memory-when.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130815/52a538b0/attachment-0001.ksh>
