@@ -1,136 +1,69 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 15 Aug 2013 10:10:02 +0100
-Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <2CD735CE-3FCF-4AB5-89C0-D813ECD19F11@codeaurora.org>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
- <2CD735CE-3FCF-4AB5-89C0-D813ECD19F11@codeaurora.org>
-Message-ID: <520C9AEA.6030507@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Aug 2013 10:12:16 +0100
+Subject: [PATCH v8 0/2] TWL6030, TWL6032 GPADC driver
+In-Reply-To: <1374758813-6539-1-git-send-email-oleksandr.kozaruk@ti.com>
+References: <1374758813-6539-1-git-send-email-oleksandr.kozaruk@ti.com>
+Message-ID: <20130815091216.GB28366@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kumar,
+Hi,
 
-Thanks for a review of the bindings.
+apologies for the late reply.
 
-On 14/08/13 22:03, Kumar Gala wrote:
->
-> On Jul 23, 2013, at 4:19 AM, Punit Agrawal wrote:
->
->> The CCI PMU can profile bus transactions at the master and slave
->> interfaces of the CCI. The PMU can be used to observe an aggregated view
->> of the bus traffic between the various components connected to the CCI.
->>
->> Extend the existing CCI driver to support the PMU by registering a perf
->> backend for it.
->>
->> Document the device tree binding to describe the CCI PMU.
->>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Nicolas Pitre <nico@linaro.org>
->> Cc: Dave Martin <dave.martin@linaro.org>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Reviewed-by: Will Deacon <will.deacon@arm.com>
->> ---
->> Documentation/devicetree/bindings/arm/cci.txt |   38 ++
->> drivers/bus/arm-cci.c                         |  642 +++++++++++++++++++++++++
->> 2 files changed, 680 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
->> index 92d36e2..5bc95e5 100644
->> --- a/Documentation/devicetree/bindings/arm/cci.txt
->> +++ b/Documentation/devicetree/bindings/arm/cci.txt
->> @@ -79,6 +79,34 @@ specific to ARM.
->> 				    corresponding interface programming
->> 				    registers.
->>
->> +	- CCI PMU node
->> +
->> +		Node name must be "pmu".
->> +		Parent node must be CCI interconnect node.
->> +
->> +		A CCI pmu node must contain the following properties:
->> +
->> +		- compatible
->> +			Usage: required
->> +			Value type: <string>
->> +			Definition: must be set to one of
->> +				    "arm,cci-400-pmu"
->> +				    "arm,cci-400-pmu,rev0"
->> +				    "arm,cci-400-pmu,rev1"
->
-> Do you really mean only one?  Seems like ""arm,cci-400-pmu,rev0", "arm,cci-400-pmu" would be valid.
->
+On Thu, Jul 25, 2013 at 02:26:51PM +0100, Oleksandr Kozaruk wrote:
+> Hello,
+> 
+> v8 - removed unused test channels completely, removed die
+>      temperature channels, as it is not known how to convert ADC code
+>      to temperature. There if formula for twl6030, but no formula
+>      for twl6032.
+> v7 - addressed clean up comments, removed test channels
+> v6 - addressed comments about trim bits, checkpatch clean up
+> v5 - gpadc DT node renamed from "gpadc" to generic "adc", added
+>      temperature channels; raw code is corracted with calibration
+>      data.
+> v4 - addressed comments: fixed style violation, bug in freeing memory,
+>      added comments explaining calibration method, removed test network
+>      channels from exposing to userspace, error handling for 
+>      wait_for_complition
+> v3 - fixed compiler warning
+> v2 - the driver put in drivers/iio, and
+> converted using iio facilities as suggested by Graeme.
+> 
+> TWL603[02] GPADC is used to measure battery voltage,
+> battery temperature, battery presence ID, and could
+> be used to measure twl603[02] die temperature.
+> This is used on TI blaze, blaze tablet platforms.
+> 
+> The TWL6030/TWL6032 is a PMIC that has a GPADC with 17/19
+> channels respectively. Some channels have current
+> source and are used for measuring voltage drop
+> on resistive load for detecting battery ID resistance,
+> or measuring voltage drop on NTC resistors for external
+> temperature measurements, other channels measure voltage,
+> (i.e. battery voltage), and have inbuilt voltage dividers,
+> thus, capable to scale voltage. Some channels are dedicated
+> for measuring die temperature.
+> 
+> Some channels could be calibrated in 2 points, having
+> offsets from ideal values in trim registers.
+> 
+> The difference between GPADC in TWL6030 and TWL6032:
+> - 10 bit vs 12 bit ADC;
+> - 17 vs 19 channels;
+> - channels have different purpose(i. e. battery voltage
+>   channel 8 vs channel 18);
+> - trim values are interpreted differently.
+> 
+> The driver is derived from git://git.omapzoom.org/kernel/omap.git
+> The original driver's authors and contributors are Balaji T K,
+> Graeme Gregory, Ambresh K, Girish S Ghongdemath.
+> 
+> The changes to the original driver:
+> - device tree adaptation;
 
-Hmm... yes both would be valid. But...
+I couldn't see a binding document in this series or in mainline. Have I
+looked in the wrong places?
 
-The event numbering scheme changed between Rev 0 and Rev 1 of the CCI. 
-If the revision is specified then it is used to get the event ranges to 
-validate the events. If not, i.e., "arm,cci-400-pmu" is used, then the 
-driver tries to find the the revision by reading the peripheral id 
-registers.
-
-I was trying to make the bindings robust in the face of change in 
-behaviour between different revisons of the IP.
-
->> +
->> +		- reg:
->> +			Usage: required
->> +			Value type: <prop-encoded-array>
->> +			Definition: the base address and size of the
->> +				    corresponding interface programming
->> +				    registers.
->> +
->> +		- interrupts:
->> +			Usage: required
->> +			Value type: <prop-encoded-array>
->> +			Definition: comma-separated list of unique PMU
->> +				    interrupts
->
-> What is the list of interrupts related to, should there be an associated interrupts-names
->
-
-For the CCI PMU, each interrupt signal corresponds to the overflow of a 
-performance counter.
-
-Here again, I was trying to be robust in the face of differing hardware 
-configurations - specially the scenario where multiple interrupt lines 
-from the CCI PMU are tied together to generate a single interrupt to the 
-CPU.
-
-Cheers,
-Punit
-
->> +
->> * CCI interconnect bus masters
->>
->> 	Description: masters in the device tree connected to a CCI port
->> @@ -163,6 +191,16 @@ Example:
->> 			interface-type = "ace";
->> 			reg = <0x5000 0x1000>;
->> 		};
->> +
->> +		pmu at 9000 {
->> +			 compatible = "arm,cci-400-pmu,rev0";
->> +			 reg = <0x9000 0x5000>;
->> +			 interrupts = <0 101 4>,
->> +				      <0 102 4>,
->> +				      <0 103 4>,
->> +				      <0 104 4>,
->> +				      <0 105 4>;
->> +		};
->> 	};
->>
->
-> [ snip ]
->
-> - k
->
-> --
-> Employee of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
->
->
->
->
+Mark.
