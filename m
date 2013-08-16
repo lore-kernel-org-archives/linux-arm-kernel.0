@@ -1,52 +1,40 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 16 Aug 2013 21:54:44 +0200
-Subject: [RFC v1 4/5] ARM: mvebu: add Armada 1500 and Sony NSZ-GS7 device
- tree files
-In-Reply-To: <20130816195046.GU13964@titan.lakedaemon.net>
-References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376682098-10580-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130816195046.GU13964@titan.lakedaemon.net>
-Message-ID: <520E8384.2010209@gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 16 Aug 2013 12:58:49 -0700
+Subject: [PATCH RFC 1/3] spmi: Linux driver framework for SPMI
+In-Reply-To: <20130816194714.GH4035@joshc.qualcomm.com>
+References: <cover.1376596224.git.joshc@codeaurora.org>
+ <02deef1d90121011ab1df90ad704ef0ee36e2584.1376596224.git.joshc@codeaurora.org>
+ <20130816184614.GA31510@kroah.com>
+ <20130816194714.GH4035@joshc.qualcomm.com>
+Message-ID: <20130816195849.GA17974@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/16/2013 09:50 PM, Jason Cooper wrote:
-> On Fri, Aug 16, 2013 at 09:41:37PM +0200, Sebastian Hesselbarth wrote:
->> This adds very basic device tree files for the Marvell Armada 1500 SoC
->> and the Sony NSZ-GS7 GoogleTV board. Currently, SoC only has nodes for
->> cpus, some clocks, l2 cache controller, local timer, apb timers, uart,
->> and interrupt controllers.
-[...]
->> ---
->>   arch/arm/boot/dts/Makefile                     |    3 +-
->>   arch/arm/boot/dts/armada-1500-sony-nsz-gs7.dts |   29 +++
->>   arch/arm/boot/dts/armada-1500.dtsi             |  225 ++++++++++++++++++++++++
->>   3 files changed, 256 insertions(+), 1 deletion(-)
->>   create mode 100644 arch/arm/boot/dts/armada-1500-sony-nsz-gs7.dts
->>   create mode 100644 arch/arm/boot/dts/armada-1500.dtsi
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 641b3c9..3186904 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -103,7 +103,8 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
->>   	armada-370-rd.dtb \
->>   	armada-xp-db.dtb \
->>   	armada-xp-gp.dtb \
->> -	armada-xp-openblocks-ax3-4.dtb
->> +	armada-xp-openblocks-ax3-4.dtb \
->> +	armada-1500-sony-nsz-gs7.dtb
->
-> alphabetical.
+On Fri, Aug 16, 2013 at 02:47:15PM -0500, Josh Cartwright wrote:
+> > > +#ifdef CONFIG_DEBUG_FS
+> > 
+> > Why?  If debugfs isn't enabled, the functions should just compile away
+> > with the debugfs_() calls, so no need to do this type of thing here,
+> > right?
+> 
+> Not sure I follow you, but it may be because this is a bit misleading.
+> 
+> Currently CONFIG_DEBUG_FS is being extended to also mean "do you want
+> the SPMI core to create device entries?".  It would probably make more
+> sense to have a CONFIG_SPMI_DEBUG option which is def_bool DEBUG_FS, as
+> other busses have.
+> 
+> The #ifdef here would then be #ifdef CONFIG_SPMI_DEBUG, as well as in
+> the Makefile:
+> 
+>   spmi-core-$(CONFIG_SPMI_DEBUG) += spmi-dbgfs.o
 
-Dammit, true! ;)
+If debugfs is enabled why wouldn't you want debugfs entries for your
+devices?  Don't assume a user is going to be able to rebuild their
+kernel just for debugging stuff (hint, they usually aren't), so having
+these present, if they don't cause any performance issues, is usually
+best to always have around.
 
-> And now I need to pick up a googleTV...
+thanks,
 
-Jep, go shopping :)
-
-Unfortunately, I (again) put too many people in Cc and all 5 patches
-are stuck waiting for moderator approval. With 5 DT maintainers it isn't
-easy to get those though to MLs.
-
-Sebastian
+greg k-h
