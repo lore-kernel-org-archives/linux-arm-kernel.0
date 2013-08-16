@@ -1,29 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Aug 2013 15:20:09 +0200
-Subject: [PATCH] gpio/mxc: add chained_irq_enter/exit() to
- mx2_gpio_irq_handler
-In-Reply-To: <20130730073917.GL1754@pengutronix.de>
-References: <1374152286-12955-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CACRpkdZjsAOtm2Jt7kY-VC2ToFfMQ+UxjWQE7aUZAbsBt0ugvw@mail.gmail.com>
- <20130730073917.GL1754@pengutronix.de>
-Message-ID: <CACRpkdaph+44SG5+VoSCiqkwMpjDO8Vc3ZVwVnhywx7DD5=-Vg@mail.gmail.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Fri, 16 Aug 2013 15:20:38 +0200
+Subject: [PATCH v2 0/2] omap4/twl6030: typical connection to omap4 as
+ a separate dtsi file
+In-Reply-To: <CAB=otbTUk68CLmgQsEoefMMFTAnZCAMbZa-yiYmn1b3F1X8BiQ@mail.gmail.com>
+References: <1376469348-10797-1-git-send-email-ruslan.bilovol@ti.com>
+ <520B8B45.1010300@baylibre.com>
+ <CAB=otbTUk68CLmgQsEoefMMFTAnZCAMbZa-yiYmn1b3F1X8BiQ@mail.gmail.com>
+Message-ID: <520E2726.304@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 9:39 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
+Hi Ruslan,
+
+On 16/08/2013 14:04, Ruslan Bilovol wrote:
+> Hi Benoit,
+> 
+> On Wed, Aug 14, 2013 at 4:51 PM, Benoit Cousson <bcousson@baylibre.com> wrote:
+>> Hi Ruslan,
+>>
+>> On 14/08/2013 10:35, Ruslan Bilovol wrote:
+>>>
+>>> Hello,
+>>>
+>>> There is no functional changes between v1 and v2 - just
+>>> added the patch for omap4-var-som - Uri Yosef confirmed
+>>> this board have the same connection of OMAP4<->TWL6030 as
+>>> SDP4430 board
+>>
+>>
+>> The series looks good to me, but it will be good to have a test for Panda
+>> and Variscite boards before merging it.
+> 
+> Okay, so I just verified this patch series on PandaBoard ES2. Should I
+> resubmit this series with
+> fixed commit message?
+
+No, that's fine, I already applied it and fixed the subject and the changelog.
+
+Here it is:
+
+commit 2e25df1e5a4af906a9b25332719ace000063eb0d
+Author: Ruslan Bilovol <ruslan.bilovol@ti.com>
+Date:   Wed Aug 14 11:35:47 2013 +0300
+
+    ARM: dts: twl6030: Move common configuration for OMAP4 boards in a separate dtsi file
+    
+    The OMAP4 SoC family uses specially-designed PMIC (power management IC)
+    companion chip for power management needs: TWL6030/TWL6032.
+    Therefore there is a typical connection of PMIC to OMAP4 so we can
+    move it into separate .dtsi file and do not duplicate over
+    board-specific files.
+    
+    Tested on OMAP4 SDP board and compile-tested for Panda board
+    
+    Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
+    Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
 
 
->> The encoding is what screw things up.
+Just let me know if you are OK with the updated version.
 
-> That means git is unable to apply base64 encoded mail? Hmm, testing with
-> git 1.8.3.2 (from Debian) I can apply the base64 encoded patch.
-> Does your git have 87ab799234639c26ea10de74782fa511cb3ca606 (i.e. is
-> older than 1.5.1)?
+> However I cannot verify the patch for Variscite board because I do not
+> own any such board so
+> you can drop that patch. But maybe Uri Yosef can verify it. Uri?
 
-Hm it works, I just never tried it ... nevermind.
+It seems that Uri cannot test it right now, so I will have to drop that one.
 
-Patch applied with Shawn's ACK.
-
-Yours,
-Linus Walleij
+Thanks,
+Benoit
