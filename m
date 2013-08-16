@@ -1,74 +1,169 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Fri, 16 Aug 2013 02:22:51 +0000
-Subject: at91: watchdog: Can't get watchdog to trigger
-In-Reply-To: <91586D499ADFD74FBCFB8425266A5DE40153ADC7E586@pluto.melinkcorp.local>
-References: <91586D499ADFD74FBCFB8425266A5DE40153ADC7E586@pluto.melinkcorp.local>
-Message-ID: <B256D81BAE5131468A838E5D7A24364172E2A205@penmbx02>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 16 Aug 2013 07:54:57 +0530
+Subject: [PATCH 00/34] CPUFreq: Move freq change notifications out of drivers
+Message-ID: <cover.1376619363.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Another 452 lines gone :)
 
+Total stats upto now for all the 5 patchsets:
+Viresh Kumar (186):
+...
+69 files changed, 700 insertions(+), 2451 deletions(-)
 
-> -----Original Message-----
-> From: Bryan Evenson [mailto:bevenson at melinkcorp.com]
-> Sent: 2013?8?15? 9:42
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Ferre, Nicolas; Yang, Wenyou
-> Subject: at91: watchdog: Can't get watchdog to trigger
-> 
-> All,
-> 
-> I am using Atmel's stable branch of the Linux kernel
-> (https://github.com/linux4sam/linux-at91.git, branch linux-3.6.9-at91, back at
-> commit 5fe012d4aee98ef82df66e6763882c735902ed0f) on a AT91SAM9G25
-> based board.  I am having issues getting the watchdog to trigger with this
-> version of the kernel.
-> 
-> First, I've verified that the watchdog is enabled in the bootstrap and U-Boot.  I
-> see the line:
-> 
-> at91sam9_wdt: enabled (heartbeat=15 sec, nowayout=0)
-> 
-> during boot showing that the watchdog is enabled.  I've tried triggering the
-> watchdog by writing a single character to it from the command line (echo "0" >
-> /dev/watchdog) and by using the two watchdog sample applications under
-> Documentation/watchdog.  In every case I see the line:
-> 
-> watchdog watchdog0: watchdog did not stop!
-> 
-> But the board does not reset.  Just to make sure, I also set
-> CONFIG_WATCHDOG_NOWAYOUT in the kernel configuration and I still have
-> the same results.
-> 
-> I have my kernel configuration and the device tree files for my build over at
-> https://github.com/evensonbryan/at91sam9g25-dt.git.  Other than the
-> device tree files and the configuration, I have not made any kernel
-> modifications.  What do I have setup wrong?
+Net: 1751 lines gone..
 
-This is the at91_wdt controller inherent property, once the watchdog is started, it can't be stopped.
-Because the Watchdog Mode Register (WDT_MR) can be written only once. Only a processor reset resets it, as said in the datasheet.
+-----x-------------x----------------
 
-So the driver is implemented as following,
-1./ If the \dev\watchdog device is opened by the user space application, then it is the application's responsibility to feed the watchdog. If the application does not feed the watchdog, it will trigger RESET.
-2./ If the device isn't opened or close by the application, The responsibility to feed the watchdog is turned to the driver.
+Most of the drivers do following in their ->target_index() routines:
 
-For your case, 
-echo "0" > /dev/watchdog, it will arise the following actions
-1./ open \dev\watchdog device, -->The responsibility to feed the watchdog is turned to the user space application
-2./ start the watchdog controller
-3./ ping the watchdog controller
-4./ stop the watchdog controller --> Since the watchdog can't be stopped, so output: watchdog watchdog0: watchdog did not stop!
-5./ close \dev\watchdog device --> The responsibility to feed the watchdog is turned to the Kernel Space
+	struct cpufreq_freqs freqs;
+	freqs.old = old freq...
+	freqs.new = new freq...
 
-So, the watchdog doesn't trigger the RESET.
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 
-Documentation/watchdog/src/ watchdog-simple.c: after opening \dev\watchdog device, it is always feed the watchdog with the 10 seconds interval.
-Documentation/watchdog/src/ watchdog-test.c: after opening \dev\watchdog device, it is always ping the watchdog with the 1 seconds interval.
+	/* Change rate here */
 
-Bye
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 
-Wenyou Yang
+This is replicated over all cpufreq drivers today and there doesn't exists a
+good enough reason why this shouldn't be moved to cpufreq core instead.
 
-> 
-> Thanks,
-> Bryan
+There are few special cases though, like exynos5440, which doesn't do everything
+on the call to ->target_index() routine and call some kind of bottom halves for
+doing this work, work/tasklet/etc..
+
+They may continue doing notification from their own code and so this patch
+introduces another flag: CPUFREQ_NO_NOTIFICATION, which will be set by such
+drivers.
+
+This is Fifth part of my cleanup work for CPUFreq, first three are (And
+obviously its rebased over them):
+
+1: cpufreq: Introduce cpufreq_table_validate_and_show()
+https://lkml.org/lkml/2013/8/8/263
+
+2: cpufreq: define generic routines for cpufreq drivers
+https://lkml.org/lkml/2013/8/10/48
+
+3. CPUFreq: Implement light weight ->target(): for 3.13
+https://lkml.org/lkml/2013/8/13/349
+
+4. CPUFreq: set policy->cur in cpufreq core instead of drivers
+https://lkml.org/lkml/2013/8/14/288
+
+All these are pushed here:
+https://git.linaro.org/gitweb?p=people/vireshk/linux.git;a=shortlog;h=refs/heads/for-v3.13
+
+--
+viresh
+
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+Cc: Jesper Nilsson <jesper.nilsson@axis.com>
+Cc: John Crispin <blogic@openwrt.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-cris-kernel at axis.com
+Cc: Mikael Starvik <starvik@axis.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: sparclinux at vger.kernel.org
+Cc: spear-devel at list.st.com
+Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Steven Miao <realmz6@gmail.com>
+Cc: Tony Luck <tony.luck@intel.com>
+
+Viresh Kumar (34):
+  cpufreq: move freq change notifications to cpufreq core
+  cpufreq: acpi: remove calls to cpufreq_notify_transition()
+  cpufreq: arm_big_little: remove calls to cpufreq_notify_transition()
+  cpufreq: at32ap: remove calls to cpufreq_notify_transition()
+  cpufreq: blackfin: remove calls to cpufreq_notify_transition()
+  cpufreq: cpu0: remove calls to cpufreq_notify_transition()
+  cpufreq: cris: remove calls to cpufreq_notify_transition()
+  cpufreq: davinci: remove calls to cpufreq_notify_transition()
+  cpufreq: dbx500: remove calls to cpufreq_notify_transition()
+  cpufreq: e_powersaver: remove calls to cpufreq_notify_transition()
+  cpufreq: elanfreq: remove calls to cpufreq_notify_transition()
+  cpufreq: exynos: remove calls to cpufreq_notify_transition()
+  cpufreq: exynos5440: set CPUFREQ_NO_NOTIFICATION flag
+  cpufreq: ia64-acpi: remove calls to cpufreq_notify_transition()
+  cpufreq: imx6q: remove calls to cpufreq_notify_transition()
+  cpufreq: kirkwood: remove calls to cpufreq_notify_transition()
+  cpufreq: longhaul: set CPUFREQ_NO_NOTIFICATION flag
+  cpufreq: loongson2: remove calls to cpufreq_notify_transition()
+  cpufreq: maple: remove calls to cpufreq_notify_transition()
+  cpufreq: omap: remove calls to cpufreq_notify_transition()
+  cpufreq: p4-clockmod: remove calls to cpufreq_notify_transition()
+  cpufreq: pasemi: remove calls to cpufreq_notify_transition()
+  cpufreq: pmac: remove calls to cpufreq_notify_transition()
+  cpufreq: powernow: remove calls to cpufreq_notify_transition()
+  cpufreq: ppc: remove calls to cpufreq_notify_transition()
+  cpufreq: pxa: remove calls to cpufreq_notify_transition()
+  cpufreq: s3c: remove calls to cpufreq_notify_transition()
+  cpufreq: s5pv210: remove calls to cpufreq_notify_transition()
+  cpufreq: sa11x0: remove calls to cpufreq_notify_transition()
+  cpufreq: sc520: remove calls to cpufreq_notify_transition()
+  cpufreq: sparc: remove calls to cpufreq_notify_transition()
+  cpufreq: SPEAr: remove calls to cpufreq_notify_transition()
+  cpufreq: speedstep: remove calls to cpufreq_notify_transition()
+  cpufreq: tegra: remove calls to cpufreq_notify_transition()
+
+ drivers/cpufreq/acpi-cpufreq.c         | 14 ++-------
+ drivers/cpufreq/arm_big_little.c       | 25 ++--------------
+ drivers/cpufreq/at32ap-cpufreq.c       | 22 ++++++--------
+ drivers/cpufreq/blackfin-cpufreq.c     | 22 +++++---------
+ drivers/cpufreq/cpufreq-cpu0.c         | 33 ++++++++-------------
+ drivers/cpufreq/cpufreq.c              | 34 +++++++++++++++++++++
+ drivers/cpufreq/cris-artpec3-cpufreq.c |  8 -----
+ drivers/cpufreq/cris-etraxfs-cpufreq.c |  8 -----
+ drivers/cpufreq/davinci-cpufreq.c      | 30 +++++++------------
+ drivers/cpufreq/dbx500-cpufreq.c       | 22 +-------------
+ drivers/cpufreq/e_powersaver.c         | 23 ++-------------
+ drivers/cpufreq/elanfreq.c             | 13 --------
+ drivers/cpufreq/exynos-cpufreq.c       | 28 +++++-------------
+ drivers/cpufreq/exynos5440-cpufreq.c   |  2 +-
+ drivers/cpufreq/ia64-acpi-cpufreq.c    | 19 ------------
+ drivers/cpufreq/imx6q-cpufreq.c        | 39 ++++++++++--------------
+ drivers/cpufreq/kirkwood-cpufreq.c     | 54 +++++++++++++---------------------
+ drivers/cpufreq/longhaul.c             |  1 +
+ drivers/cpufreq/loongson2_cpufreq.c    | 16 ----------
+ drivers/cpufreq/maple-cpufreq.c        | 18 +-----------
+ drivers/cpufreq/omap-cpufreq.c         | 39 +++++++++---------------
+ drivers/cpufreq/p4-clockmod.c          | 10 -------
+ drivers/cpufreq/pasemi-cpufreq.c       | 14 +--------
+ drivers/cpufreq/pmac32-cpufreq.c       | 20 +++----------
+ drivers/cpufreq/pmac64-cpufreq.c       | 18 +-----------
+ drivers/cpufreq/powernow-k6.c          |  8 -----
+ drivers/cpufreq/powernow-k7.c          | 11 +------
+ drivers/cpufreq/powernow-k8.c          | 15 +---------
+ drivers/cpufreq/ppc-corenet-cpufreq.c  | 19 +-----------
+ drivers/cpufreq/ppc_cbe_cpufreq.c      | 19 +-----------
+ drivers/cpufreq/pxa2xx-cpufreq.c       | 27 ++++-------------
+ drivers/cpufreq/pxa3xx-cpufreq.c       | 12 --------
+ drivers/cpufreq/s3c2416-cpufreq.c      | 21 +++----------
+ drivers/cpufreq/s3c64xx-cpufreq.c      | 48 ++++++++++--------------------
+ drivers/cpufreq/s5pv210-cpufreq.c      | 16 ++++------
+ drivers/cpufreq/sa1100-cpufreq.c       | 17 ++++-------
+ drivers/cpufreq/sa1110-cpufreq.c       | 12 ++------
+ drivers/cpufreq/sc520_freq.c           | 11 -------
+ drivers/cpufreq/sparc-us2e-cpufreq.c   |  7 -----
+ drivers/cpufreq/sparc-us3-cpufreq.c    |  7 -----
+ drivers/cpufreq/spear-cpufreq.c        | 13 +-------
+ drivers/cpufreq/speedstep-centrino.c   | 20 +------------
+ drivers/cpufreq/speedstep-ich.c        |  9 ------
+ drivers/cpufreq/speedstep-smi.c        |  7 -----
+ drivers/cpufreq/tegra-cpufreq.c        | 25 ++++------------
+ include/linux/cpufreq.h                |  6 ++++
+ 46 files changed, 205 insertions(+), 657 deletions(-)
+
+-- 
+1.7.12.rc2.18.g61b472e
