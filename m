@@ -1,9 +1,9 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Aug 2013 07:55:10 +0530
-Subject: [PATCH 13/34] cpufreq: exynos5440: set CPUFREQ_NO_NOTIFICATION flag
+Date: Fri, 16 Aug 2013 07:55:14 +0530
+Subject: [PATCH 17/34] cpufreq: longhaul: set CPUFREQ_NO_NOTIFICATION flag
 In-Reply-To: <cover.1376619363.git.viresh.kumar@linaro.org>
 References: <cover.1376619363.git.viresh.kumar@linaro.org>
-Message-ID: <14993d27bdc6a91eced0af5eb96bdb5ca6546cbf.1376619363.git.viresh.kumar@linaro.org>
+Message-ID: <b67c7b6951b63ff38bac847e0b213bff3368e0b7.1376619363.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,24 +26,22 @@ Earlier patches have added support in cpufreq core to do cpufreq notification on
 frequency change, but this drivers needs to do this notification itself and so
 it sets its CPUFREQ_NO_NOTIFICATION flag.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/exynos5440-cpufreq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/cpufreq/longhaul.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
-index 91a64d6..8fb6183 100644
---- a/drivers/cpufreq/exynos5440-cpufreq.c
-+++ b/drivers/cpufreq/exynos5440-cpufreq.c
-@@ -323,7 +323,7 @@ static int exynos_cpufreq_cpu_init(struct cpufreq_policy *policy)
+diff --git a/drivers/cpufreq/longhaul.c b/drivers/cpufreq/longhaul.c
+index 45bafdd..7359043 100644
+--- a/drivers/cpufreq/longhaul.c
++++ b/drivers/cpufreq/longhaul.c
+@@ -909,6 +909,7 @@ static int longhaul_cpu_init(struct cpufreq_policy *policy)
  }
  
- static struct cpufreq_driver exynos_driver = {
--	.flags		= CPUFREQ_STICKY,
-+	.flags		= CPUFREQ_STICKY | CPUFREQ_NO_NOTIFICATION,
- 	.verify		= cpufreq_generic_frequency_table_verify,
- 	.target_index	= exynos_target,
- 	.get		= exynos_getspeed,
+ static struct cpufreq_driver longhaul_driver = {
++	.flags = CPUFREQ_NO_NOTIFICATION,
+ 	.verify	= cpufreq_generic_frequency_table_verify,
+ 	.target_index = longhaul_target,
+ 	.get	= longhaul_get,
 -- 
 1.7.12.rc2.18.g61b472e
