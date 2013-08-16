@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Aug 2013 07:55:22 +0530
-Subject: [PATCH 25/34] cpufreq: ppc: remove calls to
+Date: Fri, 16 Aug 2013 07:55:25 +0530
+Subject: [PATCH 28/34] cpufreq: s5pv210: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1376619363.git.viresh.kumar@linaro.org>
 References: <cover.1376619363.git.viresh.kumar@linaro.org>
-Message-ID: <95d6f504e95c5508e9597ed60c3a91b47e5b741d.1376619363.git.viresh.kumar@linaro.org>
+Message-ID: <18ddada60c1c5b96c6771eb6047a4d5703d3a136.1376619363.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,95 +28,76 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/ppc-corenet-cpufreq.c | 19 +------------------
- drivers/cpufreq/ppc_cbe_cpufreq.c     | 19 +------------------
- 2 files changed, 2 insertions(+), 36 deletions(-)
+ drivers/cpufreq/s5pv210-cpufreq.c | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/cpufreq/ppc-corenet-cpufreq.c b/drivers/cpufreq/ppc-corenet-cpufreq.c
-index 79d8e9c..3f7be46 100644
---- a/drivers/cpufreq/ppc-corenet-cpufreq.c
-+++ b/drivers/cpufreq/ppc-corenet-cpufreq.c
-@@ -69,8 +69,6 @@ static const struct soc_data sdata[] = {
- static u32 min_cpufreq;
- static const u32 *fmask;
+diff --git a/drivers/cpufreq/s5pv210-cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
+index 76a4177..efa1080 100644
+--- a/drivers/cpufreq/s5pv210-cpufreq.c
++++ b/drivers/cpufreq/s5pv210-cpufreq.c
+@@ -26,7 +26,6 @@
+ static struct clk *cpu_clk;
+ static struct clk *dmc0_clk;
+ static struct clk *dmc1_clk;
+-static struct cpufreq_freqs freqs;
+ static DEFINE_MUTEX(set_freq_lock);
  
--/* serialize frequency changes  */
--static DEFINE_MUTEX(cpufreq_lock);
- static DEFINE_PER_CPU(struct cpu_data *, cpu_data);
+ /* APLL M,P,S values for 1G/800Mhz */
+@@ -179,6 +178,7 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
+ 	unsigned int priv_index;
+ 	unsigned int pll_changing = 0;
+ 	unsigned int bus_speed_changing = 0;
++	unsigned int old_freq, new_freq;
+ 	int arm_volt, int_volt;
+ 	int ret = 0;
  
- /* cpumask in a cluster */
-@@ -253,26 +251,11 @@ static int __exit corenet_cpufreq_cpu_exit(struct cpufreq_policy *policy)
- static int corenet_cpufreq_target(struct cpufreq_policy *policy,
- 		unsigned int index)
- {
--	struct cpufreq_freqs freqs;
- 	struct clk *parent;
--	int ret;
- 	struct cpu_data *data = per_cpu(cpu_data, policy->cpu);
+@@ -193,12 +193,12 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
+ 		goto exit;
+ 	}
  
--	freqs.old = policy->cur;
--	freqs.new = data->table[index].frequency;
--
--	mutex_lock(&cpufreq_lock);
+-	freqs.old = s5pv210_getspeed(0);
+-	freqs.new = s5pv210_freq_table[index].frequency;
++	old_freq = s5pv210_getspeed(0);
++	new_freq = s5pv210_freq_table[index].frequency;
+ 
+ 	/* Finding current running level index */
+ 	if (cpufreq_frequency_table_target(policy, s5pv210_freq_table,
+-					   freqs.old, CPUFREQ_RELATION_H,
++					   old_freq, CPUFREQ_RELATION_H,
+ 					   &priv_index)) {
+ 		ret = -EINVAL;
+ 		goto exit;
+@@ -207,7 +207,7 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
+ 	arm_volt = dvs_conf[index].arm_volt;
+ 	int_volt = dvs_conf[index].int_volt;
+ 
+-	if (freqs.new > freqs.old) {
++	if (new_freq > old_freq) {
+ 		ret = regulator_set_voltage(arm_regulator,
+ 				arm_volt, arm_volt_max);
+ 		if (ret)
+@@ -219,8 +219,6 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
+ 			goto exit;
+ 	}
+ 
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 -
- 	parent = of_clk_get(data->parent, data->table[index].driver_data);
--	ret = clk_set_parent(data->clk, parent);
--	if (ret)
--		freqs.new = freqs.old;
--
+ 	/* Check if there need to change PLL */
+ 	if ((index == L0) || (priv_index == L0))
+ 		pll_changing = 1;
+@@ -431,9 +429,7 @@ static int s5pv210_target(struct cpufreq_policy *policy, unsigned int index)
+ 		}
+ 	}
+ 
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
--	mutex_unlock(&cpufreq_lock);
 -
--	return ret;
-+	return clk_set_parent(data->clk, parent);
- }
+-	if (freqs.new < freqs.old) {
++	if (new_freq < old_freq) {
+ 		regulator_set_voltage(int_regulator,
+ 				int_volt, int_volt_max);
  
- static struct cpufreq_driver ppc_corenet_cpufreq_driver = {
-diff --git a/drivers/cpufreq/ppc_cbe_cpufreq.c b/drivers/cpufreq/ppc_cbe_cpufreq.c
-index 52f707d..e42ca9c 100644
---- a/drivers/cpufreq/ppc_cbe_cpufreq.c
-+++ b/drivers/cpufreq/ppc_cbe_cpufreq.c
-@@ -30,9 +30,6 @@
- 
- #include "ppc_cbe_cpufreq.h"
- 
--static DEFINE_MUTEX(cbe_switch_mutex);
--
--
- /* the CBE supports an 8 step frequency scaling */
- static struct cpufreq_frequency_table cbe_freqs[] = {
- 	{1,	0},
-@@ -131,27 +128,13 @@ static int cbe_cpufreq_cpu_init(struct cpufreq_policy *policy)
- static int cbe_cpufreq_target(struct cpufreq_policy *policy,
- 			      unsigned int cbe_pmode_new)
- {
--	int rc;
--	struct cpufreq_freqs freqs;
--
--	freqs.old = policy->cur;
--	freqs.new = cbe_freqs[cbe_pmode_new].frequency;
--
--	mutex_lock(&cbe_switch_mutex);
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
--
- 	pr_debug("setting frequency for cpu %d to %d kHz, " \
- 		 "1/%d of max frequency\n",
- 		 policy->cpu,
- 		 cbe_freqs[cbe_pmode_new].frequency,
- 		 cbe_freqs[cbe_pmode_new].driver_data);
- 
--	rc = set_pmode(policy->cpu, cbe_pmode_new);
--
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
--	mutex_unlock(&cbe_switch_mutex);
--
--	return rc;
-+	return set_pmode(policy->cpu, cbe_pmode_new);
- }
- 
- static struct cpufreq_driver cbe_cpufreq_driver = {
 -- 
 1.7.12.rc2.18.g61b472e
