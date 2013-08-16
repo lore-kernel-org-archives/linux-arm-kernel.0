@@ -1,42 +1,76 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 Aug 2013 09:00:47 -0400
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.12
-In-Reply-To: <20130816063715.GI7035@quad.lixom.net>
-References: <20130814201630.GH13964@titan.lakedaemon.net>
- <20130816063715.GI7035@quad.lixom.net>
-Message-ID: <20130816130047.GS13964@titan.lakedaemon.net>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 16 Aug 2013 16:09:23 +0300
+Subject: [PATCH v3 0/8] phy: omap-usb: Support multiple instances and new types
+Message-ID: <1376658571-20992-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 11:37:15PM -0700, Olof Johansson wrote:
-> On Wed, Aug 14, 2013 at 04:16:30PM -0400, Jason Cooper wrote:
-> > Arnd, Olof,
-> > 
-> > Here's the DT changes for v3.12 that didn't accompany driver conversions
-> > (MBus, mv643xx_eth, clocksource, irqchip, msi/pci, etc).  I've attached
-> > the conflict resolution below.  The small conflict in the binding
-> > documentation is against arm-soc/for-next as well.  The rest is against
-> > mvebu/boards.
-> > 
-> > Gregory CLEMENT (1):
-> >       ARM: dts: mvebu: Introduce a new compatible string for mv64xxx-i2c
-> 
-> I didn't see any review of this patch by a device tree maintainer.
-> 
-> Also, there's a conflict with f480adaf1b7130ad43760f627b762f771fcfc5f5
-> which is part of -rc5. That patch was merged through the i2c maintainer,
-> so it would seem appropriate to do the same to this. Please get bindings
-> acks or send the bindings update through a devicetree maintainer. dts/dtsi
-> updates should still go through arm-soc. Given that the other update went in
-> through the i2c maintainer, it could be appropriate to at least give him the
-> choice of taking the bindings portion of this one as well.
+Hi,
 
-You're right.  Gregory, I'm going to drop this one from mvebu/dt.
-Please resubmit it as two patches (binding/dts changes) including the
-devicetree mailinglist.
+This patchset does the following:
 
-Olof, v2 of the pull (see, I didn't say 'PR' :) ) on it's way.
+* Get rid of omap_control_usb platform data as we support DT only.
 
-thx,
+* Restructure and add support for new PHY types. We now support the follwing
+four types
 
-Jason.
+ TYPE_OMAP - if it has otghs_control mailbox register (e.g. on OMAP4)
+ TYPE_USB2 - if it has Power down bit in control_dev_conf register. e.g. USB2 PHY
+ TYPE_USB3 - if it has DPLL and individual Rx & Tx power control. e.g. USB3 PHY or SATA PHY
+ TYPE_DRA7 - if it has both power down and power aux registers. e.g. USB2 PHY on DRA7
+
+* Get rid of "ti,type" DT property and introduce compatible strings for each type.
+
+* Have only one power control API "omap_control_usb_phy_power()" instead of a
+different one for each PHY type.
+
+* Get rid of omap_get_control_dev() so that we can support multiple instances
+of the control device. We take advantage of the fact that omap control USB device
+is only present on OMAP4 onwards and hence only supports DT boot. The users
+of control USB device can get a reference to it from the device node's phandle.
+
+Patches are based on balbi/next.
+
+Smoke tested on OMAP4 panda with MUSB in gadget mode (g_zero).
+
+You can find the patches in branch
+ usb-control-module
+in git tree
+ git://github.com/rogerq/linux.git
+
+v3:
+- return -EINVAL instead of -ENODEV on probe failure.
+- pass device type data through of_device_id table.
+- get rid of "ti,mailbox" property and "has_mailbox" from musb platform data.
+
+v2:
+- get rid of "ti,type" property and introduce compatible strings for each device type.
+
+cheers,
+-roger
+
+--
+Roger Quadros (8):
+  usb: phy: omap-control: Get rid of platform data
+  usb: phy: omap: Add new device types and remove
+    omap_control_usb3_phy_power()
+  usb: phy: omap-usb2: Don't use omap_get_control_dev()
+  usb: phy: omap-usb3: Don't use omap_get_control_dev()
+  usb: musb: omap2430: Don't use omap_get_control_dev()
+  usb: phy: omap: get rid of omap_get_control_dev()
+  ARM: dts: omap4: update omap-control-usb nodes
+  ARM: dts: omap5: update omap-control-usb node
+
+ Documentation/devicetree/bindings/usb/omap-usb.txt |   32 ++--
+ arch/arm/boot/dts/omap4.dtsi                       |   20 ++-
+ arch/arm/boot/dts/omap5.dtsi                       |   20 ++-
+ drivers/usb/musb/omap2430.c                        |   25 ++-
+ drivers/usb/phy/phy-omap-control.c                 |  210 +++++++++++---------
+ drivers/usb/phy/phy-omap-usb2.c                    |   26 ++-
+ drivers/usb/phy/phy-omap-usb3.c                    |   28 ++-
+ include/linux/usb/musb.h                           |    2 -
+ include/linux/usb/omap_control_usb.h               |   33 ++--
+ 9 files changed, 224 insertions(+), 172 deletions(-)
+
+-- 
+1.7.4.1
