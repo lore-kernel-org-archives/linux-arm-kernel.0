@@ -1,41 +1,35 @@
-From: wangx@marvell.com (Xiang Wang)
-Date: Fri, 16 Aug 2013 15:57:53 +0800
-Subject: [v3 1/2] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <1376497189-21298-1-git-send-email-zonque@gmail.com>
-References: <1376497189-21298-1-git-send-email-zonque@gmail.com>
-Message-ID: <520DDB81.20607@marvell.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 16 Aug 2013 13:29:58 +0530
+Subject: [PATCH 02/34] cpufreq: acpi: remove calls to
+ cpufreq_notify_transition()
+In-Reply-To: <CAOLK0pyVDSc6x1u8Ro6ng1dH8ELqc3P9jPHamgiXBn6sWDgm8w@mail.gmail.com>
+References: <cover.1376619363.git.viresh.kumar@linaro.org>
+ <333bf5868dfbfb6de474f060dc216fa6d33848e2.1376619363.git.viresh.kumar@linaro.org>
+ <CAOLK0pz7e8nQVnZY0a-j_Fd_kFOqF8ZS4tRfYw1S+25Lv8GoFQ@mail.gmail.com>
+ <CAOLK0pyVDSc6x1u8Ro6ng1dH8ELqc3P9jPHamgiXBn6sWDgm8w@mail.gmail.com>
+Message-ID: <CAKohpom7yk3Zq5JABZ6T+Z_AcMn5G1hoswZK8T=viYv0fp0mcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2013 12:19 AM, Daniel Mack wrote:
-> In order to report the channel's residue, we have to memorize the first
-> dma buffer position when the channel is configured.
->
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
->   drivers/dma/mmp_pdma.c | 45 +++++++++++++++++++++++++++++++++++++++++++--
->   1 file changed, 43 insertions(+), 2 deletions(-)
->
+On 16 August 2013 13:24, Lan Tianyu <lantianyu1986@gmail.com> wrote:
+> Sorry for misoperation.
 
-> +static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan)
-> +{
-> +	struct mmp_pdma_desc_sw *sw;
-> +	u32 curr, done = 0;
-> +
-> +	if (chan->dir == DMA_DEV_TO_MEM)
-> +		curr = readl(chan->phy->base + DTADR(chan->phy->idx));
-One concern for this patch:
-If we call dmaengine_tx_status() after dma_do_tasklet at mmp_pdma.c, 
-chan->phy will most likely to be NULL.
-dma_do_tasklet() -> start_pending_queue() -> mmp_pdma_free_phy()
+No Problem...
 
-For why do we call dmaengine_tx_status() after a DMA interrupt:
-briefly, if we use DMA to handle device trailing bytes, it'll report a 
-DMA interrupt. We need to get to know how many bytes have been received 
-in the IRQ handler.
-We've discussed about this in the link below:
-http://thread.gmane.org/gmane.linux.kernel/1500713
+>                 One concern. Target() callback may return before changing
+> cpufreq actually due to some check failures. After this change, prechange
+> event will be triggered when these check failures take place. I am not sure
+> whether this should be took into account.
 
--- 
-Regards,
-Xiang
+Yes, if you see the first patch of this series, it takes this into
+account.. In case
+target() failed and returned an error, we simply notify the POST CHANGE
+notification with old frequencies instead of new ones. I believe that would be
+enough..
+
+This is exactly what acpi-cpufreq and others are doing currently.
+
+Hope I answered your question well?
+
+--
+viresh
