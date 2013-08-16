@@ -1,39 +1,25 @@
-From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
-Date: Fri, 16 Aug 2013 11:02:20 -0400 (EDT)
-Subject: [PATCH] gpio: (gpio-pca953x) move header to linux/platform_data/
-In-Reply-To: <CACRpkdZdeVNtJSmc6Lr6j=oO9FLsAvjyrwhYS0j4OoAEhxCN9g@mail.gmail.com>
-Message-ID: <82440653.410050.1376665340121.JavaMail.root@mail>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 16 Aug 2013 17:10:35 +0200
+Subject: [PATCH 3/9] clk: u300: Fix incorrect placement of __initconst
+In-Reply-To: <1376298847-21828-3-git-send-email-sachin.kamat@linaro.org>
+References: <1376298847-21828-1-git-send-email-sachin.kamat@linaro.org>
+ <1376298847-21828-3-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <CACRpkdbhNBgO65gf670NDC0BrdbQcM-V=w462dgkqutrgVLGeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon, Aug 12, 2013 at 11:14 AM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
 
-You wrote:
-> But:
-> 
-> >  drivers/gpio/gpio-pca953x.c                 |  2 +-
-> (...)
-> > diff --git a/drivers/gpio/gpio-pca953x.c
-> > b/drivers/gpio/gpio-pca953x.c
-> > index 426c51d..8804aec 100644
-> > --- a/drivers/gpio/gpio-pca953x.c
-> > +++ b/drivers/gpio/gpio-pca953x.c
-> > @@ -18,7 +18,7 @@
-> >  #include <linux/irq.h>
-> >  #include <linux/irqdomain.h>
-> >  #include <linux/i2c.h>
-> > -#include <linux/i2c/pca953x.h>
-> > +#include <linux/platform_data/pca953x.h>
-> 
-> Why does the GPIO driver need platform data from the
-> I2C driver???
-> 
-> Can't this just be made to go away?
+> __initconst should be placed between the variable name and equal
+> sign for the variable to be placed in the intended section.
+>
+> While at it also make 'u300_clk_lookup' static as it is used only
+> in this file.
+>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-I didn't dig that much in the driver, but I cannot imagine
-another way to pass, for instance, the setup callback.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-What would be a good alternative for you?
-
-Regards,
-Vivien
+Yours,
+Linus Walleij
