@@ -1,172 +1,51 @@
-From: oleksandr.kozaruk@ti.com (Kozaruk, Oleksandr)
-Date: Fri, 16 Aug 2013 12:48:32 +0000
-Subject: [PATCH v8 0/2] TWL6030, TWL6032 GPADC driver
-In-Reply-To: <20130816085440.GF32421@e106331-lin.cambridge.arm.com>
-References: <1374758813-6539-1-git-send-email-oleksandr.kozaruk@ti.com>
- <20130815091216.GB28366@e106331-lin.cambridge.arm.com>
- <520CB566.2050201@kernel.org>
- <20130815125906.GA32421@e106331-lin.cambridge.arm.com>
- <520D16EC.90604@kernel.org>
- <2A7ABDFCE21540479A5AEB0244A684D5E3EE9C@DNCE04.ent.ti.com>,
- <20130816085440.GF32421@e106331-lin.cambridge.arm.com>
-Message-ID: <2A7ABDFCE21540479A5AEB0244A684D5E3EEC2@DNCE04.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 16 Aug 2013 14:51:22 +0200
+Subject: [PATCH v3 2/3] ARM: bcm281xx: Device Tree bindings for GPIO driver
+In-Reply-To: <1374870345-8276-3-git-send-email-markus.mayer@linaro.org>
+References: <1374870345-8276-1-git-send-email-markus.mayer@linaro.org>
+ <1374870345-8276-3-git-send-email-markus.mayer@linaro.org>
+Message-ID: <CACRpkdbjtO_chMhrywXDbqztmuQv4abJpg-QVfuVZh9JGGdLaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->On Fri, Aug 16, 2013 at 07:39:35AM +0100, Kozaruk, Oleksandr wrote:
->>>On 08/15/13 13:59, Mark Rutland wrote:
->>>> On Thu, Aug 15, 2013 at 12:03:02PM +0100, Jonathan Cameron wrote:
->>>>>
->>>>>>> The changes to the original driver:
->>>>>>> - device tree adaptation;
->>>>>>
->>>>>> I couldn't see a binding document in this series or in mainline. Have I
->>>>>> looked in the wrong places?
->>>>>
->>>>> Nothing explicit supplied, but does it need one given it is doing only
->>>>> iio bindings (bindings/iio/iio-bindings.txt)
->>>>> plus twl child bindings
->>>>> (bindings/mfd/twl-family.txt)
->>>>
->>>> Every binding needs to be documented.
->>>>
->>>>>
->>>>> If it does, I guess absolutely everything does, then fair enough!
->>>>> I guess that would make sense as there is no way for someone writing
->>>>> a device tree to know that there is nothing else to be specified.
->>>>
->>>> Yup, that's why. Also, Linux isn't necessarily the only consumer, and
->>>> other consumers shouldn't need to read Linux code to figure out how a
->>>> particular binding is supposed to look.
->>>>
->>>Fair enough. Thanks for clearing that up.
->>>
->>>Oleksandr, could you send a follow up patch adding the required documentation?
->>>(mostly a cut and paste job from similar elements by the look of it).
->>>
->>
->>Hello,
->>
->>Is this good enough?
->>
->>From 211e81ff4a146d9ec27443696a429e795c58dc30 Mon Sep 17 00:00:00 2001
->>From: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
->>Date: Thu, 15 Aug 2013 16:14:11 +0300
->>Subject: [PATCH] iio: adc: Add bindigs documentation for twl6030 GPADC
->>
->>Add required documentation for twl6030 GPADC device tree
->>bindings.
->>
->>Signed-off-by: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
->>---
->> .../devicetree/bindings/iio/adc/twl6030-gpadc.txt          | 14 ++++++++++++++
->> 1 file changed, 14 insertions(+)
->> create mode 100644 Documentation/devicetree/bindings/iio/adc/twl6030-gpadc.txt
->>
->>diff --git a/Documentation/devicetree/bindings/iio/adc/twl6030-gpadc.txt b/Documentation/devicetree/bindings/iio/adc/twl6030-gpadc.txt
->>new file mode 100644
->>index 0000000..6829420
->>--- /dev/null
->>+++ b/Documentation/devicetree/bindings/iio/adc/twl6030-gpadc.txt
->>@@ -0,0 +1,14 @@
->>+Texas Instruments twl6030/twl6032 GPADC device driver
->>+
->>+Required properties:
->>+       - compatible: must be "ti,twl6030-gpadc" for TWL6030 or
->>+         "ti,twl6032-gpadc" for TWL6032
->>+       - interrupts: interrupt number associated with it
->>+       - #io-channel-cells: must be <1> - multiple IIO outputs
+On Fri, Jul 26, 2013 at 10:25 PM, Markus Mayer <markus.mayer@linaro.org> wrote:
+
+> --- a/arch/arm/boot/dts/bcm11351.dtsi
+> +++ b/arch/arm/boot/dts/bcm11351.dtsi
+> @@ -63,6 +63,22 @@
+>                 clock-frequency = <32768>;
+>         };
 >
->There should be a desscription of valid values for the io-channel-cells
->as used by consumers.
->
->Otherwise, this looks fine.
->
->Thanks,
->Mark.
->
->> +
->> +Example:
->> +       adc {
->> +               compatible = "ti,twl6030-gpadc";
->> +               interrupts = <3>;
->> +               #io-channel-cells = <1>;
->> +       };
->> 
+> +       gpio: gpio at 35003000 {
+> +               compatible = "brcm,kona-gpio";
+> +               reg = <0x35003000 0x800>;
+> +               interrupts =
+> +                      <0x0 106 0x4
+> +                       0x0 115 0x4
+> +                       0x0 114 0x4
+> +                       0x0 113 0x4
+> +                       0x0 112 0x4
+> +                       0x0 111 0x4>;
+> +               #gpio-cells = <2>;
+> +               #interrupt-cells = <2>;
+> +               gpio-controller;
+> +               interrupt-controller;
+> +       };
 
-Hi Mark,
+Do this:
 
-Thank you for the review.
+#include <dt-bindings//interrupt-controller/irq.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
 
-Here is new version.
+Rewrite like this:
 
->From 167b0aab359a9c38dfb2fd11bc3f810d1c403952 Mon Sep 17 00:00:00 2001
-From: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
-Date: Thu, 15 Aug 2013 16:14:11 +0300
-Subject: [PATCH] iio: adc: Add bindigs documentation for twl6030 GPADC
++               interrupts =
++                      <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH
++                       GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH
 
-Add required documentation for twl6030 GPADC device tree
-bindings.
+As you can see we can now understand the dts file.
 
-Signed-off-by: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
----
- .../devicetree/bindings/iio/adc/twl6030-gpadc.txt  | 45 ++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/twl6030-gpadc.txt
+Possibly this should also be done in the examples.
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/twl6030-gpadc.txt b/Documentation/devicetree/bindings/iio/adc/twl6030-gpadc.txt
-new file mode 100644
-index 0000000..6cd3ef3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/adc/twl6030-gpadc.txt
-@@ -0,0 +1,45 @@
-+Texas Instruments twl6030/twl6032 GPADC device driver
-+
-+Required properties:
-+	- compatible: must be "ti,twl6030-gpadc" for TWL6030 or
-+	  "ti,twl6032-gpadc" for TWL6032
-+	- interrupts: interrupt number associated with it
-+	- #io-channel-cells: must be <1> - multiple IIO outputs are present
-+	  iio consumers can use following io-channels:
-+		twl6030:
-+			0 - battery type
-+			1 - battery temperature resistor value
-+			2 - audio accessory/general purpose
-+			3 - general purpose
-+			4 - temperature/general purpose
-+			5 - general purpose
-+			6 - general purpose
-+			7 - main battery
-+			8 - backup battery
-+			9 - charger input
-+			10 - VBUS
-+			11 - VBUS charging current
-+			14 - USB ID
-+		twl6032:
-+			0 - battery type
-+			1 - battery temperature resistor value
-+			2 - audio accessory/general purpose
-+			3 - temperature with external diode/general purpose
-+			4 - temperature/general purpose
-+			5 - general purpose
-+			6 - general purpose
-+			7 - system supply
-+			8 - backup battery
-+			9 - charger input
-+			10 - VBUS
-+			11 - VBUS charging current
-+			14 - USB ID
-+			17 - battery charging current
-+			18 - battery voltage
-+
-+Example:
-+	adc {
-+		compatible = "ti,twl6030-gpadc";
-+		interrupts = <3>;
-+		#io-channel-cells = <1>;
-+	};
--- 
-1.8.1.2
-
-Regards,
-Sasha.
+Yours,
+Linus Walleij
