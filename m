@@ -1,289 +1,83 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 16 Aug 2013 10:28:06 -0700
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
- with external L3-cache.
-In-Reply-To: <CALrVBkvEP1Q0mKpv8ViOTLRvW2ks18MQXgmurSBHn+aJcz+=gw@mail.gmail.com>
-References: <CAAhSdy3-+tJ34QQgieifo931pfGoYt3RAqr8OkVtkxO6jgGdHQ@mail.gmail.com>
- <3ebe469fcf451cc7396dd2a5d3f01272@www.loen.fr>
- <CAAhSdy3WwZcLW6s05mV=Mn8=w8TcubTdYrgNqAChqiHxXC53eg@mail.gmail.com>
- <747a0675165da4ef147bbda4e140549b@www.loen.fr>
- <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
- <5935339137684ecf90dd484cc5739548@www.loen.fr>
- <20130815165344.GA3853@cbox>
- <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
- <20130816171449.GA20246@cbox>
- <CALrVBkvEP1Q0mKpv8ViOTLRvW2ks18MQXgmurSBHn+aJcz+=gw@mail.gmail.com>
-Message-ID: <20130816172806.GC20246@cbox>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 16 Aug 2013 10:28:38 -0700
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <5209152F.5020307@linaro.org>
+References: <c44e700d-64da-487b-a975-1263d7505371@CH1EHSMHS043.ehs.local>
+ <5204C54A.9020105@st.com> <5204FA5D.3060908@linaro.org>
+ <20130809172757.GD14845@codeaurora.org>
+ <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
+ <52090B43.9090000@codeaurora.org>
+ <d36fc2db-1189-4c6a-9bc4-0ac2e29eaa1b@AM1EHSMHS009.ehs.local>
+ <5209120D.1010701@linaro.org>
+ <9b07d8a3-b650-4147-b952-9bcfc1172c51@VA3EHSMHS025.ehs.local>
+ <5209152F.5020307@linaro.org>
+Message-ID: <86b18b0d-08e1-4899-86ea-ed22d3d36dee@DB8EHSMHS028.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 10:48:39PM +0530, Anup Patel wrote:
-> On 16 August 2013 22:44, Christoffer Dall <christoffer.dall@linaro.org>wrote:
+On Mon, Aug 12, 2013 at 07:02:39PM +0200, Daniel Lezcano wrote:
+> On 08/12/2013 06:53 PM, S?ren Brinkmann wrote:
+> > On Mon, Aug 12, 2013 at 06:49:17PM +0200, Daniel Lezcano wrote:
+> >> On 08/12/2013 06:32 PM, S?ren Brinkmann wrote:
+> >>> On Mon, Aug 12, 2013 at 09:20:19AM -0700, Stephen Boyd wrote:
+> >>>> On 08/12/13 09:03, S?ren Brinkmann wrote:
+> >>>>> On Fri, Aug 09, 2013 at 10:27:57AM -0700, Stephen Boyd wrote:
+> >>>>>> On 08/09, Daniel Lezcano wrote:
+> >>>>>>> yes, but at least the broadcast mechanism should send an IPI to cpu0 to
+> >>>>>>> wake it up, no ? As Stephen stated this kind of configuration should has
+> >>>>>>> never been tested before so the tick broadcast code is not handling this
+> >>>>>>> case properly IMHO.
+> >>>>>>>
+> >>>>>> If you have a per-cpu tick device that isn't suffering from
+> >>>>>> FEAT_C3_STOP why wouldn't you use that for the tick versus a
+> >>>>>> per-cpu tick device that has FEAT_C3_STOP? It sounds like there
+> >>>>>> is a bug in the preference logic or you should boost the rating
+> >>>>>> of the arm global timer above the twd. Does this patch help? It
+> >>>>>> should make the arm global timer the tick device and whatever the
+> >>>>>> cadence timer you have into the broadcast device.
+> >>>>> I finally got to test your patch. Unfortunately, it makes the system
+> >>>>> hang even earlier:
+> >>>>
+> >>>> Sorry it had a bug depending on the registration order. Can you try this
+> >>>> one (tabs are probably spaces, sorry)? I will go read through this
+> >>>> thread to see if we already covered the registration order.
+> >>>
+> >>> That did it! Booted straight into the system. 
+> >>
+> >> Good news :)
+> >>
+> >>> The broadcast device is
+> >>> the TTC instead of GT, now.
+> >>>
+> >>> 	Tick Device: mode:     1
+> >>> 	Broadcast device
+> >>> 	Clock Event Device: ttc_clockevent
+> >>> 	 max_delta_ns:   1207932479
+> >>> 	 min_delta_ns:   18432
+> >>> 	 mult:           233015
+> >>> 	 shift:          32
+> >>> 	 mode:           1
+> >>> 	 next_event:     9223372036854775807 nsecs
+> >>> 	 set_next_event: ttc_set_next_event
+> >>> 	 set_mode:       ttc_set_mode
+> >>> 	 event_handler:  tick_handle_oneshot_broadcast
+> >>> 	 retries:        0
+> >>> 	
+> >>> 	tick_broadcast_mask: 00000000
+> >>> 	tick_broadcast_oneshot_mask: 00000000
+> >>
+> >> At the first glance, the timer broadcast usage is not set, right ? Can
+> >> you try with the cpuidle flag even if it is not needed ?
+> > 
+> > It's actually present. I have a clean 3.11-rc3 and the only changes are
+> > my patch to enable the GT and Stephen's fix.
+> > The cpuidle stats show both idle states being used.
 > 
-> > On Fri, Aug 16, 2013 at 10:32:30AM +0530, Anup Patel wrote:
-> > > On Thu, Aug 15, 2013 at 10:23 PM, Christoffer Dall
-> > > <christoffer.dall@linaro.org> wrote:
-> > > > On Thu, Aug 15, 2013 at 04:37:27PM +0100, Marc Zyngier wrote:
-> > > >> On 2013-08-15 16:13, Anup Patel wrote:
-> > > >> > Hi Marc,
-> > > >> >
-> > > >> > On Thu, Aug 15, 2013 at 8:17 PM, Marc Zyngier <marc.zyngier@arm.com
-> > >
-> > > >> > wrote:
-> > > >> >> On 2013-08-15 14:31, Anup Patel wrote:
-> > > >> >>>
-> > > >> >>> On Thu, Aug 15, 2013 at 2:01 PM, Marc Zyngier
-> > > >> >>> <marc.zyngier@arm.com>
-> > > >> >>> wrote:
-> > > >> >>>>
-> > > >> >>>> On 2013-08-15 07:26, Anup Patel wrote:
-> > > >> >>>>>
-> > > >> >>>>>
-> > > >> >>>>> Hi Marc,
-> > > >> >>>>>
-> > > >> >>>>> On Thu, Aug 15, 2013 at 10:22 AM, Marc Zyngier
-> > > >> >>>>> <marc.zyngier@arm.com>
-> > > >> >>>>> wrote:
-> > > >> >>>>>>
-> > > >> >>>>>>
-> > > >> >>>>>> Hi Anup,
-> > > >> >>>>>>
-> > > >> >>>>>>
-> > > >> >>>>>> On 2013-08-14 15:22, Anup Patel wrote:
-> > > >> >>>>>>>
-> > > >> >>>>>>>
-> > > >> >>>>>>>
-> > > >> >>>>>>> On Wed, Aug 14, 2013 at 5:34 PM, Marc Zyngier
-> > > >> >>>>>>> <marc.zyngier@arm.com>
-> > > >> >>>>>>> wrote:
-> > > >> >>>>>>>>
-> > > >> >>>>>>>>
-> > > >> >>>>>>>>
-> > > >> >>>>>>>> Hi Pranav,
-> > > >> >>>>>>>>
-> > > >> >>>>>>>> On 2013-08-14 12:47, Pranavkumar Sawargaonkar wrote:
-> > > >> >>>>>>>>>
-> > > >> >>>>>>>>>
-> > > >> >>>>>>>>>
-> > > >> >>>>>>>>> Systems with large external L3-cache (few MBs), might have
-> > > >> >>>>>>>>> dirty
-> > > >> >>>>>>>>> content belonging to the guest page in L3-cache. To tackle
-> > > >> >>>>>>>>> this,
-> > > >> >>>>>>>>> we need to flush such dirty content from d-cache so that
-> > > >> >>>>>>>>> guest
-> > > >> >>>>>>>>> will see correct contents of guest page when guest MMU is
-> > > >> >>>>>>>>> disabled.
-> > > >> >>>>>>>>>
-> > > >> >>>>>>>>> The patch fixes coherent_icache_guest_page() for external
-> > > >> >>>>>>>>> L3-cache.
-> > > >> >>>>>>>>>
-> > > >> >>>>>>>>> Signed-off-by: Pranavkumar Sawargaonkar
-> > > >> >>>>>>>>> <pranavkumar@linaro.org>
-> > > >> >>>>>>>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> > > >> >>>>>>>>> ---
-> > > >> >>>>>>>>>  arch/arm64/include/asm/kvm_mmu.h |    2 ++
-> > > >> >>>>>>>>>  1 file changed, 2 insertions(+)
-> > > >> >>>>>>>>>
-> > > >> >>>>>>>>> diff --git a/arch/arm64/include/asm/kvm_mmu.h
-> > > >> >>>>>>>>> b/arch/arm64/include/asm/kvm_mmu.h
-> > > >> >>>>>>>>> index efe609c..5129038 100644
-> > > >> >>>>>>>>> --- a/arch/arm64/include/asm/kvm_mmu.h
-> > > >> >>>>>>>>> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> > > >> >>>>>>>>> @@ -123,6 +123,8 @@ static inline void
-> > > >> >>>>>>>>> coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
-> > > >> >>>>>>>>>       if (!icache_is_aliasing()) {            /* PIPT */
-> > > >> >>>>>>>>>               unsigned long hva = gfn_to_hva(kvm, gfn);
-> > > >> >>>>>>>>>               flush_icache_range(hva, hva + PAGE_SIZE);
-> > > >> >>>>>>>>> +             /* Flush d-cache for systems with external
-> > > >> >>>>>>>>> caches. */
-> > > >> >>>>>>>>> +             __flush_dcache_area((void *) hva, PAGE_SIZE);
-> > > >> >>>>>>>>>       } else if (!icache_is_aivivt()) {       /* non
-> > > >> >>>>>>>>> ASID-tagged
-> > > >> >>>>>>>>> VIVT
-> > > >> >>>>>>>>> */
-> > > >> >>>>>>>>>               /* any kind of VIPT cache */
-> > > >> >>>>>>>>>               __flush_icache_all();
-> > > >> >>>>>>>>
-> > > >> >>>>>>>>
-> > > >> >>>>>>>>
-> > > >> >>>>>>>>
-> > > >> >>>>>>>> [adding Will to the discussion as we talked about this in the
-> > > >> >>>>>>>> past]
-> > > >> >>>>>>>>
-> > > >> >>>>>>>> That's definitely an issue, but I'm not sure the fix is to
-> > hit
-> > > >> >>>>>>>> the
-> > > >> >>>>>>>> data
-> > > >> >>>>>>>> cache on each page mapping. It looks overkill.
-> > > >> >>>>>>>>
-> > > >> >>>>>>>> Wouldn't it be enough to let userspace do the cache cleaning?
-> > > >> >>>>>>>> kvmtools
-> > > >> >>>>>>>> knows which bits of the guest memory have been touched, and
-> > > >> >>>>>>>> can do a
-> > > >> >>>>>>>> "DC
-> > > >> >>>>>>>> DVAC" on this region.
-> > > >> >>>>>>>
-> > > >> >>>>>>>
-> > > >> >>>>>>>
-> > > >> >>>>>>>
-> > > >> >>>>>>> It seems a bit unnatural to have cache cleaning is user-space.
-> > > >> >>>>>>> I am
-> > > >> >>>>>>> sure
-> > > >> >>>>>>> other architectures don't have such cache cleaning in
-> > > >> >>>>>>> user-space for
-> > > >> >>>>>>> KVM.
-> > > >> >>>>>>>
-> > > >> >>>>>>>>
-> > > >> >>>>>>>> The alternative is do it in the kernel before running any
-> > vcpu
-> > > >> >>>>>>>> - but
-> > > >> >>>>>>>> that's not very nice either (have to clean the whole of the
-> > > >> >>>>>>>> guest
-> > > >> >>>>>>>> memory, which makes a full dcache clean more appealing).
-> > > >> >>>>>>>
-> > > >> >>>>>>>
-> > > >> >>>>>>>
-> > > >> >>>>>>>
-> > > >> >>>>>>> Actually, cleaning full d-cache by set/way upon first run of
-> > > >> >>>>>>> VCPU was
-> > > >> >>>>>>> our second option but current approach seemed very simple
-> > hence
-> > > >> >>>>>>> we went for this.
-> > > >> >>>>>>>
-> > > >> >>>>>>> If more people vote for full d-cache clean upon first run of
-> > > >> >>>>>>> VCPU then
-> > > >> >>>>>>> we should revise this patch.
-> > > >> >>>>>>
-> > > >> >>>>>>
-> > > >> >>>>>>
-> > > >> >>>>>>
-> > > >> >>>>>> Can you please give the attached patch a spin on your HW? I've
-> > > >> >>>>>> boot-tested
-> > > >> >>>>>> it on a model, but of course I can't really verify that it
-> > fixes
-> > > >> >>>>>> your
-> > > >> >>>>>> issue.
-> > > >> >>>>>>
-> > > >> >>>>>> As far as I can see, it should fix it without any additional
-> > > >> >>>>>> flushing.
-> > > >> >>>>>>
-> > > >> >>>>>> Please let me know how it goes.
-> > > >> >>>>>
-> > > >> >>>>>
-> > > >> >>>>>
-> > > >> >>>>> HCR_EL2.DC=1 means all memory access for Stage1 MMU off are
-> > > >> >>>>> treated as "Normal Non-shareable, Inner Write-Back
-> > > >> >>>>> Write-Allocate,
-> > > >> >>>>> Outer Write-Back Write-Allocate memory"
-> > > >> >>>>>
-> > > >> >>>>> HCR_EL2.DC=0 means all memory access for Stage1 MMU off are
-> > > >> >>>>> treated as "Strongly-ordered device memory"
-> > > >> >>>>>
-> > > >> >>>>> Now if Guest/VM access hardware MMIO devices directly (such as
-> > > >> >>>>> VGIC CPU interface) with MMU off then MMIO devices will be
-> > > >> >>>>> accessed as normal memory when HCR_EL2.DC=1.
-> > > >> >>>>
-> > > >> >>>>
-> > > >> >>>>
-> > > >> >>>> I don't think so. Stage-2 still applies, and should force MMIO to
-> > > >> >>>> be
-> > > >> >>>> accessed as device memory.
-> > > >> >>>>
-> > > >> >>>>
-> > > >> >>>>> The HCR_EL2.DC=1 makes sense only if we have all software
-> > > >> >>>>> emulated devices for Guest/VM which is not true for KVM ARM or
-> > > >> >>>>> KVM ARM64 because we use VGIC.
-> > > >> >>>>>
-> > > >> >>>>> IMHO, this patch enforces incorrect memory attribute for
-> > Guest/VM
-> > > >> >>>>> when Stage1 MMU is off.
-> > > >> >>>>
-> > > >> >>>>
-> > > >> >>>>
-> > > >> >>>> See above. My understanding is that HCR.DC controls the default
-> > > >> >>>> output of
-> > > >> >>>> Stage-1, and Stage-2 overrides still apply.
-> > > >> >>>
-> > > >> >>>
-> > > >> >>> You had mentioned that PAGE_S2_DEVICE attribute was redundant
-> > > >> >>> and wanted guest to decide the memory attribute. In other words,
-> > > >> >>> you
-> > > >> >>> did not want to enforce any memory attribute in Stage2.
-> > > >> >>>
-> > > >> >>> Please refer to this patch
-> > > >> >>> https://patchwork.kernel.org/patch/2543201/
-> > > >> >>
-> > > >> >>
-> > > >> >> This patch has never been merged. If you carry on following the
-> > > >> >> discussion,
-> > > >> >> you will certainly notice it was dropped for a very good reason:
-> > > >> >>
-> > https://lists.cs.columbia.edu/pipermail/kvmarm/2013-May/005827.html
-> > > >> >>
-> > > >> >> So Stage-2 memory attributes are used, they are not going away, and
-> > > >> >> they are
-> > > >> >> essential to the patch I sent this morning.
-> > > >> >>
-> > > >> >>
-> > > >> >>         M.
-> > > >> >> --
-> > > >> >> Fast, cheap, reliable. Pick two.
-> > > >> >
-> > > >> > HCR_EL2.DC=1 will break Guest/VM bootloader/firmware if the Guest/VM
-> > > >> > is
-> > > >> > provided a DMA-capable device in pass-through mode. The reason being
-> > > >> > bootloader/firmware typically don't enable MMU and such
-> > > >> > bootloader/firmware
-> > > >> > will programme a pass-through DMA-capable device without any flushes
-> > > >> > to
-> > > >> > guest RAM (because it has not enabled MMU).
-> > > >> >
-> > > >> > A good example of such a device would be SATA AHCI controller given
-> > > >> > to a
-> > > >> > Guest/VM as direct access (using SystemMMU) and Guest
-> > > >> > bootloader/firmware
-> > > >> > accessing this SATA AHCI controller to load kernel images from SATA
-> > > >> > disk.
-> > > >> > In this situation, we will have to hack Guest bootloader/firmware
-> > > >> > AHCI driver to
-> > > >> > explicitly flushes to Guest RAM (because have HCR_EL2.DC=1).
-> > > >>
-> > > >> OK. So *that* looks like a valid argument against HCR_EL2.DC==1. Out
-> > of
-> > > >> curiosity: is that a made up example or something you actually have?
-> > > >>
-> > > >> Back to square one:
-> > > >> Can you please benchmark the various cache cleaning options (global at
-> > > >> startup time, per-page on S2 translation fault, and user-space)?
-> > > >>
-> > > > Eh, why is this a more valid argument than the vgic?  The device
-> > > > passthrough Stage-2 mappings would still have the Stage-2 memory
-> > > > attributes to configure that memory region as device memory.  Why is it
-> > > > relevant if the device is DMA-capable in this context?
-> > > >
-> > >
-> > > Most ARM bootloader/firmware run with MMU off hence, they will not do
-> > > explicit cache flushes when programming DMA-capable device. Now If
-> > > HCR_EL2.DC=1 then Guest RAM updates done by bootloader/firmware
-> > > will not be visible to DMA-capable device.
-> > >
-> > Read my question again: The bootloaders running with the MMU off in a VM
-> > will only disable the MMU for Stage-1 translations.  Stage-2
-> > translations are still enforced using hte Stage-2 page tables and their
-> > attributes for all mappings to devices will still enforce
-> > strongly-ordered device type memory.
-> >
-> 
-> Please read my reply again. Also try to read-up SATA AHCI spec.
-> 
->
+> Ah, right. The tick_broadcast_mask is not set because the arm global
+> timer has not the CLOCK_EVT_FEAT_C3STOP feature flag set.
 
-Can you please explain how the specs realate to my question?
+Just to check in. Do you want any additional testing done? Or can I
+expect Stephens fix to get merged, so Zynq can use the GT?
 
-The only case I can see is if the guest puts data in a DMA region that
-it expects the device to read.  Is this the case?
-
-Just so we're clear, this is quite different from programming the device
-through the device memory.
-
--Christoffer
+	Thanks,
+	S?ren
