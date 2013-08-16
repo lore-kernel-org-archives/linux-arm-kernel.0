@@ -1,35 +1,80 @@
-From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
-Date: Fri, 16 Aug 2013 19:41:02 +0530
-Subject: [PATCH v5 2/2] ARM: davinci: da850: add OF_DEV_AUXDATA entry for
- davinci_emac
-In-Reply-To: <1376662262-21795-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1376662262-21795-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <1376662262-21795-3-git-send-email-prabhakar.csengg@gmail.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Fri, 16 Aug 2013 16:15:57 +0200
+Subject: [PATCH v3 1/2] rtc: omap: update of_device_id to reflect latest
+ ip revisions
+In-Reply-To: <1376653017-21935-2-git-send-email-gururaja.hebbar@ti.com>
+References: <1376653017-21935-1-git-send-email-gururaja.hebbar@ti.com>
+ <1376653017-21935-2-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <520E341D.4080206@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+Hi Gururaja,
 
-Add OF_DEV_AUXDATA for ethernet davinci_emac driver in da850 board dt
-file to use emac clock.
+On 16/08/2013 13:36, Hebbar, Gururaja wrote:
+> The syntax of compatible property in DT is to mention the Most specific
+> match to most generic match.
+>
+> Since AM335x is the platform with latest IP revision, add it 1st in
+> the device id table.
 
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- arch/arm/mach-davinci/da8xx-dt.c |    2 ++
- 1 file changed, 2 insertions(+)
+I don't understand why? The order should not matter at all.
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index d172563..d2bc574 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -44,6 +44,8 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ns16550a", 0x01d0c000, "serial8250.1", NULL),
- 	OF_DEV_AUXDATA("ns16550a", 0x01d0d000, "serial8250.2", NULL),
- 	OF_DEV_AUXDATA("ti,davinci_mdio", 0x01e24000, "davinci_mdio.0", NULL),
-+	OF_DEV_AUXDATA("ti,davinci-dm6467-emac", 0x01e20000, "davinci_emac.1",
-+		       NULL),
- 	{}
- };
- 
--- 
-1.7.9.5
+I've tried to follow the thread you had with Mark on the v2, but AFAIK, 
+you've never answered to his latest question.
+
+Moreover, checking the differences between the Davinci and the am3352 
+RTC IP, I would not claim that both are compatible.
+
+Sure you can use the am3352 with the Davinci driver, but you will lose 
+the wakeup functionality without even being notify about that.
+
+For my point of view, compatible mean that the HW will still be fully 
+functional with both versions of the driver, which is not the case here.
+
+am3352 DTS must use the ti,am3352-rtc to have the expected behavior. 
+Using the ti,da830-rtc version will not make the board working as 
+expected. So we cannot claim the compatibility.
+
+> This way, we can add new matching compatible as 1st and maintain old
+> compatible string for backwards compatibility.
+>
+> ex:
+> 	compatible = "ti,am3352-rtc", "ti,da830-rtc";
+>
+> Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
+> CC: mark.rutland at arm.com
+> ---
+> Changes in v3:
+> 	- new patch
+>
+> :100644 100644 dc62cc3... 2f0968c... M	drivers/rtc/rtc-omap.c
+>   drivers/rtc/rtc-omap.c |    6 +++---
+>   1 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> index dc62cc3..2f0968c 100644
+> --- a/drivers/rtc/rtc-omap.c
+> +++ b/drivers/rtc/rtc-omap.c
+> @@ -330,12 +330,12 @@ static struct platform_device_id omap_rtc_devtype[] = {
+>   MODULE_DEVICE_TABLE(platform, omap_rtc_devtype);
+>
+>   static const struct of_device_id omap_rtc_of_match[] = {
+> -	{	.compatible	= "ti,da830-rtc",
+> -		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_DA830_IDX],
+> -	},
+>   	{	.compatible	= "ti,am3352-rtc",
+>   		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_AM335X_IDX],
+>   	},
+> +	{	.compatible	= "ti,da830-rtc",
+> +		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_DA830_IDX],
+> +	},
+>   	{},
+>   };
+>   MODULE_DEVICE_TABLE(of, omap_rtc_of_match);
+
+Bottom-line, if you get rid of the old compatible entry, you will not 
+have to play some trick with the entries order.
+
+Regards,
+Benoit
