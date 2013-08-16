@@ -1,34 +1,35 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 Aug 2013 16:21:10 -0600
-Subject: [PATCH v2] extcon: palmas: Modified the compatible type to *ti,
- palmas-usb-vid*
-In-Reply-To: <1376648448-27447-1-git-send-email-kishon@ti.com>
-References: <1376648448-27447-1-git-send-email-kishon@ti.com>
-Message-ID: <520EA5D6.3040409@wwwdotorg.org>
+Date: Fri, 16 Aug 2013 16:36:45 -0600
+Subject: [PATCHv4 2/3] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <1376498884-9199-2-git-send-email-dinguyen@altera.com>
+References: <1376498884-9199-1-git-send-email-dinguyen@altera.com>
+ <1376498884-9199-2-git-send-email-dinguyen@altera.com>
+Message-ID: <520EA97D.7050404@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/16/2013 04:20 AM, Kishon Vijay Abraham I wrote:
-> The Palmas device contains only a USB VID detector, so modified the
-> compatible type to *ti,palmas-usb-vid*.
+On 08/14/2013 10:48 AM, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> Add bindings for SD/MMC for SOCFPGA.
 
-> diff --git a/Documentation/devicetree/bindings/extcon/extcon-palmas.txt b/Documentation/devicetree/bindings/extcon/extcon-palmas.txt
+> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
 
->  PALMAS USB COMPARATOR
->  Required Properties:
-> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
-> + - compatible : Should be "ti,palmas-usb-vid".
+> +* altr,sysmgr: Should be the phandle to the system_mgr node. As this is where
+> +		this where the register that controls the CIU clock phases
+> +		reside.
 
-Has the old value been published in a release kernel? If so, it makes
-sense to document both values, but say the old one is deprecated, and ...
+On the surface, this binding series seems OK, but I do have a question:
+how is the sysmgr phandle used?
 
-> diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
+I assume there's some register in this syscon device that resets or
+enables or otherwise controls this MSHC module. How does the code know
+which register it is? The phandle in the altr,sysmgr property would
+usually be followed by a/some cell(s) that encode this information, so
+that the MSHC driver doesn't have to know anything about the layout of
+the syscon registers, and so the sysconf driver doesn't have to know
+anything about the identity of the MSHC client device.
 
->  static struct of_device_id of_palmas_match_tbl[] = {
-> -	{ .compatible = "ti,palmas-usb", },
-> -	{ .compatible = "ti,twl6035-usb", },
-> +	{ .compatible = "ti,palmas-usb-vid", },
-
-... perhaps just add the new value here, and don't remove the old values?
-
-If not, ignore this.
+That way, the MSHC driver will work fine if a HW designer has dropped
+the MSHC IP block into a completely different SoC with a different
+syscon register layout.
