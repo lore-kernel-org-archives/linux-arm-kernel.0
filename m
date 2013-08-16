@@ -1,292 +1,126 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 16 Aug 2013 11:46:14 -0700
-Subject: [PATCH RFC 1/3] spmi: Linux driver framework for SPMI
-In-Reply-To: <02deef1d90121011ab1df90ad704ef0ee36e2584.1376596224.git.joshc@codeaurora.org>
-References: <cover.1376596224.git.joshc@codeaurora.org>
- <02deef1d90121011ab1df90ad704ef0ee36e2584.1376596224.git.joshc@codeaurora.org>
-Message-ID: <20130816184614.GA31510@kroah.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 16 Aug 2013 13:47:18 -0500
+Subject: [PATCH v2] drivers: CCI: add ARM CCI PMU support
+In-Reply-To: <1376673599-3967-1-git-send-email-punit.agrawal@arm.com>
+References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
+ <1376673599-3967-1-git-send-email-punit.agrawal@arm.com>
+Message-ID: <4698B009-124E-4D51-868B-336F80A7D7F8@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 01:37:09PM -0700, Josh Cartwright wrote:
-> --- /dev/null
-> +++ b/drivers/of/of_spmi.c
-> @@ -0,0 +1,74 @@
-> +/* Copyright (c) 2012,2013 The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#define pr_fmt(fmt) "%s: " fmt, __func__
 
-As you never make a pr_* call in this file, this line isn't needed.
+On Aug 16, 2013, at 12:19 PM, Punit Agrawal wrote:
 
-> +++ b/drivers/spmi/spmi-dbgfs.c
-> @@ -0,0 +1,591 @@
-> +/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#define pr_fmt(fmt) "%s:%d: " fmt, __func__, __LINE__
-
-__func__ and __LINE__?  Is that really needed, what will it help with?
-Seems like extra noise, especially as you only have a few pr_* calls in
-this file:
-
-> +static int
-> +spmi_read_data(struct spmi_device *sdev, uint8_t *buf, int offset, int cnt)
-> +{
-> +	int ret = 0;
-> +	int len;
-> +	uint16_t addr;
+> The CCI PMU can profile bus transactions at the master and slave
+> interfaces of the CCI. The PMU can be used to observe an aggregated view
+> of the bus traffic between the various components connected to the CCI.
+> 
+> Extend the existing CCI driver to support the PMU by registering a perf
+> backend for it.
+> 
+> Document the device tree binding to describe the CCI PMU.
+> 
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Cc: Dave Martin <dave.martin@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> ---
+> 
+> Hi, 
+> 
+> This is the second version of the CCI PMU driver. The changes incorporate review
+> comments on device tree bindings and corresponding update to the driver.
+> 
+> Cheers,
+> Punit
+> 
+> Will, I've dropped your reviewed-by tag due to the changes. Let me know if you are
+> ok with the changes and I'll add the tag.
+> 
+> Changes since v1:
+> * Dropped requirement for node name.
+> * Dropped compatible strings for different revisions - rely on peripheral id
+>  register to provide the revision.
+> * Change interrupt bindings to require overflow interrupt per counter.
+> 
+> Documentation/devicetree/bindings/arm/cci.txt |   44 ++
+> drivers/bus/arm-cci.c                         |  628 +++++++++++++++++++++++++
+> 2 files changed, 672 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
+> index 92d36e2..7cf35bc 100644
+> --- a/Documentation/devicetree/bindings/arm/cci.txt
+> +++ b/Documentation/devicetree/bindings/arm/cci.txt
+> @@ -79,6 +79,40 @@ specific to ARM.
+> 				    corresponding interface programming
+> 				    registers.
+> 
+> +	- CCI PMU node
 > +
-> +	while (cnt > 0) {
-> +		addr = offset & 0xFFFF;
-> +		len = min(cnt, MAX_REG_PER_TRANSACTION);
+> +		Parent node must be CCI interconnect node.
 > +
-> +		ret = spmi_ext_register_readl(sdev, addr, buf, len);
-> +		if (ret < 0) {
-> +			pr_err("SPMI read failed, err = %d\n", ret);
-
-Should be using dev_err() instead.
-
-> +/**
-> + * spmi_write_data: writes data across the SPMI bus
-> + * @ctrl: The SPMI controller
-> + * @buf: data to be written.
-> + * @offset: SPMI address offset to start writing to.
-> + * @cnt: The number of bytes to write.
-> + *
-> + * Returns 0 on success, otherwise returns error code from SPMI driver.
-> + */
-> +static int
-> +spmi_write_data(struct spmi_device *sdev, uint8_t *buf, int offset, int cnt)
-> +{
-> +	int ret = 0;
-> +	int len;
-> +	uint16_t addr;
+> +		A CCI pmu node must contain the following properties:
 > +
-> +	while (cnt > 0) {
-> +		addr = offset & 0xFFFF;
-> +		len = min(cnt, MAX_REG_PER_TRANSACTION);
+> +		- compatible
+> +			Usage: required
+> +			Value type: <string>
+> +			Definition: must be "arm,cci-400-pmu"
 > +
-> +		ret = spmi_ext_register_writel(sdev, addr, buf, len);
-> +		if (ret < 0) {
-> +			pr_err("SPMI write failed, err = %d\n", ret);
-
-Same, dev_err() please.
-
-> +static ssize_t spmi_device_dfs_reg_write(struct file *file,
-> +					 const char __user *buf,
-> +					 size_t count, loff_t *ppos)
-> +{
-> +	int bytes_read;
-> +	int data;
-> +	int pos = 0;
-> +	int cnt = 0;
-> +	u8  *values;
-> +	size_t ret = 0;
+> +		- reg:
+> +			Usage: required
+> +			Value type: <prop-encoded-array>
+> +			Definition: the base address and size of the
+> +				    corresponding interface programming
+> +				    registers.
 > +
-> +	struct spmi_trans *trans = file->private_data;
-> +	u32 offset = trans->offset;
+> +		- interrupts:
+> +			Usage: required
+> +			Value type: <prop-encoded-array>
+> +			Definition: comma-separated list of counter overflow
+> +				    interrupts, one per counter. The interrupts
+> +				    must be specified starting with the cycle
+> +				    counter overflow interrupt, followed by
+> +				    counter0 overflow interrupt, counter1
+> +				    overflow interrupt,..., counterN overflow
+> +				    interrupt.
 > +
-> +	/* Make a copy of the user data */
-> +	char *kbuf = kmalloc(count + 1, GFP_KERNEL);
-> +	if (!kbuf)
-> +		return -ENOMEM;
+> +				    The CCI PMU has an interrupt signal for each
+> +				    counter. Typically, the number of
+> +				    interrupts will be equal to the number of
+> +				    counters.
 > +
-> +	ret = copy_from_user(kbuf, buf, count);
-> +	if (ret == count) {
-> +		pr_err("failed to copy data from user\n");
-
-No need for a message here at all, you will get a message in the
-function if something happened wrong.
-
-Also, shouldn't it just be a simple:
-	if (copy_from_user()) {
-test?
-
-> +		ret = -EFAULT;
-> +		goto free_buf;
-> +	}
+> * CCI interconnect bus masters
+> 
+> 	Description: masters in the device tree connected to a CCI port
+> @@ -163,6 +197,16 @@ Example:
+> 			interface-type = "ace";
+> 			reg = <0x5000 0x1000>;
+> 		};
 > +
-> +	count -= ret;
-> +	*ppos += count;
-> +	kbuf[count] = '\0';
-> +
-> +	/* Override the text buffer with the raw data */
-> +	values = kbuf;
-> +
-> +	/* Parse the data in the buffer.  It should be a string of numbers */
-> +	while (sscanf(kbuf + pos, "%i%n", &data, &bytes_read) == 1) {
-> +		pos += bytes_read;
-> +		values[cnt++] = data & 0xff;
-> +	}
-> +
-> +	if (!cnt)
-> +		goto free_buf;
-> +
-> +	/* Perform the SPMI write(s) */
-> +	ret = spmi_write_data(trans->sdev, values, offset, cnt);
-> +
-> +	if (ret) {
-> +		pr_err("SPMI write failed, err = %zu\n", ret);
+> +		pmu at 9000 {
+> +			 compatible = "arm,cci-400-pmu,rev0";
 
-dev_err() please.
+drop the ',rev0'
 
-> +static ssize_t spmi_device_dfs_reg_read(struct file *file, char __user *buf,
-> +					size_t count, loff_t *ppos)
-> +{
-> +	struct spmi_trans *trans = file->private_data;
-> +	struct spmi_log_buffer *log = trans->log;
-> +	size_t ret;
-> +	size_t len;
-> +
-> +	/* Is the the log buffer empty */
-> +	if (log->rpos >= log->wpos) {
-> +		if (get_log_data(trans) <= 0)
-> +			return 0;
-> +	}
-> +
-> +	len = min(count, (size_t) log->wpos - log->rpos);
-> +
-> +	ret = copy_to_user(buf, &log->data[log->rpos], len);
-> +	if (ret == len) {
-> +		pr_err("error copy SPMI register values to user\n");
+> +			 reg = <0x9000 0x5000>;
+> +			 interrupts = <0 101 4>,
+> +				      <0 102 4>,
+> +				      <0 103 4>,
+> +				      <0 104 4>,
+> +				      <0 105 4>;
+> +		};
+> 	};
+> 
+> This CCI node corresponds to a CCI component whose control registers sits
 
-Same comments as above.
+[snip]
 
-> +void __exit spmi_dfs_exit(void)
-> +{
-> +	pr_debug("de-initializing spmi debugfs ...");
+- k
 
-Not needed, use the in-kernel trace functionality if you really want to
-know this.
-
-> +	debugfs_remove_recursive(spmi_debug_root);
-> +}
-> +
-> +void __init spmi_dfs_init(void)
-> +{
-> +	struct dentry *help;
-> +
-> +	pr_debug("creating SPMI debugfs file-system\n");
-
-Same as above, not needed.
-
-So, with those changes, pr_fmt() isn't needed at all :)
-
-> --- /dev/null
-> +++ b/drivers/spmi/spmi-dbgfs.h
-> @@ -0,0 +1,37 @@
-> +/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#ifndef _SPMI_DBGFS_H
-> +#define _SPMI_DBGFS_H
-> +
-> +#include <linux/spmi.h>
-> +#include <linux/debugfs.h>
-> +
-> +#ifdef CONFIG_DEBUG_FS
-
-Why?  If debugfs isn't enabled, the functions should just compile away
-with the debugfs_() calls, so no need to do this type of thing here,
-right?
-
-> +
-> +extern void __init spmi_dfs_init(void);
-> +extern void __exit spmi_dfs_exit(void);
-> +extern void spmi_dfs_add_controller(struct spmi_controller *ctrl);
-> +extern void spmi_dfs_del_controller(struct spmi_controller *ctrl);
-> +extern void spmi_dfs_add_device(struct spmi_device *sdev);
-> +extern void spmi_dfs_del_device(struct spmi_device *sdev);
-> +
-> +#else
-> +
-> +static inline void __init spmi_dfs_init(void) { }
-> +static inline void __exit spmi_dfs_exit(void) { }
-> +static inline void spmi_dfs_add_controller(struct spmi_controller *ctrl) { }
-> +static inline void spmi_dfs_del_controller(struct spmi_controller *ctrl) { }
-> +static inline void spmi_dfs_add_device(struct spmi_device *sdev) { }
-> +static inline void spmi_dfs_del_device(struct spmi_device *sdev) { }
-> +#endif
-> +
-> +#endif /* _SPMI_DBGFS_H */
-> diff --git a/drivers/spmi/spmi.c b/drivers/spmi/spmi.c
-> new file mode 100644
-> index 0000000..3bbcc63
-> --- /dev/null
-> +++ b/drivers/spmi/spmi.c
-> @@ -0,0 +1,449 @@
-> +/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#define pr_fmt(fmt) "%s: " fmt, __func__
-
-Again, not needed for this file, because:
-
-> +int spmi_add_controller(struct spmi_controller *ctrl)
-> +{
-> +	int id;
-> +
-> +	pr_debug("adding controller for bus %d (0x%p)\n", ctrl->nr, ctrl);
-
-dev_dbg() if you really need/want it.
-
-> +
-> +	if (((int)ctrl->nr) < 0) {
-> +		pr_err("invalid bus identifier %d\n", ctrl->nr);
-
-dev_err() please.
-
-> +		return -EINVAL;
-> +	}
-> +
-> +	idr_preload(GFP_KERNEL);
-> +	mutex_lock(&board_lock);
-> +	id = idr_alloc(&ctrl_idr, ctrl, ctrl->nr, ctrl->nr + 1, GFP_NOWAIT);
-> +	mutex_unlock(&board_lock);
-> +	idr_preload_end();
-> +
-> +	if (id < 0) {
-> +		pr_err(
-> +		   "idr_alloc(start:%d end:%d):%d at spmi_add_controller()\n",
-> +		   ctrl->nr, ctrl->nr, id);
-
-dev_err() please.
-
-And then the pr_fmt() line can be removed.
-
-thanks,
-
-greg k-h
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
