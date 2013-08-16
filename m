@@ -1,68 +1,58 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Fri, 16 Aug 2013 20:17:21 +0900
-Subject: [PATCH v9 03/16] iommu/exynos: fix page table maintenance
-In-Reply-To: <CANEJEGveOtGs8XEYFnnXoZ575bqKRkc3AMikr_1x02cNikwTng@mail.gmail.com>
-References: <002701ce941a$eecebdb0$cc6c3910$@samsung.com>
- <1516548.d7oQuzQS7g@amdc1227>
- <CANEJEGu1ponghpfvyUsQX16+TZWUV+0KXJ7AehjXpju2N_H+Ew@mail.gmail.com>
- <20130814104938.GF4491@8bytes.org>
- <CANEJEGveOtGs8XEYFnnXoZ575bqKRkc3AMikr_1x02cNikwTng@mail.gmail.com>
-Message-ID: <20130816201721.b93a6e3db960e38b29ca7b1a@samsung.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 16 Aug 2013 16:47:26 +0530
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Trustzone-based security
+ solution for ARM Linux
+In-Reply-To: <CAGsJ_4yjZQ9a+VAXk-c5DGFpz-SpGrqm=p7zfYq2C=vTCz8X+w@mail.gmail.com>
+References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
+ <20130815042812.GA8968@kroah.com>
+ <CAGsJ_4w2hOgsOB=ZYmWqm7tM+pL6=UMR1fG++A+rdAReJzFSjw@mail.gmail.com>
+ <520CFBDE.4000408@wwwdotorg.org>
+ <20130815174307.GA17245@localhost.localdomain>
+ <CAGsJ_4yjZQ9a+VAXk-c5DGFpz-SpGrqm=p7zfYq2C=vTCz8X+w@mail.gmail.com>
+Message-ID: <CABb+yY3B+9ZyLbyTExPdK4ns_Asvzb2n=dGc-He+Qr+gSYaYCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Aug 2013 13:54:53 -0700, Grant Grundler wrote:
-> On Wed, Aug 14, 2013 at 3:49 AM, Joerg Roedel <joro@8bytes.org> wrote:
-> > On Thu, Aug 08, 2013 at 11:28:44AM -0700, Grant Grundler wrote:
-> >> I can't speak to the previous BUG_ON(). I believe the EADDRESSINUSE
-> >> failures could be either WARN_ON or BUG_ON.   This condition is
-> >> clearly a bug in the generic IOMMU allocator and I think that's why
-> >> KyongHo Cho used BUG_ON.
-> >>
-> >> Handing out duplicate addresses will generally lead to some sort of
-> >> data corruption or other fault depending on how robust the underlying
-> >> device drivers are written.  So my preference is a BUG_ON to
-> >> immediately flag this condition instead of hoping a device driver will
-> >> correctly handling the dma mapping failure (Some do, most currently
-> >> don't).
-> >>
-> >> WARN_ON() + return -EADDRESSINUSE would be a good alternative.
-> >
-> > Even if it is a real BUG condition, I don't think it is worth to stop
-> > execution at this point. It makes debugging harder and the system less
-> > reliable. I prefer to go with the WARN_ON and an error return value.
-> 
-> I'm ok with WARN_ON and an error return value. This is "valid"
-> behavior.  I expect this bug to never happen but if and when it does,
-> I want a clear symptom (e.g. WARN_ON) that it happened.
-> 
+On Fri, Aug 16, 2013 at 8:09 AM, Barry Song <21cnbao@gmail.com> wrote:
+>>> >>
+>>> >> Isn't that up to the hardware?  Nothing that Linux can do about that.
+>>> >
+>>> > right. but linux need to assign interrupts to right group in GIC
+>>> > hardware. now it doesn't care.
+>>>
+>>> I strongly hope that whatever is the secure OS is setting up these
+>>> routings, and the HW prevents the non-secure OS from modifying them and
+>>> hence never attempts to. Otherwise, the non-secure OS is able to affect
+>>> the functioning of the secure OS, which seems like a bad thing.
+>>
+>> Typically, the master controls are hard-wired for Secure-only access in
+>> hardware: so assigning GIC interrupts to groups is something the secure
+>> OS/firmware has to take care of.
+>>
+>> Of course, if Linux is acting as secure OS, it might have to understand
+>> what controls exist and to do some of that configuration itself.
+>
+> that is just what i want. linux need to realize whether it is running
+> in security or non-security.
+>
+TZ should be seen as two platforms tied together. "DTB" for each mode
+should reflect what's available in that mode (dtb for NS kernel
+shouldn't/can't specify any Secure asset and while that of Secure
+kernel should specify anything that is not accessible from NS mode).
+So ideally there should just be the control passing mechanism (like
+SMC command) to be told to the kernel running in NS mode.
 
-Ok.
-Finally, everyone thinks that WARN_ON() is OK.
-It will be helpful for the kernel code that uses iommu api.
+> for example, if one irq is assigned to security, even though users
+> want to get it in non-security, linux should make it fail.
+> linux need security/non-security realization in GIC.
+>
+If there is an 'alias' for the secure asset in NS mode, it is better
+to leave it for NS kernel to manage it.
+If some asset is visible in Secure mode only, the NS kernel shouldn't
+be able to simply do an SMC call to have it manipulated. Otherwise we
+leave room for some rooted NS kernel to hack the TrustedOS.
 
-> My concern is that historically, drivers did not get an error return
-> value on failure:
->     ftp://193.166.3.4/pub/linux/kernel/v2.3/patch-html/patch-2.3.47/linux_Documentation_DMA-mapping.txt.html
-> 
-> or later:
->     https://www.kernel.org/pub/linux/kernel/people/marcelo/linux-2.4/Documentation/DMA-mapping.txt
-> 
-> And thus, some drivers don't check or attempt to handle mapping
-> failures based on this existing code. Here is a recent example:
->      http://comments.gmane.org/gmane.linux.network/272969
-> 
-> I hope very few or none of those exist since Neil Horman demonstrated
-> "dma debugging" can flag this behavior.
-> 
-> Just for fun, I'll include this link : (apperently 2003 was a good
-> year for DMA talks :)
->      http://ols.fedoraproject.org/OLS/Reprints-2003/LinuxSymposium2003-2side.pdf
->      (three talks on DMA issues)
-> 
-
-Thank you for the resources :)
-Those will be helpful for the guys with me.
-
-> thanks
-> grant
+Point of the rant being, perhaps we don't need new kernel
+policies/designs to enforce TZ security. We just need properly
+partitioned h/w and s/w flow control routed from NS via SMC directly
+to SecureApps(not the Secure Kernel).
