@@ -1,59 +1,49 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 16 Aug 2013 14:04:22 -0500
-Subject: [PATCH RFC 1/3] spmi: Linux driver framework for SPMI
-In-Reply-To: <02deef1d90121011ab1df90ad704ef0ee36e2584.1376596224.git.joshc@codeaurora.org>
-References: <cover.1376596224.git.joshc@codeaurora.org>
- <02deef1d90121011ab1df90ad704ef0ee36e2584.1376596224.git.joshc@codeaurora.org>
-Message-ID: <1E157BCF-C34F-4839-AFE0-CBECA828B221@codeaurora.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 16 Aug 2013 14:06:24 -0500
+Subject: [PATCH] gpio: (gpio-pca953x) move header to linux/platform_data/
+In-Reply-To: <82440653.410050.1376665340121.JavaMail.root@mail>
+References: <CACRpkdZdeVNtJSmc6Lr6j=oO9FLsAvjyrwhYS0j4OoAEhxCN9g@mail.gmail.com>
+ <82440653.410050.1376665340121.JavaMail.root@mail>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0021DAC7DA184@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday, August 16, 2013 8:02 AM, Vivien Didelot wrote:
+> Hi Linus,
+>
+> You wrote:
+> > But:
+>>
+>>>  drivers/gpio/gpio-pca953x.c                 |  2 +-
+>> (...)
+>>> diff --git a/drivers/gpio/gpio-pca953x.c
+>>> b/drivers/gpio/gpio-pca953x.c
+>>> index 426c51d..8804aec 100644
+>>> --- a/drivers/gpio/gpio-pca953x.c
+>>> +++ b/drivers/gpio/gpio-pca953x.c
+>>> @@ -18,7 +18,7 @@
+>>>  #include <linux/irq.h>
+>>>  #include <linux/irqdomain.h>
+>>>  #include <linux/i2c.h>
+>>> -#include <linux/i2c/pca953x.h>
+>>> +#include <linux/platform_data/pca953x.h>
+>> 
+>> Why does the GPIO driver need platform data from the
+>> I2C driver???
+>> 
+>> Can't this just be made to go away?
+>
+> I didn't dig that much in the driver, but I cannot imagine
+> another way to pass, for instance, the setup callback.
+>
+> What would be a good alternative for you?
 
-On Aug 9, 2013, at 3:37 PM, Josh Cartwright wrote:
+I think the confusion here is because the pca953x.h header was initially
+placed in linux/i2c.
 
-> From: Kenneth Heitke <kheitke@codeaurora.org>
-> 
-> System Power Management Interface (SPMI) is a specification
-> developed by the MIPI (Mobile Industry Process Interface) Alliance
-> optimized for the real time control of Power Management ICs (PMIC).
-> 
-> SPMI is a two-wire serial interface that supports up to 4 master
-> devices and up to 16 logical slaves.
-> 
-> The framework supports message APIs, multiple busses (1 controller
-> per bus) and multiple clients/slave devices per controller.
-> 
-> Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
-> Signed-off-by: Michael Bohan <mbohan@codeaurora.org>
-> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> ---
-> drivers/Kconfig                 |   2 +
-> drivers/Makefile                |   1 +
-> drivers/of/Kconfig              |   6 +
-> drivers/of/Makefile             |   1 +
-> drivers/of/of_spmi.c            |  74 +++++
-> drivers/spmi/Kconfig            |   9 +
-> drivers/spmi/Makefile           |   7 +
-> drivers/spmi/spmi-dbgfs.c       | 591 ++++++++++++++++++++++++++++++++++++++++
-> drivers/spmi/spmi-dbgfs.h       |  37 +++
-> drivers/spmi/spmi.c             | 449 ++++++++++++++++++++++++++++++
-> include/linux/mod_devicetable.h |   8 +
-> include/linux/of_spmi.h         |  37 +++
-> include/linux/spmi.h            | 337 +++++++++++++++++++++++
-> 13 files changed, 1559 insertions(+)
-> create mode 100644 drivers/of/of_spmi.c
-> create mode 100644 drivers/spmi/Kconfig
-> create mode 100644 drivers/spmi/Makefile
-> create mode 100644 drivers/spmi/spmi-dbgfs.c
-> create mode 100644 drivers/spmi/spmi-dbgfs.h
-> create mode 100644 drivers/spmi/spmi.c
-> create mode 100644 include/linux/of_spmi.h
-> create mode 100644 include/linux/spmi.h
+This device is an I2C connected GPIO expander. The pca953x.h header has
+the information needed for the platform to hook up to the device. It doesn't
+really expose the fact that it's an I2C driver.
 
-Looks like you are missing a patch for the general OF binding for SPMI
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Just by 2 cents...
+Hartley
