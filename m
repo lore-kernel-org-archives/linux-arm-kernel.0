@@ -1,126 +1,79 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 15 Aug 2013 22:32:56 -0700
-Subject: [PATCH v5 2/3] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <1376049119-12655-3-git-send-email-m.szyprowski@samsung.com>
-References: <1376049119-12655-1-git-send-email-m.szyprowski@samsung.com>
- <1376049119-12655-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20130816053256.GB7035@quad.lixom.net>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Fri, 16 Aug 2013 14:43:17 +0900
+Subject: [PATCH V5] ARM: dts: Change i2s compatible string on exynos5250
+In-Reply-To: <CAOesGMj4y=uVMmETLXs_1ZfTD+CrQgKuirrpGrqs=CU3uk5__Q@mail.gmail.com>
+References: <1376627178-28649-1-git-send-email-padma.v@samsung.com>
+ <CAOesGMj4y=uVMmETLXs_1ZfTD+CrQgKuirrpGrqs=CU3uk5__Q@mail.gmail.com>
+Message-ID: <13f801ce9a43$823571b0$86a05510$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Olof Johansson wrote:
+> 
+> On Thu, Aug 15, 2013 at 9:26 PM, Padmavathi Venna <padma.v@samsung.com>
+> wrote:
+> > This patch removes quirks from i2s node and change the i2s
+> > compatible names.
+> >
+> > Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> > ---
+> >
+> > Changes since V4:
+> >         - Mark Brown reverted the below two patches due to below build
+> failure with
+> >           exynos_defconfig.
+> >                 "ARM: dts: exynos5250: move common i2s properties to
+exynos5
+> dtsi"
+> >                 "ARM: dts: Change i2s compatible string on exynos5250"
+> >
+> >           build error:
+> >           DTC     arch/arm/boot/dts/exynos5420-smdk5420.dtb
+> >           ERROR (phandle_references): Reference to non-existent node or
+> label "pdma1"
+> >           ERROR (phandle_references): Reference to non-existent node or
+> label "pdma1"
+> >           ERROR (phandle_references): Reference to non-existent node or
+> label "pdma0"
+> >           ERROR (phandle_references): Reference to non-existent node or
+> label "pdma0"
+> >
+> > But with out "ARM: dts: Change i2s compatible string on exynos5250" will
+> break the i2s
+> > driver.
+> >
+> > So posting this patch now and will take care of posting other patch
+> later after dependent
+> > patches got merged.
+> >
+> >  arch/arm/boot/dts/exynos5250.dtsi |    9 +++------
+> >  1 files changed, 3 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> b/arch/arm/boot/dts/exynos5250.dtsi
+> > index ef57277..376090f 100644
+> > --- a/arch/arm/boot/dts/exynos5250.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> > @@ -405,7 +405,7 @@
+> >         };
+> >
+> >         i2s0: i2s at 03830000 {
+> > -               compatible = "samsung,i2s-v5";
+> > +               compatible = "samsung,s5pv210-i2s";
+> 
+> Device tree reviewers, this is something to look out for in the
+> future. Some samsung platforms/drivers use "samsung,<chip>-<ip>",
+> others "samsung,<ip>-<chip>". I don't personally care much one way or
+> another, but it really should be consistent.
+> 
+Hmm...I think, if "samsung,<ip name>-<ip version>" is possible, it would be
+nice. I remember there are no versions in datasheet for some IPs but
+something have like i2s and mfc. So "samsung,<ip>-<version>" is used for
+only i2s and mfc. But actually there are versions for Samsung IPs, no
+comments for that in datasheet. So I think, if Samsung can provide the
+specific version of Samsung IPs, we can use that like other platforms. I
+will prepare some table for that after meeting with Samsung hardware IP team
+so that samsung platform use one format "samsung,<ip>-<version>".
 
-On Fri, Aug 09, 2013 at 01:51:58PM +0200, Marek Szyprowski wrote:
-> Add device tree support for contiguous and reserved memory regions
-> defined in device tree. Initialization is done in 2 steps. First, the
-> memory is reserved, what happens very early when only flattened device
-> tree is available. Then on device initialization the corresponding cma
-> and reserved regions are assigned to each device structure.
-
-Bikeshedding on some wording, mostly in case you have to respin for other
-reasons.
-
-> diff --git a/Documentation/devicetree/bindings/memory.txt b/Documentation/devicetree/bindings/memory.txt
-> new file mode 100644
-> index 0000000..167d013
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/memory.txt
-> @@ -0,0 +1,152 @@
-> +*** Memory binding ***
-> +
-> +The /memory node provides basic information about the address and size
-> +of the physical memory. This node is usually filled or updated by the
-> +bootloader, depending on the actual memory configuration of the given
-> +hardware.
-> +
-> +The memory layout is described by the folllowing node:
-> +
-> +memory {
-> +	device_type = "memory";
-> +	reg =  <(baseaddr1) (size1)
-> +		(baseaddr2) (size2)
-> +		...
-> +		(baseaddrN) (sizeN)>;
-> +};
-> +
-> +baseaddrX:	the base address of the defined memory bank
-> +sizeX:		the size of the defined memory bank
-> +
-> +More than one memory bank can be defined.
-> +
-> +
-> +*** Reserved memory regions ***
-> +
-> +In /memory/reserved-memory node one can create additional nodes
-
-There's really no requirement on naming here. We should instead search all of
-/memory for the compatible properties.
-
-> +describing particular reserved (excluded from normal use) memory
-> +regions. Such memory regions are usually designed for the special usage
-> +by various device drivers. A good example are contiguous memory
-> +allocations or memory sharing with other operating system on the same
-> +hardware board. Those special memory regions might depend on the board
-> +configuration and devices used on the target system.
-> +
-> +Parameters for each memory region can be encoded into the device tree
-> +wit the following convention:
-> +
-> +[(label):] (name)@(address) {
-
-@(unit-address)
-
-> +	compatible = "contiguous-memory-region", "reserved-memory-region";
-> +	reg = <(address) (size)>;
-> +	(linux,default-contiguous-region);
-> +};
-> +
-> +label:		label given to the defined region (optional)
-> +name:		an name given to the defined region
-> +address:	the base address of the defined region
-
-unit-address. It's optional unless there are conflicting node names.
-
-> +size:		the size of the memory region
-> +
-> +compatible:	"contiguous-memory-region" - enables binding of this
-> +		region to Contiguous Memory Allocator (special region for
-> +		contiguous memory allocations, shared with movable system
-> +		memory, Linux kernel-specific), alternatively if
-> +		"reserved-memory-region" - compatibility is defined, given
-> +		region is assigned for exclusive usage for DMA transfers
-
-"reserved-memory-region" isn't necessarily just for DMA transfers, it can be
-used pretty much for anything. pstore comes to mind.
-
-> +linux,default-contiguous-region: property indicating that the region
-> +		is the default region for all contiguous memory
-> +		allocations, Linux specific (optional)
-
-Hmm. We handle some of these defaults such as device naming (i2c busses, etc)
-through /alias nodes. Maybe it would be more consistent to do that here too,
-by providing a phandle there instead.
-
-> +Each defined region must use unique name.
-
-Hmm, this is quite different from how memory nodes work, and it'd
-be nice to keep similar semantics. A "name" property would make more
-sense for areas that need to be named, but even then, why do names here
-matter? References should be by phandle, not by name. So I think it
-should likely just be scrapped.
-
-> It is optional to specify the
-> +base address, so if one wants to use autoconfiguration of the base
-> +address, he must specify the '0' as base address in the 'reg' property
-> +and assign ann unique name to such regions.
-
-"an unique"
-
-But I don't think this is a good idea, since it violates basic use of the reg
-properties, where you usually don't have overlaps, and no real requirements on
-names (as mentioned above).
-
-
-
--Olof
+Thanks,
+Kukjin
