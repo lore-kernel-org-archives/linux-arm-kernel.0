@@ -1,33 +1,67 @@
 From: bcousson@baylibre.com (Benoit Cousson)
-Date: Fri, 16 Aug 2013 12:47:14 +0200
-Subject: [PATCH 0/2] ARM: dts: AM33XX: node definition cleanups
-In-Reply-To: <520DEFF7.2010809@ti.com>
-References: <1376154311-10184-1-git-send-email-javier.martinez@collabora.co.uk>
- <520A1C52.7070401@baylibre.com> <520DEFF7.2010809@ti.com>
-Message-ID: <520E0332.6000403@baylibre.com>
+Date: Fri, 16 Aug 2013 12:52:17 +0200
+Subject: [PATCH v2 0/9] USB: phy: phy-nop: Manage RESET GPIO in the driver
+In-Reply-To: <1376561909-4406-1-git-send-email-rogerq@ti.com>
+References: <1376561909-4406-1-git-send-email-rogerq@ti.com>
+Message-ID: <520E0461.70305@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/08/2013 11:25, Rajendra Nayak wrote:
-> On Tuesday 13 August 2013 05:15 PM, Benoit Cousson wrote:
->> + Few TI folks to review and test.
->>
->> On 10/08/2013 19:05, Javier Martinez Canillas wrote:
->>> Hi,
-> []..
->
->>>
->>> Even though the binary dtb is the same and there shouldn't be
->>> any visible changes, boot testing will be highly appreciated.
->
-> I just boot tested these on my BoneBlack and it boots just fine [1]
-> Feel free to add,
-> Tested-by: Rajendra Nayak <rnayak@ti.com>
+Hi Roger,
 
-Thanks Rajendra.
+On 15/08/2013 12:18, Roger Quadros wrote:
+> Hi,
+>
+> Modelling the RESET line as a regulator supply wasn't a good idea
+> as it abuses the regulator framework and makes adaptation
+> code/data more complex.
+>
+> Instead, manage the RESET gpio line directly in the driver.
+>
+> This also makes us easy to migrate to a dedicated GPIO RESET controller
+> whenever it becomes available. As of now, it doesn't seem to be making
+> it into 3.12.
+>
+> *NOTE:* As there are changes to platform data, Patch 1 needs to be shared
+> between the arm-soc tree and usb tree.
+>
+> Patch 1 is available at repo
+> 	git://github.com/rogerq/linux.git
+> in branch
+> 	phy-reset-common
+>
+> Patch 2 contains the phy-nop driver changes
+> Patches 3 and 4 adapt legacy boot code to the phy-nop driver changes.
+> Patches 5, 6 and 7 adapt DT data to the binding changes.
+> Patch 8 is cleanup of omap3-beagle DT.
+> Patch 9 adds USB host support to omap3-beagle-xm using the new binding.
+>
+> Patches are based on v3.11-rc5.
+> Tested leacy boot on omap3-beagle and omap3-beagle-xm
+> Tested DT boot on omap3-beagle, omap3-beagle-xm and omap4-panda-es
+>
+> v2:
+> - Added RESET GPIO polarity feature
+> - Changed to gpio_set_value_cansleep()
+>
+> cheers,
+> -roger
+>
+> ---
+> Roger Quadros (9):
+>    usb: phy: nop: Add gpio_reset to platform data
+>    usb: phy: nop: Don't use regulator framework for RESET line
+>    ARM: OMAP2+: omap-usb-host: Get rid of platform_data from struct
+>      usbhs_phy_data
+>    ARM: OMAP2+: usb-host: Adapt to USB phy-nop RESET line changes
+>    ARM: dts: omap3-beagle: Use reset-gpios for hsusb2_reset
+>    ARM: dts: omap4-panda: Use reset-gpios for hsusb1_reset
+>    ARM: dts: omap5-uevm: Use reset-gpios for hsusb2_reset
+>    ARM: dts: omap3-beagle: Make USB host pin naming consistent
+>    ARM: dts: omap3-beagle-xm: Add USB Host support
 
-Javier,
-I've just applied it for 3.12 with Rajendra's T-by.
+The 5 DTS patches looks good to me, and I can apply them, but you need 
+to be sure that the driver will be merged for 3.12 as well.
 
 Regards,
 Benoit
