@@ -1,159 +1,110 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 Aug 2013 11:20:26 -0600
-Subject: [GIT PULL 2/4] ARM: tegra: core SoC enhancements for 3.12
-In-Reply-To: <1376673628-5867-1-git-send-email-swarren@wwwdotorg.org>
-References: <1376673628-5867-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1376673628-5867-2-git-send-email-swarren@wwwdotorg.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Aug 2013 18:20:22 +0100
+Subject: [PATCH v3 1/2] rtc: omap: update of_device_id to reflect
+ latest ip revisions
+In-Reply-To: <520E341D.4080206@baylibre.com>
+References: <1376653017-21935-1-git-send-email-gururaja.hebbar@ti.com>
+ <1376653017-21935-2-git-send-email-gururaja.hebbar@ti.com>
+ <520E341D.4080206@baylibre.com>
+Message-ID: <20130816172022.GA3719@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch includes a number of enhancements to core SoC support for
-Tegra devices. The major new features are:
+Hi Benoit,
 
-* Adds a new CPU-power-gated cpuidle state for Tegra114.
-* Adds initial system suspend support for Tegra114, initially supporting
-  just CPU-power-gating during suspend.
-* Adds "LP1" suspend mode support for all of Tegra20/30/114. This mode
-  both gates CPU power, and places the DRAM into self-refresh mode.
-* A new DT-driven PCIe driver to Tegra20/30. The driver is also moved
-  from arch/arm/mach-tegra/ to drivers/pci/host/.
+On Fri, Aug 16, 2013 at 03:15:57PM +0100, Benoit Cousson wrote:
+> Hi Gururaja,
+> 
+> On 16/08/2013 13:36, Hebbar, Gururaja wrote:
+> > The syntax of compatible property in DT is to mention the Most specific
+> > match to most generic match.
+> >
+> > Since AM335x is the platform with latest IP revision, add it 1st in
+> > the device id table.
+> 
+> I don't understand why? The order should not matter at all.
+> 
+> I've tried to follow the thread you had with Mark on the v2, but AFAIK, 
+> you've never answered to his latest question.
+> 
+> Moreover, checking the differences between the Davinci and the am3352 
+> RTC IP, I would not claim that both are compatible.
+> 
+> Sure you can use the am3352 with the Davinci driver, but you will lose 
+> the wakeup functionality without even being notify about that.
 
-The PCIe driver work depends on the following tag from Thomas Petazzoni:
-git://git.infradead.org/linux-mvebu.git mis-3.12.2
-... which is merged into the middle of this pull request.
+Could you describe the wakeup functionality, and how it differs between
+the am3352-rtc and the da830-rtc?
 
-----------------------------------------------------------------
+As I understand it, the am3352 functionality is a superset of the da830
+functionality. You can use the old driver, and get some functionality,
+or use the new driver and get it all.
 
-(If the location of the merge into this branch is problematic, just let
-me know and I'll rebase everything on top of the merge)
+That means that am3352-rtc is compatible with da830. As long as the
+kernel first checks for am3352-rtc, there will be *no* loss of
+functionality. All this does is enable older kernels to use the hardware
+in some fashion, and given the older kernel didn't have support for the
+am3352-rtc features, this is a *gain* in functionality, not a loss.
 
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+> 
+> For my point of view, compatible mean that the HW will still be fully 
+> functional with both versions of the driver, which is not the case here.
 
-  Linux 3.11-rc1
+What? A driver for any entry in the compatible list should be able to
+drive the hardware to *some* level of functionality. We list from
+most-specific to most-general to allow a graceful degradation from fully
+supported to bare minimum functionality.
 
-are available in the git repository at:
+> 
+> am3352 DTS must use the ti,am3352-rtc to have the expected behavior. 
+> Using the ti,da830-rtc version will not make the board working as 
+> expected. So we cannot claim the compatibility.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.12-soc
+Please can you explain what you mean by "expected behaviour"?
 
-for you to fetch changes up to b4f173752a56187bd55752b0474429202f2ab1d3:
+> 
+> > This way, we can add new matching compatible as 1st and maintain old
+> > compatible string for backwards compatibility.
+> >
+> > ex:
+> > 	compatible = "ti,am3352-rtc", "ti,da830-rtc";
+> >
+> > Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
+> > CC: mark.rutland at arm.com
+> > ---
+> > Changes in v3:
+> > 	- new patch
+> >
+> > :100644 100644 dc62cc3... 2f0968c... M	drivers/rtc/rtc-omap.c
+> >   drivers/rtc/rtc-omap.c |    6 +++---
+> >   1 files changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> > index dc62cc3..2f0968c 100644
+> > --- a/drivers/rtc/rtc-omap.c
+> > +++ b/drivers/rtc/rtc-omap.c
+> > @@ -330,12 +330,12 @@ static struct platform_device_id omap_rtc_devtype[] = {
+> >   MODULE_DEVICE_TABLE(platform, omap_rtc_devtype);
+> >
+> >   static const struct of_device_id omap_rtc_of_match[] = {
+> > -	{	.compatible	= "ti,da830-rtc",
+> > -		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_DA830_IDX],
+> > -	},
+> >   	{	.compatible	= "ti,am3352-rtc",
+> >   		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_AM335X_IDX],
+> >   	},
+> > +	{	.compatible	= "ti,da830-rtc",
+> > +		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_DA830_IDX],
+> > +	},
+> >   	{},
+> >   };
+> >   MODULE_DEVICE_TABLE(of, omap_rtc_of_match);
+> 
+> Bottom-line, if you get rid of the old compatible entry, you will not 
+> have to play some trick with the entries order.
 
-  ARM: tegra: disable LP2 cpuidle state if PCIe is enabled
+I don't think it's playing tricks. It's ensuring compatibility, and it's
+a simple change in ordering.
 
-----------------------------------------------------------------
-
-Jay Agarwal (1):
-      PCI: tegra: Add Tegra 30 PCIe support
-
-Joseph Lo (21):
-      ARM: tegra: enable Cortex-A15 erratum 798181
-      Revert "ARM: tegra: add cpu_disable for hotplug"
-      ARM: tegra114: Reprogram GIC CPU interface to bypass IRQ on CPU PM entry
-      ARM: tegra114: add low level support for CPU idle powered-down mode
-      ARM: tegra114: cpuidle: add powered-down state
-      ARM: tegra: do v7_invalidate_l1 only when CPU is Cortex-A9
-      ARM: tegra: add a flag for tegra_disable_clean_inv_dcache to do LoUIS or ALL
-      ARM: tegra: set up the correct L2 data RAM latency for Cortex-A15
-      ARM: tegra: add low level code for Tegra114 cluster power down
-      ARM: tegra: shut off the CPU rail when the last CPU in suspend
-      ARM: tegra: hook tegra_tear_down_cpu function
-      ARM: tegra: flowctrl: add support for cpu_suspend_enter/exit
-      clk: tegra: add suspend/resume function for tegra_cpu_car_ops
-      ARM: tegra: remove the limitation that Tegra114 can't support suspend
-      ARM: tegra: add common resume handling code for LP1 resuming
-      ARM: tegra: config the polarity of the request of sys clock
-      clk: tegra114: add LP1 suspend/resume support
-      ARM: tegra: add common LP1 suspend support
-      ARM: tegra: add LP1 suspend support for Tegra30
-      ARM: tegra: add LP1 suspend support for Tegra20
-      ARM: tegra: add LP1 suspend support for Tegra114
-
-Stephen Warren (4):
-      ARM: tegra: unify Tegra's Kconfig a bit more
-      Merge tag 'msi-3.12-2' into for-3.12/soc
-      PCI: tegra: set up PADS_REFCLK_CFG1
-      ARM: tegra: disable LP2 cpuidle state if PCIe is enabled
-
-Thierry Reding (3):
-      PCI: tegra: Move PCIe driver to drivers/pci/host
-      MAINTAINERS: Add myself as Tegra PCIe maintainer
-
-(and the following from the dependency branch)
-
-Thierry Reding (3):
-      PCI: Introduce new MSI chip infrastructure
-
-Thomas Petazzoni (5):
-      PCI: use weak functions for MSI arch-specific functions
-      PCI: remove ARCH_SUPPORTS_MSI kconfig option
-      of: pci: add registry of MSI chips
-      ARM: pci: add ->add_bus() and ->remove_bus() hooks to hw_pci
-      PCI: msi: add default MSI operations for !HAVE_GENERIC_HARDIRQS platforms
-
- .../bindings/pci/nvidia,tegra20-pcie.txt        |  163 ++
- MAINTAINERS                                     |    7 +
- arch/arm/Kconfig                                |    1 -
- arch/arm/include/asm/mach/pci.h                 |    4 +
- arch/arm/kernel/bios32.c                        |   16 +
- arch/arm/mach-tegra/Kconfig                     |   29 +-
- arch/arm/mach-tegra/Makefile                    |    6 +-
- arch/arm/mach-tegra/board-harmony-pcie.c        |   89 -
- arch/arm/mach-tegra/board.h                     |    8 -
- arch/arm/mach-tegra/common.h                    |    1 -
- arch/arm/mach-tegra/cpuidle-tegra114.c          |   51 +-
- arch/arm/mach-tegra/cpuidle-tegra20.c           |   12 +
- arch/arm/mach-tegra/cpuidle.c                   |   10 +
- arch/arm/mach-tegra/cpuidle.h                   |    1 +
- arch/arm/mach-tegra/flowctrl.c                  |    2 +
- arch/arm/mach-tegra/flowctrl.h                  |    9 +
- arch/arm/mach-tegra/headsmp.S                   |    3 +-
- arch/arm/mach-tegra/hotplug.c                   |   13 +-
- arch/arm/mach-tegra/iomap.h                     |   11 +-
- arch/arm/mach-tegra/irq.c                       |   40 +
- arch/arm/mach-tegra/pcie.c                      |  886 ---------
- arch/arm/mach-tegra/platsmp.c                   |    1 -
- arch/arm/mach-tegra/pm-tegra20.c                |   34 +
- arch/arm/mach-tegra/pm-tegra30.c                |   34 +
- arch/arm/mach-tegra/pm.c                        |  148 +-
- arch/arm/mach-tegra/pm.h                        |   12 +
- arch/arm/mach-tegra/pmc.c                       |   53 +-
- arch/arm/mach-tegra/pmc.h                       |    3 +
- arch/arm/mach-tegra/reset-handler.S             |   21 +-
- arch/arm/mach-tegra/reset.c                     |    2 +
- arch/arm/mach-tegra/reset.h                     |    4 +
- arch/arm/mach-tegra/sleep-tegra20.S             |  297 +++
- arch/arm/mach-tegra/sleep-tegra30.S             |  616 ++++++-
- arch/arm/mach-tegra/sleep.S                     |   37 +-
- arch/arm/mach-tegra/sleep.h                     |   14 +-
- arch/arm/mach-tegra/tegra.c                     |   24 -
- arch/ia64/Kconfig                               |    1 -
- arch/mips/Kconfig                               |    2 -
- arch/mips/include/asm/pci.h                     |    5 -
- arch/powerpc/Kconfig                            |    1 -
- arch/powerpc/include/asm/pci.h                  |    5 -
- arch/s390/Kconfig                               |    1 -
- arch/s390/include/asm/pci.h                     |    4 -
- arch/sparc/Kconfig                              |    1 -
- arch/tile/Kconfig                               |    1 -
- arch/x86/Kconfig                                |    1 -
- arch/x86/include/asm/pci.h                      |   30 -
- arch/x86/kernel/x86_init.c                      |   24 +
- drivers/clk/tegra/clk-tegra114.c                |   38 +
- drivers/of/of_pci.c                             |   45 +
- drivers/pci/Kconfig                             |    4 -
- drivers/pci/host/Kconfig                        |    4 +
- drivers/pci/host/Makefile                       |    1 +
- drivers/pci/host/pci-tegra.c                    | 1702 ++++++++++++++++++
- drivers/pci/msi.c                               |   85 +-
- drivers/pci/probe.c                             |    1 +
- include/linux/msi.h                             |   21 +-
- include/linux/of_pci.h                          |   12 +
- include/linux/pci.h                             |    1 +
- include/linux/tegra-cpuidle.h                   |   19 +
- 60 files changed, 3521 insertions(+), 1150 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
- delete mode 100644 arch/arm/mach-tegra/board-harmony-pcie.c
- delete mode 100644 arch/arm/mach-tegra/pcie.c
- create mode 100644 arch/arm/mach-tegra/pm-tegra20.c
- create mode 100644 arch/arm/mach-tegra/pm-tegra30.c
- create mode 100644 drivers/pci/host/pci-tegra.c
- create mode 100644 include/linux/tegra-cpuidle.h
+Thanks,
+Mark.
