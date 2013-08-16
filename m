@@ -1,304 +1,777 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 16 Aug 2013 10:19:12 -0700
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
- with external L3-cache.
-In-Reply-To: <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
-References: <da83e967f5a266ca28ee54638a4a9be9@www.loen.fr>
- <CAAhSdy3-+tJ34QQgieifo931pfGoYt3RAqr8OkVtkxO6jgGdHQ@mail.gmail.com>
- <3ebe469fcf451cc7396dd2a5d3f01272@www.loen.fr>
- <CAAhSdy3WwZcLW6s05mV=Mn8=w8TcubTdYrgNqAChqiHxXC53eg@mail.gmail.com>
- <747a0675165da4ef147bbda4e140549b@www.loen.fr>
- <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
- <5935339137684ecf90dd484cc5739548@www.loen.fr>
- <20130815165344.GA3853@cbox>
- <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
- <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
-Message-ID: <20130816171912.GB20246@cbox>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 16 Aug 2013 18:19:59 +0100
+Subject: [PATCH v2] drivers: CCI: add ARM CCI PMU support
+In-Reply-To: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
+References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1376673599-3967-1-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 12:27:55PM +0530, Anup Patel wrote:
-> On Fri, Aug 16, 2013 at 10:32 AM, Anup Patel <anup@brainfault.org> wrote:
-> > On Thu, Aug 15, 2013 at 10:23 PM, Christoffer Dall
-> > <christoffer.dall@linaro.org> wrote:
-> >> On Thu, Aug 15, 2013 at 04:37:27PM +0100, Marc Zyngier wrote:
-> >>> On 2013-08-15 16:13, Anup Patel wrote:
-> >>> > Hi Marc,
-> >>> >
-> >>> > On Thu, Aug 15, 2013 at 8:17 PM, Marc Zyngier <marc.zyngier@arm.com>
-> >>> > wrote:
-> >>> >> On 2013-08-15 14:31, Anup Patel wrote:
-> >>> >>>
-> >>> >>> On Thu, Aug 15, 2013 at 2:01 PM, Marc Zyngier
-> >>> >>> <marc.zyngier@arm.com>
-> >>> >>> wrote:
-> >>> >>>>
-> >>> >>>> On 2013-08-15 07:26, Anup Patel wrote:
-> >>> >>>>>
-> >>> >>>>>
-> >>> >>>>> Hi Marc,
-> >>> >>>>>
-> >>> >>>>> On Thu, Aug 15, 2013 at 10:22 AM, Marc Zyngier
-> >>> >>>>> <marc.zyngier@arm.com>
-> >>> >>>>> wrote:
-> >>> >>>>>>
-> >>> >>>>>>
-> >>> >>>>>> Hi Anup,
-> >>> >>>>>>
-> >>> >>>>>>
-> >>> >>>>>> On 2013-08-14 15:22, Anup Patel wrote:
-> >>> >>>>>>>
-> >>> >>>>>>>
-> >>> >>>>>>>
-> >>> >>>>>>> On Wed, Aug 14, 2013 at 5:34 PM, Marc Zyngier
-> >>> >>>>>>> <marc.zyngier@arm.com>
-> >>> >>>>>>> wrote:
-> >>> >>>>>>>>
-> >>> >>>>>>>>
-> >>> >>>>>>>>
-> >>> >>>>>>>> Hi Pranav,
-> >>> >>>>>>>>
-> >>> >>>>>>>> On 2013-08-14 12:47, Pranavkumar Sawargaonkar wrote:
-> >>> >>>>>>>>>
-> >>> >>>>>>>>>
-> >>> >>>>>>>>>
-> >>> >>>>>>>>> Systems with large external L3-cache (few MBs), might have
-> >>> >>>>>>>>> dirty
-> >>> >>>>>>>>> content belonging to the guest page in L3-cache. To tackle
-> >>> >>>>>>>>> this,
-> >>> >>>>>>>>> we need to flush such dirty content from d-cache so that
-> >>> >>>>>>>>> guest
-> >>> >>>>>>>>> will see correct contents of guest page when guest MMU is
-> >>> >>>>>>>>> disabled.
-> >>> >>>>>>>>>
-> >>> >>>>>>>>> The patch fixes coherent_icache_guest_page() for external
-> >>> >>>>>>>>> L3-cache.
-> >>> >>>>>>>>>
-> >>> >>>>>>>>> Signed-off-by: Pranavkumar Sawargaonkar
-> >>> >>>>>>>>> <pranavkumar@linaro.org>
-> >>> >>>>>>>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> >>> >>>>>>>>> ---
-> >>> >>>>>>>>>  arch/arm64/include/asm/kvm_mmu.h |    2 ++
-> >>> >>>>>>>>>  1 file changed, 2 insertions(+)
-> >>> >>>>>>>>>
-> >>> >>>>>>>>> diff --git a/arch/arm64/include/asm/kvm_mmu.h
-> >>> >>>>>>>>> b/arch/arm64/include/asm/kvm_mmu.h
-> >>> >>>>>>>>> index efe609c..5129038 100644
-> >>> >>>>>>>>> --- a/arch/arm64/include/asm/kvm_mmu.h
-> >>> >>>>>>>>> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> >>> >>>>>>>>> @@ -123,6 +123,8 @@ static inline void
-> >>> >>>>>>>>> coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
-> >>> >>>>>>>>>       if (!icache_is_aliasing()) {            /* PIPT */
-> >>> >>>>>>>>>               unsigned long hva = gfn_to_hva(kvm, gfn);
-> >>> >>>>>>>>>               flush_icache_range(hva, hva + PAGE_SIZE);
-> >>> >>>>>>>>> +             /* Flush d-cache for systems with external
-> >>> >>>>>>>>> caches. */
-> >>> >>>>>>>>> +             __flush_dcache_area((void *) hva, PAGE_SIZE);
-> >>> >>>>>>>>>       } else if (!icache_is_aivivt()) {       /* non
-> >>> >>>>>>>>> ASID-tagged
-> >>> >>>>>>>>> VIVT
-> >>> >>>>>>>>> */
-> >>> >>>>>>>>>               /* any kind of VIPT cache */
-> >>> >>>>>>>>>               __flush_icache_all();
-> >>> >>>>>>>>
-> >>> >>>>>>>>
-> >>> >>>>>>>>
-> >>> >>>>>>>>
-> >>> >>>>>>>> [adding Will to the discussion as we talked about this in the
-> >>> >>>>>>>> past]
-> >>> >>>>>>>>
-> >>> >>>>>>>> That's definitely an issue, but I'm not sure the fix is to hit
-> >>> >>>>>>>> the
-> >>> >>>>>>>> data
-> >>> >>>>>>>> cache on each page mapping. It looks overkill.
-> >>> >>>>>>>>
-> >>> >>>>>>>> Wouldn't it be enough to let userspace do the cache cleaning?
-> >>> >>>>>>>> kvmtools
-> >>> >>>>>>>> knows which bits of the guest memory have been touched, and
-> >>> >>>>>>>> can do a
-> >>> >>>>>>>> "DC
-> >>> >>>>>>>> DVAC" on this region.
-> >>> >>>>>>>
-> >>> >>>>>>>
-> >>> >>>>>>>
-> >>> >>>>>>>
-> >>> >>>>>>> It seems a bit unnatural to have cache cleaning is user-space.
-> >>> >>>>>>> I am
-> >>> >>>>>>> sure
-> >>> >>>>>>> other architectures don't have such cache cleaning in
-> >>> >>>>>>> user-space for
-> >>> >>>>>>> KVM.
-> >>> >>>>>>>
-> >>> >>>>>>>>
-> >>> >>>>>>>> The alternative is do it in the kernel before running any vcpu
-> >>> >>>>>>>> - but
-> >>> >>>>>>>> that's not very nice either (have to clean the whole of the
-> >>> >>>>>>>> guest
-> >>> >>>>>>>> memory, which makes a full dcache clean more appealing).
-> >>> >>>>>>>
-> >>> >>>>>>>
-> >>> >>>>>>>
-> >>> >>>>>>>
-> >>> >>>>>>> Actually, cleaning full d-cache by set/way upon first run of
-> >>> >>>>>>> VCPU was
-> >>> >>>>>>> our second option but current approach seemed very simple hence
-> >>> >>>>>>> we went for this.
-> >>> >>>>>>>
-> >>> >>>>>>> If more people vote for full d-cache clean upon first run of
-> >>> >>>>>>> VCPU then
-> >>> >>>>>>> we should revise this patch.
-> >>> >>>>>>
-> >>> >>>>>>
-> >>> >>>>>>
-> >>> >>>>>>
-> >>> >>>>>> Can you please give the attached patch a spin on your HW? I've
-> >>> >>>>>> boot-tested
-> >>> >>>>>> it on a model, but of course I can't really verify that it fixes
-> >>> >>>>>> your
-> >>> >>>>>> issue.
-> >>> >>>>>>
-> >>> >>>>>> As far as I can see, it should fix it without any additional
-> >>> >>>>>> flushing.
-> >>> >>>>>>
-> >>> >>>>>> Please let me know how it goes.
-> >>> >>>>>
-> >>> >>>>>
-> >>> >>>>>
-> >>> >>>>> HCR_EL2.DC=1 means all memory access for Stage1 MMU off are
-> >>> >>>>> treated as "Normal Non-shareable, Inner Write-Back
-> >>> >>>>> Write-Allocate,
-> >>> >>>>> Outer Write-Back Write-Allocate memory"
-> >>> >>>>>
-> >>> >>>>> HCR_EL2.DC=0 means all memory access for Stage1 MMU off are
-> >>> >>>>> treated as "Strongly-ordered device memory"
-> >>> >>>>>
-> >>> >>>>> Now if Guest/VM access hardware MMIO devices directly (such as
-> >>> >>>>> VGIC CPU interface) with MMU off then MMIO devices will be
-> >>> >>>>> accessed as normal memory when HCR_EL2.DC=1.
-> >>> >>>>
-> >>> >>>>
-> >>> >>>>
-> >>> >>>> I don't think so. Stage-2 still applies, and should force MMIO to
-> >>> >>>> be
-> >>> >>>> accessed as device memory.
-> >>> >>>>
-> >>> >>>>
-> >>> >>>>> The HCR_EL2.DC=1 makes sense only if we have all software
-> >>> >>>>> emulated devices for Guest/VM which is not true for KVM ARM or
-> >>> >>>>> KVM ARM64 because we use VGIC.
-> >>> >>>>>
-> >>> >>>>> IMHO, this patch enforces incorrect memory attribute for Guest/VM
-> >>> >>>>> when Stage1 MMU is off.
-> >>> >>>>
-> >>> >>>>
-> >>> >>>>
-> >>> >>>> See above. My understanding is that HCR.DC controls the default
-> >>> >>>> output of
-> >>> >>>> Stage-1, and Stage-2 overrides still apply.
-> >>> >>>
-> >>> >>>
-> >>> >>> You had mentioned that PAGE_S2_DEVICE attribute was redundant
-> >>> >>> and wanted guest to decide the memory attribute. In other words,
-> >>> >>> you
-> >>> >>> did not want to enforce any memory attribute in Stage2.
-> >>> >>>
-> >>> >>> Please refer to this patch
-> >>> >>> https://patchwork.kernel.org/patch/2543201/
-> >>> >>
-> >>> >>
-> >>> >> This patch has never been merged. If you carry on following the
-> >>> >> discussion,
-> >>> >> you will certainly notice it was dropped for a very good reason:
-> >>> >> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-May/005827.html
-> >>> >>
-> >>> >> So Stage-2 memory attributes are used, they are not going away, and
-> >>> >> they are
-> >>> >> essential to the patch I sent this morning.
-> >>> >>
-> >>> >>
-> >>> >>         M.
-> >>> >> --
-> >>> >> Fast, cheap, reliable. Pick two.
-> >>> >
-> >>> > HCR_EL2.DC=1 will break Guest/VM bootloader/firmware if the Guest/VM
-> >>> > is
-> >>> > provided a DMA-capable device in pass-through mode. The reason being
-> >>> > bootloader/firmware typically don't enable MMU and such
-> >>> > bootloader/firmware
-> >>> > will programme a pass-through DMA-capable device without any flushes
-> >>> > to
-> >>> > guest RAM (because it has not enabled MMU).
-> >>> >
-> >>> > A good example of such a device would be SATA AHCI controller given
-> >>> > to a
-> >>> > Guest/VM as direct access (using SystemMMU) and Guest
-> >>> > bootloader/firmware
-> >>> > accessing this SATA AHCI controller to load kernel images from SATA
-> >>> > disk.
-> >>> > In this situation, we will have to hack Guest bootloader/firmware
-> >>> > AHCI driver to
-> >>> > explicitly flushes to Guest RAM (because have HCR_EL2.DC=1).
-> >>>
-> >>> OK. So *that* looks like a valid argument against HCR_EL2.DC==1. Out of
-> >>> curiosity: is that a made up example or something you actually have?
-> >>>
-> >>> Back to square one:
-> >>> Can you please benchmark the various cache cleaning options (global at
-> >>> startup time, per-page on S2 translation fault, and user-space)?
-> >>>
-> >> Eh, why is this a more valid argument than the vgic?  The device
-> >> passthrough Stage-2 mappings would still have the Stage-2 memory
-> >> attributes to configure that memory region as device memory.  Why is it
-> >> relevant if the device is DMA-capable in this context?
-> >>
-> >> -Christoffer
-> >
-> > Most ARM bootloader/firmware run with MMU off hence, they will not do
-> > explicit cache flushes when programming DMA-capable device. Now If
-> > HCR_EL2.DC=1 then Guest RAM updates done by bootloader/firmware
-> > will not be visible to DMA-capable device.
-> >
-> > --Anup
-> 
-> The approach of flushing d-cache by set/way upon first run of VCPU will
-> not work because for set/way operations ARM ARM says: "For set/way
-> operations, and for All (entire cache) operations, the point is defined to be
-> to the next level of caching". In other words, set/way operations work upto
-> point of unification.
-> 
-> Also, Guest Linux already does __flush_dcache_all() from __cpu_setup()
-> at bootup time which does not work for us when L3-cache is enabled so,
-> there is no point is adding one more __flush_dcache_all() upon first run of
-> VCPU in KVM ARM64.
+The CCI PMU can profile bus transactions at the master and slave
+interfaces of the CCI. The PMU can be used to observe an aggregated view
+of the bus traffic between the various components connected to the CCI.
 
-When did anyone suggest using a cache cleaning method that doesn't apply
-to this case.  I'm a little confused about your comment here.
+Extend the existing CCI driver to support the PMU by registering a perf
+backend for it.
 
-> 
-> IMHO, we are left with following options:
-> 1. Flush all RAM regions of VCPU using __flush_dcache_range()
->     upon first run of VCPU
+Document the device tree binding to describe the CCI PMU.
 
-We could do that, but we have to ensure that no other memory regions can
-be added later.  Is this the case?  I don't remember.
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Dave Martin <dave.martin@linaro.org>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+---
 
-> 2. Implement outer-cache framework for ARM64 and flush all
->     caches + outer cache (i.e. L3-cache) upon first run of VCPU
+Hi, 
 
-What's the difference between (2) and (1)?
+This is the second version of the CCI PMU driver. The changes incorporate review
+comments on device tree bindings and corresponding update to the driver.
 
-> 3. Use an alternate version of flush_icache_range() which will
->     flush d-cache by PoC instead of PoU. We can also ensure
->     that coherent_icache_guest_page() function will be called
->     upon Stage2 prefetch aborts only.
-> 
+Cheers,
+Punit
 
-I'm sorry, but I'm not following this discussion.  Are we not mixing a
-discussion along two different axis here?  As I see it there are two
-separate issues:
+Will, I've dropped your reviewed-by tag due to the changes. Let me know if you are
+ok with the changes and I'll add the tag.
 
- (A) When/Where to flush the memory regions
- (B) How to flush the memory regions, including the hardware method and
-     the kernel software engineering aspect.
+Changes since v1:
+* Dropped requirement for node name.
+* Dropped compatible strings for different revisions - rely on peripheral id
+  register to provide the revision.
+* Change interrupt bindings to require overflow interrupt per counter.
 
--Christoffer
+ Documentation/devicetree/bindings/arm/cci.txt |   44 ++
+ drivers/bus/arm-cci.c                         |  628 +++++++++++++++++++++++++
+ 2 files changed, 672 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
+index 92d36e2..7cf35bc 100644
+--- a/Documentation/devicetree/bindings/arm/cci.txt
++++ b/Documentation/devicetree/bindings/arm/cci.txt
+@@ -79,6 +79,40 @@ specific to ARM.
+ 				    corresponding interface programming
+ 				    registers.
+ 
++	- CCI PMU node
++
++		Parent node must be CCI interconnect node.
++
++		A CCI pmu node must contain the following properties:
++
++		- compatible
++			Usage: required
++			Value type: <string>
++			Definition: must be "arm,cci-400-pmu"
++
++		- reg:
++			Usage: required
++			Value type: <prop-encoded-array>
++			Definition: the base address and size of the
++				    corresponding interface programming
++				    registers.
++
++		- interrupts:
++			Usage: required
++			Value type: <prop-encoded-array>
++			Definition: comma-separated list of counter overflow
++				    interrupts, one per counter. The interrupts
++				    must be specified starting with the cycle
++				    counter overflow interrupt, followed by
++				    counter0 overflow interrupt, counter1
++				    overflow interrupt,..., counterN overflow
++				    interrupt.
++
++				    The CCI PMU has an interrupt signal for each
++				    counter. Typically, the number of
++				    interrupts will be equal to the number of
++				    counters.
++
+ * CCI interconnect bus masters
+ 
+ 	Description: masters in the device tree connected to a CCI port
+@@ -163,6 +197,16 @@ Example:
+ 			interface-type = "ace";
+ 			reg = <0x5000 0x1000>;
+ 		};
++
++		pmu at 9000 {
++			 compatible = "arm,cci-400-pmu,rev0";
++			 reg = <0x9000 0x5000>;
++			 interrupts = <0 101 4>,
++				      <0 102 4>,
++				      <0 103 4>,
++				      <0 104 4>,
++				      <0 105 4>;
++		};
+ 	};
+ 
+ This CCI node corresponds to a CCI component whose control registers sits
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 7332889..ddc36f6 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -18,11 +18,21 @@
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
+ #include <linux/slab.h>
++#include <linux/spinlock.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/irq_regs.h>
++#include <asm/pmu.h>
+ #include <asm/smp_plat.h>
+ 
++#define DRIVER_NAME		"CCI-400"
++#define DRIVER_NAME_PMU		DRIVER_NAME " PMU"
++#define PMU_NAME		"CCI_400"
++
+ #define CCI_PORT_CTRL		0x0
+ #define CCI_CTRL_STATUS		0xc
+ 
+@@ -54,6 +64,587 @@ static unsigned int nb_cci_ports;
+ static void __iomem *cci_ctrl_base;
+ static unsigned long cci_ctrl_phys;
+ 
++#ifdef CONFIG_HW_PERF_EVENTS
++
++#define CCI_PMCR		0x0100
++#define CCI_PID2		0x0fe8
++
++#define CCI_PMCR_CEN		0x00000001
++#define CCI_PMCR_NCNT_MASK	0x0000f800
++#define CCI_PMCR_NCNT_SHIFT	11
++
++#define CCI_PID2_REV_MASK	0xf0
++#define CCI_PID2_REV_SHIFT	4
++
++/* Port ids */
++#define CCI_PORT_S0	0
++#define CCI_PORT_S1	1
++#define CCI_PORT_S2	2
++#define CCI_PORT_S3	3
++#define CCI_PORT_S4	4
++#define CCI_PORT_M0	5
++#define CCI_PORT_M1	6
++#define CCI_PORT_M2	7
++
++#define CCI_REV_R0		0
++#define CCI_REV_R1		1
++#define CCI_REV_R0_P4		4
++#define CCI_REV_R1_P2		6
++
++#define CCI_PMU_EVT_SEL		0x000
++#define CCI_PMU_CNTR		0x004
++#define CCI_PMU_CNTR_CTRL	0x008
++#define CCI_PMU_OVRFLW		0x00c
++
++#define CCI_PMU_OVRFLW_FLAG	1
++
++#define CCI_PMU_CNTR_BASE(idx)	((idx) * SZ_4K)
++
++/*
++ * Instead of an event id to monitor CCI cycles, a dedicated counter is
++ * provided. Use 0xff to represent CCI cycles and hope that no future revisions
++ * make use of this event in hardware.
++ */
++enum cci400_perf_events {
++	CCI_PMU_CYCLES = 0xff
++};
++
++#define CCI_PMU_EVENT_MASK		0xff
++#define CCI_PMU_EVENT_SOURCE(event)	((event >> 5) & 0x7)
++#define CCI_PMU_EVENT_CODE(event)	(event & 0x1f)
++
++#define CCI_PMU_MAX_HW_EVENTS 5   /* CCI PMU has 4 counters + 1 cycle counter */
++
++#define CCI_PMU_CYCLE_CNTR_IDX		0
++#define CCI_PMU_CNTR0_IDX		1
++#define CCI_PMU_CNTR_LAST(cci_pmu)	(CCI_PMU_CYCLE_CNTR_IDX + cci_pmu->num_events - 1)
++
++/*
++ * CCI PMU event id is an 8-bit value made of two parts - bits 7:5 for one of 8
++ * ports and bits 4:0 are event codes. There are different event codes
++ * associated with each port type.
++ *
++ * Additionally, the range of events associated with the port types changed
++ * between Rev0 and Rev1.
++ *
++ * The constants below define the range of valid codes for each port type for
++ * the different revisions and are used to validate the event to be monitored.
++ */
++
++#define CCI_REV_R0_SLAVE_PORT_MIN_EV	0x00
++#define CCI_REV_R0_SLAVE_PORT_MAX_EV	0x13
++#define CCI_REV_R0_MASTER_PORT_MIN_EV	0x14
++#define CCI_REV_R0_MASTER_PORT_MAX_EV	0x1a
++
++#define CCI_REV_R1_SLAVE_PORT_MIN_EV	0x00
++#define CCI_REV_R1_SLAVE_PORT_MAX_EV	0x14
++#define CCI_REV_R1_MASTER_PORT_MIN_EV	0x00
++#define CCI_REV_R1_MASTER_PORT_MAX_EV	0x11
++
++struct pmu_port_event_ranges {
++	u8 slave_min;
++	u8 slave_max;
++	u8 master_min;
++	u8 master_max;
++};
++
++static struct pmu_port_event_ranges port_event_range[] = {
++	[CCI_REV_R0] = {
++		.slave_min = CCI_REV_R0_SLAVE_PORT_MIN_EV,
++		.slave_max = CCI_REV_R0_SLAVE_PORT_MAX_EV,
++		.master_min = CCI_REV_R0_MASTER_PORT_MIN_EV,
++		.master_max = CCI_REV_R0_MASTER_PORT_MAX_EV,
++	},
++	[CCI_REV_R1] = {
++		.slave_min = CCI_REV_R1_SLAVE_PORT_MIN_EV,
++		.slave_max = CCI_REV_R1_SLAVE_PORT_MAX_EV,
++		.master_min = CCI_REV_R1_MASTER_PORT_MIN_EV,
++		.master_max = CCI_REV_R1_MASTER_PORT_MAX_EV,
++	},
++};
++
++struct cci_pmu_drv_data {
++	void __iomem *base;
++	struct arm_pmu *cci_pmu;
++	int nr_irqs;
++	int irqs[CCI_PMU_MAX_HW_EVENTS];
++	unsigned long active_irqs;
++	struct perf_event *events[CCI_PMU_MAX_HW_EVENTS];
++	unsigned long used_mask[BITS_TO_LONGS(CCI_PMU_MAX_HW_EVENTS)];
++	struct pmu_port_event_ranges *port_ranges;
++	struct pmu_hw_events hw_events;
++};
++static struct cci_pmu_drv_data *pmu;
++
++static bool is_duplicate_irq(int irq, int *irqs, int nr_irqs)
++{
++	int i;
++
++	for (i = 0; i < nr_irqs; i++)
++		if (irq == irqs[i])
++			return true;
++
++	return false;
++}
++
++static int probe_cci_revision(void)
++{
++	int rev;
++	rev = readl_relaxed(cci_ctrl_base + CCI_PID2) & CCI_PID2_REV_MASK;
++	rev >>= CCI_PID2_REV_SHIFT;
++
++	if (rev <= CCI_REV_R0_P4)
++		return CCI_REV_R0;
++	else if (rev <= CCI_REV_R1_P2)
++		return CCI_REV_R1;
++
++	return -ENOENT;
++}
++
++static struct pmu_port_event_ranges *port_range_by_rev(void)
++{
++	int rev = probe_cci_revision();
++
++	if (rev < 0)
++		return NULL;
++
++	return &port_event_range[rev];
++}
++
++static int pmu_is_valid_slave_event(u8 ev_code)
++{
++	return pmu->port_ranges->slave_min <= ev_code &&
++		ev_code <= pmu->port_ranges->slave_max;
++}
++
++static int pmu_is_valid_master_event(u8 ev_code)
++{
++	return pmu->port_ranges->master_min <= ev_code &&
++		ev_code <= pmu->port_ranges->master_max;
++}
++
++static int pmu_validate_hw_event(u8 hw_event)
++{
++	u8 ev_source = CCI_PMU_EVENT_SOURCE(hw_event);
++	u8 ev_code = CCI_PMU_EVENT_CODE(hw_event);
++
++	switch (ev_source) {
++	case CCI_PORT_S0:
++	case CCI_PORT_S1:
++	case CCI_PORT_S2:
++	case CCI_PORT_S3:
++	case CCI_PORT_S4:
++		/* Slave Interface */
++		if (pmu_is_valid_slave_event(ev_code))
++			return hw_event;
++		break;
++	case CCI_PORT_M0:
++	case CCI_PORT_M1:
++	case CCI_PORT_M2:
++		/* Master Interface */
++		if (pmu_is_valid_master_event(ev_code))
++			return hw_event;
++		break;
++	}
++
++	return -ENOENT;
++}
++
++static int pmu_is_valid_counter(struct arm_pmu *cci_pmu, int idx)
++{
++	return CCI_PMU_CYCLE_CNTR_IDX <= idx &&
++		idx <= CCI_PMU_CNTR_LAST(cci_pmu);
++}
++
++static u32 pmu_read_register(int idx, unsigned int offset)
++{
++	return readl_relaxed(pmu->base + CCI_PMU_CNTR_BASE(idx) + offset);
++}
++
++static void pmu_write_register(u32 value, int idx, unsigned int offset)
++{
++	return writel_relaxed(value, pmu->base + CCI_PMU_CNTR_BASE(idx) + offset);
++}
++
++static void pmu_disable_counter(int idx)
++{
++	pmu_write_register(0, idx, CCI_PMU_CNTR_CTRL);
++}
++
++static void pmu_enable_counter(int idx)
++{
++	pmu_write_register(1, idx, CCI_PMU_CNTR_CTRL);
++}
++
++static void pmu_set_event(int idx, unsigned long event)
++{
++	event &= CCI_PMU_EVENT_MASK;
++	pmu_write_register(event, idx, CCI_PMU_EVT_SEL);
++}
++
++static u32 pmu_get_max_counters(void)
++{
++	u32 n_cnts = (readl_relaxed(cci_ctrl_base + CCI_PMCR) &
++		      CCI_PMCR_NCNT_MASK) >> CCI_PMCR_NCNT_SHIFT;
++
++	/* add 1 for cycle counter */
++	return n_cnts + 1;
++}
++
++static struct pmu_hw_events *pmu_get_hw_events(void)
++{
++	return &pmu->hw_events;
++}
++
++static int pmu_get_event_idx(struct pmu_hw_events *hw, struct perf_event *event)
++{
++	struct arm_pmu *cci_pmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hw_event = &event->hw;
++	unsigned long cci_event = hw_event->config_base & CCI_PMU_EVENT_MASK;
++	int idx;
++
++	if (cci_event == CCI_PMU_CYCLES) {
++		if (test_and_set_bit(CCI_PMU_CYCLE_CNTR_IDX, hw->used_mask))
++			return -EAGAIN;
++
++		return CCI_PMU_CYCLE_CNTR_IDX;
++	}
++
++	for (idx = CCI_PMU_CNTR0_IDX; idx <= CCI_PMU_CNTR_LAST(cci_pmu); ++idx)
++		if (!test_and_set_bit(idx, hw->used_mask))
++			return idx;
++
++	/* No counters available */
++	return -EAGAIN;
++}
++
++static int pmu_map_event(struct perf_event *event)
++{
++	int mapping;
++	u8 config = event->attr.config & CCI_PMU_EVENT_MASK;
++
++	if (event->attr.type < PERF_TYPE_MAX)
++		return -ENOENT;
++
++	if (config == CCI_PMU_CYCLES)
++		mapping = config;
++	else
++		mapping = pmu_validate_hw_event(config);
++
++	return mapping;
++}
++
++static int pmu_request_irq(struct arm_pmu *cci_pmu, irq_handler_t handler)
++{
++	int i;
++	struct platform_device *pmu_device = cci_pmu->plat_device;
++
++	if (unlikely(!pmu_device))
++		return -ENODEV;
++
++	if (pmu->nr_irqs < 1) {
++		dev_err(&pmu_device->dev, "no irqs for CCI PMUs defined\n");
++		return -ENODEV;
++	}
++
++	/*
++	 * Register all available CCI PMU interrupts. In the interrupt handler
++	 * we iterate over the counters checking for interrupt source (the
++	 * overflowing counter) and clear it.
++	 *
++	 * This should allow handling of non-unique interrupt for the counters.
++	 */
++	for (i = 0; i < pmu->nr_irqs; i++) {
++		int err = request_irq(pmu->irqs[i], handler, IRQF_SHARED,
++				"arm-cci-pmu", cci_pmu);
++		if (err) {
++			dev_err(&pmu_device->dev, "unable to request IRQ%d for ARM CCI PMU counters\n",
++				pmu->irqs[i]);
++			return err;
++		}
++
++		set_bit(i, &pmu->active_irqs);
++	}
++
++	return 0;
++}
++
++static irqreturn_t pmu_handle_irq(int irq_num, void *dev)
++{
++	unsigned long flags;
++	struct arm_pmu *cci_pmu = (struct arm_pmu *)dev;
++	struct pmu_hw_events *events = cci_pmu->get_hw_events();
++	struct perf_sample_data data;
++	struct pt_regs *regs;
++	int idx, handled = IRQ_NONE;
++
++	raw_spin_lock_irqsave(&events->pmu_lock, flags);
++	regs = get_irq_regs();
++	/*
++	 * Iterate over counters and update the corresponding perf events.
++	 * This should work regardless of whether we have per-counter overflow
++	 * interrupt or a combined overflow interrupt.
++	 */
++	for (idx = CCI_PMU_CYCLE_CNTR_IDX; idx <= CCI_PMU_CNTR_LAST(cci_pmu); idx++) {
++		struct perf_event *event = events->events[idx];
++		struct hw_perf_event *hw_counter;
++
++		if (!event)
++			continue;
++
++		hw_counter = &event->hw;
++
++		/* Did this counter overflow? */
++		if (!pmu_read_register(idx, CCI_PMU_OVRFLW) & CCI_PMU_OVRFLW_FLAG)
++			continue;
++
++		pmu_write_register(CCI_PMU_OVRFLW_FLAG, idx, CCI_PMU_OVRFLW);
++
++		handled = IRQ_HANDLED;
++
++		armpmu_event_update(event);
++		perf_sample_data_init(&data, 0, hw_counter->last_period);
++		if (!armpmu_event_set_period(event))
++			continue;
++
++		if (perf_event_overflow(event, &data, regs))
++			cci_pmu->disable(event);
++	}
++	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
++
++	return IRQ_RETVAL(handled);
++}
++
++static void pmu_free_irq(struct arm_pmu *cci_pmu)
++{
++	int i;
++
++	for (i = 0; i < pmu->nr_irqs; i++) {
++		if (!test_and_clear_bit(i, &pmu->active_irqs))
++			continue;
++
++		free_irq(pmu->irqs[i], cci_pmu);
++	}
++}
++
++static void pmu_enable_event(struct perf_event *event)
++{
++	unsigned long flags;
++	struct arm_pmu *cci_pmu = to_arm_pmu(event->pmu);
++	struct pmu_hw_events *events = cci_pmu->get_hw_events();
++	struct hw_perf_event *hw_counter = &event->hw;
++	int idx = hw_counter->idx;
++
++	if (unlikely(!pmu_is_valid_counter(cci_pmu, idx))) {
++		dev_err(&cci_pmu->plat_device->dev, "Invalid CCI PMU counter %d\n", idx);
++		return;
++	}
++
++	raw_spin_lock_irqsave(&events->pmu_lock, flags);
++
++	/* Configure the event to count, unless you are counting cycles */
++	if (idx != CCI_PMU_CYCLE_CNTR_IDX)
++		pmu_set_event(idx, hw_counter->config_base);
++
++	pmu_enable_counter(idx);
++
++	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
++}
++
++static void pmu_disable_event(struct perf_event *event)
++{
++	struct arm_pmu *cci_pmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hw_counter = &event->hw;
++	int idx = hw_counter->idx;
++
++	if (unlikely(!pmu_is_valid_counter(cci_pmu, idx))) {
++		dev_err(&cci_pmu->plat_device->dev, "Invalid CCI PMU counter %d\n", idx);
++		return;
++	}
++
++	pmu_disable_counter(idx);
++}
++
++static void pmu_start(struct arm_pmu *cci_pmu)
++{
++	u32 val;
++	unsigned long flags;
++	struct pmu_hw_events *events = cci_pmu->get_hw_events();
++
++	raw_spin_lock_irqsave(&events->pmu_lock, flags);
++
++	/* Enable all the PMU counters. */
++	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) | CCI_PMCR_CEN;
++	writel(val, cci_ctrl_base + CCI_PMCR);
++
++	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
++}
++
++static void pmu_stop(struct arm_pmu *cci_pmu)
++{
++	u32 val;
++	unsigned long flags;
++	struct pmu_hw_events *events = cci_pmu->get_hw_events();
++
++	raw_spin_lock_irqsave(&events->pmu_lock, flags);
++
++	/* Disable all the PMU counters. */
++	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) & ~CCI_PMCR_CEN;
++	writel(val, cci_ctrl_base + CCI_PMCR);
++
++	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
++}
++
++static u32 pmu_read_counter(struct perf_event *event)
++{
++	struct arm_pmu *cci_pmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hw_counter = &event->hw;
++	int idx = hw_counter->idx;
++	u32 value;
++
++	if (unlikely(!pmu_is_valid_counter(cci_pmu, idx))) {
++		dev_err(&cci_pmu->plat_device->dev, "Invalid CCI PMU counter %d\n", idx);
++		return 0;
++	}
++	value = pmu_read_register(idx, CCI_PMU_CNTR);
++
++	return value;
++}
++
++static void pmu_write_counter(struct perf_event *event, u32 value)
++{
++	struct arm_pmu *cci_pmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hw_counter = &event->hw;
++	int idx = hw_counter->idx;
++
++	if (unlikely(!pmu_is_valid_counter(cci_pmu, idx)))
++		dev_err(&cci_pmu->plat_device->dev, "Invalid CCI PMU counter %d\n", idx);
++	else
++		pmu_write_register(value, idx, CCI_PMU_CNTR);
++}
++
++static int cci_pmu_init(struct arm_pmu *cci_pmu, struct platform_device *pdev)
++{
++	*cci_pmu = (struct arm_pmu){
++		.name             = PMU_NAME,
++		.max_period       = (1LLU << 32) - 1,
++		.get_hw_events    = pmu_get_hw_events,
++		.get_event_idx    = pmu_get_event_idx,
++		.map_event        = pmu_map_event,
++		.request_irq      = pmu_request_irq,
++		.handle_irq       = pmu_handle_irq,
++		.free_irq         = pmu_free_irq,
++		.enable           = pmu_enable_event,
++		.disable          = pmu_disable_event,
++		.start            = pmu_start,
++		.stop             = pmu_stop,
++		.read_counter     = pmu_read_counter,
++		.write_counter    = pmu_write_counter,
++	};
++
++	cci_pmu->plat_device = pdev;
++	cci_pmu->num_events = pmu_get_max_counters();
++
++	return armpmu_register(cci_pmu, -1);
++}
++
++static const struct of_device_id arm_cci_pmu_matches[] = {
++	{
++		.compatible = "arm,cci-400-pmu",
++	},
++	{},
++};
++
++static int cci_pmu_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	int i, ret, irq;
++
++	pmu = devm_kzalloc(&pdev->dev, sizeof(*pmu), GFP_KERNEL);
++	if (!pmu)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_warn(&pdev->dev, "Failed to get mem resource\n");
++		ret = -EINVAL;
++		goto memalloc_err;
++	};
++
++	pmu->base = devm_ioremap_resource(&pdev->dev, res);
++	if (!pmu->base) {
++		dev_warn(&pdev->dev, "Failed to ioremap\n");
++		ret = -ENOMEM;
++		goto memalloc_err;
++	}
++
++	/*
++	 * CCI PMU has 5 overflow signals - one per counter; but some may be tied
++	 * together to a common interrupt.
++	 */
++	pmu->nr_irqs = 0;
++	for (i = 0; i < CCI_PMU_MAX_HW_EVENTS; i++) {
++		irq = platform_get_irq(pdev, i);
++		if (irq < 0)
++			break;
++
++		if (is_duplicate_irq(irq, pmu->irqs, pmu->nr_irqs))
++			continue;
++
++		pmu->irqs[pmu->nr_irqs++] = irq;
++	}
++
++	/*
++	 * Ensure that the device tree has as many interrupts as the number
++	 * of counters.
++	 */
++	if (i < CCI_PMU_MAX_HW_EVENTS) {
++		dev_warn(&pdev->dev, "In-correct number of interrupts: %d, should be %d\n",
++			i, CCI_PMU_MAX_HW_EVENTS);
++		ret = -EINVAL;
++		goto memalloc_err;
++	}
++
++	pmu->port_ranges = port_range_by_rev();
++	if (!pmu->port_ranges) {
++		dev_warn(&pdev->dev, "CCI PMU version not supported\n");
++		ret = -EINVAL;
++		goto memalloc_err;
++	}
++
++	pmu->cci_pmu = devm_kzalloc(&pdev->dev, sizeof(*(pmu->cci_pmu)), GFP_KERNEL);
++	if (!pmu->cci_pmu) {
++		ret = -ENOMEM;
++		goto memalloc_err;
++	}
++
++	pmu->hw_events.events = pmu->events;
++	pmu->hw_events.used_mask = pmu->used_mask;
++	raw_spin_lock_init(&pmu->hw_events.pmu_lock);
++
++	ret = cci_pmu_init(pmu->cci_pmu, pdev);
++	if (ret)
++		goto pmuinit_err;
++
++	return 0;
++
++pmuinit_err:
++	kfree(pmu->cci_pmu);
++memalloc_err:
++	kfree(pmu);
++	return ret;
++}
++
++static int cci_platform_probe(struct platform_device *pdev)
++{
++	if (!cci_probed())
++		return -ENODEV;
++
++	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
++}
++
++#endif /* CONFIG_HW_PERF_EVENTS */
++
+ struct cpu_port {
+ 	u64 mpidr;
+ 	u32 port;
+@@ -516,6 +1107,42 @@ static int __init cci_init(void)
+ 	return cci_init_status;
+ }
+ 
++#ifdef CONFIG_HW_PERF_EVENTS
++static struct platform_driver cci_pmu_driver = {
++	.driver = {
++		   .name = DRIVER_NAME_PMU,
++		   .of_match_table = arm_cci_pmu_matches,
++		  },
++	.probe = cci_pmu_probe,
++};
++
++static struct platform_driver cci_platform_driver = {
++	.driver = {
++		   .name = DRIVER_NAME,
++		   .of_match_table = arm_cci_matches,
++		  },
++	.probe = cci_platform_probe,
++};
++
++static int __init cci_platform_init(void)
++{
++	int ret;
++
++	ret = platform_driver_register(&cci_pmu_driver);
++	if (ret)
++		return ret;
++
++	return platform_driver_register(&cci_platform_driver);
++}
++
++#else
++
++static int __init cci_platform_init(void)
++{
++	return 0;
++}
++
++#endif
+ /*
+  * To sort out early init calls ordering a helper function is provided to
+  * check if the CCI driver has beed initialized. Function check if the driver
+@@ -529,5 +1156,6 @@ bool __init cci_probed(void)
+ EXPORT_SYMBOL_GPL(cci_probed);
+ 
+ early_initcall(cci_init);
++core_initcall(cci_platform_init);
+ MODULE_LICENSE("GPL");
+ MODULE_DESCRIPTION("ARM CCI support");
+-- 
+1.7.10.4
