@@ -1,28 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Aug 2013 17:42:25 +0200
-Subject: [PATCH] gpio: (gpio-pca953x) move header to linux/platform_data/
-In-Reply-To: <82440653.410050.1376665340121.JavaMail.root@mail>
-References: <CACRpkdZdeVNtJSmc6Lr6j=oO9FLsAvjyrwhYS0j4OoAEhxCN9g@mail.gmail.com>
- <82440653.410050.1376665340121.JavaMail.root@mail>
-Message-ID: <CACRpkdYX_u3yn0AhyMpCSYoQQJdaWJeK_GztxNM_LUL15WpAhA@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 16 Aug 2013 21:28:49 +0530
+Subject: [PATCH v4 3/5] ARM: davinci: da850: add OF_DEV_AUXDATA entry
+ for mdio.
+In-Reply-To: <1376546497-26931-4-git-send-email-prabhakar.csengg@gmail.com>
+References: <1376546497-26931-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1376546497-26931-4-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <520E4C39.9080301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 5:02 PM, Vivien Didelot
-<vivien.didelot@savoirfairelinux.com> wrote:
+On 8/15/2013 11:31 AM, Lad, Prabhakar wrote:
+> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+> 
+> Add OF_DEV_AUXDATA for mdio driver in da850 board dt
+> file to use mdio clock.
+> 
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
->> Why does the GPIO driver need platform data from the
->> I2C driver???
->>
->> Can't this just be made to go away?
->
-> I didn't dig that much in the driver, but I cannot imagine
-> another way to pass, for instance, the setup callback.
+Queued for v3.12
 
-Hm so this is some combined platform data for I2C *and* GPIO?
-
-Hmm ugly, but OK then.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Thanks,
+Sekhar
