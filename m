@@ -1,51 +1,68 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 16 Aug 2013 12:14:01 +0100
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Trustzone-based security
- solution for ARM Linux
-In-Reply-To: <CAGsJ_4yjZQ9a+VAXk-c5DGFpz-SpGrqm=p7zfYq2C=vTCz8X+w@mail.gmail.com>
-References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
- <20130815042812.GA8968@kroah.com>
- <CAGsJ_4w2hOgsOB=ZYmWqm7tM+pL6=UMR1fG++A+rdAReJzFSjw@mail.gmail.com>
- <520CFBDE.4000408@wwwdotorg.org>
- <20130815174307.GA17245@localhost.localdomain>
- <CAGsJ_4yjZQ9a+VAXk-c5DGFpz-SpGrqm=p7zfYq2C=vTCz8X+w@mail.gmail.com>
-Message-ID: <20130816111401.GB2909@localhost.localdomain>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Fri, 16 Aug 2013 20:17:21 +0900
+Subject: [PATCH v9 03/16] iommu/exynos: fix page table maintenance
+In-Reply-To: <CANEJEGveOtGs8XEYFnnXoZ575bqKRkc3AMikr_1x02cNikwTng@mail.gmail.com>
+References: <002701ce941a$eecebdb0$cc6c3910$@samsung.com>
+ <1516548.d7oQuzQS7g@amdc1227>
+ <CANEJEGu1ponghpfvyUsQX16+TZWUV+0KXJ7AehjXpju2N_H+Ew@mail.gmail.com>
+ <20130814104938.GF4491@8bytes.org>
+ <CANEJEGveOtGs8XEYFnnXoZ575bqKRkc3AMikr_1x02cNikwTng@mail.gmail.com>
+Message-ID: <20130816201721.b93a6e3db960e38b29ca7b1a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 10:39:20AM +0800, Barry Song wrote:
-> >> >>
-> >> >> Isn't that up to the hardware?  Nothing that Linux can do about that.
-> >> >
-> >> > right. but linux need to assign interrupts to right group in GIC
-> >> > hardware. now it doesn't care.
+On Wed, 14 Aug 2013 13:54:53 -0700, Grant Grundler wrote:
+> On Wed, Aug 14, 2013 at 3:49 AM, Joerg Roedel <joro@8bytes.org> wrote:
+> > On Thu, Aug 08, 2013 at 11:28:44AM -0700, Grant Grundler wrote:
+> >> I can't speak to the previous BUG_ON(). I believe the EADDRESSINUSE
+> >> failures could be either WARN_ON or BUG_ON.   This condition is
+> >> clearly a bug in the generic IOMMU allocator and I think that's why
+> >> KyongHo Cho used BUG_ON.
 > >>
-> >> I strongly hope that whatever is the secure OS is setting up these
-> >> routings, and the HW prevents the non-secure OS from modifying them and
-> >> hence never attempts to. Otherwise, the non-secure OS is able to affect
-> >> the functioning of the secure OS, which seems like a bad thing.
+> >> Handing out duplicate addresses will generally lead to some sort of
+> >> data corruption or other fault depending on how robust the underlying
+> >> device drivers are written.  So my preference is a BUG_ON to
+> >> immediately flag this condition instead of hoping a device driver will
+> >> correctly handling the dma mapping failure (Some do, most currently
+> >> don't).
+> >>
+> >> WARN_ON() + return -EADDRESSINUSE would be a good alternative.
 > >
-> > Typically, the master controls are hard-wired for Secure-only access in
-> > hardware: so assigning GIC interrupts to groups is something the secure
-> > OS/firmware has to take care of.
-> >
-> > Of course, if Linux is acting as secure OS, it might have to understand
-> > what controls exist and to do some of that configuration itself.
+> > Even if it is a real BUG condition, I don't think it is worth to stop
+> > execution at this point. It makes debugging harder and the system less
+> > reliable. I prefer to go with the WARN_ON and an error return value.
 > 
-> that is just what i want. linux need to realize whether it is running
-> in security or non-security.
-> for example, if one irq is assigned to security, even though users
-> want to get it in non-security, linux should make it fail.
-> linux need security/non-security realization in GIC.
+> I'm ok with WARN_ON and an error return value. This is "valid"
+> behavior.  I expect this bug to never happen but if and when it does,
+> I want a clear symptom (e.g. WARN_ON) that it happened.
+> 
 
-For just telling Linux where it is and what peripherals are available,
-DT feels like the right answer: if Linux is booted Secure, it would have
-a different DT from the one it would be given in the Normal World.
+Ok.
+Finally, everyone thinks that WARN_ON() is OK.
+It will be helpful for the kernel code that uses iommu api.
 
-The DT provided to Linux in the Normal World might depend on configuration
-choices made in the Secure World -- so it might be generated from the
-Secure World DT and passed to the Normal World boot stack.  But initially
-it's simpler to keep all that stuff static.
+> My concern is that historically, drivers did not get an error return
+> value on failure:
+>     ftp://193.166.3.4/pub/linux/kernel/v2.3/patch-html/patch-2.3.47/linux_Documentation_DMA-mapping.txt.html
+> 
+> or later:
+>     https://www.kernel.org/pub/linux/kernel/people/marcelo/linux-2.4/Documentation/DMA-mapping.txt
+> 
+> And thus, some drivers don't check or attempt to handle mapping
+> failures based on this existing code. Here is a recent example:
+>      http://comments.gmane.org/gmane.linux.network/272969
+> 
+> I hope very few or none of those exist since Neil Horman demonstrated
+> "dma debugging" can flag this behavior.
+> 
+> Just for fun, I'll include this link : (apperently 2003 was a good
+> year for DMA talks :)
+>      http://ols.fedoraproject.org/OLS/Reprints-2003/LinuxSymposium2003-2side.pdf
+>      (three talks on DMA issues)
+> 
 
-Cheers
----Dave
+Thank you for the resources :)
+Those will be helpful for the guys with me.
+
+> thanks
+> grant
