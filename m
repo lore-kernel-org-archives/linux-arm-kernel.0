@@ -1,35 +1,62 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Aug 2013 13:29:58 +0530
-Subject: [PATCH 02/34] cpufreq: acpi: remove calls to
- cpufreq_notify_transition()
-In-Reply-To: <CAOLK0pyVDSc6x1u8Ro6ng1dH8ELqc3P9jPHamgiXBn6sWDgm8w@mail.gmail.com>
-References: <cover.1376619363.git.viresh.kumar@linaro.org>
- <333bf5868dfbfb6de474f060dc216fa6d33848e2.1376619363.git.viresh.kumar@linaro.org>
- <CAOLK0pz7e8nQVnZY0a-j_Fd_kFOqF8ZS4tRfYw1S+25Lv8GoFQ@mail.gmail.com>
- <CAOLK0pyVDSc6x1u8Ro6ng1dH8ELqc3P9jPHamgiXBn6sWDgm8w@mail.gmail.com>
-Message-ID: <CAKohpom7yk3Zq5JABZ6T+Z_AcMn5G1hoswZK8T=viYv0fp0mcg@mail.gmail.com>
+From: wangx@marvell.com (Xiang Wang)
+Date: Fri, 16 Aug 2013 16:05:47 +0800
+Subject: [PATCH 09/12] dma: mmp_pdma: add support for byte-aligned
+ transfers
+In-Reply-To: <520360DD.9070906@gmail.com>
+References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
+ <1375870770-14263-10-git-send-email-zonque@gmail.com>
+ <4CF37FDA40C2184293FA2CF8CFAE31322007F0131D@SC-VEXCH4.marvell.com>
+ <520360DD.9070906@gmail.com>
+Message-ID: <520DDD5B.6080605@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 August 2013 13:24, Lan Tianyu <lantianyu1986@gmail.com> wrote:
-> Sorry for misoperation.
+On 08/08/2013 05:11 PM, Daniel Mack wrote:
+> Hi Xiang,
+>
+> On 08.08.2013 11:04, Xiang Wang wrote:
+>>> Subject: [PATCH 09/12] dma: mmp_pdma: add support for byte-aligned
+>>> transfers
+>>>
+>>> The PXA DMA controller has a DALGN register which allows for
+>>> byte-aligned DMA transfers. Use it in case any of the transfer
+>>> descriptors is not aligned to a mask of ~0x7.
+>
+> [...]
+>
+>> We do need to set DALGN bit in some of our drivers.
+>
+> Which ones, and how do you currently do that? I didn't find any code to
+> support this yet in mmp-pdma.
+Hi, Daniel
+When we use DMA in UART and let DMA handle the UART trailing bytes, we 
+should set the DALGN bit. Otherwise, DMA controller cannot move the 
+bytes from UART FIFO to memory correctly because they are not 
+8-bytes-alligned.
+>
+>> But we cannot
+>> configure this via standard dma engine API. In this patch, dma
+>> address is used to determine whether or not to set DALGN. But what if
+>> we need to use 1-byte-aligned mode when addresses are
+>> 8-byte-aligned?
+>
+> Hmm, why would you need that? What's the constraint for this driver that
+> they have to rely on that?
+>
+>> Is it proper to always use 1-byte-aligned mode?
+>
+> As far as I understand the datasheet, this bit has performance
+> implications and should only be used if really needed.
+>
+> I think if you have that constraint in drivers, and the dmaengine
+> implementation can't determine that automatically, we should introduce a
+> flag or something in the dma_slave_config struct.
+>
+>
+> Daniel
+>
 
-No Problem...
 
->                 One concern. Target() callback may return before changing
-> cpufreq actually due to some check failures. After this change, prechange
-> event will be triggered when these check failures take place. I am not sure
-> whether this should be took into account.
-
-Yes, if you see the first patch of this series, it takes this into
-account.. In case
-target() failed and returned an error, we simply notify the POST CHANGE
-notification with old frequencies instead of new ones. I believe that would be
-enough..
-
-This is exactly what acpi-cpufreq and others are doing currently.
-
-Hope I answered your question well?
-
---
-viresh
+-- 
+Regards,
+Xiang
