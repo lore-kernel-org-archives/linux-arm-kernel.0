@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Aug 2013 07:55:15 +0530
-Subject: [PATCH 18/34] cpufreq: loongson2: remove calls to
+Date: Fri, 16 Aug 2013 07:55:16 +0530
+Subject: [PATCH 19/34] cpufreq: maple: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1376619363.git.viresh.kumar@linaro.org>
 References: <cover.1376619363.git.viresh.kumar@linaro.org>
-Message-ID: <4bd67c506fc1b3deb79dd33f62e85800dd94e7e0.1376619363.git.viresh.kumar@linaro.org>
+Message-ID: <f25256fa5fc04dd5ddf585d1fea4d2ce7e196b56.1376619363.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,50 +28,47 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
-Cc: John Crispin <blogic@openwrt.org>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/loongson2_cpufreq.c | 16 ----------------
- 1 file changed, 16 deletions(-)
+ drivers/cpufreq/maple-cpufreq.c | 18 +-----------------
+ 1 file changed, 1 insertion(+), 17 deletions(-)
 
-diff --git a/drivers/cpufreq/loongson2_cpufreq.c b/drivers/cpufreq/loongson2_cpufreq.c
-index c33347c..6232d29 100644
---- a/drivers/cpufreq/loongson2_cpufreq.c
-+++ b/drivers/cpufreq/loongson2_cpufreq.c
-@@ -57,7 +57,6 @@ static int loongson2_cpufreq_target(struct cpufreq_policy *policy,
+diff --git a/drivers/cpufreq/maple-cpufreq.c b/drivers/cpufreq/maple-cpufreq.c
+index b508147..45db7a2 100644
+--- a/drivers/cpufreq/maple-cpufreq.c
++++ b/drivers/cpufreq/maple-cpufreq.c
+@@ -69,8 +69,6 @@ static struct cpufreq_frequency_table maple_cpu_freqs[] = {
+  */
+ static int maple_pmode_cur;
+ 
+-static DEFINE_MUTEX(maple_switch_mutex);
+-
+ static const u32 *maple_pmode_data;
+ static int maple_pmode_max;
+ 
+@@ -133,21 +131,7 @@ static int maple_scom_query_freq(void)
+ static int maple_cpufreq_target(struct cpufreq_policy *policy,
+ 	unsigned int index)
  {
- 	unsigned int cpu = policy->cpu;
- 	cpumask_t cpus_allowed;
 -	struct cpufreq_freqs freqs;
- 	unsigned int freq;
- 
- 	cpus_allowed = current->cpus_allowed;
-@@ -67,26 +66,11 @@ static int loongson2_cpufreq_target(struct cpufreq_policy *policy,
- 	    ((cpu_clock_freq / 1000) *
- 	     loongson2_clockmod_table[index].driver_data) / 8;
- 
--	pr_debug("cpufreq: requested frequency %u Hz\n",
--			loongson2_clockmod_table[index].frequency * 1000);
+-	int rc;
 -
--	freqs.old = loongson2_cpufreq_get(cpu);
--	freqs.new = freq;
--	freqs.flags = 0;
+-	mutex_lock(&maple_switch_mutex);
 -
--	/* notifiers */
+-	freqs.old = maple_cpu_freqs[maple_pmode_cur].frequency;
+-	freqs.new = maple_cpu_freqs[index].frequency;
+-
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
--
- 	set_cpus_allowed_ptr(current, &cpus_allowed);
- 
- 	/* setting the cpu frequency */
- 	clk_set_rate(cpuclk, freq);
- 
--	/* notifiers */
+-	rc = maple_scom_switch_freq(index);
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 -
--	pr_debug("cpufreq: set frequency %u kHz\n", freq);
+-	mutex_unlock(&maple_switch_mutex);
 -
- 	return 0;
+-	return rc;
++	return maple_scom_switch_freq(index);
  }
  
+ static unsigned int maple_cpufreq_get_speed(unsigned int cpu)
 -- 
 1.7.12.rc2.18.g61b472e
