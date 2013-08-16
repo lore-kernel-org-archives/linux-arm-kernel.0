@@ -1,55 +1,77 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 16 Aug 2013 11:43:36 -0500
-Subject: [PATCH v1 03/14] clk: Add of_clk_match() for device drivers
-In-Reply-To: <20130815050226.4443.39100@quantum>
-References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
- <1374713022-6049-4-git-send-email-sboyd@codeaurora.org>
- <20130812202347.5348.76490@quantum> <20130813054839.GF14845@codeaurora.org>
- <20130815050226.4443.39100@quantum>
-Message-ID: <0181ACFD-4F25-493C-9143-E197C53282DF@codeaurora.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 16 Aug 2013 12:54:37 -0400
+Subject: [GIT PULL v2] ARM: mvebu: DT changes for v3.12
+In-Reply-To: <20130814201630.GH13964@titan.lakedaemon.net>
+References: <20130814201630.GH13964@titan.lakedaemon.net>
+Message-ID: <20130816165437.GT13964@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Olof,
 
-On Aug 15, 2013, at 12:02 AM, Mike Turquette wrote:
+I've dropped the mv64xxx-i2c change until Gregory reworks it.
 
->> Right now we have
->> 
->>        pll8: pll8 {
->>                #clock-cells = <0>;
->>                compatible = "qcom,pll";
->>                clocks = <&pxo>;
->>        };
->> 
->> in DT and
->> 
->>        static struct pll_desc pll8_desc = {
->>                .l_reg = 0x3144,
->>                .m_reg = 0x3148,
->>                .n_reg = 0x314c,
->>                .config_reg = 0x3154,
->>                .mode_reg = 0x3140,
->>                .status_reg = 0x3158,
->>                .status_bit = 16,
->>        };
->> 
->> in C. Do you want everything to be in DT? Something like:
->> 
->>        pll8: pll8 at 3140 {
->>                #clock-cells = <0>;
->>                compatible = "qcom,pll";
->>                clocks = <&pxo>;
->>                reg = <0x3140 0x20>;
->>        };
->> 
->> and then assume that all those registers are offset from the base
->> register and that the status bit is 16 (it usually is but not
->> always)?
+thx,
 
-I think its reasonable to put the various regs associated with a clock in the .dts like the example you show, but we should be going down to bit level details.  If we think of each clock as its own device its reasonable that the clock would have some set of registers associated with it.
+Jason.
 
--k
+The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+  Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/dt-3.12
+
+for you to fetch changes up to 5d3b883071763e6448386b875f04fcb201b6e12d:
+
+  ARM: mvebu: Fix the Armada 370/XP timer compatible strings (2013-08-16 13:02:11 +0000)
+
+----------------------------------------------------------------
+mvebu dt changes for v3.12
+
+ - kirkwood
+    - add ZyXEL NSA310 board, fan for ReadyNAS Duo v2
+
+ - mvebu
+    - add ReadyNAS 102 board
+
+ - misc dts updates and changes.
+
+v2:
+ - dropped mv64xxx-i2c change
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Kirkwood: Add support for another ZyXEL NSA310 variant
+
+Arnaud Ebalard (2):
+      arm: kirkwood: readynas duo v2: Add GMT G762 Fan Controller
+      ARM: mvebu: Add Netgear ReadyNAS 102 board
+
+Ezequiel Garcia (1):
+      ARM: mvebu: Fix the Armada 370/XP timer compatible strings
+
+Jason Cooper (2):
+      ARM: kirkwood: use dts pre-processor for nsa310 boards
+      ARM: mvebu: use dts pre-processor for readynas 102
+
+Thomas Petazzoni (1):
+      ARM: mvebu: use correct #interrupt-cells instead of #interrupts-cells
+
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts     | 179 +++++++++++++++++++++
+ arch/arm/boot/dts/armada-370-xp.dtsi               |   2 -
+ arch/arm/boot/dts/armada-370.dtsi                  |  11 +-
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi           |   4 +-
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi           |   6 +-
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi           |   6 +-
+ arch/arm/boot/dts/armada-xp.dtsi                   |   2 +-
+ .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  |  20 +++
+ arch/arm/boot/dts/kirkwood-nsa310-common.dtsi      | 107 ++++++++++++
+ arch/arm/boot/dts/kirkwood-nsa310.dts              | 100 +-----------
+ arch/arm/boot/dts/kirkwood-nsa310a.dts             | 165 +++++++++++++++++++
+ 12 files changed, 491 insertions(+), 113 deletions(-)
+ create mode 100644 arch/arm/boot/dts/armada-370-netgear-rn102.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-nsa310-common.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-nsa310a.dts
