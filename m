@@ -1,238 +1,144 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Aug 2013 10:44:12 +0100
-Subject: [RESEND PATCH 4/4] ARM: msm: Add support for 8974 SMP
-In-Reply-To: <520C06F4.7080205@codeaurora.org>
-References: <1375409725-22004-1-git-send-email-rvaswani@codeaurora.org>
- <1375409725-22004-5-git-send-email-rvaswani@codeaurora.org>
- <20130812163905.GE27165@e106331-lin.cambridge.arm.com>
- <520C06F4.7080205@codeaurora.org>
-Message-ID: <20130816094412.GH32421@e106331-lin.cambridge.arm.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 16 Aug 2013 11:45:33 +0200
+Subject: [PATCH] ASoC: imx-audmux: Move definitions to dt-bindings
+Message-ID: <1376646333-20463-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 11:38:44PM +0100, Rohit Vaswani wrote:
-> On 8/12/2013 9:39 AM, Mark Rutland wrote:
-> > On Fri, Aug 02, 2013 at 03:15:25AM +0100, Rohit Vaswani wrote:
-> >> Add the cpus bindings and the Kraitv2 release sequence
-> >> to make SMP work for 2 cores on MSM8974.
-> >>
-> >> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
-> >> ---
-> >>   Documentation/devicetree/bindings/arm/cpus.txt |  1 +
-> >>   arch/arm/boot/dts/msm8974.dts                  | 23 ++++++++
-> >>   arch/arm/mach-msm/board-dt-8974.c              |  3 +
-> >>   arch/arm/mach-msm/platsmp.c                    | 79 ++++++++++++++++++++++++++
-> >>   4 files changed, 106 insertions(+)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> >> index 1132eac..7c3c677 100644
-> >> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> >> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> >> @@ -52,6 +52,7 @@ For the ARM architecture every CPU node must contain the following properties:
-> >>   		 This should be one of:
-> >>   		 "qcom,scss"
-> >>   		 "qcom,kpssv1"
-> >> +		 "qcom,kpssv2"
-> > I guess I should've looked at the whole series before responding, that
-> > answers my prior question about what variation we expect.
-> >
-> >>   
-> >>   Example:
-> >>   
-> >> diff --git a/arch/arm/boot/dts/msm8974.dts b/arch/arm/boot/dts/msm8974.dts
-> >> index c31c097..ef35a9b 100644
-> >> --- a/arch/arm/boot/dts/msm8974.dts
-> >> +++ b/arch/arm/boot/dts/msm8974.dts
-> >> @@ -7,6 +7,22 @@
-> >>   	compatible = "qcom,msm8974";
-> >>   	interrupt-parent = <&intc>;
-> >>   
-> >> +	cpus {
-> >> +		#address-cells = <1>;
-> >> +		#size-cells = <0>;
-> >> +		compatible = "qcom,krait";
-> >> +		device_type = "cpu";
-> >> +		enable-method = "qcom,kpssv2";
-> >> +
-> >> +		cpu at 0 {
-> >> +			reg = <0>;
-> >> +		};
-> >> +
-> >> +		cpu at 1 {
-> >> +			reg = <1>;
-> >> +		};
-> >> +	};
-> >> +
-> >>   	intc: interrupt-controller at f9000000 {
-> >>   		compatible = "qcom,msm-qgic2";
-> >>   		interrupt-controller;
-> >> @@ -23,4 +39,11 @@
-> >>   			     <1 1 0xf08>;
-> >>   		clock-frequency = <19200000>;
-> >>   	};
-> >> +
-> >> +	kpss at f9012000 {
-> >> +		compatible = "qcom,kpss";
-> >> +		reg = <0xf9012000 0x1000>,
-> >> +		      <0xf9088000 0x1000>,
-> >> +		      <0xf9098000 0x1000>;
-> >> +	};
-> > In the previous examples, the number of CPUs was equal to the number of
-> > kpss reg values. Why does it differ here. Either:
-> >
-> > * We always have the extra regsiter here, and it should be described
-> >    even if we don't use it.
-> >
-> > * It's a different hardware block, and needs a more specific
-> >    compatible string.
-> >
-> > Eitehr way this strengthens my feeling that we need to define the linkage
-> > from a CPU to the portion of the kpss which affects it.
-> Will add documentation for each of the registers. We have one for each 
-> CPU and one within the KPSS (Krait Processor Sub-System) e.g the L2 saw 
-> base in this case.
+Move imx-audmux macro definitions to include/dt-bindings, so they can be
+used for devicetree.
 
-Ok.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ include/dt-bindings/sound/fsl-imx-audmux.h | 56 ++++++++++++++++++++++++++++++
+ sound/soc/fsl/imx-audmux.h                 | 52 +--------------------------
+ 2 files changed, 57 insertions(+), 51 deletions(-)
+ create mode 100644 include/dt-bindings/sound/fsl-imx-audmux.h
 
-So the previous example had no L2 saw base?
-
-> >
-> >>   };
-> >> diff --git a/arch/arm/mach-msm/board-dt-8974.c b/arch/arm/mach-msm/board-dt-8974.c
-> >> index d7f84f2..06119f9 100644
-> >> --- a/arch/arm/mach-msm/board-dt-8974.c
-> >> +++ b/arch/arm/mach-msm/board-dt-8974.c
-> >> @@ -13,11 +13,14 @@
-> >>   #include <linux/of_platform.h>
-> >>   #include <asm/mach/arch.h>
-> >>   
-> >> +#include "common.h"
-> >> +
-> >>   static const char * const msm8974_dt_match[] __initconst = {
-> >>   	"qcom,msm8974",
-> >>   	NULL
-> >>   };
-> >>   
-> >>   DT_MACHINE_START(MSM8974_DT, "Qualcomm MSM (Flattened Device Tree)")
-> >> +	.smp = smp_ops(msm_smp_ops),
-> >>   	.dt_compat = msm8974_dt_match,
-> >>   MACHINE_END
-> >> diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-> >> index 82eb079..0fdae69 100644
-> >> --- a/arch/arm/mach-msm/platsmp.c
-> >> +++ b/arch/arm/mach-msm/platsmp.c
-> >> @@ -124,6 +124,80 @@ static int msm8960_release_secondary(unsigned int cpu)
-> >>   	return 0;
-> >>   }
-> >>   
-> >> +static int msm8974_release_secondary(unsigned int cpu)
-> >> +{
-> >> +	void __iomem *reg;
-> >> +	void __iomem *l2_saw_base;
-> >> +	struct device_node *dn = NULL;
-> >> +	unsigned apc_pwr_gate_ctl = 0x14;
-> >> +	unsigned reg_val;
-> >> +
-> >> +	if (cpu == 0 || cpu >= num_possible_cpus())
-> >> +		return -EINVAL;
-> >> +
-> >> +	dn = of_find_compatible_node(dn, NULL, "qcom,kpss");
-> >> +	if (!dn) {
-> >> +		pr_err("%s : Missing kpss node from device tree\n", __func__);
-> >> +		return -ENXIO;
-> >> +	}
-> >> +
-> >> +	reg = of_iomap(dn, cpu+1);
-> > This looks very fishy given the prior patch being one off from this.
-> > why is reg[0] now different?
-> >
-> >> +	if (!reg)
-> >> +		return -ENOMEM;
-> >> +
-> >> +	pr_debug("Starting secondary CPU %d\n", cpu);
-> >> +
-> >> +	/* Turn on the BHS, turn off LDO Bypass and power down LDO */
-> >> +	reg_val =  0x403f0001;
-> > Magic number?
-> It represents the comment above it. It didnt seem clean to define 4 
-> different offsets with #defines within a single register for the purpose 
-> of 1 write.
-
-In general I'd prefer having symbolic names, but I'm not going to argue
-here.
-
-> >
-> >> +	writel_relaxed(reg_val, reg + apc_pwr_gate_ctl);
-> >> +
-> >> +	/* complete the above write before the delay */
-> >> +	mb();
-> > Use writel?
-> >
-> >> +	/* wait for the bhs to settle */
-> >> +	udelay(1);
-> >> +
-> >> +	/* Turn on BHS segments */
-> >> +	reg_val |= 0x3f << 1;
-> >> +	writel_relaxed(reg_val, reg + apc_pwr_gate_ctl);
-> >> +
-> >> +	/* complete the above write before the delay */
-> >> +	mb();
-> > Use writel again?
-> >
-> >> +	 /* wait for the bhs to settle */
-> >> +	udelay(1);
-> >> +
-> >> +	/* Finally turn on the bypass so that BHS supplies power */
-> >> +	reg_val |= 0x3f << 8;
-> >> +	writel_relaxed(reg_val, reg + apc_pwr_gate_ctl);
-> >> +
-> >> +	/* enable max phases */
-> >> +	l2_saw_base = of_iomap(dn, 0);
-> >> +	if (!l2_saw_base) {
-> >> +		return -ENOMEM;
-> >> +	}
-> > What?
-> >
-> > You've just lost your only reference to the mapping in reg.
-> >
-> > Why do you not do this at the start, before poking everything else? Even
-> > better, do it at probe time and fail once rather than for each CPU you
-> > have no chance of bringing up.
-> Will do.
-> 
-> >
-> > [...]
-> >>   static void boot_cold_cpu(unsigned int cpu)
-> >> @@ -151,6 +225,11 @@ static void boot_cold_cpu(unsigned int cpu)
-> >>   			msm8960_release_secondary(cpu);
-> >>   			per_cpu(cold_boot_done, cpu) = true;
-> >>   		}
-> >> +	} else if (!strcmp(enable_method, "qcom,kpssv2")) {
-> >> +		if (per_cpu(cold_boot_done, cpu) == false) {
-> >> +			msm8974_release_secondary(cpu);
-> >> +			per_cpu(cold_boot_done, cpu) = true;
-> >> +		}
-> >>   	} else {
-> >>   		pr_err("%s: Invalid enable-method property: %s\n",
-> >>   				__func__, enable_method);
-> > The enable-method parsing really should be moved out to common code. We
-> > could make it scan the enable-method if a machine has no smp ops (which
-> > is more general than the PSCI fallback that's been suggested before).
-> But we have smp ops like every other SoC. I might need to go back to the 
-> drawing board for incorporating enable-method into generic code.
-> Any suggestions are appreciated.
-
-I think we need generic infrastructure that checks if we have a NULL
-smp_ops and tries to find one based on any enable-method properties in
-the dt.
-
-> If enable-method seems cumbersome to be enforced for every SoC, I would 
-> be comfortable using the cpu compatible string as you suggested in the 
-> previous patch.
-
-I'm not sure cpu compatible string alone gives us enough, the
-integration of the SoC and particular board will affect how we bring up
-secondaries.
-
-Thanks,
-Mark.
+diff --git a/include/dt-bindings/sound/fsl-imx-audmux.h b/include/dt-bindings/sound/fsl-imx-audmux.h
+new file mode 100644
+index 0000000..50b09e9
+--- /dev/null
++++ b/include/dt-bindings/sound/fsl-imx-audmux.h
+@@ -0,0 +1,56 @@
++#ifndef __DT_FSL_IMX_AUDMUX_H
++#define __DT_FSL_IMX_AUDMUX_H
++
++#define MX27_AUDMUX_HPCR1_SSI0		0
++#define MX27_AUDMUX_HPCR2_SSI1		1
++#define MX27_AUDMUX_HPCR3_SSI_PINS_4	2
++#define MX27_AUDMUX_PPCR1_SSI_PINS_1	3
++#define MX27_AUDMUX_PPCR2_SSI_PINS_2	4
++#define MX27_AUDMUX_PPCR3_SSI_PINS_3	5
++
++#define MX31_AUDMUX_PORT1_SSI0		0
++#define MX31_AUDMUX_PORT2_SSI1		1
++#define MX31_AUDMUX_PORT3_SSI_PINS_3	2
++#define MX31_AUDMUX_PORT4_SSI_PINS_4	3
++#define MX31_AUDMUX_PORT5_SSI_PINS_5	4
++#define MX31_AUDMUX_PORT6_SSI_PINS_6	5
++#define MX31_AUDMUX_PORT7_SSI_PINS_7	6
++
++#define MX51_AUDMUX_PORT1_SSI0		0
++#define MX51_AUDMUX_PORT2_SSI1		1
++#define MX51_AUDMUX_PORT3		2
++#define MX51_AUDMUX_PORT4		3
++#define MX51_AUDMUX_PORT5		4
++#define MX51_AUDMUX_PORT6		5
++#define MX51_AUDMUX_PORT7		6
++
++/* Register definitions for the i.MX21/27 Digital Audio Multiplexer */
++#define IMX_AUDMUX_V1_PCR_INMMASK(x)	((x) & 0xff)
++#define IMX_AUDMUX_V1_PCR_INMEN		(1 << 8)
++#define IMX_AUDMUX_V1_PCR_TXRXEN	(1 << 10)
++#define IMX_AUDMUX_V1_PCR_SYN		(1 << 12)
++#define IMX_AUDMUX_V1_PCR_RXDSEL(x)	(((x) & 0x7) << 13)
++#define IMX_AUDMUX_V1_PCR_RFCSEL(x)	(((x) & 0xf) << 20)
++#define IMX_AUDMUX_V1_PCR_RCLKDIR	(1 << 24)
++#define IMX_AUDMUX_V1_PCR_RFSDIR	(1 << 25)
++#define IMX_AUDMUX_V1_PCR_TFCSEL(x)	(((x) & 0xf) << 26)
++#define IMX_AUDMUX_V1_PCR_TCLKDIR	(1 << 30)
++#define IMX_AUDMUX_V1_PCR_TFSDIR	(1 << 31)
++
++/* Register definitions for the i.MX25/31/35/51 Digital Audio Multiplexer */
++#define IMX_AUDMUX_V2_PTCR_TFSDIR	(1 << 31)
++#define IMX_AUDMUX_V2_PTCR_TFSEL(x)	(((x) & 0xf) << 27)
++#define IMX_AUDMUX_V2_PTCR_TCLKDIR	(1 << 26)
++#define IMX_AUDMUX_V2_PTCR_TCSEL(x)	(((x) & 0xf) << 22)
++#define IMX_AUDMUX_V2_PTCR_RFSDIR	(1 << 21)
++#define IMX_AUDMUX_V2_PTCR_RFSEL(x)	(((x) & 0xf) << 17)
++#define IMX_AUDMUX_V2_PTCR_RCLKDIR	(1 << 16)
++#define IMX_AUDMUX_V2_PTCR_RCSEL(x)	(((x) & 0xf) << 12)
++#define IMX_AUDMUX_V2_PTCR_SYN		(1 << 11)
++
++#define IMX_AUDMUX_V2_PDCR_RXDSEL(x)	(((x) & 0x7) << 13)
++#define IMX_AUDMUX_V2_PDCR_TXRXEN	(1 << 12)
++#define IMX_AUDMUX_V2_PDCR_MODE(x)	(((x) & 0x3) << 8)
++#define IMX_AUDMUX_V2_PDCR_INMMASK(x)	((x) & 0xff)
++
++#endif /* __DT_FSL_IMX_AUDMUX_H */
+diff --git a/sound/soc/fsl/imx-audmux.h b/sound/soc/fsl/imx-audmux.h
+index b8ff44b..38a4209 100644
+--- a/sound/soc/fsl/imx-audmux.h
++++ b/sound/soc/fsl/imx-audmux.h
+@@ -1,57 +1,7 @@
+ #ifndef __IMX_AUDMUX_H
+ #define __IMX_AUDMUX_H
+ 
+-#define MX27_AUDMUX_HPCR1_SSI0		0
+-#define MX27_AUDMUX_HPCR2_SSI1		1
+-#define MX27_AUDMUX_HPCR3_SSI_PINS_4	2
+-#define MX27_AUDMUX_PPCR1_SSI_PINS_1	3
+-#define MX27_AUDMUX_PPCR2_SSI_PINS_2	4
+-#define MX27_AUDMUX_PPCR3_SSI_PINS_3	5
+-
+-#define MX31_AUDMUX_PORT1_SSI0		0
+-#define MX31_AUDMUX_PORT2_SSI1		1
+-#define MX31_AUDMUX_PORT3_SSI_PINS_3	2
+-#define MX31_AUDMUX_PORT4_SSI_PINS_4	3
+-#define MX31_AUDMUX_PORT5_SSI_PINS_5	4
+-#define MX31_AUDMUX_PORT6_SSI_PINS_6	5
+-#define MX31_AUDMUX_PORT7_SSI_PINS_7	6
+-
+-#define MX51_AUDMUX_PORT1_SSI0		0
+-#define MX51_AUDMUX_PORT2_SSI1		1
+-#define MX51_AUDMUX_PORT3		2
+-#define MX51_AUDMUX_PORT4		3
+-#define MX51_AUDMUX_PORT5		4
+-#define MX51_AUDMUX_PORT6		5
+-#define MX51_AUDMUX_PORT7		6
+-
+-/* Register definitions for the i.MX21/27 Digital Audio Multiplexer */
+-#define IMX_AUDMUX_V1_PCR_INMMASK(x)	((x) & 0xff)
+-#define IMX_AUDMUX_V1_PCR_INMEN		(1 << 8)
+-#define IMX_AUDMUX_V1_PCR_TXRXEN	(1 << 10)
+-#define IMX_AUDMUX_V1_PCR_SYN		(1 << 12)
+-#define IMX_AUDMUX_V1_PCR_RXDSEL(x)	(((x) & 0x7) << 13)
+-#define IMX_AUDMUX_V1_PCR_RFCSEL(x)	(((x) & 0xf) << 20)
+-#define IMX_AUDMUX_V1_PCR_RCLKDIR	(1 << 24)
+-#define IMX_AUDMUX_V1_PCR_RFSDIR	(1 << 25)
+-#define IMX_AUDMUX_V1_PCR_TFCSEL(x)	(((x) & 0xf) << 26)
+-#define IMX_AUDMUX_V1_PCR_TCLKDIR	(1 << 30)
+-#define IMX_AUDMUX_V1_PCR_TFSDIR	(1 << 31)
+-
+-/* Register definitions for the i.MX25/31/35/51 Digital Audio Multiplexer */
+-#define IMX_AUDMUX_V2_PTCR_TFSDIR	(1 << 31)
+-#define IMX_AUDMUX_V2_PTCR_TFSEL(x)	(((x) & 0xf) << 27)
+-#define IMX_AUDMUX_V2_PTCR_TCLKDIR	(1 << 26)
+-#define IMX_AUDMUX_V2_PTCR_TCSEL(x)	(((x) & 0xf) << 22)
+-#define IMX_AUDMUX_V2_PTCR_RFSDIR	(1 << 21)
+-#define IMX_AUDMUX_V2_PTCR_RFSEL(x)	(((x) & 0xf) << 17)
+-#define IMX_AUDMUX_V2_PTCR_RCLKDIR	(1 << 16)
+-#define IMX_AUDMUX_V2_PTCR_RCSEL(x)	(((x) & 0xf) << 12)
+-#define IMX_AUDMUX_V2_PTCR_SYN		(1 << 11)
+-
+-#define IMX_AUDMUX_V2_PDCR_RXDSEL(x)	(((x) & 0x7) << 13)
+-#define IMX_AUDMUX_V2_PDCR_TXRXEN	(1 << 12)
+-#define IMX_AUDMUX_V2_PDCR_MODE(x)	(((x) & 0x3) << 8)
+-#define IMX_AUDMUX_V2_PDCR_INMMASK(x)	((x) & 0xff)
++#include <dt-bindings/sound/fsl-imx-audmux.h>
+ 
+ int imx_audmux_v1_configure_port(unsigned int port, unsigned int pcr);
+ 
+-- 
+1.8.3.2
