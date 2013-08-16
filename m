@@ -1,70 +1,29 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Fri, 16 Aug 2013 15:17:06 +0200
-Subject: [PATCH v2 0/2] omap4/twl6030: typical connection to omap4 as
- a separate dtsi file
-In-Reply-To: <CAHooxd7Sg8B-MM38F2ce=vR5ftO6ye2byrXH1-iFous=_AvTLg@mail.gmail.com>
-References: <1376469348-10797-1-git-send-email-ruslan.bilovol@ti.com>
- <520B8B45.1010300@baylibre.com>
- <CAB=otbTUk68CLmgQsEoefMMFTAnZCAMbZa-yiYmn1b3F1X8BiQ@mail.gmail.com>
- <CAHooxd7Sg8B-MM38F2ce=vR5ftO6ye2byrXH1-iFous=_AvTLg@mail.gmail.com>
-Message-ID: <520E2652.4090103@baylibre.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 16 Aug 2013 15:20:09 +0200
+Subject: [PATCH] gpio/mxc: add chained_irq_enter/exit() to
+ mx2_gpio_irq_handler
+In-Reply-To: <20130730073917.GL1754@pengutronix.de>
+References: <1374152286-12955-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdZjsAOtm2Jt7kY-VC2ToFfMQ+UxjWQE7aUZAbsBt0ugvw@mail.gmail.com>
+ <20130730073917.GL1754@pengutronix.de>
+Message-ID: <CACRpkdaph+44SG5+VoSCiqkwMpjDO8Vc3ZVwVnhywx7DD5=-Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uri,
+On Tue, Jul 30, 2013 at 9:39 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-On 16/08/2013 14:30, Uri Yosef wrote:
-> Hi,
->
-> I am on vacation until Aug 25th, I will test it when I back.
 
-OK, but it will be too late for this merge window. I'll drop it for 3.12 
-then.
+>> The encoding is what screw things up.
 
-Thanks,
-Benoit
+> That means git is unable to apply base64 encoded mail? Hmm, testing with
+> git 1.8.3.2 (from Debian) I can apply the base64 encoded patch.
+> Does your git have 87ab799234639c26ea10de74782fa511cb3ca606 (i.e. is
+> older than 1.5.1)?
 
->
-> Regards,
-> Uri Yosef
->
->
-> On Fri, Aug 16, 2013 at 3:04 PM, Ruslan Bilovol <ruslan.bilovol@ti.com
-> <mailto:ruslan.bilovol@ti.com>> wrote:
->
->     Hi Benoit,
->
->     On Wed, Aug 14, 2013 <tel:2013> at 4:51 PM, Benoit Cousson
->     <bcousson at baylibre.com <mailto:bcousson@baylibre.com>> wrote:
->      > Hi Ruslan,
->      >
->      > On 14/08/2013 10:35, Ruslan Bilovol wrote:
->      >>
->      >> Hello,
->      >>
->      >> There is no functional changes between v1 and v2 - just
->      >> added the patch for omap4-var-som - Uri Yosef confirmed
->      >> this board have the same connection of OMAP4<->TWL6030 as
->      >> SDP4430 board
->      >
->      >
->      > The series looks good to me, but it will be good to have a test
->     for Panda
->      > and Variscite boards before merging it.
->
->     Okay, so I just verified this patch series on PandaBoard ES2. Should I
->     resubmit this series with
->     fixed commit message?
->     However I cannot verify the patch for Variscite board because I do not
->     own any such board so
->     you can drop that patch. But maybe Uri Yosef can verify it. Uri?
->
->      >
->      > Regards,
->      > Benoit
->
->     --
->     Best regards,
->     Ruslan Bilvol
->
->
+Hm it works, I just never tried it ... nevermind.
+
+Patch applied with Shawn's ACK.
+
+Yours,
+Linus Walleij
