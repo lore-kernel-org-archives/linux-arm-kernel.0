@@ -1,76 +1,56 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 16 Aug 2013 06:31:02 -0500
-Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <520E0556.5080702@arm.com>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
- <2CD735CE-3FCF-4AB5-89C0-D813ECD19F11@codeaurora.org>
- <520C9AEA.6030507@arm.com>
- <9E753731-852D-4F04-931B-112B589D9FFB@codeaurora.org>
- <520E0556.5080702@arm.com>
-Message-ID: <B78CECED-CF8B-4FC0-A4C5-D29F81F8D40E@codeaurora.org>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Fri, 16 Aug 2013 17:06:55 +0530
+Subject: [PATCH v3 0/2] rtc: omap: update AM335x rtc ip revision
+Message-ID: <1376653017-21935-1-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The syntax of compatible property in DT is to mention the Most specific
+match to most generic match.
 
-On Aug 16, 2013, at 5:56 AM, Punit Agrawal wrote:
+Since AM335x is the platform with latest IP revision, add it 1st in
+the device id table.
 
-> Hi Kumar,
-> 
-> On 15/08/13 20:00, Kumar Gala wrote:
->> 
->> On Aug 15, 2013, at 4:10 AM, Punit Agrawal wrote:
->> 
->>>> What is the list of interrupts related to, should there be an associated interrupts-names
->>>> 
->>> 
->>> For the CCI PMU, each interrupt signal corresponds to the overflow of a performance counter.
->>> 
->>> Here again, I was trying to be robust in the face of differing hardware configurations - specially the scenario where multiple interrupt lines from the CCI PMU are tied together to generate a single interrupt to the CPU.
->> 
->> Even in the case of multiple interrupt lines tied together, why wouldn't you still specify each interrupt specifier and they all just be the same and thus the interrupt appears to be shared ?
->> 
-> 
-> I am not quite sure what you are asking here. Are you suggesting that even if the interrupts are muxed, they should be specified multiple times?
+This way, we can add new matching compatible as 1st and maintain old
+compatible string for backwards compatibility.
 
-I'm saying the # of interrupts should equal the # of counters w/regards to the dts and binding.
+ex:
+	compatible = "ti,am3352-rtc", "ti,da830-rtc";
 
-> Below is an update I've added to the documentation to better describe the interrupts. Does this help?
-> 
-> @@ -104,8 +103,19 @@ specific to ARM.
->                - interrupts:
->                        Usage: required
->                        Value type: <prop-encoded-array>
-> -                   Definition: comma-separated list of unique PMU
-> -                               interrupts
-> +                 Definition: comma-separated list of counter overflow
-> +                             interrupts.
-> +
-> +                             The CCI PMU has an interrupt signal for each
-> +                             counters. Typically, the number of
-> +                             interrupts will be equal to the number of
-> +                             counters.
-> +
-> +                             On some platforms, the individual interrupt
-> +                             signals may be combined in some fashion
-> +                             before being routed to the interrupt
-> +                             controller resulting in less number of
-> +                             interrupts than counters.
+Also, update am335x .dtsi file (am33xx.dtsi) as above.
 
-I'd drop the last paragraph.  Think about a case in which the SoC ORs all the interrupts for each counter together, in the .dts it should still look something like (my example assumes 4 counters):
+Note:
+This is a part of previously submitted patch-set [1]. Out of 4 patches,
+3 was accepted and 1 got an acceptable NAK. Hence resubmitting only the
+rejected + updated changes.
 
-interrupts = < 0 100 4 >, < 0 100 4 >, < 0 100 4 >, < 0 100 4 >;
+Changes in V3:
+	- As per Mark Rutland's suggestion [2], maintain old compatible
+	  string and add the new matching string as the 1st compatible.
 
-or lets say the SoC has 2 interrupts with counters 1 & 2 on first interrupt and 3 & 4 on second
+Changes in V2:
+	- Coding style corrections (remove extra space, use lower case
+	  for hex numbers
+	- use prefix ARM: for commit subject keeping with arch/arm
+	  convention)
+	- use "[AM/am]3352" instead of "[AM/am]335x" to keep the all
+	  usages in sync.
+	- Use index defined for struct members so they remain in sync
+	- Add new compatible to existing one so that when driver
+	  supports enhanced features of hardware, they are available
+	  to the user else the basic functionality still works
 
-interrupts = < 0 100 4 >, < 0 100 4 >, < 0 101 4 >, < 0 101 4 >;
+[2]
+https://lkml.org/lkml/2013/7/3/74
+[1]
+https://lkml.org/lkml/2013/8/1/442
 
-or a crazy SoC (counters 1 & 3 on first interrupt, 2 & 4 on second):
+Hebbar Gururaja (1):
+  ARM: dts: AM33XX: update rtc node compatibility
 
-interrupts = < 0 100 4 >, < 0 101 4 >, < 0 100 4 >, < 0 101 4 >;
+Hebbar, Gururaja (1):
+  rtc: omap: update of_device_id to reflect latest ip revisions
 
-make sense?
-
-- k
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+ arch/arm/boot/dts/am33xx.dtsi |    2 +-
+ drivers/rtc/rtc-omap.c        |    6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
