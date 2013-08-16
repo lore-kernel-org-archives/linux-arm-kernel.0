@@ -1,38 +1,58 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 Aug 2013 16:48:21 -0600
-Subject: [PATCHv2 1/2] ARM: dts: Change dw-apb-timer-osc and
- dw-apb-timer-sp to just dw-apb-timer
-In-Reply-To: <1376522956-14960-1-git-send-email-dinguyen@altera.com>
-References: <1376522956-14960-1-git-send-email-dinguyen@altera.com>
-Message-ID: <520EAC35.5000804@wwwdotorg.org>
+Date: Fri, 16 Aug 2013 17:11:27 -0600
+Subject: [PATCH 2/2] ARM: dts: AM4372: add few nodes
+In-Reply-To: <520DFC37.3080601@baylibre.com>
+References: <ffa2f76fcac54bfe76c234ffce0394fd2c25fe52.1375450395.git.afzal@ti.com>
+ <6f0f838176ab93aac8dab4c3ab9d9f95a3027ff7.1375450395.git.afzal@ti.com>
+ <51FCEE60.7080809@ti.com> <51FF335D.4050803@ti.com>
+ <20130810142317.GE18085@e106331-lin.cambridge.arm.com>
+ <52088526.90004@ti.com> <520DFC37.3080601@baylibre.com>
+Message-ID: <520EB19F.1010005@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2013 05:29 PM, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
+On 08/16/2013 04:17 AM, Benoit Cousson wrote:
+> Hi Afzal,
 > 
-> "dw-apb-timer-osc" and "dw-apb-timer-sp" are the same implementation of the
-> DW APB timer, just fed by different clocks. Thus, deprecate both
-> "dw-apb-timer-osc" and "dw-apb-timer-sp" in lieu of "dw-apb-timer",
+> On 12/08/2013 08:48, Afzal Mohammed wrote:
+>> Hi Mark,
+>>
+>> On Saturday 10 August 2013 07:53 PM, Mark Rutland wrote:
+>>
+>>>>>> +        mac: ethernet at 4a100000 {
+>>>>>> +            compatible = "ti,am4372-cpsw","ti,cpsw";
+>>
+>>> One point worth mentioning is that the "ti,am4372-cpsw" string isn't
+>>> documented. Will the "ti,am4372-cpsw" binding definitely be a superset
+>>> of the "ti,cpsw" binding, and if you were to take the DT as of this
+>>> patch, and attempt to use it with a future kernel, can you guarantee
+>>> it'll work?
+>>
+>> "ti,am4372-cpsw" was not documented as OMAP DT maintainer didn't prefer
+>> documenting only for a new compatible.
 > 
-> Clean up the timer entries for socfpga by removing timer<n> and set the
-> correct clocks for the timers.
+> My point was more that creating a new compatible for the exact same
+> version of the IP is pointeless and could lead to tons of compatible
+> strings that would never be used since this is always the exact same IP.
 
-Hmm. That sounds like a separate patch. Cleanup isn't the same as adding
-new DT compatible values...
+Well, there are two aspects: Version of the IP block, and the
+integration into the SoC. We need an entry in compatible for any/all of
+these. If the IP block doesn't have some standalone versioning scheme
+because the design flow isn't IP-block-centric, the SoC name makes a
+reasonable substitute.
 
-> diff --git a/Documentation/devicetree/bindings/rtc/dw-apb.txt b/Documentation/devicetree/bindings/rtc/dw-apb.txt
+...
+> My second point is, even if we want to differentiate the IPs in various
+> SoCs, using the name of the SoC in the IP compatible string is not a
+> very good practice anyway.
 
->  Required properties:
-> -- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc"
-> +- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc" <DEPRECATED>
-> +- compatible: "snps,dw-apb-timer"
+There may be integration-specific issues, so even if SoC A and B use the
+exact same IP block version, there should still be compatible values for
+the SoC as well as the IP block version, so you can quirk on those later.
 
-It's slightly unclear whether "snps,dw-apb-timer-sp" is deprecated.
-Also, listing the non-deprecated values first would be a good hint to
-people which they should use. How about:
-
-compatible: One of:
-	"snps,dw-apb-timer"
-	"snps,dw-apb-timer-sp" <DEPRECATED>
-	"snps,dw-apb-timer-osc" <DEPRECATED>
+... although I suppose it might not be too bad if the IP block
+compatible value only contained the IP block version, and if any
+integration-specific quirks were needed, they could be triggered off
+entries in the top-level node's compatible value? That only works for
+on-Soc modules, and not complex MFD-like modules, unless you have an
+easy way to find the DT node for the top-level of the MFD...
