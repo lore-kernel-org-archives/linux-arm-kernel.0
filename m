@@ -1,40 +1,60 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 16 Aug 2013 12:09:16 -0700
-Subject: [PATCH] clk: ux500: Remove BML8580 clock
-In-Reply-To: <CACRpkdZOPZE1aDw0NZDVX5_fVStqPFKqvLP-6dtjNawSCLg2Bg@mail.gmail.com>
-References: <1376257756-23575-1-git-send-email-linus.walleij@linaro.org>
- <20130815184202.4443.33356@quantum>
- <CACRpkdZOPZE1aDw0NZDVX5_fVStqPFKqvLP-6dtjNawSCLg2Bg@mail.gmail.com>
-Message-ID: <20130816190916.4443.68092@quantum>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 16 Aug 2013 14:25:49 -0500
+Subject: [PATCH RFC 3/3] spmi: document the PMIC arbiter SPMI bindings
+In-Reply-To: <D1534646-7CB5-4EE7-8C1E-1C607BE22396@codeaurora.org>
+References: <cover.1376596224.git.joshc@codeaurora.org>
+ <b639088d50df93caaef8fe7e09c12953b1153ce8.1376596224.git.joshc@codeaurora.org>
+ <D1534646-7CB5-4EE7-8C1E-1C607BE22396@codeaurora.org>
+Message-ID: <20130816192549.GG4035@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2013-08-16 02:15:13)
-> On Thu, Aug 15, 2013 at 8:42 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting Linus Walleij (2013-08-11 14:49:16)
-> >> From: Lee Jones <lee.jones@linaro.org>
-> >>
-> >> There is no mention of the PRCMU_BML8580CLK in any of the Design
-> >> Specifications for the chips supported in Mainline. In fact, where it
-> >> is incorrectly used in the u8540 clock definition driver it would
-> >> have the side effect of using the incorrect clock management address
-> >> ([PRCM_BML8580CLK_MGT] 0x108 instead of the correct value 0x04C).
-> >>
-> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >
-> > Pulled into clk-next.
-> 
-> 
-> Hm it turns out that I need this to be in the middle of Lee's patch
-> set for device tree clock that need to go through ARM SoC.
-> 
-> Can you (please) drop this patch and provide an ACK instead?
+Hey Kumar-
 
-I've dropped the patch from clk-next. Please add my Ack.
+Thanks for the review.
 
-Regards,
-Mike
-
+On Fri, Aug 16, 2013 at 01:53:27PM -0500, Kumar Gala wrote:
+> On Aug 9, 2013, at 3:37 PM, Josh Cartwright wrote:
 > 
-> Yours,
-> Linus Walleij
+> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> > ---
+> > .../devicetree/bindings/spmi/spmi-pmic-arb.txt     | 26 ++++++++++++++++++++++
+> > 1 file changed, 26 insertions(+)
+> > create mode 100644 Documentation/devicetree/bindings/spmi/spmi-pmic-arb.txt
+> 
+> As this is a qcom specific binding, I think the file name should be msm-spmi-pmic-arb.txt or something like that.
+
+Agreed.  It might be nice to use a vendor prefix in the name too.  How's qcom,msm-pmic-arb.txt sound?
+
+> > diff --git a/Documentation/devicetree/bindings/spmi/spmi-pmic-arb.txt b/Documentation/devicetree/bindings/spmi/spmi-pmic-arb.txt
+> > new file mode 100644
+> > index 0000000..1c14bf4
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/spmi/spmi-pmic-arb.txt
+> > @@ -0,0 +1,26 @@
+> > +Qualcomm SPMI Controller (PMIC Arbiter)
+> 
+> We should get in the habit of trying to have at least one sentence about what the device is or does.
+
+Certainly.
+
+> > +
+> > +Required properties:
+> > +- compatible : should be "qcom,spmi-pmic-arb".
+> > +- reg-names  : should be "core", "intr", "cnfg"
+> > +- reg : offset and length of the PMIC Arbiter Core register map.
+> > +- reg : offset and length of the PMIC Arbiter Interrupt controller register map.
+> > +- reg : offset and length of the PMIC Arbiter Configuration register map.
+> > +- #address-cells : must be set to 1
+> > +- #size-cells : must be set to 0
+> 
+> Hmm, you aren't describe anything about child nodes.
+
+Indeed.  I'll put together a generic SPMI binding document as you had
+suggested before and reference it in this binding.
+
+  Josh
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
