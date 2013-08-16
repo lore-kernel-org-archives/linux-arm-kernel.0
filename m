@@ -1,39 +1,27 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 16 Aug 2013 14:48:59 -0500
-Subject: [PATCH RFC 3/3] spmi: document the PMIC arbiter SPMI bindings
-In-Reply-To: <20130816192549.GG4035@joshc.qualcomm.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 16 Aug 2013 14:50:44 -0500
+Subject: [PATCH RFC 1/3] spmi: Linux driver framework for SPMI
+In-Reply-To: <20130816194714.GH4035@joshc.qualcomm.com>
 References: <cover.1376596224.git.joshc@codeaurora.org>
- <b639088d50df93caaef8fe7e09c12953b1153ce8.1376596224.git.joshc@codeaurora.org>
- <D1534646-7CB5-4EE7-8C1E-1C607BE22396@codeaurora.org>
- <20130816192549.GG4035@joshc.qualcomm.com>
-Message-ID: <A1FAB0A0-C205-4401-838C-B745B5B95FF3@codeaurora.org>
+ <02deef1d90121011ab1df90ad704ef0ee36e2584.1376596224.git.joshc@codeaurora.org>
+ <20130816184614.GA31510@kroah.com>
+ <20130816194714.GH4035@joshc.qualcomm.com>
+Message-ID: <20130816195044.GI4035@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Aug 16, 2013, at 2:25 PM, Josh Cartwright wrote:
-
-> Hey Kumar-
+On Fri, Aug 16, 2013 at 02:47:14PM -0500, Josh Cartwright wrote:
+> > 
+> > Why?  If debugfs isn't enabled, the functions should just compile away
+> > with the debugfs_() calls, so no need to do this type of thing here,
+> > right?
 > 
-> Thanks for the review.
+> Not sure I follow you, but it may be because this is a bit misleading.
 > 
-> On Fri, Aug 16, 2013 at 01:53:27PM -0500, Kumar Gala wrote:
->> On Aug 9, 2013, at 3:37 PM, Josh Cartwright wrote:
->> 
->>> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
->>> ---
->>> .../devicetree/bindings/spmi/spmi-pmic-arb.txt     | 26 ++++++++++++++++++++++
->>> 1 file changed, 26 insertions(+)
->>> create mode 100644 Documentation/devicetree/bindings/spmi/spmi-pmic-arb.txt
->> 
->> As this is a qcom specific binding, I think the file name should be msm-spmi-pmic-arb.txt or something like that.
-> 
-> Agreed.  It might be nice to use a vendor prefix in the name too.  How's qcom,msm-pmic-arb.txt sound?
-
-Sounds good, as I see we have other examples of having a comma in file names for bindings.
-
-- k
+> Currently CONFIG_DEBUG_FS is being extended to also mean "do you want
+> the SPMI core to create device entries?".  It would probably make more
+                      debugfs -^
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
