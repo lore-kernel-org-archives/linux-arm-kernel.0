@@ -1,47 +1,29 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Fri, 16 Aug 2013 08:45:35 +0200
-Subject: [PATCH] ARM: imx27.dtsi: fix CSPI PER clock id
-Message-ID: <1376635535-10325-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Fri, 16 Aug 2013 09:43:19 +0100
+Subject: [RFC PATCH 3/4] powerpc: refactor of_get_cpu_node to support
+ other architectures
+In-Reply-To: <1376628601.4255.138.camel@pasglop>
+References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376586580-5409-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376628601.4255.138.camel@pasglop>
+Message-ID: <520DE627.2080007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CSPI PER clock is per2clk (per2_gate id 60) instead of cspiX_ipg_gate.
+On 16/08/13 05:50, Benjamin Herrenschmidt wrote:
+> On Thu, 2013-08-15 at 18:09 +0100, Sudeep KarkadaNagesha wrote:
+>>                /* Check for ibm,ppc-interrupt-server#s. If it doesn't exist
+>>                  * fallback to "reg" property and assume no threads
+>>                  */
+>> -
+> 
+> Oh and I forgot ... that comment is now wrong, since your code handles
+> threads in the "reg" case...
+> 
+I have fixed it in the next patch while adding the documentation to
+these function. I wanted changes in this patch minimal. I can fix it
+here too if you insist on it.
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
----
- arch/arm/boot/dts/imx27.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 0695264..f71d233 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -152,7 +152,7 @@
- 				compatible = "fsl,imx27-cspi";
- 				reg = <0x1000e000 0x1000>;
- 				interrupts = <16>;
--				clocks = <&clks 53>, <&clks 53>;
-+				clocks = <&clks 53>, <&clks 60>;
- 				clock-names = "ipg", "per";
- 				status = "disabled";
- 			};
-@@ -163,7 +163,7 @@
- 				compatible = "fsl,imx27-cspi";
- 				reg = <0x1000f000 0x1000>;
- 				interrupts = <15>;
--				clocks = <&clks 52>, <&clks 52>;
-+				clocks = <&clks 52>, <&clks 60>;
- 				clock-names = "ipg", "per";
- 				status = "disabled";
- 			};
-@@ -266,7 +266,7 @@
- 				compatible = "fsl,imx27-cspi";
- 				reg = <0x10017000 0x1000>;
- 				interrupts = <6>;
--				clocks = <&clks 51>, <&clks 51>;
-+				clocks = <&clks 51>, <&clks 60>;
- 				clock-names = "ipg", "per";
- 				status = "disabled";
- 			};
--- 
-1.8.1.5
+Regards,
+Sudeep
