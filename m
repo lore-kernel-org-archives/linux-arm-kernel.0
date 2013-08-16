@@ -1,66 +1,82 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 Aug 2013 17:29:00 -0600
-Subject: [PATCH v4 5/6] clocksource: armada-370-xp: Fix device-tree binding
-In-Reply-To: <20130815162751.GA2403@localhost>
-References: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1376404995-24548-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130814152621.GA18868@e106331-lin.cambridge.arm.com>
- <20130815162751.GA2403@localhost>
-Message-ID: <520EB5BC.4060102@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 17 Aug 2013 01:55:51 +0200
+Subject: [PATCH 3/3] ARM: nomadik: retire ethernet IRQ request mechanism
+Message-ID: <1376697351-18918-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2013 10:27 AM, Ezequiel Garcia wrote:
-...
-> Armada XP
-> ---------
-> 
-> Two clock sources are available for timer and watchdog counters:
-> 
-> Just as explained for the Armada 370, the timer and watchdog counters decrement
-> rate is a configurable ratio of the L2/coherency fabric clock.
-> The current clocksource driver implementation chooses an abritrary ratio.
-> 
-> In addition to this, both timer and watchdog counter rate can be configured
-> to use an (internal) 25 MHz fixed clock.
+I was a bit picky and did actually define the ethernet GPIO line
+as both a plain GPIO line in one place and as an interrupt line
+in another place - as a GPIO line it would be requested and set
+to input and then left like that.
 
-So there are clearly two clocks fed into the HW block here. The DT
-should reflect that.
+Now that the GPIO OF core will request and set as input any GPIO
+line used as interrupt, we can remove this mechanism and delete
+the corresponding device tree node.
 
-> However, and as explained in this patchset, using the letter fixed clock is in
-> practice the only choice. Once CPUFreq support is implemented for the
-> Armada XP SoC the L2/coherency fabric clock will change its rate, and handling
-> such change will be problematic.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-nomadik-s8815.dts |  4 ----
+ arch/arm/mach-nomadik/cpu-8815.c        | 32 --------------------------------
+ 2 files changed, 36 deletions(-)
 
-It's not mandatory for an OS to implement cpufreq, so it'd be quite
-possible to still use that variable-rate clock on some HW. What SW
-may-or-may-not do on HW isn't something that should feed into the DT
-binding design.
-
-> Maybe the most accurate representation would be something like this...
-> 
-> timer {
-> 	compatible = "marvell,armada-xp-timer";
-> 	reg = ...
-> 	interrupts = ...
-> 	clocks = ... /* either 25 MHz fixed clock
-> 	              * or L2/coherency fabric clock */
-> };
-
-I think better would be:
-
-clocks = <&xxx ...> <&yyy ...>;
-clock-names = "fabric", "fixed";
-
-In the documentation for this HW block, there's a register that switches
-between the two clock sources. What names are used for the clocks in the
-documentation of that register? Those names should be used for
-clock-names entries.
-
-Is the fact that one of "fabric" and "fixed" is variable and one
-fixed-rate more a facet of the integration of the IP block into the SoC,
-and not forced by the design of the IP block itself? If so, perhaps
-you'd want some additional properties indicating which of those clocks
-was fixed and which was variable, which would allow SW to make
-intelligent decisions re: which to use. Perhaps it can be assumed this
-information can be queried from the source of the clock though?
+diff --git a/arch/arm/boot/dts/ste-nomadik-s8815.dts b/arch/arm/boot/dts/ste-nomadik-s8815.dts
+index 16c3888..f557feb 100644
+--- a/arch/arm/boot/dts/ste-nomadik-s8815.dts
++++ b/arch/arm/boot/dts/ste-nomadik-s8815.dts
+@@ -67,10 +67,6 @@
+ 
+ 	/* Custom board node with GPIO pins to active etc */
+ 	usb-s8815 {
+-		/* The S8815 is using this very GPIO pin for the SMSC91x IRQs */
+-		ethernet-gpio {
+-			gpios = <&gpio3 8 0x1>;
+-		};
+ 		/* This will bias the MMC/SD card detect line */
+ 		mmcsd-gpio {
+ 			gpios = <&gpio3 16 0x1>;
+diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
+index 13e0df9..b5c7244 100644
+--- a/arch/arm/mach-nomadik/cpu-8815.c
++++ b/arch/arm/mach-nomadik/cpu-8815.c
+@@ -158,38 +158,6 @@ static struct fsmc_nand_platform_data cpu8815_nand_data = {
+ };
+ 
+ /*
+- * The SMSC911x IRQ is connected to a GPIO pin, but the driver expects
+- * to simply request an IRQ passed as a resource. So the GPIO pin needs
+- * to be requested by this hog and set as input.
+- */
+-static int __init cpu8815_eth_init(void)
+-{
+-	struct device_node *eth;
+-	int gpio, irq, err;
+-
+-	eth = of_find_node_by_path("/usb-s8815/ethernet-gpio");
+-	if (!eth) {
+-		pr_info("could not find any ethernet GPIO\n");
+-		return 0;
+-	}
+-	gpio = of_get_gpio(eth, 0);
+-	err = gpio_request(gpio, "eth_irq");
+-	if (err) {
+-		pr_info("failed to request ethernet GPIO\n");
+-		return -ENODEV;
+-	}
+-	err = gpio_direction_input(gpio);
+-	if (err) {
+-		pr_info("failed to set ethernet GPIO as input\n");
+-		return -ENODEV;
+-	}
+-	irq = gpio_to_irq(gpio);
+-	pr_info("enabled USB-S8815 ethernet GPIO %d, IRQ %d\n", gpio, irq);
+-	return 0;
+-}
+-device_initcall(cpu8815_eth_init);
+-
+-/*
+  * TODO:
+  * cannot be set from device tree, convert to a proper DT
+  * binding.
+-- 
+1.8.1.4
