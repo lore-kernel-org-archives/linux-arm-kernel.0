@@ -1,49 +1,59 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Fri, 16 Aug 2013 17:51:54 +0530
-Subject: [PATCH v4 2/2] ARM: dts: AM33XX: update rtc node compatibility
-In-Reply-To: <1376655714-28947-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1376655714-28947-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1376655714-28947-3-git-send-email-gururaja.hebbar@ti.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 16 Aug 2013 22:32:31 +1000
+Subject: [RFC PATCH 3/4] powerpc: refactor of_get_cpu_node to support
+ other architectures
+In-Reply-To: <520DE753.8090601@arm.com>
+References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376586580-5409-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376628563.4255.137.camel@pasglop> <520DE753.8090601@arm.com>
+Message-ID: <1376656351.25016.2.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hebbar Gururaja <gururaja.hebbar@ti.com>
+On Fri, 2013-08-16 at 09:48 +0100, Sudeep KarkadaNagesha wrote:
 
-Since AM33xx RTC IP has RTC_IRQWAKEEN to support Alarm Wake-up, update
-the rtc compatible property to enable handling of this feature inside
-rtc-omap driver.
+> > Naming is a bit gross. You might want to make it clearer that
+> > we are talking about CPU IDs in the device-tree here.
+> > 
+> Any particular preference to the name or just a note is sufficient.
+> Also unlike PPC, in ARM we don't set hard processor id value based
+> values read from device tree. DT must contain the values matching to the
+> hardware ID registers.
 
-Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-CC: mark.rutland at arm.com
----
-Changes in V4:
-	- No change.
+This is exactly the same on ppc. We don't "set" HW values. The
+device-tree content matches the HW internals. Some processors have a
+"PIR" register as well which contains the HW value, in this case the
+device-tree must contain the same value as the PIR on that processor.
 
-Changes in V3:
-	- Instead of replacing the old matching string, add new
-	  matching compatible as 1st and maintain old compatible string
-	  for backwards compatibility 
+> >> +static bool __of_find_n_match_cpu_property(struct device_node *cpun,
+> >> +			const char *prop_name, int cpu, unsigned int *thread)
+> >> +{
+> >> +	const __be32 *cell;
+> >> +	int ac, prop_len, tid;
+> >> +	u64 hwid;
+> >> +
+> >> +	ac = of_n_addr_cells(cpun);
+> >> +	cell = of_get_property(cpun, prop_name, &prop_len);
+> >> +	if (!cell)
+> >> +		return false;
+> >> +	prop_len /= sizeof(*cell);
+> >> +	for (tid = 0; tid < prop_len; tid++) {
+> >> +		hwid = of_read_number(cell, ac);
+> >> +		if (arch_match_cpu_phys_id(cpu, hwid)) {
+> >> +			if (thread)
+> >> +				*thread = tid;
+> >> +			return true;
+> >> +		}
+> > 
+> > Missing:          cell += ac;
+> Ah, missed it while refactoring, will fix it. Thanks
 
-Changes in V2:
-	- Add new compatible to existing one so that when driver
-	  supports enhanced features of hardware, they are available
-	  to the user else the basic functionality still works
-:100644 100644 0aaf8ce... daeafa0... M	arch/arm/boot/dts/am33xx.dtsi
- arch/arm/boot/dts/am33xx.dtsi |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Ben.
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 0aaf8ce..daeafa0 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -317,7 +317,7 @@
- 		};
- 
- 		rtc at 44e3e000 {
--			compatible = "ti,da830-rtc";
-+			compatible = "ti,am3352-rtc", "ti,da830-rtc";
- 			reg = <0x44e3e000 0x1000>;
- 			interrupts = <75
- 				      76>;
--- 
-1.7.0.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
