@@ -1,58 +1,32 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 16 Aug 2013 16:47:26 +0530
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Trustzone-based security
- solution for ARM Linux
-In-Reply-To: <CAGsJ_4yjZQ9a+VAXk-c5DGFpz-SpGrqm=p7zfYq2C=vTCz8X+w@mail.gmail.com>
-References: <CAGsJ_4xnivwNW_Pvhv7Jg62a94d5FChwqEwnNX3Miqd5fAxNHA@mail.gmail.com>
- <20130815042812.GA8968@kroah.com>
- <CAGsJ_4w2hOgsOB=ZYmWqm7tM+pL6=UMR1fG++A+rdAReJzFSjw@mail.gmail.com>
- <520CFBDE.4000408@wwwdotorg.org>
- <20130815174307.GA17245@localhost.localdomain>
- <CAGsJ_4yjZQ9a+VAXk-c5DGFpz-SpGrqm=p7zfYq2C=vTCz8X+w@mail.gmail.com>
-Message-ID: <CABb+yY3B+9ZyLbyTExPdK4ns_Asvzb2n=dGc-He+Qr+gSYaYCA@mail.gmail.com>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Fri, 16 Aug 2013 20:17:49 +0900
+Subject: [PATCH v9 04/16] iommu/exynos: allocate lv2 page table from own
+ slab
+In-Reply-To: <20130814105615.GG4491@8bytes.org>
+References: <002801ce941a$fb6369e0$f22a3da0$@samsung.com>
+ <2544843.sndV7usHTj@amdc1227>
+ <20130809145849.790a9800f4f9893b30e54a1c@samsung.com>
+ <2101296.S6JDU5igl3@flatron> <20130814105615.GG4491@8bytes.org>
+Message-ID: <20130816201749.a4bbaa8e85fc5a2d4e0b02ad@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 8:09 AM, Barry Song <21cnbao@gmail.com> wrote:
->>> >>
->>> >> Isn't that up to the hardware?  Nothing that Linux can do about that.
->>> >
->>> > right. but linux need to assign interrupts to right group in GIC
->>> > hardware. now it doesn't care.
->>>
->>> I strongly hope that whatever is the secure OS is setting up these
->>> routings, and the HW prevents the non-secure OS from modifying them and
->>> hence never attempts to. Otherwise, the non-secure OS is able to affect
->>> the functioning of the secure OS, which seems like a bad thing.
->>
->> Typically, the master controls are hard-wired for Secure-only access in
->> hardware: so assigning GIC interrupts to groups is something the secure
->> OS/firmware has to take care of.
->>
->> Of course, if Linux is acting as secure OS, it might have to understand
->> what controls exist and to do some of that configuration itself.
->
-> that is just what i want. linux need to realize whether it is running
-> in security or non-security.
->
-TZ should be seen as two platforms tied together. "DTB" for each mode
-should reflect what's available in that mode (dtb for NS kernel
-shouldn't/can't specify any Secure asset and while that of Secure
-kernel should specify anything that is not accessible from NS mode).
-So ideally there should just be the control passing mechanism (like
-SMC command) to be told to the kernel running in NS mode.
+On Wed, 14 Aug 2013 12:56:16 +0200, 'Joerg Roedel' wrote:
+> On Fri, Aug 09, 2013 at 09:55:30AM +0200, Tomasz Figa wrote:
+> > Oh, this is a valid point, but it was more a nitpick about the coding 
+> > style. Single path error handling (with goto) is widely used in the kernel 
+> > in cases when more than one thing has to be undone and so I suggested this 
+> > method of error handling here as well.
+> 
+> I agree with that review from Tomasz, the error-handling should look
+> similar to all the other places in the kernel and use goto.
+> 
+Ok.
 
-> for example, if one irq is assigned to security, even though users
-> want to get it in non-security, linux should make it fail.
-> linux need security/non-security realization in GIC.
->
-If there is an 'alias' for the secure asset in NS mode, it is better
-to leave it for NS kernel to manage it.
-If some asset is visible in Secure mode only, the NS kernel shouldn't
-be able to simply do an SMC call to have it manipulated. Otherwise we
-leave room for some rooted NS kernel to hack the TrustedOS.
+Thanks.
 
-Point of the rant being, perhaps we don't need new kernel
-policies/designs to enforce TZ security. We just need properly
-partitioned h/w and s/w flow control routed from NS via SMC directly
-to SecureApps(not the Secure Kernel).
+KyongHo.
+> 
+> 	Joerg
+> 
+> 
