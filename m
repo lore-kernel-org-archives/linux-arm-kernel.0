@@ -1,27 +1,186 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 15 Aug 2013 20:07:52 -0700
-Subject: [ARM ATTEND] Clock DT bindings
-Message-ID: <520D9788.5080805@codeaurora.org>
+From: george.cherian@ti.com (George Cherian)
+Date: Fri, 16 Aug 2013 08:49:26 +0530
+Subject: [PATCH v3] arm: dts: AM43x: Add usb DT nodes for AM4372
+In-Reply-To: <520B958B.1000900@baylibre.com>
+References: <1373444082-4169-1-git-send-email-george.cherian@ti.com>
+ <520B9144.5000701@ti.com> <520B958B.1000900@baylibre.com>
+Message-ID: <520D9A3E.1040903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You asked for specific topics. So, here's one:
+Hi Benoit ,
 
-Clock DT bindings discussion on:
-* Allowing producers to export clocks by names.
-* Allowing consumers to list clocks by "producer phandle, clock name".
-* Should we allow for -clock magic similar to regulators?
-* Should the entire clock tree be represented in DT.
+Thanks for your review.
 
-I would like to attend the ARM summit to represent the needs of SoCs 
-with complicated clocking HW. I have worked on clocks for about 5 years 
-(since MSM started running Linux) and would like to throw in my opinion 
-on what clock DT bindings would work well, why and help come up with a 
-solution that works well for everyone.
+On 8/14/2013 8:04 PM, Benoit Cousson wrote:
+> + Roger
+>
+> Hi George,
+>
+> Yes, I had some comment about the "ti'type" in Roger's series that 
+> will be applicable here as well.
+>
 
-Thanks,
-Saravana
+
+>
+> On 14/08/2013 16:16, George Cherian wrote:
+>> +Benoit
+>>   If you dont have any comments, can you take this for 3.12?
+>>
+>> Regards
+>> -George
+>>
+>> On 7/10/2013 1:44 PM, George Cherian wrote:
+>>
+>>> This patch adds
+>>>     - HS USB nodes
+>>>     - phy nodes
+>>>     - usb control module nodes.
+>>>
+>>> Signed-off-by: George Cherian <george.cherian@ti.com>
+>>> ---
+>>>
+>>> changes from v2
+>>> change synopsis to snps
+>>> use simple node names
+>>> add both USB and PHY instances
+>>> add usbctrl node
+>>>
+>>> changes from v1
+>>> renamed synopsis to snps
+>>> removed flag tx-fifo-resize
+>>>
+>>>   arch/arm/boot/dts/am4372.dtsi | 58
+>>> +++++++++++++++++++++++++++++++++++++++++++
+>>>   1 file changed, 58 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/am4372.dtsi
+>>> b/arch/arm/boot/dts/am4372.dtsi
+>>> index ddc1df7..37f196f 100644
+>>> --- a/arch/arm/boot/dts/am4372.dtsi
+>>> +++ b/arch/arm/boot/dts/am4372.dtsi
+>>> @@ -64,5 +64,63 @@
+>>>               compatible = "ti,am4372-counter32k","ti,omap-counter32k";
+>>>               reg = <0x44e86000 0x40>;
+>>>           };
+>>> +
+>>> +        phy1: usbphy1 {
+>>> +            compatible = "ti,am4372-usb2";
+>
+> That's not a very good name for a phy? It looks like a usb module.
+>
+> The bindings specify only ti,omap-usb2 or ti,omap-usb3 for USB2 or USB3.
+> I guess it should be one of them and potentially the binding should be 
+> updated with ti,omap-usb2-phy and ti,omap-usb3-phy names while we can 
+> still do it.
+>
+>>> +            #phy-cells = <0>;
+>>> +            id = <0>;
+>>> +            status = "disabled";
+>>> +        };
+>>> +
+>>> +        phy2: usbphy2 {
+>
+> Why do you need a different node name here? It should be a generic 
+> name to identify the function, so usbphy or usb-phy seems good enough.
+
+There are 2 instances of usb controllers and these instances for those 2 
+phys, which essentially dont have any reg property. So I named it as 
+usbphy1 and usbphy2.
+>
+>>> +            compatible = "ti,am4372-usb2";
+>>> +            #phy-cells = <0>;
+>>> +            id = <1>;
+>>> +            status = "disabled";
+>>> +        };
+>>> +
+>>> +        usbctrl: omap-control-usb at 44e10620 {
+>>> +            compatible = "ti,omap-control-usb";
+>>> +            reg = <0x44e10620 0x10>;
+>>> +            reg-names = "control_dev_conf";
+>>> +            ti,type = <3>;
+>>> +            status = "disabled";
+>>> +        };
+>>> +
+>>> +        usb1: am4372_dwc3 at 48380000 {
+>>> +            status = "disabled";
+>>> +            compatible = "ti,am4372-dwc3";
+>>> +            reg = <0x48380000 0x200>;
+>>> +            interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
+>>> +            #address-cells = <1>;
+>>> +            #size-cells = <1>;
+>>> +            utmi-mode = <1>;
+>>> +            ranges;
+>
+> A blank line here will be nice.
+
+okay
+>
+>>> +            dwc3 at 48390000 {
+>>> +                compatible = "snps,dwc3";
+>>> +                reg = <0x48390000 0xd000>;
+>>> +                interrupts = <GIC_SPI  168 IRQ_TYPE_LEVEL_HIGH>;
+>>> +                phys = <&phy1>;
+>>> +                phy-names = "am4372-usb1";
+>
+> What is the purpose of the phy-names? Is it relevant to add the SoC 
+> name in something that usually, at least for the clocks and IRQs, is 
+> IP specific?
+>
+> The current documentation does not explain it and does not support 
+> phys property either.
+>
+>   synopsys DWC3 CORE
+>
+>   DWC3- USB3 CONTROLLER
+>
+>   Required properties:
+>    - compatible: must be "synopsys,dwc3"
+>    - reg : Address and length of the register set for the device
+>    - interrupts: Interrupts used by the dwc3 controller.
+>    - usb-phy : array of phandle for the PHY device
+>
+> Is there some binding update ongoing for 3.12?
+
+The phy part, especially was added with the generic phy framework in 
+mind. The generic phy framework uses phys and phy-names instead of usb-phy.
+Also all synopsys  references for compatible are being replaced with snps.
+
+>
+>>> +            };
+>>> +        };
+>>> +
+>>> +        usb2: am4372_dwc3 at 483c0000 {
+>>> +            status = "disabled";
+>>> +            compatible = "ti,am4372-dwc3";
+>>> +            reg = <0x483c0000 0x200>;
+>>> +            interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
+>>> +            #address-cells = <1>;
+>>> +            #size-cells = <1>;
+>>> +            utmi-mode = <1>;
+>>> +            ranges;
+>
+> A blank line here will be nice.
+>
+
+okay
+>>> +            dwc3 at 483d0000 {
+>>> +                compatible = "snps,dwc3";
+>>> +                reg = <0x483d0000 0xd000>;
+>>> +                interrupts = <GIC_SPI  174 IRQ_TYPE_LEVEL_HIGH>;
+>>> +                phys = <&phy2>;
+>>> +                phy-names = "am4372-usb2";
+>>> +            };
+>>> +        };
+>>>       };
+>>>   };
+>>
+>>
+>
+> Regards,
+> Benoit
+>
+
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+-George
