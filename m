@@ -1,44 +1,56 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 16 Aug 2013 15:25:38 +0800
-Subject: [PATCH RESEND] ARM: dts: vf610-twr: enable i2c0 device
-In-Reply-To: <1376629339-4647-1-git-send-email-b35083@freescale.com>
-References: <1376629339-4647-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130816072536.GA16889@S2101-09.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 16 Aug 2013 00:30:05 -0700
+Subject: [GIT PULL 2/2] minimal dra7xx support for v3.12 merge window
+In-Reply-To: <pull-1376638205-27268>
+Message-ID: <mailman.0.1376638234.1056.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 01:02:19PM +0800, Jingchang Lu wrote:
-> enable i2c0 device on Vybrid VF610 Tower Board
-> 
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
 
-Applied, thanks.
+  Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
 
-Shawn
+are available in the git repository at:
 
-> ---
->  arch/arm/boot/dts/vf610-twr.dts | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-> index b3905f5..1a58678 100644
-> --- a/arch/arm/boot/dts/vf610-twr.dts
-> +++ b/arch/arm/boot/dts/vf610-twr.dts
-> @@ -50,6 +50,13 @@
->  	status = "okay";
->  };
->  
-> +&i2c0 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c0_1>;
-> +	status = "okay";
-> +};
-> +
->  &uart1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_uart1_1>;
-> -- 
-> 1.8.0
-> 
-> 
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.12/dra7xx
+
+for you to fetch changes up to cf470a1b1a741bca00080ebc70968b4f22d9b1ea:
+
+  Merge tag 'dra7-core-support-minus-dt' of git://github.com/rrnayak/linux into omap-for-v3.12/soc (2013-08-14 01:01:41 -0700)
+
+----------------------------------------------------------------
+
+Minimal DRA7xx based SoC core support via Rajendra Nayak <rnayak@ti.com>
+
+----------------------------------------------------------------
+R Sricharan (7):
+      ARM: DRA7: Reuse all of PRCM and MPUSS SMP infra
+      ARM: DRA7: Reuse io tables and add a new .init_early
+      ARM: DRA7: Resue the clocksource, clockevent support
+      ARM: DRA7: board-generic: Add basic DT support
+      ARM: DRA7: Kconfig: Make ARCH_NR_GPIO default to 512
+      ARM: DRA7: id: Add cpu detection support for DRA7xx based SoCs'
+      ARM: DRA7: Add the build support in omap2plus
+
+Rajendra Nayak (1):
+      ARM: DRA7: hwmod: Reuse the soc_ops used for OMAP4/5
+
+Tony Lindgren (1):
+      Merge tag 'dra7-core-support-minus-dt' of git://github.com/rrnayak/linux into omap-for-v3.12/soc
+
+ Documentation/devicetree/bindings/arm/omap/omap.txt |  3 +++
+ arch/arm/Kconfig                                    |  2 +-
+ arch/arm/configs/omap2plus_defconfig                |  1 +
+ arch/arm/mach-omap1/include/mach/soc.h              |  1 +
+ arch/arm/mach-omap2/Kconfig                         | 12 ++++++++++--
+ arch/arm/mach-omap2/Makefile                        |  6 ++++++
+ arch/arm/mach-omap2/board-generic.c                 | 18 ++++++++++++++++++
+ arch/arm/mach-omap2/common.h                        |  1 +
+ arch/arm/mach-omap2/id.c                            |  4 ++--
+ arch/arm/mach-omap2/io.c                            | 20 ++++++++++++++++++--
+ arch/arm/mach-omap2/omap54xx.h                      |  4 ++++
+ arch/arm/mach-omap2/omap_hwmod.c                    |  2 +-
+ arch/arm/mach-omap2/soc.h                           | 17 +++++++++++++++++
+ arch/arm/mach-omap2/timer.c                         |  3 ++-
+ arch/arm/plat-omap/Kconfig                          |  2 +-
+ 15 files changed, 86 insertions(+), 10 deletions(-)
