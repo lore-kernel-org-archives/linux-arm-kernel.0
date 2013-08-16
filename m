@@ -1,54 +1,55 @@
-From: lantianyu1986@gmail.com (Lan Tianyu)
-Date: Fri, 16 Aug 2013 23:30:56 +0800
-Subject: [PATCH 02/34] cpufreq: acpi: remove calls to
- cpufreq_notify_transition()
-In-Reply-To: <CAKohpom7yk3Zq5JABZ6T+Z_AcMn5G1hoswZK8T=viYv0fp0mcg@mail.gmail.com>
-References: <cover.1376619363.git.viresh.kumar@linaro.org>
- <333bf5868dfbfb6de474f060dc216fa6d33848e2.1376619363.git.viresh.kumar@linaro.org>
- <CAOLK0pz7e8nQVnZY0a-j_Fd_kFOqF8ZS4tRfYw1S+25Lv8GoFQ@mail.gmail.com>
- <CAOLK0pyVDSc6x1u8Ro6ng1dH8ELqc3P9jPHamgiXBn6sWDgm8w@mail.gmail.com>
- <CAKohpom7yk3Zq5JABZ6T+Z_AcMn5G1hoswZK8T=viYv0fp0mcg@mail.gmail.com>
-Message-ID: <CAOLK0py25j2g+X0rCzDjxvFac1ZZcOS0y_sehTFYYwkz8FrUHg@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 16 Aug 2013 17:40:06 +0200
+Subject: [v3 1/2] dma: mmp_pdma: add support for residue reporting
+In-Reply-To: <520DDB81.20607@marvell.com>
+References: <1376497189-21298-1-git-send-email-zonque@gmail.com>
+ <520DDB81.20607@marvell.com>
+Message-ID: <520E47D6.8020000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/8/16 Viresh Kumar <viresh.kumar@linaro.org>:
-> On 16 August 2013 13:24, Lan Tianyu <lantianyu1986@gmail.com> wrote:
->> Sorry for misoperation.
->
-> No Problem...
->
->>                 One concern. Target() callback may return before changing
->> cpufreq actually due to some check failures. After this change, prechange
->> event will be triggered when these check failures take place. I am not sure
->> whether this should be took into account.
->
-> Yes, if you see the first patch of this series, it takes this into
-> account.. In case
-> target() failed and returned an error, we simply notify the POST CHANGE
-> notification with old frequencies instead of new ones. I believe that would be
-> enough..
+On 16.08.2013 09:57, Xiang Wang wrote:
+> On 08/15/2013 12:19 AM, Daniel Mack wrote:
+>> In order to report the channel's residue, we have to memorize the first
+>> dma buffer position when the channel is configured.
+>>
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>> ---
+>>   drivers/dma/mmp_pdma.c | 45 +++++++++++++++++++++++++++++++++++++++++++--
+>>   1 file changed, 43 insertions(+), 2 deletions(-)
+>>
+> 
+>> +static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan)
+>> +{
+>> +	struct mmp_pdma_desc_sw *sw;
+>> +	u32 curr, done = 0;
+>> +
+>> +	if (chan->dir == DMA_DEV_TO_MEM)
+>> +		curr = readl(chan->phy->base + DTADR(chan->phy->idx));
+> One concern for this patch:
+> If we call dmaengine_tx_status() after dma_do_tasklet at mmp_pdma.c, 
+> chan->phy will most likely to be NULL.
+> dma_do_tasklet() -> start_pending_queue() -> mmp_pdma_free_phy()
 
-Yes, I have seen it but I missed the following two patches because they
-are not in the linux-pm tree. You moved the cpufreq_frequency_table_target()
-to cpufreq core and before notifying PRE CHANGE notification. The major
-check has been done. Now I think it's ok. Thanks for explanation.
+Yes, I noticed this, too. I'm not really sure what the reason is to call
+start_pending_queue() _before_ the callbacks are done. A quick test
+shows that it works as well the other way around.
 
-http://www.spinics.net/lists/cpufreq/msg06970.html
-http://www.spinics.net/lists/cpufreq/msg06896.html
+> For why do we call dmaengine_tx_status() after a DMA interrupt:
+> briefly, if we use DMA to handle device trailing bytes, it'll report a 
+> DMA interrupt. We need to get to know how many bytes have been received 
+> in the IRQ handler.
+> We've discussed about this in the link below:
+> http://thread.gmane.org/gmane.linux.kernel/1500713
 
-Reviewed-by: Lan Tianyu <tianyu.lan@intel.com>
+Thanks for the link, I wasn't aware of that discussion. And I actually
+second what Andy said: As long as the residue calculation algorithm can
+cope with the chan->phy==NULL condition and return 0 in that case, it's
+actually doing the right thing, because a completed transaction has a
+residue of 0 bytes.
 
->
-> This is exactly what acpi-cpufreq and others are doing currently.
->
-> Hope I answered your question well?
->
-> --
-> viresh
-
+I'll send out another series later, that also aims to fix the tasklet
+behaviour. I'd appreciate another round of reviews :)
 
 
--- 
-Best regards
-Tianyu Lan
+Daniel
