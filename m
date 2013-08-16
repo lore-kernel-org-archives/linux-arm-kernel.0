@@ -1,40 +1,66 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 Aug 2013 17:17:18 -0600
-Subject: [PATCH RFC 3/3] spmi: document the PMIC arbiter SPMI bindings
-In-Reply-To: <A1FAB0A0-C205-4401-838C-B745B5B95FF3@codeaurora.org>
-References: <cover.1376596224.git.joshc@codeaurora.org>
- <b639088d50df93caaef8fe7e09c12953b1153ce8.1376596224.git.joshc@codeaurora.org>
- <D1534646-7CB5-4EE7-8C1E-1C607BE22396@codeaurora.org>
- <20130816192549.GG4035@joshc.qualcomm.com>
- <A1FAB0A0-C205-4401-838C-B745B5B95FF3@codeaurora.org>
-Message-ID: <520EB2FE.2030903@wwwdotorg.org>
+Date: Fri, 16 Aug 2013 17:29:00 -0600
+Subject: [PATCH v4 5/6] clocksource: armada-370-xp: Fix device-tree binding
+In-Reply-To: <20130815162751.GA2403@localhost>
+References: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1376404995-24548-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130814152621.GA18868@e106331-lin.cambridge.arm.com>
+ <20130815162751.GA2403@localhost>
+Message-ID: <520EB5BC.4060102@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/16/2013 01:48 PM, Kumar Gala wrote:
+On 08/15/2013 10:27 AM, Ezequiel Garcia wrote:
+...
+> Armada XP
+> ---------
 > 
-> On Aug 16, 2013, at 2:25 PM, Josh Cartwright wrote:
+> Two clock sources are available for timer and watchdog counters:
 > 
->> Hey Kumar-
->>
->> Thanks for the review.
->>
->> On Fri, Aug 16, 2013 at 01:53:27PM -0500, Kumar Gala wrote:
->>> On Aug 9, 2013, at 3:37 PM, Josh Cartwright wrote:
->>>
->>>> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
->>>> ---
->>>> .../devicetree/bindings/spmi/spmi-pmic-arb.txt     | 26 ++++++++++++++++++++++
->>>> 1 file changed, 26 insertions(+)
->>>> create mode 100644 Documentation/devicetree/bindings/spmi/spmi-pmic-arb.txt
->>>
->>> As this is a qcom specific binding, I think the file name should be msm-spmi-pmic-arb.txt or something like that.
->>
->> Agreed.  It might be nice to use a vendor prefix in the name too.  How's qcom,msm-pmic-arb.txt sound?
+> Just as explained for the Armada 370, the timer and watchdog counters decrement
+> rate is a configurable ratio of the L2/coherency fabric clock.
+> The current clocksource driver implementation chooses an abritrary ratio.
 > 
-> Sounds good, as I see we have other examples of having a comma in file names for bindings.
+> In addition to this, both timer and watchdog counter rate can be configured
+> to use an (internal) 25 MHz fixed clock.
 
-The rule I've applied for bindings I created is use the complete
-compatible value for the file name. Where multiple are supported (e.g.
-SoC versions), just use the first one. Then, the filename is pretty
-unambiguous, both from a point of view of `ls` and from choosing a name.
+So there are clearly two clocks fed into the HW block here. The DT
+should reflect that.
+
+> However, and as explained in this patchset, using the letter fixed clock is in
+> practice the only choice. Once CPUFreq support is implemented for the
+> Armada XP SoC the L2/coherency fabric clock will change its rate, and handling
+> such change will be problematic.
+
+It's not mandatory for an OS to implement cpufreq, so it'd be quite
+possible to still use that variable-rate clock on some HW. What SW
+may-or-may-not do on HW isn't something that should feed into the DT
+binding design.
+
+> Maybe the most accurate representation would be something like this...
+> 
+> timer {
+> 	compatible = "marvell,armada-xp-timer";
+> 	reg = ...
+> 	interrupts = ...
+> 	clocks = ... /* either 25 MHz fixed clock
+> 	              * or L2/coherency fabric clock */
+> };
+
+I think better would be:
+
+clocks = <&xxx ...> <&yyy ...>;
+clock-names = "fabric", "fixed";
+
+In the documentation for this HW block, there's a register that switches
+between the two clock sources. What names are used for the clocks in the
+documentation of that register? Those names should be used for
+clock-names entries.
+
+Is the fact that one of "fabric" and "fixed" is variable and one
+fixed-rate more a facet of the integration of the IP block into the SoC,
+and not forced by the design of the IP block itself? If so, perhaps
+you'd want some additional properties indicating which of those clocks
+was fixed and which was variable, which would allow SW to make
+intelligent decisions re: which to use. Perhaps it can be assumed this
+information can be queried from the source of the clock though?
