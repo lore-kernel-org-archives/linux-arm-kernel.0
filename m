@@ -1,38 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 Aug 2013 00:19:58 -0700
-Subject: [GIT PULL] omap fixes against v3.11-rc5
-Message-ID: <20130816071958.GB7656@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 16 Aug 2013 15:25:38 +0800
+Subject: [PATCH RESEND] ARM: dts: vf610-twr: enable i2c0 device
+In-Reply-To: <1376629339-4647-1-git-send-email-b35083@freescale.com>
+References: <1376629339-4647-1-git-send-email-b35083@freescale.com>
+Message-ID: <20130816072536.GA16889@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+On Fri, Aug 16, 2013 at 01:02:19PM +0800, Jingchang Lu wrote:
+> enable i2c0 device on Vybrid VF610 Tower Board
+> 
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
 
-  Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+Applied, thanks.
 
-are available in the git repository at:
+Shawn
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/fixes-against-rc5
-
-for you to fetch changes up to d7641b2087203b971ba4a76ffa4ecfa343b4bce0:
-
-  ARM: OMAP: rx51: change musb mode to OTG (2013-08-16 00:13:55 -0700)
-
-----------------------------------------------------------------
-Two fixes for Nokia n8x0 USB regressions and update of
-Benoit Cousson's email address.
-
-----------------------------------------------------------------
-Aaro Koskinen (1):
-      ARM: OMAP: rx51: change musb mode to OTG
-
-Benoit Cousson (1):
-      MAINTAINERS: Update email address for Benoit Cousson
-
-Daniel Mack (1):
-      ARM: OMAP2: fix musb usage for n8x0
-
- MAINTAINERS                      | 6 +++---
- arch/arm/mach-omap2/board-n8x0.c | 4 ----
- arch/arm/mach-omap2/board-rx51.c | 2 +-
- arch/arm/mach-omap2/usb-musb.c   | 5 +----
- 4 files changed, 5 insertions(+), 12 deletions(-)
+> ---
+>  arch/arm/boot/dts/vf610-twr.dts | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+> index b3905f5..1a58678 100644
+> --- a/arch/arm/boot/dts/vf610-twr.dts
+> +++ b/arch/arm/boot/dts/vf610-twr.dts
+> @@ -50,6 +50,13 @@
+>  	status = "okay";
+>  };
+>  
+> +&i2c0 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c0_1>;
+> +	status = "okay";
+> +};
+> +
+>  &uart1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_uart1_1>;
+> -- 
+> 1.8.0
+> 
+> 
