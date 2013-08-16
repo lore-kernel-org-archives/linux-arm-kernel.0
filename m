@@ -1,32 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 16 Aug 2013 14:58:37 -0700
-Subject: [GIT PULL] omap fixes against v3.11-rc5
-In-Reply-To: <20130816071958.GB7656@atomide.com>
-References: <20130816071958.GB7656@atomide.com>
-Message-ID: <CAOesGMiQBajdyW5AFJx6ASh1pHmdDPrh6Gy3o2HOBtFc9-g_Ag@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sat, 17 Aug 2013 08:13:06 +1000
+Subject: [RFC PATCH v2 3/4] powerpc: refactor of_get_cpu_node to support
+ other architectures
+In-Reply-To: <1376674791-28244-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376674791-28244-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376674791-28244-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1376691186.25016.4.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 2013-08-16 at 18:39 +0100, Sudeep KarkadaNagesha wrote:
+> +static bool __of_find_n_match_cpu_property(struct device_node *cpun,
+> +                       const char *prop_name, int cpu, unsigned int
+> *thread)
+> +{
+> +       const __be32 *cell;
+> +       int ac, prop_len, tid;
+> +       u64 hwid;
+> +
+> +       ac = of_n_addr_cells(cpun);
+> +       cell = of_get_property(cpun, prop_name, &prop_len);
+> +       if (!cell)
+> +               return false;
+> +       prop_len /= sizeof(*cell);
+> +       for (tid = 0; tid < prop_len; tid++) {
+> +               hwid = of_read_number(cell, ac);
+> +               if (arch_match_cpu_phys_id(cpu, hwid)) {
+> +                       if (thread)
+> +                               *thread = tid;
+> +                       return true;
+> +               }
+> +               cell += ac;
+> +       }
+> +       return false;
+> +}
 
+The only problem I can see here is if "ac" is not 1, that will not work
+for the ibm,ppc-interrupt-server#s case. IE. The latter is always 1 cell
+per entry, only "reg" depends on #address-cells.
 
+However that's only a theorical problem since on ppc #address-cells of
+/cpus is always 1...
 
-On Fri, Aug 16, 2013 at 12:19 AM, Tony Lindgren <tony@atomide.com> wrote:
-> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
->
->   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/fixes-against-rc5
-
-Our current fixes branch is based on -rc4, and I didn't see any of
-these commits in linux-next, so I took the liberty to rebase them back
-onto our current branch.
-
-I.e. pulled, but rebased.
-
-
-Thanks,
-
--Olof
+Cheers,
+Ben.
