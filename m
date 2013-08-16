@@ -1,46 +1,43 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Fri, 16 Aug 2013 17:06:57 +0530
-Subject: [PATCH v3 2/2] ARM: dts: AM33XX: update rtc node compatibility
-In-Reply-To: <1376653017-21935-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1376653017-21935-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1376653017-21935-3-git-send-email-gururaja.hebbar@ti.com>
+From: ruslan.bilovol@ti.com (Ruslan Bilovol)
+Date: Fri, 16 Aug 2013 15:04:29 +0300
+Subject: [PATCH v2 0/2] omap4/twl6030: typical connection to omap4 as a
+ separate dtsi file
+In-Reply-To: <520B8B45.1010300@baylibre.com>
+References: <1376469348-10797-1-git-send-email-ruslan.bilovol@ti.com>
+ <520B8B45.1010300@baylibre.com>
+Message-ID: <CAB=otbTUk68CLmgQsEoefMMFTAnZCAMbZa-yiYmn1b3F1X8BiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hebbar Gururaja <gururaja.hebbar@ti.com>
+Hi Benoit,
 
-Since AM33xx RTC IP has RTC_IRQWAKEEN to support Alarm Wake-up, update
-the rtc compatible property to enable handling of this feature inside
-rtc-omap driver.
+On Wed, Aug 14, 2013 at 4:51 PM, Benoit Cousson <bcousson@baylibre.com> wrote:
+> Hi Ruslan,
+>
+> On 14/08/2013 10:35, Ruslan Bilovol wrote:
+>>
+>> Hello,
+>>
+>> There is no functional changes between v1 and v2 - just
+>> added the patch for omap4-var-som - Uri Yosef confirmed
+>> this board have the same connection of OMAP4<->TWL6030 as
+>> SDP4430 board
+>
+>
+> The series looks good to me, but it will be good to have a test for Panda
+> and Variscite boards before merging it.
 
-Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-CC: mark.rutland at arm.com
----
-Changes in V3:
-	- Instead of replacing the old matching string, add new
-	  matching compatible as 1st and maintain old compatible string
-	  for backwards compatibility 
+Okay, so I just verified this patch series on PandaBoard ES2. Should I
+resubmit this series with
+fixed commit message?
+However I cannot verify the patch for Variscite board because I do not
+own any such board so
+you can drop that patch. But maybe Uri Yosef can verify it. Uri?
 
-Changes in V2:
-	- Add new compatible to existing one so that when driver
-	  supports enhanced features of hardware, they are available
-	  to the user else the basic functionality still works
-:100644 100644 0aaf8ce... daeafa0... M	arch/arm/boot/dts/am33xx.dtsi
- arch/arm/boot/dts/am33xx.dtsi |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> Regards,
+> Benoit
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 0aaf8ce..daeafa0 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -317,7 +317,7 @@
- 		};
- 
- 		rtc at 44e3e000 {
--			compatible = "ti,da830-rtc";
-+			compatible = "ti,am3352-rtc", "ti,da830-rtc";
- 			reg = <0x44e3e000 0x1000>;
- 			interrupts = <75
- 				      76>;
 -- 
-1.7.0.4
+Best regards,
+Ruslan Bilvol
