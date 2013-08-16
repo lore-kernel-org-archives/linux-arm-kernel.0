@@ -1,47 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 Aug 2013 00:30:05 -0700
-Subject: [GIT PULL 1/2] usb phy nop rename for v3.12 merge window
-Message-ID: <pull-1376638205-27268>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Fri, 16 Aug 2013 13:19:34 +0530
+Subject: [PATCH V2 0/4] clk: Samsung: audss: Add support for Exynos5420
+Message-ID: <1376639378-20707-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
+This patch set adds support for audio subsystem clks on Exynos5420. Exynos5420
+audio subsystem has a gate bit for ADMA controller and the some of the parent
+clks for mout_i2s and sclk_pcm are different from Exynos5250. So this patch
+adds provision for supporting both the platforms by determining the parent clk
+names based on compatible string.
 
-  Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
+Changes since V1:
+	- parent clocks are determined by using the compatible string and not
+	  passed via device tree as done in V1 because the probing order of
+	  the clock providers can't be guaranteed.
 
-are available in the git repository at:
+Andrew Bresticker (3):
+  clk: exynos-audss: add support for Exynos 5420
+  clk: exynos-audss: set correct parent clocks
+  ARM: dts: exynos5420: add audio clock controller
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.12/usb-signed
+Padmavathi Venna (1):
+  ARM: dts: Correct the /include entry on exynos5420 dtsi file
 
-for you to fetch changes up to 3fa4d7344be0afebd80382ffeea6b1787cccf971:
+ .../devicetree/bindings/clock/clk-exynos-audss.txt |    7 +++++--
+ arch/arm/boot/dts/exynos5420.dtsi                  |   11 ++++++++++-
+ drivers/clk/samsung/clk-exynos-audss.c             |   20 +++++++++++++++++++-
+ include/dt-bindings/clk/exynos-audss-clk.h         |    3 ++-
+ 4 files changed, 36 insertions(+), 5 deletions(-)
 
-  usb: phy: rename nop_usb_xceiv => usb_phy_gen_xceiv (2013-08-09 17:26:00 +0300)
-
-----------------------------------------------------------------
-USB nop phy rename via Felipe Balbi <balbi@ti.com>:
-
-Here's a pull request of one patch to avoid conflicts during the merge
-window.
-
-----------------------------------------------------------------
-Sebastian Andrzej Siewior (1):
-      usb: phy: rename nop_usb_xceiv => usb_phy_gen_xceiv
-
- arch/arm/mach-omap2/board-omap3beagle.c            |  4 +-
- arch/arm/mach-omap2/board-omap3evm.c               |  4 +-
- arch/arm/mach-omap2/board-omap3pandora.c           |  2 +-
- arch/arm/mach-omap2/usb-host.c                     | 10 ++---
- drivers/usb/dwc3/dwc3-exynos.c                     |  8 ++--
- drivers/usb/dwc3/dwc3-pci.c                        |  8 ++--
- drivers/usb/musb/am35x.c                           |  2 +-
- drivers/usb/musb/blackfin.c                        |  2 +-
- drivers/usb/musb/da8xx.c                           |  2 +-
- drivers/usb/musb/davinci.c                         |  2 +-
- drivers/usb/musb/musb_dsps.c                       |  2 +-
- drivers/usb/musb/tusb6010.c                        |  2 +-
- drivers/usb/phy/Makefile                           |  2 +-
- drivers/usb/phy/{phy-nop.c => phy-generic.c}       | 44 +++++++++++-----------
- .../usb/{nop-usb-xceiv.h => usb_phy_gen_xceiv.h}   |  4 +-
- 15 files changed, 49 insertions(+), 49 deletions(-)
- rename drivers/usb/phy/{phy-nop.c => phy-generic.c} (83%)
- rename include/linux/usb/{nop-usb-xceiv.h => usb_phy_gen_xceiv.h} (81%)
+-- 
+1.7.4.4
