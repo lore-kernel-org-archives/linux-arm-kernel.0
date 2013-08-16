@@ -1,25 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Aug 2013 17:10:35 +0200
-Subject: [PATCH 3/9] clk: u300: Fix incorrect placement of __initconst
-In-Reply-To: <1376298847-21828-3-git-send-email-sachin.kamat@linaro.org>
-References: <1376298847-21828-1-git-send-email-sachin.kamat@linaro.org>
- <1376298847-21828-3-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <CACRpkdbhNBgO65gf670NDC0BrdbQcM-V=w462dgkqutrgVLGeA@mail.gmail.com>
+From: lantianyu1986@gmail.com (Lan Tianyu)
+Date: Fri, 16 Aug 2013 23:30:56 +0800
+Subject: [PATCH 02/34] cpufreq: acpi: remove calls to
+ cpufreq_notify_transition()
+In-Reply-To: <CAKohpom7yk3Zq5JABZ6T+Z_AcMn5G1hoswZK8T=viYv0fp0mcg@mail.gmail.com>
+References: <cover.1376619363.git.viresh.kumar@linaro.org>
+ <333bf5868dfbfb6de474f060dc216fa6d33848e2.1376619363.git.viresh.kumar@linaro.org>
+ <CAOLK0pz7e8nQVnZY0a-j_Fd_kFOqF8ZS4tRfYw1S+25Lv8GoFQ@mail.gmail.com>
+ <CAOLK0pyVDSc6x1u8Ro6ng1dH8ELqc3P9jPHamgiXBn6sWDgm8w@mail.gmail.com>
+ <CAKohpom7yk3Zq5JABZ6T+Z_AcMn5G1hoswZK8T=viYv0fp0mcg@mail.gmail.com>
+Message-ID: <CAOLK0py25j2g+X0rCzDjxvFac1ZZcOS0y_sehTFYYwkz8FrUHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 11:14 AM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-
-> __initconst should be placed between the variable name and equal
-> sign for the variable to be placed in the intended section.
+2013/8/16 Viresh Kumar <viresh.kumar@linaro.org>:
+> On 16 August 2013 13:24, Lan Tianyu <lantianyu1986@gmail.com> wrote:
+>> Sorry for misoperation.
 >
-> While at it also make 'u300_clk_lookup' static as it is used only
-> in this file.
+> No Problem...
 >
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>                 One concern. Target() callback may return before changing
+>> cpufreq actually due to some check failures. After this change, prechange
+>> event will be triggered when these check failures take place. I am not sure
+>> whether this should be took into account.
+>
+> Yes, if you see the first patch of this series, it takes this into
+> account.. In case
+> target() failed and returned an error, we simply notify the POST CHANGE
+> notification with old frequencies instead of new ones. I believe that would be
+> enough..
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Yes, I have seen it but I missed the following two patches because they
+are not in the linux-pm tree. You moved the cpufreq_frequency_table_target()
+to cpufreq core and before notifying PRE CHANGE notification. The major
+check has been done. Now I think it's ok. Thanks for explanation.
 
-Yours,
-Linus Walleij
+http://www.spinics.net/lists/cpufreq/msg06970.html
+http://www.spinics.net/lists/cpufreq/msg06896.html
+
+Reviewed-by: Lan Tianyu <tianyu.lan@intel.com>
+
+>
+> This is exactly what acpi-cpufreq and others are doing currently.
+>
+> Hope I answered your question well?
+>
+> --
+> viresh
+
+
+
+-- 
+Best regards
+Tianyu Lan
