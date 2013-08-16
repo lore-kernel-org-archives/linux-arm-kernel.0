@@ -1,94 +1,59 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 16 Aug 2013 05:53:14 -0500
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 16 Aug 2013 11:56:22 +0100
 Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <520DFF6C.1040500@arm.com>
+In-Reply-To: <9E753731-852D-4F04-931B-112B589D9FFB@codeaurora.org>
 References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
  <2CD735CE-3FCF-4AB5-89C0-D813ECD19F11@codeaurora.org>
  <520C9AEA.6030507@arm.com>
- <ADB3A138-838D-4437-853A-ABFCB0B32FAB@codeaurora.org>
- <520DFF6C.1040500@arm.com>
-Message-ID: <D6F94B5E-E895-4709-81E1-66EBFB25DD27@codeaurora.org>
+ <9E753731-852D-4F04-931B-112B589D9FFB@codeaurora.org>
+Message-ID: <520E0556.5080702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Kumar,
 
-On Aug 16, 2013, at 5:31 AM, Punit Agrawal wrote:
+On 15/08/13 20:00, Kumar Gala wrote:
+>
+> On Aug 15, 2013, at 4:10 AM, Punit Agrawal wrote:
+>
+>>> What is the list of interrupts related to, should there be an associated interrupts-names
+>>>
+>>
+>> For the CCI PMU, each interrupt signal corresponds to the overflow of a performance counter.
+>>
+>> Here again, I was trying to be robust in the face of differing hardware configurations - specially the scenario where multiple interrupt lines from the CCI PMU are tied together to generate a single interrupt to the CPU.
+>
+> Even in the case of multiple interrupt lines tied together, why wouldn't you still specify each interrupt specifier and they all just be the same and thus the interrupt appears to be shared ?
+>
 
-> On 15/08/13 17:25, Kumar Gala wrote:
->> 
->> On Aug 15, 2013, at 4:10 AM, Punit Agrawal wrote:
->> 
->>> Hi Kumar,
->>> 
->>> Thanks for a review of the bindings.
->>> 
->>> On 14/08/13 22:03, Kumar Gala wrote:
->>>> 
->>>> On Jul 23, 2013, at 4:19 AM, Punit Agrawal wrote:
->>>> 
->>>>> The CCI PMU can profile bus transactions at the master and slave
->>>>> interfaces of the CCI. The PMU can be used to observe an aggregated view
->>>>> of the bus traffic between the various components connected to the CCI.
->>>>> 
->>>>> Extend the existing CCI driver to support the PMU by registering a perf
->>>>> backend for it.
->>>>> 
->>>>> Document the device tree binding to describe the CCI PMU.
->>>>> 
->>>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>>>> Cc: Nicolas Pitre <nico@linaro.org>
->>>>> Cc: Dave Martin <dave.martin@linaro.org>
->>>>> Cc: Rob Herring <rob.herring@calxeda.com>
->>>>> Cc: Will Deacon <will.deacon@arm.com>
->>>>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->>>>> Reviewed-by: Will Deacon <will.deacon@arm.com>
->>>>> ---
->>>>> Documentation/devicetree/bindings/arm/cci.txt |   38 ++
->>>>> drivers/bus/arm-cci.c                         |  642 +++++++++++++++++++++++++
->>>>> 2 files changed, 680 insertions(+)
->>>>> 
->>>>> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
->>>>> index 92d36e2..5bc95e5 100644
->>>>> --- a/Documentation/devicetree/bindings/arm/cci.txt
->>>>> +++ b/Documentation/devicetree/bindings/arm/cci.txt
->>>>> @@ -79,6 +79,34 @@ specific to ARM.
->>>>> 				    corresponding interface programming
->>>>> 				    registers.
->>>>> 
->>>>> +	- CCI PMU node
->>>>> +
->>>>> +		Node name must be "pmu".
->>>>> +		Parent node must be CCI interconnect node.
->>>>> +
->>>>> +		A CCI pmu node must contain the following properties:
->>>>> +
->>>>> +		- compatible
->>>>> +			Usage: required
->>>>> +			Value type: <string>
->>>>> +			Definition: must be set to one of
->>>>> +				    "arm,cci-400-pmu"
->>>>> +				    "arm,cci-400-pmu,rev0"
->>>>> +				    "arm,cci-400-pmu,rev1"
->>>> 
->>>> Do you really mean only one?  Seems like ""arm,cci-400-pmu,rev0", "arm,cci-400-pmu" would be valid.
->>>> 
->>> 
->>> Hmm... yes both would be valid. But...
->>> 
->>> The event numbering scheme changed between Rev 0 and Rev 1 of the CCI. If the revision is specified then it is used to get the event ranges to validate the events. If not, i.e., "arm,cci-400-pmu" is used, then the driver tries to find the the revision by reading the peripheral id registers.
->>> 
->>> I was trying to make the bindings robust in the face of change in behaviour between different revisons of the IP.
->> 
->> If there is a periph id register why bother with the device tree having different version info in it?
->> 
-> 
-> The different version strings are useful when the identification registers are either incorrect or broken.
-> 
-> But I am not aware of any such platforms currently out there. I can remove the additional compatible strings and rely on the peripheral id register solely. Do you prefer that?
+I am not quite sure what you are asking here. Are you suggesting that 
+even if the interrupts are muxed, they should be specified multiple times?
+
+Below is an update I've added to the documentation to better describe 
+the interrupts. Does this help?
+
+@@ -104,8 +103,19 @@ specific to ARM.
+                 - interrupts:
+                         Usage: required
+                         Value type: <prop-encoded-array>
+-                   Definition: comma-separated list of unique PMU
+-                               interrupts
++                 Definition: comma-separated list of counter overflow
++                             interrupts.
++
++                             The CCI PMU has an interrupt signal for each
++                             counters. Typically, the number of
++                             interrupts will be equal to the number of
++                             counters.
++
++                             On some platforms, the individual interrupt
++                             signals may be combined in some fashion
++                             before being routed to the interrupt
++                             controller resulting in less number of
++                             interrupts than counters.
+
+  * CCI interconnect bus masters
 
 
-Yes please make this change.  While I agree the compat field is useful when ID registers are broken, if they are known to be correct I would recommend utilizing them until the situation arises that they arent.
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> - k
+>
