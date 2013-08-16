@@ -1,9 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Aug 2013 07:55:14 +0530
-Subject: [PATCH 17/34] cpufreq: longhaul: set CPUFREQ_NO_NOTIFICATION flag
+Date: Fri, 16 Aug 2013 07:55:11 +0530
+Subject: [PATCH 14/34] cpufreq: ia64-acpi: remove calls to
+ cpufreq_notify_transition()
 In-Reply-To: <cover.1376619363.git.viresh.kumar@linaro.org>
 References: <cover.1376619363.git.viresh.kumar@linaro.org>
-Message-ID: <b67c7b6951b63ff38bac847e0b213bff3368e0b7.1376619363.git.viresh.kumar@linaro.org>
+Message-ID: <84963d5452aa2178f43c96c6adc87c34cdb27403.1376619363.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,25 +24,64 @@ This is replicated over all cpufreq drivers today and there doesn't exists a
 good enough reason why this shouldn't be moved to cpufreq core instead.
 
 Earlier patches have added support in cpufreq core to do cpufreq notification on
-frequency change, but this drivers needs to do this notification itself and so
-it sets its CPUFREQ_NO_NOTIFICATION flag.
+frequency change, this one removes it from this driver.
 
+Some related minor cleanups are also done along with it.
+
+Cc: Tony Luck <tony.luck@intel.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/longhaul.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/cpufreq/ia64-acpi-cpufreq.c | 19 -------------------
+ 1 file changed, 19 deletions(-)
 
-diff --git a/drivers/cpufreq/longhaul.c b/drivers/cpufreq/longhaul.c
-index 45bafdd..7359043 100644
---- a/drivers/cpufreq/longhaul.c
-+++ b/drivers/cpufreq/longhaul.c
-@@ -909,6 +909,7 @@ static int longhaul_cpu_init(struct cpufreq_policy *policy)
- }
+diff --git a/drivers/cpufreq/ia64-acpi-cpufreq.c b/drivers/cpufreq/ia64-acpi-cpufreq.c
+index 4695fa2..53c6ac6 100644
+--- a/drivers/cpufreq/ia64-acpi-cpufreq.c
++++ b/drivers/cpufreq/ia64-acpi-cpufreq.c
+@@ -141,7 +141,6 @@ processor_set_freq (
+ {
+ 	int			ret = 0;
+ 	u32			value = 0;
+-	struct cpufreq_freqs    cpufreq_freqs;
+ 	cpumask_t		saved_mask;
+ 	int			retval;
  
- static struct cpufreq_driver longhaul_driver = {
-+	.flags = CPUFREQ_NO_NOTIFICATION,
- 	.verify	= cpufreq_generic_frequency_table_verify,
- 	.target_index = longhaul_target,
- 	.get	= longhaul_get,
+@@ -168,13 +167,6 @@ processor_set_freq (
+ 	pr_debug("Transitioning from P%d to P%d\n",
+ 		data->acpi_data.state, state);
+ 
+-	/* cpufreq frequency struct */
+-	cpufreq_freqs.old = data->freq_table[data->acpi_data.state].frequency;
+-	cpufreq_freqs.new = data->freq_table[state].frequency;
+-
+-	/* notify cpufreq */
+-	cpufreq_notify_transition(policy, &cpufreq_freqs, CPUFREQ_PRECHANGE);
+-
+ 	/*
+ 	 * First we write the target state's 'control' value to the
+ 	 * control_register.
+@@ -186,22 +178,11 @@ processor_set_freq (
+ 
+ 	ret = processor_set_pstate(value);
+ 	if (ret) {
+-		unsigned int tmp = cpufreq_freqs.new;
+-		cpufreq_notify_transition(policy, &cpufreq_freqs,
+-				CPUFREQ_POSTCHANGE);
+-		cpufreq_freqs.new = cpufreq_freqs.old;
+-		cpufreq_freqs.old = tmp;
+-		cpufreq_notify_transition(policy, &cpufreq_freqs,
+-				CPUFREQ_PRECHANGE);
+-		cpufreq_notify_transition(policy, &cpufreq_freqs,
+-				CPUFREQ_POSTCHANGE);
+ 		printk(KERN_WARNING "Transition failed with error %d\n", ret);
+ 		retval = -ENODEV;
+ 		goto migrate_end;
+ 	}
+ 
+-	cpufreq_notify_transition(policy, &cpufreq_freqs, CPUFREQ_POSTCHANGE);
+-
+ 	data->acpi_data.state = state;
+ 
+ 	retval = 0;
 -- 
 1.7.12.rc2.18.g61b472e
