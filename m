@@ -1,40 +1,69 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 16 Aug 2013 12:58:49 -0700
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 16 Aug 2013 15:21:10 -0500
 Subject: [PATCH RFC 1/3] spmi: Linux driver framework for SPMI
-In-Reply-To: <20130816194714.GH4035@joshc.qualcomm.com>
+In-Reply-To: <20130816184921.GB31510@kroah.com>
 References: <cover.1376596224.git.joshc@codeaurora.org>
  <02deef1d90121011ab1df90ad704ef0ee36e2584.1376596224.git.joshc@codeaurora.org>
- <20130816184614.GA31510@kroah.com>
- <20130816194714.GH4035@joshc.qualcomm.com>
-Message-ID: <20130816195849.GA17974@kroah.com>
+ <20130816184921.GB31510@kroah.com>
+Message-ID: <20130816202110.GJ4035@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 02:47:15PM -0500, Josh Cartwright wrote:
-> > > +#ifdef CONFIG_DEBUG_FS
-> > 
-> > Why?  If debugfs isn't enabled, the functions should just compile away
-> > with the debugfs_() calls, so no need to do this type of thing here,
-> > right?
+On Fri, Aug 16, 2013 at 11:49:21AM -0700, Greg Kroah-Hartman wrote:
+> On Fri, Aug 09, 2013 at 01:37:09PM -0700, Josh Cartwright wrote:
+> > +++ b/drivers/spmi/spmi.c
+> > @@ -0,0 +1,449 @@
+[..]
+> > +static void spmi_ctrl_release(struct device *dev)
+> > +{
+> > +	struct spmi_controller *ctrl = to_spmi_controller(dev);
+> > +	complete(&ctrl->dev_released);
 > 
-> Not sure I follow you, but it may be because this is a bit misleading.
+> When is this memory going to be freed?
 > 
-> Currently CONFIG_DEBUG_FS is being extended to also mean "do you want
-> the SPMI core to create device entries?".  It would probably make more
-> sense to have a CONFIG_SPMI_DEBUG option which is def_bool DEBUG_FS, as
-> other busses have.
+> Ah, you think it will be when you remove the device later on:
 > 
-> The #ifdef here would then be #ifdef CONFIG_SPMI_DEBUG, as well as in
-> the Makefile:
+> > +int spmi_del_controller(struct spmi_controller *ctrl)
+> > +{
+> > +	struct spmi_controller *found;
+> > +
+> > +	if (!ctrl)
+> > +		return -EINVAL;
+> > +
+> > +	/* Check that the ctrl has been added */
+> > +	mutex_lock(&board_lock);
+> > +	found = idr_find(&ctrl_idr, ctrl->nr);
+> > +	mutex_unlock(&board_lock);
+> > +
+> > +	if (found != ctrl)
+> > +		return -EINVAL;
+> > +
+> > +	spmi_dfs_del_controller(ctrl);
+> > +
+> > +	/* Remove all the clients associated with this controller */
+> > +	mutex_lock(&board_lock);
+> > +	bus_for_each_dev(&spmi_bus_type, NULL, ctrl, spmi_ctrl_remove_device);
+> > +	idr_remove(&ctrl_idr, ctrl->nr);
+> > +	mutex_unlock(&board_lock);
+> > +
+> > +	init_completion(&ctrl->dev_released);
+> > +	device_unregister(&ctrl->dev);
+> > +	wait_for_completion(&ctrl->dev_released);
 > 
->   spmi-core-$(CONFIG_SPMI_DEBUG) += spmi-dbgfs.o
+> But you just leaked memory, right?
+> 
+> You should never have to wait for this to happen, why did you need to
+> add this?  Why not just a simple call to kfree() in the release
+> function?
 
-If debugfs is enabled why wouldn't you want debugfs entries for your
-devices?  Don't assume a user is going to be able to rebuild their
-kernel just for debugging stuff (hint, they usually aren't), so having
-these present, if they don't cause any performance issues, is usually
-best to always have around.
+Unfortunately, the reason why this was necessary may be lost to history.  :(
 
-thanks,
+I'll do some testing with the completion removed and a simple kfree() in
+the release and see if there is any fallout.
 
-greg k-h
+Thanks,
+  Josh
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
