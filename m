@@ -1,61 +1,72 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 Aug 2013 16:22:16 -0400
-Subject: [RFC v1 4/5] ARM: mvebu: add Armada 1500 and Sony NSZ-GS7
- device tree files
-In-Reply-To: <1376682098-10580-5-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376682098-10580-5-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130816202216.GV13964@titan.lakedaemon.net>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 16 Aug 2013 13:28:56 -0700
+Subject: [PATCH RFC 1/3] spmi: Linux driver framework for SPMI
+In-Reply-To: <20130816202110.GJ4035@joshc.qualcomm.com>
+References: <cover.1376596224.git.joshc@codeaurora.org>
+ <02deef1d90121011ab1df90ad704ef0ee36e2584.1376596224.git.joshc@codeaurora.org>
+ <20130816184921.GB31510@kroah.com>
+ <20130816202110.GJ4035@joshc.qualcomm.com>
+Message-ID: <20130816202856.GA20882@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 09:41:37PM +0200, Sebastian Hesselbarth wrote:
-> This adds very basic device tree files for the Marvell Armada 1500 SoC
-> and the Sony NSZ-GS7 GoogleTV board. Currently, SoC only has nodes for
-> cpus, some clocks, l2 cache controller, local timer, apb timers, uart,
-> and interrupt controllers.
+On Fri, Aug 16, 2013 at 03:21:10PM -0500, Josh Cartwright wrote:
+> On Fri, Aug 16, 2013 at 11:49:21AM -0700, Greg Kroah-Hartman wrote:
+> > On Fri, Aug 09, 2013 at 01:37:09PM -0700, Josh Cartwright wrote:
+> > > +++ b/drivers/spmi/spmi.c
+> > > @@ -0,0 +1,449 @@
+> [..]
+> > > +static void spmi_ctrl_release(struct device *dev)
+> > > +{
+> > > +	struct spmi_controller *ctrl = to_spmi_controller(dev);
+> > > +	complete(&ctrl->dev_released);
+> > 
+> > When is this memory going to be freed?
+> > 
+> > Ah, you think it will be when you remove the device later on:
+> > 
+> > > +int spmi_del_controller(struct spmi_controller *ctrl)
+> > > +{
+> > > +	struct spmi_controller *found;
+> > > +
+> > > +	if (!ctrl)
+> > > +		return -EINVAL;
+> > > +
+> > > +	/* Check that the ctrl has been added */
+> > > +	mutex_lock(&board_lock);
+> > > +	found = idr_find(&ctrl_idr, ctrl->nr);
+> > > +	mutex_unlock(&board_lock);
+> > > +
+> > > +	if (found != ctrl)
+> > > +		return -EINVAL;
+> > > +
+> > > +	spmi_dfs_del_controller(ctrl);
+> > > +
+> > > +	/* Remove all the clients associated with this controller */
+> > > +	mutex_lock(&board_lock);
+> > > +	bus_for_each_dev(&spmi_bus_type, NULL, ctrl, spmi_ctrl_remove_device);
+> > > +	idr_remove(&ctrl_idr, ctrl->nr);
+> > > +	mutex_unlock(&board_lock);
+> > > +
+> > > +	init_completion(&ctrl->dev_released);
+> > > +	device_unregister(&ctrl->dev);
+> > > +	wait_for_completion(&ctrl->dev_released);
+> > 
+> > But you just leaked memory, right?
+> > 
+> > You should never have to wait for this to happen, why did you need to
+> > add this?  Why not just a simple call to kfree() in the release
+> > function?
 > 
-> The clocks are fixed-clock placeholders until a real DT clock provider
-> is available. Cache controller node may be wrong and was just guessed
-> out of Armada 370 and GPL'd 1500 source. Timers except clocksource have
-> not really been tested.
+> Unfortunately, the reason why this was necessary may be lost to history.  :(
 > 
-> The separation into soc/apb and soc/sm-apb may be removed, but it looks
-> like Armada 1500 has a separate peripheral bus for the System Manager
-> core that can also been accessed by CPUs. (If you look closely on GTV
-> boot logs, you can see SM and CPU fighting for UART ;) )
-> 
-> The Sony NSZ-GS7 is a GoogleTV consumer device comprising the SoC above.
-> Since last week or so, there is a way to install a custom u-boot and
-> boot stock, unsigned kernels easily. Just ask Google about it, if you
-> are willing to void your warranty.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ian.campbell@citrix.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/boot/dts/Makefile                     |    3 +-
->  arch/arm/boot/dts/armada-1500-sony-nsz-gs7.dts |   29 +++
->  arch/arm/boot/dts/armada-1500.dtsi             |  225 ++++++++++++++++++++++++
->  3 files changed, 256 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/armada-1500-sony-nsz-gs7.dts
->  create mode 100644 arch/arm/boot/dts/armada-1500.dtsi
+> I'll do some testing with the completion removed and a simple kfree() in
+> the release and see if there is any fallout.
 
-Also, binding docs?
+There will be, you need to fix up the calling logic and the driver to
+prevent memory that it thinks it still has access to, from going away
+(that was my hint for the other patch you sent.)
 
-thx,
+thanks,
 
-Jason.
+greg k-h
