@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Aug 2013 07:55:26 +0530
-Subject: [PATCH 29/34] cpufreq: sa11x0: remove calls to
+Date: Fri, 16 Aug 2013 07:55:27 +0530
+Subject: [PATCH 30/34] cpufreq: sc520: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1376619363.git.viresh.kumar@linaro.org>
 References: <cover.1376619363.git.viresh.kumar@linaro.org>
-Message-ID: <d5201184e4b090e3be5fc55917b1c7565df4c878.1376619363.git.viresh.kumar@linaro.org>
+Message-ID: <f4529e4aed377bdcded17cd01e6a447c430bf460.1376619363.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,86 +28,41 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
-Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/sa1100-cpufreq.c | 17 ++++++-----------
- drivers/cpufreq/sa1110-cpufreq.c | 12 ++----------
- 2 files changed, 8 insertions(+), 21 deletions(-)
+ drivers/cpufreq/sc520_freq.c | 11 -----------
+ 1 file changed, 11 deletions(-)
 
-diff --git a/drivers/cpufreq/sa1100-cpufreq.c b/drivers/cpufreq/sa1100-cpufreq.c
-index aa49a08..a89c47b 100644
---- a/drivers/cpufreq/sa1100-cpufreq.c
-+++ b/drivers/cpufreq/sa1100-cpufreq.c
-@@ -180,22 +180,17 @@ static void sa1100_update_dram_timings(int current_speed, int new_speed)
- static int sa1100_target(struct cpufreq_policy *policy, unsigned int ppcr)
+diff --git a/drivers/cpufreq/sc520_freq.c b/drivers/cpufreq/sc520_freq.c
+index 6c86452..6adb354 100644
+--- a/drivers/cpufreq/sc520_freq.c
++++ b/drivers/cpufreq/sc520_freq.c
+@@ -56,17 +56,8 @@ static unsigned int sc520_freq_get_cpu_frequency(unsigned int cpu)
+ static int sc520_freq_target(struct cpufreq_policy *policy, unsigned int state)
  {
- 	unsigned int cur = sa11x0_getspeed(0);
--	struct cpufreq_freqs freqs;
-+	unsigned int new_freq;
  
--	freqs.old = cur;
--	freqs.new = sa11x0_freq_table[ppcr].frequency;
-+	new_freq = sa11x0_freq_table[ppcr].frequency;
+-	struct cpufreq_freqs	freqs;
+ 	u8 clockspeed_reg;
  
+-	freqs.old = sc520_freq_get_cpu_frequency(0);
+-	freqs.new = sc520_freq_table[state].frequency;
+-
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 -
--	if (freqs.new > cur)
--		sa1100_update_dram_timings(cur, freqs.new);
-+	if (new_freq > cur)
-+		sa1100_update_dram_timings(cur, new_freq);
- 
- 	PPCR = ppcr;
- 
--	if (freqs.new < cur)
--		sa1100_update_dram_timings(cur, freqs.new);
+-	pr_debug("attempting to set frequency to %i kHz\n",
+-			sc520_freq_table[state].frequency);
 -
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
-+	if (new_freq < cur)
-+		sa1100_update_dram_timings(cur, new_freq);
+ 	local_irq_disable();
  
+ 	clockspeed_reg = *cpuctl & ~0x03;
+@@ -74,8 +65,6 @@ static int sc520_freq_target(struct cpufreq_policy *policy, unsigned int state)
+ 
+ 	local_irq_enable();
+ 
+-	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+-
  	return 0;
  }
-diff --git a/drivers/cpufreq/sa1110-cpufreq.c b/drivers/cpufreq/sa1110-cpufreq.c
-index c00cf2b..0e52e80 100644
---- a/drivers/cpufreq/sa1110-cpufreq.c
-+++ b/drivers/cpufreq/sa1110-cpufreq.c
-@@ -232,15 +232,11 @@ sdram_update_refresh(u_int cpu_khz, struct sdram_params *sdram)
- static int sa1110_target(struct cpufreq_policy *policy, unsigned int ppcr)
- {
- 	struct sdram_params *sdram = &sdram_params;
--	struct cpufreq_freqs freqs;
- 	struct sdram_info sd;
- 	unsigned long flags;
- 	unsigned int unused;
  
--	freqs.old = sa11x0_getspeed(0);
--	freqs.new = sa11x0_freq_table[ppcr].frequency;
--
--	sdram_calculate_timing(&sd, freqs.new, sdram);
-+	sdram_calculate_timing(&sd, sa11x0_freq_table[ppcr].frequency, sdram);
- 
- #if 0
- 	/*
-@@ -259,8 +255,6 @@ static int sa1110_target(struct cpufreq_policy *policy, unsigned int ppcr)
- 	sd.mdcas[2] = 0xaaaaaaaa;
- #endif
- 
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
--
- 	/*
- 	 * The clock could be going away for some time.  Set the SDRAMs
- 	 * to refresh rapidly (every 64 memory clock cycles).  To get
-@@ -305,9 +299,7 @@ static int sa1110_target(struct cpufreq_policy *policy, unsigned int ppcr)
- 	/*
- 	 * Now, return the SDRAM refresh back to normal.
- 	 */
--	sdram_update_refresh(freqs.new, sdram);
--
--	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
-+	sdram_update_refresh(sa11x0_freq_table[ppcr].frequency, sdram);
- 
- 	return 0;
- }
 -- 
 1.7.12.rc2.18.g61b472e
