@@ -1,55 +1,72 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 16 Aug 2013 17:40:06 +0200
-Subject: [v3 1/2] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <520DDB81.20607@marvell.com>
-References: <1376497189-21298-1-git-send-email-zonque@gmail.com>
- <520DDB81.20607@marvell.com>
-Message-ID: <520E47D6.8020000@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 16 Aug 2013 21:11:30 +0530
+Subject: [PATCH v3 1/2] rtc: omap: update of_device_id to reflect latest
+ ip revisions
+In-Reply-To: <520E341D.4080206@baylibre.com>
+References: <1376653017-21935-1-git-send-email-gururaja.hebbar@ti.com>
+ <1376653017-21935-2-git-send-email-gururaja.hebbar@ti.com>
+ <520E341D.4080206@baylibre.com>
+Message-ID: <520E482A.1070504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.08.2013 09:57, Xiang Wang wrote:
-> On 08/15/2013 12:19 AM, Daniel Mack wrote:
->> In order to report the channel's residue, we have to memorize the first
->> dma buffer position when the channel is configured.
->>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
->> ---
->>   drivers/dma/mmp_pdma.c | 45 +++++++++++++++++++++++++++++++++++++++++++--
->>   1 file changed, 43 insertions(+), 2 deletions(-)
->>
+
+On 8/16/2013 7:45 PM, Benoit Cousson wrote:
+> Hi Gururaja,
 > 
->> +static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan)
->> +{
->> +	struct mmp_pdma_desc_sw *sw;
->> +	u32 curr, done = 0;
->> +
->> +	if (chan->dir == DMA_DEV_TO_MEM)
->> +		curr = readl(chan->phy->base + DTADR(chan->phy->idx));
-> One concern for this patch:
-> If we call dmaengine_tx_status() after dma_do_tasklet at mmp_pdma.c, 
-> chan->phy will most likely to be NULL.
-> dma_do_tasklet() -> start_pending_queue() -> mmp_pdma_free_phy()
+> On 16/08/2013 13:36, Hebbar, Gururaja wrote:
+>> The syntax of compatible property in DT is to mention the Most specific
+>> match to most generic match.
+>>
+>> Since AM335x is the platform with latest IP revision, add it 1st in
+>> the device id table.
+> 
+> I don't understand why? The order should not matter at all.
 
-Yes, I noticed this, too. I'm not really sure what the reason is to call
-start_pending_queue() _before_ the callbacks are done. A quick test
-shows that it works as well the other way around.
+Yes, it should not. We are trying to work around a bug in the kernel
+where the compatible order is not honored (instead the order in
+of_match[] array matters). There were patches being discussed to fix this.
 
-> For why do we call dmaengine_tx_status() after a DMA interrupt:
-> briefly, if we use DMA to handle device trailing bytes, it'll report a 
-> DMA interrupt. We need to get to know how many bytes have been received 
-> in the IRQ handler.
-> We've discussed about this in the link below:
-> http://thread.gmane.org/gmane.linux.kernel/1500713
+> 
+> I've tried to follow the thread you had with Mark on the v2, but AFAIK,
+> you've never answered to his latest question.
+> 
+> Moreover, checking the differences between the Davinci and the am3352
+> RTC IP, I would not claim that both are compatible.
+> 
+> Sure you can use the am3352 with the Davinci driver, but you will lose
+> the wakeup functionality without even being notify about that.
 
-Thanks for the link, I wasn't aware of that discussion. And I actually
-second what Andy said: As long as the residue calculation algorithm can
-cope with the chan->phy==NULL condition and return 0 in that case, it's
-actually doing the right thing, because a completed transaction has a
-residue of 0 bytes.
+When the kernel is fixed for the bug pointed out above, this should not
+happen with properly defined compatible property.
 
-I'll send out another series later, that also aims to fix the tasklet
-behaviour. I'd appreciate another round of reviews :)
+> 
+> For my point of view, compatible mean that the HW will still be fully
+> functional with both versions of the driver, which is not the case here.
 
+I do not think that's the interpretation of compatible. Its goes from
+most specific to most generic per the ePAPR spec. That in itself says
+that 100% functionality is not expected if you don't find a match for
+the more specific property.
 
-Daniel
+> 
+> am3352 DTS must use the ti,am3352-rtc to have the expected behavior.
+
+Yes, that's what patch 2/2 does.
+
+> Using the ti,da830-rtc version will not make the board working as
+> expected. So we cannot claim the compatibility.
+
+Ideally, the DT file was *always* written as
+
+	compatible = "ti,am3352-rtc", "ti,da830-rtc";
+
+even when there was no kernel support for AM3352 RTC.
+
+That way, there is no need to update the .dts[i] file. As kernel gains
+functionality, more features (like rtc wake) is available to users.
+Otherwise they get plain RTC functionality - but at least they get
+something instead of no RTC.
+
+Thanks,
+Sekhar
