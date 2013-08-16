@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Aug 2013 07:55:17 +0530
-Subject: [PATCH 20/34] cpufreq: omap: remove calls to
+Date: Fri, 16 Aug 2013 07:55:23 +0530
+Subject: [PATCH 26/34] cpufreq: pxa: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1376619363.git.viresh.kumar@linaro.org>
 References: <cover.1376619363.git.viresh.kumar@linaro.org>
-Message-ID: <f739f242fa9af3309bb454e2a885dd6dd3f80380.1376619363.git.viresh.kumar@linaro.org>
+Message-ID: <28fce5fee42ed283ec0d176c2e7be41e4eca79a4.1376619363.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,96 +28,111 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/omap-cpufreq.c | 39 ++++++++++++++-------------------------
- 1 file changed, 14 insertions(+), 25 deletions(-)
+ drivers/cpufreq/pxa2xx-cpufreq.c | 27 ++++++---------------------
+ drivers/cpufreq/pxa3xx-cpufreq.c | 12 ------------
+ 2 files changed, 6 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-index 92d45e6..97610a3 100644
---- a/drivers/cpufreq/omap-cpufreq.c
-+++ b/drivers/cpufreq/omap-cpufreq.c
-@@ -53,15 +53,15 @@ static unsigned int omap_getspeed(unsigned int cpu)
- 
- static int omap_target(struct cpufreq_policy *policy, unsigned int index)
+diff --git a/drivers/cpufreq/pxa2xx-cpufreq.c b/drivers/cpufreq/pxa2xx-cpufreq.c
+index 183bc13..0a0f436 100644
+--- a/drivers/cpufreq/pxa2xx-cpufreq.c
++++ b/drivers/cpufreq/pxa2xx-cpufreq.c
+@@ -271,7 +271,6 @@ static int pxa_set_target(struct cpufreq_policy *policy, unsigned int idx)
  {
--	int r, ret = 0;
+ 	struct cpufreq_frequency_table *pxa_freqs_table;
+ 	pxa_freqs_t *pxa_freq_settings;
 -	struct cpufreq_freqs freqs;
-+	int r, ret;
- 	struct opp *opp;
- 	unsigned long freq, volt = 0, volt_old = 0, tol = 0;
-+	unsigned int old_freq, new_freq;
+ 	unsigned long flags;
+ 	unsigned int new_freq_cpu, new_freq_mem;
+ 	unsigned int unused, preset_mdrefr, postset_mdrefr, cclkcfg;
+@@ -282,24 +281,17 @@ static int pxa_set_target(struct cpufreq_policy *policy, unsigned int idx)
  
--	freqs.old = omap_getspeed(policy->cpu);
--	freqs.new = freq_table[index].frequency;
-+	old_freq = omap_getspeed(policy->cpu);
-+	new_freq = freq_table[index].frequency;
+ 	new_freq_cpu = pxa_freq_settings[idx].khz;
+ 	new_freq_mem = pxa_freq_settings[idx].membus;
+-	freqs.old = policy->cur;
+-	freqs.new = new_freq_cpu;
  
--	freq = freqs.new * 1000;
-+	freq = new_freq * 1000;
- 	ret = clk_round_rate(mpu_clk, freq);
- 	if (IS_ERR_VALUE(ret)) {
- 		dev_warn(mpu_dev,
-@@ -77,7 +77,7 @@ static int omap_target(struct cpufreq_policy *policy, unsigned int index)
- 		if (IS_ERR(opp)) {
- 			rcu_read_unlock();
- 			dev_err(mpu_dev, "%s: unable to find MPU OPP for %d\n",
--				__func__, freqs.new);
-+				__func__, new_freq);
- 			return -EINVAL;
- 		}
- 		volt = opp_get_voltage(opp);
-@@ -87,43 +87,32 @@ static int omap_target(struct cpufreq_policy *policy, unsigned int index)
- 	}
+ 	if (freq_debug)
+ 		pr_debug("Changing CPU frequency to %d Mhz, (SDRAM %d Mhz)\n",
+-			 freqs.new / 1000, (pxa_freq_settings[idx].div2) ?
++			 new_freq_cpu / 1000, (pxa_freq_settings[idx].div2) ?
+ 			 (new_freq_mem / 2000) : (new_freq_mem / 1000));
  
- 	dev_dbg(mpu_dev, "cpufreq-omap: %u MHz, %ld mV --> %u MHz, %ld mV\n", 
--		freqs.old / 1000, volt_old ? volt_old / 1000 : -1,
--		freqs.new / 1000, volt ? volt / 1000 : -1);
--
--	/* notifiers */
+-	if (vcc_core && freqs.new > freqs.old)
++	if (vcc_core && new_freq_cpu > policy->cur) {
+ 		ret = pxa_cpufreq_change_voltage(&pxa_freq_settings[idx]);
+-	if (ret)
+-		return ret;
+-	/*
+-	 * Tell everyone what we're about to do...
+-	 * you should add a notify client with any platform specific
+-	 * Vcc changing capability
+-	 */
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
-+		old_freq / 1000, volt_old ? volt_old / 1000 : -1,
-+		new_freq / 1000, volt ? volt / 1000 : -1);
++		if (ret)
++			return ret;
++	}
  
- 	/* scaling up?  scale voltage before frequency */
--	if (mpu_reg && (freqs.new > freqs.old)) {
-+	if (mpu_reg && (new_freq > old_freq)) {
- 		r = regulator_set_voltage(mpu_reg, volt - tol, volt + tol);
- 		if (r < 0) {
- 			dev_warn(mpu_dev, "%s: unable to scale voltage up.\n",
- 				 __func__);
--			freqs.new = freqs.old;
--			goto done;
-+			return r;
- 		}
- 	}
+ 	/* Calculate the next MDREFR.  If we're slowing down the SDRAM clock
+ 	 * we need to preset the smaller DRI before the change.	 If we're
+@@ -350,13 +342,6 @@ static int pxa_set_target(struct cpufreq_policy *policy, unsigned int idx)
+ 	local_irq_restore(flags);
  
--	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
-+	ret = clk_set_rate(mpu_clk, new_freq * 1000);
- 
- 	/* scaling down?  scale voltage after frequency */
--	if (mpu_reg && (freqs.new < freqs.old)) {
-+	if (mpu_reg && (new_freq < old_freq)) {
- 		r = regulator_set_voltage(mpu_reg, volt - tol, volt + tol);
- 		if (r < 0) {
- 			dev_warn(mpu_dev, "%s: unable to scale voltage down.\n",
- 				 __func__);
--			ret = clk_set_rate(mpu_clk, freqs.old * 1000);
--			freqs.new = freqs.old;
--			goto done;
-+			clk_set_rate(mpu_clk, old_freq * 1000);
-+			return r;
- 		}
- 	}
- 
--	freqs.new = omap_getspeed(policy->cpu);
--
--done:
--	/* notifiers */
+ 	/*
+-	 * Tell everyone what we've just done...
+-	 * you should add a notify client with any platform specific
+-	 * SDRAM refresh timer adjustments
+-	 */
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 -
- 	return ret;
+-	/*
+ 	 * Even if voltage setting fails, we don't report it, as the frequency
+ 	 * change succeeded. The voltage reduction is not a critical failure,
+ 	 * only power savings will suffer from this.
+@@ -365,7 +350,7 @@ static int pxa_set_target(struct cpufreq_policy *policy, unsigned int idx)
+ 	 * bug is triggered (seems a deadlock). Should anybody find out where,
+ 	 * the "return 0" should become a "return ret".
+ 	 */
+-	if (vcc_core && freqs.new < freqs.old)
++	if (vcc_core && new_freq_cpu < policy->cur)
+ 		ret = pxa_cpufreq_change_voltage(&pxa_freq_settings[idx]);
+ 
+ 	return 0;
+diff --git a/drivers/cpufreq/pxa3xx-cpufreq.c b/drivers/cpufreq/pxa3xx-cpufreq.c
+index 132e37d..9384004 100644
+--- a/drivers/cpufreq/pxa3xx-cpufreq.c
++++ b/drivers/cpufreq/pxa3xx-cpufreq.c
+@@ -158,7 +158,6 @@ static unsigned int pxa3xx_cpufreq_get(unsigned int cpu)
+ static int pxa3xx_cpufreq_set(struct cpufreq_policy *policy, unsigned int index)
+ {
+ 	struct pxa3xx_freq_info *next;
+-	struct cpufreq_freqs freqs;
+ 	unsigned long flags;
+ 
+ 	if (policy->cpu != 0)
+@@ -166,22 +165,11 @@ static int pxa3xx_cpufreq_set(struct cpufreq_policy *policy, unsigned int index)
+ 
+ 	next = &pxa3xx_freqs[index];
+ 
+-	freqs.old = policy->cur;
+-	freqs.new = next->cpufreq_mhz * 1000;
+-
+-	pr_debug("CPU frequency from %d MHz to %d MHz%s\n",
+-			freqs.old / 1000, freqs.new / 1000,
+-			(freqs.old == freqs.new) ? " (skipped)" : "");
+-
+-	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+-
+ 	local_irq_save(flags);
+ 	__update_core_freq(next);
+ 	__update_bus_freq(next);
+ 	local_irq_restore(flags);
+ 
+-	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+-
+ 	return 0;
  }
  
 -- 
