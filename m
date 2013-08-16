@@ -1,60 +1,65 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Fri, 16 Aug 2013 14:25:49 -0500
-Subject: [PATCH RFC 3/3] spmi: document the PMIC arbiter SPMI bindings
-In-Reply-To: <D1534646-7CB5-4EE7-8C1E-1C607BE22396@codeaurora.org>
-References: <cover.1376596224.git.joshc@codeaurora.org>
- <b639088d50df93caaef8fe7e09c12953b1153ce8.1376596224.git.joshc@codeaurora.org>
- <D1534646-7CB5-4EE7-8C1E-1C607BE22396@codeaurora.org>
-Message-ID: <20130816192549.GG4035@joshc.qualcomm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 16 Aug 2013 21:41:33 +0200
+Subject: [RFC v1 0/5] ARM: Initial support for Marvell Armada 1500
+Message-ID: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Kumar-
+This is a RFC adding initial support for the Marvell Armada 1500
+(88DE3100) found on various consumer devices (Chromecast, GoogleTV).
 
-Thanks for the review.
+Actually, it is a two-fold RFC also raising discussions on mach-mvebu
+cleanup roadmap to allow other SoCs to hop into it. While mach-mvebu
+originally was created to add support for Armada 370/XP and merge
+existing Marvell Orion familiy into it, I am not so sure about
+Armada 1500 fits that well (the mbus has gone!).
 
-On Fri, Aug 16, 2013 at 01:53:27PM -0500, Kumar Gala wrote:
-> On Aug 9, 2013, at 3:37 PM, Josh Cartwright wrote:
-> 
-> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> > ---
-> > .../devicetree/bindings/spmi/spmi-pmic-arb.txt     | 26 ++++++++++++++++++++++
-> > 1 file changed, 26 insertions(+)
-> > create mode 100644 Documentation/devicetree/bindings/spmi/spmi-pmic-arb.txt
-> 
-> As this is a qcom specific binding, I think the file name should be msm-spmi-pmic-arb.txt or something like that.
+If you are brave enough to try this on any GoogleTV, hit Google for
+instructions on how to get a unlocked u-boot and void your warranty :)
+The patches are based on v3.11-rc5 directly.
 
-Agreed.  It might be nice to use a vendor prefix in the name too.  How's qcom,msm-pmic-arb.txt sound?
+This cover letter and the separate patches have also been Cc'd to the
+respective maintainers to clear up some questions before posting a real
+patch set.
 
-> > diff --git a/Documentation/devicetree/bindings/spmi/spmi-pmic-arb.txt b/Documentation/devicetree/bindings/spmi/spmi-pmic-arb.txt
-> > new file mode 100644
-> > index 0000000..1c14bf4
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/spmi/spmi-pmic-arb.txt
-> > @@ -0,0 +1,26 @@
-> > +Qualcomm SPMI Controller (PMIC Arbiter)
-> 
-> We should get in the habit of trying to have at least one sentence about what the device is or does.
+Sebastian Hesselbarth (5):
+  irqchip: add Armada 1500 APB interrupt controller
+  ARM: mvebu: add Armada 1500 to defconfig
+  ARM: mvebu: add Armada 150 uart to lowlevel debug
+  ARM: mvebu: add Armada 1500 and Sony NSZ-GS7 device tree files
+  ARM: mvebu: add board init for Armada 1500
 
-Certainly.
+ arch/arm/boot/dts/Makefile                     |    3 +-
+ arch/arm/boot/dts/armada-1500-sony-nsz-gs7.dts |   29 +++
+ arch/arm/boot/dts/armada-1500.dtsi             |  225 ++++++++++++++++++++++++
+ arch/arm/configs/mvebu_defconfig               |    1 +
+ arch/arm/include/debug/mvebu.S                 |   26 +--
+ arch/arm/mach-mvebu/Kconfig                    |   15 ++
+ arch/arm/mach-mvebu/Makefile                   |   13 +-
+ arch/arm/mach-mvebu/armada-1500.c              |   63 +++++++
+ drivers/irqchip/Makefile                       |    1 +
+ drivers/irqchip/irq-armada-1500-apb.c          |  108 ++++++++++++
+ 10 files changed, 467 insertions(+), 17 deletions(-)
+ create mode 100644 arch/arm/boot/dts/armada-1500-sony-nsz-gs7.dts
+ create mode 100644 arch/arm/boot/dts/armada-1500.dtsi
+ create mode 100644 arch/arm/mach-mvebu/armada-1500.c
+ create mode 100644 drivers/irqchip/irq-armada-1500-apb.c
 
-> > +
-> > +Required properties:
-> > +- compatible : should be "qcom,spmi-pmic-arb".
-> > +- reg-names  : should be "core", "intr", "cnfg"
-> > +- reg : offset and length of the PMIC Arbiter Core register map.
-> > +- reg : offset and length of the PMIC Arbiter Interrupt controller register map.
-> > +- reg : offset and length of the PMIC Arbiter Configuration register map.
-> > +- #address-cells : must be set to 1
-> > +- #size-cells : must be set to 0
-> 
-> Hmm, you aren't describe anything about child nodes.
-
-Indeed.  I'll put together a generic SPMI binding document as you had
-suggested before and reference it in this binding.
-
-  Josh
-
+---
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ian.campbell@citrix.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.10.4
