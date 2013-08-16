@@ -1,101 +1,78 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 15 Aug 2013 18:31:19 -0700
-Subject: [PATCH v1 03/14] clk: Add of_clk_match() for device drivers
-In-Reply-To: <20130815050226.4443.39100@quantum>
-References: <1374713022-6049-1-git-send-email-sboyd@codeaurora.org>
- <1374713022-6049-4-git-send-email-sboyd@codeaurora.org>
- <20130812202347.5348.76490@quantum>
- <20130813054839.GF14845@codeaurora.org>
- <20130815050226.4443.39100@quantum>
-Message-ID: <20130816013118.GC27999@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 15 Aug 2013 19:00:58 -0700
+Subject: [PATCH] clk: clk-divider: Export clk_register_divider()
+In-Reply-To: <1375460047-27160-1-git-send-email-festevam@gmail.com>
+References: <1375460047-27160-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130816020058.4443.17923@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14, Mike Turquette wrote:
-> Quoting Stephen Boyd (2013-08-12 22:48:39)
-> > On 08/12, Mike Turquette wrote:
-> > > Quoting Stephen Boyd (2013-07-24 17:43:31)
-> > > > In similar fashion as of_regulator_match() add an of_clk_match()
-> > > > function that finds an initializes clock init_data structs from
-> > > > devicetree. Drivers should use this API to find clocks that their
-> > > > device is providing and then iterate over their match table
-> > > > registering the clocks with the init data parsed.
-> > > > 
-> > > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > > 
-> > > Stephen,
-> > > 
-> > > In general I like this approach. Writing real device drivers for clock
-> > > controllers is The Right Way and of_clk_match helps.
-> > > 
-> > > Am I reading this correctly that the base register addresses/offsets for
-> > > the clock nodes still come from C files? For example I still see
-> > > pll8_desc defining reg stuff in drivers/clk/msm/gcc-8960.c.
-> > 
-> > I think we may be able to put the registers in DT but I don't
-> > know why we need to do that if we're already matching up nodes
-> > with C structs.
+Quoting Fabio Estevam (2013-08-02 09:14:07)
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> The reason to do so is to remove the per-clock data from the kernel
-> sources entirely. Separating logic and data.
+> clk_register_divider() needs to be exported so that it could be used
+> in a module driver, otherwise we get the following error:
+> 
+> ERROR: "clk_register_divider" [sound/soc/mxs/snd-soc-mxs.ko] undefined!
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  drivers/clk/clk-divider.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index 6d55eb2..98ee97f 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -317,6 +317,7 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
+>         return _register_divider(dev, name, parent_name, flags, reg, shift,
+>                         width, clk_divider_flags, NULL, lock);
+>  }
+> +EXPORT_SYMBOL_GPL(clk_register_divider);
+>  
+>  /**
+>   * clk_register_divider_table - register a table based divider clock with
+> -- 
+> 1.8.1.2
 
-Ok.
+Taken into clk-next. I also exported clk_register_divider_table. Updated
+patch below:
 
-> 
-> > It also made me want to introduce devm_of_iomap()
-> > which just seemed wrong (if you have a dev struct why can't you
-> > use devm_ioremap()).
-> > 
-[snip]
-> > 
-> > This is great for making the kernel DT-data-driven, but I
-> > couldn't find any other driver that was describing register level
-> > details in DT.
-> 
-> Yeah, this sucks. Building a binding from a C struct is a bad idea. How
-> many permutations are there? Hopefully some clocks use the same bit
-> shifts and have reliable register offsets, with the only difference
-> being base address. If this is the case then a compatible string could
-> be done for each permutation assuming that number is low and manageable.
 
-In the multimedia controller almost every clock has a different
-register layout. Making a compatible string for each clock is
-pretty much what I've done if you consider that I match up the
-name of the node to a struct instead of matching a compatible
-string to a struct. In the global controller it's more sane,
-following a single register layout per compatible string.
-Remember though, all the single bit clocks (gates or what we call
-branches) have a completely random location for their on/off bit
-and status bit.
 
-> 
-> > 
-> > The good news is that newer clock controllers follow a standard
-> > and so we can specify one or two register properties and the type
-> > of clock and we're pretty much done. The software interface
-> > hasn't been randomized like on earlier controllers and bits
-> > within registers are always the same.
-> 
-> This does not suck. Just for the sake of argument let's say that you
-> only had to deal with this new and improved register layout and not the
-> old (current) stuff. Do you still see a reason to match DT data up with
-> C struct data objects in the kernel?
+>From 43cf78b2d87c525d009515c936e4ad2c6c7cfc24 Mon Sep 17 00:00:00 2001
+From: Fabio Estevam <fabio.estevam@freescale.com>
+Date: Fri, 2 Aug 2013 13:14:07 -0300
+Subject: [PATCH] clk: clk-divider: Export clk_register_divider()
 
-I would still need to match up frequency tables unless I figure
-out a way to put that in DT too.
+clk_register_divider() needs to be exported so that it could be used
+in a module driver, otherwise we get the following error:
 
-> 
-> > We still have some clocks
-> > that are just on/off switches though and so we'll have to put
-> > register level details like which bit turns that clock on in DT
-> > (which I believe is not preferred/allowed?). I don't see any way
-> > to avoid that if we want it to be entirely DT driven.
-> 
-> This is what I'm doing for the generic clock bindings. No one has
-> screamed over that stuff so I guess rules were meant to be broken.
-> 
+ERROR: "clk_register_divider" [sound/soc/mxs/snd-soc-mxs.ko] undefined!
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+[mturquette at linaro.org: also export clk_register_divider_table]
+---
+ drivers/clk/clk-divider.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 6d55eb2..749372f 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -317,6 +317,7 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
+ 	return _register_divider(dev, name, parent_name, flags, reg, shift,
+ 			width, clk_divider_flags, NULL, lock);
+ }
++EXPORT_SYMBOL_GPL(clk_register_divider);
  
-
+ /**
+  * clk_register_divider_table - register a table based divider clock with
+@@ -341,3 +342,4 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
+ 	return _register_divider(dev, name, parent_name, flags, reg, shift,
+ 			width, clk_divider_flags, table, lock);
+ }
++EXPORT_SYMBOL_GPL(clk_register_divider_table);
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.1.2
