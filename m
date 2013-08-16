@@ -1,37 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 16 Aug 2013 09:04:41 -0700
-Subject: Broken device trees for exynos in linux-next
-In-Reply-To: <13b101ce9a14$2cebd700$86c38500$@org>
-References: <CAOesGMgv9gTQ_NtaKZY_ZfLD1NBU19E-vaLaWwmvGJJB1MQrwg@mail.gmail.com>
- <13b101ce9a14$2cebd700$86c38500$@org>
-Message-ID: <CAOesGMiyNM6VdNzKQU3XwoiacJV8hc60mcLiH+vHoS6xJM6q-A@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 16 Aug 2013 10:06:46 -0600
+Subject: [PATCH v5 2/3] drivers: of: add initialization code for dma
+ reserved memory
+In-Reply-To: <20130816052520.GA7035@quad.lixom.net>
+References: <1376049119-12655-1-git-send-email-m.szyprowski@samsung.com>
+ <1376049119-12655-3-git-send-email-m.szyprowski@samsung.com>
+ <520A924C.6070309@wwwdotorg.org> <20130816052520.GA7035@quad.lixom.net>
+Message-ID: <520E4E16.3040408@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 5:04 PM, Kukjin Kim <kgene@kernel.org> wrote:
-> I think, maybe we discussed about that? :) current exynos_defconfig cannot
-> support exynos5440 because of LPAE and I remember we decided LPAE and
-> non-LPAE should be separated. So as I commented before, exynos5440_defconfig
-> is needed. If you have any concerns, please let me know.
+On 08/15/2013 11:25 PM, Olof Johansson wrote:
+> On Tue, Aug 13, 2013 at 02:08:44PM -0600, Stephen Warren wrote:
+>> On 08/09/2013 05:51 AM, Marek Szyprowski wrote:
+>>> Add device tree support for contiguous and reserved memory regions
+>>> defined in device tree. Initialization is done in 2 steps. First, the
+>>> memory is reserved, what happens very early when only flattened device
+>>> tree is available. Then on device initialization the corresponding cma
+>>> and reserved regions are assigned to each device structure.
+>>
+>> Hmmm. This seems an awful lot like putting SW configuration/policy
+>> information into DT rather than HW description. This feels like a
+>> slippery slope... Isn't this kind of thing better handled by a kernel
+>> command-line option to set up the CMA size?
+> 
+> Sorry, you were not part of the in-person discussion since it happened
+> at Linaro Connect in Dublin. The concern is that we really need a way
+> to describe some of these _system_ properties. They're not necessarily
+> hardware properties, but they are well-known and likely properties of
+> the system that is running.
 
-Having a SoC-specific defconfig makes no sense. You can run with LPAE
-enabled on A15 and A7-based systems even if they don't have enough
-memory to need it.
+OK, that seems reasonable enough. It's just the first I heard of this.
 
-Really, what we want is to just turn on the LPAE functionality and
-keep everything else common. Forking into two defconfigs seems like
-the wrong idea, even if we did discuss it before. Having something
-like a config fragment to include would make more sense, since that
-could be shared across all platforms (and apply with
-multi_v7_defconfig for those who want to run that on LPAE as well).
-
-Or, you know, just have your build script enable it without having an
-in-tree config fragment. That'd work too.
-
-The main case where this isn't sufficient is on platforms where _all_
-memory sits above 4G, since you can't boot a non-LPAE kernel on those
-at all. It seems like 5440 has memory starting at 2GB so it's not one
-of those.
-
-
--Olof
+I rather suspect that similar arguments will be applied to a bunch of
+other data people want to put into DT. I guess we'll just have to wait
+and see what gets proposed, and what really is "system data" rather than
+policy:-)
