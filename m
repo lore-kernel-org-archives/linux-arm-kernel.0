@@ -1,186 +1,38 @@
-From: george.cherian@ti.com (George Cherian)
-Date: Fri, 16 Aug 2013 08:49:26 +0530
-Subject: [PATCH v3] arm: dts: AM43x: Add usb DT nodes for AM4372
-In-Reply-To: <520B958B.1000900@baylibre.com>
-References: <1373444082-4169-1-git-send-email-george.cherian@ti.com>
- <520B9144.5000701@ti.com> <520B958B.1000900@baylibre.com>
-Message-ID: <520D9A3E.1040903@ti.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Fri, 16 Aug 2013 09:04:01 +0530
+Subject: Broken device trees for exynos in linux-next
+In-Reply-To: <20130816004202.GA28985@sirena.org.uk>
+References: <CAOesGMgv9gTQ_NtaKZY_ZfLD1NBU19E-vaLaWwmvGJJB1MQrwg@mail.gmail.com>
+ <13b101ce9a14$2cebd700$86c38500$@org>
+ <20130816003557.GJ30073@sirena.org.uk>
+ <20130816004202.GA28985@sirena.org.uk>
+Message-ID: <CAAgF-BcwfSGo0odosVS=zYHQ5-6rGpuxLRRMRSBOp1=GGNqiuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit ,
+Hi,
 
-Thanks for your review.
+On Fri, Aug 16, 2013 at 6:12 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, Aug 16, 2013 at 01:35:57AM +0100, Mark Brown wrote:
+>> On Fri, Aug 16, 2013 at 09:04:28AM +0900, Kukjin Kim wrote:
+>
+>> > NO, the build breakage is due to commit 6187288f15bc ("ARM: dts: exynos5250:
+>> > move common i2s properties to exynos5 dtsi" which is in Mark Brown's tree.
+>
+>> > Mark, pleaser revert it in your tree...
+>
+>> I'll do that but I don't know if that's then going to break anything
+>> else.  This sort of bisection/cross tree issue does come up a lot with
+>> the Samsung SoCs - it'd be good if you could remind the people working
+>> on them about the need to make sure that when there are dependencies
+>> they're handled when things are merged.
+>
+> I also had to revert "ARM: dts: Change i2s compatible string on
+> exynos5250" from my tree since it depended on the above commit.  I
+> suspect this may leave the driver broken and we'll need a new version
+> before the merge window...
 
-On 8/14/2013 8:04 PM, Benoit Cousson wrote:
-> + Roger
->
-> Hi George,
->
-> Yes, I had some comment about the "ti'type" in Roger's series that 
-> will be applicable here as well.
->
+I apologize for this bisection. Soon I will post a new patch for this.
 
-
->
-> On 14/08/2013 16:16, George Cherian wrote:
->> +Benoit
->>   If you dont have any comments, can you take this for 3.12?
->>
->> Regards
->> -George
->>
->> On 7/10/2013 1:44 PM, George Cherian wrote:
->>
->>> This patch adds
->>>     - HS USB nodes
->>>     - phy nodes
->>>     - usb control module nodes.
->>>
->>> Signed-off-by: George Cherian <george.cherian@ti.com>
->>> ---
->>>
->>> changes from v2
->>> change synopsis to snps
->>> use simple node names
->>> add both USB and PHY instances
->>> add usbctrl node
->>>
->>> changes from v1
->>> renamed synopsis to snps
->>> removed flag tx-fifo-resize
->>>
->>>   arch/arm/boot/dts/am4372.dtsi | 58
->>> +++++++++++++++++++++++++++++++++++++++++++
->>>   1 file changed, 58 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/am4372.dtsi
->>> b/arch/arm/boot/dts/am4372.dtsi
->>> index ddc1df7..37f196f 100644
->>> --- a/arch/arm/boot/dts/am4372.dtsi
->>> +++ b/arch/arm/boot/dts/am4372.dtsi
->>> @@ -64,5 +64,63 @@
->>>               compatible = "ti,am4372-counter32k","ti,omap-counter32k";
->>>               reg = <0x44e86000 0x40>;
->>>           };
->>> +
->>> +        phy1: usbphy1 {
->>> +            compatible = "ti,am4372-usb2";
->
-> That's not a very good name for a phy? It looks like a usb module.
->
-> The bindings specify only ti,omap-usb2 or ti,omap-usb3 for USB2 or USB3.
-> I guess it should be one of them and potentially the binding should be 
-> updated with ti,omap-usb2-phy and ti,omap-usb3-phy names while we can 
-> still do it.
->
->>> +            #phy-cells = <0>;
->>> +            id = <0>;
->>> +            status = "disabled";
->>> +        };
->>> +
->>> +        phy2: usbphy2 {
->
-> Why do you need a different node name here? It should be a generic 
-> name to identify the function, so usbphy or usb-phy seems good enough.
-
-There are 2 instances of usb controllers and these instances for those 2 
-phys, which essentially dont have any reg property. So I named it as 
-usbphy1 and usbphy2.
->
->>> +            compatible = "ti,am4372-usb2";
->>> +            #phy-cells = <0>;
->>> +            id = <1>;
->>> +            status = "disabled";
->>> +        };
->>> +
->>> +        usbctrl: omap-control-usb at 44e10620 {
->>> +            compatible = "ti,omap-control-usb";
->>> +            reg = <0x44e10620 0x10>;
->>> +            reg-names = "control_dev_conf";
->>> +            ti,type = <3>;
->>> +            status = "disabled";
->>> +        };
->>> +
->>> +        usb1: am4372_dwc3 at 48380000 {
->>> +            status = "disabled";
->>> +            compatible = "ti,am4372-dwc3";
->>> +            reg = <0x48380000 0x200>;
->>> +            interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
->>> +            #address-cells = <1>;
->>> +            #size-cells = <1>;
->>> +            utmi-mode = <1>;
->>> +            ranges;
->
-> A blank line here will be nice.
-
-okay
->
->>> +            dwc3 at 48390000 {
->>> +                compatible = "snps,dwc3";
->>> +                reg = <0x48390000 0xd000>;
->>> +                interrupts = <GIC_SPI  168 IRQ_TYPE_LEVEL_HIGH>;
->>> +                phys = <&phy1>;
->>> +                phy-names = "am4372-usb1";
->
-> What is the purpose of the phy-names? Is it relevant to add the SoC 
-> name in something that usually, at least for the clocks and IRQs, is 
-> IP specific?
->
-> The current documentation does not explain it and does not support 
-> phys property either.
->
->   synopsys DWC3 CORE
->
->   DWC3- USB3 CONTROLLER
->
->   Required properties:
->    - compatible: must be "synopsys,dwc3"
->    - reg : Address and length of the register set for the device
->    - interrupts: Interrupts used by the dwc3 controller.
->    - usb-phy : array of phandle for the PHY device
->
-> Is there some binding update ongoing for 3.12?
-
-The phy part, especially was added with the generic phy framework in 
-mind. The generic phy framework uses phys and phy-names instead of usb-phy.
-Also all synopsys  references for compatible are being replaced with snps.
-
->
->>> +            };
->>> +        };
->>> +
->>> +        usb2: am4372_dwc3 at 483c0000 {
->>> +            status = "disabled";
->>> +            compatible = "ti,am4372-dwc3";
->>> +            reg = <0x483c0000 0x200>;
->>> +            interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
->>> +            #address-cells = <1>;
->>> +            #size-cells = <1>;
->>> +            utmi-mode = <1>;
->>> +            ranges;
->
-> A blank line here will be nice.
->
-
-okay
->>> +            dwc3 at 483d0000 {
->>> +                compatible = "snps,dwc3";
->>> +                reg = <0x483d0000 0xd000>;
->>> +                interrupts = <GIC_SPI  174 IRQ_TYPE_LEVEL_HIGH>;
->>> +                phys = <&phy2>;
->>> +                phy-names = "am4372-usb2";
->>> +            };
->>> +        };
->>>       };
->>>   };
->>
->>
->
-> Regards,
-> Benoit
->
-
-
--- 
--George
+Thanks
+Padma
