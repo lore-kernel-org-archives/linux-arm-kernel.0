@@ -1,66 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 16 Aug 2013 20:59:55 +0200
-Subject: [GIT PULL] Allwinner sunXi DT additions for 3.12
-Message-ID: <20130816185955.GA30005@lukather>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 16 Aug 2013 14:04:22 -0500
+Subject: [PATCH RFC 1/3] spmi: Linux driver framework for SPMI
+In-Reply-To: <02deef1d90121011ab1df90ad704ef0ee36e2584.1376596224.git.joshc@codeaurora.org>
+References: <cover.1376596224.git.joshc@codeaurora.org>
+ <02deef1d90121011ab1df90ad704ef0ee36e2584.1376596224.git.joshc@codeaurora.org>
+Message-ID: <1E157BCF-C34F-4839-AFE0-CBECA828B221@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+On Aug 9, 2013, at 3:37 PM, Josh Cartwright wrote:
 
-are available in the git repository at:
+> From: Kenneth Heitke <kheitke@codeaurora.org>
+> 
+> System Power Management Interface (SPMI) is a specification
+> developed by the MIPI (Mobile Industry Process Interface) Alliance
+> optimized for the real time control of Power Management ICs (PMIC).
+> 
+> SPMI is a two-wire serial interface that supports up to 4 master
+> devices and up to 16 logical slaves.
+> 
+> The framework supports message APIs, multiple busses (1 controller
+> per bus) and multiple clients/slave devices per controller.
+> 
+> Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
+> Signed-off-by: Michael Bohan <mbohan@codeaurora.org>
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> ---
+> drivers/Kconfig                 |   2 +
+> drivers/Makefile                |   1 +
+> drivers/of/Kconfig              |   6 +
+> drivers/of/Makefile             |   1 +
+> drivers/of/of_spmi.c            |  74 +++++
+> drivers/spmi/Kconfig            |   9 +
+> drivers/spmi/Makefile           |   7 +
+> drivers/spmi/spmi-dbgfs.c       | 591 ++++++++++++++++++++++++++++++++++++++++
+> drivers/spmi/spmi-dbgfs.h       |  37 +++
+> drivers/spmi/spmi.c             | 449 ++++++++++++++++++++++++++++++
+> include/linux/mod_devicetable.h |   8 +
+> include/linux/of_spmi.h         |  37 +++
+> include/linux/spmi.h            | 337 +++++++++++++++++++++++
+> 13 files changed, 1559 insertions(+)
+> create mode 100644 drivers/of/of_spmi.c
+> create mode 100644 drivers/spmi/Kconfig
+> create mode 100644 drivers/spmi/Makefile
+> create mode 100644 drivers/spmi/spmi-dbgfs.c
+> create mode 100644 drivers/spmi/spmi-dbgfs.h
+> create mode 100644 drivers/spmi/spmi.c
+> create mode 100644 include/linux/of_spmi.h
+> create mode 100644 include/linux/spmi.h
 
-  https://github.com/mripard/linux.git tags/sunxi-dt-for-3.12
+Looks like you are missing a patch for the general OF binding for SPMI
 
-for you to fetch changes up to 629ae88e9cebc6281bc54be743a33eca47b7228c:
-
-  ARM: sunxi: dt: Add device tree for Mele A1000 (2013-08-14 09:59:20 +0200)
-
-----------------------------------------------------------------
-Allwinner sunXi DT additions for 3.12
-
-  - Cleanups and few fixes to the DTSI
-  - A few additions to the A10s olinuxino board
-
-----------------------------------------------------------------
-Emilio L?pez (6):
-      ARM: sun5i: dt: Add I2C muxings for sun5i A10S
-      ARM: sun5i: dt: Add I2C controller nodes to the A10S dtsi
-      ARM: sun5i: dt: Enable I2C controllers on A10S-OLinuXino-Micro
-      ARM: sun5i: dt: Add AT24 device on A10S-OLinuXino-Micro
-      ARM: sunxi: make the leds' names conform to the current naming convention
-      ARM: sunxi: dt: Add device tree for Mele A1000
-
-Maxime Ripard (6):
-      ARM: sun4i: a10: Remove useless simple-bus reg property
-      ARM: sun4i: dt: Fix A10 SoC bus base address
-      ARM: sun5i: a10s: Remove useless simple-bus reg property
-      ARM: sun5i: dt: Fix A10s SoC bus base address
-      ARM: sun5i: a13: Remove useless simple-bus reg property
-      ARM: sun5i: dt: Fix A13 SoC bus base address
-
- arch/arm/boot/dts/Makefile                       |   1 +
- arch/arm/boot/dts/sun4i-a10-a1000.dts            | 101 +++++++++++++++++++++++
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts       |   6 +-
- arch/arm/boot/dts/sun4i-a10-hackberry.dts        |   2 +-
- arch/arm/boot/dts/sun4i-a10-mini-xplus.dts       |   2 +-
- arch/arm/boot/dts/sun4i-a10.dtsi                 |   3 +-
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  27 +++++-
- arch/arm/boot/dts/sun5i-a10s.dtsi                |  57 ++++++++++++-
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts        |   2 +-
- arch/arm/boot/dts/sun5i-a13.dtsi                 |   3 +-
- 10 files changed, 191 insertions(+), 13 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun4i-a10-a1000.dts
+- k
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130816/809c6d0c/attachment.sig>
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
