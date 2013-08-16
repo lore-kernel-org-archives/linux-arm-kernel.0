@@ -1,79 +1,22 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Fri, 16 Aug 2013 14:43:17 +0900
-Subject: [PATCH V5] ARM: dts: Change i2s compatible string on exynos5250
-In-Reply-To: <CAOesGMj4y=uVMmETLXs_1ZfTD+CrQgKuirrpGrqs=CU3uk5__Q@mail.gmail.com>
-References: <1376627178-28649-1-git-send-email-padma.v@samsung.com>
- <CAOesGMj4y=uVMmETLXs_1ZfTD+CrQgKuirrpGrqs=CU3uk5__Q@mail.gmail.com>
-Message-ID: <13f801ce9a43$823571b0$86a05510$@org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 15 Aug 2013 22:53:29 -0700
+Subject: [GIT PULL] at91: fixes for 3.11 #1
+In-Reply-To: <1376469213-30981-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1376469213-30981-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20130816055329.GC7035@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+On Wed, Aug 14, 2013 at 10:33:33AM +0200, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> On Thu, Aug 15, 2013 at 9:26 PM, Padmavathi Venna <padma.v@samsung.com>
-> wrote:
-> > This patch removes quirks from i2s node and change the i2s
-> > compatible names.
-> >
-> > Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> > ---
-> >
-> > Changes since V4:
-> >         - Mark Brown reverted the below two patches due to below build
-> failure with
-> >           exynos_defconfig.
-> >                 "ARM: dts: exynos5250: move common i2s properties to
-exynos5
-> dtsi"
-> >                 "ARM: dts: Change i2s compatible string on exynos5250"
-> >
-> >           build error:
-> >           DTC     arch/arm/boot/dts/exynos5420-smdk5420.dtb
-> >           ERROR (phandle_references): Reference to non-existent node or
-> label "pdma1"
-> >           ERROR (phandle_references): Reference to non-existent node or
-> label "pdma1"
-> >           ERROR (phandle_references): Reference to non-existent node or
-> label "pdma0"
-> >           ERROR (phandle_references): Reference to non-existent node or
-> label "pdma0"
-> >
-> > But with out "ARM: dts: Change i2s compatible string on exynos5250" will
-> break the i2s
-> > driver.
-> >
-> > So posting this patch now and will take care of posting other patch
-> later after dependent
-> > patches got merged.
-> >
-> >  arch/arm/boot/dts/exynos5250.dtsi |    9 +++------
-> >  1 files changed, 3 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos5250.dtsi
-> b/arch/arm/boot/dts/exynos5250.dtsi
-> > index ef57277..376090f 100644
-> > --- a/arch/arm/boot/dts/exynos5250.dtsi
-> > +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> > @@ -405,7 +405,7 @@
-> >         };
-> >
-> >         i2s0: i2s at 03830000 {
-> > -               compatible = "samsung,i2s-v5";
-> > +               compatible = "samsung,s5pv210-i2s";
+> This is the first (late) fixes pull-reqest for AT91. I would understand if
+> you refuse it because we are already at -rc5 ;-) ...
 > 
-> Device tree reviewers, this is something to look out for in the
-> future. Some samsung platforms/drivers use "samsung,<chip>-<ip>",
-> others "samsung,<ip>-<chip>". I don't personally care much one way or
-> another, but it really should be consistent.
-> 
-Hmm...I think, if "samsung,<ip name>-<ip version>" is possible, it would be
-nice. I remember there are no versions in datasheet for some IPs but
-something have like i2s and mfc. So "samsung,<ip>-<version>" is used for
-only i2s and mfc. But actually there are versions for Samsung IPs, no
-comments for that in datasheet. So I think, if Samsung can provide the
-specific version of Samsung IPs, we can use that like other platforms. I
-will prepare some table for that after meeting with Samsung hardware IP team
-so that samsung platform use one format "samsung,<ip>-<version>".
+> On the other hand, the line count is very low and all patches are pretty
+> obvious.
 
-Thanks,
-Kukjin
+Thanks, pulled and will be sent up for 3.11.
+
+
+-Olof
