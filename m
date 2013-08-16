@@ -1,86 +1,89 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 16 Aug 2013 13:41:29 +0100
-Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <B78CECED-CF8B-4FC0-A4C5-D29F81F8D40E@codeaurora.org>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
- <2CD735CE-3FCF-4AB5-89C0-D813ECD19F11@codeaurora.org>
- <520C9AEA.6030507@arm.com>
- <9E753731-852D-4F04-931B-112B589D9FFB@codeaurora.org>
- <520E0556.5080702@arm.com>
- <B78CECED-CF8B-4FC0-A4C5-D29F81F8D40E@codeaurora.org>
-Message-ID: <520E1DF9.6070005@arm.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Fri, 16 Aug 2013 13:41:25 +0100
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Clock DT bindings
+In-Reply-To: <20130816040708.4443.26655@quantum>
+References: <520D9788.5080805@codeaurora.org>
+ <20130816040708.4443.26655@quantum>
+Message-ID: <520E1DF5.4030409@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/08/13 12:31, Kumar Gala wrote:
->
-> On Aug 16, 2013, at 5:56 AM, Punit Agrawal wrote:
->
->> Hi Kumar,
+On 16/08/13 05:07, Mike Turquette wrote:
+> Quoting Saravana Kannan (2013-08-15 20:07:52)
+>> You asked for specific topics. So, here's one:
 >>
->> On 15/08/13 20:00, Kumar Gala wrote:
->>>
->>> On Aug 15, 2013, at 4:10 AM, Punit Agrawal wrote:
->>>
->>>>> What is the list of interrupts related to, should there be an associated interrupts-names
->>>>>
->>>>
->>>> For the CCI PMU, each interrupt signal corresponds to the overflow of a performance counter.
->>>>
->>>> Here again, I was trying to be robust in the face of differing hardware configurations - specially the scenario where multiple interrupt lines from the CCI PMU are tied together to generate a single interrupt to the CPU.
->>>
->>> Even in the case of multiple interrupt lines tied together, why wouldn't you still specify each interrupt specifier and they all just be the same and thus the interrupt appears to be shared ?
->>>
+>> Clock DT bindings discussion on:
+>> * Allowing producers to export clocks by names.
+>> * Allowing consumers to list clocks by "producer phandle, clock name".
+>> * Should we allow for -clock magic similar to regulators?
+>> * Should the entire clock tree be represented in DT.
 >>
->> I am not quite sure what you are asking here. Are you suggesting that even if the interrupts are muxed, they should be specified multiple times?
->
-> I'm saying the # of interrupts should equal the # of counters w/regards to the dts and binding.
->
->> Below is an update I've added to the documentation to better describe the interrupts. Does this help?
->>
->> @@ -104,8 +103,19 @@ specific to ARM.
->>                 - interrupts:
->>                         Usage: required
->>                         Value type: <prop-encoded-array>
->> -                   Definition: comma-separated list of unique PMU
->> -                               interrupts
->> +                 Definition: comma-separated list of counter overflow
->> +                             interrupts.
->> +
->> +                             The CCI PMU has an interrupt signal for each
->> +                             counters. Typically, the number of
->> +                             interrupts will be equal to the number of
->> +                             counters.
->> +
->> +                             On some platforms, the individual interrupt
->> +                             signals may be combined in some fashion
->> +                             before being routed to the interrupt
->> +                             controller resulting in less number of
->> +                             interrupts than counters.
->
-> I'd drop the last paragraph.  Think about a case in which the SoC ORs all the interrupts for each counter together, in the .dts it should still look something like (my example assumes 4 counters):
->
-> interrupts = < 0 100 4 >, < 0 100 4 >, < 0 100 4 >, < 0 100 4 >;
->
-> or lets say the SoC has 2 interrupts with counters 1 & 2 on first interrupt and 3 & 4 on second
->
-> interrupts = < 0 100 4 >, < 0 100 4 >, < 0 101 4 >, < 0 101 4 >;
->
-> or a crazy SoC (counters 1 & 3 on first interrupt, 2 & 4 on second):
->
-> interrupts = < 0 100 4 >, < 0 101 4 >, < 0 100 4 >, < 0 101 4 >;
->
-> make sense?
->
+>> I would like to attend the ARM summit to represent the needs of SoCs 
+>> with complicated clocking HW. I have worked on clocks for about 5 years 
+>> (since MSM started running Linux) and would like to throw in my opinion 
+>> on what clock DT bindings would work well, why and help come up with a 
+>> solution that works well for everyone.
 
-Got it. I was trying to prevent the need to specify duplicate interrupts 
-but I'll update the patch with this and the other review comments and 
-post a new version.
+I'd also be interested in attending discussions about Clocks and DT
+(among other things - I'm the Meta architecture (arch/metag) maintainer,
+and will find myself increasingly working on MIPS and KVM).
 
-Thanks once again for the review.
+I've worked on supporting the Meta based TZ1090 SoC, which has clock
+layout entirely represented in DT, but hit difficulties with where to
+put clock configuration/policy data that doesn't describe the hardware
+itself.
 
-Cheers,
-Punit
+This is a general problem that I think needs discussion. Basically some
+other data is sometimes required that:
+* doesn't describe the hardware - therefore it cannot live in device tree.
+* is platform specific - so doesn't really live in the clock drivers
+themselves (and there's resistance to having any platform setup code in
+new arches like Meta).
+* is application specific, perhaps depending on what has been started on
+other non-Linux processor cores in the SoC, or on what the bootloader
+has configured, or perhaps some arbitrary constraint to workaround a
+hardware bug - so doesn't really live in platform setup code anyway.
 
-> - k
->
+A couple of more concrete examples:
+* Prevent a clock from being remuxed or changed (or force it to use a
+specific parent). For whatever reason it is sometimes desired that a
+particular clock uses a particular parent or cannot be remuxed. E.g.
+firmware on a non-Linux core might be driving a peripheral which shares
+the clock and doesn't want the clock rate to change under it's feet, or
+perhaps the use of a particular clock causes instability in certain
+devices, or perhaps it's a critical clock (that the core CPU or DDR
+clock is derived from).
+* Disable certain devices. If firmware on other non-Linux cores are
+driving certain devices (e.g. one of the SPI or I2C buses that a radio
+tuner is connected to), then you want status="disabled" on that device
+to prevent Linux trying to drive it at the same time, but technically
+there's nothing preventing Linux from driving it if it wasn't already in
+use.
+
+The automatic clock reparenting patchset I wrote helps with some cases
+where the best/correct clock to use can be determined dynamically, but
+that doesn't cover all cases.
+
+I've heard Mike refer to a hypothetical configtree (which I think is the
+idea of passing a tree of config data similar to device tree, either in
+addition to or somehow merged with the device tree), but at the moment
+in our kernel tree we work around these by putting that data directly in
+device tree.
+
+Have others hit similar difficulties?
+
+Is some kind of configtree the right solution or are there other
+preferred solutions?
+
+I'm attending ELCE so should be able to be around.
+
+Cheers
+James
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130816/fd733f17/attachment.sig>
