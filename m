@@ -1,57 +1,50 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 15 Aug 2013 19:16:48 -0700
-Subject: [PATCH] clk: export fixed-factor, gate & mux registration
-Message-ID: <1376619408-19923-1-git-send-email-mturquette@linaro.org>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Fri, 16 Aug 2013 10:21:01 +0800
+Subject: [v3 1/2] dma: mmp_pdma: add support for residue reporting
+In-Reply-To: <520D19F5.7050406@gmail.com>
+References: <1376497189-21298-1-git-send-email-zonque@gmail.com>
+ <CADApbegKj=AMGx4OFOBVsyk71BGis97Gw9QM_-0EsNi90pS+Hw@mail.gmail.com>
+ <520C4E98.6020001@gmail.com>
+ <CADApbejtvXvgF8jpQAyrbY3Yr=XkBech5D6fCEM+yMj8DRRY9w@mail.gmail.com>
+ <520D19F5.7050406@gmail.com>
+Message-ID: <CADApbejp+JysyRFHC8=1y5JXTXCqsBsBNfAuDX4kaC==FPBtUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These registration calls may be used by loadable modules. Export them.
+On Fri, Aug 16, 2013 at 2:12 AM, Daniel Mack <zonque@gmail.com> wrote:
+> On 15.08.2013 10:08, Chao Xie wrote:
+>> In the function mmp_pdma_tx_submit
+>> It will assign cookie for every descriptors by
+>> list_for_each_entry(child, &desc->tx_list, node) {
+>>                 cookie = dma_cookie_assign(&child->async_tx);
+>>         }
+>> So not all the descriptors in same transaction will share same cookie.
+>
+> Hmm, yes. You're right. However, I see quite some more issues with the
+> driver as it stands, especially due to assumptions that are made for
+> multiple transactions on one channel.
+>
+> For example, let's think about two transactions with multiple
+> descriptors each, and both transactions are present in the chain_running
+> list. Each transaction has the ENDIRQEN bit set on the last descriptor only.
+>
+> Currently, when an interrupt is caught, the code will only look at the
+> very last entry in the running list and complete its cookie, and then
+> dispose the entire running chain. Hence, the other transaction's cookie
+> will never complete. Even worse: as an interrupt will always be for the
+> first descriptor in the chain with the ENDIRQEN bit set, we complete the
+> second transaction that is in fact still running (and call the
+> completion handler for it), while we don't do exactly that for the first
+> one.
+>
+> Am I right with the above or do I make faulty assumptions? I'll think
+> about how the driver can be changed in order to fix this, but it will be
+> more invasive than I thought.
+>
+I think you are right. I include the orignal author for the driver, and maybe
+he can comment at it.
 
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
----
- drivers/clk/clk-fixed-factor.c | 2 ++
- drivers/clk/clk-gate.c         | 1 +
- drivers/clk/clk-mux.c          | 2 ++
- 3 files changed, 5 insertions(+)
-
-diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-index 9ff7d51..0e1d89b 100644
---- a/drivers/clk/clk-fixed-factor.c
-+++ b/drivers/clk/clk-fixed-factor.c
-@@ -97,6 +97,8 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
- 
- 	return clk;
- }
-+EXPORT_SYMBOL_GPL(clk_register_fixed_factor);
-+
- #ifdef CONFIG_OF
- /**
-  * of_fixed_factor_clk_setup() - Setup function for simple fixed factor clock
-diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-index 790306e..2b28a00 100644
---- a/drivers/clk/clk-gate.c
-+++ b/drivers/clk/clk-gate.c
-@@ -161,3 +161,4 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
- 
- 	return clk;
- }
-+EXPORT_SYMBOL_GPL(clk_register_gate);
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 92f1a1b..b918dc3 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -162,6 +162,7 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
- 
- 	return clk;
- }
-+EXPORT_SYMBOL_GPL(clk_register_mux_table);
- 
- struct clk *clk_register_mux(struct device *dev, const char *name,
- 		const char **parent_names, u8 num_parents, unsigned long flags,
-@@ -174,3 +175,4 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
- 				      flags, reg, shift, mask, clk_mux_flags,
- 				      NULL, lock);
- }
-+EXPORT_SYMBOL_GPL(clk_register_mux);
--- 
-1.8.1.2
+>
+> Thanks for sharing your ideas,
+> Daniel
+>
