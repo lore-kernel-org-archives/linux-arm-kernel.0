@@ -1,73 +1,50 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 16 Aug 2013 11:57:32 +0300
-Subject: [PATCH v2 1/8] usb: phy: omap-control: Get rid of platform data
-In-Reply-To: <20130815162229.GA10982@linutronix.de>
+Date: Fri, 16 Aug 2013 12:00:27 +0300
+Subject: [PATCH v2 6/8] usb: phy: omap: get rid of omap_get_control_dev()
+In-Reply-To: <20130815165152.GB10982@linutronix.de>
 References: <1376572512-9561-1-git-send-email-rogerq@ti.com>
- <1376572512-9561-2-git-send-email-rogerq@ti.com>
- <20130815162229.GA10982@linutronix.de>
-Message-ID: <520DE97C.1050403@ti.com>
+ <1376572512-9561-7-git-send-email-rogerq@ti.com>
+ <20130815165152.GB10982@linutronix.de>
+Message-ID: <520DEA2B.5030608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
-
-On 08/15/2013 07:22 PM, Sebastian Andrzej Siewior wrote:
-> * Roger Quadros | 2013-08-15 16:15:05 [+0300]:
+On 08/15/2013 07:51 PM, Sebastian Andrzej Siewior wrote:
+> * Roger Quadros | 2013-08-15 16:15:10 [+0300]:
 > 
 >> diff --git a/drivers/usb/phy/phy-omap-control.c b/drivers/usb/phy/phy-omap-control.c
->> index a4dda8e..3b9ee83 100644
+>> index 078c46f..d144c14 100644
 >> --- a/drivers/usb/phy/phy-omap-control.c
 >> +++ b/drivers/usb/phy/phy-omap-control.c
->> @@ -197,8 +197,13 @@ static int omap_control_usb_probe(struct platform_device *pdev)
+>> @@ -187,11 +167,19 @@ void omap_control_usb_set_mode(struct device *dev,
 >> {
->> 	struct resource	*res;
->> 	struct device_node *np = pdev->dev.of_node;
->> -	struct omap_control_usb_platform_data *pdata =
->> -			dev_get_platdata(&pdev->dev);
->> +
->> +	if (np) {
->> +		of_property_read_u32(np, "ti,type", &control_usb->type);
->> +	} else {
->> +		/* We only support DT boot */
->> +		return -ENODEV;
+>> 	struct omap_control_usb	*ctrl_usb;
+>>
+>> -	if (IS_ERR(dev) || control_usb->type != OMAP_CTRL_TYPE_OMAP)
+>> +	if (IS_ERR(dev) || !dev)
+>> 		return;
+>>
+>> 	ctrl_usb = dev_get_drvdata(dev);
+>>
+>> +	if (!ctrl_usb) {
+>> +		dev_err(dev, "Invalid control usb device\n");
+>> +		return;
 >> +	}
+>> +
+>> +	if (ctrl_usb->type != OMAP_CTRL_TYPE_OMAP)
+>> +		return;
+>> +
 > 
-> what about
->     if (!nop)
->         return -EINVAL;
+> I don't like that part where you can call this function even before the
+> driver probed the device. This shouldn't happen since you have hard module
+> dependency and the proper compatible string in your device. But this
+> kind of thing won't happen in the am335x reset driver.
 
-OK, I can change it to -EINVAL.
+I don't like that part either, but omap_control_usb_set_mode is being called
+from outside this driver (e.g. musb) and we are not making any changes to that behaviour
+in this patch.
 
-> 
->> 	control_usb = devm_kzalloc(&pdev->dev, sizeof(*control_usb),
->> 		GFP_KERNEL);
->> @@ -207,15 +212,6 @@ static int omap_control_usb_probe(struct platform_device *pdev)
->> 		return -ENOMEM;
->> 	}
->>
->> -	if (np) {
->> -		of_property_read_u32(np, "ti,type", &control_usb->type);
-> 
-> and here you shift the property to the left and remove the other lines.
-> But then you wanted to remove that ti,type thingy but I guess this will
-> be part of another patch then. Since you can't do everything in one
-> patch, it is okay.
-
-I've actually moved the ti,type stuff on the top. So there is no functional change
-other than getting rid of platform data.
-
-> 
->> -	} else if (pdata) {
->> -		control_usb->type = pdata->type;
->> -	} else {
->> -		dev_err(&pdev->dev, "no pdata present\n");
->> -		return -EINVAL;
->> -	}
->> -
->> 	control_usb->dev	= &pdev->dev;
->>
->> 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> 
+I think the issue you mentioned is being fixed by Kishon's extcon migration series.
 
 cheers,
 -roger
