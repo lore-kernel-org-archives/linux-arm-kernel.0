@@ -1,31 +1,39 @@
 From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Fri, 16 Aug 2013 20:17:49 +0900
-Subject: [PATCH v9 04/16] iommu/exynos: allocate lv2 page table from own
- slab
-In-Reply-To: <20130814105615.GG4491@8bytes.org>
-References: <002801ce941a$fb6369e0$f22a3da0$@samsung.com>
- <2544843.sndV7usHTj@amdc1227>
- <20130809145849.790a9800f4f9893b30e54a1c@samsung.com>
- <2101296.S6JDU5igl3@flatron> <20130814105615.GG4491@8bytes.org>
-Message-ID: <20130816201749.a4bbaa8e85fc5a2d4e0b02ad@samsung.com>
+Date: Fri, 16 Aug 2013 20:21:51 +0900
+Subject: [PATCH 2/2] iommu/exynos: Follow kernel coding style for
+ __sysmmu_enable return type
+In-Reply-To: <20130814131547.GA5889@8bytes.org>
+References: <1374766502-14823-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1374766502-14823-2-git-send-email-a.motakis@virtualopensystems.com>
+ <003101ce89ed$52317330$f6945990$@samsung.com>
+ <20130814131547.GA5889@8bytes.org>
+Message-ID: <20130816202151.b47fae1e9ed249d06baa37d1@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Aug 2013 12:56:16 +0200, 'Joerg Roedel' wrote:
-> On Fri, Aug 09, 2013 at 09:55:30AM +0200, Tomasz Figa wrote:
-> > Oh, this is a valid point, but it was more a nitpick about the coding 
-> > style. Single path error handling (with goto) is widely used in the kernel 
-> > in cases when more than one thing has to be undone and so I suggested this 
-> > method of error handling here as well.
+On Wed, 14 Aug 2013 15:15:49 +0200, 'Joerg Roedel' wrote:
+> KyongHo,
 > 
-> I agree with that review from Tomasz, the error-handling should look
-> similar to all the other places in the kernel and use goto.
+> On Fri, Jul 26, 2013 at 07:46:01PM +0900, Cho KyongHo wrote:
+> > __sysmmu_enable() must return 1 if it is called with the same page table.
+> > I have fixed it exynos_iommu_attach_device() to always return zero on success
+> > in the next patchset which I will post today.
+> > 
+> > Thank you.
 > 
+> When you are fine with these patches please put them on-top of your
+> patch-set when you re-submit. I will take them from there then.
+> 
+
 Ok.
 
-Thanks.
+Antonios,
+
+Would you mind
+if I submit your 2 patches on top of my patches with your signed-off?
 
 KyongHo.
+
 > 
 > 	Joerg
 > 
