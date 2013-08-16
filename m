@@ -1,118 +1,41 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 16 Aug 2013 14:49:23 +1000
-Subject: [RFC PATCH 3/4] powerpc: refactor of_get_cpu_node to support
- other architectures
-In-Reply-To: <1376586580-5409-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376586580-5409-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1376628563.4255.137.camel@pasglop>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Fri, 16 Aug 2013 10:28:23 +0530
+Subject: [PATCH v10] i2c: exynos5: add High Speed I2C controller driver
+In-Reply-To: <20130815131226.GI17155@katana>
+References: <1354021236-28596-2-git-send-email-ch.naveen@samsung.com>
+ <1371638905-30633-1-git-send-email-ch.naveen@samsung.com>
+ <3925484.kHD24rQYyy@amdc1227> <20130815131226.GI17155@katana>
+Message-ID: <CAHfPSqBnj2OTHdbnW3SCRf7SL1maMsWau1+9DWFLYRBM+1HOJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-08-15 at 18:09 +0100, Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> 
-> Currently different drivers requiring to access cpu device node are
-> parsing the device tree themselves. Since the ordering in the DT need
-> not match the logical cpu ordering, the parsing logic needs to consider
-> that. However, this has resulted in lots of code duplication and in some
-> cases even incorrect logic.
+On 15 August 2013 18:42, Wolfram Sang <wsa@the-dreams.de> wrote:
+> On Mon, Jul 01, 2013 at 12:25:19PM +0200, Tomasz Figa wrote:
+>> Hi Naveen,
+>>
+>> Looks mostly good, but see some comments inline.
+>
+> Ping?
+Hello Wolfram,
 
- .../...
+I made a patch fixing your comments and from Thomas Figa as well.
 
->  
-> +bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
-> +{
-> +	return (int)phys_id == get_hard_smp_processor_id(cpu);
-> +}
+Meanwhile, we hit a random crash in exynos5_i2c_irq function.
+The "len" variable being is still being near the FIFO_MAX after this condition
+ len = HSI2C_FIFO_MAX - fifo_level;
+ +             if (len > i2c->msg->len)
+ +                     len = i2c->msg->len;
 
-Naming is a bit gross. You might want to make it clearer that
-we are talking about CPU IDs in the device-tree here.
+Once, we fix this problem. i planned to rebase and submit.
 
-> +static bool __of_find_n_match_cpu_property(struct device_node *cpun,
-> +			const char *prop_name, int cpu, unsigned int *thread)
-> +{
-> +	const __be32 *cell;
-> +	int ac, prop_len, tid;
-> +	u64 hwid;
-> +
-> +	ac = of_n_addr_cells(cpun);
-> +	cell = of_get_property(cpun, prop_name, &prop_len);
-> +	if (!cell)
-> +		return false;
-> +	prop_len /= sizeof(*cell);
-> +	for (tid = 0; tid < prop_len; tid++) {
-> +		hwid = of_read_number(cell, ac);
-> +		if (arch_match_cpu_phys_id(cpu, hwid)) {
-> +			if (thread)
-> +				*thread = tid;
-> +			return true;
-> +		}
+Is it okey with you?
 
-Missing:          cell += ac;
+Thanks,
+Naveen
+>
 
-> +	}
-> +	return false;
-> +}
-> +
->  /* Find the device node for a given logical cpu number, also returns the cpu
->   * local thread number (index in ibm,interrupt-server#s) if relevant and
->   * asked for (non NULL)
->   */
->  struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
->  {
-> -	int hardid;
-> -	struct device_node *np;
-> +	struct device_node *cpun, *cpus;
->  
-> -	hardid = get_hard_smp_processor_id(cpu);
-> +	cpus = of_find_node_by_path("/cpus");
-> +	if (!cpus) {
-> +		pr_warn("Missing cpus node, bailing out\n");
-> +		return NULL;
-> +	}
->  
-> -	for_each_node_by_type(np, "cpu") {
-> -		const u32 *intserv;
-> -		unsigned int plen, t;
-> +	for_each_child_of_node(cpus, cpun) {
-> +		if (of_node_cmp(cpun->type, "cpu"))
-> +			continue;
->  
->  		/* Check for ibm,ppc-interrupt-server#s. If it doesn't exist
->  		 * fallback to "reg" property and assume no threads
->  		 */
-> -		intserv = of_get_property(np, "ibm,ppc-interrupt-server#s",
-> -				&plen);
-> -		if (intserv == NULL) {
-> -			const u32 *reg = of_get_property(np, "reg", NULL);
-> -			if (reg == NULL)
-> -				continue;
-> -			if (*reg == hardid) {
-> -				if (thread)
-> -					*thread = 0;
-> -				return np;
-> -			}
-> -		} else {
-> -			plen /= sizeof(u32);
-> -			for (t = 0; t < plen; t++) {
-> -				if (hardid == intserv[t]) {
-> -					if (thread)
-> -						*thread = t;
-> -					return np;
-> -				}
-> -			}
-> -		}
-> +		if (__of_find_n_match_cpu_property(cpun,
-> +				"ibm,ppc-interrupt-server#s", cpu, thread))
-> +			return cpun;
-> +
-> +		if (__of_find_n_match_cpu_property(cpun, "reg", cpu, thread))
-> +			return cpun;
->  	}
->  	return NULL;
->  }
 
-Cheers,
-Ben.
+
+-- 
+Shine bright,
+(: Nav :)
