@@ -1,54 +1,139 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Fri, 16 Aug 2013 18:39:49 +0100
-Subject: [RFC PATCH v2 0/4] DT: move of_get_cpu_node from PPC to DT core
-In-Reply-To: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Date: Fri, 16 Aug 2013 18:39:50 +0100
+Subject: [RFC PATCH v2 3/4] powerpc: refactor of_get_cpu_node to support other
+ architectures
+In-Reply-To: <1376674791-28244-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1376674791-28244-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376674791-28244-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1376674791-28244-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Hi,
+Currently different drivers requiring to access cpu device node are
+parsing the device tree themselves. Since the ordering in the DT need
+not match the logical cpu ordering, the parsing logic needs to consider
+that. However, this has resulted in lots of code duplication and in some
+cases even incorrect logic.
 
-This series needs to be prepended with the original series[1][2][3]
-Except the first patch in the original series(which is merged into this
-as last patch), there is no other change(apart from function signature)
-I am posting only this part for feedback separately for review as the
-original series is already reviewed and acked.
+It's better to consolidate them by adding support for getting cpu
+device node for a given logical cpu index in DT core library. However
+logical to physical index mapping can be architecture specific.
 
-v1->v2:
-- Fixed an issue - updating cell pointer
-- Documentated in arch_match_cpu_phys_id that phys_id are values read
-  from the device tree only in the weak definition
+PowerPC has it's own implementation to get the cpu node for a given
+logical index.
 
-[Since first 2 patches have not changed, microblaze and openrisc lists are
-bouncing for non-members, I am not resending them again. Michal(for
-microblaze) has acked when it was first pointed. I am waiting for response
-from Jonas(for openrisc)]
+This patch refactors the current implementation of of_get_cpu_node.
+This in preparation to move the implementation to DT core library.
+It separates out the logical to physical mapping so that a default
+matching of the physical id to the logical cpu index can be added
+when moved to common code. Architecture specific code can override it.
 
-Rob, Ben,
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+---
+ arch/powerpc/kernel/prom.c | 76 ++++++++++++++++++++++++++++------------------
+ 1 file changed, 47 insertions(+), 29 deletions(-)
 
-If you are OK with these patches and ACK, I can combine and post the complete
-series.
-
-Regards,
-Sudeep
-
-Sudeep KarkadaNagesha (4):
-  microblaze: remove undefined of_get_cpu_node declaration
-  openrisc: remove undefined of_get_cpu_node declaration
-  powerpc: refactor of_get_cpu_node to support other architectures
-  of: move of_get_cpu_node implementation to DT core library
-
- arch/microblaze/include/asm/prom.h |  3 --
- arch/openrisc/include/asm/prom.h   |  3 --
- arch/powerpc/include/asm/prom.h    |  3 --
- arch/powerpc/kernel/prom.c         | 43 +----------------
- drivers/of/base.c                  | 96 ++++++++++++++++++++++++++++++++++++++
- include/linux/cpu.h                |  1 +
- include/linux/of.h                 |  7 +++
- 7 files changed, 106 insertions(+), 50 deletions(-)
-
+diff --git a/arch/powerpc/kernel/prom.c b/arch/powerpc/kernel/prom.c
+index eb23ac9..fb12be6 100644
+--- a/arch/powerpc/kernel/prom.c
++++ b/arch/powerpc/kernel/prom.c
+@@ -865,45 +865,63 @@ static int __init prom_reconfig_setup(void)
+ __initcall(prom_reconfig_setup);
+ #endif
+ 
++bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
++{
++	return (int)phys_id == get_hard_smp_processor_id(cpu);
++}
++
++static bool __of_find_n_match_cpu_property(struct device_node *cpun,
++			const char *prop_name, int cpu, unsigned int *thread)
++{
++	const __be32 *cell;
++	int ac, prop_len, tid;
++	u64 hwid;
++
++	ac = of_n_addr_cells(cpun);
++	cell = of_get_property(cpun, prop_name, &prop_len);
++	if (!cell)
++		return false;
++	prop_len /= sizeof(*cell);
++	for (tid = 0; tid < prop_len; tid++) {
++		hwid = of_read_number(cell, ac);
++		if (arch_match_cpu_phys_id(cpu, hwid)) {
++			if (thread)
++				*thread = tid;
++			return true;
++		}
++		cell += ac;
++	}
++	return false;
++}
++
+ /* Find the device node for a given logical cpu number, also returns the cpu
+  * local thread number (index in ibm,interrupt-server#s) if relevant and
+  * asked for (non NULL)
+  */
+ struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
+ {
+-	int hardid;
+-	struct device_node *np;
++	struct device_node *cpun, *cpus;
+ 
+-	hardid = get_hard_smp_processor_id(cpu);
++	cpus = of_find_node_by_path("/cpus");
++	if (!cpus) {
++		pr_warn("Missing cpus node, bailing out\n");
++		return NULL;
++	}
+ 
+-	for_each_node_by_type(np, "cpu") {
+-		const u32 *intserv;
+-		unsigned int plen, t;
++	for_each_child_of_node(cpus, cpun) {
++		if (of_node_cmp(cpun->type, "cpu"))
++			continue;
+ 
+-		/* Check for ibm,ppc-interrupt-server#s. If it doesn't exist
+-		 * fallback to "reg" property and assume no threads
++		/* Check for historical "ibm,ppc-interrupt-server#s" property
++		 * for thread ids on PowerPC. If it doesn't exist fallback to
++		 * standard "reg" property.
+ 		 */
+-		intserv = of_get_property(np, "ibm,ppc-interrupt-server#s",
+-				&plen);
+-		if (intserv == NULL) {
+-			const u32 *reg = of_get_property(np, "reg", NULL);
+-			if (reg == NULL)
+-				continue;
+-			if (*reg == hardid) {
+-				if (thread)
+-					*thread = 0;
+-				return np;
+-			}
+-		} else {
+-			plen /= sizeof(u32);
+-			for (t = 0; t < plen; t++) {
+-				if (hardid == intserv[t]) {
+-					if (thread)
+-						*thread = t;
+-					return np;
+-				}
+-			}
+-		}
++		if (__of_find_n_match_cpu_property(cpun,
++				"ibm,ppc-interrupt-server#s", cpu, thread))
++			return cpun;
++
++		if (__of_find_n_match_cpu_property(cpun, "reg", cpu, thread))
++			return cpun;
+ 	}
+ 	return NULL;
+ }
 -- 
 1.8.1.2
