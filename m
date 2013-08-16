@@ -1,62 +1,42 @@
-From: wangx@marvell.com (Xiang Wang)
-Date: Fri, 16 Aug 2013 16:05:47 +0800
-Subject: [PATCH 09/12] dma: mmp_pdma: add support for byte-aligned
- transfers
-In-Reply-To: <520360DD.9070906@gmail.com>
-References: <1375870770-14263-1-git-send-email-zonque@gmail.com>
- <1375870770-14263-10-git-send-email-zonque@gmail.com>
- <4CF37FDA40C2184293FA2CF8CFAE31322007F0131D@SC-VEXCH4.marvell.com>
- <520360DD.9070906@gmail.com>
-Message-ID: <520DDD5B.6080605@marvell.com>
+From: alekskartashov@parallels.com (Alexander Kartashov)
+Date: Fri, 16 Aug 2013 12:20:25 +0400
+Subject: [PATCH] arm: align shared memory unconditionally to the SHMLBA
+ boundary
+In-Reply-To: <51E546A6.7010606@parallels.com>
+References: <1361254269-3444-1-git-send-email-alekskartashov@parallels.com>
+ <20130715173238.GJ1730@moon> <20130715180846.GV24642@n2100.arm.linux.org.uk>
+ <20130715185739.GK1730@moon> <51E4DC0B.8040908@parallels.com>
+ <20130716095349.GB16370@moon> <51E51EF1.3010104@parallels.com>
+ <20130716103649.GC24642@n2100.arm.linux.org.uk>
+ <51E524D1.2090504@parallels.com>
+ <20130716110721.GD24642@n2100.arm.linux.org.uk>
+ <51E546A6.7010606@parallels.com>
+Message-ID: <520DE0C9.5070907@parallels.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2013 05:11 PM, Daniel Mack wrote:
-> Hi Xiang,
->
-> On 08.08.2013 11:04, Xiang Wang wrote:
->>> Subject: [PATCH 09/12] dma: mmp_pdma: add support for byte-aligned
->>> transfers
->>>
->>> The PXA DMA controller has a DALGN register which allows for
->>> byte-aligned DMA transfers. Use it in case any of the transfer
->>> descriptors is not aligned to a mask of ~0x7.
->
-> [...]
->
->> We do need to set DALGN bit in some of our drivers.
->
-> Which ones, and how do you currently do that? I didn't find any code to
-> support this yet in mmp-pdma.
-Hi, Daniel
-When we use DMA in UART and let DMA handle the UART trailing bytes, we 
-should set the DALGN bit. Otherwise, DMA controller cannot move the 
-bytes from UART FIFO to memory correctly because they are not 
-8-bytes-alligned.
->
->> But we cannot
->> configure this via standard dma engine API. In this patch, dma
->> address is used to determine whether or not to set DALGN. But what if
->> we need to use 1-byte-aligned mode when addresses are
->> 8-byte-aligned?
->
-> Hmm, why would you need that? What's the constraint for this driver that
-> they have to rely on that?
->
->> Is it proper to always use 1-byte-aligned mode?
->
-> As far as I understand the datasheet, this bit has performance
-> implications and should only be used if really needed.
->
-> I think if you have that constraint in drivers, and the dmaengine
-> implementation can't determine that automatically, we should introduce a
-> flag or something in the dma_slave_config struct.
->
->
-> Daniel
->
+Dear Russell,
 
+I'm sorry for the delayed response.
+
+On 07/16/2013 05:12 PM, Alexander Kartashov wrote:
+> The lines in trouble is
+>
+> #if SHMLBA > 16384
+> #error FIX ME
+> #endif
+
+Nevertheless, removing these lines fixes both the compilation
+and shared memory alignment issue. Thank you.
 
 -- 
-Regards,
-Xiang
+Sincerely yours,
+Alexander Kartashov
+
+Intern
+Core team
+
+www.parallels.com
+
+Skype: aleksandr.kartashov
+Email: alekskartashov at parallels.com
