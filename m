@@ -1,56 +1,47 @@
 From: tony@atomide.com (Tony Lindgren)
 Date: Fri, 16 Aug 2013 00:30:05 -0700
-Subject: [GIT PULL 2/2] minimal dra7xx support for v3.12 merge window
-In-Reply-To: <pull-1376638205-27268>
-Message-ID: <mailman.0.1376638234.1056.linux-arm-kernel@lists.infradead.org>
+Subject: [GIT PULL 1/2] usb phy nop rename for v3.12 merge window
+Message-ID: <pull-1376638205-27268>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
 
-  Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+  Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.12/dra7xx
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.12/usb-signed
 
-for you to fetch changes up to cf470a1b1a741bca00080ebc70968b4f22d9b1ea:
+for you to fetch changes up to 3fa4d7344be0afebd80382ffeea6b1787cccf971:
 
-  Merge tag 'dra7-core-support-minus-dt' of git://github.com/rrnayak/linux into omap-for-v3.12/soc (2013-08-14 01:01:41 -0700)
-
-----------------------------------------------------------------
-
-Minimal DRA7xx based SoC core support via Rajendra Nayak <rnayak@ti.com>
+  usb: phy: rename nop_usb_xceiv => usb_phy_gen_xceiv (2013-08-09 17:26:00 +0300)
 
 ----------------------------------------------------------------
-R Sricharan (7):
-      ARM: DRA7: Reuse all of PRCM and MPUSS SMP infra
-      ARM: DRA7: Reuse io tables and add a new .init_early
-      ARM: DRA7: Resue the clocksource, clockevent support
-      ARM: DRA7: board-generic: Add basic DT support
-      ARM: DRA7: Kconfig: Make ARCH_NR_GPIO default to 512
-      ARM: DRA7: id: Add cpu detection support for DRA7xx based SoCs'
-      ARM: DRA7: Add the build support in omap2plus
+USB nop phy rename via Felipe Balbi <balbi@ti.com>:
 
-Rajendra Nayak (1):
-      ARM: DRA7: hwmod: Reuse the soc_ops used for OMAP4/5
+Here's a pull request of one patch to avoid conflicts during the merge
+window.
 
-Tony Lindgren (1):
-      Merge tag 'dra7-core-support-minus-dt' of git://github.com/rrnayak/linux into omap-for-v3.12/soc
+----------------------------------------------------------------
+Sebastian Andrzej Siewior (1):
+      usb: phy: rename nop_usb_xceiv => usb_phy_gen_xceiv
 
- Documentation/devicetree/bindings/arm/omap/omap.txt |  3 +++
- arch/arm/Kconfig                                    |  2 +-
- arch/arm/configs/omap2plus_defconfig                |  1 +
- arch/arm/mach-omap1/include/mach/soc.h              |  1 +
- arch/arm/mach-omap2/Kconfig                         | 12 ++++++++++--
- arch/arm/mach-omap2/Makefile                        |  6 ++++++
- arch/arm/mach-omap2/board-generic.c                 | 18 ++++++++++++++++++
- arch/arm/mach-omap2/common.h                        |  1 +
- arch/arm/mach-omap2/id.c                            |  4 ++--
- arch/arm/mach-omap2/io.c                            | 20 ++++++++++++++++++--
- arch/arm/mach-omap2/omap54xx.h                      |  4 ++++
- arch/arm/mach-omap2/omap_hwmod.c                    |  2 +-
- arch/arm/mach-omap2/soc.h                           | 17 +++++++++++++++++
- arch/arm/mach-omap2/timer.c                         |  3 ++-
- arch/arm/plat-omap/Kconfig                          |  2 +-
- 15 files changed, 86 insertions(+), 10 deletions(-)
+ arch/arm/mach-omap2/board-omap3beagle.c            |  4 +-
+ arch/arm/mach-omap2/board-omap3evm.c               |  4 +-
+ arch/arm/mach-omap2/board-omap3pandora.c           |  2 +-
+ arch/arm/mach-omap2/usb-host.c                     | 10 ++---
+ drivers/usb/dwc3/dwc3-exynos.c                     |  8 ++--
+ drivers/usb/dwc3/dwc3-pci.c                        |  8 ++--
+ drivers/usb/musb/am35x.c                           |  2 +-
+ drivers/usb/musb/blackfin.c                        |  2 +-
+ drivers/usb/musb/da8xx.c                           |  2 +-
+ drivers/usb/musb/davinci.c                         |  2 +-
+ drivers/usb/musb/musb_dsps.c                       |  2 +-
+ drivers/usb/musb/tusb6010.c                        |  2 +-
+ drivers/usb/phy/Makefile                           |  2 +-
+ drivers/usb/phy/{phy-nop.c => phy-generic.c}       | 44 +++++++++++-----------
+ .../usb/{nop-usb-xceiv.h => usb_phy_gen_xceiv.h}   |  4 +-
+ 15 files changed, 49 insertions(+), 49 deletions(-)
+ rename drivers/usb/phy/{phy-nop.c => phy-generic.c} (83%)
+ rename include/linux/usb/{nop-usb-xceiv.h => usb_phy_gen_xceiv.h} (81%)
