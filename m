@@ -1,34 +1,75 @@
-From: b35083@freescale.com (Jingchang Lu)
-Date: Fri, 16 Aug 2013 13:02:19 +0800
-Subject: [PATCH RESEND] ARM: dts: vf610-twr: enable i2c0 device
-Message-ID: <1376629339-4647-1-git-send-email-b35083@freescale.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 16 Aug 2013 00:57:34 -0500
+Subject: [PATCH v3 00/12] edma: Add support for SG lists of any length
+In-Reply-To: <1375719297-12871-1-git-send-email-joelf@ti.com>
+References: <1375719297-12871-1-git-send-email-joelf@ti.com>
+Message-ID: <520DBF4E.2060101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable i2c0 device on Vybrid VF610 Tower Board
+Following offline discussions with Sekhar, we discussed some ideas to
+change a few things in this patch series to make it fail-safe. As such,
+the only changes we are making for v4 will be to not cyclically link
+immediately but doing so only once the ISR has finished setup (apart
+from other style cleanups).
 
-Signed-off-by: Jingchang Lu <b35083@freescale.com>
----
- arch/arm/boot/dts/vf610-twr.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+Any conditions where we are not able to modify the link in time (due to
+heavily loaded system) will be detected and reported by the use of
+linking to a NULL set.
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index b3905f5..1a58678 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -50,6 +50,13 @@
- 	status = "okay";
- };
- 
-+&i2c0 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c0_1>;
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1_1>;
--- 
-1.8.0
+The new approach will be fast because of no requirement to stall or
+wait, and any DMA issues with heavily loaded systems can be detected as
+error conditions.
+
+This should architecturally be the final version of the patch series to
+add DMA support for SG lists of any length.
+
+Thanks,
+
+-Joel
+
+On 08/05/2013 11:14 AM, Joel Fernandes wrote:
+> Here is a more improved approach for DMA support of SG lists of any length
+> in the EDMA DMA Engine driver.
+> 
+> In the previous approach [1] we depended on error interrupts to detect
+> missed events and manually retrigger them, however as discussed in [2],
+> there are concerns this can be trouble some for high speed peripherals
+> which may need a more real-time response from the DMA controller.
+> 
+> In this approach, we divide the total no of MAX slots per channel, into
+> 2 linked sets which are cyclically linked to each other (the cyclic
+> link between the 2 sets make sure that the DMA is continuous till the whole
+> SG list has exhausted). We then enable completion interrupts on both linked
+> sets which results in recyling/preparing respective linked set with the
+> next set of SG entries. The interrupt handler executes in parallel while
+> the EDMA controller DMA's the next list. This results in no interruption.
+> 
+> Special handling is done for first linked set (as we set up both linked
+> sets initially before starting with the DMA), and last one where the cyclic
+> link has to be broken and a link to the Dummy slot has to be created.
+> Also we keep track of whether all pending DMA operations have completed
+> before we can mark it as complete.
+> 
+> [1] https://lkml.org/lkml/2013/7/29/312
+> [2] https://lkml.org/lkml/2013/7/30/54
+> 
+> Joel Fernandes (12):
+>   dma: edma: Setup parameters to DMA MAX_NR_SG at a time
+>   ARM: edma: Don't clear EMR of channel in edma_stop
+>   dma: edma: remove limits on number of slots
+>   dma: edma: Write out and handle MAX_NR_SG at a given time
+>   ARM: edma: Add function to enable interrupt for a PaRAM slot
+>   ARM: edma: Add pr_debug in edma_link
+>   dma: edma: Add function to dump a PaRAM set from PaRAM
+>   dma: edma: Add one more required slot to MAX slots
+>   dma: edma: Implement multiple linked sets for continuity
+>   dma: edma: Check if MAX_NR_SG is even in prep function
+>   dma: edma: Keep tracking of Pending interrupts (pending_acks)
+>   dma: edma: Return if nothing left todo in edma_execute
+> 
+>  arch/arm/common/edma.c             |   18 ++-
+>  drivers/dma/edma.c                 |  279 +++++++++++++++++++++++++++++-------
+>  include/linux/platform_data/edma.h |    1 +
+>  3 files changed, 243 insertions(+), 55 deletions(-)
+> 
