@@ -1,32 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Aug 2013 11:15:13 +0200
-Subject: [PATCH] clk: ux500: Remove BML8580 clock
-In-Reply-To: <20130815184202.4443.33356@quantum>
-References: <1376257756-23575-1-git-send-email-linus.walleij@linaro.org>
- <20130815184202.4443.33356@quantum>
-Message-ID: <CACRpkdZOPZE1aDw0NZDVX5_fVStqPFKqvLP-6dtjNawSCLg2Bg@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 16 Aug 2013 14:55:11 +0530
+Subject: [PATCH 0/2] ARM: dts: AM33XX: node definition cleanups
+In-Reply-To: <520A1C52.7070401@baylibre.com>
+References: <1376154311-10184-1-git-send-email-javier.martinez@collabora.co.uk>
+ <520A1C52.7070401@baylibre.com>
+Message-ID: <520DEFF7.2010809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 8:42 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Linus Walleij (2013-08-11 14:49:16)
->> From: Lee Jones <lee.jones@linaro.org>
+On Tuesday 13 August 2013 05:15 PM, Benoit Cousson wrote:
+> + Few TI folks to review and test.
+> 
+> On 10/08/2013 19:05, Javier Martinez Canillas wrote:
+>> Hi,
+[]..
+
 >>
->> There is no mention of the PRCMU_BML8580CLK in any of the Design
->> Specifications for the chips supported in Mainline. In fact, where it
->> is incorrectly used in the u8540 clock definition driver it would
->> have the side effect of using the incorrect clock management address
->> ([PRCM_BML8580CLK_MGT] 0x108 instead of the correct value 0x04C).
->>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->
-> Pulled into clk-next.
+>> Even though the binary dtb is the same and there shouldn't be
+>> any visible changes, boot testing will be highly appreciated.
 
+I just boot tested these on my BoneBlack and it boots just fine [1]
+Feel free to add,
+Tested-by: Rajendra Nayak <rnayak@ti.com>
 
-Hm it turns out that I need this to be in the middle of Lee's patch
-set for device tree clock that need to go through ARM SoC.
+[1] http://pastebin.com/Z2j6pymp
 
-Can you (please) drop this patch and provide an ACK instead?
-
-Yours,
-Linus Walleij
+> 
+> Thanks it looks good to me.
+> 
+> Regards,
+> Benoit
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
