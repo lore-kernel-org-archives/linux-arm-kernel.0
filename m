@@ -1,65 +1,150 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 16 Aug 2013 21:41:33 +0200
-Subject: [RFC v1 0/5] ARM: Initial support for Marvell Armada 1500
-Message-ID: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 16 Aug 2013 14:47:15 -0500
+Subject: [PATCH RFC 1/3] spmi: Linux driver framework for SPMI
+In-Reply-To: <20130816184614.GA31510@kroah.com>
+References: <cover.1376596224.git.joshc@codeaurora.org>
+ <02deef1d90121011ab1df90ad704ef0ee36e2584.1376596224.git.joshc@codeaurora.org>
+ <20130816184614.GA31510@kroah.com>
+Message-ID: <20130816194714.GH4035@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a RFC adding initial support for the Marvell Armada 1500
-(88DE3100) found on various consumer devices (Chromecast, GoogleTV).
+Hey Greg-
 
-Actually, it is a two-fold RFC also raising discussions on mach-mvebu
-cleanup roadmap to allow other SoCs to hop into it. While mach-mvebu
-originally was created to add support for Armada 370/XP and merge
-existing Marvell Orion familiy into it, I am not so sure about
-Armada 1500 fits that well (the mbus has gone!).
+Thanks for the comments.
 
-If you are brave enough to try this on any GoogleTV, hit Google for
-instructions on how to get a unlocked u-boot and void your warranty :)
-The patches are based on v3.11-rc5 directly.
+On Fri, Aug 16, 2013 at 11:46:14AM -0700, Greg Kroah-Hartman wrote:
+> On Fri, Aug 09, 2013 at 01:37:09PM -0700, Josh Cartwright wrote:
+> > --- /dev/null
+> > +++ b/drivers/of/of_spmi.c
+> > @@ -0,0 +1,74 @@
+> > +/* Copyright (c) 2012,2013 The Linux Foundation. All rights reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 and
+> > + * only version 2 as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +#define pr_fmt(fmt) "%s: " fmt, __func__
+> 
+> As you never make a pr_* call in this file, this line isn't needed.
 
-This cover letter and the separate patches have also been Cc'd to the
-respective maintainers to clear up some questions before posting a real
-patch set.
+I'll clean these up for v2.
 
-Sebastian Hesselbarth (5):
-  irqchip: add Armada 1500 APB interrupt controller
-  ARM: mvebu: add Armada 1500 to defconfig
-  ARM: mvebu: add Armada 150 uart to lowlevel debug
-  ARM: mvebu: add Armada 1500 and Sony NSZ-GS7 device tree files
-  ARM: mvebu: add board init for Armada 1500
+> > +static int
+> > +spmi_read_data(struct spmi_device *sdev, uint8_t *buf, int offset, int cnt)
+> > +{
+> > +	int ret = 0;
+> > +	int len;
+> > +	uint16_t addr;
+> > +
+> > +	while (cnt > 0) {
+> > +		addr = offset & 0xFFFF;
+> > +		len = min(cnt, MAX_REG_PER_TRANSACTION);
+> > +
+> > +		ret = spmi_ext_register_readl(sdev, addr, buf, len);
+> > +		if (ret < 0) {
+> > +			pr_err("SPMI read failed, err = %d\n", ret);
+> 
+> Should be using dev_err() instead.
 
- arch/arm/boot/dts/Makefile                     |    3 +-
- arch/arm/boot/dts/armada-1500-sony-nsz-gs7.dts |   29 +++
- arch/arm/boot/dts/armada-1500.dtsi             |  225 ++++++++++++++++++++++++
- arch/arm/configs/mvebu_defconfig               |    1 +
- arch/arm/include/debug/mvebu.S                 |   26 +--
- arch/arm/mach-mvebu/Kconfig                    |   15 ++
- arch/arm/mach-mvebu/Makefile                   |   13 +-
- arch/arm/mach-mvebu/armada-1500.c              |   63 +++++++
- drivers/irqchip/Makefile                       |    1 +
- drivers/irqchip/irq-armada-1500-apb.c          |  108 ++++++++++++
- 10 files changed, 467 insertions(+), 17 deletions(-)
- create mode 100644 arch/arm/boot/dts/armada-1500-sony-nsz-gs7.dts
- create mode 100644 arch/arm/boot/dts/armada-1500.dtsi
- create mode 100644 arch/arm/mach-mvebu/armada-1500.c
- create mode 100644 drivers/irqchip/irq-armada-1500-apb.c
+These too.
 
----
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
+[..]
+> > +
+> > +	/* Make a copy of the user data */
+> > +	char *kbuf = kmalloc(count + 1, GFP_KERNEL);
+> > +	if (!kbuf)
+> > +		return -ENOMEM;
+> > +
+> > +	ret = copy_from_user(kbuf, buf, count);
+> > +	if (ret == count) {
+> > +		pr_err("failed to copy data from user\n");
+> 
+> No need for a message here at all, you will get a message in the
+> function if something happened wrong.
+> 
+> Also, shouldn't it just be a simple:
+> 	if (copy_from_user()) {
+> test?
+
+Indeed, thanks.
+
+[..]
+> > +void __exit spmi_dfs_exit(void)
+> > +{
+> > +	pr_debug("de-initializing spmi debugfs ...");
+> 
+> Not needed, use the in-kernel trace functionality if you really want to
+> know this.
+
+Will kill these.
+
+> > --- /dev/null
+> > +++ b/drivers/spmi/spmi-dbgfs.h
+> > @@ -0,0 +1,37 @@
+> > +/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 and
+> > + * only version 2 as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +#ifndef _SPMI_DBGFS_H
+> > +#define _SPMI_DBGFS_H
+> > +
+> > +#include <linux/spmi.h>
+> > +#include <linux/debugfs.h>
+> > +
+> > +#ifdef CONFIG_DEBUG_FS
+> 
+> Why?  If debugfs isn't enabled, the functions should just compile away
+> with the debugfs_() calls, so no need to do this type of thing here,
+> right?
+
+Not sure I follow you, but it may be because this is a bit misleading.
+
+Currently CONFIG_DEBUG_FS is being extended to also mean "do you want
+the SPMI core to create device entries?".  It would probably make more
+sense to have a CONFIG_SPMI_DEBUG option which is def_bool DEBUG_FS, as
+other busses have.
+
+The #ifdef here would then be #ifdef CONFIG_SPMI_DEBUG, as well as in
+the Makefile:
+
+  spmi-core-$(CONFIG_SPMI_DEBUG) += spmi-dbgfs.o
+
+> > +
+> > +extern void __init spmi_dfs_init(void);
+> > +extern void __exit spmi_dfs_exit(void);
+> > +extern void spmi_dfs_add_controller(struct spmi_controller *ctrl);
+> > +extern void spmi_dfs_del_controller(struct spmi_controller *ctrl);
+> > +extern void spmi_dfs_add_device(struct spmi_device *sdev);
+> > +extern void spmi_dfs_del_device(struct spmi_device *sdev);
+> > +
+> > +#else
+> > +
+> > +static inline void __init spmi_dfs_init(void) { }
+> > +static inline void __exit spmi_dfs_exit(void) { }
+> > +static inline void spmi_dfs_add_controller(struct spmi_controller *ctrl) { }
+> > +static inline void spmi_dfs_del_controller(struct spmi_controller *ctrl) { }
+> > +static inline void spmi_dfs_add_device(struct spmi_device *sdev) { }
+> > +static inline void spmi_dfs_del_device(struct spmi_device *sdev) { }
+> > +#endif
+> > +
+> > +#endif /* _SPMI_DBGFS_H */
+
+Thanks,
+  Josh
+
 -- 
-1.7.10.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
