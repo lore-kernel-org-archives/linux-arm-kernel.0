@@ -1,28 +1,43 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 16 Aug 2013 11:52:56 -0700
-Subject: [PATCH RFC 2/3] spmi: Add MSM PMIC Arbiter SPMI controller
-In-Reply-To: <2b97e8deb412ae0087bffe227690a26ea9dd9bba.1376596224.git.joshc@codeaurora.org>
-References: <cover.1376596224.git.joshc@codeaurora.org>
- <2b97e8deb412ae0087bffe227690a26ea9dd9bba.1376596224.git.joshc@codeaurora.org>
-Message-ID: <20130816185256.GC31510@kroah.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 16 Aug 2013 20:55:24 +0200
+Subject: [GIT PULL] Allwinner sunXi core additions for 3.12
+Message-ID: <20130816185524.GA29790@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 01:37:07PM -0700, Josh Cartwright wrote:
-> +struct spmi_pmic_arb_dev {
-> +	struct spmi_controller	controller;
-> +	struct device		*dev;
-> +	struct device		*slave;
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
-This is problematic.
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
 
-Why do you have the driver "own" the controller?  What is dev for,
-there's already a struct device within the controller.  Same for slave,
-what is it?
+are available in the git repository at:
 
-You have 3 struct devices here, which one controls the lifecycle of the
-object (hint, I know the answer, but I think it's wrong...)
+  https://github.com/mripard/linux.git tags/sunxi-core-for-3.12
 
-thanks,
+for you to fetch changes up to 29d3d373e2a780b6e818f296ece6cc29742bc11f:
 
-greg k-h
+  ARM: sunxi: Remove Makefile.boot file (2013-07-29 13:55:41 +0200)
+
+----------------------------------------------------------------
+Allwinner sunXi core additions for 3.12
+
+There's not much in this pull request, only a patch removing some dead code.
+
+----------------------------------------------------------------
+Maxime Ripard (1):
+      ARM: sunxi: Remove Makefile.boot file
+
+ arch/arm/mach-sunxi/Makefile.boot | 1 -
+ 1 file changed, 1 deletion(-)
+ delete mode 100644 arch/arm/mach-sunxi/Makefile.boot
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130816/1ef036de/attachment.sig>
