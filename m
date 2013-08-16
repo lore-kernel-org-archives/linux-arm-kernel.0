@@ -1,123 +1,177 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 16 Aug 2013 19:05:06 +0200
-Subject: [PATCH v4 3/4] dma: mmp_pdma: add support for residue reporting
+Date: Fri, 16 Aug 2013 19:05:05 +0200
+Subject: [PATCH v4 2/4] dma: mmp_pdma: add support for cyclic DMA descriptors
 In-Reply-To: <1376672707-24527-1-git-send-email-zonque@gmail.com>
 References: <1376672707-24527-1-git-send-email-zonque@gmail.com>
-Message-ID: <1376672707-24527-4-git-send-email-zonque@gmail.com>
+Message-ID: <1376672707-24527-3-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to report the channel's residue, we walk the list of running
-descriptors, look for those which match the cookie, and then try to find
-the descriptor which defines upper and lower boundaries that embrace the
-current transport pointer.
+Provide a callback to prepare cyclic DMA transfers.
+This is for instance needed for audio channel transport.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- drivers/dma/mmp_pdma.c | 77 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 75 insertions(+), 2 deletions(-)
+ drivers/dma/mmp_pdma.c | 112 ++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 111 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index 0be99a6..b29b581 100644
+index 9929f85..0be99a6 100644
 --- a/drivers/dma/mmp_pdma.c
 +++ b/drivers/dma/mmp_pdma.c
-@@ -28,8 +28,8 @@
- #define DALGN		0x00a0
- #define DINT		0x00f0
- #define DDADR		0x0200
--#define DSADR		0x0204
--#define DTADR		0x0208
-+#define DSADR(n)	(0x0204 + ((n) << 4))
-+#define DTADR(n)	(0x0208 + ((n) << 4))
- #define DCMD		0x020c
+@@ -98,6 +98,9 @@ struct mmp_pdma_chan {
+ 	struct mmp_pdma_phy *phy;
+ 	enum dma_transfer_direction dir;
  
- #define DCSR_RUN	(1 << 31)	/* Run Bit (read / write) */
-@@ -759,6 +759,78 @@ static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
- 	return ret;
- }
++	struct mmp_pdma_desc_sw *cyclic_first;	/* first desc_sw if channel
++						 * is in cyclic mode */
++
+ 	/* channel's basic info */
+ 	struct tasklet_struct tasklet;
+ 	u32 dcmd;
+@@ -517,6 +520,8 @@ mmp_pdma_prep_memcpy(struct dma_chan *dchan,
+ 	new->desc.ddadr = DDADR_STOP;
+ 	new->desc.dcmd |= DCMD_ENDIRQEN;
  
-+static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan,
-+				     dma_cookie_t cookie)
-+{
-+	struct mmp_pdma_desc_sw *sw;
-+	u32 curr, residue = 0;
-+	bool passed = false;
-+	bool cyclic = chan->cyclic_first != NULL;
++	chan->cyclic_first = NULL;
 +
-+	/*
-+	 * If the channel does not have a phy pointer anymore, it has already
-+	 * been completed. Therefore, its residue is 0.
-+	 */
-+	if (!chan->phy)
-+		return 0;
+ 	return &first->async_tx;
+ 
+ fail:
+@@ -592,6 +597,94 @@ mmp_pdma_prep_slave_sg(struct dma_chan *dchan, struct scatterlist *sgl,
+ 	new->desc.ddadr = DDADR_STOP;
+ 	new->desc.dcmd |= DCMD_ENDIRQEN;
+ 
++	chan->dir = dir;
++	chan->cyclic_first = NULL;
 +
-+	if (chan->dir == DMA_DEV_TO_MEM)
-+		curr = readl(chan->phy->base + DTADR(chan->phy->idx));
-+	else
-+		curr = readl(chan->phy->base + DSADR(chan->phy->idx));
++	return &first->async_tx;
 +
-+	list_for_each_entry(sw, &chan->chain_running, node) {
-+		u32 start, end, len;
-+
-+		if (chan->dir == DMA_DEV_TO_MEM)
-+			start = sw->desc.dtadr;
-+		else
-+			start = sw->desc.dsadr;
-+
-+		len = sw->desc.dcmd & DCMD_LENGTH;
-+		end = start + len;
-+
-+		/*
-+		 * 'passed' will be latched once we found the descriptor which
-+		 * lies inside the boundaries of the curr pointer. All
-+		 * descriptors that occur in the list _after_ we found that
-+		 * partially handled descriptor are still to be processed and
-+		 * are hence added to the residual bytes counter.
-+		 */
-+		if (passed) {
-+			residue += len;
-+		} else if (curr >= start && curr <= end) {
-+			residue += end - curr;
-+			passed = true;
-+		}
-+
-+		/*
-+		 * Descriptors that have the ENDIRQEN bit set mark the end of a
-+		 * transaction chain, and the cookie assigned with it has been
-+		 * returned previously from mmp_pdma_tx_submit().
-+		 *
-+		 * In case we have multiple transactions in the running chain,
-+		 * and the cookie does not match the one the user asked us
-+		 * about, reset the state variables and start over.
-+		 *
-+		 * This logic does not apply to cyclic transactions, where all
-+		 * descriptors have the ENDIRQEN bit set, and for which we
-+		 * can't have multiple transactions on one channel anyway.
-+		 */
-+		if (!cyclic && (sw->desc.dcmd & DCMD_ENDIRQEN)) {
-+			if (sw->async_tx.cookie != cookie) {
-+				residue = 0;
-+				passed = false;
-+			} else {
-+				return residue;
-+			}
-+		}
-+	}
-+
-+	/* We should only get here in case of cyclic transactions */
-+	return residue;
++fail:
++	if (first)
++		mmp_pdma_free_desc_list(chan, &first->tx_list);
++	return NULL;
 +}
 +
- static enum dma_status mmp_pdma_tx_status(struct dma_chan *dchan,
- 			dma_cookie_t cookie, struct dma_tx_state *txstate)
- {
-@@ -768,6 +840,7 @@ static enum dma_status mmp_pdma_tx_status(struct dma_chan *dchan,
++static struct dma_async_tx_descriptor *mmp_pdma_prep_dma_cyclic(
++	struct dma_chan *dchan, dma_addr_t buf_addr, size_t len,
++	size_t period_len, enum dma_transfer_direction direction,
++	unsigned long flags, void *context)
++{
++	struct mmp_pdma_chan *chan;
++	struct mmp_pdma_desc_sw *first = NULL, *prev = NULL, *new;
++	dma_addr_t dma_src, dma_dst;
++
++	if (!dchan || !len || !period_len)
++		return NULL;
++
++	/* the buffer length must be a multiple of period_len */
++	if (len % period_len != 0)
++		return NULL;
++
++	if (period_len > PDMA_MAX_DESC_BYTES)
++		return NULL;
++
++	chan = to_mmp_pdma_chan(dchan);
++
++	switch (direction) {
++	case DMA_MEM_TO_DEV:
++		dma_src = buf_addr;
++		dma_dst = chan->dev_addr;
++		break;
++	case DMA_DEV_TO_MEM:
++		dma_dst = buf_addr;
++		dma_src = chan->dev_addr;
++		break;
++	default:
++		dev_err(chan->dev, "Unsupported direction for cyclic DMA\n");
++		return NULL;
++	}
++
++	chan->dir = direction;
++
++	do {
++		/* Allocate the link descriptor from DMA pool */
++		new = mmp_pdma_alloc_descriptor(chan);
++		if (!new) {
++			dev_err(chan->dev, "no memory for desc\n");
++			goto fail;
++		}
++
++		new->desc.dcmd = chan->dcmd | DCMD_ENDIRQEN |
++					(DCMD_LENGTH & period_len);
++		new->desc.dsadr = dma_src;
++		new->desc.dtadr = dma_dst;
++
++		if (!first)
++			first = new;
++		else
++			prev->desc.ddadr = new->async_tx.phys;
++
++		new->async_tx.cookie = 0;
++		async_tx_ack(&new->async_tx);
++
++		prev = new;
++		len -= period_len;
++
++		if (chan->dir == DMA_MEM_TO_DEV)
++			dma_src += period_len;
++		else
++			dma_dst += period_len;
++
++		/* Insert the link descriptor to the LD ring */
++		list_add_tail(&new->node, &first->tx_list);
++	} while (len);
++
++	first->async_tx.flags = flags; /* client is in control of this ack */
++	first->async_tx.cookie = -EBUSY;
++
++	/* make the cyclic link */
++	new->desc.ddadr = first->async_tx.phys;
++	chan->cyclic_first = first;
++
+ 	return &first->async_tx;
  
+ fail:
+@@ -706,8 +799,23 @@ static void dma_do_tasklet(unsigned long data)
+ 	LIST_HEAD(chain_cleanup);
+ 	unsigned long flags;
+ 
+-	/* submit pending list; callback for each desc; free desc */
++	if (chan->cyclic_first) {
++		dma_async_tx_callback cb = NULL;
++		void *cb_data = NULL;
+ 
++		spin_lock_irqsave(&chan->desc_lock, flags);
++		desc = chan->cyclic_first;
++		cb = desc->async_tx.callback;
++		cb_data = desc->async_tx.callback_param;
++		spin_unlock_irqrestore(&chan->desc_lock, flags);
++
++		if (cb)
++			cb(cb_data);
++
++		return;
++	}
++
++	/* submit pending list; callback for each desc; free desc */
  	spin_lock_irqsave(&chan->desc_lock, flags);
- 	ret = dma_cookie_status(dchan, cookie, txstate);
-+	txstate->residue = mmp_pdma_residue(chan, cookie);
- 	spin_unlock_irqrestore(&chan->desc_lock, flags);
  
- 	return ret;
+ 	list_for_each_entry_safe(desc, _desc, &chan->chain_running, node) {
+@@ -904,12 +1012,14 @@ static int mmp_pdma_probe(struct platform_device *op)
+ 
+ 	dma_cap_set(DMA_SLAVE, pdev->device.cap_mask);
+ 	dma_cap_set(DMA_MEMCPY, pdev->device.cap_mask);
++	dma_cap_set(DMA_CYCLIC, pdev->device.cap_mask);
+ 	pdev->device.dev = &op->dev;
+ 	pdev->device.device_alloc_chan_resources = mmp_pdma_alloc_chan_resources;
+ 	pdev->device.device_free_chan_resources = mmp_pdma_free_chan_resources;
+ 	pdev->device.device_tx_status = mmp_pdma_tx_status;
+ 	pdev->device.device_prep_dma_memcpy = mmp_pdma_prep_memcpy;
+ 	pdev->device.device_prep_slave_sg = mmp_pdma_prep_slave_sg;
++	pdev->device.device_prep_dma_cyclic = mmp_pdma_prep_dma_cyclic;
+ 	pdev->device.device_issue_pending = mmp_pdma_issue_pending;
+ 	pdev->device.device_control = mmp_pdma_control;
+ 	pdev->device.copy_align = PDMA_ALIGNMENT;
 -- 
 1.8.3.1
