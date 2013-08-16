@@ -1,50 +1,92 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Aug 2013 15:51:33 +0530
-Subject: [PATCH] arm: omap5: dts: split SMPS10 dt node
-In-Reply-To: <520DE8C1.2080406@baylibre.com>
-References: <1376300221-15172-1-git-send-email-kishon@ti.com>
- <520A32CF.1010701@baylibre.com> <520A4685.7050503@ti.com>
- <520A474F.9080500@baylibre.com> <520DB559.80305@ti.com>
- <520DE8C1.2080406@baylibre.com>
-Message-ID: <520DFD2D.9020408@ti.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 16 Aug 2013 11:31:08 +0100
+Subject: [PATCH] drivers: CCI: add ARM CCI PMU support
+In-Reply-To: <ADB3A138-838D-4437-853A-ABFCB0B32FAB@codeaurora.org>
+References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
+ <2CD735CE-3FCF-4AB5-89C0-D813ECD19F11@codeaurora.org>
+ <520C9AEA.6030507@arm.com>
+ <ADB3A138-838D-4437-853A-ABFCB0B32FAB@codeaurora.org>
+Message-ID: <520DFF6C.1040500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 August 2013 02:24 PM, Benoit Cousson wrote:
-> On 16/08/2013 07:15, Kishon Vijay Abraham I wrote:
->> Hi Benoit,
+On 15/08/13 17:25, Kumar Gala wrote:
+>
+> On Aug 15, 2013, at 4:10 AM, Punit Agrawal wrote:
+>
+>> Hi Kumar,
 >>
->> On Tuesday 13 August 2013 08:18 PM, Benoit Cousson wrote:
->>> On 13/08/2013 16:45, Kishon Vijay Abraham I wrote:
->>>> Hi,
->>>>
->>>> On Tuesday 13 August 2013 06:51 PM, Benoit Cousson wrote:
->>>>> Hi Kishon,
->>>>>
->>>>> On 12/08/2013 11:37, Kishon Vijay Abraham I wrote:
->>>>>> SMPS10 has two outputs OUT1 and OUT2. Hence SMPS10 is modeled as
->>>>>> two regulators. The dt node is split to reflect it.
->>>>>
->>>>> Mmm, I'm curious. How is it supposed to work?
->>>>>
->>>>> Do you have dedicated control on each output?
->>>>
->>>> Yes. It can be controlled by setting different values to the same bit fields.
->>>> You can refer [1] where we actually implement SMPS10 as two different
->>>> regulators.
->>>>
->>>> [1] -> http://permalink.gmane.org/gmane.linux.kernel/1542521
->>>
->>> Great, thanks.
->>>
->>> Can we merge that one safely if the driver changed are not done yet?
+>> Thanks for a review of the bindings.
 >>
->> I think it shouldn't cause any issues. However Mark has already merged the
->> driver changes.
-> 
-> Cool. I've just applied your patch in for_3.12/dts
+>> On 14/08/13 22:03, Kumar Gala wrote:
+>>>
+>>> On Jul 23, 2013, at 4:19 AM, Punit Agrawal wrote:
+>>>
+>>>> The CCI PMU can profile bus transactions at the master and slave
+>>>> interfaces of the CCI. The PMU can be used to observe an aggregated view
+>>>> of the bus traffic between the various components connected to the CCI.
+>>>>
+>>>> Extend the existing CCI driver to support the PMU by registering a perf
+>>>> backend for it.
+>>>>
+>>>> Document the device tree binding to describe the CCI PMU.
+>>>>
+>>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>>> Cc: Nicolas Pitre <nico@linaro.org>
+>>>> Cc: Dave Martin <dave.martin@linaro.org>
+>>>> Cc: Rob Herring <rob.herring@calxeda.com>
+>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>>>> Reviewed-by: Will Deacon <will.deacon@arm.com>
+>>>> ---
+>>>> Documentation/devicetree/bindings/arm/cci.txt |   38 ++
+>>>> drivers/bus/arm-cci.c                         |  642 +++++++++++++++++++++++++
+>>>> 2 files changed, 680 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
+>>>> index 92d36e2..5bc95e5 100644
+>>>> --- a/Documentation/devicetree/bindings/arm/cci.txt
+>>>> +++ b/Documentation/devicetree/bindings/arm/cci.txt
+>>>> @@ -79,6 +79,34 @@ specific to ARM.
+>>>> 				    corresponding interface programming
+>>>> 				    registers.
+>>>>
+>>>> +	- CCI PMU node
+>>>> +
+>>>> +		Node name must be "pmu".
+>>>> +		Parent node must be CCI interconnect node.
+>>>> +
+>>>> +		A CCI pmu node must contain the following properties:
+>>>> +
+>>>> +		- compatible
+>>>> +			Usage: required
+>>>> +			Value type: <string>
+>>>> +			Definition: must be set to one of
+>>>> +				    "arm,cci-400-pmu"
+>>>> +				    "arm,cci-400-pmu,rev0"
+>>>> +				    "arm,cci-400-pmu,rev1"
+>>>
+>>> Do you really mean only one?  Seems like ""arm,cci-400-pmu,rev0", "arm,cci-400-pmu" would be valid.
+>>>
+>>
+>> Hmm... yes both would be valid. But...
+>>
+>> The event numbering scheme changed between Rev 0 and Rev 1 of the CCI. If the revision is specified then it is used to get the event ranges to validate the events. If not, i.e., "arm,cci-400-pmu" is used, then the driver tries to find the the revision by reading the peripheral id registers.
+>>
+>> I was trying to make the bindings robust in the face of change in behaviour between different revisons of the IP.
+>
+> If there is a periph id register why bother with the device tree having different version info in it?
+>
 
-Thanks :-)
+The different version strings are useful when the identification 
+registers are either incorrect or broken.
 
-Regards
-Kishon
+But I am not aware of any such platforms currently out there. I can 
+remove the additional compatible strings and rely on the peripheral id 
+register solely. Do you prefer that?
+
+Cheers,
+Punit
+
+> - k
+>
