@@ -1,28 +1,34 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 16 Aug 2013 19:05:03 +0200
-Subject: [PATCH v4 0/4] dma: pdma: cyclic, residue, DMA_PRIVATE
-Message-ID: <1376672707-24527-1-git-send-email-zonque@gmail.com>
+Date: Fri, 16 Aug 2013 19:05:07 +0200
+Subject: [PATCH v4 4/4] dma: mmp_pdma: set DMA_PRIVATE
+In-Reply-To: <1376672707-24527-1-git-send-email-zonque@gmail.com>
+References: <1376672707-24527-1-git-send-email-zonque@gmail.com>
+Message-ID: <1376672707-24527-5-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's another spin of my pending patches for mmp_pdma. It has grown
-by two more patches now, and they address the issues pointed out by
-Chao Xie and Xiang Wang.
+As the driver now has its own xlate function and makes use of the
+dma_get_slave_channel(), we need to manually set the DMA_PRIVATE flags.
 
-I'd appreciate another round of reviews.
+Drivers which rely on of_dma_simple_xlate() do implicitly the same by
+going through __dma_request_channel().
 
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ drivers/dma/mmp_pdma.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-Daniel
-
-Daniel Mack (4):
-  dma: mmp_pdma: only complete one transaction from dma_do_tasklet()
-  dma: mmp_pdma: add support for cyclic DMA descriptors
-  dma: mmp_pdma: add support for residue reporting
-  dma: mmp_pdma: set DMA_PRIVATE
-
- drivers/dma/mmp_pdma.c | 225 +++++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 208 insertions(+), 17 deletions(-)
-
+diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
+index b29b581..dfccfe1 100644
+--- a/drivers/dma/mmp_pdma.c
++++ b/drivers/dma/mmp_pdma.c
+@@ -1086,6 +1086,7 @@ static int mmp_pdma_probe(struct platform_device *op)
+ 	dma_cap_set(DMA_SLAVE, pdev->device.cap_mask);
+ 	dma_cap_set(DMA_MEMCPY, pdev->device.cap_mask);
+ 	dma_cap_set(DMA_CYCLIC, pdev->device.cap_mask);
++	dma_cap_set(DMA_PRIVATE, pdev->device.cap_mask);
+ 	pdev->device.dev = &op->dev;
+ 	pdev->device.device_alloc_chan_resources = mmp_pdma_alloc_chan_resources;
+ 	pdev->device.device_free_chan_resources = mmp_pdma_free_chan_resources;
 -- 
 1.8.3.1
