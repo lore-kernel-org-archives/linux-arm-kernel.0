@@ -1,177 +1,87 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 16 Aug 2013 19:05:05 +0200
-Subject: [PATCH v4 2/4] dma: mmp_pdma: add support for cyclic DMA descriptors
-In-Reply-To: <1376672707-24527-1-git-send-email-zonque@gmail.com>
-References: <1376672707-24527-1-git-send-email-zonque@gmail.com>
-Message-ID: <1376672707-24527-3-git-send-email-zonque@gmail.com>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Fri, 16 Aug 2013 22:37:09 +0530
+Subject: [PATCH v6] ARM: davinci: da850: add DT node for ethernet
+Message-ID: <1376672829-4220-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a callback to prepare cyclic DMA transfers.
-This is for instance needed for audio channel transport.
+From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
+Add ethernet device tree node information and pinmux for mii to da850 by
+providing interrupt details and local mac address.
+
+Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 ---
- drivers/dma/mmp_pdma.c | 112 ++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 111 insertions(+), 1 deletion(-)
+ Changes for v6:
+ 1: Fixed review comment pointed by Sergei.
+ 
+ arch/arm/boot/dts/da850-evm.dts |    5 +++++
+ arch/arm/boot/dts/da850.dtsi    |   30 ++++++++++++++++++++++++++++++
+ 2 files changed, 35 insertions(+)
 
-diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index 9929f85..0be99a6 100644
---- a/drivers/dma/mmp_pdma.c
-+++ b/drivers/dma/mmp_pdma.c
-@@ -98,6 +98,9 @@ struct mmp_pdma_chan {
- 	struct mmp_pdma_phy *phy;
- 	enum dma_transfer_direction dir;
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 1f8cfdd..588ce58 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -96,6 +96,11 @@
+ 			pinctrl-0 = <&mdio_pins>;
+ 			bus_freq = <2200000>;
+ 		};
++		eth0: ethernet at 1e20000 {
++			status = "okay";
++			pinctrl-names = "default";
++			pinctrl-0 = <&mii_pins>;
++		};
+ 	};
+ 	nand_cs3 at 62000000 {
+ 		status = "okay";
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index d5138b4..8d17346 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -131,6 +131,22 @@
+ 					0x10 0x00000088 0x000000ff
+ 				>;
+ 			};
++			mii_pins: pinmux_mii_pins {
++				pinctrl-single,bits = <
++					/*
++					 * MII_TXEN, MII_TXCLK, MII_COL
++					 * MII_TXD_3, MII_TXD_2, MII_TXD_1
++					 * MII_TXD_0
++					 */
++					0x8 0x88888880 0xfffffff0
++					/*
++					 * MII_RXER, MII_CRS, MII_RXCLK
++					 * MII_RXDV, MII_RXD_3, MII_RXD_2
++					 * MII_RXD_1, MII_RXD_0
++					 */
++					0xc 0x88888888 0xffffffff
++				>;
++			};
  
-+	struct mmp_pdma_desc_sw *cyclic_first;	/* first desc_sw if channel
-+						 * is in cyclic mode */
-+
- 	/* channel's basic info */
- 	struct tasklet_struct tasklet;
- 	u32 dcmd;
-@@ -517,6 +520,8 @@ mmp_pdma_prep_memcpy(struct dma_chan *dchan,
- 	new->desc.ddadr = DDADR_STOP;
- 	new->desc.dcmd |= DCMD_ENDIRQEN;
- 
-+	chan->cyclic_first = NULL;
-+
- 	return &first->async_tx;
- 
- fail:
-@@ -592,6 +597,94 @@ mmp_pdma_prep_slave_sg(struct dma_chan *dchan, struct scatterlist *sgl,
- 	new->desc.ddadr = DDADR_STOP;
- 	new->desc.dcmd |= DCMD_ENDIRQEN;
- 
-+	chan->dir = dir;
-+	chan->cyclic_first = NULL;
-+
-+	return &first->async_tx;
-+
-+fail:
-+	if (first)
-+		mmp_pdma_free_desc_list(chan, &first->tx_list);
-+	return NULL;
-+}
-+
-+static struct dma_async_tx_descriptor *mmp_pdma_prep_dma_cyclic(
-+	struct dma_chan *dchan, dma_addr_t buf_addr, size_t len,
-+	size_t period_len, enum dma_transfer_direction direction,
-+	unsigned long flags, void *context)
-+{
-+	struct mmp_pdma_chan *chan;
-+	struct mmp_pdma_desc_sw *first = NULL, *prev = NULL, *new;
-+	dma_addr_t dma_src, dma_dst;
-+
-+	if (!dchan || !len || !period_len)
-+		return NULL;
-+
-+	/* the buffer length must be a multiple of period_len */
-+	if (len % period_len != 0)
-+		return NULL;
-+
-+	if (period_len > PDMA_MAX_DESC_BYTES)
-+		return NULL;
-+
-+	chan = to_mmp_pdma_chan(dchan);
-+
-+	switch (direction) {
-+	case DMA_MEM_TO_DEV:
-+		dma_src = buf_addr;
-+		dma_dst = chan->dev_addr;
-+		break;
-+	case DMA_DEV_TO_MEM:
-+		dma_dst = buf_addr;
-+		dma_src = chan->dev_addr;
-+		break;
-+	default:
-+		dev_err(chan->dev, "Unsupported direction for cyclic DMA\n");
-+		return NULL;
-+	}
-+
-+	chan->dir = direction;
-+
-+	do {
-+		/* Allocate the link descriptor from DMA pool */
-+		new = mmp_pdma_alloc_descriptor(chan);
-+		if (!new) {
-+			dev_err(chan->dev, "no memory for desc\n");
-+			goto fail;
-+		}
-+
-+		new->desc.dcmd = chan->dcmd | DCMD_ENDIRQEN |
-+					(DCMD_LENGTH & period_len);
-+		new->desc.dsadr = dma_src;
-+		new->desc.dtadr = dma_dst;
-+
-+		if (!first)
-+			first = new;
-+		else
-+			prev->desc.ddadr = new->async_tx.phys;
-+
-+		new->async_tx.cookie = 0;
-+		async_tx_ack(&new->async_tx);
-+
-+		prev = new;
-+		len -= period_len;
-+
-+		if (chan->dir == DMA_MEM_TO_DEV)
-+			dma_src += period_len;
-+		else
-+			dma_dst += period_len;
-+
-+		/* Insert the link descriptor to the LD ring */
-+		list_add_tail(&new->node, &first->tx_list);
-+	} while (len);
-+
-+	first->async_tx.flags = flags; /* client is in control of this ack */
-+	first->async_tx.cookie = -EBUSY;
-+
-+	/* make the cyclic link */
-+	new->desc.ddadr = first->async_tx.phys;
-+	chan->cyclic_first = first;
-+
- 	return &first->async_tx;
- 
- fail:
-@@ -706,8 +799,23 @@ static void dma_do_tasklet(unsigned long data)
- 	LIST_HEAD(chain_cleanup);
- 	unsigned long flags;
- 
--	/* submit pending list; callback for each desc; free desc */
-+	if (chan->cyclic_first) {
-+		dma_async_tx_callback cb = NULL;
-+		void *cb_data = NULL;
- 
-+		spin_lock_irqsave(&chan->desc_lock, flags);
-+		desc = chan->cyclic_first;
-+		cb = desc->async_tx.callback;
-+		cb_data = desc->async_tx.callback_param;
-+		spin_unlock_irqrestore(&chan->desc_lock, flags);
-+
-+		if (cb)
-+			cb(cb_data);
-+
-+		return;
-+	}
-+
-+	/* submit pending list; callback for each desc; free desc */
- 	spin_lock_irqsave(&chan->desc_lock, flags);
- 
- 	list_for_each_entry_safe(desc, _desc, &chan->chain_running, node) {
-@@ -904,12 +1012,14 @@ static int mmp_pdma_probe(struct platform_device *op)
- 
- 	dma_cap_set(DMA_SLAVE, pdev->device.cap_mask);
- 	dma_cap_set(DMA_MEMCPY, pdev->device.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, pdev->device.cap_mask);
- 	pdev->device.dev = &op->dev;
- 	pdev->device.device_alloc_chan_resources = mmp_pdma_alloc_chan_resources;
- 	pdev->device.device_free_chan_resources = mmp_pdma_free_chan_resources;
- 	pdev->device.device_tx_status = mmp_pdma_tx_status;
- 	pdev->device.device_prep_dma_memcpy = mmp_pdma_prep_memcpy;
- 	pdev->device.device_prep_slave_sg = mmp_pdma_prep_slave_sg;
-+	pdev->device.device_prep_dma_cyclic = mmp_pdma_prep_dma_cyclic;
- 	pdev->device.device_issue_pending = mmp_pdma_issue_pending;
- 	pdev->device.device_control = mmp_pdma_control;
- 	pdev->device.copy_align = PDMA_ALIGNMENT;
+ 		};
+ 		serial0: serial at 1c42000 {
+@@ -226,6 +242,20 @@
+ 			#size-cells = <0>;
+ 			reg = <0x224000 0x1000>;
+ 		};
++		eth0: ethernet at 1e20000 {
++			compatible = "ti,davinci-dm6467-emac";
++			reg = <0x220000 0x4000>;
++			ti,davinci-ctrl-reg-offset = <0x3000>;
++			ti,davinci-ctrl-mod-reg-offset = <0x2000>;
++			ti,davinci-ctrl-ram-offset = <0>;
++			ti,davinci-ctrl-ram-size = <0x2000>;
++			local-mac-address = [ 00 00 00 00 00 00 ];
++			interrupts = <33
++					34
++					35
++					36
++					>;
++		};
+ 	};
+ 	nand_cs3 at 62000000 {
+ 		compatible = "ti,davinci-nand";
 -- 
-1.8.3.1
+1.7.9.5
