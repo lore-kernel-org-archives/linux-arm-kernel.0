@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Aug 2013 07:55:05 +0530
-Subject: [PATCH 08/34] cpufreq: davinci: remove calls to
+Date: Fri, 16 Aug 2013 07:55:06 +0530
+Subject: [PATCH 09/34] cpufreq: dbx500: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1376619363.git.viresh.kumar@linaro.org>
 References: <cover.1376619363.git.viresh.kumar@linaro.org>
-Message-ID: <afcf37938eb552cccba058f414cd900ee585bc0a.1376619363.git.viresh.kumar@linaro.org>
+Message-ID: <6ce2b2cfc0c51c27ab27c4b4ff6d446debfd4dd9.1376619363.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,72 +28,45 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
-Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/davinci-cpufreq.c | 30 ++++++++++--------------------
- 1 file changed, 10 insertions(+), 20 deletions(-)
+ drivers/cpufreq/dbx500-cpufreq.c | 22 +---------------------
+ 1 file changed, 1 insertion(+), 21 deletions(-)
 
-diff --git a/drivers/cpufreq/davinci-cpufreq.c b/drivers/cpufreq/davinci-cpufreq.c
-index 07ea6c0..7fcae0c 100644
---- a/drivers/cpufreq/davinci-cpufreq.c
-+++ b/drivers/cpufreq/davinci-cpufreq.c
-@@ -70,46 +70,36 @@ static unsigned int davinci_getspeed(unsigned int cpu)
- 
- static int davinci_target(struct cpufreq_policy *policy, unsigned int idx)
+diff --git a/drivers/cpufreq/dbx500-cpufreq.c b/drivers/cpufreq/dbx500-cpufreq.c
+index d6d6b8c..060430c 100644
+--- a/drivers/cpufreq/dbx500-cpufreq.c
++++ b/drivers/cpufreq/dbx500-cpufreq.c
+@@ -22,28 +22,8 @@ static struct clk *armss_clk;
+ static int dbx500_cpufreq_target(struct cpufreq_policy *policy,
+ 				unsigned int index)
  {
--	int ret = 0;
 -	struct cpufreq_freqs freqs;
- 	struct davinci_cpufreq_config *pdata = cpufreq.dev->platform_data;
- 	struct clk *armclk = cpufreq.armclk;
-+	unsigned int old_freq, new_freq;
-+	int ret = 0;
- 
--	freqs.old = davinci_getspeed(0);
--	freqs.new = pdata->freq_table[idx].frequency;
+-	int ret;
 -
--	dev_dbg(cpufreq.dev, "transition: %u --> %u\n", freqs.old, freqs.new);
+-	freqs.old = policy->cur;
+-	freqs.new = freq_table[index].frequency;
 -
+-	/* pre-change notification */
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
-+	old_freq = davinci_getspeed(0);
-+	new_freq = pdata->freq_table[idx].frequency;
- 
- 	/* if moving to higher frequency, up the voltage beforehand */
--	if (pdata->set_voltage && freqs.new > freqs.old) {
-+	if (pdata->set_voltage && new_freq > old_freq) {
- 		ret = pdata->set_voltage(idx);
- 		if (ret)
--			goto out;
-+			return ret;
- 	}
- 
- 	ret = clk_set_rate(armclk, idx);
- 	if (ret)
--		goto out;
-+		return ret;
- 
- 	if (cpufreq.asyncclk) {
- 		ret = clk_set_rate(cpufreq.asyncclk, cpufreq.asyncrate);
- 		if (ret)
--			goto out;
-+			return ret;
- 	}
- 
- 	/* if moving to lower freq, lower the voltage after lowering freq */
--	if (pdata->set_voltage && freqs.new < freqs.old)
-+	if (pdata->set_voltage && new_freq < old_freq)
- 		pdata->set_voltage(idx);
- 
--out:
--	if (ret)
--		freqs.new = freqs.old;
 -
+ 	/* update armss clk frequency */
+-	ret = clk_set_rate(armss_clk, freqs.new * 1000);
+-
+-	if (ret) {
+-		pr_err("dbx500-cpufreq: Failed to set armss_clk to %d Hz: error %d\n",
+-		       freqs.new * 1000, ret);
+-		freqs.new = freqs.old;
+-	}
+-
+-	/* post change notification */
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 -
 -	return ret;
-+	return 0;
++	return clk_set_rate(armss_clk, freq_table[index].frequency * 1000);
  }
  
- static int davinci_cpu_init(struct cpufreq_policy *policy)
+ static unsigned int dbx500_cpufreq_getspeed(unsigned int cpu)
 -- 
 1.7.12.rc2.18.g61b472e
