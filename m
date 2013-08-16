@@ -1,39 +1,29 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 15 Aug 2013 21:35:33 -0300
-Subject: [PATCH] ARM: fiq: Cast the first argument of flush_icache_range()
-Message-ID: <1376613333-7021-1-git-send-email-festevam@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 16 Aug 2013 01:35:57 +0100
+Subject: Broken device trees for exynos in linux-next
+In-Reply-To: <13b101ce9a14$2cebd700$86c38500$@org>
+References: <CAOesGMgv9gTQ_NtaKZY_ZfLD1NBU19E-vaLaWwmvGJJB1MQrwg@mail.gmail.com>
+ <13b101ce9a14$2cebd700$86c38500$@org>
+Message-ID: <20130816003557.GJ30073@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Aug 16, 2013 at 09:04:28AM +0900, Kukjin Kim wrote:
 
-Commit 2ba85e7af4 (ARM: Fix FIQ code on VIVT CPUs) causes the following build
-warning:
+> NO, the build breakage is due to commit 6187288f15bc ("ARM: dts: exynos5250:
+> move common i2s properties to exynos5 dtsi" which is in Mark Brown's tree.
 
-arch/arm/kernel/fiq.c: In function 'set_fiq_handler':
-arch/arm/kernel/fiq.c:92:3: warning: passing argument 1 of 'cpu_cache.coherent_kern_range' makes integer from pointer without a cast [enabled by default]
-arch/arm/kernel/fiq.c:92:3: note: expected 'long unsigned int' but argument is of type 'void *'
+> Mark, pleaser revert it in your tree...
 
-Cast it as '(unsigned long)base' to avoid the warning.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/kernel/fiq.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-index fc79202..d6515b9 100644
---- a/arch/arm/kernel/fiq.c
-+++ b/arch/arm/kernel/fiq.c
-@@ -89,7 +89,8 @@ void set_fiq_handler(void *start, unsigned int length)
- 
- 	memcpy(base + offset, start, length);
- 	if (!cache_is_vipt_nonaliasing())
--		flush_icache_range(base + offset, offset + length);
-+		flush_icache_range((unsigned long)base + offset, offset +
-+				   length);
- 	flush_icache_range(0xffff0000 + offset, 0xffff0000 + offset + length);
- }
- 
--- 
-1.8.1.2
+I'll do that but I don't know if that's then going to break anything
+else.  This sort of bisection/cross tree issue does come up a lot with
+the Samsung SoCs - it'd be good if you could remind the people working
+on them about the need to make sure that when there are dependencies
+they're handled when things are merged.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130816/846e6eb2/attachment.sig>
