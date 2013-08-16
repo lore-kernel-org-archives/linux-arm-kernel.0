@@ -1,40 +1,51 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 15 Aug 2013 21:07:08 -0700
-Subject: [ARM ATTEND] Clock DT bindings
-In-Reply-To: <520D9788.5080805@codeaurora.org>
-References: <520D9788.5080805@codeaurora.org>
-Message-ID: <20130816040708.4443.26655@quantum>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 16 Aug 2013 09:37:31 +0530
+Subject: [PATCH v4 4/5] ARM: davinci: da850: add DT node for eth0.
+In-Reply-To: <520D2C50.4040902@cogentembedded.com>
+References: <1376546497-26931-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1376546497-26931-5-git-send-email-prabhakar.csengg@gmail.com>
+ <520D2C50.4040902@cogentembedded.com>
+Message-ID: <CA+V-a8tDUE8Ni2CbJchA0rnTY3OijBuLK6L=OtH_FDXupOn9tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Saravana Kannan (2013-08-15 20:07:52)
-> You asked for specific topics. So, here's one:
-> 
-> Clock DT bindings discussion on:
-> * Allowing producers to export clocks by names.
-> * Allowing consumers to list clocks by "producer phandle, clock name".
-> * Should we allow for -clock magic similar to regulators?
-> * Should the entire clock tree be represented in DT.
-> 
-> I would like to attend the ARM summit to represent the needs of SoCs 
-> with complicated clocking HW. I have worked on clocks for about 5 years 
-> (since MSM started running Linux) and would like to throw in my opinion 
-> on what clock DT bindings would work well, why and help come up with a 
-> solution that works well for everyone.
+Hi Sergei,
 
-+1
-
-Would be nice to have you in attendance Saravana. Some of these issues
-also cross over into the "kernel data bloat" topic that was posted to
-the list earlier.
+On Fri, Aug 16, 2013 at 1:00 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Hello.
+>
+>
+> On 15-08-2013 10:01, Lad, Prabhakar wrote:
+>
+>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>
+>
+>> Add eth0 device tree node information and pinmux for mii to da850 by
+>> providing interrupt details and local mac address of eth0.
+>
+>
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>
+> [...]
+>
+>
+>> @@ -226,6 +242,20 @@
+>>                         #size-cells = <0>;
+>>                         reg = <0x224000 0x1000>;
+>>                 };
+>> +               eth0: emac at 1e20000 {
+>
+>
+>    According to the ePAPR spec[1] section 2.2.2, the node should be named
+> "ethernet".
+>
+Thanks for pointing it, I'll fix and repost it.
 
 Regards,
-Mike
+--Prabhakar Lad
 
-> 
-> Thanks,
-> Saravana
-> 
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+> [1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+>
+> WBR, Sergei
+>
