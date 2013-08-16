@@ -1,163 +1,51 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 16 Aug 2013 14:48:41 -0700
-Subject: [PATCH RFC 2/2] clk: implement clk_unregister
-In-Reply-To: <1375804317-10576-3-git-send-email-s.nawrocki@samsung.com>
-References: <1375804317-10576-1-git-send-email-s.nawrocki@samsung.com>
- <1375804317-10576-3-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20130816214841.4443.10515@quantum>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 16 Aug 2013 14:52:11 -0700
+Subject: [patch v2 3/3] mm: page_alloc: fair zone allocator policy
+In-Reply-To: <20130816201814.GA26409@cmpxchg.org> (Johannes Weiner's message
+ of "Fri, 16 Aug 2013 16:18:14 -0400")
+References: <1375457846-21521-1-git-send-email-hannes@cmpxchg.org>
+ <1375457846-21521-4-git-send-email-hannes@cmpxchg.org>
+ <20130807145828.GQ2296@suse.de> <20130807153743.GH715@cmpxchg.org>
+ <20130808041623.GL1845@cmpxchg.org> <87haepblo2.fsf@kernel.org>
+ <20130816201814.GA26409@cmpxchg.org>
+Message-ID: <8738q9b8xg.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2013-08-06 08:51:57)
-> +/*
-> + * Empty clk_ops for unregistered clocks. These are used temporarily
-> + * after clk_unregister() was called on a clock and until last clock
-> + * consumer calls clk_put() and the struct clk object is freed.
-> + */
-> +static int clk_dummy_prepare_enable(struct clk_hw *hw)
-> +{
-> +       return -ENXIO;
-> +}
-> +
-> +static void clk_dummy_disable_unprepare(struct clk_hw *hw)
-> +{
-> +       WARN_ON(1);
-> +}
-> +
-> +static int clk_dummy_set_rate(struct clk_hw *hw, unsigned long rate,
-> +                                       unsigned long parent_rate)
-> +{
-> +       return -ENXIO;
-> +}
-> +
-> +static int clk_dummy_set_parent(struct clk_hw *hw, u8 index)
-> +{
-> +       return -ENXIO;
-> +}
-> +
-> +static const struct clk_ops clk_dummy_ops = {
-> +       .enable         = clk_dummy_prepare_enable,
-> +       .disable        = clk_dummy_disable_unprepare,
-> +       .prepare        = clk_dummy_prepare_enable,
-> +       .unprepare      = clk_dummy_disable_unprepare,
-> +       .set_rate       = clk_dummy_set_rate,
-> +       .set_parent     = clk_dummy_set_parent,
-> +};
+Johannes Weiner <hannes@cmpxchg.org> writes:
 
-Don't use "clk_dummy_*" here. The use of dummy often implies that
-operations will return success in the absence of actual hardware but
-these return an error, and rightly so. So maybe rename the functions and
-clk_ops instance to something like "clk_nodev_*" or "clk_missing_*"?
+> Hi Kevin,
+>
+> On Fri, Aug 16, 2013 at 10:17:01AM -0700, Kevin Hilman wrote:
+>> Johannes Weiner <hannes@cmpxchg.org> writes:
+>> > On Wed, Aug 07, 2013 at 11:37:43AM -0400, Johannes Weiner wrote:
+>> > Subject: [patch] mm: page_alloc: use vmstats for fair zone allocation batching
+>> >
+>> > Avoid dirtying the same cache line with every single page allocation
+>> > by making the fair per-zone allocation batch a vmstat item, which will
+>> > turn it into batched percpu counters on SMP.
+>> >
+>> > Signed-off-by: Johannes Weiner <hannes@cmpxchg.org>
+>> 
+>> I bisected several boot failures on various ARM platform in
+>> next-20130816 down to this patch (commit 67131f9837 in linux-next.)
+>> 
+>> Simply reverting it got things booting again on top of -next.  Example
+>> boot crash below.
+>
+> Thanks for the bisect and report!
 
-> +
->  /**
->   * clk_unregister - unregister a currently registered clock
->   * @clk: clock to unregister
-> - *
-> - * Currently unimplemented.
->   */
-> -void clk_unregister(struct clk *clk) {}
-> +void clk_unregister(struct clk *clk)
-> +{
-> +       unsigned long flags;
-> +
-> +       clk_prepare_lock();
-> +
-> +       if (!clk || IS_ERR(clk)) {
-> +               pr_err("%s: invalid clock: %p\n", __func__, clk);
-> +               goto out;
-> +       }
-> +
-> +       if (clk->ops == &clk_dummy_ops) {
-> +               pr_err("%s: unregistered clock: %s\n", __func__, clk->name);
-> +               goto out;
-> +       }
-> +       /*
-> +        * Assign dummy clock ops for consumers that might still hold
-> +        * a reference to this clock.
-> +        */
-> +       flags = clk_enable_lock();
-> +       clk->ops = &clk_dummy_ops;
-> +       clk_enable_unlock(flags);
-> +
-> +       if (!hlist_empty(&clk->children)) {
-> +               struct clk *child;
-> +
-> +               /* Reparent all children to the orphan list. */
-> +               hlist_for_each_entry(child, &clk->children, child_node)
-> +                       clk_set_parent(child, NULL);
-> +       }
+You're welcome.  Thanks for the quick fix!
 
-This looks pretty good. A remaining problem is re-loading the clock
-provider module will have string name conflicts with the old
-unregistered clocks (but not yet released) clocks during calls to
-__clk_lookup.
+> I deref the percpu pointers before initializing them properly.  It
+> didn't trigger on x86 because the percpu offset added to the pointer
+> is big enough so that it does not fall into PFN 0, but it probably
+> ended up corrupting something...
+>
+> Could you try this patch on top of linux-next instead of the revert?
 
-The best solution would be to refactor clk.c to not use string name
-lookups but that is probably too big of an issue for the purpose of this
-series (but it will happen some day).
+Yup, that change fixes it.
 
-A short term solution would be to poison the clock's string name here.
-Reallocate the clk->name string with some poison data so that name
-conflicts don't occur. What do you think?
+Tested-by: Kevin Hilman <khilman@linaro.org>
 
-Regards,
-Mike
-
-> +
-> +       clk_debug_unregister(clk);
-> +
-> +       hlist_del_init(&clk->child_node);
-> +
-> +       if (clk->prepare_count)
-> +               pr_warn("%s: unregistering prepared clock: %s\n",
-> +                                       __func__, clk->name);
-> +
-> +       kref_put(&clk->ref, __clk_release);
-> +out:
-> +       clk_prepare_unlock();
-> +}
->  EXPORT_SYMBOL_GPL(clk_unregister);
-> 
->  static void devm_clk_release(struct device *dev, void *res)
-> @@ -1861,6 +1973,7 @@ int __clk_get(struct clk *clk)
->         if (!try_module_get(clk->owner))
->                 return 0;
-> 
-> +       kref_get(&clk->ref);
->         return 1;
->  }
->  EXPORT_SYMBOL(__clk_get);
-> @@ -1870,6 +1983,10 @@ void __clk_put(struct clk *clk)
->         if (!clk || IS_ERR(clk))
->                 return;
-> 
-> +       clk_prepare_lock();
-> +       kref_put(&clk->ref, __clk_release);
-> +       clk_prepare_unlock();
-> +
->         module_put(clk->owner);
->  }
->  EXPORT_SYMBOL(__clk_put);
-> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-> index b7c0b58..36c1fc8 100644
-> --- a/include/linux/clk-private.h
-> +++ b/include/linux/clk-private.h
-> @@ -12,6 +12,7 @@
->  #define __LINUX_CLK_PRIVATE_H
-> 
->  #include <linux/clk-provider.h>
-> +#include <linux/kref.h>
->  #include <linux/list.h>
-> 
->  /*
-> @@ -47,6 +48,7 @@ struct clk {
->  #ifdef CONFIG_COMMON_CLK_DEBUG
->         struct dentry           *dentry;
->  #endif
-> +       struct kref             ref;
->  };
-> 
->  /*
-> --
-> 1.7.9.5
+Kevin
