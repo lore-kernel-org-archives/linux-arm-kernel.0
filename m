@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Aug 2013 07:55:03 +0530
-Subject: [PATCH 06/34] cpufreq: cpu0: remove calls to
+Date: Fri, 16 Aug 2013 07:55:04 +0530
+Subject: [PATCH 07/34] cpufreq: cris: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1376619363.git.viresh.kumar@linaro.org>
 References: <cover.1376619363.git.viresh.kumar@linaro.org>
-Message-ID: <c3ce6b7d589113f149f8e1aaac82a6e6ce857a70.1376619363.git.viresh.kumar@linaro.org>
+Message-ID: <d8b7b00908f0fa16feca841b1bf7fb1a49c62df1.1376619363.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,98 +28,71 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Jesper Nilsson <jesper.nilsson@axis.com>
+Cc: Mikael Starvik <starvik@axis.com>
+Cc: linux-cris-kernel at axis.com
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/cpufreq-cpu0.c | 33 ++++++++++++---------------------
- 1 file changed, 12 insertions(+), 21 deletions(-)
+ drivers/cpufreq/cris-artpec3-cpufreq.c | 8 --------
+ drivers/cpufreq/cris-etraxfs-cpufreq.c | 8 --------
+ 2 files changed, 16 deletions(-)
 
-diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-index 4014925..ddd9010 100644
---- a/drivers/cpufreq/cpufreq-cpu0.c
-+++ b/drivers/cpufreq/cpufreq-cpu0.c
-@@ -36,20 +36,19 @@ static unsigned int cpu0_get_speed(unsigned int cpu)
+diff --git a/drivers/cpufreq/cris-artpec3-cpufreq.c b/drivers/cpufreq/cris-artpec3-cpufreq.c
+index dace19d..e31e1e5 100644
+--- a/drivers/cpufreq/cris-artpec3-cpufreq.c
++++ b/drivers/cpufreq/cris-artpec3-cpufreq.c
+@@ -29,15 +29,9 @@ static unsigned int cris_freq_get_cpu_frequency(unsigned int cpu)
  
- static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
+ static int cris_freq_target(struct cpufreq_policy *policy, unsigned int state)
  {
 -	struct cpufreq_freqs freqs;
- 	struct opp *opp;
- 	unsigned long volt = 0, volt_old = 0, tol = 0;
-+	unsigned int old_freq, new_freq;
- 	long freq_Hz, freq_exact;
- 	int ret;
+ 	reg_clkgen_rw_clk_ctrl clk_ctrl;
+ 	clk_ctrl = REG_RD(clkgen, regi_clkgen, rw_clk_ctrl);
  
- 	freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
- 	if (freq_Hz < 0)
- 		freq_Hz = freq_table[index].frequency * 1000;
--	freq_exact = freq_Hz;
--	freqs.new = freq_Hz / 1000;
--	freqs.old = clk_get_rate(cpu_clk) / 1000;
- 
+-	freqs.old = cris_freq_get_cpu_frequency(policy->cpu);
+-	freqs.new = cris_freq_table[state].frequency;
+-
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
-+	freq_exact = freq_Hz;
-+	new_freq = freq_Hz / 1000;
-+	old_freq = clk_get_rate(cpu_clk) / 1000;
+-
+ 	local_irq_disable();
  
- 	if (!IS_ERR(cpu_reg)) {
- 		rcu_read_lock();
-@@ -57,9 +56,7 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
- 		if (IS_ERR(opp)) {
- 			rcu_read_unlock();
- 			pr_err("failed to find OPP for %ld\n", freq_Hz);
--			freqs.new = freqs.old;
--			ret = PTR_ERR(opp);
--			goto post_notify;
-+			return PTR_ERR(opp);
- 		}
- 		volt = opp_get_voltage(opp);
- 		rcu_read_unlock();
-@@ -68,16 +65,15 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
- 	}
+ 	/* Even though we may be SMP they will share the same clock
+@@ -50,8 +44,6 @@ static int cris_freq_target(struct cpufreq_policy *policy, unsigned int state)
  
- 	pr_debug("%u MHz, %ld mV --> %u MHz, %ld mV\n",
--		 freqs.old / 1000, volt_old ? volt_old / 1000 : -1,
--		 freqs.new / 1000, volt ? volt / 1000 : -1);
-+		 old_freq / 1000, volt_old ? volt_old / 1000 : -1,
-+		 new_freq / 1000, volt ? volt / 1000 : -1);
+ 	local_irq_enable();
  
- 	/* scaling up?  scale voltage before frequency */
--	if (!IS_ERR(cpu_reg) && freqs.new > freqs.old) {
-+	if (!IS_ERR(cpu_reg) && new_freq > old_freq) {
- 		ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
- 		if (ret) {
- 			pr_err("failed to scale voltage up: %d\n", ret);
--			freqs.new = freqs.old;
--			goto post_notify;
-+			return ret;
- 		}
- 	}
- 
-@@ -86,23 +82,18 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
- 		pr_err("failed to set clock rate: %d\n", ret);
- 		if (!IS_ERR(cpu_reg))
- 			regulator_set_voltage_tol(cpu_reg, volt_old, tol);
--		freqs.new = freqs.old;
--		goto post_notify;
-+		return ret;
- 	}
- 
- 	/* scaling down?  scale voltage after frequency */
--	if (!IS_ERR(cpu_reg) && freqs.new < freqs.old) {
-+	if (!IS_ERR(cpu_reg) && new_freq < old_freq) {
- 		ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
- 		if (ret) {
- 			pr_err("failed to scale voltage down: %d\n", ret);
--			clk_set_rate(cpu_clk, freqs.old * 1000);
--			freqs.new = freqs.old;
-+			clk_set_rate(cpu_clk, old_freq * 1000);
- 		}
- 	}
- 
--post_notify:
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 -
- 	return ret;
+ 	return 0;
+ }
+ 
+diff --git a/drivers/cpufreq/cris-etraxfs-cpufreq.c b/drivers/cpufreq/cris-etraxfs-cpufreq.c
+index 4d40d9df..9d577d0 100644
+--- a/drivers/cpufreq/cris-etraxfs-cpufreq.c
++++ b/drivers/cpufreq/cris-etraxfs-cpufreq.c
+@@ -29,15 +29,9 @@ static unsigned int cris_freq_get_cpu_frequency(unsigned int cpu)
+ 
+ static int cris_freq_target(struct cpufreq_policy *policy, unsigned int state)
+ {
+-	struct cpufreq_freqs freqs;
+ 	reg_config_rw_clk_ctrl clk_ctrl;
+ 	clk_ctrl = REG_RD(config, regi_config, rw_clk_ctrl);
+ 
+-	freqs.old = cris_freq_get_cpu_frequency(policy->cpu);
+-	freqs.new = cris_freq_table[state].frequency;
+-
+-	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+-
+ 	local_irq_disable();
+ 
+ 	/* Even though we may be SMP they will share the same clock
+@@ -50,8 +44,6 @@ static int cris_freq_target(struct cpufreq_policy *policy, unsigned int state)
+ 
+ 	local_irq_enable();
+ 
+-	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+-
+ 	return 0;
  }
  
 -- 
