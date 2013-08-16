@@ -1,27 +1,34 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sat, 17 Aug 2013 08:14:33 +1000
-Subject: [RFC PATCH v2 4/4] of: move of_get_cpu_node implementation to
- DT core library
-In-Reply-To: <1376674791-28244-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376674791-28244-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376674791-28244-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1376691273.25016.5.camel@pasglop>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 16 Aug 2013 16:21:10 -0600
+Subject: [PATCH v2] extcon: palmas: Modified the compatible type to *ti,
+ palmas-usb-vid*
+In-Reply-To: <1376648448-27447-1-git-send-email-kishon@ti.com>
+References: <1376648448-27447-1-git-send-email-kishon@ti.com>
+Message-ID: <520EA5D6.3040409@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-08-16 at 18:39 +0100, Sudeep KarkadaNagesha wrote:
-> +#ifdef CONFIG_PPC
-> +               /* Check for historical "ibm,ppc-interrupt-server#s" property
-> +                * for thread ids on PowerPC. If it doesn't exist fallback to
-> +                * standard "reg" property.
-> +                */
-> +               if (__of_find_n_match_cpu_property(cpun,
-> +                               "ibm,ppc-interrupt-server#s", cpu, thread))
-> +                       return cpun;
-> +#endif
+On 08/16/2013 04:20 AM, Kishon Vijay Abraham I wrote:
+> The Palmas device contains only a USB VID detector, so modified the
+> compatible type to *ti,palmas-usb-vid*.
 
-It's not "historical". It's still very much in use and well defined in PAPR :-)
+> diff --git a/Documentation/devicetree/bindings/extcon/extcon-palmas.txt b/Documentation/devicetree/bindings/extcon/extcon-palmas.txt
 
-Cheers,
-Ben.
+>  PALMAS USB COMPARATOR
+>  Required Properties:
+> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
+> + - compatible : Should be "ti,palmas-usb-vid".
+
+Has the old value been published in a release kernel? If so, it makes
+sense to document both values, but say the old one is deprecated, and ...
+
+> diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
+
+>  static struct of_device_id of_palmas_match_tbl[] = {
+> -	{ .compatible = "ti,palmas-usb", },
+> -	{ .compatible = "ti,twl6035-usb", },
+> +	{ .compatible = "ti,palmas-usb-vid", },
+
+... perhaps just add the new value here, and don't remove the old values?
+
+If not, ignore this.
