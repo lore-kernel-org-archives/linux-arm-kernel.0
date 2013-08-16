@@ -1,81 +1,177 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Fri, 16 Aug 2013 15:40:55 -0500
-Subject: [PATCH RFC 1/3] spmi: Linux driver framework for SPMI
-In-Reply-To: <20130816195849.GA17974@kroah.com>
-References: <cover.1376596224.git.joshc@codeaurora.org>
- <02deef1d90121011ab1df90ad704ef0ee36e2584.1376596224.git.joshc@codeaurora.org>
- <20130816184614.GA31510@kroah.com>
- <20130816194714.GH4035@joshc.qualcomm.com>
- <20130816195849.GA17974@kroah.com>
-Message-ID: <20130816204055.GK4035@joshc.qualcomm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 16 Aug 2013 16:48:31 -0400
+Subject: [RFC v1 5/5] ARM: mvebu: add board init for Armada 1500
+In-Reply-To: <1376682098-10580-6-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376682098-10580-6-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130816204831.GX13964@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 12:58:49PM -0700, Greg Kroah-Hartman wrote:
-> On Fri, Aug 16, 2013 at 02:47:15PM -0500, Josh Cartwright wrote:
-> > > > +#ifdef CONFIG_DEBUG_FS
-> > > 
-> > > Why?  If debugfs isn't enabled, the functions should just compile away
-> > > with the debugfs_() calls, so no need to do this type of thing here,
-> > > right?
-> > 
-> > Not sure I follow you, but it may be because this is a bit misleading.
-> > 
-> > Currently CONFIG_DEBUG_FS is being extended to also mean "do you want
-> > the SPMI core to create device entries?".  It would probably make more
-> > sense to have a CONFIG_SPMI_DEBUG option which is def_bool DEBUG_FS, as
-> > other busses have.
-> > 
-> > The #ifdef here would then be #ifdef CONFIG_SPMI_DEBUG, as well as in
-> > the Makefile:
-> > 
-> >   spmi-core-$(CONFIG_SPMI_DEBUG) += spmi-dbgfs.o
+On Fri, Aug 16, 2013 at 09:41:38PM +0200, Sebastian Hesselbarth wrote:
+> This adds initial setup for the Marvell Armada 1500 SoCs. The code
+> is fairly straight-forward, but especially _timer_and_clk_init()
+> can be simplified by using default arch hooks. I will have some time
+> until mach-mvebu is prepared for other SoCs moving over, so I can
+> catch up with latest machine simplifications.
 > 
-> If debugfs is enabled why wouldn't you want debugfs entries for your
-> devices?  Don't assume a user is going to be able to rebuild their
-> kernel just for debugging stuff (hint, they usually aren't), so having
-> these present, if they don't cause any performance issues, is usually
-> best to always have around.
-
-Okay, that makes sense.
-
-So, backing up a step, you're original comment was regarding the
-CONFIG_DEBUG_FS conditional in spmi-dbgfs.h:
-
-On Fri, Aug 16, 2013 at 11:46:14AM -0700, Greg Kroah-Hartman wrote:
-> > --- /dev/null
-> > +++ b/drivers/spmi/spmi-dbgfs.h
-> > @@ -0,0 +1,37 @@
-> > +/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 and
-> > + * only version 2 as published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +#ifndef _SPMI_DBGFS_H
-> > +#define _SPMI_DBGFS_H
-> > +
-> > +#include <linux/spmi.h>
-> > +#include <linux/debugfs.h>
-> > +
-> > +#ifdef CONFIG_DEBUG_FS
+> I am not so sure about the .map_io but I didn't yet fully understand
+> the mapping requirement. Anyway, it is required for iomap and friends
+> to work and basically remaps physical register addressed onto the same
+> virtual addresses.
 > 
-> Why?  If debugfs isn't enabled, the functions should just compile away
-> with the debugfs_() calls, so no need to do this type of thing here,
-> right?
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/mach-mvebu/Kconfig       |   15 +++++++++
+>  arch/arm/mach-mvebu/Makefile      |   13 ++++----
+>  arch/arm/mach-mvebu/armada-1500.c |   63 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 85 insertions(+), 6 deletions(-)
+>  create mode 100644 arch/arm/mach-mvebu/armada-1500.c
+> 
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index 9eb63d7..e2e93ed 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -36,6 +36,21 @@ config MACH_ARMADA_370
+>  	  Say 'Y' here if you want your kernel to support boards based
+>  	  on the Marvell Armada 370 SoC with device tree.
+>  
+> +config MACH_ARMADA_1500
+> +	bool "Marvell Armada 1500 boards"
+> +	select ARMADA_1500_CLK
+> +	select ARM_GIC
 
-The reason why this is done is because the spmi debugfs support code is
-is only built-in when CONFIG_DEBUG_FS is set.
+nit, alpha.
 
-Would you rather it always be built-in (well, whenever SPMI support is
-included), and rely on the debugfs_* shims to handle the
-!CONFIG_DEBUG_FS case?
+> +	select CACHE_L2X0
+> +	select CPU_PJ4B
+> +	select DW_APB_TIMER_OF
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> +	select LOCAL_TIMERS if SMP
+> +	select HAVE_ARM_TWD if LOCAL_TIMERS
+
+alpha.
+
+> +	select HAVE_SMP
+> +	select PINCTRL_ARMADA_1500
+> +	help
+> +	  Say 'Y' here if you want your kernel to support boards based
+> +	  on the Marvell Armada 1500 SoC with device tree.
+> +
+>  config MACH_ARMADA_XP
+>  	bool "Marvell Armada XP boards"
+>  	select ARMADA_XP_CLK
+> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+> index 2d04f0e..2e10b4a 100644
+> --- a/arch/arm/mach-mvebu/Makefile
+> +++ b/arch/arm/mach-mvebu/Makefile
+> @@ -1,10 +1,11 @@
+>  ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+>  	-I$(srctree)/arch/arm/plat-orion/include
+>  
+> -AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
+> +AFLAGS_coherency_ll.o			:= -Wa,-march=armv7-a
+>  
+> -obj-y				 += system-controller.o
+> -obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o
+> -obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
+> -obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
+> -obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
+> +obj-y					+= system-controller.o
+> +obj-$(CONFIG_MACH_ARMADA_370_XP)	+= armada-370-xp.o
+> +obj-$(CONFIG_MACH_ARMADA_1500)		+= armada-1500.o
+
+guess what?  :)
+
+I swear I had a more substantive comment when I started this.  But after
+a suitable application of gray matter, these nits were all that were
+left. :(
+
+thx,
+
+Jason.
+
+> +obj-$(CONFIG_ARCH_MVEBU)		+= coherency.o coherency_ll.o pmsu.o
+> +obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
+> +obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+> diff --git a/arch/arm/mach-mvebu/armada-1500.c b/arch/arm/mach-mvebu/armada-1500.c
+> new file mode 100644
+> index 0000000..b7c556b
+> --- /dev/null
+> +++ b/arch/arm/mach-mvebu/armada-1500.c
+> @@ -0,0 +1,63 @@
+> +/*
+> + * Device Tree support for Armada 1500 platforms.
+> + *
+> + * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/clocksource.h>
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/of_platform.h>
+> +#include <asm/hardware/cache-l2x0.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/mach/time.h>
+> +#include "common.h"
+> +#include "coherency.h"
+> +
+> +#define ARMADA_1500_REG_BASE_VIRT	0xf6000000
+> +#define ARMADA_1500_REG_BASE_SIZE	0x03000000
+> +
+> +static struct map_desc armada_1500_io_desc[] __initdata = {
+> +	{
+> +		.virtual	= ARMADA_1500_REG_BASE_VIRT,
+> +		.pfn		= __phys_to_pfn(ARMADA_1500_REG_BASE_VIRT),
+> +		.length		= ARMADA_1500_REG_BASE_SIZE,
+> +		.type		= MT_DEVICE,
+> +	},
+> +};
+> +
+> +static void __init armada_1500_map_io(void)
+> +{
+> +	iotable_init(armada_1500_io_desc, ARRAY_SIZE(armada_1500_io_desc));
+> +}
+> +
+> +static void __init armada_1500_timer_and_clk_init(void)
+> +{
+> +	of_clk_init(NULL);
+> +	clocksource_of_init();
+> +}
+> +
+> +static void __init armada_1500_dt_init(void)
+> +{
+> +	l2x0_of_init(0x70c00000, 0xfeffffff);
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +}
+> +
+> +static const char * const armada_1500_dt_compat[] = {
+> +	"marvell,armada-1500",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(ARMADA_1500_DT, "Marvell Armada 1500")
+> +	.init_machine	= armada_1500_dt_init,
+> +	.map_io		= armada_1500_map_io,
+> +	.init_time	= armada_1500_timer_and_clk_init,
+> +	.dt_compat	= armada_1500_dt_compat,
+> +MACHINE_END
+> -- 
+> 1.7.10.4
+> 
