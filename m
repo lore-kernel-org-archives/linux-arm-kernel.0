@@ -1,50 +1,84 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Fri, 16 Aug 2013 13:19:38 +0530
-Subject: [PATCH V2 4/4] ARM: dts: exynos5420: add audio clock controller
-In-Reply-To: <1376639378-20707-1-git-send-email-padma.v@samsung.com>
-References: <1376639378-20707-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1376639378-20707-5-git-send-email-padma.v@samsung.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 16 Aug 2013 09:48:28 +0200
+Subject: [PATCH V5] ARM: dts: Change i2s compatible string on exynos5250
+In-Reply-To: <CAOesGMj4y=uVMmETLXs_1ZfTD+CrQgKuirrpGrqs=CU3uk5__Q@mail.gmail.com>
+References: <1376627178-28649-1-git-send-email-padma.v@samsung.com>
+ <CAOesGMj4y=uVMmETLXs_1ZfTD+CrQgKuirrpGrqs=CU3uk5__Q@mail.gmail.com>
+Message-ID: <2100011.uIh4j153YZ@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Bresticker <abrestic@chromium.org>
+Hi Olof,
 
-This adds device-tree bindings for the audio subsystem clock controller
-on Exynos 5420.
+On Thursday 15 of August 2013 21:48:32 Olof Johansson wrote:
+> On Thu, Aug 15, 2013 at 9:26 PM, Padmavathi Venna <padma.v@samsung.com> 
+wrote:
+> > This patch removes quirks from i2s node and change the i2s
+> > compatible names.
+> > 
+> > Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> > ---
+> > 
+> > Changes since V4:
+> >         - Mark Brown reverted the below two patches due to below build
+> >         failure with>         
+> >           exynos_defconfig.
+> >           
+> >                 "ARM: dts: exynos5250: move common i2s properties to
+> >                 exynos5 dtsi"
+> >                 "ARM: dts: Change i2s compatible string on exynos5250"
+> >           
+> >           build error:
+> >           DTC     arch/arm/boot/dts/exynos5420-smdk5420.dtb
+> >           ERROR (phandle_references): Reference to non-existent node
+> >           or label "pdma1" ERROR (phandle_references): Reference to
+> >           non-existent node or label "pdma1" ERROR
+> >           (phandle_references): Reference to non-existent node or
+> >           label "pdma0" ERROR (phandle_references): Reference to
+> >           non-existent node or label "pdma0"> 
+> > But with out "ARM: dts: Change i2s compatible string on exynos5250"
+> > will break the i2s driver.
+> > 
+> > So posting this patch now and will take care of posting other patch
+> > later after dependent patches got merged.
+> > 
+> >  arch/arm/boot/dts/exynos5250.dtsi |    9 +++------
+> >  1 files changed, 3 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> > b/arch/arm/boot/dts/exynos5250.dtsi index ef57277..376090f 100644
+> > --- a/arch/arm/boot/dts/exynos5250.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> > @@ -405,7 +405,7 @@
+> > 
+> >         };
+> >         
+> >         i2s0: i2s at 03830000 {
+> > 
+> > -               compatible = "samsung,i2s-v5";
+> > +               compatible = "samsung,s5pv210-i2s";
+> 
+> Device tree reviewers, this is something to look out for in the
+> future. Some samsung platforms/drivers use "samsung,<chip>-<ip>",
+> others "samsung,<ip>-<chip>". I don't personally care much one way or
+> another, but it really should be consistent.
 
-Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-Reviewed-by: Simon Glass <sjg@chromium.org>
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- arch/arm/boot/dts/exynos5420.dtsi |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+Hmm, I just did a quick git grep over arch/arm/boot/dts and could not 
+really find the "samsung,<ip>-<chip>" pattern.
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 334f7b7..dde4cc2 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -15,6 +15,9 @@
- 
- #include "exynos5.dtsi"
- #include "exynos5420-pinctrl.dtsi"
-+
-+#include <dt-bindings/clk/exynos-audss-clk.h>
-+
- / {
- 	compatible = "samsung,exynos5420";
- 
-@@ -65,6 +68,12 @@
- 		#clock-cells = <1>;
- 	};
- 
-+	clock_audss: audss-clock-controller at 3810000 {
-+		compatible = "samsung,exynos5420-audss-clock";
-+		reg = <0x03810000 0x0C>;
-+		#clock-cells = <1>;
-+	};
-+
- 	mct at 101C0000 {
- 		compatible = "samsung,exynos4210-mct";
- 		reg = <0x101C0000 0x800>;
--- 
-1.7.4.4
+Except MFC (and without Padma's patch also I2S), which used "samsung,<ip>-
+<ip version>, all the compatible values I can see are based on 
+"samsung,<chip>-<ip>" pattern.
+
+I believe we discussed this issue several times already and finally agreed 
+to use "samsung,<chip>-<ip>" for any new compatible values.
+
+Best regards,
+Tomasz
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130816/c5653333/attachment.sig>
