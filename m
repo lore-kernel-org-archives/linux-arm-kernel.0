@@ -1,83 +1,81 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 Aug 2013 16:39:35 -0400
-Subject: [RFC v1 3/5] ARM: mvebu: add Armada 150 uart to lowlevel debug
-In-Reply-To: <1376682098-10580-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376682098-10580-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130816203935.GW13964@titan.lakedaemon.net>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 16 Aug 2013 15:40:55 -0500
+Subject: [PATCH RFC 1/3] spmi: Linux driver framework for SPMI
+In-Reply-To: <20130816195849.GA17974@kroah.com>
+References: <cover.1376596224.git.joshc@codeaurora.org>
+ <02deef1d90121011ab1df90ad704ef0ee36e2584.1376596224.git.joshc@codeaurora.org>
+ <20130816184614.GA31510@kroah.com>
+ <20130816194714.GH4035@joshc.qualcomm.com>
+ <20130816195849.GA17974@kroah.com>
+Message-ID: <20130816204055.GK4035@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 09:41:36PM +0200, Sebastian Hesselbarth wrote:
-> This adds UART0 as found on the Armada 1500 to the lowlevel debug of
-> mach-mvebu. Unfortunately, default register base addresses for Armada
-> 370/XP switched from 0xd000000 to 0xf100000. So, we finally end up
-> in three different lowlevel setups:
+On Fri, Aug 16, 2013 at 12:58:49PM -0700, Greg Kroah-Hartman wrote:
+> On Fri, Aug 16, 2013 at 02:47:15PM -0500, Josh Cartwright wrote:
+> > > > +#ifdef CONFIG_DEBUG_FS
+> > > 
+> > > Why?  If debugfs isn't enabled, the functions should just compile away
+> > > with the debugfs_() calls, so no need to do this type of thing here,
+> > > right?
+> > 
+> > Not sure I follow you, but it may be because this is a bit misleading.
+> > 
+> > Currently CONFIG_DEBUG_FS is being extended to also mean "do you want
+> > the SPMI core to create device entries?".  It would probably make more
+> > sense to have a CONFIG_SPMI_DEBUG option which is def_bool DEBUG_FS, as
+> > other busses have.
+> > 
+> > The #ifdef here would then be #ifdef CONFIG_SPMI_DEBUG, as well as in
+> > the Makefile:
+> > 
+> >   spmi-core-$(CONFIG_SPMI_DEBUG) += spmi-dbgfs.o
 > 
->  (a) Armada 1500 (possibly also Armada 1000, or MV88DE3xxx in general)
->  (b) Armada 370/XP with new bootloader mapping at 0xf1000000 and
->      the other Orion SoCs (Dove, Kirkwood, Orion5x, MV78xx0)
->  (c) Armada 370/XP with old bootloader mapping at 0xd0000000
+> If debugfs is enabled why wouldn't you want debugfs entries for your
+> devices?  Don't assume a user is going to be able to rebuild their
+> kernel just for debugging stuff (hint, they usually aren't), so having
+> these present, if they don't cause any performance issues, is usually
+> best to always have around.
+
+Okay, that makes sense.
+
+So, backing up a step, you're original comment was regarding the
+CONFIG_DEBUG_FS conditional in spmi-dbgfs.h:
+
+On Fri, Aug 16, 2013 at 11:46:14AM -0700, Greg Kroah-Hartman wrote:
+> > --- /dev/null
+> > +++ b/drivers/spmi/spmi-dbgfs.h
+> > @@ -0,0 +1,37 @@
+> > +/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 and
+> > + * only version 2 as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +#ifndef _SPMI_DBGFS_H
+> > +#define _SPMI_DBGFS_H
+> > +
+> > +#include <linux/spmi.h>
+> > +#include <linux/debugfs.h>
+> > +
+> > +#ifdef CONFIG_DEBUG_FS
 > 
-> Now, mach-mvebu has been a Armada 370/XP-only playground for a while
-> but with great work of Thomas, Gregory, and the others we have moved
-> almost all drivers to DT. I suggest to clean-up a little and find
-> some meaningful names for the DEBUG_ Kconfigs.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/include/debug/mvebu.S |   26 ++++++++++++++++----------
->  1 file changed, 16 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/include/debug/mvebu.S b/arch/arm/include/debug/mvebu.S
-> index 6517311..ca41c02 100644
-> --- a/arch/arm/include/debug/mvebu.S
-> +++ b/arch/arm/include/debug/mvebu.S
-> @@ -11,19 +11,25 @@
->   * published by the Free Software Foundation.
->  */
->  
-> -#ifdef CONFIG_DEBUG_MVEBU_UART_ALTERNATE
-> -#define ARMADA_370_XP_REGS_PHYS_BASE	0xf1000000
-> -#else
-> -#define ARMADA_370_XP_REGS_PHYS_BASE	0xd0000000
-> +#if defined(CONFIG_MACH_ARMADA_1500)
-> +#define MVEBU_REGS_PHYS_BASE	0xf7f80000
-> +#define MVEBU_REGS_VIRT_BASE	0xf7f80000
-> +#define MVEBU_UART0_OFFSET	0x00049000
+> Why?  If debugfs isn't enabled, the functions should just compile away
+> with the debugfs_() calls, so no need to do this type of thing here,
+> right?
 
+The reason why this is done is because the spmi debugfs support code is
+is only built-in when CONFIG_DEBUG_FS is set.
 
-> +#elif defined(CONFIG_DEBUG_MVEBU_UART)
-> +#define MVEBU_REGS_PHYS_BASE	0xd0000000
-> +#define MVEBU_REGS_VIRT_BASE	0xfec00000
-> +#define MVEBU_UART0_OFFSET	0x00012000
-> +#else /* CONFIG_DEBUG_MVEBU_UART_ALTERNATE */
-> +#define MVEBU_REGS_PHYS_BASE	0xf1000000
-> +#define MVEBU_REGS_VIRT_BASE	0xfec00000
-> +#define MVEBU_UART0_OFFSET	0x00012000
->  #endif
+Would you rather it always be built-in (well, whenever SPMI support is
+included), and rely on the debugfs_* shims to handle the
+!CONFIG_DEBUG_FS case?
 
-We should preserve the default like so:
-
-+#elif defined(CONFIG_DEBUG_MVEBU_UART_ALTERNATE)
-+#define MVEBU_REGS_PHYS_BASE	0xf1000000
-+#define MVEBU_REGS_VIRT_BASE	0xfec00000
-+#define MVEBU_UART0_OFFSET	0x00012000
-+#else /* CONFIG_DEBUG_MVEBU_UART */
-+#define MVEBU_REGS_PHYS_BASE	0xd0000000
-+#define MVEBU_REGS_VIRT_BASE	0xfec00000
-+#define MVEBU_UART0_OFFSET	0x00012000
- #endif
-
-thx,
-
-Jason.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
