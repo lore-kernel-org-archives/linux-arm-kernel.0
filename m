@@ -1,65 +1,70 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 16 Aug 2013 16:09:30 +0300
-Subject: [PATCH v3 7/8] ARM: dts: omap4: update omap-control-usb nodes
-In-Reply-To: <1376658571-20992-1-git-send-email-rogerq@ti.com>
-References: <1376658571-20992-1-git-send-email-rogerq@ti.com>
-Message-ID: <1376658571-20992-8-git-send-email-rogerq@ti.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Fri, 16 Aug 2013 15:17:06 +0200
+Subject: [PATCH v2 0/2] omap4/twl6030: typical connection to omap4 as
+ a separate dtsi file
+In-Reply-To: <CAHooxd7Sg8B-MM38F2ce=vR5ftO6ye2byrXH1-iFous=_AvTLg@mail.gmail.com>
+References: <1376469348-10797-1-git-send-email-ruslan.bilovol@ti.com>
+ <520B8B45.1010300@baylibre.com>
+ <CAB=otbTUk68CLmgQsEoefMMFTAnZCAMbZa-yiYmn1b3F1X8BiQ@mail.gmail.com>
+ <CAHooxd7Sg8B-MM38F2ce=vR5ftO6ye2byrXH1-iFous=_AvTLg@mail.gmail.com>
+Message-ID: <520E2652.4090103@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split otghs_ctrl and USB2 PHY power down into separate
-omap-control-usb nodes. Get rid of "ti,type" property.
+Hi Uri,
 
-CC: Benoit Cousson <bcousson@baylibre.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/boot/dts/omap4.dtsi |   20 ++++++++++++--------
- 1 files changed, 12 insertions(+), 8 deletions(-)
+On 16/08/2013 14:30, Uri Yosef wrote:
+> Hi,
+>
+> I am on vacation until Aug 25th, I will test it when I back.
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 22d9f2b..a77dd0a 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -519,7 +519,7 @@
- 			usb2_phy: usb2phy at 4a0ad080 {
- 				compatible = "ti,omap-usb2";
- 				reg = <0x4a0ad080 0x58>;
--				ctrl-module = <&omap_control_usb>;
-+				ctrl-module = <&omap_control_usb2phy>;
- 			};
- 		};
- 
-@@ -643,12 +643,16 @@
- 			};
- 		};
- 
--		omap_control_usb: omap-control-usb at 4a002300 {
--			compatible = "ti,omap-control-usb";
--			reg = <0x4a002300 0x4>,
--			      <0x4a00233c 0x4>;
--			reg-names = "control_dev_conf", "otghs_control";
--			ti,type = <1>;
-+		omap_control_usb2phy: omap-control-usb at 4a002300 {
-+			compatible = "ti,usb2-control-usb";
-+			reg = <0x4a002300 0x4>;
-+			reg-names = "power";
-+		};
-+
-+		omap_control_usbotg: omap-control-usb at 4a00233c {
-+			compatible = "ti,omap4-control-usb";
-+			reg = <0x4a00233c 0x4>;
-+			reg-names = "otghs_control";
- 		};
- 
- 		usb_otg_hs: usb_otg_hs at 4a0ab000 {
-@@ -661,7 +665,7 @@
- 			multipoint = <1>;
- 			num-eps = <16>;
- 			ram-bits = <12>;
--			ti,has-mailbox;
-+			ctrl-module = <&omap_control_usbotg>;
- 		};
- 	};
- };
--- 
-1.7.4.1
+OK, but it will be too late for this merge window. I'll drop it for 3.12 
+then.
+
+Thanks,
+Benoit
+
+>
+> Regards,
+> Uri Yosef
+>
+>
+> On Fri, Aug 16, 2013 at 3:04 PM, Ruslan Bilovol <ruslan.bilovol@ti.com
+> <mailto:ruslan.bilovol@ti.com>> wrote:
+>
+>     Hi Benoit,
+>
+>     On Wed, Aug 14, 2013 <tel:2013> at 4:51 PM, Benoit Cousson
+>     <bcousson at baylibre.com <mailto:bcousson@baylibre.com>> wrote:
+>      > Hi Ruslan,
+>      >
+>      > On 14/08/2013 10:35, Ruslan Bilovol wrote:
+>      >>
+>      >> Hello,
+>      >>
+>      >> There is no functional changes between v1 and v2 - just
+>      >> added the patch for omap4-var-som - Uri Yosef confirmed
+>      >> this board have the same connection of OMAP4<->TWL6030 as
+>      >> SDP4430 board
+>      >
+>      >
+>      > The series looks good to me, but it will be good to have a test
+>     for Panda
+>      > and Variscite boards before merging it.
+>
+>     Okay, so I just verified this patch series on PandaBoard ES2. Should I
+>     resubmit this series with
+>     fixed commit message?
+>     However I cannot verify the patch for Variscite board because I do not
+>     own any such board so
+>     you can drop that patch. But maybe Uri Yosef can verify it. Uri?
+>
+>      >
+>      > Regards,
+>      > Benoit
+>
+>     --
+>     Best regards,
+>     Ruslan Bilvol
+>
+>
