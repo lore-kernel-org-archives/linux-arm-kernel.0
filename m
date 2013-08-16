@@ -1,27 +1,85 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 15 Aug 2013 23:39:03 -0700
-Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.12
-In-Reply-To: <20130814202109.GI13964@titan.lakedaemon.net>
-References: <20130814202109.GI13964@titan.lakedaemon.net>
-Message-ID: <20130816063903.GJ7035@quad.lixom.net>
+From: oleksandr.kozaruk@ti.com (Kozaruk, Oleksandr)
+Date: Fri, 16 Aug 2013 06:39:35 +0000
+Subject: [PATCH v8 0/2] TWL6030, TWL6032 GPADC driver
+In-Reply-To: <520D16EC.90604@kernel.org>
+References: <1374758813-6539-1-git-send-email-oleksandr.kozaruk@ti.com>
+ <20130815091216.GB28366@e106331-lin.cambridge.arm.com>
+ <520CB566.2050201@kernel.org>
+ <20130815125906.GA32421@e106331-lin.cambridge.arm.com>,
+ <520D16EC.90604@kernel.org>
+Message-ID: <2A7ABDFCE21540479A5AEB0244A684D5E3EE9C@DNCE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 04:21:10PM -0400, Jason Cooper wrote:
-> Arnd, Olof,
-> 
-> Praise to $diety, this one is easy ;-)
-> 
-> 
-> The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
-> 
->   Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/defconfig-3.12
+>On 08/15/13 13:59, Mark Rutland wrote:
+>> On Thu, Aug 15, 2013 at 12:03:02PM +0100, Jonathan Cameron wrote:
+>>>
+>>>>> The changes to the original driver:
+>>>>> - device tree adaptation;
+>>>>
+>>>> I couldn't see a binding document in this series or in mainline. Have I
+>>>> looked in the wrong places?
+>>>
+>>> Nothing explicit supplied, but does it need one given it is doing only
+>>> iio bindings (bindings/iio/iio-bindings.txt)
+>>> plus twl child bindings
+>>> (bindings/mfd/twl-family.txt)
+>>
+>> Every binding needs to be documented.
+>>
+>>>
+>>> If it does, I guess absolutely everything does, then fair enough!
+>>> I guess that would make sense as there is no way for someone writing
+>>> a device tree to know that there is nothing else to be specified.
+>>
+>> Yup, that's why. Also, Linux isn't necessarily the only consumer, and
+>> other consumers shouldn't need to read Linux code to figure out how a
+>> particular binding is supposed to look.
+>>
+>Fair enough. Thanks for clearing that up.
+>
+>Oleksandr, could you send a follow up patch adding the required documentation?
+>(mostly a cut and paste job from similar elements by the look of it).
+>
 
-Pulled, thanks.
+Hello,
 
+Is this good enough?
 
--Olof
+>From 211e81ff4a146d9ec27443696a429e795c58dc30 Mon Sep 17 00:00:00 2001
+From: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
+Date: Thu, 15 Aug 2013 16:14:11 +0300
+Subject: [PATCH] iio: adc: Add bindigs documentation for twl6030 GPADC
+
+Add required documentation for twl6030 GPADC device tree
+bindings.
+
+Signed-off-by: Oleksandr Kozaruk <oleksandr.kozaruk@ti.com>
+---
+ .../devicetree/bindings/iio/adc/twl6030-gpadc.txt          | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/twl6030-gpadc.txt
+
+diff --git a/Documentation/devicetree/bindings/iio/adc/twl6030-gpadc.txt b/Documentation/devicetree/bindings/iio/adc/twl6030-gpadc.txt
+new file mode 100644
+index 0000000..6829420
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/adc/twl6030-gpadc.txt
+@@ -0,0 +1,14 @@
++Texas Instruments twl6030/twl6032 GPADC device driver
++
++Required properties:
++       - compatible: must be "ti,twl6030-gpadc" for TWL6030 or
++         "ti,twl6032-gpadc" for TWL6032
++       - interrupts: interrupt number associated with it
++       - #io-channel-cells: must be <1> - multiple IIO outputs
++
++Example:
++       adc {
++               compatible = "ti,twl6030-gpadc";
++               interrupts = <3>;
++               #io-channel-cells = <1>;
++       };
+
+-- 
+1.8.1.2
