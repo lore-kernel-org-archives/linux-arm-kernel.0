@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Aug 2013 07:55:00 +0530
-Subject: [PATCH 03/34] cpufreq: arm_big_little: remove calls to
+Date: Fri, 16 Aug 2013 07:55:01 +0530
+Subject: [PATCH 04/34] cpufreq: at32ap: remove calls to
  cpufreq_notify_transition()
 In-Reply-To: <cover.1376619363.git.viresh.kumar@linaro.org>
 References: <cover.1376619363.git.viresh.kumar@linaro.org>
-Message-ID: <abfababbb45f34fbc43e51a183d27e20adb0beae.1376619363.git.viresh.kumar@linaro.org>
+Message-ID: <1507bf552f7f9f61197c599236be870e739b337c.1376619363.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,48 +28,52 @@ frequency change, this one removes it from this driver.
 
 Some related minor cleanups are also done along with it.
 
+Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/arm_big_little.c | 25 +++----------------------
- 1 file changed, 3 insertions(+), 22 deletions(-)
+ drivers/cpufreq/at32ap-cpufreq.c | 22 +++++++++-------------
+ 1 file changed, 9 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-index daf4423..e3e8f25 100644
---- a/drivers/cpufreq/arm_big_little.c
-+++ b/drivers/cpufreq/arm_big_little.c
-@@ -51,30 +51,11 @@ static unsigned int bL_cpufreq_get(unsigned int cpu)
- static int bL_cpufreq_set_target(struct cpufreq_policy *policy,
- 		unsigned int index)
+diff --git a/drivers/cpufreq/at32ap-cpufreq.c b/drivers/cpufreq/at32ap-cpufreq.c
+index 81d0752..856ad80 100644
+--- a/drivers/cpufreq/at32ap-cpufreq.c
++++ b/drivers/cpufreq/at32ap-cpufreq.c
+@@ -37,27 +37,23 @@ static unsigned long	loops_per_jiffy_ref;
+ 
+ static int at32_set_target(struct cpufreq_policy *policy, unsigned int index)
  {
 -	struct cpufreq_freqs freqs;
--	u32 cpu = policy->cpu, cur_cluster;
--	int ret = 0;
-+	u32 cur_cluster;
++	unsigned int old_freq, new_freq;
  
- 	cur_cluster = cpu_to_cluster(policy->cpu);
--
--	freqs.old = bL_cpufreq_get(policy->cpu);
--	freqs.new = freq_table[cur_cluster][index].frequency;
--
--	pr_debug("%s: cpu: %d, cluster: %d, oldfreq: %d, target freq: %d, new freq: %d\n",
--			__func__, cpu, cur_cluster, freqs.old, freqs.new,
--			freqs.new);
--
+-	freqs.old = at32_get_speed(0);
+-	freqs.new = freq_table[index].frequency;
++	old_freq = at32_get_speed(0);
++	new_freq = freq_table[index].frequency;
+ 
+ 	if (!ref_freq) {
+-		ref_freq = freqs.old;
++		ref_freq = old_freq;
+ 		loops_per_jiffy_ref = boot_cpu_data.loops_per_jiffy;
+ 	}
+ 
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
--
--	ret = clk_set_rate(clk[cur_cluster], freqs.new * 1000);
--	if (ret) {
--		pr_err("clk_set_rate failed: %d\n", ret);
--		freqs.new = freqs.old;
--	}
--
+-	if (freqs.old < freqs.new)
++	if (old_freq < new_freq)
+ 		boot_cpu_data.loops_per_jiffy = cpufreq_scale(
+-				loops_per_jiffy_ref, ref_freq, freqs.new);
+-	clk_set_rate(cpuclk, freqs.new * 1000);
+-	if (freqs.new < freqs.old)
++				loops_per_jiffy_ref, ref_freq, new_freq);
++	clk_set_rate(cpuclk, new_freq * 1000);
++	if (new_freq < old_freq)
+ 		boot_cpu_data.loops_per_jiffy = cpufreq_scale(
+-				loops_per_jiffy_ref, ref_freq, freqs.new);
 -	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 -
--	return ret;
-+	return clk_set_rate(clk[cur_cluster],
-+			freq_table[cur_cluster][index].frequency * 1000);
- }
+-	pr_debug("cpufreq: set frequency %u Hz\n", freqs.new * 1000);
++				loops_per_jiffy_ref, ref_freq, new_freq);
  
- static void put_cluster_clk_and_freq_table(struct device *cpu_dev)
+ 	return 0;
+ }
 -- 
 1.7.12.rc2.18.g61b472e
