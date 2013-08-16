@@ -1,69 +1,97 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Fri, 16 Aug 2013 15:20:38 +0200
-Subject: [PATCH v2 0/2] omap4/twl6030: typical connection to omap4 as
- a separate dtsi file
-In-Reply-To: <CAB=otbTUk68CLmgQsEoefMMFTAnZCAMbZa-yiYmn1b3F1X8BiQ@mail.gmail.com>
-References: <1376469348-10797-1-git-send-email-ruslan.bilovol@ti.com>
- <520B8B45.1010300@baylibre.com>
- <CAB=otbTUk68CLmgQsEoefMMFTAnZCAMbZa-yiYmn1b3F1X8BiQ@mail.gmail.com>
-Message-ID: <520E2726.304@baylibre.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 16 Aug 2013 14:23:26 +0100
+Subject: [PATCH v3 1/5] ARM: add basic Trusted Foundations support
+In-Reply-To: <520D500C.5070901@wwwdotorg.org>
+References: <1376360992-1508-1-git-send-email-acourbot@nvidia.com>
+ <1376360992-1508-2-git-send-email-acourbot@nvidia.com>
+ <20130815115227.GC2562@localhost.localdomain>
+ <520D500C.5070901@wwwdotorg.org>
+Message-ID: <20130816132326.GC2909@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ruslan,
-
-On 16/08/2013 14:04, Ruslan Bilovol wrote:
-> Hi Benoit,
+On Thu, Aug 15, 2013 at 04:02:52PM -0600, Stephen Warren wrote:
+> On 08/15/2013 05:52 AM, Dave Martin wrote:
+> > On Tue, Aug 13, 2013 at 11:29:48AM +0900, Alexandre Courbot wrote:
+> >> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+> >> can be invoked  using a consistent smc-based API on all supported
+> >> platforms. This patch adds initial basic support for Trusted
+> >> Foundations using the ARM firmware API. Current features are limited
+> >> to the ability to boot secondary processors.
 > 
-> On Wed, Aug 14, 2013 at 4:51 PM, Benoit Cousson <bcousson@baylibre.com> wrote:
->> Hi Ruslan,
->>
->> On 14/08/2013 10:35, Ruslan Bilovol wrote:
->>>
->>> Hello,
->>>
->>> There is no functional changes between v1 and v2 - just
->>> added the patch for omap4-var-som - Uri Yosef confirmed
->>> this board have the same connection of OMAP4<->TWL6030 as
->>> SDP4430 board
->>
->>
->> The series looks good to me, but it will be good to have a test for Panda
->> and Variscite boards before merging it.
+> >> diff --git a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
 > 
-> Okay, so I just verified this patch series on PandaBoard ES2. Should I
-> resubmit this series with
-> fixed commit message?
+> >> +Required properties:
+> >> +- compatible : "tl,trusted-foundations"
+> >> +- version : Must contain the version number string of the Trusted Foundation
+> >> +	firmware.
+> > 
+> > Are you sure there is no low-level way to probe vendor and version info?
+> > If there is, then the DT should describe nothing except the fact that
+> > the probe interface exists.
+> > 
+> > I also worry that two integrations on different SoCs might have the
+> > same version number, yet still be different due to vendor-specific
+> > features and options.
+> 
+> I would expect HW-specific compatible values also to be present in a DT.
+> For example, perhaps:
+> 
+> compatible = "tl,trusted-foundations-nvidia-shield",
+> "tl,trusted-foundations";
+> 
+> (nvidia vendor, shield board/implementation)
+> 
+> This would allow matching on the specific value
+> "tl,trusted-foundations-nvidia-shield" in the future if some quirking
+> was needed, but if this wasn't needed, drivers could just bind to the
+> generic "tl,trusted-foundations".
 
-No, that's fine, I already applied it and fixed the subject and the changelog.
+That seems reasonable *unless* there is a reliable way to obtain
+a vendor ID from the SMC ABI directly, in which case we should just
+use that.
 
-Here it is:
+One could debate whether the extra compatible string should have
+"nvidia," or "tl," but the fact that "nvidia" is in the name at all
+pretty much narrows it down.
 
-commit 2e25df1e5a4af906a9b25332719ace000063eb0d
-Author: Ruslan Bilovol <ruslan.bilovol@ti.com>
-Date:   Wed Aug 14 11:35:47 2013 +0300
+> 
+> >> +- version : Must contain the version number string of the Trusted Foundation
+> >> +	firmware.
+> > 
+> > Are you sure there is no low-level way to probe vendor and version info?
+> > If there is, then the DT should describe nothing except the fact that
+> > the probe interface exists.
+> > 
+> > I also worry that two integrations on different SoCs might have the
+> > same version number, yet still be different due to vendor-specific
+> > features and options.
+> 
+> Talking of the version - if we do need to represent this in the DT, how
+> about 2 separate cells for major/minor version rather than encoding it
+> into a string? Then, no parsing would be required.
 
-    ARM: dts: twl6030: Move common configuration for OMAP4 boards in a separate dtsi file
-    
-    The OMAP4 SoC family uses specially-designed PMIC (power management IC)
-    companion chip for power management needs: TWL6030/TWL6032.
-    Therefore there is a typical connection of PMIC to OMAP4 so we can
-    move it into separate .dtsi file and do not duplicate over
-    board-specific files.
-    
-    Tested on OMAP4 SDP board and compile-tested for Panda board
-    
-    Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
-    Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
+I think the key thing here is to match whatever TF's native notion of
+version is.
+
+If it's truly a string with specific comparison rules, we should leave it
+a string and write code to examine it.  If it's a simple <major minor>
+pair, then putting it in the DT in this form makes sense.
+
+And, as you previosly suggested, if there's a reliable ABI for getting
+the firmware to tell you its version number, we should just use that and
+not describe the version number in the DT at all.
+
+I'm not in a position to answer that one.
+
+If we really have no idea, we'll have to go with a best guess, and
+change the compatible string later if necessary.  But it would be better
+to get it right if we can.
 
 
-Just let me know if you are OK with the updated version.
+If TF has version/vendor probe interfaces but those might be missing/
+broken/wrong, we could still specify "vendor" and "version" properties
+which allow the probed values to be overridden.
 
-> However I cannot verify the patch for Variscite board because I do not
-> own any such board so
-> you can drop that patch. But maybe Uri Yosef can verify it. Uri?
-
-It seems that Uri cannot test it right now, so I will have to drop that one.
-
-Thanks,
-Benoit
+Cheers
+---Dave
