@@ -1,43 +1,53 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Aug 2013 10:45:05 +0530
-Subject: [PATCH] arm: omap5: dts: split SMPS10 dt node
-In-Reply-To: <520A474F.9080500@baylibre.com>
-References: <1376300221-15172-1-git-send-email-kishon@ti.com>
- <520A32CF.1010701@baylibre.com> <520A4685.7050503@ti.com>
- <520A474F.9080500@baylibre.com>
-Message-ID: <520DB559.80305@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 15 Aug 2013 22:25:20 -0700
+Subject: [PATCH v5 2/3] drivers: of: add initialization code for dma
+ reserved memory
+In-Reply-To: <520A924C.6070309@wwwdotorg.org>
+References: <1376049119-12655-1-git-send-email-m.szyprowski@samsung.com>
+ <1376049119-12655-3-git-send-email-m.szyprowski@samsung.com>
+ <520A924C.6070309@wwwdotorg.org>
+Message-ID: <20130816052520.GA7035@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
-
-On Tuesday 13 August 2013 08:18 PM, Benoit Cousson wrote:
-> On 13/08/2013 16:45, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> On Tuesday 13 August 2013 06:51 PM, Benoit Cousson wrote:
->>> Hi Kishon,
->>>
->>> On 12/08/2013 11:37, Kishon Vijay Abraham I wrote:
->>>> SMPS10 has two outputs OUT1 and OUT2. Hence SMPS10 is modeled as
->>>> two regulators. The dt node is split to reflect it.
->>>
->>> Mmm, I'm curious. How is it supposed to work?
->>>
->>> Do you have dedicated control on each output?
->>
->> Yes. It can be controlled by setting different values to the same bit fields.
->> You can refer [1] where we actually implement SMPS10 as two different
->> regulators.
->>
->> [1] -> http://permalink.gmane.org/gmane.linux.kernel/1542521
+On Tue, Aug 13, 2013 at 02:08:44PM -0600, Stephen Warren wrote:
+> On 08/09/2013 05:51 AM, Marek Szyprowski wrote:
+> > Add device tree support for contiguous and reserved memory regions
+> > defined in device tree. Initialization is done in 2 steps. First, the
+> > memory is reserved, what happens very early when only flattened device
+> > tree is available. Then on device initialization the corresponding cma
+> > and reserved regions are assigned to each device structure.
 > 
-> Great, thanks.
-> 
-> Can we merge that one safely if the driver changed are not done yet?
+> Hmmm. This seems an awful lot like putting SW configuration/policy
+> information into DT rather than HW description. This feels like a
+> slippery slope... Isn't this kind of thing better handled by a kernel
+> command-line option to set up the CMA size?
 
-I think it shouldn't cause any issues. However Mark has already merged the
-driver changes.
+Sorry, you were not part of the in-person discussion since it happened
+at Linaro Connect in Dublin. The concern is that we really need a way
+to describe some of these _system_ properties. They're not necessarily
+hardware properties, but they are well-known and likely properties of
+the system that is running.
 
-Thanks
-Kishon
+I.e. say you have a device with a known screen resolution running some
+reasonably well-known software stacks/applications that you expect
+will use a certain amount of graphics memory. Or you know how large
+your camera sensor is, so you know how much carveout the ISP will need
+for captures. So defining how large the default carveouts should be
+is very much a property of this system. We would previously have put
+these settings in a board file and be done, but now we need a way to
+describe it.
+
+/chosen was proposed, but that's mostly used for things that the
+sysadmin would adjust (traditionally such as firmware stdin/stdout, etc).
+/options isn't a good place either.
+
+Having them on the command line doesn't really work well, over time
+we'll start to accumulate cruft there. It's bad enough for some of the
+devices out there that do it, I'd say.
+
+So, for the specific case of memory carveouts, this was suggested as the best
+way forward.
+
+
+-Olof
