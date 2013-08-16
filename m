@@ -1,9 +1,9 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 16 Aug 2013 16:09:28 +0300
-Subject: [PATCH v3 5/8] usb: musb: omap2430: Don't use omap_get_control_dev()
+From: rogerq@TI.COM (Roger Quadros)
+Date: Fri, 16 Aug 2013 16:09:27 +0300
+Subject: [PATCH v3 4/8] usb: phy: omap-usb3: Don't use omap_get_control_dev()
 In-Reply-To: <1376658571-20992-1-git-send-email-rogerq@ti.com>
 References: <1376658571-20992-1-git-send-email-rogerq@ti.com>
-Message-ID: <1376658571-20992-6-git-send-email-rogerq@ti.com>
+Message-ID: <1376658571-20992-5-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,100 +12,61 @@ multiple instances. As control device is present only from OMAP4
 onwards which supports DT only, we use phandles to get the
 reference to the control device.
 
-Also get rid of "ti,has-mailbox" property as it is redundant and
-we can determine that from whether "ctrl-module" property is present
-or not. Get rid of has_mailbox from musb_hdrc_platform_data as well.
+As we don't support non-DT boot, we just bail out on probe
+if device node is not present.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- Documentation/devicetree/bindings/usb/omap-usb.txt |    3 --
- drivers/usb/musb/omap2430.c                        |   25 +++++++++++--------
- include/linux/usb/musb.h                           |    2 -
- 3 files changed, 14 insertions(+), 16 deletions(-)
+ drivers/usb/phy/phy-omap-usb3.c |   22 ++++++++++++++++++----
+ 1 files changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
-index e24078f..2567b6b 100644
---- a/Documentation/devicetree/bindings/usb/omap-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
-@@ -3,9 +3,6 @@ OMAP GLUE AND OTHER OMAP SPECIFIC COMPONENTS
- OMAP MUSB GLUE
-  - compatible : Should be "ti,omap4-musb" or "ti,omap3-musb"
-  - ti,hwmods : must be "usb_otg_hs"
-- - ti,has-mailbox : to specify that omap uses an external mailbox
--   (in control module) to communicate with the musb core during device connect
--   and disconnect.
-  - multipoint : Should be "1" indicating the musb controller supports
-    multipoint. This is a MUSB configuration-specific setting.
-  - num-eps : Specifies the number of endpoints. This is also a
-diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-index ebb46ec..516795b 100644
---- a/drivers/usb/musb/omap2430.c
-+++ b/drivers/usb/musb/omap2430.c
-@@ -38,6 +38,7 @@
+diff --git a/drivers/usb/phy/phy-omap-usb3.c b/drivers/usb/phy/phy-omap-usb3.c
+index 4a7f27c..981313e 100644
+--- a/drivers/usb/phy/phy-omap-usb3.c
++++ b/drivers/usb/phy/phy-omap-usb3.c
+@@ -26,6 +26,7 @@
+ #include <linux/pm_runtime.h>
  #include <linux/delay.h>
- #include <linux/usb/musb-omap.h>
  #include <linux/usb/omap_control_usb.h>
 +#include <linux/of_platform.h>
  
- #include "musb_core.h"
- #include "omap2430.h"
-@@ -509,8 +510,12 @@ static int omap2430_probe(struct platform_device *pdev)
- 	glue->dev			= &pdev->dev;
- 	glue->musb			= musb;
- 	glue->status			= OMAP_MUSB_UNKNOWN;
-+	glue->control_otghs = ERR_PTR(-ENODEV);
- 
- 	if (np) {
-+		struct device_node *control_node;
-+		struct platform_device *control_pdev;
+ #define	PLL_STATUS		0x00000004
+ #define	PLL_GO			0x00000008
+@@ -198,6 +199,12 @@ static int omap_usb3_probe(struct platform_device *pdev)
+ {
+ 	struct omap_usb			*phy;
+ 	struct resource			*res;
++	struct device_node *node = pdev->dev.of_node;
++	struct device_node *control_node;
++	struct platform_device *control_pdev;
 +
- 		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
- 		if (!pdata) {
- 			dev_err(&pdev->dev,
-@@ -539,22 +544,20 @@ static int omap2430_probe(struct platform_device *pdev)
- 		of_property_read_u32(np, "ram-bits", (u32 *)&config->ram_bits);
- 		of_property_read_u32(np, "power", (u32 *)&pdata->power);
- 		config->multipoint = of_property_read_bool(np, "multipoint");
--		pdata->has_mailbox = of_property_read_bool(np,
--		    "ti,has-mailbox");
++	if (!node)
++		return -EINVAL;
  
- 		pdata->board_data	= data;
- 		pdata->config		= config;
--	}
- 
--	if (pdata->has_mailbox) {
--		glue->control_otghs = omap_get_control_dev();
--		if (IS_ERR(glue->control_otghs)) {
--			dev_vdbg(&pdev->dev, "Failed to get control device\n");
--			ret = PTR_ERR(glue->control_otghs);
--			goto err2;
-+		control_node = of_parse_phandle(np, "ctrl-module", 0);
-+		if (control_node) {
-+			control_pdev = of_find_device_by_node(control_node);
-+			if (!control_pdev) {
-+				dev_err(&pdev->dev, "Failed to get control device\n");
-+				ret = -EINVAL;
-+				goto err2;
-+			}
-+			glue->control_otghs = &control_pdev->dev;
- 		}
--	} else {
--		glue->control_otghs = ERR_PTR(-ENODEV);
+ 	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
+ 	if (!phy) {
+@@ -239,11 +246,18 @@ static int omap_usb3_probe(struct platform_device *pdev)
+ 		return -EINVAL;
  	}
- 	pdata->platform_ops		= &omap2430_ops;
  
-diff --git a/include/linux/usb/musb.h b/include/linux/usb/musb.h
-index 053c268..eb50525 100644
---- a/include/linux/usb/musb.h
-+++ b/include/linux/usb/musb.h
-@@ -99,8 +99,6 @@ struct musb_hdrc_platform_data {
- 	/* MUSB_HOST, MUSB_PERIPHERAL, or MUSB_OTG */
- 	u8		mode;
+-	phy->control_dev = omap_get_control_dev();
+-	if (IS_ERR(phy->control_dev)) {
+-		dev_dbg(&pdev->dev, "Failed to get control device\n");
+-		return -ENODEV;
++	control_node = of_parse_phandle(node, "ctrl-module", 0);
++	if (!control_node) {
++		dev_err(&pdev->dev, "Failed to get control device phandle\n");
++		return -EINVAL;
+ 	}
++	control_pdev = of_find_device_by_node(control_node);
++	if (!control_pdev) {
++		dev_err(&pdev->dev, "Failed to get control device\n");
++		return -EINVAL;
++	}
++
++	phy->control_dev = &control_pdev->dev;
  
--	u8		has_mailbox:1;
--
- 	/* for clk_get() */
- 	const char	*clock;
- 
+ 	omap_control_usb_phy_power(phy->control_dev, 0);
+ 	usb_add_phy_dev(&phy->phy);
 -- 
 1.7.4.1
