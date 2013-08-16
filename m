@@ -1,105 +1,238 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Aug 2013 11:43:01 +0200
-Subject: [GIT PULL] ux500 devicetree base for v3.12
-Message-ID: <CACRpkdYtyyQhXbvikg_iQVhuocwy0bERLMXDkbGH0k+DV_jUKQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Aug 2013 10:44:12 +0100
+Subject: [RESEND PATCH 4/4] ARM: msm: Add support for 8974 SMP
+In-Reply-To: <520C06F4.7080205@codeaurora.org>
+References: <1375409725-22004-1-git-send-email-rvaswani@codeaurora.org>
+ <1375409725-22004-5-git-send-email-rvaswani@codeaurora.org>
+ <20130812163905.GE27165@e106331-lin.cambridge.arm.com>
+ <520C06F4.7080205@codeaurora.org>
+Message-ID: <20130816094412.GH32421@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On Wed, Aug 14, 2013 at 11:38:44PM +0100, Rohit Vaswani wrote:
+> On 8/12/2013 9:39 AM, Mark Rutland wrote:
+> > On Fri, Aug 02, 2013 at 03:15:25AM +0100, Rohit Vaswani wrote:
+> >> Add the cpus bindings and the Kraitv2 release sequence
+> >> to make SMP work for 2 cores on MSM8974.
+> >>
+> >> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+> >> ---
+> >>   Documentation/devicetree/bindings/arm/cpus.txt |  1 +
+> >>   arch/arm/boot/dts/msm8974.dts                  | 23 ++++++++
+> >>   arch/arm/mach-msm/board-dt-8974.c              |  3 +
+> >>   arch/arm/mach-msm/platsmp.c                    | 79 ++++++++++++++++++++++++++
+> >>   4 files changed, 106 insertions(+)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> >> index 1132eac..7c3c677 100644
+> >> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> >> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> >> @@ -52,6 +52,7 @@ For the ARM architecture every CPU node must contain the following properties:
+> >>   		 This should be one of:
+> >>   		 "qcom,scss"
+> >>   		 "qcom,kpssv1"
+> >> +		 "qcom,kpssv2"
+> > I guess I should've looked at the whole series before responding, that
+> > answers my prior question about what variation we expect.
+> >
+> >>   
+> >>   Example:
+> >>   
+> >> diff --git a/arch/arm/boot/dts/msm8974.dts b/arch/arm/boot/dts/msm8974.dts
+> >> index c31c097..ef35a9b 100644
+> >> --- a/arch/arm/boot/dts/msm8974.dts
+> >> +++ b/arch/arm/boot/dts/msm8974.dts
+> >> @@ -7,6 +7,22 @@
+> >>   	compatible = "qcom,msm8974";
+> >>   	interrupt-parent = <&intc>;
+> >>   
+> >> +	cpus {
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <0>;
+> >> +		compatible = "qcom,krait";
+> >> +		device_type = "cpu";
+> >> +		enable-method = "qcom,kpssv2";
+> >> +
+> >> +		cpu at 0 {
+> >> +			reg = <0>;
+> >> +		};
+> >> +
+> >> +		cpu at 1 {
+> >> +			reg = <1>;
+> >> +		};
+> >> +	};
+> >> +
+> >>   	intc: interrupt-controller at f9000000 {
+> >>   		compatible = "qcom,msm-qgic2";
+> >>   		interrupt-controller;
+> >> @@ -23,4 +39,11 @@
+> >>   			     <1 1 0xf08>;
+> >>   		clock-frequency = <19200000>;
+> >>   	};
+> >> +
+> >> +	kpss at f9012000 {
+> >> +		compatible = "qcom,kpss";
+> >> +		reg = <0xf9012000 0x1000>,
+> >> +		      <0xf9088000 0x1000>,
+> >> +		      <0xf9098000 0x1000>;
+> >> +	};
+> > In the previous examples, the number of CPUs was equal to the number of
+> > kpss reg values. Why does it differ here. Either:
+> >
+> > * We always have the extra regsiter here, and it should be described
+> >    even if we don't use it.
+> >
+> > * It's a different hardware block, and needs a more specific
+> >    compatible string.
+> >
+> > Eitehr way this strengthens my feeling that we need to define the linkage
+> > from a CPU to the portion of the kpss which affects it.
+> Will add documentation for each of the registers. We have one for each 
+> CPU and one within the KPSS (Krait Processor Sub-System) e.g the L2 saw 
+> base in this case.
 
-this pull request is mostly described in the signed tag, it basically consists
-of leftovers and cleanups from the previous kernel cycle and some real
-nice houskeeping from Lee Jones.
+Ok.
 
-Please pull it into a suitable branch in the ARM SoC tree for v3.12.
+So the previous example had no L2 saw base?
 
-Yours,
-Linus Walleij
+> >
+> >>   };
+> >> diff --git a/arch/arm/mach-msm/board-dt-8974.c b/arch/arm/mach-msm/board-dt-8974.c
+> >> index d7f84f2..06119f9 100644
+> >> --- a/arch/arm/mach-msm/board-dt-8974.c
+> >> +++ b/arch/arm/mach-msm/board-dt-8974.c
+> >> @@ -13,11 +13,14 @@
+> >>   #include <linux/of_platform.h>
+> >>   #include <asm/mach/arch.h>
+> >>   
+> >> +#include "common.h"
+> >> +
+> >>   static const char * const msm8974_dt_match[] __initconst = {
+> >>   	"qcom,msm8974",
+> >>   	NULL
+> >>   };
+> >>   
+> >>   DT_MACHINE_START(MSM8974_DT, "Qualcomm MSM (Flattened Device Tree)")
+> >> +	.smp = smp_ops(msm_smp_ops),
+> >>   	.dt_compat = msm8974_dt_match,
+> >>   MACHINE_END
+> >> diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+> >> index 82eb079..0fdae69 100644
+> >> --- a/arch/arm/mach-msm/platsmp.c
+> >> +++ b/arch/arm/mach-msm/platsmp.c
+> >> @@ -124,6 +124,80 @@ static int msm8960_release_secondary(unsigned int cpu)
+> >>   	return 0;
+> >>   }
+> >>   
+> >> +static int msm8974_release_secondary(unsigned int cpu)
+> >> +{
+> >> +	void __iomem *reg;
+> >> +	void __iomem *l2_saw_base;
+> >> +	struct device_node *dn = NULL;
+> >> +	unsigned apc_pwr_gate_ctl = 0x14;
+> >> +	unsigned reg_val;
+> >> +
+> >> +	if (cpu == 0 || cpu >= num_possible_cpus())
+> >> +		return -EINVAL;
+> >> +
+> >> +	dn = of_find_compatible_node(dn, NULL, "qcom,kpss");
+> >> +	if (!dn) {
+> >> +		pr_err("%s : Missing kpss node from device tree\n", __func__);
+> >> +		return -ENXIO;
+> >> +	}
+> >> +
+> >> +	reg = of_iomap(dn, cpu+1);
+> > This looks very fishy given the prior patch being one off from this.
+> > why is reg[0] now different?
+> >
+> >> +	if (!reg)
+> >> +		return -ENOMEM;
+> >> +
+> >> +	pr_debug("Starting secondary CPU %d\n", cpu);
+> >> +
+> >> +	/* Turn on the BHS, turn off LDO Bypass and power down LDO */
+> >> +	reg_val =  0x403f0001;
+> > Magic number?
+> It represents the comment above it. It didnt seem clean to define 4 
+> different offsets with #defines within a single register for the purpose 
+> of 1 write.
 
+In general I'd prefer having symbolic names, but I'm not going to argue
+here.
 
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+> >
+> >> +	writel_relaxed(reg_val, reg + apc_pwr_gate_ctl);
+> >> +
+> >> +	/* complete the above write before the delay */
+> >> +	mb();
+> > Use writel?
+> >
+> >> +	/* wait for the bhs to settle */
+> >> +	udelay(1);
+> >> +
+> >> +	/* Turn on BHS segments */
+> >> +	reg_val |= 0x3f << 1;
+> >> +	writel_relaxed(reg_val, reg + apc_pwr_gate_ctl);
+> >> +
+> >> +	/* complete the above write before the delay */
+> >> +	mb();
+> > Use writel again?
+> >
+> >> +	 /* wait for the bhs to settle */
+> >> +	udelay(1);
+> >> +
+> >> +	/* Finally turn on the bypass so that BHS supplies power */
+> >> +	reg_val |= 0x3f << 8;
+> >> +	writel_relaxed(reg_val, reg + apc_pwr_gate_ctl);
+> >> +
+> >> +	/* enable max phases */
+> >> +	l2_saw_base = of_iomap(dn, 0);
+> >> +	if (!l2_saw_base) {
+> >> +		return -ENOMEM;
+> >> +	}
+> > What?
+> >
+> > You've just lost your only reference to the mapping in reg.
+> >
+> > Why do you not do this at the start, before poking everything else? Even
+> > better, do it at probe time and fail once rather than for each CPU you
+> > have no chance of bringing up.
+> Will do.
+> 
+> >
+> > [...]
+> >>   static void boot_cold_cpu(unsigned int cpu)
+> >> @@ -151,6 +225,11 @@ static void boot_cold_cpu(unsigned int cpu)
+> >>   			msm8960_release_secondary(cpu);
+> >>   			per_cpu(cold_boot_done, cpu) = true;
+> >>   		}
+> >> +	} else if (!strcmp(enable_method, "qcom,kpssv2")) {
+> >> +		if (per_cpu(cold_boot_done, cpu) == false) {
+> >> +			msm8974_release_secondary(cpu);
+> >> +			per_cpu(cold_boot_done, cpu) = true;
+> >> +		}
+> >>   	} else {
+> >>   		pr_err("%s: Invalid enable-method property: %s\n",
+> >>   				__func__, enable_method);
+> > The enable-method parsing really should be moved out to common code. We
+> > could make it scan the enable-method if a machine has no smp ops (which
+> > is more general than the PSCI fallback that's been suggested before).
+> But we have smp ops like every other SoC. I might need to go back to the 
+> drawing board for incorporating enable-method into generic code.
+> Any suggestions are appreciated.
 
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+I think we need generic infrastructure that checks if we have a NULL
+smp_ops and tries to find one based on any enable-method properties in
+the dt.
 
-are available in the git repository at:
+> If enable-method seems cumbersome to be enforced for every SoC, I would 
+> be comfortable using the cpu compatible string as you suggested in the 
+> previous patch.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-devicetree-for-v3.12-1
+I'm not sure cpu compatible string alone gives us enough, the
+integration of the SoC and particular board will affect how we bring up
+secondaries.
 
-for you to fetch changes up to 2ce05a14bb379bd81ba3ad12cc08b2c4bda83480:
-
-  ARM: ux500: fix devicetree builds (2013-08-14 22:32:07 +0200)
-
-----------------------------------------------------------------
-Ux500 device tree enablement base for the v3.12
-development cycle:
-- Various cleanups like remove non-existant hardware from
-  the Snowball device tree, prefix all files with "ste-*"
-- External regulators
-- Documentation updates
-- Delete some minor dangling platform data
-- Pin control settings for U8540 through DT
-
-----------------------------------------------------------------
-Gabriel Fernandez (2):
-      ARM: u8540: Add Pinctrl Device Tree settings for uart0, uart2
-      ARM: u8540: DT: Set pinctrl mapping to i2c0,1,2,4 & 5
-
-Lee Jones (19):
-      ARM: ux500: Fix trivial whitespace/tabbing issue
-      ARM: ux500: Add Device Tree nodes for AB8500 External regulators
-      ARM: ux500: Provide a supply name for the AB8500 AUX regulators to use
-      ARM: ux500: Supply external regulator names for Snowball's DT
-      Documentation: Update binding for Nomadik and DBx5x based platforms
-      ARM: ux500: Stop passing MMC's platform data for Device Tree boots
-      ARM: ux500: Remove Toshiba TC35892 I/O Expander's DT entry from
-Snowball's DTS
-      ARM: ux500: Remove Snowball DTS entry for National Semiconductor
-LP5521 LED chip
-      ARM: ux500: Remove Snowball DTS entry for TPS61052 chip
-      ARM: ux500: Remove Snowball DTS entry for ROHM BH1780GLI ambient
-light sensor
-      ARM: ux500: Apply a ste-* prefix onto snowball.dts
-      ARM: ux500: Apply a ste-* prefix onto ccu8540.dts
-      ARM: ux500: Apply a ste-* prefix onto ccu9540.dts
-      ARM: ux500: Apply a ste-* prefix onto href.dtsi
-      ARM: ux500: Apply a ste-* prefix onto hrefprev60.dts
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
-      ARM: ux500: Apply a ste-* prefix onto hrefv60plus.dts
-      ARM: ux500: Apply a ste-* prefix onto stuib.dtsi
-      ARM: ux500: Apply a ste-* prefix onto dbx5x0.dtsi
-      ARM: ux500: Remove u9540.dts as it's been replaced
-
-Linus Walleij (1):
-      ARM: ux500: fix devicetree builds
-
- .../devicetree/bindings/pinctrl/ste,nomadik.txt    |   6 +-
- arch/arm/boot/dts/Makefile                         |  10 +-
- arch/arm/boot/dts/ccu8540.dts                      |  41 -----
- arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi         | 196 +++++++++++++++++++++
- arch/arm/boot/dts/ste-ccu8540.dts                  |  86 +++++++++
- arch/arm/boot/dts/{ccu9540.dts => ste-ccu9540.dts} |   2 +-
- arch/arm/boot/dts/{dbx5x0.dtsi => ste-dbx5x0.dtsi} |  30 +++-
- arch/arm/boot/dts/{href.dtsi => ste-href.dtsi}     |   2 +-
- .../dts/{hrefprev60.dts => ste-hrefprev60.dts}     |   6 +-
- .../dts/{hrefv60plus.dts => ste-hrefv60plus.dts}   |   6 +-
- arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi         |  95 ++++++++++
- .../boot/dts/{snowball.dts => ste-snowball.dts}    |  44 ++---
- arch/arm/boot/dts/{stuib.dtsi => ste-stuib.dtsi}   |   0
- arch/arm/boot/dts/u9540.dts                        |  72 --------
- arch/arm/mach-ux500/cpu-db8500.c                   |   8 +-
- include/dt-bindings/pinctrl/nomadik.h              |  36 ++++
- 16 files changed, 477 insertions(+), 163 deletions(-)
- delete mode 100644 arch/arm/boot/dts/ccu8540.dts
- create mode 100644 arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi
- create mode 100644 arch/arm/boot/dts/ste-ccu8540.dts
- rename arch/arm/boot/dts/{ccu9540.dts => ste-ccu9540.dts} (98%)
- rename arch/arm/boot/dts/{dbx5x0.dtsi => ste-dbx5x0.dtsi} (96%)
- rename arch/arm/boot/dts/{href.dtsi => ste-href.dtsi} (99%)
- rename arch/arm/boot/dts/{hrefprev60.dts => ste-hrefprev60.dts} (92%)
- rename arch/arm/boot/dts/{hrefv60plus.dts => ste-hrefv60plus.dts} (98%)
- create mode 100644 arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi
- rename arch/arm/boot/dts/{snowball.dts => ste-snowball.dts} (93%)
- rename arch/arm/boot/dts/{stuib.dtsi => ste-stuib.dtsi} (100%)
- delete mode 100644 arch/arm/boot/dts/u9540.dts
- create mode 100644 include/dt-bindings/pinctrl/nomadik.h
+Thanks,
+Mark.
