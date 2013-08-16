@@ -1,35 +1,38 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 Aug 2013 16:36:45 -0600
-Subject: [PATCHv4 2/3] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <1376498884-9199-2-git-send-email-dinguyen@altera.com>
-References: <1376498884-9199-1-git-send-email-dinguyen@altera.com>
- <1376498884-9199-2-git-send-email-dinguyen@altera.com>
-Message-ID: <520EA97D.7050404@wwwdotorg.org>
+Date: Fri, 16 Aug 2013 16:48:21 -0600
+Subject: [PATCHv2 1/2] ARM: dts: Change dw-apb-timer-osc and
+ dw-apb-timer-sp to just dw-apb-timer
+In-Reply-To: <1376522956-14960-1-git-send-email-dinguyen@altera.com>
+References: <1376522956-14960-1-git-send-email-dinguyen@altera.com>
+Message-ID: <520EAC35.5000804@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2013 10:48 AM, dinguyen at altera.com wrote:
+On 08/14/2013 05:29 PM, dinguyen at altera.com wrote:
 > From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> Add bindings for SD/MMC for SOCFPGA.
+> "dw-apb-timer-osc" and "dw-apb-timer-sp" are the same implementation of the
+> DW APB timer, just fed by different clocks. Thus, deprecate both
+> "dw-apb-timer-osc" and "dw-apb-timer-sp" in lieu of "dw-apb-timer",
+> 
+> Clean up the timer entries for socfpga by removing timer<n> and set the
+> correct clocks for the timers.
 
-> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+Hmm. That sounds like a separate patch. Cleanup isn't the same as adding
+new DT compatible values...
 
-> +* altr,sysmgr: Should be the phandle to the system_mgr node. As this is where
-> +		this where the register that controls the CIU clock phases
-> +		reside.
+> diff --git a/Documentation/devicetree/bindings/rtc/dw-apb.txt b/Documentation/devicetree/bindings/rtc/dw-apb.txt
 
-On the surface, this binding series seems OK, but I do have a question:
-how is the sysmgr phandle used?
+>  Required properties:
+> -- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc"
+> +- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc" <DEPRECATED>
+> +- compatible: "snps,dw-apb-timer"
 
-I assume there's some register in this syscon device that resets or
-enables or otherwise controls this MSHC module. How does the code know
-which register it is? The phandle in the altr,sysmgr property would
-usually be followed by a/some cell(s) that encode this information, so
-that the MSHC driver doesn't have to know anything about the layout of
-the syscon registers, and so the sysconf driver doesn't have to know
-anything about the identity of the MSHC client device.
+It's slightly unclear whether "snps,dw-apb-timer-sp" is deprecated.
+Also, listing the non-deprecated values first would be a good hint to
+people which they should use. How about:
 
-That way, the MSHC driver will work fine if a HW designer has dropped
-the MSHC IP block into a completely different SoC with a different
-syscon register layout.
+compatible: One of:
+	"snps,dw-apb-timer"
+	"snps,dw-apb-timer-sp" <DEPRECATED>
+	"snps,dw-apb-timer-osc" <DEPRECATED>
