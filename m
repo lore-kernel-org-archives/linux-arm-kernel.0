@@ -1,64 +1,46 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Fri, 16 Aug 2013 09:48:19 +0100
-Subject: [RFC PATCH 3/4] powerpc: refactor of_get_cpu_node to support
- other architectures
-In-Reply-To: <1376628563.4255.137.camel@pasglop>
-References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376586580-5409-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376628563.4255.137.camel@pasglop>
-Message-ID: <520DE753.8090601@arm.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Fri, 16 Aug 2013 10:54:25 +0200
+Subject: [PATCH] arm: omap5: dts: split SMPS10 dt node
+In-Reply-To: <520DB559.80305@ti.com>
+References: <1376300221-15172-1-git-send-email-kishon@ti.com>
+ <520A32CF.1010701@baylibre.com> <520A4685.7050503@ti.com>
+ <520A474F.9080500@baylibre.com> <520DB559.80305@ti.com>
+Message-ID: <520DE8C1.2080406@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/08/13 05:49, Benjamin Herrenschmidt wrote:
-> On Thu, 2013-08-15 at 18:09 +0100, Sudeep KarkadaNagesha wrote:
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+On 16/08/2013 07:15, Kishon Vijay Abraham I wrote:
+> Hi Benoit,
+>
+> On Tuesday 13 August 2013 08:18 PM, Benoit Cousson wrote:
+>> On 13/08/2013 16:45, Kishon Vijay Abraham I wrote:
+>>> Hi,
+>>>
+>>> On Tuesday 13 August 2013 06:51 PM, Benoit Cousson wrote:
+>>>> Hi Kishon,
+>>>>
+>>>> On 12/08/2013 11:37, Kishon Vijay Abraham I wrote:
+>>>>> SMPS10 has two outputs OUT1 and OUT2. Hence SMPS10 is modeled as
+>>>>> two regulators. The dt node is split to reflect it.
+>>>>
+>>>> Mmm, I'm curious. How is it supposed to work?
+>>>>
+>>>> Do you have dedicated control on each output?
+>>>
+>>> Yes. It can be controlled by setting different values to the same bit fields.
+>>> You can refer [1] where we actually implement SMPS10 as two different
+>>> regulators.
+>>>
+>>> [1] -> http://permalink.gmane.org/gmane.linux.kernel/1542521
 >>
->> Currently different drivers requiring to access cpu device node are
->> parsing the device tree themselves. Since the ordering in the DT need
->> not match the logical cpu ordering, the parsing logic needs to consider
->> that. However, this has resulted in lots of code duplication and in some
->> cases even incorrect logic.
-> 
->  .../...
-> 
->>  
->> +bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
->> +{
->> +	return (int)phys_id == get_hard_smp_processor_id(cpu);
->> +}
-> 
-> Naming is a bit gross. You might want to make it clearer that
-> we are talking about CPU IDs in the device-tree here.
-> 
-Any particular preference to the name or just a note is sufficient.
-Also unlike PPC, in ARM we don't set hard processor id value based
-values read from device tree. DT must contain the values matching to the
-hardware ID registers.
+>> Great, thanks.
+>>
+>> Can we merge that one safely if the driver changed are not done yet?
+>
+> I think it shouldn't cause any issues. However Mark has already merged the
+> driver changes.
 
->> +static bool __of_find_n_match_cpu_property(struct device_node *cpun,
->> +			const char *prop_name, int cpu, unsigned int *thread)
->> +{
->> +	const __be32 *cell;
->> +	int ac, prop_len, tid;
->> +	u64 hwid;
->> +
->> +	ac = of_n_addr_cells(cpun);
->> +	cell = of_get_property(cpun, prop_name, &prop_len);
->> +	if (!cell)
->> +		return false;
->> +	prop_len /= sizeof(*cell);
->> +	for (tid = 0; tid < prop_len; tid++) {
->> +		hwid = of_read_number(cell, ac);
->> +		if (arch_match_cpu_phys_id(cpu, hwid)) {
->> +			if (thread)
->> +				*thread = tid;
->> +			return true;
->> +		}
-> 
-> Missing:          cell += ac;
-Ah, missed it while refactoring, will fix it. Thanks
+Cool. I've just applied your patch in for_3.12/dts
 
-Regards,
-Sudeep
+Thanks,
+Benoit
