@@ -1,67 +1,57 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 17 Aug 2013 19:30:11 +0900
-Subject: [PATCH v2 0/8] Common Clock Framework support for Samsung S3C64xx
-In-Reply-To: <3890424.fJfWX17mED@flatron>
-References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
- <2956608.dyLtqySMuJ@amdc1227> <20130816210203.4443.43511@quantum>
- <3890424.fJfWX17mED@flatron>
-Message-ID: <158901ce9b34$c0ac8720$42059560$@org>
+Date: Sat, 17 Aug 2013 19:40:18 +0900
+Subject: Broken device trees for exynos in linux-next
+In-Reply-To: <CAOesGMiyNM6VdNzKQU3XwoiacJV8hc60mcLiH+vHoS6xJM6q-A@mail.gmail.com>
+References: <CAOesGMgv9gTQ_NtaKZY_ZfLD1NBU19E-vaLaWwmvGJJB1MQrwg@mail.gmail.com>
+ <13b101ce9a14$2cebd700$86c38500$@org>
+ <CAOesGMiyNM6VdNzKQU3XwoiacJV8hc60mcLiH+vHoS6xJM6q-A@mail.gmail.com>
+Message-ID: <159201ce9b36$2a513f30$7ef3bd90$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+Olof Johansson wrote:
+> 
+> On Thu, Aug 15, 2013 at 5:04 PM, Kukjin Kim <kgene@kernel.org> wrote:
+> > I think, maybe we discussed about that? :) current exynos_defconfig
+> cannot
+> > support exynos5440 because of LPAE and I remember we decided LPAE and
+> > non-LPAE should be separated. So as I commented before,
+> exynos5440_defconfig
+> > is needed. If you have any concerns, please let me know.
+> 
+> Having a SoC-specific defconfig makes no sense. You can run with LPAE
+> enabled on A15 and A7-based systems even if they don't have enough
+> memory to need it.
+> 
+Hmm, I'm not sure. If so, I'm wondering why LPAE is implemented with 'ifdef'
+and why Red Hat and Canonical provide PAE enabled kernel separately in
+x86...
 
-[...]
+> Really, what we want is to just turn on the LPAE functionality and
+> keep everything else common. Forking into two defconfigs seems like
+> the wrong idea, even if we did discuss it before. Having something
+> like a config fragment to include would make more sense, since that
+> could be shared across all platforms (and apply with
+> multi_v7_defconfig for those who want to run that on LPAE as well).
+> 
+If we could make LPAE enabled defconfig for all ARM platforms, I'm fine. I
+think your concern is creating SoC specific defconfig and I agree with you.
+But I'm not sure how we can support LPAE enabled defconfig for ARM
+platforms.
 
-> > > > >
-> > > > > Basically, this series looks good to me, but I'm not sure how this
-> > > > > should be handled because of dependency with PWM cleanup and clk
-> > > > > stuff
-> > > > > in clk tree now...
-> > > >
-> > > > Patches 1-3 can go into the clk tree. 4-6 should go through their
-> > > > respective trees.
-> > >
-> > > It looks like version 2 of patch 2/8 has been applied by mistake,
-> > > breaking compilation (and operation) of the clock driver added in
-> > > patch 3/8.
-> > Ugh. My mistake.
+> Or, you know, just have your build script enable it without having an
+> in-tree config fragment. That'd work too.
 > 
-> Happens. Thanks for fast response.
-> 
-Sorry for late ;-)
+I don't think so because the defconfig will be used by customer for their
+product so I should provide some defconfig for exynos5440 in mainline...
 
-> > > Could you please fix this up? Thanks in advance.
-> >
-> > This is a little tricky since I published the clk-next-s3c64xx branch as
-> > a stable branch for Samsung which I think has been merged to the
-> > Samsung tree already.
+> The main case where this isn't sufficient is on platforms where _all_
+> memory sits above 4G, since you can't boot a non-LPAE kernel on those
+> at all. It seems like 5440 has memory starting at 2GB so it's not one
+> of those.
 > 
-> Right, this somewhat limits our options. Although I'm not really sure
-> whether Kukjin already has pushed it to his public tree.
-> 
-Yeah, I already did sort out in my local but not public tree because of some
-problem.
+5440 has 8GB memory by default.
 
-> > So what are the options?
-> >
-> > One option is to create a fixup patch that just manages the delta
-> > between V2 and V3. I can then add this to the top of clk-next-s3c64xx
-> > and re-merge it into clk-next. Then the Samsung tree will need to
-> > re-merge that dependency branch.
-> 
-> Well, I can make a "convert PLL65xx to new registration method" patch,
-> that would be basically the delta. If this could be merged before patch
-> 7/8, no regression would be introduced.
-> 
-> > Do you have a better idea?
-> 
-> Not really. Maybe let's ask Kukjin whether he has already merged it to his
-> tree. Kukjin, have you?
-> 
-OK, if new branch is ready, I will replace with that or if re-merge is
-required, I will. Either way, I'm fine and can handle. Mike, let me know
-your choice :-)
+So let me know which way is fine to us?
 
-Thanks,
-Kukjin
+- Kukjin
