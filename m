@@ -1,44 +1,91 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 17 Aug 2013 11:24:13 -0500
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] DT maintainer
-In-Reply-To: <20130815160628.GB32265@arm.com>
-References: <CAL_JsqJpxeRbaZ4Uk4YNmN3w8D=XYf3VWX2c4NEqCy40zSdGSA@mail.gmail.com>
- <20130815160628.GB32265@arm.com>
-Message-ID: <CAL_JsqK=cnbe4L2aX3-p8bEJ0g2eXQ9cUHx1r9CfkBLmq32M-A@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 17 Aug 2013 13:38:49 -0300
+Subject: [PATCH v4 5/6] clocksource: armada-370-xp: Fix device-tree binding
+In-Reply-To: <520EB5BC.4060102@wwwdotorg.org>
+References: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1376404995-24548-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130814152621.GA18868@e106331-lin.cambridge.arm.com>
+ <20130815162751.GA2403@localhost> <520EB5BC.4060102@wwwdotorg.org>
+Message-ID: <20130817163848.GA2765@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 11:06 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Tue, Aug 13, 2013 at 02:11:06PM +0100, Rob Herring wrote:
->> Other topics I'd like to discuss:
->> What's left for ARM consolidation work? What further work needed to
->> avoid arm64 duplication?
->
-> We'll have a better idea once we see more arm64 hardware. In the
-> meantime, what I know for sure is that we need a PCIe implementation
-> that is able to share drivers/host/* code between arm and arm64 (and
-> possibly other architectures). We had some attempts for more unification
-> between arm64, powerpc, microblaze, mips
-> (http://lkml.indiana.edu/hypermail/linux/kernel/1304.3/00698.html,
-> http://www.linux-mips.org/archives/linux-mips/2013-07/msg00031.html) and
-> work is ongoing.
->
->> Now that we are moving from just compiling multiple platforms together
->> to actually running them, what problems have been run into? Are there
->> issues around multi-platform kernels such as kernel size or need for
->> additional run-time patching?
->
-> If size becomes an issue, the next step for multi-platform could be
-> compiling as much SoC-related code as possible into loadable modules
-> that can go into initramfs.
+On Fri, Aug 16, 2013 at 05:29:00PM -0600, Stephen Warren wrote:
+> On 08/15/2013 10:27 AM, Ezequiel Garcia wrote:
+> ...
+> > Armada XP
+> > ---------
+> > 
+> > Two clock sources are available for timer and watchdog counters:
+> > 
+> > Just as explained for the Armada 370, the timer and watchdog counters decrement
+> > rate is a configurable ratio of the L2/coherency fabric clock.
+> > The current clocksource driver implementation chooses an abritrary ratio.
+> > 
+> > In addition to this, both timer and watchdog counter rate can be configured
+> > to use an (internal) 25 MHz fixed clock.
+> 
+> So there are clearly two clocks fed into the HW block here. The DT
+> should reflect that.
+> 
 
-Yes, that is the obvious and easy first step. The challenge here are
-the many inter-dependencies of modules needed at boot time like i2c,
-gpio, regulators, pmic's, etc. Perhaps having something like
-preloaded/built-in modules which are available at boot time, but could
-be unloaded after boot if not needed. Special per machine linker
-sections which could be freed are another option, but the trend seems
-to be moving away from special sections like __devinit,
+Right.
 
-Rob
+> > However, and as explained in this patchset, using the letter fixed clock is in
+> > practice the only choice. Once CPUFreq support is implemented for the
+> > Armada XP SoC the L2/coherency fabric clock will change its rate, and handling
+> > such change will be problematic.
+> 
+> It's not mandatory for an OS to implement cpufreq, so it'd be quite
+> possible to still use that variable-rate clock on some HW. What SW
+> may-or-may-not do on HW isn't something that should feed into the DT
+> binding design.
+> 
+
+Agreed.
+
+> > Maybe the most accurate representation would be something like this...
+> > 
+> > timer {
+> > 	compatible = "marvell,armada-xp-timer";
+> > 	reg = ...
+> > 	interrupts = ...
+> > 	clocks = ... /* either 25 MHz fixed clock
+> > 	              * or L2/coherency fabric clock */
+> > };
+> 
+> I think better would be:
+> 
+> clocks = <&xxx ...> <&yyy ...>;
+> clock-names = "fabric", "fixed";
+> 
+> In the documentation for this HW block, there's a register that switches
+> between the two clock sources. What names are used for the clocks in the
+> documentation of that register? Those names should be used for
+> clock-names entries.
+> 
+
+Strictly speaking the documentation says the timer/watchdog counters
+are incremented at a configurable rate of the "coherency fabric clock".
+
+In addition, there's a register bit that enables/disables a
+"25Mhz frequency" rate for each timer/watchdog.
+
+The names between "" are the names used in the documentation: "coherency
+fabric clock" and "25Mhz frequency" (yes, it's odd).
+
+> Is the fact that one of "fabric" and "fixed" is variable and one
+> fixed-rate more a facet of the integration of the IP block into the SoC,
+> and not forced by the design of the IP block itself? If so, perhaps
+> you'd want some additional properties indicating which of those clocks
+> was fixed and which was variable, which would allow SW to make
+> intelligent decisions re: which to use. Perhaps it can be assumed this
+> information can be queried from the source of the clock though?
+
+Not sure about this, but I think I agree with Tomasz Figa in that
+this kind of details can be inside the driver.
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
