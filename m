@@ -1,209 +1,226 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 17 Aug 2013 21:08:42 +0200
-Subject: [PATCH 1/2] clk: sunxi: Add Allwinner A20 gates
+Date: Sat, 17 Aug 2013 21:08:43 +0200
+Subject: [PATCH 2/2] ARM: sun7i: Enable the A20 clocks in the DTSI
 In-Reply-To: <1376766523-9107-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1376766523-9107-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1376766523-9107-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1376766523-9107-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A20 is almost identical to the earlier A10 SoC from
-Allwinner on many aspects, including the clocks tree. However, since the
-A20 has some additionnal IPs compared to the A10, the clock tree isn't
-exactly the same, especially when it comes to the gated clocks
-available. We thus need to register different clock gates for the A20.
+Now that the clock driver knows about the available clocks found on the
+A20, we can build up the clock tree from the device tree.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt  |  3 +
- .../bindings/clock/sunxi/sun7i-a20-gates.txt       | 98 ++++++++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c                      | 15 ++++
- 3 files changed, 116 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt
+ arch/arm/boot/dts/sun7i-a20.dtsi | 126 +++++++++++++++++++++++++++++++++++----
+ 1 file changed, 116 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index c383d12..00a5c264 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -16,18 +16,21 @@ Required properties:
- 	"allwinner,sun4i-ahb-gates-clk" - for the AHB gates on A10
- 	"allwinner,sun5i-a13-ahb-gates-clk" - for the AHB gates on A13
- 	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
-+	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
- 	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
- 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
- 	"allwinner,sun4i-apb0-clk" - for the APB0 clock
- 	"allwinner,sun4i-apb0-gates-clk" - for the APB0 gates on A10
- 	"allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
- 	"allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
-+	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
- 	"allwinner,sun4i-apb1-clk" - for the APB1 clock
- 	"allwinner,sun4i-apb1-mux-clk" - for the APB1 clock muxing
- 	"allwinner,sun4i-apb1-gates-clk" - for the APB1 gates on A10
- 	"allwinner,sun5i-a13-apb1-gates-clk" - for the APB1 gates on A13
- 	"allwinner,sun5i-a10s-apb1-gates-clk" - for the APB1 gates on A10s
- 	"allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
-+	"allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
- 	"allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
- 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index da1411b..fb81e78 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -44,7 +44,8 @@
  
-diff --git a/Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt b/Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt
-new file mode 100644
-index 0000000..357f4fd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt
-@@ -0,0 +1,98 @@
-+Gate clock outputs
-+------------------
-+
-+  * AXI gates ("allwinner,sun4i-axi-gates-clk")
-+
-+    DRAM					0
-+
-+  * AHB gates ("allwinner,sun7i-a20-ahb-gates-clk")
-+
-+    USB0					0
-+    EHCI0					1
-+    OHCI0					2
-+    EHCI1					3
-+    OHCI1					4
-+    SS						5
-+    DMA						6
-+    BIST					7
-+    MMC0					8
-+    MMC1					9
-+    MMC2					10
-+    MMC3					11
-+    MS						12
-+    NAND					13
-+    SDRAM					14
-+
-+    ACE						16
-+    EMAC					17
-+    TS						18
-+
-+    SPI0					20
-+    SPI1					21
-+    SPI2					22
-+    SPI3					23
-+
-+    SATA					25
-+
-+    HSTIMER					28
-+
-+    VE						32
-+    TVD						33
-+    TVE0					34
-+    TVE1					35
-+    LCD0					36
-+    LCD1					37
-+
-+    CSI0					40
-+    CSI1					41
-+
-+    HDMI1					42
-+    HDMI0					43
-+    DE_BE0					44
-+    DE_BE1					45
-+    DE_FE1					46
-+    DE_FE1					47
-+
-+    GMAC					49
-+    MP						50
-+
-+    MALI400					52
-+
-+  * APB0 gates ("allwinner,sun7i-a20-apb0-gates-clk")
-+
-+    CODEC					0
-+    SPDIF					1
-+    AC97					2
-+    IIS0					3
-+    IIS1					4
-+    PIO						5
-+    IR0						6
-+    IR1						7
-+    IIS2					8
-+
-+    KEYPAD					10
-+
-+  * APB1 gates ("allwinner,sun7i-a20-apb1-gates-clk")
-+
-+    I2C0					0
-+    I2C1					1
-+    I2C2					2
-+    I2C3					3
-+    CAN						4
-+    SCR						5
-+    PS20					6
-+    PS21					7
-+
-+    I2C4					15
-+    UART0					16
-+    UART1					17
-+    UART2					18
-+    UART3					19
-+    UART4					20
-+    UART5					21
-+    UART6					22
-+    UART7					23
-+
-+Notation:
-+ [*]:  The datasheet didn't mention these, but they are present on AW code
-+ [**]: The datasheet had this marked as "NC" but they are used on AW code
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index bd01a02..c359775 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -462,6 +462,10 @@ static const __initconst struct gates_data sun6i_a31_ahb1_gates_data = {
- 	.mask = {0xEDFE7F62, 0x794F931},
- };
+ 		osc24M: osc24M at 01c20050 {
+ 			#clock-cells = <0>;
+-			compatible = "fixed-clock";
++			compatible = "allwinner,sun4i-osc-clk";
++			reg = <0x01c20050 0x4>;
+ 			clock-frequency = <24000000>;
+ 		};
  
-+static const __initconst struct gates_data sun7i_a20_ahb_gates_data = {
-+	.mask = { 0x12f77fff, 0x16ff3f },
-+};
+@@ -53,6 +54,111 @@
+ 			compatible = "fixed-clock";
+ 			clock-frequency = <32768>;
+ 		};
 +
- static const __initconst struct gates_data sun4i_apb0_gates_data = {
- 	.mask = {0x4EF},
- };
-@@ -474,6 +478,10 @@ static const __initconst struct gates_data sun5i_a13_apb0_gates_data = {
- 	.mask = {0x61},
- };
++		pll1: pll1 at 01c20000 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-pll1-clk";
++			reg = <0x01c20000 0x4>;
++			clocks = <&osc24M>;
++		};
++
++		/*
++		 * This is a dummy clock, to be used as placeholder on
++		 * other mux clocks when a specific parent clock is not
++		 * yet implemented. It should be dropped when the driver
++		 * is complete.
++		 */
++		pll6: pll6 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <0>;
++		};
++
++		cpu: cpu at 01c20054 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-cpu-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&osc32k>, <&osc24M>, <&pll1>, <&pll6>;
++		};
++
++		axi: axi at 01c20054 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-axi-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&cpu>;
++		};
++
++		ahb: ahb at 01c20054 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-ahb-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&axi>;
++		};
++
++		ahb_gates: ahb_gates at 01c20060 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun7i-a20-ahb-gates-clk";
++			reg = <0x01c20060 0x8>;
++			clocks = <&ahb>;
++			clock-output-names = "ahb_usb0", "ahb_ehci0",
++				"ahb_ohci0", "ahb_ehci1", "ahb_ohci1",
++				"ahb_ss", "ahb_dma", "ahb_bist", "ahb_mmc0",
++				"ahb_mmc1", "ahb_mmc2", "ahb_mmc3", "ahb_ms",
++				"ahb_nand", "ahb_sdram", "ahb_ace",
++				"ahb_emac", "ahb_ts", "ahb_spi0", "ahb_spi1",
++				"ahb_spi2", "ahb_spi3", "ahb_sata",
++				"ahb_hstimer", "ahb_ve", "ahb_tvd", "ahb_tve0",
++				"ahb_tve1", "ahb_lcd0", "ahb_lcd1", "ahb_csi0",
++				"ahb_csi1", "ahb_hdmi1", "ahb_hdmi0",
++				"ahb_de_be0", "ahb_de_be1", "ahb_de_fe0",
++				"ahb_de_fe1", "ahb_gmac", "ahb_mp",
++				"ahb_mali";
++		};
++
++		apb0: apb0 at 01c20054 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-apb0-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&ahb>;
++		};
++
++		apb0_gates: apb0_gates at 01c20068 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun7i-a20-apb0-gates-clk";
++			reg = <0x01c20068 0x4>;
++			clocks = <&apb0>;
++			clock-output-names = "apb0_codec", "apb0_spdif",
++				"apb0_ac97", "apb0_iis0", "apb0_iis1",
++				"apb0_pio", "apb0_ir0", "apb0_ir1",
++				"apb0_iis2", "apb0_keypad";
++		};
++
++		apb1_mux: apb1_mux at 01c20058 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-apb1-mux-clk";
++			reg = <0x01c20058 0x4>;
++			clocks = <&osc24M>, <&pll6>, <&osc32k>;
++		};
++
++		apb1: apb1 at 01c20058 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-apb1-clk";
++			reg = <0x01c20058 0x4>;
++			clocks = <&apb1_mux>;
++		};
++
++		apb1_gates: apb1_gates at 01c2006c {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun7i-a20-apb1-gates-clk";
++			reg = <0x01c2006c 0x4>;
++			clocks = <&apb1>;
++			clock-output-names = "apb1_i2c0", "apb1_i2c1",
++				"apb1_i2c2", "apb1_i2c3", "apb1_can",
++				"apb1_scr", "apb1_ps20", "apb1_ps21",
++				"apb1_i2c4", "apb1_uart0", "apb1_uart1",
++				"apb1_uart2", "apb1_uart3", "apb1_uart4",
++				"apb1_uart5", "apb1_uart6", "apb1_uart7";
++		};
+ 	};
  
-+static const __initconst struct gates_data sun7i_a20_apb0_gates_data = {
-+	.mask = { 0x4ff },
-+};
-+
- static const __initconst struct gates_data sun4i_apb1_gates_data = {
- 	.mask = {0xFF00F7},
- };
-@@ -494,6 +502,10 @@ static const __initconst struct gates_data sun6i_a31_apb2_gates_data = {
- 	.mask = {0x3F000F},
- };
+ 	soc at 01c00000 {
+@@ -65,7 +171,7 @@
+ 			compatible = "allwinner,sun7i-a20-pinctrl";
+ 			reg = <0x01c20800 0x400>;
+ 			interrupts = <0 28 1>;
+-			clocks = <&osc24M>;
++			clocks = <&apb0_gates 5>;
+ 			gpio-controller;
+ 			interrupt-controller;
+ 			#address-cells = <1>;
+@@ -117,7 +223,7 @@
+ 			interrupts = <0 1 1>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc24M>;
++			clocks = <&apb1_gates 16>;
+ 			status = "disabled";
+ 		};
  
-+static const __initconst struct gates_data sun7i_a20_apb1_gates_data = {
-+	.mask = { 0xff80ff },
-+};
-+
- static void __init sunxi_gates_clk_setup(struct device_node *node,
- 					 struct gates_data *data)
- {
-@@ -575,13 +587,16 @@ static const __initconst struct of_device_id clk_gates_match[] = {
- 	{.compatible = "allwinner,sun5i-a10s-ahb-gates-clk", .data = &sun5i_a10s_ahb_gates_data,},
- 	{.compatible = "allwinner,sun5i-a13-ahb-gates-clk", .data = &sun5i_a13_ahb_gates_data,},
- 	{.compatible = "allwinner,sun6i-a31-ahb1-gates-clk", .data = &sun6i_a31_ahb1_gates_data,},
-+	{.compatible = "allwinner,sun7i-a20-ahb-gates-clk", .data = &sun7i_a20_ahb_gates_data,},
- 	{.compatible = "allwinner,sun4i-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
- 	{.compatible = "allwinner,sun5i-a10s-apb0-gates-clk", .data = &sun5i_a10s_apb0_gates_data,},
- 	{.compatible = "allwinner,sun5i-a13-apb0-gates-clk", .data = &sun5i_a13_apb0_gates_data,},
-+	{.compatible = "allwinner,sun7i-a20-apb0-gates-clk", .data = &sun7i_a20_apb0_gates_data,},
- 	{.compatible = "allwinner,sun4i-apb1-gates-clk", .data = &sun4i_apb1_gates_data,},
- 	{.compatible = "allwinner,sun5i-a10s-apb1-gates-clk", .data = &sun5i_a10s_apb1_gates_data,},
- 	{.compatible = "allwinner,sun5i-a13-apb1-gates-clk", .data = &sun5i_a13_apb1_gates_data,},
- 	{.compatible = "allwinner,sun6i-a31-apb1-gates-clk", .data = &sun6i_a31_apb1_gates_data,},
-+	{.compatible = "allwinner,sun7i-a20-apb1-gates-clk", .data = &sun7i_a20_apb1_gates_data,},
- 	{.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
- 	{}
- };
+@@ -127,7 +233,7 @@
+ 			interrupts = <0 2 1>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc24M>;
++			clocks = <&apb1_gates 17>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -137,7 +243,7 @@
+ 			interrupts = <0 3 1>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc24M>;
++			clocks = <&apb1_gates 18>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -147,7 +253,7 @@
+ 			interrupts = <0 4 1>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc24M>;
++			clocks = <&apb1_gates 19>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -157,7 +263,7 @@
+ 			interrupts = <0 17 1>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc24M>;
++			clocks = <&apb1_gates 20>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -167,7 +273,7 @@
+ 			interrupts = <0 18 1>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc24M>;
++			clocks = <&apb1_gates 21>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -177,7 +283,7 @@
+ 			interrupts = <0 19 1>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc24M>;
++			clocks = <&apb1_gates 22>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -187,7 +293,7 @@
+ 			interrupts = <0 20 1>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc24M>;
++			clocks = <&apb1_gates 23>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
 1.8.3.4
