@@ -1,69 +1,49 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 17 Aug 2013 08:36:45 +0400
-Subject: [PATCH] ARM: dts: imx27-phytec-phycore-rdk: Add DT nodes for
- camera module
-In-Reply-To: <20130812080835.GH25061@S2101-09.ap.freescale.net>
-References: <1376117398-19080-1-git-send-email-shc_work@mail.ru>
- <20130812080835.GH25061@S2101-09.ap.freescale.net>
-Message-ID: <20130817083645.abf40501da3831e1d976a1c8@mail.ru>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sat, 17 Aug 2013 12:37:59 +0800
+Subject: [PATCH RESEND] can: mcp251x: Replace power callbacks with
+ regulator API
+In-Reply-To: <20130817083014.a01144051b158c34ec7dd9d9@mail.ru>
+References: <1375963227-6468-1-git-send-email-shc_work@mail.ru>
+ <52049C44.6030902@pengutronix.de> <520EDDA8.6050309@gmail.com>
+ <20130817083014.a01144051b158c34ec7dd9d9@mail.ru>
+Message-ID: <CAN1soZz68ymkj4x5bWTP-6Qc7zVuVotLoT8nYLrdTd3DQHyFbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Aug 2013 16:08:37 +0800
-Shawn Guo <shawn.guo@linaro.org> wrote:
+On Sat, Aug 17, 2013 at 12:30 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> On Sat, 17 Aug 2013 10:19:20 +0800
+> Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+>
+>> On 08/09/2013 03:37 PM, Marc Kleine-Budde wrote:
+>> > On 08/08/2013 02:00 PM, Alexander Shiyan wrote:
+>> >> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+>> >> ---
+>> >>   arch/arm/mach-pxa/icontrol.c         |  3 --
+>> >>   arch/arm/mach-pxa/zeus.c             | 46 ++++++++++----------
+>> >
+>> > What's pxa's status of DT conversion? Do you (still) accept patches to
+>> > board files?
+>> >
+>> > Marc
+>> >
+>>
+>> Since DT conversion isn't finished, I still accept the board files.
+>> But this patch should be split into two parts. One is for pxa, and the
+>> other one is for net.
+>
+> Patch cannot be splitted because this can create hole which break git-bisect.
+>
+> In any case, I want to create a v2 with a more detailed description, and I
+> have a supplementary question for the CAN subsystem maintainers.
+> "Transciever power" is not used by any of the boards, can we remove it
+> completely? This will greatly simplify driver.
+> Thanks.
+>
+> --
+> Alexander Shiyan <shc_work@mail.ru>
 
-> On Sat, Aug 10, 2013 at 10:49:58AM +0400, Alexander Shiyan wrote:
-> > This patch adds PCA9536 device on first I2C bus (this device is
-> > used on camera addon module to enable CSI bus muxing) and GPIO to
-> > enable camera interface for Phytec PCM-970 RDK.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
-> >  arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 31 ++++++++++++++++++++++++++
-> >  1 file changed, 31 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> > index 0fc6551..e93c968 100644
-> > --- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> > +++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> > @@ -12,6 +12,25 @@
-> >  / {
-> >  	model = "Phytec pcm970";
-> >  	compatible = "phytec,imx27-pcm970", "phytec,imx27-pcm038", "fsl,imx27";
-> > +
-> > +	cameramux: fixedregulator at 0 {
-> 
-> Generally, we only have @num on node name when there is "reg" property
-> for the node.
-> 
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "CAM_MUX";
-> > +		regulator-min-microvolt = <3300000>;
-> > +		regulator-max-microvolt = <3300000>;
-> > +		enable-active-high;
-> > +		gpio = <&camgpio 0 0>;
-> > +		vin-supply = <&csi_en>;
-> 
-> I do not quite understand the use case here.  You have a supply for this
-> fixed regulator?  And what will you do about this vin-supply?  The fixed
-> regulator will get and enable this vin-supply?
-> 
-> > +	};
-> > +
-> > +	csi_en: fixedregulator at 1 {
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "CSI_EN";
-> > +		regulator-min-microvolt = <3300000>;
-> > +		regulator-max-microvolt = <3300000>;
-> > +		gpio = <&gpio2 24 0>;
-> > +		vin-supply = <&vcam_reg>;
-> 
-> Ditto
+If you want to make the patch go through pxa tree, you need to get the Ack
+from CAN maintainer.
 
-I create this sequence to ensure that all necessary power and GPIOs are in
-desired state before camera driver will be probed.
-Anyway, we missing DT camera driver at this time and this patch can be dropped.
-Thanks.
-
--- 
-Alexander Shiyan <shc_work@mail.ru>
+Regards
+Haojian
