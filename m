@@ -1,48 +1,166 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 17 Aug 2013 10:15:53 +0400
-Subject: [PATCH v2] ARM: i.MX6Q clocks: Fix CKIH clock name
-Message-ID: <1376720153-19659-1-git-send-email-shc_work@mail.ru>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 17 Aug 2013 10:54:52 +0200
+Subject: [PATCH] pinctrl: queue GPIO request instead of defering
+Message-ID: <1376729692-21108-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6Q have only one High-frequency reference clock (CKIH).
-Patch removes index from CKIH and makes name according datasheet.
-This is just a cosmetic fix and since this clock currently is not
-used by any DTS, change should be safe.
+We currently defer probing of the caller if a pinctrl GPIO
+request comes in before the range mapping a certain GPIO to
+a certain pin controller is available.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+If this pinctrl_gpio_request() is done for a GPIO driver
+adding the range from the gpiochip side (as is recommended)
+they can end up with a circular dependency: the GPIO driver
+needs the pin controller to be ready and the pin controller
+need the GPIO driver to be ready. This also happens if
+pin controllers and GPIO controllers compiled as modules
+are inserted in a certain order.
+
+To break this circular dependence, queue any requests
+coming to the framework until the range is ready, instead
+of deferring the probe of the caller.
+
+On the Nomadik we get this situation with the pinctrl
+driver when moving to requesting GPIOs off the gpiochip
+right after it has been added, and with this patch the
+boot dilemma is sorted out nicely, as can be seen in this
+condensed bootlog:
+
+pinctrl core: initialized pinctrl subsystem
+gpio 101e4000.gpio: at address cc852000
+gpio 101e5000.gpio: at address cc854000
+gpio 101e6000.gpio: at address cc856000
+pinctrl core: queueing pinctrl request for GPIO 104
+gpio 101e7000.gpio: at address cc858000
+pinctrl core: requested queued GPIO 104
+pinctrl-nomadik pinctrl.0: initialized Nomadik pin control driver
+
+Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+Cc: Lars Poeschel <poeschel@lemonage.de>
+Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 4 ++--
- arch/arm/mach-imx/clk-imx6q.c  | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+Some testing of this would be appreciated, especially for
+HiSilicon etc that already have some complicated GPIO ranges.
+---
+ drivers/pinctrl/core.c | 73 +++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 70 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index ccd55c2..d8a2f5fd 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -54,8 +54,8 @@
- 			clock-frequency = <32768>;
- 		};
+diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+index 2a00239..59cbf41 100644
+--- a/drivers/pinctrl/core.c
++++ b/drivers/pinctrl/core.c
+@@ -404,9 +404,11 @@ static int pinctrl_get_device_gpio_range(unsigned gpio,
+ 		}
+ 	}
  
--		ckih1 {
--			compatible = "fsl,imx-ckih1", "fixed-clock";
-+		ckih {
-+			compatible = "fsl,imx-ckih", "fixed-clock";
- 			clock-frequency = <0>;
- 		};
+-	return -EPROBE_DEFER;
++	return -EINVAL;
+ }
  
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 9181a24..8f2a8b5 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -292,7 +292,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
++static void pinctrl_process_queued_gpio_requests(void);
++
+ /**
+  * pinctrl_add_gpio_range() - register a GPIO range for a controller
+  * @pctldev: pin controller device to add the range to
+@@ -421,6 +423,8 @@ void pinctrl_add_gpio_range(struct pinctrl_dev *pctldev,
+ 	mutex_lock(&pctldev->mutex);
+ 	list_add_tail(&range->node, &pctldev->gpio_ranges);
+ 	mutex_unlock(&pctldev->mutex);
++	/* Maybe we have outstanding GPIO requests for this range? */
++	pinctrl_process_queued_gpio_requests();
+ }
+ EXPORT_SYMBOL_GPL(pinctrl_add_gpio_range);
  
- 	clk[dummy] = imx_clk_fixed("dummy", 0);
- 	clk[ckil] = imx_obtain_fixed_clock("ckil", 0);
--	clk[ckih] = imx_obtain_fixed_clock("ckih1", 0);
-+	clk[ckih] = imx_obtain_fixed_clock("ckih", 0);
- 	clk[osc] = imx_obtain_fixed_clock("osc", 0);
+@@ -534,6 +538,16 @@ int pinctrl_get_group_selector(struct pinctrl_dev *pctldev,
+ 	return -EINVAL;
+ }
  
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
++/*
++ * Queued GPIO requests are stored in this list.
++ */
++struct pinctrl_gpio_req {
++	struct list_head node;
++	int gpio;
++};
++
++static LIST_HEAD(pinctrl_queued_gpio_requests);
++
+ /**
+  * pinctrl_request_gpio() - request a single pin to be used in as GPIO
+  * @gpio: the GPIO pin number from the GPIO subsystem number space
+@@ -551,9 +565,26 @@ int pinctrl_request_gpio(unsigned gpio)
+ 
+ 	ret = pinctrl_get_device_gpio_range(gpio, &pctldev, &range);
+ 	if (ret) {
++		/* Maybe this pin does not have a pinctrl back-end at all? */
+ 		if (pinctrl_ready_for_gpio_range(gpio))
+-			ret = 0;
+-		return ret;
++			return 0;
++		/*
++		 * We get to this point if pinctrl_request_gpio() is called
++		 * from a GPIO driver which does not yet have a registered
++		 * pinctrl driver backend, and thus no ranges are defined for
++		 * it. This could happen during system start up or if we're
++		 * probing pin controllers as modules. Queue the request and
++		 * handle it when and if the range arrives.
++		 */
++		struct pinctrl_gpio_req *req =
++			kzalloc(sizeof(struct pinctrl_gpio_req), GFP_KERNEL);
++
++		if (!req)
++			return -ENOMEM;
++		req->gpio = gpio;
++		list_add_tail(&req->node, &pinctrl_queued_gpio_requests);
++		pr_info("queueing pinctrl request for GPIO %d\n", req->gpio);
++		return 0;
+ 	}
+ 
+ 	/* Convert to the pin controllers number space */
+@@ -566,6 +597,42 @@ int pinctrl_request_gpio(unsigned gpio)
+ EXPORT_SYMBOL_GPL(pinctrl_request_gpio);
+ 
+ /**
++ * pinctrl_process_queued_gpio_requests() - process queued GPIO requests
++ *
++ * This is called whenever a new GPIO range is added to see if some GPIO
++ * driver has outstanding requests to GPIOs in the range, and then these
++ * get processed at this point.
++ */
++static void pinctrl_process_queued_gpio_requests(void)
++{
++	struct list_head *node, *tmp;
++
++        list_for_each_safe(node, tmp, &pinctrl_queued_gpio_requests) {
++                struct pinctrl_gpio_req *req =
++			list_entry(node, struct pinctrl_gpio_req, node);
++		struct pinctrl_dev *pctldev;
++		struct pinctrl_gpio_range *range;
++		int pin;
++		int ret;
++
++		ret = pinctrl_get_device_gpio_range(req->gpio, &pctldev, &range);
++		if (ret)
++			continue;
++
++		/* Convert to the pin controllers number space */
++		pin = gpio_to_pin(range, req->gpio);
++		ret = pinmux_request_gpio(pctldev, range, pin, req->gpio);
++
++		if (ret)
++			pr_err("failed to request queued GPIO %d\n", req->gpio);
++		else
++			pr_info("requested queued GPIO %d\n", req->gpio);
++                list_del(node);
++                kfree(req);
++        }
++}
++
++/**
+  * pinctrl_free_gpio() - free control on a single pin, currently used as GPIO
+  * @gpio: the GPIO pin number from the GPIO subsystem number space
+  *
 -- 
-1.8.1.5
+1.8.1.4
