@@ -1,58 +1,36 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 17 Aug 2013 08:32:30 +0400
-Subject: [PATCH 00/10] ARM: clps711x: Initial DT support / Fixes
-In-Reply-To: <20130814062900.GA19951@quad.lixom.net>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <20130803075442.6d1a418eb60217f7196a25fc@mail.ru>
- <20130814062900.GA19951@quad.lixom.net>
-Message-ID: <20130817083230.9ab0aaf04f8c84d42f88c4ce@mail.ru>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 17 Aug 2013 01:36:19 -0300
+Subject: [PATCH] ARM: fiq: Cast the first argument of flush_icache_range()
+In-Reply-To: <CAOesGMgi3f4sYN9S7ywXqbLEjYaGcNCQ+_YTQYkv-UegunaZeg@mail.gmail.com>
+References: <1376613333-7021-1-git-send-email-festevam@gmail.com>
+ <CAOesGMgi3f4sYN9S7ywXqbLEjYaGcNCQ+_YTQYkv-UegunaZeg@mail.gmail.com>
+Message-ID: <CAOMZO5DnrrPY4US5MVVVUaTW-ha2NLoOFG3GauDovVE+M6F5dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Aug 2013 23:29:00 -0700
-Olof Johansson <olof@lixom.net> wrote:
+On Sat, Aug 17, 2013 at 1:24 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Thu, Aug 15, 2013 at 5:35 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>> Commit 2ba85e7af4 (ARM: Fix FIQ code on VIVT CPUs) causes the following build
+>> warning:
+>>
+>> arch/arm/kernel/fiq.c: In function 'set_fiq_handler':
+>> arch/arm/kernel/fiq.c:92:3: warning: passing argument 1 of 'cpu_cache.coherent_kern_range' makes integer from pointer without a cast [enabled by default]
+>> arch/arm/kernel/fiq.c:92:3: note: expected 'long unsigned int' but argument is of type 'void *'
+>>
+>> Cast it as '(unsigned long)base' to avoid the warning.
+>>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>
+> Acked-by: Olof Johansson <olof@lixom.net>
+>
+> This warning just showed up on mainline with the last arm fixes.
+> Please send to the patch tracker.
 
-> On Sat, Aug 03, 2013 at 07:54:42AM +0400, Alexander Shiyan wrote:
-> > On Thu, 18 Jul 2013 22:34:51 +0400
-> > Alexander Shiyan <shc_work@mail.ru> wrote:
-> > 
-> > > Here is next patchset for the Cirrus Logic CLPS711X target CPUs.
-> > > The first four patches is a small fixes. The rest is a attempt
-> > > to add DT support for this subarch.
-> > > As long as DT support is incomplete (no peripherals), I did not
-> > > add DTS yet. This is the next step.
-> > > 
-> > > Alexander Shiyan (10):
-> > >   ARM: clps711x: Remove the special name for the syscon driver
-> > >   ARM: clps711x: Drop fortunet board support
-> > >   ARM: clps711x: autcpu12: Remove incorrect config checking
-> > >   ARM: clps711x: edb7211: Remove extra iotable_init() call
-> > >   ARM: clps711x: Add CLPS711X clk driver
-> > >   ARM: clps711x: Add CLPS711X clocksource driver
-> > >   ARM: clps711x: Add CLPS711X irqchip driver
-> > >   ARM: clps711x: Add CLPS711X cpuidle driver
-> > >   ARM: clps711x: Migrate CLPS711X subarch to the new basic drivers
-> > >   ARM: clps711x: Add initial DT support
-> > [...]
-> > 
-> > If there is no objection about "fixes" part of patchset,
-> > can these parts (1/10-4/10) be applied?
-> > Thanks.
-> 
-> Definitely, I'll apply them to fixes-non-critical for 3.12.
-> 
-> Btw, Kevin Hilman is stepping in to help out with arm-soc maintenance, so
-> please email arm at kenrel.org, since it's an alias that we are all on.
-> 
-> Also, I don't know if I've asked this of you before, but for these "smaller"
-> platforms that don't see quite so much activity, it's easy for us to forget who
-> wants us to apply patches and who stages branches. So emails like these are
-> appreciated so we know if you want them applied, or if we'll get a pull request
-> later. Clarifying in the patch posting if they are for review or for applying
-> works too.
+Yes, I have already sent it to the patch system:
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7819/1
 
-Do you mean always create CC to "arm at ..." for parts [0/xx] or after review period?
-Thnaks.
+Regards,
 
--- 
-Alexander Shiyan <shc_work@mail.ru>
+Fabio Estevam
