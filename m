@@ -1,33 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 17 Aug 2013 21:01:51 +0200
-Subject: [RFC v1 3/5] ARM: mvebu: add Armada 150 uart to lowlevel debug
-In-Reply-To: <1376682098-10580-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Sat, 17 Aug 2013 21:08:38 +0200
+Subject: [RFC v1 5/5] ARM: mvebu: add board init for Armada 1500
+In-Reply-To: <20130816204831.GX13964@titan.lakedaemon.net>
 References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376682098-10580-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <201308172101.51537.arnd@arndb.de>
+ <1376682098-10580-6-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130816204831.GX13964@titan.lakedaemon.net>
+Message-ID: <201308172108.38824.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 August 2013, Sebastian Hesselbarth wrote:
-> 
-> -#ifdef CONFIG_DEBUG_MVEBU_UART_ALTERNATE
-> -#define ARMADA_370_XP_REGS_PHYS_BASE   0xf1000000
-> -#else
-> -#define ARMADA_370_XP_REGS_PHYS_BASE   0xd0000000
-> +#if defined(CONFIG_MACH_ARMADA_1500)
-> +#define MVEBU_REGS_PHYS_BASE   0xf7f80000
-> +#define MVEBU_REGS_VIRT_BASE   0xf7f80000
-> +#define MVEBU_UART0_OFFSET     0x00049000
-> +#elif defined(CONFIG_DEBUG_MVEBU_UART)
-> +#define MVEBU_REGS_PHYS_BASE   0xd0000000
-> +#define MVEBU_REGS_VIRT_BASE   0xfec00000
-> +#define MVEBU_UART0_OFFSET     0x00012000
-> +#else /* CONFIG_DEBUG_MVEBU_UART_ALTERNATE */
+On Friday 16 August 2013, Jason Cooper wrote:
+> > +
+> > +#define ARMADA_1500_REG_BASE_VIRT	0xf6000000
+> > +#define ARMADA_1500_REG_BASE_SIZE	0x03000000
+> > +
+> > +static struct map_desc armada_1500_io_desc[] __initdata = {
+> > +	{
+> > +		.virtual	= ARMADA_1500_REG_BASE_VIRT,
+> > +		.pfn		= __phys_to_pfn(ARMADA_1500_REG_BASE_VIRT),
+> > +		.length		= ARMADA_1500_REG_BASE_SIZE,
+> > +		.type		= MT_DEVICE,
+> > +	},
+> > +};
 
-It seems wrong to base this on CONFIG_MACH_ARMADA_1500. I think you need to
-add a new config option just like we have for all other platforms. The above
-makes it impossible to build a multiplatform kernel and select 
-CONFIG_DEBUG_MVEBU_UART for debugging while keeping CONFIG_MACH_ARMADA_1500
-enabled.
+You should really try to find out what driver uses this. If you have a requirement
+that VIRT == PHYS here, the most likely explanation is that some driver accidentally
+uses readl/writel on the physical address rather than on the result of ioremap.
+
+You can try shrinking the area using bisection until you have found the offending
+driver based on the address.
+
+> > +static void __init armada_1500_timer_and_clk_init(void)
+> > +{
+> > +	of_clk_init(NULL);
+> > +	clocksource_of_init();
+> > +}
+> > +
+> > +static void __init armada_1500_dt_init(void)
+> > +{
+> > +	l2x0_of_init(0x70c00000, 0xfeffffff);
+
+New platforms should call this as 'l2x0_of_init(0, 0);' and get the bits from DT.
+
+Note that we should really change the common code to do both the of_clk_init()
+and the l2x0_of_init() automatically, but that needs to be done with some care,
+in order to not break any of the existing platforms. Would you be able to do
+one of the two? We can then get the next person that wants to add a platform
+to do the last one ;-)
 
 	Arnd
