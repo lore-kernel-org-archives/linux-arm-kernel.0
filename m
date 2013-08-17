@@ -1,42 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 17 Aug 2013 21:32:59 +0200
-Subject: [RFC v1 0/5] ARM: Initial support for Marvell Armada 1500
-In-Reply-To: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <201308172132.59402.arnd@arndb.de>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Sat, 17 Aug 2013 21:59:10 +0200
+Subject: [PATCH RESEND] can: mcp251x: Replace power callbacks with
+ regulator API
+In-Reply-To: <20130817083014.a01144051b158c34ec7dd9d9@mail.ru>
+References: <1375963227-6468-1-git-send-email-shc_work@mail.ru>
+ <52049C44.6030902@pengutronix.de> <520EDDA8.6050309@gmail.com>
+ <20130817083014.a01144051b158c34ec7dd9d9@mail.ru>
+Message-ID: <520FD60E.4040709@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 August 2013, Sebastian Hesselbarth wrote:
-> This is a RFC adding initial support for the Marvell Armada 1500
-> (88DE3100) found on various consumer devices (Chromecast, GoogleTV).
+On 08/17/2013 06:30 AM, Alexander Shiyan wrote:
+[...]
+>> Since DT conversion isn't finished, I still accept the board files.
+>> But this patch should be split into two parts. One is for pxa, and the
+>> other one is for net.
 > 
-> Actually, it is a two-fold RFC also raising discussions on mach-mvebu
-> cleanup roadmap to allow other SoCs to hop into it. While mach-mvebu
-> originally was created to add support for Armada 370/XP and merge
-> existing Marvell Orion familiy into it, I am not so sure about
-> Armada 1500 fits that well (the mbus has gone!).
+> Patch cannot be splitted because this can create hole which break git-bisect.
 > 
-> If you are brave enough to try this on any GoogleTV, hit Google for
-> instructions on how to get a unlocked u-boot and void your warranty :)
-> The patches are based on v3.11-rc5 directly.
-> 
-> This cover letter and the separate patches have also been Cc'd to the
-> respective maintainers to clear up some questions before posting a real
-> patch set.
+> In any case, I want to create a v2 with a more detailed description, and I
+> have a supplementary question for the CAN subsystem maintainers.
+> "Transciever power" is not used by any of the boards, can we remove it
+> completely? This will greatly simplify driver.
 
-Great stuff!
+Do you mean the former transceiver_enable() callback?
 
-Regarding the question about the directory, is there going to be any
-shared code with the files present in mach-mvebu, e.g. the SMP support
-that I assume is planned for a later point?
+>  struct mcp251x_platform_data {
+>  	unsigned long oscillator_frequency;
+>  	unsigned long irq_flags;
+> -	int (*board_specific_setup)(struct spi_device *spi);
+> -	int (*transceiver_enable)(int enable);
+> -	int (*power_enable) (int enable);
+>  };
 
-If there is shared code, it's probably best to have it in here. Otherwise
-I don't care either way: We have precedent for fairly unrelated platforms
-(ev2+shmobile, or the mach-bcm) being in the same directory for practical
-reasons, and you can also create an almost empty directory now as we are
-likely going to consolidate all "trivial" platforms in the future. Once
-the l2x0 and clock init code as well as the early mapping has been
-addressed, there won't be any platform code left.
+Having a switchable transceiver is a quite common thing. So I'd like
+that you keep it. The flexcan driver was just converted from a callback
+to a regulator too. It already has device tree bindings and I'd like to
+use these bindings as a standard for new drivers. From flexcan's dt
+bindings:
 
-	Arnd
+> - xceiver-supply: Regulator that powers the CAN transceiver
+
+which translates into:
+
+> priv->reg_xceiver = devm_regulator_get(&pdev->dev, "xceiver");
+
+Can you please use "xceiver" instead of "transceiver", so that future DT
+binding will fit the scheme.
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130817/bb6c21aa/attachment-0001.sig>
