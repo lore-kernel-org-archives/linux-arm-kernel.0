@@ -1,57 +1,81 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 17 Aug 2013 19:40:18 +0900
-Subject: Broken device trees for exynos in linux-next
-In-Reply-To: <CAOesGMiyNM6VdNzKQU3XwoiacJV8hc60mcLiH+vHoS6xJM6q-A@mail.gmail.com>
-References: <CAOesGMgv9gTQ_NtaKZY_ZfLD1NBU19E-vaLaWwmvGJJB1MQrwg@mail.gmail.com>
- <13b101ce9a14$2cebd700$86c38500$@org>
- <CAOesGMiyNM6VdNzKQU3XwoiacJV8hc60mcLiH+vHoS6xJM6q-A@mail.gmail.com>
-Message-ID: <159201ce9b36$2a513f30$7ef3bd90$@org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 17 Aug 2013 12:50:07 +0200
+Subject: [RFC PATCH v2 3/4] powerpc: refactor of_get_cpu_node to support
+ other architectures
+In-Reply-To: <1376674791-28244-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376674791-28244-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376674791-28244-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <2032060.4bgTKOdEX2@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> 
-> On Thu, Aug 15, 2013 at 5:04 PM, Kukjin Kim <kgene@kernel.org> wrote:
-> > I think, maybe we discussed about that? :) current exynos_defconfig
-> cannot
-> > support exynos5440 because of LPAE and I remember we decided LPAE and
-> > non-LPAE should be separated. So as I commented before,
-> exynos5440_defconfig
-> > is needed. If you have any concerns, please let me know.
-> 
-> Having a SoC-specific defconfig makes no sense. You can run with LPAE
-> enabled on A15 and A7-based systems even if they don't have enough
-> memory to need it.
-> 
-Hmm, I'm not sure. If so, I'm wondering why LPAE is implemented with 'ifdef'
-and why Red Hat and Canonical provide PAE enabled kernel separately in
-x86...
+Hi Sudeep,
 
-> Really, what we want is to just turn on the LPAE functionality and
-> keep everything else common. Forking into two defconfigs seems like
-> the wrong idea, even if we did discuss it before. Having something
-> like a config fragment to include would make more sense, since that
-> could be shared across all platforms (and apply with
-> multi_v7_defconfig for those who want to run that on LPAE as well).
+This looks good to me overall, but I have one more question inline.
+
+On Friday 16 of August 2013 18:39:50 Sudeep KarkadaNagesha wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 > 
-If we could make LPAE enabled defconfig for all ARM platforms, I'm fine. I
-think your concern is creating SoC specific defconfig and I agree with you.
-But I'm not sure how we can support LPAE enabled defconfig for ARM
-platforms.
-
-> Or, you know, just have your build script enable it without having an
-> in-tree config fragment. That'd work too.
+> Currently different drivers requiring to access cpu device node are
+> parsing the device tree themselves. Since the ordering in the DT need
+> not match the logical cpu ordering, the parsing logic needs to consider
+> that. However, this has resulted in lots of code duplication and in some
+> cases even incorrect logic.
 > 
-I don't think so because the defconfig will be used by customer for their
-product so I should provide some defconfig for exynos5440 in mainline...
-
-> The main case where this isn't sufficient is on platforms where _all_
-> memory sits above 4G, since you can't boot a non-LPAE kernel on those
-> at all. It seems like 5440 has memory starting at 2GB so it's not one
-> of those.
+> It's better to consolidate them by adding support for getting cpu
+> device node for a given logical cpu index in DT core library. However
+> logical to physical index mapping can be architecture specific.
 > 
-5440 has 8GB memory by default.
+> PowerPC has it's own implementation to get the cpu node for a given
+> logical index.
+> 
+> This patch refactors the current implementation of of_get_cpu_node.
+> This in preparation to move the implementation to DT core library.
+> It separates out the logical to physical mapping so that a default
+> matching of the physical id to the logical cpu index can be added
+> when moved to common code. Architecture specific code can override it.
+> 
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> ---
+>  arch/powerpc/kernel/prom.c | 76
+> ++++++++++++++++++++++++++++------------------ 1 file changed, 47
+> insertions(+), 29 deletions(-)
+> 
+> diff --git a/arch/powerpc/kernel/prom.c b/arch/powerpc/kernel/prom.c
+> index eb23ac9..fb12be6 100644
+> --- a/arch/powerpc/kernel/prom.c
+> +++ b/arch/powerpc/kernel/prom.c
+> @@ -865,45 +865,63 @@ static int __init prom_reconfig_setup(void)
+>  __initcall(prom_reconfig_setup);
+>  #endif
+> 
+> +bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
+> +{
+> +	return (int)phys_id == get_hard_smp_processor_id(cpu);
+> +}
+> +
+> +static bool __of_find_n_match_cpu_property(struct device_node *cpun,
+> +			const char *prop_name, int cpu, unsigned int 
+*thread)
+> +{
+> +	const __be32 *cell;
+> +	int ac, prop_len, tid;
+> +	u64 hwid;
+> +
+> +	ac = of_n_addr_cells(cpun);
+> +	cell = of_get_property(cpun, prop_name, &prop_len);
+> +	if (!cell)
+> +		return false;
 
-So let me know which way is fine to us?
+I wonder how would this handle uniprocessor ARM (pre-v7) cores, for which 
+the updated bindings[1] define #address-cells = <0> and so no reg 
+property.
 
-- Kukjin
+[1] - http://thread.gmane.org/gmane.linux.ports.arm.kernel/260795
+
+Best regards,
+Tomasz
