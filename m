@@ -1,39 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 17 Aug 2013 21:13:41 +0200
-Subject: [RFC v1 5/5] ARM: mvebu: add board init for Armada 1500
-In-Reply-To: <201308172108.38824.arnd@arndb.de>
+Date: Sat, 17 Aug 2013 21:28:34 +0200
+Subject: [RFC v1 4/5] ARM: mvebu: add Armada 1500 and Sony NSZ-GS7 device
+ tree files
+In-Reply-To: <1376682098-10580-5-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130816204831.GX13964@titan.lakedaemon.net>
- <201308172108.38824.arnd@arndb.de>
-Message-ID: <201308172113.41376.arnd@arndb.de>
+ <1376682098-10580-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <201308172128.35245.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 17 August 2013, Arnd Bergmann wrote:
-> On Friday 16 August 2013, Jason Cooper wrote:
-> > > +
+On Friday 16 August 2013, Sebastian Hesselbarth wrote:
+> +               cpu at 0 {
+> +                       compatible = "marvell,sheeva-v7";
+> +                       device_type = "cpu";
+> +                       next-level-cache = <&l2>;
+> +                       reg = <0>;
+> +               };
+...
+> +               l2: l2-cache-controller at 1ac0000 {
+> +                       compatible = "marvell,aurora-outer-cache";
+> +                       reg = <0x1ac0000 0x1000>;
+> +                       cache-level = <2>;
+> +               };
+> +
+> +               gic: interrupt-controller at 1ad0000 {
+> +                       compatible = "arm,cortex-a9-gic";
+> +                       reg = <0x1ad1000 0x1000
+> +                              0x1ad0100 0x0100>;
+> +                       interrupt-controller;
+> +                       #interrupt-cells = <3>;
+> +               };
+> +
+> +               local-timer at 1ad0600 {
+> +                       compatible = "arm,cortex-a9-twd-timer";
+> +                       reg = <0x1ad0600 0x20>;
+> +                       interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&cpu0clk>;
+> +               };
 
-> 
-> You should really try to find out what driver uses this. If you have a requirement
-> that VIRT == PHYS here, the most likely explanation is that some driver accidentally
-> uses readl/writel on the physical address rather than on the result of ioremap.
-> 
-> You can try shrinking the area using bisection until you have found the offending
-> driver based on the address.
-> 
-
-> > > +static void __init armada_1500_timer_and_clk_init(void)
-> 
-> New platforms should call this as 'l2x0_of_init(0, 0);' and get the bits from DT.
-> 
-> Note that we should really change the common code to do both the of_clk_init()
-> and the l2x0_of_init() automatically, but that needs to be done with some care,
-> in order to not break any of the existing platforms. Would you be able to do
-> one of the two? We can then get the next person that wants to add a platform
-> to do the last one ;-)
-
-
-I replied to the wrong mail. My comments were obviously meant for Sebastian,
-not for Jason.
+This seems like a strange combination. I would have expected either PJ4+Aurora+apbtimer
+or A9+pl310+localtimer, based on what I found in the chromecast kernel source.
+Do you have more information here about what is used on the two variants?
 
 	Arnd
