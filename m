@@ -1,11 +1,11 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sat, 17 Aug 2013 10:03:31 +0800
+Date: Sat, 17 Aug 2013 10:19:20 +0800
 Subject: [PATCH RESEND] can: mcp251x: Replace power callbacks with
  regulator API
 In-Reply-To: <52049C44.6030902@pengutronix.de>
 References: <1375963227-6468-1-git-send-email-shc_work@mail.ru>
  <52049C44.6030902@pengutronix.de>
-Message-ID: <520ED9F3.1090906@gmail.com>
+Message-ID: <520EDDA8.6050309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
