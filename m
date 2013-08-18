@@ -1,41 +1,74 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Sat, 17 Aug 2013 21:42:26 -0500
-Subject: [PATCH v2 05/14] crypto: omap-aes: Sync SG before DMA operation
+Date: Sat, 17 Aug 2013 21:42:31 -0500
+Subject: [PATCH v2 10/14] crypto: omap-aes: Switch to PIO mode during probe
 In-Reply-To: <1376793755-30478-1-git-send-email-joelf@ti.com>
 References: <1376793755-30478-1-git-send-email-joelf@ti.com>
-Message-ID: <1376793755-30478-6-git-send-email-joelf@ti.com>
+Message-ID: <1376793755-30478-11-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Earlier functions that did a similar sync are replaced by the dma_sync_sg_*
-which can operate on entire SG list.
+In cases where requesting for DMA channels fails for some reason, or channel
+numbers are not provided in DT or platform data, we switch to PIO-only mode
+also checking if platform provides IRQ numbers and interrupt register offsets
+in DT and platform data. All dma-only paths are avoided in this mode.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/crypto/omap-aes.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/crypto/omap-aes.c |   28 +++++++++++++++++++++++-----
+ 1 file changed, 23 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index 64dd5c1..5e034a1 100644
+index 62b3260..d214dbf 100644
 --- a/drivers/crypto/omap-aes.c
 +++ b/drivers/crypto/omap-aes.c
-@@ -489,6 +489,8 @@ static int omap_aes_crypt_dma(struct crypto_tfm *tfm,
- 	struct dma_slave_config cfg;
- 	int ret;
+@@ -1064,7 +1064,7 @@ static int omap_aes_probe(struct platform_device *pdev)
+ 	struct omap_aes_dev *dd;
+ 	struct crypto_alg *algp;
+ 	struct resource res;
+-	int err = -ENOMEM, i, j;
++	int err = -ENOMEM, i, j, irq = -1;
+ 	u32 reg;
  
-+	dma_sync_sg_for_device(dd->dev, dd->in_sg, in_sg_len, DMA_TO_DEVICE);
+ 	dd = kzalloc(sizeof(struct omap_aes_dev), GFP_KERNEL);
+@@ -1108,8 +1108,23 @@ static int omap_aes_probe(struct platform_device *pdev)
+ 	tasklet_init(&dd->queue_task, omap_aes_queue_task, (unsigned long)dd);
+ 
+ 	err = omap_aes_dma_init(dd);
+-	if (err)
+-		goto err_dma;
++	if (err && AES_REG_IRQ_STATUS(dd) && AES_REG_IRQ_ENABLE(dd)) {
++		dd->pio_only = 1;
 +
- 	memset(&cfg, 0, sizeof(cfg));
- 
- 	cfg.src_addr = dd->phys_base + AES_REG_DATA_N(dd, 0);
-@@ -676,6 +678,8 @@ static void omap_aes_done_task(unsigned long data)
- 
- 	pr_debug("enter done_task\n");
- 
-+	dma_sync_sg_for_cpu(dd->dev, dd->in_sg, dd->in_sg_len, DMA_FROM_DEVICE);
++		irq = platform_get_irq(pdev, 0);
++		if (irq < 0) {
++			dev_err(dev, "can't get IRQ resource\n");
++			goto err_irq;
++		}
 +
- 	omap_aes_crypt_dma_stop(dd);
- 	omap_aes_finish_req(dd, 0);
- 	omap_aes_handle_queue(dd, NULL);
++		err = request_irq(irq, omap_aes_irq, 0,
++				dev_name(dev), dd);
++		if (err) {
++			dev_err(dev, "Unable to grab omap-aes IRQ\n");
++			goto err_irq;
++		}
++	}
++
+ 
+ 	INIT_LIST_HEAD(&dd->list);
+ 	spin_lock(&list_lock);
+@@ -1137,8 +1152,11 @@ err_algs:
+ 		for (j = dd->pdata->algs_info[i].registered - 1; j >= 0; j--)
+ 			crypto_unregister_alg(
+ 					&dd->pdata->algs_info[i].algs_list[j]);
+-	omap_aes_dma_cleanup(dd);
+-err_dma:
++	if (dd->pio_only)
++		free_irq(irq, dd);
++	else
++		omap_aes_dma_cleanup(dd);
++err_irq:
+ 	tasklet_kill(&dd->done_task);
+ 	tasklet_kill(&dd->queue_task);
+ 	pm_runtime_disable(dev);
 -- 
 1.7.9.5
