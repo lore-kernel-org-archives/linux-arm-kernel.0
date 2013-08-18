@@ -1,38 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 Aug 2013 05:17:21 +0900
-Subject: [PATCH RESEND] ARM: plat-samsung: Fix switching FIFO in
- arch_enable_uart_fifo function
-In-Reply-To: <1372792593-7457-1-git-send-email-shc_work@mail.ru>
-References: <1372792593-7457-1-git-send-email-shc_work@mail.ru>
-Message-ID: <52112BD1.6090505@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sun, 18 Aug 2013 22:25:15 +0200
+Subject: [PATCH] arm64: wire in generic parport.h
+In-Reply-To: <1376841688.11104.8.camel@t520.redhat.com>
+References: <1376841688.11104.8.camel@t520.redhat.com>
+Message-ID: <CAMuHMdXfXAaNeCAhmxTQb007Um7AjqRdF2=85t1Po_63T7XT5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/13 04:16, Alexander Shiyan wrote:
-> When CONFIG_S3C_BOOT_UART_FORCE_FIFO symbol is set, we should
-> enable FIFO but actually switch command is missing in the code.
-> This patch adds this switching.
+On Sun, Aug 18, 2013 at 6:01 PM, Mark Salter <msalter@redhat.com> wrote:
+> The arm64 port doesn't provide a parport.h which causes a build failure
+> with some configurations:
 >
-> Signed-off-by: Alexander Shiyan<shc_work@mail.ru>
-> ---
->   arch/arm/plat-samsung/include/plat/uncompress.h | 2 ++
->   1 file changed, 2 insertions(+)
+>   drivers/parport/parport_pc.c:67:25: fatal error: asm/parport.h: No such file or directory
+>    #include <asm/parport.h>
 >
-> diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h b/arch/arm/plat-samsung/include/plat/uncompress.h
-> index 4afc32f..f48dc0a 100644
-> --- a/arch/arm/plat-samsung/include/plat/uncompress.h
-> +++ b/arch/arm/plat-samsung/include/plat/uncompress.h
-> @@ -145,6 +145,8 @@ static inline void arch_enable_uart_fifo(void)
->   			if (!(fifocon&  S3C2410_UFCON_RESETBOTH))
->   				break;
->   		}
-> +
-> +		uart_wr(S3C2410_UFCON, S3C2410_UFCON_FIFOMODE);
->   	}
->   }
->   #else
+> This patch wires in the generic parport.h for arm64.
 
-Sorry for late response, applied.
+Can arm64 have a PC-style parport?
 
-Thanks,
-Kukjin
+If not, you're better off disabling it in drivers/parport/Kconfig.
+
+You will receive bonus points for introducing ARCH_MAY_HAVE_PC_PARPORT,
+cfr. ARCH_MAY_HAVE_PC_FDC.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
