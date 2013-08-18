@@ -1,57 +1,52 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 Aug 2013 04:54:41 +0900
-Subject: [PATCH 4/4] ARM: dts: exynos5420: add audio clock controller
-In-Reply-To: <1373458313-18970-5-git-send-email-padma.v@samsung.com>
-References: <1373458313-18970-1-git-send-email-padma.v@samsung.com>
- <1373458313-18970-5-git-send-email-padma.v@samsung.com>
-Message-ID: <52112681.7060808@samsung.com>
+Date: Mon, 19 Aug 2013 05:03:43 +0900
+Subject: [PATCH] ARM: EXYNOS: always enable PM domains support for
+ EXYNOS4x12
+In-Reply-To: <1427702.Wy3A0eELLT@amdc1227>
+References: <2897494.fSQeGUd9YR@amdc1032> <1427702.Wy3A0eELLT@amdc1227>
+Message-ID: <5211289F.7000804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/13 21:11, Padmavathi Venna wrote:
-> From: Andrew Bresticker<abrestic@chromium.org>
+On 08/09/13 23:53, Tomasz Figa wrote:
+> Hi Bart,
 >
-> This adds device-tree bindings for the audio subsystem clock controller
-> on Exynos 5420.
+> On Friday 09 of August 2013 13:56:05 Bartlomiej Zolnierkiewicz wrote:
+>> Currently PM domains support will be enabled for EXYNOS4x12 SoCs
+>> only if EXYNOS4210 SoC or EXYNOS5250 SoC support is also enabled.
+>>
+>> Fix it by explicitly selecting PM domains support (if PM support
+>> is enabled) by SOC_EXYNOS4212 and SOC_EXYNOS4412 config options.
+>>
+>> Signed-off-by: Bartlomiej Zolnierkiewicz<b.zolnierkie@samsung.com>
+>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+>> ---
+>>   arch/arm/mach-exynos/Kconfig |    2 ++
+>>   1 file changed, 2 insertions(+)
+>>
+>> Index: b/arch/arm/mach-exynos/Kconfig
+>> ===================================================================
+>> --- a/arch/arm/mach-exynos/Kconfig	2013-08-08 14:36:02.000000000 +0200
+>> +++ b/arch/arm/mach-exynos/Kconfig	2013-08-08 14:38:48.967486318 +0200
+>> @@ -52,6 +52,7 @@ config SOC_EXYNOS4212
+>>   	depends on ARCH_EXYNOS4
+>>   	select ARCH_HAS_BANDGAP
+>>   	select PINCTRL_EXYNOS
+>> +	select PM_GENERIC_DOMAINS if PM
+>>   	select S5P_PM if PM
+>>   	select S5P_SLEEP if PM
+>>   	select SAMSUNG_DMADEV
+>> @@ -64,6 +65,7 @@ config SOC_EXYNOS4412
+>>   	depends on ARCH_EXYNOS4
+>>   	select ARCH_HAS_BANDGAP
+>>   	select PINCTRL_EXYNOS
+>> +	select PM_GENERIC_DOMAINS if PM
+>>   	select SAMSUNG_DMADEV
+>>   	help
+>>   	  Enable EXYNOS4412 SoC support
 >
-> Signed-off-by: Andrew Bresticker<abrestic@chromium.org>
-> Reviewed-on: https://gerrit.chromium.org/gerrit/57712
-> Reviewed-by: Simon Glass<sjg@chromium.org>
-> Signed-off-by: Padmavathi Venna<padma.v@samsung.com>
-> ---
->   arch/arm/boot/dts/exynos5420.dtsi |   11 +++++++++++
->   1 files changed, 11 insertions(+), 0 deletions(-)
+> Acked-by: Tomasz Figa<t.figa@samsung.com>
 >
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index da55160..a84f5f1 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -15,6 +15,9 @@
->
->   #include "exynos5.dtsi"
->   #include "exynos5420-pinctrl.dtsi"
-> +
-> +#include<dt-bindings/clk/exynos-audss-clk.h>
-> +
->   / {
->   	compatible = "samsung,exynos5420";
->
-> @@ -65,6 +68,14 @@
->   		#clock-cells =<1>;
->   	};
->
-> +	clock_audss: audss-clock-controller at 3810000 {
-> +		compatible = "samsung,exynos5420-audss-clock";
-> +		reg =<0x03810000 0x0C>;
-> +		#clock-cells =<1>;
-> +		clocks =<&clock 148>;
-> +		clock-names = "sclk_audio";
-> +	};
-> +
->   	mct at 101C0000 {
->   		compatible = "samsung,exynos4210-mct";
->   		reg =<0x101C0000 0x800>;
-
 Applied, thanks.
 
 - Kukjin
