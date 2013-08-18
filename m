@@ -1,44 +1,100 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Sat, 17 Aug 2013 21:42:34 -0500
-Subject: [PATCH v2 13/14] crypto: omap-aes: Convert request_irq to
- devm_request_irq
+Date: Sat, 17 Aug 2013 21:42:30 -0500
+Subject: [PATCH v2 09/14] crypto: omap-aes: PIO mode: platform data for
+ OMAP4/AM437x and trigger
 In-Reply-To: <1376793755-30478-1-git-send-email-joelf@ti.com>
 References: <1376793755-30478-1-git-send-email-joelf@ti.com>
-Message-ID: <1376793755-30478-14-git-send-email-joelf@ti.com>
+Message-ID: <1376793755-30478-10-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keeps request_irq exit/error code paths simpler.
+We initialize the scatter gather walk lists needed for PIO mode and avoid all
+DMA paths such as mapping/unmapping buffers by checking for the pio_only flag.
 
-Suggested-by: Lokesh Vutla <lokeshvutla@ti.com>
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/crypto/omap-aes.c |    6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/crypto/omap-aes.c |   43 ++++++++++++++++++++++++++++++-------------
+ 1 file changed, 30 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index 6a4ac4a..ab449b5 100644
+index 889dc99..62b3260 100644
 --- a/drivers/crypto/omap-aes.c
 +++ b/drivers/crypto/omap-aes.c
-@@ -1197,7 +1197,7 @@ static int omap_aes_probe(struct platform_device *pdev)
- 			goto err_irq;
- 		}
+@@ -168,6 +168,7 @@ struct omap_aes_dev {
+ 	struct dma_chan		*dma_lch_out;
+ 	int			in_sg_len;
+ 	int			out_sg_len;
++	int			pio_only;
+ 	const struct omap_aes_pdata	*pdata;
+ };
  
--		err = request_irq(irq, omap_aes_irq, 0,
-+		err = devm_request_irq(dev, irq, omap_aes_irq, 0,
- 				dev_name(dev), dd);
- 		if (err) {
- 			dev_err(dev, "Unable to grab omap-aes IRQ\n");
-@@ -1232,9 +1232,7 @@ err_algs:
- 		for (j = dd->pdata->algs_info[i].registered - 1; j >= 0; j--)
- 			crypto_unregister_alg(
- 					&dd->pdata->algs_info[i].algs_list[j]);
--	if (dd->pio_only)
--		free_irq(irq, dd);
--	else
-+	if (!dd->pio_only)
- 		omap_aes_dma_cleanup(dd);
- err_irq:
- 	tasklet_kill(&dd->done_task);
+@@ -413,6 +414,16 @@ static int omap_aes_crypt_dma(struct crypto_tfm *tfm,
+ 	struct dma_slave_config cfg;
+ 	int ret;
+ 
++	if (dd->pio_only) {
++		scatterwalk_start(&dd->in_walk, dd->in_sg);
++		scatterwalk_start(&dd->out_walk, dd->out_sg);
++
++		/* Enable DATAIN interrupt and let it take
++		   care of the rest */
++		omap_aes_write(dd, AES_REG_IRQ_ENABLE(dd), 0x2);
++		return 0;
++	}
++
+ 	dma_sync_sg_for_device(dd->dev, dd->in_sg, in_sg_len, DMA_TO_DEVICE);
+ 
+ 	memset(&cfg, 0, sizeof(cfg));
+@@ -482,21 +493,25 @@ static int omap_aes_crypt_dma_start(struct omap_aes_dev *dd)
+ 
+ 	pr_debug("total: %d\n", dd->total);
+ 
+-	err = dma_map_sg(dd->dev, dd->in_sg, dd->in_sg_len, DMA_TO_DEVICE);
+-	if (!err) {
+-		dev_err(dd->dev, "dma_map_sg() error\n");
+-		return -EINVAL;
+-	}
++	if (!dd->pio_only) {
++		err = dma_map_sg(dd->dev, dd->in_sg, dd->in_sg_len,
++				 DMA_TO_DEVICE);
++		if (!err) {
++			dev_err(dd->dev, "dma_map_sg() error\n");
++			return -EINVAL;
++		}
+ 
+-	err = dma_map_sg(dd->dev, dd->out_sg, dd->out_sg_len, DMA_FROM_DEVICE);
+-	if (!err) {
+-		dev_err(dd->dev, "dma_map_sg() error\n");
+-		return -EINVAL;
++		err = dma_map_sg(dd->dev, dd->out_sg, dd->out_sg_len,
++				 DMA_FROM_DEVICE);
++		if (!err) {
++			dev_err(dd->dev, "dma_map_sg() error\n");
++			return -EINVAL;
++		}
+ 	}
+ 
+ 	err = omap_aes_crypt_dma(tfm, dd->in_sg, dd->out_sg, dd->in_sg_len,
+ 				 dd->out_sg_len);
+-	if (err) {
++	if (err && !dd->pio_only) {
+ 		dma_unmap_sg(dd->dev, dd->in_sg, dd->in_sg_len, DMA_TO_DEVICE);
+ 		dma_unmap_sg(dd->dev, dd->out_sg, dd->out_sg_len,
+ 			     DMA_FROM_DEVICE);
+@@ -600,9 +615,11 @@ static void omap_aes_done_task(unsigned long data)
+ 
+ 	pr_debug("enter done_task\n");
+ 
+-	dma_sync_sg_for_cpu(dd->dev, dd->in_sg, dd->in_sg_len, DMA_FROM_DEVICE);
+-
+-	omap_aes_crypt_dma_stop(dd);
++	if (!dd->pio_only) {
++		dma_sync_sg_for_device(dd->dev, dd->out_sg, dd->out_sg_len,
++				       DMA_FROM_DEVICE);
++		omap_aes_crypt_dma_stop(dd);
++	}
+ 	omap_aes_finish_req(dd, 0);
+ 	omap_aes_handle_queue(dd, NULL);
+ 
 -- 
 1.7.9.5
