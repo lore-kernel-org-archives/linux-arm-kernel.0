@@ -1,34 +1,38 @@
 From: msalter@redhat.com (Mark Salter)
-Date: Sun, 18 Aug 2013 12:01:28 -0400
-Subject: [PATCH] arm64: wire in generic parport.h
-Message-ID: <1376841688.11104.8.camel@t520.redhat.com>
+Date: Sun, 18 Aug 2013 12:22:50 -0400
+Subject: [PATCH] arm64: add screen_info for console support
+Message-ID: <1376842970.11104.11.camel@t520.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 port doesn't provide a parport.h which causes a build failure
-with some configurations:
+The arm64 port doesn't provide a screen_info struct for console support
+which leads to a build failure with some configurations:
 
-  drivers/parport/parport_pc.c:67:25: fatal error: asm/parport.h: No such file or directory
-   #include <asm/parport.h>
+  drivers/video/console/vgacon.c:820: undefined reference to `screen_info'
 
-This patch wires in the generic parport.h for arm64.
+This patch adds an empty declaration of screen_info to fix the build
+problem. Some additional runtime code is needed to actually make it
+useful.
 
 Signed-off-by: Mark Salter <msalter@redhat.com>
 ---
- arch/arm64/include/asm/Kbuild | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/kernel/setup.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 79a642d..487b0a2 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -25,6 +25,7 @@ generic-y += local64.h
- generic-y += mman.h
- generic-y += msgbuf.h
- generic-y += mutex.h
-+generic-y += parport.h                                                                                         
- generic-y += pci.h
- generic-y += percpu.h
- generic-y += poll.h
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index add6ea6..eb9f93a 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -64,6 +64,10 @@ static const char *cpu_name;
+ static const char *machine_name;
+ phys_addr_t __fdt_pointer __initdata;
+ 
++#if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)                                               
++struct screen_info screen_info;                                                                                
++#endif                                                                                                         
++
+ /*
+  * Standard memory resources
+  */
 -- 
 1.8.1.4
