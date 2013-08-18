@@ -1,67 +1,42 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 19 Aug 2013 01:01:54 +0200
+Date: Mon, 19 Aug 2013 01:02:00 +0200
 Subject: [RFC v1 5/5] ARM: mvebu: add board init for Armada 1500
-In-Reply-To: <201308172108.38824.arnd@arndb.de>
+In-Reply-To: <201308172112.30773.arnd@arndb.de>
 References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1376682098-10580-6-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130816204831.GX13964@titan.lakedaemon.net>
- <201308172108.38824.arnd@arndb.de>
-Message-ID: <52115262.70402@gmail.com>
+ <201308172112.30773.arnd@arndb.de>
+Message-ID: <52115268.4010100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2013 09:08 PM, Arnd Bergmann wrote:
-> On Friday 16 August 2013, Jason Cooper wrote:
->>> +
->>> +#define ARMADA_1500_REG_BASE_VIRT	0xf6000000
->>> +#define ARMADA_1500_REG_BASE_SIZE	0x03000000
->>> +
->>> +static struct map_desc armada_1500_io_desc[] __initdata = {
->>> +	{
->>> +		.virtual	= ARMADA_1500_REG_BASE_VIRT,
->>> +		.pfn		= __phys_to_pfn(ARMADA_1500_REG_BASE_VIRT),
->>> +		.length		= ARMADA_1500_REG_BASE_SIZE,
->>> +		.type		= MT_DEVICE,
->>> +	},
->>> +};
+On 08/17/2013 09:12 PM, Arnd Bergmann wrote:
+> On Friday 16 August 2013, Sebastian Hesselbarth wrote:
+>> +config MACH_ARMADA_1500
+>> +       bool "Marvell Armada 1500 boards"
+>> +       select ARMADA_1500_CLK
+>> +       select ARM_GIC
+>> +       select CACHE_L2X0
+>> +       select CPU_PJ4B
+>> +       select DW_APB_TIMER_OF
+>> +       select LOCAL_TIMERS if SMP
+>> +       select HAVE_ARM_TWD if LOCAL_TIMERS
+>> +       select HAVE_SMP
+>> +       select PINCTRL_ARMADA_1500
 >
-> You should really try to find out what driver uses this. If you have a requirement
-> that VIRT == PHYS here, the most likely explanation is that some driver accidentally
-> uses readl/writel on the physical address rather than on the result of ioremap.
+> Hmm, I also noticed that this enables support for both the Cortex-A9
+> (using GIC and L2X0) and the PJ4 based variants of Armada 1500. I
+> wonder if we should have separate options for the two. E.g. if you
+> want to build a kernel for the Chromecast, there would be no need to
+> enabled PJ4 support.
 >
-> You can try shrinking the area using bisection until you have found the offending
-> driver based on the address.
+> I have not been able to find out which core is used in most of the
+> production Google TV boxes.
 
-While bringing up timer and irq, I had no luck without that mapping,
-but I didn't try without later on. There is no driver requiring it,
-as I either only use mainline drivers that never knew about A1500
-before, or I have written it on my own (dw-apb-ictl).
+AFAIK, there is Armada 1500 (88de3100) used in every Google TV 2nd Gen
+devices, some older multimedia boxes also used Armada 1000 (88de3010),
+and Chromecast comprises Armada 1500-mini (88de3005).
 
-I don't think it is required and will try to remove it, now that I
-know I have set up core stuff correctly and it boots.
-
->>> +static void __init armada_1500_timer_and_clk_init(void)
->>> +{
->>> +	of_clk_init(NULL);
->>> +	clocksource_of_init();
->>> +}
->>> +
->>> +static void __init armada_1500_dt_init(void)
->>> +{
->>> +	l2x0_of_init(0x70c00000, 0xfeffffff);
->
-> New platforms should call this as 'l2x0_of_init(0, 0);' and get the bits from DT.
-
-Ok.
-
-> Note that we should really change the common code to do both the of_clk_init()
-> and the l2x0_of_init() automatically, but that needs to be done with some care,
-> in order to not break any of the existing platforms. Would you be able to do
-> one of the two? We can then get the next person that wants to add a platform
-> to do the last one ;-)
-
-Scary but that reduces armada-1500.c to MACH descriptor and DT
-compatible only ;) I don't expect any weird hacks required for
-it anyway.
+We should be able to find out if it is PJ4B or Cortex-A9 by checking
+any CPU register?
 
 Sebastian
