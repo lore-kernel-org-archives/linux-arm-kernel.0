@@ -1,58 +1,63 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 19 Aug 2013 01:11:37 +0200
-Subject: [RFC v1 4/5] ARM: mvebu: add Armada 1500 and Sony NSZ-GS7 device
- tree files
-In-Reply-To: <201308172128.35245.arnd@arndb.de>
+Date: Mon, 19 Aug 2013 01:21:19 +0200
+Subject: [RFC v1 0/5] ARM: Initial support for Marvell Armada 1500
+In-Reply-To: <201308172132.59402.arnd@arndb.de>
 References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376682098-10580-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <201308172128.35245.arnd@arndb.de>
-Message-ID: <521154A9.3000505@gmail.com>
+ <201308172132.59402.arnd@arndb.de>
+Message-ID: <521156EF.3090201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2013 09:28 PM, Arnd Bergmann wrote:
+On 08/17/2013 09:32 PM, Arnd Bergmann wrote:
 > On Friday 16 August 2013, Sebastian Hesselbarth wrote:
->> +               cpu at 0 {
->> +                       compatible = "marvell,sheeva-v7";
->> +                       device_type = "cpu";
->> +                       next-level-cache = <&l2>;
->> +                       reg = <0>;
->> +               };
-> ...
->> +               l2: l2-cache-controller at 1ac0000 {
->> +                       compatible = "marvell,aurora-outer-cache";
->> +                       reg = <0x1ac0000 0x1000>;
->> +                       cache-level = <2>;
->> +               };
->> +
->> +               gic: interrupt-controller at 1ad0000 {
->> +                       compatible = "arm,cortex-a9-gic";
->> +                       reg = <0x1ad1000 0x1000
->> +                              0x1ad0100 0x0100>;
->> +                       interrupt-controller;
->> +                       #interrupt-cells = <3>;
->> +               };
->> +
->> +               local-timer at 1ad0600 {
->> +                       compatible = "arm,cortex-a9-twd-timer";
->> +                       reg = <0x1ad0600 0x20>;
->> +                       interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
->> +                       clocks = <&cpu0clk>;
->> +               };
+>> This is a RFC adding initial support for the Marvell Armada 1500
+>> (88DE3100) found on various consumer devices (Chromecast, GoogleTV).
+>>
+>> Actually, it is a two-fold RFC also raising discussions on mach-mvebu
+>> cleanup roadmap to allow other SoCs to hop into it. While mach-mvebu
+>> originally was created to add support for Armada 370/XP and merge
+>> existing Marvell Orion familiy into it, I am not so sure about
+>> Armada 1500 fits that well (the mbus has gone!).
+>>
+>> If you are brave enough to try this on any GoogleTV, hit Google for
+>> instructions on how to get a unlocked u-boot and void your warranty :)
+>> The patches are based on v3.11-rc5 directly.
+>>
+>> This cover letter and the separate patches have also been Cc'd to the
+>> respective maintainers to clear up some questions before posting a real
+>> patch set.
 >
-> This seems like a strange combination. I would have expected either PJ4+Aurora+apbtimer
-> or A9+pl310+localtimer, based on what I found in the chromecast kernel source.
-> Do you have more information here about what is used on the two variants?
+> Great stuff!
 
-I have no clue, what combination it really is. Unfortunately,
-Marvell didn't release any open datasheets, of course.
+Thanks! I thought you'd be interested in this, so I Cc'd you :)
 
-I can only look at GPL'd Asus Cube kernel, I used for getting an idea
-of what was required for initial support and reg offsets, irqs and
-friends. They bring up twd as localtimer. Also, grep'ing the Cube
-kernel sources in mach-mv88de3100 gives hits for CONFIG_PJ4 (note the
-missing B), l2x0, smp_twd, apb_timer.
+> Regarding the question about the directory, is there going to be any
+> shared code with the files present in mach-mvebu, e.g. the SMP support
+> that I assume is planned for a later point?
 
-No hits for pl310, A9.
+I must admit, I never had a close look at the gory early start-up
+internals, so all of this is quite new to me. Of course, I plan to
+use both cores and therefore add SMP.
+
+> If there is shared code, it's probably best to have it in here. Otherwise
+> I don't care either way: We have precedent for fairly unrelated platforms
+> (ev2+shmobile, or the mach-bcm) being in the same directory for practical
+> reasons, and you can also create an almost empty directory now as we are
+> likely going to consolidate all "trivial" platforms in the future. Once
+> the l2x0 and clock init code as well as the early mapping has been
+> addressed, there won't be any platform code left.
+
+As Thomas already mentioned, Armada 1500 doesn't fit mach-mvebu exactly
+because it's from a different business unit within Marvell. And it is
+kind of different from what I expected, most notably register addresses
+are really different (see mvebu.S).
+
+We either put it into mach-mvebu and pretend to consolidate Marvell SoCs
+in there. Pro would be that it is close to other Armadas there, con is
+that Armada is codename for virtually any Marvell SoC lately.
+
+If we want a new mach- directory, I'd suggest either mach-berlin which
+looks like some nickname for 88de3xxx SoCs or simply boring
+mach-88de3xxx.
 
 Sebastian
