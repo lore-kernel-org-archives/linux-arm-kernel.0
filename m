@@ -1,36 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sun, 18 Aug 2013 14:03:39 +1000
-Subject: [GIT PULL 0/2] Renesas ARM based SoC boards cleanups for v3.12
-In-Reply-To: <20130814081242.GJ30577@quad.lixom.net>
-References: <cover.1375842006.git.horms+renesas@verge.net.au>
- <20130814081242.GJ30577@quad.lixom.net>
-Message-ID: <20130818040339.GE30709@verge.net.au>
+From: joe@perches.com (Joe Perches)
+Date: Sat, 17 Aug 2013 21:22:27 -0700
+Subject: [PATCH v2 02/14] crypto: omap-aes: Add useful debug macros
+In-Reply-To: <1376793755-30478-3-git-send-email-joelf@ti.com>
+References: <1376793755-30478-1-git-send-email-joelf@ti.com>
+ <1376793755-30478-3-git-send-email-joelf@ti.com>
+Message-ID: <1376799747.2027.11.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 01:12:42AM -0700, Olof Johansson wrote:
-> On Wed, Aug 07, 2013 at 01:36:37PM +0900, Simon Horman wrote:
-> > Hi Olof, Hi Arnd,
-> > 
-> > please consider these Renesas ARM based SoC boards cleanups for v3.12.
-> > 
-> > This pull-request is based on renesas-boards-for-v3.12,
-> > which I have previously sent a pull-request for.
-> > 
-> > I have separated these cleanups from those that I included
-> > in renesas-cleanup3-for-v3.12 as there are different dependencies
-> > involved and this approach seemed simpler somehow.
-> > 
-> > 
-> > The following changes since commit f79d68da510bf1b95beff4d556b78d06801f11dc:
-> > 
-> >   ARM: shmobile: ape6evm: add SDHI interfaces (2013-07-25 14:46:38 +0900)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards-cleanup-for-v3.12
+On Sat, 2013-08-17 at 21:42 -0500, Joel Fernandes wrote:
+> When DEBUG is enabled, these macros can be used to print variables in integer
+> and hex format, and clearly display which registers, offsets and values are
+> being read/written , including printing the names of the offsets and their values.
 > 
-> Pulled, thanks. FWIW, this could have been baked into boards2.
+> Note:
+> This patch results in a checkpatch error that cannot be fixed.
+> ERROR: Macros with multiple statements should be enclosed in a do - while loop
+> +#define omap_aes_read(dd, offset)                                      \
+> +       __raw_readl(dd->io_base + offset);                              \
+> +       pr_debug("omap_aes_read(" #offset ")\n");
+> 
+> Using do-while loop will break a lot of code such as:
+> ret = omap_aes_read(..);
 
-Thanks. To be honest I am rather unclear on when something should go in a
-cleanup branch and when it shouldn't.
+That's where you use a statement expression macro
+
+#define omap_aes_read(dd, offset)					\
+({									\
+	pr_debug("omap_aes_read("omap_aes_read(" #offset ")\n");	\
+	__raw_readl((dd)->iobase + offset);				\
+})
