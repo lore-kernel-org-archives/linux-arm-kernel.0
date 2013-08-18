@@ -1,44 +1,37 @@
-From: a.motakis@virtualopensystems.com (Antonios Motakis)
-Date: Sun, 18 Aug 2013 15:33:07 +0200
-Subject: [PATCH 2/2] iommu/exynos: Follow kernel coding style for
- __sysmmu_enable return type
-In-Reply-To: <20130816202151.b47fae1e9ed249d06baa37d1@samsung.com>
-References: <1374766502-14823-1-git-send-email-a.motakis@virtualopensystems.com>
- <1374766502-14823-2-git-send-email-a.motakis@virtualopensystems.com>
- <003101ce89ed$52317330$f6945990$@samsung.com>
- <20130814131547.GA5889@8bytes.org>
- <20130816202151.b47fae1e9ed249d06baa37d1@samsung.com>
-Message-ID: <CAG8rG2zf8CUu+1qRURRhvX8RsNx8CLXJU85qnsFjCvm0FYYuRg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 18 Aug 2013 21:48:04 +0800
+Subject: [GIT PULL 1/5] ARM: imx: weim bus driver update for 3.12
+Message-ID: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes, of course, I have no objections.
+The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
 
-On Fri, Aug 16, 2013 at 1:21 PM, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> On Wed, 14 Aug 2013 15:15:49 +0200, 'Joerg Roedel' wrote:
->> KyongHo,
->>
->> On Fri, Jul 26, 2013 at 07:46:01PM +0900, Cho KyongHo wrote:
->> > __sysmmu_enable() must return 1 if it is called with the same page table.
->> > I have fixed it exynos_iommu_attach_device() to always return zero on success
->> > in the next patchset which I will post today.
->> >
->> > Thank you.
->>
->> When you are fine with these patches please put them on-top of your
->> patch-set when you re-submit. I will take them from there then.
->>
->
-> Ok.
->
-> Antonios,
->
-> Would you mind
-> if I submit your 2 patches on top of my patches with your signed-off?
->
-> KyongHo.
->
->>
->>       Joerg
->>
->>
+  Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-weim-3.12
+
+for you to fetch changes up to 3f98b6baad63b181da4e859d81953e88ce8a50ec:
+
+  drivers: bus: imx-weim: Add support for i.MX1/21/25/27/31/35/50/51/53 (2013-08-16 12:59:44 +0800)
+
+----------------------------------------------------------------
+This is a patch series that updates imx-weim bus driver to have it
+support more i.MX SoCs.  Because there is no maintainer for
+drivers/bus so far, I'm forwarding it through IMX tree for 3.12 merge
+window.
+
+----------------------------------------------------------------
+Alexander Shiyan (5):
+      drivers: bus: imx-weim: Remove private driver data
+      drivers: bus: imx-weim: Simplify error path
+      drivers: bus: imx-weim: use module_platform_driver_probe()
+      drivers: bus: imx-weim: Add missing platform_driver.owner field
+      drivers: bus: imx-weim: Add support for i.MX1/21/25/27/31/35/50/51/53
+
+ Documentation/devicetree/bindings/bus/imx-weim.txt |   17 ++-
+ drivers/bus/Kconfig                                |    3 +-
+ drivers/bus/imx-weim.c                             |  129 +++++++++++---------
+ 3 files changed, 87 insertions(+), 62 deletions(-)
