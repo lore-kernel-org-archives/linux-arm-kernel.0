@@ -1,66 +1,72 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 19 Aug 2013 01:33:18 +0200
-Subject: [PATCH v4 5/6] clocksource: armada-370-xp: Fix device-tree binding
-In-Reply-To: <20130817164319.GA2772@localhost>
-References: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130815162751.GA2403@localhost> <520EB5BC.4060102@wwwdotorg.org>
- <1982398.OuHBuuDmYS@flatron> <520F6CA8.1090401@gmail.com>
- <20130817164319.GA2772@localhost>
-Message-ID: <521159BE.1020206@gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Mon, 19 Aug 2013 06:57:27 +0900
+Subject: [PATCH 13/34] cpufreq: exynos5440: set CPUFREQ_NO_NOTIFICATION
+ flag
+In-Reply-To: <CADGdYn6TKURuO8jxL=tjvSLbmpUoUwoa08MZhsBAiEF91FM-cA@mail.gmail.com>
+References: <cover.1376619363.git.viresh.kumar@linaro.org>
+ <14993d27bdc6a91eced0af5eb96bdb5ca6546cbf.1376619363.git.viresh.kumar@linaro.org>
+ <CADGdYn6TKURuO8jxL=tjvSLbmpUoUwoa08MZhsBAiEF91FM-cA@mail.gmail.com>
+Message-ID: <15ca01ce9c5d$ed957650$c8c062f0$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2013 06:43 PM, Ezequiel Garcia wrote:
-> On Sat, Aug 17, 2013 at 02:29:28PM +0200, Sebastian Hesselbarth wrote:
->
-> In fact: I'm not sure. I'm slightly inclined towards considering both
-> clocks as clock sources, just as Stephen and Tomasz are proposing.
->
->> But in the end, passing it by DT should be the way to go. I cannot look
->> into the XP datasheet, but I would guess that the exact feature of the
->> ip is not to use _the_ fixed 25MHz clock but XTAL as reference. Maybe
->> one of the free-electrons guys can look it up?
->>
->
-> No, the documentation has a register bit for "25Mhz frequency enable",
-> for each timer/watchdog.
->
-> ---
->
-> Anyway, I (almost) agree that the 25Mhz fixed clock must be somehow represented
-> in the device-tree, but I'm not exactly sure how. Gregory: maybe you can help
-> in this?
->
+amit daniel kachhap wrote:
+> 
+> On Fri, Aug 16, 2013 at 7:55 AM, Viresh Kumar <viresh.kumar@linaro.org>
+> wrote:
+> > Most of the drivers do following in their ->target_index() routines:
+> >
+> >         struct cpufreq_freqs freqs;
+> >         freqs.old = old freq...
+> >         freqs.new = new freq...
+> >
+> >         cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+> >
+> >         /* Change rate here */
+> >
+> >         cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+> >
+> > This is replicated over all cpufreq drivers today and there doesn't
+> exists a
+> > good enough reason why this shouldn't be moved to cpufreq core instead.
+> >
+> > Earlier patches have added support in cpufreq core to do cpufreq
+> notification on
+> > frequency change, but this drivers needs to do this notification itself
+> and so
+> > it sets its CPUFREQ_NO_NOTIFICATION flag.
+> >
+> > Cc: Kukjin Kim <kgene.kim@samsung.com>
 
-In armada-370-xp.dtsi add a 25MHz ref clock node and modify timer node
-to reference it:
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-cpus { ... };
+Thanks,
+Kukjin
 
-clocks {
-	ref25M: timer-clock {
-		compatible = "fixed-clock";
-		clock-frequency = <25000000>;
-	};
-}
-
-...
-
-internal-regs {
-	timer at 20300 {
-		compatible = "marvell,armada-370-xp-timer";
-		reg = <0x20300 0x30>, <0x21040 0x30>;
-		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
-		clocks = <&coreclk 2>, <&ref25M>;
-		clock-names = "fabric", "fixed";
-	};
-};
-
-Then use of_clk_get_by_name(np, "fabric") and of_clk_get_by_name(np,
-"fixed") respectively. Clock select strategy should be, (a) fail if
-no clock, (b) use fabric/fixed if just one clock, (c) use fixed if
-both clocks.
-
-Does that answer your questions? :)
-
-Sebastian
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> The code change looks fine,
+> Acked-By: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> 
+> Thanks
+> Amit Daniel
+> > ---
+> >  drivers/cpufreq/exynos5440-cpufreq.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/cpufreq/exynos5440-cpufreq.c
+> b/drivers/cpufreq/exynos5440-cpufreq.c
+> > index 91a64d6..8fb6183 100644
+> > --- a/drivers/cpufreq/exynos5440-cpufreq.c
+> > +++ b/drivers/cpufreq/exynos5440-cpufreq.c
+> > @@ -323,7 +323,7 @@ static int exynos_cpufreq_cpu_init(struct
+> cpufreq_policy *policy)
+> >  }
+> >
+> >  static struct cpufreq_driver exynos_driver = {
+> > -       .flags          = CPUFREQ_STICKY,
+> > +       .flags          = CPUFREQ_STICKY | CPUFREQ_NO_NOTIFICATION,
+> >         .verify         = cpufreq_generic_frequency_table_verify,
+> >         .target_index   = exynos_target,
+> >         .get            = exynos_getspeed,
+> > --
+> > 1.7.12.rc2.18.g61b472e
