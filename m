@@ -1,38 +1,38 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Sun, 18 Aug 2013 12:22:50 -0400
-Subject: [PATCH] arm64: add screen_info for console support
-Message-ID: <1376842970.11104.11.camel@t520.redhat.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 18 Aug 2013 18:34:21 +0200
+Subject: [RFC v1 0/5] ARM: Initial support for Marvell Armada 1500
+In-Reply-To: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130818183421.724eb404@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 port doesn't provide a screen_info struct for console support
-which leads to a build failure with some configurations:
+Dear Sebastian Hesselbarth,
 
-  drivers/video/console/vgacon.c:820: undefined reference to `screen_info'
+On Fri, 16 Aug 2013 21:41:33 +0200, Sebastian Hesselbarth wrote:
+> This is a RFC adding initial support for the Marvell Armada 1500
+> (88DE3100) found on various consumer devices (Chromecast, GoogleTV).
 
-This patch adds an empty declaration of screen_info to fix the build
-problem. Some additional runtime code is needed to actually make it
-useful.
+Nice!
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- arch/arm64/kernel/setup.c | 4 ++++
- 1 file changed, 4 insertions(+)
+> Actually, it is a two-fold RFC also raising discussions on mach-mvebu
+> cleanup roadmap to allow other SoCs to hop into it. While mach-mvebu
+> originally was created to add support for Armada 370/XP and merge
+> existing Marvell Orion familiy into it, I am not so sure about
+> Armada 1500 fits that well (the mbus has gone!).
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index add6ea6..eb9f93a 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -64,6 +64,10 @@ static const char *cpu_name;
- static const char *machine_name;
- phys_addr_t __fdt_pointer __initdata;
- 
-+#if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)                                               
-+struct screen_info screen_info;                                                                                
-+#endif                                                                                                         
-+
- /*
-  * Standard memory resources
-  */
+Technically speaking, the Armada 1500 is not designed by the EBU
+division of Marvell (that does the Orion, Kirkwood, Armada 370/XP SOCs),
+so having it under mach-mvebu may sound a little bit strange. However,
+I don't yet have a clear vision of how much different the platform code
+will be, especially since the platform code tends to get smaller and
+smaller due to the move of lots of code to drivers/.
+
+Best regards,
+
+Thomas
 -- 
-1.8.1.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
