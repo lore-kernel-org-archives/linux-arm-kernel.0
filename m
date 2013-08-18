@@ -1,109 +1,60 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Sun, 18 Aug 2013 00:56:11 -0500
-Subject: [PATCH v2 02/14] crypto: omap-aes: Add useful debug macros
-In-Reply-To: <1376799747.2027.11.camel@joe-AO722>
-References: <1376793755-30478-1-git-send-email-joelf@ti.com>
- <1376793755-30478-3-git-send-email-joelf@ti.com>
- <1376799747.2027.11.camel@joe-AO722>
-Message-ID: <521061FB.2030504@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 18 Aug 2013 14:02:07 +0800
+Subject: [PATCH v2] ARM: i.MX6Q clocks: Fix CKIH clock name
+In-Reply-To: <1376720153-19659-1-git-send-email-shc_work@mail.ru>
+References: <1376720153-19659-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20130818060205.GC1545@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2013 11:22 PM, Joe Perches wrote:
-> On Sat, 2013-08-17 at 21:42 -0500, Joel Fernandes wrote:
->> When DEBUG is enabled, these macros can be used to print variables in integer
->> and hex format, and clearly display which registers, offsets and values are
->> being read/written , including printing the names of the offsets and their values.
->>
->> Note:
->> This patch results in a checkpatch error that cannot be fixed.
->> ERROR: Macros with multiple statements should be enclosed in a do - while loop
->> +#define omap_aes_read(dd, offset)                                      \
->> +       __raw_readl(dd->io_base + offset);                              \
->> +       pr_debug("omap_aes_read(" #offset ")\n");
->>
->> Using do-while loop will break a lot of code such as:
->> ret = omap_aes_read(..);
+On Sat, Aug 17, 2013 at 10:15:53AM +0400, Alexander Shiyan wrote:
+> i.MX6Q have only one High-frequency reference clock (CKIH).
+> Patch removes index from CKIH and makes name according datasheet.
+> This is just a cosmetic fix and since this clock currently is not
+> used by any DTS, change should be safe.
 > 
-> That's where you use a statement expression macro
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/boot/dts/imx6qdl.dtsi | 4 ++--
+>  arch/arm/mach-imx/clk-imx6q.c  | 2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> #define omap_aes_read(dd, offset)					\
-> ({									\
-> 	pr_debug("omap_aes_read("omap_aes_read(" #offset ")\n");	\
-> 	__raw_readl((dd)->iobase + offset);				\
-> })
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index ccd55c2..d8a2f5fd 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -54,8 +54,8 @@
+>  			clock-frequency = <32768>;
+>  		};
+>  
+> -		ckih1 {
+> -			compatible = "fsl,imx-ckih1", "fixed-clock";
+> +		ckih {
+> +			compatible = "fsl,imx-ckih", "fixed-clock";
+>  			clock-frequency = <0>;
+>  		};
+>  
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index 9181a24..8f2a8b5 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -292,7 +292,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+>  
+>  	clk[dummy] = imx_clk_fixed("dummy", 0);
+>  	clk[ckil] = imx_obtain_fixed_clock("ckil", 0);
+> -	clk[ckih] = imx_obtain_fixed_clock("ckih1", 0);
+> +	clk[ckih] = imx_obtain_fixed_clock("ckih", 0);
+
+We're entering a stage where we need to consider the device tree
+compatibility.  Since imx_obtain_fixed_clock() will try to look
+for the node using full path, the change will break the support for
+existing device tree.
+
+Shawn
+
+>  	clk[osc] = imx_obtain_fixed_clock("osc", 0);
+>  
+>  	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
+> -- 
+> 1.8.1.5
 > 
-
-That made things a lot simpler, thanks. Re-spinning just this patch as below:
-
---->8---
-
-From: Joel Fernandes <joelf@ti.com>
-Subject: [PATCH] crypto: omap-aes: Add useful debug macros
-
-When DEBUG is enabled, these macros can be used to print variables in integer
-and hex format, and clearly display which registers, offsets and values are
-being read/written , including printing the names of the offsets and their values.
-
-Using statement expression macros in read path as,
-Suggested-by: Joe Perches <joe@perches.com>
-
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
- drivers/crypto/omap-aes.c |   24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index ee15b0f..e26d4d4 100644
---- a/drivers/crypto/omap-aes.c
-+++ b/drivers/crypto/omap-aes.c
-@@ -13,7 +13,9 @@
-  *
-  */
-
--#define pr_fmt(fmt) "%s: " fmt, __func__
-+#define pr_fmt(fmt) "%20s: " fmt, __func__
-+#define prn(num) pr_debug(#num "=%d\n", num)
-+#define prx(num) pr_debug(#num "=%x\n", num)
-
- #include <linux/err.h>
- #include <linux/module.h>
-@@ -172,16 +174,36 @@ struct omap_aes_dev {
- static LIST_HEAD(dev_list);
- static DEFINE_SPINLOCK(list_lock);
-
-+#ifdef DEBUG
-+#define omap_aes_read(dd, offset)				\
-+({								\
-+	int _read_ret;						\
-+	_read_ret = __raw_readl(dd->io_base + offset);		\
-+	pr_debug("omap_aes_read(" #offset "=%#x)= %#x\n",	\
-+		 offset, _read_ret);				\
-+	_read_ret;						\
-+})
-+#else
- static inline u32 omap_aes_read(struct omap_aes_dev *dd, u32 offset)
- {
- 	return __raw_readl(dd->io_base + offset);
- }
-+#endif
-
-+#ifdef DEBUG
-+#define omap_aes_write(dd, offset, value)				\
-+	do {								\
-+		pr_debug("omap_aes_write(" #offset "=%#x) value=%#x\n",	\
-+			 offset, value);				\
-+		__raw_writel(value, dd->io_base + offset);		\
-+	} while (0)
-+#else
- static inline void omap_aes_write(struct omap_aes_dev *dd, u32 offset,
- 				  u32 value)
- {
- 	__raw_writel(value, dd->io_base + offset);
- }
-+#endif
-
- static inline void omap_aes_write_mask(struct omap_aes_dev *dd, u32 offset,
- 					u32 value, u32 mask)
--- 
-1.7.9.5
