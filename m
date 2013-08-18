@@ -1,63 +1,66 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 19 Aug 2013 01:21:19 +0200
-Subject: [RFC v1 0/5] ARM: Initial support for Marvell Armada 1500
-In-Reply-To: <201308172132.59402.arnd@arndb.de>
-References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <201308172132.59402.arnd@arndb.de>
-Message-ID: <521156EF.3090201@gmail.com>
+Date: Mon, 19 Aug 2013 01:33:18 +0200
+Subject: [PATCH v4 5/6] clocksource: armada-370-xp: Fix device-tree binding
+In-Reply-To: <20130817164319.GA2772@localhost>
+References: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130815162751.GA2403@localhost> <520EB5BC.4060102@wwwdotorg.org>
+ <1982398.OuHBuuDmYS@flatron> <520F6CA8.1090401@gmail.com>
+ <20130817164319.GA2772@localhost>
+Message-ID: <521159BE.1020206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2013 09:32 PM, Arnd Bergmann wrote:
-> On Friday 16 August 2013, Sebastian Hesselbarth wrote:
->> This is a RFC adding initial support for the Marvell Armada 1500
->> (88DE3100) found on various consumer devices (Chromecast, GoogleTV).
->>
->> Actually, it is a two-fold RFC also raising discussions on mach-mvebu
->> cleanup roadmap to allow other SoCs to hop into it. While mach-mvebu
->> originally was created to add support for Armada 370/XP and merge
->> existing Marvell Orion familiy into it, I am not so sure about
->> Armada 1500 fits that well (the mbus has gone!).
->>
->> If you are brave enough to try this on any GoogleTV, hit Google for
->> instructions on how to get a unlocked u-boot and void your warranty :)
->> The patches are based on v3.11-rc5 directly.
->>
->> This cover letter and the separate patches have also been Cc'd to the
->> respective maintainers to clear up some questions before posting a real
->> patch set.
+On 08/17/2013 06:43 PM, Ezequiel Garcia wrote:
+> On Sat, Aug 17, 2013 at 02:29:28PM +0200, Sebastian Hesselbarth wrote:
 >
-> Great stuff!
+> In fact: I'm not sure. I'm slightly inclined towards considering both
+> clocks as clock sources, just as Stephen and Tomasz are proposing.
+>
+>> But in the end, passing it by DT should be the way to go. I cannot look
+>> into the XP datasheet, but I would guess that the exact feature of the
+>> ip is not to use _the_ fixed 25MHz clock but XTAL as reference. Maybe
+>> one of the free-electrons guys can look it up?
+>>
+>
+> No, the documentation has a register bit for "25Mhz frequency enable",
+> for each timer/watchdog.
+>
+> ---
+>
+> Anyway, I (almost) agree that the 25Mhz fixed clock must be somehow represented
+> in the device-tree, but I'm not exactly sure how. Gregory: maybe you can help
+> in this?
+>
 
-Thanks! I thought you'd be interested in this, so I Cc'd you :)
+In armada-370-xp.dtsi add a 25MHz ref clock node and modify timer node
+to reference it:
 
-> Regarding the question about the directory, is there going to be any
-> shared code with the files present in mach-mvebu, e.g. the SMP support
-> that I assume is planned for a later point?
+cpus { ... };
 
-I must admit, I never had a close look at the gory early start-up
-internals, so all of this is quite new to me. Of course, I plan to
-use both cores and therefore add SMP.
+clocks {
+	ref25M: timer-clock {
+		compatible = "fixed-clock";
+		clock-frequency = <25000000>;
+	};
+}
 
-> If there is shared code, it's probably best to have it in here. Otherwise
-> I don't care either way: We have precedent for fairly unrelated platforms
-> (ev2+shmobile, or the mach-bcm) being in the same directory for practical
-> reasons, and you can also create an almost empty directory now as we are
-> likely going to consolidate all "trivial" platforms in the future. Once
-> the l2x0 and clock init code as well as the early mapping has been
-> addressed, there won't be any platform code left.
+...
 
-As Thomas already mentioned, Armada 1500 doesn't fit mach-mvebu exactly
-because it's from a different business unit within Marvell. And it is
-kind of different from what I expected, most notably register addresses
-are really different (see mvebu.S).
+internal-regs {
+	timer at 20300 {
+		compatible = "marvell,armada-370-xp-timer";
+		reg = <0x20300 0x30>, <0x21040 0x30>;
+		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
+		clocks = <&coreclk 2>, <&ref25M>;
+		clock-names = "fabric", "fixed";
+	};
+};
 
-We either put it into mach-mvebu and pretend to consolidate Marvell SoCs
-in there. Pro would be that it is close to other Armadas there, con is
-that Armada is codename for virtually any Marvell SoC lately.
+Then use of_clk_get_by_name(np, "fabric") and of_clk_get_by_name(np,
+"fixed") respectively. Clock select strategy should be, (a) fail if
+no clock, (b) use fabric/fixed if just one clock, (c) use fixed if
+both clocks.
 
-If we want a new mach- directory, I'd suggest either mach-berlin which
-looks like some nickname for 88de3xxx SoCs or simply boring
-mach-88de3xxx.
+Does that answer your questions? :)
 
 Sebastian
