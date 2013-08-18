@@ -1,35 +1,63 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 17 Aug 2013 19:12:28 -0500
-Subject: [PATCH v2] ARM: highbank: fix debug uart virtual address for LPAE
-Message-ID: <1376784748-31914-1-git-send-email-robherring2@gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Sat, 17 Aug 2013 21:42:22 -0500
+Subject: [PATCH v2 01/14] crypto: scatterwalk: Add support for calculating
+ number of SG elements
+In-Reply-To: <1376793755-30478-1-git-send-email-joelf@ti.com>
+References: <1376793755-30478-1-git-send-email-joelf@ti.com>
+Message-ID: <1376793755-30478-2-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Crypto layer only passes nbytes to encrypt but in omap-aes driver we need to
+know number of SG elements to pass to dmaengine slave API.  We add function for
+the same to scatterwalk library.
 
-Section entries are 2MB on LPAE, so the DEBUG_LL virtual address must
-have the same offset in the 2MB section as the physical address. This
-fixes async external aborts when DEBUG_LL is enabled on Midway.
-
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
-v2: Rebase on Russell's DEBUG_LL clean-up
+ crypto/scatterwalk.c         |   22 ++++++++++++++++++++++
+ include/crypto/scatterwalk.h |    2 ++
+ 2 files changed, 24 insertions(+)
 
- arch/arm/Kconfig.debug | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 2d57da3..2a88a4d 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1005,7 +1005,7 @@ config DEBUG_UART_VIRT
- 	default 0xfee003f8 if FOOTBRIDGE
- 	default 0xfee08300 if DEBUG_DAVINCI_TNETV107X_UART1
- 	default 0xfee20000 if DEBUG_NSPIRE_CLASSIC_UART || DEBUG_NSPIRE_CX_UART
--	default 0xfee36000 if DEBUG_HIGHBANK_UART
-+	default 0xfef36000 if DEBUG_HIGHBANK_UART
- 	default 0xfee82340 if ARCH_IOP13XX
- 	default 0xfef00000 if ARCH_IXP4XX && !CPU_BIG_ENDIAN
- 	default 0xfef00003 if ARCH_IXP4XX && CPU_BIG_ENDIAN
+diff --git a/crypto/scatterwalk.c b/crypto/scatterwalk.c
+index 7281b8a..79ca227 100644
+--- a/crypto/scatterwalk.c
++++ b/crypto/scatterwalk.c
+@@ -124,3 +124,25 @@ void scatterwalk_map_and_copy(void *buf, struct scatterlist *sg,
+ 	scatterwalk_done(&walk, out, 0);
+ }
+ EXPORT_SYMBOL_GPL(scatterwalk_map_and_copy);
++
++int scatterwalk_bytes_sglen(struct scatterlist *sg, int num_bytes)
++{
++	int offset = 0, n = 0;
++
++	/* num_bytes is too small */
++	if (num_bytes < sg->length)
++		return -1;
++
++	do {
++		offset += sg->length;
++		n++;
++		sg = scatterwalk_sg_next(sg);
++
++		/* num_bytes is too large */
++		if (unlikely(!sg && (num_bytes < offset)))
++			return -1;
++	} while (sg && (num_bytes > offset));
++
++	return n;
++}
++EXPORT_SYMBOL_GPL(scatterwalk_bytes_sglen);
+diff --git a/include/crypto/scatterwalk.h b/include/crypto/scatterwalk.h
+index 3744d2a..13621cc 100644
+--- a/include/crypto/scatterwalk.h
++++ b/include/crypto/scatterwalk.h
+@@ -113,4 +113,6 @@ void scatterwalk_done(struct scatter_walk *walk, int out, int more);
+ void scatterwalk_map_and_copy(void *buf, struct scatterlist *sg,
+ 			      unsigned int start, unsigned int nbytes, int out);
+ 
++int scatterwalk_bytes_sglen(struct scatterlist *sg, int num_bytes);
++
+ #endif  /* _CRYPTO_SCATTERWALK_H */
 -- 
-1.8.1.2
+1.7.9.5
