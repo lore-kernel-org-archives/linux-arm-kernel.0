@@ -1,37 +1,35 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 18 Aug 2013 14:35:17 -0500
-Subject: [PATCH 1/2] ARM: move outer_cache declaration out of ifdef
-Message-ID: <1376854518-22596-1-git-send-email-robherring2@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 19 Aug 2013 04:54:06 +0900
+Subject: [PATCH 3/4] ARM: dts: Correct the /include entry on exynos5420
+ dtsi file
+In-Reply-To: <1373458313-18970-4-git-send-email-padma.v@samsung.com>
+References: <1373458313-18970-1-git-send-email-padma.v@samsung.com>
+ <1373458313-18970-4-git-send-email-padma.v@samsung.com>
+Message-ID: <5211265E.7030808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On 07/10/13 21:11, Padmavathi Venna wrote:
+> This patch corrects the /include to #include on exynos5420
+>
+> Signed-off-by: Padmavathi Venna<padma.v@samsung.com>
+> ---
+>   arch/arm/boot/dts/exynos5420.dtsi |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index 8c54c4b..da55160 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -14,7 +14,7 @@
+>    */
+>
+>   #include "exynos5.dtsi"
+> -/include/ "exynos5420-pinctrl.dtsi"
+> +#include "exynos5420-pinctrl.dtsi"
+>   / {
+>   	compatible = "samsung,exynos5420";
+>
+Applied, thanks.
 
-Move the outer_cache declaration of the CONFIG_OUTER_CACHE ifdef so that
-outer_cache can be used inside IS_ENABLED condition.
-
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
- arch/arm/include/asm/outercache.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index 12f71a1..f94784f 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -37,10 +37,10 @@ struct outer_cache_fns {
- 	void (*resume)(void);
- };
- 
--#ifdef CONFIG_OUTER_CACHE
--
- extern struct outer_cache_fns outer_cache;
- 
-+#ifdef CONFIG_OUTER_CACHE
-+
- static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
- {
- 	if (outer_cache.inv_range)
--- 
-1.8.1.2
+- Kukjin
