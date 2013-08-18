@@ -1,35 +1,67 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 18 Aug 2013 22:25:15 +0200
-Subject: [PATCH] arm64: wire in generic parport.h
-In-Reply-To: <1376841688.11104.8.camel@t520.redhat.com>
-References: <1376841688.11104.8.camel@t520.redhat.com>
-Message-ID: <CAMuHMdXfXAaNeCAhmxTQb007Um7AjqRdF2=85t1Po_63T7XT5w@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 19 Aug 2013 01:01:54 +0200
+Subject: [RFC v1 5/5] ARM: mvebu: add board init for Armada 1500
+In-Reply-To: <201308172108.38824.arnd@arndb.de>
+References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376682098-10580-6-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130816204831.GX13964@titan.lakedaemon.net>
+ <201308172108.38824.arnd@arndb.de>
+Message-ID: <52115262.70402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 18, 2013 at 6:01 PM, Mark Salter <msalter@redhat.com> wrote:
-> The arm64 port doesn't provide a parport.h which causes a build failure
-> with some configurations:
+On 08/17/2013 09:08 PM, Arnd Bergmann wrote:
+> On Friday 16 August 2013, Jason Cooper wrote:
+>>> +
+>>> +#define ARMADA_1500_REG_BASE_VIRT	0xf6000000
+>>> +#define ARMADA_1500_REG_BASE_SIZE	0x03000000
+>>> +
+>>> +static struct map_desc armada_1500_io_desc[] __initdata = {
+>>> +	{
+>>> +		.virtual	= ARMADA_1500_REG_BASE_VIRT,
+>>> +		.pfn		= __phys_to_pfn(ARMADA_1500_REG_BASE_VIRT),
+>>> +		.length		= ARMADA_1500_REG_BASE_SIZE,
+>>> +		.type		= MT_DEVICE,
+>>> +	},
+>>> +};
 >
->   drivers/parport/parport_pc.c:67:25: fatal error: asm/parport.h: No such file or directory
->    #include <asm/parport.h>
+> You should really try to find out what driver uses this. If you have a requirement
+> that VIRT == PHYS here, the most likely explanation is that some driver accidentally
+> uses readl/writel on the physical address rather than on the result of ioremap.
 >
-> This patch wires in the generic parport.h for arm64.
+> You can try shrinking the area using bisection until you have found the offending
+> driver based on the address.
 
-Can arm64 have a PC-style parport?
+While bringing up timer and irq, I had no luck without that mapping,
+but I didn't try without later on. There is no driver requiring it,
+as I either only use mainline drivers that never knew about A1500
+before, or I have written it on my own (dw-apb-ictl).
 
-If not, you're better off disabling it in drivers/parport/Kconfig.
+I don't think it is required and will try to remove it, now that I
+know I have set up core stuff correctly and it boots.
 
-You will receive bonus points for introducing ARCH_MAY_HAVE_PC_PARPORT,
-cfr. ARCH_MAY_HAVE_PC_FDC.
+>>> +static void __init armada_1500_timer_and_clk_init(void)
+>>> +{
+>>> +	of_clk_init(NULL);
+>>> +	clocksource_of_init();
+>>> +}
+>>> +
+>>> +static void __init armada_1500_dt_init(void)
+>>> +{
+>>> +	l2x0_of_init(0x70c00000, 0xfeffffff);
+>
+> New platforms should call this as 'l2x0_of_init(0, 0);' and get the bits from DT.
 
-Gr{oetje,eeting}s,
+Ok.
 
-                        Geert
+> Note that we should really change the common code to do both the of_clk_init()
+> and the l2x0_of_init() automatically, but that needs to be done with some care,
+> in order to not break any of the existing platforms. Would you be able to do
+> one of the two? We can then get the next person that wants to add a platform
+> to do the last one ;-)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Scary but that reduces armada-1500.c to MACH descriptor and DT
+compatible only ;) I don't expect any weird hacks required for
+it anyway.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Sebastian
