@@ -1,63 +1,44 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Sun, 18 Aug 2013 16:24:00 +0530
-Subject: [PATCH 13/34] cpufreq: exynos5440: set CPUFREQ_NO_NOTIFICATION
- flag
-In-Reply-To: <14993d27bdc6a91eced0af5eb96bdb5ca6546cbf.1376619363.git.viresh.kumar@linaro.org>
-References: <cover.1376619363.git.viresh.kumar@linaro.org>
- <14993d27bdc6a91eced0af5eb96bdb5ca6546cbf.1376619363.git.viresh.kumar@linaro.org>
-Message-ID: <CADGdYn6TKURuO8jxL=tjvSLbmpUoUwoa08MZhsBAiEF91FM-cA@mail.gmail.com>
+From: a.motakis@virtualopensystems.com (Antonios Motakis)
+Date: Sun, 18 Aug 2013 15:33:07 +0200
+Subject: [PATCH 2/2] iommu/exynos: Follow kernel coding style for
+ __sysmmu_enable return type
+In-Reply-To: <20130816202151.b47fae1e9ed249d06baa37d1@samsung.com>
+References: <1374766502-14823-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1374766502-14823-2-git-send-email-a.motakis@virtualopensystems.com>
+ <003101ce89ed$52317330$f6945990$@samsung.com>
+ <20130814131547.GA5889@8bytes.org>
+ <20130816202151.b47fae1e9ed249d06baa37d1@samsung.com>
+Message-ID: <CAG8rG2zf8CUu+1qRURRhvX8RsNx8CLXJU85qnsFjCvm0FYYuRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 7:55 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Most of the drivers do following in their ->target_index() routines:
->
->         struct cpufreq_freqs freqs;
->         freqs.old = old freq...
->         freqs.new = new freq...
->
->         cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
->
->         /* Change rate here */
->
->         cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
->
-> This is replicated over all cpufreq drivers today and there doesn't exists a
-> good enough reason why this shouldn't be moved to cpufreq core instead.
->
-> Earlier patches have added support in cpufreq core to do cpufreq notification on
-> frequency change, but this drivers needs to do this notification itself and so
-> it sets its CPUFREQ_NO_NOTIFICATION flag.
->
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-The code change looks fine,
-Acked-By: Amit Daniel Kachhap <amit.daniel@samsung.com>
+Yes, of course, I have no objections.
 
-Thanks
-Amit Daniel
-> ---
->  drivers/cpufreq/exynos5440-cpufreq.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Fri, Aug 16, 2013 at 1:21 PM, Cho KyongHo <pullip.cho@samsung.com> wrote:
+> On Wed, 14 Aug 2013 15:15:49 +0200, 'Joerg Roedel' wrote:
+>> KyongHo,
+>>
+>> On Fri, Jul 26, 2013 at 07:46:01PM +0900, Cho KyongHo wrote:
+>> > __sysmmu_enable() must return 1 if it is called with the same page table.
+>> > I have fixed it exynos_iommu_attach_device() to always return zero on success
+>> > in the next patchset which I will post today.
+>> >
+>> > Thank you.
+>>
+>> When you are fine with these patches please put them on-top of your
+>> patch-set when you re-submit. I will take them from there then.
+>>
 >
-> diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
-> index 91a64d6..8fb6183 100644
-> --- a/drivers/cpufreq/exynos5440-cpufreq.c
-> +++ b/drivers/cpufreq/exynos5440-cpufreq.c
-> @@ -323,7 +323,7 @@ static int exynos_cpufreq_cpu_init(struct cpufreq_policy *policy)
->  }
+> Ok.
 >
->  static struct cpufreq_driver exynos_driver = {
-> -       .flags          = CPUFREQ_STICKY,
-> +       .flags          = CPUFREQ_STICKY | CPUFREQ_NO_NOTIFICATION,
->         .verify         = cpufreq_generic_frequency_table_verify,
->         .target_index   = exynos_target,
->         .get            = exynos_getspeed,
-> --
-> 1.7.12.rc2.18.g61b472e
+> Antonios,
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Would you mind
+> if I submit your 2 patches on top of my patches with your signed-off?
+>
+> KyongHo.
+>
+>>
+>>       Joerg
+>>
+>>
