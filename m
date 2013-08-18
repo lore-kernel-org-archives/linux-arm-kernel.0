@@ -1,38 +1,52 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 18 Aug 2013 18:34:21 +0200
-Subject: [RFC v1 0/5] ARM: Initial support for Marvell Armada 1500
-In-Reply-To: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130818183421.724eb404@skate>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sun, 18 Aug 2013 22:25:13 +0530
+Subject: [PATCH v5 1/2] ARM: davinci: da850: add DT node for ethernet
+In-Reply-To: <520E7377.1080808@cogentembedded.com>
+References: <1376662262-21795-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1376662262-21795-2-git-send-email-prabhakar.csengg@gmail.com>
+ <520E7377.1080808@cogentembedded.com>
+Message-ID: <5210FC71.3010600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian Hesselbarth,
+On 8/17/2013 12:16 AM, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 08/16/2013 06:11 PM, Lad, Prabhakar wrote:
+> 
+>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+> 
+>> Add ethernet device tree node information and pinmux for mii to da850 by
+>> providing interrupt details and local mac address.
+> 
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>> ---
+>>   arch/arm/boot/dts/da850-evm.dts |    5 +++++
+>>   arch/arm/boot/dts/da850.dtsi    |   30 ++++++++++++++++++++++++++++++
+>>   2 files changed, 35 insertions(+)
+> 
+>> diff --git a/arch/arm/boot/dts/da850-evm.dts
+>> b/arch/arm/boot/dts/da850-evm.dts
+>> index 1f8cfdd..44f3fbc 100644
+>> --- a/arch/arm/boot/dts/da850-evm.dts
+>> +++ b/arch/arm/boot/dts/da850-evm.dts
+>> @@ -96,6 +96,11 @@
+>>               pinctrl-0 = <&mdio_pins>;
+>>               bus_freq = <2200000>;
+>>           };
+>> +        ethernet: emac at 1e20000 {
+> 
+>    Why label the node in the board file too?
 
-On Fri, 16 Aug 2013 21:41:33 +0200, Sebastian Hesselbarth wrote:
-> This is a RFC adding initial support for the Marvell Armada 1500
-> (88DE3100) found on various consumer devices (Chromecast, GoogleTV).
+May be not required, but all other entries in da850-evm.dts have labels
+too. Other .dts files like am335x-bone.dts use labels too (even though
+they are never used in references). So I am inclined to let this be like
+this and if needed have all the labels removed through a separate patch
+- at least we remain consistent within the file that way.
 
-Nice!
+Prabhakar,
 
-> Actually, it is a two-fold RFC also raising discussions on mach-mvebu
-> cleanup roadmap to allow other SoCs to hop into it. While mach-mvebu
-> originally was created to add support for Armada 370/XP and merge
-> existing Marvell Orion familiy into it, I am not so sure about
-> Armada 1500 fits that well (the mbus has gone!).
+Please mind the new e-mail address of the devicetree list.
 
-Technically speaking, the Armada 1500 is not designed by the EBU
-division of Marvell (that does the Orion, Kirkwood, Armada 370/XP SOCs),
-so having it under mach-mvebu may sound a little bit strange. However,
-I don't yet have a clear vision of how much different the platform code
-will be, especially since the platform code tends to get smaller and
-smaller due to the move of lots of code to drivers/.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks,
+Sekhar
