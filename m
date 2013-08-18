@@ -1,150 +1,48 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Sat, 17 Aug 2013 21:42:29 -0500
-Subject: [PATCH v2 08/14] crypto: omap-aes: PIO mode: Add IRQ handler and walk
- SGs
+Date: Sat, 17 Aug 2013 21:42:33 -0500
+Subject: [PATCH v2 12/14] crypto: omap-aes: Convert kzalloc to devm_kzalloc
 In-Reply-To: <1376793755-30478-1-git-send-email-joelf@ti.com>
 References: <1376793755-30478-1-git-send-email-joelf@ti.com>
-Message-ID: <1376793755-30478-9-git-send-email-joelf@ti.com>
+Message-ID: <1376793755-30478-13-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We add an IRQ handler that implements a state-machine for PIO-mode and data
-structures for walking the scatter-gather list. The IRQ handler is called in
-succession both when data is available to read or next data can be sent for
-processing. This process continues till the entire in/out SG lists have been
-walked. Once the SG-list has been completely walked, the IRQ handler schedules
-the done_task tasklet.
-
-Also add a useful macro that is used through out the IRQ code for a common
-pattern of calculating how much an SG list has been walked.  This improves code
-readability and avoids checkpatch errors.
+Use devm_kzalloc instead of kzalloc. With this change, there is no need to
+call kfree in error/exit paths.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/crypto/omap-aes.c |   90 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 90 insertions(+)
+ drivers/crypto/omap-aes.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index 9a964e8..889dc99 100644
+index cbeaaf4..6a4ac4a 100644
 --- a/drivers/crypto/omap-aes.c
 +++ b/drivers/crypto/omap-aes.c
-@@ -39,6 +39,8 @@
- #define DST_MAXBURST			4
- #define DMA_MIN				(DST_MAXBURST * sizeof(u32))
+@@ -1147,7 +1147,7 @@ static int omap_aes_probe(struct platform_device *pdev)
+ 	int err = -ENOMEM, i, j, irq = -1;
+ 	u32 reg;
  
-+#define _calc_walked(inout) (dd->inout##_walk.offset - dd->inout##_sg->offset)
-+
- /* OMAP TRM gives bitfields as start:end, where start is the higher bit
-    number. For example 7:0 */
- #define FLD_MASK(start, end)	(((1 << ((start) - (end) + 1)) - 1) << (end))
-@@ -91,6 +93,8 @@
- #define FLAGS_FAST		BIT(5)
- #define FLAGS_BUSY		BIT(6)
+-	dd = kzalloc(sizeof(struct omap_aes_dev), GFP_KERNEL);
++	dd = devm_kzalloc(dev, sizeof(struct omap_aes_dev), GFP_KERNEL);
+ 	if (dd == NULL) {
+ 		dev_err(dev, "unable to alloc data struct.\n");
+ 		goto err_data;
+@@ -1241,7 +1241,6 @@ err_irq:
+ 	tasklet_kill(&dd->queue_task);
+ 	pm_runtime_disable(dev);
+ err_res:
+-	kfree(dd);
+ 	dd = NULL;
+ err_data:
+ 	dev_err(dev, "initialization failed.\n");
+@@ -1269,7 +1268,6 @@ static int omap_aes_remove(struct platform_device *pdev)
+ 	tasklet_kill(&dd->queue_task);
+ 	omap_aes_dma_cleanup(dd);
+ 	pm_runtime_disable(dd->dev);
+-	kfree(dd);
+ 	dd = NULL;
  
-+#define AES_BLOCK_WORDS		(AES_BLOCK_SIZE >> 2)
-+
- struct omap_aes_ctx {
- 	struct omap_aes_dev *dd;
- 
-@@ -156,6 +160,8 @@ struct omap_aes_dev {
- 	size_t				total;
- 	struct scatterlist		*in_sg;
- 	struct scatterlist		*out_sg;
-+	struct scatter_walk		in_walk;
-+	struct scatter_walk		out_walk;
- 	int			dma_in;
- 	struct dma_chan		*dma_lch_in;
- 	int			dma_out;
-@@ -852,6 +858,90 @@ static const struct omap_aes_pdata omap_aes_pdata_omap4 = {
- 	.minor_shift	= 0,
- };
- 
-+static irqreturn_t omap_aes_irq(int irq, void *dev_id)
-+{
-+	struct omap_aes_dev *dd = dev_id;
-+	u32 status, i;
-+	u32 *src, *dst;
-+
-+	status = omap_aes_read(dd, AES_REG_IRQ_STATUS(dd));
-+	if (status & AES_REG_IRQ_DATA_IN) {
-+		omap_aes_write(dd, AES_REG_IRQ_ENABLE(dd), 0x0);
-+
-+		BUG_ON(!dd->in_sg);
-+
-+		BUG_ON(_calc_walked(in) > dd->in_sg->length);
-+
-+		src = sg_virt(dd->in_sg) + _calc_walked(in);
-+
-+		for (i = 0; i < AES_BLOCK_WORDS; i++) {
-+			omap_aes_write(dd, AES_REG_DATA_N(dd, i), *src);
-+
-+			scatterwalk_advance(&dd->in_walk, 4);
-+			if (dd->in_sg->length == _calc_walked(in)) {
-+				dd->in_sg = scatterwalk_sg_next(dd->in_sg);
-+				if (dd->in_sg) {
-+					scatterwalk_start(&dd->in_walk,
-+							  dd->in_sg);
-+					src = sg_virt(dd->in_sg) +
-+					      _calc_walked(in);
-+				}
-+			} else {
-+				src++;
-+			}
-+		}
-+
-+		/* Clear IRQ status */
-+		status &= ~AES_REG_IRQ_DATA_IN;
-+		omap_aes_write(dd, AES_REG_IRQ_STATUS(dd), status);
-+
-+		/* Enable DATA_OUT interrupt */
-+		omap_aes_write(dd, AES_REG_IRQ_ENABLE(dd), 0x4);
-+
-+	} else if (status & AES_REG_IRQ_DATA_OUT) {
-+		omap_aes_write(dd, AES_REG_IRQ_ENABLE(dd), 0x0);
-+
-+		BUG_ON(!dd->out_sg);
-+
-+		BUG_ON(_calc_walked(out) > dd->out_sg->length);
-+
-+		dst = sg_virt(dd->out_sg) + _calc_walked(out);
-+
-+		for (i = 0; i < AES_BLOCK_WORDS; i++) {
-+			*dst = omap_aes_read(dd, AES_REG_DATA_N(dd, i));
-+			scatterwalk_advance(&dd->out_walk, 4);
-+			if (dd->out_sg->length == _calc_walked(out)) {
-+				dd->out_sg = scatterwalk_sg_next(dd->out_sg);
-+				if (dd->out_sg) {
-+					scatterwalk_start(&dd->out_walk,
-+							  dd->out_sg);
-+					dst = sg_virt(dd->out_sg) +
-+					      _calc_walked(out);
-+				}
-+			} else {
-+				dst++;
-+			}
-+		}
-+
-+		dd->total -= AES_BLOCK_SIZE;
-+
-+		BUG_ON(dd->total < 0);
-+
-+		/* Clear IRQ status */
-+		status &= ~AES_REG_IRQ_DATA_OUT;
-+		omap_aes_write(dd, AES_REG_IRQ_STATUS(dd), status);
-+
-+		if (!dd->total)
-+			/* All bytes read! */
-+			tasklet_schedule(&dd->done_task);
-+		else
-+			/* Enable DATA_IN interrupt for next block */
-+			omap_aes_write(dd, AES_REG_IRQ_ENABLE(dd), 0x2);
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
- static const struct of_device_id omap_aes_of_match[] = {
- 	{
- 		.compatible	= "ti,omap2-aes",
+ 	return 0;
 -- 
 1.7.9.5
