@@ -1,86 +1,166 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Sat, 17 Aug 2013 21:42:23 -0500
-Subject: [PATCH v2 02/14] crypto: omap-aes: Add useful debug macros
+Date: Sat, 17 Aug 2013 21:42:27 -0500
+Subject: [PATCH v2 06/14] crypto: omap-aes: Remove previously used
+ intermediate buffers
 In-Reply-To: <1376793755-30478-1-git-send-email-joelf@ti.com>
 References: <1376793755-30478-1-git-send-email-joelf@ti.com>
-Message-ID: <1376793755-30478-3-git-send-email-joelf@ti.com>
+Message-ID: <1376793755-30478-7-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When DEBUG is enabled, these macros can be used to print variables in integer
-and hex format, and clearly display which registers, offsets and values are
-being read/written , including printing the names of the offsets and their values.
-
-Note:
-This patch results in a checkpatch error that cannot be fixed.
-ERROR: Macros with multiple statements should be enclosed in a do - while loop
-+#define omap_aes_read(dd, offset)                                      \
-+       __raw_readl(dd->io_base + offset);                              \
-+       pr_debug("omap_aes_read(" #offset ")\n");
-
-Using do-while loop will break a lot of code such as:
-ret = omap_aes_read(..);
-
-On the other hand, not using a do-while loop will only result in a spurious
-debug print message when DEBUG is enabled, all other issues would be caught at
-compile time if any. As such, there is no code in the driver as of now that
-requires a do-while loop, but there is code that will break if a do-while loop
-is used in the macro so we ignore the checkpatch error in this case.
+Intermdiate buffers were allocated, mapped and used for DMA.  These are no
+longer required as we use the SGs from crypto layer directly in previous
+commits in the series. Also along with it, remove the logic for copying SGs
+etc as they are no longer used, and all the associated variables in omap_aes_device.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/crypto/omap-aes.c |   22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+ drivers/crypto/omap-aes.c |   90 ---------------------------------------------
+ 1 file changed, 90 deletions(-)
 
 diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index ee15b0f..26b802b 100644
+index 5e034a1..bbdd1c3 100644
 --- a/drivers/crypto/omap-aes.c
 +++ b/drivers/crypto/omap-aes.c
-@@ -13,7 +13,8 @@
-  *
-  */
+@@ -149,25 +149,13 @@ struct omap_aes_dev {
+ 	struct ablkcipher_request	*req;
+ 	size_t				total;
+ 	struct scatterlist		*in_sg;
+-	struct scatterlist		in_sgl;
+-	size_t				in_offset;
+ 	struct scatterlist		*out_sg;
+-	struct scatterlist		out_sgl;
+-	size_t				out_offset;
+-
+-	size_t			buflen;
+-	void			*buf_in;
+-	size_t			dma_size;
+ 	int			dma_in;
+ 	struct dma_chan		*dma_lch_in;
+-	dma_addr_t		dma_addr_in;
+-	void			*buf_out;
+ 	int			dma_out;
+ 	struct dma_chan		*dma_lch_out;
+ 	int			in_sg_len;
+ 	int			out_sg_len;
+-	dma_addr_t		dma_addr_out;
+-
+ 	const struct omap_aes_pdata	*pdata;
+ };
  
--#define pr_fmt(fmt) "%s: " fmt, __func__
-+#define prn(num) pr_debug(#num "=%d\n", num)
-+#define prx(num) pr_debug(#num "=%x\n", num)
+@@ -352,33 +340,6 @@ static int omap_aes_dma_init(struct omap_aes_dev *dd)
+ 	dd->dma_lch_out = NULL;
+ 	dd->dma_lch_in = NULL;
  
- #include <linux/err.h>
- #include <linux/module.h>
-@@ -172,16 +173,35 @@ struct omap_aes_dev {
- static LIST_HEAD(dev_list);
- static DEFINE_SPINLOCK(list_lock);
+-	dd->buf_in = (void *)__get_free_pages(GFP_KERNEL, OMAP_AES_CACHE_SIZE);
+-	dd->buf_out = (void *)__get_free_pages(GFP_KERNEL, OMAP_AES_CACHE_SIZE);
+-	dd->buflen = PAGE_SIZE << OMAP_AES_CACHE_SIZE;
+-	dd->buflen &= ~(AES_BLOCK_SIZE - 1);
+-
+-	if (!dd->buf_in || !dd->buf_out) {
+-		dev_err(dd->dev, "unable to alloc pages.\n");
+-		goto err_alloc;
+-	}
+-
+-	/* MAP here */
+-	dd->dma_addr_in = dma_map_single(dd->dev, dd->buf_in, dd->buflen,
+-					 DMA_TO_DEVICE);
+-	if (dma_mapping_error(dd->dev, dd->dma_addr_in)) {
+-		dev_err(dd->dev, "dma %d bytes error\n", dd->buflen);
+-		err = -EINVAL;
+-		goto err_map_in;
+-	}
+-
+-	dd->dma_addr_out = dma_map_single(dd->dev, dd->buf_out, dd->buflen,
+-					  DMA_FROM_DEVICE);
+-	if (dma_mapping_error(dd->dev, dd->dma_addr_out)) {
+-		dev_err(dd->dev, "dma %d bytes error\n", dd->buflen);
+-		err = -EINVAL;
+-		goto err_map_out;
+-	}
+-
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
  
-+#ifdef DEBUG
-+/*
-+ * Note: In DEBUG mode, when using conditionals, omap_aes_read _must_
-+ * be surrounded by braces otherwise you may see spurious prints.
-+ */
-+#define omap_aes_read(dd, offset)					\
-+	__raw_readl(dd->io_base + offset);				\
-+	pr_debug("omap_aes_read(" #offset ")\n");
-+#else
- static inline u32 omap_aes_read(struct omap_aes_dev *dd, u32 offset)
+@@ -405,14 +366,6 @@ static int omap_aes_dma_init(struct omap_aes_dev *dd)
+ err_dma_out:
+ 	dma_release_channel(dd->dma_lch_in);
+ err_dma_in:
+-	dma_unmap_single(dd->dev, dd->dma_addr_out, dd->buflen,
+-			 DMA_FROM_DEVICE);
+-err_map_out:
+-	dma_unmap_single(dd->dev, dd->dma_addr_in, dd->buflen, DMA_TO_DEVICE);
+-err_map_in:
+-	free_pages((unsigned long)dd->buf_out, OMAP_AES_CACHE_SIZE);
+-	free_pages((unsigned long)dd->buf_in, OMAP_AES_CACHE_SIZE);
+-err_alloc:
+ 	if (err)
+ 		pr_err("error: %d\n", err);
+ 	return err;
+@@ -422,11 +375,6 @@ static void omap_aes_dma_cleanup(struct omap_aes_dev *dd)
  {
- 	return __raw_readl(dd->io_base + offset);
+ 	dma_release_channel(dd->dma_lch_out);
+ 	dma_release_channel(dd->dma_lch_in);
+-	dma_unmap_single(dd->dev, dd->dma_addr_out, dd->buflen,
+-			 DMA_FROM_DEVICE);
+-	dma_unmap_single(dd->dev, dd->dma_addr_in, dd->buflen, DMA_TO_DEVICE);
+-	free_pages((unsigned long)dd->buf_out, OMAP_AES_CACHE_SIZE);
+-	free_pages((unsigned long)dd->buf_in, OMAP_AES_CACHE_SIZE);
  }
-+#endif
  
-+#ifdef DEBUG
-+#define omap_aes_write(dd, offset, value)				\
-+	do {								\
-+		pr_debug("omap_aes_write(" #offset "=%x) value=%d\n",	\
-+			 offset, value);				\
-+		__raw_writel(value, dd->io_base + offset);		\
-+	} while (0)
-+#else
- static inline void omap_aes_write(struct omap_aes_dev *dd, u32 offset,
- 				  u32 value)
- {
- 	__raw_writel(value, dd->io_base + offset);
+ static void sg_copy_buf(void *buf, struct scatterlist *sg,
+@@ -443,42 +391,6 @@ static void sg_copy_buf(void *buf, struct scatterlist *sg,
+ 	scatterwalk_done(&walk, out, 0);
  }
-+#endif
  
- static inline void omap_aes_write_mask(struct omap_aes_dev *dd, u32 offset,
- 					u32 value, u32 mask)
+-static int sg_copy(struct scatterlist **sg, size_t *offset, void *buf,
+-		   size_t buflen, size_t total, int out)
+-{
+-	unsigned int count, off = 0;
+-
+-	while (buflen && total) {
+-		count = min((*sg)->length - *offset, total);
+-		count = min(count, buflen);
+-
+-		if (!count)
+-			return off;
+-
+-		/*
+-		 * buflen and total are AES_BLOCK_SIZE size aligned,
+-		 * so count should be also aligned
+-		 */
+-
+-		sg_copy_buf(buf + off, *sg, *offset, count, out);
+-
+-		off += count;
+-		buflen -= count;
+-		*offset += count;
+-		total -= count;
+-
+-		if (*offset == (*sg)->length) {
+-			*sg = sg_next(*sg);
+-			if (*sg)
+-				*offset = 0;
+-			else
+-				total = 0;
+-		}
+-	}
+-
+-	return off;
+-}
+-
+ static int omap_aes_crypt_dma(struct crypto_tfm *tfm,
+ 		struct scatterlist *in_sg, struct scatterlist *out_sg,
+ 		int in_sg_len, int out_sg_len)
+@@ -643,9 +555,7 @@ static int omap_aes_handle_queue(struct omap_aes_dev *dd,
+ 	/* assign new request to device */
+ 	dd->req = req;
+ 	dd->total = req->nbytes;
+-	dd->in_offset = 0;
+ 	dd->in_sg = req->src;
+-	dd->out_offset = 0;
+ 	dd->out_sg = req->dst;
+ 
+ 	dd->in_sg_len = scatterwalk_bytes_sglen(dd->in_sg, dd->total);
 -- 
 1.7.9.5
