@@ -1,219 +1,185 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 Aug 2013 04:21:09 +0900
-Subject: [PATCHv3 1/4] drm/exynos: add device tree support for rotator
-In-Reply-To: <1376370779-26930-2-git-send-email-chanho61.park@samsung.com>
-References: <1376370779-26930-1-git-send-email-chanho61.park@samsung.com>
- <1376370779-26930-2-git-send-email-chanho61.park@samsung.com>
-Message-ID: <52111EA5.5000800@samsung.com>
+Date: Mon, 19 Aug 2013 04:27:00 +0900
+Subject: [PATCH] ARM: DT: Exynos: fix number of interrupt-cells in mct node
+In-Reply-To: <CANuQgHEq3QA_zE1axnXqCdv8RLXHTfv3wVn59gHSk3jEPtLiXQ@mail.gmail.com>
+References: <1371220886-11616-1-git-send-email-chander.kashyap@linaro.org>	<CANuQgHH+nebJf4HPrsWPLECyvWO8OGJj=YeDG4GQAmLHM8GrPw@mail.gmail.com>
+ <CANuQgHEq3QA_zE1axnXqCdv8RLXHTfv3wVn59gHSk3jEPtLiXQ@mail.gmail.com>
+Message-ID: <52112004.90202@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/13 14:12, Chanho Park wrote:
-> The exynos4 platform is only dt-based since 3.10, we should convert driver data
-> and ids to dt-based parsing methods. The rotator driver has a limit table to get
-> size limit of input picture. Each SoCs has slightly different limit value
-> compared with any others.
-> For example, exynos4210's max_size of RGB888 is 16k x 16k. But, others have
-> 8k x 8k. Another example the exynos5250 should have multiple of 2 pixel size
-> for its X/Y axis. Thus, we should keep different tables for each of them.
-> This patch also includes desciptions of each nodes for the rotator and specifies
-> a example how to bind it.
+On 08/12/13 15:23, Chander Kashyap wrote:
+> ping
 >
-> Signed-off-by: Chanho Park<chanho61.park@samsung.com>
-> Cc: Inki Dae<inki.dae@samsung.com>
+> On 23 July 2013 15:17, Chander Kashyap<chander.kashyap@linaro.org>  wrote:
+>> ping.
+>>
+>> On 14 June 2013 20:11, Chander Kashyap<chander.kashyap@linaro.org>  wrote:
+>>> Two cells were used to specify interrupts in mct node, while second cell
+>>> always remains unused. Hence use only one cell.
+>>> Suggested by Tomasz Figa.
+>>>
+>>> Signed-off-by: Chander Kashyap<chander.kashyap@linaro.org>
+>>> ---
+>>>   arch/arm/boot/dts/exynos4210.dtsi |   19 +++++++++----------
+>>>   arch/arm/boot/dts/exynos4212.dtsi |   19 +++++++++----------
+>>>   arch/arm/boot/dts/exynos4412.dtsi |   23 +++++++++++------------
+>>>   arch/arm/boot/dts/exynos5250.dtsi |   19 +++++++++----------
+>>>   4 files changed, 38 insertions(+), 42 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+>>> index 54710de..ad50010 100644
+>>> --- a/arch/arm/boot/dts/exynos4210.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+>>> @@ -52,23 +52,22 @@
+>>>                  compatible = "samsung,exynos4210-mct";
+>>>                  reg =<0x10050000 0x800>;
+>>>                  interrupt-controller;
+>>> -               #interrups-cells =<2>;
+>>> +               #interrups-cells =<1>;
+>>>                  interrupt-parent =<&mct_map>;
+>>> -               interrupts =<0 0>,<1 0>,<2 0>,<3 0>,
+>>> -<4 0>,<5 0>;
+>>> +               interrupts =<0>,<1>,<2>,<3>,<4>,<5>;
+>>>                  clocks =<&clock 3>,<&clock 344>;
+>>>                  clock-names = "fin_pll", "mct";
+>>>
+>>>                  mct_map: mct-map {
+>>> -                       #interrupt-cells =<2>;
+>>> +                       #interrupt-cells =<1>;
+>>>                          #address-cells =<0>;
+>>>                          #size-cells =<0>;
+>>> -                       interrupt-map =<0x0 0&gic 0 57 0>,
+>>> -<0x1 0&gic 0 69 0>,
+>>> -<0x2 0&combiner 12 6>,
+>>> -<0x3 0&combiner 12 7>,
+>>> -<0x4 0&gic 0 42 0>,
+>>> -<0x5 0&gic 0 48 0>;
+>>> +                       interrupt-map =<0&gic 0 57 0>,
+>>> +<1&gic 0 69 0>,
+>>> +<2&combiner 12 6>,
+>>> +<3&combiner 12 7>,
+>>> +<4&gic 0 42 0>,
+>>> +<5&gic 0 48 0>;
+>>>                  };
+>>>          };
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+>>> index c0f60f4..ba9ada1 100644
+>>> --- a/arch/arm/boot/dts/exynos4212.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos4212.dtsi
+>>> @@ -39,21 +39,20 @@
+>>>                  compatible = "samsung,exynos4412-mct";
+>>>                  reg =<0x10050000 0x800>;
+>>>                  interrupt-controller;
+>>> -               #interrups-cells =<2>;
+>>> +               #interrups-cells =<1>;
+>>>                  interrupt-parent =<&mct_map>;
+>>> -               interrupts =<0 0>,<1 0>,<2 0>,<3 0>,
+>>> -<4 0>,<5 0>;
+>>> +               interrupts =<0>,<1>,<2>,<3>,<4>,<5>;
+>>>
+>>>                  mct_map: mct-map {
+>>> -                       #interrupt-cells =<2>;
+>>> +                       #interrupt-cells =<>;
+>>>                          #address-cells =<0>;
+>>>                          #size-cells =<0>;
+>>> -                       interrupt-map =<0x0 0&gic 0 57 0>,
+>>> -<0x1 0&combiner 12 5>,
+>>> -<0x2 0&combiner 12 6>,
+>>> -<0x3 0&combiner 12 7>,
+>>> -<0x4 0&gic 1 12 0>,
+>>> -<0x5 0&gic 1 12 0>;
+>>> +                       interrupt-map =<0&gic 0 57 0>,
+>>> +<1&combiner 12 5>,
+>>> +<2&combiner 12 6>,
+>>> +<3&combiner 12 7>,
+>>> +<4&gic 1 12 0>,
+>>> +<5&gic 1 12 0>;
+>>>                  };
+>>>          };
+>>>   };
+>>> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+>>> index 270b389..a680de7 100644
+>>> --- a/arch/arm/boot/dts/exynos4412.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos4412.dtsi
+>>> @@ -39,25 +39,24 @@
+>>>                  compatible = "samsung,exynos4412-mct";
+>>>                  reg =<0x10050000 0x800>;
+>>>                  interrupt-controller;
+>>> -               #interrups-cells =<2>;
+>>> +               #interrups-cells =<1>;
+>>>                  interrupt-parent =<&mct_map>;
+>>> -               interrupts =<0 0>,<1 0>,<2 0>,<3 0>,
+>>> -<4 0>,<5 0>,<6 0>,<7 0>;
+>>> +               interrupts =<0>,<1>,<2>,<3>,<4>,<5>,<6>,<7>;
+>>>                  clocks =<&clock 3>,<&clock 344>;
+>>>                  clock-names = "fin_pll", "mct";
+>>>
+>>>                  mct_map: mct-map {
+>>> -                       #interrupt-cells =<2>;
+>>> +                       #interrupt-cells =<1>;
+>>>                          #address-cells =<0>;
+>>>                          #size-cells =<0>;
+>>> -                       interrupt-map =<0x0 0&gic 0 57 0>,
+>>> -<0x1 0&combiner 12 5>,
+>>> -<0x2 0&combiner 12 6>,
+>>> -<0x3 0&combiner 12 7>,
+>>> -<0x4 0&gic 1 12 0>,
+>>> -<0x5 0&gic 1 12 0>,
+>>> -<0x6 0&gic 1 12 0>,
+>>> -<0x7 0&gic 1 12 0>;
+>>> +                       interrupt-map =<0&gic 0 57 0>,
+>>> +<1&combiner 12 5>,
+>>> +<2&combiner 12 6>,
+>>> +<3&combiner 12 7>,
+>>> +<4&gic 1 12 0>,
+>>> +<5&gic 1 12 0>,
+>>> +<6&gic 1 12 0>,
+>>> +<7&gic 1 12 0>;
+>>>                  };
+>>>          };
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+>>> index a7cf3f5..4e633ef 100644
+>>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>>> @@ -94,23 +94,22 @@
+>>>                  compatible = "samsung,exynos4210-mct";
+>>>                  reg =<0x101C0000 0x800>;
+>>>                  interrupt-controller;
+>>> -               #interrups-cells =<2>;
+>>> +               #interrups-cells =<1>;
+>>>                  interrupt-parent =<&mct_map>;
+>>> -               interrupts =<0 0>,<1 0>,<2 0>,<3 0>,
+>>> -<4 0>,<5 0>;
+>>> +               interrupts =<0>,<1>,<2>,<3>,<4>,<5>;
+>>>                  clocks =<&clock 1>,<&clock 335>;
+>>>                  clock-names = "fin_pll", "mct";
+>>>
+>>>                  mct_map: mct-map {
+>>> -                       #interrupt-cells =<2>;
+>>> +                       #interrupt-cells =<1>;
+>>>                          #address-cells =<0>;
+>>>                          #size-cells =<0>;
+>>> -                       interrupt-map =<0x0 0&combiner 23 3>,
+>>> -<0x1 0&combiner 23 4>,
+>>> -<0x2 0&combiner 25 2>,
+>>> -<0x3 0&combiner 25 3>,
+>>> -<0x4 0&gic 0 120 0>,
+>>> -<0x5 0&gic 0 121 0>;
+>>> +                       interrupt-map =<0&combiner 23 3>,
+>>> +<1&combiner 23 4>,
+>>> +<2&combiner 25 2>,
+>>> +<3&combiner 25 3>,
+>>> +<4&gic 0 120 0>,
+>>> +<5&gic 0 121 0>;
+>>>                  };
+>>>          };
+>>>
+>>> --
+>>> 1.7.9.5
 
-Inki, do you OK on this? If so, let me take this whole series into the 
-samsung tree.
+Should be updated with regarding Doc.
 
-Thanks,
 Kukjin
-
-> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
-> ---
->   .../devicetree/bindings/gpu/samsung-rotator.txt    |   27 +++++
->   drivers/gpu/drm/exynos/exynos_drm_rotator.c        |  108 +++++++++++++++-----
->   2 files changed, 107 insertions(+), 28 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/gpu/samsung-rotator.txt
->
-> diff --git a/Documentation/devicetree/bindings/gpu/samsung-rotator.txt b/Documentation/devicetree/bindings/gpu/samsung-rotator.txt
-> new file mode 100644
-> index 0000000..82cd1ed
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpu/samsung-rotator.txt
-> @@ -0,0 +1,27 @@
-> +* Samsung Image Rotator
-> +
-> +Required properties:
-> +  - compatible : value should be one of the following:
-> +	(a) "samsung,exynos4210-rotator" for Rotator IP in Exynos4210
-> +	(b) "samsung,exynos4212-rotator" for Rotator IP in Exynos4212/4412
-> +	(c) "samsung,exynos5250-rotator" for Rotator IP in Exynos5250
-> +
-> +  - reg : Physical base address of the IP registers and length of memory
-> +	  mapped region.
-> +
-> +  - interrupts : Interrupt specifier for rotator interrupt, according to format
-> +		 specific to interrupt parent.
-> +
-> +  - clocks : Clock specifier for rotator clock, according to generic clock
-> +	     bindings. (See Documentation/devicetree/bindings/clock/exynos*.txt)
-> +
-> +  - clock-names : Names of clocks. For exynos rotator, it should be "rotator".
-> +
-> +Example:
-> +	rotator at 12810000 {
-> +		compatible = "samsung,exynos4210-rotator";
-> +		reg =<0x12810000 0x1000>;
-> +		interrupts =<0 83 0>;
-> +		clocks =<&clock 278>;
-> +		clock-names = "rotator";
-> +	};
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_rotator.c b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-> index 427640a..0485aea5 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-> @@ -632,21 +632,98 @@ static int rotator_ippdrv_start(struct device *dev, enum drm_exynos_ipp_cmd cmd)
->   	return 0;
->   }
->
-> +static struct rot_limit_table rot_limit_tbl_4210 = {
-> +	.ycbcr420_2p = {
-> +		.min_w = 32,
-> +		.min_h = 32,
-> +		.max_w = SZ_64K,
-> +		.max_h = SZ_64K,
-> +		.align = 3,
-> +	},
-> +	.rgb888 = {
-> +		.min_w = 8,
-> +		.min_h = 8,
-> +		.max_w = SZ_16K,
-> +		.max_h = SZ_16K,
-> +		.align = 2,
-> +	},
-> +};
-> +
-> +static struct rot_limit_table rot_limit_tbl_4x12 = {
-> +	.ycbcr420_2p = {
-> +		.min_w = 32,
-> +		.min_h = 32,
-> +		.max_w = SZ_32K,
-> +		.max_h = SZ_32K,
-> +		.align = 3,
-> +	},
-> +	.rgb888 = {
-> +		.min_w = 8,
-> +		.min_h = 8,
-> +		.max_w = SZ_8K,
-> +		.max_h = SZ_8K,
-> +		.align = 2,
-> +	},
-> +};
-> +
-> +static struct rot_limit_table rot_limit_tbl_5250 = {
-> +	.ycbcr420_2p = {
-> +		.min_w = 32,
-> +		.min_h = 32,
-> +		.max_w = SZ_32K,
-> +		.max_h = SZ_32K,
-> +		.align = 3,
-> +	},
-> +	.rgb888 = {
-> +		.min_w = 8,
-> +		.min_h = 8,
-> +		.max_w = SZ_8K,
-> +		.max_h = SZ_8K,
-> +		.align = 1,
-> +	},
-> +};
-> +
-> +static const struct of_device_id exynos_rotator_match[] = {
-> +	{
-> +		.compatible = "samsung,exynos4210-rotator",
-> +		.data =&rot_limit_tbl_4210,
-> +	},
-> +	{
-> +		.compatible = "samsung,exynos4212-rotator",
-> +		.data =&rot_limit_tbl_4x12,
-> +	},
-> +	{
-> +		.compatible = "samsung,exynos5250-rotator",
-> +		.data =&rot_limit_tbl_5250,
-> +	},
-> +	{},
-> +};
-> +
->   static int rotator_probe(struct platform_device *pdev)
->   {
->   	struct device *dev =&pdev->dev;
->   	struct rot_context *rot;
->   	struct exynos_drm_ippdrv *ippdrv;
-> +	const struct of_device_id *match;
->   	int ret;
->
-> +	if (!dev->of_node) {
-> +		dev_err(dev, "cannot find of_node.\n");
-> +		return -ENODEV;
-> +	}
-> +
->   	rot = devm_kzalloc(dev, sizeof(*rot), GFP_KERNEL);
->   	if (!rot) {
->   		dev_err(dev, "failed to allocate rot\n");
->   		return -ENOMEM;
->   	}
->
-> -	rot->limit_tbl = (struct rot_limit_table *)
-> -				platform_get_device_id(pdev)->driver_data;
-> +	match = of_match_node(exynos_rotator_match, dev->of_node);
-> +	if (!match) {
-> +		dev_err(dev, "failed to match node\n");
-> +		return -ENODEV;
-> +	}
-> +	rot->limit_tbl = (struct rot_limit_table *)match->data;
->
->   	rot->regs_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->   	rot->regs = devm_ioremap_resource(dev, rot->regs_res);
-> @@ -718,31 +795,6 @@ static int rotator_remove(struct platform_device *pdev)
->   	return 0;
->   }
->
-> -static struct rot_limit_table rot_limit_tbl = {
-> -	.ycbcr420_2p = {
-> -		.min_w = 32,
-> -		.min_h = 32,
-> -		.max_w = SZ_32K,
-> -		.max_h = SZ_32K,
-> -		.align = 3,
-> -	},
-> -	.rgb888 = {
-> -		.min_w = 8,
-> -		.min_h = 8,
-> -		.max_w = SZ_8K,
-> -		.max_h = SZ_8K,
-> -		.align = 2,
-> -	},
-> -};
-> -
-> -static struct platform_device_id rotator_driver_ids[] = {
-> -	{
-> -		.name		= "exynos-rot",
-> -		.driver_data	= (unsigned long)&rot_limit_tbl,
-> -	},
-> -	{},
-> -};
-> -
->   static int rotator_clk_crtl(struct rot_context *rot, bool enable)
->   {
->   	if (enable) {
-> @@ -804,10 +856,10 @@ static const struct dev_pm_ops rotator_pm_ops = {
->   struct platform_driver rotator_driver = {
->   	.probe		= rotator_probe,
->   	.remove		= rotator_remove,
-> -	.id_table	= rotator_driver_ids,
->   	.driver		= {
->   		.name	= "exynos-rot",
->   		.owner	= THIS_MODULE,
->   		.pm	=&rotator_pm_ops,
-> +		.of_match_table = exynos_rotator_match,
->   	},
->   };
