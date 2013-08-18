@@ -1,51 +1,38 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 Aug 2013 05:08:00 +0900
-Subject: [PATCH RESEND] ARM: dts: Add USB host node for Exynos4
-In-Reply-To: <1375726159-20486-1-git-send-email-tobetter@gmail.com>
-References: <1375726159-20486-1-git-send-email-tobetter@gmail.com>
-Message-ID: <521129A0.9050404@samsung.com>
+Date: Mon, 19 Aug 2013 05:17:21 +0900
+Subject: [PATCH RESEND] ARM: plat-samsung: Fix switching FIFO in
+ arch_enable_uart_fifo function
+In-Reply-To: <1372792593-7457-1-git-send-email-shc_work@mail.ru>
+References: <1372792593-7457-1-git-send-email-shc_work@mail.ru>
+Message-ID: <52112BD1.6090505@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/13 03:09, Dongjin Kim wrote:
-> This patch adds EHCI and OHCI host device nodes for Exynos4.
+On 07/03/13 04:16, Alexander Shiyan wrote:
+> When CONFIG_S3C_BOOT_UART_FORCE_FIFO symbol is set, we should
+> enable FIFO but actually switch command is missing in the code.
+> This patch adds this switching.
 >
-> CC: Jingoo Han<jg1.han@samsung.com>
-> Signed-off-by: Dongjin Kim<tobetter@gmail.com>
+> Signed-off-by: Alexander Shiyan<shc_work@mail.ru>
 > ---
->   arch/arm/boot/dts/exynos4.dtsi |   18 ++++++++++++++++++
->   1 file changed, 18 insertions(+)
+>   arch/arm/plat-samsung/include/plat/uncompress.h | 2 ++
+>   1 file changed, 2 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> index 3f94fe8..cbe5219 100644
-> --- a/arch/arm/boot/dts/exynos4.dtsi
-> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> @@ -155,6 +155,24 @@
->   		status = "disabled";
->   	};
->
-> +	ehci at 12580000 {
-> +		compatible = "samsung,exynos4210-ehci";
-> +		reg =<0x12580000 0x100>;
-> +		interrupts =<0 70 0>;
-> +		clocks =<&clock 304>;
-> +		clock-names = "usbhost";
-> +		status = "disabled";
-> +	};
+> diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h b/arch/arm/plat-samsung/include/plat/uncompress.h
+> index 4afc32f..f48dc0a 100644
+> --- a/arch/arm/plat-samsung/include/plat/uncompress.h
+> +++ b/arch/arm/plat-samsung/include/plat/uncompress.h
+> @@ -145,6 +145,8 @@ static inline void arch_enable_uart_fifo(void)
+>   			if (!(fifocon&  S3C2410_UFCON_RESETBOTH))
+>   				break;
+>   		}
 > +
-> +	ohci at 12590000 {
-> +		compatible = "samsung,exynos4210-ohci";
-> +		reg =<0x12590000 0x100>;
-> +		interrupts =<0 70 0>;
-> +		clocks =<&clock 304>;
-> +		clock-names = "usbhost";
-> +		status = "disabled";
-> +	};
-> +
->   	mfc: codec at 13400000 {
->   		compatible = "samsung,mfc-v5";
->   		reg =<0x13400000 0x10000>;
+> +		uart_wr(S3C2410_UFCON, S3C2410_UFCON_FIFOMODE);
+>   	}
+>   }
+>   #else
 
-Applied, thanks.
+Sorry for late response, applied.
 
-- Kukjin
+Thanks,
+Kukjin
