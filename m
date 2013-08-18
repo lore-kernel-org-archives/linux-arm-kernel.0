@@ -1,57 +1,55 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Sun, 18 Aug 2013 10:00:34 +0200
-Subject: [PATCH RESEND] can: mcp251x: Replace power callbacks with
- regulator API
-In-Reply-To: <1376773805.878998573@f169.i.mail.ru>
-References: <1375963227-6468-1-git-send-email-shc_work@mail.ru>
- <20130817083014.a01144051b158c34ec7dd9d9@mail.ru>
- <520FD60E.4040709@pengutronix.de> <1376773805.878998573@f169.i.mail.ru>
-Message-ID: <52107F22.80002@pengutronix.de>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Sun, 18 Aug 2013 17:37:00 +0900
+Subject: [PATCH v3 2/5] ARM: tegra: add support for Trusted Foundations
+In-Reply-To: <520BF8BD.7050706@wwwdotorg.org>
+References: <1376360992-1508-1-git-send-email-acourbot@nvidia.com>
+ <1376360992-1508-3-git-send-email-acourbot@nvidia.com>
+ <520BF8BD.7050706@wwwdotorg.org>
+Message-ID: <CAAVeFuJY_UkS8rF=xfB0uEpJp4bZpc77i599bP4qmY9Xr91PSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2013 11:10 PM, Alexander Shiyan wrote:
-[...]
+On Thu, Aug 15, 2013 at 6:38 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/12/2013 08:29 PM, Alexandre Courbot wrote:
+>> Register the firmware operations for Trusted Foundations if the device
+>> tree indicates it is active on the device.
+>
+>> diff --git a/arch/arm/mach-tegra/firmware.c b/arch/arm/mach-tegra/firmware.c
+>
+>> +void __init tegra_init_firmware(void)
+>> +{
+>> +     struct device_node *node;
+>> +
+>> +     if (!of_have_populated_dt())
+>> +             return;
+>
+> That's never false on Tegra, at least upstream.
 
->>> - xceiver-supply: Regulator that powers the CAN transceiver
->>
->> which translates into:
->>
->>> priv->reg_xceiver = devm_regulator_get(&pdev->dev, "xceiver");
->>
->> Can you please use "xceiver" instead of "transceiver", so that future DT
->> binding will fit the scheme.
-> 
-> OK. I am not ready to add DT support yet, but it can be added later,
+Will remove, thanks.
 
-DT support can be added later, I just want to make sure that you use
-"xceiver" for the regulator, so that you don't need to change any code
-if DT is added.
+>> +     node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
+>> +     if (node) {
+>> +             const char *tf_version;
+>> +             int err;
+>> +
+>> +             err = of_property_read_string(node, "version", &tf_version);
+>> +             if (err != 0) {
+>> +                     pr_crit("Cannot read Trusted Foundation version: %d\n",
+>> +                             err);
+>> +                     BUG();
+>> +             } else {
+>> +                     register_trusted_foundations(tf_version);
+>> +             }
+>> +     }
+>> +}
+>
+> I think most/all of that function will be common across all SoCs that
+> support the TF monitor. I think you want to move the code into
+> register_trusted_foundations() (or a function that calls that) in patch 1?
 
-> so v2 will contain 3 parts:
+Agreed. If we push the logic a bit further, we should also have some
+platform parameters for non-DT users, along with an
+of_register_trusted_foundations() for those who prefer DT.
 
-If you mean series v3 consists of three patches....
-
-> 1 - Replace power callbacks with regulator API
-> 2 - Eliminate mcp251x_platform_data->irq_flags
-> 3 - Replace oscillator_frequency with CLK API (and remove mcp251x.h header)
-> 
-> Are you OK with such changes?
-
-...them I'm okay :)
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130818/53d32f03/attachment-0001.sig>
+Thanks,
+Alex.
