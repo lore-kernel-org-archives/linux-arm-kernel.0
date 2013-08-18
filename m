@@ -1,47 +1,52 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Sat, 17 Aug 2013 21:42:24 -0500
-Subject: [PATCH v2 03/14] crypto: omap-aes: Populate number of SG elements
+Date: Sat, 17 Aug 2013 21:42:28 -0500
+Subject: [PATCH v2 07/14] crypto: omap-aes: Add IRQ info and helper macros
 In-Reply-To: <1376793755-30478-1-git-send-email-joelf@ti.com>
 References: <1376793755-30478-1-git-send-email-joelf@ti.com>
-Message-ID: <1376793755-30478-4-git-send-email-joelf@ti.com>
+Message-ID: <1376793755-30478-8-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Crypto layer only passes nbytes but number of SG elements is needed for mapping
-or unmapping SGs at one time using dma_map* API and also needed to pass in for
-dmaengine prep function.
-
-We call function added to scatterwalk for this purpose in omap_aes_handle_queue
-to populate the values which are used later.
+Add IRQ information to pdata and helper macros. These are required
+for PIO-mode support.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/crypto/omap-aes.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/crypto/omap-aes.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index 26b802b..e369e6e 100644
+index bbdd1c3..9a964e8 100644
 --- a/drivers/crypto/omap-aes.c
 +++ b/drivers/crypto/omap-aes.c
-@@ -164,6 +164,8 @@ struct omap_aes_dev {
- 	void			*buf_out;
- 	int			dma_out;
- 	struct dma_chan		*dma_lch_out;
-+	int			in_sg_len;
-+	int			out_sg_len;
- 	dma_addr_t		dma_addr_out;
+@@ -75,6 +75,10 @@
  
- 	const struct omap_aes_pdata	*pdata;
-@@ -731,6 +733,10 @@ static int omap_aes_handle_queue(struct omap_aes_dev *dd,
- 	dd->out_offset = 0;
- 	dd->out_sg = req->dst;
+ #define AES_REG_LENGTH_N(x)		(0x54 + ((x) * 0x04))
  
-+	dd->in_sg_len = scatterwalk_bytes_sglen(dd->in_sg, dd->total);
-+	dd->out_sg_len = scatterwalk_bytes_sglen(dd->out_sg, dd->total);
-+	BUG_ON(dd->in_sg_len < 0 || dd->out_sg_len < 0);
-+
- 	rctx = ablkcipher_request_ctx(req);
- 	ctx = crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(req));
- 	rctx->mode &= FLAGS_MODE_MASK;
++#define AES_REG_IRQ_STATUS(dd)         ((dd)->pdata->irq_status_ofs)
++#define AES_REG_IRQ_ENABLE(dd)         ((dd)->pdata->irq_enable_ofs)
++#define AES_REG_IRQ_DATA_IN            BIT(1)
++#define AES_REG_IRQ_DATA_OUT           BIT(2)
+ #define DEFAULT_TIMEOUT		(5*HZ)
+ 
+ #define FLAGS_MODE_MASK		0x000f
+@@ -120,6 +124,8 @@ struct omap_aes_pdata {
+ 	u32		data_ofs;
+ 	u32		rev_ofs;
+ 	u32		mask_ofs;
++	u32             irq_enable_ofs;
++	u32             irq_status_ofs;
+ 
+ 	u32		dma_enable_in;
+ 	u32		dma_enable_out;
+@@ -836,6 +842,8 @@ static const struct omap_aes_pdata omap_aes_pdata_omap4 = {
+ 	.data_ofs	= 0x60,
+ 	.rev_ofs	= 0x80,
+ 	.mask_ofs	= 0x84,
++	.irq_status_ofs = 0x8c,
++	.irq_enable_ofs = 0x90,
+ 	.dma_enable_in	= BIT(5),
+ 	.dma_enable_out	= BIT(6),
+ 	.major_mask	= 0x0700,
 -- 
 1.7.9.5
