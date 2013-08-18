@@ -1,60 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 18 Aug 2013 14:02:07 +0800
-Subject: [PATCH v2] ARM: i.MX6Q clocks: Fix CKIH clock name
-In-Reply-To: <1376720153-19659-1-git-send-email-shc_work@mail.ru>
-References: <1376720153-19659-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20130818060205.GC1545@S2101-09.ap.freescale.net>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Sun, 18 Aug 2013 10:00:34 +0200
+Subject: [PATCH RESEND] can: mcp251x: Replace power callbacks with
+ regulator API
+In-Reply-To: <1376773805.878998573@f169.i.mail.ru>
+References: <1375963227-6468-1-git-send-email-shc_work@mail.ru>
+ <20130817083014.a01144051b158c34ec7dd9d9@mail.ru>
+ <520FD60E.4040709@pengutronix.de> <1376773805.878998573@f169.i.mail.ru>
+Message-ID: <52107F22.80002@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 17, 2013 at 10:15:53AM +0400, Alexander Shiyan wrote:
-> i.MX6Q have only one High-frequency reference clock (CKIH).
-> Patch removes index from CKIH and makes name according datasheet.
-> This is just a cosmetic fix and since this clock currently is not
-> used by any DTS, change should be safe.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/boot/dts/imx6qdl.dtsi | 4 ++--
->  arch/arm/mach-imx/clk-imx6q.c  | 2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index ccd55c2..d8a2f5fd 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -54,8 +54,8 @@
->  			clock-frequency = <32768>;
->  		};
->  
-> -		ckih1 {
-> -			compatible = "fsl,imx-ckih1", "fixed-clock";
-> +		ckih {
-> +			compatible = "fsl,imx-ckih", "fixed-clock";
->  			clock-frequency = <0>;
->  		};
->  
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index 9181a24..8f2a8b5 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -292,7 +292,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->  
->  	clk[dummy] = imx_clk_fixed("dummy", 0);
->  	clk[ckil] = imx_obtain_fixed_clock("ckil", 0);
-> -	clk[ckih] = imx_obtain_fixed_clock("ckih1", 0);
-> +	clk[ckih] = imx_obtain_fixed_clock("ckih", 0);
+On 08/17/2013 11:10 PM, Alexander Shiyan wrote:
+[...]
 
-We're entering a stage where we need to consider the device tree
-compatibility.  Since imx_obtain_fixed_clock() will try to look
-for the node using full path, the change will break the support for
-existing device tree.
-
-Shawn
-
->  	clk[osc] = imx_obtain_fixed_clock("osc", 0);
->  
->  	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
-> -- 
-> 1.8.1.5
+>>> - xceiver-supply: Regulator that powers the CAN transceiver
+>>
+>> which translates into:
+>>
+>>> priv->reg_xceiver = devm_regulator_get(&pdev->dev, "xceiver");
+>>
+>> Can you please use "xceiver" instead of "transceiver", so that future DT
+>> binding will fit the scheme.
 > 
+> OK. I am not ready to add DT support yet, but it can be added later,
+
+DT support can be added later, I just want to make sure that you use
+"xceiver" for the regulator, so that you don't need to change any code
+if DT is added.
+
+> so v2 will contain 3 parts:
+
+If you mean series v3 consists of three patches....
+
+> 1 - Replace power callbacks with regulator API
+> 2 - Eliminate mcp251x_platform_data->irq_flags
+> 3 - Replace oscillator_frequency with CLK API (and remove mcp251x.h header)
+> 
+> Are you OK with such changes?
+
+...them I'm okay :)
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130818/53d32f03/attachment-0001.sig>
