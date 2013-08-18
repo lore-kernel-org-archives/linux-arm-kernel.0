@@ -1,107 +1,51 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Sun, 18 Aug 2013 17:38:16 +0900
-Subject: [PATCH v3 1/5] ARM: add basic Trusted Foundations support
-In-Reply-To: <20130816132326.GC2909@localhost.localdomain>
-References: <1376360992-1508-1-git-send-email-acourbot@nvidia.com>
- <1376360992-1508-2-git-send-email-acourbot@nvidia.com>
- <20130815115227.GC2562@localhost.localdomain>
- <520D500C.5070901@wwwdotorg.org> <20130816132326.GC2909@localhost.localdomain>
-Message-ID: <CAAVeFuK612z6sYYBQNrbV=x3_Uy91qqusW4G+=yNVg4tMbV2Kg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 18 Aug 2013 17:12:06 +0800
+Subject: [PATCH v2 1/2] ARM: imx_v6_v7_defconfig: Remove CONFIG_USB_PHY
+ selection
+In-Reply-To: <1376486268-31599-1-git-send-email-festevam@gmail.com>
+References: <1376486268-31599-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130818091202.GA15070@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 10:23 PM, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Thu, Aug 15, 2013 at 04:02:52PM -0600, Stephen Warren wrote:
->> On 08/15/2013 05:52 AM, Dave Martin wrote:
->> > On Tue, Aug 13, 2013 at 11:29:48AM +0900, Alexandre Courbot wrote:
->> >> Trusted Foundations is a TrustZone-based secure monitor for ARM that
->> >> can be invoked  using a consistent smc-based API on all supported
->> >> platforms. This patch adds initial basic support for Trusted
->> >> Foundations using the ARM firmware API. Current features are limited
->> >> to the ability to boot secondary processors.
->>
->> >> diff --git a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
->>
->> >> +Required properties:
->> >> +- compatible : "tl,trusted-foundations"
->> >> +- version : Must contain the version number string of the Trusted Foundation
->> >> +  firmware.
->> >
->> > Are you sure there is no low-level way to probe vendor and version info?
->> > If there is, then the DT should describe nothing except the fact that
->> > the probe interface exists.
->> >
->> > I also worry that two integrations on different SoCs might have the
->> > same version number, yet still be different due to vendor-specific
->> > features and options.
->>
->> I would expect HW-specific compatible values also to be present in a DT.
->> For example, perhaps:
->>
->> compatible = "tl,trusted-foundations-nvidia-shield",
->> "tl,trusted-foundations";
->>
->> (nvidia vendor, shield board/implementation)
->>
->> This would allow matching on the specific value
->> "tl,trusted-foundations-nvidia-shield" in the future if some quirking
->> was needed, but if this wasn't needed, drivers could just bind to the
->> generic "tl,trusted-foundations".
->
-> That seems reasonable *unless* there is a reliable way to obtain
-> a vendor ID from the SMC ABI directly, in which case we should just
-> use that.
->
-> One could debate whether the extra compatible string should have
-> "nvidia," or "tl," but the fact that "nvidia" is in the name at all
-> pretty much narrows it down.
->
->>
->> >> +- version : Must contain the version number string of the Trusted Foundation
->> >> +  firmware.
->> >
->> > Are you sure there is no low-level way to probe vendor and version info?
->> > If there is, then the DT should describe nothing except the fact that
->> > the probe interface exists.
->> >
->> > I also worry that two integrations on different SoCs might have the
->> > same version number, yet still be different due to vendor-specific
->> > features and options.
->>
->> Talking of the version - if we do need to represent this in the DT, how
->> about 2 separate cells for major/minor version rather than encoding it
->> into a string? Then, no parsing would be required.
->
-> I think the key thing here is to match whatever TF's native notion of
-> version is.
->
-> If it's truly a string with specific comparison rules, we should leave it
-> a string and write code to examine it.  If it's a simple <major minor>
-> pair, then putting it in the DT in this form makes sense.
+On Wed, Aug 14, 2013 at 10:17:47AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Since commit 052a11d1 (usb: phy: make PHY driver selection possible by
+> controller drivers), CONFIG_USB_PHY is selected via drivers/usb/phy/Kconfig, so
+> there is no need to select it via defconfig anymore.
 
-TF's native version is this major/minor pair, and indeed it should be
-sensible and harmless to turn it into a pair of cells.
+Applying the patch on IMX tree will break the boot right away, because
+the prerequisite commit 052a11d1 is available on IMX tree and causes
+CONFIG_USB_PHY lost.  So please do not send me such patches until the
+prerequisite ones hit mainline.
 
-Then there are other components that can be added to build a more
-precise "version string". You can have a look at this file to see how
-this is done:
+Also, I do not think the change is worth a patch, since it will go away
+when next time we run savedefconfig.
 
-http://nv-tegra.nvidia.com/gitweb/?p=linux-2.6.git;a=blob;f=security/tf_driver/s_version.h;h=d75c5f35d32d597b664c9533b1c5a52696e81b49;hb=rel-roth-ota-1
+Shawn
 
-The version string I used to far is the S_VERSION_MAIN macro, since it
-is the only one that seems to be platform-independant.
-S_VERSION_PLATFORM and S_VERSION_OS can be used to indentify if
-Android is used and which version. Then all these strings (plus a few
-others) are concatenated to build S_VERSION_STRING which is the
-ultimate version, but also considerably more complicated to handle.
-
-At the current level of support, I don't think it makes sense to look
-further than S_VERSION_MAIN for the moment. If we switch it to a pair
-of integer cells as Stephen suggested, nothing prevents us to extend
-the bindings with other properties (for instance version-platform and
-version-os) if they become necessary. But at the moment I don't think
-it makes sense to overthink versions beyond the main version number,
-especially if it can be extended safely if needed in the future.
-
-Thanks,
-Alex.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v1:
+> - Split it in two patches
+> 
+>  arch/arm/configs/imx_v6_v7_defconfig | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> index 5d488c2..402f282 100644
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -195,7 +195,6 @@ CONFIG_USB_EHCI_MXC=y
+>  CONFIG_USB_STORAGE=y
+>  CONFIG_USB_CHIPIDEA=y
+>  CONFIG_USB_CHIPIDEA_HOST=y
+> -CONFIG_USB_PHY=y
+>  CONFIG_NOP_USB_XCEIV=y
+>  CONFIG_USB_MXS_PHY=y
+>  CONFIG_MMC=y
+> -- 
+> 1.8.1.2
+> 
