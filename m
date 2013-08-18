@@ -1,36 +1,35 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 18 Aug 2013 00:22:43 +0200
-Subject: [RFC PATCH v2 3/4] powerpc: refactor of_get_cpu_node to support
- other architectures
-In-Reply-To: <1376777376.25016.11.camel@pasglop>
-References: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <2032060.4bgTKOdEX2@flatron> <1376777376.25016.11.camel@pasglop>
-Message-ID: <6043373.ZgY5Yo1tNM@flatron>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 17 Aug 2013 19:12:28 -0500
+Subject: [PATCH v2] ARM: highbank: fix debug uart virtual address for LPAE
+Message-ID: <1376784748-31914-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 18 of August 2013 08:09:36 Benjamin Herrenschmidt wrote:
-> On Sat, 2013-08-17 at 12:50 +0200, Tomasz Figa wrote:
-> > I wonder how would this handle uniprocessor ARM (pre-v7) cores, for
-> > which
-> > the updated bindings[1] define #address-cells = <0> and so no reg
-> > property.
-> > 
-> > [1] - http://thread.gmane.org/gmane.linux.ports.arm.kernel/260795
-> 
-> Why did you do that in the binding ? That sounds like looking to create
-> problems ...
+From: Rob Herring <rob.herring@calxeda.com>
 
-[Copying Lorenzo...]
+Section entries are 2MB on LPAE, so the DEBUG_LL virtual address must
+have the same offset in the 2MB section as the physical address. This
+fixes async external aborts when DEBUG_LL is enabled on Midway.
 
-I'm not the author of the change. I was just passing by, while the 
-question showed up in my mind. ;)
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+v2: Rebase on Russell's DEBUG_LL clean-up
 
-> Traditionally, UP setups just used "0" as the "reg" property on other
-> architectures, why do differently ?
+ arch/arm/Kconfig.debug | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Right, especially since the ARM DT topology parsing code still considers a 
-device tree without reg property in cpu node invalid.
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 2d57da3..2a88a4d 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1005,7 +1005,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfee003f8 if FOOTBRIDGE
+ 	default 0xfee08300 if DEBUG_DAVINCI_TNETV107X_UART1
+ 	default 0xfee20000 if DEBUG_NSPIRE_CLASSIC_UART || DEBUG_NSPIRE_CX_UART
+-	default 0xfee36000 if DEBUG_HIGHBANK_UART
++	default 0xfef36000 if DEBUG_HIGHBANK_UART
+ 	default 0xfee82340 if ARCH_IOP13XX
+ 	default 0xfef00000 if ARCH_IXP4XX && !CPU_BIG_ENDIAN
+ 	default 0xfef00003 if ARCH_IXP4XX && CPU_BIG_ENDIAN
+-- 
+1.8.1.2
