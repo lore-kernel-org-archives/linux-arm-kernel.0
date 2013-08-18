@@ -1,185 +1,62 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 Aug 2013 04:27:00 +0900
-Subject: [PATCH] ARM: DT: Exynos: fix number of interrupt-cells in mct node
-In-Reply-To: <CANuQgHEq3QA_zE1axnXqCdv8RLXHTfv3wVn59gHSk3jEPtLiXQ@mail.gmail.com>
-References: <1371220886-11616-1-git-send-email-chander.kashyap@linaro.org>	<CANuQgHH+nebJf4HPrsWPLECyvWO8OGJj=YeDG4GQAmLHM8GrPw@mail.gmail.com>
- <CANuQgHEq3QA_zE1axnXqCdv8RLXHTfv3wVn59gHSk3jEPtLiXQ@mail.gmail.com>
-Message-ID: <52112004.90202@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 18 Aug 2013 14:35:18 -0500
+Subject: [PATCH 2/2] ARM: highbank: avoid L2 cache smc calls when PL310 is not
+ present
+In-Reply-To: <1376854518-22596-1-git-send-email-robherring2@gmail.com>
+References: <1376854518-22596-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1376854518-22596-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/13 15:23, Chander Kashyap wrote:
-> ping
->
-> On 23 July 2013 15:17, Chander Kashyap<chander.kashyap@linaro.org>  wrote:
->> ping.
->>
->> On 14 June 2013 20:11, Chander Kashyap<chander.kashyap@linaro.org>  wrote:
->>> Two cells were used to specify interrupts in mct node, while second cell
->>> always remains unused. Hence use only one cell.
->>> Suggested by Tomasz Figa.
->>>
->>> Signed-off-by: Chander Kashyap<chander.kashyap@linaro.org>
->>> ---
->>>   arch/arm/boot/dts/exynos4210.dtsi |   19 +++++++++----------
->>>   arch/arm/boot/dts/exynos4212.dtsi |   19 +++++++++----------
->>>   arch/arm/boot/dts/exynos4412.dtsi |   23 +++++++++++------------
->>>   arch/arm/boot/dts/exynos5250.dtsi |   19 +++++++++----------
->>>   4 files changed, 38 insertions(+), 42 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
->>> index 54710de..ad50010 100644
->>> --- a/arch/arm/boot/dts/exynos4210.dtsi
->>> +++ b/arch/arm/boot/dts/exynos4210.dtsi
->>> @@ -52,23 +52,22 @@
->>>                  compatible = "samsung,exynos4210-mct";
->>>                  reg =<0x10050000 0x800>;
->>>                  interrupt-controller;
->>> -               #interrups-cells =<2>;
->>> +               #interrups-cells =<1>;
->>>                  interrupt-parent =<&mct_map>;
->>> -               interrupts =<0 0>,<1 0>,<2 0>,<3 0>,
->>> -<4 0>,<5 0>;
->>> +               interrupts =<0>,<1>,<2>,<3>,<4>,<5>;
->>>                  clocks =<&clock 3>,<&clock 344>;
->>>                  clock-names = "fin_pll", "mct";
->>>
->>>                  mct_map: mct-map {
->>> -                       #interrupt-cells =<2>;
->>> +                       #interrupt-cells =<1>;
->>>                          #address-cells =<0>;
->>>                          #size-cells =<0>;
->>> -                       interrupt-map =<0x0 0&gic 0 57 0>,
->>> -<0x1 0&gic 0 69 0>,
->>> -<0x2 0&combiner 12 6>,
->>> -<0x3 0&combiner 12 7>,
->>> -<0x4 0&gic 0 42 0>,
->>> -<0x5 0&gic 0 48 0>;
->>> +                       interrupt-map =<0&gic 0 57 0>,
->>> +<1&gic 0 69 0>,
->>> +<2&combiner 12 6>,
->>> +<3&combiner 12 7>,
->>> +<4&gic 0 42 0>,
->>> +<5&gic 0 48 0>;
->>>                  };
->>>          };
->>>
->>> diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
->>> index c0f60f4..ba9ada1 100644
->>> --- a/arch/arm/boot/dts/exynos4212.dtsi
->>> +++ b/arch/arm/boot/dts/exynos4212.dtsi
->>> @@ -39,21 +39,20 @@
->>>                  compatible = "samsung,exynos4412-mct";
->>>                  reg =<0x10050000 0x800>;
->>>                  interrupt-controller;
->>> -               #interrups-cells =<2>;
->>> +               #interrups-cells =<1>;
->>>                  interrupt-parent =<&mct_map>;
->>> -               interrupts =<0 0>,<1 0>,<2 0>,<3 0>,
->>> -<4 0>,<5 0>;
->>> +               interrupts =<0>,<1>,<2>,<3>,<4>,<5>;
->>>
->>>                  mct_map: mct-map {
->>> -                       #interrupt-cells =<2>;
->>> +                       #interrupt-cells =<>;
->>>                          #address-cells =<0>;
->>>                          #size-cells =<0>;
->>> -                       interrupt-map =<0x0 0&gic 0 57 0>,
->>> -<0x1 0&combiner 12 5>,
->>> -<0x2 0&combiner 12 6>,
->>> -<0x3 0&combiner 12 7>,
->>> -<0x4 0&gic 1 12 0>,
->>> -<0x5 0&gic 1 12 0>;
->>> +                       interrupt-map =<0&gic 0 57 0>,
->>> +<1&combiner 12 5>,
->>> +<2&combiner 12 6>,
->>> +<3&combiner 12 7>,
->>> +<4&gic 1 12 0>,
->>> +<5&gic 1 12 0>;
->>>                  };
->>>          };
->>>   };
->>> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
->>> index 270b389..a680de7 100644
->>> --- a/arch/arm/boot/dts/exynos4412.dtsi
->>> +++ b/arch/arm/boot/dts/exynos4412.dtsi
->>> @@ -39,25 +39,24 @@
->>>                  compatible = "samsung,exynos4412-mct";
->>>                  reg =<0x10050000 0x800>;
->>>                  interrupt-controller;
->>> -               #interrups-cells =<2>;
->>> +               #interrups-cells =<1>;
->>>                  interrupt-parent =<&mct_map>;
->>> -               interrupts =<0 0>,<1 0>,<2 0>,<3 0>,
->>> -<4 0>,<5 0>,<6 0>,<7 0>;
->>> +               interrupts =<0>,<1>,<2>,<3>,<4>,<5>,<6>,<7>;
->>>                  clocks =<&clock 3>,<&clock 344>;
->>>                  clock-names = "fin_pll", "mct";
->>>
->>>                  mct_map: mct-map {
->>> -                       #interrupt-cells =<2>;
->>> +                       #interrupt-cells =<1>;
->>>                          #address-cells =<0>;
->>>                          #size-cells =<0>;
->>> -                       interrupt-map =<0x0 0&gic 0 57 0>,
->>> -<0x1 0&combiner 12 5>,
->>> -<0x2 0&combiner 12 6>,
->>> -<0x3 0&combiner 12 7>,
->>> -<0x4 0&gic 1 12 0>,
->>> -<0x5 0&gic 1 12 0>,
->>> -<0x6 0&gic 1 12 0>,
->>> -<0x7 0&gic 1 12 0>;
->>> +                       interrupt-map =<0&gic 0 57 0>,
->>> +<1&combiner 12 5>,
->>> +<2&combiner 12 6>,
->>> +<3&combiner 12 7>,
->>> +<4&gic 1 12 0>,
->>> +<5&gic 1 12 0>,
->>> +<6&gic 1 12 0>,
->>> +<7&gic 1 12 0>;
->>>                  };
->>>          };
->>>
->>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
->>> index a7cf3f5..4e633ef 100644
->>> --- a/arch/arm/boot/dts/exynos5250.dtsi
->>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->>> @@ -94,23 +94,22 @@
->>>                  compatible = "samsung,exynos4210-mct";
->>>                  reg =<0x101C0000 0x800>;
->>>                  interrupt-controller;
->>> -               #interrups-cells =<2>;
->>> +               #interrups-cells =<1>;
->>>                  interrupt-parent =<&mct_map>;
->>> -               interrupts =<0 0>,<1 0>,<2 0>,<3 0>,
->>> -<4 0>,<5 0>;
->>> +               interrupts =<0>,<1>,<2>,<3>,<4>,<5>;
->>>                  clocks =<&clock 1>,<&clock 335>;
->>>                  clock-names = "fin_pll", "mct";
->>>
->>>                  mct_map: mct-map {
->>> -                       #interrupt-cells =<2>;
->>> +                       #interrupt-cells =<1>;
->>>                          #address-cells =<0>;
->>>                          #size-cells =<0>;
->>> -                       interrupt-map =<0x0 0&combiner 23 3>,
->>> -<0x1 0&combiner 23 4>,
->>> -<0x2 0&combiner 25 2>,
->>> -<0x3 0&combiner 25 3>,
->>> -<0x4 0&gic 0 120 0>,
->>> -<0x5 0&gic 0 121 0>;
->>> +                       interrupt-map =<0&combiner 23 3>,
->>> +<1&combiner 23 4>,
->>> +<2&combiner 25 2>,
->>> +<3&combiner 25 3>,
->>> +<4&gic 0 120 0>,
->>> +<5&gic 0 121 0>;
->>>                  };
->>>          };
->>>
->>> --
->>> 1.7.9.5
+From: Rob Herring <rob.herring@calxeda.com>
 
-Should be updated with regarding Doc.
+While Midway firmware handles L2 smc calls as nops, the custom smc calls
+present a problem when running virtualized Midway guest. They aren't
+needed so just avoid calling them.
 
-Kukjin
+In the process, cleanup the L2X0 ifdefs and use IS_ENABLED instead.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/mach-highbank/highbank.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 0749b42..42ac14b 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -65,13 +65,11 @@ void highbank_set_cpu_jump(int cpu, void *jump_addr)
+ 			  HB_JUMP_TABLE_PHYS(cpu) + 15);
+ }
+ 
+-#ifdef CONFIG_CACHE_L2X0
+ static void highbank_l2x0_disable(void)
+ {
+ 	/* Disable PL310 L2 Cache controller */
+ 	highbank_smc1(0x102, 0x0);
+ }
+-#endif
+ 
+ static void __init highbank_init_irq(void)
+ {
+@@ -80,12 +78,13 @@ static void __init highbank_init_irq(void)
+ 	if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
+ 		highbank_scu_map_io();
+ 
+-#ifdef CONFIG_CACHE_L2X0
+ 	/* Enable PL310 L2 Cache controller */
+-	highbank_smc1(0x102, 0x1);
+-	l2x0_of_init(0, ~0UL);
+-	outer_cache.disable = highbank_l2x0_disable;
+-#endif
++	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
++	    of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
++		highbank_smc1(0x102, 0x1);
++		l2x0_of_init(0, ~0UL);
++		outer_cache.disable = highbank_l2x0_disable;
++	}
+ }
+ 
+ static void __init highbank_timer_init(void)
+-- 
+1.8.1.2
