@@ -1,81 +1,91 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 19 Aug 2013 09:12:38 +0200
-Subject: [PATCH resend] ARM: add workaround for ambiguous C99 stdint.h types
-Message-ID: <1376896358-21076-1-git-send-email-ard.biesheuvel@linaro.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 19 Aug 2013 10:24:58 +0300
+Subject: [PATCH v3 7/8] ARM: dts: omap4: update omap-control-usb nodes
+In-Reply-To: <520E379B.4090108@baylibre.com>
+References: <1376658571-20992-1-git-send-email-rogerq@ti.com>
+ <1376658571-20992-8-git-send-email-rogerq@ti.com>
+ <520E379B.4090108@baylibre.com>
+Message-ID: <5211C84A.5040000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
-unambiguous on ARM as you would expect. For the types below, there is a
-difference on ARM between GCC built for bare metal ARM, GCC built for glibc
-and the kernel itself, which results in build errors if you try to build with
--ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
-in order to use NEON intrinsics)
+Hi Benoit,
 
-As the typedefs for these types in 'stdint.h' are based on builtin defines
-supplied by GCC, we can tweak these to align with the kernel's idea of those
-types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
-source file (provided that -ffreestanding is used).
+On 08/16/2013 05:30 PM, Benoit Cousson wrote:
+> Hi Roger,
+> 
+> Sorry I missed something in the previous revision :-(
 
-                   int32_t         uint32_t               uintptr_t
-bare metal GCC     long            unsigned long          unsigned int
-glibc GCC          int             unsigned int           unsigned int
-kernel             int             unsigned int           unsigned long
+no problem :)
+> 
+> On 16/08/2013 15:09, Roger Quadros wrote:
+>> Split otghs_ctrl and USB2 PHY power down into separate
+>> omap-control-usb nodes. Get rid of "ti,type" property.
+> 
+> You should add that you update the usb_otg_hs node accordingly as well.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-Acked by: Dave Martin <dave.martin@arm.com>
-Acked-by: Mikael Pettersson <mikpe@it.uu.se>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/include/asm/types.h | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 arch/arm/include/asm/types.h
+OK.
+> 
+>> CC: Benoit Cousson <bcousson@baylibre.com>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>   arch/arm/boot/dts/omap4.dtsi |   20 ++++++++++++--------
+>>   1 files changed, 12 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>> index 22d9f2b..a77dd0a 100644
+>> --- a/arch/arm/boot/dts/omap4.dtsi
+>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>> @@ -519,7 +519,7 @@
+>>               usb2_phy: usb2phy at 4a0ad080 {
+>>                   compatible = "ti,omap-usb2";
+>>                   reg = <0x4a0ad080 0x58>;
+>> -                ctrl-module = <&omap_control_usb>;
+>> +                ctrl-module = <&omap_control_usb2phy>;
+>>               };
+>>           };
+>>
+>> @@ -643,12 +643,16 @@
+>>               };
+>>           };
+>>
+>> -        omap_control_usb: omap-control-usb at 4a002300 {
+>> -            compatible = "ti,omap-control-usb";
+>> -            reg = <0x4a002300 0x4>,
+>> -                  <0x4a00233c 0x4>;
+>> -            reg-names = "control_dev_conf", "otghs_control";
+>> -            ti,type = <1>;
+>> +        omap_control_usb2phy: omap-control-usb at 4a002300 {
+>> +            compatible = "ti,usb2-control-usb";
+>> +            reg = <0x4a002300 0x4>;
+>> +            reg-names = "power";
+>> +        };
+>> +
+>> +        omap_control_usbotg: omap-control-usb at 4a00233c {
+>> +            compatible = "ti,omap4-control-usb";
+>> +            reg = <0x4a00233c 0x4>;
+>> +            reg-names = "otghs_control";
+>>           };
+>>
+>>           usb_otg_hs: usb_otg_hs at 4a0ab000 {
+>> @@ -661,7 +665,7 @@
+>>               multipoint = <1>;
+>>               num-eps = <16>;
+>>               ram-bits = <12>;
+>> -            ti,has-mailbox;
+>> +            ctrl-module = <&omap_control_usbotg>;
+> 
+> In omap-usb.txt, ti,has-mailbox is still marked as mandatory whereas the ctrl-module is optional.
+> 
+> You should update the usb-otg-hs bindings as well.
 
-diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
-new file mode 100644
-index 0000000..c4f0bca
---- /dev/null
-+++ b/arch/arm/include/asm/types.h
-@@ -0,0 +1,40 @@
-+#ifndef _ASM_TYPES_H
-+#define _ASM_TYPES_H
-+
-+#include <asm-generic/int-ll64.h>
-+
-+/*
-+ * The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
-+ * unambiguous on ARM as you would expect. For the types below, there is a
-+ * difference on ARM between GCC built for bare metal ARM, GCC built for glibc
-+ * and the kernel itself, which results in build errors if you try to build with
-+ * -ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
-+ * in order to use NEON intrinsics)
-+ *
-+ * As the typedefs for these types in 'stdint.h' are based on builtin defines
-+ * supplied by GCC, we can tweak these to align with the kernel's idea of those
-+ * types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
-+ * source file (provided that -ffreestanding is used).
-+ * 
-+ *                    int32_t         uint32_t               uintptr_t
-+ * bare metal GCC     long            unsigned long          unsigned int
-+ * glibc GCC          int             unsigned int           unsigned int
-+ * kernel             int             unsigned int           unsigned long
-+ */
-+
-+#ifdef __INT32_TYPE__
-+#undef __INT32_TYPE__
-+#define __INT32_TYPE__		int
-+#endif
-+
-+#ifdef __UINT32_TYPE__
-+#undef __UINT32_TYPE__
-+#define __UINT32_TYPE__	unsigned int
-+#endif
-+
-+#ifdef __UINTPTR_TYPE__
-+#undef __UINTPTR_TYPE__
-+#define __UINTPTR_TYPE__	unsigned long
-+#endif
-+
-+#endif /* _ASM_TYPES_H */
--- 
-1.8.1.2
+Right, I removed it from the binding information, but missed the example.
+
+> 
+> BTW, why is that property not prefixed with "ti,"? Is ctrl-module really meaningful for other arch?
+
+The ctrl-module thing is TI specific, but otg_hs is used by other platforms, maybe that's why
+the "ti," prefix was used.
+
+cheers,
+-roger
