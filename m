@@ -1,165 +1,65 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 19 Aug 2013 16:52:00 +0300
-Subject: [PATCHv5 16/31] CLK: TI: DRA7: Add APLL support
-In-Reply-To: <20130813111449.GL27165@e106331-lin.cambridge.arm.com>
-References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
- <1375460751-23676-17-git-send-email-t-kristo@ti.com>
- <20130813111449.GL27165@e106331-lin.cambridge.arm.com>
-Message-ID: <52122300.4040606@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 19 Aug 2013 21:53:17 +0800
+Subject: [PATCH] ARM: dts: imx6sl reuses imx6q sdma firmware
+In-Reply-To: <20130819123541-7656@mutt-kz>
+References: <1376903386-27771-1-git-send-email-shawn.guo@linaro.org>
+ <20130819123541-7656@mutt-kz>
+Message-ID: <20130819135315.GA28297@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2013 02:14 PM, Mark Rutland wrote:
-> On Fri, Aug 02, 2013 at 05:25:35PM +0100, Tero Kristo wrote:
->> From: Keerthy <j-keerthy@ti.com>
->>
->> The patch adds support for DRA7 PCIe APLL. The APLL
->> sources the optional functional clocks for PCIe module.
->>
->> APLL stands for Analog PLL. This is different when comapred
->> with DPLL meaning Digital PLL, the phase detection is done
->> using an analog circuit.
->>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->>   .../devicetree/bindings/clock/ti/apll.txt          |   32 +++
->>   arch/arm/mach-omap2/clock.h                        |    1 -
->>   drivers/clk/ti/Makefile                            |    2 +-
->>   drivers/clk/ti/apll.c                              |  209 ++++++++++++++++++++
->>   include/linux/clk/ti.h                             |    2 +
->>   5 files changed, 244 insertions(+), 2 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/clock/ti/apll.txt
->>   create mode 100644 drivers/clk/ti/apll.c
->>
->> diff --git a/Documentation/devicetree/bindings/clock/ti/apll.txt b/Documentation/devicetree/bindings/clock/ti/apll.txt
->> new file mode 100644
->> index 0000000..f7a82e9
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/ti/apll.txt
->> @@ -0,0 +1,32 @@
->> +Binding for Texas Instruments APLL clock.
->> +
->> +This binding uses the common clock binding[1].  It assumes a
->> +register-mapped APLL with usually two selectable input clocks
->> +(reference clock and bypass clock), with analog phase locked
->> +loop logic for multiplying the input clock to a desired output
->> +clock. This clock also typically supports different operation
->> +modes (locked, low power stop etc.) APLL mostly behaves like
->> +a subtype of a DPLL [2], although a simplified one at that.
->> +
->> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->> +[2] Documentation/devicetree/bindings/clock/ti/dpll.txt
->> +
->> +Required properties:
->> +- compatible : shall be "ti,dra7-apll-clock"
->> +- #clock-cells : from common clock binding; shall be set to 0.
->> +- clocks : link phandles of parent clocks (clk-ref and clk-bypass)
->> +- reg : array of register base addresses for controlling the APLL:
->> +       reg[0] = control register
->> +       reg[1] = idle status register
->
-> Using reg-names is likely a good idea here.
+On Mon, Aug 19, 2013 at 02:35:42PM +0200, Luka Perkov wrote:
+> Hi Shawn,
+> 
+> On Mon, Aug 19, 2013 at 05:09:46PM +0800, Shawn Guo wrote:
+> > There is no imx6sl specific sdma firmware.  Instead, imx6sl reuses
+> > imx6q sdma firmware.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/imx6sl.dtsi |    3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> > index c46651e..9fec772 100644
+> > --- a/arch/arm/boot/dts/imx6sl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> > @@ -619,7 +619,8 @@
+> >  					 <&clks IMX6SL_CLK_SDMA>;
+> >  				clock-names = "ipg", "ahb";
+> >  				#dma-cells = <3>;
+> > -				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6sl.bin";
+> > +				/* imx6sl reuses imx6q sdma firmware */
+> > +				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
+> 
+> As you may have noticed my patch changes both imx6sl.dtsi and
+> imx6qdl.dtsi because of the naming convention used in other sdma
+> firmwares:
 
-I'll change these for next rev to be similar to what was discussed in 
-the DPLL part.
+The convention is to use SoC name to specify the firmware for particular
+SoC.  imx6 is not a SoC name.  Sure, sdma-imx6sl.bin is incorrect since
+there is no imx6sl specific sdma firmware.  Instead, it reuses imx6q
+one.
 
->
->> +- ti,clk-ref : link phandle for the reference clock
->> +- ti,clk-bypass : link phandle for the bypass clock
->
-> You don't need this. Use the clocks and clock-names properties.
+> 
+> $ fgrep sdma-ram-script-name arch/arm/boot
+> arch/arm/boot/dts/imx6qdl.dtsi:				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
+> arch/arm/boot/dts/imx6sl.dtsi:				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6sl.bin";
+> arch/arm/boot/dts/imx51.dtsi:				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
+> arch/arm/boot/dts/imx53.dtsi:				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
+> 
+> Also, last patch containing sdma firmware blobs sent to the mailing list
+> [1] uses "sdma-imx6.bin" name.
 
-Ditto.
+The patch never got merged.  I do not like the name, simply because imx6
+is not a SoC name.
 
->
-> [...]
->
->> +static int dra7_apll_enable(struct clk_hw *hw)
->> +{
->> +       struct clk_hw_omap *clk = to_clk_hw_omap(hw);
->> +       int r = 0, i = 0;
->> +       struct dpll_data *ad;
->> +       const char *clk_name;
->> +       u8 state = 1;
->> +       u32 v;
->> +
->> +       ad = clk->dpll_data;
->> +       if (!ad)
->> +               return -EINVAL;
->> +
->> +       clk_name = __clk_get_name(clk->hw.clk);
->> +
->> +       state <<= __ffs(ad->idlest_mask);
->> +
->> +       /* Check is already locked */
->> +       if ((__raw_readl(ad->idlest_reg) & ad->idlest_mask) == state)
->> +               return r;
->
-> Why __raw_readl rather than raw_readl?
+> That is why I think patch I have sent
+> recently [2] is more appropriate. Don't you think so?
 
-Hmm not sure, Keerthy, do you have any comment on this as the patch was 
-originally written by you? :)
+No, I do not think so, and that's why I sent my version with you on Cc.
 
->
->> +
->> +       v = __raw_readl(ad->control_reg);
->> +       v &= ~ad->enable_mask;
->> +       v |= APLL_FORCE_LOCK << __ffs(ad->enable_mask);
->> +       __raw_writel(v, ad->control_reg);
->
-> Why not raw_writel? Do you not need the rmb() provided by writel, here
-> or anywhere else?
+Shawn
 
-Same, Keerthy? Probably just legacy copy paste from omap2 code and can 
-be updated based on your comment. Some of these might actually be some 
-old optimizations, but the APLL enable/disable should be called so 
-seldom it shouldn't matter. If no objections, I'll just change these all 
-for next rev.
-
->
-> [...]
->
->> +void __init of_dra7_apll_setup(struct device_node *node)
->> +{
->> +       const struct clk_ops *ops;
->> +       struct clk *clk;
->> +       const char *clk_name = node->name;
->> +       int num_parents;
->> +       const char **parent_names = NULL;
->> +       struct of_phandle_args clkspec;
->> +       u8 apll_flags = 0;
->> +       struct dpll_data *ad;
->> +       u32 idlest_mask = 0x1;
->> +       u32 autoidle_mask = 0x3;
->> +       int i;
->> +
->> +       ops = &apll_ck_ops;
->> +       ad = kzalloc(sizeof(*ad), GFP_KERNEL);
->> +       if (!ad) {
->> +               pr_err("%s: could not allocate dpll_data\n", __func__);
->> +               return;
->> +       }
->> +
->> +       of_property_read_string(node, "clock-output-names", &clk_name);
->> +
->> +       num_parents = of_clk_get_parent_count(node);
->> +       if (num_parents < 1) {
->> +               pr_err("%s: omap dpll %s must have parent(s)\n",
->> +                      __func__, node->name);
->> +               goto cleanup;
->> +       }
->> +
->> +       parent_names = kzalloc(sizeof(char *) * num_parents, GFP_KERNEL);
->> +
->> +       for (i = 0; i < num_parents; i++)
->> +               parent_names[i] = of_clk_get_parent_name(node, i);
->> +
->> +       clkspec.np = of_parse_phandle(node, "ti,clk-ref", 0);
->> +       ad->clk_ref = of_clk_get_from_provider(&clkspec);
->
-> Use clocks, clock-names, and of_clk_get_by_name().
-
-Yea, will change.
-
--Tero
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/143025.html
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/191108.html
