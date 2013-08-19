@@ -1,154 +1,464 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 19 Aug 2013 19:19:26 +0300
-Subject: [PATCHv5 05/31] CLK: TI: add support for OMAP gate clock
-In-Reply-To: <20130819155830.GR3719@e106331-lin.cambridge.arm.com>
-References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
- <1375460751-23676-6-git-send-email-t-kristo@ti.com>
- <20130813110437.GK27165@e106331-lin.cambridge.arm.com>
- <521220AD.4070308@ti.com>
- <20130819142959.GP3719@e106331-lin.cambridge.arm.com>
- <52122F03.5050602@ti.com>
- <20130819155830.GR3719@e106331-lin.cambridge.arm.com>
-Message-ID: <5212458E.906@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 19 Aug 2013 18:23:46 +0200
+Subject: [PATCH] ARM: at91/dt: split sam9x5 peripheral definitions
+In-Reply-To: <5203B7DA.8030706@overkiz.com>
+References: <1375870466-1093-1-git-send-email-b.brezillon@overkiz.com>
+ <20130808140722.GA18627@ns203013.ovh.net> <5203B7DA.8030706@overkiz.com>
+Message-ID: <52124692.4080905@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2013 06:58 PM, Mark Rutland wrote:
-> On Mon, Aug 19, 2013 at 03:43:15PM +0100, Tero Kristo wrote:
->> On 08/19/2013 05:29 PM, Mark Rutland wrote:
->>> On Mon, Aug 19, 2013 at 02:42:05PM +0100, Tero Kristo wrote:
->>>> On 08/13/2013 02:04 PM, Mark Rutland wrote:
->>>>> On Fri, Aug 02, 2013 at 05:25:24PM +0100, Tero Kristo wrote:
->>>>>> This node adds support for a clock node which allows control to the
->>>>>> clockdomain enable / disable.
->>>>>>
->>>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>>>>> ---
->>>>>>     .../devicetree/bindings/clock/ti/gate.txt          |   41 ++++++++
->>>>>>     arch/arm/mach-omap2/clock.h                        |    9 --
->>>>>>     drivers/clk/ti/Makefile                            |    2 +-
->>>>>>     drivers/clk/ti/gate.c                              |  106 ++++++++++++++++++++
->>>>>>     include/linux/clk/ti.h                             |    8 ++
->>>>>>     5 files changed, 156 insertions(+), 10 deletions(-)
->>>>>>     create mode 100644 Documentation/devicetree/bindings/clock/ti/gate.txt
->>>>>>     create mode 100644 drivers/clk/ti/gate.c
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/clock/ti/gate.txt b/Documentation/devicetree/bindings/clock/ti/gate.txt
->>>>>> new file mode 100644
->>>>>> index 0000000..620a73d
->>>>>> --- /dev/null
->>>>>> +++ b/Documentation/devicetree/bindings/clock/ti/gate.txt
->>>>>> @@ -0,0 +1,41 @@
->>>>>> +Binding for Texas Instruments gate clock.
->>>>>> +
->>>>>> +This binding uses the common clock binding[1]. This clock is
->>>>>> +quite much similar to the basic gate-clock [2], however,
->>>>>> +it supports a number of additional features. If no register
->>>>>> +is provided for this clock, the code assumes that a clockdomain
->>>>>> +will be controlled instead and the corresponding hw-ops for
->>>>>> +that is used.
->>>>>> +
->>>>>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->>>>>> +[2] Documentation/devicetree/bindings/clock/gate-clock.txt
->>>>>> +
->>>>>> +Required properties:
->>>>>> +- compatible : shall be "ti,gate-clock"
->>>>>> +- #clock-cells : from common clock binding; shall be set to 0
->>>>>> +- clocks : link to phandle of parent clock
->>>>>> +
->>>>>> +Optional properties:
->>>>>> +- reg : base address for register controlling adjustable gate
->>>>>
->>>>> Optional? That's odd. If I have a clock with registers, but don't
->>>>> specify the register, will it still work? i.e. are registerless clocks
->>>>> really compatible with clocks with registers?.
->>>>
->>>> I think I implemented this in somewhat confusing manner. This could be
->>>> split to:
->>>>
->>>> ti,gate-clock:
->>>>      requires reg and ti,enable-bit info
->>>> ti,clkdm-clock:
->>>>      requires ti,clkdm-name
->>>>
->>>> clkdm clock is kind of a master clock for clockdomain, the clock is
->>>> provided always if the clockdomain is active.
+On 08/08/2013 17:23, boris brezillon :
+> Hello Jean-Christophe,
+>
+> On 08/08/2013 16:07, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> On 12:14 Wed 07 Aug     , Boris BREZILLON wrote:
+>>> This patch splits the sam9x5 peripheral definitions into:
+>>> - a common base for all sam9x5 SoCs (at91sam9x5.dtsi)
+>>> - several optional peripheral definitions which will be included by specific
+>>>     sam9x5 SoCs (at91sam9x5_'periph name'.dtsi)
 >>>
->>> Ok.
+>>> This provides a better representation of the real hardware (drop unneeded
+>>> dt nodes) and avoids future peripheral id conflict (lcdc and isi both use
+>>> peripheral id 25).
+>> I really don't like this
+>>
+>> the mapping is soc specific (here familly) so I does not see any advantage
+>> except move files so NO for me
+> Let me explain in detail why I did that.
+>
+> This separation was part of the "at91 common clk" series and was here to
+> avoid the
+> definition of unavailable clocks or definition of clocks with the same
+> id (which may result
+> in bad clk registration).
+> If we keep all the definitions in one .dtsi file (even the one which are
+> not really available),
+> I may need to add a new property to each peripheral (and system) clk
+> node to specify the
+> availabilty of the clock (something similar to 'status="disabled"' in
+> device nodes).
+
+This is indeed a pretty good argument.
+I do think that we have to ask Mike Turquette to see if he already has 
+encountered such a case.
+
+I must say that I was not in favor for this split because of readability 
+and dts/dtsi file organization (you know, the usual question: where the 
+hell this peripheral property is finally setup?).
+
+But, if we really have to implement a new kind of property to tell if a 
+clock is actually present or not, I am in favor for reconsidering this 
+solution as it seems quite simple and self-explanatory...
+
+> As explained to Thomas, I thought device tree was here to give a real
+> description of the
+> hardware parts (in case of sam9x5.dtsi the description of the common
+> parts of sam9x5 SoC
+> family).
+> If you define peripherals that are not present in a SoC (lets say macb0
+> for sam9g15) you break
+> this rule.
+
+Well, on the other hand, the status says "disabled", so we can imagine 
+that it has been disabled, from its birth, in hardware...
+
+> I'm not telling I have the right approach here, I'm just trying to
+> understand what should be done and
+> what should not.
+>
+> Finally, I'd like to point that the memory footprint of the dtb file
+> generated after this patch has been
+> applied is bit smaller (even if it won't make a real difference):
+>
+> with this patch:
+>
+> 15937 arch/arm/boot/dts/at91-ariag25.dtb
+> 15860 arch/arm/boot/dts/at91sam9g15ek.dtb
+> 16905 arch/arm/boot/dts/at91sam9g25ek.dtb
+> 16473 arch/arm/boot/dts/at91sam9g35ek.dtb
+> 17341 arch/arm/boot/dts/at91sam9x25ek.dtb
+> 16473 arch/arm/boot/dts/at91sam9x35ek.dtb
+>
+> without this patch:
+>
+> 16077 arch/arm/boot/dts/at91-ariag25.dtb
+> 16824 arch/arm/boot/dts/at91sam9g15ek.dtb
+> 16849 arch/arm/boot/dts/at91sam9g25ek.dtb
+> 16849 arch/arm/boot/dts/at91sam9g35ek.dtb
+> 15017 arch/arm/boot/dts/at91sam9m10g45ek.dtb
+> 17145 arch/arm/boot/dts/at91sam9x25ek.dtb
+> 16849 arch/arm/boot/dts/at91sam9x35ek.dtb
+
+okay, but difference in size are not impressive. But it is true that:
+- it can grow a little if we switch LCD to full DT
+- each bit saved can have an influence on boot time
+but it will not be a decisive factor.
+
+
+>> Best Regards,
+>> J.
+>>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>>> ---
+>>>    arch/arm/boot/dts/at91sam9g25.dtsi       |    2 +
+>>>    arch/arm/boot/dts/at91sam9g35.dtsi       |    1 +
+>>>    arch/arm/boot/dts/at91sam9x25.dtsi       |   24 ++---------
+>>>    arch/arm/boot/dts/at91sam9x35.dtsi       |    1 +
+>>>    arch/arm/boot/dts/at91sam9x5.dtsi        |   67 ------------------------------
+>>>    arch/arm/boot/dts/at91sam9x5_macb0.dtsi  |   56 +++++++++++++++++++++++++
+>>>    arch/arm/boot/dts/at91sam9x5_macb1.dtsi  |   44 ++++++++++++++++++++
+>>>    arch/arm/boot/dts/at91sam9x5_usart3.dtsi |   51 +++++++++++++++++++++++
+>>>    8 files changed, 158 insertions(+), 88 deletions(-)
+>>>    create mode 100644 arch/arm/boot/dts/at91sam9x5_macb0.dtsi
+>>>    create mode 100644 arch/arm/boot/dts/at91sam9x5_macb1.dtsi
+>>>    create mode 100644 arch/arm/boot/dts/at91sam9x5_usart3.dtsi
 >>>
->>>>
->>>>>
->>>>>> +- ti,enable-bit : bit shift for programming the clock gate
->>>>>
->>>>> Why is this needed? Does the hardware vary wildly, or are several clocks
->>>>> sharing the same register(s)?
->>>>
->>>> Yea, same register is shared.
+>>> diff --git a/arch/arm/boot/dts/at91sam9g25.dtsi b/arch/arm/boot/dts/at91sam9g25.dtsi
+>>> index b4ec6fe..17b8799 100644
+>>> --- a/arch/arm/boot/dts/at91sam9g25.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9g25.dtsi
+>>> @@ -7,6 +7,8 @@
+>>>     */
 >>>
->>> Ok. Are those gate clocks are part of a larger "gate clocks" block, with
->>> the register that controls them? or are they really independent? Does
->>> the register control other items too?
->>
->> Not really. Typically they only have the clockdomain in common, and the
->> individual clocks are mostly controlled independently from each other.
->> For example on omap3 we have following register:
+>>>    #include "at91sam9x5.dtsi"
+>>> +#include "at91sam9x5_usart3.dtsi"
+>>> +#include "at91sam9x5_macb0.dtsi"
+>>>
+>>>    / {
+>>>    	model = "Atmel AT91SAM9G25 SoC";
+>>> diff --git a/arch/arm/boot/dts/at91sam9g35.dtsi b/arch/arm/boot/dts/at91sam9g35.dtsi
+>>> index bebf9f5..e35c2fc 100644
+>>> --- a/arch/arm/boot/dts/at91sam9g35.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9g35.dtsi
+>>> @@ -7,6 +7,7 @@
+>>>     */
+>>>
+>>>    #include "at91sam9x5.dtsi"
+>>> +#include "at91sam9x5_macb0.dtsi"
+>>>
+>>>    / {
+>>>    	model = "Atmel AT91SAM9G35 SoC";
+>>> diff --git a/arch/arm/boot/dts/at91sam9x25.dtsi b/arch/arm/boot/dts/at91sam9x25.dtsi
+>>> index 49e94ab..c255421 100644
+>>> --- a/arch/arm/boot/dts/at91sam9x25.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9x25.dtsi
+>>> @@ -7,6 +7,9 @@
+>>>     */
+>>>
+>>>    #include "at91sam9x5.dtsi"
+>>> +#include "at91sam9x5_usart3.dtsi"
+>>> +#include "at91sam9x5_macb0.dtsi"
+>>> +#include "at91sam9x5_macb1.dtsi"
+>>>
+>>>    / {
+>>>    	model = "Atmel AT91SAM9X25 SoC";
+>>> @@ -22,27 +25,6 @@
+>>>    				       0x80000000 0xfffd0000 0xb83fffff  /* pioC */
+>>>    				       0x003fffff 0x003f8000 0x00000000  /* pioD */
+>>>    				      >;
+>>> -
+>>> -				macb1 {
+>>> -					pinctrl_macb1_rmii: macb1_rmii-0 {
+>>> -						atmel,pins =
+>>> -							<AT91_PIOC 16 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC16 periph B */
+>>> -							 AT91_PIOC 18 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC18 periph B */
+>>> -							 AT91_PIOC 19 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC19 periph B */
+>>> -							 AT91_PIOC 20 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC20 periph B */
+>>> -							 AT91_PIOC 21 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC21 periph B */
+>>> -							 AT91_PIOC 27 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC27 periph B */
+>>> -							 AT91_PIOC 28 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC28 periph B */
+>>> -							 AT91_PIOC 29 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC29 periph B */
+>>> -							 AT91_PIOC 30 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC30 periph B */
+>>> -							 AT91_PIOC 31 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PC31 periph B */
+>>> -					};
+>>> -				};
+>>> -			};
+>>> -
+>>> -			macb1: ethernet at f8030000 {
+>>> -				pinctrl-names = "default";
+>>> -				pinctrl-0 = <&pinctrl_macb1_rmii>;
+>>>    			};
+>>>    		};
+>>>    	};
+>>> diff --git a/arch/arm/boot/dts/at91sam9x35.dtsi b/arch/arm/boot/dts/at91sam9x35.dtsi
+>>> index 1a3d525..8eac66c 100644
+>>> --- a/arch/arm/boot/dts/at91sam9x35.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9x35.dtsi
+>>> @@ -7,6 +7,7 @@
+>>>     */
+>>>
+>>>    #include "at91sam9x5.dtsi"
+>>> +#include "at91sam9x5_macb0.dtsi"
+>>>
+>>>    / {
+>>>    	model = "Atmel AT91SAM9X35 SoC";
+>>> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> index 57d45f5..05f4c74 100644
+>>> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> @@ -206,29 +206,6 @@
+>>>    					};
+>>>    				};
+>>>
+>>> -				usart3 {
+>>> -					pinctrl_usart3: usart3-0 {
+>>> -						atmel,pins =
+>>> -							<AT91_PIOC 22 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* PC22 periph B with pullup */
+>>> -							 AT91_PIOC 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PC23 periph B */
+>>> -					};
+>>> -
+>>> -					pinctrl_usart3_rts: usart3_rts-0 {
+>>> -						atmel,pins =
+>>> -							<AT91_PIOC 24 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PC24 periph B */
+>>> -					};
+>>> -
+>>> -					pinctrl_usart3_cts: usart3_cts-0 {
+>>> -						atmel,pins =
+>>> -							<AT91_PIOC 25 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PC25 periph B */
+>>> -					};
+>>> -
+>>> -					pinctrl_usart3_sck: usart3_sck-0 {
+>>> -						atmel,pins =
+>>> -							<AT91_PIOC 26 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PC26 periph B */
+>>> -					};
+>>> -				};
+>>> -
+>>>    				uart0 {
+>>>    					pinctrl_uart0: uart0-0 {
+>>>    						atmel,pins =
+>>> @@ -277,34 +254,6 @@
+>>>    					};
+>>>    				};
+>>>
+>>> -				macb0 {
+>>> -					pinctrl_macb0_rmii: macb0_rmii-0 {
+>>> -						atmel,pins =
+>>> -							<AT91_PIOB 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB0 periph A */
+>>> -							 AT91_PIOB 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB1 periph A */
+>>> -							 AT91_PIOB 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB2 periph A */
+>>> -							 AT91_PIOB 3 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB3 periph A */
+>>> -							 AT91_PIOB 4 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB4 periph A */
+>>> -							 AT91_PIOB 5 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB5 periph A */
+>>> -							 AT91_PIOB 6 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB6 periph A */
+>>> -							 AT91_PIOB 7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB7 periph A */
+>>> -							 AT91_PIOB 9 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB9 periph A */
+>>> -							 AT91_PIOB 10 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB10 periph A */
+>>> -					};
+>>> -
+>>> -					pinctrl_macb0_rmii_mii: macb0_rmii_mii-0 {
+>>> -						atmel,pins =
+>>> -							<AT91_PIOB 8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB8 periph A */
+>>> -							 AT91_PIOB 11 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB11 periph A */
+>>> -							 AT91_PIOB 12 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB12 periph A */
+>>> -							 AT91_PIOB 13 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB13 periph A */
+>>> -							 AT91_PIOB 14 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB14 periph A */
+>>> -							 AT91_PIOB 15 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB15 periph A */
+>>> -							 AT91_PIOB 16 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB16 periph A */
+>>> -							 AT91_PIOB 17 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB17 periph A */
+>>> -					};
+>>> -				};
+>>> -
+>>>    				mmc0 {
+>>>    					pinctrl_mmc0_slot0_clk_cmd_dat0: mmc0_slot0_clk_cmd_dat0-0 {
+>>>    						atmel,pins =
+>>> @@ -605,22 +554,6 @@
+>>>    				status = "disabled";
+>>>    			};
+>>>
+>>> -			macb0: ethernet at f802c000 {
+>>> -				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+>>> -				reg = <0xf802c000 0x100>;
+>>> -				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 3>;
+>>> -				pinctrl-names = "default";
+>>> -				pinctrl-0 = <&pinctrl_macb0_rmii>;
+>>> -				status = "disabled";
+>>> -			};
+>>> -
+>>> -			macb1: ethernet at f8030000 {
+>>> -				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+>>> -				reg = <0xf8030000 0x100>;
+>>> -				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 3>;
+>>> -				status = "disabled";
+>>> -			};
+>>> -
+>>>    			i2c0: i2c at f8010000 {
+>>>    				compatible = "atmel,at91sam9x5-i2c";
+>>>    				reg = <0xf8010000 0x100>;
+>>> diff --git a/arch/arm/boot/dts/at91sam9x5_macb0.dtsi b/arch/arm/boot/dts/at91sam9x5_macb0.dtsi
+>>> new file mode 100644
+>>> index 0000000..55731ff
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/at91sam9x5_macb0.dtsi
+>>> @@ -0,0 +1,56 @@
+>>> +/*
+>>> + * at91sam9x5_macb0.dtsi - Device Tree Include file for AT91SAM9x5 SoC with 1
+>>> + * Ethernet interface.
+>>> + *
+>>> + * Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
+>>> + *
+>>> + * Licensed under GPLv2.
+>>> + */
+>>> +
+>>> +#include <dt-bindings/pinctrl/at91.h>
+>>> +#include <dt-bindings/interrupt-controller/irq.h>
+>>> +
+>>> +/ {
+>>> +	ahb {
+>>> +		apb {
+>>> +			pinctrl at fffff400 {
+>>> +				macb0 {
+>>> +					pinctrl_macb0_rmii: macb0_rmii-0 {
+>>> +						atmel,pins =
+>>> +							<AT91_PIOB 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB0 periph A */
+>>> +							 AT91_PIOB 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB1 periph A */
+>>> +							 AT91_PIOB 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB2 periph A */
+>>> +							 AT91_PIOB 3 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB3 periph A */
+>>> +							 AT91_PIOB 4 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB4 periph A */
+>>> +							 AT91_PIOB 5 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB5 periph A */
+>>> +							 AT91_PIOB 6 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB6 periph A */
+>>> +							 AT91_PIOB 7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB7 periph A */
+>>> +							 AT91_PIOB 9 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB9 periph A */
+>>> +							 AT91_PIOB 10 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB10 periph A */
+>>> +					};
+>>> +
+>>> +					pinctrl_macb0_rmii_mii: macb0_rmii_mii-0 {
+>>> +						atmel,pins =
+>>> +							<AT91_PIOB 8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB8 periph A */
+>>> +							 AT91_PIOB 11 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB11 periph A */
+>>> +							 AT91_PIOB 12 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB12 periph A */
+>>> +							 AT91_PIOB 13 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB13 periph A */
+>>> +							 AT91_PIOB 14 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB14 periph A */
+>>> +							 AT91_PIOB 15 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB15 periph A */
+>>> +							 AT91_PIOB 16 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB16 periph A */
+>>> +							 AT91_PIOB 17 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB17 periph A */
+>>> +					};
+>>> +				};
+>>> +			};
+>>> +
+>>> +			macb0: ethernet at f802c000 {
+>>> +				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+>>> +				reg = <0xf802c000 0x100>;
+>>> +				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 3>;
+>>> +				pinctrl-names = "default";
+>>> +				pinctrl-0 = <&pinctrl_macb0_rmii>;
+>>> +				status = "disabled";
+>>> +			};
+>>> +		};
+>>> +	};
+>>> +};
+>>> diff --git a/arch/arm/boot/dts/at91sam9x5_macb1.dtsi b/arch/arm/boot/dts/at91sam9x5_macb1.dtsi
+>>> new file mode 100644
+>>> index 0000000..77425a6
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/at91sam9x5_macb1.dtsi
+>>> @@ -0,0 +1,44 @@
+>>> +/*
+>>> + * at91sam9x5_macb1.dtsi - Device Tree Include file for AT91SAM9x5 SoC with 2
+>>> + * Ethernet interfaces.
+>>> + *
+>>> + * Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
+>>> + *
+>>> + * Licensed under GPLv2.
+>>> + */
+>>> +
+>>> +#include <dt-bindings/pinctrl/at91.h>
+>>> +#include <dt-bindings/interrupt-controller/irq.h>
+>>> +
+>>> +/ {
+>>> +	ahb {
+>>> +		apb {
+>>> +			pinctrl at fffff400 {
+>>> +				macb1 {
+>>> +					pinctrl_macb1_rmii: macb1_rmii-0 {
+>>> +						atmel,pins =
+>>> +							<AT91_PIOC 16 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC16 periph B */
+>>> +							 AT91_PIOC 18 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC18 periph B */
+>>> +							 AT91_PIOC 19 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC19 periph B */
+>>> +							 AT91_PIOC 20 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC20 periph B */
+>>> +							 AT91_PIOC 21 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC21 periph B */
+>>> +							 AT91_PIOC 27 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC27 periph B */
+>>> +							 AT91_PIOC 28 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC28 periph B */
+>>> +							 AT91_PIOC 29 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC29 periph B */
+>>> +							 AT91_PIOC 30 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PC30 periph B */
+>>> +							 AT91_PIOC 31 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PC31 periph B */
+>>> +					};
+>>> +				};
+>>> +			};
+>>> +
+>>> +			macb1: ethernet at f8030000 {
+>>> +				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+>>> +				reg = <0xf8030000 0x100>;
+>>> +				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 3>;
+>>> +				pinctrl-names = "default";
+>>> +				pinctrl-0 = <&pinctrl_macb1_rmii>;
+>>> +				status = "disabled";
+>>> +			};
+>>> +		};
+>>> +	};
+>>> +};
+>>> diff --git a/arch/arm/boot/dts/at91sam9x5_usart3.dtsi b/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
+>>> new file mode 100644
+>>> index 0000000..5589579
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
+>>> @@ -0,0 +1,51 @@
+>>> +/*
+>>> + * at91sam9x5_lcdc.dtsi - Device Tree Include file for AT91SAM9x5 SoC with
+>>> + * 4 USART.
+>>> + *
+>>> + * Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
+>>> + *
+>>> + * Licensed under GPLv2.
+>>> + */
+>>> +
+>>> +#include <dt-bindings/pinctrl/at91.h>
+>>> +#include <dt-bindings/interrupt-controller/irq.h>
+>>> +
+>>> +/ {
+>>> +	ahb {
+>>> +		apb {
+>>> +			pinctrl at fffff400 {
+>>> +				usart3 {
+>>> +					pinctrl_usart3: usart3-0 {
+>>> +						atmel,pins =
+>>> +							<AT91_PIOC 22 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* PC22 periph B with pullup */
+>>> +							 AT91_PIOC 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;		/* PC23 periph B */
+>>> +					};
+>>> +
+>>> +					pinctrl_usart3_rts: usart3_rts-0 {
+>>> +						atmel,pins =
+>>> +							<AT91_PIOC 24 AT91_PERIPH_B AT91_PINCTRL_NONE>;		/* PC24 periph B */
+>>> +					};
+>>> +
+>>> +					pinctrl_usart3_cts: usart3_cts-0 {
+>>> +						atmel,pins =
+>>> +							<AT91_PIOC 25 AT91_PERIPH_B AT91_PINCTRL_NONE>;		/* PC25 periph B */
+>>> +					};
+>>> +
+>>> +					pinctrl_usart3_sck: usart3_sck-0 {
+>>> +						atmel,pins =
+>>> +							<AT91_PIOC 26 AT91_PERIPH_B AT91_PINCTRL_NONE>;		/* PC26 periph B */
+>>> +					};
+>>> +				};
+>>> +			};
+>>> +
+>>> +			usart3: serial at f8028000 {
+>>> +				compatible = "atmel,at91sam9260-usart";
+>>> +				reg = <0xf8028000 0x200>;
+>>> +				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
+>>> +				pinctrl-names = "default";
+>>> +				pinctrl-0 = <&pinctrl_usart3>;
+>>> +				status = "disabled";
+>>> +			};
+>>> +		};
+>>> +	};
+>>> +};
+>>> --
+>>> 1.7.9.5
+>>>
 >
-> You say they typically only have the clockdomain in common. Do you mean
-> that they always have the same clockdomain, but not necessarily other
-> properties, or may they not even have the clockdomain in common?
+>
 
-Currently it seems if the clocks share a register, they are in the same 
-clockdomain (I guess this is something that might also change in 
-future.) The input clocks can be different (some are using the same), 
-and the outputs are routed to different destinations on the SoC. For the 
-below example, GPTs can have either sys_ck or 32k_ck as parent, UARTs 
-are fed from 48M clock etc.
 
->
->>
->> CM_FCLKEN_PER
->> Physical Address 0x4800 5000
->> BIT31:19 RESERVED Write 0s for future compatibility. Read returns 0.
->> BIT18 EN_UART4 UART4 functional clock control.
->> BIT17 EN_GPIO6 GPIO6 functional clock control.
->> BIT16 EN_GPIO5 GPIO5 functional clock control.
->> BIT15 EN_GPIO4 GPIO4 functional clock control.
->> BIT14 EN_GPIO3 GPIO3 functional clock control.
->> BIT13 EN_GPIO2 GPIO2 functional clock control.
->> BIT12 EN_WDT3 WDT3 functional clock control.
->> BIT11 EN_UART3 Type UART3 functional clock control.
->> BIT10 EN_GPT9 GPTIMER 9 functional clock control.
->> BIT9 EN_GPT8 GPTIMER 8 functional clock control.
->> BIT8 EN_GPT7 GPTIMER 7 functional clock control.
->> BIT7 EN_GPT6 GPTIMER 6 functional clock control.
->> BIT6 EN_GPT5 GPTIMER 5 functional clock control.
->> BIT5 EN_GPT4 GPTIMER 4 functional clock control.
->> BIT4 EN_GPT3GPTIMER 3 functional clock control.
->> BIT3 EN_GPT2 GPTIMER 2 functional clock control.
->> BIT2 EN_MCBSP4 McBSP 4 functional clock control.
->> BIT1 EN_MCBSP3 McBSP3 functional clock control.
->> BIT0 EN_MCBSP2 McBSP 2 functional clock control.
->>
->> So multiple drivers will be using this register for example.
->
-> The point I was trying to get across is that this looks like a single
-> logical block which controls the (independent) gating of several clocks,
-> along the same lines as multiple swtiches bound together in a DIP
-> switch.
->
-> It's equally valid to view that as several clock gates which happen to
-> have their control bits in close proximity in the memory map, as you
-> suggest.
-
-For clarity, I think it is better to have the clocks as separate nodes, 
-as otherwise specifying the mapping for individual clocks becomes a pain 
-for the layers that are going to use the clock mapping. You would end up 
-with obfuscated name for UART3 / GPTIMER5 for example, and this would be 
-rather error prone approach also if I understand your point correctly.
-
--Tero
-
->
-> Thanks,
-> Mark.
->
+-- 
+Nicolas Ferre
