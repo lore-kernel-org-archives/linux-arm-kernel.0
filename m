@@ -1,32 +1,27 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 19 Aug 2013 23:45:31 +0200
-Subject: [PATCH v4 3/3] ARM: bcm281xx: Device Tree bindings for GPIO driver
-In-Reply-To: <1376938761-13657-4-git-send-email-markus.mayer@linaro.org>
-References: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
- <1376938761-13657-4-git-send-email-markus.mayer@linaro.org>
-Message-ID: <7172097.b0dioE2CoB@flatron>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 19 Aug 2013 15:51:26 -0600
+Subject: [PATCH 4/4] clocksource: armada-370-xp: Fix clock input in
+ devicetree binding
+In-Reply-To: <1376929695-10026-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1376929695-10026-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <5212935E.7030703@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+On 08/19/2013 10:28 AM, Ezequiel Garcia wrote:
+> This commit specifies the clock inputs available for the Armada XP
+> timer: namely the 'nbclk' (L2/coherency fabric) and the 'refclk'
+> (25 MHz fixed-clock).
 
-The patch looks good overall, just a little nitpick about the commit 
-message.
+> diff --git a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
 
-On Monday 19 of August 2013 11:59:21 Markus Mayer wrote:
-> GPIO device tree bindings for the Broadcom bcm281xx family of chips
+> -- clocks: clock driving the timer hardware, only required for
+> -  "marvell,armada-370-timer";
+> +- clocks: clock driving the timer hardware.
 
-Device tree bindings are sets of properties and subnodes defined for 
-device nodes used to describe those devices. In other words, bindings are 
-what you have described in numerous files 
-Documentation/devicetree/bindings.
+The valid (and required?) entries for clock-names need to be documented
+here in the list of properties, not just show up in the example below.
 
-What this patch is adding is a device node for the GPIO controller of 
-bcm11351.
-
-Other than that:
-
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-
-Best regards,
-Tomasz
+Didn't I see some other conflicting patch for this file just the other
+day which was doing exactly that? Maybe I'm getting different patches
+confused...
