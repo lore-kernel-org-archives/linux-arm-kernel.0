@@ -1,121 +1,88 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 19 Aug 2013 10:55:16 +0530
-Subject: [PATCH v3 1/2] dmaengine: add interface of dma_get_slave_channel
-In-Reply-To: <1376550163-30145-2-git-send-email-zhangfei.gao@linaro.org>
-References: <1376550163-30145-1-git-send-email-zhangfei.gao@linaro.org>
- <1376550163-30145-2-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <20130819052516.GT32147@intel.com>
+From: ruslan.bilovol@ti.com (Ruslan Bilovol)
+Date: Mon, 19 Aug 2013 09:14:29 +0300
+Subject: [PATCH v2 0/2] omap4/twl6030: typical connection to omap4 as a
+ separate dtsi file
+In-Reply-To: <520E2726.304@baylibre.com>
+References: <1376469348-10797-1-git-send-email-ruslan.bilovol@ti.com>
+ <520B8B45.1010300@baylibre.com>
+ <CAB=otbTUk68CLmgQsEoefMMFTAnZCAMbZa-yiYmn1b3F1X8BiQ@mail.gmail.com>
+ <520E2726.304@baylibre.com>
+Message-ID: <CAB=otbRLea7V6_4Rhfr=ApNV=+2sQXnY=JW9-vy6V+hbt336wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 03:02:42PM +0800, Zhangfei Gao wrote:
-> Suggested by Arnd, add dma_get_slave_channel interface
-> Dma host driver could get specific channel specificied by request line, rather than filter.
-> 
-> host example:
-> static struct dma_chan *xx_of_dma_simple_xlate(struct of_phandle_args *dma_spec,
-> 		struct of_dma *ofdma)
-> {
-> 	struct xx_dma_dev *d = ofdma->of_dma_data;
-> 	unsigned int request = dma_spec->args[0];
-> 
-> 	if (request > d->dma_requests)
-> 		return NULL;
-> 
-> 	return dma_get_slave_channel(&(d->chans[request].vc.chan));
-> }
-> 
-> probe:
-> of_dma_controller_register((&op->dev)->of_node, xx_of_dma_simple_xlate, d);
-> 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/dma/dmaengine.c   |   25 +++++++++++++++++++++++++
->  include/linux/dmaengine.h |    1 +
->  2 files changed, 26 insertions(+)
-> 
-> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-> index 9e56745..38dd8c3 100644
-> --- a/drivers/dma/dmaengine.c
-> +++ b/drivers/dma/dmaengine.c
-> @@ -504,6 +504,31 @@ static struct dma_chan *private_candidate(const dma_cap_mask_t *mask,
->  }
->  
->  /**
-> + * dma_request_channel - try to get specific channel exclusively
-> + * @chan: target channel
-> + */
-> +struct dma_chan *dma_get_slave_channel(struct dma_chan *chan)
-> +{
-> +	int err = -EBUSY;
-> +
-> +	/* lock against __dma_request_channel */
-> +	mutex_lock(&dma_list_mutex);
-> +
-> +	if (chan->client_count == 0) {
-> +		err = dma_chan_get(chan);
-> +		if (err)
-> +			pr_debug("%s: failed to get %s: (%d)\n",
-> +				__func__, dma_chan_name(chan), err);
-> +	} else
-> +		chan = NULL;
-> +
-> +	mutex_unlock(&dma_list_mutex);
-> +
-> +	return chan;
-> +}
-> +EXPORT_SYMBOL_GPL(dma_get_slave_channel);
-No, this is not the right approach.
+Hi Benoit,
 
-When patch is applied and you find an issue you fix the issue. I have already
-pushed and merged this. So removing is a bad idea.
-you provide a fix for this miss.
+On Fri, Aug 16, 2013 at 4:20 PM, Benoit Cousson <bcousson@baylibre.com> wrote:
+> Hi Ruslan,
+>
+> On 16/08/2013 14:04, Ruslan Bilovol wrote:
+>> Hi Benoit,
+>>
+>> On Wed, Aug 14, 2013 at 4:51 PM, Benoit Cousson <bcousson@baylibre.com> wrote:
+>>> Hi Ruslan,
+>>>
+>>> On 14/08/2013 10:35, Ruslan Bilovol wrote:
+>>>>
+>>>> Hello,
+>>>>
+>>>> There is no functional changes between v1 and v2 - just
+>>>> added the patch for omap4-var-som - Uri Yosef confirmed
+>>>> this board have the same connection of OMAP4<->TWL6030 as
+>>>> SDP4430 board
+>>>
+>>>
+>>> The series looks good to me, but it will be good to have a test for Panda
+>>> and Variscite boards before merging it.
+>>
+>> Okay, so I just verified this patch series on PandaBoard ES2. Should I
+>> resubmit this series with
+>> fixed commit message?
+>
+> No, that's fine, I already applied it and fixed the subject and the changelog.
+>
+> Here it is:
+>
+> commit 2e25df1e5a4af906a9b25332719ace000063eb0d
+> Author: Ruslan Bilovol <ruslan.bilovol@ti.com>
+> Date:   Wed Aug 14 11:35:47 2013 +0300
+>
+>     ARM: dts: twl6030: Move common configuration for OMAP4 boards in a separate dtsi file
+>
+>     The OMAP4 SoC family uses specially-designed PMIC (power management IC)
+>     companion chip for power management needs: TWL6030/TWL6032.
+>     Therefore there is a typical connection of PMIC to OMAP4 so we can
+>     move it into separate .dtsi file and do not duplicate over
+>     board-specific files.
+>
+>     Tested on OMAP4 SDP board and compile-tested for Panda board
 
-Also for this you need to give due credit to Dan (reporter). That is how the
-process works.
+Just for archives: I've successfully tested it on PandaBoard ES2 last
+week as well.
 
-Anyway I have applied the below fix and will push it out.
+>
+>     Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
+>     Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
+>
+>
+> Just let me know if you are OK with the updated version.
 
----
-dmaengine: fix - error: potential NULL dereference 'chan'
+Yes, this version looks good to me. Thanks for picking it up!
 
-commit 7bb587f4 "dmaengine: add interface of dma_get_slave_channel" introduced
-the above error so fix it
+>
+>> However I cannot verify the patch for Variscite board because I do not
+>> own any such board so
+>> you can drop that patch. But maybe Uri Yosef can verify it. Uri?
+>
+> It seems that Uri cannot test it right now, so I will have to drop that one.
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Suggested-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Signed-off-by: Vinod Koul <vinod.koul@intel.com>
----
- drivers/dma/dmaengine.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+Okay, let's wait for Uri's verification.
 
-diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-index 5932ab1..755ba2f 100644
---- a/drivers/dma/dmaengine.c
-+++ b/drivers/dma/dmaengine.c
-@@ -514,16 +514,16 @@ struct dma_chan *dma_get_slave_channel(struct dma_chan *chan)
- 	/* lock against __dma_request_channel */
- 	mutex_lock(&dma_list_mutex);
- 
--	if (chan->client_count == 0)
-+	if (chan->client_count == 0) {
- 		err = dma_chan_get(chan);
--	else
-+		if (err)
-+			pr_debug("%s: failed to get %s: (%d)\n",
-+				__func__, dma_chan_name(chan), err);
-+	} else
- 		chan = NULL;
- 
- 	mutex_unlock(&dma_list_mutex);
- 
--	if (err)
--		pr_debug("%s: failed to get %s: (%d)\n",
--			__func__, dma_chan_name(chan), err);
- 
- 	return chan;
- }
+Best regards,
+Ruslan
 
---
-~Vinod
+>
+> Thanks,
+> Benoit
+>
+>
