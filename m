@@ -1,67 +1,131 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 19 Aug 2013 19:39:12 +0200
-Subject: [PATCH 2/3] dma: imx-sdma: Add ROM script addresses to driver
-In-Reply-To: <20130819144136.GC28297@S2101-09.ap.freescale.net>
-References: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
- <1376914563-10912-3-git-send-email-s.hauer@pengutronix.de>
- <20130819144136.GC28297@S2101-09.ap.freescale.net>
-Message-ID: <20130819173912.GF31036@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 19 Aug 2013 13:42:19 -0400
+Subject: [PATCH 1/8] clk: keystone: add Keystone PLL clock driver
+In-Reply-To: <520A659C.3030809@ti.com>
+References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
+ <1375719147-7578-2-git-send-email-santosh.shilimkar@ti.com>
+ <20130813154842.GQ27165@e106331-lin.cambridge.arm.com>
+ <520A5877.7050608@ti.com>
+ <20130813164730.GT27165@e106331-lin.cambridge.arm.com>
+ <520A659C.3030809@ti.com>
+Message-ID: <521258FB.2070002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 10:41:38PM +0800, Shawn Guo wrote:
-> Copy devicetree mailing list.
+Mark,
+
+On Tuesday 13 August 2013 12:58 PM, Santosh Shilimkar wrote:
+> On Tuesday 13 August 2013 12:47 PM, Mark Rutland wrote:
+>> On Tue, Aug 13, 2013 at 05:01:59PM +0100, Santosh Shilimkar wrote:
+>>> On Tuesday 13 August 2013 11:48 AM, Mark Rutland wrote:
+>>>> [Adding dt maintainers]
+>>>>
+>>>> On Mon, Aug 05, 2013 at 05:12:20PM +0100, Santosh Shilimkar wrote:
+>>>>> Add the driver for the PLL IPs found on Keystone 2 devices. The main PLL
+>>>>> IP typically has a multiplier, and a divider. The addtional PLL IPs like
+>>>>> ARMPLL, DDRPLL and PAPLL are controlled by the memory mapped register where
+>>>>> as the Main PLL is controlled by a PLL controller and memory map registers.
+>>>>> This difference is handle using 'has_pll_cntrl' property.
+>>>>>
+>>>>> Cc: Mike Turquette <mturquette@linaro.org>
+>>>>>
+>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>>> ---
+>>>
+>>> Thanks for review Mark.
+>>>
+>>>>>  .../devicetree/bindings/clock/keystone-pll.txt     |   36 ++++
+>>>>>  drivers/clk/keystone/pll.c                         |  197 ++++++++++++++++++++
+>>>>>  include/linux/clk/keystone.h                       |   18 ++
+>>>>>  3 files changed, 251 insertions(+)
+>>>>>  create mode 100644 Documentation/devicetree/bindings/clock/keystone-pll.txt
+>>>>>  create mode 100644 drivers/clk/keystone/pll.c
+>>>>>  create mode 100644 include/linux/clk/keystone.h
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/clock/keystone-pll.txt b/Documentation/devicetree/bindings/clock/keystone-pll.txt
+>>>>> new file mode 100644
+>>>>> index 0000000..58f6470
+>>>>> --- /dev/null
+>>>>> +++ b/Documentation/devicetree/bindings/clock/keystone-pll.txt
+>>>>> @@ -0,0 +1,36 @@
+>>>>> +Binding for keystone PLLs. The main PLL IP typically has a multiplier,
+>>>>> +a divider and a post divider. The additional PLL IPs like ARMPLL, DDRPLL
+>>>>> +and PAPLL are controlled by the memory mapped register where as the Main
+>>>>> +PLL is controlled by a PLL controller. This difference is handle using
+>>>>> +'pll_has_pllctrl' property.
+>>>>> +
+>>>>> +This binding uses the common clock binding[1].
+>>>>> +
+>>>>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>>>> +
+>>>>> +Required properties:
+>>>>> +- compatible : shall be "keystone,pll-clk".
+>>>>
+>>>> Keystone isn't a vendor, and generally, bindings have used "clock"
+>>>> rather than "clk".
+>>>>
+>>>> Perhaps "ti,keystone-pll-clock" ?
+>>>>
+>>> Agree.
+>>>
+>>>>> +- #clock-cells : from common clock binding; shall be set to 0.
+>>>>> +- clocks : parent clock phandle
+>>>>> +- reg - index 0 -  PLLCTRL PLLM register address
+>>>>> +- 	index 1 -  MAINPLL_CTL0 register address
+>>>>
+>>>> Perhaps a reg-names would be useful?
+>>>>
+>>>>> +- pll_has_pllctrl - PLL is controlled by controller or memory mapped register
+>>>>
+>>>> Huh? I don't understand what that description means. What does the
+>>>> property tell you? Is having one of the registers optional? If so that
+>>>> should be described by a reg-names property associated with the reg, and
+>>>> should be noted in the binding.
+>>>>
+>>> After re-reading it, yes I agree it not clear. The point is there
+>>> are two different types of IPs and pogramming model changes quite
+>>> a bit. Its not just 1 register optional.
+>>
+>> If that's the case, then having different compatible strings would make
+>> sense.
+>>
+>>>
+>>>>> +- pllm_lower_mask - pllm lower bit mask
+>>>>> +- pllm_upper_mask - pllm upper bit mask
+>>>>> +- plld_mask - plld mask
+>>>>> +- fixed_postdiv - fixed post divider value
+>>>>
+>>>> Please use '-' rather than '_' in property names, it's a standard
+>>>> convention for dt and going against it just makes things unnecessarily
+>>>> complicated.
+>>>>
+>>>> Why are these necessary? Are clocks sharing common registers, are there
+>>>> some sets of "keystone,pll-clk"s that have the same masks, or does this
+>>>> just vary wildly?
+>>>>
+>>> This is mainly to take care of the programming model which varies between
+>>> IPs. Will try to make that bit more clear.
+>>
+>> Are there more than the two IPs mentioned above? If they had separate
+>> compatible strings, would that give enough information implicitly,
+>> without the precise masks needing to be in the dt?
+>>
+> I will explore the separate compatible option. Thanks for suggestion.
 > 
-> > @@ -352,8 +521,15 @@ static struct platform_device_id sdma_devtypes[] = {
-> >  MODULE_DEVICE_TABLE(platform, sdma_devtypes);
-> >  
-> >  static const struct of_device_id sdma_dt_ids[] = {
-> > -	{ .compatible = "fsl,imx31-sdma", .data = &sdma_imx31, },
-> > +	{ .compatible = "fsl,imx6q-sdma", .data = &sdma_imx6q, },
-> > +	{ .compatible = "fsl,imx53-sdma", .data = &sdma_imx53, },
-> > +	{ .compatible = "fsl,imx51-sdma", .data = &sdma_imx51, },
-> > +	{ .compatible = "fsl,imx35-to2-sdma", .data = &sdma_imx35_to2, },
-> > +	{ .compatible = "fsl,imx35-to1-sdma", .data = &sdma_imx35_to1, },
-> >  	{ .compatible = "fsl,imx35-sdma", .data = &sdma_imx35, },
-> 
-> Do we need to bind the compatible with sdma_imx35_to2 like below?
-> 
->   	{ .compatible = "fsl,imx35-sdma", .data = &sdma_imx35_to2, },
+I looked at further into separate compatible option or reg-names
+to check if it can help to reduce some additional dt information.
+Actually it doesn't help much. The base programming model is shared
+between both types of PLL IPs. The PLLs which has PLL controller along
+with MMRs, has to take into account additional bit-fields for the
+multiplier and divider along with the base model multiplier and divider
+registers.
 
-If we do this we assume that every i.MX35 is TO2. TO1 revisions will
-misbehave then. I intentionally didn't do this so that the current
-binding continues to work as before without script addresses.
+Having said that, there are few parameters which are fixed like
+plld_mask, pllm_upper_shift etc need not come from DT. I am going
+to remove them from dt bindings and also make the reg index consistent
+as it should have been in first place.
 
-> 
-> Otherwise, we will need to patch sdma_imx35 with proper .script_addrs
-> assignment?
-> 
-> Also, I do not know how we will play these tapeout specific compatible
-> in device tree.  As you know, we currently do not have tapeout but only
-> chip specific DTS, since we expect kernel will figure out the
-> tapeout/revision and handle the differences accordingly.
+Rest of the comments are fine and will be addressed in next version.
 
-In fact the kernel does figure out the tapeout version, but I don't have
-access to it in the driver.
-
-Currently we have a problem anyway. We have the firmware names in the
-dts, but the firmware is tapeout specific for i.MX31/35.
-
-So I think our options are:
-
-- remove the tapeout specifics from the devicetrees, this would mean to
-  also remove the firmware names.
-- keep the tapeout specifics in the devicetree, then we could even add
-  some more like I did ;)
-
-I don't know what's the best way to proceed. For now I could remove the
-tapeout specific bindings, this way we would get the ROM script
-addresses at least for i.MX25/5/6.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Santosh
