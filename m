@@ -1,41 +1,45 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 19 Aug 2013 19:47:18 -0300
-Subject: [PATCH 4/4] clocksource: armada-370-xp: Fix clock input in
- devicetree binding
-In-Reply-To: <5212935E.7030703@wwwdotorg.org>
-References: <1376929695-10026-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <5212935E.7030703@wwwdotorg.org>
-Message-ID: <20130819224717.GA2388@localhost>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 19 Aug 2013 16:50:17 -0600
+Subject: [PATCH v4 1/3] ARM: bcm281xx: Add GPIO driver
+In-Reply-To: <1376938761-13657-2-git-send-email-markus.mayer@linaro.org>
+References: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
+ <1376938761-13657-2-git-send-email-markus.mayer@linaro.org>
+Message-ID: <5212A129.6080601@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 03:51:26PM -0600, Stephen Warren wrote:
-> On 08/19/2013 10:28 AM, Ezequiel Garcia wrote:
-> > This commit specifies the clock inputs available for the Armada XP
-> > timer: namely the 'nbclk' (L2/coherency fabric) and the 'refclk'
-> > (25 MHz fixed-clock).
-> 
-> > diff --git a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-> 
-> > -- clocks: clock driving the timer hardware, only required for
-> > -  "marvell,armada-370-timer";
-> > +- clocks: clock driving the timer hardware.
-> 
-> The valid (and required?) entries for clock-names need to be documented
-> here in the list of properties, not just show up in the example below.
-> 
+On 08/19/2013 12:59 PM, Markus Mayer wrote:
+> This patch adds the GPIO driver for the bcm281xx family of chips.
 
-Argh, of course... I'll send a new version.
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt b/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
 
-> Didn't I see some other conflicting patch for this file just the other
-> day which was doing exactly that? Maybe I'm getting different patches
-> confused...
+The simple way to avoid the discussion re: the name of the file might
+have been to name it exactly matching the compatible value it documents,
+i.e. brcm,kona-gpio.txt. That's what I personally prefer, but it's not
+mandatory in any way at all.
 
-Mmm.. probably the previous patchset (on which this one is based)?
+> +Broadcom Kona Family GPIO
+> +-------------------------
+> +
+> +This GPIO driver is used in the following Broadcom SoCs:
+> +  BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+> +
+> +The GPIO controller only supports edge, not level, triggering of interrupts.
+> +
+> +- compatible: "brcm,kona-gpio"
 
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/260179
+Per recent discussions, all the supported compatible values should be
+spelled out here, which I assume are:
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+brcm,kona-gpio
+brcm,bcm11130
+brcm,bcm11140
+brcm,bcm11351
+brcm,bcm28145
+brcm,bcm28155
+
+Documenting all of them allows drivers to implement quirks/workarounds
+based on individual SoCs if ever needed.
+
+Aside from that, the binding seems reasonable, so the binding,
+Acked-by: Stephen Warren <swarren@nvidia.com>
