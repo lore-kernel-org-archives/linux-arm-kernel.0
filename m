@@ -1,46 +1,70 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Mon, 19 Aug 2013 22:54:39 +0200
-Subject: [GIT PULL] KVM/ARM Fixes for 3.11
-In-Reply-To: <1376280781-6539-1-git-send-email-christoffer.dall@linaro.org>
-References: <1376280781-6539-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <5212860F.4050804@redhat.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 19 Aug 2013 14:55:44 -0600
+Subject: [RFC 3/3] PCI: tegra: Support driver unbinding
+In-Reply-To: <20130819201623.GD5191@mithrandir>
+References: <1376392346-14127-1-git-send-email-treding@nvidia.com>
+ <1376392346-14127-4-git-send-email-treding@nvidia.com>
+ <520BFA0C.5070001@wwwdotorg.org> <20130815103452.GA13740@ulmo>
+ <520CF211.6060003@wwwdotorg.org> <20130819201623.GD5191@mithrandir>
+Message-ID: <52128650.7090009@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 12/08/2013 06:12, Christoffer Dall ha scritto:
-> The following changes since commit e769ece3b129698d2b09811a6f6d304e4eaa8c29:
+On 08/19/2013 02:16 PM, Thierry Reding wrote:
+> On Thu, Aug 15, 2013 at 09:21:53AM -0600, Stephen Warren wrote:
+>> On 08/15/2013 04:34 AM, Thierry Reding wrote:
+>>> On Wed, Aug 14, 2013 at 03:43:40PM -0600, Stephen Warren
+>>> wrote:
+>>>> On 08/13/2013 05:12 AM, Thierry Reding wrote:
+>>>>> Implement the platform driver's .remove() callback to free
+>>>>> all resources allocated during driver setup and call 
+>>>>> pci_common_exit() to cleanup ARM specific datastructures.
+>>>>> Unmap the fixed PCI I/O mapping by calling the new
+>>>>> pci_iounmap_io() function in the new .teardown() callback.
+>>>>> 
+>>>>> Finally, no longer set the .suppress_bind_attrs field to
+>>>>> true to allow the driver to unbind from a device.
+>>>> 
+>>>>> +static int tegra_pcie_remove(struct platform_device *pdev)
+>>>>> +{ +	struct tegra_pcie *pcie = platform_get_drvdata(pdev);
+>>>>> + struct tegra_pcie_bus *bus, *tmp; +	int err; + + 
+>>>>> pci_common_exit(&pcie->sys); + +
+>>>>> list_for_each_entry_safe(bus, tmp, &pcie->busses, list) { +
+>>>>> vunmap(bus->area->addr); + kfree(bus); +	} + +	if
+>>>>> (IS_ENABLED(CONFIG_PCI_MSI)) { +		err = 
+>>>>> tegra_pcie_disable_msi(pcie); +		if (err < 0) +			return
+>>>>> err; + }
+>>>> 
+>>>> Wouldn't it make sense to do that as early as possible in
+>>>> the function, to make sure that no MSI accidentally fires
+>>>> after some of the cleanup has already happened?
+>>> 
+>>> I don't think that's strictly necessary in this case. After
+>>> the call to pci_common_exit() there are no PCI devices left,
+>>> there's not even a bus left. All MSI users should have cleaned
+>>> up after themselves.
+>>> 
+>>> Given that I thought it more useful to mirror the setup done
+>>> in .probe() to make it clearer what's being undone (and
+>>> potentially what's missing).
+>> 
+>> That makes sense SW-wise, but what about mis-behaving HW that
+>> triggers an MSI even when it's been told not to? I assume that 
+>> tegra_pcie_disable_msi() unrequests the IRQ, hence solves that 
+>> problem, if done early enough.
 > 
->   KVM: s390: fix pfmf non-quiescing control handling (2013-07-29 09:02:30 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-fixes-3.11
-> 
-> for you to fetch changes up to 2184a60de26b94bc5a88de3e5a960ef9ff54ba5a:
-> 
->   KVM: ARM: Squash len warning (2013-08-11 21:03:39 -0700)
-> 
-> ----------------------------------------------------------------
-> Christoffer Dall (3):
->       ARM: KVM: Fix 64-bit coprocessor handling
->       ARM: KVM: Fix unaligned unmap_range leak
->       KVM: ARM: Squash len warning
-> 
-> Marc Zyngier (1):
->       arm64: KVM: fix 2-level page tables unmapping
-> 
->  arch/arm/kvm/coproc.c     |   26 +++++++++++++++++++-------
->  arch/arm/kvm/coproc.h     |    3 +++
->  arch/arm/kvm/coproc_a15.c |    6 +++++-
->  arch/arm/kvm/mmio.c       |    3 ++-
->  arch/arm/kvm/mmu.c        |   36 +++++++++++++++---------------------
->  5 files changed, 44 insertions(+), 30 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> To be honest, I'm not sure about the side-effects that this will
+> have. tegra_pcie_disable_msi() does quite a bit more than just
+> masking the interrupts. It also completely removes the IRQ domain
+> that provides the MSI interrupts. While I haven't tried it yet I
+> can imagine that it will cause crashes at a later point when
+> drivers want to disable MSI on a device and the IRQ domain having
+> vanished from underneath.
 
-Thanks, pulled and sent to Linus.
+Surely by the time the PCIe controller device has been remove()d then
+all devices for PCIe "client" devices have also been removed.
 
-Paolo
+But I guess the problem is if the controller is added back, yet the
+IRQ resources aren't re-parsed under the new IRQ domain? Still, that
+seems like an unrelated issue to exactly where the MSI IRQ domain gets
+cleaned up in the host controller's remove().
