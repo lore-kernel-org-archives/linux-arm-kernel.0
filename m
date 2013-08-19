@@ -1,233 +1,67 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 19 Aug 2013 13:43:53 -0700
-Subject: [PATCH 2/8] clk: keystone: Add gate control clock driver
-In-Reply-To: <20130813165344.GU27165@e106331-lin.cambridge.arm.com>
-References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
- <1375719147-7578-3-git-send-email-santosh.shilimkar@ti.com>
- <20130813161314.GR27165@e106331-lin.cambridge.arm.com>
- <520A60A2.2030104@ti.com>
- <20130813165344.GU27165@e106331-lin.cambridge.arm.com>
-Message-ID: <20130819204353.4443.48466@quantum>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 19 Aug 2013 21:54:14 +0100
+Subject: [PATCH v4 1/3] ARM: bcm281xx: Add GPIO driver
+In-Reply-To: <CAPdLdqk-7dfGK62Y0Og8vzJ9TUz_OAZv3AfFPUDJDy52tPVszQ@mail.gmail.com>
+References: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
+ <2184179.Dja4tiYGvP@lenovo>
+ <CAPdLdqk-7dfGK62Y0Og8vzJ9TUz_OAZv3AfFPUDJDy52tPVszQ@mail.gmail.com>
+Message-ID: <1804309.Ypdt3FAFFr@lenovo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mark Rutland (2013-08-13 09:53:44)
-> On Tue, Aug 13, 2013 at 05:36:50PM +0100, Santosh Shilimkar wrote:
-> > On Tuesday 13 August 2013 12:13 PM, Mark Rutland wrote:
-> > > [adding dt maintainers]
-> > > 
-> > > On Mon, Aug 05, 2013 at 05:12:21PM +0100, Santosh Shilimkar wrote:
-> > >> Add the driver for the clock gate control which uses PSC (Power Sleep
-> > >> Controller) IP on Keystone 2 based SOCs. It is responsible for enabling and
-> > >> disabling of the clocks for different IPs present in the SoC.
-> > >>
-> > >> Cc: Mike Turquette <mturquette@linaro.org>
-> > >>
-> > >> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > >> ---
-> > >>  .../devicetree/bindings/clock/keystone-gate.txt    |   30 ++
-> > >>  drivers/clk/keystone/gate.c                        |  306 ++++++++++++++++++++
-> > >>  include/linux/clk/keystone.h                       |    1 +
-> > >>  3 files changed, 337 insertions(+)
-> > >>  create mode 100644 Documentation/devicetree/bindings/clock/keystone-gate.txt
-> > >>  create mode 100644 drivers/clk/keystone/gate.c
-> > >>
-> > >> diff --git a/Documentation/devicetree/bindings/clock/keystone-gate.txt b/Documentation/devicetree/bindings/clock/keystone-gate.txt
-> > >> new file mode 100644
-> > >> index 0000000..40afef5
-> > >> --- /dev/null
-> > >> +++ b/Documentation/devicetree/bindings/clock/keystone-gate.txt
-> > >> @@ -0,0 +1,30 @@
-> > >> +Binding for Keystone gate control driver which uses PSC controller IP.
-> > >> +
-> > >> +This binding uses the common clock binding[1].
-> > >> +
-> > >> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > >> +
-> > >> +Required properties:
-> > >> +- compatible : shall be "keystone,psc-clk".
-> > > 
-> > > Similarly to my comments on patch 1, this should probably be something
-> > > more like "ti,keystone-psc-clock"
-> > > 
-> > >> +- #clock-cells : from common clock binding; shall be set to 0.
-> > >> +- clocks : parent clock phandle
-> > >> +- reg :        psc address address space
-> > >> +
-> > >> +Optional properties:
-> > >> +- clock-output-names : From common clock binding to override the
-> > >> +                       default output clock name
-> > >> +- status : "enabled" if clock is always enabled
-> > > 
-> > > Huh? This is a standard property, for which ePAPR defines "okay",
-> > > "disabled", "fail", and "fail-sss", and not "enabled". This also doesn't
-> > > seem to follow the standard meaning judging by the code.
-> > > 
-> > > It looks like this could be a boolean property
-> > > ("clock-always-enabled"?), but that assumes it's necessary.
-> > > 
-> > > Why do you need this?
-> > > 
-> > I dropped this already. Forgot to update the documentation.
-> 
-> Ok.
-> 
+Le lundi 19 ao?t 2013 12:23:47 Markus Mayer a ?crit :
+> On 19 August 2013 12:11, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> > Le lundi 19 ao?t 2013 12:05:55 Markus Mayer a ?crit :
+> >> On 19 August 2013 12:02, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> >> > Hello Markus,
+> >> > 
+> >> > Le lundi 19 ao?t 2013 11:59:19 Markus Mayer a ?crit :
+> >> >> From: Markus Mayer <mmayer@broadcom.com>
+> >> >> 
+> >> >> This patch adds the GPIO driver for the bcm281xx family of chips.
+> >> >> 
+> >> >> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+> >> >> Reviewed-by: Christian Daudt <csd@broadcom.com>
+> >> >> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+> >> >> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> >> >> ---
+> >> >> 
+> >> >>  .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   43 ++
+> >> > 
+> >> > Since the vendor prefix has been changed from brcm to bcm, should that
+> >> > also be reflected in the Device Tree binding documentation file?
+> >> 
+> >> Actually, it is the other way around. "brcm," was there first, but we
+> >> overlooked that and started upstreaming code with the "bcm," vendor
+> >> prefix. There are various patches floating around out there to change
+> >> our use of "bcm," to "brcm," to make it conform to the established
+> >> vendor prefixes.
 > > 
-> > >> +- lpsc : lpsc module id, if not set defaults to zero
-> > > 
-> > > What's that needed for? Are there multiple clocks sharing a common
-> > > register bank?
-> > > 
-> > >> +- pd : power domain number, if not set defaults to zero (always ON)
-> > > 
-> > > Please don't use abbreviations unnecessarily. "power-domain-id" or
-> > > similar would be far better. What exactly does this represent? Does the
-> > > clock IP itself handle power domains, or is there some external unit
-> > > that controls power domains?
-> > > 
-> > pd is commonly used but I can expand it. This represent the power
-> > domain number.
+> > Ermm yes, I realized that after hitting send. Netherless, should this be
+> > renamed to "gpio-brcm-kona.txt" directly such that the patches you mention
+> > do not have to get updated to patch this one too?
 > 
-> Does the the clock IP have some internal logic for handling power
-> domains only covering its clocks, or is there some external power
-> controller involved (i.e. do we possibly need to describe an external
-> unit and a linkage to it?).
+> After long discussions on how to handle the "bcm" vs. "brcm"
+> situation, we said we would be renaming the "bcm," vendor prefixes to
+> "brcm,", but would otherwise refrain from renaming files, variables,
+> function names, etc. except if the file name contains the vendor
+> prefix itself.
+> 
+> The thing is that Broadcom is exclusively using the BCM abbreviation
+> internally. Except for our stock ticker, nothing is named "BRCM". :-)
+> So, the less "brcm" is out there, the better it is. Unfortunately,
+> it's too late for the vendor prefix.
+> 
+> I can see how a file called gpio-bcm-kona.txt talking about the
+> "brcm," could be a bit confusing. It's still straight forward enough
+> to find out that the definition of "brcm,kona-gpio" is in the
+> gpio-bcm-kona.txt file. And the boundary of what's called "brcm" is
+> still firm: just the vendor prefix.
+> 
+> But if we renamed it to gpio-brcm-kona.txt, then it would be confusing
+> why there are not other files named *brcm* and the boundary of what is
+> named how would become quite blurry.
 
-Hmm, does the clock own the power domain or does the power domain own
-the clock? As you well know on OMAP the clock resides within the power
-domain. So it seems to me that the better way to do this would be for
-the power domain to have it's own binding and node, and then reference
-the clock:
-
-power-domain {
-	...
-	clocks = <&chipclk3>, <&chipclk4>;
-	clock-names = "perclk", "uartclk";
-	...
-};
-
-Now maybe things are different on Keystone, but if not then I don't see
-why the clock binding should have anything to do with the power domain.
-
-> 
-> > 
-> > >> +- gpsc : gpsc number, if not set defaults to zero
-> > > 
-> > > How does that interact with the lpsc property? When are these necessary?
-> > > 
-> > lpsc is local clock/module control where as gpsc sits on top of it. 
-
-Similar to the above, should the gpsc have it's own binding and node
-that contains the lpsc which also have their own bindings/nodes, which
-finally contain the clocks? Maybe that is over engineered but I want to
-consider this before the binding gets set in stone.
-
-Regards,
-Mike
-
-> 
-> Ok. I'm not sure haivng these default to zero makes much sense, as that
-> could easily hide errors in dts. It might make more sense to make them
-> required and error out if they aren't present.
-> 
-> Unless they're zero far more often?
-> 
-> > 
-> > >> diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
-> > >> new file mode 100644
-> > >> index 0000000..72ac478
-> > >> --- /dev/null
-> > >> +++ b/drivers/clk/keystone/gate.c
-> > 
-> > [..]
-> > 
-> > >> +/**
-> > >> + * clk_register_psc - register psc clock
-> > >> + * @dev: device that is registering this clock
-> > >> + * @name: name of this clock
-> > >> + * @parent_name: name of clock's parent
-> > >> + * @psc_data: platform data to configure this clock
-> > >> + * @lock: spinlock used by this clock
-> > >> + */
-> > >> +static struct clk *clk_register_psc(struct device *dev,
-> > >> +                       const char *name,
-> > >> +                       const char *parent_name,
-> > >> +                       struct clk_psc_data *psc_data,
-> > >> +                       spinlock_t *lock)
-> > >> +{
-> > >> +       struct clk_init_data init;
-> > >> +       struct clk_psc *psc;
-> > >> +       struct clk *clk;
-> > >> +
-> > >> +       psc = kzalloc(sizeof(*psc), GFP_KERNEL);
-> > >> +       if (!psc)
-> > >> +               return ERR_PTR(-ENOMEM);
-> > >> +
-> > >> +       init.name = name;
-> > >> +       init.ops = &clk_psc_ops;
-> > >> +       init.flags = psc_data->flags;
-> > >> +       init.parent_names = (parent_name ? &parent_name : NULL);
-> > > 
-> > > Is &parent_name not a pointer to a pointer on the stack? Is this only
-> > > used once?
-> > > 
-> > >> +       init.num_parents = (parent_name ? 1 : 0);
-> > >> +
-> > >> +       psc->psc_data = psc_data;
-> > >> +       psc->lock = lock;
-> > >> +       psc->hw.init = &init;
-> > > 
-> > > That's definitely a pointer to some data on the stack, and that seems to
-> > > be kept around. Is this only used for one-time initialisation, or might
-> > > it be used later?
-> > > 
-> > Its init only.
-> 
-> Ok.
-> 
-> > 
-> > >> +       data->base = psc_addr[gpsc].io_base;
-> > >> +       data->lpsc = lpsc;
-> > >> +       data->gpsc = gpsc;
-> > >> +       data->domain = pd;
-> > >> +
-> > >> +       if (of_property_read_bool(node, "ti,psc-lreset"))
-> > >> +               data->psc_flags |= PSC_LRESET;
-> > >> +       if (of_property_read_bool(node, "ti,psc-force"))
-> > >> +               data->psc_flags |= PSC_FORCE;
-> > > 
-> > > Neither of these were defined in the binding, and they don't appear to
-> > > have been inherited form another binding. What are they for? Why are
-> > > they needed?
-> > > 
-> > They represent the hardware support transition method needed to have
-> > proper clock enable/disable sequence to work. Will update the binding
-> > along with other comments which I agree.
-> 
-> Ok.
-> 
-> > 
-> > >> +
-> > >> +       clk = clk_register_psc(NULL, clk_name, parent_name,
-> > >> +                               data, lock);
-> > >> +
-> > >> +       if (clk) {
-> > >> +               of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> > >> +
-> > >> +               rc = of_property_read_string(node, "status", &status);
-> > >> +               if (status && !strcmp(status, "enabled"))
-> > >> +                       clk_prepare_enable(clk);
-> > >> +               return;
-> > >> +       }
-> > > 
-> > > As mentioned above, this abuses the standard status property, and it's
-> > > not clear why this is necessary.
-> > > 
-> > Actually I have removed this one from dt nodes. Looks like missed
-> > to pick the right patch while posting. Have dropped this change
-> > already.
-> 
-> Great!
-> 
-> Thanks,
-> Mark.
+I am happy with that explanation, thanks! That works for me too.
+-- 
+Florian
