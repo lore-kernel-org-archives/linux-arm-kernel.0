@@ -1,52 +1,37 @@
-From: fathi.boudra@linaro.org (Fathi Boudra)
-Date: Mon, 19 Aug 2013 22:03:43 +0300
-Subject: [PATCH v2] ARM: vexpress_defconfig: Enable voltage regulators
-In-Reply-To: <1376684908-20445-1-git-send-email-christoffer.dall@linaro.org>
-References: <1376684908-20445-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <CAGNsrLCvhda-zuBSjjEbRpH4LQ4U4ud9RFWrQiZTec_cq1dFaQ@mail.gmail.com>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Mon, 19 Aug 2013 12:05:55 -0700
+Subject: [PATCH v4 1/3] ARM: bcm281xx: Add GPIO driver
+In-Reply-To: <17431632.gcbUH2MqH0@lenovo>
+References: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
+ <1376938761-13657-2-git-send-email-markus.mayer@linaro.org>
+ <17431632.gcbUH2MqH0@lenovo>
+Message-ID: <CAPdLdqn31133KeQgFDcdN8jXDC5qbPn5HOS1mbfOMycMtgDkSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 August 2013 23:28, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> Enable voltage regulators by default for versatile express.
+On 19 August 2013 12:02, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> Hello Markus,
 >
-> This should work on all verstatile express platforms and not enabling it
-> prevents a defconfig'ed kernel from using the SD card controller on the
-> qemu emulated platform, which is unfortunate for first-time casual
-> users.
+> Le lundi 19 ao?t 2013 11:59:19 Markus Mayer a ?crit :
+>> From: Markus Mayer <mmayer@broadcom.com>
+>>
+>> This patch adds the GPIO driver for the bcm281xx family of chips.
+>>
+>> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+>> Reviewed-by: Christian Daudt <csd@broadcom.com>
+>> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+>> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+>> ---
+>>  .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   43 ++
 >
-> Cc: Peter Maydell <peter.maydell@linaro.org>
-> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->
-> Changelog[v1 -> v2]:
->  - Only enabling CONFIG_REGULATOR is sufficient to boot qemu guests as
->    pointedout by Tixy.
->
->  arch/arm/configs/vexpress_defconfig |    1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
-> index f2de51f..d46c22a 100644
-> --- a/arch/arm/configs/vexpress_defconfig
-> +++ b/arch/arm/configs/vexpress_defconfig
-> @@ -138,3 +138,4 @@ CONFIG_DEBUG_LL=y
->  CONFIG_EARLY_PRINTK=y
->  # CONFIG_CRYPTO_ANSI_CPRNG is not set
->  # CONFIG_CRYPTO_HW is not set
-> +CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_VEXPRESS=y
+> Since the vendor prefix has been changed from brcm to bcm, should that also be
+> reflected in the Device Tree binding documentation file?
 
-include also CONFIG_REGULATOR_VEXPRESS as used in our config fragment.
+Actually, it is the other way around. "brcm," was there first, but we
+overlooked that and started upstreaming code with the "bcm," vendor
+prefix. There are various patches floating around out there to change
+our use of "bcm," to "brcm," to make it conform to the established
+vendor prefixes.
 
-Tested-by: Fathi Boudra <fathi.boudra@linaro.org>
-
-> --
-> 1.7.10.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards,
+-Markus
