@@ -1,72 +1,100 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 20 Aug 2013 07:13:12 +0800
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Trustzone-based security
- solution for ARM Linux
-In-Reply-To: <20130816110446.GA2909@localhost.localdomain>
-References: <20130816110446.GA2909@localhost.localdomain>
-Message-ID: <CAGsJ_4wnF4=Yi5keMtOpSzXGVVCSWoaijUyJRdvw7sayoAUgtA@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 19 Aug 2013 19:16:45 -0400 (EDT)
+Subject: [PATCH resend] ARM: add workaround for ambiguous C99 stdint.h
+ types
+In-Reply-To: <1376896358-21076-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1376896358-21076-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.03.1308191915190.14472@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/8/16 Dave Martin <Dave.Martin@arm.com>:
-> On Fri, Aug 16, 2013 at 10:49:30AM +0800, Barry Song wrote:
->> [snip]
->> >
->> > Needless to say, there are multiple proprietary blobs out there which
->> > do much what you describe, though these are closed and locked down.
->> >
->> yes. i have listed [1][2][3] as examples.
->> [1]SafeG (Safety Gate): http://www.toppers.jp/en/safeg.html
->> [2]Green Hills Multivisor:
->> http://www.ghs.com/products/rtos/integrity_virtualization.html
->> [3]SierraVisor: http://www.openvirtualization.org/
->>
->> >
->> > As others have said, the Secure World is just another execution space,
->> > so there's no technical reason not to have some FOSS running in there,
->> > be it an RTOS, uClinux or Linux.
->> >
->>
->> non-security world need to know how much time is taken away from
->> security world whatewer OS security world uses.
->>
->> > However, the ways in which resources can be shared between the Secure
->> > World and Normal World are inflexible compared with the kind of sharing
->> > you get from a normal hypervisor.  The Secure World doesn't have any
->> > true virtualisation capabilities.
->> >
->>
->> except the stolen time issue, actually a high-level msg protocol like
->> virtio and RPMsg will help rich information sharing between
->> non-security and security world than a simple SMC call.
->> these communication channels are not specific to CSR chips, can be
->> re-used by all SoCs if they have similar scenarios. so i am thinking
->> whether we can have some generic framework for that in ARM Linux.
->
-> Despite what I said about TZ not supporting true virtualisation, there
-> are a lot similar issues.  This things you mention (IPC, timekeeping,
-> blackout avoidance etc.) don't sound like unique problems.
+On Mon, 19 Aug 2013, Ard Biesheuvel wrote:
 
-yes. there are similar issues with a real virtualisation. here the
-unique problems are callbacks and frameworks which help hook TZ into
-virtualization-similar architecture without enabling the whole
-virtualization in kernel. we can have a generic TZ implementation
-instead of per-soc instance.
+> The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
+> unambiguous on ARM as you would expect. For the types below, there is a
+> difference on ARM between GCC built for bare metal ARM, GCC built for glibc
+> and the kernel itself, which results in build errors if you try to build with
+> -ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
+> in order to use NEON intrinsics)
+> 
+> As the typedefs for these types in 'stdint.h' are based on builtin defines
+> supplied by GCC, we can tweak these to align with the kernel's idea of those
+> types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
+> source file (provided that -ffreestanding is used).
+> 
+>                    int32_t         uint32_t               uintptr_t
+> bare metal GCC     long            unsigned long          unsigned int
+> glibc GCC          int             unsigned int           unsigned int
+> kernel             int             unsigned int           unsigned long
+> 
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+> Acked by: Dave Martin <dave.martin@arm.com>
+> Acked-by: Mikael Pettersson <mikpe@it.uu.se>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
->
-> I suppose this may indeed be viewed as a special, limited case of
-> virtualisation, where physical memory is statically partitioned and not
-> virtualised, and there is only one guest*
->
->
-> I guess it would be worth getting ideas from the KVM guys about what
-> concepts can be applied here, even if the code is not directly re-usable.
->
+I think you may put this patch into Russell's patch system now:
 
-agree.
+http://www.arm.linux.org.uk/developer/patches/
 
-> Cheers
-> ---Dave
->
 
--barry
+
+> ---
+>  arch/arm/include/asm/types.h | 40 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+>  create mode 100644 arch/arm/include/asm/types.h
+> 
+> diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
+> new file mode 100644
+> index 0000000..c4f0bca
+> --- /dev/null
+> +++ b/arch/arm/include/asm/types.h
+> @@ -0,0 +1,40 @@
+> +#ifndef _ASM_TYPES_H
+> +#define _ASM_TYPES_H
+> +
+> +#include <asm-generic/int-ll64.h>
+> +
+> +/*
+> + * The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
+> + * unambiguous on ARM as you would expect. For the types below, there is a
+> + * difference on ARM between GCC built for bare metal ARM, GCC built for glibc
+> + * and the kernel itself, which results in build errors if you try to build with
+> + * -ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
+> + * in order to use NEON intrinsics)
+> + *
+> + * As the typedefs for these types in 'stdint.h' are based on builtin defines
+> + * supplied by GCC, we can tweak these to align with the kernel's idea of those
+> + * types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
+> + * source file (provided that -ffreestanding is used).
+> + * 
+> + *                    int32_t         uint32_t               uintptr_t
+> + * bare metal GCC     long            unsigned long          unsigned int
+> + * glibc GCC          int             unsigned int           unsigned int
+> + * kernel             int             unsigned int           unsigned long
+> + */
+> +
+> +#ifdef __INT32_TYPE__
+> +#undef __INT32_TYPE__
+> +#define __INT32_TYPE__		int
+> +#endif
+> +
+> +#ifdef __UINT32_TYPE__
+> +#undef __UINT32_TYPE__
+> +#define __UINT32_TYPE__	unsigned int
+> +#endif
+> +
+> +#ifdef __UINTPTR_TYPE__
+> +#undef __UINTPTR_TYPE__
+> +#define __UINTPTR_TYPE__	unsigned long
+> +#endif
+> +
+> +#endif /* _ASM_TYPES_H */
+> -- 
+> 1.8.1.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
