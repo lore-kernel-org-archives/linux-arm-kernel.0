@@ -1,16 +1,56 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Mon, 19 Aug 2013 13:20:34 +0200
-Subject: [PATCH 0/7] replace devm_request_and_ioremap by devm_ioremap_resource
-Message-ID: <1376911241-27720-1-git-send-email-Julia.Lawall@lip6.fr>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 19 Aug 2013 12:21:34 +0100
+Subject: [PATCH v2] drivers: CCI: add ARM CCI PMU support
+In-Reply-To: <4698B009-124E-4D51-868B-336F80A7D7F8@codeaurora.org>
+References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
+ <1376673599-3967-1-git-send-email-punit.agrawal@arm.com>
+ <4698B009-124E-4D51-868B-336F80A7D7F8@codeaurora.org>
+Message-ID: <5211FFBE.2040002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_request_and_ioremap has been replaced by devm_ioremap_resource, which
-gives more informative error return code information.  This patch series
-removes the remaining uses of devm_request_and_ioremap.
+Hi Kumar,
 
-This patch series was generated using the semantic patch
-scripts/coccinelle/api/devm_ioremap_resource.cocci from the Linux kernel
-source tree.  Manual modifications have been made to move associated calls
-to platform_get_resource closer to the resulting call to
-devm_ioremap_resource and to remove the associated error handling code.
+On 16/08/13 19:47, Kumar Gala wrote:
+>
+> On Aug 16, 2013, at 12:19 PM, Punit Agrawal wrote:
+>
+[...]
+>>
+>> 	Description: masters in the device tree connected to a CCI port
+>> @@ -163,6 +197,16 @@ Example:
+>> 			interface-type = "ace";
+>> 			reg = <0x5000 0x1000>;
+>> 		};
+>> +
+>> +		pmu at 9000 {
+>> +			 compatible = "arm,cci-400-pmu,rev0";
+>
+> drop the ',rev0'
+>
+
+Missed this instance in the update. Now taken care of.
+
+Will post the next (and hopefully last) version addressing Stephen's 
+comments as well.
+
+Can I use either your Acked-by or Reviewd-by with these changes in place?
+
+Cheers,
+Punit
+
+>> +			 reg = <0x9000 0x5000>;
+>> +			 interrupts = <0 101 4>,
+>> +				      <0 102 4>,
+>> +				      <0 103 4>,
+>> +				      <0 104 4>,
+>> +				      <0 105 4>;
+>> +		};
+>> 	};
+>>
+>> This CCI node corresponds to a CCI component whose control registers sits
+>
+> [snip]
+>
+> - k
+>
