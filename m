@@ -1,30 +1,45 @@
-From: luka@openwrt.org (Luka Perkov)
-Date: Mon, 19 Aug 2013 18:28:27 +0200
-Subject: [PATCH] ARM: dts: imx6sl reuses imx6q sdma firmware
-In-Reply-To: <20130819135315.GA28297@S2101-09.ap.freescale.net>
-References: <1376903386-27771-1-git-send-email-shawn.guo@linaro.org>
- <20130819123541-7656@mutt-kz>
- <20130819135315.GA28297@S2101-09.ap.freescale.net>
-Message-ID: <20130819162827-27661@mutt-kz>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 19 Aug 2013 09:32:45 -0700
+Subject: [GIT PULL] DaVinci fixes for v3.11
+In-Reply-To: <5211CC26.7050702@ti.com> (Sekhar Nori's message of "Mon, 19 Aug
+ 2013 13:11:26 +0530")
+References: <5211C957.4090902@ti.com> <5211CC26.7050702@ti.com>
+Message-ID: <87mwodk5ea.fsf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 09:53:17PM +0800, Shawn Guo wrote:
-> On Mon, Aug 19, 2013 at 02:35:42PM +0200, Luka Perkov wrote:
-> > On Mon, Aug 19, 2013 at 05:09:46PM +0800, Shawn Guo wrote:
-> > Also, last patch containing sdma firmware blobs sent to the mailing list
-> > [1] uses "sdma-imx6.bin" name.
-> 
-> The patch never got merged.  I do not like the name, simply because imx6
-> is not a SoC name.
+Hi Sekhar,
 
-IMHO "sdma-imx6.bin" is much more descriptive then "sdma-imx6q.bin" in
-this case.
+Sekhar Nori <nsekhar@ti.com> writes:
 
-It could have been named "foobar" as far as I am concerned. But because
-it was named "sdma-imx6q.bin" in imx6qdl.dtsi error was made when new
-imx6sl.dtsi was created. Naming it "sdma-imx6.bin" or "sdma-imx6x.bin"
-would help avoiding confusions in the future (despite it's not SoC
-name).
+>> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+>> 
+>>   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+>> 
+>> are available in the git repository at:
+>> 
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.11
+>> 
+>> for you to fetch changes up to de30e316d38b0837fe4c09b43f1b52c8e230c44e:
+>> 
+>>   ARM: davinci: nand: specify ecc strength (2013-08-16 15:12:20 +0530)
+>> 
+>> ----------------------------------------------------------------
+>> This pull request includes a patch for
+>> making NAND flash work on multiple DaVinci
+>> boards. The NAND probe was failing because
+>> ecc strength was not specified while using
+>> hardware ecc algorithm.
 
-Luka
+Note that our current fixes branch is based on -rc4, and since it
+doesn't look like this fix is in -next, I've rebased it onto our fixes
+branch.
+
+IOW, rebased to -rc4, and applied to fixes.
+
+In general, we prefer fixes based on older -rcs (at least not newer than
+the current fixes branch) unless there is a dependency on a newer -rc.
+
+Thanks,
+
+Kevin
