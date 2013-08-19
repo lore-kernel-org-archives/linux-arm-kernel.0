@@ -1,48 +1,28 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Mon, 19 Aug 2013 11:59:21 -0700
-Subject: [PATCH v4 3/3] ARM: bcm281xx: Device Tree bindings for GPIO
- driver
-In-Reply-To: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 19 Aug 2013 20:02:55 +0100
+Subject: [PATCH v4 1/3] ARM: bcm281xx: Add GPIO driver
+In-Reply-To: <1376938761-13657-2-git-send-email-markus.mayer@linaro.org>
 References: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <1376938761-13657-4-git-send-email-markus.mayer@linaro.org>
+ <1376938761-13657-2-git-send-email-markus.mayer@linaro.org>
+Message-ID: <17431632.gcbUH2MqH0@lenovo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO device tree bindings for the Broadcom bcm281xx family of chips
+Hello Markus,
 
-Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Le lundi 19 ao?t 2013 11:59:19 Markus Mayer a ?crit :
+> From: Markus Mayer <mmayer@broadcom.com>
+> 
+> This patch adds the GPIO driver for the bcm281xx family of chips.
+> 
+> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+> Reviewed-by: Christian Daudt <csd@broadcom.com>
+> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> ---
+>  .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   43 ++
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index c0cdf66..a3945e3 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -63,6 +63,22 @@
- 		clock-frequency = <32768>;
- 	};
- 
-+	gpio: gpio at 35003000 {
-+		compatible = "brcm,bcm11351-gpio", "brcm,kona-gpio";
-+		reg = <0x35003000 0x800>;
-+		interrupts =
-+		       <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		#interrupt-cells = <2>;
-+		gpio-controller;
-+		interrupt-controller;
-+	};
-+
- 	sdio0: sdio at 0x3f180000 {
- 		compatible = "bcm,kona-sdhci";
- 		reg = <0x3f180000 0x10000>;
+Since the vendor prefix has been changed from brcm to bcm, should that also be 
+reflected in the Device Tree binding documentation file?
 -- 
-1.7.9.5
+Florian
