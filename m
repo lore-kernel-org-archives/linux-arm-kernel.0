@@ -1,84 +1,144 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 19 Aug 2013 12:09:58 +0800
-Subject: [PATCH V1 0/5] Add the Quadspi driver for vf610-twr
-Message-ID: <1376885403-12156-1-git-send-email-b32955@freescale.com>
+Date: Mon, 19 Aug 2013 12:10:01 +0800
+Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
+In-Reply-To: <1376885403-12156-1-git-send-email-b32955@freescale.com>
+References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
+Message-ID: <1376885403-12156-4-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch set is based on Li Xiaochun's init version.
-http://marc.info/?l=linux-arm-kernel&m=137181252311126&w=2
+This patch adds the quad read support:
 
-(0) What is the Quadspi controller?
+(1) Add the relative commands:
+      OPCODE_QIOR, OPCODE_4QIOR, OPCODE_RDCR,
 
-    The Quadspi(Quad Serial Peripheral Interface) acts as an interface to
-    one single or two external serial flash devices, each with up to 4
-    bidirectional data lines.
+    also add the relative macro for the Configuartion Register.
 
-(1) The Quadspi controller is driven by the LUT(Look-up Table) registers.
-    The LUT registers are a look-up-table for sequences of instructions.
-    A valid sequence consists of four LUT registers.
+(2) add the "m25p,quad-read" property for the m25p80 driver
+    If the dts has the "m25p,quad-read" property, the kernel will
+    set the Quad bit of the configuration register, and when the
+    setting is suceeded, we set the read opcode with OPCODE_QIOR.
 
-(2) The definition of the LUT register shows below:
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ Documentation/devicetree/bindings/mtd/m25p80.txt |    5 ++
+ drivers/mtd/devices/m25p80.c                     |   51 ++++++++++++++++++++++
+ include/linux/mtd/spi-nor.h                      |    6 +++
+ 3 files changed, 62 insertions(+), 0 deletions(-)
 
-    ---------------------------------------------------
-    | INSTR1 | PAD1 | OPRND1 | INSTR0 | PAD0 | OPRND0 |
-    ---------------------------------------------------
-
-    There are several types of INSTRx, such as:
-    	CMD	: the SPI NOR command.
-	ADDR	: the address for the SPI NOR command.
-	DUMMY	: the dummy cycles needed by the SPI NOR command.
-	....
-
-(3) We connect the NOR the QuadSPI now. I am not sure, but i think the
-    QuadSPI will be only used for the NOR. We may connect other devices
-    to it. But, for the reason of (2), we have to parse out the SPI NOR
-    command for the QuadSPI.
-
-(4) Test this driver with the JFFS2 and UBIFS with the Spansion s25fl128s :
-
-    For jffs2:
-         #flash_eraseall /dev/mtd0
-         #mount -t jffs2 /dev/mtdblock0 tmp
-         #bonnie++ -d tmp -u 0 -s 10 -r 5
-
-    For ubifs:
-         #flash_eraseall /dev/mtd0
-    	 #ubiattach /dev/ubi_ctrl -m 0
-    	 #ubimkvol /dev/ubi0 -N test -m
-         #mount -t ubifs ubi0:test tmp
-         #bonnie++ -d tmp -u 0 -s 10 -r 5
-
- (5) TODO:
-     1.) add DDR QUAD read. 
-     2.) support two nor chips
-
-changelog:
-
-init --> v1:
- 	[1] since the ic bug in the IPS read,
-            abandon the IPS read, use the AHB read.
-	[2] change the mtd code, add the quad read support.
-	[3] add the quad read support the QuadSpi driver.
-	[4] misc.
-
-
-Huang Shijie (5):
-  mtd: m25p80: move the spi-nor commands to a header
-  mtd: m25p80: add support for Spansion s25fl128s chip
-  mtd: m25p80: add the quad-read support
-  spi: Add Freescale QuadSpi driver
-  ARM: dts: vf610-twr: Add SPI NOR support
-
- Documentation/devicetree/bindings/mtd/m25p80.txt   |    5 +
- .../devicetree/bindings/spi/fsl-quadspi.txt        |   27 +
- arch/arm/boot/dts/vf610-twr.dts                    |   22 +
- drivers/mtd/devices/m25p80.c                       |   93 ++-
- drivers/spi/Kconfig                                |    7 +
- drivers/spi/Makefile                               |    1 +
- drivers/spi/spi-fsl-quadspi.c                      |  930 ++++++++++++++++++++
- include/linux/mtd/spi-nor.h                        |   58 ++
- 8 files changed, 1103 insertions(+), 40 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/spi/fsl-quadspi.txt
- create mode 100644 drivers/spi/spi-fsl-quadspi.c
- create mode 100644 include/linux/mtd/spi-nor.h
+diff --git a/Documentation/devicetree/bindings/mtd/m25p80.txt b/Documentation/devicetree/bindings/mtd/m25p80.txt
+index 6d3d576..b33313f 100644
+--- a/Documentation/devicetree/bindings/mtd/m25p80.txt
++++ b/Documentation/devicetree/bindings/mtd/m25p80.txt
+@@ -17,6 +17,11 @@ Optional properties:
+                    Refer to your chips' datasheet to check if this is supported
+                    by your chip.
+ 
++- m25p,quad-read : Use the "quad read" opcode to read data from the chip instead
++                   of the usual "read" opcode. This opcode is not supported by
++                   all chips and support for it can not be detected at runtime.
++                   Refer to your chips' datasheet to check if this is supported
++                   by your chip.
+ Example:
+ 
+ 	flash: m25p80 at 0 {
+diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+index f3598c1..4bc9b1b 100644
+--- a/drivers/mtd/devices/m25p80.c
++++ b/drivers/mtd/devices/m25p80.c
+@@ -103,6 +103,40 @@ static int write_sr(struct m25p *flash, u8 val)
+ }
+ 
+ /*
++ * Read the configuration register, returning its value in the location
++ * Return the configuration register value.
++ * Returns negative if error occurred.
++ */
++static int read_cr(struct m25p *flash)
++{
++	u8 code = OPCODE_RDCR;
++	int ret;
++	u8 val;
++
++	ret = spi_write_then_read(flash->spi, &code, 1, &val, 1);
++	if (ret < 0) {
++		dev_err(&flash->spi->dev, "error %d reading CR\n", ret);
++		return ret;
++	}
++	return val;
++}
++
++/*
++ * Write status register and configuration register with 2 bytes
++ * The first byte will be written to the status register, while the second byte
++ * will be written to the configuration register.
++ * Returns negative if error occurred.
++ */
++static int write_sr_cr(struct m25p *flash, u16 val)
++{
++	flash->command[0] = OPCODE_WRSR;
++	flash->command[1] = 0;
++	flash->command[2] = (val >> 8);
++
++	return spi_write(flash->spi, flash->command, 3);
++}
++
++/*
+  * Set write enable latch with Write Enable command.
+  * Returns negative if error occurred.
+  */
+@@ -880,6 +914,8 @@ static int m25p_probe(struct spi_device *spi)
+ 	unsigned			i;
+ 	struct mtd_part_parser_data	ppdata;
+ 	struct device_node __maybe_unused *np = spi->dev.of_node;
++	u16 sr_cr;
++	int ret;
+ 
+ #ifdef CONFIG_MTD_OF_PARTS
+ 	if (!of_device_is_available(np))
+@@ -1014,6 +1050,21 @@ static int m25p_probe(struct spi_device *spi)
+ 	else
+ 		flash->read_opcode = OPCODE_NORM_READ;
+ 
++	/* Try to enable the Quad Read */
++	if (np && of_property_read_bool(np, "m25p,quad-read")) {
++		/* The configuration register is set by the second byte. */
++		sr_cr = CR_QUAD << 8;
++
++		/* Write the QUAD bit to the Configuration Register. */
++		write_enable(flash);
++		if (write_sr_cr(flash, sr_cr) == 0) {
++			/* read back and check it */
++			ret = read_cr(flash);
++			if (ret > 0 && (ret & CR_QUAD))
++				flash->read_opcode = OPCODE_QIOR;
++		}
++	}
++
+ 	flash->program_opcode = OPCODE_PP;
+ 
+ 	if (info->addr_width)
+diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+index b420a5b..d5b189d 100644
+--- a/include/linux/mtd/spi-nor.h
++++ b/include/linux/mtd/spi-nor.h
+@@ -39,6 +39,9 @@
+ 
+ /* Used for Spansion flashes only. */
+ #define	OPCODE_BRWR		0x17	/* Bank register write */
++#define OPCODE_QIOR		0xeb	/* Quad read */
++#define OPCODE_4QIOR		0xec	/* Quad read */
++#define	OPCODE_RDCR		0x35	/* Read configuration register */
+ 
+ /* Status Register bits. */
+ #define	SR_WIP			1	/* Write in progress */
+@@ -49,4 +52,7 @@
+ #define	SR_BP2			0x10	/* Block protect 2 */
+ #define	SR_SRWD			0x80	/* SR write protect */
+ 
++/* Configuration Register bits. */
++#define CR_QUAD			0x2	/* Quad I/O */
++
+ #endif /* __LINUX_MTD_SPI_NOR_H */
+-- 
+1.7.1
