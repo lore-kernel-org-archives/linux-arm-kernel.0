@@ -1,70 +1,66 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 19 Aug 2013 01:01:12 +0200
-Subject: [PATCH v4 5/6] clocksource: armada-370-xp: Fix device-tree binding
-In-Reply-To: <521159BE.1020206@gmail.com>
-References: <1376404995-24548-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130817164319.GA2772@localhost> <521159BE.1020206@gmail.com>
-Message-ID: <1459049.v9II6MKhh6@flatron>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 19 Aug 2013 10:48:02 +1000
+Subject: [patch v2 3/3] mm: page_alloc: fair zone allocator policy
+In-Reply-To: <8738q9b8xg.fsf@kernel.org>
+References: <1375457846-21521-1-git-send-email-hannes@cmpxchg.org>
+ <1375457846-21521-4-git-send-email-hannes@cmpxchg.org>
+ <20130807145828.GQ2296@suse.de> <20130807153743.GH715@cmpxchg.org>
+ <20130808041623.GL1845@cmpxchg.org> <87haepblo2.fsf@kernel.org>
+ <20130816201814.GA26409@cmpxchg.org> <8738q9b8xg.fsf@kernel.org>
+Message-ID: <20130819104802.e5a8088d87ba81c5ad0d2a66@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 of August 2013 01:33:18 Sebastian Hesselbarth wrote:
-> On 08/17/2013 06:43 PM, Ezequiel Garcia wrote:
-> > On Sat, Aug 17, 2013 at 02:29:28PM +0200, Sebastian Hesselbarth wrote:
-> > 
-> > In fact: I'm not sure. I'm slightly inclined towards considering both
-> > clocks as clock sources, just as Stephen and Tomasz are proposing.
-> > 
-> >> But in the end, passing it by DT should be the way to go. I cannot
-> >> look
-> >> into the XP datasheet, but I would guess that the exact feature of
-> >> the
-> >> ip is not to use _the_ fixed 25MHz clock but XTAL as reference. Maybe
-> >> one of the free-electrons guys can look it up?
-> > 
-> > No, the documentation has a register bit for "25Mhz frequency enable",
-> > for each timer/watchdog.
-> > 
-> > ---
-> > 
-> > Anyway, I (almost) agree that the 25Mhz fixed clock must be somehow
-> > represented in the device-tree, but I'm not exactly sure how.
-> > Gregory: maybe you can help in this?
-> 
-> In armada-370-xp.dtsi add a 25MHz ref clock node and modify timer node
-> to reference it:
-> 
-> cpus { ... };
-> 
-> clocks {
-> 	ref25M: timer-clock {
-> 		compatible = "fixed-clock";
-> 		clock-frequency = <25000000>;
-> 	};
-> }
-> 
-> ...
-> 
-> internal-regs {
-> 	timer at 20300 {
-> 		compatible = "marvell,armada-370-xp-timer";
-> 		reg = <0x20300 0x30>, <0x21040 0x30>;
-> 		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
-> 		clocks = <&coreclk 2>, <&ref25M>;
-> 		clock-names = "fabric", "fixed";
+Hi all,
 
-These names look more like SoC-level clock names, not clock input names of 
-the IP. Are they referenced by such names in documentation?
-
-> 	};
-> };
+On Fri, 16 Aug 2013 14:52:11 -0700 Kevin Hilman <khilman@linaro.org> wrote:
+>
+> Johannes Weiner <hannes@cmpxchg.org> writes:
 > 
-> Then use of_clk_get_by_name(np, "fabric") and of_clk_get_by_name(np,
-> "fixed") respectively. Clock select strategy should be, (a) fail if
-> no clock, (b) use fabric/fixed if just one clock, (c) use fixed if
-> both clocks.
+> > On Fri, Aug 16, 2013 at 10:17:01AM -0700, Kevin Hilman wrote:
+> >> Johannes Weiner <hannes@cmpxchg.org> writes:
+> >> > On Wed, Aug 07, 2013 at 11:37:43AM -0400, Johannes Weiner wrote:
+> >> > Subject: [patch] mm: page_alloc: use vmstats for fair zone allocation batching
+> >> >
+> >> > Avoid dirtying the same cache line with every single page allocation
+> >> > by making the fair per-zone allocation batch a vmstat item, which will
+> >> > turn it into batched percpu counters on SMP.
+> >> >
+> >> > Signed-off-by: Johannes Weiner <hannes@cmpxchg.org>
+> >> 
+> >> I bisected several boot failures on various ARM platform in
+> >> next-20130816 down to this patch (commit 67131f9837 in linux-next.)
+> >> 
+> >> Simply reverting it got things booting again on top of -next.  Example
+> >> boot crash below.
+> >
+> > Thanks for the bisect and report!
+> 
+> You're welcome.  Thanks for the quick fix!
+> 
+> > I deref the percpu pointers before initializing them properly.  It
+> > didn't trigger on x86 because the percpu offset added to the pointer
+> > is big enough so that it does not fall into PFN 0, but it probably
+> > ended up corrupting something...
+> >
+> > Could you try this patch on top of linux-next instead of the revert?
+> 
+> Yup, that change fixes it.
+> 
+> Tested-by: Kevin Hilman <khilman@linaro.org>
 
-This basically sounds good, except those names.
+> Tested-by: Stephen Warren <swarren@nvidia.com>
 
-Best regards,
-Tomasz
+I will add that into the akpm-current tree in linux-next today (unless
+Andrew releases a new mmotm in the mean time).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130819/9b117b24/attachment.sig>
