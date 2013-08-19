@@ -1,67 +1,52 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 19 Aug 2013 21:54:14 +0100
-Subject: [PATCH v4 1/3] ARM: bcm281xx: Add GPIO driver
-In-Reply-To: <CAPdLdqk-7dfGK62Y0Og8vzJ9TUz_OAZv3AfFPUDJDy52tPVszQ@mail.gmail.com>
-References: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
- <2184179.Dja4tiYGvP@lenovo>
- <CAPdLdqk-7dfGK62Y0Og8vzJ9TUz_OAZv3AfFPUDJDy52tPVszQ@mail.gmail.com>
-Message-ID: <1804309.Ypdt3FAFFr@lenovo>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 19 Aug 2013 22:54:35 +0200
+Subject: [GIT PULL] ux500 core changes for v3.12
+Message-ID: <CACRpkdbRaV9_oCNKXh2O2JR6pyvz6+5c4=pxYCFhT6-KzbqyMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le lundi 19 ao?t 2013 12:23:47 Markus Mayer a ?crit :
-> On 19 August 2013 12:11, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> > Le lundi 19 ao?t 2013 12:05:55 Markus Mayer a ?crit :
-> >> On 19 August 2013 12:02, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> >> > Hello Markus,
-> >> > 
-> >> > Le lundi 19 ao?t 2013 11:59:19 Markus Mayer a ?crit :
-> >> >> From: Markus Mayer <mmayer@broadcom.com>
-> >> >> 
-> >> >> This patch adds the GPIO driver for the bcm281xx family of chips.
-> >> >> 
-> >> >> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-> >> >> Reviewed-by: Christian Daudt <csd@broadcom.com>
-> >> >> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> >> >> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> >> >> ---
-> >> >> 
-> >> >>  .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   43 ++
-> >> > 
-> >> > Since the vendor prefix has been changed from brcm to bcm, should that
-> >> > also be reflected in the Device Tree binding documentation file?
-> >> 
-> >> Actually, it is the other way around. "brcm," was there first, but we
-> >> overlooked that and started upstreaming code with the "bcm," vendor
-> >> prefix. There are various patches floating around out there to change
-> >> our use of "bcm," to "brcm," to make it conform to the established
-> >> vendor prefixes.
-> > 
-> > Ermm yes, I realized that after hitting send. Netherless, should this be
-> > renamed to "gpio-brcm-kona.txt" directly such that the patches you mention
-> > do not have to get updated to patch this one too?
-> 
-> After long discussions on how to handle the "bcm" vs. "brcm"
-> situation, we said we would be renaming the "bcm," vendor prefixes to
-> "brcm,", but would otherwise refrain from renaming files, variables,
-> function names, etc. except if the file name contains the vendor
-> prefix itself.
-> 
-> The thing is that Broadcom is exclusively using the BCM abbreviation
-> internally. Except for our stock ticker, nothing is named "BRCM". :-)
-> So, the less "brcm" is out there, the better it is. Unfortunately,
-> it's too late for the vendor prefix.
-> 
-> I can see how a file called gpio-bcm-kona.txt talking about the
-> "brcm," could be a bit confusing. It's still straight forward enough
-> to find out that the definition of "brcm,kona-gpio" is in the
-> gpio-bcm-kona.txt file. And the boundary of what's called "brcm" is
-> still firm: just the vendor prefix.
-> 
-> But if we renamed it to gpio-brcm-kona.txt, then it would be confusing
-> why there are not other files named *brcm* and the boundary of what is
-> named how would become quite blurry.
+Hi ARM SoC folks,
 
-I am happy with that explanation, thanks! That works for me too.
--- 
-Florian
+here are some smallish ux500 core changes for the v3.12
+cycle. Basically just three random patches. The big thing is
+that we can now restart the ux500 with software.
+
+Please pull these in!
+
+Yours,
+Linus Walleij
+
+The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+
+  Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-core-for-arm-soc
+
+for you to fetch changes up to 0a429fd15ecb05d7d5fa8eb4adaff69c7a00984b:
+
+  ARM: ux500: set coherent_dma_mask for dma40 (2013-08-19 22:49:25 +0200)
+
+----------------------------------------------------------------
+Core ux500 changes for v3.12:
+- Add support for restart using the PRCMU
+- Move secondary startup out of INIT section
+- set coherent_dma_mask for DMA40
+
+----------------------------------------------------------------
+Fabio Baltieri (2):
+      ARM: ux500: add restart support via prcmu
+      ARM: ux500: set coherent_dma_mask for dma40
+
+Srinivas Kandagatla (1):
+      ARM: ux500: remove u8500_secondary_startup from INIT section.
+
+ arch/arm/mach-ux500/board-mop500.c   | 5 ++++-
+ arch/arm/mach-ux500/cpu-db8500.c     | 2 +-
+ arch/arm/mach-ux500/cpu.c            | 8 ++++++++
+ arch/arm/mach-ux500/devices-db8500.c | 1 +
+ arch/arm/mach-ux500/headsmp.S        | 2 --
+ arch/arm/mach-ux500/setup.h          | 3 +++
+ 6 files changed, 17 insertions(+), 4 deletions(-)
