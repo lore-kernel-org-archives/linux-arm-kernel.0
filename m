@@ -1,46 +1,207 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 Aug 2013 13:23:34 +0200
-Subject: [PATCHv3 4/9] pinctrl: sunxi: Add Allwinner A20 pins set
-In-Reply-To: <20130812083319.GN2911@lukather>
-References: <1375610330-18185-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375610330-18185-5-git-send-email-maxime.ripard@free-electrons.com>
- <20130812083319.GN2911@lukather>
-Message-ID: <20130819112334.GK3173@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 19 Aug 2013 12:38:07 +0100
+Subject: [PATCH] mfd: dbx500-prcmu: Move PRCMU numerical clock identifiers
+ into DT include file
+Message-ID: <1376912287-26460-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 12, 2013 at 10:33:19AM +0200, Maxime Ripard wrote:
-> Hi Linus,
-> 
-> On Sun, Aug 04, 2013 at 11:58:45AM +0200, Maxime Ripard wrote:
-> > The Allwinner A20 is pin-compatible with the older A10, so the two pin
-> > set are quite similar. However, since the A20 has new features, we can't
-> > just use the A10 pin set as is, and we need to define our own for the
-> > A20.
-> 
-> I'd like this to get merged in 3.12, do you have any comments on this
-> patch?
-> 
-> It's mostly just another round of pin sets additions for yet another
-> SoC, like we already had a few times.
-> 
-> Hopefully, it will be the end of it, unless if Allwinner release a new
-> SoC.
-> 
-> The only missing feature now is the gpio irq support for the A31 that
-> had a slightly different interrupts handling. Anyway, this support will
-> likely be in 3.13.
+These are required to request DBx500 PRCMU clocks from Device Tree. The
+numbers used are taken directly from the Hardware Specification document.
+We're moving them from the DBx500 PRCMU include file into the DT include
+directory and referencing them from the former via a #include.
 
-Ping again :)
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ include/dt-bindings/mfd/dbx500-prcmu.h | 84 ++++++++++++++++++++++++++++++++++
+ include/linux/mfd/dbx500-prcmu.h       | 77 +------------------------------
+ 2 files changed, 86 insertions(+), 75 deletions(-)
+ create mode 100644 include/dt-bindings/mfd/dbx500-prcmu.h
 
+diff --git a/include/dt-bindings/mfd/dbx500-prcmu.h b/include/dt-bindings/mfd/dbx500-prcmu.h
+new file mode 100644
+index 0000000..b7ee8c9
+--- /dev/null
++++ b/include/dt-bindings/mfd/dbx500-prcmu.h
+@@ -0,0 +1,84 @@
++/*
++ * This header provides constants for the PRCMU bindings.
++ *
++ */
++
++#ifndef _DT_BINDINGS_MFD_PRCMU_H
++#define _DT_BINDINGS_MFD_PRCMU_H
++
++/*
++ * Clock identifiers.
++ */
++#define ARMCLK			0
++#define PRCMU_ACLK		1
++#define PRCMU_SVAMMCSPCLK 	2
++#define PRCMU_SDMMCHCLK 	2  /* DBx540 only. */
++#define PRCMU_SIACLK 		3
++#define PRCMU_SIAMMDSPCLK 	3  /* DBx540 only. */
++#define PRCMU_SGACLK 		4
++#define PRCMU_UARTCLK 		5
++#define PRCMU_MSP02CLK 		6
++#define PRCMU_MSP1CLK 		7
++#define PRCMU_I2CCLK 		8
++#define PRCMU_SDMMCCLK 		9
++#define PRCMU_SLIMCLK 		10
++#define PRCMU_CAMCLK 		10 /* DBx540 only. */
++#define PRCMU_PER1CLK 		11
++#define PRCMU_PER2CLK 		12
++#define PRCMU_PER3CLK 		13
++#define PRCMU_PER5CLK 		14
++#define PRCMU_PER6CLK 		15
++#define PRCMU_PER7CLK 		16
++#define PRCMU_LCDCLK 		17
++#define PRCMU_BMLCLK 		18
++#define PRCMU_HSITXCLK 		19
++#define PRCMU_HSIRXCLK 		20
++#define PRCMU_HDMICLK		21
++#define PRCMU_APEATCLK 		22
++#define PRCMU_APETRACECLK 	23
++#define PRCMU_MCDECLK  	 	24
++#define PRCMU_IPI2CCLK  	25
++#define PRCMU_DSIALTCLK  	26
++#define PRCMU_DMACLK  	 	27
++#define PRCMU_B2R2CLK  	 	28
++#define PRCMU_TVCLK  	 	29
++#define SPARE_UNIPROCLK  	30
++#define PRCMU_SSPCLK  	 	31
++#define PRCMU_RNGCLK  	 	32
++#define PRCMU_UICCCLK  	 	33
++#define PRCMU_G1CLK             34 /* DBx540 only. */
++#define PRCMU_HVACLK            35 /* DBx540 only. */
++#define PRCMU_SPARE1CLK	 	36
++#define PRCMU_SPARE2CLK	 	37
++
++#define PRCMU_NUM_REG_CLOCKS  	38
++
++#define PRCMU_RTCCLK  	 	PRCMU_NUM_REG_CLOCKS
++#define PRCMU_SYSCLK  	 	39
++#define PRCMU_CDCLK  	 	40
++#define PRCMU_TIMCLK  	 	41
++#define PRCMU_PLLSOC0  	 	42
++#define PRCMU_PLLSOC1  	 	43
++#define PRCMU_ARMSS  	 	44
++#define PRCMU_PLLDDR  	 	45
++#define PRCMU_BML8580CLK        46
++
++/* DSI Clocks */
++#define PRCMU_PLLDSI  	 	47
++#define PRCMU_DSI0CLK 	  	48
++#define PRCMU_DSI1CLK  	 	49
++#define PRCMU_DSI0ESCCLK  	50
++#define PRCMU_DSI1ESCCLK  	51
++#define PRCMU_DSI2ESCCLK  	52
++
++/* LCD DSI PLL - Ux540 only */
++#define PRCMU_PLLDSI_LCD        53
++#define PRCMU_DSI0CLK_LCD       54
++#define PRCMU_DSI1CLK_LCD       55
++#define PRCMU_DSI0ESCCLK_LCD    56
++#define PRCMU_DSI1ESCCLK_LCD    57
++#define PRCMU_DSI2ESCCLK_LCD    58
++
++#define PRCMU_NUM_CLKS  	59
++
++#endif
+diff --git a/include/linux/mfd/dbx500-prcmu.h b/include/linux/mfd/dbx500-prcmu.h
+index 87667d4..060e112 100644
+--- a/include/linux/mfd/dbx500-prcmu.h
++++ b/include/linux/mfd/dbx500-prcmu.h
+@@ -12,6 +12,8 @@
+ #include <linux/notifier.h>
+ #include <linux/err.h>
+ 
++#include <dt-bindings/mfd/dbx500-prcmu.h> /* For clock identifiers */
++
+ /* Offset for the firmware version within the TCPM */
+ #define DB8500_PRCMU_FW_VERSION_OFFSET 0xA4
+ #define DBX540_PRCMU_FW_VERSION_OFFSET 0xA8
+@@ -94,81 +96,6 @@ enum prcmu_wakeup_index {
+ #define PRCMU_CLKSRC_ARMCLKFIX		0x46
+ #define PRCMU_CLKSRC_HDMICLK		0x47
+ 
+-/*
+- * Clock identifiers.
+- */
+-#define ARMCLK			0
+-#define PRCMU_ACLK		1
+-#define PRCMU_SVAMMCSPCLK 	2
+-#define PRCMU_SDMMCHCLK 	2  /* DBx540 only. */
+-#define PRCMU_SIACLK 		3
+-#define PRCMU_SIAMMDSPCLK 	3  /* DBx540 only. */
+-#define PRCMU_SGACLK 		4
+-#define PRCMU_UARTCLK 		5
+-#define PRCMU_MSP02CLK 		6
+-#define PRCMU_MSP1CLK 		7
+-#define PRCMU_I2CCLK 		8
+-#define PRCMU_SDMMCCLK 		9
+-#define PRCMU_SLIMCLK 		10
+-#define PRCMU_CAMCLK 		10 /* DBx540 only. */
+-#define PRCMU_PER1CLK 		11
+-#define PRCMU_PER2CLK 		12
+-#define PRCMU_PER3CLK 		13
+-#define PRCMU_PER5CLK 		14
+-#define PRCMU_PER6CLK 		15
+-#define PRCMU_PER7CLK 		16
+-#define PRCMU_LCDCLK 		17
+-#define PRCMU_BMLCLK 		18
+-#define PRCMU_HSITXCLK 		19
+-#define PRCMU_HSIRXCLK 		20
+-#define PRCMU_HDMICLK		21
+-#define PRCMU_APEATCLK 		22
+-#define PRCMU_APETRACECLK 	23
+-#define PRCMU_MCDECLK  	 	24
+-#define PRCMU_IPI2CCLK  	25
+-#define PRCMU_DSIALTCLK  	26
+-#define PRCMU_DMACLK  	 	27
+-#define PRCMU_B2R2CLK  	 	28
+-#define PRCMU_TVCLK  	 	29
+-#define SPARE_UNIPROCLK  	30
+-#define PRCMU_SSPCLK  	 	31
+-#define PRCMU_RNGCLK  	 	32
+-#define PRCMU_UICCCLK  	 	33
+-#define PRCMU_G1CLK             34 /* DBx540 only. */
+-#define PRCMU_HVACLK            35 /* DBx540 only. */
+-#define PRCMU_SPARE1CLK	 	36
+-#define PRCMU_SPARE2CLK	 	37
+-
+-#define PRCMU_NUM_REG_CLOCKS  	38
+-
+-#define PRCMU_RTCCLK  	 	PRCMU_NUM_REG_CLOCKS
+-#define PRCMU_SYSCLK  	 	39
+-#define PRCMU_CDCLK  	 	40
+-#define PRCMU_TIMCLK  	 	41
+-#define PRCMU_PLLSOC0  	 	42
+-#define PRCMU_PLLSOC1  	 	43
+-#define PRCMU_ARMSS  	 	44
+-#define PRCMU_PLLDDR  	 	45
+-#define PRCMU_BML8580CLK        46
+-
+-/* DSI Clocks */
+-#define PRCMU_PLLDSI  	 	47
+-#define PRCMU_DSI0CLK 	  	48
+-#define PRCMU_DSI1CLK  	 	49
+-#define PRCMU_DSI0ESCCLK  	50
+-#define PRCMU_DSI1ESCCLK  	51
+-#define PRCMU_DSI2ESCCLK  	52
+-
+-/* LCD DSI PLL - Ux540 only */
+-#define PRCMU_PLLDSI_LCD        53
+-#define PRCMU_DSI0CLK_LCD       54
+-#define PRCMU_DSI1CLK_LCD       55
+-#define PRCMU_DSI0ESCCLK_LCD    56
+-#define PRCMU_DSI1ESCCLK_LCD    57
+-#define PRCMU_DSI2ESCCLK_LCD    58
+-
+-#define PRCMU_NUM_CLKS  	59
+-
+ /**
+  * enum prcmu_wdog_id - PRCMU watchdog IDs
+  * @PRCMU_WDOG_ALL: use all timers
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130819/b35d8166/attachment.sig>
+1.8.1.2
