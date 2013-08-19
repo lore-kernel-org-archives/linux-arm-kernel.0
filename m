@@ -1,50 +1,65 @@
-From: luka@openwrt.org (Luka Perkov)
-Date: Mon, 19 Aug 2013 14:35:42 +0200
-Subject: [PATCH] ARM: dts: imx6sl reuses imx6q sdma firmware
-In-Reply-To: <1376903386-27771-1-git-send-email-shawn.guo@linaro.org>
-References: <1376903386-27771-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130819123541-7656@mutt-kz>
+From: gururaja.hebbar@ti.com (Gururaja Hebbar)
+Date: Mon, 19 Aug 2013 18:24:55 +0530
+Subject: [PATCHv3 5/9] ARM: OMAP2+: AM33XX: Add assembly code for PM
+ operations
+In-Reply-To: <1375811376-49985-6-git-send-email-d-gerlach@ti.com>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-6-git-send-email-d-gerlach@ti.com>
+Message-ID: <5212159F.10302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi,
 
-On Mon, Aug 19, 2013 at 05:09:46PM +0800, Shawn Guo wrote:
-> There is no imx6sl specific sdma firmware.  Instead, imx6sl reuses
-> imx6q sdma firmware.
+On 8/6/2013 11:19 PM, Dave Gerlach wrote:
+> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/boot/dts/imx6sl.dtsi |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> In preparation for suspend-resume support for AM33XX, add
+> the assembly file with the code which is copied to internal
+> memory (OCMC RAM) during bootup and runs from there.
 > 
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index c46651e..9fec772 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -619,7 +619,8 @@
->  					 <&clks IMX6SL_CLK_SDMA>;
->  				clock-names = "ipg", "ahb";
->  				#dma-cells = <3>;
-> -				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6sl.bin";
-> +				/* imx6sl reuses imx6q sdma firmware */
-> +				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
+> As part of the low power entry (DeepSleep0 mode in AM33XX TRM),
+> the code running from OCMC RAM does the following
+> 1. Stores the EMIF configuration
+> 2. Puts external memory in self-refresh
+> 3. Disables EMIF clock
+> 4. Executes WFI after writing to MPU_CLKCTRL register.
+> 
 
-As you may have noticed my patch changes both imx6sl.dtsi and
-imx6qdl.dtsi because of the naming convention used in other sdma
-firmwares:
+...snip...
+...snip...
 
-$ fgrep sdma-ram-script-name arch/arm/boot
-arch/arm/boot/dts/imx6qdl.dtsi:				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
-arch/arm/boot/dts/imx6sl.dtsi:				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6sl.bin";
-arch/arm/boot/dts/imx51.dtsi:				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
-arch/arm/boot/dts/imx53.dtsi:				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
 
-Also, last patch containing sdma firmware blobs sent to the mailing list
-[1] uses "sdma-imx6.bin" name. That is why I think patch I have sent
-recently [2] is more appropriate. Don't you think so?
+> +	ldr	r1, [r0, #EMIF_DDR_PHY_CTRL_1]
+> +	str	r1, emif_rd_lat_val
+> +
+> +	/* Put SDRAM in self-refresh */
+> +	ldr	r1, [r0, #EMIF_POWER_MANAGEMENT_CONTROL]
+> +	orr	r1, r1, #0xa0
+> +	str	r1, [r0, #EMIF_POWER_MANAGEMENT_CTRL_SHDW]
+> +	str	r1, [r0, #4]
 
-Luka
+This seems to be a bug which I had pointed out to VB earlier.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/143025.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/191108.html
+r0 ---> base of emif module
+
+r0 + 4 ---> EMIF4_0_SDRAM_STATUS   ===> which is read only register
+
+
+Above 2 lines should be as below
+
++	str	r1, [r0, #EMIF_POWER_MANAGEMENT_CONTROL]
++	str	r1, [r0, #EMIF_POWER_MANAGEMENT_CTRL_SHDW]
+
+
+It works even with the bug because the Shadow register is updated and
+that some how seems to take precedence.
+
+
+Thanks & regards
+Gururaja
+
+
+> +
+> +	ldr	r1, dram_sync_word	@ a dummy access to DDR as per spec
+> +	ldr	r2, [r1, #0]
