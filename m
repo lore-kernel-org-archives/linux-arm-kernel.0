@@ -1,35 +1,49 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Aug 2013 13:12:06 -0600
-Subject: [PATCH] pinctrl: Pass all configs to driver on pin_config_set()
-In-Reply-To: <1376606573-15093-1-git-send-email-syin@broadcom.com>
-References: <1376606573-15093-1-git-send-email-syin@broadcom.com>
-Message-ID: <52126E06.1040108@wwwdotorg.org>
+Date: Mon, 19 Aug 2013 13:21:25 -0600
+Subject: [PATCH v2] pinctrl: queue GPIO operations instead of defering
+In-Reply-To: <1376751410-14560-1-git-send-email-linus.walleij@linaro.org>
+References: <1376751410-14560-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <52127035.7000909@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2013 04:42 PM, Sherman Yin wrote:
-> When setting pin configuration in the pinctrl framework, pin_config_set() or
-> pin_config_group_set() is called in a loop to set one configuration at a time
-> for the specified pin or group.
+On 08/17/2013 08:56 AM, Linus Walleij wrote:
+> We currently defer probing of the caller if a pinctrl GPIO
+> request or direction setting comes in before the range mapping
+> a certain GPIO to a certain pin controller is available.
 > 
-> This patch 1) removes the loop and 2) changes the API to pass the whole pin
-> config array to the driver.  It is now up to the driver to loop through the
-> configs.  This allows the driver to potentially combine configs and reduce the
-> number of writes to pin config registers.
+> This can end up with a circular dependency: the GPIO driver
+> needs the pin controller to be ready and the pin controller
+> need the GPIO driver to be ready. This also happens if
+> pin controllers and GPIO controllers compiled as modules
+> are inserted in a certain order.
 > 
-> Signed-off-by: Sherman Yin <syin@broadcom.com>
-> Reviewed-by: Christian Daudt <csd@broadcom.com>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> To break this circular dependence, queue any GPIO
+> operations coming to the framework until the range is ready,
+> instead of deferring the probe of the caller.
 
-> Change-Id: I99cbfa2ae7b774456eb71edb276711b1ddcd42c8
+I just noticed that next-20130819 is failing on the Tegra114 Dalmore
+board because of this patch. The kernel log is below. Reverting this
+patch solves the problem
 
-That tag shouldn't be included in upstream patches.
-
->  drivers/pinctrl/pinconf.c             |   42 ++++----
->  drivers/pinctrl/pinctrl-tegra.c       |   69 ++++++------
->  include/linux/pinctrl/pinconf.h       |    6 +-
-
-Those files, Reviewed-by: Stephen Warren <swarren@nvidia.com>
-
-On Tegra (Tegra114 Dalmore board, on top of next-20130816),
-Tested-by: Stephen Warren <nvidia.com>
+> [   12.427751] tegra114-pinctrl 70000868.pinmux: pin USB_VBUS_EN0 PN4 already requested by Tegra GPIOs:108; cannot claim for Tegra GPIOs:108
+> [   12.440320] tegra114-pinctrl 70000868.pinmux: pin-108 (Tegra GPIOs:108) status -22
+> [   12.447965] usb1_vbus: Failed to request enable GPIO108: -22
+> [   12.454306] reg-fixed-voltage 3.regulator: Failed to register regulator: -22
+> [   12.461508] reg-fixed-voltage: probe of 3.regulator failed with error -22
+> [   12.469659] tegra114-pinctrl 70000868.pinmux: pin SPDIF_IN PK6 already requested by Tegra GPIOs:86; cannot claim for Tegra GPIOs:86
+> [   12.481606] tegra114-pinctrl 70000868.pinmux: pin-86 (Tegra GPIOs:86) status -22
+> [   12.489052] usb2_vbus: Failed to request enable GPIO86: -22
+> [   12.495226] reg-fixed-voltage 4.regulator: Failed to register regulator: -22
+> [   12.502449] reg-fixed-voltage: probe of 4.regulator failed with error -22
+> [   12.510542] tegra114-pinctrl 70000868.pinmux: pin GMI_CLK PK1 already requested by Tegra GPIOs:81; cannot claim for Tegra GPIOs:81
+> [   12.522403] tegra114-pinctrl 70000868.pinmux: pin-81 (Tegra GPIOs:81) status -22
+> [   12.529896] vdd_hdmi_5v0: Failed to request enable GPIO81: -22
+> [   12.536281] reg-fixed-voltage 5.regulator: Failed to register regulator: -22
+> [   12.543465] reg-fixed-voltage: probe of 5.regulator failed with error -22
+> [   12.552509] vdd_cam_1v8_reg: 1800 mV 
+> [   12.558205] platform 7d008000.usb: Driver tegra-ehci requests probe deferral
+> [   12.566600] platform 7d008000.usb-phy: Driver tegra-phy requests probe deferral
+> [   12.577475] input: gpio-keys.2 as /devices/soc0/gpio-keys.2/input/input1
+> [   12.588329] platform 7d008000.usb: Driver tegra-ehci requests probe deferral
+> [   12.596967] platform 7d008000.usb-phy: Driver tegra-phy requests probe deferral
