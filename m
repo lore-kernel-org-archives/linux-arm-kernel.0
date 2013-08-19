@@ -1,40 +1,30 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 19 Aug 2013 13:29:01 -0300
-Subject: [PATCH 3/4] clocksource: armada-370-xp: Get reference fixed-clock by
- name
-Message-ID: <1376929741-10137-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: luka@openwrt.org (Luka Perkov)
+Date: Mon, 19 Aug 2013 18:28:27 +0200
+Subject: [PATCH] ARM: dts: imx6sl reuses imx6q sdma firmware
+In-Reply-To: <20130819135315.GA28297@S2101-09.ap.freescale.net>
+References: <1376903386-27771-1-git-send-email-shawn.guo@linaro.org>
+ <20130819123541-7656@mutt-kz>
+ <20130819135315.GA28297@S2101-09.ap.freescale.net>
+Message-ID: <20130819162827-27661@mutt-kz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada XP timer has two mandatory clock inputs: nbclk and refclk,
-as specified by the device-tree binding.
+On Mon, Aug 19, 2013 at 09:53:17PM +0800, Shawn Guo wrote:
+> On Mon, Aug 19, 2013 at 02:35:42PM +0200, Luka Perkov wrote:
+> > On Mon, Aug 19, 2013 at 05:09:46PM +0800, Shawn Guo wrote:
+> > Also, last patch containing sdma firmware blobs sent to the mailing list
+> > [1] uses "sdma-imx6.bin" name.
+> 
+> The patch never got merged.  I do not like the name, simply because imx6
+> is not a SoC name.
 
-This commit fixes the clock selection. Instead of hard-coding the clock
-rate for the 25 MHz reference fixed-clock, obtain the clock by its name.
+IMHO "sdma-imx6.bin" is much more descriptive then "sdma-imx6q.bin" in
+this case.
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
---
- drivers/clocksource/time-armada-370-xp.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+It could have been named "foobar" as far as I am concerned. But because
+it was named "sdma-imx6q.bin" in imx6qdl.dtsi error was made when new
+imx6sl.dtsi was created. Naming it "sdma-imx6.bin" or "sdma-imx6x.bin"
+would help avoiding confusions in the future (despite it's not SoC
+name).
 
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index 11d91e5..01ba99e 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -292,8 +292,11 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
- 
- static void __init armada_xp_timer_init(struct device_node *np)
- {
--	/* The fixed 25MHz timer is required, timer25Mhz is true by default */
--	timer_clk = 25000000;
-+	struct clk *clk = of_clk_get_by_name(np, "fixed");
-+
-+	/* The 25Mhz fixed clock is mandatory, and must always be available */
-+	WARN_ON(IS_ERR(clk));
-+	timer_clk = clk_get_rate(clk);
- 
- 	armada_370_xp_timer_common_init(np);
- }
--- 
-1.8.1.5
+Luka
