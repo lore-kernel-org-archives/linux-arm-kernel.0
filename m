@@ -1,65 +1,51 @@
-From: gururaja.hebbar@ti.com (Gururaja Hebbar)
-Date: Mon, 19 Aug 2013 18:24:55 +0530
-Subject: [PATCHv3 5/9] ARM: OMAP2+: AM33XX: Add assembly code for PM
- operations
-In-Reply-To: <1375811376-49985-6-git-send-email-d-gerlach@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-6-git-send-email-d-gerlach@ti.com>
-Message-ID: <5212159F.10302@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 19 Aug 2013 08:02:52 -0500
+Subject: [RFC PATCH v2 3/4] powerpc: refactor of_get_cpu_node to support
+ other architectures
+In-Reply-To: <20130819101922.GI3719@e106331-lin.cambridge.arm.com>
+References: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376674791-28244-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376674791-28244-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <2032060.4bgTKOdEX2@flatron> <1376777376.25016.11.camel@pasglop>
+ <20130819101922.GI3719@e106331-lin.cambridge.arm.com>
+Message-ID: <5212177C.8000709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 8/6/2013 11:19 PM, Dave Gerlach wrote:
-> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+On 08/19/2013 05:19 AM, Mark Rutland wrote:
+> On Sat, Aug 17, 2013 at 11:09:36PM +0100, Benjamin Herrenschmidt wrote:
+>> On Sat, 2013-08-17 at 12:50 +0200, Tomasz Figa wrote:
+>>> I wonder how would this handle uniprocessor ARM (pre-v7) cores, for
+>>> which 
+>>> the updated bindings[1] define #address-cells = <0> and so no reg 
+>>> property.
+>>>
+>>> [1] - http://thread.gmane.org/gmane.linux.ports.arm.kernel/260795
+>>
+>> Why did you do that in the binding ? That sounds like looking to create
+>> problems ... 
+>>
+>> Traditionally, UP setups just used "0" as the "reg" property on other
+>> architectures, why do differently ?
 > 
-> In preparation for suspend-resume support for AM33XX, add
-> the assembly file with the code which is copied to internal
-> memory (OCMC RAM) during bootup and runs from there.
+> The decision was taken because we defined our reg property to refer to
+> the MPIDR register's Aff{2,1,0} bitfields, and on UP cores before v7
+> there's no MPIDR register at all. Given there can only be a single CPU
+> in that case, describing a register that wasn't present didn't seem
+> necessary or helpful.
+
+What exactly reg represents is up to the binding definition, but it
+still should be present IMO. I don't see any issue with it being
+different for pre-v7.
+
+Rob
+
 > 
-> As part of the low power entry (DeepSleep0 mode in AM33XX TRM),
-> the code running from OCMC RAM does the following
-> 1. Stores the EMIF configuration
-> 2. Puts external memory in self-refresh
-> 3. Disables EMIF clock
-> 4. Executes WFI after writing to MPU_CLKCTRL register.
+> Thanks,
+> Mark.
 > 
-
-...snip...
-...snip...
-
-
-> +	ldr	r1, [r0, #EMIF_DDR_PHY_CTRL_1]
-> +	str	r1, emif_rd_lat_val
-> +
-> +	/* Put SDRAM in self-refresh */
-> +	ldr	r1, [r0, #EMIF_POWER_MANAGEMENT_CONTROL]
-> +	orr	r1, r1, #0xa0
-> +	str	r1, [r0, #EMIF_POWER_MANAGEMENT_CTRL_SHDW]
-> +	str	r1, [r0, #4]
-
-This seems to be a bug which I had pointed out to VB earlier.
-
-r0 ---> base of emif module
-
-r0 + 4 ---> EMIF4_0_SDRAM_STATUS   ===> which is read only register
-
-
-Above 2 lines should be as below
-
-+	str	r1, [r0, #EMIF_POWER_MANAGEMENT_CONTROL]
-+	str	r1, [r0, #EMIF_POWER_MANAGEMENT_CTRL_SHDW]
-
-
-It works even with the bug because the Shadow register is updated and
-that some how seems to take precedence.
-
-
-Thanks & regards
-Gururaja
-
-
-> +
-> +	ldr	r1, dram_sync_word	@ a dummy access to DDR as per spec
-> +	ldr	r2, [r1, #0]
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
