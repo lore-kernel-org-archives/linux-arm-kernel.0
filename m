@@ -1,88 +1,86 @@
-From: ruslan.bilovol@ti.com (Ruslan Bilovol)
-Date: Mon, 19 Aug 2013 09:14:29 +0300
-Subject: [PATCH v2 0/2] omap4/twl6030: typical connection to omap4 as a
- separate dtsi file
-In-Reply-To: <520E2726.304@baylibre.com>
-References: <1376469348-10797-1-git-send-email-ruslan.bilovol@ti.com>
- <520B8B45.1010300@baylibre.com>
- <CAB=otbTUk68CLmgQsEoefMMFTAnZCAMbZa-yiYmn1b3F1X8BiQ@mail.gmail.com>
- <520E2726.304@baylibre.com>
-Message-ID: <CAB=otbRLea7V6_4Rhfr=ApNV=+2sQXnY=JW9-vy6V+hbt336wg@mail.gmail.com>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Mon, 19 Aug 2013 11:46:57 +0530
+Subject: [PATCH V2 01/35] cpufreq: Implement light weight ->target_index()
+ routine
+In-Reply-To: <CAKohpokeJZq5Y9PpQCiEqVFqZq0U266rqLEQeEh4ZszWEM6_XA@mail.gmail.com>
+References: <cover.1376392602.git.viresh.kumar@linaro.org>
+ <eb988fc9e72b90b7ba99f16405f5dcb072da7840.1376392602.git.viresh.kumar@linaro.org>
+ <CADGdYn4=si46x7b5Qa0EJ1vUDKrP3maXBqWwQ6s7gkep-8MxFg@mail.gmail.com>
+ <CAKohpokeJZq5Y9PpQCiEqVFqZq0U266rqLEQeEh4ZszWEM6_XA@mail.gmail.com>
+Message-ID: <CADGdYn4LoFEfZTd2bT=iGKRb5M=7CfpG-suxf3L-V5HXH7QuPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Mon, Aug 19, 2013 at 10:07 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> Hi Amit,
+>
+> Thanks for your feedback :)
+>
+> On 18 August 2013 16:11, amit daniel kachhap <amit.daniel@samsung.com> wrote:
+>> This new API is fine but I have another idea.
+>
+> good.
+>
+>> Say During the registration of the frequency table cpufreq_policy can
+>> be registered as SCALE_DIRECT or SCALE_STEPS. With SCALE_DIRECT flag,
+>> valid frequency will be requested. With this flags the governor itself
+>> can  can figure out if frequency scaling is required or not and very
+>> few calls to __cpufreq_driver_target will happen.
+>
+> Honestly speaking I couldn't get what your idea is :) ... but governor is
+> in no position to make this direct call to drivers.. Taking such stuff to
+> governors will replicate this code again.. Its better all governors call
+> some common part of cpufreq.c which then decides what to do..
+I meant that something like 2 policies can be registered SCALE_DIRECT/STEPS.
+if SCALE_DIRECT is registered than target will be called with exact
+frequency. SCALE_STEPS will behave as currently happening. This way
+target_index api may not be needed. But looks like Rafael and others
+are fine with your approach so you can ignore this :)
+>
+>> But i agree that in this approach cpufreq_frequency_table_target is
+>> still required but again it can be optimized by binary search as
+>> currently the search is linear.
+>
+> Frequencies in this table aren't required to be in ascending order :)
+OK right. Actually I had thought only about the case when opp library
+is used to create the cpufreq table and then it creates the table in
+ascending order. Anyways not all platform uses opp libraries so it is
+not generic enough.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-On Fri, Aug 16, 2013 at 4:20 PM, Benoit Cousson <bcousson@baylibre.com> wrote:
-> Hi Ruslan,
->
-> On 16/08/2013 14:04, Ruslan Bilovol wrote:
->> Hi Benoit,
->>
->> On Wed, Aug 14, 2013 at 4:51 PM, Benoit Cousson <bcousson@baylibre.com> wrote:
->>> Hi Ruslan,
->>>
->>> On 14/08/2013 10:35, Ruslan Bilovol wrote:
->>>>
->>>> Hello,
->>>>
->>>> There is no functional changes between v1 and v2 - just
->>>> added the patch for omap4-var-som - Uri Yosef confirmed
->>>> this board have the same connection of OMAP4<->TWL6030 as
->>>> SDP4430 board
->>>
->>>
->>> The series looks good to me, but it will be good to have a test for Panda
->>> and Variscite boards before merging it.
->>
->> Okay, so I just verified this patch series on PandaBoard ES2. Should I
->> resubmit this series with
->> fixed commit message?
->
-> No, that's fine, I already applied it and fixed the subject and the changelog.
->
-> Here it is:
->
-> commit 2e25df1e5a4af906a9b25332719ace000063eb0d
-> Author: Ruslan Bilovol <ruslan.bilovol@ti.com>
-> Date:   Wed Aug 14 11:35:47 2013 +0300
->
->     ARM: dts: twl6030: Move common configuration for OMAP4 boards in a separate dtsi file
->
->     The OMAP4 SoC family uses specially-designed PMIC (power management IC)
->     companion chip for power management needs: TWL6030/TWL6032.
->     Therefore there is a typical connection of PMIC to OMAP4 so we can
->     move it into separate .dtsi file and do not duplicate over
->     board-specific files.
->
->     Tested on OMAP4 SDP board and compile-tested for Panda board
 
-Just for archives: I've successfully tested it on PandaBoard ES2 last
-week as well.
-
+On Mon, Aug 19, 2013 at 10:07 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> Hi Amit,
 >
->     Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
->     Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
+> Thanks for your feedback :)
 >
+> On 18 August 2013 16:11, amit daniel kachhap <amit.daniel@samsung.com> wrote:
+>> This new API is fine but I have another idea.
 >
-> Just let me know if you are OK with the updated version.
-
-Yes, this version looks good to me. Thanks for picking it up!
-
+> good.
 >
->> However I cannot verify the patch for Variscite board because I do not
->> own any such board so
->> you can drop that patch. But maybe Uri Yosef can verify it. Uri?
+>> Say During the registration of the frequency table cpufreq_policy can
+>> be registered as SCALE_DIRECT or SCALE_STEPS. With SCALE_DIRECT flag,
+>> valid frequency will be requested. With this flags the governor itself
+>> can  can figure out if frequency scaling is required or not and very
+>> few calls to __cpufreq_driver_target will happen.
 >
-> It seems that Uri cannot test it right now, so I will have to drop that one.
-
-Okay, let's wait for Uri's verification.
-
-Best regards,
-Ruslan
-
+> Honestly speaking I couldn't get what your idea is :) ... but governor is
+> in no position to make this direct call to drivers.. Taking such stuff to
+> governors will replicate this code again.. Its better all governors call
+> some common part of cpufreq.c which then decides what to do..
 >
-> Thanks,
-> Benoit
+>> But i agree that in this approach cpufreq_frequency_table_target is
+>> still required but again it can be optimized by binary search as
+>> currently the search is linear.
 >
+> Frequencies in this table aren't required to be in ascending order :)
 >
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
