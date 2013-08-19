@@ -1,72 +1,56 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 19 Aug 2013 10:37:06 +0300
-Subject: [PATCH v2 0/9] USB: phy: phy-nop: Manage RESET GPIO in the driver
-In-Reply-To: <520E0461.70305@baylibre.com>
-References: <1376561909-4406-1-git-send-email-rogerq@ti.com>
- <520E0461.70305@baylibre.com>
-Message-ID: <5211CB22.4040600@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 19 Aug 2013 13:11:26 +0530
+Subject: [GIT PULL] DaVinci fixes for v3.11
+In-Reply-To: <5211C957.4090902@ti.com>
+References: <5211C957.4090902@ti.com>
+Message-ID: <5211CC26.7050702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+Fixing the LAKML address this time.
 
-On 08/16/2013 01:52 PM, Benoit Cousson wrote:
-> Hi Roger,
+Thanks,
+Sekhar
+
+On 8/19/2013 12:59 PM, Sekhar Nori wrote:
+> Hi Kevin, Arnd, Olof,
 > 
-> On 15/08/2013 12:18, Roger Quadros wrote:
->> Hi,
->>
->> Modelling the RESET line as a regulator supply wasn't a good idea
->> as it abuses the regulator framework and makes adaptation
->> code/data more complex.
->>
->> Instead, manage the RESET gpio line directly in the driver.
->>
->> This also makes us easy to migrate to a dedicated GPIO RESET controller
->> whenever it becomes available. As of now, it doesn't seem to be making
->> it into 3.12.
->>
->> *NOTE:* As there are changes to platform data, Patch 1 needs to be shared
->> between the arm-soc tree and usb tree.
->>
->> Patch 1 is available at repo
->>     git://github.com/rogerq/linux.git
->> in branch
->>     phy-reset-common
->>
->> Patch 2 contains the phy-nop driver changes
->> Patches 3 and 4 adapt legacy boot code to the phy-nop driver changes.
->> Patches 5, 6 and 7 adapt DT data to the binding changes.
->> Patch 8 is cleanup of omap3-beagle DT.
->> Patch 9 adds USB host support to omap3-beagle-xm using the new binding.
->>
->> Patches are based on v3.11-rc5.
->> Tested leacy boot on omap3-beagle and omap3-beagle-xm
->> Tested DT boot on omap3-beagle, omap3-beagle-xm and omap4-panda-es
->>
->> v2:
->> - Added RESET GPIO polarity feature
->> - Changed to gpio_set_value_cansleep()
->>
->> cheers,
->> -roger
->>
->> ---
->> Roger Quadros (9):
->>    usb: phy: nop: Add gpio_reset to platform data
->>    usb: phy: nop: Don't use regulator framework for RESET line
->>    ARM: OMAP2+: omap-usb-host: Get rid of platform_data from struct
->>      usbhs_phy_data
->>    ARM: OMAP2+: usb-host: Adapt to USB phy-nop RESET line changes
->>    ARM: dts: omap3-beagle: Use reset-gpios for hsusb2_reset
->>    ARM: dts: omap4-panda: Use reset-gpios for hsusb1_reset
->>    ARM: dts: omap5-uevm: Use reset-gpios for hsusb2_reset
->>    ARM: dts: omap3-beagle: Make USB host pin naming consistent
->>    ARM: dts: omap3-beagle-xm: Add USB Host support
+> Can you please pull this fix for v3.11? The commit has been marked
+> for inclusion in -stable kernel too.
 > 
-> The 5 DTS patches looks good to me, and I can apply them, but you need to be sure that the driver will be merged for 3.12 as well.
-
-Could you please let us know if this series can make it to 3.12? Thanks.
-
-cheers,
--roger
+> Thanks,
+> Sekhar
+> 
+> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+> 
+>   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.11
+> 
+> for you to fetch changes up to de30e316d38b0837fe4c09b43f1b52c8e230c44e:
+> 
+>   ARM: davinci: nand: specify ecc strength (2013-08-16 15:12:20 +0530)
+> 
+> ----------------------------------------------------------------
+> This pull request includes a patch for
+> making NAND flash work on multiple DaVinci
+> boards. The NAND probe was failing because
+> ecc strength was not specified while using
+> hardware ecc algorithm.
+> 
+> ----------------------------------------------------------------
+> Sekhar Nori (1):
+>       ARM: davinci: nand: specify ecc strength
+> 
+>  arch/arm/mach-davinci/board-dm355-leopard.c |    1 +
+>  arch/arm/mach-davinci/board-dm644x-evm.c    |    1 +
+>  arch/arm/mach-davinci/board-dm646x-evm.c    |    1 +
+>  arch/arm/mach-davinci/board-neuros-osd2.c   |    1 +
+>  4 files changed, 4 insertions(+)
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+> 
