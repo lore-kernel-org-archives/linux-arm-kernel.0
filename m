@@ -1,100 +1,71 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 19 Aug 2013 19:16:45 -0400 (EDT)
-Subject: [PATCH resend] ARM: add workaround for ambiguous C99 stdint.h
- types
-In-Reply-To: <1376896358-21076-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1376896358-21076-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.03.1308191915190.14472@syhkavp.arg>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Aug 2013 00:24:11 +0100
+Subject: [PATCH resend] ARM: nommu: remove ARCH_MULTIPLATFORM's
+ dependency on CONFIG_MMU
+In-Reply-To: <1374597712-18112-1-git-send-email-jonathan.austin@arm.com>
+References: <1374597712-18112-1-git-send-email-jonathan.austin@arm.com>
+Message-ID: <20130819232411.GX23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Aug 2013, Ard Biesheuvel wrote:
-
-> The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
-> unambiguous on ARM as you would expect. For the types below, there is a
-> difference on ARM between GCC built for bare metal ARM, GCC built for glibc
-> and the kernel itself, which results in build errors if you try to build with
-> -ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
-> in order to use NEON intrinsics)
+On Tue, Jul 23, 2013 at 05:41:51PM +0100, Jonathan Austin wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
 > 
-> As the typedefs for these types in 'stdint.h' are based on builtin defines
-> supplied by GCC, we can tweak these to align with the kernel's idea of those
-> types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
-> source file (provided that -ffreestanding is used).
+> ARCH_MULTIPLATFORM currently requires CONFIG_MMU to be set, however it is
+> intended that all future V6/V7 platforms are compatible with
+> ARCH_MULTIPLATFORM, and so this requirement precludes that addition of new
+> !MMU platforms.
 > 
->                    int32_t         uint32_t               uintptr_t
-> bare metal GCC     long            unsigned long          unsigned int
-> glibc GCC          int             unsigned int           unsigned int
-> kernel             int             unsigned int           unsigned long
+> Furthermore, this requirement creates unnecessary differences between the MMU
+> and !MMU worlds, which is undesirable.
 > 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> Acked by: Dave Martin <dave.martin@arm.com>
-> Acked-by: Mikael Pettersson <mikpe@it.uu.se>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-I think you may put this patch into Russell's patch system now:
-
-http://www.arm.linux.org.uk/developer/patches/
-
-
-
+> This patch allows ARCH_MULTIPLATFORM to remain selected in a !MMU
+> configuration. There is still a need to hardcode CONFIG_DRAM_BASE and other
+> parameters relating to the system, so this patch is less about making an
+> actual multiplatform kernel for !MMU and more about consistency across the
+> kernel.
+> 
+> Along with the nommu-fixes, R7 support and MPU support already sent to this
+> list, this patch is sufficient to allow building and booting of kernel for a
+> Cortex-R7 core on a Versatile Express platform.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
 > ---
->  arch/arm/include/asm/types.h | 40 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
->  create mode 100644 arch/arm/include/asm/types.h
 > 
-> diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
-> new file mode 100644
-> index 0000000..c4f0bca
-> --- /dev/null
-> +++ b/arch/arm/include/asm/types.h
-> @@ -0,0 +1,40 @@
-> +#ifndef _ASM_TYPES_H
-> +#define _ASM_TYPES_H
-> +
-> +#include <asm-generic/int-ll64.h>
-> +
-> +/*
-> + * The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
-> + * unambiguous on ARM as you would expect. For the types below, there is a
-> + * difference on ARM between GCC built for bare metal ARM, GCC built for glibc
-> + * and the kernel itself, which results in build errors if you try to build with
-> + * -ffreestanding and include 'stdint.h' (such as when you include 'arm_neon.h'
-> + * in order to use NEON intrinsics)
-> + *
-> + * As the typedefs for these types in 'stdint.h' are based on builtin defines
-> + * supplied by GCC, we can tweak these to align with the kernel's idea of those
-> + * types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
-> + * source file (provided that -ffreestanding is used).
-> + * 
-> + *                    int32_t         uint32_t               uintptr_t
-> + * bare metal GCC     long            unsigned long          unsigned int
-> + * glibc GCC          int             unsigned int           unsigned int
-> + * kernel             int             unsigned int           unsigned long
-> + */
-> +
-> +#ifdef __INT32_TYPE__
-> +#undef __INT32_TYPE__
-> +#define __INT32_TYPE__		int
-> +#endif
-> +
-> +#ifdef __UINT32_TYPE__
-> +#undef __UINT32_TYPE__
-> +#define __UINT32_TYPE__	unsigned int
-> +#endif
-> +
-> +#ifdef __UINTPTR_TYPE__
-> +#undef __UINTPTR_TYPE__
-> +#define __UINTPTR_TYPE__	unsigned long
-> +#endif
-> +
-> +#endif /* _ASM_TYPES_H */
-> -- 
-> 1.8.1.2
+> This patch was written by Arnd and after some discussion/testing at my end he
+> asked me to send it to the list with a full description.
 > 
+> I'm resending this after testing it still allows R7 to boot on 3.11.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Assuming no comments, I'll drop this in the patch system shortly. Any
+> calls for Cc-ing stable?
+
+No, this is not a stable issue.  Stable is for fixing regressions, it's
+not for features, and as this is something that has never been in any
+kernel, it can't be claimed to be fixing a regression.
+
+Now, here's the question: can multiplatform ever work properly on nommu?
+
+We get multiplatform working on MMU by using the MMU to provide a more
+consistent view of the system.  On noMMU, we don't have that.  So if
+your kernel is built to run assuming that it will be located in ram at
+location X on platform Y, that isn't going to work if platform Z doesn't
+have RAM there.
+
+My feeling is that the motivation behind this patch is to avoid an
+amount of yuckyness associated with trying to enable Versatile Express
+support outside of the multiplatform container - it's not really about
+being able to build a single zImage which works on all noMMU platforms.
+So, I don't think this is the right solution to this problem.
+
+The quick way to solve this is to append || !MMU to:
+
+	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7
+
+but this still leaves us in the situation where we can select multiple
+incompatible platforms.  That I don't really have an answer for.
+
+However, one thing I am certain of is that faking things by allowing
+multiplatform support for platforms which can't be multiplatform is
+the wrong approach.
