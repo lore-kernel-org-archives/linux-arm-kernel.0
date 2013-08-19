@@ -1,73 +1,63 @@
-From: andre.przywara@linaro.org (Andre Przywara)
-Date: Mon, 19 Aug 2013 12:19:28 +0200
-Subject: [PATCH v2] DMA: fix AMBA PL08x compilation issue with 64bit DMA
- address type
-In-Reply-To: <20130815211515.GF23006@n2100.arm.linux.org.uk>
-References: <20130815211515.GF23006@n2100.arm.linux.org.uk>
-Message-ID: <1376907568-18689-1-git-send-email-andre.przywara@linaro.org>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Mon, 19 Aug 2013 12:21:05 +0200
+Subject: [PATCH v2] extcon: palmas: Modified the compatible type to *ti,
+ palmas-usb-vid*
+In-Reply-To: <5211E563.6080200@ti.com>
+References: <1376648448-27447-1-git-send-email-kishon@ti.com>
+ <520EA5D6.3040409@wwwdotorg.org> <5211A7B3.4040906@ti.com>
+ <5211DBB4.6090508@ti.com> <5211E45B.1010109@samsung.com>
+ <5211E563.6080200@ti.com>
+Message-ID: <5211F191.7010303@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When dma_addr_t is 64 bits long, compilation of the AMBA PL08x DMA
-driver breaks due to a missing 64bit%8bit modulo operation.
-Looking more closely the divisor in these operations can only be
-1, 2 or 4, so the full featured '%' modulo operation is overkill and
-can be replaced with simple bit masking.
+Hi Kishon,
 
-Change from v1:
-Replace open-coded function with existing IS_ALIGNED macro and use a
-macro around that to avoid a line becoming too long.
+On 19/08/2013 11:29, Kishon Vijay Abraham I wrote:
+> On Monday 19 August 2013 02:54 PM, Chanwoo Choi wrote:
+>> On 08/19/2013 05:47 PM, Kishon Vijay Abraham I wrote:
+>>> On Monday 19 August 2013 10:35 AM, Kishon Vijay Abraham I wrote:
+>>>> Hi,
+>>>>
+>>>> On Saturday 17 August 2013 03:51 AM, Stephen Warren wrote:
+>>>>> On 08/16/2013 04:20 AM, Kishon Vijay Abraham I wrote:
+>>>>>> The Palmas device contains only a USB VID detector, so modified the
+>>>>>> compatible type to *ti,palmas-usb-vid*.
+>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/extcon/extcon-palmas.txt b/Documentation/devicetree/bindings/extcon/extcon-palmas.txt
 
-Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
----
- drivers/dma/amba-pl08x.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+That file is not yet in 3.11. Only the twl is there.
+Is this one a rename of the twl one?
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index bce5fbf..bff41d4 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -133,6 +133,8 @@ struct pl08x_bus_data {
- 	u8 buswidth;
- };
- 
-+#define IS_BUS_ALIGNED(bus) IS_ALIGNED((bus)->addr, (bus)->buswidth)
-+
- /**
-  * struct pl08x_phy_chan - holder for the physical channels
-  * @id: physical index to this channel
-@@ -889,8 +891,8 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 				return 0;
- 			}
- 
--			if ((bd.srcbus.addr % bd.srcbus.buswidth) ||
--					(bd.dstbus.addr % bd.dstbus.buswidth)) {
-+			if (!IS_BUS_ALIGNED(&bd.srcbus) ||
-+				!IS_BUS_ALIGNED(&bd.dstbus)) {
- 				dev_err(&pl08x->adev->dev,
- 					"%s src & dst address must be aligned to src"
- 					" & dst width if peripheral is flow controller",
-@@ -911,9 +913,9 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 		 */
- 		if (bd.remainder < mbus->buswidth)
- 			early_bytes = bd.remainder;
--		else if ((mbus->addr) % (mbus->buswidth)) {
--			early_bytes = mbus->buswidth - (mbus->addr) %
--				(mbus->buswidth);
-+		else if (!IS_BUS_ALIGNED(mbus)) {
-+			early_bytes = mbus->buswidth -
-+				(mbus->addr & (mbus->buswidth - 1));
- 			if ((bd.remainder - early_bytes) < mbus->buswidth)
- 				early_bytes = bd.remainder;
- 		}
-@@ -931,7 +933,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 			 * Master now aligned
- 			 * - if slave is not then we must set its width down
- 			 */
--			if (sbus->addr % sbus->buswidth) {
-+			if (!IS_BUS_ALIGNED(sbus)) {
- 				dev_dbg(&pl08x->adev->dev,
- 					"%s set down bus width to one byte\n",
- 					__func__);
--- 
-1.7.12.1
+Regards,
+Benoit
+
+>>>>>
+>>>>>>   PALMAS USB COMPARATOR
+>>>>>>   Required Properties:
+>>>>>> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
+>>>>>> + - compatible : Should be "ti,palmas-usb-vid".
+>>>>>
+>>>>> Has the old value been published in a release kernel? If so, it makes
+>>>>
+>>>> No. This was merged only in 3.11-rc1. So I think we should take this version?
+>>>> Chanwoo can you take this patch?
+>>>
+>>> Ah.. the old values will be part of 3.11 kernel. So should we retain the old
+>>> values?
+>>
+>> What is the meaning of old value? previous value related to extcon-twl.txt?
+>
+> We were discussing on whether to have "ti,palmas-usb" or "ti,twl6035-usb" in
+> compatible value in addition to "ti,palmas-usb-vid". Stephen wanted the old
+> values ("ti,palmas-usb" or "ti,twl6035-usb") if it has been published in a
+> release kernel.
+>>
+>> The extcon-twl.txt was included in 3.11 kernel
+>
+> Right. Since it's part of 3.11 kernel, I think we should retain the old
+> compatible values.
+>
+> Thanks
+> Kishon
+>
