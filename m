@@ -1,89 +1,41 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Mon, 19 Aug 2013 12:04:30 +0200
-Subject: [PATCH v2 0/2] omap4/twl6030: typical connection to omap4 as
- a separate dtsi file
-In-Reply-To: <CAB=otbRLea7V6_4Rhfr=ApNV=+2sQXnY=JW9-vy6V+hbt336wg@mail.gmail.com>
-References: <1376469348-10797-1-git-send-email-ruslan.bilovol@ti.com>
- <520B8B45.1010300@baylibre.com>
- <CAB=otbTUk68CLmgQsEoefMMFTAnZCAMbZa-yiYmn1b3F1X8BiQ@mail.gmail.com>
- <520E2726.304@baylibre.com>
- <CAB=otbRLea7V6_4Rhfr=ApNV=+2sQXnY=JW9-vy6V+hbt336wg@mail.gmail.com>
-Message-ID: <5211EDAE.1090407@baylibre.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 19 Aug 2013 18:05:44 +0800
+Subject: [PATCH] mtd: atmel_nand: pmecc: fix bug fail to correct bit error in
+ 1024-bytes sector
+Message-ID: <1376906744-4711-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ruslan,
+The PMECC use BCH algorithm to correct error. In BCH algorithm, the primitive
+polynomial value is GF(2^13) for 512-bytes sector size. And it is GF(2^14) for
+1024-bytes sector size.
 
-On 19/08/2013 08:14, Ruslan Bilovol wrote:
-> Hi Benoit,
->
-> On Fri, Aug 16, 2013 at 4:20 PM, Benoit Cousson <bcousson@baylibre.com> wrote:
->> Hi Ruslan,
->>
->> On 16/08/2013 14:04, Ruslan Bilovol wrote:
->>> Hi Benoit,
->>>
->>> On Wed, Aug 14, 2013 at 4:51 PM, Benoit Cousson <bcousson@baylibre.com> wrote:
->>>> Hi Ruslan,
->>>>
->>>> On 14/08/2013 10:35, Ruslan Bilovol wrote:
->>>>>
->>>>> Hello,
->>>>>
->>>>> There is no functional changes between v1 and v2 - just
->>>>> added the patch for omap4-var-som - Uri Yosef confirmed
->>>>> this board have the same connection of OMAP4<->TWL6030 as
->>>>> SDP4430 board
->>>>
->>>>
->>>> The series looks good to me, but it will be good to have a test for Panda
->>>> and Variscite boards before merging it.
->>>
->>> Okay, so I just verified this patch series on PandaBoard ES2. Should I
->>> resubmit this series with
->>> fixed commit message?
->>
->> No, that's fine, I already applied it and fixed the subject and the changelog.
->>
->> Here it is:
->>
->> commit 2e25df1e5a4af906a9b25332719ace000063eb0d
->> Author: Ruslan Bilovol <ruslan.bilovol@ti.com>
->> Date:   Wed Aug 14 11:35:47 2013 +0300
->>
->>      ARM: dts: twl6030: Move common configuration for OMAP4 boards in a separate dtsi file
->>
->>      The OMAP4 SoC family uses specially-designed PMIC (power management IC)
->>      companion chip for power management needs: TWL6030/TWL6032.
->>      Therefore there is a typical connection of PMIC to OMAP4 so we can
->>      move it into separate .dtsi file and do not duplicate over
->>      board-specific files.
->>
->>      Tested on OMAP4 SDP board and compile-tested for Panda board
->
-> Just for archives: I've successfully tested it on PandaBoard ES2 last
-> week as well.
+This patch will choose correct degree of the remainders(13 or 14) for
+different sector size.
+Tested in AT91SAM9X5-EK with MLC nand flash.
 
-Great, I'll update the changelog before pushing it.
+More detail can be refered to section 5.4.1 of:
+  AT91SAM ARM-based Embedded MPU Application Note
+  <http://www.atmel.com/Images/doc11127.pdf>
 
->>      Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
->>      Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
->>
->>
->> Just let me know if you are OK with the updated version.
->
-> Yes, this version looks good to me. Thanks for picking it up!
->
->>
->>> However I cannot verify the patch for Variscite board because I do not
->>> own any such board so
->>> you can drop that patch. But maybe Uri Yosef can verify it. Uri?
->>
->> It seems that Uri cannot test it right now, so I will have to drop that one.
->
-> Okay, let's wait for Uri's verification.
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+ drivers/mtd/nand/atmel_nand.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-I'll keep it for 3.13.
-
-Thanks,
-Benoit
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 0e365da..8b2eb3e 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -1204,7 +1204,8 @@ static int __init atmel_pmecc_nand_init_params(struct platform_device *pdev,
+ 	/* set ECC page size and oob layout */
+ 	switch (mtd->writesize) {
+ 	case 2048:
+-		host->pmecc_degree = PMECC_GF_DIMENSION_13;
++		host->pmecc_degree = (sector_size == 512) ?
++			PMECC_GF_DIMENSION_13 : PMECC_GF_DIMENSION_14;
+ 		host->pmecc_cw_len = (1 << host->pmecc_degree) - 1;
+ 		host->pmecc_sector_number = mtd->writesize / sector_size;
+ 		host->pmecc_bytes_per_sector = pmecc_get_ecc_bytes(
+-- 
+1.7.9.5
