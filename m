@@ -1,51 +1,82 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 19 Aug 2013 16:07:07 +0200
-Subject: [PATCH v2 0/7] ARM: imx27 pinctrl
-Message-ID: <1376921234-26682-1-git-send-email-mpa@pengutronix.de>
+Date: Mon, 19 Aug 2013 16:07:12 +0200
+Subject: [PATCH v2 5/7] ARM: dts: imx27 phyCARD-S pinctrl
+In-Reply-To: <1376921234-26682-1-git-send-email-mpa@pengutronix.de>
+References: <1376921234-26682-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1376921234-26682-6-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Enable pinctrl for phyCARD-S devices.
 
-this series implements a imx27 pinctrl driver. imx1/21/27 have a register
-format that is not compatible with the rest of imx series processors. The
-series adds a imx1 core driver for the different register layout.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts | 10 ++++++++++
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts |  4 ++++
+ 2 files changed, 14 insertions(+)
 
-Regards,
-
-Markus
-
-Changes since v1:
- - Removed changes of gpio-mxc driver
- - imx and imx1-core drivers are completely seperated now
- - Splitted DT pinctrl entries into imx27.dtsi and board files
- - Other style changes
-
-Markus Pargmann (7):
-      pinctrl: imx1 core driver
-      pinctrl: imx27: imx27 pincontrol driver
-      ARM: dts: imx27 pin functions
-      ARM: dts: imx27 pinctrl
-      ARM: dts: imx27 phyCARD-S pinctrl
-      ARM: dts: imx27 phycore pinctrl
-      ARM: imx27: enable pinctrl
-
- .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  53 ++
- arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts   |  10 +
- arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts   |   4 +
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts     |   2 +
- arch/arm/boot/dts/imx27-phytec-phycore-som.dts     |   6 +
- arch/arm/boot/dts/imx27-pinfunc.h                  | 524 +++++++++++++++++
- arch/arm/boot/dts/imx27.dtsi                       |  84 +++
- arch/arm/mach-imx/Kconfig                          |   2 +
- drivers/pinctrl/Kconfig                            |  13 +
- drivers/pinctrl/Makefile                           |   2 +
- drivers/pinctrl/pinctrl-imx1-core.c                | 655 +++++++++++++++++++++
- drivers/pinctrl/pinctrl-imx1.h                     |  73 +++
- drivers/pinctrl/pinctrl-imx27.c                    | 477 +++++++++++++++
- 13 files changed, 1905 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
- create mode 100644 arch/arm/boot/dts/imx27-pinfunc.h
- create mode 100644 drivers/pinctrl/pinctrl-imx1-core.c
- create mode 100644 drivers/pinctrl/pinctrl-imx1.h
- create mode 100644 drivers/pinctrl/pinctrl-imx27.c
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
+index 5a31c77..5709921 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
+@@ -54,6 +54,8 @@
+ };
+ 
+ &i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c_1>;
+ 	status = "okay";
+ 
+ 	rtc at 51 {
+@@ -69,6 +71,8 @@
+ };
+ 
+ &owire {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_owire_1>;
+ 	status = "okay";
+ };
+ 
+@@ -79,15 +83,21 @@
+ 
+ &uart1 {
+ 	fsl,uart-has-rtscts;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart_1>;
+ 	status = "okay";
+ };
+ 
+ &uart2 {
+ 	fsl,uart-has-rtscts;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart_2>;
+ 	status = "okay";
+ };
+ 
+ &uart3 {
+ 	fsl,uart-has-rtscts;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart_3>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+index c8d57d1..3e87d28 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+@@ -30,10 +30,14 @@
+ };
+ 
+ &fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec_1>;
+ 	status = "okay";
+ };
+ 
+ &i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c_2>;
+ 	status = "okay";
+ 
+ 	at24 at 52 {
+-- 
+1.8.4.rc3
