@@ -1,199 +1,759 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 20 Aug 2013 00:40:37 +0200
-Subject: [PATCH v6 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <52129BC2.6020804@wwwdotorg.org>
-References: <1376924669-28873-1-git-send-email-m.szyprowski@samsung.com>
- <9906612.JEHkvlBKY1@flatron> <52129BC2.6020804@wwwdotorg.org>
-Message-ID: <3804224.ROD4LeYdVO@flatron>
+Date: Tue, 20 Aug 2013 00:47:04 +0200
+Subject: [PATCH v4 1/3] ARM: bcm281xx: Add GPIO driver
+In-Reply-To: <1376938761-13657-2-git-send-email-markus.mayer@linaro.org>
+References: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
+ <1376938761-13657-2-git-send-email-markus.mayer@linaro.org>
+Message-ID: <1798078.kJ4bQYzcF9@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 of August 2013 16:27:14 Stephen Warren wrote:
-> On 08/19/2013 04:24 PM, Tomasz Figa wrote:
-> > On Monday 19 of August 2013 16:17:30 Stephen Warren wrote:
-> >> On 08/19/2013 04:02 PM, Tomasz Figa wrote:
-> >>> Hi Stephen,
-> >>> 
-> >>> On Monday 19 of August 2013 15:49:20 Stephen Warren wrote:
-> >>>> On 08/19/2013 09:04 AM, Marek Szyprowski wrote:
-> >>>>> This patch adds device tree support for contiguous and reserved
-> >>>>> memory
-> >>>>> regions defined in device tree.
-> >>>>> 
-> >>>>> diff --git a/Documentation/devicetree/bindings/memory.txt
-> >>>>> b/Documentation/devicetree/bindings/memory.txt
-> >>>>> 
-> >>>>> +*** Reserved memory regions ***
-> >>>>> +
-> >>>>> +In /memory/reserved-memory node one can create additional nodes
-> >>>> 
-> >>>> s/additional/child/ or s/additional/sub/ would make it clearer
-> >>>> where
-> >>>> the "additional" nodes should be placed.
-> >>>> 
-> >>>>> +compatible:	"linux,contiguous-memory-region" - enables binding
-> >>> 
-> >>> of
-> >>> 
-> >>>>> this
-> >>>>> +		region to Contiguous Memory Allocator (special 
-region for
-> >>>>> +		contiguous memory allocations, shared with movable 
-system
-> >>>>> +		memory, Linux kernel-specific), alternatively if
-> >>>>> +		"reserved-memory-region" - compatibility is 
-defined, given
-> >>>>> +		region is assigned for exclusive usage for by the
-> >>> 
-> >>> respective
-> >>> 
-> >>>>> +		devices
-> >>>> 
-> >>>> "alternatively" makes it sound like the two compatible values are
-> >>>> mutually-exclusive. Perhaps make this a list, like:
-> >>>> 
-> >>>> ----------
-> >>>> 
-> >>>> compatible: One or more of:
-> >>>> 	- "linux,contiguous-memory-region" - enables binding of this
-> >>>> 	
-> >>>> 	  region to Contiguous Memory Allocator (special region for
-> >>>> 	  contiguous memory allocations, shared with movable system
-> >>>> 	  memory, Linux kernel-specific).
-> >>>> 	
-> >>>> 	- "reserved-memory-region" - compatibility is defined, given
-> >>>> 	
-> >>>> 	  region is assigned for exclusive usage for by the respective
-> >>>> 	  devices.
-> >>>> 
-> >>>> ----------
-> >>>> 
-> >>>> "linux,contiguous-memory-region" is already long enough, but I'd
-> >>>> slightly bikeshed towards
-> >>>> "linux,contiguous-memory-allocator-region",
-> >>>> or perhaps "linux,cma-region" since it's not really describing
-> >>>> whether the memory is contiguous (at the level of /memory, each
-> >>>> chunk of memory is contiguous...)
-> >>> 
-> >>> I'm not really sure if we need the "linux" prefix for
-> >>> "contiguous-memory- region". The concept of contiguous memory region
-> >>> is rather OS independent and tells us that memory allocated from
-> >>> this
-> >>> region will be contiguous. IMHO any OS is free to implement its own
-> >>> contiguous memory allocation method, without being limited to Linux
-> >>> CMA.
-> >>> 
-> >>> Keep in mind that rationale behind those contiguous regions was that
-> >>> there are devices that require buffers contiguous in memory to
-> >>> operate correctly.
-> >>> 
-> >>> But this is just nitpicking and I don't really have any strong
-> >>> opinion
-> >>> on this.
-> >>> 
-> >>>>> +*** Device node's properties ***
-> >>>>> +
-> >>>>> +Once regions in the /memory/reserved-memory node have been
-> >>>>> defined,
-> >>>>> they +can be assigned to device nodes to enable respective device
-> >>>>> drivers to +access them. The following properties are defined:
-> >>>>> +
-> >>>>> +memory-region = <&phandle_to_defined_region>;
-> >>>> 
-> >>>> I think the naming of that property should more obviously match
-> >>>> this
-> >>>> binding and/or compatible value; perhaps cma-region or
-> >>>> contiguous-memory-region?
-> >>> 
-> >>> This property is not CMA-specific. Any memory region can be given
-> >>> using
-> >>> the memory-region property and used to allocate buffers for
-> >>> particular
-> >>> device.
-> >> 
-> >> OK, that makes sense.
-> >> 
-> >> What I'm looking for is some way to make it obvious that when you see
-> >> a
-> >> "memory-region" property in a node, you go look at the "memory.txt"
-> >> rather than the DT binding for the node where that property appears.
-> >> Right now, it doesn't seem that obvious to me.
-> >> 
-> >> I think the real issue here is that my brief reading of memory.txt
-> >> implies that arbitrary device nodes can include the memory-region
-> >> property without the node's own binding having to document it; the
-> >> property name is essentially "forced into" all other bindings.
-> >> 
-> >> I think instead, memory.txt should say:
-> >> 
-> >> ----------
-> >> ** Device node's properties ***
-> >> 
-> >> Once regions in the /memory/reserved-memory node have been defined,
-> >> they may be referenced by other device nodes. Bindings that wish to
-> >> reference memory regions should explicitly document their use of the
-> >> following property:
-> >> 
-> >> memory-region = <&phandle_to_defined_region>;
-> >> 
-> >> This property indicates that the device driver should use the memory
-> >> region pointed by the given phandle.
-> >> ----------
-> >> 
-> >> Also, what if a device needs multiple separate memory regions?
-> >> Perhaps a GPU is forced to allocate displayable surfaces from
-> >> addresses 0..32M and textures/off-screen-render-targets from
-> >> 256M..384M or something whacky like that. In that case, we could
-> >> either:
-> >> 
-> >> a) Adjust memory.txt to allow multiple entries in memory-regions, and
-> >> add an associated memory-region-names property.
-> >> 
-> >> or:
-> >> 
-> >> b) Adjust memory.txt not to mention any specific property names, but
-> >> simply mention that other DT nodes can refer to define memory regions
-> >> by phandle, and leave it up to individual bindings to define which
-> >> property they use to reference the memory regions, perhaps with
-> >> memory.txt providing a recommendation of memory-region for the
-> >> simple case, but perhaps also allowing a custom case, e.g.:
-> >> 
-> >> display-memory-region = <&phandl1e1>;
-> >> texture-memory-region = <&phahndle2>;
-> > 
-> > Well, such setup simply cannot be handled by Linux today, as one
-> > device
-> > (aka one struct device) can only have one memory region bound to it.
-> > So
-> > this is not something we can implement today.
-> 
-> Don't you just create "fake" struct devices to make this work, so that
-> the top-level struct device is instantiated from DT, and the others
-> created manually in the top-level device's probe routine, and the memory
-> regions get attached to those "fake" child devices? Seems pretty
-> conceptually easy.
+Hi Markus,
 
-Correct. However you need those fake struct devices to be attached to some 
-memory region and often other things like IOMMU. In fact, they aren't 
-entirely fake, as they usually represent real bus masters of the IP.
+Please see my comments inline.
 
-> > I agree that the device tree should be able to describe such
-> > configurations,
+On Monday 19 of August 2013 11:59:19 Markus Mayer wrote:
+> From: Markus Mayer <mmayer@broadcom.com>
 > 
-> good:-)
+> This patch adds the GPIO driver for the bcm281xx family of chips.
 > 
-> > though, but I'm not sure if this should be done from this side.
+> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+> Reviewed-by: Christian Daudt <csd@broadcom.com>
+> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> ---
+>  .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   43 ++
+>  drivers/gpio/gpio-bcm-kona.c                       |  658
+> ++++++++++++++++++++ 2 files changed, 701 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt create mode
+> 100644 drivers/gpio/gpio-bcm-kona.c
 > 
-> I'm not sure what "from this side" means. It seems pretty simple to
-> adjust this patch to allow such HW to be represented, so shouldn't we
-> just do it and be done with the question?
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
+> b/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt new file
+> mode 100644
+> index 0000000..70b2faf
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
+> @@ -0,0 +1,43 @@
+> +Broadcom Kona Family GPIO
+> +-------------------------
+> +
+> +This GPIO driver is used in the following Broadcom SoCs:
+> +  BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+> +
+> +The GPIO controller only supports edge, not level, triggering of
+> interrupts. +
 
-Well, if it's just about modifying the binding to support such cases, but 
-without actually adding support for them in Linux, then I guess it's fine. 
-Otherwise a lot of memory management code (mostly the DMA mapping API and 
-a lot of its users) would have to be almost completely reworked, which 
-wouldn't be an easy task.
+It should be noted that following properties are required, like it is
+done in most of binding descriptions, for example by adding
+
+Required properties:
+
+before the following list of properties.
+
+> +- compatible: "brcm,kona-gpio"
+> +- reg: Physical base address and length of the controller's registers.
+> +- interrupts: The interrupt outputs from the controller. There is one
+> GPIO +  interrupt per GPIO bank. The number of GPIO banks is HW
+> configurable.
+
+What do you mean by HW configurable? Does it mean that it depends from
+SoC or you can have different bank configurations on the same SoC?
+
+How does the driver know the layout of GPIO banks? The code suggests that
+the number of interrupts is used as bank count. While this saves you from
+adding any new property or any other way of getting this information, I'm
+not sure if it's completely correct. I'd like to hear others' opinion on
+this, though.
+
+> The +  number of interrupts listed depends on the number
+> of GPIO banks on the +  SoC. The interrupts must be ordered by bank,
+> starting with bank 0. +- #gpio-cells: Should be <2>. The first cell is
+> the pin number, the second +  cell is used to specify optional
+> parameters:
+> +  - bit 0 specifies polarity (0 for normal, 1 for inverted)
+
+Maybe some reference to generic GPIO flags could be nice here?
+
+> +- #interrupt-cells: Should be <2>. The first cell is the GPIO number.
+> +  The second cell is used to specify flags:
+> +  - trigger type (bits[1:0]):
+> +      1 = low-to-high edge triggered.
+> +      2 = high-to-low edge triggered.
+> +      3 = low-to-high or high-to-low edge triggered
+
+This seems to be a subset of generic interrupt flags specified in
+bindings/interrupt-controller/interrupts.txt. Maybe this should be
+mentioned here?
+
+> +      Valid values are 1, 2, 3
+> +- gpio-controller: Marks the device node as a GPIO controller.
+> +- interrupt-controller: Marks the device node as an interrupt
+> controller. +
+> +Example:
+> +	gpio: gpio at 35003000 {
+> +		compatible = "brcm,bcm11351-gpio", "brcm,kona-gpio";
+> +		reg = <0x35003000 0x800>;
+> +		interrupts =
+> +		       <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH
+> +			GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH
+> +			GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH
+> +			GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
+> +			GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH
+> +			GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+> +		#gpio-cells = <2>;
+> +		#interrupt-cells = <2>;
+> +		gpio-controller;
+> +		interrupt-controller;
+> +	};
+> diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
+> new file mode 100644
+> index 0000000..9715b06
+> --- /dev/null
+> +++ b/drivers/gpio/gpio-bcm-kona.c
+> @@ -0,0 +1,658 @@
+> +/*
+> + * Copyright (C) 2012-2013 Broadcom Corporation
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/gpio.h>
+> +#include <linux/of_device.h>
+> +#include <linux/module.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/irqchip/chained_irq.h>
+> +
+> +#define BCM_GPIO_PASSWD				0x00a5a501
+> +#define GPIO_PER_BANK				32
+> +
+> +#define GPIO_BANK(gpio)				((gpio) >> 5)
+> +#define GPIO_BIT(gpio)				((gpio) & (GPIO_PER_BANK - 1))
+> +
+> +#define GPIO_OUT_STATUS(bank)			(0x00000000 + ((bank) << 2))
+> +#define GPIO_IN_STATUS(bank)			(0x00000020 + ((bank) << 2))
+> +#define GPIO_OUT_SET(bank)			(0x00000040 + ((bank) << 2))
+> +#define GPIO_OUT_CLEAR(bank)			(0x00000060 + ((bank) << 2))
+> +#define GPIO_INT_STATUS(bank)			(0x00000080 + ((bank) << 2))
+> +#define GPIO_INT_MASK(bank)			(0x000000A0 + ((bank) << 2))
+
+nit: Hex numbers should be lowercase.
+
+> +#define GPIO_INT_MSKCLR(bank)			(0x000000C0 + ((bank) << 2))
+
+Ditto.
+
+> +#define GPIO_CONTROL(bank)			(0x00000100 + ((bank) << 2))
+> +#define GPIO_PWD_STATUS(bank)			(0x00000500 + ((bank) << 2))
+> +
+> +#define GPIO_GPPWR_OFFSET			0x00000520
+> +
+> +#define GPIO_GPCTR0_DBR_SHIFT			5
+> +#define GPIO_GPCTR0_DBR_MASK			0x000001E0
+
+Ditto.
+
+> +
+> +#define GPIO_GPCTR0_ITR_SHIFT			3
+> +#define GPIO_GPCTR0_ITR_MASK			0x00000018
+> +#define GPIO_GPCTR0_ITR_CMD_RISING_EDGE		0x00000001
+> +#define GPIO_GPCTR0_ITR_CMD_FALLING_EDGE	0x00000002
+> +#define GPIO_GPCTR0_ITR_CMD_BOTH_EDGE		0x00000003
+> +
+> +#define GPIO_GPCTR0_IOTR_MASK			0x00000001
+> +#define GPIO_GPCTR0_IOTR_CMD_0UTPUT		0x00000000
+> +#define GPIO_GPCTR0_IOTR_CMD_INPUT		0x00000001
+> +
+> +#define GPIO_GPCTR0_DB_ENABLE_MASK		0x00000100
+> +
+> +#define LOCK_CODE				0xFFFFFFFF
+
+Ditto.
+
+> +#define UNLOCK_CODE				0x00000000
+> +
+> +struct bcm_kona_gpio {
+> +	void __iomem *reg_base;
+> +	int num_bank;
+> +	int irq_base;
+> +	spinlock_t lock;
+> +	struct gpio_chip gpio_chip;
+> +	struct irq_domain *irq_domain;
+> +	struct bcm_kona_gpio_bank *banks;
+> +	struct platform_device *pdev;
+> +};
+> +
+> +struct bcm_kona_gpio_bank {
+> +	int id;
+> +	int irq;
+> +	/* Used in the interrupt handler */
+> +	void __iomem *reg_base;
+> +};
+> +
+> +static inline struct bcm_kona_gpio *to_kona_gpio(struct gpio_chip
+> *chip) +{
+> +	return container_of(chip, struct bcm_kona_gpio, gpio_chip);
+> +}
+> +
+> +/* This function counts IRQ entries in the device tree */
+> +static int bcm_kona_count_irq_resources(struct platform_device *pdev)
+> +{
+> +	int i, ret;
+> +
+> +	for (i = 0;; i++) {
+> +		ret = platform_get_irq(pdev, i);
+> +		if (ret < 0)
+> +			break;
+> +	}
+> +	return i;
+> +}
+
+Well, if this driver supports only device tree, you can use of_count_irq()
+instead of this function.
+
+> +
+> +static void bcm_kona_gpio_set_lockcode_bank(void __iomem *reg_base, int
+> bank_id, +	int lockcode)
+> +{
+> +	writel(BCM_GPIO_PASSWD, reg_base + GPIO_GPPWR_OFFSET);
+> +	writel(lockcode, reg_base + GPIO_PWD_STATUS(bank_id));
+> +}
+> +
+> +static inline void bcm_kona_gpio_lock_bank(void __iomem *reg_base, int
+> bank_id) +{
+> +	bcm_kona_gpio_set_lockcode_bank(reg_base, bank_id, LOCK_CODE);
+> +}
+> +
+> +static inline void bcm_kona_gpio_unlock_bank(void __iomem *reg_base,
+> +	int bank_id)
+> +{
+> +	bcm_kona_gpio_set_lockcode_bank(reg_base, bank_id, UNLOCK_CODE);
+> +}
+> +
+> +static void bcm_kona_gpio_set(struct gpio_chip *chip, unsigned gpio,
+> +	int value)
+> +{
+> +	struct bcm_kona_gpio *kona_gpio;
+> +	void __iomem *reg_base;
+> +	int bank_id = GPIO_BANK(gpio);
+> +	int bit = GPIO_BIT(gpio);
+> +	u32 val, reg_offset;
+> +	unsigned long flags;
+> +
+> +	kona_gpio = to_kona_gpio(chip);
+> +	reg_base = kona_gpio->reg_base;
+> +	spin_lock_irqsave(&kona_gpio->lock, flags);
+> +	bcm_kona_gpio_unlock_bank(reg_base, bank_id);
+> +
+> +	/* determine the GPIO pin direction */
+> +	val = readl(reg_base + GPIO_CONTROL(gpio));
+> +	val &= GPIO_GPCTR0_IOTR_MASK;
+> +
+> +	/* this function only applies to output pin */
+> +	if (GPIO_GPCTR0_IOTR_CMD_INPUT == val)
+> +		return;
+> +
+> +	reg_offset = value ? GPIO_OUT_SET(bank_id) : GPIO_OUT_CLEAR(bank_id);
+> +
+> +	val = readl(reg_base + reg_offset);
+> +	val |= 1 << bit;
+> +	writel(val, reg_base + reg_offset);
+> +
+> +	bcm_kona_gpio_lock_bank(reg_base, bank_id);
+> +	spin_unlock_irqrestore(&kona_gpio->lock, flags);
+> +}
+> +
+> +static int bcm_kona_gpio_get(struct gpio_chip *chip, unsigned gpio)
+> +{
+> +	struct bcm_kona_gpio *kona_gpio;
+> +	void __iomem *reg_base;
+> +	int bank_id = GPIO_BANK(gpio);
+> +	int bit = GPIO_BIT(gpio);
+> +	u32 val, reg_offset;
+> +	unsigned long flags;
+> +
+> +	kona_gpio = to_kona_gpio(chip);
+> +	reg_base = kona_gpio->reg_base;
+> +	spin_lock_irqsave(&kona_gpio->lock, flags);
+> +	bcm_kona_gpio_unlock_bank(reg_base, bank_id);
+> +
+> +	/* determine the GPIO pin direction */
+> +	val = readl(reg_base + GPIO_CONTROL(gpio));
+> +	val &= GPIO_GPCTR0_IOTR_MASK;
+> +
+> +	/* read the GPIO bank status */
+> +	reg_offset = (GPIO_GPCTR0_IOTR_CMD_INPUT == val) ?
+> +					GPIO_IN_STATUS(bank_id) :
+> +					GPIO_OUT_STATUS(bank_id);
+> +	val = readl(reg_base + reg_offset);
+> +
+> +	bcm_kona_gpio_lock_bank(reg_base, bank_id);
+> +	spin_unlock_irqrestore(&kona_gpio->lock, flags);
+> +
+> +	/* return the specified bit status */
+> +	return (val >> bit) & 1;
+> +}
+> +
+> +static int bcm_kona_gpio_direction_input(struct gpio_chip *chip,
+> +	unsigned gpio)
+> +{
+> +	struct bcm_kona_gpio *kona_gpio;
+> +	void __iomem *reg_base;
+> +	u32 val;
+> +	unsigned long flags;
+> +	int bank_id = GPIO_BANK(gpio);
+> +
+> +	kona_gpio = to_kona_gpio(chip);
+> +	reg_base = kona_gpio->reg_base;
+> +	spin_lock_irqsave(&kona_gpio->lock, flags);
+> +	bcm_kona_gpio_unlock_bank(reg_base, bank_id);
+> +
+> +	val = readl(reg_base + GPIO_CONTROL(gpio));
+> +	val &= ~GPIO_GPCTR0_IOTR_MASK;
+> +	val |= GPIO_GPCTR0_IOTR_CMD_INPUT;
+> +	writel(val, reg_base + GPIO_CONTROL(gpio));
+> +
+> +	bcm_kona_gpio_lock_bank(reg_base, bank_id);
+> +	spin_unlock_irqrestore(&kona_gpio->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int bcm_kona_gpio_direction_output(struct gpio_chip *chip,
+> +	unsigned gpio, int value)
+> +{
+> +	struct bcm_kona_gpio *kona_gpio;
+> +	void __iomem *reg_base;
+> +	int bank_id = GPIO_BANK(gpio);
+> +	int bit = GPIO_BIT(gpio);
+> +	u32 val, reg_offset;
+> +	unsigned long flags;
+> +
+> +	kona_gpio = to_kona_gpio(chip);
+> +	reg_base = kona_gpio->reg_base;
+> +	spin_lock_irqsave(&kona_gpio->lock, flags);
+> +	bcm_kona_gpio_unlock_bank(reg_base, bank_id);
+> +
+> +	val = readl(reg_base + GPIO_CONTROL(gpio));
+> +	val &= ~GPIO_GPCTR0_IOTR_MASK;
+> +	val |= GPIO_GPCTR0_IOTR_CMD_0UTPUT;
+> +	writel(val, reg_base + GPIO_CONTROL(gpio));
+> +	reg_offset = value ? GPIO_OUT_SET(bank_id) : GPIO_OUT_CLEAR(bank_id);
+> +
+> +	val = readl(reg_base + reg_offset);
+> +	val |= 1 << bit;
+> +	writel(val, reg_base + reg_offset);
+> +
+> +	bcm_kona_gpio_lock_bank(reg_base, bank_id);
+> +	spin_unlock_irqrestore(&kona_gpio->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int bcm_kona_gpio_to_irq(struct gpio_chip *chip, unsigned gpio)
+> +{
+> +	struct bcm_kona_gpio *kona_gpio;
+> +
+> +	kona_gpio = to_kona_gpio(chip);
+> +	if (gpio >= kona_gpio->gpio_chip.ngpio)
+> +		return -ENXIO;
+> +	return irq_create_mapping(kona_gpio->irq_domain, gpio);
+> +}
+> +
+> +static int bcm_kona_gpio_set_debounce(struct gpio_chip *chip, unsigned
+> gpio, +	unsigned debounce)
+> +{
+> +	struct bcm_kona_gpio *kona_gpio;
+> +	void __iomem *reg_base;
+> +	u32 val, res;
+> +	unsigned long flags;
+> +	int bank_id = GPIO_BANK(gpio);
+> +
+> +	kona_gpio = to_kona_gpio(chip);
+> +	reg_base = kona_gpio->reg_base;
+> +	/* debounce must be 1-128ms (or 0) */
+> +	if ((debounce > 0 && debounce < 1000) || debounce > 128000) {
+> +		dev_err(chip->dev, "Debounce value %u not in range\n",
+> +			debounce);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* calculate debounce bit value */
+> +	if (debounce != 0) {
+> +		/* Convert to ms */
+> +		debounce /= 1000;
+> +		/* find the MSB */
+> +		res = fls(debounce) - 1;
+> +		/* Check if MSB-1 is set (round up or down) */
+> +		if (res > 0 && (debounce & 1 << (res - 1)))
+> +			res++;
+> +	}
+> +
+> +	/* spin lock for read-modify-write of the GPIO register */
+> +	spin_lock_irqsave(&kona_gpio->lock, flags);
+> +	bcm_kona_gpio_unlock_bank(reg_base, bank_id);
+> +
+> +	val = readl(reg_base + GPIO_CONTROL(gpio));
+> +	val &= ~GPIO_GPCTR0_DBR_MASK;
+> +
+> +	if (debounce == 0) {
+> +		/* disable debounce */
+> +		val &= ~GPIO_GPCTR0_DB_ENABLE_MASK;
+> +	} else {
+> +		val |= GPIO_GPCTR0_DB_ENABLE_MASK |
+> +			  (res << GPIO_GPCTR0_DBR_SHIFT);
+> +	}
+> +
+> +	writel(val, reg_base + GPIO_CONTROL(gpio));
+> +
+> +	bcm_kona_gpio_lock_bank(reg_base, bank_id);
+> +	spin_unlock_irqrestore(&kona_gpio->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct gpio_chip template_chip = {
+> +	.label = "bcm-kona-gpio",
+> +	.direction_input = bcm_kona_gpio_direction_input,
+> +	.get = bcm_kona_gpio_get,
+> +	.direction_output = bcm_kona_gpio_direction_output,
+> +	.set = bcm_kona_gpio_set,
+> +	.set_debounce = bcm_kona_gpio_set_debounce,
+> +	.to_irq = bcm_kona_gpio_to_irq,
+> +	.base = 0,
+> +};
+> +
+> +static void bcm_kona_gpio_irq_ack(struct irq_data *d)
+> +{
+> +	struct bcm_kona_gpio *kona_gpio;
+> +	void __iomem *reg_base;
+> +	int gpio = d->hwirq;
+> +	int bank_id = GPIO_BANK(gpio);
+> +	int bit = GPIO_BIT(gpio);
+> +	u32 val;
+> +	unsigned long flags;
+> +
+> +	kona_gpio = irq_data_get_irq_chip_data(d);
+> +	reg_base = kona_gpio->reg_base;
+> +	spin_lock_irqsave(&kona_gpio->lock, flags);
+> +	bcm_kona_gpio_unlock_bank(reg_base, bank_id);
+> +
+> +	val = readl(reg_base + GPIO_INT_STATUS(bank_id));
+> +	val |= 1 << bit;
+> +	writel(val, reg_base + GPIO_INT_STATUS(bank_id));
+> +
+> +	bcm_kona_gpio_lock_bank(reg_base, bank_id);
+> +	spin_unlock_irqrestore(&kona_gpio->lock, flags);
+> +}
+> +
+> +static void bcm_kona_gpio_irq_mask(struct irq_data *d)
+> +{
+> +	struct bcm_kona_gpio *kona_gpio;
+> +	void __iomem *reg_base;
+> +	int gpio = d->hwirq;
+> +	int bank_id = GPIO_BANK(gpio);
+> +	int bit = GPIO_BIT(gpio);
+> +	u32 val;
+> +	unsigned long flags;
+> +
+> +	kona_gpio = irq_data_get_irq_chip_data(d);
+> +	reg_base = kona_gpio->reg_base;
+> +	spin_lock_irqsave(&kona_gpio->lock, flags);
+> +	bcm_kona_gpio_unlock_bank(reg_base, bank_id);
+> +
+> +	val = readl(reg_base + GPIO_INT_MASK(bank_id));
+> +	val |= 1 << bit;
+> +	writel(val, reg_base + GPIO_INT_MASK(bank_id));
+> +
+> +	bcm_kona_gpio_lock_bank(reg_base, bank_id);
+> +	spin_unlock_irqrestore(&kona_gpio->lock, flags);
+> +}
+> +
+> +static void bcm_kona_gpio_irq_unmask(struct irq_data *d)
+> +{
+> +	struct bcm_kona_gpio *kona_gpio;
+> +	void __iomem *reg_base;
+> +	int gpio = d->hwirq;
+> +	int bank_id = GPIO_BANK(gpio);
+> +	int bit = GPIO_BIT(gpio);
+> +	u32 val;
+> +	unsigned long flags;
+> +
+> +	kona_gpio = irq_data_get_irq_chip_data(d);
+> +	reg_base = kona_gpio->reg_base;
+> +	spin_lock_irqsave(&kona_gpio->lock, flags);
+> +	bcm_kona_gpio_unlock_bank(reg_base, bank_id);
+> +
+> +	val = readl(reg_base + GPIO_INT_MSKCLR(bank_id));
+> +	val |= 1 << bit;
+> +	writel(val, reg_base + GPIO_INT_MSKCLR(bank_id));
+> +
+> +	bcm_kona_gpio_lock_bank(reg_base, bank_id);
+> +	spin_unlock_irqrestore(&kona_gpio->lock, flags);
+> +}
+> +
+> +static int bcm_kona_gpio_irq_set_type(struct irq_data *d, unsigned int
+> type) +{
+> +	struct bcm_kona_gpio *kona_gpio;
+> +	void __iomem *reg_base;
+> +	int gpio = d->hwirq;
+> +	u32 lvl_type;
+> +	u32 val;
+> +	unsigned long flags;
+> +	int bank_id = GPIO_BANK(gpio);
+> +
+> +	kona_gpio = irq_data_get_irq_chip_data(d);
+> +	reg_base = kona_gpio->reg_base;
+> +	switch (type & IRQ_TYPE_SENSE_MASK) {
+> +	case IRQ_TYPE_EDGE_RISING:
+> +		lvl_type = GPIO_GPCTR0_ITR_CMD_RISING_EDGE;
+> +		break;
+> +
+> +	case IRQ_TYPE_EDGE_FALLING:
+> +		lvl_type = GPIO_GPCTR0_ITR_CMD_FALLING_EDGE;
+> +		break;
+> +
+> +	case IRQ_TYPE_EDGE_BOTH:
+> +		lvl_type = GPIO_GPCTR0_ITR_CMD_BOTH_EDGE;
+> +		break;
+> +
+> +	case IRQ_TYPE_LEVEL_HIGH:
+> +	case IRQ_TYPE_LEVEL_LOW:
+> +		/* BCM GPIO doesn't support level triggering */
+> +	default:
+> +		dev_err(kona_gpio->gpio_chip.dev,
+> +			"Invalid BCM GPIO irq type 0x%x\n", type);
+> +		return -EINVAL;
+> +	}
+> +
+> +	spin_lock_irqsave(&kona_gpio->lock, flags);
+> +	bcm_kona_gpio_unlock_bank(reg_base, bank_id);
+> +
+> +	val = readl(reg_base + GPIO_CONTROL(gpio));
+> +	val &= ~GPIO_GPCTR0_ITR_MASK;
+> +	val |= lvl_type << GPIO_GPCTR0_ITR_SHIFT;
+> +	writel(val, reg_base + GPIO_CONTROL(gpio));
+> +
+> +	bcm_kona_gpio_lock_bank(reg_base, bank_id);
+> +	spin_unlock_irqrestore(&kona_gpio->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static void bcm_kona_gpio_irq_handler(unsigned int irq, struct irq_desc
+> *desc) +{
+> +	void __iomem *reg_base;
+> +	int bit, bank_id;
+> +	unsigned long sta;
+> +	struct bcm_kona_gpio_bank *bank = irq_get_handler_data(irq);
+> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+> +
+> +	chained_irq_enter(chip, desc);
+> +
+> +	/*
+> +	 * For bank interrupts, we can't use chip_data to store the kona_gpio
+> +	 * pointer, since GIC needs it for its own purposes. Therefore, we get
+> +	 * our pointer from the bank structure.
+> +	 */
+> +	reg_base = bank->reg_base;
+> +	bank_id = bank->id;
+> +	bcm_kona_gpio_unlock_bank(reg_base, bank_id);
+> +
+> +	sta = readl(reg_base + GPIO_INT_STATUS(bank_id)) &
+> +	    (~(readl(reg_base + GPIO_INT_MASK(bank_id))));
+> +
+> +	for_each_set_bit(bit, &sta, 32) {
+> +		/*
+> +		 * Clear interrupt before handler is called so we don't
+> +		 * miss any interrupt occurred during executing them.
+> +		 */
+> +		writel(readl(reg_base + GPIO_INT_STATUS(bank_id)) |
+> +				(1 << bit),
+> +				reg_base + GPIO_INT_STATUS(bank_id));
+> +		/* Invoke interrupt handler */
+> +		generic_handle_irq(gpio_to_irq(GPIO_PER_BANK * bank_id + bit));
+
+Calling the full gpio_to_irq() here in interrupt handler looks like an
+overkill for me. If you have 1:1 GPIO to interrupt mapping (and irq_chip
+ops above suggest so) then you could simply call irq_find_mapping() with
+your IRQ domain and GPIO number as the hwirq argument. You would have to
+somehow retrieve the IRQ domain pointer, though. (Possibly adding it to
+bcm_kona_gpio_bank struct wouldn't be too bad idea.)
+
+> +	}
+> +
+> +	bcm_kona_gpio_lock_bank(reg_base, bank_id);
+> +
+> +	chained_irq_exit(chip, desc);
+> +}
+> +
+> +static struct irq_chip bcm_gpio_irq_chip = {
+> +	.name = "bcm-kona-gpio",
+> +	.irq_ack = bcm_kona_gpio_irq_ack,
+> +	.irq_mask = bcm_kona_gpio_irq_mask,
+> +	.irq_unmask = bcm_kona_gpio_irq_unmask,
+> +	.irq_set_type = bcm_kona_gpio_irq_set_type,
+> +};
+> +
+> +static struct __initconst of_device_id bcm_kona_gpio_of_match[] = {
+> +	{ .compatible = "brcm,kona-gpio" },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, bcm_kona_gpio_of_match);
+> +
+> +/*
+> + * This lock class tells lockdep that GPIO irqs are in a different
+> + * category than their parents, so it won't report false recursion.
+> + */
+> +static struct lock_class_key gpio_lock_class;
+> +
+> +static int bcm_kona_gpio_irq_map(struct irq_domain *d, unsigned int
+> virq, +				irq_hw_number_t hwirq)
+> +{
+> +	int ret;
+> +
+> +	ret = irq_set_chip_data(virq, d->host_data);
+> +	if (ret < 0)
+> +		return ret;
+> +	irq_set_lockdep_class(virq, &gpio_lock_class);
+> +	irq_set_chip_and_handler(virq, &bcm_gpio_irq_chip, handle_simple_irq);
+> +	irq_set_nested_thread(virq, 1);
+> +	set_irq_flags(virq, IRQF_VALID);
+> +
+> +	return 0;
+> +}
+> +
+> +static void bcm_kona_gpio_irq_unmap(struct irq_domain *d, unsigned int
+> virq) +{
+> +	irq_set_chip_and_handler(virq, NULL, NULL);
+> +	irq_set_chip_data(virq, NULL);
+> +}
+> +
+> +static struct irq_domain_ops bcm_kona_irq_ops = {
+> +	.map    = bcm_kona_gpio_irq_map,
+> +	.unmap  = bcm_kona_gpio_irq_unmap,
+> +	.xlate  = irq_domain_xlate_twocell,
+> +};
+> +
+> +static void bcm_kona_gpio_reset(struct bcm_kona_gpio *kona_gpio)
+> +{
+> +	void __iomem *reg_base;
+> +	int i;
+> +
+> +	reg_base = kona_gpio->reg_base;
+> +	/* disable interrupts and clear status */
+> +	for (i = 0; i < kona_gpio->num_bank; i++) {
+> +		bcm_kona_gpio_unlock_bank(reg_base, i);
+> +		writel(0xFFFFFFFF, reg_base + GPIO_INT_MASK(i));
+> +		writel(0xFFFFFFFF, reg_base + GPIO_INT_STATUS(i));
+> +		bcm_kona_gpio_lock_bank(reg_base, i);
+> +	}
+> +}
+> +
+> +static int bcm_kona_gpio_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	const struct of_device_id *match;
+> +	struct resource *res;
+> +	struct bcm_kona_gpio_bank *bank;
+> +	struct bcm_kona_gpio *kona_gpio;
+> +	struct gpio_chip *chip;
+> +	int ret;
+> +	int i;
+> +
+> +	match = of_match_device(bcm_kona_gpio_of_match, dev);
+> +	if (!match) {
+> +		dev_err(dev, "Failed to find gpio controller\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	kona_gpio = devm_kzalloc(dev, sizeof(*kona_gpio), GFP_KERNEL);
+> +	if (!kona_gpio) {
+> +		dev_err(dev, "Failed to allocate memory for GPIO device");
+
+nit: devm_kzalloc() already prints an error message if allocation fails.
+
+> +		return -ENOMEM;
+> +	}
+> +	kona_gpio->gpio_chip = template_chip;
+> +	chip = &kona_gpio->gpio_chip;
+> +	kona_gpio->num_bank = bcm_kona_count_irq_resources(pdev);
+
+of_irq_count() could be used here, if the driver is supposed to be
+DT-only, but as I said before, I'm not sure if this is the right way to
+get bank count from DT.
+
+> +	if (kona_gpio->num_bank == 0) {
+> +		dev_err(dev, "Couldn't determine # GPIO banks\n");
+> +		return -ENOENT;
+> +	}
+> +	kona_gpio->banks = devm_kzalloc(dev,
+> +				       kona_gpio->num_bank *
+> +				       sizeof(*kona_gpio->banks),
+> +				       GFP_KERNEL);
+> +	if (!kona_gpio->banks) {
+> +		dev_err(dev, "Couldn't allocate bank structure\n");
+
+nit: devm_kzalloc() already prints an error on failure.
+
+> +		return -ENOMEM;
+> +	}
+> +
+> +	kona_gpio->pdev = pdev;
+> +	platform_set_drvdata(pdev, kona_gpio);
+> +	chip->of_node = dev->of_node;
+> +	chip->ngpio = kona_gpio->num_bank * GPIO_PER_BANK;
+> +
+> +	kona_gpio->irq_base = irq_alloc_descs(-1, 0, chip->ngpio, 0);
+
+Why do you need a static base here? Anyway, it doesn't seem to be used
+anywhere in this driver, so I guess it might some kind of leftover.
+
+> +	if (kona_gpio->irq_base < 0) {
+> +		dev_err(dev, "Couldn't allocate IRQ numbers\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	kona_gpio->irq_domain = irq_domain_add_linear(dev->of_node,
+> +						chip->ngpio,
+> +						&bcm_kona_irq_ops,
+> +						kona_gpio);
+> +	if (!kona_gpio->irq_domain) {
+> +		dev_err(dev, "Couldn't allocate IRQ domain\n");
+> +		ret = -ENXIO;
+> +		goto err_irq_descs;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(dev, "Missing MEM resource\n");
+> +		ret = -ENXIO;
+> +		goto err_irq_domain;
+> +	}
+
+You don't need to check the return value of platform_get_resource(),
+because devm_ioremap_resource() already does it.
+
+> +
+> +	kona_gpio->reg_base = devm_request_and_ioremap(dev, res);
+
+devm_request_and_ioremap() is deprecated. devm_ioremap_resource() should
+be used in new code (remembering that it returns ERR_PTR() on errors, not
+NULL, like the old one).
+
+> +	if (!kona_gpio->reg_base) {
+> +		dev_err(dev, "Couldn't ioremap regs\n");
+
+nit: devm_ioremap_resource() already prints an error on failure.
 
 Best regards,
 Tomasz
