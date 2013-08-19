@@ -1,110 +1,171 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Aug 2013 15:59:46 -0600
-Subject: [RFC 3/3] PCI: tegra: Support driver unbinding
-In-Reply-To: <20130819215208.GC9885@mithrandir>
-References: <1376392346-14127-1-git-send-email-treding@nvidia.com>
- <1376392346-14127-4-git-send-email-treding@nvidia.com>
- <520BFA0C.5070001@wwwdotorg.org> <20130815103452.GA13740@ulmo>
- <520CF211.6060003@wwwdotorg.org> <20130819201623.GD5191@mithrandir>
- <52128650.7090009@wwwdotorg.org> <20130819215208.GC9885@mithrandir>
-Message-ID: <52129552.8040608@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 19 Aug 2013 15:00:06 -0700
+Subject: [PATCHv5 02/31] CLK: TI: Add DPLL clock support
+In-Reply-To: <5212509F.9030608@ti.com>
+References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
+ <1375460751-23676-3-git-send-email-t-kristo@ti.com>
+ <20130813105042.GJ27165@e106331-lin.cambridge.arm.com>
+ <52121EF5.9040706@ti.com>
+ <20130819141803.GO3719@e106331-lin.cambridge.arm.com>
+ <52123531.4060608@ti.com>
+ <20130819162450.GS3719@e106331-lin.cambridge.arm.com>
+ <5212509F.9030608@ti.com>
+Message-ID: <20130819220006.4443.23042@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2013 03:52 PM, Thierry Reding wrote:
-> On Mon, Aug 19, 2013 at 02:55:44PM -0600, Stephen Warren wrote:
->> On 08/19/2013 02:16 PM, Thierry Reding wrote:
->>> On Thu, Aug 15, 2013 at 09:21:53AM -0600, Stephen Warren
->>> wrote:
->>>> On 08/15/2013 04:34 AM, Thierry Reding wrote:
->>>>> On Wed, Aug 14, 2013 at 03:43:40PM -0600, Stephen Warren 
->>>>> wrote:
->>>>>> On 08/13/2013 05:12 AM, Thierry Reding wrote:
->>>>>>> Implement the platform driver's .remove() callback to
->>>>>>> free all resources allocated during driver setup and
->>>>>>> call pci_common_exit() to cleanup ARM specific
->>>>>>> datastructures. Unmap the fixed PCI I/O mapping by
->>>>>>> calling the new pci_iounmap_io() function in the new
->>>>>>> .teardown() callback.
->>>>>>> 
->>>>>>> Finally, no longer set the .suppress_bind_attrs field
->>>>>>> to true to allow the driver to unbind from a device.
->>>>>> 
->>>>>>> +static int tegra_pcie_remove(struct platform_device
->>>>>>> *pdev) +{ +	struct tegra_pcie *pcie =
->>>>>>> platform_get_drvdata(pdev); + struct tegra_pcie_bus
->>>>>>> *bus, *tmp; +	int err; + + pci_common_exit(&pcie->sys);
->>>>>>> + + list_for_each_entry_safe(bus, tmp, &pcie->busses,
->>>>>>> list) { + vunmap(bus->area->addr); + kfree(bus); +	} +
->>>>>>> +	if (IS_ENABLED(CONFIG_PCI_MSI)) { +		err = 
->>>>>>> tegra_pcie_disable_msi(pcie); +		if (err < 0) +
->>>>>>> return err; + }
->>>>>> 
->>>>>> Wouldn't it make sense to do that as early as possible
->>>>>> in the function, to make sure that no MSI accidentally
->>>>>> fires after some of the cleanup has already happened?
->>>>> 
->>>>> I don't think that's strictly necessary in this case.
->>>>> After the call to pci_common_exit() there are no PCI
->>>>> devices left, there's not even a bus left. All MSI users
->>>>> should have cleaned up after themselves.
->>>>> 
->>>>> Given that I thought it more useful to mirror the setup
->>>>> done in .probe() to make it clearer what's being undone
->>>>> (and potentially what's missing).
->>>> 
->>>> That makes sense SW-wise, but what about mis-behaving HW
->>>> that triggers an MSI even when it's been told not to? I
->>>> assume that tegra_pcie_disable_msi() unrequests the IRQ,
->>>> hence solves that problem, if done early enough.
->>> 
->>> To be honest, I'm not sure about the side-effects that this
->>> will have. tegra_pcie_disable_msi() does quite a bit more than
->>> just masking the interrupts. It also completely removes the IRQ
->>> domain that provides the MSI interrupts. While I haven't tried
->>> it yet I can imagine that it will cause crashes at a later
->>> point when drivers want to disable MSI on a device and the IRQ
->>> domain having vanished from underneath.
->> 
->> Surely by the time the PCIe controller device has been remove()d
->> then all devices for PCIe "client" devices have also been
->> removed.
+Quoting Tero Kristo (2013-08-19 10:06:39)
+> On 08/19/2013 07:24 PM, Mark Rutland wrote:
+> > On Mon, Aug 19, 2013 at 04:09:37PM +0100, Tero Kristo wrote:
+> >> On 08/19/2013 05:18 PM, Mark Rutland wrote:
+> >>> On Mon, Aug 19, 2013 at 02:34:45PM +0100, Tero Kristo wrote:
+> >>>> On 08/13/2013 01:50 PM, Mark Rutland wrote:
+> >>>>> Hi,
+> >>>>>
+> >>>>> On Fri, Aug 02, 2013 at 05:25:21PM +0100, Tero Kristo wrote:
+> >>>>>> The OMAP clock driver now supports DPLL clock type. This patch also
+> >>>>>> adds support for DT DPLL nodes.
+> >>>>>>
+> >>>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> >>>>>> ---
+> >>>>>>     .../devicetree/bindings/clock/ti/dpll.txt          |   70 +++
+> >>>>>>     arch/arm/mach-omap2/clock.h                        |  144 +-----
+> >>>>>>     arch/arm/mach-omap2/clock3xxx.h                    |    2 -
+> >>>>>>     drivers/clk/Makefile                               |    1 +
+> >>>>>>     drivers/clk/ti/Makefile                            |    3 +
+> >>>>>>     drivers/clk/ti/dpll.c                              |  488 ++++++++++++++++++++
+> >>>>>>     include/linux/clk/ti.h                             |  164 +++++++
+> >>>>>>     7 files changed, 727 insertions(+), 145 deletions(-)
+> >>>>>>     create mode 100644 Documentation/devicetree/bindings/clock/ti/dpll.txt
+> >>>>>>     create mode 100644 drivers/clk/ti/Makefile
+> >>>>>>     create mode 100644 drivers/clk/ti/dpll.c
+> >>>>>>     create mode 100644 include/linux/clk/ti.h
+> >>>>>>
+> >>>>>> diff --git a/Documentation/devicetree/bindings/clock/ti/dpll.txt b/Documentation/devicetree/bindings/clock/ti/dpll.txt
+> >>>>>> new file mode 100644
+> >>>>>> index 0000000..dcd6e63
+> >>>>>> --- /dev/null
+> >>>>>> +++ b/Documentation/devicetree/bindings/clock/ti/dpll.txt
+> >>>>>> @@ -0,0 +1,70 @@
+> >>>>>> +Binding for Texas Instruments DPLL clock.
+> >>>>>> +
+> >>>>>> +This binding uses the common clock binding[1].  It assumes a
+> >>>>>> +register-mapped DPLL with usually two selectable input clocks
+> >>>>>> +(reference clock and bypass clock), with digital phase locked
+> >>>>>> +loop logic for multiplying the input clock to a desired output
+> >>>>>> +clock. This clock also typically supports different operation
+> >>>>>> +modes (locked, low power stop etc.) This binding has several
+> >>>>>> +sub-types, which effectively result in slightly different setup
+> >>>>>> +for the actual DPLL clock.
+> >>>>>> +
+> >>>>>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >>>>>> +
+> >>>>>> +Required properties:
+> >>>>>> +- compatible : shall be one of:
+> >>>>>> +               "ti,omap4-dpll-x2-clock",
+> >>>>>> +               "ti,omap3-dpll-clock",
+> >>>>>> +               "ti,omap3-dpll-core-clock",
+> >>>>>> +               "ti,omap3-dpll-per-clock",
+> >>>>>> +               "ti,omap3-dpll-per-j-type-clock",
+> >>>>>> +               "ti,omap4-dpll-clock",
+> >>>>>> +               "ti,omap4-dpll-core-clock",
+> >>>>>> +               "ti,omap4-dpll-m4xen-clock",
+> >>>>>> +               "ti,omap4-dpll-j-type-clock",
+> >>>>>> +               "ti,omap4-dpll-no-gate-clock",
+> >>>>>> +               "ti,omap4-dpll-no-gate-j-type-clock",
+> >>>>>> +
+> >>>>>> +- #clock-cells : from common clock binding; shall be set to 0.
+> >>>>>> +- clocks : link phandles of parent clocks (clk-ref and clk-bypass)
+> >>>>>
+> >>>>> It might be a good idea to use clock-names to clarify which clocks are
+> >>>>> present (I notice your examples contain only one clock input).
+> >>>>
+> >>>> All DPLLs have both bypass and reference clocks, but these can be the
+> >>>> same. Is it better to just list both always (and hence drop
+> >>>> clock-names), or provide clock-names always?
+> >>>
+> >>> If they're separate inputs, it's worth listing both (even if they're fed
+> >>> by the same provider). If it's possible one input might not be wired up,
+> >>> use clock-names.
+> >>
+> >> Ref and bypass clocks are used currently by all DPLLs (also the APLL) so
+> >> I guess I just enforce both to be specified.
+> >
+> > Ok. It's always possible to add clock-names later if a platform doesn't
+> > wire an input. We lose the possibility of future compatibility, but
+> > backwards compatibility is easy enough to maintain.
+> >
+> >>>>>> +- ti,clkdm-name : clockdomain name for the DPLL
+> >>>>>
+> >>>>> Could you elaborate on what this is for? What constitutes a valid name?
+> >>>>>
+> >>>>> I'm not sure a string is the best way to define the linkage of several
+> >>>>> elements to a domain...
+> >>>>
+> >>>> Well, I am not sure if we can do this any better at this point, we don't
+> >>>> have DT nodes for clockdomain at the moment (I am not sure if we will
+> >>>> have those either as there are only a handful of those per SoC) but I'll
+> >>>> add some more documentation for this.
+> >>>
+> >>> I'll have to see the documentation, but I'd be very wary of putting that
+> >>> in as-is. Does having the clock domain string link this up to domains in
+> >>> platform data?
+> >>>
+> >>> I'm not sure how well we'll be able to maintain support for that in
+> >>> future if it requires other platform code to use now, and we're not sure
+> >>> how the domains themselves will be represented in dt.
+> >>
+> >> Hmm so, should I add a stub representation for the clockdomains to the
+> >> DT then for now or how should this be handled? The stubs could then be
+> >> mapped to the actual clock domains based on their node names.
+
+I'm not sure that this binding should know about the clock domain at
+all. Maybe the clock domain binding should list the clocks that are
+within the domain?
+
+> >>
+> >
+> > I unfortunately don't have a good answer here, because I'm not that
+> > familiar with how we handle clockdomains for power management purposes.
+> >
+> > As I understand it, each clock domain is essentially a clock gate
+> > controlling multiple clock signals, so it's possible to describe that
+> > with the common clock bindings, with a domain's clocks all coming from a
+> > "domain-gate-clock" node (or something like that). That would make the
+> > wiring of clocks to a domain explicit and in line with the rest of the
+> > common clock bindings. But perhaps I've simplified things a bit too
+> > far.
 > 
-> The PCIe controller is the device being removed. Part of that
-> removal involves stopping and removing all PCI devices. That's done
-> as part of pci_common_exit().
+> You got it basically right, but maybe oversimplified it a bit. The 
+> root/parent clocks can still cross clockdomain boundaries, so mapping 
+> everything under a simple clockdomain gate would not work. Basically 
+> each clock has a mapping on the SoC for both its parent clock signal and 
+> the clockdomain association, kind of having two parents at the same 
+> time. In OMAP case, most of the clockdomains support hardware autoidle 
+> type functionality, which puts the domain to idle once all the clocks on 
+> it are disabled.
+
+I always thought that OMAP clock domains were poorly named. Seems to me
+that they had more to do with the IP/module programming than clocks per
+se.  Again, I'm not sure that putting clkdm data into this binding is
+correct.
+
+Is it because you want a call to clk_enable to program the clock domain
+in the .enable callback? I always thought that this was better left to a
+pm_runtime_get callback...
+
+Regards,
+Mike
+
 > 
-> But I was under the impression that you were arguing that the call
-> to tegra_pcie_disable_msi() should be the first call in .remove()
-> in order to prevent any spurious MSIs from occurring. That in turn
-> would mean calling tegra_pcie_disable_msi() before
-> pci_common_exit(), and that would lead to the problem that I
-> described.
-
-Earlier yes, but perhaps not first. Right now the order is:
-
-1) pci_common_exit
-
-2) unmap some memory, free some buses
-
-3) tear down MSI infra-structure
-
-I suppose if the MSI IRQ handler is guaranteed to never touch the
-stuff torn down by (2) then the code is fine as-is, but it might be
-clearer to do the following instead:
-
-1) pci_common_exit
-
-2) tear down MSI infra-structure (and indeed unregister non-MSI IRQ too)
-
-3) unmap some memory, free some buses
-
-... since then no matter what, no IRQ can be handled before any
-resource is torn down.
-
-also, perhaps when initially responding I missed that
-pci_common_exit() is what forcibly removed all PCIe "client" device
-drivers; in other sub-systems, client devices take refcounts on their
-resources, so the resource can't be .remove()d until all the objects
-referencing them have been manually removed, but PCIe apparently works
-the other way around - removing the controller removes all the users?
+> -Tero
+> 
+> > I'm not sure how easy it would be to use that information for power
+> > management. I don't know what the kernel logic for clock domain power
+> > management needs to know about consumers of the clocks and how it would
+> > need to poke those consumers.
+> 
+> >
+> > Cheers,
+> > Mark.
+> >
