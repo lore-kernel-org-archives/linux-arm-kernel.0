@@ -1,96 +1,133 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 19 Aug 2013 14:36:24 -0500
-Subject: [PATCH v5 2/3] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <52122FF5.7000802@samsung.com>
-References: <1376049119-12655-1-git-send-email-m.szyprowski@samsung.com>
- <1376049119-12655-3-git-send-email-m.szyprowski@samsung.com>
- <CAL_JsqJLv-dUb=64vP+OeP8=Usw7=r6RKqJAXCSPryCFGZ89_w@mail.gmail.com>
- <52089E23.1090406@samsung.com>
- <CAL_JsqJR_mdCiA8knd3COuZ=DcpuAtdzsCy8tAPMSMq67m=SAw@mail.gmail.com>
- <52122FF5.7000802@samsung.com>
-Message-ID: <CAL_JsqLGFkU-5vmsiQ8Z9UfZk5SwHf0VY_dc25DkjO0BGuA24A@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 19 Aug 2013 12:41:32 -0700
+Subject: [PATCH RFC 1/2] clk: Provide not locked variant of
+ of_clk_get_from_provider()
+In-Reply-To: <1376066046-16037-2-git-send-email-s.nawrocki@samsung.com>
+References: <1376066046-16037-1-git-send-email-s.nawrocki@samsung.com>
+ <1376066046-16037-2-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <20130819194132.4443.4807@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 9:47 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
->
-> On 8/13/2013 3:00 PM, Rob Herring wrote:
->>
->> On Mon, Aug 12, 2013 at 3:34 AM, Marek Szyprowski
->> <m.szyprowski@samsung.com> wrote:
->> > Hello,
->> >
->> >
->> > On 8/10/2013 7:33 PM, Rob Herring wrote:
+Quoting Sylwester Nawrocki (2013-08-09 09:34:05)
+> Add helper functions for the of_clk_providers list locking and
+> an unlocked variant of of_clk_get_from_provider().
+> These functions are intended to be used in the clkdev to avoid
+> race condition in the device tree based clock look up in clk_get().
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-[snip]
+Looks good to me.
 
->> > early_init_dt_scan_memory() is also called from of_scan_flat_dt() and
->> > it also implements similar state machine to parse fdt. The only
->> > difference is the fact that "memory" is a direct child of root node,
->> > so the state machine is much simpler (there is no need to parse
->> > /memory/reserved-memory path).
->> >
->>
->> If you have already found the memory node, then why find it again? I
->> don't think the existing scan functions handle anything but top-level
->> nodes very well. So doing something like this from
->> early_init_dt_scan_memory() is what I was thinking. It is a very rough
->> sketch:
->>
->> // find the reserved-memory node
->> for (ndepth = 0, off = fdt_next_node(blob, parent_offset, &ndepth);
->>      (off >= 0) && (ndepth > 0);
->>      off = fdt_next_node(blob, off, &ndepth)) {
->>      if (ndepth == 1) {
->>          name = fdt_get_name(blob, off, 0), off);
->>          if (strcmp(name, "reserved-memory") == 0) {
->>               parent_offset = off;
->>               break; // found
->>      }
->> }
->>
->> // find the child nodes
->> for (ndepth = 0, off = fdt_next_node(blob, parent_offset, &ndepth);
->>      (off >= 0) && (ndepth == 1);
->>      off = fdt_next_node(blob, off, &ndepth)) {
->>      // now handle each child
->> }
->>
->> These could probably be further refined with some loop iterator macros.
->
->
-> The above code looks pretty nice, but there are some problems with it:
->
-> 1. Although it would look nice to call it from early_init_dt_scan_memory()
-> it won't be possible, because that time it is too early. memblock structures
-> are initialized after a call to early_init_dt_scan_memory() and until that
-> no changes to memory layout are easily possible.
+Russell,
 
-Okay. So the reserved areas have to be setup after memblock_add is
-called. It seems that what exactly early_init_dt_add_memory_arch does
-varies by arch. For example, arm64 directly does a memblock_add call
-and would probably work as I suggested. The arm code just puts the
-information in an intermediate arch specific struct until later. There
-is a lot of room for clean-up in the early DT code to reduce the
-amount of arch code.
+Any objections?
 
-> 2. Currently there are no fdt parsing functions in the kernel. I've tried
-> to split of_scan_flat_dt() into fdt_next_node() + fdt_get_name() and use
-> them both in of_scan_flat_dt() and above reserved memory parsing functions.
-> In the end I got quite a lot of code, which is still quite hard to follow.
->
-> Because of the above I decided to resurrect of_scan_flat_dt_by_path()
-> function from the previous version and use #size-cells/#address-cells
-> attributes from root node what in the end simplified reserved memory
-> parsing function. I hope that it can be accepted after such changes
-> without introducing a burden caused by the whole infrastructure for
-> manual parsing fdt.
+Regards,
+Mike
 
-This all looks fine at first glance.
-
-Rob
+> ---
+>  drivers/clk/clk.c   |   36 ++++++++++++++++++++++++++++--------
+>  include/linux/clk.h |    3 +++
+>  2 files changed, 31 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 0d4c982..8b8c152 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2143,7 +2143,18 @@ static const struct of_device_id __clk_of_table_sentinel
+>         __used __section(__clk_of_table_end);
+>  
+>  static LIST_HEAD(of_clk_providers);
+> -static DEFINE_MUTEX(of_clk_lock);
+> +static DEFINE_MUTEX(of_clk_mutex);
+> +
+> +/* of_clk_provider list locking helpers */
+> +void of_clk_lock(void)
+> +{
+> +       mutex_lock(&of_clk_mutex);
+> +}
+> +
+> +void of_clk_unlock(void)
+> +{
+> +       mutex_unlock(&of_clk_mutex);
+> +}
+>  
+>  struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
+>                                      void *data)
+> @@ -2187,9 +2198,9 @@ int of_clk_add_provider(struct device_node *np,
+>         cp->data = data;
+>         cp->get = clk_src_get;
+>  
+> -       mutex_lock(&of_clk_lock);
+> +       mutex_lock(&of_clk_mutex);
+>         list_add(&cp->link, &of_clk_providers);
+> -       mutex_unlock(&of_clk_lock);
+> +       mutex_unlock(&of_clk_mutex);
+>         pr_info("Added clock from %s\n", np->full_name);
+>  
+>         return 0;
+> @@ -2204,7 +2215,7 @@ void of_clk_del_provider(struct device_node *np)
+>  {
+>         struct of_clk_provider *cp;
+>  
+> -       mutex_lock(&of_clk_lock);
+> +       mutex_lock(&of_clk_mutex);
+>         list_for_each_entry(cp, &of_clk_providers, link) {
+>                 if (cp->node == np) {
+>                         list_del(&cp->link);
+> @@ -2213,24 +2224,33 @@ void of_clk_del_provider(struct device_node *np)
+>                         break;
+>                 }
+>         }
+> -       mutex_unlock(&of_clk_lock);
+> +       mutex_unlock(&of_clk_mutex);
+>  }
+>  EXPORT_SYMBOL_GPL(of_clk_del_provider);
+>  
+> -struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
+> +struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec)
+>  {
+>         struct of_clk_provider *provider;
+>         struct clk *clk = ERR_PTR(-ENOENT);
+>  
+>         /* Check if we have such a provider in our array */
+> -       mutex_lock(&of_clk_lock);
+>         list_for_each_entry(provider, &of_clk_providers, link) {
+>                 if (provider->node == clkspec->np)
+>                         clk = provider->get(clkspec, provider->data);
+>                 if (!IS_ERR(clk))
+>                         break;
+>         }
+> -       mutex_unlock(&of_clk_lock);
+> +
+> +       return clk;
+> +}
+> +
+> +struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
+> +{
+> +       struct clk *clk;
+> +
+> +       mutex_lock(&of_clk_mutex);
+> +       clk = __of_clk_get_from_provider(clkspec);
+> +       mutex_unlock(&of_clk_mutex);
+>  
+>         return clk;
+>  }
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 9a6d045..ea6822e 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -368,6 +368,9 @@ struct of_phandle_args;
+>  struct clk *of_clk_get(struct device_node *np, int index);
+>  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+>  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+> +struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec);
+> +void of_clk_lock(void);
+> +void of_clk_unlock(void);
+>  #else
+>  static inline struct clk *of_clk_get(struct device_node *np, int index)
+>  {
+> -- 
+> 1.7.9.5
