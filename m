@@ -1,22 +1,66 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 19 Aug 2013 10:10:05 +0530
-Subject: [PATCH 13/34] cpufreq: exynos5440: set CPUFREQ_NO_NOTIFICATION
- flag
-In-Reply-To: <CADGdYn4frwbpjn94XE_G7pz0D=dcMG8_9zyqUsvKrVtQnphM5Q@mail.gmail.com>
-References: <cover.1376619363.git.viresh.kumar@linaro.org>
- <14993d27bdc6a91eced0af5eb96bdb5ca6546cbf.1376619363.git.viresh.kumar@linaro.org>
- <CADGdYn6TKURuO8jxL=tjvSLbmpUoUwoa08MZhsBAiEF91FM-cA@mail.gmail.com>
- <CADGdYn4frwbpjn94XE_G7pz0D=dcMG8_9zyqUsvKrVtQnphM5Q@mail.gmail.com>
-Message-ID: <CAKohpon2UZbsZiq4r0r67FwJ+VtzCoM3=naH8qPR-PFaUGbycQ@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 19 Aug 2013 09:52:23 +0530
+Subject: [PATCHv2 0/2] dma: mv_xor: big endian support
+In-Reply-To: <20130815180044.224b14ea@skate>
+References: <1375112534-748-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130815180044.224b14ea@skate>
+Message-ID: <20130819042223.GQ32147@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 August 2013 09:12, amit daniel kachhap <amit.daniel@samsung.com> wrote:
->>> +       .flags          = CPUFREQ_STICKY | CPUFREQ_NO_NOTIFICATION,
-> How about naming the flag as CPUFREQ_ASYNC_NOTIFICATION? For platforms
-> not defining this flag, the notifiers can be called synchronously from
-> the core driver.
+On Thu, Aug 15, 2013 at 06:00:44PM +0200, Thomas Petazzoni wrote:
+> Vinod, Dan,
+> 
+> I've sent the below two patches about three weeks ago, and they haven't
+> received any comments. They are relatively simple, so would it be
+> possible to queue them for 3.12 ?
+> 
+> Jason, Andrew, Gregory, as the Marvell EBU maintainers, it would be
+> great if you could give your Acked-by and/or Tested-by on those patches.
+> 
+> Thanks!
+> 
+> Thomas
+> 
+> On Mon, 29 Jul 2013 17:42:12 +0200, Thomas Petazzoni wrote:
+> > Vinod, Dan,
+> > 
+> > This small set of patches adds support for big endian operation in the
+> > DMA mv_xor driver. It has been tested in both little-endian and
+> > big-endian modes on the Armada XP GP board.
+> > 
+> > If possible, I'd like those to be merged for 3.12.
+These look fine to me.
 
-Nice.. +1
+Dan let me know if you okay with me to carry these
 
-My repo will be updated with this change..
+~Vinod
+
+> > 
+> > Changes since v1:
+> >  * Use readl_relaxed() and writel_relaxed() instead of readl/writel
+> >    when converting from raw_readl/raw_writel, since they preserve the
+> >    same barrier behavior. Suggested by Russell King.
+> > 
+> > Thanks!
+> > 
+> > Thomas
+> > 
+> > Thomas Petazzoni (2):
+> >   mv_xor: use {readl,writel}_relaxed instead of __raw_{readl,writel}
+> >   mv_xor: support big endian systems using descriptor swap feature
+> > 
+> >  drivers/dma/mv_xor.c | 47 +++++++++++++++++++++++++++--------------------
+> >  drivers/dma/mv_xor.h | 28 +++++++++++++++++++++++++++-
+> >  2 files changed, 54 insertions(+), 21 deletions(-)
+> > 
+> 
+> 
+> 
+> -- 
+> Thomas Petazzoni, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+
+-- 
