@@ -1,56 +1,27 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 19 Aug 2013 13:11:26 +0530
-Subject: [GIT PULL] DaVinci fixes for v3.11
-In-Reply-To: <5211C957.4090902@ti.com>
-References: <5211C957.4090902@ti.com>
-Message-ID: <5211CC26.7050702@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Aug 2013 09:44:25 +0200
+Subject: [RFC v1 5/5] ARM: mvebu: add board init for Armada 1500
+In-Reply-To: <52115262.70402@gmail.com>
+References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201308172108.38824.arnd@arndb.de> <52115262.70402@gmail.com>
+Message-ID: <201308190944.26177.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixing the LAKML address this time.
+On Monday 19 August 2013, Sebastian Hesselbarth wrote:
+> > Note that we should really change the common code to do both the of_clk_init()
+> > and the l2x0_of_init() automatically, but that needs to be done with some care,
+> > in order to not break any of the existing platforms. Would you be able to do
+> > one of the two? We can then get the next person that wants to add a platform
+> > to do the last one ;-)
+> 
+> Scary but that reduces armada-1500.c to MACH descriptor and DT
+> compatible only ;) I don't expect any weird hacks required for
+> it anyway.
 
-Thanks,
-Sekhar
+You will need the .smp_ops pointer once you add SMP support. Other than that,
+if your machine descriptor only has the pointer to the compatible strings,
+you can actually build without a machine descriptor (as we do on arm64).
+The string is used only in /proc/cpuinfo then.
 
-On 8/19/2013 12:59 PM, Sekhar Nori wrote:
-> Hi Kevin, Arnd, Olof,
-> 
-> Can you please pull this fix for v3.11? The commit has been marked
-> for inclusion in -stable kernel too.
-> 
-> Thanks,
-> Sekhar
-> 
-> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
-> 
->   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.11
-> 
-> for you to fetch changes up to de30e316d38b0837fe4c09b43f1b52c8e230c44e:
-> 
->   ARM: davinci: nand: specify ecc strength (2013-08-16 15:12:20 +0530)
-> 
-> ----------------------------------------------------------------
-> This pull request includes a patch for
-> making NAND flash work on multiple DaVinci
-> boards. The NAND probe was failing because
-> ecc strength was not specified while using
-> hardware ecc algorithm.
-> 
-> ----------------------------------------------------------------
-> Sekhar Nori (1):
->       ARM: davinci: nand: specify ecc strength
-> 
->  arch/arm/mach-davinci/board-dm355-leopard.c |    1 +
->  arch/arm/mach-davinci/board-dm644x-evm.c    |    1 +
->  arch/arm/mach-davinci/board-dm646x-evm.c    |    1 +
->  arch/arm/mach-davinci/board-neuros-osd2.c   |    1 +
->  4 files changed, 4 insertions(+)
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
-> 
+	Arnd
