@@ -1,52 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 19 Aug 2013 22:54:35 +0200
-Subject: [GIT PULL] ux500 core changes for v3.12
-Message-ID: <CACRpkdbRaV9_oCNKXh2O2JR6pyvz6+5c4=pxYCFhT6-KzbqyMg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 19 Aug 2013 13:54:42 -0700
+Subject: Build error: kvm/reset.c
+In-Reply-To: <20130815114150.GC23006@n2100.arm.linux.org.uk>
+References: <20130815114150.GC23006@n2100.arm.linux.org.uk>
+Message-ID: <20130819205442.GC21832@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On Thu, Aug 15, 2013 at 12:41:50PM +0100, Russell King - ARM Linux wrote:
+> Last night's omap4430-sdp randconfig failed with this error in the KVM code:
+> 
+> arch/arm/kvm/reset.c:43:2: error: unknown field 'irq' specified in initializer
+> 
+> Configs etc at http://www.arm.linux.org.uk/developer/build/
+> 
+> Tree is my tip plus arm-soc tip plus Linus' tip.
 
-here are some smallish ux500 core changes for the v3.12
-cycle. Basically just three random patches. The big thing is
-that we can now restart the ux500 with software.
 
-Please pull these in!
+hmmm, I'm wondering if this is actually related to:
+http://gcc.gnu.org/bugzilla/show_bug.cgi?id=10676
 
-Yours,
-Linus Walleij
+Can you tell me which GCC version you are using?
 
-The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+I have been unable to reproduce this in any way (unfortunately it seems
+the randconfig generating this error is also not available anymore), but
+this patch may solve the issue:
 
-  Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+index b7840e7..71e08ba 100644
+--- a/arch/arm/kvm/reset.c
++++ b/arch/arm/kvm/reset.c
+@@ -40,7 +40,7 @@ static struct kvm_regs a15_regs_reset = {
+ };
+ 
+ static const struct kvm_irq_level a15_vtimer_irq = {
+-	.irq = 27,
++	{ .irq = 27 },
+ 	.level = 1,
+ };
+ 
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-core-for-arm-soc
-
-for you to fetch changes up to 0a429fd15ecb05d7d5fa8eb4adaff69c7a00984b:
-
-  ARM: ux500: set coherent_dma_mask for dma40 (2013-08-19 22:49:25 +0200)
-
-----------------------------------------------------------------
-Core ux500 changes for v3.12:
-- Add support for restart using the PRCMU
-- Move secondary startup out of INIT section
-- set coherent_dma_mask for DMA40
-
-----------------------------------------------------------------
-Fabio Baltieri (2):
-      ARM: ux500: add restart support via prcmu
-      ARM: ux500: set coherent_dma_mask for dma40
-
-Srinivas Kandagatla (1):
-      ARM: ux500: remove u8500_secondary_startup from INIT section.
-
- arch/arm/mach-ux500/board-mop500.c   | 5 ++++-
- arch/arm/mach-ux500/cpu-db8500.c     | 2 +-
- arch/arm/mach-ux500/cpu.c            | 8 ++++++++
- arch/arm/mach-ux500/devices-db8500.c | 1 +
- arch/arm/mach-ux500/headsmp.S        | 2 --
- arch/arm/mach-ux500/setup.h          | 3 +++
- 6 files changed, 17 insertions(+), 4 deletions(-)
+-Christoffer
