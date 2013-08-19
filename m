@@ -1,33 +1,110 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 19 Aug 2013 18:45:02 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MiAyLzddIHBpbmN0cmw6IGlteDI3OiBpbXgyNyBwaW5j?=
- =?UTF-8?B?b250cm9sIGRyaXZlcg==?=
-In-Reply-To: <1376921234-26682-3-git-send-email-mpa@pengutronix.de>
-References: <1376921234-26682-1-git-send-email-mpa@pengutronix.de>
- <1376921234-26682-3-git-send-email-mpa@pengutronix.de>
-Message-ID: <1376923502.112235348@f25.i.mail.ru>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 19 Aug 2013 15:45:37 +0100
+Subject: [PATCH v3 1/2] rtc: omap: update of_device_id to reflect
+ latest ip revisions
+In-Reply-To: <520E6B9E.5080706@baylibre.com>
+References: <1376653017-21935-1-git-send-email-gururaja.hebbar@ti.com>
+ <1376653017-21935-2-git-send-email-gururaja.hebbar@ti.com>
+ <520E341D.4080206@baylibre.com>
+ <20130816172022.GA3719@e106331-lin.cambridge.arm.com>
+ <520E6B9E.5080706@baylibre.com>
+Message-ID: <20130819144537.GQ3719@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> imx27 pincontrol driver using the imx1 core driver. The DT bindings are
-> similar to other imx pincontrol drivers.
+On Fri, Aug 16, 2013 at 07:12:46PM +0100, Benoit Cousson wrote:
+> Hi Mark,
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
-[...]
-> diff --git a/drivers/pinctrl/pinctrl-imx27.c b/drivers/pinctrl/pinctrl-imx27.c
-[...]
-> +	MX27_PAD_ATA_DATA15 = PAD_ID(PF, 23),
-> +	MX27_PAD_UNUSED15 = PAD_ID(PF, 24),
-> +	MX27_PAD_UNUSED16 = PAD_ID(PF, 25),
-> +	MX27_PAD_UNUSED17 = PAD_ID(PF, 26),
-> +	MX27_PAD_UNUSED18 = PAD_ID(PF, 27),
-> +	MX27_PAD_UNUSED19 = PAD_ID(PF, 28),
-> +	MX27_PAD_UNUSED20 = PAD_ID(PF, 29),
-> +	MX27_PAD_UNUSED21 = PAD_ID(PF, 30),
-> +	MX27_PAD_UNUSED22 = PAD_ID(PF, 31),
+> On 16/08/2013 19:20, Mark Rutland wrote:
+> > Hi Benoit,
+> >
+> > On Fri, Aug 16, 2013 at 03:15:57PM +0100, Benoit Cousson wrote:
+> >> Hi Gururaja,
+> >>
+> >> On 16/08/2013 13:36, Hebbar, Gururaja wrote:
+> >>> The syntax of compatible property in DT is to mention the Most specific
+> >>> match to most generic match.
+> >>>
+> >>> Since AM335x is the platform with latest IP revision, add it 1st in
+> >>> the device id table.
+> >>
+> >> I don't understand why? The order should not matter at all.
+> >>
+> >> I've tried to follow the thread you had with Mark on the v2, but AFAIK,
+> >> you've never answered to his latest question.
+> >>
+> >> Moreover, checking the differences between the Davinci and the am3352
+> >> RTC IP, I would not claim that both are compatible.
+> >>
+> >> Sure you can use the am3352 with the Davinci driver, but you will lose
+> >> the wakeup functionality without even being notify about that.
+> >
+> > Could you describe the wakeup functionality, and how it differs between
+> > the am3352-rtc and the da830-rtc?
+> 
+> AFAIK, da830-rtc does not have that functionality at all. This is 
+> something that was added to the am3352-rtc.
 
-No PF24-PF31 pads in CPU.
-Is it worth it to have these definitions?
+Ok. So the am3352-rtc can be driven with the full functionality of the
+da830-rtc (ie. it's compatible with the da830-rtc programming model), or
+it can be driven as an am3352-rtc, for the OS to gain wakeup
+functionality in addition to the da830-rtc features. :)
 
----
+> 
+> > As I understand it, the am3352 functionality is a superset of the da830
+> > functionality. You can use the old driver, and get some functionality,
+> > or use the new driver and get it all.
+> 
+> Mmm, what your are saying now seems to make sense to me as well. So I'm 
+> even more confused :-)
+
+I'll convince you yet :)
+
+> 
+> > That means that am3352-rtc is compatible with da830. As long as the
+> > kernel first checks for am3352-rtc, there will be *no* loss of
+> > functionality. All this does is enable older kernels to use the hardware
+> > in some fashion, and given the older kernel didn't have support for the
+> > am3352-rtc features, this is a *gain* in functionality, not a loss.
+> >
+> >>
+> >> For my point of view, compatible mean that the HW will still be fully
+> >> functional with both versions of the driver, which is not the case here.
+> >
+> > What? A driver for any entry in the compatible list should be able to
+> > drive the hardware to *some* level of functionality. We list from
+> > most-specific to most-general to allow a graceful degradation from fully
+> > supported to bare minimum functionality.
+> 
+> OK, but where is it written in the DT spec that this is what the 
+> compatible is supposed to mean?
+> 
+> I'm quoting it again:
+> "
+> The compatible property value consists of one or more strings that 
+> define the specific programming model for the device. This list of 
+> strings should be used by a client program for device driver selection. 
+> The property value consists of a concatenated list of null terminated
+> strings, from most specific to most general. They allow a device to 
+> express its compatibility with a family of similar devices, potentially 
+> allowing a single device driver to match against several devices.
+> "
+> 
+> The graceful degradation or the loss of functionality is not something 
+> that I really understand in that text.
+
+I think it's implicit in the example that follows, where a failure to
+match against a specific device results in the OS falling back to a
+"more general" device. The "more general" device may not have all the
+features of a more specific device (conversely, the more general device
+may have more optional features that a more specific device is known not
+to implement).
+
+> 
+> Anyway, I'm probably too tired... I'll go back home, and think about 
+> that after the week-end.
+
+Ok, let me know what you think. :)
+
+Thanks,
+Mark.
