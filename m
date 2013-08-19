@@ -1,86 +1,102 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Mon, 19 Aug 2013 11:46:57 +0530
-Subject: [PATCH V2 01/35] cpufreq: Implement light weight ->target_index()
- routine
-In-Reply-To: <CAKohpokeJZq5Y9PpQCiEqVFqZq0U266rqLEQeEh4ZszWEM6_XA@mail.gmail.com>
-References: <cover.1376392602.git.viresh.kumar@linaro.org>
- <eb988fc9e72b90b7ba99f16405f5dcb072da7840.1376392602.git.viresh.kumar@linaro.org>
- <CADGdYn4=si46x7b5Qa0EJ1vUDKrP3maXBqWwQ6s7gkep-8MxFg@mail.gmail.com>
- <CAKohpokeJZq5Y9PpQCiEqVFqZq0U266rqLEQeEh4ZszWEM6_XA@mail.gmail.com>
-Message-ID: <CADGdYn4LoFEfZTd2bT=iGKRb5M=7CfpG-suxf3L-V5HXH7QuPQ@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 19 Aug 2013 11:05:11 +0530
+Subject: [PATCH v2 2/2] dmaengine: Add hisilicon k3 DMA engine driver
+In-Reply-To: <CAMj5Bki0H+=0wQY39+jDw4nAEq5wEq3V3yri9xpNRxQ2GRwPbA@mail.gmail.com>
+References: <1372423153-6742-1-git-send-email-zhangfei.gao@linaro.org>
+ <1372423153-6742-3-git-send-email-zhangfei.gao@linaro.org>
+ <20130813112043.GB32147@intel.com>
+ <CAMj5Bki0H+=0wQY39+jDw4nAEq5wEq3V3yri9xpNRxQ2GRwPbA@mail.gmail.com>
+Message-ID: <20130819053511.GU32147@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 10:07 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Hi Amit,
->
-> Thanks for your feedback :)
->
-> On 18 August 2013 16:11, amit daniel kachhap <amit.daniel@samsung.com> wrote:
->> This new API is fine but I have another idea.
->
-> good.
->
->> Say During the registration of the frequency table cpufreq_policy can
->> be registered as SCALE_DIRECT or SCALE_STEPS. With SCALE_DIRECT flag,
->> valid frequency will be requested. With this flags the governor itself
->> can  can figure out if frequency scaling is required or not and very
->> few calls to __cpufreq_driver_target will happen.
->
-> Honestly speaking I couldn't get what your idea is :) ... but governor is
-> in no position to make this direct call to drivers.. Taking such stuff to
-> governors will replicate this code again.. Its better all governors call
-> some common part of cpufreq.c which then decides what to do..
-I meant that something like 2 policies can be registered SCALE_DIRECT/STEPS.
-if SCALE_DIRECT is registered than target will be called with exact
-frequency. SCALE_STEPS will behave as currently happening. This way
-target_index api may not be needed. But looks like Rafael and others
-are fine with your approach so you can ignore this :)
->
->> But i agree that in this approach cpufreq_frequency_table_target is
->> still required but again it can be optimized by binary search as
->> currently the search is linear.
->
-> Frequencies in this table aren't required to be in ascending order :)
-OK right. Actually I had thought only about the case when opp library
-is used to create the cpufreq table and then it creates the table in
-ascending order. Anyways not all platform uses opp libraries so it is
-not generic enough.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Thu, Aug 15, 2013 at 01:54:28PM +0800, zhangfei gao wrote:
+> On Tue, Aug 13, 2013 at 7:20 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> > On Fri, Jun 28, 2013 at 08:39:13PM +0800, Zhangfei Gao wrote:
+> >> Add dmaengine driver for hisilicon k3 platform based on virt_dma
+> >>
+> >> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> >> Tested-by: Kai Yang <jean.yangkai@huawei.com>
+> >> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> >> ---
+> >
+> >> +#define DRIVER_NAME          "k3-dma"
+> >> +#define DMA_ALIGN            3
+> >> +#define DMA_MAX_SIZE         0x1ffc
+> >> +
+> >> +#define INT_STAT             0x00
+> >> +#define INT_TC1                      0x04
+> >> +#define INT_ERR1             0x0c
+> >> +#define INT_ERR2             0x10
+> >> +#define INT_TC1_MASK         0x18
+> >> +#define INT_ERR1_MASK                0x20
+> >> +#define INT_ERR2_MASK                0x24
+> >> +#define INT_TC1_RAW          0x600
+> >> +#define INT_ERR1_RAW         0x608
+> >> +#define INT_ERR2_RAW         0x610
+> >> +#define CH_PRI                       0x688
+> >> +#define CH_STAT                      0x690
+> >> +#define CX_CUR_CNT           0x704
+> >> +#define CX_LLI                       0x800
+> >> +#define CX_CNT                       0x810
+> >> +#define CX_SRC                       0x814
+> >> +#define CX_DST                       0x818
+> >> +#define CX_CONFIG            0x81c
+> >> +#define AXI_CONFIG           0x820
+> >> +#define DEF_AXI_CONFIG               0x201201
+> >> +
+> >> +#define CX_LLI_CHAIN_EN              0x2
+> >> +#define CCFG_EN                      0x1
+> >> +#define CCFG_MEM2PER         (0x1 << 2)
+> >> +#define CCFG_PER2MEM         (0x2 << 2)
+> >> +#define CCFG_SRCINCR         (0x1 << 31)
+> >> +#define CCFG_DSTINCR         (0x1 << 30)
+> > I see these are not namespace aptly and can collide..
+> OK,
+> How about change name to
+> #define CX_CFG                 0x81c
+since you are calling your driver K3_DMA it would be apt to namespace all of the
+above with K3_INT_STAT to K3_CFG_EN and so on...
 
+> 
+> #define CX_CFG_EN              0x1
+> #define CX_CFG_MEM2PER         (0x1 << 2)
+> ~
+> 
+> >> +             switch (width) {
+> >> +             case DMA_SLAVE_BUSWIDTH_1_BYTE:
+> >> +                     val = 0;
+> >> +                     break;
+> >> +             case DMA_SLAVE_BUSWIDTH_2_BYTES:
+> >> +                     val = 1;
+> >> +                     break;
+> >> +             case DMA_SLAVE_BUSWIDTH_4_BYTES:
+> >> +                     val = 2;
+> >> +                     break;
+> >> +             case DMA_SLAVE_BUSWIDTH_8_BYTES:
+> >> +                     val = 3;
+> > DMA_SLAVE_BUSWIDTHS are 1, 2, 4, 8...
+> > so if you can do val = ffs(width) as well?
+> 
+> Good idea, will use __ffs(width) here.
+> 
+> >
+> >
+> >> +     case DMA_PAUSE:
+> >> +             dev_dbg(d->slave.dev, "vchan %p: pause\n", &c->vc);
+> >> +             if (c->status == DMA_IN_PROGRESS) {
+> >> +                     c->status = DMA_PAUSED;
+> >> +                     if (p) {
+> >> +                             k3_dma_pause_dma(p, false);
+> >> +                     } else {
+> >> +                             spin_lock(&d->lock);
+> >> +                             list_del_init(&c->node);
+> >> +                             spin_unlock(&d->lock);
+> >> +                     }
+> > why do we need the else part here?
+> Since asynchronous mode is supported.
+> Desc is submitted to list but may not get physical channel to run.
+But when you pause you pause the running channel. You dont pause a descriptor.
+So whatever you are trying to imply doesnt make sense to me.
 
-On Mon, Aug 19, 2013 at 10:07 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Hi Amit,
->
-> Thanks for your feedback :)
->
-> On 18 August 2013 16:11, amit daniel kachhap <amit.daniel@samsung.com> wrote:
->> This new API is fine but I have another idea.
->
-> good.
->
->> Say During the registration of the frequency table cpufreq_policy can
->> be registered as SCALE_DIRECT or SCALE_STEPS. With SCALE_DIRECT flag,
->> valid frequency will be requested. With this flags the governor itself
->> can  can figure out if frequency scaling is required or not and very
->> few calls to __cpufreq_driver_target will happen.
->
-> Honestly speaking I couldn't get what your idea is :) ... but governor is
-> in no position to make this direct call to drivers.. Taking such stuff to
-> governors will replicate this code again.. Its better all governors call
-> some common part of cpufreq.c which then decides what to do..
->
->> But i agree that in this approach cpufreq_frequency_table_target is
->> still required but again it can be optimized by binary search as
->> currently the search is linear.
->
-> Frequencies in this table aren't required to be in ascending order :)
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+~Vinod
