@@ -1,65 +1,75 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 19 Aug 2013 21:53:17 +0800
-Subject: [PATCH] ARM: dts: imx6sl reuses imx6q sdma firmware
-In-Reply-To: <20130819123541-7656@mutt-kz>
-References: <1376903386-27771-1-git-send-email-shawn.guo@linaro.org>
- <20130819123541-7656@mutt-kz>
-Message-ID: <20130819135315.GA28297@S2101-09.ap.freescale.net>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 19 Aug 2013 16:54:28 +0300
+Subject: [PATCHv5 22/31] CLK: TI: add interface clock support for OMAP3
+In-Reply-To: <20130813113010.GN27165@e106331-lin.cambridge.arm.com>
+References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
+ <1375460751-23676-23-git-send-email-t-kristo@ti.com>
+ <20130813113010.GN27165@e106331-lin.cambridge.arm.com>
+Message-ID: <52122394.9040904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 02:35:42PM +0200, Luka Perkov wrote:
-> Hi Shawn,
-> 
-> On Mon, Aug 19, 2013 at 05:09:46PM +0800, Shawn Guo wrote:
-> > There is no imx6sl specific sdma firmware.  Instead, imx6sl reuses
-> > imx6q sdma firmware.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/imx6sl.dtsi |    3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> > index c46651e..9fec772 100644
-> > --- a/arch/arm/boot/dts/imx6sl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> > @@ -619,7 +619,8 @@
-> >  					 <&clks IMX6SL_CLK_SDMA>;
-> >  				clock-names = "ipg", "ahb";
-> >  				#dma-cells = <3>;
-> > -				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6sl.bin";
-> > +				/* imx6sl reuses imx6q sdma firmware */
-> > +				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
-> 
-> As you may have noticed my patch changes both imx6sl.dtsi and
-> imx6qdl.dtsi because of the naming convention used in other sdma
-> firmwares:
+On 08/13/2013 02:30 PM, Mark Rutland wrote:
+> On Fri, Aug 02, 2013 at 05:25:41PM +0100, Tero Kristo wrote:
+>> OMAP3 has interface clocks in addition to functional clocks, which
+>> require special handling for the autoidle and idle status register
+>> offsets mainly.
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> ---
+>>   .../devicetree/bindings/clock/ti/interface.txt     |   45 +++++++++
+>>   arch/arm/mach-omap2/clock.h                        |    6 --
+>>   drivers/clk/ti/Makefile                            |    2 +-
+>>   drivers/clk/ti/interface.c                         |  105 ++++++++++++++++++++
+>>   include/linux/clk/ti.h                             |    7 ++
+>>   5 files changed, 158 insertions(+), 7 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/clock/ti/interface.txt
+>>   create mode 100644 drivers/clk/ti/interface.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/ti/interface.txt b/Documentation/devicetree/bindings/clock/ti/interface.txt
+>> new file mode 100644
+>> index 0000000..8b09ae7
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/ti/interface.txt
+>> @@ -0,0 +1,45 @@
+>> +Binding for Texas Instruments interface clock.
+>> +
+>> +This binding uses the common clock binding[1]. This clock is
+>> +quite much similar to the basic gate-clock [2], however,
+>> +it supports a number of additional features, including
+>> +companion clock finding (match corresponding functional gate
+>> +clock) and hardware autoidle enable / disable.
+>> +
+>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +[2] Documentation/devicetree/bindings/clock/gate-clock.txt
+>> +
+>> +Required properties:
+>> +- compatible : shall be "ti,interface-clock"
+>
+> It might make sense to be more specific: "ti,omap3-interface-clock".
 
-The convention is to use SoC name to specify the firmware for particular
-SoC.  imx6 is not a SoC name.  Sure, sdma-imx6sl.bin is incorrect since
-there is no imx6sl specific sdma firmware.  Instead, it reuses imx6q
-one.
+Ok.
 
-> 
-> $ fgrep sdma-ram-script-name arch/arm/boot
-> arch/arm/boot/dts/imx6qdl.dtsi:				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
-> arch/arm/boot/dts/imx6sl.dtsi:				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6sl.bin";
-> arch/arm/boot/dts/imx51.dtsi:				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
-> arch/arm/boot/dts/imx53.dtsi:				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
-> 
-> Also, last patch containing sdma firmware blobs sent to the mailing list
-> [1] uses "sdma-imx6.bin" name.
+>
+>> +- #clock-cells : from common clock binding; shall be set to 0
+>> +- clocks : link to phandle of parent clock
+>> +- reg : base address for the control register
+>> +
+>> +Optional properties:
+>> +- ti,enable-bit : bit shift for the bit enabling/disabling the clock
+>> +		  (default 0)
+>> +- ti,iclk-no-wait : flag for selecting non-waiting hw-ops
+>> +- ti,iclk-hsotgusb : flag for selecting hsotgusb hw-ops
+>> +- ti,iclk-dss : flag for selecting DSS interface clock hw-ops
+>> +- ti,iclk-ssi : flag for selecting SSI interface clock hw-ops
+>> +- ti,am35xx-clk : flag for selecting AM35xx interface clock hw-ops
+>
+> I think these should be selected based on the compatible string. They're
+> mutually exclusive, and incompatible.
 
-The patch never got merged.  I do not like the name, simply because imx6
-is not a SoC name.
+Ok, I'll change this for next rev so that each has its own compatible 
+string.
 
-> That is why I think patch I have sent
-> recently [2] is more appropriate. Don't you think so?
+Thanks for your comments Mark.
 
-No, I do not think so, and that's why I sent my version with you on Cc.
-
-Shawn
-
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/143025.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/191108.html
+-Tero
