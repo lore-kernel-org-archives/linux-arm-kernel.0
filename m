@@ -1,92 +1,108 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 20 Aug 2013 00:02:37 +0200
-Subject: [PATCH v6 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <521292E0.105@wwwdotorg.org>
-References: <1376924669-28873-1-git-send-email-m.szyprowski@samsung.com>
- <1376924669-28873-4-git-send-email-m.szyprowski@samsung.com>
- <521292E0.105@wwwdotorg.org>
-Message-ID: <98354044.bRIxVeGEeu@flatron>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 20 Aug 2013 00:04:17 +0200
+Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
+In-Reply-To: <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
+References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
+ <CACxGe6uNJNMdZ1HYGgCtLM2t2TWGCR6btjOHVmP=vDXXvvFfRg@mail.gmail.com>
+ <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
+Message-ID: <344239800.bDEkDg48ZQ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Linus,
 
-On Monday 19 of August 2013 15:49:20 Stephen Warren wrote:
-> On 08/19/2013 09:04 AM, Marek Szyprowski wrote:
-> > This patch adds device tree support for contiguous and reserved memory
-> > regions defined in device tree.
+On Wednesday 31 July 2013 01:44:53 Linus Walleij wrote:
+> On Tue, Jul 30, 2013 at 6:30 AM, Grant Likely wrote:
+> > On Mon, Jul 29, 2013 at 6:36 AM, Linus Walleij wrote:
+> >> To solve this dilemma, perform an interrupt consistency check
+> >> when adding a GPIO chip: if the chip is both gpio-controller and
+> >> interrupt-controller, walk all children of the device tree,
+> >> check if these in turn reference the interrupt-controller, and
+> >> if they do, loop over the interrupts used by that child and
+> >> perform gpio_reques() and gpio_direction_input() on these,
+> >> making them unreachable from the GPIO side.
 > > 
-> > diff --git a/Documentation/devicetree/bindings/memory.txt
-> > b/Documentation/devicetree/bindings/memory.txt
+> > Ugh, that's pretty awful, and it doesn't actually solve the root
+> > problem of the GPIO and IRQ subsystems not cooperating. It's also a
+> > very DT-centric solution even though we're going to see the exact same
+> > issue on ACPI machines.
+> 
+> The problem is that the patches for OMAP that I applied and now have had to
+> revert solves it in an even uglier way, leading to breaking boards, as was
+> noticed.
+> 
+> The approach in this patch has the potential to actually work without
+> regressing a bunch of boards...
+> 
+> Whether this is a problem in ACPI or not remains to be seen, but I'm not
+> sure about that. Device trees allows for a GPIO line to be used as an
+> interrupt source and GPIO line orthogonally, and that is the root of this
+> problem. Does ACPI have the same problem, or does it impose natural
+> restrictions on such use cases?
+> 
+> > We have to solve the problem in a better way than that. Rearranging
+> > your patch description, here are some of the points you brought up so
+> > I can comment on them...
 > > 
-> > +*** Reserved memory regions ***
-> > +
-> > +In /memory/reserved-memory node one can create additional nodes
+> >> This has the following undesired effects:
+> >> 
+> >> - The GPIOlib subsystem is not aware that the line is in use
+> >>   and willingly lets some other consumer perform gpio_request()
+> >>   on it, leading to a complex resource conflict if it occurs.
+> > 
+> > If a gpio line is being both requested as a gpio and used as an
+> > interrupt line, then either a) it's a bug, or b) the gpio line needs
+> > to be used as input only so it is compatible with irq usage. b) should
+> > be supportable.
 > 
-> s/additional/child/ or s/additional/sub/ would make it clearer where the
-> "additional" nodes should be placed.
+> Yes this is what I'm saying too I think...
 > 
-> > +compatible:	"linux,contiguous-memory-region" - enables binding 
-of
-> > this
-> > +		region to Contiguous Memory Allocator (special region for
-> > +		contiguous memory allocations, shared with movable system
-> > +		memory, Linux kernel-specific), alternatively if
-> > +		"reserved-memory-region" - compatibility is defined, given
-> > +		region is assigned for exclusive usage for by the 
-respective
-> > +		devices
+> The bug in (a) manifested itself in the OMAP patch with no real solution in
+> sight.
 > 
-> "alternatively" makes it sound like the two compatible values are
-> mutually-exclusive. Perhaps make this a list, like:
+> >> - The GPIO debugfs file claims this GPIO line is "free".
+> > 
+> > Surely we can fix this. I still don't see a problem of having the
+> > controller request the gpio when it is claimed as an irq if we can get
+> > around the problem of another user performing a /valid/ request on the
+> > same GPIO line. The solution may be to have a special form of request
+> > or flag that allows it to be shared.
 > 
-> ----------
-> compatible: One or more of:
-> 
-> 	- "linux,contiguous-memory-region" - enables binding of this
-> 	  region to Contiguous Memory Allocator (special region for
-> 	  contiguous memory allocations, shared with movable system
-> 	  memory, Linux kernel-specific).
-> 	- "reserved-memory-region" - compatibility is defined, given
-> 	  region is assigned for exclusive usage for by the respective
-> 	  devices.
-> ----------
-> 
-> "linux,contiguous-memory-region" is already long enough, but I'd
-> slightly bikeshed towards "linux,contiguous-memory-allocator-region", or
-> perhaps "linux,cma-region" since it's not really describing whether the
-> memory is contiguous (at the level of /memory, each chunk of memory is
-> contiguous...)
+> I don't see how sharing works here, or how another user, i.e. another one
+> than the user wanting to recieve the IRQ, can validly request such a line?
+> What would the usecase for that valid request be?
 
-I'm not really sure if we need the "linux" prefix for "contiguous-memory-
-region". The concept of contiguous memory region is rather OS independent 
-and tells us that memory allocated from this region will be contiguous. 
-IMHO any OS is free to implement its own contiguous memory allocation 
-method, without being limited to Linux CMA.
+When the GPIO is wired to a status signal (such as an MMC card detect signal) 
+the driver might want to read the state of the signal independently of the 
+interrupt handler.
 
-Keep in mind that rationale behind those contiguous regions was that there 
-are devices that require buffers contiguous in memory to operate 
-correctly.
-
-But this is just nitpicking and I don't really have any strong opinion on 
-this.
-
-> > +*** Device node's properties ***
-> > +
-> > +Once regions in the /memory/reserved-memory node have been defined,
-> > they +can be assigned to device nodes to enable respective device
-> > drivers to +access them. The following properties are defined:
-> > +
-> > +memory-region = <&phandle_to_defined_region>;
+> Basically I believe these two things need to be exclusive in the DT world:
 > 
-> I think the naming of that property should more obviously match this
-> binding and/or compatible value; perhaps cma-region or
-> contiguous-memory-region?
+> A: request_irq(a resource passed from "interrupts");
+>      -> core implicitly performs gpio_request()
+>          gpio_direction_input()
+> 
+> B: gpio_request(a resource passed from "gpios");
+>      gpio_direction_input()
+>      request_irq(gpio_to_irq())
+> 
+> Never both. And IIUC that was what happened in the OMAP case.
 
-This property is not CMA-specific. Any memory region can be given using 
-the memory-region property and used to allocate buffers for particular 
-device.
+Isn't the core issue that we can translate a GPIO number to an IRQ number, but 
+not the other way around ? If that could be done, we could request the GPIO 
+and configure it as an input when the IRQ is requested.
 
-Best regards,
-Tomasz
+> >> - The line direction of the interrupt GPIO line is not
+> >> 
+> >>   explicitly set as input, even though it is obvious that such
+> >>   a line need to be set up in this way, often making the system
+> >>   depend on boot-on defaults for this kind of settings.
+> > 
+> > Should also be solvable if the gpio request problem is solved.
+> 
+> Agreed...
+
+-- 
+Regards,
+
+Laurent Pinchart
