@@ -1,113 +1,109 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 19 Aug 2013 12:47:37 -0500
-Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <5211E3F6.6090108@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <5211E3F6.6090108@ti.com>
-Message-ID: <52125A39.3010008@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Aug 2013 19:47:43 +0200
+Subject: [RFC v1 5/5] ARM: mvebu: add board init for Armada 1500
+In-Reply-To: <5212312A.20401@gmail.com>
+References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201308172108.38824.arnd@arndb.de> <5212312A.20401@gmail.com>
+Message-ID: <201308191947.43960.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2013 04:23 AM, Gururaja Hebbar wrote:
-> On 8/6/2013 11:19 PM, Dave Gerlach wrote:
->> Hi,
->>
->> This is the third version of the patch series for adding basic suspend-resume
->> support for AM33XX, previously submitted by Vaibhav Bedia. This patchset
->> is based on 3.11-rc4 and depends on a forthcoming patchset from Suman Anna
->> that adds mailbox support for the wkup_m3. The patches at [1], [2], and [3] are
->> required for the pm code to properly suspend and resume.
->>
->> The PM code uses the firmware interface and expects the userspace to load
->> the WKUP_M3 binary before the suspend-resume functionality is made available.
->> The binary file (and the source-code for WKUP_M3) can be obtained from the
->> 'next2' branch at [4]. The WKUP_M3 binary can either be loaded post bootup
->> via the sysfs entry './sys/devices/ocp.2/wkup_m3.4/firmware' or it can be
->> included in the kernel image as part of the build process.
->>
->> Suspend to mem is tested on am335x-bone and am335x-evm.
->>
->> More details on AM335x suspend-resume are provided within the commit logs
->> for each patch.
+On Monday 19 August 2013, Sebastian Hesselbarth wrote:
+> On 08/17/13 21:08, Arnd Bergmann wrote:
+> > On Friday 16 August 2013, Jason Cooper wrote:
 >
-> can you share the working repo which has all these patches applied?
+> > You should really try to find out what driver uses this. If you have a requirement
+> > that VIRT == PHYS here, the most likely explanation is that some driver accidentally
+> > uses readl/writel on the physical address rather than on the result of ioremap.
+> >
+> > You can try shrinking the area using bisection until you have found the offending
+> > driver based on the address.
+> 
+> I just removed the above and it still works. Must have been a placebo
+> for me to believe it made it working.
+
+Ah, good.
+
+> >>> +static void __init armada_1500_timer_and_clk_init(void)
+> >>> +{
+> >>> +	of_clk_init(NULL);
+> >>> +	clocksource_of_init();
+> >>> +}
+> >>> +
+> >>> +static void __init armada_1500_dt_init(void)
+> >>> +{
+> >>> +	l2x0_of_init(0x70c00000, 0xfeffffff);
+> >
+> > New platforms should call this as 'l2x0_of_init(0, 0);' and get the bits from DT.
+> 
+> Is there any work on "get the bits from DT" already? I looked in
+> arm-soc/for-next and for-next but couldn't find any parsing of
+> aux_*.
+
+Have a look at the pl310_of_setup() and aurora_of_setup() functions, they parse
+the available properties and edit the mask. You might have to add further properties
+in the same way.
+
+> > Note that we should really change the common code to do both the of_clk_init()
+> > and the l2x0_of_init() automatically, but that needs to be done with some care,
+> > in order to not break any of the existing platforms. Would you be able to do
+> > one of the two? We can then get the next person that wants to add a platform
+> > to do the last one ;-)
+> 
+> Haven't had a look at cache init, but of_clk_init(NULL). Since most
+> platforms need clocks prior timer, I guess any initcall is too late?
+
+Right.
+
+> Below init sequence guessing may be wrong, but that is what I read
+> from init/main.c and arm arch init.
+> 
+> Looking through arch/ there is arc, arm, arm64, and metag using
+> of_clk_init(NULL).
+> 
+> arch/arc/plat-tb10x and arch/arm64 call it right before
+> of_platform_populate which is after time_init() and too late for
+> us, arch/metag calls it within time_init().
+> 
+> On arch/arm of_clk_init(NULL) is heavily spread among mach- subdirs
+> with exynos, highbank, imx (all sub-machs), mvebu, nspire, rockchip,
+> sti, and vexpress calling it in .init_time; tegra calls it even
+> earlier in .init_irq, socfpga in .init_machine. With latest clocksource
+> driver for Orion, -dove, -orion5x, and -mv78xx0, will also need clocks
+> prior timer.
 >
-> Thanks & Regards
-> Gururaja
->
+> If we are going for an arch/arm specific call to of_clk_init(NULL),
+> we could also call it from time_init(); after asking the tegra guys
+> about the specific requirement to have them (and the drivers using
+> it) ready before timers have been initialized.
+> 
+> For the transition period, we should add a static bool to of_clk_init
+> to WARN_ON double registration attempts.
+> 
+> I could prepare some patches to convert existing arch/arm users to
+> get some noise on the corresponding mailing lists. Maybe one of the
+> tegra guys is also reading this and can comment on .init_irq before.
 
-The working repo for this version of the patch series can be found here:
+Sounds good. I think it can easily be done in a way that it's harmless
+to call it multiple times with a NULL argument, which would take care
+of platforms that might need it to be called earlier.
 
-git://github.com/dgerlach/linux-pm.git am335x-3.11rc4-suspend-resume
+I've gone over the platforms with Mark Rutland before and we found
+four other platforms that need a little work before the conversion
+can work:
 
-Regards,
-Dave
+* arch/arm/mach-highbank/highbank.c needs to map sregs_base before
+  calling of_clk_init().
 
->>
->> Changes in v3:
->> - Moved wkup_m3 code into separate driver
->> - Split up ti_emif header move
->> - Addressed clean-up comments
->> - Removed mailbox patches
->> - v2-v3 Discussion:
->> http://marc.info/?l=linux-arm-kernel&m=135698501821090&w=4
->>
->> Changes in v2:
->> - Broke patches up to isolate assembly code and build hookup.
->> - Moved control module code to separate module
->> - v1->v2 Discussion:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/129508.html
->>
->> Regards,
->> Dave
->>
->> [1] http://marc.info/?l=linux-arm-kernel&m=137303736714638&w=4
->> [2] http://marc.info/?l=linux-omap&m=137303723114610&w=4
->> [3] http://marc.info/?l=linux-omap&m=137401384611934&w=4
->> [4] http://arago-project.org/git/projects/?p=am33x-cm3.git;a=shortlog;h=refs/heads/next2
->>
->>
->> Dave Gerlach (1):
->>    memory: emif: Move EMIF register defines to include/linux/
->>
->> Vaibhav Bedia (8):
->>    ARM: OMAP2+: AM33XX: control: Add some control module registers and
->>      APIs
->>    ARM: OMAP: DTB: Update IRQ data for WKUP_M3
->>    ARM: OMAP2+: AM33XX: Reserve memory to comply with EMIF spec
->>    ARM: OMAP2+: AM33XX: Add assembly code for PM operations
->>    ARM: OMAP2+: timer: Add suspend-resume callbacks for clkevent device
->>    ARM: OMAP: omap_device: Add APIs to enable and idle hwmods
->>    ARM: OMAP2+: AM33XX: Basic suspend resume support
->>    ARM: OMAP2+: AM33XX: Hookup AM33XX PM code into OMAP builds
->>
->>   arch/arm/boot/dts/am33xx.dtsi       |    1 +
->>   arch/arm/mach-omap2/Kconfig         |    7 +-
->>   arch/arm/mach-omap2/Makefile        |    2 +
->>   arch/arm/mach-omap2/board-generic.c |    3 +-
->>   arch/arm/mach-omap2/common.c        |   28 ++
->>   arch/arm/mach-omap2/common.h        |   14 +
->>   arch/arm/mach-omap2/control.c       |   57 ++++
->>   arch/arm/mach-omap2/control.h       |   54 ++++
->>   arch/arm/mach-omap2/io.c            |    6 +
->>   arch/arm/mach-omap2/omap_device.c   |    8 +
->>   arch/arm/mach-omap2/omap_device.h   |    2 +
->>   arch/arm/mach-omap2/pm.c            |    3 +-
->>   arch/arm/mach-omap2/pm.h            |    5 +
->>   arch/arm/mach-omap2/pm33xx.c        |  474 +++++++++++++++++++++++++++++
->>   arch/arm/mach-omap2/pm33xx.h        |   77 +++++
->>   arch/arm/mach-omap2/sleep33xx.S     |  350 ++++++++++++++++++++++
->>   arch/arm/mach-omap2/sram.c          |   10 +-
->>   arch/arm/mach-omap2/sram.h          |    2 +
->>   arch/arm/mach-omap2/timer.c         |   32 ++
->>   arch/arm/mach-omap2/wkup_m3.c       |  183 ++++++++++++
->>   drivers/memory/emif.h               |  543 +---------------------------------
->>   include/linux/ti_emif.h             |  558 +++++++++++++++++++++++++++++++++++
->>   22 files changed, 1872 insertions(+), 547 deletions(-)
->>   create mode 100644 arch/arm/mach-omap2/pm33xx.c
->>   create mode 100644 arch/arm/mach-omap2/pm33xx.h
->>   create mode 100644 arch/arm/mach-omap2/sleep33xx.S
->>   create mode 100644 arch/arm/mach-omap2/wkup_m3.c
->>   create mode 100644 include/linux/ti_emif.h
->>
->
+* Similar code in drivers/clk/clk-vt8500.c and drivers/clk/zynq/clkc.c
+
+* arch/arm/mach-imx/clk-imx51-imx53.c has a lot of interdependencies
+  with other code.
+
+One could either change those to not depend on a pointer outside of
+the driver, which would be the cleaner approach but possibly more
+work, or they could be changed back to using a non-NULL argument,
+at least as an intermediate step, so calling of_clk_init(NULL) won't
+actually initialize these.
+
+	Arnd
