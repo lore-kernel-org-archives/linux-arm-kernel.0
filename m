@@ -1,110 +1,109 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 19 Aug 2013 16:36:15 +0800
-Subject: [PATCH] dma: mxs-dma: remove code left from generic DMA binding
- conversion
-In-Reply-To: <1373966926-13809-1-git-send-email-shawn.guo@linaro.org>
-References: <1373966926-13809-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130819083613.GB26883@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Aug 2013 10:46:13 +0200
+Subject: [RFC v1 4/5] ARM: mvebu: add Armada 1500 and Sony NSZ-GS7 device
+ tree files
+In-Reply-To: <521154A9.3000505@gmail.com>
+References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201308172128.35245.arnd@arndb.de> <521154A9.3000505@gmail.com>
+Message-ID: <201308191046.13504.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 05:28:46PM +0800, Shawn Guo wrote:
-> With all mxs-dma clients moved to use generic DMA helper, the code
-> left from generic DMA binding conversion can be removed now.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+On Monday 19 August 2013, Sebastian Hesselbarth wrote:
+> On 08/17/2013 09:28 PM, Arnd Bergmann wrote:
+> > On Friday 16 August 2013, Sebastian Hesselbarth wrote:
 
-Vinod,
-
-Can you please queue this patch for 3.12?
-
-Shawn
-
-> ---
->  drivers/dma/mxs-dma.c       |   23 -----------------------
->  include/linux/fsl/mxs-dma.h |   20 --------------------
->  2 files changed, 43 deletions(-)
->  delete mode 100644 include/linux/fsl/mxs-dma.h
+> > This seems like a strange combination. I would have expected either PJ4+Aurora+apbtimer
+> > or A9+pl310+localtimer, based on what I found in the chromecast kernel source.
+> > Do you have more information here about what is used on the two variants?
 > 
-> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> index 7195930..099be73 100644
-> --- a/drivers/dma/mxs-dma.c
-> +++ b/drivers/dma/mxs-dma.c
-> @@ -23,7 +23,6 @@
->  #include <linux/dmaengine.h>
->  #include <linux/delay.h>
->  #include <linux/module.h>
-> -#include <linux/fsl/mxs-dma.h>
->  #include <linux/stmp_device.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> @@ -197,24 +196,6 @@ static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
->  	return container_of(chan, struct mxs_dma_chan, chan);
->  }
->  
-> -int mxs_dma_is_apbh(struct dma_chan *chan)
-> -{
-> -	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
-> -	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> -
-> -	return dma_is_apbh(mxs_dma);
-> -}
-> -EXPORT_SYMBOL_GPL(mxs_dma_is_apbh);
-> -
-> -int mxs_dma_is_apbx(struct dma_chan *chan)
-> -{
-> -	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
-> -	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> -
-> -	return !dma_is_apbh(mxs_dma);
-> -}
-> -EXPORT_SYMBOL_GPL(mxs_dma_is_apbx);
-> -
->  static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
->  {
->  	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> @@ -349,13 +330,9 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
->  static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
->  {
->  	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
-> -	struct mxs_dma_data *data = chan->private;
->  	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
->  	int ret;
->  
-> -	if (data)
-> -		mxs_chan->chan_irq = data->chan_irq;
-> -
->  	mxs_chan->ccw = dma_alloc_coherent(mxs_dma->dma_device.dev,
->  				CCW_BLOCK_SIZE, &mxs_chan->ccw_phys,
->  				GFP_KERNEL);
-> diff --git a/include/linux/fsl/mxs-dma.h b/include/linux/fsl/mxs-dma.h
-> deleted file mode 100644
-> index 55d8702..0000000
-> --- a/include/linux/fsl/mxs-dma.h
-> +++ /dev/null
-> @@ -1,20 +0,0 @@
-> -/*
-> - * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> -
-> -#ifndef __MACH_MXS_DMA_H__
-> -#define __MACH_MXS_DMA_H__
-> -
-> -#include <linux/dmaengine.h>
-> -
-> -struct mxs_dma_data {
-> -	int chan_irq;
-> -};
-> -
-> -extern int mxs_dma_is_apbh(struct dma_chan *chan);
-> -extern int mxs_dma_is_apbx(struct dma_chan *chan);
-> -#endif /* __MACH_MXS_DMA_H__ */
-> -- 
-> 1.7.9.5
+> I have no clue, what combination it really is. Unfortunately,
+> Marvell didn't release any open datasheets, of course.
 > 
+> I can only look at GPL'd Asus Cube kernel, I used for getting an idea
+> of what was required for initial support and reg offsets, irqs and
+> friends. They bring up twd as localtimer. Also, grep'ing the Cube
+> kernel sources in mach-mv88de3100 gives hits for CONFIG_PJ4 (note the
+> missing B), l2x0, smp_twd, apb_timer.
 > 
+> No hits for pl310, A9.
+
+I found this snippet in Kconfig for the Chromecast:
+
+config ARCH_MV88DE3100_BG2
+        bool "BG2 family"
+        help
+          Support for Marvell BG2 processors, based on the Marvell
+          PJ4B CPU and the Marvell TAUROS3 L2 cache controller, or
+          the ARM CortexA9 CPU and the ARM PL310 L2 cache controller
+
+config ARCH_MV88DE3100_BG3
+        bool "BG3 family"
+        help
+          Support for Marvell BG3 processors, based on the ARM
+          CortexA9MP CPU and the ARM PL310 L2 cache controller
+
+
+A9 will always work when CPU_V7 is set, it doesn't have a Kconfig option.
+When CPU_PJ4 is set, it will work on both. Regarding the other options,
+this is what I found from the defconfigs in chromecast:
+
+$ git grep LOCAL_TIMER arch/arm/configs/*mv88*
+arch/arm/configs/mv88de3100_ax_android_defconfig:CONFIG_LOCAL_TIMERS=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2:CONFIG_LOCAL_TIMERS=y
+arch/arm/configs/mv88de3100_ax_emmc_android_defconfig:CONFIG_LOCAL_TIMERS=y
+arch/arm/configs/mv88de3100_ax_linux_defconfig:CONFIG_LOCAL_TIMERS=y
+
+$ git grep CONFIG_SMP= arch/arm/configs/*mv88*
+arch/arm/configs/mv88de3100_ax_android_defconfig:CONFIG_SMP=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2:CONFIG_SMP=y
+arch/arm/configs/mv88de3100_ax_emmc_android_defconfig:CONFIG_SMP=y
+arch/arm/configs/mv88de3100_ax_linux_defconfig:CONFIG_SMP=y
+
+$ git grep CPU_PJ4 arch/arm/configs/*mv88*
+arch/arm/configs/eureka_mv88de31xx_defconfig:CONFIG_CPU_PJ4=y
+arch/arm/configs/mv88de3100_ax_android_defconfig:CONFIG_CPU_PJ4=y
+arch/arm/configs/mv88de3100_ax_bg2a0_rdkdmp_dongle_defconfig:CONFIG_CPU_PJ4=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2:CONFIG_CPU_PJ4=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2cd_dmp:CONFIG_CPU_PJ4=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2cd_dmp_nol2:CONFIG_CPU_PJ4=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2cd_dngle_256:CONFIG_CPU_PJ4=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2cd_dngle_nol2:CONFIG_CPU_PJ4=y
+arch/arm/configs/mv88de3100_ax_emmc_android_defconfig:CONFIG_CPU_PJ4=y
+arch/arm/configs/mv88de3100_ax_linux_defconfig:CONFIG_CPU_PJ4=y
+
+$ git grep CACHE_TAUROS3= arch/arm/configs/*mv88*
+arch/arm/configs/eureka_mv88de31xx_defconfig:CONFIG_CACHE_TAUROS3=y
+arch/arm/configs/mv88de3100_ax_android_defconfig:CONFIG_CACHE_TAUROS3=y
+arch/arm/configs/mv88de3100_ax_bg2a0_rdkdmp_dongle_defconfig:CONFIG_CACHE_TAUROS3=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2:CONFIG_CACHE_TAUROS3=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2cd_dmp:CONFIG_CACHE_TAUROS3=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2cd_dngle_256:CONFIG_CACHE_TAUROS3=y
+arch/arm/configs/mv88de3100_ax_emmc_android_defconfig:CONFIG_CACHE_TAUROS3=y
+arch/arm/configs/mv88de3100_ax_linux_defconfig:CONFIG_CACHE_TAUROS3=y
+
+$ git grep CACHE_PL310 arch/arm/configs/*mv88*
+arch/arm/configs/eureka_mv88de30xx_defconfig:CONFIG_CACHE_PL310=y
+
+$ git grep L2X arch/arm/configs/*mv88*
+arch/arm/configs/eureka_mv88de30xx_defconfig:CONFIG_CACHE_L2X0=y
+
+$ git grep MV88DE3100_BG....= arch/arm/configs/*mv88*
+arch/arm/configs/eureka_mv88de30xx_defconfig:CONFIG_MV88DE3100_BG2_CD=y
+arch/arm/configs/eureka_mv88de31xx_defconfig:CONFIG_MV88DE3100_BG2_A0=y
+arch/arm/configs/mv88de3100_ax_android_defconfig:CONFIG_MV88DE3100_BG2_A0=y
+arch/arm/configs/mv88de3100_ax_bg2a0_rdkdmp_dongle_defconfig:CONFIG_MV88DE3100_BG2_A0=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2:CONFIG_MV88DE3100_BG2_A0=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2cd_dmp:CONFIG_MV88DE3100_BG2_A0=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2cd_dmp_nol2:CONFIG_MV88DE3100_BG2_A0=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2cd_dngle_256:CONFIG_MV88DE3100_BG2_A0=y
+arch/arm/configs/mv88de3100_ax_defconfig.bg2cd_dngle_nol2:CONFIG_MV88DE3100_BG2_A0=y
+arch/arm/configs/mv88de3100_ax_emmc_android_defconfig:CONFIG_MV88DE3100_BG2_A0=y
+arch/arm/configs/mv88de3100_ax_linux_defconfig:CONFIG_MV88DE3100_BG2_A0=y
+
+Evidently, the only defconfig that is for Cortex-A9 is eureka_mv88de30xx_defconfig,
+which is used on the Chromecast and has version MV88DE3100_BG2_CD (presumably
+renamed to product number de3005). LOCAL_TIMER is used exactly on those that have
+SMP support here, which makes sense.
+
+	Arnd
