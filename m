@@ -1,68 +1,35 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 19 Aug 2013 13:37:46 +0300
-Subject: [PATCH v4 7/8] ARM: dts: omap4: update omap-control-usb nodes
-In-Reply-To: <1376908667-14974-1-git-send-email-rogerq@ti.com>
-References: <1376908667-14974-1-git-send-email-rogerq@ti.com>
-Message-ID: <1376908667-14974-8-git-send-email-rogerq@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 Aug 2013 13:02:44 +0200
+Subject: [PATCH v7] ARM: sunxi: New watchdog driver for Allwinner A10/A13
+In-Reply-To: <1375212046-12823-1-git-send-email-carlo.caione@gmail.com>
+References: <1375212046-12823-1-git-send-email-carlo.caione@gmail.com>
+Message-ID: <20130819110244.GH3173@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split otghs_ctrl and USB2 PHY power down into separate
-omap-control-usb nodes. Get rid of "ti,type" property.
+Hi Wim,
 
-Also get rid of "ti,has-mailbox" property from usb_otg_hs
-node and provide the ctrl-module phandle.
+On Tue, Jul 30, 2013 at 09:20:46PM +0200, Carlo Caione wrote:
+> This patch adds the driver for the watchdog found in the Allwinner A10 and
+> A13 SoCs. It has DT-support and uses the new watchdog framework.
+> 
+> Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-CC: Benoit Cousson <bcousson@baylibre.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/boot/dts/omap4.dtsi |   20 ++++++++++++--------
- 1 files changed, 12 insertions(+), 8 deletions(-)
+It would be great if this patch could come in 3.12. Do you have any
+additional comments?
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 22d9f2b..a77dd0a 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -519,7 +519,7 @@
- 			usb2_phy: usb2phy at 4a0ad080 {
- 				compatible = "ti,omap-usb2";
- 				reg = <0x4a0ad080 0x58>;
--				ctrl-module = <&omap_control_usb>;
-+				ctrl-module = <&omap_control_usb2phy>;
- 			};
- 		};
- 
-@@ -643,12 +643,16 @@
- 			};
- 		};
- 
--		omap_control_usb: omap-control-usb at 4a002300 {
--			compatible = "ti,omap-control-usb";
--			reg = <0x4a002300 0x4>,
--			      <0x4a00233c 0x4>;
--			reg-names = "control_dev_conf", "otghs_control";
--			ti,type = <1>;
-+		omap_control_usb2phy: omap-control-usb at 4a002300 {
-+			compatible = "ti,usb2-control-usb";
-+			reg = <0x4a002300 0x4>;
-+			reg-names = "power";
-+		};
-+
-+		omap_control_usbotg: omap-control-usb at 4a00233c {
-+			compatible = "ti,omap4-control-usb";
-+			reg = <0x4a00233c 0x4>;
-+			reg-names = "otghs_control";
- 		};
- 
- 		usb_otg_hs: usb_otg_hs at 4a0ab000 {
-@@ -661,7 +665,7 @@
- 			multipoint = <1>;
- 			num-eps = <16>;
- 			ram-bits = <12>;
--			ti,has-mailbox;
-+			ctrl-module = <&omap_control_usbotg>;
- 		};
- 	};
- };
+Thanks,
+Maxime
+
 -- 
-1.7.4.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130819/3739385c/attachment.sig>
