@@ -1,26 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Aug 2013 09:58:17 +0100
-Subject: [PATCH] mmc: sdhci: request irq after sdhci_init() is called
-In-Reply-To: <20130819083357.GA26883@S2101-09.ap.freescale.net>
-References: <1373006335-31239-1-git-send-email-shawn.guo@linaro.org>
- <20130819083357.GA26883@S2101-09.ap.freescale.net>
-Message-ID: <20130819085817.GR23006@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 19 Aug 2013 17:09:46 +0800
+Subject: [PATCH] ARM: dts: imx6sl reuses imx6q sdma firmware
+Message-ID: <1376903386-27771-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 04:33:59PM +0800, Shawn Guo wrote:
-> Hi Chris,
-> 
-> Can you please queue this patch for 3.12?
+There is no imx6sl specific sdma firmware.  Instead, imx6sl reuses
+imx6q sdma firmware.
 
-I already reported this months ago - it's caused because the SDHCI
-initialization code is broken.  It plays at separating out the
-"alloc+init" from the "add" but doesn't get it right, because it does
-a whole swathe of initialisation at the "add" stage.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx6sl.dtsi |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-This pretty much makes it impossible to use the generic GPIO slot detect
-stuff with SDHCI, and why I have no motivation what so ever to convert
-the dove sdhci support over to the generic GPIO stuff.
-
-SDHCI basically needs its initialisation stuff rewritten to conform to
-the "get everything initialised at alloc time" approach.
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index c46651e..9fec772 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -619,7 +619,8 @@
+ 					 <&clks IMX6SL_CLK_SDMA>;
+ 				clock-names = "ipg", "ahb";
+ 				#dma-cells = <3>;
+-				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6sl.bin";
++				/* imx6sl reuses imx6q sdma firmware */
++				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
+ 			};
+ 
+ 			pxp: pxp at 020f0000 {
+-- 
+1.7.9.5
