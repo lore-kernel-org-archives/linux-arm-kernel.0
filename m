@@ -1,138 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Aug 2013 16:17:30 -0600
-Subject: [PATCH v6 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <98354044.bRIxVeGEeu@flatron>
-References: <1376924669-28873-1-git-send-email-m.szyprowski@samsung.com>
- <1376924669-28873-4-git-send-email-m.szyprowski@samsung.com>
- <521292E0.105@wwwdotorg.org> <98354044.bRIxVeGEeu@flatron>
-Message-ID: <5212997A.5060206@wwwdotorg.org>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Mon, 19 Aug 2013 17:23:40 -0500
+Subject: [PATCH] dma: imx-sdma: Add ROM script addresses to driver
+In-Reply-To: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
+References: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <CAHCPf3t1_5zhSOrfVFHgeVPa25sT+ewv1=OZA8X4_YZXb9cSeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2013 04:02 PM, Tomasz Figa wrote:
-> Hi Stephen,
-> 
-> On Monday 19 of August 2013 15:49:20 Stephen Warren wrote:
->> On 08/19/2013 09:04 AM, Marek Szyprowski wrote:
->>> This patch adds device tree support for contiguous and reserved memory
->>> regions defined in device tree.
->>>
->>> diff --git a/Documentation/devicetree/bindings/memory.txt
->>> b/Documentation/devicetree/bindings/memory.txt
->>>
->>> +*** Reserved memory regions ***
->>> +
->>> +In /memory/reserved-memory node one can create additional nodes
->>
->> s/additional/child/ or s/additional/sub/ would make it clearer where the
->> "additional" nodes should be placed.
->>
->>> +compatible:	"linux,contiguous-memory-region" - enables binding 
-> of
->>> this
->>> +		region to Contiguous Memory Allocator (special region for
->>> +		contiguous memory allocations, shared with movable system
->>> +		memory, Linux kernel-specific), alternatively if
->>> +		"reserved-memory-region" - compatibility is defined, given
->>> +		region is assigned for exclusive usage for by the 
-> respective
->>> +		devices
->>
->> "alternatively" makes it sound like the two compatible values are
->> mutually-exclusive. Perhaps make this a list, like:
->>
->> ----------
->> compatible: One or more of:
->>
->> 	- "linux,contiguous-memory-region" - enables binding of this
->> 	  region to Contiguous Memory Allocator (special region for
->> 	  contiguous memory allocations, shared with movable system
->> 	  memory, Linux kernel-specific).
->> 	- "reserved-memory-region" - compatibility is defined, given
->> 	  region is assigned for exclusive usage for by the respective
->> 	  devices.
->> ----------
->>
->> "linux,contiguous-memory-region" is already long enough, but I'd
->> slightly bikeshed towards "linux,contiguous-memory-allocator-region", or
->> perhaps "linux,cma-region" since it's not really describing whether the
->> memory is contiguous (at the level of /memory, each chunk of memory is
->> contiguous...)
-> 
-> I'm not really sure if we need the "linux" prefix for "contiguous-memory-
-> region". The concept of contiguous memory region is rather OS independent 
-> and tells us that memory allocated from this region will be contiguous. 
-> IMHO any OS is free to implement its own contiguous memory allocation 
-> method, without being limited to Linux CMA.
-> 
-> Keep in mind that rationale behind those contiguous regions was that there 
-> are devices that require buffers contiguous in memory to operate 
-> correctly.
-> 
-> But this is just nitpicking and I don't really have any strong opinion on 
-> this.
-> 
->>> +*** Device node's properties ***
->>> +
->>> +Once regions in the /memory/reserved-memory node have been defined,
->>> they +can be assigned to device nodes to enable respective device
->>> drivers to +access them. The following properties are defined:
->>> +
->>> +memory-region = <&phandle_to_defined_region>;
->>
->> I think the naming of that property should more obviously match this
->> binding and/or compatible value; perhaps cma-region or
->> contiguous-memory-region?
-> 
-> This property is not CMA-specific. Any memory region can be given using 
-> the memory-region property and used to allocate buffers for particular 
-> device.
+Please could you describe how the compatible property allows matching
+and covers both the ROM version *and* the distributed firmware file
+that is also referenced in the device tree for each sdma node for each
+SoC supported? As far as I recall, the offsets for the (potentially
+buggy) on-chip version and the one in the BSP (and hopefully in
+upstream kernels at some soon-approaching version) are not the same
+for a good swath of these chips.
 
-OK, that makes sense.
+How would the driver hope to match this up without causing some DMA
+explosions and/or invalid device trees if the BSP firmware is
+described, the BSP firmware file is not found, and the driver is left
+with the ROM version?
 
-What I'm looking for is some way to make it obvious that when you see a
-"memory-region" property in a node, you go look at the "memory.txt"
-rather than the DT binding for the node where that property appears.
-Right now, it doesn't seem that obvious to me.
+Ta,
+Matt
 
-I think the real issue here is that my brief reading of memory.txt
-implies that arbitrary device nodes can include the memory-region
-property without the node's own binding having to document it; the
-property name is essentially "forced into" all other bindings.
-
-I think instead, memory.txt should say:
-
-----------
-** Device node's properties ***
-
-Once regions in the /memory/reserved-memory node have been defined, they
-may be referenced by other device nodes. Bindings that wish to reference
-memory regions should explicitly document their use of the following
-property:
-
-memory-region = <&phandle_to_defined_region>;
-
-This property indicates that the device driver should use the memory
-region pointed by the given phandle.
-----------
-
-Also, what if a device needs multiple separate memory regions? Perhaps a
-GPU is forced to allocate displayable surfaces from addresses 0..32M and
-textures/off-screen-render-targets from 256M..384M or something whacky
-like that. In that case, we could either:
-
-a) Adjust memory.txt to allow multiple entries in memory-regions, and
-add an associated memory-region-names property.
-
-or:
-
-b) Adjust memory.txt not to mention any specific property names, but
-simply mention that other DT nodes can refer to define memory regions by
-phandle, and leave it up to individual bindings to define which property
-they use to reference the memory regions, perhaps with memory.txt
-providing a recommendation of memory-region for the simple case, but
-perhaps also allowing a custom case, e.g.:
-
-display-memory-region = <&phandl1e1>;
-texture-memory-region = <&phahndle2>;
+On Mon, Aug 19, 2013 at 7:16 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> The following series adds the ROM script addresses to the driver.
+> These have been provided by platform_data for platform based systems,
+> but with devicetree the driver no longer supports the ROM script
+> addresses. This means that the sdma driver currently needs a firmware
+> to work. By adding the script addresses to the driver it can work
+> without additional firmware.
+>
+> Sascha
+>
+> ----------------------------------------------------------------
+> Sascha Hauer (3):
+>       dma: imx-sdma: Use struct for driver data
+>       dma: imx-sdma: Add ROM script addresses to driver
+>       ARM: i.MX: remove sdma script address arrays from platform data
+>
+>  .../devicetree/bindings/dma/fsl-imx-sdma.txt       |   7 +-
+>  arch/arm/mach-imx/mm-imx25.c                       |  17 --
+>  arch/arm/mach-imx/mm-imx3.c                        |  67 ++----
+>  arch/arm/mach-imx/mm-imx5.c                        |  14 --
+>  drivers/dma/imx-sdma.c                             | 241 ++++++++++++++++++---
+>  5 files changed, 230 insertions(+), 116 deletions(-)
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
