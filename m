@@ -1,68 +1,165 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 19 Aug 2013 16:15:49 +0800
-Subject: [PATCH] pinctrl: sirf: add lost atlas6 uart0-no-stream-control
- pingroup
-Message-ID: <1376900149-27298-1-git-send-email-Baohua.Song@csr.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 19 Aug 2013 16:33:59 +0800
+Subject: [PATCH] mmc: sdhci: request irq after sdhci_init() is called
+In-Reply-To: <1373006335-31239-1-git-send-email-shawn.guo@linaro.org>
+References: <1373006335-31239-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130819083357.GA26883@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Qipan Li <Qipan.Li@csr.com>
+Hi Chris,
 
-the old codes defined uart0_nostreamctrl_pins, but missed pingroup
-and padmux definition for it. this patch fixes it.
+Can you please queue this patch for 3.12?
 
-Signed-off-by: Qipan Li <Qipan.Li@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/boot/dts/atlas6.dtsi         | 6 ++++++
- drivers/pinctrl/sirf/pinctrl-atlas6.c | 4 ++++
- 2 files changed, 10 insertions(+)
+Shawn
 
-diff --git a/arch/arm/boot/dts/atlas6.dtsi b/arch/arm/boot/dts/atlas6.dtsi
-index a0f2721..8678e0c 100644
---- a/arch/arm/boot/dts/atlas6.dtsi
-+++ b/arch/arm/boot/dts/atlas6.dtsi
-@@ -329,6 +329,12 @@
- 						sirf,function = "uart0";
- 					};
- 				};
-+				uart0_noflow_pins_a: uart0 at 1 {
-+					uart {
-+						sirf,pins = "uart0_nostreamctrlgrp";
-+						sirf,function = "uart0_nostreamctrl";
-+					};
-+				};
- 				uart1_pins_a: uart1 at 0 {
- 					uart {
- 						sirf,pins = "uart1grp";
-diff --git a/drivers/pinctrl/sirf/pinctrl-atlas6.c b/drivers/pinctrl/sirf/pinctrl-atlas6.c
-index 867c968..edf45a6 100644
---- a/drivers/pinctrl/sirf/pinctrl-atlas6.c
-+++ b/drivers/pinctrl/sirf/pinctrl-atlas6.c
-@@ -831,6 +831,7 @@ static const struct sirfsoc_pin_group sirfsoc_pin_groups[] = {
- 	SIRFSOC_PIN_GROUP("lcd_24bitsgrp", lcd_24bits_pins),
- 	SIRFSOC_PIN_GROUP("lcdrom_grp", lcdrom_pins),
- 	SIRFSOC_PIN_GROUP("uart0grp", uart0_pins),
-+	SIRFSOC_PIN_GROUP("uart0_nostreamctrlgrp", uart0_nostreamctrl_pins),
- 	SIRFSOC_PIN_GROUP("uart1grp", uart1_pins),
- 	SIRFSOC_PIN_GROUP("uart2grp", uart2_pins),
- 	SIRFSOC_PIN_GROUP("uart2_nostreamctrlgrp", uart2_nostreamctrl_pins),
-@@ -874,6 +875,7 @@ static const char * const lcd_18bitsgrp[] = { "lcd_18bitsgrp" };
- static const char * const lcd_24bitsgrp[] = { "lcd_24bitsgrp" };
- static const char * const lcdromgrp[] = { "lcdromgrp" };
- static const char * const uart0grp[] = { "uart0grp" };
-+static const char * const uart0_nostreamctrlgrp[] = { "uart0_nostreamctrlgrp" };
- static const char * const uart1grp[] = { "uart1grp" };
- static const char * const uart2grp[] = { "uart2grp" };
- static const char * const uart2_nostreamctrlgrp[] = { "uart2_nostreamctrlgrp" };
-@@ -917,6 +919,8 @@ static const struct sirfsoc_pmx_func sirfsoc_pmx_functions[] = {
- 	SIRFSOC_PMX_FUNCTION("lcd_24bits", lcd_24bitsgrp, lcd_24bits_padmux),
- 	SIRFSOC_PMX_FUNCTION("lcdrom", lcdromgrp, lcdrom_padmux),
- 	SIRFSOC_PMX_FUNCTION("uart0", uart0grp, uart0_padmux),
-+	SIRFSOC_PMX_FUNCTION("uart0_nostreamctrl", uart0_nostreamctrlgrp,
-+						uart0_nostreamctrl_padmux),
- 	SIRFSOC_PMX_FUNCTION("uart1", uart1grp, uart1_padmux),
- 	SIRFSOC_PMX_FUNCTION("uart2", uart2grp, uart2_padmux),
- 	SIRFSOC_PMX_FUNCTION("uart2_nostreamctrl", uart2_nostreamctrlgrp, uart2_nostreamctrl_padmux),
--- 
-1.8.2.3
+On Fri, Jul 05, 2013 at 02:38:55PM +0800, Shawn Guo wrote:
+> Generally request_irq() should be called after hardware has been
+> initialized into a sane state.  However, sdhci driver currently calls
+> request_irq() before sdhci_init().  At least, the following kernel panic
+> seen on i.MX6 is caused by that.  The sdhci controller on i.MX6 may have
+> noisy glitch on DAT1 line, which will trigger SDIO interrupt handling
+> once request_irq() is called.  But at this point, the SDIO interrupt
+> handler host->sdio_irq_thread has not been registered yet.  Thus, we
+> see the NULL pointer access with wake_up_process(host->sdio_irq_thread)
+> in mmc_signal_sdio_irq().
+> 
+> sdhci-pltfm: SDHCI platform and OF driver helper
+> mmc0: no vqmmc regulator found
+> mmc0: no vmmc regulator found
+> Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> pgd = 80004000
+> [00000000] *pgd=00000000
+> Internal error: Oops: 5 [#1] SMP ARM
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0+ #3
+> task: 9f860000 ti: 9f862000 task.ti: 9f862000
+> PC is at wake_up_process+0xc/0x44
+> LR is at sdhci_irq+0x378/0x93c
+> pc : [<8004f768>]    lr : [<803fb698>]    psr: 40000193
+> sp : 9f863ba0  ip : 9f863bb8  fp : 9f863bb4
+> r10: 9f807900  r9 : 80761fbc  r8 : 00000000
+> r7 : 00000000  r6 : 00000000  r5 : 00000001  r4 : 9fa68000
+> r3 : 00000001  r2 : 00000002  r1 : 20000193  r0 : 00000000
+> Flags: nZcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+> Control: 10c53c7d  Table: 8000404a  DAC: 00000017
+> Process swapper/0 (pid: 1, stack limit = 0x9f862238)
+> Stack: (0x9f863ba0 to 0x9f864000)
+> 3ba0: 00000001 9fa68000 9f863c04 9f863bb8 803fb698 8004f768 8011af00 80265aac
+> 3bc0: 00000000 000003d9 00000000 9fa51880 00000001 00000000 9f863c14 9fa53640
+> 3be0: 00000001 00000000 00000000 00000036 80761fbc 9f807900 9f863c3c 9f863c08
+> 3c00: 80075154 803fb32c 802c2b38 802c63d8 802c63cc 9f807900 00000001 9f862000
+> 3c20: 00000036 00000000 9f807930 60000113 9f863c54 9f863c40 800752ec 8007510c
+> 3c40: 9f807900 00000001 9f863c6c 9f863c58 80078324 800752a8 00000036 8071fd64
+> 3c60: 9f863c84 9f863c70 80074ac0 80078294 00000140 8072ab78 9f863cac 9f863c88
+> 3c80: 8000ee34 80074aa4 00000000 a080e10c 8072acbc 9f863cd0 a080e100 00000036
+> 3ca0: 9f863ccc 9f863cb0 80008600 8000edec 805386a8 60000113 ffffffff 9f863d04
+> 3cc0: 9f863d24 9f863cd0 8000e0c0 800085dc 9f807950 60000113 00000007 00000000
+> 3ce0: 9f807900 9fa53640 9f807950 9fa68240 00000036 9f807930 60000113 9f863d24
+> 3d00: 9f863d28 9f863d18 80076834 805386a8 60000113 ffffffff 9f863d64 9f863d28
+> 3d20: 80076834 80538688 00000000 800bfe4c 00002fac 00000001 9f863d54 9fa53640
+> 3d40: 9f807900 803fb320 9fa68240 00000080 00000000 00000036 9f863d94 9f863d68
+> 3d60: 80076b38 80076674 00000080 9fa68240 9fa68000 04000000 9fa6836c 9fa68380
+> 3d80: 806d620c 80700350 9f863dc4 9f863d98 803fce8c 80076a88 9fa532c0 9fa68240
+> 3da0: 9fa51490 9fa51490 9fa68240 00000000 9f8ae600 9f81d080 9f863df4 9f863dc8
+> 3dc0: 803fea0c 803fc808 9f863de4 9f863dd8 80125850 807b1ed8 807576b8 9f8ae610
+> 3de0: 00000000 807576b8 9f863e04 9f863df8 802ee0d4 803fe798 9f863e2c 9f863e08
+> 3e00: 802ecd1c 802ee0c0 00000000 9f8ae610 807576b8 9f8ae644 00000000 000000a9
+> 3e20: 9f863e4c 9f863e30 802ecec0 802ecc30 9f83355c 807576b8 802ece2c 00000000
+> 3e40: 9f863e74 9f863e50 802eb3d8 802ece38 9f83355c 9f8ac3b4 9f833570 807576b8
+> 3e60: 80746e70 9fa51400 9f863e84 9f863e78 802ec838 802eb388 9f863eb4 9f863e88
+> 3e80: 802ec3d0 802ec824 80692748 807620c0 9f863eb4 807576b8 00000006 807620c0
+> 3ea0: 00000000 000000a9 9f863edc 9f863eb8 802ed3e8 802ec2fc 9f862000 00000006
+> 3ec0: 807620c0 00000000 000000a9 80700350 9f863eec 9f863ee0 802ee2f8 802ed374
+> 3ee0: 9f863efc 9f863ef0 80700364 802ee2b8 9f863f54 9f863f00 8000870c 8070035c
+> 3f00: 9f863f54 9f863f10 9f862000 00000000 00000000 00000006 00000006 806d3aa4
+> 3f20: 00000000 80688b18 9f863f54 80713560 00000006 80713540 807620c0 000000a9
+> 3f40: 806d620c 8071ec24 9f863f94 9f863f58 806d6994 800086dc 00000006 00000006
+> 3f60: 806d620c f6bfffff fb7f5df7 00000000 8052da28 00000000 00000000 00000000
+> 3f80: 00000000 00000000 9f863fac 9f863f98 8052da38 806d689c ffffffff 00000000
+> 3fa0: 00000000 9f863fb0 8000e5d8 8052da34 00000000 00000000 00000000 00000000
+> 3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> 3fe0: 00000000 00000000 00000000 00000000 00000013 00000000 d9cdf5ff 1fff5ffe
+> Backtrace:
+> [<8004f75c>] (wake_up_process+0x0/0x44) from [<803fb698>] (sdhci_irq+0x378/0x93c)
+>  r4:9fa68000 r3:00000001
+> [<803fb320>] (sdhci_irq+0x0/0x93c) from [<80075154>] (handle_irq_event_percpu+0x54/0x19c)
+> [<80075100>] (handle_irq_event_percpu+0x0/0x19c) from [<800752ec>] (handle_irq_event+0x50/0x70)
+> [<8007529c>] (handle_irq_event+0x0/0x70) from [<80078324>] (handle_fasteoi_irq+0x9c/0x170)
+>  r5:00000001 r4:9f807900
+> [<80078288>] (handle_fasteoi_irq+0x0/0x170) from [<80074ac0>] (generic_handle_irq+0x28/0x38)
+>  r5:8071fd64 r4:00000036
+> [<80074a98>] (generic_handle_irq+0x0/0x38) from [<8000ee34>] (handle_IRQ+0x54/0xb4)
+>  r4:8072ab78 r3:00000140
+> [<8000ede0>] (handle_IRQ+0x0/0xb4) from [<80008600>] (gic_handle_irq+0x30/0x64)
+>  r8:00000036 r7:a080e100 r6:9f863cd0 r5:8072acbc r4:a080e10c
+> r3:00000000
+> [<800085d0>] (gic_handle_irq+0x0/0x64) from [<8000e0c0>] (__irq_svc+0x40/0x54)
+> Exception stack(0x9f863cd0 to 0x9f863d18)
+> 3cc0:                                     9f807950 60000113 00000007 00000000
+> 3ce0: 9f807900 9fa53640 9f807950 9fa68240 00000036 9f807930 60000113 9f863d24
+> 3d00: 9f863d28 9f863d18 80076834 805386a8 60000113 ffffffff
+>  r7:9f863d04 r6:ffffffff r5:60000113 r4:805386a8
+> [<8053867c>] (_raw_spin_unlock_irqrestore+0x0/0x30) from [<80076834>] (__setup_irq+0x1cc/0x414)
+> [<80076668>] (__setup_irq+0x0/0x414) from [<80076b38>] (request_threaded_irq+0xbc/0x140)
+> [<80076a7c>] (request_threaded_irq+0x0/0x140) from [<803fce8c>] (sdhci_add_host+0x690/0xb88)
+> [<803fc7fc>] (sdhci_add_host+0x0/0xb88) from [<803fea0c>] (sdhci_esdhc_imx_probe+0x280/0x4d4)
+>  r8:9f81d080 r7:9f8ae600 r6:00000000 r5:9fa68240 r4:9fa51490
+> [<803fe78c>] (sdhci_esdhc_imx_probe+0x0/0x4d4) from [<802ee0d4>] (platform_drv_probe+0x20/0x24)
+>  r8:807576b8 r7:00000000 r6:9f8ae610 r5:807576b8 r4:807b1ed8
+> [<802ee0b4>] (platform_drv_probe+0x0/0x24) from [<802ecd1c>] (driver_probe_device+0xf8/0x208)
+> [<802ecc24>] (driver_probe_device+0x0/0x208) from [<802ecec0>] (__driver_attach+0x94/0x98)
+>  r8:000000a9 r7:00000000 r6:9f8ae644 r5:807576b8 r4:9f8ae610
+> r3:00000000
+> [<802ece2c>] (__driver_attach+0x0/0x98) from [<802eb3d8>] (bus_for_each_dev+0x5c/0x90)
+>  r6:00000000 r5:802ece2c r4:807576b8 r3:9f83355c
+> [<802eb37c>] (bus_for_each_dev+0x0/0x90) from [<802ec838>] (driver_attach+0x20/0x28)
+>  r6:9fa51400 r5:80746e70 r4:807576b8
+> [<802ec818>] (driver_attach+0x0/0x28) from [<802ec3d0>] (bus_add_driver+0xe0/0x234)
+> [<802ec2f0>] (bus_add_driver+0x0/0x234) from [<802ed3e8>] (driver_register+0x80/0x14c)
+>  r8:000000a9 r7:00000000 r6:807620c0 r5:00000006 r4:807576b8
+> [<802ed368>] (driver_register+0x0/0x14c) from [<802ee2f8>] (platform_driver_register+0x4c/0x60)
+> [<802ee2ac>] (platform_driver_register+0x0/0x60) from [<80700364>] (sdhci_esdhc_imx_driver_init+0x14/0x1c)
+> [<80700350>] (sdhci_esdhc_imx_driver_init+0x0/0x1c) from [<8000870c>] (do_one_initcall+0x3c/0x164)
+> [<800086d0>] (do_one_initcall+0x0/0x164) from [<806d6994>] (kernel_init_freeable+0x104/0x1d0)
+> [<806d6890>] (kernel_init_freeable+0x0/0x1d0) from [<8052da38>] (kernel_init+0x10/0xec)
+> [<8052da28>] (kernel_init+0x0/0xec) from [<8000e5d8>] (ret_from_fork+0x14/0x3c)
+>  r4:00000000 r3:ffffffff
+> Code: e89da800 e1a0c00d e92dd818 e24cb004 (e5903000)
+> ---[ end trace e9af3588936b63f0 ]---
+> Kernel panic - not syncing: Fatal exception in interrupt
+> 
+> Fix the panic by simply reverse the calling sequence between
+> request_irq() and sdhci_init().
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/mmc/host/sdhci.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 2ea429c..a821b71 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -3174,6 +3174,8 @@ int sdhci_add_host(struct sdhci_host *host)
+>  		host->tuning_timer.function = sdhci_tuning_timer;
+>  	}
+>  
+> +	sdhci_init(host, 0);
+> +
+>  	ret = request_irq(host->irq, sdhci_irq, IRQF_SHARED,
+>  		mmc_hostname(mmc), host);
+>  	if (ret) {
+> @@ -3182,8 +3184,6 @@ int sdhci_add_host(struct sdhci_host *host)
+>  		goto untasklet;
+>  	}
+>  
+> -	sdhci_init(host, 0);
+> -
+>  #ifdef CONFIG_MMC_DEBUG
+>  	sdhci_dumpregs(host);
+>  #endif
+> -- 
+> 1.7.9.5
+> 
+> 
