@@ -1,60 +1,28 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Mon, 19 Aug 2013 11:41:51 -0700
-Subject: [PATCH v3 2/3] ARM: bcm281xx: Device Tree bindings for GPIO driver
-In-Reply-To: <CACRpkdbjtO_chMhrywXDbqztmuQv4abJpg-QVfuVZh9JGGdLaQ@mail.gmail.com>
-References: <1374870345-8276-1-git-send-email-markus.mayer@linaro.org>
- <1374870345-8276-3-git-send-email-markus.mayer@linaro.org>
- <CACRpkdbjtO_chMhrywXDbqztmuQv4abJpg-QVfuVZh9JGGdLaQ@mail.gmail.com>
-Message-ID: <CAPdLdqmCyXrZFbNVju+RWYu4MS+uoK9Ju5yb6RAR+xDQvKsRoA@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 19 Aug 2013 20:56:33 +0200
+Subject: [PATCH RESEND] i2c: move of helpers into the core
+In-Reply-To: <5212624D.5090708@samsung.com>
+References: <1376918361-7014-1-git-send-email-wsa@the-dreams.de>
+ <1376935183-11218-1-git-send-email-wsa@the-dreams.de>
+ <5212624D.5090708@samsung.com>
+Message-ID: <20130819185633.GA12011@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 August 2013 05:51, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Jul 26, 2013 at 10:25 PM, Markus Mayer <markus.mayer@linaro.org> wrote:
->
->> --- a/arch/arm/boot/dts/bcm11351.dtsi
->> +++ b/arch/arm/boot/dts/bcm11351.dtsi
->> @@ -63,6 +63,22 @@
->>                 clock-frequency = <32768>;
->>         };
->>
->> +       gpio: gpio at 35003000 {
->> +               compatible = "brcm,kona-gpio";
->> +               reg = <0x35003000 0x800>;
->> +               interrupts =
->> +                      <0x0 106 0x4
->> +                       0x0 115 0x4
->> +                       0x0 114 0x4
->> +                       0x0 113 0x4
->> +                       0x0 112 0x4
->> +                       0x0 111 0x4>;
->> +               #gpio-cells = <2>;
->> +               #interrupt-cells = <2>;
->> +               gpio-controller;
->> +               interrupt-controller;
->> +       };
->
-> Do this:
->
-> #include <dt-bindings//interrupt-controller/irq.h>
-> #include <dt-bindings/interrupt-controller/arm-gic.h>
->
-> Rewrite like this:
->
-> +               interrupts =
-> +                      <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH
-> +                       GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH
->
-> As you can see we can now understand the dts file.
->
-> Possibly this should also be done in the examples.
 
-Thanks for the feedback. This change will be part of the next revision
-that I am about to send out (in dtsi & examples).
+> However this patch fails to apply onto either v3.11-rc4 or v3.11-rc6:
 
-Regards,
--Markus
+Argh, did not drop the MPC patch before rebasing :( So either pick the
+patch "i2c: powermac: fix return path on error" before, pull the branch
+[1], or force me to resend ;)
 
--- 
-Markus Mayer
-Broadcom Landing Team
+Thanks!
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/core-with-of
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130819/8253fb4f/attachment.sig>
