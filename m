@@ -1,70 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Aug 2013 14:55:44 -0600
-Subject: [RFC 3/3] PCI: tegra: Support driver unbinding
-In-Reply-To: <20130819201623.GD5191@mithrandir>
-References: <1376392346-14127-1-git-send-email-treding@nvidia.com>
- <1376392346-14127-4-git-send-email-treding@nvidia.com>
- <520BFA0C.5070001@wwwdotorg.org> <20130815103452.GA13740@ulmo>
- <520CF211.6060003@wwwdotorg.org> <20130819201623.GD5191@mithrandir>
-Message-ID: <52128650.7090009@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 19 Aug 2013 16:57:36 -0400
+Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
+In-Reply-To: <20130819160537.1eeb0a9ebc269def138e016b@canb.auug.org.au>
+References: <20130819160537.1eeb0a9ebc269def138e016b@canb.auug.org.au>
+Message-ID: <20130819205736.GA13964@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2013 02:16 PM, Thierry Reding wrote:
-> On Thu, Aug 15, 2013 at 09:21:53AM -0600, Stephen Warren wrote:
->> On 08/15/2013 04:34 AM, Thierry Reding wrote:
->>> On Wed, Aug 14, 2013 at 03:43:40PM -0600, Stephen Warren
->>> wrote:
->>>> On 08/13/2013 05:12 AM, Thierry Reding wrote:
->>>>> Implement the platform driver's .remove() callback to free
->>>>> all resources allocated during driver setup and call 
->>>>> pci_common_exit() to cleanup ARM specific datastructures.
->>>>> Unmap the fixed PCI I/O mapping by calling the new
->>>>> pci_iounmap_io() function in the new .teardown() callback.
->>>>> 
->>>>> Finally, no longer set the .suppress_bind_attrs field to
->>>>> true to allow the driver to unbind from a device.
->>>> 
->>>>> +static int tegra_pcie_remove(struct platform_device *pdev)
->>>>> +{ +	struct tegra_pcie *pcie = platform_get_drvdata(pdev);
->>>>> + struct tegra_pcie_bus *bus, *tmp; +	int err; + + 
->>>>> pci_common_exit(&pcie->sys); + +
->>>>> list_for_each_entry_safe(bus, tmp, &pcie->busses, list) { +
->>>>> vunmap(bus->area->addr); + kfree(bus); +	} + +	if
->>>>> (IS_ENABLED(CONFIG_PCI_MSI)) { +		err = 
->>>>> tegra_pcie_disable_msi(pcie); +		if (err < 0) +			return
->>>>> err; + }
->>>> 
->>>> Wouldn't it make sense to do that as early as possible in
->>>> the function, to make sure that no MSI accidentally fires
->>>> after some of the cleanup has already happened?
->>> 
->>> I don't think that's strictly necessary in this case. After
->>> the call to pci_common_exit() there are no PCI devices left,
->>> there's not even a bus left. All MSI users should have cleaned
->>> up after themselves.
->>> 
->>> Given that I thought it more useful to mirror the setup done
->>> in .probe() to make it clearer what's being undone (and
->>> potentially what's missing).
->> 
->> That makes sense SW-wise, but what about mis-behaving HW that
->> triggers an MSI even when it's been told not to? I assume that 
->> tegra_pcie_disable_msi() unrequests the IRQ, hence solves that 
->> problem, if done early enough.
-> 
-> To be honest, I'm not sure about the side-effects that this will
-> have. tegra_pcie_disable_msi() does quite a bit more than just
-> masking the interrupts. It also completely removes the IRQ domain
-> that provides the MSI interrupts. While I haven't tried it yet I
-> can imagine that it will cause crashes at a later point when
-> drivers want to disable MSI on a device and the IRQ domain having
-> vanished from underneath.
+Hi Stephen,
 
-Surely by the time the PCIe controller device has been remove()d then
-all devices for PCIe "client" devices have also been removed.
+On Mon, Aug 19, 2013 at 04:05:37PM +1000, Stephen Rothwell wrote:
+> Today's linux-next merge of the mvebu tree got conflicts in various files
+> between merges and commits in the arm-soc tree and merges in the mvebu
+> tree.
 
-But I guess the problem is if the controller is added back, yet the
-IRQ resources aren't re-parsed under the new IRQ domain? Still, that
-seems like an unrelated issue to exactly where the MSI IRQ domain gets
-cleaned up in the host controller's remove().
+I'm afraid I'm a bit lost...
+
+> These merges/commits in the mvebu tree appear to be from a previous
+> version of the arm-soc tree that the mvebu tree has been rebased upon.
+> Please don't do that - the arm-soc tree as a whole is not stable.
+
+I didn't do anything different from the other times I built for-next.
+Could you give me a specific example when you build linux-next again?
+I'll certainly try to avoid it in the future, but it'll be easier if I
+know what 'it' is. ;-)
+
+I'll not change for-next today, and we'll see how it goes.
+
+thx,
+
+Jason.
