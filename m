@@ -1,67 +1,159 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 19 Aug 2013 22:16:24 +0200
-Subject: [RFC 3/3] PCI: tegra: Support driver unbinding
-In-Reply-To: <520CF211.6060003@wwwdotorg.org>
-References: <1376392346-14127-1-git-send-email-treding@nvidia.com>
- <1376392346-14127-4-git-send-email-treding@nvidia.com>
- <520BFA0C.5070001@wwwdotorg.org> <20130815103452.GA13740@ulmo>
- <520CF211.6060003@wwwdotorg.org>
-Message-ID: <20130819201623.GD5191@mithrandir>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 19 Aug 2013 13:33:59 -0700
+Subject: [PATCH 1/8] clk: keystone: add Keystone PLL clock driver
+In-Reply-To: <521258FB.2070002@ti.com>
+References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
+ <1375719147-7578-2-git-send-email-santosh.shilimkar@ti.com>
+ <20130813154842.GQ27165@e106331-lin.cambridge.arm.com>
+ <520A5877.7050608@ti.com>
+ <20130813164730.GT27165@e106331-lin.cambridge.arm.com>
+ <520A659C.3030809@ti.com> <521258FB.2070002@ti.com>
+Message-ID: <20130819203359.4443.72378@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 09:21:53AM -0600, Stephen Warren wrote:
-> On 08/15/2013 04:34 AM, Thierry Reding wrote:
-> > On Wed, Aug 14, 2013 at 03:43:40PM -0600, Stephen Warren wrote:
-> >> On 08/13/2013 05:12 AM, Thierry Reding wrote:
-> >>> Implement the platform driver's .remove() callback to free all
-> >>> resources allocated during driver setup and call
-> >>> pci_common_exit() to cleanup ARM specific datastructures. Unmap
-> >>> the fixed PCI I/O mapping by calling the new pci_iounmap_io()
-> >>> function in the new .teardown() callback.
-> >>> 
-> >>> Finally, no longer set the .suppress_bind_attrs field to true
-> >>> to allow the driver to unbind from a device.
-> >> 
-> >>> +static int tegra_pcie_remove(struct platform_device *pdev) +{ 
-> >>> +	struct tegra_pcie *pcie = platform_get_drvdata(pdev); +
-> >>> struct tegra_pcie_bus *bus, *tmp; +	int err; + +
-> >>> pci_common_exit(&pcie->sys); + +	list_for_each_entry_safe(bus,
-> >>> tmp, &pcie->busses, list) { +		vunmap(bus->area->addr); +
-> >>> kfree(bus); +	} + +	if (IS_ENABLED(CONFIG_PCI_MSI)) { +		err =
-> >>> tegra_pcie_disable_msi(pcie); +		if (err < 0) +			return err; +
-> >>> }
-> >> 
-> >> Wouldn't it make sense to do that as early as possible in the
-> >> function, to make sure that no MSI accidentally fires after some
-> >> of the cleanup has already happened?
-> > 
-> > I don't think that's strictly necessary in this case. After the
-> > call to pci_common_exit() there are no PCI devices left, there's
-> > not even a bus left. All MSI users should have cleaned up after
-> > themselves.
-> > 
-> > Given that I thought it more useful to mirror the setup done in
-> > .probe() to make it clearer what's being undone (and potentially
-> > what's missing).
+Quoting Santosh Shilimkar (2013-08-19 10:42:19)
+> Mark,
 > 
-> That makes sense SW-wise, but what about mis-behaving HW that triggers
-> an MSI even when it's been told not to? I assume that
-> tegra_pcie_disable_msi() unrequests the IRQ, hence solves that
-> problem, if done early enough.
+> On Tuesday 13 August 2013 12:58 PM, Santosh Shilimkar wrote:
+> > On Tuesday 13 August 2013 12:47 PM, Mark Rutland wrote:
+> >> On Tue, Aug 13, 2013 at 05:01:59PM +0100, Santosh Shilimkar wrote:
+> >>> On Tuesday 13 August 2013 11:48 AM, Mark Rutland wrote:
+> >>>> [Adding dt maintainers]
+> >>>>
+> >>>> On Mon, Aug 05, 2013 at 05:12:20PM +0100, Santosh Shilimkar wrote:
+> >>>>> Add the driver for the PLL IPs found on Keystone 2 devices. The main PLL
+> >>>>> IP typically has a multiplier, and a divider. The addtional PLL IPs like
+> >>>>> ARMPLL, DDRPLL and PAPLL are controlled by the memory mapped register where
+> >>>>> as the Main PLL is controlled by a PLL controller and memory map registers.
+> >>>>> This difference is handle using 'has_pll_cntrl' property.
+> >>>>>
+> >>>>> Cc: Mike Turquette <mturquette@linaro.org>
+> >>>>>
+> >>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>>>> ---
+> >>>
+> >>> Thanks for review Mark.
+> >>>
+> >>>>>  .../devicetree/bindings/clock/keystone-pll.txt     |   36 ++++
+> >>>>>  drivers/clk/keystone/pll.c                         |  197 ++++++++++++++++++++
+> >>>>>  include/linux/clk/keystone.h                       |   18 ++
+> >>>>>  3 files changed, 251 insertions(+)
+> >>>>>  create mode 100644 Documentation/devicetree/bindings/clock/keystone-pll.txt
+> >>>>>  create mode 100644 drivers/clk/keystone/pll.c
+> >>>>>  create mode 100644 include/linux/clk/keystone.h
+> >>>>>
+> >>>>> diff --git a/Documentation/devicetree/bindings/clock/keystone-pll.txt b/Documentation/devicetree/bindings/clock/keystone-pll.txt
+> >>>>> new file mode 100644
+> >>>>> index 0000000..58f6470
+> >>>>> --- /dev/null
+> >>>>> +++ b/Documentation/devicetree/bindings/clock/keystone-pll.txt
+> >>>>> @@ -0,0 +1,36 @@
+> >>>>> +Binding for keystone PLLs. The main PLL IP typically has a multiplier,
+> >>>>> +a divider and a post divider. The additional PLL IPs like ARMPLL, DDRPLL
+> >>>>> +and PAPLL are controlled by the memory mapped register where as the Main
+> >>>>> +PLL is controlled by a PLL controller. This difference is handle using
+> >>>>> +'pll_has_pllctrl' property.
+> >>>>> +
+> >>>>> +This binding uses the common clock binding[1].
+> >>>>> +
+> >>>>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >>>>> +
+> >>>>> +Required properties:
+> >>>>> +- compatible : shall be "keystone,pll-clk".
+> >>>>
+> >>>> Keystone isn't a vendor, and generally, bindings have used "clock"
+> >>>> rather than "clk".
+> >>>>
+> >>>> Perhaps "ti,keystone-pll-clock" ?
+> >>>>
+> >>> Agree.
+> >>>
+> >>>>> +- #clock-cells : from common clock binding; shall be set to 0.
+> >>>>> +- clocks : parent clock phandle
+> >>>>> +- reg - index 0 -  PLLCTRL PLLM register address
+> >>>>> +-        index 1 -  MAINPLL_CTL0 register address
+> >>>>
+> >>>> Perhaps a reg-names would be useful?
+> >>>>
+> >>>>> +- pll_has_pllctrl - PLL is controlled by controller or memory mapped register
+> >>>>
+> >>>> Huh? I don't understand what that description means. What does the
+> >>>> property tell you? Is having one of the registers optional? If so that
+> >>>> should be described by a reg-names property associated with the reg, and
+> >>>> should be noted in the binding.
+> >>>>
+> >>> After re-reading it, yes I agree it not clear. The point is there
+> >>> are two different types of IPs and pogramming model changes quite
+> >>> a bit. Its not just 1 register optional.
+> >>
+> >> If that's the case, then having different compatible strings would make
+> >> sense.
+> >>
+> >>>
+> >>>>> +- pllm_lower_mask - pllm lower bit mask
+> >>>>> +- pllm_upper_mask - pllm upper bit mask
+> >>>>> +- plld_mask - plld mask
+> >>>>> +- fixed_postdiv - fixed post divider value
+> >>>>
+> >>>> Please use '-' rather than '_' in property names, it's a standard
+> >>>> convention for dt and going against it just makes things unnecessarily
+> >>>> complicated.
+> >>>>
+> >>>> Why are these necessary? Are clocks sharing common registers, are there
+> >>>> some sets of "keystone,pll-clk"s that have the same masks, or does this
+> >>>> just vary wildly?
+> >>>>
+> >>> This is mainly to take care of the programming model which varies between
+> >>> IPs. Will try to make that bit more clear.
+> >>
+> >> Are there more than the two IPs mentioned above? If they had separate
+> >> compatible strings, would that give enough information implicitly,
+> >> without the precise masks needing to be in the dt?
+> >>
+> > I will explore the separate compatible option. Thanks for suggestion.
+> > 
+> I looked at further into separate compatible option or reg-names
+> to check if it can help to reduce some additional dt information.
+> Actually it doesn't help much. The base programming model is shared
+> between both types of PLL IPs. The PLLs which has PLL controller along
+> with MMRs, has to take into account additional bit-fields for the
+> multiplier and divider along with the base model multiplier and divider
+> registers.
 
-To be honest, I'm not sure about the side-effects that this will have.
-tegra_pcie_disable_msi() does quite a bit more than just masking the
-interrupts. It also completely removes the IRQ domain that provides the
-MSI interrupts. While I haven't tried it yet I can imagine that it will
-cause crashes at a later point when drivers want to disable MSI on a
-device and the IRQ domain having vanished from underneath.
+It is common for the base programming model to be similar or shared
+between two different compatible strings. You can use the same clk_ops
+for clk_prepare, clk_enable, etc.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130819/672164dc/attachment.sig>
+The point is to use the different compatible strings to encode the
+differences in *data* between the two clock types. That way you have
+fewer properties to list in the binding since two separate setup
+functions can implicitly handle the differences in initializing the
+per-clock data.
+
+> 
+> Having said that, there are few parameters which are fixed like
+> plld_mask, pllm_upper_shift etc need not come from DT. I am going
+> to remove them from dt bindings and also make the reg index consistent
+> as it should have been in first place.
+
+This is nice. Note that these things may change in future Keystone
+versions because hardware people hate you and want to make your life
+hard. So the compatible string might benefit from including the first
+keystone part number that uses this binding (e.g.
+ti,keystone-2420-pll-clock, which I just made up).
+
+In the future when the register layout, offsets and masks change for
+absolutely no reason (but the programming model is the same) then you
+can just write a new binding that setups up your private clk_pll_data
+struct without having to jam all of those details into DT (e.g.
+ti,keystone-3430-pll-clock, which I also just made up).
+
+Regards,
+Mike
+
+> 
+> Rest of the comments are fine and will be addressed in next version.
+> 
+> Regards,
+> Santosh
