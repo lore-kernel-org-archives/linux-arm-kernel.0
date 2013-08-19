@@ -1,36 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Aug 2013 11:42:23 +0200
-Subject: [PATCHv2 0/2] dma: mv_xor: big endian support
-In-Reply-To: <CAA9_cmdU4ePytnwMYWpN5a=U4UhHqYKR9qD3rzyoLrO-=ng7zg@mail.gmail.com>
-References: <1375112534-748-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130815180044.224b14ea@skate> <20130819042223.GQ32147@intel.com>
- <CAA9_cmdU4ePytnwMYWpN5a=U4UhHqYKR9qD3rzyoLrO-=ng7zg@mail.gmail.com>
-Message-ID: <20130819114223.4fdf981f@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 19 Aug 2013 11:52:19 +0200
+Subject: [GIT PULL] Nomadik I2C for v3.12
+Message-ID: <CACRpkdYxUJy3pt8uD6as+7Uz2c_giizhib2s7Gv0GHxNmy-+eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Dan Williams,
+Hi ARM SoC folks,
 
-On Mon, 19 Aug 2013 01:33:26 -0700, Dan Williams wrote:
+here is a single patch for the Nomadik, switching it to use the
+actual I2C silicon instead of bit-banging.
 
-> >> > Vinod, Dan,
-> >> >
-> >> > This small set of patches adds support for big endian operation in the
-> >> > DMA mv_xor driver. It has been tested in both little-endian and
-> >> > big-endian modes on the Armada XP GP board.
-> >> >
-> >> > If possible, I'd like those to be merged for 3.12.
-> > These look fine to me.
-> >
-> > Dan let me know if you okay with me to carry these
-> 
-> I'm dusting off the tree for a few other patches.  I'll apply them.
+Please pull it into the ARM SoC tree!
 
-Great, thanks!
+Yours,
+Linus Walleij
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+tags/nomadik-i2c-for-arm-soc
+
+for you to fetch changes up to 66e0c12f9e17a1c97fc358f9e1f5e1dc615e279a:
+
+  ARM: nomadik: switch to use the Nomadik I2C driver (2013-08-07 00:59:06 +0200)
+
+----------------------------------------------------------------
+Enables the standard Nomadik I2C driver for use
+on the original Nomadik instead of using a bit-banged
+driver.
+
+----------------------------------------------------------------
+Linus Walleij (1):
+      ARM: nomadik: switch to use the Nomadik I2C driver
+
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 42 ++++++++++++++++++++++--------
+ arch/arm/mach-nomadik/Kconfig              |  1 +
+ 2 files changed, 32 insertions(+), 11 deletions(-)
