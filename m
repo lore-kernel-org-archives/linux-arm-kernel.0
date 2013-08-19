@@ -1,151 +1,285 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 19 Aug 2013 20:06:39 +0300
-Subject: [PATCHv5 02/31] CLK: TI: Add DPLL clock support
-In-Reply-To: <20130819162450.GS3719@e106331-lin.cambridge.arm.com>
-References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
- <1375460751-23676-3-git-send-email-t-kristo@ti.com>
- <20130813105042.GJ27165@e106331-lin.cambridge.arm.com>
- <52121EF5.9040706@ti.com>
- <20130819141803.GO3719@e106331-lin.cambridge.arm.com>
- <52123531.4060608@ti.com>
- <20130819162450.GS3719@e106331-lin.cambridge.arm.com>
-Message-ID: <5212509F.9030608@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 19 Aug 2013 18:22:39 +0100
+Subject: [PATCH 1/4] arm64: optimized copy_to_user assembly code
+In-Reply-To: <1376591397-1776-1-git-send-email-fkan@apm.com>
+References: <1376591397-1776-1-git-send-email-fkan@apm.com>
+Message-ID: <20130819172239.GE19712@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2013 07:24 PM, Mark Rutland wrote:
-> On Mon, Aug 19, 2013 at 04:09:37PM +0100, Tero Kristo wrote:
->> On 08/19/2013 05:18 PM, Mark Rutland wrote:
->>> On Mon, Aug 19, 2013 at 02:34:45PM +0100, Tero Kristo wrote:
->>>> On 08/13/2013 01:50 PM, Mark Rutland wrote:
->>>>> Hi,
->>>>>
->>>>> On Fri, Aug 02, 2013 at 05:25:21PM +0100, Tero Kristo wrote:
->>>>>> The OMAP clock driver now supports DPLL clock type. This patch also
->>>>>> adds support for DT DPLL nodes.
->>>>>>
->>>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>>>>> ---
->>>>>>     .../devicetree/bindings/clock/ti/dpll.txt          |   70 +++
->>>>>>     arch/arm/mach-omap2/clock.h                        |  144 +-----
->>>>>>     arch/arm/mach-omap2/clock3xxx.h                    |    2 -
->>>>>>     drivers/clk/Makefile                               |    1 +
->>>>>>     drivers/clk/ti/Makefile                            |    3 +
->>>>>>     drivers/clk/ti/dpll.c                              |  488 ++++++++++++++++++++
->>>>>>     include/linux/clk/ti.h                             |  164 +++++++
->>>>>>     7 files changed, 727 insertions(+), 145 deletions(-)
->>>>>>     create mode 100644 Documentation/devicetree/bindings/clock/ti/dpll.txt
->>>>>>     create mode 100644 drivers/clk/ti/Makefile
->>>>>>     create mode 100644 drivers/clk/ti/dpll.c
->>>>>>     create mode 100644 include/linux/clk/ti.h
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/clock/ti/dpll.txt b/Documentation/devicetree/bindings/clock/ti/dpll.txt
->>>>>> new file mode 100644
->>>>>> index 0000000..dcd6e63
->>>>>> --- /dev/null
->>>>>> +++ b/Documentation/devicetree/bindings/clock/ti/dpll.txt
->>>>>> @@ -0,0 +1,70 @@
->>>>>> +Binding for Texas Instruments DPLL clock.
->>>>>> +
->>>>>> +This binding uses the common clock binding[1].  It assumes a
->>>>>> +register-mapped DPLL with usually two selectable input clocks
->>>>>> +(reference clock and bypass clock), with digital phase locked
->>>>>> +loop logic for multiplying the input clock to a desired output
->>>>>> +clock. This clock also typically supports different operation
->>>>>> +modes (locked, low power stop etc.) This binding has several
->>>>>> +sub-types, which effectively result in slightly different setup
->>>>>> +for the actual DPLL clock.
->>>>>> +
->>>>>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->>>>>> +
->>>>>> +Required properties:
->>>>>> +- compatible : shall be one of:
->>>>>> +               "ti,omap4-dpll-x2-clock",
->>>>>> +               "ti,omap3-dpll-clock",
->>>>>> +               "ti,omap3-dpll-core-clock",
->>>>>> +               "ti,omap3-dpll-per-clock",
->>>>>> +               "ti,omap3-dpll-per-j-type-clock",
->>>>>> +               "ti,omap4-dpll-clock",
->>>>>> +               "ti,omap4-dpll-core-clock",
->>>>>> +               "ti,omap4-dpll-m4xen-clock",
->>>>>> +               "ti,omap4-dpll-j-type-clock",
->>>>>> +               "ti,omap4-dpll-no-gate-clock",
->>>>>> +               "ti,omap4-dpll-no-gate-j-type-clock",
->>>>>> +
->>>>>> +- #clock-cells : from common clock binding; shall be set to 0.
->>>>>> +- clocks : link phandles of parent clocks (clk-ref and clk-bypass)
->>>>>
->>>>> It might be a good idea to use clock-names to clarify which clocks are
->>>>> present (I notice your examples contain only one clock input).
->>>>
->>>> All DPLLs have both bypass and reference clocks, but these can be the
->>>> same. Is it better to just list both always (and hence drop
->>>> clock-names), or provide clock-names always?
->>>
->>> If they're separate inputs, it's worth listing both (even if they're fed
->>> by the same provider). If it's possible one input might not be wired up,
->>> use clock-names.
->>
->> Ref and bypass clocks are used currently by all DPLLs (also the APLL) so
->> I guess I just enforce both to be specified.
->
-> Ok. It's always possible to add clock-names later if a platform doesn't
-> wire an input. We lose the possibility of future compatibility, but
-> backwards compatibility is easy enough to maintain.
->
->>>>>> +- ti,clkdm-name : clockdomain name for the DPLL
->>>>>
->>>>> Could you elaborate on what this is for? What constitutes a valid name?
->>>>>
->>>>> I'm not sure a string is the best way to define the linkage of several
->>>>> elements to a domain...
->>>>
->>>> Well, I am not sure if we can do this any better at this point, we don't
->>>> have DT nodes for clockdomain at the moment (I am not sure if we will
->>>> have those either as there are only a handful of those per SoC) but I'll
->>>> add some more documentation for this.
->>>
->>> I'll have to see the documentation, but I'd be very wary of putting that
->>> in as-is. Does having the clock domain string link this up to domains in
->>> platform data?
->>>
->>> I'm not sure how well we'll be able to maintain support for that in
->>> future if it requires other platform code to use now, and we're not sure
->>> how the domains themselves will be represented in dt.
->>
->> Hmm so, should I add a stub representation for the clockdomains to the
->> DT then for now or how should this be handled? The stubs could then be
->> mapped to the actual clock domains based on their node names.
->>
->
-> I unfortunately don't have a good answer here, because I'm not that
-> familiar with how we handle clockdomains for power management purposes.
->
-> As I understand it, each clock domain is essentially a clock gate
-> controlling multiple clock signals, so it's possible to describe that
-> with the common clock bindings, with a domain's clocks all coming from a
-> "domain-gate-clock" node (or something like that). That would make the
-> wiring of clocks to a domain explicit and in line with the rest of the
-> common clock bindings. But perhaps I've simplified things a bit too
-> far.
+On Thu, Aug 15, 2013 at 07:29:57PM +0100, Feng Kan wrote:
+> Using the optimized copy_to_user code, iperf performance improved 20%.
 
-You got it basically right, but maybe oversimplified it a bit. The 
-root/parent clocks can still cross clockdomain boundaries, so mapping 
-everything under a simple clockdomain gate would not work. Basically 
-each clock has a mapping on the SoC for both its parent clock signal and 
-the clockdomain association, kind of having two parents at the same 
-time. In OMAP case, most of the clockdomains support hardware autoidle 
-type functionality, which puts the domain to idle once all the clocks on 
-it are disabled.
+I have some questions first:
 
--Tero
+Was this code written from scratch or derived from something else? I can
+see some Linaro copyright in there.
 
-> I'm not sure how easy it would be to use that information for power
-> management. I don't know what the kernel logic for clock domain power
-> management needs to know about consumers of the clocks and how it would
-> need to poke those consumers.
+Since it is dual-licensed, have you replaced the original code entirely?
 
->
-> Cheers,
-> Mark.
->
+Is this patch part of a series? I can't seem to find the other 3 patches
+(unless I deleted them by mistake).
+
+> diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
+> index a0aeeb9..2a07b13 100644
+> --- a/arch/arm64/lib/copy_to_user.S
+> +++ b/arch/arm64/lib/copy_to_user.S
+> @@ -1,61 +1,220 @@
+>  /*
+> - * Copyright (C) 2012 ARM Ltd.
+> + * Copyright (c) 2013, Applied Micro Circuits Corporation
+> + * Copyright (c) 2012-2013, Linaro Limited
+>   *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> + * Author: Feng Kan <fkan@apm.com>
+> + * Author: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+>   *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> + * The code is adopted from the memcpy routine by Linaro Limited.
+>   *
+> - * You should have received a copy of the GNU General Public License
+> - * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + * This file is dual licensed: you can use it either under the terms of
+> + * the GPL, or the BSD license, at your option.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + *     You should have received a copy of the GNU General Public
+> + *     License along with this library; if not, write to the Free
+> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> + *     MA 02110-1301 USA
+
+This is raised regularly, please don't include the FSF address, they may
+relocated. Just point at the web address.
+
+> -/*
+> - * Copy to user space from a kernel buffer (alignment handled by the hardware)
+> - *
+> - * Parameters:
+> - *	x0 - to
+> - *	x1 - from
+> - *	x2 - n
+> - * Returns:
+> - *	x0 - bytes not copied
+> - */
+
+What's the point of dropping some of the documentation (not that it was
+much either)?
+
+
+
+> -ENTRY(__copy_to_user)
+> -	add	x4, x0, x2			// upper user buffer boundary
+> -	subs	x2, x2, #8
+> -	b.mi	2f
+> +#define dstin	x0
+> +#define src	x1
+> +#define count	x2
+> +#define tmp1	x3
+> +#define tmp1w	w3
+> +#define tmp2	x4
+> +#define tmp2w	w4
+> +#define tmp3	x5
+> +#define tmp3w	w5
+> +#define dst	x6
+> +
+> +#define A_l	x7
+> +#define A_h	x8
+> +#define B_l	x9
+> +#define B_h	x10
+> +#define C_l	x11
+> +#define C_h	x12
+> +#define D_l	x13
+> +#define D_h	x14
+
+Could we use .req instead of #define?
+
+> +
+> +	/*
+> +	 * Prototype: size_t copy_to_user (void *dst, const void *src, size_t nb)
+> +	 */
+> +	.text
+> +	.align	2
+> +	.p2align 6,,63
+
+Do we need two align directives?
+
+> +ENTRY(__copy_to_user)	
+> +	mov	dst, dstin
+> +	cmp	count, #64
+> +	b.ge	.Lcpy_not_short
+> +	cmp	count, #15
+> +	b.le	.Ltail15tiny
+> +
+> +	/* Deal with small copies quickly by dropping straight into the
+> +	 * exit block.  */
+> +.Ltail63:
+> +	/* Copy up to 48 bytes of data.  At this point we only need the
+> +	 * bottom 6 bits of count to be accurate.  */
+> +	ands	tmp1, count, #0x30
+> +	b.eq	.Ltail15
+> +	add	dst, dst, tmp1
+> +	add	src, src, tmp1
+> +	cmp	tmp1w, #0x20
+> +	b.eq	1f
+> +	b.lt	2f
+> +	ldp	A_l, A_h, [src, #-48]
+> +USER (9f, stp A_l, A_h, [dst, #-48])
+> +1:
+> +	ldp	A_l, A_h, [src, #-32]
+> +USER (9f, stp A_l, A_h, [dst, #-32])
+> +2:
+> +	ldp	A_l, A_h, [src, #-16]
+> +USER (9f, stp A_l, A_h, [dst, #-16])
+> +
+> +.Ltail15:
+> +	ands	count, count, #15
+> +	beq	1f
+> +	add	src, src, count
+> +	ldp	A_l, A_h, [src, #-16]
+> +	add	dst, dst, count
+> +USER (9f, stp A_l, A_h, [dst, #-16])
+> +1:
+> +	b	.Lsuccess
+> +
+> +.Ltail15tiny:
+> +	/* Copy up to 15 bytes of data.  Does not assume additional data
+> +	   being copied.  */
+> +	tbz	count, #3, 1f
+> +	ldr	tmp1, [src], #8
+> +USER (9f, str tmp1, [dst], #8)
+> +1:
+> +	tbz	count, #2, 1f
+> +	ldr	tmp1w, [src], #4
+> +USER (9f, str tmp1w, [dst], #4)
+>  1:
+> -	ldr	x3, [x1], #8
+> -	subs	x2, x2, #8
+> -USER(9f, str	x3, [x0], #8	)
+> -	b.pl	1b
+> -2:	adds	x2, x2, #4
+> -	b.mi	3f
+> -	ldr	w3, [x1], #4
+> -	sub	x2, x2, #4
+> -USER(9f, str	w3, [x0], #4	)
+> -3:	adds	x2, x2, #2
+> -	b.mi	4f
+> -	ldrh	w3, [x1], #2
+> -	sub	x2, x2, #2
+> -USER(9f, strh	w3, [x0], #2	)
+> -4:	adds	x2, x2, #1
+> -	b.mi	5f
+> -	ldrb	w3, [x1]
+> -USER(9f, strb	w3, [x0]	)
+> -5:	mov	x0, #0
+> +	tbz	count, #1, 1f
+> +	ldrh	tmp1w, [src], #2
+> +USER (9f, strh tmp1w, [dst], #2)
+> +1:
+> +	tbz	count, #0, 1f
+> +	ldrb	tmp1w, [src]
+> +USER (9f, strb tmp1w, [dst])
+> +1:
+> +	b	.Lsuccess
+> +
+> +.Lcpy_not_short:
+> +	/* We don't much care about the alignment of DST, but we want SRC
+> +	 * to be 128-bit (16 byte) aligned so that we don't cross cache line
+> +	 * boundaries on both loads and stores.  */
+> +	neg	tmp2, src
+> +	ands	tmp2, tmp2, #15		/* Bytes to reach alignment.  */
+> +	b.eq	2f
+> +	sub	count, count, tmp2
+> +	/* Copy more data than needed; it's faster than jumping
+> +	 * around copying sub-Quadword quantities.  We know that
+> +	 * it can't overrun.  */
+> +	ldp	A_l, A_h, [src]
+> +	add	src, src, tmp2
+> +USER (9f, stp A_l, A_h, [dst])
+> +	add	dst, dst, tmp2
+> +	/* There may be less than 63 bytes to go now.  */
+> +	cmp	count, #63
+> +	b.le	.Ltail63
+> +2:
+> +	subs	count, count, #128
+> +	b.ge	.Lcpy_body_large
+> +	/* Less than 128 bytes to copy, so handle 64 here and then jump
+> +	 * to the tail.  */
+> +	ldp	A_l, A_h, [src]
+> +	ldp	B_l, B_h, [src, #16]
+> +	ldp	C_l, C_h, [src, #32]
+> +	ldp	D_l, D_h, [src, #48]
+> +USER (9f, stp A_l, A_h, [dst])
+> +USER (9f, stp B_l, B_h, [dst, #16])
+> +USER (9f, stp C_l, C_h, [dst, #32])
+> +USER (9f, stp D_l, D_h, [dst, #48])
+> +	tst	count, #0x3f
+> +	add	src, src, #64
+> +	add	dst, dst, #64
+> +	b.ne	.Ltail63
+> +	b	.Lsuccess
+> +
+> +	/* Critical loop.  Start at a new cache line boundary.  Assuming
+> +	 * 64 bytes per line this ensures the entire loop is in one line.  */
+> +	.p2align 6
+> +.Lcpy_body_large:
+> +	/* There are at least 128 bytes to copy.  */
+> +	ldp	A_l, A_h, [src, #0]
+> +	sub	dst, dst, #16		/* Pre-bias.  */
+> +	ldp	B_l, B_h, [src, #16]
+> +	ldp	C_l, C_h, [src, #32]
+> +	ldp	D_l, D_h, [src, #48]!	/* src += 64 - Pre-bias.  */
+> +1:
+> +USER (9f, stp A_l, A_h, [dst, #16])
+> +	ldp	A_l, A_h, [src, #16]
+> +USER (9f, stp B_l, B_h, [dst, #32])
+> +	ldp	B_l, B_h, [src, #32]
+> +USER (9f, stp C_l, C_h, [dst, #48])
+> +	ldp	C_l, C_h, [src, #48]
+> +USER (9f, stp D_l, D_h, [dst, #64]!)
+> +	ldp	D_l, D_h, [src, #64]!
+> +	subs	count, count, #64
+> +	b.ge	1b
+> +USER (9f, stp A_l, A_h, [dst, #16])
+> +USER (9f, stp B_l, B_h, [dst, #32])
+> +USER (9f, stp C_l, C_h, [dst, #48])
+> +USER (9f, stp D_l, D_h, [dst, #64])
+> +	add	src, src, #16
+> +	add	dst, dst, #64 + 16
+> +	tst	count, #0x3f
+> +	b.ne	.Ltail63
+> +.Lsuccess:
+> +	mov	x0, #0		    // nothing left to copy
+>  	ret
+>  ENDPROC(__copy_to_user)
+>  
+>  	.section .fixup,"ax"
+> -	.align	2
+> -9:	sub	x0, x4, x0			// bytes not copied
+> +	.align    2
+
+The .align change is just whitespace.
+
+> +9:	mov    x0, count            // approximate the number of bytes not copied
+
+Is this an approximate or the real number of bytes not copied?
+
+I haven't done a proper review of the algorithm yet, so I'll give more
+comments. For the next version there are also a few coding style issues
+that need clean-up (comment style, white space).
+
+-- 
+Catalin
