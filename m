@@ -1,418 +1,134 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 19 Aug 2013 11:11:06 +0800
-Subject: [RFC PATCH] pwm: atmel-pwm: add pwm controller driver
-Message-ID: <1376881866-14214-1-git-send-email-voice.shen@atmel.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Mon, 19 Aug 2013 03:18:24 +0000
+Subject: at91: watchdog: Can't get watchdog to trigger
+In-Reply-To: <91586D499ADFD74FBCFB8425266A5DE40153ADD143B6@pluto.melinkcorp.local>
+References: <91586D499ADFD74FBCFB8425266A5DE40153ADC7E586@pluto.melinkcorp.local>
+ <B256D81BAE5131468A838E5D7A24364172E2A205@penmbx02>
+ <91586D499ADFD74FBCFB8425266A5DE40153ADD143B6@pluto.melinkcorp.local>
+Message-ID: <B256D81BAE5131468A838E5D7A24364172E2AC2D@penmbx02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add atmel pwm controller driver based on PWM framework
 
-this is basic function implementation of pwm controller
-it can work with pwm based led and backlight
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> -----Original Message-----
+> From: Bryan Evenson [mailto:bevenson at melinkcorp.com]
+> Sent: 2013?8?17? 4:37
+> To: Yang, Wenyou; linux-arm-kernel at lists.infradead.org
+> Cc: Ferre, Nicolas
+> Subject: RE: at91: watchdog: Can't get watchdog to trigger
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: Yang, Wenyou [mailto:Wenyou.Yang at atmel.com]
+> > Sent: Thursday, August 15, 2013 10:23 PM
+> > To: Bryan Evenson; linux-arm-kernel at lists.infradead.org
+> > Cc: Ferre, Nicolas
+> > Subject: RE: at91: watchdog: Can't get watchdog to trigger
+> >
+> >
+> >
+> > > -----Original Message-----
+> > > From: Bryan Evenson [mailto:bevenson at melinkcorp.com]
+> > > Sent: 2013?8?15? 9:42
+> > > To: linux-arm-kernel at lists.infradead.org
+> > > Cc: Ferre, Nicolas; Yang, Wenyou
+> > > Subject: at91: watchdog: Can't get watchdog to trigger
+> > >
+> > > All,
+> > >
+> > > I am using Atmel's stable branch of the Linux kernel
+> > > (https://github.com/linux4sam/linux-at91.git, branch linux-3.6.9-
+> > at91,
+> > > back at commit 5fe012d4aee98ef82df66e6763882c735902ed0f) on a
+> > > AT91SAM9G25 based board.  I am having issues getting the watchdog to
+> > > trigger with this version of the kernel.
+> > >
+> > > First, I've verified that the watchdog is enabled in the bootstrap
+> > and
+> > > U-Boot.  I see the line:
+> > >
+> > > at91sam9_wdt: enabled (heartbeat=15 sec, nowayout=0)
+> > >
+> > > during boot showing that the watchdog is enabled.  I've tried
+> > > triggering the watchdog by writing a single character to it from the
+> > > command line (echo "0" >
+> > > /dev/watchdog) and by using the two watchdog sample applications
+> > under
+> > > Documentation/watchdog.  In every case I see the line:
+> > >
+> > > watchdog watchdog0: watchdog did not stop!
+> > >
+> > > But the board does not reset.  Just to make sure, I also set
+> > > CONFIG_WATCHDOG_NOWAYOUT in the kernel configuration and I still
+> have
+> > > the same results.
+> > >
+> > > I have my kernel configuration and the device tree files for my build
+> > > over at https://github.com/evensonbryan/at91sam9g25-dt.git.  Other
+> > > than the device tree files and the configuration, I have not made any
+> > > kernel modifications.  What do I have setup wrong?
+> >
+> > This is the at91_wdt controller inherent property, once the watchdog is
+> > started, it can't be stopped.
+> > Because the Watchdog Mode Register (WDT_MR) can be written only once.
+> > Only a processor reset resets it, as said in the datasheet.
+> >
+> > So the driver is implemented as following, 1./ If the \dev\watchdog
+> > device is opened by the user space application, then it is the
+> > application's responsibility to feed the watchdog. If the application
+> > does not feed the watchdog, it will trigger RESET.
+> > 2./ If the device isn't opened or close by the application, The
+> > responsibility to feed the watchdog is turned to the driver.
+> >
+> > For your case,
+> > echo "0" > /dev/watchdog, it will arise the following actions 1./ open
+> > \dev\watchdog device, -->The responsibility to feed the watchdog is
+> > turned to the user space application 2./ start the watchdog controller
+> > 3./ ping the watchdog controller 4./ stop the watchdog controller -->
+> > Since the watchdog can't be stopped, so output: watchdog watchdog0:
+> > watchdog did not stop!
+> > 5./ close \dev\watchdog device --> The responsibility to feed the
+> > watchdog is turned to the Kernel Space
+> >
+> > So, the watchdog doesn't trigger the RESET.
+> >
+> > Documentation/watchdog/src/ watchdog-simple.c: after opening
+> > \dev\watchdog device, it is always feed the watchdog with the 10
+> > seconds interval.
+> > Documentation/watchdog/src/ watchdog-test.c: after opening
+> > \dev\watchdog device, it is always ping the watchdog with the 1 seconds
+> > interval.
+> 
+> This is different than what I've seen with other versions of the kernel.  In the
+> past, if my application didn't write the magic character to the watchdog before
+> closing /dev/watchdog (or if it didn't close /dev/watchdog), the watchdog
+> would reset the system.  For example, if I run the watchdog-simple.c test
+> under my 2.6.39 kernel and ctrl-c to kill it, the watchdog resets my board.  
+I double checked it, ctrl-c will invoke watchdog_release to close the /dev/watchdog. 
 
----
-This patch is based on Linux v3.11 rc6
-Tested on sama5d31ek and at91sam9m10g45ek board
----
- .../devicetree/bindings/pwm/atmel-pwm.txt          |   19 ++
- drivers/pwm/Kconfig                                |    9 +
- drivers/pwm/Makefile                               |    1 +
- drivers/pwm/pwm-atmel.c                            |  327 ++++++++++++++++++++
- 4 files changed, 356 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/atmel-pwm.txt
- create mode 100644 drivers/pwm/pwm-atmel.c
+> But,
+> with this 3.6.9 kernel that action does not reset my board.  I did just run a test
+> where I opened /dev/watchdog, wrote one character to it, and started and
+> infinite loop.  In that case, my board reset as it should.
+> 
+> Is this a intentional change in how the watchdog interacts with userspace, or
+> was it always supposed to work the way it does in the 3.6.9 kernel?
+I think it will work in this way. It is more reasonable.
 
-diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-new file mode 100644
-index 0000000..127fcdb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-@@ -0,0 +1,19 @@
-+Atmel PWM controller
-+
-+Required properties:
-+  - compatible: should be one of:
-+    - "atmel,at91sam9rl-pwm"
-+    - "atmel,sama5-pwm"
-+  - reg: physical base address and length of the controller's registers
-+  - #pwm-cells: Should be 3.
-+    - The first cell specifies the per-chip index of the PWM to use
-+    - The second cell is the period in nanoseconds
-+    - The third cell is used to encode the polarity of PWM output
-+
-+Example:
-+
-+	pwm0: pwm at f8034000 {
-+		compatible = "atmel,at91sam9rl-pwm";
-+		reg = <0xf8034000 0x400>;
-+		#pwm-cells = <3>;
-+	};
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index 75840b5..54237b9 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -41,6 +41,15 @@ config PWM_AB8500
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-ab8500.
- 
-+config PWM_ATMEL
-+	tristate "Atmel PWM support"
-+	depends on ARCH_AT91
-+	help
-+	  Generic PWM framework driver for Atmel SoC.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-atmel.
-+
- config PWM_ATMEL_TCB
- 	tristate "Atmel TC Block PWM support"
- 	depends on ATMEL_TCLIB && OF
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index 77a8c18..5b193f8 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -1,6 +1,7 @@
- obj-$(CONFIG_PWM)		+= core.o
- obj-$(CONFIG_PWM_SYSFS)		+= sysfs.o
- obj-$(CONFIG_PWM_AB8500)	+= pwm-ab8500.o
-+obj-$(CONFIG_PWM_ATMEL)		+= pwm-atmel.o
- obj-$(CONFIG_PWM_ATMEL_TCB)	+= pwm-atmel-tcb.o
- obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
- obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
-diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-new file mode 100644
-index 0000000..b83d68e
---- /dev/null
-+++ b/drivers/pwm/pwm-atmel.c
-@@ -0,0 +1,327 @@
-+/*
-+ * Driver for Atmel Pulse Width Modulation Controller
-+ *
-+ * Copyright (C) 2013 Atmel Semiconductor Technology Ltd.
-+ *		 Bo Shen <voice.shen@atmel.com>
-+ *
-+ * GPL v2 or later
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/pinctrl/consumer.h>
-+#include <linux/platform_device.h>
-+#include <linux/pwm.h>
-+#include <linux/slab.h>
-+
-+#define PWM_MR		0x00
-+#define PWM_ENA		0x04
-+#define PWM_DIS		0x08
-+#define PWM_SR		0x0C
-+
-+#define PWM_CMR		0x00
-+
-+/* The following register for PWM v1 */
-+#define PWMv1_CDTY	0x04
-+#define PWMv1_CPRD	0x08
-+#define PWMv1_CUPD	0x10
-+
-+/* The following register for PWM v2 */
-+#define PWMv2_CDTY	0x04
-+#define PWMv2_CDTYUPD	0x08
-+#define PWMv2_CPRD	0x0C
-+#define PWMv2_CPRDUPD	0x10
-+
-+#define PWM_NUM		4
-+
-+struct atmel_pwm_chip {
-+	struct pwm_chip chip;
-+	struct clk *clk;
-+	void __iomem *base;
-+
-+	void (*config)(struct atmel_pwm_chip *chip, struct pwm_device *pwm,
-+			unsigned int dty, unsigned int prd);
-+};
-+
-+#define to_atmel_pwm_chip(chip) container_of(chip, struct atmel_pwm_chip, chip)
-+
-+static inline u32 atmel_pwm_readl(struct atmel_pwm_chip *chip, int offset)
-+{
-+	return readl(chip->base + offset);
-+}
-+
-+static inline void atmel_pwm_writel(struct atmel_pwm_chip *chip, int offset,
-+		u32 val)
-+{
-+	writel(val, chip->base + offset);
-+}
-+
-+static inline u32 atmel_pwm_ch_readl(struct atmel_pwm_chip *chip, int ch,
-+		int offset)
-+{
-+	return readl(chip->base + 0x200 + ch * 0x20 + offset);
-+}
-+
-+static inline void atmel_pwm_ch_writel(struct atmel_pwm_chip *chip, int ch,
-+		int offset, u32 val)
-+{
-+	writel(val, chip->base + 0x200 + ch * 0x20 + offset);
-+}
-+
-+static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+		int duty_ns, int period_ns)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+	unsigned long long val, prd, dty;
-+	unsigned long long div, clk_rate;
-+	int ret, pres = 0;
-+
-+	clk_rate = clk_get_rate(atmel_pwm->clk);
-+
-+	while (1) {
-+		div = 1000000000;
-+		div *= 1 << pres;
-+		val = clk_rate * period_ns;
-+		prd = div_u64(val, div);
-+		val = clk_rate * duty_ns;
-+		dty = div_u64(val, div);
-+
-+		if (prd < 0x0001 || dty < 0x0)
-+			return -EINVAL;
-+
-+		if (prd > 0xffff || dty > 0xffff) {
-+			if (++pres > 0x10)
-+				return -EINVAL;
-+			continue;
-+		}
-+
-+		break;
-+	}
-+
-+	/* Enable clock */
-+	ret = clk_prepare_enable(atmel_pwm->clk);
-+	if (ret) {
-+		pr_err("failed to enable pwm clock\n");
-+		return ret;
-+	}
-+
-+	atmel_pwm->config(atmel_pwm, pwm, dty, prd);
-+
-+	/* Check whether need to disable clock */
-+	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
-+	if ((val & 0xf) == 0)
-+		clk_disable_unprepare(atmel_pwm->clk);
-+
-+	return 0;
-+}
-+
-+static void atmel_pwm_config_v1(struct atmel_pwm_chip *atmel_pwm,
-+		struct pwm_device *pwm, unsigned int dty, unsigned int prd)
-+{
-+	unsigned int val;
-+
-+	/*
-+	 * if the pwm channel is enabled, using update register to update
-+	 * related register value, or else write it directly
-+	 */
-+	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CUPD, dty);
-+
-+		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
-+		val &= ~(1 << 10);
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-+	} else {
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CDTY, dty);
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CPRD, prd);
-+	}
-+}
-+
-+static void atmel_pwm_config_v2(struct atmel_pwm_chip *atmel_pwm,
-+		struct pwm_device *pwm, unsigned int dty, unsigned int prd)
-+{
-+	/*
-+	 * if the pwm channel is enabled, using update register to update
-+	 * related register value, or else write it directly
-+	 */
-+	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTYUPD, dty);
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CPRDUPD, prd);
-+	} else {
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTY, dty);
-+		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CPRD, prd);
-+	}
-+}
-+
-+static int atmel_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-+		enum pwm_polarity polarity)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+	u32 val = 0;
-+	int ret;
-+
-+	/* Enable clock */
-+	ret = clk_prepare_enable(atmel_pwm->clk);
-+	if (ret) {
-+		pr_err("failed to enable pwm clock\n");
-+		return ret;
-+	}
-+
-+	if (polarity == PWM_POLARITY_NORMAL)
-+		val &= ~(1 << 9);
-+	else
-+		val |= 1 << 9;
-+
-+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-+
-+	/* Disable clock */
-+	clk_disable_unprepare(atmel_pwm->clk);
-+
-+	return 0;
-+}
-+
-+static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+
-+	clk_prepare_enable(atmel_pwm->clk);
-+
-+	atmel_pwm_writel(atmel_pwm, PWM_ENA, 1 << pwm->hwpwm);
-+
-+	return 0;
-+}
-+
-+static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-+	u32 val;
-+
-+	atmel_pwm_writel(atmel_pwm, PWM_DIS, 1 << pwm->hwpwm);
-+
-+	/* Disable clock */
-+	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
-+	if ((val & 0xf) == 0)
-+		clk_disable_unprepare(atmel_pwm->clk);
-+}
-+
-+static const struct pwm_ops atmel_pwm_ops = {
-+	.config = atmel_pwm_config,
-+	.set_polarity = atmel_pwm_set_polarity,
-+	.enable = atmel_pwm_enable,
-+	.disable = atmel_pwm_disable,
-+	.owner = THIS_MODULE,
-+};
-+
-+struct atmel_pwm_data {
-+	void (*config)(struct atmel_pwm_chip *chip, struct pwm_device *pwm,
-+			unsigned int dty, unsigned int prd);
-+};
-+
-+static struct atmel_pwm_data atmel_pwm_data_v1 = {
-+	.config = atmel_pwm_config_v1,
-+};
-+
-+static struct atmel_pwm_data atmel_pwm_data_v2 = {
-+	.config = atmel_pwm_config_v2,
-+};
-+
-+static const struct of_device_id atmel_pwm_dt_ids[] = {
-+	{
-+		.compatible = "atmel,at91sam9rl-pwm",
-+		.data = &atmel_pwm_data_v1,
-+	}, {
-+		.compatible = "atmel,sama5-pwm",
-+		.data = &atmel_pwm_data_v2,
-+	}, {
-+		/* sentinel */
-+	},
-+};
-+MODULE_DEVICE_TABLE(of, atmel_pwm_dt_ids);
-+
-+static int atmel_pwm_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *of_id =
-+		of_match_device(atmel_pwm_dt_ids, &pdev->dev);
-+	const struct atmel_pwm_data *data;
-+	struct atmel_pwm_chip *atmel_pwm;
-+	struct resource *res;
-+	struct pinctrl *pinctrl;
-+	int ret;
-+
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl)) {
-+		dev_err(&pdev->dev, "failed get pinctrl\n");
-+		return PTR_ERR(pinctrl);
-+	}
-+
-+	atmel_pwm = devm_kzalloc(&pdev->dev, sizeof(*atmel_pwm), GFP_KERNEL);
-+	if (!atmel_pwm) {
-+		dev_err(&pdev->dev, "out of memory\n");
-+		return -ENOMEM;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "no memory resource defined\n");
-+		return -ENODEV;
-+	}
-+
-+	atmel_pwm->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(atmel_pwm->base)) {
-+		dev_err(&pdev->dev, "ioremap failed\n");
-+		return PTR_ERR(atmel_pwm->base);
-+	}
-+
-+	atmel_pwm->clk = devm_clk_get(&pdev->dev, "pwm_clk");
-+	if (IS_ERR(atmel_pwm->clk)) {
-+		dev_err(&pdev->dev, "clk get failed\n");
-+		return PTR_ERR(atmel_pwm->clk);
-+	}
-+
-+	atmel_pwm->chip.dev = &pdev->dev;
-+	atmel_pwm->chip.ops = &atmel_pwm_ops;
-+	atmel_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
-+	atmel_pwm->chip.of_pwm_n_cells = 3;
-+	atmel_pwm->chip.base = -1;
-+	atmel_pwm->chip.npwm = PWM_NUM;
-+
-+	data = of_id->data;
-+	atmel_pwm->config = data->config;
-+
-+	ret = pwmchip_add(&atmel_pwm->chip);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to add pwm chip %d\n", ret);
-+		return ret;
-+	}
-+
-+	platform_set_drvdata(pdev, atmel_pwm);
-+
-+	dev_info(&pdev->dev, "successfully register pwm\n");
-+
-+	return 0;
-+}
-+
-+static int atmel_pwm_remove(struct platform_device *pdev)
-+{
-+	struct atmel_pwm_chip *atmel_pwm = platform_get_drvdata(pdev);
-+
-+	return pwmchip_remove(&atmel_pwm->chip);
-+}
-+
-+static struct platform_driver atmel_pwm_driver = {
-+	.driver = {
-+		.name = "atmel-pwm",
-+		.of_match_table = of_match_ptr(atmel_pwm_dt_ids),
-+	},
-+	.probe = atmel_pwm_probe,
-+	.remove = atmel_pwm_remove,
-+};
-+module_platform_driver(atmel_pwm_driver);
-+
-+MODULE_ALIAS("platform:atmel-pwm");
-+MODULE_AUTHOR("Bo Shen <voice.shen@atmel.com>");
-+MODULE_DESCRIPTION("Atmel PWM driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.9.5
+Best Regards,
+Wenyou Yang
+
+> 
+> Thanks,
+> Bryan
+> 
+> >
+> > Bye
+> >
+> > Wenyou Yang
+> >
+> > >
+> > > Thanks,
+> > > Bryan
