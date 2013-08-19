@@ -1,126 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 19 Aug 2013 21:28:10 +0200
-Subject: [PATCH v2] ARM: ux500: add restart support via prcmu
-Message-ID: <1376940490-13277-1-git-send-email-linus.walleij@linaro.org>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Mon, 19 Aug 2013 12:23:47 -0700
+Subject: [PATCH v4 1/3] ARM: bcm281xx: Add GPIO driver
+In-Reply-To: <2184179.Dja4tiYGvP@lenovo>
+References: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
+ <17431632.gcbUH2MqH0@lenovo>
+ <CAPdLdqn31133KeQgFDcdN8jXDC5qbPn5HOS1mbfOMycMtgDkSg@mail.gmail.com>
+ <2184179.Dja4tiYGvP@lenovo>
+Message-ID: <CAPdLdqk-7dfGK62Y0Og8vzJ9TUz_OAZv3AfFPUDJDy52tPVszQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Baltieri <fabio.baltieri@linaro.org>
+On 19 August 2013 12:11, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> Le lundi 19 ao?t 2013 12:05:55 Markus Mayer a ?crit :
+>> On 19 August 2013 12:02, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> > Hello Markus,
+>> >
+>> > Le lundi 19 ao?t 2013 11:59:19 Markus Mayer a ?crit :
+>> >> From: Markus Mayer <mmayer@broadcom.com>
+>> >>
+>> >> This patch adds the GPIO driver for the bcm281xx family of chips.
+>> >>
+>> >> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+>> >> Reviewed-by: Christian Daudt <csd@broadcom.com>
+>> >> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+>> >> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+>> >> ---
+>> >>
+>> >>  .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   43 ++
+>> >
+>> > Since the vendor prefix has been changed from brcm to bcm, should that
+>> > also be reflected in the Device Tree binding documentation file?
+>>
+>> Actually, it is the other way around. "brcm," was there first, but we
+>> overlooked that and started upstreaming code with the "bcm," vendor
+>> prefix. There are various patches floating around out there to change
+>> our use of "bcm," to "brcm," to make it conform to the established
+>> vendor prefixes.
+>
+> Ermm yes, I realized that after hitting send. Netherless, should this be
+> renamed to "gpio-brcm-kona.txt" directly such that the patches you mention do
+> not have to get updated to patch this one too?
 
-Add necessary code to restart ux500 based machines using
-prcmu_system_reset().
+After long discussions on how to handle the "bcm" vs. "brcm"
+situation, we said we would be renaming the "bcm," vendor prefixes to
+"brcm,", but would otherwise refrain from renaming files, variables,
+function names, etc. except if the file name contains the vendor
+prefix itself.
 
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Rebased to use the new signature of the restart hook
-  taking an enum rather than a char.
----
- arch/arm/mach-ux500/board-mop500.c | 5 ++++-
- arch/arm/mach-ux500/cpu-db8500.c   | 2 +-
- arch/arm/mach-ux500/cpu.c          | 8 ++++++++
- arch/arm/mach-ux500/setup.h        | 3 +++
- 4 files changed, 16 insertions(+), 2 deletions(-)
+The thing is that Broadcom is exclusively using the BCM abbreviation
+internally. Except for our stock ticker, nothing is named "BRCM". :-)
+So, the less "brcm" is out there, the better it is. Unfortunately,
+it's too late for the vendor prefix.
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index df5d27a..4e7ab3a 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -42,7 +42,6 @@
- #include <linux/platform_data/dma-ste-dma40.h>
- 
- #include <asm/mach-types.h>
--#include <asm/mach/arch.h>
- 
- #include "setup.h"
- #include "devices.h"
-@@ -686,6 +685,7 @@ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
- 	.init_time	= ux500_timer_init,
- 	.init_machine	= mop500_init_machine,
- 	.init_late	= ux500_init_late,
-+	.restart        = ux500_restart,
- MACHINE_END
- 
- MACHINE_START(U8520, "ST-Ericsson U8520 Platform HREFP520")
-@@ -695,6 +695,7 @@ MACHINE_START(U8520, "ST-Ericsson U8520 Platform HREFP520")
- 	.init_time	= ux500_timer_init,
- 	.init_machine	= mop500_init_machine,
- 	.init_late	= ux500_init_late,
-+	.restart        = ux500_restart,
- MACHINE_END
- 
- MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
-@@ -705,6 +706,7 @@ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
- 	.init_time	= ux500_timer_init,
- 	.init_machine	= hrefv60_init_machine,
- 	.init_late	= ux500_init_late,
-+	.restart        = ux500_restart,
- MACHINE_END
- 
- MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
-@@ -716,4 +718,5 @@ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
- 	.init_time	= ux500_timer_init,
- 	.init_machine	= snowball_init_machine,
- 	.init_late	= NULL,
-+	.restart        = ux500_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 12eee81..03ec8a2 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -26,7 +26,6 @@
- 
- #include <asm/pmu.h>
- #include <asm/mach/map.h>
--#include <asm/mach/arch.h>
- 
- #include "setup.h"
- #include "devices.h"
-@@ -325,6 +324,7 @@ DT_MACHINE_START(U8500_DT, "ST-Ericsson Ux5x0 platform (Device Tree Support)")
- 	.init_machine	= u8500_init_machine,
- 	.init_late	= NULL,
- 	.dt_compat      = stericsson_dt_platform_compat,
-+	.restart        = ux500_restart,
- MACHINE_END
- 
- #endif
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index e6fb023..5d7eebc 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -31,6 +31,14 @@
- #include "db8500-regs.h"
- #include "id.h"
- 
-+void ux500_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	local_irq_disable();
-+	local_fiq_disable();
-+
-+	prcmu_system_reset(0);
-+}
-+
- /*
-  * FIXME: Should we set up the GPIO domain here?
-  *
-diff --git a/arch/arm/mach-ux500/setup.h b/arch/arm/mach-ux500/setup.h
-index cad3ca8..656324a 100644
---- a/arch/arm/mach-ux500/setup.h
-+++ b/arch/arm/mach-ux500/setup.h
-@@ -11,10 +11,13 @@
- #ifndef __ASM_ARCH_SETUP_H
- #define __ASM_ARCH_SETUP_H
- 
-+#include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <linux/init.h>
- #include <linux/mfd/abx500/ab8500.h>
- 
-+void ux500_restart(enum reboot_mode mode, const char *cmd);
-+
- void __init ux500_map_io(void);
- extern void __init u8500_map_io(void);
- 
+I can see how a file called gpio-bcm-kona.txt talking about the
+"brcm," could be a bit confusing. It's still straight forward enough
+to find out that the definition of "brcm,kona-gpio" is in the
+gpio-bcm-kona.txt file. And the boundary of what's called "brcm" is
+still firm: just the vendor prefix.
+
+But if we renamed it to gpio-brcm-kona.txt, then it would be confusing
+why there are not other files named *brcm* and the boundary of what is
+named how would become quite blurry.
+
+Regards,
+-Markus
+
 -- 
-1.8.1.4
+Markus Mayer
+Broadcom Landing Team
