@@ -1,44 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Aug 2013 10:25:44 -0600
-Subject: [PATCH 2/5] clk: tegra: Add reset only clock node flag and COP
-In-Reply-To: <20130819145353.GP18810@tbergstrom-lnx.Nvidia.com>
-References: <1375874709-10438-1-git-send-email-markz@nvidia.com>
- <1375874709-10438-2-git-send-email-markz@nvidia.com>
- <52027C9B.2030009@wwwdotorg.org>
- <20130819145353.GP18810@tbergstrom-lnx.Nvidia.com>
-Message-ID: <52124708.20205@wwwdotorg.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 19 Aug 2013 13:27:38 -0300
+Subject: [PATCH 0/4] Armada XP clocks for timer
+Message-ID: <1376929658-9953-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2013 08:53 AM, Peter De Schrijver wrote:
-> On Wed, Aug 07, 2013 at 06:58:03PM +0200, Stephen Warren wrote:
->> On 08/07/2013 05:25 AM, Mark Zhang wrote:
->>> From: Peter De Schrijver <pdeschrijver@nvidia.com>
->>>
->>> COP is a reset only clock. So this patch adds NO_CLK support
->>> then adds the COP clock.
->>
->> Do we actually need this clock upstream yet?
->>
->> IIRC, Prashant was working on implementing the common reset API, so I'd
->> prefer not to add any reset-only "clocks" to the clock driver, but
->> rather to simply make sure that the new reset driver exposes them.
->>
-> 
-> It would be better if we can switch to the reset API.
-> 
->>> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
->>
->>>  enum tegra114_clk {
->>> -	rtc = 4, timer = 5, uarta = 6, sdmmc2 = 9, i2s1 = 11, i2c1 = 12,
->>> +	cop = 1, rtc = 4, timer = 5, uarta = 6, sdmmc2 = 9, i2s1 = 11, i2c1 = 12,
->>
->> To make this change, you would also need to edit
->> include/dt-bindings/clock/tegra114-car.h. BTW, why doesn't the Tegra
->> clock driver include that file rather than defining its own enum?
-> 
-> History. include/dt-bindings/clock/tegra114-car.h didn't exist when
-> clk-tegra114.c was written.
+After the recent discussion on the device tree binding for the Armada 370/XP
+clocksource driver, Stephen Warren, Tomasz Figa and others suggested
+that the reference 25 MHz fixed-clock (aka refclk) should have a proper
+device tree representation.
 
-Right, but then someone created tegra114-car.h, but didn't bother to
-follow through and update the clock driver:-(
+(Although that's still debatable, given the 25 MHz fixed-clock seems to be
+used only by the timer/watchdog IP block.)
+
+In addition to that and to be accurate, both timer clock inputs: nbclk and
+refclk should be exposed in the DT node for the Armada XP timer.
+
+Following an excellent suggestion from Sebastian Hesselbarth, here's a
+patchset to accurately model the clock inputs for the timer.
+
+Considering this is very minor improvemente from my previous patchset [1],
+I dare ask about v3.12 inclusion. On the other side, maybe it's too late already
+and it's best to keep it for v3.13.
+
+Patches 1 and 2 apply on v3.11-rc4 plus the commit:
+"ARM: mvebu: Fix the Armada 370/XP timer compatible strings"
+that's already in mvebu/dt.
+
+Patch 3 and 4 applies on tip/timers/core plus the recent series [1].
+
+[1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/260179
+
+Ezequiel Garcia (4):
+  ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
+  ARM: mvebu: Add clock properties to Armada XP timer node
+  clocksource: armada-370-xp: Get reference fixed-clock by name
+  clocksource: armada-370-xp: Fix clock input in devicetree binding
+
+ .../devicetree/bindings/timer/marvell,armada-370-xp-timer.txt |  5 +++--
+ arch/arm/boot/dts/armada-xp.dtsi                              | 11 +++++++++++
+ drivers/clocksource/time-armada-370-xp.c                      |  7 +++++--
+ 3 files changed, 19 insertions(+), 4 deletions(-)
+
+-- 
+1.8.1.5
