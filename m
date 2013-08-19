@@ -1,172 +1,276 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 19 Aug 2013 14:16:01 +0200
-Subject: [PATCH 1/3] dma: imx-sdma: Use struct for driver data
+Date: Mon, 19 Aug 2013 14:16:02 +0200
+Subject: [PATCH 2/3] dma: imx-sdma: Add ROM script addresses to driver
 In-Reply-To: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
 References: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1376914563-10912-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1376914563-10912-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a struct type instead of an enum type for distinguishing between
-different IP versions. This makes it simpler to handle multiple
-differences without cluttering the code with comparisons for certain
-IP versions.
+This adds the ROM script addresses to the SDMA driver needed for the
+driver to work without additional firmware.
+
+The ROM script addresses are SoC specific and in some cases even tapeout
+specific. This makes it necessary to introduce SoC specific and tapeout
+specific bindings for the driver. While extending the binding also make
+the <chip_type> explicit in the binding documentation.
+
+The non tapeout specific variants of the i.MX31/35 bindings are kept
+for compatibility.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/dma/imx-sdma.c | 63 ++++++++++++++++++++++++++------------------------
- 1 file changed, 33 insertions(+), 30 deletions(-)
+ .../devicetree/bindings/dma/fsl-imx-sdma.txt       |   7 +-
+ drivers/dma/imx-sdma.c                             | 180 ++++++++++++++++++++-
+ 2 files changed, 185 insertions(+), 2 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
+index 68cee4f5..4fa814d 100644
+--- a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
++++ b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
+@@ -1,7 +1,12 @@
+ * Freescale Smart Direct Memory Access (SDMA) Controller for i.MX
+ 
+ Required properties:
+-- compatible : Should be "fsl,<chip>-sdma"
++- compatible : Should be "fsl,imx31-sdma", "fsl,imx31-to1-sdma",
++  "fsl,imx31-to2-sdma", "fsl,imx35-sdma", "fsl,imx35-to1-sdma",
++  "fsl,imx35-to2-sdma", "fsl,imx51-sdma", "fsl,imx53-sdma" or
++  "fsl,imx6q-sdma". The -to variants should be preferred since they
++  allow to determnine the correct ROM script addresses needed for
++  the driver to work without additional firmware.
+ - reg : Should contain SDMA registers location and length
+ - interrupts : Should contain SDMA interrupt
+ - #dma-cells : Must be <3>.
 diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 1e44b8c..e3e7e3f 100644
+index e3e7e3f..42142b7 100644
 --- a/drivers/dma/imx-sdma.c
 +++ b/drivers/dma/imx-sdma.c
-@@ -307,9 +307,9 @@ struct sdma_firmware_header {
- 	u32	ram_code_size;
- };
- 
--enum sdma_devtype {
--	IMX31_SDMA,	/* runs on i.mx31 */
--	IMX35_SDMA,	/* runs on i.mx35 and later */
-+struct sdma_driver_data {
-+	int chnenbl0;
-+	int num_events;
+@@ -310,6 +310,7 @@ struct sdma_firmware_header {
+ struct sdma_driver_data {
+ 	int chnenbl0;
+ 	int num_events;
++	struct sdma_script_start_addrs	*script_addrs;
  };
  
  struct sdma_engine {
-@@ -318,8 +318,6 @@ struct sdma_engine {
- 	struct sdma_channel		channel[MAX_DMA_CHANNELS];
- 	struct sdma_channel_control	*channel_control;
- 	void __iomem			*regs;
--	enum sdma_devtype		devtype;
--	unsigned int			num_events;
- 	struct sdma_context_data	*context;
- 	dma_addr_t			context_phys;
- 	struct dma_device		dma_device;
-@@ -327,15 +325,26 @@ struct sdma_engine {
- 	struct clk			*clk_ahb;
- 	spinlock_t			channel_0_lock;
- 	struct sdma_script_start_addrs	*script_addrs;
-+	const struct sdma_driver_data	*drvdata;
-+};
-+
-+struct sdma_driver_data sdma_imx31 = {
-+	.chnenbl0 = SDMA_CHNENBL0_IMX31,
-+	.num_events = 32,
-+};
-+
-+struct sdma_driver_data sdma_imx35 = {
-+	.chnenbl0 = SDMA_CHNENBL0_IMX35,
-+	.num_events = 48,
+@@ -328,23 +329,191 @@ struct sdma_engine {
+ 	const struct sdma_driver_data	*drvdata;
  };
  
++static struct sdma_script_start_addrs sdma_script_imx31_to1 = {
++	.per_2_per_addr = 1677,
++};
++
++static struct sdma_script_start_addrs sdma_script_imx31_to2 = {
++	.ap_2_ap_addr = 423,
++	.ap_2_bp_addr = 829,
++	.bp_2_ap_addr = 1029,
++};
++
+ struct sdma_driver_data sdma_imx31 = {
+ 	.chnenbl0 = SDMA_CHNENBL0_IMX31,
+ 	.num_events = 32,
+ };
+ 
++struct sdma_driver_data sdma_imx31_to1 = {
++	.chnenbl0 = SDMA_CHNENBL0_IMX31,
++	.num_events = 32,
++	.script_addrs = &sdma_script_imx31_to1,
++};
++
++struct sdma_driver_data sdma_imx31_to2 = {
++	.chnenbl0 = SDMA_CHNENBL0_IMX31,
++	.num_events = 32,
++	.script_addrs = &sdma_script_imx31_to2,
++};
++
++static struct sdma_script_start_addrs sdma_script_imx25 = {
++	.ap_2_ap_addr = 729,
++	.uart_2_mcu_addr = 904,
++	.per_2_app_addr = 1255,
++	.mcu_2_app_addr = 834,
++	.uartsh_2_mcu_addr = 1120,
++	.per_2_shp_addr = 1329,
++	.mcu_2_shp_addr = 1048,
++	.ata_2_mcu_addr = 1560,
++	.mcu_2_ata_addr = 1479,
++	.app_2_per_addr = 1189,
++	.app_2_mcu_addr = 770,
++	.shp_2_per_addr = 1407,
++	.shp_2_mcu_addr = 979,
++};
++
++struct sdma_driver_data sdma_imx25 = {
++	.chnenbl0 = SDMA_CHNENBL0_IMX35,
++	.num_events = 48,
++	.script_addrs = &sdma_script_imx25,
++};
++
++static struct sdma_script_start_addrs sdma_script_imx35_to1 = {
++	.ap_2_ap_addr = 642,
++	.uart_2_mcu_addr = 817,
++	.mcu_2_app_addr = 747,
++	.uartsh_2_mcu_addr = 1183,
++	.per_2_shp_addr = 1033,
++	.mcu_2_shp_addr = 961,
++	.ata_2_mcu_addr = 1333,
++	.mcu_2_ata_addr = 1252,
++	.app_2_mcu_addr = 683,
++	.shp_2_per_addr = 1111,
++	.shp_2_mcu_addr = 892,
++};
++
++static struct sdma_script_start_addrs sdma_script_imx35_to2 = {
++	.ap_2_ap_addr = 729,
++	.uart_2_mcu_addr = 904,
++	.per_2_app_addr = 1597,
++	.mcu_2_app_addr = 834,
++	.uartsh_2_mcu_addr = 1270,
++	.per_2_shp_addr = 1120,
++	.mcu_2_shp_addr = 1048,
++	.ata_2_mcu_addr = 1429,
++	.mcu_2_ata_addr = 1339,
++	.app_2_per_addr = 1531,
++	.app_2_mcu_addr = 770,
++	.shp_2_per_addr = 1198,
++	.shp_2_mcu_addr = 979,
++};
++
+ struct sdma_driver_data sdma_imx35 = {
+ 	.chnenbl0 = SDMA_CHNENBL0_IMX35,
+ 	.num_events = 48,
+ };
+ 
++struct sdma_driver_data sdma_imx35_to1 = {
++	.chnenbl0 = SDMA_CHNENBL0_IMX35,
++	.num_events = 48,
++	.script_addrs = &sdma_script_imx35_to1,
++};
++
++struct sdma_driver_data sdma_imx35_to2 = {
++	.chnenbl0 = SDMA_CHNENBL0_IMX35,
++	.num_events = 48,
++	.script_addrs = &sdma_script_imx35_to2,
++};
++
++static struct sdma_script_start_addrs sdma_script_imx51 = {
++	.ap_2_ap_addr = 642,
++	.uart_2_mcu_addr = 817,
++	.mcu_2_app_addr = 747,
++	.mcu_2_shp_addr = 961,
++	.ata_2_mcu_addr = 1473,
++	.mcu_2_ata_addr = 1392,
++	.app_2_per_addr = 1033,
++	.app_2_mcu_addr = 683,
++	.shp_2_per_addr = 1251,
++	.shp_2_mcu_addr = 892,
++};
++
++struct sdma_driver_data sdma_imx51 = {
++	.chnenbl0 = SDMA_CHNENBL0_IMX35,
++	.num_events = 48,
++	.script_addrs = &sdma_script_imx51,
++};
++
++static struct sdma_script_start_addrs sdma_script_imx53 = {
++	.ap_2_ap_addr = 642,
++	.app_2_mcu_addr = 683,
++	.mcu_2_app_addr = 747,
++	.uart_2_mcu_addr = 817,
++	.shp_2_mcu_addr = 891,
++	.mcu_2_shp_addr = 960,
++	.uartsh_2_mcu_addr = 1032,
++	.spdif_2_mcu_addr = 1100,
++	.mcu_2_spdif_addr = 1134,
++	.firi_2_mcu_addr = 1193,
++	.mcu_2_firi_addr = 1290,
++};
++
++struct sdma_driver_data sdma_imx53 = {
++	.chnenbl0 = SDMA_CHNENBL0_IMX35,
++	.num_events = 48,
++	.script_addrs = &sdma_script_imx53,
++};
++
++static struct sdma_script_start_addrs sdma_script_imx6q = {
++	.ap_2_ap_addr = 642,
++	.uart_2_mcu_addr = 817,
++	.mcu_2_app_addr = 747,
++	.per_2_per_addr = 6331,
++	.uartsh_2_mcu_addr = 1032,
++	.mcu_2_shp_addr = 960,
++	.app_2_mcu_addr = 683,
++	.shp_2_mcu_addr = 891,
++	.spdif_2_mcu_addr = 1100,
++	.mcu_2_spdif_addr = 1134,
++};
++
++struct sdma_driver_data sdma_imx6q = {
++	.chnenbl0 = SDMA_CHNENBL0_IMX35,
++	.num_events = 48,
++	.script_addrs = &sdma_script_imx6q,
++};
++
  static struct platform_device_id sdma_devtypes[] = {
  	{
++		.name = "imx25-sdma",
++		.driver_data = (unsigned long)&sdma_imx25,
++	}, {
  		.name = "imx31-sdma",
--		.driver_data = IMX31_SDMA,
-+		.driver_data = (unsigned long)&sdma_imx31,
+ 		.driver_data = (unsigned long)&sdma_imx31,
++	},  {
++		.name = "imx31-to1-sdma",
++		.driver_data = (unsigned long)&sdma_imx31_to1,
++	},  {
++		.name = "imx31-to2-sdma",
++		.driver_data = (unsigned long)&sdma_imx31_to2,
  	}, {
  		.name = "imx35-sdma",
--		.driver_data = IMX35_SDMA,
-+		.driver_data = (unsigned long)&sdma_imx35,
+ 		.driver_data = (unsigned long)&sdma_imx35,
++	},  {
++		.name = "imx35-to1-sdma",
++		.driver_data = (unsigned long)&sdma_imx35_to1,
++	},  {
++		.name = "imx35-to2-sdma",
++		.driver_data = (unsigned long)&sdma_imx35_to2,
++	}, {
++		.name = "imx51-sdma",
++		.driver_data = (unsigned long)&sdma_imx51,
++	}, {
++		.name = "imx53-sdma",
++		.driver_data = (unsigned long)&sdma_imx53,
++	}, {
++		.name = "imx6q-sdma",
++		.driver_data = (unsigned long)&sdma_imx6q,
  	}, {
  		/* sentinel */
  	}
-@@ -343,8 +352,8 @@ static struct platform_device_id sdma_devtypes[] = {
+@@ -352,8 +521,15 @@ static struct platform_device_id sdma_devtypes[] = {
  MODULE_DEVICE_TABLE(platform, sdma_devtypes);
  
  static const struct of_device_id sdma_dt_ids[] = {
--	{ .compatible = "fsl,imx31-sdma", .data = &sdma_devtypes[IMX31_SDMA], },
--	{ .compatible = "fsl,imx35-sdma", .data = &sdma_devtypes[IMX35_SDMA], },
+-	{ .compatible = "fsl,imx31-sdma", .data = &sdma_imx31, },
++	{ .compatible = "fsl,imx6q-sdma", .data = &sdma_imx6q, },
++	{ .compatible = "fsl,imx53-sdma", .data = &sdma_imx53, },
++	{ .compatible = "fsl,imx51-sdma", .data = &sdma_imx51, },
++	{ .compatible = "fsl,imx35-to2-sdma", .data = &sdma_imx35_to2, },
++	{ .compatible = "fsl,imx35-to1-sdma", .data = &sdma_imx35_to1, },
+ 	{ .compatible = "fsl,imx35-sdma", .data = &sdma_imx35, },
++	{ .compatible = "fsl,imx31-to2-sdma", .data = &sdma_imx31_to2, },
++	{ .compatible = "fsl,imx31-to1-sdma", .data = &sdma_imx31_to1, },
 +	{ .compatible = "fsl,imx31-sdma", .data = &sdma_imx31, },
-+	{ .compatible = "fsl,imx35-sdma", .data = &sdma_imx35, },
  	{ /* sentinel */ }
  };
  MODULE_DEVICE_TABLE(of, sdma_dt_ids);
-@@ -356,8 +365,7 @@ MODULE_DEVICE_TABLE(of, sdma_dt_ids);
+@@ -1434,6 +1610,8 @@ static int __init sdma_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err_init;
  
- static inline u32 chnenbl_ofs(struct sdma_engine *sdma, unsigned int event)
- {
--	u32 chnenbl0 = (sdma->devtype == IMX31_SDMA ? SDMA_CHNENBL0_IMX31 :
--						      SDMA_CHNENBL0_IMX35);
-+	u32 chnenbl0 = sdma->drvdata->chnenbl0;
- 	return chnenbl0 + event * 4;
- }
- 
-@@ -733,7 +741,7 @@ static int sdma_config_channel(struct sdma_channel *sdmac)
- 	sdmac->per_addr = 0;
- 
- 	if (sdmac->event_id0) {
--		if (sdmac->event_id0 >= sdmac->sdma->num_events)
-+		if (sdmac->event_id0 >= sdmac->sdma->drvdata->num_events)
- 			return -EINVAL;
- 		sdma_event_enable(sdmac, sdmac->event_id0);
- 	}
-@@ -1218,19 +1226,6 @@ static int __init sdma_init(struct sdma_engine *sdma)
- 	int i, ret;
- 	dma_addr_t ccb_phys;
- 
--	switch (sdma->devtype) {
--	case IMX31_SDMA:
--		sdma->num_events = 32;
--		break;
--	case IMX35_SDMA:
--		sdma->num_events = 48;
--		break;
--	default:
--		dev_err(sdma->dev, "Unknown sdma type %d. aborting\n",
--			sdma->devtype);
--		return -ENODEV;
--	}
--
- 	clk_enable(sdma->clk_ipg);
- 	clk_enable(sdma->clk_ahb);
- 
-@@ -1257,7 +1252,7 @@ static int __init sdma_init(struct sdma_engine *sdma)
- 			MAX_DMA_CHANNELS * sizeof (struct sdma_channel_control));
- 
- 	/* disable all channels */
--	for (i = 0; i < sdma->num_events; i++)
-+	for (i = 0; i < sdma->drvdata->num_events; i++)
- 		writel_relaxed(0, sdma->regs + chnenbl_ofs(sdma, i));
- 
- 	/* All channels have priority 0 */
-@@ -1339,6 +1334,17 @@ static int __init sdma_probe(struct platform_device *pdev)
- 	int i;
- 	struct sdma_engine *sdma;
- 	s32 *saddr_arr;
-+	const struct sdma_driver_data *drvdata = NULL;
-+
-+	if (of_id)
-+		drvdata = of_id->data;
-+	else if (pdev->id_entry)
-+		drvdata = (void *)pdev->id_entry->driver_data;
-+
-+	if (!drvdata) {
-+		dev_err(&pdev->dev, "unable to find driver data\n");
-+		return -EINVAL;
-+	}
- 
- 	sdma = kzalloc(sizeof(*sdma), GFP_KERNEL);
- 	if (!sdma)
-@@ -1347,6 +1353,7 @@ static int __init sdma_probe(struct platform_device *pdev)
- 	spin_lock_init(&sdma->channel_0_lock);
- 
- 	sdma->dev = &pdev->dev;
-+	sdma->drvdata = drvdata;
- 
- 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	irq = platform_get_irq(pdev, 0);
-@@ -1396,10 +1403,6 @@ static int __init sdma_probe(struct platform_device *pdev)
- 	for (i = 0; i < SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1; i++)
- 		saddr_arr[i] = -EINVAL;
- 
--	if (of_id)
--		pdev->id_entry = of_id->data;
--	sdma->devtype = pdev->id_entry->driver_data;
--
- 	dma_cap_set(DMA_SLAVE, sdma->dma_device.cap_mask);
- 	dma_cap_set(DMA_CYCLIC, sdma->dma_device.cap_mask);
++	if (sdma->drvdata->script_addrs)
++		sdma_add_scripts(sdma, sdma->drvdata->script_addrs);
+ 	if (pdata && pdata->script_addrs)
+ 		sdma_add_scripts(sdma, pdata->script_addrs);
  
 -- 
 1.8.4.rc3
