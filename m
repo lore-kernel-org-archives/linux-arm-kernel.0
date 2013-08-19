@@ -1,63 +1,41 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Mon, 19 Aug 2013 12:21:05 +0200
-Subject: [PATCH v2] extcon: palmas: Modified the compatible type to *ti,
- palmas-usb-vid*
-In-Reply-To: <5211E563.6080200@ti.com>
-References: <1376648448-27447-1-git-send-email-kishon@ti.com>
- <520EA5D6.3040409@wwwdotorg.org> <5211A7B3.4040906@ti.com>
- <5211DBB4.6090508@ti.com> <5211E45B.1010109@samsung.com>
- <5211E563.6080200@ti.com>
-Message-ID: <5211F191.7010303@baylibre.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Mon, 19 Aug 2013 11:21:39 +0100
+Subject: [RFC PATCH v2 4/4] of: move of_get_cpu_node implementation to
+ DT core library
+In-Reply-To: <1376691273.25016.5.camel@pasglop>
+References: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376674791-28244-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376674791-28244-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376691273.25016.5.camel@pasglop>
+Message-ID: <5211F1B3.4080206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On 16/08/13 23:14, Benjamin Herrenschmidt wrote:
+> On Fri, 2013-08-16 at 18:39 +0100, Sudeep KarkadaNagesha wrote:
+>> +#ifdef CONFIG_PPC
+>> +               /* Check for historical "ibm,ppc-interrupt-server#s" property
+>> +                * for thread ids on PowerPC. If it doesn't exist fallback to
+>> +                * standard "reg" property.
+>> +                */
+>> +               if (__of_find_n_match_cpu_property(cpun,
+>> +                               "ibm,ppc-interrupt-server#s", cpu, thread))
+>> +                       return cpun;
+>> +#endif
+> 
+> It's not "historical". It's still very much in use and well defined in PAPR :-)
+> 
+By historical, I meant it should not be used in future bindings.
 
-On 19/08/2013 11:29, Kishon Vijay Abraham I wrote:
-> On Monday 19 August 2013 02:54 PM, Chanwoo Choi wrote:
->> On 08/19/2013 05:47 PM, Kishon Vijay Abraham I wrote:
->>> On Monday 19 August 2013 10:35 AM, Kishon Vijay Abraham I wrote:
->>>> Hi,
->>>>
->>>> On Saturday 17 August 2013 03:51 AM, Stephen Warren wrote:
->>>>> On 08/16/2013 04:20 AM, Kishon Vijay Abraham I wrote:
->>>>>> The Palmas device contains only a USB VID detector, so modified the
->>>>>> compatible type to *ti,palmas-usb-vid*.
->>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/extcon/extcon-palmas.txt b/Documentation/devicetree/bindings/extcon/extcon-palmas.txt
+Ah, sorry missed it in ePAPR, because its not under CPU node section.
+What's more interesting is that ePAPR has it as an example for
+non-standard property names :)
 
-That file is not yet in 3.11. Only the twl is there.
-Is this one a rename of the twl one?
+Can I mark it as custom/non-standard instead ? I mainly want to indicate
+that we need to use 'reg' property and not introduce any more custom
+properties for thread ids.
+
+Can I add your ACK with this comment fixed ?
 
 Regards,
-Benoit
-
->>>>>
->>>>>>   PALMAS USB COMPARATOR
->>>>>>   Required Properties:
->>>>>> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
->>>>>> + - compatible : Should be "ti,palmas-usb-vid".
->>>>>
->>>>> Has the old value been published in a release kernel? If so, it makes
->>>>
->>>> No. This was merged only in 3.11-rc1. So I think we should take this version?
->>>> Chanwoo can you take this patch?
->>>
->>> Ah.. the old values will be part of 3.11 kernel. So should we retain the old
->>> values?
->>
->> What is the meaning of old value? previous value related to extcon-twl.txt?
->
-> We were discussing on whether to have "ti,palmas-usb" or "ti,twl6035-usb" in
-> compatible value in addition to "ti,palmas-usb-vid". Stephen wanted the old
-> values ("ti,palmas-usb" or "ti,twl6035-usb") if it has been published in a
-> release kernel.
->>
->> The extcon-twl.txt was included in 3.11 kernel
->
-> Right. Since it's part of 3.11 kernel, I think we should retain the old
-> compatible values.
->
-> Thanks
-> Kishon
->
+Sudeep
