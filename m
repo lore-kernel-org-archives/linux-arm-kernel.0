@@ -1,19 +1,21 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 19 Aug 2013 14:20:38 +0530
-Subject: [PATCH] dma: mxs-dma: remove code left from generic DMA
- binding conversion
-In-Reply-To: <1373966926-13809-1-git-send-email-shawn.guo@linaro.org>
-References: <1373966926-13809-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130819085038.GX32147@intel.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 19 Aug 2013 17:36:14 +0800
+Subject: [PATCH v2] arm: prima2: move to generic reset controller driver
+ framework
+In-Reply-To: <1375175159-13953-1-git-send-email-Baohua.Song@csr.com>
+References: <1375175159-13953-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <CAGsJ_4wZX5Tj92T1q=QcNNk+YhjQ0VLt8zQ9Vepy539GPRuF-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 16, 2013 at 05:28:46PM +0800, Shawn Guo wrote:
-> With all mxs-dma clients moved to use generic DMA helper, the code
-> left from generic DMA binding conversion can be removed now.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-Applied thanks
+2013/7/30 Barry Song <21cnbao@gmail.com>:
+> this moves to generic IP module reset framework, and make other drivers
+> use common device_reset() API.
+>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-~Vinod
+Oolf, do you want to comment on it more, or apply it manually, or want
+me to send a pull request?
+
+-barry
