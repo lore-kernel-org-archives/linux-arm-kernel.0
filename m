@@ -1,69 +1,51 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 19 Aug 2013 12:42:16 -0700
-Subject: [PATCH RFC 2/2] clkdev: Fix race condition in clock lookup from
- device tree
-In-Reply-To: <1376066046-16037-3-git-send-email-s.nawrocki@samsung.com>
-References: <1376066046-16037-1-git-send-email-s.nawrocki@samsung.com>
- <1376066046-16037-3-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20130819194216.4443.2570@quantum>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 19 Aug 2013 21:46:04 +0200
+Subject: [PATCH RESEND] i2c: move of helpers into the core
+In-Reply-To: <1376935183-11218-1-git-send-email-wsa@the-dreams.de>
+References: <1376918361-7014-1-git-send-email-wsa@the-dreams.de>
+ <1376935183-11218-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <20130819194603.GC4961@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2013-08-09 09:34:06)
-> There is currently a race condition in the device tree part of clk_get()
-> function, since the pointer returned from of_clk_get_by_name() may become
-> invalid before __clk_get() call. For example, due to the clock provider
-> driver remove() callback being called in between of_clk_get_by_name()
-> and __clk_get().
-> 
-> Fix this by doing both the look up and __clk_get() operations with the
-> clock providers list mutex held. This ensures that the clock pointer
-> returned from __of_clk_get_from_provider() call and passed to __clk_get()
-> is valid, as long as the clock supplier module first removes its clock
-> provider instance and then does clk_unregister() on the corresponding
-> clocks.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+On Mon, Aug 19, 2013 at 07:59:40PM +0200, Wolfram Sang wrote:
+[...]
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+[...]
+> +#if IS_ENABLED(CONFIG_OF)
+> +static void of_i2c_register_devices(struct i2c_adapter *adap)
+> +{
+[...]
+> +}
+[...]
+> +#endif /* CONFIG_OF */
 
-Reviewed-by: Mike Turquette <mturquette@linaro.org>
+Isn't this missing the dummy implementation for !OF.
 
-I can take this through the clk tree if Russell's ACKs.
+>  static int i2c_do_add_adapter(struct i2c_driver *driver,
+>  			      struct i2c_adapter *adap)
+>  {
+> @@ -1058,6 +1160,8 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
+>  
+>  exit_recovery:
+>  	/* create pre-declared device nodes */
+> +	of_i2c_register_devices(adap);
 
-Regards,
-Mike
+Alternatively you could remove the of_i2c_register_devices() from the
+"#ifdef CONFIG_OF" block so that it will always be compiled. You could
+turn the above into
 
-> ---
->  drivers/clk/clkdev.c |   10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 442a313..4f5c4ef 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -39,7 +39,13 @@ struct clk *of_clk_get(struct device_node *np, int index)
->         if (rc)
->                 return ERR_PTR(rc);
-> 
-> -       clk = of_clk_get_from_provider(&clkspec);
-> +       of_clk_lock();
-> +       clk = __of_clk_get_from_provider(&clkspec);
-> +
-> +       if (!IS_ERR(clk) && !__clk_get(clk))
-> +               clk = ERR_PTR(-ENOENT);
-> +
-> +       of_clk_unlock();
->         of_node_put(clkspec.np);
->         return clk;
->  }
-> @@ -157,7 +163,7 @@ struct clk *clk_get(struct device *dev, const char *con_id)
-> 
->         if (dev) {
->                 clk = of_clk_get_by_name(dev->of_node, con_id);
-> -               if (!IS_ERR(clk) && __clk_get(clk))
-> +               if (!IS_ERR(clk))
->                         return clk;
->         }
-> 
-> --
-> 1.7.9.5
+	if (IS_ENABLED(CONFIG_OF))
+		of_i2c_register_devices(adap);
+
+and let the compiler throw the static function away if it sees that the
+condition is always false.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130819/39b2197d/attachment.sig>
