@@ -1,33 +1,80 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 Aug 2013 17:55:49 +0100
-Subject: [PATCH v4 05/10] arm64: do not initialize arm64_swiotlb if
- dma_ops is already set
-In-Reply-To: <1376565054-24153-5-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1308151200580.4470@kaball.uk.xensource.com>
- <1376565054-24153-5-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130819165549.GD19712@arm.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 19 Aug 2013 13:59:56 -0300
+Subject: [PATCH 1/3] ARM: Introduce atomic MMIO clear/set
+In-Reply-To: <20130812182942.GA28695@mudshark.cambridge.arm.com>
+References: <1376138582-7550-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1376138582-7550-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130812182942.GA28695@mudshark.cambridge.arm.com>
+Message-ID: <20130819165955.GA20522@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 12:10:49PM +0100, Stefano Stabellini wrote:
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: catalin.marinas at arm.com
-> CC: will.deacon at arm.com
-> ---
->  arch/arm64/mm/dma-mapping.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+On Mon, Aug 12, 2013 at 07:29:42PM +0100, Will Deacon wrote:
+> On Sat, Aug 10, 2013 at 01:43:00PM +0100, Ezequiel Garcia wrote:
+> > Some SoC have MMIO regions that are shared across orthogonal
+> > subsystems. This commit implements a possible solution for the
+> > thread-safe access of such regions through a spinlock-protected API
+> > with clear-set semantics.
+> > 
+> > Concurrent access is protected with a single spinlock for the
+> > entire MMIO address space. While this protects shared-registers,
+> > it also serializes access to unrelated/unshared registers.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index 4bd7579..a006e84 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -63,6 +63,8 @@ static struct dma_map_ops arm64_swiotlb_dma_ops = {
->  
->  void __init arm64_swiotlb_init(void)
->  {
-> +	if (dma_ops != NULL)
-> +		return;
->  	dma_ops = &arm64_swiotlb_dma_ops;
->  	swiotlb_init(1);
+> [...]
+> 
+> > +void atomic_io_clear_set(void __iomem *reg, u32 clear, u32 set)
+> > +{
+> > +	spin_lock(&__io_lock);
+> > +	writel((readl(reg) & ~clear) | set, reg);
+> > +	spin_unlock(&__io_lock);
+> > +}
+> 
+> I appreciate that you've lifted this code from a previous driver, but this
+> doesn't really make any sense to me. The spin_unlock operation is
+> essentially a store to normal, cacheable memory, whilst the writel is an
+> __iowmb followed by a store to device memory.
+> 
+> This means that you don't have ordering guarantees between the two accesses
+> outside of the CPU, potentially giving you:
+> 
+> 	spin_lock(&__io_lock);
+> 	spin_unlock(&__io_lock);
+> 	writel((readl(reg) & ~clear) | set, reg);
+> 
+> which is probably not what you want.
+> 
+> I suggest adding an iowmb after the writel if you really need this ordering
+> to be enforced (but this may have a significant performance impact,
+> depending on your SoC).
+> 
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+I don't want to argue with you, given I have zero knowledge about this
+ordering issue. However let me ask you a question.
+
+In arch/arm/include/asm/spinlock.h I'm seeing this comment:
+
+""ARMv6 ticket-based spin-locking.
+A memory barrier is required after we get a lock, and before we
+release it, because V6 CPUs are assumed to have weakly ordered
+memory.""
+
+and also:
+
+static inline void arch_spin_unlock(arch_spinlock_t *lock)
+{
+	smp_mb();
+	lock->tickets.owner++;
+	dsb_sev();
+}
+
+So, knowing this atomic API should work for every ARMv{N}, and not being very
+sure what the call to dsb_sev() does. Would you care to explain how the above
+is *not* enough to guarantee a memory barrier before the spin unlocking?
+
+Thanks!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
