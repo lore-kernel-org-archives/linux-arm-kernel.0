@@ -1,32 +1,103 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 19 Aug 2013 17:29:42 +0200
-Subject: [PATCH v11 0/7] ASoC: fsl-ssi: ac97-slave support
-In-Reply-To: <52123635.1080908@pengutronix.de>
-References: <1376924761-4054-1-git-send-email-mpa@pengutronix.de>
- <5212361D.80405@pengutronix.de> <52123635.1080908@pengutronix.de>
-Message-ID: <20130819152942.GB24669@s25.your-server.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 19 Aug 2013 09:56:46 -0600
+Subject: [PATCH v3 1/5] ARM: add basic Trusted Foundations support
+In-Reply-To: <CAAVeFuJ9tgXRf+QZRK5K8O2X=mKxUZtFgTsB06r4huQrDwZx2A@mail.gmail.com>
+References: <1376360992-1508-1-git-send-email-acourbot@nvidia.com>
+ <1376360992-1508-2-git-send-email-acourbot@nvidia.com>
+ <520BF835.5080309@wwwdotorg.org>
+ <CAAVeFuJ9tgXRf+QZRK5K8O2X=mKxUZtFgTsB06r4huQrDwZx2A@mail.gmail.com>
+Message-ID: <5212403E.9070304@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 05:13:57PM +0200, Marc Kleine-Budde wrote:
-> On 08/19/2013 05:13 PM, Marc Kleine-Budde wrote:
-> > On 08/19/2013 05:05 PM, Markus Pargmann wrote:
-> >> Michael Grzeschik (2):
-> >>       ASoC: fsl-ssi: imx-pcm-fiq bugfix
-> >>       ASoC: fsl: disable ssi irq for imx
-> >>
-> >> Steffen Trumtrar (1):
-> >>       ASoC: fsl-ssi: add SSIEN errata work around
-> > 
-> > You should add you S-o-b to patches from other develops.
-> developers
-yes, I forgot that, thanks
+On 08/18/2013 02:37 AM, Alexandre Courbot wrote:
+> On Thu, Aug 15, 2013 at 6:35 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 08/12/2013 08:29 PM, Alexandre Courbot wrote:
+>>> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+>>> can be invoked  using a consistent smc-based API on all supported
+>>> platforms. This patch adds initial basic support for Trusted
+>>> Foundations using the ARM firmware API. Current features are limited
+>>> to the ability to boot secondary processors.
+>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+>>
+>>> +Trusted Foundations
+>>> +
+>>> +Boards that use the Trusted Foundations secure monitor can signal its
+>>> +presence by declaring a node compatible with "tl,trusted-foundations"
+>>> +(the name and location of the node does not matter).
+>>> +
+>>> +Required properties:
+>>> +- compatible : "tl,trusted-foundations"
+>>
+>>> +- version : Must contain the version number string of the Trusted Foundation
+>>> +     firmware.
+>>
+>> Can the version be queried at run-time from the firmware itself?
+> 
+> I'm afraid there is not, unfortunately. :/
+> 
+>> If not, I wonder if we shouldn't instead encode the version number into
+>> the compatible value.
+> 
+> Why? This would make the node harder to find and would also complicate
+> the case where a given firmware handler can support a given range of
+> versions (which is what I expect will happen).
 
-Markus
+I guess that would be painful. There are probably a lot more valid
+version numbers for a SW firmware interface than there are for a HW IP
+block interface, so it makes less sense to encoded the version into the
+compatible value, at least in cases where the interface is "similar
+enough"; we can add some kind of basic version number into the
+compatible values for radically different interfaces if they appear in
+the future.
 
+>>> diff --git a/arch/arm/firmware/Kconfig b/arch/arm/firmware/Kconfig
+>>
+>>> +config ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
+>>> +     bool
+>>
+>> Shouldn't that be "config ARCH_SUPPORTS_FIRMWARE", since presumably in
+>> the future there will be more entries in the menu, and hence we want the
+>> menu to appear if any of those entries are useful?
+> 
+> The things is that because you support one firmware does not mean you
+> will support then all. Only some set of architectures will support
+> firmware X, and another set (maybe not inclusive) will support
+> firmware Y. We do not want to allow selecting firmware Y if the kernel
+> does not support any of the architectures that may make use of it.
+> 
+>>> +
+>>> +menu "Firmware options"
+>>> +     depends on ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
+>>
+>> Or perhaps that comment is more appropriate for that "depends".
+> 
+> Here the idea is to not show the "Firmware options" menu if the kernel
+> does not include support for any architecture that uses them. As more
+> firmwares get added, the depends line should expand into something
+> like "depends on ARCH_SUPPORTS_FIRMWARE_X || ARCH_SUPPORTS_FIRMWARE_Y
+> || ...
+> 
+> Maybe there's a better way to express this?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Is there a need for a menu at all? I suppose it might group things
+nicely. If so, how about:
+
+config ARCH_SUPPORTS_FIRMWARE
+	bool
+
+config ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
+	bool
+	select ARCH_SUPPORTS_FIRMWARE
+
+config ARCH_SUPPORTS_SOME_OTHER_FW
+	bool
+	select ARCH_SUPPORTS_FIRMWARE
+
+menu "Firmware options"
+	depends on ARCH_SUPPORTS_FIRMWARE
+
+That's probably slightly easier to read than a huge "depends" statement
+in the menu stanza, and ARCH_SUPPORTS_FIRMWARE might be a useful to
+build in support for any core firmware utility code.
