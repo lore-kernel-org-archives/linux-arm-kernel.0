@@ -1,82 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 19 Aug 2013 08:26:13 -0500
-Subject: [PATCH v2] DMA: fix AMBA PL08x compilation issue with 64bit DMA
- address type
-In-Reply-To: <1376907568-18689-1-git-send-email-andre.przywara@linaro.org>
-References: <20130815211515.GF23006@n2100.arm.linux.org.uk>
- <1376907568-18689-1-git-send-email-andre.przywara@linaro.org>
-Message-ID: <52121CF5.1070905@gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 19 Aug 2013 16:38:21 +0300
+Subject: [PATCH] mtd: atmel_nand: pmecc: fix bug fail to correct bit
+ error in 1024-bytes sector
+In-Reply-To: <1376906744-4711-1-git-send-email-josh.wu@atmel.com>
+References: <1376906744-4711-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1376919501.2089.465.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2013 05:19 AM, Andre Przywara wrote:
-> When dma_addr_t is 64 bits long, compilation of the AMBA PL08x DMA
-> driver breaks due to a missing 64bit%8bit modulo operation.
-> Looking more closely the divisor in these operations can only be
-> 1, 2 or 4, so the full featured '%' modulo operation is overkill and
-> can be replaced with simple bit masking.
+On Mon, 2013-08-19 at 18:05 +0800, Josh Wu wrote:
+> The PMECC use BCH algorithm to correct error. In BCH algorithm, the primitive
+> polynomial value is GF(2^13) for 512-bytes sector size. And it is GF(2^14) for
+> 1024-bytes sector size.
 > 
-> Change from v1:
-> Replace open-coded function with existing IS_ALIGNED macro and use a
-> macro around that to avoid a line becoming too long.
+> This patch will choose correct degree of the remainders(13 or 14) for
+> different sector size.
+> Tested in AT91SAM9X5-EK with MLC nand flash.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
-
-Vinod,
-
-Can I have your ack and take this thru arm-soc tree. I'm dependent on
-this to select 64-bit dma_addr_t for highbank.
-
-Rob
-
-> ---
->  drivers/dma/amba-pl08x.c | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
+> More detail can be refered to section 5.4.1 of:
+>   AT91SAM ARM-based Embedded MPU Application Note
+>   <http://www.atmel.com/Images/doc11127.pdf>
 > 
-> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-> index bce5fbf..bff41d4 100644
-> --- a/drivers/dma/amba-pl08x.c
-> +++ b/drivers/dma/amba-pl08x.c
-> @@ -133,6 +133,8 @@ struct pl08x_bus_data {
->  	u8 buswidth;
->  };
->  
-> +#define IS_BUS_ALIGNED(bus) IS_ALIGNED((bus)->addr, (bus)->buswidth)
-> +
->  /**
->   * struct pl08x_phy_chan - holder for the physical channels
->   * @id: physical index to this channel
-> @@ -889,8 +891,8 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
->  				return 0;
->  			}
->  
-> -			if ((bd.srcbus.addr % bd.srcbus.buswidth) ||
-> -					(bd.dstbus.addr % bd.dstbus.buswidth)) {
-> +			if (!IS_BUS_ALIGNED(&bd.srcbus) ||
-> +				!IS_BUS_ALIGNED(&bd.dstbus)) {
->  				dev_err(&pl08x->adev->dev,
->  					"%s src & dst address must be aligned to src"
->  					" & dst width if peripheral is flow controller",
-> @@ -911,9 +913,9 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
->  		 */
->  		if (bd.remainder < mbus->buswidth)
->  			early_bytes = bd.remainder;
-> -		else if ((mbus->addr) % (mbus->buswidth)) {
-> -			early_bytes = mbus->buswidth - (mbus->addr) %
-> -				(mbus->buswidth);
-> +		else if (!IS_BUS_ALIGNED(mbus)) {
-> +			early_bytes = mbus->buswidth -
-> +				(mbus->addr & (mbus->buswidth - 1));
->  			if ((bd.remainder - early_bytes) < mbus->buswidth)
->  				early_bytes = bd.remainder;
->  		}
-> @@ -931,7 +933,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
->  			 * Master now aligned
->  			 * - if slave is not then we must set its width down
->  			 */
-> -			if (sbus->addr % sbus->buswidth) {
-> +			if (!IS_BUS_ALIGNED(sbus)) {
->  				dev_dbg(&pl08x->adev->dev,
->  					"%s set down bus width to one byte\n",
->  					__func__);
-> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+
+Pushed to l2-mtd.git, thanks!
+
+-- 
+Best Regards,
+Artem Bityutskiy
