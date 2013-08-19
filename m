@@ -1,28 +1,41 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 19 Aug 2013 20:56:33 +0200
-Subject: [PATCH RESEND] i2c: move of helpers into the core
-In-Reply-To: <5212624D.5090708@samsung.com>
-References: <1376918361-7014-1-git-send-email-wsa@the-dreams.de>
- <1376935183-11218-1-git-send-email-wsa@the-dreams.de>
- <5212624D.5090708@samsung.com>
-Message-ID: <20130819185633.GA12011@katana>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Mon, 19 Aug 2013 11:59:18 -0700
+Subject: [PATCH v4 0/3] ARM: bcm281xx: GPIO driver
+Message-ID: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series adds the GPIO driver, and its device tree bindings,
+for the Broadcom bcm281xx family of chips.
 
-> However this patch fails to apply onto either v3.11-rc4 or v3.11-rc6:
+Changes since v3:
 
-Argh, did not drop the MPC patch before rebasing :( So either pick the
-patch "i2c: powermac: fix return path on error" before, pull the branch
-[1], or force me to resend ;)
+- removed global variables
+- removed inline functions for register access
+- removed bcm_kona_gpio_request() & bcm_kona_gpio_free()
+- removed bcm_kona_gpio_remove() for now
+- fixed MODULE_DEVICE_TABLE
+- added chip-specific compatibility value to device tree binding
+- added missing "#interrupt-cells = <2>;" to device tree binding
+- device tree binding document comes with code patch (rather than DT patch)
+- turn on GPIO by defaulting to 'y', not by selecting based on platform
+- use symbolic values in device tree file
+- some additional clean-up & error-checking
 
-Thanks!
+Markus Mayer (3):
+  ARM: bcm281xx: Add GPIO driver
+  ARM: bcm281xx: Enable GPIO driver
+  ARM: bcm281xx: Device Tree bindings for GPIO driver
 
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/core-with-of
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130819/8253fb4f/attachment.sig>
+ .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   43 ++
+ arch/arm/boot/dts/bcm11351.dtsi                    |   16 +
+ arch/arm/mach-bcm/Kconfig                          |    1 -
+ drivers/gpio/Kconfig                               |    7 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-bcm-kona.c                       |  658 ++++++++++++++++++++
+ 6 files changed, 725 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
+ create mode 100644 drivers/gpio/gpio-bcm-kona.c
+
+-- 
+1.7.9.5
