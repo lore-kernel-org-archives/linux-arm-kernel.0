@@ -1,168 +1,182 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 19 Aug 2013 20:04:33 +0200
-Subject: [PATCH RFC 2/2] clk: implement clk_unregister
-In-Reply-To: <20130816214841.4443.10515@quantum>
-References: <1375804317-10576-1-git-send-email-s.nawrocki@samsung.com>
- <1375804317-10576-3-git-send-email-s.nawrocki@samsung.com>
- <20130816214841.4443.10515@quantum>
-Message-ID: <52125E31.6090207@samsung.com>
+Date: Mon, 19 Aug 2013 20:22:05 +0200
+Subject: [PATCH RESEND] i2c: move of helpers into the core
+In-Reply-To: <1376935183-11218-1-git-send-email-wsa@the-dreams.de>
+References: <1376918361-7014-1-git-send-email-wsa@the-dreams.de>
+ <1376935183-11218-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <5212624D.5090708@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/16/2013 11:48 PM, Mike Turquette wrote:
-> Quoting Sylwester Nawrocki (2013-08-06 08:51:57)
->> +/*
->> + * Empty clk_ops for unregistered clocks. These are used temporarily
->> + * after clk_unregister() was called on a clock and until last clock
->> + * consumer calls clk_put() and the struct clk object is freed.
->> + */
->> +static int clk_dummy_prepare_enable(struct clk_hw *hw)
->> +{
->> +       return -ENXIO;
->> +}
->> +
->> +static void clk_dummy_disable_unprepare(struct clk_hw *hw)
->> +{
->> +       WARN_ON(1);
->> +}
->> +
->> +static int clk_dummy_set_rate(struct clk_hw *hw, unsigned long rate,
->> +                                       unsigned long parent_rate)
->> +{
->> +       return -ENXIO;
->> +}
->> +
->> +static int clk_dummy_set_parent(struct clk_hw *hw, u8 index)
->> +{
->> +       return -ENXIO;
->> +}
->> +
->> +static const struct clk_ops clk_dummy_ops = {
->> +       .enable         = clk_dummy_prepare_enable,
->> +       .disable        = clk_dummy_disable_unprepare,
->> +       .prepare        = clk_dummy_prepare_enable,
->> +       .unprepare      = clk_dummy_disable_unprepare,
->> +       .set_rate       = clk_dummy_set_rate,
->> +       .set_parent     = clk_dummy_set_parent,
->> +};
+On 08/19/2013 07:59 PM, Wolfram Sang wrote:
+> I2C of helpers used to live in of_i2c.c but experience (from SPI) shows
+> that it is much cleaner to have this in the core. This also removes a
+> circular dependency between the helpers and the core, and so we can
+> finally register child nodes in the core instead of doing this manually
+> in each driver. So, fix the drivers and documentation, too.
 > 
-> Don't use "clk_dummy_*" here. The use of dummy often implies that
-> operations will return success in the absence of actual hardware but
-> these return an error, and rightly so. So maybe rename the functions and
-> clk_ops instance to something like "clk_nodev_*" or "clk_missing_*"?
-
-Hmm, this is more about a driver being removed rather than the device.
-Then perhaps we could make it __clk_nodrv_* or clk_nodrv_* ?
-
->>  /**
->>   * clk_unregister - unregister a currently registered clock
->>   * @clk: clock to unregister
->> - *
->> - * Currently unimplemented.
->>   */
->> -void clk_unregister(struct clk *clk) {}
->> +void clk_unregister(struct clk *clk)
->> +{
->> +       unsigned long flags;
->> +
->> +       clk_prepare_lock();
->> +
->> +       if (!clk || IS_ERR(clk)) {
->> +               pr_err("%s: invalid clock: %p\n", __func__, clk);
->> +               goto out;
->> +       }
->> +
->> +       if (clk->ops == &clk_dummy_ops) {
->> +               pr_err("%s: unregistered clock: %s\n", __func__, clk->name);
->> +               goto out;
->> +       }
->> +       /*
->> +        * Assign dummy clock ops for consumers that might still hold
->> +        * a reference to this clock.
->> +        */
->> +       flags = clk_enable_lock();
->> +       clk->ops = &clk_dummy_ops;
->> +       clk_enable_unlock(flags);
->> +
->> +       if (!hlist_empty(&clk->children)) {
->> +               struct clk *child;
->> +
->> +               /* Reparent all children to the orphan list. */
->> +               hlist_for_each_entry(child, &clk->children, child_node)
->> +                       clk_set_parent(child, NULL);
->> +       }
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> ---
 > 
-> This looks pretty good. A remaining problem is re-loading the clock
-> provider module will have string name conflicts with the old
-> unregistered clocks (but not yet released) clocks during calls to
-> __clk_lookup.
-
-But the clock is being dropped from the clock tree immediately in this
-function. After the hlist_del_init() call below the clock is not present
-on any clocks list. Upon clock release only the memory allocated for
-the clock is freed.
-
-> The best solution would be to refactor clk.c to not use string name
-> lookups but that is probably too big of an issue for the purpose of this
-> series (but it will happen some day).
+> Sigh, hitting the CC threshold on vger again. So resending to the lists only.
+> BTW this patch is based on -rc4 and was tested on an AT91 board. More tests
+> very welcome. Thanks!
 > 
-> A short term solution would be to poison the clock's string name here.
-> Reallocate the clk->name string with some poison data so that name
-> conflicts don't occur. What do you think?
-
-This shouldn't be necessary, for the reason described above. I've tested
-multiple registrations when a clock was being referenced by a consumer
-driver and it worked well.
-
-I'm still a bit unsure about the kref reference counting, but I'd would
-assume it is good to have. It prevents the kernel to crash in some
-situations. Many other subsystems/drivers crash miserably when a driver
-gets unbound using the sysfs "unbind" attribute. However, if it is assumed
-that user space needs to keep track of respective resource references
-and should know what it does when unbinding drivers, then we could probably
-do without the kref. I'm seriously sceptical though about letting user
-space to crash the kernel in fairly simple steps, it just doesn't sound
-right.
-
-> Regards,
-> Mike
 > 
->> +
->> +       clk_debug_unregister(clk);
->> +
->> +       hlist_del_init(&clk->child_node);
->> +
->> +       if (clk->prepare_count)
->> +               pr_warn("%s: unregistering prepared clock: %s\n",
->> +                                       __func__, clk->name);
->> +
->> +       kref_put(&clk->ref, __clk_release);
->> +out:
->> +       clk_prepare_unlock();
->> +}
->>  EXPORT_SYMBOL_GPL(clk_unregister);
->>
->>  static void devm_clk_release(struct device *dev, void *res)
->> @@ -1861,6 +1973,7 @@ int __clk_get(struct clk *clk)
->>         if (!try_module_get(clk->owner))
->>                 return 0;
->>
->> +       kref_get(&clk->ref);
->>         return 1;
->>  }
->>  EXPORT_SYMBOL(__clk_get);
->> @@ -1870,6 +1983,10 @@ void __clk_put(struct clk *clk)
->>         if (!clk || IS_ERR(clk))
->>                 return;
->>
->> +       clk_prepare_lock();
->> +       kref_put(&clk->ref, __clk_release);
->> +       clk_prepare_unlock();
->> +
->>         module_put(clk->owner);
->>  }
->>  EXPORT_SYMBOL(__clk_put);
+>  drivers/i2c/busses/i2c-s3c2410.c                |    2 -
+>  drivers/media/platform/exynos4-is/fimc-is-i2c.c |    3 -
 
---
-Regards,
+For these:
+
+Acked-by: Sylwester Nawrocki <s.nawrocki@amsung.com>
+
+However this patch fails to apply onto either v3.11-rc4 or v3.11-rc6:
+
+Applying: i2c: move of helpers into the core
+fatal: sha1 information is lacking or useless (drivers/i2c/busses/i2c-powermac.c).
+Repository lacks necessary blobs to fall back on 3-way merge.
+Cannot fall back to three-way merge.
+Patch failed at 0001 i2c: move of helpers into the core
+
+
+One nitpick below..
+
+[...]
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index f32ca29..321b7ca 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -23,7 +23,11 @@
+>     SMBus 2.0 support by Mark Studebaker <mdsxyz123@yahoo.com> and
+>     Jean Delvare <khali@linux-fr.org>
+>     Mux support by Rodolfo Giometti <giometti@enneenne.com> and
+> -   Michael Lawnick <michael.lawnick.ext@nsn.com> */
+> +   Michael Lawnick <michael.lawnick.ext@nsn.com>
+> +   OF support is copyright (c) 2008 Jochen Friedrich <jochen@scram.de>
+> +   (based on a previous patch from Jon Smirl <jonsmirl@gmail.com>) and
+> +   (c) 2013  Wolfram Sang <wsa@the-dreams.de>
+> + */
+>  
+>  #include <linux/module.h>
+>  #include <linux/kernel.h>
+> @@ -35,7 +39,9 @@
+>  #include <linux/init.h>
+>  #include <linux/idr.h>
+>  #include <linux/mutex.h>
+> +#include <linux/of.h>
+>  #include <linux/of_device.h>
+> +#include <linux/of_irq.h>
+>  #include <linux/completion.h>
+>  #include <linux/hardirq.h>
+>  #include <linux/irqflags.h>
+> @@ -954,6 +960,102 @@ static void i2c_scan_static_board_info(struct i2c_adapter *adapter)
+>  	up_read(&__i2c_board_lock);
+>  }
+>  
+> +/* of support code */
+
+/* OF support code */
+
+or
+
+/*
+ * Device Tree support code.
+ */
+
+?
+> +#if IS_ENABLED(CONFIG_OF)
+> +static void of_i2c_register_devices(struct i2c_adapter *adap)
+> +{
+> +	void *result;
+> +	struct device_node *node;
+> +
+> +	/* Only register child devices if the adapter has a node pointer set */
+> +	if (!adap->dev.of_node)
+> +		return;
+> +
+> +	dev_dbg(&adap->dev, "of_i2c: walking child nodes\n");
+> +
+> +	for_each_available_child_of_node(adap->dev.of_node, node) {
+> +		struct i2c_board_info info = {};
+> +		struct dev_archdata dev_ad = {};
+> +		const __be32 *addr;
+> +		int len;
+> +
+> +		dev_dbg(&adap->dev, "of_i2c: register %s\n", node->full_name);
+> +
+> +		if (of_modalias_node(node, info.type, sizeof(info.type)) < 0) {
+> +			dev_err(&adap->dev, "of_i2c: modalias failure on %s\n",
+> +				node->full_name);
+> +			continue;
+> +		}
+> +
+> +		addr = of_get_property(node, "reg", &len);
+> +		if (!addr || (len < sizeof(int))) {
+> +			dev_err(&adap->dev, "of_i2c: invalid reg on %s\n",
+> +				node->full_name);
+> +			continue;
+> +		}
+> +
+> +		info.addr = be32_to_cpup(addr);
+> +		if (info.addr > (1 << 10) - 1) {
+> +			dev_err(&adap->dev, "of_i2c: invalid addr=%x on %s\n",
+> +				info.addr, node->full_name);
+> +			continue;
+> +		}
+> +
+> +		info.irq = irq_of_parse_and_map(node, 0);
+> +		info.of_node = of_node_get(node);
+> +		info.archdata = &dev_ad;
+> +
+> +		if (of_get_property(node, "wakeup-source", NULL))
+> +			info.flags |= I2C_CLIENT_WAKE;
+> +
+> +		request_module("%s%s", I2C_MODULE_PREFIX, info.type);
+> +
+> +		result = i2c_new_device(adap, &info);
+> +		if (result == NULL) {
+> +			dev_err(&adap->dev, "of_i2c: Failure registering %s\n",
+> +				node->full_name);
+> +			of_node_put(node);
+> +			irq_dispose_mapping(info.irq);
+> +			continue;
+> +		}
+> +	}
+> +}
+> +
+> +static int of_dev_node_match(struct device *dev, void *data)
+> +{
+> +	return dev->of_node == data;
+> +}
+> +
+> +/* must call put_device() when done with returned i2c_client device */
+> +struct i2c_client *of_find_i2c_device_by_node(struct device_node *node)
+> +{
+> +	struct device *dev;
+> +
+> +	dev = bus_find_device(&i2c_bus_type, NULL, node,
+> +					 of_dev_node_match);
+> +	if (!dev)
+> +		return NULL;
+> +
+> +	return i2c_verify_client(dev);
+> +}
+> +EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
+> +
+> +/* must call put_device() when done with returned i2c_adapter device */
+> +struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
+> +{
+> +	struct device *dev;
+> +
+> +	dev = bus_find_device(&i2c_bus_type, NULL, node,
+> +					 of_dev_node_match);
+> +	if (!dev)
+> +		return NULL;
+> +
+> +	return i2c_verify_adapter(dev);
+> +}
+> +EXPORT_SYMBOL(of_find_i2c_device_by_node);
+> +#endif /* CONFIG_OF */
+
+Thanks,
 Sylwester
