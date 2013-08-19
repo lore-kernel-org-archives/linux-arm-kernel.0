@@ -1,17 +1,33 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 Aug 2013 17:55:03 +0100
-Subject: [PATCH v4 06/10] xen/arm,arm64: move Xen initialization earlier
-In-Reply-To: <1376565054-24153-6-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Mon, 19 Aug 2013 17:55:49 +0100
+Subject: [PATCH v4 05/10] arm64: do not initialize arm64_swiotlb if
+ dma_ops is already set
+In-Reply-To: <1376565054-24153-5-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1308151200580.4470@kaball.uk.xensource.com>
- <1376565054-24153-6-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130819165502.GC19712@arm.com>
+ <1376565054-24153-5-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130819165549.GD19712@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 12:10:50PM +0100, Stefano Stabellini wrote:
+On Thu, Aug 15, 2013 at 12:10:49PM +0100, Stefano Stabellini wrote:
 > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: catalin.marinas at arm.com
+> CC: will.deacon at arm.com
+> ---
+>  arch/arm64/mm/dma-mapping.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 4bd7579..a006e84 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -63,6 +63,8 @@ static struct dma_map_ops arm64_swiotlb_dma_ops = {
+>  
+>  void __init arm64_swiotlb_init(void)
+>  {
+> +	if (dma_ops != NULL)
+> +		return;
+>  	dma_ops = &arm64_swiotlb_dma_ops;
+>  	swiotlb_init(1);
 
-Some explanation on why and how early it needs to be moved?
-
--- 
-Catalin
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
