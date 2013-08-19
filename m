@@ -1,63 +1,233 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 Aug 2013 14:09:00 -0700
-Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
-In-Reply-To: <20130819205736.GA13964@titan.lakedaemon.net>
-References: <20130819160537.1eeb0a9ebc269def138e016b@canb.auug.org.au>
- <20130819205736.GA13964@titan.lakedaemon.net>
-Message-ID: <CAOesGMhRo1X=w=2-pKNz-eXiviWg3aqtVyW=f43RfigTS4dRmg@mail.gmail.com>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Mon, 19 Aug 2013 18:09:41 -0300
+Subject: [PATCH 1/2] clk: sunxi: Add Allwinner A20 gates
+In-Reply-To: <1376766523-9107-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1376766523-9107-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1376766523-9107-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <52128995.1080200@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-it's this commit:
+Hi Maxime,
 
-commit 89602312c5755c87a5ca6ba8ef6b0fce9d510951
-Merge: a0cec78 f23afe2
-Author:     Jason Cooper <jason@lakedaemon.net>
-AuthorDate: Wed Aug 14 18:55:13 2013 +0000
-Commit:     Jason Cooper <jason@lakedaemon.net>
-CommitDate: Wed Aug 14 18:55:13 2013 +0000
-
-    Merge remote-tracking branch 'arm-soc/for-next' into mvebu/drivers
-
-
-
-You merged back the for-next branch from arm-soc into your tree. Big no-no.
-
-
-This brings up the subject of subplatform trees and conflicts and
--next. I wonder if we should ask Stephen to put all these trees in a
-category where if they have any substantial conflicts or weirdness
-like this, that he just drops it for the current -next build instead
-of spending effort on them.
-
-That would give us on arm-soc a chance to sort out things and even
-rebase patches if needed without causing a lot of extra work for sfr.
-
-
--Olof
-
-
-On Mon, Aug 19, 2013 at 1:57 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> Hi Stephen,
+El 17/08/13 16:08, Maxime Ripard escribi?:
+> The Allwinner A20 is almost identical to the earlier A10 SoC from
+> Allwinner on many aspects, including the clocks tree. However, since the
+> A20 has some additionnal IPs compared to the A10, the clock tree isn't
+> exactly the same, especially when it comes to the gated clocks
+> available. We thus need to register different clock gates for the A20.
 >
-> On Mon, Aug 19, 2013 at 04:05:37PM +1000, Stephen Rothwell wrote:
->> Today's linux-next merge of the mvebu tree got conflicts in various files
->> between merges and commits in the arm-soc tree and merges in the mvebu
->> tree.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Code wise it looks good to me, I just have some small comments.
+
+Reviewed-by: Emilio L?pez <emilio@elopez.com.ar>
+
+> ---
+>   Documentation/devicetree/bindings/clock/sunxi.txt  |  3 +
+>   .../bindings/clock/sunxi/sun7i-a20-gates.txt       | 98 ++++++++++++++++++++++
+>   drivers/clk/sunxi/clk-sunxi.c                      | 15 ++++
+>   3 files changed, 116 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt
 >
-> I'm afraid I'm a bit lost...
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index c383d12..00a5c264 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -16,18 +16,21 @@ Required properties:
+>   	"allwinner,sun4i-ahb-gates-clk" - for the AHB gates on A10
+>   	"allwinner,sun5i-a13-ahb-gates-clk" - for the AHB gates on A13
+>   	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
+> +	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
+>   	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
+>   	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+>   	"allwinner,sun4i-apb0-clk" - for the APB0 clock
+>   	"allwinner,sun4i-apb0-gates-clk" - for the APB0 gates on A10
+>   	"allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
+>   	"allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
+> +	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
+>   	"allwinner,sun4i-apb1-clk" - for the APB1 clock
+>   	"allwinner,sun4i-apb1-mux-clk" - for the APB1 clock muxing
+>   	"allwinner,sun4i-apb1-gates-clk" - for the APB1 gates on A10
+>   	"allwinner,sun5i-a13-apb1-gates-clk" - for the APB1 gates on A13
+>   	"allwinner,sun5i-a10s-apb1-gates-clk" - for the APB1 gates on A10s
+>   	"allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
+> +	"allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
+>   	"allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
+>   	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
 >
->> These merges/commits in the mvebu tree appear to be from a previous
->> version of the arm-soc tree that the mvebu tree has been rebased upon.
->> Please don't do that - the arm-soc tree as a whole is not stable.
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt b/Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt
+> new file mode 100644
+> index 0000000..357f4fd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt
+> @@ -0,0 +1,98 @@
+> +Gate clock outputs
+> +------------------
+> +
+> +  * AXI gates ("allwinner,sun4i-axi-gates-clk")
+> +
+> +    DRAM					0
+> +
+> +  * AHB gates ("allwinner,sun7i-a20-ahb-gates-clk")
+> +
+> +    USB0					0
+> +    EHCI0					1
+> +    OHCI0					2
+> +    EHCI1					3
+> +    OHCI1					4
+> +    SS						5
+> +    DMA						6
+> +    BIST					7
+> +    MMC0					8
+> +    MMC1					9
+> +    MMC2					10
+> +    MMC3					11
+> +    MS						12
+> +    NAND					13
+> +    SDRAM					14
+> +
+> +    ACE						16
+> +    EMAC					17
+> +    TS						18
+> +
+> +    SPI0					20
+> +    SPI1					21
+> +    SPI2					22
+> +    SPI3					23
+> +
+> +    SATA					25
+> +
+> +    HSTIMER					28
+> +
+> +    VE						32
+> +    TVD						33
+> +    TVE0					34
+> +    TVE1					35
+> +    LCD0					36
+> +    LCD1					37
+> +
+> +    CSI0					40
+> +    CSI1					41
+> +
+> +    HDMI1					42
+> +    HDMI0					43
+> +    DE_BE0					44
+> +    DE_BE1					45
+> +    DE_FE1					46
+> +    DE_FE1					47
+> +
+> +    GMAC					49
+> +    MP						50
+> +
+> +    MALI400					52
+> +
+> +  * APB0 gates ("allwinner,sun7i-a20-apb0-gates-clk")
+> +
+> +    CODEC					0
+> +    SPDIF					1
+> +    AC97					2
+> +    IIS0					3
+> +    IIS1					4
+> +    PIO						5
+> +    IR0						6
+> +    IR1						7
+> +    IIS2					8
+> +
+> +    KEYPAD					10
+> +
+> +  * APB1 gates ("allwinner,sun7i-a20-apb1-gates-clk")
+> +
+> +    I2C0					0
+> +    I2C1					1
+> +    I2C2					2
+> +    I2C3					3
+> +    CAN						4
+> +    SCR						5
+> +    PS20					6
+> +    PS21					7
+> +
+> +    I2C4					15
+> +    UART0					16
+> +    UART1					17
+> +    UART2					18
+> +    UART3					19
+> +    UART4					20
+> +    UART5					21
+> +    UART6					22
+> +    UART7					23
+> +
+> +Notation:
+> + [*]:  The datasheet didn't mention these, but they are present on AW code
+> + [**]: The datasheet had this marked as "NC" but they are used on AW code
+
+Same comment as on the other series, this can probably be dropped as 
+you're not using it, but it's not a deal breaker as it might come in 
+handy in the future.
+
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index bd01a02..c359775 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -462,6 +462,10 @@ static const __initconst struct gates_data sun6i_a31_ahb1_gates_data = {
+>   	.mask = {0xEDFE7F62, 0x794F931},
+>   };
 >
-> I didn't do anything different from the other times I built for-next.
-> Could you give me a specific example when you build linux-next again?
-> I'll certainly try to avoid it in the future, but it'll be easier if I
-> know what 'it' is. ;-)
+> +static const __initconst struct gates_data sun7i_a20_ahb_gates_data = {
+> +	.mask = { 0x12f77fff, 0x16ff3f },
+> +};
+> +
+>   static const __initconst struct gates_data sun4i_apb0_gates_data = {
+>   	.mask = {0x4EF},
+>   };
+> @@ -474,6 +478,10 @@ static const __initconst struct gates_data sun5i_a13_apb0_gates_data = {
+>   	.mask = {0x61},
+>   };
 >
-> I'll not change for-next today, and we'll see how it goes.
+> +static const __initconst struct gates_data sun7i_a20_apb0_gates_data = {
+> +	.mask = { 0x4ff },
+> +};
+> +
+>   static const __initconst struct gates_data sun4i_apb1_gates_data = {
+>   	.mask = {0xFF00F7},
+>   };
+> @@ -494,6 +502,10 @@ static const __initconst struct gates_data sun6i_a31_apb2_gates_data = {
+>   	.mask = {0x3F000F},
+>   };
 >
-> thx,
+> +static const __initconst struct gates_data sun7i_a20_apb1_gates_data = {
+> +	.mask = { 0xff80ff },
+> +};
+> +
+
+I believe we discussed this already on another series :) I'd rather see 
+A20 support merged than having it stalled because of a style issue though.
+
+>   static void __init sunxi_gates_clk_setup(struct device_node *node,
+>   					 struct gates_data *data)
+>   {
+> @@ -575,13 +587,16 @@ static const __initconst struct of_device_id clk_gates_match[] = {
+>   	{.compatible = "allwinner,sun5i-a10s-ahb-gates-clk", .data = &sun5i_a10s_ahb_gates_data,},
+>   	{.compatible = "allwinner,sun5i-a13-ahb-gates-clk", .data = &sun5i_a13_ahb_gates_data,},
+>   	{.compatible = "allwinner,sun6i-a31-ahb1-gates-clk", .data = &sun6i_a31_ahb1_gates_data,},
+> +	{.compatible = "allwinner,sun7i-a20-ahb-gates-clk", .data = &sun7i_a20_ahb_gates_data,},
+>   	{.compatible = "allwinner,sun4i-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
+>   	{.compatible = "allwinner,sun5i-a10s-apb0-gates-clk", .data = &sun5i_a10s_apb0_gates_data,},
+>   	{.compatible = "allwinner,sun5i-a13-apb0-gates-clk", .data = &sun5i_a13_apb0_gates_data,},
+> +	{.compatible = "allwinner,sun7i-a20-apb0-gates-clk", .data = &sun7i_a20_apb0_gates_data,},
+>   	{.compatible = "allwinner,sun4i-apb1-gates-clk", .data = &sun4i_apb1_gates_data,},
+>   	{.compatible = "allwinner,sun5i-a10s-apb1-gates-clk", .data = &sun5i_a10s_apb1_gates_data,},
+>   	{.compatible = "allwinner,sun5i-a13-apb1-gates-clk", .data = &sun5i_a13_apb1_gates_data,},
+>   	{.compatible = "allwinner,sun6i-a31-apb1-gates-clk", .data = &sun6i_a31_apb1_gates_data,},
+> +	{.compatible = "allwinner,sun7i-a20-apb1-gates-clk", .data = &sun7i_a20_apb1_gates_data,},
+>   	{.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
+>   	{}
+>   };
 >
-> Jason.
+
+Once again, thank you for working on this :) Hopefully I'll have an A20 
+device to do tests on soon.
+
+Cheers,
+
+Emilio
