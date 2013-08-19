@@ -1,74 +1,50 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 19 Aug 2013 12:14:41 +0100
-Subject: [PATCH v2] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <520E701D.6040006@wwwdotorg.org>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
- <1376673599-3967-1-git-send-email-punit.agrawal@arm.com>
- <520E701D.6040006@wwwdotorg.org>
-Message-ID: <5211FE21.4030707@arm.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Mon, 19 Aug 2013 13:20:37 +0200
+Subject: [PATCH 3/7] iommu/arm: replace devm_request_and_ioremap by
+ devm_ioremap_resource
+In-Reply-To: <1376911241-27720-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1376911241-27720-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1376911241-27720-4-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Thanks for the helpful comments.
+Use devm_ioremap_resource instead of devm_request_and_ioremap.
 
-On 16/08/13 19:31, Stephen Warren wrote:
-> On 08/16/2013 11:19 AM, Punit Agrawal wrote:
->> The CCI PMU can profile bus transactions at the master and slave
->> interfaces of the CCI. The PMU can be used to observe an aggregated view
->> of the bus traffic between the various components connected to the CCI.
->>
->> Extend the existing CCI driver to support the PMU by registering a perf
->> backend for it.
->
-> I think this binding addresses my comments, thanks. Just one comment below:
->
->> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
->
->> +		- reg:
->> +			Usage: required
->> +			Value type: <prop-encoded-array>
->
->> +		- interrupts:
->> +			Usage: required
->> +			Value type: <prop-encoded-array>
->
-> That makes it sound like the layout/content of those two properties is
-> the same. That's not true; one is an array of (base, size) cells, and
-> the other is of (phandle, args*) cells. The difference between the data
-> being phandles-vs-integers seems important.
->
-> Perhaps says:
->
-> Value type: Integer cells. Array of register entries, each expressed as
-> a pair of cells, containing base and size.
->
-> Value type: Integer cells. Array of interrupt specifier entries, as
-> defined in ../interrupt-controller/interupts.txt.
->
+This was partly done using the semantic patch
+scripts/coccinelle/api/devm_ioremap_resource.cocci
 
-This is indeed better. I've updated the documentation for "interrupts" 
-but am not sure about changing the "reg" property. The description used 
-here is similar to other "reg" property description in the same file 
-used for other CCI sub-nodes. Do you think this is sufficiently 
-important clarification to change the other instances as well?
+The error-handling code on the call to platform_get_resource was removed
+manually, and the initialization of smmu->size was manually moved lower, to
+take advantage of the NULL test on res performed by devm_ioremap_resource.
 
->> +			Definition: comma-separated list of counter overflow
->
-> Oh, and lists of cells aren't necessarily comma-separated; comma is used
-> between <> but not inside <>, and there's no requirement that each
-> individual interrupt specifier be in its own <>, vs. just aggregating
-> all of them into a single <>.
->
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-I wasn't aware of this. I've now updated the text to remove 
-"comma-separated". Thanks.
+---
+ drivers/iommu/arm-smmu.c |   11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-I'll post an updated version (including some of the improvements 
-suggested here and in the other email by Kumar) soon. Please let me know 
-if you'd prefer to change the description of all instances of "reg" in 
-the file or keep this one as is.
-
-Cheers,
-Punit
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index ebd0a4c..dd91465 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1761,15 +1761,10 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	smmu->dev = dev;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res) {
+-		dev_err(dev, "missing base address/size\n");
+-		return -ENODEV;
+-	}
+-
++	smmu->base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(smmu->base))
++		return PTR_ERR(smmu->base);
+ 	smmu->size = resource_size(res);
+-	smmu->base = devm_request_and_ioremap(dev, res);
+-	if (!smmu->base)
+-		return -EADDRNOTAVAIL;
+ 
+ 	if (of_property_read_u32(dev->of_node, "#global-interrupts",
+ 				 &smmu->num_global_irqs)) {
