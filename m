@@ -1,50 +1,66 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 19 Aug 2013 17:05:53 +0200
-Subject: [PATCH v11 0/7] ASoC: fsl-ssi: ac97-slave support
-Message-ID: <1376924761-4054-1-git-send-email-mpa@pengutronix.de>
+Date: Mon, 19 Aug 2013 17:05:57 +0200
+Subject: [PATCH v11 4/8] ASoC: fsl: Kconfig,
+ visible config items for simple card
+In-Reply-To: <1376924761-4054-1-git-send-email-mpa@pengutronix.de>
+References: <1376924761-4054-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1376924761-4054-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The simple sound card does not automatically select the used
+chipdrivers. This patch makes them user-selectable so simple sound cards
+can be used without a problem.
 
-this series implements ac97-slave support for fsl-ssi and adds a simple generic
-DT sound card.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ sound/soc/fsl/Kconfig | 23 +++++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
 
-Regards,
-
-Markus
-
-Changes in v11:
- - Dropped phycard specific sound patches
- - Added a generic simple DT sound card with support for ac97 using ac97-codec
- - Some new bugfix patches
-
-Markus Pargmann (5):
-      ASoC: imx-pcm-dma: Add missing include
-      ASoC: core: Generic ac97 link reset functions
-      ASoC: generic: simple DT sound card
-      ASoC: fsl: Kconfig, visible config items for simple card
-      ASoC: fsl-ssi: ac97-slave support
-
-Michael Grzeschik (2):
-      ASoC: fsl-ssi: imx-pcm-fiq bugfix
-      ASoC: fsl: disable ssi irq for imx
-
-Steffen Trumtrar (1):
-      ASoC: fsl-ssi: add SSIEN errata work around
-
- .../devicetree/bindings/sound/fsl,ssi.txt          |   4 +
- .../bindings/sound/generic,simple-dt-card.txt      |  28 ++
- .../devicetree/bindings/sound/soc-ac97link.txt     |  28 ++
- include/sound/soc.h                                |   2 +
- sound/soc/fsl/Kconfig                              |  23 +-
- sound/soc/fsl/fsl_ssi.c                            | 369 ++++++++++++++++-----
- sound/soc/fsl/imx-pcm-dma.c                        |   1 +
- sound/soc/generic/Kconfig                          |   1 +
- sound/soc/generic/Makefile                         |   3 +-
- sound/soc/generic/simple-dt-card.c                 | 186 +++++++++++
- sound/soc/soc-core.c                               | 153 +++++++++
- 11 files changed, 711 insertions(+), 87 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/generic,simple-dt-card.txt
- create mode 100644 Documentation/devicetree/bindings/sound/soc-ac97link.txt
- create mode 100644 sound/soc/generic/simple-dt-card.c
+diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
+index 3a4808d..247e340 100644
+--- a/sound/soc/fsl/Kconfig
++++ b/sound/soc/fsl/Kconfig
+@@ -1,5 +1,11 @@
+ config SND_SOC_FSL_SSI
+-	tristate
++	tristate "Freescale SSI unit"
++	help
++	  Say Y here if you want tou use a Freescale SSI unit. This option is
++	  automatically selected if your board has a seperated sound card
++	  driver. If you are using one of the generic drivers, please select
++	  this manually.
++
+ 
+ config SND_SOC_FSL_UTILS
+ 	tristate
+@@ -109,15 +115,24 @@ config SND_SOC_IMX_SSI
+ 	tristate
+ 
+ config SND_SOC_IMX_PCM_FIQ
+-	tristate
++	tristate "i.MX PCM FIQ"
+ 	select FIQ
++	help
++	  Say Y here if you are using a generic soundcard and you have a chip
++	  that with this audio muxer. Otherwise select N.
+ 
+ config SND_SOC_IMX_PCM_DMA
+-	tristate
++	tristate "i.MX PCM DMA"
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
++	help
++	  Say Y here if you are using a generic soundcard and you have a DMA
++	  capable SSI unit. Otherwise select N.
+ 
+ config SND_SOC_IMX_AUDMUX
+-	tristate
++	tristate "i.MX Audio muxer"
++	help
++	  Say Y here if you are using a generic soundcard and you have chip
++	  with this audio muxer. Otherwise select N.
+ 
+ config SND_MXC_SOC_WM1133_EV1
+ 	tristate "Audio on the i.MX31ADS with WM1133-EV1 fitted"
+-- 
+1.8.4.rc3
