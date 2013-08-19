@@ -1,42 +1,37 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 19 Aug 2013 11:52:19 +0200
-Subject: [GIT PULL] Nomadik I2C for v3.12
-Message-ID: <CACRpkdYxUJy3pt8uD6as+7Uz2c_giizhib2s7Gv0GHxNmy-+eQ@mail.gmail.com>
+Date: Mon, 19 Aug 2013 11:56:52 +0200
+Subject: [RFC] ARM: ux500: remove u8500_secondary_startup from INIT
+ section.
+In-Reply-To: <1375360855-25219-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1375360855-25219-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <CACRpkdYo+XpQPo-dVR4Xm33kUdj1NuT0wzU4t3N06LzhSjMO0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On Thu, Aug 1, 2013 at 2:40 PM, Srinivas KANDAGATLA
+<srinivas.kandagatla@st.com> wrote:
 
-here is a single patch for the Nomadik, switching it to use the
-actual I2C silicon instead of bit-banging.
+> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>
+> This patch removes u8500_secondary_startup from _INIT section, there are
+> two  reason for this removal.
+> 1. discarding such a small code does not save much, given the RAM sizes.
+> 2. Having this code discarded, creates corruption issue when we boot
+> smp-kernel with nr_cpus=1 or with single cpu node in DT.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> ---
+> Hi,
+>
+> I did encounter corruption issues on STi CA9 SOCs when a SMP kernel is booted with
+> nr_cpus=1. This boiled down to freeing the __INIT section of the secondary
+> startup code. It looks like two other SOCs(Spear and ux500) might have same
+> issue.
+>
+> Do you think this patch is valid for ux500?
 
-Please pull it into the ARM SoC tree!
+Yes, tentatively applied, I cannot test the patch right now since
+ux500 has some boot regression and I'm hunting the cause.
 
 Yours,
 Linus Walleij
-
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
-
-  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/nomadik-i2c-for-arm-soc
-
-for you to fetch changes up to 66e0c12f9e17a1c97fc358f9e1f5e1dc615e279a:
-
-  ARM: nomadik: switch to use the Nomadik I2C driver (2013-08-07 00:59:06 +0200)
-
-----------------------------------------------------------------
-Enables the standard Nomadik I2C driver for use
-on the original Nomadik instead of using a bit-banged
-driver.
-
-----------------------------------------------------------------
-Linus Walleij (1):
-      ARM: nomadik: switch to use the Nomadik I2C driver
-
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 42 ++++++++++++++++++++++--------
- arch/arm/mach-nomadik/Kconfig              |  1 +
- 2 files changed, 32 insertions(+), 11 deletions(-)
