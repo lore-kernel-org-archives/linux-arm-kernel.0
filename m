@@ -1,37 +1,32 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 19 Aug 2013 13:28:33 -0300
-Subject: [PATCH 1/4] ARM: mvebu: Add the reference 25 MHz fixed-clock to
- Armada XP
-Message-ID: <1376929713-10063-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Mon, 19 Aug 2013 13:28:46 -0300
+Subject: [PATCH 2/4] ARM: mvebu: Add clock properties to Armada XP timer node
+Message-ID: <1376929726-10100-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada XP SoC has a reference 25 MHz fixed-clock that is used in
-some controllers such as the timer and the watchdog. This commit adds
-a DT representation of this clock through a fixed-clock compatible node.
+With the addition of the Armada XP reference clock, we can now model
+accurately the available clock inputs for the timer: namely, nbclk
+and refclk. For each of this clock inputs we assign a name, for the
+driver to select as appropriate.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/armada-xp.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 549151e..50e404e 100644
+index 50e404e..2642f55 100644
 --- a/arch/arm/boot/dts/armada-xp.dtsi
 +++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -162,4 +162,13 @@
+@@ -63,6 +63,8 @@
+ 
+ 			timer at 20300 {
+ 				compatible = "marvell,armada-xp-timer";
++				clocks = <&coreclk 2>, <&refclk>;
++				clock-names = "nbclk", "fixed";
  			};
- 		};
- 	};
-+
-+	clocks {
-+		/* 25 MHz reference crystal */
-+		refclk: oscillator {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <25000000>;
-+		};
-+	};
- };
+ 
+ 			coreclk: mvebu-sar at 18230 {
 -- 
 1.8.1.5
