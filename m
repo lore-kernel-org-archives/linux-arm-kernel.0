@@ -1,43 +1,46 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 19 Aug 2013 13:54:42 -0700
-Subject: Build error: kvm/reset.c
-In-Reply-To: <20130815114150.GC23006@n2100.arm.linux.org.uk>
-References: <20130815114150.GC23006@n2100.arm.linux.org.uk>
-Message-ID: <20130819205442.GC21832@cbox>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 19 Aug 2013 22:54:39 +0200
+Subject: [GIT PULL] KVM/ARM Fixes for 3.11
+In-Reply-To: <1376280781-6539-1-git-send-email-christoffer.dall@linaro.org>
+References: <1376280781-6539-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <5212860F.4050804@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 12:41:50PM +0100, Russell King - ARM Linux wrote:
-> Last night's omap4430-sdp randconfig failed with this error in the KVM code:
+Il 12/08/2013 06:12, Christoffer Dall ha scritto:
+> The following changes since commit e769ece3b129698d2b09811a6f6d304e4eaa8c29:
 > 
-> arch/arm/kvm/reset.c:43:2: error: unknown field 'irq' specified in initializer
+>   KVM: s390: fix pfmf non-quiescing control handling (2013-07-29 09:02:30 +0200)
 > 
-> Configs etc at http://www.arm.linux.org.uk/developer/build/
+> are available in the git repository at:
 > 
-> Tree is my tip plus arm-soc tip plus Linus' tip.
+>   git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-fixes-3.11
+> 
+> for you to fetch changes up to 2184a60de26b94bc5a88de3e5a960ef9ff54ba5a:
+> 
+>   KVM: ARM: Squash len warning (2013-08-11 21:03:39 -0700)
+> 
+> ----------------------------------------------------------------
+> Christoffer Dall (3):
+>       ARM: KVM: Fix 64-bit coprocessor handling
+>       ARM: KVM: Fix unaligned unmap_range leak
+>       KVM: ARM: Squash len warning
+> 
+> Marc Zyngier (1):
+>       arm64: KVM: fix 2-level page tables unmapping
+> 
+>  arch/arm/kvm/coproc.c     |   26 +++++++++++++++++++-------
+>  arch/arm/kvm/coproc.h     |    3 +++
+>  arch/arm/kvm/coproc_a15.c |    6 +++++-
+>  arch/arm/kvm/mmio.c       |    3 ++-
+>  arch/arm/kvm/mmu.c        |   36 +++++++++++++++---------------------
+>  5 files changed, 44 insertions(+), 30 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
+Thanks, pulled and sent to Linus.
 
-hmmm, I'm wondering if this is actually related to:
-http://gcc.gnu.org/bugzilla/show_bug.cgi?id=10676
-
-Can you tell me which GCC version you are using?
-
-I have been unable to reproduce this in any way (unfortunately it seems
-the randconfig generating this error is also not available anymore), but
-this patch may solve the issue:
-
-diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
-index b7840e7..71e08ba 100644
---- a/arch/arm/kvm/reset.c
-+++ b/arch/arm/kvm/reset.c
-@@ -40,7 +40,7 @@ static struct kvm_regs a15_regs_reset = {
- };
- 
- static const struct kvm_irq_level a15_vtimer_irq = {
--	.irq = 27,
-+	{ .irq = 27 },
- 	.level = 1,
- };
- 
-
--Christoffer
+Paolo
