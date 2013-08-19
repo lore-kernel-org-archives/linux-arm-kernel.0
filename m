@@ -1,70 +1,96 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Mon, 19 Aug 2013 12:23:47 -0700
-Subject: [PATCH v4 1/3] ARM: bcm281xx: Add GPIO driver
-In-Reply-To: <2184179.Dja4tiYGvP@lenovo>
-References: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
- <17431632.gcbUH2MqH0@lenovo>
- <CAPdLdqn31133KeQgFDcdN8jXDC5qbPn5HOS1mbfOMycMtgDkSg@mail.gmail.com>
- <2184179.Dja4tiYGvP@lenovo>
-Message-ID: <CAPdLdqk-7dfGK62Y0Og8vzJ9TUz_OAZv3AfFPUDJDy52tPVszQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 19 Aug 2013 14:36:24 -0500
+Subject: [PATCH v5 2/3] drivers: of: add initialization code for dma
+ reserved memory
+In-Reply-To: <52122FF5.7000802@samsung.com>
+References: <1376049119-12655-1-git-send-email-m.szyprowski@samsung.com>
+ <1376049119-12655-3-git-send-email-m.szyprowski@samsung.com>
+ <CAL_JsqJLv-dUb=64vP+OeP8=Usw7=r6RKqJAXCSPryCFGZ89_w@mail.gmail.com>
+ <52089E23.1090406@samsung.com>
+ <CAL_JsqJR_mdCiA8knd3COuZ=DcpuAtdzsCy8tAPMSMq67m=SAw@mail.gmail.com>
+ <52122FF5.7000802@samsung.com>
+Message-ID: <CAL_JsqLGFkU-5vmsiQ8Z9UfZk5SwHf0VY_dc25DkjO0BGuA24A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 August 2013 12:11, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> Le lundi 19 ao?t 2013 12:05:55 Markus Mayer a ?crit :
->> On 19 August 2013 12:02, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> > Hello Markus,
->> >
->> > Le lundi 19 ao?t 2013 11:59:19 Markus Mayer a ?crit :
->> >> From: Markus Mayer <mmayer@broadcom.com>
->> >>
->> >> This patch adds the GPIO driver for the bcm281xx family of chips.
->> >>
->> >> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
->> >> Reviewed-by: Christian Daudt <csd@broadcom.com>
->> >> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
->> >> Reviewed-by: Matt Porter <matt.porter@linaro.org>
->> >> ---
->> >>
->> >>  .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   43 ++
->> >
->> > Since the vendor prefix has been changed from brcm to bcm, should that
->> > also be reflected in the Device Tree binding documentation file?
->>
->> Actually, it is the other way around. "brcm," was there first, but we
->> overlooked that and started upstreaming code with the "bcm," vendor
->> prefix. There are various patches floating around out there to change
->> our use of "bcm," to "brcm," to make it conform to the established
->> vendor prefixes.
+On Mon, Aug 19, 2013 at 9:47 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
 >
-> Ermm yes, I realized that after hitting send. Netherless, should this be
-> renamed to "gpio-brcm-kona.txt" directly such that the patches you mention do
-> not have to get updated to patch this one too?
+>
+> On 8/13/2013 3:00 PM, Rob Herring wrote:
+>>
+>> On Mon, Aug 12, 2013 at 3:34 AM, Marek Szyprowski
+>> <m.szyprowski@samsung.com> wrote:
+>> > Hello,
+>> >
+>> >
+>> > On 8/10/2013 7:33 PM, Rob Herring wrote:
 
-After long discussions on how to handle the "bcm" vs. "brcm"
-situation, we said we would be renaming the "bcm," vendor prefixes to
-"brcm,", but would otherwise refrain from renaming files, variables,
-function names, etc. except if the file name contains the vendor
-prefix itself.
+[snip]
 
-The thing is that Broadcom is exclusively using the BCM abbreviation
-internally. Except for our stock ticker, nothing is named "BRCM". :-)
-So, the less "brcm" is out there, the better it is. Unfortunately,
-it's too late for the vendor prefix.
+>> > early_init_dt_scan_memory() is also called from of_scan_flat_dt() and
+>> > it also implements similar state machine to parse fdt. The only
+>> > difference is the fact that "memory" is a direct child of root node,
+>> > so the state machine is much simpler (there is no need to parse
+>> > /memory/reserved-memory path).
+>> >
+>>
+>> If you have already found the memory node, then why find it again? I
+>> don't think the existing scan functions handle anything but top-level
+>> nodes very well. So doing something like this from
+>> early_init_dt_scan_memory() is what I was thinking. It is a very rough
+>> sketch:
+>>
+>> // find the reserved-memory node
+>> for (ndepth = 0, off = fdt_next_node(blob, parent_offset, &ndepth);
+>>      (off >= 0) && (ndepth > 0);
+>>      off = fdt_next_node(blob, off, &ndepth)) {
+>>      if (ndepth == 1) {
+>>          name = fdt_get_name(blob, off, 0), off);
+>>          if (strcmp(name, "reserved-memory") == 0) {
+>>               parent_offset = off;
+>>               break; // found
+>>      }
+>> }
+>>
+>> // find the child nodes
+>> for (ndepth = 0, off = fdt_next_node(blob, parent_offset, &ndepth);
+>>      (off >= 0) && (ndepth == 1);
+>>      off = fdt_next_node(blob, off, &ndepth)) {
+>>      // now handle each child
+>> }
+>>
+>> These could probably be further refined with some loop iterator macros.
+>
+>
+> The above code looks pretty nice, but there are some problems with it:
+>
+> 1. Although it would look nice to call it from early_init_dt_scan_memory()
+> it won't be possible, because that time it is too early. memblock structures
+> are initialized after a call to early_init_dt_scan_memory() and until that
+> no changes to memory layout are easily possible.
 
-I can see how a file called gpio-bcm-kona.txt talking about the
-"brcm," could be a bit confusing. It's still straight forward enough
-to find out that the definition of "brcm,kona-gpio" is in the
-gpio-bcm-kona.txt file. And the boundary of what's called "brcm" is
-still firm: just the vendor prefix.
+Okay. So the reserved areas have to be setup after memblock_add is
+called. It seems that what exactly early_init_dt_add_memory_arch does
+varies by arch. For example, arm64 directly does a memblock_add call
+and would probably work as I suggested. The arm code just puts the
+information in an intermediate arch specific struct until later. There
+is a lot of room for clean-up in the early DT code to reduce the
+amount of arch code.
 
-But if we renamed it to gpio-brcm-kona.txt, then it would be confusing
-why there are not other files named *brcm* and the boundary of what is
-named how would become quite blurry.
+> 2. Currently there are no fdt parsing functions in the kernel. I've tried
+> to split of_scan_flat_dt() into fdt_next_node() + fdt_get_name() and use
+> them both in of_scan_flat_dt() and above reserved memory parsing functions.
+> In the end I got quite a lot of code, which is still quite hard to follow.
+>
+> Because of the above I decided to resurrect of_scan_flat_dt_by_path()
+> function from the previous version and use #size-cells/#address-cells
+> attributes from root node what in the end simplified reserved memory
+> parsing function. I hope that it can be accepted after such changes
+> without introducing a burden caused by the whole infrastructure for
+> manual parsing fdt.
 
-Regards,
--Markus
+This all looks fine at first glance.
 
--- 
-Markus Mayer
-Broadcom Landing Team
+Rob
