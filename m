@@ -1,28 +1,50 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 19 Aug 2013 17:05:54 +0200
-Subject: [PATCH v11 1/8] ASoC: imx-pcm-dma: Add missing include
-In-Reply-To: <1376924761-4054-1-git-send-email-mpa@pengutronix.de>
-References: <1376924761-4054-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1376924761-4054-2-git-send-email-mpa@pengutronix.de>
+Date: Mon, 19 Aug 2013 17:05:53 +0200
+Subject: [PATCH v11 0/7] ASoC: fsl-ssi: ac97-slave support
+Message-ID: <1376924761-4054-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- sound/soc/fsl/imx-pcm-dma.c | 1 +
- 1 file changed, 1 insertion(+)
+Hi,
 
-diff --git a/sound/soc/fsl/imx-pcm-dma.c b/sound/soc/fsl/imx-pcm-dma.c
-index aa6de5c..4dc1296 100644
---- a/sound/soc/fsl/imx-pcm-dma.c
-+++ b/sound/soc/fsl/imx-pcm-dma.c
-@@ -14,6 +14,7 @@
- #include <linux/platform_device.h>
- #include <linux/dmaengine.h>
- #include <linux/types.h>
-+#include <linux/module.h>
- 
- #include <sound/core.h>
- #include <sound/pcm.h>
--- 
-1.8.4.rc3
+this series implements ac97-slave support for fsl-ssi and adds a simple generic
+DT sound card.
+
+Regards,
+
+Markus
+
+Changes in v11:
+ - Dropped phycard specific sound patches
+ - Added a generic simple DT sound card with support for ac97 using ac97-codec
+ - Some new bugfix patches
+
+Markus Pargmann (5):
+      ASoC: imx-pcm-dma: Add missing include
+      ASoC: core: Generic ac97 link reset functions
+      ASoC: generic: simple DT sound card
+      ASoC: fsl: Kconfig, visible config items for simple card
+      ASoC: fsl-ssi: ac97-slave support
+
+Michael Grzeschik (2):
+      ASoC: fsl-ssi: imx-pcm-fiq bugfix
+      ASoC: fsl: disable ssi irq for imx
+
+Steffen Trumtrar (1):
+      ASoC: fsl-ssi: add SSIEN errata work around
+
+ .../devicetree/bindings/sound/fsl,ssi.txt          |   4 +
+ .../bindings/sound/generic,simple-dt-card.txt      |  28 ++
+ .../devicetree/bindings/sound/soc-ac97link.txt     |  28 ++
+ include/sound/soc.h                                |   2 +
+ sound/soc/fsl/Kconfig                              |  23 +-
+ sound/soc/fsl/fsl_ssi.c                            | 369 ++++++++++++++++-----
+ sound/soc/fsl/imx-pcm-dma.c                        |   1 +
+ sound/soc/generic/Kconfig                          |   1 +
+ sound/soc/generic/Makefile                         |   3 +-
+ sound/soc/generic/simple-dt-card.c                 | 186 +++++++++++
+ sound/soc/soc-core.c                               | 153 +++++++++
+ 11 files changed, 711 insertions(+), 87 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/generic,simple-dt-card.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/soc-ac97link.txt
+ create mode 100644 sound/soc/generic/simple-dt-card.c
