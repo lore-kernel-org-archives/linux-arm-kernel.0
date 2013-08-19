@@ -1,64 +1,30 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 19 Aug 2013 14:33:25 +0800
-Subject: [PATCH] dma: imx-sdma: remove the unused completion
-In-Reply-To: <1373010655-3800-1-git-send-email-b32955@freescale.com>
-References: <1373010655-3800-1-git-send-email-b32955@freescale.com>
-Message-ID: <5211BC35.5080507@freescale.com>
+From: bilhuang@nvidia.com (Bill Huang)
+Date: Sun, 18 Aug 2013 23:33:48 -0700
+Subject: [PATCH 1/1] ARM: tegra: configure power off for Dalmore
+Message-ID: <1376894028-30060-1-git-send-email-bilhuang@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?07?05? 15:50, Huang Shijie ??:
-> After the patch: "2ccaef0 dma: imx-sdma: make channel0 operations atomic",
-> the "done" completion is not used any more.
->
-> Just remove it.
->
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  drivers/dma/imx-sdma.c |    7 -------
->  1 files changed, 0 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index 1e44b8c..2c02a9d 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -243,7 +243,6 @@ struct sdma_engine;
->   * @event_id1		for channels that use 2 events
->   * @word_size		peripheral access size
->   * @buf_tail		ID of the buffer that was processed
-> - * @done		channel completion
->   * @num_bd		max NUM_BD. number of descriptors currently handling
->   */
->  struct sdma_channel {
-> @@ -255,7 +254,6 @@ struct sdma_channel {
->  	unsigned int			event_id1;
->  	enum dma_slave_buswidth		word_size;
->  	unsigned int			buf_tail;
-> -	struct completion		done;
->  	unsigned int			num_bd;
->  	struct sdma_buffer_descriptor	*bd;
->  	dma_addr_t			bd_phys;
-> @@ -547,8 +545,6 @@ static void sdma_tasklet(unsigned long data)
->  {
->  	struct sdma_channel *sdmac = (struct sdma_channel *) data;
->  
-> -	complete(&sdmac->done);
-> -
->  	if (sdmac->flags & IMX_DMA_SG_LOOP)
->  		sdma_handle_channel_loop(sdmac);
->  	else
-> @@ -812,9 +808,6 @@ static int sdma_request_channel(struct sdma_channel *sdmac)
->  	sdma->channel_control[channel].current_bd_ptr = sdmac->bd_phys;
->  
->  	sdma_set_channel_priority(sdmac, MXC_SDMA_DEFAULT_PRIORITY);
-> -
-> -	init_completion(&sdmac->done);
-> -
->  	return 0;
->  out:
->  
-Hi Vinod:
-Could you merge this patch?
+Add DT property to tell the regulator to register pm_power_off to make
+"shutdown" work.
 
-thanks
-Huang Shijie
+Signed-off-by: Bill Huang <bilhuang@nvidia.com>
+---
+ arch/arm/boot/dts/tegra114-dalmore.dts |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index 45056a2..6023028 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -845,6 +845,8 @@
+ 			#interrupt-cells = <2>;
+ 			interrupt-controller;
+ 
++			ti,system-power-controller;
++
+ 			palmas_gpio: gpio {
+ 				compatible = "ti,palmas-gpio";
+ 				gpio-controller;
+-- 
+1.7.9.5
