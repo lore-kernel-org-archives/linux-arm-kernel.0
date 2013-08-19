@@ -1,51 +1,36 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Mon, 19 Aug 2013 15:31:25 -0700
-Subject: [PATCH v4 3/3] ARM: bcm281xx: Device Tree bindings for GPIO driver
-In-Reply-To: <7172097.b0dioE2CoB@flatron>
-References: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
- <1376938761-13657-4-git-send-email-markus.mayer@linaro.org>
- <7172097.b0dioE2CoB@flatron>
-Message-ID: <CAPdLdq=1-sf0ODyRuONTU4RrnTPzgCLpWrkqzcMu+WHZP7B4zQ@mail.gmail.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Mon, 19 Aug 2013 15:38:51 -0700
+Subject: [PATCH] ARM: bcm: Rename board_bcm
+In-Reply-To: <1375989863-17144-1-git-send-email-csd@broadcom.com>
+References: <1375989863-17144-1-git-send-email-csd@broadcom.com>
+Message-ID: <52129E7B.9060708@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 August 2013 14:45, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Markus,
+On 13-08-08 12:24 PM, Christian Daudt wrote:
+> In order to support multiple SoC models in the mach-bcm
+> directory, board_bcm.c is being renamed board_bcm281xx.c
 >
-> The patch looks good overall, just a little nitpick about the commit
-> message.
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> Signed-off-by: Christian Daudt <csd@broadcom.com>
 >
-> On Monday 19 of August 2013 11:59:21 Markus Mayer wrote:
->> GPIO device tree bindings for the Broadcom bcm281xx family of chips
->
-> Device tree bindings are sets of properties and subnodes defined for
-> device nodes used to describe those devices. In other words, bindings are
-> what you have described in numerous files
-> Documentation/devicetree/bindings.
->
-> What this patch is adding is a device node for the GPIO controller of
-> bcm11351.
->
-> Other than that:
->
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+> index 6adb6aec..873817e 100644
+> --- a/arch/arm/mach-bcm/Makefile
+> +++ b/arch/arm/mach-bcm/Makefile
+> @@ -10,6 +10,6 @@
+>   # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   # GNU General Public License for more details.
+>   
+> -obj-$(CONFIG_ARCH_BCM)		:= board_bcm.o bcm_kona_smc.o bcm_kona_smc_asm.o
+> +obj-$(CONFIG_ARCH_BCM)		:= board_bcm281xx.o bcm_kona_smc.o bcm_kona_smc_asm.o
+>   plus_sec := $(call as-instr,.arch_extension sec,+sec)
+>   AFLAGS_bcm_kona_smc_asm.o	:=-Wa,-march=armv7-a$(plus_sec)
+> diff --git a/arch/arm/mach-bcm/board_bcm.c b/arch/arm/mach-bcm/board_bcm281xx.c
+> similarity index 100%
+> rename from arch/arm/mach-bcm/board_bcm.c
+> rename to arch/arm/mach-bcm/board_bcm281xx.c
+Applied to bcm/for-3.12/soc
 
-Thanks. Does this look okay?
-
------
-ARM: bcm281xx: Add device node for the GPIO controller
-
-Add the GPIO controller device node for the Broadcom bcm281xx family of
-chips
------
-
-bcm11351 is one flavour of the bcm281xx family (long story why the
-numbers look completely different), so I'd rather use that in the
-description.
-
-Regards,
--Markus
-
--- 
-Markus Mayer
-Broadcom Landing Team
+  thanks,
+    csd
