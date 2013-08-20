@@ -1,39 +1,46 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 20 Aug 2013 18:41:54 +0200
-Subject: [PATCH] irqchip: gic: Allow setting affinity to offline CPUs
-In-Reply-To: <52139A5B.5040708@codeaurora.org>
-References: <1377015070-26320-1-git-send-email-t.figa@samsung.com>
- <52139A5B.5040708@codeaurora.org>
-Message-ID: <3879851.vmCHJ3AcgQ@amdc1227>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 20 Aug 2013 13:42:53 -0300
+Subject: [PATCH] ARM: omap2: Use a consistent AM33XX SoC option description
+In-Reply-To: <CABxcv=keV2Jf4gDwF477a9Msk6b-RgDBcxK1QyhchWffbKAoXw@mail.gmail.com>
+References: <1375997528-396-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <CABxcv=keV2Jf4gDwF477a9Msk6b-RgDBcxK1QyhchWffbKAoXw@mail.gmail.com>
+Message-ID: <20130820164251.GC4889@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 of August 2013 09:33:31 Stephen Boyd wrote:
-> On 08/20/13 09:11, Tomasz Figa wrote:
-> > Sometimes it is necessary to fix interrupt affinity to an offline CPU,
-> > for example in initialization of local timers. This patch modifies
-> > .set_affinity() operation of irq-gic driver to fall back to any
-> > possible
-> > CPU if no online CPU can be found in requested CPU mask.
-> > 
-> > This fixes broken Exynos4210 support since commit
-> > 
-> > 	ee98d27df6 ARM: EXYNOS4: Divorce mct from local timer API
-> > 
-> > caused by timer initialization code unable to set affinity for local
-> > timer interrupts.
+On Fri, Aug 09, 2013 at 11:18:43AM +0200, Javier Martinez Canillas wrote:
+> On Thu, Aug 8, 2013 at 11:32 PM, Ezequiel Garcia
+> <ezequiel.garcia@free-electrons.com> wrote:
+> > Fix the option description to match the other TI SoCs.
+> > This is just a cosmetic change.
+> >
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  arch/arm/mach-omap2/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> > index 76170dd..56021c6 100644
+> > --- a/arch/arm/mach-omap2/Kconfig
+> > +++ b/arch/arm/mach-omap2/Kconfig
+> > @@ -64,7 +64,7 @@ config SOC_OMAP5
+> >         select ARM_ERRATA_798181 if SMP
+> >
+> >  config SOC_AM33XX
+> > -       bool "AM33XX support"
+> > +       bool "TI AM33XX"
+> >         depends on ARCH_MULTI_V7
+> >         select ARCH_OMAP2PLUS
+> >         select ARM_CPU_SUSPEND if PM
+> > --
+> > 1.8.1.5
+> >
+> >
 > 
-> Care to elaborate further? I don't see how the interrupt affinity is set
-> for a CPU that isn't online because the mct code runs on the CPU that
-> the affinity is being set to.
+> Reviewed-by: Javier Martinez Canillas <javier@dowhile0.org>
 
-Well, please look at secondary_start_kernel() in arch/arm/kernel/smp.c [1]. 
-You can see that notify_cpu_starting() (line 348) that fires the notifier 
-registered in MCT driver is called before set_cpu_online() (line 359) that 
-marks the CPU as online. Also notice that, originally, local timer 
-initialization was happening after set_cpu_online() - see line 365.
-
-[1] - http://lxr.free-electrons.com/source/arch/arm/kernel/smp.c?a=arm#L312
-
-Best regards,
-Tomasz
+ping?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
