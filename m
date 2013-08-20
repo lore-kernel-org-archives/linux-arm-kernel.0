@@ -1,26 +1,34 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 20 Aug 2013 11:56:05 +0300
-Subject: [PATCH v2] clk: tegra: Correct sbc mux width & parent
-In-Reply-To: <5203BB79.1000704@wwwdotorg.org>
-References: <1375941327-4231-1-git-send-email-markz@nvidia.com>
- <5203BB79.1000704@wwwdotorg.org>
-Message-ID: <20130820085605.GS18810@tbergstrom-lnx.Nvidia.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 20 Aug 2013 10:58:32 +0200
+Subject: [PATCH v2 2/3] can: mcp251x: Eliminate irq_flags from driver
+ platform_data
+In-Reply-To: <1376912361-22133-2-git-send-email-shc_work@mail.ru>
+References: <1376912361-22133-1-git-send-email-shc_work@mail.ru>
+ <1376912361-22133-2-git-send-email-shc_work@mail.ru>
+Message-ID: <52132FB8.5030502@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 05:38:33PM +0200, Stephen Warren wrote:
-> On 08/07/2013 11:55 PM, Mark Zhang wrote:
-> > Tegra114 sbc1-sbc6 have more possible parent clocks than Tegra30.
-> > So correct the parents and mux width for them.
+On 08/19/2013 01:39 PM, Alexander Shiyan wrote:
+> Flags is not used by boards, so remove this field from the driver
+> platform_data.
 > 
-> Acked-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Acked-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+Applied to linux-can-next/testing
 
-Note that in downstream we intentionally leave out pllc2 and pllc3 as possible
-parents for clocks which are not controlled using the cbus/shared clock
-mechanism.
+Marc
 
-Cheers,
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Peter.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130820/8905e646/attachment.sig>
