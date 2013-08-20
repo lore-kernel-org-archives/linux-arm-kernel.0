@@ -1,74 +1,170 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 20 Aug 2013 10:31:11 +0800
-Subject: [PATCH v7 09/11] ARM: hi3xxx: add hotplug support
+Date: Tue, 20 Aug 2013 10:31:12 +0800
+Subject: [PATCH v7 10/11] ARM: hi3xxx: add clk-hi3716
 In-Reply-To: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1376965873-14431-10-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1376965873-14431-11-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Zhangfei Gao <zhangfei.gao@linaro.org>
 
-Enable hotplug support on hi3xxx platform
-
-How to test:
-cat proc/interrupts
-echo 0 > /sys/devices/system/cpu/cpuX/online
-cat proc/interrupts
-echo 1 > /sys/devices/system/cpu/cpuX/online
-
 Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Tested-by: Zhang Mingjun <zhang.mingjun@linaro.org>
+Signed-off-by: Zhang Mingjun <zhang.mingjun@linaro.org>
 ---
- arch/arm/mach-hi3xxx/Makefile  |   1 +
- arch/arm/mach-hi3xxx/core.h    |   5 ++
- arch/arm/mach-hi3xxx/hi3xxx.c  |   1 +
- arch/arm/mach-hi3xxx/hotplug.c | 154 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-hi3xxx/platsmp.c |   5 ++
- 5 files changed, 166 insertions(+)
- create mode 100644 arch/arm/mach-hi3xxx/hotplug.c
+ Documentation/devicetree/bindings/clock/hi3716.txt | 121 ++++++++++
+ drivers/clk/Makefile                               |   2 +-
+ drivers/clk/clk-hi3716.c                           | 268 +++++++++++++++++++++
+ 3 files changed, 390 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/hi3716.txt
+ create mode 100644 drivers/clk/clk-hi3716.c
 
-diff --git a/arch/arm/mach-hi3xxx/Makefile b/arch/arm/mach-hi3xxx/Makefile
-index 0917f1c..c597cbf 100644
---- a/arch/arm/mach-hi3xxx/Makefile
-+++ b/arch/arm/mach-hi3xxx/Makefile
-@@ -4,3 +4,4 @@
- 
- obj-y	+= hi3xxx.o system.o
- obj-$(CONFIG_SMP)		+= platsmp.o
-+obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
-diff --git a/arch/arm/mach-hi3xxx/core.h b/arch/arm/mach-hi3xxx/core.h
-index 2cfd643..c2ce35d 100644
---- a/arch/arm/mach-hi3xxx/core.h
-+++ b/arch/arm/mach-hi3xxx/core.h
-@@ -11,4 +11,9 @@ extern void hs_map_io(void);
- extern void hs_restart(enum reboot_mode, const char *cmd);
- extern struct smp_operations hs_smp_ops;
- 
-+extern void __init hs_hotplug_init(void);
-+extern void hs_cpu_die(unsigned int cpu);
-+extern int hs_cpu_kill(unsigned int cpu);
-+extern void hs_set_cpu(int cpu, bool enable);
-+
- #endif
-diff --git a/arch/arm/mach-hi3xxx/hi3xxx.c b/arch/arm/mach-hi3xxx/hi3xxx.c
-index 567a0d5..01ac68b 100644
---- a/arch/arm/mach-hi3xxx/hi3xxx.c
-+++ b/arch/arm/mach-hi3xxx/hi3xxx.c
-@@ -24,6 +24,7 @@
- static void __init hi3xxx_timer_init(void)
- {
- 	hs_map_io();
-+	hs_hotplug_init();
- 	of_clk_init(NULL);
- 	clocksource_of_init();
- }
-diff --git a/arch/arm/mach-hi3xxx/hotplug.c b/arch/arm/mach-hi3xxx/hotplug.c
+diff --git a/Documentation/devicetree/bindings/clock/hi3716.txt b/Documentation/devicetree/bindings/clock/hi3716.txt
 new file mode 100644
-index 0000000..c67f8a2
+index 0000000..60af61e
 --- /dev/null
-+++ b/arch/arm/mach-hi3xxx/hotplug.c
-@@ -0,0 +1,154 @@
++++ b/Documentation/devicetree/bindings/clock/hi3716.txt
+@@ -0,0 +1,121 @@
++Device Tree Clock bindings for hi3716
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Clock control register
++Required properties:
++- compatible : "hisilicon,clkbase"
++- reg : Address and size of clkbase.
++
++Device Clocks
++
++Device clocks are required to have one or both of the following sets of
++properties:
++
++
++Gated device clocks:
++
++Required properties:
++- compatible : "hisilicon,hi3716-clk-gate"
++- gate-reg : shall be the register offset from clkbase and enable bit, reset bit
++- clock-output-names : shall be reference name
++
++
++Mux device clocks:
++
++Required properties:
++- compatible : "hisilicon,hi3716-clk-mux"
++- mux-reg : shall be the register offset from clkbase and mux_shift mux_width
++- mux-table : shall be reg value to be choose clocks accordingly
++- clock-output-names : shall be reference name
++
++
++Fixed divisor device clocks:
++
++Required properties:
++- compatible : "hisilicon,hi3716-fixed-divider"
++- div-table : shall be divisor sequence
++- clock-output-names : shall be reference name according to divisor
++
++
++Fixed pll clocks:
++
++Required properties:
++- compatible : "hisilicon,hi3716-fixed-pll"
++- clock-frequency : shall be output clock frequence sequence
++- clock-output-names : shall be reference name according to clock-frequnce
++
++For example:
++	clkbase at f8a22000 {
++		compatible = "hisilicon,clkbase";
++		reg = <0xf8a22000 0x1000>;
++	};
++
++	osc24m: osc {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24000000>;
++		clock-output-names = "osc24mhz";
++	};
++
++	bpll: bpll {
++		compatible = "hisilicon,hi3716-fixed-pll";
++		#clock-cells = <1>;
++		clocks = <&osc24m>;
++		clock-frequency = <1200000000>,
++				  <600000000>,
++				  <300000000>,
++				  <200000000>,
++				  <150000000>;
++		clock-output-names = "bpll_fout0",
++				     "bpll_fout1",
++				     "bpll_fout2",
++				     "bpll_fout3",
++				     "bpll_fout4";
++	};
++
++	bpll_fout0_div: bpll_fout0_div {/* 1200Mhz */
++		compatible = "hisilicon,hi3716-fixed-divider";
++		#clock-cells = <1>;
++		clocks = <&bpll 0>;
++		div-table = <3 14 25 50>;
++		clock-output-names = "fout0_400m", "fout0_86m",
++					"fout0_48m", "fout0_24m";
++	};
++
++	bpll_fout3_div: bpll_fout3_div {
++		compatible = "hisilicon,hi3716-fixed-divider";
++		#clock-cells = <1>;
++		clocks = <&bpll 3>;
++		div-table = <2 4 5 8>;
++		clock-output-names = "fout3_100m", "fout3_50m",
++					"fout3_40m", "fout3_25m";
++	};
++
++	clk_sfc_mux: clk_sfc_mux {
++		compatible = "hisilicon,hi3716-clk-mux";
++		#clock-cells = <0>;
++		/* clks: 24M 75M 100M 150M 200M */
++		clocks = <&osc24m>, <&bpll_fout2_div>,
++		       <&bpll_fout3_div 0>, <&bpll 4>, <&bpll 3>;
++
++		/* offset mux_shift mux_width */
++		mux-reg = <0x5c 8 3>;
++		/* mux reg value to choose clks */
++		mux-table = <0 7 6 4 5>;
++
++		clock-output-names = "sfc_mux";
++	};
++
++	clk_sfc: clk_sfc {
++		compatible = "hisilicon,hi3716-clk-gate";
++		#clock-cells = <0>;
++		clocks = <&clk_sfc_mux>;
++
++		/* offset, enable, reset */
++		gate-reg = <0x5c 0 4>;
++
++		clock-output-names = "sfc";
++	};
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 2451ce6..b652b3d 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -12,7 +12,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
+ # SoCs specific
+ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+ obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+-obj-$(CONFIG_ARCH_HI3xxx)	+= clk-hi3xxx.o
++obj-$(CONFIG_ARCH_HI3xxx)	+= clk-hi3xxx.o clk-hi3716.o
+ obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+ obj-$(CONFIG_ARCH_NSPIRE)	+= clk-nspire.o
+ obj-$(CONFIG_ARCH_MXS)		+= mxs/
+diff --git a/drivers/clk/clk-hi3716.c b/drivers/clk/clk-hi3716.c
+new file mode 100644
+index 0000000..887ffe9
+--- /dev/null
++++ b/drivers/clk/clk-hi3716.c
+@@ -0,0 +1,268 @@
 +/*
 + * Copyright (c) 2013 Linaro Ltd.
 + * Copyright (c) 2013 Hisilicon Limited.
@@ -77,172 +173,265 @@ index 0000000..c67f8a2
 + * under the terms and conditions of the GNU General Public License,
 + * version 2, as published by the Free Software Foundation.
 + */
-+#include <linux/cpu.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
-+#include "core.h"
 +
-+enum {
-+	HI3620_CTRL,
-+	HI3716_CTRL,
++#include <linux/kernel.h>
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++
++static DEFINE_SPINLOCK(_lock);
++
++static void __iomem *clk_base;
++
++struct hi3716_clk {
++	struct		clk_gate gate;
++	void __iomem	*reg;
++	u8		reset_bit;
 +};
 +
-+static void __iomem *ctrl_base;
-+static int id;
++#define MAX_NUMS	10
 +
-+void hs_set_cpu(int cpu, bool enable)
++static struct hi3716_clk *to_clk_hi3716(struct clk_hw *hw)
 +{
-+	u32 val = 0;
-+
-+	if (!ctrl_base)
-+		return;
-+
-+	if (id == HI3620_CTRL) {
-+		if (enable) {
-+			/* MTCMOS */
-+			writel_relaxed((0x01 << (cpu + 3)), ctrl_base + 0xD0);
-+			writel_relaxed((0x1011 << cpu), ctrl_base + 0x414);
-+			writel_relaxed((0x401011 << cpu), ctrl_base + 0x410);
-+
-+			/* ISO disable */
-+			writel((0x01 << (cpu + 3)), ctrl_base + 0x0C4);
-+
-+			/* WFI Mask */
-+			val = readl(ctrl_base + 0x200);
-+			val &= ~(0x1 << (cpu+28));
-+			writel(val, ctrl_base + 0x200);
-+
-+			/* Enable core */
-+			writel_relaxed((0x01 << cpu), ctrl_base + 0xf4);
-+			/* Unreset */
-+			writel_relaxed((0x401011 << cpu), ctrl_base + 0x414);
-+		} else {
-+			/* iso enable */
-+			writel_relaxed((0x01 << (cpu + 3)), ctrl_base + 0xC0);
-+
-+			/* MTCMOS */
-+			writel_relaxed((0x01 << (cpu + 3)), ctrl_base + 0xD4);
-+
-+			/* wfi mask */
-+			val = readl_relaxed(ctrl_base + 0x200);
-+			val |= (0x1 << (cpu+28));
-+			writel_relaxed(val, ctrl_base + 0x200);
-+
-+			/* disable core*/
-+			writel_relaxed((0x01 << cpu), ctrl_base + 0xf8);
-+			/* Reset */
-+			writel_relaxed((0x401011 << cpu), ctrl_base + 0x410);
-+		}
-+	} else if (id == HI3716_CTRL) {
-+		if (enable) {
-+			/* power on cpu1 */
-+			val = readl_relaxed(ctrl_base + 0x1000);
-+			val &=  ~(0x1 << 8);
-+			val |= (0x1 << 7);
-+			val &= ~(0x1 << 3);
-+			writel_relaxed(val, ctrl_base + 0x1000);
-+
-+			/* unreset */
-+			val = readl_relaxed(ctrl_base + 0x50);
-+			val &= ~(0x1 << 17);
-+			writel_relaxed(val, ctrl_base + 0x50);
-+		} else {
-+			/* power down cpu1 */
-+			val = readl_relaxed(ctrl_base + 0x1000);
-+			val &=  ~(0x1 << 8);
-+			val |= (0x1 << 7);
-+			val |= (0x1 << 3);
-+			writel_relaxed(val, ctrl_base + 0x1000);
-+
-+			/* reset */
-+			val = readl_relaxed(ctrl_base + 0x50);
-+			val |= (0x1 << 17);
-+			writel_relaxed(val, ctrl_base + 0x50);
-+		}
-+	}
++	return container_of(hw, struct hi3716_clk, gate.hw);
 +}
 +
-+void __init hs_hotplug_init(void)
++static void __init hi3716_map_io(void)
 +{
 +	struct device_node *node;
 +
-+	node = of_find_compatible_node(NULL, NULL, "hisilicon,cpuctrl");
-+	if (node) {
-+		ctrl_base = of_iomap(node, 0);
-+		id = HI3716_CTRL;
++	if (clk_base)
++		return;
++
++	node = of_find_compatible_node(NULL, NULL, "hisilicon,clkbase");
++	if (node)
++		clk_base = of_iomap(node, 0);
++	WARN_ON(!clk_base);
++}
++
++static int hi3716_clkgate_prepare(struct clk_hw *hw)
++{
++	struct hi3716_clk *clk = to_clk_hi3716(hw);
++	unsigned long flags = 0;
++	u32 reg;
++
++	spin_lock_irqsave(&_lock, flags);
++
++	reg = readl_relaxed(clk->reg);
++	reg &= ~BIT(clk->reset_bit);
++	writel_relaxed(reg, clk->reg);
++
++	spin_unlock_irqrestore(&_lock, flags);
++
++	return 0;
++}
++
++static void hi3716_clkgate_unprepare(struct clk_hw *hw)
++{
++	struct hi3716_clk *clk = to_clk_hi3716(hw);
++	unsigned long flags = 0;
++	u32 reg;
++
++	spin_lock_irqsave(&_lock, flags);
++
++	reg = readl_relaxed(clk->reg);
++	reg |= BIT(clk->reset_bit);
++	writel_relaxed(reg, clk->reg);
++
++	spin_unlock_irqrestore(&_lock, flags);
++}
++
++static struct clk_ops hi3716_clkgate_ops = {
++	.prepare	= hi3716_clkgate_prepare,
++	.unprepare	= hi3716_clkgate_unprepare,
++};
++
++void __init hi3716_clkgate_setup(struct device_node *node)
++{
++	struct clk *clk;
++	struct hi3716_clk *p_clk;
++	struct clk_init_data init;
++	const char *parent_name;
++	u32 array[3];	/* reg, enable_bit, reset_bit */
++	int err;
++
++	hi3716_map_io();
++	err = of_property_read_u32_array(node, "gate-reg", &array[0], 3);
++	if (WARN_ON(err))
++		return;
++
++	err = of_property_read_string(node, "clock-output-names", &init.name);
++	if (WARN_ON(err))
++		return;
++
++	p_clk = kzalloc(sizeof(*p_clk), GFP_KERNEL);
++	if (WARN_ON(!p_clk))
++		return;
++
++	hi3716_clkgate_ops.enable = clk_gate_ops.enable;
++	hi3716_clkgate_ops.disable = clk_gate_ops.disable;
++	hi3716_clkgate_ops.is_enabled = clk_gate_ops.is_enabled;
++
++	init.ops = &hi3716_clkgate_ops;
++	init.flags = CLK_SET_RATE_PARENT;
++	parent_name = of_clk_get_parent_name(node, 0);
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	p_clk->reg = p_clk->gate.reg = clk_base + array[0];
++	p_clk->gate.bit_idx = array[1];
++	p_clk->gate.flags = 0;
++	p_clk->gate.lock = &_lock;
++	p_clk->gate.hw.init = &init;
++	p_clk->reset_bit = array[2];
++
++	clk = clk_register(NULL, &p_clk->gate.hw);
++	if (WARN_ON(IS_ERR(clk))) {
++		kfree(p_clk);
 +		return;
 +	}
-+	node = of_find_compatible_node(NULL, NULL, "hisilicon,sctrl");
-+	if (node) {
-+		ctrl_base = of_iomap(node, 0);
-+		id = HI3620_CTRL;
++
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++
++static void __init hi3716_clkmux_setup(struct device_node *node)
++{
++	int num = 0, err;
++	void __iomem *reg;
++	unsigned int shift, width;
++	u32 array[3];	/* reg, mux_shift, mux_width */
++	u32 *table = NULL;
++	const char *clk_name = node->name;
++	const char *parents[MAX_NUMS];
++	struct clk *clk;
++
++	hi3716_map_io();
++	err = of_property_read_string(node, "clock-output-names", &clk_name);
++	if (WARN_ON(err))
 +		return;
++
++	err = of_property_read_u32_array(node, "mux-reg", &array[0], 3);
++	if (WARN_ON(err))
++		return;
++
++	reg = clk_base + array[0];
++	shift = array[1];
++	width = array[2];
++
++	while ((num < MAX_NUMS) &&
++		((parents[num] = of_clk_get_parent_name(node, num)) != NULL))
++		num++;
++	if (!num)
++		return;
++
++	table = kzalloc(sizeof(u32 *) * num, GFP_KERNEL);
++	if (WARN_ON(!table))
++		return;
++
++	err = of_property_read_u32_array(node, "mux-table", table, num);
++	if (WARN_ON(err))
++		goto err;
++
++	clk = clk_register_mux_table(NULL, clk_name, parents, num,
++			CLK_SET_RATE_PARENT, reg, shift, BIT(width) - 1,
++			0, table, &_lock);
++	if (WARN_ON(IS_ERR(clk)))
++		goto err;
++
++	clk_register_clkdev(clk, clk_name, NULL);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	return;
++
++err:
++	kfree(table);
++	return;
++}
++
++static void __init hi3716_fixed_pll_setup(struct device_node *node)
++{
++	const char *clk_name, *parent_name;
++	struct clk *clks[MAX_NUMS];
++	u32 rate[MAX_NUMS];
++	struct clk_onecell_data *clk_data;
++	int i, err, nums = 0;
++
++	nums = of_property_count_strings(node, "clock-output-names");
++	if (WARN_ON((nums < 0) || (nums > MAX_NUMS)))
++		return;
++
++	err = of_property_read_u32_array(node, "clock-frequency",
++						&rate[0], nums);
++	WARN_ON(err);
++
++	parent_name = of_clk_get_parent_name(node, 0);
++
++	for (i = 0; i < nums; i++) {
++		err = of_property_read_string_index(node, "clock-output-names",
++				i, &clk_name);
++		WARN_ON(err);
++
++		clks[i] = clk_register_fixed_rate(NULL, clk_name,
++					parent_name, 0, rate[i]);
++		WARN_ON(IS_ERR(clks[i]));
 +	}
++
++	clk_data = kzalloc(sizeof(*clk_data) + nums * sizeof(struct clk *),
++			GFP_KERNEL);
++	if (WARN_ON(!clk_data))
++		return;
++
++	memcpy(&clk_data[1], clks, nums * sizeof(struct clk *));
++	clk_data->clks = (struct clk **)&clk_data[1];
++	clk_data->clk_num = nums;
++	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
 +}
 +
-+static inline void cpu_enter_lowpower(void)
++void __init hi3716_fixed_divider_setup(struct device_node *node)
 +{
-+	unsigned int v;
++	const char *clk_parent;
++	const char *clk_name;
++	u32 div[MAX_NUMS];
++	struct clk *clks[MAX_NUMS];
++	struct clk_onecell_data *clk_data;
++	int err, i, nums = 0;
 +
-+	flush_cache_all();
-+	asm volatile(
-+	/*
-+	 * Turn off coherency and L1 D-cache
-+	 */
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	bic	%0, %0, #0x40\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	"	mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	bic	%0, %0, #0x04\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	  : "=&r" (v)
-+	  : "r" (0)
-+	  : "cc");
++	clk_parent = of_clk_get_parent_name(node, 0);
++
++	nums = of_property_count_strings(node, "clock-output-names");
++	if (WARN_ON((nums < 0) || (nums > MAX_NUMS)))
++		return;
++
++	err = of_property_read_u32_array(node, "div-table", &div[0], nums);
++	WARN_ON(err);
++
++	for (i = 0; i < nums; i++) {
++		err = of_property_read_string_index(node,
++				"clock-output-names", i, &clk_name);
++		WARN_ON(err);
++
++		clks[i] = clk_register_fixed_factor(NULL, clk_name,
++				clk_parent, CLK_SET_RATE_PARENT, 1, div[i]);
++		WARN_ON(IS_ERR(clks[i]));
++	}
++
++	clk_data = kzalloc(sizeof(*clk_data) + nums * sizeof(struct clk *),
++			GFP_KERNEL);
++	if (WARN_ON(!clk_data))
++		return;
++
++	memcpy(&clk_data[1], clks, nums * sizeof(struct clk *));
++	clk_data->clks = (struct clk **)&clk_data[1];
++	clk_data->clk_num = nums;
++	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
 +}
 +
-+void hs_cpu_die(unsigned int cpu)
-+{
-+	cpu_enter_lowpower();
-+	hs_set_cpu_jump(cpu, phys_to_virt(0));
-+	cpu_do_idle();
-+
-+	/* We should have never returned from idle */
-+	panic("cpu %d unexpectedly exit from shutdown\n", cpu);
-+}
-+
-+int hs_cpu_kill(unsigned int cpu)
-+{
-+	unsigned long timeout = jiffies + msecs_to_jiffies(50);
-+
-+	while (hs_get_cpu_jump(cpu))
-+		if (time_after(jiffies, timeout))
-+			return 0;
-+	hs_set_cpu(cpu, false);
-+	return 1;
-+}
-diff --git a/arch/arm/mach-hi3xxx/platsmp.c b/arch/arm/mach-hi3xxx/platsmp.c
-index a76a3cc..6a08630 100644
---- a/arch/arm/mach-hi3xxx/platsmp.c
-+++ b/arch/arm/mach-hi3xxx/platsmp.c
-@@ -32,6 +32,7 @@ static void __init hs_smp_prepare_cpus(unsigned int max_cpus)
- 
- static int hs_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
-+	hs_set_cpu(cpu, true);
- 	hs_set_cpu_jump(cpu, secondary_startup);
- 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
- 	return 0;
-@@ -40,4 +41,8 @@ static int hs_boot_secondary(unsigned int cpu, struct task_struct *idle)
- struct smp_operations hs_smp_ops __initdata = {
- 	.smp_prepare_cpus	= hs_smp_prepare_cpus,
- 	.smp_boot_secondary	= hs_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= hs_cpu_die,
-+	.cpu_kill		= hs_cpu_kill,
-+#endif
- };
++CLK_OF_DECLARE(hi3716_fixed_rate, "fixed-clock", of_fixed_clk_setup)
++CLK_OF_DECLARE(hi3716_fixed_pll, "hisilicon,hi3716-fixed-pll", hi3716_fixed_pll_setup)
++CLK_OF_DECLARE(hi3716_divider, "hisilicon,hi3716-fixed-divider", hi3716_fixed_divider_setup)
++CLK_OF_DECLARE(hi3716_mux, "hisilicon,hi3716-clk-mux", hi3716_clkmux_setup)
++CLK_OF_DECLARE(hi3716_gate, "hisilicon,hi3716-clk-gate", hi3716_clkgate_setup)
 -- 
 1.8.1.2
