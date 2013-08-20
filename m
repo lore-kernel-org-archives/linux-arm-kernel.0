@@ -1,52 +1,40 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 20 Aug 2013 22:01:29 +0200
-Subject: [RFC 05/17] ARM: highbank: remove custom .init_time hook
-In-Reply-To: <5213BF91.3030300@calxeda.com>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376964271-22715-6-git-send-email-sebastian.hesselbarth@gmail.com>
- <5213BF91.3030300@calxeda.com>
-Message-ID: <5213CB19.6000905@gmail.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Tue, 20 Aug 2013 13:12:17 -0700
+Subject: Tegra baseline test results for v3.11-rc6
+Message-ID: <5213CDA1.4070906@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2013 09:12 PM, Rob Herring wrote:
-> On 08/19/2013 09:04 PM, Sebastian Hesselbarth wrote:
->> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
->> remove custom .init_time hooks. Highbank clock provider need a reference
->> to system registers, as a workaround current clk driver maps those
->> independent of arch code now.
->>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> ---
->> Notes:
->> - I suggest to consolidate the four single clock providers into a single
->>    provider with one node if possible.
->
-> And how do you suggest doing that while maintaining the DT ABI?
+Here are some basic Tegra test results for Linux v3.11-rc6.
+Logs and other details at:
 
-Rob,
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.11-rc6/20130818150105/
 
-I am aware of ABI status of the DT bindings and the discussion about
-deprecating/cleanup of what went in in the past. Maybe "suggest" is a
-little bit too strong and should have been "would be nice to have".
 
-But looking at clk-highbank, all providers depend on the same register.
-If you'd introduce e.g. a new "calxeda,core-clocks" that sets up the
-four providers and also CLK_OF_DECLARE the same init with one out of
-the  four existing compatibles shouldn't that maintain backwards
-compatibility?
+Test summary
+------------
 
-Anyway, I was just puting the note above to raise some comment on it.
-You actually gave a good one to leave it as is.
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
->> ---
->>   arch/arm/mach-highbank/highbank.c |   23 +++++++----------------
->>   drivers/clk/clk-highbank.c        |   10 +++++++---
->>   2 files changed, 14 insertions(+), 19 deletions(-)
->
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
 
-Ok, I keep that in mind until all other issues are resolved.
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
 
-Thanks,
-   Sebastian
+
+vmlinux object size
+(delta in bytes from test_v3.11-rc5 (d4e4ab86bcba5a72779c43dc1459f71fea3d89c8)):
+    text     data      bss    total  kernel
+   +1148        0        0    +1148  multi_v7_defconfig
+    +728        0        0     +728  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.11-rc5 (d4e4ab86bcba5a72779c43dc1459f71fea3d89c8))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
+         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
