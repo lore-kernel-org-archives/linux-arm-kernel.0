@@ -1,172 +1,68 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 20 Aug 2013 13:02:46 +0530
-Subject: [PATCH 3/3] ARM: OMAP2+: Let DT say what devices should not to idled
- or reset
-In-Reply-To: <1376983966-16490-1-git-send-email-rnayak@ti.com>
-References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
-Message-ID: <1376983966-16490-4-git-send-email-rnayak@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 20 Aug 2013 09:34:11 +0200
+Subject: [PATCH] ARM: imx27.dtsi: fix CSPI PER clock id
+In-Reply-To: <1376635535-10325-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1376635535-10325-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <20130820073411.GA31060@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have DT bindings to specify which devices on the SoC should not
-be reset or idled, get rid of the same information existing as part of the
-hwmod data files and pass this info from DT instead.
+On Fri, Aug 16, 2013 at 08:45:35AM +0200, Gwenhael Goavec-Merou wrote:
+> CSPI PER clock is per2clk (per2_gate id 60) instead of cspiX_ipg_gate.
+> 
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 
-For GPMC, the HWMOD_INIT_NO_RESET flag seems to be added in hwmod not due to
-any errata around the GPMC IP, but rather because any timings
-set by the bootloader are not being correctly programmed by the kernel.
-This seems like something that needs to be fixed as part of GPMC driver
-in the kernel, and hence the flag is left as is in hwmod, which can be
-removed once the driver does what its expected to.
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/boot/dts/am33xx.dtsi              |    2 ++
- arch/arm/boot/dts/omap4.dtsi               |    3 +++
- arch/arm/boot/dts/omap5.dtsi               |    2 ++
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    4 ++--
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    4 +---
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c |    2 --
- 6 files changed, 10 insertions(+), 7 deletions(-)
+Sascha
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 38b446b..402d373 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -492,6 +492,7 @@
- 			reg = <0x44d00000 0x4000	/* M3 UMEM */
- 			       0x44d80000 0x2000>;	/* M3 DMEM */
- 			ti,hwmods = "wkup_m3";
-+			ti,no-reset;
- 		};
- 
- 		elm: elm at 48080000 {
-@@ -522,6 +523,7 @@
- 		gpmc: gpmc at 50000000 {
- 			compatible = "ti,am3352-gpmc";
- 			ti,hwmods = "gpmc";
-+			ti,no-idle;
- 			reg = <0x50000000 0x2000>;
- 			interrupts = <100>;
- 			gpmc,num-cs = <7>;
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 22d9f2b..9e22399 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -214,6 +214,7 @@
- 			gpmc,num-cs = <8>;
- 			gpmc,num-waitpins = <4>;
- 			ti,hwmods = "gpmc";
-+			ti,no-idle;
- 		};
- 
- 		uart1: serial at 4806a000 {
-@@ -492,6 +493,7 @@
- 			reg = <0x4c000000 0x100>;
- 			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "emif1";
-+			ti,no-idle;
- 			phy-type = <1>;
- 			hw-caps-read-idle-ctrl;
- 			hw-caps-ll-interface;
-@@ -503,6 +505,7 @@
- 			reg = <0x4d000000 0x100>;
- 			interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "emif2";
-+			ti,no-idle;
- 			phy-type = <1>;
- 			hw-caps-read-idle-ctrl;
- 			hw-caps-ll-interface;
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index e643620..85d20af 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -607,6 +607,7 @@
- 		emif1: emif at 0x4c000000 {
- 			compatible	= "ti,emif-4d5";
- 			ti,hwmods	= "emif1";
-+			ti,no-idle;
- 			phy-type	= <2>; /* DDR PHY type: Intelli PHY */
- 			reg = <0x4c000000 0x400>;
- 			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
-@@ -618,6 +619,7 @@
- 		emif2: emif at 0x4d000000 {
- 			compatible	= "ti,emif-4d5";
- 			ti,hwmods	= "emif2";
-+			ti,no-idle;
- 			phy-type	= <2>; /* DDR PHY type: Intelli PHY */
- 			reg = <0x4d000000 0x400>;
- 			interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index d4f0531..f34612b 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -198,7 +198,7 @@ static struct omap_hwmod am33xx_wkup_m3_hwmod = {
- 	.class		= &am33xx_wkup_m3_hwmod_class,
- 	.clkdm_name	= "l4_wkup_aon_clkdm",
- 	/* Keep hardreset asserted */
--	.flags		= HWMOD_INIT_NO_RESET | HWMOD_NO_IDLEST,
-+	.flags		= HWMOD_NO_IDLEST,
- 	.main_clk	= "dpll_core_m4_div2_ck",
- 	.prcm		= {
- 		.omap4	= {
-@@ -926,7 +926,7 @@ static struct omap_hwmod am33xx_gpmc_hwmod = {
- 	.name		= "gpmc",
- 	.class		= &am33xx_gpmc_hwmod_class,
- 	.clkdm_name	= "l3s_clkdm",
--	.flags		= (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET),
-+	.flags		= HWMOD_INIT_NO_RESET,
- 	.main_clk	= "l3s_gclk",
- 	.prcm		= {
- 		.omap4	= {
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 1e5b12c..a507a70 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -914,7 +914,6 @@ static struct omap_hwmod omap44xx_emif1_hwmod = {
- 	.name		= "emif1",
- 	.class		= &omap44xx_emif_hwmod_class,
- 	.clkdm_name	= "l3_emif_clkdm",
--	.flags		= HWMOD_INIT_NO_IDLE,
- 	.main_clk	= "ddrphy_ck",
- 	.prcm = {
- 		.omap4 = {
-@@ -930,7 +929,6 @@ static struct omap_hwmod omap44xx_emif2_hwmod = {
- 	.name		= "emif2",
- 	.class		= &omap44xx_emif_hwmod_class,
- 	.clkdm_name	= "l3_emif_clkdm",
--	.flags		= HWMOD_INIT_NO_IDLE,
- 	.main_clk	= "ddrphy_ck",
- 	.prcm = {
- 		.omap4 = {
-@@ -1184,7 +1182,7 @@ static struct omap_hwmod omap44xx_gpmc_hwmod = {
- 	 * the kernel from the board file or DT data.
- 	 * HWMOD_INIT_NO_RESET should be removed ASAP.
- 	 */
--	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
-+	.flags		= HWMOD_INIT_NO_RESET,
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = OMAP4_CM_L3_2_GPMC_CLKCTRL_OFFSET,
-diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-index 5483c6d..2cdc194 100644
---- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-@@ -353,7 +353,6 @@ static struct omap_hwmod omap54xx_emif1_hwmod = {
- 	.name		= "emif1",
- 	.class		= &omap54xx_emif_hwmod_class,
- 	.clkdm_name	= "emif_clkdm",
--	.flags		= HWMOD_INIT_NO_IDLE,
- 	.main_clk	= "dpll_core_h11x2_ck",
- 	.prcm = {
- 		.omap4 = {
-@@ -369,7 +368,6 @@ static struct omap_hwmod omap54xx_emif2_hwmod = {
- 	.name		= "emif2",
- 	.class		= &omap54xx_emif_hwmod_class,
- 	.clkdm_name	= "emif_clkdm",
--	.flags		= HWMOD_INIT_NO_IDLE,
- 	.main_clk	= "dpll_core_h11x2_ck",
- 	.prcm = {
- 		.omap4 = {
+> ---
+>  arch/arm/boot/dts/imx27.dtsi | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> index 0695264..f71d233 100644
+> --- a/arch/arm/boot/dts/imx27.dtsi
+> +++ b/arch/arm/boot/dts/imx27.dtsi
+> @@ -152,7 +152,7 @@
+>  				compatible = "fsl,imx27-cspi";
+>  				reg = <0x1000e000 0x1000>;
+>  				interrupts = <16>;
+> -				clocks = <&clks 53>, <&clks 53>;
+> +				clocks = <&clks 53>, <&clks 60>;
+>  				clock-names = "ipg", "per";
+>  				status = "disabled";
+>  			};
+> @@ -163,7 +163,7 @@
+>  				compatible = "fsl,imx27-cspi";
+>  				reg = <0x1000f000 0x1000>;
+>  				interrupts = <15>;
+> -				clocks = <&clks 52>, <&clks 52>;
+> +				clocks = <&clks 52>, <&clks 60>;
+>  				clock-names = "ipg", "per";
+>  				status = "disabled";
+>  			};
+> @@ -266,7 +266,7 @@
+>  				compatible = "fsl,imx27-cspi";
+>  				reg = <0x10017000 0x1000>;
+>  				interrupts = <6>;
+> -				clocks = <&clks 51>, <&clks 51>;
+> +				clocks = <&clks 51>, <&clks 60>;
+>  				clock-names = "ipg", "per";
+>  				status = "disabled";
+>  			};
+> -- 
+> 1.8.1.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
