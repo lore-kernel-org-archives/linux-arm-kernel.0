@@ -1,104 +1,80 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 20 Aug 2013 10:27:18 -0700
-Subject: [PATCH] ARM: bcm: Make secure API call optional
-In-Reply-To: <1375989594-12193-1-git-send-email-csd@broadcom.com>
-References: <1375989594-12193-1-git-send-email-csd@broadcom.com>
-Message-ID: <5213A6F6.4070105@broadcom.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 20 Aug 2013 19:31:32 +0200
+Subject: [PATCH RFC 1/2] clk: Provide not locked variant of
+ of_clk_get_from_provider()
+In-Reply-To: <20130819195016.GU23006@n2100.arm.linux.org.uk>
+References: <1376066046-16037-1-git-send-email-s.nawrocki@samsung.com>
+ <1376066046-16037-2-git-send-email-s.nawrocki@samsung.com>
+ <20130819194132.4443.4807@quantum>
+ <20130819195016.GU23006@n2100.arm.linux.org.uk>
+Message-ID: <5213A7F4.7050200@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-08-08 12:19 PM, Christian Daudt wrote:
-> The current bcm_kona_smc_init function throws a BUG_ON if there's no SMC
-> device node defined in the device tree.
->
-> Since secure API access is optional depending the chip configuration,
-> fix this by allowing the rest of the code to run even if there's no SMC
-> device node defined
->
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> Signed-off-by: Christian Daudt <csd@broadcom.com>
->
-> diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
-> index 56d9d19..e32c1b3 100644
-> --- a/arch/arm/mach-bcm/bcm_kona_smc.c
-> +++ b/arch/arm/mach-bcm/bcm_kona_smc.c
-> @@ -41,13 +41,14 @@ static const struct of_device_id bcm_kona_smc_ids[] __initconst = {
->   };
->   
->   /* Map in the bounce area */
-> -void __init bcm_kona_smc_init(void)
-> +int __init bcm_kona_smc_init(void)
->   {
->   	struct device_node *node;
->   
->   	/* Read buffer addr and size from the device tree node */
->   	node = of_find_matching_node(NULL, bcm_kona_smc_ids);
-> -	BUG_ON(!node);
-> +	if (!node)
-> +		return -ENODEV;
->   
->   	/* Don't care about size or flags of the DT node */
->   	bridge_data.buffer_addr =
-> @@ -59,7 +60,9 @@ void __init bcm_kona_smc_init(void)
->   
->   	bridge_data.initialized = 1;
->   
-> -	pr_info("Secure API initialized!\n");
-> +	pr_info("Kona Secure API initialized\n");
-> +
-> +	return 0;
->   }
->   
->   /* __bcm_kona_smc() should only run on CPU 0, with pre-emption disabled */
-> diff --git a/arch/arm/mach-bcm/bcm_kona_smc.h b/arch/arm/mach-bcm/bcm_kona_smc.h
-> index 3bedbed1..d098a7e 100644
-> --- a/arch/arm/mach-bcm/bcm_kona_smc.h
-> +++ b/arch/arm/mach-bcm/bcm_kona_smc.h
-> @@ -64,7 +64,7 @@
->   #define SSAPI_BRCM_START_VC_CORE	0x0E000008
->   
->   #ifndef	__ASSEMBLY__
-> -extern void bcm_kona_smc_init(void);
-> +extern int __init bcm_kona_smc_init(void);
->   
->   extern unsigned bcm_kona_smc(unsigned service_id,
->   			     unsigned arg0,
-> diff --git a/arch/arm/mach-bcm/board_bcm.c b/arch/arm/mach-bcm/board_bcm.c
-> index 2859932..70cc44f 100644
-> --- a/arch/arm/mach-bcm/board_bcm.c
-> +++ b/arch/arm/mach-bcm/board_bcm.c
-> @@ -29,15 +29,18 @@ static int __init kona_l2_cache_init(void)
->   	if (!IS_ENABLED(CONFIG_CACHE_L2X0))
->   		return 0;
->   
-> +	if (bcm_kona_smc_init() < 0) {
-> +		pr_info("Kona secure API not available. Skipping L2 init\n");
-> +		return 0;
-> +	}
-> +
->   	bcm_kona_smc(SSAPI_ENABLE_L2_CACHE, 0, 0, 0, 0);
->   
->   	/*
->   	 * The aux_val and aux_mask have no effect since L2 cache is already
->   	 * enabled.  Pass 0s for aux_val and 1s for aux_mask for default value.
->   	 */
-> -	l2x0_of_init(0, ~0);
-> -
-> -	return 0;
-> +	return l2x0_of_init(0, ~0);
->   }
->   
->   static void __init board_init(void)
-> @@ -45,8 +48,6 @@ static void __init board_init(void)
->   	of_platform_populate(NULL, of_default_bus_match_table, NULL,
->   		&platform_bus);
->   
-> -	bcm_kona_smc_init();
-> -
->   	kona_l2_cache_init();
->   }
->   
-applied to bcm/for-3.12/soc
+On 08/19/2013 09:50 PM, Russell King - ARM Linux wrote:
+> On Mon, Aug 19, 2013 at 12:41:32PM -0700, Mike Turquette wrote:
+>> Quoting Sylwester Nawrocki (2013-08-09 09:34:05)
+>>> Add helper functions for the of_clk_providers list locking and
+>>> an unlocked variant of of_clk_get_from_provider().
+>>> These functions are intended to be used in the clkdev to avoid
+>>> race condition in the device tree based clock look up in clk_get().
+>>>
+>>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>
+>> Looks good to me.
+>>
+>> Russell,
+>>
+>> Any objections?
+> 
+> Yes.
+> 
+>>> diff --git a/include/linux/clk.h b/include/linux/clk.h
+>>> index 9a6d045..ea6822e 100644
+>>> --- a/include/linux/clk.h
+>>> +++ b/include/linux/clk.h
+>>> @@ -368,6 +368,9 @@ struct of_phandle_args;
+>>>  struct clk *of_clk_get(struct device_node *np, int index);
+>>>  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+>>>  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+>>> +struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec);
+>>> +void of_clk_lock(void);
+>>> +void of_clk_unlock(void);
+> 
+> Here's the thing.  Yes, I know we have a directory called 'include'
+> where header files live, but there is nothing layed down which requires
+> all header files to be under a directory called 'include' - especially
+> when it's stuff which should _not_ be shared with the rest of the
+> kernel.
+> 
+> In this case, these three functions are merely exported from
+> drivers/clk/clk.c to drivers/clk/clkdev.c - which is in the very same
+> directory.  It is not intended that these functions be used for any
+> other purpose.
+> 
+> So, why not put them in a header file in drivers/clk/ which both these
+> files can include?
 
-  thanks,
-   csd
+Yes, that's certainly a good idea. In fact it bothered me a bit that
+those functions are unnecessarily exposed like that. But I somehow missed
+a separate header could be simply added. Thanks for the suggestion.
+
+I'm going to post v2 of $subject series and the one adding clk_unregister()
+implementation including corrections for those couple issues pointed out in
+the reviews. Would appreciate to know you opinion on those and perhaps have
+your Ack so Mike could take whole series into his tree.
+
+> I *really* wish that people would get out of their mind that everything
+> has to live in a header file in include/ or arch/arm/include/ and local
+> includes are bad.  Local includes are a very good thing, they aid in
+> reducing the visibility of stuff which is not meant to be visible to
+> the entire kernel.
+> 
+> Just look at things like fs/mount.h to see what I mean.  Or the various
+> driver header files which contain definitions only for use by their
+> associated drivers in the drivers/ subtree.
+
+--
+Thanks,
+Sylwester
