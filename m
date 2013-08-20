@@ -1,116 +1,94 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Aug 2013 15:20:32 +0200
-Subject: [PATCH] ARM: ux500: fix up the I2C devices
-Message-ID: <1377004832-30278-1-git-send-email-linus.walleij@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Aug 2013 14:27:12 +0100
+Subject: [PATCH v3 4/6] ARM64: arch_timer: configure and enable event
+ stream
+In-Reply-To: <1376414984-14182-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376414984-14182-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376414984-14182-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <20130820132712.GE26129@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The I2C device registration on the different ux500 board was
-buggy due to a switch to dynamically assigned I2C host
-addresses. This I2C host is still there, but we have to add
-the devices dynamically instead of using board data.
+Hi Sudeep,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.c | 33 +++++++++++++--------------------
- 1 file changed, 13 insertions(+), 20 deletions(-)
+Couple of comments inline...
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 4e7ab3a..ad0806e 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -324,21 +324,19 @@ static struct lp55xx_platform_data __initdata lp5521_sec_data = {
-        .clock_mode     = LP55XX_CLOCK_EXT,
- };
- 
-+/* I2C0 devices only available on the first HREF/MOP500 */
- static struct i2c_board_info __initdata mop500_i2c0_devices[] = {
- 	{
- 		I2C_BOARD_INFO("tc3589x", 0x42),
- 		.irq		= NOMADIK_GPIO_TO_IRQ(217),
- 		.platform_data  = &mop500_tc35892_data,
- 	},
--	/* I2C0 devices only available prior to HREFv60 */
- 	{
- 		I2C_BOARD_INFO("tps61052", 0x33),
- 		.platform_data  = &mop500_tps61052_data,
- 	},
- };
- 
--#define NUM_PRE_V60_I2C0_DEVICES 1
--
- static struct i2c_board_info __initdata mop500_i2c2_devices[] = {
- 	{
- 		/* lp5521 LED driver, 1st device */
-@@ -356,6 +354,17 @@ static struct i2c_board_info __initdata mop500_i2c2_devices[] = {
- 	},
- };
- 
-+static int __init mop500_i2c_board_init(void)
-+{
-+	if (machine_is_u8500())
-+		mop500_uib_i2c_add(0, mop500_i2c0_devices,
-+				   ARRAY_SIZE(mop500_i2c0_devices));
-+	mop500_uib_i2c_add(2, mop500_i2c2_devices,
-+			   ARRAY_SIZE(mop500_i2c2_devices));
-+	return 0;
-+}
-+device_initcall(mop500_i2c_board_init);
-+
- static void __init mop500_i2c_init(struct device *parent)
- {
- 	db8500_add_i2c0(parent, NULL);
-@@ -564,7 +573,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
- static void __init mop500_init_machine(void)
- {
- 	struct device *parent = NULL;
--	int i2c0_devs;
- 	int i;
- 
- 	platform_device_register(&db8500_prcmu_device);
-@@ -587,19 +595,13 @@ static void __init mop500_init_machine(void)
- 	mop500_spi_init(parent);
- 	mop500_audio_init(parent);
- 	mop500_uart_init(parent);
--
- 	u8500_cryp1_hash1_init(parent);
- 
--	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
--
--	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
--	i2c_register_board_info(2, mop500_i2c2_devices,
--				ARRAY_SIZE(mop500_i2c2_devices));
--
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
- }
- 
-+
- static void __init snowball_init_machine(void)
- {
- 	struct device *parent = NULL;
-@@ -634,7 +636,6 @@ static void __init snowball_init_machine(void)
- static void __init hrefv60_init_machine(void)
- {
- 	struct device *parent = NULL;
--	int i2c0_devs;
- 	int i;
- 
- 	platform_device_register(&db8500_prcmu_device);
-@@ -663,14 +664,6 @@ static void __init hrefv60_init_machine(void)
- 	mop500_audio_init(parent);
- 	mop500_uart_init(parent);
- 
--	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
--
--	i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
--
--	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
--	i2c_register_board_info(2, mop500_i2c2_devices,
--				ARRAY_SIZE(mop500_i2c2_devices));
--
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
- }
--- 
-1.8.1.4
+On Tue, Aug 13, 2013 at 06:29:42PM +0100, Sudeep KarkadaNagesha wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> This patch configures the event stream frequency and enables it.
+> It also adds the hwcaps as well as compat-specific definitions to
+> the user to detect this event stream feature.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> [sudeep: moving ARM/ARM64 changes into separate patches]
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> ---
+>  arch/arm64/include/asm/arch_timer.h | 12 ++++++++++--
+>  arch/arm64/include/asm/hwcap.h      |  4 +++-
+>  arch/arm64/include/uapi/asm/hwcap.h |  1 +
+>  arch/arm64/kernel/setup.c           |  1 +
+>  4 files changed, 15 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index 69f5c8e..43f322a 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -106,14 +106,22 @@ static inline void arch_counter_set_user_access(int divider)
+>  	/* Disable user access to the timers and the physical counter. */
+>  	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
+>  			| ARCH_TIMER_USR_VT_ACCESS_EN
+> +			| ARCH_TIMER_EVT_TRIGGER_MASK
+>  			| ARCH_TIMER_USR_PCT_ACCESS_EN);
+>  
+> -	/* Enable user access to the virtual counter. */
+> -	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
+> +	/* Enable event stream and user access to the virtual counter */
+> +	cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
+> +			| ARCH_TIMER_VIRT_EVT_EN
+> +			| ARCH_TIMER_USR_VCT_ACCESS_EN;
+>  
+>  	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+>  }
+>  
+> +static inline void arch_timer_set_hwcap_evtstrm(void)
+> +{
+> +	elf_hwcap |= HWCAP_EVTSTRM;
+> +}
+> +
+>  static inline u64 arch_counter_get_cntvct(void)
+>  {
+>  	u64 cval;
+> diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
+> index 6d4482f..effd8f9 100644
+> --- a/arch/arm64/include/asm/hwcap.h
+> +++ b/arch/arm64/include/asm/hwcap.h
+> @@ -30,6 +30,7 @@
+>  #define COMPAT_HWCAP_IDIVA	(1 << 17)
+>  #define COMPAT_HWCAP_IDIVT	(1 << 18)
+>  #define COMPAT_HWCAP_IDIV	(COMPAT_HWCAP_IDIVA|COMPAT_HWCAP_IDIVT)
+> +#define COMPAT_HWCAP_EVTSTRM	(1 << 21)
+
+Looking@the context, we should also add COMPAT_HWCAP_LPAE as a separate
+patch (not part of this series).
+
+>  #ifndef __ASSEMBLY__
+>  /*
+> @@ -41,7 +42,8 @@
+>  				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
+>  				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
+>  				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
+> -				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV)
+> +				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV|\
+> +				 COMPAT_HWCAP_EVTSTRM)
+
+So here you're hardcoding COMPAT_HWCAP_EVTSTRM in the COMPAT_ELF_HWCAP, yet
+we only enable the native one from the arch-timer driver. The question then is
+"Can we rely on the event-stream working for AArch64?". If so, we don't need
+the native hwcap at all. If not, then we need to make the compat hwcap
+dynamic.
+
+Will
