@@ -1,51 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Aug 2013 22:08:39 +0100
-Subject: [PATCH v2 1/3] ARM: Introduce atomic MMIO clear/set
-In-Reply-To: <1377017307-23201-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377017307-23201-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377017307-23201-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130820210839.GE17845@n2100.arm.linux.org.uk>
+From: fathi.boudra@linaro.org (Fathi Boudra)
+Date: Wed, 21 Aug 2013 00:02:42 +0300
+Subject: [PATCH 2/3] ARM: vexpress_defconfig: Enable voltage regulator support
+In-Reply-To: <1377032563-4502-1-git-send-email-fathi.boudra@linaro.org>
+References: <1377032563-4502-1-git-send-email-fathi.boudra@linaro.org>
+Message-ID: <1377032563-4502-3-git-send-email-fathi.boudra@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 01:48:25PM -0300, Ezequiel Garcia wrote:
-> Based on a similar approach suggested by Russel King:
+It is needed for the MMC controller and allows to use the SD card:
 
-Russell please.
+mmc0: host doesn't support card's voltages
+mmc0: error -22 whilst initialising SD card
 
-We Russells get upset when our names are incorrectly spelt, just like
-others get upset if they end up with extra letters in their names, or
-you confuse Steven vs Stephen.  Or even dare call a Deborah "Debs"
-(I did that once and the result was not particularly nice!)
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Fathi Boudra <fathi.boudra@linaro.org>
+---
+ arch/arm/configs/vexpress_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> +void atomic_io_clear_set(u32 clear, u32 set, void __iomem *reg)
-> +{
-> +	spin_lock(&__io_lock);
-> +	writel((readl(reg) & ~clear) | set, reg);
-> +	/* ensure the write get done before unlocking */
-> +	__iowmb();
-> +	spin_unlock(&__io_lock);
-> +}
-> +EXPORT_SYMBOL(atomic_io_clear_set);
-
-Some comments - neither of them you _have_ to act on:
-
-1. writel((readl(reg) & ~mask) | (set & mask), reg) could be deemed
-   to give better semantics - consider that if you don't look at the
-   implementation, how do you know what the result of setting a bit
-   in both the set & clear masks would be?
-
-2. A historical note, that back in the 1980s with things like the BBC
-   micro, this kind of operation was defined:
-
-	new_value = (old_value & mask) ^ value
-
-   which has the flexibility of being able to set, clear or toggle any
-   bit.  I'm not saying that's a good interface, I'm merely pointing
-   out that the problem of being able to set and clear bits is nothing
-   new and other solutions are available. :)
-
-3. Would it be better to separate these by having atomic_io_clear() and
-   atomic_io_set() functions?
-
-Just some things to think about; I have no overall preference here.
+diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
+index 3f970f1..c2f7ca1 100644
+--- a/arch/arm/configs/vexpress_defconfig
++++ b/arch/arm/configs/vexpress_defconfig
+@@ -77,6 +77,8 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ CONFIG_LEGACY_PTY_COUNT=16
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_HWMON is not set
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_VEXPRESS=y
+ CONFIG_FB=y
+ CONFIG_FB_ARMCLCD=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+-- 
+1.8.1.2
