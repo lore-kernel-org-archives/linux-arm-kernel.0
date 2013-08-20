@@ -1,41 +1,53 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 20 Aug 2013 12:45:53 -0300
-Subject: [PATCH v3 4/5] clocksource: armada-370-xp: Get reference fixed-clock
- by name
+Date: Tue, 20 Aug 2013 12:45:54 -0300
+Subject: [PATCH v3 5/5] clocksource: armada-370-xp: Add detailed clock
+ requirements in devicetree binding
 In-Reply-To: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1377013554-23389-5-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1377013554-23389-6-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada XP timer has two mandatory clock inputs: nbclk and refclk,
-as specified by the device-tree binding.
+Specifies the required clock inputs for each supported compatible.
+Armada 370 requires a single clock phandle, and Armada XP requires
+two clock phandles with clock-names "nbclk" and "fixed".
 
-This commit fixes the clock selection. Instead of hard-coding the clock
-rate for the 25 MHz reference fixed-clock, obtain the clock by its name.
-
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/clocksource/time-armada-370-xp.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+No changes from v2.
 
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index fca318f..99f9a41 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -292,8 +292,11 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
- 
- static void __init armada_xp_timer_init(struct device_node *np)
- {
--	/* The fixed 25MHz timer is required, timer25Mhz is true by default */
--	timer_clk = 25000000;
-+	struct clk *clk = of_clk_get_by_name(np, "fixed");
+ .../bindings/timer/marvell,armada-370-xp-timer.txt          | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+index 4c453b2..f455182 100644
+--- a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
++++ b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
+@@ -9,8 +9,15 @@ Required properties:
+ - reg: Should contain location and length for timers register. First
+   pair for the Global Timer registers, second pair for the
+   local/private timers.
+-- clocks: clock driving the timer hardware, only required for
+-  "marvell,armada-370-timer";
 +
-+	/* The 25Mhz fixed clock is mandatory, and must always be available */
-+	BUG_ON(IS_ERR(clk));
-+	timer_clk = clk_get_rate(clk);
++Clocks required for compatible = "marvell,armada-370-timer":
++- clocks : Must contain a single entry describing the clock input
++
++Clocks required for compatible = "marvell,armada-xp-timer":
++- clocks : Must contain an entry for each entry in clock-names.
++- clock-names : Must include the following entries:
++  "nbclk" (L2/coherency fabric clock),
++  "fixed" (Reference 25 MHz fixed-clock).
  
- 	armada_370_xp_timer_common_init(np);
- }
+ Examples:
+ 
+@@ -29,4 +36,6 @@ Examples:
+ 		compatible = "marvell,armada-xp-timer";
+ 		reg = <0x20300 0x30>, <0x21040 0x30>;
+ 		interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
++		clocks = <&coreclk 2>, <&refclk>;
++		clock-names = "nbclk", "fixed";
+ 	};
 -- 
 1.8.1.5
