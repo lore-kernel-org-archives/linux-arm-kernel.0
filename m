@@ -1,35 +1,46 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 20 Aug 2013 11:01:06 -0300
-Subject: [RFC 08/17] ARM: mvebu: remove custom .init_time hook
-In-Reply-To: <52136B2C.3030509@gmail.com>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376964271-22715-9-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130820125012.GA4272@localhost> <52136B2C.3030509@gmail.com>
-Message-ID: <20130820140105.GB4272@localhost>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 20 Aug 2013 16:20:02 +0200
+Subject: [PATCH 0/8] Exynos device tree clean-up for 3.12
+In-Reply-To: <1377006768-23174-1-git-send-email-t.figa@samsung.com>
+References: <1377006768-23174-1-git-send-email-t.figa@samsung.com>
+Message-ID: <52137B12.2050708@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 03:12:12PM +0200, Sebastian Hesselbarth wrote:
-> > Maybe that's why I'm getting only the patches where I'm Cced?
+On 08/20/2013 03:52 PM, Tomasz Figa wrote:
+> This series intends to fix small problems with Exynos device tree sources
+> that I spotted during my work on other things. The fixes are mostly
+> stylistic, without any funtional changes introduced, except patch 6/8,
+> which makes the mshc node disabled by default, but for all affected
+> boards it is enabled at board level.
 > 
-> I try to keep Cc list as short as possible, so I only put Gregory as the 
-> maintainer of mach-mvebu on Cc.
+> Tomasz Figa (8):
+>   Documentation: devicetree: Update Exynos MCT bindings description
+>   ARM: dts: exynos4: Drop interrupt controller properties from MCT nodes
+>   ARM: dts: exynos4x12: Move MCT node to exynos4x12.dtsi
+>   ARM: dts: exynos4: Simplify MCT interrupt map
+>   ARM: dts: exynos4x12: Move mshc node to exynos4x12.dtsi
+>   ARM: dts: exynos4x12: Keep mshc node disabled by default
+>   ARM: dts: exynos: Fix missing spaces after labels
+>   ARM: dts: exynos4: Add missing unit-address of sysreg node
 > 
+>  .../bindings/timer/samsung,exynos4210-mct.txt      | 49 ++++++++++++++--------
+>  arch/arm/boot/dts/exynos4.dtsi                     |  6 +--
+>  arch/arm/boot/dts/exynos4210.dtsi                  | 23 +++++-----
+>  arch/arm/boot/dts/exynos4212.dtsi                  | 24 +----------
+>  arch/arm/boot/dts/exynos4412.dtsi                  | 36 +---------------
+>  arch/arm/boot/dts/exynos4x12.dtsi                  | 29 +++++++++++++
+>  arch/arm/boot/dts/exynos5.dtsi                     |  4 +-
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts          |  6 +--
+>  arch/arm/boot/dts/exynos5440.dtsi                  |  2 +-
+>  9 files changed, 82 insertions(+), 97 deletions(-)
 
-Pff... you're right, I got this because my mvebu-filters caught it from
-lkml! I'm seeing now the complete patchset in lkml, it looks good!
+Thanks Tomasz, for the whole series:
 
-> 
-> I expect machs to move until all of it has been Ack'ed, so I
-> based in on most recent tag of linux-next yesterday.
-> 
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-No problem, just wanted to let you know about that.
-Feel free to update the remaining bits once Daniel's lands
-in linux-next.
 
-Thanks,
+Regards,
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Sylwester Nawrocki
+Samsung R&D Institute Poland
