@@ -1,55 +1,47 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Tue, 20 Aug 2013 16:01:47 +0530
-Subject: Kexec: BE kernel on ARM VE TC2
-In-Reply-To: <CALicx6vwz9h3gKozaKxaL+FbVvfkWS5djYrt22vM0d72ObDhYw@mail.gmail.com>
-References: <CALicx6ueLxCFCeun1grdtcC21HSkCDfenLWOSfuoSJnhx9GZ6w@mail.gmail.com>
- <20130808215034.GE19383@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1308131851300.14472@syhkavp.arg>
- <CALicx6uKhd0z=81G68VvTjBpPy=vwK3tgK8zk11dpu34N=YyYA@mail.gmail.com>
- <alpine.LFD.2.03.1308141026210.14472@syhkavp.arg>
- <CALicx6sgS6J4aU2mf3fBoWA7oREDrbkit4FW-ptj49EmLuH_HA@mail.gmail.com>
- <CALicx6vwz9h3gKozaKxaL+FbVvfkWS5djYrt22vM0d72ObDhYw@mail.gmail.com>
-Message-ID: <CALicx6s8A5+YUm0ZD0fZS8DU37HkA_3FHF70R0XDRj2=mta4_w@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 20 Aug 2013 12:37:18 +0200
+Subject: [RFC 06/17] ARM: imx: remove custom .init_time hook
+In-Reply-To: <20130820102032.GY23006@n2100.arm.linux.org.uk>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376964271-22715-7-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130820072642.GJ31036@pengutronix.de> <52132D6C.2080606@gmail.com>
+ <20130820091000.GK31036@pengutronix.de> <521334C6.4070605@gmail.com>
+ <20130820102032.GY23006@n2100.arm.linux.org.uk>
+Message-ID: <521346DE.9080600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 5:47 PM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
-> Hi Nicolas,
+On 08/20/13 12:20, Russell King - ARM Linux wrote:
+> On Tue, Aug 20, 2013 at 11:20:06AM +0200, Sebastian Hesselbarth wrote:
+>> Yeah, I am having troubles with linux-arm-kernel rejecting my mails
+>> because of a suspicious header. I have no clue, what has changed lately
+>> with my mails sent by git send-email to make them get stuck.
 >
-> On Mon, Aug 19, 2013 at 1:01 PM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
->> On Wed, Aug 14, 2013 at 8:49 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
->>> On Wed, 14 Aug 2013, Vijay Kilari wrote:
->>>
->>>> On Wed, Aug 14, 2013 at 4:22 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
->>>> > On Thu, 8 Aug 2013, Will Deacon wrote:
->>>> >
->>>> >> On Mon, Aug 05, 2013 at 01:12:17PM +0100, Vijay Kilari wrote:
->>>> >> > Hi Will,
->>>> >> >
->>>> >> > I am trying to make kexec work on BE kernel on ARM VE TC2.
->>>> >> >
->>>> >> > First, to make KEXEC work with SMP on ARM VE TC2 board,
->>>> >> > I set nr_cpus=2 (i.e boot only A15's) this works with LE kernel.
->>>> >>
->>>> >> Interesting, is this with a mainline kernel? I don't see how SMP kexec can
->>>> >> work on TC2 without additional patches to park the secondary cores safely.
->>>> >
->>>> > BTW those patches are available in linux-next at the moment.
->>>>
+> I believe David feels the same way as I do wrt thread hijacking on
+> mailing lists.  The problem is that it seems all too easy for people
+> to hit the reply button on some random message from the mailing list,
+> change the subject line, and then type an entirely new email into the
+> body not related to the message they hit "reply" on.
+>
+> So, any message which doesn't look like it's a reply to the preceding
+> message gets held for moderation.  However, git came along and broke
+> that - because every patch sent as a threaded reply to a cover email
+> is effectively a "hijack".  Therefore, there's an exception to this -
+> if the subject line starts with "[PATCH" then it will be allowed through.
+>
+> This means if you want to send a RFC, it must be "[PATCH RFC" not just
+> "[RFC", because "[RFC" isn't whitelisted.  Maybe it should be, but that
+> is David's decision now.
 
->
-> After using v5.0 firmware version + CPU migration patch and making changes to
-> board.txt according to
-> http://lists.linaro.org/pipermail/linaro-dev/2013-January/015095.html
->
-> Now all the CPU's are booting up. I will check now Kexec
->
->
+Russell,
 
-I see two issues:
+I already guessed it has something to do with the In-reply-to line, as
+only the patches but not the cover letter gets stuck. Thanks for
+pointing me at the missing PATCH prefix and sorry for the noise on
+the moderators screen.
 
-1) KEXEC rebooting with Thumb2 kernel fails when booted on LE Kernel.
-2) Secondary CPU's are not booted with BE kernel with TC2 Power mgmt enabled
-    Where as with LE, secondary CPU's are booted
+For me it is fine not to expand the whitelist and after reading
+SubmittingPatches again, it clearly says that RFC is just a tag to be
+added after PATCH.
 
->>> Nicolas
+Sebastian
