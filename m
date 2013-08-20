@@ -1,205 +1,173 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 20 Aug 2013 19:31:37 +0200
-Subject: [PATCH 10/16] clk: samsung: pll: Add support for rate configuration of
- PLL45xx
+Date: Tue, 20 Aug 2013 19:31:38 +0200
+Subject: [PATCH 11/16] clk: samsung: pll: Use new registration method for
+ PLL46xx
 In-Reply-To: <1377019903-14614-1-git-send-email-t.figa@samsung.com>
 References: <1377019903-14614-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1377019903-14614-11-git-send-email-t.figa@samsung.com>
+Message-ID: <1377019903-14614-12-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements round_rate and set_rate callbacks of PLL45xx
-driver to allow reconfiguration of PLL at runtime.
+This patch modifies PLL46xx support code and its users to use the
+recently introduced common PLL registration helper.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/clk/samsung/clk-pll.c | 109 +++++++++++++++++++++++++++++++++++++++++-
- drivers/clk/samsung/clk-pll.h |  10 ++++
- 2 files changed, 118 insertions(+), 1 deletion(-)
+ drivers/clk/samsung/clk-exynos4.c | 13 +++-------
+ drivers/clk/samsung/clk-pll.c     | 52 +++++----------------------------------
+ drivers/clk/samsung/clk-pll.h     | 14 +++--------
+ 3 files changed, 14 insertions(+), 65 deletions(-)
 
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 6036fdf..42a4001 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -994,6 +994,10 @@ static struct __initdata samsung_pll_clock exynos4210_plls[nr_plls] = {
+ 		APLL_CON0, "fout_apll", NULL),
+ 	[mpll] = PLL_A(pll_4508, fout_mpll, "fout_mpll", "fin_pll",
+ 		E4210_MPLL_LOCK, E4210_MPLL_CON0, "fout_mpll", NULL),
++	[epll] = PLL_A(pll_4600, fout_epll, "fout_epll", "fin_pll", EPLL_LOCK,
++		EPLL_CON0, "fout_epll", NULL),
++	[vpll] = PLL_A(pll_4650c, fout_vpll, "fout_vpll", "mout_vpllsrc",
++		VPLL_LOCK, VPLL_CON0, "fout_vpll", NULL),
+ };
+ 
+ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
+@@ -1012,8 +1016,6 @@ static void __init exynos4_clk_init(struct device_node *np,
+ 				    enum exynos4_soc exynos4_soc,
+ 				    void __iomem *reg_base, unsigned long xom)
+ {
+-	struct clk *epll, *vpll;
+-
+ 	reg_base = of_iomap(np, 0);
+ 	if (!reg_base)
+ 		panic("%s: failed to map registers\n", __func__);
+@@ -1036,13 +1038,6 @@ static void __init exynos4_clk_init(struct device_node *np,
+ 	if (exynos4_soc == EXYNOS4210) {
+ 		samsung_clk_register_pll(exynos4210_plls,
+ 					ARRAY_SIZE(exynos4210_plls), reg_base);
+-		epll = samsung_clk_register_pll46xx("fout_epll", "fin_pll",
+-					reg_base + EPLL_CON0, pll_4600);
+-		vpll = samsung_clk_register_pll46xx("fout_vpll", "mout_vpllsrc",
+-					reg_base + VPLL_CON0, pll_4650c);
+-
+-		samsung_clk_add_lookup(epll, fout_epll);
+-		samsung_clk_add_lookup(vpll, fout_vpll);
+ 	} else {
+ 		samsung_clk_register_pll(exynos4x12_plls,
+ 					ARRAY_SIZE(exynos4x12_plls), reg_base);
 diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
-index b0398d2..cb971cb 100644
+index cb971cb..8a008ca 100644
 --- a/drivers/clk/samsung/clk-pll.c
 +++ b/drivers/clk/samsung/clk-pll.c
-@@ -10,9 +10,12 @@
- */
+@@ -422,18 +422,10 @@ static const struct clk_ops samsung_pll45xx_clk_min_ops = {
+ #define PLL4650C_KDIV_MASK	(0xFFF)
+ #define PLL46XX_KDIV_SHIFT	(0)
  
- #include <linux/errno.h>
-+#include <linux/hrtimer.h>
- #include "clk.h"
- #include "clk-pll.h"
- 
-+#define PLL_TIMEOUT_MS		10
-+
- struct samsung_clk_pll {
- 	struct clk_hw		hw;
- 	void __iomem		*lock_reg;
-@@ -272,13 +275,20 @@ static const struct clk_ops samsung_pll36xx_clk_min_ops = {
- /*
-  * PLL45xx Clock Type
-  */
-+#define PLL4502_LOCK_FACTOR	400
-+#define PLL4508_LOCK_FACTOR	240
- 
- #define PLL45XX_MDIV_MASK	(0x3FF)
- #define PLL45XX_PDIV_MASK	(0x3F)
- #define PLL45XX_SDIV_MASK	(0x7)
-+#define PLL45XX_AFC_MASK	(0x1F)
- #define PLL45XX_MDIV_SHIFT	(16)
- #define PLL45XX_PDIV_SHIFT	(8)
- #define PLL45XX_SDIV_SHIFT	(0)
-+#define PLL45XX_AFC_SHIFT	(0)
-+
-+#define PLL45XX_ENABLE		BIT(31)
-+#define PLL45XX_LOCKED		BIT(29)
- 
- static unsigned long samsung_pll45xx_recalc_rate(struct clk_hw *hw,
+-struct samsung_clk_pll46xx {
+-	struct clk_hw		hw;
+-	enum pll46xx_type	type;
+-	const void __iomem	*con_reg;
+-};
+-
+-#define to_clk_pll46xx(_hw) container_of(_hw, struct samsung_clk_pll46xx, hw)
+-
+ static unsigned long samsung_pll46xx_recalc_rate(struct clk_hw *hw,
  				unsigned long parent_rate)
-@@ -301,8 +311,100 @@ static unsigned long samsung_pll45xx_recalc_rate(struct clk_hw *hw,
- 	return (unsigned long)fvco;
- }
- 
-+static bool samsung_pll45xx_mp_change(u32 pll_con0, u32 pll_con1,
-+				const struct samsung_pll_rate_table *rate)
-+{
-+	u32 old_mdiv, old_pdiv, old_afc;
-+
-+	old_mdiv = (pll_con0 >> PLL45XX_MDIV_SHIFT) & PLL45XX_MDIV_MASK;
-+	old_pdiv = (pll_con0 >> PLL45XX_PDIV_SHIFT) & PLL45XX_PDIV_MASK;
-+	old_afc = (pll_con1 >> PLL45XX_AFC_SHIFT) & PLL45XX_AFC_MASK;
-+
-+	return (old_mdiv != rate->mdiv || old_pdiv != rate->pdiv);
-+}
-+
-+static int samsung_pll45xx_set_rate(struct clk_hw *hw, unsigned long drate,
-+					unsigned long prate)
-+{
+ {
+-	struct samsung_clk_pll46xx *pll = to_clk_pll46xx(hw);
 +	struct samsung_clk_pll *pll = to_clk_pll(hw);
-+	const struct samsung_pll_rate_table *rate;
-+	u32 con0, con1;
-+	ktime_t start;
-+
-+	/* Get required rate settings from table */
-+	rate = samsung_get_pll_settings(pll, drate);
-+	if (!rate) {
-+		pr_err("%s: Invalid rate : %lu for pll clk %s\n", __func__,
-+			drate, __clk_get_name(hw->clk));
-+		return -EINVAL;
-+	}
-+
-+	con0 = __raw_readl(pll->con_reg);
-+	con1 = __raw_readl(pll->con_reg + 0x4);
-+
-+	if (!(samsung_pll45xx_mp_change(con0, con1, rate))) {
-+		/* If only s change, change just s value only*/
-+		con0 &= ~(PLL45XX_SDIV_MASK << PLL45XX_SDIV_SHIFT);
-+		con0 |= rate->sdiv << PLL45XX_SDIV_SHIFT;
-+		__raw_writel(con0, pll->con_reg);
-+
-+		return 0;
-+	}
-+
-+	/* Set PLL PMS values. */
-+	con0 &= ~((PLL45XX_MDIV_MASK << PLL45XX_MDIV_SHIFT) |
-+			(PLL45XX_PDIV_MASK << PLL45XX_PDIV_SHIFT) |
-+			(PLL45XX_SDIV_MASK << PLL45XX_SDIV_SHIFT));
-+	con0 |= (rate->mdiv << PLL45XX_MDIV_SHIFT) |
-+			(rate->pdiv << PLL45XX_PDIV_SHIFT) |
-+			(rate->sdiv << PLL45XX_SDIV_SHIFT);
-+
-+	/* Set PLL AFC value. */
-+	con1 = __raw_readl(pll->con_reg + 0x4);
-+	con1 &= ~(PLL45XX_AFC_MASK << PLL45XX_AFC_SHIFT);
-+	con1 |= (rate->afc << PLL45XX_AFC_SHIFT);
-+
-+	/* Set PLL lock time. */
-+	switch (pll->type) {
-+	case pll_4502:
-+		__raw_writel(rate->pdiv * PLL4502_LOCK_FACTOR, pll->lock_reg);
-+		break;
-+	case pll_4508:
-+		__raw_writel(rate->pdiv * PLL4508_LOCK_FACTOR, pll->lock_reg);
-+		break;
-+	default:
-+		break;
-+	};
-+
-+	/* Set new configuration. */
-+	__raw_writel(con1, pll->con_reg + 0x4);
-+	__raw_writel(con0, pll->con_reg);
-+
-+	/* Wait for locking. */
-+	start = ktime_get();
-+	while (!(__raw_readl(pll->con_reg) & PLL45XX_LOCKED)) {
-+		ktime_t delta = ktime_sub(ktime_get(), start);
-+
-+		if (ktime_to_ms(delta) > PLL_TIMEOUT_MS) {
-+			pr_err("%s: could not lock PLL %s\n",
-+					__func__, __clk_get_name(hw->clk));
-+			return -EFAULT;
-+		}
-+
-+		cpu_relax();
-+	}
-+
-+	return 0;
-+}
-+
- static const struct clk_ops samsung_pll45xx_clk_ops = {
- 	.recalc_rate = samsung_pll45xx_recalc_rate,
-+	.round_rate = samsung_pll_round_rate,
-+	.set_rate = samsung_pll45xx_set_rate,
-+};
-+
-+static const struct clk_ops samsung_pll45xx_clk_min_ops = {
-+	.recalc_rate = samsung_pll45xx_recalc_rate,
+ 	u32 mdiv, pdiv, sdiv, kdiv, pll_con0, pll_con1, shift;
+ 	u64 fvco = parent_rate;
+ 
+@@ -457,43 +449,6 @@ static const struct clk_ops samsung_pll46xx_clk_ops = {
+ 	.recalc_rate = samsung_pll46xx_recalc_rate,
  };
  
+-struct clk * __init samsung_clk_register_pll46xx(const char *name,
+-			const char *pname, const void __iomem *con_reg,
+-			enum pll46xx_type type)
+-{
+-	struct samsung_clk_pll46xx *pll;
+-	struct clk *clk;
+-	struct clk_init_data init;
+-
+-	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+-	if (!pll) {
+-		pr_err("%s: could not allocate pll clk %s\n", __func__, name);
+-		return NULL;
+-	}
+-
+-	init.name = name;
+-	init.ops = &samsung_pll46xx_clk_ops;
+-	init.flags = CLK_GET_RATE_NOCACHE;
+-	init.parent_names = &pname;
+-	init.num_parents = 1;
+-
+-	pll->hw.init = &init;
+-	pll->con_reg = con_reg;
+-	pll->type = type;
+-
+-	clk = clk_register(NULL, &pll->hw);
+-	if (IS_ERR(clk)) {
+-		pr_err("%s: failed to register pll clock %s\n", __func__,
+-				name);
+-		kfree(pll);
+-	}
+-
+-	if (clk_register_clkdev(clk, name, NULL))
+-		pr_err("%s: failed to register lookup for %s", __func__, name);
+-
+-	return clk;
+-}
+-
  /*
-@@ -680,9 +782,14 @@ static void __init _samsung_clk_register_pll(struct samsung_pll_clock *pll_clk,
- 			init.ops = &samsung_pll35xx_clk_ops;
+  * PLL6552 Clock Type
+  */
+@@ -799,6 +754,11 @@ static void __init _samsung_clk_register_pll(struct samsung_pll_clock *pll_clk,
+ 		else
+ 			init.ops = &samsung_pll36xx_clk_ops;
  		break;
- 	case pll_4500:
-+		init.ops = &samsung_pll45xx_clk_min_ops;
++	case pll_4600:
++	case pll_4650:
++	case pll_4650c:
++		init.ops = &samsung_pll46xx_clk_ops;
 +		break;
- 	case pll_4502:
- 	case pll_4508:
--		init.ops = &samsung_pll45xx_clk_ops;
-+		if (!pll->rate_table)
-+			init.ops = &samsung_pll45xx_clk_min_ops;
-+		else
-+			init.ops = &samsung_pll45xx_clk_ops;
- 		break;
- 	/* clk_ops for 36xx and 2650 are similar */
- 	case pll_36xx:
+ 	default:
+ 		pr_warn("%s: Unknown pll type for pll clk %s\n",
+ 			__func__, pll_clk->name);
 diff --git a/drivers/clk/samsung/clk-pll.h b/drivers/clk/samsung/clk-pll.h
-index f3faf24..aa8cc15 100644
+index aa8cc15..7de5e3e 100644
 --- a/drivers/clk/samsung/clk-pll.h
 +++ b/drivers/clk/samsung/clk-pll.h
-@@ -39,6 +39,15 @@ enum samsung_pll_type {
- 		.kdiv	=	(_k),				\
- 	}
- 
-+#define PLL_45XX_RATE(_rate, _m, _p, _s, _afc)			\
-+	{							\
-+		.rate	=	(_rate),			\
-+		.mdiv	=	(_m),				\
-+		.pdiv	=	(_p),				\
-+		.sdiv	=	(_s),				\
-+		.afc	=	(_afc),				\
-+	}
-+
- /* NOTE: Rate table should be kept sorted in descending order. */
- 
- struct samsung_pll_rate_table {
-@@ -47,6 +56,7 @@ struct samsung_pll_rate_table {
- 	unsigned int mdiv;
- 	unsigned int sdiv;
- 	unsigned int kdiv;
-+	unsigned int afc;
+@@ -19,7 +19,10 @@ enum samsung_pll_type {
+ 	pll_2650,
+ 	pll_4500,
+ 	pll_4502,
+-	pll_4508
++	pll_4508,
++	pll_4600,
++	pll_4650,
++	pll_4650c,
  };
  
- enum pll46xx_type {
+ #define PLL_35XX_RATE(_rate, _m, _p, _s)			\
+@@ -59,15 +62,6 @@ struct samsung_pll_rate_table {
+ 	unsigned int afc;
+ };
+ 
+-enum pll46xx_type {
+-	pll_4600,
+-	pll_4650,
+-	pll_4650c,
+-};
+-
+-extern struct clk * __init samsung_clk_register_pll46xx(const char *name,
+-			const char *pname, const void __iomem *con_reg,
+-			enum pll46xx_type type);
+ extern struct clk *samsung_clk_register_pll6552(const char *name,
+ 			const char *pname, void __iomem *base);
+ extern struct clk *samsung_clk_register_pll6553(const char *name,
 -- 
 1.8.3.2
