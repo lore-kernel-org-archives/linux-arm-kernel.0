@@ -1,49 +1,34 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 20 Aug 2013 15:12:12 +0200
-Subject: [RFC 08/17] ARM: mvebu: remove custom .init_time hook
-In-Reply-To: <20130820125012.GA4272@localhost>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376964271-22715-9-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130820125012.GA4272@localhost>
-Message-ID: <52136B2C.3030509@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Aug 2013 14:12:45 +0100
+Subject: [PATCH] AArch64: Add single-step and breakpoint handler hooks
+In-Reply-To: <CA+b37P11oFTo8SHWMB8ijy__sqj5HXBPXWd-svkTK3bPTeARuA@mail.gmail.com>
+References: <1375769526-3526-1-git-send-email-sandeepa.prabhu@linaro.org>
+ <20130813113253.GF30280@mudshark.cambridge.arm.com>
+ <CA+b37P11oFTo8SHWMB8ijy__sqj5HXBPXWd-svkTK3bPTeARuA@mail.gmail.com>
+Message-ID: <20130820131245.GC26129@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/13 14:50, Ezequiel Garcia wrote:
-> I've only received a few patches of this series. I *think*
-> using "RFC" alone is not correct in LAKML and for some reason
-> you're required to use RFC/PATCH.
+On Tue, Aug 13, 2013 at 03:45:30PM +0100, Sandeepa Prabhu wrote:
+> On 13 August 2013 17:02, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Aug 06, 2013 at 07:12:06AM +0100, Sandeepa Prabhu wrote:
+> >> +     cmp     x24, #ESR_EL1_EC_WATCHPT_EL1
+> >> +     csel    x0, x25, x22, eq        //addr: x25->far_el1, x22->elr_el1
+> >> +     b.ge    do_dbg
+> >>       tbz     x24, #0, el1_inv                // EL1 only
+> >
+> > I'd rather you left the tbz as the first instruction in el1_dbg, then you
+> > can also lose the b.ge.
+> well, my understanding is that the tbz check is needed only for
+> Exception Class < 0x35 as per debug spec. If this is true, and if tbz
+> is first instruction, it fails for breakpoint (EC=0x3A) case and call
+> el1_inv to panic instead of routing to do_debug_exception. I am not
+> sure if we can optimize the code further to eliminate this one
+> branching as well.
 
-Ezequiel,
+Well, you're actually only interested in 0x3c (BRK instruction executed in
+AArch64 state), so you should check for that explicitly. I guess it doesn't
+matter where you check bit #0 first or not, provided you have the branch
+logic correct.
 
-we already sorted out, why they got stuck on LAKML. It is because
-of the missing PATCH prefix, I'll add that in future postings for sure.
-
-But the patches should have been managed to get through to LKML.
-
-> Maybe that's why I'm getting only the patches where I'm Cced?
-
-I try to keep Cc list as short as possible, so I only put Gregory as the 
-maintainer of mach-mvebu on Cc.
-
-> Could you please re-send this? The series looks promising and I'd like
-> to take a peep :-)
-
-No, I am not going to resend v1 but only updates. For a single mach
-you need patches [1], [2], and the one supposed for your mach.
-
-> BTW, some of this (but not all) has already been posted [1, 2] and
-> is on its way to v3.12 through Daniel Lezcano.
->
-> (Maybe you already noticed, but just in case...)
->
-> [1] http://www.spinics.net/lists/arm-kernel/msg265509.html
-> [2] http://comments.gmane.org/gmane.linux.ports.arm.kernel/260179
-
-I expect machs to move until all of it has been Ack'ed, so I
-based in on most recent tag of linux-next yesterday.
-
-Sebastian
-
-[1] https://lkml.org/lkml/2013/8/19/591
-[2] https://lkml.org/lkml/2013/8/19/592
+Will
