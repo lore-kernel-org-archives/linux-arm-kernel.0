@@ -1,26 +1,32 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 21 Aug 2013 07:48:29 +1000
-Subject: [PATCH v4 03/19] powerpc: refactor of_get_cpu_node to support
- other architectures
-In-Reply-To: <52135F86.9020401@arm.com>
-References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376991021-12160-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <3703987.W8AZjrDbn0@vostro.rjw.lan> <52135F86.9020401@arm.com>
-Message-ID: <1377035309.25016.167.camel@pasglop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Aug 2013 22:52:21 +0100
+Subject: [PATCH v2 4/4] clkdev: Fix race condition in clock lookup from
+ device tree
+In-Reply-To: <1377020063-30213-5-git-send-email-s.nawrocki@samsung.com>
+References: <1377020063-30213-1-git-send-email-s.nawrocki@samsung.com>
+ <1377020063-30213-5-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <20130820215221.GH17845@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-08-20 at 13:22 +0100, Sudeep KarkadaNagesha wrote:
-> Correct, he has reviewed but I am waiting for his ACK before I could
-> sent you pull request. Hopefully I should be able to send pull request
-> tomorrow with his ACK.
+On Tue, Aug 20, 2013 at 07:34:23PM +0200, Sylwester Nawrocki wrote:
+> There is currently a race condition in the device tree part of clk_get()
+> function, since the pointer returned from of_clk_get_by_name() may become
+> invalid before __clk_get() call. I.e. due to the clock provider driver
+> remove() callback being called in between of_clk_get_by_name() and
+> __clk_get().
 > 
-> Hi Ben,
+> Fix this by doing both the look up and __clk_get() operations with the
+> clock providers list mutex held. This ensures that the clock pointer
+> returned from __of_clk_get_from_provider() call and passed to __clk_get()
+> is valid, as long as the clock supplier module first removes its clock
+> provider instance and then does clk_unregister() on the corresponding
+> clocks.
 > 
-> If this is patch is fine, can I have your ACK ?
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Reviewed-by: Mike Turquette <mturquette@linaro.org>
 
-I just want to test it (just in case...), will give an Ack then.
+Thanks.
 
-Cheers,
-Ben.
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
