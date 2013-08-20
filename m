@@ -1,167 +1,62 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 20 Aug 2013 11:07:53 -0700
-Subject: [PATCH] hwrng: reorder OMAP TRNG driver code
-Message-ID: <1377022073-28198-1-git-send-email-olof@lixom.net>
+From: csd@broadcom.com (Christian Daudt)
+Date: Tue, 20 Aug 2013 11:33:51 -0700
+Subject: [GIT PULL] ARM: bcm SOC  for 3.12
+Message-ID: <5213B68F.4050800@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added omap4 support in the driver was added without
-consideration for building older configs. When building omap1_defconfig,
-it resulted in:
+Hi Arnd, Olof,
+  Please pull the branch below. It contains various SOC related cleanups 
+for BCM arch.
 
-drivers/char/hw_random/omap-rng.c:190:12: warning: 'omap4_rng_init' defined but not used [-Wunused-function]
-drivers/char/hw_random/omap-rng.c:215:13: warning: 'omap4_rng_cleanup' defined but not used [-Wunused-function]
-drivers/char/hw_random/omap-rng.c:251:20: warning: 'omap4_rng_irq' defined but not used [-Wunused-function]
+  Thanks,
+    csd
 
-Move the code around so it is grouped with its operations struct, which
-for the omap4 case means also under the #ifdef CONFIG_OF, where it needs
-to be.
+The following changes since commit c095ba7224d8edc71dcef0d655911399a8bd4a3f:
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
-Cc: Lokesh Vutla <lokeshvutla@ti.com>
----
- drivers/char/hw_random/omap-rng.c |  108 ++++++++++++++++++-------------------
- 1 file changed, 54 insertions(+), 54 deletions(-)
+   Linux 3.11-rc4 (2013-08-04 13:46:46 -0700)
 
-diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
-index f3f7142..9b89ff4 100644
---- a/drivers/char/hw_random/omap-rng.c
-+++ b/drivers/char/hw_random/omap-rng.c
-@@ -140,16 +140,6 @@ static inline void omap_rng_write(struct omap_rng_dev *priv, u16 reg,
- 	__raw_writel(val, priv->base + priv->pdata->regs[reg]);
- }
- 
--static inline u32 omap2_rng_data_present(struct omap_rng_dev *priv)
--{
--	return omap_rng_read(priv, RNG_STATUS_REG) ? 0 : 1;
--}
--
--static inline u32 omap4_rng_data_present(struct omap_rng_dev *priv)
--{
--	return omap_rng_read(priv, RNG_STATUS_REG) & RNG_REG_STATUS_RDY;
--}
--
- static int omap_rng_data_present(struct hwrng *rng, int wait)
- {
- 	struct omap_rng_dev *priv;
-@@ -187,6 +177,60 @@ static int omap_rng_data_read(struct hwrng *rng, u32 *data)
- 	return data_size;
- }
- 
-+static int omap_rng_init(struct hwrng *rng)
-+{
-+	struct omap_rng_dev *priv;
-+
-+	priv = (struct omap_rng_dev *)rng->priv;
-+	return priv->pdata->init(priv);
-+}
-+
-+static void omap_rng_cleanup(struct hwrng *rng)
-+{
-+	struct omap_rng_dev *priv;
-+
-+	priv = (struct omap_rng_dev *)rng->priv;
-+	priv->pdata->cleanup(priv);
-+}
-+
-+static struct hwrng omap_rng_ops = {
-+	.name		= "omap",
-+	.data_present	= omap_rng_data_present,
-+	.data_read	= omap_rng_data_read,
-+	.init		= omap_rng_init,
-+	.cleanup	= omap_rng_cleanup,
-+};
-+
-+static inline u32 omap2_rng_data_present(struct omap_rng_dev *priv)
-+{
-+	return omap_rng_read(priv, RNG_STATUS_REG) ? 0 : 1;
-+}
-+
-+static int omap2_rng_init(struct omap_rng_dev *priv)
-+{
-+	omap_rng_write(priv, RNG_SYSCONFIG_REG, 0x1);
-+	return 0;
-+}
-+
-+static void omap2_rng_cleanup(struct omap_rng_dev *priv)
-+{
-+	omap_rng_write(priv, RNG_SYSCONFIG_REG, 0x0);
-+}
-+
-+static struct omap_rng_pdata omap2_rng_pdata = {
-+	.regs		= (u16 *)reg_map_omap2,
-+	.data_size	= OMAP2_RNG_OUTPUT_SIZE,
-+	.data_present	= omap2_rng_data_present,
-+	.init		= omap2_rng_init,
-+	.cleanup	= omap2_rng_cleanup,
-+};
-+
-+#if defined(CONFIG_OF)
-+static inline u32 omap4_rng_data_present(struct omap_rng_dev *priv)
-+{
-+	return omap_rng_read(priv, RNG_STATUS_REG) & RNG_REG_STATUS_RDY;
-+}
-+
- static int omap4_rng_init(struct omap_rng_dev *priv)
- {
- 	u32 val;
-@@ -221,33 +265,6 @@ static void omap4_rng_cleanup(struct omap_rng_dev *priv)
- 	omap_rng_write(priv, RNG_CONFIG_REG, val);
- }
- 
--static int omap2_rng_init(struct omap_rng_dev *priv)
--{
--	omap_rng_write(priv, RNG_SYSCONFIG_REG, 0x1);
--	return 0;
--}
--
--static void omap2_rng_cleanup(struct omap_rng_dev *priv)
--{
--	omap_rng_write(priv, RNG_SYSCONFIG_REG, 0x0);
--}
--
--static int omap_rng_init(struct hwrng *rng)
--{
--	struct omap_rng_dev *priv;
--
--	priv = (struct omap_rng_dev *)rng->priv;
--	return priv->pdata->init(priv);
--}
--
--static void omap_rng_cleanup(struct hwrng *rng)
--{
--	struct omap_rng_dev *priv;
--
--	priv = (struct omap_rng_dev *)rng->priv;
--	priv->pdata->cleanup(priv);
--}
--
- static irqreturn_t omap4_rng_irq(int irq, void *dev_id)
- {
- 	struct omap_rng_dev *priv = dev_id;
-@@ -275,23 +292,6 @@ static irqreturn_t omap4_rng_irq(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--static struct hwrng omap_rng_ops = {
--	.name		= "omap",
--	.data_present	= omap_rng_data_present,
--	.data_read	= omap_rng_data_read,
--	.init		= omap_rng_init,
--	.cleanup	= omap_rng_cleanup,
--};
--
--static struct omap_rng_pdata omap2_rng_pdata = {
--	.regs		= (u16 *)reg_map_omap2,
--	.data_size	= OMAP2_RNG_OUTPUT_SIZE,
--	.data_present	= omap2_rng_data_present,
--	.init		= omap2_rng_init,
--	.cleanup	= omap2_rng_cleanup,
--};
--
--#if defined(CONFIG_OF)
- static struct omap_rng_pdata omap4_rng_pdata = {
- 	.regs		= (u16 *)reg_map_omap4,
- 	.data_size	= OMAP4_RNG_OUTPUT_SIZE,
--- 
-1.7.10.4
+are available in the git repository at:
+
+   git://github.com/broadcom/bcm11351.git armsoc/for-3.12/soc
+
+for you to fetch changes up to 3a76b35186cb967a69c4a3935caf2fdf428e933b:
+
+   ARM: bcm: Make secure API call optional (2013-08-20 10:51:39 -0700)
+
+----------------------------------------------------------------
+SoC changes for 3.12 BCM
+
+----------------------------------------------------------------
+Christian Daudt (4):
+       ARM: bcm: Rename board_bcm
+       ARM: mmc: fix NONREMOVABLE test in sdhci-bcm-kona
+       ARM: DT: binding fixup to align with vendor-prefixes.txt (drivers)
+       ARM: bcm: Make secure API call optional
+
+Markus Mayer (4):
+       ARM: bcm281xx: Turn on L2 cache.
+       ARM bcm281xx: Turn on socket & network support.
+       ARM: bcm281xx: Board specific reboot code
+       mmc: sdhci-bcm-kona: make linker-section warning go away
+
+Matt Porter (1):
+       ARM: configs: disable DEBUG_LL in bcm_defconfig
+
+  arch/arm/configs/bcm_defconfig                      |   13 ++++++++++++-
+  arch/arm/mach-bcm/Kconfig                           |    1 +
+  arch/arm/mach-bcm/Makefile                          |    4 ++--
+  arch/arm/mach-bcm/bcm_kona_smc.c                    |   12 ++++++++----
+  arch/arm/mach-bcm/bcm_kona_smc.h                    |    2 +-
+  arch/arm/mach-bcm/{board_bcm.c => board_bcm281xx.c} |   30 
++++++++++++++++++++++++-------
+  arch/arm/mach-bcm/kona.c                            |   65 
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  arch/arm/mach-bcm/kona.h                            |   17 
++++++++++++++++++
+  drivers/clocksource/bcm_kona_timer.c                |    8 +++++++-
+  drivers/mmc/host/sdhci-bcm-kona.c                   |   15 ++++++++-------
+  10 files changed, 144 insertions(+), 23 deletions(-)
+  rename arch/arm/mach-bcm/{board_bcm.c => board_bcm281xx.c} (68%)
+  create mode 100644 arch/arm/mach-bcm/kona.c
+  create mode 100644 arch/arm/mach-bcm/kona.h
