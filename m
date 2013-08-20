@@ -1,88 +1,101 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 20 Aug 2013 18:59:47 +0200
-Subject: [PATCH 1/1] ARM: at91: at91sam9260: add missing pinctrl-names
- on mmc
-In-Reply-To: <20130820162442.GF5149@ludovic.desroches@atmel.com>
-References: <1373882719-9940-1-git-send-email-plagnioj@jcrosoft.com>
- <520B353F.9070605@atmel.com>
- <20130820162442.GF5149@ludovic.desroches@atmel.com>
-Message-ID: <5213A083.6010005@atmel.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 20 Aug 2013 10:00:23 -0700
+Subject: [PATCH 2/4] devicetree: serial: Document msm_serial bindings
+In-Reply-To: <543F6671-8317-446A-B14A-147373BCA9B6@codeaurora.org>
+References: <1376948397-6882-1-git-send-email-sboyd@codeaurora.org>
+ <1376948397-6882-3-git-send-email-sboyd@codeaurora.org>
+ <543F6671-8317-446A-B14A-147373BCA9B6@codeaurora.org>
+Message-ID: <5213A0A7.9010502@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/08/2013 18:24, Ludovic Desroches :
-> On Wed, Aug 14, 2013 at 09:43:59AM +0200, Nicolas Ferre wrote:
->> On 15/07/2013 12:05, Jean-Christophe PLAGNIOL-VILLARD :
->>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> ---
->>>   arch/arm/boot/dts/at91sam9260.dtsi | 1 +
->>>   1 file changed, 1 insertion(+)
->>>
->>> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
->>> index c7ccbcb..56ee828 100644
->>> --- a/arch/arm/boot/dts/at91sam9260.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
->>> @@ -572,6 +572,7 @@
->>>   				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
->>>   				#address-cells = <1>;
->>>   				#size-cells = <0>;
->>> +				pinctrl-names = "default";
->>
->> Ok, but there is no pinctrl property in this node: maybe it would be
->> good to have a default entry for this.
->>
->> It is then overloaded in arch/arm/boot/dts/animeo_ip.dts for instance...
->>
+On 08/20/13 07:41, Kumar Gala wrote:
+> On Aug 19, 2013, at 4:39 PM, Stephen Boyd wrote:
 >
-> Yes it is overloaded in arch/arm/boot/dts/at91sam9g20ek_common.dtsi.
+>> diff --git a/Documentation/devicetree/bindings/serial/msm_serial.txt b/Documentation/devicetree/bindings/serial/msm_serial.txt
+>> new file mode 100644
+>> index 0000000..a6efac3
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/serial/msm_serial.txt
+>> @@ -0,0 +1,82 @@
+>> +* MSM Serial UART and UARTDM
+>> +
+>> +There are two MSM serial hardware designs. UARTDM is designed for use with a
+>> +dma engine in high-speed use cases and the non-DM design is for lower speed use
+>> +cases. The two designs are mostly compatible from a software perspective except
+>> +the non-DM design can only read and write one character at a time and so the
+>> +register layout differs slightly.
+> I think you split this into two binding spec docs, one for each type of uart.
+
+Should split into two files? I can do that.
+
 >
-> mmc0 pinctrl configuration is set in at91sam9260.dtsi that is ok but do we have
-> to put a minimal pinctrl property as the mmc clock pinctrl? It is board
-> relative and no device related.
-
-Well, I think that the minimal set of IOs to do some MMC/SD transfers is 
-device related. You can choose the clock, command and DAT0 lines that a 
-particular product is using for a certain MCI instance. Even if the IOs 
-are changing on the board (i suspect none of our AT91 chips have several 
-multiplexing options for MCI), you can still overload them in the board 
-.dtsi/.dts file. It is certainly useful for adding DAT1-DAT3 for example.
-
-Looking at the other peripherals, I see that we are very often doing 
-this kind of pinctrl declaration scheme.
-
-> So maybe it is not the right place then I am
-> wondering if pinctrl-names should be set in at91sam9260.dtsi...
-
-It seems to be the right place in addition to a pinctrl-0 property 
-setting a ... default set of pins.
-
->> Can you please add one?
-
-Ludovic, I let you take over the addition of such a
-pinctrl-names/pinctrl-0 set of properties to this node.
-
-Bye,
-
->>
->> Bye,
->>
->>>   				status = "disabled";
->>>   			};
->>>
->>>
->>
->>
->> --
->> Nicolas Ferre
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> +
+>> +UART
+>> +----
+>> +Required properties:
+>> +- compatible: Should contain "qcom,msm-uart"
+>> +- reg: Should contain UART register location and length. The first
+> first? is there more than one reg region?
 >
->
+>> +       register shall specify the main control registers
+>> +- interrupts: Should contain UART interrupt.
+>> +- clocks: Should contain the core clock.
+>> +- clock-names: Should be "core_clk".
+>> +
+>> +Optional properties:
+>> +- dmas: Should contain dma specifiers for transmit and receive
+>> +- dma-names: Should contain "tx" for transmit and "rx" for receive
+> confused, above you say the non-DM doesn't support DMA so, why the optional props?
 
+Ah sorry, copy pasta.
+
+>
+>> +
+>> +Example:
+>> +
+>> +A uart device with dma capabilities.
+>> +
+>> +serial at a9c00000 {
+>> +	compatible = "qcom,msm-uart";
+>> +	reg = <0xa9c00000 0x1000>;
+>> +	interrupts = <11>;
+>> +	clocks = <&uart_cxc>;
+>> +	clock-names = "core_clk";
+>> +	dmas = <&dma0 0>, <&dma0 1>;
+>> +	dma-names = "tx", "rx";
+>> +};
+>> +
+>> +UARTDM
+>> +------
+>> +Required properties:
+>> +- compatible: Should contain at least "qcom,msm-uartdm".
+>> +              A more specific property should be specified as follows depending
+>> +	      on the version:
+>> +		"qcom,msm-uartdm-v1.1"
+>> +		"qcom,msm-uartdm-v1.2"
+>> +		"qcom,msm-uartdm-v1.3"
+>> +		"qcom,msm-uartdm-v1.4"
+>> +- reg: Should contain UART register locations and lengths. The first
+>> +       register shall specify the main control registers. An optional second
+>> +       register location shall specify the GSBI control region.
+> Is GSBI region existing tied to particular versions (if so can we say that)
+
+Not really. GSBI will always be related to v1.3 but not all v1.3
+hardware is part of a GSBI.
+
+>
+> reg-names?
+
+Optional should be fine? The driver is already handling this without
+reg-names.
+
+>> +- interrupts: Should contain UART interrupt.
+>> +- clocks: Should contain the core clock and the ahb clock.
+> nit, ahb in caps?
+
+Done.
 
 -- 
-Nicolas Ferre
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
