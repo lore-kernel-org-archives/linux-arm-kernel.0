@@ -1,52 +1,62 @@
-From: wangx@marvell.com (Xiang Wang)
-Date: Tue, 20 Aug 2013 10:27:37 +0800
-Subject: [PATCH v4 1/4] dma: mmp_pdma: only complete one transaction from
- dma_do_tasklet()
-In-Reply-To: <1376672707-24527-2-git-send-email-zonque@gmail.com>
-References: <1376672707-24527-1-git-send-email-zonque@gmail.com>
- <1376672707-24527-2-git-send-email-zonque@gmail.com>
-Message-ID: <5212D419.5030504@marvell.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 20 Aug 2013 10:31:03 +0800
+Subject: [PATCH v7 01/11] ARM: debug: support debug ll on hisilicon soc
+In-Reply-To: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1376965873-14431-2-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2013 01:05 AM, Daniel Mack wrote:
-> Currently, when an interrupt has occured for a channel, the tasklet
-> worker code will only look at the very last entry in the running list
-> and complete its cookie, and then dispose the entire running chain.
-> Hence, the first transaction's cookie will never complete.
->
-> In fact, the interrupt we should handle will be the one related to the
-> first descriptor in the chain with the ENDIRQEN bit set, so complete
-> the second transaction that is in fact still running.
->
-> As a result, the driver can't currently handle multiple transactions on
-> one chanel, and it's likely that no drivers exist that rely on this
-> feature.
->
-> Fix this by walking the running_chain and look for the first
-> descriptor that has the interrupt-enable bit set. Only queue
-> descriptors up to that point for completion handling, while leaving
-> the rest intact. Also, only make the channel idle if the list is
-> completely empty after such a cycle.
->
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
->   drivers/dma/mmp_pdma.c | 35 +++++++++++++++++++++--------------
->   1 file changed, 21 insertions(+), 14 deletions(-)
->
+Support UART0 debug ll on Hisilicon Hi3620 SoC & Hi3716 SoC.
 
-Hi, Daniel
-I think we would not run into the situation that there is a descriptor 
-with ENDIRQEN set in the middle of the running chain.
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/Kconfig.debug | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-in mmp_pdma.c:
-mmp_pdma_tx_submit() -> append_pending_queue() ->
-tail->desc.dcmd &= ~DCMD_ENDIRQEN;
-
-So in the pending list (same for running list), only the last descriptor 
-will have ENDIRQEN set.
-
-Please correct me if any problems.
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 814d224..bba9662 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -194,6 +194,22 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on HI3716 UART.
+ 
++	config DEBUG_HI3620_UART
++		bool "Hisilicon HI3620 Debug UART"
++		depends on ARCH_HI3xxx
++		select DEBUG_UART_PL01X
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on HI3620 UART.
++
++	config DEBUG_HI3716_UART
++		bool "Hisilicon Hi3716 Debug UART"
++		depends on ARCH_HI3xxx
++		select DEBUG_UART_PL01X
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on HI3716 UART.
++
+ 	config DEBUG_HIGHBANK_UART
+ 		bool "Kernel low-level debugging messages via Highbank UART"
+ 		depends on ARCH_HIGHBANK
+@@ -980,6 +996,8 @@ config DEBUG_UART_PHYS
+ 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
+ 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
+ 				ARCH_ORION5X
++	default 0xf8b00000 if DEBUG_HI3716_UART
++	default 0xfcb00000 if DEBUG_HI3620_UART
+ 	default 0xfe800000 if ARCH_IOP32X
+ 	default 0xffc02000 if DEBUG_SOCFPGA_UART
+ 	default 0xffd82340 if ARCH_IOP13XX
+@@ -1016,6 +1034,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfe100000 if DEBUG_IMX23_UART || DEBUG_IMX28_UART
+ 	default 0xfe230000 if DEBUG_PICOXCELL_UART
+ 	default 0xfe800000 if ARCH_IOP32X
++	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HI3716_UART
+ 	default 0xfeb24000 if DEBUG_RK3X_UART0
+ 	default 0xfeb26000 if DEBUG_RK3X_UART1
+ 	default 0xfeb30c00 if DEBUG_KEYSTONE_UART0
 -- 
-Regards,
-Xiang
+1.8.1.2
