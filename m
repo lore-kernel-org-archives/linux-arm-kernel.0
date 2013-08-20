@@ -1,146 +1,84 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 20 Aug 2013 09:41:25 -0500
-Subject: [PATCH 2/4] devicetree: serial: Document msm_serial bindings
-In-Reply-To: <1376948397-6882-3-git-send-email-sboyd@codeaurora.org>
-References: <1376948397-6882-1-git-send-email-sboyd@codeaurora.org>
- <1376948397-6882-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <543F6671-8317-446A-B14A-147373BCA9B6@codeaurora.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 20 Aug 2013 11:52:00 -0300
+Subject: [PATCH 1/3] ARM: Introduce atomic MMIO clear/set
+In-Reply-To: <CAHCPf3t1Tv_kpkCi2YQrr7+6ujQJy9MhifueO=k6fT=oZuqAwA@mail.gmail.com>
+References: <1376138582-7550-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1376138582-7550-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130812182942.GA28695@mudshark.cambridge.arm.com>
+ <20130819165955.GA20522@localhost>
+ <CAHCPf3t1Tv_kpkCi2YQrr7+6ujQJy9MhifueO=k6fT=oZuqAwA@mail.gmail.com>
+Message-ID: <20130820145158.GB4889@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Aug 19, 2013, at 4:39 PM, Stephen Boyd wrote:
-
-> The msm serial device bindings were added to the DTS files but
-> never documented. Let's document them now and also fix things up
-> so that it's clearer what hardware is supported. Instead of using
-> hsuart (for high speed uart), let's use uartdm because that
-> matches the actual name of the hardware. Also, let's add the
-> version information in case we need to differentiate between
-> different versions of the hardware in the future.
+On Tue, Aug 20, 2013 at 09:32:13AM -0500, Matt Sealey wrote:
+> On Mon, Aug 19, 2013 at 11:59 AM, Ezequiel Garcia
+> <ezequiel.garcia@free-electrons.com> wrote:
+> > On Mon, Aug 12, 2013 at 07:29:42PM +0100, Will Deacon wrote:
+> >
+> >> This means that you don't have ordering guarantees between the two accesses
+> >> outside of the CPU, potentially giving you:
+> >>
+> >>       spin_lock(&__io_lock);
+> >>       spin_unlock(&__io_lock);
+> >>       writel((readl(reg) & ~clear) | set, reg);
+> >>
+> >> which is probably not what you want.
+> >>
+> >> I suggest adding an iowmb after the writel if you really need this ordering
+> >> to be enforced (but this may have a significant performance impact,
+> >> depending on your SoC).
+> >
+> > I don't want to argue with you, given I have zero knowledge about this
+> > ordering issue. However let me ask you a question.
+> >
+> > In arch/arm/include/asm/spinlock.h I'm seeing this comment:
+> >
+> > ""ARMv6 ticket-based spin-locking.
+> > A memory barrier is required after we get a lock, and before we
+> > release it, because V6 CPUs are assumed to have weakly ordered
+> > memory.""
+> >
+> > and also:
+> >
+> > static inline void arch_spin_unlock(arch_spinlock_t *lock)
+> > {
+> >         smp_mb();
+> >         lock->tickets.owner++;
+> >         dsb_sev();
+> > }
+> >
+> > So, knowing this atomic API should work for every ARMv{N}, and not being very
+> > sure what the call to dsb_sev() does. Would you care to explain how the above
+> > is *not* enough to guarantee a memory barrier before the spin unlocking?
 > 
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> .../devicetree/bindings/serial/msm_serial.txt      | 82 ++++++++++++++++++++++
-> 1 file changed, 82 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/serial/msm_serial.txt
+> arch_spin_[un]lock as an API is not guaranteed to use a barrier before
+> or after doing anything, even if this particular implementation does.
 > 
-> diff --git a/Documentation/devicetree/bindings/serial/msm_serial.txt b/Documentation/devicetree/bindings/serial/msm_serial.txt
-> new file mode 100644
-> index 0000000..a6efac3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/serial/msm_serial.txt
-> @@ -0,0 +1,82 @@
-> +* MSM Serial UART and UARTDM
-> +
-> +There are two MSM serial hardware designs. UARTDM is designed for use with a
-> +dma engine in high-speed use cases and the non-DM design is for lower speed use
-> +cases. The two designs are mostly compatible from a software perspective except
-> +the non-DM design can only read and write one character at a time and so the
-> +register layout differs slightly.
-
-I think you split this into two binding spec docs, one for each type of uart.
-
-> +
-> +UART
-> +----
-> +Required properties:
-> +- compatible: Should contain "qcom,msm-uart"
-> +- reg: Should contain UART register location and length. The first
-
-first? is there more than one reg region?
-
-> +       register shall specify the main control registers
-> +- interrupts: Should contain UART interrupt.
-> +- clocks: Should contain the core clock.
-> +- clock-names: Should be "core_clk".
-> +
-> +Optional properties:
-> +- dmas: Should contain dma specifiers for transmit and receive
-> +- dma-names: Should contain "tx" for transmit and "rx" for receive
-
-confused, above you say the non-DM doesn't support DMA so, why the optional props?
-
-> +
-> +Example:
-> +
-> +A uart device with dma capabilities.
-> +
-> +serial at a9c00000 {
-> +	compatible = "qcom,msm-uart";
-> +	reg = <0xa9c00000 0x1000>;
-> +	interrupts = <11>;
-> +	clocks = <&uart_cxc>;
-> +	clock-names = "core_clk";
-> +	dmas = <&dma0 0>, <&dma0 1>;
-> +	dma-names = "tx", "rx";
-> +};
-> +
-> +UARTDM
-> +------
-> +Required properties:
-> +- compatible: Should contain at least "qcom,msm-uartdm".
-> +              A more specific property should be specified as follows depending
-> +	      on the version:
-> +		"qcom,msm-uartdm-v1.1"
-> +		"qcom,msm-uartdm-v1.2"
-> +		"qcom,msm-uartdm-v1.3"
-> +		"qcom,msm-uartdm-v1.4"
-> +- reg: Should contain UART register locations and lengths. The first
-> +       register shall specify the main control registers. An optional second
-> +       register location shall specify the GSBI control region.
-
-Is GSBI region existing tied to particular versions (if so can we say that)
-
-reg-names?
-
-> +- interrupts: Should contain UART interrupt.
-> +- clocks: Should contain the core clock and the ahb clock.
-
-nit, ahb in caps?
-
-> +- clock-names: Should be "core_clk" for the core clock and "iface_clk" for the
-> +	       ahb clock.
-> +
-> +Optional properties:
-> +- dmas: Should contain dma specifiers for transmit and receive channels
-> +- dma-names: Should contain "tx" for transmit and "rx" for receive channels
-> +
-> +Examples:
-> +
-> +A uartdm v1.4 device with dma capabilities.
-> +
-> +serial at f991e000 {
-> +	compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-> +	reg = <0xf991e000 0x1000>;
-> +	interrupts = <0 108 0x0>;
-> +	clocks = <&blsp1_uart2_apps_cxc>, <&blsp1_ahb_cxc>;
-> +	clock-names = "core_clk", "iface_clk";
-> +	dmas = <&dma0 0>, <&dma0 1>;
-> +	dma-names = "tx", "rx";
-> +};
-> +
-> +A uartdm v1.3 device without dma capabilities.
-> +
-> +serial at 19c40000 {
-> +	compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
-> +	reg = <0x19c40000 0x1000>,
-> +	      <0x19c00000 0x1000>;
-> +	interrupts = <0 195 0x0>;
-> +	clocks = <&gsbi5_uart_cxc>, <&gsbi5_ahb_cxc>;
-> +	clock-names = "core_clk", "iface_clk";
-> +};
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+> dsb_sev() is an SMP helper which does a synchronization barrier and
+> then sends events to other CPUs which informs them of the unlock. If
+> the other CPUs were in WFE state waiting on that spinlock, they can
+> now thunder in and attempt to lock it themselves. It's not really
+> relevant to the discussion as arch_spin_unlock is not guaranteed to
+> perform a barrier before returning.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> On some other architecture there may be ISA additions which make
+> locking barrier-less, or on a specific implementation of an ARM
+> architecture SoC whereby there may be a bank of "hardware spinlocks"
+> available.
+> 
+> So, in this sense, you shouldn't rely on implementation-specific
+> behaviors of a function. If you need to be sure C follows B follows A,
+> insert a barrier yourself. Don't expect A to barrier for you just
+> because you saw some source code that does it today, as tomorrow it
+> may be different. It's not an optimization, just a potential source of
+> new bugs if the implementation changes underneath you later.
+> 
 
+Of course. I agree completely.
+
+Thanks a lot,
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
