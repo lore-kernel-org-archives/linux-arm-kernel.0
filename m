@@ -1,61 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 20 Aug 2013 12:35:03 +0100
-Subject: [PATCH 3/7] iommu/arm: replace devm_request_and_ioremap by
- devm_ioremap_resource
-In-Reply-To: <1376911241-27720-4-git-send-email-Julia.Lawall@lip6.fr>
-References: <1376911241-27720-1-git-send-email-Julia.Lawall@lip6.fr>
- <1376911241-27720-4-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20130820113503.GC23007@mudshark.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 20 Aug 2013 12:44:21 +0100
+Subject: [alsa-devel] [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM
+ links between codec and cpu DAI
+In-Reply-To: <20130820102555.GZ23006@n2100.arm.linux.org.uk>
+References: <20130805203202.GX23006@n2100.arm.linux.org.uk>
+ <20130805220639.GB26637@sirena.org.uk>
+ <20130805233015.GY23006@n2100.arm.linux.org.uk>
+ <20130806133206.GA6427@sirena.org.uk>
+ <20130810161123.GW23006@n2100.arm.linux.org.uk>
+ <20130810211342.GX23006@n2100.arm.linux.org.uk>
+ <1376293215.2385.32.camel@loki>
+ <20130812082837.GB23006@n2100.arm.linux.org.uk>
+ <1376405952.2617.101.camel@loki>
+ <20130820102555.GZ23006@n2100.arm.linux.org.uk>
+Message-ID: <20130820114421.GN30073@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julia,
+On Tue, Aug 20, 2013 at 11:25:55AM +0100, Russell King - ARM Linux wrote:
 
-On Mon, Aug 19, 2013 at 12:20:37PM +0100, Julia Lawall wrote:
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> Use devm_ioremap_resource instead of devm_request_and_ioremap.
-> 
-> This was partly done using the semantic patch
-> scripts/coccinelle/api/devm_ioremap_resource.cocci
-> 
-> The error-handling code on the call to platform_get_resource was removed
-> manually, and the initialization of smmu->size was manually moved lower, to
-> take advantage of the NULL test on res performed by devm_ioremap_resource.
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> ---
->  drivers/iommu/arm-smmu.c |   11 +++--------
->  1 file changed, 3 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index ebd0a4c..dd91465 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1761,15 +1761,10 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->  	smmu->dev = dev;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	if (!res) {
-> -		dev_err(dev, "missing base address/size\n");
-> -		return -ENODEV;
-> -	}
-> -
-> +	smmu->base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(smmu->base))
-> +		return PTR_ERR(smmu->base);
->  	smmu->size = resource_size(res);
-> -	smmu->base = devm_request_and_ioremap(dev, res);
-> -	if (!smmu->base)
-> -		return -EADDRNOTAVAIL;
+> Mark is adamant that the Kirkwood-i2s with SPDIF support _will_ use DPCM
+> and refuses to take patches which don't.
 
-This does mean we trade arguably more useful error codes for the catch-all
--EINVAL, but the code ends up looking neater so I can be swayed either way.
+No, that's for simultaneous use of I2S and S/PDIF.  Using one or the
+other shouldn't be a problem, that's just a single DAI and a single PCM
+which has always been supported.
 
-Is this part of a series you're dealing with, or would you like me to take
-this (I already sent my SMMU patches for 3.12)?
+> So, until DPCM gets fixed, I can't proceed with getting SPDIF for kirkwood
+> into mainline.
 
-Cheers,
-
-Will
+I would suggest getting the either/or support merged first.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130820/f4c6f1ac/attachment.sig>
