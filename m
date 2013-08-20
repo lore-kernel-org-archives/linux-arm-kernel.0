@@ -1,80 +1,42 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 20 Aug 2013 19:31:32 +0200
-Subject: [PATCH RFC 1/2] clk: Provide not locked variant of
- of_clk_get_from_provider()
-In-Reply-To: <20130819195016.GU23006@n2100.arm.linux.org.uk>
-References: <1376066046-16037-1-git-send-email-s.nawrocki@samsung.com>
- <1376066046-16037-2-git-send-email-s.nawrocki@samsung.com>
- <20130819194132.4443.4807@quantum>
- <20130819195016.GU23006@n2100.arm.linux.org.uk>
-Message-ID: <5213A7F4.7050200@samsung.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 20 Aug 2013 19:31:27 +0200
+Subject: [PATCH 00/16] Exynos clock clean-up for 3.12
+Message-ID: <1377019903-14614-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2013 09:50 PM, Russell King - ARM Linux wrote:
-> On Mon, Aug 19, 2013 at 12:41:32PM -0700, Mike Turquette wrote:
->> Quoting Sylwester Nawrocki (2013-08-09 09:34:05)
->>> Add helper functions for the of_clk_providers list locking and
->>> an unlocked variant of of_clk_get_from_provider().
->>> These functions are intended to be used in the clkdev to avoid
->>> race condition in the device tree based clock look up in clk_get().
->>>
->>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>
->> Looks good to me.
->>
->> Russell,
->>
->> Any objections?
-> 
-> Yes.
-> 
->>> diff --git a/include/linux/clk.h b/include/linux/clk.h
->>> index 9a6d045..ea6822e 100644
->>> --- a/include/linux/clk.h
->>> +++ b/include/linux/clk.h
->>> @@ -368,6 +368,9 @@ struct of_phandle_args;
->>>  struct clk *of_clk_get(struct device_node *np, int index);
->>>  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
->>>  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
->>> +struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec);
->>> +void of_clk_lock(void);
->>> +void of_clk_unlock(void);
-> 
-> Here's the thing.  Yes, I know we have a directory called 'include'
-> where header files live, but there is nothing layed down which requires
-> all header files to be under a directory called 'include' - especially
-> when it's stuff which should _not_ be shared with the rest of the
-> kernel.
-> 
-> In this case, these three functions are merely exported from
-> drivers/clk/clk.c to drivers/clk/clkdev.c - which is in the very same
-> directory.  It is not intended that these functions be used for any
-> other purpose.
-> 
-> So, why not put them in a header file in drivers/clk/ which both these
-> files can include?
+This series fixes various functional and non-functional (e.g. stylistic)
+issues in Common Clock Framework drivers for Samsung Exynos SoCs. See
+particular patches for more detailed descriptions.
 
-Yes, that's certainly a good idea. In fact it bothered me a bit that
-those functions are unnecessarily exposed like that. But I somehow missed
-a separate header could be simply added. Thanks for the suggestion.
+Tomasz Figa (16):
+  pwm: samsung: Update DT bindings documentation to cover clocks
+  ARM: dts: exynos4: Specify PWM clocks in PWM node
+  clocksource: samsung_pwm_timer: Get clock from device tree
+  clk: samsung: exynos4: Use separate aliases for cpufreq related clocks
+  clk: samsung: Modify _get_rate() helper to use __clk_lookup()
+  clk: samsung: exynos4: Remove unused static clkdev aliases
+  clk: samsung: exynos4: Remove checks for DT node
+  clk: samsung: exynos4: Rename exynos4_plls to exynos4x12_plls
+  clk: samsung: pll: Use new registration method for PLL45xx
+  clk: samsung: pll: Add support for rate configuration of PLL45xx
+  clk: samsung: pll: Use new registration method for PLL46xx
+  clk: samsung: pll: Add support for rate configuration of PLL46xx
+  clk: samsung: exynos4: Reorder registration of mout_vpllsrc
+  clk: samsung: exynos4: Register PLL rate tables for Exynos4210
+  clk: samsung: exynos4: Register PLL rate tables for Exynos4x12
+  clk: samsung: exynos5250: Simplify registration of PLL rate tables
 
-I'm going to post v2 of $subject series and the one adding clk_unregister()
-implementation including corrections for those couple issues pointed out in
-the reviews. Would appreciate to know you opinion on those and perhaps have
-your Ack so Mike could take whole series into his tree.
+ .../devicetree/bindings/pwm/pwm-samsung.txt        |  12 +
+ arch/arm/boot/dts/exynos4.dtsi                     |   2 +
+ drivers/clk/samsung/clk-exynos4.c                  | 539 ++++++++++++---------
+ drivers/clk/samsung/clk-exynos5250.c               |  12 +-
+ drivers/clk/samsung/clk-exynos5440.c               |   2 +-
+ drivers/clk/samsung/clk-pll.c                      | 284 ++++++++---
+ drivers/clk/samsung/clk-pll.h                      |  59 ++-
+ drivers/clk/samsung/clk.c                          |  10 +-
+ drivers/clocksource/samsung_pwm_timer.c            |  12 +-
+ 9 files changed, 601 insertions(+), 331 deletions(-)
 
-> I *really* wish that people would get out of their mind that everything
-> has to live in a header file in include/ or arch/arm/include/ and local
-> includes are bad.  Local includes are a very good thing, they aid in
-> reducing the visibility of stuff which is not meant to be visible to
-> the entire kernel.
-> 
-> Just look at things like fs/mount.h to see what I mean.  Or the various
-> driver header files which contain definitions only for use by their
-> associated drivers in the drivers/ subtree.
-
---
-Thanks,
-Sylwester
+-- 
+1.8.3.2
