@@ -1,150 +1,97 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 20 Aug 2013 17:55:56 -0400
-Subject: [PATCH 2/8] clk: keystone: Add gate control clock driver
-In-Reply-To: <20130820213045.4443.89971@quantum>
-References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
- <1375719147-7578-3-git-send-email-santosh.shilimkar@ti.com>
- <20130813161314.GR27165@e106331-lin.cambridge.arm.com>
- <520A60A2.2030104@ti.com>
- <20130813165344.GU27165@e106331-lin.cambridge.arm.com>
- <20130819204353.4443.48466@quantum> <5213756A.5090903@ti.com>
- <20130820213045.4443.89971@quantum>
-Message-ID: <5213E5EC.8070208@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 20 Aug 2013 22:00:20 +0000 (UTC)
+Subject: OMAP baseline test results for v3.11-rc6
+Message-ID: <alpine.DEB.2.02.1308202156340.6426@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 August 2013 05:30 PM, Mike Turquette wrote:
-> Quoting Santosh Shilimkar (2013-08-20 06:55:54)
->> On Monday 19 August 2013 04:43 PM, Mike Turquette wrote:
->>> Quoting Mark Rutland (2013-08-13 09:53:44)
->>>> On Tue, Aug 13, 2013 at 05:36:50PM +0100, Santosh Shilimkar wrote:
->>>>> On Tuesday 13 August 2013 12:13 PM, Mark Rutland wrote:
->>>>>> [adding dt maintainers]
->>>>>>
->>>>>> On Mon, Aug 05, 2013 at 05:12:21PM +0100, Santosh Shilimkar wrote:
->>>>>>> Add the driver for the clock gate control which uses PSC (Power Sleep
->>>>>>> Controller) IP on Keystone 2 based SOCs. It is responsible for enabling and
->>>>>>> disabling of the clocks for different IPs present in the SoC.
->>>>>>>
->>>>>>> Cc: Mike Turquette <mturquette@linaro.org>
->>>>>>>
->>>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>>>> ---
->>>>>>>  .../devicetree/bindings/clock/keystone-gate.txt    |   30 ++
->>>>>>>  drivers/clk/keystone/gate.c                        |  306 ++++++++++++++++++++
->>>>>>>  include/linux/clk/keystone.h                       |    1 +
->>>>>>>  3 files changed, 337 insertions(+)
->>>>>>>  create mode 100644 Documentation/devicetree/bindings/clock/keystone-gate.txt
->>>>>>>  create mode 100644 drivers/clk/keystone/gate.c
->>>>>>>
->>>>>>> diff --git a/Documentation/devicetree/bindings/clock/keystone-gate.txt b/Documentation/devicetree/bindings/clock/keystone-gate.txt
->>>>>>> new file mode 100644
->>>>>>> index 0000000..40afef5
->>>>>>> --- /dev/null
->>>>>>> +++ b/Documentation/devicetree/bindings/clock/keystone-gate.txt
->>>>>>> @@ -0,0 +1,30 @@
->>>>>>> +Binding for Keystone gate control driver which uses PSC controller IP.
->>>>>>> +
->>>>>>> +This binding uses the common clock binding[1].
->>>>>>> +
->>>>>>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->>>>>>> +
->>>>>>> +Required properties:
->>>>>>> +- compatible : shall be "keystone,psc-clk".
->>>>>>
->>>>>> Similarly to my comments on patch 1, this should probably be something
->>>>>> more like "ti,keystone-psc-clock"
->>>>>>
->>>>>>> +- #clock-cells : from common clock binding; shall be set to 0.
->>>>>>> +- clocks : parent clock phandle
->>>>>>> +- reg :        psc address address space
->>>>>>> +
->>>>>>> +Optional properties:
->>>>>>> +- clock-output-names : From common clock binding to override the
->>>>>>> +                       default output clock name
->>>>>>> +- status : "enabled" if clock is always enabled
->>>>>>
->>>>>> Huh? This is a standard property, for which ePAPR defines "okay",
->>>>>> "disabled", "fail", and "fail-sss", and not "enabled". This also doesn't
->>>>>> seem to follow the standard meaning judging by the code.
->>>>>>
->>>>>> It looks like this could be a boolean property
->>>>>> ("clock-always-enabled"?), but that assumes it's necessary.
->>>>>>
->>>>>> Why do you need this?
->>>>>>
->>>>> I dropped this already. Forgot to update the documentation.
->>>>
->>>> Ok.
->>>>
->>>>>
->>>>>>> +- lpsc : lpsc module id, if not set defaults to zero
->>>>>>
->>>>>> What's that needed for? Are there multiple clocks sharing a common
->>>>>> register bank?
->>>>>>
->>>>>>> +- pd : power domain number, if not set defaults to zero (always ON)
->>>>>>
->>>>>> Please don't use abbreviations unnecessarily. "power-domain-id" or
->>>>>> similar would be far better. What exactly does this represent? Does the
->>>>>> clock IP itself handle power domains, or is there some external unit
->>>>>> that controls power domains?
->>>>>>
->>>>> pd is commonly used but I can expand it. This represent the power
->>>>> domain number.
->>>>
->>>> Does the the clock IP have some internal logic for handling power
->>>> domains only covering its clocks, or is there some external power
->>>> controller involved (i.e. do we possibly need to describe an external
->>>> unit and a linkage to it?).
->>>
->>> Hmm, does the clock own the power domain or does the power domain own
->>> the clock? As you well know on OMAP the clock resides within the power
->>> domain. So it seems to me that the better way to do this would be for
->>> the power domain to have it's own binding and node, and then reference
->>> the clock:
->>>
->>> power-domain {
->>>       ...
->>>       clocks = <&chipclk3>, <&chipclk4>;
->>>       clock-names = "perclk", "uartclk";
->>>       ...
->>> };
->>>
->>> Now maybe things are different on Keystone, but if not then I don't see
->>> why the clock binding should have anything to do with the power domain.
->>>
->> They are bit different w.r.t OMAP. LPSC itself is the clock control of the
->> IP. The LPSC number in the bindings is actually the specific number which
->> is used to reach to the address space of the clock control. One can view
->> that one as clock control register index.
-> 
-> Thanks for the information. I have a further question about then: are
-> the LPSC clocks really module clocks that belong to the IP that they are
-> gating?
-> 
-LPSC controls the clock enable/disable to the IP/module so answer is yes.
-In certain cases LPSC controls clock to more than one IP as well.
 
-> If so then they could be defined within the node defining their parent
-> IP. That might be enough to get rid of the LPSC index value. Again I
-> might be over-engineering it. Just trying to get an understanding.
-> 
-Am not sure I follow you here on not having the LPSC index. Sorry. 
+Here are some basic OMAP test results for Linux v3.11-rc6.
+Logs and other details at:
 
->>
->> The power domain as such are above the lpsc but the clock enable/disable needs
->> to follow a recommended sequence which needs the access to those registers.
->> As such there is no major validation done on dynamically switching off PDs
->> in current generation devices.
->>
->> As I mentioned you to on IRC, the PD was the only odd part I have to keep
->> around to address the sequencing need which is kind of interlinked.
-> 
-> Right. Well maybe some day that part can go away but I understand the
-> need for it now.
-> 
-right. Thanks
+    http://www.pwsan.com/omap/testlogs/test_v3.11-rc6/20130818180958/
 
-regards,
-Santosh
+
+Test summary
+------------
+
+Build: uImage:
+    Pass (14/14): n800_multi_omap2xxx, n800_only_a, omap1_defconfig,
+                  omap1_defconfig_1510innovator_only,
+                  omap1_defconfig_5912osk_only, omap2plus_defconfig,
+                  omap2plus_defconfig_2430sdp_only,
+                  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+                  omap2plus_defconfig_omap2_4_only,
+                  omap2plus_defconfig_omap3_4_only,
+                  rmk_omap3430_ldp_allnoconfig,
+                  rmk_omap3430_ldp_oldconfig,
+                  rmk_omap4430_sdp_allnoconfig
+
+Build: uImage+dtb:
+    Pass ( 3/ 3): am33xx_only/am335x-bone,
+                  omap2plus_defconfig/omap4-panda,
+                  omap2plus_defconfig/omap4-panda-es
+
+Build: zImage:
+    Pass ( 1/ 1): omap2plus_defconfig
+
+Boot to userspace:
+    skip ( 1/ 1): 5912osk
+    Pass (10/10): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
+                  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+                  am335xbonelt, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 2/ 6): 2430sdp, 4430es2panda
+    Pass ( 4/ 6): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    FAIL ( 3/ 6): 2430sdp, 4430es2panda, 4460pandaes
+    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 37xxevm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 2/ 4): 4430es2panda, 4460pandaes
+    Pass ( 2/ 4): 3530es3beagle, 37xxevm
+
+PM: chip off via dynamic idle:
+    FAIL ( 2/ 4): 4430es2panda, 4460pandaes
+    Pass ( 2/ 4): 3530es3beagle, 37xxevm
+
+
+vmlinux object size
+(delta in bytes from test_v3.11-rc5 
+(d4e4ab86bcba5a72779c43dc1459f71fea3d89c8)):
+   text     data      bss    total  kernel
+   +272        0        0     +272  n800_multi_omap2xxx
+   +272        0        0     +272  n800_only_a
+  +1000        0        0    +1000  omap1_defconfig
+  +1984        0        0    +1984  omap1_defconfig_1510innovator_only
+   +992        0        0     +992  omap1_defconfig_5912osk_only
+  +4880        0        0    +4880  omap2plus_defconfig
+   +712        0        0     +712  omap2plus_defconfig_2430sdp_only
+   +784        0        0     +784  omap2plus_defconfig_cpupm
+   +720        0        0     +720  omap2plus_defconfig_no_pm
+   +784        0        0     +784  omap2plus_defconfig_omap2_4_only
+   +784        0        0     +784  omap2plus_defconfig_omap3_4_only
+   +296        0      -32     +264  rmk_omap3430_ldp_allnoconfig
+   +448        0        0     +448  rmk_omap3430_ldp_oldconfig
+   +280        0      -16     +264  rmk_omap4430_sdp_allnoconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.11-rc5 
+(d4e4ab86bcba5a72779c43dc1459f71fea3d89c8))
+  avail  rsrvd   high  freed  board          kconfig
+    -8k     8k      .      .  2430sdp        omap2plus_defconfig
+    -8k     8k      .      .  3517evm        omap2plus_defconfig
+    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
+    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
+    -8k     8k      .      .  37xxevm        omap2plus_defconfig
+    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
+    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
+    -8k     8k      .      .  am335xbonelt   am33xx_only
