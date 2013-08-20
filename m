@@ -1,42 +1,55 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 20 Aug 2013 16:09:26 +0900
-Subject: [PATCH v2 0/8] Common Clock Framework support for Samsung
- S3C64xx
-In-Reply-To: <20130820002258.4443.34197@quantum>
-References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
- <2956608.dyLtqySMuJ@amdc1227> <20130816210203.4443.43511@quantum>
- <3890424.fJfWX17mED@flatron> <158901ce9b34$c0ac8720$42059560$@org>
- <20130820002258.4443.34197@quantum>
-Message-ID: <18f101ce9d74$34e23450$9ea69cf0$@org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 20 Aug 2013 09:14:11 +0200
+Subject: [PATCH v2 4/7] ARM: dts: imx27 pinctrl
+In-Reply-To: <1376921234-26682-5-git-send-email-mpa@pengutronix.de>
+References: <1376921234-26682-1-git-send-email-mpa@pengutronix.de>
+ <1376921234-26682-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130820071411.GI31036@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Turquette wrote:
+On Mon, Aug 19, 2013 at 04:07:11PM +0200, Markus Pargmann wrote:
+> Pinctrl driver node and pin group definitions for other driver nodes.
 > 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+> +					pinctrl_uart_1: uart-1 {
+> +						fsl,pins = <
+> +							MX27_PAD_UART1_TXD__UART1_TXD 0x0
+> +							MX27_PAD_UART1_RXD__UART1_RXD 0x0
+> +							MX27_PAD_UART1_CTS__UART1_CTS 0x0
+> +							MX27_PAD_UART1_RTS__UART1_RTS 0x0
+> +						>;
+> +					};
 
-[...]
+The above either misses a group number or an uart number. We need
+pinctrl_uart<uartno>_<groupno>
 
-> > OK, if new branch is ready, I will replace with that or if re-merge is
-> > required, I will. Either way, I'm fine and can handle. Mike, let me know
-> > your choice :-)
-> 
-> Since I have already published it let's just go with the delta patch.  I
-> can create another stable branch named clk-next-s3c64xx-delta that just
-> has this patch on top of clk-next-s3c64xx OR I can apply it on top of
-> the existing clk-next-s3c64xx and re-merge it.
-> 
-Sounds good to me. If the branch for the delta is ready, let me know.
+Also this doesn't scale very good. For boards without RTS/CTS we would have
+to add a completely different group. For the FEC I've seen different
+groups with a dozen pins each which differ in only a single pin.
 
-> I'm trying to think on whether there are any weird git corner cases with
-> re-merging clk-next-s3c64xx. Let me know if re-merging is somehow unsafe
-> (makes history weird, or whatever).
-> 
-I don't think it causes some problem.
+I therefore suggest (and Shawn acked the general idea already) to
+do this:
 
-> Let me know what option is better for you. I'll publish as soon as I get
-> the delta patch. Apologies again for creating some extra work!
-> 
-No problem.
+	pinctrl_uart1_1: uart1-1 {
+		fsl,pins = <
+			MX27_PAD_UART1_TXD__UART1_TXD 0x0
+			MX27_PAD_UART1_RXD__UART1_RXD 0x0
+		>;
+	};
 
-Thanks,
-Kukjin
+	pinctrl_uart1_rtscts_1: uart1-rtscts-1 {
+		fsl,pins = <
+			MX27_PAD_UART1_CTS__UART1_CTS 0x0
+			MX27_PAD_UART1_RTS__UART1_RTS 0x0
+		>;
+	};
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
