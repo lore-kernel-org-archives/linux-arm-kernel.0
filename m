@@ -1,53 +1,88 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 20 Aug 2013 18:57:17 +0200
-Subject: [PATCH] irqchip: gic: Allow setting affinity to offline CPUs
-In-Reply-To: <52139DD9.3020004@codeaurora.org>
-References: <1377015070-26320-1-git-send-email-t.figa@samsung.com>
- <3879851.vmCHJ3AcgQ@amdc1227> <52139DD9.3020004@codeaurora.org>
-Message-ID: <3020706.rrCKqOb5n3@amdc1227>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 20 Aug 2013 18:59:47 +0200
+Subject: [PATCH 1/1] ARM: at91: at91sam9260: add missing pinctrl-names
+ on mmc
+In-Reply-To: <20130820162442.GF5149@ludovic.desroches@atmel.com>
+References: <1373882719-9940-1-git-send-email-plagnioj@jcrosoft.com>
+ <520B353F.9070605@atmel.com>
+ <20130820162442.GF5149@ludovic.desroches@atmel.com>
+Message-ID: <5213A083.6010005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 of August 2013 09:48:25 Stephen Boyd wrote:
-> On 08/20/13 09:41, Tomasz Figa wrote:
-> > On Tuesday 20 of August 2013 09:33:31 Stephen Boyd wrote:
-> >> On 08/20/13 09:11, Tomasz Figa wrote:
-> >>> Sometimes it is necessary to fix interrupt affinity to an offline
-> >>> CPU,
-> >>> for example in initialization of local timers. This patch modifies
-> >>> .set_affinity() operation of irq-gic driver to fall back to any
-> >>> possible
-> >>> CPU if no online CPU can be found in requested CPU mask.
-> >>> 
-> >>> This fixes broken Exynos4210 support since commit
-> >>> 
-> >>> 	ee98d27df6 ARM: EXYNOS4: Divorce mct from local timer API
-> >>> 
-> >>> caused by timer initialization code unable to set affinity for local
-> >>> timer interrupts.
-> >> 
-> >> Care to elaborate further? I don't see how the interrupt affinity is
-> >> set
-> >> for a CPU that isn't online because the mct code runs on the CPU that
-> >> the affinity is being set to.
-> > 
-> > Well, please look at secondary_start_kernel() in arch/arm/kernel/smp.c
-> > [1]. You can see that notify_cpu_starting() (line 348) that fires the
-> > notifier registered in MCT driver is called before set_cpu_online()
-> > (line 359) that marks the CPU as online. Also notice that, originally,
-> > local timer initialization was happening after set_cpu_online() - see
-> > line 365.
-> Great, thank you. Please put this information in the commit text next
-> time.
+On 20/08/2013 18:24, Ludovic Desroches :
+> On Wed, Aug 14, 2013 at 09:43:59AM +0200, Nicolas Ferre wrote:
+>> On 15/07/2013 12:05, Jean-Christophe PLAGNIOL-VILLARD :
+>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>> ---
+>>>   arch/arm/boot/dts/at91sam9260.dtsi | 1 +
+>>>   1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+>>> index c7ccbcb..56ee828 100644
+>>> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+>>> @@ -572,6 +572,7 @@
+>>>   				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
+>>>   				#address-cells = <1>;
+>>>   				#size-cells = <0>;
+>>> +				pinctrl-names = "default";
+>>
+>> Ok, but there is no pinctrl property in this node: maybe it would be
+>> good to have a default entry for this.
+>>
+>> It is then overloaded in arch/arm/boot/dts/animeo_ip.dts for instance...
+>>
+>
+> Yes it is overloaded in arch/arm/boot/dts/at91sam9g20ek_common.dtsi.
+>
+> mmc0 pinctrl configuration is set in at91sam9260.dtsi that is ok but do we have
+> to put a minimal pinctrl property as the mmc clock pinctrl? It is board
+> relative and no device related.
 
-Right, I could have added a sentence or two about this.
+Well, I think that the minimal set of IOs to do some MMC/SD transfers is 
+device related. You can choose the clock, command and DAT0 lines that a 
+particular product is using for a certain MCI instance. Even if the IOs 
+are changing on the board (i suspect none of our AT91 chips have several 
+multiplexing options for MCI), you can still overload them in the board 
+.dtsi/.dts file. It is certainly useful for adding DAT1-DAT3 for example.
 
-> I wonder if we shouldn't make the cpumask_any_and() work on the present
-> mask instead? If we ever support physical hotplug on ARM I think we
-> wouldn't want to allow interrupts to go to CPUs that aren't even present
-> (but still possible).
+Looking at the other peripherals, I see that we are very often doing 
+this kind of pinctrl declaration scheme.
 
-Yes, cpu_present_mask might be better indeed.
+> So maybe it is not the right place then I am
+> wondering if pinctrl-names should be set in at91sam9260.dtsi...
 
-Best regards,
-Tomasz
+It seems to be the right place in addition to a pinctrl-0 property 
+setting a ... default set of pins.
+
+>> Can you please add one?
+
+Ludovic, I let you take over the addition of such a
+pinctrl-names/pinctrl-0 set of properties to this node.
+
+Bye,
+
+>>
+>> Bye,
+>>
+>>>   				status = "disabled";
+>>>   			};
+>>>
+>>>
+>>
+>>
+>> --
+>> Nicolas Ferre
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+
+
+-- 
+Nicolas Ferre
