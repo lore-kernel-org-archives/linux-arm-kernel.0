@@ -1,35 +1,33 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 20 Aug 2013 12:45:51 -0300
-Subject: [PATCH v3 2/5] ARM: mvebu: Add clock properties to Armada XP timer
- node
+Date: Tue, 20 Aug 2013 12:45:52 -0300
+Subject: [PATCH v3 3/5] clocksource: armada-370-xp: Replace WARN_ON with BUG_ON
 In-Reply-To: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1377013554-23389-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1377013554-23389-4-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the addition of the Armada XP reference clock, we can now model
-accurately the available clock inputs for the timer: namely, nbclk
-and refclk. For each of this clock inputs we assign a name, for the
-driver to select as appropriate.
+If the clock fails to be obtained and the timer fails to be properly
+registered, the kernel will freeze real soon. Instead, let's BUG()
+where the actual problem is located.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/clocksource/time-armada-370-xp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 50e404e..2642f55 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -63,6 +63,8 @@
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index 11d91e5..fca318f 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -304,7 +304,7 @@ static void __init armada_370_timer_init(struct device_node *np)
+ {
+ 	struct clk *clk = of_clk_get(np, 0);
  
- 			timer at 20300 {
- 				compatible = "marvell,armada-xp-timer";
-+				clocks = <&coreclk 2>, <&refclk>;
-+				clock-names = "nbclk", "fixed";
- 			};
+-	WARN_ON(IS_ERR(clk));
++	BUG_ON(IS_ERR(clk));
+ 	timer_clk = clk_get_rate(clk) / TIMER_DIVIDER;
+ 	timer25Mhz = false;
  
- 			coreclk: mvebu-sar at 18230 {
 -- 
 1.8.1.5
