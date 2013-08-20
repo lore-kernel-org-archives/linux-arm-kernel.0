@@ -1,62 +1,114 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 20 Aug 2013 17:16:58 +0100
-Subject: [PATCH v3 4/6] ARM64: arch_timer: configure and enable event
- stream
-In-Reply-To: <52137CD5.7010201@arm.com>
-References: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376414984-14182-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376414984-14182-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <20130820132712.GE26129@mudshark.cambridge.arm.com>
- <52137CD5.7010201@arm.com>
-Message-ID: <20130820161658.GD27819@mudshark.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 20 Aug 2013 18:21:47 +0200
+Subject: [PATCH v5 0/3] i2c-mv64xxx: Fixes and new feature for controlers
+ embedded in Aramda XP
+In-Reply-To: <1376039158-1896-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1376039158-1896-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <5213979B.4050306@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 03:27:33PM +0100, Sudeep KarkadaNagesha wrote:
-> On 20/08/13 14:27, Will Deacon wrote:
-> > On Tue, Aug 13, 2013 at 06:29:42PM +0100, Sudeep KarkadaNagesha wrote:
-> >> diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
-> >> index 6d4482f..effd8f9 100644
-> >> --- a/arch/arm64/include/asm/hwcap.h
-> >> +++ b/arch/arm64/include/asm/hwcap.h
-> >> @@ -30,6 +30,7 @@
-> >>  #define COMPAT_HWCAP_IDIVA	(1 << 17)
-> >>  #define COMPAT_HWCAP_IDIVT	(1 << 18)
-> >>  #define COMPAT_HWCAP_IDIV	(COMPAT_HWCAP_IDIVA|COMPAT_HWCAP_IDIVT)
-> >> +#define COMPAT_HWCAP_EVTSTRM	(1 << 21)
-> > 
-> > Looking at the context, we should also add COMPAT_HWCAP_LPAE as a separate
-> > patch (not part of this series).
-> > 
-> Ok make sense, I can do that. IIUC even this needs at least under some
-> config option, assuming can't be dynamic ?
-
-I'm not sure I follow you... if you're asking whether the LPAE HWCAP should
-be dynamic for ARMv8, then no, since the capabilities offered by LPAE are
-included in ARMv8 as far as userspace is concerned.
-
-> >>  #ifndef __ASSEMBLY__
-> >>  /*
-> >> @@ -41,7 +42,8 @@
-> >>  				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
-> >>  				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
-> >>  				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
-> >> -				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV)
-> >> +				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV|\
-> >> +				 COMPAT_HWCAP_EVTSTRM)
-> > 
-> > So here you're hardcoding COMPAT_HWCAP_EVTSTRM in the COMPAT_ELF_HWCAP, yet
-> > we only enable the native one from the arch-timer driver. The question then is
-> > "Can we rely on the event-stream working for AArch64?". If so, we don't need
-> > the native hwcap at all. If not, then we need to make the compat hwcap
-> > dynamic.
+On 09/08/2013 11:05, Gregory CLEMENT wrote:
+> Hello,
 > 
-> How about something like this ? I am not sure if
-> arch/arm64/kernel/setup.c is apt place for compat_elf_hwcap though.
+> This new version just brings the handle of the "marvell,mv78230-i2"
+> string as a single compatible string. As there were no other remarks
+> since about 2 months I hope that this version will be able to be
+> merged in 3.12.
+> 
+> This patch set adds support for the I2C Transaction Generator which
+> offloads CPU from managing I2C transfer step by step. This feature is
+> currently only available on the I2C controller IP embedded in the
+> Armada XP SoC.
+> 
+> This series also contains a real fix for the I2C controller of the
+> Armada XP SoC.
+> 
+> The first two patches modify the driver itself and should go through
+> i2c subsystem.
+> 
+> The last patch updates the device tree to be able to use this new
+> feature. I kept this patch in the series for having a coherent series,
+> but it have already been pulled in the mvebu subsystem.
+> 
 
-Looks like the right sort of idea, yes. I can't think of a better place to
-put it. You could adjust it slightly so that COMPAT_ELF_HWCAP stays like it
-is, with an extra '| compat_dyn_elf_hwcap' on the end, but I have no real
-preference.
+Wolfram,
 
-Will
+Jason Cooper drooped the third patch as it conflicted with a patch from
+Maxime Ripard which adds the AllWinner support. Olof also asked a formal
+acked-by from a device tree maintainer even if we already answer to
+Mark Rutland request.
+
+Olof also requested that you take the binding update, so I am going to send
+a new version of this patch set with the last patch split in two parts.
+
+As explained earlier today, unless you really want I use be32_to_cpu in the
+mv64xxx_i2c_offload_msg() I won't change anything else.
+
+Regards,
+
+> Thanks,
+> 
+> Changelog:
+> 
+> v4-v5:
+> 
+>  - handle of the "marvell,mv78230-i2" string as a single compatible
+>    string. Even it is strongly discouraged to use "marvell,
+>    mv78230-i2" alone, it is better to be able to handle it.
+> 
+> 
+> v3->v4:
+> 
+>  - reverse the order of the compatible strings, with the most
+>    specific first
+> 
+>  - rebased on 3.11-rc1
+> 
+> v2->v3:
+> 
+>  - Introduces a new compatible string mv78230-i2c which will be used
+>    for the fix and for the offload feature which are only present on
+>    the Armada XP SoCs
+> 
+>  - Removes the unneeded spin_lock_irqsave pointed by Russell King
+> 
+>  - The offload mechanism is now port of the fsm and handle the
+>    multiple messages.
+> 
+>  - The flag bridge-enabled is renamed to offload_enabled, but the
+>    register name stills contains the BRIDGE word to match the
+>    datasheet.
+> 
+>  - Uses writel_relaxed on the place pointed by Russell King
+> 
+>  - Uses the bool type for the flag (pointed by Thomas Petazzoni)
+> 
+>  - Removes useless code (pointed by Thomas Petazzoni)
+> 
+>  - Updates the bindings documentation
+> 
+> v1->v2:
+>  - Move the flag for the timing issue from global scope to per device
+>    scope
+>  - Assignment is no more done in if condition
+> 
+> Gregory CLEMENT (3):
+>   i2c-mv64xxx: Add I2C Transaction Generator support
+>   i2c-mv64xxx: Fix timing issue on Armada XP (errata FE-8471889)
+>   ARM: dts: mvebu: Introduce a new compatible string for mv64xxx-i2c
+> 
+>  .../devicetree/bindings/i2c/i2c-mv64xxx.txt        |  13 +-
+>  arch/arm/boot/dts/armada-370-xp.dtsi               |   2 -
+>  arch/arm/boot/dts/armada-370.dtsi                  |   8 +
+>  arch/arm/boot/dts/armada-xp.dtsi                   |  10 +
+>  drivers/i2c/busses/i2c-mv64xxx.c                   | 217 ++++++++++++++++++++-
+>  5 files changed, 237 insertions(+), 13 deletions(-)
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
