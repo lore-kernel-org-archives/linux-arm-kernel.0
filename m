@@ -1,57 +1,27 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Tue, 20 Aug 2013 09:33:19 -0700
-Subject: [PATCH v4 1/4] ARM: OMAP2+: AM33XX: I2C Sleep/wake sequence
- support
-In-Reply-To: <5211B201.2000401@ti.com>
-References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
- <1376432412-8509-2-git-send-email-Russ.Dill@ti.com>
- <520B595F.2040207@ti.com>
- <CA+Bv8XZ-QGhVV1mK=rRekOZzaTDN-Y9YkWYYoEc8EtvP0JouEA@mail.gmail.com>
- <5211B201.2000401@ti.com>
-Message-ID: <CA+Bv8XaPU6N3KztAPFZb8OMMg8Tc+Kv5hf1Utz7QS=NCRdO3Rg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 20 Aug 2013 09:33:31 -0700
+Subject: [PATCH] irqchip: gic: Allow setting affinity to offline CPUs
+In-Reply-To: <1377015070-26320-1-git-send-email-t.figa@samsung.com>
+References: <1377015070-26320-1-git-send-email-t.figa@samsung.com>
+Message-ID: <52139A5B.5040708@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 18, 2013 at 10:49 PM, Gururaja Hebbar
-<gururaja.hebbar@ti.com> wrote:
+On 08/20/13 09:11, Tomasz Figa wrote:
+> Sometimes it is necessary to fix interrupt affinity to an offline CPU,
+> for example in initialization of local timers. This patch modifies
+> .set_affinity() operation of irq-gic driver to fall back to any possible
+> CPU if no online CPU can be found in requested CPU mask.
 >
-> On 8/15/2013 4:04 AM, Russ Dill wrote:
-> > On Wed, Aug 14, 2013 at 3:18 AM, Gururaja Hebbar <gururaja.hebbar@ti.com> wrote:
-> >> On 8/14/2013 3:50 AM, Russ Dill wrote:
-> >>> Changes since v1:
-> >>> * Rebased onto new am335x PM branch
-> >>> * Changed to use 5th param register
->
-> >>
->
-> [snip]
-> [snip]
->
-> >>> +
-> >>> +     wkup_m3_reset_data_pos();
-> >>> +     if (am33xx_i2c_sleep_sequence) {
-> >>> +             pos = wkup_m3_copy_data(am33xx_i2c_sleep_sequence,
-> >>> +                                             i2c_sleep_sequence_sz);
-> >>
-> >> Why do we need to copy this data (same constant data) on every iteration?
-> >
-> > Because the CM3 firmware is reset after each suspend/resume cycle. The
-> > firmware reset handler reinitializes the DMEM.
->
-> Well in that why can't the i2c payload be copied to UMEM?
->
-> Thanks & regards
-> Gururaja
->
+> This fixes broken Exynos4210 support since commit
+> 	ee98d27df6 ARM: EXYNOS4: Divorce mct from local timer API
+> caused by timer initialization code unable to set affinity for local
+> timer interrupts.
 
-I've given this some thought, and gone back and forth a bit. UMEM is a
-bit more complicated because the linker decides what should go where.
-Also, it may be that in the future, either the PM for am335x or am43xx
-will be writing different sequences depending on the suspend
-mode/options.
+Care to elaborate further? I don't see how the interrupt affinity is set
+for a CPU that isn't online because the mct code runs on the CPU that
+the affinity is being set to.
 
-Is there a specific aspect of copying the data each suspend cycle that
-you are trying to fix? Is it just that the data could only be copied
-once? Or is it the latency of the copy?
-
-Thanks!
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
