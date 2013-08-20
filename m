@@ -1,76 +1,67 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 20 Aug 2013 10:30:12 +0100
-Subject: [PATCH v4 10/19] drivers/bus: arm-cci: avoid parsing DT for cpu
- device nodes
+Date: Tue, 20 Aug 2013 10:30:13 +0100
+Subject: [PATCH v4 11/19] cpufreq: imx6q-cpufreq: remove device tree parsing
+ for cpu nodes
 In-Reply-To: <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
  <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1376991021-12160-11-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1376991021-12160-12-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Since the CPU device nodes can be retrieved using arch_of_get_cpu_node,
-we can use it to avoid parsing the cpus node searching the cpu nodes and
-mapping to logical index.
+Now that the cpu device registration initialises the of_node(if available)
+appropriately for all the cpus, parsing here is redundant.
 
-This patch removes parsing DT for cpu nodes by using of_get_cpu_node.
+This patch removes all DT parsing and uses cpu->of_node instead.
 
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- drivers/bus/arm-cci.c | 28 +++++++---------------------
- 1 file changed, 7 insertions(+), 21 deletions(-)
+ arch/arm/mach-imx/mach-imx6q.c  | 3 +--
+ drivers/cpufreq/imx6q-cpufreq.c | 4 +---
+ 2 files changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 7332889..2009266 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -122,17 +122,8 @@ EXPORT_SYMBOL_GPL(cci_ace_get_port);
- 
- static void __init cci_ace_init_ports(void)
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 7be13f8..a02f275 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -254,13 +254,12 @@ static void __init imx6q_opp_init(struct device *cpu_dev)
  {
--	int port, ac, cpu;
--	u64 hwid;
--	const u32 *cell;
--	struct device_node *cpun, *cpus;
--
--	cpus = of_find_node_by_path("/cpus");
--	if (WARN(!cpus, "Missing cpus node, bailing out\n"))
--		return;
--
--	if (WARN_ON(of_property_read_u32(cpus, "#address-cells", &ac)))
--		ac = of_n_addr_cells(cpus);
-+	int port, cpu;
-+	struct device_node *cpun;
+ 	struct device_node *np;
  
- 	/*
- 	 * Port index look-up speeds up the function disabling ports by CPU,
-@@ -141,18 +132,13 @@ static void __init cci_ace_init_ports(void)
- 	 * The stashed index array is initialized for all possible CPUs
- 	 * at probe time.
- 	 */
--	for_each_child_of_node(cpus, cpun) {
--		if (of_node_cmp(cpun->type, "cpu"))
--			continue;
--		cell = of_get_property(cpun, "reg", NULL);
--		if (WARN(!cell, "%s: missing reg property\n", cpun->full_name))
--			continue;
--
--		hwid = of_read_number(cell, ac);
--		cpu = get_logical_index(hwid & MPIDR_HWID_BITMASK);
-+	for_each_possible_cpu(cpu) {
-+		/* too early to use cpu->of_node */
-+		cpun = of_get_cpu_node(cpu, NULL);
+-	np = of_find_node_by_path("/cpus/cpu at 0");
++	np = of_node_get(cpu_dev->of_node);
+ 	if (!np) {
+ 		pr_warn("failed to find cpu0 node\n");
+ 		return;
+ 	}
  
--		if (cpu < 0 || !cpu_possible(cpu))
-+		if (WARN(!cpun, "Missing cpu device node\n"))
- 			continue;
-+
- 		port = __cci_ace_get_port(cpun, ACE_PORT);
- 		if (port < 0)
- 			continue;
+-	cpu_dev->of_node = np;
+ 	if (of_init_opp_table(cpu_dev)) {
+ 		pr_warn("failed to init OPP table\n");
+ 		goto put_node;
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index e37cdae..b16632b 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -221,14 +221,12 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 
+ 	cpu_dev = &pdev->dev;
+ 
+-	np = of_find_node_by_path("/cpus/cpu at 0");
++	np = of_node_get(cpu_dev->of_node);
+ 	if (!np) {
+ 		dev_err(cpu_dev, "failed to find cpu0 node\n");
+ 		return -ENOENT;
+ 	}
+ 
+-	cpu_dev->of_node = np;
+-
+ 	arm_clk = devm_clk_get(cpu_dev, "arm");
+ 	pll1_sys_clk = devm_clk_get(cpu_dev, "pll1_sys");
+ 	pll1_sw_clk = devm_clk_get(cpu_dev, "pll1_sw");
 -- 
 1.8.1.2
