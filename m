@@ -1,277 +1,74 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 20 Aug 2013 10:31:10 +0800
-Subject: [PATCH v7 08/11] ARM: hi3xxx: add smp support
+Date: Tue, 20 Aug 2013 10:31:11 +0800
+Subject: [PATCH v7 09/11] ARM: hi3xxx: add hotplug support
 In-Reply-To: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1376965873-14431-9-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1376965873-14431-10-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Zhangfei Gao <zhangfei.gao@linaro.org>
 
-Enable SMP support on hi3xxx platform
+Enable hotplug support on hi3xxx platform
+
+How to test:
+cat proc/interrupts
+echo 0 > /sys/devices/system/cpu/cpuX/online
+cat proc/interrupts
+echo 1 > /sys/devices/system/cpu/cpuX/online
 
 Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 Tested-by: Zhang Mingjun <zhang.mingjun@linaro.org>
-Tested-by: Li Xin <li.xin@linaro.org>
 ---
- .../bindings/arm/hisilicon/hisilicon.txt           | 47 ++++++++++++++++
- arch/arm/boot/dts/hi3620.dtsi                      | 28 +++++++++-
- arch/arm/boot/dts/hi4511.dts                       |  2 +-
- arch/arm/mach-hi3xxx/Kconfig                       |  2 +
- arch/arm/mach-hi3xxx/Makefile                      |  3 +-
- arch/arm/mach-hi3xxx/core.h                        | 14 +++++
- arch/arm/mach-hi3xxx/hi3xxx.c                      |  5 ++
- arch/arm/mach-hi3xxx/platsmp.c                     | 43 ++++++++++++++
- arch/arm/mach-hi3xxx/system.c                      | 65 ++++++++++++++++++++++
- 9 files changed, 206 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mach-hi3xxx/core.h
- create mode 100644 arch/arm/mach-hi3xxx/platsmp.c
- create mode 100644 arch/arm/mach-hi3xxx/system.c
+ arch/arm/mach-hi3xxx/Makefile  |   1 +
+ arch/arm/mach-hi3xxx/core.h    |   5 ++
+ arch/arm/mach-hi3xxx/hi3xxx.c  |   1 +
+ arch/arm/mach-hi3xxx/hotplug.c | 154 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-hi3xxx/platsmp.c |   5 ++
+ 5 files changed, 166 insertions(+)
+ create mode 100644 arch/arm/mach-hi3xxx/hotplug.c
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index 3be60c8..4cc5c57 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -8,3 +8,50 @@ Required root node properties:
- Hi4511 Board
- Required root node properties:
- 	- compatible = "hisilicon,hi3620-hi4511";
-+
-+
-+Hisilicon sctrl resiter
-+
-+Required properties:
-+- compatible : "hisilicon,sctrl"
-+- reg : Address and size of sysctrl.
-+
-+Optional properties:
-+- smp_reg : offset in sysctrl for notifying slave cpu booting
-+		cpu 1, reg;
-+		cpu 2, reg + 0x4;
-+		cpu 3, reg + 0x8;
-+		If reg value is not zero, cpun exit wfi and go
-+- resume_reg : offset in sysctrl for notifying cpu0 when resume
-+- reset_reg : offset in sysctrl for system reset
-+
-+Example:
-+	hi3716:
-+	sctrl at f8000000 {
-+		compatible = "hisilicon,sctrl";
-+		reg = <0xf8000000 0x1000>;
-+		smp_reg = <0xc0>;
-+		reboot_reg = <0x4>;
-+	};
-+
-+	hi3620:
-+	sctrl at fc802000 {
-+		compatible = "hisilicon,sctrl";
-+		reg = <0xfc802000 0x1000>;
-+		smp_reg = <0x31c>;
-+		resume_reg = <0x308>;
-+		reboot_reg = <0x4>;
-+	};
-+
-+Hi3716 cpuctrl register
-+Required properties:
-+- compatible : "hisilicon,cpuctrl"
-+- reg : Address and size of cpuctrl.
-+
-+Hi3716 specific cpuctrl register, control hotplug info etc.
-+Example:
-+	hi3716:
-+	cpuctrl at f8a22000 {
-+		compatible = "hisilicon,cpuctrl";
-+		reg = <0xf8a22000 0x2000>;
-+	};
-diff --git a/arch/arm/boot/dts/hi3620.dtsi b/arch/arm/boot/dts/hi3620.dtsi
-index 39fa37f..ee81192 100644
---- a/arch/arm/boot/dts/hi3620.dtsi
-+++ b/arch/arm/boot/dts/hi3620.dtsi
-@@ -32,6 +32,24 @@
- 			reg = <0x0>;
- 			next-level-cache = <&L2>;
- 		};
-+		cpu1: cpu at 1 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <1>;
-+			next-level-cache = <&L2>;
-+		};
-+		cpu2: cpu at 2 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <2>;
-+			next-level-cache = <&L2>;
-+		};
-+		cpu3: cpu at 3 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <3>;
-+			next-level-cache = <&L2>;
-+		};
- 	};
- 
- 	osc32k: osc32k {
-@@ -130,7 +148,9 @@
- 			reg = <0xfc802000 0x1000>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--
-+			smp_reg = <0x31c>;
-+			resume_reg = <0x308>;
-+			reboot_reg = <0x4>;
- 
- 			timer0_mux: timer0_mux {
- 				compatible = "hisilicon,clk-mux";
-@@ -1242,6 +1262,12 @@
- 			status = "disabled";
- 		};
- 
-+		timer5: timer at fc000600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0xfc000600 0x20>;
-+			interrupts = <1 13 0xf01>;
-+		};
-+
- 		uart0: uart at fcb00000 {
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0xfcb00000 0x1000>;
-diff --git a/arch/arm/boot/dts/hi4511.dts b/arch/arm/boot/dts/hi4511.dts
-index 7e67564..c9fd329 100644
---- a/arch/arm/boot/dts/hi4511.dts
-+++ b/arch/arm/boot/dts/hi4511.dts
-@@ -15,7 +15,7 @@
- 	compatible = "hisilicon,hi3620-hi4511";
- 
- 	chosen {
--		bootargs = "console=ttyAMA0,115200 root=/dev/ram0 earlyprintk";
-+		bootargs = "console=ttyAMA0,115200 root=/dev/ram0 nr_cpus=4 earlyprintk";
- 	};
- 
- 	memory {
-diff --git a/arch/arm/mach-hi3xxx/Kconfig b/arch/arm/mach-hi3xxx/Kconfig
-index 68bd26c..d2e7d57 100644
---- a/arch/arm/mach-hi3xxx/Kconfig
-+++ b/arch/arm/mach-hi3xxx/Kconfig
-@@ -6,6 +6,8 @@ config ARCH_HI3xxx
- 	select CACHE_L2X0
- 	select CLKSRC_OF
- 	select GENERIC_CLOCKEVENTS
-+	select HAVE_ARM_SCU
-+	select HAVE_SMP
- 	select PINCTRL
- 	select PINCTRL_SINGLE
- 	help
 diff --git a/arch/arm/mach-hi3xxx/Makefile b/arch/arm/mach-hi3xxx/Makefile
-index d68ebb3..0917f1c 100644
+index 0917f1c..c597cbf 100644
 --- a/arch/arm/mach-hi3xxx/Makefile
 +++ b/arch/arm/mach-hi3xxx/Makefile
-@@ -2,4 +2,5 @@
- # Makefile for Hisilicon Hi36xx/Hi37xx processors line
- #
+@@ -4,3 +4,4 @@
  
--obj-y	+= hi3xxx.o
-+obj-y	+= hi3xxx.o system.o
-+obj-$(CONFIG_SMP)		+= platsmp.o
+ obj-y	+= hi3xxx.o system.o
+ obj-$(CONFIG_SMP)		+= platsmp.o
++obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
 diff --git a/arch/arm/mach-hi3xxx/core.h b/arch/arm/mach-hi3xxx/core.h
-new file mode 100644
-index 0000000..2cfd643
---- /dev/null
+index 2cfd643..c2ce35d 100644
+--- a/arch/arm/mach-hi3xxx/core.h
 +++ b/arch/arm/mach-hi3xxx/core.h
-@@ -0,0 +1,14 @@
-+#ifndef __HISILICON_CORE_H
-+#define __HISILICON_CORE_H
+@@ -11,4 +11,9 @@ extern void hs_map_io(void);
+ extern void hs_restart(enum reboot_mode, const char *cmd);
+ extern struct smp_operations hs_smp_ops;
+ 
++extern void __init hs_hotplug_init(void);
++extern void hs_cpu_die(unsigned int cpu);
++extern int hs_cpu_kill(unsigned int cpu);
++extern void hs_set_cpu(int cpu, bool enable);
 +
-+#include <linux/init.h>
-+#include <linux/reboot.h>
-+
-+extern void hs_set_cpu_jump(int cpu, void *jump_addr);
-+extern int hs_get_cpu_jump(int cpu);
-+extern void secondary_startup(void);
-+extern void hs_map_io(void);
-+extern void hs_restart(enum reboot_mode, const char *cmd);
-+extern struct smp_operations hs_smp_ops;
-+
-+#endif
+ #endif
 diff --git a/arch/arm/mach-hi3xxx/hi3xxx.c b/arch/arm/mach-hi3xxx/hi3xxx.c
-index e7c54bc..567a0d5 100644
+index 567a0d5..01ac68b 100644
 --- a/arch/arm/mach-hi3xxx/hi3xxx.c
 +++ b/arch/arm/mach-hi3xxx/hi3xxx.c
-@@ -19,8 +19,11 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
-+#include "core.h"
-+
+@@ -24,6 +24,7 @@
  static void __init hi3xxx_timer_init(void)
  {
-+	hs_map_io();
+ 	hs_map_io();
++	hs_hotplug_init();
  	of_clk_init(NULL);
  	clocksource_of_init();
  }
-@@ -33,4 +36,6 @@ static const char *hs_compat[] __initdata = {
- DT_MACHINE_START(HI3xxx, "Hisilicon Hi36xx/Hi37xx (Flattened Device Tree)")
- 	.init_time	= hi3xxx_timer_init,
- 	.dt_compat	= hs_compat,
-+	.smp		= smp_ops(hs_smp_ops),
-+	.restart	= hs_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-hi3xxx/platsmp.c b/arch/arm/mach-hi3xxx/platsmp.c
+diff --git a/arch/arm/mach-hi3xxx/hotplug.c b/arch/arm/mach-hi3xxx/hotplug.c
 new file mode 100644
-index 0000000..a76a3cc
+index 0000000..c67f8a2
 --- /dev/null
-+++ b/arch/arm/mach-hi3xxx/platsmp.c
-@@ -0,0 +1,43 @@
-+/*
-+ * Copyright (c) 2013 Linaro Ltd.
-+ * Copyright (c) 2013 Hisilicon Limited.
-+ * Based on platsmp.c, Copyright (C) 2002 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
-+#include <linux/smp.h>
-+#include <linux/io.h>
-+#include <asm/smp_scu.h>
-+
-+#include "core.h"
-+
-+static void __init hs_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	unsigned long base;
-+	void __iomem *scu_base;
-+
-+	if (scu_a9_has_base()) {
-+		base = scu_a9_get_base();
-+		scu_base = ioremap(base, SZ_4K);
-+		if (!scu_base) {
-+			pr_err("ioremap(scu_base) failed\n");
-+			return;
-+		}
-+		scu_enable(scu_base);
-+		iounmap(scu_base);
-+	}
-+}
-+
-+static int hs_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	hs_set_cpu_jump(cpu, secondary_startup);
-+	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+	return 0;
-+}
-+
-+struct smp_operations hs_smp_ops __initdata = {
-+	.smp_prepare_cpus	= hs_smp_prepare_cpus,
-+	.smp_boot_secondary	= hs_boot_secondary,
-+};
-diff --git a/arch/arm/mach-hi3xxx/system.c b/arch/arm/mach-hi3xxx/system.c
-new file mode 100644
-index 0000000..51bb247
---- /dev/null
-+++ b/arch/arm/mach-hi3xxx/system.c
-@@ -0,0 +1,65 @@
++++ b/arch/arm/mach-hi3xxx/hotplug.c
+@@ -0,0 +1,154 @@
 +/*
 + * Copyright (c) 2013 Linaro Ltd.
 + * Copyright (c) 2013 Hisilicon Limited.
@@ -280,62 +77,172 @@ index 0000000..51bb247
 + * under the terms and conditions of the GNU General Public License,
 + * version 2, as published by the Free Software Foundation.
 + */
++#include <linux/cpu.h>
 +#include <linux/io.h>
 +#include <linux/of_address.h>
 +#include <linux/of_platform.h>
-+
-+#include <asm/proc-fns.h>
++#include <asm/cacheflush.h>
 +#include <asm/smp_plat.h>
-+
 +#include "core.h"
 +
-+static void __iomem *hs_sctrl_base;
-+static int hs_smp_reg;
-+static int hs_resume_reg;
-+static int hs_reboot_reg;
++enum {
++	HI3620_CTRL,
++	HI3716_CTRL,
++};
 +
-+void hs_map_io(void)
++static void __iomem *ctrl_base;
++static int id;
++
++void hs_set_cpu(int cpu, bool enable)
 +{
-+	struct device_node *np;
++	u32 val = 0;
 +
-+	np = of_find_compatible_node(NULL, NULL, "hisilicon,sctrl");
-+	if (np) {
-+		hs_sctrl_base = of_iomap(np, 0);
-+		if (!hs_sctrl_base)
-+			pr_err("of_iomap(sctrl_base) failed\n");
-+		of_property_read_u32(np, "smp_reg", &hs_smp_reg);
-+		of_property_read_u32(np, "resume_reg", &hs_resume_reg);
-+		of_property_read_u32(np, "reboot_reg", &hs_reboot_reg);
++	if (!ctrl_base)
++		return;
++
++	if (id == HI3620_CTRL) {
++		if (enable) {
++			/* MTCMOS */
++			writel_relaxed((0x01 << (cpu + 3)), ctrl_base + 0xD0);
++			writel_relaxed((0x1011 << cpu), ctrl_base + 0x414);
++			writel_relaxed((0x401011 << cpu), ctrl_base + 0x410);
++
++			/* ISO disable */
++			writel((0x01 << (cpu + 3)), ctrl_base + 0x0C4);
++
++			/* WFI Mask */
++			val = readl(ctrl_base + 0x200);
++			val &= ~(0x1 << (cpu+28));
++			writel(val, ctrl_base + 0x200);
++
++			/* Enable core */
++			writel_relaxed((0x01 << cpu), ctrl_base + 0xf4);
++			/* Unreset */
++			writel_relaxed((0x401011 << cpu), ctrl_base + 0x414);
++		} else {
++			/* iso enable */
++			writel_relaxed((0x01 << (cpu + 3)), ctrl_base + 0xC0);
++
++			/* MTCMOS */
++			writel_relaxed((0x01 << (cpu + 3)), ctrl_base + 0xD4);
++
++			/* wfi mask */
++			val = readl_relaxed(ctrl_base + 0x200);
++			val |= (0x1 << (cpu+28));
++			writel_relaxed(val, ctrl_base + 0x200);
++
++			/* disable core*/
++			writel_relaxed((0x01 << cpu), ctrl_base + 0xf8);
++			/* Reset */
++			writel_relaxed((0x401011 << cpu), ctrl_base + 0x410);
++		}
++	} else if (id == HI3716_CTRL) {
++		if (enable) {
++			/* power on cpu1 */
++			val = readl_relaxed(ctrl_base + 0x1000);
++			val &=  ~(0x1 << 8);
++			val |= (0x1 << 7);
++			val &= ~(0x1 << 3);
++			writel_relaxed(val, ctrl_base + 0x1000);
++
++			/* unreset */
++			val = readl_relaxed(ctrl_base + 0x50);
++			val &= ~(0x1 << 17);
++			writel_relaxed(val, ctrl_base + 0x50);
++		} else {
++			/* power down cpu1 */
++			val = readl_relaxed(ctrl_base + 0x1000);
++			val &=  ~(0x1 << 8);
++			val |= (0x1 << 7);
++			val |= (0x1 << 3);
++			writel_relaxed(val, ctrl_base + 0x1000);
++
++			/* reset */
++			val = readl_relaxed(ctrl_base + 0x50);
++			val |= (0x1 << 17);
++			writel_relaxed(val, ctrl_base + 0x50);
++		}
 +	}
 +}
 +
-+void hs_set_cpu_jump(int cpu, void *jump_addr)
++void __init hs_hotplug_init(void)
 +{
-+	int offset = hs_smp_reg;
++	struct device_node *node;
 +
-+	cpu = cpu_logical_map(cpu);
-+	if (cpu > 0)
-+		offset +=  0x04 * (cpu - 1);
-+	writel_relaxed(virt_to_phys(jump_addr), hs_sctrl_base + offset);
++	node = of_find_compatible_node(NULL, NULL, "hisilicon,cpuctrl");
++	if (node) {
++		ctrl_base = of_iomap(node, 0);
++		id = HI3716_CTRL;
++		return;
++	}
++	node = of_find_compatible_node(NULL, NULL, "hisilicon,sctrl");
++	if (node) {
++		ctrl_base = of_iomap(node, 0);
++		id = HI3620_CTRL;
++		return;
++	}
 +}
 +
-+int hs_get_cpu_jump(int cpu)
++static inline void cpu_enter_lowpower(void)
 +{
-+	int offset = hs_smp_reg;
++	unsigned int v;
 +
-+	cpu = cpu_logical_map(cpu);
-+	if (cpu > 0)
-+		offset +=  0x04 * (cpu - 1);
-+	return readl_relaxed(hs_sctrl_base + offset);
++	flush_cache_all();
++	asm volatile(
++	/*
++	 * Turn off coherency and L1 D-cache
++	 */
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	bic	%0, %0, #0x40\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	"	mrc	p15, 0, %0, c1, c0, 0\n"
++	"	bic	%0, %0, #0x04\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	  : "=&r" (v)
++	  : "r" (0)
++	  : "cc");
 +}
 +
-+void hs_restart(enum reboot_mode mode, const char *cmd)
++void hs_cpu_die(unsigned int cpu)
 +{
-+	writel_relaxed(0xdeadbeef, hs_sctrl_base + hs_reboot_reg);
++	cpu_enter_lowpower();
++	hs_set_cpu_jump(cpu, phys_to_virt(0));
++	cpu_do_idle();
 +
-+	while (1)
-+		cpu_do_idle();
++	/* We should have never returned from idle */
++	panic("cpu %d unexpectedly exit from shutdown\n", cpu);
 +}
 +
++int hs_cpu_kill(unsigned int cpu)
++{
++	unsigned long timeout = jiffies + msecs_to_jiffies(50);
++
++	while (hs_get_cpu_jump(cpu))
++		if (time_after(jiffies, timeout))
++			return 0;
++	hs_set_cpu(cpu, false);
++	return 1;
++}
+diff --git a/arch/arm/mach-hi3xxx/platsmp.c b/arch/arm/mach-hi3xxx/platsmp.c
+index a76a3cc..6a08630 100644
+--- a/arch/arm/mach-hi3xxx/platsmp.c
++++ b/arch/arm/mach-hi3xxx/platsmp.c
+@@ -32,6 +32,7 @@ static void __init hs_smp_prepare_cpus(unsigned int max_cpus)
+ 
+ static int hs_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
++	hs_set_cpu(cpu, true);
+ 	hs_set_cpu_jump(cpu, secondary_startup);
+ 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+ 	return 0;
+@@ -40,4 +41,8 @@ static int hs_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ struct smp_operations hs_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= hs_smp_prepare_cpus,
+ 	.smp_boot_secondary	= hs_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_die		= hs_cpu_die,
++	.cpu_kill		= hs_cpu_kill,
++#endif
+ };
 -- 
 1.8.1.2
