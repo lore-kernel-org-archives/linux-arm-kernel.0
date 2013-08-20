@@ -1,35 +1,41 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 20 Aug 2013 09:36:27 -0300
-Subject: [PATCH v2 2/4] ARM: mvebu: Add clock properties to Armada XP timer
- node
+Date: Tue, 20 Aug 2013 09:36:28 -0300
+Subject: [PATCH v2 3/4] clocksource: armada-370-xp: Get reference fixed-clock
+ by name
 In-Reply-To: <1377002189-4398-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1377002189-4398-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1377002189-4398-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1377002189-4398-4-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the addition of the Armada XP reference clock, we can now model
-accurately the available clock inputs for the timer: namely, nbclk
-and refclk. For each of this clock inputs we assign a name, for the
-driver to select as appropriate.
+The Armada XP timer has two mandatory clock inputs: nbclk and refclk,
+as specified by the device-tree binding.
+
+This commit fixes the clock selection. Instead of hard-coding the clock
+rate for the 25 MHz reference fixed-clock, obtain the clock by its name.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/clocksource/time-armada-370-xp.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 50e404e..2642f55 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -63,6 +63,8 @@
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index 11d91e5..01ba99e 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -292,8 +292,11 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
  
- 			timer at 20300 {
- 				compatible = "marvell,armada-xp-timer";
-+				clocks = <&coreclk 2>, <&refclk>;
-+				clock-names = "nbclk", "fixed";
- 			};
+ static void __init armada_xp_timer_init(struct device_node *np)
+ {
+-	/* The fixed 25MHz timer is required, timer25Mhz is true by default */
+-	timer_clk = 25000000;
++	struct clk *clk = of_clk_get_by_name(np, "fixed");
++
++	/* The 25Mhz fixed clock is mandatory, and must always be available */
++	WARN_ON(IS_ERR(clk));
++	timer_clk = clk_get_rate(clk);
  
- 			coreclk: mvebu-sar at 18230 {
+ 	armada_370_xp_timer_common_init(np);
+ }
 -- 
 1.8.1.5
