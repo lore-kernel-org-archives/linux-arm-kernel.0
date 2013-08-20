@@ -1,86 +1,53 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 20 Aug 2013 13:55:13 -0300
-Subject: [PATCH v2 1/3] ARM: Introduce atomic MMIO clear/set
-In-Reply-To: <1377017307-23201-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377017307-23201-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377017307-23201-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130820165510.GA23311@localhost>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 20 Aug 2013 18:57:17 +0200
+Subject: [PATCH] irqchip: gic: Allow setting affinity to offline CPUs
+In-Reply-To: <52139DD9.3020004@codeaurora.org>
+References: <1377015070-26320-1-git-send-email-t.figa@samsung.com>
+ <3879851.vmCHJ3AcgQ@amdc1227> <52139DD9.3020004@codeaurora.org>
+Message-ID: <3020706.rrCKqOb5n3@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 01:48:25PM -0300, Ezequiel Garcia wrote:
-> Some SoC have MMIO regions that are shared across orthogonal
-> subsystems. This commit implements a possible solution for the
-> thread-safe access of such regions through a spinlock-protected API
-> with clear-set semantics.
-> 
-> Concurrent access is protected with a single spinlock for the
-> entire MMIO address space. While this protects shared-registers,
-> it also serializes access to unrelated/unshared registers.
-> 
-> ---
-> Based on a similar approach suggested by Russel King:
-> http://archive.arm.linux.org.uk/lurker/message/20130618.113606.d7d4fe4b.en.html
-> 
-> Changes from v1:
-> 
-> * Added an io barrier iowmb() as suggested by Will Deacon,
->   to ensure the writel gets completed before the spin_unlock().
+On Tuesday 20 of August 2013 09:48:25 Stephen Boyd wrote:
+> On 08/20/13 09:41, Tomasz Figa wrote:
+> > On Tuesday 20 of August 2013 09:33:31 Stephen Boyd wrote:
+> >> On 08/20/13 09:11, Tomasz Figa wrote:
+> >>> Sometimes it is necessary to fix interrupt affinity to an offline
+> >>> CPU,
+> >>> for example in initialization of local timers. This patch modifies
+> >>> .set_affinity() operation of irq-gic driver to fall back to any
+> >>> possible
+> >>> CPU if no online CPU can be found in requested CPU mask.
+> >>> 
+> >>> This fixes broken Exynos4210 support since commit
+> >>> 
+> >>> 	ee98d27df6 ARM: EXYNOS4: Divorce mct from local timer API
+> >>> 
+> >>> caused by timer initialization code unable to set affinity for local
+> >>> timer interrupts.
+> >> 
+> >> Care to elaborate further? I don't see how the interrupt affinity is
+> >> set
+> >> for a CPU that isn't online because the mct code runs on the CPU that
+> >> the affinity is being set to.
+> > 
+> > Well, please look at secondary_start_kernel() in arch/arm/kernel/smp.c
+> > [1]. You can see that notify_cpu_starting() (line 348) that fires the
+> > notifier registered in MCT driver is called before set_cpu_online()
+> > (line 359) that marks the CPU as online. Also notice that, originally,
+> > local timer initialization was happening after set_cpu_online() - see
+> > line 365.
+> Great, thank you. Please put this information in the commit text next
+> time.
 
-Argh! of course the above goes below the SOB.
+Right, I could have added a sentence or two about this.
 
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/include/asm/io.h |  5 +++++
->  arch/arm/kernel/io.c      | 13 +++++++++++++
->  2 files changed, 18 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index d070741..3cea1f0 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -36,6 +36,11 @@
->  #define isa_bus_to_virt phys_to_virt
->  
->  /*
-> + * Atomic MMIO-wide IO clear/set
-> + */
-> +extern void atomic_io_clear_set(u32 clear, u32 set, void __iomem *reg);
-> +
-> +/*
->   * Generic IO read/write.  These perform native-endian accesses.  Note
->   * that some architectures will want to re-define __raw_{read,write}w.
->   */
-> diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
-> index dcd5b4d..b2a53a3 100644
-> --- a/arch/arm/kernel/io.c
-> +++ b/arch/arm/kernel/io.c
-> @@ -1,6 +1,19 @@
->  #include <linux/export.h>
->  #include <linux/types.h>
->  #include <linux/io.h>
-> +#include <linux/spinlock.h>
-> +
-> +static DEFINE_SPINLOCK(__io_lock);
-> +
-> +void atomic_io_clear_set(u32 clear, u32 set, void __iomem *reg)
-> +{
-> +	spin_lock(&__io_lock);
-> +	writel((readl(reg) & ~clear) | set, reg);
-> +	/* ensure the write get done before unlocking */
-> +	__iowmb();
-> +	spin_unlock(&__io_lock);
-> +}
-> +EXPORT_SYMBOL(atomic_io_clear_set);
->  
->  /*
->   * Copy data from IO memory space to "real" memory space.
-> -- 
-> 1.8.1.5
-> 
+> I wonder if we shouldn't make the cpumask_any_and() work on the present
+> mask instead? If we ever support physical hotplug on ARM I think we
+> wouldn't want to allow interrupts to go to CPUs that aren't even present
+> (but still possible).
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Yes, cpu_present_mask might be better indeed.
+
+Best regards,
+Tomasz
