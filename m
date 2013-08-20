@@ -1,98 +1,63 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 20 Aug 2013 16:38:52 +0800
-Subject: [PATCH 3/3] staging: drm/imx: ldb: correct the ldb di clock trees
+Date: Tue, 20 Aug 2013 16:38:51 +0800
+Subject: [PATCH 2/3] ARM: dts: imx6q/imx6dl: add necessary clocks for ldb node
 In-Reply-To: <1376987932-5540-1-git-send-email-Ying.Liu@freescale.com>
 References: <1376987932-5540-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1376987932-5540-4-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1376987932-5540-3-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In ldb split mode, the ldb_di[0/1]_ipu_div dividers should
-be configured as clock dividers of 1/3.5, while in others
-ldb modes of 1/7. This patch gets the di[0/1]_div_3_5,
-di[0/1]_div_7 and di[0/1]_div_sel clocks and sets the
-di[0/1]_div_3_5 or di[0/1]_div_7 clocks to be the parents of
-di[0/1]_div_sel clocks according to the ldb mode. The real
-dividers are the two fixed factors bewteen the ldb_di[0/1] and
-the pll clocks, so it's unnecessary to set the frequency for
-the ldb_di[0/1] clocks again after pll clock frequency is set.
-This patch removes the redundant clock frequency setting code
-as well.
+This patch adds di[0/1]_div_3_5, di[0/1]_div_7 and di[0/1]_div_sel
+clocks to the ldb nodes so that the ldb driver may use them to
+setup the display clock trees.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
- drivers/staging/imx-drm/imx-ldb.c |   38 +++++++++++++++++++++++++++++--------
- 1 file changed, 30 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/imx6dl.dtsi |    8 ++++++--
+ arch/arm/boot/dts/imx6q.dtsi  |    8 ++++++--
+ 2 files changed, 12 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
-index 8af7f3b..7c553b8 100644
---- a/drivers/staging/imx-drm/imx-ldb.c
-+++ b/drivers/staging/imx-drm/imx-ldb.c
-@@ -81,6 +81,9 @@ struct imx_ldb {
- 	struct clk *clk[2]; /* our own clock */
- 	struct clk *clk_sel[4]; /* parent of display clock */
- 	struct clk *clk_pll[2]; /* upstream clock we can adjust */
-+	struct clk *clk_div_3_5[2]; /* fixed factor of 1/3.5 */
-+	struct clk *clk_div_7[2]; /* fixed factor of 1/7 */
-+	struct clk *clk_div_sel[2]; /* 1/3.5 or 1/7 */
- 	u32 ldb_ctrl;
- 	const struct bus_mux *lvds_mux;
- };
-@@ -150,6 +153,18 @@ static void imx_ldb_set_clock(struct imx_ldb *ldb, int mux, int chno,
- {
- 	int ret;
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 9e8ae11..ff0d743 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -75,10 +75,14 @@
+ &ldb {
+ 	clocks = <&clks 33>, <&clks 34>,
+ 		 <&clks 39>, <&clks 40>,
+-		 <&clks 135>, <&clks 136>;
++		 <&clks 135>, <&clks 136>,
++		 <&clks 184>, <&clks 185>, <&clks 203>, <&clks 204>,
++		 <&clks 205>, <&clks 206>;
+ 	clock-names = "di0_pll", "di1_pll",
+ 		      "di0_sel", "di1_sel",
+-		      "di0", "di1";
++		      "di0", "di1",
++		      "di0_div_3_5", "di1_div_3_5", "di0_div_7", "di1_div_7",
++		      "di0_div_sel", "di1_div_sel";
  
-+	if (ldb->ldb_ctrl & LDB_SPLIT_MODE_EN) {
-+		ret = clk_set_parent(ldb->clk_div_sel[chno], ldb->clk_div_3_5[chno]);
-+		if (ret)
-+			dev_err(ldb->dev, "unable to set di%d_div_sel parent clock "
-+				"to di%d_div_3_5\n", chno, chno);
-+	} else {
-+		ret = clk_set_parent(ldb->clk_div_sel[chno], ldb->clk_div_7[chno]);
-+		if (ret)
-+			dev_err(ldb->dev, "unable to set di%d_div_sel parent clock "
-+				"to di%d_div_7\n", chno, chno);
-+	}
-+
- 	dev_dbg(ldb->dev, "%s: now: %ld want: %ld\n", __func__,
- 			clk_get_rate(ldb->clk_pll[chno]), serial_clk);
- 	clk_set_rate(ldb->clk_pll[chno], serial_clk);
-@@ -157,14 +172,6 @@ static void imx_ldb_set_clock(struct imx_ldb *ldb, int mux, int chno,
- 	dev_dbg(ldb->dev, "%s after: %ld\n", __func__,
- 			clk_get_rate(ldb->clk_pll[chno]));
+ 	lvds-channel at 0 {
+ 		crtcs = <&ipu1 0>, <&ipu1 1>;
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index f024ef2..b078a42 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -146,10 +146,14 @@
+ &ldb {
+ 	clocks = <&clks 33>, <&clks 34>,
+ 		 <&clks 39>, <&clks 40>, <&clks 41>, <&clks 42>,
+-		 <&clks 135>, <&clks 136>;
++		 <&clks 135>, <&clks 136>,
++		 <&clks 184>, <&clks 185>, <&clks 203>, <&clks 204>,
++		 <&clks 205>, <&clks 206>;
+ 	clock-names = "di0_pll", "di1_pll",
+ 		      "di0_sel", "di1_sel", "di2_sel", "di3_sel",
+-		      "di0", "di1";
++		      "di0", "di1",
++		      "di0_div_3_5", "di1_div_3_5", "di0_div_7", "di1_div_7",
++		      "di0_div_sel", "di1_div_sel";
  
--	dev_dbg(ldb->dev, "%s: now: %ld want: %ld\n", __func__,
--			clk_get_rate(ldb->clk[chno]),
--			(long int)di_clk);
--	clk_set_rate(ldb->clk[chno], di_clk);
--
--	dev_dbg(ldb->dev, "%s after: %ld\n", __func__,
--			clk_get_rate(ldb->clk[chno]));
--
- 	/* set display clock mux to LDB input clock */
- 	ret = clk_set_parent(ldb->clk_sel[mux], ldb->clk[chno]);
- 	if (ret) {
-@@ -362,6 +369,21 @@ static int imx_ldb_get_clk(struct imx_ldb *ldb, int chno)
- 	if (IS_ERR(ldb->clk_pll[chno]))
- 		return PTR_ERR(ldb->clk_pll[chno]);
- 
-+	sprintf(clkname, "di%d_div_3_5", chno);
-+	ldb->clk_div_3_5[chno] = devm_clk_get(ldb->dev, clkname);
-+	if (IS_ERR(ldb->clk_div_3_5[chno]))
-+		return PTR_ERR(ldb->clk_div_3_5[chno]);
-+
-+	sprintf(clkname, "di%d_div_7", chno);
-+	ldb->clk_div_7[chno] = devm_clk_get(ldb->dev, clkname);
-+	if (IS_ERR(ldb->clk_div_7[chno]))
-+		return PTR_ERR(ldb->clk_div_7[chno]);
-+
-+	sprintf(clkname, "di%d_div_sel", chno);
-+	ldb->clk_div_sel[chno] = devm_clk_get(ldb->dev, clkname);
-+	if (IS_ERR(ldb->clk_div_sel[chno]))
-+		return PTR_ERR(ldb->clk_div_sel[chno]);
-+
- 	return 0;
- }
- 
+ 	lvds-channel at 0 {
+ 		crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
 -- 
 1.7.9.5
