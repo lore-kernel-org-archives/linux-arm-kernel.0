@@ -1,50 +1,110 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Aug 2013 09:14:11 +0200
-Subject: [PATCH v2 4/7] ARM: dts: imx27 pinctrl
-In-Reply-To: <1376921234-26682-5-git-send-email-mpa@pengutronix.de>
-References: <1376921234-26682-1-git-send-email-mpa@pengutronix.de>
- <1376921234-26682-5-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130820071411.GI31036@pengutronix.de>
+Date: Tue, 20 Aug 2013 09:26:42 +0200
+Subject: [RFC 06/17] ARM: imx: remove custom .init_time hook
+In-Reply-To: <1376964271-22715-7-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376964271-22715-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130820072642.GJ31036@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 04:07:11PM +0200, Markus Pargmann wrote:
-> Pinctrl driver node and pin group definitions for other driver nodes.
+On Tue, Aug 20, 2013 at 04:04:20AM +0200, Sebastian Hesselbarth wrote:
+> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+> remove custom .init_time hooks.
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
-> +					pinctrl_uart_1: uart-1 {
-> +						fsl,pins = <
-> +							MX27_PAD_UART1_TXD__UART1_TXD 0x0
-> +							MX27_PAD_UART1_RXD__UART1_RXD 0x0
-> +							MX27_PAD_UART1_CTS__UART1_CTS 0x0
-> +							MX27_PAD_UART1_RTS__UART1_RTS 0x0
-> +						>;
-> +					};
+> Notes:
+> - Although mx5_clocks_common_init() is shared with non-DT, removing
+>   of_clk_init(NULL) should be fine, as it only registers DT clk providers.
+> - For imx6q, printing of silicon revision has been moved from .init_time
+>   to .init_machine hook.
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/mach-imx/clk-imx51-imx53.c |   12 ------------
+>  arch/arm/mach-imx/common.h          |    2 --
+>  arch/arm/mach-imx/imx51-dt.c        |    6 ------
+>  arch/arm/mach-imx/mach-imx53.c      |    6 ------
+>  arch/arm/mach-imx/mach-imx6q.c      |   14 +++-----------
+>  arch/arm/mach-imx/mach-imx6sl.c     |    7 -------
+>  arch/arm/mach-imx/mach-vf610.c      |    9 ---------
+>  7 files changed, 3 insertions(+), 53 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+> index 1a56a33..5955a54 100644
+> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
+> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+> @@ -131,8 +131,6 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+>  {
+>  	int i;
+>  
+> -	of_clk_init(NULL);
+> -
+>  	clk[dummy] = imx_clk_fixed("dummy", 0);
+>  	clk[ckil] = imx_obtain_fixed_clock("ckil", rate_ckil);
+>  	clk[osc] = imx_obtain_fixed_clock("osc", rate_osc);
+> @@ -569,13 +567,3 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+>  
+>  	return 0;
+>  }
+> -
+> -int __init mx51_clocks_init_dt(void)
+> -{
+> -	return mx51_clocks_init(0, 0, 0, 0);
+> -}
+> -
+> -int __init mx53_clocks_init_dt(void)
+> -{
+> -	return mx53_clocks_init(0, 0, 0, 0);
+> -}
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> index 4517fd7..0ce8313 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -68,8 +68,6 @@ extern int mx53_clocks_init(unsigned long ckil, unsigned long osc,
+>  extern int mx25_clocks_init_dt(void);
+>  extern int mx27_clocks_init_dt(void);
+>  extern int mx31_clocks_init_dt(void);
+> -extern int mx51_clocks_init_dt(void);
+> -extern int mx53_clocks_init_dt(void);
+>  extern struct platform_device *mxc_register_gpio(char *name, int id,
+>  	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
+>  extern void mxc_set_cpu_type(unsigned int type);
+> diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
+> index 53e43e5..bece8a6 100644
+> --- a/arch/arm/mach-imx/imx51-dt.c
+> +++ b/arch/arm/mach-imx/imx51-dt.c
+> @@ -34,17 +34,11 @@ static const char *imx51_dt_board_compat[] __initdata = {
+>  	NULL
+>  };
+>  
+> -static void __init imx51_timer_init(void)
+> -{
+> -	mx51_clocks_init_dt();
+> -}
+> -
+>  DT_MACHINE_START(IMX51_DT, "Freescale i.MX51 (Device Tree Support)")
+>  	.map_io		= mx51_map_io,
+>  	.init_early	= imx51_init_early,
+>  	.init_irq	= mx51_init_irq,
+>  	.handle_irq	= imx51_handle_irq,
+> -	.init_time	= imx51_timer_init,
 
-The above either misses a group number or an uart number. We need
-pinctrl_uart<uartno>_<groupno>
+On i.MX5 the init_time hook calls mx5x_clocks_init_dt which calls
+mx5x_clocks_init which not only calls of_clk_init() but also registers
+all clocks in the system. You can't remove it.
 
-Also this doesn't scale very good. For boards without RTS/CTS we would have
-to add a completely different group. For the FEC I've seen different
-groups with a dozen pins each which differ in only a single pin.
+I am missing some
 
-I therefore suggest (and Shawn acked the general idea already) to
-do this:
+CLK_OF_DECLARE(imx51, "fsl,imx51-ccm", imx51_clocks_init);
+CLK_OF_DECLARE(imx53, "fsl,imx53-ccm", imx53_clocks_init);
 
-	pinctrl_uart1_1: uart1-1 {
-		fsl,pins = <
-			MX27_PAD_UART1_TXD__UART1_TXD 0x0
-			MX27_PAD_UART1_RXD__UART1_RXD 0x0
-		>;
-	};
-
-	pinctrl_uart1_rtscts_1: uart1-rtscts-1 {
-		fsl,pins = <
-			MX27_PAD_UART1_CTS__UART1_CTS 0x0
-			MX27_PAD_UART1_RTS__UART1_RTS 0x0
-		>;
-	};
+Somewhere.
 
 Sascha
 
