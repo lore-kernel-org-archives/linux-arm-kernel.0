@@ -1,113 +1,72 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Tue, 20 Aug 2013 17:01:41 +0200
-Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.12
-Message-ID: <521384D5.1050607@baylibre.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 20 Aug 2013 17:02:52 +0200
+Subject: [PATCH] dma: imx-sdma: Add ROM script addresses to driver
+In-Reply-To: <CAHCPf3sJDRXUkrkRtku06OvBav2idFvJwThsxsrHngXg3mEXJA@mail.gmail.com>
+References: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
+ <CAHCPf3t1_5zhSOrfVFHgeVPa25sT+ewv1=OZA8X4_YZXb9cSeA@mail.gmail.com>
+ <20130820070039.GH31036@pengutronix.de>
+ <CAHCPf3sJDRXUkrkRtku06OvBav2idFvJwThsxsrHngXg3mEXJA@mail.gmail.com>
+Message-ID: <20130820150252.GB31060@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 20, 2013 at 08:53:42AM -0500, Matt Sealey wrote:
+> You know what, I am really confused by this in the first place. Since
+> when did the SDMA driver actually support ROM addresses in device tree
+> anyway (referring your comments in the patch series) and when did it
+> get removed? Why is platform data somehow now required in a driver and
+> not being put in it's correct place in the device tree?
 
-Hi Tony,
+The SDMA driver never supported ROM script addresses when probed from
+the devicetree. This was only ever supported with platform based
+devices. With devicetree probing platform data never was and and is not
+required.
 
-Please pull the following commits for OMAP Device Tree for v3.12.
+> 
+> Why require a firmware file for anything here, bugs notwithstanding?
+> As far as I recall there were one or two in older tape-out i.MX6 (uart
+> dma I think) and a few more in i.MX51 and i.MX53 early tapeouts. I was
+> sure I saw some BSP commits that update the firmware to fix some bugs
+> in production tape-outs (oddly they're seemingly not in the errata for
+> any tape-out?). The ROM addresses should be in DT, and for those
+> devices that now have platform_data glue hardcoding the vaues, they'll
+> work. DT platforms won't.
+> 
+> I don't understand here how it's not possible to specify the ROM
+> addresses in the DT for instance using the way regulators are handled
+> (but I'd want to see reg used to specify the address and name instead
+> of a custom properties in this case).
 
-Thanks,
-Benoit
+We could specify ROM addresses in the dt, but why should we do this? It
+would just add more API between the kernel and the dt for no gain.
 
-----------------------------------------------------------------
-Add the minimal DTS support for DRA7xx based SoC core.
-Add the initial support for N900 and gta04 phones.
-Do a lot of various cleanups.
-----------------------------------------------------------------
+> 
+> What I'd really like to see is the "waiting on a firmware that doesn't
+> exist when there is a working ROM version of those scripts in the SoC"
 
-The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
+Then this patch is for you. This is exactly what the patch solves.
 
-  Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
+> bug fixed properly, by using ROM addresses in DT - specifying the
+> "wrong" addresses is a device tree bug for that board with that
+> tape-out or users using the wrong device-tree. Then fudging
+> platform_data for non-DT platforms makes sense in that they have no
+> DTs. And when they are converted they will follow suit anyway -
+> there's a path to take to get there that is really clear.
+> 
+> In this case it is just hardcoding one or two SoC and then leaving the
+> rest tha tare actually device-tree compliant to use that abominable,
+> OS-specific firmware path name property.. keeping the hangs. I'm
+> really trying to figure out the intent and design process here,
+> because from a perspective of getting more device tree support this
+> really is stepping backwards via a hack to get a couple boards to
+> work.
 
-are available in the git repository at:
+This patch is by no means board specific.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.12/dts
+Sascha
 
-for you to fetch changes up to 9f311a2325905043718da9bf649e2344b8df8473:
-
-  ARM: dts: omap3-beagle: Make USB host pin naming consistent (2013-08-20 14:30:07 +0200)
-
-----------------------------------------------------------------
-Afzal Mohammed (2):
-      ARM: dts: AM4372: cpu(s) node per latest binding
-      ARM: dts: AM4372: add few nodes
-
-Alexandre Belloni (1):
-      ARM: dts: AM33XX: Add PMU support
-
-Javier Martinez Canillas (5):
-      ARM: dts: omap3-igep: add pinmux node for GPIO LED configuration
-      ARM: dts: omap3-igep0020: add mux conf for GPIO LEDs
-      ARM: dts: omap3-igep0030: add mux conf for GPIO LED
-      ARM: dts: AM33XX: use pinmux node defined in included file
-      ARM: dts: AM33XX: don't redefine OCP bus and device nodes
-
-Kishon Vijay Abraham I (1):
-      ARM: dts: omap5-uevm: Split SMPS10 in two nodes
-
-Lars Poeschel (1):
-      ARM: dts: AM33xx: Correct gpio #interrupt-cells property
-
-Lee Jones (7):
-      ARM: dts: Remove '0x's from OMAP2420 H4 DTS file
-      ARM: dts: Remove '0x's from OMAP3 IGEP0020 DTS file
-      ARM: dts: Remove '0x's from OMAP3 IGEP0030 DTS file
-      ARM: dts: Remove '0x's from OMAP3 DTS file
-      ARM: dts: Remove '0x's from OMAP3430 SDP DTS file
-      ARM: dts: Remove '0x's from OMAP4 DTS file
-      ARM: dts: Remove '0x's from OMAP5 DTS file
-
-Marek Belisko (1):
-      ARM: dts: Add devicetree for gta04 board.
-
-Pavel Machek (1):
-      ARM: dts: N900: Add device tree
-
-R Sricharan (1):
-      ARM: dts: DRA7: Add the dts files for dra7 SoC and dra7-evm board
-
-Robert Nelson (1):
-      ARM: dts: omap3-beagle-xm: fix string error in compatible property
-
-Roger Quadros (1):
-      ARM: dts: omap3-beagle: Make USB host pin naming consistent
-
-Ruslan Bilovol (1):
-      ARM: dts: twl6030: Move common configuration for OMAP4 boards in a separate dtsi file
-
- arch/arm/boot/dts/Makefile                |   5 +-
- arch/arm/boot/dts/am335x-bone.dts         | 217 ++++++-----
- arch/arm/boot/dts/am335x-evm.dts          | 576 +++++++++++++++---------------
- arch/arm/boot/dts/am335x-evmsk.dts        | 374 ++++++++++---------
- arch/arm/boot/dts/am33xx.dtsi             |  13 +-
- arch/arm/boot/dts/am4372.dtsi             | 347 ++++++++++++++++++
- arch/arm/boot/dts/dra7-evm.dts            | 140 ++++++++
- arch/arm/boot/dts/dra7.dtsi               | 575 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap2420-h4.dts         |   6 +-
- arch/arm/boot/dts/omap3-beagle-xm.dts     |   2 +-
- arch/arm/boot/dts/omap3-beagle.dts        |  24 +-
- arch/arm/boot/dts/omap3-gta04.dts         | 168 +++++++++
- arch/arm/boot/dts/omap3-igep.dtsi         |   2 +
- arch/arm/boot/dts/omap3-igep0020.dts      |  19 +-
- arch/arm/boot/dts/omap3-igep0030.dts      |  17 +-
- arch/arm/boot/dts/omap3-n900.dts          |  92 +++++
- arch/arm/boot/dts/omap3.dtsi              |   2 +-
- arch/arm/boot/dts/omap3430-sdp.dts        |  22 +-
- arch/arm/boot/dts/omap4-panda-common.dtsi |  21 +-
- arch/arm/boot/dts/omap4-sdp.dts           |  21 +-
- arch/arm/boot/dts/omap4.dtsi              |   2 +-
- arch/arm/boot/dts/omap5-uevm.dts          |  13 +-
- arch/arm/boot/dts/omap5.dtsi              |   4 +-
- arch/arm/boot/dts/twl6030_omap4.dtsi      |  38 ++
- include/dt-bindings/pinctrl/dra.h         |  50 +++
- 25 files changed, 2077 insertions(+), 673 deletions(-)
- create mode 100644 arch/arm/boot/dts/dra7-evm.dts
- create mode 100644 arch/arm/boot/dts/dra7.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-gta04.dts
- create mode 100644 arch/arm/boot/dts/omap3-n900.dts
- create mode 100644 arch/arm/boot/dts/twl6030_omap4.dtsi
- create mode 100644 include/dt-bindings/pinctrl/dra.h
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
