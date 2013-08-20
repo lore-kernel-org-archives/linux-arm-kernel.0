@@ -1,95 +1,93 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 20 Aug 2013 17:28:25 -0600
-Subject: [GIT PULL 2/4] ARM: tegra: core SoC enhancements for 3.12
-In-Reply-To: <87mwocj680.fsf@kernel.org>
-References: <1376673628-5867-1-git-send-email-swarren@wwwdotorg.org>
- <1376673628-5867-2-git-send-email-swarren@wwwdotorg.org>
- <87mwocj680.fsf@kernel.org>
-Message-ID: <5213FB99.5030903@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 20 Aug 2013 23:39:25 +0000 (UTC)
+Subject: [PATCHv3 2/9] ARM: OMAP2+: AM33XX: control: Add some control
+ module registers and APIs
+In-Reply-To: <520BBDF6.1070103@ti.com>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-3-git-send-email-d-gerlach@ti.com>
+ <5203A0BC.8060205@ti.com> <5203C457.80301@ti.com>
+ <20130809051146.GB7656@atomide.com> <52055733.70808@ti.com>
+ <87y586pvkq.fsf@kernel.org>
+ <5209565C.7090508@ti.com> <87d2phpsu1.fsf@kernel.org>
+ <520A4BE7.7090603@ti.com> <87wqnplg1n.fsf@kernel.org>
+ <520A785C.3000304@ti.com>
+ <CA+Bv8Xbg9v4zRy-EJPsxwCdwpSy50V8SjwQfmAvVxiCR=6mYBw@mail.gmail.com>
+ <87bo51jtiu.fsf@kernel.org> <520BBDF6.1070103@ti.com>
+Message-ID: <alpine.DEB.2.02.1308202317490.6426@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2013 05:24 PM, Kevin Hilman wrote:
-> + Mike Turquette
-> 
-> Stephen Warren <swarren@wwwdotorg.org> writes:
-> 
->> This branch includes a number of enhancements to core SoC support for
->> Tegra devices. The major new features are:
->>
->> * Adds a new CPU-power-gated cpuidle state for Tegra114.
->> * Adds initial system suspend support for Tegra114, initially supporting
->>   just CPU-power-gating during suspend.
->> * Adds "LP1" suspend mode support for all of Tegra20/30/114. This mode
->>   both gates CPU power, and places the DRAM into self-refresh mode.
->> * A new DT-driven PCIe driver to Tegra20/30. The driver is also moved
->>   from arch/arm/mach-tegra/ to drivers/pci/host/.
->>
->> The PCIe driver work depends on the following tag from Thomas Petazzoni:
->> git://git.infradead.org/linux-mvebu.git mis-3.12.2
->> ... which is merged into the middle of this pull request.
->>
->> ----------------------------------------------------------------
->>
->> (If the location of the merge into this branch is problematic, just let
->> me know and I'll rebase everything on top of the merge)
-> 
-> The merge looks fine, but...
-> 
->> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
->>
->>   Linux 3.11-rc1
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.12-soc
->>
->> for you to fetch changes up to b4f173752a56187bd55752b0474429202f2ab1d3:
->>
->>   ARM: tegra: disable LP2 cpuidle state if PCIe is enabled
->>
->> ----------------------------------------------------------------
->>
->> Jay Agarwal (1):
->>       PCI: tegra: Add Tegra 30 PCIe support
->>
->> Joseph Lo (21):
->>       ARM: tegra: enable Cortex-A15 erratum 798181
->>       Revert "ARM: tegra: add cpu_disable for hotplug"
->>       ARM: tegra114: Reprogram GIC CPU interface to bypass IRQ on CPU PM entry
->>       ARM: tegra114: add low level support for CPU idle powered-down mode
->>       ARM: tegra114: cpuidle: add powered-down state
->>       ARM: tegra: do v7_invalidate_l1 only when CPU is Cortex-A9
->>       ARM: tegra: add a flag for tegra_disable_clean_inv_dcache to do LoUIS or ALL
->>       ARM: tegra: set up the correct L2 data RAM latency for Cortex-A15
->>       ARM: tegra: add low level code for Tegra114 cluster power down
->>       ARM: tegra: shut off the CPU rail when the last CPU in suspend
->>       ARM: tegra: hook tegra_tear_down_cpu function
->>       ARM: tegra: flowctrl: add support for cpu_suspend_enter/exit
->>       clk: tegra: add suspend/resume function for tegra_cpu_car_ops
-> 
-> This one...
-> 
->>       ARM: tegra: remove the limitation that Tegra114 can't support suspend
->>       ARM: tegra: add common resume handling code for LP1 resuming
->>       ARM: tegra: config the polarity of the request of sys clock
->>       clk: tegra114: add LP1 suspend/resume support
-> 
-> ...and this one are drivers/clk and I don't see an ack from the
-> clock framework maintainer (Mike Turquette) on either.
-> 
-> If Mike is OK for them to go via arm-soc, that should be specified in
-> the description above (and he should ack them), otherwise they should be
-> split out and sent via Mike.
-> 
-> A quick glance suggests there are no direct dependencies, so it's
-> probably best if those changes go through Mike.
+Hi
 
-There are at least run-time dependencies here, although it's possible
-they're limited to "suspend won't work on Tegra114 unless all those
-patches are present" rather than "if all these patches aren't present,
-something other than a new feature will regress due to this series".
+a few comments
 
-Mike's certainly been CC'd on the patches many times as quite a few
-versions of each were posted, and I asked for acks, but got no response.
-In the past, that's meant he's fine with the patches...
+On Wed, 14 Aug 2013, Suman Anna wrote:
+
+> The remoteproc infrastructure is currently tied closely with the
+> virtio/rpmsg framework, and the boot requires that there are virtio
+> devices present in the resource table from the firmware image.
+
+Using static channels is something that can be added to the existing code, 
+if you don't want to use dynamic channels.
+
+> The rpmsg shared memory buffers are currently kinda fixed (512 buffers 
+> of 512 bytes each) and requires 3 pages just for the vring structures 
+> for this many buffers. So, if there are restrictions on DDR access, then 
+> this pretty much rules out remoteproc/rpmsg infrastructure.
+
+It should be possible to patch that code to vary the size and count of the 
+memory buffers, based on the remote processor.  So no direct DDR access 
+should be required - for that reason, anyway.
+
+> If the DDR access is ok, then there are other challenges that needs to
+> be met. The current firmware definitely requires the addition of the
+> resource table and the lower level code for handling the virtio_ring
+> transport for receiving messages. It would also need its own remoteproc
+> driver for handling the firmware binary format 
+
+Hmm, could you explain this further?  Are you just referring to the 
+process of parsing out the dynamic channel data during initialization?
+
+> and the signalling required to trigger the rpmsg buffer processing. The 
+> firmware binary format needs to be adapted to something that this driver 
+> would understand.  It definitely doesn't look like ELF currently, so 
+> something on the lines of ste_modem_rproc needs to be done.
+
+Or just use ELF or static channels.
+
+> Also, the remoteproc/rpmsg infrastructure can support multiple vring 
+> transport channels between the processor, and depending on how many are 
+> supported, we either need to exchange the vq_id (like OMAP remoteproc), 
+> or process the known virtqueues always (like DA8xx remoteproc). The 
+> former requires that a message payload is used, and mandates the usage 
+> of the IPC data registers in the control module given that WkupM3 on 
+> AM335 cannot access any mailbox registers. Any usage of IPC data 
+> registers depends on where we do it. If all the accesses were to be done 
+> within mach-omap2/control.c, then there is no easy way for using this 
+> API from drivers/remoteproc, until we have the control module driver.
+
+Yep, real SCM drivers have been needed for some time now, for pretty much 
+all of the OMAP SoCs.  It should be pretty easy to prototype for your 
+purposes, though.
+
+> The current communication uses the IPC data registers, and sometimes
+> uses them as plain status registers. There's certain registers used for
+> sharing status, version etc which are shared by both the processors.
+> Using rpmsg would require communicating every single message, and if
+> there were to be some shared variables to be used simultaneously, then
+> this has to be exchanged through a new remoteproc resource type.
+
+I don't quite understand this last part - "shared variables to be used 
+simultaneously".  How does the existing code synchronize them?
+
+> One additional aspect is that the current remoteproc core does not have
+> the necessary runtime pm support, but in general the approach would be
+> to treat the remoteprocs as true slave devices. I would imagine the
+> driver core to put the remoteprocs into reset state, after asking them
+> to save their context during suspend.
+
+Why is runtime PM support needed in the remoteproc core?  Wouldn't that 
+only be needed in the remote processor's device driver?
+
+
+- Paul
