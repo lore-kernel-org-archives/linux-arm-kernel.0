@@ -1,49 +1,144 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Tue, 20 Aug 2013 08:53:42 -0500
-Subject: [PATCH] dma: imx-sdma: Add ROM script addresses to driver
-In-Reply-To: <20130820070039.GH31036@pengutronix.de>
-References: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
- <CAHCPf3t1_5zhSOrfVFHgeVPa25sT+ewv1=OZA8X4_YZXb9cSeA@mail.gmail.com>
- <20130820070039.GH31036@pengutronix.de>
-Message-ID: <CAHCPf3sJDRXUkrkRtku06OvBav2idFvJwThsxsrHngXg3mEXJA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 20 Aug 2013 09:55:54 -0400
+Subject: [PATCH 2/8] clk: keystone: Add gate control clock driver
+In-Reply-To: <20130819204353.4443.48466@quantum>
+References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
+ <1375719147-7578-3-git-send-email-santosh.shilimkar@ti.com>
+ <20130813161314.GR27165@e106331-lin.cambridge.arm.com>
+ <520A60A2.2030104@ti.com>
+ <20130813165344.GU27165@e106331-lin.cambridge.arm.com>
+ <20130819204353.4443.48466@quantum>
+Message-ID: <5213756A.5090903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You know what, I am really confused by this in the first place. Since
-when did the SDMA driver actually support ROM addresses in device tree
-anyway (referring your comments in the patch series) and when did it
-get removed? Why is platform data somehow now required in a driver and
-not being put in it's correct place in the device tree?
+On Monday 19 August 2013 04:43 PM, Mike Turquette wrote:
+> Quoting Mark Rutland (2013-08-13 09:53:44)
+>> On Tue, Aug 13, 2013 at 05:36:50PM +0100, Santosh Shilimkar wrote:
+>>> On Tuesday 13 August 2013 12:13 PM, Mark Rutland wrote:
+>>>> [adding dt maintainers]
+>>>>
+>>>> On Mon, Aug 05, 2013 at 05:12:21PM +0100, Santosh Shilimkar wrote:
+>>>>> Add the driver for the clock gate control which uses PSC (Power Sleep
+>>>>> Controller) IP on Keystone 2 based SOCs. It is responsible for enabling and
+>>>>> disabling of the clocks for different IPs present in the SoC.
+>>>>>
+>>>>> Cc: Mike Turquette <mturquette@linaro.org>
+>>>>>
+>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>>> ---
+>>>>>  .../devicetree/bindings/clock/keystone-gate.txt    |   30 ++
+>>>>>  drivers/clk/keystone/gate.c                        |  306 ++++++++++++++++++++
+>>>>>  include/linux/clk/keystone.h                       |    1 +
+>>>>>  3 files changed, 337 insertions(+)
+>>>>>  create mode 100644 Documentation/devicetree/bindings/clock/keystone-gate.txt
+>>>>>  create mode 100644 drivers/clk/keystone/gate.c
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/clock/keystone-gate.txt b/Documentation/devicetree/bindings/clock/keystone-gate.txt
+>>>>> new file mode 100644
+>>>>> index 0000000..40afef5
+>>>>> --- /dev/null
+>>>>> +++ b/Documentation/devicetree/bindings/clock/keystone-gate.txt
+>>>>> @@ -0,0 +1,30 @@
+>>>>> +Binding for Keystone gate control driver which uses PSC controller IP.
+>>>>> +
+>>>>> +This binding uses the common clock binding[1].
+>>>>> +
+>>>>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>>>> +
+>>>>> +Required properties:
+>>>>> +- compatible : shall be "keystone,psc-clk".
+>>>>
+>>>> Similarly to my comments on patch 1, this should probably be something
+>>>> more like "ti,keystone-psc-clock"
+>>>>
+>>>>> +- #clock-cells : from common clock binding; shall be set to 0.
+>>>>> +- clocks : parent clock phandle
+>>>>> +- reg :        psc address address space
+>>>>> +
+>>>>> +Optional properties:
+>>>>> +- clock-output-names : From common clock binding to override the
+>>>>> +                       default output clock name
+>>>>> +- status : "enabled" if clock is always enabled
+>>>>
+>>>> Huh? This is a standard property, for which ePAPR defines "okay",
+>>>> "disabled", "fail", and "fail-sss", and not "enabled". This also doesn't
+>>>> seem to follow the standard meaning judging by the code.
+>>>>
+>>>> It looks like this could be a boolean property
+>>>> ("clock-always-enabled"?), but that assumes it's necessary.
+>>>>
+>>>> Why do you need this?
+>>>>
+>>> I dropped this already. Forgot to update the documentation.
+>>
+>> Ok.
+>>
+>>>
+>>>>> +- lpsc : lpsc module id, if not set defaults to zero
+>>>>
+>>>> What's that needed for? Are there multiple clocks sharing a common
+>>>> register bank?
+>>>>
+>>>>> +- pd : power domain number, if not set defaults to zero (always ON)
+>>>>
+>>>> Please don't use abbreviations unnecessarily. "power-domain-id" or
+>>>> similar would be far better. What exactly does this represent? Does the
+>>>> clock IP itself handle power domains, or is there some external unit
+>>>> that controls power domains?
+>>>>
+>>> pd is commonly used but I can expand it. This represent the power
+>>> domain number.
+>>
+>> Does the the clock IP have some internal logic for handling power
+>> domains only covering its clocks, or is there some external power
+>> controller involved (i.e. do we possibly need to describe an external
+>> unit and a linkage to it?).
+> 
+> Hmm, does the clock own the power domain or does the power domain own
+> the clock? As you well know on OMAP the clock resides within the power
+> domain. So it seems to me that the better way to do this would be for
+> the power domain to have it's own binding and node, and then reference
+> the clock:
+> 
+> power-domain {
+> 	...
+> 	clocks = <&chipclk3>, <&chipclk4>;
+> 	clock-names = "perclk", "uartclk";
+> 	...
+> };
+> 
+> Now maybe things are different on Keystone, but if not then I don't see
+> why the clock binding should have anything to do with the power domain.
+>
+They are bit different w.r.t OMAP. LPSC itself is the clock control of the
+IP. The LPSC number in the bindings is actually the specific number which
+is used to reach to the address space of the clock control. One can view
+that one as clock control register index.
 
-Why require a firmware file for anything here, bugs notwithstanding?
-As far as I recall there were one or two in older tape-out i.MX6 (uart
-dma I think) and a few more in i.MX51 and i.MX53 early tapeouts. I was
-sure I saw some BSP commits that update the firmware to fix some bugs
-in production tape-outs (oddly they're seemingly not in the errata for
-any tape-out?). The ROM addresses should be in DT, and for those
-devices that now have platform_data glue hardcoding the vaues, they'll
-work. DT platforms won't.
+The power domain as such are above the lpsc but the clock enable/disable needs
+to follow a recommended sequence which needs the access to those registers.
+As such there is no major validation done on dynamically switching off PDs
+in current generation devices.
 
-I don't understand here how it's not possible to specify the ROM
-addresses in the DT for instance using the way regulators are handled
-(but I'd want to see reg used to specify the address and name instead
-of a custom properties in this case).
+As I mentioned you to on IRC, the PD was the only odd part I have to keep
+around to address the sequencing need which is kind of interlinked.
+ 
+>>
+>>>
+>>>>> +- gpsc : gpsc number, if not set defaults to zero
+>>>>
+>>>> How does that interact with the lpsc property? When are these necessary?
+>>>>
+>>> lpsc is local clock/module control where as gpsc sits on top of it. 
+> 
+> Similar to the above, should the gpsc have it's own binding and node
+> that contains the lpsc which also have their own bindings/nodes, which
+> finally contain the clocks? Maybe that is over engineered but I want to
+> consider this before the binding gets set in stone.
+> 
+Actually GPSC need not be even mentioned since its one per SOC. Let me 
+see if I can drop it to avoid any confusion.
 
-What I'd really like to see is the "waiting on a firmware that doesn't
-exist when there is a working ROM version of those scripts in the SoC"
-bug fixed properly, by using ROM addresses in DT - specifying the
-"wrong" addresses is a device tree bug for that board with that
-tape-out or users using the wrong device-tree. Then fudging
-platform_data for non-DT platforms makes sense in that they have no
-DTs. And when they are converted they will follow suit anyway -
-there's a path to take to get there that is really clear.
-
-In this case it is just hardcoding one or two SoC and then leaving the
-rest tha tare actually device-tree compliant to use that abominable,
-OS-specific firmware path name property.. keeping the hangs. I'm
-really trying to figure out the intent and design process here,
-because from a perspective of getting more device tree support this
-really is stepping backwards via a hack to get a couple boards to
-work.
-
--- Matt
+Regards,
+Santosh
