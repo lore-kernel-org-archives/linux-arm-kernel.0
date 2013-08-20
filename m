@@ -1,167 +1,173 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 20 Aug 2013 09:50:14 -0300
-Subject: [RFC 08/17] ARM: mvebu: remove custom .init_time hook
-In-Reply-To: <1376964271-22715-9-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376964271-22715-9-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130820125012.GA4272@localhost>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 20 Aug 2013 20:56:17 +0800
+Subject: [PATCH v2 1/7] pinctrl: imx1 core driver
+In-Reply-To: <1376921234-26682-2-git-send-email-mpa@pengutronix.de>
+References: <1376921234-26682-1-git-send-email-mpa@pengutronix.de>
+ <1376921234-26682-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130820125614.GE29114@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+Looks good to me.  A couple of small comments below.
 
-I've only received a few patches of this series. I *think*
-using "RFC" alone is not correct in LAKML and for some reason
-you're required to use RFC/PATCH.
+On Mon, Aug 19, 2013 at 04:07:08PM +0200, Markus Pargmann wrote:
+> +/*
+> + * Write to a register with 2 bits per pin. The function will automatically
+> + * use the next register if the pin is managed in the second register.
+> + */
+> +static void imx1_write_2bit(struct imx1_pinctrl *ipctl, unsigned int pin_id,
+> +		u32 value, u32 reg_offset)
+> +{
+> +	void __iomem *reg = imx1_mem(ipctl, pin_id) + reg_offset;
+> +	int offset = (pin_id % 16) * 2; /* offset, regardless of register used */
+> +	int mask = ~(0x3 << offset); /* Mask for 2 bits@offset */
+> +	u32 old_val;
+> +	u32 new_val;
+> +
+> +	dev_dbg(ipctl->dev, "write: register 0x%p offset %d value 0x%x\n",
+> +			reg, offset, value);
+> +
+> +	/* Use the next register if the pin's port pin number is >=16 */
+> +	if (pin_id % 32 >= 16)
+> +		reg += 0x04;
+> +
+> +	/* Get current state of pins */
+> +	old_val = readl(reg);
+> +	old_val &= mask;
+> +
+> +	new_val = value & 0x3; /* Make sure value is really 2 bit */
+> +	new_val <<= offset;
+> +	new_val |= old_val;/* Set new state for pin_id */
+> +
+> +	writel(new_val, reg);
+> +}
+> +
+> +static void imx1_write_bit(struct imx1_pinctrl *ipctl, unsigned int pin_id,
+> +		u32 value, u32 reg_offset)
+> +{
+> +	void __iomem *reg = imx1_mem(ipctl, pin_id) + reg_offset;
+> +	int offset = pin_id % 32;
+> +	int mask = ~BIT_MASK(offset);
+> +	u32 old_val;
+> +	u32 new_val;
+> +
+> +	/* Get current state of pins */
+> +	old_val = readl(reg);
+> +	old_val &= mask;
+> +
+> +	new_val = value & 0x1; /* Make sure value is really 2 bit */
 
-Maybe that's why I'm getting only the patches where I'm Cced?
+Copy&past error in comment.
 
-Could you please re-send this? The series looks promising and I'd like
-to take a peep :-)
+> +	new_val <<= offset;
+> +	new_val |= old_val;/* Set new state for pin_id */
+> +
+> +	writel(new_val, reg);
+> +}
 
-BTW, some of this (but not all) has already been posted [1, 2] and
-is on its way to v3.12 through Daniel Lezcano.
+<snip>
 
-(Maybe you already noticed, but just in case...)
+> +static int imx1_pinctrl_parse_groups(struct device_node *np,
+> +				    struct imx1_pin_group *grp,
+> +				    struct imx1_pinctrl_soc_info *info,
+> +				    u32 index)
+> +{
+> +	int size;
+> +	const __be32 *list;
+> +	int i;
+> +
+> +	dev_dbg(info->dev, "group(%d): %s\n", index, np->name);
+> +
+> +	/* Initialise group */
+> +	grp->name = np->name;
+> +
+> +	/*
+> +	 * the binding format is fsl,pins = <PIN_FUNC_ID CONFIG ...>,
 
-[1] http://www.spinics.net/lists/arm-kernel/msg265509.html
-[2] http://comments.gmane.org/gmane.linux.ports.arm.kernel/260179
+It does not match the bindings.
 
-Regards,
-Ezequiel
+> +	 * do sanity check and calculate pins number
+> +	 */
+> +	list = of_get_property(np, "fsl,pins", &size);
+> +	/* we do not check return since it's safe node passed down */
+> +	if (!size || size % 12) {
+> +		dev_notice(info->dev, "Not a valid fsl,pins property (%s)\n",
+> +				np->name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	grp->npins = size / 12;
+> +	grp->pins = devm_kzalloc(info->dev,
+> +			grp->npins * sizeof(struct imx1_pin), GFP_KERNEL);
+> +	grp->pin_ids = devm_kzalloc(info->dev,
+> +			grp->npins * sizeof(unsigned int), GFP_KERNEL);
+> +
+> +	if (!grp->pins || !grp->pin_ids)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < grp->npins; i++) {
+> +		grp->pins[i].pin_id = be32_to_cpu(*list++);
+> +		grp->pins[i].mux_id = be32_to_cpu(*list++);
+> +		grp->pins[i].config = be32_to_cpu(*list++);
+> +
+> +		grp->pin_ids[i] = grp->pins[i].pin_id;
+> +	}
+> +
+> +	return 0;
+> +}
 
-On Tue, Aug 20, 2013 at 04:04:22AM +0200, Sebastian Hesselbarth wrote:
-> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
-> remove custom .init_time hooks.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Notes:
-> - coherency, mbus, and cache init are moved to .init_machine hook
-> - time-armada-370-xp is converted to clocksource_of_init compatible init
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/mach-mvebu/armada-370-xp.c      |   11 +----------
->  drivers/clocksource/time-armada-370-xp.c |    7 +++----
->  include/linux/time-armada-370-xp.h       |   16 ----------------
->  3 files changed, 4 insertions(+), 30 deletions(-)
->  delete mode 100644 include/linux/time-armada-370-xp.h
-> 
-> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-> index 829b573..139f572 100644
-> --- a/arch/arm/mach-mvebu/armada-370-xp.c
-> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
-> @@ -14,11 +14,9 @@
->  
->  #include <linux/kernel.h>
->  #include <linux/init.h>
-> -#include <linux/clk-provider.h>
->  #include <linux/of_address.h>
->  #include <linux/of_platform.h>
->  #include <linux/io.h>
-> -#include <linux/time-armada-370-xp.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/mbus.h>
->  #include <asm/hardware/cache-l2x0.h>
-> @@ -34,19 +32,13 @@ static void __init armada_370_xp_map_io(void)
->  	debug_ll_io_init();
->  }
->  
-> -static void __init armada_370_xp_timer_and_clk_init(void)
-> +static void __init armada_370_xp_dt_init(void)
->  {
-> -	of_clk_init(NULL);
-> -	armada_370_xp_timer_init();
->  	coherency_init();
->  	BUG_ON(mvebu_mbus_dt_init());
->  #ifdef CONFIG_CACHE_L2X0
->  	l2x0_of_init(0, ~0UL);
->  #endif
-> -}
-> -
-> -static void __init armada_370_xp_dt_init(void)
-> -{
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->  }
->  
-> @@ -59,7 +51,6 @@ DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 370/XP (Device Tree)")
->  	.smp		= smp_ops(armada_xp_smp_ops),
->  	.init_machine	= armada_370_xp_dt_init,
->  	.map_io		= armada_370_xp_map_io,
-> -	.init_time	= armada_370_xp_timer_and_clk_init,
->  	.restart	= mvebu_restart,
->  	.dt_compat	= armada_370_xp_dt_compat,
->  MACHINE_END
-> diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-> index 847cab6..67904cf 100644
-> --- a/drivers/clocksource/time-armada-370-xp.c
-> +++ b/drivers/clocksource/time-armada-370-xp.c
-> @@ -30,7 +30,6 @@
->  #include <linux/module.h>
->  #include <linux/sched_clock.h>
->  #include <linux/percpu.h>
-> -#include <linux/time-armada-370-xp.h>
->  
->  /*
->   * Timer block registers.
-> @@ -217,13 +216,11 @@ static struct notifier_block armada_370_xp_timer_cpu_nb = {
->  	.notifier_call = armada_370_xp_timer_cpu_notify,
->  };
->  
-> -void __init armada_370_xp_timer_init(void)
-> +void __init armada_370_xp_timer_init(struct device_node *np)
->  {
->  	u32 u;
-> -	struct device_node *np;
->  	int res;
->  
-> -	np = of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-timer");
->  	timer_base = of_iomap(np, 0);
->  	WARN_ON(!timer_base);
->  	local_base = of_iomap(np, 1);
-> @@ -293,3 +290,5 @@ void __init armada_370_xp_timer_init(void)
->  	if (!res)
->  		armada_370_xp_timer_setup(this_cpu_ptr(armada_370_xp_evt));
->  }
-> +CLOCKSOURCE_OF_DECLARE(armada_370_xp_timer, "marvell,armada-370-xp-timer",
-> +		       armada_370_xp_timer_init);
-> diff --git a/include/linux/time-armada-370-xp.h b/include/linux/time-armada-370-xp.h
-> deleted file mode 100644
-> index 6fb0856..0000000
-> --- a/include/linux/time-armada-370-xp.h
-> +++ /dev/null
-> @@ -1,16 +0,0 @@
-> -/*
-> - * Marvell Armada 370/XP SoC timer handling.
-> - *
-> - * Copyright (C) 2012 Marvell
-> - *
-> - * Lior Amsalem <alior@marvell.com>
-> - * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> - * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> - *
-> - */
-> -#ifndef __TIME_ARMADA_370_XPPRCMU_H
-> -#define __TIME_ARMADA_370_XPPRCMU_H
-> -
-> -void armada_370_xp_timer_init(void);
-> -
-> -#endif
-> -- 
-> 1.7.10.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+<snip>
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+> +static int imx1_pinctrl_parse_dt(struct platform_device *pdev,
+> +		struct imx1_pinctrl *pctl, struct imx1_pinctrl_soc_info *info)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct device_node *child;
+> +	int ret;
+> +	u32 nfuncs = 0;
+> +	u32 ngroups = 0;
+> +	u32 ifunc = 0;
+> +	u32 base_addr;
+> +
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	ret = of_property_read_u32(np, "reg", &base_addr);
+
+It seems base_addr is used nowhere?
+
+Shawn
+
+> +	if (ret)
+> +		return ret;
+> +
+> +	for_each_child_of_node(np, child) {
+> +		++nfuncs;
+> +		ngroups += of_get_child_count(child);
+> +	}
+> +
+> +	if (!nfuncs) {
+> +		dev_err(&pdev->dev, "No pin functions defined\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	info->nfunctions = nfuncs;
+> +	info->functions = devm_kzalloc(&pdev->dev,
+> +			nfuncs * sizeof(struct imx1_pmx_func), GFP_KERNEL);
+> +
+> +	info->ngroups = ngroups;
+> +	info->groups = devm_kzalloc(&pdev->dev,
+> +			ngroups * sizeof(struct imx1_pin_group), GFP_KERNEL);
+> +
+> +
+> +	if (!info->functions || !info->groups)
+> +		return -ENOMEM;
+> +
+> +	for_each_child_of_node(np, child) {
+> +		ret = imx1_pinctrl_parse_functions(child, info, ifunc++);
+> +		if (ret == -ENOMEM)
+> +			return -ENOMEM;
+> +	}
+> +
+> +	return 0;
+> +}
