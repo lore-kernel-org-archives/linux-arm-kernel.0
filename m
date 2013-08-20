@@ -1,47 +1,46 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 20 Aug 2013 16:45:34 -0700
-Subject: [GIT PULL 3/4] ARM: tegra: device tree changes for 3.12
-In-Reply-To: <1376673628-5867-3-git-send-email-swarren@wwwdotorg.org> (Stephen
- Warren's message of "Fri, 16 Aug 2013 11:20:27 -0600")
-References: <1376673628-5867-1-git-send-email-swarren@wwwdotorg.org>
- <1376673628-5867-3-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <8738q4j59d.fsf@kernel.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 20 Aug 2013 23:57:26 +0000 (UTC)
+Subject: [PATCH 3/3] ARM: OMAP4: dts: Add main and optional clock data
+ into DT
+In-Reply-To: <1374560679-14666-4-git-send-email-rnayak@ti.com>
+References: <1374560679-14666-1-git-send-email-rnayak@ti.com>
+ <1374560679-14666-4-git-send-email-rnayak@ti.com>
+Message-ID: <alpine.DEB.2.02.1308202352330.6426@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+Hi
 
-> This branch contains all *.dts (device tree) changes for Tegra.
-> New features enabled are:
->
-> * PMICs on Dalmore
-> * CPU power-gating on Dalmore
-> * HDMI output on Beaver
-> * LP1 system suspend mode on almost all boards
-> * PCIe support on numerous Tegra20/30 boards
-> * USB support on Tegra30/114 boards
-> * Audio capture on Beaver and Dalmore
-> * Temperature sensor on Cardhu.
->
-> ... along with a few DT cleanups.
+On Tue, 23 Jul 2013, Rajendra Nayak wrote:
 
-Hmm, shouldn't I have a DT maintainer signoff on this stuff... oh,
-wait... ;)
+> With support to parse clock data from DT, move all main and optional
+> clock information from hwmod to DT.
+> 
+> We still retain clocks in hwmod for devices which do not have a DT node.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  arch/arm/boot/dts/omap4.dtsi               |  100 +++++++++++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  112 ----------------------------
+>  2 files changed, 100 insertions(+), 112 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 8e142f9..4dddf64 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -106,6 +106,8 @@
+>  			compatible = "ti,omap-counter32k";
+>  			reg = <0x4a304000 0x20>;
+>  			ti,hwmods = "counter_32k";
+> +			clocks = <&sys_32k_ck>;
+> +			clock-names = "fck";
 
-> ----------------------------------------------------------------
->
-> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
->
->   Linux 3.11-rc1
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.12-dt
->
-> for you to fetch changes up to 8af3bbec752902c0480c84613d7f10e22f485977:
->
->   ARM: tegra: add Mic Jack to Dalmore device tree
+Shouldn't these patches be using the official DT clock binding format?  
+Either the 'clocks' property should be something like:
 
-Pulled into next/dt.
+    clocks = <&prm 10>;
 
-Kevin
+or a change to the bindings needs to be discussed and implemented.
+
+
+- Paul
