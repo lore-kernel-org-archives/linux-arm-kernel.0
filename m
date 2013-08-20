@@ -1,102 +1,104 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Tue, 20 Aug 2013 10:25:05 -0700
-Subject: [PATCH] arm64: Expand arm64 image header
-In-Reply-To: <1376588447.26173.28.camel@t520.redhat.com>
-References: <1376521800-967-1-git-send-email-roy.franz@linaro.org>
- <1376539080.26173.23.camel@t520.redhat.com>
- <CAFECyb-B0X1bXLs-Q=rX7tY5GZiNASZZDP97ZLT9LSk_vSKS=Q@mail.gmail.com>
- <1376588447.26173.28.camel@t520.redhat.com>
-Message-ID: <CAFECyb8EU55rT6R9g-FjO4YBeXzNFkm4em7MSqYNJUW5+PcvDQ@mail.gmail.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Tue, 20 Aug 2013 10:27:18 -0700
+Subject: [PATCH] ARM: bcm: Make secure API call optional
+In-Reply-To: <1375989594-12193-1-git-send-email-csd@broadcom.com>
+References: <1375989594-12193-1-git-send-email-csd@broadcom.com>
+Message-ID: <5213A6F6.4070105@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 10:40 AM, Mark Salter <msalter@redhat.com> wrote:
-> On Thu, 2013-08-15 at 08:49 -0700, Roy Franz wrote:
->> On Wed, Aug 14, 2013 at 8:58 PM, Mark Salter <msalter@redhat.com> wrote:
->> > On Wed, 2013-08-14 at 16:10 -0700, Roy Franz wrote:
->> >> Expand the arm64 image header to allow for co-existance with
->> >> PE/COFF header required by the EFI stub.  The PE/COFF format
->> >> requires the "MZ" header to be at offset 0, and the offset
->> >> to the PE/COFF header to be at offset 0x3c.  The image
->> >> header is expanded to allow 2 instructions at the beginning
->> >> to accommodate a benign intruction at offset 0 that includes
->> >> the "MZ" header, a magic number, and the offset to the PE/COFF
->> >> header.
->> >>
->> >>
->> >> Signed-off-by: Roy Franz <roy.franz@linaro.org>
->> >> ---
->> >>  Documentation/arm64/booting.txt |   16 +++++++++++++---
->> >>  arch/arm64/kernel/head.S        |    8 ++++++++
->> >>  2 files changed, 21 insertions(+), 3 deletions(-)
->> >>
->> >> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
->> >> index 9c4d388..5273c4d 100644
->> >> --- a/Documentation/arm64/booting.txt
->> >> +++ b/Documentation/arm64/booting.txt
->> >> @@ -68,13 +68,23 @@ Image target is available instead.
->> >>
->> >>  Requirement: MANDATORY
->> >>
->> >> -The decompressed kernel image contains a 32-byte header as follows:
->> >> +The decompressed kernel image contains a 64-byte header as follows:
->> >>
->> >> -  u32 magic  = 0x14000008;   /* branch to stext, little-endian */
->> >> -  u32 res0   = 0;            /* reserved */
->> >> +  u32 code0;                 /* Executable code */
->> >> +  u32 code1;                 /* Executable code */
->> >>    u64 text_offset;           /* Image load offset */
->> >> +  u64 res0   = 0;            /* reserved */
->> >>    u64 res1   = 0;            /* reserved */
->> >>    u64 res2   = 0;            /* reserved */
->> >> +  u64 res3   = 0;            /* reserved */
->> >> +  u64 res4   = 0;            /* reserved */
->> >> +  u32 magic  = 0x644d5241;   /* Magic number, little endian, "ARM\x64" */
->> >> +  u32 res5 = 0;                      /* reserved */
->> >> +
->> >> +
->> >> +Header notes:
->> >> +
->> >> +- code0/code1 are responsible for branching to stext.
->> >
->> > Do we really want to change the already documented image header? Any
->> > existing bootloaders which check the magic number would stop working.
->> > In my preliminary patches to add an efi stub, I avoid that by making
->> > an Image.efi which is an Image file with pe/coff header prepended. I
->> > could easily switch to using the above header change, but wanted to
->> > point out an alternative that doesn't change the already established
->> > header.
->> >
->> > --Mark
->> >
->>
->> Hi Mark,
->>
->>    Yes, we do want to make the change, as one the goals is to have a
->> single binary format, not multiple formats.  This was discussed fairly
->> extensively at LCE, and I think my patch represents the consensus on
->> how the EFI stub should be integrated.
->> Also, since it is early enough in the arm64 development this should be
->> a relatively easy time to make it.  I don't think that the current
->> magic number is checked in the current UEFI loader, as the image boots
->> fine with either header.  If the current ARM64 loaders don't check the
->> magic number, then they will work with either format, since the entry
->> point is the same.
->>
->> Roy
+On 13-08-08 12:19 PM, Christian Daudt wrote:
+> The current bcm_kona_smc_init function throws a BUG_ON if there's no SMC
+> device node defined in the device tree.
 >
-> That's fine. I wasn't at LCE, so I just wanted to avoid doubt and point
-> out the alternative. Either way works for the main part of the efi stub
-> so I'm okay with whatever uncompressed image header is used.
+> Since secure API access is optional depending the chip configuration,
+> fix this by allowing the rest of the code to run even if there's no SMC
+> device node defined
 >
-> --Mark
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> Signed-off-by: Christian Daudt <csd@broadcom.com>
 >
->
+> diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
+> index 56d9d19..e32c1b3 100644
+> --- a/arch/arm/mach-bcm/bcm_kona_smc.c
+> +++ b/arch/arm/mach-bcm/bcm_kona_smc.c
+> @@ -41,13 +41,14 @@ static const struct of_device_id bcm_kona_smc_ids[] __initconst = {
+>   };
+>   
+>   /* Map in the bounce area */
+> -void __init bcm_kona_smc_init(void)
+> +int __init bcm_kona_smc_init(void)
+>   {
+>   	struct device_node *node;
+>   
+>   	/* Read buffer addr and size from the device tree node */
+>   	node = of_find_matching_node(NULL, bcm_kona_smc_ids);
+> -	BUG_ON(!node);
+> +	if (!node)
+> +		return -ENODEV;
+>   
+>   	/* Don't care about size or flags of the DT node */
+>   	bridge_data.buffer_addr =
+> @@ -59,7 +60,9 @@ void __init bcm_kona_smc_init(void)
+>   
+>   	bridge_data.initialized = 1;
+>   
+> -	pr_info("Secure API initialized!\n");
+> +	pr_info("Kona Secure API initialized\n");
+> +
+> +	return 0;
+>   }
+>   
+>   /* __bcm_kona_smc() should only run on CPU 0, with pre-emption disabled */
+> diff --git a/arch/arm/mach-bcm/bcm_kona_smc.h b/arch/arm/mach-bcm/bcm_kona_smc.h
+> index 3bedbed1..d098a7e 100644
+> --- a/arch/arm/mach-bcm/bcm_kona_smc.h
+> +++ b/arch/arm/mach-bcm/bcm_kona_smc.h
+> @@ -64,7 +64,7 @@
+>   #define SSAPI_BRCM_START_VC_CORE	0x0E000008
+>   
+>   #ifndef	__ASSEMBLY__
+> -extern void bcm_kona_smc_init(void);
+> +extern int __init bcm_kona_smc_init(void);
+>   
+>   extern unsigned bcm_kona_smc(unsigned service_id,
+>   			     unsigned arg0,
+> diff --git a/arch/arm/mach-bcm/board_bcm.c b/arch/arm/mach-bcm/board_bcm.c
+> index 2859932..70cc44f 100644
+> --- a/arch/arm/mach-bcm/board_bcm.c
+> +++ b/arch/arm/mach-bcm/board_bcm.c
+> @@ -29,15 +29,18 @@ static int __init kona_l2_cache_init(void)
+>   	if (!IS_ENABLED(CONFIG_CACHE_L2X0))
+>   		return 0;
+>   
+> +	if (bcm_kona_smc_init() < 0) {
+> +		pr_info("Kona secure API not available. Skipping L2 init\n");
+> +		return 0;
+> +	}
+> +
+>   	bcm_kona_smc(SSAPI_ENABLE_L2_CACHE, 0, 0, 0, 0);
+>   
+>   	/*
+>   	 * The aux_val and aux_mask have no effect since L2 cache is already
+>   	 * enabled.  Pass 0s for aux_val and 1s for aux_mask for default value.
+>   	 */
+> -	l2x0_of_init(0, ~0);
+> -
+> -	return 0;
+> +	return l2x0_of_init(0, ~0);
+>   }
+>   
+>   static void __init board_init(void)
+> @@ -45,8 +48,6 @@ static void __init board_init(void)
+>   	of_platform_populate(NULL, of_default_bus_match_table, NULL,
+>   		&platform_bus);
+>   
+> -	bcm_kona_smc_init();
+> -
+>   	kona_l2_cache_init();
+>   }
+>   
+applied to bcm/for-3.12/soc
 
-Hi Catalin,
-
-   Have you had a chance to look at this?  Please let me know if this
-is acceptable or if you would like changes made.
-
-Thanks,
-Roy
+  thanks,
+   csd
