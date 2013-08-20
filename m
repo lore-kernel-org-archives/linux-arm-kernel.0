@@ -1,73 +1,86 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Aug 2013 10:35:51 +0800
-Subject: [PATCH 2/3] dma: imx-sdma: Add ROM script addresses to driver
-In-Reply-To: <20130819173912.GF31036@pengutronix.de>
-References: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
- <1376914563-10912-3-git-send-email-s.hauer@pengutronix.de>
- <20130819144136.GC28297@S2101-09.ap.freescale.net>
- <20130819173912.GF31036@pengutronix.de>
-Message-ID: <20130820023545.GA29114@S2101-09.ap.freescale.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 20 Aug 2013 11:50:15 +0800
+Subject: [GIT PULL] pull request to 3.12 for hi3xxx
+In-Reply-To: <CAN1soZzRmZyC38i8gCJL20ebRZPH0fd+DC7aFqnWbu=NfnYCzg@mail.gmail.com>
+References: <CAN1soZzRmZyC38i8gCJL20ebRZPH0fd+DC7aFqnWbu=NfnYCzg@mail.gmail.com>
+Message-ID: <CAN1soZwcrsQmaV4vERtpzgQy23yRKFe8Gd4nmob18G+PzPP4Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 07:39:12PM +0200, Sascha Hauer wrote:
-> On Mon, Aug 19, 2013 at 10:41:38PM +0800, Shawn Guo wrote:
-> > Copy devicetree mailing list.
-> > 
-> > > @@ -352,8 +521,15 @@ static struct platform_device_id sdma_devtypes[] = {
-> > >  MODULE_DEVICE_TABLE(platform, sdma_devtypes);
-> > >  
-> > >  static const struct of_device_id sdma_dt_ids[] = {
-> > > -	{ .compatible = "fsl,imx31-sdma", .data = &sdma_imx31, },
-> > > +	{ .compatible = "fsl,imx6q-sdma", .data = &sdma_imx6q, },
-> > > +	{ .compatible = "fsl,imx53-sdma", .data = &sdma_imx53, },
-> > > +	{ .compatible = "fsl,imx51-sdma", .data = &sdma_imx51, },
-> > > +	{ .compatible = "fsl,imx35-to2-sdma", .data = &sdma_imx35_to2, },
-> > > +	{ .compatible = "fsl,imx35-to1-sdma", .data = &sdma_imx35_to1, },
-> > >  	{ .compatible = "fsl,imx35-sdma", .data = &sdma_imx35, },
+On Tue, Aug 20, 2013 at 11:44 AM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> Hi all,
+>
+> Please help to merge hi3xxx from pxa git tree.
+>
+> Regards
+> Haojian
+>
+>
+> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+>
+>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git tags/hi3xxx
+>
+> for you to fetch changes up to a9b42411245867a3730cd15982f79191b70cc8c0:
+>
+>   ARM: hi3xxx: support hi3716-dkb board (2013-08-20 11:11:23 +0800)
+>
+> ----------------------------------------------------------------
+> enable Hisilicon Hi3xxx
+>
+> ----------------------------------------------------------------
+> Haojian Zhuang (4):
+>       ARM: hi3xxx: add board support with device tree
+>       ARM: dts: enable hi4511 with device tree
+>       ARM: config: enable hi3xxx in multi_v7_defconfig
+>       ARM: config: add defconfig for Hi3xxx
+>
+> Zhangfei Gao (3):
+>       ARM: hi3xxx: add smp support
+>       ARM: hi3xxx: add hotplug support
+>       ARM: hi3xxx: support hi3716-dkb board
+>
+>  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt |   57 +++
+>  arch/arm/Kconfig                                              |    2 +
+>  arch/arm/Makefile                                             |    1 +
+>  arch/arm/boot/dts/Makefile                                    |    1 +
+>  arch/arm/boot/dts/hi3620.dtsi                                 | 1671
+> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/hi3716-dkb.dts                              |   37 ++
+>  arch/arm/boot/dts/hi3716.dtsi                                 |  275
+> +++++++++++++
+>  arch/arm/boot/dts/hi4511.dts                                  |  648
+> +++++++++++++++++++++++++++++++
+>  arch/arm/configs/hi3xxx_defconfig                             |   56 +++
+>  arch/arm/configs/multi_v7_defconfig                           |    1 +
+>  arch/arm/mach-hi3xxx/Kconfig                                  |   14 +
+>  arch/arm/mach-hi3xxx/Makefile                                 |    7 +
+>  arch/arm/mach-hi3xxx/core.h                                   |   19 +
+>  arch/arm/mach-hi3xxx/hi3xxx.c                                 |   43 +++
+>  arch/arm/mach-hi3xxx/hotplug.c                                |  154 ++++++++
+>  arch/arm/mach-hi3xxx/platsmp.c                                |   48 +++
+>  arch/arm/mach-hi3xxx/system.c                                 |   64 +++
+>  17 files changed, 3098 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>  create mode 100644 arch/arm/boot/dts/hi3620.dtsi
+>  create mode 100644 arch/arm/boot/dts/hi3716-dkb.dts
+>  create mode 100644 arch/arm/boot/dts/hi3716.dtsi
+>  create mode 100644 arch/arm/boot/dts/hi4511.dts
+>  create mode 100644 arch/arm/configs/hi3xxx_defconfig
+>  create mode 100644 arch/arm/mach-hi3xxx/Kconfig
+>  create mode 100644 arch/arm/mach-hi3xxx/Makefile
+>  create mode 100644 arch/arm/mach-hi3xxx/core.h
+>  create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
+>  create mode 100644 arch/arm/mach-hi3xxx/hotplug.c
+>  create mode 100644 arch/arm/mach-hi3xxx/platsmp.c
+>  create mode 100644 arch/arm/mach-hi3xxx/system.c
 
-<snip>
+Forget to loop mailing list.
 
-> > Also, I do not know how we will play these tapeout specific compatible
-> > in device tree.  As you know, we currently do not have tapeout but only
-> > chip specific DTS, since we expect kernel will figure out the
-> > tapeout/revision and handle the differences accordingly.
-> 
-> In fact the kernel does figure out the tapeout version, but I don't have
-> access to it in the driver.
-
-Yeah.  But since we're using SoC for IP versioning and the version could
-vary even for same SoC between different revisions, I think we will see
-such need of accessing SoC revision from device driver more and more.
-Thus, we will need a generic approach for that sooner or later, I guess.
-
-One approach I can think of is that we define a property "revision"
-under node "soc", and ask platform code to fill this property by calling
-of_update_property().  Then drivers can simply get it via device tree
-/soc/revision.
-
-> 
-> Currently we have a problem anyway. We have the firmware names in the
-> dts, but the firmware is tapeout specific for i.MX31/35.
-> 
-> So I think our options are:
-> 
-> - remove the tapeout specifics from the devicetrees, this would mean to
->   also remove the firmware names.
-> - keep the tapeout specifics in the devicetree, then we could even add
->   some more like I did ;)
-
-If I understand this option correctly, we will need something like
-imx35-to1.dtsi and imx35-to2.dtsi, and board level dts authors need to
-include the correct one per the chip revision on their boards.  What
-about some board that solder both revisions, and socket board that can
-change chips?  I do not think it's going to work.
-
-> 
-> I don't know what's the best way to proceed. For now I could remove the
-> tapeout specific bindings, this way we would get the ROM script
-> addresses at least for i.MX25/5/6.
-
-Yeah, it's still something nice.
-
-Shawn
+Regards
+Haojian
