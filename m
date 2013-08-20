@@ -1,22 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 20 Aug 2013 09:46:30 -0600
-Subject: [RFC 02/17] ARM: call clk_of_init from time_init
-In-Reply-To: <1376964271-22715-3-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376964271-22715-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <52138F56.6030008@wwwdotorg.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 20 Aug 2013 17:56:02 +0200
+Subject: [PATCH v5 1/3] i2c-mv64xxx: Add I2C Transaction Generator support
+In-Reply-To: <20130815121340.GB17155@katana>
+References: <1376039158-1896-1-git-send-email-gregory.clement@free-electrons.com>
+ <1376039158-1896-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130815121340.GB17155@katana>
+Message-ID: <52139192.5070507@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2013 08:04 PM, Sebastian Hesselbarth wrote:
-> Most DT ARM machs require common clock providers initialized before timers.
-> Currently, arch/arm machs use .init_time to call clk_of_init right before
-> clocksource_of_init. This prevents to remove that hook and use the default
-> hook instead. clk_of_init now checks for multiple calls to it, so add
-> the call to ARM arch time_init by default.
+On 15/08/2013 14:13, Wolfram Sang wrote:
+> 
+>> +	if ((msg->flags & I2C_M_RD) == 0) { +		for (i = 0; i < 4 && i < msg->len; i++) +			data_reg_lo = data_reg_lo | +					(msg->buf[i] << ((i & 0x3) * 8)); + +		for (i = 4; i < 8 && i <
+>> msg->len; i++) +			data_reg_hi = data_reg_hi | +					(msg->buf[i] << ((i & 0x3) * 8));
+> 
+> Same comment as in the last version: What about be32_to_cpu and friends instead of the loops (here and later)?
+> 
 
-Some SoCs call this function in .init_irq() rather than .init_time().
-Perhaps we adjust this patch to do that instead. That way, we can
-presumably get rid of patch 1/17 since we can eliminate any duplicate
-calls, and adjust patch 14/17 (Tegra board file) to remove its custom
-call to of_clock_init(NULL)?
+We can't use be32_to_cpu and friends, because one of the stop condition of this
+loop is the length of the msg.
+
+For reading from msg->buf we could consider to mask the irrelevant part.But for
+writing to msg->buf it would imply to write outside of the allocated buffer!
+
+Do you agree to not change anything on this patch?
+
+Thanks,
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
