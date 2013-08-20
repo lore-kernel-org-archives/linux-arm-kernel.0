@@ -1,33 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Aug 2013 11:30:34 +0200
-Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the
- DBX500 DT
-In-Reply-To: <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
-Message-ID: <20130820093034.GL31036@pengutronix.de>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Tue, 20 Aug 2013 10:30:16 +0100
+Subject: [PATCH v4 14/19] cpufreq: spear-cpufreq: remove device tree parsing
+ for cpu nodes
+In-Reply-To: <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1376991021-12160-15-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 11:11:19AM +0200, Linus Walleij wrote:
-> On Thu, Jun 6, 2013 at 2:16 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > +++ b/arch/arm/boot/dts/dbx5x0.dtsi
-> > @@ -572,6 +572,8 @@
-> >                         v-i2c-supply = <&db8500_vape_reg>;
-> >
-> >                         clock-frequency = <400000>;
-> > +                       clocks = <&prcc_kclk 3 3>, <&prcc_pclk 3 3>;
-> > +                       clock-names = "nmk-i2c.0", "apb_pclk";
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Why do most clocks in this series have the instance number in the clock
-names? This looks very wrong to me.
+Now that the cpu device registration initialises the of_node(if available)
+appropriately for all the cpus, parsing here is redundant.
 
-Sascha
+This patch removes all DT parsing and uses cpu->of_node instead.
 
+Cc: Deepak Sikri <sikrid@qti.qualcomm.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+---
+ drivers/cpufreq/spear-cpufreq.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/cpufreq/spear-cpufreq.c b/drivers/cpufreq/spear-cpufreq.c
+index c3efa7f..19e364fa 100644
+--- a/drivers/cpufreq/spear-cpufreq.c
++++ b/drivers/cpufreq/spear-cpufreq.c
+@@ -18,7 +18,7 @@
+ #include <linux/err.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
+-#include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/slab.h>
+ #include <linux/types.h>
+ 
+@@ -223,7 +223,7 @@ static int spear_cpufreq_driver_init(void)
+ 	const __be32 *val;
+ 	int cnt, i, ret;
+ 
+-	np = of_find_node_by_path("/cpus/cpu at 0");
++	np = of_cpu_device_node_get(0);
+ 	if (!np) {
+ 		pr_err("No cpu node found");
+ 		return -ENODEV;
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.1.2
