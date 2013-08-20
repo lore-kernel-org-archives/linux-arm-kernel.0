@@ -1,271 +1,164 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 20 Aug 2013 10:30:06 +0100
-Subject: [PATCH v4 04/19] of: move of_get_cpu_node implementation to DT core
- library
+Date: Tue, 20 Aug 2013 10:30:10 +0100
+Subject: [PATCH v4 08/19] ARM: topology: remove hwid/MPIDR dependency from
+ cpu_capacity
 In-Reply-To: <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
  <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1376991021-12160-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1376991021-12160-9-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-This patch moves the generalized implementation of of_get_cpu_node from
-PowerPC to DT core library, thereby adding support for retrieving cpu
-node for a given logical cpu index on any architecture.
+Currently the topology code computes cpu capacity and stores it in
+the list along with hwid(which is MPIDR) as it parses the CPU nodes
+in the device tree. This is required as it needs to be mapped to the
+logical CPU later.
 
-The CPU subsystem can now use this function to assign of_node in the
-cpu device while registering CPUs.
+Since the CPU device nodes can be retrieved in the logical ordering
+using DT/OF helpers, its possible to store cpu_capacity also in logical
+ordering and avoid storing hwid for each entry.
 
-It is recommended to use these helper function only in pre-SMP/early
-initialisation stages to retrieve CPU device node pointers in logical
-ordering. Once the cpu devices are registered, it can be retrieved easily
-from cpu device of_node which avoids unnecessary parsing and matching.
+This patch removes hwid by making use of of_get_cpu_node.
 
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Acked-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- arch/powerpc/include/asm/prom.h |  3 --
- arch/powerpc/kernel/prom.c      | 57 -------------------------
- drivers/of/base.c               | 95 +++++++++++++++++++++++++++++++++++++++++
- include/linux/cpu.h             |  1 +
- include/linux/of.h              |  7 +++
- 5 files changed, 103 insertions(+), 60 deletions(-)
+ arch/arm/kernel/topology.c | 61 +++++++++++++++-------------------------------
+ 1 file changed, 19 insertions(+), 42 deletions(-)
 
-diff --git a/arch/powerpc/include/asm/prom.h b/arch/powerpc/include/asm/prom.h
-index bc2da15..ac204e0 100644
---- a/arch/powerpc/include/asm/prom.h
-+++ b/arch/powerpc/include/asm/prom.h
-@@ -43,9 +43,6 @@ void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index c5a5954..85a8737 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -74,12 +74,8 @@ struct cpu_efficiency table_efficiency[] = {
+ 	{NULL, },
+ };
  
- extern void kdump_move_device_tree(void);
+-struct cpu_capacity {
+-	unsigned long hwid;
+-	unsigned long capacity;
+-};
+-
+-struct cpu_capacity *cpu_capacity;
++unsigned long *__cpu_capacity;
++#define cpu_capacity(cpu)	__cpu_capacity[cpu]
  
--/* CPU OF node matching */
--struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
--
- /* cache lookup */
- struct device_node *of_find_next_cache_node(struct device_node *np);
+ unsigned long middle_capacity = 1;
  
-diff --git a/arch/powerpc/kernel/prom.c b/arch/powerpc/kernel/prom.c
-index f7b8c0b..1c14cd4 100644
---- a/arch/powerpc/kernel/prom.c
-+++ b/arch/powerpc/kernel/prom.c
-@@ -870,63 +870,6 @@ bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
- 	return (int)phys_id == get_hard_smp_processor_id(cpu);
- }
+@@ -100,15 +96,19 @@ static void __init parse_dt_topology(void)
+ 	unsigned long capacity = 0;
+ 	int alloc_size, cpu = 0;
  
--static bool __of_find_n_match_cpu_property(struct device_node *cpun,
--			const char *prop_name, int cpu, unsigned int *thread)
--{
--	const __be32 *cell;
--	int ac, prop_len, tid;
--	u64 hwid;
--
--	ac = of_n_addr_cells(cpun);
--	cell = of_get_property(cpun, prop_name, &prop_len);
--	if (!cell)
--		return false;
--	prop_len /= sizeof(*cell);
--	for (tid = 0; tid < prop_len; tid++) {
--		hwid = of_read_number(cell, ac);
--		if (arch_match_cpu_phys_id(cpu, hwid)) {
--			if (thread)
--				*thread = tid;
--			return true;
--		}
--		cell += ac;
--	}
--	return false;
--}
--
--/* Find the device node for a given logical cpu number, also returns the cpu
-- * local thread number (index in ibm,interrupt-server#s) if relevant and
-- * asked for (non NULL)
-- */
--struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
--{
--	struct device_node *cpun, *cpus;
--
--	cpus = of_find_node_by_path("/cpus");
--	if (!cpus) {
--		pr_warn("Missing cpus node, bailing out\n");
--		return NULL;
--	}
--
--	for_each_child_of_node(cpus, cpun) {
--		if (of_node_cmp(cpun->type, "cpu"))
--			continue;
--
--		/* Check for non-standard "ibm,ppc-interrupt-server#s" property
--		 * for thread ids on PowerPC. If it doesn't exist fallback to
--		 * standard "reg" property.
--		 */
--		if (__of_find_n_match_cpu_property(cpun,
--				"ibm,ppc-interrupt-server#s", cpu, thread))
--			return cpun;
--
--		if (__of_find_n_match_cpu_property(cpun, "reg", cpu, thread))
--			return cpun;
--	}
--	return NULL;
--}
--EXPORT_SYMBOL(of_get_cpu_node);
--
- #if defined(CONFIG_DEBUG_FS) && defined(DEBUG)
- static struct debugfs_blob_wrapper flat_dt_blob;
+-	alloc_size = nr_cpu_ids * sizeof(struct cpu_capacity);
+-	cpu_capacity = kzalloc(alloc_size, GFP_NOWAIT);
++	alloc_size = nr_cpu_ids * sizeof(*__cpu_capacity);
++	__cpu_capacity = kzalloc(alloc_size, GFP_NOWAIT);
  
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 5c54279..605afa9 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -18,6 +18,7 @@
-  *      2 of the License, or (at your option) any later version.
-  */
- #include <linux/ctype.h>
-+#include <linux/cpu.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/spinlock.h>
-@@ -230,6 +231,100 @@ const void *of_get_property(const struct device_node *np, const char *name,
- }
- EXPORT_SYMBOL(of_get_property);
+-	while ((cn = of_find_node_by_type(cn, "cpu"))) {
+-		const u32 *rate, *reg;
++	for_each_possible_cpu(cpu) {
++		const u32 *rate;
+ 		int len;
  
-+/*
-+ * arch_match_cpu_phys_id - Match the given logical CPU and physical id
-+ *
-+ * @cpu: logical cpu index of a core/thread
-+ * @phys_id: physical identifier of a core/thread
-+ *
-+ * CPU logical to physical index mapping is architecture specific.
-+ * However this __weak function provides a default match of physical
-+ * id to logical cpu index. phys_id provided here is usually values read
-+ * from the device tree which must match the hardware internal registers.
-+ *
-+ * Returns true if the physical identifier and the logical cpu index
-+ * correspond to the same core/thread, false otherwise.
-+ */
-+bool __weak arch_match_cpu_phys_id(int cpu, u64 phys_id)
-+{
-+	return (u32)phys_id == cpu;
-+}
-+
-+/**
-+ * Checks if the given "prop_name" property holds the physical id of the
-+ * core/thread corresponding to the logical cpu 'cpu'. If 'thread' is not
-+ * NULL, local thread number within the core is returned in it.
-+ */
-+static bool __of_find_n_match_cpu_property(struct device_node *cpun,
-+			const char *prop_name, int cpu, unsigned int *thread)
-+{
-+	const __be32 *cell;
-+	int ac, prop_len, tid;
-+	u64 hwid;
-+
-+	ac = of_n_addr_cells(cpun);
-+	cell = of_get_property(cpun, prop_name, &prop_len);
-+	if (!cell)
-+		return false;
-+	prop_len /= sizeof(*cell);
-+	for (tid = 0; tid < prop_len; tid++) {
-+		hwid = of_read_number(cell, ac);
-+		if (arch_match_cpu_phys_id(cpu, hwid)) {
-+			if (thread)
-+				*thread = tid;
-+			return true;
-+		}
-+		cell += ac;
-+	}
-+	return false;
-+}
-+
-+/**
-+ * of_get_cpu_node - Get device node associated with the given logical CPU
-+ *
-+ * @cpu: CPU number(logical index) for which device node is required
-+ * @thread: if not NULL, local thread number within the physical core is
-+ *          returned
-+ *
-+ * The main purpose of this function is to retrieve the device node for the
-+ * given logical CPU index. It should be used to initialize the of_node in
-+ * cpu device. Once of_node in cpu device is populated, all the further
-+ * references can use that instead.
-+ *
-+ * CPU logical to physical index mapping is architecture specific and is built
-+ * before booting secondary cores. This function uses arch_match_cpu_phys_id
-+ * which can be overridden by architecture specific implementation.
-+ *
-+ * Returns a node pointer for the logical cpu if found, else NULL.
-+ */
-+struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
-+{
-+	struct device_node *cpun, *cpus;
-+
-+	cpus = of_find_node_by_path("/cpus");
-+	if (!cpus) {
-+		pr_warn("Missing cpus node, bailing out\n");
-+		return NULL;
-+	}
-+
-+	for_each_child_of_node(cpus, cpun) {
-+		if (of_node_cmp(cpun->type, "cpu"))
+-		if (cpu >= num_possible_cpus())
+-			break;
++		/* too early to use cpu->of_node */
++		cn = of_get_cpu_node(cpu, NULL);
++		if (!cn) {
++			pr_err("missing device node for CPU %d\n", cpu);
 +			continue;
-+		/* Check for non-standard "ibm,ppc-interrupt-server#s" property
-+		 * for thread ids on PowerPC. If it doesn't exist fallback to
-+		 * standard "reg" property.
-+		 */
-+		if (IS_ENABLED(CONFIG_PPC) &&
-+			__of_find_n_match_cpu_property(cpun,
-+				"ibm,ppc-interrupt-server#s", cpu, thread))
-+			return cpun;
-+		if (__of_find_n_match_cpu_property(cpun, "reg", cpu, thread))
-+			return cpun;
-+	}
-+	return NULL;
-+}
-+EXPORT_SYMBOL(of_get_cpu_node);
-+
- /** Checks if the given "compat" string matches one of the strings in
-  * the device's "compatible" property
++		}
+ 
+ 		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
+ 			if (of_device_is_compatible(cn, cpu_eff->compatible))
+@@ -124,12 +124,6 @@ static void __init parse_dt_topology(void)
+ 			continue;
+ 		}
+ 
+-		reg = of_get_property(cn, "reg", &len);
+-		if (!reg || len != 4) {
+-			pr_err("%s missing reg property\n", cn->full_name);
+-			continue;
+-		}
+-
+ 		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
+ 
+ 		/* Save min capacity of the system */
+@@ -140,13 +134,9 @@ static void __init parse_dt_topology(void)
+ 		if (capacity > max_capacity)
+ 			max_capacity = capacity;
+ 
+-		cpu_capacity[cpu].capacity = capacity;
+-		cpu_capacity[cpu++].hwid = be32_to_cpup(reg);
++		cpu_capacity(cpu) = capacity;
+ 	}
+ 
+-	if (cpu < num_possible_cpus())
+-		cpu_capacity[cpu].hwid = (unsigned long)(-1);
+-
+ 	/* If min and max capacities are equals, we bypass the update of the
+ 	 * cpu_scale because all CPUs have the same capacity. Otherwise, we
+ 	 * compute a middle_capacity factor that will ensure that the capacity
+@@ -154,9 +144,7 @@ static void __init parse_dt_topology(void)
+ 	 * SCHED_POWER_SCALE, which is the default value, but with the
+ 	 * constraint explained near table_efficiency[].
+ 	 */
+-	if (min_capacity == max_capacity)
+-		cpu_capacity[0].hwid = (unsigned long)(-1);
+-	else if (4*max_capacity < (3*(max_capacity + min_capacity)))
++	if (4*max_capacity < (3*(max_capacity + min_capacity)))
+ 		middle_capacity = (min_capacity + max_capacity)
+ 				>> (SCHED_POWER_SHIFT+1);
+ 	else
+@@ -170,23 +158,12 @@ static void __init parse_dt_topology(void)
+  * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
+  * function returns directly for SMP system.
   */
-diff --git a/include/linux/cpu.h b/include/linux/cpu.h
-index ab0eade..3dfed2b 100644
---- a/include/linux/cpu.h
-+++ b/include/linux/cpu.h
-@@ -28,6 +28,7 @@ struct cpu {
- extern int register_cpu(struct cpu *cpu, int num);
- extern struct device *get_cpu_device(unsigned cpu);
- extern bool cpu_is_hotpluggable(unsigned cpu);
-+extern bool arch_match_cpu_phys_id(int cpu, u64 phys_id);
- 
- extern int cpu_add_dev_attr(struct device_attribute *attr);
- extern void cpu_remove_dev_attr(struct device_attribute *attr);
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 1fd08ca..c0bb2f1 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -266,6 +266,7 @@ extern int of_device_is_available(const struct device_node *device);
- extern const void *of_get_property(const struct device_node *node,
- 				const char *name,
- 				int *lenp);
-+extern struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
- #define for_each_property_of_node(dn, pp) \
- 	for (pp = dn->properties; pp != NULL; pp = pp->next)
- 
-@@ -459,6 +460,12 @@ static inline const void *of_get_property(const struct device_node *node,
- 	return NULL;
- }
- 
-+static inline struct device_node *of_get_cpu_node(int cpu,
-+					unsigned int *thread)
-+{
-+	return NULL;
-+}
-+
- static inline int of_property_read_u64(const struct device_node *np,
- 				       const char *propname, u64 *out_value)
+-void update_cpu_power(unsigned int cpu, unsigned long hwid)
++void update_cpu_power(unsigned int cpu)
  {
+-	unsigned int idx = 0;
+-
+-	/* look for the cpu's hwid in the cpu capacity table */
+-	for (idx = 0; idx < num_possible_cpus(); idx++) {
+-		if (cpu_capacity[idx].hwid == hwid)
+-			break;
+-
+-		if (cpu_capacity[idx].hwid == -1)
+-			return;
+-	}
+-
+-	if (idx == num_possible_cpus())
++	if (!cpu_capacity(cpu))
+ 		return;
+ 
+-	set_power_scale(cpu, cpu_capacity[idx].capacity / middle_capacity);
++	set_power_scale(cpu, cpu_capacity(cpu) / middle_capacity);
+ 
+ 	printk(KERN_INFO "CPU%u: update cpu_power %lu\n",
+ 		cpu, arch_scale_freq_power(NULL, cpu));
+@@ -194,7 +171,7 @@ void update_cpu_power(unsigned int cpu, unsigned long hwid)
+ 
+ #else
+ static inline void parse_dt_topology(void) {}
+-static inline void update_cpu_power(unsigned int cpuid, unsigned int mpidr) {}
++static inline void update_cpu_power(unsigned int cpuid) {}
+ #endif
+ 
+  /*
+@@ -281,7 +258,7 @@ void store_cpu_topology(unsigned int cpuid)
+ 
+ 	update_siblings_masks(cpuid);
+ 
+-	update_cpu_power(cpuid, mpidr & MPIDR_HWID_BITMASK);
++	update_cpu_power(cpuid);
+ 
+ 	printk(KERN_INFO "CPU%u: thread %d, cpu %d, socket %d, mpidr %x\n",
+ 		cpuid, cpu_topology[cpuid].thread_id,
 -- 
 1.8.1.2
