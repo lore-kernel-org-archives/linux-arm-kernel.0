@@ -1,99 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Aug 2013 11:25:55 +0100
-Subject: [alsa-devel] [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM
- links between codec and cpu DAI
-In-Reply-To: <1376405952.2617.101.camel@loki>
-References: <20130805145644.GV23006@n2100.arm.linux.org.uk>
- <20130805203202.GX23006@n2100.arm.linux.org.uk>
- <20130805220639.GB26637@sirena.org.uk>
- <20130805233015.GY23006@n2100.arm.linux.org.uk>
- <20130806133206.GA6427@sirena.org.uk>
- <20130810161123.GW23006@n2100.arm.linux.org.uk>
- <20130810211342.GX23006@n2100.arm.linux.org.uk>
- <1376293215.2385.32.camel@loki>
- <20130812082837.GB23006@n2100.arm.linux.org.uk>
- <1376405952.2617.101.camel@loki>
-Message-ID: <20130820102555.GZ23006@n2100.arm.linux.org.uk>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Tue, 20 Aug 2013 16:01:47 +0530
+Subject: Kexec: BE kernel on ARM VE TC2
+In-Reply-To: <CALicx6vwz9h3gKozaKxaL+FbVvfkWS5djYrt22vM0d72ObDhYw@mail.gmail.com>
+References: <CALicx6ueLxCFCeun1grdtcC21HSkCDfenLWOSfuoSJnhx9GZ6w@mail.gmail.com>
+ <20130808215034.GE19383@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1308131851300.14472@syhkavp.arg>
+ <CALicx6uKhd0z=81G68VvTjBpPy=vwK3tgK8zk11dpu34N=YyYA@mail.gmail.com>
+ <alpine.LFD.2.03.1308141026210.14472@syhkavp.arg>
+ <CALicx6sgS6J4aU2mf3fBoWA7oREDrbkit4FW-ptj49EmLuH_HA@mail.gmail.com>
+ <CALicx6vwz9h3gKozaKxaL+FbVvfkWS5djYrt22vM0d72ObDhYw@mail.gmail.com>
+Message-ID: <CALicx6s8A5+YUm0ZD0fZS8DU37HkA_3FHF70R0XDRj2=mta4_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 03:59:12PM +0100, Liam Girdwood wrote:
-> On Mon, 2013-08-12 at 09:28 +0100, Russell King - ARM Linux wrote:
-> > On Mon, Aug 12, 2013 at 08:40:15AM +0100, Liam Girdwood wrote:
-> > > Russell, I'm just back from holiday now and have done a quick re test on
-> > > Haswell. I can see the correct DAPM path and DPCM state as expected for
-> > > Haswell, but let me get through my Inbox today and I'll see where we
-> > > have some differences tomorrow.
-> > 
-> > Liam, welcome back.
-> > 
-> > Looking at this last night, I notice this:
-> > 
-> >  * Creates a new internal PCM instance with no userspace device or procfs
-> >  * entries. This is used by ASoC Back End PCMs in order to create a PCM that
-> >  * will only be used internally by kernel drivers. i.e. it cannot be opened
-> >  * by userspace. It provides existing ASoC components drivers with a substream
-> >  * and access to any private data.
-> >  *
-> >  * The pcm operators have to be set afterwards to the new instance
-> >  * via snd_pcm_set_ops().
-> > 
-> > Note the final paragraph.  So, soc-pcm.c does this:
-> > 
-> >         /* create the PCM */
-> >         if (rtd->dai_link->no_pcm) {
-> >                 snprintf(new_name, sizeof(new_name), "(%s)",
-> >                         rtd->dai_link->stream_name);
-> > 
-> >                 ret = snd_pcm_new_internal(rtd->card->snd_card, new_name, num,
-> >                                 playback, capture, &pcm);
-> >         } else {
-> > ...
-> >         if (rtd->dai_link->no_pcm) {
-> >                 if (playback)
-> >                         pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream->private_data = rtd;
-> >                 if (capture)
-> >                         pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream->private_data = rtd;
-> >                 goto out;
-> >         }
-> > ...
-> >         if (playback)
-> >                 snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &rtd->ops);
-> > 
-> >         if (capture)
-> >                 snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &rtd->ops);
-> > ...
-> > out:
-> >         dev_info(rtd->card->dev, " %s <-> %s mapping ok\n", codec_dai->name,
-> >                 cpu_dai->name);
-> >         return ret;
-> > 
-> > Hence, soc-pcm.c never sets the ops for the 'internal' stream, which,
-> > because it uses the dummy DAI, has both a playback and a capture
-> > stream.
-> > 
-> > The above is the only place where the ops are set on the ALSA stream(s)
-> > by ASoC, which means there's no way that the internal streams can ever
-> > have a non-NULL ops pointer, and suggests a possible reason why I get
-> > this oops.
-> 
-> Ah, Ok. The OMAP4 ABE driver always had ops so never hit this (probably
-> true for Qualcomm driver too). I think we need a check at some point so
-> that we don't dereference this if no ops are set.
-> 
-> Iiuc, there should be no harm in setting the ops (since ASoC checks for
-> NULL) for either playback or capture as a workaround in the short term
-> until the fix is upstream.   
+On Mon, Aug 19, 2013 at 5:47 PM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
+> Hi Nicolas,
+>
+> On Mon, Aug 19, 2013 at 1:01 PM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
+>> On Wed, Aug 14, 2013 at 8:49 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>>> On Wed, 14 Aug 2013, Vijay Kilari wrote:
+>>>
+>>>> On Wed, Aug 14, 2013 at 4:22 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>>>> > On Thu, 8 Aug 2013, Will Deacon wrote:
+>>>> >
+>>>> >> On Mon, Aug 05, 2013 at 01:12:17PM +0100, Vijay Kilari wrote:
+>>>> >> > Hi Will,
+>>>> >> >
+>>>> >> > I am trying to make kexec work on BE kernel on ARM VE TC2.
+>>>> >> >
+>>>> >> > First, to make KEXEC work with SMP on ARM VE TC2 board,
+>>>> >> > I set nr_cpus=2 (i.e boot only A15's) this works with LE kernel.
+>>>> >>
+>>>> >> Interesting, is this with a mainline kernel? I don't see how SMP kexec can
+>>>> >> work on TC2 without additional patches to park the secondary cores safely.
+>>>> >
+>>>> > BTW those patches are available in linux-next at the moment.
+>>>>
 
-So where do we stand with all this stuff?  As far as I'm concerned, there's
-nothing more _I_ can do with DPCM to make it work.  DPCM seems to be broken.
+>
+> After using v5.0 firmware version + CPU migration patch and making changes to
+> board.txt according to
+> http://lists.linaro.org/pipermail/linaro-dev/2013-January/015095.html
+>
+> Now all the CPU's are booting up. I will check now Kexec
+>
+>
 
-Mark is adamant that the Kirkwood-i2s with SPDIF support _will_ use DPCM
-and refuses to take patches which don't.
+I see two issues:
 
-So, until DPCM gets fixed, I can't proceed with getting SPDIF for kirkwood
-into mainline.
+1) KEXEC rebooting with Thumb2 kernel fails when booted on LE Kernel.
+2) Secondary CPU's are not booted with BE kernel with TC2 Power mgmt enabled
+    Where as with LE, secondary CPU's are booted
 
-Either that, or I need you to ack the patches and tell Mark to accept them
-because they're actually correct and its just the core DPCM code which
-won't allow them to work (which is what I suspect the real situation to be.)
+>>> Nicolas
