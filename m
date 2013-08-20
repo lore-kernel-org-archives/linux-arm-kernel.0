@@ -1,56 +1,112 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 20 Aug 2013 09:46:36 +0200
-Subject: [GIT PULL] Allwinner sunXi DT additions for 3.12, take 2
-Message-ID: <20130820074636.GA11668@lukather>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Tue, 20 Aug 2013 15:55:05 +0800
+Subject: [PATCH v2 2/2] dmaengine: Add hisilicon k3 DMA engine driver
+In-Reply-To: <20130819053511.GU32147@intel.com>
+References: <1372423153-6742-1-git-send-email-zhangfei.gao@linaro.org>
+ <1372423153-6742-3-git-send-email-zhangfei.gao@linaro.org>
+ <20130813112043.GB32147@intel.com>
+ <CAMj5Bki0H+=0wQY39+jDw4nAEq5wEq3V3yri9xpNRxQ2GRwPbA@mail.gmail.com>
+ <20130819053511.GU32147@intel.com>
+Message-ID: <CAMj5BkixUR2-MnYLVymPLnQ922jEhbKnwUHs__d3hr2d_Qb8fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 629ae88e9cebc6281bc54be743a33eca47b7228c:
+On Mon, Aug 19, 2013 at 1:35 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Thu, Aug 15, 2013 at 01:54:28PM +0800, zhangfei gao wrote:
+>> On Tue, Aug 13, 2013 at 7:20 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+>> > On Fri, Jun 28, 2013 at 08:39:13PM +0800, Zhangfei Gao wrote:
+>> >> Add dmaengine driver for hisilicon k3 platform based on virt_dma
+>> >>
+>> >> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> >> Tested-by: Kai Yang <jean.yangkai@huawei.com>
+>> >> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> >> ---
+>> >
+>> >> +#define DRIVER_NAME          "k3-dma"
+>> >> +#define DMA_ALIGN            3
+>> >> +#define DMA_MAX_SIZE         0x1ffc
+>> >> +
+>> >> +#define INT_STAT             0x00
+>> >> +#define INT_TC1                      0x04
+>> >> +#define INT_ERR1             0x0c
+>> >> +#define INT_ERR2             0x10
+>> >> +#define INT_TC1_MASK         0x18
+>> >> +#define INT_ERR1_MASK                0x20
+>> >> +#define INT_ERR2_MASK                0x24
+>> >> +#define INT_TC1_RAW          0x600
+>> >> +#define INT_ERR1_RAW         0x608
+>> >> +#define INT_ERR2_RAW         0x610
+>> >> +#define CH_PRI                       0x688
+>> >> +#define CH_STAT                      0x690
+>> >> +#define CX_CUR_CNT           0x704
+>> >> +#define CX_LLI                       0x800
+>> >> +#define CX_CNT                       0x810
+>> >> +#define CX_SRC                       0x814
+>> >> +#define CX_DST                       0x818
+>> >> +#define CX_CONFIG            0x81c
+>> >> +#define AXI_CONFIG           0x820
+>> >> +#define DEF_AXI_CONFIG               0x201201
+>> >> +
+>> >> +#define CX_LLI_CHAIN_EN              0x2
+>> >> +#define CCFG_EN                      0x1
+>> >> +#define CCFG_MEM2PER         (0x1 << 2)
+>> >> +#define CCFG_PER2MEM         (0x2 << 2)
+>> >> +#define CCFG_SRCINCR         (0x1 << 31)
+>> >> +#define CCFG_DSTINCR         (0x1 << 30)
+>> > I see these are not namespace aptly and can collide..
+>> OK,
+>> How about change name to
+>> #define CX_CFG                 0x81c
+> since you are calling your driver K3_DMA it would be apt to namespace all of the
+> above with K3_INT_STAT to K3_CFG_EN and so on...
 
-  ARM: sunxi: dt: Add device tree for Mele A1000 (2013-08-14 09:59:20 +0200)
+Sorry, does define of register need add name space?
+Is it looks too long?
 
-are available in the git repository at:
+There are many example keep define simple.
+drivers/dma/sa11x0-dma.c
+#define DCSR_RUN        (1 << 0)
+#define DCSR_IE         (1 << 1)
+#define DCSR_ERROR      (1 << 2)
 
-  https://github.com/mripard/linux.git tags/sunxi-dt-for-3.12-2
+drivers/dma/mxs-dma.c
+#define CCW_CHAIN               (1 << 2)
+#define CCW_IRQ                 (1 << 3)
+#define CCW_DEC_SEM             (1 << 6)
 
-for you to fetch changes up to e476ac8b483de4ce1d8570509be343afc7cd3baf:
+>
+>>
+>> #define CX_CFG_EN              0x1
+>> #define CX_CFG_MEM2PER         (0x1 << 2)
+>> ~
 
-  ARM: sun7i: Add Olimex A20-Olinuxino-Micro support (2013-08-20 08:18:45 +0200)
+>> >
+>> >> +     case DMA_PAUSE:
+>> >> +             dev_dbg(d->slave.dev, "vchan %p: pause\n", &c->vc);
+>> >> +             if (c->status == DMA_IN_PROGRESS) {
+>> >> +                     c->status = DMA_PAUSED;
+>> >> +                     if (p) {
+>> >> +                             k3_dma_pause_dma(p, false);
+>> >> +                     } else {
+>> >> +                             spin_lock(&d->lock);
+>> >> +                             list_del_init(&c->node);
+>> >> +                             spin_unlock(&d->lock);
+>> >> +                     }
+>> > why do we need the else part here?
+>> Since asynchronous mode is supported.
+>> Desc is submitted to list but may not get physical channel to run.
+> But when you pause you pause the running channel. You dont pause a descriptor.
+> So whatever you are trying to imply doesnt make sense to me.
 
-----------------------------------------------------------------
-Allwinner sunXi DT additions for 3.12, take 2
+Here delete node from chan_pending, which will be quired from tasklet.
 
-These patches add basic support for:
-  - Allwinner A31 and A20 SoCs
-  - The Olimex A20-Olinuxino board
-  - The Olimex A10s-Olinuxino board
+The physical channel is free matched.
+dma_issue_pending will put node to d->k3_dma_issue_pending if no phy allocated.
+Tasklet do two jobs
+1, check running channel for new request form desc_issued.
+2, check any new chan_pending and alloc phy if available.
 
-----------------------------------------------------------------
-Maxime Ripard (4):
-      ARM: sunxi: Add Allwinner A31 DTSI
-      ARM: sun6i: Add WITS Colombus A31 evaluation kit support
-      ARM: sun7i: Add Allwinner A20 DTSI
-      ARM: sun7i: Add Olimex A20-Olinuxino-Micro support
-
- arch/arm/boot/dts/Makefile                      |   4 +-
- arch/arm/boot/dts/sun6i-a31-colombus.dts        |  30 +++++
- arch/arm/boot/dts/sun6i-a31.dtsi                | 156 +++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts |  34 +++++
- arch/arm/boot/dts/sun7i-a20.dtsi                | 172 ++++++++++++++++++++++++
- 5 files changed, 395 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun6i-a31-colombus.dts
- create mode 100644 arch/arm/boot/dts/sun6i-a31.dtsi
- create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
- create mode 100644 arch/arm/boot/dts/sun7i-a20.dtsi
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130820/a6a3529d/attachment.sig>
+If no phy, the node will be put in chan_pending.
+If pause does not remove from chan_pending, it may be got from tasklet
+to start a new transaction.
+So it's safe to remove from chan_pending when pause, and add back when resume.
