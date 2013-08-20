@@ -1,30 +1,69 @@
-From: rientjes@google.com (David Rientjes)
-Date: Mon, 19 Aug 2013 23:59:44 -0700 (PDT)
-Subject: [RESEND PATCH 2/4] ARM: msm: Re-organize platsmp to make it
- extensible
-In-Reply-To: <20130812155016.GC27165@e106331-lin.cambridge.arm.com>
-References: <1375409725-22004-1-git-send-email-rvaswani@codeaurora.org>
- <1375409725-22004-3-git-send-email-rvaswani@codeaurora.org>
- <20130812155016.GC27165@e106331-lin.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1308192357420.17575@chino.kir.corp.google.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 20 Aug 2013 09:59:45 +0300
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
+ non-probable system topologies
+In-Reply-To: <CAOesGMgyQYTqObtvyJsVqxsrWz1rYTuA-qW4QwnZ+Co=1iKOBA@mail.gmail.com>
+References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
+ <20130801192730.GC9174@kroah.com>
+ <20130802115334.GN2465@mudshark.cambridge.arm.com>
+ <20130802142010.GC7533@kroah.com>
+ <20130802160932.GG5292@mudshark.cambridge.arm.com>
+ <20130802223247.GC28831@kroah.com>
+ <CAOesGMgyQYTqObtvyJsVqxsrWz1rYTuA-qW4QwnZ+Co=1iKOBA@mail.gmail.com>
+Message-ID: <20130820095945.df4689fca20a820b494a0e22@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Aug 2013, Mark Rutland wrote:
+On Sat, 3 Aug 2013 07:16:57 +0200
+Olof Johansson <olof@lixom.net> wrote:
 
-> >  static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
-> >  {
-> > +	int cpu, map;
-> > +	unsigned int flags = 0;
-> > +
-> > +	for_each_present_cpu(cpu) {
-> > +		map = cpu_logical_map(cpu);
-> > +		if (map > ARRAY_SIZE(cold_boot_flags)) {
-> > +			set_cpu_present(cpu, false);
-> > +			__WARN();
-> > +			continue;
-> > +		}
-> > +		flags |= cold_boot_flags[map];
+> On Fri, Aug 2, 2013 at 3:32 PM, Greg KH <greg@kroah.com> wrote:
+> > On Fri, Aug 02, 2013 at 05:09:32PM +0100, Will Deacon wrote:
+> >> On Fri, Aug 02, 2013 at 03:20:10PM +0100, Greg KH wrote:
+> >> > On Fri, Aug 02, 2013 at 12:53:34PM +0100, Will Deacon wrote:
+> >> > > We can change the mindset by yelling, but if you're writing a new
+> >> > > driver for a peripheral on an ARM SoC, platform_bus is mighty tempting
+> >> > > because you get a bunch of device-tree parsing code for free (see
+> >> > > drivers/of/platform.c).
+> >> >
+> >> > I know :(
+> >> >
+> >> > So, who do I "yell at", and what do I do to make things easier for you
+> >> > from the driver-core perspective?
+> >>
+> >> I would anticipate most of these drivers going through the arm-soc tree, so
+> >> Olof and Kevin would be doing the yelling. You could join in the chorus too!
+> >>
+> >> We basically need reviewers to adopt the position that a new bus should be
+> >> considered and dismissed before using the platform_bus, then you can yell
+> >> transitively through them.
+> >
+> > I don't scale if I'm forced to review every driver to ensure that they
+> > shouldn't be using platform device and should be creating their own bus
+> > type.  You can do that, along with the other ARM developers reviewing
+> > these new subsystems and code being added.
+> 
+> For most new platforms, using basic platform_bus devices makes sense
+> when the setup is simple and just has a few devices. It's only when
+> they need to add support for {S,IO}MMUs and get the more advanced
+> functionality going that things get messy and platform_bus stops
+> working.
+> 
+> So, we have the option of having someone care about the {S,IO}MMU
+> pieces, and when they spot the attempts to make that work, push them
+> towards a proper bus architecture. Until then, the simpler solution is
+> probably a reasonable idea compared to having newcomers worry about
+> defining new bus architectures and raising the bar for what it takes
+> to sort out the initial contributions and getting engaged upstream.
 
-__WARN() can't be used in generic code because it's possible to have 
-CONFIG_BUG=n, you probably want something like WARN_ON(1) instead.
+Agree. Tegra has an central IOMMU(SMMU) in memory controller, where
+almost all platform devices can depend on IOMMU. Those IOMMU'abilities
+are configurable. We have device instanciation order problem since
+IOMMU H/W needs to be instanciated earler than any other IOMMU'able
+platform devices, but DT doesn't have any framework to force
+this instanciation order[1]. One solution could be to use
+-EPROBE_DEFER in drivers, but we have too many IOMMU'able devices, and
+also we want to allow to boot with/without IOMMU and to keep drivers
+as they are regardless of IOMMU enabled/disabled.
+
+[1] https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/036542.html
