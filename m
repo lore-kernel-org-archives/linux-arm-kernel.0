@@ -1,66 +1,32 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 20 Aug 2013 11:13:24 +0100
-Subject: [PATCH] of: reduce the number of PROBE_DEFERs
-In-Reply-To: <20130820120105.55a4c0ce@armhf>
-References: <20130820120105.55a4c0ce@armhf>
-Message-ID: <CACxGe6vNKoi47-R3H2sYUhGuX5Lh0nokWaj6Bzw2zv2U0_Wgsg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Aug 2013 11:20:32 +0100
+Subject: [RFC 06/17] ARM: imx: remove custom .init_time hook
+In-Reply-To: <521334C6.4070605@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376964271-22715-7-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130820072642.GJ31036@pengutronix.de> <52132D6C.2080606@gmail.com>
+ <20130820091000.GK31036@pengutronix.de> <521334C6.4070605@gmail.com>
+Message-ID: <20130820102032.GY23006@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 11:01 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> This patch populates the platform from the device tree into two steps:
-> the first step creates the nodes that are referenced by a phandle,
-> the second step creates the other nodes.
->
-> This permits to reduce the number of PROBE_DEFERs.
->
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
-> A better way to reduce probe deferral could be sorting the nodes
-> according to their phandle level in the DT blob at compilation time ...
+On Tue, Aug 20, 2013 at 11:20:06AM +0200, Sebastian Hesselbarth wrote:
+> Yeah, I am having troubles with linux-arm-kernel rejecting my mails
+> because of a suspicious header. I have no clue, what has changed lately
+> with my mails sent by git send-email to make them get stuck.
 
-Have you got measurements or statistics that show this making a
-difference? I suspect you'll find for boot time it will have little to
-no affect since the device driver probe order is more closely related
-to the kernel link order than the order that devices were registered.
+I believe David feels the same way as I do wrt thread hijacking on
+mailing lists.  The problem is that it seems all too easy for people
+to hit the reply button on some random message from the mailing list,
+change the subject line, and then type an entirely new email into the
+body not related to the message they hit "reply" on.
 
-g.
+So, any message which doesn't look like it's a reply to the preceding
+message gets held for moderation.  However, git came along and broke
+that - because every patch sent as a threaded reply to a cover email
+is effectively a "hijack".  Therefore, there's an exception to this -
+if the subject line starts with "[PATCH" then it will be allowed through.
 
-> ---
->  drivers/of/platform.c | 17 ++++++++++++++++-
->  1 file changed, 16 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index e0a6514..a2ea858 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -382,8 +382,23 @@ static int of_platform_bus_create(struct device_node *bus,
->         if (!dev || !of_match_node(matches, bus))
->                 return 0;
->
-> +       /* first step: create the nodes that are referenced by phandle */
->         for_each_child_of_node(bus, child) {
-> -               pr_debug("   create child: %s\n", child->full_name);
-> +               if (child->phandle == 0)
-> +                       continue;
-> +               pr_debug("   create child 1: %s\n", child->full_name);
-> +               rc = of_platform_bus_create(child, matches, lookup, &dev->dev, strict);
-> +               if (rc) {
-> +                       of_node_put(child);
-> +                       return rc;
-> +               }
-> +       }
-> +
-> +       /* second step: create the other nodes */
-> +       for_each_child_of_node(bus, child) {
-> +               if (child->phandle != 0)
-> +                       continue;
-> +               pr_debug("   create child 2: %s\n", child->full_name);
->                 rc = of_platform_bus_create(child, matches, lookup, &dev->dev, strict);
->                 if (rc) {
->                         of_node_put(child);
->
->
-> --
-> Ken ar c'henta? |             ** Breizh ha Linux atav! **
-> Jef             |               http://moinejf.free.fr/
+This means if you want to send a RFC, it must be "[PATCH RFC" not just
+"[RFC", because "[RFC" isn't whitelisted.  Maybe it should be, but that
+is David's decision now.
