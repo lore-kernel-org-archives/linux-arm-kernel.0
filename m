@@ -1,91 +1,20 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Aug 2013 08:42:46 +0200
-Subject: [PATCH 2/3] dma: imx-sdma: Add ROM script addresses to driver
-In-Reply-To: <20130820023545.GA29114@S2101-09.ap.freescale.net>
-References: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
- <1376914563-10912-3-git-send-email-s.hauer@pengutronix.de>
- <20130819144136.GC28297@S2101-09.ap.freescale.net>
- <20130819173912.GF31036@pengutronix.de>
- <20130820023545.GA29114@S2101-09.ap.freescale.net>
-Message-ID: <20130820064246.GG31036@pengutronix.de>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 20 Aug 2013 12:19:39 +0530
+Subject: [PATCH] pinctrl: SPEAr310: Pass correct of_device_id table name
+ to MODULE_DEVICE_TABLE
+In-Reply-To: <1376978280.19775.1.camel@phoenix>
+References: <1376978280.19775.1.camel@phoenix>
+Message-ID: <CAOh2x=nvnvuXf3C8Mgk1_5fxYR-eSqPek8M=DwPM-ombnSKLPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 10:35:51AM +0800, Shawn Guo wrote:
-> On Mon, Aug 19, 2013 at 07:39:12PM +0200, Sascha Hauer wrote:
-> > On Mon, Aug 19, 2013 at 10:41:38PM +0800, Shawn Guo wrote:
-> > > Copy devicetree mailing list.
-> > > 
-> > > > @@ -352,8 +521,15 @@ static struct platform_device_id sdma_devtypes[] = {
-> > > >  MODULE_DEVICE_TABLE(platform, sdma_devtypes);
-> > > >  
-> > > >  static const struct of_device_id sdma_dt_ids[] = {
-> > > > -	{ .compatible = "fsl,imx31-sdma", .data = &sdma_imx31, },
-> > > > +	{ .compatible = "fsl,imx6q-sdma", .data = &sdma_imx6q, },
-> > > > +	{ .compatible = "fsl,imx53-sdma", .data = &sdma_imx53, },
-> > > > +	{ .compatible = "fsl,imx51-sdma", .data = &sdma_imx51, },
-> > > > +	{ .compatible = "fsl,imx35-to2-sdma", .data = &sdma_imx35_to2, },
-> > > > +	{ .compatible = "fsl,imx35-to1-sdma", .data = &sdma_imx35_to1, },
-> > > >  	{ .compatible = "fsl,imx35-sdma", .data = &sdma_imx35, },
-> 
-> <snip>
-> 
-> > > Also, I do not know how we will play these tapeout specific compatible
-> > > in device tree.  As you know, we currently do not have tapeout but only
-> > > chip specific DTS, since we expect kernel will figure out the
-> > > tapeout/revision and handle the differences accordingly.
-> > 
-> > In fact the kernel does figure out the tapeout version, but I don't have
-> > access to it in the driver.
-> 
-> Yeah.  But since we're using SoC for IP versioning and the version could
-> vary even for same SoC between different revisions, I think we will see
-> such need of accessing SoC revision from device driver more and more.
-> Thus, we will need a generic approach for that sooner or later, I guess.
-> 
-> One approach I can think of is that we define a property "revision"
-> under node "soc", and ask platform code to fill this property by calling
-> of_update_property().  Then drivers can simply get it via device tree
-> /soc/revision.
+On Tue, Aug 20, 2013 at 11:28 AM, Axel Lin <axel.lin@ingics.com> wrote:
+> The symbol SPEAr310_pinctrl_of_match does not exist at all. Fix it.
+> We didn't hit the compile error because this driver can only be built-in now.
+>
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> ---
+>  drivers/pinctrl/spear/pinctrl-spear310.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-If the IP differs between SoC revisions then I would argue these should
-have different compatible entries. Otherwise we end up coding SoC
-specifics in the driver, something we just recently got rid of.
-
-Of course it's not very convenient to let the bootloader adjust the dtb
-for different SoC revisions. This leaves the kernel architecture code to
-do it.
-
-> 
-> > 
-> > Currently we have a problem anyway. We have the firmware names in the
-> > dts, but the firmware is tapeout specific for i.MX31/35.
-> > 
-> > So I think our options are:
-> > 
-> > - remove the tapeout specifics from the devicetrees, this would mean to
-> >   also remove the firmware names.
-> > - keep the tapeout specifics in the devicetree, then we could even add
-> >   some more like I did ;)
-> 
-> If I understand this option correctly, we will need something like
-> imx35-to1.dtsi and imx35-to2.dtsi, and board level dts authors need to
-> include the correct one per the chip revision on their boards.  What
-> about some board that solder both revisions, and socket board that can
-> change chips?  I do not think it's going to work.
-
-I would not go the way to have two different dtsi files in the kernel.
-If we want to go this way we either have to let the bootloader or the
-kernel architecture code fix it up between SoC revisions.
-
-I'll postpone this problem for now by removing the ROM script support
-for i.MX31/35.
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
