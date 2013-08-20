@@ -1,50 +1,277 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 20 Aug 2013 18:08:48 +0800
-Subject: [PATCH 0/3] refactor some ldb related clocks
-In-Reply-To: <1376991823.4000.22.camel@pizza.hi.pengutronix.de>
-References: <1376987932-5540-1-git-send-email-Ying.Liu@freescale.com>
- <1376991823.4000.22.camel@pizza.hi.pengutronix.de>
-Message-ID: <52134030.4030502@freescale.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Tue, 20 Aug 2013 07:10:12 -0300
+Subject: [PATCHv3 3/4] clk: sunxi: Add A31 clocks support
+In-Reply-To: <20130820062512.GM3173@lukather>
+References: <1375735381-18214-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375735381-18214-4-git-send-email-maxime.ripard@free-electrons.com>
+ <52127CC1.7030005@elopez.com.ar> <20130820062512.GM3173@lukather>
+Message-ID: <52134084.8030500@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2013 05:43 PM, Philipp Zabel wrote:
-> Am Dienstag, den 20.08.2013, 16:38 +0800 schrieb Liu Ying:
->> The ldb_di[0/1]_ipu_div clock dividers in the CSCMR2 register
->> of i.MX53, i.MX6Q and i.MX6DL SoCs can be configured to a 1/3.5
->> drivider or a 1/7 divider. The common clock framework cannot
->> deal with the two dividers directly even with the divider table
->> which only supports integral dividers. So, the idea is to take
->> the 1/3.5 and 1/7 dividers as separate fixed factor dividers and
->> introduce a new multiplexer clock to be derived from the them.
->> Then, the ldb display clock trees can be setup correctly.
->> This series contains the necessary clock driver changes, dts code
->> changes and imx-drm/ldb driver changes to fullfill the task.
-> 
-> I don't see how this improves the situation. Does this solve any real
-> problem?
+Hi,
+
+El 20/08/13 03:25, Maxime Ripard escribi?:
+> Hi Emilio,
 >
+> On Mon, Aug 19, 2013 at 05:14:57PM -0300, Emilio L?pez wrote:
+>> El 05/08/13 17:43, Maxime Ripard escribi?:
+>>> The A31 has a mostly different clock set compared to the other older
+>>> SoCs currently supported in the Allwinner clock driver.
+>>>
+>>> Add support for the basic useful clocks. The other ones will come in
+>>> eventually.
+>>>
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>
+>> I had another quick look at it and overall it looks good to go,
+>>
+>> Reviewed-by: Emilio L?pez <emilio@elopez.com.ar>
+>
+> Thanks!
+>
+>>> ---
+>>>   Documentation/devicetree/bindings/clock/sunxi.txt  |   6 +
+>>>   .../bindings/clock/sunxi/sun6i-a31-gates.txt       |  83 ++++++++++++++
+>>>   drivers/clk/sunxi/clk-sunxi.c                      | 124 +++++++++++++++++++++
+>>>   3 files changed, 213 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+>>> index b24de10..c383d12 100644
+>>> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+>>> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+>>> @@ -8,6 +8,7 @@ Required properties:
+>>>   - compatible : shall be one of the following:
+>>>   	"allwinner,sun4i-osc-clk" - for a gatable oscillator
+>>>   	"allwinner,sun4i-pll1-clk" - for the main PLL clock
+>>> +	"allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
+>>>   	"allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
+>>>   	"allwinner,sun4i-axi-clk" - for the AXI clock
+>>>   	"allwinner,sun4i-axi-gates-clk" - for the AXI gates
+>>> @@ -15,6 +16,8 @@ Required properties:
+>>>   	"allwinner,sun4i-ahb-gates-clk" - for the AHB gates on A10
+>>>   	"allwinner,sun5i-a13-ahb-gates-clk" - for the AHB gates on A13
+>>>   	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
+>>> +	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
+>>> +	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+>>>   	"allwinner,sun4i-apb0-clk" - for the APB0 clock
+>>>   	"allwinner,sun4i-apb0-gates-clk" - for the APB0 gates on A10
+>>>   	"allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
+>>> @@ -24,6 +27,9 @@ Required properties:
+>>>   	"allwinner,sun4i-apb1-gates-clk" - for the APB1 gates on A10
+>>>   	"allwinner,sun5i-a13-apb1-gates-clk" - for the APB1 gates on A13
+>>>   	"allwinner,sun5i-a10s-apb1-gates-clk" - for the APB1 gates on A10s
+>>> +	"allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
+>>> +	"allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
+>>> +	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+>>>
+>>>   Required properties for all clocks:
+>>>   - reg : shall be the control register address for the clock.
+>>> diff --git a/Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt b/Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
+>>> new file mode 100644
+>>> index 0000000..fe44932
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
+>>> @@ -0,0 +1,83 @@
+>>> +Gate clock outputs
+>>> +------------------
+>>> +
+>>> +  * AHB1 gates ("allwinner,sun6i-a31-ahb1-gates-clk")
+>>> +
+>>> +    MIPI DSI					1
+>>> +
+>>> +    SS						5
+>>> +    DMA						6
+>>> +
+>>> +    MMC0					8
+>>> +    MMC1					9
+>>> +    MMC2					10
+>>> +    MMC3					11
+>>> +
+>>> +    NAND1					12
+>>> +    NAND0					13
+>>> +    SDRAM					14
+>>> +
+>>> +    GMAC					17
+>>> +    TS						18
+>>> +    HSTIMER					19
+>>> +    SPI0					20
+>>> +    SPI1					21
+>>> +    SPI2					22
+>>> +    SPI3					23
+>>> +    USB_OTG					24
+>>> +
+>>> +    EHCI0					26
+>>> +    EHCI1					27
+>>> +
+>>> +    OHCI0					29
+>>> +    OHCI1					30
+>>> +    OHCI2					31
+>>> +    VE						32
+>>> +
+>>> +    LCD0					36
+>>> +    LCD1					37
+>>> +
+>>> +    CSI						40
+>>> +
+>>> +    HDMI					43
+>>> +    DE_BE0					44
+>>> +    DE_BE1					45
+>>> +    DE_FE1					46
+>>> +    DE_FE1					47
+>>> +
+>>> +    MP						50
+>>> +
+>>> +    GPU						52
+>>> +
+>>> +    DEU0					55
+>>> +    DEU1					56
+>>> +    DRC0					57
+>>> +    DRC1					58
+>>> +
+>>> +  * APB1 gates ("allwinner,sun6i-a31-apb1-gates-clk")
+>>> +
+>>> +    CODEC					0
+>>> +
+>>> +    DIGITAL MIC					4
+>>> +    PIO						5
+>>> +
+>>> +    DAUDIO0					12
+>>> +    DAUDIO1					13
+>>> +
+>>> +  * APB2 gates ("allwinner,sun6i-a31-apb2-gates-clk")
+>>> +
+>>> +    I2C0					0
+>>> +    I2C1					1
+>>> +    I2C2					2
+>>> +    I2C3					3
+>>> +
+>>> +    UART0					16
+>>> +    UART1					17
+>>> +    UART2					18
+>>> +    UART3					19
+>>> +    UART4					20
+>>> +    UART5					21
+>>> +
+>>> +Notation:
+>>> + [*]:  The datasheet didn't mention these, but they are present on AW code
+>>> + [**]: The datasheet had this marked as "NC" but they are used on AW code
+>>
+>> If you have to respin this, I suppose you could drop the notation
+>> block, as it's not being used. But don't worry otherwise.
+>
+> Actually, I left it here on purpose, if we ever need to add such clocks.
+> That way we would have the same notation than on the other files of the
+> documentation.
 
-I don't see any functional problem without this series.
-But, it may correct ldb_di[n] clock frequency returned from clk_get_rate() when using 1/7 divider.
-Furthermore, since this series makes the ldb related clocks from pll to ldb_di[0/1] have the CLK_SET_RATE_PARENT flag set, the imx-drm/ldb driver may set the clocks' frequency more flexibly, i.e.,
-only calling clk_set_rate() for ldb_di[n] clock would be an alternative.
+Ok, sounds sensible.
 
-> While I admit to having introduced the combination of 1/3.5 fixed
-> divider and configurable 1/1,1/2 divder clocks to describe this
-> fractional divider for the reasons you state, I think the correct
-> solution would be to improve the table divider to support fractional
-> values and get rid of the virtual ldb_di<n>_div_3_5 clocks, not
-> introduce more virtual clocks.
+>>
+>>> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+>>> index cd07169..bd01a02 100644
+>>> --- a/drivers/clk/sunxi/clk-sunxi.c
+>>> +++ b/drivers/clk/sunxi/clk-sunxi.c
+>>> @@ -125,7 +125,89 @@ static void sun4i_get_pll1_factors(u32 *freq, u32 parent_rate,
+>>>   	*n = div / 4;
+>>>   }
+>>>
+>>> +/**
+>>> + * sun6i_a31_get_pll1_factors() - calculates n, k and m factors for PLL1
+>>> + * PLL1 rate is calculated as follows
+>>> + * rate = parent_rate * (n + 1) * (k + 1) / (m + 1);
+>>> + * parent_rate should always be 24MHz
+>>> + */
+>>> +static void sun6i_a31_get_pll1_factors(u32 *freq, u32 parent_rate,
+>>> +				       u8 *n, u8 *k, u8 *m, u8 *p)
+>>> +{
+>>> +	/*
+>>> +	 * We can operate only on MHz, this will make our life easier
+>>> +	 * later.
+>>> +	 */
+>>> +	u32 freq_mhz = *freq / 1000000;
+>>> +	u32 parent_freq_mhz = parent_rate / 1000000;
+>>> +
+>>> +	/*
+>>> +	 * Round down the frequency to the closest multiple of either
+>>> +	 * 6 or 16
+>>> +	 */
+>>> +	u32 round_freq_6 = round_down(freq_mhz, 6);
+>>> +	u32 round_freq_16 = round_down(freq_mhz, 16);
+>>> +
+>>> +	if (round_freq_6 > round_freq_16)
+>>> +		freq_mhz = round_freq_6;
+>>> +	else
+>>> +		freq_mhz = round_freq_16;
+>>>
+>>> +	*freq = freq_mhz * 1000000;
+>>> +
+>>> +	/*
+>>> +	 * If the factors pointer are null, we were just called to
+>>> +	 * round down the frequency.
+>>> +	 * Exit.
+>>> +	 */
+>>> +	if (n == NULL)
+>>> +		return;
+>>> +
+>>> +	/* If the frequency is a multiple of 32 MHz, k is always 3 */
+>>> +	if (!(freq_mhz % 32))
+>>> +		*k = 3;
+>>> +	/* If the frequency is a multiple of 9 MHz, k is always 2 */
+>>> +	else if (!(freq_mhz % 9))
+>>> +		*k = 2;
+>>> +	/* If the frequency is a multiple of 8 MHz, k is always 1 */
+>>> +	else if (!(freq_mhz % 8))
+>>> +		*k = 1;
+>>> +	/* Otherwise, we don't use the k factor */
+>>> +	else
+>>> +		*k = 0;
+>>> +
+>>> +	/*
+>>> +	 * If the frequency is a multiple of 2 but not a multiple of
+>>> +	 * 3, m is 3. This is the first time we use 6 here, yet we
+>>> +	 * will use it on several other places.
+>>> +	 * We use this number because it's the lowest frequency we can
+>>> +	 * generate (with n = 0, k = 0, m = 3), so every other frequency
+>>> +	 * somehow relates to this frequency.
+>>> +	 */
+>>> +	if ((freq_mhz % 6) == 2 || (freq_mhz % 6) == 4)
+>>> +		*m = 2;
+>>> +	/*
+>>> +	 * If the frequency is a multiple of 6MHz, but the factor is
+>>> +	 * odd, m will be 3
+>>> +	 */
+>>> +	else if ((freq_mhz / 6) & 1)
+>>> +		*m = 3;
+>>> +	/* Otherwise, we end up with m = 1 */
+>>> +	else
+>>> +		*m = 1;
+>>> +
+>>> +	/* Calculate n thanks to the above factors we already got */
+>>> +	*n = freq_mhz * (*m + 1) / ((*k + 1) * parent_freq_mhz) - 1;
+>>> +
+>>> +	/*
+>>> +	 * If n end up being outbound, and that we can still decrease
+>>> +	 * m, do it.
+>>> +	 */
+>>> +	if ((*n + 1) > 31 && (*m + 1) > 1) {
+>>> +		*n = (*n + 1) / 2 - 1;
+>>> +		*m = (*m + 1) / 2 - 1;
+>>> +	}
+>>> +}
+>>>
+>>
+>> And again, I'm purely nitpicking, but it'd be good to keep the space
+>> between functions consistent.
+>
+> Hmmm, what space? The coding style documentation clearly states that
+> there should be only one line between two functions.
 
-Yes, it's good to support fractional values for the table divider(not sure if there is any plan for this).
-I see there is something similar in 'include/linux/sh_clk.h'.
+Hmm, I wasn't aware of that. I was using three lines between functions 
+with their struct sets to keep some kind of visual separation between 
+code for different clocks. But if the coding style dictates that, we can 
+switch to it.
 
-> 
-> regards
-> Philipp
-> 
-> 
+Cheers,
 
-Regards,
-Liu Ying
+Emilio
