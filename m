@@ -1,45 +1,27 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 20 Aug 2013 11:25:30 -0400
-Subject: [PATCH] arm64: wire in generic parport.h
-In-Reply-To: <CAMuHMdXfXAaNeCAhmxTQb007Um7AjqRdF2=85t1Po_63T7XT5w@mail.gmail.com>
-References: <1376841688.11104.8.camel@t520.redhat.com>
- <CAMuHMdXfXAaNeCAhmxTQb007Um7AjqRdF2=85t1Po_63T7XT5w@mail.gmail.com>
-Message-ID: <1377012330.2039.5.camel@t520.redhat.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 20 Aug 2013 12:40:52 -0300
+Subject: [PATCH 1/3] ARM: imx6q: refactor some ldb related clocks
+In-Reply-To: <1376987932-5540-2-git-send-email-Ying.Liu@freescale.com>
+References: <1376987932-5540-1-git-send-email-Ying.Liu@freescale.com>
+ <1376987932-5540-2-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <CAOMZO5Afjp-zPzUaNE63L7Y2LjZbSrLupAJ_jFnf1Gg1+hx0Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2013-08-18 at 22:25 +0200, Geert Uytterhoeven wrote:
-> On Sun, Aug 18, 2013 at 6:01 PM, Mark Salter <msalter@redhat.com> wrote:
-> > The arm64 port doesn't provide a parport.h which causes a build failure
-> > with some configurations:
-> >
-> >   drivers/parport/parport_pc.c:67:25: fatal error: asm/parport.h: No such file or directory
-> >    #include <asm/parport.h>
-> >
-> > This patch wires in the generic parport.h for arm64.
-> 
-> Can arm64 have a PC-style parport?
-> 
-> If not, you're better off disabling it in drivers/parport/Kconfig.
-> 
-> You will receive bonus points for introducing ARCH_MAY_HAVE_PC_PARPORT,
-> cfr. ARCH_MAY_HAVE_PC_FDC.
+On Tue, Aug 20, 2013 at 5:38 AM, Liu Ying <Ying.Liu@freescale.com> wrote:
 
-Okay, I have two versions of the patch. One which follows the PC_FDC
-patch and adds something like this to arch/<somearch>/Kconfig:
+> diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> index 5a90a72..90e923e 100644
+> --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> @@ -89,8 +89,6 @@ clocks and IDs.
+>         gpu3d_shader            74
+>         ipu1_podf               75
+>         ipu2_podf               76
+> -       ldb_di0_podf            77
+> -       ldb_di1_podf            78
+>         ipu1_di0_pre            79
+>         ipu1_di1_pre            80
+>         ipu2_di0_pre            81
 
-config ARCH_MAY_HAVE_PC_PARPORT
-	def_bool y
-
-
-The other version adds:
-
-config ARCH_MAY_HAVE_PC_PARPORT
-	bool
-
-to arch/Kconfig (or maybe that should be in drivers/parport/Kconfig) so
-that the various arches just need to select it.
-
-Is there any preference for one over the other?
-
---Mark
+This causes a 'hole' in the clock numbering scheme: 74, 75, 76, 79, 80, etc
