@@ -1,115 +1,33 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Aug 2013 09:26:42 +0200
-Subject: [RFC 06/17] ARM: imx: remove custom .init_time hook
-In-Reply-To: <1376964271-22715-7-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376964271-22715-7-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130820072642.GJ31036@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 20 Aug 2013 13:02:43 +0530
+Subject: [PATCH 0/3] OMAP: Add DT bindings to specify when devices should not
+ be idled or reset
+Message-ID: <1376983966-16490-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 04:04:20AM +0200, Sebastian Hesselbarth wrote:
-> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
-> remove custom .init_time hooks.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Notes:
-> - Although mx5_clocks_common_init() is shared with non-DT, removing
->   of_clk_init(NULL) should be fine, as it only registers DT clk providers.
-> - For imx6q, printing of silicon revision has been moved from .init_time
->   to .init_machine hook.
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c |   12 ------------
->  arch/arm/mach-imx/common.h          |    2 --
->  arch/arm/mach-imx/imx51-dt.c        |    6 ------
->  arch/arm/mach-imx/mach-imx53.c      |    6 ------
->  arch/arm/mach-imx/mach-imx6q.c      |   14 +++-----------
->  arch/arm/mach-imx/mach-imx6sl.c     |    7 -------
->  arch/arm/mach-imx/mach-vf610.c      |    9 ---------
->  7 files changed, 3 insertions(+), 53 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index 1a56a33..5955a54 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -131,8 +131,6 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  {
->  	int i;
->  
-> -	of_clk_init(NULL);
-> -
->  	clk[dummy] = imx_clk_fixed("dummy", 0);
->  	clk[ckil] = imx_obtain_fixed_clock("ckil", rate_ckil);
->  	clk[osc] = imx_obtain_fixed_clock("osc", rate_osc);
-> @@ -569,13 +567,3 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
->  
->  	return 0;
->  }
-> -
-> -int __init mx51_clocks_init_dt(void)
-> -{
-> -	return mx51_clocks_init(0, 0, 0, 0);
-> -}
-> -
-> -int __init mx53_clocks_init_dt(void)
-> -{
-> -	return mx53_clocks_init(0, 0, 0, 0);
-> -}
-> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> index 4517fd7..0ce8313 100644
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -68,8 +68,6 @@ extern int mx53_clocks_init(unsigned long ckil, unsigned long osc,
->  extern int mx25_clocks_init_dt(void);
->  extern int mx27_clocks_init_dt(void);
->  extern int mx31_clocks_init_dt(void);
-> -extern int mx51_clocks_init_dt(void);
-> -extern int mx53_clocks_init_dt(void);
->  extern struct platform_device *mxc_register_gpio(char *name, int id,
->  	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
->  extern void mxc_set_cpu_type(unsigned int type);
-> diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
-> index 53e43e5..bece8a6 100644
-> --- a/arch/arm/mach-imx/imx51-dt.c
-> +++ b/arch/arm/mach-imx/imx51-dt.c
-> @@ -34,17 +34,11 @@ static const char *imx51_dt_board_compat[] __initdata = {
->  	NULL
->  };
->  
-> -static void __init imx51_timer_init(void)
-> -{
-> -	mx51_clocks_init_dt();
-> -}
-> -
->  DT_MACHINE_START(IMX51_DT, "Freescale i.MX51 (Device Tree Support)")
->  	.map_io		= mx51_map_io,
->  	.init_early	= imx51_init_early,
->  	.init_irq	= mx51_init_irq,
->  	.handle_irq	= imx51_handle_irq,
-> -	.init_time	= imx51_timer_init,
+We have devices like co-processors, SoC internal busses, memory controllers
+etc which should not be idled or reset. In some cases erratas around IP blocks
+prevent them from either being idled or reset. Have a way to pass this
+information from Device tree, and get rid of similar information that
+exists as part of the omap_hwmod data files for various DT only OMAP SoCs.
 
-On i.MX5 the init_time hook calls mx5x_clocks_init_dt which calls
-mx5x_clocks_init which not only calls of_clk_init() but also registers
-all clocks in the system. You can't remove it.
+Patches are tested on am335x beagleboneblack and omap4 panda es boards.
 
-I am missing some
+Rajendra Nayak (3):
+  ARM: OMAP2+: hwmod: cleanup HWMOD_INIT_NO_RESET usage
+  ARM: OMAP2+: Add new bindings for OMAP
+  ARM: OMAP2+: Let DT say what devices should not to idled or reset
 
-CLK_OF_DECLARE(imx51, "fsl,imx51-ccm", imx51_clocks_init);
-CLK_OF_DECLARE(imx53, "fsl,imx53-ccm", imx53_clocks_init);
-
-Somewhere.
-
-Sascha
+ .../devicetree/bindings/arm/omap/omap.txt          |    3 ++-
+ arch/arm/boot/dts/am33xx.dtsi                      |    2 ++
+ arch/arm/boot/dts/omap4.dtsi                       |    3 +++
+ arch/arm/boot/dts/omap5.dtsi                       |    2 ++
+ arch/arm/mach-omap2/omap_hwmod.c                   |   22 +++++++++++++-------
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |   22 ++++++++++----------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 ++----
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    4 +---
+ 8 files changed, 38 insertions(+), 26 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
