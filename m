@@ -1,33 +1,49 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 20 Aug 2013 15:52:48 +0200
-Subject: [PATCH 8/8] ARM: dts: exynos4: Add missing unit-address of sysreg node
-In-Reply-To: <1377006768-23174-1-git-send-email-t.figa@samsung.com>
-References: <1377006768-23174-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1377006768-23174-9-git-send-email-t.figa@samsung.com>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Tue, 20 Aug 2013 08:53:42 -0500
+Subject: [PATCH] dma: imx-sdma: Add ROM script addresses to driver
+In-Reply-To: <20130820070039.GH31036@pengutronix.de>
+References: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
+ <CAHCPf3t1_5zhSOrfVFHgeVPa25sT+ewv1=OZA8X4_YZXb9cSeA@mail.gmail.com>
+ <20130820070039.GH31036@pengutronix.de>
+Message-ID: <CAHCPf3sJDRXUkrkRtku06OvBav2idFvJwThsxsrHngXg3mEXJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The node contains reg property, so unit-address suffix should be present
-in its name.
+You know what, I am really confused by this in the first place. Since
+when did the SDMA driver actually support ROM addresses in device tree
+anyway (referring your comments in the patch series) and when did it
+get removed? Why is platform data somehow now required in a driver and
+not being put in it's correct place in the device tree?
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos4.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Why require a firmware file for anything here, bugs notwithstanding?
+As far as I recall there were one or two in older tape-out i.MX6 (uart
+dma I think) and a few more in i.MX51 and i.MX53 early tapeouts. I was
+sure I saw some BSP commits that update the firmware to fix some bugs
+in production tape-outs (oddly they're seemingly not in the errata for
+any tape-out?). The ROM addresses should be in DT, and for those
+devices that now have platform_data glue hardcoding the vaues, they'll
+work. DT platforms won't.
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index 892d5ea..92c9d24 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -93,7 +93,7 @@
- 		reg = <0x10440000 0x1000>;
- 	};
- 
--	sys_reg: sysreg {
-+	sys_reg: sysreg at 10010000 {
- 		compatible = "samsung,exynos4-sysreg", "syscon";
- 		reg = <0x10010000 0x400>;
- 	};
--- 
-1.8.3.2
+I don't understand here how it's not possible to specify the ROM
+addresses in the DT for instance using the way regulators are handled
+(but I'd want to see reg used to specify the address and name instead
+of a custom properties in this case).
+
+What I'd really like to see is the "waiting on a firmware that doesn't
+exist when there is a working ROM version of those scripts in the SoC"
+bug fixed properly, by using ROM addresses in DT - specifying the
+"wrong" addresses is a device tree bug for that board with that
+tape-out or users using the wrong device-tree. Then fudging
+platform_data for non-DT platforms makes sense in that they have no
+DTs. And when they are converted they will follow suit anyway -
+there's a path to take to get there that is really clear.
+
+In this case it is just hardcoding one or two SoC and then leaving the
+rest tha tare actually device-tree compliant to use that abominable,
+OS-specific firmware path name property.. keeping the hangs. I'm
+really trying to figure out the intent and design process here,
+because from a perspective of getting more device tree support this
+really is stepping backwards via a hack to get a couple boards to
+work.
+
+-- Matt
