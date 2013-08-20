@@ -1,20 +1,30 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 20 Aug 2013 12:19:39 +0530
-Subject: [PATCH] pinctrl: SPEAr310: Pass correct of_device_id table name
- to MODULE_DEVICE_TABLE
-In-Reply-To: <1376978280.19775.1.camel@phoenix>
-References: <1376978280.19775.1.camel@phoenix>
-Message-ID: <CAOh2x=nvnvuXf3C8Mgk1_5fxYR-eSqPek8M=DwPM-ombnSKLPA@mail.gmail.com>
+From: rientjes@google.com (David Rientjes)
+Date: Mon, 19 Aug 2013 23:59:44 -0700 (PDT)
+Subject: [RESEND PATCH 2/4] ARM: msm: Re-organize platsmp to make it
+ extensible
+In-Reply-To: <20130812155016.GC27165@e106331-lin.cambridge.arm.com>
+References: <1375409725-22004-1-git-send-email-rvaswani@codeaurora.org>
+ <1375409725-22004-3-git-send-email-rvaswani@codeaurora.org>
+ <20130812155016.GC27165@e106331-lin.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1308192357420.17575@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 11:28 AM, Axel Lin <axel.lin@ingics.com> wrote:
-> The symbol SPEAr310_pinctrl_of_match does not exist at all. Fix it.
-> We didn't hit the compile error because this driver can only be built-in now.
->
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
-> ---
->  drivers/pinctrl/spear/pinctrl-spear310.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Mon, 12 Aug 2013, Mark Rutland wrote:
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >  static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
+> >  {
+> > +	int cpu, map;
+> > +	unsigned int flags = 0;
+> > +
+> > +	for_each_present_cpu(cpu) {
+> > +		map = cpu_logical_map(cpu);
+> > +		if (map > ARRAY_SIZE(cold_boot_flags)) {
+> > +			set_cpu_present(cpu, false);
+> > +			__WARN();
+> > +			continue;
+> > +		}
+> > +		flags |= cold_boot_flags[map];
+
+__WARN() can't be used in generic code because it's possible to have 
+CONFIG_BUG=n, you probably want something like WARN_ON(1) instead.
