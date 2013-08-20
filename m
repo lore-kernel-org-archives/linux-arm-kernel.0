@@ -1,40 +1,41 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Tue, 20 Aug 2013 13:12:17 -0700
-Subject: Tegra baseline test results for v3.11-rc6
-Message-ID: <5213CDA1.4070906@nvidia.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 20 Aug 2013 22:19:36 +0200
+Subject: [RFC 02/17] ARM: call clk_of_init from time_init
+In-Reply-To: <5213C90F.9010407@wwwdotorg.org>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376964271-22715-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <52138F56.6030008@wwwdotorg.org> <5213C7E1.4070401@gmail.com>
+ <5213C90F.9010407@wwwdotorg.org>
+Message-ID: <5213CF58.50703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.11-rc6.
-Logs and other details at:
+On 08/20/2013 09:52 PM, Stephen Warren wrote:
+> On 08/20/2013 01:47 PM, Sebastian Hesselbarth wrote:
+>> On 08/20/2013 05:46 PM, Stephen Warren wrote:
+>>> Some SoCs call this function in .init_irq() rather than .init_time().
+>>> Perhaps we adjust this patch to do that instead. That way, we can
+>>> presumably get rid of patch 1/17 since we can eliminate any duplicate
+>>> calls, and adjust patch 14/17 (Tegra board file) to remove its custom
+>>> call to of_clock_init(NULL)?
+>>
+>> Currently as of -next from yesterday, only tegra is requiring clocks
+>> that early, while others are fine with them close to timers. I really
+>> have no strong opinion on that. That decision should rather be made
+>> by those with a far more complete insight of the consequences than I
+>> have.
+>
+> Perhaps if Tegra is a special-case, it shouldn't rely on the generic
+> init_time() callback, and hence you could still eliminate patch 1/17?
+>
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.11-rc6/20130818150105/
+Perhaps Tegra is the common case but other SoC haven't dug deep enough?
+IMHO from a HW point-of-view clocks are really among the essential
+things that need to be running before you can do anything useful.
 
+Just consider boot loaders that run fine without irqs but don't without
+clocks (even if just represented by API). Maybe you are right, and we
+should call of_clk_init(NULL) as early as possible. That would also
+eliminate patch 1/17 as you suggest.
 
-Test summary
-------------
-
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v3.11-rc5 (d4e4ab86bcba5a72779c43dc1459f71fea3d89c8)):
-    text     data      bss    total  kernel
-   +1148        0        0    +1148  multi_v7_defconfig
-    +728        0        0     +728  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.11-rc5 (d4e4ab86bcba5a72779c43dc1459f71fea3d89c8))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Sebastian
