@@ -1,243 +1,45 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 20 Aug 2013 17:03:25 +0800
-Subject: [RFC PATCH] pwm: atmel-pwm: add pwm controller driver
-In-Reply-To: <521329D0.1090104@atmel.com>
-References: <1376881866-14214-1-git-send-email-voice.shen@atmel.com>
- <521329D0.1090104@atmel.com>
-Message-ID: <521330DD.2080308@atmel.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 20 Aug 2013 13:52:31 +0530
+Subject: [PATCH v3 1/2] dmaengine: add interface of dma_get_slave_channel
+In-Reply-To: <CAMj5Bkhq=kvfpYiMX0de3PBaAzOUfgPVELamaeMAWhHaoDgc8g@mail.gmail.com>
+References: <1376550163-30145-1-git-send-email-zhangfei.gao@linaro.org>
+ <1376550163-30145-2-git-send-email-zhangfei.gao@linaro.org>
+ <20130819052516.GT32147@intel.com>
+ <CAMj5Bkhq=kvfpYiMX0de3PBaAzOUfgPVELamaeMAWhHaoDgc8g@mail.gmail.com>
+Message-ID: <20130820082231.GE5810@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Tue, Aug 20, 2013 at 03:58:41PM +0800, zhangfei gao wrote:
+> > No, this is not the right approach.
+> >
+> > When patch is applied and you find an issue you fix the issue. I have already
+> > pushed and merged this. So removing is a bad idea.
+> > you provide a fix for this miss.
+> >
+> > Also for this you need to give due credit to Dan (reporter). That is how the
+> > process works.
+> >
+> > Anyway I have applied the below fix and will push it out.
+> >
+> > ---
+> > dmaengine: fix - error: potential NULL dereference 'chan'
+> >
+> > commit 7bb587f4 "dmaengine: add interface of dma_get_slave_channel" introduced
+> > the above error so fix it
+> >
+> > Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> > Suggested-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> > Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+> 
+> Thanks Vinod for the kind education.
+> Understand, will take care next time.
+No issues...
 
-On 8/20/2013 16:33, Nicolas Ferre wrote:
-> On 19/08/2013 05:11, Bo Shen :
->> add atmel pwm controller driver based on PWM framework
->>
->> this is basic function implementation of pwm controller
->> it can work with pwm based led and backlight
->>
->> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->>
->> ---
->> This patch is based on Linux v3.11 rc6
->> Tested on sama5d31ek and at91sam9m10g45ek board
->> ---
->>   .../devicetree/bindings/pwm/atmel-pwm.txt          |   19 ++
->>   drivers/pwm/Kconfig                                |    9 +
->>   drivers/pwm/Makefile                               |    1 +
->>   drivers/pwm/pwm-atmel.c                            |  327
->> ++++++++++++++++++++
->>   4 files changed, 356 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/pwm/atmel-pwm.txt
->>   create mode 100644 drivers/pwm/pwm-atmel.c
->>
->> diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
->> b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
->> new file mode 100644
->> index 0000000..127fcdb
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
->> @@ -0,0 +1,19 @@
->> +Atmel PWM controller
->> +
->> +Required properties:
->> +  - compatible: should be one of:
->> +    - "atmel,at91sam9rl-pwm"
->> +    - "atmel,sama5-pwm"
->
-> No, the compatibility string should be: "atmel,sama5d3-pwm"
+> 
+> BTW, it is strange I do not see such compile warning here :(
+Try running smatch and you will see. Compiler will not worry about these, static
+checkers would. Since the bug report is from Dan, my guess is it would be
+triggered by Smatch.
 
-OK, I will change it in next version.
-
->> +  - reg: physical base address and length of the controller's registers
->> +  - #pwm-cells: Should be 3.
->> +    - The first cell specifies the per-chip index of the PWM to use
->> +    - The second cell is the period in nanoseconds
->> +    - The third cell is used to encode the polarity of PWM output
->> +
->> +Example:
->> +
->> +    pwm0: pwm at f8034000 {
->> +        compatible = "atmel,at91sam9rl-pwm";
->> +        reg = <0xf8034000 0x400>;
->> +        #pwm-cells = <3>;
->> +    };
->
-> Can you add an example of consumer: it would make the example much more
-> understandable.
-
-I will add an example of consumer.
-
-[...]
-
->> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
->> new file mode 100644
->> index 0000000..b83d68e
->> --- /dev/null
->> +++ b/drivers/pwm/pwm-atmel.c
->> @@ -0,0 +1,327 @@
->> +/*
->> + * Driver for Atmel Pulse Width Modulation Controller
->> + *
->> + * Copyright (C) 2013 Atmel Semiconductor Technology Ltd.
->
-> use "Atmel Corporation" in copyright.
->
->> + *         Bo Shen <voice.shen@atmel.com>
->> + *
->> + * GPL v2 or later
->> + */
->
-> A general remark also pointed out by Thierry: please use more defined
-> constants in your code: it makes the code more readable and avoid this
-> black magic feeling when we read it.
-
-Please help review v2.
-
->
->> +#include <linux/clk.h>
->> +#include <linux/err.h>
->> +#include <linux/io.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/of_device.h>
->> +#include <linux/pinctrl/consumer.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/pwm.h>
->> +#include <linux/slab.h>
->> +
->> +#define PWM_MR        0x00
->> +#define PWM_ENA        0x04
->> +#define PWM_DIS        0x08
->> +#define PWM_SR        0x0C
->> +
->> +#define PWM_CMR        0x00
->> +
->> +/* The following register for PWM v1 */
->> +#define PWMv1_CDTY    0x04
->> +#define PWMv1_CPRD    0x08
->> +#define PWMv1_CUPD    0x10
->> +
->> +/* The following register for PWM v2 */
->> +#define PWMv2_CDTY    0x04
->> +#define PWMv2_CDTYUPD    0x08
->> +#define PWMv2_CPRD    0x0C
->> +#define PWMv2_CPRDUPD    0x10
->> +
->> +#define PWM_NUM        4
->> +
->> +struct atmel_pwm_chip {
->> +    struct pwm_chip chip;
->> +    struct clk *clk;
->> +    void __iomem *base;
->> +
->> +    void (*config)(struct atmel_pwm_chip *chip, struct pwm_device *pwm,
->> +            unsigned int dty, unsigned int prd);
->> +};
->> +
->> +#define to_atmel_pwm_chip(chip) container_of(chip, struct
->> atmel_pwm_chip, chip)
->> +
->> +static inline u32 atmel_pwm_readl(struct atmel_pwm_chip *chip, int
->> offset)
->> +{
->> +    return readl(chip->base + offset);
->> +}
->> +
->> +static inline void atmel_pwm_writel(struct atmel_pwm_chip *chip, int
->> offset,
->> +        u32 val)
->> +{
->> +    writel(val, chip->base + offset);
->> +}
->> +
->> +static inline u32 atmel_pwm_ch_readl(struct atmel_pwm_chip *chip, int
->> ch,
->> +        int offset)
->> +{
->> +    return readl(chip->base + 0x200 + ch * 0x20 + offset);
->
-> Maybe a constant for this 0x200 value...
-
-OK. I will fix it in net version.
-
->> +}
->> +
->> +static inline void atmel_pwm_ch_writel(struct atmel_pwm_chip *chip,
->> int ch,
->> +        int offset, u32 val)
->> +{
->> +    writel(val, chip->base + 0x200 + ch * 0x20 + offset);
->> +}
->> +
->> +static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device
->> *pwm,
->> +        int duty_ns, int period_ns)
->> +{
->> +    struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
->> +    unsigned long long val, prd, dty;
->> +    unsigned long long div, clk_rate;
->> +    int ret, pres = 0;
->> +
->> +    clk_rate = clk_get_rate(atmel_pwm->clk);
->> +
->> +    while (1) {
->
-> Why not use a proper loop condition here instead of a frightening
-> while (true) loop? Is it really making the code less readable?
-
-OK, I will try to use the proper loop condition here.
-
->> +        div = 1000000000;
->
-> use a constant or at least a comment for this initialization.
-
-I will add comment in next version.
-
->> +        div *= 1 << pres;
->> +        val = clk_rate * period_ns;
->> +        prd = div_u64(val, div);
->> +        val = clk_rate * duty_ns;
->> +        dty = div_u64(val, div);
->> +
->> +        if (prd < 0x0001 || dty < 0x0)
->> +            return -EINVAL;
->> +
->> +        if (prd > 0xffff || dty > 0xffff) {
->
-> Yes, here define those constants please.
-
-Please help review v2.
-
->> +            if (++pres > 0x10)
->> +                return -EINVAL;
->> +            continue;
->> +        }
->> +
->> +        break;
->> +    }
->> +
->> +    /* Enable clock */
->> +    ret = clk_prepare_enable(atmel_pwm->clk);
->> +    if (ret) {
->> +        pr_err("failed to enable pwm clock\n");
->> +        return ret;
->> +    }
->> +
->> +    atmel_pwm->config(atmel_pwm, pwm, dty, prd);
->> +
->> +    /* Check whether need to disable clock */
->> +    val = atmel_pwm_readl(atmel_pwm, PWM_SR);
->> +    if ((val & 0xf) == 0)
->
-> Ditto.
->
->> +        clk_disable_unprepare(atmel_pwm->clk);
->> +
->> +    return 0;
->> +}
->> +
-
-Best Regards,
-Bo Shen
+~Vinod
