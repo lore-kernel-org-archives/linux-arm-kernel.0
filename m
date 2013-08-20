@@ -1,31 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Aug 2013 22:14:42 +0100
-Subject: [PATCH] irqchip: gic: Allow setting affinity to offline CPUs
-In-Reply-To: <1377015070-26320-1-git-send-email-t.figa@samsung.com>
-References: <1377015070-26320-1-git-send-email-t.figa@samsung.com>
-Message-ID: <20130820211442.GF17845@n2100.arm.linux.org.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 20 Aug 2013 14:18:27 -0700
+Subject: [PATCH 1/3] ARM: imx6q: refactor some ldb related clocks
+In-Reply-To: <CAOMZO5Afjp-zPzUaNE63L7Y2LjZbSrLupAJ_jFnf1Gg1+hx0Nw@mail.gmail.com>
+References: <1376987932-5540-1-git-send-email-Ying.Liu@freescale.com>
+ <1376987932-5540-2-git-send-email-Ying.Liu@freescale.com>
+ <CAOMZO5Afjp-zPzUaNE63L7Y2LjZbSrLupAJ_jFnf1Gg1+hx0Nw@mail.gmail.com>
+Message-ID: <20130820211827.4443.97943@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 06:11:10PM +0200, Tomasz Figa wrote:
-> Sometimes it is necessary to fix interrupt affinity to an offline CPU,
-> for example in initialization of local timers. This patch modifies
-> .set_affinity() operation of irq-gic driver to fall back to any possible
-> CPU if no online CPU can be found in requested CPU mask.
+Quoting Fabio Estevam (2013-08-20 08:40:52)
+> On Tue, Aug 20, 2013 at 5:38 AM, Liu Ying <Ying.Liu@freescale.com> wrote:
+> 
+> > diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> > index 5a90a72..90e923e 100644
+> > --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> > +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> > @@ -89,8 +89,6 @@ clocks and IDs.
+> >         gpu3d_shader            74
+> >         ipu1_podf               75
+> >         ipu2_podf               76
+> > -       ldb_di0_podf            77
+> > -       ldb_di1_podf            78
+> >         ipu1_di0_pre            79
+> >         ipu1_di1_pre            80
+> >         ipu2_di0_pre            81
+> 
+> This causes a 'hole' in the clock numbering scheme: 74, 75, 76, 79, 80, etc
 
-Err, this is a bad idea.  If a CPU is offline, then it must not respond
-to interrupts.  If you bind an interrupt to an offline CPU, and that
-device asserts its interrupt, what happens?  It doesn't get serviced
-until that CPU comes back online, which may be a very long time.
+How does this fit in with the idea of having a stable binding/ABI? Seems
+like changing this would be a bad idea for devices in the field that
+have older DTBs.
 
-If, for example, that is your network device, it would mean your
-network stops operating.  Worse, the network layer will time out and
-reset the ethernet device, trying to get things working (which it
-won't.)
+Regards,
+Mike
 
-I think how I used to handle this case prior to genirq is that I fell
-back to any online CPU if the interrupt ended up only routed to offline
-CPUs, but when an offline CPU comes back, it could then be re-routed
-back to that CPU.  In other words, the mask change was non-destructive.
-
-I think with genirq, such mask changes are destructive.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
