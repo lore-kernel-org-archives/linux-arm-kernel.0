@@ -1,68 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Aug 2013 09:34:11 +0200
-Subject: [PATCH] ARM: imx27.dtsi: fix CSPI PER clock id
-In-Reply-To: <1376635535-10325-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1376635535-10325-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20130820073411.GA31060@pengutronix.de>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 20 Aug 2013 09:44:00 +0200
+Subject: [PATCH v4 1/4] dma: mmp_pdma: only complete one transaction from
+ dma_do_tasklet()
+In-Reply-To: <5212D419.5030504@marvell.com>
+References: <1376672707-24527-1-git-send-email-zonque@gmail.com>
+ <1376672707-24527-2-git-send-email-zonque@gmail.com>
+ <5212D419.5030504@marvell.com>
+Message-ID: <52131E40.5040304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 08:45:35AM +0200, Gwenhael Goavec-Merou wrote:
-> CSPI PER clock is per2clk (per2_gate id 60) instead of cspiX_ipg_gate.
-> 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+Hi Xiang,
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+On 20.08.2013 04:27, Xiang Wang wrote:
+> I think we would not run into the situation that there is a descriptor 
+> with ENDIRQEN set in the middle of the running chain.
+> 
+> in mmp_pdma.c:
+> mmp_pdma_tx_submit() -> append_pending_queue() ->
+> tail->desc.dcmd &= ~DCMD_ENDIRQEN;
+> 
+> So in the pending list (same for running list), only the last descriptor 
+> will have ENDIRQEN set.
 
-Sascha
+Right, thanks for noting that.
 
-> ---
->  arch/arm/boot/dts/imx27.dtsi | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> index 0695264..f71d233 100644
-> --- a/arch/arm/boot/dts/imx27.dtsi
-> +++ b/arch/arm/boot/dts/imx27.dtsi
-> @@ -152,7 +152,7 @@
->  				compatible = "fsl,imx27-cspi";
->  				reg = <0x1000e000 0x1000>;
->  				interrupts = <16>;
-> -				clocks = <&clks 53>, <&clks 53>;
-> +				clocks = <&clks 53>, <&clks 60>;
->  				clock-names = "ipg", "per";
->  				status = "disabled";
->  			};
-> @@ -163,7 +163,7 @@
->  				compatible = "fsl,imx27-cspi";
->  				reg = <0x1000f000 0x1000>;
->  				interrupts = <15>;
-> -				clocks = <&clks 52>, <&clks 52>;
-> +				clocks = <&clks 52>, <&clks 60>;
->  				clock-names = "ipg", "per";
->  				status = "disabled";
->  			};
-> @@ -266,7 +266,7 @@
->  				compatible = "fsl,imx27-cspi";
->  				reg = <0x10017000 0x1000>;
->  				interrupts = <6>;
-> -				clocks = <&clks 51>, <&clks 51>;
-> +				clocks = <&clks 51>, <&clks 60>;
->  				clock-names = "ipg", "per";
->  				status = "disabled";
->  			};
-> -- 
-> 1.8.1.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+But is that what we want? I think that clearing of the ENDIRQEN bit
+needs to be removed then, because if we really have multiple
+transactions running, then we want to get an interrupt whenever _any_ of
+it is completed. Also, the way I solved it now, the ENDIRQEN bit is also
+looked at when the residue code tries to distinguish the transactions in
+the list.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Hence, would you agree that we should remove that "tail->desc.dcmd &=
+~DCMD_ENDIRQEN;" modification in order to make the above logic work?
+
+
+Thanks,
+Daniel
