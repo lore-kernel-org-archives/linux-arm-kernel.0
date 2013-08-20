@@ -1,69 +1,59 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 20 Aug 2013 17:23:25 +0100
-Subject: [PATCH v3 4/6] ARM64: arch_timer: configure and enable event
- stream
-In-Reply-To: <20130820161658.GD27819@mudshark.cambridge.arm.com>
-References: <1374492082-13686-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376414984-14182-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376414984-14182-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <20130820132712.GE26129@mudshark.cambridge.arm.com>
- <52137CD5.7010201@arm.com>
- <20130820161658.GD27819@mudshark.cambridge.arm.com>
-Message-ID: <521397FD.8040102@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 20 Aug 2013 18:24:42 +0200
+Subject: [PATCH 1/1] ARM: at91: at91sam9260: add missing pinctrl-names on
+ mmc
+In-Reply-To: <520B353F.9070605@atmel.com>
+References: <1373882719-9940-1-git-send-email-plagnioj@jcrosoft.com>
+ <520B353F.9070605@atmel.com>
+Message-ID: <20130820162442.GF5149@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/08/13 17:16, Will Deacon wrote:
-> On Tue, Aug 20, 2013 at 03:27:33PM +0100, Sudeep KarkadaNagesha wrote:
->> On 20/08/13 14:27, Will Deacon wrote:
->>> On Tue, Aug 13, 2013 at 06:29:42PM +0100, Sudeep KarkadaNagesha wrote:
->>>> diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
->>>> index 6d4482f..effd8f9 100644
->>>> --- a/arch/arm64/include/asm/hwcap.h
->>>> +++ b/arch/arm64/include/asm/hwcap.h
->>>> @@ -30,6 +30,7 @@
->>>>  #define COMPAT_HWCAP_IDIVA	(1 << 17)
->>>>  #define COMPAT_HWCAP_IDIVT	(1 << 18)
->>>>  #define COMPAT_HWCAP_IDIV	(COMPAT_HWCAP_IDIVA|COMPAT_HWCAP_IDIVT)
->>>> +#define COMPAT_HWCAP_EVTSTRM	(1 << 21)
->>>
->>> Looking at the context, we should also add COMPAT_HWCAP_LPAE as a separate
->>> patch (not part of this series).
->>>
->> Ok make sense, I can do that. IIUC even this needs at least under some
->> config option, assuming can't be dynamic ?
+On Wed, Aug 14, 2013 at 09:43:59AM +0200, Nicolas Ferre wrote:
+> On 15/07/2013 12:05, Jean-Christophe PLAGNIOL-VILLARD :
+> >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> >Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >---
+> >  arch/arm/boot/dts/at91sam9260.dtsi | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> >diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> >index c7ccbcb..56ee828 100644
+> >--- a/arch/arm/boot/dts/at91sam9260.dtsi
+> >+++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> >@@ -572,6 +572,7 @@
+> >  				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
+> >  				#address-cells = <1>;
+> >  				#size-cells = <0>;
+> >+				pinctrl-names = "default";
 > 
-> I'm not sure I follow you... if you're asking whether the LPAE HWCAP should
-> be dynamic for ARMv8, then no, since the capabilities offered by LPAE are
-> included in ARMv8 as far as userspace is concerned.
->
-Ok, then it can be in the default list of compat hwcap.
+> Ok, but there is no pinctrl property in this node: maybe it would be
+> good to have a default entry for this.
+> 
+> It is then overloaded in arch/arm/boot/dts/animeo_ip.dts for instance...
+> 
 
->>>>  #ifndef __ASSEMBLY__
->>>>  /*
->>>> @@ -41,7 +42,8 @@
->>>>  				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
->>>>  				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
->>>>  				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
->>>> -				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV)
->>>> +				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV|\
->>>> +				 COMPAT_HWCAP_EVTSTRM)
->>>
->>> So here you're hardcoding COMPAT_HWCAP_EVTSTRM in the COMPAT_ELF_HWCAP, yet
->>> we only enable the native one from the arch-timer driver. The question then is
->>> "Can we rely on the event-stream working for AArch64?". If so, we don't need
->>> the native hwcap at all. If not, then we need to make the compat hwcap
->>> dynamic.
->>
->> How about something like this ? I am not sure if
->> arch/arm64/kernel/setup.c is apt place for compat_elf_hwcap though.
-> 
-> Looks like the right sort of idea, yes. I can't think of a better place to
-> put it. You could adjust it slightly so that COMPAT_ELF_HWCAP stays like it
-> is, with an extra '| compat_dyn_elf_hwcap' on the end, but I have no real
-> preference.
-> 
-Yes that's better, will do this way.
+Yes it is overloaded in arch/arm/boot/dts/at91sam9g20ek_common.dtsi.
 
-Regards,
-Sudeep
+mmc0 pinctrl configuration is set in at91sam9260.dtsi that is ok but do we have
+to put a minimal pinctrl property as the mmc clock pinctrl? It is board
+relative and no device related. So maybe it is not the right place then I am
+wondering if pinctrl-names should be set in at91sam9260.dtsi...
+
+> Can you please add one?
+> 
+> Bye,
+> 
+> >  				status = "disabled";
+> >  			};
+> >
+> >
+> 
+> 
+> -- 
+> Nicolas Ferre
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
