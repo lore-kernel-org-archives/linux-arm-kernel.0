@@ -1,46 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 20 Aug 2013 09:48:25 -0700
-Subject: [PATCH] irqchip: gic: Allow setting affinity to offline CPUs
-In-Reply-To: <3879851.vmCHJ3AcgQ@amdc1227>
-References: <1377015070-26320-1-git-send-email-t.figa@samsung.com>
- <52139A5B.5040708@codeaurora.org> <3879851.vmCHJ3AcgQ@amdc1227>
-Message-ID: <52139DD9.3020004@codeaurora.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 20 Aug 2013 13:48:24 -0300
+Subject: [PATCH v2 0/3] Introduce atomic MMIO register clear-set
+Message-ID: <1377017307-23201-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/13 09:41, Tomasz Figa wrote:
-> On Tuesday 20 of August 2013 09:33:31 Stephen Boyd wrote:
->> On 08/20/13 09:11, Tomasz Figa wrote:
->>> Sometimes it is necessary to fix interrupt affinity to an offline CPU,
->>> for example in initialization of local timers. This patch modifies
->>> .set_affinity() operation of irq-gic driver to fall back to any
->>> possible
->>> CPU if no online CPU can be found in requested CPU mask.
->>>
->>> This fixes broken Exynos4210 support since commit
->>>
->>> 	ee98d27df6 ARM: EXYNOS4: Divorce mct from local timer API
->>>
->>> caused by timer initialization code unable to set affinity for local
->>> timer interrupts.
->> Care to elaborate further? I don't see how the interrupt affinity is set
->> for a CPU that isn't online because the mct code runs on the CPU that
->> the affinity is being set to.
-> Well, please look at secondary_start_kernel() in arch/arm/kernel/smp.c [1]. 
-> You can see that notify_cpu_starting() (line 348) that fires the notifier 
-> registered in MCT driver is called before set_cpu_online() (line 359) that 
-> marks the CPU as online. Also notice that, originally, local timer 
-> initialization was happening after set_cpu_online() - see line 365.
->
->
+Here's the v2 for the introduction of a generic thread-safe clear-set
+register access.
 
-Great, thank you. Please put this information in the commit text next time.
+Following the v1, I've added a proper barrier to ensure proper ordering,
+between the writel and the spin_unlock.
 
-I wonder if we shouldn't make the cpumask_any_and() work on the present
-mask instead? If we ever support physical hotplug on ARM I think we
-wouldn't want to allow interrupts to go to CPUs that aren't even present
-(but still possible).
+It's worth noticing a different approach has been proposed (several times)
+for getting thread-safe register access, through the use of regmap_update_bits
+(just as it's done in mfd/syscon).
+
+However, as noted in [1], such solution has been rejected (several times)
+for two reasons:
+
+  * It's way more heavy-weight than necessary
+  * It cannot be used in very early scenarios,
+    such as a clocksource initialization.
+
+Using this API it's possible -for instance- to add support for Armada 370/XP
+in the orion_wdt driver. That work is ready, and it's been hold until we
+decide a proper solution for shared-register access.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg266494.html
+
+Ezequiel Garcia (3):
+  ARM: Introduce atomic MMIO clear/set
+  clocksource: orion: Use atomic access for shared registers
+  watchdog: orion: Use atomic access for shared registers
+
+ arch/arm/include/asm/io.h        |  5 +++++
+ arch/arm/kernel/io.c             | 13 +++++++++++++
+ drivers/clocksource/time-orion.c |  9 ++-------
+ drivers/watchdog/orion_wdt.c     |  8 ++------
+ 4 files changed, 22 insertions(+), 13 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.1.5
