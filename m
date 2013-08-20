@@ -1,82 +1,76 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 20 Aug 2013 17:56:09 +0300
-Subject: [PATCH v5 0/8] phy: omap-usb: Support multiple instances and new types
-Message-ID: <1377010577-19355-1-git-send-email-rogerq@ti.com>
+Date: Tue, 20 Aug 2013 17:56:13 +0300
+Subject: [PATCH v5 4/8] usb: phy: omap-usb3: Don't use omap_get_control_dev()
+In-Reply-To: <1377010577-19355-1-git-send-email-rogerq@ti.com>
+References: <1377010577-19355-1-git-send-email-rogerq@ti.com>
+Message-ID: <1377010577-19355-5-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+omap_get_control_dev() is being deprecated as it doesn't support
+multiple instances. As control device is present only from OMAP4
+onwards which supports DT only, we use phandles to get the
+reference to the control device.
 
-This patchset does the following:
+As we don't support non-DT boot, we just bail out on probe
+if device node is not present.
 
-* Get rid of omap_control_usb platform data as we support DT only.
-
-* Restructure and add support for new PHY types. We now support the follwing
-four types
-
- TYPE_OMAP - if it has otghs_control mailbox register (e.g. on OMAP4)
- TYPE_USB2 - if it has Power down bit in control_dev_conf register. e.g. USB2 PHY
- TYPE_USB3 - if it has DPLL and individual Rx & Tx power control. e.g. USB3 PHY or SATA PHY
- TYPE_DRA7 - if it has both power down and power aux registers. e.g. USB2 PHY on DRA7
-
-* Get rid of "ti,type" DT property and introduce compatible strings for each type.
-
-* Have only one power control API "omap_control_usb_phy_power()" instead of a
-different one for each PHY type.
-
-* Get rid of omap_get_control_dev() so that we can support multiple instances
-of the control device. We take advantage of the fact that omap control USB device
-is only present on OMAP4 onwards and hence only supports DT boot. The users
-of control USB device can get a reference to it from the device node's phandle.
-
-Patches are based on balbi/next.
-
-Smoke tested on OMAP4 panda with MUSB in gadget mode (g_zero).
-
-You can find the patches in branch
- usb-control-module
-in git tree
- git://github.com/rogerq/linux.git
-
-v5:
-- fixed whitespace alignment issues.
-
-v4:
-- removed "ti,has-mailbox" from omap-usb binding document example.
-
-v3:
-- return -EINVAL instead of -ENODEV on probe failure.
-- pass device type data through of_device_id table.
-- get rid of "ti,mailbox" property and "has_mailbox" from musb platform data.
-
-v2:
-- get rid of "ti,type" property and introduce compatible strings for each device type.
-
-cheers,
--roger
-
+Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
-Roger Quadros (8):
-  usb: phy: omap-control: Get rid of platform data
-  usb: phy: omap: Add new device types and remove
-    omap_control_usb3_phy_power()
-  usb: phy: omap-usb2: Don't use omap_get_control_dev()
-  usb: phy: omap-usb3: Don't use omap_get_control_dev()
-  usb: musb: omap2430: Don't use omap_get_control_dev()
-  usb: phy: omap: get rid of omap_get_control_dev()
-  ARM: dts: omap4: update omap-control-usb nodes
-  ARM: dts: omap5: update omap-control-usb node
+ drivers/usb/phy/phy-omap-usb3.c |   26 ++++++++++++++++++++------
+ 1 files changed, 20 insertions(+), 6 deletions(-)
 
- Documentation/devicetree/bindings/usb/omap-usb.txt |   33 ++--
- arch/arm/boot/dts/omap4.dtsi                       |   20 ++-
- arch/arm/boot/dts/omap5.dtsi                       |   20 ++-
- drivers/usb/musb/omap2430.c                        |   25 ++-
- drivers/usb/phy/phy-omap-control.c                 |  210 +++++++++++---------
- drivers/usb/phy/phy-omap-usb2.c                    |   26 ++-
- drivers/usb/phy/phy-omap-usb3.c                    |   32 +++-
- include/linux/usb/musb.h                           |    2 -
- include/linux/usb/omap_control_usb.h               |   33 ++--
- 9 files changed, 226 insertions(+), 175 deletions(-)
-
+diff --git a/drivers/usb/phy/phy-omap-usb3.c b/drivers/usb/phy/phy-omap-usb3.c
+index 4a7f27c..4004f82 100644
+--- a/drivers/usb/phy/phy-omap-usb3.c
++++ b/drivers/usb/phy/phy-omap-usb3.c
+@@ -26,6 +26,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/delay.h>
+ #include <linux/usb/omap_control_usb.h>
++#include <linux/of_platform.h>
+ 
+ #define	PLL_STATUS		0x00000004
+ #define	PLL_GO			0x00000008
+@@ -196,8 +197,14 @@ static int omap_usb3_init(struct usb_phy *x)
+ 
+ static int omap_usb3_probe(struct platform_device *pdev)
+ {
+-	struct omap_usb			*phy;
+-	struct resource			*res;
++	struct omap_usb *phy;
++	struct resource *res;
++	struct device_node *node = pdev->dev.of_node;
++	struct device_node *control_node;
++	struct platform_device *control_pdev;
++
++	if (!node)
++		return -EINVAL;
+ 
+ 	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
+ 	if (!phy) {
+@@ -239,11 +246,18 @@ static int omap_usb3_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	phy->control_dev = omap_get_control_dev();
+-	if (IS_ERR(phy->control_dev)) {
+-		dev_dbg(&pdev->dev, "Failed to get control device\n");
+-		return -ENODEV;
++	control_node = of_parse_phandle(node, "ctrl-module", 0);
++	if (!control_node) {
++		dev_err(&pdev->dev, "Failed to get control device phandle\n");
++		return -EINVAL;
+ 	}
++	control_pdev = of_find_device_by_node(control_node);
++	if (!control_pdev) {
++		dev_err(&pdev->dev, "Failed to get control device\n");
++		return -EINVAL;
++	}
++
++	phy->control_dev = &control_pdev->dev;
+ 
+ 	omap_control_usb_phy_power(phy->control_dev, 0);
+ 	usb_add_phy_dev(&phy->phy);
 -- 
 1.7.4.1
