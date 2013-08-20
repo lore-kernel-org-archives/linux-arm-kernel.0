@@ -1,360 +1,73 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 20 Aug 2013 10:31:13 +0800
-Subject: [PATCH v7 11/11] ARM: hi3xxx: support hi3716-dkb board
-In-Reply-To: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1376965873-14431-12-git-send-email-haojian.zhuang@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 20 Aug 2013 10:35:51 +0800
+Subject: [PATCH 2/3] dma: imx-sdma: Add ROM script addresses to driver
+In-Reply-To: <20130819173912.GF31036@pengutronix.de>
+References: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
+ <1376914563-10912-3-git-send-email-s.hauer@pengutronix.de>
+ <20130819144136.GC28297@S2101-09.ap.freescale.net>
+ <20130819173912.GF31036@pengutronix.de>
+Message-ID: <20130820023545.GA29114@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhangfei Gao <zhangfei.gao@linaro.org>
+On Mon, Aug 19, 2013 at 07:39:12PM +0200, Sascha Hauer wrote:
+> On Mon, Aug 19, 2013 at 10:41:38PM +0800, Shawn Guo wrote:
+> > Copy devicetree mailing list.
+> > 
+> > > @@ -352,8 +521,15 @@ static struct platform_device_id sdma_devtypes[] = {
+> > >  MODULE_DEVICE_TABLE(platform, sdma_devtypes);
+> > >  
+> > >  static const struct of_device_id sdma_dt_ids[] = {
+> > > -	{ .compatible = "fsl,imx31-sdma", .data = &sdma_imx31, },
+> > > +	{ .compatible = "fsl,imx6q-sdma", .data = &sdma_imx6q, },
+> > > +	{ .compatible = "fsl,imx53-sdma", .data = &sdma_imx53, },
+> > > +	{ .compatible = "fsl,imx51-sdma", .data = &sdma_imx51, },
+> > > +	{ .compatible = "fsl,imx35-to2-sdma", .data = &sdma_imx35_to2, },
+> > > +	{ .compatible = "fsl,imx35-to1-sdma", .data = &sdma_imx35_to1, },
+> > >  	{ .compatible = "fsl,imx35-sdma", .data = &sdma_imx35, },
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Signed-off-by: Zhang Mingjun <zhang.mingjun@linaro.org>
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- arch/arm/boot/dts/hi3716-dkb.dts |  37 ++++++
- arch/arm/boot/dts/hi3716.dtsi    | 275 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-hi3xxx/hi3xxx.c    |   1 +
- 3 files changed, 313 insertions(+)
- create mode 100644 arch/arm/boot/dts/hi3716-dkb.dts
- create mode 100644 arch/arm/boot/dts/hi3716.dtsi
+<snip>
 
-diff --git a/arch/arm/boot/dts/hi3716-dkb.dts b/arch/arm/boot/dts/hi3716-dkb.dts
-new file mode 100644
-index 0000000..32b507b
---- /dev/null
-+++ b/arch/arm/boot/dts/hi3716-dkb.dts
-@@ -0,0 +1,37 @@
-+/*
-+ * Copyright (c) 2013 Linaro Ltd.
-+ * Copyright (c) 2013 Hisilicon Limited.
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+/include/ "hi3716.dtsi"
-+
-+/ {
-+	model = "Hisilicon Hi3716 Development Board";
-+	compatible = "hisilicon,hi3716";
-+
-+	chosen {
-+		bootargs = "console=ttyAMA0,115200";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x80000000>;
-+	};
-+
-+	soc {
-+		amba {
-+			timer0: timer at f8002000 {
-+				status = "okay";
-+			};
-+
-+			uart0: uart at f8b00000 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/hi3716.dtsi b/arch/arm/boot/dts/hi3716.dtsi
-new file mode 100644
-index 0000000..1350d6c
---- /dev/null
-+++ b/arch/arm/boot/dts/hi3716.dtsi
-@@ -0,0 +1,275 @@
-+/*
-+ * Copyright (c) 2013 Linaro Ltd.
-+ * Copyright (c) 2013 Hisilicon Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <0>;
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu at 1 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <1>;
-+			next-level-cache = <&l2>;
-+		};
-+	};
-+
-+	gic: interrupt-controller at fc001000 {
-+		compatible = "arm,cortex-a9-gic";
-+		#interrupt-cells = <3>;
-+		#address-cells = <0>;
-+		interrupt-controller;
-+		/* gic dist base, gic cpu base */
-+		reg = <0xf8a01000 0x1000>, <0xf8a00100 0x100>;
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		device_type = "soc";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		amba {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "arm,amba-bus";
-+			ranges;
-+
-+			timer0: timer at f8002000 {
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0xf8002000 0x1000>;
-+				/* timer00 & timer01 */
-+				interrupts = <0 24 4>;
-+				clocks = <&osc24m>;
-+				status = "disabled";
-+			};
-+
-+			timer1: timer at f8a29000 {
-+				/*
-+				 * Only used in NORMAL state, not available ins
-+				 * SLOW or DOZE state.
-+				 * The rate is fixed in 24MHz.
-+				 */
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0xf8a29000 0x1000>;
-+				/* timer10 & timer11 */
-+				interrupts = <0 25 4>;
-+				clocks = <&osc24m>;
-+				status = "disabled";
-+			};
-+
-+			timer2: timer at f8a2a000 {
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0xf8a2a000 0x1000>;
-+				/* timer20 & timer21 */
-+				interrupts = <0 26 4>;
-+				clocks = <&osc24m>;
-+				status = "disabled";
-+			};
-+
-+			timer3: timer at f8a2b000 {
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0xf8a2b000 0x1000>;
-+				/* timer30 & timer31 */
-+				interrupts = <0 27 4>;
-+				clocks = <&osc24m>;
-+				status = "disabled";
-+			};
-+
-+			timer4: timer at f8a81000 {
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0xf8a81000 0x1000>;
-+				/* timer30 & timer31 */
-+				interrupts = <0 28 4>;
-+				clocks = <&osc24m>;
-+				status = "disabled";
-+			};
-+
-+			uart0: uart at f8b00000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0xf8b00000 0x1000>;
-+				interrupts = <0 49 4>;
-+				clocks = <&bpll_fout0_div 1>;
-+				clock-names = "apb_pclk";
-+				status = "disabled";
-+			};
-+
-+			uart1: uart at f8006000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0xf8006000 0x1000>;
-+				interrupts = <0 50 4>;
-+				clocks = <&bpll_fout0_div 1>;
-+				clock-names = "apb_pclk";
-+				status = "disabled";
-+			};
-+
-+			uart2: uart at f8b02000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0xf8b02000 0x1000>;
-+				interrupts = <0 51 4>;
-+				clocks = <&bpll_fout0_div 1>;
-+				clock-names = "apb_pclk";
-+				status = "disabled";
-+			};
-+
-+			uart3: uart at f8b03000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0xf8b03000 0x1000>;
-+				interrupts = <0 52 4>;
-+				clocks = <&bpll_fout0_div 1>;
-+				clock-names = "apb_pclk";
-+				status = "disabled";
-+			};
-+
-+			uart4: uart at f8b04000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0xf8b04000 0x1000>;
-+				interrupts = <0 53 4>;
-+				clocks = <&bpll_fout0_div 1>;
-+				clock-names = "apb_pclk";
-+				status = "disabled";
-+			};
-+		};
-+
-+		clocks {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			osc24m: osc {
-+				compatible = "fixed-clock";
-+				#clock-cells = <0>;
-+				clock-frequency = <24000000>;
-+				clock-output-names = "osc24mhz";
-+			};
-+
-+			bpll: bpll {
-+				compatible = "hisilicon,hi3716-fixed-pll";
-+				#clock-cells = <1>;
-+				clocks = <&osc24m>;
-+				clock-frequency = <1200000000>,
-+						  <600000000>,
-+						  <300000000>,
-+						  <200000000>,
-+						  <150000000>;
-+				clock-output-names = "bpll_fout0",
-+						     "bpll_fout1",
-+						     "bpll_fout2",
-+						     "bpll_fout3",
-+						     "bpll_fout4";
-+			};
-+
-+			bpll_fout0_div: bpll_fout0_div {/* 1200Mhz */
-+				compatible = "hisilicon,hi3716-fixed-divider";
-+				#clock-cells = <1>;
-+				clocks = <&bpll 0>;
-+				div-table = <3 14 25 50>;
-+				clock-output-names = "fout0_400m", "fout0_86m",
-+							"fout0_48m", "fout0_24m";
-+			};
-+
-+			bpll_fout1_div: bpll_fout1_div {
-+				compatible = "hisilicon,hi3716-fixed-divider";
-+				#clock-cells = <0>;
-+				clocks = <&bpll 1>;
-+				div-table = <10>;
-+				clock-output-names = "fout1_60m";
-+			};
-+
-+			bpll_fout2_div: bpll_fout2_div {
-+				compatible = "hisilicon,hi3716-fixed-divider";
-+				#clock-cells = <0>;
-+				clocks = <&bpll 2>;
-+				div-table = <4>;
-+				clock-output-names = "fout2_75m";
-+			};
-+
-+			bpll_fout3_div: bpll_fout3_div {
-+				compatible = "hisilicon,hi3716-fixed-divider";
-+				#clock-cells = <1>;
-+				clocks = <&bpll 3>;
-+				div-table = <2 4 5 8>;
-+				clock-output-names = "fout3_100m", "fout3_50m",
-+							"fout3_40m", "fout3_25m";
-+			};
-+
-+			clk_sfc_mux: clk_sfc_mux {
-+				compatible = "hisilicon,hi3716-clk-mux";
-+				#clock-cells = <0>;
-+				/* clks: 24M 75M 100M 150M 200M */
-+				clocks = <&osc24m>, <&bpll_fout2_div>,
-+				       <&bpll_fout3_div 0>, <&bpll 4>, <&bpll 3>;
-+
-+				/* offset mux_shift mux_width */
-+				mux-reg = <0x5c 8 3>;
-+				/* mux reg value to choose clks */
-+				mux-table = <0 7 6 4 5>;
-+
-+				clock-output-names = "sfc_mux";
-+			};
-+
-+			clk_sfc: clk_sfc {
-+				compatible = "hisilicon,hi3716-clk-gate";
-+				#clock-cells = <0>;
-+				clocks = <&clk_sfc_mux>;
-+
-+				/* offset, enable, reset */
-+				gate-reg = <0x5c 0 4>;
-+
-+				clock-output-names = "sfc";
-+			};
-+		};
-+
-+		local_timer at f8a00600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0xf8a00600 0x20>;
-+			interrupts = <1 13 0xf01>;
-+		};
-+
-+		l2: l2-cache {
-+			compatible = "arm,pl310-cache";
-+			reg = <0xf8a10000 0x100000>;
-+			interrupts = <0 15 4>;
-+			cache-unified;
-+			cache-level = <2>;
-+			hisilicon,l2cache-aux = <0x00050000 0xfff0ffff>;
-+		};
-+
-+		sctrl at f8000000 {
-+			compatible = "hisilicon,sctrl";
-+			reg = <0xf8000000 0x1000>;
-+			smp_reg = <0xc0>;
-+			reboot_reg = <0x4>;
-+		};
-+
-+		clkbase at f8a22000 {
-+			compatible = "hisilicon,clkbase";
-+			reg = <0xf8a22000 0x1000>;
-+		};
-+
-+		cpuctrl at f8a22000 {
-+			compatible = "hisilicon,cpuctrl";
-+			reg = <0xf8a22000 0x2000>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-hi3xxx/hi3xxx.c b/arch/arm/mach-hi3xxx/hi3xxx.c
-index 01ac68b..dfe3902 100644
---- a/arch/arm/mach-hi3xxx/hi3xxx.c
-+++ b/arch/arm/mach-hi3xxx/hi3xxx.c
-@@ -31,6 +31,7 @@ static void __init hi3xxx_timer_init(void)
- 
- static const char *hs_compat[] __initdata = {
- 	"hisilicon,hi3620-hi4511",
-+	"hisilicon,hi3716",
- 	NULL,
- };
- 
--- 
-1.8.1.2
+> > Also, I do not know how we will play these tapeout specific compatible
+> > in device tree.  As you know, we currently do not have tapeout but only
+> > chip specific DTS, since we expect kernel will figure out the
+> > tapeout/revision and handle the differences accordingly.
+> 
+> In fact the kernel does figure out the tapeout version, but I don't have
+> access to it in the driver.
+
+Yeah.  But since we're using SoC for IP versioning and the version could
+vary even for same SoC between different revisions, I think we will see
+such need of accessing SoC revision from device driver more and more.
+Thus, we will need a generic approach for that sooner or later, I guess.
+
+One approach I can think of is that we define a property "revision"
+under node "soc", and ask platform code to fill this property by calling
+of_update_property().  Then drivers can simply get it via device tree
+/soc/revision.
+
+> 
+> Currently we have a problem anyway. We have the firmware names in the
+> dts, but the firmware is tapeout specific for i.MX31/35.
+> 
+> So I think our options are:
+> 
+> - remove the tapeout specifics from the devicetrees, this would mean to
+>   also remove the firmware names.
+> - keep the tapeout specifics in the devicetree, then we could even add
+>   some more like I did ;)
+
+If I understand this option correctly, we will need something like
+imx35-to1.dtsi and imx35-to2.dtsi, and board level dts authors need to
+include the correct one per the chip revision on their boards.  What
+about some board that solder both revisions, and socket board that can
+change chips?  I do not think it's going to work.
+
+> 
+> I don't know what's the best way to proceed. For now I could remove the
+> tapeout specific bindings, this way we would get the ROM script
+> addresses at least for i.MX25/5/6.
+
+Yeah, it's still something nice.
+
+Shawn
