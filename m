@@ -1,433 +1,184 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 20 Aug 2013 12:03:20 +0800
-Subject: [RFC PATCH] pwm: atmel-pwm: add pwm controller driver
-In-Reply-To: <20130819212054.GA9885@mithrandir>
-References: <1376881866-14214-1-git-send-email-voice.shen@atmel.com>
- <20130819212054.GA9885@mithrandir>
-Message-ID: <5212EA88.1090100@atmel.com>
+From: a0393675@ti.com (Keerthy)
+Date: Tue, 20 Aug 2013 09:39:34 +0530
+Subject: [PATCHv5 16/31] CLK: TI: DRA7: Add APLL support
+In-Reply-To: <52122300.4040606@ti.com>
+References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
+ <1375460751-23676-17-git-send-email-t-kristo@ti.com>
+ <20130813111449.GL27165@e106331-lin.cambridge.arm.com>
+ <52122300.4040606@ti.com>
+Message-ID: <5212EBFE.2040206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+Hi Mark/Tero,
 
-On 8/20/2013 05:20, Thierry Reding wrote:
-> On Mon, Aug 19, 2013 at 11:11:06AM +0800, Bo Shen wrote:
->> add atmel pwm controller driver based on PWM framework
+Sorry for responding late.
+
+On Monday 19 August 2013 07:22 PM, Tero Kristo wrote:
+> On 08/13/2013 02:14 PM, Mark Rutland wrote:
+>> On Fri, Aug 02, 2013 at 05:25:35PM +0100, Tero Kristo wrote:
+>>> From: Keerthy <j-keerthy@ti.com>
+>>>
+>>> The patch adds support for DRA7 PCIe APLL. The APLL
+>>> sources the optional functional clocks for PCIe module.
+>>>
+>>> APLL stands for Analog PLL. This is different when comapred
+>>> with DPLL meaning Digital PLL, the phase detection is done
+>>> using an analog circuit.
+>>>
+>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>> ---
+>>>   .../devicetree/bindings/clock/ti/apll.txt          |   32 +++
+>>>   arch/arm/mach-omap2/clock.h                        |    1 -
+>>>   drivers/clk/ti/Makefile                            |    2 +-
+>>>   drivers/clk/ti/apll.c                              |  209 
+>>> ++++++++++++++++++++
+>>>   include/linux/clk/ti.h                             |    2 +
+>>>   5 files changed, 244 insertions(+), 2 deletions(-)
+>>>   create mode 100644 
+>>> Documentation/devicetree/bindings/clock/ti/apll.txt
+>>>   create mode 100644 drivers/clk/ti/apll.c
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/clock/ti/apll.txt 
+>>> b/Documentation/devicetree/bindings/clock/ti/apll.txt
+>>> new file mode 100644
+>>> index 0000000..f7a82e9
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/clock/ti/apll.txt
+>>> @@ -0,0 +1,32 @@
+>>> +Binding for Texas Instruments APLL clock.
+>>> +
+>>> +This binding uses the common clock binding[1].  It assumes a
+>>> +register-mapped APLL with usually two selectable input clocks
+>>> +(reference clock and bypass clock), with analog phase locked
+>>> +loop logic for multiplying the input clock to a desired output
+>>> +clock. This clock also typically supports different operation
+>>> +modes (locked, low power stop etc.) APLL mostly behaves like
+>>> +a subtype of a DPLL [2], although a simplified one at that.
+>>> +
+>>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>> +[2] Documentation/devicetree/bindings/clock/ti/dpll.txt
+>>> +
+>>> +Required properties:
+>>> +- compatible : shall be "ti,dra7-apll-clock"
+>>> +- #clock-cells : from common clock binding; shall be set to 0.
+>>> +- clocks : link phandles of parent clocks (clk-ref and clk-bypass)
+>>> +- reg : array of register base addresses for controlling the APLL:
+>>> +       reg[0] = control register
+>>> +       reg[1] = idle status register
 >>
->> this is basic function implementation of pwm controller
->> it can work with pwm based led and backlight
+>> Using reg-names is likely a good idea here.
 >
-> Please use the proper spelling "PWM" in prose. Variable names and such
-> should be "pwm", though. Also sentences should start with a capital
-> letter and end with a full stop ('.').
-
-I will do in next version.
-
->> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> I'll change these for next rev to be similar to what was discussed in 
+> the DPLL part.
+>
 >>
->> ---
->> This patch is based on Linux v3.11 rc6
+>>> +- ti,clk-ref : link phandle for the reference clock
+>>> +- ti,clk-bypass : link phandle for the bypass clock
+>>
+>> You don't need this. Use the clocks and clock-names properties.
 >
-> It's usually safer to work on top of the latest subsystem branch because
-> it may contain patches that influence your patch as well. For most
-> subsystems that branch is merged into linux-next, so that usually works
-> well as the basis when writing patches.
+> Ditto.
+>
+>>
+>> [...]
+>>
+>>> +static int dra7_apll_enable(struct clk_hw *hw)
+>>> +{
+>>> +       struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+>>> +       int r = 0, i = 0;
+>>> +       struct dpll_data *ad;
+>>> +       const char *clk_name;
+>>> +       u8 state = 1;
+>>> +       u32 v;
+>>> +
+>>> +       ad = clk->dpll_data;
+>>> +       if (!ad)
+>>> +               return -EINVAL;
+>>> +
+>>> +       clk_name = __clk_get_name(clk->hw.clk);
+>>> +
+>>> +       state <<= __ffs(ad->idlest_mask);
+>>> +
+>>> +       /* Check is already locked */
+>>> +       if ((__raw_readl(ad->idlest_reg) & ad->idlest_mask) == state)
+>>> +               return r;
+>>
+>> Why __raw_readl rather than raw_readl?
+>
+> Hmm not sure, Keerthy, do you have any comment on this as the patch 
+> was originally written by you? :)
 
-For next version, I will base on for-next branch on Linux PWM tree
+It was more taking the reference from omap2 code. raw_readl can be used.
 
->> diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-> [...]
->> +  - #pwm-cells: Should be 3.
->> +    - The first cell specifies the per-chip index of the PWM to use
->> +    - The second cell is the period in nanoseconds
->> +    - The third cell is used to encode the polarity of PWM output
 >
-> For instance, patches were recently added to make the description of
-> this property more consistent across the bindings documentation of PWM
-> drivers. The more canonical form now is:
+>>
+>>> +
+>>> +       v = __raw_readl(ad->control_reg);
+>>> +       v &= ~ad->enable_mask;
+>>> +       v |= APLL_FORCE_LOCK << __ffs(ad->enable_mask);
+>>> +       __raw_writel(v, ad->control_reg);
+>>
+>> Why not raw_writel? Do you not need the rmb() provided by writel, here
+>> or anywhere else?
 >
->   - #pwm-cells: Should be 3. See pwm.txt in this directory for a
->     description of the cells format.
+> Same, Keerthy? Probably just legacy copy paste from omap2 code and can 
+> be updated based on your comment. Some of these might actually be some 
+> old optimizations, but the APLL enable/disable should be called so 
+> seldom it shouldn't matter. If no objections, I'll just change these 
+> all for next rev.
 
-Thanks, I will use this in next version.
+Thanks Tero.
 
->> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-> [...]
->> +#define PWM_MR		0x00
 >
-> This doesn't seem to be used.
+>>
+>> [...]
+>>
+>>> +void __init of_dra7_apll_setup(struct device_node *node)
+>>> +{
+>>> +       const struct clk_ops *ops;
+>>> +       struct clk *clk;
+>>> +       const char *clk_name = node->name;
+>>> +       int num_parents;
+>>> +       const char **parent_names = NULL;
+>>> +       struct of_phandle_args clkspec;
+>>> +       u8 apll_flags = 0;
+>>> +       struct dpll_data *ad;
+>>> +       u32 idlest_mask = 0x1;
+>>> +       u32 autoidle_mask = 0x3;
+>>> +       int i;
+>>> +
+>>> +       ops = &apll_ck_ops;
+>>> +       ad = kzalloc(sizeof(*ad), GFP_KERNEL);
+>>> +       if (!ad) {
+>>> +               pr_err("%s: could not allocate dpll_data\n", __func__);
+>>> +               return;
+>>> +       }
+>>> +
+>>> +       of_property_read_string(node, "clock-output-names", &clk_name);
+>>> +
+>>> +       num_parents = of_clk_get_parent_count(node);
+>>> +       if (num_parents < 1) {
+>>> +               pr_err("%s: omap dpll %s must have parent(s)\n",
+>>> +                      __func__, node->name);
+>>> +               goto cleanup;
+>>> +       }
+>>> +
+>>> +       parent_names = kzalloc(sizeof(char *) * num_parents, 
+>>> GFP_KERNEL);
+>>> +
+>>> +       for (i = 0; i < num_parents; i++)
+>>> +               parent_names[i] = of_clk_get_parent_name(node, i);
+>>> +
+>>> +       clkspec.np = of_parse_phandle(node, "ti,clk-ref", 0);
+>>> +       ad->clk_ref = of_clk_get_from_provider(&clkspec);
+>>
+>> Use clocks, clock-names, and of_clk_get_by_name().
+>
+> Yea, will change.
+>
+> -Tero
 
-I will remove it in next version, If will it for new feature, I will add it.
-
->> +#define PWM_ENA		0x04
->> +#define PWM_DIS		0x08
->> +#define PWM_SR		0x0C
->
-> Perhaps it'd be useful to add a comment that the above are global
-> registers and the ones below are per-channel.
-
-I will add the comments in next version.
-
->> +#define PWM_CMR		0x00
->> +
->> +/* The following register for PWM v1 */
->> +#define PWMv1_CDTY	0x04
->> +#define PWMv1_CPRD	0x08
->> +#define PWMv1_CUPD	0x10
->> +
->> +/* The following register for PWM v2 */
->> +#define PWMv2_CDTY	0x04
->> +#define PWMv2_CDTYUPD	0x08
->> +#define PWMv2_CPRD	0x0C
->> +#define PWMv2_CPRDUPD	0x10
->> +
->> +#define PWM_NUM		4
->
-> The only place where this is used is in the .probe() function, so you
-> can just as well drop it.
-
-OK, I will hard code it in probe function.
-
->> +struct atmel_pwm_chip {
->> +	struct pwm_chip chip;
->> +	struct clk *clk;
->> +	void __iomem *base;
->> +
->> +	void (*config)(struct atmel_pwm_chip *chip, struct pwm_device *pwm,
->> +			unsigned int dty, unsigned int prd);
->
-> Please use the same parameter names as the PWM core for consistency.
-
-OK, I will use the same parameter names as the PWM core for consistency.
-
->> +};
->> +
->> +#define to_atmel_pwm_chip(chip) container_of(chip, struct atmel_pwm_chip, chip)
->
-> This should be a static inline function so that types are properly
-> checked
-
-OK, I will change it as a static inline function.
-
->> +
->> +static inline u32 atmel_pwm_readl(struct atmel_pwm_chip *chip, int offset)
->
-> "offset" is usually unsigned long.
-
-OK, I will use unsigned long to define it. And change all related 
-definition.
-
->> +{
->> +	return readl(chip->base + offset);
->> +}
->> +
->> +static inline void atmel_pwm_writel(struct atmel_pwm_chip *chip, int offset,
->> +		u32 val)
->
-> And "value" is usually also unsigned long.
->
->> +{
->> +	writel(val, chip->base + offset);
->> +}
->> +
->> +static inline u32 atmel_pwm_ch_readl(struct atmel_pwm_chip *chip, int ch,
->> +		int offset)
->
-> "channel" can be unsigned int, and "offset" unsigned long again. Also
-> the alignment is wrong here. The arguments continued on a new line
-> should be aligned with the arguments on the previous line.
-
-I will fix the alignment in next version.
-
->> +static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->> +		int duty_ns, int period_ns)
->> +{
->> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
->> +	unsigned long long val, prd, dty;
->> +	unsigned long long div, clk_rate;
->
-> All of these unsigned long long can be declared on one line.
-
-I will fix in next version.
-
->> +	int ret, pres = 0;
->> +
->> +	clk_rate = clk_get_rate(atmel_pwm->clk);
->> +
->> +	while (1) {
->> +		div = 1000000000;
->> +		div *= 1 << pres;
->> +		val = clk_rate * period_ns;
->> +		prd = div_u64(val, div);
->> +		val = clk_rate * duty_ns;
->> +		dty = div_u64(val, div);
->> +
->> +		if (prd < 0x0001 || dty < 0x0)
->> +			return -EINVAL;
->
-> I find the usage of hexadecimal literals a bit strange here. Perhaps
-> just change this to:
->
-> 		if (prd < 1 || dty < 0)
->
->> +		if (prd > 0xffff || dty > 0xffff) {
->
-> This makes some sense, because I would assume that these are restricted
-> by register fields. Might be good to add a comment to that effect,
-> though.
-
-I will add the comments.
-
->> +			if (++pres > 0x10)
->> +				return -EINVAL;
->
-> But here again, I think writing:
->
-> 			if (++pres > 16)
->
-> would be clearer.
->
->> +	/* Enable clock */
->> +	ret = clk_prepare_enable(atmel_pwm->clk);
->
-> You should probably call clk_prepare() in .probe() already and only call
-> clk_enable() here. The reason is that clk_get_rate() might actually fail
-> if you haven't called clk_prepare() on it. Furthermore clk_prepare()
-> potentially involves a lot more than clk_enable() so it makes sense to
-> call it earlier, where the delay doesn't matter.
-
-I will do this in next version.
-
->> +	if (ret) {
->> +		pr_err("failed to enable pwm clock\n");
->> +		return ret;
->> +	}
->> +
->> +	atmel_pwm->config(atmel_pwm, pwm, dty, prd);
->> +
->> +	/* Check whether need to disable clock */
->> +	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
->> +	if ((val & 0xf) == 0)
->
-> Can we have a symbolic name for the 0xf constant here?
-
-I will use symbol to replace hard code.
-
->> +		clk_disable_unprepare(atmel_pwm->clk);
->
-> Similarly this should just call clk_disable() and .remove() should call
-> clk_unprepare().
->
->> +static void atmel_pwm_config_v1(struct atmel_pwm_chip *atmel_pwm,
->> +		struct pwm_device *pwm, unsigned int dty, unsigned int prd)
->
-> Parameter alignment again.
-
-OK.
-
->> +{
->> +	unsigned int val;
->> +
->> +	/*
->> +	 * if the pwm channel is enabled, using update register to update
->> +	 * related register value, or else write it directly
->> +	 */
->
-> This comment is somewhat confusing, can you rewrite it to make it more
-> clear what is meant?
-
-I will make it more clearly.
-
->> +	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
->> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CUPD, dty);
->> +
->> +		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
->> +		val &= ~(1 << 10);
->
-> Symbolic constant for 1 << 10, please.
-
-OK.
-
->> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
->> +	} else {
->> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CDTY, dty);
->> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CPRD, prd);
->> +	}
->> +}
->> +
->> +static void atmel_pwm_config_v2(struct atmel_pwm_chip *atmel_pwm,
->> +		struct pwm_device *pwm, unsigned int dty, unsigned int prd)
->> +{
->> +	/*
->> +	 * if the pwm channel is enabled, using update register to update
->> +	 * related register value, or else write it directly
->> +	 */
->> +	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
->> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTYUPD, dty);
->> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CPRDUPD, prd);
->> +	} else {
->> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTY, dty);
->> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CPRD, prd);
->> +	}
->> +}
->
-> Same comments as for atmel_pwm_config_v1().
->
->> +
->> +static int atmel_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
->> +		enum pwm_polarity polarity)
->> +{
->> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
->> +	u32 val = 0;
->> +	int ret;
->> +
->> +	/* Enable clock */
->> +	ret = clk_prepare_enable(atmel_pwm->clk);
->
-> That comment doesn't add anything valuable. Also split clk_prepare() and
-> clk_enable() again.
->
->> +	if (ret) {
->> +		pr_err("failed to enable pwm clock\n");
->> +		return ret;
->> +	}
->> +
->> +	if (polarity == PWM_POLARITY_NORMAL)
->> +		val &= ~(1 << 9);
->> +	else
->> +		val |= 1 << 9;
->
-> 1 << 9 should be a symbolic constant.
->
->> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
->> +
->> +	/* Disable clock */
->> +	clk_disable_unprepare(atmel_pwm->clk);
->
-> That comment isn't useful either.
-
-I will remove the comment.
-
->> +static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->> +{
->> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
->> +	u32 val;
->> +
->> +	atmel_pwm_writel(atmel_pwm, PWM_DIS, 1 << pwm->hwpwm);
->> +
->> +	/* Disable clock */
->> +	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
->> +	if ((val & 0xf) == 0)
->> +		clk_disable_unprepare(atmel_pwm->clk);
->
-> The intent of this would be much clearer if 0xf was a symbolic constant.
->
->> +}
->> +struct atmel_pwm_data {
->> +	void (*config)(struct atmel_pwm_chip *chip, struct pwm_device *pwm,
->> +			unsigned int dty, unsigned int prd);
->> +};
->
-> I think it would be nicer to use the same parameter names as the PWM
-> core uses.
->
->> +static struct atmel_pwm_data atmel_pwm_data_v1 = {
->> +	.config = atmel_pwm_config_v1,
->> +};
->> +
->> +static struct atmel_pwm_data atmel_pwm_data_v2 = {
->> +	.config = atmel_pwm_config_v2,
->> +};
->
-> Can both of these not be "static const"?
-
-OK.
-
->> +static const struct of_device_id atmel_pwm_dt_ids[] = {
->> +	{
->> +		.compatible = "atmel,at91sam9rl-pwm",
->> +		.data = &atmel_pwm_data_v1,
->> +	}, {
->> +		.compatible = "atmel,sama5-pwm",
->> +		.data = &atmel_pwm_data_v2,
->> +	}, {
->> +		/* sentinel */
->> +	},
->> +};
->> +MODULE_DEVICE_TABLE(of, atmel_pwm_dt_ids);
->
-> Given that you use of_match_ptr() in the driver structure, you should
-> probably protect this using #ifdef CONFIG_OF, otherwise non-OF builds
-> will warn about this table being unused.
-
-OK. I will add it.
-
->> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
->> +	if (IS_ERR(pinctrl)) {
->> +		dev_err(&pdev->dev, "failed get pinctrl\n");
->> +		return PTR_ERR(pinctrl);
->> +	}
->
-> That should be taken care of by the core and therefore not needed to be
-> done by the driver explicitly. When you remove this, make sure to remove
-> the linux/pinctrl/consumer.h include along with it.
-
-I will remove it.
-
->> +	atmel_pwm = devm_kzalloc(&pdev->dev, sizeof(*atmel_pwm), GFP_KERNEL);
->> +	if (!atmel_pwm) {
->> +		dev_err(&pdev->dev, "out of memory\n");
->> +		return -ENOMEM;
->> +	}
->
-> I don't think that error message provides a lot of useful information.
-> If the probe() function fails then the core will output an error message
-> that includes the error code, so the reason for the failure can easily
-> be reconstructed from that already.
-
-OK, I will fix it.
-
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	if (!res) {
->> +		dev_err(&pdev->dev, "no memory resource defined\n");
->> +		return -ENODEV;
->> +	}
->
-> devm_ioremap_resource() checks for the validity of the res parameter, so
-> you can drop the checks here.
->
->> +	atmel_pwm->base = devm_ioremap_resource(&pdev->dev, res);
->> +	if (IS_ERR(atmel_pwm->base)) {
->> +		dev_err(&pdev->dev, "ioremap failed\n");
->
-> devm_ioremap_resource() provides it's own error messages, so you don't
-> have to duplicate it here.
-
-I will remove it.
-
->> +	atmel_pwm->clk = devm_clk_get(&pdev->dev, "pwm_clk");
->
-> If this is the only clock that the driver uses, why do you need to
-> specify the consumer ID at all? Doesn't a simple:
->
-> 	atmel_pwm->clk = devm_clk_get(&pdev->dev, NULL);
->
-> work?
-
-It works.
-
->> +	dev_info(&pdev->dev, "successfully register pwm\n");
->
-> That's not necessary. You should provide an error message if probing
-> failed. If everything went as expected there's no need to be verbose.
->
->> +MODULE_LICENSE("GPL v2");
->
-> I think that "GPL v2" means "GPL v2", not "GPL v2 (and later)" and
-> therefore is in conflict with the license note in the file header.
->
-> Thierry
->
-
-Best Regards,
-Bo Shen
+Regards,
+Keerthy
