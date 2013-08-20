@@ -1,57 +1,36 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 20 Aug 2013 17:13:08 +0200
-Subject: Enable arm_global_timer for Zynq brakes boot
-In-Reply-To: <20130820005748.GA23960@codeaurora.org>
-References: <20130809172757.GD14845@codeaurora.org>
- <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
- <52090B43.9090000@codeaurora.org>
- <d36fc2db-1189-4c6a-9bc4-0ac2e29eaa1b@AM1EHSMHS009.ehs.local>
- <5209120D.1010701@linaro.org>
- <9b07d8a3-b650-4147-b952-9bcfc1172c51@VA3EHSMHS025.ehs.local>
- <5209152F.5020307@linaro.org>
- <86b18b0d-08e1-4899-86ea-ed22d3d36dee@DB8EHSMHS028.ehs.local>
- <5212A394.5020109@codeaurora.org>
- <140fc91a-cc81-418e-8a5e-413bbf47834e@CO1EHSMHS025.ehs.local>
- <20130820005748.GA23960@codeaurora.org>
-Message-ID: <52138784.7050703@linaro.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 20 Aug 2013 08:18:52 -0700
+Subject: [PATCH v4 06/19] driver/core: cpu: initialize of_node in cpu's
+ device struture
+In-Reply-To: <1376991021-12160-7-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376991021-12160-7-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <20130820151852.GB18016@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2013 02:57 AM, Stephen Boyd wrote:
-> On 08/19, S??ren Brinkmann wrote:
->> Hi Stephen,
->>
->> On Mon, Aug 19, 2013 at 04:00:36PM -0700, Stephen Boyd wrote:
->>> On 08/16/13 10:28, S??ren Brinkmann wrote:
->>>> On Mon, Aug 12, 2013 at 07:02:39PM +0200, Daniel Lezcano wrote:
->>>>> On 08/12/2013 06:53 PM, S??ren Brinkmann wrote:
->>>>>> It's actually present. I have a clean 3.11-rc3 and the only changes are
->>>>>> my patch to enable the GT and Stephen's fix.
->>>>>> The cpuidle stats show both idle states being used.
->>>>> Ah, right. The tick_broadcast_mask is not set because the arm global
->>>>> timer has not the CLOCK_EVT_FEAT_C3STOP feature flag set.
->>>> Just to check in. Do you want any additional testing done? Or can I
->>>> expect Stephens fix to get merged, so Zynq can use the GT?
->>>>
->>>
->>> I was curious, can you use just the first hunk of the patch that applied
->>> to tick-broadcast.c to fix the problem? I think the answer is yes.
->>
->> Yes, that seems to be enough.
->>
+On Tue, Aug 20, 2013 at 10:30:08AM +0100, Sudeep KarkadaNagesha wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 > 
-> Great thank you. I will split the patch into two pieces. That way
-> we can discuss the merit of always using a timer that doesn't
-> suffer from FEAT_C3_STOP over a timer that does.
+> CPUs are also registered as devices but the of_node in these cpu
+> devices are not initialized. Currently different drivers requiring
+> to access cpu device node are parsing the nodes themselves and
+> initialising the of_node in cpu device.
+> 
+> The of_node in all the cpu devices needs to be initialized properly
+> and at one place. The best place to update this is CPU subsystem
+> driver when registering the cpu devices.
+> 
+> The OF/DT core library now provides of_get_cpu_node to retrieve a cpu
+> device node for a given logical index by abstracting the architecture
+> specific details.
+> 
+> This patch uses of_get_cpu_node to assign of_node when registering the
+> cpu devices.
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Yes, that sounds a good idea.
-
-  -- Daniel
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
