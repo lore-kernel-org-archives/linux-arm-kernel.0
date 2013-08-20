@@ -1,57 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 20 Aug 2013 16:07:32 +0100
-Subject: [PATCH v2] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <1376673599-3967-1-git-send-email-punit.agrawal@arm.com>
-References: <1374571176-11584-1-git-send-email-punit.agrawal@arm.com>
- <1376673599-3967-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20130820150731.GB27819@mudshark.cambridge.arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 20 Aug 2013 17:13:08 +0200
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <20130820005748.GA23960@codeaurora.org>
+References: <20130809172757.GD14845@codeaurora.org>
+ <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
+ <52090B43.9090000@codeaurora.org>
+ <d36fc2db-1189-4c6a-9bc4-0ac2e29eaa1b@AM1EHSMHS009.ehs.local>
+ <5209120D.1010701@linaro.org>
+ <9b07d8a3-b650-4147-b952-9bcfc1172c51@VA3EHSMHS025.ehs.local>
+ <5209152F.5020307@linaro.org>
+ <86b18b0d-08e1-4899-86ea-ed22d3d36dee@DB8EHSMHS028.ehs.local>
+ <5212A394.5020109@codeaurora.org>
+ <140fc91a-cc81-418e-8a5e-413bbf47834e@CO1EHSMHS025.ehs.local>
+ <20130820005748.GA23960@codeaurora.org>
+Message-ID: <52138784.7050703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 06:19:59PM +0100, Punit Agrawal wrote:
-> The CCI PMU can profile bus transactions at the master and slave
-> interfaces of the CCI. The PMU can be used to observe an aggregated view
-> of the bus traffic between the various components connected to the CCI.
+On 08/20/2013 02:57 AM, Stephen Boyd wrote:
+> On 08/19, S??ren Brinkmann wrote:
+>> Hi Stephen,
+>>
+>> On Mon, Aug 19, 2013 at 04:00:36PM -0700, Stephen Boyd wrote:
+>>> On 08/16/13 10:28, S??ren Brinkmann wrote:
+>>>> On Mon, Aug 12, 2013 at 07:02:39PM +0200, Daniel Lezcano wrote:
+>>>>> On 08/12/2013 06:53 PM, S??ren Brinkmann wrote:
+>>>>>> It's actually present. I have a clean 3.11-rc3 and the only changes are
+>>>>>> my patch to enable the GT and Stephen's fix.
+>>>>>> The cpuidle stats show both idle states being used.
+>>>>> Ah, right. The tick_broadcast_mask is not set because the arm global
+>>>>> timer has not the CLOCK_EVT_FEAT_C3STOP feature flag set.
+>>>> Just to check in. Do you want any additional testing done? Or can I
+>>>> expect Stephens fix to get merged, so Zynq can use the GT?
+>>>>
+>>>
+>>> I was curious, can you use just the first hunk of the patch that applied
+>>> to tick-broadcast.c to fix the problem? I think the answer is yes.
+>>
+>> Yes, that seems to be enough.
+>>
 > 
-> Extend the existing CCI driver to support the PMU by registering a perf
-> backend for it.
-> 
-> Document the device tree binding to describe the CCI PMU.
-> 
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Dave Martin <dave.martin@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> ---
-> 
-> Hi,
-> 
-> This is the second version of the CCI PMU driver. The changes incorporate review
-> comments on device tree bindings and corresponding update to the driver.
-> 
-> Cheers,
-> Punit
-> 
-> Will, I've dropped your reviewed-by tag due to the changes. Let me know if you are
-> ok with the changes and I'll add the tag.
+> Great thank you. I will split the patch into two pieces. That way
+> we can discuss the merit of always using a timer that doesn't
+> suffer from FEAT_C3_STOP over a timer that does.
 
-I'm not the right person to review the DT binding, but the actual driver
-code is fine. You can either:
+Yes, that sounds a good idea.
 
-  1. Add my reviewed-by once you have an Ack from a DT maintainer
+  -- Daniel
 
-or
 
-  2. Split the patch in two (binding + driver) and add my reviewed-by to the
-     driver part
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Either way, once you have the DT part sorted out, please send a fresh
-version with the relevant tags and stick me on CC.
-
-Cheers,
-
-Will
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
