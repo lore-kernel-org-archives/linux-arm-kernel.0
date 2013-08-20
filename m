@@ -1,35 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Aug 2013 12:49:49 +0100
-Subject: [alsa-devel] [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM
- links between codec and cpu DAI
-In-Reply-To: <20130820114421.GN30073@sirena.org.uk>
-References: <20130805220639.GB26637@sirena.org.uk>
- <20130805233015.GY23006@n2100.arm.linux.org.uk>
- <20130806133206.GA6427@sirena.org.uk>
- <20130810161123.GW23006@n2100.arm.linux.org.uk>
- <20130810211342.GX23006@n2100.arm.linux.org.uk>
- <1376293215.2385.32.camel@loki>
- <20130812082837.GB23006@n2100.arm.linux.org.uk>
- <1376405952.2617.101.camel@loki>
- <20130820102555.GZ23006@n2100.arm.linux.org.uk>
- <20130820114421.GN30073@sirena.org.uk>
-Message-ID: <20130820114949.GB23006@n2100.arm.linux.org.uk>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 20 Aug 2013 14:13:04 +0200
+Subject: [PATCH] ARM: EXYNOS: fix PL330 MDMA1 address in DT for Universal
+ C210 board
+In-Reply-To: <8667689.9TcYbn9cHO@amdc1032>
+References: <8667689.9TcYbn9cHO@amdc1032>
+Message-ID: <1448881.nvIAFtzzXr@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 12:44:21PM +0100, Mark Brown wrote:
-> On Tue, Aug 20, 2013 at 11:25:55AM +0100, Russell King - ARM Linux wrote:
-> 
-> > Mark is adamant that the Kirkwood-i2s with SPDIF support _will_ use DPCM
-> > and refuses to take patches which don't.
-> 
-> No, that's for simultaneous use of I2S and S/PDIF.  Using one or the
-> other shouldn't be a problem, that's just a single DAI and a single PCM
-> which has always been supported.
-> 
-> > So, until DPCM gets fixed, I can't proceed with getting SPDIF for kirkwood
-> > into mainline.
-> 
-> I would suggest getting the either/or support merged first.
+Hi Bart,
 
-Sorry, I don't know how to do that.
+On Tuesday 20 of August 2013 13:22:45 Bartlomiej Zolnierkiewicz wrote:
+> Revision 0 of Exynos4210 SoC (used on Universal C210 board) requires
+> 'secure' PL330 MDMA1 address (0x12840000) instead of 'non-secure' one
+> (0x12850000). Fix it by overriding the default PL330 MDMA1 address in
+> exynos4210-universal_c210.dts.
+> 
+> This is a Device Tree (DT) version of commit 91280e7 ("ARM: EXYNOS:
+> PL330 MDMA1 fix for revision 0 of Exynos4210 SOC") and fixes recent
+> regression caused by conversion to DT-only setup on ARM EXYNOS.
+> 
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts
+> b/arch/arm/boot/dts/exynos4210-universal_c210.dts index 889cdad..d2e3f5f
+> 100644
+> --- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
+> +++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+> @@ -350,3 +350,7 @@
+>  		status = "okay";
+>  	};
+>  };
+> +
+> +&mdma1 {
+> +	reg = <0x12840000 0x1000>;
+> +};
+
+Acked-by: Tomasz Figa <t.figa@samsung.com>
+
+As a side note for other reviewers, Universal C210 is the only board based 
+on Exynos4210 rev0, so board-level dts is the right place for such 
+override.
+
+Best regards,
+Tomasz
