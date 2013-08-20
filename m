@@ -1,41 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 20 Aug 2013 07:26:32 -0500
-Subject: [PATCH 01/15] drivers: phy: add generic PHY framework
-In-Reply-To: <5211ACE9.3040302@ti.com>
-References: <20130720220006.GA7977@kroah.com> <520A2100.6000709@ti.com>
- <520AB0F0.8010106@gmail.com> <2128883.KpgODjXPJQ@flatron>
- <520B9C9E.8010002@ti.com> <5211ACE9.3040302@ti.com>
-Message-ID: <20130820122632.GS26587@radagast>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Aug 2013 05:32:32 -0700
+Subject: [GIT PULL] omap fixes against v3.11-rc5
+In-Reply-To: <CAOesGMiQBajdyW5AFJx6ASh1pHmdDPrh6Gy3o2HOBtFc9-g_Ag@mail.gmail.com>
+References: <20130816071958.GB7656@atomide.com>
+ <CAOesGMiQBajdyW5AFJx6ASh1pHmdDPrh6Gy3o2HOBtFc9-g_Ag@mail.gmail.com>
+Message-ID: <20130820123232.GN7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Olof Johansson <olof@lixom.net> [130816 15:05]:
+> 
+> Our current fixes branch is based on -rc4, and I didn't see any of
+> these commits in linux-next, so I took the liberty to rebase them back
+> onto our current branch.
+> 
+> I.e. pulled, but rebased.
 
-On Mon, Aug 19, 2013 at 10:58:09AM +0530, Kishon Vijay Abraham I wrote:
-> >> So maybe let's stop solving an already solved problem and just state that 
-> >> you need to explicitly assign device ID to use this framework?
-> > 
-> > Felipe,
-> > Can we have it the way I had in my v10 patch series till we find a better way?
-> > I think this *non-dt* stuff shouldn't be blocking as most of the users are dt only?
+Thanks no problem at my end. But to avoid future confusion, what's
+the reasoning for rebasing? AFAIK, pulling this in would have just
+automatically updated your branch to -rc5, no?
 
-I don't have a lot of things against it, but preventing driver authors
-to use PLATFORM_DEVID_AUTO just to use the framework is likely going to
-piss some people off.
+The only time where pulling in a branch based on a later mainline
+commit would cause problems is if your branch is based on another
+series of patches you want to send separately as then you'd get
+all the commits between -rc4 and -rc5 when doing the pull request.
 
-Perhaps we can start with this approach and fix things later ? At least
-it ungates all the PHY drivers which are depending on this framework
-(quite a few already). If everybody agrees with this approach, I'd be ok
-with it too.
+Probably nothing new in this for your, but FYI, you can use pulling
+or merging branches as a way of updating your publick branches without
+rebasing or adding extra merge commits while keeping the branch
+pullable.
 
-cheers
+Let's assume you have arm-soc/fixes based on -rc4, and -rc5
+comes out:
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130820/3d97825d/attachment.sig>
+$ git checkout -b my-fixes-of-the-week v3.11-rc5
+# apply pending patches
+...
+$ git checkout arm-soc/fixes
+$ git merge my-fixes-of-the-week
+
+And then you have essentially fast forwarded your arm-soc/fixes to
+-rc5 and it stays pullable ;)
+
+Regards,
+
+Tony
