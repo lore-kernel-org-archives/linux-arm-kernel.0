@@ -1,43 +1,75 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 20 Aug 2013 13:48:24 -0300
-Subject: [PATCH v2 0/3] Introduce atomic MMIO register clear-set
-Message-ID: <1377017307-23201-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Tue, 20 Aug 2013 13:48:25 -0300
+Subject: [PATCH v2 1/3] ARM: Introduce atomic MMIO clear/set
+In-Reply-To: <1377017307-23201-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1377017307-23201-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1377017307-23201-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's the v2 for the introduction of a generic thread-safe clear-set
-register access.
+Some SoC have MMIO regions that are shared across orthogonal
+subsystems. This commit implements a possible solution for the
+thread-safe access of such regions through a spinlock-protected API
+with clear-set semantics.
 
-Following the v1, I've added a proper barrier to ensure proper ordering,
-between the writel and the spin_unlock.
+Concurrent access is protected with a single spinlock for the
+entire MMIO address space. While this protects shared-registers,
+it also serializes access to unrelated/unshared registers.
 
-It's worth noticing a different approach has been proposed (several times)
-for getting thread-safe register access, through the use of regmap_update_bits
-(just as it's done in mfd/syscon).
+---
+Based on a similar approach suggested by Russel King:
+http://archive.arm.linux.org.uk/lurker/message/20130618.113606.d7d4fe4b.en.html
 
-However, as noted in [1], such solution has been rejected (several times)
-for two reasons:
+Changes from v1:
 
-  * It's way more heavy-weight than necessary
-  * It cannot be used in very early scenarios,
-    such as a clocksource initialization.
+* Added an io barrier iowmb() as suggested by Will Deacon,
+  to ensure the writel gets completed before the spin_unlock().
 
-Using this API it's possible -for instance- to add support for Armada 370/XP
-in the orion_wdt driver. That work is ready, and it's been hold until we
-decide a proper solution for shared-register access.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/include/asm/io.h |  5 +++++
+ arch/arm/kernel/io.c      | 13 +++++++++++++
+ 2 files changed, 18 insertions(+)
 
-[1] http://www.spinics.net/lists/arm-kernel/msg266494.html
-
-Ezequiel Garcia (3):
-  ARM: Introduce atomic MMIO clear/set
-  clocksource: orion: Use atomic access for shared registers
-  watchdog: orion: Use atomic access for shared registers
-
- arch/arm/include/asm/io.h        |  5 +++++
- arch/arm/kernel/io.c             | 13 +++++++++++++
- drivers/clocksource/time-orion.c |  9 ++-------
- drivers/watchdog/orion_wdt.c     |  8 ++------
- 4 files changed, 22 insertions(+), 13 deletions(-)
-
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index d070741..3cea1f0 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -36,6 +36,11 @@
+ #define isa_bus_to_virt phys_to_virt
+ 
+ /*
++ * Atomic MMIO-wide IO clear/set
++ */
++extern void atomic_io_clear_set(u32 clear, u32 set, void __iomem *reg);
++
++/*
+  * Generic IO read/write.  These perform native-endian accesses.  Note
+  * that some architectures will want to re-define __raw_{read,write}w.
+  */
+diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
+index dcd5b4d..b2a53a3 100644
+--- a/arch/arm/kernel/io.c
++++ b/arch/arm/kernel/io.c
+@@ -1,6 +1,19 @@
+ #include <linux/export.h>
+ #include <linux/types.h>
+ #include <linux/io.h>
++#include <linux/spinlock.h>
++
++static DEFINE_SPINLOCK(__io_lock);
++
++void atomic_io_clear_set(u32 clear, u32 set, void __iomem *reg)
++{
++	spin_lock(&__io_lock);
++	writel((readl(reg) & ~clear) | set, reg);
++	/* ensure the write get done before unlocking */
++	__iowmb();
++	spin_unlock(&__io_lock);
++}
++EXPORT_SYMBOL(atomic_io_clear_set);
+ 
+ /*
+  * Copy data from IO memory space to "real" memory space.
 -- 
 1.8.1.5
