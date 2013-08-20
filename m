@@ -1,59 +1,57 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 20 Aug 2013 18:24:42 +0200
-Subject: [PATCH 1/1] ARM: at91: at91sam9260: add missing pinctrl-names on
- mmc
-In-Reply-To: <520B353F.9070605@atmel.com>
-References: <1373882719-9940-1-git-send-email-plagnioj@jcrosoft.com>
- <520B353F.9070605@atmel.com>
-Message-ID: <20130820162442.GF5149@ludovic.desroches@atmel.com>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Tue, 20 Aug 2013 09:33:19 -0700
+Subject: [PATCH v4 1/4] ARM: OMAP2+: AM33XX: I2C Sleep/wake sequence
+ support
+In-Reply-To: <5211B201.2000401@ti.com>
+References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
+ <1376432412-8509-2-git-send-email-Russ.Dill@ti.com>
+ <520B595F.2040207@ti.com>
+ <CA+Bv8XZ-QGhVV1mK=rRekOZzaTDN-Y9YkWYYoEc8EtvP0JouEA@mail.gmail.com>
+ <5211B201.2000401@ti.com>
+Message-ID: <CA+Bv8XaPU6N3KztAPFZb8OMMg8Tc+Kv5hf1Utz7QS=NCRdO3Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 09:43:59AM +0200, Nicolas Ferre wrote:
-> On 15/07/2013 12:05, Jean-Christophe PLAGNIOL-VILLARD :
-> >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >---
-> >  arch/arm/boot/dts/at91sam9260.dtsi | 1 +
-> >  1 file changed, 1 insertion(+)
+On Sun, Aug 18, 2013 at 10:49 PM, Gururaja Hebbar
+<gururaja.hebbar@ti.com> wrote:
+>
+> On 8/15/2013 4:04 AM, Russ Dill wrote:
+> > On Wed, Aug 14, 2013 at 3:18 AM, Gururaja Hebbar <gururaja.hebbar@ti.com> wrote:
+> >> On 8/14/2013 3:50 AM, Russ Dill wrote:
+> >>> Changes since v1:
+> >>> * Rebased onto new am335x PM branch
+> >>> * Changed to use 5th param register
+>
+> >>
+>
+> [snip]
+> [snip]
+>
+> >>> +
+> >>> +     wkup_m3_reset_data_pos();
+> >>> +     if (am33xx_i2c_sleep_sequence) {
+> >>> +             pos = wkup_m3_copy_data(am33xx_i2c_sleep_sequence,
+> >>> +                                             i2c_sleep_sequence_sz);
+> >>
+> >> Why do we need to copy this data (same constant data) on every iteration?
 > >
-> >diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> >index c7ccbcb..56ee828 100644
-> >--- a/arch/arm/boot/dts/at91sam9260.dtsi
-> >+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> >@@ -572,6 +572,7 @@
-> >  				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
-> >  				#address-cells = <1>;
-> >  				#size-cells = <0>;
-> >+				pinctrl-names = "default";
-> 
-> Ok, but there is no pinctrl property in this node: maybe it would be
-> good to have a default entry for this.
-> 
-> It is then overloaded in arch/arm/boot/dts/animeo_ip.dts for instance...
-> 
+> > Because the CM3 firmware is reset after each suspend/resume cycle. The
+> > firmware reset handler reinitializes the DMEM.
+>
+> Well in that why can't the i2c payload be copied to UMEM?
+>
+> Thanks & regards
+> Gururaja
+>
 
-Yes it is overloaded in arch/arm/boot/dts/at91sam9g20ek_common.dtsi.
+I've given this some thought, and gone back and forth a bit. UMEM is a
+bit more complicated because the linker decides what should go where.
+Also, it may be that in the future, either the PM for am335x or am43xx
+will be writing different sequences depending on the suspend
+mode/options.
 
-mmc0 pinctrl configuration is set in at91sam9260.dtsi that is ok but do we have
-to put a minimal pinctrl property as the mmc clock pinctrl? It is board
-relative and no device related. So maybe it is not the right place then I am
-wondering if pinctrl-names should be set in at91sam9260.dtsi...
+Is there a specific aspect of copying the data each suspend cycle that
+you are trying to fix? Is it just that the data could only be copied
+once? Or is it the latency of the copy?
 
-> Can you please add one?
-> 
-> Bye,
-> 
-> >  				status = "disabled";
-> >  			};
-> >
-> >
-> 
-> 
-> -- 
-> Nicolas Ferre
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks!
