@@ -1,55 +1,34 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 20 Aug 2013 14:20:37 +0530
-Subject: [PATCH v2 2/2] dmaengine: Add hisilicon k3 DMA engine driver
-In-Reply-To: <5213359B.4070208@linaro.org>
-References: <1372423153-6742-1-git-send-email-zhangfei.gao@linaro.org>
- <1372423153-6742-3-git-send-email-zhangfei.gao@linaro.org>
- <20130813112043.GB32147@intel.com>
- <CAMj5Bki0H+=0wQY39+jDw4nAEq5wEq3V3yri9xpNRxQ2GRwPbA@mail.gmail.com>
- <20130819053511.GU32147@intel.com>
- <CAMj5BkixUR2-MnYLVymPLnQ922jEhbKnwUHs__d3hr2d_Qb8fA@mail.gmail.com>
- <20130820082749.GG5810@intel.com> <5213359B.4070208@linaro.org>
-Message-ID: <20130820085037.GH5810@intel.com>
+From: b35083@freescale.com (Jingchang Lu)
+Date: Tue, 20 Aug 2013 17:42:37 +0800
+Subject: [PATCH] i2c: imx: use exact SoC revision document binding
+Message-ID: <1376991757-9727-1-git-send-email-b35083@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 05:23:39PM +0800, zhangfei wrote:
-> >>>>>why do we need the else part here?
-> >>>>Since asynchronous mode is supported.
-> >>>>Desc is submitted to list but may not get physical channel to run.
-> >>>But when you pause you pause the running channel. You dont pause a descriptor.
-> >>>So whatever you are trying to imply doesnt make sense to me.
-> >>
-> >>Here delete node from chan_pending, which will be quired from tasklet.
-> >>
-> >>The physical channel is free matched.
-> >>dma_issue_pending will put node to d->k3_dma_issue_pending if no phy allocated.
-> >>Tasklet do two jobs
-> >>1, check running channel for new request form desc_issued.
-> >>2, check any new chan_pending and alloc phy if available.
-> >>
-> >>If no phy, the node will be put in chan_pending.
-> >>If pause does not remove from chan_pending, it may be got from tasklet
-> >>to start a new transaction.
-> >>So it's safe to remove from chan_pending when pause, and add back when resume.
-> >But when you add, where do you start from, from the start of the descriptor or
-> >the previosu position.
-> >
-> >The point is pause-resume you dont need to do all that. Channel is paused so
-> >just pause it by stopping exuection, not more. Then you resume by asking
-> >controller to start from where it left off.
-> 
-> Since it is async mode, it does not know the physical channel is
-> really started or not.
-> 
-> When desc is submitted, it can be
-> a). get phy and run, pause can stop and resume where it stops.
-> b). Dot not start at all since no phy available (16 phys vs 27
-> request line), if pause do nothing it will stay in chan_pending, if
-> tasklet happens again, it will be fetched and started, while upper
-> layer thought it is already paused.
-> 
-> Do we need consider case b?
-and how do you handle when the desc is running on a phy.
+use exact SoC revision instead of wildcard describing
+the compatible property requirement in the binding
+document. This will make the binding more clearer.
 
-~Vinod
+Signed-off-by: Jingchang Lu <b35083@freescale.com>
+---
+ Documentation/devicetree/bindings/i2c/i2c-imx.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-imx.txt b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
+index 3614242..4e7282d 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-imx.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
+@@ -1,7 +1,10 @@
+ * Freescale Inter IC (I2C) and High Speed Inter IC (HS-I2C) for i.MX
+ 
+ Required properties:
+-- compatible : Should be "fsl,<chip>-i2c"
++- compatible :
++  - "fsl,imx1-i2c" for I2C used similar to that on i.MX1 SoC
++  - "fsl,imx21-i2c" for I2C used similar to that on i.MX21 SoC
++  - "fsl,vf610-i2c" for I2C used similar to that on Vybrid vf610 SoC
+ - reg : Should contain I2C/HS-I2C registers location and length
+ - interrupts : Should contain I2C/HS-I2C interrupt
+ 
+-- 
+1.8.0
