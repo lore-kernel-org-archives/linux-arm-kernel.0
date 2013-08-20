@@ -1,31 +1,26 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Aug 2013 16:52:46 +0800
-Subject: [PATCH v2] dma: imx-sdma: Add ROM script addresses to driver
-In-Reply-To: <1376985873-25776-1-git-send-email-s.hauer@pengutronix.de>
-References: <1376985873-25776-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130820085244.GD29114@S2101-09.ap.freescale.net>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 20 Aug 2013 11:56:05 +0300
+Subject: [PATCH v2] clk: tegra: Correct sbc mux width & parent
+In-Reply-To: <5203BB79.1000704@wwwdotorg.org>
+References: <1375941327-4231-1-git-send-email-markz@nvidia.com>
+ <5203BB79.1000704@wwwdotorg.org>
+Message-ID: <20130820085605.GS18810@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 10:04:30AM +0200, Sascha Hauer wrote:
-> Changes since v1:
+On Thu, Aug 08, 2013 at 05:38:33PM +0200, Stephen Warren wrote:
+> On 08/07/2013 11:55 PM, Mark Zhang wrote:
+> > Tegra114 sbc1-sbc6 have more possible parent clocks than Tegra30.
+> > So correct the parents and mux width for them.
 > 
-> - skip handling of SoCs which have a tapeout specific SDMA firmware,
->   namely i.MX31/35
-> 
-> ----------------------------------------------------------------
-> Sascha Hauer (3):
->       dma: imx-sdma: Use struct for driver data
->       dma: imx-sdma: Add ROM script addresses to driver
->       ARM: i.MX: remove sdma script address arrays from platform data
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 
-For the series,
+Acked-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Note that in downstream we intentionally leave out pllc2 and pllc3 as possible
+parents for clocks which are not controlled using the cbus/shared clock
+mechanism.
 
-> 
->  .../devicetree/bindings/dma/fsl-imx-sdma.txt       |   7 +-
->  arch/arm/mach-imx/mm-imx25.c                       |  17 ---
->  arch/arm/mach-imx/mm-imx5.c                        |  14 --
->  drivers/dma/imx-sdma.c                             | 161 +++++++++++++++++----
->  4 files changed, 137 insertions(+), 62 deletions(-)
+Cheers,
+
+Peter.
