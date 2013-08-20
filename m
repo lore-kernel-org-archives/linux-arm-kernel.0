@@ -1,52 +1,35 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 20 Aug 2013 09:36:25 -0300
-Subject: [PATCH v2 0/4] Armada XP clocks for timer
-Message-ID: <1377002189-4398-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Tue, 20 Aug 2013 09:36:27 -0300
+Subject: [PATCH v2 2/4] ARM: mvebu: Add clock properties to Armada XP timer
+ node
+In-Reply-To: <1377002189-4398-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1377002189-4398-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1377002189-4398-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the recent discussion on the device tree binding for the Armada 370/XP
-clocksource driver, Stephen Warren, Tomasz Figa and others suggested
-that the reference 25 MHz fixed-clock (aka refclk) should have a proper
-device tree representation.
+With the addition of the Armada XP reference clock, we can now model
+accurately the available clock inputs for the timer: namely, nbclk
+and refclk. For each of this clock inputs we assign a name, for the
+driver to select as appropriate.
 
-(Although that's still debatable, given the 25 MHz fixed-clock seems to be
-used only by the timer/watchdog IP block.)
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-xp.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-In addition to that and to be accurate, both timer clock inputs: nbclk and
-refclk should be exposed in the DT node for the Armada XP timer.
-
-Following an excellent suggestion from Sebastian Hesselbarth, here's a
-patchset to accurately model the clock inputs for the timer.
-
-Considering this is very minor improvemente from my previous patchset [1],
-I dare ask about v3.12 inclusion. On the other side, maybe it's too late already
-and it's best to keep it for v3.13.
-
-Patches 1 and 2 apply on v3.11-rc4 plus the commit:
-"ARM: mvebu: Fix the Armada 370/XP timer compatible strings"
-that's already in mvebu/dt.
-
-Patch 3 and 4 applies on tip/timers/core plus the recent series [1].
-
-[1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/260179
-
-Changes from v1:
-
-  * Improve the devicetree binding as the requirements were very
-    badly stated.
-
-Ezequiel Garcia (4):
-  ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
-  ARM: mvebu: Add clock properties to Armada XP timer node
-  clocksource: armada-370-xp: Get reference fixed-clock by name
-  clocksource: armada-370-xp: Add detailed clock requirements in
-    devicetree binding
-
- .../bindings/timer/marvell,armada-370-xp-timer.txt          | 13 +++++++++++--
- arch/arm/boot/dts/armada-xp.dtsi                            | 11 +++++++++++
- drivers/clocksource/time-armada-370-xp.c                    |  7 +++++--
- 3 files changed, 27 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 50e404e..2642f55 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -63,6 +63,8 @@
+ 
+ 			timer at 20300 {
+ 				compatible = "marvell,armada-xp-timer";
++				clocks = <&coreclk 2>, <&refclk>;
++				clock-names = "nbclk", "fixed";
+ 			};
+ 
+ 			coreclk: mvebu-sar at 18230 {
 -- 
 1.8.1.5
