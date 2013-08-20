@@ -1,125 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 20 Aug 2013 21:38:03 +0200
-Subject: [PATCH] Kconfig: Remove hotplug enable hints in CONFIG_KEXEC help
- texts
-Message-ID: <1377027483-17025-1-git-send-email-geert@linux-m68k.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 20 Aug 2013 21:47:45 +0200
+Subject: [RFC 02/17] ARM: call clk_of_init from time_init
+In-Reply-To: <52138F56.6030008@wwwdotorg.org>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376964271-22715-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <52138F56.6030008@wwwdotorg.org>
+Message-ID: <5213C7E1.4070401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 40b313608ad4ea655addd2ec6cdd106477ae8e15 ("Finally eradicate
-CONFIG_HOTPLUG") removed remaining references to CONFIG_HOTPLUG, but missed
-a few plain English references in the CONFIG_KEXEC help texts.
+On 08/20/2013 05:46 PM, Stephen Warren wrote:
+> On 08/19/2013 08:04 PM, Sebastian Hesselbarth wrote:
+>> Most DT ARM machs require common clock providers initialized before timers.
+>> Currently, arch/arm machs use .init_time to call clk_of_init right before
+>> clocksource_of_init. This prevents to remove that hook and use the default
+>> hook instead. clk_of_init now checks for multiple calls to it, so add
+>> the call to ARM arch time_init by default.
+>
+> Some SoCs call this function in .init_irq() rather than .init_time().
+> Perhaps we adjust this patch to do that instead. That way, we can
+> presumably get rid of patch 1/17 since we can eliminate any duplicate
+> calls, and adjust patch 14/17 (Tegra board file) to remove its custom
+> call to of_clock_init(NULL)?
 
-Remove them, too.
+Currently as of -next from yesterday, only tegra is requiring clocks
+that early, while others are fine with them close to timers. I really
+have no strong opinion on that. That decision should rather be made
+by those with a far more complete insight of the consequences than I
+have.
 
-Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
----
- arch/arm/Kconfig     |    3 +--
- arch/ia64/Kconfig    |    6 +++---
- arch/mips/Kconfig    |    6 +++---
- arch/powerpc/Kconfig |    6 +++---
- arch/sh/Kconfig      |    6 +++---
- arch/x86/Kconfig     |    6 +++---
- 6 files changed, 16 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 43594d5..cd5c1c9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2064,8 +2064,7 @@ config KEXEC
- 
- 	  It is an ongoing process to be certain the hardware in a machine
- 	  is properly shutdown, so do not be surprised if this code does not
--	  initially work for you.  It may help to enable device hotplugging
--	  support.
-+	  initially work for you.
- 
- config ATAGS_PROC
- 	bool "Export atags in procfs"
-diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-index 5a768ad..b36370d 100644
---- a/arch/ia64/Kconfig
-+++ b/arch/ia64/Kconfig
-@@ -565,9 +565,9 @@ config KEXEC
- 
- 	  It is an ongoing process to be certain the hardware in a machine
- 	  is properly shutdown, so do not be surprised if this code does not
--	  initially work for you.  It may help to enable device hotplugging
--	  support.  As of this writing the exact hardware interface is
--	  strongly in flux, so no good recommendation can be made.
-+	  initially work for you.  As of this writing the exact hardware
-+	  interface is strongly in flux, so no good recommendation can be
-+	  made.
- 
- config CRASH_DUMP
- 	  bool "kernel crash dumps"
-diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
-index e12764c..dccd7ce 100644
---- a/arch/mips/Kconfig
-+++ b/arch/mips/Kconfig
-@@ -2305,9 +2305,9 @@ config KEXEC
- 
- 	  It is an ongoing process to be certain the hardware in a machine
- 	  is properly shutdown, so do not be surprised if this code does not
--	  initially work for you.  It may help to enable device hotplugging
--	  support.  As of this writing the exact hardware interface is
--	  strongly in flux, so no good recommendation can be made.
-+	  initially work for you.  As of this writing the exact hardware
-+	  interface is strongly in flux, so no good recommendation can be
-+	  made.
- 
- config CRASH_DUMP
- 	  bool "Kernel crash dumps"
-diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index dbd9d3c..cc61418 100644
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -369,9 +369,9 @@ config KEXEC
- 
- 	  It is an ongoing process to be certain the hardware in a machine
- 	  is properly shutdown, so do not be surprised if this code does not
--	  initially work for you.  It may help to enable device hotplugging
--	  support.  As of this writing the exact hardware interface is
--	  strongly in flux, so no good recommendation can be made.
-+	  initially work for you.  As of this writing the exact hardware
-+	  interface is strongly in flux, so no good recommendation can be
-+	  made.
- 
- config CRASH_DUMP
- 	bool "Build a kdump crash kernel"
-diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-index 1020dd8..1018ed3 100644
---- a/arch/sh/Kconfig
-+++ b/arch/sh/Kconfig
-@@ -643,9 +643,9 @@ config KEXEC
- 
- 	  It is an ongoing process to be certain the hardware in a machine
- 	  is properly shutdown, so do not be surprised if this code does not
--	  initially work for you.  It may help to enable device hotplugging
--	  support.  As of this writing the exact hardware interface is
--	  strongly in flux, so no good recommendation can be made.
-+	  initially work for you.  As of this writing the exact hardware
-+	  interface is strongly in flux, so no good recommendation can be
-+	  made.
- 
- config CRASH_DUMP
- 	bool "kernel crash dumps (EXPERIMENTAL)"
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index b32ebf9..6ace5de 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -1627,9 +1627,9 @@ config KEXEC
- 
- 	  It is an ongoing process to be certain the hardware in a machine
- 	  is properly shutdown, so do not be surprised if this code does not
--	  initially work for you.  It may help to enable device hotplugging
--	  support.  As of this writing the exact hardware interface is
--	  strongly in flux, so no good recommendation can be made.
-+	  initially work for you.  As of this writing the exact hardware
-+	  interface is strongly in flux, so no good recommendation can be
-+	  made.
- 
- config CRASH_DUMP
- 	bool "kernel crash dumps"
--- 
-1.7.9.5
+Sebastian
