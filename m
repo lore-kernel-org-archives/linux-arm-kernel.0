@@ -1,95 +1,46 @@
-From: b.brezillon@overkiz.com (b.brezillon at overkiz.com)
-Date: Tue, 20 Aug 2013 08:11:37 +0200
-Subject: [PATCH 1/8] ARM: at91: move peripheral id definitions to
- dt-bindings include dir
-In-Reply-To: <52124BD5.5060801@atmel.com>
-References: <1375339733-3488-1-git-send-email-b.brezillon@overkiz.com>
- <1375339933-3643-1-git-send-email-b.brezillon@overkiz.com>
- <201308072224.30614.arnd@arndb.de> <520319DE.5090100@overkiz.com>
- <52124BD5.5060801@atmel.com>
-Message-ID: <37721084ba1145097fc0dcbb8d74acb7@localhost>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 20 Aug 2013 14:25:58 +0800
+Subject: [PATCH] ARM: dts: imx6sl reuses imx6q sdma firmware
+In-Reply-To: <20130819162827-27661@mutt-kz>
+References: <1376903386-27771-1-git-send-email-shawn.guo@linaro.org>
+ <20130819123541-7656@mutt-kz>
+ <20130819135315.GA28297@S2101-09.ap.freescale.net>
+ <20130819162827-27661@mutt-kz>
+Message-ID: <20130820062555.GC29114@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Nicolas,
+On Mon, Aug 19, 2013 at 06:28:27PM +0200, Luka Perkov wrote:
+> On Mon, Aug 19, 2013 at 09:53:17PM +0800, Shawn Guo wrote:
+> > On Mon, Aug 19, 2013 at 02:35:42PM +0200, Luka Perkov wrote:
+> > > On Mon, Aug 19, 2013 at 05:09:46PM +0800, Shawn Guo wrote:
+> > > Also, last patch containing sdma firmware blobs sent to the mailing list
+> > > [1] uses "sdma-imx6.bin" name.
+> > 
+> > The patch never got merged.  I do not like the name, simply because imx6
+> > is not a SoC name.
+> 
+> IMHO "sdma-imx6.bin" is much more descriptive then "sdma-imx6q.bin" in
+> this case.
 
-On Mon, 19 Aug 2013 18:46:13 +0200, Nicolas Ferre
-<nicolas.ferre@atmel.com> wrote:
-> On 08/08/2013 06:09, boris brezillon :
->> Hello Arnd,
->>
->> On 07/08/2013 22:24, Arnd Bergmann wrote:
->>> On Thursday 01 August 2013, Boris BREZILLON wrote:
->>>> This patch moves peripheral id definitions from machine specific include
->>>> dir (arch/arm/mach-at91/include/mach/'soc-name'.h) to dt-bindinds include
->>>> dir (include/dt-bindings/at91/'soc-name'/peripherals.h).
->>>>
->>>> These definitions will be used inside dt to define interrupt ids and
->>>> peripheral clk ids.
->>>>
->>>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->>> This seems counterproductive, why would you do that?
->>
->> This was requested by Jean-Christophe Plagniol-Villard (and proposed by
->> Richard Genoud)
->> for the 3rd version of the "ARM: at91: move to common clk framework"
->> patch series (see
->> https://lkml.org/lkml/2013/7/29/361) and thought it was a good idea too
->> (even if I didn't know
->> where to put the macro files as there are no soc specific macro files in
->> dt-bindings include
->> dir).
->>
->> Indeed I found it much easier to detect bugs in dt definition using
->> macros because
->> the macro names and dt node names are the same (it does not protect
->> against errors
->> in the macro definitions).
->>
->> If you think these macro definitions should be dropped, I won't argue
->> against this.
->> But please, have a talk with Jean-Christophe first.
-> 
-> [..]
-> 
->>> There is no sharing of identifiers across SoCs here, you just move the
->>> data around, and changing the .dts files to use the abstract macros would
->>> just end up making them harder to understand, not easier, since you then
->>> have to look up the numbers in another file.
-> 
-> Boris, Jean-Christophe and Richard,
-> 
-> Well, I must say that I do agree with Arnd on this point.
-> 
-> I think that a simple numeric field in a cell has to be represented
-> as a number and even if this simple information is used twice
-> (interrupt number and clock bit position in PMC). The possibility of
-> error is very low compared to the big amount of unneeded definitions
-> added by this solution.
-> 
-> Moreover, I had the hope to completely remove this long list of
-> peripheral definitions for all SoC when we have a full DT kernel (with
-> your patches about common clock framework). So I think it is not
-> interesting to move in this direction and continue to build such a
-> list for future full DT products...
-> 
-> Believe me, I am sorry that I didn't entered the discussion earlier
-> and avoid unnecessary work... Anyway, give me your opinion, but I do
-> think that the simpler is the best.
-> 
+I take it opposite.  "sdma-imx6q.bin" tells that the firmware is created
+for imx6q and gets reused on imx6sl, while "sdma-imx6.bin" tells nothing
+about that compatibility info.
 
-As discussed with you (on IRC), I am not absolutely convinced we need
-these macro definitions, and given the direction you want to take
-(completely
-remove the peripheral id definitions), i would say we'd rather drop
-this patch.
-It won't bother me at all to rework the "sama5 dt clk" patch series
-(this is the
-only SoC I supported in the 3rd version of the at91 common clk
-transition)
-to remove references to these macros.
+> 
+> It could have been named "foobar" as far as I am concerned. But because
+> it was named "sdma-imx6q.bin" in imx6qdl.dtsi error was made when new
+> imx6sl.dtsi was created.
 
-Best Regards,
-Boris
+The error is there only because the author of imx6sl.dtsi (me) was not
+aware of there is no imx6sl specific sdma firmware.
 
-> Bye,
+> Naming it "sdma-imx6.bin" or "sdma-imx6x.bin"
+> would help avoiding confusions in the future (despite it's not SoC
+> name).
+
+Just for example, if the next imx6 SoC uses a different sdma firmware,
+I guess "sdma-imx6.bin" or "sdma-imx6x.bin" would become the source
+of confusion.
+
+Shawn
