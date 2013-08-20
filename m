@@ -1,34 +1,116 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 20 Aug 2013 14:12:45 +0100
-Subject: [PATCH] AArch64: Add single-step and breakpoint handler hooks
-In-Reply-To: <CA+b37P11oFTo8SHWMB8ijy__sqj5HXBPXWd-svkTK3bPTeARuA@mail.gmail.com>
-References: <1375769526-3526-1-git-send-email-sandeepa.prabhu@linaro.org>
- <20130813113253.GF30280@mudshark.cambridge.arm.com>
- <CA+b37P11oFTo8SHWMB8ijy__sqj5HXBPXWd-svkTK3bPTeARuA@mail.gmail.com>
-Message-ID: <20130820131245.GC26129@mudshark.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Aug 2013 15:20:32 +0200
+Subject: [PATCH] ARM: ux500: fix up the I2C devices
+Message-ID: <1377004832-30278-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 13, 2013 at 03:45:30PM +0100, Sandeepa Prabhu wrote:
-> On 13 August 2013 17:02, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Aug 06, 2013 at 07:12:06AM +0100, Sandeepa Prabhu wrote:
-> >> +     cmp     x24, #ESR_EL1_EC_WATCHPT_EL1
-> >> +     csel    x0, x25, x22, eq        //addr: x25->far_el1, x22->elr_el1
-> >> +     b.ge    do_dbg
-> >>       tbz     x24, #0, el1_inv                // EL1 only
-> >
-> > I'd rather you left the tbz as the first instruction in el1_dbg, then you
-> > can also lose the b.ge.
-> well, my understanding is that the tbz check is needed only for
-> Exception Class < 0x35 as per debug spec. If this is true, and if tbz
-> is first instruction, it fails for breakpoint (EC=0x3A) case and call
-> el1_inv to panic instead of routing to do_debug_exception. I am not
-> sure if we can optimize the code further to eliminate this one
-> branching as well.
+The I2C device registration on the different ux500 board was
+buggy due to a switch to dynamically assigned I2C host
+addresses. This I2C host is still there, but we have to add
+the devices dynamically instead of using board data.
 
-Well, you're actually only interested in 0x3c (BRK instruction executed in
-AArch64 state), so you should check for that explicitly. I guess it doesn't
-matter where you check bit #0 first or not, provided you have the branch
-logic correct.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500.c | 33 +++++++++++++--------------------
+ 1 file changed, 13 insertions(+), 20 deletions(-)
 
-Will
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 4e7ab3a..ad0806e 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -324,21 +324,19 @@ static struct lp55xx_platform_data __initdata lp5521_sec_data = {
+        .clock_mode     = LP55XX_CLOCK_EXT,
+ };
+ 
++/* I2C0 devices only available on the first HREF/MOP500 */
+ static struct i2c_board_info __initdata mop500_i2c0_devices[] = {
+ 	{
+ 		I2C_BOARD_INFO("tc3589x", 0x42),
+ 		.irq		= NOMADIK_GPIO_TO_IRQ(217),
+ 		.platform_data  = &mop500_tc35892_data,
+ 	},
+-	/* I2C0 devices only available prior to HREFv60 */
+ 	{
+ 		I2C_BOARD_INFO("tps61052", 0x33),
+ 		.platform_data  = &mop500_tps61052_data,
+ 	},
+ };
+ 
+-#define NUM_PRE_V60_I2C0_DEVICES 1
+-
+ static struct i2c_board_info __initdata mop500_i2c2_devices[] = {
+ 	{
+ 		/* lp5521 LED driver, 1st device */
+@@ -356,6 +354,17 @@ static struct i2c_board_info __initdata mop500_i2c2_devices[] = {
+ 	},
+ };
+ 
++static int __init mop500_i2c_board_init(void)
++{
++	if (machine_is_u8500())
++		mop500_uib_i2c_add(0, mop500_i2c0_devices,
++				   ARRAY_SIZE(mop500_i2c0_devices));
++	mop500_uib_i2c_add(2, mop500_i2c2_devices,
++			   ARRAY_SIZE(mop500_i2c2_devices));
++	return 0;
++}
++device_initcall(mop500_i2c_board_init);
++
+ static void __init mop500_i2c_init(struct device *parent)
+ {
+ 	db8500_add_i2c0(parent, NULL);
+@@ -564,7 +573,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+ static void __init mop500_init_machine(void)
+ {
+ 	struct device *parent = NULL;
+-	int i2c0_devs;
+ 	int i;
+ 
+ 	platform_device_register(&db8500_prcmu_device);
+@@ -587,19 +595,13 @@ static void __init mop500_init_machine(void)
+ 	mop500_spi_init(parent);
+ 	mop500_audio_init(parent);
+ 	mop500_uart_init(parent);
+-
+ 	u8500_cryp1_hash1_init(parent);
+ 
+-	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
+-
+-	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
+-	i2c_register_board_info(2, mop500_i2c2_devices,
+-				ARRAY_SIZE(mop500_i2c2_devices));
+-
+ 	/* This board has full regulator constraints */
+ 	regulator_has_full_constraints();
+ }
+ 
++
+ static void __init snowball_init_machine(void)
+ {
+ 	struct device *parent = NULL;
+@@ -634,7 +636,6 @@ static void __init snowball_init_machine(void)
+ static void __init hrefv60_init_machine(void)
+ {
+ 	struct device *parent = NULL;
+-	int i2c0_devs;
+ 	int i;
+ 
+ 	platform_device_register(&db8500_prcmu_device);
+@@ -663,14 +664,6 @@ static void __init hrefv60_init_machine(void)
+ 	mop500_audio_init(parent);
+ 	mop500_uart_init(parent);
+ 
+-	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
+-
+-	i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
+-
+-	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
+-	i2c_register_board_info(2, mop500_i2c2_devices,
+-				ARRAY_SIZE(mop500_i2c2_devices));
+-
+ 	/* This board has full regulator constraints */
+ 	regulator_has_full_constraints();
+ }
+-- 
+1.8.1.4
