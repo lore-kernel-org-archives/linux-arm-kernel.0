@@ -1,44 +1,35 @@
-From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Tue, 20 Aug 2013 19:30:46 +0530
-Subject: [PATCH] AArch64: Add single-step and breakpoint handler hooks
-In-Reply-To: <20130820131245.GC26129@mudshark.cambridge.arm.com>
-References: <1375769526-3526-1-git-send-email-sandeepa.prabhu@linaro.org>
- <20130813113253.GF30280@mudshark.cambridge.arm.com>
- <CA+b37P11oFTo8SHWMB8ijy__sqj5HXBPXWd-svkTK3bPTeARuA@mail.gmail.com>
- <20130820131245.GC26129@mudshark.cambridge.arm.com>
-Message-ID: <CA+b37P1fTXy1eS_Z8bmBSKFX3NqJ3Bg3kP4NWpQuK_Wr9KLfNQ@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 20 Aug 2013 11:01:06 -0300
+Subject: [RFC 08/17] ARM: mvebu: remove custom .init_time hook
+In-Reply-To: <52136B2C.3030509@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376964271-22715-9-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130820125012.GA4272@localhost> <52136B2C.3030509@gmail.com>
+Message-ID: <20130820140105.GB4272@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 August 2013 18:42, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Aug 13, 2013 at 03:45:30PM +0100, Sandeepa Prabhu wrote:
->> On 13 August 2013 17:02, Will Deacon <will.deacon@arm.com> wrote:
->> > On Tue, Aug 06, 2013 at 07:12:06AM +0100, Sandeepa Prabhu wrote:
->> >> +     cmp     x24, #ESR_EL1_EC_WATCHPT_EL1
->> >> +     csel    x0, x25, x22, eq        //addr: x25->far_el1, x22->elr_el1
->> >> +     b.ge    do_dbg
->> >>       tbz     x24, #0, el1_inv                // EL1 only
->> >
->> > I'd rather you left the tbz as the first instruction in el1_dbg, then you
->> > can also lose the b.ge.
->> well, my understanding is that the tbz check is needed only for
->> Exception Class < 0x35 as per debug spec. If this is true, and if tbz
->> is first instruction, it fails for breakpoint (EC=0x3A) case and call
->> el1_inv to panic instead of routing to do_debug_exception. I am not
->> sure if we can optimize the code further to eliminate this one
->> branching as well.
->
-> Well, you're actually only interested in 0x3c (BRK instruction executed in
-> AArch64 state), so you should check for that explicitly. I guess it doesn't
-> matter where you check bit #0 first or not, provided you have the branch
-> logic correct.
-Agreed, then 0x3c is the only case where bit #0 check shall be ignored.
-I will rework this code accordingly, and as you have mentioned, I will
-add this patch along with the complete kprobes series later that will
-be using it.
+On Tue, Aug 20, 2013 at 03:12:12PM +0200, Sebastian Hesselbarth wrote:
+> > Maybe that's why I'm getting only the patches where I'm Cced?
+> 
+> I try to keep Cc list as short as possible, so I only put Gregory as the 
+> maintainer of mach-mvebu on Cc.
+> 
+
+Pff... you're right, I got this because my mvebu-filters caught it from
+lkml! I'm seeing now the complete patchset in lkml, it looks good!
+
+> 
+> I expect machs to move until all of it has been Ack'ed, so I
+> based in on most recent tag of linux-next yesterday.
+> 
+
+No problem, just wanted to let you know about that.
+Feel free to update the remaining bits once Daniel's lands
+in linux-next.
 
 Thanks,
-Sandeepa
-
->
-> Will
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
