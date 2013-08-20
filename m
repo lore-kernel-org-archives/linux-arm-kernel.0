@@ -1,171 +1,421 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Aug 2013 10:04:31 +0200
-Subject: [PATCH 1/3] dma: imx-sdma: Use struct for driver data
-In-Reply-To: <1376985873-25776-1-git-send-email-s.hauer@pengutronix.de>
-References: <1376985873-25776-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1376985873-25776-2-git-send-email-s.hauer@pengutronix.de>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 20 Aug 2013 16:11:55 +0800
+Subject: [v2 PATCH] PWM: atmel-pwm: add PWM controller driver
+Message-ID: <1376986316-10874-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a struct type instead of an enum type for distinguishing between
-different versions. This makes it simpler to handle multiple differences
-withtou cluttering the code with comparisons for certain devtypes.
+Add Atmel PWM controller driver based on PWM framework.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+This is the basic function implementation of Atmel PWM controller.
+It can work with PWM based led and backlight.
+
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+
 ---
- drivers/dma/imx-sdma.c | 63 ++++++++++++++++++++++++++------------------------
- 1 file changed, 33 insertions(+), 30 deletions(-)
+This patch is based on the for-next branch on Linux pwm tree
+Test on at91sam9m10g45ek board with pwm led
+Test on sama5d31ek board with pwm backlight
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 1e44b8c..e3e7e3f 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -307,9 +307,9 @@ struct sdma_firmware_header {
- 	u32	ram_code_size;
- };
+Changes in v2:
+  - Address the comments from Thierry Reding
+
+ .../devicetree/bindings/pwm/atmel-pwm.txt          |   17 +
+ drivers/pwm/Kconfig                                |    9 +
+ drivers/pwm/Makefile                               |    1 +
+ drivers/pwm/pwm-atmel.c                            |  328 ++++++++++++++++++++
+ 4 files changed, 355 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+ create mode 100644 drivers/pwm/pwm-atmel.c
+
+diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+new file mode 100644
+index 0000000..f7b04f7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+@@ -0,0 +1,17 @@
++Atmel PWM controller
++
++Required properties:
++  - compatible: should be one of:
++    - "atmel,at91sam9rl-pwm"
++    - "atmel,sama5-pwm"
++  - reg: physical base address and length of the controller's registers
++  - #pwm-cells: Should be 3. See pwm.txt in this directory for a
++    description of the cells format
++
++Example:
++
++	pwm0: pwm at f8034000 {
++		compatible = "atmel,at91sam9rl-pwm";
++		reg = <0xf8034000 0x400>;
++		#pwm-cells = <3>;
++	};
+diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+index 75840b5..54237b9 100644
+--- a/drivers/pwm/Kconfig
++++ b/drivers/pwm/Kconfig
+@@ -41,6 +41,15 @@ config PWM_AB8500
+ 	  To compile this driver as a module, choose M here: the module
+ 	  will be called pwm-ab8500.
  
--enum sdma_devtype {
--	IMX31_SDMA,	/* runs on i.mx31 */
--	IMX35_SDMA,	/* runs on i.mx35 and later */
-+struct sdma_driver_data {
-+	int chnenbl0;
-+	int num_events;
- };
- 
- struct sdma_engine {
-@@ -318,8 +318,6 @@ struct sdma_engine {
- 	struct sdma_channel		channel[MAX_DMA_CHANNELS];
- 	struct sdma_channel_control	*channel_control;
- 	void __iomem			*regs;
--	enum sdma_devtype		devtype;
--	unsigned int			num_events;
- 	struct sdma_context_data	*context;
- 	dma_addr_t			context_phys;
- 	struct dma_device		dma_device;
-@@ -327,15 +325,26 @@ struct sdma_engine {
- 	struct clk			*clk_ahb;
- 	spinlock_t			channel_0_lock;
- 	struct sdma_script_start_addrs	*script_addrs;
-+	const struct sdma_driver_data	*drvdata;
++config PWM_ATMEL
++	tristate "Atmel PWM support"
++	depends on ARCH_AT91
++	help
++	  Generic PWM framework driver for Atmel SoC.
++
++	  To compile this driver as a module, choose M here: the module
++	  will be called pwm-atmel.
++
+ config PWM_ATMEL_TCB
+ 	tristate "Atmel TC Block PWM support"
+ 	depends on ATMEL_TCLIB && OF
+diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+index 77a8c18..5b193f8 100644
+--- a/drivers/pwm/Makefile
++++ b/drivers/pwm/Makefile
+@@ -1,6 +1,7 @@
+ obj-$(CONFIG_PWM)		+= core.o
+ obj-$(CONFIG_PWM_SYSFS)		+= sysfs.o
+ obj-$(CONFIG_PWM_AB8500)	+= pwm-ab8500.o
++obj-$(CONFIG_PWM_ATMEL)		+= pwm-atmel.o
+ obj-$(CONFIG_PWM_ATMEL_TCB)	+= pwm-atmel-tcb.o
+ obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
+ obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
+diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+new file mode 100644
+index 0000000..a9af974
+--- /dev/null
++++ b/drivers/pwm/pwm-atmel.c
+@@ -0,0 +1,328 @@
++/*
++ * Driver for Atmel Pulse Width Modulation Controller
++ *
++ * Copyright (C) 2013 Atmel Semiconductor Technology Ltd.
++ *		 Bo Shen <voice.shen@atmel.com>
++ *
++ * GPL v2
++ */
++
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/pwm.h>
++#include <linux/slab.h>
++
++/* The following is global registers for PWM controller */
++#define PWM_ENA		0x04
++#define PWM_DIS		0x08
++#define PWM_SR		0x0C
++/* bit field in SR */
++#define PWM_SR_ALL_CH_ON	0x0F
++
++/* The following register is PWM channel related registers */
++#define PWM_CMR		0x00
++/* bit field in CMR */
++#define PWM_CMR_CPOL		(1 << 9)
++#define PWM_CMR_UPD_CDTY	(1 << 10)
++
++/* The following registers for PWM v1 */
++#define PWMv1_CDTY	0x04
++#define PWMv1_CPRD	0x08
++#define PWMv1_CUPD	0x10
++
++/* The following registers for PWM v2 */
++#define PWMv2_CDTY	0x04
++#define PWMv2_CDTYUPD	0x08
++#define PWMv2_CPRD	0x0C
++#define PWMv2_CPRDUPD	0x10
++
++struct atmel_pwm_chip {
++	struct pwm_chip chip;
++	struct clk *clk;
++	void __iomem *base;
++
++	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
++		       int dty, int prd);
 +};
 +
-+struct sdma_driver_data sdma_imx31 = {
-+	.chnenbl0 = SDMA_CHNENBL0_IMX31,
-+	.num_events = 32,
-+};
++static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
++{
++	return container_of(chip, struct atmel_pwm_chip, chip);
++}
 +
-+struct sdma_driver_data sdma_imx35 = {
-+	.chnenbl0 = SDMA_CHNENBL0_IMX35,
-+	.num_events = 48,
- };
- 
- static struct platform_device_id sdma_devtypes[] = {
- 	{
- 		.name = "imx31-sdma",
--		.driver_data = IMX31_SDMA,
-+		.driver_data = (unsigned long)&sdma_imx31,
- 	}, {
- 		.name = "imx35-sdma",
--		.driver_data = IMX35_SDMA,
-+		.driver_data = (unsigned long)&sdma_imx35,
- 	}, {
- 		/* sentinel */
- 	}
-@@ -343,8 +352,8 @@ static struct platform_device_id sdma_devtypes[] = {
- MODULE_DEVICE_TABLE(platform, sdma_devtypes);
- 
- static const struct of_device_id sdma_dt_ids[] = {
--	{ .compatible = "fsl,imx31-sdma", .data = &sdma_devtypes[IMX31_SDMA], },
--	{ .compatible = "fsl,imx35-sdma", .data = &sdma_devtypes[IMX35_SDMA], },
-+	{ .compatible = "fsl,imx31-sdma", .data = &sdma_imx31, },
-+	{ .compatible = "fsl,imx35-sdma", .data = &sdma_imx35, },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sdma_dt_ids);
-@@ -356,8 +365,7 @@ MODULE_DEVICE_TABLE(of, sdma_dt_ids);
- 
- static inline u32 chnenbl_ofs(struct sdma_engine *sdma, unsigned int event)
- {
--	u32 chnenbl0 = (sdma->devtype == IMX31_SDMA ? SDMA_CHNENBL0_IMX31 :
--						      SDMA_CHNENBL0_IMX35);
-+	u32 chnenbl0 = sdma->drvdata->chnenbl0;
- 	return chnenbl0 + event * 4;
- }
- 
-@@ -733,7 +741,7 @@ static int sdma_config_channel(struct sdma_channel *sdmac)
- 	sdmac->per_addr = 0;
- 
- 	if (sdmac->event_id0) {
--		if (sdmac->event_id0 >= sdmac->sdma->num_events)
-+		if (sdmac->event_id0 >= sdmac->sdma->drvdata->num_events)
- 			return -EINVAL;
- 		sdma_event_enable(sdmac, sdmac->event_id0);
- 	}
-@@ -1218,19 +1226,6 @@ static int __init sdma_init(struct sdma_engine *sdma)
- 	int i, ret;
- 	dma_addr_t ccb_phys;
- 
--	switch (sdma->devtype) {
--	case IMX31_SDMA:
--		sdma->num_events = 32;
--		break;
--	case IMX35_SDMA:
--		sdma->num_events = 48;
--		break;
--	default:
--		dev_err(sdma->dev, "Unknown sdma type %d. aborting\n",
--			sdma->devtype);
--		return -ENODEV;
--	}
--
- 	clk_enable(sdma->clk_ipg);
- 	clk_enable(sdma->clk_ahb);
- 
-@@ -1257,7 +1252,7 @@ static int __init sdma_init(struct sdma_engine *sdma)
- 			MAX_DMA_CHANNELS * sizeof (struct sdma_channel_control));
- 
- 	/* disable all channels */
--	for (i = 0; i < sdma->num_events; i++)
-+	for (i = 0; i < sdma->drvdata->num_events; i++)
- 		writel_relaxed(0, sdma->regs + chnenbl_ofs(sdma, i));
- 
- 	/* All channels have priority 0 */
-@@ -1339,6 +1334,17 @@ static int __init sdma_probe(struct platform_device *pdev)
- 	int i;
- 	struct sdma_engine *sdma;
- 	s32 *saddr_arr;
-+	const struct sdma_driver_data *drvdata = NULL;
++static inline u32 atmel_pwm_readl(struct atmel_pwm_chip *chip,
++				  unsigned long offset)
++{
++	return readl(chip->base + offset);
++}
 +
-+	if (of_id)
-+		drvdata = of_id->data;
-+	else if (pdev->id_entry)
-+		drvdata = (void *)pdev->id_entry->driver_data;
++static inline void atmel_pwm_writel(struct atmel_pwm_chip *chip,
++				    unsigned long offset, unsigned long val)
++{
++	writel(val, chip->base + offset);
++}
 +
-+	if (!drvdata) {
-+		dev_err(&pdev->dev, "unable to find driver data\n");
-+		return -EINVAL;
++static inline u32 atmel_pwm_ch_readl(struct atmel_pwm_chip *chip,
++				     unsigned int ch, unsigned long offset)
++{
++	return readl(chip->base + 0x200 + ch * 0x20 + offset);
++}
++
++static inline void atmel_pwm_ch_writel(struct atmel_pwm_chip *chip,
++				       unsigned int ch, unsigned long offset,
++				       unsigned long val)
++{
++	writel(val, chip->base + 0x200 + ch * 0x20 + offset);
++}
++
++static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
++		int duty_ns, int period_ns)
++{
++	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
++	unsigned long long val, prd, dty, div, clk_rate;
++	int ret, pres = 0;
++
++	clk_rate = clk_get_rate(atmel_pwm->clk);
++
++	while (1) {
++		div = 1000000000;
++		div *= 1 << pres;
++		val = clk_rate * period_ns;
++		prd = div_u64(val, div);
++		val = clk_rate * duty_ns;
++		dty = div_u64(val, div);
++
++		if (prd < 1 || dty < 0)
++			return -EINVAL;
++
++		/*
++		 * Although the period register is 32 bit,
++		 * however the LSB 16 bits is used
++		 */
++		if (prd > 0xffff || dty > 0xffff) {
++			if (++pres > 16)
++				return -EINVAL;
++			continue;
++		}
++
++		break;
 +	}
- 
- 	sdma = kzalloc(sizeof(*sdma), GFP_KERNEL);
- 	if (!sdma)
-@@ -1347,6 +1353,7 @@ static int __init sdma_probe(struct platform_device *pdev)
- 	spin_lock_init(&sdma->channel_0_lock);
- 
- 	sdma->dev = &pdev->dev;
-+	sdma->drvdata = drvdata;
- 
- 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	irq = platform_get_irq(pdev, 0);
-@@ -1396,10 +1403,6 @@ static int __init sdma_probe(struct platform_device *pdev)
- 	for (i = 0; i < SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1; i++)
- 		saddr_arr[i] = -EINVAL;
- 
--	if (of_id)
--		pdev->id_entry = of_id->data;
--	sdma->devtype = pdev->id_entry->driver_data;
--
- 	dma_cap_set(DMA_SLAVE, sdma->dma_device.cap_mask);
- 	dma_cap_set(DMA_CYCLIC, sdma->dma_device.cap_mask);
- 
++
++	ret = clk_enable(atmel_pwm->clk);
++	if (ret) {
++		pr_err("failed to enable pwm clock\n");
++		return ret;
++	}
++
++	atmel_pwm->config(chip, pwm, dty, prd);
++
++	/* Check whether need to disable clock */
++	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
++	if ((val & PWM_SR_ALL_CH_ON) == 0)
++		clk_disable(atmel_pwm->clk);
++
++	return 0;
++}
++
++static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
++				int dty, int prd)
++{
++	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
++	unsigned int val;
++
++	/*
++	 * If the PWM channel is disabled, write value to duty and period
++	 * registers directly.
++	 * If the PWM channel is enabled, only update the duty register
++	 *
++	 * When update duty value, it need to set bit 10 of CMR to 0
++	 */
++	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
++		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CUPD, dty);
++
++		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
++		val &= ~PWM_CMR_UPD_CDTY;
++		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
++	} else {
++		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CDTY, dty);
++		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv1_CPRD, prd);
++	}
++}
++
++static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
++				int dty, int prd)
++{
++	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
++
++	/*
++	 * If the PWM channel is disabled, write value to duty and period
++	 * registers directly.
++	 * If the PWM channel is enabled, using period update register to update
++	 * value to period register, the same operation to duty register
++	 */
++	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
++		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTYUPD, dty);
++		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CPRDUPD, prd);
++	} else {
++		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CDTY, dty);
++		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMv2_CPRD, prd);
++	}
++}
++
++static int atmel_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
++		enum pwm_polarity polarity)
++{
++	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
++	u32 val = 0;
++	int ret;
++
++	ret = clk_enable(atmel_pwm->clk);
++	if (ret) {
++		pr_err("failed to enable pwm clock\n");
++		return ret;
++	}
++
++	if (polarity == PWM_POLARITY_NORMAL)
++		val &= ~PWM_CMR_CPOL;
++	else
++		val |= PWM_CMR_CPOL;
++
++	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
++
++	clk_disable(atmel_pwm->clk);
++
++	return 0;
++}
++
++static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
++
++	clk_prepare_enable(atmel_pwm->clk);
++
++	atmel_pwm_writel(atmel_pwm, PWM_ENA, 1 << pwm->hwpwm);
++
++	return 0;
++}
++
++static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
++	u32 val;
++
++	atmel_pwm_writel(atmel_pwm, PWM_DIS, 1 << pwm->hwpwm);
++
++	val = atmel_pwm_readl(atmel_pwm, PWM_SR);
++	if ((val & PWM_SR_ALL_CH_ON) == 0)
++		clk_disable(atmel_pwm->clk);
++}
++
++static const struct pwm_ops atmel_pwm_ops = {
++	.config = atmel_pwm_config,
++	.set_polarity = atmel_pwm_set_polarity,
++	.enable = atmel_pwm_enable,
++	.disable = atmel_pwm_disable,
++	.owner = THIS_MODULE,
++};
++
++struct atmel_pwm_data {
++	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
++		       int dty, int prd);
++};
++
++static const struct atmel_pwm_data atmel_pwm_data_v1 = {
++	.config = atmel_pwm_config_v1,
++};
++
++static const struct atmel_pwm_data atmel_pwm_data_v2 = {
++	.config = atmel_pwm_config_v2,
++};
++
++#ifdef CONFIG_OF
++static const struct of_device_id atmel_pwm_dt_ids[] = {
++	{
++		.compatible = "atmel,at91sam9rl-pwm",
++		.data = &atmel_pwm_data_v1,
++	}, {
++		.compatible = "atmel,sama5-pwm",
++		.data = &atmel_pwm_data_v2,
++	}, {
++		/* sentinel */
++	},
++};
++MODULE_DEVICE_TABLE(of, atmel_pwm_dt_ids);
++#endif
++
++static int atmel_pwm_probe(struct platform_device *pdev)
++{
++	const struct of_device_id *of_id =
++		of_match_device(atmel_pwm_dt_ids, &pdev->dev);
++	const struct atmel_pwm_data *data;
++	struct atmel_pwm_chip *atmel_pwm;
++	struct resource *res;
++	int ret;
++
++	atmel_pwm = devm_kzalloc(&pdev->dev, sizeof(*atmel_pwm), GFP_KERNEL);
++	if (!atmel_pwm)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -ENODEV;
++
++	atmel_pwm->base = devm_ioremap_resource(&pdev->dev, res);
++
++	atmel_pwm->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(atmel_pwm->clk))
++		return PTR_ERR(atmel_pwm->clk);
++	clk_prepare(atmel_pwm->clk);
++
++	atmel_pwm->chip.dev = &pdev->dev;
++	atmel_pwm->chip.ops = &atmel_pwm_ops;
++	atmel_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
++	atmel_pwm->chip.of_pwm_n_cells = 3;
++	atmel_pwm->chip.base = -1;
++	atmel_pwm->chip.npwm = 4;
++
++	data = of_id->data;
++	atmel_pwm->config = data->config;
++
++	ret = pwmchip_add(&atmel_pwm->chip);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to add pwm chip %d\n", ret);
++		return ret;
++	}
++
++	platform_set_drvdata(pdev, atmel_pwm);
++
++	return 0;
++}
++
++static int atmel_pwm_remove(struct platform_device *pdev)
++{
++	struct atmel_pwm_chip *atmel_pwm = platform_get_drvdata(pdev);
++
++	clk_unprepare(atmel_pwm->clk);
++
++	return pwmchip_remove(&atmel_pwm->chip);
++}
++
++static struct platform_driver atmel_pwm_driver = {
++	.driver = {
++		.name = "atmel-pwm",
++		.of_match_table = of_match_ptr(atmel_pwm_dt_ids),
++	},
++	.probe = atmel_pwm_probe,
++	.remove = atmel_pwm_remove,
++};
++module_platform_driver(atmel_pwm_driver);
++
++MODULE_ALIAS("platform:atmel-pwm");
++MODULE_AUTHOR("Bo Shen <voice.shen@atmel.com>");
++MODULE_DESCRIPTION("Atmel PWM driver");
++MODULE_LICENSE("GPL v2");
 -- 
-1.8.4.rc3
+1.7.9.5
