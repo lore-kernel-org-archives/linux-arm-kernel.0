@@ -1,159 +1,62 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 20 Aug 2013 15:41:28 -0700
-Subject: [PATCH 2/8] clk: keystone: Add gate control clock driver
-In-Reply-To: <5213E5EC.8070208@ti.com>
-References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
- <1375719147-7578-3-git-send-email-santosh.shilimkar@ti.com>
- <20130813161314.GR27165@e106331-lin.cambridge.arm.com>
- <520A60A2.2030104@ti.com>
- <20130813165344.GU27165@e106331-lin.cambridge.arm.com>
- <20130819204353.4443.48466@quantum> <5213756A.5090903@ti.com>
- <20130820213045.4443.89971@quantum> <5213E5EC.8070208@ti.com>
-Message-ID: <20130820224128.4443.78729@quantum>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 20 Aug 2013 22:48:27 +0000 (UTC)
+Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume
+ support
+In-Reply-To: <87iozfga1t.fsf@kernel.org>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
+ <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
+ <52038E88.2050604@ti.com> <5203B336.90102@ti.com> <5203C211.7040207@ti.com>
+ <87iozfga1t.fsf@kernel.org>
+Message-ID: <alpine.DEB.2.02.1308202244350.6426@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Santosh Shilimkar (2013-08-20 14:55:56)
-> On Tuesday 20 August 2013 05:30 PM, Mike Turquette wrote:
-> > Quoting Santosh Shilimkar (2013-08-20 06:55:54)
-> >> On Monday 19 August 2013 04:43 PM, Mike Turquette wrote:
-> >>> Quoting Mark Rutland (2013-08-13 09:53:44)
-> >>>> On Tue, Aug 13, 2013 at 05:36:50PM +0100, Santosh Shilimkar wrote:
-> >>>>> On Tuesday 13 August 2013 12:13 PM, Mark Rutland wrote:
-> >>>>>> [adding dt maintainers]
-> >>>>>>
-> >>>>>> On Mon, Aug 05, 2013 at 05:12:21PM +0100, Santosh Shilimkar wrote:
-> >>>>>>> Add the driver for the clock gate control which uses PSC (Power Sleep
-> >>>>>>> Controller) IP on Keystone 2 based SOCs. It is responsible for enabling and
-> >>>>>>> disabling of the clocks for different IPs present in the SoC.
-> >>>>>>>
-> >>>>>>> Cc: Mike Turquette <mturquette@linaro.org>
-> >>>>>>>
-> >>>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>>>>>> ---
-> >>>>>>>  .../devicetree/bindings/clock/keystone-gate.txt    |   30 ++
-> >>>>>>>  drivers/clk/keystone/gate.c                        |  306 ++++++++++++++++++++
-> >>>>>>>  include/linux/clk/keystone.h                       |    1 +
-> >>>>>>>  3 files changed, 337 insertions(+)
-> >>>>>>>  create mode 100644 Documentation/devicetree/bindings/clock/keystone-gate.txt
-> >>>>>>>  create mode 100644 drivers/clk/keystone/gate.c
-> >>>>>>>
-> >>>>>>> diff --git a/Documentation/devicetree/bindings/clock/keystone-gate.txt b/Documentation/devicetree/bindings/clock/keystone-gate.txt
-> >>>>>>> new file mode 100644
-> >>>>>>> index 0000000..40afef5
-> >>>>>>> --- /dev/null
-> >>>>>>> +++ b/Documentation/devicetree/bindings/clock/keystone-gate.txt
-> >>>>>>> @@ -0,0 +1,30 @@
-> >>>>>>> +Binding for Keystone gate control driver which uses PSC controller IP.
-> >>>>>>> +
-> >>>>>>> +This binding uses the common clock binding[1].
-> >>>>>>> +
-> >>>>>>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> >>>>>>> +
-> >>>>>>> +Required properties:
-> >>>>>>> +- compatible : shall be "keystone,psc-clk".
-> >>>>>>
-> >>>>>> Similarly to my comments on patch 1, this should probably be something
-> >>>>>> more like "ti,keystone-psc-clock"
-> >>>>>>
-> >>>>>>> +- #clock-cells : from common clock binding; shall be set to 0.
-> >>>>>>> +- clocks : parent clock phandle
-> >>>>>>> +- reg :        psc address address space
-> >>>>>>> +
-> >>>>>>> +Optional properties:
-> >>>>>>> +- clock-output-names : From common clock binding to override the
-> >>>>>>> +                       default output clock name
-> >>>>>>> +- status : "enabled" if clock is always enabled
-> >>>>>>
-> >>>>>> Huh? This is a standard property, for which ePAPR defines "okay",
-> >>>>>> "disabled", "fail", and "fail-sss", and not "enabled". This also doesn't
-> >>>>>> seem to follow the standard meaning judging by the code.
-> >>>>>>
-> >>>>>> It looks like this could be a boolean property
-> >>>>>> ("clock-always-enabled"?), but that assumes it's necessary.
-> >>>>>>
-> >>>>>> Why do you need this?
-> >>>>>>
-> >>>>> I dropped this already. Forgot to update the documentation.
-> >>>>
-> >>>> Ok.
-> >>>>
-> >>>>>
-> >>>>>>> +- lpsc : lpsc module id, if not set defaults to zero
-> >>>>>>
-> >>>>>> What's that needed for? Are there multiple clocks sharing a common
-> >>>>>> register bank?
-> >>>>>>
-> >>>>>>> +- pd : power domain number, if not set defaults to zero (always ON)
-> >>>>>>
-> >>>>>> Please don't use abbreviations unnecessarily. "power-domain-id" or
-> >>>>>> similar would be far better. What exactly does this represent? Does the
-> >>>>>> clock IP itself handle power domains, or is there some external unit
-> >>>>>> that controls power domains?
-> >>>>>>
-> >>>>> pd is commonly used but I can expand it. This represent the power
-> >>>>> domain number.
-> >>>>
-> >>>> Does the the clock IP have some internal logic for handling power
-> >>>> domains only covering its clocks, or is there some external power
-> >>>> controller involved (i.e. do we possibly need to describe an external
-> >>>> unit and a linkage to it?).
-> >>>
-> >>> Hmm, does the clock own the power domain or does the power domain own
-> >>> the clock? As you well know on OMAP the clock resides within the power
-> >>> domain. So it seems to me that the better way to do this would be for
-> >>> the power domain to have it's own binding and node, and then reference
-> >>> the clock:
-> >>>
-> >>> power-domain {
-> >>>       ...
-> >>>       clocks = <&chipclk3>, <&chipclk4>;
-> >>>       clock-names = "perclk", "uartclk";
-> >>>       ...
-> >>> };
-> >>>
-> >>> Now maybe things are different on Keystone, but if not then I don't see
-> >>> why the clock binding should have anything to do with the power domain.
-> >>>
-> >> They are bit different w.r.t OMAP. LPSC itself is the clock control of the
-> >> IP. The LPSC number in the bindings is actually the specific number which
-> >> is used to reach to the address space of the clock control. One can view
-> >> that one as clock control register index.
-> > 
-> > Thanks for the information. I have a further question about then: are
-> > the LPSC clocks really module clocks that belong to the IP that they are
-> > gating?
-> > 
-> LPSC controls the clock enable/disable to the IP/module so answer is yes.
-> In certain cases LPSC controls clock to more than one IP as well.
-> 
-> > If so then they could be defined within the node defining their parent
-> > IP. That might be enough to get rid of the LPSC index value. Again I
-> > might be over-engineering it. Just trying to get an understanding.
-> > 
-> Am not sure I follow you here on not having the LPSC index. Sorry. 
 
-How are the 'reg' property and the 'lpsc' property related? Does the
-lpsc property modify the register address used to access the clock
-control bits?
+Hi folks,
 
-Thanks,
-Mike
+catching up on this thread.
 
-> 
-> >>
-> >> The power domain as such are above the lpsc but the clock enable/disable needs
-> >> to follow a recommended sequence which needs the access to those registers.
-> >> As such there is no major validation done on dynamically switching off PDs
-> >> in current generation devices.
-> >>
-> >> As I mentioned you to on IRC, the PD was the only odd part I have to keep
-> >> around to address the sequencing need which is kind of interlinked.
-> > 
-> > Right. Well maybe some day that part can go away but I understand the
-> > need for it now.
-> > 
-> right. Thanks
-> 
-> regards,
-> Santosh
+On 08/06/2013 12:49 PM, Dave Gerlach wrote:
+
+> +
+> +static int am33xx_pm_suspend(void)
+> +{
+> +     int i, j, ret = 0;
+> +
+> +     int status = 0;
+> +     struct platform_device *pdev;
+> +     struct omap_device *od;
+> +
+> +     /*
+> +      * By default the following IPs do not have MSTANDBY asserted
+> +      * which is necessary for PER domain transition. If the drivers
+> +      * are not compiled into the kernel HWMOD code will not change the
+> +      * state of the IPs if the IP was not never enabled. To ensure
+> +      * that there no issues with or without the drivers being compiled
+> +      * in the kernel, we forcefully put these IPs to idle.
+> +      */
+> +     for (i = 0; i < ARRAY_SIZE(am33xx_mod); i++) {
+> +             pdev = to_platform_device(am33xx_mod[i].dev);
+> +             od = to_omap_device(pdev);
+> +             if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER) {
+> +                     omap_device_enable_hwmods(od);
+> +                     omap_device_idle_hwmods(od);
+> +             }
+> +     }
+
+Does this have to be done for every suspend entry, or can it just be done 
+once during kernel initialization?
+
+If the latter, shouldn't this be done by hwmod during the initial reset 
+and idle of all of these devices, based on a flag?  For example, we had 
+this flag for OMAP3630:
+
+ * HWMOD_FORCE_MSTANDBY: Always keep MIDLEMODE bits cleared so that device
+ *     is kept in force-standby mode. Failing to do so causes PM problems
+ *     with musb on OMAP3630 at least. Note that musb has a dedicated 
+register
+ *     to control MSTANDBY signal when MIDLEMODE is set to force-standby.
+
+
+- Paul
