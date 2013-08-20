@@ -1,41 +1,48 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 20 Aug 2013 10:30:04 +0100
-Subject: [PATCH v4 02/19] openrisc: remove undefined of_get_cpu_node
- declaration
+Date: Tue, 20 Aug 2013 10:30:07 +0100
+Subject: [PATCH v4 05/19] ARM: DT/kernel: define ARM specific
+ arch_match_cpu_phys_id
 In-Reply-To: <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
  <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1376991021-12160-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1376991021-12160-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-This patch removes the declaration of the function 'of_get_cpu_node'
-which is not defined for openrisc. This is in preparation to move
-it's definition from PPC to DT common code.
+OF/DT core library now provides architecture specific hook to match the
+logical cpu index with the corresponding physical identifier. Most of the
+cpu DT node parsing and initialisation is contained in devtree.c. So it's
+better to define ARM specific arch_match_cpu_phys_id there.
 
-Again it could be there as it was originally copied from powerpc.
+This mainly helps to avoid replication of the code doing CPU node parsing
+and physical(MPIDR) to logical mapping.
 
-Cc: Jonas Bonn <jonas@southpole.se>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- arch/openrisc/include/asm/prom.h | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/kernel/devtree.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/openrisc/include/asm/prom.h b/arch/openrisc/include/asm/prom.h
-index bbb34e5..eb59bfe 100644
---- a/arch/openrisc/include/asm/prom.h
-+++ b/arch/openrisc/include/asm/prom.h
-@@ -44,9 +44,6 @@ void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 5859c8b..2ee8a17 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -169,6 +169,11 @@ void __init arm_dt_init_cpu_maps(void)
+ 	}
+ }
  
- extern void kdump_move_device_tree(void);
- 
--/* CPU OF node matching */
--struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
--
- /* Get the MAC address */
- extern const void *of_get_mac_address(struct device_node *np);
- 
++bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
++{
++	return (phys_id & MPIDR_HWID_BITMASK) == cpu_logical_map(cpu);
++}
++
+ /**
+  * setup_machine_fdt - Machine setup when an dtb was passed to the kernel
+  * @dt_phys: physical address of dt blob
 -- 
 1.8.1.2
