@@ -1,116 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 20 Aug 2013 14:00:13 -0600
-Subject: [PATCH] ARM: tegra: always enable USB VBUS regulators
-Message-ID: <1377028813-32762-1-git-send-email-swarren@wwwdotorg.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 20 Aug 2013 22:01:29 +0200
+Subject: [RFC 05/17] ARM: highbank: remove custom .init_time hook
+In-Reply-To: <5213BF91.3030300@calxeda.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376964271-22715-6-git-send-email-sebastian.hesselbarth@gmail.com>
+ <5213BF91.3030300@calxeda.com>
+Message-ID: <5213CB19.6000905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 08/20/2013 09:12 PM, Rob Herring wrote:
+> On 08/19/2013 09:04 PM, Sebastian Hesselbarth wrote:
+>> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+>> remove custom .init_time hooks. Highbank clock provider need a reference
+>> to system registers, as a workaround current clk driver maps those
+>> independent of arch code now.
+>>
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> ---
+>> Notes:
+>> - I suggest to consolidate the four single clock providers into a single
+>>    provider with one node if possible.
+>
+> And how do you suggest doing that while maintaining the DT ABI?
 
-This fixes a regression exposed during the merge window by commit
-9f310de "ARM: tegra: fix VBUS regulator GPIO polarity in DT"; namely that
-USB VBUS doesn't get turned on, so USB devices are not detected. This
-affects the internal USB port on TrimSlice (i.e. the USB->SATA bridge, to
-which the SSD is connected) and the external port(s) on Seaboard/
-Springbank and Whistler.
+Rob,
 
-The Tegra DT as written in v3.11 allows two paths to enable USB VBUS:
+I am aware of ABI status of the DT bindings and the discussion about
+deprecating/cleanup of what went in in the past. Maybe "suggest" is a
+little bit too strong and should have been "would be nice to have".
 
-1) Via the legacy DT binding for the USB controller; it can directly
-   acquire a VBUS GPIO and activate it.
+But looking at clk-highbank, all providers depend on the same register.
+If you'd introduce e.g. a new "calxeda,core-clocks" that sets up the
+four providers and also CLK_OF_DECLARE the same init with one out of
+the  four existing compatibles shouldn't that maintain backwards
+compatibility?
 
-2) Via a regulator for VBUS, which is referenced by the new DT binding
-   for the USB controller.
+Anyway, I was just puting the note above to raise some comment on it.
+You actually gave a good one to leave it as is.
 
-Those two methods both use the same GPIO, and hence whichever of the
-USB controller and regulator gets probed first ends up owning the GPIO.
-In practice, the USB driver only supports path (1) above, since the
-patches to support the new USB binding are not present until v3.12:-(
+>> ---
+>>   arch/arm/mach-highbank/highbank.c |   23 +++++++----------------
+>>   drivers/clk/clk-highbank.c        |   10 +++++++---
+>>   2 files changed, 14 insertions(+), 19 deletions(-)
+>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-In practice, the regulator ends up being probed first and owning the
-GPIO. Since nothing enables the regulator (the USB driver code is not
-yet present), the regulator ends up being turned off. This originally
-caused no problem, because the polarity in the regulator definition was
-incorrect, so attempting to turn off the regulator actually turned it
-on, and everything worked:-(
+Ok, I keep that in mind until all other issues are resolved.
 
-However, when testing the new USB driver code in v3.12, I noticed the
-incorrect polarity and fixed it in commit 9f310de "ARM: tegra: fix VBUS
-regulator GPIO polarity in DT". In the context of v3.11, this patch then
-caused the USB VBUS to actually turn off, which broke USB ports with VBUS
-control. I got this patch included in v3.11-rc1 since it fixed a bug in
-device tree (incorrect polarity specification), and hence was suitable to
-be included early in the rc series. I evidently did not test the patch at
-all, or correctly, in the context of v3.11, and hence did not notice the
-issue that I have explained above:-(
-
-Fix this by making the USB VBUS regulators always enabled. This way, if
-the regulator owns the GPIO, it will always be turned on, even if there
-is no USB driver code to request the regulator be turned on. Even
-ignoring this bug, this is a reasonable way to configure the HW anyway.
-
-If this patch is applied to v3.11, it will cause a couple pretty trivial
-conflicts in tegra20-{trimslice,seaboard}.dts when creating v3.12, since
-the context right above the added lines changed in patches destined for
-v3.12.
-
-Reported-by: Kyle McMartin <kmcmarti@redhat.com>
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-This is a patch for v3.11-rc*
-
- arch/arm/boot/dts/tegra20-seaboard.dts  | 2 ++
- arch/arm/boot/dts/tegra20-trimslice.dts | 2 ++
- arch/arm/boot/dts/tegra20-whistler.dts  | 4 ++++
- 3 files changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index 365760b..40e6fb2 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -830,6 +830,8 @@
- 			regulator-max-microvolt = <5000000>;
- 			enable-active-high;
- 			gpio = <&gpio 24 0>; /* PD0 */
-+			regulator-always-on;
-+			regulator-boot-on;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
-index ed4b901..37c93d3 100644
---- a/arch/arm/boot/dts/tegra20-trimslice.dts
-+++ b/arch/arm/boot/dts/tegra20-trimslice.dts
-@@ -412,6 +412,8 @@
- 			regulator-max-microvolt = <5000000>;
- 			enable-active-high;
- 			gpio = <&gpio 170 0>; /* PV2 */
-+			regulator-always-on;
-+			regulator-boot-on;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
-index ab67c94..a3d0eba 100644
---- a/arch/arm/boot/dts/tegra20-whistler.dts
-+++ b/arch/arm/boot/dts/tegra20-whistler.dts
-@@ -588,6 +588,8 @@
- 			regulator-max-microvolt = <5000000>;
- 			enable-active-high;
- 			gpio = <&tca6416 0 0>; /* GPIO_PMU0 */
-+			regulator-always-on;
-+			regulator-boot-on;
- 		};
- 
- 		vbus3_reg: regulator at 3 {
-@@ -598,6 +600,8 @@
- 			regulator-max-microvolt = <5000000>;
- 			enable-active-high;
- 			gpio = <&tca6416 1 0>; /* GPIO_PMU1 */
-+			regulator-always-on;
-+			regulator-boot-on;
- 		};
- 	};
- 
--- 
-1.8.1.5
+Thanks,
+   Sebastian
