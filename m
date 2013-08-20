@@ -1,16 +1,17 @@
 From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 20 Aug 2013 11:33:51 -0700
-Subject: [GIT PULL] ARM: bcm SOC  for 3.12
-Message-ID: <5213B68F.4050800@broadcom.com>
+Date: Tue, 20 Aug 2013 11:33:59 -0700
+Subject: [GIT PULL] ARM: bcm DT  for 3.12
+Message-ID: <5213B697.2080207@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
-  Please pull the branch below. It contains various SOC related cleanups 
+  Please pull the branch below. It contains various DT related cleanups 
 for BCM arch.
 
   Thanks,
     csd
+
 
 The following changes since commit c095ba7224d8edc71dcef0d655911399a8bd4a3f:
 
@@ -18,45 +19,42 @@ The following changes since commit c095ba7224d8edc71dcef0d655911399a8bd4a3f:
 
 are available in the git repository at:
 
-   git://github.com/broadcom/bcm11351.git armsoc/for-3.12/soc
+   git://github.com/broadcom/bcm11351.git armsoc/for-3.12/dt
 
-for you to fetch changes up to 3a76b35186cb967a69c4a3935caf2fdf428e933b:
+for you to fetch changes up to 15e22ddf045ed9796d0d2302e759aa7a37826523:
 
-   ARM: bcm: Make secure API call optional (2013-08-20 10:51:39 -0700)
-
-----------------------------------------------------------------
-SoC changes for 3.12 BCM
+   ARM: DT: binding fixup to align with vendor-prefixes.txt (DT) 
+(2013-08-20 10:47:47 -0700)
 
 ----------------------------------------------------------------
-Christian Daudt (4):
-       ARM: bcm: Rename board_bcm
-       ARM: mmc: fix NONREMOVABLE test in sdhci-bcm-kona
-       ARM: DT: binding fixup to align with vendor-prefixes.txt (drivers)
-       ARM: bcm: Make secure API call optional
+DT related BCM mods for 3.12
 
-Markus Mayer (4):
-       ARM: bcm281xx: Turn on L2 cache.
-       ARM bcm281xx: Turn on socket & network support.
-       ARM: bcm281xx: Board specific reboot code
-       mmc: sdhci-bcm-kona: make linker-section warning go away
+----------------------------------------------------------------
+Christian Daudt (3):
+       ARM: dts: align sdio numbers to HW definition
+       ARM: dts: add sdio blocks to bcm28155-ap board
+       ARM: DT: binding fixup to align with vendor-prefixes.txt (DT)
 
-Matt Porter (1):
-       ARM: configs: disable DEBUG_LL in bcm_defconfig
+Markus Mayer (2):
+       ARM: bcm281xx: DT changes for reboot code
 
-  arch/arm/configs/bcm_defconfig                      |   13 ++++++++++++-
-  arch/arm/mach-bcm/Kconfig                           |    1 +
-  arch/arm/mach-bcm/Makefile                          |    4 ++--
-  arch/arm/mach-bcm/bcm_kona_smc.c                    |   12 ++++++++----
-  arch/arm/mach-bcm/bcm_kona_smc.h                    |    2 +-
-  arch/arm/mach-bcm/{board_bcm.c => board_bcm281xx.c} |   30 
-+++++++++++++++++++++++-------
-  arch/arm/mach-bcm/kona.c                            |   65 
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  arch/arm/mach-bcm/kona.h                            |   17 
-+++++++++++++++++
-  drivers/clocksource/bcm_kona_timer.c                |    8 +++++++-
-  drivers/mmc/host/sdhci-bcm-kona.c                   |   15 ++++++++-------
-  10 files changed, 144 insertions(+), 23 deletions(-)
-  rename arch/arm/mach-bcm/{board_bcm.c => board_bcm281xx.c} (68%)
-  create mode 100644 arch/arm/mach-bcm/kona.c
-  create mode 100644 arch/arm/mach-bcm/kona.h
+  Documentation/devicetree/bindings/arm/bcm/bcm11351.txt |    3 ++-
+  Documentation/devicetree/bindings/arm/bcm/{bcm,kona-timer.txt => 
+kona-timer.txt} |    5 +++--
+  Documentation/devicetree/bindings/arm/bcm/kona-wdt.txt |   15 
++++++++++++++++
+  Documentation/devicetree/bindings/misc/smc.txt |    5 +++--
+  Documentation/devicetree/bindings/mmc/{bcm,kona-sdhci.txt => 
+kona-sdhci.txt}     |    5 +++--
+  arch/arm/boot/dts/Makefile |    3 ++-
+  arch/arm/boot/dts/bcm11351-brt.dts |    8 ++++----
+  arch/arm/boot/dts/bcm11351.dtsi |   33 +++++++++++++++++++--------------
+  arch/arm/boot/dts/bcm28155-ap.dts |   45 
++++++++++++++++++++++++++++++++++++++++++++++
+  9 files changed, 96 insertions(+), 26 deletions(-)
+  rename Documentation/devicetree/bindings/arm/bcm/{bcm,kona-timer.txt 
+=> kona-timer.txt} (80%)
+  create mode 100644 Documentation/devicetree/bindings/arm/bcm/kona-wdt.txt
+  rename Documentation/devicetree/bindings/mmc/{bcm,kona-sdhci.txt => 
+kona-sdhci.txt} (67%)
+  create mode 100644 arch/arm/boot/dts/bcm28155-ap.dts
