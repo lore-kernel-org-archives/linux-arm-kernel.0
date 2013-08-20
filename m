@@ -1,85 +1,47 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 19 Aug 2013 17:22:58 -0700
-Subject: [PATCH v2 0/8] Common Clock Framework support for Samsung
- S3C64xx
-In-Reply-To: <158901ce9b34$c0ac8720$42059560$@org>
-References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
- <2956608.dyLtqySMuJ@amdc1227> <20130816210203.4443.43511@quantum>
- <3890424.fJfWX17mED@flatron> <158901ce9b34$c0ac8720$42059560$@org>
-Message-ID: <20130820002258.4443.34197@quantum>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 19 Aug 2013 17:57:48 -0700
+Subject: Enable arm_global_timer for Zynq brakes boot
+In-Reply-To: <140fc91a-cc81-418e-8a5e-413bbf47834e@CO1EHSMHS025.ehs.local>
+References: <20130809172757.GD14845@codeaurora.org>
+ <c1e112a3-cfed-4e53-951e-b1a9208d7dc8@TX2EHSMHS038.ehs.local>
+ <52090B43.9090000@codeaurora.org>
+ <d36fc2db-1189-4c6a-9bc4-0ac2e29eaa1b@AM1EHSMHS009.ehs.local>
+ <5209120D.1010701@linaro.org>
+ <9b07d8a3-b650-4147-b952-9bcfc1172c51@VA3EHSMHS025.ehs.local>
+ <5209152F.5020307@linaro.org>
+ <86b18b0d-08e1-4899-86ea-ed22d3d36dee@DB8EHSMHS028.ehs.local>
+ <5212A394.5020109@codeaurora.org>
+ <140fc91a-cc81-418e-8a5e-413bbf47834e@CO1EHSMHS025.ehs.local>
+Message-ID: <20130820005748.GA23960@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kukjin Kim (2013-08-17 03:30:11)
-> Tomasz Figa wrote:
+On 08/19, S??ren Brinkmann wrote:
+> Hi Stephen,
 > 
-> [...]
-> 
-> > > > > >
-> > > > > > Basically, this series looks good to me, but I'm not sure how this
-> > > > > > should be handled because of dependency with PWM cleanup and clk
-> > > > > > stuff
-> > > > > > in clk tree now...
-> > > > >
-> > > > > Patches 1-3 can go into the clk tree. 4-6 should go through their
-> > > > > respective trees.
-> > > >
-> > > > It looks like version 2 of patch 2/8 has been applied by mistake,
-> > > > breaking compilation (and operation) of the clock driver added in
-> > > > patch 3/8.
-> > > Ugh. My mistake.
-> > 
-> > Happens. Thanks for fast response.
-> > 
-> Sorry for late ;-)
-> 
-> > > > Could you please fix this up? Thanks in advance.
+> On Mon, Aug 19, 2013 at 04:00:36PM -0700, Stephen Boyd wrote:
+> > On 08/16/13 10:28, S??ren Brinkmann wrote:
+> > > On Mon, Aug 12, 2013 at 07:02:39PM +0200, Daniel Lezcano wrote:
+> > >> On 08/12/2013 06:53 PM, S??ren Brinkmann wrote:
+> > >>> It's actually present. I have a clean 3.11-rc3 and the only changes are
+> > >>> my patch to enable the GT and Stephen's fix.
+> > >>> The cpuidle stats show both idle states being used.
+> > >> Ah, right. The tick_broadcast_mask is not set because the arm global
+> > >> timer has not the CLOCK_EVT_FEAT_C3STOP feature flag set.
+> > > Just to check in. Do you want any additional testing done? Or can I
+> > > expect Stephens fix to get merged, so Zynq can use the GT?
 > > >
-> > > This is a little tricky since I published the clk-next-s3c64xx branch as
-> > > a stable branch for Samsung which I think has been merged to the
-> > > Samsung tree already.
 > > 
-> > Right, this somewhat limits our options. Although I'm not really sure
-> > whether Kukjin already has pushed it to his public tree.
-> > 
-> Yeah, I already did sort out in my local but not public tree because of some
-> problem.
+> > I was curious, can you use just the first hunk of the patch that applied
+> > to tick-broadcast.c to fix the problem? I think the answer is yes.
 > 
-> > > So what are the options?
-> > >
-> > > One option is to create a fixup patch that just manages the delta
-> > > between V2 and V3. I can then add this to the top of clk-next-s3c64xx
-> > > and re-merge it into clk-next. Then the Samsung tree will need to
-> > > re-merge that dependency branch.
-> > 
-> > Well, I can make a "convert PLL65xx to new registration method" patch,
-> > that would be basically the delta. If this could be merged before patch
-> > 7/8, no regression would be introduced.
-> > 
-> > > Do you have a better idea?
-> > 
-> > Not really. Maybe let's ask Kukjin whether he has already merged it to his
-> > tree. Kukjin, have you?
-> > 
-> OK, if new branch is ready, I will replace with that or if re-merge is
-> required, I will. Either way, I'm fine and can handle. Mike, let me know
-> your choice :-)
-
-Since I have already published it let's just go with the delta patch.  I
-can create another stable branch named clk-next-s3c64xx-delta that just
-has this patch on top of clk-next-s3c64xx OR I can apply it on top of
-the existing clk-next-s3c64xx and re-merge it.
-
-I'm trying to think on whether there are any weird git corner cases with
-re-merging clk-next-s3c64xx. Let me know if re-merging is somehow unsafe
-(makes history weird, or whatever).
-
-Let me know what option is better for you. I'll publish as soon as I get
-the delta patch. Apologies again for creating some extra work!
-
-Thanks,
-Mike
-
+> Yes, that seems to be enough.
 > 
-> Thanks,
-> Kukjin
+
+Great thank you. I will split the patch into two pieces. That way
+we can discuss the merit of always using a timer that doesn't
+suffer from FEAT_C3_STOP over a timer that does.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
