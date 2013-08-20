@@ -1,19 +1,41 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 20 Aug 2013 14:04:04 -0400
-Subject: [PATCH] arm64: add screen_info for console support
-In-Reply-To: <20130820171453.GF21383@arm.com>
-References: <1376842970.11104.11.camel@t520.redhat.com>
- <20130820133733.GF26129@mudshark.cambridge.arm.com>
- <20130820171453.GF21383@arm.com>
-Message-ID: <1377021844.3591.1.camel@t520.redhat.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 20 Aug 2013 21:57:24 +0400
+Subject: [PATCH v5 5/8] usb: musb: omap2430: Don't use
+ omap_get_control_dev()
+In-Reply-To: <1377010577-19355-6-git-send-email-rogerq@ti.com>
+References: <1377010577-19355-1-git-send-email-rogerq@ti.com>
+ <1377010577-19355-6-git-send-email-rogerq@ti.com>
+Message-ID: <5213AE04.1070907@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-08-20 at 18:14 +0100, Catalin Marinas wrote:
-> I was wondering about this but do we need screen_info for DUMMY_CONSOLE
-> as well?
+Hello.
 
-I thought so because my grep turned up a reference to screen_info in
-dummycon.c but a closer look shows that only applies to arm.
+On 08/20/2013 06:56 PM, Roger Quadros wrote:
 
---Mark
+> omap_get_control_dev() is being deprecated as it doesn't support
+> multiple instances. As control device is present only from OMAP4
+> onwards which supports DT only, we use phandles to get the
+> reference to the control device.
+
+> Also get rid of "ti,has-mailbox" property as it is redundant and
+> we can determine that from whether "ctrl-module" property is present
+> or not. Get rid of has_mailbox from musb_hdrc_platform_data as well.
+
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+[...]
+
+> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+> index ebb46ec..516795b 100644
+> --- a/drivers/usb/musb/omap2430.c
+> +++ b/drivers/usb/musb/omap2430.c
+[...]
+> @@ -509,8 +510,12 @@ static int omap2430_probe(struct platform_device *pdev)
+>   	glue->dev			= &pdev->dev;
+>   	glue->musb			= musb;
+>   	glue->status			= OMAP_MUSB_UNKNOWN;
+> +	glue->control_otghs = ERR_PTR(-ENODEV);
+
+    Could you please align = with the others above?
+
+WBR, Sergei
