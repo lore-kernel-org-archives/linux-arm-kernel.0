@@ -1,61 +1,28 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 20 Aug 2013 07:52:40 +0200
-Subject: arm-soc: Xilinx Zynq cleanups for v3.12 v2
-Message-ID: <52130428.3010205@monstr.eu>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Tue, 20 Aug 2013 13:58:00 +0800
+Subject: [PATCH] pinctrl: SPEAr310: Pass correct of_device_id table name to
+ MODULE_DEVICE_TABLE
+Message-ID: <1376978280.19775.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin and Olof,
+The symbol SPEAr310_pinctrl_of_match does not exist at all. Fix it.
+We didn't hit the compile error because this driver can only be built-in now.
 
-This is the second pull request because Kevin wanted to remove clk changes
-and send them through Mike's clk tree.
-Please pull these cleanup patches to your tree.
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+---
+ drivers/pinctrl/spear/pinctrl-spear310.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Michal
-
-The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
-
-  Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
-
-are available in the git repository at:
-
-  git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.12
-
-for you to fetch changes up to b522877b53cf3f26d7f072616a45e10fe579cd19:
-
-  arm: zynq: hotplug: Remove unreachable code (2013-08-20 07:32:13 +0200)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq cleanup patches for v3.12
-
-This branch contains these fixes:
-- SLCR cleanup
-- Hotplug cleanup
-
-----------------------------------------------------------------
-Soren Brinkmann (4):
-      arm: zynq: slcr: Remove redundant header #includes
-      arm: zynq: slcr: Clean up #defines
-      arm: zynq: slcr: Use read-modify-write for register writes
-      arm: zynq: hotplug: Remove unreachable code
-
- arch/arm/mach-zynq/hotplug.c | 55 +++++--------------------------------------------------
- arch/arm/mach-zynq/slcr.c    | 45 +++++++++++++++++----------------------------
- 2 files changed, 22 insertions(+), 78 deletions(-)
-
+diff --git a/drivers/pinctrl/spear/pinctrl-spear310.c b/drivers/pinctrl/spear/pinctrl-spear310.c
+index 06c7e6f..ed1d360 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear310.c
++++ b/drivers/pinctrl/spear/pinctrl-spear310.c
+@@ -430,4 +430,4 @@ module_exit(spear310_pinctrl_exit);
+ MODULE_AUTHOR("Viresh Kumar <viresh.linux@gmail.com>");
+ MODULE_DESCRIPTION("ST Microelectronics SPEAr310 pinctrl driver");
+ MODULE_LICENSE("GPL v2");
+-MODULE_DEVICE_TABLE(of, SPEAr310_pinctrl_of_match);
++MODULE_DEVICE_TABLE(of, spear310_pinctrl_of_match);
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130820/a40d37e0/attachment.sig>
+1.8.1.2
