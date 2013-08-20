@@ -1,69 +1,25 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 20 Aug 2013 09:59:45 +0300
-Subject: [Ksummit-2013-discuss] [ARM ATTEND] Describing complex,
- non-probable system topologies
-In-Reply-To: <CAOesGMgyQYTqObtvyJsVqxsrWz1rYTuA-qW4QwnZ+Co=1iKOBA@mail.gmail.com>
-References: <20130801183531.GB29831@mudshark.cambridge.arm.com>
- <20130801192730.GC9174@kroah.com>
- <20130802115334.GN2465@mudshark.cambridge.arm.com>
- <20130802142010.GC7533@kroah.com>
- <20130802160932.GG5292@mudshark.cambridge.arm.com>
- <20130802223247.GC28831@kroah.com>
- <CAOesGMgyQYTqObtvyJsVqxsrWz1rYTuA-qW4QwnZ+Co=1iKOBA@mail.gmail.com>
-Message-ID: <20130820095945.df4689fca20a820b494a0e22@nvidia.com>
+From: luka@openwrt.org (Luka Perkov)
+Date: Tue, 20 Aug 2013 08:59:55 +0200
+Subject: [PATCH] ARM: dts: imx6sl reuses imx6q sdma firmware
+In-Reply-To: <20130820062555.GC29114@S2101-09.ap.freescale.net>
+References: <1376903386-27771-1-git-send-email-shawn.guo@linaro.org>
+ <20130819123541-7656@mutt-kz>
+ <20130819135315.GA28297@S2101-09.ap.freescale.net>
+ <20130819162827-27661@mutt-kz>
+ <20130820062555.GC29114@S2101-09.ap.freescale.net>
+Message-ID: <20130820065955-7214@mutt-kz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 3 Aug 2013 07:16:57 +0200
-Olof Johansson <olof@lixom.net> wrote:
-
-> On Fri, Aug 2, 2013 at 3:32 PM, Greg KH <greg@kroah.com> wrote:
-> > On Fri, Aug 02, 2013 at 05:09:32PM +0100, Will Deacon wrote:
-> >> On Fri, Aug 02, 2013 at 03:20:10PM +0100, Greg KH wrote:
-> >> > On Fri, Aug 02, 2013 at 12:53:34PM +0100, Will Deacon wrote:
-> >> > > We can change the mindset by yelling, but if you're writing a new
-> >> > > driver for a peripheral on an ARM SoC, platform_bus is mighty tempting
-> >> > > because you get a bunch of device-tree parsing code for free (see
-> >> > > drivers/of/platform.c).
-> >> >
-> >> > I know :(
-> >> >
-> >> > So, who do I "yell at", and what do I do to make things easier for you
-> >> > from the driver-core perspective?
-> >>
-> >> I would anticipate most of these drivers going through the arm-soc tree, so
-> >> Olof and Kevin would be doing the yelling. You could join in the chorus too!
-> >>
-> >> We basically need reviewers to adopt the position that a new bus should be
-> >> considered and dismissed before using the platform_bus, then you can yell
-> >> transitively through them.
-> >
-> > I don't scale if I'm forced to review every driver to ensure that they
-> > shouldn't be using platform device and should be creating their own bus
-> > type.  You can do that, along with the other ARM developers reviewing
-> > these new subsystems and code being added.
+On Tue, Aug 20, 2013 at 02:25:58PM +0800, Shawn Guo wrote:
+> > Naming it "sdma-imx6.bin" or "sdma-imx6x.bin"
+> > would help avoiding confusions in the future (despite it's not SoC
+> > name).
 > 
-> For most new platforms, using basic platform_bus devices makes sense
-> when the setup is simple and just has a few devices. It's only when
-> they need to add support for {S,IO}MMUs and get the more advanced
-> functionality going that things get messy and platform_bus stops
-> working.
-> 
-> So, we have the option of having someone care about the {S,IO}MMU
-> pieces, and when they spot the attempts to make that work, push them
-> towards a proper bus architecture. Until then, the simpler solution is
-> probably a reasonable idea compared to having newcomers worry about
-> defining new bus architectures and raising the bar for what it takes
-> to sort out the initial contributions and getting engaged upstream.
+> Just for example, if the next imx6 SoC uses a different sdma firmware,
+> I guess "sdma-imx6.bin" or "sdma-imx6x.bin" would become the source
+> of confusion.
 
-Agree. Tegra has an central IOMMU(SMMU) in memory controller, where
-almost all platform devices can depend on IOMMU. Those IOMMU'abilities
-are configurable. We have device instanciation order problem since
-IOMMU H/W needs to be instanciated earler than any other IOMMU'able
-platform devices, but DT doesn't have any framework to force
-this instanciation order[1]. One solution could be to use
--EPROBE_DEFER in drivers, but we have too many IOMMU'able devices, and
-also we want to allow to boot with/without IOMMU and to keep drivers
-as they are regardless of IOMMU enabled/disabled.
+Ok, agreed :)
 
-[1] https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-June/036542.html
+Luka
