@@ -1,54 +1,39 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 20 Aug 2013 19:31:43 +0200
-Subject: [PATCH 16/16] clk: samsung: exynos5250: Simplify registration of PLL
- rate tables
-In-Reply-To: <1377019903-14614-1-git-send-email-t.figa@samsung.com>
-References: <1377019903-14614-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1377019903-14614-17-git-send-email-t.figa@samsung.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 20 Aug 2013 19:34:19 +0200
+Subject: [PATCH v2 0/4] clk: clock deregistration support
+Message-ID: <1377020063-30213-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the _get_rate() helper has been modified to use __clk_lookup()
-internally, checking of PLL input rates can be done using it and so the
-registration code can be simplified.
+This series combines my previous ones ([1], [2]) adding clk_unregister()
+function's implementation and fixing a race condition in the device tree
+related part of clk_get().
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/clk/samsung/clk-exynos5250.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+There are couple changes since the RFC v1:
+ - moved of_clk_{lock, unlock}, __of_clk_get_from_provider() function
+   declaractions to a local header,
+ - renamed clk_dummy_* to clk_nodrv_*.
 
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index a9916a4..00a80e4 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -543,8 +543,6 @@ static struct of_device_id ext_clk_match[] __initdata = {
- static void __init exynos5250_clk_init(struct device_node *np)
- {
- 	void __iomem *reg_base;
--	struct clk *vpllsrc;
--	unsigned long fin_pll_rate, mout_vpllsrc_rate = 0;
- 
- 	if (np) {
- 		reg_base = of_iomap(np, 0);
-@@ -563,16 +561,10 @@ static void __init exynos5250_clk_init(struct device_node *np)
- 	samsung_clk_register_mux(exynos5250_pll_pmux_clks,
- 				ARRAY_SIZE(exynos5250_pll_pmux_clks));
- 
--	fin_pll_rate = _get_rate("fin_pll");
--
--	if (fin_pll_rate == 24 * MHZ)
-+	if (_get_rate("fin_pll") == 24 * MHZ)
- 		exynos5250_plls[epll].rate_table = epll_24mhz_tbl;
- 
--	vpllsrc = __clk_lookup("mout_vpllsrc");
--	if (vpllsrc)
--		mout_vpllsrc_rate = clk_get_rate(vpllsrc);
--
--	if (mout_vpllsrc_rate == 24 * MHZ)
-+	if (_get_rate("mout_vpllsrc") == 24 * MHZ)
- 		exynos5250_plls[vpll].rate_table =  vpll_24mhz_tbl;
- 
- 	samsung_clk_register_pll(exynos5250_plls, ARRAY_SIZE(exynos5250_plls),
--- 
-1.8.3.2
+[1] https://lkml.org/lkml/2013/8/6/306
+[2] http://www.spinics.net/lists/arm-kernel/msg265989.html
+
+Sylwester Nawrocki (4):
+  clk: add common __clk_get(), __clk_put() implementations
+  clk: implement clk_unregister
+  clk: Provide not locked variant of of_clk_get_from_provider()
+  clkdev: Fix race condition in clock lookup from device tree
+
+ arch/arm/include/asm/clkdev.h      |    2 +
+ arch/blackfin/include/asm/clkdev.h |    2 +
+ arch/mips/include/asm/clkdev.h     |    2 +
+ arch/sh/include/asm/clkdev.h       |    2 +
+ drivers/clk/clk.c                  |  185 +++++++++++++++++++++++++++++++++---
+ drivers/clk/clk.h                  |   16 ++++
+ drivers/clk/clkdev.c               |   12 ++-
+ include/linux/clk-private.h        |    5 +
+ include/linux/clkdev.h             |    5 +
+ 9 files changed, 218 insertions(+), 13 deletions(-)
+ create mode 100644 drivers/clk/clk.h
+
+--
+1.7.9.5
