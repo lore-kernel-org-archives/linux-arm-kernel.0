@@ -1,93 +1,61 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 20 Aug 2013 04:04:14 +0200
-Subject: [RFC 00/17] ARM: provide common arch init for DT clocks
-Message-ID: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Tue, 20 Aug 2013 04:04:24 +0200
+Subject: [RFC 10/17] ARM: nspire: remove custom .init_time hook
+In-Reply-To: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1376964271-22715-11-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This RFC converts arch/arm to provide a common arch init for DT clock
-providers. Currently, the call to of_clk_init(NULL) to initialize DT
-clock providers is spread among several mach-dirs. Since most machs
-require DT clocks initialized before timers, no initcall can be used.
+With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+remove custom .init_time hooks.
 
-By adding of_clk_init(NULL) to ARM time_init(), we can remove all
-mach-specific .init_time hooks that basically called of_clk_init before
-starting timers. Some machs use the hook for more initialization, that
-has been moved to other hooks where required.
-
-The only exception is mach-tegra which requires clocks even earlier in
-.init_irq. To allow machs to call clk_of_init at any time earlier than
-time_init(), we first need to ensure drivers in __clk_of_table are only
-initialized once.
-
-The RFC is based on next-20130819 to catch up with future clock related
-changes. It has been tested on mach-mvebu and compile tested for all the
-other machs modified. All single patches have also been sent to the
-respective maintainers.
-
-Although some patches also modify files in mach-foo and drivers/clk, I
-decided to keep them in a single patch to also show what would be
-required for a common arch clock init.
-
-Sebastian Hesselbarth (17):
-  clk: ensure __clk_of_table is only initialized once
-  ARM: call clk_of_init from time_init
-  ARM: dove: remove custom .init_time hook
-  ARM: exynos: remove custom .init_time hook
-  ARM: highbank: remove custom .init_time hook
-  ARM: imx: remove custom .init_time hook
-  ARM: kirkwood: remove custom .init_time hook
-  ARM: mvebu: remove custom .init_time hook
-  ARM: mxs: remove custom .init_time hook
-  ARM: nspire: remove custom .init_time hook
-  ARM: rockchip: remove custom .init_time hook
-  ARM: socfpga: remove custom .init_time hook
-  ARM: sti: remove custom .init_time hook
-  ARM: tegra: remove .init_time hook to clocksource_of_init
-  ARM: vexpress: remove custom .init_time hook
-  clk: vt8500: remove call to of_clk_init
-  clk: zynq: remove call to of_clk_init
-
- arch/arm/kernel/time.c                   |    4 ++++
- arch/arm/mach-dove/board-dt.c            |   16 +---------------
- arch/arm/mach-exynos/common.c            |    7 -------
- arch/arm/mach-exynos/common.h            |    1 -
- arch/arm/mach-exynos/mach-exynos4-dt.c   |    1 -
- arch/arm/mach-exynos/mach-exynos5-dt.c   |    1 -
- arch/arm/mach-highbank/highbank.c        |   23 +++++++----------------
- arch/arm/mach-imx/clk-imx51-imx53.c      |   12 ------------
- arch/arm/mach-imx/common.h               |    2 --
- arch/arm/mach-imx/imx51-dt.c             |    6 ------
- arch/arm/mach-imx/mach-imx53.c           |    6 ------
- arch/arm/mach-imx/mach-imx6q.c           |   14 +++-----------
- arch/arm/mach-imx/mach-imx6sl.c          |    7 -------
- arch/arm/mach-imx/mach-vf610.c           |    9 ---------
- arch/arm/mach-kirkwood/board-dt.c        |    8 --------
- arch/arm/mach-mvebu/armada-370-xp.c      |   11 +----------
- arch/arm/mach-mxs/mach-mxs.c             |   13 -------------
- arch/arm/mach-nspire/nspire.c            |    9 ---------
- arch/arm/mach-rockchip/rockchip.c        |    9 ---------
- arch/arm/mach-socfpga/socfpga.c          |    2 --
- arch/arm/mach-sti/board-dt.c             |   10 ++++------
- arch/arm/mach-tegra/tegra.c              |    2 --
- arch/arm/mach-vexpress/v2m.c             |   14 +-------------
- drivers/clk/clk-highbank.c               |   10 +++++++---
- drivers/clk/clk-vt8500.c                 |    2 --
- drivers/clk/clk.c                        |    8 +++++++-
- drivers/clk/mxs/clk-imx23.c              |   16 +++++++---------
- drivers/clk/mxs/clk-imx28.c              |   16 ++++++++--------
- drivers/clk/zynq/clkc.c                  |    1 -
- drivers/clocksource/time-armada-370-xp.c |    7 +++----
- include/linux/clk/mxs.h                  |    2 --
- include/linux/time-armada-370-xp.h       |   16 ----------------
- 32 files changed, 53 insertions(+), 212 deletions(-)
- delete mode 100644 include/linux/time-armada-370-xp.h
-
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
-Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/mach-nspire/nspire.c |    9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/arch/arm/mach-nspire/nspire.c b/arch/arm/mach-nspire/nspire.c
+index 99e2609..4b2ed2e 100644
+--- a/arch/arm/mach-nspire/nspire.c
++++ b/arch/arm/mach-nspire/nspire.c
+@@ -14,11 +14,9 @@
+ #include <linux/of_platform.h>
+ #include <linux/irqchip.h>
+ #include <linux/irqchip/arm-vic.h>
+-#include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/clcd.h>
+-#include <linux/clocksource.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -65,12 +63,6 @@ static void __init nspire_init(void)
+ 			nspire_auxdata, NULL);
+ }
+ 
+-static void __init nspire_init_time(void)
+-{
+-	of_clk_init(NULL);
+-	clocksource_of_init();
+-}
+-
+ static void nspire_restart(char mode, const char *cmd)
+ {
+ 	void __iomem *base = ioremap(NSPIRE_MISC_PHYS_BASE, SZ_4K);
+@@ -83,7 +75,6 @@ static void nspire_restart(char mode, const char *cmd)
+ DT_MACHINE_START(NSPIRE, "TI-NSPIRE")
+ 	.dt_compat	= nspire_dt_match,
+ 	.map_io		= nspire_map_io,
+-	.init_time	= nspire_init_time,
+ 	.init_machine	= nspire_init,
+ 	.restart	= nspire_restart,
+ MACHINE_END
 -- 
 1.7.10.4
