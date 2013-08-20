@@ -1,62 +1,58 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Tue, 20 Aug 2013 17:23:39 +0800
-Subject: [PATCH v2 2/2] dmaengine: Add hisilicon k3 DMA engine driver
-In-Reply-To: <20130820082749.GG5810@intel.com>
-References: <1372423153-6742-1-git-send-email-zhangfei.gao@linaro.org>
- <1372423153-6742-3-git-send-email-zhangfei.gao@linaro.org>
- <20130813112043.GB32147@intel.com>
- <CAMj5Bki0H+=0wQY39+jDw4nAEq5wEq3V3yri9xpNRxQ2GRwPbA@mail.gmail.com>
- <20130819053511.GU32147@intel.com>
- <CAMj5BkixUR2-MnYLVymPLnQ922jEhbKnwUHs__d3hr2d_Qb8fA@mail.gmail.com>
- <20130820082749.GG5810@intel.com>
-Message-ID: <5213359B.4070208@linaro.org>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Tue, 20 Aug 2013 10:30:08 +0100
+Subject: [PATCH v4 06/19] driver/core: cpu: initialize of_node in cpu's device
+ struture
+In-Reply-To: <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1376991021-12160-7-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-08-20 04:27 PM, Vinod Koul wrote:
-> On Tue, Aug 20, 2013 at 03:55:05PM +0800, zhangfei gao wrote:
->> There are many example keep define simple.
-> and there are others examples which have done the otherway. I would prefer that
-> way please!
->
-Personally, I prefer simple is better, it is only used in the file.
-But is it fine to change.
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
+CPUs are also registered as devices but the of_node in these cpu
+devices are not initialized. Currently different drivers requiring
+to access cpu device node are parsing the nodes themselves and
+initialising the of_node in cpu device.
 
->
->>>>> why do we need the else part here?
->>>> Since asynchronous mode is supported.
->>>> Desc is submitted to list but may not get physical channel to run.
->>> But when you pause you pause the running channel. You dont pause a descriptor.
->>> So whatever you are trying to imply doesnt make sense to me.
->>
->> Here delete node from chan_pending, which will be quired from tasklet.
->>
->> The physical channel is free matched.
->> dma_issue_pending will put node to d->k3_dma_issue_pending if no phy allocated.
->> Tasklet do two jobs
->> 1, check running channel for new request form desc_issued.
->> 2, check any new chan_pending and alloc phy if available.
->>
->> If no phy, the node will be put in chan_pending.
->> If pause does not remove from chan_pending, it may be got from tasklet
->> to start a new transaction.
->> So it's safe to remove from chan_pending when pause, and add back when resume.
-> But when you add, where do you start from, from the start of the descriptor or
-> the previosu position.
->
-> The point is pause-resume you dont need to do all that. Channel is paused so
-> just pause it by stopping exuection, not more. Then you resume by asking
-> controller to start from where it left off.
+The of_node in all the cpu devices needs to be initialized properly
+and at one place. The best place to update this is CPU subsystem
+driver when registering the cpu devices.
 
-Since it is async mode, it does not know the physical channel is really 
-started or not.
+The OF/DT core library now provides of_get_cpu_node to retrieve a cpu
+device node for a given logical index by abstracting the architecture
+specific details.
 
-When desc is submitted, it can be
-a). get phy and run, pause can stop and resume where it stops.
-b). Dot not start at all since no phy available (16 phys vs 27 request 
-line), if pause do nothing it will stay in chan_pending, if tasklet 
-happens again, it will be fetched and started, while upper layer thought 
-it is already paused.
+This patch uses of_get_cpu_node to assign of_node when registering the
+cpu devices.
 
-Do we need consider case b?
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+---
+ drivers/base/cpu.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
+index 4c358bc..4cf0717 100644
+--- a/drivers/base/cpu.c
++++ b/drivers/base/cpu.c
+@@ -14,6 +14,7 @@
+ #include <linux/slab.h>
+ #include <linux/percpu.h>
+ #include <linux/acpi.h>
++#include <linux/of.h>
+ 
+ #include "base.h"
+ 
+@@ -289,6 +290,7 @@ int register_cpu(struct cpu *cpu, int num)
+ 	cpu->dev.release = cpu_device_release;
+ 	cpu->dev.offline_disabled = !cpu->hotpluggable;
+ 	cpu->dev.offline = !cpu_online(num);
++	cpu->dev.of_node = of_get_cpu_node(num, NULL);
+ #ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
+ 	cpu->dev.bus->uevent = arch_cpu_uevent;
+ #endif
+-- 
+1.8.1.2
