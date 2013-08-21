@@ -1,32 +1,85 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Aug 2013 09:04:07 +0200
-Subject: [PATCHv2 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
-In-Reply-To: <1376522956-14960-2-git-send-email-dinguyen@altera.com>
-References: <1376522956-14960-1-git-send-email-dinguyen@altera.com>
- <1376522956-14960-2-git-send-email-dinguyen@altera.com>
-Message-ID: <CACRpkda9oyb2mr6PR1dfMpoxbzj3vUp7hKiQtN1oWH6aG_N96w@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 21 Aug 2013 12:43:16 +0530
+Subject: [PATCH v2 01/13] ARM: OMAP2+: CM: reintroduce SW_SLEEP for OMAP4
+In-Reply-To: <cfcae1c52efc51786878c60b75cc3c182bcd50a5.1375443858.git.afzal@ti.com>
+References: <cover.1375443858.git.afzal@ti.com>
+ <cfcae1c52efc51786878c60b75cc3c182bcd50a5.1375443858.git.afzal@ti.com>
+Message-ID: <5214688C.9030801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 1:29 AM,  <dinguyen@altera.com> wrote:
-
-> -       sched_io_base = iobase + 0x04;
-> +       sched_io_base = iobase;
->         sched_rate = rate;
+On Friday 02 August 2013 07:06 PM, Afzal Mohammed wrote:
+> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> 
+> "65aa94b ARM: OMAP4: clockdomain/CM code: Update supported transition modes"
+> removed SW_SLEEP mode for clockdomains on OMAP4 class of devices. Not
+> having SW_SLEEP mode works fine for OMAP4/5 devices but it gets in the
+> way of reuse for other devices like AM43x which have the same hardware
+> but where most of clockdomains support only SW_SLEEP/SW_WKUP modes.
+> 
+> This also can help make AM335x (which has custom functions) reuse
+> OMAP4 PRM/CM functions.
+> 
+> While here also fixup a trivial typo in the comment.
+> 
+> [afzal at ti.com: Alter message to refer to AM43x instead of AM335x, this
+>  was pulled in from series that reuses OMAP4 PRM/CM for AM335x, which
+>  as of now is not being followed upon]
+> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/cminst44xx.c |   20 +++++++++++++++++---
+>  1 file changed, 17 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+> index f0290f5..35051fd 100644
+> --- a/arch/arm/mach-omap2/cminst44xx.c
+> +++ b/arch/arm/mach-omap2/cminst44xx.c
+> @@ -237,7 +237,7 @@ void omap4_cminst_clkdm_disable_hwsup(u8 part, s16 inst, u16 cdoffs)
 >  }
->
->  static u32 read_sched_clock(void)
+>  
+>  /**
+> - * omap4_cminst_clkdm_force_sleep - try to take a clockdomain out of idle
+> + * omap4_cminst_clkdm_force_wakeup - try to take a clockdomain out of idle
+>   * @part: PRCM partition ID that the clockdomain registers exist in
+>   * @inst: CM instance register offset (*_INST macro)
+>   * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
+> @@ -250,6 +250,20 @@ void omap4_cminst_clkdm_force_wakeup(u8 part, s16 inst, u16 cdoffs)
+>  	_clktrctrl_write(OMAP34XX_CLKSTCTRL_FORCE_WAKEUP, part, inst, cdoffs);
+>  }
+>  
+> +/**
+> + * omap4_cminst_clkdm_force_sleep - try to put a clockdomain to idle
+> + * @part: PRCM partition ID that the clockdomain registers exist in
+> + * @inst: CM instance register offset (*_INST macro)
+> + * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
+> + *
+> + * Put a clockdomain referred to by (@part, @inst, @cdoffs) to idle,
+> + * forcing it to sleep.  No return value.
+> + */
+> +void omap4_cminst_clkdm_force_sleep(u8 part, s16 inst, u16 cdoffs)
+> +{
+> +	_clktrctrl_write(OMAP34XX_CLKSTCTRL_FORCE_SLEEP, part, inst, cdoffs);
+
+I guess this won't work on omap4/5 where some clockdomains do not support
+SW_SLEEP and only support HW_AUTO. We might need to have different clkdm
+operations for the different omap4 variants.
+
+
+> +}
+> +
+>  /*
+>   *
+>   */
+> @@ -404,8 +418,8 @@ static int omap4_clkdm_clear_all_wkup_sleep_deps(struct clockdomain *clkdm)
+>  
+>  static int omap4_clkdm_sleep(struct clockdomain *clkdm)
 >  {
-> -       return __raw_readl(sched_io_base);
-> +       return ~__raw_readl(sched_io_base + 0x4);
-
-So what about #define what 0x04 is?
-
-#define MY_FOO_REGISTER_OFFSET 0x04
-
-raw_readl(sched_io_base + MY_FOO_REGISTER_OFFSET);
-
-You get the idea.
-
-Yours,
-Linus Walleij
+> -	omap4_cminst_clkdm_enable_hwsup(clkdm->prcm_partition,
+> -					clkdm->cm_inst, clkdm->clkdm_offs);
+> +	omap4_cminst_clkdm_force_sleep(clkdm->prcm_partition,
+> +				       clkdm->cm_inst, clkdm->clkdm_offs);
+>  	return 0;
+>  }
+>  
+> 
