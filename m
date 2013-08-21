@@ -1,39 +1,23 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 21 Aug 2013 02:53:12 +0000 (UTC)
-Subject: [PATCH v2 00/13] ARM: OMAP2+: AM43x PRCM support
-In-Reply-To: <cover.1375443858.git.afzal@ti.com>
-References: <cover.1375443858.git.afzal@ti.com>
-Message-ID: <alpine.DEB.2.02.1308210249260.6426@utopia.booyaka.com>
+From: Li.Xiubo@freescale.com (Xiubo Li)
+Date: Wed, 21 Aug 2013 11:07:38 +0800
+Subject: [PATCH 0/4] Add freescale ftm pwm driver for Vybrid VF610 TOWER
+Message-ID: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hello,
 
-On Fri, 2 Aug 2013, Afzal Mohammed wrote:
+This patch series is the freescale ftm pwm implementation.
+There are 8 channels most supported by the ftm pwm,
+and there are two pwm modes:
+- Center-Aligned PWM (CPWM) mode
+- Edge-Aligned PWM (EPWM) mode
 
-> AM43x PRCM support (excluding clock tree) is being added with this
-> series. AM43x reuses most of the IP's from AM335x, as that is the
-> case, much of the AM335x hwmod data is reused.
+This implementation is only compatible with device tree definition.
 
-...
+Please feel free to comment the dt bindinds.
 
-> Currently there is no public TRM available for AM43x.
+This patch series is based on linux-next and has been tested on Vybrid VF610TWR board using device tree.
 
-Can you think of any way that the data can be doublechecked against some 
-reference or against the reality of the chip?
-
-Can development boards be made available to the OMAP maintainers so we can 
-ensure that the code, once merged, continues to work?
-
-> Powerdomain & Clockdomain data has been added separately as it was not
-> giving much advantage reusing AM335x ones (runtime updates required
-> was getting too ugly). But as AM43x PRCM functionality is similar to
-> OMAP4, power domain, clock domain & hwmod operations are reused from
-> OMAP4.
-
-Is the AM43xx PRCM design and IP derived from AM33xx, or from OMAP4, or 
-from something else?
-
-
-
-- Paul
+Best Regards,
+Xiubo Li
