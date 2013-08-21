@@ -1,46 +1,49 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 21 Aug 2013 18:14:55 +0530
-Subject: [PATCH 2/3] ARM: OMAP2+: Add new bindings for OMAP
-In-Reply-To: <5214B50D.3050703@ti.com>
-References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
- <1376983966-16490-3-git-send-email-rnayak@ti.com>
- <20130821074514.GU7656@atomide.com> <52147E95.5000606@ti.com>
- <20130821085330.GH7656@atomide.com> <521486E1.6030009@ti.com>
- <20130821122327.GI7656@atomide.com> <5214B50D.3050703@ti.com>
-Message-ID: <5214B647.8040408@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 21 Aug 2013 14:45:21 +0200
+Subject: [PATCH 14/16] clk: samsung: exynos4: Register PLL rate tables for
+ Exynos4210
+In-Reply-To: <CAKew6eXbc8ai9vSX2EMv+=7LYmxZ+75z1X72ytULOxtwX7bebg@mail.gmail.com>
+References: <1377019903-14614-1-git-send-email-t.figa@samsung.com>
+ <1377019903-14614-15-git-send-email-t.figa@samsung.com>
+ <CAKew6eXbc8ai9vSX2EMv+=7LYmxZ+75z1X72ytULOxtwX7bebg@mail.gmail.com>
+Message-ID: <1953130.hE0ZFC2CqQ@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday 21 of August 2013 18:04:07 Yadwinder Singh Brar wrote:
+> On Tue, Aug 20, 2013 at 11:01 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> > This patch adds rate tables for PLLs that can be reconfigured at
+> > runtime
+> > for Exynos4210 SoCs. Provided tables contain PLL coefficients for
+> > input clock of 24 MHz and so are registered only in this case. MPLL
+> > does
+> > not need runtime reconfiguration and so table for it is not provided.
+> > 
+> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> > 
+> >  drivers/clk/samsung/clk-exynos4.c | 45
+> >  +++++++++++++++++++++++++++++++++++++++ 1 file changed, 45
+> >  insertions(+)
+> > 
+> > diff --git a/drivers/clk/samsung/clk-exynos4.c
+> > b/drivers/clk/samsung/clk-exynos4.c index 34474ce..e18cfae 100644
+> > --- a/drivers/clk/samsung/clk-exynos4.c
+> > +++ b/drivers/clk/samsung/clk-exynos4.c
+> > @@ -992,6 +992,40 @@ static struct of_device_id ext_clk_match[]
+> > __initdata = {> 
+> >         {},
+> >  
+> >  };
+> > 
+> > +/* PLLs PMS values */
+> > +static struct samsung_pll_rate_table exynos4210_apll_rates[] = {
+> > +       PLL_45XX_RATE(1200000000, 150,  3, 1, 28),
 > 
-> So, If I understand this right we would have the dt entries
-> something like,
-> 
-> omap4.dtsi
-> ------
-> ocp {
-> 	reg = <...>;
-> 	interrupts = <...>;
-> 	ti,no-reset-on-init = <&emif1, &emif2, &gpmc>;
-> 	...
-> };
-> 
-> omap4-panda-es.dts
-> ------
-> ocp {
+> All these tables in this patch as well as next patch can be __initdata
 
-This would actually be
-&ocp {
+Right, I forgot to mark them as such. Thanks for spotting.
 
-> 	ti,no-reset-on-init = <&emif1, &emif2, &gpmc, &gpio4>;
-> 	...
-> };
-> 
-> Is it that, or you suggesting we can _append_ the soc list of
-> modules with board specific modules, which I am not sure if its
-> possible.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Best regards,
+Tomasz
