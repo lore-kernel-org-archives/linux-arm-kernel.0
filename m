@@ -1,51 +1,46 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 21 Aug 2013 23:21:51 +0200
-Subject: [PATCH v7 7/7] ARM: dts: Add dts file for S3C6410-based SMDK6410 board
+Date: Wed, 21 Aug 2013 23:21:50 +0200
+Subject: [PATCH v7 6/7] ARM: dts: Add dts file for S3C6410-based Mini6410 board
 In-Reply-To: <1377120111-25601-1-git-send-email-tomasz.figa@gmail.com>
 References: <1377120111-25601-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1377120111-25601-8-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1377120111-25601-7-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic device tree sources for SAMSUNG SMDK6410 board
-based on SAMSUNG S3C6410 SoC.
-
-Currently only UARTs, SD channel 0 and 100Mbps ethernet (SMSC911x) are
-supported.
+This patch adds basic device tree sources for FriendlyARM Mini6410 board
+based on Samsung S3C6410 SoC.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/boot/dts/Makefile             |   3 +-
- arch/arm/boot/dts/s3c6410-smdk6410.dts | 103 +++++++++++++++++++++++++++++++++
- 2 files changed, 105 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/s3c6410-smdk6410.dts
+ arch/arm/boot/dts/Makefile             |   1 +
+ arch/arm/boot/dts/s3c6410-mini6410.dts | 228 +++++++++++++++++++++++++++++++++
+ 2 files changed, 229 insertions(+)
+ create mode 100644 arch/arm/boot/dts/s3c6410-mini6410.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 72f8af3..e55c644 100644
+index ada589c..72f8af3 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -194,7 +194,8 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
+@@ -194,6 +194,7 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
  	ccu8540.dtb \
  	ccu9540.dtb
  dtb-$(CONFIG_ARCH_S3C24XX) += s3c2416-smdk2416.dtb
--dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb
-+dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb \
-+	s3c6410-smdk6410.dtb
++dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb
  dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
  	emev2-kzm9d-reference.dtb \
  	r8a7740-armadillo800eva.dtb \
-diff --git a/arch/arm/boot/dts/s3c6410-smdk6410.dts b/arch/arm/boot/dts/s3c6410-smdk6410.dts
+diff --git a/arch/arm/boot/dts/s3c6410-mini6410.dts b/arch/arm/boot/dts/s3c6410-mini6410.dts
 new file mode 100644
-index 0000000..ecf35ec
+index 0000000..57e00f9
 --- /dev/null
-+++ b/arch/arm/boot/dts/s3c6410-smdk6410.dts
-@@ -0,0 +1,103 @@
++++ b/arch/arm/boot/dts/s3c6410-mini6410.dts
+@@ -0,0 +1,228 @@
 +/*
-+ * Samsung S3C6410 based SMDK6410 board device tree source.
++ * Samsung's S3C6410 based Mini6410 board device tree source
 + *
 + * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
 + *
-+ * Device tree source file for SAMSUNG SMDK6410 board which is based on
++ * Device tree source file for FriendlyARM Mini6410 board which is based on
 + * Samsung's S3C6410 SoC.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -61,11 +56,11 @@ index 0000000..ecf35ec
 +#include "s3c6410.dtsi"
 +
 +/ {
-+	model = "SAMSUNG SMDK6410 board based on S3C6410";
-+	compatible = "samsung,mini6410", "samsung,s3c6410";
++	model = "FriendlyARM Mini6410 board based on S3C6410";
++	compatible = "friendlyarm,mini6410", "samsung,s3c6410";
 +
 +	memory {
-+		reg = <0x50000000 0x8000000>;
++		reg = <0x50000000 0x10000000>;
 +	};
 +
 +	chosen {
@@ -102,14 +97,110 @@ index 0000000..ecf35ec
 +		ranges;
 +
 +		ethernet at 18000000 {
-+			compatible = "smsc,lan9115";
-+			reg = <0x18000000 0x10000>;
++			compatible = "davicom,dm9000";
++			reg = <0x18000000 0x2 0x18000004 0x2>;
 +			interrupt-parent = <&gpn>;
-+			interrupts = <10 IRQ_TYPE_LEVEL_LOW>;
-+			phy-mode = "mii";
-+			reg-io-width = <4>;
-+			smsc,force-internal-phy;
++			interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
++			davicom,no-eeprom;
 +		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gpio_keys>;
++		autorepeat;
++
++		button-k1 {
++			label = "K1";
++			gpios = <&gpn 0 GPIO_ACTIVE_LOW>;
++			linux,code = <2>;
++			debounce-interval = <20>;
++		};
++
++		button-k2 {
++			label = "K2";
++			gpios = <&gpn 1 GPIO_ACTIVE_LOW>;
++			linux,code = <3>;
++			debounce-interval = <20>;
++		};
++
++		button-k3 {
++			label = "K3";
++			gpios = <&gpn 2 GPIO_ACTIVE_LOW>;
++			linux,code = <4>;
++			debounce-interval = <20>;
++		};
++
++		button-k4 {
++			label = "K4";
++			gpios = <&gpn 3 GPIO_ACTIVE_LOW>;
++			linux,code = <5>;
++			debounce-interval = <20>;
++		};
++
++		button-k5 {
++			label = "K5";
++			gpios = <&gpn 4 GPIO_ACTIVE_LOW>;
++			linux,code = <6>;
++			debounce-interval = <20>;
++		};
++
++		button-k6 {
++			label = "K6";
++			gpios = <&gpn 5 GPIO_ACTIVE_LOW>;
++			linux,code = <7>;
++			debounce-interval = <20>;
++		};
++
++		button-k7 {
++			label = "K7";
++			gpios = <&gpl 11 GPIO_ACTIVE_LOW>;
++			linux,code = <8>;
++			debounce-interval = <20>;
++		};
++
++		button-k8 {
++			label = "K8";
++			gpios = <&gpl 12 GPIO_ACTIVE_LOW>;
++			linux,code = <9>;
++			debounce-interval = <20>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gpio_leds>;
++
++		led-1 {
++			label = "LED1";
++			gpios = <&gpk 4 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "heartbeat";
++		};
++
++		led-2 {
++			label = "LED2";
++			gpios = <&gpk 5 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "mmc0";
++		};
++
++		led-3 {
++			label = "LED3";
++			gpios = <&gpk 6 GPIO_ACTIVE_LOW>;
++		};
++
++		led-4 {
++			label = "LED4";
++			gpios = <&gpk 7 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	buzzer {
++		compatible = "pwm-beeper";
++		pwms = <&pwm 0 1000000 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm0_out>;
 +	};
 +};
 +
@@ -122,13 +213,13 @@ index 0000000..ecf35ec
 +
 +&uart0 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_data>, <&uart0_fctl>;
++	pinctrl-0 = <&uart0_data>;
 +	status = "okay";
 +};
 +
 +&uart1 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_data>;
++	pinctrl-0 = <&uart1_data>, <&uart1_fctl>;
 +	status = "okay";
 +};
 +
@@ -142,6 +233,35 @@ index 0000000..ecf35ec
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&uart3_data>;
 +	status = "okay";
++};
++
++&pwm {
++	status = "okay";
++};
++
++&pinctrl0 {
++	gpio_leds: gpio-leds {
++		samsung,pins = "gpk-4", "gpk-5", "gpk-6", "gpk-7";
++		samsung,pin-pud = <PIN_PULL_NONE>;
++	};
++
++	gpio_keys: gpio-keys {
++		samsung,pins = "gpn-0", "gpn-1", "gpn-2", "gpn-3",
++				"gpn-4", "gpn-5", "gpl-11", "gpl-12";
++		samsung,pin-pud = <PIN_PULL_NONE>;
++	};
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_bus>;
++	status = "okay";
++
++	eeprom at 50 {
++		compatible = "atmel,24c08";
++		reg = <0x50>;
++		pagesize = <16>;
++	};
 +};
 -- 
 1.8.3.2
