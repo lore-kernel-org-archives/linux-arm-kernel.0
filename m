@@ -1,44 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 Aug 2013 09:21:42 +0100
-Subject: [PATCH 05/13] ARM: ux500: Apply a ste-* prefix onto snowball.dts
-In-Reply-To: <CAOesGMgd51g7WAkQu+ckT-=skKuMyj19nJkHxh+YmGSBhSL+Vg@mail.gmail.com>
-References: <1374243229-8585-1-git-send-email-lee.jones@linaro.org>
- <1374243229-8585-6-git-send-email-lee.jones@linaro.org>
- <CAOesGMgd51g7WAkQu+ckT-=skKuMyj19nJkHxh+YmGSBhSL+Vg@mail.gmail.com>
-Message-ID: <20130821082142.GB29850@lee--X1>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Aug 2013 10:23:11 +0200
+Subject: [PATCH 19/33] clk: ux500: Add Device Tree support for the PRCMU
+ clock
+In-Reply-To: <1370521041-32318-20-git-send-email-lee.jones@linaro.org>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <1370521041-32318-20-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdar9oOWQ9xuQnKvvAOw-eQS1-FkDSDD8BwQT3WDE8YzBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Aug 2013, Olof Johansson wrote:
+On Thu, Jun 6, 2013 at 2:17 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> On Fri, Jul 19, 2013 at 7:13 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/{snowball.dts => ste-snowball.dts} | 0
-> >  1 file changed, 0 insertions(+), 0 deletions(-)
-> >  rename arch/arm/boot/dts/{snowball.dts => ste-snowball.dts} (100%)
-> >
-> > diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-> > similarity index 100%
-> > rename from arch/arm/boot/dts/snowball.dts
-> > rename to arch/arm/boot/dts/ste-snowball.dts
-> 
-> Grmbl, grmbl, grmbl. This now breaks any script that knows to use
-> snowball.dtb. :(
-> 
-> It's good to get the prefixes added, but it's annoying to have to deal
-> with both during an overlap period. Maybe generate both dtb filenames
-> for a while but rename the source?
+> This patch enables clocks to be specified from Device Tree via phandles
+> to the "prcmu-clock" node.
+(..)
+> @@ -52,14 +54,17 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+>         clk = clk_reg_prcmu_gate("soc0_pll", NULL, PRCMU_PLLSOC0,
+>                                 CLK_IS_ROOT|CLK_IGNORE_UNUSED);
+>         clk_register_clkdev(clk, "soc0_pll", NULL);
+> +       prcmu_clk[PRCMU_PLLSOC0] = clk;
 
-How would you create both DTB files from one DTS file?
+Same comment on all these.
 
-Surely they only solution would be to maintain both snowball.dts and
-ste-snowball.dts at the same time, which doesn't sound logical at all.
+No clk_register_clkdev() on the DT boot path please.
 
-Why can't you do as Linus and I have done and just change your script?
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yours,
+Linus Walleij
