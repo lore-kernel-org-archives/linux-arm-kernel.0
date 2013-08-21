@@ -1,44 +1,38 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 22 Aug 2013 01:07:30 +0200
-Subject: [PATCH v2] pinctrl: queue GPIO operations instead of defering
-In-Reply-To: <52126EDE.5060000@wwwdotorg.org>
-References: <1376751410-14560-1-git-send-email-linus.walleij@linaro.org>
- <52126EDE.5060000@wwwdotorg.org>
-Message-ID: <CACRpkdasWurMctYTMZCHS+fwhvmnREaQD1vN54QYpMToTuFjsg@mail.gmail.com>
+Date: Thu, 22 Aug 2013 01:19:34 +0200
+Subject: [PATCH v7 1/7] ARM: common: vic: Parse interrupt and resume masks
+ from device tree
+In-Reply-To: <1377120111-25601-2-git-send-email-tomasz.figa@gmail.com>
+References: <1377120111-25601-1-git-send-email-tomasz.figa@gmail.com>
+ <1377120111-25601-2-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <CACRpkdboi3MUiUSDuhjwsjzVH3y9bYf9VpyfWK6PCkV-0fUZzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 9:15 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/17/2013 08:56 AM, Linus Walleij wrote:
+On Wed, Aug 21, 2013 at 11:21 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 
->> and the pin controller need the GPIO driver to be ready.
+> +++ b/Documentation/devicetree/bindings/arm/vic.txt
+> @@ -18,6 +18,9 @@ Required properties:
+>  Optional properties:
 >
-> Why does that happen?
+>  - interrupts : Interrupt source for parent controllers if the VIC is nested.
+> +- interrupt-mask : Bit mask of valid interrupt sources (defaults to all valid)
+> +- wakeup-mask : Bit mask of interrupt sources that can wake up the system
+> +  (defaults to all allowed)
 
-The pin controller call back into the GPIO-side controller
-functions by utilizing the GPIO ranges.
-(Maybe the code is silly, I dunno, check drivers/pinctrl/pinctrl-nomadik.c)
+The "interrupt-mask" is called "valid-mask" on the FPGA IRQ controller
+See
+Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt
 
->> This also happens if
->> pin controllers and GPIO controllers compiled as modules
->> are inserted in a certain order.
->
-> Shouldn't deferred probe resolve that just fine, assuming there are no
-> circular dependencies?
+Example:
 
-The above leads to circular dependencies so that is what I'm
-trying to fix with this.
+                reg = <0x10000040 0x100>;
+                clear-mask = <0xffffffff>;
+                valid-mask = <0x00000007>;
 
->> On the Nomadik we get this situation with the pinctrl
->> driver when moving to requesting GPIOs off the gpiochip
->> right after it has been added,
->
-> So, the pinctrl driver calls gpio_request()? Surely the solution is
-> simply not to do that?
+Please use the same name.
 
-This is what the other patch we're discussing is doing.
-The one that harvests and requests interrupt GPIO's when
-a gpiochip is added...
+(wakeup-mask is fine).
 
 Yours,
 Linus Walleij
