@@ -1,135 +1,46 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 21 Aug 2013 11:46:15 +0200
-Subject: [PATCH] arm: omap5: hwmod: add missing ocp2scp hwmod data
-In-Reply-To: <20130821074728.GV7656@atomide.com>
-References: <1373642066-5235-1-git-send-email-balbi@ti.com>
- <20130821074728.GV7656@atomide.com>
-Message-ID: <52148C67.3080106@baylibre.com>
+From: richard.genoud@gmail.com (Richard GENOUD)
+Date: Wed, 21 Aug 2013 11:47:20 +0200
+Subject: sun4i_handle_irq: WARNING at net/ipv4/tcp_input.c:2711
+ tcp_fastretrans_alert
+Message-ID: <20130821094432.GA28249@lnx-rg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/08/2013 09:47, Tony Lindgren wrote:
-> Benoit,
->
-> Got this one queued up somewhere?
+Hi Maxime, Stephan
 
-No yet. That's the only hwmod patch I have so far.
-I'll put it in a branch and send you the pull-request ASAP.
+I just realise that, *sometimes*, I have some warnings on my cubieboard
+(6 since the 22 of july, and the board is runnning 24/24).
+It has happened also on 3.10 + emac patches.
+Here it is:
+[27224.060000] ------------[ cut here ]------------
+[27224.070000] WARNING: CPU: 0 PID: 0 at net/ipv4/tcp_input.c:2711 tcp_fastretrans_alert+0x717/0x734()
+[27224.080000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.11.0-rc6-00010-g54f11ec #8
+[27224.080000] [<c000f231>] (unwind_backtrace+0x1/0x98) from [<c000e2b7>] (show_stack+0xb/0xc)
+[27224.090000] [<c000e2b7>] (show_stack+0xb/0xc) from [<c0013cd3>] (warn_slowpath_common+0x43/0x5c)
+[27224.100000] [<c0013cd3>] (warn_slowpath_common+0x43/0x5c) from [<c0013d6d>] (warn_slowpath_null+0x11/0x14)
+[27224.110000] [<c0013d6d>] (warn_slowpath_null+0x11/0x14) from [<c015eadf>] (tcp_fastretrans_alert+0x717/0x734)
+[27224.120000] [<c015eadf>] (tcp_fastretrans_alert+0x717/0x734) from [<c015f32b>] (tcp_ack+0x6af/0x984)
+[27224.130000] [<c015f32b>] (tcp_ack+0x6af/0x984) from [<c015fcab>] (tcp_rcv_established+0x93/0x3ec)
+[27224.140000] [<c015fcab>] (tcp_rcv_established+0x93/0x3ec) from [<c0165621>] (tcp_v4_do_rcv+0xa1/0x160)
+[27224.150000] [<c0165621>] (tcp_v4_do_rcv+0xa1/0x160) from [<c0167129>] (tcp_v4_rcv+0x4e9/0x500)
+[27224.160000] [<c0167129>] (tcp_v4_rcv+0x4e9/0x500) from [<c015025d>] (ip_local_deliver_finish+0x79/0x180)
+[27224.170000] [<c015025d>] (ip_local_deliver_finish+0x79/0x180) from [<c01500a1>] (ip_rcv_finish+0xc9/0x20c)
+[27224.180000] [<c01500a1>] (ip_rcv_finish+0xc9/0x20c) from [<c0129493>] (__netif_receive_skb_core+0x287/0x3dc)
+[27224.190000] [<c0129493>] (__netif_receive_skb_core+0x287/0x3dc) from [<c0129a8b>] (process_backlog+0x5b/0xd0)
+[27224.200000] [<c0129a8b>] (process_backlog+0x5b/0xd0) from [<c012bc6f>] (net_rx_action+0x5f/0xe8)
+[27224.200000] [<c012bc6f>] (net_rx_action+0x5f/0xe8) from [<c0015fc9>] (__do_softirq+0x91/0x134)
+[27224.210000] [<c0015fc9>] (__do_softirq+0x91/0x134) from [<c0016251>] (irq_exit+0x59/0x80)
+[27224.220000] [<c0016251>] (irq_exit+0x59/0x80) from [<c000d00d>] (handle_IRQ+0x21/0x54)
+[27224.230000] [<c000d00d>] (handle_IRQ+0x21/0x54) from [<c00083ef>] (sun4i_handle_irq+0x1f/0x30)
+[27224.240000] [<c00083ef>] (sun4i_handle_irq+0x1f/0x30) from [<c000ea1b>] (__irq_svc+0x3b/0x5c)
+[27224.250000] Exception stack(0xc0287f70 to 0xc0287fb8)
+[27224.250000] 7f60:                                     00000000 00000000 00000000 00000000
+[27224.260000] 7f80: c0286000 c02ad7fd 00000001 c02ad7fd c028e084 413fc082 00000000 00000000
+[27224.270000] 7fa0: 01000000 c0287fb8 c000d115 c000d116 40000033 ffffffff
+[27224.270000] [<c000ea1b>] (__irq_svc+0x3b/0x5c) from [<c000d116>] (arch_cpu_idle+0x16/0x1c)
+[27224.280000] [<c000d116>] (arch_cpu_idle+0x16/0x1c) from [<c002e69d>] (cpu_startup_entry+0x35/0xa0)
+[27224.290000] [<c002e69d>] (cpu_startup_entry+0x35/0xa0) from [<c026f75f>] (start_kernel+0x1af/0x1f0)
+[27224.300000] ---[ end trace 15641276e08fba8a ]---
 
-Regards,
-Benoit
-
->
-> * Felipe Balbi <balbi@ti.com> [130712 08:21]:
->> From: Benoit Cousson <benoit.cousson@linaro.org>
->>
->> without that hwmod data, USB3 will not in OMAP5 boards.
->>
->> While at that, also fix DTS data to pass reg property,
->> otherwise driver won't probe.
->>
->> Signed-off-by: Benoit Cousson <benoit.cousson@linaro.org>
->> Signed-off-by: Felipe Balbi <balbi@ti.com>
->> ---
->>
->> tested on OMAP5 uEVM. Gets rid of a data abort when USB3
->> is enabled. There still some other patches missing to get
->> USB3 working out of the box, but that's on Palmas and will
->> come as soon as I get those ready.
->>
->> This is already on step forward.
->>
->>   arch/arm/boot/dts/omap5.dtsi               |  3 +-
->>   arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 45 ++++++++++++++++++++++++++++++
->>   2 files changed, 47 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
->> index da41d70..a0de586 100644
->> --- a/arch/arm/boot/dts/omap5.dtsi
->> +++ b/arch/arm/boot/dts/omap5.dtsi
->> @@ -654,10 +654,11 @@
->>   			};
->>   		};
->>
->> -		ocp2scp {
->> +		ocp2scp at 4a080000 {
->>   			compatible = "ti,omap-ocp2scp";
->>   			#address-cells = <1>;
->>   			#size-cells = <1>;
->> +			reg = <0x4a080000 0x20>;
->>   			ranges;
->>   			ti,hwmods = "ocp2scp1";
->>   			usb2_phy: usb2phy at 4a084000 {
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
->> index 2435109..d9118a1 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
->> @@ -1105,6 +1105,42 @@ static struct omap_hwmod omap54xx_mpu_hwmod = {
->>   };
->>
->>   /*
->> + * 'ocp2scp' class
->> + * bridge to transform ocp interface protocol to scp (serial control port)
->> + * protocol
->> + */
->> +
->> +static struct omap_hwmod_class_sysconfig omap54xx_ocp2scp_sysc = {
->> +	.rev_offs	= 0x0000,
->> +	.sysc_offs	= 0x0010,
->> +	.syss_offs	= 0x0014,
->> +	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE |
->> +			SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
->> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
->> +	.sysc_fields	= &omap_hwmod_sysc_type1,
->> +};
->> +
->> +static struct omap_hwmod_class omap54xx_ocp2scp_hwmod_class = {
->> +	.name	= "ocp2scp",
->> +	.sysc	= &omap54xx_ocp2scp_sysc,
->> +};
->> +
->> +/* ocp2scp1 */
->> +static struct omap_hwmod omap54xx_ocp2scp1_hwmod = {
->> +	.name		= "ocp2scp1",
->> +	.class		= &omap54xx_ocp2scp_hwmod_class,
->> +	.clkdm_name	= "l3init_clkdm",
->> +	.main_clk	= "l4_root_clk_div",
->> +	.prcm = {
->> +		.omap4 = {
->> +			.clkctrl_offs = OMAP54XX_CM_L3INIT_OCP2SCP1_CLKCTRL_OFFSET,
->> +			.context_offs = OMAP54XX_RM_L3INIT_OCP2SCP1_CONTEXT_OFFSET,
->> +			.modulemode   = MODULEMODE_HWCTRL,
->> +		},
->> +	},
->> +};
->> +
->> +/*
->>    * 'timer' class
->>    * general purpose timer module with accurate 1ms tick
->>    * This class contains several variants: ['timer_1ms', 'timer']
->> @@ -1900,6 +1936,14 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__mpu = {
->>   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->>   };
->>
->> +/* l4_cfg -> ocp2scp1 */
->> +static struct omap_hwmod_ocp_if omap54xx_l4_cfg__ocp2scp1 = {
->> +	.master		= &omap54xx_l4_cfg_hwmod,
->> +	.slave		= &omap54xx_ocp2scp1_hwmod,
->> +	.clk		= "l4_root_clk_div",
->> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->> +};
->> +
->>   /* l4_wkup -> timer1 */
->>   static struct omap_hwmod_ocp_if omap54xx_l4_wkup__timer1 = {
->>   	.master		= &omap54xx_l4_wkup_hwmod,
->> @@ -2102,6 +2146,7 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
->>   	&omap54xx_l4_per__mmc4,
->>   	&omap54xx_l4_per__mmc5,
->>   	&omap54xx_l4_cfg__mpu,
->> +	&omap54xx_l4_cfg__ocp2scp1,
->>   	&omap54xx_l4_wkup__timer1,
->>   	&omap54xx_l4_per__timer2,
->>   	&omap54xx_l4_per__timer3,
->> --
->> 1.8.2.1
->>
+Best regards,
+Richard
