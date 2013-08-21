@@ -1,28 +1,39 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 21 Aug 2013 17:59:50 +0900
-Subject: [PATCH 00/05] ARM: shmobile: Yet another SMP series
-In-Reply-To: <20130807221321.22251.22774.sendpatchset@w520>
-References: <20130807221321.22251.22774.sendpatchset@w520>
-Message-ID: <20130821085949.GI20014@verge.net.au>
+Date: Wed, 21 Aug 2013 18:00:19 +0900
+Subject: [PATCH 00/02] ARM: shmobile: Rename to
+ r8a73a4/r8a7790_init_early()
+In-Reply-To: <20130807222638.22283.78607.sendpatchset@w520>
+References: <20130807222638.22283.78607.sendpatchset@w520>
+Message-ID: <20130821090018.GJ20014@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 08, 2013 at 07:13:21AM +0900, Magnus Damm wrote:
-> ARM: shmobile: Yet another SMP series
+On Thu, Aug 08, 2013 at 07:26:38AM +0900, Magnus Damm wrote:
+> ARM: shmobile: Rename to r8a73a4/r8a7790_init_early()
 > 
-> [PATCH 01/05] ARM: shmobile: Introduce shmobile_smp_cpu_disable()
-> [PATCH 02/05] ARM: shmobile: Use shmobile_smp_cpu_disable() on sh73a0
-> [PATCH 03/05] ARM: shmobile: Remove unused shmobile_smp_init_cpus()
-> [PATCH 04/05] ARM: shmobile: Expose shmobile_invalidate_start()
-> [PATCH 05/05] ARM: shmobile: Introduce shmobile_boot_size
+> [PATCH 01/02] ARM: shmobile: Rename to r8a73a4_init_early()
+> [PATCH 02/02] ARM: shmobile: Rename to r8a7790_init_early()
 > 
-> This series cleans up the existing SMP code and introduces various new SMP
-> functions for mach-shmobile. The new functions are partially used by existing
-> SMP support code, but are also consumed by upcoming SMP support patches.
+> This series renames r8a73a4/r8a7790_init_delay() to 
+> r8a73a4/r8a7790_init_early(). The reason for this is
+> that future SMP code will hook into these functions
+> which will make them handle more than just delay setup.
 > 
 > Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  Written against renesas.git renesas-devel-20130806v4 and
+>  [PATCH 00/05] ARM: shmobile: Yet another SMP series
+> 
+>  arch/arm/mach-shmobile/board-ape6evm-reference.c |    2 +-
+>  arch/arm/mach-shmobile/board-ape6evm.c           |    2 +-
+>  arch/arm/mach-shmobile/board-lager-reference.c   |    2 +-
+>  arch/arm/mach-shmobile/board-lager.c             |    2 +-
+>  arch/arm/mach-shmobile/include/mach/r8a73a4.h    |    2 +-
+>  arch/arm/mach-shmobile/include/mach/r8a7790.h    |    2 +-
+>  arch/arm/mach-shmobile/setup-r8a73a4.c           |    4 ++--
+>  arch/arm/mach-shmobile/setup-r8a7790.c           |    4 ++--
+>  8 files changed, 10 insertions(+), 10 deletions(-)
 
-Thanks Magnus,
-
-I plan to queue this up in the smp branch which will most likely occur
-tomorrow.
+Thanks Magnus, I have plan to queue this up in the cleanup4 branch
+which will most likely happen tomorrow.
