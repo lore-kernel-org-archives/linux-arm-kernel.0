@@ -1,33 +1,41 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 21 Aug 2013 17:14:58 +0530
-Subject: [PATCH v2 00/13] ARM: OMAP2+: AM43x PRCM support
-In-Reply-To: <cover.1375443858.git.afzal@ti.com>
-References: <cover.1375443858.git.afzal@ti.com>
-Message-ID: <5214A83A.5080701@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 21 Aug 2013 12:47:03 +0100
+Subject: [PATCH] usb: musb: ux500: Add check for NULL board data
+Message-ID: <1377085623-8773-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 August 2013 07:05 PM, Afzal Mohammed wrote:
-> Hwmod database of AM335x is reused by moving common elements to a new
-> array (most of AM335x IP's are present in AM43x) and keeping separate
-> arrays for elements that are specific only to either one of AM335x or
-> AM43x. And in the cases where relevant IP is present in both that has
-> difference in details like CLKCTRL register offsets, it is being
-> updated at runtime based on the SoC detected.
+Dan Carpenter's automatic Smatch checker found an anomaly in the ux500
+MUSB driver, whereby board data was checked before use in all but one
+occasion. It is believed that it needs to be checked every time.
 
-I feel the reuse part is good but we need to structure them such that we
-don't compromise too much on readability of the data.
+Smatch complaint:
+  drivers/usb/musb/ux500_dma.c:335 ux500_dma_controller_start()
+         error: we previously assumed 'data' could be null (see line 313)
 
-So what I suggest is
-1. Create something like omap_hwmod_am43_am33_interconnect_data.c and have all common
-interconnect ocp_if structs
-2. Create something like omap_hwmod_am43_am33_ipblock_data.c and have all common
-hwmod structs.
-3. Since most PRCM register offsets are different, have them all inited in *one* place
-(even for the ones which are common), instead of common ones being statically defined
-and others dynamically inited.
-4. For instances like clkdm being different or clock topology has changed (which is in
-rare cases) have seperate structures for am33xx and am43xx. Once we move some of the clocks etc
-to DT we can then move them into common files if needed.
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-usb at vger.kernel.org
+Cc: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/usb/musb/ux500_dma.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Paul/Benoit, does the above make sense?
+diff --git a/drivers/usb/musb/ux500_dma.c b/drivers/usb/musb/ux500_dma.c
+index bfb7a65..679f511 100644
+--- a/drivers/usb/musb/ux500_dma.c
++++ b/drivers/usb/musb/ux500_dma.c
+@@ -339,7 +339,9 @@ static int ux500_dma_controller_start(struct dma_controller *c)
+ 			if (!ux500_channel->dma_chan)
+ 				ux500_channel->dma_chan =
+ 					dma_request_channel(mask,
+-							    data->dma_filter,
++							    data ?
++							    data->dma_filter :
++							    NULL,
+ 							    param_array[ch_num]);
+ 
+ 			if (!ux500_channel->dma_chan) {
+-- 
+1.8.1.2
