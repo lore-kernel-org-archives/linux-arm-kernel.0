@@ -1,243 +1,67 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 21 Aug 2013 16:55:57 +0200
-Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.12
-In-Reply-To: <20130821071334.GQ7656@atomide.com>
-References: <521384D5.1050607@baylibre.com> <20130821071334.GQ7656@atomide.com>
-Message-ID: <5214D4FD.4060405@baylibre.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 21 Aug 2013 17:05:10 +0200
+Subject: [GIT PULL] at91: device tree update for 3.12 #1
+Message-ID: <1377097510-14090-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin & Olof,
+Arnd, Olof, Kevin,
 
-I've just updated the branch with the few USB3 patches I missed from Felipe.
+Here is the first pull request about DT on AT91 for 3.12.
+It is based on 3.11-rc5 as I saw that the branch is coming from this tag on
+your side.
 
-So here is a new pull-request.
+Thanks, best regards,
 
-Thanks,
-Benoit
+The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
 
-----------------------------------------------------------------
-Add the minimal DTS support for DRA7xx based SoC core.
-Add the initial support for N900 and gta04 phones.
-Enable USB3 on OMAP5 evm board.
-Do a lot of various cleanups.
-----------------------------------------------------------------
-
-
-The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
-
-  Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
+  Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.12/dts
+  git://github.com/at91linux/linux-at91.git tags/at91-dt
 
-for you to fetch changes up to 5903208d4e2c09a3872feba6b9e2e49c64fd07ad:
+for you to fetch changes up to 90d01929ad38259596371c78df8a9ecf37a7f815:
 
-  ARM: configs: omap2plus_defconfig: enable dwc3 and dependencies (2013-08-21 16:43:21 +0200)
+  ARM: at91/dt: sam9x5ek: add sound configuration (2013-08-21 13:33:44 +0200)
 
 ----------------------------------------------------------------
-Afzal Mohammed (2):
-      ARM: dts: AM4372: cpu(s) node per latest binding
-      ARM: dts: AM4372: add few nodes
+More DT work on AT91:
+- sound support for at91sam9x5 family
+- at91sam9n12: touch button, i2c and gpio-keys
+- adding missing pinctrl-names to MCI on at91rm9200 and at91sam9260/9g20
+- adding ARM Performance Monitor Unit (PMU) on sama5d3
 
+----------------------------------------------------------------
 Alexandre Belloni (1):
-      ARM: dts: AM33XX: Add PMU support
+      ARM: at91: Add PMU support for sama5d3
 
-Benoit Cousson (1):
-      ARM: OMAP5: hwmod: add missing ocp2scp hwmod data
+Jean-Christophe PLAGNIOL-VILLARD (3):
+      ARM: at91: at91sam9260: add missing pinctrl-names on mmc
+      ARM: at91: at91rm9200: set default mmc0 pinctrl-names
+      ARM: at91/dt: add at91rm9200 PQFP package version
 
-Felipe Balbi (4):
-      ARM: OMAP5: dts: fix reg property size
-      ARM: OMAP5: dts: fix ocp2scp DTS data
-      ARM: OMAP5: dts: add palmas-usb node
-      ARM: configs: omap2plus_defconfig: enable dwc3 and dependencies
+Richard Genoud (4):
+      ARM: at91/dt: sam9x5: add SSC DMA parameters
+      ARM: at91/dt: sam9x5ek: add WM8731 codec
+      ARM: at91/dt: sam9x5ek: enable SSC
+      ARM: at91/dt: sam9x5ek: add sound configuration
 
-Javier Martinez Canillas (5):
-      ARM: dts: omap3-igep: add pinmux node for GPIO LED configuration
-      ARM: dts: omap3-igep0020: add mux conf for GPIO LEDs
-      ARM: dts: omap3-igep0030: add mux conf for GPIO LED
-      ARM: dts: AM33XX: use pinmux node defined in included file
-      ARM: dts: AM33XX: don't redefine OCP bus and device nodes
+voice (3):
+      ARM: at91: at91sam9n12: add pinctrl of TWI
+      ARM: at91: at91sam9n12: add qt1070 support
+      ARM: at91: at91sam9n12: correct pin number of gpio-key
 
-Kishon Vijay Abraham I (1):
-      ARM: dts: omap5-uevm: Split SMPS10 in two nodes
+ arch/arm/boot/dts/at91rm9200.dtsi      |  1 +
+ arch/arm/boot/dts/at91rm9200_pqfp.dtsi | 17 +++++++++++++++++
+ arch/arm/boot/dts/at91sam9260.dtsi     |  1 +
+ arch/arm/boot/dts/at91sam9n12.dtsi     | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9n12ek.dts    | 18 +++++++++++++++++-
+ arch/arm/boot/dts/at91sam9x5.dtsi      |  3 +++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi    | 24 ++++++++++++++++++++++++
+ arch/arm/boot/dts/sama5d3.dtsi         |  5 +++++
+ 8 files changed, 88 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/at91rm9200_pqfp.dtsi
 
-Lars Poeschel (1):
-      ARM: dts: AM33xx: Correct gpio #interrupt-cells property
-
-Lee Jones (7):
-      ARM: dts: Remove '0x's from OMAP2420 H4 DTS file
-      ARM: dts: Remove '0x's from OMAP3 IGEP0020 DTS file
-      ARM: dts: Remove '0x's from OMAP3 IGEP0030 DTS file
-      ARM: dts: Remove '0x's from OMAP3 DTS file
-      ARM: dts: Remove '0x's from OMAP3430 SDP DTS file
-      ARM: dts: Remove '0x's from OMAP4 DTS file
-      ARM: dts: Remove '0x's from OMAP5 DTS file
-
-Marek Belisko (1):
-      ARM: dts: Add devicetree for gta04 board.
-
-Pavel Machek (1):
-      ARM: dts: N900: Add device tree
-
-R Sricharan (1):
-      ARM: dts: DRA7: Add the dts files for dra7 SoC and dra7-evm board
-
-Robert Nelson (1):
-      ARM: dts: omap3-beagle-xm: fix string error in compatible property
-
-Roger Quadros (1):
-      ARM: dts: omap3-beagle: Make USB host pin naming consistent
-
-Ruslan Bilovol (1):
-      ARM: dts: twl6030: Move common configuration for OMAP4 boards in a separate dtsi file
-
- arch/arm/boot/dts/Makefile                 |   5 +-
- arch/arm/boot/dts/am335x-bone.dts          | 217 ++++++-----
- arch/arm/boot/dts/am335x-evm.dts           | 576 ++++++++++++++---------------
- arch/arm/boot/dts/am335x-evmsk.dts         | 374 ++++++++++---------
- arch/arm/boot/dts/am33xx.dtsi              |  13 +-
- arch/arm/boot/dts/am4372.dtsi              | 347 +++++++++++++++++
- arch/arm/boot/dts/dra7-evm.dts             | 140 +++++++
- arch/arm/boot/dts/dra7.dtsi                | 575 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap2420-h4.dts          |   6 +-
- arch/arm/boot/dts/omap3-beagle-xm.dts      |   2 +-
- arch/arm/boot/dts/omap3-beagle.dts         |  24 +-
- arch/arm/boot/dts/omap3-gta04.dts          | 168 +++++++++
- arch/arm/boot/dts/omap3-igep.dtsi          |   2 +
- arch/arm/boot/dts/omap3-igep0020.dts       |  19 +-
- arch/arm/boot/dts/omap3-igep0030.dts       |  17 +-
- arch/arm/boot/dts/omap3-n900.dts           |  92 +++++
- arch/arm/boot/dts/omap3.dtsi               |   2 +-
- arch/arm/boot/dts/omap3430-sdp.dts         |  22 +-
- arch/arm/boot/dts/omap4-panda-common.dtsi  |  21 +-
- arch/arm/boot/dts/omap4-sdp.dts            |  21 +-
- arch/arm/boot/dts/omap4.dtsi               |   2 +-
- arch/arm/boot/dts/omap5-uevm.dts           |  25 +-
- arch/arm/boot/dts/omap5.dtsi               |  13 +-
- arch/arm/boot/dts/twl6030_omap4.dtsi       |  38 ++
- arch/arm/configs/omap2plus_defconfig       |   9 +
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c |  45 +++
- include/dt-bindings/pinctrl/dra.h          |  50 +++
- 27 files changed, 2148 insertions(+), 677 deletions(-)
- create mode 100644 arch/arm/boot/dts/dra7-evm.dts
- create mode 100644 arch/arm/boot/dts/dra7.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-gta04.dts
- create mode 100644 arch/arm/boot/dts/omap3-n900.dts
- create mode 100644 arch/arm/boot/dts/twl6030_omap4.dtsi
- create mode 100644 include/dt-bindings/pinctrl/dra.h
-
-
-On 21/08/2013 09:13, Tony Lindgren wrote:
-> Kevin & Olof,
-> 
-> Care to pull the below .dts changes directly from Benoit?
-> 
-> * Benoit Cousson <bcousson@baylibre.com> [130820 08:08]:
->>
->> Hi Tony,
->>
->> Please pull the following commits for OMAP Device Tree for v3.12.
->>
->> Thanks,
->> Benoit
->>
->> ----------------------------------------------------------------
->> Add the minimal DTS support for DRA7xx based SoC core.
->> Add the initial support for N900 and gta04 phones.
->> Do a lot of various cleanups.
->> ----------------------------------------------------------------
->>
->> The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
->>
->>    Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.12/dts
->>
->> for you to fetch changes up to 9f311a2325905043718da9bf649e2344b8df8473:
->>
->>    ARM: dts: omap3-beagle: Make USB host pin naming consistent (2013-08-20 14:30:07 +0200)
->>
->> ----------------------------------------------------------------
->> Afzal Mohammed (2):
->>        ARM: dts: AM4372: cpu(s) node per latest binding
->>        ARM: dts: AM4372: add few nodes
->>
->> Alexandre Belloni (1):
->>        ARM: dts: AM33XX: Add PMU support
->>
->> Javier Martinez Canillas (5):
->>        ARM: dts: omap3-igep: add pinmux node for GPIO LED configuration
->>        ARM: dts: omap3-igep0020: add mux conf for GPIO LEDs
->>        ARM: dts: omap3-igep0030: add mux conf for GPIO LED
->>        ARM: dts: AM33XX: use pinmux node defined in included file
->>        ARM: dts: AM33XX: don't redefine OCP bus and device nodes
->>
->> Kishon Vijay Abraham I (1):
->>        ARM: dts: omap5-uevm: Split SMPS10 in two nodes
->>
->> Lars Poeschel (1):
->>        ARM: dts: AM33xx: Correct gpio #interrupt-cells property
->>
->> Lee Jones (7):
->>        ARM: dts: Remove '0x's from OMAP2420 H4 DTS file
->>        ARM: dts: Remove '0x's from OMAP3 IGEP0020 DTS file
->>        ARM: dts: Remove '0x's from OMAP3 IGEP0030 DTS file
->>        ARM: dts: Remove '0x's from OMAP3 DTS file
->>        ARM: dts: Remove '0x's from OMAP3430 SDP DTS file
->>        ARM: dts: Remove '0x's from OMAP4 DTS file
->>        ARM: dts: Remove '0x's from OMAP5 DTS file
->>
->> Marek Belisko (1):
->>        ARM: dts: Add devicetree for gta04 board.
->>
->> Pavel Machek (1):
->>        ARM: dts: N900: Add device tree
->>
->> R Sricharan (1):
->>        ARM: dts: DRA7: Add the dts files for dra7 SoC and dra7-evm board
->>
->> Robert Nelson (1):
->>        ARM: dts: omap3-beagle-xm: fix string error in compatible property
->>
->> Roger Quadros (1):
->>        ARM: dts: omap3-beagle: Make USB host pin naming consistent
->>
->> Ruslan Bilovol (1):
->>        ARM: dts: twl6030: Move common configuration for OMAP4 boards in a separate dtsi file
->>
->>   arch/arm/boot/dts/Makefile                |   5 +-
->>   arch/arm/boot/dts/am335x-bone.dts         | 217 ++++++-----
->>   arch/arm/boot/dts/am335x-evm.dts          | 576 +++++++++++++++---------------
->>   arch/arm/boot/dts/am335x-evmsk.dts        | 374 ++++++++++---------
->>   arch/arm/boot/dts/am33xx.dtsi             |  13 +-
->>   arch/arm/boot/dts/am4372.dtsi             | 347 ++++++++++++++++++
->>   arch/arm/boot/dts/dra7-evm.dts            | 140 ++++++++
->>   arch/arm/boot/dts/dra7.dtsi               | 575 +++++++++++++++++++++++++++++
->>   arch/arm/boot/dts/omap2420-h4.dts         |   6 +-
->>   arch/arm/boot/dts/omap3-beagle-xm.dts     |   2 +-
->>   arch/arm/boot/dts/omap3-beagle.dts        |  24 +-
->>   arch/arm/boot/dts/omap3-gta04.dts         | 168 +++++++++
->>   arch/arm/boot/dts/omap3-igep.dtsi         |   2 +
->>   arch/arm/boot/dts/omap3-igep0020.dts      |  19 +-
->>   arch/arm/boot/dts/omap3-igep0030.dts      |  17 +-
->>   arch/arm/boot/dts/omap3-n900.dts          |  92 +++++
->>   arch/arm/boot/dts/omap3.dtsi              |   2 +-
->>   arch/arm/boot/dts/omap3430-sdp.dts        |  22 +-
->>   arch/arm/boot/dts/omap4-panda-common.dtsi |  21 +-
->>   arch/arm/boot/dts/omap4-sdp.dts           |  21 +-
->>   arch/arm/boot/dts/omap4.dtsi              |   2 +-
->>   arch/arm/boot/dts/omap5-uevm.dts          |  13 +-
->>   arch/arm/boot/dts/omap5.dtsi              |   4 +-
->>   arch/arm/boot/dts/twl6030_omap4.dtsi      |  38 ++
->>   include/dt-bindings/pinctrl/dra.h         |  50 +++
->>   25 files changed, 2077 insertions(+), 673 deletions(-)
->>   create mode 100644 arch/arm/boot/dts/dra7-evm.dts
->>   create mode 100644 arch/arm/boot/dts/dra7.dtsi
->>   create mode 100644 arch/arm/boot/dts/omap3-gta04.dts
->>   create mode 100644 arch/arm/boot/dts/omap3-n900.dts
->>   create mode 100644 arch/arm/boot/dts/twl6030_omap4.dtsi
->>   create mode 100644 include/dt-bindings/pinctrl/dra.h
+-- 
+Nicolas Ferre
