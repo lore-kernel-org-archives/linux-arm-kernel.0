@@ -1,66 +1,71 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 21 Aug 2013 13:58:26 +0530
-Subject: [PATCH 3/3] ARM: OMAP4: dts: Add main and optional clock data
- into DT
-In-Reply-To: <alpine.DEB.2.02.1308202352330.6426@utopia.booyaka.com>
-References: <1374560679-14666-1-git-send-email-rnayak@ti.com>
- <1374560679-14666-4-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.02.1308202352330.6426@utopia.booyaka.com>
-Message-ID: <52147A2A.60105@ti.com>
+From: gururaja.hebbar@ti.com (Gururaja Hebbar)
+Date: Wed, 21 Aug 2013 13:59:56 +0530
+Subject: [PATCH v4 1/4] ARM: OMAP2+: AM33XX: I2C Sleep/wake sequence
+ support
+In-Reply-To: <CA+Bv8XaPU6N3KztAPFZb8OMMg8Tc+Kv5hf1Utz7QS=NCRdO3Rg@mail.gmail.com>
+References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
+ <1376432412-8509-2-git-send-email-Russ.Dill@ti.com> <520B595F.2040207@ti.com>
+ <CA+Bv8XZ-QGhVV1mK=rRekOZzaTDN-Y9YkWYYoEc8EtvP0JouEA@mail.gmail.com>
+ <5211B201.2000401@ti.com>
+ <CA+Bv8XaPU6N3KztAPFZb8OMMg8Tc+Kv5hf1Utz7QS=NCRdO3Rg@mail.gmail.com>
+Message-ID: <52147A84.8030704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 August 2013 05:27 AM, Paul Walmsley wrote:
-> Hi
-> 
-> On Tue, 23 Jul 2013, Rajendra Nayak wrote:
-> 
->> With support to parse clock data from DT, move all main and optional
->> clock information from hwmod to DT.
+On 8/20/2013 10:03 PM, Russ Dill wrote:
+> On Sun, Aug 18, 2013 at 10:49 PM, Gururaja Hebbar
+> <gururaja.hebbar@ti.com> wrote:
 >>
->> We still retain clocks in hwmod for devices which do not have a DT node.
+>> On 8/15/2013 4:04 AM, Russ Dill wrote:
+>>> On Wed, Aug 14, 2013 at 3:18 AM, Gururaja Hebbar <gururaja.hebbar@ti.com> wrote:
+>>>> On 8/14/2013 3:50 AM, Russ Dill wrote:
+>>>>> Changes since v1:
+>>>>> * Rebased onto new am335x PM branch
+>>>>> * Changed to use 5th param register
 >>
->> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->> ---
->>  arch/arm/boot/dts/omap4.dtsi               |  100 +++++++++++++++++++++++++
->>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  112 ----------------------------
->>  2 files changed, 100 insertions(+), 112 deletions(-)
+>>>>
 >>
->> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->> index 8e142f9..4dddf64 100644
->> --- a/arch/arm/boot/dts/omap4.dtsi
->> +++ b/arch/arm/boot/dts/omap4.dtsi
->> @@ -106,6 +106,8 @@
->>  			compatible = "ti,omap-counter32k";
->>  			reg = <0x4a304000 0x20>;
->>  			ti,hwmods = "counter_32k";
->> +			clocks = <&sys_32k_ck>;
->> +			clock-names = "fck";
+>> [snip]
+>> [snip]
+>>
+>>>>> +
+>>>>> +     wkup_m3_reset_data_pos();
+>>>>> +     if (am33xx_i2c_sleep_sequence) {
+>>>>> +             pos = wkup_m3_copy_data(am33xx_i2c_sleep_sequence,
+>>>>> +                                             i2c_sleep_sequence_sz);
+>>>>
+>>>> Why do we need to copy this data (same constant data) on every iteration?
+>>>
+>>> Because the CM3 firmware is reset after each suspend/resume cycle. The
+>>> firmware reset handler reinitializes the DMEM.
+>>
+>> Well in that why can't the i2c payload be copied to UMEM?
+>>
+>> Thanks & regards
+>> Gururaja
+>>
 > 
-> Shouldn't these patches be using the official DT clock binding format?
+> I've given this some thought, and gone back and forth a bit. UMEM is a
+> bit more complicated because the linker decides what should go where.
 
-They are, already.
- 
-> Either the 'clocks' property should be something like:
-> 
->     clocks = <&prm 10>;
+but linker doesn't know about the copy and the location we are doing at
+runtime.
 
-That depends on the #clock-cells for the clock provider node. These patches
-are based on Teros series to move all OMAP clocks to DT [1], and the clock providers
-in his series have the #clock-cells set to 0.
+> Also, it may be that in the future, either the PM for am335x or am43xx
+> will be writing different sequences depending on the suspend
+> mode/options.
 
-So the clock bindings do not mandate
-	clocks = <&clk-provider index>
-or
-	clocks = <&clk-provider>
-
-It just depends on how the clk-provider node is defined.
-
-[1] http://comments.gmane.org/gmane.linux.ports.arm.omap/100117
+still these info will be coming from DT and can be copied to UMEM. only
+issue could be space.
 
 > 
-> or a change to the bindings needs to be discussed and implemented.
+> Is there a specific aspect of copying the data each suspend cycle that
+> you are trying to fix? Is it just that the data could only be copied
+> once? Or is it the latency of the copy?
+
+Copy latency on every iterations is what worries me. it will surely add
+a delay for suspend.
+
 > 
-> 
-> - Paul
+> Thanks!
 > 
