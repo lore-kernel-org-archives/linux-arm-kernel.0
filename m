@@ -1,31 +1,40 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Wed, 21 Aug 2013 13:31:31 -0700
-Subject: [PATCH v2 0/2] ARM: dts: Add SHAM and AES DT information
-In-Reply-To: <5214C372.3080402@baylibre.com>
-References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.02.1308210012420.6426@utopia.booyaka.com>
- <5214C11F.8090808@baylibre.com> <5214C372.3080402@baylibre.com>
-Message-ID: <20130821203131.GA6692@animalcreek.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Wed, 21 Aug 2013 13:39:28 -0700
+Subject: [PATCHv2 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
+In-Reply-To: <1377115342.1554.21.camel@linux-builds1>
+References: <1376522956-14960-1-git-send-email-dinguyen@altera.com>
+ <1376522956-14960-2-git-send-email-dinguyen@altera.com>
+ <CACRpkda9oyb2mr6PR1dfMpoxbzj3vUp7hKiQtN1oWH6aG_N96w@mail.gmail.com>
+ <20130821190729.GA9657@amd.pavel.ucw.cz>
+ <1377115342.1554.21.camel@linux-builds1>
+Message-ID: <52152580.90508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 03:41:06PM +0200, Benoit Cousson wrote:
-> Hi Mark,
+On 08/21/2013 01:02 PM, Dinh Nguyen wrote:
+> On Wed, 2013-08-21 at 21:07 +0200, ZY - pavel wrote:
+>> On Wed 2013-08-21 09:04:07, Linus Walleij wrote:
+>>> On Thu, Aug 15, 2013 at 1:29 AM,  <dinguyen@altera.com> wrote:
+>>>
+>>>> -       sched_io_base = iobase + 0x04;
+>>>> +       sched_io_base = iobase;
+>>>>         sched_rate = rate;
+>>>>  }
+>>>>
+>>>>  static u32 read_sched_clock(void)
+>>>>  {
+>>>> -       return __raw_readl(sched_io_base);
+>>>> +       return ~__raw_readl(sched_io_base + 0x4);
+>>> So what about #define what 0x04 is?
+>>>
+>>> #define MY_FOO_REGISTER_OFFSET 0x04
+>>>
+>>> raw_readl(sched_io_base + MY_FOO_REGISTER_OFFSET);
+>> That define is already there, #define APBTMR_N_CURRENT_VALUE 0x04, but
+>> it is in .c file, not in header.
+> I'll send a V2 that will address this comment and Stephen Warren's.
+Please be sure to CC Daniel Lezcano <daniel.lezcano@linaro.org> on
+future versions as he's now maintaining the drivers/clocksource directory.
 
-Hi Benoit.
-
-> In fact I cannot even apply these patches since they are referring
-> the the edma controller node that does not seem to be there in
-> 3.11-rc6.
-
-I just applied them on top of k.o fd3930f (proc: more readdir
-conversion bug-fixes) without issue.  I also went through the
-resulting code and it looked okay.
-
-Which repo are you applying them to?
-
-If I should put them on top of another repo/branch, just let
-me know which one.
-
-Mark
---
+thanks
+-john
