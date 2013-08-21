@@ -1,29 +1,81 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Wed, 21 Aug 2013 13:40:33 -0700
-Subject: [PATCH v2 0/2] ARM: dts: Add SHAM and AES DT information
-In-Reply-To: <5214C11F.8090808@baylibre.com>
-References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.02.1308210012420.6426@utopia.booyaka.com>
- <5214C11F.8090808@baylibre.com>
-Message-ID: <20130821204033.GB6692@animalcreek.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 21 Aug 2013 15:53:47 -0500
+Subject: [PATCHv3 4/4] clocksource: dw_apb_timer_of: Fix read_sched_clock
+In-Reply-To: <1377118427-20644-1-git-send-email-dinguyen@altera.com>
+References: <1377118427-20644-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1377118427-20644-4-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 03:31:11PM +0200, Benoit Cousson wrote:
+From: Dinh Nguyen <dinguyen@altera.com>
 
-> Mark,
-> 
-> After a quick search on Google, I did not see any comment on these
-> patches. Did you get any review so far?
+The read_sched_clock should return the ~value because the clock is a
+countdown implementation. read_sched_clock() should be the same as
+__apbt_read_clocksource().
 
-Some people reviewed v1.  The entire thread starts here:
+If a separate timer for the sched_clock exist, then read_sched_clock()
+will return an incorrect value. The (sched_io_base + 0x4) needs to be in
+the function for both cases.
 
-	http://www.spinics.net/lists/arm-kernel/msg259079.html
+Maintain backwards compatibility for "dw-apb-timer-sp" and
+"dw-apb-timer-osc".
 
-Joel Fernandes <joelf@ti.com> had given his "Tested-by" but
-Lokesh Vutla <lokeshvutla@ti.com> found an issue so I made
-and posted v2 which is what you have now.  I haven't received
-any comments on v2.
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Acked-by: Jamie Iles <jamie@jamieiles.com>
+CC: Rob Herring <rob.herring@calxeda.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+CC: Jamie Iles <jamie@jamieiles.com>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Pavel Machek <pavel@denx.de>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: linux-arm-kernel at lists.infradead.org
 
-Mark
---
+v3:
+- Use APBTMR_N_CURRENT_VALUE define in read_sched_clock()
+
+v2:
+- Maintain backwards compatibility for "dw-apb-timer-sp" and
+  "dw-apb-timer-osc".
+---
+ drivers/clocksource/dw_apb_timer_of.c |    9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index 4cbae4f..01c1238 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -102,18 +102,17 @@ static void add_clocksource(struct device_node *source_timer)
+ 	 * timer is found. sched_io_base then points to the current_value
+ 	 * register of the clocksource timer.
+ 	 */
+-	sched_io_base = iobase + 0x04;
++	sched_io_base = iobase;
+ 	sched_rate = rate;
+ }
+ 
+ static u32 read_sched_clock(void)
+ {
+-	return __raw_readl(sched_io_base);
++	return ~__raw_readl(sched_io_base + APBTMR_N_CURRENT_VALUE);
+ }
+ 
+ static const struct of_device_id sptimer_ids[] __initconst = {
+ 	{ .compatible = "picochip,pc3x2-rtc" },
+-	{ .compatible = "snps,dw-apb-timer-sp" },
+ 	{ /* Sentinel */ },
+ };
+ 
+@@ -153,4 +152,6 @@ static void __init dw_apb_timer_init(struct device_node *timer)
+ 	num_called++;
+ }
+ CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
+-CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer-osc", dw_apb_timer_init);
++CLOCKSOURCE_OF_DECLARE(apb_timer_osc, "snps,dw-apb-timer-osc", dw_apb_timer_init);
++CLOCKSOURCE_OF_DECLARE(apb_timer_sp, "snps,dw-apb-timer-sp", dw_apb_timer_init);
++CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer", dw_apb_timer_init);
+-- 
+1.7.9.5
