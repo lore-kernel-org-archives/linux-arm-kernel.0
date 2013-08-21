@@ -1,37 +1,91 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Aug 2013 05:54:28 -0700
-Subject: [PATCH] arm: omap5: hwmod: add missing ocp2scp hwmod data
-In-Reply-To: <5214AE69.8010009@baylibre.com>
-References: <1373642066-5235-1-git-send-email-balbi@ti.com>
- <20130821074728.GV7656@atomide.com> <52148C67.3080106@baylibre.com>
- <CALpuT30YToRvgS3rgvpSZf8d1DZBK9y5mNUJL6qbHS22mL4k-g@mail.gmail.com>
- <5214AE69.8010009@baylibre.com>
-Message-ID: <20130821125427.GL7656@atomide.com>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Wed, 21 Aug 2013 18:42:40 +0530
+Subject: [PATCH 12/16] clk: samsung: pll: Add support for rate
+ configuration of PLL46xx
+In-Reply-To: <14520108.LqsSBuPVXk@amdc1227>
+References: <1377019903-14614-1-git-send-email-t.figa@samsung.com>
+ <1377019903-14614-13-git-send-email-t.figa@samsung.com>
+ <CAKew6eU4ofumk64fwZSK-R-UUBQos6UU1TLDdVRDE-bvOrbitw@mail.gmail.com>
+ <14520108.LqsSBuPVXk@amdc1227>
+Message-ID: <CAKew6eUGOgUWzgU7SnCjAenSHxwaOgFUhPWHbav3C8z=tS+EpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <bcousson@baylibre.com> [130821 05:18]:
-> + Kishon and Roger
-> 
-> Ok, so in fact that's a complete series now.
-> 
-> [v2,1/5] arm: omap5: dts: fix reg property size
-> [v2,2/5] arm: omap5: dts: fix ocp2scp DTS data
-> [v2,3/5] arm: omap5: dts: add palmas-usb node
-> [v2,4/5] arm: omap5: hwmod: add missing ocp2scp hwmod data
-> [v2,5/5] arm: omap2plus_defconfig: enable dwc3 and dependencies
-> 
-> Moreover, it does not build because of the change in the palmas SMPS10 regulator name from Kishon I already pulled.
-> 
-> Kishon or Roger,
-> 
-> Could you resend that series ASAP after fixing, testing and changing my email address?
-> 
-> 
-> Tony,
-> 
-> I will need your ack for the omap2plus_defconfig patch. 
+>> <snip>
+>>
+>> > --- a/drivers/clk/samsung/clk-pll.h
+>> > +++ b/drivers/clk/samsung/clk-pll.h
+>> > @@ -51,6 +51,28 @@ enum samsung_pll_type {
+>> >
+>> >                 .afc    =       (_afc),                         \
+>> >
+>> >         }
+>> >
+>> > +#define PLL_4600_RATE(_rate, _m, _p, _s, _k, _vsel)            \
+>> > +       {                                                       \
+>> > +               .rate   =       (_rate),                        \
+>> > +               .mdiv   =       (_m),                           \
+>> > +               .pdiv   =       (_p),                           \
+>> > +               .sdiv   =       (_s),                           \
+>> > +               .kdiv   =       (_k),                           \
+>> > +               .vsel   =       (_vsel),                        \
+>> > +       }
+>> > +
+>> > +#define PLL_4650_RATE(_rate, _m, _p, _s, _k, _mfr, _mrr, _vsel)
+>> > \ +       {                                                       \ +
+>> >              .rate   =       (_rate),                        \ +
+>> >         .mdiv   =       (_m),                           \ +
+>> >    .pdiv   =       (_p),                           \ +
+>> > .sdiv   =       (_s),                           \ +
+>> > .kdiv   =       (_k),                           \ +               .mfr
+>> >    =       (_mfr),                         \ +               .mrr    =
+>> >       (_mrr),                         \ +               .vsel   =
+>> >  (_vsel),                        \ +       }
+>> > +
+>> >
+>> >  /* NOTE: Rate table should be kept sorted in descending order. */
+>> >
+>> >  struct samsung_pll_rate_table {
+>> >
+>> > @@ -60,6 +82,9 @@ struct samsung_pll_rate_table {
+>> >
+>> >         unsigned int sdiv;
+>> >         unsigned int kdiv;
+>> >         unsigned int afc;
+>> >
+>> > +       unsigned int mfr;
+>> > +       unsigned int mrr;
+>> > +       unsigned int vsel;
+>> >
+>> >  };
+>>
+>> This struct seems to be expanding too much.
+>
+> I don't think it's a problem. How many bytes such tables can occupy in a
+> system?
+>
 
-OK, acked the v2 of the omap2plus_defconfig patch.
+no doubt comparing with memory size its negligible..
+but comparing only struct size and coding lines it seems costlier :) .
 
-Tony
+>> Can we re-think on options for using bit map same as register
+>> definition? It can reduce code in set_rate also little bit.
+>
+> IMHO it is more clear what the code does when accessing a single
+> coefficient at once.
+>
+> In addition you still would need to preserve bitfields that are not changed
+> by the driver
+
+Sorry, I can't see any such problem, it will OR only the required bits.
+
+> and also unpack some of the coefficients anyway, like pdiv
+> that is used to calculate lock time.
+
+Agree, but cases of unpacking will always be less than cases of
+shifting and packing.
+
+Anyways, its only MHO :).
+
+Regards,
+Yadwinder
