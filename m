@@ -1,42 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Aug 2013 01:08:21 -0700
-Subject: [PATCH] ARM: OMAP: dma: fix error return code in
- omap_system_dma_probe()
-In-Reply-To: <CAPgLHd-yE_qW1NeK5KkPSUtA1wGfQcnROywrcfa7cH+Dtwfezw@mail.gmail.com>
-References: <CAPgLHd-yE_qW1NeK5KkPSUtA1wGfQcnROywrcfa7cH+Dtwfezw@mail.gmail.com>
-Message-ID: <20130821080820.GE7656@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Aug 2013 10:08:36 +0200
+Subject: [PATCH 28/33] ARM: ux500: Remove AUXDATA relating to MSP (Audio)
+ clock-name bindings
+In-Reply-To: <1370521041-32318-29-git-send-email-lee.jones@linaro.org>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <1370521041-32318-29-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYE7SgJiacneBq=cZ=7dAO2x3sBscFW075cDODxesYUWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Wei Yongjun <weiyj.lk@gmail.com> [130716 05:17]:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> Fix to return a negative error code from the error handling
-> case instead of 0, as done elsewhere in this function.
+On Thu, Jun 6, 2013 at 2:17 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Thanks applying into omap-for-v3.12/fixes-non-critical.
+> @@ -232,15 +232,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+>         /* Requires device name bindings. */
+>         OF_DEV_AUXDATA("stericsson,db8500-pinctrl", U8500_PRCMU_BASE,
+>                 "pinctrl-db8500", NULL),
+> -       /* Requires clock name and DMA bindings. */
 
-Tony
- 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> ---
->  arch/arm/plat-omap/dma.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-> index 4d463ca..0376606 100644
-> --- a/arch/arm/plat-omap/dma.c
-> +++ b/arch/arm/plat-omap/dma.c
-> @@ -2083,6 +2083,7 @@ static int omap_system_dma_probe(struct platform_device *pdev)
->  		dma_irq = platform_get_irq_byname(pdev, irq_name);
->  		if (dma_irq < 0) {
->  			dev_err(&pdev->dev, "failed: request IRQ %d", dma_irq);
-> +			ret = dma_irq;
->  			goto exit_dma_lch_fail;
->  		}
->  		ret = setup_irq(dma_irq, &omap24xx_dma_irq);
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The comment is just wrong.
+
+> -       OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80123000,
+> -               "ux500-msp-i2s.0", &msp0_platform_data),
+
+Look, it also adds &msp0_platform_data, which is vital.
+
+Result after boot:
+ALSA device list:
+  No soundcards found.
+
+Before the patch set we had audio and I kind of liked it :-)
+
+I think you're able to set the device name as NULL though so
+we only add this platform data, try it out.
+
+Yours,
+Linus Walleij
