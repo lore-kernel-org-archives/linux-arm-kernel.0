@@ -1,80 +1,63 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 21 Aug 2013 13:55:27 +0200
+Date: Wed, 21 Aug 2013 14:03:12 +0200
 Subject: [PATCH v4 3/4] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <5214A601.1010607@marvell.com>
+In-Reply-To: <CAHp75VfFFq0kaf7wDt3WTwsx6peBmt=rDXaUGXz=cnn4-bBKZw@mail.gmail.com>
 References: <1376672707-24527-1-git-send-email-zonque@gmail.com>
  <1376672707-24527-4-git-send-email-zonque@gmail.com>
  <5214A601.1010607@marvell.com>
-Message-ID: <5214AAAF.6010409@gmail.com>
+ <CAHp75VfFFq0kaf7wDt3WTwsx6peBmt=rDXaUGXz=cnn4-bBKZw@mail.gmail.com>
+Message-ID: <5214AC80.2090102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xiang,
+Hi Andy,
 
-On 21.08.2013 13:35, Xiang Wang wrote:
-> On 08/17/2013 01:05 AM, Daniel Mack wrote:
-
-> Hi, Daniel
-> One thing I want to check with you and all:
-> If we have these descriptors in the running chain:
-> D1T1 -> D2T1 -> D3T1 => D1T2 -> D2T2 -> D3T2
-> |    Transaction 1    | Transaction 2      |
+On 21.08.2013 13:52, Andy Shevchenko wrote:
+> On Wed, Aug 21, 2013 at 2:35 PM, Xiang Wang <wangx@marvell.com> wrote:
+>> On 08/17/2013 01:05 AM, Daniel Mack wrote:
+>>>
+>>> In order to report the channel's residue, we walk the list of running
+>>> descriptors, look for those which match the cookie, and then try to find
+>>> the descriptor which defines upper and lower boundaries that embrace the
+>>> current transport pointer.
+>>>
+>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
 > 
-> And DMA currently running to D2T1, if we provide the cookie of D3T2, 
-> what the residual value we should get? All unfinished bytes in T1+T2 or 
-> only unfinished bytes in T2 (seems not easy to implement)?
-
-We returned the cookie of T2 when the user submitted the transaction,
-and so if we're asked about the residue of cookie(T2), it should only
-count bytes of T2. That's also how I implemented it.
-
->> +static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan,
->> +				     dma_cookie_t cookie)
->> +{
->> +	struct mmp_pdma_desc_sw *sw;
->> +	u32 curr, residue = 0;
->> +	bool passed = false;
->> +	bool cyclic = chan->cyclic_first != NULL;
->> +
->> +	/*
->> +	 * If the channel does not have a phy pointer anymore, it has already
->> +	 * been completed. Therefore, its residue is 0.
->> +	 */
->> +	if (!chan->phy)
->> +		return 0;
+>> One thing I want to check with you and all:
+>> If we have these descriptors in the running chain:
+>> D1T1 -> D2T1 -> D3T1 => D1T2 -> D2T2 -> D3T2
+>> |    Transaction 1    | Transaction 2      |
+>>
+>> And DMA currently running to D2T1, if we provide the cookie of D3T2, what
+>> the residual value we should get? All unfinished bytes in T1+T2 or only
+>> unfinished bytes in T2 (seems not easy to implement)?
 > 
->  From my point of view, there is one concern:
-> If we want to use the End-of-Receive Interrupt (EORIRQEN in DCSR), when 
-> an interrupt comes, usually it doesn't mean there is no bytes left.
+> You have a really good question. Different drivers do different things.
 
-If an interrupt occurs, it does because any of the descriptors has
-EORIRQEN set. And an interrupt for one specific channel will occur for
-the first descriptor in the list. If there is another one which has
-EORIRQEN set, there will be a second one for this one, too.
+I think the idea of how things should work is pretty clear, but I'd like
+Vinod to ack my understanding here :)
 
-For non-cyclic transfers, an occured interrupt that occurs at the end of
-a transaction *does* mean that it is finished, and hence the above check
-returns 0 in that case. I believe that's correct, but only as long as we
-really just handle and complete the oldest transaction in the chain.
+The user is free to submit multiple transactions per channel, and
+dmaengine_submit() will submit a new cookie for each one.
 
-Note that for cyclic transfers, things are different, because every
-descriptor in the transaction has the EORIRQEN set. That is necessary
-because users want a callback after each period.
+When the engine is asked about the residue of a specific cookie, it
+should of course only return the value for the related transaction. If
+that transaction is not yet processed, the residue value should be the
+complete length, regardless of the transaction that is currently processed.
 
-> We talked about this in this thread:
-> http://thread.gmane.org/gmane.linux.kernel/1500713
-> 
-> I posted a patch some time ago:
-> http://thread.gmane.org/gmane.linux.kernel/1510435
-> There were some comments suggested by Vinod.
+> In dw_dmac, for example, we return the T1 (means 'active') residue always.
 
-Yes, I've read that, and I believe that all these comments are addressed
-in my series. I'll repost a v5 now, which includes one more patch to
-remove the clearing of EORIRQEN of the last descriptor when a
-transaction is appended.
+I'd say that's a bug.
+
+> I don't think you have different cookies per descriptors in chain of
+> one transaction.
+
+Currently, the pdma driver does in fact assign a cookie to each
+descriptor, but the external user will only get so see the cookie for
+the last descriptor in the transaction. I don't think that's a problem,
+but we have to maintain an understanding of which descriptors belong to
+one transaction.
 
 
-Many thanks for your review. Much appreciated :)
-
-
+Thanks,
 Daniel
