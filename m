@@ -1,28 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 21 Aug 2013 11:29:33 -0600
-Subject: [PATCH 2/2] ARM: tegra: add Palmas pincontrol to Dalmore device
- tree
-In-Reply-To: <1377088461-9499-2-git-send-email-ldewangan@nvidia.com>
-References: <1377088461-9499-1-git-send-email-ldewangan@nvidia.com>
- <1377088461-9499-2-git-send-email-ldewangan@nvidia.com>
-Message-ID: <5214F8FD.3070003@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 21 Aug 2013 18:30:39 +0100
+Subject: [PATCH] arm64: Expand arm64 image header
+In-Reply-To: <1376521800-967-1-git-send-email-roy.franz@linaro.org>
+References: <1376521800-967-1-git-send-email-roy.franz@linaro.org>
+Message-ID: <20130821173038.GF6361@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2013 06:34 AM, Laxman Dewangan wrote:
-> Add Palmas pincontrol to Dalmore device tree and make following
-> configuration as default:
-> - Disable DVFS1 and DVFS2.
-> - Set GPIO6 to gpio mode.
+On Thu, Aug 15, 2013 at 12:10:00AM +0100, Roy Franz wrote:
+> Expand the arm64 image header to allow for co-existance with
+> PE/COFF header required by the EFI stub.  The PE/COFF format
+> requires the "MZ" header to be at offset 0, and the offset
+> to the PE/COFF header to be at offset 0x3c.  The image
+> header is expanded to allow 2 instructions at the beginning
+> to accommodate a benign intruction at offset 0 that includes
+> the "MZ" header, a magic number, and the offset to the PE/COFF
+> header.
+> 
+> 
+> Signed-off-by: Roy Franz <roy.franz@linaro.org>
 
-> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+The patch looks fine to me. I couldn't come up with a better magic
+number in 4 bytes (something that would suggest Linux kernel). If you
+have a better idea let me know before the merging window (LKA64 maybe?)
 
-> +			palmas_pinctrl {
-> +				compatible = "ti,tps65913-pinctrl";
+Thanks.
 
-A node name of "pinmux" would be more appropriate here, since the node
-name should represent device type rather than device identity.
-
-Aside from that, the series looks fine, but at this point will have to
-wait for 3.13 I think, unless this series has a side-effect of fixing
-some bug/regression. Can you please repost once 3.12-rc1 is out?
+-- 
+Catalin
