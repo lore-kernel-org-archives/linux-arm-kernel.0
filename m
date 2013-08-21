@@ -1,224 +1,51 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 21 Aug 2013 17:39:48 +0200
-Subject: [PATCH v6 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <52139AE7.4050300@wwwdotorg.org>
-References: <1376924669-28873-1-git-send-email-m.szyprowski@samsung.com>
- <52134B92.10308@samsung.com> <52139AE7.4050300@wwwdotorg.org>
-Message-ID: <2011590.EGDykoeEOS@amdc1227>
+From: davej@redhat.com (Dave Jones)
+Date: Wed, 21 Aug 2013 11:43:55 -0400
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] catching up on exploit
+ mitigations
+In-Reply-To: <20130821152614.GN17845@n2100.arm.linux.org.uk>
+References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
+ <20130730221435.GA22240@redhat.com>
+ <20130730231120.GC30725@blackmetal.musicnaut.iki.fi>
+ <20130730231533.GA26824@redhat.com>
+ <20130730235834.GD30725@blackmetal.musicnaut.iki.fi>
+ <20130731000444.GC1281@redhat.com>
+ <20130731094012.GU24642@n2100.arm.linux.org.uk>
+ <20130731142430.GA4545@redhat.com>
+ <20130821152614.GN17845@n2100.arm.linux.org.uk>
+Message-ID: <20130821154355.GA20784@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 of August 2013 10:35:51 Stephen Warren wrote:
-> On 08/20/2013 04:57 AM, Marek Szyprowski wrote:
-> > Hello,
-> > 
-> > On 8/20/2013 12:17 AM, Stephen Warren wrote:
-> >> On 08/19/2013 04:02 PM, Tomasz Figa wrote:
-> >> > Hi Stephen,
-> >> > 
-> >> > On Monday 19 of August 2013 15:49:20 Stephen Warren wrote:
-> >> >> On 08/19/2013 09:04 AM, Marek Szyprowski wrote:
-> >> >>> This patch adds device tree support for contiguous and reserved
-> >> 
-> >> memory
-> >> 
-> >> >>> regions defined in device tree.
-> >> >>> 
-> >> >>> diff --git a/Documentation/devicetree/bindings/memory.txt
-> >> >>> b/Documentation/devicetree/bindings/memory.txt
-> >> >>> 
-> >> >>> +*** Reserved memory regions ***
-> >> >>> +
-> >> >>> +In /memory/reserved-memory node one can create additional nodes
-> >> >> 
-> >> >> s/additional/child/ or s/additional/sub/ would make it clearer
-> >> 
-> >> where the
-> >> 
-> >> >> "additional" nodes should be placed.
-> >> >> 
-> >> >>> +compatible:    "linux,contiguous-memory-region" - enables binding
-> >> > 
-> >> > of
-> >> > 
-> >> >>> this
-> >> >>> +        region to Contiguous Memory Allocator (special region for
-> >> >>> +        contiguous memory allocations, shared with movable system
-> >> >>> +        memory, Linux kernel-specific), alternatively if
-> >> >>> +        "reserved-memory-region" - compatibility is defined,
-> >> >>> given
-> >> >>> +        region is assigned for exclusive usage for by the
-> >> > 
-> >> > respective
-> >> > 
-> >> >>> +        devices
-> >> >> 
-> >> >> "alternatively" makes it sound like the two compatible values are
-> >> >> mutually-exclusive. Perhaps make this a list, like:
-> >> >> 
-> >> >> ----------
-> >> >> 
-> >> >> compatible: One or more of:
-> >> >>     - "linux,contiguous-memory-region" - enables binding of this
-> >> >>     
-> >> >>       region to Contiguous Memory Allocator (special region for
-> >> >>       contiguous memory allocations, shared with movable system
-> >> >>       memory, Linux kernel-specific).
-> >> >>     
-> >> >>     - "reserved-memory-region" - compatibility is defined, given
-> >> >>     
-> >> >>       region is assigned for exclusive usage for by the respective
-> >> >>       devices.
-> >> >> 
-> >> >> ----------
-> >> >> 
-> >> >> "linux,contiguous-memory-region" is already long enough, but I'd
-> >> >> slightly bikeshed towards
-> >> 
-> >> "linux,contiguous-memory-allocator-region", or
-> >> 
-> >> >> perhaps "linux,cma-region" since it's not really describing whether
-> >> 
-> >> the
-> >> 
-> >> >> memory is contiguous (at the level of /memory, each chunk of memory
-> >> >> is
-> >> >> contiguous...)
-> >> > 
-> >> > I'm not really sure if we need the "linux" prefix for
-> >> 
-> >> "contiguous-memory-
-> >> 
-> >> > region". The concept of contiguous memory region is rather OS
-> >> 
-> >> independent
-> >> 
-> >> > and tells us that memory allocated from this region will be
-> >> > contiguous.
-> >> > IMHO any OS is free to implement its own contiguous memory
-> >> > allocation
-> >> > method, without being limited to Linux CMA.
-> >> > 
-> >> > Keep in mind that rationale behind those contiguous regions was that
-> >> 
-> >> there
-> >> 
-> >> > are devices that require buffers contiguous in memory to operate
-> >> > correctly.
-> >> > 
-> >> > But this is just nitpicking and I don't really have any strong
-> >> 
-> >> opinion on
-> >> 
-> >> > this.
-> >> > 
-> >> >>> +*** Device node's properties ***
-> >> >>> +
-> >> >>> +Once regions in the /memory/reserved-memory node have been
-> >> >>> defined,
-> >> >>> they +can be assigned to device nodes to enable respective device
-> >> >>> drivers to +access them. The following properties are defined:
-> >> >>> +
-> >> >>> +memory-region = <&phandle_to_defined_region>;
-> >> >> 
-> >> >> I think the naming of that property should more obviously match
-> >> >> this
-> >> >> binding and/or compatible value; perhaps cma-region or
-> >> >> contiguous-memory-region?
-> >> > 
-> >> > This property is not CMA-specific. Any memory region can be given
-> >> > using
-> >> > the memory-region property and used to allocate buffers for
-> >> > particular
-> >> > device.
-> >> 
-> >> OK, that makes sense.
-> >> 
-> >> What I'm looking for is some way to make it obvious that when you see
-> >> a
-> >> "memory-region" property in a node, you go look at the "memory.txt"
-> >> rather than the DT binding for the node where that property appears.
-> >> Right now, it doesn't seem that obvious to me.
-> >> 
-> >> I think the real issue here is that my brief reading of memory.txt
-> >> implies that arbitrary device nodes can include the memory-region
-> >> property without the node's own binding having to document it; the
-> >> property name is essentially "forced into" all other bindings.
-> >> 
-> >> I think instead, memory.txt should say:
-> >> 
-> >> ----------
-> >> ** Device node's properties ***
-> >> 
-> >> Once regions in the /memory/reserved-memory node have been defined,
-> >> they
-> >> may be referenced by other device nodes. Bindings that wish to
-> >> reference
-> >> memory regions should explicitly document their use of the following
-> >> property:
-> >> 
-> >> memory-region = <&phandle_to_defined_region>;
-> >> 
-> >> This property indicates that the device driver should use the memory
-> >> region pointed by the given phandle.
-> >> ----------
-> >> 
-> >> Also, what if a device needs multiple separate memory regions? Perhaps
-> >> a
-> >> GPU is forced to allocate displayable surfaces from addresses 0..32M
-> >> and
-> >> textures/off-screen-render-targets from 256M..384M or something whacky
-> >> like that. In that case, we could either:
-> >> 
-> >> a) Adjust memory.txt to allow multiple entries in memory-regions, and
-> >> add an associated memory-region-names property.
-> >> 
-> >> or:
-> >> 
-> >> b) Adjust memory.txt not to mention any specific property names, but
-> >> simply mention that other DT nodes can refer to define memory regions
-> >> by
-> >> phandle, and leave it up to individual bindings to define which
-> >> property
-> >> they use to reference the memory regions, perhaps with memory.txt
-> >> providing a recommendation of memory-region for the simple case, but
-> >> perhaps also allowing a custom case, e.g.:
-> >> 
-> >> display-memory-region = <&phandl1e1>;
-> >> texture-memory-region = <&phahndle2>;
-> > 
-> > Support for multiple regions is something that need to be discussed
-> > separately. In case of Exynos hardware it is also related to iommu
-> > bindings and configuration, because each busmuster on the internal
-> > memory bus has separate iommu controller. Having each busmaster
-> > defined as a separate node,
-> > enables to put there the associated memory region and/or iommu
-> > controller as
-> > well as dma window properties (in case of limited dma window).
-> > 
-> > However right now I would like to focus on the simple case (1 device,
-> > 1 memory region) and define bindings which can be extended later.
-> > I hope that my current proposal covers this (I will send updated
-> > binding
-> > documentation asap) and the initial support for reserved memory can be
-> > merged to -next soon.
-> 
-> I don't believe that's a good approach unless you have at least a
-> partial idea of how the current bindings will be extended to support
-> multiple memory regions.
+On Wed, Aug 21, 2013 at 04:26:14PM +0100, Russell King - ARM Linux wrote:
+ > On Wed, Jul 31, 2013 at 10:24:30AM -0400, Dave Jones wrote:
+ > > On Wed, Jul 31, 2013 at 10:40:12AM +0100, Russell King - ARM Linux wrote:
+ > >  > On Tue, Jul 30, 2013 at 08:04:44PM -0400, Dave Jones wrote:
+ > >  > > To use ARM as an example, the bugs I've seen have mostly been in arch specific
+ > >  > > code that does things like page-table manipulation.  The chromebook bugs I
+ > >  > > was hitting for eg were various kinds of PTE corruption warnings. 
+ > >  > 
+ > >  > Hmm, really?  Did you reported these bugs?  I'm not aware of mainline
+ > >  > having any changes related to bug reports on PTEs on ARM.
+ > > 
+ > > I wasn't sure if it was a googleism, or happens on mainline, so no.
+ > 
+ > I've been running several iterations of it for a while (== up to 10 minutes
+ > run time - which is normally about how long it takes to find the rather-too-
+ > exposed kmalloc in sys_oabi_epoll_wait) and so far have seen no sign of any
+ > page table corruption.
 
-I believe that at least three "at least partial" ideas have been brought in 
-this thread. Moreover, I don't think that defining the simple binding now 
-would stop us from extending it according to any of those ideas in any way.
+awesome. Guess it was a google specific issue then.
+(Or something that got fixed post 3.4)
 
-> Without a clear idea how that will eventually work, you run a real risk
-> of not being able to extend the bindings in a 100% backwards-compatible
-> way, and hence wishing to break DT ABI.
+ > Maybe you can give some ideas as to how you were running it?  Was it
+ > running as root or as a normal user? 
 
-As a fallback you can always define a new binding, while keeping support 
-for old one. Of course this is the last resort, but it is not that simple 
-to find a case that couldn't be supported without breaking the ABI.
+yeah, unpriv'd user. 
 
-Best regards,
-Tomasz
+ > Were there any nonstandard platform
+ > specific devices in /dev which that user could access - such as graphics
+ > or video decoder devices which could be exposing big holes?
+
+I'm not sure what google patched into that kernel altogether, so who knows..
+
+	Dave
