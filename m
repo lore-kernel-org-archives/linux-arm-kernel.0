@@ -1,42 +1,41 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Aug 2013 00:19:01 -0700
-Subject: [PATCH] ARM: OMAP: fix return value check in
- omap_device_build_from_dt()
-In-Reply-To: <CAPgLHd_E8wht4q5c9=TjUTwXxysjbbX+HnZyYe2KJU=w79cK4w@mail.gmail.com>
-References: <CAPgLHd_E8wht4q5c9=TjUTwXxysjbbX+HnZyYe2KJU=w79cK4w@mail.gmail.com>
-Message-ID: <20130821071901.GR7656@atomide.com>
+Date: Wed, 21 Aug 2013 00:25:06 -0700
+Subject: [PATCH] ARM: Kconfig: NR_GPIO AM43x default
+In-Reply-To: <1375451651-27173-1-git-send-email-afzal@ti.com>
+References: <1375451651-27173-1-git-send-email-afzal@ti.com>
+Message-ID: <20130821072506.GS7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+* Afzal Mohammed <afzal@ti.com> [130802 07:01]:
+> On an AM43x only config, currently default ARCH_NR_GPIO would be zero.
+> Default it to that supported by the SoC.
 
-* Wei Yongjun <weiyj.lk@gmail.com> [130704 06:48]:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> In case of error, the function omap_device_alloc() returns ERR_PTR()
-> and never returns NULL. The NULL test in the return value check
-> should be replaced with IS_ERR().
+Looks like this can wait a bit until the am43x patches have been
+reviewed and queued. When that's done, I suggest that Afzal
+puts this patch into Russell's patch tracking system.
 
-Looks like this is still pending, care to take this?
+Regards,
 
 Tony
  
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
 > ---
->  arch/arm/mach-omap2/omap_device.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> index 5cc9287..28e70c0 100644
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -155,7 +155,7 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
->  	}
->  
->  	od = omap_device_alloc(pdev, hwmods, oh_cnt);
-> -	if (!od) {
-> +	if (IS_ERR(od)) {
->  		dev_err(&pdev->dev, "Cannot allocate omap_device for :%s\n",
->  			oh_name);
->  		ret = PTR_ERR(od);
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 37c0f4e..c5356c5 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1605,6 +1605,7 @@ config ARCH_NR_GPIO
+>  	default 352 if ARCH_VT8500
+>  	default 288 if ARCH_SUNXI
+>  	default 264 if MACH_H4700
+> +	default 192 if SOC_AM43XX
+>  	default 0
+>  	help
+>  	  Maximum number of GPIOs in the system.
+> -- 
+> 1.7.9.5
 > 
