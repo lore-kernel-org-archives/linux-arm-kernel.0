@@ -1,35 +1,124 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 21 Aug 2013 11:51:53 +0100
-Subject: [PATCH 0/3] ARM: vexpress_defconfig: Allow to boot using a
- regular filesystem on SD card
-In-Reply-To: <1377075956.3591.23.camel@linaro1.home>
-References: <1377032563-4502-1-git-send-email-fathi.boudra@linaro.org>
- <1377075956.3591.23.camel@linaro1.home>
-Message-ID: <1377082313.10707.11.camel@hornet>
+From: christian.gmeiner@gmail.com (Christian Gmeiner)
+Date: Wed, 21 Aug 2013 12:55:52 +0200
+Subject: [RFC PATCH 1/3] of: provide a binding for the 'fixed-link'
+ property
+In-Reply-To: <20130812083746.GM26614@pengutronix.de>
+References: <1373902450-11857-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1373902450-11857-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130812063806.GD2324@pengutronix.de> <20130812101649.743c08aa@skate>
+ <20130812083746.GM26614@pengutronix.de>
+Message-ID: <CAH9NwWewcDE57g8qgy4aeOeQpfE_RA8hT+cQ9U2_gOFEWKAUDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-08-21 at 10:05 +0100, Jon Medhurst (Tixy) wrote:
-> On Wed, 2013-08-21 at 00:02 +0300, Fathi Boudra wrote:
-> > vexpress_defconfig is known broken on some use-cases. This serie of
-> > patches allow to boot test Versatile Express using a regular filesystem
-> > on SD card.
-> > 
-> > Fathi Boudra (3):
-> >   ARM: vexpress_defconfig: Enable and automount devtmpfs filesystem
-> >   ARM: vexpress_defconfig: Enable voltage regulator support
-> >   ARM: vexpress_defconfig: Enable ext4 filesystem
-> > 
-> >  arch/arm/configs/vexpress_defconfig | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> 
-> One good question is who do you have to convince to get these changes
-> accepted (or rejected)?
+--
+Christian Gmeiner, MSc
 
-This gets down to the question do we actually want the
-vexpress_defconfig at all? I was considering removing it completely as
-multi_v7_defconfig should do the job (potentially subject to an extra
-config option or two), but if there really is a need for vexpress-only
-one, I can take the changes and queue it for the next-next merge window.
 
-Pawe?
+2013/8/12 Sascha Hauer <s.hauer@pengutronix.de>:
+> On Mon, Aug 12, 2013 at 10:16:49AM +0200, Thomas Petazzoni wrote:
+>> Dear Sascha Hauer,
+>>
+>> On Mon, 12 Aug 2013 08:38:06 +0200, Sascha Hauer wrote:
+>>
+>> > > This patch adds:
+>> > >
+>> > >  * A documentation for the Device Tree property "fixed-link".
+>> > >
+>> > >  * A of_phy_register_fixed_link() OF helper, which provided an OF node
+>> > >    that contains a "fixed-link" property, registers the corresponding
+>> > >    fixed PHY.
+>> > >
+>> > >  * Removes the warning on the of_phy_connect_fixed_link() that says
+>> > >    new drivers should not use it, since Grant Likely indicated that
+>> > >    this "fixed-link" property is indeed the way to go.
+>> > >
+>> >
+>> > Any progress with this series?
+>>
+>> I am not sure there really was a consensus yet on what the DT binding
+>> looks like. As soon as there is a consensus, I'm definitely willing to
+>> make progress on this series.
+>>
+>> > We have more and more boards here with exactly the same problem as
+>> > Thomas has. For reasons stated below I don't like this binding, but
+>> > still it would solve my problem.
+>>
+>> Ok.
+>>
+>> > > +Example:
+>> > > +
+>> > > +ethernet at 0 {
+>> > > + ...
+>> > > + fixed-link = <1 1 1000 0 0>;
+>> > > + ...
+>> > > +};
+>> >
+>> > I must say I don't like this binding at all for two reasons.
+>>
+>> As I explained, this binding was chosen for this RFC for two reasons:
+>>
+>>  * It's the binding used on PowerPC platforms to represent fixed links.
+>>  * It allows to encode all the informations into a single property,
+>>    which avoids the need for a separate DT node for a "fake PHY", which
+>>    isn't a representation of the hardware.
+>
+> The fake phy is avoided by making the other side of the link what it
+> really is: An ethernet switch. I'm currently not aware of a situation
+> where a fixed link is needed and the other side is not a switch. And I
+> can't think of a situation in which the other side of the other side of
+> the fixed link really is pure 'virtual', I mean there always must be
+> something connected, right?
+>
+>>
+>> > First the positional arguments make it impossible to add optional
+>> > arguments to the link.
+>> >
+>> > Second the other side of the link is most likely a switch. Once this
+>> > switch has its own node in the devicetree it seems like having a phandle
+>> > to the switch here would be better.
+>>
+>> So, in other words, what you're suggesting is something like:
+>>
+>>       ethernet at 0 {
+>>               reg = <...>;
+>>               interrupt = <...>;
+>>               phy = <&phy0>;
+>>               phy0: phy at 0 {
+>>                       fixed-link;
+>>                       speed = <1000>;
+>>                       full-duplex;
+>>                       ...
+>>               };
+>>       };
+>
+> Yes, this looks good. ePAPR suggests naming the phy property
+> "phy-handle" instead of just "phy", but that's just details. In case the
+> phy really is a switch the phandle could just point to a i2c device instead
+> of the ethernet node.
+>
+
+I have here a I.MX6 based board where I have the same issue that the
+MAC is directly
+connected to a switch. The switch has 5 phys (5 port 100mbt switch)
+but the phy5 is not
+physically connected to my FEC MAC as my hw guy has chosen to do it without it.
+In general it is not a bad idea and I got networking working in u-boot
+quite easily.
+
+http://patchwork.ozlabs.org/patch/266558/
+
+Now I am interested in a solution and I think that a fixed-phy is the wrong way.
+I like the fixed-link solution more as it models the real world
+better. In my example I
+do not have any phy, but I have a fixed-link.
+
+&fec {
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_enet_1>;
+        fixed-link = <0 1 100 0 0>;
+        status = "okay";
+};
+
+--
+Christian Gmeiner, MSc
