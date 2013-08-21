@@ -1,12 +1,12 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 Aug 2013 11:10:43 +0100
-Subject: [PATCH 19/33] clk: ux500: Add Device Tree support for the PRCMU
- clock
-In-Reply-To: <CACRpkdar9oOWQ9xuQnKvvAOw-eQS1-FkDSDD8BwQT3WDE8YzBA@mail.gmail.com>
+Date: Wed, 21 Aug 2013 11:14:48 +0100
+Subject: [PATCH 21/33] clk: ux500: Add Device Tree support for the PRCC
+ Kernel clock
+In-Reply-To: <CACRpkdY2KOxX=oA7i9GUnzpwRKiK2rXqTBPVpg+zW082f2TJdg@mail.gmail.com>
 References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-20-git-send-email-lee.jones@linaro.org>
- <CACRpkdar9oOWQ9xuQnKvvAOw-eQS1-FkDSDD8BwQT3WDE8YzBA@mail.gmail.com>
-Message-ID: <20130821101043.GI29850@lee--X1>
+ <1370521041-32318-22-git-send-email-lee.jones@linaro.org>
+ <CACRpkdY2KOxX=oA7i9GUnzpwRKiK2rXqTBPVpg+zW082f2TJdg@mail.gmail.com>
+Message-ID: <20130821101448.GJ29850@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,19 +15,51 @@ On Wed, 21 Aug 2013, Linus Walleij wrote:
 > On Thu, Jun 6, 2013 at 2:17 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
 > > This patch enables clocks to be specified from Device Tree via phandles
-> > to the "prcmu-clock" node.
-> (..)
-> > @@ -52,14 +54,17 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
-> >         clk = clk_reg_prcmu_gate("soc0_pll", NULL, PRCMU_PLLSOC0,
-> >                                 CLK_IS_ROOT|CLK_IGNORE_UNUSED);
-> >         clk_register_clkdev(clk, "soc0_pll", NULL);
-> > +       prcmu_clk[PRCMU_PLLSOC0] = clk;
+> > to the "prcc-kernel-clock" node.
+> >
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> (...)
+> >  static struct clk *prcmu_clk[PRCMU_NUM_CLKS];
+> >  static struct clk *prcc_pclk[(PRCC_NUM_PERIPH_CLUSTERS + 1) * PRCC_PERIPHS_PER_CLUSTER];
+> > +static struct clk *prcc_kclk[(PRCC_NUM_PERIPH_CLUSTERS + 1) * PRCC_PERIPHS_PER_CLUSTER];
+> >
+> >  #define PRCC_SHOW(clk, base, bit) \
+> >         clk[(base * PRCC_PERIPHS_PER_CLUSTER) + bit]
+> > @@ -540,110 +541,136 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+> >         clk = clk_reg_prcc_kclk("p1_uart0_kclk", "uartclk",
+> >                         clkrst1_base, BIT(0), CLK_SET_RATE_GATE);
+> >         clk_register_clkdev(clk, NULL, "uart0");
+> > +       PRCC_KCLK_STORE(clk, 1, 0);
+> >
+> >         clk = clk_reg_prcc_kclk("p1_uart1_kclk", "uartclk",
+> >                         clkrst1_base, BIT(1), CLK_SET_RATE_GATE);
+> >         clk_register_clkdev(clk, NULL, "uart1");
+> > +       PRCC_KCLK_STORE(clk, 1, 1);
 > 
-> Same comment on all these.
+> (etc)
 > 
-> No clk_register_clkdev() on the DT boot path please.
+> On device tree boots, clk_register_clkdev() is obviously pointless,
+> as you're later deleting the AUXDATA connecting that device name
+> to the clock.
+> 
+> This should not be called at all on the DT boot path.
+> 
+> However this looks cluttered as well:
+> 
+> if (dt_probe)
+>   clk_register_clkdev(clk, NULL, "uart0");
+> else
+>   PRCC_KCLK_STORE(clk, 1, 0);
+> 
+> Isn't it possible to fork a function u8500_clk_init_dt() to add all the
+> clocks in the DT probe path and keep this function
+> u8500_clk_init() as it is?
 
-I'll fix this during my ATAG removal patch-set.
+Yes, we probably could do that, but as we're ripping out ATAG booting
+support from the ux500 platform, I'll just remove the
+clk_register_clkdev()s during the process.
 
 -- 
 Lee Jones
