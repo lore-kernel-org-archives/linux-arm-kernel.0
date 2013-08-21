@@ -1,132 +1,34 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 21 Aug 2013 15:53:45 -0500
-Subject: [PATCHv3 2/4] arm: dts: Change dw-apb-timer-osc and dw-apb-timer-sp
- to just dw-apb-timer
-In-Reply-To: <1377118427-20644-1-git-send-email-dinguyen@altera.com>
-References: <1377118427-20644-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1377118427-20644-2-git-send-email-dinguyen@altera.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Aug 2013 23:01:08 +0200
+Subject: [PATCH 1/2] DMA: fix AMBA PL08x driver issue with 64bit DMA
+ address type
+In-Reply-To: <1376484729-11826-2-git-send-email-andre.przywara@linaro.org>
+References: <1376484729-11826-1-git-send-email-andre.przywara@linaro.org>
+ <1376484729-11826-2-git-send-email-andre.przywara@linaro.org>
+Message-ID: <CACRpkdZg6kQSY2bm6LWpNCDhd90-7G2GSFQv7Jho2+Xq-EQCkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Wed, Aug 14, 2013 at 2:52 PM, Andre Przywara
+<andre.przywara@linaro.org> wrote:
 
-"dw-apb-timer-osc" and "dw-apb-timer-sp" are the same implementation of the
-DW APB timer, just fed by different clocks. Thus, deprecate both
-"dw-apb-timer-osc" and "dw-apb-timer-sp" in lieu of "dw-apb-timer".
+> In Rob's recent pull request the patch
+>         ARM: highbank: select ARCH_DMA_ADDR_T_64BIT for LPAE
+> promotes dma_addr_t to 64bit, which breaks compilation of the
+> AMBA PL08x DMA driver.
+> GCC has no function for the 64bit/8bit modulo operation.
+> Looking more closely the divisor can only be 1, 2 or 4, so the full
+> featured '%' modulo operation is overkill and can be replaced by
+> simple bit masking.
+>
+> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Reviewed-by: Pavel Machek <pavel@denx.de>
-CC: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-CC: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-CC: Jamie Iles <jamie@jamieiles.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Pavel Machek <pavel@denx.de>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
+Can you give some context? Which platform have you tested
+this on after the change, or is this only compile-tested?
 
-v3:
-- Split out a separate that cleans up the timer entries and clock information.
-- Clearly states which binding is deprecated in the bindingd doc.
+Of the current defconfigs selecting this driver, none is 64bit,
+so makes me a bit curious if there is really some PL08x
+on the Highbank or similar?
 
-v2:
-- Deprecate the "dw-apb-timer-osc" and "dw-apb-timer-sp" but maintain
-  backwards compatibility in the driver.
----
- Documentation/devicetree/bindings/rtc/dw-apb.txt |   34 +++++++---------------
- arch/arm/boot/dts/socfpga.dtsi                   |    8 ++---
- 2 files changed, 15 insertions(+), 27 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/rtc/dw-apb.txt b/Documentation/devicetree/bindings/rtc/dw-apb.txt
-index eb2327b..c703d51 100644
---- a/Documentation/devicetree/bindings/rtc/dw-apb.txt
-+++ b/Documentation/devicetree/bindings/rtc/dw-apb.txt
-@@ -1,7 +1,10 @@
- * Designware APB timer
- 
- Required properties:
--- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc"
-+- compatible: One of:
-+ 	"snps,dw-apb-timer"
-+	"snps,dw-apb-timer-sp" <DEPRECATED>
-+	"snps,dw-apb-timer-osc" <DEPRECATED>
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: IRQ line for the timer.
-@@ -20,25 +23,10 @@ systems may use one.
- 
- 
- Example:
--
--		timer1: timer at ffc09000 {
--				compatible = "snps,dw-apb-timer-sp";
--				interrupts = <0 168 4>;
--				clock-frequency = <200000000>;
--				reg = <0xffc09000 0x1000>;
--			};
--
--		timer2: timer at ffd00000 {
--				compatible = "snps,dw-apb-timer-osc";
--				interrupts = <0 169 4>;
--				clock-frequency = <200000000>;
--				reg = <0xffd00000 0x1000>;
--			};
--
--		timer3: timer at ffe00000 {
--				compatible = "snps,dw-apb-timer-osc";
--				interrupts = <0 170 4>;
--				reg = <0xffe00000 0x1000>;
--				clocks = <&timer_clk>, <&timer_pclk>;
--				clock-names = "timer", "pclk";
--			};
-+	timer at ffe00000 {
-+		compatible = "snps,dw-apb-timer";
-+		interrupts = <0 170 4>;
-+		reg = <0xffe00000 0x1000>;
-+		clocks = <&timer_clk>, <&timer_pclk>;
-+		clock-names = "timer", "pclk";
-+	};
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 9957bae..03845cb 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -483,28 +483,28 @@
- 		};
- 
- 		timer at ffc08000 {
--			compatible = "snps,dw-apb-timer-sp";
-+			compatible = "snps,dw-apb-timer";
- 			interrupts = <0 167 4>;
- 			reg = <0xffc08000 0x1000>;
- 			clocks = <&osc>;
- 		};
- 
- 		timer at ffc09000 {
--			compatible = "snps,dw-apb-timer-sp";
-+			compatible = "snps,dw-apb-timer";
- 			interrupts = <0 168 4>;
- 			reg = <0xffc09000 0x1000>;
- 			clocks = <&osc>;
- 		};
- 
- 		timer at ffd00000 {
--			compatible = "snps,dw-apb-timer-osc";
-+			compatible = "snps,dw-apb-timer";
- 			interrupts = <0 169 4>;
- 			reg = <0xffd00000 0x1000>;
- 			clocks = <&l4_sp_clk>;
- 		};
- 
- 		timer at ffd01000 {
--			compatible = "snps,dw-apb-timer-osc";
-+			compatible = "snps,dw-apb-timer";
- 			interrupts = <0 170 4>;
- 			reg = <0xffd01000 0x1000>;
- 			clocks = <&l4_sp_clk>;
--- 
-1.7.9.5
+Yours,
+Linus Walleij
