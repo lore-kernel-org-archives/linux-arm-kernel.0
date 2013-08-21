@@ -1,225 +1,116 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 21 Aug 2013 19:16:45 +0300
-Subject: [PATCHv5 02/31] CLK: TI: Add DPLL clock support
-In-Reply-To: <20130819220006.4443.23042@quantum>
-References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
- <1375460751-23676-3-git-send-email-t-kristo@ti.com>
- <20130813105042.GJ27165@e106331-lin.cambridge.arm.com>
- <52121EF5.9040706@ti.com>
- <20130819141803.GO3719@e106331-lin.cambridge.arm.com>
- <52123531.4060608@ti.com>
- <20130819162450.GS3719@e106331-lin.cambridge.arm.com>
- <5212509F.9030608@ti.com> <20130819220006.4443.23042@quantum>
-Message-ID: <5214E7ED.80909@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 21 Aug 2013 17:28:48 +0100
+Subject: [PATCH v2 1/3] ARM: Introduce atomic MMIO clear/set
+In-Reply-To: <20130821142203.GA2459@localhost>
+References: <1377017307-23201-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377017307-23201-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130821122424.GB1653@mudshark.cambridge.arm.com>
+ <20130821142203.GA2459@localhost>
+Message-ID: <20130821162848.GF1653@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2013 01:00 AM, Mike Turquette wrote:
-> Quoting Tero Kristo (2013-08-19 10:06:39)
->> On 08/19/2013 07:24 PM, Mark Rutland wrote:
->>> On Mon, Aug 19, 2013 at 04:09:37PM +0100, Tero Kristo wrote:
->>>> On 08/19/2013 05:18 PM, Mark Rutland wrote:
->>>>> On Mon, Aug 19, 2013 at 02:34:45PM +0100, Tero Kristo wrote:
->>>>>> On 08/13/2013 01:50 PM, Mark Rutland wrote:
->>>>>>> Hi,
->>>>>>>
->>>>>>> On Fri, Aug 02, 2013 at 05:25:21PM +0100, Tero Kristo wrote:
->>>>>>>> The OMAP clock driver now supports DPLL clock type. This patch also
->>>>>>>> adds support for DT DPLL nodes.
->>>>>>>>
->>>>>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>>>>>>> ---
->>>>>>>>      .../devicetree/bindings/clock/ti/dpll.txt          |   70 +++
->>>>>>>>      arch/arm/mach-omap2/clock.h                        |  144 +-----
->>>>>>>>      arch/arm/mach-omap2/clock3xxx.h                    |    2 -
->>>>>>>>      drivers/clk/Makefile                               |    1 +
->>>>>>>>      drivers/clk/ti/Makefile                            |    3 +
->>>>>>>>      drivers/clk/ti/dpll.c                              |  488 ++++++++++++++++++++
->>>>>>>>      include/linux/clk/ti.h                             |  164 +++++++
->>>>>>>>      7 files changed, 727 insertions(+), 145 deletions(-)
->>>>>>>>      create mode 100644 Documentation/devicetree/bindings/clock/ti/dpll.txt
->>>>>>>>      create mode 100644 drivers/clk/ti/Makefile
->>>>>>>>      create mode 100644 drivers/clk/ti/dpll.c
->>>>>>>>      create mode 100644 include/linux/clk/ti.h
->>>>>>>>
->>>>>>>> diff --git a/Documentation/devicetree/bindings/clock/ti/dpll.txt b/Documentation/devicetree/bindings/clock/ti/dpll.txt
->>>>>>>> new file mode 100644
->>>>>>>> index 0000000..dcd6e63
->>>>>>>> --- /dev/null
->>>>>>>> +++ b/Documentation/devicetree/bindings/clock/ti/dpll.txt
->>>>>>>> @@ -0,0 +1,70 @@
->>>>>>>> +Binding for Texas Instruments DPLL clock.
->>>>>>>> +
->>>>>>>> +This binding uses the common clock binding[1].  It assumes a
->>>>>>>> +register-mapped DPLL with usually two selectable input clocks
->>>>>>>> +(reference clock and bypass clock), with digital phase locked
->>>>>>>> +loop logic for multiplying the input clock to a desired output
->>>>>>>> +clock. This clock also typically supports different operation
->>>>>>>> +modes (locked, low power stop etc.) This binding has several
->>>>>>>> +sub-types, which effectively result in slightly different setup
->>>>>>>> +for the actual DPLL clock.
->>>>>>>> +
->>>>>>>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->>>>>>>> +
->>>>>>>> +Required properties:
->>>>>>>> +- compatible : shall be one of:
->>>>>>>> +               "ti,omap4-dpll-x2-clock",
->>>>>>>> +               "ti,omap3-dpll-clock",
->>>>>>>> +               "ti,omap3-dpll-core-clock",
->>>>>>>> +               "ti,omap3-dpll-per-clock",
->>>>>>>> +               "ti,omap3-dpll-per-j-type-clock",
->>>>>>>> +               "ti,omap4-dpll-clock",
->>>>>>>> +               "ti,omap4-dpll-core-clock",
->>>>>>>> +               "ti,omap4-dpll-m4xen-clock",
->>>>>>>> +               "ti,omap4-dpll-j-type-clock",
->>>>>>>> +               "ti,omap4-dpll-no-gate-clock",
->>>>>>>> +               "ti,omap4-dpll-no-gate-j-type-clock",
->>>>>>>> +
->>>>>>>> +- #clock-cells : from common clock binding; shall be set to 0.
->>>>>>>> +- clocks : link phandles of parent clocks (clk-ref and clk-bypass)
->>>>>>>
->>>>>>> It might be a good idea to use clock-names to clarify which clocks are
->>>>>>> present (I notice your examples contain only one clock input).
->>>>>>
->>>>>> All DPLLs have both bypass and reference clocks, but these can be the
->>>>>> same. Is it better to just list both always (and hence drop
->>>>>> clock-names), or provide clock-names always?
->>>>>
->>>>> If they're separate inputs, it's worth listing both (even if they're fed
->>>>> by the same provider). If it's possible one input might not be wired up,
->>>>> use clock-names.
->>>>
->>>> Ref and bypass clocks are used currently by all DPLLs (also the APLL) so
->>>> I guess I just enforce both to be specified.
->>>
->>> Ok. It's always possible to add clock-names later if a platform doesn't
->>> wire an input. We lose the possibility of future compatibility, but
->>> backwards compatibility is easy enough to maintain.
->>>
->>>>>>>> +- ti,clkdm-name : clockdomain name for the DPLL
->>>>>>>
->>>>>>> Could you elaborate on what this is for? What constitutes a valid name?
->>>>>>>
->>>>>>> I'm not sure a string is the best way to define the linkage of several
->>>>>>> elements to a domain...
->>>>>>
->>>>>> Well, I am not sure if we can do this any better at this point, we don't
->>>>>> have DT nodes for clockdomain at the moment (I am not sure if we will
->>>>>> have those either as there are only a handful of those per SoC) but I'll
->>>>>> add some more documentation for this.
->>>>>
->>>>> I'll have to see the documentation, but I'd be very wary of putting that
->>>>> in as-is. Does having the clock domain string link this up to domains in
->>>>> platform data?
->>>>>
->>>>> I'm not sure how well we'll be able to maintain support for that in
->>>>> future if it requires other platform code to use now, and we're not sure
->>>>> how the domains themselves will be represented in dt.
->>>>
->>>> Hmm so, should I add a stub representation for the clockdomains to the
->>>> DT then for now or how should this be handled? The stubs could then be
->>>> mapped to the actual clock domains based on their node names.
->
-> I'm not sure that this binding should know about the clock domain at
-> all. Maybe the clock domain binding should list the clocks that are
-> within the domain?
+On Wed, Aug 21, 2013 at 03:22:04PM +0100, Ezequiel Garcia wrote:
+> On Wed, Aug 21, 2013 at 01:24:24PM +0100, Will Deacon wrote:
+> > On Tue, Aug 20, 2013 at 05:48:25PM +0100, Ezequiel Garcia wrote:
+> > > diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
+> > > index dcd5b4d..b2a53a3 100644
+> > > --- a/arch/arm/kernel/io.c
+> > > +++ b/arch/arm/kernel/io.c
+> > > @@ -1,6 +1,19 @@
+> > >  #include <linux/export.h>
+> > >  #include <linux/types.h>
+> > >  #include <linux/io.h>
+> > > +#include <linux/spinlock.h>
+> > > +
+> > > +static DEFINE_SPINLOCK(__io_lock);
+> > > +
+> > > +void atomic_io_clear_set(u32 clear, u32 set, void __iomem *reg)
+> > 
+> > First off, what exactly is this function supposed to guarantee? Do you simply
+> > require thread-safe device access, or do you also require completion of the
+> > the device writes?
+> > 
+> 
+> Indeed, thread-safe device access would be enough, unless I'm missing
+> something.
 
-Ok, I experimented with this stuff a bit to have a proper reply, and it 
-looks like I can get this done with a clockdomain mapping, which has its 
-own binding. Something like this:
+Great!
 
-         clockdomains {
-                 usbhost_clkdm: usbhost_clkdm {
-                         compatible = "ti,clockdomain";
-                         clocks = <&usbhost_48m_fck>, <&usbhost_ick>;
-                 };
-	};
+> > > +	spin_lock(&__io_lock);
+> > 
+> > Is this function likely to be used in irq context? If so, better disable
+> > IRQs here.
+> > 
+> 
+> No, I don't think this API is aimed particularly at irq-context.
+> 
+> That said, it's a generic API that can be used anywhere, yet users are expected
+> to be aware of the performance impact (or at least I hope that).
+> 
+> And speaking about performance, I appreciate any performance tunings,
+> but I guess we can all agree this API is not meant for hot-paths.
 
-Mike, what is your approach on this? Are you okay having the 
-implementation for this under drivers/clk? I recall you mentioned 
-earlier that you don't want clockdomain stuff under drivers/clk, hence I 
-am asking.
+Well, device accesses in interrupt handlers are very common, so if you need
+to co-exist with other users of the device, you could decide to use this
+API. I think it's a good idea to use the _irqsave variant here.
 
-Here is the initial implementation for the binding:
+> > > +	/* ensure the write get done before unlocking */
+> > > +	__iowmb();
+> > 
+> > And then, despite my previous suggestion, you can drop this line too.
+> > 
+> 
+> Ok... I'm not sure I understand why using relaxed variants allows us to drop this.
+> 
+> Maybe you can (try) to enlighten me?
 
-void __init of_omap_clockdomain_setup(struct device_node *node)
-{
-         struct clk *clk;
-         struct clk_hw *clk_hw;
-         const char *clkdm_name = node->name;
-         int i;
-         int num_clks;
+Sure. Firstly, an __iowmb() is only required for ensuring *endpoint* ordering
+between normal, cacheable memory and device memory. i.e. you write a normal
+cacheable buffer, then you poke a device to go and read it. That is why
+there is this barrier in writel, before the actual device write: it ensures
+that the buffer is visible to the device before it sees the control write.
 
-         num_clks = of_count_phandle_with_args(node, "clocks", 
-"#clock-cells");
+My original, rushed reading of your patch lead me to think that this was all
+about endpoint ordering and you were trying to guarantee some sort of
+immediacy of the device write by using a spinlock, but now I see that's not
+the case. Given that the device is never going to go and read the spinlock
+value, you can drop the __iowmb() regardless.
 
-         for (i = 0; i < num_clks; i++) {
-                 clk = of_clk_get(node, i);
-                 if (__clk_get_flags(clk) & CLK_IS_BASIC) {
-                         pr_warn("%s: can't setup clkdm for basic clk %s\n",
-                                 __func__, __clk_get_name(clk));
-                         continue;
-                 }
-                 clk_hw = __clk_get_hw(clk);
-                 to_clk_hw_omap(clk_hw)->clkdm_name = clkdm_name;
-                 omap2_init_clk_clkdm(clk_hw);
-         }
-}
-CLK_OF_DECLARE(omap_clockdomain, "ti,clockdomain", 
-of_omap_clockdomain_setup);
+> > Now, the only downside with this approach is that you need explicit barriers
+> > in the driver if you want to enforce ordering with respect to normal,
+> > cacheable buffers to be consumed/populated by the device.
+> > 
+> > What do you think? An alternative would be just to relax the readl and rely
+> > on the dsb preceeding the writel, then add atomic_io_clear_set_relaxed
+> > to implement what I described above, but it depends on how you envisage
+> > this helper being used.
+> > 
+> 
+> Mmm.. it's not easy to foresee, for we have only a scarce bunch of planned
+> usage for the API. I guess any simple shared-register access would want
+> to use this, typically just to enable/disable something in some 'control'
+> register.
 
->
->>>>
->>>
->>> I unfortunately don't have a good answer here, because I'm not that
->>> familiar with how we handle clockdomains for power management purposes.
->>>
->>> As I understand it, each clock domain is essentially a clock gate
->>> controlling multiple clock signals, so it's possible to describe that
->>> with the common clock bindings, with a domain's clocks all coming from a
->>> "domain-gate-clock" node (or something like that). That would make the
->>> wiring of clocks to a domain explicit and in line with the rest of the
->>> common clock bindings. But perhaps I've simplified things a bit too
->>> far.
->>
->> You got it basically right, but maybe oversimplified it a bit. The
->> root/parent clocks can still cross clockdomain boundaries, so mapping
->> everything under a simple clockdomain gate would not work. Basically
->> each clock has a mapping on the SoC for both its parent clock signal and
->> the clockdomain association, kind of having two parents at the same
->> time. In OMAP case, most of the clockdomains support hardware autoidle
->> type functionality, which puts the domain to idle once all the clocks on
->> it are disabled.
->
-> I always thought that OMAP clock domains were poorly named. Seems to me
-> that they had more to do with the IP/module programming than clocks per
-> se.  Again, I'm not sure that putting clkdm data into this binding is
-> correct.
->
-> Is it because you want a call to clk_enable to program the clock domain
-> in the .enable callback? I always thought that this was better left to a
-> pm_runtime_get callback...
+Right, but if that control register causes the device to go off and read a
+normal, cacheable buffer then the driver would need explicit barriers if we
+exclusively use relaxed accessors here. The more I think about it, the more
+I like the idea of having two versions:
 
-My guess is that some clocks require the clockdomain itself to be forced 
-on before they are enabled, some of the DPLLs do this for example. I am 
-just trying not to cause any regressions with this set, thus attempting 
-to keep most of the implementation specifics intact.
+atomic_io_clear_set
+	spin_lock
+	writel(readl_relaxed(...)
+	spin_unlock
 
--Tero
+atomic_io_clear_set_relaxed
+	spin_lock
+	writel_relaxed(readl_relaxed(...))
+	spin_unlock
 
->
-> Regards,
-> Mike
->
->>
->> -Tero
->>
->>> I'm not sure how easy it would be to use that information for power
->>> management. I don't know what the kernel logic for clock domain power
->>> management needs to know about consumers of the clocks and how it would
->>> need to poke those consumers.
->>
->>>
->>> Cheers,
->>> Mark.
->>>
+That way, the two versions match the semantics of the simpler I/O accessors
+from which they are built and drivers can use the relaxed variant as an
+optimisation.
+
+Hope that helps, and sorry for the confusion.
+
+Will
