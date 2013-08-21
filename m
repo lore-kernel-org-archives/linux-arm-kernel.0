@@ -1,44 +1,44 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 21 Aug 2013 09:57:03 -0600
-Subject: [GIT PULL 3/4] ARM: tegra: device tree changes for 3.12
-In-Reply-To: <8738q4j59d.fsf@kernel.org>
-References: <1376673628-5867-1-git-send-email-swarren@wwwdotorg.org>
- <1376673628-5867-3-git-send-email-swarren@wwwdotorg.org>
- <8738q4j59d.fsf@kernel.org>
-Message-ID: <5214E34F.2030606@wwwdotorg.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 21 Aug 2013 09:01:12 -0700
+Subject: [GIT PULL 3/3] ARM: shmobile: lager: enable Ether
+In-Reply-To: <4901e136aa5c35873701156c4c0af5b3c2c8faee.1375839719.git.horms+renesas@verge.net.au>
+ (Simon Horman's message of "Wed, 7 Aug 2013 13:30:25 +0900")
+References: <cover.1375839719.git.horms+renesas@verge.net.au>
+ <4901e136aa5c35873701156c4c0af5b3c2c8faee.1375839719.git.horms+renesas@verge.net.au>
+Message-ID: <87siy3owxj.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2013 05:45 PM, Kevin Hilman wrote:
-> Stephen Warren <swarren@wwwdotorg.org> writes:
-> 
->> This branch contains all *.dts (device tree) changes for Tegra.
->> New features enabled are:
->>
->> * PMICs on Dalmore
->> * CPU power-gating on Dalmore
->> * HDMI output on Beaver
->> * LP1 system suspend mode on almost all boards
->> * PCIe support on numerous Tegra20/30 boards
->> * USB support on Tegra30/114 boards
->> * Audio capture on Beaver and Dalmore
->> * Temperature sensor on Cardhu.
->>
->> ... along with a few DT cleanups.
-> 
-> Hmm, shouldn't I have a DT maintainer signoff on this stuff... oh,
-> wait... ;)
+Simon Horman <horms+renesas@verge.net.au> writes:
 
-One thought here on my DT binding maintainer role (hence CCing the other
-DT maintainers):
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-I assume that the DT maintainers are reviewing the DT bindings, and not
-the *.dts files. There's certainly so much email defining/modifying
-bindings that I can't even keep up with that. So, I deliberately don't
-even attempt to look at anything other than the binding changes. Is this
-not what the role entails? If the role is supposed to include reviewing
-*.dts changes, then perhaps I should wait until someone else has
-reviewed such patches before applying them to the Tegra tree?
+This one is triggering a new build failure in -next:
 
-Of course, as Tegra maintainer I do actively look at the specific *.dts
-changes that go through my own tree.
+arch/arm/mach-shmobile/board-lager.c:99:2: error: unknown field 'register_type' specified in initializer
+arch/arm/mach-shmobile/board-lager.c:99:19: error: 'SH_ETH_REG_FAST_RCAR' undeclared here (not in a function)
+
+> +/* Ether */
+> +static struct sh_eth_plat_data ether_pdata __initdata = {
+> +	.phy			= 0x1,
+> +	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
+> +	.register_type		= SH_ETH_REG_FAST_RCAR,
+
+and it looks to be because this board is trying to use the register_type
+field which was removed by:
+
+commit 8d3214c4e8c8be6efd8ec7a172239ebbd4deb04b
+Author: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Date:   Sun Aug 18 03:13:26 2013 +0400
+
+    sh_eth: remove 'register_type' field from 'struct sh_eth_plat_data'
+    
+    Now that the 'register_type' field of the 'sh_eth' driver's platform data is not
+    used by the driver anymore, it's time to remove it and  its initializers from
+    the SH platform code. Also  move *enum* declaring values for this  field from
+    <linux/sh_eth.h>  to  the  local driver's  header file as they're only needed
+    by the driver itself  now...
+    
+    Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
