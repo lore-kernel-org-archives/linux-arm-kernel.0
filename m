@@ -1,54 +1,68 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Wed, 21 Aug 2013 11:42:24 +0300
-Subject: [patch] usb: gadget: double unlocks on error in atmel_usba_start()
-Message-ID: <20130821084224.GM5240@elgon.mountain>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 21 Aug 2013 14:17:17 +0530
+Subject: [PATCH 2/3] ARM: OMAP2+: Add new bindings for OMAP
+In-Reply-To: <20130821074514.GU7656@atomide.com>
+References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
+ <1376983966-16490-3-git-send-email-rnayak@ti.com>
+ <20130821074514.GU7656@atomide.com>
+Message-ID: <52147E95.5000606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "goto out" statements were wrong.  We aren't holding any locks at
-that point so we should return directly.
+On Wednesday 21 August 2013 01:15 PM, Tony Lindgren wrote:
+> * Rajendra Nayak <rnayak@ti.com> [130820 00:41]:
+>> On OMAP we have co-processor IPs, memory controllers,
+>> GPIOs which control regulators and power switches to
+>> PMIC, and SoC internal Bus IPs, some or most of which
+>> should either not be reset or idled or both. Have a
+>> way to pass this information from DT.
+>> (In some cases there are erratas which prevent an IPs
+>> from being reset)
+>>
+>> Also update omap_hwmod to extract this from DT.
+>>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> ---
+>>  .../devicetree/bindings/arm/omap/omap.txt          |    3 ++-
+>>  arch/arm/mach-omap2/omap_hwmod.c                   |   22 +++++++++++++-------
+>>  2 files changed, 17 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> index 6d498c7..a08647e 100644
+>> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> @@ -21,7 +21,8 @@ Required properties:
+>>  Optional properties:
+>>  - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
+>>    during suspend.
+>> -
+>> +- ti,no-reset: When present, the module should not be reset
+>> +- ti,no-idle: When present, the module should not be idled
+> 
+> This naming is a bit confusing as people may think that the
+> hardware has no reset support or no idle support. Let's try
+> to make this to describe the hardware a bit more instead.
+> 
+> Then ideally we'd not map individual bits of data to properties,
+> but describe few basic types of hardware instead and build
+> lists of things instead of tagging things. Or maybe we
+> can get this data from the bus hierarchy instead?
 
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
----
-I can't compile this.
+Yeah, I thought if I could do this without any new bindings.
+For instance, never reset or idle something which is a "cpu" or an
+"interrupt-controller" or a "memory-controller" or a "bus".
+For some like memory-controllers though there are no bindings which
+describe them as memory-controllers.
 
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index 40d2338..2cb52e0 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -1772,7 +1772,7 @@ out:
- static int atmel_usba_start(struct usb_gadget *gadget,
- 		struct usb_gadget_driver *driver)
- {
--	int ret = 0;
-+	int ret;
- 	struct usba_udc *udc = container_of(gadget, struct usba_udc, gadget);
- 	unsigned long flags;
- 
-@@ -1784,11 +1784,11 @@ static int atmel_usba_start(struct usb_gadget *gadget,
- 
- 	ret = clk_prepare_enable(udc->pclk);
- 	if (ret)
--		goto out;
-+		return ret;
- 	ret = clk_prepare_enable(udc->hclk);
- 	if (ret) {
- 		clk_disable_unprepare(udc->pclk);
--		goto out;
-+		return ret;
- 	}
- 
- 	DBG(DBG_GADGET, "registered driver `%s'\n", driver->driver.name);
-@@ -1804,11 +1804,9 @@ static int atmel_usba_start(struct usb_gadget *gadget,
- 		usba_writel(udc, CTRL, USBA_ENABLE_MASK);
- 		usba_writel(udc, INT_ENB, USBA_END_OF_RESET);
- 	}
--
--out:
- 	spin_unlock_irqrestore(&udc->lock, flags);
- 
--	return ret;
-+	return 0;
- }
- 
- static int atmel_usba_stop(struct usb_gadget *gadget,
+> 
+> If these options don't work, and the choice may be board
+> specific, then how about ti,skip-reset-on-init, and
+> ti,skip-idle-on-init?
+
+This looks fine too.
+
+> 
+> Regards,
+> 
+> Tony
+> 
