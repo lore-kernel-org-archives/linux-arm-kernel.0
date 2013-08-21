@@ -1,176 +1,47 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 21 Aug 2013 10:51:16 +0530
-Subject: [PATCH] hwrng: reorder OMAP TRNG driver code
-In-Reply-To: <1377022073-28198-1-git-send-email-olof@lixom.net>
-References: <1377022073-28198-1-git-send-email-olof@lixom.net>
-Message-ID: <52144E4C.4050405@ti.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 21 Aug 2013 10:28:23 +0530
+Subject: [PATCH v2 2/2] dmaengine: Add hisilicon k3 DMA engine driver
+In-Reply-To: <CAMj5Bkg_uQUgod0Cf9ZpLgX92Ys-u344BAFeHbrUwysG3pJVgw@mail.gmail.com>
+References: <1372423153-6742-1-git-send-email-zhangfei.gao@linaro.org>
+ <1372423153-6742-3-git-send-email-zhangfei.gao@linaro.org>
+ <20130813112043.GB32147@intel.com>
+ <CAMj5Bki0H+=0wQY39+jDw4nAEq5wEq3V3yri9xpNRxQ2GRwPbA@mail.gmail.com>
+ <20130819053511.GU32147@intel.com>
+ <CAMj5BkixUR2-MnYLVymPLnQ922jEhbKnwUHs__d3hr2d_Qb8fA@mail.gmail.com>
+ <20130820082749.GG5810@intel.com> <5213359B.4070208@linaro.org>
+ <20130820085037.GH5810@intel.com>
+ <CAMj5Bkg_uQUgod0Cf9ZpLgX92Ys-u344BAFeHbrUwysG3pJVgw@mail.gmail.com>
+Message-ID: <20130821045823.GK5810@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-On Tuesday 20 August 2013 11:37 PM, Olof Johansson wrote:
-> The newly added omap4 support in the driver was added without
-> consideration for building older configs. When building omap1_defconfig,
-> it resulted in:
+On Tue, Aug 20, 2013 at 09:36:50PM +0800, zhangfei gao wrote:
+> > and how do you handle when the desc is running on a phy.
 > 
-> drivers/char/hw_random/omap-rng.c:190:12: warning: 'omap4_rng_init' defined but not used [-Wunused-function]
-> drivers/char/hw_random/omap-rng.c:215:13: warning: 'omap4_rng_cleanup' defined but not used [-Wunused-function]
-> drivers/char/hw_random/omap-rng.c:251:20: warning: 'omap4_rng_irq' defined but not used [-Wunused-function]
+> Currently k3dma is used with uart.
 > 
-> Move the code around so it is grouped with its operations struct, which
-> for the omap4 case means also under the #ifdef CONFIG_OF, where it needs
-> to be.
-> 
-Missed testing this. Thanks for the patch.
-Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
+> drivers/tty/serial/amba-pl011.c
+> pl011_dma_rx_irq: dmaengine_pause -> device_tx_status
+> First pause channel, then get residue.
+> k3_dma_tx_status:
+> a) if desc in issue queue, then it still not started, return total size.
+> b) otherwise get the residue via counting descriptor.
+> pl011 get the residue and recaculate the pending.
+Okay thanks, While looks like for uart this is usage (note this driver doesnt not
+call resume. So for that you dont need resume to be implemented.
 
-Regards,
-Lokesh
+Also, the driver will call the residue and then terminate always. So again I dont
+see a point of yours with what your are doing with descriptors.
 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> Cc: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
->  drivers/char/hw_random/omap-rng.c |  108 ++++++++++++++++++-------------------
->  1 file changed, 54 insertions(+), 54 deletions(-)
-> 
-> diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
-> index f3f7142..9b89ff4 100644
-> --- a/drivers/char/hw_random/omap-rng.c
-> +++ b/drivers/char/hw_random/omap-rng.c
-> @@ -140,16 +140,6 @@ static inline void omap_rng_write(struct omap_rng_dev *priv, u16 reg,
->  	__raw_writel(val, priv->base + priv->pdata->regs[reg]);
->  }
->  
-> -static inline u32 omap2_rng_data_present(struct omap_rng_dev *priv)
-> -{
-> -	return omap_rng_read(priv, RNG_STATUS_REG) ? 0 : 1;
-> -}
-> -
-> -static inline u32 omap4_rng_data_present(struct omap_rng_dev *priv)
-> -{
-> -	return omap_rng_read(priv, RNG_STATUS_REG) & RNG_REG_STATUS_RDY;
-> -}
-> -
->  static int omap_rng_data_present(struct hwrng *rng, int wait)
->  {
->  	struct omap_rng_dev *priv;
-> @@ -187,6 +177,60 @@ static int omap_rng_data_read(struct hwrng *rng, u32 *data)
->  	return data_size;
->  }
->  
-> +static int omap_rng_init(struct hwrng *rng)
-> +{
-> +	struct omap_rng_dev *priv;
-> +
-> +	priv = (struct omap_rng_dev *)rng->priv;
-> +	return priv->pdata->init(priv);
-> +}
-> +
-> +static void omap_rng_cleanup(struct hwrng *rng)
-> +{
-> +	struct omap_rng_dev *priv;
-> +
-> +	priv = (struct omap_rng_dev *)rng->priv;
-> +	priv->pdata->cleanup(priv);
-> +}
-> +
-> +static struct hwrng omap_rng_ops = {
-> +	.name		= "omap",
-> +	.data_present	= omap_rng_data_present,
-> +	.data_read	= omap_rng_data_read,
-> +	.init		= omap_rng_init,
-> +	.cleanup	= omap_rng_cleanup,
-> +};
-> +
-> +static inline u32 omap2_rng_data_present(struct omap_rng_dev *priv)
-> +{
-> +	return omap_rng_read(priv, RNG_STATUS_REG) ? 0 : 1;
-> +}
-> +
-> +static int omap2_rng_init(struct omap_rng_dev *priv)
-> +{
-> +	omap_rng_write(priv, RNG_SYSCONFIG_REG, 0x1);
-> +	return 0;
-> +}
-> +
-> +static void omap2_rng_cleanup(struct omap_rng_dev *priv)
-> +{
-> +	omap_rng_write(priv, RNG_SYSCONFIG_REG, 0x0);
-> +}
-> +
-> +static struct omap_rng_pdata omap2_rng_pdata = {
-> +	.regs		= (u16 *)reg_map_omap2,
-> +	.data_size	= OMAP2_RNG_OUTPUT_SIZE,
-> +	.data_present	= omap2_rng_data_present,
-> +	.init		= omap2_rng_init,
-> +	.cleanup	= omap2_rng_cleanup,
-> +};
-> +
-> +#if defined(CONFIG_OF)
-> +static inline u32 omap4_rng_data_present(struct omap_rng_dev *priv)
-> +{
-> +	return omap_rng_read(priv, RNG_STATUS_REG) & RNG_REG_STATUS_RDY;
-> +}
-> +
->  static int omap4_rng_init(struct omap_rng_dev *priv)
->  {
->  	u32 val;
-> @@ -221,33 +265,6 @@ static void omap4_rng_cleanup(struct omap_rng_dev *priv)
->  	omap_rng_write(priv, RNG_CONFIG_REG, val);
->  }
->  
-> -static int omap2_rng_init(struct omap_rng_dev *priv)
-> -{
-> -	omap_rng_write(priv, RNG_SYSCONFIG_REG, 0x1);
-> -	return 0;
-> -}
-> -
-> -static void omap2_rng_cleanup(struct omap_rng_dev *priv)
-> -{
-> -	omap_rng_write(priv, RNG_SYSCONFIG_REG, 0x0);
-> -}
-> -
-> -static int omap_rng_init(struct hwrng *rng)
-> -{
-> -	struct omap_rng_dev *priv;
-> -
-> -	priv = (struct omap_rng_dev *)rng->priv;
-> -	return priv->pdata->init(priv);
-> -}
-> -
-> -static void omap_rng_cleanup(struct hwrng *rng)
-> -{
-> -	struct omap_rng_dev *priv;
-> -
-> -	priv = (struct omap_rng_dev *)rng->priv;
-> -	priv->pdata->cleanup(priv);
-> -}
-> -
->  static irqreturn_t omap4_rng_irq(int irq, void *dev_id)
->  {
->  	struct omap_rng_dev *priv = dev_id;
-> @@ -275,23 +292,6 @@ static irqreturn_t omap4_rng_irq(int irq, void *dev_id)
->  	return IRQ_HANDLED;
->  }
->  
-> -static struct hwrng omap_rng_ops = {
-> -	.name		= "omap",
-> -	.data_present	= omap_rng_data_present,
-> -	.data_read	= omap_rng_data_read,
-> -	.init		= omap_rng_init,
-> -	.cleanup	= omap_rng_cleanup,
-> -};
-> -
-> -static struct omap_rng_pdata omap2_rng_pdata = {
-> -	.regs		= (u16 *)reg_map_omap2,
-> -	.data_size	= OMAP2_RNG_OUTPUT_SIZE,
-> -	.data_present	= omap2_rng_data_present,
-> -	.init		= omap2_rng_init,
-> -	.cleanup	= omap2_rng_cleanup,
-> -};
-> -
-> -#if defined(CONFIG_OF)
->  static struct omap_rng_pdata omap4_rng_pdata = {
->  	.regs		= (u16 *)reg_map_omap4,
->  	.data_size	= OMAP4_RNG_OUTPUT_SIZE,
-> 
+And since you support PAUSE/RESUME, if someone tries to use this with sound,
+this will break as sound will call pause and then resume. No resubmitting or
+terminating.
+
+> Have pass the stress test with amba-pl011.
+See the example of amba-pl08x.c, I think Linux W had this in mind when he added
+this and other exapmple of PAUSE and RESUME implemented in drivers
+
+Also, again you PAUSE a channel not a trancation, so it doesnt not really matter
+where the descriptor is. In phy or somehwere else! We shouldnt care
+
+~Vinod
