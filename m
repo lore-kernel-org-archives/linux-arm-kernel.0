@@ -1,34 +1,43 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 21 Aug 2013 16:31:02 +0800
-Subject: [PATCH] ARM: OMAP2: remove useless variable 'ret'
-In-Reply-To: <521479B4.8030604@asianux.com>
-References: <521479B4.8030604@asianux.com>
-Message-ID: <52147AC6.9040300@asianux.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Wed, 21 Aug 2013 11:33:30 +0300
+Subject: [patch 1/2] iommu/arm-smmu: fix a signedness bug
+Message-ID: <20130821083329.GF5240@elgon.mountain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove useless variable 'ret', the related warning:
+Unsigned char is never equal to -1.
 
-  arch/arm/mach-omap2/board-am3517crane.c:113:6: warning: unused variable ?ret? [-Wunused-variable]
-
-
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 ---
- arch/arm/mach-omap2/board-am3517crane.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+I can't compile this code.
 
-diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-index fc53911..0d499a1 100644
---- a/arch/arm/mach-omap2/board-am3517crane.c
-+++ b/arch/arm/mach-omap2/board-am3517crane.c
-@@ -110,8 +110,6 @@ static void __init am3517_crane_i2c_init(void)
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index f417e89e..7243af3 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -377,6 +377,7 @@ struct arm_smmu_cfg {
+ 	u32				cbar;
+ 	pgd_t				*pgd;
+ };
++#define INVALID_IRPTNDX			0xff
  
- static void __init am3517_crane_init(void)
- {
--	int ret;
--
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
- 	omap_serial_init();
- 	omap_sdrc_init(NULL, NULL);
--- 
-1.7.7.6
+ #define ARM_SMMU_CB_ASID(cfg)		((cfg)->cbndx)
+ #define ARM_SMMU_CB_VMID(cfg)		((cfg)->cbndx + 1)
+@@ -840,7 +841,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 	if (IS_ERR_VALUE(ret)) {
+ 		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
+ 			root_cfg->irptndx, irq);
+-		root_cfg->irptndx = -1;
++		root_cfg->irptndx = INVALID_IRPTNDX;
+ 		goto out_free_context;
+ 	}
+ 
+@@ -869,7 +870,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+ 	writel_relaxed(0, cb_base + ARM_SMMU_CB_SCTLR);
+ 	arm_smmu_tlb_inv_context(root_cfg);
+ 
+-	if (root_cfg->irptndx != -1) {
++	if (root_cfg->irptndx != INVALID_IRPTNDX) {
+ 		irq = smmu->irqs[smmu->num_global_irqs + root_cfg->irptndx];
+ 		free_irq(irq, domain);
+ 	}
