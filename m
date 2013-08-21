@@ -1,41 +1,113 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Aug 2013 12:44:18 +0200
-Subject: [PATCH v5 0/3] i2c-mv64xxx: Fixes and new feature for controlers
- embedded in Aramda XP
-In-Reply-To: <20130820190714.GB24466@katana>
-References: <1376039158-1896-1-git-send-email-gregory.clement@free-electrons.com>
- <5213979B.4050306@free-electrons.com> <20130820190714.GB24466@katana>
-Message-ID: <52149A02.1000504@free-electrons.com>
+From: B47053@freescale.com (Xiubo Li-B47053)
+Date: Wed, 21 Aug 2013 10:46:39 +0000
+Subject: [PATCH 1/4] pwm: add freescale ftm pwm driver support
+In-Reply-To: <20130821095049.GQ31036@pengutronix.de>
+References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377054462-6283-2-git-send-email-Li.Xiubo@freescale.com>
+ <20130821073659.GN31036@pengutronix.de>
+ <1DD289F6464F0949A2FCA5AA6DC23F827D1C51@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20130821095049.GQ31036@pengutronix.de>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827D1D4D@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/08/2013 21:07, Wolfram Sang wrote:
-> 
->> Jason Cooper drooped the third patch as it conflicted with a patch from Maxime Ripard which adds the AllWinner support. Olof also asked a formal acked-by from a device tree maintainer
->> even if we already answer to Mark Rutland request.
->> 
->> Olof also requested that you take the binding update, so I am going to send a new version of this patch set with the last patch split in two parts.
-> 
-> Yeah, I wondered about the binding already being accepted when the driver review was not done.
+TO Sascha,
 
-As there will be a conflict for the
-Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt file with the
-commit "i2c: mv64xxx: Document the newly introduced allwinner
-compatible", do you want that I rebase my patch set on your
-i2c/for-current branch, or do you prefer to take care of the merge
-conflict yourself?
+Thanks very much for your quick reply.
 
+
+
+> > > > +	fpc = to_fsl_chip(chip);
+> > > > +
+> > > > +	if (WARN_ON(!test_bit(PWMF_REQUESTED, &pwm->flags)))
+> > > > +		return -ESHUTDOWN;
+> > > > +
+> > > > +	statename = kasprintf(GFP_KERNEL, "en%d", pwm->hwpwm);
+> > > > +	pins_state = pinctrl_lookup_state(fpc->pinctrl,
+> > > > +			statename);
+> > > > +	/* enable pins to be muxed in and configured */
+> > > > +	if (!IS_ERR(pins_state)) {
+> > > > +		ret = pinctrl_select_state(fpc->pinctrl, pins_state);
+> > > > +		if (ret)
+> > > > +			dev_warn(&fpc->pdev->dev,
+> > > > +					"could not set default pins\n");
+> > >
+> > > Why do you need to manipulate the pinctrl to en/disable a channel?
+> > >
+> >
+> > This is because in Vybrid VF610 TOWER board, there are 4 leds, and
+> > each led's one point(diode's positive pole) is connected to 3.3V, and
+> > the other point is connected to pwm's one channel. When the 4 pinctrls
+> are configured as enable at the same time, the 4 pinctrls is low valtage,
+> and the 4 leds will be lighted up as default, then when you
+> enable/disable one led will effects others.
+> >
 > 
->> As explained earlier today, unless you really want I use be32_to_cpu in the mv64xxx_i2c_offload_msg() I won't change anything else.
+> I think the inactive state of a PWM is pretty much undefined by the PWM
+> framework and left to the drivers.
 > 
-> I found some more (minor) issues. Expect a review by tomorrow evening.
+> I stumbled upon this aswell. It would be good to think about the inactive
+> state and how the PWM framework could help us here getting things right.
+> 
+> There are several things to consider. For a noninverted PWM the inactive
+> state should probably logic 0. For an inverted PWM it should probably be
+> logic 1. I guess several PWM devices have an undefined inactive state,
+> most of the PWM devices probably can control the inactive state by
+> setting the duty cycle to 100% / 0% without actually disabling the PWM.
+> 
+> Using the pinctrl is one way to control the inactive state and probaby
+> the only one before initialization. It might be good to wire this up in
+> the core instead of the individual PWM drivers.
+> 
+> These are just the thoughts which first came to my mind.
 > 
 
-Ok I will wait for your review to send the new version
+That's a very good idea, and I have also thought about it before.
+But from the power dissipation:
+If so, upon my board is up, the pwm core should be alive even I won't use it.
 
-Thanks,
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I think the pwm core should be in idle mode when not using it,
+when any of it's channels is requested and enabled, the pwm core will keep alive.
+
+What do you think about it ?
+
+> Thierry, any more input about this?
+> 
+> 
+> > > > +	fpc = dev_get_drvdata(dev);
+> > > > +
+> > > > +	ret = kstrtouint(buf, 0, &val);
+> > > > +	if (ret)
+> > > > +		return ret;
+> > > > +
+> > > > +	mutex_lock(&fpc->lock);
+> > > > +	if (!!(val) != !!(fpc->cpwm)) {
+> > > > +		fpc->cpwm = !!val;
+> > > > +		fsl_updata_config(fpc, NULL);
+> > > > +	}
+> > > > +	mutex_unlock(&fpc->lock);
+> > > > +
+> > > > +	return count;
+> > > > +}
+> > >
+> > > What is this cpwm thingy?
+> >
+> > Up-down counting mode:
+> > CNTIN(a register) defines the starting value of the count and MOD(a
+> > register) defines the final value of the count. The value of CNTIN is
+> > loaded into the FTM counter, and the counter increments until the
+> > value of MOD is reached, at which point the counter is decremented
+> until it returns to the value of CNTIN and the up-down counting restarts.
+> 
+> The current PWM framework only cares about period times and duty cycles.
+> Why would I want to care about this?
+
+I will think it over, If this hasn't any help here, I'll drop it in v2.
+
+
+
+Thanks very much.
+
+--
+Best Regards,
+Xiubo Li
