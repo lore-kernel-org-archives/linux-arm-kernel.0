@@ -1,68 +1,55 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 21 Aug 2013 14:17:17 +0530
-Subject: [PATCH 2/3] ARM: OMAP2+: Add new bindings for OMAP
-In-Reply-To: <20130821074514.GU7656@atomide.com>
-References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
- <1376983966-16490-3-git-send-email-rnayak@ti.com>
- <20130821074514.GU7656@atomide.com>
-Message-ID: <52147E95.5000606@ti.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 21 Aug 2013 10:50:34 +0200
+Subject: [PATCH] usb: musb dsps: fix pdev cast in suspend/resume
+In-Reply-To: <1376397630-26863-1-git-send-email-zonque@gmail.com>
+References: <1376397630-26863-1-git-send-email-zonque@gmail.com>
+Message-ID: <52147F5A.90801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 August 2013 01:15 PM, Tony Lindgren wrote:
-> * Rajendra Nayak <rnayak@ti.com> [130820 00:41]:
->> On OMAP we have co-processor IPs, memory controllers,
->> GPIOs which control regulators and power switches to
->> PMIC, and SoC internal Bus IPs, some or most of which
->> should either not be reset or idled or both. Have a
->> way to pass this information from DT.
->> (In some cases there are erratas which prevent an IPs
->> from being reset)
->>
->> Also update omap_hwmod to extract this from DT.
->>
->> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->> ---
->>  .../devicetree/bindings/arm/omap/omap.txt          |    3 ++-
->>  arch/arm/mach-omap2/omap_hwmod.c                   |   22 +++++++++++++-------
->>  2 files changed, 17 insertions(+), 8 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
->> index 6d498c7..a08647e 100644
->> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
->> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
->> @@ -21,7 +21,8 @@ Required properties:
->>  Optional properties:
->>  - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
->>    during suspend.
->> -
->> +- ti,no-reset: When present, the module should not be reset
->> +- ti,no-idle: When present, the module should not be idled
+On 13.08.2013 14:40, Daniel Mack wrote:
+> dsps_suspend() and dsps_resume() are called with the device that has the
+> glue assigned as drvdata. Using dev->parent seems wrong and causes a
+> NULL pointer exception on an AM33xx board.
 > 
-> This naming is a bit confusing as people may think that the
-> hardware has no reset support or no idle support. Let's try
-> to make this to describe the hardware a bit more instead.
+> The code was introduced by commit c68bb4c6 ("usb: musb: dsps: control
+> module handling (quirk)") but I wonder whether it was ever used.
 > 
-> Then ideally we'd not map individual bits of data to properties,
-> but describe few basic types of hardware instead and build
-> lists of things instead of tagging things. Or maybe we
-> can get this data from the bus hierarchy instead?
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
 
-Yeah, I thought if I could do this without any new bindings.
-For instance, never reset or idle something which is a "cpu" or an
-"interrupt-controller" or a "memory-controller" or a "bus".
-For some like memory-controllers though there are no bindings which
-describe them as memory-controllers.
+Felipe, is this one good to go in?
 
-> 
-> If these options don't work, and the choice may be board
-> specific, then how about ti,skip-reset-on-init, and
-> ti,skip-idle-on-init?
 
-This looks fine too.
 
+Thanks,
+Daniel
+
+
+
+> ---
+>  drivers/usb/musb/musb_dsps.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Regards,
-> 
-> Tony
+> diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+> index 5233804..f20218e 100644
+> --- a/drivers/usb/musb/musb_dsps.c
+> +++ b/drivers/usb/musb/musb_dsps.c
+> @@ -692,7 +692,7 @@ static int dsps_remove(struct platform_device *pdev)
+>  #ifdef CONFIG_PM_SLEEP
+>  static int dsps_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev->parent);
+> +	struct platform_device *pdev = to_platform_device(dev);
+>  	struct dsps_glue *glue = platform_get_drvdata(pdev);
+>  	const struct dsps_musb_wrapper *wrp = glue->wrp;
+>  	int i;
+> @@ -705,7 +705,7 @@ static int dsps_suspend(struct device *dev)
+>  
+>  static int dsps_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev->parent);
+> +	struct platform_device *pdev = to_platform_device(dev);
+>  	struct dsps_glue *glue = platform_get_drvdata(pdev);
+>  	const struct dsps_musb_wrapper *wrp = glue->wrp;
+>  	int i;
 > 
