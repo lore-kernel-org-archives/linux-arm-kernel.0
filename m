@@ -1,65 +1,87 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 21 Aug 2013 14:08:55 +0200
-Subject: [PATCH v5 2/5] dma: mmp_pdma: don't clear DCMD_ENDIRQEN at end of
- pending chain
+Date: Wed, 21 Aug 2013 14:08:54 +0200
+Subject: [PATCH v5 1/5] dma: mmp_pdma: only complete one transaction from
+ dma_do_tasklet()
 In-Reply-To: <1377086938-29145-1-git-send-email-zonque@gmail.com>
 References: <1377086938-29145-1-git-send-email-zonque@gmail.com>
-Message-ID: <1377086938-29145-3-git-send-email-zonque@gmail.com>
+Message-ID: <1377086938-29145-2-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to fully support multiple transactions per channel, we need to
-assure we get an interrupt for each completed transaction. That flags
-bit is also our only way to tell at which descriptor a transaction ends.
+Currently, when an interrupt has occured for a channel, the tasklet
+worker code will only look at the very last entry in the running list
+and complete its cookie, and then dispose the entire running chain.
+Hence, the first transaction's cookie will never complete.
 
-So, remove the manual clearing of that bit, and then inline the only
-remaining command that is left in append_pending_queue() for better
-readability.
+In fact, the interrupt we should handle will be the one related to the
+first descriptor in the chain with the ENDIRQEN bit set, so complete
+the second transaction that is in fact still running.
+
+As a result, the driver can't currently handle multiple transactions on
+one chanel, and it's likely that no drivers exist that rely on this
+feature.
+
+Fix this by walking the running_chain and look for the first
+descriptor that has the interrupt-enable bit set. Only queue
+descriptors up to that point for completion handling, while leaving
+the rest intact. Also, only make the channel idle if the list is
+completely empty after such a cycle.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- drivers/dma/mmp_pdma.c | 22 ++--------------------
- 1 file changed, 2 insertions(+), 20 deletions(-)
+ drivers/dma/mmp_pdma.c | 35 +++++++++++++++++++++--------------
+ 1 file changed, 21 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index 9929f85..31e9a71 100644
+index 579f79a..9929f85 100644
 --- a/drivers/dma/mmp_pdma.c
 +++ b/drivers/dma/mmp_pdma.c
-@@ -279,25 +279,6 @@ static void mmp_pdma_free_phy(struct mmp_pdma_chan *pchan)
- 	spin_unlock_irqrestore(&pdev->phy_lock, flags);
- }
+@@ -710,25 +710,32 @@ static void dma_do_tasklet(unsigned long data)
  
--/* desc->tx_list ==> pending list */
--static void append_pending_queue(struct mmp_pdma_chan *chan,
--					struct mmp_pdma_desc_sw *desc)
--{
--	struct mmp_pdma_desc_sw *tail =
--				to_mmp_pdma_desc(chan->chain_pending.prev);
+ 	spin_lock_irqsave(&chan->desc_lock, flags);
+ 
+-	/* update the cookie if we have some descriptors to cleanup */
+-	if (!list_empty(&chan->chain_running)) {
+-		dma_cookie_t cookie;
 -
--	if (list_empty(&chan->chain_pending))
--		goto out_splice;
--
--	/* one irq per queue, even appended */
--	tail->desc.ddadr = desc->async_tx.phys;
--	tail->desc.dcmd &= ~DCMD_ENDIRQEN;
--
--	/* softly link to pending list */
--out_splice:
--	list_splice_tail_init(&desc->tx_list, &chan->chain_pending);
--}
--
- /**
-  * start_pending_queue - transfer any pending transactions
-  * pending list ==> running list
-@@ -360,7 +341,8 @@ static dma_cookie_t mmp_pdma_tx_submit(struct dma_async_tx_descriptor *tx)
- 		cookie = dma_cookie_assign(&child->async_tx);
+-		desc = to_mmp_pdma_desc(chan->chain_running.prev);
+-		cookie = desc->async_tx.cookie;
+-		dma_cookie_complete(&desc->async_tx);
++	list_for_each_entry_safe(desc, _desc, &chan->chain_running, node) {
++		/*
++		 * move the descriptors to a temporary list so we can drop
++		 * the lock during the entire cleanup operation
++		 */
++		list_del(&desc->node);
++		list_add(&desc->node, &chain_cleanup);
+ 
+-		dev_dbg(chan->dev, "completed_cookie=%d\n", cookie);
++		/*
++		 * Look for the first list entry which has the ENDIRQEN flag
++		 * set. That is the descriptor we got an interrupt for, so
++		 * complete that transaction and its cookie.
++		 */
++		if (desc->desc.dcmd & DCMD_ENDIRQEN) {
++			dma_cookie_t cookie = desc->async_tx.cookie;
++			dma_cookie_complete(&desc->async_tx);
++			dev_dbg(chan->dev, "completed_cookie=%d\n", cookie);
++			break;
++		}
  	}
  
--	append_pending_queue(chan, desc);
-+	/* softly link to pending list - desc->tx_list ==> pending list */
-+	list_splice_tail_init(&desc->tx_list, &chan->chain_pending);
+ 	/*
+-	 * move the descriptors to a temporary list so we can drop the lock
+-	 * during the entire cleanup operation
++	 * The hardware is idle and ready for more when the
++	 * chain_running list is empty.
+ 	 */
+-	list_splice_tail_init(&chan->chain_running, &chain_cleanup);
+-
+-	/* the hardware is now idle and ready for more */
+-	chan->idle = true;
++	chan->idle = list_empty(&chan->chain_running);
  
- 	spin_unlock_irqrestore(&chan->desc_lock, flags);
- 
+ 	/* Start any pending transactions automatically */
+ 	start_pending_queue(chan);
 -- 
 1.8.3.1
