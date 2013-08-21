@@ -1,33 +1,63 @@
 From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 21 Aug 2013 11:25:55 +0200
-Subject: [PATCH] ARM: dts: am33xx: Correct gpio #interrupt-cells property
-In-Reply-To: <20130821075939.GA7656@atomide.com>
-References: <1375873592-26881-1-git-send-email-larsi@wh2.tu-dresden.de>
- <20130821075016.GW7656@atomide.com> <201308210957.01956.poeschel@lemonage.de>
- <20130821075939.GA7656@atomide.com>
-Message-ID: <521487A3.3020701@baylibre.com>
+Date: Wed, 21 Aug 2013 11:29:48 +0200
+Subject: [PATCH 2/3] ARM: OMAP2+: Add new bindings for OMAP
+In-Reply-To: <20130821074514.GU7656@atomide.com>
+References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
+ <1376983966-16490-3-git-send-email-rnayak@ti.com>
+ <20130821074514.GU7656@atomide.com>
+Message-ID: <5214888C.8050205@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 21/08/2013 09:59, Tony Lindgren wrote:
-> * Lars Poeschel <poeschel@lemonage.de> [130821 01:04]:
->> Hi Tony!
+On 21/08/2013 09:45, Tony Lindgren wrote:
+> * Rajendra Nayak <rnayak@ti.com> [130820 00:41]:
+>> On OMAP we have co-processor IPs, memory controllers,
+>> GPIOs which control regulators and power switches to
+>> PMIC, and SoC internal Bus IPs, some or most of which
+>> should either not be reset or idled or both. Have a
+>> way to pass this information from DT.
+>> (In some cases there are erratas which prevent an IPs
+>> from being reset)
 >>
->> On Wednesday 21 August 2013 at 09:50:16, Tony Lindgren wrote:
->>> Benoit,
->>>
->>> Care to take a look at this too?
+>> Also update omap_hwmod to extract this from DT.
 >>
->> Benoit already applied this with Mark Rutlands Acked-By and Javier Martinez
->> Canillas Reviewed-by.
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> ---
+>>   .../devicetree/bindings/arm/omap/omap.txt          |    3 ++-
+>>   arch/arm/mach-omap2/omap_hwmod.c                   |   22 +++++++++++++-------
+>>   2 files changed, 17 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> index 6d498c7..a08647e 100644
+>> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> @@ -21,7 +21,8 @@ Required properties:
+>>   Optional properties:
+>>   - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
+>>     during suspend.
+>> -
+>> +- ti,no-reset: When present, the module should not be reset
+>> +- ti,no-idle: When present, the module should not be idled
 >
-> OK thanks for the update, I'm just trying to follow-up and clear
-> my inbox a bit.
+> This naming is a bit confusing as people may think that the
+> hardware has no reset support or no idle support. Let's try
+> to make this to describe the hardware a bit more instead.
 
-I've just checked, because I thought I missed it, and this is indeed in 
-my pull request I sent you yesterday.
+Yeah, I do agree here. That should look like a real HW property and nor 
+a configuration.
 
-Thanks,
+> Then ideally we'd not map individual bits of data to properties,
+> but describe few basic types of hardware instead and build
+> lists of things instead of tagging things. Or maybe we
+> can get this data from the bus hierarchy instead?
+>
+> If these options don't work, and the choice may be board
+> specific, then how about ti,skip-reset-on-init, and
+> ti,skip-idle-on-init?
+
+It looks like a configuration as well :-).
+I was thinking of something like "ti,do-not-support-reset-on-init", but 
+that a little bit too long.
+
+Regards,
 Benoit
