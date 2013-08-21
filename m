@@ -1,40 +1,144 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Wed, 21 Aug 2013 18:04:07 +0530
-Subject: [PATCH 14/16] clk: samsung: exynos4: Register PLL rate tables for
- Exynos4210
-In-Reply-To: <1377019903-14614-15-git-send-email-t.figa@samsung.com>
-References: <1377019903-14614-1-git-send-email-t.figa@samsung.com>
- <1377019903-14614-15-git-send-email-t.figa@samsung.com>
-Message-ID: <CAKew6eXbc8ai9vSX2EMv+=7LYmxZ+75z1X72ytULOxtwX7bebg@mail.gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 21 Aug 2013 20:37:09 +0800
+Subject: [PATCH 0/3] of: add update device node status via cmdline feature
+In-Reply-To: <CACxGe6tMm=u1jFKUQ59+cj-rYkLLAZUqMhsXamyi-wwpWaOGvw@mail.gmail.com>
+References: <1376564133-11286-1-git-send-email-b29396@freescale.com>
+ <CACxGe6tMm=u1jFKUQ59+cj-rYkLLAZUqMhsXamyi-wwpWaOGvw@mail.gmail.com>
+Message-ID: <20130821123708.GA17748@b29396-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 11:01 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> This patch adds rate tables for PLLs that can be reconfigured at runtime
-> for Exynos4210 SoCs. Provided tables contain PLL coefficients for
-> input clock of 24 MHz and so are registered only in this case. MPLL does
-> not need runtime reconfiguration and so table for it is not provided.
->
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos4.c | 45 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->
-> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-> index 34474ce..e18cfae 100644
-> --- a/drivers/clk/samsung/clk-exynos4.c
-> +++ b/drivers/clk/samsung/clk-exynos4.c
-> @@ -992,6 +992,40 @@ static struct of_device_id ext_clk_match[] __initdata = {
->         {},
->  };
->
-> +/* PLLs PMS values */
-> +static struct samsung_pll_rate_table exynos4210_apll_rates[] = {
-> +       PLL_45XX_RATE(1200000000, 150,  3, 1, 28),
+On Thu, Aug 15, 2013 at 01:45:48PM +0100, Grant Likely wrote:
+> On Thu, Aug 15, 2013 at 11:55 AM, Dong Aisheng <b29396@freescale.com> wrote:
+> > We meet some boards having a lot of pin conflicts between different devices,
+> > only one of them can be enabled to run at one time.
+> >
+> > e.g. imx6q sabreauto board, i2c, spi, weim, flexcan, uart and etc involved
+> > with pin conflict.
+> >
+> > Instead of changing dts manually or adding a lot dts files according to
+> > different device availability, we provide feature to dynamically update the
+> > device node status via command line, then those devices involved with
+> > pin conflict can be enabled or disabled dynamically.
+> 
+> Ugh, no. If there are dynamic conflicts, then the driver really should
+> be responsible for handling them. ie. if the driver isn't able to get
+> the resource it needs because they don't exist, then driver probe
+> should fail.
+> 
 
-All these tables in this patch as well as next patch can be __initdata
+Detect pin confliction in driver is not our purpose.
+The real requirement is to flexibly decide which device involved in confliction
+is enabled when booting kernel since only one of them can be running at one time,
+not detect them.
 
+Before using device tree, we defined kernel param in mach code ourself to fix
+this issue.
+e.g. i2c and spi are conflicted.
+We add kernel boot param i2c3_en to decide whether enable i2c3 or spi.
+Then user can test devices flexibly as they want.
 
-Regards,
-Yadwinder
+After switch to device tree, since this part of work actually is soc independent,
+we move it into the dt core to let the kernel provide such feature.
+Then everyone else can also use it if needed.
+
+If do not provide such features in kernel, we may have to do it either in mach-code
+which may cause a lot of code duplication, or board dts file which cause add a lot
+duplicated board dts files.
+e.g. there are 11 devices involved with pin confliction in imx6q sabreauto board.
+i2c3, ecspi1, weim_nor, uart3, gpmi, can1, enet, tunner, satellite, mipi, csi.
+Some of them are combined conflicted.(e.g i2c3, ecspi1, weim_nor all conflict with EIM_D18)
+One simple way to use board dts to fix this issue may be add 11 more board dts files
+with one common board dts with all those device disabled by default.
+It may be:
+imx6q-sabreauto.dts
+imx6q-sabreauto-with-i2c3.dts
+imx6q-sabreauto-with-ecspi1.dts
+imx6q-sabreauto-with-weim-nor.dts
+imx6q-sabreauto-with-uart3.dts
+imx6q-sabreauto-with-gpmi.dts
+imx6q-sabreauto-with-can1.dts
+imx6q-sabreauto-with-enet.dts
+imx6q-sabreauto-with-tunner.dts
+imx6q-sabreauto-with-satellite.dts
+imx6q-sabreauto-with-mipi.dts
+imx6q-sabreauto-with-csi.dts
+
+We may also reduce them by combine some of them.
+e.g.
+imx6q-sabreauto-with-i2c3-uart3-can1-tunner-mipi.dts
+imx6q-sabreauto-with-ecspi1-gpmi-enet-satellite-csi.dts
+imx6q-sabreauto-with-weim-nor-*.dts
+....
+The defect is the combination and name is arbitrary and may
+cause dts file name changed usually.
+
+The common issue of above two way is that 1) it bloats the device tree,
+add a lot of duplicated dts files with the same board
+2) the fix is out of control and not permanent.
+If any new board having more conflict devices, we have to add these new board dts
+separately and figure out the combination again.
+e.g. for imx6q arm2 board, it also has conflicted devices flexcan, gpmi, sd and etc.
+So i'm not sure if you can accept this way.
+
+By comparing adding dts file, if the kernel provides such feature, we do not have
+to add these duplicated board dts files, only one board dts file with all conflicted
+devices disable by default and let user decide which device is enabled flexibly with
+kernel command line. And the fix is also permanently, not depends on hw design
+and how many device conflicted.
+
+Also in our case, it's pin confliction. However, it works for other conflict type
+as well that only one can work which may also exist on other platforms.
+
+> Except in very excpetional circumstances (ie. firmware workarounds)
+> the kernel needs to treat the device tree as immutable*. The tree
+> passed in at boot should not be manipulated at runtime.
+> 
+
+I understand the tree passed should be treated as inmmutable at most time.
+But now we did have this requirement and this is caused by real hw design.
+I'm not sure if our case can be treated as an excpetional circumstances,
+but it does look like a excpetional to me.
+
+so i wonder if kernel could provide such feature and let user to decide whether
+to use since it is valuable.
+
+BTW, except the pin confliction, freescale imx6q soc can also be fused
+with different IP availability.
+
+That means the same imx6q sabreauto board, if the soc chip is with different fuse,
+the device availability may be different.
+e.g. 
+imx6q(a) sabreauto with enet enabled.
+imx6q(b) sabreauto with enet disabled.
+
+We probably may still want to dynamically update the device node status by reading
+the fuse map before populating platform devices since if the IP is not exist,
+creating it's device is unreasonable.
+
+The devices involved with fused devices for imx6sdl are:
+"pxp", "ovg", "dsi_csi2", "enet", "mlb",
+"epdc", "hdmi", "pcie", "sata", "dtcp",
+"2d", "3d", "vpu", "divx3", "rv",
+"sorensen",
+
+> * There are powerpc platforms that modify the FDT at runtime; but in
+> those cases it is in response to firmware changing the data, not the
+> kernel.
+> 
+
+I'm not very clear about the case in response to firmware changing the data.
+Can you help give a example?
+Then i can understand the difference between our case and the exception you said.
+
+However, i did saw many exist code calling of_property_* API to change the device tree
+in kernel, although not clear about their purpose. But,
+e.g
+arch/powerpc/platforms/85xx/p1022_ds.c
+In these file, it also disable device node dynamically by commandline.
+If kernel has this feature, these code can be removed.
+arch/arm/mach-omap2/timer.c
+also disable the node...
+
+Regards
+Dong Aisheng
