@@ -1,67 +1,146 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 21 Aug 2013 23:21:47 +0200
-Subject: [PATCH v7 3/7] gpio: samsung: Skip initialization if device tree is
- present
+Date: Wed, 21 Aug 2013 23:21:48 +0200
+Subject: [PATCH v7 4/7] ARM: s3c64xx: Add board file for boot using Device Tree
 In-Reply-To: <1377120111-25601-1-git-send-email-tomasz.figa@gmail.com>
 References: <1377120111-25601-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1377120111-25601-4-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1377120111-25601-5-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since this driver does not handle GPIO on device tree enabled platforms
-any more, it should be bypassed whenever device tree is available, to
-not conflict with the new pinctrl-samsung driver.
+This patch adds board file that will be used to boot S3C64xx-based boards
+using Device Tree.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- drivers/gpio/gpio-samsung.c | 34 +++++++---------------------------
- 1 file changed, 7 insertions(+), 27 deletions(-)
+ arch/arm/mach-s3c64xx/Kconfig           | 16 +++++++
+ arch/arm/mach-s3c64xx/Makefile          |  1 +
+ arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c | 85 +++++++++++++++++++++++++++++++++
+ 3 files changed, 102 insertions(+)
+ create mode 100644 arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
 
-diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-index a1392f4..cc93b1b 100644
---- a/drivers/gpio/gpio-samsung.c
-+++ b/drivers/gpio/gpio-samsung.c
-@@ -2949,34 +2949,14 @@ static __init int samsung_gpiolib_init(void)
- 	int i, nr_chips;
- 	int group = 0;
- 
--#if defined(CONFIG_PINCTRL_EXYNOS) || defined(CONFIG_PINCTRL_EXYNOS5440)
- 	/*
--	* This gpio driver includes support for device tree support and there
--	* are platforms using it. In order to maintain compatibility with those
--	* platforms, and to allow non-dt Exynos4210 platforms to use this
--	* gpiolib support, a check is added to find out if there is a active
--	* pin-controller driver support available. If it is available, this
--	* gpiolib support is ignored and the gpiolib support available in
--	* pin-controller driver is used. This is a temporary check and will go
--	* away when all of the Exynos4210 platforms have switched to using
--	* device tree and the pin-ctrl driver.
--	*/
--	struct device_node *pctrl_np;
--	static const struct of_device_id exynos_pinctrl_ids[] = {
--		{ .compatible = "samsung,s3c2412-pinctrl", },
--		{ .compatible = "samsung,s3c2416-pinctrl", },
--		{ .compatible = "samsung,s3c2440-pinctrl", },
--		{ .compatible = "samsung,s3c2450-pinctrl", },
--		{ .compatible = "samsung,exynos4210-pinctrl", },
--		{ .compatible = "samsung,exynos4x12-pinctrl", },
--		{ .compatible = "samsung,exynos5250-pinctrl", },
--		{ .compatible = "samsung,exynos5440-pinctrl", },
--		{ }
--	};
--	for_each_matching_node(pctrl_np, exynos_pinctrl_ids)
--		if (pctrl_np && of_device_is_available(pctrl_np))
--			return -ENODEV;
--#endif
-+	 * Currently there are two drivers that can provide GPIO support for
-+	 * Samsung SoCs. For device tree enabled platforms, the new
-+	 * pinctrl-samsung driver is used, providing both GPIO and pin control
-+	 * interfaces. For legacy (non-DT) platforms this driver is used.
-+	 */
-+	if (of_have_populated_dt())
-+		return -ENODEV;
- 
- 	samsung_gpiolib_set_cfg(samsung_gpio_cfgs, ARRAY_SIZE(samsung_gpio_cfgs));
- 
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 041da51..bd14e3a 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -306,3 +306,19 @@ config MACH_WLF_CRAGG_6410
+ 	select SAMSUNG_GPIO_EXTRA128
+ 	help
+ 	  Machine support for the Wolfson Cragganmore S3C6410 variant.
++
++config MACH_S3C64XX_DT
++	bool "Samsung S3C6400/S3C6410 machine using Device Tree"
++	select CLKSRC_OF
++	select CPU_S3C6400
++	select CPU_S3C6410
++	select PINCTRL
++	select PINCTRL_S3C64XX
++	select USE_OF
++	help
++	  Machine support for Samsung S3C6400/S3C6410 machines with Device Tree
++	  enabled.
++	  Select this if a fdt blob is available for your S3C64XX SoC based
++	  board.
++	  Note: This is under development and not all peripherals can be
++	  supported with this machine file.
+diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
+index 645a8fe..6faedcf 100644
+--- a/arch/arm/mach-s3c64xx/Makefile
++++ b/arch/arm/mach-s3c64xx/Makefile
+@@ -57,3 +57,4 @@ obj-$(CONFIG_MACH_SMARTQ7)		+= mach-smartq7.o
+ obj-$(CONFIG_MACH_SMDK6400)		+= mach-smdk6400.o
+ obj-$(CONFIG_MACH_SMDK6410)		+= mach-smdk6410.o
+ obj-$(CONFIG_MACH_WLF_CRAGG_6410)	+= mach-crag6410.o mach-crag6410-module.o
++obj-$(CONFIG_MACH_S3C64XX_DT)		+= mach-s3c64xx-dt.o
+diff --git a/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+new file mode 100644
+index 0000000..7eb9a10
+--- /dev/null
++++ b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+@@ -0,0 +1,85 @@
++/*
++ * Samsung's S3C64XX flattened device tree enabled machine
++ *
++ * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/clk-provider.h>
++#include <linux/irqchip.h>
++#include <linux/of_platform.h>
++
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <asm/system_misc.h>
++
++#include <plat/cpu.h>
++#include <plat/watchdog-reset.h>
++
++#include <mach/map.h>
++
++#include "common.h"
++
++/*
++ * IO mapping for shared system controller IP.
++ *
++ * FIXME: Make remaining drivers use dynamic mapping.
++ */
++static struct map_desc s3c64xx_dt_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S3C_VA_SYS,
++		.pfn		= __phys_to_pfn(S3C64XX_PA_SYSCON),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++};
++
++static void __init s3c64xx_dt_map_io(void)
++{
++	debug_ll_io_init();
++	iotable_init(s3c64xx_dt_iodesc, ARRAY_SIZE(s3c64xx_dt_iodesc));
++
++	s3c64xx_init_cpu();
++
++	if (!soc_is_s3c64xx())
++		panic("SoC is not S3C64xx!");
++}
++
++static void __init s3c64xx_dt_init_irq(void)
++{
++	of_clk_init(NULL);
++	samsung_wdt_reset_of_init();
++	irqchip_init();
++};
++
++static void __init s3c64xx_dt_init_machine(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++static void s3c64xx_dt_restart(enum reboot_mode mode, const char *cmd)
++{
++	if (mode != REBOOT_SOFT)
++		samsung_wdt_reset();
++
++	/* if all else fails, or mode was for soft, jump to 0 */
++	soft_restart(0);
++}
++
++static char const *s3c64xx_dt_compat[] __initdata = {
++	"samsung,s3c6400",
++	"samsung,s3c6410",
++	NULL
++};
++
++DT_MACHINE_START(S3C6400_DT, "Samsung S3C64xx (Flattened Device Tree)")
++	/* Maintainer: Tomasz Figa <tomasz.figa@gmail.com> */
++	.dt_compat	= s3c64xx_dt_compat,
++	.map_io		= s3c64xx_dt_map_io,
++	.init_irq	= s3c64xx_dt_init_irq,
++	.init_machine	= s3c64xx_dt_init_machine,
++	.restart        = s3c64xx_dt_restart,
++MACHINE_END
 -- 
 1.8.3.2
