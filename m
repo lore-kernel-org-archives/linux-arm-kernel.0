@@ -1,35 +1,40 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 21 Aug 2013 12:12:19 +0800
-Subject: [PATCH 0/3] refactor some ldb related clocks
-In-Reply-To: <20130821015939.GD30533@S2101-09.ap.freescale.net>
+Date: Wed, 21 Aug 2013 12:20:45 +0800
+Subject: [PATCH 1/3] ARM: imx6q: refactor some ldb related clocks
+In-Reply-To: <CAOMZO5Afjp-zPzUaNE63L7Y2LjZbSrLupAJ_jFnf1Gg1+hx0Nw@mail.gmail.com>
 References: <1376987932-5540-1-git-send-email-Ying.Liu@freescale.com>
- <1376991823.4000.22.camel@pizza.hi.pengutronix.de>
- <52134030.4030502@freescale.com>
- <20130821015939.GD30533@S2101-09.ap.freescale.net>
-Message-ID: <52143E23.9080203@freescale.com>
+ <1376987932-5540-2-git-send-email-Ying.Liu@freescale.com>
+ <CAOMZO5Afjp-zPzUaNE63L7Y2LjZbSrLupAJ_jFnf1Gg1+hx0Nw@mail.gmail.com>
+Message-ID: <5214401D.8010402@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2013 09:59 AM, Shawn Guo wrote:
-> Hi Ying,
+On 08/20/2013 11:40 PM, Fabio Estevam wrote:
+> On Tue, Aug 20, 2013 at 5:38 AM, Liu Ying <Ying.Liu@freescale.com> wrote:
 > 
-> On Tue, Aug 20, 2013 at 06:08:48PM +0800, Liu Ying wrote:
->>> While I admit to having introduced the combination of 1/3.5 fixed
->>> divider and configurable 1/1,1/2 divder clocks to describe this
->>> fractional divider for the reasons you state, I think the correct
->>> solution would be to improve the table divider to support fractional
->>> values and get rid of the virtual ldb_di<n>_div_3_5 clocks, not
->>> introduce more virtual clocks.
->>
->> Yes, it's good to support fractional values for the table divider(not sure if there is any plan for this).
->> I see there is something similar in 'include/linux/sh_clk.h'.
+>> diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+>> index 5a90a72..90e923e 100644
+>> --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+>> +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+>> @@ -89,8 +89,6 @@ clocks and IDs.
+>>         gpu3d_shader            74
+>>         ipu1_podf               75
+>>         ipu2_podf               76
+>> -       ldb_di0_podf            77
+>> -       ldb_di1_podf            78
+>>         ipu1_di0_pre            79
+>>         ipu1_di1_pre            80
+>>         ipu2_di0_pre            81
 > 
-> Yeah, I agree with Philipp on improving table divider to support
-> fractional values.  Would you like to work on that?
-> 
-> Shawn
+> This causes a 'hole' in the clock numbering scheme: 74, 75, 76, 79, 80, etc
 > 
 
-I don't have a plan to work on that now.
+I find there is a 'hole' in Documentation/devicetree/bindings/clock/imx5-clock.txt as well.
+The 'hole' was taken by tve_di(26) clock before.
+
+Is this more acceptable?
+
+ldb_di0_podf_unused            77
+ldb_di1_podf_unused            78
 
 Liu Ying
