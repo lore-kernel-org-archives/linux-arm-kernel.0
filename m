@@ -1,39 +1,66 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 Aug 2013 09:28:11 +0100
-Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the
- DBX500 DT
-In-Reply-To: <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
-Message-ID: <20130821082811.GC29850@lee--X1>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 21 Aug 2013 13:58:26 +0530
+Subject: [PATCH 3/3] ARM: OMAP4: dts: Add main and optional clock data
+ into DT
+In-Reply-To: <alpine.DEB.2.02.1308202352330.6426@utopia.booyaka.com>
+References: <1374560679-14666-1-git-send-email-rnayak@ti.com>
+ <1374560679-14666-4-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.02.1308202352330.6426@utopia.booyaka.com>
+Message-ID: <52147A2A.60105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Aug 2013, Linus Walleij wrote:
-
-> On Thu, Jun 6, 2013 at 2:16 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wednesday 21 August 2013 05:27 AM, Paul Walmsley wrote:
+> Hi
 > 
-> > +++ b/arch/arm/boot/dts/dbx5x0.dtsi
-> > @@ -572,6 +572,8 @@
-> >                         v-i2c-supply = <&db8500_vape_reg>;
-> >
-> >                         clock-frequency = <400000>;
-> > +                       clocks = <&prcc_kclk 3 3>, <&prcc_pclk 3 3>;
-> > +                       clock-names = "nmk-i2c.0", "apb_pclk";
+> On Tue, 23 Jul 2013, Rajendra Nayak wrote:
 > 
-> To avoid confusing the clock name "nmk-i2c.0" with the device
-> name in Linux of that device instance, can we use a name such
-> that it is clear that this is not a dev_name match?
+>> With support to parse clock data from DT, move all main and optional
+>> clock information from hwmod to DT.
+>>
+>> We still retain clocks in hwmod for devices which do not have a DT node.
+>>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> ---
+>>  arch/arm/boot/dts/omap4.dtsi               |  100 +++++++++++++++++++++++++
+>>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  112 ----------------------------
+>>  2 files changed, 100 insertions(+), 112 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>> index 8e142f9..4dddf64 100644
+>> --- a/arch/arm/boot/dts/omap4.dtsi
+>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>> @@ -106,6 +106,8 @@
+>>  			compatible = "ti,omap-counter32k";
+>>  			reg = <0x4a304000 0x20>;
+>>  			ti,hwmods = "counter_32k";
+>> +			clocks = <&sys_32k_ck>;
+>> +			clock-names = "fck";
 > 
-> "i2c0" works just fine as name I think?
+> Shouldn't these patches be using the official DT clock binding format?
 
-If you do that, then I think you need to change all of these too:
+They are, already.
+ 
+> Either the 'clocks' property should be something like:
+> 
+>     clocks = <&prm 10>;
 
-git grep -e "\.0" -e "\.1" -e "\.2" -e "\.3" -- drivers/clk/ux500/
+That depends on the #clock-cells for the clock provider node. These patches
+are based on Teros series to move all OMAP clocks to DT [1], and the clock providers
+in his series have the #clock-cells set to 0.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+So the clock bindings do not mandate
+	clocks = <&clk-provider index>
+or
+	clocks = <&clk-provider>
+
+It just depends on how the clk-provider node is defined.
+
+[1] http://comments.gmane.org/gmane.linux.ports.arm.omap/100117
+
+> 
+> or a change to the bindings needs to be discussed and implemented.
+> 
+> 
+> - Paul
+> 
