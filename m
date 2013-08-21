@@ -1,78 +1,141 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 21 Aug 2013 11:10:42 +0200
-Subject: [PATCH v2] ARM: at91: at91sam9260: add missing pinctrl on mmc
-In-Reply-To: <20130821085601.GH5149@ludovic.desroches@atmel.com>
-References: <1377070957-24984-1-git-send-email-ludovic.desroches@atmel.com>
- <52147553.2010305@atmel.com>
- <20130821085601.GH5149@ludovic.desroches@atmel.com>
-Message-ID: <52148412.4020504@atmel.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 21 Aug 2013 18:14:18 +0900
+Subject: [PATCH 01/02] ARM: shmobile: Add r8a7790 SMP support using APMU
+ code
+In-Reply-To: <20130809100755.10827.10538.sendpatchset@w520>
+References: <20130809100744.10827.62207.sendpatchset@w520>
+ <20130809100755.10827.10538.sendpatchset@w520>
+Message-ID: <20130821091417.GA2843@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/08/2013 10:56, Ludovic Desroches :
-> On Wed, Aug 21, 2013 at 10:07:47AM +0200, Nicolas Ferre wrote:
->> On 21/08/2013 09:42, ludovic.desroches at atmel.com :
->>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->>>
->>> pinctrl-names was missing causing mmc pinctrl to never be requested. Moreover,
->>> add minimal pin configuration to not cause error if overloading is forgotten
->>> in board files.
->>>
->>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>
->> (modified the "interrupts" property to add the macro definition).
->>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->
-> After discussing with Jean-Christophe keeping the first version of the patch
-> seems a better choice because the user will be notified if he forgets to
-> overload pin configuration instead of thinking that everything goes right and
-> having a default pin configuration that could not fit its configuration.
+On Fri, Aug 09, 2013 at 07:07:55PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Add r8a7790 SMP support using the shared APMU code. To enable
+> SMP the r8a7790 specific DTS needs to be updated to include
+> CPU cores, and this is happening in a separate patch.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  arch/arm/mach-shmobile/Makefile               |    1 
+>  arch/arm/mach-shmobile/include/mach/r8a7790.h |    1 
+>  arch/arm/mach-shmobile/setup-r8a7790.c        |    3 +
+>  arch/arm/mach-shmobile/smp-r8a7790.c          |   67 +++++++++++++++++++++++++
+>  4 files changed, 72 insertions(+)
+> 
+> --- 0011/arch/arm/mach-shmobile/Makefile
+> +++ work/arch/arm/mach-shmobile/Makefile	2013-08-07 20:10:54.000000000 +0900
+> @@ -35,6 +35,7 @@ smp-y				:= platsmp.o headsmp.o
+>  smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
+>  smp-$(CONFIG_ARCH_R8A73A4)	+= smp-r8a73a4.o platsmp-apmu.o
+>  smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
+> +smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o platsmp-apmu.o
+>  smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
+>  
+>  # IRQ objects
+> --- 0009/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> +++ work/arch/arm/mach-shmobile/include/mach/r8a7790.h	2013-08-07 20:10:54.000000000 +0900
+> @@ -7,6 +7,7 @@ void r8a7790_clock_init(void);
+>  void r8a7790_pinmux_init(void);
+>  void r8a7790_init_early(void);
+>  void r8a7790_timer_init(void);
+> +extern struct smp_operations r8a7790_smp_ops;
+>  
+>  #define MD(nr) BIT(nr)
+>  u32 r8a7790_read_mode_pins(void);
+> --- 0009/arch/arm/mach-shmobile/setup-r8a7790.c
+> +++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-08-07 20:10:54.000000000 +0900
+> @@ -272,6 +272,9 @@ void __init r8a7790_init_early(void)
+>  #ifndef CONFIG_ARM_ARCH_TIMER
+>  	shmobile_setup_delay(1300, 2, 4); /* Cortex-A15 @ 1300MHz */
+>  #endif
+> +#ifdef CONFIG_SMP
+> +	smp_set_ops(&r8a7790_smp_ops);
+> +#endif
+>  }
+>  
+>  #ifdef CONFIG_USE_OF
 
-Ah, okay: that makes sense.
+As per your email to Olof and Arnd regarding the r8a73a4 version of this
+change, I am holding off on this until there is some determination if it is
+preferred to set smp_set_ops() in ->init_early(i) or to use the (more
+traditional) method of setting smp_ops directly in the per-board
+DT_MACHINE_START.
 
->> stacked in at91-3.12-dt.
-
-So I replace the patch.
-
-Thanks,
-
->>
->> Due to macro change, I can't tag it for -stable. We have to remember
->> to add it when it is accepted upstream.
->>
->> thanks.
->>
->>> ---
->>>
->>> v2:
->>>    - add minimal pin configuration
->>>
->>>   arch/arm/boot/dts/at91sam9260.dtsi | 2 ++
->>>   1 file changed, 2 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
->>> index 84c4bef..b4de52a 100644
->>> --- a/arch/arm/boot/dts/at91sam9260.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
->>> @@ -477,6 +477,8 @@
->>>   				interrupts = <9 4 0>;
->>>   				#address-cells = <1>;
->>>   				#size-cells = <0>;
->>> +				pinctrl-names = "default";
->>> +				pinctrl-0 = <&pinctrl_mmc0_clk &pinctrl_mmc0_slot1_cmd_dat0>;
->>>   				status = "disabled";
->>>   			};
->>>
->>>
->>
->>
->> --
->> Nicolas Ferre
->
->
-
-
--- 
-Nicolas Ferre
+> --- /dev/null
+> +++ work/arch/arm/mach-shmobile/smp-r8a7790.c	2013-08-07 20:10:55.000000000 +0900
+> @@ -0,0 +1,67 @@
+> +/*
+> + * SMP support for r8a7790
+> + *
+> + * Copyright (C) 2012-2013 Renesas Solutions Corp.
+> + * Copyright (C) 2012 Takashi Yoshii <takashi.yoshii.ze@renesas.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; version 2 of the License.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/smp.h>
+> +#include <linux/io.h>
+> +#include <asm/smp_plat.h>
+> +#include <mach/common.h>
+> +
+> +#define RST		0xe6160000
+> +#define CA15BAR		0x0020
+> +#define CA7BAR		0x0030
+> +#define CA15RESCNT	0x0040
+> +#define CA7RESCNT	0x0044
+> +#define MERAM		0xe8080000
+> +
+> +static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
+> +{
+> +	void __iomem *p;
+> +	u32 bar;
+> +
+> +	/* let APMU code install data related to shmobile_boot_vector */
+> +	shmobile_smp_apmu_prepare_cpus(max_cpus);
+> +
+> +	/* MERAM for jump stub, because BAR requires 256KB aligned address */
+> +	p = ioremap_nocache(MERAM, shmobile_boot_size);
+> +	memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
+> +	iounmap(p);
+> +
+> +	/* setup reset vectors */
+> +	p = ioremap_nocache(RST, 0x63);
+> +	bar = (MERAM >> 8) & 0xfffffc00;
+> +	writel_relaxed(bar, p + CA15BAR);
+> +	writel_relaxed(bar, p + CA7BAR);
+> +	writel_relaxed(bar | 0x10, p + CA15BAR);
+> +	writel_relaxed(bar | 0x10, p + CA7BAR);
+> +
+> +	/* enable clocks to all CPUs */
+> +	writel_relaxed((readl_relaxed(p + CA15RESCNT) & ~0x0f) | 0xa5a50000,
+> +		       p + CA15RESCNT);
+> +	writel_relaxed((readl_relaxed(p + CA7RESCNT) & ~0x0f) | 0x5a5a0000,
+> +		       p + CA7RESCNT);
+> +	iounmap(p);
+> +}
+> +
+> +struct smp_operations r8a7790_smp_ops __initdata = {
+> +	.smp_prepare_cpus	= r8a7790_smp_prepare_cpus,
+> +	.smp_boot_secondary	= shmobile_smp_apmu_boot_secondary,
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +	.cpu_disable		= shmobile_smp_cpu_disable,
+> +	.cpu_die		= shmobile_smp_apmu_cpu_die,
+> +	.cpu_kill		= shmobile_smp_apmu_cpu_kill,
+> +#endif
+> +};
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
