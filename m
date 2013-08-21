@@ -1,33 +1,29 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 20 Aug 2013 16:57:40 -0700
-Subject: [PATCH] ARM: tegra: configure power off for Dalmore
-In-Reply-To: <1376930650-6078-1-git-send-email-swarren@wwwdotorg.org> (Stephen
- Warren's message of "Mon, 19 Aug 2013 10:44:10 -0600")
-References: <1376930650-6078-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <87r4dnj4p7.fsf@kernel.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 21 Aug 2013 00:13:25 +0000 (UTC)
+Subject: [PATCH v2 0/2] ARM: dts: Add SHAM and AES DT information
+In-Reply-To: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
+References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <alpine.DEB.2.02.1308210012420.6426@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+Hi Beno?t,
 
-> From: Bill Huang <bilhuang@nvidia.com>
->
-> Add DT property to tell the regulator to register pm_power_off to make
-> "shutdown" work.
->
-> Signed-off-by: Bill Huang <bilhuang@nvidia.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> arm-soc folk,
->
-> This patch showed up a little late to include in the Tegra pull requests,
-> but it's simple and useful enough I'd like to see it included in v3.12 if
-> possible. Could you possibly apply it to whichever branch you have/will
-> apply Tegra's tegra-for-3.12-dt pull request to, after the pull request
-> is applied? Thanks.
+On Wed, 17 Jul 2013, Mark A. Greer wrote:
 
-Applied to next/dt just after the Tegra DT pull request.
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
+> 
+> Long overdue patches to add the device tree updates and
+> documentation for the SHAM and AES modules on the am33xx.
+> The supporting code is already in the mainline kernel.
+> 
+> This series is based on the current mainline kernel,
+> c0d15cc (linked-list: Remove __list_for_each).
+> 
+> Changes from v1:
+>  - Added missing '};' as pointed out by Lokesh Vutla <lokeshvutla@ti.com>
 
-Thanks for the detailed explanaton.
+I guess you should take these patches?
 
-Kevin
+
+- Paul
