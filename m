@@ -1,54 +1,53 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Wed, 21 Aug 2013 14:59:39 -0500
-Subject: [RFC PATCH] ARM: smp_twd: Fix twd_get_clock() to get clock from
- dts or clock framework
-In-Reply-To: <CACRpkdb3C4FScyChR2TyZUpbNnhfArE+CDRWYj1iKsQtZy94tg@mail.gmail.com>
-References: <1376087720-14539-1-git-send-email-dinguyen@altera.com>
- <CACRpkdb3C4FScyChR2TyZUpbNnhfArE+CDRWYj1iKsQtZy94tg@mail.gmail.com>
-Message-ID: <1377115179.1554.19.camel@linux-builds1>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 22 Aug 2013 01:30:13 +0530
+Subject: [GIT PULL 2/2] DaVinci DT updates for v3.12
+In-Reply-To: <52151BA6.2060109@ti.com>
+References: <52151BA6.2060109@ti.com>
+Message-ID: <52151C4D.2000408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-08-14 at 21:47 +0200, Linus Walleij wrote:
-> On Sat, Aug 10, 2013 at 12:35 AM,  <dinguyen@altera.com> wrote:
-> 
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> >
-> > Some platforms have a clock for the smp_twd that goes through a fixed
-> > divider. Registering this smp_twd clocks is done by calling
-> > clk_register_fixed_factor().
-> >
-> > Fix up twd_get_clock() so that it can get the clock from the device
-> > tree node or clk_register_fixed_factor().
-> >
-> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> (...)
-> >         if (np)
-> >                 twd_clk = of_clk_get(np, 0);
-> > -       else
-> > +
-> > +       /* Some platforms do not register the smp_twd clock in the device */
-> > +       /* node of the twd timer. */
-> > +       if (IS_ERR(twd_clk))
-> >                 twd_clk = clk_get_sys("smp_twd", NULL);
-> 
-> NACK.
-> 
-> The patch commit message and the patch itself does not match.
-> This has nothing to do with using fixed factor or whatever.
-> 
-> What it wants to do is use clk_get_sys() in case of_clk_get() fails,
-> so DT clocks take precedence.
-> 
-> But this patch is buggy. If you have only platform data, and boot
-> without device tree, np will be NULL, and twd_clk will also be
-> NULL and thus clk_get_sys() will not execute and the system
-> is bugged up.
+Hi Arnd, Olof, Kevin,
 
-Ah, I apologize. I did not even think about the none device tree case.
+Please pull the following DaVinci DT updates for v3.12.
+It depends on the SoC updates in 1/2
 
-Dinh
-> 
-> Yours,
-> Linus Walleij
-> 
+Thanks,
+Sekhar
+
+The following changes since commit 46c1833467c5e555f31cd6f14b342a7383f26885:
+
+  ARM: davinci: fix clock lookup for mdio device (2013-08-22 00:39:01 +0530)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.12/dt
+
+for you to fetch changes up to 29864962f79e3dab645a5b00ccc7d4da96e9db33:
+
+  ARM: davinci: da850: do not specify clock_frequency for UART DT node (2013-08-22 00:44:58 +0530)
+
+----------------------------------------------------------------
+DaVinci DT updates for v3.12
+----------------------------
+
+This set of patches add ethernet DT nodes
+for DA850 and also remove now unneeded
+specification of UART clock frequency so
+kernel can now boot irrespective of what
+the bootloader setting of UART frequency is.
+
+----------------------------------------------------------------
+Lad, Prabhakar (4):
+      ARM: davinci: da850: add DT node for mdio device
+      ARM: davinci: da850: add OF_DEV_AUXDATA entry for mdio.
+      ARM: davinci: da850: add OF_DEV_AUXDATA entry for davinci_emac
+      ARM: davinci: da850: add DT node for ethernet
+
+Manjunathappa, Prakash (1):
+      ARM: davinci: da850: do not specify clock_frequency for UART DT node
+
+ arch/arm/boot/dts/da850-evm.dts  |   11 +++++++++
+ arch/arm/boot/dts/da850.dtsi     |   46 +++++++++++++++++++++++++++++++++++---
+ arch/arm/mach-davinci/da8xx-dt.c |    3 +++
+ 3 files changed, 57 insertions(+), 3 deletions(-)
