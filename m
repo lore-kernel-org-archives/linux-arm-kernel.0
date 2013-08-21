@@ -1,35 +1,52 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 21 Aug 2013 15:02:58 -0700
-Subject: [GIT PULL] Allwinner sunXi DT additions for 3.12
-In-Reply-To: <20130816185955.GA30005@lukather> (Maxime Ripard's message of
- "Fri, 16 Aug 2013 20:59:55 +0200")
-References: <20130816185955.GA30005@lukather>
-Message-ID: <87vc2yog6l.fsf@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 22 Aug 2013 00:14:02 +0200
+Subject: [PATCH] pinctrl: Pass all configs to driver on pin_config_set()
+In-Reply-To: <1376606573-15093-1-git-send-email-syin@broadcom.com>
+References: <1376606573-15093-1-git-send-email-syin@broadcom.com>
+Message-ID: <CACRpkdaUacAbLd+i4Y=DXv=aSaUwBSz6-icPV9SVjxZkUjheww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+Hi Sherman,
 
-> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
->
->   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
->
-> are available in the git repository at:
->
->   https://github.com/mripard/linux.git tags/sunxi-dt-for-3.12
->
-> for you to fetch changes up to 629ae88e9cebc6281bc54be743a33eca47b7228c:
->
->   ARM: sunxi: dt: Add device tree for Mele A1000 (2013-08-14 09:59:20 +0200)
->
-> ----------------------------------------------------------------
-> Allwinner sunXi DT additions for 3.12
->
->   - Cleanups and few fixes to the DTSI
->   - A few additions to the A10s olinuxino board
->
-> ----------------------------------------------------------------
+On Fri, Aug 16, 2013 at 12:42 AM, Sherman Yin <syin@broadcom.com> wrote:
 
-Pulled into next/dt.
+> When setting pin configuration in the pinctrl framework, pin_config_set() or
+> pin_config_group_set() is called in a loop to set one configuration at a time
+> for the specified pin or group.
+>
+> This patch 1) removes the loop and 2) changes the API to pass the whole pin
+> config array to the driver.  It is now up to the driver to loop through the
+> configs.  This allows the driver to potentially combine configs and reduce the
+> number of writes to pin config registers.
+>
+> Signed-off-by: Sherman Yin <syin@broadcom.com>
+> Reviewed-by: Christian Daudt <csd@broadcom.com>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> Change-Id: I99cbfa2ae7b774456eb71edb276711b1ddcd42c8
+> ---
+> Please refer to the discussion with Linus W. "[PATCH] ARM: Adds pin config API
+> to set all configs in one function" here:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/166567.html
+>
+> All c files changed have been build-tested to verify the change compiles and
+> that the corresponding .o are successfully generated.
 
-Kevin
+Good work! This is obviously the right thing to do and it's looking
+very good.
+
+Right now this does not apply to my "devel" branch, so I'd like you
+to rebase on that right now. (This is what will go into v3.12).
+
+This is also late in the development cycle so I believe this is going to
+be v3.13 material unless there are more release candidates.
+
+You can also hold on until after the v3.12 merge window and then
+rebase it and we'll merge it as a first patch in the v3.13 development
+cycle.
+
+What do you say?
+
+Yours,
+Linus Walleij
