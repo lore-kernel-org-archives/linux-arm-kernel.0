@@ -1,64 +1,44 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 21 Aug 2013 17:23:37 -0600
-Subject: [PATCH v2] pinctrl: queue GPIO operations instead of defering
-In-Reply-To: <CACRpkdasWurMctYTMZCHS+fwhvmnREaQD1vN54QYpMToTuFjsg@mail.gmail.com>
-References: <1376751410-14560-1-git-send-email-linus.walleij@linaro.org>
- <52126EDE.5060000@wwwdotorg.org>
- <CACRpkdasWurMctYTMZCHS+fwhvmnREaQD1vN54QYpMToTuFjsg@mail.gmail.com>
-Message-ID: <52154BF9.1060704@wwwdotorg.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 21 Aug 2013 16:34:30 -0700
+Subject: [GIT PULL] Allwinner sunXi core additions for 3.12, take 2
+In-Reply-To: <20130820075929.GA11906@lukather> (Maxime Ripard's message of
+ "Tue, 20 Aug 2013 09:59:29 +0200")
+References: <20130820075929.GA11906@lukather>
+Message-ID: <87k3jeoby1.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2013 05:07 PM, Linus Walleij wrote:
-> On Mon, Aug 19, 2013 at 9:15 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 08/17/2013 08:56 AM, Linus Walleij wrote:
-> 
->>> and the pin controller need the GPIO driver to be ready.
->>
->> Why does that happen?
-> 
-> The pin controller call back into the GPIO-side controller
-> functions by utilizing the GPIO ranges.
-> (Maybe the code is silly, I dunno, check drivers/pinctrl/pinctrl-nomadik.c)
-> 
->>> This also happens if
->>> pin controllers and GPIO controllers compiled as modules
->>> are inserted in a certain order.
->>
->> Shouldn't deferred probe resolve that just fine, assuming there are no
->> circular dependencies?
-> 
-> The above leads to circular dependencies so that is what I'm
-> trying to fix with this.
+Maxime Ripard <maxime.ripard@free-electrons.com> writes:
 
-But the circular dependencies are imposed by a specific driver, not by
-the GPIO and pinctrl subsystems.
+> The following changes since commit 29d3d373e2a780b6e818f296ece6cc29742bc11f:
+>
+>   ARM: sunxi: Remove Makefile.boot file (2013-07-29 13:55:41 +0200)
+>
+> are available in the git repository at:
+>
+>   https://github.com/mripard/linux.git tags/sunxi-core-for-3.12-2
+>
+> for you to fetch changes up to d18fd9445b18c4adf56cfc58c378c702c8edd0da:
+>
+>   ARM: sunxi: Introduce Allwinner A20 support (2013-08-16 23:23:41 +0200)
+>
+> ----------------------------------------------------------------
+> Allwinner sunXi core additions for 3.12, take 2
+>
+> These patches add machine support for the Allwinner A20 and A31 SoCs
+>
+> ----------------------------------------------------------------
 
-gpiolib operations call into pinctrl to acquire pin ownership. Hence, no
-pinctrl operation (or implementation in a driver) can call into gpiolib,
-or a GPIO driver.
+Pulled into next/soc
 
-Shouldn't this simply be fixed inside whichever driver is performing
-circular operations, rather than leaving the driver performing circular
-operations, and attemping to make the subsystems support something that
-can't be supported?
+In the future, when you do a 'take 2', it would be good to be specific
+in the pull request about whether you want this to replace the original,
+or you want it on top of the original.
 
->>> On the Nomadik we get this situation with the pinctrl
->>> driver when moving to requesting GPIOs off the gpiochip
->>> right after it has been added,
->>
->> So, the pinctrl driver calls gpio_request()? Surely the solution is
->> simply not to do that?
-> 
-> This is what the other patch we're discussing is doing.
-> The one that harvests and requests interrupt GPIO's when
-> a gpiochip is added...
+It was pretty obvious in this case that the 2nd tag was based on top of
+the first, but it's best to be be more detailed in the pull request to
+avoid us assuming.
 
-It would have been good to mention the two patches were related, or did
-I just miss that?
+Thanks,
 
-So that's another reason for me to object to that other patch. If that
-whole process was triggered inside the IRQ controller implementation,
-which is logically part of the GPIO controller implementation for the
-same HW, the call direction would also be GPIO -> pinctrl or IRQ -> GPIO
--> pinctrl, and hence have no circular issues.
+Kevin
