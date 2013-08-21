@@ -1,46 +1,95 @@
-From: richard.genoud@gmail.com (Richard GENOUD)
-Date: Wed, 21 Aug 2013 11:47:20 +0200
-Subject: sun4i_handle_irq: WARNING at net/ipv4/tcp_input.c:2711
- tcp_fastretrans_alert
-Message-ID: <20130821094432.GA28249@lnx-rg>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 21 Aug 2013 11:50:49 +0200
+Subject: [PATCH 1/4] pwm: add freescale ftm pwm driver support
+In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F827D1C51@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377054462-6283-2-git-send-email-Li.Xiubo@freescale.com>
+ <20130821073659.GN31036@pengutronix.de>
+ <1DD289F6464F0949A2FCA5AA6DC23F827D1C51@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <20130821095049.GQ31036@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime, Stephan
+On Wed, Aug 21, 2013 at 09:24:56AM +0000, Xiubo Li-B47053 wrote:
+> TO Sascha,
+> 
+> > > +
+> > > +	fpc = to_fsl_chip(chip);
+> > > +
+> > > +	if (WARN_ON(!test_bit(PWMF_REQUESTED, &pwm->flags)))
+> > > +		return -ESHUTDOWN;
+> > > +
+> > > +	statename = kasprintf(GFP_KERNEL, "en%d", pwm->hwpwm);
+> > > +	pins_state = pinctrl_lookup_state(fpc->pinctrl,
+> > > +			statename);
+> > > +	/* enable pins to be muxed in and configured */
+> > > +	if (!IS_ERR(pins_state)) {
+> > > +		ret = pinctrl_select_state(fpc->pinctrl, pins_state);
+> > > +		if (ret)
+> > > +			dev_warn(&fpc->pdev->dev,
+> > > +					"could not set default pins\n");
+> > 
+> > Why do you need to manipulate the pinctrl to en/disable a channel?
+> > 
+> 
+> This is because in Vybrid VF610 TOWER board, there are 4 leds, and each led's one point(diode's positive pole) is connected to 3.3V,
+> and the other point is connected to pwm's one channel. When the 4 pinctrls are configured as enable at the same time, 
+> the 4 pinctrls is low valtage, and the 4 leds will be lighted up as default, then when you enable/disable one led will effects others.
+> 
 
-I just realise that, *sometimes*, I have some warnings on my cubieboard
-(6 since the 22 of july, and the board is runnning 24/24).
-It has happened also on 3.10 + emac patches.
-Here it is:
-[27224.060000] ------------[ cut here ]------------
-[27224.070000] WARNING: CPU: 0 PID: 0 at net/ipv4/tcp_input.c:2711 tcp_fastretrans_alert+0x717/0x734()
-[27224.080000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.11.0-rc6-00010-g54f11ec #8
-[27224.080000] [<c000f231>] (unwind_backtrace+0x1/0x98) from [<c000e2b7>] (show_stack+0xb/0xc)
-[27224.090000] [<c000e2b7>] (show_stack+0xb/0xc) from [<c0013cd3>] (warn_slowpath_common+0x43/0x5c)
-[27224.100000] [<c0013cd3>] (warn_slowpath_common+0x43/0x5c) from [<c0013d6d>] (warn_slowpath_null+0x11/0x14)
-[27224.110000] [<c0013d6d>] (warn_slowpath_null+0x11/0x14) from [<c015eadf>] (tcp_fastretrans_alert+0x717/0x734)
-[27224.120000] [<c015eadf>] (tcp_fastretrans_alert+0x717/0x734) from [<c015f32b>] (tcp_ack+0x6af/0x984)
-[27224.130000] [<c015f32b>] (tcp_ack+0x6af/0x984) from [<c015fcab>] (tcp_rcv_established+0x93/0x3ec)
-[27224.140000] [<c015fcab>] (tcp_rcv_established+0x93/0x3ec) from [<c0165621>] (tcp_v4_do_rcv+0xa1/0x160)
-[27224.150000] [<c0165621>] (tcp_v4_do_rcv+0xa1/0x160) from [<c0167129>] (tcp_v4_rcv+0x4e9/0x500)
-[27224.160000] [<c0167129>] (tcp_v4_rcv+0x4e9/0x500) from [<c015025d>] (ip_local_deliver_finish+0x79/0x180)
-[27224.170000] [<c015025d>] (ip_local_deliver_finish+0x79/0x180) from [<c01500a1>] (ip_rcv_finish+0xc9/0x20c)
-[27224.180000] [<c01500a1>] (ip_rcv_finish+0xc9/0x20c) from [<c0129493>] (__netif_receive_skb_core+0x287/0x3dc)
-[27224.190000] [<c0129493>] (__netif_receive_skb_core+0x287/0x3dc) from [<c0129a8b>] (process_backlog+0x5b/0xd0)
-[27224.200000] [<c0129a8b>] (process_backlog+0x5b/0xd0) from [<c012bc6f>] (net_rx_action+0x5f/0xe8)
-[27224.200000] [<c012bc6f>] (net_rx_action+0x5f/0xe8) from [<c0015fc9>] (__do_softirq+0x91/0x134)
-[27224.210000] [<c0015fc9>] (__do_softirq+0x91/0x134) from [<c0016251>] (irq_exit+0x59/0x80)
-[27224.220000] [<c0016251>] (irq_exit+0x59/0x80) from [<c000d00d>] (handle_IRQ+0x21/0x54)
-[27224.230000] [<c000d00d>] (handle_IRQ+0x21/0x54) from [<c00083ef>] (sun4i_handle_irq+0x1f/0x30)
-[27224.240000] [<c00083ef>] (sun4i_handle_irq+0x1f/0x30) from [<c000ea1b>] (__irq_svc+0x3b/0x5c)
-[27224.250000] Exception stack(0xc0287f70 to 0xc0287fb8)
-[27224.250000] 7f60:                                     00000000 00000000 00000000 00000000
-[27224.260000] 7f80: c0286000 c02ad7fd 00000001 c02ad7fd c028e084 413fc082 00000000 00000000
-[27224.270000] 7fa0: 01000000 c0287fb8 c000d115 c000d116 40000033 ffffffff
-[27224.270000] [<c000ea1b>] (__irq_svc+0x3b/0x5c) from [<c000d116>] (arch_cpu_idle+0x16/0x1c)
-[27224.280000] [<c000d116>] (arch_cpu_idle+0x16/0x1c) from [<c002e69d>] (cpu_startup_entry+0x35/0xa0)
-[27224.290000] [<c002e69d>] (cpu_startup_entry+0x35/0xa0) from [<c026f75f>] (start_kernel+0x1af/0x1f0)
-[27224.300000] ---[ end trace 15641276e08fba8a ]---
+I think the inactive state of a PWM is pretty much undefined by the PWM
+framework and left to the drivers.
 
-Best regards,
-Richard
+I stumbled upon this aswell. It would be good to think about the
+inactive state and how the PWM framework could help us here getting
+things right.
+
+There are several things to consider. For a noninverted PWM the inactive
+state should probably logic 0. For an inverted PWM it should probably be
+logic 1. I guess several PWM devices have an undefined inactive state,
+most of the PWM devices probably can control the inactive state by
+setting the duty cycle to 100% / 0% without actually disabling the PWM.
+
+Using the pinctrl is one way to control the inactive state and probaby
+the only one before initialization. It might be good to wire this up in
+the core instead of the individual PWM drivers.
+
+These are just the thoughts which first came to my mind.
+
+Thierry, any more input about this?
+
+
+> > > +	fpc = dev_get_drvdata(dev);
+> > > +
+> > > +	ret = kstrtouint(buf, 0, &val);
+> > > +	if (ret)
+> > > +		return ret;
+> > > +
+> > > +	mutex_lock(&fpc->lock);
+> > > +	if (!!(val) != !!(fpc->cpwm)) {
+> > > +		fpc->cpwm = !!val;
+> > > +		fsl_updata_config(fpc, NULL);
+> > > +	}
+> > > +	mutex_unlock(&fpc->lock);
+> > > +
+> > > +	return count;
+> > > +}
+> > 
+> > What is this cpwm thingy?
+> 
+> Up-down counting mode:
+> CNTIN(a register) defines the starting value of the count and MOD(a register) defines the final value of the
+> count. The value of CNTIN is loaded into the FTM counter, and the counter increments
+> until the value of MOD is reached, at which point the counter is decremented until it
+> returns to the value of CNTIN and the up-down counting restarts.
+
+The current PWM framework only cares about period times and duty cycles.
+Why would I want to care about this?
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
