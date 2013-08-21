@@ -1,44 +1,51 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 21 Aug 2013 09:46:29 +0300
-Subject: [PATCH v5 1/8] usb: phy: omap-control: Get rid of platform data
-In-Reply-To: <593AEF6C47F46446852B067021A273D6D982D30B@MUCSE039.lantiq.com>
-References: <1377010577-19355-1-git-send-email-rogerq@ti.com>
- <1377010577-19355-2-git-send-email-rogerq@ti.com>
- <593AEF6C47F46446852B067021A273D6D982D30B@MUCSE039.lantiq.com>
-Message-ID: <52146245.6020904@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 20 Aug 2013 23:48:05 -0700
+Subject: [PATCH v2 4/5] ARM: dts: msm: Update uartdm compatible strings
+In-Reply-To: <1377067686-31957-1-git-send-email-sboyd@codeaurora.org>
+References: <1377067686-31957-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1377067686-31957-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Let's follow the ratified DT binding and use uartdm instead of
+hsuart. This does break backwards compatibility but this
+shouldn't be a problem because the uart driver isn't probing on
+these devices without adding clock support (which isn't merged so
+far).
 
-On 08/20/2013 06:04 PM, thomas.langer at lantiq.com wrote:
-> Hello Roger,
-> 
-> this will not work!
-> 
-> Roger Quadros wrote on 2013-08-20:
-> 
->> -	struct omap_control_usb_platform_data *pdata =
->> -			dev_get_platdata(&pdev->dev);
->> +
->> +	if (np) {
->> +		of_property_read_u32(np, "ti,type", &control_usb->type);
-> 
-> here you are dereferencing control_usb
-> 
->> +	} else {
->> +		/* We only support DT boot */
->> +		return -EINVAL;
->> +	}
->>
->>  	control_usb = devm_kzalloc(&pdev->dev, sizeof(*control_usb),
->>  		GFP_KERNEL);
-> 
-> and here it is allocated!
+Cc: David Brown <davidb@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/boot/dts/msm8660-surf.dts | 2 +-
+ arch/arm/boot/dts/msm8960-cdp.dts  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Good catch :).
-The problem is eliminated by other patches in this series, so tests ran fine.
-But I'll fix this one.
-
-cheers,
--roger
+diff --git a/arch/arm/boot/dts/msm8660-surf.dts b/arch/arm/boot/dts/msm8660-surf.dts
+index cdc010e..386d428 100644
+--- a/arch/arm/boot/dts/msm8660-surf.dts
++++ b/arch/arm/boot/dts/msm8660-surf.dts
+@@ -38,7 +38,7 @@
+ 	};
+ 
+ 	serial at 19c40000 {
+-		compatible = "qcom,msm-hsuart", "qcom,msm-uart";
++		compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+ 		reg = <0x19c40000 0x1000>,
+ 		      <0x19c00000 0x1000>;
+ 		interrupts = <0 195 0x0>;
+diff --git a/arch/arm/boot/dts/msm8960-cdp.dts b/arch/arm/boot/dts/msm8960-cdp.dts
+index db2060c..532050b 100644
+--- a/arch/arm/boot/dts/msm8960-cdp.dts
++++ b/arch/arm/boot/dts/msm8960-cdp.dts
+@@ -38,7 +38,7 @@
+ 	};
+ 
+ 	serial at 16440000 {
+-		compatible = "qcom,msm-hsuart", "qcom,msm-uart";
++		compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+ 		reg = <0x16440000 0x1000>,
+ 		      <0x16400000 0x1000>;
+ 		interrupts = <0 154 0x0>;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
