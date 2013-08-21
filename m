@@ -1,73 +1,43 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 21 Aug 2013 12:16:24 +0200
-Subject: [PATCH 1/5] ARM: at91: at91_dt_defconfig: enable rm9200 support
-In-Reply-To: <51C97346.40209@atmel.com>
-References: <20130617123645.GA21034@game.jcrosoft.org>
- <1371472710-18535-1-git-send-email-plagnioj@jcrosoft.com>
- <51C97346.40209@atmel.com>
-Message-ID: <52149378.3090400@atmel.com>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Wed, 21 Aug 2013 11:16:28 +0100
+Subject: [PATCH v2] arm: update advice on kernel, initramfs and FDT load
+ address.
+In-Reply-To: <20130821100526.GK17845@n2100.arm.linux.org.uk>
+References: <1375974974-31603-1-git-send-email-ian.campbell@citrix.com>
+ <20130808215429.GG19383@mudshark.cambridge.arm.com>
+ <1377079147.31937.37.camel@hastur.hellion.org.uk>
+ <20130821100526.GK17845@n2100.arm.linux.org.uk>
+Message-ID: <1377080188.31937.53.camel@hastur.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/06/2013 12:39, Nicolas Ferre :
-> On 17/06/2013 14:38, Jean-Christophe PLAGNIOL-VILLARD :
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>    arch/arm/configs/at91_dt_defconfig |    4 +++-
->>    1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
->> index 75fd842..690e892 100644
->> --- a/arch/arm/configs/at91_dt_defconfig
->> +++ b/arch/arm/configs/at91_dt_defconfig
->> @@ -14,11 +14,13 @@ CONFIG_MODULE_UNLOAD=y
->>    # CONFIG_IOSCHED_DEADLINE is not set
->>    # CONFIG_IOSCHED_CFQ is not set
->>    CONFIG_ARCH_AT91=y
->> +CONFIG_SOC_AT91RM9200=y
->>    CONFIG_SOC_AT91SAM9260=y
->>    CONFIG_SOC_AT91SAM9263=y
->>    CONFIG_SOC_AT91SAM9G45=y
->>    CONFIG_SOC_AT91SAM9X5=y
->>    CONFIG_SOC_AT91SAM9N12=y
->> +CONFIG_MACH_AT91RM9200_DT=y
->>    CONFIG_MACH_AT91SAM9_DT=y
->>    CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
->>    CONFIG_AT91_TIMER_HZ=128
->> @@ -62,6 +64,7 @@ CONFIG_MTD=y
->>    CONFIG_MTD_CMDLINE_PARTS=y
->>    CONFIG_MTD_CHAR=y
->>    CONFIG_MTD_BLOCK=y
->> +CONFIG_MTD_DATAFLASH=y
->>    CONFIG_MTD_NAND=y
->>    CONFIG_MTD_NAND_ATMEL=y
->>    CONFIG_MTD_UBI=y
->> @@ -78,7 +81,6 @@ CONFIG_BLK_DEV_SD=y
->>    CONFIG_SCSI_MULTI_LUN=y
->>    # CONFIG_SCSI_LOWLEVEL is not set
->>    CONFIG_NETDEVICES=y
->> -CONFIG_MII=y
->
-> What is the reason for this change? It is really related with rm9200 DT
-> suppot?
+On Wed, 2013-08-21 at 11:05 +0100, Russell King - ARM Linux wrote:
+> On Wed, Aug 21, 2013 at 10:59:07AM +0100, Ian Campbell wrote:
+> > Unless there are any more comments on the correctness of the advice I
+> > suppose this should go via Russell's PTS? Now to dredge up the 8 year
+> > old memories of how that stuff works...
+> 
+> It's quite simple - with the standard git formatted email (iow, without
+> 8<==== stuff or similar), just send it to the PTS address.
+> 
+> In other words, summary in the subject line, patch description in the
+> body along with the sign-off, the end-of-description marker, be that
+> the dashes or "PATCH FOLLOWS", and the patch following that.
 
-Okay, automatic selection by MACB => we can remove it.
+Thanks, git has simplified this a fair bit it seems.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> The only additional thing that needs to be added is a "Kernelversion:"
+> tag to specify which kernel version the patch was generated against.
+> That can go almost anywhere in the message before the actual patch
+> itself.
 
-stacked on at91-3.12-cleanup
+Cool. Does it understand git tags and stuff? e.g v3.11-rc3 or a sha1?
 
-Thanks,
+> Alternatively, if you can remember your web login etc, then you can use
+> the online form, which tries to make it easier (since it generates the
+> formatted email for you - but some people find this method harder.)
 
->
->>    CONFIG_MACB=y
->>    # CONFIG_NET_VENDOR_BROADCOM is not set
->>    # CONFIG_NET_VENDOR_FARADAY is not set
->>
->
->
+I think remembering my web login is probably the biggest barrier for me
+there. In fact remembering the username is probably too much ;-)
 
-
--- 
-Nicolas Ferre
+Ian.
