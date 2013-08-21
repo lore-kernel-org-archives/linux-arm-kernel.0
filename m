@@ -1,33 +1,32 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 21 Aug 2013 21:50:52 +1000
-Subject: [PATCH v2 00/14] crypto: omap-aes: Improve DMA, add PIO mode and
- support for AM437x
-In-Reply-To: <1376793755-30478-1-git-send-email-joelf@ti.com>
-References: <1376793755-30478-1-git-send-email-joelf@ti.com>
-Message-ID: <20130821115051.GE23287@gondor.apana.org.au>
+Date: Wed, 21 Aug 2013 21:51:42 +1000
+Subject: [PATCH] hwrng: reorder OMAP TRNG driver code
+In-Reply-To: <52144E4C.4050405@ti.com>
+References: <1377022073-28198-1-git-send-email-olof@lixom.net>
+ <52144E4C.4050405@ti.com>
+Message-ID: <20130821115142.GI23287@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 17, 2013 at 09:42:21PM -0500, Joel Fernandes wrote:
-> Following patch series rewrites the DMA code to be cleaner and faster. Earlier,
-> only a single SG was used for DMA purpose, and the SG-list passed from the
-> crypto layer was being copied and DMA'd one entry at a time. This turns out to
-> be quite inefficient and lot of code, we replace it with much simpler approach
-> that directly passes the SG-list from crypto to the DMA layers for cases where
-> possible. For all cases where such a direct passing of SG list is not possible,
-> we create a new SG-list and do the copying. This is still better than before, as
-> we create an SG list as big as needed and not just 1-element list.
-> 
-> We also add PIO mode support to the driver, and switch to it whenever the DMA
-> channel allocation is not available. This also has shown to give good performance
-> for small blocks as shown below.
-> 
-> Tests have been performed on AM335x, OMAP4 and AM437x SoCs.
-> 
-> Below is a sample run on AM335x SoC (beaglebone board), showing
-> performance improvement (20% for 8K blocks):
+On Wed, Aug 21, 2013 at 10:51:16AM +0530, Lokesh Vutla wrote:
+> Hi Olof,
+> On Tuesday 20 August 2013 11:37 PM, Olof Johansson wrote:
+> > The newly added omap4 support in the driver was added without
+> > consideration for building older configs. When building omap1_defconfig,
+> > it resulted in:
+> > 
+> > drivers/char/hw_random/omap-rng.c:190:12: warning: 'omap4_rng_init' defined but not used [-Wunused-function]
+> > drivers/char/hw_random/omap-rng.c:215:13: warning: 'omap4_rng_cleanup' defined but not used [-Wunused-function]
+> > drivers/char/hw_random/omap-rng.c:251:20: warning: 'omap4_rng_irq' defined but not used [-Wunused-function]
+> > 
+> > Move the code around so it is grouped with its operations struct, which
+> > for the omap4 case means also under the #ifdef CONFIG_OF, where it needs
+> > to be.
+> > 
+> Missed testing this. Thanks for the patch.
+> Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
 
-All applied.  Thanks!
+Patch applied.  Thanks!
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
