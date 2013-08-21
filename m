@@ -1,141 +1,243 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 21 Aug 2013 16:46:48 +0200
-Subject: [PATCH V2] i2c: move of helpers into the core
-In-Reply-To: <1377092832-3417-1-git-send-email-wsa@the-dreams.de>
-References: <1377092832-3417-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <5214D2D8.7010106@samsung.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Wed, 21 Aug 2013 16:55:57 +0200
+Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.12
+In-Reply-To: <20130821071334.GQ7656@atomide.com>
+References: <521384D5.1050607@baylibre.com> <20130821071334.GQ7656@atomide.com>
+Message-ID: <5214D4FD.4060405@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2013 03:47 PM, Wolfram Sang wrote:
-> I2C of helpers used to live in of_i2c.c but experience (from SPI) shows
-> that it is much cleaner to have this in the core. This also removes a
-> circular dependency between the helpers and the core, and so we can
-> finally register child nodes in the core instead of doing this manually
-> in each driver. So, fix the drivers and documentation, too.
-> 
-> Acked-by: Sylwester Nawrocki <s.nawrocki@amsung.com>
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+Hi Kevin & Olof,
 
-With this patch there are still couple of of_i2c.h header file
-inclusions:
+I've just updated the branch with the few USB3 patches I missed from Felipe.
 
-$ git grep of_i2c.h
-arch/powerpc/platforms/44x/warp.c:#include <linux/of_i2c.h>
-drivers/gpu/drm/tilcdc/tilcdc_slave.c:#include <linux/of_i2c.h>
-drivers/gpu/drm/tilcdc/tilcdc_tfp410.c:#include <linux/of_i2c.h>
-drivers/gpu/host1x/drm/output.c:#include <linux/of_i2c.h>
-drivers/media/platform/exynos4-is/fimc-is.c:#include <linux/of_i2c.h>
-drivers/media/platform/exynos4-is/media-dev.c:#include <linux/of_i2c.h>
-drivers/staging/imx-drm/imx-tve.c:#include <linux/of_i2c.h>
-sound/soc/fsl/imx-sgtl5000.c:#include <linux/of_i2c.h>
-sound/soc/fsl/imx-wm8962.c:#include <linux/of_i2c.h>
+So here is a new pull-request.
 
-
-Please include also this chunk, without it I'm getting build errors.
-
---------------8<---------------------
-diff --git a/drivers/media/platform/exynos4-is/fimc-is-i2c.c
-b/drivers/media/platform/exynos4-is/fimc-is-i2c.c
-index ca07b48..e38e9dc 100644
---- a/drivers/media/platform/exynos4-is/fimc-is-i2c.c
-+++ b/drivers/media/platform/exynos4-is/fimc-is-i2c.c
-@@ -11,6 +11,7 @@
-  */
-
- #include <linux/clk.h>
-+#include <linux/i2c.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
-diff --git a/drivers/media/platform/exynos4-is/fimc-is.c
-b/drivers/media/platform/exynos4-is/fimc-is.c
-index 6743ae3..63e4f1d 100644
---- a/drivers/media/platform/exynos4-is/fimc-is.c
-+++ b/drivers/media/platform/exynos4-is/fimc-is.c
-@@ -21,7 +21,6 @@
- #include <linux/interrupt.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
--#include <linux/of_i2c.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-diff --git a/drivers/media/platform/exynos4-is/media-dev.c
-b/drivers/media/platform/exynos4-is/media-dev.c
-index c10dee2..00e5f91 100644
---- a/drivers/media/platform/exynos4-is/media-dev.c
-+++ b/drivers/media/platform/exynos4-is/media-dev.c
-@@ -22,7 +22,6 @@
- #include <linux/of.h>
- #include <linux/of_platform.h>
- #include <linux/of_device.h>
--#include <linux/of_i2c.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/types.h>
---------------8<---------------------
-
-> ---
-> 
-> V1 -> V2: * Add #else branch to #if CONFIG_OF
-> 	  * EXPORT_SYMBOLs got attached to wrong functions
-> 	  * cosmetic change (of -> OF)
-> 	  * properly based on 3.11-rc4
-> 
->  Documentation/acpi/enumeration.txt              |    1 -
->  drivers/i2c/busses/i2c-at91.c                   |    3 -
->  drivers/i2c/busses/i2c-cpm.c                    |    6 --
->  drivers/i2c/busses/i2c-davinci.c                |    2 -
->  drivers/i2c/busses/i2c-designware-platdrv.c     |    2 -
->  drivers/i2c/busses/i2c-gpio.c                   |    3 -
->  drivers/i2c/busses/i2c-i801.c                   |    2 -
->  drivers/i2c/busses/i2c-ibm_iic.c                |    4 -
->  drivers/i2c/busses/i2c-imx.c                    |    3 -
->  drivers/i2c/busses/i2c-mpc.c                    |    2 -
->  drivers/i2c/busses/i2c-mv64xxx.c                |    3 -
->  drivers/i2c/busses/i2c-mxs.c                    |    3 -
->  drivers/i2c/busses/i2c-nomadik.c                |    3 -
->  drivers/i2c/busses/i2c-ocores.c                 |    3 -
->  drivers/i2c/busses/i2c-octeon.c                 |    3 -
->  drivers/i2c/busses/i2c-omap.c                   |    3 -
->  drivers/i2c/busses/i2c-pnx.c                    |    3 -
->  drivers/i2c/busses/i2c-powermac.c               |    9 +-
->  drivers/i2c/busses/i2c-pxa.c                    |    2 -
->  drivers/i2c/busses/i2c-s3c2410.c                |    2 -
->  drivers/i2c/busses/i2c-sh_mobile.c              |    2 -
->  drivers/i2c/busses/i2c-sirf.c                   |    3 -
->  drivers/i2c/busses/i2c-stu300.c                 |    2 -
->  drivers/i2c/busses/i2c-tegra.c                  |    3 -
->  drivers/i2c/busses/i2c-versatile.c              |    2 -
->  drivers/i2c/busses/i2c-wmt.c                    |    3 -
->  drivers/i2c/busses/i2c-xiic.c                   |    3 -
->  drivers/i2c/i2c-core.c                          |  109 +++++++++++++++++++++-
->  drivers/i2c/i2c-mux.c                           |    3 -
->  drivers/i2c/muxes/i2c-arb-gpio-challenge.c      |    1 -
->  drivers/i2c/muxes/i2c-mux-gpio.c                |    1 -
->  drivers/i2c/muxes/i2c-mux-pinctrl.c             |    1 -
->  drivers/media/platform/exynos4-is/fimc-is-i2c.c |    3 -
->  drivers/of/Kconfig                              |    6 --
->  drivers/of/Makefile                             |    1 -
->  drivers/of/of_i2c.c                             |  114 -----------------------
->  include/linux/i2c.h                             |   20 ++++
->  include/linux/of_i2c.h                          |   46 ---------
->  38 files changed, 132 insertions(+), 253 deletions(-)
->  delete mode 100644 drivers/of/of_i2c.c
->  delete mode 100644 include/linux/of_i2c.h
-
-I've tested this patch on Exynos4412 SoC based board, so this covers
-i2c-s3c2410 and fimc-is-i2c. Compiled with CONFIG_OF enabled.
-
-I guess after removing all remaining occurrences of
-#include <linux/of_i2c.h> you could add:
-
-Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-
---
 Thanks,
-Sylwester
+Benoit
+
+----------------------------------------------------------------
+Add the minimal DTS support for DRA7xx based SoC core.
+Add the initial support for N900 and gta04 phones.
+Enable USB3 on OMAP5 evm board.
+Do a lot of various cleanups.
+----------------------------------------------------------------
+
+
+The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
+
+  Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.12/dts
+
+for you to fetch changes up to 5903208d4e2c09a3872feba6b9e2e49c64fd07ad:
+
+  ARM: configs: omap2plus_defconfig: enable dwc3 and dependencies (2013-08-21 16:43:21 +0200)
+
+----------------------------------------------------------------
+Afzal Mohammed (2):
+      ARM: dts: AM4372: cpu(s) node per latest binding
+      ARM: dts: AM4372: add few nodes
+
+Alexandre Belloni (1):
+      ARM: dts: AM33XX: Add PMU support
+
+Benoit Cousson (1):
+      ARM: OMAP5: hwmod: add missing ocp2scp hwmod data
+
+Felipe Balbi (4):
+      ARM: OMAP5: dts: fix reg property size
+      ARM: OMAP5: dts: fix ocp2scp DTS data
+      ARM: OMAP5: dts: add palmas-usb node
+      ARM: configs: omap2plus_defconfig: enable dwc3 and dependencies
+
+Javier Martinez Canillas (5):
+      ARM: dts: omap3-igep: add pinmux node for GPIO LED configuration
+      ARM: dts: omap3-igep0020: add mux conf for GPIO LEDs
+      ARM: dts: omap3-igep0030: add mux conf for GPIO LED
+      ARM: dts: AM33XX: use pinmux node defined in included file
+      ARM: dts: AM33XX: don't redefine OCP bus and device nodes
+
+Kishon Vijay Abraham I (1):
+      ARM: dts: omap5-uevm: Split SMPS10 in two nodes
+
+Lars Poeschel (1):
+      ARM: dts: AM33xx: Correct gpio #interrupt-cells property
+
+Lee Jones (7):
+      ARM: dts: Remove '0x's from OMAP2420 H4 DTS file
+      ARM: dts: Remove '0x's from OMAP3 IGEP0020 DTS file
+      ARM: dts: Remove '0x's from OMAP3 IGEP0030 DTS file
+      ARM: dts: Remove '0x's from OMAP3 DTS file
+      ARM: dts: Remove '0x's from OMAP3430 SDP DTS file
+      ARM: dts: Remove '0x's from OMAP4 DTS file
+      ARM: dts: Remove '0x's from OMAP5 DTS file
+
+Marek Belisko (1):
+      ARM: dts: Add devicetree for gta04 board.
+
+Pavel Machek (1):
+      ARM: dts: N900: Add device tree
+
+R Sricharan (1):
+      ARM: dts: DRA7: Add the dts files for dra7 SoC and dra7-evm board
+
+Robert Nelson (1):
+      ARM: dts: omap3-beagle-xm: fix string error in compatible property
+
+Roger Quadros (1):
+      ARM: dts: omap3-beagle: Make USB host pin naming consistent
+
+Ruslan Bilovol (1):
+      ARM: dts: twl6030: Move common configuration for OMAP4 boards in a separate dtsi file
+
+ arch/arm/boot/dts/Makefile                 |   5 +-
+ arch/arm/boot/dts/am335x-bone.dts          | 217 ++++++-----
+ arch/arm/boot/dts/am335x-evm.dts           | 576 ++++++++++++++---------------
+ arch/arm/boot/dts/am335x-evmsk.dts         | 374 ++++++++++---------
+ arch/arm/boot/dts/am33xx.dtsi              |  13 +-
+ arch/arm/boot/dts/am4372.dtsi              | 347 +++++++++++++++++
+ arch/arm/boot/dts/dra7-evm.dts             | 140 +++++++
+ arch/arm/boot/dts/dra7.dtsi                | 575 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap2420-h4.dts          |   6 +-
+ arch/arm/boot/dts/omap3-beagle-xm.dts      |   2 +-
+ arch/arm/boot/dts/omap3-beagle.dts         |  24 +-
+ arch/arm/boot/dts/omap3-gta04.dts          | 168 +++++++++
+ arch/arm/boot/dts/omap3-igep.dtsi          |   2 +
+ arch/arm/boot/dts/omap3-igep0020.dts       |  19 +-
+ arch/arm/boot/dts/omap3-igep0030.dts       |  17 +-
+ arch/arm/boot/dts/omap3-n900.dts           |  92 +++++
+ arch/arm/boot/dts/omap3.dtsi               |   2 +-
+ arch/arm/boot/dts/omap3430-sdp.dts         |  22 +-
+ arch/arm/boot/dts/omap4-panda-common.dtsi  |  21 +-
+ arch/arm/boot/dts/omap4-sdp.dts            |  21 +-
+ arch/arm/boot/dts/omap4.dtsi               |   2 +-
+ arch/arm/boot/dts/omap5-uevm.dts           |  25 +-
+ arch/arm/boot/dts/omap5.dtsi               |  13 +-
+ arch/arm/boot/dts/twl6030_omap4.dtsi       |  38 ++
+ arch/arm/configs/omap2plus_defconfig       |   9 +
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c |  45 +++
+ include/dt-bindings/pinctrl/dra.h          |  50 +++
+ 27 files changed, 2148 insertions(+), 677 deletions(-)
+ create mode 100644 arch/arm/boot/dts/dra7-evm.dts
+ create mode 100644 arch/arm/boot/dts/dra7.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-gta04.dts
+ create mode 100644 arch/arm/boot/dts/omap3-n900.dts
+ create mode 100644 arch/arm/boot/dts/twl6030_omap4.dtsi
+ create mode 100644 include/dt-bindings/pinctrl/dra.h
+
+
+On 21/08/2013 09:13, Tony Lindgren wrote:
+> Kevin & Olof,
+> 
+> Care to pull the below .dts changes directly from Benoit?
+> 
+> * Benoit Cousson <bcousson@baylibre.com> [130820 08:08]:
+>>
+>> Hi Tony,
+>>
+>> Please pull the following commits for OMAP Device Tree for v3.12.
+>>
+>> Thanks,
+>> Benoit
+>>
+>> ----------------------------------------------------------------
+>> Add the minimal DTS support for DRA7xx based SoC core.
+>> Add the initial support for N900 and gta04 phones.
+>> Do a lot of various cleanups.
+>> ----------------------------------------------------------------
+>>
+>> The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
+>>
+>>    Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.12/dts
+>>
+>> for you to fetch changes up to 9f311a2325905043718da9bf649e2344b8df8473:
+>>
+>>    ARM: dts: omap3-beagle: Make USB host pin naming consistent (2013-08-20 14:30:07 +0200)
+>>
+>> ----------------------------------------------------------------
+>> Afzal Mohammed (2):
+>>        ARM: dts: AM4372: cpu(s) node per latest binding
+>>        ARM: dts: AM4372: add few nodes
+>>
+>> Alexandre Belloni (1):
+>>        ARM: dts: AM33XX: Add PMU support
+>>
+>> Javier Martinez Canillas (5):
+>>        ARM: dts: omap3-igep: add pinmux node for GPIO LED configuration
+>>        ARM: dts: omap3-igep0020: add mux conf for GPIO LEDs
+>>        ARM: dts: omap3-igep0030: add mux conf for GPIO LED
+>>        ARM: dts: AM33XX: use pinmux node defined in included file
+>>        ARM: dts: AM33XX: don't redefine OCP bus and device nodes
+>>
+>> Kishon Vijay Abraham I (1):
+>>        ARM: dts: omap5-uevm: Split SMPS10 in two nodes
+>>
+>> Lars Poeschel (1):
+>>        ARM: dts: AM33xx: Correct gpio #interrupt-cells property
+>>
+>> Lee Jones (7):
+>>        ARM: dts: Remove '0x's from OMAP2420 H4 DTS file
+>>        ARM: dts: Remove '0x's from OMAP3 IGEP0020 DTS file
+>>        ARM: dts: Remove '0x's from OMAP3 IGEP0030 DTS file
+>>        ARM: dts: Remove '0x's from OMAP3 DTS file
+>>        ARM: dts: Remove '0x's from OMAP3430 SDP DTS file
+>>        ARM: dts: Remove '0x's from OMAP4 DTS file
+>>        ARM: dts: Remove '0x's from OMAP5 DTS file
+>>
+>> Marek Belisko (1):
+>>        ARM: dts: Add devicetree for gta04 board.
+>>
+>> Pavel Machek (1):
+>>        ARM: dts: N900: Add device tree
+>>
+>> R Sricharan (1):
+>>        ARM: dts: DRA7: Add the dts files for dra7 SoC and dra7-evm board
+>>
+>> Robert Nelson (1):
+>>        ARM: dts: omap3-beagle-xm: fix string error in compatible property
+>>
+>> Roger Quadros (1):
+>>        ARM: dts: omap3-beagle: Make USB host pin naming consistent
+>>
+>> Ruslan Bilovol (1):
+>>        ARM: dts: twl6030: Move common configuration for OMAP4 boards in a separate dtsi file
+>>
+>>   arch/arm/boot/dts/Makefile                |   5 +-
+>>   arch/arm/boot/dts/am335x-bone.dts         | 217 ++++++-----
+>>   arch/arm/boot/dts/am335x-evm.dts          | 576 +++++++++++++++---------------
+>>   arch/arm/boot/dts/am335x-evmsk.dts        | 374 ++++++++++---------
+>>   arch/arm/boot/dts/am33xx.dtsi             |  13 +-
+>>   arch/arm/boot/dts/am4372.dtsi             | 347 ++++++++++++++++++
+>>   arch/arm/boot/dts/dra7-evm.dts            | 140 ++++++++
+>>   arch/arm/boot/dts/dra7.dtsi               | 575 +++++++++++++++++++++++++++++
+>>   arch/arm/boot/dts/omap2420-h4.dts         |   6 +-
+>>   arch/arm/boot/dts/omap3-beagle-xm.dts     |   2 +-
+>>   arch/arm/boot/dts/omap3-beagle.dts        |  24 +-
+>>   arch/arm/boot/dts/omap3-gta04.dts         | 168 +++++++++
+>>   arch/arm/boot/dts/omap3-igep.dtsi         |   2 +
+>>   arch/arm/boot/dts/omap3-igep0020.dts      |  19 +-
+>>   arch/arm/boot/dts/omap3-igep0030.dts      |  17 +-
+>>   arch/arm/boot/dts/omap3-n900.dts          |  92 +++++
+>>   arch/arm/boot/dts/omap3.dtsi              |   2 +-
+>>   arch/arm/boot/dts/omap3430-sdp.dts        |  22 +-
+>>   arch/arm/boot/dts/omap4-panda-common.dtsi |  21 +-
+>>   arch/arm/boot/dts/omap4-sdp.dts           |  21 +-
+>>   arch/arm/boot/dts/omap4.dtsi              |   2 +-
+>>   arch/arm/boot/dts/omap5-uevm.dts          |  13 +-
+>>   arch/arm/boot/dts/omap5.dtsi              |   4 +-
+>>   arch/arm/boot/dts/twl6030_omap4.dtsi      |  38 ++
+>>   include/dt-bindings/pinctrl/dra.h         |  50 +++
+>>   25 files changed, 2077 insertions(+), 673 deletions(-)
+>>   create mode 100644 arch/arm/boot/dts/dra7-evm.dts
+>>   create mode 100644 arch/arm/boot/dts/dra7.dtsi
+>>   create mode 100644 arch/arm/boot/dts/omap3-gta04.dts
+>>   create mode 100644 arch/arm/boot/dts/omap3-n900.dts
+>>   create mode 100644 arch/arm/boot/dts/twl6030_omap4.dtsi
+>>   create mode 100644 include/dt-bindings/pinctrl/dra.h
