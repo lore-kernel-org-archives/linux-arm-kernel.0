@@ -1,135 +1,225 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 21 Aug 2013 10:06:54 -0600
-Subject: [GIT PULL 2/4] ARM: tegra: core SoC enhancements for 3.12
-In-Reply-To: <20130821012822.4443.83479@quantum>
-References: <1376673628-5867-1-git-send-email-swarren@wwwdotorg.org>
- <1376673628-5867-2-git-send-email-swarren@wwwdotorg.org>
- <87mwocj680.fsf@kernel.org> <5213FB99.5030903@wwwdotorg.org>
- <20130821012822.4443.83479@quantum>
-Message-ID: <5214E59E.2070908@wwwdotorg.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 21 Aug 2013 19:16:45 +0300
+Subject: [PATCHv5 02/31] CLK: TI: Add DPLL clock support
+In-Reply-To: <20130819220006.4443.23042@quantum>
+References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
+ <1375460751-23676-3-git-send-email-t-kristo@ti.com>
+ <20130813105042.GJ27165@e106331-lin.cambridge.arm.com>
+ <52121EF5.9040706@ti.com>
+ <20130819141803.GO3719@e106331-lin.cambridge.arm.com>
+ <52123531.4060608@ti.com>
+ <20130819162450.GS3719@e106331-lin.cambridge.arm.com>
+ <5212509F.9030608@ti.com> <20130819220006.4443.23042@quantum>
+Message-ID: <5214E7ED.80909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2013 07:28 PM, Mike Turquette wrote:
-> Quoting Stephen Warren (2013-08-20 16:28:25)
->> On 08/20/2013 05:24 PM, Kevin Hilman wrote:
->>> + Mike Turquette
+On 08/20/2013 01:00 AM, Mike Turquette wrote:
+> Quoting Tero Kristo (2013-08-19 10:06:39)
+>> On 08/19/2013 07:24 PM, Mark Rutland wrote:
+>>> On Mon, Aug 19, 2013 at 04:09:37PM +0100, Tero Kristo wrote:
+>>>> On 08/19/2013 05:18 PM, Mark Rutland wrote:
+>>>>> On Mon, Aug 19, 2013 at 02:34:45PM +0100, Tero Kristo wrote:
+>>>>>> On 08/13/2013 01:50 PM, Mark Rutland wrote:
+>>>>>>> Hi,
+>>>>>>>
+>>>>>>> On Fri, Aug 02, 2013 at 05:25:21PM +0100, Tero Kristo wrote:
+>>>>>>>> The OMAP clock driver now supports DPLL clock type. This patch also
+>>>>>>>> adds support for DT DPLL nodes.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>>>>>>> ---
+>>>>>>>>      .../devicetree/bindings/clock/ti/dpll.txt          |   70 +++
+>>>>>>>>      arch/arm/mach-omap2/clock.h                        |  144 +-----
+>>>>>>>>      arch/arm/mach-omap2/clock3xxx.h                    |    2 -
+>>>>>>>>      drivers/clk/Makefile                               |    1 +
+>>>>>>>>      drivers/clk/ti/Makefile                            |    3 +
+>>>>>>>>      drivers/clk/ti/dpll.c                              |  488 ++++++++++++++++++++
+>>>>>>>>      include/linux/clk/ti.h                             |  164 +++++++
+>>>>>>>>      7 files changed, 727 insertions(+), 145 deletions(-)
+>>>>>>>>      create mode 100644 Documentation/devicetree/bindings/clock/ti/dpll.txt
+>>>>>>>>      create mode 100644 drivers/clk/ti/Makefile
+>>>>>>>>      create mode 100644 drivers/clk/ti/dpll.c
+>>>>>>>>      create mode 100644 include/linux/clk/ti.h
+>>>>>>>>
+>>>>>>>> diff --git a/Documentation/devicetree/bindings/clock/ti/dpll.txt b/Documentation/devicetree/bindings/clock/ti/dpll.txt
+>>>>>>>> new file mode 100644
+>>>>>>>> index 0000000..dcd6e63
+>>>>>>>> --- /dev/null
+>>>>>>>> +++ b/Documentation/devicetree/bindings/clock/ti/dpll.txt
+>>>>>>>> @@ -0,0 +1,70 @@
+>>>>>>>> +Binding for Texas Instruments DPLL clock.
+>>>>>>>> +
+>>>>>>>> +This binding uses the common clock binding[1].  It assumes a
+>>>>>>>> +register-mapped DPLL with usually two selectable input clocks
+>>>>>>>> +(reference clock and bypass clock), with digital phase locked
+>>>>>>>> +loop logic for multiplying the input clock to a desired output
+>>>>>>>> +clock. This clock also typically supports different operation
+>>>>>>>> +modes (locked, low power stop etc.) This binding has several
+>>>>>>>> +sub-types, which effectively result in slightly different setup
+>>>>>>>> +for the actual DPLL clock.
+>>>>>>>> +
+>>>>>>>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>>>>>>> +
+>>>>>>>> +Required properties:
+>>>>>>>> +- compatible : shall be one of:
+>>>>>>>> +               "ti,omap4-dpll-x2-clock",
+>>>>>>>> +               "ti,omap3-dpll-clock",
+>>>>>>>> +               "ti,omap3-dpll-core-clock",
+>>>>>>>> +               "ti,omap3-dpll-per-clock",
+>>>>>>>> +               "ti,omap3-dpll-per-j-type-clock",
+>>>>>>>> +               "ti,omap4-dpll-clock",
+>>>>>>>> +               "ti,omap4-dpll-core-clock",
+>>>>>>>> +               "ti,omap4-dpll-m4xen-clock",
+>>>>>>>> +               "ti,omap4-dpll-j-type-clock",
+>>>>>>>> +               "ti,omap4-dpll-no-gate-clock",
+>>>>>>>> +               "ti,omap4-dpll-no-gate-j-type-clock",
+>>>>>>>> +
+>>>>>>>> +- #clock-cells : from common clock binding; shall be set to 0.
+>>>>>>>> +- clocks : link phandles of parent clocks (clk-ref and clk-bypass)
+>>>>>>>
+>>>>>>> It might be a good idea to use clock-names to clarify which clocks are
+>>>>>>> present (I notice your examples contain only one clock input).
+>>>>>>
+>>>>>> All DPLLs have both bypass and reference clocks, but these can be the
+>>>>>> same. Is it better to just list both always (and hence drop
+>>>>>> clock-names), or provide clock-names always?
+>>>>>
+>>>>> If they're separate inputs, it's worth listing both (even if they're fed
+>>>>> by the same provider). If it's possible one input might not be wired up,
+>>>>> use clock-names.
+>>>>
+>>>> Ref and bypass clocks are used currently by all DPLLs (also the APLL) so
+>>>> I guess I just enforce both to be specified.
 >>>
->>> Stephen Warren <swarren@wwwdotorg.org> writes:
+>>> Ok. It's always possible to add clock-names later if a platform doesn't
+>>> wire an input. We lose the possibility of future compatibility, but
+>>> backwards compatibility is easy enough to maintain.
 >>>
->>>> This branch includes a number of enhancements to core SoC support for
->>>> Tegra devices. The major new features are:
+>>>>>>>> +- ti,clkdm-name : clockdomain name for the DPLL
+>>>>>>>
+>>>>>>> Could you elaborate on what this is for? What constitutes a valid name?
+>>>>>>>
+>>>>>>> I'm not sure a string is the best way to define the linkage of several
+>>>>>>> elements to a domain...
+>>>>>>
+>>>>>> Well, I am not sure if we can do this any better at this point, we don't
+>>>>>> have DT nodes for clockdomain at the moment (I am not sure if we will
+>>>>>> have those either as there are only a handful of those per SoC) but I'll
+>>>>>> add some more documentation for this.
+>>>>>
+>>>>> I'll have to see the documentation, but I'd be very wary of putting that
+>>>>> in as-is. Does having the clock domain string link this up to domains in
+>>>>> platform data?
+>>>>>
+>>>>> I'm not sure how well we'll be able to maintain support for that in
+>>>>> future if it requires other platform code to use now, and we're not sure
+>>>>> how the domains themselves will be represented in dt.
 >>>>
->>>> * Adds a new CPU-power-gated cpuidle state for Tegra114.
->>>> * Adds initial system suspend support for Tegra114, initially supporting
->>>>   just CPU-power-gating during suspend.
->>>> * Adds "LP1" suspend mode support for all of Tegra20/30/114. This mode
->>>>   both gates CPU power, and places the DRAM into self-refresh mode.
->>>> * A new DT-driven PCIe driver to Tegra20/30. The driver is also moved
->>>>   from arch/arm/mach-tegra/ to drivers/pci/host/.
+>>>> Hmm so, should I add a stub representation for the clockdomains to the
+>>>> DT then for now or how should this be handled? The stubs could then be
+>>>> mapped to the actual clock domains based on their node names.
+>
+> I'm not sure that this binding should know about the clock domain at
+> all. Maybe the clock domain binding should list the clocks that are
+> within the domain?
+
+Ok, I experimented with this stuff a bit to have a proper reply, and it 
+looks like I can get this done with a clockdomain mapping, which has its 
+own binding. Something like this:
+
+         clockdomains {
+                 usbhost_clkdm: usbhost_clkdm {
+                         compatible = "ti,clockdomain";
+                         clocks = <&usbhost_48m_fck>, <&usbhost_ick>;
+                 };
+	};
+
+Mike, what is your approach on this? Are you okay having the 
+implementation for this under drivers/clk? I recall you mentioned 
+earlier that you don't want clockdomain stuff under drivers/clk, hence I 
+am asking.
+
+Here is the initial implementation for the binding:
+
+void __init of_omap_clockdomain_setup(struct device_node *node)
+{
+         struct clk *clk;
+         struct clk_hw *clk_hw;
+         const char *clkdm_name = node->name;
+         int i;
+         int num_clks;
+
+         num_clks = of_count_phandle_with_args(node, "clocks", 
+"#clock-cells");
+
+         for (i = 0; i < num_clks; i++) {
+                 clk = of_clk_get(node, i);
+                 if (__clk_get_flags(clk) & CLK_IS_BASIC) {
+                         pr_warn("%s: can't setup clkdm for basic clk %s\n",
+                                 __func__, __clk_get_name(clk));
+                         continue;
+                 }
+                 clk_hw = __clk_get_hw(clk);
+                 to_clk_hw_omap(clk_hw)->clkdm_name = clkdm_name;
+                 omap2_init_clk_clkdm(clk_hw);
+         }
+}
+CLK_OF_DECLARE(omap_clockdomain, "ti,clockdomain", 
+of_omap_clockdomain_setup);
+
+>
 >>>>
->>>> The PCIe driver work depends on the following tag from Thomas Petazzoni:
->>>> git://git.infradead.org/linux-mvebu.git mis-3.12.2
->>>> ... which is merged into the middle of this pull request.
->>>>
->>>> ----------------------------------------------------------------
->>>>
->>>> (If the location of the merge into this branch is problematic, just let
->>>> me know and I'll rebase everything on top of the merge)
 >>>
->>> The merge looks fine, but...
+>>> I unfortunately don't have a good answer here, because I'm not that
+>>> familiar with how we handle clockdomains for power management purposes.
 >>>
->>>> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
->>>>
->>>>   Linux 3.11-rc1
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.12-soc
->>>>
->>>> for you to fetch changes up to b4f173752a56187bd55752b0474429202f2ab1d3:
->>>>
->>>>   ARM: tegra: disable LP2 cpuidle state if PCIe is enabled
->>>>
->>>> ----------------------------------------------------------------
->>>>
->>>> Jay Agarwal (1):
->>>>       PCI: tegra: Add Tegra 30 PCIe support
->>>>
->>>> Joseph Lo (21):
->>>>       ARM: tegra: enable Cortex-A15 erratum 798181
->>>>       Revert "ARM: tegra: add cpu_disable for hotplug"
->>>>       ARM: tegra114: Reprogram GIC CPU interface to bypass IRQ on CPU PM entry
->>>>       ARM: tegra114: add low level support for CPU idle powered-down mode
->>>>       ARM: tegra114: cpuidle: add powered-down state
->>>>       ARM: tegra: do v7_invalidate_l1 only when CPU is Cortex-A9
->>>>       ARM: tegra: add a flag for tegra_disable_clean_inv_dcache to do LoUIS or ALL
->>>>       ARM: tegra: set up the correct L2 data RAM latency for Cortex-A15
->>>>       ARM: tegra: add low level code for Tegra114 cluster power down
->>>>       ARM: tegra: shut off the CPU rail when the last CPU in suspend
->>>>       ARM: tegra: hook tegra_tear_down_cpu function
->>>>       ARM: tegra: flowctrl: add support for cpu_suspend_enter/exit
->>>>       clk: tegra: add suspend/resume function for tegra_cpu_car_ops
->>>
->>> This one...
->>>
->>>>       ARM: tegra: remove the limitation that Tegra114 can't support suspend
->>>>       ARM: tegra: add common resume handling code for LP1 resuming
->>>>       ARM: tegra: config the polarity of the request of sys clock
->>>>       clk: tegra114: add LP1 suspend/resume support
->>>
->>> ...and this one are drivers/clk and I don't see an ack from the
->>> clock framework maintainer (Mike Turquette) on either.
->>>
->>> If Mike is OK for them to go via arm-soc, that should be specified in
->>> the description above (and he should ack them), otherwise they should be
->>> split out and sent via Mike.
->>>
->>> A quick glance suggests there are no direct dependencies, so it's
->>> probably best if those changes go through Mike.
+>>> As I understand it, each clock domain is essentially a clock gate
+>>> controlling multiple clock signals, so it's possible to describe that
+>>> with the common clock bindings, with a domain's clocks all coming from a
+>>> "domain-gate-clock" node (or something like that). That would make the
+>>> wiring of clocks to a domain explicit and in line with the rest of the
+>>> common clock bindings. But perhaps I've simplified things a bit too
+>>> far.
 >>
->> There are at least run-time dependencies here, although it's possible
->> they're limited to "suspend won't work on Tegra114 unless all those
->> patches are present" rather than "if all these patches aren't present,
->> something other than a new feature will regress due to this series".
+>> You got it basically right, but maybe oversimplified it a bit. The
+>> root/parent clocks can still cross clockdomain boundaries, so mapping
+>> everything under a simple clockdomain gate would not work. Basically
+>> each clock has a mapping on the SoC for both its parent clock signal and
+>> the clockdomain association, kind of having two parents at the same
+>> time. In OMAP case, most of the clockdomains support hardware autoidle
+>> type functionality, which puts the domain to idle once all the clocks on
+>> it are disabled.
+>
+> I always thought that OMAP clock domains were poorly named. Seems to me
+> that they had more to do with the IP/module programming than clocks per
+> se.  Again, I'm not sure that putting clkdm data into this binding is
+> correct.
+>
+> Is it because you want a call to clk_enable to program the clock domain
+> in the .enable callback? I always thought that this was better left to a
+> pm_runtime_get callback...
+
+My guess is that some clocks require the clockdomain itself to be forced 
+on before they are enabled, some of the DPLLs do this for example. I am 
+just trying not to cause any regressions with this set, thus attempting 
+to keep most of the implementation specifics intact.
+
+-Tero
+
+>
+> Regards,
+> Mike
+>
 >>
->> Mike's certainly been CC'd on the patches many times as quite a few
->> versions of each were posted, and I asked for acks, but got no response.
->> In the past, that's meant he's fine with the patches...
-> 
-> Hi Stephen,
-> 
-> Let's not set the precedent of silence conferring an Ack. For the patch
-> "clk: tegra: add suspend/resume function for tegra_cpu_car_ops" I gave
-> the V1 patch a "looks good to me" response but I seemed to have missed
-> the V2 patch:
-> http://article.gmane.org/gmane.linux.ports.tegra/12213
-
-Yes, it looks like Joseph simply didn't add the ack to the commit. I'll
-follow up internally to make sure people get the process right.
-
-> For the patch "clk: tegra114: add LP1 suspend/resume support" I hadn't
-> bothered to review since there were plenty of comments on V1 & V2. The
-> same day V3 was posted it was merged into your tree. I should have given
-> it a post-merge Ack but didn't.
-
-Sorry to be picky, but I don't think there were any comments on this
-specific patch in V1. Admittedly there were some on V2, and by the time
-V3 had come around I had forgotten that there were actually changes to
-the clk patch within the series. All these series that require so many
-revisions wear me down:-(
-
-It'd be really useful if you could reply to the patches and let us know
-you've seen them and are deliberately holding off on reviewing them.
-That way I'll know you aren't just ignoring them due to e.g. too much
-mail. Or, review v1 rather than waiting for any other issues to be
-resolved in the series. In the past, I got the impression that you cared
-mostly about the core common clock implementation, and didn't really
-care what happened inside the individual clock drivers, and were happy
-to just have the relevant SoC maintainers review them. Hence, I have
-treated your ack on drivers/clk/tegra/* as a bonus more than a necessity.
-
-> Anyways the changes are fine by me. Kevin if you don't mind applying it:
-> Acked-by: Mike Turquette <mturquette@linaro.org>
-
-Thanks.
+>> -Tero
+>>
+>>> I'm not sure how easy it would be to use that information for power
+>>> management. I don't know what the kernel logic for clock domain power
+>>> management needs to know about consumers of the clocks and how it would
+>>> need to poke those consumers.
+>>
+>>>
+>>> Cheers,
+>>> Mark.
+>>>
