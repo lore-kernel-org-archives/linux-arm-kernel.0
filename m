@@ -1,91 +1,178 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 21 Aug 2013 09:16:33 -0400
-Subject: [PATCH 2/8] clk: keystone: Add gate control clock driver
-In-Reply-To: <20130821022225.4443.97467@quantum>
-References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
- <20130813161314.GR27165@e106331-lin.cambridge.arm.com>
- <520A60A2.2030104@ti.com>
- <20130813165344.GU27165@e106331-lin.cambridge.arm.com>
- <20130819204353.4443.48466@quantum> <5213756A.5090903@ti.com>
- <20130820213045.4443.89971@quantum> <5213E5EC.8070208@ti.com>
- <20130820224128.4443.78729@quantum> <5213F397.6020708@ti.com>
- <20130821022225.4443.97467@quantum>
-Message-ID: <5214BDB1.9080503@ti.com>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Wed, 21 Aug 2013 18:47:10 +0530
+Subject: [PATCH 09/16] clk: samsung: pll: Use new registration method for
+ PLL45xx
+In-Reply-To: <1377019903-14614-10-git-send-email-t.figa@samsung.com>
+References: <1377019903-14614-1-git-send-email-t.figa@samsung.com>
+ <1377019903-14614-10-git-send-email-t.figa@samsung.com>
+Message-ID: <CAKew6eV79H60iU9X5DKOKo57Y51RfVtML2qEqD1z4m6rT_yLJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 August 2013 10:22 PM, Mike Turquette wrote:
-> Quoting Santosh Shilimkar (2013-08-20 15:54:15)
->> On Tuesday 20 August 2013 06:41 PM, Mike Turquette wrote:
->>> Quoting Santosh Shilimkar (2013-08-20 14:55:56)
->>>> On Tuesday 20 August 2013 05:30 PM, Mike Turquette wrote:
->>
->> [...]
->>
->>>>>> They are bit different w.r.t OMAP. LPSC itself is the clock control of the
->>>>>> IP. The LPSC number in the bindings is actually the specific number which
->>>>>> is used to reach to the address space of the clock control. One can view
->>>>>> that one as clock control register index.
->>>>>
->>>>> Thanks for the information. I have a further question about then: are
->>>>> the LPSC clocks really module clocks that belong to the IP that they are
->>>>> gating?
->>>>>
->>>> LPSC controls the clock enable/disable to the IP/module so answer is yes.
->>>> In certain cases LPSC controls clock to more than one IP as well.
->>>>
->>>>> If so then they could be defined within the node defining their parent
->>>>> IP. That might be enough to get rid of the LPSC index value. Again I
->>>>> might be over-engineering it. Just trying to get an understanding.
->>>>>
->>>> Am not sure I follow you here on not having the LPSC index. Sorry. 
->>>
->>> How are the 'reg' property and the 'lpsc' property related? Does the
->>> lpsc property modify the register address used to access the clock
->>> control bits?
->>>
->> Yes it does. Currently all nodes use fix address and then lpsc is
->> used as an index.
-> 
-> Ok cool. Well the reason I brought that up was because I even had the
-> idea to define these module clocks within the module nodes that own them
-> in DT. I am way outside of my DT knowledge at this point but I wonder
-> if the following type of binding is possible:
-> 
-> module: module at 4a308200 {
-> 	#address-cells = <1>;
-> 	#size-cells = <1>;
-> 	reg = <0x4a308200 0x1000>;
-> 
-> 	clock {
-> 		#clock-cells = <0>;
-> 		compatible = "keystone,psc-clk";
-> 		clocks = <&chipclk3>;
-> 		clock-output-names = "debugss_trc";
-> 		reg = <0x0256>;
-> 		pd = <1>;
-> 	};
-> };
-> 
-> Again, my DT knowledge is pretty limited, but could the reg property of
-> the clock be directly affected by the parent node? That seems like it
-> could nicely model what the hardware is really doing.
-> 
-The module(I assume you mean IP here) reg address space is separate than
-that used for clock control so that doesn't fit as such. Traditionally
-clock controls even though targeted for specific modules sits in different
-control as at least seen on OMAP and Keystone. OCP wrappers on OMAP
-were bit of exceptions but they were little bit of glue logic without
-much control within the address space.
+>  };
+>
+> +static struct __initdata samsung_pll_clock exynos4210_plls[nr_plls] = {
 
->> But I think we can do better by just using the
->> right(offset) address in the reg property. Will have a look at it
->> and see what I can do here.
-> 
-> This also solves the problem nicely.  Thanks for putting up with my
-> silly questions ;-)
-> 
-You asked right and good questions.
+NIT: __initdata should be at last.
 
-Regards,
-Santosh
+> +       [apll] = PLL_A(pll_4508, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
+> +               APLL_CON0, "fout_apll", NULL),
+> +       [mpll] = PLL_A(pll_4508, fout_mpll, "fout_mpll", "fin_pll",
+> +               E4210_MPLL_LOCK, E4210_MPLL_CON0, "fout_mpll", NULL),
+> +};
+> +
+>  static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
+>         [apll] = PLL(pll_35xx, fout_apll, "fout_apll", "fin_pll",
+>                         APLL_LOCK, APLL_CON0, NULL),
+> @@ -1004,7 +1012,7 @@ static void __init exynos4_clk_init(struct device_node *np,
+>                                     enum exynos4_soc exynos4_soc,
+>                                     void __iomem *reg_base, unsigned long xom)
+>  {
+> -       struct clk *apll, *mpll, *epll, *vpll;
+> +       struct clk *epll, *vpll;
+>
+>         reg_base = of_iomap(np, 0);
+>         if (!reg_base)
+> @@ -1026,17 +1034,13 @@ static void __init exynos4_clk_init(struct device_node *np,
+>         exynos4_clk_register_finpll(xom);
+>
+>         if (exynos4_soc == EXYNOS4210) {
+> -               apll = samsung_clk_register_pll45xx("fout_apll", "fin_pll",
+> -                                       reg_base + APLL_CON0, pll_4508);
+> -               mpll = samsung_clk_register_pll45xx("fout_mpll", "fin_pll",
+> -                                       reg_base + E4210_MPLL_CON0, pll_4508);
+> +               samsung_clk_register_pll(exynos4210_plls,
+> +                                       ARRAY_SIZE(exynos4210_plls), reg_base);
+>                 epll = samsung_clk_register_pll46xx("fout_epll", "fin_pll",
+>                                         reg_base + EPLL_CON0, pll_4600);
+>                 vpll = samsung_clk_register_pll46xx("fout_vpll", "mout_vpllsrc",
+>                                         reg_base + VPLL_CON0, pll_4650c);
+>
+> -               samsung_clk_add_lookup(apll, fout_apll);
+> -               samsung_clk_add_lookup(mpll, fout_mpll);
+>                 samsung_clk_add_lookup(epll, fout_epll);
+>                 samsung_clk_add_lookup(vpll, fout_vpll);
+>         } else {
+> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+> index 0775554..b0398d2 100644
+> --- a/drivers/clk/samsung/clk-pll.c
+> +++ b/drivers/clk/samsung/clk-pll.c
+> @@ -280,18 +280,10 @@ static const struct clk_ops samsung_pll36xx_clk_min_ops = {
+>  #define PLL45XX_PDIV_SHIFT     (8)
+>  #define PLL45XX_SDIV_SHIFT     (0)
+>
+> -struct samsung_clk_pll45xx {
+> -       struct clk_hw           hw;
+> -       enum pll45xx_type       type;
+> -       const void __iomem      *con_reg;
+> -};
+> -
+> -#define to_clk_pll45xx(_hw) container_of(_hw, struct samsung_clk_pll45xx, hw)
+> -
+>  static unsigned long samsung_pll45xx_recalc_rate(struct clk_hw *hw,
+>                                 unsigned long parent_rate)
+>  {
+> -       struct samsung_clk_pll45xx *pll = to_clk_pll45xx(hw);
+> +       struct samsung_clk_pll *pll = to_clk_pll(hw);
+>         u32 mdiv, pdiv, sdiv, pll_con;
+>         u64 fvco = parent_rate;
+>
+> @@ -313,43 +305,6 @@ static const struct clk_ops samsung_pll45xx_clk_ops = {
+>         .recalc_rate = samsung_pll45xx_recalc_rate,
+>  };
+>
+> -struct clk * __init samsung_clk_register_pll45xx(const char *name,
+> -                       const char *pname, const void __iomem *con_reg,
+> -                       enum pll45xx_type type)
+> -{
+> -       struct samsung_clk_pll45xx *pll;
+> -       struct clk *clk;
+> -       struct clk_init_data init;
+> -
+> -       pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+> -       if (!pll) {
+> -               pr_err("%s: could not allocate pll clk %s\n", __func__, name);
+> -               return NULL;
+> -       }
+> -
+> -       init.name = name;
+> -       init.ops = &samsung_pll45xx_clk_ops;
+> -       init.flags = CLK_GET_RATE_NOCACHE;
+> -       init.parent_names = &pname;
+> -       init.num_parents = 1;
+> -
+> -       pll->hw.init = &init;
+> -       pll->con_reg = con_reg;
+> -       pll->type = type;
+> -
+> -       clk = clk_register(NULL, &pll->hw);
+> -       if (IS_ERR(clk)) {
+> -               pr_err("%s: failed to register pll clock %s\n", __func__,
+> -                               name);
+> -               kfree(pll);
+> -       }
+> -
+> -       if (clk_register_clkdev(clk, name, NULL))
+> -               pr_err("%s: failed to register lookup for %s", __func__, name);
+> -
+> -       return clk;
+> -}
+> -
+>  /*
+>   * PLL46xx Clock Type
+>   */
+> @@ -724,6 +679,11 @@ static void __init _samsung_clk_register_pll(struct samsung_pll_clock *pll_clk,
+>                 else
+>                         init.ops = &samsung_pll35xx_clk_ops;
+>                 break;
+> +       case pll_4500:
+> +       case pll_4502:
+> +       case pll_4508:
+> +               init.ops = &samsung_pll45xx_clk_ops;
+> +               break;
+>         /* clk_ops for 36xx and 2650 are similar */
+>         case pll_36xx:
+>         case pll_2650:
+> diff --git a/drivers/clk/samsung/clk-pll.h b/drivers/clk/samsung/clk-pll.h
+> index 2f70e88..f3faf24 100644
+> --- a/drivers/clk/samsung/clk-pll.h
+> +++ b/drivers/clk/samsung/clk-pll.h
+> @@ -17,6 +17,9 @@ enum samsung_pll_type {
+>         pll_36xx,
+>         pll_2550,
+>         pll_2650,
+> +       pll_4500,
+> +       pll_4502,
+> +       pll_4508
+>  };
+>
+>  #define PLL_35XX_RATE(_rate, _m, _p, _s)                       \
+> @@ -46,21 +49,12 @@ struct samsung_pll_rate_table {
+>         unsigned int kdiv;
+>  };
+>
+> -enum pll45xx_type {
+> -       pll_4500,
+> -       pll_4502,
+> -       pll_4508
+> -};
+> -
+>  enum pll46xx_type {
+>         pll_4600,
+>         pll_4650,
+>         pll_4650c,
+>  };
+>
+> -extern struct clk * __init samsung_clk_register_pll45xx(const char *name,
+> -                       const char *pname, const void __iomem *con_reg,
+> -                       enum pll45xx_type type);
+>  extern struct clk * __init samsung_clk_register_pll46xx(const char *name,
+>                         const char *pname, const void __iomem *con_reg,
+>                         enum pll46xx_type type);
+> --
+> 1.8.3.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
