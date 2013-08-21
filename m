@@ -1,62 +1,176 @@
-From: jonas@southpole.se (Jonas Bonn)
-Date: Wed, 21 Aug 2013 07:10:33 +0200
-Subject: [RFC PATCH 2/4] openrisc: remove undefined of_get_cpu_node
- declaration
-In-Reply-To: <520DF3BD.2070904@arm.com>
-References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376586580-5409-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <520DF3BD.2070904@arm.com>
-Message-ID: <52144BC9.9030007@southpole.se>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 21 Aug 2013 10:51:16 +0530
+Subject: [PATCH] hwrng: reorder OMAP TRNG driver code
+In-Reply-To: <1377022073-28198-1-git-send-email-olof@lixom.net>
+References: <1377022073-28198-1-git-send-email-olof@lixom.net>
+Message-ID: <52144E4C.4050405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/16/13 11:41, Sudeep KarkadaNagesha wrote:
-> On 15/08/13 18:09, Sudeep KarkadaNagesha wrote:
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> This patch removes the declaration of the function 'of_get_cpu_node'
->> which is not defined for openrisc. This is in preparation to move
->> it's definition from PPC to DT common code.
->>
->> Again it could be there as it was originally copied from powerpc.
->>
->> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->> Cc: Jonas Bonn <jonas@southpole.se>
-> Hi Jonas,
->
-> Since both microblaze and openrisc have moderated lists which I am not
-> member of, these patches were blocked. Michal Simek agreed to remove
-> this for microblaze. Do you see any concern with this patch for openrisc
-> ? Can I have you ACK if it looks fine ?
+Hi Olof,
+On Tuesday 20 August 2013 11:37 PM, Olof Johansson wrote:
+> The newly added omap4 support in the driver was added without
+> consideration for building older configs. When building omap1_defconfig,
+> it resulted in:
+> 
+> drivers/char/hw_random/omap-rng.c:190:12: warning: 'omap4_rng_init' defined but not used [-Wunused-function]
+> drivers/char/hw_random/omap-rng.c:215:13: warning: 'omap4_rng_cleanup' defined but not used [-Wunused-function]
+> drivers/char/hw_random/omap-rng.c:251:20: warning: 'omap4_rng_irq' defined but not used [-Wunused-function]
+> 
+> Move the code around so it is grouped with its operations struct, which
+> for the omap4 case means also under the #ifdef CONFIG_OF, where it needs
+> to be.
+> 
+Missed testing this. Thanks for the patch.
+Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
 
-Hi Sudeep,
-Yes, thanks, the patch looks good.
+Regards,
+Lokesh
 
-Acked-by: Jonas Bonn <jonas@southpole.se>
-
-/Jonas
-
->
-> Regards,
-> Sudeep
->> ---
->>   arch/openrisc/include/asm/prom.h | 3 ---
->>   1 file changed, 3 deletions(-)
->>
->> diff --git a/arch/openrisc/include/asm/prom.h b/arch/openrisc/include/asm/prom.h
->> index bbb34e5..eb59bfe 100644
->> --- a/arch/openrisc/include/asm/prom.h
->> +++ b/arch/openrisc/include/asm/prom.h
->> @@ -44,9 +44,6 @@ void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
->>   
->>   extern void kdump_move_device_tree(void);
->>   
->> -/* CPU OF node matching */
->> -struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
->> -
->>   /* Get the MAC address */
->>   extern const void *of_get_mac_address(struct device_node *np);
->>   
->>
->
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> Cc: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  drivers/char/hw_random/omap-rng.c |  108 ++++++++++++++++++-------------------
+>  1 file changed, 54 insertions(+), 54 deletions(-)
+> 
+> diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
+> index f3f7142..9b89ff4 100644
+> --- a/drivers/char/hw_random/omap-rng.c
+> +++ b/drivers/char/hw_random/omap-rng.c
+> @@ -140,16 +140,6 @@ static inline void omap_rng_write(struct omap_rng_dev *priv, u16 reg,
+>  	__raw_writel(val, priv->base + priv->pdata->regs[reg]);
+>  }
+>  
+> -static inline u32 omap2_rng_data_present(struct omap_rng_dev *priv)
+> -{
+> -	return omap_rng_read(priv, RNG_STATUS_REG) ? 0 : 1;
+> -}
+> -
+> -static inline u32 omap4_rng_data_present(struct omap_rng_dev *priv)
+> -{
+> -	return omap_rng_read(priv, RNG_STATUS_REG) & RNG_REG_STATUS_RDY;
+> -}
+> -
+>  static int omap_rng_data_present(struct hwrng *rng, int wait)
+>  {
+>  	struct omap_rng_dev *priv;
+> @@ -187,6 +177,60 @@ static int omap_rng_data_read(struct hwrng *rng, u32 *data)
+>  	return data_size;
+>  }
+>  
+> +static int omap_rng_init(struct hwrng *rng)
+> +{
+> +	struct omap_rng_dev *priv;
+> +
+> +	priv = (struct omap_rng_dev *)rng->priv;
+> +	return priv->pdata->init(priv);
+> +}
+> +
+> +static void omap_rng_cleanup(struct hwrng *rng)
+> +{
+> +	struct omap_rng_dev *priv;
+> +
+> +	priv = (struct omap_rng_dev *)rng->priv;
+> +	priv->pdata->cleanup(priv);
+> +}
+> +
+> +static struct hwrng omap_rng_ops = {
+> +	.name		= "omap",
+> +	.data_present	= omap_rng_data_present,
+> +	.data_read	= omap_rng_data_read,
+> +	.init		= omap_rng_init,
+> +	.cleanup	= omap_rng_cleanup,
+> +};
+> +
+> +static inline u32 omap2_rng_data_present(struct omap_rng_dev *priv)
+> +{
+> +	return omap_rng_read(priv, RNG_STATUS_REG) ? 0 : 1;
+> +}
+> +
+> +static int omap2_rng_init(struct omap_rng_dev *priv)
+> +{
+> +	omap_rng_write(priv, RNG_SYSCONFIG_REG, 0x1);
+> +	return 0;
+> +}
+> +
+> +static void omap2_rng_cleanup(struct omap_rng_dev *priv)
+> +{
+> +	omap_rng_write(priv, RNG_SYSCONFIG_REG, 0x0);
+> +}
+> +
+> +static struct omap_rng_pdata omap2_rng_pdata = {
+> +	.regs		= (u16 *)reg_map_omap2,
+> +	.data_size	= OMAP2_RNG_OUTPUT_SIZE,
+> +	.data_present	= omap2_rng_data_present,
+> +	.init		= omap2_rng_init,
+> +	.cleanup	= omap2_rng_cleanup,
+> +};
+> +
+> +#if defined(CONFIG_OF)
+> +static inline u32 omap4_rng_data_present(struct omap_rng_dev *priv)
+> +{
+> +	return omap_rng_read(priv, RNG_STATUS_REG) & RNG_REG_STATUS_RDY;
+> +}
+> +
+>  static int omap4_rng_init(struct omap_rng_dev *priv)
+>  {
+>  	u32 val;
+> @@ -221,33 +265,6 @@ static void omap4_rng_cleanup(struct omap_rng_dev *priv)
+>  	omap_rng_write(priv, RNG_CONFIG_REG, val);
+>  }
+>  
+> -static int omap2_rng_init(struct omap_rng_dev *priv)
+> -{
+> -	omap_rng_write(priv, RNG_SYSCONFIG_REG, 0x1);
+> -	return 0;
+> -}
+> -
+> -static void omap2_rng_cleanup(struct omap_rng_dev *priv)
+> -{
+> -	omap_rng_write(priv, RNG_SYSCONFIG_REG, 0x0);
+> -}
+> -
+> -static int omap_rng_init(struct hwrng *rng)
+> -{
+> -	struct omap_rng_dev *priv;
+> -
+> -	priv = (struct omap_rng_dev *)rng->priv;
+> -	return priv->pdata->init(priv);
+> -}
+> -
+> -static void omap_rng_cleanup(struct hwrng *rng)
+> -{
+> -	struct omap_rng_dev *priv;
+> -
+> -	priv = (struct omap_rng_dev *)rng->priv;
+> -	priv->pdata->cleanup(priv);
+> -}
+> -
+>  static irqreturn_t omap4_rng_irq(int irq, void *dev_id)
+>  {
+>  	struct omap_rng_dev *priv = dev_id;
+> @@ -275,23 +292,6 @@ static irqreturn_t omap4_rng_irq(int irq, void *dev_id)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -static struct hwrng omap_rng_ops = {
+> -	.name		= "omap",
+> -	.data_present	= omap_rng_data_present,
+> -	.data_read	= omap_rng_data_read,
+> -	.init		= omap_rng_init,
+> -	.cleanup	= omap_rng_cleanup,
+> -};
+> -
+> -static struct omap_rng_pdata omap2_rng_pdata = {
+> -	.regs		= (u16 *)reg_map_omap2,
+> -	.data_size	= OMAP2_RNG_OUTPUT_SIZE,
+> -	.data_present	= omap2_rng_data_present,
+> -	.init		= omap2_rng_init,
+> -	.cleanup	= omap2_rng_cleanup,
+> -};
+> -
+> -#if defined(CONFIG_OF)
+>  static struct omap_rng_pdata omap4_rng_pdata = {
+>  	.regs		= (u16 *)reg_map_omap4,
+>  	.data_size	= OMAP4_RNG_OUTPUT_SIZE,
+> 
