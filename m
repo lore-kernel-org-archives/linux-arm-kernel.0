@@ -1,53 +1,69 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 21 Aug 2013 09:26:40 +0200
-Subject: [PATCH] Kconfig: Remove hotplug enable hints in CONFIG_KEXEC
- help texts
-In-Reply-To: <1377027483-17025-1-git-send-email-geert@linux-m68k.org>
-References: <1377027483-17025-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <20130821072640.GA27495@gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Wed, 21 Aug 2013 11:28:23 +0400
+Subject: [PATCH 1/3] ARM: dts: i.MX51: Separate TXD/RXD and RTS/CTS pinmux
+ entries for UARTs
+Message-ID: <1377070105-15902-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+RTS/CTS pins can be used for different purposes, so create separate
+definitions for these pins.
 
-* Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/boot/dts/imx51-babbage.dts |  4 ++--
+ arch/arm/boot/dts/imx51.dtsi        | 10 ++++++++++
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
-> commit 40b313608ad4ea655addd2ec6cdd106477ae8e15 ("Finally eradicate
-> CONFIG_HOTPLUG") removed remaining references to CONFIG_HOTPLUG, but missed
-> a few plain English references in the CONFIG_KEXEC help texts.
-> 
-> Remove them, too.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> ---
->  arch/arm/Kconfig     |    3 +--
->  arch/ia64/Kconfig    |    6 +++---
->  arch/mips/Kconfig    |    6 +++---
->  arch/powerpc/Kconfig |    6 +++---
->  arch/sh/Kconfig      |    6 +++---
->  arch/x86/Kconfig     |    6 +++---
->  6 files changed, 16 insertions(+), 17 deletions(-)
-[...]
->  	bool "kernel crash dumps (EXPERIMENTAL)"
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index b32ebf9..6ace5de 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -1627,9 +1627,9 @@ config KEXEC
->  
->  	  It is an ongoing process to be certain the hardware in a machine
->  	  is properly shutdown, so do not be surprised if this code does not
-> -	  initially work for you.  It may help to enable device hotplugging
-> -	  support.  As of this writing the exact hardware interface is
-> -	  strongly in flux, so no good recommendation can be made.
-> +	  initially work for you.  As of this writing the exact hardware
-> +	  interface is strongly in flux, so no good recommendation can be
-> +	  made.
->  
->  config CRASH_DUMP
->  	bool "kernel crash dumps"
-
-Acked-by: Ingo Molnar <mingo@kernel.org>
-
-Thanks,
-
-	Ingo
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 1d337d9..f13f339 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -95,7 +95,7 @@
+ 
+ &uart3 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_uart3_1>;
++	pinctrl-0 = <&pinctrl_uart3_1 &pinctrl_uart3_rtscts_1>;
+ 	fsl,uart-has-rtscts;
+ 	status = "okay";
+ };
+@@ -252,7 +252,7 @@
+ 
+ &uart1 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_uart1_1>;
++	pinctrl-0 = <&pinctrl_uart1_1 &pinctrl_uart1_rtscts_1>;
+ 	fsl,uart-has-rtscts;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index a85abb4..b7cda0a 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -747,6 +747,11 @@
+ 			fsl,pins = <
+ 				MX51_PAD_UART1_RXD__UART1_RXD 0x1c5
+ 				MX51_PAD_UART1_TXD__UART1_TXD 0x1c5
++			>;
++		};
++
++		pinctrl_uart1_rtscts_1: uart1rtscts-1 {
++			fsl,pins = <
+ 				MX51_PAD_UART1_RTS__UART1_RTS 0x1c5
+ 				MX51_PAD_UART1_CTS__UART1_CTS 0x1c5
+ 			>;
+@@ -767,6 +772,11 @@
+ 			fsl,pins = <
+ 				MX51_PAD_EIM_D25__UART3_RXD 0x1c5
+ 				MX51_PAD_EIM_D26__UART3_TXD 0x1c5
++			>;
++		};
++
++		pinctrl_uart3_rtscts_1: uart3rtscts-1 {
++			fsl,pins = <
+ 				MX51_PAD_EIM_D27__UART3_RTS 0x1c5
+ 				MX51_PAD_EIM_D24__UART3_CTS 0x1c5
+ 			>;
+-- 
+1.8.1.5
