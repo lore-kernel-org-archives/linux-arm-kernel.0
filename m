@@ -1,42 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 21 Aug 2013 10:26:40 +0800
-Subject: [PATCH v2] i2c: imx: use exact SoC revision to document binding
-In-Reply-To: <1377051119-23004-1-git-send-email-b35083@freescale.com>
-References: <1377051119-23004-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130821022637.GF30533@S2101-09.ap.freescale.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 21 Aug 2013 02:53:12 +0000 (UTC)
+Subject: [PATCH v2 00/13] ARM: OMAP2+: AM43x PRCM support
+In-Reply-To: <cover.1375443858.git.afzal@ti.com>
+References: <cover.1375443858.git.afzal@ti.com>
+Message-ID: <alpine.DEB.2.02.1308210249260.6426@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 10:11:59AM +0800, Jingchang Lu wrote:
-> use exact SoC revision instead of wildcard describing
-> the compatible property requirement in the binding
-> document. This will make the binding more clearer.
-> 
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+Hi
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+On Fri, 2 Aug 2013, Afzal Mohammed wrote:
 
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-imx.txt | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-imx.txt b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-> index 3614242..4a8513e 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-> @@ -1,7 +1,10 @@
->  * Freescale Inter IC (I2C) and High Speed Inter IC (HS-I2C) for i.MX
->  
->  Required properties:
-> -- compatible : Should be "fsl,<chip>-i2c"
-> +- compatible :
-> +  - "fsl,imx1-i2c" for I2C compatible with the one integrated on i.MX1 SoC
-> +  - "fsl,imx21-i2c" for I2C compatible with the one integrated on i.MX21 SoC
-> +  - "fsl,vf610-i2c" for I2C compatible with the one integrated on Vybrid vf610 SoC
->  - reg : Should contain I2C/HS-I2C registers location and length
->  - interrupts : Should contain I2C/HS-I2C interrupt
->  
-> -- 
-> 1.8.0
-> 
-> 
+> AM43x PRCM support (excluding clock tree) is being added with this
+> series. AM43x reuses most of the IP's from AM335x, as that is the
+> case, much of the AM335x hwmod data is reused.
+
+...
+
+> Currently there is no public TRM available for AM43x.
+
+Can you think of any way that the data can be doublechecked against some 
+reference or against the reality of the chip?
+
+Can development boards be made available to the OMAP maintainers so we can 
+ensure that the code, once merged, continues to work?
+
+> Powerdomain & Clockdomain data has been added separately as it was not
+> giving much advantage reusing AM335x ones (runtime updates required
+> was getting too ugly). But as AM43x PRCM functionality is similar to
+> OMAP4, power domain, clock domain & hwmod operations are reused from
+> OMAP4.
+
+Is the AM43xx PRCM design and IP derived from AM33xx, or from OMAP4, or 
+from something else?
+
+
+
+- Paul
