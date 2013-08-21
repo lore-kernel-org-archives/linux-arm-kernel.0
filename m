@@ -1,40 +1,62 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 21 Aug 2013 12:20:45 +0800
-Subject: [PATCH 1/3] ARM: imx6q: refactor some ldb related clocks
-In-Reply-To: <CAOMZO5Afjp-zPzUaNE63L7Y2LjZbSrLupAJ_jFnf1Gg1+hx0Nw@mail.gmail.com>
-References: <1376987932-5540-1-git-send-email-Ying.Liu@freescale.com>
- <1376987932-5540-2-git-send-email-Ying.Liu@freescale.com>
- <CAOMZO5Afjp-zPzUaNE63L7Y2LjZbSrLupAJ_jFnf1Gg1+hx0Nw@mail.gmail.com>
-Message-ID: <5214401D.8010402@freescale.com>
+From: jonas@southpole.se (Jonas Bonn)
+Date: Wed, 21 Aug 2013 07:10:33 +0200
+Subject: [RFC PATCH 2/4] openrisc: remove undefined of_get_cpu_node
+ declaration
+In-Reply-To: <520DF3BD.2070904@arm.com>
+References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376586580-5409-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <520DF3BD.2070904@arm.com>
+Message-ID: <52144BC9.9030007@southpole.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2013 11:40 PM, Fabio Estevam wrote:
-> On Tue, Aug 20, 2013 at 5:38 AM, Liu Ying <Ying.Liu@freescale.com> wrote:
-> 
->> diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
->> index 5a90a72..90e923e 100644
->> --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
->> +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
->> @@ -89,8 +89,6 @@ clocks and IDs.
->>         gpu3d_shader            74
->>         ipu1_podf               75
->>         ipu2_podf               76
->> -       ldb_di0_podf            77
->> -       ldb_di1_podf            78
->>         ipu1_di0_pre            79
->>         ipu1_di1_pre            80
->>         ipu2_di0_pre            81
-> 
-> This causes a 'hole' in the clock numbering scheme: 74, 75, 76, 79, 80, etc
-> 
+On 08/16/13 11:41, Sudeep KarkadaNagesha wrote:
+> On 15/08/13 18:09, Sudeep KarkadaNagesha wrote:
+>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>>
+>> This patch removes the declaration of the function 'of_get_cpu_node'
+>> which is not defined for openrisc. This is in preparation to move
+>> it's definition from PPC to DT common code.
+>>
+>> Again it could be there as it was originally copied from powerpc.
+>>
+>> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>> Cc: Jonas Bonn <jonas@southpole.se>
+> Hi Jonas,
+>
+> Since both microblaze and openrisc have moderated lists which I am not
+> member of, these patches were blocked. Michal Simek agreed to remove
+> this for microblaze. Do you see any concern with this patch for openrisc
+> ? Can I have you ACK if it looks fine ?
 
-I find there is a 'hole' in Documentation/devicetree/bindings/clock/imx5-clock.txt as well.
-The 'hole' was taken by tve_di(26) clock before.
+Hi Sudeep,
+Yes, thanks, the patch looks good.
 
-Is this more acceptable?
+Acked-by: Jonas Bonn <jonas@southpole.se>
 
-ldb_di0_podf_unused            77
-ldb_di1_podf_unused            78
+/Jonas
 
-Liu Ying
+>
+> Regards,
+> Sudeep
+>> ---
+>>   arch/openrisc/include/asm/prom.h | 3 ---
+>>   1 file changed, 3 deletions(-)
+>>
+>> diff --git a/arch/openrisc/include/asm/prom.h b/arch/openrisc/include/asm/prom.h
+>> index bbb34e5..eb59bfe 100644
+>> --- a/arch/openrisc/include/asm/prom.h
+>> +++ b/arch/openrisc/include/asm/prom.h
+>> @@ -44,9 +44,6 @@ void of_parse_dma_window(struct device_node *dn, const void *dma_window_prop,
+>>   
+>>   extern void kdump_move_device_tree(void);
+>>   
+>> -/* CPU OF node matching */
+>> -struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
+>> -
+>>   /* Get the MAC address */
+>>   extern const void *of_get_mac_address(struct device_node *np);
+>>   
+>>
+>
