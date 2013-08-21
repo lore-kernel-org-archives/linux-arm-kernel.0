@@ -1,77 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Aug 2013 01:53:31 -0700
-Subject: [PATCH 2/3] ARM: OMAP2+: Add new bindings for OMAP
-In-Reply-To: <52147E95.5000606@ti.com>
-References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
- <1376983966-16490-3-git-send-email-rnayak@ti.com>
- <20130821074514.GU7656@atomide.com> <52147E95.5000606@ti.com>
-Message-ID: <20130821085330.GH7656@atomide.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 21 Aug 2013 10:56:01 +0200
+Subject: [PATCH v2] ARM: at91: at91sam9260: add missing pinctrl on mmc
+In-Reply-To: <52147553.2010305@atmel.com>
+References: <1377070957-24984-1-git-send-email-ludovic.desroches@atmel.com>
+ <52147553.2010305@atmel.com>
+Message-ID: <20130821085601.GH5149@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [130821 01:54]:
-> On Wednesday 21 August 2013 01:15 PM, Tony Lindgren wrote:
-> > * Rajendra Nayak <rnayak@ti.com> [130820 00:41]:
-> >> On OMAP we have co-processor IPs, memory controllers,
-> >> GPIOs which control regulators and power switches to
-> >> PMIC, and SoC internal Bus IPs, some or most of which
-> >> should either not be reset or idled or both. Have a
-> >> way to pass this information from DT.
-> >> (In some cases there are erratas which prevent an IPs
-> >> from being reset)
-> >>
-> >> Also update omap_hwmod to extract this from DT.
-> >>
-> >> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> >> ---
-> >>  .../devicetree/bindings/arm/omap/omap.txt          |    3 ++-
-> >>  arch/arm/mach-omap2/omap_hwmod.c                   |   22 +++++++++++++-------
-> >>  2 files changed, 17 insertions(+), 8 deletions(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> >> index 6d498c7..a08647e 100644
-> >> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-> >> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> >> @@ -21,7 +21,8 @@ Required properties:
-> >>  Optional properties:
-> >>  - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
-> >>    during suspend.
-> >> -
-> >> +- ti,no-reset: When present, the module should not be reset
-> >> +- ti,no-idle: When present, the module should not be idled
-> > 
-> > This naming is a bit confusing as people may think that the
-> > hardware has no reset support or no idle support. Let's try
-> > to make this to describe the hardware a bit more instead.
-> > 
-> > Then ideally we'd not map individual bits of data to properties,
-> > but describe few basic types of hardware instead and build
-> > lists of things instead of tagging things. Or maybe we
-> > can get this data from the bus hierarchy instead?
+On Wed, Aug 21, 2013 at 10:07:47AM +0200, Nicolas Ferre wrote:
+> On 21/08/2013 09:42, ludovic.desroches at atmel.com :
+> >From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >
+> >pinctrl-names was missing causing mmc pinctrl to never be requested. Moreover,
+> >add minimal pin configuration to not cause error if overloading is forgotten
+> >in board files.
+> >
+> >Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > 
-> Yeah, I thought if I could do this without any new bindings.
-> For instance, never reset or idle something which is a "cpu" or an
-> "interrupt-controller" or a "memory-controller" or a "bus".
-> For some like memory-controllers though there are no bindings which
-> describe them as memory-controllers.
+> (modified the "interrupts" property to add the macro definition).
 > 
-> > 
-> > If these options don't work, and the choice may be board
-> > specific, then how about ti,skip-reset-on-init, and
-> > ti,skip-idle-on-init?
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+After discussing with Jean-Christophe keeping the first version of the patch
+seems a better choice because the user will be notified if he forgets to
+overload pin configuration instead of thinking that everything goes right and
+having a default pin configuration that could not fit its configuration.
+
 > 
-> This looks fine too.
-
-Or you could also have various bus specific bindings for the ocp
-with lists of phandles?
-
-ocp {
-	reg = <...>;
-	interrupts = <...>;
-	ti,reset-on-init = <&module1, &module2>;
-	...
-};
-
-Or something similar.
-
-Tony
+> stacked in at91-3.12-dt.
+> 
+> Due to macro change, I can't tag it for -stable. We have to remember
+> to add it when it is accepted upstream.
+> 
+> thanks.
+> 
+> >---
+> >
+> >v2:
+> >   - add minimal pin configuration
+> >
+> >  arch/arm/boot/dts/at91sam9260.dtsi | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> >diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> >index 84c4bef..b4de52a 100644
+> >--- a/arch/arm/boot/dts/at91sam9260.dtsi
+> >+++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> >@@ -477,6 +477,8 @@
+> >  				interrupts = <9 4 0>;
+> >  				#address-cells = <1>;
+> >  				#size-cells = <0>;
+> >+				pinctrl-names = "default";
+> >+				pinctrl-0 = <&pinctrl_mmc0_clk &pinctrl_mmc0_slot1_cmd_dat0>;
+> >  				status = "disabled";
+> >  			};
+> >
+> >
+> 
+> 
+> -- 
+> Nicolas Ferre
