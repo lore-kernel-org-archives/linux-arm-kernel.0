@@ -1,116 +1,104 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 21 Aug 2013 17:28:48 +0100
-Subject: [PATCH v2 1/3] ARM: Introduce atomic MMIO clear/set
-In-Reply-To: <20130821142203.GA2459@localhost>
-References: <1377017307-23201-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377017307-23201-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130821122424.GB1653@mudshark.cambridge.arm.com>
- <20130821142203.GA2459@localhost>
-Message-ID: <20130821162848.GF1653@mudshark.cambridge.arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 21 Aug 2013 09:32:32 -0700
+Subject: [PATCH v2 2/5] devicetree: serial: Document msm_serial bindings
+In-Reply-To: <6E3C7111-D337-4DDF-9EF9-F8DC75A1C0B4@codeaurora.org>
+References: <1377067686-31957-1-git-send-email-sboyd@codeaurora.org>
+ <1377067686-31957-3-git-send-email-sboyd@codeaurora.org>
+ <6E3C7111-D337-4DDF-9EF9-F8DC75A1C0B4@codeaurora.org>
+Message-ID: <20130821163231.GC23960@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 03:22:04PM +0100, Ezequiel Garcia wrote:
-> On Wed, Aug 21, 2013 at 01:24:24PM +0100, Will Deacon wrote:
-> > On Tue, Aug 20, 2013 at 05:48:25PM +0100, Ezequiel Garcia wrote:
-> > > diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
-> > > index dcd5b4d..b2a53a3 100644
-> > > --- a/arch/arm/kernel/io.c
-> > > +++ b/arch/arm/kernel/io.c
-> > > @@ -1,6 +1,19 @@
-> > >  #include <linux/export.h>
-> > >  #include <linux/types.h>
-> > >  #include <linux/io.h>
-> > > +#include <linux/spinlock.h>
-> > > +
-> > > +static DEFINE_SPINLOCK(__io_lock);
-> > > +
-> > > +void atomic_io_clear_set(u32 clear, u32 set, void __iomem *reg)
-> > 
-> > First off, what exactly is this function supposed to guarantee? Do you simply
-> > require thread-safe device access, or do you also require completion of the
-> > the device writes?
-> > 
+On 08/21, Kumar Gala wrote:
 > 
-> Indeed, thread-safe device access would be enough, unless I'm missing
-> something.
-
-Great!
-
-> > > +	spin_lock(&__io_lock);
-> > 
-> > Is this function likely to be used in irq context? If so, better disable
-> > IRQs here.
-> > 
+> On Aug 21, 2013, at 1:48 AM, Stephen Boyd wrote:
 > 
-> No, I don't think this API is aimed particularly at irq-context.
-> 
-> That said, it's a generic API that can be used anywhere, yet users are expected
-> to be aware of the performance impact (or at least I hope that).
-> 
-> And speaking about performance, I appreciate any performance tunings,
-> but I guess we can all agree this API is not meant for hot-paths.
-
-Well, device accesses in interrupt handlers are very common, so if you need
-to co-exist with other users of the device, you could decide to use this
-API. I think it's a good idea to use the _irqsave variant here.
-
-> > > +	/* ensure the write get done before unlocking */
-> > > +	__iowmb();
+> > The msm serial device bindings were added to the DTS files but
+> > never documented. Let's document them now and also fix things up
+> > so that it's clearer what hardware is supported. Instead of using
+> > hsuart (for high speed uart), let's use uartdm because that
+> > matches the actual name of the hardware. Also, let's add the
+> > version information in case we need to differentiate between
+> > different versions of the hardware in the future.
 > > 
-> > And then, despite my previous suggestion, you can drop this line too.
-> > 
+> > Cc: David Brown <davidb@codeaurora.org>
+> > Cc: <devicetree@vger.kernel.org>
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> > .../devicetree/bindings/serial/qcom,msm-uart.txt   | 25 +++++++++++
+> > .../devicetree/bindings/serial/qcom,msm-uartdm.txt | 52 ++++++++++++++++++++++
+> > 2 files changed, 77 insertions(+)
+> > create mode 100644 Documentation/devicetree/bindings/serial/qcom,msm-uart.txt
+> > create mode 100644 Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt
 > 
-> Ok... I'm not sure I understand why using relaxed variants allows us to drop this.
+> Should we remove bindings/tty/serial/msm_serial.txt ?
+
+Yes, although I'm confused why there is a tty/serial/ and a serial/
+binding directory.
+
 > 
-> Maybe you can (try) to enlighten me?
-
-Sure. Firstly, an __iowmb() is only required for ensuring *endpoint* ordering
-between normal, cacheable memory and device memory. i.e. you write a normal
-cacheable buffer, then you poke a device to go and read it. That is why
-there is this barrier in writel, before the actual device write: it ensures
-that the buffer is visible to the device before it sees the control write.
-
-My original, rushed reading of your patch lead me to think that this was all
-about endpoint ordering and you were trying to guarantee some sort of
-immediacy of the device write by using a spinlock, but now I see that's not
-the case. Given that the device is never going to go and read the spinlock
-value, you can drop the __iowmb() regardless.
-
-> > Now, the only downside with this approach is that you need explicit barriers
-> > in the driver if you want to enforce ordering with respect to normal,
-> > cacheable buffers to be consumed/populated by the device.
-> > 
-> > What do you think? An alternative would be just to relax the readl and rely
-> > on the dsb preceeding the writel, then add atomic_io_clear_set_relaxed
-> > to implement what I described above, but it depends on how you envisage
-> > this helper being used.
-> > 
+> > diff --git a/Documentation/devicetree/bindings/serial/qcom,msm-uart.txt b/Documentation/devicetree/bindings/serial/qcom,msm-uart.txt
+> > new file mode 100644
+> > index 0000000..ce8c901
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/serial/qcom,msm-uart.txt
+> > @@ -0,0 +1,25 @@
+> > +* MSM Serial UART
+> > +
+> > +The MSM serial UART hardware is designed for low-speed use cases where a
+> > +dma-engine isn't needed. From a software perspective it's mostly compatible
+> > +with the MSM serial UARTDM except that it only supports reading and writing one
+> > +character at a time.
+> > +
+> > +Required properties:
+> > +- compatible: Should contain "qcom,msm-uart"
+> > +- reg: Should contain UART register location and length.
+> > +- interrupts: Should contain UART interrupt.
+> > +- clocks: Should contain the core clock.
+> > +- clock-names: Should be "core".
+> > +
+> > +Example:
+> > +
+> > +A uart device at 0xa9c00000 with interrupt 11.
+> > +
+> > +serial at a9c00000 {
+> > +	compatible = "qcom,msm-uart";
+> > +	reg = <0xa9c00000 0x1000>;
+> > +	interrupts = <11>;
+> > +	clocks = <&uart_cxc>;
+> > +	clock-names = "core";
+> > +};
+> > diff --git a/Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt b/Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt
+> > new file mode 100644
+> > index 0000000..1a4d681
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt
+> > @@ -0,0 +1,52 @@
+> > +* MSM Serial UARTDM
+> > +
+> > +The MSM serial UARTDM hardware is designed for high-speed use cases where the
+> > +transmit and/or receive channels can be offloaded to a dma-engine. From a
+> > +software perspective it's mostly compatible with the MSM serial UART except
+> > +that it supports reading and writing multiple characters at a time.
+> > +
+> > +Required properties:
+> > +- compatible: Should contain at least "qcom,msm-uartdm".
+> > +              A more specific property should be specified as follows depending
+> > +	      on the version:
+> > +		"qcom,msm-uartdm-v1.1"
+> > +		"qcom,msm-uartdm-v1.2"
+> > +		"qcom,msm-uartdm-v1.3"
+> > +		"qcom,msm-uartdm-v1.4"
+> > +- reg: Should contain UART register locations and lengths. The first
+> > +       register shall specify the main control registers. An optional second
+> > +       register location shall specify the GSBI control region.
 > 
-> Mmm.. it's not easy to foresee, for we have only a scarce bunch of planned
-> usage for the API. I guess any simple shared-register access would want
-> to use this, typically just to enable/disable something in some 'control'
-> register.
+> Can we add something like:
+> 
+> "qcom,msm-uartdm-v1.3" is the only compatible that might optionally need the GSBI control region.
 
-Right, but if that control register causes the device to go off and read a
-normal, cacheable buffer then the driver would need explicit barriers if we
-exclusively use relaxed accessors here. The more I think about it, the more
-I like the idea of having two versions:
+Ok. I will remove the part from the example.
 
-atomic_io_clear_set
-	spin_lock
-	writel(readl_relaxed(...)
-	spin_unlock
-
-atomic_io_clear_set_relaxed
-	spin_lock
-	writel_relaxed(readl_relaxed(...))
-	spin_unlock
-
-That way, the two versions match the semantics of the simpler I/O accessors
-from which they are built and drivers can use the relaxed variant as an
-optimisation.
-
-Hope that helps, and sorry for the confusion.
-
-Will
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
