@@ -1,61 +1,98 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 21 Aug 2013 18:09:41 +0530
-Subject: [PATCH 2/3] ARM: OMAP2+: Add new bindings for OMAP
-In-Reply-To: <20130821122327.GI7656@atomide.com>
-References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
- <1376983966-16490-3-git-send-email-rnayak@ti.com>
- <20130821074514.GU7656@atomide.com> <52147E95.5000606@ti.com>
- <20130821085330.GH7656@atomide.com> <521486E1.6030009@ti.com>
- <20130821122327.GI7656@atomide.com>
-Message-ID: <5214B50D.3050703@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 21 Aug 2013 14:44:41 +0200
+Subject: [PATCH 12/16] clk: samsung: pll: Add support for rate
+ configuration of PLL46xx
+In-Reply-To: <CAKew6eU4ofumk64fwZSK-R-UUBQos6UU1TLDdVRDE-bvOrbitw@mail.gmail.com>
+References: <1377019903-14614-1-git-send-email-t.figa@samsung.com>
+ <1377019903-14614-13-git-send-email-t.figa@samsung.com>
+ <CAKew6eU4ofumk64fwZSK-R-UUBQos6UU1TLDdVRDE-bvOrbitw@mail.gmail.com>
+Message-ID: <14520108.LqsSBuPVXk@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 August 2013 05:53 PM, Tony Lindgren wrote:
-> * Rajendra Nayak <rnayak@ti.com> [130821 02:29]:
->> On Wednesday 21 August 2013 02:23 PM, Tony Lindgren wrote:
->>>
->>> Or you could also have various bus specific bindings for the ocp
->>> with lists of phandles?
->>>
->>> ocp {
->>> 	reg = <...>;
->>> 	interrupts = <...>;
->>> 	ti,reset-on-init = <&module1, &module2>;
->>> 	...
->>> };
->>>
->>> Or something similar.
->>
->> The only problem I see with this is that some of these modules could be
->> board specific ones and need to be part of the board dts files, like
->> some boards which have PMIC power switch hooked up to some gpio etc.
->> So there could be some SoC specific modules (like emif/gpmc on OMAPs)
->> and some which depend on how the boards are designed.
+On Wednesday 21 of August 2013 18:02:16 Yadwinder Singh Brar wrote:
+> > +       con0 |= (rate->mdiv << PLL46XX_MDIV_SHIFT) |
+> > +                       (rate->pdiv << PLL46XX_PDIV_SHIFT) |
+> > +                       (rate->sdiv << PLL46XX_SDIV_SHIFT) |
+> > +                       (rate->vsel << PLL46XX_VSEL_SHIFT);
+> > +
+> > +       /* Set PLL AFC, MFR and MRR values. */
 > 
-> You can still override the ocp entry in the board specific .dts file.
-> Would probably be a lot easier than to override each module separately
-> in the board specific .dts file.
+> This comments seems to be miss match with below code.
 
-So, If I understand this right we would have the dt entries
-something like,
+Hmm, looks like a copy/paste error. Thanks for spotting.
 
-omap4.dtsi
-------
-ocp {
-	reg = <...>;
-	interrupts = <...>;
-	ti,no-reset-on-init = <&emif1, &emif2, &gpmc>;
-	...
-};
+> > +       con1 = __raw_readl(pll->con_reg + 0x4);
+> > +       con1 &= ~((PLL46XX_KDIV_MASK << PLL46XX_KDIV_SHIFT) |
+> > +                       (PLL46XX_MFR_MASK << PLL46XX_MFR_SHIFT) |
+> > +                       (PLL46XX_MRR_MASK << PLL46XX_MRR_SHIFT));
+> > +       con1 |= (rate->kdiv << PLL46XX_KDIV_SHIFT) |
+> > +                       (rate->mfr << PLL46XX_MFR_SHIFT) |
+> > +                       (rate->mrr << PLL46XX_MRR_SHIFT);
+> > +
+> 
+> <snip>
+> 
+> > --- a/drivers/clk/samsung/clk-pll.h
+> > +++ b/drivers/clk/samsung/clk-pll.h
+> > @@ -51,6 +51,28 @@ enum samsung_pll_type {
+> > 
+> >                 .afc    =       (_afc),                         \
+> >         
+> >         }
+> > 
+> > +#define PLL_4600_RATE(_rate, _m, _p, _s, _k, _vsel)            \
+> > +       {                                                       \
+> > +               .rate   =       (_rate),                        \
+> > +               .mdiv   =       (_m),                           \
+> > +               .pdiv   =       (_p),                           \
+> > +               .sdiv   =       (_s),                           \
+> > +               .kdiv   =       (_k),                           \
+> > +               .vsel   =       (_vsel),                        \
+> > +       }
+> > +
+> > +#define PLL_4650_RATE(_rate, _m, _p, _s, _k, _mfr, _mrr, _vsel)       
+> > \ +       {                                                       \ + 
+> >              .rate   =       (_rate),                        \ +      
+> >         .mdiv   =       (_m),                           \ +           
+> >    .pdiv   =       (_p),                           \ +              
+> > .sdiv   =       (_s),                           \ +              
+> > .kdiv   =       (_k),                           \ +               .mfr
+> >    =       (_mfr),                         \ +               .mrr    =
+> >       (_mrr),                         \ +               .vsel   =     
+> >  (_vsel),                        \ +       }
+> > +
+> > 
+> >  /* NOTE: Rate table should be kept sorted in descending order. */
+> >  
+> >  struct samsung_pll_rate_table {
+> > 
+> > @@ -60,6 +82,9 @@ struct samsung_pll_rate_table {
+> > 
+> >         unsigned int sdiv;
+> >         unsigned int kdiv;
+> >         unsigned int afc;
+> > 
+> > +       unsigned int mfr;
+> > +       unsigned int mrr;
+> > +       unsigned int vsel;
+> > 
+> >  };
+> 
+> This struct seems to be expanding too much.
 
-omap4-panda-es.dts
-------
-ocp {
-	ti,no-reset-on-init = <&emif1, &emif2, &gpmc, &gpio4>;
-	...
-};
+I don't think it's a problem. How many bytes such tables can occupy in a 
+system?
 
-Is it that, or you suggesting we can _append_ the soc list of
-modules with board specific modules, which I am not sure if its
-possible.
+> Can we re-think on options for using bit map same as register
+> definition? It can reduce code in set_rate also little bit.
+
+IMHO it is more clear what the code does when accessing a single 
+coefficient at once.
+
+In addition you still would need to preserve bitfields that are not changed 
+by the driver and also unpack some of the coefficients anyway, like pdiv 
+that is used to calculate lock time.
+
+Best regards,
+Tomasz
