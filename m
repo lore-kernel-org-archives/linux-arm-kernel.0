@@ -1,56 +1,27 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 21 Aug 2013 15:41:06 +0200
-Subject: [PATCH v2 0/2] ARM: dts: Add SHAM and AES DT information
-In-Reply-To: <5214C11F.8090808@baylibre.com>
-References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.02.1308210012420.6426@utopia.booyaka.com>
- <5214C11F.8090808@baylibre.com>
-Message-ID: <5214C372.3080402@baylibre.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 21 Aug 2013 15:43:40 +0200
+Subject: [PATCH v5 0/3] i2c-mv64xxx: Fixes and new feature for controlers
+ embedded in Aramda XP
+In-Reply-To: <52149A02.1000504@free-electrons.com>
+References: <1376039158-1896-1-git-send-email-gregory.clement@free-electrons.com>
+ <5213979B.4050306@free-electrons.com>
+ <20130820190714.GB24466@katana>
+ <52149A02.1000504@free-electrons.com>
+Message-ID: <20130821134340.GA3238@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
 
-In fact I cannot even apply these patches since they are referring the 
-the edma controller node that does not seem to be there in 3.11-rc6.
+> compatible", do you want that I rebase my patch set on your
+> i2c/for-current branch, or do you prefer to take care of the merge
+> conflict yourself?
 
-Is this EDMA series supposed to be merged for 3.12? If this is the case, 
-where can I find a reference GIT for it?
+My for-next would be preferred.
 
-Thanks,
-Benoit
-
-On 21/08/2013 15:31, Benoit Cousson wrote:
-> Hi Paul,
->
-> On 21/08/2013 02:13, Paul Walmsley wrote:
->> Hi Beno?t,
->>
->> On Wed, 17 Jul 2013, Mark A. Greer wrote:
->>
->>> From: "Mark A. Greer" <mgreer@animalcreek.com>
->>>
->>> Long overdue patches to add the device tree updates and
->>> documentation for the SHAM and AES modules on the am33xx.
->>> The supporting code is already in the mainline kernel.
->>>
->>> This series is based on the current mainline kernel,
->>> c0d15cc (linked-list: Remove __list_for_each).
->>>
->>> Changes from v1:
->>>   - Added missing '};' as pointed out by Lokesh Vutla
->>> <lokeshvutla@ti.com>
->>
->> I guess you should take these patches?
->
-> You're right, I should, I've just never seen them :-(
-> Thanks for the pointer.
->
-> Mark,
->
-> After a quick search on Google, I did not see any comment on these
-> patches. Did you get any review so far?
->
-> Thanks,
-> Benoit
->
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130821/2b791dc9/attachment.sig>
