@@ -1,76 +1,26 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Wed, 21 Aug 2013 11:07:42 +0800
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for Freescale FTM
- PWM
-In-Reply-To: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Wed, 21 Aug 2013 11:19:01 +0800
+Subject: remove pxa ssp driver???
+Message-ID: <CADApbej4bvSW7PVXnor4v3iFMcZ=ZHN9T_ST5-SYFJZM9sakDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
----
- .../devicetree/bindings/pwm/fsl-ftm-pwm.txt        | 52 ++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
+hi
+In arch/arm/plat-pxa, there is a ssp driver named ssp.c.
+The ssp driver will probe all the ssp devices one by one, and linked
+them into a list.
+The driver also provides two APIs pxa_request_pxa() and pxa_ssp_free().
 
-diff --git a/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt b/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
-new file mode 100644
-index 0000000..698965b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
-@@ -0,0 +1,52 @@
-+Freescale FTM PWM controller
-+
-+Required properties:
-+- compatible: should be "fsl,vf610-ftm-pwm"
-+- reg: physical base address and length of the controller's registers
-+- #pwm-cells: Should be 3. Number of cells being used to specify PWM property.
-+  First cell specifies the per-chip channel index of the PWM to use, the
-+  second cell is the period in nanoseconds and bit 0 in the third cell is
-+  used to encode the polarity of PWM output. Set bit 0 of the third in PWM
-+  specifier to 1 for inverse polarity & set to 0 for normal polarity.
-+- fsl,pwm-clk-ps: the ftm0 pwm clock's prescaler, divide-by 2^n(n = 0 ~ 7).
-+- fsl,pwm-cpwm: Center-Aligned PWM (CPWM) mode.
-+- fsl,pwm-number: the number of PWM devices, and is must equal to the number
-+  of "fsl,pwm-channels".
-+- fsl,pwm-channels: the channels' order which is be used for pwm in ftm0
-+  module, and they must be one or some of 0 ~ 7, because the ftm0 only has
-+  8 channels can be used.
-+- for very channel, the revlatived the pinctrl should be at least two state
-+  {"enN", "dsN"}, which "en" means "enable", "ds" means "disable" and "N"
-+  means the order of the channel.
-+
-+Example:
-+
-+pwm0: pwm at 40038000 {
-+	      compatible = "fsl,vf610-ftm-pwm";
-+	      reg = <0x40038000 0x1000>;
-+	      #pwm-cells = <3>;
-+	      pinctrl-names = "en0", "ds0", "en3", "ds3";
-+	      pinctrl-0 = <&pinctrl_pwm0_ch0_en>;
-+	      pinctrl-1 = <&pinctrl_pwm0_ch0_ds>;
-+	      pinctrl-2 = <&pinctrl_pwm0_ch3_en>;
-+	      pinctrl-3 = <&pinctrl_pwm0_ch3_ds>;
-+	      fsl,pwm-clk-ps = <7>;
-+	      fsl,pwm-cpwm = <0>;
-+	      fsl,pwm-number = <2>;
-+	      fsl,pwm-channels = <0 3>;
-+	      ...
-+      };
-+
-+leds {
-+	compatible = "pwm-leds";
-+	led {
-+		label = "fsl_led";
-+		pwms = <&pwm0 0 10000000 0>;
-+		max-brightness = <127>;
-+	};
-+	backlight {
-+		label = "fsl_backlight";
-+		pwms = <&pwm0 3 10000000 1>;
-+		max-brightness = <100>;
-+	};
-+};
--- 
-1.8.0
+So why we will have ssp.c driver? The only thing the driver will do is
+linked all the ssp devices into a list, and then provides APIs to
+others to allocate and free the ssp ports.
+
+The ssp connection is defined by board, and it is fixed. So for a
+single board, i do not think the port will be allocated or freed
+dynamically. Is there any case that will two drivers will share same
+port?
+
+If the two APIs are not needed. Then we can remove the driver, and
+lets other drivers, for example, spi-pxa.c and sound/soc/pxa/pxa-ssp.c
+to directly handle the ssp resources(get irq number, iomap the
+register and etc.)
