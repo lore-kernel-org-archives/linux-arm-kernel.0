@@ -1,143 +1,46 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 21 Aug 2013 11:16:13 +0530
-Subject: [PATCH v11 8/8] usb: phy: twl4030-usb: remove *set_suspend* and
- *phy_init* ops
-In-Reply-To: <1377063973-22044-1-git-send-email-kishon@ti.com>
-References: <1377063973-22044-1-git-send-email-kishon@ti.com>
-Message-ID: <1377063973-22044-9-git-send-email-kishon@ti.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 21 Aug 2013 09:41:51 +0300
+Subject: [PATCH v5 5/8] usb: musb: omap2430: Don't use
+ omap_get_control_dev()
+In-Reply-To: <5213AE04.1070907@cogentembedded.com>
+References: <1377010577-19355-1-git-send-email-rogerq@ti.com>
+ <1377010577-19355-6-git-send-email-rogerq@ti.com>
+ <5213AE04.1070907@cogentembedded.com>
+Message-ID: <5214612F.4000500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that twl4030-usb is adapted to the new generic PHY framework,
-*set_suspend* and *phy_init* ops can be removed from twl4030-usb driver.
+On 08/20/2013 08:57 PM, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 08/20/2013 06:56 PM, Roger Quadros wrote:
+> 
+>> omap_get_control_dev() is being deprecated as it doesn't support
+>> multiple instances. As control device is present only from OMAP4
+>> onwards which supports DT only, we use phandles to get the
+>> reference to the control device.
+> 
+>> Also get rid of "ti,has-mailbox" property as it is redundant and
+>> we can determine that from whether "ctrl-module" property is present
+>> or not. Get rid of has_mailbox from musb_hdrc_platform_data as well.
+> 
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> [...]
+> 
+>> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+>> index ebb46ec..516795b 100644
+>> --- a/drivers/usb/musb/omap2430.c
+>> +++ b/drivers/usb/musb/omap2430.c
+> [...]
+>> @@ -509,8 +510,12 @@ static int omap2430_probe(struct platform_device *pdev)
+>>       glue->dev            = &pdev->dev;
+>>       glue->musb            = musb;
+>>       glue->status            = OMAP_MUSB_UNKNOWN;
+>> +    glue->control_otghs = ERR_PTR(-ENODEV);
+> 
+>    Could you please align = with the others above?
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- drivers/phy/phy-twl4030-usb.c |   57 ++++++++++-------------------------------
- 1 file changed, 13 insertions(+), 44 deletions(-)
+OK.
 
-diff --git a/drivers/phy/phy-twl4030-usb.c b/drivers/phy/phy-twl4030-usb.c
-index 494f107..c437211 100644
---- a/drivers/phy/phy-twl4030-usb.c
-+++ b/drivers/phy/phy-twl4030-usb.c
-@@ -422,25 +422,20 @@ static void twl4030_phy_power(struct twl4030_usb *twl, int on)
- 	}
- }
- 
--static void twl4030_phy_suspend(struct twl4030_usb *twl, int controller_off)
-+static int twl4030_phy_power_off(struct phy *phy)
- {
-+	struct twl4030_usb *twl = phy_get_drvdata(phy);
-+
- 	if (twl->asleep)
--		return;
-+		return 0;
- 
- 	twl4030_phy_power(twl, 0);
- 	twl->asleep = 1;
- 	dev_dbg(twl->dev, "%s\n", __func__);
--}
--
--static int twl4030_phy_power_off(struct phy *phy)
--{
--	struct twl4030_usb *twl = phy_get_drvdata(phy);
--
--	twl4030_phy_suspend(twl, 0);
- 	return 0;
- }
- 
--static void __twl4030_phy_resume(struct twl4030_usb *twl)
-+static void __twl4030_phy_power_on(struct twl4030_usb *twl)
- {
- 	twl4030_phy_power(twl, 1);
- 	twl4030_i2c_access(twl, 1);
-@@ -449,11 +444,13 @@ static void __twl4030_phy_resume(struct twl4030_usb *twl)
- 		twl4030_i2c_access(twl, 0);
- }
- 
--static void twl4030_phy_resume(struct twl4030_usb *twl)
-+static int twl4030_phy_power_on(struct phy *phy)
- {
-+	struct twl4030_usb *twl = phy_get_drvdata(phy);
-+
- 	if (!twl->asleep)
--		return;
--	__twl4030_phy_resume(twl);
-+		return 0;
-+	__twl4030_phy_power_on(twl);
- 	twl->asleep = 0;
- 	dev_dbg(twl->dev, "%s\n", __func__);
- 
-@@ -466,13 +463,6 @@ static void twl4030_phy_resume(struct twl4030_usb *twl)
- 		cancel_delayed_work(&twl->id_workaround_work);
- 		schedule_delayed_work(&twl->id_workaround_work, HZ);
- 	}
--}
--
--static int twl4030_phy_power_on(struct phy *phy)
--{
--	struct twl4030_usb *twl = phy_get_drvdata(phy);
--
--	twl4030_phy_resume(twl);
- 	return 0;
- }
- 
-@@ -604,9 +594,9 @@ static void twl4030_id_workaround_work(struct work_struct *work)
- 	}
- }
- 
--static int twl4030_usb_phy_init(struct usb_phy *phy)
-+static int twl4030_phy_init(struct phy *phy)
- {
--	struct twl4030_usb *twl = phy_to_twl(phy);
-+	struct twl4030_usb *twl = phy_get_drvdata(phy);
- 	enum omap_musb_vbus_id_status status;
- 
- 	/*
-@@ -621,32 +611,13 @@ static int twl4030_usb_phy_init(struct usb_phy *phy)
- 
- 	if (status == OMAP_MUSB_ID_GROUND || status == OMAP_MUSB_VBUS_VALID) {
- 		omap_musb_mailbox(twl->linkstat);
--		twl4030_phy_resume(twl);
-+		twl4030_phy_power_on(phy);
- 	}
- 
- 	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
- 	return 0;
- }
- 
--static int twl4030_phy_init(struct phy *phy)
--{
--	struct twl4030_usb *twl = phy_get_drvdata(phy);
--
--	return twl4030_usb_phy_init(&twl->phy);
--}
--
--static int twl4030_set_suspend(struct usb_phy *x, int suspend)
--{
--	struct twl4030_usb *twl = phy_to_twl(x);
--
--	if (suspend)
--		twl4030_phy_suspend(twl, 1);
--	else
--		twl4030_phy_resume(twl);
--
--	return 0;
--}
--
- static int twl4030_set_peripheral(struct usb_otg *otg,
- 					struct usb_gadget *gadget)
- {
-@@ -719,8 +690,6 @@ static int twl4030_usb_probe(struct platform_device *pdev)
- 	twl->phy.label		= "twl4030";
- 	twl->phy.otg		= otg;
- 	twl->phy.type		= USB_PHY_TYPE_USB2;
--	twl->phy.set_suspend	= twl4030_set_suspend;
--	twl->phy.init		= twl4030_usb_phy_init;
- 
- 	otg->phy		= &twl->phy;
- 	otg->set_host		= twl4030_set_host;
--- 
-1.7.10.4
+cheers,
+-roger
