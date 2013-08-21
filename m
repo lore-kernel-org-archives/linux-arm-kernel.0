@@ -1,44 +1,96 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Aug 2013 01:03:13 -0700
-Subject: [PATCH] ARM: fix wrong address when loading
- PRM_FRAC_INCREMENTOR_DENUMERATOR_RELOAD
-In-Reply-To: <1375884321-30489-1-git-send-email-baozich@gmail.com>
-References: <1375884321-30489-1-git-send-email-baozich@gmail.com>
-Message-ID: <20130821080313.GC7656@atomide.com>
+From: poeschel@lemonage.de (Lars Poeschel)
+Date: Wed, 21 Aug 2013 09:57:01 +0200
+Subject: [PATCH] ARM: dts: am33xx: Correct gpio #interrupt-cells property
+In-Reply-To: <20130821075016.GW7656@atomide.com>
+References: <1375873592-26881-1-git-send-email-larsi@wh2.tu-dresden.de>
+ <20130821075016.GW7656@atomide.com>
+Message-ID: <201308210957.01956.poeschel@lemonage.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Chen Baozi <baozich@gmail.com> [130807 07:18]:
-> The denominator should be load from INCREMENTOR_DENUMERATOR_RELOAD_OFFSET
-> rather than INCREMENTER_NUMERATOR_OFFSET.
+Hi Tony!
+
+On Wednesday 21 August 2013 at 09:50:16, Tony Lindgren wrote:
+> Benoit,
 > 
-> This is more likely a typo, since INCREMENTER_DENUMERATOR_RELOAD[23:17] is
-> reserved. It seems that it won't make much trouble without this fix, because
-> the useful [11:0] bits are mask and set the right value. Anyway, reading
-> from a right address is better choice.
+> Care to take a look at this too?
 
-Thanks applying to omap-for-v3.12/fixes-non-critical.
+Benoit already applied this with Mark Rutlands Acked-By and Javier Martinez 
+Canillas Reviewed-by.
 
-Tony
+Regards,
+Lars
  
-> Signed-off-by: Chen Baozi <baozich@gmail.com>
-> ---
->  arch/arm/mach-omap2/timer.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 1e77f11..ccc5c72 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -537,7 +537,7 @@ static void __init realtime_counter_init(void)
->  	reg |= num;
->  	__raw_writel(reg, base + INCREMENTER_NUMERATOR_OFFSET);
->  
-> -	reg = __raw_readl(base + INCREMENTER_NUMERATOR_OFFSET) &
-> +	reg = __raw_readl(base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET) &
->  			NUMERATOR_DENUMERATOR_MASK;
->  	reg |= den;
->  	__raw_writel(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
-> -- 
-> 1.8.1.4
-> 
+> * Lars Poeschel <larsi@wh2.tu-dresden.de> [130807 04:14]:
+> > From: Lars Poeschel <poeschel@lemonage.de>
+> > 
+> > Following commit ff5c9059 and therefore other omap platforms using
+> > the gpio-omap driver correct the #interrupt-cells property on am33xx
+> > too. The omap gpio binding documentaion also states that
+> > the #interrupt-cells property should be 2.
+> > 
+> > Signed-off-by: Lars Poeschel <poeschel@lemonage.de>
+> > ---
+> > 
+> >  arch/arm/boot/dts/am33xx.dtsi |    8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/am33xx.dtsi
+> > b/arch/arm/boot/dts/am33xx.dtsi index 38b446b..033c5dd 100644
+> > --- a/arch/arm/boot/dts/am33xx.dtsi
+> > +++ b/arch/arm/boot/dts/am33xx.dtsi
+> > @@ -102,7 +102,7 @@
+> > 
+> >  			gpio-controller;
+> >  			#gpio-cells = <2>;
+> >  			interrupt-controller;
+> > 
+> > -			#interrupt-cells = <1>;
+> > +			#interrupt-cells = <2>;
+> > 
+> >  			reg = <0x44e07000 0x1000>;
+> >  			interrupts = <96>;
+> >  		
+> >  		};
+> > 
+> > @@ -113,7 +113,7 @@
+> > 
+> >  			gpio-controller;
+> >  			#gpio-cells = <2>;
+> >  			interrupt-controller;
+> > 
+> > -			#interrupt-cells = <1>;
+> > +			#interrupt-cells = <2>;
+> > 
+> >  			reg = <0x4804c000 0x1000>;
+> >  			interrupts = <98>;
+> >  		
+> >  		};
+> > 
+> > @@ -124,7 +124,7 @@
+> > 
+> >  			gpio-controller;
+> >  			#gpio-cells = <2>;
+> >  			interrupt-controller;
+> > 
+> > -			#interrupt-cells = <1>;
+> > +			#interrupt-cells = <2>;
+> > 
+> >  			reg = <0x481ac000 0x1000>;
+> >  			interrupts = <32>;
+> >  		
+> >  		};
+> > 
+> > @@ -135,7 +135,7 @@
+> > 
+> >  			gpio-controller;
+> >  			#gpio-cells = <2>;
+> >  			interrupt-controller;
+> > 
+> > -			#interrupt-cells = <1>;
+> > +			#interrupt-cells = <2>;
+> > 
+> >  			reg = <0x481ae000 0x1000>;
+> >  			interrupts = <62>;
+> >  		
+> >  		};
