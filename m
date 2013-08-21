@@ -1,95 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 21 Aug 2013 11:50:49 +0200
-Subject: [PATCH 1/4] pwm: add freescale ftm pwm driver support
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F827D1C51@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-2-git-send-email-Li.Xiubo@freescale.com>
- <20130821073659.GN31036@pengutronix.de>
- <1DD289F6464F0949A2FCA5AA6DC23F827D1C51@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <20130821095049.GQ31036@pengutronix.de>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 21 Aug 2013 17:50:17 +0800
+Subject: [PATCH] ARM64: include: asm: include "asm/types.h" in
+ "pgtable-2level-types.h" and "pgtable-3level-types.h"
+Message-ID: <52148D59.5090603@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 09:24:56AM +0000, Xiubo Li-B47053 wrote:
-> TO Sascha,
-> 
-> > > +
-> > > +	fpc = to_fsl_chip(chip);
-> > > +
-> > > +	if (WARN_ON(!test_bit(PWMF_REQUESTED, &pwm->flags)))
-> > > +		return -ESHUTDOWN;
-> > > +
-> > > +	statename = kasprintf(GFP_KERNEL, "en%d", pwm->hwpwm);
-> > > +	pins_state = pinctrl_lookup_state(fpc->pinctrl,
-> > > +			statename);
-> > > +	/* enable pins to be muxed in and configured */
-> > > +	if (!IS_ERR(pins_state)) {
-> > > +		ret = pinctrl_select_state(fpc->pinctrl, pins_state);
-> > > +		if (ret)
-> > > +			dev_warn(&fpc->pdev->dev,
-> > > +					"could not set default pins\n");
-> > 
-> > Why do you need to manipulate the pinctrl to en/disable a channel?
-> > 
-> 
-> This is because in Vybrid VF610 TOWER board, there are 4 leds, and each led's one point(diode's positive pole) is connected to 3.3V,
-> and the other point is connected to pwm's one channel. When the 4 pinctrls are configured as enable at the same time, 
-> the 4 pinctrls is low valtage, and the 4 leds will be lighted up as default, then when you enable/disable one led will effects others.
-> 
+Need include "asm/types.h", just like arm has done, or can not pass
+compiling, the related error:
 
-I think the inactive state of a PWM is pretty much undefined by the PWM
-framework and left to the drivers.
+  In file included from arch/arm64/include/asm/page.h:37:0,
+                   from drivers/staging/lustre/include/linux/lnet/linux/lib-lnet.h:42,
+                   from drivers/staging/lustre/include/linux/lnet/lib-lnet.h:44,
+                   from drivers/staging/lustre/lnet/lnet/api-ni.c:38:
+  arch/arm64/include/asm/pgtable-2level-types.h:19:1: error: unknown type name ?u64
+  arch/arm64/include/asm/pgtable-2level-types.h:20:1: error: unknown type name ?u64?
 
-I stumbled upon this aswell. It would be good to think about the
-inactive state and how the PWM framework could help us here getting
-things right.
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm64/include/asm/pgtable-2level-types.h |    2 ++
+ arch/arm64/include/asm/pgtable-3level-types.h |    2 ++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-There are several things to consider. For a noninverted PWM the inactive
-state should probably logic 0. For an inverted PWM it should probably be
-logic 1. I guess several PWM devices have an undefined inactive state,
-most of the PWM devices probably can control the inactive state by
-setting the duty cycle to 100% / 0% without actually disabling the PWM.
-
-Using the pinctrl is one way to control the inactive state and probaby
-the only one before initialization. It might be good to wire this up in
-the core instead of the individual PWM drivers.
-
-These are just the thoughts which first came to my mind.
-
-Thierry, any more input about this?
-
-
-> > > +	fpc = dev_get_drvdata(dev);
-> > > +
-> > > +	ret = kstrtouint(buf, 0, &val);
-> > > +	if (ret)
-> > > +		return ret;
-> > > +
-> > > +	mutex_lock(&fpc->lock);
-> > > +	if (!!(val) != !!(fpc->cpwm)) {
-> > > +		fpc->cpwm = !!val;
-> > > +		fsl_updata_config(fpc, NULL);
-> > > +	}
-> > > +	mutex_unlock(&fpc->lock);
-> > > +
-> > > +	return count;
-> > > +}
-> > 
-> > What is this cpwm thingy?
-> 
-> Up-down counting mode:
-> CNTIN(a register) defines the starting value of the count and MOD(a register) defines the final value of the
-> count. The value of CNTIN is loaded into the FTM counter, and the counter increments
-> until the value of MOD is reached, at which point the counter is decremented until it
-> returns to the value of CNTIN and the up-down counting restarts.
-
-The current PWM framework only cares about period times and duty cycles.
-Why would I want to care about this?
-
-Sascha
-
+diff --git a/arch/arm64/include/asm/pgtable-2level-types.h b/arch/arm64/include/asm/pgtable-2level-types.h
+index 3c3ca7d..5f101e6 100644
+--- a/arch/arm64/include/asm/pgtable-2level-types.h
++++ b/arch/arm64/include/asm/pgtable-2level-types.h
+@@ -16,6 +16,8 @@
+ #ifndef __ASM_PGTABLE_2LEVEL_TYPES_H
+ #define __ASM_PGTABLE_2LEVEL_TYPES_H
+ 
++#include <asm/types.h>
++
+ typedef u64 pteval_t;
+ typedef u64 pgdval_t;
+ typedef pgdval_t pmdval_t;
+diff --git a/arch/arm64/include/asm/pgtable-3level-types.h b/arch/arm64/include/asm/pgtable-3level-types.h
+index 4489615..4e94424 100644
+--- a/arch/arm64/include/asm/pgtable-3level-types.h
++++ b/arch/arm64/include/asm/pgtable-3level-types.h
+@@ -16,6 +16,8 @@
+ #ifndef __ASM_PGTABLE_3LEVEL_TYPES_H
+ #define __ASM_PGTABLE_3LEVEL_TYPES_H
+ 
++#include <asm/types.h>
++
+ typedef u64 pteval_t;
+ typedef u64 pmdval_t;
+ typedef u64 pgdval_t;
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.7.6
