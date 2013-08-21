@@ -1,37 +1,284 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 21 Aug 2013 11:28:25 +0400
-Subject: [PATCH 3/3] ARM: dts: i.MX51: Add W1 devicetree node
-In-Reply-To: <1377070105-15902-1-git-send-email-shc_work@mail.ru>
-References: <1377070105-15902-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1377070105-15902-3-git-send-email-shc_work@mail.ru>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 21 Aug 2013 09:36:59 +0200
+Subject: [PATCH 1/4] pwm: add freescale ftm pwm driver support
+In-Reply-To: <1377054462-6283-2-git-send-email-Li.Xiubo@freescale.com>
+References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377054462-6283-2-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20130821073659.GN31036@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the missing W1 (onewire) devicetree node for i.MX51 CPUs.
+On Wed, Aug 21, 2013 at 11:07:39AM +0800, Xiubo Li wrote:
+> +
+> +#define FTM_CSC_BASE        0x0C
+> +#define FTM_CSC(_CHANNEL) \
+> +	(FTM_CSC_BASE + (_CHANNEL * 0x08))
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx51.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+I see this more and more in FSL code. This is unsafe! Consider what
+happens when we call FTM_CSC(1 + 1). The result is certainly not what
+you want.
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 09ecf29..2805132 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -379,6 +379,14 @@
- 				clocks = <&clks 107>;
- 			};
- 
-+			owire: owire at 83fa4000 {
-+				compatible = "fsl,imx51-owire", "fsl,imx21-owire";
-+				reg = <0x83fa4000 0x4000>;
-+				interrupts = <88>;
-+				clocks = <&clks 159>;
-+				status = "disabled";
-+			};
-+
- 			ecspi2: ecspi at 83fac000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
+> +
+> +static int fsl_pwm_request_channel(struct pwm_chip *chip,
+> +			       struct pwm_device *pwm)
+> +{
+> +	int ret = 0;
+
+No need to initialize this variable.
+
+> +	struct fsl_pwm_chip *fpc;
+> +
+> +	fpc = to_fsl_chip(chip);
+> +
+> +	ret = clk_prepare_enable(fpc->clk);
+> +	if (ret) {
+> +		dev_err(&fpc->pdev->dev,
+> +				"failed to clk_prepare_enable "
+> +				"ftm pwm module clock : %d\n",
+> +				ret);
+
+Just return ret. We do not need a message for each failed function in
+the kernel.
+
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+
+> +static int fsl_updata_config(struct fsl_pwm_chip *fpc,
+> +			     struct pwm_device *pwm)
+> +{
+> +	int i;
+> +	unsigned long reg, cntin = FTM_CNTIN_VAL;
+> +	struct pwm_chip *chip = &fpc->chip;
+> +
+> +	reg = readl(fpc->base + FTM_SC);
+> +	reg &= ~(FTMSC_CPWMS);
+> +	reg |= (fpc->cpwm ? FTMSC_CPWMS : 0x00);
+> +	writel(reg, fpc->base + FTM_SC);
+> +
+> +	if (pwm && fpc->cpwm) {
+> +		writel(fpc->fpwms[pwm->hwpwm].period_cycles / 2 + cntin,
+> +				fpc->base + FTM_MOD);
+> +		writel(fpc->fpwms[pwm->hwpwm].duty_cycles / 2 + cntin,
+> +				fpc->base + FTM_CV(pwm->hwpwm));
+> +	} else if (pwm) {
+> +		writel(fpc->fpwms[pwm->hwpwm].period_cycles + cntin - 1,
+> +				fpc->base + FTM_MOD);
+> +		writel(fpc->fpwms[pwm->hwpwm].duty_cycles + cntin,
+> +				fpc->base + FTM_CV(pwm->hwpwm));
+> +	}
+> +
+> +	if (pwm)
+> +		return 0;
+> +
+> +	for (i = 0; i < chip->npwm; i++) {
+> +		if (!test_bit(PWMF_ENABLED, &chip->pwms[i].flags))
+> +			continue;
+> +		if (fpc->cpwm) {
+> +			writel(fpc->fpwms[i].period_cycles / 2 + cntin,
+> +					fpc->base + FTM_MOD);
+> +			writel(fpc->fpwms[i].duty_cycles / 2 + cntin,
+> +					fpc->base + FTM_CV(i));
+> +		} else {
+> +			writel(fpc->fpwms[i].period_cycles + cntin - 1,
+> +					fpc->base + FTM_MOD);
+> +			writel(fpc->fpwms[i].duty_cycles + cntin,
+> +					fpc->base + FTM_CV(i));
+> +		}
+> +	}
+> +
+
+The behaviour of this function is completely different for pwm == NULL
+and pwm != NULL. This indicates that it should really be two functions.
+This probably makes the intention of this code much clearer.
+
+> +static int fsl_pwm_config_channel(struct pwm_chip *chip,
+> +			      struct pwm_device *pwm,
+> +			      int duty_ns,
+> +			      int period_ns)
+> +{
+> +	unsigned long period_cycles, duty_cycles;
+> +	struct fsl_pwm_chip *fpc;
+> +
+> +	fpc = to_fsl_chip(chip);
+> +
+> +	if (WARN_ON(!test_bit(PWMF_REQUESTED, &pwm->flags)))
+> +		return -ESHUTDOWN;
+> +
+> +	period_cycles = fsl_rate_to_cycles(fpc, period_ns);
+> +	if (period_cycles > 0xFFFF) {
+> +		dev_warn(&fpc->pdev->dev,
+> +				"required PWM period cycles(%lu) "
+> +				"overflow 16-bits counter!\n",
+> +				period_cycles);
+> +		period_cycles = 0xFFFF;
+
+If you can't fulfill the requirements you have to return an error. It's
+the caller that needs to know the failure. The caller can't read read
+the syslog.
+
+> +static int fsl_pwm_enable_channel(struct pwm_chip *chip,
+> +			      struct pwm_device *pwm)
+> +{
+> +	int ret;
+> +	unsigned long reg;
+> +	struct fsl_pwm_chip *fpc;
+> +	struct pinctrl_state *pins_state;
+> +	const char *statename;
+> +
+> +	fpc = to_fsl_chip(chip);
+> +
+> +	if (WARN_ON(!test_bit(PWMF_REQUESTED, &pwm->flags)))
+> +		return -ESHUTDOWN;
+> +
+> +	statename = kasprintf(GFP_KERNEL, "en%d", pwm->hwpwm);
+> +	pins_state = pinctrl_lookup_state(fpc->pinctrl,
+> +			statename);
+> +	/* enable pins to be muxed in and configured */
+> +	if (!IS_ERR(pins_state)) {
+> +		ret = pinctrl_select_state(fpc->pinctrl, pins_state);
+> +		if (ret)
+> +			dev_warn(&fpc->pdev->dev,
+> +					"could not set default pins\n");
+
+Why do you need to manipulate the pinctrl to en/disable a channel?
+
+> +static ssize_t fsl_pwm_cpwm_store(struct device *dev,
+> +				  struct device_attribute *attr,
+> +				  const char *buf,
+> +				  size_t count)
+> +{
+> +	int ret;
+> +	unsigned int val;
+> +	struct fsl_pwm_chip *fpc;
+> +
+> +	fpc = dev_get_drvdata(dev);
+> +
+> +	ret = kstrtouint(buf, 0, &val);
+> +	if (ret)
+> +		return ret;
+> +
+> +	mutex_lock(&fpc->lock);
+> +	if (!!(val) != !!(fpc->cpwm)) {
+> +		fpc->cpwm = !!val;
+> +		fsl_updata_config(fpc, NULL);
+> +	}
+> +	mutex_unlock(&fpc->lock);
+> +
+> +	return count;
+> +}
+
+What is this cpwm thingy?
+
+> +
+> +static DEVICE_ATTR(cpwm, S_IRUGO | S_IWUSR | S_IWGRP,
+> +		fsl_pwm_cpwm_show, fsl_pwm_cpwm_store);
+> +
+> +static struct attribute *fsl_pwm_attrs[] = {
+> +	&dev_attr_cpwm.attr,
+> +	NULL
+> +};
+> +
+
+
+> +static int fsl_pwm_probe(struct platform_device *pdev)
+> +{
+> +	int ret = 0;
+> +	struct fsl_pwm_chip *fpc;
+> +	struct resource *res;
+> +
+> +	fpc = devm_kzalloc(&pdev->dev, sizeof(*fpc), GFP_KERNEL);
+> +	if (!fpc) {
+> +		dev_err(&pdev->dev,
+> +				"failed to allocate memory\n");
+
+Drop this message. You'll never see it.
+
+> +		return -ENOMEM;
+> +	}
+> +
+> +	mutex_init(&fpc->lock);
+> +
+> +	fpc->pdev = pdev;
+> +
+> +	ret = fsl_pwm_parse_dt(fpc);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	fpc->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(fpc->base)) {
+> +		dev_err(&pdev->dev,
+> +				"failed to ioremap() registers\n");
+> +		ret = PTR_ERR(fpc->base);
+> +		return ret;
+> +	}
+> +
+> +	fpc->chip.dev = &pdev->dev;
+> +	fpc->chip.ops = &fsl_pwm_ops;
+> +	fpc->chip.of_xlate = of_pwm_xlate_with_flags;
+> +	fpc->chip.of_pwm_n_cells = 3;
+> +	fpc->chip.base = -1;
+> +
+> +	ret = pwmchip_add(&fpc->chip);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev,
+> +				"failed to add ftm0 pwm chip %d\n",
+> +				ret);
+> +		return ret;
+> +	}
+
+You can only add the PWM when you grabbed all resources, not before
+this.
+
+> +
+> +	fpc->clk = devm_clk_get(&pdev->dev, "ftm0");
+> +	if (IS_ERR(fpc->clk)) {
+> +		ret = PTR_ERR(fpc->clk);
+> +		dev_err(&pdev->dev,
+> +				"failed to get ftm0's module clock %d\n",
+> +				ret);
+> +		return ret;
+> +	}
+> +
+> +	fpc->pinctrl = devm_pinctrl_get(&pdev->dev);
+> +	if (IS_ERR(fpc->pinctrl)) {
+> +		ret = PTR_ERR(fpc->pinctrl);
+> +		return ret;
+> +	}
+> +
+> +	ret = sysfs_create_group(&pdev->dev.kobj,
+> +				 &fsl_pwm_attr_group);
+> +	if (ret) {
+> +		dev_err(&pdev->dev,
+> +				"Failed to create sysfs "
+> +				"attributes, err: %d\n",
+> +				ret);
+> +		return ret;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, fpc);
+> +
+> +	return 0;
+> +}
+> +
+> +static int fsl_pwm_remove(struct platform_device *pdev)
+> +{
+> +	struct fsl_pwm_chip *fpc;
+> +
+> +	fpc = platform_get_drvdata(pdev);
+> +	if (fpc == NULL)
+> +		return -ENODEV;
+
+This won't happen.
+
+Sascha
+
 -- 
-1.8.1.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
