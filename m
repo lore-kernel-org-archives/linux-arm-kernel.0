@@ -1,43 +1,32 @@
 From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Wed, 21 Aug 2013 11:33:30 +0300
-Subject: [patch 1/2] iommu/arm-smmu: fix a signedness bug
-Message-ID: <20130821083329.GF5240@elgon.mountain>
+Date: Wed, 21 Aug 2013 11:34:20 +0300
+Subject: [patch 2/2] iommu/arm-smmu: fix iommu_present() test in init
+Message-ID: <20130821083420.GG5240@elgon.mountain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unsigned char is never equal to -1.
+The extra semi-colon on the end breaks the test.
 
 Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 ---
-I can't compile this code.
+I can't compile this or test it.  The original code didn't work as
+intended but it would still be good to test this because it changes the
+code a lot.
 
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index f417e89e..7243af3 100644
+index 7243af3..913bd15 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -377,6 +377,7 @@ struct arm_smmu_cfg {
- 	u32				cbar;
- 	pgd_t				*pgd;
- };
-+#define INVALID_IRPTNDX			0xff
+@@ -1967,10 +1967,10 @@ static int __init arm_smmu_init(void)
+ 		return ret;
  
- #define ARM_SMMU_CB_ASID(cfg)		((cfg)->cbndx)
- #define ARM_SMMU_CB_VMID(cfg)		((cfg)->cbndx + 1)
-@@ -840,7 +841,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 	if (IS_ERR_VALUE(ret)) {
- 		dev_err(smmu->dev, "failed to request context IRQ %d (%u)\n",
- 			root_cfg->irptndx, irq);
--		root_cfg->irptndx = -1;
-+		root_cfg->irptndx = INVALID_IRPTNDX;
- 		goto out_free_context;
- 	}
+ 	/* Oh, for a proper bus abstraction */
+-	if (!iommu_present(&platform_bus_type));
++	if (!iommu_present(&platform_bus_type))
+ 		bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
  
-@@ -869,7 +870,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
- 	writel_relaxed(0, cb_base + ARM_SMMU_CB_SCTLR);
- 	arm_smmu_tlb_inv_context(root_cfg);
+-	if (!iommu_present(&amba_bustype));
++	if (!iommu_present(&amba_bustype))
+ 		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
  
--	if (root_cfg->irptndx != -1) {
-+	if (root_cfg->irptndx != INVALID_IRPTNDX) {
- 		irq = smmu->irqs[smmu->num_global_irqs + root_cfg->irptndx];
- 		free_irq(irq, domain);
- 	}
+ 	return 0;
