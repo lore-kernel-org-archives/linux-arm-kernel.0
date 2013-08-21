@@ -1,58 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Aug 2013 10:17:59 +0200
-Subject: [PATCH 21/33] clk: ux500: Add Device Tree support for the PRCC
- Kernel clock
-In-Reply-To: <1370521041-32318-22-git-send-email-lee.jones@linaro.org>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-22-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdY2KOxX=oA7i9GUnzpwRKiK2rXqTBPVpg+zW082f2TJdg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 21 Aug 2013 09:21:42 +0100
+Subject: [PATCH 05/13] ARM: ux500: Apply a ste-* prefix onto snowball.dts
+In-Reply-To: <CAOesGMgd51g7WAkQu+ckT-=skKuMyj19nJkHxh+YmGSBhSL+Vg@mail.gmail.com>
+References: <1374243229-8585-1-git-send-email-lee.jones@linaro.org>
+ <1374243229-8585-6-git-send-email-lee.jones@linaro.org>
+ <CAOesGMgd51g7WAkQu+ckT-=skKuMyj19nJkHxh+YmGSBhSL+Vg@mail.gmail.com>
+Message-ID: <20130821082142.GB29850@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 6, 2013 at 2:17 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Tue, 20 Aug 2013, Olof Johansson wrote:
 
-> This patch enables clocks to be specified from Device Tree via phandles
-> to the "prcc-kernel-clock" node.
->
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-(...)
->  static struct clk *prcmu_clk[PRCMU_NUM_CLKS];
->  static struct clk *prcc_pclk[(PRCC_NUM_PERIPH_CLUSTERS + 1) * PRCC_PERIPHS_PER_CLUSTER];
-> +static struct clk *prcc_kclk[(PRCC_NUM_PERIPH_CLUSTERS + 1) * PRCC_PERIPHS_PER_CLUSTER];
->
->  #define PRCC_SHOW(clk, base, bit) \
->         clk[(base * PRCC_PERIPHS_PER_CLUSTER) + bit]
-> @@ -540,110 +541,136 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
->         clk = clk_reg_prcc_kclk("p1_uart0_kclk", "uartclk",
->                         clkrst1_base, BIT(0), CLK_SET_RATE_GATE);
->         clk_register_clkdev(clk, NULL, "uart0");
-> +       PRCC_KCLK_STORE(clk, 1, 0);
->
->         clk = clk_reg_prcc_kclk("p1_uart1_kclk", "uartclk",
->                         clkrst1_base, BIT(1), CLK_SET_RATE_GATE);
->         clk_register_clkdev(clk, NULL, "uart1");
-> +       PRCC_KCLK_STORE(clk, 1, 1);
+> On Fri, Jul 19, 2013 at 7:13 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/{snowball.dts => ste-snowball.dts} | 0
+> >  1 file changed, 0 insertions(+), 0 deletions(-)
+> >  rename arch/arm/boot/dts/{snowball.dts => ste-snowball.dts} (100%)
+> >
+> > diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+> > similarity index 100%
+> > rename from arch/arm/boot/dts/snowball.dts
+> > rename to arch/arm/boot/dts/ste-snowball.dts
+> 
+> Grmbl, grmbl, grmbl. This now breaks any script that knows to use
+> snowball.dtb. :(
+> 
+> It's good to get the prefixes added, but it's annoying to have to deal
+> with both during an overlap period. Maybe generate both dtb filenames
+> for a while but rename the source?
 
-(etc)
+How would you create both DTB files from one DTS file?
 
-On device tree boots, clk_register_clkdev() is obviously pointless,
-as you're later deleting the AUXDATA connecting that device name
-to the clock.
+Surely they only solution would be to maintain both snowball.dts and
+ste-snowball.dts at the same time, which doesn't sound logical at all.
 
-This should not be called at all on the DT boot path.
+Why can't you do as Linus and I have done and just change your script?
 
-However this looks cluttered as well:
-
-if (dt_probe)
-  clk_register_clkdev(clk, NULL, "uart0");
-else
-  PRCC_KCLK_STORE(clk, 1, 0);
-
-Isn't it possible to fork a function u8500_clk_init_dt() to add all the
-clocks in the DT probe path and keep this function
-u8500_clk_init() as it is?
-
-Yours,
-Linus Walleij
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
