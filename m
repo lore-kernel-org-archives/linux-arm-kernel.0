@@ -1,72 +1,36 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 20 Aug 2013 19:54:42 -0500
-Subject: [PATCH v2 04/14] crypto: omap-aes: Simplify DMA usage by using
- direct SGs
-In-Reply-To: <521367B4.2020203@ti.com>
-References: <1376793755-30478-1-git-send-email-joelf@ti.com>
- <1376793755-30478-5-git-send-email-joelf@ti.com> <521367B4.2020203@ti.com>
-Message-ID: <52140FD2.7020403@ti.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 21 Aug 2013 11:13:23 +1000
+Subject: [PATCH] Kconfig: Remove hotplug enable hints in CONFIG_KEXEC
+ help texts
+In-Reply-To: <1377027483-17025-1-git-send-email-geert@linux-m68k.org>
+References: <1377027483-17025-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <20130821111323.1325e3f37faf2f54f3549832@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2013 07:57 AM, Lokesh Vutla wrote:
-> Hi Joel,
+Hi Geert,
+
+On Tue, 20 Aug 2013 21:38:03 +0200 Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>
+> commit 40b313608ad4ea655addd2ec6cdd106477ae8e15 ("Finally eradicate
+> CONFIG_HOTPLUG") removed remaining references to CONFIG_HOTPLUG, but missed
+> a few plain English references in the CONFIG_KEXEC help texts.
 > 
-> On Sunday 18 August 2013 08:12 AM, Joel Fernandes wrote:
->> In early version of this driver, assumptions were made such as DMA layer
->> requires contiguous buffers etc. Due to this, new buffers were allocated,
->> mapped and used for DMA. These assumptions are no longer true and DMAEngine
->> scatter-gather DMA doesn't have such requirements. We simply the DMA operations
->> by directly using the scatter-gather buffers provided by the crypto layer
->> instead of creating our own.
->>
->> Lot of logic that handled DMA'ing only X number of bytes of the total, or as
->> much as fitted into a 3rd party buffer is removed and is no longer required.
->>
->> Also, good performance improvement of atleast ~20% seen with encrypting a
->> buffer size of 8K (1800 ops/sec vs 1400 ops/sec).  Improvement will be higher
->> for much larger blocks though such benchmarking is left as an exercise for the
->> reader.  Also DMA usage is much more simplified and coherent with rest of the
->> code.
->>
->> Signed-off-by: Joel Fernandes <joelf@ti.com>
->> ---
->>  drivers/crypto/omap-aes.c |  147 ++++++++-------------------------------------
->>  1 file changed, 25 insertions(+), 122 deletions(-)
->>
->> diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
->> index e369e6e..64dd5c1 100644
->> --- a/drivers/crypto/omap-aes.c
->> +++ b/drivers/crypto/omap-aes.c
->> @@ -480,22 +480,14 @@ static int sg_copy(struct scatterlist **sg, size_t *offset, void *buf,
->>  }
->>  
->>  static int omap_aes_crypt_dma(struct crypto_tfm *tfm,
->> -		struct scatterlist *in_sg, struct scatterlist *out_sg)
->> +		struct scatterlist *in_sg, struct scatterlist *out_sg,
->> +		int in_sg_len, int out_sg_len)
->>  {
->>  	struct omap_aes_ctx *ctx = crypto_tfm_ctx(tfm);
->>  	struct omap_aes_dev *dd = ctx->dd;
->>  	struct dma_async_tx_descriptor *tx_in, *tx_out;
->>  	struct dma_slave_config cfg;
->> -	dma_addr_t dma_addr_in = sg_dma_address(in_sg);
->> -	int ret, length = sg_dma_len(in_sg);
->> -
->> -	pr_debug("len: %d\n", length);
->> -
->> -	dd->dma_size = length;
->> -
->> -	if (!(dd->flags & FLAGS_FAST))
->> -		dma_sync_single_for_device(dd->dev, dma_addr_in, length,
->> -					   DMA_TO_DEVICE);
->> +	int ret;
-> By this change FLAGS_FAST is unsed, it can be cleaned right?
-> or Am I missing something?
+> Remove them, too.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-Yes, FLAGS_FAST would be unused now and can go away. Since it is very trivial
-change, I will make this change in the not-immediate future and submit.
+Looks good to me.  Thanks.
 
-Thanks,
+Acked-by: Stephen Rothwell <sfr@canb.auug.org.au>
 
--Joel
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130821/e4e9a6da/attachment-0001.sig>
