@@ -1,49 +1,70 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 21 Aug 2013 14:45:21 +0200
-Subject: [PATCH 14/16] clk: samsung: exynos4: Register PLL rate tables for
- Exynos4210
-In-Reply-To: <CAKew6eXbc8ai9vSX2EMv+=7LYmxZ+75z1X72ytULOxtwX7bebg@mail.gmail.com>
-References: <1377019903-14614-1-git-send-email-t.figa@samsung.com>
- <1377019903-14614-15-git-send-email-t.figa@samsung.com>
- <CAKew6eXbc8ai9vSX2EMv+=7LYmxZ+75z1X72ytULOxtwX7bebg@mail.gmail.com>
-Message-ID: <1953130.hE0ZFC2CqQ@amdc1227>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 21 Aug 2013 20:47:23 +0800
+Subject: [PATCH 0/3] of: add update device node status via cmdline feature
+In-Reply-To: <520CCB70.8090908@gmail.com>
+References: <1376564133-11286-1-git-send-email-b29396@freescale.com>
+ <520CCB70.8090908@gmail.com>
+Message-ID: <20130821124722.GB17748@b29396-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 of August 2013 18:04:07 Yadwinder Singh Brar wrote:
-> On Tue, Aug 20, 2013 at 11:01 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> > This patch adds rate tables for PLLs that can be reconfigured at
-> > runtime
-> > for Exynos4210 SoCs. Provided tables contain PLL coefficients for
-> > input clock of 24 MHz and so are registered only in this case. MPLL
-> > does
-> > not need runtime reconfiguration and so table for it is not provided.
+On Thu, Aug 15, 2013 at 07:37:04AM -0500, Rob Herring wrote:
+> On 08/15/2013 05:55 AM, Dong Aisheng wrote:
+> > We meet some boards having a lot of pin conflicts between different devices,
+> > only one of them can be enabled to run at one time.
 > > 
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
+> > e.g. imx6q sabreauto board, i2c, spi, weim, flexcan, uart and etc involved
+> > with pin conflict.
 > > 
-> >  drivers/clk/samsung/clk-exynos4.c | 45
-> >  +++++++++++++++++++++++++++++++++++++++ 1 file changed, 45
-> >  insertions(+)
+> > Instead of changing dts manually or adding a lot dts files according to
+> > different device availability, we provide feature to dynamically update the
+> > device node status via command line, then those devices involved with
+> > pin conflict can be enabled or disabled dynamically.
 > > 
-> > diff --git a/drivers/clk/samsung/clk-exynos4.c
-> > b/drivers/clk/samsung/clk-exynos4.c index 34474ce..e18cfae 100644
-> > --- a/drivers/clk/samsung/clk-exynos4.c
-> > +++ b/drivers/clk/samsung/clk-exynos4.c
-> > @@ -992,6 +992,40 @@ static struct of_device_id ext_clk_match[]
-> > __initdata = {> 
-> >         {},
-> >  
-> >  };
-> > 
-> > +/* PLLs PMS values */
-> > +static struct samsung_pll_rate_table exynos4210_apll_rates[] = {
-> > +       PLL_45XX_RATE(1200000000, 150,  3, 1, 28),
+> > It's conveniently to use and can save a lot dts board files, also can
+> > permenantly fix the pin conflicts issue.
 > 
-> All these tables in this patch as well as next patch can be __initdata
+> This doesn't scale either with updating of lots devices or when the next
+> person comes along and wants to edit another property.
+> 
 
-Right, I forgot to mark them as such. Thanks for spotting.
+I'm not sure about other property.
+But we update it did cause by the real requirement, not arbitrary.
+Or we can try to find another better way to avoid it.
 
-Best regards,
-Tomasz
+> This is something u-boot is perfectly capable of handling and updating
+> status is something lots of boards already do.
+> 
+
+How does uboot handle this according to our needs?
+Also dynamically update the device node status with uboot command?
+Can you help point out an example for me to check?
+
+Regards
+Dong Aisheng
+
+> Rob
+> 
+> > 
+> > The patch series is based on v3.11-rc5.
+> > 
+> > Dong Aisheng (3):
+> >   of: add device node status update APIs
+> >   of: add update device node status via cmdline feature
+> >   of: add node status update via name format with cmdline
+> > 
+> >  Documentation/kernel-parameters.txt |   10 +++
+> >  drivers/of/base.c                   |  107 +++++++++++++++++++++++++++++++++
+> >  drivers/of/fdt.c                    |  111 +++++++++++++++++++++++++++++++++++
+> >  include/linux/of.h                  |   13 ++++
+> >  4 files changed, 241 insertions(+), 0 deletions(-)
+> > 
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> 
+> 
