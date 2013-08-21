@@ -1,56 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 21 Aug 2013 10:27:04 -0300
-Subject: [PATCH 3/3] ARM: dts: imx53-qsb: Allow usb peripheral mode to work
-In-Reply-To: <1377091624-13174-1-git-send-email-festevam@gmail.com>
-References: <1377091624-13174-1-git-send-email-festevam@gmail.com>
-Message-ID: <1377091624-13174-3-git-send-email-festevam@gmail.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Wed, 21 Aug 2013 15:31:11 +0200
+Subject: [PATCH v2 0/2] ARM: dts: Add SHAM and AES DT information
+In-Reply-To: <alpine.DEB.2.02.1308210012420.6426@utopia.booyaka.com>
+References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.02.1308210012420.6426@utopia.booyaka.com>
+Message-ID: <5214C11F.8090808@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Paul,
 
-Trying to use the usb otg port on mx53qsb results in the following error:
+On 21/08/2013 02:13, Paul Walmsley wrote:
+> Hi Beno?t,
+>
+> On Wed, 17 Jul 2013, Mark A. Greer wrote:
+>
+>> From: "Mark A. Greer" <mgreer@animalcreek.com>
+>>
+>> Long overdue patches to add the device tree updates and
+>> documentation for the SHAM and AES modules on the am33xx.
+>> The supporting code is already in the mainline kernel.
+>>
+>> This series is based on the current mainline kernel,
+>> c0d15cc (linked-list: Remove __list_for_each).
+>>
+>> Changes from v1:
+>>   - Added missing '};' as pointed out by Lokesh Vutla <lokeshvutla@ti.com>
+>
+> I guess you should take these patches?
 
-$ modprobe g_ether
-using random self ethernet address
-using random host ethernet address
-usb0: HOST MAC 52:0f:8a:1e:aa:09
-usb0: MAC de:f3:70:d8:6c:62
-using random self ethernet address
-using random host ethernet address
-g_ether gadget: Ethernet Gadget, version: Memorial Day 2008
-g_ether gadget: g_ether ready
+You're right, I should, I've just never seen them :-(
+Thanks for the pointer.
 
-(Connect the USB cable)
+Mark,
 
-$ ci_hdrc ci_hdrc.0: remove, state 4
-usb usb1: USB disconnect, device number 1
-ci_hdrc ci_hdrc.0: USB bus 1 deregistered
-ci_hdrc ci_hdrc.0: timeout waiting for 00000800 in 11
+After a quick search on Google, I did not see any comment on these 
+patches. Did you get any review so far?
 
-USB otg port goes to connector J3 (mini USB) and also to the USB combo (J2).
-
-As mx53qsb does not provide a USB ID pin, pass the dr_mode as 'peripheral' so 
-that we can have usb device working.
-
-Tested via g_ether. 
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx53-qsb.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-index e97ddae..94597c3 100644
---- a/arch/arm/boot/dts/imx53-qsb.dts
-+++ b/arch/arm/boot/dts/imx53-qsb.dts
-@@ -318,5 +318,6 @@
- };
- 
- &usbotg {
--       status = "okay";
-+	dr_mode = "peripheral";
-+	status = "okay";
- };
--- 
-1.8.1.2
+Thanks,
+Benoit
