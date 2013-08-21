@@ -1,120 +1,42 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Aug 2013 00:13:34 -0700
-Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.12
-In-Reply-To: <521384D5.1050607@baylibre.com>
-References: <521384D5.1050607@baylibre.com>
-Message-ID: <20130821071334.GQ7656@atomide.com>
+Date: Wed, 21 Aug 2013 00:19:01 -0700
+Subject: [PATCH] ARM: OMAP: fix return value check in
+ omap_device_build_from_dt()
+In-Reply-To: <CAPgLHd_E8wht4q5c9=TjUTwXxysjbbX+HnZyYe2KJU=w79cK4w@mail.gmail.com>
+References: <CAPgLHd_E8wht4q5c9=TjUTwXxysjbbX+HnZyYe2KJU=w79cK4w@mail.gmail.com>
+Message-ID: <20130821071901.GR7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin & Olof,
+Kevin,
 
-Care to pull the below .dts changes directly from Benoit?
+* Wei Yongjun <weiyj.lk@gmail.com> [130704 06:48]:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> In case of error, the function omap_device_alloc() returns ERR_PTR()
+> and never returns NULL. The NULL test in the return value check
+> should be replaced with IS_ERR().
 
-* Benoit Cousson <bcousson@baylibre.com> [130820 08:08]:
+Looks like this is still pending, care to take this?
+
+Tony
+ 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+>  arch/arm/mach-omap2/omap_device.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Hi Tony,
+> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+> index 5cc9287..28e70c0 100644
+> --- a/arch/arm/mach-omap2/omap_device.c
+> +++ b/arch/arm/mach-omap2/omap_device.c
+> @@ -155,7 +155,7 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+>  	}
+>  
+>  	od = omap_device_alloc(pdev, hwmods, oh_cnt);
+> -	if (!od) {
+> +	if (IS_ERR(od)) {
+>  		dev_err(&pdev->dev, "Cannot allocate omap_device for :%s\n",
+>  			oh_name);
+>  		ret = PTR_ERR(od);
 > 
-> Please pull the following commits for OMAP Device Tree for v3.12.
-> 
-> Thanks,
-> Benoit
-> 
-> ----------------------------------------------------------------
-> Add the minimal DTS support for DRA7xx based SoC core.
-> Add the initial support for N900 and gta04 phones.
-> Do a lot of various cleanups.
-> ----------------------------------------------------------------
-> 
-> The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
-> 
->   Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.12/dts
-> 
-> for you to fetch changes up to 9f311a2325905043718da9bf649e2344b8df8473:
-> 
->   ARM: dts: omap3-beagle: Make USB host pin naming consistent (2013-08-20 14:30:07 +0200)
-> 
-> ----------------------------------------------------------------
-> Afzal Mohammed (2):
->       ARM: dts: AM4372: cpu(s) node per latest binding
->       ARM: dts: AM4372: add few nodes
-> 
-> Alexandre Belloni (1):
->       ARM: dts: AM33XX: Add PMU support
-> 
-> Javier Martinez Canillas (5):
->       ARM: dts: omap3-igep: add pinmux node for GPIO LED configuration
->       ARM: dts: omap3-igep0020: add mux conf for GPIO LEDs
->       ARM: dts: omap3-igep0030: add mux conf for GPIO LED
->       ARM: dts: AM33XX: use pinmux node defined in included file
->       ARM: dts: AM33XX: don't redefine OCP bus and device nodes
-> 
-> Kishon Vijay Abraham I (1):
->       ARM: dts: omap5-uevm: Split SMPS10 in two nodes
-> 
-> Lars Poeschel (1):
->       ARM: dts: AM33xx: Correct gpio #interrupt-cells property
-> 
-> Lee Jones (7):
->       ARM: dts: Remove '0x's from OMAP2420 H4 DTS file
->       ARM: dts: Remove '0x's from OMAP3 IGEP0020 DTS file
->       ARM: dts: Remove '0x's from OMAP3 IGEP0030 DTS file
->       ARM: dts: Remove '0x's from OMAP3 DTS file
->       ARM: dts: Remove '0x's from OMAP3430 SDP DTS file
->       ARM: dts: Remove '0x's from OMAP4 DTS file
->       ARM: dts: Remove '0x's from OMAP5 DTS file
-> 
-> Marek Belisko (1):
->       ARM: dts: Add devicetree for gta04 board.
-> 
-> Pavel Machek (1):
->       ARM: dts: N900: Add device tree
-> 
-> R Sricharan (1):
->       ARM: dts: DRA7: Add the dts files for dra7 SoC and dra7-evm board
-> 
-> Robert Nelson (1):
->       ARM: dts: omap3-beagle-xm: fix string error in compatible property
-> 
-> Roger Quadros (1):
->       ARM: dts: omap3-beagle: Make USB host pin naming consistent
-> 
-> Ruslan Bilovol (1):
->       ARM: dts: twl6030: Move common configuration for OMAP4 boards in a separate dtsi file
-> 
->  arch/arm/boot/dts/Makefile                |   5 +-
->  arch/arm/boot/dts/am335x-bone.dts         | 217 ++++++-----
->  arch/arm/boot/dts/am335x-evm.dts          | 576 +++++++++++++++---------------
->  arch/arm/boot/dts/am335x-evmsk.dts        | 374 ++++++++++---------
->  arch/arm/boot/dts/am33xx.dtsi             |  13 +-
->  arch/arm/boot/dts/am4372.dtsi             | 347 ++++++++++++++++++
->  arch/arm/boot/dts/dra7-evm.dts            | 140 ++++++++
->  arch/arm/boot/dts/dra7.dtsi               | 575 +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap2420-h4.dts         |   6 +-
->  arch/arm/boot/dts/omap3-beagle-xm.dts     |   2 +-
->  arch/arm/boot/dts/omap3-beagle.dts        |  24 +-
->  arch/arm/boot/dts/omap3-gta04.dts         | 168 +++++++++
->  arch/arm/boot/dts/omap3-igep.dtsi         |   2 +
->  arch/arm/boot/dts/omap3-igep0020.dts      |  19 +-
->  arch/arm/boot/dts/omap3-igep0030.dts      |  17 +-
->  arch/arm/boot/dts/omap3-n900.dts          |  92 +++++
->  arch/arm/boot/dts/omap3.dtsi              |   2 +-
->  arch/arm/boot/dts/omap3430-sdp.dts        |  22 +-
->  arch/arm/boot/dts/omap4-panda-common.dtsi |  21 +-
->  arch/arm/boot/dts/omap4-sdp.dts           |  21 +-
->  arch/arm/boot/dts/omap4.dtsi              |   2 +-
->  arch/arm/boot/dts/omap5-uevm.dts          |  13 +-
->  arch/arm/boot/dts/omap5.dtsi              |   4 +-
->  arch/arm/boot/dts/twl6030_omap4.dtsi      |  38 ++
->  include/dt-bindings/pinctrl/dra.h         |  50 +++
->  25 files changed, 2077 insertions(+), 673 deletions(-)
->  create mode 100644 arch/arm/boot/dts/dra7-evm.dts
->  create mode 100644 arch/arm/boot/dts/dra7.dtsi
->  create mode 100644 arch/arm/boot/dts/omap3-gta04.dts
->  create mode 100644 arch/arm/boot/dts/omap3-n900.dts
->  create mode 100644 arch/arm/boot/dts/twl6030_omap4.dtsi
->  create mode 100644 include/dt-bindings/pinctrl/dra.h
