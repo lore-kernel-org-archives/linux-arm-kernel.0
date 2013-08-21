@@ -1,39 +1,35 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 21 Aug 2013 11:48:36 +0100
-Subject: [PATCH 2/3] ARM: vexpress_defconfig: Enable voltage regulator
- support
-In-Reply-To: <1377032563-4502-3-git-send-email-fathi.boudra@linaro.org>
+Date: Wed, 21 Aug 2013 11:51:53 +0100
+Subject: [PATCH 0/3] ARM: vexpress_defconfig: Allow to boot using a
+ regular filesystem on SD card
+In-Reply-To: <1377075956.3591.23.camel@linaro1.home>
 References: <1377032563-4502-1-git-send-email-fathi.boudra@linaro.org>
- <1377032563-4502-3-git-send-email-fathi.boudra@linaro.org>
-Message-ID: <1377082116.10707.8.camel@hornet>
+ <1377075956.3591.23.camel@linaro1.home>
+Message-ID: <1377082313.10707.11.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-08-20 at 22:02 +0100, Fathi Boudra wrote:
-> It is needed for the MMC controller and allows to use the SD card:
+On Wed, 2013-08-21 at 10:05 +0100, Jon Medhurst (Tixy) wrote:
+> On Wed, 2013-08-21 at 00:02 +0300, Fathi Boudra wrote:
+> > vexpress_defconfig is known broken on some use-cases. This serie of
+> > patches allow to boot test Versatile Express using a regular filesystem
+> > on SD card.
+> > 
+> > Fathi Boudra (3):
+> >   ARM: vexpress_defconfig: Enable and automount devtmpfs filesystem
+> >   ARM: vexpress_defconfig: Enable voltage regulator support
+> >   ARM: vexpress_defconfig: Enable ext4 filesystem
+> > 
+> >  arch/arm/configs/vexpress_defconfig | 5 +++++
+> >  1 file changed, 5 insertions(+)
 > 
-> mmc0: host doesn't support card's voltages
-> mmc0: error -22 whilst initialising SD card
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Fathi Boudra <fathi.boudra@linaro.org>
-> ---
->  arch/arm/configs/vexpress_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
-> index 3f970f1..c2f7ca1 100644
-> --- a/arch/arm/configs/vexpress_defconfig
-> +++ b/arch/arm/configs/vexpress_defconfig
-> @@ -77,6 +77,8 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
->  CONFIG_LEGACY_PTY_COUNT=16
->  # CONFIG_HW_RANDOM is not set
->  # CONFIG_HWMON is not set
-> +CONFIG_REGULATOR=y
-> +CONFIG_REGULATOR_VEXPRESS=y
+> One good question is who do you have to convince to get these changes
+> accepted (or rejected)?
 
-The REGULATOR_VEXPRESS is not necessary to "fix" the MMC issue.
-REGULATOR=y will make the REGULATOR_FIXED_VOLTAGE being selected, which
-is enough.
+This gets down to the question do we actually want the
+vexpress_defconfig at all? I was considering removing it completely as
+multi_v7_defconfig should do the job (potentially subject to an extra
+config option or two), but if there really is a need for vexpress-only
+one, I can take the changes and queue it for the next-next merge window.
 
 Pawe?
