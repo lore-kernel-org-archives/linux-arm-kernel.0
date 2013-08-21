@@ -1,28 +1,45 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 21 Aug 2013 09:59:41 +0800
-Subject: [PATCH 0/3] refactor some ldb related clocks
-In-Reply-To: <52134030.4030502@freescale.com>
-References: <1376987932-5540-1-git-send-email-Ying.Liu@freescale.com>
- <1376991823.4000.22.camel@pizza.hi.pengutronix.de>
- <52134030.4030502@freescale.com>
-Message-ID: <20130821015939.GD30533@S2101-09.ap.freescale.net>
+Date: Wed, 21 Aug 2013 10:04:10 +0800
+Subject: [PATCH] i2c: imx: use exact SoC revision document binding
+In-Reply-To: <1376991757-9727-1-git-send-email-b35083@freescale.com>
+References: <1376991757-9727-1-git-send-email-b35083@freescale.com>
+Message-ID: <20130821020408.GE30533@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ying,
-
-On Tue, Aug 20, 2013 at 06:08:48PM +0800, Liu Ying wrote:
-> > While I admit to having introduced the combination of 1/3.5 fixed
-> > divider and configurable 1/1,1/2 divder clocks to describe this
-> > fractional divider for the reasons you state, I think the correct
-> > solution would be to improve the table divider to support fractional
-> > values and get rid of the virtual ldb_di<n>_div_3_5 clocks, not
-> > introduce more virtual clocks.
+On Tue, Aug 20, 2013 at 05:42:37PM +0800, Jingchang Lu wrote:
+> use exact SoC revision instead of wildcard describing
+> the compatible property requirement in the binding
+> document. This will make the binding more clearer.
 > 
-> Yes, it's good to support fractional values for the table divider(not sure if there is any plan for this).
-> I see there is something similar in 'include/linux/sh_clk.h'.
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-imx.txt | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-imx.txt b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
+> index 3614242..4e7282d 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-imx.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
+> @@ -1,7 +1,10 @@
+>  * Freescale Inter IC (I2C) and High Speed Inter IC (HS-I2C) for i.MX
+>  
+>  Required properties:
+> -- compatible : Should be "fsl,<chip>-i2c"
+> +- compatible :
+> +  - "fsl,imx1-i2c" for I2C used similar to that on i.MX1 SoC
 
-Yeah, I agree with Philipp on improving table divider to support
-fractional values.  Would you like to work on that?
+Would it be any better to word it like "for I2C compatible with the one
+integrated on i.MX1 SoC".
 
 Shawn
+
+> +  - "fsl,imx21-i2c" for I2C used similar to that on i.MX21 SoC
+> +  - "fsl,vf610-i2c" for I2C used similar to that on Vybrid vf610 SoC
+>  - reg : Should contain I2C/HS-I2C registers location and length
+>  - interrupts : Should contain I2C/HS-I2C interrupt
+>  
+> -- 
+> 1.8.0
+> 
+> 
