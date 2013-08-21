@@ -1,29 +1,31 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 21 Aug 2013 00:13:25 +0000 (UTC)
-Subject: [PATCH v2 0/2] ARM: dts: Add SHAM and AES DT information
-In-Reply-To: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
-References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <alpine.DEB.2.02.1308210012420.6426@utopia.booyaka.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 20 Aug 2013 17:31:45 -0700
+Subject: [PATCH 05/13] ARM: ux500: Apply a ste-* prefix onto snowball.dts
+In-Reply-To: <1374243229-8585-6-git-send-email-lee.jones@linaro.org>
+References: <1374243229-8585-1-git-send-email-lee.jones@linaro.org>
+ <1374243229-8585-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAOesGMgd51g7WAkQu+ckT-=skKuMyj19nJkHxh+YmGSBhSL+Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Beno?t,
+On Fri, Jul 19, 2013 at 7:13 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/{snowball.dts => ste-snowball.dts} | 0
+>  1 file changed, 0 insertions(+), 0 deletions(-)
+>  rename arch/arm/boot/dts/{snowball.dts => ste-snowball.dts} (100%)
+>
+> diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+> similarity index 100%
+> rename from arch/arm/boot/dts/snowball.dts
+> rename to arch/arm/boot/dts/ste-snowball.dts
 
-On Wed, 17 Jul 2013, Mark A. Greer wrote:
+Grmbl, grmbl, grmbl. This now breaks any script that knows to use
+snowball.dtb. :(
 
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
-> 
-> Long overdue patches to add the device tree updates and
-> documentation for the SHAM and AES modules on the am33xx.
-> The supporting code is already in the mainline kernel.
-> 
-> This series is based on the current mainline kernel,
-> c0d15cc (linked-list: Remove __list_for_each).
-> 
-> Changes from v1:
->  - Added missing '};' as pointed out by Lokesh Vutla <lokeshvutla@ti.com>
-
-I guess you should take these patches?
+It's good to get the prefixes added, but it's annoying to have to deal
+with both during an overlap period. Maybe generate both dtb filenames
+for a while but rename the source?
 
 
-- Paul
+-Olof
