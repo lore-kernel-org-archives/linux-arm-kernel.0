@@ -1,58 +1,92 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 21 Aug 2013 10:27:02 -0300
-Subject: [PATCH 1/3] ARM: dts: imx6qdl-wandboard: Add usbotg support
-Message-ID: <1377091624-13174-1-git-send-email-festevam@gmail.com>
+Date: Wed, 21 Aug 2013 10:27:03 -0300
+Subject: [PATCH 2/3] ARM: dts: imx28-evk: Allow usb peripheral mode to work
+In-Reply-To: <1377091624-13174-1-git-send-email-festevam@gmail.com>
+References: <1377091624-13174-1-git-send-email-festevam@gmail.com>
+Message-ID: <1377091624-13174-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Tested via g_ether:
+Testing g_ether results in the following:
 
-$ modprobe g_ether
-using random self ethernet address
-using random host ethernet address
-usb0: HOST MAC 42:b5:26:a9:48:21
-usb0: MAC 36:a6:85:9b:9e:13
-using random self ethernet address
-using random host ethernet address
-g_ether gadget: Ethernet Gadget, version: Memorial Day 2008
-g_ether gadget: g_ether ready
-$ g_ether gadget: high-speed config #1: CDC Ethernet (ECM)
-$ ifconfig usb0 10.0.0.2
+[    1.648022] using random self ethernet address
+[    1.652778] using random host ethernet address
+[    1.660504] usb0: HOST MAC c6:28:6a:81:dc:ff
+[    1.666360] usb0: MAC 7e:81:54:16:c0:c6
+[    1.670504] using random self ethernet address
+[    1.675842] using random host ethernet address
+[    1.682655] g_ether gadget: Ethernet Gadget, version: Memorial Day 2008
+[    1.689332] g_ether gadget: g_ether ready
+[    3.328974] irq 237: nobody cared (try booting with the "irqpoll" option)
+[    3.335831] CPU: 0 PID: 1 Comm: swapper Not tainted 3.11.0-rc6-next-20130819 #1035
+[    3.343500] [<c0014258>] (unwind_backtrace+0x0/0xf0) from [<c0011b20>] (show_stack+0x10/0x14)
+[    3.352098] [<c0011b20>] (show_stack+0x10/0x14) from [<c006af4c>] (__report_bad_irq+0x20/0xc0)
+[    3.360763] [<c006af4c>] (__report_bad_irq+0x20/0xc0) from [<c006b3f4>] (note_interrupt+0x1d4/0x234)
+[    3.369943] [<c006b3f4>] (note_interrupt+0x1d4/0x234) from [<c0069754>] (handle_irq_event_percpu+0xc4/0x268)
+[    3.379815] [<c0069754>] (handle_irq_event_percpu+0xc4/0x268) from [<c0069934>] (handle_irq_event+0x3c/0x5c)
+[    3.389686] [<c0069934>] (handle_irq_event+0x3c/0x5c) from [<c006bb78>] (handle_level_irq+0x8c/0xe8)
+[    3.398865] [<c006bb78>] (handle_level_irq+0x8c/0xe8) from [<c0068ff0>] (generic_handle_irq+0x20/0x30)
+[    3.408213] [<c0068ff0>] (generic_handle_irq+0x20/0x30) from [<c000fc9c>] (handle_IRQ+0x30/0x84)
+[    3.417040] [<c000fc9c>] (handle_IRQ+0x30/0x84) from [<c0012564>] (__irq_svc+0x44/0x54)
+[    3.425094] [<c0012564>] (__irq_svc+0x44/0x54) from [<c0020244>] (__do_softirq+0x90/0x268)
+[    3.433400] [<c0020244>] (__do_softirq+0x90/0x268) from [<c00207d4>] (irq_exit+0x9c/0xd8)
+[    3.441619] [<c00207d4>] (irq_exit+0x9c/0xd8) from [<c000fca0>] (handle_IRQ+0x34/0x84)
+[    3.449577] [<c000fca0>] (handle_IRQ+0x34/0x84) from [<c0012564>] (__irq_svc+0x44/0x54)
+[    3.457629] [<c0012564>] (__irq_svc+0x44/0x54) from [<c04602b0>] (_raw_spin_unlock_irqrestore+0x34/0x44)
+[    3.467164] [<c04602b0>] (_raw_spin_unlock_irqrestore+0x34/0x44) from [<c0348298>] (input_register_handler+0x98/0xb4)
+[    3.477835] [<c0348298>] (input_register_handler+0x98/0xb4) from [<c064bc10>] (mousedev_init+0x30/0x60)
+[    3.487275] [<c064bc10>] (mousedev_init+0x30/0x60) from [<c00088ac>] (do_one_initcall+0xe8/0x154)
+[    3.496198] [<c00088ac>] (do_one_initcall+0xe8/0x154) from [<c062aabc>] (kernel_init_freeable+0xf0/0x1b4)
+[    3.505810] [<c062aabc>] (kernel_init_freeable+0xf0/0x1b4) from [<c0456550>] (kernel_init+0x8/0xe4)
+[    3.514899] [<c0456550>] (kernel_init+0x8/0xe4) from [<c000ee60>] (ret_from_fork+0x14/0x34)
+[    3.523263] handlers:
+[    3.525578] [<c0339d14>] ci_irq
+[    3.528757] Disabling IRQ #237
 
-Then on the PC host side:
-
-~$ sudo ifconfig usb0 10.0.0.1
-~$ ping 10.0.0.2
-PING 10.0.0.2 (10.0.0.2) 56(84) bytes of data.
-64 bytes from 10.0.0.2: icmp_req=1 ttl=64 time=1.26 ms
-64 bytes from 10.0.0.2: icmp_req=2 ttl=64 time=0.280 ms
-64 bytes from 10.0.0.2: icmp_req=3 ttl=64 time=0.297 ms
+Provide the USB0_ID pin in the usb0 node, so that g_ether can operate
+correctly.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/imx28-evk.dts |  2 ++
+ arch/arm/boot/dts/imx28.dtsi    | 10 ++++++++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-index a55113e..b462080 100644
---- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-@@ -115,6 +115,14 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index 15715d9..8cb6b6a 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -242,6 +242,8 @@
  
-+&usbotg {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg_1>;
-+	disable-over-current;
-+	dr_mode = "peripheral";
-+	status = "okay";
-+};
+ 	ahb at 80080000 {
+ 		usb0: usb at 80080000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&usb0_id_pins_a>;
+ 			vbus-supply = <&reg_usb0_vbus>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 7363fde..c596b6d 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -740,6 +740,16 @@
+ 					fsl,voltage = <1>;
+ 					fsl,pull-up = <0>;
+ 				};
 +
- &usdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc1_2>;
++				usb0_id_pins_a: usb0id at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x3071 /* MX28_PAD_AUART1_RTS__USB0_ID */
++					>;
++					fsl,drive-strength = <2>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
+ 			};
+ 
+ 			digctl: digctl at 8001c000 {
 -- 
 1.8.1.2
