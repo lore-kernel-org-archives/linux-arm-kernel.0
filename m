@@ -1,202 +1,87 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 21 Aug 2013 14:11:21 +0200
-Subject: [PATCH] arm: omap5: hwmod: add missing ocp2scp hwmod data
-In-Reply-To: <CALpuT30YToRvgS3rgvpSZf8d1DZBK9y5mNUJL6qbHS22mL4k-g@mail.gmail.com>
-References: <1373642066-5235-1-git-send-email-balbi@ti.com>
- <20130821074728.GV7656@atomide.com> <52148C67.3080106@baylibre.com>
- <CALpuT30YToRvgS3rgvpSZf8d1DZBK9y5mNUJL6qbHS22mL4k-g@mail.gmail.com>
-Message-ID: <5214AE69.8010009@baylibre.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 21 Aug 2013 14:13:38 +0200
+Subject: [PATCH v4 1/5] ARM: at91/tc/clocksource: replace
+ clk_enable/disable with clk_prepare_enable/disable_unprepare.
+In-Reply-To: <1374134291-27704-1-git-send-email-b.brezillon@overkiz.com>
+References: <1374132753-15206-1-git-send-email-b.brezillon@overkiz.com>
+ <1374134291-27704-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <5214AEF2.7030102@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Kishon and Roger
+On 18/07/2013 09:58, Boris BREZILLON :
+> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+> avoid common clk framework warnings.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-Ok, so in fact that's a complete series now.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-[v2,1/5] arm: omap5: dts: fix reg property size
-[v2,2/5] arm: omap5: dts: fix ocp2scp DTS data
-[v2,3/5] arm: omap5: dts: add palmas-usb node
-[v2,4/5] arm: omap5: hwmod: add missing ocp2scp hwmod data
-[v2,5/5] arm: omap2plus_defconfig: enable dwc3 and dependencies
+John, Thomas,
 
-Moreover, it does not build because of the change in the palmas SMPS10 regulator name from Kishon I already pulled.
+Do you want me to re-sent this patch with acked-by collected or you can 
+take it like this?
 
-Kishon or Roger,
+Also, tell me if I should take it with other AT91-related changes 
+through ARM-soc git tree?
 
-Could you resend that series ASAP after fixing, testing and changing my email address?
+Bye,
+
+> ---
+>   drivers/clocksource/tcb_clksrc.c |   10 +++++-----
+>   1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> index 8a61872..229c019 100644
+> --- a/drivers/clocksource/tcb_clksrc.c
+> +++ b/drivers/clocksource/tcb_clksrc.c
+> @@ -100,7 +100,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+>   			|| tcd->clkevt.mode == CLOCK_EVT_MODE_ONESHOT) {
+>   		__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
+>   		__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
+> -		clk_disable(tcd->clk);
+> +		clk_disable_unprepare(tcd->clk);
+>   	}
+>
+>   	switch (m) {
+> @@ -109,7 +109,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+>   	 * of oneshot, we get lower overhead and improved accuracy.
+>   	 */
+>   	case CLOCK_EVT_MODE_PERIODIC:
+> -		clk_enable(tcd->clk);
+> +		clk_prepare_enable(tcd->clk);
+>
+>   		/* slow clock, count up to RC, then irq and restart */
+>   		__raw_writel(timer_clock
+> @@ -126,7 +126,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+>   		break;
+>
+>   	case CLOCK_EVT_MODE_ONESHOT:
+> -		clk_enable(tcd->clk);
+> +		clk_prepare_enable(tcd->clk);
+>
+>   		/* slow clock, count up to RC, then irq and stop */
+>   		__raw_writel(timer_clock | ATMEL_TC_CPCSTOP
+> @@ -275,7 +275,7 @@ static int __init tcb_clksrc_init(void)
+>   	pdev = tc->pdev;
+>
+>   	t0_clk = tc->clk[0];
+> -	clk_enable(t0_clk);
+> +	clk_prepare_enable(t0_clk);
+>
+>   	/* How fast will we be counting?  Pick something over 5 MHz.  */
+>   	rate = (u32) clk_get_rate(t0_clk);
+> @@ -313,7 +313,7 @@ static int __init tcb_clksrc_init(void)
+>   		/* tclib will give us three clocks no matter what the
+>   		 * underlying platform supports.
+>   		 */
+> -		clk_enable(tc->clk[1]);
+> +		clk_prepare_enable(tc->clk[1]);
+>   		/* setup both channel 0 & 1 */
+>   		tcb_setup_dual_chan(tc, best_divisor_idx);
+>   	}
+>
 
 
-Tony,
-
-I will need your ack for the omap2plus_defconfig patch. 
-
-Thanks,
-Benoit 
-
-
-On 21/08/2013 11:48, Benoit Cousson wrote:
-> Gosh, I've just realized it does contain some DTS stuff in it as well :-(
-> I should have pushed it in my DTS branch.
-> 
-> Benoit
-> 
-> 
-> 2013/8/21 Benoit Cousson <bcousson@baylibre.com 
-> <mailto:bcousson@baylibre.com>>
-> 
->     On 21/08/2013 09:47, Tony Lindgren wrote:
-> 
->         Benoit,
-> 
->         Got this one queued up somewhere?
-> 
-> 
->     No yet. That's the only hwmod patch I have so far.
->     I'll put it in a branch and send you the pull-request ASAP.
-> 
->     Regards,
->     Benoit
-> 
-> 
-> 
->         * Felipe Balbi <balbi at ti.com <mailto:balbi@ti.com>> [130712 08:21]:
-> 
->             From: Benoit Cousson <benoit.cousson@linaro.org
->             <mailto:benoit.cousson@linaro.org>>
-> 
->             without that hwmod data, USB3 will not in OMAP5 boards.
-> 
->             While at that, also fix DTS data to pass reg property,
->             otherwise driver won't probe.
-> 
->             Signed-off-by: Benoit Cousson <benoit.cousson@linaro.org
->             <mailto:benoit.cousson@linaro.org>>
->             Signed-off-by: Felipe Balbi <balbi at ti.com <mailto:balbi@ti.com>>
->             ---
-> 
->             tested on OMAP5 uEVM. Gets rid of a data abort when USB3
->             is enabled. There still some other patches missing to get
->             USB3 working out of the box, but that's on Palmas and will
->             come as soon as I get those ready.
-> 
->             This is already on step forward.
-> 
->                arch/arm/boot/dts/omap5.dtsi               |  3 +-
->                arch/arm/mach-omap2/omap___hwmod_54xx_data.c | 45
->             ++++++++++++++++++++++++++++++
->                2 files changed, 47 insertions(+), 1 deletion(-)
-> 
->             diff --git a/arch/arm/boot/dts/omap5.dtsi
->             b/arch/arm/boot/dts/omap5.dtsi
->             index da41d70..a0de586 100644
->             --- a/arch/arm/boot/dts/omap5.dtsi
->             +++ b/arch/arm/boot/dts/omap5.dtsi
->             @@ -654,10 +654,11 @@
->                                      };
->                              };
-> 
->             -               ocp2scp {
->             +               ocp2scp at 4a080000 {
->                                      compatible = "ti,omap-ocp2scp";
->                                      #address-cells = <1>;
->                                      #size-cells = <1>;
->             +                       reg = <0x4a080000 0x20>;
->                                      ranges;
->                                      ti,hwmods = "ocp2scp1";
->                                      usb2_phy: usb2phy at 4a084000 {
->             diff --git a/arch/arm/mach-omap2/omap___hwmod_54xx_data.c
->             b/arch/arm/mach-omap2/omap___hwmod_54xx_data.c
->             index 2435109..d9118a1 100644
->             --- a/arch/arm/mach-omap2/omap___hwmod_54xx_data.c
->             +++ b/arch/arm/mach-omap2/omap___hwmod_54xx_data.c
->             @@ -1105,6 +1105,42 @@ static struct omap_hwmod
->             omap54xx_mpu_hwmod = {
->                };
-> 
->                /*
->             + * 'ocp2scp' class
->             + * bridge to transform ocp interface protocol to scp
->             (serial control port)
->             + * protocol
->             + */
->             +
->             +static struct omap_hwmod_class_sysconfig
->             omap54xx_ocp2scp_sysc = {
->             +       .rev_offs       = 0x0000,
->             +       .sysc_offs      = 0x0010,
->             +       .syss_offs      = 0x0014,
->             +       .sysc_flags     = (SYSC_HAS_AUTOIDLE |
->             SYSC_HAS_SIDLEMODE |
->             +                       SYSC_HAS_SOFTRESET |
->             SYSS_HAS_RESET_STATUS),
->             +       .idlemodes      = (SIDLE_FORCE | SIDLE_NO |
->             SIDLE_SMART),
->             +       .sysc_fields    = &omap_hwmod_sysc_type1,
->             +};
->             +
->             +static struct omap_hwmod_class omap54xx_ocp2scp_hwmod_class = {
->             +       .name   = "ocp2scp",
->             +       .sysc   = &omap54xx_ocp2scp_sysc,
->             +};
->             +
->             +/* ocp2scp1 */
->             +static struct omap_hwmod omap54xx_ocp2scp1_hwmod = {
->             +       .name           = "ocp2scp1",
->             +       .class          = &omap54xx_ocp2scp_hwmod_class,
->             +       .clkdm_name     = "l3init_clkdm",
->             +       .main_clk       = "l4_root_clk_div",
->             +       .prcm = {
->             +               .omap4 = {
->             +                       .clkctrl_offs =
->             OMAP54XX_CM_L3INIT_OCP2SCP1___CLKCTRL_OFFSET,
->             +                       .context_offs =
->             OMAP54XX_RM_L3INIT_OCP2SCP1___CONTEXT_OFFSET,
->             +                       .modulemode   = MODULEMODE_HWCTRL,
->             +               },
->             +       },
->             +};
->             +
->             +/*
->                 * 'timer' class
->                 * general purpose timer module with accurate 1ms tick
->                 * This class contains several variants: ['timer_1ms',
->             'timer']
->             @@ -1900,6 +1936,14 @@ static struct omap_hwmod_ocp_if
->             omap54xx_l4_cfg__mpu = {
->                      .user           = OCP_USER_MPU | OCP_USER_SDMA,
->                };
-> 
->             +/* l4_cfg -> ocp2scp1 */
->             +static struct omap_hwmod_ocp_if omap54xx_l4_cfg__ocp2scp1 = {
->             +       .master         = &omap54xx_l4_cfg_hwmod,
->             +       .slave          = &omap54xx_ocp2scp1_hwmod,
->             +       .clk            = "l4_root_clk_div",
->             +       .user           = OCP_USER_MPU | OCP_USER_SDMA,
->             +};
->             +
->                /* l4_wkup -> timer1 */
->                static struct omap_hwmod_ocp_if omap54xx_l4_wkup__timer1 = {
->                      .master         = &omap54xx_l4_wkup_hwmod,
->             @@ -2102,6 +2146,7 @@ static struct omap_hwmod_ocp_if
->             *omap54xx_hwmod_ocp_ifs[] __initdata = {
->                      &omap54xx_l4_per__mmc4,
->                      &omap54xx_l4_per__mmc5,
->                      &omap54xx_l4_cfg__mpu,
->             +       &omap54xx_l4_cfg__ocp2scp1,
->                      &omap54xx_l4_wkup__timer1,
->                      &omap54xx_l4_per__timer2,
->                      &omap54xx_l4_per__timer3,
->             --
->             1.8.2.1
-> 
-> 
-> 
-> 
-> 
-> -- 
-> *Beno?t Cousson*
-> CTO
-> BayLibre - Incubateur PACA Est
-> Business Pole
-> 1047 route des Dolines, Acc?s All?e Pierre Ziller, Entr?e A
-> 06560 Valbonne Sophia Antipolis
+-- 
+Nicolas Ferre
