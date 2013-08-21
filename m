@@ -1,33 +1,39 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 21 Aug 2013 21:51:42 +1000
-Subject: [PATCH] hwrng: reorder OMAP TRNG driver code
-In-Reply-To: <52144E4C.4050405@ti.com>
-References: <1377022073-28198-1-git-send-email-olof@lixom.net>
- <52144E4C.4050405@ti.com>
-Message-ID: <20130821115142.GI23287@gondor.apana.org.au>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 21 Aug 2013 14:52:16 +0300
+Subject: [PATCH v4 3/4] dma: mmp_pdma: add support for residue reporting
+In-Reply-To: <5214A601.1010607@marvell.com>
+References: <1376672707-24527-1-git-send-email-zonque@gmail.com>
+ <1376672707-24527-4-git-send-email-zonque@gmail.com>
+ <5214A601.1010607@marvell.com>
+Message-ID: <CAHp75VfFFq0kaf7wDt3WTwsx6peBmt=rDXaUGXz=cnn4-bBKZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 10:51:16AM +0530, Lokesh Vutla wrote:
-> Hi Olof,
-> On Tuesday 20 August 2013 11:37 PM, Olof Johansson wrote:
-> > The newly added omap4 support in the driver was added without
-> > consideration for building older configs. When building omap1_defconfig,
-> > it resulted in:
-> > 
-> > drivers/char/hw_random/omap-rng.c:190:12: warning: 'omap4_rng_init' defined but not used [-Wunused-function]
-> > drivers/char/hw_random/omap-rng.c:215:13: warning: 'omap4_rng_cleanup' defined but not used [-Wunused-function]
-> > drivers/char/hw_random/omap-rng.c:251:20: warning: 'omap4_rng_irq' defined but not used [-Wunused-function]
-> > 
-> > Move the code around so it is grouped with its operations struct, which
-> > for the omap4 case means also under the #ifdef CONFIG_OF, where it needs
-> > to be.
-> > 
-> Missed testing this. Thanks for the patch.
-> Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
+On Wed, Aug 21, 2013 at 2:35 PM, Xiang Wang <wangx@marvell.com> wrote:
+> On 08/17/2013 01:05 AM, Daniel Mack wrote:
+>>
+>> In order to report the channel's residue, we walk the list of running
+>> descriptors, look for those which match the cookie, and then try to find
+>> the descriptor which defines upper and lower boundaries that embrace the
+>> current transport pointer.
+>>
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
 
-Patch applied.  Thanks!
+> One thing I want to check with you and all:
+> If we have these descriptors in the running chain:
+> D1T1 -> D2T1 -> D3T1 => D1T2 -> D2T2 -> D3T2
+> |    Transaction 1    | Transaction 2      |
+>
+> And DMA currently running to D2T1, if we provide the cookie of D3T2, what
+> the residual value we should get? All unfinished bytes in T1+T2 or only
+> unfinished bytes in T2 (seems not easy to implement)?
+
+You have a really good question. Different drivers do different things.
+In dw_dmac, for example, we return the T1 (means 'active') residue always.
+
+I don't think you have different cookies per descriptors in chain of
+one transaction.
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+With Best Regards,
+Andy Shevchenko
