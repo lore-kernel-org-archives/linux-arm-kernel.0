@@ -1,244 +1,38 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Wed, 21 Aug 2013 15:02:22 -0500
-Subject: [PATCHv2 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
-In-Reply-To: <20130821190729.GA9657@amd.pavel.ucw.cz>
-References: <1376522956-14960-1-git-send-email-dinguyen@altera.com>
- <1376522956-14960-2-git-send-email-dinguyen@altera.com>
- <CACRpkda9oyb2mr6PR1dfMpoxbzj3vUp7hKiQtN1oWH6aG_N96w@mail.gmail.com>
- <20130821190729.GA9657@amd.pavel.ucw.cz>
-Message-ID: <1377115342.1554.21.camel@linux-builds1>
+From: dsd@laptop.org (Daniel Drake)
+Date: Wed, 21 Aug 2013 14:27:55 -0600
+Subject: [PATCH v6 01/11] irqchip: move mmp irq driver
+In-Reply-To: <CAMLZHHTeKN7N6AsgTySE0QLHBv8yq-00C31iue_swusXnG6=uA@mail.gmail.com>
+References: <1374833133-21119-1-git-send-email-haojian.zhuang@gmail.com>
+ <1374833133-21119-2-git-send-email-haojian.zhuang@gmail.com>
+ <CAMLZHHTeKN7N6AsgTySE0QLHBv8yq-00C31iue_swusXnG6=uA@mail.gmail.com>
+Message-ID: <CAMLZHHSYqTPfo1QhRK9cfaGzE4hDk0bA5rz39PatzCSUau01ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-08-21 at 21:07 +0200, ZY - pavel wrote:
-> On Wed 2013-08-21 09:04:07, Linus Walleij wrote:
-> > On Thu, Aug 15, 2013 at 1:29 AM,  <dinguyen@altera.com> wrote:
-> > 
-> > > -       sched_io_base = iobase + 0x04;
-> > > +       sched_io_base = iobase;
-> > >         sched_rate = rate;
-> > >  }
-> > >
-> > >  static u32 read_sched_clock(void)
-> > >  {
-> > > -       return __raw_readl(sched_io_base);
-> > > +       return ~__raw_readl(sched_io_base + 0x4);
-> > 
-> > So what about #define what 0x04 is?
-> > 
-> > #define MY_FOO_REGISTER_OFFSET 0x04
-> > 
-> > raw_readl(sched_io_base + MY_FOO_REGISTER_OFFSET);
-> 
-> That define is already there, #define APBTMR_N_CURRENT_VALUE 0x04, but
-> it is in .c file, not in header.
+Hi Haojian,
 
-I'll send a V2 that will address this comment and Stephen Warren's.
+On Wed, Aug 14, 2013 at 3:26 PM, Daniel Drake <dsd@laptop.org> wrote:
+> This patch series affects 3 different subsystems: irqchip,
+> clocksource, clk. It's not clear from your submission who you are
+> expecting to review/merge this. Unless there is some prior agreement,
+> maybe it would be easier and clearer to divide this up by subsystem.
+> There doesn't seem to be any overlap/dependencies between the 3 parts.
 
-Dinh
-> 
-> Actually I believe I had patch that did that, and it was even applied,
-> but it clashed with same other patches, and was dropped. (It is below,
-> for reference).
-> 
-> Currently, the code _does not work_, and we have three platforms using
-> it. It would be good to solve this now, and polish it later.
-> 
-> 								Pavel
-> 
-> From pavel at denx.de Tue May  7 22:11:26 2013
-> Date: Tue, 7 May 2013 22:11:26 +0200
-> From: Pavel Machek <pavel@denx.de>
-> To: John Stultz <john.stultz@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>, tglx at linutronix.de,
-> 	Jamie Iles <jamie@jamieiles.com>, dinguyen at altera.com, wd at denx.de,
-> 	linux-arm-kernel at lists.infradead.org, olof at lixom.net,
-> 	kernel list <linux-kernel@vger.kernel.org>
-> Subject: Re: dw_apb_timer_of.c: remove parts that were picoxcell-specific
-> Message-ID: <20130507201126.GA8169@amd.pavel.ucw.cz>
-> References: <20130426121433.GA16249@amd.pavel.ucw.cz>
->  <201305061545.22587.arnd@arndb.de>
->  <20130506155304.GA6645@amd.pavel.ucw.cz>
->  <201305062324.17080.arnd@arndb.de>
->  <20130507135752.GA3500@amd.pavel.ucw.cz>
->  <51892E5E.8090909@linaro.org>
-> MIME-Version: 1.0
-> Content-Type: text/plain; charset=us-ascii
-> Content-Disposition: inline
-> In-Reply-To: <51892E5E.8090909@linaro.org>
-> User-Agent: Mutt/1.5.20 (2009-06-14)
-> Status: RO
-> Content-Length: 4987
-> Lines: 170
-> 
-> Hi!
-> 
-> > >>>So I guess it should go through the timekeeping tree...?
-> > >>I would prefer that, but we can also take it through arm-soc, it doesn't
-> > >>really matter.
-> > >I see no response from timekeeping people... so if you could take it,
-> > >that would be great.
-> > 
-> > I don't think the original patch ever made it to my inbox.
-> 
-> For some reason, I cced johnstul at us.ibm.com. (I guess
-> get_maintainer.pl? But it seems to behave now.) Anyway, patch is
-> below...
-> 
-> It would be great if you could apply it... Thanks,
-> 							Pavel
-> 
-> ----
-> 
-> It seems we made a mistake when creating dw_apb_timer_of.c:
-> picoxcell sched_clock had parts that were not related to
-> dw_apb_timer, yet we moved them to dw_apb_timer_of, and tried to
-> use them on socfpga.
-> 
-> This results in system where user/system time is not measured
-> properly, as demonstrated by
->     
->     time dd if=/dev/urandom of=/dev/zero bs=100000 count=100
->     
-> So this patch switches sched_clock to hardware that exists on both
-> platforms, and adds missing of_node_put() in dw_apb_timer_init().
->     
-> Signed-off-by: Pavel Machek <pavel@denx.de>
-> Acked-by: Jamie Iles <jamie@jamieiles.com>
-> 
-> diff --git a/arch/arm/mach-picoxcell/common.h b/arch/arm/mach-picoxcell/common.h
-> index 481b42a..237fb3b 100644
-> --- a/arch/arm/mach-picoxcell/common.h
-> +++ b/arch/arm/mach-picoxcell/common.h
-> @@ -12,6 +12,4 @@
->  
->  #include <asm/mach/time.h>
->  
-> -extern void dw_apb_timer_init(void);
-> -
->  #endif /* __PICOXCELL_COMMON_H__ */
-> diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-> index 8c2a35f..460ac99 100644
-> --- a/drivers/clocksource/dw_apb_timer.c
-> +++ b/drivers/clocksource/dw_apb_timer.c
-> @@ -21,12 +21,6 @@
->  #define APBT_MIN_PERIOD			4
->  #define APBT_MIN_DELTA_USEC		200
->  
-> -#define APBTMR_N_LOAD_COUNT		0x00
-> -#define APBTMR_N_CURRENT_VALUE		0x04
-> -#define APBTMR_N_CONTROL		0x08
-> -#define APBTMR_N_EOI			0x0c
-> -#define APBTMR_N_INT_STATUS		0x10
-> -
->  #define APBTMRS_INT_STATUS		0xa0
->  #define APBTMRS_EOI			0xa4
->  #define APBTMRS_RAW_INT_STATUS		0xa8
-> diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-> index ab09ed3..0fa3104 100644
-> --- a/drivers/clocksource/dw_apb_timer_of.c
-> +++ b/drivers/clocksource/dw_apb_timer_of.c
-> @@ -57,6 +57,15 @@ static void add_clockevent(struct device_node *event_timer)
->  	dw_apb_clockevent_register(ced);
->  }
->  
-> +static void __iomem *sched_io_base;
-> +
-> +/* This is actually same as __apbt_read_clocksource(), but with
-> +   different interface */
-> +static u32 read_sched_clock_sptimer(void)
-> +{
-> +	return ~__raw_readl(sched_io_base + APBTMR_N_CURRENT_VALUE);
-> +}
-> +
->  static void add_clocksource(struct device_node *source_timer)
->  {
->  	void __iomem *iobase;
-> @@ -71,41 +80,27 @@ static void add_clocksource(struct device_node *source_timer)
->  
->  	dw_apb_clocksource_start(cs);
->  	dw_apb_clocksource_register(cs);
-> -}
->  
-> -static void __iomem *sched_io_base;
-> -
-> -static u32 read_sched_clock(void)
-> -{
-> -	return __raw_readl(sched_io_base);
-> +	sched_io_base = iobase;
-> +	setup_sched_clock(read_sched_clock_sptimer, 32, rate);
->  }
->  
-> -static const struct of_device_id sptimer_ids[] __initconst = {
-> -	{ .compatible = "picochip,pc3x2-rtc" },
-> +static const struct of_device_id osctimer_ids[] __initconst = {
-> +	{ .compatible = "picochip,pc3x2-timer" },
-> +	{ .compatible = "snps,dw-apb-timer-osc" },
->  	{ .compatible = "snps,dw-apb-timer-sp" },
-> -	{ /* Sentinel */ },
-> +	{  /* Sentinel */ },
->  };
->  
-> -static void init_sched_clock(void)
-> -{
-> -	struct device_node *sched_timer;
-> -	u32 rate;
-> -
-> -	sched_timer = of_find_matching_node(NULL, sptimer_ids);
-> -	if (!sched_timer)
-> -		panic("No RTC for sched clock to use");
-> +/*
-> +   You don't have to use dw_apb_timer for scheduler clock,
-> +   this should also work fine on arm:
->  
-> -	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
-> -	of_node_put(sched_timer);
-> +  twd_local_timer_of_register();
-> +  arch_timer_of_register();                 
-> +  arch_timer_sched_clock_init();
-> +*/
->  
-> -	setup_sched_clock(read_sched_clock, 32, rate);
-> -}
-> -
-> -static const struct of_device_id osctimer_ids[] __initconst = {
-> -	{ .compatible = "picochip,pc3x2-timer" },
-> -	{ .compatible = "snps,dw-apb-timer-osc" },
-> -	{},
-> -};
->  
->  void __init dw_apb_timer_init(void)
->  {
-> @@ -121,7 +116,6 @@ void __init dw_apb_timer_init(void)
->  		panic("No timer for clocksource");
->  	add_clocksource(source_timer);
->  
-> +	of_node_put(event_timer);
->  	of_node_put(source_timer);
-> -
-> -	init_sched_clock();
->  }
-> diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
-> index dd755ce..a64c987 100644
-> --- a/include/linux/dw_apb_timer.h
-> +++ b/include/linux/dw_apb_timer.h
-> @@ -17,6 +17,12 @@
->  #include <linux/clocksource.h>
->  #include <linux/interrupt.h>
->  
-> +#define APBTMR_N_LOAD_COUNT		0x00
-> +#define APBTMR_N_CURRENT_VALUE		0x04
-> +#define APBTMR_N_CONTROL		0x08
-> +#define APBTMR_N_EOI			0x0c
-> +#define APBTMR_N_INT_STATUS		0x10
-> +
->  #define APBTMRS_REG_SIZE       0x14
->  
->  struct dw_apb_timer {
-> 
-> 
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
-> 
-> 
+I haven't heard back from you on these patches. Is there anything I
+can do to help?
+
+I know these patches are blocking the 5-or-so patches I am trying to
+submit for OLPC XO support. Only one of those patches is perhaps
+calling for discussion (how to put the clocks in DT) and it is a bit
+frustrating that after two months we have still not progressed.
+
+To start with, maybe I could resend patches 1 to 5 in this series to
+the irqchip maintainers, with the review comments incorporated, adding
+the following 2 patches on at the
+end?http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/176643.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/176643.html
+
+Or any other suggestions for how I can help things move along?
+
+Thanks
+Daniel
