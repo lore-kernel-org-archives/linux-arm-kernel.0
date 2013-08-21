@@ -1,113 +1,51 @@
-From: B47053@freescale.com (Xiubo Li-B47053)
-Date: Wed, 21 Aug 2013 10:46:39 +0000
-Subject: [PATCH 1/4] pwm: add freescale ftm pwm driver support
-In-Reply-To: <20130821095049.GQ31036@pengutronix.de>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-2-git-send-email-Li.Xiubo@freescale.com>
- <20130821073659.GN31036@pengutronix.de>
- <1DD289F6464F0949A2FCA5AA6DC23F827D1C51@039-SN2MPN1-013.039d.mgd.msft.net>
- <20130821095049.GQ31036@pengutronix.de>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827D1D4D@039-SN2MPN1-013.039d.mgd.msft.net>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 21 Aug 2013 11:46:50 +0100
+Subject: [PATCH 1/3] ARM: vexpress_defconfig: Enable and automount
+ devtmpfs filesystem
+In-Reply-To: <1377032563-4502-2-git-send-email-fathi.boudra@linaro.org>
+References: <1377032563-4502-1-git-send-email-fathi.boudra@linaro.org>
+ <1377032563-4502-2-git-send-email-fathi.boudra@linaro.org>
+Message-ID: <1377082010.10707.6.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TO Sascha,
-
-Thanks very much for your quick reply.
-
-
-
-> > > > +	fpc = to_fsl_chip(chip);
-> > > > +
-> > > > +	if (WARN_ON(!test_bit(PWMF_REQUESTED, &pwm->flags)))
-> > > > +		return -ESHUTDOWN;
-> > > > +
-> > > > +	statename = kasprintf(GFP_KERNEL, "en%d", pwm->hwpwm);
-> > > > +	pins_state = pinctrl_lookup_state(fpc->pinctrl,
-> > > > +			statename);
-> > > > +	/* enable pins to be muxed in and configured */
-> > > > +	if (!IS_ERR(pins_state)) {
-> > > > +		ret = pinctrl_select_state(fpc->pinctrl, pins_state);
-> > > > +		if (ret)
-> > > > +			dev_warn(&fpc->pdev->dev,
-> > > > +					"could not set default pins\n");
-> > >
-> > > Why do you need to manipulate the pinctrl to en/disable a channel?
-> > >
-> >
-> > This is because in Vybrid VF610 TOWER board, there are 4 leds, and
-> > each led's one point(diode's positive pole) is connected to 3.3V, and
-> > the other point is connected to pwm's one channel. When the 4 pinctrls
-> are configured as enable at the same time, the 4 pinctrls is low valtage,
-> and the 4 leds will be lighted up as default, then when you
-> enable/disable one led will effects others.
-> >
+On Tue, 2013-08-20 at 22:02 +0100, Fathi Boudra wrote:
+> udev no longer creates device nodes under /dev and it has to be managed
+> by the kernel devtmpfs filesystem.
 > 
-> I think the inactive state of a PWM is pretty much undefined by the PWM
-> framework and left to the drivers.
+> This means that a kernel built with the current config will not boot on
+> a system with a recent udev:
 > 
-> I stumbled upon this aswell. It would be good to think about the inactive
-> state and how the PWM framework could help us here getting things right.
+> mount: mounting udev on /dev failed: No such device
+> W: devtmpfs not available, falling back to tmpfs for /dev
 > 
-> There are several things to consider. For a noninverted PWM the inactive
-> state should probably logic 0. For an inverted PWM it should probably be
-> logic 1. I guess several PWM devices have an undefined inactive state,
-> most of the PWM devices probably can control the inactive state by
-> setting the duty cycle to 100% / 0% without actually disabling the PWM.
+> Also, it is good to have /dev automatically mounted since some
+> non-initramfs based setups assumes this and don't manually mount it.
 > 
-> Using the pinctrl is one way to control the inactive state and probaby
-> the only one before initialization. It might be good to wire this up in
-> the core instead of the individual PWM drivers.
+> Signed-off-by: Fathi Boudra <fathi.boudra@linaro.org>
+> ---
+>  arch/arm/configs/vexpress_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> These are just the thoughts which first came to my mind.
-> 
+> diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
+> index f2de51f..3f970f1 100644
+> --- a/arch/arm/configs/vexpress_defconfig
+> +++ b/arch/arm/configs/vexpress_defconfig
+> @@ -45,6 +45,8 @@ CONFIG_IP_PNP_BOOTP=y
+>  # CONFIG_IPV6 is not set
+>  # CONFIG_WIRELESS is not set
+>  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+> +CONFIG_DEVTMPFS=y
 
-That's a very good idea, and I have also thought about it before.
-But from the power dissipation:
-If so, upon my board is up, the pwm core should be alive even I won't use it.
+This makes sense...
 
-I think the pwm core should be in idle mode when not using it,
-when any of it's channels is requested and enabled, the pwm core will keep alive.
+> +CONFIG_DEVTMPFS_MOUNT=y
 
-What do you think about it ?
+... but I'm not so sure about this one. Normally it's up to the boot
+scripts to decide when to mount the devtmpfs. And yes - I know it's
+required to boot Ubuntu-based rootfs without initramfs, but that's
+Ubuntu's problem, really.
 
-> Thierry, any more input about this?
-> 
-> 
-> > > > +	fpc = dev_get_drvdata(dev);
-> > > > +
-> > > > +	ret = kstrtouint(buf, 0, &val);
-> > > > +	if (ret)
-> > > > +		return ret;
-> > > > +
-> > > > +	mutex_lock(&fpc->lock);
-> > > > +	if (!!(val) != !!(fpc->cpwm)) {
-> > > > +		fpc->cpwm = !!val;
-> > > > +		fsl_updata_config(fpc, NULL);
-> > > > +	}
-> > > > +	mutex_unlock(&fpc->lock);
-> > > > +
-> > > > +	return count;
-> > > > +}
-> > >
-> > > What is this cpwm thingy?
-> >
-> > Up-down counting mode:
-> > CNTIN(a register) defines the starting value of the count and MOD(a
-> > register) defines the final value of the count. The value of CNTIN is
-> > loaded into the FTM counter, and the counter increments until the
-> > value of MOD is reached, at which point the counter is decremented
-> until it returns to the value of CNTIN and the up-down counting restarts.
-> 
-> The current PWM framework only cares about period times and duty cycles.
-> Why would I want to care about this?
-
-I will think it over, If this hasn't any help here, I'll drop it in v2.
-
-
-
-Thanks very much.
-
---
-Best Regards,
-Xiubo Li
+>  CONFIG_MTD=y
+>  CONFIG_MTD_CONCAT=y
+>  CONFIG_MTD_PARTITIONS=y
