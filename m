@@ -1,44 +1,62 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 21 Aug 2013 09:01:12 -0700
-Subject: [GIT PULL 3/3] ARM: shmobile: lager: enable Ether
-In-Reply-To: <4901e136aa5c35873701156c4c0af5b3c2c8faee.1375839719.git.horms+renesas@verge.net.au>
- (Simon Horman's message of "Wed, 7 Aug 2013 13:30:25 +0900")
-References: <cover.1375839719.git.horms+renesas@verge.net.au>
- <4901e136aa5c35873701156c4c0af5b3c2c8faee.1375839719.git.horms+renesas@verge.net.au>
-Message-ID: <87siy3owxj.fsf@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 21 Aug 2013 16:56:32 +0100
+Subject: [Ksummit-2013-discuss] [ARM ATTEND] catching up on exploit
+ mitigations
+In-Reply-To: <20130821154355.GA20784@redhat.com>
+References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
+ <20130730221435.GA22240@redhat.com>
+ <20130730231120.GC30725@blackmetal.musicnaut.iki.fi>
+ <20130730231533.GA26824@redhat.com>
+ <20130730235834.GD30725@blackmetal.musicnaut.iki.fi>
+ <20130731000444.GC1281@redhat.com>
+ <20130731094012.GU24642@n2100.arm.linux.org.uk>
+ <20130731142430.GA4545@redhat.com>
+ <20130821152614.GN17845@n2100.arm.linux.org.uk>
+ <20130821154355.GA20784@redhat.com>
+Message-ID: <20130821155632.GO17845@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon Horman <horms+renesas@verge.net.au> writes:
+On Wed, Aug 21, 2013 at 11:43:55AM -0400, Dave Jones wrote:
+> On Wed, Aug 21, 2013 at 04:26:14PM +0100, Russell King - ARM Linux wrote:
+>  > I've been running several iterations of it for a while (== up to 10 minutes
+>  > run time - which is normally about how long it takes to find the rather-too-
+>  > exposed kmalloc in sys_oabi_epoll_wait) and so far have seen no sign of any
+>  > page table corruption.
+> 
+> awesome. Guess it was a google specific issue then.
+> (Or something that got fixed post 3.4)
 
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+It's been running on this run for 38 minutes so far (having put a
+__GFP_NOWARN stopper in that kmalloc - which I think there needs to be
+a better solution.)
 
-This one is triggering a new build failure in -next:
+What I have noticed is during the initialisation of the fd[] array, it
+sometimes hangs on a futex.  Killing trinity, removing all the files
+and restarting it seems to sort the problem out.  I'm not sure what's
+doing that - any ideas?  I couldn't find any evidence of another trinity
+thread doing anything with futexes.
 
-arch/arm/mach-shmobile/board-lager.c:99:2: error: unknown field 'register_type' specified in initializer
-arch/arm/mach-shmobile/board-lager.c:99:19: error: 'SH_ETH_REG_FAST_RCAR' undeclared here (not in a function)
+>  > Were there any nonstandard platform
+>  > specific devices in /dev which that user could access - such as graphics
+>  > or video decoder devices which could be exposing big holes?
+> 
+> I'm not sure what google patched into that kernel altogether, so who knows..
 
-> +/* Ether */
-> +static struct sh_eth_plat_data ether_pdata __initdata = {
-> +	.phy			= 0x1,
-> +	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
-> +	.register_type		= SH_ETH_REG_FAST_RCAR,
+Unfortunately, it seems to be rather common if there's hardware GPU or
+video codecs to expose physical addresses to userspace which get passed
+around in closed source libraries and ultimately to GPU/video hardware.
+I would not be surprised if trinity was finding that and finding some
+way to get something to poke randomly in kernel memory.
 
-and it looks to be because this board is trying to use the register_type
-field which was removed by:
+It seems also that the normal approach is to expose the device nodes in
+/dev to the world, effectively handing any userspace program the ability
+to:
 
-commit 8d3214c4e8c8be6efd8ec7a172239ebbd4deb04b
-Author: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Date:   Sun Aug 18 03:13:26 2013 +0400
+(a) a way to allocate from a pool of memory, and get its physical address
+(b) to be able to pass a physical address to hardware for DMA type operations
+(c) to initiate DMA on that hardware
 
-    sh_eth: remove 'register_type' field from 'struct sh_eth_plat_data'
-    
-    Now that the 'register_type' field of the 'sh_eth' driver's platform data is not
-    used by the driver anymore, it's time to remove it and  its initializers from
-    the SH platform code. Also  move *enum* declaring values for this  field from
-    <linux/sh_eth.h>  to  the  local driver's  header file as they're only needed
-    by the driver itself  now...
-    
-    Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-    Signed-off-by: David S. Miller <davem@davemloft.net>
+This is why closed source GPU/video stuff is Bad News(tm) for security.
+I'd strongly suggest keeping such platforms well away from any data
+anyone cares about keeping private and keeping them well isolated. :)
