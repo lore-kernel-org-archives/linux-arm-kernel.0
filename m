@@ -1,62 +1,66 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Wed, 21 Aug 2013 20:48:27 +0900
-Subject: [PATCH v5 0/4] mmc: dw_mmc: fixes for suspend/resume on exynos
-In-Reply-To: <1376066000-5495-1-git-send-email-dianders@chromium.org>
-References: <1375825071-20922-1-git-send-email-dianders@chromium.org>
- <1376066000-5495-1-git-send-email-dianders@chromium.org>
-Message-ID: <001e01ce9e64$59c3b780$0d4b2680$%jun@samsung.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 21 Aug 2013 17:19:52 +0530
+Subject: [PATCH 2/3] ARM: OMAP2+: Add new bindings for OMAP
+In-Reply-To: <5214888C.8050205@baylibre.com>
+References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
+ <1376983966-16490-3-git-send-email-rnayak@ti.com>
+ <20130821074514.GU7656@atomide.com> <5214888C.8050205@baylibre.com>
+Message-ID: <5214A960.9010802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-Do you have any update for this series?
-Please let me know.
+On Wednesday 21 August 2013 02:59 PM, Benoit Cousson wrote:
+> On 21/08/2013 09:45, Tony Lindgren wrote:
+>> * Rajendra Nayak <rnayak@ti.com> [130820 00:41]:
+>>> On OMAP we have co-processor IPs, memory controllers,
+>>> GPIOs which control regulators and power switches to
+>>> PMIC, and SoC internal Bus IPs, some or most of which
+>>> should either not be reset or idled or both. Have a
+>>> way to pass this information from DT.
+>>> (In some cases there are erratas which prevent an IPs
+>>> from being reset)
+>>>
+>>> Also update omap_hwmod to extract this from DT.
+>>>
+>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>>> ---
+>>>   .../devicetree/bindings/arm/omap/omap.txt          |    3 ++-
+>>>   arch/arm/mach-omap2/omap_hwmod.c                   |   22 +++++++++++++-------
+>>>   2 files changed, 17 insertions(+), 8 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>>> index 6d498c7..a08647e 100644
+>>> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>>> @@ -21,7 +21,8 @@ Required properties:
+>>>   Optional properties:
+>>>   - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
+>>>     during suspend.
+>>> -
+>>> +- ti,no-reset: When present, the module should not be reset
+>>> +- ti,no-idle: When present, the module should not be idled
+>>
+>> This naming is a bit confusing as people may think that the
+>> hardware has no reset support or no idle support. Let's try
+>> to make this to describe the hardware a bit more instead.
+> 
+> Yeah, I do agree here. That should look like a real HW property and nor a configuration.
+> 
+>> Then ideally we'd not map individual bits of data to properties,
+>> but describe few basic types of hardware instead and build
+>> lists of things instead of tagging things. Or maybe we
+>> can get this data from the bus hierarchy instead?
+>>
+>> If these options don't work, and the choice may be board
+>> specific, then how about ti,skip-reset-on-init, and
+>> ti,skip-idle-on-init?
+> 
+> It looks like a configuration as well :-).
+> I was thinking of something like "ti,do-not-support-reset-on-init", but that a little bit too long.
 
-Thanks,
-Seungwon Jeon
+How about 'ti,no-reset-on-init' :) which is what I had initially which I then moved to 'ti,no-reset'
 
-On Sat, August 10, 2013, Doug Anderson wrote:
-> This series of patches addresses some suspend/resume problems with
-> dw_mmc on exynos platforms, espeically exynos5420.  Since
-> suspend/resume is not fully working on ToT Linux (v3.11-rc4) on
-> exynos5250-snow, this series was tested against the current ToT
-> ChromeOS 3.8 tree.  I have confirmed basic booting and eMMC / SD card
-> usage (and compiling, honest!) against ToT Linux.
 > 
-> I have received confirmation from Samsung that the problem solved is a
-> silicon errata on exynos5420 and that this is a good fix.
+> Regards,
+> Benoit
 > 
-> Changes in v5:
-> - Remove force_clkinit as per Jaehoon.
-> - Update commit message to (hopefully) be clearer.
-> - Cleaned up dw_mci_exynos_resume_noirq() comment as per Seungwon.
-> - Don't memcpy dev_pm_ops structure, define a new one.
-> 
-> Changes in v4:
-> - Take Seungwon's suggestion and don't add any dw_mmc-pltfm code.
-> 
-> Changes in v3:
-> - Add freeze/thaw and poweroff/restore noirq entries.
-> 
-> Changes in v2:
-> - Fix typo (some -> come)
-> - Use ~0 instead of 0xFFFFFFFF; add comment about value
-> - Use suspend_noirq as per James Hogan.
-> 
-> Doug Anderson (4):
->   mmc: dw_mmc: Invalidate cache of current_speed after suspend/resume
->   mmc: dw_mmc: Add exynos resume_noirq callback to clear WAKEUP_INT
->   mmc: dw_mmc: Always setup the bus after suspend/resume
->   mmc: dw_mmc: Set timeout to max upon resume
-> 
->  drivers/mmc/host/dw_mmc-exynos.c | 56 +++++++++++++++++++++++++++++++++++++++-
->  drivers/mmc/host/dw_mmc.c        | 21 ++++++++++-----
->  2 files changed, 69 insertions(+), 8 deletions(-)
-> 
-> --
-> 1.8.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
