@@ -1,84 +1,43 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 21 Aug 2013 21:30:04 +0200
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for Freescale
- FTM PWM
-In-Reply-To: <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1473340.OXSHEp7d4P@flatron>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Wed, 21 Aug 2013 12:46:51 -0700
+Subject: [PATCH RFC 0/2] PM / Hibernate: sysfs resume 
+Message-ID: <1377114413-8521-1-git-send-email-sebastian.capella@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xiubo,
+Patchset related to hibernation resume: one enhancement to make the use
+of an existing file more general and one documentation update.
 
-Please see my comments inline.
+Both patches are based on the 3.11-rc6 tag.  This was tested on a
+Pandaboard with partial hibernation support, and compiled on x86.
 
-On Wednesday 21 of August 2013 11:07:42 Xiubo Li wrote:
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> ---
->  .../devicetree/bindings/pwm/fsl-ftm-pwm.txt        | 52
-> ++++++++++++++++++++++ 1 file changed, 52 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
-> b/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt new file mode
-> 100644
-> index 0000000..698965b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
-> @@ -0,0 +1,52 @@
-> +Freescale FTM PWM controller
-> +
-> +Required properties:
-> +- compatible: should be "fsl,vf610-ftm-pwm"
-> +- reg: physical base address and length of the controller's registers
-> +- #pwm-cells: Should be 3. Number of cells being used to specify PWM
-> property.
-> +  First cell specifies the per-chip channel index of the PWM
-> to use, the 
-> +  second cell is the period in nanoseconds and bit 0 in
-> the third cell is 
-> +  used to encode the polarity of PWM output. Set bit
-> 0 of the third in PWM 
-> +  specifier to 1 for inverse polarity & set to 0
-> for normal polarity.
+Further testing is needed on other platforms.  Please let me know if
+you're able to verify this on any other systems.
 
-If the meaning of flags cell is the same as in generic, default PWM 
-specifier format, then it should be noted here and generic PWM binding 
-documentation mentioned. 
+[PATCH RFC 1/2] PM / Hibernate: use name_to_dev_t to parse resume
+  Use name_to_dev_t to parse the /sys/power/resume file making the
+  syntax more flexible.  It supports the previous use syntax
+  and additionally can support other formats such as
+  /dev/devicenode and UUID= formats.
 
-> +- fsl,pwm-clk-ps: the ftm0 pwm clock's prescaler,
-> divide-by 2^n(n = 0 ~ 7).
+  By changing /sys/debug/resume to accept the same syntax as
+  the resume=device parameter, we can parse the resume=device
+  in the initrd init script and use the resume device directly
+  from the kernel command line.
 
-Is it a hardware-specific property?
+  kernel/power/hibernate.c |   14 +++++++++-----
+  1 file changed, 9 insertions(+), 5 deletions(-)
 
-> +- fsl,pwm-cpwm: Center-Aligned PWM (CPWM)
-> mode.
+[PATCH RFC 2/2] PM / Hibernate: add section for resume options
+  This adds a small section to the swsusp.txt file to address the
+  options for resuming.  This comments on the manual resume
+  option which is used when resorting to an initrd or initramfs
+  for resuming.  Resuming from late init is discussed later in
+  the document, but it seemed appropriate to list them together.
 
-Could you explain meaning of this property?
+  Documentation/power/swsusp.txt |   15 ++++++++++++++-
+  1 file changed, 14 insertions(+), 1 deletion(-)
 
-> +- fsl,pwm-number: the number of PWM devices, and is must equal to the
-> number +  of "fsl,pwm-channels".
+Thanks,
 
-This is redundant, because you can simply count how many entries have been 
-specified in fsl,pwm-channels.
-
-> +- fsl,pwm-channels: the channels' order which is be used for pwm in
-> ftm0 +  module, and they must be one or some of 0 ~ 7, because the ftm0
-> only has +  8 channels can be used.
-
-Could you explain meaning of this property more precisely? I'm interested 
-especially how is this related to the PWM IP block and boards.
-
-> +- for very channel, the revlatived the pinctrl should be at least two
-                           ^ typo?
-
-> state +  {"enN", "dsN"}, which "en" means "enable", "ds" means
-> "disable" and "N" +  means the order of the channel.
-
-I'd suggest a more readable naming convention, for example chN-active and 
-chN-idle. These words seem to be more common across existing bindings.
-
-Best regards,
-Tomasz
+Sebastian
