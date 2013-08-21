@@ -1,51 +1,39 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 21 Aug 2013 11:46:50 +0100
-Subject: [PATCH 1/3] ARM: vexpress_defconfig: Enable and automount
- devtmpfs filesystem
-In-Reply-To: <1377032563-4502-2-git-send-email-fathi.boudra@linaro.org>
+Date: Wed, 21 Aug 2013 11:48:36 +0100
+Subject: [PATCH 2/3] ARM: vexpress_defconfig: Enable voltage regulator
+ support
+In-Reply-To: <1377032563-4502-3-git-send-email-fathi.boudra@linaro.org>
 References: <1377032563-4502-1-git-send-email-fathi.boudra@linaro.org>
- <1377032563-4502-2-git-send-email-fathi.boudra@linaro.org>
-Message-ID: <1377082010.10707.6.camel@hornet>
+ <1377032563-4502-3-git-send-email-fathi.boudra@linaro.org>
+Message-ID: <1377082116.10707.8.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 2013-08-20 at 22:02 +0100, Fathi Boudra wrote:
-> udev no longer creates device nodes under /dev and it has to be managed
-> by the kernel devtmpfs filesystem.
+> It is needed for the MMC controller and allows to use the SD card:
 > 
-> This means that a kernel built with the current config will not boot on
-> a system with a recent udev:
+> mmc0: host doesn't support card's voltages
+> mmc0: error -22 whilst initialising SD card
 > 
-> mount: mounting udev on /dev failed: No such device
-> W: devtmpfs not available, falling back to tmpfs for /dev
-> 
-> Also, it is good to have /dev automatically mounted since some
-> non-initramfs based setups assumes this and don't manually mount it.
-> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > Signed-off-by: Fathi Boudra <fathi.boudra@linaro.org>
 > ---
 >  arch/arm/configs/vexpress_defconfig | 2 ++
 >  1 file changed, 2 insertions(+)
 > 
 > diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
-> index f2de51f..3f970f1 100644
+> index 3f970f1..c2f7ca1 100644
 > --- a/arch/arm/configs/vexpress_defconfig
 > +++ b/arch/arm/configs/vexpress_defconfig
-> @@ -45,6 +45,8 @@ CONFIG_IP_PNP_BOOTP=y
->  # CONFIG_IPV6 is not set
->  # CONFIG_WIRELESS is not set
->  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-> +CONFIG_DEVTMPFS=y
+> @@ -77,6 +77,8 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+>  CONFIG_LEGACY_PTY_COUNT=16
+>  # CONFIG_HW_RANDOM is not set
+>  # CONFIG_HWMON is not set
+> +CONFIG_REGULATOR=y
+> +CONFIG_REGULATOR_VEXPRESS=y
 
-This makes sense...
+The REGULATOR_VEXPRESS is not necessary to "fix" the MMC issue.
+REGULATOR=y will make the REGULATOR_FIXED_VOLTAGE being selected, which
+is enough.
 
-> +CONFIG_DEVTMPFS_MOUNT=y
-
-... but I'm not so sure about this one. Normally it's up to the boot
-scripts to decide when to mount the devtmpfs. And yes - I know it's
-required to boot Ubuntu-based rootfs without initramfs, but that's
-Ubuntu's problem, really.
-
->  CONFIG_MTD=y
->  CONFIG_MTD_CONCAT=y
->  CONFIG_MTD_PARTITIONS=y
+Pawe?
