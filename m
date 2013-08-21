@@ -1,38 +1,55 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Wed, 21 Aug 2013 09:42:37 +0200
-Subject: [PATCH v2] ARM: at91: at91sam9260: add missing pinctrl on mmc
-Message-ID: <1377070957-24984-1-git-send-email-ludovic.desroches@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Aug 2013 00:45:14 -0700
+Subject: [PATCH 2/3] ARM: OMAP2+: Add new bindings for OMAP
+In-Reply-To: <1376983966-16490-3-git-send-email-rnayak@ti.com>
+References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
+ <1376983966-16490-3-git-send-email-rnayak@ti.com>
+Message-ID: <20130821074514.GU7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+* Rajendra Nayak <rnayak@ti.com> [130820 00:41]:
+> On OMAP we have co-processor IPs, memory controllers,
+> GPIOs which control regulators and power switches to
+> PMIC, and SoC internal Bus IPs, some or most of which
+> should either not be reset or idled or both. Have a
+> way to pass this information from DT.
+> (In some cases there are erratas which prevent an IPs
+> from being reset)
+> 
+> Also update omap_hwmod to extract this from DT.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  .../devicetree/bindings/arm/omap/omap.txt          |    3 ++-
+>  arch/arm/mach-omap2/omap_hwmod.c                   |   22 +++++++++++++-------
+>  2 files changed, 17 insertions(+), 8 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> index 6d498c7..a08647e 100644
+> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> @@ -21,7 +21,8 @@ Required properties:
+>  Optional properties:
+>  - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
+>    during suspend.
+> -
+> +- ti,no-reset: When present, the module should not be reset
+> +- ti,no-idle: When present, the module should not be idled
 
-pinctrl-names was missing causing mmc pinctrl to never be requested. Moreover,
-add minimal pin configuration to not cause error if overloading is forgotten
-in board files.
+This naming is a bit confusing as people may think that the
+hardware has no reset support or no idle support. Let's try
+to make this to describe the hardware a bit more instead.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
+Then ideally we'd not map individual bits of data to properties,
+but describe few basic types of hardware instead and build
+lists of things instead of tagging things. Or maybe we
+can get this data from the bus hierarchy instead?
 
-v2:
-  - add minimal pin configuration
+If these options don't work, and the choice may be board
+specific, then how about ti,skip-reset-on-init, and
+ti,skip-idle-on-init?
 
- arch/arm/boot/dts/at91sam9260.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+Regards,
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index 84c4bef..b4de52a 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -477,6 +477,8 @@
- 				interrupts = <9 4 0>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_mmc0_clk &pinctrl_mmc0_slot1_cmd_dat0>;
- 				status = "disabled";
- 			};
- 
--- 
-1.7.11.3
+Tony
