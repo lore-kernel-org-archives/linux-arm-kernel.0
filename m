@@ -1,43 +1,57 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Wed, 21 Aug 2013 11:16:28 +0100
-Subject: [PATCH v2] arm: update advice on kernel, initramfs and FDT load
- address.
-In-Reply-To: <20130821100526.GK17845@n2100.arm.linux.org.uk>
-References: <1375974974-31603-1-git-send-email-ian.campbell@citrix.com>
- <20130808215429.GG19383@mudshark.cambridge.arm.com>
- <1377079147.31937.37.camel@hastur.hellion.org.uk>
- <20130821100526.GK17845@n2100.arm.linux.org.uk>
-Message-ID: <1377080188.31937.53.camel@hastur.hellion.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 21 Aug 2013 12:20:41 +0200
+Subject: [PATCH 4/5] ARM: AT91: dt: add at91rm9200 PQFP package version
+In-Reply-To: <51CA9E8A.3080708@atmel.com>
+References: <20130617123645.GA21034@game.jcrosoft.org>
+ <1371472710-18535-1-git-send-email-plagnioj@jcrosoft.com>
+ <1371472710-18535-4-git-send-email-plagnioj@jcrosoft.com>
+ <51CA9E8A.3080708@atmel.com>
+Message-ID: <52149479.9050402@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-08-21 at 11:05 +0100, Russell King - ARM Linux wrote:
-> On Wed, Aug 21, 2013 at 10:59:07AM +0100, Ian Campbell wrote:
-> > Unless there are any more comments on the correctness of the advice I
-> > suppose this should go via Russell's PTS? Now to dredge up the 8 year
-> > old memories of how that stuff works...
-> 
-> It's quite simple - with the standard git formatted email (iow, without
-> 8<==== stuff or similar), just send it to the PTS address.
-> 
-> In other words, summary in the subject line, patch description in the
-> body along with the sign-off, the end-of-description marker, be that
-> the dashes or "PATCH FOLLOWS", and the patch following that.
+On 26/06/2013 09:55, Nicolas Ferre :
+> On 17/06/2013 14:38, Jean-Christophe PLAGNIOL-VILLARD :
+>> the PQFP version have only 3 gpio banks (A, B & C)
+>>
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+>> ---
+>>    arch/arm/boot/dts/at91rm9200_pqfp.dtsi |   17 +++++++++++++++++
+>>    1 file changed, 17 insertions(+)
+>>    create mode 100644 arch/arm/boot/dts/at91rm9200_pqfp.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/at91rm9200_pqfp.dtsi b/arch/arm/boot/dts/at91rm9200_pqfp.dtsi
+>> new file mode 100644
+>> index 0000000..8e3d43f
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/at91rm9200_pqfp.dtsi
+>> @@ -0,0 +1,17 @@
+>> +/*
+>> + * at91rm9200_pqfp.dtsi - Device Tree Include file for AT91RM9200 PQFP family SoC
+>> + *
+>> + * Copyright (C) 2013 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> + *
+>> + * Licensed under GPLv2 or later.
+>> + */
+>> +
+>> +#include "at91rm9200.dtsi"
+>> +
+>> +/ {
+>> +	compatible = "atmel,at91rm9200-pqfp", "atmel,at91rm9200";
+>> +};
+>> +
+>> +&pioD {
+>> +	status = "disable";
+>
+> Typo: s/disable/disabled/
 
-Thanks, git has simplified this a fair bit it seems.
+With typo corrected, stacked on at91-3.12-dt
 
-> The only additional thing that needs to be added is a "Kernelversion:"
-> tag to specify which kernel version the patch was generated against.
-> That can go almost anywhere in the message before the actual patch
-> itself.
+Thanks,
 
-Cool. Does it understand git tags and stuff? e.g v3.11-rc3 or a sha1?
-
-> Alternatively, if you can remember your web login etc, then you can use
-> the online form, which tries to make it easier (since it generates the
-> formatted email for you - but some people find this method harder.)
-
-I think remembering my web login is probably the biggest barrier for me
-there. In fact remembering the username is probably too much ;-)
-
-Ian.
+-- 
+Nicolas Ferre
