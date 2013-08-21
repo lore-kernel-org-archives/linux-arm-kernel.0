@@ -1,144 +1,61 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 21 Aug 2013 20:37:09 +0800
-Subject: [PATCH 0/3] of: add update device node status via cmdline feature
-In-Reply-To: <CACxGe6tMm=u1jFKUQ59+cj-rYkLLAZUqMhsXamyi-wwpWaOGvw@mail.gmail.com>
-References: <1376564133-11286-1-git-send-email-b29396@freescale.com>
- <CACxGe6tMm=u1jFKUQ59+cj-rYkLLAZUqMhsXamyi-wwpWaOGvw@mail.gmail.com>
-Message-ID: <20130821123708.GA17748@b29396-Latitude-E6410>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 21 Aug 2013 18:09:41 +0530
+Subject: [PATCH 2/3] ARM: OMAP2+: Add new bindings for OMAP
+In-Reply-To: <20130821122327.GI7656@atomide.com>
+References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
+ <1376983966-16490-3-git-send-email-rnayak@ti.com>
+ <20130821074514.GU7656@atomide.com> <52147E95.5000606@ti.com>
+ <20130821085330.GH7656@atomide.com> <521486E1.6030009@ti.com>
+ <20130821122327.GI7656@atomide.com>
+Message-ID: <5214B50D.3050703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 01:45:48PM +0100, Grant Likely wrote:
-> On Thu, Aug 15, 2013 at 11:55 AM, Dong Aisheng <b29396@freescale.com> wrote:
-> > We meet some boards having a lot of pin conflicts between different devices,
-> > only one of them can be enabled to run at one time.
-> >
-> > e.g. imx6q sabreauto board, i2c, spi, weim, flexcan, uart and etc involved
-> > with pin conflict.
-> >
-> > Instead of changing dts manually or adding a lot dts files according to
-> > different device availability, we provide feature to dynamically update the
-> > device node status via command line, then those devices involved with
-> > pin conflict can be enabled or disabled dynamically.
+On Wednesday 21 August 2013 05:53 PM, Tony Lindgren wrote:
+> * Rajendra Nayak <rnayak@ti.com> [130821 02:29]:
+>> On Wednesday 21 August 2013 02:23 PM, Tony Lindgren wrote:
+>>>
+>>> Or you could also have various bus specific bindings for the ocp
+>>> with lists of phandles?
+>>>
+>>> ocp {
+>>> 	reg = <...>;
+>>> 	interrupts = <...>;
+>>> 	ti,reset-on-init = <&module1, &module2>;
+>>> 	...
+>>> };
+>>>
+>>> Or something similar.
+>>
+>> The only problem I see with this is that some of these modules could be
+>> board specific ones and need to be part of the board dts files, like
+>> some boards which have PMIC power switch hooked up to some gpio etc.
+>> So there could be some SoC specific modules (like emif/gpmc on OMAPs)
+>> and some which depend on how the boards are designed.
 > 
-> Ugh, no. If there are dynamic conflicts, then the driver really should
-> be responsible for handling them. ie. if the driver isn't able to get
-> the resource it needs because they don't exist, then driver probe
-> should fail.
-> 
+> You can still override the ocp entry in the board specific .dts file.
+> Would probably be a lot easier than to override each module separately
+> in the board specific .dts file.
 
-Detect pin confliction in driver is not our purpose.
-The real requirement is to flexibly decide which device involved in confliction
-is enabled when booting kernel since only one of them can be running at one time,
-not detect them.
+So, If I understand this right we would have the dt entries
+something like,
 
-Before using device tree, we defined kernel param in mach code ourself to fix
-this issue.
-e.g. i2c and spi are conflicted.
-We add kernel boot param i2c3_en to decide whether enable i2c3 or spi.
-Then user can test devices flexibly as they want.
+omap4.dtsi
+------
+ocp {
+	reg = <...>;
+	interrupts = <...>;
+	ti,no-reset-on-init = <&emif1, &emif2, &gpmc>;
+	...
+};
 
-After switch to device tree, since this part of work actually is soc independent,
-we move it into the dt core to let the kernel provide such feature.
-Then everyone else can also use it if needed.
+omap4-panda-es.dts
+------
+ocp {
+	ti,no-reset-on-init = <&emif1, &emif2, &gpmc, &gpio4>;
+	...
+};
 
-If do not provide such features in kernel, we may have to do it either in mach-code
-which may cause a lot of code duplication, or board dts file which cause add a lot
-duplicated board dts files.
-e.g. there are 11 devices involved with pin confliction in imx6q sabreauto board.
-i2c3, ecspi1, weim_nor, uart3, gpmi, can1, enet, tunner, satellite, mipi, csi.
-Some of them are combined conflicted.(e.g i2c3, ecspi1, weim_nor all conflict with EIM_D18)
-One simple way to use board dts to fix this issue may be add 11 more board dts files
-with one common board dts with all those device disabled by default.
-It may be:
-imx6q-sabreauto.dts
-imx6q-sabreauto-with-i2c3.dts
-imx6q-sabreauto-with-ecspi1.dts
-imx6q-sabreauto-with-weim-nor.dts
-imx6q-sabreauto-with-uart3.dts
-imx6q-sabreauto-with-gpmi.dts
-imx6q-sabreauto-with-can1.dts
-imx6q-sabreauto-with-enet.dts
-imx6q-sabreauto-with-tunner.dts
-imx6q-sabreauto-with-satellite.dts
-imx6q-sabreauto-with-mipi.dts
-imx6q-sabreauto-with-csi.dts
-
-We may also reduce them by combine some of them.
-e.g.
-imx6q-sabreauto-with-i2c3-uart3-can1-tunner-mipi.dts
-imx6q-sabreauto-with-ecspi1-gpmi-enet-satellite-csi.dts
-imx6q-sabreauto-with-weim-nor-*.dts
-....
-The defect is the combination and name is arbitrary and may
-cause dts file name changed usually.
-
-The common issue of above two way is that 1) it bloats the device tree,
-add a lot of duplicated dts files with the same board
-2) the fix is out of control and not permanent.
-If any new board having more conflict devices, we have to add these new board dts
-separately and figure out the combination again.
-e.g. for imx6q arm2 board, it also has conflicted devices flexcan, gpmi, sd and etc.
-So i'm not sure if you can accept this way.
-
-By comparing adding dts file, if the kernel provides such feature, we do not have
-to add these duplicated board dts files, only one board dts file with all conflicted
-devices disable by default and let user decide which device is enabled flexibly with
-kernel command line. And the fix is also permanently, not depends on hw design
-and how many device conflicted.
-
-Also in our case, it's pin confliction. However, it works for other conflict type
-as well that only one can work which may also exist on other platforms.
-
-> Except in very excpetional circumstances (ie. firmware workarounds)
-> the kernel needs to treat the device tree as immutable*. The tree
-> passed in at boot should not be manipulated at runtime.
-> 
-
-I understand the tree passed should be treated as inmmutable at most time.
-But now we did have this requirement and this is caused by real hw design.
-I'm not sure if our case can be treated as an excpetional circumstances,
-but it does look like a excpetional to me.
-
-so i wonder if kernel could provide such feature and let user to decide whether
-to use since it is valuable.
-
-BTW, except the pin confliction, freescale imx6q soc can also be fused
-with different IP availability.
-
-That means the same imx6q sabreauto board, if the soc chip is with different fuse,
-the device availability may be different.
-e.g. 
-imx6q(a) sabreauto with enet enabled.
-imx6q(b) sabreauto with enet disabled.
-
-We probably may still want to dynamically update the device node status by reading
-the fuse map before populating platform devices since if the IP is not exist,
-creating it's device is unreasonable.
-
-The devices involved with fused devices for imx6sdl are:
-"pxp", "ovg", "dsi_csi2", "enet", "mlb",
-"epdc", "hdmi", "pcie", "sata", "dtcp",
-"2d", "3d", "vpu", "divx3", "rv",
-"sorensen",
-
-> * There are powerpc platforms that modify the FDT at runtime; but in
-> those cases it is in response to firmware changing the data, not the
-> kernel.
-> 
-
-I'm not very clear about the case in response to firmware changing the data.
-Can you help give a example?
-Then i can understand the difference between our case and the exception you said.
-
-However, i did saw many exist code calling of_property_* API to change the device tree
-in kernel, although not clear about their purpose. But,
-e.g
-arch/powerpc/platforms/85xx/p1022_ds.c
-In these file, it also disable device node dynamically by commandline.
-If kernel has this feature, these code can be removed.
-arch/arm/mach-omap2/timer.c
-also disable the node...
-
-Regards
-Dong Aisheng
+Is it that, or you suggesting we can _append_ the soc list of
+modules with board specific modules, which I am not sure if its
+possible.
