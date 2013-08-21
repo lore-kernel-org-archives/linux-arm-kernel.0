@@ -1,53 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 21 Aug 2013 23:54:24 +0200
-Subject: [PATCHv3 5/9] pinctrl: sunxi: Fix inconsistent indentation
-In-Reply-To: <CACRpkdb0-Ue3aRT8ohHVMUU3RmeL4D0ZDR6pB-OBb0p+2Anw9Q@mail.gmail.com>
-References: <1375610330-18185-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375610330-18185-6-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdb0-Ue3aRT8ohHVMUU3RmeL4D0ZDR6pB-OBb0p+2Anw9Q@mail.gmail.com>
-Message-ID: <20130821215424.GA2970@lukather>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 22 Aug 2013 00:02:39 +0200
+Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
+In-Reply-To: <344239800.bDEkDg48ZQ@avalon>
+References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
+ <CACxGe6uNJNMdZ1HYGgCtLM2t2TWGCR6btjOHVmP=vDXXvvFfRg@mail.gmail.com>
+ <CACRpkdYjJL6FZwEbB7XLnb9QtjB=3LeE9Ny6KQ4PkM3zpdNqqg@mail.gmail.com>
+ <344239800.bDEkDg48ZQ@avalon>
+Message-ID: <CACRpkdavR=fv+y1RCNfdgQypPuRbO6isOSwGsABDrYiGeMdyZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 11:49:58PM +0200, Linus Walleij wrote:
-> On Sun, Aug 4, 2013 at 11:58 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> 
-> > Some pin functions in the array were not indented like the other
-> > functions in this array. Fix this.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Patch applied.
-> 
-> Since the reply mentions that you want me to apply it I
-> did so.
-> 
-> And I assume you want to take the two others so I
-> applied those as well.
-> 
-> The thing that made it take time was partly that it
-> was part of a multi-patch set and I couldn't figure out
-> how that was going to be merged and as there were
-> comments on the other patches in the set I assume
-> the whole thing will be respun.
-> 
-> But whatever, I applied these three patches now,
-> tell me if there are more of them.
+On Tue, Aug 20, 2013 at 12:04 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Wednesday 31 July 2013 01:44:53 Linus Walleij wrote:
 
-Great, thanks! :)
+>> I don't see how sharing works here, or how another user, i.e. another one
+>> than the user wanting to recieve the IRQ, can validly request such a line?
+>> What would the usecase for that valid request be?
+>
+> When the GPIO is wired to a status signal (such as an MMC card detect signal)
+> the driver might want to read the state of the signal independently of the
+> interrupt handler.
 
-Maxime
+That is true. But for such a complex usecase I think it's reasonable that
+we only specify the GPIO in the device tree, and the driver utilizing the
+IRQ need to take that and perform gpio_to_irq() on it, and then it still
+works to use it both ways.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130821/8b49cfda/attachment.sig>
+>> Basically I believe these two things need to be exclusive in the DT world:
+>>
+>> A: request_irq(a resource passed from "interrupts");
+>>      -> core implicitly performs gpio_request()
+>>          gpio_direction_input()
+>>
+>> B: gpio_request(a resource passed from "gpios");
+>>      gpio_direction_input()
+>>      request_irq(gpio_to_irq())
+>>
+>> Never both. And IIUC that was what happened in the OMAP case.
+>
+> Isn't the core issue that we can translate a GPIO number to an IRQ number, but
+> not the other way around ? If that could be done, we could request the GPIO
+> and configure it as an input when the IRQ is requested.
+
+That is true. It would be easier if all GPIO drivers has an irqchip and
+and irqdomain, then we could implement irq_to_gpio() properly in gpiolib
+and this would not be a problem. Alas, not all do.
+
+But I also think that the DT contains (as demonstrated by the patch)
+all information about what interrupts and GPIOs may conflict, so I
+also see this as something of a consistency check, but it could go
+in either way.
+
+Yours,
+Linus Walleij
