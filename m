@@ -1,63 +1,43 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 21 Aug 2013 11:29:48 +0200
-Subject: [PATCH 2/3] ARM: OMAP2+: Add new bindings for OMAP
-In-Reply-To: <20130821074514.GU7656@atomide.com>
-References: <1376983966-16490-1-git-send-email-rnayak@ti.com>
- <1376983966-16490-3-git-send-email-rnayak@ti.com>
- <20130821074514.GU7656@atomide.com>
-Message-ID: <5214888C.8050205@baylibre.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 21 Aug 2013 11:35:40 +0200
+Subject: [PATCH v2 0/3] arm: atmel: at91sam9n12: add i2c pinctrl and qt1070
+ support
+In-Reply-To: <1373513446-18215-1-git-send-email-voice.shen@atmel.com>
+References: <1373513446-18215-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <521489EC.9090107@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/08/2013 09:45, Tony Lindgren wrote:
-> * Rajendra Nayak <rnayak@ti.com> [130820 00:41]:
->> On OMAP we have co-processor IPs, memory controllers,
->> GPIOs which control regulators and power switches to
->> PMIC, and SoC internal Bus IPs, some or most of which
->> should either not be reset or idled or both. Have a
->> way to pass this information from DT.
->> (In some cases there are erratas which prevent an IPs
->> from being reset)
->>
->> Also update omap_hwmod to extract this from DT.
->>
->> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->> ---
->>   .../devicetree/bindings/arm/omap/omap.txt          |    3 ++-
->>   arch/arm/mach-omap2/omap_hwmod.c                   |   22 +++++++++++++-------
->>   2 files changed, 17 insertions(+), 8 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
->> index 6d498c7..a08647e 100644
->> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
->> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
->> @@ -21,7 +21,8 @@ Required properties:
->>   Optional properties:
->>   - ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
->>     during suspend.
->> -
->> +- ti,no-reset: When present, the module should not be reset
->> +- ti,no-idle: When present, the module should not be idled
+On 11/07/2013 05:30, Bo Shen :
+> this patch is based on linux master branch, implementation as following:
+>    - add the i2c pinctrl which needed for using at91sam9n12 TWI
+>    - enable qt1070
+>    - trival fix for the gpio-key pin number
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+On the whole series.
+
 >
-> This naming is a bit confusing as people may think that the
-> hardware has no reset support or no idle support. Let's try
-> to make this to describe the hardware a bit more instead.
-
-Yeah, I do agree here. That should look like a real HW property and nor 
-a configuration.
-
-> Then ideally we'd not map individual bits of data to properties,
-> but describe few basic types of hardware instead and build
-> lists of things instead of tagging things. Or maybe we
-> can get this data from the bus hierarchy instead?
+> Changes in v2:
+>    - remove comments as use micro
+>    - using micro for interrupt trigger mode
 >
-> If these options don't work, and the choice may be board
-> specific, then how about ti,skip-reset-on-init, and
-> ti,skip-idle-on-init?
+> Bo Shen (3):
+>    arm: atmel: at91sam9n12: add pinctrl of TWI
 
-It looks like a configuration as well :-).
-I was thinking of something like "ti,do-not-support-reset-on-init", but 
-that a little bit too long.
+Beware:
+1/ "arm" in upper case
+2/ not "atmel" as second identifier but "at91" (lower case)
 
-Regards,
-Benoit
+>    arm: atmel: at91sam9n12: add qt1070 support
+>    arm: atmel: at91sam9n12: correct pin number of gpio-key
+>
+>   arch/arm/boot/dts/at91sam9n12.dtsi  |   20 ++++++++++++++++++++
+>   arch/arm/boot/dts/at91sam9n12ek.dts |   18 +++++++++++++++++-
+>   2 files changed, 37 insertions(+), 1 deletion(-)
+>
+
+
+-- 
+Nicolas Ferre
