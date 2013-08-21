@@ -1,49 +1,135 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 21 Aug 2013 11:40:04 +0200
-Subject: [PATCH 5/5] ARM: at91: at91rm9200: set default mmc0 pinctrl-names
-In-Reply-To: <51C97284.40300@atmel.com>
-References: <20130617123645.GA21034@game.jcrosoft.org>
- <1371472710-18535-1-git-send-email-plagnioj@jcrosoft.com>
- <1371472710-18535-5-git-send-email-plagnioj@jcrosoft.com>
- <51C97284.40300@atmel.com>
-Message-ID: <52148AF4.5090200@atmel.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Wed, 21 Aug 2013 11:46:15 +0200
+Subject: [PATCH] arm: omap5: hwmod: add missing ocp2scp hwmod data
+In-Reply-To: <20130821074728.GV7656@atomide.com>
+References: <1373642066-5235-1-git-send-email-balbi@ti.com>
+ <20130821074728.GV7656@atomide.com>
+Message-ID: <52148C67.3080106@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/06/2013 12:35, Nicolas Ferre :
-> On 17/06/2013 14:38, Jean-Christophe PLAGNIOL-VILLARD :
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+On 21/08/2013 09:47, Tony Lindgren wrote:
+> Benoit,
+>
+> Got this one queued up somewhere?
+
+No yet. That's the only hwmod patch I have so far.
+I'll put it in a branch and send you the pull-request ASAP.
+
+Regards,
+Benoit
+
+>
+> * Felipe Balbi <balbi@ti.com> [130712 08:21]:
+>> From: Benoit Cousson <benoit.cousson@linaro.org>
+>>
+>> without that hwmod data, USB3 will not in OMAP5 boards.
+>>
+>> While at that, also fix DTS data to pass reg property,
+>> otherwise driver won't probe.
+>>
+>> Signed-off-by: Benoit Cousson <benoit.cousson@linaro.org>
+>> Signed-off-by: Felipe Balbi <balbi@ti.com>
 >> ---
->>    arch/arm/boot/dts/at91rm9200.dtsi |    1 +
->>    1 file changed, 1 insertion(+)
 >>
->> diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
->> index 1fc645e..8bc87e5 100644
->> --- a/arch/arm/boot/dts/at91rm9200.dtsi
->> +++ b/arch/arm/boot/dts/at91rm9200.dtsi
->> @@ -116,6 +116,7 @@
->>    				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 0>;
->>    				#address-cells = <1>;
->>    				#size-cells = <0>;
->> +				pinctrl-names = "default";
->
-> You do not add a pinctrl cell: is it normal? Which pinctrl definition
-> does it take then?
-
-Okay, same fix that the one for 9260/9g20. So I take this one without a 
-change:
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
->
->>    				status = "disabled";
->>    			};
+>> tested on OMAP5 uEVM. Gets rid of a data abort when USB3
+>> is enabled. There still some other patches missing to get
+>> USB3 working out of the box, but that's on Palmas and will
+>> come as soon as I get those ready.
 >>
+>> This is already on step forward.
 >>
->
->
-
-
--- 
-Nicolas Ferre
+>>   arch/arm/boot/dts/omap5.dtsi               |  3 +-
+>>   arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 45 ++++++++++++++++++++++++++++++
+>>   2 files changed, 47 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+>> index da41d70..a0de586 100644
+>> --- a/arch/arm/boot/dts/omap5.dtsi
+>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>> @@ -654,10 +654,11 @@
+>>   			};
+>>   		};
+>>
+>> -		ocp2scp {
+>> +		ocp2scp at 4a080000 {
+>>   			compatible = "ti,omap-ocp2scp";
+>>   			#address-cells = <1>;
+>>   			#size-cells = <1>;
+>> +			reg = <0x4a080000 0x20>;
+>>   			ranges;
+>>   			ti,hwmods = "ocp2scp1";
+>>   			usb2_phy: usb2phy at 4a084000 {
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
+>> index 2435109..d9118a1 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
+>> @@ -1105,6 +1105,42 @@ static struct omap_hwmod omap54xx_mpu_hwmod = {
+>>   };
+>>
+>>   /*
+>> + * 'ocp2scp' class
+>> + * bridge to transform ocp interface protocol to scp (serial control port)
+>> + * protocol
+>> + */
+>> +
+>> +static struct omap_hwmod_class_sysconfig omap54xx_ocp2scp_sysc = {
+>> +	.rev_offs	= 0x0000,
+>> +	.sysc_offs	= 0x0010,
+>> +	.syss_offs	= 0x0014,
+>> +	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE |
+>> +			SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
+>> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+>> +	.sysc_fields	= &omap_hwmod_sysc_type1,
+>> +};
+>> +
+>> +static struct omap_hwmod_class omap54xx_ocp2scp_hwmod_class = {
+>> +	.name	= "ocp2scp",
+>> +	.sysc	= &omap54xx_ocp2scp_sysc,
+>> +};
+>> +
+>> +/* ocp2scp1 */
+>> +static struct omap_hwmod omap54xx_ocp2scp1_hwmod = {
+>> +	.name		= "ocp2scp1",
+>> +	.class		= &omap54xx_ocp2scp_hwmod_class,
+>> +	.clkdm_name	= "l3init_clkdm",
+>> +	.main_clk	= "l4_root_clk_div",
+>> +	.prcm = {
+>> +		.omap4 = {
+>> +			.clkctrl_offs = OMAP54XX_CM_L3INIT_OCP2SCP1_CLKCTRL_OFFSET,
+>> +			.context_offs = OMAP54XX_RM_L3INIT_OCP2SCP1_CONTEXT_OFFSET,
+>> +			.modulemode   = MODULEMODE_HWCTRL,
+>> +		},
+>> +	},
+>> +};
+>> +
+>> +/*
+>>    * 'timer' class
+>>    * general purpose timer module with accurate 1ms tick
+>>    * This class contains several variants: ['timer_1ms', 'timer']
+>> @@ -1900,6 +1936,14 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__mpu = {
+>>   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>>   };
+>>
+>> +/* l4_cfg -> ocp2scp1 */
+>> +static struct omap_hwmod_ocp_if omap54xx_l4_cfg__ocp2scp1 = {
+>> +	.master		= &omap54xx_l4_cfg_hwmod,
+>> +	.slave		= &omap54xx_ocp2scp1_hwmod,
+>> +	.clk		= "l4_root_clk_div",
+>> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>> +};
+>> +
+>>   /* l4_wkup -> timer1 */
+>>   static struct omap_hwmod_ocp_if omap54xx_l4_wkup__timer1 = {
+>>   	.master		= &omap54xx_l4_wkup_hwmod,
+>> @@ -2102,6 +2146,7 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
+>>   	&omap54xx_l4_per__mmc4,
+>>   	&omap54xx_l4_per__mmc5,
+>>   	&omap54xx_l4_cfg__mpu,
+>> +	&omap54xx_l4_cfg__ocp2scp1,
+>>   	&omap54xx_l4_wkup__timer1,
+>>   	&omap54xx_l4_per__timer2,
+>>   	&omap54xx_l4_per__timer3,
+>> --
+>> 1.8.2.1
+>>
