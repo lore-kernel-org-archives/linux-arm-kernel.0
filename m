@@ -1,87 +1,123 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 21 Aug 2013 14:08:54 +0200
-Subject: [PATCH v5 1/5] dma: mmp_pdma: only complete one transaction from
- dma_do_tasklet()
+Date: Wed, 21 Aug 2013 14:08:57 +0200
+Subject: [PATCH v5 4/5] dma: mmp_pdma: add support for residue reporting
 In-Reply-To: <1377086938-29145-1-git-send-email-zonque@gmail.com>
 References: <1377086938-29145-1-git-send-email-zonque@gmail.com>
-Message-ID: <1377086938-29145-2-git-send-email-zonque@gmail.com>
+Message-ID: <1377086938-29145-5-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, when an interrupt has occured for a channel, the tasklet
-worker code will only look at the very last entry in the running list
-and complete its cookie, and then dispose the entire running chain.
-Hence, the first transaction's cookie will never complete.
-
-In fact, the interrupt we should handle will be the one related to the
-first descriptor in the chain with the ENDIRQEN bit set, so complete
-the second transaction that is in fact still running.
-
-As a result, the driver can't currently handle multiple transactions on
-one chanel, and it's likely that no drivers exist that rely on this
-feature.
-
-Fix this by walking the running_chain and look for the first
-descriptor that has the interrupt-enable bit set. Only queue
-descriptors up to that point for completion handling, while leaving
-the rest intact. Also, only make the channel idle if the list is
-completely empty after such a cycle.
+In order to report the channel's residue, we walk the list of running
+descriptors, look for those which match the cookie, and then try to find
+the descriptor which defines upper and lower boundaries that embrace the
+current transport pointer.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- drivers/dma/mmp_pdma.c | 35 +++++++++++++++++++++--------------
- 1 file changed, 21 insertions(+), 14 deletions(-)
+ drivers/dma/mmp_pdma.c | 77 ++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 75 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index 579f79a..9929f85 100644
+index d82a4f6..efb583f 100644
 --- a/drivers/dma/mmp_pdma.c
 +++ b/drivers/dma/mmp_pdma.c
-@@ -710,25 +710,32 @@ static void dma_do_tasklet(unsigned long data)
+@@ -28,8 +28,8 @@
+ #define DALGN		0x00a0
+ #define DINT		0x00f0
+ #define DDADR		0x0200
+-#define DSADR		0x0204
+-#define DTADR		0x0208
++#define DSADR(n)	(0x0204 + ((n) << 4))
++#define DTADR(n)	(0x0208 + ((n) << 4))
+ #define DCMD		0x020c
+ 
+ #define DCSR_RUN	(1 << 31)	/* Run Bit (read / write) */
+@@ -741,6 +741,78 @@ static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
+ 	return ret;
+ }
+ 
++static unsigned int mmp_pdma_residue(struct mmp_pdma_chan *chan,
++				     dma_cookie_t cookie)
++{
++	struct mmp_pdma_desc_sw *sw;
++	u32 curr, residue = 0;
++	bool passed = false;
++	bool cyclic = chan->cyclic_first != NULL;
++
++	/*
++	 * If the channel does not have a phy pointer anymore, it has already
++	 * been completed. Therefore, its residue is 0.
++	 */
++	if (!chan->phy)
++		return 0;
++
++	if (chan->dir == DMA_DEV_TO_MEM)
++		curr = readl(chan->phy->base + DTADR(chan->phy->idx));
++	else
++		curr = readl(chan->phy->base + DSADR(chan->phy->idx));
++
++	list_for_each_entry(sw, &chan->chain_running, node) {
++		u32 start, end, len;
++
++		if (chan->dir == DMA_DEV_TO_MEM)
++			start = sw->desc.dtadr;
++		else
++			start = sw->desc.dsadr;
++
++		len = sw->desc.dcmd & DCMD_LENGTH;
++		end = start + len;
++
++		/*
++		 * 'passed' will be latched once we found the descriptor which
++		 * lies inside the boundaries of the curr pointer. All
++		 * descriptors that occur in the list _after_ we found that
++		 * partially handled descriptor are still to be processed and
++		 * are hence added to the residual bytes counter.
++		 */
++		if (passed) {
++			residue += len;
++		} else if (curr >= start && curr <= end) {
++			residue += end - curr;
++			passed = true;
++		}
++
++		/*
++		 * Descriptors that have the ENDIRQEN bit set mark the end of a
++		 * transaction chain, and the cookie assigned with it has been
++		 * returned previously from mmp_pdma_tx_submit().
++		 *
++		 * In case we have multiple transactions in the running chain,
++		 * and the cookie does not match the one the user asked us
++		 * about, reset the state variables and start over.
++		 *
++		 * This logic does not apply to cyclic transactions, where all
++		 * descriptors have the ENDIRQEN bit set, and for which we
++		 * can't have multiple transactions on one channel anyway.
++		 */
++		if (!cyclic && (sw->desc.dcmd & DCMD_ENDIRQEN)) {
++			if (sw->async_tx.cookie != cookie) {
++				residue = 0;
++				passed = false;
++			} else {
++				return residue;
++			}
++		}
++	}
++
++	/* We should only get here in case of cyclic transactions */
++	return residue;
++}
++
+ static enum dma_status mmp_pdma_tx_status(struct dma_chan *dchan,
+ 			dma_cookie_t cookie, struct dma_tx_state *txstate)
+ {
+@@ -750,6 +822,7 @@ static enum dma_status mmp_pdma_tx_status(struct dma_chan *dchan,
  
  	spin_lock_irqsave(&chan->desc_lock, flags);
+ 	ret = dma_cookie_status(dchan, cookie, txstate);
++	txstate->residue = mmp_pdma_residue(chan, cookie);
+ 	spin_unlock_irqrestore(&chan->desc_lock, flags);
  
--	/* update the cookie if we have some descriptors to cleanup */
--	if (!list_empty(&chan->chain_running)) {
--		dma_cookie_t cookie;
--
--		desc = to_mmp_pdma_desc(chan->chain_running.prev);
--		cookie = desc->async_tx.cookie;
--		dma_cookie_complete(&desc->async_tx);
-+	list_for_each_entry_safe(desc, _desc, &chan->chain_running, node) {
-+		/*
-+		 * move the descriptors to a temporary list so we can drop
-+		 * the lock during the entire cleanup operation
-+		 */
-+		list_del(&desc->node);
-+		list_add(&desc->node, &chain_cleanup);
- 
--		dev_dbg(chan->dev, "completed_cookie=%d\n", cookie);
-+		/*
-+		 * Look for the first list entry which has the ENDIRQEN flag
-+		 * set. That is the descriptor we got an interrupt for, so
-+		 * complete that transaction and its cookie.
-+		 */
-+		if (desc->desc.dcmd & DCMD_ENDIRQEN) {
-+			dma_cookie_t cookie = desc->async_tx.cookie;
-+			dma_cookie_complete(&desc->async_tx);
-+			dev_dbg(chan->dev, "completed_cookie=%d\n", cookie);
-+			break;
-+		}
- 	}
- 
- 	/*
--	 * move the descriptors to a temporary list so we can drop the lock
--	 * during the entire cleanup operation
-+	 * The hardware is idle and ready for more when the
-+	 * chain_running list is empty.
- 	 */
--	list_splice_tail_init(&chan->chain_running, &chain_cleanup);
--
--	/* the hardware is now idle and ready for more */
--	chan->idle = true;
-+	chan->idle = list_empty(&chan->chain_running);
- 
- 	/* Start any pending transactions automatically */
- 	start_pending_queue(chan);
+ 	return ret;
 -- 
 1.8.3.1
