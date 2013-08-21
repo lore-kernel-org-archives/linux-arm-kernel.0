@@ -1,25 +1,36 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 21 Aug 2013 08:13:18 -0700
-Subject: [PATCH v5 0/4] mmc: dw_mmc: fixes for suspend/resume on exynos
-In-Reply-To: <001e01ce9e64$59c3b780$0d4b2680$%jun@samsung.com>
-References: <1375825071-20922-1-git-send-email-dianders@chromium.org>
- <1376066000-5495-1-git-send-email-dianders@chromium.org>
- <001e01ce9e64$59c3b780$0d4b2680$%jun@samsung.com>
-Message-ID: <CAD=FV=Uo3zs6EqZDJTh1=dezRRtT-M3RDRoWCGw6pquZ8qFboA@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 21 Aug 2013 08:15:10 -0700
+Subject: build warnings: multi_v7_defconfig + LPAE, printk with variable types
+Message-ID: <87k3jfqdmp.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seungwon,
+I've started auto-building the multi_v7_defconfig with LPAE enabled, and
+noticed a handful of warnings[1]
 
+Several are due to using prink format on a type that changes with a
+config option (e.g several below use %x to print a resource_size_t,
+which is obviously different between 32- and 64-bit builds.
 
-On Wed, Aug 21, 2013 at 4:48 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
-> Hi Doug,
-> Do you have any update for this series?
-> Please let me know.
+So this got me to wondering if there is "one true way" for using printk
+on types that might change with config option (preferably without
+ifdef.)
 
-Thank you for the ping.  The changes requested looked big enough that
-I knew I was going to have to devote some time to looking this all
-over again, which I haven't had time for.  I'll make time for it today
-or tomorrow and repost.  Sorry for the delay.
+The one that comes to mind would be to just always cast to the larger of
+the types and use the correspondig format.  For the ones below, it would
+mean casting to (u64) and using '%llx'.
 
--Doug
+Is there a better way?
+
+Kevin
+
+[1] 
+Warnings:
+        arch/arm/mach-omap2/gpmc.c:1495:4: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'resource_size_t' [-Wformat]
+        net/ipv6/addrconf.c:2793:22: warning: 'link_dev' may be used uninitialized in this function [-Wuninitialized]
+        drivers/dma/ste_dma40.c:3228:2: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'resource_size_t' [-Wformat]
+        drivers/dma/ste_dma40.c:3582:3: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'resource_size_t' [-Wformat]
+        drivers/dma/ste_dma40.c:3582:3: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t' [-Wformat]
+        drivers/dma/ste_dma40.c:3593:5: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t' [-Wformat]
+        drivers/spi/spi-pl022.c:2178:9: warning: format '%x' expects argument of type 'unsigned int', but argument 2 has type 'resource_size_t' [-Wformat]
+        drivers/tty/serial/imx.c:1542:6: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
