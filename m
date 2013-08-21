@@ -1,86 +1,42 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 20 Aug 2013 19:22:25 -0700
-Subject: [PATCH 2/8] clk: keystone: Add gate control clock driver
-In-Reply-To: <5213F397.6020708@ti.com>
-References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
- <20130813161314.GR27165@e106331-lin.cambridge.arm.com>
- <520A60A2.2030104@ti.com>
- <20130813165344.GU27165@e106331-lin.cambridge.arm.com>
- <20130819204353.4443.48466@quantum> <5213756A.5090903@ti.com>
- <20130820213045.4443.89971@quantum> <5213E5EC.8070208@ti.com>
- <20130820224128.4443.78729@quantum> <5213F397.6020708@ti.com>
-Message-ID: <20130821022225.4443.97467@quantum>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 21 Aug 2013 10:26:40 +0800
+Subject: [PATCH v2] i2c: imx: use exact SoC revision to document binding
+In-Reply-To: <1377051119-23004-1-git-send-email-b35083@freescale.com>
+References: <1377051119-23004-1-git-send-email-b35083@freescale.com>
+Message-ID: <20130821022637.GF30533@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Santosh Shilimkar (2013-08-20 15:54:15)
-> On Tuesday 20 August 2013 06:41 PM, Mike Turquette wrote:
-> > Quoting Santosh Shilimkar (2013-08-20 14:55:56)
-> >> On Tuesday 20 August 2013 05:30 PM, Mike Turquette wrote:
+On Wed, Aug 21, 2013 at 10:11:59AM +0800, Jingchang Lu wrote:
+> use exact SoC revision instead of wildcard describing
+> the compatible property requirement in the binding
+> document. This will make the binding more clearer.
 > 
-> [...]
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-imx.txt | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
-> >>>> They are bit different w.r.t OMAP. LPSC itself is the clock control of the
-> >>>> IP. The LPSC number in the bindings is actually the specific number which
-> >>>> is used to reach to the address space of the clock control. One can view
-> >>>> that one as clock control register index.
-> >>>
-> >>> Thanks for the information. I have a further question about then: are
-> >>> the LPSC clocks really module clocks that belong to the IP that they are
-> >>> gating?
-> >>>
-> >> LPSC controls the clock enable/disable to the IP/module so answer is yes.
-> >> In certain cases LPSC controls clock to more than one IP as well.
-> >>
-> >>> If so then they could be defined within the node defining their parent
-> >>> IP. That might be enough to get rid of the LPSC index value. Again I
-> >>> might be over-engineering it. Just trying to get an understanding.
-> >>>
-> >> Am not sure I follow you here on not having the LPSC index. Sorry. 
-> > 
-> > How are the 'reg' property and the 'lpsc' property related? Does the
-> > lpsc property modify the register address used to access the clock
-> > control bits?
-> > 
-> Yes it does. Currently all nodes use fix address and then lpsc is
-> used as an index.
-
-Ok cool. Well the reason I brought that up was because I even had the
-idea to define these module clocks within the module nodes that own them
-in DT. I am way outside of my DT knowledge at this point but I wonder
-if the following type of binding is possible:
-
-module: module at 4a308200 {
-	#address-cells = <1>;
-	#size-cells = <1>;
-	reg = <0x4a308200 0x1000>;
-
-	clock {
-		#clock-cells = <0>;
-		compatible = "keystone,psc-clk";
-		clocks = <&chipclk3>;
-		clock-output-names = "debugss_trc";
-		reg = <0x0256>;
-		pd = <1>;
-	};
-};
-
-Again, my DT knowledge is pretty limited, but could the reg property of
-the clock be directly affected by the parent node? That seems like it
-could nicely model what the hardware is really doing.
-
-> But I think we can do better by just using the
-> right(offset) address in the reg property. Will have a look at it
-> and see what I can do here.
-
-This also solves the problem nicely.  Thanks for putting up with my
-silly questions ;-)
-
-Regards,
-Mike
-
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-imx.txt b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
+> index 3614242..4a8513e 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-imx.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
+> @@ -1,7 +1,10 @@
+>  * Freescale Inter IC (I2C) and High Speed Inter IC (HS-I2C) for i.MX
+>  
+>  Required properties:
+> -- compatible : Should be "fsl,<chip>-i2c"
+> +- compatible :
+> +  - "fsl,imx1-i2c" for I2C compatible with the one integrated on i.MX1 SoC
+> +  - "fsl,imx21-i2c" for I2C compatible with the one integrated on i.MX21 SoC
+> +  - "fsl,vf610-i2c" for I2C compatible with the one integrated on Vybrid vf610 SoC
+>  - reg : Should contain I2C/HS-I2C registers location and length
+>  - interrupts : Should contain I2C/HS-I2C interrupt
+>  
+> -- 
+> 1.8.0
 > 
-> Thanks for asking this questions Mike 
 > 
-> regards,
-> Santosh
