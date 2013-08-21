@@ -1,191 +1,141 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 21 Aug 2013 16:38:40 +0200
-Subject: [PATCH v6 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <52139AE7.4050300@wwwdotorg.org>
-References: <1376924669-28873-1-git-send-email-m.szyprowski@samsung.com>
- <1376924669-28873-4-git-send-email-m.szyprowski@samsung.com>
- <521292E0.105@wwwdotorg.org> <98354044.bRIxVeGEeu@flatron>
- <5212997A.5060206@wwwdotorg.org> <52134B92.10308@samsung.com>
- <52139AE7.4050300@wwwdotorg.org>
-Message-ID: <5214D0F0.10209@samsung.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 21 Aug 2013 16:46:48 +0200
+Subject: [PATCH V2] i2c: move of helpers into the core
+In-Reply-To: <1377092832-3417-1-git-send-email-wsa@the-dreams.de>
+References: <1377092832-3417-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <5214D2D8.7010106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 08/21/2013 03:47 PM, Wolfram Sang wrote:
+> I2C of helpers used to live in of_i2c.c but experience (from SPI) shows
+> that it is much cleaner to have this in the core. This also removes a
+> circular dependency between the helpers and the core, and so we can
+> finally register child nodes in the core instead of doing this manually
+> in each driver. So, fix the drivers and documentation, too.
+> 
+> Acked-by: Sylwester Nawrocki <s.nawrocki@amsung.com>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 
-On 8/20/2013 6:35 PM, Stephen Warren wrote:
-> On 08/20/2013 04:57 AM, Marek Szyprowski wrote:
-> > Hello,
-> >
-> > On 8/20/2013 12:17 AM, Stephen Warren wrote:
-> >> On 08/19/2013 04:02 PM, Tomasz Figa wrote:
-> >> > Hi Stephen,
-> >> >
-> >> > On Monday 19 of August 2013 15:49:20 Stephen Warren wrote:
-> >> >> On 08/19/2013 09:04 AM, Marek Szyprowski wrote:
-> >> >>> This patch adds device tree support for contiguous and reserved
-> >> memory
-> >> >>> regions defined in device tree.
-> >> >>>
-> >> >>> diff --git a/Documentation/devicetree/bindings/memory.txt
-> >> >>> b/Documentation/devicetree/bindings/memory.txt
-> >> >>>
-> >> >>> +*** Reserved memory regions ***
-> >> >>> +
-> >> >>> +In /memory/reserved-memory node one can create additional nodes
-> >> >>
-> >> >> s/additional/child/ or s/additional/sub/ would make it clearer
-> >> where the
-> >> >> "additional" nodes should be placed.
-> >> >>
-> >> >>> +compatible:    "linux,contiguous-memory-region" - enables binding
-> >> > of
-> >> >>> this
-> >> >>> +        region to Contiguous Memory Allocator (special region for
-> >> >>> +        contiguous memory allocations, shared with movable system
-> >> >>> +        memory, Linux kernel-specific), alternatively if
-> >> >>> +        "reserved-memory-region" - compatibility is defined, given
-> >> >>> +        region is assigned for exclusive usage for by the
-> >> > respective
-> >> >>> +        devices
-> >> >>
-> >> >> "alternatively" makes it sound like the two compatible values are
-> >> >> mutually-exclusive. Perhaps make this a list, like:
-> >> >>
-> >> >> ----------
-> >> >> compatible: One or more of:
-> >> >>
-> >> >>     - "linux,contiguous-memory-region" - enables binding of this
-> >> >>       region to Contiguous Memory Allocator (special region for
-> >> >>       contiguous memory allocations, shared with movable system
-> >> >>       memory, Linux kernel-specific).
-> >> >>     - "reserved-memory-region" - compatibility is defined, given
-> >> >>       region is assigned for exclusive usage for by the respective
-> >> >>       devices.
-> >> >> ----------
-> >> >>
-> >> >> "linux,contiguous-memory-region" is already long enough, but I'd
-> >> >> slightly bikeshed towards
-> >> "linux,contiguous-memory-allocator-region", or
-> >> >> perhaps "linux,cma-region" since it's not really describing whether
-> >> the
-> >> >> memory is contiguous (at the level of /memory, each chunk of memory is
-> >> >> contiguous...)
-> >> >
-> >> > I'm not really sure if we need the "linux" prefix for
-> >> "contiguous-memory-
-> >> > region". The concept of contiguous memory region is rather OS
-> >> independent
-> >> > and tells us that memory allocated from this region will be contiguous.
-> >> > IMHO any OS is free to implement its own contiguous memory allocation
-> >> > method, without being limited to Linux CMA.
-> >> >
-> >> > Keep in mind that rationale behind those contiguous regions was that
-> >> there
-> >> > are devices that require buffers contiguous in memory to operate
-> >> > correctly.
-> >> >
-> >> > But this is just nitpicking and I don't really have any strong
-> >> opinion on
-> >> > this.
-> >> >
-> >> >>> +*** Device node's properties ***
-> >> >>> +
-> >> >>> +Once regions in the /memory/reserved-memory node have been defined,
-> >> >>> they +can be assigned to device nodes to enable respective device
-> >> >>> drivers to +access them. The following properties are defined:
-> >> >>> +
-> >> >>> +memory-region = <&phandle_to_defined_region>;
-> >> >>
-> >> >> I think the naming of that property should more obviously match this
-> >> >> binding and/or compatible value; perhaps cma-region or
-> >> >> contiguous-memory-region?
-> >> >
-> >> > This property is not CMA-specific. Any memory region can be given using
-> >> > the memory-region property and used to allocate buffers for particular
-> >> > device.
-> >>
-> >> OK, that makes sense.
-> >>
-> >> What I'm looking for is some way to make it obvious that when you see a
-> >> "memory-region" property in a node, you go look at the "memory.txt"
-> >> rather than the DT binding for the node where that property appears.
-> >> Right now, it doesn't seem that obvious to me.
-> >>
-> >> I think the real issue here is that my brief reading of memory.txt
-> >> implies that arbitrary device nodes can include the memory-region
-> >> property without the node's own binding having to document it; the
-> >> property name is essentially "forced into" all other bindings.
-> >>
-> >> I think instead, memory.txt should say:
-> >>
-> >> ----------
-> >> ** Device node's properties ***
-> >>
-> >> Once regions in the /memory/reserved-memory node have been defined, they
-> >> may be referenced by other device nodes. Bindings that wish to reference
-> >> memory regions should explicitly document their use of the following
-> >> property:
-> >>
-> >> memory-region = <&phandle_to_defined_region>;
-> >>
-> >> This property indicates that the device driver should use the memory
-> >> region pointed by the given phandle.
-> >> ----------
-> >>
-> >> Also, what if a device needs multiple separate memory regions? Perhaps a
-> >> GPU is forced to allocate displayable surfaces from addresses 0..32M and
-> >> textures/off-screen-render-targets from 256M..384M or something whacky
-> >> like that. In that case, we could either:
-> >>
-> >> a) Adjust memory.txt to allow multiple entries in memory-regions, and
-> >> add an associated memory-region-names property.
-> >>
-> >> or:
-> >>
-> >> b) Adjust memory.txt not to mention any specific property names, but
-> >> simply mention that other DT nodes can refer to define memory regions by
-> >> phandle, and leave it up to individual bindings to define which property
-> >> they use to reference the memory regions, perhaps with memory.txt
-> >> providing a recommendation of memory-region for the simple case, but
-> >> perhaps also allowing a custom case, e.g.:
-> >>
-> >> display-memory-region = <&phandl1e1>;
-> >> texture-memory-region = <&phahndle2>;
-> >
-> > Support for multiple regions is something that need to be discussed
-> > separately. In case of Exynos hardware it is also related to iommu bindings
-> > and configuration, because each busmuster on the internal memory bus has
-> > separate iommu controller. Having each busmaster defined as a separate
-> > node,
-> > enables to put there the associated memory region and/or iommu
-> > controller as
-> > well as dma window properties (in case of limited dma window).
-> >
-> > However right now I would like to focus on the simple case (1 device,
-> > 1 memory region) and define bindings which can be extended later.
-> > I hope that my current proposal covers this (I will send updated binding
-> > documentation asap) and the initial support for reserved memory can be
-> > merged to -next soon.
->
-> I don't believe that's a good approach unless you have at least a
-> partial idea of how the current bindings will be extended to support
-> multiple memory regions.
->
-> Without a clear idea how that will eventually work, you run a real risk
-> of not being able to extend the bindings in a 100% backwards-compatible
-> way, and hence wishing to break DT ABI.
+With this patch there are still couple of of_i2c.h header file
+inclusions:
 
-Both already proposed approaches for extending them to support multiple
-memory regions are compatible with the 'single memory region' approach
-defined in my patches. Adding additional property with region names is
-probably the simplest way from binding perspective, while adding additional
-child nodes for each bus master or memory interface gives much more
-flexibility in describing hardware properties. Besides memory region, one
-can assign iommu controller or dma window properties to each such node.
+$ git grep of_i2c.h
+arch/powerpc/platforms/44x/warp.c:#include <linux/of_i2c.h>
+drivers/gpu/drm/tilcdc/tilcdc_slave.c:#include <linux/of_i2c.h>
+drivers/gpu/drm/tilcdc/tilcdc_tfp410.c:#include <linux/of_i2c.h>
+drivers/gpu/host1x/drm/output.c:#include <linux/of_i2c.h>
+drivers/media/platform/exynos4-is/fimc-is.c:#include <linux/of_i2c.h>
+drivers/media/platform/exynos4-is/media-dev.c:#include <linux/of_i2c.h>
+drivers/staging/imx-drm/imx-tve.c:#include <linux/of_i2c.h>
+sound/soc/fsl/imx-sgtl5000.c:#include <linux/of_i2c.h>
+sound/soc/fsl/imx-wm8962.c:#include <linux/of_i2c.h>
 
-Best regards
--- 
-Marek Szyprowski
-Samsung R&D Institute Poland
+
+Please include also this chunk, without it I'm getting build errors.
+
+--------------8<---------------------
+diff --git a/drivers/media/platform/exynos4-is/fimc-is-i2c.c
+b/drivers/media/platform/exynos4-is/fimc-is-i2c.c
+index ca07b48..e38e9dc 100644
+--- a/drivers/media/platform/exynos4-is/fimc-is-i2c.c
++++ b/drivers/media/platform/exynos4-is/fimc-is-i2c.c
+@@ -11,6 +11,7 @@
+  */
+
+ #include <linux/clk.h>
++#include <linux/i2c.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+diff --git a/drivers/media/platform/exynos4-is/fimc-is.c
+b/drivers/media/platform/exynos4-is/fimc-is.c
+index 6743ae3..63e4f1d 100644
+--- a/drivers/media/platform/exynos4-is/fimc-is.c
++++ b/drivers/media/platform/exynos4-is/fimc-is.c
+@@ -21,7 +21,6 @@
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+-#include <linux/of_i2c.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+diff --git a/drivers/media/platform/exynos4-is/media-dev.c
+b/drivers/media/platform/exynos4-is/media-dev.c
+index c10dee2..00e5f91 100644
+--- a/drivers/media/platform/exynos4-is/media-dev.c
++++ b/drivers/media/platform/exynos4-is/media-dev.c
+@@ -22,7 +22,6 @@
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/of_device.h>
+-#include <linux/of_i2c.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/types.h>
+--------------8<---------------------
+
+> ---
+> 
+> V1 -> V2: * Add #else branch to #if CONFIG_OF
+> 	  * EXPORT_SYMBOLs got attached to wrong functions
+> 	  * cosmetic change (of -> OF)
+> 	  * properly based on 3.11-rc4
+> 
+>  Documentation/acpi/enumeration.txt              |    1 -
+>  drivers/i2c/busses/i2c-at91.c                   |    3 -
+>  drivers/i2c/busses/i2c-cpm.c                    |    6 --
+>  drivers/i2c/busses/i2c-davinci.c                |    2 -
+>  drivers/i2c/busses/i2c-designware-platdrv.c     |    2 -
+>  drivers/i2c/busses/i2c-gpio.c                   |    3 -
+>  drivers/i2c/busses/i2c-i801.c                   |    2 -
+>  drivers/i2c/busses/i2c-ibm_iic.c                |    4 -
+>  drivers/i2c/busses/i2c-imx.c                    |    3 -
+>  drivers/i2c/busses/i2c-mpc.c                    |    2 -
+>  drivers/i2c/busses/i2c-mv64xxx.c                |    3 -
+>  drivers/i2c/busses/i2c-mxs.c                    |    3 -
+>  drivers/i2c/busses/i2c-nomadik.c                |    3 -
+>  drivers/i2c/busses/i2c-ocores.c                 |    3 -
+>  drivers/i2c/busses/i2c-octeon.c                 |    3 -
+>  drivers/i2c/busses/i2c-omap.c                   |    3 -
+>  drivers/i2c/busses/i2c-pnx.c                    |    3 -
+>  drivers/i2c/busses/i2c-powermac.c               |    9 +-
+>  drivers/i2c/busses/i2c-pxa.c                    |    2 -
+>  drivers/i2c/busses/i2c-s3c2410.c                |    2 -
+>  drivers/i2c/busses/i2c-sh_mobile.c              |    2 -
+>  drivers/i2c/busses/i2c-sirf.c                   |    3 -
+>  drivers/i2c/busses/i2c-stu300.c                 |    2 -
+>  drivers/i2c/busses/i2c-tegra.c                  |    3 -
+>  drivers/i2c/busses/i2c-versatile.c              |    2 -
+>  drivers/i2c/busses/i2c-wmt.c                    |    3 -
+>  drivers/i2c/busses/i2c-xiic.c                   |    3 -
+>  drivers/i2c/i2c-core.c                          |  109 +++++++++++++++++++++-
+>  drivers/i2c/i2c-mux.c                           |    3 -
+>  drivers/i2c/muxes/i2c-arb-gpio-challenge.c      |    1 -
+>  drivers/i2c/muxes/i2c-mux-gpio.c                |    1 -
+>  drivers/i2c/muxes/i2c-mux-pinctrl.c             |    1 -
+>  drivers/media/platform/exynos4-is/fimc-is-i2c.c |    3 -
+>  drivers/of/Kconfig                              |    6 --
+>  drivers/of/Makefile                             |    1 -
+>  drivers/of/of_i2c.c                             |  114 -----------------------
+>  include/linux/i2c.h                             |   20 ++++
+>  include/linux/of_i2c.h                          |   46 ---------
+>  38 files changed, 132 insertions(+), 253 deletions(-)
+>  delete mode 100644 drivers/of/of_i2c.c
+>  delete mode 100644 include/linux/of_i2c.h
+
+I've tested this patch on Exynos4412 SoC based board, so this covers
+i2c-s3c2410 and fimc-is-i2c. Compiled with CONFIG_OF enabled.
+
+I guess after removing all remaining occurrences of
+#include <linux/of_i2c.h> you could add:
+
+Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+
+--
+Thanks,
+Sylwester
