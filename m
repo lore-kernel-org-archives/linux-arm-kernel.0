@@ -1,41 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Aug 2013 00:25:06 -0700
-Subject: [PATCH] ARM: Kconfig: NR_GPIO AM43x default
-In-Reply-To: <1375451651-27173-1-git-send-email-afzal@ti.com>
-References: <1375451651-27173-1-git-send-email-afzal@ti.com>
-Message-ID: <20130821072506.GS7656@atomide.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 21 Aug 2013 09:26:40 +0200
+Subject: [PATCH] Kconfig: Remove hotplug enable hints in CONFIG_KEXEC
+ help texts
+In-Reply-To: <1377027483-17025-1-git-send-email-geert@linux-m68k.org>
+References: <1377027483-17025-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <20130821072640.GA27495@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Afzal Mohammed <afzal@ti.com> [130802 07:01]:
-> On an AM43x only config, currently default ARCH_NR_GPIO would be zero.
-> Default it to that supported by the SoC.
 
-Looks like this can wait a bit until the am43x patches have been
-reviewed and queued. When that's done, I suggest that Afzal
-puts this patch into Russell's patch tracking system.
+* Geert Uytterhoeven <geert@linux-m68k.org> wrote:
 
-Regards,
-
-Tony
- 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> commit 40b313608ad4ea655addd2ec6cdd106477ae8e15 ("Finally eradicate
+> CONFIG_HOTPLUG") removed remaining references to CONFIG_HOTPLUG, but missed
+> a few plain English references in the CONFIG_KEXEC help texts.
+> 
+> Remove them, too.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
 > ---
->  arch/arm/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 37c0f4e..c5356c5 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1605,6 +1605,7 @@ config ARCH_NR_GPIO
->  	default 352 if ARCH_VT8500
->  	default 288 if ARCH_SUNXI
->  	default 264 if MACH_H4700
-> +	default 192 if SOC_AM43XX
->  	default 0
->  	help
->  	  Maximum number of GPIOs in the system.
-> -- 
-> 1.7.9.5
-> 
+>  arch/arm/Kconfig     |    3 +--
+>  arch/ia64/Kconfig    |    6 +++---
+>  arch/mips/Kconfig    |    6 +++---
+>  arch/powerpc/Kconfig |    6 +++---
+>  arch/sh/Kconfig      |    6 +++---
+>  arch/x86/Kconfig     |    6 +++---
+>  6 files changed, 16 insertions(+), 17 deletions(-)
+[...]
+>  	bool "kernel crash dumps (EXPERIMENTAL)"
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index b32ebf9..6ace5de 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -1627,9 +1627,9 @@ config KEXEC
+>  
+>  	  It is an ongoing process to be certain the hardware in a machine
+>  	  is properly shutdown, so do not be surprised if this code does not
+> -	  initially work for you.  It may help to enable device hotplugging
+> -	  support.  As of this writing the exact hardware interface is
+> -	  strongly in flux, so no good recommendation can be made.
+> +	  initially work for you.  As of this writing the exact hardware
+> +	  interface is strongly in flux, so no good recommendation can be
+> +	  made.
+>  
+>  config CRASH_DUMP
+>  	bool "kernel crash dumps"
+
+Acked-by: Ingo Molnar <mingo@kernel.org>
+
+Thanks,
+
+	Ingo
