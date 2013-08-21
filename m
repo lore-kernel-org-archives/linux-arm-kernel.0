@@ -1,41 +1,57 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 21 Aug 2013 21:07:29 +0200
-Subject: [PATCHv2 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
-In-Reply-To: <CACRpkda9oyb2mr6PR1dfMpoxbzj3vUp7hKiQtN1oWH6aG_N96w@mail.gmail.com>
-References: <1376522956-14960-1-git-send-email-dinguyen@altera.com>
- <1376522956-14960-2-git-send-email-dinguyen@altera.com>
- <CACRpkda9oyb2mr6PR1dfMpoxbzj3vUp7hKiQtN1oWH6aG_N96w@mail.gmail.com>
-Message-ID: <20130821190729.GA9657@amd.pavel.ucw.cz>
+From: fathi.boudra@linaro.org (Fathi Boudra)
+Date: Wed, 21 Aug 2013 22:11:17 +0300
+Subject: [PATCH 1/3] ARM: vexpress_defconfig: Enable and automount
+ devtmpfs filesystem
+In-Reply-To: <1377082010.10707.6.camel@hornet>
+References: <1377032563-4502-1-git-send-email-fathi.boudra@linaro.org>
+ <1377032563-4502-2-git-send-email-fathi.boudra@linaro.org>
+ <1377082010.10707.6.camel@hornet>
+Message-ID: <CAGNsrLCunsZEMyDkASHbuJ4O0uQP6emRJcCKpqE6V0EzS2BPdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2013-08-21 09:04:07, Linus Walleij wrote:
-> On Thu, Aug 15, 2013 at 1:29 AM,  <dinguyen@altera.com> wrote:
-> 
-> > -       sched_io_base = iobase + 0x04;
-> > +       sched_io_base = iobase;
-> >         sched_rate = rate;
-> >  }
-> >
-> >  static u32 read_sched_clock(void)
-> >  {
-> > -       return __raw_readl(sched_io_base);
-> > +       return ~__raw_readl(sched_io_base + 0x4);
-> 
-> So what about #define what 0x04 is?
-> 
-> #define MY_FOO_REGISTER_OFFSET 0x04
-> 
-> raw_readl(sched_io_base + MY_FOO_REGISTER_OFFSET);
+On 21 August 2013 13:46, Pawel Moll <pawel.moll@arm.com> wrote:
+> On Tue, 2013-08-20 at 22:02 +0100, Fathi Boudra wrote:
+>> udev no longer creates device nodes under /dev and it has to be managed
+>> by the kernel devtmpfs filesystem.
+>>
+>> This means that a kernel built with the current config will not boot on
+>> a system with a recent udev:
+>>
+>> mount: mounting udev on /dev failed: No such device
+>> W: devtmpfs not available, falling back to tmpfs for /dev
+>>
+>> Also, it is good to have /dev automatically mounted since some
+>> non-initramfs based setups assumes this and don't manually mount it.
+>>
+>> Signed-off-by: Fathi Boudra <fathi.boudra@linaro.org>
+>> ---
+>>  arch/arm/configs/vexpress_defconfig | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
+>> index f2de51f..3f970f1 100644
+>> --- a/arch/arm/configs/vexpress_defconfig
+>> +++ b/arch/arm/configs/vexpress_defconfig
+>> @@ -45,6 +45,8 @@ CONFIG_IP_PNP_BOOTP=y
+>>  # CONFIG_IPV6 is not set
+>>  # CONFIG_WIRELESS is not set
+>>  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+>> +CONFIG_DEVTMPFS=y
+>
+> This makes sense...
+>
+>> +CONFIG_DEVTMPFS_MOUNT=y
+>
+> ... but I'm not so sure about this one. Normally it's up to the boot
+> scripts to decide when to mount the devtmpfs. And yes - I know it's
+> required to boot Ubuntu-based rootfs without initramfs, but that's
+> Ubuntu's problem, really.
 
-That define is already there, #define APBTMR_N_CURRENT_VALUE 0x04, but
-it is in .c file, not in header.
+Sure, I can workaround in my build system but why is it an issue to enable it?
+Obviously, it resolves my use case to boot test vexpress with Linaro
+images and doesn't introduce a particular problem afaics.
 
-Actually I believe I had patch that did that, and it was even applied,
-but it clashed with same other patches, and was dropped. (It is below,
-for reference).
-
-Currently, the code _does not work_, and we have three platforms using
-it. It would be good to solve this now, and polish it later.
-
-								Pavel
+>>  CONFIG_MTD=y
+>>  CONFIG_MTD_CONCAT=y
+>>  CONFIG_MTD_PARTITIONS=y
