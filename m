@@ -1,35 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 21 Aug 2013 11:21:12 +0100
-Subject: [PATCH v2] arm: update advice on kernel, initramfs and FDT
- load address.
-In-Reply-To: <1377080188.31937.53.camel@hastur.hellion.org.uk>
-References: <1375974974-31603-1-git-send-email-ian.campbell@citrix.com>
- <20130808215429.GG19383@mudshark.cambridge.arm.com>
- <1377079147.31937.37.camel@hastur.hellion.org.uk>
- <20130821100526.GK17845@n2100.arm.linux.org.uk>
- <1377080188.31937.53.camel@hastur.hellion.org.uk>
-Message-ID: <20130821102112.GL17845@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 21 Aug 2013 12:26:22 +0200
+Subject: [PATCH 0/4] Add sound in SAM9x5 DTS
+In-Reply-To: <1376310662-20003-1-git-send-email-richard.genoud@gmail.com>
+References: <1376310662-20003-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <521495CE.5040205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 11:16:28AM +0100, Ian Campbell wrote:
-> On Wed, 2013-08-21 at 11:05 +0100, Russell King - ARM Linux wrote:
-> > The only additional thing that needs to be added is a "Kernelversion:"
-> > tag to specify which kernel version the patch was generated against.
-> > That can go almost anywhere in the message before the actual patch
-> > itself.
-> 
-> Cool. Does it understand git tags and stuff? e.g v3.11-rc3 or a sha1?
+On 12/08/2013 14:30, Richard Genoud :
+> As the sam9x5-wm8731 machine driver has been merged, we have now to add
+> the device tree nodes...
+> And here they are !
+>
+> (Based on next-20130812)
+> Tested on at91sam9g35-ek
+>
+> [I didn't add the DT list, as far as there's no new binding, we don't
+> have to bother themi, right ?]
 
-I'd prefer not full sha1's - the numeric version is normally close enough
-to work out where it needs to go should it not apply immediately.
+Yep!
 
-> > Alternatively, if you can remember your web login etc, then you can use
-> > the online form, which tries to make it easier (since it generates the
-> > formatted email for you - but some people find this method harder.)
-> 
-> I think remembering my web login is probably the biggest barrier for me
-> there. In fact remembering the username is probably too much ;-)
+On the whole series:
 
-Well, I've updated the email address to your current one, so you should
-be able to recover the password now.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Stacked on top of at91-3.12-dt
+
+Thanks a lot Richard!
+
+> Richard Genoud (4):
+>    ARM: AT91: DTS: sam9x5: add SSC DMA parameters
+>    ARM: AT91: DTS: sam9x5ek: add WM8731 codec
+>    ARM: AT91: DTS: sam9x5ek: enable SSC
+>    ARM: AT91: DTS: sam9x5ek: add sound configuration
+>
+>   arch/arm/boot/dts/at91sam9x5.dtsi   |    3 +++
+>   arch/arm/boot/dts/at91sam9x5ek.dtsi |   24 ++++++++++++++++++++++++
+>   2 files changed, 27 insertions(+)
+>
+
+
+-- 
+Nicolas Ferre
