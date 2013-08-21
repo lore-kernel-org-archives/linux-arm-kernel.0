@@ -1,91 +1,91 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Wed, 21 Aug 2013 18:42:40 +0530
-Subject: [PATCH 12/16] clk: samsung: pll: Add support for rate
- configuration of PLL46xx
-In-Reply-To: <14520108.LqsSBuPVXk@amdc1227>
-References: <1377019903-14614-1-git-send-email-t.figa@samsung.com>
- <1377019903-14614-13-git-send-email-t.figa@samsung.com>
- <CAKew6eU4ofumk64fwZSK-R-UUBQos6UU1TLDdVRDE-bvOrbitw@mail.gmail.com>
- <14520108.LqsSBuPVXk@amdc1227>
-Message-ID: <CAKew6eUGOgUWzgU7SnCjAenSHxwaOgFUhPWHbav3C8z=tS+EpA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 21 Aug 2013 09:16:33 -0400
+Subject: [PATCH 2/8] clk: keystone: Add gate control clock driver
+In-Reply-To: <20130821022225.4443.97467@quantum>
+References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130813161314.GR27165@e106331-lin.cambridge.arm.com>
+ <520A60A2.2030104@ti.com>
+ <20130813165344.GU27165@e106331-lin.cambridge.arm.com>
+ <20130819204353.4443.48466@quantum> <5213756A.5090903@ti.com>
+ <20130820213045.4443.89971@quantum> <5213E5EC.8070208@ti.com>
+ <20130820224128.4443.78729@quantum> <5213F397.6020708@ti.com>
+ <20130821022225.4443.97467@quantum>
+Message-ID: <5214BDB1.9080503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> <snip>
+On Tuesday 20 August 2013 10:22 PM, Mike Turquette wrote:
+> Quoting Santosh Shilimkar (2013-08-20 15:54:15)
+>> On Tuesday 20 August 2013 06:41 PM, Mike Turquette wrote:
+>>> Quoting Santosh Shilimkar (2013-08-20 14:55:56)
+>>>> On Tuesday 20 August 2013 05:30 PM, Mike Turquette wrote:
 >>
->> > --- a/drivers/clk/samsung/clk-pll.h
->> > +++ b/drivers/clk/samsung/clk-pll.h
->> > @@ -51,6 +51,28 @@ enum samsung_pll_type {
->> >
->> >                 .afc    =       (_afc),                         \
->> >
->> >         }
->> >
->> > +#define PLL_4600_RATE(_rate, _m, _p, _s, _k, _vsel)            \
->> > +       {                                                       \
->> > +               .rate   =       (_rate),                        \
->> > +               .mdiv   =       (_m),                           \
->> > +               .pdiv   =       (_p),                           \
->> > +               .sdiv   =       (_s),                           \
->> > +               .kdiv   =       (_k),                           \
->> > +               .vsel   =       (_vsel),                        \
->> > +       }
->> > +
->> > +#define PLL_4650_RATE(_rate, _m, _p, _s, _k, _mfr, _mrr, _vsel)
->> > \ +       {                                                       \ +
->> >              .rate   =       (_rate),                        \ +
->> >         .mdiv   =       (_m),                           \ +
->> >    .pdiv   =       (_p),                           \ +
->> > .sdiv   =       (_s),                           \ +
->> > .kdiv   =       (_k),                           \ +               .mfr
->> >    =       (_mfr),                         \ +               .mrr    =
->> >       (_mrr),                         \ +               .vsel   =
->> >  (_vsel),                        \ +       }
->> > +
->> >
->> >  /* NOTE: Rate table should be kept sorted in descending order. */
->> >
->> >  struct samsung_pll_rate_table {
->> >
->> > @@ -60,6 +82,9 @@ struct samsung_pll_rate_table {
->> >
->> >         unsigned int sdiv;
->> >         unsigned int kdiv;
->> >         unsigned int afc;
->> >
->> > +       unsigned int mfr;
->> > +       unsigned int mrr;
->> > +       unsigned int vsel;
->> >
->> >  };
+>> [...]
 >>
->> This struct seems to be expanding too much.
->
-> I don't think it's a problem. How many bytes such tables can occupy in a
-> system?
->
+>>>>>> They are bit different w.r.t OMAP. LPSC itself is the clock control of the
+>>>>>> IP. The LPSC number in the bindings is actually the specific number which
+>>>>>> is used to reach to the address space of the clock control. One can view
+>>>>>> that one as clock control register index.
+>>>>>
+>>>>> Thanks for the information. I have a further question about then: are
+>>>>> the LPSC clocks really module clocks that belong to the IP that they are
+>>>>> gating?
+>>>>>
+>>>> LPSC controls the clock enable/disable to the IP/module so answer is yes.
+>>>> In certain cases LPSC controls clock to more than one IP as well.
+>>>>
+>>>>> If so then they could be defined within the node defining their parent
+>>>>> IP. That might be enough to get rid of the LPSC index value. Again I
+>>>>> might be over-engineering it. Just trying to get an understanding.
+>>>>>
+>>>> Am not sure I follow you here on not having the LPSC index. Sorry. 
+>>>
+>>> How are the 'reg' property and the 'lpsc' property related? Does the
+>>> lpsc property modify the register address used to access the clock
+>>> control bits?
+>>>
+>> Yes it does. Currently all nodes use fix address and then lpsc is
+>> used as an index.
+> 
+> Ok cool. Well the reason I brought that up was because I even had the
+> idea to define these module clocks within the module nodes that own them
+> in DT. I am way outside of my DT knowledge at this point but I wonder
+> if the following type of binding is possible:
+> 
+> module: module at 4a308200 {
+> 	#address-cells = <1>;
+> 	#size-cells = <1>;
+> 	reg = <0x4a308200 0x1000>;
+> 
+> 	clock {
+> 		#clock-cells = <0>;
+> 		compatible = "keystone,psc-clk";
+> 		clocks = <&chipclk3>;
+> 		clock-output-names = "debugss_trc";
+> 		reg = <0x0256>;
+> 		pd = <1>;
+> 	};
+> };
+> 
+> Again, my DT knowledge is pretty limited, but could the reg property of
+> the clock be directly affected by the parent node? That seems like it
+> could nicely model what the hardware is really doing.
+> 
+The module(I assume you mean IP here) reg address space is separate than
+that used for clock control so that doesn't fit as such. Traditionally
+clock controls even though targeted for specific modules sits in different
+control as at least seen on OMAP and Keystone. OCP wrappers on OMAP
+were bit of exceptions but they were little bit of glue logic without
+much control within the address space.
 
-no doubt comparing with memory size its negligible..
-but comparing only struct size and coding lines it seems costlier :) .
-
->> Can we re-think on options for using bit map same as register
->> definition? It can reduce code in set_rate also little bit.
->
-> IMHO it is more clear what the code does when accessing a single
-> coefficient at once.
->
-> In addition you still would need to preserve bitfields that are not changed
-> by the driver
-
-Sorry, I can't see any such problem, it will OR only the required bits.
-
-> and also unpack some of the coefficients anyway, like pdiv
-> that is used to calculate lock time.
-
-Agree, but cases of unpacking will always be less than cases of
-shifting and packing.
-
-Anyways, its only MHO :).
+>> But I think we can do better by just using the
+>> right(offset) address in the reg property. Will have a look at it
+>> and see what I can do here.
+> 
+> This also solves the problem nicely.  Thanks for putting up with my
+> silly questions ;-)
+> 
+You asked right and good questions.
 
 Regards,
-Yadwinder
+Santosh
