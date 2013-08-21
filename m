@@ -1,28 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Aug 2013 20:54:10 +0200
-Subject: [RFC 02/17] ARM: call clk_of_init from time_init
-In-Reply-To: <5213CF58.50703@gmail.com>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <5213C90F.9010407@wwwdotorg.org> <5213CF58.50703@gmail.com>
-Message-ID: <201308212054.10417.arnd@arndb.de>
+From: pavel@denx.de (Pavel Machek)
+Date: Wed, 21 Aug 2013 21:07:29 +0200
+Subject: [PATCHv2 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
+In-Reply-To: <CACRpkda9oyb2mr6PR1dfMpoxbzj3vUp7hKiQtN1oWH6aG_N96w@mail.gmail.com>
+References: <1376522956-14960-1-git-send-email-dinguyen@altera.com>
+ <1376522956-14960-2-git-send-email-dinguyen@altera.com>
+ <CACRpkda9oyb2mr6PR1dfMpoxbzj3vUp7hKiQtN1oWH6aG_N96w@mail.gmail.com>
+Message-ID: <20130821190729.GA9657@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 August 2013, Sebastian Hesselbarth wrote:
-> Perhaps Tegra is the common case but other SoC haven't dug deep enough?
-> IMHO from a HW point-of-view clocks are really among the essential
-> things that need to be running before you can do anything useful.
+On Wed 2013-08-21 09:04:07, Linus Walleij wrote:
+> On Thu, Aug 15, 2013 at 1:29 AM,  <dinguyen@altera.com> wrote:
 > 
-> Just consider boot loaders that run fine without irqs but don't without
-> clocks (even if just represented by API). Maybe you are right, and we
-> should call of_clk_init(NULL) as early as possible. That would also
-> eliminate patch 1/17 as you suggest.
+> > -       sched_io_base = iobase + 0x04;
+> > +       sched_io_base = iobase;
+> >         sched_rate = rate;
+> >  }
+> >
+> >  static u32 read_sched_clock(void)
+> >  {
+> > -       return __raw_readl(sched_io_base);
+> > +       return ~__raw_readl(sched_io_base + 0x4);
+> 
+> So what about #define what 0x04 is?
+> 
+> #define MY_FOO_REGISTER_OFFSET 0x04
+> 
+> raw_readl(sched_io_base + MY_FOO_REGISTER_OFFSET);
 
-Timers and interrupts are also things that are required really early,
-and from my experience they tend to be needed earlier than clock
-management. Obviously you need some clocks to be enabled in order
-to do anything (including interrupt handling), but those clocks tend
-to be enabled in the boot loader, so we don't have to worry about
-reprogramming them this early.
+That define is already there, #define APBTMR_N_CURRENT_VALUE 0x04, but
+it is in .c file, not in header.
 
-	Arnd
+Actually I believe I had patch that did that, and it was even applied,
+but it clashed with same other patches, and was dropped. (It is below,
+for reference).
+
+Currently, the code _does not work_, and we have three platforms using
+it. It would be good to solve this now, and polish it later.
+
+								Pavel
