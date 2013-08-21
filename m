@@ -1,53 +1,48 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Wed, 21 Aug 2013 12:46:53 -0700
-Subject: [PATCH RFC 2/2] PM / Hibernate: add section for resume options
-In-Reply-To: <1377114413-8521-1-git-send-email-sebastian.capella@linaro.org>
-References: <1377114413-8521-1-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <1377114413-8521-3-git-send-email-sebastian.capella@linaro.org>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Wed, 21 Aug 2013 14:48:50 -0500
+Subject: [PATCHv4 2/3] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <520EA97D.7050404@wwwdotorg.org>
+References: <1376498884-9199-1-git-send-email-dinguyen@altera.com>
+ <1376498884-9199-2-git-send-email-dinguyen@altera.com>
+ <520EA97D.7050404@wwwdotorg.org>
+Message-ID: <1377114530.1554.13.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expand the existing documentation to explicitly list the options for
-resuming a hibernation image, including the manual resume option which
-can be used from the initrd or initramfs and the kernel init resume.
+On Fri, 2013-08-16 at 16:36 -0600, Stephen Warren wrote:
+> On 08/14/2013 10:48 AM, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Add bindings for SD/MMC for SOCFPGA.
+> 
+> > diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+> 
+> > +* altr,sysmgr: Should be the phandle to the system_mgr node. As this is where
+> > +		this where the register that controls the CIU clock phases
+> > +		reside.
+> 
+> On the surface, this binding series seems OK, but I do have a question:
+> how is the sysmgr phandle used?
+> 
+> I assume there's some register in this syscon device that resets or
+> enables or otherwise controls this MSHC module. How does the code know
+> which register it is? The phandle in the altr,sysmgr property would
+> usually be followed by a/some cell(s) that encode this information, so
+> that the MSHC driver doesn't have to know anything about the layout of
+> the syscon registers, and so the sysconf driver doesn't have to know
+> anything about the identity of the MSHC client device.
 
-Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
----
- Documentation/power/swsusp.txt |   15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+There is a #define SYSMGR_SDMMCGRP_CTRL_OFFSET that is in
+dw_mmc-socfpga.c. This defines the offset from the base address that the
+sysmgr phandle will give me.
 
-diff --git a/Documentation/power/swsusp.txt b/Documentation/power/swsusp.txt
-index 0b4b63e..079160e 100644
---- a/Documentation/power/swsusp.txt
-+++ b/Documentation/power/swsusp.txt
-@@ -50,6 +50,19 @@ echo N > /sys/power/image_size
- 
- before suspend (it is limited to 500 MB by default).
- 
-+. The resume process checks for the presence of the resume device,
-+if found, it then checks the contents for the hibernation image signature.
-+If both are found, it resumes the hibernation image.
-+
-+. The resume process may be triggered in two ways:
-+  1) During lateinit:  If resume=/dev/your_swap_partition is specified on
-+     the kernel command line, lateinit runs the resume process.  If the
-+     resume device has not been probed yet, the resume process fails and
-+     bootup continues.
-+  2) Manually from an initrd or initramfs:  May be run from
-+     the init script by using the /sys/power/resume file.  It is vital
-+     that this be done prior to remounting any filesystems (even as
-+     read-only) otherwise data may be corrupted.
- 
- Article about goals and implementation of Software Suspend for Linux
- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-@@ -326,7 +339,7 @@ Q: How can distributions ship a swsusp-supporting kernel with modular
- disk drivers (especially SATA)?
- 
- A: Well, it can be done, load the drivers, then do echo into
--/sys/power/disk/resume file from initrd. Be sure not to mount
-+/sys/power/resume file from initrd. Be sure not to mount
- anything, not even read-only mount, or you are going to lose your
- data.
- 
--- 
-1.7.9.5
+> 
+> That way, the MSHC driver will work fine if a HW designer has dropped
+> the MSHC IP block into a completely different SoC with a different
+> syscon register layout.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
