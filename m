@@ -1,41 +1,41 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 22 Aug 2013 00:14:02 -0700
-Subject: [PATCH] ARM: OMAP2: add type cast from 'unsigned' to 'signed'
-In-Reply-To: <521479B4.8030604@asianux.com>
+Date: Thu, 22 Aug 2013 00:17:02 -0700
+Subject: [PATCH] ARM: OMAP2: remove useless variable 'ret'
+In-Reply-To: <52147AC6.9040300@asianux.com>
 References: <521479B4.8030604@asianux.com>
-Message-ID: <20130822071402.GQ7656@atomide.com>
+ <52147AC6.9040300@asianux.com>
+Message-ID: <20130822071702.GR7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Chen Gang <gang.chen@asianux.com> [130821 01:34]:
-> Need add type cast, or can not notice the failure. The related warning
-> (allmodconfig, "EXTRA_CFLAGS=-W"):
+* Chen Gang <gang.chen@asianux.com> [130821 01:39]:
+> Remove useless variable 'ret', the related warning:
 > 
->   arch/arm/mach-omap2/gpmc.c:728:2: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
-> 
-> 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index f3fdd6a..62377b5 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -725,7 +725,7 @@ static int gpmc_setup_irq(void)
->  		return -EINVAL;
->  
->  	gpmc_irq_start = irq_alloc_descs(-1, 0, GPMC_NR_IRQ, 0);
-> -	if (gpmc_irq_start < 0) {
-> +	if ((signed)gpmc_irq_start < 0) {
->  		pr_err("irq_alloc_descs failed\n");
->  		return gpmc_irq_start;
->  	}
+>   arch/arm/mach-omap2/board-am3517crane.c:113:6: warning: unused variable ?ret? [-Wunused-variable]
 
-Hmm shouldn't we just have int gpmc_irq_start instead
-of unsigned gpmc_irq_start?
+Thanks applying into omap-for-v3.12/fixes-non-critical.
 
 Regards,
 
-Tony
+Tony 
+ 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm/mach-omap2/board-am3517crane.c |    2 --
+>  1 files changed, 0 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
+> index fc53911..0d499a1 100644
+> --- a/arch/arm/mach-omap2/board-am3517crane.c
+> +++ b/arch/arm/mach-omap2/board-am3517crane.c
+> @@ -110,8 +110,6 @@ static void __init am3517_crane_i2c_init(void)
+>  
+>  static void __init am3517_crane_init(void)
+>  {
+> -	int ret;
+> -
+>  	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+>  	omap_serial_init();
+>  	omap_sdrc_init(NULL, NULL);
+> -- 
+> 1.7.7.6
