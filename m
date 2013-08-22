@@ -1,64 +1,91 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Thu, 22 Aug 2013 13:01:18 +0200
-Subject: [PATCHv3 3/4] clocksource: dw_apb_timer: Move timer defines to
- header file.
-In-Reply-To: <1377118427-20644-3-git-send-email-dinguyen@altera.com>
-References: <1377118427-20644-1-git-send-email-dinguyen@altera.com>
- <1377118427-20644-3-git-send-email-dinguyen@altera.com>
-Message-ID: <20130822110118.GB19347@amd.pavel.ucw.cz>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 22 Aug 2013 17:03:10 +0530
+Subject: [PATCH 1/3] misc: Add crossbar driver
+In-Reply-To: <CACRpkdagSHxzV3=427O9iftNxM+N=w9aPds=iDvGQPoG3H-cWw@mail.gmail.com>
+References: <51E83A4F.5080904@ti.com>
+ <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
+ <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com> <51EFFBE1.4090505@ti.com>
+ <51F0031B.1050307@ti.com> <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
+ <51F0223E.4050008@ti.com> <51F0240F.3050507@ti.com>
+ <20130813081003.GU7656@atomide.com> <520A02BA.4090805@ti.com>
+ <CACRpkda+m82PYJsExLM6JLsLa8-bVhdvy_r_+-uKfVT2NG7Cbg@mail.gmail.com>
+ <520D398D.9040806@ti.com>
+ <CACRpkdYeo1y-HhftkRWgwyq8o-NVuJ978Uq+ON880LHhUxC=hg@mail.gmail.com>
+ <520D44C5.6080205@ti.com>
+ <CACRpkdagSHxzV3=427O9iftNxM+N=w9aPds=iDvGQPoG3H-cWw@mail.gmail.com>
+Message-ID: <5215F6F6.9060703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Linus,
 
-On Wed 2013-08-21 15:53:46, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> Move all dw_apb_timer defines to include/linux/dw_apb_timer.h.
+On Thursday 22 August 2013 02:40 AM, Linus Walleij wrote:
+> On Thu, Aug 15, 2013 at 11:14 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> On Thursday 15 August 2013 04:51 PM, Linus Walleij wrote:
+> (...)
+>>> Sorry I don't understand what thread that is... can you point me there?
+>>> My previous statement on this issue what this:
+>>> http://marc.info/?l=linux-kernel&m=137442541628641&w=2
+> (...)
+>>>> I don't see how you can make this happen with an irqchip
+>>>> infrastructure.
+>>> I think my post above describes this.
+>>>
+>> Sorry for being dumb but I don't think cascaded irqchip examples
+>> like GPIO and cross-bars are same. If you take an example of
+>> GPIO irqchip, it always have a physical connection even if it
+>> is 1 IRQ line for (32 logical/sparse IRQs). That goes with
+>> other MFD examples too.
+>>
+>> So may be I am still missing something in your proposal.
+> Why does it matter if it is a GPIO or MFD or whatever?
+> The point is that the IRQ line passes thru something else,
+> and this we model as an irqdomain.
+>
+> Anyway here is a silicon cascaded IRQ chip:
+> arch/arm/mach-versatile/core.c
+> See versatile_init_irq():
+>
+> __vic_init(VA_VIC_BASE, IRQ_VIC_START, ~0, 0, np);
+> (...)
+> fpga_irq_init(VA_SIC_BASE, "SIC", IRQ_SIC_START,
+>                 IRQ_VICSOURCE31, PIC_VALID, np);
+>
+> The VIC in the versatile has the SIC cascaded from one of
+> its IRQ lines. Both the VIC and SIC (fpga IRQ) are
+> using irqdomains so the SIC spawns a child irqdomain
+> from IRQ 31 (last IRQ) of the VIC.
+ Ok, this is a typical example of irqchip cascaded.
+> The difference with a crossbar is that it can software-config
+> which IRQ goes where, and does not have a callback
+> to clear interrupts or anything like that, it just passes them
+> thru. But it is best modeled as an irqdomain IMO.
+We can model crossbar as irqchip and gic as its interrupt parent
+and peripherals to have crossbar as interrupt-parent.
+   
+ peripherals will do request_irq(crossbar_number)
+              |
+              |
+ crossbar_unmask()
+              |
+              |
+ maps crossbar number<->  to interrupt number and
+ calls request_irq(int_no, crossbar_handler,..)
 
-That makes sense. But the changelog says "move" while the patch only
-adds them to second place, which can not be right.
+ 
+ crossbar_handler(interrupt number)
+            |
+            |
+ get crossbar number from interrupt number
+            |
+            |
+ handle_irq(crossbar_domain(crossbar number))
+                                                                             
 
-Is there public git tree with the patches somewhere?
+So this means a extra dummy handler.
+Also the concern is by modelling it as irqchip, we will have
+to find a different solution for DMA crossbar.
 
-Thanks,
-								Pavel
-
-> ---
->  include/linux/dw_apb_timer.h |   19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
-> index 1f79b20..1d2b949 100644
-> --- a/include/linux/dw_apb_timer.h
-> +++ b/include/linux/dw_apb_timer.h
-> @@ -19,6 +19,25 @@
->  
->  #define APBTMRS_REG_SIZE       0x14
->  
-> +#define APBT_MIN_PERIOD                 4
-> +#define APBT_MIN_DELTA_USEC             200
-> +
-> +#define APBTMR_N_LOAD_COUNT             0x00
-> +#define APBTMR_N_CURRENT_VALUE          0x04
-> +#define APBTMR_N_CONTROL                0x08
-> +#define APBTMR_N_EOI                    0x0c
-> +#define APBTMR_N_INT_STATUS             0x10
-> +
-> +#define APBTMRS_INT_STATUS              0xa0
-> +#define APBTMRS_EOI                     0xa4
-> +#define APBTMRS_RAW_INT_STATUS          0xa8
-> +#define APBTMRS_COMP_VERSION            0xac
-> +
-> +#define APBTMR_CONTROL_ENABLE           (1 << 0)
-> +/* 1: periodic, 0:free running. */
-> +#define APBTMR_CONTROL_MODE_PERIODIC    (1 << 1)
-> +#define APBTMR_CONTROL_INT              (1 << 2)
-> +
->  struct dw_apb_timer {
->  	void __iomem				*base;
->  	unsigned long				freq;
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Regards,
+ Sricharan
