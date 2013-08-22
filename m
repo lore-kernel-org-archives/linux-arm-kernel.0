@@ -1,49 +1,45 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 22 Aug 2013 18:22:43 +0200
-Subject: [PATCH v6 3/4] ARM: dts: mvebu: Introduce a new compatible
- string for mv64xxx-i2c
-In-Reply-To: <1377181169-17483-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1377181169-17483-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130822162241.GC31704@katana>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 22 Aug 2013 09:19:05 -0700
+Subject: [PATCH v6 0/3] mmc: dw_mmc: fixes for suspend/resume on exynos
+Message-ID: <1377188348-3418-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series of patches addresses some suspend/resume problems with
+dw_mmc on exynos platforms, espeically exynos5420.  This patchset was
+tested on the current ToT Chromeos 3.8 tree (which has lots of
+backports from 3.10/3.11) and on ToT Linux (v3.11-rc6).  I have
+confirmed basic booting and that SD cards work across suspend/resume
+(both if they are plugged in and if they are not plugged in).
 
-> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> @@ -5,6 +5,8 @@ Required properties :
->  
->   - reg             : Offset and length of the register set for the device
->   - compatible      : Should be "marvell,mv64xxx-i2c" or "allwinner,sun4i-i2c"
-> +                     or for controller which support the I2C Transaction
-> +                     Generator "marvell,mv64xxx-i2c","marvell,mv7230-i2c"
+I have received confirmation from Samsung that the problem solved for
+exynos5420 is a silicon errata and that this is a good fix.
 
-Too complicated IMO:
-+			or "marvell,mv7230-i2c".
+Changes in v6:
+- Took out TODO comment copied from main platform code.
+- Replaces previous pathes that ensured saving/restoring clocks.
 
-DT creators don't need to know about transaction generators. They just
-supply the compatible string and the driver knows the details.
+Changes in v5:
+- Cleaned up dw_mci_exynos_resume_noirq() comment as per Seungwon.
+- Don't memcpy dev_pm_ops structure, define a new one.
 
-> +For a controller which support the I2C Transaction Generator:
+Changes in v4:
+- Take Seungwon's suggestion and don't add any dw_mmc-pltfm code.
 
-"For the Armada XP" - there might be later IP cores on later SoC with
-transaction generators and different errata. They will just get a new
-compatible and the driver know the details.
+Changes in v3:
+- Add freeze/thaw and poweroff/restore noirq entries.
 
-> +
-> +	i2c at 11000 {
-> +		compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
-> +		reg = <0x11000 0x100>;
-> +		interrupts = <29>;
-> +		clock-frequency = <100000>;
-> +	};
-> -- 
-> 1.8.1.2
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130822/bf59dad4/attachment.sig>
+Changes in v2:
+- Use suspend_noirq as per James Hogan.
+
+Doug Anderson (3):
+  mmc: dw_mmc: Add exynos resume_noirq callback to clear WAKEUP_INT
+  mmc: dw_mmc: Honor requests to set the clock to 0 (turn off clock)
+  mmc: dw_mmc: Set timeout to max upon resume
+
+ drivers/mmc/host/dw_mmc-exynos.c | 53 +++++++++++++++++++++++++++++++++++++++-
+ drivers/mmc/host/dw_mmc.c        | 24 ++++++++++--------
+ 2 files changed, 66 insertions(+), 11 deletions(-)
+
+-- 
+1.8.3
