@@ -1,34 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 22 Aug 2013 00:45:24 -0700
-Subject: [Suggestion] ARM: allmodconfig: about cross compiling failure
- under i386 ubuntu.
-In-Reply-To: <52147E12.4060401@asianux.com>
-References: <521479B4.8030604@asianux.com> <52147AC6.9040300@asianux.com>
- <52147E12.4060401@asianux.com>
-Message-ID: <20130822074524.GS7656@atomide.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Thu, 22 Aug 2013 15:47:21 +0800
+Subject: [PATCH v2] ARM: OMAP2: use 'int' instead of 'unsigned' for variable
+ 'gpmc_irq_start'
+In-Reply-To: <5215C12D.5020807@asianux.com>
+References: <521479B4.8030604@asianux.com> <20130822071402.GQ7656@atomide.com>
+ <5215C12D.5020807@asianux.com>
+Message-ID: <5215C209.3080606@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Chen Gang <gang.chen@asianux.com> [130821 01:53]:
-> Hello Maintainers:
-> 
-> When build arm with allmodconfig under ubuntu i386 with arm-linux-
-> gnueabi-gcc 4.7, as 2.22, it report the errors.
-> 
-> Please help check, thanks (the related config file in attachment).
+'gpmc_irq_start' is mostly used as 'int', and for a variable, do not
+suggest to only use 'unsigned' as its type, so use 'int' instead of
+'unsigned' for variable 'gpmc_irq_start'.
 
-It seems that some make flags may need to be specified separately
-in some makefiles. See the following for some examples:
+Also it will fix the related issue (dummy the real world failure):
 
-$ find arch/arm -name Makefile | xargs grep -i flags
+  arch/arm/mach-omap2/gpmc.c:728:2: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
 
-I'm getting different errors though, I'm getting:
 
-arch/arm/mach-zynq/hotplug.c:1: error: bad value (cortex-a9) for -mcpu= switch
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm/mach-omap2/gpmc.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-As probably my compiler does not support the cortex-a9 switch,
-I have gcc version 4.3.5 (Debian 4.3.5-4), tried with v3.11-rc5.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index f3fdd6a..9f4795a 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -149,7 +149,7 @@ struct omap3_gpmc_regs {
+ 
+ static struct gpmc_client_irq gpmc_client_irq[GPMC_NR_IRQ];
+ static struct irq_chip gpmc_irq_chip;
+-static unsigned gpmc_irq_start;
++static int gpmc_irq_start;
+ 
+ static struct resource	gpmc_mem_root;
+ static struct resource	gpmc_cs_mem[GPMC_CS_NUM];
+-- 
+1.7.7.6
