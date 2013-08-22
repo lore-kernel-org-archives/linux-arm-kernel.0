@@ -1,68 +1,131 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 22 Aug 2013 11:43:12 -0700
-Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if
- UP system
-In-Reply-To: <51E7236D.3010700@codeaurora.org>
-References: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
- <20130712111322.GC3213@e102654-lin.cambridge.arm.com>
- <20130712121023.GB27430@codeaurora.org>
- <51E71249.4050200@codeaurora.org>
- <alpine.LFD.2.03.1307171830170.14924@syhkavp.arg>
- <51E71C78.6080604@codeaurora.org>
- <alpine.LFD.2.03.1307171849180.14924@syhkavp.arg>
- <51E7236D.3010700@codeaurora.org>
-Message-ID: <20130822184312.GE23960@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 22 Aug 2013 12:50:06 -0600
+Subject: [PATCH v7 05/11] ARM: dts: enable hi4511 with device tree
+In-Reply-To: <8761uxsiox.fsf@linaro.org>
+References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
+ <1376965873-14431-6-git-send-email-haojian.zhuang@linaro.org>
+ <8761uxsiox.fsf@linaro.org>
+Message-ID: <52165D5E.7040500@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17, Stephen Boyd wrote:
-> On 07/17/13 15:53, Nicolas Pitre wrote:
-> > On Wed, 17 Jul 2013, Stephen Boyd wrote:
-> >
-> >> On 07/17/13 15:34, Nicolas Pitre wrote:
-> >>> On Wed, 17 Jul 2013, Stephen Boyd wrote:
-> >>>
-> >>>> On 07/12/13 05:10, Stephen Boyd wrote:
-> >>>>> On 07/12, Javi Merino wrote:
-> >>>>>> I agree, we should drop the check.  It's annoying in uniprocessors and
-> >>>>>> unlikely to be found in the real world unless your gic entry in the dt
-> >>>>>> is wrong.
-> >>> And that's a likely outcome in the real world.
-> >>>
-> >>>>> Ok. How about this?
-> >>>> Any comments?
-> >>> What about this instead:
-> >> Unfortunately arm64 doesn't have SMP_ON_UP. 
-> > And why does that matter?
+On 08/22/2013 12:07 PM, Kevin Hilman wrote:
+> [+ DT maintainers]
 > 
-> Because the gic driver is compiled on both arm and arm64? I suppose we
-> could define is_smp() to 1 on arm64 but its probably better to rely on
-> generic kernel things instead of arch specific functions.
+> Haojian Zhuang <haojian.zhuang@linaro.org> writes:
 > 
-> >
-> >> It sounds like you preferred the first patch using num_possible_cpus()
-> > Probably, yes.  I didn't follow the early conversation though.
+>> Enable Hisilicon Hi4511 development platform with device tree support.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+...
+>> +/include/ "skeleton.dtsi"
+>> +
+>> +/ {
+>> +	aliases {
+>> +		serial0 = &uart0;
+>> +		serial1 = &uart1;
+>> +		serial2 = &uart2;
+>> +		serial3 = &uart3;
+>> +		serial4 = &uart4;
+>> +	};
+>> +
+>> +	cpus {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu0: cpu at 0 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a9";
+>> +			reg = <0x0>;
+>> +			next-level-cache = <&L2>;
+>> +		};
+>> +	};
+>> +
+>> +	osc32k: osc32k {
+>> +		compatible = "fixed-clock";
+>> +		#clock-cells = <0>;
+>> +		clock-frequency = <32768>;
+>> +		clock-output-names = "osc32khz";
+>> +	};
 > 
-> This was the first patch:
+> ...seems many of the recent users of clocks have grouped them into a
+> clocks {} grouping on a "simple-bus".
 > 
-> ---8<----
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 19ceaa6..589c760 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -368,7 +368,7 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
->  			break;
->  	}
->  
-> -	if (!mask)
-> +	if (!mask && num_possible_cpus() > 1)
->  		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
->  
->  	return mask;
+> DT folks: is there a rule of thumb on how whether these fixed clocks
+> should be grouped on a simple bus?
 
-Can one of these two patches be picked up?
+I would expect all the clock node names to be just "clock", since the
+node names should describe the type of device not their identity (i.e.
+clock name).
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+In turn, this means that each clock node name needs to use a unit
+address ("@nnn") to make them unique. In turn, this means they must have
+a reg property since the unit address must match the first entry in the
+reg property.
+
+Now I assume these clocks don't have any memory-mapped IO registers, so
+they would need an arbitrary reg value rather than a real one. So it
+doesn't make sense to place them directly under the root DT node, since
+their reg values would make no sense within the context of the
+CPU-visible MMIO space that the root node describes.
+
+In this case, it's typical to put all the clock nodes into e.g. a
+/clocks node, since that node can introduce a separate numbering-space
+for clocks. For example, I'd expect something like:
+
+        clocks {
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                osc32k: clock at 0 {
+                        compatible = "fixed-clock";
+                        reg = <0>;
+                        #clock-cells = <0>;
+                        clock-frequency = <32768>;
+                        clock-output-names = "osc32khz";
+                };
+
+                osc26m: clock at 1 {
+                        compatible = "fixed-clock";
+                        reg = <1>;
+                        #clock-cells = <0>;
+                        clock-frequency = <26000000>;
+                        clock-output-names = "osc26mhz";
+                };
+                ...
+        };
+
+However, it also depends on what is actually providing those clocks. If
+every one of them is some standalone device on the board (e.g. a
+crystal), then just dumping them all in /clocks makes sense. However, if
+the clocks are provided by some on-SoC clock module, then I'd likely
+expect the clocks to be contained within the DT node that represents
+that clock module, which presumably does have some registers, and hence
+could be a direct child of the root node. For example, I wonder if the
+following is more accurate:
+
+	sctrl: sctrl at fc802000 {
+		compatible = "hisilicon,sctrl";
+		reg = <0xfc802000 0x1000>;
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                osc32k: clock at 0 {
+                        compatible = "fixed-clock";
+                        reg = <0>;
+                        #clock-cells = <0>;
+                        clock-frequency = <32768>;
+                        clock-output-names = "osc32khz";
+                };
+
+                osc26m: clock at 1 {
+                        compatible = "fixed-clock";
+                        reg = <1>;
+                        #clock-cells = <0>;
+                        clock-frequency = <26000000>;
+                        clock-output-names = "osc26mhz";
+                };
+                ...
+        };
+
+... since I see there are already quite a few clocks inside the sctrl node.
