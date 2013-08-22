@@ -1,58 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Aug 2013 15:23:39 +0100
-Subject: Linking failure on linux-next with arm allyesconfig
-In-Reply-To: <CAHbNUh2MXZhg7L8BN9ds17rmg8ueo6d8CJhRMgy6fK-xn7qRoQ@mail.gmail.com>
-References: <CAHbNUh2MXZhg7L8BN9ds17rmg8ueo6d8CJhRMgy6fK-xn7qRoQ@mail.gmail.com>
-Message-ID: <20130822142339.GI6617@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 22 Aug 2013 22:42:44 +0800
+Subject: [GIT PULL 2/5] ARM: imx: soc changes for 3.12
+In-Reply-To: <87li3tvnj8.fsf@linaro.org>
+References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
+ <1376833688-24542-2-git-send-email-shawn.guo@linaro.org>
+ <87li3tvnj8.fsf@linaro.org>
+Message-ID: <20130822144242.GI30533@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm not sure why you're sending this to ARM people as I don't believe we
-are the ones responsible for this breakage, neither have we had any
-visibility of this breakage coming up.
-
->From what I can see, the mainline state is that we reference user_exit
-when CONTEXT_TRACKING is enabled, and kernel/context_tracking.c is
-built also when this symbol is enabled, and that file provides
-user_exit() and user_entry().
-
-If these two functions have been removed without our knowledge, it is
-because someone is not following correct procedure when making changes
-to the kernel source.  Using grep to find users of the symbols that
-they're removing for example, and copying those who may be affected by
-those changes with the patch etc.
-
-If you are going to be spending time running build tests and reporting
-breakage, can you also please spend the time to diagnose the cause of
-the breakage so you can target your reports a little better.  Thanks.
-
-On Thu, Aug 22, 2013 at 07:38:15PM +0530, Tushar Behera wrote:
-> Hi,
+On Thu, Aug 22, 2013 at 06:54:35AM -0700, Kevin Hilman wrote:
+> Shawn Guo <shawn.guo@linaro.org> writes:
 > 
-> With ARCH=arm 'allyesconfig' on next-20130822, following linking error
-> is observed.
+> > The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
+> >
+> >   Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-soc-3.12
+> >
+> > for you to fetch changes up to 0c383e6a56c2e70db9f2a68f9fe095645f11c151:
+> >
+> >   phy: micrel: Add definitions for common Micrel PHY registers (2013-08-18 09:30:39 +0800)
+> >
+> > ----------------------------------------------------------------
+> > It contains a bunch of imx soc updates for 3.12.
+> >
+> > - Add more ethernet phy fixups for imx6 boards
+> > - Add some missing imx6q clocks into clock driver
+> > - Add new clock types fixup mux and div to work around some ugly
+> >   hardware defect
+> > - Consolidate L2 cache initialization function, so that it can be used
+> >   on more i.MX SoCs
+> > - Replace magic numbers in mach-imx6q.c with well defined macros
+> > - Support low-level debug for vybrid
 > 
-> arch/arm/kernel/built-in.o: In function `ret_fast_syscall':
-> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-common.S:42:
-> undefined reference to `user_enter'
-> arch/arm/kernel/built-in.o: In function `no_work_pending':
-> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-common.S:77:
-> undefined reference to `user_enter'
-> arch/arm/kernel/built-in.o: In function `vector_swi':
-> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-common.S:376:
-> undefined reference to `user_exit'
-> arch/arm/kernel/built-in.o: In function `__dabt_usr':
-> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-armv.S:365:
-> undefined reference to `user_exit'
-> arch/arm/kernel/built-in.o: In function `__irq_usr':
-> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-armv.S:375:
-> undefined reference to `user_exit'
-> arch/arm/kernel/built-in.o: In function `__und_usr':
-> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-armv.S:388:
-> undefined reference to `user_exit'
-> arch/arm/kernel/built-in.o: In function `__pabt_usr':
-> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-armv.S:662:
-> undefined reference to `user_exit'
+> This patch causes a conflict with Russell's DEBUG_LL cleanup, which is
+> already in linux-next.
+
+The vybrid patch is already in linux-next as well.  And conflict was
+reported and solved by Stephen one month ago [1].
+
+>From the past experience, such trivial conflict with other tree is
+allowed by arm-soc folks, and they will ask Linus to take care of it
+when sending patches upstream.  But ...
+
+> For v3.12, I suggest you drop this patch and rework your new DEBUG_LL
+> support on top of Russell's cleanup.
+
+... I'm also fine with your suggestion.
+
+> Have a look at that and see if you
+> can reuse the the generic 8250 stuff added by Russell.
+
+Seems not.
+
+> While there, you
+> might look at imx.S as well.
+
+I think Russell would have converted it if it can reuse 8250 stuff.
+
 > 
-> -- 
-> Tushar Behera
+> If that's OK with you, can you send an updated pull request without the
+> DEBUG_LL changes?  The other changes look OK for v3.12.
+
+Okay, will send you an updated pull request without DEBUG_LL changes.
+
+Shawn
+
+[1] https://lkml.org/lkml/2013/6/3/22
