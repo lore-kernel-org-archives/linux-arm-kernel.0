@@ -1,102 +1,104 @@
 From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 22 Aug 2013 17:47:48 +0100
-Subject: [PATCH 1/3] ARM: PCI: versatile: Fix map_irq function to match
- hardware
+Date: Thu, 22 Aug 2013 17:47:49 +0100
+Subject: [PATCH 2/3] ARM: PCI: versatile: Fix PCI I/O
 In-Reply-To: <1377190070-7305-1-git-send-email-peter.maydell@linaro.org>
 References: <1377190070-7305-1-git-send-email-peter.maydell@linaro.org>
-Message-ID: <1377190070-7305-2-git-send-email-peter.maydell@linaro.org>
+Message-ID: <1377190070-7305-3-git-send-email-peter.maydell@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI controller code for the Versatile board has never had the
-correct IRQ mapping for hardware.  For many years it had an odd
-mapping ("all interrupts are int 27") which aligned with the
-equivalent bug in QEMU.  However as of commit 1bc39ac5dab265
-the mapping changed and no longer matched either hardware or QEMU,
-with the result that any PCI card beyond the first in QEMU would
-not have functioning interrupts; for example a boot with a SCSI
-controller would time out as follows:
+The versatile PCI controller code was confused between the
+PCI I/O window (at 0x43000000) and the first PCI memory
+window (at 0x44000000). Pass the correct base address to
+pci_remap_io() so that PCI I/O accesses work.
 
- ------------
- sym0: <895a> rev 0x0 at pci 0000:00:0d.0 irq 92
- sym0: SCSI BUS has been reset.
- scsi0 : sym-2.2.3
- [...]
- scsi 0:0:0:0: ABORT operation started
- scsi 0:0:0:0: ABORT operation timed-out.
- scsi 0:0:0:0: DEVICE RESET operation started
- scsi 0:0:0:0: DEVICE RESET operation timed-out.
- scsi 0:0:0:0: BUS RESET operation started
- scsi 0:0:0:0: BUS RESET operation timed-out.
- scsi 0:0:0:0: HOST RESET operation started
- sym0: SCSI BUS has been reset
- ------------
+Since the first PCI memory window isn't used at all (it's
+an odd size), rename the associated variables and labels
+so that it's clear that it isn't related to the I/O window.
 
-Fix the mapping so that it matches real hardware (checked against the
-schematics for PB926 and backplane, and tested against the hardware).
-This allows PCI cards using interrupts to work on hardware for the
-first time; this change will also work with QEMU 1.5 or later, where
-the equivalent bugs in the modelling of the hardware have been fixed.
-
-Although QEMU will attempt to autodetect whether the kernel is
-expecting the long-standing "everything is int 27" mapping or the one
-hardware has, for certainty we force it into "definitely behave like
-hardware mode"; this will avoid unexpected surprises later if we
-implement sparse irqs. This is harmless on hardware.
-
-Thanks to Paul Gortmaker for bisecting the problem and finding an initial
-solution, to Russell King for providing the correct interrupt mapping,
-and to Guenter Roeck for providing an initial version of this patch
-and prodding me into relocating the hardware and retesting everything.
+This has been tested and confirmed to fix PCI I/O accesses
+both on physical PB926+PCI backplane hardware and on QEMU.
 
 Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
 ---
- arch/arm/mach-versatile/pci.c |   25 +++++++++++++++++++------
- 1 file changed, 19 insertions(+), 6 deletions(-)
+ arch/arm/mach-versatile/include/mach/platform.h |    2 ++
+ arch/arm/mach-versatile/pci.c                   |   16 ++++++++--------
+ 2 files changed, 10 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm/mach-versatile/include/mach/platform.h b/arch/arm/mach-versatile/include/mach/platform.h
+index ec08740..6f938cc 100644
+--- a/arch/arm/mach-versatile/include/mach/platform.h
++++ b/arch/arm/mach-versatile/include/mach/platform.h
+@@ -231,12 +231,14 @@
+ /* PCI space */
+ #define VERSATILE_PCI_BASE             0x41000000	/* PCI Interface */
+ #define VERSATILE_PCI_CFG_BASE	       0x42000000
++#define VERSATILE_PCI_IO_BASE          0x43000000
+ #define VERSATILE_PCI_MEM_BASE0        0x44000000
+ #define VERSATILE_PCI_MEM_BASE1        0x50000000
+ #define VERSATILE_PCI_MEM_BASE2        0x60000000
+ /* Sizes of above maps */
+ #define VERSATILE_PCI_BASE_SIZE	       0x01000000
+ #define VERSATILE_PCI_CFG_BASE_SIZE    0x02000000
++#define VERSATILE_PCI_IO_BASE_SIZE     0x01000000
+ #define VERSATILE_PCI_MEM_BASE0_SIZE   0x0c000000	/* 32Mb */
+ #define VERSATILE_PCI_MEM_BASE1_SIZE   0x10000000	/* 256Mb */
+ #define VERSATILE_PCI_MEM_BASE2_SIZE   0x10000000	/* 256Mb */
 diff --git a/arch/arm/mach-versatile/pci.c b/arch/arm/mach-versatile/pci.c
-index e92e5e0..234740d 100644
+index 234740d..1e48878 100644
 --- a/arch/arm/mach-versatile/pci.c
 +++ b/arch/arm/mach-versatile/pci.c
-@@ -295,6 +295,19 @@ int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
- 	__raw_writel(PHYS_OFFSET, local_pci_cfg_base + PCI_BASE_ADDRESS_2);
+@@ -170,8 +170,8 @@ static struct pci_ops pci_versatile_ops = {
+ 	.write	= versatile_write_config,
+ };
  
- 	/*
-+	 * For many years the kernel and QEMU were symbiotically buggy
-+	 * in that they both assumed the same broken IRQ mapping.
-+	 * QEMU therefore attempts to auto-detect old broken kernels
-+	 * so that they still work on newer QEMU as they did on old
-+	 * QEMU. Since we now use the correct (ie matching-hardware)
-+	 * IRQ mapping we write a definitely different value to a
-+	 * PCI_INTERRUPT_LINE register to tell QEMU that we expect
-+	 * real hardware behaviour and it need not be backwards
-+	 * compatible for us. This write is harmless on real hardware.
-+	 */
-+	__raw_writel(0, VERSATILE_PCI_VIRT_BASE+PCI_INTERRUPT_LINE);
-+
-+	/*
- 	 * Do not to map Versatile FPGA PCI device into memory space
- 	 */
- 	pci_slot_ignore |= (1 << myslot);
-@@ -327,13 +340,13 @@ static int __init versatile_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+-static struct resource io_mem = {
+-	.name	= "PCI I/O space",
++static struct resource unused_mem = {
++	.name	= "PCI unused",
+ 	.start	= VERSATILE_PCI_MEM_BASE0,
+ 	.end	= VERSATILE_PCI_MEM_BASE0+VERSATILE_PCI_MEM_BASE0_SIZE-1,
+ 	.flags	= IORESOURCE_MEM,
+@@ -195,9 +195,9 @@ static int __init pci_versatile_setup_resources(struct pci_sys_data *sys)
  {
- 	int irq;
+ 	int ret = 0;
  
--	/* slot,  pin,	irq
--	 *  24     1     IRQ_SIC_PCI0
--	 *  25     1     IRQ_SIC_PCI1
--	 *  26     1     IRQ_SIC_PCI2
--	 *  27     1     IRQ_SIC_PCI3
-+	/*
-+	 * Slot	INTA	INTB	INTC	INTD
-+	 * 31	PCI1	PCI2	PCI3	PCI0
-+	 * 30	PCI0	PCI1	PCI2	PCI3
-+	 * 29	PCI3	PCI0	PCI1	PCI2
- 	 */
--	irq = IRQ_SIC_PCI0 + ((slot - 24 + pin - 1) & 3);
-+	irq = IRQ_SIC_PCI0 + ((slot + 2 + pin - 1) & 3);
+-	ret = request_resource(&iomem_resource, &io_mem);
++	ret = request_resource(&iomem_resource, &unused_mem);
+ 	if (ret) {
+-		printk(KERN_ERR "PCI: unable to allocate I/O "
++		printk(KERN_ERR "PCI: unable to allocate unused "
+ 		       "memory region (%d)\n", ret);
+ 		goto out;
+ 	}
+@@ -205,7 +205,7 @@ static int __init pci_versatile_setup_resources(struct pci_sys_data *sys)
+ 	if (ret) {
+ 		printk(KERN_ERR "PCI: unable to allocate non-prefetchable "
+ 		       "memory region (%d)\n", ret);
+-		goto release_io_mem;
++		goto release_unused_mem;
+ 	}
+ 	ret = request_resource(&iomem_resource, &pre_mem);
+ 	if (ret) {
+@@ -225,8 +225,8 @@ static int __init pci_versatile_setup_resources(struct pci_sys_data *sys)
  
- 	return irq;
+  release_non_mem:
+ 	release_resource(&non_mem);
+- release_io_mem:
+-	release_resource(&io_mem);
++ release_unused_mem:
++	release_resource(&unused_mem);
+  out:
+ 	return ret;
  }
+@@ -246,7 +246,7 @@ int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
+ 		goto out;
+ 	}
+ 
+-	ret = pci_ioremap_io(0, VERSATILE_PCI_MEM_BASE0);
++	ret = pci_ioremap_io(0, VERSATILE_PCI_IO_BASE);
+ 	if (ret)
+ 		goto out;
+ 
 -- 
 1.7.9.5
