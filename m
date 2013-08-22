@@ -1,80 +1,51 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 22 Aug 2013 16:10:54 -0700
-Subject: [PATCH RFC v2 2/5] spmi: Linux driver framework for SPMI
-In-Reply-To: <46db5901fe4d04d09cee8fd81ea1c62068ee9503.1377202730.git.joshc@codeaurora.org>
-References: <cover.1377202730.git.joshc@codeaurora.org>
- <46db5901fe4d04d09cee8fd81ea1c62068ee9503.1377202730.git.joshc@codeaurora.org>
-Message-ID: <20130822231054.GA31973@kroah.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 23 Aug 2013 01:19:53 +0200
+Subject: [PATCH v7 3/7] gpio: samsung: Skip initialization if device tree
+ is present
+In-Reply-To: <1c9a01ce9f1e$473b58b0$d5b20a10$@org>
+References: <1377120111-25601-1-git-send-email-tomasz.figa@gmail.com>
+ <3452017.UPhKO6xNO5@flatron> <1c9a01ce9f1e$473b58b0$d5b20a10$@org>
+Message-ID: <2011022.7zNcjpuhKL@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 01:37:09PM -0700, Josh Cartwright wrote:
-> +static char dbgfs_help[] =
-> +	"SPMI Debug-FS support\n"
-> +	"\n"
-> +	"Hierarchy schema:\n"
-> +	"/sys/kernel/debug/spmi\n"
-> +	"       /help                -- Static help text\n"
-> +	"       /spmi-0              -- Directory for SPMI bus 0\n"
-> +	"       /spmi-0/0-1          -- Directory for SPMI device '0-1'\n"
-> +	"       /spmi-0/0-1/address  -- Starting register for reads or writes\n"
-> +	"       /spmi-0/0-1/count    -- Number of registers to read (only used for reads)\n"
-> +	"       /spmi-0/0-1/data     -- Initiates the SPMI read (formatted output)\n"
-> +	"       /spmi-0/0-1/data_raw -- Initiates the SPMI raw read or write\n"
-> +	"       /spmi-n              -- Directory for SPMI bus n\n"
-> +	"\n"
-> +	"To perform SPMI read or write transactions, you need to first write the\n"
-> +	"address of the slave device register to the 'address' file.  For read\n"
-> +	"transactions, the number of bytes to be read needs to be written to the\n"
-> +	"'count' file.\n"
-> +	"\n"
-> +	"The 'address' file specifies the 20-bit address of a slave device register.\n"
-> +	"The upper 4 bits 'address[19..16]' specify the slave identifier (SID) for\n"
-> +	"the slave device.  The lower 16 bits specify the slave register address.\n"
-> +	"\n"
-> +	"Reading from the 'data' file will initiate a SPMI read transaction starting\n"
-> +	"from slave register 'address' for 'count' number of bytes.\n"
-> +	"\n"
-> +	"Writing to the 'data' file will initiate a SPMI write transaction starting\n"
-> +	"from slave register 'address'.  The number of registers written to will\n"
-> +	"match the number of bytes written to the 'data' file.\n"
-> +	"\n"
-> +	"Example: Read 4 bytes starting at register address 0x1234 for SID 2\n"
-> +	"\n"
-> +	"echo 0x21234 > address\n"
-> +	"echo 4 > count\n"
-> +	"cat data\n"
-> +	"\n"
-> +	"Example: Write 3 bytes starting at register address 0x1008 for SID 1\n"
-> +	"\n"
-> +	"echo 0x11008 > address\n"
-> +	"echo 0x01 0x02 0x03 > data\n"
-> +	"\n"
-> +	"Note that the count file is not used for writes.  Since 3 bytes are\n"
-> +	"written to the 'data' file, then 3 bytes will be written across the\n"
-> +	"SPMI bus.\n\n";
+On Thursday 22 of August 2013 18:59:23 Kukjin Kim wrote:
+> Tomasz Figa wrote:
+> > On Thursday 22 of August 2013 01:21:25 Linus Walleij wrote:
+> > > On Wed, Aug 21, 2013 at 11:21 PM, Tomasz Figa
+> > > <tomasz.figa@gmail.com>
+> > 
+> > wrote:
+> > > > Since this driver does not handle GPIO on device tree enabled
+> > > > platforms
+> > > > any more, it should be bypassed whenever device tree is available,
+> > > > to
+> > > > not conflict with the new pinctrl-samsung driver.
+> > > > 
+> > > > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> > > 
+> > > This seems like something I should apply to the GPIO tree
+> > > right now, shall I?
+> > 
+> > Would be nice, but since this patch is a dependency for rest of this
+> > series and there are no other dependencies on GPIO tree, it might be
+> > easier to just let Kukjin take all the patches with required Acks.
+> 
+> Oh, I didn't see any dependencies...but if so, Linus do you agree with
+> Tomasz' opinion?
 
-The help file within the kernel is a nice touch :)
+Without this patch DT-based bootup would fail, because the legacy GPIO 
+driver would kick in and register GPIO chips before the pinctrl driver. 
+Things would compile fine, though. So this is a run time dependency, not 
+compile time.
 
-I do know the only rule for debugfs is "There are no rules", but this
-looks like you are going to have the way to interact to this bus and
-devices as debugfs, is that correct?
+> Please let me know so that I could take this with others into the
+> samsung tree. And please kindly ignore my previous reply on this ;-)
 
-Or is this only for "debugging"?  If so, please document it as such.
+I would be really happy if we could finally merge this for this release. 
+This series is not really invasive in any way, so it is unlikely to 
+introduce any regressions and it has waited so many releases, without any 
+significant changes, due to a lot of other dependencies.
 
-> +void spmi_dfs_controller_add(struct spmi_controller *ctrl)
-> +{
-> +	ctrl->dfs_dir = debugfs_create_dir(dev_name(&ctrl->dev),
-> +					   spmi_debug_root);
-> +	WARN_ON(!ctrl->dfs_dir);
-
-Why?  What is a user going to be able to do with something like this?
-You do this in a number of places, please provide "valid" error messages
-instead of just kernel stack tracebacks, failing to show the device for
-which the error occured (hint, use dev_err()).
-
-Again, never use WARN_ON() as error handling, it's lazy, and wrong.
-
-thanks,
-
-greg k-h
+Best regards,
+Tomasz
