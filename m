@@ -1,45 +1,58 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 22 Aug 2013 15:31:40 -0700
-Subject: [PATCH 3/4] clk: mvebu: add missing iounmap
-In-Reply-To: <1377175611-4241-4-git-send-email-jszhang@marvell.com>
-References: <1377175611-4241-1-git-send-email-jszhang@marvell.com>
- <1377175611-4241-4-git-send-email-jszhang@marvell.com>
-Message-ID: <20130822223140.8231.74026@quantum>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Thu, 22 Aug 2013 17:39:22 -0500
+Subject: [PATCHv4 2/3] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <521670CE.4000202@wwwdotorg.org>
+References: <1376498884-9199-1-git-send-email-dinguyen@altera.com>
+ <1376498884-9199-2-git-send-email-dinguyen@altera.com>
+ <520EA97D.7050404@wwwdotorg.org> <1377114530.1554.13.camel@linux-builds1>
+ <521670CE.4000202@wwwdotorg.org>
+Message-ID: <1377211162.30624.26.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jisheng Zhang (2013-08-22 05:46:50)
-> Add missing iounmap to setup error path.
+On Thu, 2013-08-22 at 14:13 -0600, Stephen Warren wrote:
+> On 08/21/2013 01:48 PM, Dinh Nguyen wrote:
+> > On Fri, 2013-08-16 at 16:36 -0600, Stephen Warren wrote:
+> >> On 08/14/2013 10:48 AM, dinguyen at altera.com wrote:
+> >>> From: Dinh Nguyen <dinguyen@altera.com>
+> >>>
+> >>> Add bindings for SD/MMC for SOCFPGA.
+> >>
+> >>> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+> >>
+> >>> +* altr,sysmgr: Should be the phandle to the system_mgr node. As this is where
+> >>> +		this where the register that controls the CIU clock phases
+> >>> +		reside.
+> >>
+> >> On the surface, this binding series seems OK, but I do have a question:
+> >> how is the sysmgr phandle used?
+> >>
+> >> I assume there's some register in this syscon device that resets or
+> >> enables or otherwise controls this MSHC module. How does the code know
+> >> which register it is? The phandle in the altr,sysmgr property would
+> >> usually be followed by a/some cell(s) that encode this information, so
+> >> that the MSHC driver doesn't have to know anything about the layout of
+> >> the syscon registers, and so the sysconf driver doesn't have to know
+> >> anything about the identity of the MSHC client device.
+> > 
+> > There is a #define SYSMGR_SDMMCGRP_CTRL_OFFSET that is in
+> > dw_mmc-socfpga.c. This defines the offset from the base address that the
+> > sysmgr phandle will give me.
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Hmmm. That doesn't sound good. That means that the SDMMC driver knows
+> internal details about some other HW module. It'd be better if either:
+> 
+> a) The sysmgr driver was required to provide an API to the SDMMC driver
+> to set up the CIU register as requested.
+> 
+> or:
+> 
+> b) The CIU register details were represented in DT.
+> 
+> Either of these would allow the SDMMC driver to operate unchanged on an
+> SoC with a different sysmgr register layout.
 
-Patch looks good with one minor nitpick below.
+Thanks Stephen...will rework accordingly.
 
-> @@ -145,10 +147,8 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
->         ctrl->num_gates = n;
->         ctrl->gates = kzalloc(ctrl->num_gates * sizeof(struct clk *),
->                               GFP_KERNEL);
-> -       if (WARN_ON(!ctrl->gates)) {
-> -               kfree(ctrl);
-> -               return;
-> -       }
-> +       if (WARN_ON(!ctrl->gates))
-> +               goto bail_out;
->  
->         for (n = 0; n < ctrl->num_gates; n++) {
->                 const char *parent =
-> @@ -160,4 +160,10 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
->         }
->  
->         of_clk_add_provider(np, clk_gating_get_src, ctrl);
-> +
-> +       return;
-> +bail_out:
-> +       kfree(ctrl);
-> +ctrl_out:
-> +       iounmap(base);
-
-bail_out is not the best name. How about gates_out?
-
-Regards,
-Mike
+Dinh
+> 
