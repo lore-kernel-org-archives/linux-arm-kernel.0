@@ -1,93 +1,117 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 22 Aug 2013 16:37:08 +0900
-Subject: [GIT PULL 3/3] ARM: shmobile: lager: enable Ether
-In-Reply-To: <CAOesGMjZ+a6EiDa2p3y-_kkQ0uwSHU6zdcTxuphJxNcr7QhDhw@mail.gmail.com>
-References: <cover.1375839719.git.horms+renesas@verge.net.au>
- <4901e136aa5c35873701156c4c0af5b3c2c8faee.1375839719.git.horms+renesas@verge.net.au>
- <87siy3owxj.fsf@linaro.org> <5215115A.1010400@cogentembedded.com>
- <20130822001647.GA6902@verge.net.au>
- <20130822065325.GA6615@quad.lixom.net>
- <20130822070109.GA26589@verge.net.au>
- <CAOesGMjZ+a6EiDa2p3y-_kkQ0uwSHU6zdcTxuphJxNcr7QhDhw@mail.gmail.com>
-Message-ID: <20130822073706.GA32091@verge.net.au>
+Date: Thu, 22 Aug 2013 16:39:05 +0900
+Subject: [PATCH/RFC] ARM: shmobile: r8a7779: Update early timer
+ initialisation order
+In-Reply-To: <CANqRtoSpOWOp3GhsvvwQwyWtPi3wXG0MmECkf90SPBRoPmq4DQ@mail.gmail.com>
+References: <1375952357-22938-1-git-send-email-horms+renesas@verge.net.au>
+ <CANqRtoSpOWOp3GhsvvwQwyWtPi3wXG0MmECkf90SPBRoPmq4DQ@mail.gmail.com>
+Message-ID: <20130822073904.GB32091@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 12:04:59AM -0700, Olof Johansson wrote:
-> On Thu, Aug 22, 2013 at 12:01 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Wed, Aug 21, 2013 at 11:53:25PM -0700, Olof Johansson wrote:
-> >> On Thu, Aug 22, 2013 at 09:16:49AM +0900, Simon Horman wrote:
-> >> > On Wed, Aug 21, 2013 at 11:13:30PM +0400, Sergei Shtylyov wrote:
-> >> > > Hello.
-> >> > >
-> >> > > On 08/21/2013 08:01 PM, Kevin Hilman wrote:
-> >> > >
-> >> > > >>Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> >> > > >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >> > >
-> >> > > >This one is triggering a new build failure in -next:
-> >> > >
-> >> > > >arch/arm/mach-shmobile/board-lager.c:99:2: error: unknown field 'register_type' specified in initializer
-> >> > > >arch/arm/mach-shmobile/board-lager.c:99:19: error: 'SH_ETH_REG_FAST_RCAR' undeclared here (not in a function)
-> >> > >
-> >> > > >>+/* Ether */
-> >> > > >>+static struct sh_eth_plat_data ether_pdata __initdata = {
-> >> > > >>+       .phy                    = 0x1,
-> >> > > >>+       .edmac_endian           = EDMAC_LITTLE_ENDIAN,
-> >> > > >>+       .register_type          = SH_ETH_REG_FAST_RCAR,
-> >> > >
-> >> > > >and it looks to be because this board is trying to use the register_type
-> >> > > >field which was removed by:
-> >> > >
-> >> > > >commit 8d3214c4e8c8be6efd8ec7a172239ebbd4deb04b
-> >> > > >Author: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >> > > >Date:   Sun Aug 18 03:13:26 2013 +0400
-> >> > > >
-> >> > > >     sh_eth: remove 'register_type' field from 'struct sh_eth_plat_data'
-> >> > > >
-> >> > > >     Now that the 'register_type' field of the 'sh_eth' driver's platform data is not
-> >> > > >     used by the driver anymore, it's time to remove it and  its initializers from
-> >> > > >     the SH platform code. Also  move *enum* declaring values for this  field from
-> >> > > >     <linux/sh_eth.h>  to  the  local driver's  header file as they're only needed
-> >> > > >     by the driver itself  now...
-> >> > > >
-> >> > > >     Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >> > > >     Signed-off-by: David S. Miller <davem@davemloft.net>
-> >> > >
-> >> > >    Looks like in this case I had no choice since R8A7790 support for
-> >> > > the 'sh_eth' driver will be added in 3.12 only, so if I merged these
-> >> > > patches thru the shmobile tree, we'd have gotten an error in the
-> >> > > driver...
-> >> > >    I guess it's too early to fix this in any particular tree except
-> >> > > for linux-next itself... let me know what I can do.
-> >> >
-> >> > This patch ("ARM: shmobile: lager: enable Ether") is also targeted at v3.12.
-> >> > So it seems to me that a fix for this could go through the shmobile tree
-> >> > if it is acceptable to merge net-next into the base of a pull-request.
-> >> >
-> >> > Kevin, Olof, could you give some guidance here.
-> >>
-> >> I don't think we want to pull in net-next here just for this -- that is a
-> >> massive branch.
-> >>
-> >> There's no great solution to any of this, unfortunately.
-> >>
-> >> I think easiest would be if we add a patch that fixes this up _only_ in
-> >> for-next, and merge the same patch upstream as soon as net-next lands
-> >> (if it lands after arm-soc, otherwise we include it in our branch),
-> >> that might be the least painful way to do this.
-> >>
-> >> That patch would just remove the assignment to register_type in the
-> >> board file.
+On Fri, Aug 09, 2013 at 05:37:39PM +0900, Magnus Damm wrote:
+> On Thu, Aug 8, 2013 at 5:59 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> > a894fcc2d01a89e6fe3da0845a4d80a5312e1124 ("ARM: smp_twd: Divorce smp_twd
+> > from local timer API") altered twd_local_timer_common_register() so that it
+> > may make use of late_timer_init.
 > >
-> > That is fine by me.
+> > This is problematic on marzen with Magnus's recent patch "ARM: shmobile:
+> > marzen: Switch to DT_MACHINE_START" which switches marzen around to enable
+> > USE_OF and thus shmobile_timer_init(), which is registered as
+> > late_time_init by shmobile_earlytimer_init() stops being a no-op.
 > >
-> > I think it would be easiest to supply the patch to you as
-> > a patch in email rather than a pull request.
+> > As a work-around I have updated r8a7779_earlytimer_init() so that
+> > shmobile_earlytimer_init() is called after r8a7779_register_twd().
+> > Or in other words, the shmobile_earlytimer_init() setting of
+> > late_time_init overwrites that of twd_local_timer_common_register().
 > >
-> > Does that work for you?
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> > ---
+> >
+> > This patch was created on top of a merge of next-20130807 from the
+> > linux-next tree and renesas-next-20130807 from my renesas tree.
+> >
+> > I expect the problem describe above to be present in the
+> > next version of linux-next as it will include renesas-next-20130807.
+> >
+> > I rather suspect that this fix is just papers over the problem
+> > at hand rather than fixing it. But it does at least fix the problem
+> > to the extent where the marzen board at least boots.
+> >
+> > For reference the output of /proc/interrupts after such a boot is below.
+> >
+> >             CPU0       CPU1       CPU2       CPU3
+> >   29:          0       9365       9363       9359       GIC   29  twd
+> >   59:          0          0          0          0       GIC   59  renesas_intc_irqpin.0
+> >   60:          5          0          0          0       GIC   60  renesas_intc_irqpin.0
+> >   61:          0          0          0          0       GIC   61  renesas_intc_irqpin.0
+> >   62:          0          0          0          0       GIC   62  renesas_intc_irqpin.0
+> >   64:        278          0          0          0       GIC   64  sh_tmu.0
+> >   76:          1          0          0          0       GIC   76  ehci_hcd:usb1, ohci_hcd:usb3
+> >   77:          1          0          0          0       GIC   77  ehci_hcd:usb2, ohci_hcd:usb4
+> >  111:          0          0          0          0       GIC  111  i2c-rcar.0
+> >  112:          0          0          0          0       GIC  112  i2c-rcar.2
+> >  113:          0          0          0          0       GIC  113  i2c-rcar.3
+> >  114:          0          0          0          0       GIC  114  i2c-rcar.1
+> >  122:         45          0          0          0       GIC  122  sh-sci.2:mux
+> >  132:          0          0          0          0       GIC  132  sata_rcar
+> >  173:          0          0          0          0       GIC  173  gpio_rcar.0
+> >  174:          0          0          0          0       GIC  174  gpio_rcar.1
+> >  175:          0          0          0          0       GIC  175  gpio_rcar.2
+> >  176:          0          0          0          0       GIC  176  gpio_rcar.3
+> >  177:          0          0          0          0       GIC  177  gpio_rcar.4
+> >  178:          0          0          0          0       GIC  178  gpio_rcar.5
+> >  179:          0          0          0          0       GIC  179  gpio_rcar.6
+> > 2001:          5          0          0          0  renesas_intc_irqpin.0    1  eth0
+> > IPI0:          0          0          0          0  CPU wakeup interrupts
+> > IPI1:          0          0          0          0  Timer broadcast interrupts
+> > IPI2:        314        340         58         33  Rescheduling interrupts
+> > IPI3:         22         56         34         56  Function call interrupts
+> > IPI4:          0          0          0          0  Single function call interrupts
+> > IPI5:          0          0          0          0  CPU stop interrupts
+> >  Err:          0
+> > ---
+> >  arch/arm/mach-shmobile/setup-r8a7779.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+> > index ddee4aa..b0f56d6 100644
+> > --- a/arch/arm/mach-shmobile/setup-r8a7779.c
+> > +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+> > @@ -597,8 +597,8 @@ void __init __weak r8a7779_register_twd(void) { }
+> >  void __init r8a7779_earlytimer_init(void)
+> >  {
+> >         r8a7779_clock_init();
+> > -       shmobile_earlytimer_init();
+> >         r8a7779_register_twd();
+> > +       shmobile_earlytimer_init();
+> >  }
+> >
+> >  void __init r8a7779_add_early_devices(void)
+> > --
+> > 1.8.3.2
+> >
 > 
-> Yes, definitely.
+> Hi Simon,
+> 
+> Thanks for tracking down this issue. I think your patch looks fine to
+> me.
 
-Thanks, I have posted it as
-"[PATCH] ARM: shmobile: lager: Do not use register_type field of struct".
+Thanks, could I get an acked-by ?
+
+> Regarding Marzen DT reference, I don't think TWD is used there yet
+> so I doubt that it will have the same problem as the C version of the
+> marzen board code.
+
+Agreed.
+
+> One related worry is that sh73a0 may have the same
+> issue - or rather - judging by the code in sh73a0_earlytimer_init() it
+> most certainly is affected by this too. So KZM9G should also fail as
+> Marzen which means we need to fix sh73a0 too.
+
+Curiously I do not seem to see the problem on the kzm9d.
+Would you like me to prepare a patch anyway?
