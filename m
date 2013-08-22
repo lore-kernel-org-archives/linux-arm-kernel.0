@@ -1,48 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 22 Aug 2013 10:06:40 -0700
-Subject: [PATCH 1/2] tick: broadcast: Deny per-cpu clockevents from being
- broadcast sources
-In-Reply-To: <52138784.7050703@linaro.org>
-References: <52138784.7050703@linaro.org>
-Message-ID: <1377191201-14696-1-git-send-email-sboyd@codeaurora.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 22 Aug 2013 10:23:11 -0700
+Subject: [GIT PULL] ux500 core changes for v3.12
+In-Reply-To: <CACRpkdbRaV9_oCNKXh2O2JR6pyvz6+5c4=pxYCFhT6-KzbqyMg@mail.gmail.com>
+ (Linus Walleij's message of "Mon, 19 Aug 2013 22:54:35 +0200")
+References: <CACRpkdbRaV9_oCNKXh2O2JR6pyvz6+5c4=pxYCFhT6-KzbqyMg@mail.gmail.com>
+Message-ID: <87txihskqo.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On most ARM systems the per-cpu clockevents are truly per-cpu in
-the sense that they can't be controlled on any other CPU besides
-the CPU that they interrupt. If one of these clockevents were to
-become a broadcast source we will run into a lot of trouble
-because the broadcast source is enabled on the first CPU to go
-into deep idle (if that CPU suffers from FEAT_C3_STOP) and that
-could be a different CPU than what the clockevent is interrupting
-(or even worse the CPU that the clockevent interrupts could be
-offline).
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Theoretically it's possible to support per-cpu clockevents as the
-broadcast source but so far we haven't needed this and supporting
-it is rather complicated. Let's just deny the possibility for now
-until this becomes a reality (let's hope it never does!).
+> Hi ARM SoC folks,
+>
+> here are some smallish ux500 core changes for the v3.12
+> cycle. Basically just three random patches. The big thing is
+> that we can now restart the ux500 with software.
+>
+> Please pull these in!
+>
+> Yours,
+> Linus Walleij
+>
+> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+>
+>   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/ux500-core-for-arm-soc
+>
+> for you to fetch changes up to 0a429fd15ecb05d7d5fa8eb4adaff69c7a00984b:
+>
+>   ARM: ux500: set coherent_dma_mask for dma40 (2013-08-19 22:49:25 +0200)
+>
+> ----------------------------------------------------------------
+> Core ux500 changes for v3.12:
+> - Add support for restart using the PRCMU
+> - Move secondary startup out of INIT section
+> - set coherent_dma_mask for DMA40
 
-Reported-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- kernel/time/tick-broadcast.c | 3 +++
- 1 file changed, 3 insertions(+)
+Pulled into next/soc,
 
-diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-index 218bcb5..d3539e5 100644
---- a/kernel/time/tick-broadcast.c
-+++ b/kernel/time/tick-broadcast.c
-@@ -77,6 +77,9 @@ static bool tick_check_broadcast_device(struct clock_event_device *curdev,
- 	    !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
- 		return false;
- 
-+	if (cpumask_equal(newdev->cpumask, cpumask_of(smp_processor_id())))
-+		return false;
-+
- 	return !curdev || newdev->rating > curdev->rating;
- }
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Kevin
