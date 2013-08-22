@@ -1,82 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 22 Aug 2013 15:08:48 +0100
-Subject: [PATCH v2 1/2] ARM: dts: Add SHAM data and documentation for
- AM33XX
-In-Reply-To: <1374078222-12883-2-git-send-email-mgreer@animalcreek.com>
-References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
- <1374078222-12883-2-git-send-email-mgreer@animalcreek.com>
-Message-ID: <20130822140848.GD23152@e106331-lin.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 22 Aug 2013 22:10:23 +0800
+Subject: [GIT PULL 1/5] ARM: imx: weim bus driver update for 3.12
+In-Reply-To: <874nahx4o7.fsf@linaro.org>
+References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
+ <874nahx4o7.fsf@linaro.org>
+Message-ID: <20130822141021.GH30533@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 17, 2013 at 05:23:41PM +0100, Mark A. Greer wrote:
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
+On Thu, Aug 22, 2013 at 05:59:04AM -0700, Kevin Hilman wrote:
+
+<snip>
+
+> >       drivers: bus: imx-weim: Add support for i.MX1/21/25/27/31/35/50/51/53
+> >
+> >  Documentation/devicetree/bindings/bus/imx-weim.txt |   17 ++-
+> >  drivers/bus/Kconfig                                |    3 +-
+> >  drivers/bus/imx-weim.c                             |  129 +++++++++++---------
+> >  3 files changed, 87 insertions(+), 62 deletions(-)
 > 
-> Add the generic AM33XX SHAM module's device tree data and
-> enable it for the am335x-evm, am335x-evmsk, and am335x-bone
-> platforms.  Also add Documentation file describing the data
-> for the SHAM module.
+> The bindings changes in the last patch need a a review and ack from the
+> devicetree maintainers.
 > 
-> CC: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> ---
->  .../devicetree/bindings/crypto/omap-sham.txt       | 33 ++++++++++++++++++++++
->  arch/arm/boot/dts/am335x-bone.dts                  |  4 +++
->  arch/arm/boot/dts/am335x-evm.dts                   |  4 +++
->  arch/arm/boot/dts/am335x-evmsk.dts                 |  4 +++
->  arch/arm/boot/dts/am33xx.dtsi                      | 10 +++++++
->  5 files changed, 55 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/crypto/omap-sham.txt
+> Can you please repost that patch with devicetree at vger.kernel.org Cc'd?
 > 
-> diff --git a/Documentation/devicetree/bindings/crypto/omap-sham.txt b/Documentation/devicetree/bindings/crypto/omap-sham.txt
-> new file mode 100644
-> index 0000000..c6d1202
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/crypto/omap-sham.txt
-> @@ -0,0 +1,33 @@
-> +OMAP SoC SHA crypto Module
-> +
-> +Required properties:
-> +
-> +- compatible : Should contain entries for this and backward compatible
-> +  SHAM versions:
-> +  - "ti,omap2-sham" for OMAP2 & OMAP3.
-> +  - "ti,omap4-sham" for OMAP4 and AM33XX.
-> +  Note that these two versions are incompatible.
-> +- ti,hwmods: Name of the hwmod associated with the SHAM module
-> +- reg : Offset and length of the register set for the module
-> +- interrupt-parent : the phandle for the interrupt controller that
-> +  services interrupts for this module.
-> +- interrupts : the interrupt number for the SHAM module.
-> +
-> +Optional properties:
-> +- dmas: DMA controller phandle and DMA request ordered pair.
-> +	Only one rx pair is valid per SHAM module.
+Okay, will do.
 
-This may be a little late, but...
+> Without a review/ack from the DT maintainers, we won't be pulling any
+> bindings changes.
+> 
+> Also, the binding is changed but there are no corresponding .dts file
+> changes.  Was that an oversight, or doess that mean there are no current
+> users of this binding.
 
-Nit: A dma specifier may have many cells, so calling it "pair" is not
-necessarily correct:
+The binding changes does not break the existing users, and new users are
+added through imx/dt branch.
 
-dmas = <&dma0 432 7 5>,
-       <&dma1 3>,
-       <&dma0 212 1 13>;
-
-You could instead say:
-
-- dmas: DMA specifier for the rx dma. See the DMA client binding,
-        Documentation/devicetree/bindings/dma/dma.txt
-
-> +- dma-names: DMA request name. This string corresponds 1:1 with
-> +	the ordered pair in dmas. The string naming is to be
-> +	"rx" for RX request.
-
-Similarly:
-
- - dma-names: DMA request name. Should be "rx" if a dma is present.
-
-It would be nice to get the bindings using consistent terminology so we
-don't confuse everyone further.
-
-Thanks,
-Mark.
+Shawn
