@@ -1,135 +1,52 @@
-From: B47053@freescale.com (Xiubo Li-B47053)
-Date: Thu, 22 Aug 2013 09:52:42 +0000
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM
-In-Reply-To: <1522215.zHEjdiga8V@flatron>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1473340.OXSHEp7d4P@flatron>
- <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
- <1522215.zHEjdiga8V@flatron>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827D2539@039-SN2MPN1-013.039d.mgd.msft.net>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 22 Aug 2013 17:53:00 +0800
+Subject: [PATCH v2 2/4] iio: at91: Use different prescal, startup mask
+ in MR for different IP
+In-Reply-To: <5215DF2C.3050502@atmel.com>
+References: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
+ <1376219071-29946-3-git-send-email-josh.wu@atmel.com>
+ <20130815192044.GD12162@lukather> <5215DF2C.3050502@atmel.com>
+Message-ID: <5215DF7C.2020909@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Add Ludovic in the loop.
 
-
-
-> > > If the meaning of flags cell is the same as in generic, default PWM
-> > > specifier format, then it should be noted here and generic PWM
-> > > binding documentation mentioned.
-> >
-> > OK, How about the following ?
-> > - #pwm-cells: Should be 3. See pwm.txt in this directory for a
-> >   description of the cells format.
-> 
-> I meant just the last cell, which stores flags, but actually this might
-> be a good idea, but with slightly extended description. Something among
-> those
-> lines:
-> 
->  - #pwm-cells: Should be 3. The default three cell format specified by
-> generic PWM bindings are used. Refer to the documentation of generic PWM
-> bindings for more information about the meaning of cells.
-> 
-
-That's perfect.
-
-
-> > > > +- fsl,pwm-clk-ps: the ftm0 pwm clock's prescaler,
-> > > > divide-by 2^n(n = 0 ~ 7).
-> > >
-> > > Is it a hardware-specific property?
-> >
-> > Yes, I will revise it in v2.
-> 
-> I'd like to hear a bit more elaborate description of this property. What
-> are the factors that decide what value should be used here?
-> 
-
-Sorry, "the ftm0 pwm clock's prescaler" maybe also confuse you, it should be
-"the ftm pwm counter clock input prescaler".
-
-The ftm's counter clock can be selected as :
-System clock,
-Fixed frequency clock,
-External clock.
-
-And the ftm module clock has only system clock source.
-
-The fixed frequency clock is an alternative clock source for the FTM counter that allows
-the selection of a clock other than the system clock or an external clock. This clock input
-is defined by chip integration. Due to FTM hardware implementation limitations, the 
-frequency of the fixed frequency clock must not exceed 1/2 of the system clock frequency.
-
-The external clock passes through a synchronizer clocked by the system clock to assure
-that counter transitions are properly aligned to system clock transitions.Therefore, to
-meet Nyquist criteria considering also jitter, the frequency of the external clock source
-must not exceed 1/4 of the system clock frequency.
-
-So, if the fixed frequency clock or external clock equal or exceed the system clock...
-
-
-> > > > +- fsl,pwm-number: the number of PWM devices, and is must equal to
-> > > > the
-> > > > number +  of "fsl,pwm-channels".
-> > >
-> > > This is redundant, because you can simply count how many entries
-> > > have been specified in fsl,pwm-channels.
-> >
-> > Yes, I will revise it in v2.
-> > And this would be renamed to " fsl,pwm-channel-number", which can be
-> > more Readable and understood.
-> 
-> I meant that you don't need to specify how many entries other property
-> has in another property, because device tree provides information about
-> sizes of all properties. So, in parsing code, you would be able to simply
-> get the size of "fsl,pwm-channels" property in bytes, divide that by
-> sizeof(u32) and get the numer of cells specified.
-> 
-
-OK, I will revise it in v2.
-
-> > > > +- fsl,pwm-channels: the channels' order which is be used for pwm
-> > > > +in
-> > > > ftm0 +  module, and they must be one or some of 0 ~ 7, because the
-> > > > ftm0 only has +  8 channels can be used.
-> > >
-> > > Could you explain meaning of this property more precisely? I'm
-> > > interested especially how is this related to the PWM IP block and
-> > > boards.
-> > Yes.
-> > There are 8 channels most. While the pinctrls of 4th and 5th channels
-> > could be used by uart's Rx and Tx, then these 2 channels won't be used
-> > for pwm output, so there will be 6 channels available by the pwm.
-> > Thus, the pwm chip will register only 6 pwms(6 channels)
-> > most("fsl,pwm-channel-orders = {0 1 2 3 6 7}").And also the
-> > "fsl,pwm-channel-number" will be 6.
-> >
-> > If hasn't any other problems, I will revise It in v2.
-> > And this will be renamed to "fsl,pwm-channel-orders", which can be
-> > more readable and understood.
-> 
-> As Sascha Hauer already suggested, you could get rid of both this and
-> "fsl,pwm-channel-number" properties and simply register all the channels.
-> This way you will have a deterministic 1:1 mapping of real hardware
-> channels to channels specified in device tree, which is definitely the
-> way to go.
-> 
-> Now as a safety measure, you could simply move the specification of
-> pinctrl states from SoC family or SoC level dtsi file to board level dts,
-> where only pinctrl states of channels used by a particular board would be
-> specified, so nothing could break operation of other devices that share
-> pin muxes with remaining channels.
-
-Yes, I was also considering it, but not very be clear yet.
-Thanks very much for your and Sascha's help.
-I will try to implement it in v2.
-
-
-Thanks very much.
-
---
-Best regards,
-Xiubo  
- 
+On 8/22/2013 5:51 PM, Josh Wu wrote:
+> Hi, Maxime
+>
+> On 8/16/2013 3:20 AM, Maxime Ripard wrote:
+>> Hi Josh,
+>>
+>> On Sun, Aug 11, 2013 at 07:04:29PM +0800, Josh Wu wrote:
+>>> For at91 boards, there are different IPs for adc. Different IPs has
+>>> different STARTUP & PRESCAL mask in ADC_MR.
+>>>
+>>> This patch introduce the multiple compatible string for those
+>>> different IPs.
+>>>
+>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> Overall it looks like the right ways, but I think we can take it a step
+>> further.
+>>
+>> I'd drop at least the atmel,adc-drdy-mask, atmel,adc-num-channels,
+>> atmel,adc-status-register, atmel,adc-trigger-register properties (and
+>> probably the triggers as well description as well).
+>
+> yeah, right. Currently I want to drop following:
+>
+> atmel,adc-drdy-mask, atmel,adc-status-register, 
+> atmel,adc-trigger-register, atmel,adc-channel-base
+>
+> For the adc-num-channels, I'd like to leave it in dt parameters. It is 
+> a description for an adc capablity.
+>
+> For the triggers, I am not decided. An obvious benifit to remove 
+> trigger in dt will save many lines of code.
+>
+>>
+>> Maxime
+>>
+>
+> Best Regards,
+> Josh Wu
