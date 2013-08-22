@@ -1,45 +1,81 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 22 Aug 2013 11:10:59 -0700
-Subject: [GIT PULL v2] pull request to 3.12 for hi3xxx
-In-Reply-To: <CAN1soZz6WWDVwTE5eFOXuQHAPoOGajHaNhFzJBLZh5Gwj_u9ZQ@mail.gmail.com>
- (Haojian Zhuang's message of "Wed, 21 Aug 2013 16:25:37 +0800")
-References: <CAN1soZz6WWDVwTE5eFOXuQHAPoOGajHaNhFzJBLZh5Gwj_u9ZQ@mail.gmail.com>
-Message-ID: <87y57tr3yk.fsf@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 22 Aug 2013 22:12:46 +0400
+Subject: [PATCH 2/4] net: ethernet: cpsw: add optional third memory region
+ for CONTROL module
+In-Reply-To: <1377171448-27924-3-git-send-email-zonque@gmail.com>
+References: <1377171448-27924-1-git-send-email-zonque@gmail.com>
+ <1377171448-27924-3-git-send-email-zonque@gmail.com>
+Message-ID: <5216549E.1010305@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang <haojian.zhuang@gmail.com> writes:
+Hello.
 
-> On Wed, Aug 21, 2013 at 5:52 AM, Kevin Hilman <khilman@linaro.org> wrote:
->> Hello Haojian,
->>
->> Haojian Zhuang <haojian.zhuang@gmail.com> writes:
->>
->>> Hi all,
->>>
->>> Please help to merge hi3xxx from pxa git tree.
->>>
->>
->> Thanks for sending the pull request to to arm at kernel.org, but please be
->> sure to *also* send it to the linux-arm-kernel mailing list.
->>
->> Thanks,
->>
->> Kevin
->>
+On 08/22/2013 03:37 PM, Daniel Mack wrote:
+
+> At least the AM33xx SoC has a control module register to configure
+> details such as the hardware ethernet interface mode.
+
+> I'm not sure whether all SoCs which feature the cpsw block have such a
+> register, so that third memory region is considered optional for now.
+
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+>   Documentation/devicetree/bindings/net/cpsw.txt |  5 ++++-
+>   drivers/net/ethernet/ti/cpsw.c                 | 22 ++++++++++++++++++++++
+>   2 files changed, 26 insertions(+), 1 deletion(-)
+
+> diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+> index 05d660e..4e5ca54 100644
+> --- a/Documentation/devicetree/bindings/net/cpsw.txt
+> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
+[...]
+> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+> index 63feaae..4855d8e 100644
+> --- a/drivers/net/ethernet/ti/cpsw.c
+> +++ b/drivers/net/ethernet/ti/cpsw.c
+[...]
+> @@ -2012,6 +2013,27 @@ static int cpsw_probe(struct platform_device *pdev)
+>   		goto clean_runtime_disable_ret;
+>   	}
 >
-> Hi Kevin,
->
-> Now I update this pull request since I drop the support of Hi3716 DKB.
->
+> +	/* If the control memory region is unspecified, continue without it.
+> +	 * If it is specified, but we're unable to reserve it, bail. */
 
-Thanks for the update.  However, now that I had a closer look at this
-series, I don't think it's ready for merge.  In particular, I think
-that the DT bindings and additions need a broader review from the DT
-maintainers.  I pointed out a couple questions in a reply to one of the
-specific patches: [PATCH v7 05/11] ARM: dts: enable hi4511 with device tree
+    According to Documentation/CodingStyle, the networking code's preferred 
+style of multi-line comments is this:
 
-I'm hoping the DT maintainers can step in here and help review your
-changes and give guidance on any changes needed.
+/* Bla
+  * bla
+  */
 
-Kevin
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+> +	if (!res) {
+> +		dev_err(priv->dev, "error getting control i/o resource\n");
+> +		goto no_gmii_sel;
+> +	}
+> +	if (!devm_request_mem_region(&pdev->dev, res->start, resource_size(res),
+> +				     ndev->name)) {
+
+    Not dev_name(&pdev->dev)?
+
+> +		dev_err(priv->dev, "failed request control i/o region\n");
+> +		ret = -ENXIO;
+
+    Rather -EBUSY.
+
+> +		goto clean_runtime_disable_ret;
+> +	}
+> +	priv->gmii_sel_reg = devm_ioremap(&pdev->dev, res->start,
+> +					  resource_size(res));
+> +	if (!priv->gmii_sel_reg) {
+> +		dev_err(priv->dev, "unable to map control i/o region\n");
+> +		goto clean_runtime_disable_ret;
+> +	}
+
+    Why not use devm_ioremap_resource() instead of the above sequence?
+
+> +
+> +no_gmii_sel:
+
+WBR, Sergei
