@@ -1,57 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 22 Aug 2013 14:59:30 +0100
-Subject: [RFC PATCH v2 3/4] powerpc: refactor of_get_cpu_node to
- support other architectures
-In-Reply-To: <521223FA.5050903@arm.com>
-References: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376674791-28244-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376674791-28244-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <2032060.4bgTKOdEX2@flatron> <1376777376.25016.11.camel@pasglop>
- <20130819101922.GI3719@e106331-lin.cambridge.arm.com>
- <5212177C.8000709@gmail.com> <521223FA.5050903@arm.com>
-Message-ID: <20130822135930.GC23152@e106331-lin.cambridge.arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 22 Aug 2013 06:54:35 -0700
+Subject: [GIT PULL 2/5] ARM: imx: soc changes for 3.12
+In-Reply-To: <1376833688-24542-2-git-send-email-shawn.guo@linaro.org> (Shawn
+ Guo's message of "Sun, 18 Aug 2013 21:48:05 +0800")
+References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
+ <1376833688-24542-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <87li3tvnj8.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 02:56:10PM +0100, Sudeep KarkadaNagesha wrote:
-> On 19/08/13 14:02, Rob Herring wrote:
-> > On 08/19/2013 05:19 AM, Mark Rutland wrote:
-> >> On Sat, Aug 17, 2013 at 11:09:36PM +0100, Benjamin Herrenschmidt wrote:
-> >>> On Sat, 2013-08-17 at 12:50 +0200, Tomasz Figa wrote:
-> >>>> I wonder how would this handle uniprocessor ARM (pre-v7) cores, for
-> >>>> which 
-> >>>> the updated bindings[1] define #address-cells = <0> and so no reg 
-> >>>> property.
-> >>>>
-> >>>> [1] - http://thread.gmane.org/gmane.linux.ports.arm.kernel/260795
-> >>>
-> >>> Why did you do that in the binding ? That sounds like looking to create
-> >>> problems ... 
-> >>>
-> >>> Traditionally, UP setups just used "0" as the "reg" property on other
-> >>> architectures, why do differently ?
-> >>
-> >> The decision was taken because we defined our reg property to refer to
-> >> the MPIDR register's Aff{2,1,0} bitfields, and on UP cores before v7
-> >> there's no MPIDR register at all. Given there can only be a single CPU
-> >> in that case, describing a register that wasn't present didn't seem
-> >> necessary or helpful.
-> > 
-> > What exactly reg represents is up to the binding definition, but it
-> > still should be present IMO. I don't see any issue with it being
-> > different for pre-v7.
-> > 
-> Yes it's better to have 'reg' with value 0 than not having it.
-> Otherwise this generic of_get_cpu_node implementation would need some
-> _hack_ to handle that case.
+Shawn Guo <shawn.guo@linaro.org> writes:
 
-I'm not sure that having some code to handle a difference in standard
-between two architectures is a hack. If anything, I'd argue encoding a
-reg of 0 that corresponds to a nonexistent MPIDR value (given that's
-what the reg property is defined to map to on ARM) is more of a hack ;)
+> The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
+>
+>   Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-soc-3.12
+>
+> for you to fetch changes up to 0c383e6a56c2e70db9f2a68f9fe095645f11c151:
+>
+>   phy: micrel: Add definitions for common Micrel PHY registers (2013-08-18 09:30:39 +0800)
+>
+> ----------------------------------------------------------------
+> It contains a bunch of imx soc updates for 3.12.
+>
+> - Add more ethernet phy fixups for imx6 boards
+> - Add some missing imx6q clocks into clock driver
+> - Add new clock types fixup mux and div to work around some ugly
+>   hardware defect
+> - Consolidate L2 cache initialization function, so that it can be used
+>   on more i.MX SoCs
+> - Replace magic numbers in mach-imx6q.c with well defined macros
+> - Support low-level debug for vybrid
 
-I'm not averse to having a reg value of 0 for this case, but given that
-there are existing devicetrees without it, requiring a reg property will
-break compatibility with them.
+This patch causes a conflict with Russell's DEBUG_LL cleanup, which is
+already in linux-next.
 
-Mark.
+For v3.12, I suggest you drop this patch and rework your new DEBUG_LL
+support on top of Russell's cleanup.  Have a look at that and see if you
+can reuse the the generic 8250 stuff added by Russell.  While there, you
+might look at imx.S as well.
+
+If that's OK with you, can you send an updated pull request without the
+DEBUG_LL changes?  The other changes look OK for v3.12.
+
+Kevin
