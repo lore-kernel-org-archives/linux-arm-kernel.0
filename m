@@ -1,24 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 22 Aug 2013 10:50:25 +0100
-Subject: [PATCH -next] ASoC: mmp-pcm: remove duplicated include from
- mmp-pcm.c
-In-Reply-To: <CAPgLHd9Eey5pbDjQmSquHvJY4zpDBDtp9brzWn-s5P6kaKmvpQ@mail.gmail.com>
-References: <CAPgLHd9Eey5pbDjQmSquHvJY4zpDBDtp9brzWn-s5P6kaKmvpQ@mail.gmail.com>
-Message-ID: <20130822095025.GR26118@sirena.org.uk>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 22 Aug 2013 17:51:40 +0800
+Subject: [PATCH v2 2/4] iio: at91: Use different prescal, startup mask
+ in MR for different IP
+In-Reply-To: <20130815192044.GD12162@lukather>
+References: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
+ <1376219071-29946-3-git-send-email-josh.wu@atmel.com>
+ <20130815192044.GD12162@lukather>
+Message-ID: <5215DF2C.3050502@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 10:37:20AM +0800, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> Remove duplicated include.
+Hi, Maxime
 
-Sorry, I already applied a patch for this which I saw first (though
-yours was actually sent sooner).  Thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130822/17338d05/attachment.sig>
+On 8/16/2013 3:20 AM, Maxime Ripard wrote:
+> Hi Josh,
+>
+> On Sun, Aug 11, 2013 at 07:04:29PM +0800, Josh Wu wrote:
+>> For at91 boards, there are different IPs for adc. Different IPs has
+>> different STARTUP & PRESCAL mask in ADC_MR.
+>>
+>> This patch introduce the multiple compatible string for those
+>> different IPs.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> Overall it looks like the right ways, but I think we can take it a step
+> further.
+>
+> I'd drop at least the atmel,adc-drdy-mask, atmel,adc-num-channels,
+> atmel,adc-status-register, atmel,adc-trigger-register properties (and
+> probably the triggers as well description as well).
+
+yeah, right. Currently I want to drop following:
+
+atmel,adc-drdy-mask, atmel,adc-status-register, atmel,adc-trigger-register, atmel,adc-channel-base
+
+For the adc-num-channels, I'd like to leave it in dt parameters. It is a 
+description for an adc capablity.
+
+For the triggers, I am not decided. An obvious benifit to remove trigger 
+in dt will save many lines of code.
+
+>
+> Maxime
+>
+
+Best Regards,
+Josh Wu
