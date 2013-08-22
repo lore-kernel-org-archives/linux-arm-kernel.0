@@ -1,56 +1,56 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 22 Aug 2013 12:43:14 +0200
-Subject: SHMobile Compatibility String Inconsistencies
-In-Reply-To: <20130822054639.GE11086@verge.net.au>
-References: <20130822054639.GE11086@verge.net.au>
-Message-ID: <5813266.Bt0QjqXd25@avalon>
+From: B38611@freescale.com (Fugang Duan)
+Date: Thu, 22 Aug 2013 18:47:47 +0800
+Subject: [PATCH] ARM: dts: add fec phy reset for imx6sl evk board
+Message-ID: <1377168467-8575-1-git-send-email-B38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Add fec phy reset for imx6sl evk board.
+Add iomux gpr device node, which used for fec to clear gpr1[14],
+gpr1[18-17] bit to select the fec clock source from internal anatop PLL.
 
-On Thursday 22 August 2013 14:46:40 Simon Horman wrote:
-> Hi Laurent, Hi Guennadi, Hi All,
-> 
-> Olof has brought to my attention that there is some inconsistency in the way
-> that compatibility strings for SHMobile are named and he has asked us to
-> clean things up for v3.12.
-> 
-> Looking through arch/arm/boot/dts/ I see that we have:
-> 
-> 1. {gpio,pfc}-r8aXXXX and;
-> 2. r8aXXXX-sdhi
-> 
-> The inconsistency that Olof has asked us to resolve is that we should either
-> use r8aXXXX- or -r8aXXXX. Not both.
-> 
-> It seems to me that neither option is inherently better than the other
-> so we should just choose the path of least resistance to make things
-> consistent.
-> 
-> Laurent, Guennadi, do you have any opinions on if it would be easier to
-> change the GPIO and PFC compatibility strings; or to change the SDHI
-> compatibility strings?
+Signed-off-by: Fugang Duan  <B38611@freescale.com>
+---
+ arch/arm/boot/dts/imx6sl-evk.dts |    3 +++
+ arch/arm/boot/dts/imx6sl.dtsi    |    5 +++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-I don't think either of the options would be significantly more complex than 
-the other one.
-
-> Ideally I would like you to come to some sort of consensus and send patches.
-
-Shouldn't the consensus be ARM-wide instead of SH-wide ? Quoting one of my 
-replies to Stephen Warren from another mail thread:
-
-> In the bindings I've seen, it's more typical for the compatible value to
-> be ${vendor},${soc}-${unit} than ${vendor},${unit}-${soc}. I guess I
-> don't know how common one format or the other is though.
-
-I'm personally fine with both. However, when using a version number, the 
-format is ${vendor},${unit}-${version}. As we don't have an IP core version 
-number we use the SoC name instead, so ${vendor},${unit}-${soc} would make 
-sense. We should probably decide on one of the two alternatives and document 
-it. 
-
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+index 2886a59..c4d32a5 100644
+--- a/arch/arm/boot/dts/imx6sl-evk.dts
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -23,6 +23,8 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec_1>;
+ 	phy-mode = "rmii";
++	phy-reset-gpios = <&gpio4 21 0>; /* GPIO4_21 */
++	phy-reset-duration = <1>;
+ 	status = "okay";
+ };
+ 
+@@ -38,6 +40,7 @@
+ 				MX6SL_PAD_SD2_DAT7__GPIO5_IO00    0x17059
+ 				MX6SL_PAD_SD2_DAT6__GPIO4_IO29    0x17059
+ 				MX6SL_PAD_REF_CLK_32K__GPIO3_IO22 0x17059
++				MX6SL_PAD_FEC_TX_CLK__GPIO4_IO21  0x80000000
+ 			>;
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index c5e5da0..abd1eb9 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -504,6 +504,11 @@
+ 				interrupts = <0 89 0x04>;
+ 			};
+ 
++			gpr: iomuxc-gpr at 020e0000 {
++				compatible = "fsl,imx6sl-iomuxc-gpr", "syscon";
++				reg = <0x020e0000 0x38>;
++			};
++
+ 			iomuxc: iomuxc at 020e0000 {
+ 				compatible = "fsl,imx6sl-iomuxc";
+ 				reg = <0x020e0000 0x4000>;
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.1
