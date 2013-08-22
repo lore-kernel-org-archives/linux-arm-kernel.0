@@ -1,38 +1,29 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 22 Aug 2013 13:43:37 +0100
-Subject: [RFC PATCH] phylib: mdio: handle register/unregister/register
- sequence
-In-Reply-To: <1377174836-10569-1-git-send-email-b.brezillon@overkiz.com>
-References: <1377174836-10569-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <CAGVrzcaByva=8xiswcsW1B8G4dL=jY0RdaHKzNqaT_0Lrwbprg@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 22 Aug 2013 20:46:47 +0800
+Subject: [PATCH 0/4] arm: mvebu: add missing of_node_put and iounmap
+Message-ID: <1377175611-4241-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Boris,
+These patches add missing of_node_put() to fix reference leak or
+iounmap in setup/probe error path.
 
-2013/8/22 Boris BREZILLON <b.brezillon@overkiz.com>:
-> Hello,
->
-> This patch is a proposal to support the register/unregister/register
-> sequence on a given mdio bus.
->
-> I use the register/unregister/register sequence to add a fallback when the
-> of_mdiobus_register (this function calls mdiobus_register with phy_mask
-> set to ~0) does not register any phy device (because the device tree does
-> not define any phy).
-> In this case I call mdiobus_unregister and then call mdiobus_register with
-> a phy_mask set to 0 to trigger a full mdio bus scan.
->
-> I'm not sure this is the right way to do it (this is why I added RFC in the
-> subject).
->
-> Could someone help me figuring out what I should use to implement my fallback ?
->
-> 1) use the register/unregister/register sequence
-> 2) reimplement the "for (i = 0; i < PHY_MAX_ADDR; i++)" mdiobus_scan loop
+Jisheng Zhang (4):
+  arm: mvebu: add missing of_node_put() to fix reference leak
+  bus: mvebu: add missing of_node_put() to fix reference leak
+  clk: mvebu: add missing iounmap
+  pinctrl: mvebu: add missing iounmap
 
-I think solution 2 is nicer, in that case, would it be enough in your
-case to export a function called mdiobus_scan()? You could call@a
-time you know PHY devices have a chance of having been probed?
+ arch/arm/mach-mvebu/armada-370-xp.c     |  1 +
+ arch/arm/mach-mvebu/coherency.c         |  8 +++++++-
+ arch/arm/mach-mvebu/platsmp.c           |  1 +
+ arch/arm/mach-mvebu/pmsu.c              |  1 +
+ arch/arm/mach-mvebu/system-controller.c |  1 +
+ drivers/bus/mvebu-mbus.c                |  6 +++++-
+ drivers/clk/mvebu/clk-cpu.c             |  4 +++-
+ drivers/clk/mvebu/common.c              | 18 ++++++++++++------
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c   | 24 +++++++++++++++++-------
+ 9 files changed, 48 insertions(+), 16 deletions(-)
+
 -- 
-Florian
+1.8.4.rc3
