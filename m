@@ -1,42 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 22 Aug 2013 08:26:10 +0200
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
- <1473340.OXSHEp7d4P@flatron>
- <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <20130822062610.GR31036@pengutronix.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 22 Aug 2013 15:32:01 +0900
+Subject: [PATCH 00/02] ARM: shmobile: Rename to
+ r8a73a4/r8a7790_init_early()
+In-Reply-To: <20130821090018.GJ20014@verge.net.au>
+References: <20130807222638.22283.78607.sendpatchset@w520>
+ <20130821090018.GJ20014@verge.net.au>
+Message-ID: <20130822063159.GR11086@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 02:55:42AM +0000, Xiubo Li-B47053 wrote:
-> Hi Tomasz,
-> 
-> Thanks for your comments.
-> 
-> 
-> > Could you explain meaning of this property more precisely? I'm interested
-> > especially how is this related to the PWM IP block and boards.
+On Wed, Aug 21, 2013 at 06:00:18PM +0900, Simon Horman wrote:
+> On Thu, Aug 08, 2013 at 07:26:38AM +0900, Magnus Damm wrote:
+> > ARM: shmobile: Rename to r8a73a4/r8a7790_init_early()
 > > 
+> > [PATCH 01/02] ARM: shmobile: Rename to r8a73a4_init_early()
+> > [PATCH 02/02] ARM: shmobile: Rename to r8a7790_init_early()
+> > 
+> > This series renames r8a73a4/r8a7790_init_delay() to 
+> > r8a73a4/r8a7790_init_early(). The reason for this is
+> > that future SMP code will hook into these functions
+> > which will make them handle more than just delay setup.
+> > 
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> > ---
+> > 
+> >  Written against renesas.git renesas-devel-20130806v4 and
+> >  [PATCH 00/05] ARM: shmobile: Yet another SMP series
+> > 
+> >  arch/arm/mach-shmobile/board-ape6evm-reference.c |    2 +-
+> >  arch/arm/mach-shmobile/board-ape6evm.c           |    2 +-
+> >  arch/arm/mach-shmobile/board-lager-reference.c   |    2 +-
+> >  arch/arm/mach-shmobile/board-lager.c             |    2 +-
+> >  arch/arm/mach-shmobile/include/mach/r8a73a4.h    |    2 +-
+> >  arch/arm/mach-shmobile/include/mach/r8a7790.h    |    2 +-
+> >  arch/arm/mach-shmobile/setup-r8a73a4.c           |    4 ++--
+> >  arch/arm/mach-shmobile/setup-r8a7790.c           |    4 ++--
+> >  8 files changed, 10 insertions(+), 10 deletions(-)
 > 
-> Yes.
-> There are 8 channels most. While the pinctrls of 4th and 5th channels could be
-> used by uart's Rx and Tx, then these 2 channels won't be used for pwm output,
-> so there will be 6 channels available by the pwm.
-> Thus, the pwm chip will register only 6 pwms(6 channels) most("fsl,pwm-channel-orders
-> = {0 1 2 3 6 7}").And also the "fsl,pwm-channel-number" will be 6.
+> Thanks Magnus, I have plan to queue this up in the cleanup4 branch
+> which will most likely happen tomorrow.
 
-If the chip has eight PWMs I would register all of them. If some of them
-are not routed out by the pinmux then just nothing happens if you use
-them. In a sane devicetree they won't be referenced anyway when they are
-not routed out of the SoC.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+It has now happened.
