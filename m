@@ -1,40 +1,28 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 22 Aug 2013 22:29:01 +0200
-Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
-In-Reply-To: <20130822195559.GU26118@sirena.org.uk>
-References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
- <20130822193453.GB10038@ld-irv-0074.broadcom.com>
- <20130822195559.GU26118@sirena.org.uk>
-Message-ID: <201308222229.01778.marex@denx.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 22 Aug 2013 14:36:53 -0600
+Subject: [PATCH v2] DMA: add help function to check whether dma controller
+ registered
+In-Reply-To: <1377153781-18006-1-git-send-email-rizhao@nvidia.com>
+References: <1375423458-6868-1-git-send-email-rizhao@nvidia.com>
+ <1377153781-18006-1-git-send-email-rizhao@nvidia.com>
+Message-ID: <52167665.90602@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark Brown,
-
-> On Thu, Aug 22, 2013 at 12:34:53PM -0700, Brian Norris wrote:
-> > On Mon, Aug 19, 2013 at 12:10:01PM +0800, Huang Shijie wrote:
-> > > +- m25p,quad-read : Use the "quad read" opcode to read data from the
-> > > chip instead +                   of the usual "read" opcode. This
-> > > opcode is not supported by +                   all chips and support
-> > > for it can not be detected at runtime. +                   Refer to
-> > > your chips' datasheet to check if this is supported +                 
-> > >  by your chip.
-> > 
-> > Why can't this be detected at runtime? We added a "no fast read" flag to
-> > the device table, so why not "dual/quad mode supported"? And believe it
-> > or not, not all m25p80 users have device tree. So it isn't very logical
-> > to tie this support to device-tree only.
+On 08/22/2013 12:43 AM, Richard Zhao wrote:
+> DMA client device driver usually needs to know at probe time whether
+> dma controller has been registered to deffer probe. So add a help
+> function of_dma_check_controller.
 > 
-> There needs to be some way of saying if the additional data lines are
-> actually wired up or not; it could be a negative property (flagging if
-> the lines are not present) but that runs the risk of breaking systems
-> if a driver acquires the ability to support extra data lines but a
-> system doesn't have it.
-> 
-> This should be a generic property for all quad devices to use, though,
-> since the same thing applies everywhere.
+> DMA request channel functions can also used to check it, but they
+> are usually called at open() time.
 
-Full ACK, "m25p,dual-read" and "m25p,quad-read" sound like a good prop names?
+This new function is almost identical to the existing
+of_dma_request_slave_channel(). Surely the code should be shared?
 
-Best regards,
-Marek Vasut
+But that said, I don't see any need for a new function; why can't
+drivers simply call of_dma_request_slave_channel() at probe time; from
+what I can see, that function doesn't actually request the channel, but
+rather simply looks it up, just like this one. The only difference is
+that of_dma_xlate() is also called, but that's just doing some data
+transformation, not actually recording channel ownership.
