@@ -1,73 +1,45 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 22 Aug 2013 11:07:26 -0700
-Subject: [PATCH v7 05/11] ARM: dts: enable hi4511 with device tree
-In-Reply-To: <1376965873-14431-6-git-send-email-haojian.zhuang@linaro.org>
- (Haojian Zhuang's message of "Tue, 20 Aug 2013 10:31:07 +0800")
-References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
- <1376965873-14431-6-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <8761uxsiox.fsf@linaro.org>
+Date: Thu, 22 Aug 2013 11:10:59 -0700
+Subject: [GIT PULL v2] pull request to 3.12 for hi3xxx
+In-Reply-To: <CAN1soZz6WWDVwTE5eFOXuQHAPoOGajHaNhFzJBLZh5Gwj_u9ZQ@mail.gmail.com>
+ (Haojian Zhuang's message of "Wed, 21 Aug 2013 16:25:37 +0800")
+References: <CAN1soZz6WWDVwTE5eFOXuQHAPoOGajHaNhFzJBLZh5Gwj_u9ZQ@mail.gmail.com>
+Message-ID: <87y57tr3yk.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+ DT maintainers]
+Haojian Zhuang <haojian.zhuang@gmail.com> writes:
 
-Haojian Zhuang <haojian.zhuang@linaro.org> writes:
-
-> Enable Hisilicon Hi4511 development platform with device tree support.
+> On Wed, Aug 21, 2013 at 5:52 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Hello Haojian,
+>>
+>> Haojian Zhuang <haojian.zhuang@gmail.com> writes:
+>>
+>>> Hi all,
+>>>
+>>> Please help to merge hi3xxx from pxa git tree.
+>>>
+>>
+>> Thanks for sending the pull request to to arm at kernel.org, but please be
+>> sure to *also* send it to the linux-arm-kernel mailing list.
+>>
+>> Thanks,
+>>
+>> Kevin
+>>
 >
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Hi Kevin,
+>
+> Now I update this pull request since I drop the support of Hi3716 DKB.
+>
 
-There seems to be use of several new vendor-specific bindings here that
-are not documented anywhere:
+Thanks for the update.  However, now that I had a closer look at this
+series, I don't think it's ready for merge.  In particular, I think
+that the DT bindings and additions need a broader review from the DT
+maintainers.  I pointed out a couple questions in a reply to one of the
+specific patches: [PATCH v7 05/11] ARM: dts: enable hi4511 with device tree
 
-hisilicon,sctrl 
-hisilicon,pmctrl
-hisilicon,clk-mux
-hisilicon,clk-div
-hisilicon,clk-gate
-
-Not only that, the clock-related compatible properties used here are
-different than the ones specificed PATCH 10/11 of this series where you
-document some clock bindings.  
-
-also...
-
-[...]
-
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	aliases {
-> +		serial0 = &uart0;
-> +		serial1 = &uart1;
-> +		serial2 = &uart2;
-> +		serial3 = &uart3;
-> +		serial4 = &uart4;
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu0: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0x0>;
-> +			next-level-cache = <&L2>;
-> +		};
-> +	};
-> +
-> +	osc32k: osc32k {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <32768>;
-> +		clock-output-names = "osc32khz";
-> +	};
-
-...seems many of the recent users of clocks have grouped them into a
-clocks {} grouping on a "simple-bus".
-
-DT folks: is there a rule of thumb on how whether these fixed clocks
-should be grouped on a simple bus?
+I'm hoping the DT maintainers can step in here and help review your
+changes and give guidance on any changes needed.
 
 Kevin
