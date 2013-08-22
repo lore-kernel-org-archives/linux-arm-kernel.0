@@ -1,55 +1,68 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 22 Aug 2013 17:19:53 +0800
-Subject: [Suggestion] ARM: allmodconfig: about cross compiling failure
- under i386 ubuntu.
-In-Reply-To: <20130822074524.GS7656@atomide.com>
-References: <521479B4.8030604@asianux.com> <52147AC6.9040300@asianux.com>
- <52147E12.4060401@asianux.com> <20130822074524.GS7656@atomide.com>
-Message-ID: <5215D7B9.50105@asianux.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 22 Aug 2013 10:21:30 +0100
+Subject: [PATCH 21/33] clk: ux500: Add Device Tree support for the PRCC
+ Kernel clock
+In-Reply-To: <CACRpkdYjvFTJAUL6xKxjkVd_v=DHHRkswoB_eq0Npqj5Sw23KQ@mail.gmail.com>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <1370521041-32318-22-git-send-email-lee.jones@linaro.org>
+ <CACRpkdY2KOxX=oA7i9GUnzpwRKiK2rXqTBPVpg+zW082f2TJdg@mail.gmail.com>
+ <20130821101448.GJ29850@lee--X1>
+ <CACRpkdYjvFTJAUL6xKxjkVd_v=DHHRkswoB_eq0Npqj5Sw23KQ@mail.gmail.com>
+Message-ID: <20130822092130.GB22023@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2013 03:45 PM, Tony Lindgren wrote:
-> * Chen Gang <gang.chen@asianux.com> [130821 01:53]:
->> Hello Maintainers:
->>
->> When build arm with allmodconfig under ubuntu i386 with arm-linux-
->> gnueabi-gcc 4.7, as 2.22, it report the errors.
->>
->> Please help check, thanks (the related config file in attachment).
-> 
-> It seems that some make flags may need to be specified separately
-> in some makefiles. See the following for some examples:
-> 
-> $ find arch/arm -name Makefile | xargs grep -i flags
-> 
-> I'm getting different errors though, I'm getting:
-> 
-> arch/arm/mach-zynq/hotplug.c:1: error: bad value (cortex-a9) for -mcpu= switch
-> 
-> As probably my compiler does not support the cortex-a9 switch,
-> I have gcc version 4.3.5 (Debian 4.3.5-4), tried with v3.11-rc5.
-> 
+On Thu, 22 Aug 2013, Linus Walleij wrote:
 
-Thank you for your valuable reply, I followed what you said above, and
-now it seems really related the compiler's flags.
-
-I have passed compiling for the VEXPRESS with dcscb, I will compare the
-difference between the 2 building flags.
-
-It seems we need add the related dependency for ARCH_VEXPRESS (I am just
-analyzing, may get final result today).
-
-
-Thanks.
-
-
-> Regards,
+> On Wed, Aug 21, 2013 at 12:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Wed, 21 Aug 2013, Linus Walleij wrote:
 > 
-> Tony
+> >> Isn't it possible to fork a function u8500_clk_init_dt() to add all the
+> >> clocks in the DT probe path and keep this function
+> >> u8500_clk_init() as it is?
+> >
+> > Yes, we probably could do that, but as we're ripping out ATAG booting
+> > support from the ux500 platform, I'll just remove the
+> > clk_register_clkdev()s during the process.
 > 
-> 
+> I really do not like the approach of uglifying something and then
+> beautifying it later... I prefer each step in isolation to be good
+> looking, or you will be confused when traversing the history.
 
+So then we have a few options, some more realistic than others.
+
+1. Duplicate each of the; clk_reg_prcmu_*(), clk_reg_prcc_pclk(),
+clk_reg_prcc_kclk() calls into your proposed u8500_clk_init_dt(),
+which, while keeping everything separate would be unrealistic.
+
+2. Move both clk_register_clkdev() and the struct clock arrays into
+'drivers/clk/ux500/clk-prcmu.c' and 'drivers/clk/ux500/clk-prcc.c' and
+make the correct decisions in clk_reg_prcmu() and clk_reg_prcc(). This
+would be more viable, but would entail splitting the defines and the
+struct clock arrays (stores), probably creating a little more
+disparity. It would also mean adding 3 parameters (con_id, dev_fmt and
+array_index) to each of; clk_reg_prcmu_gate(),
+clk_reg_prcmu_scalable(), clk_reg_prcmu_opp_gate(),
+clk_reg_prcmu_scalable_rate(), clk_reg_prcmu_rate(),
+clk_reg_prcmu_opp_volt_scalable, clk_reg_prcmu() and 4 parameters
+(con_id, dev_fmt, array_index_x, array_index_y) to each of
+clk_reg_prcc_pclk(), clk_reg_prcc_kclk() and clk_reg_prcc().
+
+Or, the most viable option:
+
+3. Leave it as it is. All we're doing here is populating an array of
+pointers. It costs practically nothing, continues legacy ATAG support
+as well as adding Device Tree support. It's far neater than the other
+two options, by a long shot. And then, when we're ready to take out
+ATAG booting support (which I'm working on right now), we just remove
+the clk_register_clkdev() calls and we're left with the nice and neat
+macros.
+
+Unless there's a viable 4th option which hasn't popped into my head
+just yet. I'm all hears. :)
 
 -- 
-Chen Gang
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
