@@ -1,70 +1,172 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 22 Aug 2013 12:49:06 -0300
-Subject: [PATCH v3 1/2] ARM: feroceon: Add suspend/resume operation
+Date: Thu, 22 Aug 2013 12:49:07 -0300
+Subject: [PATCH v3 2/2] ARM: kirkwood: Add standby support
 In-Reply-To: <1377186547-14284-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1377186547-14284-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1377186547-14284-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1377186547-14284-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for suspend/resume operations. The implemented procedures
-are identical to the ones for ARM926.
+Implements standby support for Kirkwood SoC. When the SoC enters
+standby state the memory PM units are disabled, the DDR is set
+in self-refresh mode, and the CPU is set in WFI.
 
+At this point there's no clock gating, as that is considered each
+driver's task.
+
+Signed-off-by: Simon Guinot <sguinot@lacie.com>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/Kconfig            |  2 +-
- arch/arm/mm/proc-feroceon.S | 26 ++++++++++++++++++++++++++
- 2 files changed, 27 insertions(+), 1 deletion(-)
+ arch/arm/mach-kirkwood/Makefile                   |  2 +
+ arch/arm/mach-kirkwood/board-dt.c                 |  1 +
+ arch/arm/mach-kirkwood/common.c                   |  1 +
+ arch/arm/mach-kirkwood/common.h                   |  6 ++
+ arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  2 +
+ arch/arm/mach-kirkwood/pm.c                       | 73 +++++++++++++++++++++++
+ 6 files changed, 85 insertions(+)
+ create mode 100644 arch/arm/mach-kirkwood/pm.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 43594d5..a5111ec 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2199,7 +2199,7 @@ source "kernel/power/Kconfig"
- 
- config ARCH_SUSPEND_POSSIBLE
- 	depends on !ARCH_S5PC100
--	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
-+	depends on CPU_ARM920T || CPU_ARM926T || CPU_FEROCEON || CPU_SA1100 || \
- 		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE || CPU_MOHAWK
- 	def_bool y
- 
-diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
-index d5146b9..db79b62 100644
---- a/arch/arm/mm/proc-feroceon.S
-+++ b/arch/arm/mm/proc-feroceon.S
-@@ -514,6 +514,32 @@ ENTRY(cpu_feroceon_set_pte_ext)
- #endif
- 	mov	pc, lr
- 
-+/* Suspend/resume support: taken from arch/arm/mm/proc-arm926.S */
-+.globl	cpu_feroceon_suspend_size
-+.equ	cpu_feroceon_suspend_size, 4 * 3
-+#ifdef CONFIG_ARM_CPU_SUSPEND
-+ENTRY(cpu_feroceon_do_suspend)
-+	stmfd	sp!, {r4 - r6, lr}
-+	mrc	p15, 0, r4, c13, c0, 0	@ PID
-+	mrc	p15, 0, r5, c3, c0, 0	@ Domain ID
-+	mrc	p15, 0, r6, c1, c0, 0	@ Control register
-+	stmia	r0, {r4 - r6}
-+	ldmfd	sp!, {r4 - r6, pc}
-+ENDPROC(cpu_feroceon_do_suspend)
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index ac4cd75..ac78dcc 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -1,4 +1,6 @@
+ obj-y				+= common.o irq.o pcie.o mpp.o
++obj-$(CONFIG_PM)		+= pm.o
 +
-+ENTRY(cpu_feroceon_do_resume)
-+	mov	ip, #0
-+	mcr	p15, 0, ip, c8, c7, 0	@ invalidate I+D TLBs
-+	mcr	p15, 0, ip, c7, c7, 0	@ invalidate I+D caches
-+	ldmia	r0, {r4 - r6}
-+	mcr	p15, 0, r4, c13, c0, 0	@ PID
-+	mcr	p15, 0, r5, c3, c0, 0	@ Domain ID
-+	mcr	p15, 0, r1, c2, c0, 0	@ TTB address
-+	mov	r0, r6			@ control register
-+	b	cpu_resume_mmu
-+ENDPROC(cpu_feroceon_do_resume)
+ 
+ obj-$(CONFIG_MACH_D2NET_V2)		+= d2net_v2-setup.o lacie_v2-common.o
+ obj-$(CONFIG_MACH_DOCKSTAR)		+= dockstar-setup.o
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 6e122ed..2d4a4aa 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -96,6 +96,7 @@ static void __init kirkwood_dt_init(void)
+ 	/* Setup root of clk tree */
+ 	kirkwood_of_clk_init();
+ 
++	kirkwood_pm_init();
+ 	kirkwood_cpuidle_init();
+ 
+ #ifdef CONFIG_KEXEC
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index e9238b5..aceb68a 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -717,6 +717,7 @@ void __init kirkwood_init(void)
+ 	kirkwood_xor1_init();
+ 	kirkwood_crypto_init();
+ 
++	kirkwood_pm_init();
+ 	kirkwood_cpuidle_init();
+ #ifdef CONFIG_KEXEC
+ 	kexec_reinit = kirkwood_enable_pcie;
+diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+index fcf3ba6..2be1226 100644
+--- a/arch/arm/mach-kirkwood/common.h
++++ b/arch/arm/mach-kirkwood/common.h
+@@ -58,6 +58,12 @@ void kirkwood_cpufreq_init(void);
+ void kirkwood_restart(enum reboot_mode, const char *);
+ void kirkwood_clk_init(void);
+ 
++#ifdef CONFIG_PM
++void kirkwood_pm_init(void);
++#else
++static inline void kirkwood_pm_init(void) {};
 +#endif
 +
- 	.type	__feroceon_setup, #function
- __feroceon_setup:
- 	mov	r0, #0
+ /* board init functions for boards not fully converted to fdt */
+ #ifdef CONFIG_MACH_DREAMPLUG_DT
+ void dreamplug_init(void);
+diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+index 91242c9..8b9d1c9 100644
+--- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
++++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+@@ -78,4 +78,6 @@
+ #define CGC_TDM			(1 << 20)
+ #define CGC_RESERVED		(0x6 << 21)
+ 
++#define MEMORY_PM_CTRL		(BRIDGE_VIRT_BASE + 0x118)
++
+ #endif
+diff --git a/arch/arm/mach-kirkwood/pm.c b/arch/arm/mach-kirkwood/pm.c
+new file mode 100644
+index 0000000..8783a71
+--- /dev/null
++++ b/arch/arm/mach-kirkwood/pm.c
+@@ -0,0 +1,73 @@
++/*
++ * Power Management driver for Marvell Kirkwood SoCs
++ *
++ * Copyright (C) 2013 Ezequiel Garcia <ezequiel@free-electrons.com>
++ * Copyright (C) 2010 Simon Guinot <sguinot@lacie.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License,
++ * version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/suspend.h>
++#include <linux/io.h>
++#include <mach/bridge-regs.h>
++
++static void __iomem *ddr_operation_base;
++
++static void kirkwood_low_power(void)
++{
++	u32 mem_pm_ctrl;
++
++	mem_pm_ctrl = readl(MEMORY_PM_CTRL);
++
++	/* Set peripherals to low-power mode */
++	writel_relaxed(~0, MEMORY_PM_CTRL);
++
++	/* Set DDR in self-refresh */
++	writel_relaxed(0x7, ddr_operation_base);
++
++	/*
++	 * Set CPU in wait-for-interrupt state.
++	 * This disables the CPU core clocks,
++	 * the array clocks, and also the L2 controller.
++	 */
++	cpu_do_idle();
++
++	writel_relaxed(mem_pm_ctrl, MEMORY_PM_CTRL);
++}
++
++static int kirkwood_suspend_enter(suspend_state_t state)
++{
++	switch (state) {
++	case PM_SUSPEND_STANDBY:
++		kirkwood_low_power();
++		break;
++	default:
++		return -EINVAL;
++	}
++	return 0;
++}
++
++static int kirkwood_pm_valid_standby(suspend_state_t state)
++{
++	return state == PM_SUSPEND_STANDBY;
++}
++
++static const struct platform_suspend_ops kirkwood_suspend_ops = {
++	.enter = kirkwood_suspend_enter,
++	.valid = kirkwood_pm_valid_standby,
++};
++
++int __init kirkwood_pm_init(void)
++{
++	ddr_operation_base = ioremap(DDR_OPERATION_BASE, 4);
++	suspend_set_ops(&kirkwood_suspend_ops);
++	return 0;
++}
 -- 
 1.8.1.5
