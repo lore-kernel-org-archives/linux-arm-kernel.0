@@ -1,91 +1,29 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 21 Aug 2013 22:59:31 -0700
-Subject: [PATCH v7 10/11] ARM: hi3xxx: add clk-hi3716
-In-Reply-To: <CAMj5BkhCVALJO=OHJ6WSr_Jsi+9DPQ_1_PGs3PgWfQxx-W-neg@mail.gmail.com>
-References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
- <1376965873-14431-11-git-send-email-haojian.zhuang@linaro.org>
- <20130821214300.8231.81515@quantum>
- <CAMj5BkhCVALJO=OHJ6WSr_Jsi+9DPQ_1_PGs3PgWfQxx-W-neg@mail.gmail.com>
-Message-ID: <20130822055931.8231.48936@quantum>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 22 Aug 2013 11:46:55 +0530
+Subject: [PATCH 2/2] ARM: tegra: add Palmas pincontrol to Dalmore device
+ tree
+In-Reply-To: <5214F8FD.3070003@wwwdotorg.org>
+References: <1377088461-9499-1-git-send-email-ldewangan@nvidia.com>
+ <1377088461-9499-2-git-send-email-ldewangan@nvidia.com>
+ <5214F8FD.3070003@wwwdotorg.org>
+Message-ID: <5215ACD7.9060400@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting zhangfei gao (2013-08-21 18:19:33)
-> On Thu, Aug 22, 2013 at 5:43 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting Haojian Zhuang (2013-08-19 19:31:12)
-> >> From: Zhangfei Gao <zhangfei.gao@linaro.org>
-> >>
-> >> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> >> Signed-off-by: Zhang Mingjun <zhang.mingjun@linaro.org>
-> >> ---
-> 
-> >> +static int hi3716_clkgate_prepare(struct clk_hw *hw)
-> >> +{
-> >> +       struct hi3716_clk *clk = to_clk_hi3716(hw);
-> >> +       unsigned long flags = 0;
-> >> +       u32 reg;
-> >> +
-> >> +       spin_lock_irqsave(&_lock, flags);
-> >> +
-> >> +       reg = readl_relaxed(clk->reg);
-> >> +       reg &= ~BIT(clk->reset_bit);
-> >> +       writel_relaxed(reg, clk->reg);
-> >> +
-> >> +       spin_unlock_irqrestore(&_lock, flags);
-> >> +
-> >> +       return 0;
-> >> +}
-> >> +
-> >> +static void hi3716_clkgate_unprepare(struct clk_hw *hw)
-> >> +{
-> >> +       struct hi3716_clk *clk = to_clk_hi3716(hw);
-> >> +       unsigned long flags = 0;
-> >> +       u32 reg;
-> >> +
-> >> +       spin_lock_irqsave(&_lock, flags);
-> >> +
-> >> +       reg = readl_relaxed(clk->reg);
-> >> +       reg |= BIT(clk->reset_bit);
-> >> +       writel_relaxed(reg, clk->reg);
-> >> +
-> >> +       spin_unlock_irqrestore(&_lock, flags);
-> >> +}
-> >> +
-> >> +static struct clk_ops hi3716_clkgate_ops = {
-> >> +       .prepare        = hi3716_clkgate_prepare,
-> >> +       .unprepare      = hi3716_clkgate_unprepare,
-> >> +};
-> >
-> > Why .prepare & .unprepare instead of .enable & .disable?
-> >
-> > Regards,
-> > Mike
-> 
-> Thanks  Mike for the review
-> 
-> the .enable & .disable is directly use clk_gate_ops.
-> 
-> +       hi3716_clkgate_ops.enable = clk_gate_ops.enable;
-> +       hi3716_clkgate_ops.disable = clk_gate_ops.disable;
-> +       hi3716_clkgate_ops.is_enabled = clk_gate_ops.is_enabled;
-> +       p_clk->gate.bit_idx = array[1];
-> 
-> prepare & unprepare is handle reset bit, while enable & disable is
-> handle enable bit.
-> We have to extend since clk_gate_ops does not consider prepare &
-> unprepare, otherwise it would be simpler.
+On Wednesday 21 August 2013 10:59 PM, Stephen Warren wrote:
+> On 08/21/2013 06:34 AM, Laxman Dewangan wrote:
+>> Add Palmas pincontrol to Dalmore device tree and make following
+>> configuration as default:
+>> - Disable DVFS1 and DVFS2.
+>> - Set GPIO6 to gpio mode.
+>> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+>> +			palmas_pinctrl {
+>> +				compatible = "ti,tps65913-pinctrl";
+> A node name of "pinmux" would be more appropriate here, since the node
+> name should represent device type rather than device identity.
+>
+> Aside from that, the series looks fine, but at this point will have to
+> wait for 3.13 I think, unless this series has a side-effect of fixing
+> some bug/regression. Can you please repost once 3.12-rc1 is out?
 
-I understand why you made this choice from the perspective of re-using
-the existing gate-clock implementation. What I meant in my question is
-whether or not handling the reset bit in the .prepare/.unprepare is the
-right thing.
-
-For instance if you called clk_enable or clk_disable from within an
-interrupt handler would you want to toggle the reset bit in that
-instance?
-
-Regards,
-Mike
-
-> 
-> Thanks
+Sure, I will correct the node name and post the patch later.
