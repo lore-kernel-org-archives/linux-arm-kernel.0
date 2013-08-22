@@ -1,39 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 21 Aug 2013 21:32:03 -0300
-Subject: [PATCH] ARM: mach-omap2: gpmc: Fix warning when CONFIG_ARM_LPAE=y
-Message-ID: <1377131523-19392-1-git-send-email-festevam@gmail.com>
+From: syin@broadcom.com (Sherman Yin)
+Date: Thu, 22 Aug 2013 00:43:10 +0000
+Subject: [PATCH] pinctrl: Pass all configs to driver on
+ pin_config_set()
+In-Reply-To: <CACRpkdaUacAbLd+i4Y=DXv=aSaUwBSz6-icPV9SVjxZkUjheww@mail.gmail.com>
+References: <1376606573-15093-1-git-send-email-syin@broadcom.com>
+ <CACRpkdaUacAbLd+i4Y=DXv=aSaUwBSz6-icPV9SVjxZkUjheww@mail.gmail.com>
+Message-ID: <051069C10411E24D9749790C498526FA1BDD9D27@SJEXCHMB12.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Linus,
 
-When CONFIG_ARM_LPAE=y the following build warning is generated:
+>Right now this does not apply to my "devel" branch, so I'd like you
+>to rebase on that right now. (This is what will go into v3.12).
+>
+>This is also late in the development cycle so I believe this is going to
+>be v3.13 material unless there are more release candidates.
+>
+>You can also hold on until after the v3.12 merge window and then
+>rebase it and we'll merge it as a first patch in the v3.13 development
+>cycle.
+>
+>What do you say?
 
-arch/arm/mach-omap2/gpmc.c:1495:4: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'resource_size_t' [-Wformat]
+You mean the "devel" branch in this tree, right?  Please let me know 
+if you're talking about another tree/branch.
 
-According to Documentation/printk-formats.txt '%pa' can be used to properly
-print 'resource_size_t'.
+git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
 
-Reported-by: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-omap2/gpmc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I cherry-picked my commit on top of devel, and there was just a simple
+conflict in pinctrl-sunxi.c.  It's easy enough to fix, so I'll send out v2 
+that's based on "devel" instead of rc6 anyway.  I can just do another
+rebase after v3.12 merge window if needed. 
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index f3fdd6a..ad6da1d 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -1491,8 +1491,8 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
- 	 */
- 	ret = gpmc_cs_remap(cs, res.start);
- 	if (ret < 0) {
--		dev_err(&pdev->dev, "cannot remap GPMC CS %d to 0x%x\n",
--			cs, res.start);
-+		dev_err(&pdev->dev, "cannot remap GPMC CS %d to %pa\n",
-+			cs, &res.start);
- 		goto err;
- 	}
- 
--- 
-1.8.1.2
+Thanks!
+Sherman
