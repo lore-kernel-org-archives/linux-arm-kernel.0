@@ -1,28 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 22 Aug 2013 14:50:22 -0600
-Subject: [PATCH v4] extcon: palmas: Added a new compatible type *ti,
- palmas-usb-vid*
-In-Reply-To: <1377160283-26934-1-git-send-email-kishon@ti.com>
-References: <1377160283-26934-1-git-send-email-kishon@ti.com>
-Message-ID: <5216798E.8070900@wwwdotorg.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 22 Aug 2013 14:03:24 -0700
+Subject: [PATCH] dma/Kconfig: TI_EDMA needs to be boolean
+Message-ID: <1377205404-16786-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2013 02:31 AM, Kishon Vijay Abraham I wrote:
-> The Palmas device contains only a USB VBUS-ID detector, so added a
-> compatible type *ti,palmas-usb-vid*. Didn't remove the existing compatible
-> types for backward compatibility.
+Fix:
 
-> diff --git a/Documentation/devicetree/bindings/extcon/extcon-palmas.txt b/Documentation/devicetree/bindings/extcon/extcon-palmas.txt
+arch/arm/common/built-in.o: undefined reference to `edma_filter_fn'
 
->  PALMAS USB COMPARATOR
->  Required Properties:
-> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
-> + - compatible : Should be "ti,palmas-usb-vid". "ti,twl6035-usb" and
-> +   "ti,palmas-usb" is deprecated and is kept for backward compatibility.
+seen with "make ARCH=arm allmodconfig"
 
-So this defines one new value and deprecates the two old values.
+Commit 6cba4355 (ARM: edma: Add DT and runtime PM support to the private EDMA
+API) adds a dependency on edma_filter_fn() into arch/arm/common/edma.c. Since
+this file is always built into the kernel, edma_filter_fn() must be built into
+the kernel as well.
 
-Why isn't a new "ti,twl6035-usb-vid" entry useful? Don't you still need
-SoC-specific compatible values so the driver can enable any SoC-specific
-bug-fixes/workarounds later if needed?
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/dma/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 6825957..643d7c7 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -194,7 +194,7 @@ config SIRF_DMA
+ 	  Enable support for the CSR SiRFprimaII DMA engine.
+ 
+ config TI_EDMA
+-	tristate "TI EDMA support"
++	bool "TI EDMA support"
+ 	depends on ARCH_DAVINCI || ARCH_OMAP
+ 	select DMA_ENGINE
+ 	select DMA_VIRTUAL_CHANNELS
+-- 
+1.7.9.7
