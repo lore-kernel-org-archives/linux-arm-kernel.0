@@ -1,48 +1,58 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 22 Aug 2013 07:21:47 -0700
-Subject: [GIT PULL 1/5] ARM: imx: weim bus driver update for 3.12
-In-Reply-To: <20130822141021.GH30533@S2101-09.ap.freescale.net>
-References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
- <874nahx4o7.fsf@linaro.org>
- <20130822141021.GH30533@S2101-09.ap.freescale.net>
-Message-ID: <CAGa+x84ogjo=zZW3f5GmPAA0wfxgRRqQKmkpPLetLMAx-YA4UA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Aug 2013 15:23:39 +0100
+Subject: Linking failure on linux-next with arm allyesconfig
+In-Reply-To: <CAHbNUh2MXZhg7L8BN9ds17rmg8ueo6d8CJhRMgy6fK-xn7qRoQ@mail.gmail.com>
+References: <CAHbNUh2MXZhg7L8BN9ds17rmg8ueo6d8CJhRMgy6fK-xn7qRoQ@mail.gmail.com>
+Message-ID: <20130822142339.GI6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 7:10 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Thu, Aug 22, 2013 at 05:59:04AM -0700, Kevin Hilman wrote:
->
-> <snip>
->
->> >       drivers: bus: imx-weim: Add support for i.MX1/21/25/27/31/35/50/51/53
->> >
->> >  Documentation/devicetree/bindings/bus/imx-weim.txt |   17 ++-
->> >  drivers/bus/Kconfig                                |    3 +-
->> >  drivers/bus/imx-weim.c                             |  129 +++++++++++---------
->> >  3 files changed, 87 insertions(+), 62 deletions(-)
->>
->> The bindings changes in the last patch need a a review and ack from the
->> devicetree maintainers.
->>
->> Can you please repost that patch with devicetree at vger.kernel.org Cc'd?
->>
-> Okay, will do.
+I'm not sure why you're sending this to ARM people as I don't believe we
+are the ones responsible for this breakage, neither have we had any
+visibility of this breakage coming up.
 
-Looking closer at this, seems this change is a trivial binding update
-that just generalizes the binding to more SoCs.  I'm OK with taking
-that change.  But in the future, please make sure binding changes are
-posted to the DT list.
+>From what I can see, the mainline state is that we reference user_exit
+when CONTEXT_TRACKING is enabled, and kernel/context_tracking.c is
+built also when this symbol is enabled, and that file provides
+user_exit() and user_entry().
 
->> Without a review/ack from the DT maintainers, we won't be pulling any
->> bindings changes.
->>
->> Also, the binding is changed but there are no corresponding .dts file
->> changes.  Was that an oversight, or doess that mean there are no current
->> users of this binding.
->
-> The binding changes does not break the existing users, and new users are
-> added through imx/dt branch.
+If these two functions have been removed without our knowledge, it is
+because someone is not following correct procedure when making changes
+to the kernel source.  Using grep to find users of the symbols that
+they're removing for example, and copying those who may be affected by
+those changes with the patch etc.
 
-OK, thanks for the clarification.
+If you are going to be spending time running build tests and reporting
+breakage, can you also please spend the time to diagnose the cause of
+the breakage so you can target your reports a little better.  Thanks.
 
-Kevin
+On Thu, Aug 22, 2013 at 07:38:15PM +0530, Tushar Behera wrote:
+> Hi,
+> 
+> With ARCH=arm 'allyesconfig' on next-20130822, following linking error
+> is observed.
+> 
+> arch/arm/kernel/built-in.o: In function `ret_fast_syscall':
+> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-common.S:42:
+> undefined reference to `user_enter'
+> arch/arm/kernel/built-in.o: In function `no_work_pending':
+> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-common.S:77:
+> undefined reference to `user_enter'
+> arch/arm/kernel/built-in.o: In function `vector_swi':
+> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-common.S:376:
+> undefined reference to `user_exit'
+> arch/arm/kernel/built-in.o: In function `__dabt_usr':
+> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-armv.S:365:
+> undefined reference to `user_exit'
+> arch/arm/kernel/built-in.o: In function `__irq_usr':
+> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-armv.S:375:
+> undefined reference to `user_exit'
+> arch/arm/kernel/built-in.o: In function `__und_usr':
+> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-armv.S:388:
+> undefined reference to `user_exit'
+> arch/arm/kernel/built-in.o: In function `__pabt_usr':
+> /home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-armv.S:662:
+> undefined reference to `user_exit'
+> 
+> -- 
+> Tushar Behera
