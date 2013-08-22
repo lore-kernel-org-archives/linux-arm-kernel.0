@@ -1,24 +1,51 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 22 Aug 2013 14:08:32 -0600
-Subject: [PATCH v6 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <5214D0F0.10209@samsung.com>
-References: <1376924669-28873-1-git-send-email-m.szyprowski@samsung.com>
- <1376924669-28873-4-git-send-email-m.szyprowski@samsung.com>
- <521292E0.105@wwwdotorg.org> <98354044.bRIxVeGEeu@flatron>
- <5212997A.5060206@wwwdotorg.org> <52134B92.10308@samsung.com>
- <52139AE7.4050300@wwwdotorg.org> <5214D0F0.10209@samsung.com>
-Message-ID: <52166FC0.1090804@wwwdotorg.org>
+Date: Thu, 22 Aug 2013 14:13:02 -0600
+Subject: [PATCHv4 2/3] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <1377114530.1554.13.camel@linux-builds1>
+References: <1376498884-9199-1-git-send-email-dinguyen@altera.com>
+ <1376498884-9199-2-git-send-email-dinguyen@altera.com>
+ <520EA97D.7050404@wwwdotorg.org> <1377114530.1554.13.camel@linux-builds1>
+Message-ID: <521670CE.4000202@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2013 08:38 AM, Marek Szyprowski wrote:
-...
->> >> b) Adjust memory.txt not to mention any specific property names, but
->> >> simply mention that other DT nodes can refer to define memory regions by
->> >> phandle, and leave it up to individual bindings to define which property
->> >> they use to reference the memory regions, perhaps with memory.txt
->> >> providing a recommendation of memory-region for the simple case
+On 08/21/2013 01:48 PM, Dinh Nguyen wrote:
+> On Fri, 2013-08-16 at 16:36 -0600, Stephen Warren wrote:
+>> On 08/14/2013 10:48 AM, dinguyen at altera.com wrote:
+>>> From: Dinh Nguyen <dinguyen@altera.com>
+>>>
+>>> Add bindings for SD/MMC for SOCFPGA.
+>>
+>>> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+>>
+>>> +* altr,sysmgr: Should be the phandle to the system_mgr node. As this is where
+>>> +		this where the register that controls the CIU clock phases
+>>> +		reside.
+>>
+>> On the surface, this binding series seems OK, but I do have a question:
+>> how is the sysmgr phandle used?
+>>
+>> I assume there's some register in this syscon device that resets or
+>> enables or otherwise controls this MSHC module. How does the code know
+>> which register it is? The phandle in the altr,sysmgr property would
+>> usually be followed by a/some cell(s) that encode this information, so
+>> that the MSHC driver doesn't have to know anything about the layout of
+>> the syscon registers, and so the sysconf driver doesn't have to know
+>> anything about the identity of the MSHC client device.
+> 
+> There is a #define SYSMGR_SDMMCGRP_CTRL_OFFSET that is in
+> dw_mmc-socfpga.c. This defines the offset from the base address that the
+> sysmgr phandle will give me.
 
-I think if we just make that change to the binding doc, it'll be fine.
-It's obvious how to extend the binding then.
+Hmmm. That doesn't sound good. That means that the SDMMC driver knows
+internal details about some other HW module. It'd be better if either:
+
+a) The sysmgr driver was required to provide an API to the SDMMC driver
+to set up the CIU register as requested.
+
+or:
+
+b) The CIU register details were represented in DT.
+
+Either of these would allow the SDMMC driver to operate unchanged on an
+SoC with a different sysmgr register layout.
