@@ -1,66 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 22 Aug 2013 22:14:22 +0200
-Subject: [GIT PULL] Allwinner sunXi DT additions for 3.12, take 3
-Message-ID: <20130822201422.GA3042@lukather>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 22 Aug 2013 14:18:27 -0600
+Subject: [PATCH] DMA: let filter functions of of_dma_simple_xlate possible
+ check of_node
+In-Reply-To: <20130822051904.GA2685@rizhao-lap>
+References: <1375408800-11789-1-git-send-email-rizhao@nvidia.com>
+ <20130822051904.GA2685@rizhao-lap>
+Message-ID: <52167213.6090604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+On 08/21/2013 11:19 PM, Richard Zhao wrote:
+> On Fri, Aug 02, 2013 at 10:00:00AM +0800, Richard Zhao wrote:
+>> pass of_phandle_args dma_spec to dma_request_channel in of_dma_simple_xlate,
+>> so the filter function could access of_node in of_phandle_args.
+>>
+>> It also remove restriction of #dma-cells has to be one.
+>>
+>> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
+>> ---
+>>  drivers/dma/edma.c     |  7 +++++--
+>>  drivers/dma/of-dma.c   | 10 ++++------
+>>  drivers/dma/omap-dma.c |  6 ++++--
+>>  3 files changed, 13 insertions(+), 10 deletions(-)
+>>
+> 
+> Hi Vinod,
+> 
+> Can you please pick up this change?
+> 
+> Hi Stephen,
+> 
+> Can you please give a ack or reviewed-by etc?
 
-Please pull the following pull request on top of the one I sent
-previously for this merge window.
+Hmm. Looking at the patch, I'm not sure it's right.
 
-The following changes since commit e476ac8b483de4ce1d8570509be343afc7cd3baf:
-
-  ARM: sun7i: Add Olimex A20-Olinuxino-Micro support (2013-08-20 08:18:45 +0200)
-
-are available in the git repository at:
-
-  https://github.com/mripard/linux.git tags/sunxi-dt-for-3.12-3
-
-for you to fetch changes up to 82abe5294aeadc42508c7944f3a9aec0eece214c:
-
-  ARM: sun7i: Add Cubieboard2 Device Tree (2013-08-22 00:19:19 +0200)
-
-----------------------------------------------------------------
-Third round of patches for the Allwinner SoCs DT
-
-These patches add support for:
-  - The cubieboard2 board
-  - The pinctrl driver that got merged for the A20 and A31
-  - The associated muxing for the A20 and A31 boards already supported
-
-----------------------------------------------------------------
-Maxime Ripard (8):
-      ARM: sunxi: dt: Add PIO controller to A31 DTSI
-      ARM: sun6i: Add UART0 muxing options
-      ARM: sun6i: colombus: Add uart0 muxing
-      ARM: sun7i: Add the PIO controller node to the DTSI
-      ARM: sun7i: DT: Add UART muxing options to the DTSI
-      ARM: sun7i: a20-olinuxino: Enable UARTs muxing
-      ARM: sun7i: a20-olinuxino: Enable the user LED
-      ARM: sun7i: Add Cubieboard2 Device Tree
-
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/sun6i-a31-colombus.dts        |  2 +
- arch/arm/boot/dts/sun6i-a31.dtsi                | 19 +++++++++
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 53 +++++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 27 +++++++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi                | 33 +++++++++++++++
- 6 files changed, 135 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130822/31337bfa/attachment.sig>
+This patch simply passes all the specfier args to the filter function,
+and the code to check the equality of the of_node to the filter args is
+still duplicated in each DMA driver. Instead, the DMA core should be
+implementing the equality check, and only even calling the
+driver-specific filter function for devices where the client's phandle
+matches the DMA providing device's of_node handle.
