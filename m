@@ -1,36 +1,125 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Thu, 22 Aug 2013 14:24:02 -0700
-Subject: [PATCH v2 0/2] ARM: dts: Add SHAM and AES DT information
-In-Reply-To: <5215CCFE.6040500@baylibre.com>
-References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.02.1308210012420.6426@utopia.booyaka.com>
- <5214C11F.8090808@baylibre.com> <5214C372.3080402@baylibre.com>
- <52158A7E.30305@ti.com> <5215CCFE.6040500@baylibre.com>
-Message-ID: <20130822212402.GA30504@animalcreek.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 23 Aug 2013 01:25:25 +0400
+Subject: [PATCH v5 2/3] ARM: shmobile: Marzen: add VIN and ADV7180 support
+In-Reply-To: <201308230119.13783.sergei.shtylyov@cogentembedded.com>
+References: <201308230119.13783.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201308230125.26064.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 10:34:06AM +0200, Benoit Cousson wrote:
-> Hi Lokesh,
-> 
-> On 22/08/2013 05:50, Lokesh Vutla wrote:
-> >Hi Benoit,
-> >On Wednesday 21 August 2013 07:11 PM, Benoit Cousson wrote:
-> >>Hi Mark,
-> >>
-> >>In fact I cannot even apply these patches since they are referring the the edma controller node that does not seem to be there in 3.11-rc6.
-> >>
-> >>Is this EDMA series supposed to be merged for 3.12? If this is the case, where can I find a reference GIT for it?
-> >The following EDMA support dt patch series from Joel is needed :
-> >http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92176.html
-> >http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92177.html
-> 
-> Thanks, it works a little bit better with these patches :-)
+From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-Yeah, sorry.
+Add ADV7180 platform devices on the Marzen board, configure VIN1/3 pins, and
+register VIN1/3 devices with the ADV7180 specific platform data.
 
-Given Mark Rutland's comments in another email, let me respin and send v3.
-I'll put a comment about the dependencies this time.
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+[Sergei: removed superfluous tabulation and inserted empty lines in the  macro
+definition, updated the copyrights, annotated VIN platform data as '__initdata']
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Mark
---
+---
+Changes since version 3:
+- changed the VIN platform device names to be R8A7779 specific.
+
+Changes since version 2:
+- annotated 'vin_platform_data' as '__initdata' since they're kmemdup()'ed while
+  registering the platform devices anyway.
+
+Changes since the original posting:
+- used a macro to define the camera platform devices;
+- updated the copyrights;
+- refreshed the patch.
+
+ arch/arm/mach-shmobile/board-marzen.c |   44 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
+
+Index: media_tree/arch/arm/mach-shmobile/board-marzen.c
+===================================================================
+--- media_tree.orig/arch/arm/mach-shmobile/board-marzen.c
++++ media_tree/arch/arm/mach-shmobile/board-marzen.c
+@@ -1,8 +1,9 @@
+ /*
+  * marzen board support
+  *
+- * Copyright (C) 2011  Renesas Solutions Corp.
++ * Copyright (C) 2011, 2013  Renesas Solutions Corp.
+  * Copyright (C) 2011  Magnus Damm
++ * Copyright (C) 2013  Cogent Embedded, Inc.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -37,6 +38,7 @@
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/mfd/tmio.h>
++#include <media/soc_camera.h>
+ #include <mach/hardware.h>
+ #include <mach/r8a7779.h>
+ #include <mach/common.h>
+@@ -178,12 +180,40 @@ static struct platform_device leds_devic
+ 	},
+ };
+ 
++static struct rcar_vin_platform_data vin_platform_data __initdata = {
++	.flags	= RCAR_VIN_BT656,
++};
++
++#define MARZEN_CAMERA(idx)					\
++static struct i2c_board_info camera##idx##_info = {		\
++	I2C_BOARD_INFO("adv7180", 0x20 + (idx)),		\
++};								\
++								\
++static struct soc_camera_link iclink##idx##_adv7180 = {		\
++	.bus_id		= 1 + 2 * (idx),			\
++	.i2c_adapter_id	= 0,					\
++	.board_info	= &camera##idx##_info,			\
++};								\
++								\
++static struct platform_device camera##idx##_device = {		\
++	.name	= "soc-camera-pdrv",				\
++	.id	= idx,						\
++	.dev	= {						\
++		.platform_data	= &iclink##idx##_adv7180,	\
++	},							\
++};
++
++MARZEN_CAMERA(0);
++MARZEN_CAMERA(1);
++
+ static struct platform_device *marzen_devices[] __initdata = {
+ 	&eth_device,
+ 	&sdhi0_device,
+ 	&thermal_device,
+ 	&hspi_device,
+ 	&leds_device,
++	&camera0_device,
++	&camera1_device,
+ };
+ 
+ static const struct pinctrl_map marzen_pinctrl_map[] = {
+@@ -219,6 +249,16 @@ static const struct pinctrl_map marzen_p
+ 	/* USB2 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform.1", "pfc-r8a7779",
+ 				  "usb2", "usb2"),
++	/* VIN1 */
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7779-vin.1", "pfc-r8a7779",
++				  "vin1_clk", "vin1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7779-vin.1", "pfc-r8a7779",
++				  "vin1_data8", "vin1"),
++	/* VIN3 */
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7779-vin.3", "pfc-r8a7779",
++				  "vin3_clk", "vin3"),
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7779-vin.3", "pfc-r8a7779",
++				  "vin3_data8", "vin3"),
+ };
+ 
+ static void __init marzen_init(void)
+@@ -235,6 +275,8 @@ static void __init marzen_init(void)
+ 
+ 	r8a7779_add_standard_devices();
+ 	r8a7779_add_usb_phy_device(&usb_phy_platform_data);
++	r8a7779_add_vin_device(1, &vin_platform_data);
++	r8a7779_add_vin_device(3, &vin_platform_data);
+ 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
+ }
+ 
