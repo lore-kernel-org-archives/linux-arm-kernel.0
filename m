@@ -1,148 +1,181 @@
-From: liam.r.girdwood@linux.intel.com (Liam Girdwood)
-Date: Thu, 22 Aug 2013 20:22:50 +0100
-Subject: [alsa-devel] [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM
- links between codec and cpu DAI
-In-Reply-To: <20130820201824.GA17845@n2100.arm.linux.org.uk>
-References: <20130810161123.GW23006@n2100.arm.linux.org.uk>
- <20130810211342.GX23006@n2100.arm.linux.org.uk>
- <1376293215.2385.32.camel@loki>
- <20130812082837.GB23006@n2100.arm.linux.org.uk>
- <1376405952.2617.101.camel@loki>
- <20130820102555.GZ23006@n2100.arm.linux.org.uk>
- <20130820114421.GN30073@sirena.org.uk>
- <20130820114949.GB23006@n2100.arm.linux.org.uk>
- <20130820133143.GC23006@n2100.arm.linux.org.uk>
- <20130820185019.GP30073@sirena.org.uk>
- <20130820201824.GA17845@n2100.arm.linux.org.uk>
-Message-ID: <1377199370.2618.99.camel@loki>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 22 Aug 2013 12:34:53 -0700
+Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
+In-Reply-To: <1376885403-12156-4-git-send-email-b32955@freescale.com>
+References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
+ <1376885403-12156-4-git-send-email-b32955@freescale.com>
+Message-ID: <20130822193453.GB10038@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-08-20 at 21:18 +0100, Russell King - ARM Linux wrote:
-> On Tue, Aug 20, 2013 at 07:50:19PM +0100, Mark Brown wrote:
-> > On Tue, Aug 20, 2013 at 02:31:43PM +0100, Russell King - ARM Linux wrote:
-> > 
-> > > Let's be a little more clear about that: I don't know how to do that
-> > > because that's the approach taken by _these_ very patches which you've
-> > > rejected for "abusing the ASoC core".  That's why I'm asking Liam
-> > 
-> > The patches I can recall seeing recently have all had some workarounds
-> > in the core which would need to be resolved differently, though it's
-> > possible I missed that being done in some version in your mails as there
-> > have generally also been a lot of modifications adding debug statements
-> > in the core.
-> 
-> The "workarounds in the core" are because there's bugs in the core that
-> I have no idea how to solve.  You are allegedly the maintainer for the
-> core code, and so you should understand that code, so you are best placed
-> to say how the core code should be fixed.  I'm willing to do the patch
-> generation to fix them but *you* need to give some guidance here -
-> something that you seem incapable to do.  At the moment, the only fix I
-> can see being workable is to comment out the broken bit in the core code.
-> 
+Adding others (keep devicetree at vger.kernel.org in the loop)
 
-I'll fix this issue as I've replied privately, but you know it's not
-appropriate to just comment stuff out in core code (especially if you
-don't fully understand it). I'm sure you would complain loudly to me if
-I tried to do a similar HACK in the ARM core.
+On Mon, Aug 19, 2013 at 12:10:01PM +0800, Huang Shijie wrote:
+> This patch adds the quad read support:
+> 
+> (1) Add the relative commands:
+>       OPCODE_QIOR, OPCODE_4QIOR, OPCODE_RDCR,
+> 
+>     also add the relative macro for the Configuartion Register.
+> 
+> (2) add the "m25p,quad-read" property for the m25p80 driver
+>     If the dts has the "m25p,quad-read" property, the kernel will
+>     set the Quad bit of the configuration register, and when the
+>     setting is suceeded, we set the read opcode with OPCODE_QIOR.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  Documentation/devicetree/bindings/mtd/m25p80.txt |    5 ++
+>  drivers/mtd/devices/m25p80.c                     |   51 ++++++++++++++++++++++
+>  include/linux/mtd/spi-nor.h                      |    6 +++
+>  3 files changed, 62 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/m25p80.txt b/Documentation/devicetree/bindings/mtd/m25p80.txt
+> index 6d3d576..b33313f 100644
+> --- a/Documentation/devicetree/bindings/mtd/m25p80.txt
+> +++ b/Documentation/devicetree/bindings/mtd/m25p80.txt
+> @@ -17,6 +17,11 @@ Optional properties:
+>                     Refer to your chips' datasheet to check if this is supported
+>                     by your chip.
+>  
+> +- m25p,quad-read : Use the "quad read" opcode to read data from the chip instead
+> +                   of the usual "read" opcode. This opcode is not supported by
+> +                   all chips and support for it can not be detected at runtime.
+> +                   Refer to your chips' datasheet to check if this is supported
+> +                   by your chip.
 
-> If the problem is that you don't understand the issue, then you could try
-> replying with some questions about it.
-> 
-> If the problem is that you don't understand the code, well... there's not
-> much point in continuing this discussion until you've had time to study
-> and understand that code.
-> 
-> > If you've got code you think is in a good state to submit then please do
-> > send it as a normal patch series, the last one I've got here has "ASoC:
-> > HACK: avoid creating duplicated widgets" as part of it for example.
-> 
-> That patch still hasn't gone away, and is still required, because there
-> has been no guidance or comments about the problem.  Let's explain it
-> yet again...
-> 
-> You have said "there is no problem registering the platform and the CPU
-> dai from the same device structure".  Let's assume that's a fact and see
-> what happens in the core code:
-> 
-> static int soc_probe_platform(struct snd_soc_card *card,
->                            struct snd_soc_platform *platform)
-> {
->         /* Create DAPM widgets for each DAI stream */
->         list_for_each_entry(dai, &dai_list, list) {
->                 if (dai->dev != platform->dev)
->                         continue;
-> 
->                 snd_soc_dapm_new_dai_widgets(&platform->dapm, dai);
->         }
-> }
-> 
-> static int soc_probe_link_dais(struct snd_soc_card *card, int num, int order)
-> {
->         if (!cpu_dai->probed &&
->                         cpu_dai->driver->probe_order == order) {
->                 if (!cpu_dai->codec) {
->                         cpu_dai->dapm.card = card;
->                         if (!try_module_get(cpu_dai->dev->driver->owner))
->                                 return -ENODEV;
-> 
->                         list_add(&cpu_dai->dapm.list, &card->dapm_list);
->                         snd_soc_dapm_new_dai_widgets(&cpu_dai->dapm, cpu_dai);
->                 }
-> 
-> Now, the CPU DAI is added to the dai_list (it has to be there to be found
-> so the DAI link can bind it, and so soc_probe_link_dais() can be called.)
-> 
-> Think about what happens with the above code if platform->dev is the same
-> as the device used for the CPU DAI (dai->dev) - which can happen when the
-> platform and CPU DAI are registered from the same platform_device, which
-> you claim is legal with ASoC.
-> 
-> Now, look at snd_soc_dapm_new_dai_widgets():
-> 
-> int snd_soc_dapm_new_dai_widgets(struct snd_soc_dapm_context *dapm,
->                                  struct snd_soc_dai *dai)
-> {
->         if (dai->driver->playback.stream_name) {
-> ...
->                 dai->playback_widget = w;
->         }
->         if (dai->driver->capture.stream_name) {
-> ...
->                 dai->capture_widget = w;
->         }
-> 
-> What happens if the widgets which are bound to are the first set that
-> are created, but they're overwritten when the second set get created?
-> (And that _does_ happen.)  The second set are the ones activated when
-> the audio device is opened, not the first set.
-> 
-> Now, there's nothing new in the above, I've already explained all the
-> above to you several times.  I've had nothing of any help what so ever
-> back from you on this.  I've asked you how to solve this.  I've had
-> absolutely nothing back.  So what am I supposed to do here?  Stuff
-> doesn't work with the core code how it is, so I took the only solution
-> _you_ left me by your silence, which is to hack the core code.
-> 
+Why can't this be detected at runtime? We added a "no fast read" flag to
+the device table, so why not "dual/quad mode supported"? And believe it
+or not, not all m25p80 users have device tree. So it isn't very logical
+to tie this support to device-tree only.
 
-It does seem that your configuration is different to the configurations
-that work well on Haswell, OMAP4 and Qualcomm and that's probably why
-you are the only person reporting this atm. I also think the tight
-coupling between the I2S and SPDIF HW made your problem far more complex
-and therefore more difficult (for me at least) to follow when the
-signal to noise ratio of this and related threads started to
-deteriorate.
+>  Example:
+>  
+>  	flash: m25p80 at 0 {
+> diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+> index f3598c1..4bc9b1b 100644
+> --- a/drivers/mtd/devices/m25p80.c
+> +++ b/drivers/mtd/devices/m25p80.c
+> @@ -103,6 +103,40 @@ static int write_sr(struct m25p *flash, u8 val)
+>  }
+>  
+>  /*
+> + * Read the configuration register, returning its value in the location
+> + * Return the configuration register value.
+> + * Returns negative if error occurred.
+> + */
+> +static int read_cr(struct m25p *flash)
+> +{
+> +	u8 code = OPCODE_RDCR;
+> +	int ret;
+> +	u8 val;
+> +
+> +	ret = spi_write_then_read(flash->spi, &code, 1, &val, 1);
+> +	if (ret < 0) {
+> +		dev_err(&flash->spi->dev, "error %d reading CR\n", ret);
+> +		return ret;
+> +	}
+> +	return val;
+> +}
+> +
+> +/*
+> + * Write status register and configuration register with 2 bytes
+> + * The first byte will be written to the status register, while the second byte
+> + * will be written to the configuration register.
+> + * Returns negative if error occurred.
+> + */
+> +static int write_sr_cr(struct m25p *flash, u16 val)
+> +{
+> +	flash->command[0] = OPCODE_WRSR;
+> +	flash->command[1] = 0;
+> +	flash->command[2] = (val >> 8);
+> +
+> +	return spi_write(flash->spi, flash->command, 3);
+> +}
+> +
+> +/*
+>   * Set write enable latch with Write Enable command.
+>   * Returns negative if error occurred.
+>   */
+> @@ -880,6 +914,8 @@ static int m25p_probe(struct spi_device *spi)
+>  	unsigned			i;
+>  	struct mtd_part_parser_data	ppdata;
+>  	struct device_node __maybe_unused *np = spi->dev.of_node;
+> +	u16 sr_cr;
+> +	int ret;
+>  
+>  #ifdef CONFIG_MTD_OF_PARTS
+>  	if (!of_device_is_available(np))
+> @@ -1014,6 +1050,21 @@ static int m25p_probe(struct spi_device *spi)
+>  	else
+>  		flash->read_opcode = OPCODE_NORM_READ;
+>  
+> +	/* Try to enable the Quad Read */
+> +	if (np && of_property_read_bool(np, "m25p,quad-read")) {
+> +		/* The configuration register is set by the second byte. */
+> +		sr_cr = CR_QUAD << 8;
+> +
+> +		/* Write the QUAD bit to the Configuration Register. */
+> +		write_enable(flash);
+> +		if (write_sr_cr(flash, sr_cr) == 0) {
+> +			/* read back and check it */
+> +			ret = read_cr(flash);
+> +			if (ret > 0 && (ret & CR_QUAD))
+> +				flash->read_opcode = OPCODE_QIOR;
 
-Both Mark and are are happy to fix things, but please remember that we
-can't just jump and schedule this work in as top priority, we have to
-prioritise work on severity and impact alongside that of our employers
-and customers. I'm sure if things were the other way around (e.g the
-problem was in the ARM core) then Mark would have to wait for you to
-respond and fix the issue in your time frame. I'm also certain Mark
-would not start making the conversation personal either.
+This is not correct. You are assuming that the SPI master knows to read
+with 4 IO lines, instead of the traditional 1 line; IOW, you are
+assuming that:
+(1) if the slave DT node has "quad-read", then the whole system supports
+    it (bad design; you're putting assumptions about the "parent" node
+    in the child)
+(2) the controller driver will act as your new driver does -- that it
+    will decode these commands and recognize that the quad read command
+    should be run on 4 IO lines, not just 1
 
-As I've said, I'll do a proper fix for patch 4 and CC you on the
-submission. The rest of the series looked ok and then I'm sure Mark will
-take it.
+What you're really missing from device-tree (and the SPI subystem in
+general) is how to detect those SPI controllers which support dual and
+quad mode transfers, and how to communicate that a particular SPI
+transaction should be performed on 1 or 4 IO lines. We shouldn't have
+this just hacked in via assumptions.
 
-Liam 
+See Wang Yuhang's patch set for adding proper dual/quad support to the
+SPI subsystem. It seems to be addressing (1) and (2) in a better way.
+
+  http://thread.gmane.org/gmane.linux.kernel.spi.devel/14420
+
+(I can't find patch 2/2)
+
+> +		}
+> +	}
+> +
+>  	flash->program_opcode = OPCODE_PP;
+>  
+>  	if (info->addr_width)
+> diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+> index b420a5b..d5b189d 100644
+> --- a/include/linux/mtd/spi-nor.h
+> +++ b/include/linux/mtd/spi-nor.h
+> @@ -39,6 +39,9 @@
+>  
+>  /* Used for Spansion flashes only. */
+>  #define	OPCODE_BRWR		0x17	/* Bank register write */
+> +#define OPCODE_QIOR		0xeb	/* Quad read */
+> +#define OPCODE_4QIOR		0xec	/* Quad read */
+
+Use tab between 'define' and 'OPCODE...', like OPCODE_RDCR below.
+
+> +#define	OPCODE_RDCR		0x35	/* Read configuration register */
+>  
+>  /* Status Register bits. */
+>  #define	SR_WIP			1	/* Write in progress */
+> @@ -49,4 +52,7 @@
+>  #define	SR_BP2			0x10	/* Block protect 2 */
+>  #define	SR_SRWD			0x80	/* SR write protect */
+>  
+> +/* Configuration Register bits. */
+> +#define CR_QUAD			0x2	/* Quad I/O */
+> +
+>  #endif /* __LINUX_MTD_SPI_NOR_H */
+
+Brian
