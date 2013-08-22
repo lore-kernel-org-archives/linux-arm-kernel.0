@@ -1,32 +1,39 @@
-From: B38611@freescale.com (Fugang Duan)
-Date: Thu, 22 Aug 2013 18:50:37 +0800
-Subject: [PATCH] ARM: imx6sl: add imx6sl iomux-gpr field define
-Message-ID: <1377168637-8676-1-git-send-email-B38611@freescale.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 22 Aug 2013 13:00:44 +0200
+Subject: [PATCH 1/1] ARM: at91: sam9g45: shutdown ddr1 too when rebooting
+Message-ID: <1377169244-20462-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx6sl iomux-gpr register field define in "imx6q-iomuxc-gpr.h" header
-file, which is not fully define all iomux-gpr registers and fields, only
-add fec related macro define.
+as on ddr0 we need to cleanly shutdown ddr1 if used before rebootinh
 
-Signed-off-by: Fugang Duan  <B38611@freescale.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/mach-at91/at91sam9g45_reset.S | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-index b6bdcd6..7086b22 100644
---- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-+++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-@@ -363,4 +363,9 @@
- #define IMX6Q_GPR13_SATA_TX_LVL_1_240_V		(0x1f << 2)
- #define IMX6Q_GPR13_SATA_MPLL_CLK_EN		BIT(1)
- #define IMX6Q_GPR13_SATA_TX_EDGE_RATE		BIT(0)
-+
-+/* For imx6sl iomux gpr register field define */
-+#define IMX6SL_GPR1_FEC_CLOCK_MUX1_SEL_MASK    (0x3 << 17)
-+#define IMX6SL_GPR1_FEC_CLOCK_MUX2_SEL_MASK    (0x1 << 14)
-+
- #endif /* __LINUX_IMX6Q_IOMUXC_GPR_H */
+diff --git a/arch/arm/mach-at91/at91sam9g45_reset.S b/arch/arm/mach-at91/at91sam9g45_reset.S
+index 721a1a3..3fd634d 100644
+--- a/arch/arm/mach-at91/at91sam9g45_reset.S
++++ b/arch/arm/mach-at91/at91sam9g45_reset.S
+@@ -21,6 +21,8 @@
+ at91sam9g45_restart:
+ 			ldr	r5, =at91_ramc_base		@ preload constants
+ 			ldr	r0, [r5]
++			add	r5, #4				@ ddr1
++			ldr	r5, [r5]
+ 			ldr	r4, =at91_rstc_base
+ 			ldr	r1, [r4]
+ 
+@@ -30,6 +32,8 @@ at91sam9g45_restart:
+ 
+ 			.balign	32				@ align to cache line
+ 
++			str	r2, [r5, #AT91_DDRSDRC_RTR]	@ disable DDR1 access
++			str	r3, [r5, #AT91_DDRSDRC_LPR]	@ power down DDR1
+ 			str	r2, [r0, #AT91_DDRSDRC_RTR]	@ disable DDR0 access
+ 			str	r3, [r0, #AT91_DDRSDRC_LPR]	@ power down DDR0
+ 			str	r4, [r1, #AT91_RSTC_CR]		@ reset processor
 -- 
-1.7.1
+1.8.4.rc1
