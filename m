@@ -1,52 +1,34 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 22 Aug 2013 15:43:41 +0800
-Subject: [PATCH] ARM: OMAP2: add type cast from 'unsigned' to 'signed'
-In-Reply-To: <20130822071402.GQ7656@atomide.com>
-References: <521479B4.8030604@asianux.com> <20130822071402.GQ7656@atomide.com>
-Message-ID: <5215C12D.5020807@asianux.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 22 Aug 2013 00:45:24 -0700
+Subject: [Suggestion] ARM: allmodconfig: about cross compiling failure
+ under i386 ubuntu.
+In-Reply-To: <52147E12.4060401@asianux.com>
+References: <521479B4.8030604@asianux.com> <52147AC6.9040300@asianux.com>
+ <52147E12.4060401@asianux.com>
+Message-ID: <20130822074524.GS7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2013 03:14 PM, Tony Lindgren wrote:
-> * Chen Gang <gang.chen@asianux.com> [130821 01:34]:
->> Need add type cast, or can not notice the failure. The related warning
->> (allmodconfig, "EXTRA_CFLAGS=-W"):
->>
->>   arch/arm/mach-omap2/gpmc.c:728:2: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
->>
->>
->> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> ---
->>  arch/arm/mach-omap2/gpmc.c |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
->> index f3fdd6a..62377b5 100644
->> --- a/arch/arm/mach-omap2/gpmc.c
->> +++ b/arch/arm/mach-omap2/gpmc.c
->> @@ -725,7 +725,7 @@ static int gpmc_setup_irq(void)
->>  		return -EINVAL;
->>  
->>  	gpmc_irq_start = irq_alloc_descs(-1, 0, GPMC_NR_IRQ, 0);
->> -	if (gpmc_irq_start < 0) {
->> +	if ((signed)gpmc_irq_start < 0) {
->>  		pr_err("irq_alloc_descs failed\n");
->>  		return gpmc_irq_start;
->>  	}
+* Chen Gang <gang.chen@asianux.com> [130821 01:53]:
+> Hello Maintainers:
 > 
-> Hmm shouldn't we just have int gpmc_irq_start instead
-> of unsigned gpmc_irq_start?
->
-
-Oh, thanks, that sounds reasonable to me, I will send patch v2.
-
-
-> Regards,
+> When build arm with allmodconfig under ubuntu i386 with arm-linux-
+> gnueabi-gcc 4.7, as 2.22, it report the errors.
 > 
-> Tony
-> 
-> 
+> Please help check, thanks (the related config file in attachment).
 
-Thanks.
--- 
-Chen Gang
+It seems that some make flags may need to be specified separately
+in some makefiles. See the following for some examples:
+
+$ find arch/arm -name Makefile | xargs grep -i flags
+
+I'm getting different errors though, I'm getting:
+
+arch/arm/mach-zynq/hotplug.c:1: error: bad value (cortex-a9) for -mcpu= switch
+
+As probably my compiler does not support the cortex-a9 switch,
+I have gcc version 4.3.5 (Debian 4.3.5-4), tried with v3.11-rc5.
+
+Regards,
+
+Tony
