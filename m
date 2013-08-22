@@ -1,99 +1,78 @@
-From: rizhao@nvidia.com (Richard Zhao)
-Date: Thu, 22 Aug 2013 14:43:00 +0800
-Subject: [PATCH v2] DMA: add help function to check whether dma controller
- registered
-In-Reply-To: <1375423458-6868-1-git-send-email-rizhao@nvidia.com>
-References: <1375423458-6868-1-git-send-email-rizhao@nvidia.com>
-Message-ID: <1377153781-18006-1-git-send-email-rizhao@nvidia.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Aug 2013 23:53:25 -0700
+Subject: [GIT PULL 3/3] ARM: shmobile: lager: enable Ether
+In-Reply-To: <20130822001647.GA6902@verge.net.au>
+References: <cover.1375839719.git.horms+renesas@verge.net.au>
+ <4901e136aa5c35873701156c4c0af5b3c2c8faee.1375839719.git.horms+renesas@verge.net.au>
+ <87siy3owxj.fsf@linaro.org> <5215115A.1010400@cogentembedded.com>
+ <20130822001647.GA6902@verge.net.au>
+Message-ID: <20130822065325.GA6615@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA client device driver usually needs to know at probe time whether
-dma controller has been registered to deffer probe. So add a help
-function of_dma_check_controller.
+On Thu, Aug 22, 2013 at 09:16:49AM +0900, Simon Horman wrote:
+> On Wed, Aug 21, 2013 at 11:13:30PM +0400, Sergei Shtylyov wrote:
+> > Hello.
+> > 
+> > On 08/21/2013 08:01 PM, Kevin Hilman wrote:
+> > 
+> > >>Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > 
+> > >This one is triggering a new build failure in -next:
+> > 
+> > >arch/arm/mach-shmobile/board-lager.c:99:2: error: unknown field 'register_type' specified in initializer
+> > >arch/arm/mach-shmobile/board-lager.c:99:19: error: 'SH_ETH_REG_FAST_RCAR' undeclared here (not in a function)
+> > 
+> > >>+/* Ether */
+> > >>+static struct sh_eth_plat_data ether_pdata __initdata = {
+> > >>+	.phy			= 0x1,
+> > >>+	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
+> > >>+	.register_type		= SH_ETH_REG_FAST_RCAR,
+> > 
+> > >and it looks to be because this board is trying to use the register_type
+> > >field which was removed by:
+> > 
+> > >commit 8d3214c4e8c8be6efd8ec7a172239ebbd4deb04b
+> > >Author: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > >Date:   Sun Aug 18 03:13:26 2013 +0400
+> > >
+> > >     sh_eth: remove 'register_type' field from 'struct sh_eth_plat_data'
+> > >
+> > >     Now that the 'register_type' field of the 'sh_eth' driver's platform data is not
+> > >     used by the driver anymore, it's time to remove it and  its initializers from
+> > >     the SH platform code. Also  move *enum* declaring values for this  field from
+> > >     <linux/sh_eth.h>  to  the  local driver's  header file as they're only needed
+> > >     by the driver itself  now...
+> > >
+> > >     Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > >     Signed-off-by: David S. Miller <davem@davemloft.net>
+> > 
+> >    Looks like in this case I had no choice since R8A7790 support for
+> > the 'sh_eth' driver will be added in 3.12 only, so if I merged these
+> > patches thru the shmobile tree, we'd have gotten an error in the
+> > driver...
+> >    I guess it's too early to fix this in any particular tree except
+> > for linux-next itself... let me know what I can do.
+> 
+> This patch ("ARM: shmobile: lager: enable Ether") is also targeted at v3.12.
+> So it seems to me that a fix for this could go through the shmobile tree
+> if it is acceptable to merge net-next into the base of a pull-request.
+> 
+> Kevin, Olof, could you give some guidance here.
 
-DMA request channel functions can also used to check it, but they
-are usually called at open() time.
+I don't think we want to pull in net-next here just for this -- that is a
+massive branch.
 
-Signed-off-by: Richard Zhao <rizhao@nvidia.com>
----
- drivers/dma/of-dma.c   | 39 +++++++++++++++++++++++++++++++++++++++
- include/linux/of_dma.h |  6 ++++++
- 2 files changed, 45 insertions(+)
+There's no great solution to any of this, unfortunately.
 
-diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
-index 8cd5f3f..0063ddf 100644
---- a/drivers/dma/of-dma.c
-+++ b/drivers/dma/of-dma.c
-@@ -189,6 +189,45 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
- }
- 
- /**
-+ * of_dma_check_controller - Check whether dma controller registered
-+ * @dev:	pointer to client device structure
-+ * @name:	slave channel name
-+ */
-+int of_dma_check_controller(struct device *dev, const char *name)
-+{
-+	struct device_node *np = dev->of_node;
-+	struct of_phandle_args dma_spec;
-+	struct of_dma *ofdma = NULL;
-+	int count, i, ret = 0;
-+
-+	if (!np || !name)
-+		return -EINVAL;
-+
-+	count = of_property_count_strings(np, "dma-names");
-+	if (count < 0) {
-+		dev_err(dev, "dma-names property missing or empty\n");
-+		return -EINVAL;
-+	}
-+
-+	for (i = 0; i < count; i++) {
-+		ret = of_dma_match_channel(np, name, i, &dma_spec);
-+		if (ret)
-+			continue;
-+
-+		mutex_lock(&of_dma_lock);
-+		ofdma = of_dma_find_controller(&dma_spec);
-+		mutex_unlock(&of_dma_lock);
-+		of_node_put(dma_spec.np);
-+		if (!ofdma)
-+			ret = -EPROBE_DEFER;
-+		break;
-+	}
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(of_dma_check_controller);
-+
-+/**
-  * of_dma_simple_xlate - Simple DMA engine translation function
-  * @dma_spec:	pointer to DMA specifier as found in the device tree
-  * @of_dma:	pointer to DMA controller data
-diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
-index ae36298..bc7195f 100644
---- a/include/linux/of_dma.h
-+++ b/include/linux/of_dma.h
-@@ -39,6 +39,7 @@ extern int of_dma_controller_register(struct device_node *np,
- extern void of_dma_controller_free(struct device_node *np);
- extern struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
- 						     const char *name);
-+extern int of_dma_check_controller(struct device *dev, const char *name);
- extern struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
- 		struct of_dma *ofdma);
- #else
-@@ -60,6 +61,11 @@ static inline struct dma_chan *of_dma_request_slave_channel(struct device_node *
- 	return NULL;
- }
- 
-+static inline int of_dma_check_controller(struct device *dev, const char *name)
-+{
-+	return 0;
-+}
-+
- static inline struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
- 		struct of_dma *ofdma)
- {
--- 
-1.8.1.5
+I think easiest would be if we add a patch that fixes this up _only_ in
+for-next, and merge the same patch upstream as soon as net-next lands
+(if it lands after arm-soc, otherwise we include it in our branch),
+that might be the least painful way to do this.
+
+That patch would just remove the assignment to register_type in the
+board file.
+
+
+-Olof
