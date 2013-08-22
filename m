@@ -1,89 +1,119 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 22 Aug 2013 10:10:14 -0400
-Subject: [PATCH 2/8] clk: keystone: Add gate control clock driver
-In-Reply-To: <20130822081256.8231.50781@quantum>
-References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
- <20130813165344.GU27165@e106331-lin.cambridge.arm.com>
- <20130819204353.4443.48466@quantum> <5213756A.5090903@ti.com>
- <20130820213045.4443.89971@quantum> <5213E5EC.8070208@ti.com>
- <20130820224128.4443.78729@quantum> <5213F397.6020708@ti.com>
- <20130821022225.4443.97467@quantum> <5214BDB1.9080503@ti.com>
- <20130822081256.8231.50781@quantum>
-Message-ID: <52161BC6.1050905@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 22 Aug 2013 16:18:33 +0200
+Subject: [PATCH v6 0/4] i2c-mv64xxx: Fixes and new feature for controlers
+ embedded in Aramda XP
+Message-ID: <1377181113-17179-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 August 2013 04:12 AM, Mike Turquette wrote:
-> Quoting Santosh Shilimkar (2013-08-21 06:16:33)
->> On Tuesday 20 August 2013 10:22 PM, Mike Turquette wrote:
->>> Quoting Santosh Shilimkar (2013-08-20 15:54:15)
->>>> On Tuesday 20 August 2013 06:41 PM, Mike Turquette wrote:
->>>>> Quoting Santosh Shilimkar (2013-08-20 14:55:56)
->>>>>> On Tuesday 20 August 2013 05:30 PM, Mike Turquette wrote:
->>>>
->>>> [...]
->>>>
->>>>>>>> They are bit different w.r.t OMAP. LPSC itself is the clock control of the
->>>>>>>> IP. The LPSC number in the bindings is actually the specific number which
->>>>>>>> is used to reach to the address space of the clock control. One can view
->>>>>>>> that one as clock control register index.
->>>>>>>
->>>>>>> Thanks for the information. I have a further question about then: are
->>>>>>> the LPSC clocks really module clocks that belong to the IP that they are
->>>>>>> gating?
->>>>>>>
->>>>>> LPSC controls the clock enable/disable to the IP/module so answer is yes.
->>>>>> In certain cases LPSC controls clock to more than one IP as well.
->>>>>>
->>>>>>> If so then they could be defined within the node defining their parent
->>>>>>> IP. That might be enough to get rid of the LPSC index value. Again I
->>>>>>> might be over-engineering it. Just trying to get an understanding.
->>>>>>>
->>>>>> Am not sure I follow you here on not having the LPSC index. Sorry. 
->>>>>
->>>>> How are the 'reg' property and the 'lpsc' property related? Does the
->>>>> lpsc property modify the register address used to access the clock
->>>>> control bits?
->>>>>
->>>> Yes it does. Currently all nodes use fix address and then lpsc is
->>>> used as an index.
->>>
->>> Ok cool. Well the reason I brought that up was because I even had the
->>> idea to define these module clocks within the module nodes that own them
->>> in DT. I am way outside of my DT knowledge at this point but I wonder
->>> if the following type of binding is possible:
->>>
->>> module: module at 4a308200 {
->>>       #address-cells = <1>;
->>>       #size-cells = <1>;
->>>       reg = <0x4a308200 0x1000>;
->>>
->>>       clock {
->>>               #clock-cells = <0>;
->>>               compatible = "keystone,psc-clk";
->>>               clocks = <&chipclk3>;
->>>               clock-output-names = "debugss_trc";
->>>               reg = <0x0256>;
->>>               pd = <1>;
->>>       };
->>> };
->>>
->>> Again, my DT knowledge is pretty limited, but could the reg property of
->>> the clock be directly affected by the parent node? That seems like it
->>> could nicely model what the hardware is really doing.
->>>
->> The module(I assume you mean IP here) reg address space is separate than
->> that used for clock control so that doesn't fit as such. Traditionally
->> clock controls even though targeted for specific modules sits in different
->> control as at least seen on OMAP and Keystone. OCP wrappers on OMAP
->> were bit of exceptions but they were little bit of glue logic without
->> much control within the address space.
-> 
-> Great, you perfectly answered my questions. I think that assigning the
-> "final" address to the 'reg' property is the right way to go (fixed
-> address + LPSC index).
-> 
-Thanks Mike.
+Hello,
 
-Regards,
-Santosh
+In this version I took in account all the remarks from Wolfram, see
+the changelog for the details.
+
+This patch set adds support for the I2C Transaction Generator which
+offloads CPU from managing I2C transfer step by step. This feature is
+currently only available on the I2C controller IP embedded in the
+Armada XP SoC.
+
+This series also contains a real fix for the I2C controller of the
+Armada XP SoC.
+
+The first two patches modify the driver itself and should go through
+i2c subsystem.
+
+The last patches updates the device tree to be able to use this new
+feature.
+
+"ARM: dts: mvebu: Introduce a new compatible string for mv64xxx-i2c"
+should go through i2c subsystems with an acked-by from the device tree
+maintainers.
+
+"ARM: dts: mvebu: Update with the new compatible string for
+mv64xxx-i2c" should go through mvebu subsystems (and then arm-soc)
+with an acked-by from the device tree maintainers.
+
+Although Mark Rutland agreed with this binding:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/190561.html
+I would like to have a formal Acked-by
+
+Thanks,
+
+Changelog:
+
+v5->v6:
+
+ - Fix the return value of mv64xxx_i2c_offload_msg(): '-EINVAL'
+   instead of '1'
+
+ - Replace the copy loop by a memcpy and a call to cpu_to_le32 to be
+   compatible with a BE kernel.
+
+- Don't write in the TX register if we are only reading (I2C_M_RD)
+
+- Get the data from the register inside the
+  mv64xxx_i2c_update_offload_data function instead of receiving them
+  by parameter.
+
+- Use false instead of 0 for the boolean variable offload_enabled
+
+- Split the dts patch in 2 part. One for the arm-soc subsystem and one
+  for the i2c subsystem.
+
+v4->v5:
+
+ - handle of the "marvell,mv78230-i2" string as a single compatible
+   string. Even it is strongly discouraged to use "marvell,
+   mv78230-i2" alone, it is better to be able to handle it.
+
+
+v3->v4:
+
+ - reverse the order of the compatible strings, with the most
+   specific first
+
+ - rebased on 3.11-rc1
+
+v2->v3:
+
+ - Introduces a new compatible string mv78230-i2c which will be used
+   for the fix and for the offload feature which are only present on
+   the Armada XP SoCs
+
+ - Removes the unneeded spin_lock_irqsave pointed by Russell King
+
+ - The offload mechanism is now port of the fsm and handle the
+   multiple messages.
+
+ - The flag bridge-enabled is renamed to offload_enabled, but the
+   register name stills contains the BRIDGE word to match the
+   datasheet.
+
+ - Uses writel_relaxed on the place pointed by Russell King
+
+ - Uses the bool type for the flag (pointed by Thomas Petazzoni)
+
+ - Removes useless code (pointed by Thomas Petazzoni)
+
+ - Updates the bindings documentation
+
+v1->v2:
+ - Move the flag for the timing issue from global scope to per device
+   scope
+ - Assignment is no more done in if condition
+
+Gregory CLEMENT (4):
+  i2c-mv64xxx: Add I2C Transaction Generator support
+  i2c-mv64xxx: Fix timing issue on Armada XP (errata FE-8471889)
+  ARM: dts: mvebu: Introduce a new compatible string for mv64xxx-i2c
+  ARM: dts: mvebu: Update with the new compatible string for mv64xxx-i2c
+
+ .../devicetree/bindings/i2c/i2c-mv64xxx.txt        |  11 ++
+ arch/arm/boot/dts/armada-370-xp.dtsi               |   2 -
+ arch/arm/boot/dts/armada-370.dtsi                  |   8 +
+ arch/arm/boot/dts/armada-xp.dtsi                   |  10 +
+ drivers/i2c/busses/i2c-mv64xxx.c                   | 202 ++++++++++++++++++++-
+ 5 files changed, 221 insertions(+), 12 deletions(-)
+
+-- 
+1.8.1.2
