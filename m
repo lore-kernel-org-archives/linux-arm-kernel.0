@@ -1,88 +1,80 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 22 Aug 2013 14:24:01 +0530
-Subject: [PATCH v2 0/2] ARM: dts: Add SHAM and AES DT information
-In-Reply-To: <5215CCFE.6040500@baylibre.com>
-References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.02.1308210012420.6426@utopia.booyaka.com>
- <5214C11F.8090808@baylibre.com> <5214C372.3080402@baylibre.com>
- <52158A7E.30305@ti.com> <5215CCFE.6040500@baylibre.com>
-Message-ID: <5215D1A9.4000508@ti.com>
+From: chen.gang.flying.transformer@gmail.com (Chen Gang F T)
+Date: Thu, 22 Aug 2013 16:59:56 +0800
+Subject: [PATCH v2] ARM: OMAP2: use 'int' instead of 'unsigned' for
+ variable 'gpmc_irq_start'
+In-Reply-To: <20130822083206.GU7656@atomide.com>
+References: <521479B4.8030604@asianux.com> <20130822071402.GQ7656@atomide.com>
+ <5215C12D.5020807@asianux.com> <5215C209.3080606@asianux.com>
+ <20130822075731.GT7656@atomide.com> <5215C555.9060902@asianux.com>
+ <20130822083206.GU7656@atomide.com>
+Message-ID: <5215D30C.1070500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
-
-On Thursday 22 August 2013 02:04 PM, Benoit Cousson wrote:
-> Hi Lokesh,
-> 
-> On 22/08/2013 05:50, Lokesh Vutla wrote:
->> Hi Benoit,
->> On Wednesday 21 August 2013 07:11 PM, Benoit Cousson wrote:
->>> Hi Mark,
+On 08/22/2013 04:32 PM, Tony Lindgren wrote:
+> * Chen Gang <gang.chen@asianux.com> [130822 01:10]:
+>> On 08/22/2013 03:57 PM, Tony Lindgren wrote:
+>>> * Chen Gang <gang.chen@asianux.com> [130822 00:55]:
+>>>> 'gpmc_irq_start' is mostly used as 'int', and for a variable, do not
+>>>> suggest to only use 'unsigned' as its type, so use 'int' instead of
+>>>> 'unsigned' for variable 'gpmc_irq_start'.
+>>>>
+>>>> Also it will fix the related issue (dummy the real world failure):
+>>>>
+>>>>   arch/arm/mach-omap2/gpmc.c:728:2: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
+>>>>
 >>>
->>> In fact I cannot even apply these patches since they are referring the the edma controller node that does not seem to be there in 3.11-rc6.
+>>> Thanks applying into omap-for-v3.12/fixes-non-critical.
 >>>
->>> Is this EDMA series supposed to be merged for 3.12? If this is the case, where can I find a reference GIT for it?
->> The following EDMA support dt patch series from Joel is needed :
->> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92176.html
->> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92177.html
-> 
-> Thanks, it works a little bit better with these patches :-)
-> 
-> What about the EDMA driver? Is this already in mainline or planned for 3.12?
-Its already in mainline..:)
-
-Thanks and regards,
-Lokesh
-> 
-> Thanks,
-> Benoit
-> 
 >>
->> Thanks and Regards,
->> Lokesh
->>>
->>> Thanks,
->>> Benoit
->>>
->>> On 21/08/2013 15:31, Benoit Cousson wrote:
->>>> Hi Paul,
->>>>
->>>> On 21/08/2013 02:13, Paul Walmsley wrote:
->>>>> Hi Beno?t,
->>>>>
->>>>> On Wed, 17 Jul 2013, Mark A. Greer wrote:
->>>>>
->>>>>> From: "Mark A. Greer" <mgreer@animalcreek.com>
->>>>>>
->>>>>> Long overdue patches to add the device tree updates and
->>>>>> documentation for the SHAM and AES modules on the am33xx.
->>>>>> The supporting code is already in the mainline kernel.
->>>>>>
->>>>>> This series is based on the current mainline kernel,
->>>>>> c0d15cc (linked-list: Remove __list_for_each).
->>>>>>
->>>>>> Changes from v1:
->>>>>>    - Added missing '};' as pointed out by Lokesh Vutla
->>>>>> <lokeshvutla@ti.com>
->>>>>
->>>>> I guess you should take these patches?
->>>>
->>>> You're right, I should, I've just never seen them :-(
->>>> Thanks for the pointer.
->>>>
->>>> Mark,
->>>>
->>>> After a quick search on Google, I did not see any comment on these
->>>> patches. Did you get any review so far?
->>>>
->>>> Thanks,
->>>> Benoit
->>>>
->>>
->>> -- 
->>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Thank you too.
 >>
+>> Hmm... excuse me, I am not quite familiar with the omap version trees,
+>> so may have a doubt: "it seems this is a real bug, is it suitable to
+>> belong to fixes-none-critical tree ?"
 > 
+> For the -rc cycle we try to limit the patches to oopses and regressions,
+> especially this close to v3.11 being tagged.
+> 
+
+Really necessary.
+
+> It seems the bug has been there for quite some time, and that we don't
+> seem to have oopses or other failures reporting this. So it seems there's
+> no reason for urgency to have it merged into the current -rc series.
+> 
+
+I guess so too (I only find it by compiling).
+
+
+> If you (or somebody else) strongly feels that it should be in applied
+> to the current -rc series as a fix instead of during the merge window,
+> then please let me know the failing cases with logs showing what
+> happens.
+> 
+
+Hmm... for urgent bugs, the reporters really need supply the failing
+cases with logs showing what happens.
+
+Bugs can be sort of by urgent priority (e.g. this bug is not urgent).
+but for most of bugs may cause critical issue which depends on the using
+environments, and can be 'imagined' by us.
+
+Hmm... I guess: for our case, what your meaning is "fixes-none-urgent",
+not "fixes-none-critical", is it correct ?  :-)
+
+
+Thanks.
+
+> Regards,
+> 
+> Tony
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+
+-- 
+Chen Gang
