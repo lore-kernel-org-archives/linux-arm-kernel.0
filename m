@@ -1,30 +1,28 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Thu, 22 Aug 2013 10:35:13 +0800
-Subject: [PATCH -next] ARM: pxa: ssp: remove kfree for memory allocated with
- devm_kzalloc
-Message-ID: <CAPgLHd8N4G4b2LwFKBRWJi-_ay6FihPL2WXMh4W3+iwObRcJzA@mail.gmail.com>
+Date: Thu, 22 Aug 2013 10:37:20 +0800
+Subject: [PATCH -next] ASoC: mmp-pcm: remove duplicated include from mmp-pcm.c
+Message-ID: <CAPgLHd9Eey5pbDjQmSquHvJY4zpDBDtp9brzWn-s5P6kaKmvpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-It's not necessary to free memory allocated with devm_kzalloc
-and using kfree leads to a double free.
+Remove duplicated include.
 
 Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- arch/arm/plat-pxa/ssp.c | 1 -
+ sound/soc/pxa/mmp-pcm.c | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
-index c83f27b..d1230a8 100644
---- a/arch/arm/plat-pxa/ssp.c
-+++ b/arch/arm/plat-pxa/ssp.c
-@@ -240,7 +240,6 @@ static int pxa_ssp_remove(struct platform_device *pdev)
- 	list_del(&ssp->node);
- 	mutex_unlock(&ssp_lock);
+diff --git a/sound/soc/pxa/mmp-pcm.c b/sound/soc/pxa/mmp-pcm.c
+index 9a97843..8235e23 100644
+--- a/sound/soc/pxa/mmp-pcm.c
++++ b/sound/soc/pxa/mmp-pcm.c
+@@ -17,7 +17,6 @@
+ #include <linux/dmaengine.h>
+ #include <linux/platform_data/dma-mmp_tdma.h>
+ #include <linux/platform_data/mmp_audio.h>
+-#include <linux/dmaengine.h>
  
--	kfree(ssp);
- 	return 0;
- }
- 
+ #include <sound/pxa2xx-lib.h>
+ #include <sound/core.h>
