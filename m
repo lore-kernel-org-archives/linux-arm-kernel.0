@@ -1,76 +1,70 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 22 Aug 2013 12:49:05 -0300
-Subject: [PATCH v3 0/2] Kirkwood standby
-Message-ID: <1377186547-14284-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Thu, 22 Aug 2013 12:49:06 -0300
+Subject: [PATCH v3 1/2] ARM: feroceon: Add suspend/resume operation
+In-Reply-To: <1377186547-14284-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1377186547-14284-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1377186547-14284-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset implements a very basic suspend/resume support on
-Kirkwood SoC's, based on the work of Simon Guinot.
+Add support for suspend/resume operations. The implemented procedures
+are identical to the ones for ARM926.
 
-Given the CPU itself is not stopped on suspend, but just sits
-waiting for interruption, this is more similar to a standby-mode,
-than to a real suspend-to-RAM. Therefore, I've chosen to use the
-'standby' power state.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/Kconfig            |  2 +-
+ arch/arm/mm/proc-feroceon.S | 26 ++++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+), 1 deletion(-)
 
-The first patch implements suspend/resume procedures in Feroceon CPU
-and it's already applied in Russell's. I'm only adding it here for
-series consistency.
-
-The second patch implements the 'standby' state by disabling SoC
-memory units and put the CPU in idle state. Additional power savings
-must be enhanced on each driver by implementing proper suspend/resume support.
-
-This is based in v3.11-rc6 and tested on Openblocks A6.
-
-By simple instrumentation I found (see the table below) that this 'standby'
-state has *no power savings* compared to a CPUIdle-enabled platform.
-Therefore, it's not clear to me the real advantage of this support.
-
-However, and hopefully, by implementing proper suspend/resume in relevant
-peripherals, the power savings of the standby might get improved.
-
-CONFIG_CPU_IDLE=y
-State             Current (mA)
-------------------------------
-Normal (system idle)   360
-Normal (system busy    440
-Standby                360
-
-!CONFIG_CPU_IDLE
-State             Current (mA)
-------------------------------
-Normal (system idle)   440
-Normal (system busy    440
-Standby                360
-
-(The above are sketchy measurements but useful to compare CPUIdle vs. Standby)
-
-Changes from v2:
-
-  * In order to remain multiplatform-ready, I reworked the kirkwood_pm_init
-    by having it explicitly called from mach-kirkwood/. Requested by
-    Andrew Lunn.
-
-Changes from v1:
-
-  * Removed clock gating. Each peripheral is in charge of implementing
-    a proper suspend/resume path, including gateable clock handling.
-
-Ezequiel Garcia (2):
-  ARM: feroceon: Add suspend/resume operation
-  ARM: kirkwood: Add standby support
-
- arch/arm/Kconfig                                  |  2 +-
- arch/arm/mach-kirkwood/Makefile                   |  2 +
- arch/arm/mach-kirkwood/board-dt.c                 |  1 +
- arch/arm/mach-kirkwood/common.c                   |  1 +
- arch/arm/mach-kirkwood/common.h                   |  6 ++
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  2 +
- arch/arm/mach-kirkwood/pm.c                       | 73 +++++++++++++++++++++++
- arch/arm/mm/proc-feroceon.S                       | 26 ++++++++
- 8 files changed, 112 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-kirkwood/pm.c
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 43594d5..a5111ec 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2199,7 +2199,7 @@ source "kernel/power/Kconfig"
+ 
+ config ARCH_SUSPEND_POSSIBLE
+ 	depends on !ARCH_S5PC100
+-	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
++	depends on CPU_ARM920T || CPU_ARM926T || CPU_FEROCEON || CPU_SA1100 || \
+ 		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE || CPU_MOHAWK
+ 	def_bool y
+ 
+diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
+index d5146b9..db79b62 100644
+--- a/arch/arm/mm/proc-feroceon.S
++++ b/arch/arm/mm/proc-feroceon.S
+@@ -514,6 +514,32 @@ ENTRY(cpu_feroceon_set_pte_ext)
+ #endif
+ 	mov	pc, lr
+ 
++/* Suspend/resume support: taken from arch/arm/mm/proc-arm926.S */
++.globl	cpu_feroceon_suspend_size
++.equ	cpu_feroceon_suspend_size, 4 * 3
++#ifdef CONFIG_ARM_CPU_SUSPEND
++ENTRY(cpu_feroceon_do_suspend)
++	stmfd	sp!, {r4 - r6, lr}
++	mrc	p15, 0, r4, c13, c0, 0	@ PID
++	mrc	p15, 0, r5, c3, c0, 0	@ Domain ID
++	mrc	p15, 0, r6, c1, c0, 0	@ Control register
++	stmia	r0, {r4 - r6}
++	ldmfd	sp!, {r4 - r6, pc}
++ENDPROC(cpu_feroceon_do_suspend)
++
++ENTRY(cpu_feroceon_do_resume)
++	mov	ip, #0
++	mcr	p15, 0, ip, c8, c7, 0	@ invalidate I+D TLBs
++	mcr	p15, 0, ip, c7, c7, 0	@ invalidate I+D caches
++	ldmia	r0, {r4 - r6}
++	mcr	p15, 0, r4, c13, c0, 0	@ PID
++	mcr	p15, 0, r5, c3, c0, 0	@ Domain ID
++	mcr	p15, 0, r1, c2, c0, 0	@ TTB address
++	mov	r0, r6			@ control register
++	b	cpu_resume_mmu
++ENDPROC(cpu_feroceon_do_resume)
++#endif
++
+ 	.type	__feroceon_setup, #function
+ __feroceon_setup:
+ 	mov	r0, #0
 -- 
 1.8.1.5
