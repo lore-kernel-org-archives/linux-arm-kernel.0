@@ -1,29 +1,33 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 22 Aug 2013 11:46:55 +0530
-Subject: [PATCH 2/2] ARM: tegra: add Palmas pincontrol to Dalmore device
- tree
-In-Reply-To: <5214F8FD.3070003@wwwdotorg.org>
-References: <1377088461-9499-1-git-send-email-ldewangan@nvidia.com>
- <1377088461-9499-2-git-send-email-ldewangan@nvidia.com>
- <5214F8FD.3070003@wwwdotorg.org>
-Message-ID: <5215ACD7.9060400@nvidia.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 22 Aug 2013 08:07:36 +0200
+Subject: remove pxa ssp driver???
+In-Reply-To: <CADApbehAcOKsPdrVo_CrkFfqFtB+wy1xr00m-fMbVgbaJkr4ug@mail.gmail.com>
+References: <CADApbej4bvSW7PVXnor4v3iFMcZ=ZHN9T_ST5-SYFJZM9sakDQ@mail.gmail.com>
+ <521481A7.5030504@gmail.com>
+ <CADApbehAcOKsPdrVo_CrkFfqFtB+wy1xr00m-fMbVgbaJkr4ug@mail.gmail.com>
+Message-ID: <5215AAA8.5050001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 August 2013 10:59 PM, Stephen Warren wrote:
-> On 08/21/2013 06:34 AM, Laxman Dewangan wrote:
->> Add Palmas pincontrol to Dalmore device tree and make following
->> configuration as default:
->> - Disable DVFS1 and DVFS2.
->> - Set GPIO6 to gpio mode.
->> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
->> +			palmas_pinctrl {
->> +				compatible = "ti,tps65913-pinctrl";
-> A node name of "pinmux" would be more appropriate here, since the node
-> name should represent device type rather than device identity.
->
-> Aside from that, the series looks fine, but at this point will have to
-> wait for 3.13 I think, unless this series has a side-effect of fixing
-> some bug/regression. Can you please repost once 3.12-rc1 is out?
+On 22.08.2013 05:13, Chao Xie wrote:
+> On Wed, Aug 21, 2013 at 5:00 PM, Daniel Mack <zonque@gmail.com> wrote:
 
-Sure, I will correct the node name and post the patch later.
+>> Yes, I agree, but I'd like to schedule that for after the 3.12 merge
+>> window has settled. Is that ok for you?
+>>
+> That is fine.
+> You have submited the patches for removing the old pxa DMA driver, what is the
+> status for that?
+
+No, not yet. The patch to do this is part of a big series that needs a
+lot more testing. Unfortunately, I haven't got much feedback yet from
+people who use PXA platforms. If you could give it a try, please do:
+
+  https://github.com/zonque/linux/tree/pxa-dma-v2
+
+Some parts of this series have been extracted and merged, but only such
+patches that don't break the current DMA implementation.
+
+
+Thanks,
+Daniel
