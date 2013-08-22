@@ -1,94 +1,41 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 22 Aug 2013 16:02:27 +0100
-Subject: [Patch v3 2/3] ARM: dts: Document the CCI PMU DT bindings
-In-Reply-To: <1377183748-5717-1-git-send-email-punit.agrawal@arm.com>
-References: <1377183748-5717-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1377183748-5717-3-git-send-email-punit.agrawal@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 22 Aug 2013 23:14:44 +0800
+Subject: [GIT PULL 2/5] ARM: imx: soc changes for 3.12
+In-Reply-To: <CAGa+x84dqBvSsPicz_cCuWjK_XpZUd-zCYanW785eEkvrUVX_A@mail.gmail.com>
+References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
+ <1376833688-24542-2-git-send-email-shawn.guo@linaro.org>
+ <87li3tvnj8.fsf@linaro.org>
+ <20130822144242.GI30533@S2101-09.ap.freescale.net>
+ <CAGa+x84dqBvSsPicz_cCuWjK_XpZUd-zCYanW785eEkvrUVX_A@mail.gmail.com>
+Message-ID: <20130822151441.GA594@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CCI PMU can profile bus transactions at the master and slave
-interfaces of the CCI. The PMU can be used to observe an aggregated
-view of the bus traffic between the various components connected to the
-CCI.
+On Thu, Aug 22, 2013 at 07:59:34AM -0700, Kevin Hilman wrote:
+> Yes, the conflict is trivial, but having seen several similar ones
+> this merge window, it's getting kinda old.  Also, I'm not crazy about
+> having Linus see several merge conflicts to the same area.  He'll see
+> that arm-soc folks are not properly coordinating things with Russell
+> and IMO that's something we need to fix in ARM land, not expose it to
+> Linus.
 
-Introduce a binding for the CCI PMU. The PMU node will be a sub-node of
-the CCI node.
+Understood.
 
-Cc: devicetree at vger.kernel.org
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
----
- Documentation/devicetree/bindings/arm/cci.txt |   46 +++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+> 
+> Also, in the future, if you're already aware of merge conflicts in
+> -next in a branch you're submitting for a pull request, it would be
+> *very* helpful to mention that in the pull request.
 
-diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
-index 024c03d..551119e 100644
---- a/Documentation/devicetree/bindings/arm/cci.txt
-+++ b/Documentation/devicetree/bindings/arm/cci.txt
-@@ -85,6 +85,42 @@ specific to ARM.
- 				    corresponding interface programming
- 				    registers.
- 
-+	- CCI PMU node
-+
-+		Parent node must be CCI interconnect node.
-+
-+		A CCI pmu node must contain the following properties:
-+
-+		- compatible
-+			Usage: required
-+			Value type: <string>
-+			Definition: must be "arm,cci-400-pmu"
-+
-+		- reg:
-+			Usage: required
-+			Value type: Integer cells. A register entry, expressed
-+				    as a pair of cells, containing base and
-+				    size.
-+			Definition: the base address and size of the
-+				    corresponding interface programming
-+				    registers.
-+
-+		- interrupts:
-+			Usage: required
-+			Value type: Integer cells. Array of interrupt specifier
-+				    entries, as defined in
-+				    ../interrupt-controller/interrupts.txt.
-+			Definition: list of counter overflow interrupts, one per
-+				    counter. The interrupts must be specified
-+				    starting with the cycle counter overflow
-+				    interrupt, followed by counter0 overflow
-+				    interrupt, counter1 overflow interrupt,...
-+				    ,counterN overflow interrupt.
-+
-+				    The CCI PMU has an interrupt signal for each
-+				    counter. The number of interrupts must be
-+				    equal to the number of counters.
-+
- * CCI interconnect bus masters
- 
- 	Description: masters in the device tree connected to a CCI port
-@@ -169,6 +205,16 @@ Example:
- 			interface-type = "ace";
- 			reg = <0x5000 0x1000>;
- 		};
-+
-+		pmu at 9000 {
-+			 compatible = "arm,cci-400-pmu";
-+			 reg = <0x9000 0x5000>;
-+			 interrupts = <0 101 4>,
-+				      <0 102 4>,
-+				      <0 103 4>,
-+				      <0 104 4>,
-+				      <0 105 4>;
-+		};
- 	};
- 
- This CCI node corresponds to a CCI component whose control registers sits
--- 
-1.7.10.4
+Okay, got it.
+
+<snip>
+
+> > [1] https://lkml.org/lkml/2013/6/3/22
+> 
+> Seems this is an unrelated conflict to the one I was seeing in Kconfig.debug
+
+Sorry, gave the wrong link.  It should be:
+
+http://article.gmane.org/gmane.linux.kernel.next/28290
+
+Shawn
