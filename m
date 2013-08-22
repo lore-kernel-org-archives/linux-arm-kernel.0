@@ -1,8 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 22 Aug 2013 16:19:28 +0200
-Subject: [PATCH v6 3/4] ARM: dts: mvebu: Introduce a new compatible string for
- mv64xxx-i2c
-Message-ID: <1377181169-17483-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Thu, 22 Aug 2013 16:19:29 +0200
+Subject: [PATCH v6 4/4] ARM: dts: mvebu: Update with the new compatible string
+ for mv64xxx-i2c
+In-Reply-To: <1377181169-17483-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1377181169-17483-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1377181169-17483-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,38 +13,78 @@ offload i2c transaction. This new version of the IP come also with
 some errata. This lead to the introduction to a another compatible
 string.
 
-This commit updates the Device Tree binding documentation accordingly.
+This commit split the i2c information into armada-370.dtsi and
+armada-xp.dtsi. Most of the data remains the same and stay in the
+common file Armada-370-xp.dtsi. With this new feature the size of the
+registers are bigger for Armada XP and the new compatible string is
+used.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/armada-370-xp.dtsi |  2 --
+ arch/arm/boot/dts/armada-370.dtsi    |  8 ++++++++
+ arch/arm/boot/dts/armada-xp.dtsi     | 10 ++++++++++
+ 3 files changed, 18 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-index 6113f92..aeff1e2 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-@@ -5,6 +5,8 @@ Required properties :
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 90b1176..d8b24c9 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -121,7 +121,6 @@
  
-  - reg             : Offset and length of the register set for the device
-  - compatible      : Should be "marvell,mv64xxx-i2c" or "allwinner,sun4i-i2c"
-+                     or for controller which support the I2C Transaction
-+                     Generator "marvell,mv64xxx-i2c","marvell,mv7230-i2c"
-  - interrupts      : The interrupt number
+ 			i2c0: i2c at 11000 {
+ 				compatible = "marvell,mv64xxx-i2c";
+-				reg = <0x11000 0x20>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				interrupts = <31>;
+@@ -132,7 +131,6 @@
  
- Optional properties :
-@@ -20,3 +22,12 @@ Examples:
- 		interrupts = <29>;
- 		clock-frequency = <100000>;
- 	};
+ 			i2c1: i2c at 11100 {
+ 				compatible = "marvell,mv64xxx-i2c";
+-				reg = <0x11100 0x20>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				interrupts = <32>;
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index fa3dfc6..0e2eefa 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -155,6 +155,14 @@
+ 				};
+ 			};
+ 
++			i2c0: i2c at 11000 {
++				reg = <0x11000 0x20>;
++			};
 +
-+For a controller which support the I2C Transaction Generator:
++			i2c1: i2c at 11100 {
++				reg = <0x11100 0x20>;
++			};
 +
-+	i2c at 11000 {
-+		compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
-+		reg = <0x11000 0x100>;
-+		interrupts = <29>;
-+		clock-frequency = <100000>;
-+	};
+ 			usb at 50000 {
+ 				clocks = <&coreclk 0>;
+ 			};
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 416eb94..e1f2547 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -138,6 +138,16 @@
+ 				};
+ 			};
+ 
++			i2c0: i2c at 11000 {
++				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
++				reg = <0x11000 0x100>;
++			};
++
++			i2c1: i2c at 11100 {
++				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
++				reg = <0x11100 0x100>;
++			};
++
+ 			usb at 50000 {
+ 				clocks = <&gateclk 18>;
+ 			};
 -- 
 1.8.1.2
