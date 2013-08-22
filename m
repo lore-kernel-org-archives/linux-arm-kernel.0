@@ -1,49 +1,56 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 22 Aug 2013 11:38:32 +0100
-Subject: [PATCH v3 4/4] spi:Add Freescale DSPI driver for Vybrid VF610
- platform
-In-Reply-To: <1376622535-8474-5-git-send-email-b44548@freescale.com>
-References: <1376622535-8474-1-git-send-email-b44548@freescale.com>
- <1376622535-8474-5-git-send-email-b44548@freescale.com>
-Message-ID: <20130822103832.GB26118@sirena.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 22 Aug 2013 12:43:14 +0200
+Subject: SHMobile Compatibility String Inconsistencies
+In-Reply-To: <20130822054639.GE11086@verge.net.au>
+References: <20130822054639.GE11086@verge.net.au>
+Message-ID: <5813266.Bt0QjqXd25@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 11:08:55AM +0800, Chao Fu wrote:
-> From: Chao Fu <B44548@freescale.com>
+Hi Simon,
+
+On Thursday 22 August 2013 14:46:40 Simon Horman wrote:
+> Hi Laurent, Hi Guennadi, Hi All,
 > 
-> The serial peripheral interface (SPI) module implemented on Freescale Vybrid
-> platform provides a synchronous serial bus for communication between Vybrid
-> and the external peripheral device.
-> The SPI supports full-duplex, three-wire synchronous transfer, has TX/RX FIFO
-> with depth of four entries.
+> Olof has brought to my attention that there is some inconsistency in the way
+> that compatibility strings for SHMobile are named and he has asked us to
+> clean things up for v3.12.
+> 
+> Looking through arch/arm/boot/dts/ I see that we have:
+> 
+> 1. {gpio,pfc}-r8aXXXX and;
+> 2. r8aXXXX-sdhi
+> 
+> The inconsistency that Olof has asked us to resolve is that we should either
+> use r8aXXXX- or -r8aXXXX. Not both.
+> 
+> It seems to me that neither option is inherently better than the other
+> so we should just choose the path of least resistance to make things
+> consistent.
+> 
+> Laurent, Guennadi, do you have any opinions on if it would be easier to
+> change the GPIO and PFC compatibility strings; or to change the SDHI
+> compatibility strings?
 
-Applied, thanks.  Couple of things though:
+I don't think either of the options would be significantly more complex than 
+the other one.
 
-> +
-> +	if (!dspi->len) {
-> +		if (dspi->dataflags & TRAN_STATE_WORD_ODD_NUM)
-> +			set_bit_mode(dspi, 16);
-> +		dspi->waitflags = 1;
-> +		wake_up_interruptible(&dspi->waitq);
+> Ideally I would like you to come to some sort of consensus and send patches.
 
-There's no reason for this to be interruptible.
+Shouldn't the consensus be ARM-wide instead of SH-wide ? Quoting one of my 
+replies to Stephen Warren from another mail thread:
 
-> +static int dspi_suspend(struct device *dev)
-> +{
-> +	struct spi_master *master = dev_get_drvdata(dev);
-> +	struct fsl_dspi *dspi = spi_master_get_devdata(master);
-> +
-> +	spi_master_suspend(master);
-> +	clk_disable_unprepare(dspi->clk);
+> In the bindings I've seen, it's more typical for the compatible value to
+> be ${vendor},${soc}-${unit} than ${vendor},${unit}-${soc}. I guess I
+> don't know how common one format or the other is though.
 
-You could get a small power optimisation by enabling and disabling the
-clock using runtime PM instead so it's only active while the controller
-is actually being used rather than whenever the CPU is active.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130822/601758fc/attachment.sig>
+I'm personally fine with both. However, when using a version number, the 
+format is ${vendor},${unit}-${version}. As we don't have an IP core version 
+number we use the SoC name instead, so ${vendor},${unit}-${soc} would make 
+sense. We should probably decide on one of the two alternatives and document 
+it. 
+
+-- 
+Regards,
+
+Laurent Pinchart
