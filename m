@@ -1,119 +1,85 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 22 Aug 2013 16:18:33 +0200
-Subject: [PATCH v6 0/4] i2c-mv64xxx: Fixes and new feature for controlers
- embedded in Aramda XP
-Message-ID: <1377181113-17179-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Thu, 22 Aug 2013 16:19:06 +0200
+Subject: [PATCH v6 2/4] i2c-mv64xxx: Fix timing issue on Armada XP (errata
+ FE-8471889)
+In-Reply-To: <1377181146-17341-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1377181146-17341-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1377181146-17341-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+All the Armada XP (mv78230, mv78260 and mv78460) have a silicon issue
+in the I2C controller which violate the i2c repeated start
+timing. The I2C standard requires a minimum of 4.7us for the repeated
+start condition whereas the I2C controller of the Armada XP this time
+is 2.9us.
 
-In this version I took in account all the remarks from Wolfram, see
-the changelog for the details.
+So this patch adds a 5us delay for the start case only if the
+the compatible i2c-mv78230 is set.
 
-This patch set adds support for the I2C Transaction Generator which
-offloads CPU from managing I2C transfer step by step. This feature is
-currently only available on the I2C controller IP embedded in the
-Armada XP SoC.
+Based on the initals patches from Zbigniew Bodek
 
-This series also contains a real fix for the I2C controller of the
-Armada XP SoC.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Zbigniew Bodek <zbb@semihalf.com>
+---
+ drivers/i2c/busses/i2c-mv64xxx.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-The first two patches modify the driver itself and should go through
-i2c subsystem.
-
-The last patches updates the device tree to be able to use this new
-feature.
-
-"ARM: dts: mvebu: Introduce a new compatible string for mv64xxx-i2c"
-should go through i2c subsystems with an acked-by from the device tree
-maintainers.
-
-"ARM: dts: mvebu: Update with the new compatible string for
-mv64xxx-i2c" should go through mvebu subsystems (and then arm-soc)
-with an acked-by from the device tree maintainers.
-
-Although Mark Rutland agreed with this binding:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/190561.html
-I would like to have a formal Acked-by
-
-Thanks,
-
-Changelog:
-
-v5->v6:
-
- - Fix the return value of mv64xxx_i2c_offload_msg(): '-EINVAL'
-   instead of '1'
-
- - Replace the copy loop by a memcpy and a call to cpu_to_le32 to be
-   compatible with a BE kernel.
-
-- Don't write in the TX register if we are only reading (I2C_M_RD)
-
-- Get the data from the register inside the
-  mv64xxx_i2c_update_offload_data function instead of receiving them
-  by parameter.
-
-- Use false instead of 0 for the boolean variable offload_enabled
-
-- Split the dts patch in 2 part. One for the arm-soc subsystem and one
-  for the i2c subsystem.
-
-v4->v5:
-
- - handle of the "marvell,mv78230-i2" string as a single compatible
-   string. Even it is strongly discouraged to use "marvell,
-   mv78230-i2" alone, it is better to be able to handle it.
-
-
-v3->v4:
-
- - reverse the order of the compatible strings, with the most
-   specific first
-
- - rebased on 3.11-rc1
-
-v2->v3:
-
- - Introduces a new compatible string mv78230-i2c which will be used
-   for the fix and for the offload feature which are only present on
-   the Armada XP SoCs
-
- - Removes the unneeded spin_lock_irqsave pointed by Russell King
-
- - The offload mechanism is now port of the fsm and handle the
-   multiple messages.
-
- - The flag bridge-enabled is renamed to offload_enabled, but the
-   register name stills contains the BRIDGE word to match the
-   datasheet.
-
- - Uses writel_relaxed on the place pointed by Russell King
-
- - Uses the bool type for the flag (pointed by Thomas Petazzoni)
-
- - Removes useless code (pointed by Thomas Petazzoni)
-
- - Updates the bindings documentation
-
-v1->v2:
- - Move the flag for the timing issue from global scope to per device
-   scope
- - Assignment is no more done in if condition
-
-Gregory CLEMENT (4):
-  i2c-mv64xxx: Add I2C Transaction Generator support
-  i2c-mv64xxx: Fix timing issue on Armada XP (errata FE-8471889)
-  ARM: dts: mvebu: Introduce a new compatible string for mv64xxx-i2c
-  ARM: dts: mvebu: Update with the new compatible string for mv64xxx-i2c
-
- .../devicetree/bindings/i2c/i2c-mv64xxx.txt        |  11 ++
- arch/arm/boot/dts/armada-370-xp.dtsi               |   2 -
- arch/arm/boot/dts/armada-370.dtsi                  |   8 +
- arch/arm/boot/dts/armada-xp.dtsi                   |  10 +
- drivers/i2c/busses/i2c-mv64xxx.c                   | 202 ++++++++++++++++++++-
- 5 files changed, 221 insertions(+), 12 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+index 2404c4e..bc60f9a 100644
+--- a/drivers/i2c/busses/i2c-mv64xxx.c
++++ b/drivers/i2c/busses/i2c-mv64xxx.c
+@@ -24,6 +24,7 @@
+ #include <linux/of_i2c.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
++#include <linux/delay.h>
+ 
+ #define MV64XXX_I2C_ADDR_ADDR(val)			((val & 0x7f) << 1)
+ #define MV64XXX_I2C_BAUD_DIV_N(val)			(val & 0x7)
+@@ -147,6 +148,8 @@ struct mv64xxx_i2c_data {
+ 	struct i2c_msg		*msg;
+ 	struct i2c_adapter	adapter;
+ 	bool			offload_enabled;
++/* 5us delay in order to avoid repeated start timing violation */
++	bool			errata_delay;
+ };
+ 
+ static struct mv64xxx_i2c_regs mv64xxx_i2c_regs_mv64xxx = {
+@@ -440,6 +443,9 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
+ 			/* Setup for the next message */
+ 			mv64xxx_i2c_prepare_for_io(drv_data, drv_data->msgs);
+ 		}
++		if (drv_data->errata_delay)
++			udelay(5);
++
+ 		/*
+ 		 * We're never at the start of the message here, and by this
+ 		 * time it's already too late to do any protocol mangling.
+@@ -499,6 +505,9 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
+ 		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_STOP,
+ 			drv_data->reg_base + drv_data->reg_offsets.control);
+ 		drv_data->block = 0;
++		if (drv_data->errata_delay)
++			udelay(5);
++
+ 		wake_up(&drv_data->waitq);
+ 		break;
+ 
+@@ -766,10 +775,12 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+ 
+ 	/*
+ 	 * For controllers embedded in new SoCs activate the
+-	 * Transaction Generator support.
++	 * Transaction Generator support and the errata fix.
+ 	 */
+-	if (of_device_is_compatible(np, "marvell,mv78230-i2c"))
++	if (of_device_is_compatible(np, "marvell,mv78230-i2c")) {
+ 		drv_data->offload_enabled = true;
++		drv_data->errata_delay = true;
++	}
+ 
+ out:
+ 	return rc;
 -- 
 1.8.1.2
