@@ -1,133 +1,57 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 22 Aug 2013 10:25:30 +0200
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for Freescale
- FTM PWM
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1473340.OXSHEp7d4P@flatron>
- <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <1522215.zHEjdiga8V@flatron>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 22 Aug 2013 14:01:23 +0530
+Subject: [PATCH v4] extcon: palmas: Added a new compatible type *ti,
+ palmas-usb-vid*
+Message-ID: <1377160283-26934-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 of August 2013 02:55:42 Xiubo Li-B47053 wrote:
-> Hi Tomasz,
-> 
-> Thanks for your comments.
-> 
-> > > +- #pwm-cells: Should be 3. Number of cells being used to specify
-> > > PWM
-> > > property.
-> > > +  First cell specifies the per-chip channel index of the PWM
-> > > to use, the
-> > > +  second cell is the period in nanoseconds and bit 0 in
-> > > the third cell is
-> > > +  used to encode the polarity of PWM output. Set bit
-> > > 0 of the third in PWM
-> > > +  specifier to 1 for inverse polarity & set to 0
-> > > for normal polarity.
-> > 
-> > If the meaning of flags cell is the same as in generic, default PWM
-> > specifier format, then it should be noted here and generic PWM binding
-> > documentation mentioned.
-> 
-> OK, How about the following ?
-> - #pwm-cells: Should be 3. See pwm.txt in this directory for a
->   description of the cells format.
+The Palmas device contains only a USB VBUS-ID detector, so added a
+compatible type *ti,palmas-usb-vid*. Didn't remove the existing compatible
+types for backward compatibility.
 
-I meant just the last cell, which stores flags, but actually this might be 
-a good idea, but with slightly extended description. Something among those 
-lines:
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+Changes from v3:
+* Fixed commit log message (VID to VBUS-ID).
+* Fixed the Documentation to tell "ti,twl6035-usb" and "ti,palmas-usb" is
+deprecated
 
- - #pwm-cells: Should be 3. The default three cell format specified by 
-generic PWM bindings are used. Refer to the documentation of generic PWM 
-bindings for more information about the meaning of cells.
+Changes from [1]:
+* Since the old compatible values will be in 3.11 kernel, we shouldn't remove
+the old compatible values. So retain the old compatible values.
 
-> I will replace it in v2.
-> 
-> > > +- fsl,pwm-clk-ps: the ftm0 pwm clock's prescaler,
-> > > divide-by 2^n(n = 0 ~ 7).
-> > 
-> > Is it a hardware-specific property?
-> 
-> Yes, I will revise it in v2.
+[1] -> http://www.spinics.net/lists/linux-omap/msg95843.html
 
-I'd like to hear a bit more elaborate description of this property. What 
-are the factors that decide what value should be used here?
+ Documentation/devicetree/bindings/extcon/extcon-palmas.txt |    3 ++-
+ drivers/extcon/extcon-palmas.c                             |    1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-> > > +- fsl,pwm-cpwm: Center-Aligned PWM (CPWM)
-> > > mode.
-> > 
-> > Could you explain meaning of this property?
-> 
-> Well, this feature will be removed from the pwm core in v2.
-
-OK.
-
-> > > +- fsl,pwm-number: the number of PWM devices, and is must equal to
-> > > the
-> > > number +  of "fsl,pwm-channels".
-> > 
-> > This is redundant, because you can simply count how many entries have
-> > been specified in fsl,pwm-channels.
-> 
-> Yes, I will revise it in v2.
-> And this would be renamed to " fsl,pwm-channel-number", which can be
-> more Readable and understood.
-
-I meant that you don't need to specify how many entries other property has 
-in another property, because device tree provides information about sizes 
-of all properties. So, in parsing code, you would be able to simply get 
-the size of "fsl,pwm-channels" property in bytes, divide that by 
-sizeof(u32) and get the numer of cells specified.
-
-Also see below.
-
-> > > +- fsl,pwm-channels: the channels' order which is be used for pwm in
-> > > ftm0 +  module, and they must be one or some of 0 ~ 7, because the
-> > > ftm0 only has +  8 channels can be used.
-> > 
-> > Could you explain meaning of this property more precisely? I'm
-> > interested especially how is this related to the PWM IP block and
-> > boards.
-> Yes.
-> There are 8 channels most. While the pinctrls of 4th and 5th channels
-> could be used by uart's Rx and Tx, then these 2 channels won't be used
-> for pwm output, so there will be 6 channels available by the pwm.
-> Thus, the pwm chip will register only 6 pwms(6 channels)
-> most("fsl,pwm-channel-orders = {0 1 2 3 6 7}").And also the
-> "fsl,pwm-channel-number" will be 6.
-> 
-> If hasn't any other problems, I will revise It in v2.
-> And this will be renamed to "fsl,pwm-channel-orders", which can be more
-> readable and understood.
-
-As Sascha Hauer already suggested, you could get rid of both this and 
-"fsl,pwm-channel-number" properties and simply register all the channels. 
-This way you will have a deterministic 1:1 mapping of real hardware 
-channels to channels specified in device tree, which is definitely the way 
-to go.
-
-Now as a safety measure, you could simply move the specification of 
-pinctrl states from SoC family or SoC level dtsi file to board level dts, 
-where only pinctrl states of channels used by a particular board would be 
-specified, so nothing could break operation of other devices that share 
-pin muxes with remaining channels.
-
-> > > +- for very channel, the revlatived the pinctrl should be at least
-> > > two
-> > > 
-> >                            ^ typo?
-> > > 
-> > > state +  {"enN", "dsN"}, which "en" means "enable", "ds" means
-> > > "disable" and "N" +  means the order of the channel.
-> > 
-> > I'd suggest a more readable naming convention, for example chN-active
-> > and chN-idle. These words seem to be more common across existing
-> > bindings.
-> That's a good idea, I will think it over and revise it in v2.
-
-OK. Looking forward to v2 then. Thanks.
-
-Best regards,
-Tomasz
+diff --git a/Documentation/devicetree/bindings/extcon/extcon-palmas.txt b/Documentation/devicetree/bindings/extcon/extcon-palmas.txt
+index 7dab6a8..dc5fab3 100644
+--- a/Documentation/devicetree/bindings/extcon/extcon-palmas.txt
++++ b/Documentation/devicetree/bindings/extcon/extcon-palmas.txt
+@@ -2,7 +2,8 @@ EXTCON FOR PALMAS/TWL CHIPS
+ 
+ PALMAS USB COMPARATOR
+ Required Properties:
+- - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
++ - compatible : Should be "ti,palmas-usb-vid". "ti,twl6035-usb" and
++   "ti,palmas-usb" is deprecated and is kept for backward compatibility.
+ 
+ Optional Properties:
+  - ti,wakeup : To enable the wakeup comparator in probe
+diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
+index 89fdd05..9672f31 100644
+--- a/drivers/extcon/extcon-palmas.c
++++ b/drivers/extcon/extcon-palmas.c
+@@ -268,6 +268,7 @@ static const struct dev_pm_ops palmas_pm_ops = {
+ 
+ static struct of_device_id of_palmas_match_tbl[] = {
+ 	{ .compatible = "ti,palmas-usb", },
++	{ .compatible = "ti,palmas-usb-vid", },
+ 	{ .compatible = "ti,twl6035-usb", },
+ 	{ /* end */ }
+ };
+-- 
+1.7.10.4
