@@ -1,36 +1,82 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 22 Aug 2013 19:38:15 +0530
-Subject: Linking failure on linux-next with arm allyesconfig
-Message-ID: <CAHbNUh2MXZhg7L8BN9ds17rmg8ueo6d8CJhRMgy6fK-xn7qRoQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 22 Aug 2013 15:08:48 +0100
+Subject: [PATCH v2 1/2] ARM: dts: Add SHAM data and documentation for
+ AM33XX
+In-Reply-To: <1374078222-12883-2-git-send-email-mgreer@animalcreek.com>
+References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
+ <1374078222-12883-2-git-send-email-mgreer@animalcreek.com>
+Message-ID: <20130822140848.GD23152@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 17, 2013 at 05:23:41PM +0100, Mark A. Greer wrote:
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
+> 
+> Add the generic AM33XX SHAM module's device tree data and
+> enable it for the am335x-evm, am335x-evmsk, and am335x-bone
+> platforms.  Also add Documentation file describing the data
+> for the SHAM module.
+> 
+> CC: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> ---
+>  .../devicetree/bindings/crypto/omap-sham.txt       | 33 ++++++++++++++++++++++
+>  arch/arm/boot/dts/am335x-bone.dts                  |  4 +++
+>  arch/arm/boot/dts/am335x-evm.dts                   |  4 +++
+>  arch/arm/boot/dts/am335x-evmsk.dts                 |  4 +++
+>  arch/arm/boot/dts/am33xx.dtsi                      | 10 +++++++
+>  5 files changed, 55 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/crypto/omap-sham.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/crypto/omap-sham.txt b/Documentation/devicetree/bindings/crypto/omap-sham.txt
+> new file mode 100644
+> index 0000000..c6d1202
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/crypto/omap-sham.txt
+> @@ -0,0 +1,33 @@
+> +OMAP SoC SHA crypto Module
+> +
+> +Required properties:
+> +
+> +- compatible : Should contain entries for this and backward compatible
+> +  SHAM versions:
+> +  - "ti,omap2-sham" for OMAP2 & OMAP3.
+> +  - "ti,omap4-sham" for OMAP4 and AM33XX.
+> +  Note that these two versions are incompatible.
+> +- ti,hwmods: Name of the hwmod associated with the SHAM module
+> +- reg : Offset and length of the register set for the module
+> +- interrupt-parent : the phandle for the interrupt controller that
+> +  services interrupts for this module.
+> +- interrupts : the interrupt number for the SHAM module.
+> +
+> +Optional properties:
+> +- dmas: DMA controller phandle and DMA request ordered pair.
+> +	Only one rx pair is valid per SHAM module.
 
-With ARCH=arm 'allyesconfig' on next-20130822, following linking error
-is observed.
+This may be a little late, but...
 
-arch/arm/kernel/built-in.o: In function `ret_fast_syscall':
-/home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-common.S:42:
-undefined reference to `user_enter'
-arch/arm/kernel/built-in.o: In function `no_work_pending':
-/home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-common.S:77:
-undefined reference to `user_enter'
-arch/arm/kernel/built-in.o: In function `vector_swi':
-/home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-common.S:376:
-undefined reference to `user_exit'
-arch/arm/kernel/built-in.o: In function `__dabt_usr':
-/home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-armv.S:365:
-undefined reference to `user_exit'
-arch/arm/kernel/built-in.o: In function `__irq_usr':
-/home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-armv.S:375:
-undefined reference to `user_exit'
-arch/arm/kernel/built-in.o: In function `__und_usr':
-/home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-armv.S:388:
-undefined reference to `user_exit'
-arch/arm/kernel/built-in.o: In function `__pabt_usr':
-/home/tushar/work/lt_devel/staging-tree/linux-next/arch/arm/kernel/entry-armv.S:662:
-undefined reference to `user_exit'
+Nit: A dma specifier may have many cells, so calling it "pair" is not
+necessarily correct:
 
--- 
-Tushar Behera
+dmas = <&dma0 432 7 5>,
+       <&dma1 3>,
+       <&dma0 212 1 13>;
+
+You could instead say:
+
+- dmas: DMA specifier for the rx dma. See the DMA client binding,
+        Documentation/devicetree/bindings/dma/dma.txt
+
+> +- dma-names: DMA request name. This string corresponds 1:1 with
+> +	the ordered pair in dmas. The string naming is to be
+> +	"rx" for RX request.
+
+Similarly:
+
+ - dma-names: DMA request name. Should be "rx" if a dma is present.
+
+It would be nice to get the bindings using consistent terminology so we
+don't confuse everyone further.
+
+Thanks,
+Mark.
