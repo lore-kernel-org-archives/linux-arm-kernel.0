@@ -1,76 +1,34 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Thu, 22 Aug 2013 17:51:50 +0100
-Subject: [RFC PATCH v2 3/4] powerpc: refactor of_get_cpu_node to support
- other architectures
-In-Reply-To: <20130822135930.GC23152@e106331-lin.cambridge.arm.com>
-References: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376674791-28244-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376674791-28244-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <2032060.4bgTKOdEX2@flatron> <1376777376.25016.11.camel@pasglop>
- <20130819101922.GI3719@e106331-lin.cambridge.arm.com>
- <5212177C.8000709@gmail.com> <521223FA.5050903@arm.com>
- <20130822135930.GC23152@e106331-lin.cambridge.arm.com>
-Message-ID: <521641A6.2070503@arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 22 Aug 2013 18:52:55 +0200
+Subject: [PATCH 1/1] ARM: at91: sam9g45: shutdown ddr1 too when rebooting
+In-Reply-To: <20130822115451.GH6617@n2100.arm.linux.org.uk>
+References: <1377169244-20462-1-git-send-email-plagnioj@jcrosoft.com>
+ <20130822115451.GH6617@n2100.arm.linux.org.uk>
+Message-ID: <20130822165255.GD18627@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/08/13 14:59, Mark Rutland wrote:
-> On Mon, Aug 19, 2013 at 02:56:10PM +0100, Sudeep KarkadaNagesha wrote:
->> On 19/08/13 14:02, Rob Herring wrote:
->>> On 08/19/2013 05:19 AM, Mark Rutland wrote:
->>>> On Sat, Aug 17, 2013 at 11:09:36PM +0100, Benjamin Herrenschmidt wrote:
->>>>> On Sat, 2013-08-17 at 12:50 +0200, Tomasz Figa wrote:
->>>>>> I wonder how would this handle uniprocessor ARM (pre-v7) cores, for
->>>>>> which 
->>>>>> the updated bindings[1] define #address-cells = <0> and so no reg 
->>>>>> property.
->>>>>>
->>>>>> [1] - http://thread.gmane.org/gmane.linux.ports.arm.kernel/260795
->>>>>
->>>>> Why did you do that in the binding ? That sounds like looking to create
->>>>> problems ... 
->>>>>
->>>>> Traditionally, UP setups just used "0" as the "reg" property on other
->>>>> architectures, why do differently ?
->>>>
->>>> The decision was taken because we defined our reg property to refer to
->>>> the MPIDR register's Aff{2,1,0} bitfields, and on UP cores before v7
->>>> there's no MPIDR register at all. Given there can only be a single CPU
->>>> in that case, describing a register that wasn't present didn't seem
->>>> necessary or helpful.
->>>
->>> What exactly reg represents is up to the binding definition, but it
->>> still should be present IMO. I don't see any issue with it being
->>> different for pre-v7.
->>>
->> Yes it's better to have 'reg' with value 0 than not having it.
->> Otherwise this generic of_get_cpu_node implementation would need some
->> _hack_ to handle that case.
+On 12:54 Thu 22 Aug     , Russell King - ARM Linux wrote:
+> On Thu, Aug 22, 2013 at 01:00:44PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > diff --git a/arch/arm/mach-at91/at91sam9g45_reset.S b/arch/arm/mach-at91/at91sam9g45_reset.S
+> > index 721a1a3..3fd634d 100644
+> > --- a/arch/arm/mach-at91/at91sam9g45_reset.S
+> > +++ b/arch/arm/mach-at91/at91sam9g45_reset.S
+> > @@ -21,6 +21,8 @@
+> >  at91sam9g45_restart:
+> >  			ldr	r5, =at91_ramc_base		@ preload constants
+> >  			ldr	r0, [r5]
+> > +			add	r5, #4				@ ddr1
+> > +			ldr	r5, [r5]
 > 
-> I'm not sure that having some code to handle a difference in standard
-> between two architectures is a hack. If anything, I'd argue encoding a
-> reg of 0 that corresponds to a nonexistent MPIDR value (given that's
-> what the reg property is defined to map to on ARM) is more of a hack ;)
+> I know this isn't critical code, but is there any reason why you can't
+> use:
 > 
-Agreed. But I am more confused.
-
-1. This raises another question as how much do we follow from ePAPR
-standard. ePAPR marks the reg property in /cpu as required.
-Does that mean we must have all the properties marked as required to be
-present in DT ? On the contrary timebase/clock-frequency is some thing
-that can be found dynamically and need not be present but they are
-marked as required too.
-
-> I'm not averse to having a reg value of 0 for this case, but given that
-> there are existing devicetrees without it, requiring a reg property will
-> break compatibility with them.
+> 			ldr	r5, [r5, #4]
 > 
+> here?
 
-2. What exactly does backward compatibility has to cover ? This can't be
-considered as breaking of the binding definition. In continuation to the
-above argument that reg property is required, do we need to cover this
-as it's clearly a case of missing required property(this holds only if
-reg is required always).
+none I just forget we can do this too
 
-Regards,
-Sudeep
+Best Regards,
+J.
