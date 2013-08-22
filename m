@@ -1,23 +1,24 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 22 Aug 2013 13:59:09 -0600
-Subject: [PATCH 09/16] clk: samsung: pll: Use new registration method
- for PLL45xx
-In-Reply-To: <CAKew6eV79H60iU9X5DKOKo57Y51RfVtML2qEqD1z4m6rT_yLJA@mail.gmail.com>
-References: <1377019903-14614-1-git-send-email-t.figa@samsung.com>
- <1377019903-14614-10-git-send-email-t.figa@samsung.com>
- <CAKew6eV79H60iU9X5DKOKo57Y51RfVtML2qEqD1z4m6rT_yLJA@mail.gmail.com>
-Message-ID: <52166D8D.1070900@wwwdotorg.org>
+Date: Thu, 22 Aug 2013 14:08:32 -0600
+Subject: [PATCH v6 3/4] drivers: of: add initialization code for dma
+ reserved memory
+In-Reply-To: <5214D0F0.10209@samsung.com>
+References: <1376924669-28873-1-git-send-email-m.szyprowski@samsung.com>
+ <1376924669-28873-4-git-send-email-m.szyprowski@samsung.com>
+ <521292E0.105@wwwdotorg.org> <98354044.bRIxVeGEeu@flatron>
+ <5212997A.5060206@wwwdotorg.org> <52134B92.10308@samsung.com>
+ <52139AE7.4050300@wwwdotorg.org> <5214D0F0.10209@samsung.com>
+Message-ID: <52166FC0.1090804@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2013 07:17 AM, Yadwinder Singh Brar wrote:
->>  };
->>
->> +static struct __initdata samsung_pll_clock exynos4210_plls[nr_plls] = {
-> 
-> NIT: __initdata should be at last.
+On 08/21/2013 08:38 AM, Marek Szyprowski wrote:
+...
+>> >> b) Adjust memory.txt not to mention any specific property names, but
+>> >> simply mention that other DT nodes can refer to define memory regions by
+>> >> phandle, and leave it up to individual bindings to define which property
+>> >> they use to reference the memory regions, perhaps with memory.txt
+>> >> providing a recommendation of memory-region for the simple case
 
-It's helpful if you only quote as much of the patch as you need to in
-order to reply to it; it wasn't obvious in your message that you had no
-comments on the rest of the patch that you quoted, so people have to
-scroll through it looking carefully for any other comments.
+I think if we just make that change to the binding doc, it'll be fine.
+It's obvious how to extend the binding then.
