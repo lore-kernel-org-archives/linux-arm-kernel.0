@@ -1,42 +1,147 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 22 Aug 2013 14:18:27 -0600
-Subject: [PATCH] DMA: let filter functions of of_dma_simple_xlate possible
- check of_node
-In-Reply-To: <20130822051904.GA2685@rizhao-lap>
-References: <1375408800-11789-1-git-send-email-rizhao@nvidia.com>
- <20130822051904.GA2685@rizhao-lap>
-Message-ID: <52167213.6090604@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Aug 2013 21:16:58 +0100
+Subject: [alsa-devel] [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM
+ links between codec and cpu DAI
+In-Reply-To: <1377199370.2618.99.camel@loki>
+References: <1376293215.2385.32.camel@loki>
+ <20130812082837.GB23006@n2100.arm.linux.org.uk>
+ <1376405952.2617.101.camel@loki>
+ <20130820102555.GZ23006@n2100.arm.linux.org.uk>
+ <20130820114421.GN30073@sirena.org.uk>
+ <20130820114949.GB23006@n2100.arm.linux.org.uk>
+ <20130820133143.GC23006@n2100.arm.linux.org.uk>
+ <20130820185019.GP30073@sirena.org.uk>
+ <20130820201824.GA17845@n2100.arm.linux.org.uk>
+ <1377199370.2618.99.camel@loki>
+Message-ID: <20130822201658.GK6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2013 11:19 PM, Richard Zhao wrote:
-> On Fri, Aug 02, 2013 at 10:00:00AM +0800, Richard Zhao wrote:
->> pass of_phandle_args dma_spec to dma_request_channel in of_dma_simple_xlate,
->> so the filter function could access of_node in of_phandle_args.
->>
->> It also remove restriction of #dma-cells has to be one.
->>
->> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
->> ---
->>  drivers/dma/edma.c     |  7 +++++--
->>  drivers/dma/of-dma.c   | 10 ++++------
->>  drivers/dma/omap-dma.c |  6 ++++--
->>  3 files changed, 13 insertions(+), 10 deletions(-)
->>
+On Thu, Aug 22, 2013 at 08:22:50PM +0100, Liam Girdwood wrote:
+> On Tue, 2013-08-20 at 21:18 +0100, Russell King - ARM Linux wrote:
+> > On Tue, Aug 20, 2013 at 07:50:19PM +0100, Mark Brown wrote:
+> > > On Tue, Aug 20, 2013 at 02:31:43PM +0100, Russell King - ARM Linux wrote:
+> > > 
+> > > > Let's be a little more clear about that: I don't know how to do that
+> > > > because that's the approach taken by _these_ very patches which you've
+> > > > rejected for "abusing the ASoC core".  That's why I'm asking Liam
+> > > 
+> > > The patches I can recall seeing recently have all had some workarounds
+> > > in the core which would need to be resolved differently, though it's
+> > > possible I missed that being done in some version in your mails as there
+> > > have generally also been a lot of modifications adding debug statements
+> > > in the core.
+> > 
+> > The "workarounds in the core" are because there's bugs in the core that
+> > I have no idea how to solve.  You are allegedly the maintainer for the
+> > core code, and so you should understand that code, so you are best placed
+> > to say how the core code should be fixed.  I'm willing to do the patch
+> > generation to fix them but *you* need to give some guidance here -
+> > something that you seem incapable to do.  At the moment, the only fix I
+> > can see being workable is to comment out the broken bit in the core code.
+> > 
 > 
-> Hi Vinod,
-> 
-> Can you please pick up this change?
-> 
-> Hi Stephen,
-> 
-> Can you please give a ack or reviewed-by etc?
+> I'll fix this issue as I've replied privately, but you know it's not
+> appropriate to just comment stuff out in core code (especially if you
+> don't fully understand it). I'm sure you would complain loudly to me if
+> I tried to do a similar HACK in the ARM core.
 
-Hmm. Looking at the patch, I'm not sure it's right.
+Hang on, tell me exactly *where* I've asked for the hack to be merged.  The
+answer is: I haven't.  What I've been asking for all along is how this
+should be solved, and getting nowhere - whether I ask in a reasonable and
+calm manner or have to take it to extremes like I have done now.
 
-This patch simply passes all the specfier args to the filter function,
-and the code to check the equality of the of_node to the filter args is
-still duplicated in each DMA driver. Instead, the DMA core should be
-implementing the equality check, and only even calling the
-driver-specific filter function for devices where the client's phandle
-matches the DMA providing device's of_node handle.
+> > If the problem is that you don't understand the issue, then you could try
+> > replying with some questions about it.
+> > 
+> > If the problem is that you don't understand the code, well... there's not
+> > much point in continuing this discussion until you've had time to study
+> > and understand that code.
+> > 
+> > > If you've got code you think is in a good state to submit then please do
+> > > send it as a normal patch series, the last one I've got here has "ASoC:
+> > > HACK: avoid creating duplicated widgets" as part of it for example.
+> > 
+> > That patch still hasn't gone away, and is still required, because there
+> > has been no guidance or comments about the problem.  Let's explain it
+> > yet again...
+> > 
+> > You have said "there is no problem registering the platform and the CPU
+> > dai from the same device structure".  Let's assume that's a fact and see
+> > what happens in the core code:
+> > 
+> > static int soc_probe_platform(struct snd_soc_card *card,
+> >                            struct snd_soc_platform *platform)
+> > {
+> >         /* Create DAPM widgets for each DAI stream */
+> >         list_for_each_entry(dai, &dai_list, list) {
+> >                 if (dai->dev != platform->dev)
+> >                         continue;
+> > 
+> >                 snd_soc_dapm_new_dai_widgets(&platform->dapm, dai);
+> >         }
+> > }
+> > 
+> > static int soc_probe_link_dais(struct snd_soc_card *card, int num, int order)
+> > {
+> >         if (!cpu_dai->probed &&
+> >                         cpu_dai->driver->probe_order == order) {
+> >                 if (!cpu_dai->codec) {
+> >                         cpu_dai->dapm.card = card;
+> >                         if (!try_module_get(cpu_dai->dev->driver->owner))
+> >                                 return -ENODEV;
+> > 
+> >                         list_add(&cpu_dai->dapm.list, &card->dapm_list);
+> >                         snd_soc_dapm_new_dai_widgets(&cpu_dai->dapm, cpu_dai);
+> >                 }
+> > 
+> > Now, the CPU DAI is added to the dai_list (it has to be there to be found
+> > so the DAI link can bind it, and so soc_probe_link_dais() can be called.)
+> > 
+> > Think about what happens with the above code if platform->dev is the same
+> > as the device used for the CPU DAI (dai->dev) - which can happen when the
+> > platform and CPU DAI are registered from the same platform_device, which
+> > you claim is legal with ASoC.
+> > 
+> > Now, look at snd_soc_dapm_new_dai_widgets():
+> > 
+> > int snd_soc_dapm_new_dai_widgets(struct snd_soc_dapm_context *dapm,
+> >                                  struct snd_soc_dai *dai)
+> > {
+> >         if (dai->driver->playback.stream_name) {
+> > ...
+> >                 dai->playback_widget = w;
+> >         }
+> >         if (dai->driver->capture.stream_name) {
+> > ...
+> >                 dai->capture_widget = w;
+> >         }
+> > 
+> > What happens if the widgets which are bound to are the first set that
+> > are created, but they're overwritten when the second set get created?
+> > (And that _does_ happen.)  The second set are the ones activated when
+> > the audio device is opened, not the first set.
+> > 
+> > Now, there's nothing new in the above, I've already explained all the
+> > above to you several times.  I've had nothing of any help what so ever
+> > back from you on this.  I've asked you how to solve this.  I've had
+> > absolutely nothing back.  So what am I supposed to do here?  Stuff
+> > doesn't work with the core code how it is, so I took the only solution
+> > _you_ left me by your silence, which is to hack the core code.
+> > 
+> 
+> It does seem that your configuration is different to the configurations
+> that work well on Haswell, OMAP4 and Qualcomm and that's probably why
+> you are the only person reporting this atm. I also think the tight
+> coupling between the I2S and SPDIF HW made your problem far more complex
+> and therefore more difficult (for me at least) to follow when the
+> signal to noise ratio of this and related threads started to
+> deteriorate.
+
+Erm, you have completely the wrong end of the stick here.  This has
+nothing to do with I2S and SPDIF at all.
+
+It's about having the _same_ struct device assocated with both the
+platform/DMA backend, registered by snd_soc_register_platform() and
+the CPU DAI registered via snd_soc_register_component().  SPDIF or
+I2S doesn't come into this bug.
