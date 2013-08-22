@@ -1,58 +1,42 @@
 From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 22 Aug 2013 17:39:22 -0500
-Subject: [PATCHv4 2/3] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <521670CE.4000202@wwwdotorg.org>
-References: <1376498884-9199-1-git-send-email-dinguyen@altera.com>
- <1376498884-9199-2-git-send-email-dinguyen@altera.com>
- <520EA97D.7050404@wwwdotorg.org> <1377114530.1554.13.camel@linux-builds1>
- <521670CE.4000202@wwwdotorg.org>
-Message-ID: <1377211162.30624.26.camel@linux-builds1>
+Date: Thu, 22 Aug 2013 17:55:36 -0500
+Subject: [PATCHv4 2/4] arm: dts: Change dw-apb-timer-osc and
+ dw-apb-timer-sp to just dw-apb-timer
+In-Reply-To: <52168E96.3020702@wwwdotorg.org>
+References: <1377189026-16656-1-git-send-email-dinguyen@altera.com>
+ <1377189026-16656-2-git-send-email-dinguyen@altera.com>
+ <52168E96.3020702@wwwdotorg.org>
+Message-ID: <1377212136.30624.41.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-08-22 at 14:13 -0600, Stephen Warren wrote:
-> On 08/21/2013 01:48 PM, Dinh Nguyen wrote:
-> > On Fri, 2013-08-16 at 16:36 -0600, Stephen Warren wrote:
-> >> On 08/14/2013 10:48 AM, dinguyen at altera.com wrote:
-> >>> From: Dinh Nguyen <dinguyen@altera.com>
-> >>>
-> >>> Add bindings for SD/MMC for SOCFPGA.
-> >>
-> >>> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
-> >>
-> >>> +* altr,sysmgr: Should be the phandle to the system_mgr node. As this is where
-> >>> +		this where the register that controls the CIU clock phases
-> >>> +		reside.
-> >>
-> >> On the surface, this binding series seems OK, but I do have a question:
-> >> how is the sysmgr phandle used?
-> >>
-> >> I assume there's some register in this syscon device that resets or
-> >> enables or otherwise controls this MSHC module. How does the code know
-> >> which register it is? The phandle in the altr,sysmgr property would
-> >> usually be followed by a/some cell(s) that encode this information, so
-> >> that the MSHC driver doesn't have to know anything about the layout of
-> >> the syscon registers, and so the sysconf driver doesn't have to know
-> >> anything about the identity of the MSHC client device.
+On Thu, 2013-08-22 at 16:20 -0600, Stephen Warren wrote:
+> On 08/22/2013 10:30 AM, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
 > > 
-> > There is a #define SYSMGR_SDMMCGRP_CTRL_OFFSET that is in
-> > dw_mmc-socfpga.c. This defines the offset from the base address that the
-> > sysmgr phandle will give me.
+> > "dw-apb-timer-osc" and "dw-apb-timer-sp" are the same implementation of the
+> > DW APB timer, just fed by different clocks. Thus, deprecate both
+> > "dw-apb-timer-osc" and "dw-apb-timer-sp" in lieu of "dw-apb-timer".
 > 
-> Hmmm. That doesn't sound good. That means that the SDMMC driver knows
-> internal details about some other HW module. It'd be better if either:
+> The binding change looks reasonable to me.
 > 
-> a) The sysmgr driver was required to provide an API to the SDMMC driver
-> to set up the CIU register as requested.
-> 
-> or:
-> 
-> b) The CIU register details were represented in DT.
-> 
-> Either of these would allow the SDMMC driver to operate unchanged on an
-> SoC with a different sysmgr register layout.
+> The *.dtsi change will cause the new DT not to work with older kernels
+> that don't support the new compatible values. Perhaps you're fine with that?
 
-Thanks Stephen...will rework accordingly.
+I am okay with the older kernels not working as SOCFPGA is pretty new
+and older kernel don't really have too much support for it.
 
+> 
+> I assume that the driver has already been updated to support the new
+> values, and that the driver change is guaranteed to be merged before
+> this change? Otherwise, git bisect will be broken for a while.
+
+Yes, the patch to update the driver was part of this series, but not
+merged yet. The driver's V1 patch was Acked-By: Jamie Iles who is the
+maintainer for Picoxcell and is the only other platform using this timer
+driver at the moment. The only changes since V1 is to maintain
+compatibility for the new binding values.
+
+Thanks,
 Dinh
 > 
