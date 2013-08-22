@@ -1,61 +1,73 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 22 Aug 2013 11:01:36 -0700
-Subject: [PATCH 1/3] ARM: PCI: versatile: Fix map_irq function to match
- hardware
-In-Reply-To: <1377190070-7305-2-git-send-email-peter.maydell@linaro.org>
-References: <1377190070-7305-1-git-send-email-peter.maydell@linaro.org>
- <1377190070-7305-2-git-send-email-peter.maydell@linaro.org>
-Message-ID: <20130822180136.GA9624@roeck-us.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 22 Aug 2013 11:07:26 -0700
+Subject: [PATCH v7 05/11] ARM: dts: enable hi4511 with device tree
+In-Reply-To: <1376965873-14431-6-git-send-email-haojian.zhuang@linaro.org>
+ (Haojian Zhuang's message of "Tue, 20 Aug 2013 10:31:07 +0800")
+References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
+ <1376965873-14431-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <8761uxsiox.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 05:47:48PM +0100, Peter Maydell wrote:
-> The PCI controller code for the Versatile board has never had the
-> correct IRQ mapping for hardware.  For many years it had an odd
-> mapping ("all interrupts are int 27") which aligned with the
-> equivalent bug in QEMU.  However as of commit 1bc39ac5dab265
-> the mapping changed and no longer matched either hardware or QEMU,
-> with the result that any PCI card beyond the first in QEMU would
-> not have functioning interrupts; for example a boot with a SCSI
-> controller would time out as follows:
-> 
->  ------------
->  sym0: <895a> rev 0x0 at pci 0000:00:0d.0 irq 92
->  sym0: SCSI BUS has been reset.
->  scsi0 : sym-2.2.3
->  [...]
->  scsi 0:0:0:0: ABORT operation started
->  scsi 0:0:0:0: ABORT operation timed-out.
->  scsi 0:0:0:0: DEVICE RESET operation started
->  scsi 0:0:0:0: DEVICE RESET operation timed-out.
->  scsi 0:0:0:0: BUS RESET operation started
->  scsi 0:0:0:0: BUS RESET operation timed-out.
->  scsi 0:0:0:0: HOST RESET operation started
->  sym0: SCSI BUS has been reset
->  ------------
-> 
-> Fix the mapping so that it matches real hardware (checked against the
-> schematics for PB926 and backplane, and tested against the hardware).
-> This allows PCI cards using interrupts to work on hardware for the
-> first time; this change will also work with QEMU 1.5 or later, where
-> the equivalent bugs in the modelling of the hardware have been fixed.
-> 
-> Although QEMU will attempt to autodetect whether the kernel is
-> expecting the long-standing "everything is int 27" mapping or the one
-> hardware has, for certainty we force it into "definitely behave like
-> hardware mode"; this will avoid unexpected surprises later if we
-> implement sparse irqs. This is harmless on hardware.
-> 
-> Thanks to Paul Gortmaker for bisecting the problem and finding an initial
-> solution, to Russell King for providing the correct interrupt mapping,
-> and to Guenter Roeck for providing an initial version of this patch
-> and prodding me into relocating the hardware and retesting everything.
-> 
-> Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
+[+ DT maintainers]
 
-Tested-by: Guenter Roeck <linux@roeck-us.net>
+Haojian Zhuang <haojian.zhuang@linaro.org> writes:
 
-Patches applied to 3.11-rc6 and 3.10.9, loaded qemu and verified that
-access to SCSI controller is working. qemu version 1.5.2.
+> Enable Hisilicon Hi4511 development platform with device tree support.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-Guenter
+There seems to be use of several new vendor-specific bindings here that
+are not documented anywhere:
+
+hisilicon,sctrl 
+hisilicon,pmctrl
+hisilicon,clk-mux
+hisilicon,clk-div
+hisilicon,clk-gate
+
+Not only that, the clock-related compatible properties used here are
+different than the ones specificed PATCH 10/11 of this series where you
+document some clock bindings.  
+
+also...
+
+[...]
+
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	aliases {
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +		serial2 = &uart2;
+> +		serial3 = &uart3;
+> +		serial4 = &uart4;
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg = <0x0>;
+> +			next-level-cache = <&L2>;
+> +		};
+> +	};
+> +
+> +	osc32k: osc32k {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <32768>;
+> +		clock-output-names = "osc32khz";
+> +	};
+
+...seems many of the recent users of clocks have grouped them into a
+clocks {} grouping on a "simple-bus".
+
+DT folks: is there a rule of thumb on how whether these fixed clocks
+should be grouped on a simple bus?
+
+Kevin
