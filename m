@@ -1,57 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 Aug 2013 08:18:43 +0100
-Subject: [PATCH 05/13] ARM: ux500: Apply a ste-* prefix onto snowball.dts
-In-Reply-To: <CAOesGMgZYFgwAhVCc-ObnxcmGTLTM-Zk27Dh7r1_p646ULWHeg@mail.gmail.com>
-References: <1374243229-8585-1-git-send-email-lee.jones@linaro.org>
- <1374243229-8585-6-git-send-email-lee.jones@linaro.org>
- <CAOesGMgd51g7WAkQu+ckT-=skKuMyj19nJkHxh+YmGSBhSL+Vg@mail.gmail.com>
- <CACRpkdasMSCfdhzrW+7kHM8UUxxQ5UMAcc5bOogc-9RwXE9RVg@mail.gmail.com>
- <CAOesGMgZYFgwAhVCc-ObnxcmGTLTM-Zk27Dh7r1_p646ULWHeg@mail.gmail.com>
-Message-ID: <20130822071843.GA22023@lee--X1>
+From: B47053@freescale.com (Xiubo Li-B47053)
+Date: Thu, 22 Aug 2013 07:32:25 +0000
+Subject: [PATCH 4/4] Documentation: Add device tree bindings for
+ Freescale FTM PWM
+In-Reply-To: <20130822062610.GR31036@pengutronix.de>
+References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
+ <1473340.OXSHEp7d4P@flatron>
+ <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20130822062610.GR31036@pengutronix.de>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827D241A@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Aug 2013, Olof Johansson wrote:
+Hi Sascha,
 
-> On Wed, Aug 21, 2013 at 3:37 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Wed, Aug 21, 2013 at 2:31 AM, Olof Johansson <olof@lixom.net> wrote:
+> > > Could you explain meaning of this property more precisely? I'm
+> > > interested especially how is this related to the PWM IP block and
+> boards.
+> > >
 > >
-> >>> diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-> >>> similarity index 100%
-> >>> rename from arch/arm/boot/dts/snowball.dts
-> >>> rename to arch/arm/boot/dts/ste-snowball.dts
-> >>
-> >> Grmbl, grmbl, grmbl. This now breaks any script that knows to use
-> >> snowball.dtb. :(
-> >>
-> >> It's good to get the prefixes added, but it's annoying to have to deal
-> >> with both during an overlap period. Maybe generate both dtb filenames
-> >> for a while but rename the source?
-> >
-> > Hm I had the same problem but changed my Makefile
-> > (scripts are too simple for me) like this:
-> >
-> >  dtb            := $(build_dir)/arch/arm/boot/dts/ste-hrefv60plus.dtb
-> > +fallbackdtb    := $(build_dir)/arch/arm/boot/dts/hrefv60plus.dtb
-> > (...)
-> > -       cat $(dtb) >> $(output_dir)/zImage
-> > +       if [ -f arch/arm/boot/dts/hrefv60plus.dts ] ; then \
-> > +           cat $(fallbackdtb) >> $(output_dir)/zImage ; echo "fallback" ; \
-> > +       else \
-> > +           cat $(dtb) >> $(output_dir)/zImage ; \
-> > +       fi
+> > Yes.
+> > There are 8 channels most. While the pinctrls of 4th and 5th channels
+> > could be used by uart's Rx and Tx, then these 2 channels won't be used
+> > for pwm output, so there will be 6 channels available by the pwm.
+> > Thus, the pwm chip will register only 6 pwms(6 channels)
+> > most("fsl,pwm-channel-orders = {0 1 2 3 6 7}").And also the "fsl,pwm-
+> > channel-number" will be 6.
 > 
-> Sure, working around it is trivial. I just did a:
->    - at cp $</arch/arm/boot/dts/ste-snowball.dtb $</arch/arm/boot/dts/snowball.dtb
+> If the chip has eight PWMs I would register all of them. If some of them
+> are not routed out by the pinmux then just nothing happens if you use
+> them. In a sane devicetree they won't be referenced anyway when they are
+> not routed out of the SoC.
 > 
-> But the point is that everybody needs to do something like that now,
-> which is unfortunate.
 
-Well with only ~5 active users it's probably not that much of a big
-deal anyway, but I'm still interested to know what the alternative is?
+Yes, that's perfect well.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I will do it in v2.
+
+Thanks very much.
+--
+Best Regards,
+Xiubo
