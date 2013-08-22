@@ -1,89 +1,99 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 22 Aug 2013 15:34:26 +0900
-Subject: [PATCH 01/02] ARM: shmobile: Add r8a73a4 SMP support using APMU
- code
-In-Reply-To: <20130822054834.GG5151@quad.lixom.net>
-References: <20130807225531.9856.18974.sendpatchset@w520>
- <20130807225540.9856.67383.sendpatchset@w520>
- <CANqRtoQmoOWwTyed4-KnWPJfWV8rLMHLCSiN1a5v6=4Bmj7Z6A@mail.gmail.com>
- <20130821085714.GH20014@verge.net.au>
- <20130822054834.GG5151@quad.lixom.net>
-Message-ID: <20130822063426.GA20703@verge.net.au>
+From: rizhao@nvidia.com (Richard Zhao)
+Date: Thu, 22 Aug 2013 14:43:00 +0800
+Subject: [PATCH v2] DMA: add help function to check whether dma controller
+ registered
+In-Reply-To: <1375423458-6868-1-git-send-email-rizhao@nvidia.com>
+References: <1375423458-6868-1-git-send-email-rizhao@nvidia.com>
+Message-ID: <1377153781-18006-1-git-send-email-rizhao@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 10:48:34PM -0700, Olof Johansson wrote:
-> [+khilman]
-> 
-> Hi,
-> 
-> On Wed, Aug 21, 2013 at 05:57:15PM +0900, Simon Horman wrote:
-> > On Thu, Aug 08, 2013 at 02:52:32PM +0900, Magnus Damm wrote:
-> > > Hi Arnd and Olof,
-> > > 
-> > > On Thu, Aug 8, 2013 at 7:55 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> > > > From: Magnus Damm <damm@opensource.se>
-> > > >
-> > > > Add r8a73a4 SMP support using the shared APMU code. To enable
-> > > > SMP the r8a73a4 specific DTS needs to be updated to include
-> > > > CPU cores, and this is happening in a separate patch.
-> > > >
-> > > > Signed-off-by: Magnus Damm <damm@opensource.se>
-> > > > ---
-> > > >
-> > > >  arch/arm/mach-shmobile/Makefile               |    1
-> > > >  arch/arm/mach-shmobile/include/mach/r8a73a4.h |    1
-> > > >  arch/arm/mach-shmobile/setup-r8a73a4.c        |    3 +
-> > > >  arch/arm/mach-shmobile/smp-r8a73a4.c          |   75 +++++++++++++++++++++++++
-> > > >  4 files changed, 80 insertions(+)
-> > > >
-> > > > --- 0001/arch/arm/mach-shmobile/Makefile
-> > > > +++ work/arch/arm/mach-shmobile/Makefile        2013-08-07 20:07:31.000000000 +0900
-> > > > @@ -33,6 +33,7 @@ endif
-> > > >  # SMP objects
-> > > >  smp-y                          := platsmp.o headsmp.o
-> > > >  smp-$(CONFIG_ARCH_SH73A0)      += smp-sh73a0.o headsmp-scu.o platsmp-scu.o
-> > > > +smp-$(CONFIG_ARCH_R8A73A4)     += smp-r8a73a4.o platsmp-apmu.o
-> > > >  smp-$(CONFIG_ARCH_R8A7779)     += smp-r8a7779.o headsmp-scu.o platsmp-scu.o
-> > > >  smp-$(CONFIG_ARCH_EMEV2)       += smp-emev2.o headsmp-scu.o platsmp-scu.o
-> > > >
-> > > > --- 0008/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-> > > > +++ work/arch/arm/mach-shmobile/include/mach/r8a73a4.h  2013-08-07 20:08:02.000000000 +0900
-> > > > @@ -6,5 +6,6 @@ void r8a73a4_add_dt_devices(void);
-> > > >  void r8a73a4_clock_init(void);
-> > > >  void r8a73a4_pinmux_init(void);
-> > > >  void r8a73a4_init_early(void);
-> > > > +extern struct smp_operations r8a73a4_smp_ops;
-> > > >
-> > > >  #endif /* __ASM_R8A73A4_H__ */
-> > > > --- 0008/arch/arm/mach-shmobile/setup-r8a73a4.c
-> > > > +++ work/arch/arm/mach-shmobile/setup-r8a73a4.c 2013-08-07 20:07:48.000000000 +0900
-> > > > @@ -212,6 +212,9 @@ void __init r8a73a4_init_early(void)
-> > > >  #ifndef CONFIG_ARM_ARCH_TIMER
-> > > >         shmobile_setup_delay(1500, 2, 4); /* Cortex-A15 @ 1500MHz */
-> > > >  #endif
-> > > > +#ifdef CONFIG_SMP
-> > > > +       smp_set_ops(&r8a73a4_smp_ops);
-> > > > +#endif
-> > > >  }
-> > > 
-> > > Arnd or Olof, may I ask for your advice here?
-> > > 
-> > > I think it's quite nice to use smp_set_ops() in ->init_early() to
-> > > install the per-SoC SMP operations. I prefer that over using the
-> > > smp_ops directly in the per-board DT_MACHINE_START. Which way do you
-> > > prefer?
-> > 
-> > Olof, Arnd, Ping.
-> 
-> 
-> Sorry, missed the original question when it was posted.
-> 
-> I guess I don't see the benefit of doing it in code vs smp_init? You
-> already have a DT_MACHINE section for r8a73a4 in this case.
-> 
-> If you use .smp_init = smp_init_ops(r8a73a4_smp_ops) then there's no
-> ifdef needed down in the DT_MACHINE section either.
+DMA client device driver usually needs to know at probe time whether
+dma controller has been registered to deffer probe. So add a help
+function of_dma_check_controller.
 
-Magnus, would you care to respin this series and the corresponding
-r8a7790 series accordingly?
+DMA request channel functions can also used to check it, but they
+are usually called at open() time.
+
+Signed-off-by: Richard Zhao <rizhao@nvidia.com>
+---
+ drivers/dma/of-dma.c   | 39 +++++++++++++++++++++++++++++++++++++++
+ include/linux/of_dma.h |  6 ++++++
+ 2 files changed, 45 insertions(+)
+
+diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
+index 8cd5f3f..0063ddf 100644
+--- a/drivers/dma/of-dma.c
++++ b/drivers/dma/of-dma.c
+@@ -189,6 +189,45 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+ }
+ 
+ /**
++ * of_dma_check_controller - Check whether dma controller registered
++ * @dev:	pointer to client device structure
++ * @name:	slave channel name
++ */
++int of_dma_check_controller(struct device *dev, const char *name)
++{
++	struct device_node *np = dev->of_node;
++	struct of_phandle_args dma_spec;
++	struct of_dma *ofdma = NULL;
++	int count, i, ret = 0;
++
++	if (!np || !name)
++		return -EINVAL;
++
++	count = of_property_count_strings(np, "dma-names");
++	if (count < 0) {
++		dev_err(dev, "dma-names property missing or empty\n");
++		return -EINVAL;
++	}
++
++	for (i = 0; i < count; i++) {
++		ret = of_dma_match_channel(np, name, i, &dma_spec);
++		if (ret)
++			continue;
++
++		mutex_lock(&of_dma_lock);
++		ofdma = of_dma_find_controller(&dma_spec);
++		mutex_unlock(&of_dma_lock);
++		of_node_put(dma_spec.np);
++		if (!ofdma)
++			ret = -EPROBE_DEFER;
++		break;
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(of_dma_check_controller);
++
++/**
+  * of_dma_simple_xlate - Simple DMA engine translation function
+  * @dma_spec:	pointer to DMA specifier as found in the device tree
+  * @of_dma:	pointer to DMA controller data
+diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
+index ae36298..bc7195f 100644
+--- a/include/linux/of_dma.h
++++ b/include/linux/of_dma.h
+@@ -39,6 +39,7 @@ extern int of_dma_controller_register(struct device_node *np,
+ extern void of_dma_controller_free(struct device_node *np);
+ extern struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+ 						     const char *name);
++extern int of_dma_check_controller(struct device *dev, const char *name);
+ extern struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
+ 		struct of_dma *ofdma);
+ #else
+@@ -60,6 +61,11 @@ static inline struct dma_chan *of_dma_request_slave_channel(struct device_node *
+ 	return NULL;
+ }
+ 
++static inline int of_dma_check_controller(struct device *dev, const char *name)
++{
++	return 0;
++}
++
+ static inline struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
+ 		struct of_dma *ofdma)
+ {
+-- 
+1.8.1.5
