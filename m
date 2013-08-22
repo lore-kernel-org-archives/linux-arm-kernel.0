@@ -1,81 +1,91 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 22 Aug 2013 22:12:46 +0400
-Subject: [PATCH 2/4] net: ethernet: cpsw: add optional third memory region
- for CONTROL module
-In-Reply-To: <1377171448-27924-3-git-send-email-zonque@gmail.com>
-References: <1377171448-27924-1-git-send-email-zonque@gmail.com>
- <1377171448-27924-3-git-send-email-zonque@gmail.com>
-Message-ID: <5216549E.1010305@cogentembedded.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 22 Aug 2013 11:31:05 -0700
+Subject: [PATCH 2/2] clockevents: Prefer clockevents that don't suffer
+ from FEAT_C3_STOP
+In-Reply-To: <52164EEE.9070707@ti.com>
+References: <52138784.7050703@linaro.org>
+ <1377191201-14696-1-git-send-email-sboyd@codeaurora.org>
+ <1377191201-14696-2-git-send-email-sboyd@codeaurora.org>
+ <52164B5B.5010902@ti.com> <52164CF5.20705@codeaurora.org>
+ <52164EEE.9070707@ti.com>
+Message-ID: <20130822183105.GD23960@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 08/22, Santosh Shilimkar wrote:
+> On Thursday 22 August 2013 01:40 PM, Stephen Boyd wrote:
+> > On 08/22/13 10:33, Santosh Shilimkar wrote:
+> >> On Thursday 22 August 2013 01:06 PM, Stephen Boyd wrote:
+> >>> On some ARM systems there are two sets of per-cpu timers: the TWD
+> >>> timers and the global timers. The TWD timers are rated at 350 and
+> >>> the global timers are rated at 300 but the TWD timers suffer from
+> >>> FEAT_C3_STOP while the arm global timers don't. The tick device
+> >>> selection logic doesn't consider the FEAT_C3_STOP flag so we'll
+> >>> always end up with the TWD as the tick device although we don't
+> >>> want that.
+> >>>
+> >>> Extend the preference logic to take the FEAT_C3_STOP flag into
+> >>> account and always prefer tick devices that don't suffer from
+> >>> FEAT_C3_STOP even if their rating is lower than tick devices that
+> >>> do suffer from FEAT_C3_STOP. This will remove the need to do any
+> >>> broadcasting on such ARM systems.
+> >>>
+> >>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> >>> ---
+> >>>  kernel/time/tick-common.c | 14 ++++++++++++--
+> >>>  1 file changed, 12 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
+> >>> index 64522ec..3ae437d 100644
+> >>> --- a/kernel/time/tick-common.c
+> >>> +++ b/kernel/time/tick-common.c
+> >>> @@ -244,12 +244,22 @@ static bool tick_check_preferred(struct clock_event_device *curdev,
+> >>>  			return false;
+> >>>  	}
+> >>>  
+> >>> +	if (!curdev)
+> >>> +		return true;
+> >>> +
+> >>> +	/* Always prefer a tick device that doesn't suffer from FEAT_C3STOP */
+> >>> +	if (!(newdev->features & CLOCK_EVT_FEAT_C3STOP) &&
+> >>> +			(curdev->features & CLOCK_EVT_FEAT_C3STOP))
+> >>> +		return true;
+> >>> +	if ((newdev->features & CLOCK_EVT_FEAT_C3STOP) &&
+> >>> +			!(curdev->features & CLOCK_EVT_FEAT_C3STOP))
+> >>> +		return false;
+> >>> +
+> >> I don't think preferring the clock-event which doesn't suffer
+> >> from FEAT_C3STOP is a good idea if the quality of the time source
+> >> is not same. Generally the global timers are slow and far away from
+> >> CPU(cycle cost). So as long as we don't get impacted because of low power
+> >> states, the tick should run out of local timers which are faster access
+> >> as well as high resolution.
+> >>
+> > 
+> > Fair enough. I have no data either way to convince anyone that this is a
+> > good or bad idea so this patch should have probably been an RFC. Are you
+> > hinting at something like switching to a per-cpu timer that doesn't
+> > suffer from FEAT_C3_STOP when a CPU goes into a deep idle state?
+> > Interesting idea but I think I'll leave that to someone else if they
+> > really care to do that.
+> > 
+> If the per-CPU timer don't suffer from C3_STOP, there is no need to
+> switch at all and the per CPU tick continue to runs on CPU local
+> timers. We need to switch to a broadcast device(no affected by C3_STOP)
+> only for the cases where the per-CPU timer wakeup don't work in CPU
+> low power states.
+> 
+> Are we talking about a hardware where one of the CPU from a cluster
+> has a local timer which is not affected by C3_STOP where as rest
+> of the CPU local timers are ? If yes, it must be crazy hardware and
+> we should not care too much about that.
 
-On 08/22/2013 03:37 PM, Daniel Mack wrote:
+We're talking about a device with the TWD and the arm global
+timers where each CPU has a TWD and an arm global timer and the
+TWD stops during deep idle but the global timer doesn't.
+Put another way, two timers per CPU where one doesn't work all
+the time.
 
-> At least the AM33xx SoC has a control module register to configure
-> details such as the hardware ethernet interface mode.
-
-> I'm not sure whether all SoCs which feature the cpsw block have such a
-> register, so that third memory region is considered optional for now.
-
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
->   Documentation/devicetree/bindings/net/cpsw.txt |  5 ++++-
->   drivers/net/ethernet/ti/cpsw.c                 | 22 ++++++++++++++++++++++
->   2 files changed, 26 insertions(+), 1 deletion(-)
-
-> diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
-> index 05d660e..4e5ca54 100644
-> --- a/Documentation/devicetree/bindings/net/cpsw.txt
-> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
-[...]
-> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-> index 63feaae..4855d8e 100644
-> --- a/drivers/net/ethernet/ti/cpsw.c
-> +++ b/drivers/net/ethernet/ti/cpsw.c
-[...]
-> @@ -2012,6 +2013,27 @@ static int cpsw_probe(struct platform_device *pdev)
->   		goto clean_runtime_disable_ret;
->   	}
->
-> +	/* If the control memory region is unspecified, continue without it.
-> +	 * If it is specified, but we're unable to reserve it, bail. */
-
-    According to Documentation/CodingStyle, the networking code's preferred 
-style of multi-line comments is this:
-
-/* Bla
-  * bla
-  */
-
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-> +	if (!res) {
-> +		dev_err(priv->dev, "error getting control i/o resource\n");
-> +		goto no_gmii_sel;
-> +	}
-> +	if (!devm_request_mem_region(&pdev->dev, res->start, resource_size(res),
-> +				     ndev->name)) {
-
-    Not dev_name(&pdev->dev)?
-
-> +		dev_err(priv->dev, "failed request control i/o region\n");
-> +		ret = -ENXIO;
-
-    Rather -EBUSY.
-
-> +		goto clean_runtime_disable_ret;
-> +	}
-> +	priv->gmii_sel_reg = devm_ioremap(&pdev->dev, res->start,
-> +					  resource_size(res));
-> +	if (!priv->gmii_sel_reg) {
-> +		dev_err(priv->dev, "unable to map control i/o region\n");
-> +		goto clean_runtime_disable_ret;
-> +	}
-
-    Why not use devm_ioremap_resource() instead of the above sequence?
-
-> +
-> +no_gmii_sel:
-
-WBR, Sergei
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
