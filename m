@@ -1,85 +1,58 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 22 Aug 2013 16:19:06 +0200
-Subject: [PATCH v6 2/4] i2c-mv64xxx: Fix timing issue on Armada XP (errata
- FE-8471889)
-In-Reply-To: <1377181146-17341-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1377181146-17341-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1377181146-17341-2-git-send-email-gregory.clement@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 22 Aug 2013 15:19:00 +0100
+Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the
+ DBX500 DT
+In-Reply-To: <20130822133730.GB23152@e106331-lin.cambridge.arm.com>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <1370521041-32318-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
+ <20130820093034.GL31036@pengutronix.de>
+ <20130822133730.GB23152@e106331-lin.cambridge.arm.com>
+Message-ID: <20130822141900.GB17154@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the Armada XP (mv78230, mv78260 and mv78460) have a silicon issue
-in the I2C controller which violate the i2c repeated start
-timing. The I2C standard requires a minimum of 4.7us for the repeated
-start condition whereas the I2C controller of the Armada XP this time
-is 2.9us.
+On Thu, 22 Aug 2013, Mark Rutland wrote:
 
-So this patch adds a 5us delay for the start case only if the
-the compatible i2c-mv78230 is set.
+> On Tue, Aug 20, 2013 at 10:30:34AM +0100, Sascha Hauer wrote:
+> > On Tue, Aug 20, 2013 at 11:11:19AM +0200, Linus Walleij wrote:
+> > > On Thu, Jun 6, 2013 at 2:16 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > > 
+> > > > +++ b/arch/arm/boot/dts/dbx5x0.dtsi
+> > > > @@ -572,6 +572,8 @@
+> > > >                         v-i2c-supply = <&db8500_vape_reg>;
+> > > >
+> > > >                         clock-frequency = <400000>;
+> > > > +                       clocks = <&prcc_kclk 3 3>, <&prcc_pclk 3 3>;
+> > > > +                       clock-names = "nmk-i2c.0", "apb_pclk";
+> > 
+> > Why do most clocks in this series have the instance number in the clock
+> > names? This looks very wrong to me.
+> 
+> +1. The clock names should be the input names to the unit, they
+> shouldn't vary per instance.
 
-Based on the initals patches from Zbigniew Bodek
+So I just had a quick look, and it looks like they each have their own
+clock:
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Zbigniew Bodek <zbb@semihalf.com>
----
- drivers/i2c/busses/i2c-mv64xxx.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+	clk = clk_reg_prcc_kclk("p1_i2c1_kclk", "i2cclk",
+			clkrst1_base, BIT(2), CLK_SET_RATE_GATE);
+	clk = clk_reg_prcc_kclk("p1_i2c2_kclk", "i2cclk",
+			clkrst1_base, BIT(6), CLK_SET_RATE_GATE);
+	clk = clk_reg_prcc_kclk("p2_i2c3_kclk", "i2cclk",
+			clkrst2_base, BIT(0), CLK_SET_RATE_GATE);
+	clk_register_clkdev(clk, NULL, "nmk-i2c.3");
+        
+        /* etc */
 
-diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-index 2404c4e..bc60f9a 100644
---- a/drivers/i2c/busses/i2c-mv64xxx.c
-+++ b/drivers/i2c/busses/i2c-mv64xxx.c
-@@ -24,6 +24,7 @@
- #include <linux/of_i2c.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-+#include <linux/delay.h>
- 
- #define MV64XXX_I2C_ADDR_ADDR(val)			((val & 0x7f) << 1)
- #define MV64XXX_I2C_BAUD_DIV_N(val)			(val & 0x7)
-@@ -147,6 +148,8 @@ struct mv64xxx_i2c_data {
- 	struct i2c_msg		*msg;
- 	struct i2c_adapter	adapter;
- 	bool			offload_enabled;
-+/* 5us delay in order to avoid repeated start timing violation */
-+	bool			errata_delay;
- };
- 
- static struct mv64xxx_i2c_regs mv64xxx_i2c_regs_mv64xxx = {
-@@ -440,6 +443,9 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
- 			/* Setup for the next message */
- 			mv64xxx_i2c_prepare_for_io(drv_data, drv_data->msgs);
- 		}
-+		if (drv_data->errata_delay)
-+			udelay(5);
-+
- 		/*
- 		 * We're never at the start of the message here, and by this
- 		 * time it's already too late to do any protocol mangling.
-@@ -499,6 +505,9 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
- 		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_STOP,
- 			drv_data->reg_base + drv_data->reg_offsets.control);
- 		drv_data->block = 0;
-+		if (drv_data->errata_delay)
-+			udelay(5);
-+
- 		wake_up(&drv_data->waitq);
- 		break;
- 
-@@ -766,10 +775,12 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
- 
- 	/*
- 	 * For controllers embedded in new SoCs activate the
--	 * Transaction Generator support.
-+	 * Transaction Generator support and the errata fix.
- 	 */
--	if (of_device_is_compatible(np, "marvell,mv78230-i2c"))
-+	if (of_device_is_compatible(np, "marvell,mv78230-i2c")) {
- 		drv_data->offload_enabled = true;
-+		drv_data->errata_delay = true;
-+	}
- 
- out:
- 	return rc;
+When using the names in Device Tree it doesn't actually matter what
+you call the first clock. You can call it "fred" if you wanted and it
+would still work, but in light of the naming conventions above and the
+fact that each clock can all be controlled independently, do we still
+want to use the name of the parent clock i.e. i2cclk?
+
 -- 
-1.8.1.2
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
