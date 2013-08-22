@@ -1,41 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 22 Aug 2013 00:17:02 -0700
-Subject: [PATCH] ARM: OMAP2: remove useless variable 'ret'
-In-Reply-To: <52147AC6.9040300@asianux.com>
-References: <521479B4.8030604@asianux.com>
- <52147AC6.9040300@asianux.com>
-Message-ID: <20130822071702.GR7656@atomide.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 22 Aug 2013 00:17:47 -0700
+Subject: [PATCH] clk: handle NULL struct clk gracefully
+Message-ID: <1377155867-15552-1-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Chen Gang <gang.chen@asianux.com> [130821 01:39]:
-> Remove useless variable 'ret', the related warning:
-> 
->   arch/arm/mach-omap2/board-am3517crane.c:113:6: warning: unused variable ?ret? [-Wunused-variable]
+At some point changes to clk_set_rate and clk_set_parent introduced a
+bug whereby NULL struct clk pointers were treated as an error. This is
+in violation of the API in include/linux/clk.h. Reintroduce graceful
+handling of NULL clk's by bailing from clk_set_rate and clk_set_parent
+with return codes of zero.
 
-Thanks applying into omap-for-v3.12/fixes-non-critical.
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+---
+ drivers/clk/clk.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Regards,
-
-Tony 
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index bc02037..7c43762 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1428,6 +1428,9 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+ 	struct clk *top, *fail_clk;
+ 	int ret = 0;
  
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm/mach-omap2/board-am3517crane.c |    2 --
->  1 files changed, 0 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-> index fc53911..0d499a1 100644
-> --- a/arch/arm/mach-omap2/board-am3517crane.c
-> +++ b/arch/arm/mach-omap2/board-am3517crane.c
-> @@ -110,8 +110,6 @@ static void __init am3517_crane_i2c_init(void)
->  
->  static void __init am3517_crane_init(void)
->  {
-> -	int ret;
-> -
->  	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
->  	omap_serial_init();
->  	omap_sdrc_init(NULL, NULL);
-> -- 
-> 1.7.7.6
++	if (!clk)
++		return 0;
++
+ 	/* prevent racing with updates to the clock topology */
+ 	clk_prepare_lock();
+ 
+@@ -1567,7 +1570,10 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ 	u8 p_index = 0;
+ 	unsigned long p_rate = 0;
+ 
+-	if (!clk || !clk->ops)
++	if (!clk)
++		return 0;
++
++	if (!clk->ops)
+ 		return -EINVAL;
+ 
+ 	/* verify ops for for multi-parent clks */
+-- 
+1.8.1.2
