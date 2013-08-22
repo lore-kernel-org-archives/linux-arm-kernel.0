@@ -1,40 +1,154 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 Aug 2013 10:23:01 +0100
-Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the
- DBX500 DT
-In-Reply-To: <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
-Message-ID: <20130822092301.GC22023@lee--X1>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Thu, 22 Aug 2013 11:41:12 +0200
+Subject: [PATCH v4 2/5] mmc: atmel-mci: prepare clk before calling enable
+In-Reply-To: <1374133132-17556-1-git-send-email-b.brezillon@overkiz.com>
+References: <1374132753-15206-1-git-send-email-b.brezillon@overkiz.com>
+ <1374133132-17556-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <5215DCB8.3020502@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Aug 2013, Linus Walleij wrote:
+Hello Chris,
 
-> On Thu, Jun 6, 2013 at 2:16 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > +++ b/arch/arm/boot/dts/dbx5x0.dtsi
-> > @@ -572,6 +572,8 @@
-> >                         v-i2c-supply = <&db8500_vape_reg>;
-> >
-> >                         clock-frequency = <400000>;
-> > +                       clocks = <&prcc_kclk 3 3>, <&prcc_pclk 3 3>;
-> > +                       clock-names = "nmk-i2c.0", "apb_pclk";
-> 
-> To avoid confusing the clock name "nmk-i2c.0" with the device
-> name in Linux of that device instance, can we use a name such
-> that it is clear that this is not a dev_name match?
+Could you take this patch ?
 
-Once we've settled the other thread, I'll look into renaming this
-something less Linuxy.
+It has been acked by Ludovic, and I need it in order to gracefully handle
+at91's SoCs migration to common clk framework.
 
-> "i2c0" works just fine as name I think?
+Thanks.
 
-Sure.
+Best Regards,
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Boris
+
+On 18/07/2013 09:38, Boris BREZILLON wrote:
+> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+> avoid common clk framework warnings.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>   drivers/mmc/host/atmel-mci.c |   34 +++++++++++++++++++++++++++-------
+>   1 file changed, 27 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index bdb84da..69e438e 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -378,6 +378,8 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+>   {
+>   	struct atmel_mci	*host = s->private;
+>   	u32			*buf;
+> +	int			ret = 0;
+> +
+>   
+>   	buf = kmalloc(ATMCI_REGS_SIZE, GFP_KERNEL);
+>   	if (!buf)
+> @@ -388,12 +390,16 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+>   	 * not disabling interrupts, so IMR and SR may not be
+>   	 * consistent.
+>   	 */
+> +	ret = clk_prepare_enable(host->mck);
+> +	if (ret)
+> +		goto out;
+> +
+>   	spin_lock_bh(&host->lock);
+> -	clk_enable(host->mck);
+>   	memcpy_fromio(buf, host->regs, ATMCI_REGS_SIZE);
+> -	clk_disable(host->mck);
+>   	spin_unlock_bh(&host->lock);
+>   
+> +	clk_disable_unprepare(host->mck);
+> +
+>   	seq_printf(s, "MR:\t0x%08x%s%s ",
+>   			buf[ATMCI_MR / 4],
+>   			buf[ATMCI_MR / 4] & ATMCI_MR_RDPROOF ? " RDPROOF" : "",
+> @@ -442,9 +448,10 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+>   				val & ATMCI_CFG_LSYNC ? " LSYNC" : "");
+>   	}
+>   
+> +out:
+>   	kfree(buf);
+>   
+> -	return 0;
+> +	return ret;
+>   }
+>   
+>   static int atmci_regs_open(struct inode *inode, struct file *file)
+> @@ -1262,6 +1269,7 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>   	struct atmel_mci_slot	*slot = mmc_priv(mmc);
+>   	struct atmel_mci	*host = slot->host;
+>   	unsigned int		i;
+> +	bool			unprepare_clk;
+>   
+>   	slot->sdc_reg &= ~ATMCI_SDCBUS_MASK;
+>   	switch (ios->bus_width) {
+> @@ -1277,9 +1285,13 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>   		unsigned int clock_min = ~0U;
+>   		u32 clkdiv;
+>   
+> +		clk_prepare(host->mck);
+> +		unprepare_clk = true;
+> +
+>   		spin_lock_bh(&host->lock);
+>   		if (!host->mode_reg) {
+>   			clk_enable(host->mck);
+> +			unprepare_clk = false;
+>   			atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+>   			atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIEN);
+>   			if (host->caps.has_cfg_reg)
+> @@ -1347,6 +1359,8 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>   	} else {
+>   		bool any_slot_active = false;
+>   
+> +		unprepare_clk = false;
+> +
+>   		spin_lock_bh(&host->lock);
+>   		slot->clock = 0;
+>   		for (i = 0; i < ATMCI_MAX_NR_SLOTS; i++) {
+> @@ -1360,12 +1374,16 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>   			if (host->mode_reg) {
+>   				atmci_readl(host, ATMCI_MR);
+>   				clk_disable(host->mck);
+> +				unprepare_clk = true;
+>   			}
+>   			host->mode_reg = 0;
+>   		}
+>   		spin_unlock_bh(&host->lock);
+>   	}
+>   
+> +	if (unprepare_clk)
+> +		clk_unprepare(host->mck);
+> +
+>   	switch (ios->power_mode) {
+>   	case MMC_POWER_UP:
+>   		set_bit(ATMCI_CARD_NEED_INIT, &slot->flags);
+> @@ -2376,10 +2394,12 @@ static int __init atmci_probe(struct platform_device *pdev)
+>   	if (!host->regs)
+>   		goto err_ioremap;
+>   
+> -	clk_enable(host->mck);
+> +	ret = clk_prepare_enable(host->mck);
+> +	if (ret)
+> +		goto err_request_irq;
+>   	atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+>   	host->bus_hz = clk_get_rate(host->mck);
+> -	clk_disable(host->mck);
+> +	clk_disable_unprepare(host->mck);
+>   
+>   	host->mapbase = regs->start;
+>   
+> @@ -2482,11 +2502,11 @@ static int __exit atmci_remove(struct platform_device *pdev)
+>   			atmci_cleanup_slot(host->slot[i], i);
+>   	}
+>   
+> -	clk_enable(host->mck);
+> +	clk_prepare_enable(host->mck);
+>   	atmci_writel(host, ATMCI_IDR, ~0UL);
+>   	atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
+>   	atmci_readl(host, ATMCI_SR);
+> -	clk_disable(host->mck);
+> +	clk_disable_unprepare(host->mck);
+>   
+>   	if (host->dma.chan)
+>   		dma_release_channel(host->dma.chan);
