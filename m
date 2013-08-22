@@ -1,80 +1,45 @@
-From: chen.gang.flying.transformer@gmail.com (Chen Gang F T)
-Date: Thu, 22 Aug 2013 16:59:56 +0800
-Subject: [PATCH v2] ARM: OMAP2: use 'int' instead of 'unsigned' for
- variable 'gpmc_irq_start'
-In-Reply-To: <20130822083206.GU7656@atomide.com>
-References: <521479B4.8030604@asianux.com> <20130822071402.GQ7656@atomide.com>
- <5215C12D.5020807@asianux.com> <5215C209.3080606@asianux.com>
- <20130822075731.GT7656@atomide.com> <5215C555.9060902@asianux.com>
- <20130822083206.GU7656@atomide.com>
-Message-ID: <5215D30C.1070500@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 22 Aug 2013 11:06:47 +0200
+Subject: [PATCH v5 1/3] i2c-mv64xxx: Add I2C Transaction Generator support
+In-Reply-To: <5215C07D.7040000@free-electrons.com>
+References: <1376039158-1896-1-git-send-email-gregory.clement@free-electrons.com>
+ <1376039158-1896-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130821210116.GA3130@katana>
+ <5215C07D.7040000@free-electrons.com>
+Message-ID: <20130822090647.GA3491@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2013 04:32 PM, Tony Lindgren wrote:
-> * Chen Gang <gang.chen@asianux.com> [130822 01:10]:
->> On 08/22/2013 03:57 PM, Tony Lindgren wrote:
->>> * Chen Gang <gang.chen@asianux.com> [130822 00:55]:
->>>> 'gpmc_irq_start' is mostly used as 'int', and for a variable, do not
->>>> suggest to only use 'unsigned' as its type, so use 'int' instead of
->>>> 'unsigned' for variable 'gpmc_irq_start'.
->>>>
->>>> Also it will fix the related issue (dummy the real world failure):
->>>>
->>>>   arch/arm/mach-omap2/gpmc.c:728:2: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
->>>>
->>>
->>> Thanks applying into omap-for-v3.12/fixes-non-critical.
->>>
->>
->> Thank you too.
->>
->> Hmm... excuse me, I am not quite familiar with the omap version trees,
->> so may have a doubt: "it seems this is a real bug, is it suitable to
->> belong to fixes-none-critical tree ?"
+
+> >> @@ -326,6 +463,12 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
+> >>  			drv_data->reg_base + drv_data->reg_offsets.control);
+> >>  		break;
+> >>  
+> >> +	case MV64XXX_I2C_ACTION_OFFLOAD_SEND_START:
+> >> +		if (mv64xxx_i2c_offload_msg(drv_data) <= 0)
+> > 
+> > needs to be adjusted when using -EINVAL above. I'd prefer the error case
+> > in the else branch, though. Easier to read.
+> > 
 > 
-> For the -rc cycle we try to limit the patches to oopses and regressions,
-> especially this close to v3.11 being tagged.
+> OK, but in this case ...
 > 
-
-Really necessary.
-
-> It seems the bug has been there for quite some time, and that we don't
-> seem to have oopses or other failures reporting this. So it seems there's
-> no reason for urgency to have it merged into the current -rc series.
+> >> +			break;
+> >> +		else
+> >> +			drv_data->action = MV64XXX_I2C_ACTION_SEND_START;
+> >> +		/* FALLTHRU */
 > 
+> ... the fall through here is less readable. But it is a matter of
+> taste, I will change this.
 
-I guess so too (I only find it by compiling).
+Ah, I see. Well, try both and decide.
 
+Thanks!
 
-> If you (or somebody else) strongly feels that it should be in applied
-> to the current -rc series as a fix instead of during the merge window,
-> then please let me know the failing cases with logs showing what
-> happens.
-> 
-
-Hmm... for urgent bugs, the reporters really need supply the failing
-cases with logs showing what happens.
-
-Bugs can be sort of by urgent priority (e.g. this bug is not urgent).
-but for most of bugs may cause critical issue which depends on the using
-environments, and can be 'imagined' by us.
-
-Hmm... I guess: for our case, what your meaning is "fixes-none-urgent",
-not "fixes-none-critical", is it correct ?  :-)
-
-
-Thanks.
-
-> Regards,
-> 
-> Tony
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
-
--- 
-Chen Gang
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130822/3a92435b/attachment-0001.sig>
