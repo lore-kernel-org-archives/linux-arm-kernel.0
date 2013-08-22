@@ -1,18 +1,27 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Thu, 22 Aug 2013 11:30:25 -0500
-Subject: [PATCHv4 3/4] clocksource: dw_apb_timer: Move timer defines to header
- file.
+Date: Thu, 22 Aug 2013 11:30:26 -0500
+Subject: [PATCHv4 4/4] clocksource: dw_apb_timer_of: Fix read_sched_clock
 In-Reply-To: <1377189026-16656-1-git-send-email-dinguyen@altera.com>
 References: <1377189026-16656-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1377189026-16656-3-git-send-email-dinguyen@altera.com>
+Message-ID: <1377189026-16656-4-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Move all dw_apb_timer defines to include/linux/dw_apb_timer.h.
+The read_sched_clock should return the ~value because the clock is a
+countdown implementation. read_sched_clock() should be the same as
+__apbt_read_clocksource().
+
+If a separate timer for the sched_clock exist, then read_sched_clock()
+will return an incorrect value. The (sched_io_base + 0x4) needs to be in
+the function for both cases.
+
+Maintain backwards compatibility for "dw-apb-timer-sp" and
+"dw-apb-timer-osc".
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Acked-by: Jamie Iles <jamie@jamieiles.com>
 CC: Rob Herring <rob.herring@calxeda.com>
 CC: Arnd Bergmann <arnd@arndb.de>
 Cc: Olof Johansson <olof@lixom.net>
@@ -25,72 +34,48 @@ Cc: Pavel Machek <pavel@denx.de>
 Cc: Heiko Stuebner <heiko@sntech.de>
 Cc: linux-arm-kernel at lists.infradead.org
 
-v2:
-- Remove the defines in dw_apb_timer.c
----
- drivers/clocksource/dw_apb_timer.c |   19 -------------------
- include/linux/dw_apb_timer.h       |   19 +++++++++++++++++++
- 2 files changed, 19 insertions(+), 19 deletions(-)
+v3:
+- Use APBTMR_N_CURRENT_VALUE define in read_sched_clock()
 
-diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-index e54ca10..c3a8f52 100644
---- a/drivers/clocksource/dw_apb_timer.c
-+++ b/drivers/clocksource/dw_apb_timer.c
-@@ -18,25 +18,6 @@
- #include <linux/io.h>
- #include <linux/slab.h>
+v2:
+- Maintain backwards compatibility for "dw-apb-timer-sp" and
+  "dw-apb-timer-osc".
+---
+ drivers/clocksource/dw_apb_timer_of.c |    9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index 4cbae4f..01c1238 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -102,18 +102,17 @@ static void add_clocksource(struct device_node *source_timer)
+ 	 * timer is found. sched_io_base then points to the current_value
+ 	 * register of the clocksource timer.
+ 	 */
+-	sched_io_base = iobase + 0x04;
++	sched_io_base = iobase;
+ 	sched_rate = rate;
+ }
  
--#define APBT_MIN_PERIOD			4
--#define APBT_MIN_DELTA_USEC		200
--
--#define APBTMR_N_LOAD_COUNT		0x00
--#define APBTMR_N_CURRENT_VALUE		0x04
--#define APBTMR_N_CONTROL		0x08
--#define APBTMR_N_EOI			0x0c
--#define APBTMR_N_INT_STATUS		0x10
--
--#define APBTMRS_INT_STATUS		0xa0
--#define APBTMRS_EOI			0xa4
--#define APBTMRS_RAW_INT_STATUS		0xa8
--#define APBTMRS_COMP_VERSION		0xac
--
--#define APBTMR_CONTROL_ENABLE		(1 << 0)
--/* 1: periodic, 0:free running. */
--#define APBTMR_CONTROL_MODE_PERIODIC	(1 << 1)
--#define APBTMR_CONTROL_INT		(1 << 2)
--
- static inline struct dw_apb_clock_event_device *
- ced_to_dw_apb_ced(struct clock_event_device *evt)
+ static u32 read_sched_clock(void)
  {
-diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
-index 1f79b20..1d2b949 100644
---- a/include/linux/dw_apb_timer.h
-+++ b/include/linux/dw_apb_timer.h
-@@ -19,6 +19,25 @@
+-	return __raw_readl(sched_io_base);
++	return ~__raw_readl(sched_io_base + APBTMR_N_CURRENT_VALUE);
+ }
  
- #define APBTMRS_REG_SIZE       0x14
+ static const struct of_device_id sptimer_ids[] __initconst = {
+ 	{ .compatible = "picochip,pc3x2-rtc" },
+-	{ .compatible = "snps,dw-apb-timer-sp" },
+ 	{ /* Sentinel */ },
+ };
  
-+#define APBT_MIN_PERIOD                 4
-+#define APBT_MIN_DELTA_USEC             200
-+
-+#define APBTMR_N_LOAD_COUNT             0x00
-+#define APBTMR_N_CURRENT_VALUE          0x04
-+#define APBTMR_N_CONTROL                0x08
-+#define APBTMR_N_EOI                    0x0c
-+#define APBTMR_N_INT_STATUS             0x10
-+
-+#define APBTMRS_INT_STATUS              0xa0
-+#define APBTMRS_EOI                     0xa4
-+#define APBTMRS_RAW_INT_STATUS          0xa8
-+#define APBTMRS_COMP_VERSION            0xac
-+
-+#define APBTMR_CONTROL_ENABLE           (1 << 0)
-+/* 1: periodic, 0:free running. */
-+#define APBTMR_CONTROL_MODE_PERIODIC    (1 << 1)
-+#define APBTMR_CONTROL_INT              (1 << 2)
-+
- struct dw_apb_timer {
- 	void __iomem				*base;
- 	unsigned long				freq;
+@@ -153,4 +152,6 @@ static void __init dw_apb_timer_init(struct device_node *timer)
+ 	num_called++;
+ }
+ CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
+-CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer-osc", dw_apb_timer_init);
++CLOCKSOURCE_OF_DECLARE(apb_timer_osc, "snps,dw-apb-timer-osc", dw_apb_timer_init);
++CLOCKSOURCE_OF_DECLARE(apb_timer_sp, "snps,dw-apb-timer-sp", dw_apb_timer_init);
++CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer", dw_apb_timer_init);
 -- 
 1.7.9.5
