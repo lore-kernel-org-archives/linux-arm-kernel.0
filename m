@@ -1,39 +1,60 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 22 Aug 2013 13:00:44 +0200
-Subject: [PATCH 1/1] ARM: at91: sam9g45: shutdown ddr1 too when rebooting
-Message-ID: <1377169244-20462-1-git-send-email-plagnioj@jcrosoft.com>
+From: B38611@freescale.com (Fugang Duan)
+Date: Thu, 22 Aug 2013 18:56:31 +0800
+Subject: [PATCH] ARM: imx6sl: config iomux-gpr1 to select clock for fec
+Message-ID: <1377168991-8824-1-git-send-email-B38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-as on ddr0 we need to cleanly shutdown ddr1 if used before rebootinh
+Config iomux-gpr1 to select clock source for fec system clock.
+Clear gpr1[14], gpr1[18-17] bit to select the fec clock source
+from internal anatop PLL.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Fugang Duan  <B38611@freescale.com>
 ---
- arch/arm/mach-at91/at91sam9g45_reset.S | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-imx/mach-imx6sl.c |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9g45_reset.S b/arch/arm/mach-at91/at91sam9g45_reset.S
-index 721a1a3..3fd634d 100644
---- a/arch/arm/mach-at91/at91sam9g45_reset.S
-+++ b/arch/arm/mach-at91/at91sam9g45_reset.S
-@@ -21,6 +21,8 @@
- at91sam9g45_restart:
- 			ldr	r5, =at91_ramc_base		@ preload constants
- 			ldr	r0, [r5]
-+			add	r5, #4				@ ddr1
-+			ldr	r5, [r5]
- 			ldr	r4, =at91_rstc_base
- 			ldr	r1, [r4]
+diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+index 132db26..e0a8c12 100644
+--- a/arch/arm/mach-imx/mach-imx6sl.c
++++ b/arch/arm/mach-imx/mach-imx6sl.c
+@@ -11,17 +11,37 @@
+ #include <linux/irqchip.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
  
-@@ -30,6 +32,8 @@ at91sam9g45_restart:
+ #include "common.h"
  
- 			.balign	32				@ align to cache line
++static void __init imx6sl_fec_init(void)
++{
++	struct regmap *gpr;
++
++	/* set FEC clock from internal PLL clock source */
++	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6sl-iomuxc-gpr");
++	if (!IS_ERR(gpr)) {
++		regmap_update_bits(gpr, IOMUXC_GPR1,
++			IMX6SL_GPR1_FEC_CLOCK_MUX2_SEL_MASK, 0);
++		regmap_update_bits(gpr, IOMUXC_GPR1,
++			IMX6SL_GPR1_FEC_CLOCK_MUX1_SEL_MASK, 0);
++	} else
++		pr_err("failed to find fsl,imx6sl-iomux-gpr regmap\n");
++}
++
+ static void __init imx6sl_init_machine(void)
+ {
+ 	mxc_arch_reset_init_dt();
  
-+			str	r2, [r5, #AT91_DDRSDRC_RTR]	@ disable DDR1 access
-+			str	r3, [r5, #AT91_DDRSDRC_LPR]	@ power down DDR1
- 			str	r2, [r0, #AT91_DDRSDRC_RTR]	@ disable DDR0 access
- 			str	r3, [r0, #AT91_DDRSDRC_LPR]	@ power down DDR0
- 			str	r4, [r1, #AT91_RSTC_CR]		@ reset processor
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++
++	imx6sl_fec_init();
+ }
+ 
+ static void __init imx6sl_init_irq(void)
 -- 
-1.8.4.rc1
+1.7.1
