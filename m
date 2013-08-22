@@ -1,50 +1,102 @@
-From: alex.elder@linaro.org (Alex Elder)
-Date: Thu, 22 Aug 2013 11:31:31 -0500
-Subject: [PATCH, resend] clk: get matching entry under lock in of_clk_init()
-In-Reply-To: <5204EBA0.1070803@linaro.org>
-References: <5204EBA0.1070803@linaro.org>
-Message-ID: <52163CE3.8000806@linaro.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 22 Aug 2013 17:47:48 +0100
+Subject: [PATCH 1/3] ARM: PCI: versatile: Fix map_irq function to match
+ hardware
+In-Reply-To: <1377190070-7305-1-git-send-email-peter.maydell@linaro.org>
+References: <1377190070-7305-1-git-send-email-peter.maydell@linaro.org>
+Message-ID: <1377190070-7305-2-git-send-email-peter.maydell@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently of_clk_init() finds a matching device node while holding
-the device tree spinlock.  When a matching device node is found, the
-lock is dropped and then re-acquired in order to get a reference
-to the matching device id structure.
+The PCI controller code for the Versatile board has never had the
+correct IRQ mapping for hardware.  For many years it had an odd
+mapping ("all interrupts are int 27") which aligned with the
+equivalent bug in QEMU.  However as of commit 1bc39ac5dab265
+the mapping changed and no longer matched either hardware or QEMU,
+with the result that any PCI card beyond the first in QEMU would
+not have functioning interrupts; for example a boot with a SCSI
+controller would time out as follows:
 
-Acquiring the spinlock twice is unnecessary (and it opens a
-vulnerable window that could conceivably lead to errors).
+ ------------
+ sym0: <895a> rev 0x0 at pci 0000:00:0d.0 irq 92
+ sym0: SCSI BUS has been reset.
+ scsi0 : sym-2.2.3
+ [...]
+ scsi 0:0:0:0: ABORT operation started
+ scsi 0:0:0:0: ABORT operation timed-out.
+ scsi 0:0:0:0: DEVICE RESET operation started
+ scsi 0:0:0:0: DEVICE RESET operation timed-out.
+ scsi 0:0:0:0: BUS RESET operation started
+ scsi 0:0:0:0: BUS RESET operation timed-out.
+ scsi 0:0:0:0: HOST RESET operation started
+ sym0: SCSI BUS has been reset
+ ------------
 
-There already exists an interface for both finding and taking a
-reference to a device id under lock, so use it.
+Fix the mapping so that it matches real hardware (checked against the
+schematics for PB926 and backplane, and tested against the hardware).
+This allows PCI cards using interrupts to work on hardware for the
+first time; this change will also work with QEMU 1.5 or later, where
+the equivalent bugs in the modelling of the hardware have been fixed.
 
-Signed-off-by: Alex Elder <elder@linaro.org>
-Reviewed-by: Christian Daudt <csd@broadcom.com>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
+Although QEMU will attempt to autodetect whether the kernel is
+expecting the long-standing "everything is int 27" mapping or the one
+hardware has, for certainty we force it into "definitely behave like
+hardware mode"; this will avoid unexpected surprises later if we
+implement sparse irqs. This is harmless on hardware.
+
+Thanks to Paul Gortmaker for bisecting the problem and finding an initial
+solution, to Russell King for providing the correct interrupt mapping,
+and to Guenter Roeck for providing an initial version of this patch
+and prodding me into relocating the hardware and retesting everything.
+
+Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
 ---
- drivers/clk/clk.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-versatile/pci.c |   25 +++++++++++++++++++------
+ 1 file changed, 19 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 56a00db..760ab1d 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2116,13 +2116,13 @@ EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
-  */
- void __init of_clk_init(const struct of_device_id *matches)
+diff --git a/arch/arm/mach-versatile/pci.c b/arch/arm/mach-versatile/pci.c
+index e92e5e0..234740d 100644
+--- a/arch/arm/mach-versatile/pci.c
++++ b/arch/arm/mach-versatile/pci.c
+@@ -295,6 +295,19 @@ int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
+ 	__raw_writel(PHYS_OFFSET, local_pci_cfg_base + PCI_BASE_ADDRESS_2);
+ 
+ 	/*
++	 * For many years the kernel and QEMU were symbiotically buggy
++	 * in that they both assumed the same broken IRQ mapping.
++	 * QEMU therefore attempts to auto-detect old broken kernels
++	 * so that they still work on newer QEMU as they did on old
++	 * QEMU. Since we now use the correct (ie matching-hardware)
++	 * IRQ mapping we write a definitely different value to a
++	 * PCI_INTERRUPT_LINE register to tell QEMU that we expect
++	 * real hardware behaviour and it need not be backwards
++	 * compatible for us. This write is harmless on real hardware.
++	 */
++	__raw_writel(0, VERSATILE_PCI_VIRT_BASE+PCI_INTERRUPT_LINE);
++
++	/*
+ 	 * Do not to map Versatile FPGA PCI device into memory space
+ 	 */
+ 	pci_slot_ignore |= (1 << myslot);
+@@ -327,13 +340,13 @@ static int __init versatile_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
  {
-+	const struct of_device_id *match;
- 	struct device_node *np;
-
- 	if (!matches)
- 		matches = __clk_of_table;
-
--	for_each_matching_node(np, matches) {
--		const struct of_device_id *match = of_match_node(matches, np);
-+	for_each_matching_node_and_match(np, matches, &match) {
- 		of_clk_init_cb_t clk_init_cb = match->data;
- 		clk_init_cb(np);
- 	}
+ 	int irq;
+ 
+-	/* slot,  pin,	irq
+-	 *  24     1     IRQ_SIC_PCI0
+-	 *  25     1     IRQ_SIC_PCI1
+-	 *  26     1     IRQ_SIC_PCI2
+-	 *  27     1     IRQ_SIC_PCI3
++	/*
++	 * Slot	INTA	INTB	INTC	INTD
++	 * 31	PCI1	PCI2	PCI3	PCI0
++	 * 30	PCI0	PCI1	PCI2	PCI3
++	 * 29	PCI3	PCI0	PCI1	PCI2
+ 	 */
+-	irq = IRQ_SIC_PCI0 + ((slot - 24 + pin - 1) & 3);
++	irq = IRQ_SIC_PCI0 + ((slot + 2 + pin - 1) & 3);
+ 
+ 	return irq;
+ }
 -- 
 1.7.9.5
