@@ -1,11 +1,13 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 23 Aug 2013 01:17:48 +0400
-Subject: [PATCH v4 0/3] R8A7779/Marzen R-Car VIN driver support
-Message-ID: <201308230117.49681.sergei.shtylyov@cogentembedded.com>
+Date: Fri, 23 Aug 2013 01:19:13 +0400
+Subject: [PATCH v5 0/3] R8A7779/Marzen R-Car VIN driver support
+Message-ID: <201308230119.13783.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
+
+   [Resending with a real version #.]
 
    Here's the set of 3 patches against the Mauro's 'media_tree.git' repo's
 'master' branch. Here we add the VIN driver platform code for the R8A7779/Marzen
