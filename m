@@ -1,58 +1,84 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Fri, 9 Aug 2013 13:37:08 -0700
-Subject: [PATCH RFC v2 5/5] spmi: document the PMIC arbiter SPMI bindings
+Date: Thu, 22 Aug 2013 14:59:06 -0500
+Subject: [PATCH RFC v2 3/5] spmi: add generic SPMI controller binding
+ documentation
 In-Reply-To: <cover.1377202730.git.joshc@codeaurora.org>
 References: <cover.1377202730.git.joshc@codeaurora.org>
-Message-ID: <ea2d30d47cb54b4322231f5c319663ee9c996784.1377202730.git.joshc@codeaurora.org>
+Message-ID: <e42576b69ef3d4e624fbfa2f32f6f79a931b55d6.1377202730.git.joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
 ---
- .../bindings/spmi/qcom,spmi-pmic-arb.txt           | 36 ++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
+I'm introducing this as an RFC, because there are set of assumptions
+made in this binding spec, that currently hold true for the supported
+controller/addressing scheme for the Snapdragon 800 series, but don't
+necessarily hold true for SPMI in general.
 
-diff --git a/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt b/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
+  1. No use of Group Slave Identifiers (GSIDs)
+     (SPMI allows for a slave to belong to zero or more groups specified
+     by GSID, however this feature isn't currently implemented)
+
+  2. No specification of Master Identifier (MID)
+     (A "system integrator" allocates to each master a 2-bit MID, this
+     currently isn't being specified, as it isn't needed by software for
+     the PMIC Arb; not sure if this is of use to other SPMI controllers)
+
+  3. Single SPMI master per controller
+
+Effectively, only a subset of possible SPMI configurations are specified
+in this document.
+
+So, if it's considered necessary to provide a generic SPMI binding
+specification, is it acceptable to only define a subset at this time,
+expanding only when necessary, or shall I expand the definition to at
+least address 1 & 2, even though they are of no use in the current
+implementation?
+
+ Documentation/devicetree/bindings/spmi/spmi.txt | 36 +++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spmi/spmi.txt
+
+diff --git a/Documentation/devicetree/bindings/spmi/spmi.txt b/Documentation/devicetree/bindings/spmi/spmi.txt
 new file mode 100644
-index 0000000..3965236
+index 0000000..a01b064
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
++++ b/Documentation/devicetree/bindings/spmi/spmi.txt
 @@ -0,0 +1,36 @@
-+Qualcomm SPMI Controller (PMIC Arbiter)
++System Power Management Interface (SPMI) Controller
 +
-+The SPMI PMIC Arbiter is found on the Snapdragon 800 Series.  It is an SPMI
-+controller with wrapping arbitration logic to allow for multiple on-chip
-+devices to control a single SPMI master.
-+
-+See spmi.txt for the generic SPMI controller bindings.
++This document defines a generic set of bindings for use by SPMI controllers.  A
++controller is modelled in device tree as a node with zero or more child nodes,
++each representing a unique slave on the bus.
 +
 +Required properties:
-+- compatible : should be "qcom,spmi-pmic-arb".
-+- reg-names  : should be "core", "intr", "cnfg"
-+- reg : offset and length of the PMIC Arbiter Core register map.
-+- reg : offset and length of the PMIC Arbiter Interrupt controller register map.
-+- reg : offset and length of the PMIC Arbiter Configuration register map.
 +- #address-cells : must be set to 1
 +- #size-cells : must be set to 0
 +
 +Child nodes:
 +
-+Zero or more child nodes must be specified as per the spmi.txt document.
++An SPMI controller node can contain zero or more children.  Each child must
++have a reg property defining its 4-bit Unique Slave Identifier (USID) on the
++SPMI bus.  This is the ID that has been "statically assigned by the system
++integrator", as per the SPMI spec.
 +
-+Example:
++Each child node represents a slave device on the bus.
 +
-+	qcom,spmi at fc4c0000 {
-+		compatible = "qcom,spmi-pmic-arb";
-+		reg-names = "core", "intr", "cnfg";
-+		reg = <0xfc4cf000 0x1000>,
-+		      <0Xfc4cb000 0x1000>,
-+		      <0Xfc4ca000 0x1000>;
++	controller at .. {
++		compatible = "...";
++		reg = <...>;
++
 +		#address-cells = <1>;
-+		#size-cells = <0>;
++		#size-cells <0>;
 +
-+		qcom,pm8841 at 4 {
-+			reg = <0x4>;
++		child at 0 {
++			compatible = "...";
++			reg = <0>;
++		};
++
++		child at 7 {
++			compatible = "...";
++			reg = <7>;
 +		};
 +	};
 -- 
