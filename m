@@ -1,48 +1,37 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 22 Aug 2013 11:41:58 -0300
-Subject: [PATCH 7/7] watchdog: orion: Update device-tree binding documentation
-In-Reply-To: <1377182518-12554-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377182518-12554-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1377182518-12554-8-git-send-email-ezequiel.garcia@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 22 Aug 2013 22:52:21 +0800
+Subject: [GIT PULL 3/5] ARM: imx: device tree changes for 3.12
+In-Reply-To: <87vc2xu7sa.fsf@linaro.org>
+References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
+ <1376833688-24542-3-git-send-email-shawn.guo@linaro.org>
+ <87vc2xu7sa.fsf@linaro.org>
+Message-ID: <20130822145219.GJ30533@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the 'reg' property meaning, by defining three required cells.
-It's important to note this commit breaks DT-compatibility for this
-device.
+On Thu, Aug 22, 2013 at 07:20:05AM -0700, Kevin Hilman wrote:
+> Shawn Guo <shawn.guo@linaro.org> writes:
+> 
+> > Olof, Kevin,
+> >
+> > The pull request depends on the previous one imx-soc-3.12.  Please take
+> > care of it.  Thanks.
+> 
+> It seems it also has a dependency on [GIT PULL 1/5] for the binding
+> changes to the weim bus?  (specifically patch "ARM: dts: i.MX27: Add
+> WEIM node" uses the updated binding, correct?)
 
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- Documentation/devicetree/bindings/watchdog/orion-wdt.txt | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+Applying this patch without [GIT PULL 1/5] does not causes any breakage
+or regression.  This new support is supposed to start working when
+imx/weim and imx/dt branch get merged together.  We generally do not
+take such thing as a dependency, right?
 
-diff --git a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-index 5dc8d30..bb7f1a2 100644
---- a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-@@ -3,7 +3,10 @@
- Required Properties:
- 
- - Compatibility : "marvell,orion-wdt"
--- reg		: Address of the timer registers
-+- reg		: Three cells are required.
-+		  First  cell contains the global timer control register.
-+		  Second cell contains the watchdog counter register.
-+		  Third  cell contains the RSTOUT register.
- 
- Optional properties:
- 
-@@ -13,7 +16,9 @@ Example:
- 
- 	wdt at 20300 {
- 		compatible = "marvell,orion-wdt";
--		reg = <0x20300 0x28>;
-+		reg = <0x20300 0x4
-+		       0x20324 0x4
-+		       0x20108 0x4>;
- 		timeout-sec = <10>;
- 		status = "okay";
- 	};
--- 
-1.8.1.5
+> Please try and describe
+> all the dependencies.
+> 
+> Also, since it's based on the previous pull where I asked for some
+> changes (dropping DEBUG_LL support) you'll need to respin this one as well.
+
+Yes, I will respin this one as well.
+
+Shawn
