@@ -1,71 +1,122 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 22 Aug 2013 11:19:21 -0500
-Subject: [PATCHv3 3/4] clocksource: dw_apb_timer: Move timer defines to
- header file.
-In-Reply-To: <20130822110118.GB19347@amd.pavel.ucw.cz>
-References: <1377118427-20644-1-git-send-email-dinguyen@altera.com>
- <1377118427-20644-3-git-send-email-dinguyen@altera.com>
- <20130822110118.GB19347@amd.pavel.ucw.cz>
-Message-ID: <1377188361.30624.18.camel@linux-builds1>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 22 Aug 2013 09:19:06 -0700
+Subject: [PATCH v6 1/3] mmc: dw_mmc: Add exynos resume_noirq callback to clear
+ WAKEUP_INT
+In-Reply-To: <1377188348-3418-1-git-send-email-dianders@chromium.org>
+References: <1377188348-3418-1-git-send-email-dianders@chromium.org>
+Message-ID: <1377188348-3418-2-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-08-22 at 13:01 +0200, ZY - pavel wrote:
-> Hi!
-> 
-> On Wed 2013-08-21 15:53:46, dinguyen at altera.com wrote:
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > Move all dw_apb_timer defines to include/linux/dw_apb_timer.h.
-> 
-> That makes sense. But the changelog says "move" while the patch only
-> adds them to second place, which can not be right.
+If the WAKEUP_INT is asserted at wakeup and not cleared, we'll end up
+looping around forever.  This has been seen to happen on exynos5420
+silicon despite the fact that we haven't enabled any wakeup events due
+to a silicon errata.  It is safe to do on all exynos variants.
 
-Oops, must not have saved on one of my shells. Thanks for the review.
-Will post a v4 asap.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+Changes in v6:
+- Took out TODO comment copied from main platform code.
 
-> 
-> Is there public git tree with the patches somewhere?
+Changes in v5:
+- Cleaned up dw_mci_exynos_resume_noirq() comment as per Seungwon.
+- Don't memcpy dev_pm_ops structure, define a new one.
 
-git://git.rocketboards.org/linux-socfpga-next.git
+Changes in v4:
+- Take Seungwon's suggestion and don't add any dw_mmc-pltfm code.
 
-Dinh
-> 
-> Thanks,
-> 								Pavel
-> 
-> > ---
-> >  include/linux/dw_apb_timer.h |   19 +++++++++++++++++++
-> >  1 file changed, 19 insertions(+)
-> > 
-> > diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
-> > index 1f79b20..1d2b949 100644
-> > --- a/include/linux/dw_apb_timer.h
-> > +++ b/include/linux/dw_apb_timer.h
-> > @@ -19,6 +19,25 @@
-> >  
-> >  #define APBTMRS_REG_SIZE       0x14
-> >  
-> > +#define APBT_MIN_PERIOD                 4
-> > +#define APBT_MIN_DELTA_USEC             200
-> > +
-> > +#define APBTMR_N_LOAD_COUNT             0x00
-> > +#define APBTMR_N_CURRENT_VALUE          0x04
-> > +#define APBTMR_N_CONTROL                0x08
-> > +#define APBTMR_N_EOI                    0x0c
-> > +#define APBTMR_N_INT_STATUS             0x10
-> > +
-> > +#define APBTMRS_INT_STATUS              0xa0
-> > +#define APBTMRS_EOI                     0xa4
-> > +#define APBTMRS_RAW_INT_STATUS          0xa8
-> > +#define APBTMRS_COMP_VERSION            0xac
-> > +
-> > +#define APBTMR_CONTROL_ENABLE           (1 << 0)
-> > +/* 1: periodic, 0:free running. */
-> > +#define APBTMR_CONTROL_MODE_PERIODIC    (1 << 1)
-> > +#define APBTMR_CONTROL_INT              (1 << 2)
-> > +
-> >  struct dw_apb_timer {
-> >  	void __iomem				*base;
-> >  	unsigned long				freq;
-> 
+Changes in v3:
+- Add freeze/thaw and poweroff/restore noirq entries.
+
+Changes in v2:
+- Use suspend_noirq as per James Hogan.
+
+ drivers/mmc/host/dw_mmc-exynos.c | 53 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 52 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+index 866edef..e8c6cc9 100644
+--- a/drivers/mmc/host/dw_mmc-exynos.c
++++ b/drivers/mmc/host/dw_mmc-exynos.c
+@@ -30,6 +30,7 @@
+ #define SDMMC_CLKSEL_TIMING(x, y, z)	(SDMMC_CLKSEL_CCLK_SAMPLE(x) |	\
+ 					SDMMC_CLKSEL_CCLK_DRIVE(y) |	\
+ 					SDMMC_CLKSEL_CCLK_DIVIDER(z))
++#define SDMMC_CLKSEL_WAKEUP_INT		BIT(11)
+ 
+ #define EXYNOS4210_FIXED_CIU_CLK_DIV	2
+ #define EXYNOS4412_FIXED_CIU_CLK_DIV	4
+@@ -100,6 +101,49 @@ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int dw_mci_exynos_suspend(struct device *dev)
++{
++	struct dw_mci *host = dev_get_drvdata(dev);
++
++	return dw_mci_suspend(host);
++}
++
++static int dw_mci_exynos_resume(struct device *dev)
++{
++	struct dw_mci *host = dev_get_drvdata(dev);
++
++	return dw_mci_resume(host);
++}
++
++/**
++ * dw_mci_exynos_resume_noirq - Exynos-specific resume code
++ *
++ * On exynos5420 there is a silicon errata that will sometimes leave the
++ * WAKEUP_INT bit in the CLKSEL register asserted.  This bit is 1 to indicate
++ * that it fired and we can clear it by writing a 1 back.  Clear it to prevent
++ * interrupts from going off constantly.
++ *
++ * We run this code on all exynos variants because it doesn't hurt.
++ */
++
++static int dw_mci_exynos_resume_noirq(struct device *dev)
++{
++	struct dw_mci *host = dev_get_drvdata(dev);
++	u32 clksel;
++
++	clksel = mci_readl(host, CLKSEL);
++	if (clksel & SDMMC_CLKSEL_WAKEUP_INT)
++		mci_writel(host, CLKSEL, clksel);
++
++	return 0;
++}
++#else
++#define dw_mci_exynos_suspend		NULL
++#define dw_mci_exynos_resume		NULL
++#define dw_mci_exynos_resume_noirq	NULL
++#endif /* CONFIG_PM_SLEEP */
++
+ static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
+ {
+ 	/*
+@@ -187,13 +231,20 @@ static int dw_mci_exynos_probe(struct platform_device *pdev)
+ 	return dw_mci_pltfm_register(pdev, drv_data);
+ }
+ 
++const struct dev_pm_ops dw_mci_exynos_pmops = {
++	SET_SYSTEM_SLEEP_PM_OPS(dw_mci_exynos_suspend, dw_mci_exynos_resume)
++	.resume_noirq = dw_mci_exynos_resume_noirq,
++	.thaw_noirq = dw_mci_exynos_resume_noirq,
++	.restore_noirq = dw_mci_exynos_resume_noirq,
++};
++
+ static struct platform_driver dw_mci_exynos_pltfm_driver = {
+ 	.probe		= dw_mci_exynos_probe,
+ 	.remove		= __exit_p(dw_mci_pltfm_remove),
+ 	.driver		= {
+ 		.name		= "dwmmc_exynos",
+ 		.of_match_table	= dw_mci_exynos_match,
+-		.pm		= &dw_mci_pltfm_pmops,
++		.pm		= &dw_mci_exynos_pmops,
+ 	},
+ };
+ 
+-- 
+1.8.3
