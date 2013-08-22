@@ -1,26 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 22 Aug 2013 16:20:06 -0600
-Subject: [PATCHv4 2/4] arm: dts: Change dw-apb-timer-osc and
- dw-apb-timer-sp to just dw-apb-timer
-In-Reply-To: <1377189026-16656-2-git-send-email-dinguyen@altera.com>
-References: <1377189026-16656-1-git-send-email-dinguyen@altera.com>
- <1377189026-16656-2-git-send-email-dinguyen@altera.com>
-Message-ID: <52168E96.3020702@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 22 Aug 2013 15:31:40 -0700
+Subject: [PATCH 3/4] clk: mvebu: add missing iounmap
+In-Reply-To: <1377175611-4241-4-git-send-email-jszhang@marvell.com>
+References: <1377175611-4241-1-git-send-email-jszhang@marvell.com>
+ <1377175611-4241-4-git-send-email-jszhang@marvell.com>
+Message-ID: <20130822223140.8231.74026@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2013 10:30 AM, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
+Quoting Jisheng Zhang (2013-08-22 05:46:50)
+> Add missing iounmap to setup error path.
 > 
-> "dw-apb-timer-osc" and "dw-apb-timer-sp" are the same implementation of the
-> DW APB timer, just fed by different clocks. Thus, deprecate both
-> "dw-apb-timer-osc" and "dw-apb-timer-sp" in lieu of "dw-apb-timer".
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-The binding change looks reasonable to me.
+Patch looks good with one minor nitpick below.
 
-The *.dtsi change will cause the new DT not to work with older kernels
-that don't support the new compatible values. Perhaps you're fine with that?
+> @@ -145,10 +147,8 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
+>         ctrl->num_gates = n;
+>         ctrl->gates = kzalloc(ctrl->num_gates * sizeof(struct clk *),
+>                               GFP_KERNEL);
+> -       if (WARN_ON(!ctrl->gates)) {
+> -               kfree(ctrl);
+> -               return;
+> -       }
+> +       if (WARN_ON(!ctrl->gates))
+> +               goto bail_out;
+>  
+>         for (n = 0; n < ctrl->num_gates; n++) {
+>                 const char *parent =
+> @@ -160,4 +160,10 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
+>         }
+>  
+>         of_clk_add_provider(np, clk_gating_get_src, ctrl);
+> +
+> +       return;
+> +bail_out:
+> +       kfree(ctrl);
+> +ctrl_out:
+> +       iounmap(base);
 
-I assume that the driver has already been updated to support the new
-values, and that the driver change is guaranteed to be merged before
-this change? Otherwise, git bisect will be broken for a while.
+bail_out is not the best name. How about gates_out?
+
+Regards,
+Mike
