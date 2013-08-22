@@ -1,71 +1,63 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Aug 2013 22:00:57 -0700
-Subject: [PATCH 00/10] ARM: clps711x: Initial DT support / Fixes
-In-Reply-To: <20130817083230.9ab0aaf04f8c84d42f88c4ce@mail.ru>
-References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
- <20130803075442.6d1a418eb60217f7196a25fc@mail.ru>
- <20130814062900.GA19951@quad.lixom.net>
- <20130817083230.9ab0aaf04f8c84d42f88c4ce@mail.ru>
-Message-ID: <20130822050057.GB5151@quad.lixom.net>
+Date: Wed, 21 Aug 2013 22:03:15 -0700
+Subject: [GIT 00/19 v2] Renesas ARM based SoC pinmux updates for v3.12
+In-Reply-To: <20130818035557.GB30709@verge.net.au>
+References: <cover.1374625203.git.horms+renesas@verge.net.au>
+ <20130814072328.GA30577@quad.lixom.net>
+ <20130818035557.GB30709@verge.net.au>
+Message-ID: <20130822050315.GC5151@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 17, 2013 at 08:32:30AM +0400, Alexander Shiyan wrote:
-> On Tue, 13 Aug 2013 23:29:00 -0700
-> Olof Johansson <olof@lixom.net> wrote:
-> 
-> > On Sat, Aug 03, 2013 at 07:54:42AM +0400, Alexander Shiyan wrote:
-> > > On Thu, 18 Jul 2013 22:34:51 +0400
-> > > Alexander Shiyan <shc_work@mail.ru> wrote:
+On Sun, Aug 18, 2013 at 01:55:57PM +1000, Simon Horman wrote:
+> On Wed, Aug 14, 2013 at 12:23:28AM -0700, Olof Johansson wrote:
+> > On Wed, Jul 24, 2013 at 09:32:14AM +0900, Simon Horman wrote:
+> > > Hi Olof, Hi Arnd,
 > > > 
-> > > > Here is next patchset for the Cirrus Logic CLPS711X target CPUs.
-> > > > The first four patches is a small fixes. The rest is a attempt
-> > > > to add DT support for this subarch.
-> > > > As long as DT support is incomplete (no peripherals), I did not
-> > > > add DTS yet. This is the next step.
-> > > > 
-> > > > Alexander Shiyan (10):
-> > > >   ARM: clps711x: Remove the special name for the syscon driver
-> > > >   ARM: clps711x: Drop fortunet board support
-> > > >   ARM: clps711x: autcpu12: Remove incorrect config checking
-> > > >   ARM: clps711x: edb7211: Remove extra iotable_init() call
-> > > >   ARM: clps711x: Add CLPS711X clk driver
-> > > >   ARM: clps711x: Add CLPS711X clocksource driver
-> > > >   ARM: clps711x: Add CLPS711X irqchip driver
-> > > >   ARM: clps711x: Add CLPS711X cpuidle driver
-> > > >   ARM: clps711x: Migrate CLPS711X subarch to the new basic drivers
-> > > >   ARM: clps711x: Add initial DT support
-> > > [...]
+> > > please consider the following pinmux updates for v3.12.
 > > > 
-> > > If there is no objection about "fixes" part of patchset,
-> > > can these parts (1/10-4/10) be applied?
-> > > Thanks.
+> > > Difference with v1 of this pull-request:
+> > > * Remove bogus i2c portions of the first patch of the series.
+> > > * Correct addressing mode used in dts of the first patch of the series.
+> > > * Removal of egg from face: wip
+> > > 
+> > > The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+> > > 
+> > >   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pinmux-for-v3.12
 > > 
-> > Definitely, I'll apply them to fixes-non-critical for 3.12.
+> > Pulled, but I noticed this. Can you please follow up with bindings revisit in
+> > time for 3.12 final (i.e. if we need to take it after merge window that's
+> > probably OK):
 > > 
-> > Btw, Kevin Hilman is stepping in to help out with arm-soc maintenance, so
-> > please email arm at kenrel.org, since it's an alias that we are all on.
+> >         pfc: pfc at e6060000 {                                                     
+> >                 compatible = "renesas,pfc-r8a7790";                             
+> >                 reg = <0 0xe6060000 0 0x250>;                                   
+> >                 #gpio-range-cells = <3>;                                        
+> >         };                                                                      
+> >                                                                                                                
+> >         sdhi0: sdhi at ee100000 {                                                  
+> >                 compatible = "renesas,r8a7790-sdhi"; 
 > > 
-> > Also, I don't know if I've asked this of you before, but for these "smaller"
-> > platforms that don't see quite so much activity, it's easy for us to forget who
-> > wants us to apply patches and who stages branches. So emails like these are
-> > appreciated so we know if you want them applied, or if we'll get a pull request
-> > later. Clarifying in the patch posting if they are for review or for applying
-> > works too.
+> > 
+> > I.e. different ordering on the compatible values looks a bit uncoordinated.
 > 
-> Do you mean always create CC to "arm at ..." for parts [0/xx] or after review period?
-> Thnaks.
+> Can I confirm that you are referring to the fact that
+> assume you mean that "-sdhi" follows "r8a7790" whereas "pfc-" precedes
+> "r8a7790"?
+> 
+> If so, I'll work with Laurent and Guennadi (both CCed, both on vacation),
+> and Magnus to resolve this inconsistency.
 
-Hi,
+Yes, exactly. Some platforms use <vendor>,<soc>-<ip>, others
+<vendor>,<ip>-<soc>. I don't care which way is used, but it would be good if
+everybody used the same convention to make it easier for developers.
 
-arm at kernel.org for when you want them applied. I try to avoid getting
-too many patches posted there just for review, it's the alias we try
-to keep mostly for platform maintainers to email us pull requests and
-patches to apply to.
-
-You can cc us on our individual addresses if you want for the reviews. We might
-not always respond in a timely manner depending on how backlogged we are on
-email, so remind us if needed.
+Preference for direction is something I leave up to the device tree maintainers
+to declare. ;-)
 
 
 -Olof
