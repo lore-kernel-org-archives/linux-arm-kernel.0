@@ -1,122 +1,36 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 22 Aug 2013 09:19:06 -0700
-Subject: [PATCH v6 1/3] mmc: dw_mmc: Add exynos resume_noirq callback to clear
- WAKEUP_INT
-In-Reply-To: <1377188348-3418-1-git-send-email-dianders@chromium.org>
-References: <1377188348-3418-1-git-send-email-dianders@chromium.org>
-Message-ID: <1377188348-3418-2-git-send-email-dianders@chromium.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 22 Aug 2013 09:20:24 -0700
+Subject: Broken device trees for exynos in linux-next
+In-Reply-To: <1c7e01ce9f1d$bf4967d0$3ddc3770$@org>
+References: <CAOesGMgv9gTQ_NtaKZY_ZfLD1NBU19E-vaLaWwmvGJJB1MQrwg@mail.gmail.com>
+ <13b101ce9a14$2cebd700$86c38500$@org>
+ <CAOesGMiyNM6VdNzKQU3XwoiacJV8hc60mcLiH+vHoS6xJM6q-A@mail.gmail.com>
+ <159201ce9b36$2a513f30$7ef3bd90$@org> <8738q5lnjc.fsf@kernel.org>
+ <1c7e01ce9f1d$bf4967d0$3ddc3770$@org>
+Message-ID: <CAOesGMhSsWp1ECuGfoB1P4TmZzc-bbDET5DwwdbvvJfJ2k2xJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the WAKEUP_INT is asserted at wakeup and not cleared, we'll end up
-looping around forever.  This has been seen to happen on exynos5420
-silicon despite the fact that we haven't enabled any wakeup events due
-to a silicon errata.  It is safe to do on all exynos variants.
+Kukjin,
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Changes in v6:
-- Took out TODO comment copied from main platform code.
+On Thu, Aug 22, 2013 at 2:55 AM, Kukjin Kim <kgene@kernel.org> wrote:
+> Yeah, it can be used for test. But there are many differences between
+> exynos_defconfig and exynos5440_defconfig...PCIe, GbE, HugeTLB and KVM...so
+> I'm still wondering how to handle it without other defconfig.
+>
+> Olof, do you still having objection for exynos5440_defconfig? If so, OK I
+> will revert exynos5440_defconfig for now so that I could pull out the
+> 'defconfig' branch to arm-soc for upcoming merge window. Then, let's discuss
+> again :)
 
-Changes in v5:
-- Cleaned up dw_mci_exynos_resume_noirq() comment as per Seungwon.
-- Don't memcpy dev_pm_ops structure, define a new one.
+As far as I see it, you have two options:
 
-Changes in v4:
-- Take Seungwon's suggestion and don't add any dw_mmc-pltfm code.
+1. Add the needed drivers to multi_v7_defconfig and use that for your platform.
+2. Add them to both multi_v7_defconfig and exynos_defconfig.
 
-Changes in v3:
-- Add freeze/thaw and poweroff/restore noirq entries.
+Enabling the new drivers on exynos_defconfig does no harm.
 
-Changes in v2:
-- Use suspend_noirq as per James Hogan.
+I don't want to see a new defconfig for this.
 
- drivers/mmc/host/dw_mmc-exynos.c | 53 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 52 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-index 866edef..e8c6cc9 100644
---- a/drivers/mmc/host/dw_mmc-exynos.c
-+++ b/drivers/mmc/host/dw_mmc-exynos.c
-@@ -30,6 +30,7 @@
- #define SDMMC_CLKSEL_TIMING(x, y, z)	(SDMMC_CLKSEL_CCLK_SAMPLE(x) |	\
- 					SDMMC_CLKSEL_CCLK_DRIVE(y) |	\
- 					SDMMC_CLKSEL_CCLK_DIVIDER(z))
-+#define SDMMC_CLKSEL_WAKEUP_INT		BIT(11)
- 
- #define EXYNOS4210_FIXED_CIU_CLK_DIV	2
- #define EXYNOS4412_FIXED_CIU_CLK_DIV	4
-@@ -100,6 +101,49 @@ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int dw_mci_exynos_suspend(struct device *dev)
-+{
-+	struct dw_mci *host = dev_get_drvdata(dev);
-+
-+	return dw_mci_suspend(host);
-+}
-+
-+static int dw_mci_exynos_resume(struct device *dev)
-+{
-+	struct dw_mci *host = dev_get_drvdata(dev);
-+
-+	return dw_mci_resume(host);
-+}
-+
-+/**
-+ * dw_mci_exynos_resume_noirq - Exynos-specific resume code
-+ *
-+ * On exynos5420 there is a silicon errata that will sometimes leave the
-+ * WAKEUP_INT bit in the CLKSEL register asserted.  This bit is 1 to indicate
-+ * that it fired and we can clear it by writing a 1 back.  Clear it to prevent
-+ * interrupts from going off constantly.
-+ *
-+ * We run this code on all exynos variants because it doesn't hurt.
-+ */
-+
-+static int dw_mci_exynos_resume_noirq(struct device *dev)
-+{
-+	struct dw_mci *host = dev_get_drvdata(dev);
-+	u32 clksel;
-+
-+	clksel = mci_readl(host, CLKSEL);
-+	if (clksel & SDMMC_CLKSEL_WAKEUP_INT)
-+		mci_writel(host, CLKSEL, clksel);
-+
-+	return 0;
-+}
-+#else
-+#define dw_mci_exynos_suspend		NULL
-+#define dw_mci_exynos_resume		NULL
-+#define dw_mci_exynos_resume_noirq	NULL
-+#endif /* CONFIG_PM_SLEEP */
-+
- static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
- {
- 	/*
-@@ -187,13 +231,20 @@ static int dw_mci_exynos_probe(struct platform_device *pdev)
- 	return dw_mci_pltfm_register(pdev, drv_data);
- }
- 
-+const struct dev_pm_ops dw_mci_exynos_pmops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(dw_mci_exynos_suspend, dw_mci_exynos_resume)
-+	.resume_noirq = dw_mci_exynos_resume_noirq,
-+	.thaw_noirq = dw_mci_exynos_resume_noirq,
-+	.restore_noirq = dw_mci_exynos_resume_noirq,
-+};
-+
- static struct platform_driver dw_mci_exynos_pltfm_driver = {
- 	.probe		= dw_mci_exynos_probe,
- 	.remove		= __exit_p(dw_mci_pltfm_remove),
- 	.driver		= {
- 		.name		= "dwmmc_exynos",
- 		.of_match_table	= dw_mci_exynos_match,
--		.pm		= &dw_mci_pltfm_pmops,
-+		.pm		= &dw_mci_exynos_pmops,
- 	},
- };
- 
--- 
-1.8.3
+-Olof
