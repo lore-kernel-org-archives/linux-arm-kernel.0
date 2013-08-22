@@ -1,33 +1,32 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Thu, 22 Aug 2013 12:52:58 +0200
-Subject: [PATCHv3 1/4] arm: dts: Add clock entries for timers in SOCFPGA
-In-Reply-To: <1377118427-20644-1-git-send-email-dinguyen@altera.com>
-References: <1377118427-20644-1-git-send-email-dinguyen@altera.com>
-Message-ID: <20130822105258.GA19347@amd.pavel.ucw.cz>
+From: B38611@freescale.com (Fugang Duan)
+Date: Thu, 22 Aug 2013 18:50:37 +0800
+Subject: [PATCH] ARM: imx6sl: add imx6sl iomux-gpr field define
+Message-ID: <1377168637-8676-1-git-send-email-B38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2013-08-21 15:53:44, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> Set the correct clock entries for the the timers, and also clean up
-> the timer entries for SOCFPGA by removing timer<n> in the timer entry.
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> CC: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ian.campbell@citrix.com>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> CC: Jamie Iles <jamie@jamieiles.com>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Heiko Stuebner <heiko@sntech.de>
+Add imx6sl iomux-gpr register field define in "imx6q-iomuxc-gpr.h" header
+file, which is not fully define all iomux-gpr registers and fields, only
+add fec related macro define.
 
+Signed-off-by: Fugang Duan  <B38611@freescale.com>
+---
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-Reviewed-by: Pavel Machek <pavel@denx.de>
-
+diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+index b6bdcd6..7086b22 100644
+--- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
++++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+@@ -363,4 +363,9 @@
+ #define IMX6Q_GPR13_SATA_TX_LVL_1_240_V		(0x1f << 2)
+ #define IMX6Q_GPR13_SATA_MPLL_CLK_EN		BIT(1)
+ #define IMX6Q_GPR13_SATA_TX_EDGE_RATE		BIT(0)
++
++/* For imx6sl iomux gpr register field define */
++#define IMX6SL_GPR1_FEC_CLOCK_MUX1_SEL_MASK    (0x3 << 17)
++#define IMX6SL_GPR1_FEC_CLOCK_MUX2_SEL_MASK    (0x1 << 14)
++
+ #endif /* __LINUX_IMX6Q_IOMUXC_GPR_H */
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.7.1
