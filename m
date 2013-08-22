@@ -1,105 +1,119 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Thu, 22 Aug 2013 18:00:31 +0200
-Subject: [PATCH 1/2] net/cadence/macb: add support for dt phy definition
-In-Reply-To: <1377187048-21944-1-git-send-email-b.brezillon@overkiz.com>
-References: <1377186980-21902-1-git-send-email-b.brezillon@overkiz.com>
- <1377187048-21944-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <5216359F.8000603@overkiz.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 22 Aug 2013 17:04:43 +0100
+Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the
+ DBX500 DT
+In-Reply-To: <20130822154116.GC17154@lee--X1>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <1370521041-32318-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
+ <20130820093034.GL31036@pengutronix.de>
+ <20130822133730.GB23152@e106331-lin.cambridge.arm.com>
+ <20130822141900.GB17154@lee--X1>
+ <20130822151723.GE23152@e106331-lin.cambridge.arm.com>
+ <20130822154116.GC17154@lee--X1>
+Message-ID: <20130822160443.GG23152@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Florian,
+On Thu, Aug 22, 2013 at 04:41:16PM +0100, Lee Jones wrote:
+> On Thu, 22 Aug 2013, Mark Rutland wrote:
+> 
+> > On Thu, Aug 22, 2013 at 03:19:00PM +0100, Lee Jones wrote:
+> > > On Thu, 22 Aug 2013, Mark Rutland wrote:
+> > > 
+> > > > On Tue, Aug 20, 2013 at 10:30:34AM +0100, Sascha Hauer wrote:
+> > > > > On Tue, Aug 20, 2013 at 11:11:19AM +0200, Linus Walleij wrote:
+> > > > > > On Thu, Jun 6, 2013 at 2:16 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > > > > > 
+> > > > > > > +++ b/arch/arm/boot/dts/dbx5x0.dtsi
+> > > > > > > @@ -572,6 +572,8 @@
+> > > > > > >                         v-i2c-supply = <&db8500_vape_reg>;
+> > > > > > >
+> > > > > > >                         clock-frequency = <400000>;
+> > > > > > > +                       clocks = <&prcc_kclk 3 3>, <&prcc_pclk 3 3>;
+> > > > > > > +                       clock-names = "nmk-i2c.0", "apb_pclk";
+> > > > > 
+> > > > > Why do most clocks in this series have the instance number in the clock
+> > > > > names? This looks very wrong to me.
+> > > > 
+> > > > +1. The clock names should be the input names to the unit, they
+> > > > shouldn't vary per instance.
+> > > 
+> > > So I just had a quick look, and it looks like they each have their own
+> > > clock:
+> > > 
+> > > 	clk = clk_reg_prcc_kclk("p1_i2c1_kclk", "i2cclk",
+> > > 			clkrst1_base, BIT(2), CLK_SET_RATE_GATE);
+> > > 	clk = clk_reg_prcc_kclk("p1_i2c2_kclk", "i2cclk",
+> > > 			clkrst1_base, BIT(6), CLK_SET_RATE_GATE);
+> > > 	clk = clk_reg_prcc_kclk("p2_i2c3_kclk", "i2cclk",
+> > > 			clkrst2_base, BIT(0), CLK_SET_RATE_GATE);
+> > > 	clk_register_clkdev(clk, NULL, "nmk-i2c.3");
+> > >         
+> > >         /* etc */
+> > > 
+> > > When using the names in Device Tree it doesn't actually matter what
+> > > you call the first clock. You can call it "fred" if you wanted and it
+> > > would still work, but in light of the naming conventions above and the
+> > > fact that each clock can all be controlled independently, do we still
+> > > want to use the name of the parent clock i.e. i2cclk?
+> > 
+> > Sorry, I don't follow.
+> > 
+> > 
+> > The name should be the name of the clock _input_ on the block described,
+> > as should be listed in documentation for the i2c block. The name should
+> > not vary with instance, and the name should not (necessarily) match the
+> > _output_ of the provider. Surely there's documentation for the i2c block
+> > that gives a name for the clock input(s)?
+> 
+> It's okay, I've fixed the patches.
 
-On 22/08/2013 17:57, Boris BREZILLON wrote:
-> The macb driver only handle PHY description through platform_data
-> (macb_platform_data).
-> Thus, when using dt you cannot define phy properties like phy address or
-> phy irq pin.
->
-> This patch makes use of the of_mdiobus_register to add support for
-> phy device definition using dt.
-> A fallback to the autoscan procedure is added in case there is no phy
-> devices defined in dt.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
->   drivers/net/ethernet/cadence/macb.c |   41 +++++++++++++++++++++++++++++------
->   1 file changed, 34 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-> index e866608..fe06ab0 100644
-> --- a/drivers/net/ethernet/cadence/macb.c
-> +++ b/drivers/net/ethernet/cadence/macb.c
-> @@ -27,6 +27,7 @@
->   #include <linux/phy.h>
->   #include <linux/of.h>
->   #include <linux/of_device.h>
-> +#include <linux/of_mdio.h>
->   #include <linux/of_net.h>
->   #include <linux/pinctrl/consumer.h>
->   
-> @@ -314,6 +315,7 @@ static int macb_mii_probe(struct net_device *dev)
->   int macb_mii_init(struct macb *bp)
->   {
->   	struct macb_platform_data *pdata;
-> +	struct device_node *np;
->   	int err = -ENXIO, i;
->   
->   	/* Enable management port */
-> @@ -335,21 +337,46 @@ int macb_mii_init(struct macb *bp)
->   	bp->mii_bus->parent = &bp->dev->dev;
->   	pdata = bp->pdev->dev.platform_data;
->   
-> -	if (pdata)
-> -		bp->mii_bus->phy_mask = pdata->phy_mask;
-> -
->   	bp->mii_bus->irq = kmalloc(sizeof(int)*PHY_MAX_ADDR, GFP_KERNEL);
->   	if (!bp->mii_bus->irq) {
->   		err = -ENOMEM;
->   		goto err_out_free_mdiobus;
->   	}
->   
-> -	for (i = 0; i < PHY_MAX_ADDR; i++)
-> -		bp->mii_bus->irq[i] = PHY_POLL;
-> -
->   	dev_set_drvdata(&bp->dev->dev, bp->mii_bus);
->   
-> -	if (mdiobus_register(bp->mii_bus))
-> +	np = bp->pdev->dev.of_node;
-> +	if (np) {
-> +		/* try dt phy registration */
-> +		err = of_mdiobus_register(bp->mii_bus, np);
-> +
-> +		/* fallback to standard phy registration if no phy were
-> +		   found during dt phy registration */
-> +		if (!err && !phy_find_first(bp->mii_bus)) {
-> +			for (i = 0; i < PHY_MAX_ADDR; i++) {
-> +				struct phy_device *phydev;
-> +
-> +				phydev = mdiobus_scan(bp->mii_bus, i);
-> +				if (IS_ERR(phydev)) {
-> +					err = PTR_ERR(phydev);
-> +					break;
-> +				}
-> +			}
-> +
+Ok.
 
-This is were I need the mdiobus_full_scan function.
+> 
+> Linus, branch fixed-up and pushed.
+> 
+> > On a related note, I see that this doesn't follow the primecell clock
+> > bindings, which seem to rely on "apb_pclk" being first in the list. I
+> > see that other primecell device bindings don't follow that in dts or
+> > drivers, so I'm not sure how to fix that brokenness.
+> 
+> To which bindings do you refer? After taking a *quick* look, I see it
+> being the other way around. Whenever the "apb_pclk" is requested, it
+> is done so by name:
+> 
+>   drivers/amba/bus.c: struct clk *pclk = clk_get(&pcdev->dev, "apb_pclk");
+> 
+> So when clk_get() calls of_clk_get_by_name(), the clock-name index is
+> returned correctly by of_property_match_string(), which then passes
+> that index through of_clk_get() and does the right thing.
+> 
+> When most of the other clocks that we deal with are being requested,
+> they rely on being index zero:
+> 
+>   drivers/i2c/busses/i2c-nomadik.c: dev->clk = clk_get(&adev->dev, NULL);
+> 
+> At the moment this works for us, so I don't think we need to go
+> around populating the name params, but we might have to if this falls
+> apart in some way (probably likely if you 'fixed' whatever brokenness
+> you're wanting to fix ;-) )
 
-> +			if (err)
-> +				goto err_out_unregister_bus;
-> +		}
-> +	} else {
-> +		for (i = 0; i < PHY_MAX_ADDR; i++)
-> +			bp->mii_bus->irq[i] = PHY_POLL;
-> +
-> +		if (pdata)
-> +			bp->mii_bus->phy_mask = pdata->phy_mask;
-> +
-> +		err = mdiobus_register(bp->mii_bus);
-> +	}
-> +
-> +	if (err)
->   		goto err_out_free_mdio_irq;
->   
->   	if (macb_mii_probe(bp->dev) != 0) {
+The brokenness here is that the binding document states one thing, and
+drivers do precisely the opposite.
+
+Documentation/devicetree/bindings/arm/primecell.txt states:
+
+- clocks : From common clock binding. First clock is phandle to clock for apb
+	pclk. Additional clocks are optional and specific to those peripherals.
+- clock-names : From common clock binding. Shall be "apb_pclk" for first clock.
+
+Yet as you've pointed out above we don't care which index apb_pblk is,
+but do for the other clock, which we get at index 0 (where the binding
+doc states apb_pclk should be).
+
+If all users are doing that currently, it's possible to fix up the
+binding document. If not, then it's a mess that can't be corrected...
+
+Thanks,
+Mark.
