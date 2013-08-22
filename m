@@ -1,119 +1,35 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 22 Aug 2013 17:04:43 +0100
-Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the
- DBX500 DT
-In-Reply-To: <20130822154116.GC17154@lee--X1>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
- <20130820093034.GL31036@pengutronix.de>
- <20130822133730.GB23152@e106331-lin.cambridge.arm.com>
- <20130822141900.GB17154@lee--X1>
- <20130822151723.GE23152@e106331-lin.cambridge.arm.com>
- <20130822154116.GC17154@lee--X1>
-Message-ID: <20130822160443.GG23152@e106331-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 Aug 2013 17:16:14 +0100
+Subject: [BUG] ARM64: Create 4K page size mmu memory map at init time
+ will trigger exception.
+In-Reply-To: <BFAC7FA8F7636E45AB9ECBAC17346F3434557683@SZXEML508-MBS.china.huawei.com>
+References: <BFAC7FA8F7636E45AB9ECBAC17346F3434557683@SZXEML508-MBS.china.huawei.com>
+Message-ID: <20130822161614.GE1352@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 04:41:16PM +0100, Lee Jones wrote:
-> On Thu, 22 Aug 2013, Mark Rutland wrote:
-> 
-> > On Thu, Aug 22, 2013 at 03:19:00PM +0100, Lee Jones wrote:
-> > > On Thu, 22 Aug 2013, Mark Rutland wrote:
-> > > 
-> > > > On Tue, Aug 20, 2013 at 10:30:34AM +0100, Sascha Hauer wrote:
-> > > > > On Tue, Aug 20, 2013 at 11:11:19AM +0200, Linus Walleij wrote:
-> > > > > > On Thu, Jun 6, 2013 at 2:16 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > > > > > 
-> > > > > > > +++ b/arch/arm/boot/dts/dbx5x0.dtsi
-> > > > > > > @@ -572,6 +572,8 @@
-> > > > > > >                         v-i2c-supply = <&db8500_vape_reg>;
-> > > > > > >
-> > > > > > >                         clock-frequency = <400000>;
-> > > > > > > +                       clocks = <&prcc_kclk 3 3>, <&prcc_pclk 3 3>;
-> > > > > > > +                       clock-names = "nmk-i2c.0", "apb_pclk";
-> > > > > 
-> > > > > Why do most clocks in this series have the instance number in the clock
-> > > > > names? This looks very wrong to me.
-> > > > 
-> > > > +1. The clock names should be the input names to the unit, they
-> > > > shouldn't vary per instance.
-> > > 
-> > > So I just had a quick look, and it looks like they each have their own
-> > > clock:
-> > > 
-> > > 	clk = clk_reg_prcc_kclk("p1_i2c1_kclk", "i2cclk",
-> > > 			clkrst1_base, BIT(2), CLK_SET_RATE_GATE);
-> > > 	clk = clk_reg_prcc_kclk("p1_i2c2_kclk", "i2cclk",
-> > > 			clkrst1_base, BIT(6), CLK_SET_RATE_GATE);
-> > > 	clk = clk_reg_prcc_kclk("p2_i2c3_kclk", "i2cclk",
-> > > 			clkrst2_base, BIT(0), CLK_SET_RATE_GATE);
-> > > 	clk_register_clkdev(clk, NULL, "nmk-i2c.3");
-> > >         
-> > >         /* etc */
-> > > 
-> > > When using the names in Device Tree it doesn't actually matter what
-> > > you call the first clock. You can call it "fred" if you wanted and it
-> > > would still work, but in light of the naming conventions above and the
-> > > fact that each clock can all be controlled independently, do we still
-> > > want to use the name of the parent clock i.e. i2cclk?
-> > 
-> > Sorry, I don't follow.
-> > 
-> > 
-> > The name should be the name of the clock _input_ on the block described,
-> > as should be listed in documentation for the i2c block. The name should
-> > not vary with instance, and the name should not (necessarily) match the
-> > _output_ of the provider. Surely there's documentation for the i2c block
-> > that gives a name for the clock input(s)?
-> 
-> It's okay, I've fixed the patches.
+On Thu, Aug 22, 2013 at 04:35:29AM +0100, Leizhen (ThunderTown, Euler) wrote:
+> This problem is on ARM64. When CONFIG_ARM64_64K_PAGES is not opened, the memory
+> map size can be 2M(section) and 4K(PAGE). First, OS will create map for pgd
+> (level 1 table) and level 2 table which in swapper_pg_dir. Then, OS register
+> mem block into memblock.memory according to memory node in fdt, like memory at 0,
+> and create map in setup_arch-->paging_init. If all mem block start address and
+> size is integral multiple of 2M, there is no problem, because we will create 2M
+> section size map whose entries locate in level 2 table. But if it is not
+> integral multiple of 2M, we should create level 3 table, which granule is 4K.
+> Now, current implementtion is call early_alloc-->memblock_alloc to alloc memory
+> for level 3 table. This function will find a 4K free memory which locate in
+> memblock.memory tail(high address), but paging_init is create map from low
+> address to high address, so new alloced memory is not mapped, write page talbe
+> entry to it will trigger exception.
 
-Ok.
+I see how this can happen. There is a memblock_set_current_limit to
+PGDIR_SIZE (1GB, we have a pre-allocated pmd) and in my tests I had at
+least 1GB of RAM which got mapped first and didn't have this problem.
+I'll come up with a patch tomorrow.
 
-> 
-> Linus, branch fixed-up and pushed.
-> 
-> > On a related note, I see that this doesn't follow the primecell clock
-> > bindings, which seem to rely on "apb_pclk" being first in the list. I
-> > see that other primecell device bindings don't follow that in dts or
-> > drivers, so I'm not sure how to fix that brokenness.
-> 
-> To which bindings do you refer? After taking a *quick* look, I see it
-> being the other way around. Whenever the "apb_pclk" is requested, it
-> is done so by name:
-> 
->   drivers/amba/bus.c: struct clk *pclk = clk_get(&pcdev->dev, "apb_pclk");
-> 
-> So when clk_get() calls of_clk_get_by_name(), the clock-name index is
-> returned correctly by of_property_match_string(), which then passes
-> that index through of_clk_get() and does the right thing.
-> 
-> When most of the other clocks that we deal with are being requested,
-> they rely on being index zero:
-> 
->   drivers/i2c/busses/i2c-nomadik.c: dev->clk = clk_get(&adev->dev, NULL);
-> 
-> At the moment this works for us, so I don't think we need to go
-> around populating the name params, but we might have to if this falls
-> apart in some way (probably likely if you 'fixed' whatever brokenness
-> you're wanting to fix ;-) )
+-- 
+Catalin
 
-The brokenness here is that the binding document states one thing, and
-drivers do precisely the opposite.
-
-Documentation/devicetree/bindings/arm/primecell.txt states:
-
-- clocks : From common clock binding. First clock is phandle to clock for apb
-	pclk. Additional clocks are optional and specific to those peripherals.
-- clock-names : From common clock binding. Shall be "apb_pclk" for first clock.
-
-Yet as you've pointed out above we don't care which index apb_pblk is,
-but do for the other clock, which we get at index 0 (where the binding
-doc states apb_pclk should be).
-
-If all users are doing that currently, it's possible to fix up the
-binding document. If not, then it's a mess that can't be corrected...
-
-Thanks,
-Mark.
+P.S. Please try to send plain-text (rather than HTML) emails only, with
+nicely wrapped lines. Thanks.
