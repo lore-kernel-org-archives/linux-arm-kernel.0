@@ -1,101 +1,76 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 Aug 2013 16:41:16 +0100
-Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the
- DBX500 DT
-In-Reply-To: <20130822151723.GE23152@e106331-lin.cambridge.arm.com>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
- <20130820093034.GL31036@pengutronix.de>
- <20130822133730.GB23152@e106331-lin.cambridge.arm.com>
- <20130822141900.GB17154@lee--X1>
- <20130822151723.GE23152@e106331-lin.cambridge.arm.com>
-Message-ID: <20130822154116.GC17154@lee--X1>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 22 Aug 2013 12:49:05 -0300
+Subject: [PATCH v3 0/2] Kirkwood standby
+Message-ID: <1377186547-14284-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Aug 2013, Mark Rutland wrote:
+This patchset implements a very basic suspend/resume support on
+Kirkwood SoC's, based on the work of Simon Guinot.
 
-> On Thu, Aug 22, 2013 at 03:19:00PM +0100, Lee Jones wrote:
-> > On Thu, 22 Aug 2013, Mark Rutland wrote:
-> > 
-> > > On Tue, Aug 20, 2013 at 10:30:34AM +0100, Sascha Hauer wrote:
-> > > > On Tue, Aug 20, 2013 at 11:11:19AM +0200, Linus Walleij wrote:
-> > > > > On Thu, Jun 6, 2013 at 2:16 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > > > > 
-> > > > > > +++ b/arch/arm/boot/dts/dbx5x0.dtsi
-> > > > > > @@ -572,6 +572,8 @@
-> > > > > >                         v-i2c-supply = <&db8500_vape_reg>;
-> > > > > >
-> > > > > >                         clock-frequency = <400000>;
-> > > > > > +                       clocks = <&prcc_kclk 3 3>, <&prcc_pclk 3 3>;
-> > > > > > +                       clock-names = "nmk-i2c.0", "apb_pclk";
-> > > > 
-> > > > Why do most clocks in this series have the instance number in the clock
-> > > > names? This looks very wrong to me.
-> > > 
-> > > +1. The clock names should be the input names to the unit, they
-> > > shouldn't vary per instance.
-> > 
-> > So I just had a quick look, and it looks like they each have their own
-> > clock:
-> > 
-> > 	clk = clk_reg_prcc_kclk("p1_i2c1_kclk", "i2cclk",
-> > 			clkrst1_base, BIT(2), CLK_SET_RATE_GATE);
-> > 	clk = clk_reg_prcc_kclk("p1_i2c2_kclk", "i2cclk",
-> > 			clkrst1_base, BIT(6), CLK_SET_RATE_GATE);
-> > 	clk = clk_reg_prcc_kclk("p2_i2c3_kclk", "i2cclk",
-> > 			clkrst2_base, BIT(0), CLK_SET_RATE_GATE);
-> > 	clk_register_clkdev(clk, NULL, "nmk-i2c.3");
-> >         
-> >         /* etc */
-> > 
-> > When using the names in Device Tree it doesn't actually matter what
-> > you call the first clock. You can call it "fred" if you wanted and it
-> > would still work, but in light of the naming conventions above and the
-> > fact that each clock can all be controlled independently, do we still
-> > want to use the name of the parent clock i.e. i2cclk?
-> 
-> Sorry, I don't follow.
-> 
-> 
-> The name should be the name of the clock _input_ on the block described,
-> as should be listed in documentation for the i2c block. The name should
-> not vary with instance, and the name should not (necessarily) match the
-> _output_ of the provider. Surely there's documentation for the i2c block
-> that gives a name for the clock input(s)?
+Given the CPU itself is not stopped on suspend, but just sits
+waiting for interruption, this is more similar to a standby-mode,
+than to a real suspend-to-RAM. Therefore, I've chosen to use the
+'standby' power state.
 
-It's okay, I've fixed the patches.
+The first patch implements suspend/resume procedures in Feroceon CPU
+and it's already applied in Russell's. I'm only adding it here for
+series consistency.
 
-Linus, branch fixed-up and pushed.
+The second patch implements the 'standby' state by disabling SoC
+memory units and put the CPU in idle state. Additional power savings
+must be enhanced on each driver by implementing proper suspend/resume support.
 
-> On a related note, I see that this doesn't follow the primecell clock
-> bindings, which seem to rely on "apb_pclk" being first in the list. I
-> see that other primecell device bindings don't follow that in dts or
-> drivers, so I'm not sure how to fix that brokenness.
+This is based in v3.11-rc6 and tested on Openblocks A6.
 
-To which bindings do you refer? After taking a *quick* look, I see it
-being the other way around. Whenever the "apb_pclk" is requested, it
-is done so by name:
+By simple instrumentation I found (see the table below) that this 'standby'
+state has *no power savings* compared to a CPUIdle-enabled platform.
+Therefore, it's not clear to me the real advantage of this support.
 
-  drivers/amba/bus.c: struct clk *pclk = clk_get(&pcdev->dev, "apb_pclk");
+However, and hopefully, by implementing proper suspend/resume in relevant
+peripherals, the power savings of the standby might get improved.
 
-So when clk_get() calls of_clk_get_by_name(), the clock-name index is
-returned correctly by of_property_match_string(), which then passes
-that index through of_clk_get() and does the right thing.
+CONFIG_CPU_IDLE=y
+State             Current (mA)
+------------------------------
+Normal (system idle)   360
+Normal (system busy    440
+Standby                360
 
-When most of the other clocks that we deal with are being requested,
-they rely on being index zero:
+!CONFIG_CPU_IDLE
+State             Current (mA)
+------------------------------
+Normal (system idle)   440
+Normal (system busy    440
+Standby                360
 
-  drivers/i2c/busses/i2c-nomadik.c: dev->clk = clk_get(&adev->dev, NULL);
+(The above are sketchy measurements but useful to compare CPUIdle vs. Standby)
 
-At the moment this works for us, so I don't think we need to go
-around populating the name params, but we might have to if this falls
-apart in some way (probably likely if you 'fixed' whatever brokenness
-you're wanting to fix ;-) )
+Changes from v2:
+
+  * In order to remain multiplatform-ready, I reworked the kirkwood_pm_init
+    by having it explicitly called from mach-kirkwood/. Requested by
+    Andrew Lunn.
+
+Changes from v1:
+
+  * Removed clock gating. Each peripheral is in charge of implementing
+    a proper suspend/resume path, including gateable clock handling.
+
+Ezequiel Garcia (2):
+  ARM: feroceon: Add suspend/resume operation
+  ARM: kirkwood: Add standby support
+
+ arch/arm/Kconfig                                  |  2 +-
+ arch/arm/mach-kirkwood/Makefile                   |  2 +
+ arch/arm/mach-kirkwood/board-dt.c                 |  1 +
+ arch/arm/mach-kirkwood/common.c                   |  1 +
+ arch/arm/mach-kirkwood/common.h                   |  6 ++
+ arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  2 +
+ arch/arm/mach-kirkwood/pm.c                       | 73 +++++++++++++++++++++++
+ arch/arm/mm/proc-feroceon.S                       | 26 ++++++++
+ 8 files changed, 112 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-kirkwood/pm.c
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.1.5
