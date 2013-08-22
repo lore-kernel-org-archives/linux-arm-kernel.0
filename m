@@ -1,51 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 22 Aug 2013 14:13:02 -0600
-Subject: [PATCHv4 2/3] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <1377114530.1554.13.camel@linux-builds1>
-References: <1376498884-9199-1-git-send-email-dinguyen@altera.com>
- <1376498884-9199-2-git-send-email-dinguyen@altera.com>
- <520EA97D.7050404@wwwdotorg.org> <1377114530.1554.13.camel@linux-builds1>
-Message-ID: <521670CE.4000202@wwwdotorg.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 Aug 2013 22:14:22 +0200
+Subject: [GIT PULL] Allwinner sunXi DT additions for 3.12, take 3
+Message-ID: <20130822201422.GA3042@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2013 01:48 PM, Dinh Nguyen wrote:
-> On Fri, 2013-08-16 at 16:36 -0600, Stephen Warren wrote:
->> On 08/14/2013 10:48 AM, dinguyen at altera.com wrote:
->>> From: Dinh Nguyen <dinguyen@altera.com>
->>>
->>> Add bindings for SD/MMC for SOCFPGA.
->>
->>> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
->>
->>> +* altr,sysmgr: Should be the phandle to the system_mgr node. As this is where
->>> +		this where the register that controls the CIU clock phases
->>> +		reside.
->>
->> On the surface, this binding series seems OK, but I do have a question:
->> how is the sysmgr phandle used?
->>
->> I assume there's some register in this syscon device that resets or
->> enables or otherwise controls this MSHC module. How does the code know
->> which register it is? The phandle in the altr,sysmgr property would
->> usually be followed by a/some cell(s) that encode this information, so
->> that the MSHC driver doesn't have to know anything about the layout of
->> the syscon registers, and so the sysconf driver doesn't have to know
->> anything about the identity of the MSHC client device.
-> 
-> There is a #define SYSMGR_SDMMCGRP_CTRL_OFFSET that is in
-> dw_mmc-socfpga.c. This defines the offset from the base address that the
-> sysmgr phandle will give me.
+Hi Arnd, Kevin, Olof,
 
-Hmmm. That doesn't sound good. That means that the SDMMC driver knows
-internal details about some other HW module. It'd be better if either:
+Please pull the following pull request on top of the one I sent
+previously for this merge window.
 
-a) The sysmgr driver was required to provide an API to the SDMMC driver
-to set up the CIU register as requested.
+The following changes since commit e476ac8b483de4ce1d8570509be343afc7cd3baf:
 
-or:
+  ARM: sun7i: Add Olimex A20-Olinuxino-Micro support (2013-08-20 08:18:45 +0200)
 
-b) The CIU register details were represented in DT.
+are available in the git repository at:
 
-Either of these would allow the SDMMC driver to operate unchanged on an
-SoC with a different sysmgr register layout.
+  https://github.com/mripard/linux.git tags/sunxi-dt-for-3.12-3
+
+for you to fetch changes up to 82abe5294aeadc42508c7944f3a9aec0eece214c:
+
+  ARM: sun7i: Add Cubieboard2 Device Tree (2013-08-22 00:19:19 +0200)
+
+----------------------------------------------------------------
+Third round of patches for the Allwinner SoCs DT
+
+These patches add support for:
+  - The cubieboard2 board
+  - The pinctrl driver that got merged for the A20 and A31
+  - The associated muxing for the A20 and A31 boards already supported
+
+----------------------------------------------------------------
+Maxime Ripard (8):
+      ARM: sunxi: dt: Add PIO controller to A31 DTSI
+      ARM: sun6i: Add UART0 muxing options
+      ARM: sun6i: colombus: Add uart0 muxing
+      ARM: sun7i: Add the PIO controller node to the DTSI
+      ARM: sun7i: DT: Add UART muxing options to the DTSI
+      ARM: sun7i: a20-olinuxino: Enable UARTs muxing
+      ARM: sun7i: a20-olinuxino: Enable the user LED
+      ARM: sun7i: Add Cubieboard2 Device Tree
+
+ arch/arm/boot/dts/Makefile                      |  1 +
+ arch/arm/boot/dts/sun6i-a31-colombus.dts        |  2 +
+ arch/arm/boot/dts/sun6i-a31.dtsi                | 19 +++++++++
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 53 +++++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 27 +++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi                | 33 +++++++++++++++
+ 6 files changed, 135 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130822/31337bfa/attachment.sig>
