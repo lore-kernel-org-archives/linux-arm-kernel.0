@@ -1,71 +1,98 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 22 Aug 2013 10:07:26 +0200
-Subject: [PATCH v3 0/5] Armada XP clocks for timer
-In-Reply-To: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <5215C6BE.3040301@free-electrons.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 22 Aug 2013 01:12:56 -0700
+Subject: [PATCH 2/8] clk: keystone: Add gate control clock driver
+In-Reply-To: <5214BDB1.9080503@ti.com>
+References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130813165344.GU27165@e106331-lin.cambridge.arm.com>
+ <20130819204353.4443.48466@quantum> <5213756A.5090903@ti.com>
+ <20130820213045.4443.89971@quantum> <5213E5EC.8070208@ti.com>
+ <20130820224128.4443.78729@quantum> <5213F397.6020708@ti.com>
+ <20130821022225.4443.97467@quantum> <5214BDB1.9080503@ti.com>
+Message-ID: <20130822081256.8231.50781@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/08/2013 17:45, Ezequiel Garcia wrote:
-> After the recent discussion on the device tree binding for the Armada 370/XP
-> clocksource driver, Stephen Warren, Tomasz Figa and others suggested
-> that the reference 25 MHz fixed-clock (aka refclk) should have a proper
-> device tree representation.
-> 
-> (Although that's still debatable, given the 25 MHz fixed-clock seems to be
-> used only by the timer/watchdog IP block.)
-> 
-> In addition to that and to be accurate, both timer clock inputs: nbclk and
-> refclk should be exposed in the DT node for the Armada XP timer.
-> 
-> Following an excellent suggestion from Sebastian Hesselbarth, here's a
-> patchset to accurately model the clock inputs for the timer.
-> 
-> Considering this is very minor improvemente from my previous patchset [1],
-> I dare ask about v3.12 inclusion. On the other side, maybe it's too late already
-> and it's best to keep it for v3.13.
-> 
-> Patches 1 and 2 apply on v3.11-rc4 plus the commit:
-> "ARM: mvebu: Fix the Armada 370/XP timer compatible strings"
-> that's already in mvebu/dt.
-> 
-> Patch 3, 4 and 5 applies on tip/timers/core plus the recent series [1].
-> 
-> [1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/260179
-> 
-> Changes from v2:
-> 
->   * Replace WARN_ON with BUG_ON. As noted in the patch, it's wrong
->     to only WARN() as the kernel cannot keep going without a working timer.
-> 
-> Changes from v1:
-> 
->   * Improve the devicetree binding as the requirements were very
->     badly stated.
-> 
-> Ezequiel Garcia (5):
->   ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
->   ARM: mvebu: Add clock properties to Armada XP timer node
->   clocksource: armada-370-xp: Replace WARN_ON with BUG_ON
->   clocksource: armada-370-xp: Get reference fixed-clock by name
->   clocksource: armada-370-xp: Add detailed clock requirements in
->     devicetree binding
+Quoting Santosh Shilimkar (2013-08-21 06:16:33)
+> On Tuesday 20 August 2013 10:22 PM, Mike Turquette wrote:
+> > Quoting Santosh Shilimkar (2013-08-20 15:54:15)
+> >> On Tuesday 20 August 2013 06:41 PM, Mike Turquette wrote:
+> >>> Quoting Santosh Shilimkar (2013-08-20 14:55:56)
+> >>>> On Tuesday 20 August 2013 05:30 PM, Mike Turquette wrote:
+> >>
+> >> [...]
+> >>
+> >>>>>> They are bit different w.r.t OMAP. LPSC itself is the clock control of the
+> >>>>>> IP. The LPSC number in the bindings is actually the specific number which
+> >>>>>> is used to reach to the address space of the clock control. One can view
+> >>>>>> that one as clock control register index.
+> >>>>>
+> >>>>> Thanks for the information. I have a further question about then: are
+> >>>>> the LPSC clocks really module clocks that belong to the IP that they are
+> >>>>> gating?
+> >>>>>
+> >>>> LPSC controls the clock enable/disable to the IP/module so answer is yes.
+> >>>> In certain cases LPSC controls clock to more than one IP as well.
+> >>>>
+> >>>>> If so then they could be defined within the node defining their parent
+> >>>>> IP. That might be enough to get rid of the LPSC index value. Again I
+> >>>>> might be over-engineering it. Just trying to get an understanding.
+> >>>>>
+> >>>> Am not sure I follow you here on not having the LPSC index. Sorry. 
+> >>>
+> >>> How are the 'reg' property and the 'lpsc' property related? Does the
+> >>> lpsc property modify the register address used to access the clock
+> >>> control bits?
+> >>>
+> >> Yes it does. Currently all nodes use fix address and then lpsc is
+> >> used as an index.
+> > 
+> > Ok cool. Well the reason I brought that up was because I even had the
+> > idea to define these module clocks within the module nodes that own them
+> > in DT. I am way outside of my DT knowledge at this point but I wonder
+> > if the following type of binding is possible:
+> > 
+> > module: module at 4a308200 {
+> >       #address-cells = <1>;
+> >       #size-cells = <1>;
+> >       reg = <0x4a308200 0x1000>;
+> > 
+> >       clock {
+> >               #clock-cells = <0>;
+> >               compatible = "keystone,psc-clk";
+> >               clocks = <&chipclk3>;
+> >               clock-output-names = "debugss_trc";
+> >               reg = <0x0256>;
+> >               pd = <1>;
+> >       };
+> > };
+> > 
+> > Again, my DT knowledge is pretty limited, but could the reg property of
+> > the clock be directly affected by the parent node? That seems like it
+> > could nicely model what the hardware is really doing.
+> > 
+> The module(I assume you mean IP here) reg address space is separate than
+> that used for clock control so that doesn't fit as such. Traditionally
+> clock controls even though targeted for specific modules sits in different
+> control as at least seen on OMAP and Keystone. OCP wrappers on OMAP
+> were bit of exceptions but they were little bit of glue logic without
+> much control within the address space.
 
-For the whole series you can add my
+Great, you perfectly answered my questions. I think that assigning the
+"final" address to the 'reg' property is the right way to go (fixed
+address + LPSC index).
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Regards,
+Mike
 
 > 
->  .../bindings/timer/marvell,armada-370-xp-timer.txt          | 13 +++++++++++--
->  arch/arm/boot/dts/armada-xp.dtsi                            | 11 +++++++++++
->  drivers/clocksource/time-armada-370-xp.c                    |  9 ++++++---
->  3 files changed, 28 insertions(+), 5 deletions(-)
+> >> But I think we can do better by just using the
+> >> right(offset) address in the reg property. Will have a look at it
+> >> and see what I can do here.
+> > 
+> > This also solves the problem nicely.  Thanks for putting up with my
+> > silly questions ;-)
+> > 
+> You asked right and good questions.
 > 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> Regards,
+> Santosh
