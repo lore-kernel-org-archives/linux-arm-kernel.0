@@ -1,67 +1,76 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 22 Aug 2013 09:20:22 +0530
-Subject: [PATCH v2 0/2] ARM: dts: Add SHAM and AES DT information
-In-Reply-To: <5214C372.3080402@baylibre.com>
-References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.02.1308210012420.6426@utopia.booyaka.com>
- <5214C11F.8090808@baylibre.com> <5214C372.3080402@baylibre.com>
-Message-ID: <52158A7E.30305@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 21 Aug 2013 21:14:48 -0700
+Subject: [PATCH v3 0/5] clk: dt: bindings for mux, divider & gate clocks
+In-Reply-To: <51E8586C.7040808@codeaurora.org>
+References: <1371795256-16703-1-git-send-email-mturquette@linaro.org>
+ <51E8586C.7040808@codeaurora.org>
+Message-ID: <20130822041448.8231.16182@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
-On Wednesday 21 August 2013 07:11 PM, Benoit Cousson wrote:
-> Hi Mark,
+Quoting Stephen Boyd (2013-07-18 14:04:44)
+> On 06/20/13 23:14, Mike Turquette wrote:
+> > This series introduces binding definitions for common register-mapped
+> > clock multiplexer, divider and gate IP blocks along with the
+> > corresponding setup functions for matching DT data.  The bindings are
+> > similar to the struct definitions but please don't hold that against the
+> > binding: the struct definitions closely model the hardware register
+> > layout.
 > 
-> In fact I cannot even apply these patches since they are referring the the edma controller node that does not seem to be there in 3.11-rc6.
-> 
-> Is this EDMA series supposed to be merged for 3.12? If this is the case, where can I find a reference GIT for it?
-The following EDMA support dt patch series from Joel is needed :
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92176.html
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92177.html
+> I know there was some discussion about clock bindings and how they
+> should and should not be done at Linaro Connect Europe last week. Can
+> someone in that discussion reply to the mailing list with what came out
+> of that? I only have second hand knowledge about the discussion so it
+> would be good for me and others to know what was discussed. I'm
+> especially curious because the arm soc update etherpad[1] says "DT
+> describes what HW is (location, type, attributes), not how HW works
+> (register descriptions, bitmasks, etc)." but these proposed generic
+> clock bindings are describing registers and bitmasks.
 
-Thanks and Regards,
-Lokesh
+Hi Stephen,
+
+I just happened across a to-do list note telling me to respond to this
+email. Better late than never.
+
+The meeting you're referring to did not focus on clock provider bindings
+as much as it focused on a pair of standard clock attributes that could
+be referenced by clock consumers. They are "assigned-clock-parent" and
+"assigned-clock-rate". The usage scribbled on the white board[1] was
+something like:
+
+mux: mux {
+	clocks = <&clock-foo>, <&clock-bar>;
+};
+
+uart: uart {
+	clocks = <&mux>;
+	assigned-clock-parent = <1>;
+};
+
+In the example above assigned-clock-parent uses the index of the mux,
+but I prefer the following:
+
+uart: uart {
+	clocks = <&mux>;
+	assigned-clock-parent = <&clock-bar>;
+};
+
+This is a way to establish initial configuration from the consumer's
+perspective. Similarly something can be done for the clock rate with
+assigned-clock-rate.
+
+With all of that said this is consumer-level stuff. We'll definitely
+talk about the clock provider DT bindings at the ARM Summit, which is
+what you discuss above.
+
+Regards,
+Mike
+
+[1] https://plus.google.com/u/0/107457854652287465481/posts/cvRveAupUpa
+
 > 
-> Thanks,
-> Benoit
-> 
-> On 21/08/2013 15:31, Benoit Cousson wrote:
->> Hi Paul,
->>
->> On 21/08/2013 02:13, Paul Walmsley wrote:
->>> Hi Beno?t,
->>>
->>> On Wed, 17 Jul 2013, Mark A. Greer wrote:
->>>
->>>> From: "Mark A. Greer" <mgreer@animalcreek.com>
->>>>
->>>> Long overdue patches to add the device tree updates and
->>>> documentation for the SHAM and AES modules on the am33xx.
->>>> The supporting code is already in the mainline kernel.
->>>>
->>>> This series is based on the current mainline kernel,
->>>> c0d15cc (linked-list: Remove __list_for_each).
->>>>
->>>> Changes from v1:
->>>>   - Added missing '};' as pointed out by Lokesh Vutla
->>>> <lokeshvutla@ti.com>
->>>
->>> I guess you should take these patches?
->>
->> You're right, I should, I've just never seen them :-(
->> Thanks for the pointer.
->>
->> Mark,
->>
->> After a quick search on Google, I did not see any comment on these
->> patches. Did you get any review so far?
->>
->> Thanks,
->> Benoit
->>
+> [1] http://pad.linaro.org/p/LCE13_ARM_SOC_Tree_Consolidation_Update
 > 
 > -- 
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
