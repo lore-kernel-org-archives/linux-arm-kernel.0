@@ -1,89 +1,60 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Thu, 22 Aug 2013 13:38:42 +0200
-Subject: [PATCH] pxa: sharpsl_param: fix invalid memory access in
- sharpsl_save_param()
-In-Reply-To: <1374361670-3214-1-git-send-email-andrea.adami@gmail.com>
-References: <1374361670-3214-1-git-send-email-andrea.adami@gmail.com>
-Message-ID: <CAAQYJAsfc61um70=gM0v06c0X=FSd_9J6geB07auEbRgE9B_eA@mail.gmail.com>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Thu, 22 Aug 2013 17:18:34 +0530
+Subject: [PATCH] arm: dts: fix NTC thermistor device nodes for cros5250
+Message-ID: <1377172114-8312-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm bumping this after one month.
-Will, I put you in copy because you did some observations about the
-patch last time and you seemingly committe the change which broke boot
-of sharpsl devices.
+This patch fixes NTC devices nodes connected to ADC channel 3, 4, 5 and 6
+on exynos5250 based snow device.
 
-Is there something wrong with it?
-
-Thanks
-
-Andrea
-
-
-Was:
-
-Devices that call sharpsl_save_param() will hang on boot due to
-a memcpy call that uses physical addresses that are no longer
-valid. This is caused by the following commit:
-
-commit 72662e01088394577be4a3f14da94cf87bea2591
-Author: Will Deacon <will.deacon@arm.com>
-Date:   Wed Nov 23 12:03:27 2011 +0000
-
-ARM: head.S: only include __turn_mmu_on in the initial identity mapping
-
-
-
-
----------- Forwarded message ----------
-From: Andrea Adami <andrea.adami@gmail.com>
-Date: Sun, Jul 21, 2013 at 1:07 AM
-Subject: [PATCH] pxa: sharpsl_param: fix invalid memory access in
-sharpsl_save_param()
-To: linux-arm-kernel at lists.infradead.org
-Cc: Russell King <linux@arm.linux.org.uk>,
-linux-kernel at vger.kernel.org, Marko Katic <dromede@gmail.com>
-
-
-From: Marko Katic <dromede@gmail.com>
-
-Unbreak kernel boot (tested with kexecboot)
-
-Patch was sent twice upstrream:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137284.html
-Devices that call sharpsl_save_param() will hang on boot due to
-a memcpy call that uses a physical address that is no longer * accessible. Fix
-his by converting the physical address into a virtual one.
-
-Signed-off-by: Marko Katic <dromede@gmail.com>
-[andrea.adami at gmail.com: checkpatch.pl dislikes void * param_start]
-Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
- arch/arm/common/sharpsl_param.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/cros5250-common.dtsi |   33 ++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-diff --git a/arch/arm/common/sharpsl_param.c b/arch/arm/common/sharpsl_param.c
-index d56c932..b70b13a 100644
---- a/arch/arm/common/sharpsl_param.c
-+++ b/arch/arm/common/sharpsl_param.c
-@@ -14,6 +14,7 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/string.h>
-+#include <asm/memory.h>
- #include <asm/mach/sharpsl_param.h>
-
- /*
-@@ -41,7 +42,8 @@ EXPORT_SYMBOL(sharpsl_param);
-
- void sharpsl_save_param(void)
- {
--       memcpy(&sharpsl_param, (void *)PARAM_BASE, sizeof(struct
-sharpsl_param_info));
-+       void *param_start = phys_to_virt(PARAM_BASE);
-+       memcpy(&sharpsl_param, param_start, sizeof(struct sharpsl_param_info));
-
-        if (sharpsl_param.comadj_keyword != COMADJ_MAGIC)
-                sharpsl_param.comadj=-1;
---
-1.8.1.5
+diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
+index dc259e8b..26bc25a 100644
+--- a/arch/arm/boot/dts/cros5250-common.dtsi
++++ b/arch/arm/boot/dts/cros5250-common.dtsi
+@@ -313,4 +313,37 @@
+ 			gpio-key,wakeup;
+ 		};
+ 	};
++
++	adc at 12D10000 {
++		vdd-supply = <&buck5_reg>;
++
++		ncp15wb473 at 3 {
++			compatible = "ntc,ncp15wb473";
++			pullup-uv = <1800000>;
++			pullup-ohm = <47000>;
++			pulldown-ohm = <0>;
++			io-channels = <&adc 3>;
++		};
++		ncp15wb473 at 4 {
++			compatible = "ntc,ncp15wb473";
++			pullup-uv = <1800000>;
++			pullup-ohm = <47000>;
++			pulldown-ohm = <0>;
++			io-channels = <&adc 4>;
++		};
++		ncp15wb473 at 5 {
++			compatible = "ntc,ncp15wb473";
++			pullup-uv = <1800000>;
++			pullup-ohm = <47000>;
++			pulldown-ohm = <0>;
++			io-channels = <&adc 5>;
++		};
++		ncp15wb473 at 6 {
++			compatible = "ntc,ncp15wb473";
++			pullup-uv = <1800000>;
++			pullup-ohm = <47000>;
++			pulldown-ohm = <0>;
++			io-channels = <&adc 6>;
++		};
++	};
+ };
+-- 
+1.7.9.5
