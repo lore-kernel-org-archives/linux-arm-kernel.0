@@ -1,60 +1,46 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 22 Aug 2013 10:06:41 -0700
-Subject: [PATCH 2/2] clockevents: Prefer clockevents that don't suffer from
- FEAT_C3_STOP
-In-Reply-To: <1377191201-14696-1-git-send-email-sboyd@codeaurora.org>
+Date: Thu, 22 Aug 2013 10:06:40 -0700
+Subject: [PATCH 1/2] tick: broadcast: Deny per-cpu clockevents from being
+ broadcast sources
+In-Reply-To: <52138784.7050703@linaro.org>
 References: <52138784.7050703@linaro.org>
- <1377191201-14696-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1377191201-14696-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1377191201-14696-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some ARM systems there are two sets of per-cpu timers: the TWD
-timers and the global timers. The TWD timers are rated at 350 and
-the global timers are rated at 300 but the TWD timers suffer from
-FEAT_C3_STOP while the arm global timers don't. The tick device
-selection logic doesn't consider the FEAT_C3_STOP flag so we'll
-always end up with the TWD as the tick device although we don't
-want that.
+On most ARM systems the per-cpu clockevents are truly per-cpu in
+the sense that they can't be controlled on any other CPU besides
+the CPU that they interrupt. If one of these clockevents were to
+become a broadcast source we will run into a lot of trouble
+because the broadcast source is enabled on the first CPU to go
+into deep idle (if that CPU suffers from FEAT_C3_STOP) and that
+could be a different CPU than what the clockevent is interrupting
+(or even worse the CPU that the clockevent interrupts could be
+offline).
 
-Extend the preference logic to take the FEAT_C3_STOP flag into
-account and always prefer tick devices that don't suffer from
-FEAT_C3_STOP even if their rating is lower than tick devices that
-do suffer from FEAT_C3_STOP. This will remove the need to do any
-broadcasting on such ARM systems.
+Theoretically it's possible to support per-cpu clockevents as the
+broadcast source but so far we haven't needed this and supporting
+it is rather complicated. Let's just deny the possibility for now
+until this becomes a reality (let's hope it never does!).
 
+Reported-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- kernel/time/tick-common.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ kernel/time/tick-broadcast.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
-index 64522ec..3ae437d 100644
---- a/kernel/time/tick-common.c
-+++ b/kernel/time/tick-common.c
-@@ -244,12 +244,22 @@ static bool tick_check_preferred(struct clock_event_device *curdev,
- 			return false;
- 	}
+diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+index 218bcb5..d3539e5 100644
+--- a/kernel/time/tick-broadcast.c
++++ b/kernel/time/tick-broadcast.c
+@@ -77,6 +77,9 @@ static bool tick_check_broadcast_device(struct clock_event_device *curdev,
+ 	    !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
+ 		return false;
  
-+	if (!curdev)
-+		return true;
-+
-+	/* Always prefer a tick device that doesn't suffer from FEAT_C3STOP */
-+	if (!(newdev->features & CLOCK_EVT_FEAT_C3STOP) &&
-+			(curdev->features & CLOCK_EVT_FEAT_C3STOP))
-+		return true;
-+	if ((newdev->features & CLOCK_EVT_FEAT_C3STOP) &&
-+			!(curdev->features & CLOCK_EVT_FEAT_C3STOP))
++	if (cpumask_equal(newdev->cpumask, cpumask_of(smp_processor_id())))
 +		return false;
 +
- 	/*
- 	 * Use the higher rated one, but prefer a CPU local device with a lower
- 	 * rating than a non-CPU local device
- 	 */
--	return !curdev ||
--		newdev->rating > curdev->rating ||
-+       return newdev->rating > curdev->rating ||
- 	       !cpumask_equal(curdev->cpumask, newdev->cpumask);
+ 	return !curdev || newdev->rating > curdev->rating;
  }
  
 -- 
