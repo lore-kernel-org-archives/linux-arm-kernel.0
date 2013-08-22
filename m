@@ -1,51 +1,79 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 23 Aug 2013 01:19:53 +0200
-Subject: [PATCH v7 3/7] gpio: samsung: Skip initialization if device tree
- is present
-In-Reply-To: <1c9a01ce9f1e$473b58b0$d5b20a10$@org>
+Date: Fri, 23 Aug 2013 01:22:32 +0200
+Subject: [PATCH v8 1/7] irqchip: vic: Parse interrupt and resume masks from
+ device tree
+In-Reply-To: <1377120111-25601-2-git-send-email-tomasz.figa@gmail.com>
 References: <1377120111-25601-1-git-send-email-tomasz.figa@gmail.com>
- <3452017.UPhKO6xNO5@flatron> <1c9a01ce9f1e$473b58b0$d5b20a10$@org>
-Message-ID: <2011022.7zNcjpuhKL@flatron>
+ <1377120111-25601-2-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1500724.07LRpFtgcx@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 of August 2013 18:59:23 Kukjin Kim wrote:
-> Tomasz Figa wrote:
-> > On Thursday 22 of August 2013 01:21:25 Linus Walleij wrote:
-> > > On Wed, Aug 21, 2013 at 11:21 PM, Tomasz Figa
-> > > <tomasz.figa@gmail.com>
-> > 
-> > wrote:
-> > > > Since this driver does not handle GPIO on device tree enabled
-> > > > platforms
-> > > > any more, it should be bypassed whenever device tree is available,
-> > > > to
-> > > > not conflict with the new pinctrl-samsung driver.
-> > > > 
-> > > > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > > 
-> > > This seems like something I should apply to the GPIO tree
-> > > right now, shall I?
-> > 
-> > Would be nice, but since this patch is a dependency for rest of this
-> > series and there are no other dependencies on GPIO tree, it might be
-> > easier to just let Kukjin take all the patches with required Acks.
-> 
-> Oh, I didn't see any dependencies...but if so, Linus do you agree with
-> Tomasz' opinion?
+This patch extends vic_of_init to parse valid interrupt sources
+and resume sources masks from device tree.
 
-Without this patch DT-based bootup would fail, because the legacy GPIO 
-driver would kick in and register GPIO chips before the pinctrl driver. 
-Things would compile fine, though. So this is a run time dependency, not 
-compile time.
+If mask values are not specified in device tree, all sources
+are assumed to be valid, as before this patch.
 
-> Please let me know so that I could take this with others into the
-> samsung tree. And please kindly ignore my previous reply on this ;-)
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ Documentation/devicetree/bindings/arm/vic.txt | 6 ++++++
+ drivers/irqchip/irq-vic.c                     | 7 ++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-I would be really happy if we could finally merge this for this release. 
-This series is not really invasive in any way, so it is unlikely to 
-introduce any regressions and it has waited so many releases, without any 
-significant changes, due to a lot of other dependencies.
+Changes since v7:
+ - Renamed interrupt-mask property to valid-mask, for consistency with
+   bindings of other interrupt controllers.
 
-Best regards,
-Tomasz
+diff --git a/Documentation/devicetree/bindings/arm/vic.txt b/Documentation/devicetree/bindings/arm/vic.txt
+index 266716b..3379666 100644
+--- a/Documentation/devicetree/bindings/arm/vic.txt
++++ b/Documentation/devicetree/bindings/arm/vic.txt
+@@ -18,6 +18,9 @@ Required properties:
+ Optional properties:
+ 
+ - interrupts : Interrupt source for parent controllers if the VIC is nested.
++- valid-mask : Bit mask of valid interrupt sources (defaults to all valid)
++- wakeup-mask : Bit mask of interrupt sources that can wake up the system
++  (defaults to all allowed)
+ 
+ Example:
+ 
+@@ -26,4 +29,7 @@ Example:
+ 		interrupt-controller;
+ 		#interrupt-cells = <1>;
+ 		reg = <0x60000 0x1000>;
++
++		valid-mask = <0xffffff7f>;
++		wakeup-mask = <0x0000ff7f>;
+ 	};
+diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
+index 2bbb004..6437b18 100644
+--- a/drivers/irqchip/irq-vic.c
++++ b/drivers/irqchip/irq-vic.c
+@@ -469,6 +469,8 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
+ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+ {
+ 	void __iomem *regs;
++	u32 interrupt_mask = ~0;
++	u32 wakeup_mask = ~0;
+ 
+ 	if (WARN(parent, "non-root VICs are not supported"))
+ 		return -EINVAL;
+@@ -477,10 +479,13 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+ 	if (WARN_ON(!regs))
+ 		return -EIO;
+ 
++	of_property_read_u32(node, "valid-mask", &interrupt_mask);
++	of_property_read_u32(node, "wakeup-mask", &wakeup_mask);
++
+ 	/*
+ 	 * Passing 0 as first IRQ makes the simple domain allocate descriptors
+ 	 */
+-	__vic_init(regs, 0, ~0, ~0, node);
++	__vic_init(regs, 0, interrupt_mask, wakeup_mask, node);
+ 
+ 	return 0;
+ }
+-- 
+1.8.3.2
