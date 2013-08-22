@@ -1,105 +1,39 @@
-From: B47053@freescale.com (Xiubo Li-B47053)
-Date: Thu, 22 Aug 2013 02:55:42 +0000
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM
-In-Reply-To: <1473340.OXSHEp7d4P@flatron>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
- <1473340.OXSHEp7d4P@flatron>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
+From: cminyard@mvista.com (Corey Minyard)
+Date: Wed, 21 Aug 2013 21:55:40 -0500
+Subject: Conflicting addr value between v6 and v7 for do_PrefetchAbort()
+Message-ID: <52157DAC.4000107@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+I was messing around in this code, talking with someone else about it, 
+and I discovered that the addr parameter do do_PrefetchAbort() is 
+different on v6 and v7.  For v7 we have:
 
-Thanks for your comments.
+ENTRY(v7_pabort)
+     mrc    p15, 0, r0, c6, c0, 2        @ get IFAR
+     mrc    p15, 0, r1, c5, c0, 1        @ get IFSR
+     b    do_PrefetchAbort
+ENDPROC(v7_pabort)
 
+And for v6:
 
-> > +- #pwm-cells: Should be 3. Number of cells being used to specify PWM
-> > property.
-> > +  First cell specifies the per-chip channel index of the PWM
-> > to use, the
-> > +  second cell is the period in nanoseconds and bit 0 in
-> > the third cell is
-> > +  used to encode the polarity of PWM output. Set bit
-> > 0 of the third in PWM
-> > +  specifier to 1 for inverse polarity & set to 0
-> > for normal polarity.
-> 
-> If the meaning of flags cell is the same as in generic, default PWM
-> specifier format, then it should be noted here and generic PWM binding
-> documentation mentioned.
-> 
+ENTRY(v6_pabort)
+     mov    r0, r4
+     mrc    p15, 0, r1, c5, c0, 1        @ get IFSR
+     b    do_PrefetchAbort
+ENDPROC(v6_pabort)
 
-OK, How about the following ?
-- #pwm-cells: Should be 3. See pwm.txt in this directory for a
-  description of the cells format.
+For v7 that's the address that was accessed to cause the fault.  For v6 
+that appears to be the address of the instruction that caused the 
+fault.  Am I right here?  Which of these is correct?
 
-I will replace it in v2.
+I see 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-September/001051.html 
+which adds this and
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/055019.html 
+which sets it to r4 for the v6.  But you get different values in addr 
+depending on whether it is v6 or v7.
 
+Thanks,
 
-> > +- fsl,pwm-clk-ps: the ftm0 pwm clock's prescaler,
-> > divide-by 2^n(n = 0 ~ 7).
-> 
-> Is it a hardware-specific property?
-
-Yes, I will revise it in v2. 
-
-> 
-> > +- fsl,pwm-cpwm: Center-Aligned PWM (CPWM)
-> > mode.
-> 
-> Could you explain meaning of this property?
-> 
-
-Well, this feature will be removed from the pwm core in v2.
-
-
-> > +- fsl,pwm-number: the number of PWM devices, and is must equal to the
-> > number +  of "fsl,pwm-channels".
-> 
-> This is redundant, because you can simply count how many entries have
-> been specified in fsl,pwm-channels.
->
-
-Yes, I will revise it in v2.
-And this would be renamed to " fsl,pwm-channel-number", which can be more
-Readable and understood.
-
- 
-> > +- fsl,pwm-channels: the channels' order which is be used for pwm in
-> > ftm0 +  module, and they must be one or some of 0 ~ 7, because the
-> > ftm0 only has +  8 channels can be used.
-> 
-> Could you explain meaning of this property more precisely? I'm interested
-> especially how is this related to the PWM IP block and boards.
-> 
-
-Yes.
-There are 8 channels most. While the pinctrls of 4th and 5th channels could be
-used by uart's Rx and Tx, then these 2 channels won't be used for pwm output,
-so there will be 6 channels available by the pwm.
-Thus, the pwm chip will register only 6 pwms(6 channels) most("fsl,pwm-channel-orders
-= {0 1 2 3 6 7}").And also the "fsl,pwm-channel-number" will be 6.
-
-If hasn't any other problems, I will revise It in v2.
-And this will be renamed to "fsl,pwm-channel-orders", which can be more readable
-and understood.
-
-> > +- for very channel, the revlatived the pinctrl should be at least two
->                            ^ typo?
-> 
-> > state +  {"enN", "dsN"}, which "en" means "enable", "ds" means
-> > "disable" and "N" +  means the order of the channel.
-> 
-> I'd suggest a more readable naming convention, for example chN-active and
-> chN-idle. These words seem to be more common across existing bindings.
-> 
-
-That's a good idea, I will think it over and revise it in v2.
-
-
-Thanks very much.
---
-Best Regards,
-Xiubo
+-corey
