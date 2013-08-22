@@ -1,84 +1,78 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 22 Aug 2013 16:01:09 +0900
-Subject: [GIT PULL 3/3] ARM: shmobile: lager: enable Ether
-In-Reply-To: <20130822065325.GA6615@quad.lixom.net>
-References: <cover.1375839719.git.horms+renesas@verge.net.au>
- <4901e136aa5c35873701156c4c0af5b3c2c8faee.1375839719.git.horms+renesas@verge.net.au>
- <87siy3owxj.fsf@linaro.org> <5215115A.1010400@cogentembedded.com>
- <20130822001647.GA6902@verge.net.au>
- <20130822065325.GA6615@quad.lixom.net>
-Message-ID: <20130822070109.GA26589@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 22 Aug 2013 00:03:40 -0700
+Subject: [GIT PULL] ARM: SoC fixes for 3.11-rc
+Message-ID: <20130822070340.GA8608@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 11:53:25PM -0700, Olof Johansson wrote:
-> On Thu, Aug 22, 2013 at 09:16:49AM +0900, Simon Horman wrote:
-> > On Wed, Aug 21, 2013 at 11:13:30PM +0400, Sergei Shtylyov wrote:
-> > > Hello.
-> > > 
-> > > On 08/21/2013 08:01 PM, Kevin Hilman wrote:
-> > > 
-> > > >>Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > > >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > 
-> > > >This one is triggering a new build failure in -next:
-> > > 
-> > > >arch/arm/mach-shmobile/board-lager.c:99:2: error: unknown field 'register_type' specified in initializer
-> > > >arch/arm/mach-shmobile/board-lager.c:99:19: error: 'SH_ETH_REG_FAST_RCAR' undeclared here (not in a function)
-> > > 
-> > > >>+/* Ether */
-> > > >>+static struct sh_eth_plat_data ether_pdata __initdata = {
-> > > >>+	.phy			= 0x1,
-> > > >>+	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
-> > > >>+	.register_type		= SH_ETH_REG_FAST_RCAR,
-> > > 
-> > > >and it looks to be because this board is trying to use the register_type
-> > > >field which was removed by:
-> > > 
-> > > >commit 8d3214c4e8c8be6efd8ec7a172239ebbd4deb04b
-> > > >Author: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > > >Date:   Sun Aug 18 03:13:26 2013 +0400
-> > > >
-> > > >     sh_eth: remove 'register_type' field from 'struct sh_eth_plat_data'
-> > > >
-> > > >     Now that the 'register_type' field of the 'sh_eth' driver's platform data is not
-> > > >     used by the driver anymore, it's time to remove it and  its initializers from
-> > > >     the SH platform code. Also  move *enum* declaring values for this  field from
-> > > >     <linux/sh_eth.h>  to  the  local driver's  header file as they're only needed
-> > > >     by the driver itself  now...
-> > > >
-> > > >     Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > > >     Signed-off-by: David S. Miller <davem@davemloft.net>
-> > > 
-> > >    Looks like in this case I had no choice since R8A7790 support for
-> > > the 'sh_eth' driver will be added in 3.12 only, so if I merged these
-> > > patches thru the shmobile tree, we'd have gotten an error in the
-> > > driver...
-> > >    I guess it's too early to fix this in any particular tree except
-> > > for linux-next itself... let me know what I can do.
-> > 
-> > This patch ("ARM: shmobile: lager: enable Ether") is also targeted at v3.12.
-> > So it seems to me that a fix for this could go through the shmobile tree
-> > if it is acceptable to merge net-next into the base of a pull-request.
-> > 
-> > Kevin, Olof, could you give some guidance here.
-> 
-> I don't think we want to pull in net-next here just for this -- that is a
-> massive branch.
-> 
-> There's no great solution to any of this, unfortunately.
-> 
-> I think easiest would be if we add a patch that fixes this up _only_ in
-> for-next, and merge the same patch upstream as soon as net-next lands
-> (if it lands after arm-soc, otherwise we include it in our branch),
-> that might be the least painful way to do this.
-> 
-> That patch would just remove the assignment to register_type in the
-> board file.
+Hi Linus,
 
-That is fine by me.
+The following changes since commit 1154f858ab5cd3c5facde7cb9ac31c889eb780a8:
 
-I think it would be easiest to supply the patch to you as
-a patch in email rather than a pull request.
+  MAINTAINERS: add TI Keystone ARM platform (2013-08-07 10:30:29 -0700)
 
-Does that work for you?
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to 30ca2226bea6f0db519dc53381b893cd66cb5b66:
+
+  ARM: tegra: always enable USB VBUS regulators (2013-08-21 21:36:19 -0700)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 3.11-rc
+
+A handful of fixes for 3.11 are still trickling in. These are:
+- A couple of fixes for older OMAP platforms
+- Another few fixes for at91 (lateish due to European summer vacations)
+- A late-found problem with USB on Tegra, fix is to keep VBUS regulator
+  on at all times
+- One fix for Exynos 5440 dealing with CPU detection
+- One MAINTAINERS update
+
+----------------------------------------------------------------
+Aaro Koskinen (1):
+      ARM: OMAP: rx51: change musb mode to OTG
+
+Benoit Cousson (1):
+      MAINTAINERS: Update email address for Benoit Cousson
+
+Boris BREZILLON (1):
+      ARM: at91: add missing uart clocks DT entries
+
+Daniel Mack (1):
+      ARM: OMAP2: fix musb usage for n8x0
+
+Kukjin Kim (1):
+      ARM: SAMSUNG: fix to support for missing cpu specific map_io
+
+Nicolas Ferre (2):
+      ARM: at91/DT: at91sam9x5ek: fix USB host property to enable port C
+      ARM: at91/DT: fix at91sam9n12ek memory node
+
+Olof Johansson (2):
+      Merge tag 'samsung-fixes-2' of git://git.kernel.org/.../kgene/linux-samsung into fixes
+      Merge tag 'at91-fixes' of git://github.com/at91linux/linux-at91 into fixes
+
+Sekhar Nori (1):
+      ARM: davinci: nand: specify ecc strength
+
+Stephen Warren (1):
+      ARM: tegra: always enable USB VBUS regulators
+
+ MAINTAINERS                                 | 6 +++---
+ arch/arm/boot/dts/at91sam9n12ek.dts         | 4 ++--
+ arch/arm/boot/dts/at91sam9x5ek.dtsi         | 5 +++--
+ arch/arm/boot/dts/tegra20-seaboard.dts      | 2 ++
+ arch/arm/boot/dts/tegra20-trimslice.dts     | 2 ++
+ arch/arm/boot/dts/tegra20-whistler.dts      | 4 ++++
+ arch/arm/mach-at91/at91sam9x5.c             | 2 ++
+ arch/arm/mach-davinci/board-dm355-leopard.c | 1 +
+ arch/arm/mach-davinci/board-dm644x-evm.c    | 1 +
+ arch/arm/mach-davinci/board-dm646x-evm.c    | 1 +
+ arch/arm/mach-davinci/board-neuros-osd2.c   | 1 +
+ arch/arm/mach-omap2/board-n8x0.c            | 4 ----
+ arch/arm/mach-omap2/board-rx51.c            | 2 +-
+ arch/arm/mach-omap2/usb-musb.c              | 5 +----
+ arch/arm/plat-samsung/init.c                | 5 +++--
+ 15 files changed, 27 insertions(+), 18 deletions(-)
