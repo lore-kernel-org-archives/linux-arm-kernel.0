@@ -1,45 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 22 Aug 2013 00:57:32 -0700
-Subject: [PATCH v2] ARM: OMAP2: use 'int' instead of 'unsigned' for
- variable 'gpmc_irq_start'
-In-Reply-To: <5215C209.3080606@asianux.com>
-References: <521479B4.8030604@asianux.com> <20130822071402.GQ7656@atomide.com>
- <5215C12D.5020807@asianux.com> <5215C209.3080606@asianux.com>
-Message-ID: <20130822075731.GT7656@atomide.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 22 Aug 2013 09:57:42 +0200
+Subject: [PATCH v7 1/7] ARM: common: vic: Parse interrupt and resume masks
+ from device tree
+In-Reply-To: <CACRpkdboi3MUiUSDuhjwsjzVH3y9bYf9VpyfWK6PCkV-0fUZzw@mail.gmail.com>
+References: <1377120111-25601-1-git-send-email-tomasz.figa@gmail.com>
+ <1377120111-25601-2-git-send-email-tomasz.figa@gmail.com>
+ <CACRpkdboi3MUiUSDuhjwsjzVH3y9bYf9VpyfWK6PCkV-0fUZzw@mail.gmail.com>
+Message-ID: <1741526.ERsruKK5Pm@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Chen Gang <gang.chen@asianux.com> [130822 00:55]:
-> 'gpmc_irq_start' is mostly used as 'int', and for a variable, do not
-> suggest to only use 'unsigned' as its type, so use 'int' instead of
-> 'unsigned' for variable 'gpmc_irq_start'.
+On Thursday 22 of August 2013 01:19:34 Linus Walleij wrote:
+> On Wed, Aug 21, 2013 at 11:21 PM, Tomasz Figa <tomasz.figa@gmail.com> 
+wrote:
+> > +++ b/Documentation/devicetree/bindings/arm/vic.txt
+> > 
+> > @@ -18,6 +18,9 @@ Required properties:
+> >  Optional properties:
+> >  
+> >  - interrupts : Interrupt source for parent controllers if the VIC is
+> >  nested.> 
+> > +- interrupt-mask : Bit mask of valid interrupt sources (defaults to
+> > all valid) +- wakeup-mask : Bit mask of interrupt sources that can
+> > wake up the system +  (defaults to all allowed)
 > 
-> Also it will fix the related issue (dummy the real world failure):
+> The "interrupt-mask" is called "valid-mask" on the FPGA IRQ controller
+> See
+> Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt
 > 
->   arch/arm/mach-omap2/gpmc.c:728:2: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
+> Example:
 > 
+>                 reg = <0x10000040 0x100>;
+>                 clear-mask = <0xffffffff>;
+>                 valid-mask = <0x00000007>;
+> 
+> Please use the same name.
 
-Thanks applying into omap-for-v3.12/fixes-non-critical.
+Oh, I haven't noticed that. Thanks for the information.
 
-Tony
- 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index f3fdd6a..9f4795a 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -149,7 +149,7 @@ struct omap3_gpmc_regs {
->  
->  static struct gpmc_client_irq gpmc_client_irq[GPMC_NR_IRQ];
->  static struct irq_chip gpmc_irq_chip;
-> -static unsigned gpmc_irq_start;
-> +static int gpmc_irq_start;
->  
->  static struct resource	gpmc_mem_root;
->  static struct resource	gpmc_cs_mem[GPMC_CS_NUM];
-> -- 
-> 1.7.7.6
+Best regards,
+Tomasz
