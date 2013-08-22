@@ -1,72 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 22 Aug 2013 22:42:44 +0800
-Subject: [GIT PULL 2/5] ARM: imx: soc changes for 3.12
-In-Reply-To: <87li3tvnj8.fsf@linaro.org>
-References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
- <1376833688-24542-2-git-send-email-shawn.guo@linaro.org>
- <87li3tvnj8.fsf@linaro.org>
-Message-ID: <20130822144242.GI30533@S2101-09.ap.freescale.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 22 Aug 2013 11:41:51 -0300
+Subject: [PATCH 0/7] Orion watchdog DT changes to support more SoCs
+Message-ID: <1377182518-12554-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 06:54:35AM -0700, Kevin Hilman wrote:
-> Shawn Guo <shawn.guo@linaro.org> writes:
-> 
-> > The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
-> >
-> >   Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-soc-3.12
-> >
-> > for you to fetch changes up to 0c383e6a56c2e70db9f2a68f9fe095645f11c151:
-> >
-> >   phy: micrel: Add definitions for common Micrel PHY registers (2013-08-18 09:30:39 +0800)
-> >
-> > ----------------------------------------------------------------
-> > It contains a bunch of imx soc updates for 3.12.
-> >
-> > - Add more ethernet phy fixups for imx6 boards
-> > - Add some missing imx6q clocks into clock driver
-> > - Add new clock types fixup mux and div to work around some ugly
-> >   hardware defect
-> > - Consolidate L2 cache initialization function, so that it can be used
-> >   on more i.MX SoCs
-> > - Replace magic numbers in mach-imx6q.c with well defined macros
-> > - Support low-level debug for vybrid
-> 
-> This patch causes a conflict with Russell's DEBUG_LL cleanup, which is
-> already in linux-next.
+As part of my work to add watchdog support to Armada 370/XP SoCs,
+here's some early patches to get early feedback.
 
-The vybrid patch is already in linux-next as well.  And conflict was
-reported and solved by Stephen one month ago [1].
+This patchset allows to build the orion_wdt driver in any Orion
+platforms.
 
->From the past experience, such trivial conflict with other tree is
-allowed by arm-soc folks, and they will ask Linus to take care of it
-when sending patches upstream.  But ...
+To achieve this it's necessary to remove the need for a mach-specific,
+which in turn is done by splitting the single memory resource into
+three memory resources: timer control, watchdog counter and RSTOUT registers;
+and handling each of this resources as independent memory resources (as they
+really are).
 
-> For v3.12, I suggest you drop this patch and rework your new DEBUG_LL
-> support on top of Russell's cleanup.
+The only drawback with this approach is the breakage of devicetree backwards
+compatibility such change produces. This is an important issue, and the main
+reason I'm submitting this patchset: Is it possible to introduce such
+DT-binding change?
 
-... I'm also fine with your suggestion.
+It's worth noting that a similar was proposed in July-15th [1], which received
+some acceptance [2].
 
-> Have a look at that and see if you
-> can reuse the the generic 8250 stuff added by Russell.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/183628.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/183857.html
 
-Seems not.
+Thanks!
 
-> While there, you
-> might look at imx.S as well.
+Ezequiel Garcia (7):
+  watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+  watchdog: orion: Make counter register a separate resource
+  watchdog: orion: Make RSTOUT register a separate resource
+  watchdog: orion: Allow to build in any Orion platform
+  ARM: kirkwood: Update watchdog 'reg' property
+  watchdog: orion: Rename device-tree binding documentation
+  watchdog: orion: Update device-tree binding documentation
 
-I think Russell would have converted it if it can reuse 8250 stuff.
+ .../devicetree/bindings/watchdog/marvel.txt        | 19 ------------
+ .../devicetree/bindings/watchdog/orion-wdt.txt     | 24 +++++++++++++++
+ arch/arm/boot/dts/kirkwood.dtsi                    |  4 ++-
+ arch/arm/mach-kirkwood/include/mach/bridge-regs.h  |  1 +
+ arch/arm/plat-orion/common.c                       | 11 ++++---
+ drivers/watchdog/Kconfig                           |  2 +-
+ drivers/watchdog/orion_wdt.c                       | 35 ++++++++++++++--------
+ 7 files changed, 59 insertions(+), 37 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/watchdog/marvel.txt
+ create mode 100644 Documentation/devicetree/bindings/watchdog/orion-wdt.txt
 
-> 
-> If that's OK with you, can you send an updated pull request without the
-> DEBUG_LL changes?  The other changes look OK for v3.12.
-
-Okay, will send you an updated pull request without DEBUG_LL changes.
-
-Shawn
-
-[1] https://lkml.org/lkml/2013/6/3/22
+-- 
+1.8.1.5
