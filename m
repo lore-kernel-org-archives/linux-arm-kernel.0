@@ -1,105 +1,58 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 22 Aug 2013 20:46:51 +0800
-Subject: [PATCH 4/4] pinctrl: mvebu: add missing iounmap
-In-Reply-To: <1377175611-4241-1-git-send-email-jszhang@marvell.com>
-References: <1377175611-4241-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1377175611-4241-5-git-send-email-jszhang@marvell.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 22 Aug 2013 05:59:04 -0700
+Subject: [GIT PULL 1/5] ARM: imx: weim bus driver update for 3.12
+In-Reply-To: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org> (Shawn
+ Guo's message of "Sun, 18 Aug 2013 21:48:04 +0800")
+References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <874nahx4o7.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing iounmap to prove error path and remove path
+Shawn Guo <shawn.guo@linaro.org> writes:
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/pinctrl/mvebu/pinctrl-mvebu.c | 24 +++++++++++++++++-------
- 1 file changed, 17 insertions(+), 7 deletions(-)
+> The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
+>
+>   Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-weim-3.12
+>
+> for you to fetch changes up to 3f98b6baad63b181da4e859d81953e88ce8a50ec:
+>
+>   drivers: bus: imx-weim: Add support for i.MX1/21/25/27/31/35/50/51/53 (2013-08-16 12:59:44 +0800)
+>
+> ----------------------------------------------------------------
+> This is a patch series that updates imx-weim bus driver to have it
+> support more i.MX SoCs.  Because there is no maintainer for
+> drivers/bus so far, I'm forwarding it through IMX tree for 3.12 merge
+> window.
+>
+> ----------------------------------------------------------------
+> Alexander Shiyan (5):
+>       drivers: bus: imx-weim: Remove private driver data
+>       drivers: bus: imx-weim: Simplify error path
+>       drivers: bus: imx-weim: use module_platform_driver_probe()
+>       drivers: bus: imx-weim: Add missing platform_driver.owner field
+>       drivers: bus: imx-weim: Add support for i.MX1/21/25/27/31/35/50/51/53
+>
+>  Documentation/devicetree/bindings/bus/imx-weim.txt |   17 ++-
+>  drivers/bus/Kconfig                                |    3 +-
+>  drivers/bus/imx-weim.c                             |  129 +++++++++++---------
+>  3 files changed, 87 insertions(+), 62 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-index bb7ddb1..d1ac6b7 100644
---- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-@@ -601,7 +601,8 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 			GFP_KERNEL);
- 	if (!pctl) {
- 		dev_err(&pdev->dev, "unable to alloc driver\n");
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto bail_out;
- 	}
- 
- 	pctl->desc.name = dev_name(&pdev->dev);
-@@ -631,7 +632,8 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 		if (ctrl->mpp_get || ctrl->mpp_set) {
- 			if (!ctrl->name || !ctrl->mpp_get || !ctrl->mpp_set) {
- 				dev_err(&pdev->dev, "wrong soc control info\n");
--				return -EINVAL;
-+				ret = -EINVAL;
-+				goto bail_out;
- 			}
- 			pctl->num_groups += 1;
- 			continue;
-@@ -641,7 +643,8 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 		names = devm_kzalloc(&pdev->dev, ctrl->npins * 8, GFP_KERNEL);
- 		if (!names) {
- 			dev_err(&pdev->dev, "failed to alloc mpp names\n");
--			return -ENOMEM;
-+			ret = -ENOMEM;
-+			goto bail_out;
- 		}
- 		for (k = 0; k < ctrl->npins; k++)
- 			sprintf(names + 8*k, "mpp%d", ctrl->pid+k);
-@@ -653,7 +656,8 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 			     sizeof(struct pinctrl_pin_desc), GFP_KERNEL);
- 	if (!pdesc) {
- 		dev_err(&pdev->dev, "failed to alloc pinctrl pins\n");
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto bail_out;
- 	}
- 
- 	for (n = 0; n < pctl->desc.npins; n++)
-@@ -664,7 +668,8 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 			     sizeof(struct mvebu_pinctrl_group), GFP_KERNEL);
- 	if (!pctl->groups) {
- 		dev_err(&pdev->dev, "failed to alloc pinctrl groups\n");
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto bail_out;
- 	}
- 
- 	/* assign mpp controls to groups */
-@@ -735,13 +740,14 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 	ret = mvebu_pinctrl_build_functions(pdev, pctl);
- 	if (ret) {
- 		dev_err(&pdev->dev, "unable to build functions\n");
--		return ret;
-+		goto bail_out;
- 	}
- 
- 	pctl->pctldev = pinctrl_register(&pctl->desc, &pdev->dev, pctl);
- 	if (!pctl->pctldev) {
- 		dev_err(&pdev->dev, "unable to register pinctrl driver\n");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto bail_out;
- 	}
- 
- 	dev_info(&pdev->dev, "registered pinctrl driver\n");
-@@ -751,11 +757,15 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 		pinctrl_add_gpio_range(pctl->pctldev, &soc->gpioranges[n]);
- 
- 	return 0;
-+bail_out:
-+	iounmap(base);
-+	return ret;
- }
- 
- int mvebu_pinctrl_remove(struct platform_device *pdev)
- {
- 	struct mvebu_pinctrl *pctl = platform_get_drvdata(pdev);
-+	iounmap(pctl->base);
- 	pinctrl_unregister(pctl->pctldev);
- 	return 0;
- }
--- 
-1.8.4.rc3
+The bindings changes in the last patch need a a review and ack from the
+devicetree maintainers.
+
+Can you please repost that patch with devicetree at vger.kernel.org Cc'd?
+
+Without a review/ack from the DT maintainers, we won't be pulling any
+bindings changes.
+
+Also, the binding is changed but there are no corresponding .dts file
+changes.  Was that an oversight, or doess that mean there are no current
+users of this binding.
+
+Thanks,
+
+Kevin
