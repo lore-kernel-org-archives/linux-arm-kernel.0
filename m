@@ -1,45 +1,55 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 22 Aug 2013 11:06:47 +0200
-Subject: [PATCH v5 1/3] i2c-mv64xxx: Add I2C Transaction Generator support
-In-Reply-To: <5215C07D.7040000@free-electrons.com>
-References: <1376039158-1896-1-git-send-email-gregory.clement@free-electrons.com>
- <1376039158-1896-2-git-send-email-gregory.clement@free-electrons.com>
- <20130821210116.GA3130@katana>
- <5215C07D.7040000@free-electrons.com>
-Message-ID: <20130822090647.GA3491@katana>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Thu, 22 Aug 2013 17:19:53 +0800
+Subject: [Suggestion] ARM: allmodconfig: about cross compiling failure
+ under i386 ubuntu.
+In-Reply-To: <20130822074524.GS7656@atomide.com>
+References: <521479B4.8030604@asianux.com> <52147AC6.9040300@asianux.com>
+ <52147E12.4060401@asianux.com> <20130822074524.GS7656@atomide.com>
+Message-ID: <5215D7B9.50105@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> >> @@ -326,6 +463,12 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
-> >>  			drv_data->reg_base + drv_data->reg_offsets.control);
-> >>  		break;
-> >>  
-> >> +	case MV64XXX_I2C_ACTION_OFFLOAD_SEND_START:
-> >> +		if (mv64xxx_i2c_offload_msg(drv_data) <= 0)
-> > 
-> > needs to be adjusted when using -EINVAL above. I'd prefer the error case
-> > in the else branch, though. Easier to read.
-> > 
+On 08/22/2013 03:45 PM, Tony Lindgren wrote:
+> * Chen Gang <gang.chen@asianux.com> [130821 01:53]:
+>> Hello Maintainers:
+>>
+>> When build arm with allmodconfig under ubuntu i386 with arm-linux-
+>> gnueabi-gcc 4.7, as 2.22, it report the errors.
+>>
+>> Please help check, thanks (the related config file in attachment).
 > 
-> OK, but in this case ...
+> It seems that some make flags may need to be specified separately
+> in some makefiles. See the following for some examples:
 > 
-> >> +			break;
-> >> +		else
-> >> +			drv_data->action = MV64XXX_I2C_ACTION_SEND_START;
-> >> +		/* FALLTHRU */
+> $ find arch/arm -name Makefile | xargs grep -i flags
 > 
-> ... the fall through here is less readable. But it is a matter of
-> taste, I will change this.
+> I'm getting different errors though, I'm getting:
+> 
+> arch/arm/mach-zynq/hotplug.c:1: error: bad value (cortex-a9) for -mcpu= switch
+> 
+> As probably my compiler does not support the cortex-a9 switch,
+> I have gcc version 4.3.5 (Debian 4.3.5-4), tried with v3.11-rc5.
+> 
 
-Ah, I see. Well, try both and decide.
+Thank you for your valuable reply, I followed what you said above, and
+now it seems really related the compiler's flags.
 
-Thanks!
+I have passed compiling for the VEXPRESS with dcscb, I will compare the
+difference between the 2 building flags.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130822/3a92435b/attachment-0001.sig>
+It seems we need add the related dependency for ARCH_VEXPRESS (I am just
+analyzing, may get final result today).
+
+
+Thanks.
+
+
+> Regards,
+> 
+> Tony
+> 
+> 
+
+
+-- 
+Chen Gang
