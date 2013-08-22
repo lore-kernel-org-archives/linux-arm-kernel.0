@@ -1,67 +1,71 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Aug 2013 21:35:12 -0700
-Subject: [PATCH] ARM: tegra: always enable USB VBUS regulators
-In-Reply-To: <1377028813-32762-1-git-send-email-swarren@wwwdotorg.org>
-References: <1377028813-32762-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130822043512.GA4237@quad.lixom.net>
+Date: Wed, 21 Aug 2013 22:00:57 -0700
+Subject: [PATCH 00/10] ARM: clps711x: Initial DT support / Fixes
+In-Reply-To: <20130817083230.9ab0aaf04f8c84d42f88c4ce@mail.ru>
+References: <1374172501-26796-1-git-send-email-shc_work@mail.ru>
+ <20130803075442.6d1a418eb60217f7196a25fc@mail.ru>
+ <20130814062900.GA19951@quad.lixom.net>
+ <20130817083230.9ab0aaf04f8c84d42f88c4ce@mail.ru>
+Message-ID: <20130822050057.GB5151@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 02:00:13PM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Sat, Aug 17, 2013 at 08:32:30AM +0400, Alexander Shiyan wrote:
+> On Tue, 13 Aug 2013 23:29:00 -0700
+> Olof Johansson <olof@lixom.net> wrote:
 > 
-> This fixes a regression exposed during the merge window by commit
-> 9f310de "ARM: tegra: fix VBUS regulator GPIO polarity in DT"; namely that
-> USB VBUS doesn't get turned on, so USB devices are not detected. This
-> affects the internal USB port on TrimSlice (i.e. the USB->SATA bridge, to
-> which the SSD is connected) and the external port(s) on Seaboard/
-> Springbank and Whistler.
+> > On Sat, Aug 03, 2013 at 07:54:42AM +0400, Alexander Shiyan wrote:
+> > > On Thu, 18 Jul 2013 22:34:51 +0400
+> > > Alexander Shiyan <shc_work@mail.ru> wrote:
+> > > 
+> > > > Here is next patchset for the Cirrus Logic CLPS711X target CPUs.
+> > > > The first four patches is a small fixes. The rest is a attempt
+> > > > to add DT support for this subarch.
+> > > > As long as DT support is incomplete (no peripherals), I did not
+> > > > add DTS yet. This is the next step.
+> > > > 
+> > > > Alexander Shiyan (10):
+> > > >   ARM: clps711x: Remove the special name for the syscon driver
+> > > >   ARM: clps711x: Drop fortunet board support
+> > > >   ARM: clps711x: autcpu12: Remove incorrect config checking
+> > > >   ARM: clps711x: edb7211: Remove extra iotable_init() call
+> > > >   ARM: clps711x: Add CLPS711X clk driver
+> > > >   ARM: clps711x: Add CLPS711X clocksource driver
+> > > >   ARM: clps711x: Add CLPS711X irqchip driver
+> > > >   ARM: clps711x: Add CLPS711X cpuidle driver
+> > > >   ARM: clps711x: Migrate CLPS711X subarch to the new basic drivers
+> > > >   ARM: clps711x: Add initial DT support
+> > > [...]
+> > > 
+> > > If there is no objection about "fixes" part of patchset,
+> > > can these parts (1/10-4/10) be applied?
+> > > Thanks.
+> > 
+> > Definitely, I'll apply them to fixes-non-critical for 3.12.
+> > 
+> > Btw, Kevin Hilman is stepping in to help out with arm-soc maintenance, so
+> > please email arm at kenrel.org, since it's an alias that we are all on.
+> > 
+> > Also, I don't know if I've asked this of you before, but for these "smaller"
+> > platforms that don't see quite so much activity, it's easy for us to forget who
+> > wants us to apply patches and who stages branches. So emails like these are
+> > appreciated so we know if you want them applied, or if we'll get a pull request
+> > later. Clarifying in the patch posting if they are for review or for applying
+> > works too.
 > 
-> The Tegra DT as written in v3.11 allows two paths to enable USB VBUS:
-> 
-> 1) Via the legacy DT binding for the USB controller; it can directly
->    acquire a VBUS GPIO and activate it.
-> 
-> 2) Via a regulator for VBUS, which is referenced by the new DT binding
->    for the USB controller.
-> 
-> Those two methods both use the same GPIO, and hence whichever of the
-> USB controller and regulator gets probed first ends up owning the GPIO.
-> In practice, the USB driver only supports path (1) above, since the
-> patches to support the new USB binding are not present until v3.12:-(
-> 
-> In practice, the regulator ends up being probed first and owning the
-> GPIO. Since nothing enables the regulator (the USB driver code is not
-> yet present), the regulator ends up being turned off. This originally
-> caused no problem, because the polarity in the regulator definition was
-> incorrect, so attempting to turn off the regulator actually turned it
-> on, and everything worked:-(
-> 
-> However, when testing the new USB driver code in v3.12, I noticed the
-> incorrect polarity and fixed it in commit 9f310de "ARM: tegra: fix VBUS
-> regulator GPIO polarity in DT". In the context of v3.11, this patch then
-> caused the USB VBUS to actually turn off, which broke USB ports with VBUS
-> control. I got this patch included in v3.11-rc1 since it fixed a bug in
-> device tree (incorrect polarity specification), and hence was suitable to
-> be included early in the rc series. I evidently did not test the patch at
-> all, or correctly, in the context of v3.11, and hence did not notice the
-> issue that I have explained above:-(
-> 
-> Fix this by making the USB VBUS regulators always enabled. This way, if
-> the regulator owns the GPIO, it will always be turned on, even if there
-> is no USB driver code to request the regulator be turned on. Even
-> ignoring this bug, this is a reasonable way to configure the HW anyway.
-> 
-> If this patch is applied to v3.11, it will cause a couple pretty trivial
-> conflicts in tegra20-{trimslice,seaboard}.dts when creating v3.12, since
-> the context right above the added lines changed in patches destined for
-> v3.12.
-> 
-> Reported-by: Kyle McMartin <kmcmarti@redhat.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> This is a patch for v3.11-rc*
+> Do you mean always create CC to "arm at ..." for parts [0/xx] or after review period?
+> Thnaks.
 
-Applied, thanks.
+Hi,
+
+arm at kernel.org for when you want them applied. I try to avoid getting
+too many patches posted there just for review, it's the alias we try
+to keep mostly for platform maintainers to email us pull requests and
+patches to apply to.
+
+You can cc us on our individual addresses if you want for the reviews. We might
+not always respond in a timely manner depending on how backlogged we are on
+email, so remind us if needed.
+
 
 -Olof
