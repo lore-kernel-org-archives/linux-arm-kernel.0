@@ -1,82 +1,61 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 22 Aug 2013 13:48:30 -0400
-Subject: [PATCH 2/2] clockevents: Prefer clockevents that don't suffer
- from FEAT_C3_STOP
-In-Reply-To: <52164CF5.20705@codeaurora.org>
-References: <52138784.7050703@linaro.org>
- <1377191201-14696-1-git-send-email-sboyd@codeaurora.org>
- <1377191201-14696-2-git-send-email-sboyd@codeaurora.org>
- <52164B5B.5010902@ti.com> <52164CF5.20705@codeaurora.org>
-Message-ID: <52164EEE.9070707@ti.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 22 Aug 2013 11:01:36 -0700
+Subject: [PATCH 1/3] ARM: PCI: versatile: Fix map_irq function to match
+ hardware
+In-Reply-To: <1377190070-7305-2-git-send-email-peter.maydell@linaro.org>
+References: <1377190070-7305-1-git-send-email-peter.maydell@linaro.org>
+ <1377190070-7305-2-git-send-email-peter.maydell@linaro.org>
+Message-ID: <20130822180136.GA9624@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 August 2013 01:40 PM, Stephen Boyd wrote:
-> On 08/22/13 10:33, Santosh Shilimkar wrote:
->> On Thursday 22 August 2013 01:06 PM, Stephen Boyd wrote:
->>> On some ARM systems there are two sets of per-cpu timers: the TWD
->>> timers and the global timers. The TWD timers are rated at 350 and
->>> the global timers are rated at 300 but the TWD timers suffer from
->>> FEAT_C3_STOP while the arm global timers don't. The tick device
->>> selection logic doesn't consider the FEAT_C3_STOP flag so we'll
->>> always end up with the TWD as the tick device although we don't
->>> want that.
->>>
->>> Extend the preference logic to take the FEAT_C3_STOP flag into
->>> account and always prefer tick devices that don't suffer from
->>> FEAT_C3_STOP even if their rating is lower than tick devices that
->>> do suffer from FEAT_C3_STOP. This will remove the need to do any
->>> broadcasting on such ARM systems.
->>>
->>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>> ---
->>>  kernel/time/tick-common.c | 14 ++++++++++++--
->>>  1 file changed, 12 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
->>> index 64522ec..3ae437d 100644
->>> --- a/kernel/time/tick-common.c
->>> +++ b/kernel/time/tick-common.c
->>> @@ -244,12 +244,22 @@ static bool tick_check_preferred(struct clock_event_device *curdev,
->>>  			return false;
->>>  	}
->>>  
->>> +	if (!curdev)
->>> +		return true;
->>> +
->>> +	/* Always prefer a tick device that doesn't suffer from FEAT_C3STOP */
->>> +	if (!(newdev->features & CLOCK_EVT_FEAT_C3STOP) &&
->>> +			(curdev->features & CLOCK_EVT_FEAT_C3STOP))
->>> +		return true;
->>> +	if ((newdev->features & CLOCK_EVT_FEAT_C3STOP) &&
->>> +			!(curdev->features & CLOCK_EVT_FEAT_C3STOP))
->>> +		return false;
->>> +
->> I don't think preferring the clock-event which doesn't suffer
->> from FEAT_C3STOP is a good idea if the quality of the time source
->> is not same. Generally the global timers are slow and far away from
->> CPU(cycle cost). So as long as we don't get impacted because of low power
->> states, the tick should run out of local timers which are faster access
->> as well as high resolution.
->>
+On Thu, Aug 22, 2013 at 05:47:48PM +0100, Peter Maydell wrote:
+> The PCI controller code for the Versatile board has never had the
+> correct IRQ mapping for hardware.  For many years it had an odd
+> mapping ("all interrupts are int 27") which aligned with the
+> equivalent bug in QEMU.  However as of commit 1bc39ac5dab265
+> the mapping changed and no longer matched either hardware or QEMU,
+> with the result that any PCI card beyond the first in QEMU would
+> not have functioning interrupts; for example a boot with a SCSI
+> controller would time out as follows:
 > 
-> Fair enough. I have no data either way to convince anyone that this is a
-> good or bad idea so this patch should have probably been an RFC. Are you
-> hinting at something like switching to a per-cpu timer that doesn't
-> suffer from FEAT_C3_STOP when a CPU goes into a deep idle state?
-> Interesting idea but I think I'll leave that to someone else if they
-> really care to do that.
+>  ------------
+>  sym0: <895a> rev 0x0 at pci 0000:00:0d.0 irq 92
+>  sym0: SCSI BUS has been reset.
+>  scsi0 : sym-2.2.3
+>  [...]
+>  scsi 0:0:0:0: ABORT operation started
+>  scsi 0:0:0:0: ABORT operation timed-out.
+>  scsi 0:0:0:0: DEVICE RESET operation started
+>  scsi 0:0:0:0: DEVICE RESET operation timed-out.
+>  scsi 0:0:0:0: BUS RESET operation started
+>  scsi 0:0:0:0: BUS RESET operation timed-out.
+>  scsi 0:0:0:0: HOST RESET operation started
+>  sym0: SCSI BUS has been reset
+>  ------------
 > 
-If the per-CPU timer don't suffer from C3_STOP, there is no need to
-switch at all and the per CPU tick continue to runs on CPU local
-timers. We need to switch to a broadcast device(no affected by C3_STOP)
-only for the cases where the per-CPU timer wakeup don't work in CPU
-low power states.
+> Fix the mapping so that it matches real hardware (checked against the
+> schematics for PB926 and backplane, and tested against the hardware).
+> This allows PCI cards using interrupts to work on hardware for the
+> first time; this change will also work with QEMU 1.5 or later, where
+> the equivalent bugs in the modelling of the hardware have been fixed.
+> 
+> Although QEMU will attempt to autodetect whether the kernel is
+> expecting the long-standing "everything is int 27" mapping or the one
+> hardware has, for certainty we force it into "definitely behave like
+> hardware mode"; this will avoid unexpected surprises later if we
+> implement sparse irqs. This is harmless on hardware.
+> 
+> Thanks to Paul Gortmaker for bisecting the problem and finding an initial
+> solution, to Russell King for providing the correct interrupt mapping,
+> and to Guenter Roeck for providing an initial version of this patch
+> and prodding me into relocating the hardware and retesting everything.
+> 
+> Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
 
-Are we talking about a hardware where one of the CPU from a cluster
-has a local timer which is not affected by C3_STOP where as rest
-of the CPU local timers are ? If yes, it must be crazy hardware and
-we should not care too much about that.
+Tested-by: Guenter Roeck <linux@roeck-us.net>
 
-Regards,
-Santosh
+Patches applied to 3.11-rc6 and 3.10.9, loaded qemu and verified that
+access to SCSI controller is working. qemu version 1.5.2.
+
+Guenter
