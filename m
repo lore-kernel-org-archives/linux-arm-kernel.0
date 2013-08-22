@@ -1,25 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 22 Aug 2013 11:02:27 +0100
-Subject: [PATCH v4 01/31] spi: mpc512x: cleanup clock API use
-In-Reply-To: <1375821851-31609-2-git-send-email-gsi@denx.de>
-References: <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1375821851-31609-1-git-send-email-gsi@denx.de>
- <1375821851-31609-2-git-send-email-gsi@denx.de>
-Message-ID: <20130822100227.GT26118@sirena.org.uk>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 22 Aug 2013 18:02:59 +0800
+Subject: [PATCH v2 4/4] iio: at91: introduce touch screen support in iio
+ adc driver
+In-Reply-To: <520CAD07.1080709@kernel.org>
+References: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
+ <1376219071-29946-5-git-send-email-josh.wu@atmel.com>
+ <20130812172453.GB31418@core.coreip.homeip.net> <520CAD07.1080709@kernel.org>
+Message-ID: <5215E1D3.5090905@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 06, 2013 at 10:43:41PM +0200, Gerhard Sittig wrote:
-> cleanup the MPC512x SoC's SPI master's use of the clock API
-> - get, prepare, and enable the MCLK during probe; disable, unprepare and
->   put the MCLK upon remove; hold a reference to the clock over the
->   period of use
+Hi, Jonathan
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130822/02ff2956/attachment.sig>
+On 8/15/2013 6:27 PM, Jonathan Cameron wrote:
+>
+> On 08/12/13 18:24, Dmitry Torokhov wrote:
+>> Hi Josh,
+> Hi Dmitry,
+>
+> As you haven't raised it here, I am guessing you are fine with having this
+> chunk of input related code in an IIO driver?  I wonder if it would be
+> better to break this into an mfd core and child input and iio drivers.
+> The two parts look fairly separable to me.
+> Clearly that means adding some overhead, but the gain is that the input
+> code ends up in input and the IIO code in IIO.
+>
+> What are your views on this?  I'm fairly flexible if you think it simply
+> isn't worth the hassle of breaking this up.  I'm more worried about setting
+> a precident than anything else.
+>
+> Jonathan
+
+Since Dmitry has no feedback yet. I am not sure is it a right time to 
+send out the next version for the IIO ad91 touch patch?
+
+[snip...]
+
+Best Regards,
+Josh Wu
