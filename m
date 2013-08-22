@@ -1,42 +1,40 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 22 Aug 2013 18:55:35 +0900
-Subject: Broken device trees for exynos in linux-next
-In-Reply-To: <8738q5lnjc.fsf@kernel.org>
-References: <CAOesGMgv9gTQ_NtaKZY_ZfLD1NBU19E-vaLaWwmvGJJB1MQrwg@mail.gmail.com>
- <13b101ce9a14$2cebd700$86c38500$@org>
- <CAOesGMiyNM6VdNzKQU3XwoiacJV8hc60mcLiH+vHoS6xJM6q-A@mail.gmail.com>
- <159201ce9b36$2a513f30$7ef3bd90$@org> <8738q5lnjc.fsf@kernel.org>
-Message-ID: <1c7e01ce9f1d$bf4967d0$3ddc3770$@org>
+Date: Thu, 22 Aug 2013 18:59:23 +0900
+Subject: [PATCH v7 3/7] gpio: samsung: Skip initialization if device tree
+ is present
+In-Reply-To: <3452017.UPhKO6xNO5@flatron>
+References: <1377120111-25601-1-git-send-email-tomasz.figa@gmail.com>
+ <1377120111-25601-4-git-send-email-tomasz.figa@gmail.com>
+ <CACRpkda2ZjPm4nEeDujPWSDCNLk4mr9izPvhqNKx5urVAg_Azg@mail.gmail.com>
+ <3452017.UPhKO6xNO5@flatron>
+Message-ID: <1c9a01ce9f1e$473b58b0$d5b20a10$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman wrote:
+Tomasz Figa wrote:
 > 
-> Kukjin Kim <kgene@kernel.org> writes:
+> On Thursday 22 of August 2013 01:21:25 Linus Walleij wrote:
+> > On Wed, Aug 21, 2013 at 11:21 PM, Tomasz Figa <tomasz.figa@gmail.com>
+> wrote:
+> > > Since this driver does not handle GPIO on device tree enabled
+> > > platforms
+> > > any more, it should be bypassed whenever device tree is available, to
+> > > not conflict with the new pinctrl-samsung driver.
+> > >
+> > > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> >
+> > This seems like something I should apply to the GPIO tree
+> > right now, shall I?
 > 
-> [...]
+> Would be nice, but since this patch is a dependency for rest of this
+> series and there are no other dependencies on GPIO tree, it might be
+> easier to just let Kukjin take all the patches with required Acks.
 > 
-> > If we could make LPAE enabled defconfig for all ARM platforms, I'm fine.
-> I
-> > think your concern is creating SoC specific defconfig and I agree with
-> you.
-> > But I'm not sure how we can support LPAE enabled defconfig for ARM
-> > platforms.
-> 
-> Here's a simple way to keep a single base defconfig, and enable LPAE:
-> 
-> $ echo CONFIG_ARM_LPAE=y > /tmp/lpae.config
-> $ ./scripts/kconfig/merge_config.sh arch/arm/config/exynos_defconfig
-> /tmp/lpae.config
-> 
-Yeah, it can be used for test. But there are many differences between
-exynos_defconfig and exynos5440_defconfig...PCIe, GbE, HugeTLB and KVM...so
-I'm still wondering how to handle it without other defconfig.
+Oh, I didn't see any dependencies...but if so, Linus do you agree with
+Tomasz' opinion?
 
-Olof, do you still having objection for exynos5440_defconfig? If so, OK I
-will revert exynos5440_defconfig for now so that I could pull out the
-'defconfig' branch to arm-soc for upcoming merge window. Then, let's discuss
-again :)
+Please let me know so that I could take this with others into the samsung
+tree. And please kindly ignore my previous reply on this ;-)
 
 Thanks,
 Kukjin
