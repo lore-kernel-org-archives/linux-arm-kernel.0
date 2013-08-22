@@ -1,40 +1,26 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 22 Aug 2013 18:02:59 +0800
-Subject: [PATCH v2 4/4] iio: at91: introduce touch screen support in iio
- adc driver
-In-Reply-To: <520CAD07.1080709@kernel.org>
-References: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
- <1376219071-29946-5-git-send-email-josh.wu@atmel.com>
- <20130812172453.GB31418@core.coreip.homeip.net> <520CAD07.1080709@kernel.org>
-Message-ID: <5215E1D3.5090905@atmel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 22 Aug 2013 11:09:34 +0100
+Subject: [PATCH v11 5/8] ASoC: fsl-ssi: ac97-slave support
+In-Reply-To: <1376924761-4054-6-git-send-email-mpa@pengutronix.de>
+References: <1376924761-4054-1-git-send-email-mpa@pengutronix.de>
+ <1376924761-4054-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130822100934.GV26118@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Jonathan
+On Mon, Aug 19, 2013 at 05:05:58PM +0200, Markus Pargmann wrote:
+> This patch adds ac97-slave support.
+> 
+> For ac97, the registers have to be setup earlier than for other ssi
+> modes because there is some communication with the external device
+> before streaming. So this patch introduces a fsl_ssi_setup function to
+> setup the registers for different ssi operation modes seperately.
 
-On 8/15/2013 6:27 PM, Jonathan Cameron wrote:
->
-> On 08/12/13 18:24, Dmitry Torokhov wrote:
->> Hi Josh,
-> Hi Dmitry,
->
-> As you haven't raised it here, I am guessing you are fine with having this
-> chunk of input related code in an IIO driver?  I wonder if it would be
-> better to break this into an mfd core and child input and iio drivers.
-> The two parts look fairly separable to me.
-> Clearly that means adding some overhead, but the gain is that the input
-> code ends up in input and the IIO code in IIO.
->
-> What are your views on this?  I'm fairly flexible if you think it simply
-> isn't worth the hassle of breaking this up.  I'm more worried about setting
-> a precident than anything else.
->
-> Jonathan
-
-Since Dmitry has no feedback yet. I am not sure is it a right time to 
-send out the next version for the IIO ad91 touch patch?
-
-[snip...]
-
-Best Regards,
-Josh Wu
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130822/0e54354f/attachment.sig>
