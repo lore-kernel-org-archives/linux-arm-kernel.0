@@ -1,27 +1,48 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 22 Aug 2013 07:20:05 -0700
-Subject: [GIT PULL 3/5] ARM: imx: device tree changes for 3.12
-In-Reply-To: <1376833688-24542-3-git-send-email-shawn.guo@linaro.org> (Shawn
- Guo's message of "Sun, 18 Aug 2013 21:48:06 +0800")
+Date: Thu, 22 Aug 2013 07:21:47 -0700
+Subject: [GIT PULL 1/5] ARM: imx: weim bus driver update for 3.12
+In-Reply-To: <20130822141021.GH30533@S2101-09.ap.freescale.net>
 References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
- <1376833688-24542-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <87vc2xu7sa.fsf@linaro.org>
+ <874nahx4o7.fsf@linaro.org>
+ <20130822141021.GH30533@S2101-09.ap.freescale.net>
+Message-ID: <CAGa+x84ogjo=zZW3f5GmPAA0wfxgRRqQKmkpPLetLMAx-YA4UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo <shawn.guo@linaro.org> writes:
-
-> Olof, Kevin,
+On Thu, Aug 22, 2013 at 7:10 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Thu, Aug 22, 2013 at 05:59:04AM -0700, Kevin Hilman wrote:
 >
-> The pull request depends on the previous one imx-soc-3.12.  Please take
-> care of it.  Thanks.
+> <snip>
+>
+>> >       drivers: bus: imx-weim: Add support for i.MX1/21/25/27/31/35/50/51/53
+>> >
+>> >  Documentation/devicetree/bindings/bus/imx-weim.txt |   17 ++-
+>> >  drivers/bus/Kconfig                                |    3 +-
+>> >  drivers/bus/imx-weim.c                             |  129 +++++++++++---------
+>> >  3 files changed, 87 insertions(+), 62 deletions(-)
+>>
+>> The bindings changes in the last patch need a a review and ack from the
+>> devicetree maintainers.
+>>
+>> Can you please repost that patch with devicetree at vger.kernel.org Cc'd?
+>>
+> Okay, will do.
 
-It seems it also has a dependency on [GIT PULL 1/5] for the binding
-changes to the weim bus?  (specifically patch "ARM: dts: i.MX27: Add
-WEIM node" uses the updated binding, correct?)  Please try and describe
-all the dependencies.
+Looking closer at this, seems this change is a trivial binding update
+that just generalizes the binding to more SoCs.  I'm OK with taking
+that change.  But in the future, please make sure binding changes are
+posted to the DT list.
 
-Also, since it's based on the previous pull where I asked for some
-changes (dropping DEBUG_LL support) you'll need to respin this one as well.
+>> Without a review/ack from the DT maintainers, we won't be pulling any
+>> bindings changes.
+>>
+>> Also, the binding is changed but there are no corresponding .dts file
+>> changes.  Was that an oversight, or doess that mean there are no current
+>> users of this binding.
+>
+> The binding changes does not break the existing users, and new users are
+> added through imx/dt branch.
+
+OK, thanks for the clarification.
 
 Kevin
