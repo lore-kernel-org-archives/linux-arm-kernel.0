@@ -1,52 +1,97 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 22 Aug 2013 17:53:00 +0800
-Subject: [PATCH v2 2/4] iio: at91: Use different prescal, startup mask
- in MR for different IP
-In-Reply-To: <5215DF2C.3050502@atmel.com>
+Date: Thu, 22 Aug 2013 17:54:16 +0800
+Subject: [PATCH v2 3/4] iio: at91: ADC start-up time calculation changed
+ since at91sam9x5
+In-Reply-To: <20130815192711.GE12162@lukather>
 References: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
- <1376219071-29946-3-git-send-email-josh.wu@atmel.com>
- <20130815192044.GD12162@lukather> <5215DF2C.3050502@atmel.com>
-Message-ID: <5215DF7C.2020909@atmel.com>
+ <1376219071-29946-4-git-send-email-josh.wu@atmel.com>
+ <20130815192711.GE12162@lukather>
+Message-ID: <5215DFC8.8090607@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Ludovic in the loop.
+Hi, Maxime
 
-On 8/22/2013 5:51 PM, Josh Wu wrote:
-> Hi, Maxime
+On 8/16/2013 3:27 AM, Maxime Ripard wrote:
+> Hi Josh,
 >
-> On 8/16/2013 3:20 AM, Maxime Ripard wrote:
->> Hi Josh,
+> On Sun, Aug 11, 2013 at 07:04:30PM +0800, Josh Wu wrote:
+>> Since in at91sam9x5, sama5d3x chip. the start up time calucation is
+>> changed.  This patch can choose different start up time calculation
+>> formula for different chips.
 >>
->> On Sun, Aug 11, 2013 at 07:04:29PM +0800, Josh Wu wrote:
->>> For at91 boards, there are different IPs for adc. Different IPs has
->>> different STARTUP & PRESCAL mask in ADC_MR.
->>>
->>> This patch introduce the multiple compatible string for those
->>> different IPs.
->>>
->>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> Overall it looks like the right ways, but I think we can take it a step
->> further.
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>> v1 --> v2:
+>>    add a new variable for different start_time calculation.
 >>
->> I'd drop at least the atmel,adc-drdy-mask, atmel,adc-num-channels,
->> atmel,adc-status-register, atmel,adc-trigger-register properties (and
->> probably the triggers as well description as well).
->
-> yeah, right. Currently I want to drop following:
->
-> atmel,adc-drdy-mask, atmel,adc-status-register, 
-> atmel,adc-trigger-register, atmel,adc-channel-base
->
-> For the adc-num-channels, I'd like to leave it in dt parameters. It is 
-> a description for an adc capablity.
->
-> For the triggers, I am not decided. An obvious benifit to remove 
-> trigger in dt will save many lines of code.
->
+>>   drivers/iio/adc/at91_adc.c |   42 +++++++++++++++++++++++++++++++++++-------
+>>   1 file changed, 35 insertions(+), 7 deletions(-)
 >>
->> Maxime
->>
+>> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+>> index b41eb60..9b0ffff 100644
+>> --- a/drivers/iio/adc/at91_adc.c
+>> +++ b/drivers/iio/adc/at91_adc.c
+>> @@ -40,6 +40,7 @@
+>>   	(writel_relaxed(val, st->reg_base + reg))
+>>   
+>>   struct at91_adc_caps {
+>> +	bool	start_time_use_lookup_tab;
+>>   	u32	mr_prescal_mask;
+>>   	u32	mr_startup_mask;
+>>   };
+>> @@ -700,13 +701,39 @@ static int at91_adc_probe(struct platform_device *pdev)
+>>   		goto error_disable_adc_clk;
+>>   	}
+>>   
+>> -	/*
+>> -	 * Number of ticks needed to cover the startup time of the ADC as
+>> -	 * defined in the electrical characteristics of the board, divided by 8.
+>> -	 * The formula thus is : Startup Time = (ticks + 1) * 8 / ADC Clock
+>> -	 */
+>> -	ticks = round_up((st->startup_time * adc_clk_khz /
+>> -			  1000) - 1, 8) / 8;
+>> +	if (!st->caps->start_time_use_lookup_tab) {
+>> +		/*
+>> +		 * Number of ticks needed to cover the startup time of the ADC
+>> +		 * as defined in the electrical characteristics of the board,
+>> +		 * divided by 8. The formula thus is :
+>> +		 *   Startup Time = (ticks + 1) * 8 / ADC Clock
+>> +		 */
+>> +		ticks = round_up((st->startup_time * adc_clk_khz /
+>> +				  1000) - 1, 8) / 8;
+>> +	} else {
+>> +		/*
+>> +		 * For sama5d3x and at91sam9x5, the formula changes to:
+>> +		 * Startup Time = <lookup_table_value> / ADC Clock
+>> +		 */
+>> +		const int startup_lookup[] = {
+>> +			0  , 8  , 16 , 24 ,
+>> +			64 , 80 , 96 , 112,
+>> +			512, 576, 640, 704,
+>> +			768, 832, 896, 960
+>> +			};
+>> +
+>> +		int i, size = ARRAY_SIZE(startup_lookup);
+>> +		ticks = st->startup_time * adc_clk_khz / 1000;
+>> +		for (i = 0; i < size; i++)
+>> +			if (ticks < startup_lookup[i])
+>> +				break;
+>> +
+>> +		ticks = i;
+>> +		if (ticks == size)
+>> +			/* Reach the end of lookup table */
+>> +			ticks = size - 1;
+>> +	}
+>> +
+> Maybe just declaring two different functions here to calculate the
+> number of ticks, and just holding the function pointer in your structure
+> would make things more readable and future-proof?
+
+I'll do this in next version. thanks.
+
 >
-> Best Regards,
-> Josh Wu
+> Maxime
+>
+Best Regards,
+Josh Wu
