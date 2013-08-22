@@ -1,60 +1,64 @@
-From: B38611@freescale.com (Fugang Duan)
-Date: Thu, 22 Aug 2013 18:56:31 +0800
-Subject: [PATCH] ARM: imx6sl: config iomux-gpr1 to select clock for fec
-Message-ID: <1377168991-8824-1-git-send-email-B38611@freescale.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Thu, 22 Aug 2013 13:01:18 +0200
+Subject: [PATCHv3 3/4] clocksource: dw_apb_timer: Move timer defines to
+ header file.
+In-Reply-To: <1377118427-20644-3-git-send-email-dinguyen@altera.com>
+References: <1377118427-20644-1-git-send-email-dinguyen@altera.com>
+ <1377118427-20644-3-git-send-email-dinguyen@altera.com>
+Message-ID: <20130822110118.GB19347@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Config iomux-gpr1 to select clock source for fec system clock.
-Clear gpr1[14], gpr1[18-17] bit to select the fec clock source
-from internal anatop PLL.
+Hi!
 
-Signed-off-by: Fugang Duan  <B38611@freescale.com>
----
- arch/arm/mach-imx/mach-imx6sl.c |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
+On Wed 2013-08-21 15:53:46, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> Move all dw_apb_timer defines to include/linux/dw_apb_timer.h.
 
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index 132db26..e0a8c12 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -11,17 +11,37 @@
- #include <linux/irqchip.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
- #include "common.h"
- 
-+static void __init imx6sl_fec_init(void)
-+{
-+	struct regmap *gpr;
-+
-+	/* set FEC clock from internal PLL clock source */
-+	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6sl-iomuxc-gpr");
-+	if (!IS_ERR(gpr)) {
-+		regmap_update_bits(gpr, IOMUXC_GPR1,
-+			IMX6SL_GPR1_FEC_CLOCK_MUX2_SEL_MASK, 0);
-+		regmap_update_bits(gpr, IOMUXC_GPR1,
-+			IMX6SL_GPR1_FEC_CLOCK_MUX1_SEL_MASK, 0);
-+	} else
-+		pr_err("failed to find fsl,imx6sl-iomux-gpr regmap\n");
-+}
-+
- static void __init imx6sl_init_machine(void)
- {
- 	mxc_arch_reset_init_dt();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+
-+	imx6sl_fec_init();
- }
- 
- static void __init imx6sl_init_irq(void)
+That makes sense. But the changelog says "move" while the patch only
+adds them to second place, which can not be right.
+
+Is there public git tree with the patches somewhere?
+
+Thanks,
+								Pavel
+
+> ---
+>  include/linux/dw_apb_timer.h |   19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
+> index 1f79b20..1d2b949 100644
+> --- a/include/linux/dw_apb_timer.h
+> +++ b/include/linux/dw_apb_timer.h
+> @@ -19,6 +19,25 @@
+>  
+>  #define APBTMRS_REG_SIZE       0x14
+>  
+> +#define APBT_MIN_PERIOD                 4
+> +#define APBT_MIN_DELTA_USEC             200
+> +
+> +#define APBTMR_N_LOAD_COUNT             0x00
+> +#define APBTMR_N_CURRENT_VALUE          0x04
+> +#define APBTMR_N_CONTROL                0x08
+> +#define APBTMR_N_EOI                    0x0c
+> +#define APBTMR_N_INT_STATUS             0x10
+> +
+> +#define APBTMRS_INT_STATUS              0xa0
+> +#define APBTMRS_EOI                     0xa4
+> +#define APBTMRS_RAW_INT_STATUS          0xa8
+> +#define APBTMRS_COMP_VERSION            0xac
+> +
+> +#define APBTMR_CONTROL_ENABLE           (1 << 0)
+> +/* 1: periodic, 0:free running. */
+> +#define APBTMR_CONTROL_MODE_PERIODIC    (1 << 1)
+> +#define APBTMR_CONTROL_INT              (1 << 2)
+> +
+>  struct dw_apb_timer {
+>  	void __iomem				*base;
+>  	unsigned long				freq;
+
 -- 
-1.7.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
