@@ -1,91 +1,84 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 22 Aug 2013 00:04:59 -0700
-Subject: [GIT PULL 3/3] ARM: shmobile: lager: enable Ether
-In-Reply-To: <20130822070109.GA26589@verge.net.au>
-References: <cover.1375839719.git.horms+renesas@verge.net.au>
- <4901e136aa5c35873701156c4c0af5b3c2c8faee.1375839719.git.horms+renesas@verge.net.au>
- <87siy3owxj.fsf@linaro.org> <5215115A.1010400@cogentembedded.com>
- <20130822001647.GA6902@verge.net.au>
- <20130822065325.GA6615@quad.lixom.net>
- <20130822070109.GA26589@verge.net.au>
-Message-ID: <CAOesGMjZ+a6EiDa2p3y-_kkQ0uwSHU6zdcTxuphJxNcr7QhDhw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 22 Aug 2013 00:10:58 -0700
+Subject: [GIT PULL] omap fixes against v3.11-rc5
+In-Reply-To: <20130822052635.GF5151@quad.lixom.net>
+References: <20130816071958.GB7656@atomide.com>
+ <CAOesGMiQBajdyW5AFJx6ASh1pHmdDPrh6Gy3o2HOBtFc9-g_Ag@mail.gmail.com>
+ <20130820123232.GN7656@atomide.com>
+ <20130822052635.GF5151@quad.lixom.net>
+Message-ID: <20130822071058.GP7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 12:01 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Aug 21, 2013 at 11:53:25PM -0700, Olof Johansson wrote:
->> On Thu, Aug 22, 2013 at 09:16:49AM +0900, Simon Horman wrote:
->> > On Wed, Aug 21, 2013 at 11:13:30PM +0400, Sergei Shtylyov wrote:
->> > > Hello.
->> > >
->> > > On 08/21/2013 08:01 PM, Kevin Hilman wrote:
->> > >
->> > > >>Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->> > > >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->> > >
->> > > >This one is triggering a new build failure in -next:
->> > >
->> > > >arch/arm/mach-shmobile/board-lager.c:99:2: error: unknown field 'register_type' specified in initializer
->> > > >arch/arm/mach-shmobile/board-lager.c:99:19: error: 'SH_ETH_REG_FAST_RCAR' undeclared here (not in a function)
->> > >
->> > > >>+/* Ether */
->> > > >>+static struct sh_eth_plat_data ether_pdata __initdata = {
->> > > >>+       .phy                    = 0x1,
->> > > >>+       .edmac_endian           = EDMAC_LITTLE_ENDIAN,
->> > > >>+       .register_type          = SH_ETH_REG_FAST_RCAR,
->> > >
->> > > >and it looks to be because this board is trying to use the register_type
->> > > >field which was removed by:
->> > >
->> > > >commit 8d3214c4e8c8be6efd8ec7a172239ebbd4deb04b
->> > > >Author: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> > > >Date:   Sun Aug 18 03:13:26 2013 +0400
->> > > >
->> > > >     sh_eth: remove 'register_type' field from 'struct sh_eth_plat_data'
->> > > >
->> > > >     Now that the 'register_type' field of the 'sh_eth' driver's platform data is not
->> > > >     used by the driver anymore, it's time to remove it and  its initializers from
->> > > >     the SH platform code. Also  move *enum* declaring values for this  field from
->> > > >     <linux/sh_eth.h>  to  the  local driver's  header file as they're only needed
->> > > >     by the driver itself  now...
->> > > >
->> > > >     Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> > > >     Signed-off-by: David S. Miller <davem@davemloft.net>
->> > >
->> > >    Looks like in this case I had no choice since R8A7790 support for
->> > > the 'sh_eth' driver will be added in 3.12 only, so if I merged these
->> > > patches thru the shmobile tree, we'd have gotten an error in the
->> > > driver...
->> > >    I guess it's too early to fix this in any particular tree except
->> > > for linux-next itself... let me know what I can do.
->> >
->> > This patch ("ARM: shmobile: lager: enable Ether") is also targeted at v3.12.
->> > So it seems to me that a fix for this could go through the shmobile tree
->> > if it is acceptable to merge net-next into the base of a pull-request.
->> >
->> > Kevin, Olof, could you give some guidance here.
->>
->> I don't think we want to pull in net-next here just for this -- that is a
->> massive branch.
->>
->> There's no great solution to any of this, unfortunately.
->>
->> I think easiest would be if we add a patch that fixes this up _only_ in
->> for-next, and merge the same patch upstream as soon as net-next lands
->> (if it lands after arm-soc, otherwise we include it in our branch),
->> that might be the least painful way to do this.
->>
->> That patch would just remove the assignment to register_type in the
->> board file.
->
-> That is fine by me.
->
-> I think it would be easiest to supply the patch to you as
-> a patch in email rather than a pull request.
->
-> Does that work for you?
+* Olof Johansson <olof@lixom.net> [130821 22:34]:
+> On Tue, Aug 20, 2013 at 05:32:32AM -0700, Tony Lindgren wrote:
+> > * Olof Johansson <olof@lixom.net> [130816 15:05]:
+> > > 
+> > > Our current fixes branch is based on -rc4, and I didn't see any of
+> > > these commits in linux-next, so I took the liberty to rebase them back
+> > > onto our current branch.
+> > > 
+> > > I.e. pulled, but rebased.
+> > 
+> > Thanks no problem at my end. But to avoid future confusion, what's
+> > the reasoning for rebasing? AFAIK, pulling this in would have just
+> > automatically updated your branch to -rc5, no?
+> > 
+> > The only time where pulling in a branch based on a later mainline
+> > commit would cause problems is if your branch is based on another
+> > series of patches you want to send separately as then you'd get
+> > all the commits between -rc4 and -rc5 when doing the pull request.
+> > 
+> > Probably nothing new in this for your, but FYI, you can use pulling
+> > or merging branches as a way of updating your publick branches without
+> > rebasing or adding extra merge commits while keeping the branch
+> > pullable.
+> > 
+> > Let's assume you have arm-soc/fixes based on -rc4, and -rc5
+> > comes out:
+> > 
+> > $ git checkout -b my-fixes-of-the-week v3.11-rc5
+> > # apply pending patches
+> > ...
+> > $ git checkout arm-soc/fixes
+> > $ git merge my-fixes-of-the-week
+> > 
+> > And then you have essentially fast forwarded your arm-soc/fixes to
+> > -rc5 and it stays pullable ;)
+> 
+> Yeah, it's not that we _can't_ pull it in, it's just that we either need to
+> merge in -rc5 manually first, or otherwise manually verify diffstat since
+> it'd otherwise cover the full delta.
 
-Yes, definitely.
+Hmm sounds like something's not right then, at least for the fixes
+branch. If you do the pull request for Linus against -rc5, it should
+only show the patches you merged, not the delta from -rc4 to -rc5.
 
+If you mean that you need to be able to diff between the earlier pull
+request against -rc4 and the new pull request against -rc5, then that
+should work too without showing the full delta of non-arm-soc patches.
 
--Olof
+For your branches, it should not be necessary to manually merge
+any upstream tags, you can just let the branches automatically
+get updated when merging in branches and pulling in branches.
+
+Especially for the fixes branch as that should not have dependencies
+to other external branches :)
+
+> My request for people to not always eagerly pick up latest -rc as base for
+> their branches is new for this release cycle, mostly to see how well it works
+> out. It would keep the history of our arm-soc changes somewhat cleaner than if
+> we have new -rcs "anchor in" on the graph in multiple locations like we
+> sometimes do now. But it might just be annoying for everyone to deal with
+> complying too, so we'll see how it goes.
+
+Yes.. I think that's against natural way of developing things as that
+requires testing against multiple trees and rebasing patches that
+can often introduce new issues.
+
+The issue of generating pull requests when there are dependencies
+to earlier branches not yet merged still remains though.
+
+Regards,
+
+Tony
