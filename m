@@ -1,44 +1,40 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 22 Aug 2013 05:20:41 -0700
-Subject: [PATCH] ARM: mach-omap2: gpmc: Fix warning when CONFIG_ARM_LPAE=y
-In-Reply-To: <1377131523-19392-1-git-send-email-festevam@gmail.com> (Fabio
- Estevam's message of "Wed, 21 Aug 2013 21:32:03 -0300")
-References: <1377131523-19392-1-git-send-email-festevam@gmail.com>
-Message-ID: <87y57tx6g6.fsf@linaro.org>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu, 22 Aug 2013 14:33:56 +0200
+Subject: [RFC PATCH] phylib: mdio: handle register/unregister/register sequence
+Message-ID: <1377174836-10569-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio Estevam <festevam@gmail.com> writes:
+Hello,
 
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> When CONFIG_ARM_LPAE=y the following build warning is generated:
->
-> arch/arm/mach-omap2/gpmc.c:1495:4: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'resource_size_t' [-Wformat]
->
-> According to Documentation/printk-formats.txt '%pa' can be used to properly
-> print 'resource_size_t'.
->
-> Reported-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+This patch is a proposal to support the register/unregister/register
+sequence on a given mdio bus.
 
-Acked-by: Kevin Hilman <khilman@linaro.org>
+I use the register/unregister/register sequence to add a fallback when the
+of_mdiobus_register (this function calls mdiobus_register with phy_mask
+set to ~0) does not register any phy device (because the device tree does
+not define any phy).
+In this case I call mdiobus_unregister and then call mdiobus_register with
+a phy_mask set to 0 to trigger a full mdio bus scan.
 
-> ---
->  arch/arm/mach-omap2/gpmc.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index f3fdd6a..ad6da1d 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -1491,8 +1491,8 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
->  	 */
->  	ret = gpmc_cs_remap(cs, res.start);
->  	if (ret < 0) {
-> -		dev_err(&pdev->dev, "cannot remap GPMC CS %d to 0x%x\n",
-> -			cs, res.start);
-> +		dev_err(&pdev->dev, "cannot remap GPMC CS %d to %pa\n",
-> +			cs, &res.start);
->  		goto err;
->  	}
+I'm not sure this is the right way to do it (this is why I added RFC in the
+subject).
+
+Could someone help me figuring out what I should use to implement my fallback ?
+
+1) use the register/unregister/register sequence
+2) reimplement the "for (i = 0; i < PHY_MAX_ADDR; i++)" mdiobus_scan loop
+
+Thanks.
+
+Best Regards,
+Boris
+
+Boris BREZILLON (1):
+  phylib: mdio: handle register/unregister/register sequence
+
+ drivers/net/phy/mdio_bus.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+-- 
+1.7.9.5
