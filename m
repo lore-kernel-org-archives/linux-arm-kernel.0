@@ -1,49 +1,57 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 22 Aug 2013 00:25:24 -0700
-Subject: [RFC 02/17] ARM: call clk_of_init from time_init
-In-Reply-To: <201308212054.10417.arnd@arndb.de>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <5213C90F.9010407@wwwdotorg.org> <5213CF58.50703@gmail.com>
- <201308212054.10417.arnd@arndb.de>
-Message-ID: <20130822072524.8231.37219@quantum>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 22 Aug 2013 08:18:43 +0100
+Subject: [PATCH 05/13] ARM: ux500: Apply a ste-* prefix onto snowball.dts
+In-Reply-To: <CAOesGMgZYFgwAhVCc-ObnxcmGTLTM-Zk27Dh7r1_p646ULWHeg@mail.gmail.com>
+References: <1374243229-8585-1-git-send-email-lee.jones@linaro.org>
+ <1374243229-8585-6-git-send-email-lee.jones@linaro.org>
+ <CAOesGMgd51g7WAkQu+ckT-=skKuMyj19nJkHxh+YmGSBhSL+Vg@mail.gmail.com>
+ <CACRpkdasMSCfdhzrW+7kHM8UUxxQ5UMAcc5bOogc-9RwXE9RVg@mail.gmail.com>
+ <CAOesGMgZYFgwAhVCc-ObnxcmGTLTM-Zk27Dh7r1_p646ULWHeg@mail.gmail.com>
+Message-ID: <20130822071843.GA22023@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Arnd Bergmann (2013-08-21 11:54:10)
-> On Tuesday 20 August 2013, Sebastian Hesselbarth wrote:
-> > Perhaps Tegra is the common case but other SoC haven't dug deep enough?
-> > IMHO from a HW point-of-view clocks are really among the essential
-> > things that need to be running before you can do anything useful.
-> > 
-> > Just consider boot loaders that run fine without irqs but don't without
-> > clocks (even if just represented by API). Maybe you are right, and we
-> > should call of_clk_init(NULL) as early as possible. That would also
-> > eliminate patch 1/17 as you suggest.
+On Wed, 21 Aug 2013, Olof Johansson wrote:
+
+> On Wed, Aug 21, 2013 at 3:37 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Wed, Aug 21, 2013 at 2:31 AM, Olof Johansson <olof@lixom.net> wrote:
+> >
+> >>> diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+> >>> similarity index 100%
+> >>> rename from arch/arm/boot/dts/snowball.dts
+> >>> rename to arch/arm/boot/dts/ste-snowball.dts
+> >>
+> >> Grmbl, grmbl, grmbl. This now breaks any script that knows to use
+> >> snowball.dtb. :(
+> >>
+> >> It's good to get the prefixes added, but it's annoying to have to deal
+> >> with both during an overlap period. Maybe generate both dtb filenames
+> >> for a while but rename the source?
+> >
+> > Hm I had the same problem but changed my Makefile
+> > (scripts are too simple for me) like this:
+> >
+> >  dtb            := $(build_dir)/arch/arm/boot/dts/ste-hrefv60plus.dtb
+> > +fallbackdtb    := $(build_dir)/arch/arm/boot/dts/hrefv60plus.dtb
+> > (...)
+> > -       cat $(dtb) >> $(output_dir)/zImage
+> > +       if [ -f arch/arm/boot/dts/hrefv60plus.dts ] ; then \
+> > +           cat $(fallbackdtb) >> $(output_dir)/zImage ; echo "fallback" ; \
+> > +       else \
+> > +           cat $(dtb) >> $(output_dir)/zImage ; \
+> > +       fi
 > 
-> Timers and interrupts are also things that are required really early,
-> and from my experience they tend to be needed earlier than clock
-> management. Obviously you need some clocks to be enabled in order
-> to do anything (including interrupt handling), but those clocks tend
-> to be enabled in the boot loader, so we don't have to worry about
-> reprogramming them this early.
-
-Some timers need to know their clock rate for the timer setup. This
-could be hard-coded (e.g. for some timer driven from a fixed 32Khz
-source) but it could also be from a clock capable of different rates
-that needs to be calculated.
-
-I remember discussing the early clock init stuff for OMAP and there was
-an idea to not rely on the clock framework for timer init and just do
-some raw reads and compute the clock rate that way. Using the framework
-would be better of course.
-
-Regards,
-Mike
-
+> Sure, working around it is trivial. I just did a:
+>    - at cp $</arch/arm/boot/dts/ste-snowball.dtb $</arch/arm/boot/dts/snowball.dtb
 > 
->         Arnd
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> But the point is that everybody needs to do something like that now,
+> which is unfortunate.
+
+Well with only ~5 active users it's probably not that much of a big
+deal anyway, but I'm still interested to know what the alternative is?
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
