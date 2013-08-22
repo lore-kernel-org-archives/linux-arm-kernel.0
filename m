@@ -1,76 +1,67 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 21 Aug 2013 21:14:48 -0700
-Subject: [PATCH v3 0/5] clk: dt: bindings for mux, divider & gate clocks
-In-Reply-To: <51E8586C.7040808@codeaurora.org>
-References: <1371795256-16703-1-git-send-email-mturquette@linaro.org>
- <51E8586C.7040808@codeaurora.org>
-Message-ID: <20130822041448.8231.16182@quantum>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Aug 2013 21:35:12 -0700
+Subject: [PATCH] ARM: tegra: always enable USB VBUS regulators
+In-Reply-To: <1377028813-32762-1-git-send-email-swarren@wwwdotorg.org>
+References: <1377028813-32762-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130822043512.GA4237@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2013-07-18 14:04:44)
-> On 06/20/13 23:14, Mike Turquette wrote:
-> > This series introduces binding definitions for common register-mapped
-> > clock multiplexer, divider and gate IP blocks along with the
-> > corresponding setup functions for matching DT data.  The bindings are
-> > similar to the struct definitions but please don't hold that against the
-> > binding: the struct definitions closely model the hardware register
-> > layout.
+On Tue, Aug 20, 2013 at 02:00:13PM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> I know there was some discussion about clock bindings and how they
-> should and should not be done at Linaro Connect Europe last week. Can
-> someone in that discussion reply to the mailing list with what came out
-> of that? I only have second hand knowledge about the discussion so it
-> would be good for me and others to know what was discussed. I'm
-> especially curious because the arm soc update etherpad[1] says "DT
-> describes what HW is (location, type, attributes), not how HW works
-> (register descriptions, bitmasks, etc)." but these proposed generic
-> clock bindings are describing registers and bitmasks.
-
-Hi Stephen,
-
-I just happened across a to-do list note telling me to respond to this
-email. Better late than never.
-
-The meeting you're referring to did not focus on clock provider bindings
-as much as it focused on a pair of standard clock attributes that could
-be referenced by clock consumers. They are "assigned-clock-parent" and
-"assigned-clock-rate". The usage scribbled on the white board[1] was
-something like:
-
-mux: mux {
-	clocks = <&clock-foo>, <&clock-bar>;
-};
-
-uart: uart {
-	clocks = <&mux>;
-	assigned-clock-parent = <1>;
-};
-
-In the example above assigned-clock-parent uses the index of the mux,
-but I prefer the following:
-
-uart: uart {
-	clocks = <&mux>;
-	assigned-clock-parent = <&clock-bar>;
-};
-
-This is a way to establish initial configuration from the consumer's
-perspective. Similarly something can be done for the clock rate with
-assigned-clock-rate.
-
-With all of that said this is consumer-level stuff. We'll definitely
-talk about the clock provider DT bindings at the ARM Summit, which is
-what you discuss above.
-
-Regards,
-Mike
-
-[1] https://plus.google.com/u/0/107457854652287465481/posts/cvRveAupUpa
-
+> This fixes a regression exposed during the merge window by commit
+> 9f310de "ARM: tegra: fix VBUS regulator GPIO polarity in DT"; namely that
+> USB VBUS doesn't get turned on, so USB devices are not detected. This
+> affects the internal USB port on TrimSlice (i.e. the USB->SATA bridge, to
+> which the SSD is connected) and the external port(s) on Seaboard/
+> Springbank and Whistler.
 > 
-> [1] http://pad.linaro.org/p/LCE13_ARM_SOC_Tree_Consolidation_Update
+> The Tegra DT as written in v3.11 allows two paths to enable USB VBUS:
 > 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
+> 1) Via the legacy DT binding for the USB controller; it can directly
+>    acquire a VBUS GPIO and activate it.
+> 
+> 2) Via a regulator for VBUS, which is referenced by the new DT binding
+>    for the USB controller.
+> 
+> Those two methods both use the same GPIO, and hence whichever of the
+> USB controller and regulator gets probed first ends up owning the GPIO.
+> In practice, the USB driver only supports path (1) above, since the
+> patches to support the new USB binding are not present until v3.12:-(
+> 
+> In practice, the regulator ends up being probed first and owning the
+> GPIO. Since nothing enables the regulator (the USB driver code is not
+> yet present), the regulator ends up being turned off. This originally
+> caused no problem, because the polarity in the regulator definition was
+> incorrect, so attempting to turn off the regulator actually turned it
+> on, and everything worked:-(
+> 
+> However, when testing the new USB driver code in v3.12, I noticed the
+> incorrect polarity and fixed it in commit 9f310de "ARM: tegra: fix VBUS
+> regulator GPIO polarity in DT". In the context of v3.11, this patch then
+> caused the USB VBUS to actually turn off, which broke USB ports with VBUS
+> control. I got this patch included in v3.11-rc1 since it fixed a bug in
+> device tree (incorrect polarity specification), and hence was suitable to
+> be included early in the rc series. I evidently did not test the patch at
+> all, or correctly, in the context of v3.11, and hence did not notice the
+> issue that I have explained above:-(
+> 
+> Fix this by making the USB VBUS regulators always enabled. This way, if
+> the regulator owns the GPIO, it will always be turned on, even if there
+> is no USB driver code to request the regulator be turned on. Even
+> ignoring this bug, this is a reasonable way to configure the HW anyway.
+> 
+> If this patch is applied to v3.11, it will cause a couple pretty trivial
+> conflicts in tegra20-{trimslice,seaboard}.dts when creating v3.12, since
+> the context right above the added lines changed in patches destined for
+> v3.12.
+> 
+> Reported-by: Kyle McMartin <kmcmarti@redhat.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> This is a patch for v3.11-rc*
+
+Applied, thanks.
+
+-Olof
