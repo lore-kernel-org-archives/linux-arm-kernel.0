@@ -1,98 +1,104 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 22 Aug 2013 01:12:56 -0700
-Subject: [PATCH 2/8] clk: keystone: Add gate control clock driver
-In-Reply-To: <5214BDB1.9080503@ti.com>
-References: <1375719147-7578-1-git-send-email-santosh.shilimkar@ti.com>
- <20130813165344.GU27165@e106331-lin.cambridge.arm.com>
- <20130819204353.4443.48466@quantum> <5213756A.5090903@ti.com>
- <20130820213045.4443.89971@quantum> <5213E5EC.8070208@ti.com>
- <20130820224128.4443.78729@quantum> <5213F397.6020708@ti.com>
- <20130821022225.4443.97467@quantum> <5214BDB1.9080503@ti.com>
-Message-ID: <20130822081256.8231.50781@quantum>
+Date: Thu, 22 Aug 2013 01:16:48 -0700
+Subject: [PATCH v7 10/11] ARM: hi3xxx: add clk-hi3716
+In-Reply-To: <CAD6h2NSCh7m5O3Tc2-D-Znf5teXA=kqorU-+af2eK261yTtO=g@mail.gmail.com>
+References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
+ <1376965873-14431-11-git-send-email-haojian.zhuang@linaro.org>
+ <20130821214300.8231.81515@quantum>
+ <CAMj5BkhCVALJO=OHJ6WSr_Jsi+9DPQ_1_PGs3PgWfQxx-W-neg@mail.gmail.com>
+ <20130822055931.8231.48936@quantum>
+ <CAD6h2NSCh7m5O3Tc2-D-Znf5teXA=kqorU-+af2eK261yTtO=g@mail.gmail.com>
+Message-ID: <20130822081648.8231.24110@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Santosh Shilimkar (2013-08-21 06:16:33)
-> On Tuesday 20 August 2013 10:22 PM, Mike Turquette wrote:
-> > Quoting Santosh Shilimkar (2013-08-20 15:54:15)
-> >> On Tuesday 20 August 2013 06:41 PM, Mike Turquette wrote:
-> >>> Quoting Santosh Shilimkar (2013-08-20 14:55:56)
-> >>>> On Tuesday 20 August 2013 05:30 PM, Mike Turquette wrote:
+Quoting Haojian Zhuang (2013-08-22 00:50:52)
+> On 22 August 2013 13:59, Mike Turquette <mturquette@linaro.org> wrote:
+> > Quoting zhangfei gao (2013-08-21 18:19:33)
+> >> On Thu, Aug 22, 2013 at 5:43 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> >> > Quoting Haojian Zhuang (2013-08-19 19:31:12)
+> >> >> From: Zhangfei Gao <zhangfei.gao@linaro.org>
+> >> >>
+> >> >> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> >> >> Signed-off-by: Zhang Mingjun <zhang.mingjun@linaro.org>
+> >> >> ---
 > >>
-> >> [...]
+> >> >> +static int hi3716_clkgate_prepare(struct clk_hw *hw)
+> >> >> +{
+> >> >> +       struct hi3716_clk *clk = to_clk_hi3716(hw);
+> >> >> +       unsigned long flags = 0;
+> >> >> +       u32 reg;
+> >> >> +
+> >> >> +       spin_lock_irqsave(&_lock, flags);
+> >> >> +
+> >> >> +       reg = readl_relaxed(clk->reg);
+> >> >> +       reg &= ~BIT(clk->reset_bit);
+> >> >> +       writel_relaxed(reg, clk->reg);
+> >> >> +
+> >> >> +       spin_unlock_irqrestore(&_lock, flags);
+> >> >> +
+> >> >> +       return 0;
+> >> >> +}
+> >> >> +
+> >> >> +static void hi3716_clkgate_unprepare(struct clk_hw *hw)
+> >> >> +{
+> >> >> +       struct hi3716_clk *clk = to_clk_hi3716(hw);
+> >> >> +       unsigned long flags = 0;
+> >> >> +       u32 reg;
+> >> >> +
+> >> >> +       spin_lock_irqsave(&_lock, flags);
+> >> >> +
+> >> >> +       reg = readl_relaxed(clk->reg);
+> >> >> +       reg |= BIT(clk->reset_bit);
+> >> >> +       writel_relaxed(reg, clk->reg);
+> >> >> +
+> >> >> +       spin_unlock_irqrestore(&_lock, flags);
+> >> >> +}
+> >> >> +
+> >> >> +static struct clk_ops hi3716_clkgate_ops = {
+> >> >> +       .prepare        = hi3716_clkgate_prepare,
+> >> >> +       .unprepare      = hi3716_clkgate_unprepare,
+> >> >> +};
+> >> >
+> >> > Why .prepare & .unprepare instead of .enable & .disable?
+> >> >
+> >> > Regards,
+> >> > Mike
 > >>
-> >>>>>> They are bit different w.r.t OMAP. LPSC itself is the clock control of the
-> >>>>>> IP. The LPSC number in the bindings is actually the specific number which
-> >>>>>> is used to reach to the address space of the clock control. One can view
-> >>>>>> that one as clock control register index.
-> >>>>>
-> >>>>> Thanks for the information. I have a further question about then: are
-> >>>>> the LPSC clocks really module clocks that belong to the IP that they are
-> >>>>> gating?
-> >>>>>
-> >>>> LPSC controls the clock enable/disable to the IP/module so answer is yes.
-> >>>> In certain cases LPSC controls clock to more than one IP as well.
-> >>>>
-> >>>>> If so then they could be defined within the node defining their parent
-> >>>>> IP. That might be enough to get rid of the LPSC index value. Again I
-> >>>>> might be over-engineering it. Just trying to get an understanding.
-> >>>>>
-> >>>> Am not sure I follow you here on not having the LPSC index. Sorry. 
-> >>>
-> >>> How are the 'reg' property and the 'lpsc' property related? Does the
-> >>> lpsc property modify the register address used to access the clock
-> >>> control bits?
-> >>>
-> >> Yes it does. Currently all nodes use fix address and then lpsc is
-> >> used as an index.
-> > 
-> > Ok cool. Well the reason I brought that up was because I even had the
-> > idea to define these module clocks within the module nodes that own them
-> > in DT. I am way outside of my DT knowledge at this point but I wonder
-> > if the following type of binding is possible:
-> > 
-> > module: module at 4a308200 {
-> >       #address-cells = <1>;
-> >       #size-cells = <1>;
-> >       reg = <0x4a308200 0x1000>;
-> > 
-> >       clock {
-> >               #clock-cells = <0>;
-> >               compatible = "keystone,psc-clk";
-> >               clocks = <&chipclk3>;
-> >               clock-output-names = "debugss_trc";
-> >               reg = <0x0256>;
-> >               pd = <1>;
-> >       };
-> > };
-> > 
-> > Again, my DT knowledge is pretty limited, but could the reg property of
-> > the clock be directly affected by the parent node? That seems like it
-> > could nicely model what the hardware is really doing.
-> > 
-> The module(I assume you mean IP here) reg address space is separate than
-> that used for clock control so that doesn't fit as such. Traditionally
-> clock controls even though targeted for specific modules sits in different
-> control as at least seen on OMAP and Keystone. OCP wrappers on OMAP
-> were bit of exceptions but they were little bit of glue logic without
-> much control within the address space.
+> >> Thanks  Mike for the review
+> >>
+> >> the .enable & .disable is directly use clk_gate_ops.
+> >>
+> >> +       hi3716_clkgate_ops.enable = clk_gate_ops.enable;
+> >> +       hi3716_clkgate_ops.disable = clk_gate_ops.disable;
+> >> +       hi3716_clkgate_ops.is_enabled = clk_gate_ops.is_enabled;
+> >> +       p_clk->gate.bit_idx = array[1];
+> >>
+> >> prepare & unprepare is handle reset bit, while enable & disable is
+> >> handle enable bit.
+> >> We have to extend since clk_gate_ops does not consider prepare &
+> >> unprepare, otherwise it would be simpler.
+> >
+> > I understand why you made this choice from the perspective of re-using
+> > the existing gate-clock implementation. What I meant in my question is
+> > whether or not handling the reset bit in the .prepare/.unprepare is the
+> > right thing.
+> >
+> > For instance if you called clk_enable or clk_disable from within an
+> > interrupt handler would you want to toggle the reset bit in that
+> > instance?
+> >
+> 
+> No. We don't want to access reset bit for clk_enable() & clk_disable().
+> 
+> We don't know what issue will occur if we always control reset & unreset with
+> enabling/disabling.
 
-Great, you perfectly answered my questions. I think that assigning the
-"final" address to the 'reg' property is the right way to go (fixed
-address + LPSC index).
+Ok then your use of .prepare & .unprepare sounds correct to me.
 
-Regards,
+Thanks,
 Mike
 
 > 
-> >> But I think we can do better by just using the
-> >> right(offset) address in the reg property. Will have a look at it
-> >> and see what I can do here.
-> > 
-> > This also solves the problem nicely.  Thanks for putting up with my
-> > silly questions ;-)
-> > 
-> You asked right and good questions.
-> 
-> Regards,
-> Santosh
+> Regards
+> Haojian
