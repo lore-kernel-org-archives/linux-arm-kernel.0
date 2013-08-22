@@ -1,41 +1,77 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 Aug 2013 14:49:30 +0100
-Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the
- DBX500 DT
-In-Reply-To: <20130822133730.GB23152@e106331-lin.cambridge.arm.com>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
- <20130820093034.GL31036@pengutronix.de>
- <20130822133730.GB23152@e106331-lin.cambridge.arm.com>
-Message-ID: <20130822134930.GA17154@lee--X1>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Thu, 22 Aug 2013 14:57:56 +0100
+Subject: [GIT PULL v2] DT/core: cpu_ofnode updates for v3.12
+Message-ID: <521618E4.4020007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Aug 2013, Mark Rutland wrote:
+Hi Rafael,
 
-> On Tue, Aug 20, 2013 at 10:30:34AM +0100, Sascha Hauer wrote:
-> > On Tue, Aug 20, 2013 at 11:11:19AM +0200, Linus Walleij wrote:
-> > > On Thu, Jun 6, 2013 at 2:16 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > > 
-> > > > +++ b/arch/arm/boot/dts/dbx5x0.dtsi
-> > > > @@ -572,6 +572,8 @@
-> > > >                         v-i2c-supply = <&db8500_vape_reg>;
-> > > >
-> > > >                         clock-frequency = <400000>;
-> > > > +                       clocks = <&prcc_kclk 3 3>, <&prcc_pclk 3 3>;
-> > > > +                       clock-names = "nmk-i2c.0", "apb_pclk";
-> > 
-> > Why do most clocks in this series have the instance number in the clock
-> > names? This looks very wrong to me.
-> 
-> +1. The clock names should be the input names to the unit, they
-> shouldn't vary per instance.
+Here is the v2 of the pull request for cpu of_node updates for v3.12
+It includes ACK for all the new changes since v1(mainly from Ben for
+PPC). Currently there's trivial conflict with today's linux-next in 3
+files. Let me know if you need me to rebase this on any particular
+branch if needed.
 
-Duly noted.
+Regards,
+Sudeep
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
+
+  Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
+
+are available in the git repository at:
+
+  git://linux-arm.org/linux-skn.git cpu_of_node
+
+for you to fetch changes up to 1037b2752345cc5666e90b711a913ab2ae6c5920:
+
+  cpufreq: pmac32-cpufreq: remove device tree parsing for cpu nodes
+(2013-08-21 10:29:56 +0100)
+
+----------------------------------------------------------------
+Sudeep KarkadaNagesha (19):
+   microblaze: remove undefined of_get_cpu_node declaration
+   openrisc: remove undefined of_get_cpu_node declaration
+   powerpc: refactor of_get_cpu_node to support other architectures
+   of: move of_get_cpu_node implementation to DT core library
+   ARM: DT/kernel: define ARM specific arch_match_cpu_phys_id
+   driver/core: cpu: initialize of_node in cpu's device struture
+   of/device: add helper to get cpu device node from logical cpu index
+   ARM: topology: remove hwid/MPIDR dependency from cpu_capacity
+   ARM: mvebu: remove device tree parsing for cpu nodes
+   drivers/bus: arm-cci: avoid parsing DT for cpu device nodes
+   cpufreq: imx6q-cpufreq: remove device tree parsing for cpu nodes
+   cpufreq: cpufreq-cpu0: remove device tree parsing for cpu nodes
+   cpufreq: highbank-cpufreq: remove device tree parsing for cpu nodes
+   cpufreq: spear-cpufreq: remove device tree parsing for cpu nodes
+   cpufreq: kirkwood-cpufreq: remove device tree parsing for cpu nodes
+   cpufreq: arm_big_little: remove device tree parsing for cpu nodes
+   cpufreq: maple-cpufreq: remove device tree parsing for cpu nodes
+   cpufreq: pmac64-cpufreq: remove device tree parsing for cpu nodes
+   cpufreq: pmac32-cpufreq: remove device tree parsing for cpu nodes
+
+ arch/arm/kernel/devtree.c           |  5 ++
+ arch/arm/kernel/topology.c          | 61 +++++-----------
+ arch/arm/mach-imx/mach-imx6q.c      |  3 +-
+ arch/arm/mach-mvebu/platsmp.c       | 51 ++++++-------
+ arch/microblaze/include/asm/prom.h  |  3 -
+ arch/openrisc/include/asm/prom.h    |  3 -
+ arch/powerpc/include/asm/prom.h     |  3 -
+ arch/powerpc/kernel/prom.c          | 43 +-----------
+ drivers/base/cpu.c                  |  2 +
+ drivers/bus/arm-cci.c               | 28 ++------
+ drivers/cpufreq/arm_big_little_dt.c | 40 ++++-------
+ drivers/cpufreq/cpufreq-cpu0.c      | 23 +-----
+ drivers/cpufreq/highbank-cpufreq.c  | 18 ++---
+ drivers/cpufreq/imx6q-cpufreq.c     |  4 +-
+ drivers/cpufreq/kirkwood-cpufreq.c  |  8 ++-
+ drivers/cpufreq/maple-cpufreq.c     | 23 +-----
+ drivers/cpufreq/pmac32-cpufreq.c    |  5 +-
+ drivers/cpufreq/pmac64-cpufreq.c    | 47 +++---------
+ drivers/cpufreq/spear-cpufreq.c     |  4 +-
+ drivers/of/base.c                   | 95 ++++++++++++++++++++++++
+ include/linux/cpu.h                 |  1 +
+ include/linux/of.h                  |  7 ++
+ include/linux/of_device.h           | 15 ++++
+ 23 files changed, 226 insertions(+), 266 deletions(-)
