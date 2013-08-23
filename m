@@ -1,50 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Aug 2013 12:48:05 +0100
-Subject: [PATCH v3 1/3] ARM: Introduce atomic MMIO modify
-In-Reply-To: <20130823113225.GF2389@localhost>
-References: <1377253445-2842-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130823103802.GO4600@tarshish> <20130823110748.GD2389@localhost>
- <20130823113225.GF2389@localhost>
-Message-ID: <20130823114805.GF10971@arm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 23 Aug 2013 04:53:09 -0700
+Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
+In-Reply-To: <52174BAC.3070901@gmail.com>
+References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
+ <201308222229.01778.marex@denx.de> <20130822233611.GA25263@sirena.org.uk>
+ <201308230158.05909.marex@denx.de> <20130823094141.GE25263@sirena.org.uk>
+ <52174BAC.3070901@gmail.com>
+Message-ID: <52174D25.9050805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 12:32:26PM +0100, Ezequiel Garcia wrote:
-> On Fri, Aug 23, 2013 at 08:07:50AM -0300, Ezequiel Garcia wrote:
-> > On Fri, Aug 23, 2013 at 01:38:02PM +0300, Baruch Siach wrote:
-> > > On Fri, Aug 23, 2013 at 07:24:03AM -0300, Ezequiel Garcia wrote:
-> > > > Some SoC have MMIO regions that are shared across orthogonal
-> > > > subsystems. This commit implements a possible solution for the
-> > > > thread-safe access of such regions through a spinlock-protected API.
-> > > > 
-> > > > Concurrent access is protected with a single spinlock for the
-> > > > entire MMIO address space. While this protects shared-registers,
-> > > > it also serializes access to unrelated/unshared registers.
-> > > > 
-> > > > We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
-> > > > respectively. The rationale for this is that some users may not require
-> > > > register write completion but only thread-safe access to a register.
-> > > > 
-> > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > 
-> > > Is there a reason why this should be limited to ARM? I haven't found anything 
-> > > ARM specific in the code.
-> > 
-> > I guess not.
-> 
-> ... or maybe yes. I'm not seeing {readl,writel}_relaxed as guaranteed
-> to exist in every architecture. So, indeed, this seems to be ARM-dependent.
+On 08/23/2013 04:46 AM, Brian Norris wrote:
+> (Now that I've been pointed to the support merged into the SPI tree...)
+>
+> Aren't the following new DT properties (for the SPI slave) sufficient?
+>
+> spi-rx-nbits
+> spi-tx-nbits
+...
+> They're already in the following commit:
+>
+> commit f477b7fb13df2b843997559ff34e87d054ba6538
+> Author: wangyuhang <wangyuhang2014@gmail.com>
+> Date:   Sun Aug 11 18:15:17 2013 +0800
+>
+>      spi: DUAL and QUAD support
+>
+>      fix the previous patch some mistake below:
+>      1. DT in slave node, use "spi-tx-nbits = <1/2/4>" in place of using
+>         "spi-tx-dual, spi-tx-quad" directly, same to rx. So correct the
+>         previous way to get the property in @of_register_spi_devices().
+>      2. Change the value of transfer bit macro(SPI_NBITS_SINGLE, SPI_NBITS_DUAL
+>         SPI_NBITS_QUAD) to 0x01, 0x02 and 0x04 to match the actual wires.
+>      3. Add the following check
+>         (1)keep the tx_nbits and rx_nbits in spi_transfer is not beyond the
+>            single, dual and quad.
+>         (2)keep tx_nbits and rx_nbits are contained by @spi_device->mode
+>            example: if @spi_device->mode = DUAL, then tx/rx_nbits can not be set
+>                     to QUAD(SPI_NBITS_QUAD)
+>         (3)if "@spi_device->mode & SPI_3WIRE", then tx/rx_nbits should be in
+>            single(SPI_NBITS_SINGLE)
+>
+>      Signed-off-by: wangyuhang <wangyuhang2014@gmail.com>
+>      Signed-off-by: Mark Brown <broonie@linaro.org>
 
-There was a discussion couple of years ago to make these part of the IO
-specification since many architectures define them:
+Speaking of which, the new device-tree properties are not documented in 
+Documentation/devicetree/bindings/spi/spi-bus.txt yet.
 
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/117626
-
-(and some older threads on linux-arch which I haven't searched)
-
-We could have some default implementation pointing to readl/writel while
-letting the arch code to define more optimised variants.
-
--- 
-Catalin
+Brian
