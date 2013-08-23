@@ -1,65 +1,67 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 23 Aug 2013 10:07:35 -0300
-Subject: [PATCH 7/7] watchdog: orion: Update device-tree binding
- documentation
-In-Reply-To: <52175C21.603@gmail.com>
-References: <1377182518-12554-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377182518-12554-8-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130823012621.GD13964@titan.lakedaemon.net>
- <20130823100450.GA2389@localhost> <20130823125311.GH2389@localhost>
- <52175C21.603@gmail.com>
-Message-ID: <20130823130734.GI2389@localhost>
+From: wangyuhang2014@gmail.com (yuhang wang)
+Date: Fri, 23 Aug 2013 21:20:53 +0800
+Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
+In-Reply-To: <52174D25.9050805@gmail.com>
+References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
+ <201308222229.01778.marex@denx.de>
+ <20130822233611.GA25263@sirena.org.uk>
+ <201308230158.05909.marex@denx.de>
+ <20130823094141.GE25263@sirena.org.uk> <52174BAC.3070901@gmail.com>
+ <52174D25.9050805@gmail.com>
+Message-ID: <CAHSAbzPq7rDgEnQgtVDE7v6w2SoHAt522C9p+xz8azt7a+xDrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 02:57:05PM +0200, Sebastian Hesselbarth wrote:
-> On 08/23/13 14:53, Ezequiel Garcia wrote:
-> > On Fri, Aug 23, 2013 at 07:04:51AM -0300, Ezequiel Garcia wrote:
-> >> On Thu, Aug 22, 2013 at 09:26:21PM -0400, Jason Cooper wrote:
-> >>> On Thu, Aug 22, 2013 at 11:41:58AM -0300, Ezequiel Garcia wrote:
-> >>>> diff --git a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-> >>>> index 5dc8d30..bb7f1a2 100644
-> >>>> --- a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-> >>>> +++ b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-> >>>> @@ -13,7 +16,9 @@ Example:
-> >>>>
-> >>>>   	wdt at 20300 {
-> >>>>   		compatible = "marvell,orion-wdt";
-> >>>> -		reg = <0x20300 0x28>;
-> >>>> +		reg = <0x20300 0x4
-> >>>> +		       0x20324 0x4
-> >>>> +		       0x20108 0x4>;
-> >>>
-> >>> I don't like this.  It reaches outside of the wdt register.  I think a
-> >>> more clean way to do this is to do a provider/consumer relationship as
-> >>> in reset.txt.  eg, here you would retain the original reg binding, and
-> >>> add a reset phandle.
-> >>
-> >> Mmm... I can't see how this fits a reset-controller usage.
-> >>
-> >> The watchdog simply "enables" the RSTOUT bit that allows the whole SoC
-> >> to be reset when the watchdog counter expires.
-> >>
-> >> The reset-controller seems to be meant to send reset signals to devices,
-> >> which is not this case.
-> >>
-> >> What am I missing?
-> >
-> > Another possible solution is to simply "enable" the RSTOUT bit for
-> > watchdog somewhere in mach-{kirkwood,mvebu,...} at board boot-up time.
-> >
-> > Do you think that would have any drawbacks?
-> 
-> IMHO, it should be fine to always enable watchdog reset -> rstout_n
-> assertion. The watchdog driver does it unconditionally anyway.
-> We can move it to arch specific code now, and reset API handler later.
-> 
+Hi,
 
-Indeed, that's more or less what I was thinking about :-)
-I'll re-send then with these modifications.
+2013/8/23 Brian Norris <computersforpeace@gmail.com>:
+> On 08/23/2013 04:46 AM, Brian Norris wrote:
+>>
+>> (Now that I've been pointed to the support merged into the SPI tree...)
+>>
+>> Aren't the following new DT properties (for the SPI slave) sufficient?
+>>
+>> spi-rx-nbits
+>> spi-tx-nbits
+>
+> ...
+>
+>> They're already in the following commit:
+>>
+>> commit f477b7fb13df2b843997559ff34e87d054ba6538
+>> Author: wangyuhang <wangyuhang2014@gmail.com>
+>> Date:   Sun Aug 11 18:15:17 2013 +0800
+>>
+>>      spi: DUAL and QUAD support
+>>
+>>      fix the previous patch some mistake below:
+>>      1. DT in slave node, use "spi-tx-nbits = <1/2/4>" in place of using
+>>         "spi-tx-dual, spi-tx-quad" directly, same to rx. So correct the
+>>         previous way to get the property in @of_register_spi_devices().
+>>      2. Change the value of transfer bit macro(SPI_NBITS_SINGLE,
+>> SPI_NBITS_DUAL
+>>         SPI_NBITS_QUAD) to 0x01, 0x02 and 0x04 to match the actual wires.
+>>      3. Add the following check
+>>         (1)keep the tx_nbits and rx_nbits in spi_transfer is not beyond
+>> the
+>>            single, dual and quad.
+>>         (2)keep tx_nbits and rx_nbits are contained by @spi_device->mode
+>>            example: if @spi_device->mode = DUAL, then tx/rx_nbits can not
+>> be set
+>>                     to QUAD(SPI_NBITS_QUAD)
+>>         (3)if "@spi_device->mode & SPI_3WIRE", then tx/rx_nbits should be
+>> in
+>>            single(SPI_NBITS_SINGLE)
+>>
+>>      Signed-off-by: wangyuhang <wangyuhang2014@gmail.com>
+>>      Signed-off-by: Mark Brown <broonie@linaro.org>
+>
+>
+> Speaking of which, the new device-tree properties are not documented in
+> Documentation/devicetree/bindings/spi/spi-bus.txt yet.
+>
+> Brian
 
-Thanks,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Sorry, because I don't have the entire environment in my own PC, so I
+will update the document patch as soon as possible when I go back to
+company.
