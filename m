@@ -1,111 +1,35 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Fri, 23 Aug 2013 15:15:33 +0800
-Subject: [PATCH] ARM: VExpress: Kconfig: avoid arm6 compatible for
- ARCH_VEXPRESS
-In-Reply-To: <52170900.5070909@asianux.com>
-References: <521479B4.8030604@asianux.com> <52147AC6.9040300@asianux.com>
- <52147E12.4060401@asianux.com> <20130822074524.GS7656@atomide.com>
- <20130822102210.GF25647@n2100.arm.linux.org.uk>
- <5216BF16.2080006@asianux.com> <5216C389.9050605@asianux.com>
- <5216D138.6080802@asianux.com> <5216D31B.9050609@asianux.com>
- <20130823055152.GY7656@atomide.com> <52170900.5070909@asianux.com>
-Message-ID: <52170C15.5010907@asianux.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 23 Aug 2013 00:17:17 -0700
+Subject: [PATCH] ARM: KVM: Bugfix: vgic_bytemap_get_reg per cpu regs
+Message-ID: <1377242237-29930-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2013 03:02 PM, Chen Gang wrote:
-> On 08/23/2013 01:51 PM, Tony Lindgren wrote:
->> * Chen Gang <gang.chen@asianux.com> [130822 20:20]:
->>> The related error:
->>>
->>>   /tmp/ccOMIprI.s: Assembler messages:
->>>   /tmp/ccOMIprI.s:507: Error: selected processor does not support ARM mode `isb '
->>>   /tmp/ccOMIprI.s:513: Error: selected processor does not support ARM mode `isb '
->>>   /tmp/ccOMIprI.s:514: Error: selected processor does not support ARM mode `dsb '
->>>   /tmp/ccOMIprI.s:584: Error: selected processor does not support ARM mode `isb '
->>>   /tmp/ccOMIprI.s:590: Error: selected processor does not support ARM mode `isb '
->>>   /tmp/ccOMIprI.s:591: Error: selected processor does not support ARM mode `dsb '
->>>   make[1]: *** [arch/arm/mach-vexpress/dcscb.o] Error 1
->>>   make: *** [arch/arm/mach-vexpress] Error 2
->>>
->>>
->>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->>> ---
->>>  arch/arm/mach-vexpress/Kconfig |    2 +-
->>>  1 files changed, 1 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
->>> index 3657954..9b176ce 100644
->>> --- a/arch/arm/mach-vexpress/Kconfig
->>> +++ b/arch/arm/mach-vexpress/Kconfig
->>> @@ -1,5 +1,5 @@
->>>  config ARCH_VEXPRESS
->>> -	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7
->>> +	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7 && !CPU_V6 && !CPU_V6K
->>>  	select ARCH_REQUIRE_GPIOLIB
->>>  	select ARM_AMBA
->>>  	select ARM_GIC
->>
->> We do support v6 and v7 in the same kernel. So instead of limiting
->> what to select in Kconfig, just specify the v7 flags in the Makefile
->> for the vexpress .c file with the inline assembly. Look for the
->> find command I posted earlier in this thread for examples of specifying 
->> flags for a single object in a makefile.
->>
-> 
-> I guess what your meaning is like the diff below:
-> 
-> --------------------------------diff begin------------------------------
-> 
-> diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
-> index 36ea824..4ebfda4 100644
-> --- a/arch/arm/mach-vexpress/Makefile
-> +++ b/arch/arm/mach-vexpress/Makefile
-> @@ -2,7 +2,7 @@
->  # Makefile for the linux kernel.
->  #
->  ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
-> -	-I$(srctree)/arch/arm/plat-versatile/include
-> +	-I$(srctree)/arch/arm/plat-versatile/include -march=armv7-a
->  
->  obj-y                                  := v2m.o
->  obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)      += ct-ca9x4.o
-> 
-> --------------------------------diff end--------------------------------
-> 
-> If my above guess is correct, it can pass compiling without related
-> warnings, but it will be like below (CONFIG_CPU_32v6 is enabled in
-> allmodconfig):
-> 
->   "... -D__LINUX_ARM_ARCH__=6 -march=armv6k -mtune=arm1136j ...  -march=armv7-a ..."
-> 
-> Is '-march=armv7-a' conflict with '-D__LINUX_ARM_ARCH__=6' ?
-> 
+For bytemaps each IRQ field is 1 byte wide, so we pack 4 irq fields in
+one word and since there are 32 private (per cpu) irqs, we have 8
+private u32 fields on the vgic_bytemap struct.  We shift the offset from
+the base of the register group right by 2, giving us the word index
+instead of the field index.  But then there are 8 private words, not 4,
+which is also why we subtract 8 words from the offset of the shared
+words.
 
-Oh, sorry.
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/vgic.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-'-D__LINUX_ARM_ARCH__' is for C file, '-march' is for assembly file.
-for assembly file (or a C file has inline assemble code), need
-'-march=armv7-a' (just like you have already mentioned).
-
-I will send patch v2 for it.
-
-
-Thanks.
-
-> 
-> The related command is :
-> 
->   arm-linux-gnueabi-gcc -Wp,-MD,arch/arm/mach-vexpress/.dcscb.o.d  -nostdinc -isystem /usr/lib/gcc/arm-linux-gnueabi/4.7/include -I/root/linux-next/arch/arm/include -Iarch/arm/include/generated  -Iinclude -I/root/linux-next/arch/arm/include/uapi -Iarch/arm/include/generated/uapi -I/root/linux-next/include/uapi -Iinclude/generated/uapi -include /root/linux-next/include/linux/kconfig.h -D__KERNEL__ -mlittle-endian -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Werror=implicit-int -Werror=strict-prototypes -Os -Wno-maybe-uninitialized -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog -fstack-protector -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -marm -D__LINUX_ARM_ARCH__=6 -march=armv6k -mtune=arm1136j-s -msoft-float -Uarm -fno-reorder-blocks -fno-ipa-cp-clone -fno-partial-inlining -Wframe-larger-than=1024 -Wno-unused-but-
- set-varia
-bl
-> e -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -femit-struct-debug-baseonly -fno-var-tracking -pg -fno-inline-functions-called-once -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -DCC_HAVE_ASM_GOTO -I/root/linux-next/arch/arm/mach-vexpress/include -I/root/linux-next/arch/arm/plat-versatile/include -march=armv7-a -W     -D"KBUILD_STR(s)=#s" -D"KBUILD_BA
-> 
->  
-> 
-> Thanks.
-> 
-
-
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 17c5ac7..96d7aa4 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -149,7 +149,7 @@ static u32 *vgic_bytemap_get_reg(struct vgic_bytemap *x, int cpuid, u32 offset)
+ {
+ 	offset >>= 2;
+ 	BUG_ON(offset > (VGIC_NR_IRQS / 4));
+-	if (offset < 4)
++	if (offset < 8)
+ 		return x->percpu[cpuid] + offset;
+ 	else
+ 		return x->shared + offset - 8;
 -- 
-Chen Gang
+1.7.10.4
