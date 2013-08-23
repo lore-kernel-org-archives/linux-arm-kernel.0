@@ -1,56 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 23 Aug 2013 16:11:52 +0800
-Subject: [PATCH 0/3] of: add update device node status via cmdline feature
-In-Reply-To: <20130823075102.GA10424@S2101-09.ap.freescale.net>
-References: <1376564133-11286-1-git-send-email-b29396@freescale.com>
- <CACxGe6tMm=u1jFKUQ59+cj-rYkLLAZUqMhsXamyi-wwpWaOGvw@mail.gmail.com>
- <20130821123708.GA17748@b29396-Latitude-E6410>
- <20130823070906.GA2460@b29396-Latitude-E6410>
- <20130823075102.GA10424@S2101-09.ap.freescale.net>
-Message-ID: <20130823081149.GB10424@S2101-09.ap.freescale.net>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Fri, 23 Aug 2013 16:12:40 +0800
+Subject: [PATCH v2] ARM: VExpress: Makefile: add armv7 flags for inline
+ assmembly code compiling
+In-Reply-To: <52171720.4050501@asianux.com>
+References: <521479B4.8030604@asianux.com> <52147AC6.9040300@asianux.com>
+ <52147E12.4060401@asianux.com> <20130822074524.GS7656@atomide.com>
+ <20130822102210.GF25647@n2100.arm.linux.org.uk>
+ <5216BF16.2080006@asianux.com> <5216C389.9050605@asianux.com>
+ <5216D138.6080802@asianux.com> <5216D31B.9050609@asianux.com>
+ <20130823055152.GY7656@atomide.com> <52170900.5070909@asianux.com>
+ <52170C15.5010907@asianux.com> <52171720.4050501@asianux.com>
+Message-ID: <52171978.7080805@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 03:51:07PM +0800, Shawn Guo wrote:
-> The device tree mailing list is changed to devicetree at vger.kernel.org.
+On 08/23/2013 04:02 PM, Chen Gang wrote:
+> When vexpress kernel is compiled for v6, it still can support armv7
+> instructions (hardware still support), so need let compiler know about
+> it for related inline assembly code, or compiling will fail.
 > 
-> On Fri, Aug 23, 2013 at 03:09:08PM +0800, Dong Aisheng wrote:
-> > I tried the uboot way with fdt command to change the node status, it can work.
-> > However, it seems using fdt command is much complicated than the way i did with kernel
-> > command line and it also does not support enable/disable multi nodes at the same time.
-> > e.g, in order to enable ecspi1 and uart3 and disable gpmi:
-> > with uboot fdt command:
-> > U-Boot > fdt addr ${dtbaddr}
-> > U-Boot > fdt set /soc/aips-bus at 02000000/spba-bus at 02000000/ecspi at 02008000 status "okay"
-> > U-Boot > fdt set /soc/aips-bus at 02100000/serial at 021e8000 status "okay"
-> > U-Boot > fdt set /soc/gpmi-nand at 00112000 status "disabled"
-> 
-> Oh, you can use the U-Boot environment and scripting function to make
-> it even easier than your kernel cmdline approach to use.
-> 
-> > with kernel cmdline:
-> > fdt.enable=ecspi at 02008000,serial at 021e8000 fdt.disable=gpmi-nand at 00112000
-> > So from the using perspective, kernel command line is much more simple and easy than uboot.
-> 
-> NAK.
-> 
-> It's not about simple or easy.  The approach completely defects the
 
-s/defects/defeats
+Hmm... need change "compiled for v6, it still can" to "compiled for both
+v6 and v7, it of cause can".
 
-Shawn
+Thanks.
 
-> point of the whole device tree project - moving stuff that kernel does
-> not care out of kernel.  Choosing device from mutually exclusive ones
-> (due to pin conflict of board design) should NOT be something that
-> kernel cares.
+> The related failure command:
 > 
-> Kernel gets device tree blob from firmware/bootloader and instantiates
-> drivers for devices found in device tree.  That's all what kernel should
-> do, nothing more.  Asking kernel to manipulate the device availability
-> property in device tree is plainly wrong to me.
+>   arm-linux-gnueabi-gcc -Wp,-MD,arch/arm/mach-vexpress/.dcscb.o.d  -nostdinc -isystem /usr/lib/gcc/arm-linux-gnueabi/4.7/include -I/root/linux-next/arch/arm/include -Iarch/arm/include/generated  -Iinclude -I/root/linux-next/arch/arm/include/uapi -Iarch/arm/include/generated/uapi -I/root/linux-next/include/uapi -Iinclude/generated/uapi -include /root/linux-next/include/linux/kconfig.h -D__KERNEL__ -mlittle-endian -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Werror=implicit-int -Werror=strict-prototypes -Os -Wno-maybe-uninitialized -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog -fstack-protector -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -marm -D__LINUX_ARM_ARCH__=6 -march=armv6k -mtune=arm1136j-s -msoft-float -Uarm -fno-reorder-blocks -fno-ipa-cp-clone -fno-partial-inlining -Wframe-larger-than=1024 -Wno-unused-but-
+ set-varia
+bl
+> e -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -femit-struct-debug-baseonly -fno-var-tracking -pg -fno-inline-functions-called-once -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -DCC_HAVE_ASM_GOTO -I/root/linux-next/arch/arm/mach-vexpress/include -I/root/linux-next/arch/arm/plat-versatile/include -W     -D"KBUILD_STR(s)=#s" -D"KBUILD_BASENAME=KBUILD_STR(dcscb)"  -D"KBUILD_MODNAME=KBUILD_STR(dcscb)" -c -o arch/arm/mach-vexpress/.tmp_dcscb.o arch/arm/mach-vexpress/dcscb.c
 > 
-> If your board is designed with so many pin conflicts between devices,
-> you have to do whatever you can do to get the decision made in device
-> tree blob, before it gets passed to kernel.  Kernel does NOT care about
-> that decision making.
+> The related error:
+> 
+>   /tmp/ccOMIprI.s: Assembler messages:
+>   /tmp/ccOMIprI.s:507: Error: selected processor does not support ARM mode `isb '
+>   /tmp/ccOMIprI.s:513: Error: selected processor does not support ARM mode `isb '
+>   /tmp/ccOMIprI.s:514: Error: selected processor does not support ARM mode `dsb '
+>   /tmp/ccOMIprI.s:584: Error: selected processor does not support ARM mode `isb '
+>   /tmp/ccOMIprI.s:590: Error: selected processor does not support ARM mode `isb '
+>   /tmp/ccOMIprI.s:591: Error: selected processor does not support ARM mode `dsb '
+>   make[1]: *** [arch/arm/mach-vexpress/dcscb.o] Error 1
+>   make: *** [arch/arm/mach-vexpress] Error 2
+> 
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm/mach-vexpress/Makefile |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
+> index 36ea824..f224577 100644
+> --- a/arch/arm/mach-vexpress/Makefile
+> +++ b/arch/arm/mach-vexpress/Makefile
+> @@ -10,3 +10,6 @@ obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o	dcscb_setup.o
+>  obj-$(CONFIG_ARCH_VEXPRESS_TC2_PM)	+= tc2_pm.o spc.o
+>  obj-$(CONFIG_SMP)			+= platsmp.o
+>  obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+> +
+> +CFLAGS_dcscb.o				+=-march=armv7-a
+> +CFLAGS_tc2_pm.o				+=-march=armv7-a
+> 
+
+
+-- 
+Chen Gang
