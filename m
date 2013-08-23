@@ -1,34 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Aug 2013 20:12:05 +0200
-Subject: [PATCH v8 1/7] irqchip: vic: Parse interrupt and resume masks
- from device tree
-In-Reply-To: <1500724.07LRpFtgcx@flatron>
-References: <1377120111-25601-1-git-send-email-tomasz.figa@gmail.com>
- <1377120111-25601-2-git-send-email-tomasz.figa@gmail.com>
- <1500724.07LRpFtgcx@flatron>
-Message-ID: <CACRpkdZEJTCx4RwNCdLfYNDQauO32iMJwJP0eZevTfyV0S-TwQ@mail.gmail.com>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Fri, 23 Aug 2013 11:12:43 -0700
+Subject: [Call for participation] Bi-Weekly KVM/ARM Technical Sync-up
+In-Reply-To: <20130822000939.GC3357@cbox>
+References: <20130822000939.GC3357@cbox>
+Message-ID: <CAFECyb958L2v3VDxG1zv7EKvpAEYy8htd7Ljs4gQjLx+vQP_Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 1:22 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-
-> This patch extends vic_of_init to parse valid interrupt sources
-> and resume sources masks from device tree.
+On Wed, Aug 21, 2013 at 5:09 PM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> Hi all,
 >
-> If mask values are not specified in device tree, all sources
-> are assumed to be valid, as before this patch.
+> Linaro is going to host a bi-weekly sync-up call for technical issues on
+> KVM/ARM development.  The KVM 32-bit and 64-bit maintainers as well as
+> the QEMU ARM maintainer will typically be on the call.
 >
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  Documentation/devicetree/bindings/arm/vic.txt | 6 ++++++
->  drivers/irqchip/irq-vic.c                     | 7 ++++++-
->  2 files changed, 12 insertions(+), 1 deletion(-)
+> The first call will be held Tuesday August 27th.
 >
-> Changes since v7:
->  - Renamed interrupt-mask property to valid-mask, for consistency with
->    bindings of other interrupt controllers.
+> If you, your organization, or any of your colleagues are interested in
+> attending this call, please reply back to me with:
+>  - Your name
+>  - Your e-mail address
+>  - The capacity in which you are interested (hobbyist, company you
+>    represent, ...)
+>
+> We will send out an invite after we have collected all the participants.
+>
+> The calls will be based on an agenda that I will E-mail out to the list
+> the Monday before the call.  If we have no items on the agenda, we will
+> not be having the call.  Agenda items should be E-mailed to me and/or
+> the kvmarm list before the call, obviously before the Monday prior to
+> the call.
+>
+> We emphasize that this is going to be a technical call for engineers and
+> not a forum to solicit services or discuss business concepts.
+>
+> Best,
+> -Christoffer
+>
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Hi Christoffer,
 
-Yours,
-Linus Walleij
+   I am interested in participating in the call.  I am not currently
+working on virtualization, but
+this is of intererest to myself and my employer.
+Roy Franz
+roy.franz at linaro.org
+I am one of the Linaro assignees from Cavium, working on the UEFI team
+in the Linaro Enterprise Group.
+
+Thanks,
+Roy
