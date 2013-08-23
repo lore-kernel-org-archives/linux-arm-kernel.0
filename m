@@ -1,40 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 23 Aug 2013 16:11:18 -0600
-Subject: [PATCH v8 1/7] irqchip: vic: Parse interrupt and resume masks
- from device tree
-In-Reply-To: <1500724.07LRpFtgcx@flatron>
-References: <1377120111-25601-1-git-send-email-tomasz.figa@gmail.com>
- <1377120111-25601-2-git-send-email-tomasz.figa@gmail.com>
- <1500724.07LRpFtgcx@flatron>
-Message-ID: <5217DE06.3070005@wwwdotorg.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 23 Aug 2013 19:12:14 -0300
+Subject: [PATCH v2 1/9] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+In-Reply-To: <1377295942-5955-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1377295942-5955-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1377295942-5955-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2013 05:22 PM, Tomasz Figa wrote:
-> This patch extends vic_of_init to parse valid interrupt sources
-> and resume sources masks from device tree.
-> 
-> If mask values are not specified in device tree, all sources
-> are assumed to be valid, as before this patch.
+With the introduction of the orion irqchip driver, now the BRIDGE_CAUSE
+bit is cleared by it. There's no longer a need to do it in the watchdog
+driver, so we can simply remove it.
 
-Can you explain further why the VIC needs this information up-front?
-Presumably it can accumulate it as devices request interrupts.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/watchdog/orion_wdt.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-> diff --git a/Documentation/devicetree/bindings/arm/vic.txt b/Documentation/devicetree/bindings/arm/vic.txt
-
-> +- valid-mask : Bit mask of valid interrupt sources (defaults to all valid)
-
-Until a device requests an interrupt, it can be left disabled. Once
-something does request it, it gets enabled. If nothing requests it, it
-never gets enabled. Doesn't the result of that logic end up being the
-same thing as valid-mask represents? The only difference would be if
-some device requests an invalid interrupt source, but then why not just
-fix the interrupt client instead of adding this property to reject the
-request?
-
-> +- wakeup-mask : Bit mask of interrupt sources that can wake up the system
-> +  (defaults to all allowed)
-
-Shouldn't drivers for end-devices request interrupts, and then set wake
-enable on those interrupts, which would then trickle up the IRQ chain to
-tell the VIC which interrupts to enable wakeup on?
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index 4ea5fcc..74d3b72 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -39,7 +39,6 @@
+ #define WDT_OK_TO_CLOSE		1
+ 
+ #define WDT_RESET_OUT_EN	BIT(1)
+-#define WDT_INT_REQ		BIT(3)
+ 
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+ static int heartbeat = -1;		/* module parameter (seconds) */
+@@ -69,9 +68,6 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ 	/* Set watchdog duration */
+ 	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
+ 
+-	/* Clear watchdog timer interrupt */
+-	writel(~WDT_INT_REQ, BRIDGE_CAUSE);
+-
+ 	/* Enable watchdog timer */
+ 	reg = readl(wdt_reg + TIMER_CTRL);
+ 	reg |= WDT_EN;
+-- 
+1.8.1.5
