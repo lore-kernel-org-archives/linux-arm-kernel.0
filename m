@@ -1,48 +1,56 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 23 Aug 2013 11:34:40 +0200
-Subject: [PATCH v2 5/5] ARM: dts: am33xx: adopt to cpsw changes
-In-Reply-To: <52172B54.8020201@ti.com>
-References: <1377247417-27386-1-git-send-email-zonque@gmail.com>
- <1377247417-27386-6-git-send-email-zonque@gmail.com>
- <52172B54.8020201@ti.com>
-Message-ID: <52172CB0.9030204@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 23 Aug 2013 17:36:02 +0800
+Subject: [PATCH 0/3] of: add update device node status via cmdline feature
+In-Reply-To: <20130823084954.GC2460@b29396-Latitude-E6410>
+References: <1376564133-11286-1-git-send-email-b29396@freescale.com>
+ <CACxGe6tMm=u1jFKUQ59+cj-rYkLLAZUqMhsXamyi-wwpWaOGvw@mail.gmail.com>
+ <20130821123708.GA17748@b29396-Latitude-E6410>
+ <20130823070906.GA2460@b29396-Latitude-E6410>
+ <20130823075102.GA10424@S2101-09.ap.freescale.net>
+ <20130823084954.GC2460@b29396-Latitude-E6410>
+Message-ID: <20130823093559.GA10662@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.08.2013 11:28, Sekhar Nori wrote:
-> On Friday 23 August 2013 02:13 PM, Daniel Mack wrote:
->> This third memory region just denotes one single register in the CONTROL
->> module block. The driver uses that in order to set the correct physical
->> ethernet interface modes.
->>
->> Also update the compatible string to make use of the am335x specific
->> features of the cpsw driver.
->>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
->> ---
->>  arch/arm/boot/dts/am33xx.dtsi | 5 +++--
->>  1 file changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->> index a785b95..1a1e9dd 100644
->> --- a/arch/arm/boot/dts/am33xx.dtsi
->> +++ b/arch/arm/boot/dts/am33xx.dtsi
->> @@ -446,7 +446,7 @@
->>  		};
->>  
->>  		mac: ethernet at 4a100000 {
->> -			compatible = "ti,cpsw";
->> +			compatible = "ti,am3352-cpsw";
+On Fri, Aug 23, 2013 at 04:49:55PM +0800, Dong Aisheng wrote:
+> On Fri, Aug 23, 2013 at 03:51:07PM +0800, Shawn Guo wrote:
+> > The device tree mailing list is changed to devicetree at vger.kernel.org.
+> > 
+> > On Fri, Aug 23, 2013 at 03:09:08PM +0800, Dong Aisheng wrote:
+> > > I tried the uboot way with fdt command to change the node status, it can work.
+> > > However, it seems using fdt command is much complicated than the way i did with kernel
+> > > command line and it also does not support enable/disable multi nodes at the same time.
+> > > e.g, in order to enable ecspi1 and uart3 and disable gpmi:
+> > > with uboot fdt command:
+> > > U-Boot > fdt addr ${dtbaddr}
+> > > U-Boot > fdt set /soc/aips-bus at 02000000/spba-bus at 02000000/ecspi at 02008000 status "okay"
+> > > U-Boot > fdt set /soc/aips-bus at 02100000/serial at 021e8000 status "okay"
+> > > U-Boot > fdt set /soc/gpmi-nand at 00112000 status "disabled"
+> > 
+> > Oh, you can use the U-Boot environment and scripting function to make
+> > it even easier than your kernel cmdline approach to use.
+> > 
 > 
-> Please keep this as
-> 
-> 	compatible = "ti,am3352-cpsw", "ti,cpsw";
-> 
-> so users can upgrade the DTB or kernel independently. Apart from this
-> the series looks good to me.
+> Hmm?
+> Can you give an example to make it easier than kernel cmdline?
 
-Ok, thanks. Given that this last patch will be merged through another
-tree, can I just resend it separately, while David takes the rest as it is?
+For imx6q-sabreauto example,
 
-Thanks,
-Daniel
+setenv loadaddr 0x12000000
+setenv fdtaddr 0x18000000
+setenv fdt_file imx6q-sabreauto.dtb
+
+setenv bootcmd 'tftpboot zImage; tftpboot ${fdtaddr} ${fdt_file}; fdt addr ${fdtaddr}; run select_${devsel}; bootz ${loadaddr} - ${fdtaddr}'
+
+setenv select_gpmi 'fdt set /soc/aips-bus at 02000000/spba-bus at 02000000/ecspi at 02008000 status disabled; fdt set /soc/aips-bus at 02100000/serial at 021e8000 status disabled; fdt set /soc/gpmi-nand at 00112000 status okay'
+setenv select_ecspi '...'
+setenv select_serial '...'
+
+You can have all above environments defined in U-Boot mx6qsabreauto.h
+at compile time.  Then at runtime, you only need the following two
+commands to boot kernel with the device that you want.
+
+U-Boot > setenv devsel gpmi
+U-Boot > boot
+
+Shawn
