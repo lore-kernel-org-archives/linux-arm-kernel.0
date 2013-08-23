@@ -1,30 +1,50 @@
-From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
-Date: Fri, 23 Aug 2013 15:19:47 -0400 (EDT)
-Subject: [PATCH] misc: (at24) move header to linux/platform_data/
-In-Reply-To: <20130823190247.GA3821@katana>
-Message-ID: <1033284781.908504.1377285587778.JavaMail.root@mail>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 23 Aug 2013 21:14:32 +0200
+Subject: [PATCH v5 2/5] net: ethernet: cpsw: add optional third memory
+ region for CONTROL module
+In-Reply-To: <5217B3BE.8020003@cogentembedded.com>
+References: <1377283987-20040-1-git-send-email-zonque@gmail.com>
+ <1377283987-20040-3-git-send-email-zonque@gmail.com>
+ <5217B3BE.8020003@cogentembedded.com>
+Message-ID: <5217B498.9010706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram wrote:
-
-> On Fri, Aug 23, 2013 at 02:38:20PM -0400, Vivien Didelot wrote:
-> > This patch moves the at24.h header from include/linux/i2c to
-> > include/linux/platform_data and updates existing support
-> > accordingly.
+On 23.08.2013 21:10, Sergei Shtylyov wrote:
+> Hello.
 > 
-> This message explains what the patch does but not why the change is
-> wanted. I'd be surprised if we really want *all* platform_data in one
-> single directory?
+> On 08/23/2013 10:53 PM, Daniel Mack wrote:
+> 
+>> At least the AM33xx SoC has a control module register to configure
+>> details such as the hardware ethernet interface mode.
+> 
+>> I'm not sure whether all SoCs which feature the cpsw block have such a
+>> register, so that third memory region is considered optional for now.
+> 
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>> ---
+>>   Documentation/devicetree/bindings/net/cpsw.txt | 5 ++++-
+>>   drivers/net/ethernet/ti/cpsw.c                 | 5 +++++
+>>   2 files changed, 9 insertions(+), 1 deletion(-)
+> 
+>> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+>> index fc3263f..4feba2f 100644
+>> --- a/drivers/net/ethernet/ti/cpsw.c
+>> +++ b/drivers/net/ethernet/ti/cpsw.c
+> [...]
+>> @@ -1989,6 +1990,10 @@ static int cpsw_probe(struct platform_device *pdev)
+>>   		goto clean_runtime_disable_ret;
+>>   	}
+>>
+>> +	/* Don't fail hard if the optional control memory region is missing */
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+>> +	priv->gmii_sel_reg = devm_ioremap_resource(&pdev->dev, res);
+> 
+>     Hm, but why now you don't fail if devm_ioremap_resource() fails?
 
-IMHO it makes sense. Why wouldn't we want all platform_data in
-include/linux/platform_data/?
+Well, because I thought maybe we should just ignore failures of that
+kind altogether for this optional resource. There will still be a
+warning in that case. Did you like the old approach better?
 
-> Is this patch part of a bigger series?
-No.
 
-> That being said i2c is not the best place for this include, in deed...
-I agree.
-
-Thanks,
-Vivien
+Daniel
