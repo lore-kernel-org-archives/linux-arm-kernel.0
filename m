@@ -1,10 +1,10 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Aug 2013 13:23:22 +0100
-Subject: [PATCH 22/40] ARM: ux500: Stop registering Pinctrl when booting with
- ATAG support
+Date: Fri, 23 Aug 2013 13:23:21 +0100
+Subject: [PATCH 21/40] ARM: ux500: Purge support for registering the RTC when
+ booting with ATAGs
 In-Reply-To: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
 References: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1377260620-18829-23-git-send-email-lee.jones@linaro.org>
+Message-ID: <1377260620-18829-22-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,48 +13,54 @@ Device Tree booting. This patch is part of that endeavour.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c     |  1 -
- arch/arm/mach-ux500/devices-common.h | 18 ------------------
- 2 files changed, 19 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c     | 1 -
+ arch/arm/mach-ux500/devices-common.h | 7 -------
+ arch/arm/mach-ux500/devices-db8500.h | 3 ---
+ 3 files changed, 11 deletions(-)
 
 diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index ebac072..33264f5 100644
+index 30024ff..ebac072 100644
 --- a/arch/arm/mach-ux500/cpu-db8500.c
 +++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -159,7 +159,6 @@ static void __init db8500_add_gpios(struct device *parent)
+@@ -191,7 +191,6 @@ struct device * __init u8500_init_devices(void)
  
- 	dbx500_add_gpios(parent, ARRAY_AND_SIZE(db8500_gpio_base),
- 			 IRQ_DB8500_GPIO0, &pdata);
--	dbx500_add_pinctrl(parent, "pinctrl-db8500", U8500_PRCMU_BASE);
- }
+ 	parent = db8500_soc_device_init();
  
- static const char *db8500_read_soc_id(void)
+-	db8500_add_rtc(parent);
+ 	db8500_add_gpios(parent);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(platform_devs); i++)
 diff --git a/arch/arm/mach-ux500/devices-common.h b/arch/arm/mach-ux500/devices-common.h
-index 360112e2..7167b69 100644
+index 030f5a0..360112e2 100644
 --- a/arch/arm/mach-ux500/devices-common.h
 +++ b/arch/arm/mach-ux500/devices-common.h
-@@ -38,22 +38,4 @@ struct nmk_gpio_platform_data;
- void dbx500_add_gpios(struct device *parent, resource_size_t *base, int num,
- 		      int irq, struct nmk_gpio_platform_data *pdata);
+@@ -33,13 +33,6 @@ dbx500_add_uart(struct device *parent, const char *name, resource_size_t base,
+ 	return amba_ahb_device_add(parent, name, base, SZ_4K, irq, 0, pdata, 0);
+ }
  
--static inline void
--dbx500_add_pinctrl(struct device *parent, const char *name,
--		   resource_size_t base)
+-static inline struct amba_device *
+-dbx500_add_rtc(struct device *parent, resource_size_t base, int irq)
 -{
--	struct resource res[] = {
--		DEFINE_RES_MEM(base, SZ_8K),
--	};
--	struct platform_device_info pdevinfo = {
--		.parent = parent,
--		.name = name,
--		.id = -1,
--		.res = res,
--		.num_res = ARRAY_SIZE(res),
--	};
--
--	platform_device_register_full(&pdevinfo);
+-	return amba_apb_device_add(parent, "rtc-pl031", base, SZ_4K, irq,
+-				0, NULL, 0);
 -}
 -
- #endif
+ struct nmk_gpio_platform_data;
+ 
+ void dbx500_add_gpios(struct device *parent, resource_size_t *base, int num,
+diff --git a/arch/arm/mach-ux500/devices-db8500.h b/arch/arm/mach-ux500/devices-db8500.h
+index 9352400..0b523b5 100644
+--- a/arch/arm/mach-ux500/devices-db8500.h
++++ b/arch/arm/mach-ux500/devices-db8500.h
+@@ -26,9 +26,6 @@ db8500_add_ssp(struct device *parent, const char *name, resource_size_t base,
+ 	return amba_ahb_device_add(parent, name, base, SZ_4K, irq, 0, pdata, 0);
+ }
+ 
+-#define db8500_add_rtc(parent) \
+-	dbx500_add_rtc(parent, U8500_RTC_BASE, IRQ_DB8500_RTC);
+-
+ #define db8500_add_ssp0(parent, pdata) \
+ 	db8500_add_ssp(parent, "ssp0", U8500_SSP0_BASE, \
+ 		       IRQ_DB8500_SSP0, pdata)
 -- 
 1.8.1.2
