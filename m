@@ -1,36 +1,32 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Aug 2013 13:23:29 +0100
-Subject: [PATCH 29/40] ARM: ux500: Stop requesting the SoC device to play
- 'parent' role
+Date: Fri, 23 Aug 2013 13:23:30 +0100
+Subject: [PATCH 30/40] ARM: ux500: Purge DB8500 PRCMU registration when not
+ booting with DT
 In-Reply-To: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
 References: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1377260620-18829-30-git-send-email-lee.jones@linaro.org>
+Message-ID: <1377260620-18829-31-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no more devices which require left to register which require
-a parent. This is part of the ux500 conversion over to Device Tree only
-booting.
+It's time to remove all ATAG support from ux500 and rely solely on
+Device Tree booting. This patch is part of that endeavour.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c | 12 ------------
- arch/arm/mach-ux500/cpu-db8500.c   |  8 --------
- 2 files changed, 20 deletions(-)
+ arch/arm/mach-ux500/board-mop500.c   |  6 ------
+ arch/arm/mach-ux500/devices-db8500.c | 36 ------------------------------------
+ arch/arm/mach-ux500/devices-db8500.h |  1 -
+ 3 files changed, 43 deletions(-)
 
 diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index db6908a..25c6dcd 100644
+index 25c6dcd..3086192 100644
 --- a/arch/arm/mach-ux500/board-mop500.c
 +++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -80,36 +80,24 @@ struct pl022_ssp_controller ssp0_plat = {
+@@ -80,24 +80,18 @@ struct pl022_ssp_controller ssp0_plat = {
  
  static void __init mop500_init_machine(void)
  {
--	struct device *parent = NULL;
--
- 	platform_device_register(&db8500_prcmu_device);
- 
--	parent = u8500_init_devices();
+-	platform_device_register(&db8500_prcmu_device);
 -
  	/* This board has full regulator constraints */
  	regulator_has_full_constraints();
@@ -38,11 +34,7 @@ index db6908a..25c6dcd 100644
  
  static void __init snowball_init_machine(void)
  {
--	struct device *parent = NULL;
--
- 	platform_device_register(&db8500_prcmu_device);
- 
--	parent = u8500_init_devices();
+-	platform_device_register(&db8500_prcmu_device);
 -
  	/* This board has full regulator constraints */
  	regulator_has_full_constraints();
@@ -50,33 +42,65 @@ index db6908a..25c6dcd 100644
  
  static void __init hrefv60_init_machine(void)
  {
--	struct device *parent = NULL;
--
- 	platform_device_register(&db8500_prcmu_device);
- 
--	parent = u8500_init_devices();
+-	platform_device_register(&db8500_prcmu_device);
 -
  	/* This board has full regulator constraints */
  	regulator_has_full_constraints();
  }
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 0ec6ddf..162ea03 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -136,14 +136,6 @@ static struct device * __init db8500_soc_device_init(void)
- 	return ux500_soc_device_init(soc_id);
- }
- 
--/*
-- * This function is called from the board init
-- */
--struct device * __init u8500_init_devices(void)
--{
--	return db8500_soc_device_init();
--}
+diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
+index 1b2faba..c59f89d 100644
+--- a/arch/arm/mach-ux500/devices-db8500.c
++++ b/arch/arm/mach-ux500/devices-db8500.c
+@@ -26,39 +26,3 @@ struct prcmu_pdata db8500_prcmu_pdata = {
+ 	.version_offset	= DB8500_PRCMU_FW_VERSION_OFFSET,
+ 	.legacy_offset	= DB8500_PRCMU_LEGACY_OFFSET,
+ };
 -
- #ifdef CONFIG_MACH_UX500_DT
- static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	/* Requires call-back bindings. */
+-static struct resource db8500_prcmu_res[] = {
+-	{
+-		.name  = "prcmu",
+-		.start = U8500_PRCMU_BASE,
+-		.end   = U8500_PRCMU_BASE + SZ_8K - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.name  = "prcmu-tcdm",
+-		.start = U8500_PRCMU_TCDM_BASE,
+-		.end   = U8500_PRCMU_TCDM_BASE + SZ_4K - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.name  = "irq",
+-		.start = IRQ_DB8500_PRCMU1,
+-		.end   = IRQ_DB8500_PRCMU1,
+-		.flags = IORESOURCE_IRQ,
+-	},
+-	{
+-		.name  = "prcmu-tcpm",
+-		.start = U8500_PRCMU_TCPM_BASE,
+-		.end   = U8500_PRCMU_TCPM_BASE + SZ_32K - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-};
+-
+-struct platform_device db8500_prcmu_device = {
+-	.name			= "db8500-prcmu",
+-	.resource		= db8500_prcmu_res,
+-	.num_resources		= ARRAY_SIZE(db8500_prcmu_res),
+-	.dev = {
+-		.platform_data = &db8500_prcmu_pdata,
+-	},
+-};
+diff --git a/arch/arm/mach-ux500/devices-db8500.h b/arch/arm/mach-ux500/devices-db8500.h
+index fc4048f..6d59218 100644
+--- a/arch/arm/mach-ux500/devices-db8500.h
++++ b/arch/arm/mach-ux500/devices-db8500.h
+@@ -16,6 +16,5 @@ struct platform_device;
+ 
+ extern struct ab8500_platform_data ab8500_platdata;
+ extern struct prcmu_pdata db8500_prcmu_pdata;
+-extern struct platform_device db8500_prcmu_device;
+ 
+ #endif
 -- 
 1.8.1.2
