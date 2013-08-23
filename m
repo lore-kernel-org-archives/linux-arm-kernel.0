@@ -1,295 +1,46 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Aug 2013 08:53:16 +0200
-Subject: [PATCH 11/12] cpuidle: mvebu: Add initial cpu idle support for Armada
- 370/XP SoC
-In-Reply-To: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1377240797-4047-12-git-send-email-gregory.clement@free-electrons.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 22 Aug 2013 23:54:17 -0700
+Subject: [PATCH v3 0/5] clk: dt: bindings for mux, divider & gate clocks
+In-Reply-To: <20130823043248.GF23960@codeaurora.org>
+References: <1371795256-16703-1-git-send-email-mturquette@linaro.org>
+ <51E8586C.7040808@codeaurora.org> <20130822041448.8231.16182@quantum>
+ <20130823043248.GF23960@codeaurora.org>
+Message-ID: <20130823065417.8231.67103@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add wfi/cpu idle/cpu deep idle power states support for Armada XP SoC.
+Quoting Stephen Boyd (2013-08-22 21:32:48)
+> On 08/21, Mike Turquette wrote:
+> > 
+> > I just happened across a to-do list note telling me to respond to this
+> > email. Better late than never.
+> > 
+> [snip]
+> >
+> > This is a way to establish initial configuration from the consumer's
+> > perspective. Similarly something can be done for the clock rate with
+> > assigned-clock-rate.
+> 
+> Ok. Thanks for the information. Unfortunately it isn't what I
+> thought it was.
+> 
+> > 
+> > With all of that said this is consumer-level stuff. We'll definitely
+> > talk about the clock provider DT bindings at the ARM Summit, which is
+> > what you discuss above.
+> 
+> I can't wait another 2 months to start discussing the clock
+> provider DT bindings. We need to discuss it on the list.
 
-All the latencies and the power consumption values used at the
-"armada_370_xp_idle_driver" structure are preliminary and will be
-modified in the future after running some measurements and analysis.
+You asked what was discussed at a conference. I told you what was
+discussed at that conference. As an aside I also told you what would be
+discussed at an upcoming conference. At no point did I say the
+discussion was tabled until then.
 
-Based on the work of Nadav Haklai.
+Regards,
+Mike
 
-Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/cpuidle/Kconfig                 |   6 ++
- drivers/cpuidle/Makefile                |   1 +
- drivers/cpuidle/cpuidle-armada-370-xp.c | 132 ++++++++++++++++++++++++++++++++
- drivers/cpuidle/suspend-armada-370-xp.S |  91 ++++++++++++++++++++++
- 4 files changed, 230 insertions(+)
- create mode 100644 drivers/cpuidle/cpuidle-armada-370-xp.c
- create mode 100644 drivers/cpuidle/suspend-armada-370-xp.S
-
-diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-index 0e2cd5c..d979a2e 100644
---- a/drivers/cpuidle/Kconfig
-+++ b/drivers/cpuidle/Kconfig
-@@ -42,6 +42,12 @@ config CPU_IDLE_ZYNQ
- 	help
- 	  Select this to enable cpuidle on Xilinx Zynq processors.
- 
-+config CPU_IDLE_ARMADA_370_XP
-+	bool "CPU Idle Driver for Armada 370/XP family processors"
-+	depends on ARCH_MVEBU
-+	help
-+	  Select this to enable cpuidle on Armada 370/XP processors.
-+
- endif
- 
- config ARCH_NEEDS_CPU_IDLE_COUPLED
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index 8767a7b..2e7cd98 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -5,6 +5,7 @@
- obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
- obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
- 
-+obj-$(CONFIG_CPU_IDLE_ARMADA_370_XP) += cpuidle-armada-370-xp.o suspend-armada-370-xp.o
- obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
- obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
- obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
-diff --git a/drivers/cpuidle/cpuidle-armada-370-xp.c b/drivers/cpuidle/cpuidle-armada-370-xp.c
-new file mode 100644
-index 0000000..98ef9be
---- /dev/null
-+++ b/drivers/cpuidle/cpuidle-armada-370-xp.c
-@@ -0,0 +1,132 @@
-+/*
-+ * Marvell Armada 370 and Armada XP SoC cpuidle driver
-+ *
-+ * Copyright (C) 2013 Marvell
-+ *
-+ * Nadav Haklai <nadavh@marvell.com>
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * Maintainer: Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ */
-+
-+#include <linux/cpuidle.h>
-+#include <linux/module.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/suspend.h>
-+#include <asm/suspend.h>
-+#include <linux/smp.h>
-+#include <asm/cpuidle.h>
-+#include <asm/smp_plat.h>
-+#include <linux/armada-370-xp-pmsu.h>
-+
-+#define ARMADA_370_XP_MAX_STATES	3
-+
-+enum mv_pm_states {
-+	WFI = 0,
-+	MV_CPU_IDLE,
-+	MV_CPU_DEEP_IDLE,
-+	DISABLED,
-+};
-+
-+extern void v7_flush_dcache_all(void);
-+
-+/* Functions defined in suspend-armada-370-xp.S */
-+int armada_370_xp_cpu_resume(unsigned long);
-+int armada_370_xp_cpu_suspend(unsigned long);
-+
-+int pm_support = WFI;
-+static int __init pm_enable_setup(char *str)
-+{
-+	if (!strncmp(str, "wfi", 3))
-+		pm_support = WFI;
-+	else if (!strncmp(str, "idle", 4))
-+		pm_support = MV_CPU_IDLE;
-+	else if (!strncmp(str, "deepidle", 6))
-+		pm_support = MV_CPU_DEEP_IDLE;
-+	else if (!strncmp(str, "off", 3))
-+		pm_support = DISABLED;
-+
-+	return 1;
-+}
-+__setup("pm_level=", pm_enable_setup);
-+
-+
-+static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
-+				struct cpuidle_driver *drv,
-+				int index)
-+{
-+	bool deepidle = false;
-+	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
-+
-+	armada_370_xp_pmsu_set_start_addr(armada_370_xp_cpu_resume, hw_cpu);
-+
-+	if (index == MV_CPU_DEEP_IDLE)
-+		deepidle = true;
-+
-+	cpu_suspend(deepidle, armada_370_xp_cpu_suspend);
-+
-+	cpu_init();
-+
-+	armada_370_xp_pmsu_idle_restore();
-+
-+	return index;
-+}
-+
-+static struct cpuidle_driver armada_370_xp_idle_driver = {
-+	.name			= "armada_370_xp_idle",
-+	.states[0]		= ARM_CPUIDLE_WFI_STATE,
-+	.states[1]		= {
-+		.enter			= armada_370_xp_enter_idle,
-+		.exit_latency		= 10,
-+		.power_usage		= 50,
-+		.target_residency	= 100,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID,
-+		.name			= "MV CPU IDLE",
-+		.desc			= "CPU power down",
-+	},
-+	.states[2]		= {
-+		.enter			= armada_370_xp_enter_idle,
-+		.exit_latency		= 100,
-+		.power_usage		= 5,
-+		.target_residency	= 1000,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID,
-+		.name			= "MV CPU DEEP IDLE",
-+		.desc			= "CPU and L2 Fabric power down",
-+	},
-+	.state_count = ARMADA_370_XP_MAX_STATES,
-+};
-+
-+static int __init armada_370_xp_cpuidle_init(void)
-+{
-+	if (!of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-pmsu"))
-+		return -ENODEV;
-+
-+	if (!of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric"))
-+		return -ENODEV;
-+
-+	pr_info("Initializing Armada-XP CPU power management ");
-+
-+	armada_370_xp_pmsu_enable_l2_powerdown_onidle();
-+
-+	if (pm_support == WFI)
-+		pr_info(" (WFI)\n");
-+	else if (pm_support == MV_CPU_IDLE)
-+		pr_info(" (CPU_IDLE)\n");
-+	else if (pm_support == MV_CPU_DEEP_IDLE)
-+		pr_info(" (CPU_DEEP_IDLE)\n");
-+	else
-+		pr_info(" (DISABLED)\n");
-+
-+	armada_370_xp_idle_driver.state_count = pm_support + 1;
-+
-+	return cpuidle_register(&armada_370_xp_idle_driver, NULL);
-+}
-+
-+module_init(armada_370_xp_cpuidle_init);
-+
-+MODULE_LICENSE("GPL v2");
-diff --git a/drivers/cpuidle/suspend-armada-370-xp.S b/drivers/cpuidle/suspend-armada-370-xp.S
-new file mode 100644
-index 0000000..490bb9b
---- /dev/null
-+++ b/drivers/cpuidle/suspend-armada-370-xp.S
-@@ -0,0 +1,91 @@
-+/*
-+ * CPU idle low level implementation for Marvell Armada 370 and Armada XP SoCs
-+ *
-+ * Copyright (C) 2013 Marvell
-+ *
-+ * Nadav Haklai <nadavh@marvell.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ */
-+#include <linux/linkage.h>
-+
-+
-+/*
-+* armadaxp_cpu_suspend: enter cpu deepIdle state
-+* input:
-+*/
-+ENTRY(armada_370_xp_cpu_suspend)
-+/* Save ARM registers */
-+	stmfd	sp!, {r4 - r11, lr}	@ save registers on stack
-+
-+	bl armada_370_xp_pmsu_idle_prepare
-+	/*
-+	 * Invalidate L1 data cache. Even though only invalidate is
-+	 * necessary exported flush API is used here. Doing clean
-+	 * on already clean cache would be almost NOP.
-+	 */
-+	bl v7_flush_dcache_all
-+
-+	/*
-+	 * Clear the SCTLR.C bit to prevent further data cache
-+	 * allocation. Clearing SCTLR.C would make all the data accesses
-+	 * strongly ordered and would not hit the cache.
-+	 */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	bic	r0, r0, #(1 << 2)	@ Disable the C bit
-+	mcr	p15, 0, r0, c1, c0, 0
-+	isb
-+
-+	bl v7_flush_dcache_all
-+
-+	/* Data memory barrier and Data sync barrier */
-+	dsb
-+	dmb
-+
-+	bl armada_370_xp_disable_snoop_ena
-+
-+	dsb				@ Data Synchronization Barrier
-+
-+/*
-+ * ===================================
-+ * == WFI instruction => Enter idle ==
-+ * ===================================
-+ */
-+
-+	wfi				@ wait for interrupt
-+/*
-+ * ===================================
-+ * == Resume path for non-OFF modes ==
-+ * ===================================
-+ */
-+
-+/* Enable SnoopEna - Exclusive */
-+	mov	r0, #1			@ r0!=0 means use virtual address
-+	mov	r1, #0			@ Do not add CPU to SMP group
-+	bl ll_set_cpu_coherent
-+
-+/* Re-enable C-bit if needed */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	tst	r0, #(1 << 2)		@ Check C bit enabled?
-+	orreq	r0, r0, #(1 << 2)	@ Enable the C bit if cleared
-+	mcreq	p15, 0, r0, c1, c0, 0
-+	isb
-+
-+	ldmfd	sp!, {r4 - r11, pc}	@ restore regs and return
-+ENDPROC(armada_370_xp_cpu_suspend)
-+
-+/*
-+* armada_370_xp_cpu_resume: exit cpu deepIdle state
-+*/
-+ENTRY(armada_370_xp_cpu_resume)
-+	mov	r0, #0			@ r0==0 means use physical address
-+	mov	r1, #1			@ Add CPU to SMP group
-+	bl ll_set_cpu_coherent
-+
-+	/* Now branch to the common CPU resume function */
-+	b	cpu_resume
-+
-+ENDPROC(armada_370_xp_cpu_resume)
--- 
-1.8.1.2
+> 
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
