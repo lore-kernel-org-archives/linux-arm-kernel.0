@@ -1,45 +1,34 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 23 Aug 2013 19:12:18 -0300
-Subject: [PATCH v2 5/9] watchdog: orion: Allow to build in any Orion platform
+Date: Fri, 23 Aug 2013 19:12:21 -0300
+Subject: [PATCH v2 8/9] ARM: kirkwood: Update watchdog 'reg' property
 In-Reply-To: <1377295942-5955-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1377295942-5955-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1377295942-5955-6-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1377295942-5955-9-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver has no need for the mach-specific header, so remove it.
-Therefore, it's no possible to allow builds in any Orion platform.
+According to the new DT binding, the 'reg' property requires
+two cells, which mean: timer control register and watchdog counter
+register respectively.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/watchdog/Kconfig     | 2 +-
- drivers/watchdog/orion_wdt.c | 1 -
- 2 files changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/boot/dts/kirkwood.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 362085d..524f30a 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -282,7 +282,7 @@ config DAVINCI_WATCHDOG
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 9809fc1..6443e12 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -105,7 +105,8 @@
  
- config ORION_WATCHDOG
- 	tristate "Orion watchdog"
--	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE
-+	depends on PLAT_ORION
- 	select WATCHDOG_CORE
- 	help
- 	  Say Y here if to include support for the watchdog timer
-diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index d6f6128..d508ff3 100644
---- a/drivers/watchdog/orion_wdt.c
-+++ b/drivers/watchdog/orion_wdt.c
-@@ -25,7 +25,6 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/of.h>
--#include <mach/bridge-regs.h>
- 
- /*
-  * Watchdog timer block registers.
+ 		wdt at 20300 {
+ 			compatible = "marvell,orion-wdt";
+-			reg = <0x20300 0x28>;
++			reg = <0x20300 0x4>, /* Timer control */
++			      <0x20324 0x4>; /* Watchdog counter */
+ 			clocks = <&gate_clk 7>;
+ 			status = "okay";
+ 		};
 -- 
 1.8.1.5
