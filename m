@@ -1,66 +1,42 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 23 Aug 2013 09:19:35 +0900
-Subject: SHMobile Compatibility String Inconsistencies
-In-Reply-To: <5813266.Bt0QjqXd25@avalon>
-References: <20130822054639.GE11086@verge.net.au> <5813266.Bt0QjqXd25@avalon>
-Message-ID: <20130823001934.GA4331@verge.net.au>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 22 Aug 2013 17:26:47 -0700
+Subject: [RFC 17/17] clk: zynq: remove call to of_clk_init
+In-Reply-To: <1376964271-22715-18-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376964271-22715-18-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <d17acba9-85f9-40cd-a176-2005e3e924f8@CO1EHSMHS002.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 12:43:14PM +0200, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> On Thursday 22 August 2013 14:46:40 Simon Horman wrote:
-> > Hi Laurent, Hi Guennadi, Hi All,
-> > 
-> > Olof has brought to my attention that there is some inconsistency in the way
-> > that compatibility strings for SHMobile are named and he has asked us to
-> > clean things up for v3.12.
-> > 
-> > Looking through arch/arm/boot/dts/ I see that we have:
-> > 
-> > 1. {gpio,pfc}-r8aXXXX and;
-> > 2. r8aXXXX-sdhi
-> > 
-> > The inconsistency that Olof has asked us to resolve is that we should either
-> > use r8aXXXX- or -r8aXXXX. Not both.
-> > 
-> > It seems to me that neither option is inherently better than the other
-> > so we should just choose the path of least resistance to make things
-> > consistent.
-> > 
-> > Laurent, Guennadi, do you have any opinions on if it would be easier to
-> > change the GPIO and PFC compatibility strings; or to change the SDHI
-> > compatibility strings?
-> 
-> I don't think either of the options would be significantly more complex than 
-> the other one.
-> 
-> > Ideally I would like you to come to some sort of consensus and send patches.
-> 
-> Shouldn't the consensus be ARM-wide instead of SH-wide ? Quoting one of my 
-> replies to Stephen Warren from another mail thread:
+Hi Sebastian,
 
-My understanding from Olof is that it is fine to just make
-an SH-mobile-wide decision.
+On Tue, Aug 20, 2013 at 04:04:31AM +0200, Sebastian Hesselbarth wrote:
+> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+> remove it from corresponding drivers/clk code.
 
-> > In the bindings I've seen, it's more typical for the compatible value to
-> > be ${vendor},${soc}-${unit} than ${vendor},${unit}-${soc}. I guess I
-> > don't know how common one format or the other is though.
-> 
-> I'm personally fine with both. However, when using a version number, the 
-> format is ${vendor},${unit}-${version}. As we don't have an IP core version 
-> number we use the SoC name instead, so ${vendor},${unit}-${soc} would make 
-> sense. We should probably decide on one of the two alternatives and document 
-> it. 
+I think that would break Zynq.
+If I see this correctly you call of_clk_init() from common code,
+_before_ the SOC specific time init function is called.
+The problem is, that we have code setting up a global pointer which is
+required by zynq_clk_setup() which is triggered when of_clk_init() is
+called.
 
-Ok, so on the one hand ${vendor},${soc}-${unit} is more common.
-But on the other hand because we use ${soc} in place of ${version} it
-seems there are cases where it would make sense for use to use
-${vendor},${unit}-${soc}.
+Let me try to illustrate the current call graph:
 
-I believe that the second hand trumps the first and we should go with
-${vendor},${unit}-${soc} on SH-mobile as that should over all our
-use-cases.
+time_init()
+	zynq_timer_init()		// this machines init_time()
+		zynq_slcr_init()	// setup System Level Control Registers including a global pointer
+			zynq_clock_init()
+				of_clk_init()
+					zynq_clk_setup()   // requires pointer setup in zynq_slcr_init()
+					...
 
-Does that sound reasonable to you?
+IIUC, your series would change this to:
+time_init()
+	of_clk_init()
+		zynq_clk_setup()	// SLCR pointer is not setup/NULL
+		...
+	zynq_timer_init()
+		zynq_slcr_init()	// now the pointer becomes valid
+
+	S?ren
