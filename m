@@ -1,87 +1,77 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Fri, 23 Aug 2013 12:30:57 -0700
-Subject: [PATCH v4 1/3] ARM: bcm281xx: Add GPIO driver
-In-Reply-To: <CAPdLdqm+r1P=48Aujz9nuDb_vpFj-wBvmCV=oOKNZ0YENmbL1g@mail.gmail.com>
-References: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
- <1376938761-13657-2-git-send-email-markus.mayer@linaro.org>
- <CACRpkdbm2cKpz2SrUgsUpB4x5xjm=Bz=VCu279sEAKFJ1x9SPg@mail.gmail.com>
- <CAPdLdqm+r1P=48Aujz9nuDb_vpFj-wBvmCV=oOKNZ0YENmbL1g@mail.gmail.com>
-Message-ID: <CAPdLdq=atsbY8QDzH-aaHJvLk1CDe5qK3phSGLVZSvm=FoncjA@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 23 Aug 2013 21:32:05 +0200
+Subject: [PATCH v6 0/5] cpsw: support for control module register
+Message-ID: <1377286330-29663-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> +static void bcm_kona_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
->>> +{
->>> +       void __iomem *reg_base;
->>> +       int bit, bank_id;
->>> +       unsigned long sta;
->>> +       struct bcm_kona_gpio_bank *bank = irq_get_handler_data(irq);
->>> +       struct irq_chip *chip = irq_desc_get_chip(desc);
->>> +
->>> +       chained_irq_enter(chip, desc);
->>> +
->>> +       /*
->>> +        * For bank interrupts, we can't use chip_data to store the kona_gpio
->>> +        * pointer, since GIC needs it for its own purposes. Therefore, we get
->>> +        * our pointer from the bank structure.
->>> +        */
->>> +       reg_base = bank->reg_base;
->>> +       bank_id = bank->id;
->>> +       bcm_kona_gpio_unlock_bank(reg_base, bank_id);
->>> +
->>> +       sta = readl(reg_base + GPIO_INT_STATUS(bank_id)) &
->>> +           (~(readl(reg_base + GPIO_INT_MASK(bank_id))));
->>> +
->>> +       for_each_set_bit(bit, &sta, 32) {
->>> +               /*
->>> +                * Clear interrupt before handler is called so we don't
->>> +                * miss any interrupt occurred during executing them.
->>> +                */
->>> +               writel(readl(reg_base + GPIO_INT_STATUS(bank_id)) |
->>> +                               (1 << bit),
->>
->> Use BIT(bit)
->>
->>> +                               reg_base + GPIO_INT_STATUS(bank_id));
->>> +               /* Invoke interrupt handler */
->>> +               generic_handle_irq(gpio_to_irq(GPIO_PER_BANK * bank_id + bit));
->>> +       }
->>
->> Usually you may want to re-read thet status for each iteration
->> of this loop, if IRQs appear as you are processing.
->
-> Will do.
+Hi,
 
-I have a follow-up question regarding status reads for each iteration.
-Is this what you are looking for?
+this is the 6th version of my patch set, the version history is below.
 
-        for (;;) {
-                sta = readl(reg_base + GPIO_INT_STATUS(bank_id)) &
-                    (~(readl(reg_base + GPIO_INT_MASK(bank_id))));
-                if (sta == 0)
-                        break;
+Note that for personal reasons, I won't be able to work on that patch
+set for two weeks, starting from a few hours from now. If there are any
+more objections or comments, I'll catch up after that period. Or if
+anyone wants to make minor changes to my patches and resubmit them,
+I'd also be fine with that :)
 
-                for_each_set_bit(bit, &sta, 32) {
-                        int gpio = GPIO_PER_BANK * bank_id + bit;
-                        int virq = irq_find_mapping(bank->kona_gpio->irq_domain,
-                                                    gpio);
-                        /*
-                         * Clear interrupt before handler is called so
-we don't
-                         * miss any interrupt occurred during
-executing them.
-                         */
-                        writel(readl(reg_base +
-GPIO_INT_STATUS(bank_id)) |
-                               BIT(bit), reg_base + GPIO_INT_STATUS(bank_id));
-                        /* Invoke interrupt handler */
-                        generic_handle_irq(virq);
-                }
-        }
+The compatibility discussion is still ongoing, but I'd rather submit
+what I got until now, and I'm also still convinced that having
+ti,am3352-cpsw is the best we can do.
 
-It's an extra loop, since I am not sure it would work to modify "sta"
-within the for_each_set_bit loop. Say an interrupt occurred whose bit
-we already checked, we'd still miss that.
 
 Thanks,
--Markus
+Daniel
+
+v5 -> v6:
+	* re-add code to fail if 3rd memory region is given but invalid
+	* added Mugunthan's ack on all patches except the one that adds
+	  ti,am3352-cpsw
+	* remove parens around integer constants
+
+v4 -> v5:
+	* fix return value assignment in devm_ioremap_resource() error
+	  paths (reported by Sergei Shtylyov)
+	* add more RGMII modes (reported by Mugunthan V N)
+	* check for IS_ERR(priv->gmii_sel_reg) in
+	  cpsw_set_phy_interface_mode() (reported by Mugunthan V N)
+	* move SoC specific definitions to cpsw.h
+	* further simplify the probe logic, as devm_ioremap_resource()
+	  will check for NULL resources (Sergei Shtylyov)
+
+v3 -> v4:
+	* use IS_ERR() to check for failed devm_ioremap_resource()
+	  calls (reported by Sergei Shtylyov)
+
+v2 -> v3:
+	* swap "ti,am3352-cpsw" and "ti,cpsw" to work around a matching
+	  bug (reported by Sekhar)
+
+v1 -> v2:
+	* combine devm_request_mem_region() and devm_ioremap() and use
+	  devm_ioremap_resource() (reported by Sergei Shtylyov)
+	* fix multi-line comment style (reported by Sergei Shtylyov)
+	* fix ti,rmii-clock-ext property name (reported by Sekhar)
+	* rebased to net-next (reported by Mugunthan V N, David Miller)
+	* add a new compatible type, and handle AM33xx specific
+	  registers that way (reported by Sekhar)
+	* move gmii_sel_reg modifications to the open routine
+	  (reported by Mugunthan V N)
+
+
+Daniel Mack (5):
+  net: ethernet: cpsw: switch to devres allocations
+  net: ethernet: cpsw: add optional third memory region for CONTROL
+    module
+  net: ethernet: cpsw: introduce ti,am3352-cpsw compatible string
+  net: ethernet: cpsw: add support for hardware interface mode config
+  ARM: dts: am33xx: adopt to cpsw changes
+
+ Documentation/devicetree/bindings/net/cpsw.txt |  10 +-
+ arch/arm/boot/dts/am33xx.dtsi                  |   5 +-
+ drivers/net/ethernet/ti/cpsw.c                 | 252 +++++++++++++------------
+ drivers/net/ethernet/ti/cpsw.h                 |   9 +
+ 4 files changed, 156 insertions(+), 120 deletions(-)
+
+-- 
+1.8.3.1
