@@ -1,80 +1,84 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Aug 2013 08:56:07 +0100
-Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the
- DBX500 DT
-In-Reply-To: <20130822211912.GE31036@pengutronix.de>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
- <20130820093034.GL31036@pengutronix.de>
- <20130822133730.GB23152@e106331-lin.cambridge.arm.com>
- <20130822141900.GB17154@lee--X1>
- <20130822151723.GE23152@e106331-lin.cambridge.arm.com>
- <20130822154116.GC17154@lee--X1>
- <20130822211912.GE31036@pengutronix.de>
-Message-ID: <20130823075607.GD17154@lee--X1>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 23 Aug 2013 09:58:29 +0200
+Subject: [PATCH 1/4] pwm: add freescale ftm pwm driver support
+In-Reply-To: <20130821095049.GQ31036@pengutronix.de>
+References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377054462-6283-2-git-send-email-Li.Xiubo@freescale.com>
+ <20130821073659.GN31036@pengutronix.de>
+ <1DD289F6464F0949A2FCA5AA6DC23F827D1C51@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20130821095049.GQ31036@pengutronix.de>
+Message-ID: <20130823075828.GD3535@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I had a short chat with Rob last night about this. I'm going to loop
-him in to the conversation, as he wrote the binding.
-
-> > When most of the other clocks that we deal with are being requested,
-> > they rely on being index zero:
+On Wed, Aug 21, 2013 at 11:50:49AM +0200, Sascha Hauer wrote:
+> On Wed, Aug 21, 2013 at 09:24:56AM +0000, Xiubo Li-B47053 wrote:
+> > TO Sascha,
 > > 
-> >   drivers/i2c/busses/i2c-nomadik.c: dev->clk = clk_get(&adev->dev, NULL);
+> > > > +
+> > > > +	fpc = to_fsl_chip(chip);
+> > > > +
+> > > > +	if (WARN_ON(!test_bit(PWMF_REQUESTED, &pwm->flags)))
+> > > > +		return -ESHUTDOWN;
+> > > > +
+> > > > +	statename = kasprintf(GFP_KERNEL, "en%d", pwm->hwpwm);
+> > > > +	pins_state = pinctrl_lookup_state(fpc->pinctrl,
+> > > > +			statename);
+> > > > +	/* enable pins to be muxed in and configured */
+> > > > +	if (!IS_ERR(pins_state)) {
+> > > > +		ret = pinctrl_select_state(fpc->pinctrl, pins_state);
+> > > > +		if (ret)
+> > > > +			dev_warn(&fpc->pdev->dev,
+> > > > +					"could not set default pins\n");
+> > > 
+> > > Why do you need to manipulate the pinctrl to en/disable a channel?
+> > > 
+> > 
+> > This is because in Vybrid VF610 TOWER board, there are 4 leds, and each led's one point(diode's positive pole) is connected to 3.3V,
+> > and the other point is connected to pwm's one channel. When the 4 pinctrls are configured as enable at the same time, 
+> > the 4 pinctrls is low valtage, and the 4 leds will be lighted up as default, then when you enable/disable one led will effects others.
+> > 
 > 
-> Look at drivers/clk/clkdev.c, there's some fuzzy matching
-> involved when you pass NULL as connection id.
+> I think the inactive state of a PWM is pretty much undefined by the PWM
+> framework and left to the drivers.
+> 
+> I stumbled upon this aswell. It would be good to think about the
+> inactive state and how the PWM framework could help us here getting
+> things right.
 
-Yes, I've been looking at that. This is why it works currently. I
-think I need to change all of the drivers to specify which clock they
-want. At the moment that 'fuzzy matching' is what's saving us. If
-anyone were to change our DTS file to match what the binding says,
-then it would cease to work. I'm guessing this is the same for all
-other DTS files too:
+I'm not sure if imposing what the inactive state should be is a good
+thing to do. For one, it might not be possible to set that particular
+state in all of the PWM drivers. Similarly some drivers may know of a
+more optimal state to put the pin into.
 
-arch/arm/boot/dts/imx23.dtsi:                clock-names = "uart", "apb_pclk";
-arch/arm/boot/dts/imx28.dtsi:                clock-names = "uart", "apb_pclk";
-arch/arm/boot/dts/nspire-cx.dts:             clock-names = "uart_clk", "apb_pclk";
-arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "timclk", "apb_pclk";
-arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "timclk", "apb_pclk";
-arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "uartclk", "apb_pclk";
-arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "uartclk", "apb_pclk";
-arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "uartclk", "apb_pclk";
-arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "rng", "apb_pclk";
-arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "mclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "refclk", "timclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "mclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "KMIREFCLK", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "KMIREFCLK", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "wdogclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "timclken1", "timclken2", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "timclken1", "timclken2", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "clcdclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "refclk", "timclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "mclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "KMIREFCLK", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "KMIREFCLK", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "wdogclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "timclken1", "timclken2", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "timclken1", "timclken2", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "clcdclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts:  clock-names = "wdogclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2p-ca9.dts:      clock-names = "clcdclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2p-ca9.dts:      clock-names = "timclk", "apb_pclk";
-arch/arm/boot/dts/vexpress-v2p-ca9.dts:      clock-names = "wdogclk", "apb_pclk";
+> There are several things to consider. For a noninverted PWM the inactive
+> state should probably logic 0. For an inverted PWM it should probably be
+> logic 1. I guess several PWM devices have an undefined inactive state,
+> most of the PWM devices probably can control the inactive state by
+> setting the duty cycle to 100% / 0% without actually disabling the PWM.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+That sounds like a reasonable set of rules. The above should also be
+equivalent to the "no power" state. I think we could possibly write down
+those rules (even though I think they are obvious enough), but enforcing
+one specific state doesn't sound right to me.
+
+> Using the pinctrl is one way to control the inactive state and probaby
+> the only one before initialization. It might be good to wire this up in
+> the core instead of the individual PWM drivers.
+
+I don't really see how the PWM core can make an educated decision about
+this. The proper inactive state for a PWM can only be known by it's
+corresponding driver. Each driver's .disable() operation should take
+care of putting the PWM into the inactive state. That is, if it can be
+done without too much effort. If putting the PWM into the inactive state
+involves pinmuxing and such, it's probably better to defer that to the
+.free() operation.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/987325fc/attachment.sig>
