@@ -1,64 +1,84 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Aug 2013 15:50:18 +0100
-Subject: [PATCH 33/40] ARM: ux500: Don't register the STMPE/SKE when
- booting with ATAG support
-In-Reply-To: <CACRpkdZE1yCPO0JVXX88SUKsp3ow7WBuJZZ=BEVk-c5=TOUO-A@mail.gmail.com>
-References: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
- <1377260620-18829-34-git-send-email-lee.jones@linaro.org>
- <CACRpkdZdzF-HqTmEWpYiBe2VwGN23fsnWCr7aqE0NYWpBfHsfw@mail.gmail.com>
- <CACRpkdZE1yCPO0JVXX88SUKsp3ow7WBuJZZ=BEVk-c5=TOUO-A@mail.gmail.com>
-Message-ID: <20130823145018.GE19107@lee--X1>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 23 Aug 2013 09:56:15 -0500
+Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <alpine.DEB.2.02.1308202244350.6426@utopia.booyaka.com>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
+ <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
+ <52038E88.2050604@ti.com> <5203B336.90102@ti.com> <5203C211.7040207@ti.com>
+ <87iozfga1t.fsf@kernel.org>
+ <alpine.DEB.2.02.1308202244350.6426@utopia.booyaka.com>
+Message-ID: <5217780F.30004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Aug 2013, Linus Walleij wrote:
+On 08/20/2013 05:48 PM, Paul Walmsley wrote:
+>
+> Hi folks,
+>
+> catching up on this thread.
+>
+> On 08/06/2013 12:49 PM, Dave Gerlach wrote:
+>
+>> +
+>> +static int am33xx_pm_suspend(void)
+>> +{
+>> +     int i, j, ret = 0;
+>> +
+>> +     int status = 0;
+>> +     struct platform_device *pdev;
+>> +     struct omap_device *od;
+>> +
+>> +     /*
+>> +      * By default the following IPs do not have MSTANDBY asserted
+>> +      * which is necessary for PER domain transition. If the drivers
+>> +      * are not compiled into the kernel HWMOD code will not change the
+>> +      * state of the IPs if the IP was not never enabled. To ensure
+>> +      * that there no issues with or without the drivers being compiled
+>> +      * in the kernel, we forcefully put these IPs to idle.
+>> +      */
+>> +     for (i = 0; i < ARRAY_SIZE(am33xx_mod); i++) {
+>> +             pdev = to_platform_device(am33xx_mod[i].dev);
+>> +             od = to_omap_device(pdev);
+>> +             if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER) {
+>> +                     omap_device_enable_hwmods(od);
+>> +                     omap_device_idle_hwmods(od);
+>> +             }
+>> +     }
+>
+> Does this have to be done for every suspend entry, or can it just be done
+> once during kernel initialization?
+>
+> If the latter, shouldn't this be done by hwmod during the initial reset
+> and idle of all of these devices, based on a flag?  For example, we had
+> this flag for OMAP3630:
+>
+>   * HWMOD_FORCE_MSTANDBY: Always keep MIDLEMODE bits cleared so that device
+>   *     is kept in force-standby mode. Failing to do so causes PM problems
+>   *     with musb on OMAP3630 at least. Note that musb has a dedicated
+> register
+>   *     to control MSTANDBY signal when MIDLEMODE is set to force-standby.
+>
 
-> On Fri, Aug 23, 2013 at 2:55 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Fri, Aug 23, 2013 at 2:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >
-> >> It's time to remove all ATAG support from ux500 and rely solely on
-> >> Device Tree booting. This patch is part of that endeavour.
-> >>
-> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > (...)
-> >> -/* STMPE/SKE keypad use this key layout */
-> >> -static const unsigned int mop500_keymap[] = {
-> >> -       KEY(2, 5, KEY_END),
-> >> -       KEY(4, 1, KEY_POWER),
-> >> -       KEY(3, 5, KEY_VOLUMEDOWN),
-> >> -       KEY(1, 3, KEY_3),
-> >> -       KEY(5, 2, KEY_RIGHT),
-> >> -       KEY(5, 0, KEY_9),
-> >> -
-> >> -       KEY(0, 5, KEY_MENU),
-> >> -       KEY(7, 6, KEY_ENTER),
-> >> -       KEY(4, 5, KEY_0),
-> >> -       KEY(6, 7, KEY_2),
-> >> -       KEY(3, 4, KEY_UP),
-> >> -       KEY(3, 3, KEY_DOWN),
-> >> -
-> >> -       KEY(6, 4, KEY_SEND),
-> >> -       KEY(6, 2, KEY_BACK),
-> >> -       KEY(4, 2, KEY_VOLUMEUP),
-> >> -       KEY(5, 5, KEY_1),
-> >> -       KEY(4, 3, KEY_LEFT),
-> >> -       KEY(3, 2, KEY_7),
-> >> -};
-> >
-> > This STMPE1601 keypad @0x40 and UIB encoding for
-> > the U8500 UIB does not exist in any DTS file does it? This
-> > means that the support for this UIB is effectively terminated.
-> 
-> You are wrong. Go read arch/arm/boot/dts/[ste-]stuib.dtsi.
-> 
-> Anyway, what you wanted to say was for these to be marked
-> "disabled" by default and turned into "okay" using an I2C
-> probe operation.
+Hi,
+Unfortunately this does have to be done at some point after every 
+suspend/resume cycle because while the IPs are idled during initial 
+reset, after a suspend cycle the context loss when no driver is bound 
+causes MSTANDBY to be unasserted again which as mentioned breaks the PER 
+power domain transition during the next suspend attempt.
 
-Why are you talking to yourself? Have you finally lost it?
+The current plan for this is somewhat similar to what you mentioned, all 
+of the troublesome modules will be flagged in hwmod and when the hwmods 
+are loaded they are tracked if no driver gets bound and then idled post 
+resume by a pm_notifier.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Dave
+
+>
+> - Paul
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
