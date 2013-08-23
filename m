@@ -1,243 +1,157 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 23 Aug 2013 17:03:47 +0200
-Subject: [PATCH v3 5/5] clk: Implement clk_unregister
-In-Reply-To: <1377270227-1030-1-git-send-email-s.nawrocki@samsung.com>
-References: <1377270227-1030-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1377270227-1030-6-git-send-email-s.nawrocki@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 23 Aug 2013 10:10:13 -0500
+Subject: [PATCH v2] dt: update PSCI binding documentation for v0.2
+Message-ID: <1377270613-28435-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_unregister() is currently not implemented and it is required when
-a clock provider module needs to be unloaded.
+From: Rob Herring <rob.herring@calxeda.com>
 
-Normally the clock supplier module is prevented to be unloaded by
-taking reference on the module in clk_get().
+The PSCI spec from ARM has been updated to 0.2 version. Update the
+binding document to reflect the spec changes. For the binding, the
+major changes are addition of system reset and poweroff functions.
+The recommended function id numbering has also changed.
 
-For cases when the clock supplier module deinitializes despite the
-consumers of its clocks holding a reference on the module, e.g. when
-the driver is unbound through "unbind" sysfs attribute, there are
-empty clock ops added. These ops are assigned temporarily to struct
-clk and used until all consumers release the clock, to avoid invoking
-callbacks from the module which just got removed.
+This update also defines 32 and 64 bit calling conventions. The calling
+convention is defined by the method property.
 
-Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Dave Martin <Dave.Martin@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <Ian.Campbell@citrix.com>
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>,
+Cc: Charles Garcia-Tobin <Charles.Garcia-Tobin@arm.com>
+Cc: Matt Sealey <neko@bakuhatsu.net>
+Cc: devicetree at vger.kernel.org
 ---
-Changes since v2:
- - none.
+ Documentation/devicetree/bindings/arm/psci.txt | 85 +++++++++++++++++++++-----
+ 1 file changed, 69 insertions(+), 16 deletions(-)
 
-Changes since RFC v1:
- - renamed clk_dummy_* to clk_nodrv_*.
-
-Changes since v3 of the original patch [1]:
- - reparent all children to the orphan list instead of leaving
-   the clock unregistered when it has child clocks,
- - removed unnecessary prerequisite checks in clk_debug_unregister(),
- - struct clk is now being freed only when the last clock consumer
-   calls clk_put(),
- - empty clock ops are used after clk_unregister() has been called
-   until all references to the clock are released and the clock
-   object is freed.
-
-[1] http://www.spinics.net/lists/arm-kernel/msg247548.html
----
- drivers/clk/clk.c           |  123 +++++++++++++++++++++++++++++++++++++++++--
- include/linux/clk-private.h |    2 +
- 2 files changed, 122 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 272d68d..738c2cc 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -344,6 +344,21 @@ out:
- 	return ret;
- }
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index 433afe9..2c03d0b 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -1,16 +1,17 @@
+ * Power State Coordination Interface (PSCI)
  
-+ /**
-+ * clk_debug_unregister - remove a clk node from the debugfs clk tree
-+ * @clk: the clk being removed from the debugfs clk tree
-+ *
-+ * Dynamically removes a clk and all it's children clk nodes from the
-+ * debugfs clk tree if clk->dentry points to debugfs created by
-+ * clk_debug_register in __clk_init.
-+ *
-+ * Caller must hold prepare_lock.
-+ */
-+static void clk_debug_unregister(struct clk *clk)
-+{
-+	debugfs_remove_recursive(clk->dentry);
-+}
-+
- /**
-  * clk_debug_reparent - reparent clk node in the debugfs clk tree
-  * @clk: the clk being reparented
-@@ -434,6 +449,9 @@ static inline int clk_debug_register(struct clk *clk) { return 0; }
- static inline void clk_debug_reparent(struct clk *clk, struct clk *new_parent)
- {
- }
-+static inline void clk_debug_unregister(struct clk *clk)
-+{
-+}
- #endif
+ Firmware implementing the PSCI functions described in ARM document number
+-ARM DEN 0022A ("Power State Coordination Interface System Software on ARM
++ARM DEN 0022B ("Power State Coordination Interface System Software on ARM
+ processors") can be used by Linux to initiate various CPU-centric power
+ operations.
  
- /* caller must hold prepare_lock */
-@@ -1657,6 +1675,7 @@ int __clk_init(struct device *dev, struct clk *clk)
+-Issue A of the specification describes functions for CPU suspend, hotplug
+-and migration of secure software.
++Issue B of the specification describes functions for CPU suspend, hotplug,
++migration of secure software, and system level reset and powerdown.
  
- 	clk_debug_register(clk);
+ Functions are invoked by trapping to the privilege level of the PSCI
+ firmware (specified as part of the binding below) and passing arguments
+-in a manner similar to that specified by AAPCS:
++as defined in ARM document "SMC Calling Convention" (ARM DEN 0028) in a manner
++similar to that specified by AAPCS:
  
-+	kref_init(&clk->ref);
- out:
- 	clk_prepare_unlock();
+ 	 r0		=> 32-bit Function ID / return value
+ 	{r1 - r3}	=> Parameters
+@@ -21,16 +22,37 @@ to #0.
  
-@@ -1792,13 +1811,106 @@ fail_out:
- }
- EXPORT_SYMBOL_GPL(clk_register);
+ Main node required properties:
  
-+/*
-+ * Free memory allocated for a clock.
-+ * Caller must hold prepare_lock.
-+ */
-+static void __clk_release(struct kref *ref)
-+{
-+	struct clk *clk = container_of(ref, struct clk, ref);
-+	int i = clk->num_parents;
-+
-+	kfree(clk->parents);
-+	while (--i >= 0)
-+		kfree(clk->parent_names[i]);
-+
-+	kfree(clk->parent_names);
-+	kfree(clk->name);
-+	kfree(clk);
-+}
-+
-+/*
-+ * Empty clk_ops for unregistered clocks. These are used temporarily
-+ * after clk_unregister() was called on a clock and until last clock
-+ * consumer calls clk_put() and the struct clk object is freed.
-+ */
-+static int clk_nodrv_prepare_enable(struct clk_hw *hw)
-+{
-+	return -ENXIO;
-+}
-+
-+static void clk_nodrv_disable_unprepare(struct clk_hw *hw)
-+{
-+	WARN_ON(1);
-+}
-+
-+static int clk_nodrv_set_rate(struct clk_hw *hw, unsigned long rate,
-+					unsigned long parent_rate)
-+{
-+	return -ENXIO;
-+}
-+
-+static int clk_nodrv_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	return -ENXIO;
-+}
-+
-+static const struct clk_ops clk_nodrv_ops = {
-+	.enable		= clk_nodrv_prepare_enable,
-+	.disable	= clk_nodrv_disable_unprepare,
-+	.prepare	= clk_nodrv_prepare_enable,
-+	.unprepare	= clk_nodrv_disable_unprepare,
-+	.set_rate	= clk_nodrv_set_rate,
-+	.set_parent	= clk_nodrv_set_parent,
-+};
-+
- /**
-  * clk_unregister - unregister a currently registered clock
-  * @clk: clock to unregister
-- *
-- * Currently unimplemented.
-  */
--void clk_unregister(struct clk *clk) {}
-+void clk_unregister(struct clk *clk)
-+{
-+	unsigned long flags;
-+
-+	clk_prepare_lock();
-+
-+	if (!clk || IS_ERR(clk)) {
-+		pr_err("%s: invalid clock: %p\n", __func__, clk);
-+		goto out;
-+	}
-+
-+	if (clk->ops == &clk_nodrv_ops) {
-+		pr_err("%s: unregistered clock: %s\n", __func__, clk->name);
-+		goto out;
-+	}
-+	/*
-+	 * Assign empty clock ops for consumers that might still hold
-+	 * a reference to this clock.
-+	 */
-+	flags = clk_enable_lock();
-+	clk->ops = &clk_nodrv_ops;
-+	clk_enable_unlock(flags);
-+
-+	if (!hlist_empty(&clk->children)) {
-+		struct clk *child;
-+
-+		/* Reparent all children to the orphan list. */
-+		hlist_for_each_entry(child, &clk->children, child_node)
-+			clk_set_parent(child, NULL);
-+	}
-+
-+	clk_debug_unregister(clk);
-+
-+	hlist_del_init(&clk->child_node);
-+
-+	if (clk->prepare_count)
-+		pr_warn("%s: unregistering prepared clock: %s\n",
-+					__func__, clk->name);
-+
-+	kref_put(&clk->ref, __clk_release);
-+out:
-+	clk_prepare_unlock();
-+}
- EXPORT_SYMBOL_GPL(clk_unregister);
+- - compatible    : Must be "arm,psci"
++ - compatible    : Must be "arm,psci-0.2" or "arm,psci"
  
- static void devm_clk_release(struct device *dev, void *res)
-@@ -1866,6 +1978,7 @@ int __clk_get(struct clk *clk)
- 	if (clk && !try_module_get(clk->owner))
- 		return 0;
+- - method        : The method of calling the PSCI firmware. Permitted
+-                   values are:
++ - method        : The method defines the calling convention for the PSCI
++                   firmware. If the firmware supports multiple calling
++                   conventions (i.e. 32 and 64 bit), then the DT shall have a
++                   node for each method. Permitted values are:
  
-+	kref_get(&clk->ref);
- 	return 1;
- }
- EXPORT_SYMBOL(__clk_get);
-@@ -1875,6 +1988,10 @@ void __clk_put(struct clk *clk)
- 	if (WARN_ON_ONCE(IS_ERR(clk)))
- 		return;
- 
-+	clk_prepare_lock();
-+	kref_put(&clk->ref, __clk_release);
-+	clk_prepare_unlock();
+                    "smc" : SMC #0, with the register assignments specified
+-		           in this binding.
++		           in this binding (deprecated, "arm,psci" only).
 +
- 	if (clk)
- 		module_put(clk->owner);
- }
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index b7c0b58..36c1fc8 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -12,6 +12,7 @@
- #define __LINUX_CLK_PRIVATE_H
++                   "smc32" : SMC #0, using 32-bit SMC calling convention with
++                             32-bit register assignments specified in this
++                             binding.
++
++                   "smc64" : SMC #0, using 64-bit SMC calling convention with
++                             64-bit register assignments specified in this
++                             binding.
  
- #include <linux/clk-provider.h>
-+#include <linux/kref.h>
- #include <linux/list.h>
+                    "hvc" : HVC #0, with the register assignments specified
+-		           in this binding.
++		           in this binding (deprecated, "arm,psci" only).
++
++                   "hvc32" : HVC #0, using 32-bit HVC calling convention with
++                             32-bit register assignments specified in this
++                             binding.
++
++                   "hvc64" : HVC #0, using 64-bit HVCC calling convention with
++                             64-bit register assignments specified in this
++                             binding.
++
++ - psci_version  : Function ID for PSCI_VERSION operation. Required for
++                   "arm,psci-0.2" compatible version or later.
  
- /*
-@@ -47,6 +48,7 @@ struct clk {
- #ifdef CONFIG_COMMON_CLK_DEBUG
- 	struct dentry		*dentry;
- #endif
-+	struct kref		ref;
- };
+ Main node optional properties:
  
- /*
+@@ -40,16 +62,47 @@ Main node optional properties:
+ 
+  - cpu_on        : Function ID for CPU_ON operation
+ 
++ - affinity_info : Function ID for AFFINITY_INFO operation
++
+  - migrate       : Function ID for MIGRATE operation
+ 
++ - migrate_info_type : Function ID for MIGRATE_INFO_TYPE operation
++
++ - migrate_info_up_cpu : Function ID for MIGRATE_INFO_UP_CPU operation
++
++ - system_reset  : Function ID for SYSTEM_RESET operation
++
++ - system_off    : Function ID for SYSTEM_OFF operation
++
+ 
+ Example:
+ 
+-	psci {
+-		compatible	= "arm,psci";
+-		method		= "smc";
+-		cpu_suspend	= <0x95c10000>;
+-		cpu_off		= <0x95c10001>;
+-		cpu_on		= <0x95c10002>;
+-		migrate		= <0x95c10003>;
++	psci32 {
++		compatible	= "arm,psci-0.2";
++		method		= "smc32";
++		psci_version	= <0x84000000>;
++		cpu_suspend	= <0x84000001>;
++		cpu_off		= <0x84000002>;
++		cpu_on		= <0x84000003>;
++		affinity_info	= <0x84000004>; 
++		migrate		= <0x84000005>;
++		migrate_info_type = <0x84000006>;
++		migrate_info_up_cpu = <0x84000007>;
++		system_off	= <0x84000008>; 
++		system_reset	= <0x84000009>; 
++	};
++
++	psci64 {
++		compatible	= "arm,psci-0.2";
++		method		= "smc64";
++		psci_version	= <0x84000000>;
++		cpu_suspend	= <0xc4000001>;
++		cpu_off		= <0x84000002>;
++		cpu_on		= <0xc4000003>;
++		affinity_info	= <0xc4000004>; 
++		migrate		= <0xc4000005>;
++		migrate_info_type = <0x84000006>;
++		migrate_info_up_cpu = <0xc4000007>;
++		system_off	= <0x84000008>; 
++		system_reset	= <0x84000009>; 
+ 	};
 -- 
-1.7.9.5
+1.8.1.2
