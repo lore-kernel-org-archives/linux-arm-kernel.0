@@ -1,37 +1,43 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 23 Aug 2013 12:17:20 -0700
-Subject: [GIT PULL 5/5] ARM: mxs: device tree changes for 3.12
-In-Reply-To: <1376833688-24542-5-git-send-email-shawn.guo@linaro.org> (Shawn
- Guo's message of "Sun, 18 Aug 2013 21:48:08 +0800")
-References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
- <1376833688-24542-5-git-send-email-shawn.guo@linaro.org>
-Message-ID: <87ob8okyin.fsf@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 23 Aug 2013 13:17:34 -0600
+Subject: [PATCH v4] extcon: palmas: Added a new compatible type *ti,
+ palmas-usb-vid*
+In-Reply-To: <52174755.8030506@ti.com>
+References: <1377160283-26934-1-git-send-email-kishon@ti.com>
+ <5216798E.8070900@wwwdotorg.org> <52174755.8030506@ti.com>
+Message-ID: <5217B54E.8070009@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo <shawn.guo@linaro.org> writes:
+On 08/23/2013 05:28 AM, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Friday 23 August 2013 02:20 AM, Stephen Warren wrote:
+>> On 08/22/2013 02:31 AM, Kishon Vijay Abraham I wrote:
+>>> The Palmas device contains only a USB VBUS-ID detector, so added a
+>>> compatible type *ti,palmas-usb-vid*. Didn't remove the existing compatible
+>>> types for backward compatibility.
+>>
+>>> diff --git a/Documentation/devicetree/bindings/extcon/extcon-palmas.txt b/Documentation/devicetree/bindings/extcon/extcon-palmas.txt
+>>
+>>>  PALMAS USB COMPARATOR
+>>>  Required Properties:
+>>> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
+>>> + - compatible : Should be "ti,palmas-usb-vid". "ti,twl6035-usb" and
+>>> +   "ti,palmas-usb" is deprecated and is kept for backward compatibility.
+>>
+>> So this defines one new value and deprecates the two old values.
+> 
+> yeah.
+>>
+>> Why isn't a new "ti,twl6035-usb-vid" entry useful? Don't you still need
+> 
+> yeah, it should be added too.
+>> SoC-specific compatible values so the driver can enable any SoC-specific
+>> bug-fixes/workarounds later if needed?
+> 
+> hmm.. Palmas is external to SoC. So not sure if adding SoC specific compatible
+> values is such a good idea.
 
-> The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
->
->   Linux 3.11-rc3 (2013-07-28 20:53:33 -0700)
->
-> are available in the git repository at:
->
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-dt-3.12
->
-> for you to fetch changes up to 23ad6f65748cd7fbaf03c1d36211bc1cbdf4ed45:
->
->   ARM: dts: mxs: add pin config for LCD sync and clock pins (2013-08-16 16:26:53 +0800)
->
-> ----------------------------------------------------------------
-> It contains mxs device tree changes for 3.12.
->
-> - New board addition and hogpins cleanup for Crystalfontz
-> - New pinctrl entry addition for lcd, ssp2 and saif0
-> - Add alias and labels for various nodes
-> - Enable devices like LRADC and USB for a couple of imx23 boards,
->   and backlight for M28EVK
-
-Pulled into next/dt
-
-Kevin
+In this case, but SoC, I meant the Palmas chip rather than the
+application processor. Is twl6035 a name for Palmas or something else?
