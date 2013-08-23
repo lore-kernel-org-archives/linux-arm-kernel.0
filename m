@@ -1,100 +1,56 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 23 Aug 2013 10:33:59 +0800
-Subject: [PATCH v2 1/4] arm: mvebu: add missing of_node_put() to fix reference
- leak
-In-Reply-To: <1377225242-5854-1-git-send-email-jszhang@marvell.com>
-References: <1377225242-5854-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1377225242-5854-2-git-send-email-jszhang@marvell.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Fri, 23 Aug 2013 12:11:11 +1000
+Subject: SHMobile Compatibility String Inconsistencies
+In-Reply-To: <20130822054639.GE11086@verge.net.au>
+References: <20130822054639.GE11086@verge.net.au>
+Message-ID: <20130823021111.GA2792@voom.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add of_node_put to properly decrement the refcount when we are
-done using a given node.
+On Thu, Aug 22, 2013 at 02:46:40PM +0900, Simon Horman wrote:
+> Hi Laurent, Hi Guennadi, Hi All,
+> 
+> Olof has brought to my attention that there is some inconsistency
+> in the way that compatibility strings for SHMobile are named and he
+> has asked us to clean things up for v3.12.
+> 
+> Looking through arch/arm/boot/dts/ I see that we have:
+> 
+> 1. {gpio,pfc}-r8aXXXX and;
+> 2. r8aXXXX-sdhi
+> 
+> The inconsistency that Olof has asked us to resolve is that we
+> should either use r8aXXXX- or -r8aXXXX. Not both.
+> 
+> It seems to me that neither option is inherently better than the other
+> so we should just choose the path of least resistance to make things
+> consistent.
+> 
+> Laurent, Guennadi, do you have any opinions on if it would
+> be easier to change the GPIO and PFC compatibility strings;
+> or to change the SDHI compatibility strings?
+> 
+> Ideally I would like you to come to some sort of consensus and send
+> patches.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm/mach-mvebu/armada-370-xp.c     | 1 +
- arch/arm/mach-mvebu/coherency.c         | 8 +++++++-
- arch/arm/mach-mvebu/platsmp.c           | 1 +
- arch/arm/mach-mvebu/pmsu.c              | 1 +
- arch/arm/mach-mvebu/system-controller.c | 1 +
- 5 files changed, 11 insertions(+), 1 deletion(-)
+So, by all means clean this up in the dts.
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 97cbb80..8a1ae83 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -64,6 +64,7 @@ static void __init armada_370_xp_mbus_init(void)
- 			ARMADA_370_XP_MBUS_WINS_SIZE,
- 			of_translate_address(dn, &sdram_wins_offs),
- 			ARMADA_370_XP_SDRAM_WINS_SIZE);
-+	of_node_put(dn);
- }
- 
- static void __init armada_370_xp_timer_and_clk_init(void)
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 4c24303..58adf2f 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -140,6 +140,7 @@ int __init coherency_init(void)
- 		coherency_base = of_iomap(np, 0);
- 		coherency_cpu_base = of_iomap(np, 1);
- 		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
-+		of_node_put(np);
- 	}
- 
- 	return 0;
-@@ -147,9 +148,14 @@ int __init coherency_init(void)
- 
- static int __init coherency_late_init(void)
- {
--	if (of_find_matching_node(NULL, of_coherency_table))
-+	struct device_node *np;
-+
-+	np = of_find_matching_node(NULL, of_coherency_table);
-+	if (np) {
- 		bus_register_notifier(&platform_bus_type,
- 				      &mvebu_hwcc_platform_nb);
-+		of_node_put(np);
-+	}
- 	return 0;
- }
- 
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index ce81d30..e7edb82 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -95,6 +95,7 @@ static void __init armada_xp_smp_init_cpus(void)
- 		panic("No 'cpus' node found\n");
- 
- 	ncores = of_get_child_count(np);
-+	of_node_put(np);
- 	if (ncores == 0 || ncores > ARMADA_XP_MAX_CPUS)
- 		panic("Invalid number of CPUs in DT\n");
- 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 3cc4bef..27fc4f0 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -67,6 +67,7 @@ int __init armada_370_xp_pmsu_init(void)
- 		pr_info("Initializing Power Management Service Unit\n");
- 		pmsu_mp_base = of_iomap(np, 0);
- 		pmsu_reset_base = of_iomap(np, 1);
-+		of_node_put(np);
- 	}
- 
- 	return 0;
-diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
-index f875124..5175083c 100644
---- a/arch/arm/mach-mvebu/system-controller.c
-+++ b/arch/arm/mach-mvebu/system-controller.c
-@@ -98,6 +98,7 @@ static int __init mvebu_system_controller_init(void)
- 		BUG_ON(!match);
- 		system_controller_base = of_iomap(np, 0);
- 		mvebu_sc = (struct mvebu_system_controller *)match->data;
-+		of_node_put(np);
- 	}
- 
- 	return 0;
+BUT, in keeping with the recent discussions on improving the DT
+process, the corresponding drivers must continue to recognize both
+forms, so that old DTs will still work correctly.
+
+It's probably also worth putting a note about the deprecated form into
+the binding description, too.
+
 -- 
-1.8.4.rc3
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/5301c2a4/attachment.sig>
