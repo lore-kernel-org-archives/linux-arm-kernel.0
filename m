@@ -1,254 +1,304 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 23 Aug 2013 14:58:38 -0700
-Subject: [PATCH v2 2/4] clk: implement clk_unregister
-In-Reply-To: <1377020063-30213-3-git-send-email-s.nawrocki@samsung.com>
-References: <1377020063-30213-1-git-send-email-s.nawrocki@samsung.com>
- <1377020063-30213-3-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20130823215838.8231.21635@quantum>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Fri, 23 Aug 2013 18:03:14 -0400
+Subject: [PATCH 3/5] drivers: thermal: make usage of CONFIG_THERMAL_HWMON
+ optional
+In-Reply-To: <1377295396-17289-1-git-send-email-eduardo.valentin@ti.com>
+References: <1377295396-17289-1-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <1377295396-17289-4-git-send-email-eduardo.valentin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2013-08-20 10:34:21)
-> clk_unregister() is currently not implemented and it is required when
-> a clock provider module needs to be unloaded.
-> 
-> Normally the clock supplier module is prevented to be unloaded by
-> taking reference on the module in clk_get().
-> 
-> For cases when the clock supplier module deinitializes despite the
-> consumers of its clocks holding a reference on the module, e.g. when
-> the driver is unbound through "unbind" sysfs attribute, there are
-> empty clock ops added. These ops are assigned temporarily to struct
-> clk and used until all consumers release the clock, to avoid invoking
-> callbacks from the module which just got removed.
-> 
-> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+When registering a new thermal_device, the thermal framework
+will always add a hwmon sysfs interface.
 
-This change looks good to me. One minor nitpick below.
+This patch adds a flag to make this behavior optional. Now
+when registering a new thermal device, the caller needs
+to say if the hwmon interface is required.
 
-> ---
-> Changes since RFC v1:
->  - renamed clk_dummy_* to clk_nodrv_*.
-> 
-> Changes since v3 of the original patch [1]:
->  - reparent all children to the orphan list instead of leaving
->    the clock unregistered when it has child clocks,
->  - removed unnecessary prerequisite checks in clk_debug_unregister(),
->  - struct clk is now being freed only when the last clock consumer
->    calls clk_put(),
->  - empty clock ops are used after clk_unregister() has been called
->    until all references to the clock are released and the clock
->    object is freed.
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg247548.html
-> ---
->  drivers/clk/clk.c           |  123 +++++++++++++++++++++++++++++++++++++++++--
->  include/linux/clk-private.h |    2 +
->  2 files changed, 122 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 0e0eb31..549fcb7 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -342,6 +342,21 @@ out:
->         return ret;
->  }
->  
-> + /**
-> + * clk_debug_unregister - remove a clk node from the debugfs clk tree
-> + * @clk: the clk being removed from the debugfs clk tree
-> + *
-> + * Dynamically removes a clk and all it's children clk nodes from the
-> + * debugfs clk tree if clk->dentry points to debugfs created by
-> + * clk_debug_register in __clk_init.
-> + *
-> + * Caller must hold prepare_lock.
-> + */
-> +static void clk_debug_unregister(struct clk *clk)
-> +{
-> +       debugfs_remove_recursive(clk->dentry);
-> +}
-> +
->  /**
->   * clk_debug_reparent - reparent clk node in the debugfs clk tree
->   * @clk: the clk being reparented
-> @@ -432,6 +447,9 @@ static inline int clk_debug_register(struct clk *clk) { return 0; }
->  static inline void clk_debug_reparent(struct clk *clk, struct clk *new_parent)
->  {
->  }
-> +static inline void clk_debug_unregister(struct clk *clk)
-> +{
-> +}
->  #endif
->  
->  /* caller must hold prepare_lock */
-> @@ -1656,6 +1674,7 @@ int __clk_init(struct device *dev, struct clk *clk)
->  
->         clk_debug_register(clk);
->  
-> +       kref_init(&clk->ref);
->  out:
->         clk_prepare_unlock();
->  
-> @@ -1785,13 +1804,106 @@ fail_out:
->  }
->  EXPORT_SYMBOL_GPL(clk_register);
->  
-> +/*
-> + * Free memory allocated for a clock.
-> + * Caller must hold prepare_lock.
-> + */
-> +static void __clk_release(struct kref *ref)
-> +{
-> +       struct clk *clk = container_of(ref, struct clk, ref);
-> +       int i = clk->num_parents;
-> +
-> +       kfree(clk->parents);
-> +       while (--i >= 0)
-> +               kfree(clk->parent_names[i]);
-> +
-> +       kfree(clk->parent_names);
-> +       kfree(clk->name);
-> +       kfree(clk);
-> +}
-> +
-> +/*
-> + * Empty clk_ops for unregistered clocks. These are used temporarily
-> + * after clk_unregister() was called on a clock and until last clock
-> + * consumer calls clk_put() and the struct clk object is freed.
-> + */
-> +static int clk_nodrv_prepare_enable(struct clk_hw *hw)
-> +{
-> +       return -ENXIO;
-> +}
-> +
-> +static void clk_nodrv_disable_unprepare(struct clk_hw *hw)
-> +{
-> +       WARN_ON(1);
+In order to keep same behavior as of today, all current
+calls will by default create the hwmon interface.
 
-Ideally we shouldn't get here, but if we do I guess it could be very
-noisy. How about WARN_ONCE?
+Cc: Anton Vorontsov <anton@enomsg.org>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: devicetree at vger.kernel.org
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Len Brown <lenb@kernel.org>
+Cc: linux-acpi at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-pm at vger.kernel.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: Matthew Garrett <matthew.garrett@nebula.com>
+Cc: Peter Feuerer <peter@piie.net>
+Cc: platform-driver-x86 at vger.kernel.org
+Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Suggested-by: Wei Ni <wni@nvidia.com>
+Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+---
+ Documentation/thermal/sysfs-api.txt                |  4 +++-
+ drivers/acpi/thermal.c                             |  6 ++++--
+ drivers/platform/x86/acerhdf.c                     |  3 ++-
+ drivers/platform/x86/intel_mid_thermal.c           |  2 +-
+ drivers/power/power_supply_core.c                  |  2 +-
+ drivers/thermal/armada_thermal.c                   |  2 +-
+ drivers/thermal/db8500_thermal.c                   |  2 +-
+ drivers/thermal/dove_thermal.c                     |  2 +-
+ drivers/thermal/exynos_thermal.c                   |  2 +-
+ drivers/thermal/kirkwood_thermal.c                 |  2 +-
+ drivers/thermal/rcar_thermal.c                     |  2 +-
+ drivers/thermal/spear_thermal.c                    |  2 +-
+ drivers/thermal/thermal_core.c                     | 13 +++++++++----
+ drivers/thermal/ti-soc-thermal/ti-thermal-common.c |  2 +-
+ drivers/thermal/x86_pkg_temp_thermal.c             |  2 +-
+ include/linux/thermal.h                            |  2 +-
+ 16 files changed, 30 insertions(+), 20 deletions(-)
 
-After you address Russell's comments in patch #1 I will be happy to take
-this series.
-
-Thanks,
-Mike
-
-> +}
-> +
-> +static int clk_nodrv_set_rate(struct clk_hw *hw, unsigned long rate,
-> +                                       unsigned long parent_rate)
-> +{
-> +       return -ENXIO;
-> +}
-> +
-> +static int clk_nodrv_set_parent(struct clk_hw *hw, u8 index)
-> +{
-> +       return -ENXIO;
-> +}
-> +
-> +static const struct clk_ops clk_nodrv_ops = {
-> +       .enable         = clk_nodrv_prepare_enable,
-> +       .disable        = clk_nodrv_disable_unprepare,
-> +       .prepare        = clk_nodrv_prepare_enable,
-> +       .unprepare      = clk_nodrv_disable_unprepare,
-> +       .set_rate       = clk_nodrv_set_rate,
-> +       .set_parent     = clk_nodrv_set_parent,
-> +};
-> +
->  /**
->   * clk_unregister - unregister a currently registered clock
->   * @clk: clock to unregister
-> - *
-> - * Currently unimplemented.
->   */
-> -void clk_unregister(struct clk *clk) {}
-> +void clk_unregister(struct clk *clk)
-> +{
-> +       unsigned long flags;
-> +
-> +       clk_prepare_lock();
-> +
-> +       if (!clk || IS_ERR(clk)) {
-> +               pr_err("%s: invalid clock: %p\n", __func__, clk);
-> +               goto out;
-> +       }
-> +
-> +       if (clk->ops == &clk_nodrv_ops) {
-> +               pr_err("%s: unregistered clock: %s\n", __func__, clk->name);
-> +               goto out;
-> +       }
-> +       /*
-> +        * Assign empty clock ops for consumers that might still hold
-> +        * a reference to this clock.
-> +        */
-> +       flags = clk_enable_lock();
-> +       clk->ops = &clk_nodrv_ops;
-> +       clk_enable_unlock(flags);
-> +
-> +       if (!hlist_empty(&clk->children)) {
-> +               struct clk *child;
-> +
-> +               /* Reparent all children to the orphan list. */
-> +               hlist_for_each_entry(child, &clk->children, child_node)
-> +                       clk_set_parent(child, NULL);
-> +       }
-> +
-> +       clk_debug_unregister(clk);
-> +
-> +       hlist_del_init(&clk->child_node);
-> +
-> +       if (clk->prepare_count)
-> +               pr_warn("%s: unregistering prepared clock: %s\n",
-> +                                       __func__, clk->name);
-> +
-> +       kref_put(&clk->ref, __clk_release);
-> +out:
-> +       clk_prepare_unlock();
-> +}
->  EXPORT_SYMBOL_GPL(clk_unregister);
->  
->  static void devm_clk_release(struct device *dev, void *res)
-> @@ -1862,6 +1974,7 @@ int __clk_get(struct clk *clk)
->         if (!try_module_get(clk->owner))
->                 return 0;
->  
-> +       kref_get(&clk->ref);
->         return 1;
->  }
->  EXPORT_SYMBOL(__clk_get);
-> @@ -1871,6 +1984,10 @@ void __clk_put(struct clk *clk)
->         if (!clk || IS_ERR(clk))
->                 return;
->  
-> +       clk_prepare_lock();
-> +       kref_put(&clk->ref, __clk_release);
-> +       clk_prepare_unlock();
-> +
->         module_put(clk->owner);
->  }
->  EXPORT_SYMBOL(__clk_put);
-> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-> index b7c0b58..36c1fc8 100644
-> --- a/include/linux/clk-private.h
-> +++ b/include/linux/clk-private.h
-> @@ -12,6 +12,7 @@
->  #define __LINUX_CLK_PRIVATE_H
->  
->  #include <linux/clk-provider.h>
-> +#include <linux/kref.h>
->  #include <linux/list.h>
->  
->  /*
-> @@ -47,6 +48,7 @@ struct clk {
->  #ifdef CONFIG_COMMON_CLK_DEBUG
->         struct dentry           *dentry;
->  #endif
-> +       struct kref             ref;
->  };
->  
->  /*
-> -- 
-> 1.7.9.5
+diff --git a/Documentation/thermal/sysfs-api.txt b/Documentation/thermal/sysfs-api.txt
+index a71bd5b..4b4a052 100644
+--- a/Documentation/thermal/sysfs-api.txt
++++ b/Documentation/thermal/sysfs-api.txt
+@@ -64,7 +64,9 @@ temperature) and throttle appropriate devices.
+ 	performing passive cooling.
+     polling_delay: number of milliseconds to wait between polls when checking
+ 	whether trip points have been crossed (0 for interrupt driven systems).
+-
++    add_hwmon: a boolean to indicate if the thermal to hwmon sysfs interface
++	is required. When add_hwmon == true, a hwmon sysfs interface
++	will be created. When add_hwmon == false, nothing will be done
+ 
+ 1.1.2 void thermal_zone_device_unregister(struct thermal_zone_device *tz)
+ 
+diff --git a/drivers/acpi/thermal.c b/drivers/acpi/thermal.c
+index a33821c..4d542b4 100644
+--- a/drivers/acpi/thermal.c
++++ b/drivers/acpi/thermal.c
+@@ -916,12 +916,14 @@ static int acpi_thermal_register_thermal_zone(struct acpi_thermal *tz)
+ 			thermal_zone_device_register("acpitz", trips, 0, tz,
+ 						&acpi_thermal_zone_ops, NULL,
+ 						     tz->trips.passive.tsp*100,
+-						     tz->polling_frequency*100);
++						     tz->polling_frequency*100,
++						     true);
+ 	else
+ 		tz->thermal_zone =
+ 			thermal_zone_device_register("acpitz", trips, 0, tz,
+ 						&acpi_thermal_zone_ops, NULL,
+-						0, tz->polling_frequency*100);
++						0, tz->polling_frequency*100,
++						true);
+ 	if (IS_ERR(tz->thermal_zone))
+ 		return -ENODEV;
+ 
+diff --git a/drivers/platform/x86/acerhdf.c b/drivers/platform/x86/acerhdf.c
+index f94467c..004d9ba0 100644
+--- a/drivers/platform/x86/acerhdf.c
++++ b/drivers/platform/x86/acerhdf.c
+@@ -663,7 +663,8 @@ static int acerhdf_register_thermal(void)
+ 
+ 	thz_dev = thermal_zone_device_register("acerhdf", 1, 0, NULL,
+ 					      &acerhdf_dev_ops, NULL, 0,
+-					      (kernelmode) ? interval*1000 : 0);
++					      (kernelmode) ? interval*1000 : 0,
++					      true);
+ 	if (IS_ERR(thz_dev))
+ 		return -EINVAL;
+ 
+diff --git a/drivers/platform/x86/intel_mid_thermal.c b/drivers/platform/x86/intel_mid_thermal.c
+index 81c491e..efea0bf 100644
+--- a/drivers/platform/x86/intel_mid_thermal.c
++++ b/drivers/platform/x86/intel_mid_thermal.c
+@@ -502,7 +502,7 @@ static int mid_thermal_probe(struct platform_device *pdev)
+ 			goto err;
+ 		}
+ 		pinfo->tzd[i] = thermal_zone_device_register(name[i],
+-				0, 0, td_info, &tzd_ops, NULL, 0, 0);
++				0, 0, td_info, &tzd_ops, NULL, 0, 0, true);
+ 		if (IS_ERR(pinfo->tzd[i])) {
+ 			kfree(td_info);
+ 			ret = PTR_ERR(pinfo->tzd[i]);
+diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
+index 3b2d5df..5f39914 100644
+--- a/drivers/power/power_supply_core.c
++++ b/drivers/power/power_supply_core.c
+@@ -359,7 +359,7 @@ static int psy_register_thermal(struct power_supply *psy)
+ 	for (i = 0; i < psy->num_properties; i++) {
+ 		if (psy->properties[i] == POWER_SUPPLY_PROP_TEMP) {
+ 			psy->tzd = thermal_zone_device_register(psy->name, 0, 0,
+-					psy, &psy_tzd_ops, NULL, 0, 0);
++					psy, &psy_tzd_ops, NULL, 0, 0, true);
+ 			if (IS_ERR(psy->tzd))
+ 				return PTR_ERR(psy->tzd);
+ 			break;
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 5e53212..bc54c80 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -182,7 +182,7 @@ static int armada_thermal_probe(struct platform_device *pdev)
+ 	priv->ops->init_sensor(priv);
+ 
+ 	thermal = thermal_zone_device_register("armada_thermal", 0, 0,
+-					       priv, &ops, NULL, 0, 0);
++					       priv, &ops, NULL, 0, 0, true);
+ 	if (IS_ERR(thermal)) {
+ 		dev_err(&pdev->dev,
+ 			"Failed to register thermal zone device\n");
+diff --git a/drivers/thermal/db8500_thermal.c b/drivers/thermal/db8500_thermal.c
+index 1e3b3bf..439a854 100644
+--- a/drivers/thermal/db8500_thermal.c
++++ b/drivers/thermal/db8500_thermal.c
+@@ -447,7 +447,7 @@ static int db8500_thermal_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	pzone->therm_dev = thermal_zone_device_register("db8500_thermal_zone",
+-		ptrips->num_trips, 0, pzone, &thdev_ops, NULL, 0, 0);
++		ptrips->num_trips, 0, pzone, &thdev_ops, NULL, 0, 0, true);
+ 
+ 	if (IS_ERR(pzone->therm_dev)) {
+ 		dev_err(&pdev->dev, "Register thermal zone device failed.\n");
+diff --git a/drivers/thermal/dove_thermal.c b/drivers/thermal/dove_thermal.c
+index 828f5e3..61f2247 100644
+--- a/drivers/thermal/dove_thermal.c
++++ b/drivers/thermal/dove_thermal.c
+@@ -155,7 +155,7 @@ static int dove_thermal_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	thermal = thermal_zone_device_register("dove_thermal", 0, 0,
+-					       priv, &ops, NULL, 0, 0);
++					       priv, &ops, NULL, 0, 0, true);
+ 	if (IS_ERR(thermal)) {
+ 		dev_err(&pdev->dev,
+ 			"Failed to register thermal zone device\n");
+diff --git a/drivers/thermal/exynos_thermal.c b/drivers/thermal/exynos_thermal.c
+index 9af4b93..6ffadd3 100644
+--- a/drivers/thermal/exynos_thermal.c
++++ b/drivers/thermal/exynos_thermal.c
+@@ -469,7 +469,7 @@ static int exynos_register_thermal(struct thermal_sensor_conf *sensor_conf)
+ 	th_zone->therm_dev = thermal_zone_device_register(sensor_conf->name,
+ 			EXYNOS_ZONE_COUNT, 0, NULL, &exynos_dev_ops, NULL, 0,
+ 			sensor_conf->trip_data.trigger_falling ?
+-			0 : IDLE_INTERVAL);
++			0 : IDLE_INTERVAL, true);
+ 
+ 	if (IS_ERR(th_zone->therm_dev)) {
+ 		pr_err("Failed to register thermal zone device\n");
+diff --git a/drivers/thermal/kirkwood_thermal.c b/drivers/thermal/kirkwood_thermal.c
+index 3b034a0..fb8853e 100644
+--- a/drivers/thermal/kirkwood_thermal.c
++++ b/drivers/thermal/kirkwood_thermal.c
+@@ -85,7 +85,7 @@ static int kirkwood_thermal_probe(struct platform_device *pdev)
+ 		return PTR_ERR(priv->sensor);
+ 
+ 	thermal = thermal_zone_device_register("kirkwood_thermal", 0, 0,
+-					       priv, &ops, NULL, 0, 0);
++					       priv, &ops, NULL, 0, 0, true);
+ 	if (IS_ERR(thermal)) {
+ 		dev_err(&pdev->dev,
+ 			"Failed to register thermal zone device\n");
+diff --git a/drivers/thermal/rcar_thermal.c b/drivers/thermal/rcar_thermal.c
+index 88f92e1..64ae530 100644
+--- a/drivers/thermal/rcar_thermal.c
++++ b/drivers/thermal/rcar_thermal.c
+@@ -439,7 +439,7 @@ static int rcar_thermal_probe(struct platform_device *pdev)
+ 		priv->zone = thermal_zone_device_register("rcar_thermal",
+ 						1, 0, priv,
+ 						&rcar_thermal_zone_ops, NULL, 0,
+-						idle);
++						idle, true);
+ 		if (IS_ERR(priv->zone)) {
+ 			dev_err(dev, "can't register thermal zone\n");
+ 			ret = PTR_ERR(priv->zone);
+diff --git a/drivers/thermal/spear_thermal.c b/drivers/thermal/spear_thermal.c
+index ab79ea4..ec0c44d 100644
+--- a/drivers/thermal/spear_thermal.c
++++ b/drivers/thermal/spear_thermal.c
+@@ -140,7 +140,7 @@ static int spear_thermal_probe(struct platform_device *pdev)
+ 	writel_relaxed(stdev->flags, stdev->thermal_base);
+ 
+ 	spear_thermal = thermal_zone_device_register("spear_thermal", 0, 0,
+-				stdev, &ops, NULL, 0, 0);
++				stdev, &ops, NULL, 0, 0, true);
+ 	if (IS_ERR(spear_thermal)) {
+ 		dev_err(&pdev->dev, "thermal zone device is NULL\n");
+ 		ret = PTR_ERR(spear_thermal);
+diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
+index 247528b..d949ab0 100644
+--- a/drivers/thermal/thermal_core.c
++++ b/drivers/thermal/thermal_core.c
+@@ -1344,6 +1344,9 @@ static void remove_trip_attrs(struct thermal_zone_device *tz)
+  * @polling_delay: number of milliseconds to wait between polls when checking
+  *		   whether trip points have been crossed (0 for interrupt
+  *		   driven systems)
++ * @add_hwmon:	a boolean to indicate if the thermal to hwmon sysfs interface
++ *		is required. When add_hwmon == true, a hwmon sysfs interface
++ *		will be created. When add_hwmon == false, nothing will be done
+  *
+  * This interface function adds a new thermal zone device (sensor) to
+  * /sys/class/thermal folder as thermal_zone[0-*]. It tries to bind all the
+@@ -1359,7 +1362,7 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
+ 	int trips, int mask, void *devdata,
+ 	const struct thermal_zone_device_ops *ops,
+ 	const struct thermal_zone_params *tzp,
+-	int passive_delay, int polling_delay)
++	int passive_delay, int polling_delay, bool add_hwmon)
+ {
+ 	struct thermal_zone_device *tz;
+ 	enum thermal_trip_type trip_type;
+@@ -1462,9 +1465,11 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
+ 
+ 	mutex_unlock(&thermal_governor_lock);
+ 
+-	result = thermal_add_hwmon_sysfs(tz);
+-	if (result)
+-		goto unregister;
++	if (add_hwmon) {
++		result = thermal_add_hwmon_sysfs(tz);
++		if (result)
++			goto unregister;
++	}
+ 
+ 	mutex_lock(&thermal_list_lock);
+ 	list_add_tail(&tz->node, &thermal_tz_list);
+diff --git a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+index 4c5f55c37..5ab613a 100644
+--- a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
++++ b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
+@@ -306,7 +306,7 @@ int ti_thermal_expose_sensor(struct ti_bandgap *bgp, int id,
+ 	data->ti_thermal = thermal_zone_device_register(domain,
+ 				OMAP_TRIP_NUMBER, 0, data, &ti_thermal_ops,
+ 				NULL, FAST_TEMP_MONITORING_RATE,
+-				FAST_TEMP_MONITORING_RATE);
++				FAST_TEMP_MONITORING_RATE, true);
+ 	if (IS_ERR(data->ti_thermal)) {
+ 		dev_err(bgp->dev, "thermal zone device is NULL\n");
+ 		return PTR_ERR(data->ti_thermal);
+diff --git a/drivers/thermal/x86_pkg_temp_thermal.c b/drivers/thermal/x86_pkg_temp_thermal.c
+index f36950e..74eb4c0 100644
+--- a/drivers/thermal/x86_pkg_temp_thermal.c
++++ b/drivers/thermal/x86_pkg_temp_thermal.c
+@@ -444,7 +444,7 @@ static int pkg_temp_thermal_device_add(unsigned int cpu)
+ 			thres_count,
+ 			(thres_count == MAX_NUMBER_OF_TRIPS) ?
+ 				0x03 : 0x01,
+-			phy_dev_entry, &tzone_ops, NULL, 0, 0);
++			phy_dev_entry, &tzone_ops, NULL, 0, 0, true);
+ 	if (IS_ERR(phy_dev_entry->tzone)) {
+ 		err = PTR_ERR(phy_dev_entry->tzone);
+ 		goto err_ret_free;
+diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+index a386a1c..88148b9 100644
+--- a/include/linux/thermal.h
++++ b/include/linux/thermal.h
+@@ -226,7 +226,7 @@ struct thermal_genl_event {
+ /* Function declarations */
+ struct thermal_zone_device *thermal_zone_device_register(const char *, int, int,
+ 		void *, const struct thermal_zone_device_ops *,
+-		const struct thermal_zone_params *, int, int);
++		const struct thermal_zone_params *, int, int, bool);
+ void thermal_zone_device_unregister(struct thermal_zone_device *);
+ 
+ int thermal_zone_bind_cooling_device(struct thermal_zone_device *, int,
+-- 
+1.8.2.1.342.gfa7285d
