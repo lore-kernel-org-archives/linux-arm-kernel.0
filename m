@@ -1,14 +1,19 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 23 Aug 2013 12:15:28 -0700
-Subject: [GIT PULL 1/5] ARM: imx: weim bus driver update for 3.12
-In-Reply-To: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org> (Shawn
- Guo's message of "Sun, 18 Aug 2013 21:48:04 +0800")
-References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <8761uwmd67.fsf@linaro.org>
+Date: Fri, 23 Aug 2013 12:16:08 -0700
+Subject: [GIT PULL v2 2/5] ARM: imx: soc changes for 3.12
+In-Reply-To: <20130822155404.GA8111@S2101-09.ap.freescale.net> (Shawn Guo's
+ message of "Thu, 22 Aug 2013 23:54:07 +0800")
+References: <20130822155404.GA8111@S2101-09.ap.freescale.net>
+Message-ID: <871u5kmd53.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Shawn Guo <shawn.guo@linaro.org> writes:
+
+> Changes since v1:
+>  * Drop patch 'ARM: imx: add low-level debug for vybrid'
+
+Thanks.
 
 > The following changes since commit 5ae90d8e467e625e447000cb4335c4db973b1095:
 >
@@ -16,17 +21,24 @@ Shawn Guo <shawn.guo@linaro.org> writes:
 >
 > are available in the git repository at:
 >
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-weim-3.12
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-soc-3.12
 >
-> for you to fetch changes up to 3f98b6baad63b181da4e859d81953e88ce8a50ec:
+> for you to fetch changes up to dc76a1adfa12ad11957bdeec565dbccf37205d04:
 >
->   drivers: bus: imx-weim: Add support for i.MX1/21/25/27/31/35/50/51/53 (2013-08-16 12:59:44 +0800)
+>   phy: micrel: Add definitions for common Micrel PHY registers (2013-08-22 23:20:54 +0800)
 >
 > ----------------------------------------------------------------
-> This is a patch series that updates imx-weim bus driver to have it
-> support more i.MX SoCs.  Because there is no maintainer for
-> drivers/bus so far, I'm forwarding it through IMX tree for 3.12 merge
-> window.
+> It contains a bunch of imx soc updates for 3.12.
+>
+> - Add more ethernet phy fixups for imx6 boards
+> - Add some missing imx6q clocks into clock driver
+> - Add new clock types fixup mux and div to work around some ugly
+>   hardware defect
+> - Consolidate L2 cache initialization function, so that it can be used
+>   on more i.MX SoCs
+> - Replace magic numbers in mach-imx6q.c with well defined macros
+> - Small fixes for imx6q and pllv3 clock drivers
+> - Some random updates on imx defconfig files
 
 Pulled into next/soc
 
