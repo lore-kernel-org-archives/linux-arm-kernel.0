@@ -1,63 +1,59 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Aug 2013 08:53:15 +0200
-Subject: [PATCH 10/12] ARM: mvebu: Set the start address of a CPU in a
- separate function
+Date: Fri, 23 Aug 2013 08:53:11 +0200
+Subject: [PATCH 06/12] ARM: mvebu: Low level functions to disbale cache
+ snooping
 In-Reply-To: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1377240797-4047-11-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1377240797-4047-7-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setting the start (or boot) address of A CPU is no more used only
-during SMP bring up, but will also be used by the CPU idle functions
-or later by the CPU hot plug ones.
+When going to deep idle we need to disable the SoC snooping by
+"hand". Playing with the coherency fabric requires to use assembly
+code to be sure that the compiler doesn't reorder the instructions nor
+do wrong optimization.
 
-This commit moves it in a separate function and exports it.
+This function will be called by the low level (in assembly) part of
+the CPU idle functions.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c         | 10 ++++++++--
- include/linux/armada-370-xp-pmsu.h |  1 +
- 2 files changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/coherency_ll.S | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 974740e..a556d178 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -56,6 +56,13 @@ static struct of_device_id of_pmsu_table[] = {
- 	{ /* end of list */ },
- };
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+index 1526b94..3fb426e 100644
+--- a/arch/arm/mach-mvebu/coherency_ll.S
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -73,6 +73,28 @@ ENTRY(ll_set_cpu_coherent)
+ 	mov	pc, lr
+ ENDPROC(ll_set_cpu_coherent)
  
-+void armada_370_xp_pmsu_set_start_addr(void *start_addr, int hw_cpu)
-+{
-+	writel(virt_to_phys(start_addr), pmsu_mp_base +
-+		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
-+}
-+EXPORT_SYMBOL_GPL(armada_370_xp_pmsu_set_start_addr);
++/*
++ * r0: if r0==0 => physical addres, else virtual address
++ */
++ENTRY(armada_370_xp_disable_snoop_ena)
++	ldr	r0, =(coherency_base)
++	ldr	r0, [r0]
++	/* Enable SnoopEna - Exclusive */
++	mrc	15, 0, r1, cr0, cr0, 5
++	and	r1, r1, #15
++	mov	r2, #(1 << 24)
++	lsl	r2, r2, r1
 +
- #ifdef CONFIG_SMP
- int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
- {
-@@ -68,8 +75,7 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
- 
- 	hw_cpu = cpu_logical_map(cpu_id);
- 
--	writel(virt_to_phys(boot_addr), pmsu_mp_base +
--			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
-+	armada_370_xp_pmsu_set_start_addr(boot_addr, hw_cpu);
- 
- 	/* Release CPU from reset by clearing reset bit*/
- 	reg = readl(pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
-diff --git a/include/linux/armada-370-xp-pmsu.h b/include/linux/armada-370-xp-pmsu.h
-index 235a40c..e09977b 100644
---- a/include/linux/armada-370-xp-pmsu.h
-+++ b/include/linux/armada-370-xp-pmsu.h
-@@ -14,5 +14,6 @@
- void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void);
- void armada_370_xp_pmsu_idle_prepare(bool deepidle);
- void armada_370_xp_pmsu_idle_restore(void);
-+void armada_370_xp_pmsu_set_start_addr(void *start_addr, int hw_cpu);
- 
- #endif	/* __ARMADA_370_XP__PMSU_H */
++1:
++	ldrex	r1, [r0]
++	bic	r1, r1, r2
++	strex	r3, r1, [r0]
++	cmp	r3, #0
++	bne 1b
++
++	mov pc, lr
++ENDPROC(armada_370_xp_disable_snoop_ena)
++
+ 	.align 2
+ 3:
+-	.long	coherency_phys_base - .
++		.long	coherency_phys_base - .
 -- 
 1.8.1.2
