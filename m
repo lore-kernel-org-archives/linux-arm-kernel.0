@@ -1,59 +1,48 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Aug 2013 08:53:11 +0200
-Subject: [PATCH 06/12] ARM: mvebu: Low level functions to disbale cache
- snooping
+Date: Fri, 23 Aug 2013 08:53:12 +0200
+Subject: [PATCH 07/12] ARM: mvebu: Add a new set of registers for pmsu
 In-Reply-To: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1377240797-4047-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1377240797-4047-8-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When going to deep idle we need to disable the SoC snooping by
-"hand". Playing with the coherency fabric requires to use assembly
-code to be sure that the compiler doesn't reorder the instructions nor
-do wrong optimization.
+The Power Management Unit Service block also controls the Coherency
+Fabric subsystem. This new set of registers is needed for the CPU idle
+implementation for the Armada 370/XP, it allows to enter a deep CPU
+idle state where the Coherency Fabric and the L2 cache are power down.
 
-This function will be called by the low level (in assembly) part of
-the CPU idle functions.
+This patch also adds warnings if one of the base registers set can't
+be ioremapped.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/coherency_ll.S | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+ arch/arm/mach-mvebu/pmsu.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
-index 1526b94..3fb426e 100644
---- a/arch/arm/mach-mvebu/coherency_ll.S
-+++ b/arch/arm/mach-mvebu/coherency_ll.S
-@@ -73,6 +73,28 @@ ENTRY(ll_set_cpu_coherent)
- 	mov	pc, lr
- ENDPROC(ll_set_cpu_coherent)
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 3cc4bef..1d147fe 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -25,6 +25,7 @@
  
-+/*
-+ * r0: if r0==0 => physical addres, else virtual address
-+ */
-+ENTRY(armada_370_xp_disable_snoop_ena)
-+	ldr	r0, =(coherency_base)
-+	ldr	r0, [r0]
-+	/* Enable SnoopEna - Exclusive */
-+	mrc	15, 0, r1, cr0, cr0, 5
-+	and	r1, r1, #15
-+	mov	r2, #(1 << 24)
-+	lsl	r2, r2, r1
-+
-+1:
-+	ldrex	r1, [r0]
-+	bic	r1, r1, r2
-+	strex	r3, r1, [r0]
-+	cmp	r3, #0
-+	bne 1b
-+
-+	mov pc, lr
-+ENDPROC(armada_370_xp_disable_snoop_ena)
-+
- 	.align 2
- 3:
--	.long	coherency_phys_base - .
-+		.long	coherency_phys_base - .
+ static void __iomem *pmsu_mp_base;
+ static void __iomem *pmsu_reset_base;
++static void __iomem *pmsu_fabric_base;
+ 
+ #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
+ #define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
+@@ -66,7 +67,11 @@ int __init armada_370_xp_pmsu_init(void)
+ 	if (np) {
+ 		pr_info("Initializing Power Management Service Unit\n");
+ 		pmsu_mp_base = of_iomap(np, 0);
++		WARN_ON(!pmsu_mp_base);
+ 		pmsu_reset_base = of_iomap(np, 1);
++		WARN_ON(!pmsu_reset_base);
++		pmsu_fabric_base = of_iomap(np, 2);
++		WARN_ON(!pmsu_fabric_base);
+ 	}
+ 
+ 	return 0;
 -- 
 1.8.1.2
