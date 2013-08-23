@@ -1,82 +1,30 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 23 Aug 2013 15:54:34 -0400
-Subject: [PATCH v4 3/5] net: ethernet: cpsw: introduce ti,am3352-cpsw
- compatible string
-In-Reply-To: <5217AA15.7010907@ti.com>
-References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
- <1377267365-24057-4-git-send-email-zonque@gmail.com>
- <52177052.1030308@ti.com> <52178E20.5040404@gmail.com>
- <52179448.1020906@ti.com> <5217974B.5090503@ti.com> <521799A3.7080706@ti.com>
- <52179AD6.8090406@gmail.com> <52179BDA.50603@ti.com>
- <52179E44.5030202@ti.com> <5217A59E.4090700@ti.com> <5217AA15.7010907@ti.com>
-Message-ID: <5217BDFA.5040904@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 23 Aug 2013 22:02:40 +0200
+Subject: [PATCH v2 5/5] clk/exynos5420: assign sclk_pixel id to pixel
+ clock divider
+In-Reply-To: <1377241078-11808-6-git-send-email-rahul.sharma@samsung.com>
+References: <1377241078-11808-1-git-send-email-rahul.sharma@samsung.com>
+ <1377241078-11808-6-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <3550203.JkdqaguvYB@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 August 2013 02:29 PM, Mugunthan V N wrote:
-> On Friday 23 August 2013 11:40 PM, Santosh Shilimkar wrote:
->> On Friday 23 August 2013 01:39 PM, Sekhar Nori wrote:
->>> On 8/23/2013 10:58 PM, Santosh Shilimkar wrote:
->>>> On Friday 23 August 2013 01:24 PM, Daniel Mack wrote:
->>>>> On 23.08.2013 19:19, Santosh Shilimkar wrote:
->>>>>> On Friday 23 August 2013 01:09 PM, Sekhar Nori wrote:
->>>>>>> On 8/23/2013 10:26 PM, Santosh Shilimkar wrote:
->>>>>>>> So just stick the IP version or call it cpsw-v1... cpsw-v2 etc.
->>>>>>> If this could be handled using IP version then the right way would be to
->>>>>>> just read the IP version from hardware and use it. No need of DT property.
->>>>>>>
->>>>>> Thats fine as well but I thought the patch needed additional properties like
->>>>>> CM reg-address come from DT and hence the separate compatible. If you can
->>>>>> manage without that, thats even better.
->>>>> We can't, that's the whole point :)
->>>>>
->>>> I saw that from the patch :)
->>>>
->>>>> Well, theoretically, we could for now, but that's not a clean solution.
->>>>> Again: the problem here is that the control port is separated from the
->>>>> cpsw core, and so we have to implement something specific for the AM3352
->>>>> SoC. I know that's a violation of clean and generic driver ideas, but
->>>>> there's no way we can assume that every cpsw v2 ip block has a control
->>>>> port that is compatible to the one found on am335x chips.
->>>>>
->>>> But there is a possibility that other SOC will just use the same
->>>> control module approach. So using a revision IP is just fine. BTW,
->>> But this is misleading because it makes appear like the same compatible
->>> can be used on on another SoC like DRA7 which probably has the same
->>> version of IP but a different control module implementation, when in
->>> practice it cannot.
->>>
->>> The fact is we are doing something SoC specific in the driver and we
->>> cannot hide that behind IP versions. If really in practice there comes
->>> another SoC with the same control module definition then it can always
->>> use ti,am3352-cpsw compatible as well. The compatible name does not
->>> preclude its usage.
->>>
->> My point was the CPSW needs a feature which is implemented using
->> control module rather than within the IP itself. Its an implementation
->> detail. As such the additional feature makes sense for that IP. O.w
->> there was no need to do any monkeying with control module.
->>
->> E.g
->> MMC card detect is a basic functionality, implemented by various types
->> like control module, PMIC or MMC IP itself. As such the driver need
->> that support and all the implementation details needs to still handled
->> to make that part work.
->>
->>
-> 
-> CPSW core as such understands only GMII/MII signals, there is an
-> additional module which converts GMII/MII signals to RGMII/RMII signals
-> respectively which is called as CPRGMII/CPRMII as specified in the
-> AM335x TRM in Figure 14-1. Ethernet Switch Integration.
-> 
-> So to control this sub-module, the control register is used and this has
-> to be configured according to the EVM design like what mode of phy is
-> connected. CPRGMII and CPRMII is no way related to CPSW core.
-> 
-Ok then why are you polluting cpsw driver with that code which
-not realted to CPSW as you said above. You are contradicting what
-you said by supporting the SOC usage in the core CPSW driver.
+Hi Rahul,
 
-Regards,
-Santosh
+On Friday 23 of August 2013 12:27:58 Rahul Sharma wrote:
+> sclk_pixel is used to represent pixel clock divider on all exynos
+> SoCs not as a gate clock. It is queried in driver to pass as the
+> parent to hdmi clock while switching between parents. A new ID can
+> be asssigned Pixel gate clock which is currently not in use. Pixel
+> clock gate is default 'on'.
+
+This doesn't sound like a correct assumption, especially if you recall how 
+common clock framework works - it disables any unclaimed clock 
+automatically. Also we might want to support gating from power management 
+reasons.
+
+IMHO you should simply export the dout_hdmi_pixel clock, keeping the 
+original sclk_pixel exported as well.
+
+Best regards,
+Tomasz
