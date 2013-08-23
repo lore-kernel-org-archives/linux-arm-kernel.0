@@ -1,57 +1,80 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 23 Aug 2013 13:56:30 +0800
-Subject: [PATCH 1/1]  ARM: dts: imx28-evk: Add pinctrl for USB OTG ID pin
-Message-ID: <1377237390-15983-1-git-send-email-peter.chen@freescale.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 23 Aug 2013 08:56:07 +0100
+Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the
+ DBX500 DT
+In-Reply-To: <20130822211912.GE31036@pengutronix.de>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <1370521041-32318-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
+ <20130820093034.GL31036@pengutronix.de>
+ <20130822133730.GB23152@e106331-lin.cambridge.arm.com>
+ <20130822141900.GB17154@lee--X1>
+ <20130822151723.GE23152@e106331-lin.cambridge.arm.com>
+ <20130822154116.GC17154@lee--X1>
+ <20130822211912.GE31036@pengutronix.de>
+Message-ID: <20130823075607.GD17154@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After that, the dual-role switch can be used at imx28-evk.
+I had a short chat with Rob last night about this. I'm going to loop
+him in to the conversation, as he wrote the binding.
 
-Due to hardware limitations, it needs to switch VDD 5V
-SOURCE SELECT to "USB 5V" if the user wants to use OTG
-dual-role switch function. it needs to switch VDD 5V
-SOURCE SELECT to "WALL 5V" if the user wants to Host 1.
+> > When most of the other clocks that we deal with are being requested,
+> > they rely on being index zero:
+> > 
+> >   drivers/i2c/busses/i2c-nomadik.c: dev->clk = clk_get(&adev->dev, NULL);
+> 
+> Look at drivers/clk/clkdev.c, there's some fuzzy matching
+> involved when you pass NULL as connection id.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- arch/arm/boot/dts/imx28-evk.dts |    2 ++
- arch/arm/boot/dts/imx28.dtsi    |   11 +++++++++++
- 2 files changed, 13 insertions(+), 0 deletions(-)
+Yes, I've been looking at that. This is why it works currently. I
+think I need to change all of the drivers to specify which clock they
+want. At the moment that 'fuzzy matching' is what's saving us. If
+anyone were to change our DTS file to match what the binding says,
+then it would cease to work. I'm guessing this is the same for all
+other DTS files too:
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 15715d9..fa48bd5 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -243,6 +243,8 @@
- 	ahb at 80080000 {
- 		usb0: usb at 80080000 {
- 			vbus-supply = <&reg_usb0_vbus>;
-+			pinctrl-names = "default";
-+  			pinctrl-0 = <&usb0_pins_a>;
- 			status = "okay";
- 		};
- 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 7363fde..54bd17c 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -731,6 +731,17 @@
- 					fsl,pull-up = <0>;
- 				};
- 
-+				usb0_pins_a: usb0 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x3071 /* MX28_PAD_AUART1_RTS__USB0_ID */
-+					>;
-+					fsl,drive-strength = <2>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+
-+
- 				usbphy1_pins_a: usbphy1 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
+arch/arm/boot/dts/imx23.dtsi:                clock-names = "uart", "apb_pclk";
+arch/arm/boot/dts/imx28.dtsi:                clock-names = "uart", "apb_pclk";
+arch/arm/boot/dts/nspire-cx.dts:             clock-names = "uart_clk", "apb_pclk";
+arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "timclk", "apb_pclk";
+arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "timclk", "apb_pclk";
+arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "uartclk", "apb_pclk";
+arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "uartclk", "apb_pclk";
+arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "uartclk", "apb_pclk";
+arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "rng", "apb_pclk";
+arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "mclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "refclk", "timclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "mclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "KMIREFCLK", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "KMIREFCLK", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "wdogclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "timclken1", "timclken2", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "timclken1", "timclken2", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "clcdclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "refclk", "timclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "mclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "KMIREFCLK", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "KMIREFCLK", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "wdogclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "timclken1", "timclken2", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "timclken1", "timclken2", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "clcdclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts:  clock-names = "wdogclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2p-ca9.dts:      clock-names = "clcdclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2p-ca9.dts:      clock-names = "timclk", "apb_pclk";
+arch/arm/boot/dts/vexpress-v2p-ca9.dts:      clock-names = "wdogclk", "apb_pclk";
+
 -- 
-1.7.1
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
