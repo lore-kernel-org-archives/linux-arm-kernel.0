@@ -1,120 +1,120 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Aug 2013 08:53:10 +0200
-Subject: [PATCH 05/12] ARM: mvebu: Makes ll_set_cpu_coherent() more
- configurable
+Date: Fri, 23 Aug 2013 08:53:14 +0200
+Subject: [PATCH 09/12] ARM: mvebu: Add the PMSU related part of the cpu idle
+ functions
 In-Reply-To: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1377240797-4047-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1377240797-4047-10-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ll_set_cpu_coherent does two things to set the coherency for a CPU:
-
-- Adding the CPU to the SMP group 0
-- Enabling the snooping on the CPU
-
-Only the second part is needed when coming back from a CPU Idle. This
-commit allows to choose to do the first part or not.
+The cpu idle support will need to acces to the Power Mangement Service
+Unit. This commit adds and exports the prepare and restore functions
+that will be used by the CPU idle.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/coherency.c    |  4 ++--
- arch/arm/mach-mvebu/coherency_ll.S | 30 ++++++++++++++++++------------
- arch/arm/mach-mvebu/headsmp.S      |  3 +++
- 3 files changed, 23 insertions(+), 14 deletions(-)
+ arch/arm/mach-mvebu/pmsu.c         | 70 ++++++++++++++++++++++++++++++++++++++
+ include/linux/armada-370-xp-pmsu.h |  2 ++
+ 2 files changed, 72 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index a2b6366..2f934f1 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -43,7 +43,7 @@ static struct of_device_id of_coherency_table[] = {
- };
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index bb7f606..974740e 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -30,6 +30,24 @@ static void __iomem *pmsu_fabric_base;
+ #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
+ #define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
  
- /* Function defined in coherency_ll.S */
--int ll_set_cpu_coherent(bool use_virt_addr);
-+int ll_set_cpu_coherent(bool use_virt_addr, bool use_smp_group);
++#define PM_CONTROL_AND_CONFIG(cpu)	((cpu * 0x100) + 0x4)
++#define PM_CONTROL_AND_CONFIG_DFS_REQ		(1 << 18)
++#define PM_CONTROL_AND_CONFIG_PWDDN_REQ	(1 << 16)
++#define PM_CONTROL_AND_CONFIG_L2_PWDDN		(1 << 20)
++
++#define PM_CPU_POWER_DOWN_CONTROL(cpu)	((cpu * 0x100) + 0x8)
++
++#define PM_CPU_POWER_DOWN_DIS_SNP_Q_SKIP	(1 << 0)
++
++#define PM_STATUS_AND_MASK(cpu)	((cpu * 0x100) + 0xc)
++#define PM_STATUS_AND_MASK_CPU_IDLE_WAIT	(1 << 16)
++#define PM_STATUS_AND_MASK_SNP_Q_EMPTY_WAIT	(1 << 17)
++#define PM_STATUS_AND_MASK_IRQ_WAKEUP		(1 << 20)
++#define PM_STATUS_AND_MASK_FIQ_WAKEUP		(1 << 21)
++#define PM_STATUS_AND_MASK_DBG_WAKEUP		(1 << 22)
++#define PM_STATUS_AND_MASK_IRQ_MASK		(1 << 24)
++#define PM_STATUS_AND_MASK_FIQ_MASK		(1 << 25)
++
+ #define L2C_NFABRIC_PM_CTL		    0x4
+ #define L2C_NFABRIC_PM_CTL_PWR_DOWN	    (1 << 20)
  
- int set_cpu_coherent(void)
- {
-@@ -53,7 +53,7 @@ int set_cpu_coherent(void)
- 		return 1;
- 	}
- 
--	return ll_set_cpu_coherent(true);
-+	return ll_set_cpu_coherent(true, true);
+@@ -91,4 +109,56 @@ void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
  }
+ EXPORT_SYMBOL_GPL(armada_370_xp_pmsu_enable_l2_powerdown_onidle);
  
- static inline void mvebu_hwcc_sync_io_barrier(void)
-diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
-index fc2e6f7..1526b94 100644
---- a/arch/arm/mach-mvebu/coherency_ll.S
-+++ b/arch/arm/mach-mvebu/coherency_ll.S
-@@ -22,7 +22,8 @@
- 
- 	.text
- /*
-- * r0: if r0==0 => physical addres, else virtual address
-+ * r0: Use virtual address if r0 != 0, else physical address
-+ * r1: Add CPU to the SMP group if r1 != 0
-  */
- ENTRY(ll_set_cpu_coherent)
- 	cmp	r0, #0
-@@ -38,26 +39,31 @@ ENTRY(ll_set_cpu_coherent)
- 	ldr	r0, [r0]
- 2:
- 	/* Create bit by cpu index */
--	mrc	15, 0, r1, cr0, cr0, 5
--	and	r1, r1, #15
-+	mrc	15, 0, r3, cr0, cr0, 5
-+	and	r3, r3, #15
- 	mov	r2, #(1 << 24)
--	lsl	r1, r2, r1
-+	lsl	r3, r2, r3
++void armada_370_xp_pmsu_idle_prepare(bool deepidle)
++{
++	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
++	int reg;
 +
-+	/* If r1=!0 then just enable the snooping */
-+	cmp	r1, #0
-+	beq	2f
- 
- 	/* Add CPU to SMP group - Atomic */
--	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
-+	add	r1, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
- 1:
--	ldrex	r2, [r3]
--	orr	r2, r2, r1
--	strex 	r0, r2, [r3]
-+	ldrex	r2, [r1]
-+	orr	r2, r2, r3
-+	strex 	r0, r2, [r1]
- 	cmp	r0, #0
- 	bne 1b
- 
-+2:
- 	/* Enable coherency on CPU - Atomic */
--	add	r3, r3, #ARMADA_XP_CFB_CFG_REG_OFFSET
-+	add	r1, r1, #ARMADA_XP_CFB_CFG_REG_OFFSET
- 1:
--	ldrex	r2, [r3]
--	orr	r2, r2, r1
--	strex	r0, r2, [r3]
-+	ldrex	r2, [r1]
-+	orr	r2, r2, r3
-+	strex	r0, r2, [r1]
- 	cmp	r0, #0
- 	bne 1b
- 
-diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
-index b2c6e95..f2732c8 100644
---- a/arch/arm/mach-mvebu/headsmp.S
-+++ b/arch/arm/mach-mvebu/headsmp.S
-@@ -30,6 +30,9 @@ ENTRY(armada_xp_secondary_startup)
- 	/* Use physical addrss */
- 	mov	r0, #0
- 
-+	/* Add CPU to the SMP group*/
-+	mov	r1, #1
++	reg = readl(pmsu_mp_base + PM_STATUS_AND_MASK(hw_cpu));
++	/* set WaitMask fields - wait for WFI signal */
++	reg |= PM_STATUS_AND_MASK_CPU_IDLE_WAIT;
++	/* enable wakeup events */
++	reg |= PM_STATUS_AND_MASK_IRQ_WAKEUP | PM_STATUS_AND_MASK_FIQ_WAKEUP;
++	/* set wait for snoop queue empty indication */
++	reg |= PM_STATUS_AND_MASK_SNP_Q_EMPTY_WAIT;
++	/* mask IRQ and FIQ from CPU */
++	reg |= PM_STATUS_AND_MASK_IRQ_MASK | PM_STATUS_AND_MASK_FIQ_MASK;
++	writel(reg, pmsu_mp_base + PM_STATUS_AND_MASK(hw_cpu));
 +
- 	/* Add CPU to coherency fabric */
- 	bl	ll_set_cpu_coherent
- 	b	secondary_startup
++	reg = readl(pmsu_mp_base + PM_CONTROL_AND_CONFIG(hw_cpu));
++	/* ask HW to power down the L2 Cache if needed */
++	if (deepidle)
++		reg |= PM_CONTROL_AND_CONFIG_L2_PWDDN;
++	/* request power down */
++	reg |= PM_CONTROL_AND_CONFIG_PWDDN_REQ;
++	writel(reg, pmsu_mp_base + PM_CONTROL_AND_CONFIG(hw_cpu));
++
++	/* Disable snoop disable by HW - SW is taking care of it */
++	reg = readl(pmsu_mp_base + PM_CPU_POWER_DOWN_CONTROL(hw_cpu));
++	reg |= PM_CPU_POWER_DOWN_DIS_SNP_Q_SKIP;
++	writel(reg, pmsu_mp_base + PM_CPU_POWER_DOWN_CONTROL(hw_cpu));
++}
++EXPORT_SYMBOL_GPL(armada_370_xp_pmsu_idle_prepare);
++
++noinline void armada_370_xp_pmsu_idle_restore(void)
++{
++	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
++	int reg;
++
++	/* cancel ask HW to power down the L2 Cache if possible */
++	reg = readl(pmsu_mp_base + PM_CONTROL_AND_CONFIG(hw_cpu));
++	reg &= ~PM_CONTROL_AND_CONFIG_L2_PWDDN;
++	writel(reg, pmsu_mp_base + PM_CONTROL_AND_CONFIG(hw_cpu));
++
++	/* cancel Enable wakeup events */
++	reg = readl(pmsu_mp_base + PM_STATUS_AND_MASK(hw_cpu));
++	reg &= ~(PM_STATUS_AND_MASK_IRQ_WAKEUP | PM_STATUS_AND_MASK_FIQ_WAKEUP);
++	reg &= ~PM_STATUS_AND_MASK_CPU_IDLE_WAIT;
++	reg &= ~PM_STATUS_AND_MASK_SNP_Q_EMPTY_WAIT;
++	/* Mask interrupts */
++	reg &= ~(PM_STATUS_AND_MASK_IRQ_MASK | PM_STATUS_AND_MASK_FIQ_MASK);
++	writel(reg, pmsu_mp_base + PM_STATUS_AND_MASK(hw_cpu));
++}
++EXPORT_SYMBOL_GPL(armada_370_xp_pmsu_idle_restore);
++
+ early_initcall(armada_370_xp_pmsu_init);
+diff --git a/include/linux/armada-370-xp-pmsu.h b/include/linux/armada-370-xp-pmsu.h
+index f85cbf7..235a40c 100644
+--- a/include/linux/armada-370-xp-pmsu.h
++++ b/include/linux/armada-370-xp-pmsu.h
+@@ -12,5 +12,7 @@
+ #define __ARMADA_370_XP__PMSU_H
+ 
+ void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void);
++void armada_370_xp_pmsu_idle_prepare(bool deepidle);
++void armada_370_xp_pmsu_idle_restore(void);
+ 
+ #endif	/* __ARMADA_370_XP__PMSU_H */
 -- 
 1.8.1.2
