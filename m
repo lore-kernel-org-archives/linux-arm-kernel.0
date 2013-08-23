@@ -1,70 +1,97 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 23 Aug 2013 09:00:23 -0700
-Subject: [RFC 17/17] clk: zynq: remove call to of_clk_init
-In-Reply-To: <20130823073250.GB30135@pengutronix.de>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376964271-22715-18-git-send-email-sebastian.hesselbarth@gmail.com>
- <d17acba9-85f9-40cd-a176-2005e3e924f8@CO1EHSMHS002.ehs.local>
- <c4d10bdf-6506-4edc-92cc-2acc67b86602@VA3EHSMHS032.ehs.local>
- <20130823073250.GB30135@pengutronix.de>
-Message-ID: <bf33d6fc-a28b-410a-aa75-be7b584aadd8@CO9EHSMHS025.ehs.local>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 23 Aug 2013 11:06:25 -0500
+Subject: [PATCH RFC v2 2/5] spmi: Linux driver framework for SPMI
+In-Reply-To: <20130822231054.GA31973@kroah.com>
+References: <cover.1377202730.git.joshc@codeaurora.org>
+ <46db5901fe4d04d09cee8fd81ea1c62068ee9503.1377202730.git.joshc@codeaurora.org>
+ <20130822231054.GA31973@kroah.com>
+Message-ID: <20130823160625.GP4035@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steffen,
+On Thu, Aug 22, 2013 at 04:10:54PM -0700, Greg Kroah-Hartman wrote:
+> On Fri, Aug 09, 2013 at 01:37:09PM -0700, Josh Cartwright wrote:
+> > +static char dbgfs_help[] =
+> > +	"SPMI Debug-FS support\n"
+> > +	"\n"
+> > +	"Hierarchy schema:\n"
+> > +	"/sys/kernel/debug/spmi\n"
+> > +	"       /help                -- Static help text\n"
+> > +	"       /spmi-0              -- Directory for SPMI bus 0\n"
+> > +	"       /spmi-0/0-1          -- Directory for SPMI device '0-1'\n"
+> > +	"       /spmi-0/0-1/address  -- Starting register for reads or writes\n"
+> > +	"       /spmi-0/0-1/count    -- Number of registers to read (only used for reads)\n"
+> > +	"       /spmi-0/0-1/data     -- Initiates the SPMI read (formatted output)\n"
+> > +	"       /spmi-0/0-1/data_raw -- Initiates the SPMI raw read or write\n"
+> > +	"       /spmi-n              -- Directory for SPMI bus n\n"
+> > +	"\n"
+> > +	"To perform SPMI read or write transactions, you need to first write the\n"
+> > +	"address of the slave device register to the 'address' file.  For read\n"
+> > +	"transactions, the number of bytes to be read needs to be written to the\n"
+> > +	"'count' file.\n"
+> > +	"\n"
+> > +	"The 'address' file specifies the 20-bit address of a slave device register.\n"
+> > +	"The upper 4 bits 'address[19..16]' specify the slave identifier (SID) for\n"
+> > +	"the slave device.  The lower 16 bits specify the slave register address.\n"
+> > +	"\n"
+> > +	"Reading from the 'data' file will initiate a SPMI read transaction starting\n"
+> > +	"from slave register 'address' for 'count' number of bytes.\n"
+> > +	"\n"
+> > +	"Writing to the 'data' file will initiate a SPMI write transaction starting\n"
+> > +	"from slave register 'address'.  The number of registers written to will\n"
+> > +	"match the number of bytes written to the 'data' file.\n"
+> > +	"\n"
+> > +	"Example: Read 4 bytes starting at register address 0x1234 for SID 2\n"
+> > +	"\n"
+> > +	"echo 0x21234 > address\n"
+> > +	"echo 4 > count\n"
+> > +	"cat data\n"
+> > +	"\n"
+> > +	"Example: Write 3 bytes starting at register address 0x1008 for SID 1\n"
+> > +	"\n"
+> > +	"echo 0x11008 > address\n"
+> > +	"echo 0x01 0x02 0x03 > data\n"
+> > +	"\n"
+> > +	"Note that the count file is not used for writes.  Since 3 bytes are\n"
+> > +	"written to the 'data' file, then 3 bytes will be written across the\n"
+> > +	"SPMI bus.\n\n";
+> 
+> The help file within the kernel is a nice touch :)
+> 
+> I do know the only rule for debugfs is "There are no rules", but this
+> looks like you are going to have the way to interact to this bus and
+> devices as debugfs, is that correct?
 
-On Fri, Aug 23, 2013 at 09:32:50AM +0200, Steffen Trumtrar wrote:
-> Hi!
-> 
-> On Thu, Aug 22, 2013 at 05:59:36PM -0700, S?ren Brinkmann wrote:
-> > On Thu, Aug 22, 2013 at 05:26:47PM -0700, S?ren Brinkmann wrote:
-[ ... ]
-> I propose getting rid of the whole global pointer and let the clkc map the
-> address itself instead.
-> 
-> Then there is no need to shuffle stuff around in the initcalls.
-> I have some WIP patches (not rebased on next and not even tested with it,
-> but with v3.11-rc4)
-> 
-> The dtsi would be something like:
-> 
->        control-register at f8000000 {
-> 	       compatible = "simple-bus";
->                #address-cells = <1>;
->                #size-cells = <1>;
->                reg = <0xf8000000 0x1000>;
->                ranges;
-> 
->                slcr: slcr at f8000000 {
->                        compatible = "xlnx,zynq-slcr", "syscon";
->                        reg = <0xf8000000 0x10>;
->                };
-> 
->                clkc: clkc at f8000100 {
->                        #clock-cells = <1>;
->                        compatible = "xlnx,ps7-clkc";
->                        reg = <0xf8000100 0x100>;
+Using debugfs is _a_ way to interact with the controller/slaves, however
+it is not _the_ way to do so.  The primary interface is the in-kernel
+spmi_{read,write,...}_* functions called within the context of a proper
+slave driver.
 
-This is splitting the SLCR into multiple regions. I just heard about the
-syscon the first time, but wouldn't it be more correct to leave the SLCR
-region in one piece in the slcr node and then pass the slcr phandle to
-the clkc and later also pinmux etc. nodes? This way the SLCR is in
-charge of the lock and all registers protected by the lock.
-That wouldn't get rid of the dependency that SLCR has to be initialized
-before any of its users, but seems to reflect actual HW better since the
-whole region is protected by the same SLCR lock which makes them kinda
-inseparable.
+> Or is this only for "debugging"?  If so, please document it as such.
 
-Anyway, after all we more or less agree, that syscon/slcr has to be
-initialized before any SLCR user. So, no matter whether we do this
-through current code and a global pointer or DT phandles, the effect
-stays the same, IIUC.
-So, in order to not mix stuff around too much, I'd rather make sure that
-zynq_slcr_init() is called early enough (put it in init_irq() or some
-init_call() whatever works best), and keep the global pointer for now.
-That way most code can stay as is and we don't have to change the DT
-bindings.
-And then you can finish your work on this and we can revisit the topic
-of migrating to use the slcr through a phandle later?
+It's there because it provides a useful interface for debugging of the
+controller code, and for simple peek/poke of the slave registers without
+having a full driver in place.  Will document this.
 
-	S?ren
+> > +void spmi_dfs_controller_add(struct spmi_controller *ctrl)
+> > +{
+> > +	ctrl->dfs_dir = debugfs_create_dir(dev_name(&ctrl->dev),
+> > +					   spmi_debug_root);
+> > +	WARN_ON(!ctrl->dfs_dir);
+> 
+> Why?  What is a user going to be able to do with something like this?
+> You do this in a number of places, please provide "valid" error messages
+> instead of just kernel stack tracebacks, failing to show the device for
+> which the error occured (hint, use dev_err()).
+
+Will do.  Thanks.
+
+> Again, never use WARN_ON() as error handling, it's lazy, and wrong.
+
+To be fair to the original author of this code, this was one of the
+'cleanups' I implemented.  So, I'll take full responsibility for the
+laziness. :)
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
