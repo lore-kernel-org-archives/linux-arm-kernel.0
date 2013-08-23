@@ -1,57 +1,97 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 23 Aug 2013 11:53:50 -0500
-Subject: [PATCH v2 0/2] ARM: dts: Add SHAM and AES DT information
-In-Reply-To: <20130822212402.GA30504@animalcreek.com>
-References: <1374078222-12883-1-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.02.1308210012420.6426@utopia.booyaka.com>
- <5214C11F.8090808@baylibre.com> <5214C372.3080402@baylibre.com>
- <52158A7E.30305@ti.com> <5215CCFE.6040500@baylibre.com>
- <20130822212402.GA30504@animalcreek.com>
-Message-ID: <5217939E.40903@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Aug 2013 17:55:39 +0100
+Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the
+ DBX500 DT
+In-Reply-To: <20130823075607.GD17154@lee--X1>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <1370521041-32318-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
+ <20130820093034.GL31036@pengutronix.de>
+ <20130822133730.GB23152@e106331-lin.cambridge.arm.com>
+ <20130822141900.GB17154@lee--X1>
+ <20130822151723.GE23152@e106331-lin.cambridge.arm.com>
+ <20130822154116.GC17154@lee--X1>
+ <20130822211912.GE31036@pengutronix.de>
+ <20130823075607.GD17154@lee--X1>
+Message-ID: <20130823165539.GD7015@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2013 04:24 PM, Mark A. Greer wrote:
-> On Thu, Aug 22, 2013 at 10:34:06AM +0200, Benoit Cousson wrote:
->> Hi Lokesh,
->>
->> On 22/08/2013 05:50, Lokesh Vutla wrote:
->>> Hi Benoit,
->>> On Wednesday 21 August 2013 07:11 PM, Benoit Cousson wrote:
->>>> Hi Mark,
->>>>
->>>> In fact I cannot even apply these patches since they are referring the the edma controller node that does not seem to be there in 3.11-rc6.
->>>>
->>>> Is this EDMA series supposed to be merged for 3.12? If this is the case, where can I find a reference GIT for it?
->>> The following EDMA support dt patch series from Joel is needed :
->>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92176.html
->>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92177.html
->>
->> Thanks, it works a little bit better with these patches :-)
+On Fri, Aug 23, 2013 at 08:56:07AM +0100, Lee Jones wrote:
+> I had a short chat with Rob last night about this. I'm going to loop
+> him in to the conversation, as he wrote the binding.
 > 
-> Yeah, sorry.
+> > > When most of the other clocks that we deal with are being requested,
+> > > they rely on being index zero:
+> > > 
+> > >   drivers/i2c/busses/i2c-nomadik.c: dev->clk = clk_get(&adev->dev, NULL);
+> > 
+> > Look at drivers/clk/clkdev.c, there's some fuzzy matching
+> > involved when you pass NULL as connection id.
 > 
-> Given Mark Rutland's comments in another email, let me respin and send v3.
-> I'll put a comment about the dependencies this time.
+> Yes, I've been looking at that. This is why it works currently. I
+> think I need to change all of the drivers to specify which clock they
+> want. At the moment that 'fuzzy matching' is what's saving us. If
+> anyone were to change our DTS file to match what the binding says,
+> then it would cease to work. I'm guessing this is the same for all
+> other DTS files too:
 
-Just sanity tested these patches on v3.11-rc6 too.
+I think if anything, the binding document(s) should be updated to
+describe that apb_pclk is referred to by name, and the names of the
+other clocks should be described in the specific device bindings. We can
+then modify the drivers which grab clock 0 to explicitly grab the first
+clock by name, and backwards compatibility should not be broken.
 
-Drivers register successfully after passing the boot crypto testmgr tests.
-
-bash-4.2# cat /proc/crypto | grep -i omap
-driver       : ctr-aes-omap
-driver       : cbc-aes-omap
-driver       : ecb-aes-omap
-driver       : omap-hmac-sha256
-driver       : omap-hmac-sha224
-driver       : omap-sha256
-driver       : omap-sha224
-driver       : omap-hmac-md5
-driver       : omap-hmac-sha1
-driver       : omap-md5
-driver       : omap-sha1
-
+I don't believe any other OS has implemented the common clock bindings,
+and we've never supported the binding as described. Let's correct the
+de-facto standard into a standard by decree.
 
 Thanks,
+Mark.
 
--Joel
+> 
+> arch/arm/boot/dts/imx23.dtsi:                clock-names = "uart", "apb_pclk";
+> arch/arm/boot/dts/imx28.dtsi:                clock-names = "uart", "apb_pclk";
+> arch/arm/boot/dts/nspire-cx.dts:             clock-names = "uart_clk", "apb_pclk";
+> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "timclk", "apb_pclk";
+> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "timclk", "apb_pclk";
+> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "uartclk", "apb_pclk";
+> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "uartclk", "apb_pclk";
+> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "uartclk", "apb_pclk";
+> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "rng", "apb_pclk";
+> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "mclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "refclk", "timclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "mclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "KMIREFCLK", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "KMIREFCLK", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "wdogclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "timclken1", "timclken2", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "timclken1", "timclken2", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "clcdclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "refclk", "timclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "mclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "KMIREFCLK", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "KMIREFCLK", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "wdogclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "timclken1", "timclken2", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "timclken1", "timclken2", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "clcdclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts:  clock-names = "wdogclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2p-ca9.dts:      clock-names = "clcdclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2p-ca9.dts:      clock-names = "timclk", "apb_pclk";
+> arch/arm/boot/dts/vexpress-v2p-ca9.dts:      clock-names = "wdogclk", "apb_pclk";
+> 
+> -- 
+> Lee Jones
+> Linaro ST-Ericsson Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
+> 
