@@ -1,60 +1,75 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 23 Aug 2013 17:03:46 +0200
-Subject: [PATCH v3 4/5] clk: Assign module owner of a clock being registered
+Date: Fri, 23 Aug 2013 17:03:44 +0200
+Subject: [PATCH v3 2/5] clkdev: Fix race condition in clock lookup from device
+ tree
 In-Reply-To: <1377270227-1030-1-git-send-email-s.nawrocki@samsung.com>
 References: <1377270227-1030-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1377270227-1030-5-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1377270227-1030-3-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Assign module owner of a driver of a device passed to _clk_register()
-and __clk_register() functions so the module_{get,put} calls in
-__clk_get(), __clk_put() can have required effect.
+There is currently a race condition in the device tree part of clk_get()
+function, since the pointer returned from of_clk_get_by_name() may become
+invalid before __clk_get() call. I.e. due to the clock provider driver
+remove() callback being called in between of_clk_get_by_name() and
+__clk_get().
+
+Fix this by doing both the look up and __clk_get() operations with the
+clock providers list mutex held. This ensures that the clock pointer
+returned from __of_clk_get_from_provider() call and passed to __clk_get()
+is valid, as long as the clock supplier module first removes its clock
+provider instance and then does clk_unregister() on the corresponding
+clocks.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
-Initially I had an 'owner' field added to struct clk_init_data so it can
-be set explicitly in clock providers.  But this required modifications
-of all users of (devm_)clk_register() as struct clk_init_data instance
-was in most cases an unitialized stack variable.  This would also require
-adding yet another argument to various clk_register_* functions
-registering the standard clocks.  So I went for assigning clk->owner from
-dev->driver->owner.  The disadvantages are that dereferencing dev->driver
-may be potentially unsafe when not holding struct device::mutex.  And
-there might be cases where clk->owner will need to be NULL.  One option
-is to set dev argument of clk_register_*() to NULL for that, but it
-predates devm_*.
+Changes since v2:
+ - none.
 
-Presumably a requirement could be added that callers of clk_register*()
-must ensure dev->driver won't change during a call to these functions ?
+Changes since v1:
+ - include "clk.h".
 ---
- drivers/clk/clk.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/clk/clkdev.c |   12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index c173f30..272d68d 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1692,6 +1692,10 @@ struct clk *__clk_register(struct device *dev, struct clk_hw *hw)
- 	clk->flags = hw->init->flags;
- 	clk->parent_names = hw->init->parent_names;
- 	clk->num_parents = hw->init->num_parents;
-+	if (dev && dev->driver)
-+		clk->owner = dev->driver->owner;
-+	else
-+		clk->owner = NULL;
-
- 	ret = __clk_init(dev, clk);
- 	if (ret)
-@@ -1712,6 +1716,8 @@ static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
- 		goto fail_name;
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 442a313..48f6721 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -21,6 +21,8 @@
+ #include <linux/clkdev.h>
+ #include <linux/of.h>
+ 
++#include "clk.h"
++
+ static LIST_HEAD(clocks);
+ static DEFINE_MUTEX(clocks_mutex);
+ 
+@@ -39,7 +41,13 @@ struct clk *of_clk_get(struct device_node *np, int index)
+ 	if (rc)
+ 		return ERR_PTR(rc);
+ 
+-	clk = of_clk_get_from_provider(&clkspec);
++	of_clk_lock();
++	clk = __of_clk_get_from_provider(&clkspec);
++
++	if (!IS_ERR(clk) && !__clk_get(clk))
++		clk = ERR_PTR(-ENOENT);
++
++	of_clk_unlock();
+ 	of_node_put(clkspec.np);
+ 	return clk;
+ }
+@@ -157,7 +165,7 @@ struct clk *clk_get(struct device *dev, const char *con_id)
+ 
+ 	if (dev) {
+ 		clk = of_clk_get_by_name(dev->of_node, con_id);
+-		if (!IS_ERR(clk) && __clk_get(clk))
++		if (!IS_ERR(clk))
+ 			return clk;
  	}
- 	clk->ops = hw->init->ops;
-+	if (dev && dev->driver)
-+		clk->owner = dev->driver->owner;
- 	clk->hw = hw;
- 	clk->flags = hw->init->flags;
- 	clk->num_parents = hw->init->num_parents;
---
+ 
+-- 
 1.7.9.5
