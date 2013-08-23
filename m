@@ -1,156 +1,105 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 23 Aug 2013 15:48:19 +0200
-Subject: [PATCH v2] ARM: document the use of NEON in kernel mode
-In-Reply-To: <1376897504-24672-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1376897504-24672-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu9_Dyw3TQknz8owao0NSFgwO+Ggrcspu-P-VXamYjw0qw@mail.gmail.com>
+From: wangyuhang2014@gmail.com (yuhang wang)
+Date: Fri, 23 Aug 2013 21:59:09 +0800
+Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
+In-Reply-To: <52172A81.5090501@freescale.com>
+References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
+ <1376885403-12156-4-git-send-email-b32955@freescale.com>
+ <CAHSAbzN166J=DFi+1koPUpnFpJVHwtbC1AP21ywhAAissQxPxg@mail.gmail.com>
+ <52172A81.5090501@freescale.com>
+Message-ID: <CAHSAbzOUCO2ghLVq4F6xnoowMZ6PKp6qo33PrN7OrY12W_yfQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No objections apparently, so pushed to Russell's patch tracker [7825/1]
+Hi, Shijie
 
-Regards,
-Ard.
+2013/8/23 Huang Shijie <b32955@freescale.com>:
+> ? 2013?08?23? 17:05, yuhang wang ??:
+>>>
+>>> +       u16 sr_cr;
+>>> >  +       int ret;
+>>> >
+>>> >    #ifdef CONFIG_MTD_OF_PARTS
+>>> >           if (!of_device_is_available(np))
+>>> >  @@ -1014,6 +1050,21 @@ static int m25p_probe(struct spi_device *spi)
+>>> >           else
+>>> >                   flash->read_opcode = OPCODE_NORM_READ;
+>>> >
+>>> >  +       /* Try to enable the Quad Read */
+>>> >  +       if (np&&  of_property_read_bool(np, "m25p,quad-read")) {
+>>>
+>>> >  +               /* The configuration register is set by the second
+>>> > byte. */
+>>> >  +               sr_cr = CR_QUAD<<  8;
+>>> >  +
+>>> >  +               /* Write the QUAD bit to the Configuration Register.
+>>> > */
+>>> >  +               write_enable(flash);
+>>> >  +               if (write_sr_cr(flash, sr_cr) == 0) {
+>>> >  +                       /* read back and check it */
+>>> >  +                       ret = read_cr(flash);
+>>> >  +                       if (ret>  0&&  (ret&  CR_QUAD))
+>>>
+>>> >  +                               flash->read_opcode = OPCODE_QIOR;
+>>> >  +               }
+>>> >  +       }
+>>> >  +
+>>
+>> Well, M25p80.c support lots of flash devices, so driver should be as
+>> general as possible. Firstly not all the devices m25p80 supports set
+>> quad mode as your sequence, perhaps write_sr_cr can not match all the
+>
+> It does not matter the NOR flash supports the write_sr_cr() or not,
+> If the NOR flash does not support the write_sr_cr(), it may fails, and you
+> will not set the OPCODE_QIOR for the
+> m25p80_read.
+>
+>
+So your purpose of the patch is to make m25p80 support quad read or
+just support QIOR? if it's the previous one, when set quad support in
+DT, but it is possible that quad mode set failed and m25p80 driver
+still read in single mode. In such case, user won't get any error
+message, so user won't know  what transfer mode the flash works in. Or
+you just aimed to support QIOR, so the name in DT(quad read) seems not
+appropriate.
 
-On 19 August 2013 09:31, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Reviewed-by: Nicolas Pitre <nico@linaro.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> v2:
-> updated the NEON intrinsics section to reflect that the type ambiguity issue has
-> been addressed by patch 'ARM: add workaround for ambiguous C99 stdint.h types'
+>> m25p80 flash. Secondly, why you only support QIOR(high performance)
+>> not QOR or DOR. Maybe QIOR seems too special, so what if user want to
+>> use QOR if he set quad mode in DTS.
+>>
+> Frankly speaking, i am reluctant to support the QIOR, it is a little slow.
+> :)
 >
->  Documentation/arm/kernel_mode_neon.txt | 121 +++++++++++++++++++++++++++++++++
->  1 file changed, 121 insertions(+)
->  create mode 100644 Documentation/arm/kernel_mode_neon.txt
+> So the the QIOR is lowest speed for QUADSPI controller, and i do not want to
+> support the DOR.
 >
-> diff --git a/Documentation/arm/kernel_mode_neon.txt b/Documentation/arm/kernel_mode_neon.txt
-> new file mode 100644
-> index 0000000..5254527
-> --- /dev/null
-> +++ b/Documentation/arm/kernel_mode_neon.txt
-> @@ -0,0 +1,121 @@
-> +Kernel mode NEON
-> +================
-> +
-> +TL;DR summary
-> +-------------
-> +* Use only NEON instructions, or VFP instructions that don't rely on support
-> +  code
-> +* Isolate your NEON code in a separate compilation unit, and compile it with
-> +  '-mfpu=neon -mfloat-abi=softfp'
-> +* Put kernel_neon_begin() and kernel_neon_end() calls around the calls into your
-> +  NEON code
-> +* Don't sleep in your NEON code, and be aware that it will be executed with
-> +  preemption disabled
-> +
-> +
-> +Introduction
-> +------------
-> +It is possible to use NEON instructions (and in some cases, VFP instructions) in
-> +code that runs in kernel mode. However, for performance reasons, the NEON/VFP
-> +register file is not preserved and restored at every context switch or taken
-> +exception like the normal register file is, so some manual intervention is
-> +required. Furthermore, special care is required for code that may sleep [i.e.,
-> +may call schedule()], as NEON or VFP instructions will be executed in a
-> +non-preemptible section for reasons outlined below.
-> +
-> +
-> +Lazy preserve and restore
-> +-------------------------
-> +The NEON/VFP register file is managed using lazy preserve (on UP systems) and
-> +lazy restore (on both SMP and UP systems). This means that the register file is
-> +kept 'live', and is only preserved and restored when multiple tasks are
-> +contending for the NEON/VFP unit (or, in the SMP case, when a task migrates to
-> +another core). Lazy restore is implemented by disabling the NEON/VFP unit after
-> +every context switch, resulting in a trap when subsequently a NEON/VFP
-> +instruction is issued, allowing the kernel to step in and perform the restore if
-> +necessary.
-> +
-> +Any use of the NEON/VFP unit in kernel mode should not interfere with this, so
-> +it is required to do an 'eager' preserve of the NEON/VFP register file, and
-> +enable the NEON/VFP unit explicitly so no exceptions are generated on first
-> +subsequent use. This is handled by the function kernel_neon_begin(), which
-> +should be called before any kernel mode NEON or VFP instructions are issued.
-> +Likewise, the NEON/VFP unit should be disabled again after use to make sure user
-> +mode will hit the lazy restore trap upon next use. This is handled by the
-> +function kernel_neon_end().
-> +
-> +
-> +Interruptions in kernel mode
-> +----------------------------
-> +For reasons of performance and simplicity, it was decided that there shall be no
-> +preserve/restore mechanism for the kernel mode NEON/VFP register contents. This
-> +implies that interruptions of a kernel mode NEON section can only be allowed if
-> +they are guaranteed not to touch the NEON/VFP registers. For this reason, the
-> +following rules and restrictions apply in the kernel:
-> +* NEON/VFP code is not allowed in interrupt context;
-> +* NEON/VFP code is not allowed to sleep;
-> +* NEON/VFP code is executed with preemption disabled.
-> +
-> +If latency is a concern, it is possible to put back to back calls to
-> +kernel_neon_end() and kernel_neon_begin() in places in your code where none of
-> +the NEON registers are live. (Additional calls to kernel_neon_begin() should be
-> +reasonably cheap if no context switch occurred in the meantime)
-> +
-> +
-> +VFP and support code
-> +--------------------
-> +Earlier versions of VFP (prior to version 3) rely on software support for things
-> +like IEEE-754 compliant underflow handling etc. When the VFP unit needs such
-> +software assistance, it signals the kernel by raising an undefined instruction
-> +exception. The kernel responds by inspecting the VFP control registers and the
-> +current instruction and arguments, and emulates the instruction in software.
-> +
-> +Such software assistance is currently not implemented for VFP instructions
-> +executed in kernel mode. If such a condition is encountered, the kernel will
-> +fail and generate an OOPS.
-> +
-> +
-> +Separating NEON code from ordinary code
-> +---------------------------------------
-> +The compiler is not aware of the special significance of kernel_neon_begin() and
-> +kernel_neon_end(), i.e., that it is only allowed to issue NEON/VFP instructions
-> +between calls to these respective functions. Furthermore, GCC may generate NEON
-> +instructions of its own at -O3 level if -mfpu=neon is selected, and even if the
-> +kernel is currently compiled at -O2, future changes may result in NEON/VFP
-> +instructions appearing in unexpected places if no special care is taken.
-> +
-> +Therefore, the recommended and only supported way of using NEON/VFP in the
-> +kernel is by adhering to the following rules:
-> +* isolate the NEON code in a separate compilation unit and compile it with
-> +  '-mfpu=neon -mfloat-abi=softfp';
-> +* issue the calls to kernel_neon_begin(), kernel_neon_end() as well as the calls
-> +  into the unit containing the NEON code from a compilation unit which is *not*
-> +  built with the GCC flag '-mfpu=neon' set.
-> +
-> +As the kernel is compiled with '-msoft-float', the above will guarantee that
-> +both NEON and VFP instructions will only ever appear in designated compilation
-> +units at any optimization level.
-> +
-> +
-> +NEON assembler
-> +--------------
-> +NEON assembler is supported with no additional caveats as long as the rules
-> +above are followed.
-> +
-> +
-> +NEON code generated by GCC
-> +--------------------------
-> +The GCC option -ftree-vectorize (implied by -O3) tries to exploit implicit
-> +parallelism, and generates NEON code from ordinary C source code. This is fully
-> +supported as long as the rules above are followed.
-> +
-> +
-> +NEON intrinsics
-> +---------------
-> +NEON intrinsics are also supported. However, as code using NEON intrinsics
-> +relies on the GCC header <arm_neon.h>, (which #includes <stdint.h>), you should
-> +observe the following in addition to the rules above:
-> +* Compile the unit containing the NEON intrinsics with '-ffreestanding' so GCC
-> +  uses its builtin version of <stdint.h> (this is a C99 header which the kernel
-> +  does not supply);
-> +* Include <arm_neon.h> last, or at least after <linux/types.h>
-> --
-> 1.8.1.2
+> In my new version, i add the support for DDR QIOR read which is the double
+> rate of the QIOR.
 >
+> The user should knows if the NOR flash supports the quad-read or not, and
+> set the proper DT.
+>
+>
+It is slow in your spi system, but to m25p80 it should be general.
+Maybe some others will use that function. So I think it is better to
+supplement the other operations.
+
+>> Another point, if command changed to OPCODE_QIOR, there should also
+>> should be some correct in m25p_read. such as the number of dummy data.
+>
+> I only need to change the read opcode.
+>
+>> QIOR can support read without read command if set the certain bit in
+>> transfer, these aspects did not reflect in your patch.
+>>
+> For the Quadspi, it will handle the dummy by the LUT sequence, such as DDR
+> QUAD read, the LUT sequence will
+> set proper dummy (6 cycles for S25FL128S). I do not need the m25p_read to
+> set the dummy.
+>
+>
+Also the same point to above, it is OK to your spi controller, but
+your current m25p80 patch can not content others. If I don't have the
+SPI controller which support LUT sequence, so my spi controller driver
+rely on the info that m25p80 provides, then your patch won't work.
+
+Best regards
