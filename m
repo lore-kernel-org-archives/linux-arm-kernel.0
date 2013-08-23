@@ -1,55 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Aug 2013 10:41:53 +0200
-Subject: [PATCH 11/12] cpuidle: mvebu: Add initial cpu idle support for
- Armada 370/XP SoC
-In-Reply-To: <1377240797-4047-12-git-send-email-gregory.clement@free-electrons.com>
-References: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
- <1377240797-4047-12-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <52172051.2030505@free-electrons.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 23 Aug 2013 10:43:32 +0200
+Subject: [PATCH v2 0/5] cpsw: support for control module register
+Message-ID: <1377247417-27386-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/08/2013 08:53, Gregory CLEMENT wrote:
-> Add wfi/cpu idle/cpu deep idle power states support for Armada XP SoC.
-> 
-> All the latencies and the power consumption values used at the
-> "armada_370_xp_idle_driver" structure are preliminary and will be
-> modified in the future after running some measurements and analysis.
-> 
-> Based on the work of Nadav Haklai.
-
-Atsushi Yamagata reported me an kernel crash when pm_support=off.
-Indeed I have lost a small chunk of code during my code reshaping.
-The following code will fix the issue. I will add it in the next
-version of this series.
-
-[...]
-> +
-> +	if (pm_support == WFI)
-> +		pr_info(" (WFI)\n");
-> +	else if (pm_support == MV_CPU_IDLE)
-> +		pr_info(" (CPU_IDLE)\n");
-> +	else if (pm_support == MV_CPU_DEEP_IDLE)
-> +		pr_info(" (CPU_DEEP_IDLE)\n");
+v1 -> v2:
+	* combine devm_request_mem_region() and devm_ioremap() and use
+	  devm_ioremap_resource() (reported by Sergei Shtylyov)
+	* fix multi-line comment style (reported by Sergei Shtylyov)
+	* fix ti,rmii-clock-ext property name (reported by Sekhar)
+	* rebased to net-next (reported by Mugunthan V N, David Miller)
+	* add a new compatible type, and handle AM33xx specific
+	  registers that way (reported by Sekhar)
+	* move gmii_sel_reg modifications to the open routine
+	  (reported by Mugunthan V N)
 
 
-> +	else
-> +		pr_info(" (DISABLED)\n");
-Will be replaced by
-+       else {
-+                       pr_info(" (DISABLED)\n");
-+                       return; /* do not register the cpuidle device */
-+       }
+Daniel Mack (5):
+  net: ethernet: cpsw: switch to devres allocations
+  net: ethernet: cpsw: add optional third memory region for CONTROL
+    module
+  net: ethernet: cpsw: introduce ti,am3352-cpsw compatible string
+  net: ethernet: cpsw: add support for hardware interface mode config
+  ARM: dts: am33xx: adopt to cpsw changes
 
-> +
-> +	armada_370_xp_idle_driver.state_count = pm_support + 1;
-> +
-> +	return cpuidle_register(&armada_370_xp_idle_driver, NULL);
-> +}
-> +
+ Documentation/devicetree/bindings/net/cpsw.txt |  10 +-
+ arch/arm/boot/dts/am33xx.dtsi                  |   5 +-
+ drivers/net/ethernet/ti/cpsw.c                 | 254 ++++++++++++++-----------
+ drivers/net/ethernet/ti/cpsw.h                 |   2 +
+ 4 files changed, 159 insertions(+), 112 deletions(-)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.3.1
