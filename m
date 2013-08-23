@@ -1,71 +1,51 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 23 Aug 2013 13:27:11 -0600
-Subject: [PATCH v6 3/4 UPDATED] drivers: of: add initialization code for
- dma reserved memory
-In-Reply-To: <1377247141-11284-1-git-send-email-m.szyprowski@samsung.com>
-References: <1376924669-28873-4-git-send-email-m.szyprowski@samsung.com>
- <1377247141-11284-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <5217B78F.1080300@wwwdotorg.org>
+Date: Fri, 23 Aug 2013 13:29:11 -0600
+Subject: [PATCH 4/4] Documentation: Add device tree bindings for Freescale
+ FTM PWM
+In-Reply-To: <20130823073612.GB3535@ulmo>
+References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
+ <1473340.OXSHEp7d4P@flatron>
+ <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20130822062610.GR31036@pengutronix.de> <20130823073612.GB3535@ulmo>
+Message-ID: <5217B807.7020800@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2013 02:39 AM,  wrote:
-> From: Marek Szyprowski <m.szyprowski@samsung.com>
+On 08/23/2013 01:36 AM, Thierry Reding wrote:
+> On Thu, Aug 22, 2013 at 08:26:10AM +0200, Sascha Hauer wrote:
+>> On Thu, Aug 22, 2013 at 02:55:42AM +0000, Xiubo Li-B47053 wrote:
+>>> Hi Tomasz,
+>>> 
+>>> Thanks for your comments.
+>>> 
+>>> 
+>>>> Could you explain meaning of this property more precisely?
+>>>> I'm interested especially how is this related to the PWM IP
+>>>> block and boards.
+>>>> 
+>>> 
+>>> Yes. There are 8 channels most. While the pinctrls of 4th and
+>>> 5th channels could be used by uart's Rx and Tx, then these 2
+>>> channels won't be used for pwm output, so there will be 6
+>>> channels available by the pwm. Thus, the pwm chip will register
+>>> only 6 pwms(6 channels) most("fsl,pwm-channel-orders = {0 1 2 3
+>>> 6 7}").And also the "fsl,pwm-channel-number" will be 6.
+>> 
+>> If the chip has eight PWMs I would register all of them. If some
+>> of them are not routed out by the pinmux then just nothing
+>> happens if you use them. In a sane devicetree they won't be
+>> referenced anyway when they are not routed out of the SoC.
 > 
-> This patch adds device tree support for contiguous and reserved memory
-> regions defined in device tree.
-> 
-> Large memory blocks can be reliably reserved only during early boot.
-> This must happen before the whole memory management subsystem is
-> initialized, because we need to ensure that the given contiguous blocks
-> are not yet allocated by kernel. Also it must happen before kernel
-> mappings for the whole low memory are created, to ensure that there will
-> be no mappings (for reserved blocks) or mapping with special properties
-> can be created (for CMA blocks). This all happens before device tree
-> structures are unflattened, so we need to get reserved memory layout
-> directly from fdt.
-> 
-> Later, those reserved memory regions are assigned to devices on each
-> device structure initialization.
+> In that case, shouldn't this be hooked up to the pinctrl subsystem
+> as well? As I understand the above, the logical thing would be for
+> each PWM channel's .request() operation to configure the pinmuxing
+> appropriately. And if it can't be configured as necessary then
+> .request() should return an error (or propagate the error from the
+> pinctrl subsystem).
 
-I think the binding looks OK now; just a couple minor comments below.
-
-> diff --git a/Documentation/devicetree/bindings/memory.txt b/Documentation/devicetree/bindings/memory.txt
-
-> +*** Reserved memory regions ***
-
-> +compatible:	one or more of:
-> +	- "linux,contiguous-memory-region" - enables binding of this
-> +	  region to Contiguous Memory Allocator (special region for
-> +	  contiguous memory allocations, shared with movable system
-> +	  memory, Linux kernel-specific).
-> +	- "reserved-memory-region" - compatibility is defined, given
-> +	  region is assigned for exclusive usage for by the respective
-> +	  devices.
-
-I'm slightly hesitant to agree with "linux" in the name here, since it
-seems like the concept of a memory region where DMA buffers/... should
-be allocated is pretty OS-independant. Similar for:
-
-> +linux,default-contiguous-region: property indicating that the region
-> +	is the default region for all contiguous memory
-> +	allocations, Linux specific (optional)
-
-But, I guess there's nothing stopping any other OS from parsing this
-same property, so I suppose it's OK. What do other DT maintainers think?
-
-> +*** Example ***
-
-> +		reserved-memory {
-...
-> +			contig_region at 0 {
-...
-> +			display_mem: region at 78000000 {
-...
-> +			multimedia_mem: region at 77000000 {
-
-Nit: I think all 3 of those nodes should be called region, but it's
-probably fine as-is.
-
-So, the binding,
-Acked-by: Stephen Warren <swarren@nvidia.com>
+I think the pin-muxing should be static, i.e. set up when the PWM
+device as a whole probe()s, rather than being twiddled at request/free
+time. Certainly the pinmux support in the device core is now set up to
+acquire the default state right before probe(). I don't see a need to
+do anything custom here.
