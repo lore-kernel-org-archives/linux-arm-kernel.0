@@ -1,10 +1,9 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Aug 2013 13:23:35 +0100
-Subject: [PATCH 35/40] ARM: ux500: Take out STUIB support when not booting
- with Device Tree
+Date: Fri, 23 Aug 2013 13:23:37 +0100
+Subject: [PATCH 37/40] ARM: ux500: Remove ATAG booting support for MOP500
 In-Reply-To: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
 References: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1377260620-18829-36-git-send-email-lee.jones@linaro.org>
+Message-ID: <1377260620-18829-38-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,89 +12,31 @@ Device Tree booting. This patch is part of that endeavour.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/Makefile             |  2 +-
- arch/arm/mach-ux500/board-mop500-stuib.c | 14 --------------
- arch/arm/mach-ux500/board-mop500-uib.c   |  8 --------
- arch/arm/mach-ux500/board-mop500.h       |  1 -
- 4 files changed, 1 insertion(+), 24 deletions(-)
- delete mode 100644 arch/arm/mach-ux500/board-mop500-stuib.c
+ arch/arm/mach-ux500/board-mop500.c | 12 ------------
+ 1 file changed, 12 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index 8634a3fa..b34b74b 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -9,7 +9,7 @@ obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
- obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o
- obj-$(CONFIG_MACH_MOP500)	+= board-mop500.o board-mop500-sdi.o \
- 				board-mop500-regulators.o \
--				board-mop500-uib.o board-mop500-stuib.o \
-+				board-mop500-uib.o \
- 				board-mop500-pins.o \
- 				board-mop500-audio.o
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
-diff --git a/arch/arm/mach-ux500/board-mop500-stuib.c b/arch/arm/mach-ux500/board-mop500-stuib.c
-deleted file mode 100644
-index 7fa3021..0000000
---- a/arch/arm/mach-ux500/board-mop500-stuib.c
-+++ /dev/null
-@@ -1,14 +0,0 @@
--/*
-- * Copyright (C) ST-Ericsson SA 2010
-- *
-- * License terms: GNU General Public License (GPL), version 2
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--
--#include "board-mop500.h"
--
--void __init mop500_stuib_init(void)
--{
--}
-diff --git a/arch/arm/mach-ux500/board-mop500-uib.c b/arch/arm/mach-ux500/board-mop500-uib.c
-index 0e94f1d..2742eec 100644
---- a/arch/arm/mach-ux500/board-mop500-uib.c
-+++ b/arch/arm/mach-ux500/board-mop500-uib.c
-@@ -15,7 +15,6 @@
- #include "id.h"
- 
- enum mop500_uib {
--	STUIB,
- };
- 
- struct uib {
-@@ -25,11 +24,6 @@ struct uib {
- };
- 
- static struct uib __initdata mop500_uibs[] = {
--	[STUIB] = {
--		.name	= "ST-UIB",
--		.option	= "stuib",
--		.init	= mop500_stuib_init,
--	},
- };
- 
- static struct uib *mop500_uib;
-@@ -99,7 +93,5 @@ int __init mop500_uib_init(void)
- 		return 0;
- 	}
- 
--	__mop500_uib_init(&mop500_uibs[STUIB], "detected");
--
- 	return 0;
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 8f1b98a..705b0d7 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -96,18 +96,6 @@ static void __init hrefv60_init_machine(void)
+ 	regulator_has_full_constraints();
  }
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index 223639b..2fb89e2 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -89,7 +89,6 @@ extern struct msp_i2s_platform_data msp2_platform_data;
- extern struct msp_i2s_platform_data msp3_platform_data;
- extern struct pl022_ssp_controller ssp0_plat;
  
--void __init mop500_stuib_init(void);
- void __init mop500_pinmaps_init(void);
- void __init snowball_pinmaps_init(void);
- void __init hrefv60_pinmaps_init(void);
+-MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
+-	/* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
+-	.atag_offset	= 0x100,
+-	.smp		= smp_ops(ux500_smp_ops),
+-	.map_io		= u8500_map_io,
+-	.init_irq	= ux500_init_irq,
+-	/* we re-use nomadik timer here */
+-	.init_time	= ux500_timer_init,
+-	.init_machine	= mop500_init_machine,
+-	.init_late	= NULL,
+-MACHINE_END
+-
+ MACHINE_START(U8520, "ST-Ericsson U8520 Platform HREFP520")
+ 	.atag_offset	= 0x100,
+ 	.map_io		= u8500_map_io,
 -- 
 1.8.1.2
