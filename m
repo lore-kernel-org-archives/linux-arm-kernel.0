@@ -1,191 +1,167 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 23 Aug 2013 14:20:44 +0530
-Subject: [PATCH v3 1/2] rtc: omap: update of_device_id to reflect latest
- ip revisions
-In-Reply-To: <520E5444.1000700@baylibre.com>
-References: <1376653017-21935-1-git-send-email-gururaja.hebbar@ti.com>
- <1376653017-21935-2-git-send-email-gururaja.hebbar@ti.com>
- <520E341D.4080206@baylibre.com> <520E482A.1070504@ti.com>
- <520E5444.1000700@baylibre.com>
-Message-ID: <52172264.3070000@ti.com>
+From: wangyuhang2014@gmail.com (yuhang wang)
+Date: Fri, 23 Aug 2013 17:05:10 +0800
+Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
+In-Reply-To: <1376885403-12156-4-git-send-email-b32955@freescale.com>
+References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
+ <1376885403-12156-4-git-send-email-b32955@freescale.com>
+Message-ID: <CAHSAbzN166J=DFi+1koPUpnFpJVHwtbC1AP21ywhAAissQxPxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+Hi, Shijie
 
-Did you get a chance to think about this, I have provided some replies
-below.
+2013/8/19 Huang Shijie <b32955@freescale.com>:
+> This patch adds the quad read support:
+>
+> (1) Add the relative commands:
+>       OPCODE_QIOR, OPCODE_4QIOR, OPCODE_RDCR,
+>
+>     also add the relative macro for the Configuartion Register.
+>
+> (2) add the "m25p,quad-read" property for the m25p80 driver
+>     If the dts has the "m25p,quad-read" property, the kernel will
+>     set the Quad bit of the configuration register, and when the
+>     setting is suceeded, we set the read opcode with OPCODE_QIOR.
+>
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  Documentation/devicetree/bindings/mtd/m25p80.txt |    5 ++
+>  drivers/mtd/devices/m25p80.c                     |   51 ++++++++++++++++++++++
+>  include/linux/mtd/spi-nor.h                      |    6 +++
+>  3 files changed, 62 insertions(+), 0 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/mtd/m25p80.txt b/Documentation/devicetree/bindings/mtd/m25p80.txt
+> index 6d3d576..b33313f 100644
+> --- a/Documentation/devicetree/bindings/mtd/m25p80.txt
+> +++ b/Documentation/devicetree/bindings/mtd/m25p80.txt
+> @@ -17,6 +17,11 @@ Optional properties:
+>                     Refer to your chips' datasheet to check if this is supported
+>                     by your chip.
+>
+> +- m25p,quad-read : Use the "quad read" opcode to read data from the chip instead
+> +                   of the usual "read" opcode. This opcode is not supported by
+> +                   all chips and support for it can not be detected at runtime.
+> +                   Refer to your chips' datasheet to check if this is supported
+> +                   by your chip.
+>  Example:
+>
+>         flash: m25p80 at 0 {
+> diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+> index f3598c1..4bc9b1b 100644
+> --- a/drivers/mtd/devices/m25p80.c
+> +++ b/drivers/mtd/devices/m25p80.c
+> @@ -103,6 +103,40 @@ static int write_sr(struct m25p *flash, u8 val)
+>  }
+>
+>  /*
+> + * Read the configuration register, returning its value in the location
+> + * Return the configuration register value.
+> + * Returns negative if error occurred.
+> + */
+> +static int read_cr(struct m25p *flash)
+> +{
+> +       u8 code = OPCODE_RDCR;
+> +       int ret;
+> +       u8 val;
+> +
+> +       ret = spi_write_then_read(flash->spi, &code, 1, &val, 1);
+> +       if (ret < 0) {
+> +               dev_err(&flash->spi->dev, "error %d reading CR\n", ret);
+> +               return ret;
+> +       }
+> +       return val;
+> +}
+> +
+> +/*
+> + * Write status register and configuration register with 2 bytes
+> + * The first byte will be written to the status register, while the second byte
+> + * will be written to the configuration register.
+> + * Returns negative if error occurred.
+> + */
+> +static int write_sr_cr(struct m25p *flash, u16 val)
+> +{
+> +       flash->command[0] = OPCODE_WRSR;
+> +       flash->command[1] = 0;
+> +       flash->command[2] = (val >> 8);
+> +
+> +       return spi_write(flash->spi, flash->command, 3);
+> +}
+> +
+> +/*
+>   * Set write enable latch with Write Enable command.
+>   * Returns negative if error occurred.
+>   */
+> @@ -880,6 +914,8 @@ static int m25p_probe(struct spi_device *spi)
+>         unsigned                        i;
+>         struct mtd_part_parser_data     ppdata;
+>         struct device_node __maybe_unused *np = spi->dev.of_node;
+> +       u16 sr_cr;
+> +       int ret;
+>
+>  #ifdef CONFIG_MTD_OF_PARTS
+>         if (!of_device_is_available(np))
+> @@ -1014,6 +1050,21 @@ static int m25p_probe(struct spi_device *spi)
+>         else
+>                 flash->read_opcode = OPCODE_NORM_READ;
+>
+> +       /* Try to enable the Quad Read */
+> +       if (np && of_property_read_bool(np, "m25p,quad-read")) {
+> +               /* The configuration register is set by the second byte. */
+> +               sr_cr = CR_QUAD << 8;
+> +
+> +               /* Write the QUAD bit to the Configuration Register. */
+> +               write_enable(flash);
+> +               if (write_sr_cr(flash, sr_cr) == 0) {
+> +                       /* read back and check it */
+> +                       ret = read_cr(flash);
+> +                       if (ret > 0 && (ret & CR_QUAD))
+> +                               flash->read_opcode = OPCODE_QIOR;
+> +               }
+> +       }
+> +
 
-On Friday 16 August 2013 10:03 PM, Benoit Cousson wrote:
-> Hi Sekhar,
-> 
-> On 16/08/2013 17:41, Sekhar Nori wrote:
->>
->> On 8/16/2013 7:45 PM, Benoit Cousson wrote:
->>> Hi Gururaja,
->>>
->>> On 16/08/2013 13:36, Hebbar, Gururaja wrote:
->>>> The syntax of compatible property in DT is to mention the Most specific
->>>> match to most generic match.
->>>>
->>>> Since AM335x is the platform with latest IP revision, add it 1st in
->>>> the device id table.
->>>
->>> I don't understand why? The order should not matter at all.
->>
->> Yes, it should not. We are trying to work around a bug in the kernel
->> where the compatible order is not honored (instead the order in
->> of_match[] array matters). There were patches being discussed to fix this.
->>
->>>
->>> I've tried to follow the thread you had with Mark on the v2, but AFAIK,
->>> you've never answered to his latest question.
->>>
->>> Moreover, checking the differences between the Davinci and the am3352
->>> RTC IP, I would not claim that both are compatible.
->>>
->>> Sure you can use the am3352 with the Davinci driver, but you will lose
->>> the wakeup functionality without even being notify about that.
->>
->> When the kernel is fixed for the bug pointed out above, this should not
->> happen with properly defined compatible property.
->>
->>>
->>> For my point of view, compatible mean that the HW will still be fully
->>> functional with both versions of the driver, which is not the case here.
->>
->> I do not think that's the interpretation of compatible. Its goes from
->> most specific to most generic per the ePAPR spec. That in itself says
->> that 100% functionality is not expected if you don't find a match for
->> the more specific property.
-> 
-> Well, to be honest I checked as well the official documentation, and this is far from being clear:
-> 
-> page 21 of the ePAPR:
-> 
-> "
-> Property: compatible
-> Value type: <stringlist>
-> 
-> Description:
->  The compatible property value consists of one or more strings that define the specific 
->  programming model for the device. This list of strings should be used by a client program for
->  device driver selection. The property value consists of a concatenated list of null terminated
->  strings, from most specific to most general. They allow a device to express its compatibility
->  with a family of similar devices, potentially allowing a single device driver to match against
->  several devices.
->  
->  The recommended format is ?manufacturer,model?, where manufacturer is a
->  string describing the name of the manufacturer (such as a stock ticker symbol), and model
->  specifies the model number.
-> 
-> Example:
->  compatible = ?fsl,mpc8641-uart?, ?ns16550";
->  In this example, an operating system would first try to locate a device driver that supported
->  fsl,mpc8641-uart. If a driver was not found, it would then try to locate a driver that supported
->  the more general ns16550 device type.
-> "
-> 
-> In this example, the generic vs specific is just about the driver. You could have one driver that manage 10 different UARTs or a specific one that manage only your HW. 
+Well, M25p80.c support lots of flash devices, so driver should be as
+general as possible. Firstly not all the devices m25p80 supports set
+quad mode as your sequence, perhaps write_sr_cr can not match all the
+m25p80 flash. Secondly, why you only support QIOR(high performance)
+not QOR or DOR. Maybe QIOR seems too special, so what if user want to
+use QOR if he set quad mode in DTS.
 
-Right, the assumption is that a specific driver is written because there
-are parts of the hardware that cannot be serviced by generic driver. So
-ultimately its all driven by changes in hardware.
+Another point, if command changed to OPCODE_QIOR, there should also
+should be some correct in m25p_read. such as the number of dummy data.
+QIOR can support read without read command if set the certain bit in
+transfer, these aspects did not reflect in your patch.
 
-> 
-> There is no assumption about the lost of functionality by using the generic version of the driver. How the user is supposed to know the amount of functionality he will lose, and if this is acceptable to him.
-
-I suppose the generic driver would return some error code like -ENOTSUP
-for the functionality it cannot provide.
-
-> I'd rather have an error at boot saying that the driver is not compatible with the HW and thus I will have to upgrade the kernel, than booting a kernel that will not work as expected because some functionality are missing for that specific HW.
-
-If you have an update available, you can always upgrade to it. But what
-if there is no update available? Would you rather not have the user use
-the available functionality in the meanwhile while he waits for the
-kernel support to be developed.
-
-> 
-> Claiming that a piece of HW is compatible with an other one that is just a subset in term of functionality is wrong. You can claim that the ti,da830-rtc is compatible with the ti,am3352-rtc driver, but not the opposite.
-
-If this is wrong, then what is the use of compatible property? Why would
-someone write a driver supporting ?fsl,mpc8641-uart? if 100% of its
-hardware features are also supported by ?ns16550" driver?
-
->>> am3352 DTS must use the ti,am3352-rtc to have the expected behavior.
->>
->> Yes, that's what patch 2/2 does.
->>
->>> Using the ti,da830-rtc version will not make the board working as
->>> expected. So we cannot claim the compatibility.
->>
->> Ideally, the DT file was *always* written as
->>
->> 	compatible = "ti,am3352-rtc", "ti,da830-rtc";
->>
->> even when there was no kernel support for AM3352 RTC.
-> 
-> You could do that only for the davinci DTS, because it is a subset of the am3352 but you cannot do that for the am3352 as explained before.
-
-DaVinci DTS will use compatible = "ti,da830-rtc"; Thats not changing
-with this patchset.
-
-> 
->> That way, there is no need to update the .dts[i] file. As kernel gains
->> functionality, more features (like rtc wake) is available to users.
-> 
-> Well, you cannot anticipate the HW evolution anyway and you did not know when Davinci DTS was done that an am3352 will exist in the future and reuse the same IP.
-
-Yeah, I am not claiming DaVinci DTS should be updated. But when
-am335x.dtsi was written, there was knowledge that a (potentially) new
-version of RTC IP is available and therefore the .dtsi should have been
-written as
-
-	compatible = "ti,am3352-rtc", "ti,da830-rtc";
-
-instead of
-
-	compatible = "ti,da830-rtc";
-
-that it is today. Thing is, you can never know if the IP needs any
-additional handling even after reading the spec. We keep discovering new
-features/quirks. So, when writing <new-soc>.dtsi its safer to always use
-
-	compatible = "ti,<new-soc>-rtc", "ti,<compatible-soc>-rtc";
-
-even though _today_ you may not have code that specifically handles
-"ti,<new-soc>-rtc".
-
-> Moreover DT is a ABI, so extending it according to the HW feature evolution is absolutely normal.
-
-You mean the DT bindings and not specifically the .dts[i], right? Then I
-agree. Ideally the .dts[i] is written once per hardware. I know its
-almost impossible to get that right.
-
-> 
-> Every SoC that are using a RTC with the same programing model than the da830 can claim the compatibility. A SoC that is using a newer version of the IP with an extended programming model cannot claim that.
-
-We differ here. As long as programming model is _extended_, new IP is
-still compatible with old. If the programming model is _changed_ then
-its not.
-
-> 
->> Otherwise they get plain RTC functionality - but at least they get
->> something instead of no RTC.
-> 
-> Because you assume that this feature is not important and thus you can use the plain RTC, but what if someone is buying that HW because of this new feature. Without that feature his system will just not work properly.
-
-Right, but thats not a problem DT can solve. He/she needs to hassle TI
-for updated drivers. But there could be 10 other customers who are just
-okay with plain RTC. So till the time driver is updated to use
-ti,am3352-rtc", are you saying no one should be able to use the RTC on
-the SoC at all even though 90% features are available?
-
-> Saying that this is compatible whereas you lost functionality is lying to the customer for my point of view.
-
-If 100% functionality is required for compatibility then I am afraid
-there is nothing like "compatibility". There are just different isolated
-versions.
-
-Thanks,
-Sekhar
+>         flash->program_opcode = OPCODE_PP;
+>
+>         if (info->addr_width)
+> diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+> index b420a5b..d5b189d 100644
+> --- a/include/linux/mtd/spi-nor.h
+> +++ b/include/linux/mtd/spi-nor.h
+> @@ -39,6 +39,9 @@
+>
+>  /* Used for Spansion flashes only. */
+>  #define        OPCODE_BRWR             0x17    /* Bank register write */
+> +#define OPCODE_QIOR            0xeb    /* Quad read */
+> +#define OPCODE_4QIOR           0xec    /* Quad read */
+> +#define        OPCODE_RDCR             0x35    /* Read configuration register */
+>
+>  /* Status Register bits. */
+>  #define        SR_WIP                  1       /* Write in progress */
+> @@ -49,4 +52,7 @@
+>  #define        SR_BP2                  0x10    /* Block protect 2 */
+>  #define        SR_SRWD                 0x80    /* SR write protect */
+>
+> +/* Configuration Register bits. */
+> +#define CR_QUAD                        0x2     /* Quad I/O */
+> +
+>  #endif /* __LINUX_MTD_SPI_NOR_H */
+> --
+> 1.7.1
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-spi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
