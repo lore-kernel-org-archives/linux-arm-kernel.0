@@ -1,46 +1,69 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 23 Aug 2013 16:16:05 +0200
-Subject: [PATCH v4 5/5] ARM: dts: am33xx: adopt to cpsw changes
-In-Reply-To: <1377267365-24057-1-git-send-email-zonque@gmail.com>
-References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
-Message-ID: <1377267365-24057-6-git-send-email-zonque@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 23 Aug 2013 16:23:03 +0200
+Subject: [RFC 08/17] ARM: mvebu: remove custom .init_time hook
+In-Reply-To: <521751E9.3000504@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376964271-22715-9-git-send-email-sebastian.hesselbarth@gmail.com>
+ <52173408.1000702@free-electrons.com> <52173A3E.2040509@gmail.com>
+ <521749E5.6020008@free-electrons.com> <521751E9.3000504@gmail.com>
+Message-ID: <52177047.9070706@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This third memory region just denotes one single register in the CONTROL
-module block. The driver uses that in order to set the correct physical
-ethernet interface modes.
+On 23/08/2013 14:13, Sebastian Hesselbarth wrote:
+> On 08/23/13 13:39, Gregory CLEMENT wrote:
+>> On 23/08/2013 12:32, Sebastian Hesselbarth wrote:
+>>> On 08/23/13 12:06, Gregory CLEMENT wrote:
+>>>> On 20/08/2013 04:04, Sebastian Hesselbarth wrote:
+>>>>> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+>>>>> remove custom .init_time hooks.
+>>>>
+>>>> As a feared it won't work on Armada XP. You moved coherency_init(), and
+>>>> l2x0_of_init() in the init_machine hook. However init_machine is an
+>>>> arch_initcall, and as all the initcall it is called at the end of the
+>>>> do_basic_setup() which is called after smp_prepare_cpus(). The issue is
+>>>> that smp_prepare_cpus need coherency (and I think L2 cache) already enable.
+>>>
+>>> Ok, I see. I remember mvebu smp relies on mbus mappings also? Can you
+>>> try below as replacement for the mach-mvebu/armada-370-xp.c changes?
+>>>
+>>> It will move coherency_init(), l2x0_of_init(), and mvebu_mbus_dt_init()
+>>> to .init_early hook.
+>>>
+>>
+>> I can't test it, because I don't receive the patch 1 and 2 neither directly
+>> or through linux-arm-kernel (it should have been bounced), or even at
+>> https://github.com/shesselba/linux-dove.git
+>>
+>> If you don't want to send them again, could you at least push our branch on your
+>> github?
+> 
+> Gregory,
+> 
+> I pushed a branch containing the latest state to
+> https://github.com/shesselba/linux-dove.git arm-clk-of-init
+> 
+> It still contains the changes to drivers/clk.c, that will become
+> obsolete, if there are no objections against Stephen's tegra patch.
+> 
 
-Also update the compatible string to make use of the am335x specific
-features of the cpsw driver.
+I tested your branch on my Armada XP boards (the GP and the AX3), and it hanged
+very early: before that anything was displayed by the early_printk!
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- arch/arm/boot/dts/am33xx.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+init_early is maybe called too early :(
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index a785b95..c7b41ae 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -446,7 +446,7 @@
- 		};
- 
- 		mac: ethernet at 4a100000 {
--			compatible = "ti,cpsw";
-+			compatible = "ti,am3352-cpsw", "ti,cpsw";
- 			ti,hwmods = "cpgmac0";
- 			cpdma_channels = <8>;
- 			ale_entries = <1024>;
-@@ -459,7 +459,8 @@
- 			cpts_clock_mult = <0x80000000>;
- 			cpts_clock_shift = <29>;
- 			reg = <0x4a100000 0x800
--			       0x4a101200 0x100>;
-+			       0x4a101200 0x100
-+			       0x44e10650 0x4>;
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			interrupt-parent = <&intc>;
+> Sebastian
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
 -- 
-1.8.3.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
