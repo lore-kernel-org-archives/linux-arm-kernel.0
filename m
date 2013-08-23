@@ -1,76 +1,77 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 23 Aug 2013 20:21:16 +0200
-Subject: sun4i_handle_irq: WARNING at net/ipv4/tcp_input.c:2711
- tcp_fastretrans_alert
-In-Reply-To: <20130821094432.GA28249@lnx-rg>
-References: <20130821094432.GA28249@lnx-rg>
-Message-ID: <20130823182116.GE1230@lukather>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Fri, 23 Aug 2013 23:59:41 +0530
+Subject: [PATCH v4 3/5] net: ethernet: cpsw: introduce ti,am3352-cpsw
+ compatible string
+In-Reply-To: <5217A59E.4090700@ti.com>
+References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
+ <1377267365-24057-4-git-send-email-zonque@gmail.com>
+ <52177052.1030308@ti.com> <52178E20.5040404@gmail.com>
+ <52179448.1020906@ti.com> <5217974B.5090503@ti.com> <521799A3.7080706@ti.com>
+ <52179AD6.8090406@gmail.com> <52179BDA.50603@ti.com>
+ <52179E44.5030202@ti.com> <5217A59E.4090700@ti.com>
+Message-ID: <5217AA15.7010907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+On Friday 23 August 2013 11:40 PM, Santosh Shilimkar wrote:
+> On Friday 23 August 2013 01:39 PM, Sekhar Nori wrote:
+>> On 8/23/2013 10:58 PM, Santosh Shilimkar wrote:
+>>> On Friday 23 August 2013 01:24 PM, Daniel Mack wrote:
+>>>> On 23.08.2013 19:19, Santosh Shilimkar wrote:
+>>>>> On Friday 23 August 2013 01:09 PM, Sekhar Nori wrote:
+>>>>>> On 8/23/2013 10:26 PM, Santosh Shilimkar wrote:
+>>>>>>> So just stick the IP version or call it cpsw-v1... cpsw-v2 etc.
+>>>>>> If this could be handled using IP version then the right way would be to
+>>>>>> just read the IP version from hardware and use it. No need of DT property.
+>>>>>>
+>>>>> Thats fine as well but I thought the patch needed additional properties like
+>>>>> CM reg-address come from DT and hence the separate compatible. If you can
+>>>>> manage without that, thats even better.
+>>>> We can't, that's the whole point :)
+>>>>
+>>> I saw that from the patch :)
+>>>
+>>>> Well, theoretically, we could for now, but that's not a clean solution.
+>>>> Again: the problem here is that the control port is separated from the
+>>>> cpsw core, and so we have to implement something specific for the AM3352
+>>>> SoC. I know that's a violation of clean and generic driver ideas, but
+>>>> there's no way we can assume that every cpsw v2 ip block has a control
+>>>> port that is compatible to the one found on am335x chips.
+>>>>
+>>> But there is a possibility that other SOC will just use the same
+>>> control module approach. So using a revision IP is just fine. BTW,
+>> But this is misleading because it makes appear like the same compatible
+>> can be used on on another SoC like DRA7 which probably has the same
+>> version of IP but a different control module implementation, when in
+>> practice it cannot.
+>>
+>> The fact is we are doing something SoC specific in the driver and we
+>> cannot hide that behind IP versions. If really in practice there comes
+>> another SoC with the same control module definition then it can always
+>> use ti,am3352-cpsw compatible as well. The compatible name does not
+>> preclude its usage.
+>>
+> My point was the CPSW needs a feature which is implemented using
+> control module rather than within the IP itself. Its an implementation
+> detail. As such the additional feature makes sense for that IP. O.w
+> there was no need to do any monkeying with control module.
+>
+> E.g
+> MMC card detect is a basic functionality, implemented by various types
+> like control module, PMIC or MMC IP itself. As such the driver need
+> that support and all the implementation details needs to still handled
+> to make that part work.
+>
+>
 
-On Wed, Aug 21, 2013 at 11:47:20AM +0200, Richard GENOUD wrote:
-> Hi Maxime, Stephan
-> 
-> I just realise that, *sometimes*, I have some warnings on my cubieboard
-> (6 since the 22 of july, and the board is runnning 24/24).
+CPSW core as such understands only GMII/MII signals, there is an
+additional module which converts GMII/MII signals to RGMII/RMII signals
+respectively which is called as CPRGMII/CPRMII as specified in the
+AM335x TRM in Figure 14-1. Ethernet Switch Integration.
 
-Wow, I'm impressed it worked this fine actually :)
+So to control this sub-module, the control register is used and this has
+to be configured according to the EVM design like what mode of phy is
+connected. CPRGMII and CPRMII is no way related to CPSW core.
 
-> It has happened also on 3.10 + emac patches.
-> Here it is:
-> [27224.060000] ------------[ cut here ]------------
-> [27224.070000] WARNING: CPU: 0 PID: 0 at net/ipv4/tcp_input.c:2711 tcp_fastretrans_alert+0x717/0x734()
-> [27224.080000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.11.0-rc6-00010-g54f11ec #8
-> [27224.080000] [<c000f231>] (unwind_backtrace+0x1/0x98) from [<c000e2b7>] (show_stack+0xb/0xc)
-> [27224.090000] [<c000e2b7>] (show_stack+0xb/0xc) from [<c0013cd3>] (warn_slowpath_common+0x43/0x5c)
-> [27224.100000] [<c0013cd3>] (warn_slowpath_common+0x43/0x5c) from [<c0013d6d>] (warn_slowpath_null+0x11/0x14)
-> [27224.110000] [<c0013d6d>] (warn_slowpath_null+0x11/0x14) from [<c015eadf>] (tcp_fastretrans_alert+0x717/0x734)
-> [27224.120000] [<c015eadf>] (tcp_fastretrans_alert+0x717/0x734) from [<c015f32b>] (tcp_ack+0x6af/0x984)
-> [27224.130000] [<c015f32b>] (tcp_ack+0x6af/0x984) from [<c015fcab>] (tcp_rcv_established+0x93/0x3ec)
-> [27224.140000] [<c015fcab>] (tcp_rcv_established+0x93/0x3ec) from [<c0165621>] (tcp_v4_do_rcv+0xa1/0x160)
-> [27224.150000] [<c0165621>] (tcp_v4_do_rcv+0xa1/0x160) from [<c0167129>] (tcp_v4_rcv+0x4e9/0x500)
-> [27224.160000] [<c0167129>] (tcp_v4_rcv+0x4e9/0x500) from [<c015025d>] (ip_local_deliver_finish+0x79/0x180)
-> [27224.170000] [<c015025d>] (ip_local_deliver_finish+0x79/0x180) from [<c01500a1>] (ip_rcv_finish+0xc9/0x20c)
-> [27224.180000] [<c01500a1>] (ip_rcv_finish+0xc9/0x20c) from [<c0129493>] (__netif_receive_skb_core+0x287/0x3dc)
-> [27224.190000] [<c0129493>] (__netif_receive_skb_core+0x287/0x3dc) from [<c0129a8b>] (process_backlog+0x5b/0xd0)
-> [27224.200000] [<c0129a8b>] (process_backlog+0x5b/0xd0) from [<c012bc6f>] (net_rx_action+0x5f/0xe8)
-> [27224.200000] [<c012bc6f>] (net_rx_action+0x5f/0xe8) from [<c0015fc9>] (__do_softirq+0x91/0x134)
-> [27224.210000] [<c0015fc9>] (__do_softirq+0x91/0x134) from [<c0016251>] (irq_exit+0x59/0x80)
-> [27224.220000] [<c0016251>] (irq_exit+0x59/0x80) from [<c000d00d>] (handle_IRQ+0x21/0x54)
-> [27224.230000] [<c000d00d>] (handle_IRQ+0x21/0x54) from [<c00083ef>] (sun4i_handle_irq+0x1f/0x30)
-> [27224.240000] [<c00083ef>] (sun4i_handle_irq+0x1f/0x30) from [<c000ea1b>] (__irq_svc+0x3b/0x5c)
-> [27224.250000] Exception stack(0xc0287f70 to 0xc0287fb8)
-> [27224.250000] 7f60:                                     00000000 00000000 00000000 00000000
-> [27224.260000] 7f80: c0286000 c02ad7fd 00000001 c02ad7fd c028e084 413fc082 00000000 00000000
-> [27224.270000] 7fa0: 01000000 c0287fb8 c000d115 c000d116 40000033 ffffffff
-> [27224.270000] [<c000ea1b>] (__irq_svc+0x3b/0x5c) from [<c000d116>] (arch_cpu_idle+0x16/0x1c)
-> [27224.280000] [<c000d116>] (arch_cpu_idle+0x16/0x1c) from [<c002e69d>] (cpu_startup_entry+0x35/0xa0)
-> [27224.290000] [<c002e69d>] (cpu_startup_entry+0x35/0xa0) from [<c026f75f>] (start_kernel+0x1af/0x1f0)
-> [27224.300000] ---[ end trace 15641276e08fba8a ]---
-
-Hmmm, that seems pretty far from the network/interrupt drivers, and it
-looks like other users have seen this on !ARM machines:
-http://forums.gentoo.org/viewtopic-p-7379928.html
-https://bugzilla.redhat.com/show_bug.cgi?id=989251
-
-There's a patch in the redhat's bugzilla, could you try to apply it and
-see if it solves your problem?
-
-Maybe the netdev guys will have other ideas as well.
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/537b7b83/attachment.sig>
+Regards
+Mugunthan V N
