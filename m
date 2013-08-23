@@ -1,110 +1,112 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Fri, 23 Aug 2013 22:08:10 +0530
-Subject: [PATCH v2 4/5] net: ethernet: cpsw: add support for hardware
- interface mode config
-In-Reply-To: <1377247417-27386-5-git-send-email-zonque@gmail.com>
-References: <1377247417-27386-1-git-send-email-zonque@gmail.com>
- <1377247417-27386-5-git-send-email-zonque@gmail.com>
-Message-ID: <52178FF2.7010308@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 23 Aug 2013 17:44:42 +0100
+Subject: [PATCH V1 4/5] spi: Add Freescale QuadSpi driver
+In-Reply-To: <1376885403-12156-5-git-send-email-b32955@freescale.com>
+References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
+ <1376885403-12156-5-git-send-email-b32955@freescale.com>
+Message-ID: <20130823164442.GA30359@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 August 2013 02:13 PM, Daniel Mack wrote:
-> The cpsw currently lacks code to properly set up the hardware interface
-> mode on AM33xx. Other platforms might be equally affected.
->
-> Usually, the bootloader will configure the control module register, so
-> probably that's why such support wasn't needed in the past. In suspend
-> mode though, this register is modified, and so it needs reprogramming
-> after resume.
->
-> This patch adds code that makes use of the previously added and optional
-> support for passing the control mode register, and configures the
-> correct register bits when the slave is opened.
->
-> The AM33xx also has a bit for each slave to configure the RMII reference
-> clock direction. Setting it is now supported by a per-slave DT property.
->
-> This code path introducted by this patch is currently exclusive for
-> am33xx.
->
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
->  Documentation/devicetree/bindings/net/cpsw.txt |  2 +
->  drivers/net/ethernet/ti/cpsw.c                 | 61 ++++++++++++++++++++++++++
->  drivers/net/ethernet/ti/cpsw.h                 |  1 +
->  3 files changed, 64 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
-> index b717458..0895a51 100644
-> --- a/Documentation/devicetree/bindings/net/cpsw.txt
-> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
-> @@ -34,6 +34,8 @@ Required properties:
->  - phy_id		: Specifies slave phy id
->  - phy-mode		: The interface between the SoC and the PHY (a string
->  			  that of_get_phy_mode() can understand)
-> +- ti,rmii-clock-ext	: If present, the driver will configure the RMII
-> +			  interface to external clock usage
->  - mac-address		: Specifies slave MAC address
->  
->  Optional properties:
-> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-> index 2e19de0..6e36f49 100644
-> --- a/drivers/net/ethernet/ti/cpsw.c
-> +++ b/drivers/net/ethernet/ti/cpsw.c
-> @@ -138,6 +138,13 @@ do {								\
->  #define CPSW_CMINTMAX_INTVL	(1000 / CPSW_CMINTMIN_CNT)
->  #define CPSW_CMINTMIN_INTVL	((1000 / CPSW_CMINTMAX_CNT) + 1)
->  
-> +#define AM33XX_GMII_SEL_MODE_MII	(0)
-> +#define AM33XX_GMII_SEL_MODE_RMII	(1)
-> +#define AM33XX_GMII_SEL_MODE_RGMII	(2)
-> +
-> +#define AM33XX_GMII_SEL_RMII2_IO_CLK_EN	BIT(7)
-> +#define AM33XX_GMII_SEL_RMII1_IO_CLK_EN	BIT(6)
+On Mon, Aug 19, 2013 at 12:10:02PM +0800, Huang Shijie wrote:
 
-These defined can go into cpsw.h so that we can maintain platform
-defines in one file.
+Looks good apart from the issues people identified already and a few
+small things below:
 
-> +
->  #define cpsw_enable_irq(priv)	\
->  	do {			\
->  		u32 i;		\
-> @@ -980,6 +987,56 @@ static inline void cpsw_add_dual_emac_def_ale_entries(
->  		priv->host_port, ALE_VLAN, slave->port_vlan);
->  }
->  
-> +static void cpsw_set_phy_interface_mode(struct cpsw_slave *slave,
-> +					struct cpsw_priv *priv)
+> +/* Instruction set for the LUT register. */
+> +#define CMD			1
+> +#define ADDR			2
+> +#define DUMMY			3
+> +#define MODE			4
+> +#define MODE2			5
+> +#define MODE4			6
+> +#define READ			7
+> +#define WRITE			8
+> +#define JMP_ON_CS		9
+> +#define ADDR_DDR		10
+> +#define MODE_DDR		11
+> +#define MODE2_DDR		12
+> +#define MODE4_DDR		13
+
+Most of the defines in the driver ought to be namespaced to avoid
+collisions with other things defining them.  FSL_QSPI_ or something for
+example.
+
+> +	default:
+> +		dev_err(q->dev, "Unsupported cmd 0x%.2x\n", cmd);
+> +		break;
+> +	}
+> +	return -1;
+
+Return a proper error code.
+
+> +static int fsl_qspi_wait_till_ready(struct fsl_qspi *q)
 > +{
-> +	u32 reg, mask, mode = 0;
+> +	unsigned long deadline;
+> +	u32 sr;
 > +
-
-Please define each variable in separate line to make it clean.
-Please check for IS_ERR(gmii_sel_reg) and return if gmii register is not
-specified in DT then the below code will crash when trying to access
-gmii_sel_reg.
-
-> +	switch (priv->data.hw_type) {
-> +	case CPSW_TYPE_AM33XX:
-> +		if (!priv->gmii_sel_reg)
+> +	deadline = jiffies + msecs_to_jiffies(40000);
+> +
+> +	do {
+> +		if ((sr = fsl_qspi_read_sr(q)) < 0)
 > +			break;
+> +		else if (!(sr & SR_WIP))
+> +			return 0;
 > +
-> +		reg = readl(priv->gmii_sel_reg);
+> +		cond_resched();
 > +
-> +		if (slave->phy) {
-> +			switch (slave->phy->interface) {
-> +			case PHY_INTERFACE_MODE_MII:
-> +			default:
-> +				mode = AM33XX_GMII_SEL_MODE_MII;
-> +				break;
-> +			case PHY_INTERFACE_MODE_RMII:
-> +				mode = AM33XX_GMII_SEL_MODE_RMII;
-> +				break;
-> +			case PHY_INTERFACE_MODE_RGMII:
+> +	} while (!time_after_eq(jiffies, deadline));
+> +
+> +	return 1;
+> +}
 
-You need to take care of other RGMII modes as well, for your info
-AM335xevm phy mode is "rgmii-txid"
+Return an error code if we time out?
 
-Regards
-Mugunthan V N
+> +static int fsl_qspi_nor_do_one_msg(struct spi_master *master,
+> +		struct spi_message *m)
+> +{
+> +	struct fsl_qspi *q = spi_master_get_devdata(master);
+> +	struct spi_transfer *t;
+> +	int ret = 0;
+> +
+> +	list_for_each_entry(t, &m->transfers, transfer_list) {
+> +		if (t->rx_buf && t->tx_buf) {
+> +			dev_err(q->dev,
+> +				"Can't send and receive simultaneously\n");
+> +			ret = -EINVAL;
+> +			break;
+> +		}
+> +
+> +		if (t->tx_buf) {
+> +			ret = fsl_qspi_nor_tx(q, t);
+> +			if (!ret)
+> +				m->actual_length += t->len;
+> +			continue;
+> +		}
+> +
+> +		if (t->rx_buf) {
+> +			ret = fsl_qspi_nor_rx(q, t);
+> +			if (!ret)
+> +				m->actual_length += t->len;
+> +		}
+> +	}
+
+The driver should flag SPI_HALF_DUPLEX since it doesn't support
+simultaneous RX and TX.
+
+> +	q->clk_en = devm_clk_get(&pdev->dev, "qspi_en");
+> +	q->clk = devm_clk_get(&pdev->dev, "qspi");
+> +	if (IS_ERR(q->clk_en) || IS_ERR(q->clk)) {
+> +		dev_err(&pdev->dev, "failed to get clocks\n");
+> +		ret = -ENOENT;
+> +		goto map_failed;
+> +	}
+
+Should use the actual returned error value from devm_clk_get().
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/9cbe573e/attachment.sig>
