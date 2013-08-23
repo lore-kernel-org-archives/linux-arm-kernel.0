@@ -1,26 +1,43 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 23 Aug 2013 16:05:30 +0200
-Subject: [PATCH v2 2/5] net: ethernet: cpsw: add optional third memory
- region for CONTROL module
-In-Reply-To: <52176BB7.3000405@cogentembedded.com>
-References: <1377247417-27386-1-git-send-email-zonque@gmail.com>
- <1377247417-27386-3-git-send-email-zonque@gmail.com>
- <52176BB7.3000405@cogentembedded.com>
-Message-ID: <52176C2A.9000801@gmail.com>
+Date: Fri, 23 Aug 2013 16:16:00 +0200
+Subject: [PATCH v4 0/5] cpsw: support for control module register
+Message-ID: <1377267365-24057-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.08.2013 16:03, Sergei Shtylyov wrote:
-> On 23-08-2013 12:43, Daniel Mack wrote:
+v3 -> v4:
+	* use IS_ERR() to check for failed devm_ioremap_resource()
+	  calls (reported by Sergei Shtylyov)
 
->> +		dev_err(priv->dev, "unable to map control i/o region\n");
-> 
->     devm_ioremap_resource() prints out the error messages itself, so you don't 
-> have to.
+v2 -> v3:
+	* swap "ti,am3352-cpsw" and "ti,cpsw" to work around a matching
+	  bug (reported by Sekhar)
 
-Right. Thanks. Will send a v4.
+v1 -> v2:
+	* combine devm_request_mem_region() and devm_ioremap() and use
+	  devm_ioremap_resource() (reported by Sergei Shtylyov)
+	* fix multi-line comment style (reported by Sergei Shtylyov)
+	* fix ti,rmii-clock-ext property name (reported by Sekhar)
+	* rebased to net-next (reported by Mugunthan V N, David Miller)
+	* add a new compatible type, and handle AM33xx specific
+	  registers that way (reported by Sekhar)
+	* move gmii_sel_reg modifications to the open routine
+	  (reported by Mugunthan V N)
 
 
+Daniel Mack (5):
+  net: ethernet: cpsw: switch to devres allocations
+  net: ethernet: cpsw: add optional third memory region for CONTROL
+    module
+  net: ethernet: cpsw: introduce ti,am3352-cpsw compatible string
+  net: ethernet: cpsw: add support for hardware interface mode config
+  ARM: dts: am33xx: adopt to cpsw changes
 
-Best,
-Daniel
+ Documentation/devicetree/bindings/net/cpsw.txt |  10 +-
+ arch/arm/boot/dts/am33xx.dtsi                  |   5 +-
+ drivers/net/ethernet/ti/cpsw.c                 | 254 ++++++++++++++-----------
+ drivers/net/ethernet/ti/cpsw.h                 |   2 +
+ 4 files changed, 159 insertions(+), 112 deletions(-)
+
+-- 
+1.8.3.1
