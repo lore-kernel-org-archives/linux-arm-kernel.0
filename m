@@ -1,112 +1,76 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 23 Aug 2013 17:44:42 +0100
-Subject: [PATCH V1 4/5] spi: Add Freescale QuadSpi driver
-In-Reply-To: <1376885403-12156-5-git-send-email-b32955@freescale.com>
-References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
- <1376885403-12156-5-git-send-email-b32955@freescale.com>
-Message-ID: <20130823164442.GA30359@sirena.org.uk>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Fri, 23 Aug 2013 22:15:53 +0530
+Subject: [PATCH v4 3/5] net: ethernet: cpsw: introduce ti,am3352-cpsw
+ compatible string
+In-Reply-To: <52177052.1030308@ti.com>
+References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
+ <1377267365-24057-4-git-send-email-zonque@gmail.com>
+ <52177052.1030308@ti.com>
+Message-ID: <521791C1.2060803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 12:10:02PM +0800, Huang Shijie wrote:
+On Friday 23 August 2013 07:53 PM, Santosh Shilimkar wrote:
+> On Friday 23 August 2013 10:16 AM, Daniel Mack wrote:
+>> In order to support features that are specific to the AM335x IP, we have
+>> to add hardware types and another compatible string.
+>>
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>> ---
+>>  Documentation/devicetree/bindings/net/cpsw.txt |  3 ++-
+>>  drivers/net/ethernet/ti/cpsw.c                 | 32 ++++++++++++++++++++------
+>>  drivers/net/ethernet/ti/cpsw.h                 |  1 +
+>>  3 files changed, 28 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+>> index 4e5ca54..b717458 100644
+>> --- a/Documentation/devicetree/bindings/net/cpsw.txt
+>> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
+>> @@ -2,7 +2,8 @@ TI SoC Ethernet Switch Controller Device Tree Bindings
+>>  ------------------------------------------------------
+>>  
+>>  Required properties:
+>> -- compatible		: Should be "ti,cpsw"
+>> +- compatible		: Should be "ti,cpsw" for generic cpsw support, or
+>> +			  "ti,am3352-cpsw" for AM3352 SoCs
+>>  - reg			: physical base address and size of the cpsw
+>>  			  registers map.
+>>  			  An optional third memory region can be supplied if
+>> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+>> index 7a25ff4..73c44cb6 100644
+>> --- a/drivers/net/ethernet/ti/cpsw.c
+>> +++ b/drivers/net/ethernet/ti/cpsw.c
+>> @@ -155,6 +155,11 @@ do {								\
+>>  		((priv->data.dual_emac) ? priv->emac_port :	\
+>>  		priv->data.active_slave)
+>>  
+>> +enum {
+>> +	CPSW_TYPE_GENERIC,
+>> +	CPSW_TYPE_AM33XX
+>> +};
+>> +
+>>  static int debug_level;
+>>  module_param(debug_level, int, 0);
+>>  MODULE_PARM_DESC(debug_level, "cpsw debug level (NETIF_MSG bits)");
+>> @@ -1692,17 +1697,36 @@ static void cpsw_slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv,
+>>  	slave->port_vlan = data->dual_emac_res_vlan;
+>>  }
+>>  
+>> +static const struct of_device_id cpsw_of_mtable[] = {
+>> +	{
+>> +		.compatible	= "ti,am3352-cpsw",
+> I didn't notice this earlier, but can't you use the IP version
+> as a compatible instead of using a SOC name. Whats really SOC specific
+> on this IP ? Sorry i have missed any earlier discussion on this but
+> this approach doesn't seem good. Its like adding SOC checks in the
+> driver subsystem.
+>
+>
+But the same IP can be used in different SoC as well where the control
+register may be different as per the Silicon Integration team's decision?
 
-Looks good apart from the issues people identified already and a few
-small things below:
+Ideally there should be a separate control module driver so that it can
+take care of different SoC related needs.
 
-> +/* Instruction set for the LUT register. */
-> +#define CMD			1
-> +#define ADDR			2
-> +#define DUMMY			3
-> +#define MODE			4
-> +#define MODE2			5
-> +#define MODE4			6
-> +#define READ			7
-> +#define WRITE			8
-> +#define JMP_ON_CS		9
-> +#define ADDR_DDR		10
-> +#define MODE_DDR		11
-> +#define MODE2_DDR		12
-> +#define MODE4_DDR		13
-
-Most of the defines in the driver ought to be namespaced to avoid
-collisions with other things defining them.  FSL_QSPI_ or something for
-example.
-
-> +	default:
-> +		dev_err(q->dev, "Unsupported cmd 0x%.2x\n", cmd);
-> +		break;
-> +	}
-> +	return -1;
-
-Return a proper error code.
-
-> +static int fsl_qspi_wait_till_ready(struct fsl_qspi *q)
-> +{
-> +	unsigned long deadline;
-> +	u32 sr;
-> +
-> +	deadline = jiffies + msecs_to_jiffies(40000);
-> +
-> +	do {
-> +		if ((sr = fsl_qspi_read_sr(q)) < 0)
-> +			break;
-> +		else if (!(sr & SR_WIP))
-> +			return 0;
-> +
-> +		cond_resched();
-> +
-> +	} while (!time_after_eq(jiffies, deadline));
-> +
-> +	return 1;
-> +}
-
-Return an error code if we time out?
-
-> +static int fsl_qspi_nor_do_one_msg(struct spi_master *master,
-> +		struct spi_message *m)
-> +{
-> +	struct fsl_qspi *q = spi_master_get_devdata(master);
-> +	struct spi_transfer *t;
-> +	int ret = 0;
-> +
-> +	list_for_each_entry(t, &m->transfers, transfer_list) {
-> +		if (t->rx_buf && t->tx_buf) {
-> +			dev_err(q->dev,
-> +				"Can't send and receive simultaneously\n");
-> +			ret = -EINVAL;
-> +			break;
-> +		}
-> +
-> +		if (t->tx_buf) {
-> +			ret = fsl_qspi_nor_tx(q, t);
-> +			if (!ret)
-> +				m->actual_length += t->len;
-> +			continue;
-> +		}
-> +
-> +		if (t->rx_buf) {
-> +			ret = fsl_qspi_nor_rx(q, t);
-> +			if (!ret)
-> +				m->actual_length += t->len;
-> +		}
-> +	}
-
-The driver should flag SPI_HALF_DUPLEX since it doesn't support
-simultaneous RX and TX.
-
-> +	q->clk_en = devm_clk_get(&pdev->dev, "qspi_en");
-> +	q->clk = devm_clk_get(&pdev->dev, "qspi");
-> +	if (IS_ERR(q->clk_en) || IS_ERR(q->clk)) {
-> +		dev_err(&pdev->dev, "failed to get clocks\n");
-> +		ret = -ENOENT;
-> +		goto map_failed;
-> +	}
-
-Should use the actual returned error value from devm_clk_get().
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/9cbe573e/attachment.sig>
+Regards
+Mugunthan V N
