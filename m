@@ -1,10 +1,10 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Aug 2013 13:23:06 +0100
-Subject: [PATCH 06/40] ARM: ux500: Disable Snowball's SMSC911x Ethernet when
- booting with ATAGs
+Date: Fri, 23 Aug 2013 13:23:07 +0100
+Subject: [PATCH 07/40] ARM: ux500: Remove support for Snowball's Ethernet
+ regulator when booting with ATAGs
 In-Reply-To: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
 References: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1377260620-18829-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1377260620-18829-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,65 +13,44 @@ Device Tree booting. This patch is part of that endeavour.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c | 32 --------------------------------
- 1 file changed, 32 deletions(-)
+ arch/arm/mach-ux500/board-mop500.c | 18 ------------------
+ 1 file changed, 18 deletions(-)
 
 diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index dcd482b..062f8bf 100644
+index 062f8bf..68bd9d3 100644
 --- a/arch/arm/mach-ux500/board-mop500.c
 +++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -33,7 +33,6 @@
- #include <linux/mfd/abx500/ab8500-codec.h>
- #include <linux/platform_data/leds-lp55xx.h>
- #include <linux/input.h>
--#include <linux/smsc911x.h>
- #include <linux/gpio_keys.h>
- #include <linux/delay.h>
- #include <linux/leds.h>
-@@ -119,36 +118,6 @@ static struct ab8500_codec_platform_data ab8500_codec_pdata = {
- 	.ear_cmv = EAR_CMV_0_95V
- };
+@@ -54,23 +54,6 @@
+ #include "board-mop500.h"
+ #include "board-mop500-regulators.h"
  
--static struct smsc911x_platform_config snowball_sbnet_cfg = {
--	.irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
--	.irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL,
--	.flags = SMSC911X_USE_16BIT | SMSC911X_FORCE_INTERNAL_PHY,
--	.shift = 1,
+-static struct fixed_voltage_config snowball_gpio_en_3v3_data = {
+-       .supply_name            = "EN-3V3",
+-       .gpio                   = SNOWBALL_EN_3V3_ETH_GPIO,
+-       .microvolts             = 3300000,
+-       .enable_high            = 1,
+-       .init_data              = &gpio_en_3v3_regulator,
+-       .startup_delay          = 5000, /* 1200us */
 -};
 -
--static struct resource sbnet_res[] = {
--	{
--		.name = "smsc911x-memory",
--		.start = (0x5000 << 16),
--		.end  =  (0x5000 << 16) + 0xffff,
--		.flags = IORESOURCE_MEM,
--	},
--	{
--		.start = NOMADIK_GPIO_TO_IRQ(140),
--		.end = NOMADIK_GPIO_TO_IRQ(140),
--		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
--	},
+-static struct platform_device snowball_gpio_en_3v3_regulator_dev = {
+-       .name   = "reg-fixed-voltage",
+-       .id     = 1,
+-       .dev    = {
+-               .platform_data  = &snowball_gpio_en_3v3_data,
+-       },
 -};
 -
--static struct platform_device snowball_sbnet_dev = {
--	.name           = "smsc911x",
--	.num_resources  = ARRAY_SIZE(sbnet_res),
--	.resource       = sbnet_res,
--	.dev            = {
--		.platform_data = &snowball_sbnet_cfg,
--	},
--};
--
- struct ab8500_platform_data ab8500_platdata = {
- 	.irq_base	= MOP500_AB8500_IRQ_BASE,
- 	.regulator	= &ab8500_regulator_plat_data,
-@@ -399,7 +368,6 @@ static void __init u8500_cryp1_hash1_init(struct device *parent)
+ /* Dynamically populated. */
+ static struct gpio sdi0_reg_gpios[] = {
+ 	{ 0, GPIOF_OUT_INIT_LOW, "mmci_vsel" },
+@@ -368,7 +351,6 @@ static void __init u8500_cryp1_hash1_init(struct device *parent)
  }
  
  static struct platform_device *snowball_platform_devs[] __initdata = {
--	&snowball_sbnet_dev,
- 	&snowball_gpio_en_3v3_regulator_dev,
+-	&snowball_gpio_en_3v3_regulator_dev,
  	&u8500_cpufreq_cooling_device,
  	&sdi0_regulator,
+ };
 -- 
 1.8.1.2
