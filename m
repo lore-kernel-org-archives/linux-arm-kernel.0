@@ -1,126 +1,116 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Aug 2013 08:53:08 +0200
-Subject: [PATCH 03/12] ARM: mvebu: ll_set_cpu_coherent always uses the current
- CPU
+Date: Fri, 23 Aug 2013 08:53:07 +0200
+Subject: [PATCH 02/12] ARM: mvebu: ll_set_cpu_coherent no more uses the
+ coherency address as parameter
 In-Reply-To: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1377240797-4047-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1377240797-4047-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ll_set_cpu_coherent is always used on the current CPU, so instead of
-passing the CPU id as argument, ll_set_cpu_coherent() can find it by
-itself.
+Until now the calling functions of ll_set_cpu_coherent() have to know
+the base address of the coherency registers. This commit doesn't
+expose anymore this address, and replace the argument by a flag to
+indicate if we have to use the physical or the virtual address.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/coherency.c    | 10 +++++-----
- arch/arm/mach-mvebu/coherency.h    |  2 +-
- arch/arm/mach-mvebu/coherency_ll.S |  7 ++++---
- arch/arm/mach-mvebu/headsmp.S      |  4 ----
- arch/arm/mach-mvebu/platsmp.c      |  2 +-
- 5 files changed, 11 insertions(+), 14 deletions(-)
+ arch/arm/mach-mvebu/coherency.c    |  6 +++---
+ arch/arm/mach-mvebu/coherency_ll.S | 18 +++++++++++++++++-
+ arch/arm/mach-mvebu/headsmp.S      | 10 ++--------
+ 3 files changed, 22 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 8e9f7b7..e48518e 100644
+index 4c24303..8e9f7b7 100644
 --- a/arch/arm/mach-mvebu/coherency.c
 +++ b/arch/arm/mach-mvebu/coherency.c
-@@ -43,17 +43,17 @@ static struct of_device_id of_coherency_table[] = {
+@@ -29,7 +29,7 @@
+ #include "armada-370-xp.h"
+ 
+ unsigned long coherency_phys_base;
+-static void __iomem *coherency_base;
++void __iomem *coherency_base;
+ static void __iomem *coherency_cpu_base;
+ 
+ /* Coherency fabric registers */
+@@ -43,7 +43,7 @@ static struct of_device_id of_coherency_table[] = {
  };
  
  /* Function defined in coherency_ll.S */
--int ll_set_cpu_coherent(bool use_virt_addr, unsigned int hw_cpu_id);
-+int ll_set_cpu_coherent(bool use_virt_addr);
+-int ll_set_cpu_coherent(void __iomem *base_addr, unsigned int hw_cpu_id);
++int ll_set_cpu_coherent(bool use_virt_addr, unsigned int hw_cpu_id);
  
--int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
-+int set_cpu_coherent(int smp_group_id)
+ int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
  {
- 	if (!coherency_base) {
--		pr_warn("Can't make CPU %d cache coherent.\n", hw_cpu_id);
-+		pr_warn("Can't make current CPU cache coherent.\n");
- 		pr_warn("Coherency fabric is not initialized\n");
+@@ -53,7 +53,7 @@ int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
  		return 1;
  	}
  
--	return ll_set_cpu_coherent(true, hw_cpu_id);
-+	return ll_set_cpu_coherent(true);
+-	return ll_set_cpu_coherent(coherency_base, hw_cpu_id);
++	return ll_set_cpu_coherent(true, hw_cpu_id);
  }
  
  static inline void mvebu_hwcc_sync_io_barrier(void)
-@@ -139,7 +139,7 @@ int __init coherency_init(void)
- 		sync_cache_w(&coherency_phys_base);
- 		coherency_base = of_iomap(np, 0);
- 		coherency_cpu_base = of_iomap(np, 1);
--		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
-+		set_cpu_coherent(0);
- 	}
- 
- 	return 0;
-diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
-index df33ad8..d4bc067 100644
---- a/arch/arm/mach-mvebu/coherency.h
-+++ b/arch/arm/mach-mvebu/coherency.h
-@@ -14,7 +14,7 @@
- #ifndef __MACH_370_XP_COHERENCY_H
- #define __MACH_370_XP_COHERENCY_H
- 
--int set_cpu_coherent(int cpu_id, int smp_group_id);
-+int set_cpu_coherent(int smp_group_id);
- int coherency_init(void);
- 
- #endif	/* __MACH_370_XP_COHERENCY_H */
 diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
-index 8d4e22f..fc2e6f7 100644
+index 5476669..8d4e22f 100644
 --- a/arch/arm/mach-mvebu/coherency_ll.S
 +++ b/arch/arm/mach-mvebu/coherency_ll.S
-@@ -23,7 +23,6 @@
+@@ -22,10 +22,22 @@
+ 
  	.text
  /*
-  * r0: if r0==0 => physical addres, else virtual address
-- * r1: HW CPU id
+- * r0: Coherency fabric base register address
++ * r0: if r0==0 => physical addres, else virtual address
+  * r1: HW CPU id
   */
  ENTRY(ll_set_cpu_coherent)
- 	cmp	r0, #0
-@@ -39,8 +38,10 @@ ENTRY(ll_set_cpu_coherent)
- 	ldr	r0, [r0]
- 2:
++	cmp	r0, #0
++	bne	1f
++    /* use physical address */
++	adr	r0, 3f
++	ldr	r3, [r0]
++	ldr	r0, [r0, r3]
++	b	2f
++1:
++    /* use virtual address */
++	ldr	r0, =(coherency_base)
++	ldr	r0, [r0]
++2:
  	/* Create bit by cpu index */
--	mov	r3, #(1 << 24)
--	lsl	r1, r3, r1
-+	mrc	15, 0, r1, cr0, cr0, 5
-+	and	r1, r1, #15
-+	mov	r2, #(1 << 24)
-+	lsl	r1, r2, r1
- 
- 	/* Add CPU to SMP group - Atomic */
- 	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
+ 	mov	r3, #(1 << 24)
+ 	lsl	r1, r3, r1
+@@ -53,3 +65,7 @@ ENTRY(ll_set_cpu_coherent)
+ 	mov	r0, #0
+ 	mov	pc, lr
+ ENDPROC(ll_set_cpu_coherent)
++
++	.align 2
++3:
++	.long	coherency_phys_base - .
 diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
-index bffaabc..b2c6e95 100644
+index 8a1b0c9..bffaabc 100644
 --- a/arch/arm/mach-mvebu/headsmp.S
 +++ b/arch/arm/mach-mvebu/headsmp.S
-@@ -30,10 +30,6 @@ ENTRY(armada_xp_secondary_startup)
- 	/* Use physical addrss */
- 	mov	r0, #0
+@@ -27,10 +27,8 @@
+  * startup
+  */
+ ENTRY(armada_xp_secondary_startup)
+-	/* Get coherency fabric base physical address */
+-	adr	r0, 1f
+-	ldr	r1, [r0]
+-	ldr	r0, [r0, r1]
++	/* Use physical addrss */
++	mov	r0, #0
  
--	/* Read CPU id */
--	mrc     p15, 0, r1, c0, c0, 5
--	and     r1, r1, #0xF
--
- 	/* Add CPU to coherency fabric */
- 	bl	ll_set_cpu_coherent
+ 	/* Read CPU id */
+ 	mrc     p15, 0, r1, c0, c0, 5
+@@ -41,7 +39,3 @@ ENTRY(armada_xp_secondary_startup)
  	b	secondary_startup
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index ce81d30..455f7cb 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -116,7 +116,7 @@ void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	set_secondary_cpus_clock();
- 	flush_cache_all();
--	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
-+	set_cpu_coherent(0);
- 	mvebu_mbus_add_window("bootrom", 0xfff00000, SZ_1M);
- }
  
+ ENDPROC(armada_xp_secondary_startup)
+-
+-	.align 2
+-1:
+-	.long	coherency_phys_base - .
 -- 
 1.8.1.2
