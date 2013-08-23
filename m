@@ -1,36 +1,45 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 23 Aug 2013 10:14:38 +0800
-Subject: [PATCH V1 4/5] spi: Add Freescale QuadSpi driver
-In-Reply-To: <20130822192158.GA10038@ld-irv-0074.broadcom.com>
-References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
- <1376885403-12156-5-git-send-email-b32955@freescale.com>
- <20130822192158.GA10038@ld-irv-0074.broadcom.com>
-Message-ID: <5216C58E.2040400@freescale.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 23 Aug 2013 10:34:02 +0800
+Subject: [PATCH v2 4/4] pinctrl: mvebu: Convert to use devm_ioremap_resource
+In-Reply-To: <1377225242-5854-1-git-send-email-jszhang@marvell.com>
+References: <1377225242-5854-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1377225242-5854-5-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?08?23? 03:21, Brian Norris ??:
-> Can this controller support more than one chip? If so, then the nor-size
-> property makes even less sense. See below.
->
-yes.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-this controller can supports two same chips at the same time.
->> >  +- clocks : The clocks needed by the QuadSPI controller
->> >  +- clock-names : the name of the clocks
->> >  +
->> >  +Optional properties:
->> >  +- fsl,nor-size : The NOR size used by the QuadSPI mapping.
-> Why does the size of the NOR flash need to be in the controller's device
-> node? Shouldn't this be detected at run-time if possible? Or at least
-yes, i can parse out the NOR size by the DT node.
-
-I can remove this DT property in the next version.
-
-
-> included as a property of m25p80, if absolutely required?
-the m25p80 has already contains the NOR size by: sector_size * n_sectors.
-but as a spi driver , there is no API i can use to get the NOR size.
-
-thanks
-Huang Shijie
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+index bb7ddb1..1caa45f 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+@@ -579,7 +579,7 @@ static int mvebu_pinctrl_build_functions(struct platform_device *pdev,
+ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ {
+ 	struct mvebu_pinctrl_soc_info *soc = dev_get_platdata(&pdev->dev);
+-	struct device_node *np = pdev->dev.of_node;
++	struct resource *res;
+ 	struct mvebu_pinctrl *pctl;
+ 	void __iomem *base;
+ 	struct pinctrl_pin_desc *pdesc;
+@@ -591,11 +591,10 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	base = of_iomap(np, 0);
+-	if (!base) {
+-		dev_err(&pdev->dev, "unable to get base address\n");
+-		return -ENODEV;
+-	}
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
+ 
+ 	pctl = devm_kzalloc(&pdev->dev, sizeof(struct mvebu_pinctrl),
+ 			GFP_KERNEL);
+-- 
+1.8.4.rc3
