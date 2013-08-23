@@ -1,24 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 23 Aug 2013 17:54:53 +0100
-Subject: [GIT PULL 2/5] ARM: imx: soc changes for 3.12
-In-Reply-To: <CAGa+x85rvPTh3NyhY6rEtBN77gq6zVAW_TvT8k_fg9JbZGtJOw@mail.gmail.com>
-References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
- <1376833688-24542-2-git-send-email-shawn.guo@linaro.org>
- <87li3tvnj8.fsf@linaro.org> <20130823101114.GM6617@n2100.arm.linux.org.uk>
- <CAGa+x85rvPTh3NyhY6rEtBN77gq6zVAW_TvT8k_fg9JbZGtJOw@mail.gmail.com>
-Message-ID: <20130823165453.GP6617@n2100.arm.linux.org.uk>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 23 Aug 2013 11:56:55 -0500
+Subject: [PATCHv3 0/8] omap mailbox dt
+In-Reply-To: <1375825193-18046-1-git-send-email-s-anna@ti.com>
+References: <1375825193-18046-1-git-send-email-s-anna@ti.com>
+Message-ID: <52179457.2080203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 09:47:44AM -0700, Kevin Hilman wrote:
-> OK, good. I didn't realize you did all the conversions.  I thought you
-> did a few to set the example and wanted others to finish converting.
+Tony, Benoit,
+
+> This is an updated series for adding the device tree support to
+> the OMAP mailbox driver. The series is based on 3.11-rc4 and now
+> includes the support for AM335 WkupM3 mailbox.
 > 
-> Thanks for the cleanup,
+> The support for WkupM3 mailbox is essential for achieving the PM
+> Suspend on AM335 devices, and this series is a dependency for
+> the AM335 suspend/resume series [1]. The AM335 support patches
+> required the mailbox DT patches posted previously, so I have
+> refreshed all of them together.
+> 
+> Tested this on Beagle-XM, Panda4 and OMAP5 uEVM (with
+> out-of-tree clock patches).
+> 
+> v3:
+> - Includes 3 new patches on top of the unchanged patches in v2.
+> - Patches 7 and 8 adds the driver support and DT node for AM335.
+> - Patch6 is a minor cleanup patch removing omap_mbox_type_t from
+>   mbox ops.
 
-It's the full thing - which is why I'm eager for there not to be residual
-work.
+Any additional feedback/comments on this series? The series contains
+patches both for the driver code and DT/hwmod data. Let me know if you
+need me to rearrange the patches. I currently have one review comment
+to address regarding adding some additional notes [1] to the DT binding
+information.
 
-Most of the debug stuff is self-contained, so there shouldn't be a problem
-if people want to send me their debug additions directly rather than
-feeding them to arm-soc.
+regards
+Suman
+
+[1] http://marc.info/?t=137582575400006&r=1&w=2
