@@ -1,116 +1,65 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Aug 2013 08:53:07 +0200
-Subject: [PATCH 02/12] ARM: mvebu: ll_set_cpu_coherent no more uses the
- coherency address as parameter
-In-Reply-To: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1377240797-4047-3-git-send-email-gregory.clement@free-electrons.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Fri, 23 Aug 2013 12:23:13 +0530
+Subject: [PATCH 1/3] misc: Add crossbar driver
+In-Reply-To: <521702E2.5000102@ti.com>
+References: <51E83A4F.5080904@ti.com>
+ <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
+ <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com> <51EFFBE1.4090505@ti.com>
+ <51F0031B.1050307@ti.com> <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
+ <51F0223E.4050008@ti.com> <51F0240F.3050507@ti.com>
+ <20130813081003.GU7656@atomide.com> <520A02BA.4090805@ti.com>
+ <CACRpkda+m82PYJsExLM6JLsLa8-bVhdvy_r_+-uKfVT2NG7Cbg@mail.gmail.com>
+ <520D398D.9040806@ti.com>
+ <CACRpkdYeo1y-HhftkRWgwyq8o-NVuJ978Uq+ON880LHhUxC=hg@mail.gmail.com>
+ <520D44C5.6080205@ti.com>
+ <CACRpkdagSHxzV3=427O9iftNxM+N=w9aPds=iDvGQPoG3H-cWw@mail.gmail.com>
+ <5215F6F6.9060703@ti.com> <5216E966.5020902@ti.com> <5216FD0C.3090709@ti.com>
+ <521702E2.5000102@ti.com>
+Message-ID: <521706D9.9070001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now the calling functions of ll_set_cpu_coherent() have to know
-the base address of the coherency registers. This commit doesn't
-expose anymore this address, and replace the argument by a flag to
-indicate if we have to use the physical or the virtual address.
+On Friday 23 August 2013 12:06 PM, Sekhar Nori wrote:
+> On Friday 23 August 2013 11:41 AM, Sricharan R wrote:
+>> Hi,
+>> On Friday 23 August 2013 10:17 AM, Rajendra Nayak wrote:
+>>> On Thursday 22 August 2013 05:03 PM, Sricharan R wrote:
+>>>>  maps crossbar number<->  to interrupt number and
+>>>>  calls request_irq(int_no, crossbar_handler,..)
+>>> So will this mapping happen based on some data passed from DT or
+>>> just based on whats available when the device does a request_irq()?
+>>>
+>>> If its based on whats available then I see an issue when you need
+>>> to remap something thats already mapped by default (and not used)
+>>> since you run out of all free ones.
+>> Yes, when done based on what is available then there is a
+>> problem when we run out of free ones because we do not
+>> know which one to replace. I was thinking of something like
+>> this,
+>>     1) DT would give a list of all free ones, and also if some are
+>>         mapped as default and not used, mark those also as free.
+>>
+>>      2) While mapping see if it has a default mapping and use it.
+>>           otherwise, pick from free list.   
+> Since the entire DT is available to you at boot time, you should be able
+> to find each node where interrupt-parent = <&crossbar> and then allocate
+> one of 0-160 GIC interrupt numbers for that node, no? Where would there
+> be a need for default mapping and remapping? From one the mails in the
+> thread the crossbar is completely flexible - any of the 320 crossbar
+> interrupts can be mapped to any of the 160 GIC interrupts.
+>
+> Any GIC interrupts left after this boot-time scan can be added to an
+> unused list for use with runtime DT fragments (when that support comes).
+>  
+> Sorry if I misunderstood, but above proposal sounds like maintaining a
+> separate free interrupt lines list in DT. That will quickly go out of sync.
+ Say, peripheral x uses crossbar 1 and specifies this in DT.
+ During boot crossbar 1 gets mapped int 10. So if by default
+some other crossbar has its interrupt mapped to 10,
+then it should be removed.  Instead clear all crossbar registers
+once and mark all as free, then  allocate only during request.
+Correct ?. In this the free no need to maintain any list.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/mach-mvebu/coherency.c    |  6 +++---
- arch/arm/mach-mvebu/coherency_ll.S | 18 +++++++++++++++++-
- arch/arm/mach-mvebu/headsmp.S      | 10 ++--------
- 3 files changed, 22 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 4c24303..8e9f7b7 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -29,7 +29,7 @@
- #include "armada-370-xp.h"
+Regards,
+ Sricharan
  
- unsigned long coherency_phys_base;
--static void __iomem *coherency_base;
-+void __iomem *coherency_base;
- static void __iomem *coherency_cpu_base;
- 
- /* Coherency fabric registers */
-@@ -43,7 +43,7 @@ static struct of_device_id of_coherency_table[] = {
- };
- 
- /* Function defined in coherency_ll.S */
--int ll_set_cpu_coherent(void __iomem *base_addr, unsigned int hw_cpu_id);
-+int ll_set_cpu_coherent(bool use_virt_addr, unsigned int hw_cpu_id);
- 
- int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
- {
-@@ -53,7 +53,7 @@ int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
- 		return 1;
- 	}
- 
--	return ll_set_cpu_coherent(coherency_base, hw_cpu_id);
-+	return ll_set_cpu_coherent(true, hw_cpu_id);
- }
- 
- static inline void mvebu_hwcc_sync_io_barrier(void)
-diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
-index 5476669..8d4e22f 100644
---- a/arch/arm/mach-mvebu/coherency_ll.S
-+++ b/arch/arm/mach-mvebu/coherency_ll.S
-@@ -22,10 +22,22 @@
- 
- 	.text
- /*
-- * r0: Coherency fabric base register address
-+ * r0: if r0==0 => physical addres, else virtual address
-  * r1: HW CPU id
-  */
- ENTRY(ll_set_cpu_coherent)
-+	cmp	r0, #0
-+	bne	1f
-+    /* use physical address */
-+	adr	r0, 3f
-+	ldr	r3, [r0]
-+	ldr	r0, [r0, r3]
-+	b	2f
-+1:
-+    /* use virtual address */
-+	ldr	r0, =(coherency_base)
-+	ldr	r0, [r0]
-+2:
- 	/* Create bit by cpu index */
- 	mov	r3, #(1 << 24)
- 	lsl	r1, r3, r1
-@@ -53,3 +65,7 @@ ENTRY(ll_set_cpu_coherent)
- 	mov	r0, #0
- 	mov	pc, lr
- ENDPROC(ll_set_cpu_coherent)
-+
-+	.align 2
-+3:
-+	.long	coherency_phys_base - .
-diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
-index 8a1b0c9..bffaabc 100644
---- a/arch/arm/mach-mvebu/headsmp.S
-+++ b/arch/arm/mach-mvebu/headsmp.S
-@@ -27,10 +27,8 @@
-  * startup
-  */
- ENTRY(armada_xp_secondary_startup)
--	/* Get coherency fabric base physical address */
--	adr	r0, 1f
--	ldr	r1, [r0]
--	ldr	r0, [r0, r1]
-+	/* Use physical addrss */
-+	mov	r0, #0
- 
- 	/* Read CPU id */
- 	mrc     p15, 0, r1, c0, c0, 5
-@@ -41,7 +39,3 @@ ENTRY(armada_xp_secondary_startup)
- 	b	secondary_startup
- 
- ENDPROC(armada_xp_secondary_startup)
--
--	.align 2
--1:
--	.long	coherency_phys_base - .
--- 
-1.8.1.2
