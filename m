@@ -1,34 +1,41 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Fri, 23 Aug 2013 13:38:02 +0300
-Subject: [PATCH v3 1/3] ARM: Introduce atomic MMIO modify
-In-Reply-To: <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Fri, 23 Aug 2013 13:38:57 +0300
+Subject: [PATCH v3 2/3] clocksource: orion: Use atomic access for shared
+ registers
+In-Reply-To: <1377253445-2842-3-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1377253445-2842-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130823103802.GO4600@tarshish>
+ <1377253445-2842-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130823103857.GP4600@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Ezequiel,
+Hi Ezequiel,
 
-On Fri, Aug 23, 2013 at 07:24:03AM -0300, Ezequiel Garcia wrote:
-> Some SoC have MMIO regions that are shared across orthogonal
-> subsystems. This commit implements a possible solution for the
-> thread-safe access of such regions through a spinlock-protected API.
-> 
-> Concurrent access is protected with a single spinlock for the
-> entire MMIO address space. While this protects shared-registers,
-> it also serializes access to unrelated/unshared registers.
-> 
-> We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
-> respectively. The rationale for this is that some users may not require
-> register write completion but only thread-safe access to a register.
+On Fri, Aug 23, 2013 at 07:24:04AM -0300, Ezequiel Garcia wrote:
+> Replace the driver-specific thread-safe shared register API
+> by the recently introduced atomic_io_clear_set().
 > 
 > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-Is there a reason why this should be limited to ARM? I haven't found anything 
-ARM specific in the code.
+[...]
+
+> @@ -131,7 +121,9 @@ static void __init orion_timer_init(struct device_node 
+>   *np)
+>  	/* setup timer0 as free-running clocksource */
+>  	writel(~0, timer_base + TIMER0_VAL);
+>  	writel(~0, timer_base + TIMER0_RELOAD);
+> -	orion_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | TIMER0_EN);
+> +	oatomic_io_modify(timer_base + TIMER_CTRL,
+
+oatomic? Are you sure this code builds?
 
 baruch
+
+> +		TIMER0_RELOAD_EN | TIMER0_EN,
+> +		TIMER0_RELOAD_EN | TIMER0_EN);
+>  	clocksource_mmio_init(timer_base + TIMER0_VAL, "orion_clocksource",
+>  			      clk_get_rate(clk), 300, 32,
+>  			      clocksource_mmio_readl_down);
 
 -- 
      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
