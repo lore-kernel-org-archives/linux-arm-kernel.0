@@ -1,50 +1,60 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 23 Aug 2013 21:14:32 +0200
-Subject: [PATCH v5 2/5] net: ethernet: cpsw: add optional third memory
- region for CONTROL module
-In-Reply-To: <5217B3BE.8020003@cogentembedded.com>
-References: <1377283987-20040-1-git-send-email-zonque@gmail.com>
- <1377283987-20040-3-git-send-email-zonque@gmail.com>
- <5217B3BE.8020003@cogentembedded.com>
-Message-ID: <5217B498.9010706@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 23 Aug 2013 12:19:58 -0700
+Subject: [PATCH 0/8] Support VGIC save/restore using device control API
+Message-ID: <1377285606-15692-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.08.2013 21:10, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 08/23/2013 10:53 PM, Daniel Mack wrote:
-> 
->> At least the AM33xx SoC has a control module register to configure
->> details such as the hardware ethernet interface mode.
-> 
->> I'm not sure whether all SoCs which feature the cpsw block have such a
->> register, so that third memory region is considered optional for now.
-> 
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
->> ---
->>   Documentation/devicetree/bindings/net/cpsw.txt | 5 ++++-
->>   drivers/net/ethernet/ti/cpsw.c                 | 5 +++++
->>   2 files changed, 9 insertions(+), 1 deletion(-)
-> 
->> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
->> index fc3263f..4feba2f 100644
->> --- a/drivers/net/ethernet/ti/cpsw.c
->> +++ b/drivers/net/ethernet/ti/cpsw.c
-> [...]
->> @@ -1989,6 +1990,10 @@ static int cpsw_probe(struct platform_device *pdev)
->>   		goto clean_runtime_disable_ret;
->>   	}
->>
->> +	/* Don't fail hard if the optional control memory region is missing */
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
->> +	priv->gmii_sel_reg = devm_ioremap_resource(&pdev->dev, res);
-> 
->     Hm, but why now you don't fail if devm_ioremap_resource() fails?
+Implement save/restore of the VGIC state using the newer KVM Device
+Control API.  This requries some number of changes to existing code in
+addition to actually supporting save/restore of the necessary state.
 
-Well, because I thought maybe we should just ignore failures of that
-kind altogether for this optional resource. There will still be a
-warning in that case. Did you like the old approach better?
+The first patches (01-03) support creating the VGIC using the Device
+Control API.  This change is necessary because there are no other
+suitable KVM APIs that we can leverage to access the VGIC state from
+user space and the device control API was crafted exactly for this
+purpose.
 
+Subsequent patches add the missing infrastructure and user space API
+pieces necessary to actually save and restore the VGIC state.  The GIC
+v2.0 architecture specification already specifies registers that can be
+used to save and restore the complete VGIC state for suspend/resume
+purposes on real hardware, and we can resuse this interface for the
+VGIC.  The API is therefore based on the memory-mapped register accesses
+defined in the specs.  See the individual patches for details.
 
-Daniel
+The patches rely on a number of small fixes sent separately to actually
+work:
+git://git.linaro.org/people/cdall/linux-kvm-arm.git vgic-migrate-prereq
+
+This patch series based on the above can be cloned from:
+git://git.linaro.org/people/cdall/linux-kvm-arm.git vgic-migrate
+
+User space patches for QEMU will follow shortly.  Tested on Versatile
+Express TC2.
+
+Christoffer Dall (8):
+  ARM: KVM: Allow creating the VGIC after VCPUs
+  KVM: arm-vgic: Support KVM_CREATE_DEVICE for VGIC
+  KVM: arm-vgic: Set base addr through device API
+  irqchip: arm-gic: Define additional MMIO offsets and masks
+  KVM: arm-vgic: Make vgic mmio functions more generic
+  KVM: arm-vgic: Add vgic reg access from dev attr
+  KVM: arm-vgic: Add GICD_SPENDSGIR and GICD_CPENDSGIR handlers
+  KVM: arm-vgic: Support CPU interface reg access
+
+ Documentation/virtual/kvm/api.txt              |    6 +-
+ Documentation/virtual/kvm/devices/arm-vgic.txt |   56 +++
+ arch/arm/include/uapi/asm/kvm.h                |    8 +
+ arch/arm/kvm/arm.c                             |   10 +-
+ include/kvm/arm_vgic.h                         |    2 +-
+ include/linux/irqchip/arm-gic.h                |   14 +
+ include/linux/kvm_host.h                       |    1 +
+ include/uapi/linux/kvm.h                       |    1 +
+ virt/kvm/arm/vgic.c                            |  479 ++++++++++++++++++++++--
+ virt/kvm/kvm_main.c                            |    5 +
+ 10 files changed, 554 insertions(+), 28 deletions(-)
+ create mode 100644 Documentation/virtual/kvm/devices/arm-vgic.txt
+
+-- 
+1.7.10.4
