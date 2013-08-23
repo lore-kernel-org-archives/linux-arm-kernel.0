@@ -1,29 +1,29 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Fri, 23 Aug 2013 11:44:20 +0530
-Subject: [PATCH 3/4] net: ethernet: cpsw: add support for hardware
- interface mode config
-In-Reply-To: <5216F366.50609@ti.com>
-References: <1377171448-27924-1-git-send-email-zonque@gmail.com>
- <1377171448-27924-4-git-send-email-zonque@gmail.com> <5216F366.50609@ti.com>
-Message-ID: <5216FDBC.3010600@ti.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Fri, 23 Aug 2013 14:14:20 +0800
+Subject: [PATCH v2] ARM: OMAP2: use 'int' instead of 'unsigned' for
+ variable 'gpmc_irq_start'
+In-Reply-To: <20130823054818.GX7656@atomide.com>
+References: <521479B4.8030604@asianux.com> <20130822071402.GQ7656@atomide.com>
+ <5215C12D.5020807@asianux.com> <5215C209.3080606@asianux.com>
+ <20130822075731.GT7656@atomide.com> <5215C555.9060902@asianux.com>
+ <20130822083206.GU7656@atomide.com> <5215D30C.1070500@gmail.com>
+ <20130823054818.GX7656@atomide.com>
+Message-ID: <5216FDBC.6080100@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 August 2013 11:00 AM, Sekhar Nori wrote:
->> @@ -728,6 +736,44 @@ static void _cpsw_adjust_link(struct cpsw_slave *slave,
->> >  	u32			mac_control = 0;
->> >  	u32			slave_port;
->> >  
->> > +	if (priv->gmii_sel_reg && of_machine_is_compatible("ti,am33xx")) {
-> This sounds like the DT version of cpu_is_am335x()! Looks like you need
-> to introduce a new compatible "ti,am3352-cpsw" to indicate the AM3352
-> specific features of the CPSW IP (yeah, control module is not really
-> part of the IP, but by introducing it in the driver, we are treating it
-> such anyway. And you can see this register as extension of IP since its
-> not shared for any other purpose).
->
+On 08/23/2013 01:48 PM, Tony Lindgren wrote:
+> * Chen Gang F T <chen.gang.flying.transformer@gmail.com> [130822 02:08]:
+>> Hmm... I guess: for our case, what your meaning is "fixes-none-urgent",
+>> not "fixes-none-critical", is it correct ?  :-)
+> 
+> Right, that naming might be actually better :)
+> 
+> Tony
+> 
+> 
 
-I also agree but it should be ti,am3352-cpsw or ti.am33xx-cpsw?
+Thanks !
 
-Regards
-Mugunthan V N
+-- 
+Chen Gang
