@@ -1,67 +1,36 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Fri, 23 Aug 2013 11:12:27 +0800
-Subject: [PATCH] ARM: VExpress: Kconfig: avoid arm6 compatible for
- ARCH_VEXPRESS
-In-Reply-To: <5216D138.6080802@asianux.com>
-References: <521479B4.8030604@asianux.com> <52147AC6.9040300@asianux.com>
- <52147E12.4060401@asianux.com> <20130822074524.GS7656@atomide.com>
- <20130822102210.GF25647@n2100.arm.linux.org.uk>
- <5216BF16.2080006@asianux.com> <5216C389.9050605@asianux.com>
- <5216D138.6080802@asianux.com>
-Message-ID: <5216D31B.9050609@asianux.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 22 Aug 2013 21:32:48 -0700
+Subject: [PATCH v3 0/5] clk: dt: bindings for mux, divider & gate clocks
+In-Reply-To: <20130822041448.8231.16182@quantum>
+References: <1371795256-16703-1-git-send-email-mturquette@linaro.org>
+ <51E8586C.7040808@codeaurora.org>
+ <20130822041448.8231.16182@quantum>
+Message-ID: <20130823043248.GF23960@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2013 11:04 AM, Chen Gang wrote:
-> ARCH_VEXPRESS isn't compatible with arm6 (not support "-march=armv6k"),
-> so add dependency for it, or allmodconfig can not pass compiling.
+On 08/21, Mike Turquette wrote:
 > 
-> The related command:
+> I just happened across a to-do list note telling me to respond to this
+> email. Better late than never.
 > 
->   arm-linux-gnueabi-gcc -Wp,-MD,arch/arm/mach-vexpress/.dcscb.o.d  -nostdinc -isystem /usr/lib/gcc/arm-linux-gnueabi/4.7/include -I/root/linux-next/arch/arm/include -Iarch/arm/include/generated  -Iinclude -I/root/linux-next/arch/arm/include/uapi -Iarch/arm/include/generated/uapi -I/root/linux-next/include/uapi -Iinclude/generated/uapi -include /root/linux-next/include/linux/kconfig.h -D__KERNEL__ -mlittle-endian -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Werror=implicit-int -Werror=strict-prototypes -Os -Wno-maybe-uninitialized -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog -fstack-protector -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -marm -D__LINUX_ARM_ARCH__=6 -march=armv6k -mtune=arm1136j-s -msoft-float -Uarm -fno-reorder-blocks -fno-ipa-cp-clone -fno-partial-inlining -Wframe-larger-than=1024 -Wno-unused-but-
- set-varia
-bl
-> e -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -femit-struct-debug-baseonly -fno-var-tracking -pg -fno-inline-functions-called-once -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -DCC_HAVE_ASM_GOTO -I/root/linux-next/arch/arm/mach-vexpress/include -I/root/linux-next/arch/arm/plat-versatile/include -W     -D"KBUILD_STR(s)=#s" -D"KBUILD_BASENAME=KBUILD_STR(dcscb)"  -D"KBUILD_MODNAME=KBUILD_STR(dcscb)" -c -o arch/arm/mach-vexpress/.tmp_dcscb.o arch/arm/mach-vexpress/dcscb.c
-> 
-> The related error:
-> 
->   /tmp/ccOMIprI.s: Assembler messages:
->   /tmp/ccOMIprI.s:507: Error: selected processor does not support ARM mode `isb '
->   /tmp/ccOMIprI.s:513: Error: selected processor does not support ARM mode `isb '
->   /tmp/ccOMIprI.s:514: Error: selected processor does not support ARM mode `dsb '
->   /tmp/ccOMIprI.s:584: Error: selected processor does not support ARM mode `isb '
->   /tmp/ccOMIprI.s:590: Error: selected processor does not support ARM mode `isb '
->   /tmp/ccOMIprI.s:591: Error: selected processor does not support ARM mode `dsb '
->   make[1]: *** [arch/arm/mach-vexpress/dcscb.o] Error 1
->   make: *** [arch/arm/mach-vexpress] Error 2
-> 
-> 
-> 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm/mach-vexpress/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-> index 3657954..945e2f9 100644
-> --- a/arch/arm/mach-vexpress/Kconfig
-> +++ b/arch/arm/mach-vexpress/Kconfig
-> @@ -1,5 +1,5 @@
->  config ARCH_VEXPRESS
-> -	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7
-> +	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7 && !ARCH_MULTI_V6 && !CPU_V6 && !CPU_V6K
->  	select ARCH_REQUIRE_GPIOLIB
->  	select ARM_AMBA
->  	select ARM_GIC
-> 
+[snip]
+>
+> This is a way to establish initial configuration from the consumer's
+> perspective. Similarly something can be done for the clock rate with
+> assigned-clock-rate.
 
-Oh, sorry, we do not need check ARCH_MULTI_V6, the new patch is in
-attachment.
+Ok. Thanks for the information. Unfortunately it isn't what I
+thought it was.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-fixing.patch
-Type: text/x-patch
-Size: 2927 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/54cba7c7/attachment.bin>
+> 
+> With all of that said this is consumer-level stuff. We'll definitely
+> talk about the clock provider DT bindings at the ARM Summit, which is
+> what you discuss above.
+
+I can't wait another 2 months to start discussing the clock
+provider DT bindings. We need to discuss it on the list.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
