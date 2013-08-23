@@ -1,53 +1,30 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 23 Aug 2013 11:31:04 -0700
-Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.12
-In-Reply-To: <5214D4FD.4060405@baylibre.com> (Benoit Cousson's message of
- "Wed, 21 Aug 2013 16:55:57 +0200")
-References: <521384D5.1050607@baylibre.com>
- <20130821071334.GQ7656@atomide.com> <5214D4FD.4060405@baylibre.com>
-Message-ID: <87fvu0mf87.fsf@linaro.org>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 23 Aug 2013 20:34:17 +0200
+Subject: [PATCH v4 1/5] net: ethernet: cpsw: switch to devres allocations
+In-Reply-To: <5217A5AE.6090704@cogentembedded.com>
+References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
+ <1377267365-24057-2-git-send-email-zonque@gmail.com>
+ <5217A5AE.6090704@cogentembedded.com>
+Message-ID: <5217AB29.9020209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit Cousson <bcousson@baylibre.com> writes:
+On 23.08.2013 20:10, Sergei Shtylyov wrote:
+> On 08/23/2013 06:16 PM, Daniel Mack wrote:
 
-> Hi Kevin & Olof,
->
-> I've just updated the branch with the few USB3 patches I missed from Felipe.
->
-> So here is a new pull-request.
->
-> Thanks,
-> Benoit
->
-> ----------------------------------------------------------------
-> Add the minimal DTS support for DRA7xx based SoC core.
-> Add the initial support for N900 and gta04 phones.
-> Enable USB3 on OMAP5 evm board.
-> Do a lot of various cleanups.
-> ----------------------------------------------------------------
+>>   	priv->coal_intvl = 0;
+>>   	priv->bus_freq_mhz = clk_get_rate(priv->clk) / 1000000;
+>>
+>> -	priv->cpsw_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> -	if (!priv->cpsw_res) {
+>> +	ss_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	if (!ss_res) {
+> 
+>     You don't need to check the result of platform_get_resource() if you call
+> devm_ioremap_resource() right afterwards -- it will check resource ptr for 
+> NULL the first thing. :-)
 
-This is a nice description, but would be even better if it was the
-description of the signed tag.  For future pulls, since we're pulling
-from you directly into arm-soc, can you start using signed tags please?
+Thanks! Will address that in v5.
 
 
-> The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
->
->   Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.12/dts
->
-> for you to fetch changes up to 5903208d4e2c09a3872feba6b9e2e49c64fd07ad:
->
->   ARM: configs: omap2plus_defconfig: enable dwc3 and dependencies (2013-08-21 16:43:21 +0200)
->
-
-Pulled into next/dt.
-
-Benoit, since we're pulling directly from you into arm-soc, can you
-start using signed tags please?  Thanks.
-
-Kevin
+Daniel
