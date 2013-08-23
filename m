@@ -1,55 +1,57 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Fri, 23 Aug 2013 12:27:54 +0530
-Subject: [PATCH v2 1/5] clk/exynos5420: add sclk_hdmiphy to the list of special
- clocks
-In-Reply-To: <1377241078-11808-1-git-send-email-rahul.sharma@samsung.com>
-References: <1377241078-11808-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1377241078-11808-2-git-send-email-rahul.sharma@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 23 Aug 2013 12:06:18 +0530
+Subject: [PATCH 1/3] misc: Add crossbar driver
+In-Reply-To: <5216FD0C.3090709@ti.com>
+References: <51E83A4F.5080904@ti.com>
+ <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
+ <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com> <51EFFBE1.4090505@ti.com>
+ <51F0031B.1050307@ti.com> <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
+ <51F0223E.4050008@ti.com> <51F0240F.3050507@ti.com>
+ <20130813081003.GU7656@atomide.com> <520A02BA.4090805@ti.com>
+ <CACRpkda+m82PYJsExLM6JLsLa8-bVhdvy_r_+-uKfVT2NG7Cbg@mail.gmail.com>
+ <520D398D.9040806@ti.com>
+ <CACRpkdYeo1y-HhftkRWgwyq8o-NVuJ978Uq+ON880LHhUxC=hg@mail.gmail.com>
+ <520D44C5.6080205@ti.com>
+ <CACRpkdagSHxzV3=427O9iftNxM+N=w9aPds=iDvGQPoG3H-cWw@mail.gmail.com>
+ <5215F6F6.9060703@ti.com> <5216E966.5020902@ti.com> <5216FD0C.3090709@ti.com>
+Message-ID: <521702E2.5000102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add sclk_hdmiphy to the list of exposed clocks. This is required
-by hdmi driver to change the parent of hdmi clock.
+On Friday 23 August 2013 11:41 AM, Sricharan R wrote:
+> Hi,
+> On Friday 23 August 2013 10:17 AM, Rajendra Nayak wrote:
+>> On Thursday 22 August 2013 05:03 PM, Sricharan R wrote:
+>>>  maps crossbar number<->  to interrupt number and
+>>>  calls request_irq(int_no, crossbar_handler,..)
+>> So will this mapping happen based on some data passed from DT or
+>> just based on whats available when the device does a request_irq()?
+>>
+>> If its based on whats available then I see an issue when you need
+>> to remap something thats already mapped by default (and not used)
+>> since you run out of all free ones.
+> Yes, when done based on what is available then there is a
+> problem when we run out of free ones because we do not
+> know which one to replace. I was thinking of something like
+> this,
+>     1) DT would give a list of all free ones, and also if some are
+>         mapped as default and not used, mark those also as free.
+> 
+>      2) While mapping see if it has a default mapping and use it.
+>           otherwise, pick from free list.   
 
-Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
----
- Documentation/devicetree/bindings/clock/exynos5420-clock.txt |    1 +
- drivers/clk/samsung/clk-exynos5420.c                         |    4 ++--
- 2 files changed, 3 insertions(+), 2 deletions(-)
+Since the entire DT is available to you at boot time, you should be able
+to find each node where interrupt-parent = <&crossbar> and then allocate
+one of 0-160 GIC interrupt numbers for that node, no? Where would there
+be a need for default mapping and remapping? From one the mails in the
+thread the crossbar is completely flexible - any of the 320 crossbar
+interrupts can be mapped to any of the 160 GIC interrupts.
 
-diff --git a/Documentation/devicetree/bindings/clock/exynos5420-clock.txt b/Documentation/devicetree/bindings/clock/exynos5420-clock.txt
-index 9bcc4b1..596a368 100644
---- a/Documentation/devicetree/bindings/clock/exynos5420-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/exynos5420-clock.txt
-@@ -59,6 +59,7 @@ clock which they consume.
-   sclk_pwm		155
-   sclk_gscl_wa		156
-   sclk_gscl_wb		157
-+  sclk_hdmiphy		158
- 
-    [Peripheral Clock Gates]
- 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index e035fd0..a86cadc 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -120,7 +120,7 @@ enum exynos5420_clks {
- 	sclk_i2s2, sclk_pcm1, sclk_pcm2, sclk_spdif, sclk_hdmi, sclk_pixel,
- 	sclk_dp1, sclk_mipi1, sclk_fimd1, sclk_maudio0, sclk_maupcm0,
- 	sclk_usbd300, sclk_usbd301, sclk_usbphy300, sclk_usbphy301, sclk_unipro,
--	sclk_pwm, sclk_gscl_wa, sclk_gscl_wb,
-+	sclk_pwm, sclk_gscl_wa, sclk_gscl_wb, sclk_hdmiphy,
- 
- 	/* gate clocks */
- 	aclk66_peric = 256, uart0, uart1, uart2, uart3, i2c0, i2c1, i2c2, i2c3,
-@@ -297,7 +297,7 @@ static struct samsung_fixed_rate_clock exynos5420_fixed_rate_ext_clks[] __initda
- 
- /* fixed rate clocks generated inside the soc */
- static struct samsung_fixed_rate_clock exynos5420_fixed_rate_clks[] __initdata = {
--	FRATE(none, "sclk_hdmiphy", NULL, CLK_IS_ROOT, 24000000),
-+	FRATE(sclk_hdmiphy, "sclk_hdmiphy", NULL, CLK_IS_ROOT, 24000000),
- 	FRATE(none, "sclk_pwi", NULL, CLK_IS_ROOT, 24000000),
- 	FRATE(none, "sclk_usbh20", NULL, CLK_IS_ROOT, 48000000),
- 	FRATE(none, "mphy_refclk_ixtal24", NULL, CLK_IS_ROOT, 48000000),
--- 
-1.7.10.4
+Any GIC interrupts left after this boot-time scan can be added to an
+unused list for use with runtime DT fragments (when that support comes).
+
+Sorry if I misunderstood, but above proposal sounds like maintaining a
+separate free interrupt lines list in DT. That will quickly go out of sync.
+
+Thanks,
+Sekhar
