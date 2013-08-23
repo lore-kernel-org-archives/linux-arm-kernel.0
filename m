@@ -1,122 +1,118 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 23 Aug 2013 14:12:36 -0700
-Subject: [PATCH v3 2/2] ARM: dts: Add AES data and documentation for AM33XX
+Date: Fri, 23 Aug 2013 14:12:35 -0700
+Subject: [PATCH v3 1/2] ARM: dts: Add SHAM data and documentation for AM33XX
 In-Reply-To: <1377292356-19199-1-git-send-email-mgreer@animalcreek.com>
 References: <1377292356-19199-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1377292356-19199-3-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1377292356-19199-2-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the generic AM33XX AES module's device tree data and
+Add the generic AM33XX SHAM module's device tree data and
 enable it for the am335x-evm, am335x-evmsk, and am335x-bone
 platforms.  Also add Documentation file describing the data
-for the AES module.
+for the SHAM module.
 
 CC: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- .../devicetree/bindings/crypto/omap-aes.txt        | 34 ++++++++++++++++++++++
+ .../devicetree/bindings/crypto/omap-sham.txt       | 31 ++++++++++++++++++++++
  arch/arm/boot/dts/am335x-bone.dts                  |  4 +++
  arch/arm/boot/dts/am335x-evm.dts                   |  4 +++
  arch/arm/boot/dts/am335x-evmsk.dts                 |  4 +++
- arch/arm/boot/dts/am33xx.dtsi                      | 11 +++++++
- 5 files changed, 57 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/omap-aes.txt
+ arch/arm/boot/dts/am33xx.dtsi                      | 10 +++++++
+ 5 files changed, 53 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/omap-sham.txt
 
-diff --git a/Documentation/devicetree/bindings/crypto/omap-aes.txt b/Documentation/devicetree/bindings/crypto/omap-aes.txt
+diff --git a/Documentation/devicetree/bindings/crypto/omap-sham.txt b/Documentation/devicetree/bindings/crypto/omap-sham.txt
 new file mode 100644
-index 0000000..4bb1e27
+index 0000000..b97710f
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/omap-aes.txt
-@@ -0,0 +1,34 @@
-+OMAP SoC AES crypto Module
++++ b/Documentation/devicetree/bindings/crypto/omap-sham.txt
+@@ -0,0 +1,31 @@
++OMAP SoC SHA crypto Module
 +
 +Required properties:
 +
 +- compatible : Should contain entries for this and backward compatible
-+  AES versions:
-+  - "ti,omap2-aes" for OMAP2.
-+  - "ti,omap3-aes" for OMAP3.
-+  - "ti,omap4-aes" for OMAP4 and AM33XX.
-+  Note that the OMAP2 and 3 versions are compatible (OMAP3 supports
-+  more algorithms) but they are incompatible with OMAP4.
-+- ti,hwmods: Name of the hwmod associated with the AES odule
++  SHAM versions:
++  - "ti,omap2-sham" for OMAP2 & OMAP3.
++  - "ti,omap4-sham" for OMAP4 and AM33XX.
++  Note that these two versions are incompatible.
++- ti,hwmods: Name of the hwmod associated with the SHAM module
 +- reg : Offset and length of the register set for the module
 +- interrupt-parent : the phandle for the interrupt controller that
 +  services interrupts for this module.
-+- interrupts : the interrupt number for the AES odule.
++- interrupts : the interrupt number for the SHAM module.
 +
 +Optional properties:
-+- dmas: DMA specifier for tx and rx dma. See the DMA client binding,
++- dmas: DMA specifier for the rx dma. See the DMA client binding,
 +	Documentation/devicetree/bindings/dma/dma.txt
-+- dma-names: DMA request names. Should be '"tx", "rx"' if dma is present.
++- dma-names: DMA request name. Should be "rx" if a dma is present.
 +
 +Example:
 +	/* AM335x */
-+	aes: aes at 53500000 {
-+		compatible = "ti,omap4-aes";
-+		ti,hwmods = "aes";
-+		reg = <0x53500000 0xa0>;
++	sham: sham at 53100000 {
++		compatible = "ti,omap4-sham";
++		ti,hwmods = "sham";
++		reg = <0x53100000 0x200>;
 +		interrupt-parent = <&intc>;
-+		interrupts = <102>;
-+		dmas = <&edma 6
-+			&edma 5>;
-+		dma-names = "tx", "rx";
++		interrupts = <109>;
++		dmas = <&edma 36>;
++		dma-names = "rx";
 +	};
 diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index bc75b2c..0cb454e 100644
+index 444b4ed..bc75b2c 100644
 --- a/arch/arm/boot/dts/am335x-bone.dts
 +++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -238,3 +238,7 @@
- &sham {
- 	status = "okay";
+@@ -234,3 +234,7 @@
+ 	pinctrl-0 = <&davinci_mdio_default>;
+ 	pinctrl-1 = <&davinci_mdio_sleep>;
  };
 +
-+&aes {
++&sham {
 +	status = "okay";
 +};
 diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 9b8c56d..76ba004 100644
+index 3aee1a4..9b8c56d 100644
 --- a/arch/arm/boot/dts/am335x-evm.dts
 +++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -492,3 +492,7 @@
- &sham {
- 	status = "okay";
+@@ -488,3 +488,7 @@
+ 		ti,adc-channels = <4 5 6 7>;
+ 	};
  };
 +
-+&aes {
++&sham {
 +	status = "okay";
 +};
 diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 61dc5d4..025a47e 100644
+index 0c8ad17..61dc5d4 100644
 --- a/arch/arm/boot/dts/am335x-evmsk.dts
 +++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -406,3 +406,7 @@
- &sham {
- 	status = "okay";
+@@ -402,3 +402,7 @@
+ 	phy_id = <&davinci_mdio>, <1>;
+ 	phy-mode = "rgmii-txid";
  };
 +
-+&aes {
++&sham {
 +	status = "okay";
 +};
 diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 739d757..6e76d85 100644
+index 784f774..739d757 100644
 --- a/arch/arm/boot/dts/am33xx.dtsi
 +++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -552,5 +552,16 @@
- 			dmas = <&edma 36>;
- 			dma-names = "rx";
+@@ -542,5 +542,15 @@
+ 			#size-cells = <1>;
+ 			status = "disabled";
  		};
 +
-+		aes: aes at 53500000 {
-+			compatible = "ti,omap4-aes";
-+			ti,hwmods = "aes";
-+			reg = <0x53500000 0xa0>;
++		sham: sham at 53100000 {
++			compatible = "ti,omap4-sham";
++			ti,hwmods = "sham";
++			reg = <0x53100000 0x200>;
 +			interrupt-parent = <&intc>;
-+			interrupts = <102>;
-+			dmas = <&edma 6
-+				&edma 5>;
-+			dma-names = "tx", "rx";
++			interrupts = <109>;
++			dmas = <&edma 36>;
++			dma-names = "rx";
 +		};
  	};
  };
