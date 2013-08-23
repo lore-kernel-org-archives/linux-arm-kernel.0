@@ -1,41 +1,70 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 23 Aug 2013 15:44:46 -0400
-Subject: [PATCH 1/3] misc: Add crossbar driver
-In-Reply-To: <CACRpkdapqEVShaAekzr6TPW1U7d_y1=Gu6ixT6VS1=D1M-QjBA@mail.gmail.com>
-References: <51E83A4F.5080904@ti.com>
- <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
- <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com> <51EFFBE1.4090505@ti.com>
- <51F0031B.1050307@ti.com> <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
- <51F0223E.4050008@ti.com> <51F0240F.3050507@ti.com>
- <20130813081003.GU7656@atomide.com> <520A02BA.4090805@ti.com>
- <CACRpkda+m82PYJsExLM6JLsLa8-bVhdvy_r_+-uKfVT2NG7Cbg@mail.gmail.com>
- <520D398D.9040806@ti.com>
- <CACRpkdYeo1y-HhftkRWgwyq8o-NVuJ978Uq+ON880LHhUxC=hg@mail.gmail.com>
- <520D44C5.6080205@ti.com>
- <CACRpkdagSHxzV3=427O9iftNxM+N=w9aPds=iDvGQPoG3H-cWw@mail.gmail.com>
- <5215F6F6.9060703@ti.com> <5216E966.5020902@ti.com> <5216FD0C.3090709@ti.com>
- <521702E2.5000102@ti.com> <521706D9.9070001@ti.com> <521719D8.7060506@ti.com>
- <521765DC.2000609@ti.com> <52178D98.8020202@ti.com>
- <CACRpkdapqEVShaAekzr6TPW1U7d_y1=Gu6ixT6VS1=D1M-QjBA@mail.gmail.com>
-Message-ID: <5217BBAE.2030703@ti.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 23 Aug 2013 14:53:33 -0500
+Subject: [PATCH v2] ARM: EDMA: Fix clearing of unused list for DT DMA resources
+Message-ID: <1377287613-16491-1-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 August 2013 03:06 PM, Linus Walleij wrote:
-> On Fri, Aug 23, 2013 at 6:28 PM, Sekhar Nori <nsekhar@ti.com> wrote:
->> On 8/23/2013 7:08 PM, Santosh Shilimkar wrote:
-> 
->>> The whole point we are moving to domain is not have any default
->>> mapping(connection done) at DT level. Rather DT only specifies the
->>> peripherals and their cross-bar connection ID(i.e cross-bar IRQ line).
->>> This will be the driver input as a IRQ line from DT. The cross-bar
->>> driver needs to map any of the free list available on *request* only.
->>
->> Right, the mapping can be done on request. That will be cleaner.
-> 
-> I like where this design is going now :-)
-> 
-Sure and thanks for good discussion. Debates are useful
+HWMOD removal for MMC and Crypto is breaking edma_start as the events are
+being manually triggered due to unused channel list not being clear. Atleast
+breakage has been seen on these peripherals, but it is expected Audio (McASP)
+maybe breaking too.
 
-regards,
-Santosh
+This patch fixes the issue, by reading the "dmas" property from the DT node if
+it exists and clearing the bits in the unused channel list so that these channels
+are not manually triggered.
+
+v2 changes:
+Reduced indendation by returning from if block.
+
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+Reported-by: Balaji T K <balajitk@ti.com>
+Cc: Pantel Antoniou <panto@antoniou-consulting.com>
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
+Note:
+Patch should go in for -rc cycle as it fixes existing crypto drivers.
+
+ arch/arm/common/edma.c | 22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 39ad030..3867e7e 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -560,14 +560,30 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
+ static int prepare_unused_channel_list(struct device *dev, void *data)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+-	int i, ctlr;
++	int i = 0, ctlr;
++	u32 dma_chan;
++	const __be32 *dma_chan_p;
++	struct property *prop;
++
++	if (dev->of_node) {
++		of_property_for_each_u32(dev->of_node, "dmas", prop,
++					 dma_chan_p, dma_chan) {
++			if (i++ & 1) {
++				ctlr = EDMA_CTLR(dma_chan);
++				clear_bit(EDMA_CHAN_SLOT(dma_chan),
++					  edma_cc[ctlr]->edma_unused);
++			}
++		}
++		return;
++	}
+ 
+-	for (i = 0; i < pdev->num_resources; i++) {
++	/* For non-OF case */
++	for (; i < pdev->num_resources; i++) {
+ 		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
+ 				(int)pdev->resource[i].start >= 0) {
+ 			ctlr = EDMA_CTLR(pdev->resource[i].start);
+ 			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
+-					edma_cc[ctlr]->edma_unused);
++				  edma_cc[ctlr]->edma_unused);
+ 		}
+ 	}
+ 
+-- 
+1.8.1.2
