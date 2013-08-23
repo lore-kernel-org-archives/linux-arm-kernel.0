@@ -1,62 +1,82 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 24 Aug 2013 01:04:44 +0200
-Subject: [PATCH v8 1/7] irqchip: vic: Parse interrupt and resume masks
- from device tree
-In-Reply-To: <5217DE06.3070005@wwwdotorg.org>
-References: <1377120111-25601-1-git-send-email-tomasz.figa@gmail.com>
- <1500724.07LRpFtgcx@flatron> <5217DE06.3070005@wwwdotorg.org>
-Message-ID: <2159266.zeHHUDxisq@flatron>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Fri, 23 Aug 2013 19:15:47 -0400
+Subject: [RFC PATCH 06/14] arm: dts: add omap4 CPU thermal data
+In-Reply-To: <1377299755-5134-1-git-send-email-eduardo.valentin@ti.com>
+References: <1377299755-5134-1-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <1377299755-5134-7-git-send-email-eduardo.valentin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 of August 2013 16:11:18 Stephen Warren wrote:
-> On 08/22/2013 05:22 PM, Tomasz Figa wrote:
-> > This patch extends vic_of_init to parse valid interrupt sources
-> > and resume sources masks from device tree.
-> > 
-> > If mask values are not specified in device tree, all sources
-> > are assumed to be valid, as before this patch.
-> 
-> Can you explain further why the VIC needs this information up-front?
-> Presumably it can accumulate it as devices request interrupts.
+This patch changes a dtsi file to contain the thermal data
+for MPU domain on OMAP4 and later SoCs. This data will
+enable the passive cooling with CPUfreq cooling device
+at 100C and the system will do a thermal shutdown at 125C.
 
-It does not need this information just for operation, but this makes the 
-hardware description more detailed and allows better sanity checking of 
-interrupts being requested.
+This thermal data can be reused across TI SoC devices.
 
-To clarify, this is a mask of valid interrupt sources of the VIC, where 
-set bit indicates that given signal is wired and clear bit that it is not.
+Cc: "Beno?t Cousson" <b-cousson@linaro.org>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ian.campbell@citrix.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-omap at vger.kernel.org
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+---
+ arch/arm/boot/dts/omap4-cpu-thermal.dtsi | 40 ++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap4-cpu-thermal.dtsi
 
-> > diff --git a/Documentation/devicetree/bindings/arm/vic.txt
-> > b/Documentation/devicetree/bindings/arm/vic.txt
-> > 
-> > +- valid-mask : Bit mask of valid interrupt sources (defaults to all
-> > valid)
-> Until a device requests an interrupt, it can be left disabled. Once
-> something does request it, it gets enabled. If nothing requests it, it
-> never gets enabled. Doesn't the result of that logic end up being the
-> same thing as valid-mask represents? The only difference would be if
-> some device requests an invalid interrupt source, but then why not just
-> fix the interrupt client instead of adding this property to reject the
-> request?
-
-This property does not have anything to do with enabling or disabling (aka 
-unmasking/masking) of interrupts. It just lists valid interrupt signals of 
-given VIC.
-
-> > +- wakeup-mask : Bit mask of interrupt sources that can wake up the
-> > system +  (defaults to all allowed)
-> 
-> Shouldn't drivers for end-devices request interrupts, and then set wake
-> enable on those interrupts, which would then trickle up the IRQ chain to
-> tell the VIC which interrupts to enable wakeup on?
-
-This is the same as previous property. It does not have anything to do 
-with requesting particular signal to wake up the system, but rather 
-indicating that particular signal _can_ be requested to do so.
-
-Again, this is not strictly needed for correct operation, but this way you 
-wouldn't get any sanity check over wake up signals being requested.
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/boot/dts/omap4-cpu-thermal.dtsi b/arch/arm/boot/dts/omap4-cpu-thermal.dtsi
+new file mode 100644
+index 0000000..d74c565
+--- /dev/null
++++ b/arch/arm/boot/dts/omap4-cpu-thermal.dtsi
+@@ -0,0 +1,40 @@
++
++/*
++ * Device Tree Source for OMAP4/5 SoC CPU thermal
++ *
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++ * Contact: Eduardo Valentin <eduardo.valentin@ti.com>
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++#include <dt-bindings/thermal/thermal.h>
++
++cpu_thermal: cpu_thermal {
++	#thermal-cells = <1>;
++	mask = <0x03>; /* trips writability */
++	passive_delay = <250>; /* milliseconds */
++	polling_delay = <1000>; /* milliseconds */
++	trips {
++		alert at 100000{
++			temperature = <100000>; /* milliCelsius */
++			hysteresis = <2000>; /* milliCelsius */
++			type = <THERMAL_TRIP_PASSIVE>;
++		};
++		crit at 125000{
++			temperature = <125000>; /* milliCelsius */
++			hysteresis = <2000>; /* milliCelsius */
++			type = <THERMAL_TRIP_CRITICAL>;
++		};
++	};
++	bind_params {
++		action at 0{
++			cooling_device = "thermal-cpufreq";
++			weight = <100>; /* percentage */
++			mask = <0x01>;
++			/* no limits, using defaults */
++		};
++	};
++};
+-- 
+1.8.2.1.342.gfa7285d
