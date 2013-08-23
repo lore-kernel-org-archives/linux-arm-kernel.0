@@ -1,51 +1,56 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Aug 2013 15:03:50 +0200
-Subject: [PATCH 32/40] ARM: ux500: Delete U8500 UIB support when booting
- with ATAGs
-In-Reply-To: <CACRpkdZJ_2HF_r8cKpMrG1Usy5bD8Fr7GM_k2Btzxgk71G-VvA@mail.gmail.com>
+Date: Fri, 23 Aug 2013 15:05:07 +0200
+Subject: [PATCH 33/40] ARM: ux500: Don't register the STMPE/SKE when
+ booting with ATAG support
+In-Reply-To: <CACRpkdZdzF-HqTmEWpYiBe2VwGN23fsnWCr7aqE0NYWpBfHsfw@mail.gmail.com>
 References: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
- <1377260620-18829-33-git-send-email-lee.jones@linaro.org>
- <CACRpkdZJ_2HF_r8cKpMrG1Usy5bD8Fr7GM_k2Btzxgk71G-VvA@mail.gmail.com>
-Message-ID: <CACRpkdZGD3O-iYiT7sNbyx8imKGOF+uk864BA97FhzJ5EksD+g@mail.gmail.com>
+ <1377260620-18829-34-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZdzF-HqTmEWpYiBe2VwGN23fsnWCr7aqE0NYWpBfHsfw@mail.gmail.com>
+Message-ID: <CACRpkdZE1yCPO0JVXX88SUKsp3ow7WBuJZZ=BEVk-c5=TOUO-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 2:53 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Fri, Aug 23, 2013 at 2:55 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Aug 23, 2013 at 2:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>
+>> It's time to remove all ATAG support from ux500 and rely solely on
+>> Device Tree booting. This patch is part of that endeavour.
+>>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> (...)
+>> -/* STMPE/SKE keypad use this key layout */
+>> -static const unsigned int mop500_keymap[] = {
+>> -       KEY(2, 5, KEY_END),
+>> -       KEY(4, 1, KEY_POWER),
+>> -       KEY(3, 5, KEY_VOLUMEDOWN),
+>> -       KEY(1, 3, KEY_3),
+>> -       KEY(5, 2, KEY_RIGHT),
+>> -       KEY(5, 0, KEY_9),
+>> -
+>> -       KEY(0, 5, KEY_MENU),
+>> -       KEY(7, 6, KEY_ENTER),
+>> -       KEY(4, 5, KEY_0),
+>> -       KEY(6, 7, KEY_2),
+>> -       KEY(3, 4, KEY_UP),
+>> -       KEY(3, 3, KEY_DOWN),
+>> -
+>> -       KEY(6, 4, KEY_SEND),
+>> -       KEY(6, 2, KEY_BACK),
+>> -       KEY(4, 2, KEY_VOLUMEUP),
+>> -       KEY(5, 5, KEY_1),
+>> -       KEY(4, 3, KEY_LEFT),
+>> -       KEY(3, 2, KEY_7),
+>> -};
+>
+> This STMPE1601 keypad @0x40 and UIB encoding for
+> the U8500 UIB does not exist in any DTS file does it? This
+> means that the support for this UIB is effectively terminated.
 
-> It is not true at all that all HREFs have the STUIB mounted.
+You are wrong. Go read arch/arm/boot/dts/[ste-]stuib.dtsi.
 
-Hm I'm confused here...
-
-arch/arm/boot/dts/[ste-]stuib.dtsi does define this stuff
-so forget about the misplaced comments.
-
-For *all* HREF boards. As it is included from both
-[ste-]hrefprev60.dts and [ste-]hrefv60plus.dts
-
-However it is only really mounted on some of the HREFs,
-and the following stays valid:
-
-> This detection needs to stay for now, unless we go and define
-> in the device tree which UIB is mounted, which would be unfortunate
-> as we can very well auto-detect it, and that makes it easier for
-> a user to just swap the UIB and test the other toch screen
-> (for example).
-
-So it would be really nice to keep this autodetection.
-
-What would be nice if we could mark all the STUIB as
-"disabled" in the device trees, and then augment the device tree
-at boot depending on if we find something at 0x44 as in this
-test:
-
-> -       /* U8500-UIB has the TC35893 at 0x44 on I2C0, the ST-UIB doesn't. */
-> -       ret = i2c_smbus_xfer(i2c0, 0x44, 0, I2C_SMBUS_WRITE, 0,
-> -                       I2C_SMBUS_QUICK, NULL);
-
-And then mark these as "okay" in the DT.
-
-That's pretty high-tech but I bet we can pull it off (and set
-a good example).
+Anyway, what you wanted to say was for these to be marked
+"disabled" by default and turned into "okay" using an I2C
+probe operation.
 
 Yours,
 Linus Walleij
