@@ -1,49 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Aug 2013 19:38:38 +0200
-Subject: [PATCH v4 3/3] ARM: bcm281xx: Device Tree bindings for GPIO driver
-In-Reply-To: <1376938761-13657-4-git-send-email-markus.mayer@linaro.org>
-References: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
- <1376938761-13657-4-git-send-email-markus.mayer@linaro.org>
-Message-ID: <CACRpkdZgZeoYA1_jkkMMojpBSUs5K9BNeC60sQGbJw6zDf=ptA@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 23 Aug 2013 23:09:16 +0530
+Subject: [PATCH v4 3/5] net: ethernet: cpsw: introduce ti,am3352-cpsw
+ compatible string
+In-Reply-To: <52179BDA.50603@ti.com>
+References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
+ <1377267365-24057-4-git-send-email-zonque@gmail.com>
+ <52177052.1030308@ti.com> <52178E20.5040404@gmail.com>
+ <52179448.1020906@ti.com> <5217974B.5090503@ti.com> <521799A3.7080706@ti.com>
+ <52179AD6.8090406@gmail.com> <52179BDA.50603@ti.com>
+Message-ID: <52179E44.5030202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 19, 2013 at 8:59 PM, Markus Mayer <markus.mayer@linaro.org> wrote:
+On 8/23/2013 10:58 PM, Santosh Shilimkar wrote:
+> On Friday 23 August 2013 01:24 PM, Daniel Mack wrote:
+>> On 23.08.2013 19:19, Santosh Shilimkar wrote:
+>>> On Friday 23 August 2013 01:09 PM, Sekhar Nori wrote:
+>>>> On 8/23/2013 10:26 PM, Santosh Shilimkar wrote:
+>>
+>>>>> So just stick the IP version or call it cpsw-v1... cpsw-v2 etc.
+>>>>
+>>>> If this could be handled using IP version then the right way would be to
+>>>> just read the IP version from hardware and use it. No need of DT property.
+>>>>
+>>> Thats fine as well but I thought the patch needed additional properties like
+>>> CM reg-address come from DT and hence the separate compatible. If you can
+>>> manage without that, thats even better.
+>>
+>> We can't, that's the whole point :)
+>>
+> I saw that from the patch :)
+> 
+>> Well, theoretically, we could for now, but that's not a clean solution.
+>> Again: the problem here is that the control port is separated from the
+>> cpsw core, and so we have to implement something specific for the AM3352
+>> SoC. I know that's a violation of clean and generic driver ideas, but
+>> there's no way we can assume that every cpsw v2 ip block has a control
+>> port that is compatible to the one found on am335x chips.
+>>
+> But there is a possibility that other SOC will just use the same
+> control module approach. So using a revision IP is just fine. BTW,
 
-> GPIO device tree bindings for the Broadcom bcm281xx family of chips
->
-> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> ---
->  arch/arm/boot/dts/bcm11351.dtsi |   16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-> index c0cdf66..a3945e3 100644
-> --- a/arch/arm/boot/dts/bcm11351.dtsi
-> +++ b/arch/arm/boot/dts/bcm11351.dtsi
-> @@ -63,6 +63,22 @@
->                 clock-frequency = <32768>;
->         };
->
-> +       gpio: gpio at 35003000 {
-> +               compatible = "brcm,bcm11351-gpio", "brcm,kona-gpio";
-> +               reg = <0x35003000 0x800>;
-> +               interrupts =
-> +                      <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH
-> +                       GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH
-> +                       GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH
-> +                       GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
-> +                       GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH
-> +                       GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-> +               #gpio-cells = <2>;
-> +               #interrupt-cells = <2>;
-> +               gpio-controller;
-> +               interrupt-controller;
-> +       };
+But this is misleading because it makes appear like the same compatible
+can be used on on another SoC like DRA7 which probably has the same
+version of IP but a different control module implementation, when in
+practice it cannot.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+The fact is we are doing something SoC specific in the driver and we
+cannot hide that behind IP versions. If really in practice there comes
+another SoC with the same control module definition then it can always
+use ti,am3352-cpsw compatible as well. The compatible name does not
+preclude its usage.
 
-Yours,
-Linus Walleij
+Thanks,
+Sekhar
