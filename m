@@ -1,67 +1,76 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 23 Aug 2013 10:23:14 -0400
-Subject: [PATCH v4 3/5] net: ethernet: cpsw: introduce ti,am3352-cpsw
- compatible string
-In-Reply-To: <1377267365-24057-4-git-send-email-zonque@gmail.com>
-References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
- <1377267365-24057-4-git-send-email-zonque@gmail.com>
-Message-ID: <52177052.1030308@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 23 Aug 2013 16:34:41 +0200
+Subject: [RFC 08/17] ARM: mvebu: remove custom .init_time hook
+In-Reply-To: <52177047.9070706@free-electrons.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1376964271-22715-9-git-send-email-sebastian.hesselbarth@gmail.com>
+ <52173408.1000702@free-electrons.com> <52173A3E.2040509@gmail.com>
+ <521749E5.6020008@free-electrons.com> <521751E9.3000504@gmail.com>
+ <52177047.9070706@free-electrons.com>
+Message-ID: <52177301.1060803@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 August 2013 10:16 AM, Daniel Mack wrote:
-> In order to support features that are specific to the AM335x IP, we have
-> to add hardware types and another compatible string.
+On 23/08/2013 16:23, Gregory CLEMENT wrote:
+> On 23/08/2013 14:13, Sebastian Hesselbarth wrote:
+>> On 08/23/13 13:39, Gregory CLEMENT wrote:
+>>> On 23/08/2013 12:32, Sebastian Hesselbarth wrote:
+>>>> On 08/23/13 12:06, Gregory CLEMENT wrote:
+>>>>> On 20/08/2013 04:04, Sebastian Hesselbarth wrote:
+>>>>>> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+>>>>>> remove custom .init_time hooks.
+>>>>>
+>>>>> As a feared it won't work on Armada XP. You moved coherency_init(), and
+>>>>> l2x0_of_init() in the init_machine hook. However init_machine is an
+>>>>> arch_initcall, and as all the initcall it is called at the end of the
+>>>>> do_basic_setup() which is called after smp_prepare_cpus(). The issue is
+>>>>> that smp_prepare_cpus need coherency (and I think L2 cache) already enable.
+>>>>
+>>>> Ok, I see. I remember mvebu smp relies on mbus mappings also? Can you
+>>>> try below as replacement for the mach-mvebu/armada-370-xp.c changes?
+>>>>
+>>>> It will move coherency_init(), l2x0_of_init(), and mvebu_mbus_dt_init()
+>>>> to .init_early hook.
+>>>>
+>>>
+>>> I can't test it, because I don't receive the patch 1 and 2 neither directly
+>>> or through linux-arm-kernel (it should have been bounced), or even at
+>>> https://github.com/shesselba/linux-dove.git
+>>>
+>>> If you don't want to send them again, could you at least push our branch on your
+>>> github?
+>>
+>> Gregory,
+>>
+>> I pushed a branch containing the latest state to
+>> https://github.com/shesselba/linux-dove.git arm-clk-of-init
+>>
+>> It still contains the changes to drivers/clk.c, that will become
+>> obsolete, if there are no objections against Stephen's tegra patch.
+>>
 > 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
->  Documentation/devicetree/bindings/net/cpsw.txt |  3 ++-
->  drivers/net/ethernet/ti/cpsw.c                 | 32 ++++++++++++++++++++------
->  drivers/net/ethernet/ti/cpsw.h                 |  1 +
->  3 files changed, 28 insertions(+), 8 deletions(-)
+> I tested your branch on my Armada XP boards (the GP and the AX3), and it hanged
+> very early: before that anything was displayed by the early_printk!
 > 
-> diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
-> index 4e5ca54..b717458 100644
-> --- a/Documentation/devicetree/bindings/net/cpsw.txt
-> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
-> @@ -2,7 +2,8 @@ TI SoC Ethernet Switch Controller Device Tree Bindings
->  ------------------------------------------------------
->  
->  Required properties:
-> -- compatible		: Should be "ti,cpsw"
-> +- compatible		: Should be "ti,cpsw" for generic cpsw support, or
-> +			  "ti,am3352-cpsw" for AM3352 SoCs
->  - reg			: physical base address and size of the cpsw
->  			  registers map.
->  			  An optional third memory region can be supplied if
-> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-> index 7a25ff4..73c44cb6 100644
-> --- a/drivers/net/ethernet/ti/cpsw.c
-> +++ b/drivers/net/ethernet/ti/cpsw.c
-> @@ -155,6 +155,11 @@ do {								\
->  		((priv->data.dual_emac) ? priv->emac_port :	\
->  		priv->data.active_slave)
->  
-> +enum {
-> +	CPSW_TYPE_GENERIC,
-> +	CPSW_TYPE_AM33XX
-> +};
-> +
->  static int debug_level;
->  module_param(debug_level, int, 0);
->  MODULE_PARM_DESC(debug_level, "cpsw debug level (NETIF_MSG bits)");
-> @@ -1692,17 +1697,36 @@ static void cpsw_slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv,
->  	slave->port_vlan = data->dual_emac_res_vlan;
->  }
->  
-> +static const struct of_device_id cpsw_of_mtable[] = {
-> +	{
-> +		.compatible	= "ti,am3352-cpsw",
-I didn't notice this earlier, but can't you use the IP version
-as a compatible instead of using a SOC name. Whats really SOC specific
-on this IP ? Sorry i have missed any earlier discussion on this but
-this approach doesn't seem good. Its like adding SOC checks in the
-driver subsystem.
+> init_early is maybe called too early :(
 
-Regards,
-Santosh
+Well actually next-20130822 don't boot. So I can't say if your changes are ok.
+
+> 
+>> Sebastian
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> 
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
