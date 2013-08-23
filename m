@@ -1,57 +1,63 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Fri, 23 Aug 2013 16:02:40 +0800
-Subject: [PATCH v2] ARM: VExpress: Makefile: add armv7 flags for inline
- assmembly code compiling
-In-Reply-To: <52170C15.5010907@asianux.com>
-References: <521479B4.8030604@asianux.com> <52147AC6.9040300@asianux.com>
- <52147E12.4060401@asianux.com> <20130822074524.GS7656@atomide.com>
- <20130822102210.GF25647@n2100.arm.linux.org.uk>
- <5216BF16.2080006@asianux.com> <5216C389.9050605@asianux.com>
- <5216D138.6080802@asianux.com> <5216D31B.9050609@asianux.com>
- <20130823055152.GY7656@atomide.com> <52170900.5070909@asianux.com>
- <52170C15.5010907@asianux.com>
-Message-ID: <52171720.4050501@asianux.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 23 Aug 2013 10:04:40 +0200
+Subject: [PATCH 4/4] Documentation: Add device tree bindings for
+ Freescale FTM PWM
+In-Reply-To: <1522215.zHEjdiga8V@flatron>
+References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
+ <1473340.OXSHEp7d4P@flatron>
+ <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
+ <1522215.zHEjdiga8V@flatron>
+Message-ID: <20130823080439.GE3535@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When vexpress kernel is compiled for v6, it still can support armv7
-instructions (hardware still support), so need let compiler know about
-it for related inline assembly code, or compiling will fail.
+On Thu, Aug 22, 2013 at 10:25:30AM +0200, Tomasz Figa wrote:
+> On Thursday 22 of August 2013 02:55:42 Xiubo Li-B47053 wrote:
+> > Hi Tomasz,
+> > 
+> > Thanks for your comments.
+> > 
+> > > > +- #pwm-cells: Should be 3. Number of cells being used to specify
+> > > > PWM
+> > > > property.
+> > > > +  First cell specifies the per-chip channel index of the PWM
+> > > > to use, the
+> > > > +  second cell is the period in nanoseconds and bit 0 in
+> > > > the third cell is
+> > > > +  used to encode the polarity of PWM output. Set bit
+> > > > 0 of the third in PWM
+> > > > +  specifier to 1 for inverse polarity & set to 0
+> > > > for normal polarity.
+> > > 
+> > > If the meaning of flags cell is the same as in generic, default PWM
+> > > specifier format, then it should be noted here and generic PWM binding
+> > > documentation mentioned.
+> > 
+> > OK, How about the following ?
+> > - #pwm-cells: Should be 3. See pwm.txt in this directory for a
+> >   description of the cells format.
+> 
+> I meant just the last cell, which stores flags, but actually this might be 
+> a good idea, but with slightly extended description. Something among those 
+> lines:
+> 
+>  - #pwm-cells: Should be 3. The default three cell format specified by 
+> generic PWM bindings are used. Refer to the documentation of generic PWM 
+> bindings for more information about the meaning of cells.
 
-The related failure command:
+Actually I prefer the second proposal, that is:
 
-  arm-linux-gnueabi-gcc -Wp,-MD,arch/arm/mach-vexpress/.dcscb.o.d  -nostdinc -isystem /usr/lib/gcc/arm-linux-gnueabi/4.7/include -I/root/linux-next/arch/arm/include -Iarch/arm/include/generated  -Iinclude -I/root/linux-next/arch/arm/include/uapi -Iarch/arm/include/generated/uapi -I/root/linux-next/include/uapi -Iinclude/generated/uapi -include /root/linux-next/include/linux/kconfig.h -D__KERNEL__ -mlittle-endian -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Werror=implicit-int -Werror=strict-prototypes -Os -Wno-maybe-uninitialized -fno-dwarf2-cfi-asm -fno-omit-frame-pointer -mapcs -mno-sched-prolog -fstack-protector -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -marm -D__LINUX_ARM_ARCH__=6 -march=armv6k -mtune=arm1136j-s -msoft-float -Uarm -fno-reorder-blocks -fno-ipa-cp-clone -fno-partial-inlining -Wframe-larger-than=1024 -Wno-unused-but-se
- t-variabl
-e -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -femit-struct-debug-baseonly -fno-var-tracking -pg -fno-inline-functions-called-once -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fconserve-stack -DCC_HAVE_ASM_GOTO -I/root/linux-next/arch/arm/mach-vexpress/include -I/root/linux-next/arch/arm/plat-versatile/include -W     -D"KBUILD_STR(s)=#s" -D"KBUILD_BASENAME=KBUILD_STR(dcscb)"  -D"KBUILD_MODNAME=KBUILD_STR(dcscb)" -c -o arch/arm/mach-vexpress/.tmp_dcscb.o arch/arm/mach-vexpress/dcscb.c
+> > - #pwm-cells: Should be 3. See pwm.txt in this directory for a
+> >   description of the cells format.
 
-The related error:
+We agreed on that wording in another thread and I'd prefer to be
+consistent across bindings.
 
-  /tmp/ccOMIprI.s: Assembler messages:
-  /tmp/ccOMIprI.s:507: Error: selected processor does not support ARM mode `isb '
-  /tmp/ccOMIprI.s:513: Error: selected processor does not support ARM mode `isb '
-  /tmp/ccOMIprI.s:514: Error: selected processor does not support ARM mode `dsb '
-  /tmp/ccOMIprI.s:584: Error: selected processor does not support ARM mode `isb '
-  /tmp/ccOMIprI.s:590: Error: selected processor does not support ARM mode `isb '
-  /tmp/ccOMIprI.s:591: Error: selected processor does not support ARM mode `dsb '
-  make[1]: *** [arch/arm/mach-vexpress/dcscb.o] Error 1
-  make: *** [arch/arm/mach-vexpress] Error 2
-
-
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm/mach-vexpress/Makefile |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
-index 36ea824..f224577 100644
---- a/arch/arm/mach-vexpress/Makefile
-+++ b/arch/arm/mach-vexpress/Makefile
-@@ -10,3 +10,6 @@ obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o	dcscb_setup.o
- obj-$(CONFIG_ARCH_VEXPRESS_TC2_PM)	+= tc2_pm.o spc.o
- obj-$(CONFIG_SMP)			+= platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
-+
-+CFLAGS_dcscb.o				+=-march=armv7-a
-+CFLAGS_tc2_pm.o				+=-march=armv7-a
--- 
-1.7.7.6
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/bb8945cd/attachment.sig>
