@@ -1,36 +1,42 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Fri, 23 Aug 2013 16:57:30 +0530
-Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
-In-Reply-To: <52174640.701@gmail.com>
-References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
- <1376885403-12156-4-git-send-email-b32955@freescale.com>
- <20130822193453.GB10038@ld-irv-0074.broadcom.com>
- <20130822195559.GU26118@sirena.org.uk> <52174640.701@gmail.com>
-Message-ID: <52174722.7010604@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 23 Aug 2013 16:58:21 +0530
+Subject: [PATCH v4] extcon: palmas: Added a new compatible type *ti,
+ palmas-usb-vid*
+In-Reply-To: <5216798E.8070900@wwwdotorg.org>
+References: <1377160283-26934-1-git-send-email-kishon@ti.com>
+ <5216798E.8070900@wwwdotorg.org>
+Message-ID: <52174755.8030506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
-On Friday 23 August 2013 04:53 PM, Brian Norris wrote:
-> On 08/22/2013 12:55 PM, Mark Brown wrote:
->> On Thu, Aug 22, 2013 at 12:34:53PM -0700, Brian Norris wrote:
->>> What you're really missing from device-tree (and the SPI subystem in
->>> general) is how to detect those SPI controllers which support dual and
->>> quad mode transfers, and how to communicate that a particular SPI
->>> transaction should be performed on 1 or 4 IO lines. We shouldn't have
->>> this just hacked in via assumptions.
->>
->> That bit does need to be fixed in this driver, yes.  The SPI core now
->> has quad mode support.
->
-> Where? Perhaps I'm missing the obvious, but I don't see SPI core quad 
-> support in linux-next or in Linus' tree.
->
-You can find it here in Mark's tree:
-git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git
-branch: remotes/brownspi/spi-next
-> Brian
->
-> ______________________________________________________
-> Linux MTD discussion mailing list
-> http://lists.infradead.org/mailman/listinfo/linux-mtd/
+
+On Friday 23 August 2013 02:20 AM, Stephen Warren wrote:
+> On 08/22/2013 02:31 AM, Kishon Vijay Abraham I wrote:
+>> The Palmas device contains only a USB VBUS-ID detector, so added a
+>> compatible type *ti,palmas-usb-vid*. Didn't remove the existing compatible
+>> types for backward compatibility.
+> 
+>> diff --git a/Documentation/devicetree/bindings/extcon/extcon-palmas.txt b/Documentation/devicetree/bindings/extcon/extcon-palmas.txt
+> 
+>>  PALMAS USB COMPARATOR
+>>  Required Properties:
+>> - - compatible : Should be "ti,palmas-usb" or "ti,twl6035-usb"
+>> + - compatible : Should be "ti,palmas-usb-vid". "ti,twl6035-usb" and
+>> +   "ti,palmas-usb" is deprecated and is kept for backward compatibility.
+> 
+> So this defines one new value and deprecates the two old values.
+
+yeah.
+> 
+> Why isn't a new "ti,twl6035-usb-vid" entry useful? Don't you still need
+
+yeah, it should be added too.
+> SoC-specific compatible values so the driver can enable any SoC-specific
+> bug-fixes/workarounds later if needed?
+
+hmm.. Palmas is external to SoC. So not sure if adding SoC specific compatible
+values is such a good idea.
+
+Thanks
+Kishon
