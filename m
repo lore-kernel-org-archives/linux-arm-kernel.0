@@ -1,10 +1,10 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Aug 2013 13:23:30 +0100
-Subject: [PATCH 30/40] ARM: ux500: Purge DB8500 PRCMU registration when not
- booting with DT
+Date: Fri, 23 Aug 2013 13:23:32 +0100
+Subject: [PATCH 32/40] ARM: ux500: Delete U8500 UIB support when booting with
+ ATAGs
 In-Reply-To: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
 References: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1377260620-18829-31-git-send-email-lee.jones@linaro.org>
+Message-ID: <1377260620-18829-33-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,94 +13,121 @@ Device Tree booting. This patch is part of that endeavour.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c   |  6 ------
- arch/arm/mach-ux500/devices-db8500.c | 36 ------------------------------------
- arch/arm/mach-ux500/devices-db8500.h |  1 -
- 3 files changed, 43 deletions(-)
+ arch/arm/mach-ux500/Makefile                |  1 -
+ arch/arm/mach-ux500/board-mop500-u8500uib.c | 14 --------------
+ arch/arm/mach-ux500/board-mop500-uib.c      | 30 +----------------------------
+ arch/arm/mach-ux500/board-mop500.h          |  1 -
+ 4 files changed, 1 insertion(+), 45 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/board-mop500-u8500uib.c
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 25c6dcd..3086192 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -80,24 +80,18 @@ struct pl022_ssp_controller ssp0_plat = {
- 
- static void __init mop500_init_machine(void)
- {
--	platform_device_register(&db8500_prcmu_device);
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index cac22ba..8634a3fa 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -10,7 +10,6 @@ obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o
+ obj-$(CONFIG_MACH_MOP500)	+= board-mop500.o board-mop500-sdi.o \
+ 				board-mop500-regulators.o \
+ 				board-mop500-uib.o board-mop500-stuib.o \
+-				board-mop500-u8500uib.o \
+ 				board-mop500-pins.o \
+ 				board-mop500-audio.o
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+diff --git a/arch/arm/mach-ux500/board-mop500-u8500uib.c b/arch/arm/mach-ux500/board-mop500-u8500uib.c
+deleted file mode 100644
+index 43c9ff1..0000000
+--- a/arch/arm/mach-ux500/board-mop500-u8500uib.c
++++ /dev/null
+@@ -1,14 +0,0 @@
+-/*
+- * Copyright (C) ST-Ericsson SA 2010
+- *
+- * Board data for the U8500 UIB, also known as the New UIB
+- * License terms: GNU General Public License (GPL), version 2
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
 -
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
- }
- 
- static void __init snowball_init_machine(void)
- {
--	platform_device_register(&db8500_prcmu_device);
+-#include "board-mop500.h"
 -
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
- }
+-void __init mop500_u8500uib_init(void)
+-{
+-}
+diff --git a/arch/arm/mach-ux500/board-mop500-uib.c b/arch/arm/mach-ux500/board-mop500-uib.c
+index bdaa422..0e94f1d 100644
+--- a/arch/arm/mach-ux500/board-mop500-uib.c
++++ b/arch/arm/mach-ux500/board-mop500-uib.c
+@@ -16,7 +16,6 @@
  
- static void __init hrefv60_init_machine(void)
- {
--	platform_device_register(&db8500_prcmu_device);
--
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
- }
-diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
-index 1b2faba..c59f89d 100644
---- a/arch/arm/mach-ux500/devices-db8500.c
-+++ b/arch/arm/mach-ux500/devices-db8500.c
-@@ -26,39 +26,3 @@ struct prcmu_pdata db8500_prcmu_pdata = {
- 	.version_offset	= DB8500_PRCMU_FW_VERSION_OFFSET,
- 	.legacy_offset	= DB8500_PRCMU_LEGACY_OFFSET,
+ enum mop500_uib {
+ 	STUIB,
+-	U8500UIB,
  };
--
--static struct resource db8500_prcmu_res[] = {
--	{
--		.name  = "prcmu",
--		.start = U8500_PRCMU_BASE,
--		.end   = U8500_PRCMU_BASE + SZ_8K - 1,
--		.flags = IORESOURCE_MEM,
--	},
--	{
--		.name  = "prcmu-tcdm",
--		.start = U8500_PRCMU_TCDM_BASE,
--		.end   = U8500_PRCMU_TCDM_BASE + SZ_4K - 1,
--		.flags = IORESOURCE_MEM,
--	},
--	{
--		.name  = "irq",
--		.start = IRQ_DB8500_PRCMU1,
--		.end   = IRQ_DB8500_PRCMU1,
--		.flags = IORESOURCE_IRQ,
--	},
--	{
--		.name  = "prcmu-tcpm",
--		.start = U8500_PRCMU_TCPM_BASE,
--		.end   = U8500_PRCMU_TCPM_BASE + SZ_32K - 1,
--		.flags = IORESOURCE_MEM,
--	},
--};
--
--struct platform_device db8500_prcmu_device = {
--	.name			= "db8500-prcmu",
--	.resource		= db8500_prcmu_res,
--	.num_resources		= ARRAY_SIZE(db8500_prcmu_res),
--	.dev = {
--		.platform_data = &db8500_prcmu_pdata,
--	},
--};
-diff --git a/arch/arm/mach-ux500/devices-db8500.h b/arch/arm/mach-ux500/devices-db8500.h
-index fc4048f..6d59218 100644
---- a/arch/arm/mach-ux500/devices-db8500.h
-+++ b/arch/arm/mach-ux500/devices-db8500.h
-@@ -16,6 +16,5 @@ struct platform_device;
  
- extern struct ab8500_platform_data ab8500_platdata;
- extern struct prcmu_pdata db8500_prcmu_pdata;
--extern struct platform_device db8500_prcmu_device;
+ struct uib {
+@@ -31,11 +30,6 @@ static struct uib __initdata mop500_uibs[] = {
+ 		.option	= "stuib",
+ 		.init	= mop500_stuib_init,
+ 	},
+-	[U8500UIB] = {
+-		.name	= "U8500-UIB",
+-		.option	= "u8500uib",
+-		.init	= mop500_u8500uib_init,
+-	},
+ };
  
- #endif
+ static struct uib *mop500_uib;
+@@ -93,14 +87,9 @@ static void __init __mop500_uib_init(struct uib *uib, const char *why)
+ 	uib->init();
+ }
+ 
+-/*
+- * Detect the UIB attached based on the presence or absence of i2c devices.
+- */
+ int __init mop500_uib_init(void)
+ {
+ 	struct uib *uib = mop500_uib;
+-	struct i2c_adapter *i2c0;
+-	int ret;
+ 
+ 	if (!cpu_is_u8500_family())
+ 		return -ENODEV;
+@@ -110,24 +99,7 @@ int __init mop500_uib_init(void)
+ 		return 0;
+ 	}
+ 
+-	i2c0 = i2c_get_adapter(0);
+-	if (!i2c0) {
+-		__mop500_uib_init(&mop500_uibs[STUIB],
+-				"fallback, could not get i2c0");
+-		return -ENODEV;
+-	}
+-
+-	/* U8500-UIB has the TC35893 at 0x44 on I2C0, the ST-UIB doesn't. */
+-	ret = i2c_smbus_xfer(i2c0, 0x44, 0, I2C_SMBUS_WRITE, 0,
+-			I2C_SMBUS_QUICK, NULL);
+-	i2c_put_adapter(i2c0);
+-
+-	if (ret == 0)
+-		uib = &mop500_uibs[U8500UIB];
+-	else
+-		uib = &mop500_uibs[STUIB];
+-
+-	__mop500_uib_init(uib, "detected");
++	__mop500_uib_init(&mop500_uibs[STUIB], "detected");
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index cf6b304..223639b 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -89,7 +89,6 @@ extern struct msp_i2s_platform_data msp2_platform_data;
+ extern struct msp_i2s_platform_data msp3_platform_data;
+ extern struct pl022_ssp_controller ssp0_plat;
+ 
+-void __init mop500_u8500uib_init(void);
+ void __init mop500_stuib_init(void);
+ void __init mop500_pinmaps_init(void);
+ void __init snowball_pinmaps_init(void);
 -- 
 1.8.1.2
