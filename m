@@ -1,29 +1,71 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 23 Aug 2013 23:26:36 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gbWlzYzogKGF0MjQpIG1vdmUgaGVhZGVyIHRvIGxpbnV4?=
- =?UTF-8?B?L3BsYXRmb3JtX2RhdGEv?=
-In-Reply-To: <1033284781.908504.1377285587778.JavaMail.root@mail>
-References: <20130823190247.GA3821@katana>
- <1033284781.908504.1377285587778.JavaMail.root@mail>
-Message-ID: <1377285996.620418788@f48.i.mail.ru>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 23 Aug 2013 13:27:11 -0600
+Subject: [PATCH v6 3/4 UPDATED] drivers: of: add initialization code for
+ dma reserved memory
+In-Reply-To: <1377247141-11284-1-git-send-email-m.szyprowski@samsung.com>
+References: <1376924669-28873-4-git-send-email-m.szyprowski@samsung.com>
+ <1377247141-11284-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <5217B78F.1080300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Wolfram wrote:
+On 08/23/2013 02:39 AM,  wrote:
+> From: Marek Szyprowski <m.szyprowski@samsung.com>
 > 
-> > On Fri, Aug 23, 2013 at 02:38:20PM -0400, Vivien Didelot wrote:
-> > > This patch moves the at24.h header from include/linux/i2c to
-> > > include/linux/platform_data and updates existing support
-> > > accordingly.
-> > 
-> > This message explains what the patch does but not why the change is
-> > wanted. I'd be surprised if we really want *all* platform_data in one
-> > single directory?
+> This patch adds device tree support for contiguous and reserved memory
+> regions defined in device tree.
 > 
-> IMHO it makes sense. Why wouldn't we want all platform_data in
-> include/linux/platform_data/?
+> Large memory blocks can be reliably reserved only during early boot.
+> This must happen before the whole memory management subsystem is
+> initialized, because we need to ensure that the given contiguous blocks
+> are not yet allocated by kernel. Also it must happen before kernel
+> mappings for the whole low memory are created, to ensure that there will
+> be no mappings (for reserved blocks) or mapping with special properties
+> can be created (for CMA blocks). This all happens before device tree
+> structures are unflattened, so we need to get reserved memory layout
+> directly from fdt.
+> 
+> Later, those reserved memory regions are assigned to devices on each
+> device structure initialization.
 
-Can this file be additionally renamed to misc-at24.h to reflect belongs
-to a particular subsystem?
+I think the binding looks OK now; just a couple minor comments below.
 
----
+> diff --git a/Documentation/devicetree/bindings/memory.txt b/Documentation/devicetree/bindings/memory.txt
+
+> +*** Reserved memory regions ***
+
+> +compatible:	one or more of:
+> +	- "linux,contiguous-memory-region" - enables binding of this
+> +	  region to Contiguous Memory Allocator (special region for
+> +	  contiguous memory allocations, shared with movable system
+> +	  memory, Linux kernel-specific).
+> +	- "reserved-memory-region" - compatibility is defined, given
+> +	  region is assigned for exclusive usage for by the respective
+> +	  devices.
+
+I'm slightly hesitant to agree with "linux" in the name here, since it
+seems like the concept of a memory region where DMA buffers/... should
+be allocated is pretty OS-independant. Similar for:
+
+> +linux,default-contiguous-region: property indicating that the region
+> +	is the default region for all contiguous memory
+> +	allocations, Linux specific (optional)
+
+But, I guess there's nothing stopping any other OS from parsing this
+same property, so I suppose it's OK. What do other DT maintainers think?
+
+> +*** Example ***
+
+> +		reserved-memory {
+...
+> +			contig_region at 0 {
+...
+> +			display_mem: region at 78000000 {
+...
+> +			multimedia_mem: region at 77000000 {
+
+Nit: I think all 3 of those nodes should be called region, but it's
+probably fine as-is.
+
+So, the binding,
+Acked-by: Stephen Warren <swarren@nvidia.com>
