@@ -1,86 +1,156 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 23 Aug 2013 09:38:36 -0400
-Subject: [PATCH 1/3] misc: Add crossbar driver
-In-Reply-To: <521719D8.7060506@ti.com>
-References: <51E83A4F.5080904@ti.com>
- <CACRpkdY3nQaWimTwB-Zt-8+Q_KZr8a0rpB1SUQq=AuoG4bAYnQ@mail.gmail.com>
- <51ED2385.60108@ti.com> <51ED5C66.1010407@ti.com> <51EFFBE1.4090505@ti.com>
- <51F0031B.1050307@ti.com> <51F00530.9090703@ti.com> <51F02069.3050207@ti.com>
- <51F0223E.4050008@ti.com> <51F0240F.3050507@ti.com>
- <20130813081003.GU7656@atomide.com> <520A02BA.4090805@ti.com>
- <CACRpkda+m82PYJsExLM6JLsLa8-bVhdvy_r_+-uKfVT2NG7Cbg@mail.gmail.com>
- <520D398D.9040806@ti.com>
- <CACRpkdYeo1y-HhftkRWgwyq8o-NVuJ978Uq+ON880LHhUxC=hg@mail.gmail.com>
- <520D44C5.6080205@ti.com>
- <CACRpkdagSHxzV3=427O9iftNxM+N=w9aPds=iDvGQPoG3H-cWw@mail.gmail.com>
- <5215F6F6.9060703@ti.com> <5216E966.5020902@ti.com> <5216FD0C.3090709@ti.com>
- <521702E2.5000102@ti.com> <521706D9.9070001@ti.com> <521719D8.7060506@ti.com>
-Message-ID: <521765DC.2000609@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 23 Aug 2013 15:48:19 +0200
+Subject: [PATCH v2] ARM: document the use of NEON in kernel mode
+In-Reply-To: <1376897504-24672-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1376897504-24672-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu9_Dyw3TQknz8owao0NSFgwO+Ggrcspu-P-VXamYjw0qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 August 2013 04:14 AM, Sekhar Nori wrote:
-> On Friday 23 August 2013 12:23 PM, Sricharan R wrote:
->> On Friday 23 August 2013 12:06 PM, Sekhar Nori wrote:
->>> On Friday 23 August 2013 11:41 AM, Sricharan R wrote:
->>>> Hi,
->>>> On Friday 23 August 2013 10:17 AM, Rajendra Nayak wrote:
->>>>> On Thursday 22 August 2013 05:03 PM, Sricharan R wrote:
->>>>>>  maps crossbar number<->  to interrupt number and
->>>>>>  calls request_irq(int_no, crossbar_handler,..)
->>>>> So will this mapping happen based on some data passed from DT or
->>>>> just based on whats available when the device does a request_irq()?
->>>>>
->>>>> If its based on whats available then I see an issue when you need
->>>>> to remap something thats already mapped by default (and not used)
->>>>> since you run out of all free ones.
->>>> Yes, when done based on what is available then there is a
->>>> problem when we run out of free ones because we do not
->>>> know which one to replace. I was thinking of something like
->>>> this,
->>>>     1) DT would give a list of all free ones, and also if some are
->>>>         mapped as default and not used, mark those also as free.
->>>>
->>>>      2) While mapping see if it has a default mapping and use it.
->>>>           otherwise, pick from free list.   
->>> Since the entire DT is available to you at boot time, you should be able
->>> to find each node where interrupt-parent = <&crossbar> and then allocate
->>> one of 0-160 GIC interrupt numbers for that node, no? Where would there
->>> be a need for default mapping and remapping? From one the mails in the
->>> thread the crossbar is completely flexible - any of the 320 crossbar
->>> interrupts can be mapped to any of the 160 GIC interrupts.
->>>
->>> Any GIC interrupts left after this boot-time scan can be added to an
->>> unused list for use with runtime DT fragments (when that support comes).
->>>  
->>> Sorry if I misunderstood, but above proposal sounds like maintaining a
->>> separate free interrupt lines list in DT. That will quickly go out of sync.
->>  Say, peripheral x uses crossbar 1 and specifies this in DT.
->>  During boot crossbar 1 gets mapped int 10. So if by default
->> some other crossbar has its interrupt mapped to 10,
->> then it should be removed.  Instead clear all crossbar registers
->> once and mark all as free, then  allocate only during request.
->> Correct ?. In this the free no need to maintain any list.
-> 
-> Right, so in my suggestion there is nothing like a "default mapping" and
-> entire 160 GIC interrupt number space is up for grabs. I think this will
-> be much simpler to write and maintain.
-> 
-> If you really want to maintain default mapping as far as possible, you
-> can do two passes on the crossbar interrupt numbers requested. Once to
-> assign the default map - for numbers less that 160 - and then look at
-> the free GIC interrupt slots and use those for numbers greater than 160.
-> 
-The whole point we are moving to domain is not have any default
-mapping(connection done) at DT level. Rather DT only specifies the
-peripherals and their cross-bar connection ID(i.e cross-bar IRQ line).
-This will be the driver input as a IRQ line from DT. The cross-bar
-driver needs to map any of the free list available on *request* only.
-
-Of-course you have 320 inputs out of which only 160 can be mapped
-and once you run out of it, you just return error on request IRQ. 
-
-That way there is no contention.
+No objections apparently, so pushed to Russell's patch tracker [7825/1]
 
 Regards,
-Santosh
+Ard.
+
+On 19 August 2013 09:31, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Reviewed-by: Nicolas Pitre <nico@linaro.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> v2:
+> updated the NEON intrinsics section to reflect that the type ambiguity issue has
+> been addressed by patch 'ARM: add workaround for ambiguous C99 stdint.h types'
+>
+>  Documentation/arm/kernel_mode_neon.txt | 121 +++++++++++++++++++++++++++++++++
+>  1 file changed, 121 insertions(+)
+>  create mode 100644 Documentation/arm/kernel_mode_neon.txt
+>
+> diff --git a/Documentation/arm/kernel_mode_neon.txt b/Documentation/arm/kernel_mode_neon.txt
+> new file mode 100644
+> index 0000000..5254527
+> --- /dev/null
+> +++ b/Documentation/arm/kernel_mode_neon.txt
+> @@ -0,0 +1,121 @@
+> +Kernel mode NEON
+> +================
+> +
+> +TL;DR summary
+> +-------------
+> +* Use only NEON instructions, or VFP instructions that don't rely on support
+> +  code
+> +* Isolate your NEON code in a separate compilation unit, and compile it with
+> +  '-mfpu=neon -mfloat-abi=softfp'
+> +* Put kernel_neon_begin() and kernel_neon_end() calls around the calls into your
+> +  NEON code
+> +* Don't sleep in your NEON code, and be aware that it will be executed with
+> +  preemption disabled
+> +
+> +
+> +Introduction
+> +------------
+> +It is possible to use NEON instructions (and in some cases, VFP instructions) in
+> +code that runs in kernel mode. However, for performance reasons, the NEON/VFP
+> +register file is not preserved and restored at every context switch or taken
+> +exception like the normal register file is, so some manual intervention is
+> +required. Furthermore, special care is required for code that may sleep [i.e.,
+> +may call schedule()], as NEON or VFP instructions will be executed in a
+> +non-preemptible section for reasons outlined below.
+> +
+> +
+> +Lazy preserve and restore
+> +-------------------------
+> +The NEON/VFP register file is managed using lazy preserve (on UP systems) and
+> +lazy restore (on both SMP and UP systems). This means that the register file is
+> +kept 'live', and is only preserved and restored when multiple tasks are
+> +contending for the NEON/VFP unit (or, in the SMP case, when a task migrates to
+> +another core). Lazy restore is implemented by disabling the NEON/VFP unit after
+> +every context switch, resulting in a trap when subsequently a NEON/VFP
+> +instruction is issued, allowing the kernel to step in and perform the restore if
+> +necessary.
+> +
+> +Any use of the NEON/VFP unit in kernel mode should not interfere with this, so
+> +it is required to do an 'eager' preserve of the NEON/VFP register file, and
+> +enable the NEON/VFP unit explicitly so no exceptions are generated on first
+> +subsequent use. This is handled by the function kernel_neon_begin(), which
+> +should be called before any kernel mode NEON or VFP instructions are issued.
+> +Likewise, the NEON/VFP unit should be disabled again after use to make sure user
+> +mode will hit the lazy restore trap upon next use. This is handled by the
+> +function kernel_neon_end().
+> +
+> +
+> +Interruptions in kernel mode
+> +----------------------------
+> +For reasons of performance and simplicity, it was decided that there shall be no
+> +preserve/restore mechanism for the kernel mode NEON/VFP register contents. This
+> +implies that interruptions of a kernel mode NEON section can only be allowed if
+> +they are guaranteed not to touch the NEON/VFP registers. For this reason, the
+> +following rules and restrictions apply in the kernel:
+> +* NEON/VFP code is not allowed in interrupt context;
+> +* NEON/VFP code is not allowed to sleep;
+> +* NEON/VFP code is executed with preemption disabled.
+> +
+> +If latency is a concern, it is possible to put back to back calls to
+> +kernel_neon_end() and kernel_neon_begin() in places in your code where none of
+> +the NEON registers are live. (Additional calls to kernel_neon_begin() should be
+> +reasonably cheap if no context switch occurred in the meantime)
+> +
+> +
+> +VFP and support code
+> +--------------------
+> +Earlier versions of VFP (prior to version 3) rely on software support for things
+> +like IEEE-754 compliant underflow handling etc. When the VFP unit needs such
+> +software assistance, it signals the kernel by raising an undefined instruction
+> +exception. The kernel responds by inspecting the VFP control registers and the
+> +current instruction and arguments, and emulates the instruction in software.
+> +
+> +Such software assistance is currently not implemented for VFP instructions
+> +executed in kernel mode. If such a condition is encountered, the kernel will
+> +fail and generate an OOPS.
+> +
+> +
+> +Separating NEON code from ordinary code
+> +---------------------------------------
+> +The compiler is not aware of the special significance of kernel_neon_begin() and
+> +kernel_neon_end(), i.e., that it is only allowed to issue NEON/VFP instructions
+> +between calls to these respective functions. Furthermore, GCC may generate NEON
+> +instructions of its own at -O3 level if -mfpu=neon is selected, and even if the
+> +kernel is currently compiled at -O2, future changes may result in NEON/VFP
+> +instructions appearing in unexpected places if no special care is taken.
+> +
+> +Therefore, the recommended and only supported way of using NEON/VFP in the
+> +kernel is by adhering to the following rules:
+> +* isolate the NEON code in a separate compilation unit and compile it with
+> +  '-mfpu=neon -mfloat-abi=softfp';
+> +* issue the calls to kernel_neon_begin(), kernel_neon_end() as well as the calls
+> +  into the unit containing the NEON code from a compilation unit which is *not*
+> +  built with the GCC flag '-mfpu=neon' set.
+> +
+> +As the kernel is compiled with '-msoft-float', the above will guarantee that
+> +both NEON and VFP instructions will only ever appear in designated compilation
+> +units at any optimization level.
+> +
+> +
+> +NEON assembler
+> +--------------
+> +NEON assembler is supported with no additional caveats as long as the rules
+> +above are followed.
+> +
+> +
+> +NEON code generated by GCC
+> +--------------------------
+> +The GCC option -ftree-vectorize (implied by -O3) tries to exploit implicit
+> +parallelism, and generates NEON code from ordinary C source code. This is fully
+> +supported as long as the rules above are followed.
+> +
+> +
+> +NEON intrinsics
+> +---------------
+> +NEON intrinsics are also supported. However, as code using NEON intrinsics
+> +relies on the GCC header <arm_neon.h>, (which #includes <stdint.h>), you should
+> +observe the following in addition to the rules above:
+> +* Compile the unit containing the NEON intrinsics with '-ffreestanding' so GCC
+> +  uses its builtin version of <stdint.h> (this is a C99 header which the kernel
+> +  does not supply);
+> +* Include <arm_neon.h> last, or at least after <linux/types.h>
+> --
+> 1.8.1.2
+>
