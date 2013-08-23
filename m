@@ -1,22 +1,35 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 24 Aug 2013 02:44:38 +0400
-Subject: [PATCH v3 0/2] R8A7778/BOCK-W: HPB-DMAC support for SDHI0
-Message-ID: <201308240244.38963.sergei.shtylyov@cogentembedded.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Fri, 23 Aug 2013 17:44:43 -0500
+Subject: [PATCHv4 2/4] arm: dts: Change dw-apb-timer-osc and
+ dw-apb-timer-sp to just dw-apb-timer
+In-Reply-To: <52168E96.3020702@wwwdotorg.org>
+References: <1377189026-16656-1-git-send-email-dinguyen@altera.com>
+ <1377189026-16656-2-git-send-email-dinguyen@altera.com>
+ <52168E96.3020702@wwwdotorg.org>
+Message-ID: <1377297883.26742.8.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, 2013-08-22 at 16:20 -0600, Stephen Warren wrote:
+> On 08/22/2013 10:30 AM, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > "dw-apb-timer-osc" and "dw-apb-timer-sp" are the same implementation of the
+> > DW APB timer, just fed by different clocks. Thus, deprecate both
+> > "dw-apb-timer-osc" and "dw-apb-timer-sp" in lieu of "dw-apb-timer".
+> 
+> The binding change looks reasonable to me.
+> 
+> The *.dtsi change will cause the new DT not to work with older kernels
+> that don't support the new compatible values. Perhaps you're fine with that?
+> 
+> I assume that the driver has already been updated to support the new
+> values, and that the driver change is guaranteed to be merged before
+> this change? Otherwise, git bisect will be broken for a while.
+> 
 
-   Here's the set of 2 patches against the Simon Horman's 'renesas.git' repo,
-'renesas-next-20130823' tag. Here we add the HPB-DMAC platform code working on
-the R8A7778 and enable DMA for SDHI0 on BOCK-W (Max has fixed the wrong settings
-that led to the SDHI0 DMA working incorrectly). The patchset depends on the
-R-Car HPB-DMAC driver patch posted earlier.
+Can I have your Acked-by: for these bindings? I just received an Ack
+from Linus Walleij for the driver portion.
 
-[1/2] ARM: shmobile: r8a7778: add HPB-DMAC support
-[2/2] ARM: shmobile: BOCK-W: enable DMA for SDHI0
-
-   The former patch #1 has been merged to the next patch moving the data from
-the now removed <mach/dma.h> to <mach/r8a7778.h>.
-
-WBR, Sergei
+Thanks,
+Dinh
