@@ -1,10 +1,10 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Aug 2013 13:23:28 +0100
-Subject: [PATCH 28/40] ARM: ux500: Remove UART support when booting without
- Device Tree
+Date: Fri, 23 Aug 2013 13:23:31 +0100
+Subject: [PATCH 31/40] ARM: ux500: Don't register Synaptics RMI4 TS when
+ booting with ATAGs
 In-Reply-To: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
 References: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1377260620-18829-29-git-send-email-lee.jones@linaro.org>
+Message-ID: <1377260620-18829-32-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,179 +13,38 @@ Device Tree booting. This patch is part of that endeavour.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c   | 76 ------------------------------------
- arch/arm/mach-ux500/board-mop500.h   |  3 --
- arch/arm/mach-ux500/devices-common.h | 10 -----
- arch/arm/mach-ux500/devices-db8500.h | 10 -----
- 4 files changed, 99 deletions(-)
+ arch/arm/mach-ux500/board-mop500-u8500uib.c | 14 --------------
+ 1 file changed, 14 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 0ae083b..db6908a 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -17,7 +17,6 @@
- #include <linux/platform_data/db8500_thermal.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/pl022.h>
--#include <linux/amba/serial.h>
- #include <linux/mfd/abx500/ab8500.h>
- #include <linux/regulator/ab8500.h>
- #include <linux/regulator/fixed.h>
-@@ -79,75 +78,6 @@ struct pl022_ssp_controller ssp0_plat = {
- 	.num_chipselect = 5,
- };
+diff --git a/arch/arm/mach-ux500/board-mop500-u8500uib.c b/arch/arm/mach-ux500/board-mop500-u8500uib.c
+index 6f6553e..43c9ff1 100644
+--- a/arch/arm/mach-ux500/board-mop500-u8500uib.c
++++ b/arch/arm/mach-ux500/board-mop500-u8500uib.c
+@@ -4,25 +4,11 @@
+  * Board data for the U8500 UIB, also known as the New UIB
+  * License terms: GNU General Public License (GPL), version 2
+  */
+-#include <linux/gpio.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/i2c.h>
+-#include <linux/interrupt.h>
+-
+-#include "irqs.h"
  
--#ifdef CONFIG_STE_DMA40
--static struct stedma40_chan_cfg uart0_dma_cfg_rx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type = DB8500_DMA_DEV13_UART0,
+ #include "board-mop500.h"
+ 
+-static struct i2c_board_info __initdata mop500_i2c3_devices_u8500[] = {
+-	{
+-		I2C_BOARD_INFO("synaptics_rmi4_i2c", 0x4B),
+-		.irq = NOMADIK_GPIO_TO_IRQ(84),
+-	},
 -};
 -
--static struct stedma40_chan_cfg uart0_dma_cfg_tx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV13_UART0,
--};
--
--static struct stedma40_chan_cfg uart1_dma_cfg_rx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type = DB8500_DMA_DEV12_UART1,
--};
--
--static struct stedma40_chan_cfg uart1_dma_cfg_tx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV12_UART1,
--};
--
--static struct stedma40_chan_cfg uart2_dma_cfg_rx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type = DB8500_DMA_DEV11_UART2,
--};
--
--static struct stedma40_chan_cfg uart2_dma_cfg_tx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV11_UART2,
--};
--#endif
--
--struct amba_pl011_data uart0_plat = {
--#ifdef CONFIG_STE_DMA40
--	.dma_filter = stedma40_filter,
--	.dma_rx_param = &uart0_dma_cfg_rx,
--	.dma_tx_param = &uart0_dma_cfg_tx,
--#endif
--};
--
--struct amba_pl011_data uart1_plat = {
--#ifdef CONFIG_STE_DMA40
--	.dma_filter = stedma40_filter,
--	.dma_rx_param = &uart1_dma_cfg_rx,
--	.dma_tx_param = &uart1_dma_cfg_tx,
--#endif
--};
--
--struct amba_pl011_data uart2_plat = {
--#ifdef CONFIG_STE_DMA40
--	.dma_filter = stedma40_filter,
--	.dma_rx_param = &uart2_dma_cfg_rx,
--	.dma_tx_param = &uart2_dma_cfg_tx,
--#endif
--};
--
--static void __init mop500_uart_init(struct device *parent)
--{
--	db8500_add_uart0(parent, &uart0_plat);
--	db8500_add_uart1(parent, &uart1_plat);
--	db8500_add_uart2(parent, &uart2_plat);
--}
--
- static void __init mop500_init_machine(void)
+ void __init mop500_u8500uib_init(void)
  {
- 	struct device *parent = NULL;
-@@ -156,8 +86,6 @@ static void __init mop500_init_machine(void)
- 
- 	parent = u8500_init_devices();
- 
--	mop500_uart_init(parent);
--
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
+-	mop500_uib_i2c_add(3, mop500_i2c3_devices_u8500,
+-			ARRAY_SIZE(mop500_i2c3_devices_u8500));
  }
-@@ -170,8 +98,6 @@ static void __init snowball_init_machine(void)
- 
- 	parent = u8500_init_devices();
- 
--	mop500_uart_init(parent);
--
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
- }
-@@ -184,8 +110,6 @@ static void __init hrefv60_init_machine(void)
- 
- 	parent = u8500_init_devices();
- 
--	mop500_uart_init(parent);
--
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
- }
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index 2cced8b..cf6b304 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -87,9 +87,6 @@ extern struct msp_i2s_platform_data msp0_platform_data;
- extern struct msp_i2s_platform_data msp1_platform_data;
- extern struct msp_i2s_platform_data msp2_platform_data;
- extern struct msp_i2s_platform_data msp3_platform_data;
--extern struct amba_pl011_data uart0_plat;
--extern struct amba_pl011_data uart1_plat;
--extern struct amba_pl011_data uart2_plat;
- extern struct pl022_ssp_controller ssp0_plat;
- 
- void __init mop500_u8500uib_init(void);
-diff --git a/arch/arm/mach-ux500/devices-common.h b/arch/arm/mach-ux500/devices-common.h
-index 15bf1ab..f3f7349 100644
---- a/arch/arm/mach-ux500/devices-common.h
-+++ b/arch/arm/mach-ux500/devices-common.h
-@@ -11,15 +11,5 @@
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
- #include <linux/sys_soc.h>
--#include <linux/amba/bus.h>
--
--struct amba_pl011_data;
--
--static inline struct amba_device *
--dbx500_add_uart(struct device *parent, const char *name, resource_size_t base,
--		int irq, struct amba_pl011_data *pdata)
--{
--	return amba_ahb_device_add(parent, name, base, SZ_4K, irq, 0, pdata, 0);
--}
- 
- #endif
-diff --git a/arch/arm/mach-ux500/devices-db8500.h b/arch/arm/mach-ux500/devices-db8500.h
-index e6ac6d2..fc4048f 100644
---- a/arch/arm/mach-ux500/devices-db8500.h
-+++ b/arch/arm/mach-ux500/devices-db8500.h
-@@ -18,14 +18,4 @@ extern struct ab8500_platform_data ab8500_platdata;
- extern struct prcmu_pdata db8500_prcmu_pdata;
- extern struct platform_device db8500_prcmu_device;
- 
--#define db8500_add_uart0(parent, pdata) \
--	dbx500_add_uart(parent, "uart0", U8500_UART0_BASE, \
--			IRQ_DB8500_UART0, pdata)
--#define db8500_add_uart1(parent, pdata) \
--	dbx500_add_uart(parent, "uart1", U8500_UART1_BASE, \
--			IRQ_DB8500_UART1, pdata)
--#define db8500_add_uart2(parent, pdata) \
--	dbx500_add_uart(parent, "uart2", U8500_UART2_BASE, \
--			IRQ_DB8500_UART2, pdata)
--
- #endif
 -- 
 1.8.1.2
