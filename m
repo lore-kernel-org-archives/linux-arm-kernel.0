@@ -1,32 +1,42 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 23 Aug 2013 12:42:12 +0200
-Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
-In-Reply-To: <20130823094141.GE25263@sirena.org.uk>
-References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
- <201308230158.05909.marex@denx.de> <20130823094141.GE25263@sirena.org.uk>
-Message-ID: <201308231242.12784.marex@denx.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 23 Aug 2013 07:49:50 -0300
+Subject: [PATCH v3 2/3] clocksource: orion: Use atomic access for shared
+ registers
+In-Reply-To: <20130823103857.GP4600@tarshish>
+References: <1377253445-2842-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377253445-2842-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130823103857.GP4600@tarshish>
+Message-ID: <20130823104949.GC2389@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark Brown,
-
-> On Fri, Aug 23, 2013 at 01:58:05AM +0200, Marek Vasut wrote:
-> > > I was actually thinking something more generic than that - putting the
-> > > property at the SPI generic bindings level.  Though if all flashes with
-> > > this dual/quad read functionality have the prefix m25p the above would
-> > > work also, at the minute this does seem to be mostly used by flash (I
-> > > bet someone's got some DSPs or something though).
-> > 
-> > Ah! So you mean the SPI controller would provide information that it can
-> > do dual/quad transfers? But then, the additional pins can only be wired
-> > to certain chips (controller by certain CS lines).
+On Fri, Aug 23, 2013 at 01:38:57PM +0300, Baruch Siach wrote:
+> Hi Ezequiel,
 > 
-> No, not exactly - I just meant that the property on the child node
-> should be one that's consistent over all chips and could hopefully be
-> implemented in the SPI core as part of instantiating the device in DT.
-> Which probably just means stripping or changing the vendor prefix.
+> On Fri, Aug 23, 2013 at 07:24:04AM -0300, Ezequiel Garcia wrote:
+> > Replace the driver-specific thread-safe shared register API
+> > by the recently introduced atomic_io_clear_set().
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> 
+> [...]
+> 
+> > @@ -131,7 +121,9 @@ static void __init orion_timer_init(struct device_node 
+> >   *np)
+> >  	/* setup timer0 as free-running clocksource */
+> >  	writel(~0, timer_base + TIMER0_VAL);
+> >  	writel(~0, timer_base + TIMER0_RELOAD);
+> > -	orion_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | TIMER0_EN);
+> > +	oatomic_io_modify(timer_base + TIMER_CTRL,
+> 
+> oatomic? Are you sure this code builds?
+> 
 
-Ah right, got you now. Thanks!
+Argh, no. I wasn't building the proper configuration/tree
+and thus this clocksource driver wasn't being used.
 
-Best regards,
-Marek Vasut
+Thanks for the catch!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
