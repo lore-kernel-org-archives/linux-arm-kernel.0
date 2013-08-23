@@ -1,26 +1,24 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Fri, 23 Aug 2013 12:36:56 +0300
-Subject: [patch] [media] exynos4-is: print error message on timeout
-Message-ID: <20130823093656.GK31293@elgon.mountain>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 23 Aug 2013 10:37:15 +0100
+Subject: [PATCH -next] spi: sirf: fix error return code in
+ spi_sirfsoc_probe()
+In-Reply-To: <CAPgLHd8sTqQX-orB1VjED4hcpwU577TgqfQV=eRYCk-vjzdYOQ@mail.gmail.com>
+References: <CAPgLHd8sTqQX-orB1VjED4hcpwU577TgqfQV=eRYCk-vjzdYOQ@mail.gmail.com>
+Message-ID: <20130823093715.GD25263@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a stray '!' character so the error message never gets printed.
+On Fri, Aug 23, 2013 at 08:33:39AM +0800, Wei Yongjun wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> Fix to return a negative error code from the error handling
+> case instead of 0, as done elsewhere in this function.
 
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
----
-Static checker stuff.  Not tested.
-
-diff --git a/drivers/media/platform/exynos4-is/fimc-is-regs.c b/drivers/media/platform/exynos4-is/fimc-is-regs.c
-index 63c68ec..42f2925 100644
---- a/drivers/media/platform/exynos4-is/fimc-is-regs.c
-+++ b/drivers/media/platform/exynos4-is/fimc-is-regs.c
-@@ -236,7 +236,7 @@ int fimc_is_itf_mode_change(struct fimc_is *is)
- 	fimc_is_hw_change_mode(is);
- 	ret = fimc_is_wait_event(is, IS_ST_CHANGE_MODE, 1,
- 				FIMC_IS_CONFIG_TIMEOUT);
--	if (!ret < 0)
-+	if (ret < 0)
- 		dev_err(&is->pdev->dev, "%s(): mode change (%d) timeout\n",
- 			__func__, is->config_index);
- 	return ret;
+applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/af72de61/attachment.sig>
