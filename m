@@ -1,85 +1,20 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 23 Aug 2013 00:51:59 -0400 (EDT)
-Subject: [PATCH] irqchip: gic: Don't complain in gic_get_cpumask() if UP
- system
-In-Reply-To: <20130823043527.GG23960@codeaurora.org>
-References: <1373067573-29946-1-git-send-email-sboyd@codeaurora.org>
- <20130712111322.GC3213@e102654-lin.cambridge.arm.com>
- <20130712121023.GB27430@codeaurora.org> <51E71249.4050200@codeaurora.org>
- <alpine.LFD.2.03.1307171830170.14924@syhkavp.arg>
- <51E71C78.6080604@codeaurora.org>
- <alpine.LFD.2.03.1307171849180.14924@syhkavp.arg>
- <51E7236D.3010700@codeaurora.org> <20130822184312.GE23960@codeaurora.org>
- <alpine.LFD.2.03.1308221458320.14472@syhkavp.arg>
- <20130823043527.GG23960@codeaurora.org>
-Message-ID: <alpine.LFD.2.03.1308230049230.14472@syhkavp.arg>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 23 Aug 2013 10:23:21 +0530
+Subject: [PATCH] cpufreq: tegra: fix the wrong clock name
+In-Reply-To: <1377222238-9439-1-git-send-email-josephl@nvidia.com>
+References: <1377222238-9439-1-git-send-email-josephl@nvidia.com>
+Message-ID: <CAKohpoki3wG=S8AU4v2LTk7NTLNS+BU_Yz5O+LTQTcdehciUbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Aug 2013, Stephen Boyd wrote:
+On 23 August 2013 07:13, Joseph Lo <josephl@nvidia.com> wrote:
+> The "cpu" and "pclk_p_cclk" was a virtual clock name that was used in
+> the legacy Tegra clock framework. It was not used after converting to
+> CCF. Fix it as the correct clock name that we are using.
+>
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> ---
+>  drivers/cpufreq/tegra-cpufreq.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-> On 08/22, Nicolas Pitre wrote:
-> > On Thu, 22 Aug 2013, Stephen Boyd wrote:
-> > 
-> > > On 07/17, Stephen Boyd wrote:
-> > > > On 07/17/13 15:53, Nicolas Pitre wrote:
-> > > > > On Wed, 17 Jul 2013, Stephen Boyd wrote:
-> > > > >
-> > > > >> On 07/17/13 15:34, Nicolas Pitre wrote:
-> > > > >>> On Wed, 17 Jul 2013, Stephen Boyd wrote:
-> > > > >>>
-> > > > >>>> On 07/12/13 05:10, Stephen Boyd wrote:
-> > > > >>>>> On 07/12, Javi Merino wrote:
-> > > > >>>>>> I agree, we should drop the check.  It's annoying in uniprocessors and
-> > > > >>>>>> unlikely to be found in the real world unless your gic entry in the dt
-> > > > >>>>>> is wrong.
-> > > > >>> And that's a likely outcome in the real world.
-> > > > >>>
-> > > > >>>>> Ok. How about this?
-> > > > >>>> Any comments?
-> > > > >>> What about this instead:
-> > > > >> Unfortunately arm64 doesn't have SMP_ON_UP. 
-> > > > > And why does that matter?
-> > > > 
-> > > > Because the gic driver is compiled on both arm and arm64? I suppose we
-> > > > could define is_smp() to 1 on arm64 but its probably better to rely on
-> > > > generic kernel things instead of arch specific functions.
-> > > > 
-> > > > >
-> > > > >> It sounds like you preferred the first patch using num_possible_cpus()
-> > > > > Probably, yes.  I didn't follow the early conversation though.
-> > > > 
-> > > > This was the first patch:
-> > > > 
-> > > > ---8<----
-> > > > 
-> > > > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> > > > index 19ceaa6..589c760 100644
-> > > > --- a/drivers/irqchip/irq-gic.c
-> > > > +++ b/drivers/irqchip/irq-gic.c
-> > > > @@ -368,7 +368,7 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
-> > > >  			break;
-> > > >  	}
-> > > >  
-> > > > -	if (!mask)
-> > > > +	if (!mask && num_possible_cpus() > 1)
-> > > >  		pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
-> > > >  
-> > > >  	return mask;
-> > > 
-> > > Can one of these two patches be picked up?
-> > 
-> > Sure.  Just send it to RMK's patch system with my ACK.
-> > 
-> 
-> I'm confused on that. MAINTAINERS says this patch should go
-> through Thomas Gleixner's irq/core branch but it looks like only
-> arm-soc has been taking patches for the current location.
-
-Blah.  OK then, just send it to Thomas.
-
-Initially this code was written and committed by RMK which is why I 
-suggested you send him the fix.
-
-
-Nicolas
+Applied to cpufreq-fixes. Thanks.
