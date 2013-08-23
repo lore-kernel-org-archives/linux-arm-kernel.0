@@ -1,35 +1,58 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 23 Aug 2013 10:41:41 +0100
-Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
-In-Reply-To: <201308230158.05909.marex@denx.de>
-References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
- <201308222229.01778.marex@denx.de>
- <20130822233611.GA25263@sirena.org.uk>
- <201308230158.05909.marex@denx.de>
-Message-ID: <20130823094141.GE25263@sirena.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 23 Aug 2013 15:10:34 +0530
+Subject: [PATCH v2 5/5] ARM: dts: am33xx: adopt to cpsw changes
+In-Reply-To: <52172CB0.9030204@gmail.com>
+References: <1377247417-27386-1-git-send-email-zonque@gmail.com>
+ <1377247417-27386-6-git-send-email-zonque@gmail.com>
+ <52172B54.8020201@ti.com> <52172CB0.9030204@gmail.com>
+Message-ID: <52172E12.2000908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 01:58:05AM +0200, Marek Vasut wrote:
+On Friday 23 August 2013 03:04 PM, Daniel Mack wrote:
+> On 23.08.2013 11:28, Sekhar Nori wrote:
+>> On Friday 23 August 2013 02:13 PM, Daniel Mack wrote:
+>>> This third memory region just denotes one single register in the CONTROL
+>>> module block. The driver uses that in order to set the correct physical
+>>> ethernet interface modes.
+>>>
+>>> Also update the compatible string to make use of the am335x specific
+>>> features of the cpsw driver.
+>>>
+>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>>> ---
+>>>  arch/arm/boot/dts/am33xx.dtsi | 5 +++--
+>>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+>>> index a785b95..1a1e9dd 100644
+>>> --- a/arch/arm/boot/dts/am33xx.dtsi
+>>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>>> @@ -446,7 +446,7 @@
+>>>  		};
+>>>  
+>>>  		mac: ethernet at 4a100000 {
+>>> -			compatible = "ti,cpsw";
+>>> +			compatible = "ti,am3352-cpsw";
+>>
+>> Please keep this as
+>>
+>> 	compatible = "ti,am3352-cpsw", "ti,cpsw";
+>>
+>> so users can upgrade the DTB or kernel independently. Apart from this
+>> the series looks good to me.
+> 
+> Ok, thanks. Given that this last patch will be merged through another
+> tree, can I just resend it separately, while David takes the rest as it is?
 
-> > I was actually thinking something more generic than that - putting the
-> > property at the SPI generic bindings level.  Though if all flashes with
-> > this dual/quad read functionality have the prefix m25p the above would
-> > work also, at the minute this does seem to be mostly used by flash (I
-> > bet someone's got some DSPs or something though).
+Ideally you could, but there are some bugs in the way compatible string
+in handled and due to this I suspect you need to reorder
+cpsw_of_mtable[] to match correctly. Not sure if the bug has been fixed
+in recent -rcs. Please check if modifying just this patch works and then
+go ahead and post.
 
-> Ah! So you mean the SPI controller would provide information that it can do 
-> dual/quad transfers? But then, the additional pins can only be wired to certain 
-> chips (controller by certain CS lines).
+Please Cc Benoit Cousson <bcousson@baylibre.com> on your next submission
+as he is the one who picks up DT patches for OMAP.
 
-No, not exactly - I just meant that the property on the child node
-should be one that's consistent over all chips and could hopefully be
-implemented in the SPI core as part of instantiating the device in DT.
-Which probably just means stripping or changing the vendor prefix.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/b412be30/attachment.sig>
+Thanks,
+Sekhar
