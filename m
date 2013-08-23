@@ -1,50 +1,116 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 23 Aug 2013 13:17:27 -0400
-Subject: [PATCH] ARM: Update SMP_ON_UP code to detect A9MPCore with 1
- CPU devices
-In-Reply-To: <52179719.3080609@ti.com>
-References: <1375381033-13220-1-git-send-email-santosh.shilimkar@ti.com>
- <51FBC610.9030900@arm.com> <51FBCEC3.4030207@ti.com>
- <51FBD42A.9040901@arm.com> <20130802154857.GD5292@mudshark.cambridge.arm.com>
- <52092AA5.3090005@ti.com> <20130813111943.GE30280@mudshark.cambridge.arm.com>
- <520A3518.3030301@ti.com> <52179719.3080609@ti.com>
-Message-ID: <52179927.1020906@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 Aug 2013 18:16:05 +0100
+Subject: [BUG] ARM64: Create 4K page size mmu memory map at init time
+ will trigger exception.
+In-Reply-To: <20130822161614.GE1352@arm.com>
+References: <BFAC7FA8F7636E45AB9ECBAC17346F3434557683@SZXEML508-MBS.china.huawei.com>
+ <20130822161614.GE1352@arm.com>
+Message-ID: <20130823171605.GH10971@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 August 2013 01:08 PM, Sekhar Nori wrote:
-> On 8/13/2013 7:01 PM, Santosh Shilimkar wrote:
->> On Tuesday 13 August 2013 07:19 AM, Will Deacon wrote:
->>> On Mon, Aug 12, 2013 at 07:34:13PM +0100, Santosh Shilimkar wrote:
->>>> On Friday 02 August 2013 11:48 AM, Will Deacon wrote:
->>>>> I think this an A9-specific register, which reads as 0 on UP A9 and reads as
->>>>> some form of PERIPH_BASE for SMP parts. The issue I have is when PERIPH_BASE
->>>>> is zero.
->>>>>
->>>> What do we do here ? Should we document this in the code and proceed ?
->>>> Mostly there is no platform with PERIPH_BASE = 0, so its should be fine but
->>>> I am open for any other alternative.
->>>
->>> The only other alternative I can think of is forcing people to have
->>> CONFIG_SMP=n, but that blows away single zImage for your platform.
->>>
->> Yep which surely we don't want considering after so much effort we
->> have it working first place. How about going ahead with assumption
->> that PERIPH_BASE = 0 case doesn't work.
+On Thu, Aug 22, 2013 at 05:16:14PM +0100, Catalin Marinas wrote:
+> On Thu, Aug 22, 2013 at 04:35:29AM +0100, Leizhen (ThunderTown, Euler) wrote:
+> > This problem is on ARM64. When CONFIG_ARM64_64K_PAGES is not opened, the memory
+> > map size can be 2M(section) and 4K(PAGE). First, OS will create map for pgd
+> > (level 1 table) and level 2 table which in swapper_pg_dir. Then, OS register
+> > mem block into memblock.memory according to memory node in fdt, like memory at 0,
+> > and create map in setup_arch-->paging_init. If all mem block start address and
+> > size is integral multiple of 2M, there is no problem, because we will create 2M
+> > section size map whose entries locate in level 2 table. But if it is not
+> > integral multiple of 2M, we should create level 3 table, which granule is 4K.
+> > Now, current implementtion is call early_alloc-->memblock_alloc to alloc memory
+> > for level 3 table. This function will find a 4K free memory which locate in
+> > memblock.memory tail(high address), but paging_init is create map from low
+> > address to high address, so new alloced memory is not mapped, write page talbe
+> > entry to it will trigger exception.
 > 
-> I must be missing something but why cannot we use the SCU configuration
-> register "CPU number" field to determine that its a UP? I do not have an
-> OMAP4 board, but on AM437x, it certainly indicates only CPU0 present.
-> 
-Thats what patch does. Yes, you are missing the point of dicussion. 
-On real UP Cortex-A9, the base address read will return '0' which is
-treated as invalid address in the patch. Will D pointed out that one
-can build a SOC where PERIPH_BASE can be 0 so thats not safe.
-Thats the only contention left here.
+> I see how this can happen. There is a memblock_set_current_limit to
+> PGDIR_SIZE (1GB, we have a pre-allocated pmd) and in my tests I had at
+> least 1GB of RAM which got mapped first and didn't have this problem.
+> I'll come up with a patch tomorrow.
 
-Will, Russell,
-Am just re-asking the question about whether we can ignore PERIPH_BASE = 0
-and just document in the code about the limitation.
+Could you please try this patch?
 
-regards,
-Santosh
+-------------------------8<---------------------------------------
+
+>From 3a35771339b7eea105925d1d573aedbeeea59ef0 Mon Sep 17 00:00:00 2001
+From: Catalin Marinas <catalin.marinas@arm.com>
+Date: Fri, 23 Aug 2013 18:04:44 +0100
+Subject: [PATCH] arm64: Fix mapping of memory banks not ending on a PMD_SIZE
+ boundary
+
+The map_mem() function limits the current memblock limit to PGDIR_SIZE
+(the initial swapper_pg_dir mapping) to avoid create_mapping()
+allocating memory from unmapped areas. However, if the first block is
+within PGDIR_SIZE and not ending on a PMD_SIZE boundary, when 4K page
+configuration is enabled, create_mapping() will try to allocate a pte
+page. Such page may be returned by memblock_alloc() from the end of such
+bank (or any subsequent bank within PGDIR_SIZE) which is not mapped yet.
+
+The patch limits the current memblock limit to the aligned end of the
+first bank and gradually increases it as more memory is mapped. It also
+ensures that the start of the first bank is aligned to PMD_SIZE to avoid
+pte page allocation for this mapping.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: "Leizhen (ThunderTown, Euler)" <thunder.leizhen@huawei.com>
+---
+ arch/arm64/mm/mmu.c | 28 ++++++++++++++++++++++++++--
+ 1 file changed, 26 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index a8d1059..49a0bc2 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -296,6 +296,7 @@ void __iomem * __init early_io_map(phys_addr_t phys, unsigned long virt)
+ static void __init map_mem(void)
+ {
+ 	struct memblock_region *reg;
++	phys_addr_t limit;
+ 
+ 	/*
+ 	 * Temporarily limit the memblock range. We need to do this as
+@@ -303,9 +304,11 @@ static void __init map_mem(void)
+ 	 * memory addressable from the initial direct kernel mapping.
+ 	 *
+ 	 * The initial direct kernel mapping, located at swapper_pg_dir,
+-	 * gives us PGDIR_SIZE memory starting from PHYS_OFFSET (aligned).
++	 * gives us PGDIR_SIZE memory starting from PHYS_OFFSET (which must be
++	 * aligned to 2MB as per Documentation/arm64/booting.txt).
+ 	 */
+-	memblock_set_current_limit((PHYS_OFFSET & PGDIR_MASK) + PGDIR_SIZE);
++	limit = PHYS_OFFSET + PGDIR_SIZE;
++	memblock_set_current_limit(limit);
+ 
+ 	/* map all the memory banks */
+ 	for_each_memblock(memory, reg) {
+@@ -315,7 +318,28 @@ static void __init map_mem(void)
+ 		if (start >= end)
+ 			break;
+ 
++#ifndef CONFIG_ARM64_64K_PAGES
++		/*
++		 * For the first memory bank align the start address and
++		 * current memblock limit to prevent create_mapping() from
++		 * allocating pte page tables from unmapped memory.
++		 * When 64K pages are enabled, the pte page table for the
++		 * first PGDIR_SIZE is already present in swapper_pg_dir.
++		 */
++		if (start < limit)
++			start = ALIGN(start, PMD_SIZE);
++		if (end < limit) {
++			limit = end & PMD_MASK;
++			memblock_set_current_limit(limit);
++		}
++#endif
++
+ 		create_mapping(start, __phys_to_virt(start), end - start);
++
++		/*
++		 * Mapping created, extend the current memblock limit.
++		 */
++		memblock_set_current_limit(end);
+ 	}
+ 
+ 	/* Limit no longer required. */
