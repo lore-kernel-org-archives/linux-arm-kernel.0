@@ -1,33 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 23 Aug 2013 12:30:58 +0100
-Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
-In-Reply-To: <52174640.701@gmail.com>
-References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
- <1376885403-12156-4-git-send-email-b32955@freescale.com>
- <20130822193453.GB10038@ld-irv-0074.broadcom.com>
- <20130822195559.GU26118@sirena.org.uk> <52174640.701@gmail.com>
-Message-ID: <20130823113058.GA23465@sirena.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 23 Aug 2013 08:32:26 -0300
+Subject: [PATCH v3 1/3] ARM: Introduce atomic MMIO modify
+In-Reply-To: <20130823110748.GD2389@localhost>
+References: <1377253445-2842-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130823103802.GO4600@tarshish> <20130823110748.GD2389@localhost>
+Message-ID: <20130823113225.GF2389@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 04:23:44AM -0700, Brian Norris wrote:
-> On 08/22/2013 12:55 PM, Mark Brown wrote:
+On Fri, Aug 23, 2013 at 08:07:50AM -0300, Ezequiel Garcia wrote:
+> On Fri, Aug 23, 2013 at 01:38:02PM +0300, Baruch Siach wrote:
+> > HI Ezequiel,
+> > 
+> > On Fri, Aug 23, 2013 at 07:24:03AM -0300, Ezequiel Garcia wrote:
+> > > Some SoC have MMIO regions that are shared across orthogonal
+> > > subsystems. This commit implements a possible solution for the
+> > > thread-safe access of such regions through a spinlock-protected API.
+> > > 
+> > > Concurrent access is protected with a single spinlock for the
+> > > entire MMIO address space. While this protects shared-registers,
+> > > it also serializes access to unrelated/unshared registers.
+> > > 
+> > > We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
+> > > respectively. The rationale for this is that some users may not require
+> > > register write completion but only thread-safe access to a register.
+> > > 
+> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > 
+> > Is there a reason why this should be limited to ARM? I haven't found anything 
+> > ARM specific in the code.
+> > 
+> 
+> I guess not.
+> 
 
-> >That bit does need to be fixed in this driver, yes.  The SPI core now
-> >has quad mode support.
-
-> Where? Perhaps I'm missing the obvious, but I don't see SPI core
-> quad support in linux-next or in Linus' tree.
-
-It went in yesterday, -next doesn't seem to have been updated today (I
-suspect Stephen may be on vacation, I'd need to check his announcement
-mail from yesterday to confirm).  The SPI tree is:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git for-next
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/8f26d531/attachment.sig>
+... or maybe yes. I'm not seeing {readl,writel}_relaxed as guaranteed
+to exist in every architecture. So, indeed, this seems to be ARM-dependent.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
