@@ -1,76 +1,37 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Fri, 23 Aug 2013 22:15:53 +0530
-Subject: [PATCH v4 3/5] net: ethernet: cpsw: introduce ti,am3352-cpsw
- compatible string
-In-Reply-To: <52177052.1030308@ti.com>
-References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
- <1377267365-24057-4-git-send-email-zonque@gmail.com>
- <52177052.1030308@ti.com>
-Message-ID: <521791C1.2060803@ti.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 23 Aug 2013 09:47:44 -0700
+Subject: [GIT PULL 2/5] ARM: imx: soc changes for 3.12
+In-Reply-To: <20130823101114.GM6617@n2100.arm.linux.org.uk>
+References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
+ <1376833688-24542-2-git-send-email-shawn.guo@linaro.org>
+ <87li3tvnj8.fsf@linaro.org>
+ <20130823101114.GM6617@n2100.arm.linux.org.uk>
+Message-ID: <CAGa+x85rvPTh3NyhY6rEtBN77gq6zVAW_TvT8k_fg9JbZGtJOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 August 2013 07:53 PM, Santosh Shilimkar wrote:
-> On Friday 23 August 2013 10:16 AM, Daniel Mack wrote:
->> In order to support features that are specific to the AM335x IP, we have
->> to add hardware types and another compatible string.
+On Fri, Aug 23, 2013 at 3:11 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Aug 22, 2013 at 06:54:35AM -0700, Kevin Hilman wrote:
+>> This patch causes a conflict with Russell's DEBUG_LL cleanup, which is
+>> already in linux-next.
 >>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
->> ---
->>  Documentation/devicetree/bindings/net/cpsw.txt |  3 ++-
->>  drivers/net/ethernet/ti/cpsw.c                 | 32 ++++++++++++++++++++------
->>  drivers/net/ethernet/ti/cpsw.h                 |  1 +
->>  3 files changed, 28 insertions(+), 8 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
->> index 4e5ca54..b717458 100644
->> --- a/Documentation/devicetree/bindings/net/cpsw.txt
->> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
->> @@ -2,7 +2,8 @@ TI SoC Ethernet Switch Controller Device Tree Bindings
->>  ------------------------------------------------------
->>  
->>  Required properties:
->> -- compatible		: Should be "ti,cpsw"
->> +- compatible		: Should be "ti,cpsw" for generic cpsw support, or
->> +			  "ti,am3352-cpsw" for AM3352 SoCs
->>  - reg			: physical base address and size of the cpsw
->>  			  registers map.
->>  			  An optional third memory region can be supplied if
->> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
->> index 7a25ff4..73c44cb6 100644
->> --- a/drivers/net/ethernet/ti/cpsw.c
->> +++ b/drivers/net/ethernet/ti/cpsw.c
->> @@ -155,6 +155,11 @@ do {								\
->>  		((priv->data.dual_emac) ? priv->emac_port :	\
->>  		priv->data.active_slave)
->>  
->> +enum {
->> +	CPSW_TYPE_GENERIC,
->> +	CPSW_TYPE_AM33XX
->> +};
->> +
->>  static int debug_level;
->>  module_param(debug_level, int, 0);
->>  MODULE_PARM_DESC(debug_level, "cpsw debug level (NETIF_MSG bits)");
->> @@ -1692,17 +1697,36 @@ static void cpsw_slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv,
->>  	slave->port_vlan = data->dual_emac_res_vlan;
->>  }
->>  
->> +static const struct of_device_id cpsw_of_mtable[] = {
->> +	{
->> +		.compatible	= "ti,am3352-cpsw",
-> I didn't notice this earlier, but can't you use the IP version
-> as a compatible instead of using a SOC name. Whats really SOC specific
-> on this IP ? Sorry i have missed any earlier discussion on this but
-> this approach doesn't seem good. Its like adding SOC checks in the
-> driver subsystem.
+>> For v3.12, I suggest you drop this patch and rework your new DEBUG_LL
+>> support on top of Russell's cleanup.  Have a look at that and see if you
+>> can reuse the the generic 8250 stuff added by Russell.  While there, you
+>> might look at imx.S as well.
 >
->
-But the same IP can be used in different SoC as well where the control
-register may be different as per the Silicon Integration team's decision?
+> I'm not sure why you think imx.S may be able to use the generic 8250
+> stuff,
 
-Ideally there should be a separate control module driver so that it can
-take care of different SoC related needs.
+Only because I was lazy and didn't actually look.  I just suggested he
+take a look.
 
-Regards
-Mugunthan V N
+> I did convert everything which I considered convertable at the time.
+
+OK, good. I didn't realize you did all the conversions.  I thought you
+did a few to set the example and wanted others to finish converting.
+
+Thanks for the cleanup,
+
+Kevin
