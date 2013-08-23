@@ -1,104 +1,82 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 23 Aug 2013 07:24:03 -0300
-Subject: [PATCH v3 1/3] ARM: Introduce atomic MMIO modify
+Date: Fri, 23 Aug 2013 07:24:04 -0300
+Subject: [PATCH v3 2/3] clocksource: orion: Use atomic access for shared
+ registers
 In-Reply-To: <1377253445-2842-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1377253445-2842-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1377253445-2842-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoC have MMIO regions that are shared across orthogonal
-subsystems. This commit implements a possible solution for the
-thread-safe access of such regions through a spinlock-protected API.
-
-Concurrent access is protected with a single spinlock for the
-entire MMIO address space. While this protects shared-registers,
-it also serializes access to unrelated/unshared registers.
-
-We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
-respectively. The rationale for this is that some users may not require
-register write completion but only thread-safe access to a register.
+Replace the driver-specific thread-safe shared register API
+by the recently introduced atomic_io_clear_set().
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
-Based on a similar approach suggested by Russell King:
-http://archive.arm.linux.org.uk/lurker/message/20130618.113606.d7d4fe4b.en.html
+ drivers/clocksource/time-orion.c | 28 ++++++++++------------------
+ 1 file changed, 10 insertions(+), 18 deletions(-)
 
-Changes from v2:
-* As suggested by Will Deacon, dropped the iowmb() barrier
-  and use relaxed variants instead. See Will's explanation for
-  details:
-  http://www.spinics.net/lists/arm-kernel/msg268775.html
-
-* Use spin_{}_irqsave/restore to allow irq-context usage
-  also suggested by Will Deacon.
-
-* Re-work the API semantics as proposed by Russell King.
-
-Changes from v1:
-* Added an io barrier iowmb() as suggested by Will Deacon,
-  to ensure the writel gets completed before the spin_unlock().
-
- arch/arm/include/asm/io.h |  6 ++++++
- arch/arm/kernel/io.c      | 29 +++++++++++++++++++++++++++++
- 2 files changed, 35 insertions(+)
-
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index d070741..27521e1 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -36,6 +36,12 @@
- #define isa_bus_to_virt phys_to_virt
+diff --git a/drivers/clocksource/time-orion.c b/drivers/clocksource/time-orion.c
+index ecbeb68..da9379e 100644
+--- a/drivers/clocksource/time-orion.c
++++ b/drivers/clocksource/time-orion.c
+@@ -35,20 +35,6 @@
+ #define ORION_ONESHOT_MAX	0xfffffffe
+ 
+ static void __iomem *timer_base;
+-static DEFINE_SPINLOCK(timer_ctrl_lock);
+-
+-/*
+- * Thread-safe access to TIMER_CTRL register
+- * (shared with watchdog timer)
+- */
+-void orion_timer_ctrl_clrset(u32 clr, u32 set)
+-{
+-	spin_lock(&timer_ctrl_lock);
+-	writel((readl(timer_base + TIMER_CTRL) & ~clr) | set,
+-		timer_base + TIMER_CTRL);
+-	spin_unlock(&timer_ctrl_lock);
+-}
+-EXPORT_SYMBOL(orion_timer_ctrl_clrset);
  
  /*
-+ * Atomic MMIO-wide IO modify
-+ */
-+extern void atomic_io_modify(void __iomem *reg, u32 mask, u32 set);
-+extern void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set);
-+
-+/*
-  * Generic IO read/write.  These perform native-endian accesses.  Note
-  * that some architectures will want to re-define __raw_{read,write}w.
-  */
-diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
-index dcd5b4d..651f1ad 100644
---- a/arch/arm/kernel/io.c
-+++ b/arch/arm/kernel/io.c
-@@ -1,6 +1,35 @@
- #include <linux/export.h>
- #include <linux/types.h>
- #include <linux/io.h>
-+#include <linux/spinlock.h>
-+
-+static DEFINE_SPINLOCK(__io_lock);
-+
-+void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set)
-+{
-+	unsigned long flags;
-+	u32 value;
-+
-+	spin_lock_irqsave(&__io_lock, flags);
-+	value = readl_relaxed(reg) & ~mask;
-+	value |= (set & mask);
-+	writel_relaxed(value, reg);
-+	spin_unlock_irqrestore(&__io_lock, flags);
-+}
-+EXPORT_SYMBOL(atomic_io_modify);
-+
-+void atomic_io_modify(void __iomem *reg, u32 mask, u32 set)
-+{
-+	unsigned long flags;
-+	u32 value;
-+
-+	spin_lock_irqsave(&__io_lock, flags);
-+	value = readl_relaxed(reg) & ~mask;
-+	value |= (set & mask);
-+	writel(value, reg);
-+	spin_unlock_irqrestore(&__io_lock, flags);
-+}
-+EXPORT_SYMBOL(atomic_io_modify);
+  * Free-running clocksource handling.
+@@ -68,7 +54,8 @@ static int orion_clkevt_next_event(unsigned long delta,
+ {
+ 	/* setup and enable one-shot timer */
+ 	writel(delta, timer_base + TIMER1_VAL);
+-	orion_timer_ctrl_clrset(TIMER1_RELOAD_EN, TIMER1_EN);
++	atomic_io_modify(timer_base + TIMER_CTRL,
++		TIMER1_RELOAD_EN | TIMER1_EN, TIMER1_EN);
  
- /*
-  * Copy data from IO memory space to "real" memory space.
+ 	return 0;
+ }
+@@ -80,10 +67,13 @@ static void orion_clkevt_mode(enum clock_event_mode mode,
+ 		/* setup and enable periodic timer at 1/HZ intervals */
+ 		writel(ticks_per_jiffy - 1, timer_base + TIMER1_RELOAD);
+ 		writel(ticks_per_jiffy - 1, timer_base + TIMER1_VAL);
+-		orion_timer_ctrl_clrset(0, TIMER1_RELOAD_EN | TIMER1_EN);
++		atomic_io_modify(timer_base + TIMER_CTRL,
++			TIMER1_RELOAD_EN | TIMER1_EN,
++			TIMER1_RELOAD_EN | TIMER1_EN);
+ 	} else {
+ 		/* disable timer */
+-		orion_timer_ctrl_clrset(TIMER1_RELOAD_EN | TIMER1_EN, 0);
++		atomic_io_modify(timer_base + TIMER_CTRL,
++			TIMER1_RELOAD_EN | TIMER1_EN, 0);
+ 	}
+ }
+ 
+@@ -131,7 +121,9 @@ static void __init orion_timer_init(struct device_node *np)
+ 	/* setup timer0 as free-running clocksource */
+ 	writel(~0, timer_base + TIMER0_VAL);
+ 	writel(~0, timer_base + TIMER0_RELOAD);
+-	orion_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | TIMER0_EN);
++	oatomic_io_modify(timer_base + TIMER_CTRL,
++		TIMER0_RELOAD_EN | TIMER0_EN,
++		TIMER0_RELOAD_EN | TIMER0_EN);
+ 	clocksource_mmio_init(timer_base + TIMER0_VAL, "orion_clocksource",
+ 			      clk_get_rate(clk), 300, 32,
+ 			      clocksource_mmio_readl_down);
 -- 
 1.8.1.5
