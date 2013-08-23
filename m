@@ -1,50 +1,32 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 23 Aug 2013 04:53:09 -0700
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 23 Aug 2013 13:01:56 +0100
 Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
-In-Reply-To: <52174BAC.3070901@gmail.com>
+In-Reply-To: <52174D25.9050805@gmail.com>
 References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
- <201308222229.01778.marex@denx.de> <20130822233611.GA25263@sirena.org.uk>
- <201308230158.05909.marex@denx.de> <20130823094141.GE25263@sirena.org.uk>
- <52174BAC.3070901@gmail.com>
-Message-ID: <52174D25.9050805@gmail.com>
+ <201308222229.01778.marex@denx.de>
+ <20130822233611.GA25263@sirena.org.uk>
+ <201308230158.05909.marex@denx.de>
+ <20130823094141.GE25263@sirena.org.uk> <52174BAC.3070901@gmail.com>
+ <52174D25.9050805@gmail.com>
+Message-ID: <20130823120156.GH25263@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2013 04:46 AM, Brian Norris wrote:
-> (Now that I've been pointed to the support merged into the SPI tree...)
->
-> Aren't the following new DT properties (for the SPI slave) sufficient?
->
-> spi-rx-nbits
-> spi-tx-nbits
-...
-> They're already in the following commit:
->
-> commit f477b7fb13df2b843997559ff34e87d054ba6538
-> Author: wangyuhang <wangyuhang2014@gmail.com>
-> Date:   Sun Aug 11 18:15:17 2013 +0800
->
->      spi: DUAL and QUAD support
->
->      fix the previous patch some mistake below:
->      1. DT in slave node, use "spi-tx-nbits = <1/2/4>" in place of using
->         "spi-tx-dual, spi-tx-quad" directly, same to rx. So correct the
->         previous way to get the property in @of_register_spi_devices().
->      2. Change the value of transfer bit macro(SPI_NBITS_SINGLE, SPI_NBITS_DUAL
->         SPI_NBITS_QUAD) to 0x01, 0x02 and 0x04 to match the actual wires.
->      3. Add the following check
->         (1)keep the tx_nbits and rx_nbits in spi_transfer is not beyond the
->            single, dual and quad.
->         (2)keep tx_nbits and rx_nbits are contained by @spi_device->mode
->            example: if @spi_device->mode = DUAL, then tx/rx_nbits can not be set
->                     to QUAD(SPI_NBITS_QUAD)
->         (3)if "@spi_device->mode & SPI_3WIRE", then tx/rx_nbits should be in
->            single(SPI_NBITS_SINGLE)
->
->      Signed-off-by: wangyuhang <wangyuhang2014@gmail.com>
->      Signed-off-by: Mark Brown <broonie@linaro.org>
+On Fri, Aug 23, 2013 at 04:53:09AM -0700, Brian Norris wrote:
+> On 08/23/2013 04:46 AM, Brian Norris wrote:
 
-Speaking of which, the new device-tree properties are not documented in 
-Documentation/devicetree/bindings/spi/spi-bus.txt yet.
+> >     Signed-off-by: wangyuhang <wangyuhang2014@gmail.com>
+> >     Signed-off-by: Mark Brown <broonie@linaro.org>
 
-Brian
+> Speaking of which, the new device-tree properties are not documented
+> in Documentation/devicetree/bindings/spi/spi-bus.txt yet.
+
+Yes, indeed - if you look at the review you'll see I asked for a
+followup patch doing that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/21873702/attachment.sig>
