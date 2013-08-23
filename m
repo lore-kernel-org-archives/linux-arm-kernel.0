@@ -1,51 +1,51 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 23 Aug 2013 09:36:13 +0200
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM
-In-Reply-To: <20130822062610.GR31036@pengutronix.de>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
- <1473340.OXSHEp7d4P@flatron>
- <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
- <20130822062610.GR31036@pengutronix.de>
-Message-ID: <20130823073612.GB3535@ulmo>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 23 Aug 2013 15:51:07 +0800
+Subject: [PATCH 0/3] of: add update device node status via cmdline feature
+In-Reply-To: <20130823070906.GA2460@b29396-Latitude-E6410>
+References: <1376564133-11286-1-git-send-email-b29396@freescale.com>
+ <CACxGe6tMm=u1jFKUQ59+cj-rYkLLAZUqMhsXamyi-wwpWaOGvw@mail.gmail.com>
+ <20130821123708.GA17748@b29396-Latitude-E6410>
+ <20130823070906.GA2460@b29396-Latitude-E6410>
+Message-ID: <20130823075102.GA10424@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 08:26:10AM +0200, Sascha Hauer wrote:
-> On Thu, Aug 22, 2013 at 02:55:42AM +0000, Xiubo Li-B47053 wrote:
-> > Hi Tomasz,
-> > 
-> > Thanks for your comments.
-> > 
-> > 
-> > > Could you explain meaning of this property more precisely? I'm interested
-> > > especially how is this related to the PWM IP block and boards.
-> > > 
-> > 
-> > Yes.
-> > There are 8 channels most. While the pinctrls of 4th and 5th channels could be
-> > used by uart's Rx and Tx, then these 2 channels won't be used for pwm output,
-> > so there will be 6 channels available by the pwm.
-> > Thus, the pwm chip will register only 6 pwms(6 channels) most("fsl,pwm-channel-orders
-> > = {0 1 2 3 6 7}").And also the "fsl,pwm-channel-number" will be 6.
-> 
-> If the chip has eight PWMs I would register all of them. If some of them
-> are not routed out by the pinmux then just nothing happens if you use
-> them. In a sane devicetree they won't be referenced anyway when they are
-> not routed out of the SoC.
+The device tree mailing list is changed to devicetree at vger.kernel.org.
 
-In that case, shouldn't this be hooked up to the pinctrl subsystem as
-well? As I understand the above, the logical thing would be for each PWM
-channel's .request() operation to configure the pinmuxing appropriately.
-And if it can't be configured as necessary then .request() should return
-an error (or propagate the error from the pinctrl subsystem).
+On Fri, Aug 23, 2013 at 03:09:08PM +0800, Dong Aisheng wrote:
+> I tried the uboot way with fdt command to change the node status, it can work.
+> However, it seems using fdt command is much complicated than the way i did with kernel
+> command line and it also does not support enable/disable multi nodes at the same time.
+> e.g, in order to enable ecspi1 and uart3 and disable gpmi:
+> with uboot fdt command:
+> U-Boot > fdt addr ${dtbaddr}
+> U-Boot > fdt set /soc/aips-bus at 02000000/spba-bus at 02000000/ecspi at 02008000 status "okay"
+> U-Boot > fdt set /soc/aips-bus at 02100000/serial at 021e8000 status "okay"
+> U-Boot > fdt set /soc/gpmi-nand at 00112000 status "disabled"
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/be8cb051/attachment-0001.sig>
+Oh, you can use the U-Boot environment and scripting function to make
+it even easier than your kernel cmdline approach to use.
+
+> with kernel cmdline:
+> fdt.enable=ecspi at 02008000,serial at 021e8000 fdt.disable=gpmi-nand at 00112000
+> So from the using perspective, kernel command line is much more simple and easy than uboot.
+
+NAK.
+
+It's not about simple or easy.  The approach completely defects the
+point of the whole device tree project - moving stuff that kernel does
+not care out of kernel.  Choosing device from mutually exclusive ones
+(due to pin conflict of board design) should NOT be something that
+kernel cares.
+
+Kernel gets device tree blob from firmware/bootloader and instantiates
+drivers for devices found in device tree.  That's all what kernel should
+do, nothing more.  Asking kernel to manipulate the device availability
+property in device tree is plainly wrong to me.
+
+If your board is designed with so many pin conflicts between devices,
+you have to do whatever you can do to get the decision made in device
+tree blob, before it gets passed to kernel.  Kernel does NOT care about
+that decision making.
+
+Shawn
