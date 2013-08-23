@@ -1,63 +1,89 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Aug 2013 18:04:11 +0100
-Subject: [PATCH v7] ARM: dts: mvebu: Introduce a new compatible string
- for mv64xxx-i2c
-In-Reply-To: <1377243174-15877-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1377243174-15877-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130823170411.GE7015@e106331-lin.cambridge.arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 23 Aug 2013 13:05:22 -0400
+Subject: [PATCH v4 3/5] net: ethernet: cpsw: introduce ti,am3352-cpsw
+ compatible string
+In-Reply-To: <521791C1.2060803@ti.com>
+References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
+ <1377267365-24057-4-git-send-email-zonque@gmail.com>
+ <52177052.1030308@ti.com> <521791C1.2060803@ti.com>
+Message-ID: <52179652.9090704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 08:32:54AM +0100, Gregory CLEMENT wrote:
-> The mv64xxx-i2c embedded in the Armada XP have a new feature to
-> offload i2c transaction. This new version of the IP come also with
-> some errata. This lead to the introduction to a another compatible
-> string.
+On Friday 23 August 2013 12:45 PM, Mugunthan V N wrote:
+> On Friday 23 August 2013 07:53 PM, Santosh Shilimkar wrote:
+>> On Friday 23 August 2013 10:16 AM, Daniel Mack wrote:
+>>> In order to support features that are specific to the AM335x IP, we have
+>>> to add hardware types and another compatible string.
+>>>
+>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/net/cpsw.txt |  3 ++-
+>>>  drivers/net/ethernet/ti/cpsw.c                 | 32 ++++++++++++++++++++------
+>>>  drivers/net/ethernet/ti/cpsw.h                 |  1 +
+>>>  3 files changed, 28 insertions(+), 8 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+>>> index 4e5ca54..b717458 100644
+>>> --- a/Documentation/devicetree/bindings/net/cpsw.txt
+>>> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
+>>> @@ -2,7 +2,8 @@ TI SoC Ethernet Switch Controller Device Tree Bindings
+>>>  ------------------------------------------------------
+>>>  
+>>>  Required properties:
+>>> -- compatible		: Should be "ti,cpsw"
+>>> +- compatible		: Should be "ti,cpsw" for generic cpsw support, or
+>>> +			  "ti,am3352-cpsw" for AM3352 SoCs
+>>>  - reg			: physical base address and size of the cpsw
+>>>  			  registers map.
+>>>  			  An optional third memory region can be supplied if
+>>> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+>>> index 7a25ff4..73c44cb6 100644
+>>> --- a/drivers/net/ethernet/ti/cpsw.c
+>>> +++ b/drivers/net/ethernet/ti/cpsw.c
+>>> @@ -155,6 +155,11 @@ do {								\
+>>>  		((priv->data.dual_emac) ? priv->emac_port :	\
+>>>  		priv->data.active_slave)
+>>>  
+>>> +enum {
+>>> +	CPSW_TYPE_GENERIC,
+>>> +	CPSW_TYPE_AM33XX
+>>> +};
+>>> +
+>>>  static int debug_level;
+>>>  module_param(debug_level, int, 0);
+>>>  MODULE_PARM_DESC(debug_level, "cpsw debug level (NETIF_MSG bits)");
+>>> @@ -1692,17 +1697,36 @@ static void cpsw_slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv,
+>>>  	slave->port_vlan = data->dual_emac_res_vlan;
+>>>  }
+>>>  
+>>> +static const struct of_device_id cpsw_of_mtable[] = {
+>>> +	{
+>>> +		.compatible	= "ti,am3352-cpsw",
+>> I didn't notice this earlier, but can't you use the IP version
+>> as a compatible instead of using a SOC name. Whats really SOC specific
+>> on this IP ? Sorry i have missed any earlier discussion on this but
+>> this approach doesn't seem good. Its like adding SOC checks in the
+>> driver subsystem.
+>>
+>>
+> But the same IP can be used in different SoC as well where the control
+> register may be different as per the Silicon Integration team's decision?
 > 
-> This commit updates the Device Tree binding documentation accordingly.
+> Ideally there should be a separate control module driver so that it can
+> take care of different SoC related needs.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
-> Changelog v6 -> v7:
-> 
-> - only keep "marvell,mv7230-i2c" for compatible name
-> 
-> - replace "For a controller which support the I2C Transaction
->   Generator" by "For the Armada XP" in the examples
-> 
->  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> index 6113f92..73cdc03 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> @@ -5,6 +5,7 @@ Required properties :
->  
->   - reg             : Offset and length of the register set for the device
->   - compatible      : Should be "marvell,mv64xxx-i2c" or "allwinner,sun4i-i2c"
-> +                     or "marvell,mv7230-i2c"
+Instead of having one control module driver to address all the requirements
+in various IP's, you could specifically address that in subsystem driver layer.
+SOC guys invariably use control modules for certain functionality since it
+is easy and quick fix. And their is uniformity in the way they are
+implemented for different IP needs.
 
-Ok, the new string looks sane, so I'm not opposed to that.
+In this specific case, if the CPSW IP version has some part of the
+functionality implemented using control module that is just harfaware
+choice. Its not mandatory to partition that in two sub-system. Rather
+consider it as a special IP version and treat it accordingly in the
+driver.
 
->   - interrupts      : The interrupt number
->  
->  Optional properties :
-> @@ -20,3 +21,12 @@ Examples:
->  		interrupts = <29>;
->  		clock-frequency = <100000>;
->  	};
-> +
-> +For the Armada XP:
-> +
-> +	i2c at 11000 {
-> +		compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
-                                         ^ That '8' shouldn't be there.
-
-> +		reg = <0x11000 0x100>;
-> +		interrupts = <29>;
-> +		clock-frequency = <100000>;
-> +	};
-
-Thanks,
-Mark.
+Regards,
+Santosh
