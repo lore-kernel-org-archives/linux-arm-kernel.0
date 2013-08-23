@@ -1,10 +1,10 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Aug 2013 13:23:04 +0100
-Subject: [PATCH 04/40] ARM: ux500: Remove ATAG booting support for Snowball's
- heatbeat LED
+Date: Fri, 23 Aug 2013 13:23:05 +0100
+Subject: [PATCH 05/40] ARM: ux500: Purge support for Snowball user buttons
+ when booting with ATAGs
 In-Reply-To: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
 References: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1377260620-18829-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1377260620-18829-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,47 +13,88 @@ Device Tree booting. This patch is part of that endeavour.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c | 21 ---------------------
- 1 file changed, 21 deletions(-)
+ arch/arm/mach-ux500/board-mop500.c | 62 --------------------------------------
+ 1 file changed, 62 deletions(-)
 
 diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index b090d4d..e634ea5 100644
+index e634ea5..dcd482b 100644
 --- a/arch/arm/mach-ux500/board-mop500.c
 +++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -55,26 +55,6 @@
- #include "board-mop500.h"
- #include "board-mop500-regulators.h"
+@@ -119,67 +119,6 @@ static struct ab8500_codec_platform_data ab8500_codec_pdata = {
+ 	.ear_cmv = EAR_CMV_0_95V
+ };
  
--static struct gpio_led snowball_led_array[] = {
+-static struct gpio_keys_button snowball_key_array[] = {
 -	{
--		.name = "user_led",
--		.default_trigger = "heartbeat",
--		.gpio = 142,
+-		.gpio           = 32,
+-		.type           = EV_KEY,
+-		.code           = KEY_1,
+-		.desc           = "userpb",
+-		.active_low     = 1,
+-		.debounce_interval = 50,
+-		.wakeup         = 1,
+-	},
+-	{
+-		.gpio           = 151,
+-		.type           = EV_KEY,
+-		.code           = KEY_2,
+-		.desc           = "extkb1",
+-		.active_low     = 1,
+-		.debounce_interval = 50,
+-		.wakeup         = 1,
+-	},
+-	{
+-		.gpio           = 152,
+-		.type           = EV_KEY,
+-		.code           = KEY_3,
+-		.desc           = "extkb2",
+-		.active_low     = 1,
+-		.debounce_interval = 50,
+-		.wakeup         = 1,
+-	},
+-	{
+-		.gpio           = 161,
+-		.type           = EV_KEY,
+-		.code           = KEY_4,
+-		.desc           = "extkb3",
+-		.active_low     = 1,
+-		.debounce_interval = 50,
+-		.wakeup         = 1,
+-	},
+-	{
+-		.gpio           = 162,
+-		.type           = EV_KEY,
+-		.code           = KEY_5,
+-		.desc           = "extkb4",
+-		.active_low     = 1,
+-		.debounce_interval = 50,
+-		.wakeup         = 1,
 -	},
 -};
 -
--static struct gpio_led_platform_data snowball_led_data = {
--	.leds = snowball_led_array,
--	.num_leds = ARRAY_SIZE(snowball_led_array),
+-static struct gpio_keys_platform_data snowball_key_data = {
+-	.buttons        = snowball_key_array,
+-	.nbuttons       = ARRAY_SIZE(snowball_key_array),
 -};
 -
--static struct platform_device snowball_led_dev = {
--	.name = "leds-gpio",
--	.dev = {
--		.platform_data = &snowball_led_data,
--	},
+-static struct platform_device snowball_key_dev = {
+-	.name           = "gpio-keys",
+-	.id             = -1,
+-	.dev            = {
+-		.platform_data  = &snowball_key_data,
+-	}
 -};
 -
- static struct fixed_voltage_config snowball_gpio_en_3v3_data = {
-        .supply_name            = "EN-3V3",
-        .gpio                   = SNOWBALL_EN_3V3_ETH_GPIO,
-@@ -480,7 +460,6 @@ static void __init u8500_cryp1_hash1_init(struct device *parent)
+ static struct smsc911x_platform_config snowball_sbnet_cfg = {
+ 	.irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
+ 	.irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL,
+@@ -460,7 +399,6 @@ static void __init u8500_cryp1_hash1_init(struct device *parent)
  }
  
  static struct platform_device *snowball_platform_devs[] __initdata = {
--	&snowball_led_dev,
- 	&snowball_key_dev,
+-	&snowball_key_dev,
  	&snowball_sbnet_dev,
  	&snowball_gpio_en_3v3_regulator_dev,
+ 	&u8500_cpufreq_cooling_device,
 -- 
 1.8.1.2
