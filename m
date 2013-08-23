@@ -1,169 +1,156 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 24 Aug 2013 02:46:19 +0400
-Subject: [PATCH v3 1/2] ARM: shmobile: r8a7778: add HPB-DMAC support
-In-Reply-To: <201308240244.38963.sergei.shtylyov@cogentembedded.com>
-References: <201308240244.38963.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201308240246.19877.sergei.shtylyov@cogentembedded.com>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Fri, 23 Aug 2013 15:40:04 -0700
+Subject: [PATCH V3 RFC 00/16] EFI stub for ARM
+In-Reply-To: <CAFECyb-1a_9AY_qicTRCw5f3haMJ7ucsMc8U3ReMmMjWCJdRFg@mail.gmail.com>
+References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
+ <CAFECyb_OMY6eEbkbYTC4sE56Za0rC+KFNFRbGWb2ECEqhiKbTQ@mail.gmail.com>
+ <CAFECyb-1a_9AY_qicTRCw5f3haMJ7ucsMc8U3ReMmMjWCJdRFg@mail.gmail.com>
+Message-ID: <CAFECyb_sJ8JTs-t5PuuxR7YyVYUYE5CaRX60NS03VsH29OeYjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Max Filippov <max.filippov@cogentembedded.com>
+On Fri, Aug 16, 2013 at 5:16 PM, Roy Franz <roy.franz@linaro.org> wrote:
+> On Tue, Aug 13, 2013 at 10:58 AM, Roy Franz <roy.franz@linaro.org> wrote:
+>> On Fri, Aug 9, 2013 at 4:26 PM, Roy Franz <roy.franz@linaro.org> wrote:
+>>>
+>>> This patch series adds EFI stub support for the ARM architecture.
+>>> Some code that was previously only used by x86/x86_64 is now shared
+>>> and has been made more general.  The stub for ARM is implemented in
+>>> a similar manner to x86 in that it is a shim layer between EFI and
+>>> the normal zImage/bzImage boot process, and that an image with the
+>>> stub configured is bootable as both a zImage and EFI application.
+>>>
+>>> This patch now (new for v3) series depends on the
+>>> "arm: Add [U]EFI runtime services support" patches by leif.lindholm at linaro.org.
+>>> The Kconfig option now depends on the "CONFIG_EFI" option that his series
+>>> adds, and this option will ensure a little endian configuration.  Also, the
+>>> EFI support is used to handle the EFI memory map the stub passes to the kernel.
+>>> There are some minor changes to be coordinated with the EFI runtime services
+>>> patch series, so I have put this back to RFC status.  These changes should be
+>>> minor and relate to final device tree bindings.
+>>>
+>>> Changes since v2:
+>>> * EFI bugfix "correct call to free_pages" that patch series
+>>>   depends on now in mainline
+>>> * remove "-fno-stack-protector" from decompressor Makefile.  The current code doesn't
+>>>   trigger the stack protection, so the decompressor now compiles with it still
+>>>   on.  Note that there has never been any stack protection in the decompressor
+>>>   since the stack usage doesn't trigger the heuristic in GCC, so right now
+>>>   the "-fno-stack-protector" is a noop.
+>>> * Changed EFI command line handling to not have a fixed limit.
+>>> * Change FDT memory allocation to retry with a larger allocation if
+>>>   first educated guess is inadequate.
+>>> * Correctly set 'SizeOfCode' in PE/COFF header.
+>>> * Reviewed ".setup" section that is in x86 PE/COFF header.  This is used for x86
+>>>   to account for code that is not in the .text section.  We don't need this
+>>>   for ARM, as all of our code is in the .text section, or in the PE/COFF header
+>>>   itself.
+>>> * Moved EFI_STUB_ERROR #define to header file to share between stub C and ASM.
+>>> * Variety of cleanups and fixes in head.S.
+>>> * Changed update_fdt_and_exit_boot() to just update the device tree, and
+>>>   renamed appropriately.  Memory allocations moved out of this function as
+>>>   well, which enables the retries if the initial FDT size is too small.
+>>>   Note that in order to do the retried allocations, the original FDT and
+>>>   command line memory regions are left allocated.  This is OK since the kernel
+>>>   has the memory map and will free these allocations along with the initrd
+>>>   and new fdt allocations.
+>>> * Added prefix to all prints, reduced number of prints, and reviewed all
+>>>   messages.
+>>> * Change mixed usage of dtb/fdt to all be fdt or "device tree" in efi-stub.c
+>>> * remove unnecessary zimage_size variable from relocate_kernel()
+>>> * correct return types on EFI functions - should be efi_status_t, not int.
+>>>
+>>>
+>>>
+>>> Changes since V1:
+>>> * Updated head.S based on feedback from Dave Martin.  ARM/THUMB
+>>>   switches now much cleaner.
+>>> * Broke up changes to x86 and common code into more patches.
+>>>   10 more patches in this series.
+>>>
+>>> Roy Franz (16):
+>>>   Move common EFI stub code from x86 arch code to common location
+>>>   Add system pointer argument to shared EFI stub related     functions
+>>>     so they no longer use global system table     pointer as they did
+>>>     when part of eboot.c.     This code is now shared, so using a
+>>>     global variable     as part of the interface is not that nice.
+>>>     Also,     by avoiding any global variables in the ARM EFI stub,
+>>>     this allows the code to be position independent without
+>>>     requiring GOT fixups.
+>>>   Rename memory allocation/free functions
+>>>   Add minimum address parameter to efi_low_alloc()
+>>>   rename __get_map() to efi_get_memory_map(), add parameter     to
+>>>     optionally return mmap key. The mmap key is required     to exit
+>>>     EFI boot services, and allows efi_get_memory_map()     to be used
+>>>     for getting final memory map.
+>>>   Enforce minimum alignment of 1 page on allocations.     The
+>>>     efi_high_alloc() and efi_low_alloc() functions     use the
+>>>     EFI_ALLOCATE_ADDRESS option to the EFI     function
+>>>     allocate_pages(), which requires a minimum     of page alignment,
+>>>     and rejects all other requests.
+>>>   Allow efi_free() to be called with size of 0, and do nothing in that
+>>>     case.
+>>>   Generalize handle_ramdisks() and rename to handle_cmdline_files().
+>>>   Renames in handle_cmdline_files() to complete generalization.
+>>>   Move EFI_READ_CHUNK_SIZE define to shared location.
+>>>   Add proper definitions for some EFI function pointers.
+>>>   Fix types in EFI calls to match EFI function definitions.
+>>>   resolve warnings found on ARM compile
+>>>   Add strstr to compressed string.c for ARM.
+>>>   Add EFI stub for ARM
+>>>   Add config EFI_STUB for ARM to Kconfig
+>>>
+>>>  arch/arm/Kconfig                       |   11 +
+>>>  arch/arm/boot/compressed/Makefile      |   15 +-
+>>>  arch/arm/boot/compressed/efi-header.S  |  111 +++++++
+>>>  arch/arm/boot/compressed/efi-stub.c    |  448 ++++++++++++++++++++++++++++
+>>>  arch/arm/boot/compressed/efi-stub.h    |    5 +
+>>>  arch/arm/boot/compressed/head.S        |   90 +++++-
+>>>  arch/arm/boot/compressed/string.c      |   21 ++
+>>>  arch/x86/boot/compressed/eboot.c       |  490 ++-----------------------------
+>>>  arch/x86/boot/compressed/eboot.h       |    9 -
+>>>  drivers/firmware/efi/efi-stub-helper.c |  505 ++++++++++++++++++++++++++++++++
+>>>  include/linux/efi.h                    |   51 +++-
+>>>  11 files changed, 1263 insertions(+), 493 deletions(-)
+>>>  create mode 100644 arch/arm/boot/compressed/efi-header.S
+>>>  create mode 100644 arch/arm/boot/compressed/efi-stub.c
+>>>  create mode 100644 arch/arm/boot/compressed/efi-stub.h
+>>>  create mode 100644 drivers/firmware/efi/efi-stub-helper.c
+>>>
+>>> --
+>>> 1.7.10.4
+>>>
+>>
+>> Hi Matt,
+>>
+>>    Do you have any more feedback on the X86 and common code (patches
+>> 1-13) that needs to be addressed?  Mark Salter has a working ARM64 EFI
+>> stub implemented based on these patches, so the common code has now
+>> been tested with another architecture, and he has acked these patches.
+>> If the current patches are OK, can this be queued for 3.12? (and into
+>> linux-next, if appropriate)
+>> The ARM portion may take a little longer based on the EFI runtime
+>> services patch dependencies, but getting the common code merged would
+>> allow the ARM64 EFI stub work to go forward independently.
+>>
+>> I can resend patches 1-13 as a new series of x86/common only changes
+>> if you would like.
+>>
+>> Thanks,
+>> Roy
+>
+> Hi Matt,
+>
+>    Any thoughts on taking the x86/common parts for 3.12?
+>
+> Thanks,
+> Roy
 
-Add HPB-DMAC platform device on R8A7778 SoC along with its slave and channel
-configurations (only for SDHI0 so far).
+Hi Matt,
 
-Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
-[Sergei: moved *enum* declaring HPB-DMAC slave IDs from now removed <mach/dma.h>
-to <mach/r8a7778.h>, removed #include <mach/dma.h> from setup-r8a7778.c, removed
-SSI-related *enum* values and SSI-related data from hpb_dmae_slaves[] and
-hpb_dmae_channels[], moved the comments after the element initializers of
-hpb_dmae_channels[].]
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+   Do you have a tree I can monitor to see if you have taken this?
+Would you like me to split out the x86/common only changes into a
+separate series from the ARM changes?
 
----
-Changes in version 3:
-- changed ASYNCMDR_ASMD2[12]_SINGLE to ASYNCMDR_ASMD2[12]_MULTI in the 'mdr'
-  field initializers;
-- moved the comments after the element initializers of hpb_dmae_channels[];
-- resolved rejects, refreshed the patch.
-
-Changes in version 2:
-- moved *enum* declaring HPB-DMAC slave IDs from the separate header file to
-  <mach/r8a7778.h>, removed #include <mach/dma.h> from setup-r8a7778.c;
-- removed SSI-related *enum* values and SSI-related data from hpb_dmae_slaves[]
-  and hpb_dmae_channels[].
-
- arch/arm/mach-shmobile/include/mach/r8a7778.h |    8 ++
- arch/arm/mach-shmobile/setup-r8a7778.c        |   79 ++++++++++++++++++++++++++
- 2 files changed, 87 insertions(+)
-
-Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7778.h
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ renesas/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -1,6 +1,7 @@
- /*
-  * Copyright (C) 2013  Renesas Solutions Corp.
-  * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ * Copyright (C) 2013  Cogent Embedded, Inc.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -20,6 +21,13 @@
- 
- #include <linux/sh_eth.h>
- 
-+/* HPB-DMA slave IDs */
-+enum {
-+	HPBDMA_SLAVE_DUMMY,
-+	HPBDMA_SLAVE_SDHI0_TX,
-+	HPBDMA_SLAVE_SDHI0_RX,
-+};
-+
- extern void r8a7778_add_standard_devices(void);
- extern void r8a7778_add_standard_devices_dt(void);
- extern void r8a7778_add_ether_device(struct sh_eth_plat_data *pdata);
-Index: renesas/arch/arm/mach-shmobile/setup-r8a7778.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ renesas/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -24,6 +24,7 @@
- #include <linux/irqchip/arm-gic.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/platform_data/dma-rcar-hpbdma.h>
- #include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_data/irq-renesas-intc-irqpin.h>
- #include <linux/platform_device.h>
-@@ -305,6 +306,82 @@ void __init r8a7778_add_dt_devices(void)
- 	r8a7778_register_tmu(1);
- }
- 
-+/* HPB-DMA */
-+
-+/* Asynchronous mode register (ASYNCMDR) bits */
-+#define	ASYNCMDR_ASMD22_MASK	BIT(2)	/* SDHI0 */
-+#define	ASYNCMDR_ASMD22_SINGLE	BIT(2)	/* SDHI0 */
-+#define	ASYNCMDR_ASMD22_MULTI	0	/* SDHI0 */
-+#define	ASYNCMDR_ASMD21_MASK	BIT(1)	/* SDHI0 */
-+#define	ASYNCMDR_ASMD21_SINGLE	BIT(1)	/* SDHI0 */
-+#define	ASYNCMDR_ASMD21_MULTI	0	/* SDHI0 */
-+
-+static const struct hpb_dmae_slave_config hpb_dmae_slaves[] = {
-+	{
-+		.id	= HPBDMA_SLAVE_SDHI0_TX,
-+		.addr	= 0xffe4c000 + 0x30,
-+		.dcr	= DCR_SPDS_16BIT | DCR_DMDL | DCR_DPDS_16BIT,
-+		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
-+			  ASYNCRSTR_ASRST23,
-+		.mdr	= ASYNCMDR_ASMD21_MULTI,
-+		.mdm	= ASYNCMDR_ASMD21_MASK,
-+		.port	= 0x0D0C,
-+		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
-+		.dma_ch	= 21,
-+	}, {
-+		.id	= HPBDMA_SLAVE_SDHI0_RX,
-+		.addr	= 0xffe4c000 + 0x30,
-+		.dcr	= DCR_SMDL | DCR_SPDS_16BIT | DCR_DPDS_16BIT,
-+		.rstr	= ASYNCRSTR_ASRST21 | ASYNCRSTR_ASRST22 |
-+			  ASYNCRSTR_ASRST23,
-+		.mdr	= ASYNCMDR_ASMD22_MULTI,
-+		.mdm	= ASYNCMDR_ASMD22_MASK,
-+		.port	= 0x0D0C,
-+		.flags	= HPB_DMAE_SET_ASYNC_RESET | HPB_DMAE_SET_ASYNC_MODE,
-+		.dma_ch	= 22,
-+	},
-+};
-+
-+static const struct hpb_dmae_channel hpb_dmae_channels[] = {
-+	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_TX), /* ch. 21 */
-+	HPB_DMAE_CHANNEL(0x7e, HPBDMA_SLAVE_SDHI0_RX), /* ch. 22 */
-+};
-+
-+static struct hpb_dmae_pdata dma_platform_data __initdata = {
-+	.slaves			= hpb_dmae_slaves,
-+	.num_slaves		= ARRAY_SIZE(hpb_dmae_slaves),
-+	.channels		= hpb_dmae_channels,
-+	.num_channels		= ARRAY_SIZE(hpb_dmae_channels),
-+	.ts_shift		= {
-+		[XMIT_SZ_8BIT]	= 0,
-+		[XMIT_SZ_16BIT]	= 1,
-+		[XMIT_SZ_32BIT]	= 2,
-+	},
-+	.num_hw_channels	= 39,
-+};
-+
-+static struct resource hpb_dmae_resources[] __initdata = {
-+	/* Channel registers */
-+	DEFINE_RES_MEM(0xffc08000, 0x1000),
-+	/* Common registers */
-+	DEFINE_RES_MEM(0xffc09000, 0x170),
-+	/* Asynchronous reset registers */
-+	DEFINE_RES_MEM(0xffc00300, 4),
-+	/* Asynchronous mode registers */
-+	DEFINE_RES_MEM(0xffc00400, 4),
-+	/* IRQ for DMA channels */
-+	DEFINE_RES_NAMED(gic_iid(0x7b), 5, NULL, IORESOURCE_IRQ),
-+};
-+
-+static void __init r8a7778_register_hpb_dmae(void)
-+{
-+	platform_device_register_resndata(&platform_bus, "hpb-dma-engine", -1,
-+					  hpb_dmae_resources,
-+					  ARRAY_SIZE(hpb_dmae_resources),
-+					  &dma_platform_data,
-+					  sizeof(dma_platform_data));
-+}
-+
- void __init r8a7778_add_standard_devices(void)
- {
- 	r8a7778_add_dt_devices();
-@@ -315,6 +392,8 @@ void __init r8a7778_add_standard_devices
- 	r8a7778_register_hspi(0);
- 	r8a7778_register_hspi(1);
- 	r8a7778_register_hspi(2);
-+
-+	r8a7778_register_hpb_dmae();
- }
- 
- void __init r8a7778_init_late(void)
+Thanks,
+Roy
