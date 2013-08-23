@@ -1,22 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Aug 2013 20:52:19 +0200
-Subject: [PATCH] pinctrl: imx: Fix compilation with DEBUG enabled
-In-Reply-To: <1377247137-19582-1-git-send-email-s.hauer@pengutronix.de>
-References: <1377247137-19582-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CACRpkdbRKzG5Kh4hNcCkS+JcBm3dbD-WWEZpKcfDV9rMrxnqqw@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 23 Aug 2013 20:53:04 +0200
+Subject: [PATCH v5 2/5] net: ethernet: cpsw: add optional third memory region
+ for CONTROL module
+In-Reply-To: <1377283987-20040-1-git-send-email-zonque@gmail.com>
+References: <1377283987-20040-1-git-send-email-zonque@gmail.com>
+Message-ID: <1377283987-20040-3-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 10:38 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+At least the AM33xx SoC has a control module register to configure
+details such as the hardware ethernet interface mode.
 
-> This became broken with converting the pinmux arrays into struct
-> types. While at it replace the preprocessor magic with a simple
-> dev_dbg.
->
-> Reported-by: Tushar Behera <tushar.behera@linaro.org>
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+I'm not sure whether all SoCs which feature the cpsw block have such a
+register, so that third memory region is considered optional for now.
 
-Patch applied with Shawn's ACK.
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ Documentation/devicetree/bindings/net/cpsw.txt | 5 ++++-
+ drivers/net/ethernet/ti/cpsw.c                 | 5 +++++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-Thanks!
-Linus Walleij
+diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+index 05d660e..4e5ca54 100644
+--- a/Documentation/devicetree/bindings/net/cpsw.txt
++++ b/Documentation/devicetree/bindings/net/cpsw.txt
+@@ -4,7 +4,10 @@ TI SoC Ethernet Switch Controller Device Tree Bindings
+ Required properties:
+ - compatible		: Should be "ti,cpsw"
+ - reg			: physical base address and size of the cpsw
+-			  registers map
++			  registers map.
++			  An optional third memory region can be supplied if
++			  the platform has a control module register to
++			  configure phy interface details
+ - interrupts		: property with a value describing the interrupt
+ 			  number
+ - interrupt-parent	: The parent interrupt controller
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index fc3263f..4feba2f 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -372,6 +372,7 @@ struct cpsw_priv {
+ 	struct cpsw_platform_data	data;
+ 	struct cpsw_ss_regs __iomem	*regs;
+ 	struct cpsw_wr_regs __iomem	*wr_regs;
++	u32 __iomem			*gmii_sel_reg;
+ 	u8 __iomem			*hw_stats;
+ 	struct cpsw_host_regs __iomem	*host_port_regs;
+ 	u32				msg_enable;
+@@ -1989,6 +1990,10 @@ static int cpsw_probe(struct platform_device *pdev)
+ 		goto clean_runtime_disable_ret;
+ 	}
+ 
++	/* Don't fail hard if the optional control memory region is missing */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
++	priv->gmii_sel_reg = devm_ioremap_resource(&pdev->dev, res);
++
+ 	memset(&dma_params, 0, sizeof(dma_params));
+ 	memset(&ale_params, 0, sizeof(ale_params));
+ 
+-- 
+1.8.3.1
