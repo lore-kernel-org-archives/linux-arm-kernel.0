@@ -1,56 +1,24 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 23 Aug 2013 09:57:43 -0600
-Subject: [PATCH] DMA: let filter functions of of_dma_simple_xlate possible
- check of_node
-In-Reply-To: <20130823012911.GB17925@rizhao-lap>
-References: <1375408800-11789-1-git-send-email-rizhao@nvidia.com>
- <20130822051904.GA2685@rizhao-lap> <52167213.6090604@wwwdotorg.org>
- <20130823012911.GB17925@rizhao-lap>
-Message-ID: <52178677.6090001@wwwdotorg.org>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Fri, 23 Aug 2013 21:29:35 +0530
+Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
+In-Reply-To: <20130824024512.GA2528@gmail.com>
+References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
+ <1376885403-12156-4-git-send-email-b32955@freescale.com>
+ <CAHSAbzN166J=DFi+1koPUpnFpJVHwtbC1AP21ywhAAissQxPxg@mail.gmail.com>
+ <52172A81.5090501@freescale.com> <52173217.70505@ti.com>
+ <20130824024512.GA2528@gmail.com>
+Message-ID: <521786E7.3070201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2013 07:29 PM, Richard Zhao wrote:
-> On Fri, Aug 23, 2013 at 04:18:27AM +0800, Stephen Warren wrote:
->> On 08/21/2013 11:19 PM, Richard Zhao wrote:
->>> On Fri, Aug 02, 2013 at 10:00:00AM +0800, Richard Zhao wrote:
->>>> pass of_phandle_args dma_spec to dma_request_channel in of_dma_simple_xlate,
->>>> so the filter function could access of_node in of_phandle_args.
->>>>
->>>> It also remove restriction of #dma-cells has to be one.
->>>>
->>>> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
->>>> ---
->>>>  drivers/dma/edma.c     |  7 +++++--
->>>>  drivers/dma/of-dma.c   | 10 ++++------
->>>>  drivers/dma/omap-dma.c |  6 ++++--
->>>>  3 files changed, 13 insertions(+), 10 deletions(-)
->>>>
+On Saturday 24 August 2013 08:15 AM, Huang Shijie wrote:
+> On Fri, Aug 23, 2013 at 03:27:43PM +0530, Sourav Poddar wrote:
+>> On Friday 23 August 2013 02:55 PM, Huang Shijie wrote:
+>>> ? 2013?08?23? 17:05, yuhang wang ??:
 >>>
->>> Hi Vinod,
->>>
->>> Can you please pick up this change?
->>>
->>> Hi Stephen,
->>>
->>> Can you please give a ack or reviewed-by etc?
->>
->> Hmm. Looking at the patch, I'm not sure it's right.
->>
->> This patch simply passes all the specfier args to the filter function,
->> and the code to check the equality of the of_node to the filter args is
->> still duplicated in each DMA driver. Instead, the DMA core should be
->> implementing the equality check, and only even calling the
->> driver-specific filter function for devices where the client's phandle
->> matches the DMA providing device's of_node handle.
-> 
-> Filter function is called in dmaengine core code, independent of dt.
-
-The core code can still check if a dmaengine's driver was instantiated
-from DT and take additional actions in that case.
-
-> And the reason why the driver has to write its own filter function is
-> it has to store slave id there in its own way.
-
-I'm not saying don't call the driver's filter function, but rather that
-the dmaengine core should perform the common checks before doing so.
+>> You should add QOR opcodes also in your patch, so we have the complete set.
+> yes, i have already supported the QIOR opcode in my driver.
+>
+I meant opcode 0x6b Quad output read which spansion flash supports.
+> thanks
+> Huang Shijie
