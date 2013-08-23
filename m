@@ -1,51 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 23 Aug 2013 15:51:07 +0800
-Subject: [PATCH 0/3] of: add update device node status via cmdline feature
-In-Reply-To: <20130823070906.GA2460@b29396-Latitude-E6410>
-References: <1376564133-11286-1-git-send-email-b29396@freescale.com>
- <CACxGe6tMm=u1jFKUQ59+cj-rYkLLAZUqMhsXamyi-wwpWaOGvw@mail.gmail.com>
- <20130821123708.GA17748@b29396-Latitude-E6410>
- <20130823070906.GA2460@b29396-Latitude-E6410>
-Message-ID: <20130823075102.GA10424@S2101-09.ap.freescale.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 23 Aug 2013 13:56:30 +0800
+Subject: [PATCH 1/1]  ARM: dts: imx28-evk: Add pinctrl for USB OTG ID pin
+Message-ID: <1377237390-15983-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device tree mailing list is changed to devicetree at vger.kernel.org.
+After that, the dual-role switch can be used at imx28-evk.
 
-On Fri, Aug 23, 2013 at 03:09:08PM +0800, Dong Aisheng wrote:
-> I tried the uboot way with fdt command to change the node status, it can work.
-> However, it seems using fdt command is much complicated than the way i did with kernel
-> command line and it also does not support enable/disable multi nodes at the same time.
-> e.g, in order to enable ecspi1 and uart3 and disable gpmi:
-> with uboot fdt command:
-> U-Boot > fdt addr ${dtbaddr}
-> U-Boot > fdt set /soc/aips-bus at 02000000/spba-bus at 02000000/ecspi at 02008000 status "okay"
-> U-Boot > fdt set /soc/aips-bus at 02100000/serial at 021e8000 status "okay"
-> U-Boot > fdt set /soc/gpmi-nand at 00112000 status "disabled"
+Due to hardware limitations, it needs to switch VDD 5V
+SOURCE SELECT to "USB 5V" if the user wants to use OTG
+dual-role switch function. it needs to switch VDD 5V
+SOURCE SELECT to "WALL 5V" if the user wants to Host 1.
 
-Oh, you can use the U-Boot environment and scripting function to make
-it even easier than your kernel cmdline approach to use.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ arch/arm/boot/dts/imx28-evk.dts |    2 ++
+ arch/arm/boot/dts/imx28.dtsi    |   11 +++++++++++
+ 2 files changed, 13 insertions(+), 0 deletions(-)
 
-> with kernel cmdline:
-> fdt.enable=ecspi at 02008000,serial at 021e8000 fdt.disable=gpmi-nand at 00112000
-> So from the using perspective, kernel command line is much more simple and easy than uboot.
-
-NAK.
-
-It's not about simple or easy.  The approach completely defects the
-point of the whole device tree project - moving stuff that kernel does
-not care out of kernel.  Choosing device from mutually exclusive ones
-(due to pin conflict of board design) should NOT be something that
-kernel cares.
-
-Kernel gets device tree blob from firmware/bootloader and instantiates
-drivers for devices found in device tree.  That's all what kernel should
-do, nothing more.  Asking kernel to manipulate the device availability
-property in device tree is plainly wrong to me.
-
-If your board is designed with so many pin conflicts between devices,
-you have to do whatever you can do to get the decision made in device
-tree blob, before it gets passed to kernel.  Kernel does NOT care about
-that decision making.
-
-Shawn
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index 15715d9..fa48bd5 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -243,6 +243,8 @@
+ 	ahb at 80080000 {
+ 		usb0: usb at 80080000 {
+ 			vbus-supply = <&reg_usb0_vbus>;
++			pinctrl-names = "default";
++  			pinctrl-0 = <&usb0_pins_a>;
+ 			status = "okay";
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 7363fde..54bd17c 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -731,6 +731,17 @@
+ 					fsl,pull-up = <0>;
+ 				};
+ 
++				usb0_pins_a: usb0 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x3071 /* MX28_PAD_AUART1_RTS__USB0_ID */
++					>;
++					fsl,drive-strength = <2>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
++
++
+ 				usbphy1_pins_a: usbphy1 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+-- 
+1.7.1
