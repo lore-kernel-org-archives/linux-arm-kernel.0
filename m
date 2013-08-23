@@ -1,33 +1,33 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 23 Aug 2013 17:22:01 +0200
-Subject: [PATCH v3 2/5] clkdev: Fix race condition in clock lookup from
- device tree
-In-Reply-To: <1377270227-1030-3-git-send-email-s.nawrocki@samsung.com>
-References: <1377270227-1030-1-git-send-email-s.nawrocki@samsung.com>
- <1377270227-1030-3-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <52177E19.3080106@samsung.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Fri, 23 Aug 2013 17:22:17 +0200
+Subject: [PATCH v4 3/5] net: ethernet: cpsw: introduce ti,am3352-cpsw
+ compatible string
+In-Reply-To: <52177052.1030308@ti.com>
+References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
+ <1377267365-24057-4-git-send-email-zonque@gmail.com>
+ <52177052.1030308@ti.com>
+Message-ID: <52177E29.6040103@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2013 05:03 PM, Sylwester Nawrocki wrote:
-> There is currently a race condition in the device tree part of clk_get()
-> function, since the pointer returned from of_clk_get_by_name() may become
-> invalid before __clk_get() call. I.e. due to the clock provider driver
-> remove() callback being called in between of_clk_get_by_name() and
-> __clk_get().
-> 
-> Fix this by doing both the look up and __clk_get() operations with the
-> clock providers list mutex held. This ensures that the clock pointer
-> returned from __of_clk_get_from_provider() call and passed to __clk_get()
-> is valid, as long as the clock supplier module first removes its clock
-> provider instance and then does clk_unregister() on the corresponding
-> clocks.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Hi Santosh,
 
-Oops, I missed to add:
+[...]
 
-Reviewed-by: Mike Turquette <mturquette@linaro.org>
+>> +static const struct of_device_id cpsw_of_mtable[] = {
+>> +	{
+>> +		.compatible	= "ti,am3352-cpsw",
+> I didn't notice this earlier, but can't you use the IP version
+> as a compatible instead of using a SOC name. Whats really SOC specific
+> on this IP ? Sorry i have missed any earlier discussion on this but
+> this approach doesn't seem good. Its like adding SOC checks in the
+> driver subsystem.
 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Hehe, welcome to the club!
+I keep arguing about that as well :-)
+
+I think we should create a Facebook group: 
+"against-the-soc-version-in-the-compatible-string".
+
+Regards,
+Benoit
