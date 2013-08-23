@@ -1,104 +1,55 @@
-From: rizhao@nvidia.com (Richard Zhao)
-Date: Fri, 23 Aug 2013 09:17:38 +0800
-Subject: [PATCH v2] DMA: add help function to check whether dma
- controller registered
-In-Reply-To: <52167665.90602@wwwdotorg.org>
-References: <1375423458-6868-1-git-send-email-rizhao@nvidia.com>
- <1377153781-18006-1-git-send-email-rizhao@nvidia.com>
- <52167665.90602@wwwdotorg.org>
-Message-ID: <20130823011738.GA17925@rizhao-lap>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 22 Aug 2013 21:26:21 -0400
+Subject: [PATCH 7/7] watchdog: orion: Update device-tree binding
+ documentation
+In-Reply-To: <1377182518-12554-8-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1377182518-12554-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377182518-12554-8-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130823012621.GD13964@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 04:36:53AM +0800, Stephen Warren wrote:
-> On 08/22/2013 12:43 AM, Richard Zhao wrote:
-> > DMA client device driver usually needs to know at probe time whether
-> > dma controller has been registered to deffer probe. So add a help
-> > function of_dma_check_controller.
-> > 
-> > DMA request channel functions can also used to check it, but they
-> > are usually called at open() time.
+On Thu, Aug 22, 2013 at 11:41:58AM -0300, Ezequiel Garcia wrote:
+> Change the 'reg' property meaning, by defining three required cells.
+> It's important to note this commit breaks DT-compatibility for this
+> device.
 > 
-> This new function is almost identical to the existing
-> of_dma_request_slave_channel(). Surely the code should be shared?
-ofdma->of_dma_xlate(&dma_spec, ofdma);
-The above is called holding of_dma_lock. If I want to abstract the
-common lines, there' two options.
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/watchdog/orion-wdt.txt | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+> index 5dc8d30..bb7f1a2 100644
+> --- a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+> @@ -3,7 +3,10 @@
+>  Required Properties:
+>  
+>  - Compatibility : "marvell,orion-wdt"
+> -- reg		: Address of the timer registers
+> +- reg		: Three cells are required.
+> +		  First  cell contains the global timer control register.
+> +		  Second cell contains the watchdog counter register.
+> +		  Third  cell contains the RSTOUT register.
+>  
+>  Optional properties:
+>  
+> @@ -13,7 +16,9 @@ Example:
+>  
+>  	wdt at 20300 {
+>  		compatible = "marvell,orion-wdt";
+> -		reg = <0x20300 0x28>;
+> +		reg = <0x20300 0x4
+> +		       0x20324 0x4
+> +		       0x20108 0x4>;
 
-Option 1:
-static struct of_dma* of_dma_check_controller_locked(np, name)
-{
-	parameter check
-	get dma-names count and check return value
-	for loop to get of_dma
-	return PTR_ERR(err) or of_dma
-}
+I don't like this.  It reaches outside of the wdt register.  I think a
+more clean way to do this is to do a provider/consumer relationship as
+in reset.txt.  eg, here you would retain the original reg binding, and
+add a reset phandle.
 
-struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
-					      const char *name)
-{
-	chan = null;
-	mutex_lock(&of_dma_lock);
-	of_dma = of_dma_check_controller_locked(np, name)
-	if(!IS_ERR(of_dma))
-		chan = ofdma->of_dma_xlate(&dma_spec, ofdma);
-	mutex_unlock(&of_dma_lock);
-	return chan;
-}
+thx,
 
-int of_dma_check_controller(struct device *dev, const char *name)
-{
-	mutex_lock(&of_dma_lock);
-	ofdma = of_dma_check_controller_locked(dev->of_node, name);
-	mutex_unlock(&of_dma_lock);
-	if (IS_ERR(ofdma))
-		return ERR_PTR(ofdma);
-	else
-		return 0;
-}
-
-Option 2:
-static struct of_dma* of_dma_check_controller_getlock(np, name)
-{
-	parameter check
-	get dma-names count and check return value
-	for loop to get of_dma, get lock at old place
-	if failed, unlock.
-	return PTR_ERR(err) or of_dma
-}
-
-struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
-					      const char *name)
-{
-}	of_dma = of_dma_check_controller_getlock(np, name)
-	if(!IS_ERR(of_dma)) {
-		chan = ofdma->of_dma_xlate(&dma_spec, ofdma);
-		unlock;
-	}
-	return chan;
-}
-
-int of_dma_check_controller(struct device *dev, const char *name)
-	ofdma = of_dma_check_controller_locked(dev->of_node, name);
-
-	if (IS_ERR(ofdma)) {
-		return ERR_PTR(ofdma);
-	} else {
-		unlock;
-		return 0;
-	}
-}
-
-> But that said, I don't see any need for a new function; why can't
-> drivers simply call of_dma_request_slave_channel() at probe time;
-It'll mislead user. channel supposed to be request at open time.
-
-> from
-> what I can see, that function doesn't actually request the channel, but
-> rather simply looks it up, just like this one. The only difference is
-> that of_dma_xlate() is also called, but that's just doing some data
-> transformation, not actually recording channel ownership.
-xlate function request the channel if things go well.
-
-Thanks
-Richard
+Jason.
