@@ -1,96 +1,69 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Aug 2013 08:53:06 +0200
-Subject: [PATCH 01/12] ARM: PJ4B: Add cpu_suspend/cpu_resume hooks for PJ4B
-In-Reply-To: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1377240797-4047-2-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri, 23 Aug 2013 08:53:05 +0200
+Subject: [PATCH 00/12] CPU idle for Armada XP
+Message-ID: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PJ4B needs extra instructions for suspend and resume, so instead of
-using the armv7 version, this commit introduces specific versions for
-PJ4B.
+Hello,
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/mm/proc-v7.S | 64 ++++++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 61 insertions(+), 3 deletions(-)
+This patch set adds the CPU idle support for Armada XP and prepares
+the support for Armada 370. This was based on the work of Nadav
+Haklai.
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 73398bc..715245e 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -162,9 +162,67 @@ ENDPROC(cpu_pj4b_do_idle)
- 	globl_equ	cpu_pj4b_do_idle,  	cpu_v7_do_idle
- #endif
- 	globl_equ	cpu_pj4b_dcache_clean_area,	cpu_v7_dcache_clean_area
--	globl_equ	cpu_pj4b_do_suspend,	cpu_v7_do_suspend
--	globl_equ	cpu_pj4b_do_resume,	cpu_v7_do_resume
--	globl_equ	cpu_pj4b_suspend_size,	cpu_v7_suspend_size
-+#ifdef CONFIG_ARM_CPU_SUSPEND
-+ENTRY(cpu_pj4b_do_suspend)
-+	stmfd	sp!, {r4 - r10, lr}
-+	mrc	p15, 0, r4, c13, c0, 0	@ FCSE/PID
-+	mrc	p15, 0, r5, c13, c0, 3	@ User r/o thread ID
-+	stmia	r0!, {r4 - r5}
-+	mrc	p15, 1, r6, c15, c1, 0  @ save CP15 - extra features
-+	mrc	p15, 1, r7, c15, c2, 0	@ save CP15 - Aux Func Modes Ctrl 0
-+	mrc	p15, 1, r8, c15, c1, 2	@ save CP15 - Aux Debug Modes Ctrl 2
-+	mrc	p15, 1, r9, c15, c1, 1  @ save CP15 - Aux Debug Modes Ctrl 1
-+	mrc	p15, 0, r10, c9, c14, 0  @ save CP15 - PMC
-+	stmia	r0!, {r6 - r10}
-+	mrc	p15, 0, r6, c3, c0, 0	@ Domain ID
-+	mrc	p15, 0, r7, c2, c0, 1	@ TTB 1
-+	mrc	p15, 0, r11, c2, c0, 2	@ TTB control register
-+	mrc	p15, 0, r8, c1, c0, 0	@ Control register
-+	mrc	p15, 0, r9, c1, c0, 1	@ Auxiliary control register
-+	mrc	p15, 0, r10, c1, c0, 2	@ Co-processor access control
-+	stmia	r0, {r6 - r11}
-+	ldmfd	sp!, {r4 - r10, pc}
-+ENDPROC(cpu_pj4b_do_suspend)
-+
-+ENTRY(cpu_pj4b_do_resume)
-+	mov	ip, #0
-+	mcr	p15, 0, ip, c7, c5, 0	@ invalidate I cache
-+	mcr	p15, 0, ip, c13, c0, 1	@ set reserved context ID
-+	ldmia	r0!, {r4 - r5}
-+	mcr	p15, 0, r4, c13, c0, 0	@ FCSE/PID
-+	mcr	p15, 0, r5, c13, c0, 3	@ User r/o thread ID
-+	ldmia	r0!, {r6 - r10}
-+	mcr	p15, 1, r6, c15, c1, 0  @ save CP15 - extra features
-+	mcr	p15, 1, r7, c15, c2, 0	@ save CP15 - Aux Func Modes Ctrl 0
-+	mcr	p15, 1, r8, c15, c1, 2	@ save CP15 - Aux Debug Modes Ctrl 2
-+	mcr	p15, 1, r9, c15, c1, 1  @ save CP15 - Aux Debug Modes Ctrl 1
-+	mcr	p15, 0, r10, c9, c14, 0  @ save CP15 - PMC
-+	ldmia	r0, {r6 - r11}
-+	mcr	p15, 0, ip, c8, c7, 0	@ invalidate TLBs
-+	mcr	p15, 0, r6, c3, c0, 0	@ Domain ID
-+#ifndef CONFIG_ARM_LPAE
-+	ALT_SMP(orr	r1, r1, #TTB_FLAGS_SMP)
-+	ALT_UP(orr	r1, r1, #TTB_FLAGS_UP)
-+#endif
-+	mcr	p15, 0, r1, c2, c0, 0	@ TTB 0
-+	mcr	p15, 0, r7, c2, c0, 1	@ TTB 1
-+	mcr	p15, 0, r11, c2, c0, 2	@ TTB control register
-+	ldr	r4, =PRRR		@ PRRR
-+	ldr	r5, =NMRR		@ NMRR
-+	mcr	p15, 0, r4, c10, c2, 0	@ write PRRR
-+	mcr	p15, 0, r5, c10, c2, 1	@ write NMRR
-+	mrc	p15, 0, r4, c1, c0, 1	@ Read Auxiliary control register
-+	teq	r4, r9			@ Is it already set?
-+	mcrne	p15, 0, r9, c1, c0, 1	@ No, so write it
-+	mcr	p15, 0, r10, c1, c0, 2	@ Co-processor access control
-+	isb
-+	dsb
-+	mov	r0, r8			@ control register
-+	b	cpu_resume_mmu
-+ENDPROC(cpu_pj4b_do_resume)
-+#endif
-+.globl	cpu_pj4b_suspend_size
-+.equ	cpu_pj4b_suspend_size, 4 * 13
- 
- #endif
- 
+Most of the patches modify the mvebu code in order to prepare the
+support for CPU idle, hence the patches 2 to 10 should go to mvebu
+subsystem (and then arm-soc).
+
+The first patch should go through ARM subsystem and should be taken
+by Russell King.
+
+The 11th patch 'cpuidle: mvebu: Add initial cpu idle support for
+Armada 370/XP SoC' is the only one who should go to the cpuidle
+subsystem. But of course I would like that Daniel Lezcano or Rafael
+J. Wysocki have a look on the whole series.
+
+The last patch should also go to mvebu subsystem (and then arm-soc)
+but with an Acked-by from on of the device tree maintainer.
+
+The whole series is also available in the branch CPU-idle-ArmadaXP at
+https://github.com/MISL-EBU-System-SW/mainline-public.git
+
+Thanks,
+
+Gregory CLEMENT (12):
+  ARM: PJ4B: Add cpu_suspend/cpu_resume hooks for PJ4B
+  ARM: mvebu: ll_set_cpu_coherent no more uses the coherency address as
+    parameter
+  ARM: mvebu: ll_set_cpu_coherent always uses the current CPU
+  ARM: mvebu: Remove the unused argument of set_cpu_coherent()
+  ARM: mvebu: Makes ll_set_cpu_coherent() more configurable
+  ARM: mvebu: Low level functions to disbale cache snooping
+  ARM: mvebu: Add a new set of registers for pmsu
+  ARM: mvebu: Allow to power down L2 cache controller in idle mode
+  ARM: mvebu: Add the PMSU related part of the cpu idle functions
+  ARM: mvebu: Set the start address of a CPU in a separate function
+  cpuidle: mvebu: Add initial cpu idle support for Armada 370/XP SoC
+  ARM: dts: mvebu: Add a new set of registers to the PMSU node
+
+ .../devicetree/bindings/arm/armada-370-xp-pmsu.txt |  12 +-
+ arch/arm/boot/dts/armada-xp.dtsi                   |   2 +-
+ arch/arm/mach-mvebu/coherency.c                    |  12 +-
+ arch/arm/mach-mvebu/coherency.h                    |   2 +-
+ arch/arm/mach-mvebu/coherency_ll.S                 |  69 +++++++++--
+ arch/arm/mach-mvebu/headsmp.S                      |  15 +--
+ arch/arm/mach-mvebu/platsmp.c                      |   2 +-
+ arch/arm/mach-mvebu/pmsu.c                         |  99 +++++++++++++++-
+ arch/arm/mm/proc-v7.S                              |  64 +++++++++-
+ drivers/cpuidle/Kconfig                            |   6 +
+ drivers/cpuidle/Makefile                           |   1 +
+ drivers/cpuidle/cpuidle-armada-370-xp.c            | 132 +++++++++++++++++++++
+ drivers/cpuidle/suspend-armada-370-xp.S            |  91 ++++++++++++++
+ include/linux/armada-370-xp-pmsu.h                 |  19 +++
+ 14 files changed, 484 insertions(+), 42 deletions(-)
+ create mode 100644 drivers/cpuidle/cpuidle-armada-370-xp.c
+ create mode 100644 drivers/cpuidle/suspend-armada-370-xp.S
+ create mode 100644 include/linux/armada-370-xp-pmsu.h
+
 -- 
 1.8.1.2
