@@ -1,70 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 23 Aug 2013 13:36:23 -0600
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for Freescale
- FTM PWM
-In-Reply-To: <20130823091052.GG3535@ulmo>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
- <20130823091052.GG3535@ulmo>
-Message-ID: <5217B9B7.9080802@wwwdotorg.org>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Sat, 24 Aug 2013 01:08:56 +0530
+Subject: [PATCH v6 0/5] cpsw: support for control module register
+In-Reply-To: <1377286330-29663-1-git-send-email-zonque@gmail.com>
+References: <1377286330-29663-1-git-send-email-zonque@gmail.com>
+Message-ID: <5217BA50.6050609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2013 03:10 AM, Thierry Reding wrote:
-> On Wed, Aug 21, 2013 at 11:07:42AM +0800, Xiubo Li wrote:
->> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com> --- 
->> .../devicetree/bindings/pwm/fsl-ftm-pwm.txt        | 52
->> ++++++++++++++++++++++ 1 file changed, 52 insertions(+) create
->> mode 100644
->> Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
+On Saturday 24 August 2013 01:02 AM, Daniel Mack wrote:
+> Hi,
+>
+> this is the 6th version of my patch set, the version history is below.
+>
+> Note that for personal reasons, I won't be able to work on that patch
+> set for two weeks, starting from a few hours from now. If there are any
+> more objections or comments, I'll catch up after that period. Or if
+> anyone wants to make minor changes to my patches and resubmit them,
+> I'd also be fine with that :)
+>
+> The compatibility discussion is still ongoing, but I'd rather submit
+> what I got until now, and I'm also still convinced that having
+> ti,am3352-cpsw is the best we can do.
+>
+>
+> Thanks,
+> Daniel
+>
+> v5 -> v6:
+> 	* re-add code to fail if 3rd memory region is given but invalid
+> 	* added Mugunthan's ack on all patches except the one that adds
+> 	  ti,am3352-cpsw
+> 	* remove parens around integer constants
+I am also in your favour of adding ti,am3352-cpsw, but lets get other
+comment. You can add my ack to that patch also if you are submitting
+another version.
 
->> diff --git
->> a/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
->> b/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
-
->> +Required properties: +- compatible: should be
->> "fsl,vf610-ftm-pwm" +- reg: physical base address and length of
->> the controller's registers +- #pwm-cells: Should be 3. Number of
->> cells being used to specify PWM property. +  First cell specifies
->> the per-chip channel index of the PWM to use, the +  second cell
->> is the period in nanoseconds and bit 0 in the third cell is +
->> used to encode the polarity of PWM output. Set bit 0 of the third
->> in PWM +  specifier to 1 for inverse polarity & set to 0 for
->> normal polarity.
-
-Lines 2..n of a property description should be indented so it's easier
-to see where each entry in the list starts.
-
->> +- fsl,pwm-clk-ps: the ftm0 pwm clock's prescaler, divide-by
->> 2^n(n = 0 ~ 7). +- fsl,pwm-cpwm: Center-Aligned PWM (CPWM) mode.
-
->> +- fsl,pwm-number: the number of PWM devices, and is must equal
->> to the number +  of "fsl,pwm-channels".
-
-Isn't that value a static facet of the HW, and hence it can be
-determined solely from the compatible value?
-
->> +- fsl,pwm-channels: the channels' order which is be used for pwm
->> in ftm0 +  module, and they must be one or some of 0 ~ 7, because
->> the ftm0 only has +  8 channels can be used.
-
-Why is there a need to re-order the channels? Why not simply reference
-the actual physical channel IDs in client nodes?
-
->> +- for very channel, the revlatived the pinctrl should be at
->> least two state +  {"enN", "dsN"}, which "en" means "enable",
->> "ds" means "disable" and "N" +  means the order of the channel.
-
-revlatived??
-
-Why is there a need for pinctrl interaction at all?
-
-Is the "N" in these property names the index into fsl,pwm-channels, or
-the physical channel number in the controller HW, or something else?
-
-"dis" would be better than "ds", although "enable-chN", "disable-chN"
-would be even better.
-
-Note that it's not possible to enable multiple pinctrl states at once,
-so what happens when channel 0 is enabled, yet channel 1 is disabled,
-and you want to enable "en0" and "ds1" at the same time?
+Regards
+Mugunthan V N
