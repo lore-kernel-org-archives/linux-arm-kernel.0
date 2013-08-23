@@ -1,37 +1,36 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 23 Aug 2013 12:32:30 +0200
-Subject: [RFC 08/17] ARM: mvebu: remove custom .init_time hook
-In-Reply-To: <52173408.1000702@free-electrons.com>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376964271-22715-9-git-send-email-sebastian.hesselbarth@gmail.com>
- <52173408.1000702@free-electrons.com>
-Message-ID: <52173A3E.2040509@gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 23 Aug 2013 13:38:02 +0300
+Subject: [PATCH v3 1/3] ARM: Introduce atomic MMIO modify
+In-Reply-To: <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1377253445-2842-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130823103802.GO4600@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/13 12:06, Gregory CLEMENT wrote:
-> On 20/08/2013 04:04, Sebastian Hesselbarth wrote:
->> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
->> remove custom .init_time hooks.
->
-> As a feared it won't work on Armada XP. You moved coherency_init(), and
-> l2x0_of_init() in the init_machine hook. However init_machine is an
-> arch_initcall, and as all the initcall it is called at the end of the
-> do_basic_setup() which is called after smp_prepare_cpus(). The issue is
-> that smp_prepare_cpus need coherency (and I think L2 cache) already enable.
+HI Ezequiel,
 
-Ok, I see. I remember mvebu smp relies on mbus mappings also? Can you
-try below as replacement for the mach-mvebu/armada-370-xp.c changes?
+On Fri, Aug 23, 2013 at 07:24:03AM -0300, Ezequiel Garcia wrote:
+> Some SoC have MMIO regions that are shared across orthogonal
+> subsystems. This commit implements a possible solution for the
+> thread-safe access of such regions through a spinlock-protected API.
+> 
+> Concurrent access is protected with a single spinlock for the
+> entire MMIO address space. While this protects shared-registers,
+> it also serializes access to unrelated/unshared registers.
+> 
+> We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
+> respectively. The rationale for this is that some users may not require
+> register write completion but only thread-safe access to a register.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-It will move coherency_init(), l2x0_of_init(), and mvebu_mbus_dt_init()
-to .init_early hook.
+Is there a reason why this should be limited to ARM? I haven't found anything 
+ARM specific in the code.
 
-Sebastian
+baruch
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: arm-of_clk_init-mvebu-proposal.diff
-Type: text/x-patch
-Size: 1292 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/dee253c6/attachment-0001.bin>
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
