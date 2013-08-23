@@ -1,55 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 22 Aug 2013 21:26:21 -0400
-Subject: [PATCH 7/7] watchdog: orion: Update device-tree binding
- documentation
-In-Reply-To: <1377182518-12554-8-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377182518-12554-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377182518-12554-8-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130823012621.GD13964@titan.lakedaemon.net>
+From: rizhao@nvidia.com (Richard Zhao)
+Date: Fri, 23 Aug 2013 09:29:11 +0800
+Subject: [PATCH] DMA: let filter functions of of_dma_simple_xlate
+ possible check of_node
+In-Reply-To: <52167213.6090604@wwwdotorg.org>
+References: <1375408800-11789-1-git-send-email-rizhao@nvidia.com>
+ <20130822051904.GA2685@rizhao-lap> <52167213.6090604@wwwdotorg.org>
+Message-ID: <20130823012911.GB17925@rizhao-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 11:41:58AM -0300, Ezequiel Garcia wrote:
-> Change the 'reg' property meaning, by defining three required cells.
-> It's important to note this commit breaks DT-compatibility for this
-> device.
+On Fri, Aug 23, 2013 at 04:18:27AM +0800, Stephen Warren wrote:
+> On 08/21/2013 11:19 PM, Richard Zhao wrote:
+> > On Fri, Aug 02, 2013 at 10:00:00AM +0800, Richard Zhao wrote:
+> >> pass of_phandle_args dma_spec to dma_request_channel in of_dma_simple_xlate,
+> >> so the filter function could access of_node in of_phandle_args.
+> >>
+> >> It also remove restriction of #dma-cells has to be one.
+> >>
+> >> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
+> >> ---
+> >>  drivers/dma/edma.c     |  7 +++++--
+> >>  drivers/dma/of-dma.c   | 10 ++++------
+> >>  drivers/dma/omap-dma.c |  6 ++++--
+> >>  3 files changed, 13 insertions(+), 10 deletions(-)
+> >>
+> > 
+> > Hi Vinod,
+> > 
+> > Can you please pick up this change?
+> > 
+> > Hi Stephen,
+> > 
+> > Can you please give a ack or reviewed-by etc?
 > 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/watchdog/orion-wdt.txt | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
+> Hmm. Looking at the patch, I'm not sure it's right.
 > 
-> diff --git a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-> index 5dc8d30..bb7f1a2 100644
-> --- a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-> @@ -3,7 +3,10 @@
->  Required Properties:
->  
->  - Compatibility : "marvell,orion-wdt"
-> -- reg		: Address of the timer registers
-> +- reg		: Three cells are required.
-> +		  First  cell contains the global timer control register.
-> +		  Second cell contains the watchdog counter register.
-> +		  Third  cell contains the RSTOUT register.
->  
->  Optional properties:
->  
-> @@ -13,7 +16,9 @@ Example:
->  
->  	wdt at 20300 {
->  		compatible = "marvell,orion-wdt";
-> -		reg = <0x20300 0x28>;
-> +		reg = <0x20300 0x4
-> +		       0x20324 0x4
-> +		       0x20108 0x4>;
+> This patch simply passes all the specfier args to the filter function,
+> and the code to check the equality of the of_node to the filter args is
+> still duplicated in each DMA driver. Instead, the DMA core should be
+> implementing the equality check, and only even calling the
+> driver-specific filter function for devices where the client's phandle
+> matches the DMA providing device's of_node handle.
 
-I don't like this.  It reaches outside of the wdt register.  I think a
-more clean way to do this is to do a provider/consumer relationship as
-in reset.txt.  eg, here you would retain the original reg binding, and
-add a reset phandle.
+Filter function is called in dmaengine core code, independent of dt.
+And the reason why the driver has to write its own filter function is
+it has to store slave id there in its own way.
 
-thx,
-
-Jason.
+Thanks
+Richard
