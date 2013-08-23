@@ -1,32 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 23 Aug 2013 13:01:56 +0100
-Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
-In-Reply-To: <52174D25.9050805@gmail.com>
-References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
- <201308222229.01778.marex@denx.de>
- <20130822233611.GA25263@sirena.org.uk>
- <201308230158.05909.marex@denx.de>
- <20130823094141.GE25263@sirena.org.uk> <52174BAC.3070901@gmail.com>
- <52174D25.9050805@gmail.com>
-Message-ID: <20130823120156.GH25263@sirena.org.uk>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 23 Aug 2013 14:08:37 +0200
+Subject: [PATCH v2 5/5] ARM: dts: am33xx: adopt to cpsw changes
+In-Reply-To: <52172E12.2000908@ti.com>
+References: <1377247417-27386-1-git-send-email-zonque@gmail.com>
+ <1377247417-27386-6-git-send-email-zonque@gmail.com>
+ <52172B54.8020201@ti.com> <52172CB0.9030204@gmail.com>
+ <52172E12.2000908@ti.com>
+Message-ID: <521750C5.3080209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 04:53:09AM -0700, Brian Norris wrote:
-> On 08/23/2013 04:46 AM, Brian Norris wrote:
+On 23.08.2013 11:40, Sekhar Nori wrote:
+> On Friday 23 August 2013 03:04 PM, Daniel Mack wrote:
+>> On 23.08.2013 11:28, Sekhar Nori wrote:
 
-> >     Signed-off-by: wangyuhang <wangyuhang2014@gmail.com>
-> >     Signed-off-by: Mark Brown <broonie@linaro.org>
+>> Ok, thanks. Given that this last patch will be merged through another
+>> tree, can I just resend it separately, while David takes the rest as it is?
+> 
+> Ideally you could, but there are some bugs in the way compatible string
+> in handled and due to this I suspect you need to reorder
+> cpsw_of_mtable[] to match correctly. Not sure if the bug has been fixed
+> in recent -rcs. Please check if modifying just this patch works and then
+> go ahead and post.
 
-> Speaking of which, the new device-tree properties are not documented
-> in Documentation/devicetree/bindings/spi/spi-bus.txt yet.
+No, you're right. I had to swap the two entries. Thanks for mentioning it.
 
-Yes, indeed - if you look at the review you'll see I asked for a
-followup patch doing that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/21873702/attachment.sig>
+> Please Cc Benoit Cousson <bcousson@baylibre.com> on your next submission
+> as he is the one who picks up DT patches for OMAP.
+
+Will do.
+
+
+
+Daniel
