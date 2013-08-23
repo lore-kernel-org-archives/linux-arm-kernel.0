@@ -1,41 +1,42 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 23 Aug 2013 07:49:50 -0300
-Subject: [PATCH v3 2/3] clocksource: orion: Use atomic access for shared
- registers
-In-Reply-To: <20130823103857.GP4600@tarshish>
+Date: Fri, 23 Aug 2013 08:07:50 -0300
+Subject: [PATCH v3 1/3] ARM: Introduce atomic MMIO modify
+In-Reply-To: <20130823103802.GO4600@tarshish>
 References: <1377253445-2842-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377253445-2842-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130823103857.GP4600@tarshish>
-Message-ID: <20130823104949.GC2389@localhost>
+ <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130823103802.GO4600@tarshish>
+Message-ID: <20130823110748.GD2389@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 01:38:57PM +0300, Baruch Siach wrote:
-> Hi Ezequiel,
+On Fri, Aug 23, 2013 at 01:38:02PM +0300, Baruch Siach wrote:
+> HI Ezequiel,
 > 
-> On Fri, Aug 23, 2013 at 07:24:04AM -0300, Ezequiel Garcia wrote:
-> > Replace the driver-specific thread-safe shared register API
-> > by the recently introduced atomic_io_clear_set().
+> On Fri, Aug 23, 2013 at 07:24:03AM -0300, Ezequiel Garcia wrote:
+> > Some SoC have MMIO regions that are shared across orthogonal
+> > subsystems. This commit implements a possible solution for the
+> > thread-safe access of such regions through a spinlock-protected API.
+> > 
+> > Concurrent access is protected with a single spinlock for the
+> > entire MMIO address space. While this protects shared-registers,
+> > it also serializes access to unrelated/unshared registers.
+> > 
+> > We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
+> > respectively. The rationale for this is that some users may not require
+> > register write completion but only thread-safe access to a register.
 > > 
 > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > 
-> [...]
-> 
-> > @@ -131,7 +121,9 @@ static void __init orion_timer_init(struct device_node 
-> >   *np)
-> >  	/* setup timer0 as free-running clocksource */
-> >  	writel(~0, timer_base + TIMER0_VAL);
-> >  	writel(~0, timer_base + TIMER0_RELOAD);
-> > -	orion_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | TIMER0_EN);
-> > +	oatomic_io_modify(timer_base + TIMER_CTRL,
-> 
-> oatomic? Are you sure this code builds?
+> Is there a reason why this should be limited to ARM? I haven't found anything 
+> ARM specific in the code.
 > 
 
-Argh, no. I wasn't building the proper configuration/tree
-and thus this clocksource driver wasn't being used.
+I guess not.
 
-Thanks for the catch!
+Any suggestions on where this could be located?
+I can't find a suitable file in kernel/, maybe in a new file kernel/io.c?
+
+Does this make any sense?
 -- 
 Ezequiel Garc?a, Free Electrons
 Embedded Linux, Kernel and Android Engineering
