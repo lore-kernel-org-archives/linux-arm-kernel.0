@@ -1,99 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 23 Aug 2013 18:59:36 +0200
-Subject: [PATCH v2 2/4] iio: at91: Use different prescal, startup mask in
- MR for different IP
-In-Reply-To: <20130823154603.GA7468@ludovic.desroches@atmel.com>
-References: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
- <1376219071-29946-3-git-send-email-josh.wu@atmel.com>
- <20130815192044.GD12162@lukather> <5215DF2C.3050502@atmel.com>
- <5215DF7C.2020909@atmel.com>
- <20130823154603.GA7468@ludovic.desroches@atmel.com>
-Message-ID: <20130823165936.GC1230@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 23 Aug 2013 17:54:53 +0100
+Subject: [GIT PULL 2/5] ARM: imx: soc changes for 3.12
+In-Reply-To: <CAGa+x85rvPTh3NyhY6rEtBN77gq6zVAW_TvT8k_fg9JbZGtJOw@mail.gmail.com>
+References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
+ <1376833688-24542-2-git-send-email-shawn.guo@linaro.org>
+ <87li3tvnj8.fsf@linaro.org> <20130823101114.GM6617@n2100.arm.linux.org.uk>
+ <CAGa+x85rvPTh3NyhY6rEtBN77gq6zVAW_TvT8k_fg9JbZGtJOw@mail.gmail.com>
+Message-ID: <20130823165453.GP6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic, Josh,
-
-On Fri, Aug 23, 2013 at 05:46:03PM +0200, Desroches, Ludovic wrote:
-> On Thu, Aug 22, 2013 at 05:53:00PM +0800, Josh Wu wrote:
-> > On 8/22/2013 5:51 PM, Josh Wu wrote:
-> > >Hi, Maxime
-> > >
-> > >On 8/16/2013 3:20 AM, Maxime Ripard wrote:
-> > >>Hi Josh,
-> > >>
-> > >>On Sun, Aug 11, 2013 at 07:04:29PM +0800, Josh Wu wrote:
-> > >>>For at91 boards, there are different IPs for adc. Different IPs has
-> > >>>different STARTUP & PRESCAL mask in ADC_MR.
-> > >>>
-> > >>>This patch introduce the multiple compatible string for those
-> > >>>different IPs.
-> > >>>
-> > >>>Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> > >>Overall it looks like the right ways, but I think we can take it a step
-> > >>further.
-> > >>
-> > >>I'd drop at least the atmel,adc-drdy-mask, atmel,adc-num-channels,
-> > >>atmel,adc-status-register, atmel,adc-trigger-register properties (and
-> > >>probably the triggers as well description as well).
-> > >
-> > >yeah, right. Currently I want to drop following:
-> > >
-> > >atmel,adc-drdy-mask, atmel,adc-status-register,
-> > >atmel,adc-trigger-register, atmel,adc-channel-base
-> > >
-> > >For the adc-num-channels, I'd like to leave it in dt parameters.
-> > >It is a description for an adc capablity.
+On Fri, Aug 23, 2013 at 09:47:44AM -0700, Kevin Hilman wrote:
+> OK, good. I didn't realize you did all the conversions.  I thought you
+> did a few to set the example and wanted others to finish converting.
 > 
-> About this parameter, I'll remove it too from the dt bindings. To set it you
-> need to have a look to the datasheet and to copy a constant value into the
-> dt. From my point of view, it means than this parameter should be managed by
-> the driver and by the dt.
-> 
-> On the other side since there are some dynamic allocation depending on this
-> parameter maybe it makes sense to keep it in the dt. If the user wants to use
-> only 2 channels why doing allocation for max channel number. By the way, this
-> case is only valid if he uses the two first channels.
+> Thanks for the cleanup,
 
-I don't recall it very well, is there any reason to not have it in the
-DT? Can the ADC channels be used for something else? Or is it just some
-IP-specific number of channels?
+It's the full thing - which is why I'm eager for there not to be residual
+work.
 
-> > >
-> > >For the triggers, I am not decided. An obvious benifit to remove
-> > >trigger in dt will save many lines of code.
-> > >
-> > >>
-> > >>Maxime
-> > >>
-> > >
-> > >Best Regards,
-> > >Josh Wu
-> >
-> 
-> Since we are talking about reworking this binding I was thinking about
-> resolution stuff. Filling atmel,adc-res is also copying constant value from
-> the device datasheet, so if I was consistent I would say it has to be removed
-> too. But I am not consistent! I mean by doing this the only thing the user
-> will have to fill is the resolution value. He can't set the value he wants,
-> there are only two choices. By keeping it into the dt then he will immediately
-> see the choices he has.
-
-But the resolution should probably be somehow user-defined, probably not
-really related to the DT has well. I think some other IIO ADC drivers
-are using sysfs files for this purpose, maybe that would be a better
-fit?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/36edda68/attachment.sig>
+Most of the debug stuff is self-contained, so there shouldn't be a problem
+if people want to send me their debug additions directly rather than
+feeding them to arm-soc.
