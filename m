@@ -1,120 +1,70 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 23 Aug 2013 19:33:45 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP: miscellaneous PRCM and hwmod updates for v3.12
-Message-ID: <alpine.DEB.2.02.1308231932400.22768@utopia.booyaka.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 23 Aug 2013 13:36:23 -0600
+Subject: [PATCH 4/4] Documentation: Add device tree bindings for Freescale
+ FTM PWM
+In-Reply-To: <20130823091052.GG3535@ulmo>
+References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
+ <20130823091052.GG3535@ulmo>
+Message-ID: <5217B9B7.9080802@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On 08/23/2013 03:10 AM, Thierry Reding wrote:
+> On Wed, Aug 21, 2013 at 11:07:42AM +0800, Xiubo Li wrote:
+>> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com> --- 
+>> .../devicetree/bindings/pwm/fsl-ftm-pwm.txt        | 52
+>> ++++++++++++++++++++++ 1 file changed, 52 insertions(+) create
+>> mode 100644
+>> Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
 
-Hi Tony
+>> diff --git
+>> a/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
+>> b/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
 
-The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
+>> +Required properties: +- compatible: should be
+>> "fsl,vf610-ftm-pwm" +- reg: physical base address and length of
+>> the controller's registers +- #pwm-cells: Should be 3. Number of
+>> cells being used to specify PWM property. +  First cell specifies
+>> the per-chip channel index of the PWM to use, the +  second cell
+>> is the period in nanoseconds and bit 0 in the third cell is +
+>> used to encode the polarity of PWM output. Set bit 0 of the third
+>> in PWM +  specifier to 1 for inverse polarity & set to 0 for
+>> normal polarity.
 
-  Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
+Lines 2..n of a property description should be indented so it's easier
+to see where each entry in the list starts.
 
-are available in the git repository at:
+>> +- fsl,pwm-clk-ps: the ftm0 pwm clock's prescaler, divide-by
+>> 2^n(n = 0 ~ 7). +- fsl,pwm-cpwm: Center-Aligned PWM (CPWM) mode.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.12/omap-prcm-hwmod
+>> +- fsl,pwm-number: the number of PWM devices, and is must equal
+>> to the number +  of "fsl,pwm-channels".
 
-for you to fetch changes up to 4514b4d7fcad2a84066c73966c6a7823ea1b3749:
+Isn't that value a static facet of the HW, and hence it can be
+determined solely from the compatible value?
 
-  Merge branches 'hwmod_devel_v3.12', 'prcm_devel_v3.12' and 'am33xx_devel_v3.12' into prcm_a_for_v3.12 (2013-08-23 12:49:48 -0600)
+>> +- fsl,pwm-channels: the channels' order which is be used for pwm
+>> in ftm0 +  module, and they must be one or some of 0 ~ 7, because
+>> the ftm0 only has +  8 channels can be used.
 
-- ----------------------------------------------------------------
+Why is there a need to re-order the channels? Why not simply reference
+the actual physical channel IDs in client nodes?
 
-Various OMAP PRCM & hwmod fixes and improvements.  Notable changes
-include:
+>> +- for very channel, the revlatived the pinctrl should be at
+>> least two state +  {"enN", "dsN"}, which "en" means "enable",
+>> "ds" means "disable" and "N" +  means the order of the channel.
 
-- - a fix for OMAP4 PLL locking to avoid a bootloader dependency that
-  causes nasty log spew on startup
+revlatived??
 
-- - AM33xx DEBUGSS support fixes in hwmod data
+Why is there a need for pinctrl interaction at all?
 
-- - OMAP5 mailbox support in hwmod data
+Is the "N" in these property names the index into fsl,pwm-channels, or
+the physical channel number in the controller HW, or something else?
 
-Basic test logs are here:
+"dis" would be better than "ds", although "enable-chN", "disable-chN"
+would be even better.
 
-http://www.pwsan.com/omap/testlogs/prcm_a_for_v3.12/20130823125002/
-
-Note that the 3530 failure is due to the mysterious transient serial
-issue affecting 3530 for several releases now, which causes a log
-parsing failure.  PM still seems to work.
-
-- ----------------------------------------------------------------
-Aida Mynzhasova (1):
-      ARM: OMAP: TI81XX: add always-on powerdomain for TI81XX
-
-Jon Hunter (1):
-      ARM: OMAP2+: Only write the sysconfig on idle when necessary
-
-Lokesh Vutla (1):
-      ARM: OMAP: AM33xx: clock: Add RNG clock data
-
-Paul Walmsley (1):
-      Merge branches 'hwmod_devel_v3.12', 'prcm_devel_v3.12' and 'am33xx_devel_v3.12' into prcm_a_for_v3.12
-
-Rajendra Nayak (1):
-      ARM: OMAP4: clock: Lock PLLs in the right sequence
-
-Suman Anna (1):
-      ARM: OMAP5: hwmod data: Add mailbox data
-
-Vaibhav Hiremath (1):
-      ARM: OMAP: AM33XX: hwmod: Add hwmod data for debugSS
-
- arch/arm/mach-omap2/cclock33xx_data.c       |  5 +++
- arch/arm/mach-omap2/cclock44xx_data.c       | 20 +++++----
- arch/arm/mach-omap2/omap_hwmod.c            |  4 +-
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c  | 69 ++++++++++++++++++++---------
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c  | 42 ++++++++++++++++++
- arch/arm/mach-omap2/powerdomains3xxx_data.c |  8 ++++
- arch/arm/mach-omap2/prcm-common.h           |  1 +
- 7 files changed, 118 insertions(+), 31 deletions(-)
-
-vmlinux object size
-(delta in bytes from test_v3.11-rc6 (b36f4be3de1b123d8601de062e7dbfc904f305fb)):
-   text     data      bss    total  kernel
-     -4      -24        0      -28  n800_multi_omap2xxx
-    +28        0        0      +28  n800_only_a
-      0        0        0        0  omap1_defconfig
-      0        0        0        0  omap1_defconfig_1510innovator_only
-      0        0        0        0  omap1_defconfig_5912osk_only
-     -4     +928        0     +924  omap2plus_defconfig
-     -4        0        0       -4  omap2plus_defconfig_2430sdp_only
-     -4     +928        0     +924  omap2plus_defconfig_cpupm
-     -4     +904        0     +900  omap2plus_defconfig_no_pm
-     -4        0        0       -4  omap2plus_defconfig_omap2_4_only
-     -4     +352        0     +348  omap2plus_defconfig_omap3_4_only
-    +16     +192      -16     +192  rmk_omap3430_ldp_allnoconfig
-    +32     +256        0     +288  rmk_omap3430_ldp_oldconfig
-    +32        0        0      +32  rmk_omap4430_sdp_allnoconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.11-rc6 (b36f4be3de1b123d8601de062e7dbfc904f305fb))
-  avail  rsrvd   high  freed  board          kconfig
-    -4k     4k      .      .  2430sdp        omap2plus_defconfig
-    -4k     4k      .      .  3517evm        omap2plus_defconfig
-    -4k     4k      .      .  3530es3beagle  omap2plus_defconfig
-    -4k     4k      .      .  3730beaglexm   omap2plus_defconfig
-    -4k     4k      .      .  37xxevm        omap2plus_defconfig
-    -4k     4k      .      .  am335xbonelt   am33xx_only
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.14 (GNU/Linux)
-
-iQIcBAEBAgAGBQJSF7jEAAoJEMePsQ0LvSpLdt0P/jMPV4b9/ZyFHs82JRLKwtKY
-e0uGdCr1B1ZNm1BG+zaybDeG3pCWnwucWVrCN6Ezv7RA1REFQnoKE6e2f2TQ7UBS
-evb5kRm70A6MKO325Rdr4TcSusm3sNyKcFovs7rrZkjnXwNNDNjtj5VlpWcmEixy
-PRxeLSKzCMmobej+fiohCjvAL3CCyihlNL4rfqZBg2zIrQlxOrs6En/c0kOPI7Od
-tPxNn+PijqoO8gD3rJaZYKAZ0McoHnWjfReDbNSyUiGZ5nrRAY+83IVc5E6J+oLY
-YWU+U+V7AlfpS187T4bbjlZojq1pa2VvW3lGoWdUlevhADtDxzar488DF5GUTN59
-dtFTCQTG5e7TkKfHfYNLqffjCmxi9Z4vuV/iUY64YOaJB8VwK6H6it0sZuEFR8mU
-60wo5V0/aA0zD12SvdlhszkG1fOpTDRfJcPK2IHfWaRR8uh0vG4DMrAFUqEYbt4P
-89eQlWjSqIhgD+pc4rBWopoWYbNkTHZa4GjNpSaLQmo+RCbYho2AztcrPaZfYGW7
-gKE1cje1TriyJOEvXJa0TCOBWxANA1PjOyYsn9xbbNxrwjOPsWWxmJ0O42gYmKjo
-0FjhLGqzL6cv33KYKhxuHVWPjIH2nfG7/+z1f6t223yC1IHCde3BWT3aCx7wyfhM
-Z/2//I/xV7uzYiwq3vJe
-=03zX
------END PGP SIGNATURE-----
+Note that it's not possible to enable multiple pinctrl states at once,
+so what happens when channel 0 is enabled, yet channel 1 is disabled,
+and you want to enable "en0" and "ds1" at the same time?
