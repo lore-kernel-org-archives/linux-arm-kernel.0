@@ -1,94 +1,22 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 23 Aug 2013 11:10:52 +0200
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM
-In-Reply-To: <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
+Date: Fri, 23 Aug 2013 11:13:09 +0200
+Subject: [PATCH 2/4] ARM: dts: Add Freescale ftm pwm node for VF610.
+In-Reply-To: <1377054462-6283-3-git-send-email-Li.Xiubo@freescale.com>
 References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20130823091052.GG3535@ulmo>
+ <1377054462-6283-3-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20130823091309.GH3535@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 11:07:42AM +0800, Xiubo Li wrote:
+On Wed, Aug 21, 2013 at 11:07:40AM +0800, Xiubo Li wrote:
 > Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 > ---
->  .../devicetree/bindings/pwm/fsl-ftm-pwm.txt        | 52 ++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
+>  arch/arm/boot/dts/vf610.dtsi | 83 +++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 82 insertions(+), 1 deletion(-)
 
-It used to be that device tree bindings documentation was squashed into
-the same commit as the driver. I see some point in splitting this up
-given that this will eventually go into a completely separate tree, but
-I just want to make sure this is now the official way of splitting
-patches so I can tell that to people in good conscience.
-
-> diff --git a/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt b/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
-> new file mode 100644
-> index 0000000..698965b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
-> @@ -0,0 +1,52 @@
-> +Freescale FTM PWM controller
-> +
-> +Required properties:
-> +- compatible: should be "fsl,vf610-ftm-pwm"
-> +- reg: physical base address and length of the controller's registers
-> +- #pwm-cells: Should be 3. Number of cells being used to specify PWM property.
-> +  First cell specifies the per-chip channel index of the PWM to use, the
-> +  second cell is the period in nanoseconds and bit 0 in the third cell is
-> +  used to encode the polarity of PWM output. Set bit 0 of the third in PWM
-> +  specifier to 1 for inverse polarity & set to 0 for normal polarity.
-> +- fsl,pwm-clk-ps: the ftm0 pwm clock's prescaler, divide-by 2^n(n = 0 ~ 7).
-> +- fsl,pwm-cpwm: Center-Aligned PWM (CPWM) mode.
-> +- fsl,pwm-number: the number of PWM devices, and is must equal to the number
-> +  of "fsl,pwm-channels".
-> +- fsl,pwm-channels: the channels' order which is be used for pwm in ftm0
-> +  module, and they must be one or some of 0 ~ 7, because the ftm0 only has
-> +  8 channels can be used.
-> +- for very channel, the revlatived the pinctrl should be at least two state
-> +  {"enN", "dsN"}, which "en" means "enable", "ds" means "disable" and "N"
-> +  means the order of the channel.
-
-This is missing a description of the clocks and clock-names properties.
-
-> +
-> +Example:
-> +
-> +pwm0: pwm at 40038000 {
-> +	      compatible = "fsl,vf610-ftm-pwm";
-> +	      reg = <0x40038000 0x1000>;
-> +	      #pwm-cells = <3>;
-> +	      pinctrl-names = "en0", "ds0", "en3", "ds3";
-> +	      pinctrl-0 = <&pinctrl_pwm0_ch0_en>;
-> +	      pinctrl-1 = <&pinctrl_pwm0_ch0_ds>;
-> +	      pinctrl-2 = <&pinctrl_pwm0_ch3_en>;
-> +	      pinctrl-3 = <&pinctrl_pwm0_ch3_ds>;
-> +	      fsl,pwm-clk-ps = <7>;
-> +	      fsl,pwm-cpwm = <0>;
-> +	      fsl,pwm-number = <2>;
-> +	      fsl,pwm-channels = <0 3>;
-> +	      ...
-
-And this mixes tabs and spaces for indentation.
-
-> +      };
-> +
-> +leds {
-> +	compatible = "pwm-leds";
-> +	led {
-> +		label = "fsl_led";
-> +		pwms = <&pwm0 0 10000000 0>;
-> +		max-brightness = <127>;
-> +	};
-> +	backlight {
-> +		label = "fsl_backlight";
-> +		pwms = <&pwm0 3 10000000 1>;
-> +		max-brightness = <100>;
-> +	};
-
-I don't think I like this at all. This example suggests to use the
-pwm-leds driver for backlight control. Why not use pwm-backlight
-instead?
+Please also pay attention to the correct capitalization in the subject
+here. "FTM" and "PWM". Furthermore this could probably use more than a
+single line as patch description.
 
 Thierry
 -------------- next part --------------
@@ -97,4 +25,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/033cb054/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/53e06f03/attachment-0001.sig>
