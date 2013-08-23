@@ -1,56 +1,65 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Aug 2013 15:05:07 +0200
-Subject: [PATCH 33/40] ARM: ux500: Don't register the STMPE/SKE when
- booting with ATAG support
-In-Reply-To: <CACRpkdZdzF-HqTmEWpYiBe2VwGN23fsnWCr7aqE0NYWpBfHsfw@mail.gmail.com>
-References: <1377260620-18829-1-git-send-email-lee.jones@linaro.org>
- <1377260620-18829-34-git-send-email-lee.jones@linaro.org>
- <CACRpkdZdzF-HqTmEWpYiBe2VwGN23fsnWCr7aqE0NYWpBfHsfw@mail.gmail.com>
-Message-ID: <CACRpkdZE1yCPO0JVXX88SUKsp3ow7WBuJZZ=BEVk-c5=TOUO-A@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 23 Aug 2013 10:07:35 -0300
+Subject: [PATCH 7/7] watchdog: orion: Update device-tree binding
+ documentation
+In-Reply-To: <52175C21.603@gmail.com>
+References: <1377182518-12554-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377182518-12554-8-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130823012621.GD13964@titan.lakedaemon.net>
+ <20130823100450.GA2389@localhost> <20130823125311.GH2389@localhost>
+ <52175C21.603@gmail.com>
+Message-ID: <20130823130734.GI2389@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 2:55 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Aug 23, 2013 at 2:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
->
->> It's time to remove all ATAG support from ux500 and rely solely on
->> Device Tree booting. This patch is part of that endeavour.
->>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> (...)
->> -/* STMPE/SKE keypad use this key layout */
->> -static const unsigned int mop500_keymap[] = {
->> -       KEY(2, 5, KEY_END),
->> -       KEY(4, 1, KEY_POWER),
->> -       KEY(3, 5, KEY_VOLUMEDOWN),
->> -       KEY(1, 3, KEY_3),
->> -       KEY(5, 2, KEY_RIGHT),
->> -       KEY(5, 0, KEY_9),
->> -
->> -       KEY(0, 5, KEY_MENU),
->> -       KEY(7, 6, KEY_ENTER),
->> -       KEY(4, 5, KEY_0),
->> -       KEY(6, 7, KEY_2),
->> -       KEY(3, 4, KEY_UP),
->> -       KEY(3, 3, KEY_DOWN),
->> -
->> -       KEY(6, 4, KEY_SEND),
->> -       KEY(6, 2, KEY_BACK),
->> -       KEY(4, 2, KEY_VOLUMEUP),
->> -       KEY(5, 5, KEY_1),
->> -       KEY(4, 3, KEY_LEFT),
->> -       KEY(3, 2, KEY_7),
->> -};
->
-> This STMPE1601 keypad @0x40 and UIB encoding for
-> the U8500 UIB does not exist in any DTS file does it? This
-> means that the support for this UIB is effectively terminated.
+On Fri, Aug 23, 2013 at 02:57:05PM +0200, Sebastian Hesselbarth wrote:
+> On 08/23/13 14:53, Ezequiel Garcia wrote:
+> > On Fri, Aug 23, 2013 at 07:04:51AM -0300, Ezequiel Garcia wrote:
+> >> On Thu, Aug 22, 2013 at 09:26:21PM -0400, Jason Cooper wrote:
+> >>> On Thu, Aug 22, 2013 at 11:41:58AM -0300, Ezequiel Garcia wrote:
+> >>>> diff --git a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+> >>>> index 5dc8d30..bb7f1a2 100644
+> >>>> --- a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+> >>>> +++ b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+> >>>> @@ -13,7 +16,9 @@ Example:
+> >>>>
+> >>>>   	wdt at 20300 {
+> >>>>   		compatible = "marvell,orion-wdt";
+> >>>> -		reg = <0x20300 0x28>;
+> >>>> +		reg = <0x20300 0x4
+> >>>> +		       0x20324 0x4
+> >>>> +		       0x20108 0x4>;
+> >>>
+> >>> I don't like this.  It reaches outside of the wdt register.  I think a
+> >>> more clean way to do this is to do a provider/consumer relationship as
+> >>> in reset.txt.  eg, here you would retain the original reg binding, and
+> >>> add a reset phandle.
+> >>
+> >> Mmm... I can't see how this fits a reset-controller usage.
+> >>
+> >> The watchdog simply "enables" the RSTOUT bit that allows the whole SoC
+> >> to be reset when the watchdog counter expires.
+> >>
+> >> The reset-controller seems to be meant to send reset signals to devices,
+> >> which is not this case.
+> >>
+> >> What am I missing?
+> >
+> > Another possible solution is to simply "enable" the RSTOUT bit for
+> > watchdog somewhere in mach-{kirkwood,mvebu,...} at board boot-up time.
+> >
+> > Do you think that would have any drawbacks?
+> 
+> IMHO, it should be fine to always enable watchdog reset -> rstout_n
+> assertion. The watchdog driver does it unconditionally anyway.
+> We can move it to arch specific code now, and reset API handler later.
+> 
 
-You are wrong. Go read arch/arm/boot/dts/[ste-]stuib.dtsi.
+Indeed, that's more or less what I was thinking about :-)
+I'll re-send then with these modifications.
 
-Anyway, what you wanted to say was for these to be marked
-"disabled" by default and turned into "okay" using an I2C
-probe operation.
-
-Yours,
-Linus Walleij
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
