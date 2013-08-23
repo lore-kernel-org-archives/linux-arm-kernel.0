@@ -1,40 +1,63 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 23 Aug 2013 11:56:55 -0500
-Subject: [PATCHv3 0/8] omap mailbox dt
-In-Reply-To: <1375825193-18046-1-git-send-email-s-anna@ti.com>
-References: <1375825193-18046-1-git-send-email-s-anna@ti.com>
-Message-ID: <52179457.2080203@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Aug 2013 18:04:11 +0100
+Subject: [PATCH v7] ARM: dts: mvebu: Introduce a new compatible string
+ for mv64xxx-i2c
+In-Reply-To: <1377243174-15877-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1377243174-15877-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130823170411.GE7015@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony, Benoit,
-
-> This is an updated series for adding the device tree support to
-> the OMAP mailbox driver. The series is based on 3.11-rc4 and now
-> includes the support for AM335 WkupM3 mailbox.
+On Fri, Aug 23, 2013 at 08:32:54AM +0100, Gregory CLEMENT wrote:
+> The mv64xxx-i2c embedded in the Armada XP have a new feature to
+> offload i2c transaction. This new version of the IP come also with
+> some errata. This lead to the introduction to a another compatible
+> string.
 > 
-> The support for WkupM3 mailbox is essential for achieving the PM
-> Suspend on AM335 devices, and this series is a dependency for
-> the AM335 suspend/resume series [1]. The AM335 support patches
-> required the mailbox DT patches posted previously, so I have
-> refreshed all of them together.
+> This commit updates the Device Tree binding documentation accordingly.
 > 
-> Tested this on Beagle-XM, Panda4 and OMAP5 uEVM (with
-> out-of-tree clock patches).
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+> Changelog v6 -> v7:
 > 
-> v3:
-> - Includes 3 new patches on top of the unchanged patches in v2.
-> - Patches 7 and 8 adds the driver support and DT node for AM335.
-> - Patch6 is a minor cleanup patch removing omap_mbox_type_t from
->   mbox ops.
+> - only keep "marvell,mv7230-i2c" for compatible name
+> 
+> - replace "For a controller which support the I2C Transaction
+>   Generator" by "For the Armada XP" in the examples
+> 
+>  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> index 6113f92..73cdc03 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> @@ -5,6 +5,7 @@ Required properties :
+>  
+>   - reg             : Offset and length of the register set for the device
+>   - compatible      : Should be "marvell,mv64xxx-i2c" or "allwinner,sun4i-i2c"
+> +                     or "marvell,mv7230-i2c"
 
-Any additional feedback/comments on this series? The series contains
-patches both for the driver code and DT/hwmod data. Let me know if you
-need me to rearrange the patches. I currently have one review comment
-to address regarding adding some additional notes [1] to the DT binding
-information.
+Ok, the new string looks sane, so I'm not opposed to that.
 
-regards
-Suman
+>   - interrupts      : The interrupt number
+>  
+>  Optional properties :
+> @@ -20,3 +21,12 @@ Examples:
+>  		interrupts = <29>;
+>  		clock-frequency = <100000>;
+>  	};
+> +
+> +For the Armada XP:
+> +
+> +	i2c at 11000 {
+> +		compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+                                         ^ That '8' shouldn't be there.
 
-[1] http://marc.info/?t=137582575400006&r=1&w=2
+> +		reg = <0x11000 0x100>;
+> +		interrupts = <29>;
+> +		clock-frequency = <100000>;
+> +	};
+
+Thanks,
+Mark.
