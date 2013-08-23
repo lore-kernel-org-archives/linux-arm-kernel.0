@@ -1,97 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Aug 2013 17:55:39 +0100
-Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the
- DBX500 DT
-In-Reply-To: <20130823075607.GD17154@lee--X1>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdbE86HgPr+7LZD9BFU_OsDFFFWTaFHW_i2fNXivKZ-3Dw@mail.gmail.com>
- <20130820093034.GL31036@pengutronix.de>
- <20130822133730.GB23152@e106331-lin.cambridge.arm.com>
- <20130822141900.GB17154@lee--X1>
- <20130822151723.GE23152@e106331-lin.cambridge.arm.com>
- <20130822154116.GC17154@lee--X1>
- <20130822211912.GE31036@pengutronix.de>
- <20130823075607.GD17154@lee--X1>
-Message-ID: <20130823165539.GD7015@e106331-lin.cambridge.arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 23 Aug 2013 12:56:40 -0400
+Subject: [PATCH v4 3/5] net: ethernet: cpsw: introduce ti,am3352-cpsw
+ compatible string
+In-Reply-To: <52178E20.5040404@gmail.com>
+References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
+ <1377267365-24057-4-git-send-email-zonque@gmail.com>
+ <52177052.1030308@ti.com> <52178E20.5040404@gmail.com>
+Message-ID: <52179448.1020906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 08:56:07AM +0100, Lee Jones wrote:
-> I had a short chat with Rob last night about this. I'm going to loop
-> him in to the conversation, as he wrote the binding.
+On Friday 23 August 2013 12:30 PM, Daniel Mack wrote:
+> On 23.08.2013 16:23, Santosh Shilimkar wrote:
+>> On Friday 23 August 2013 10:16 AM, Daniel Mack wrote:
 > 
-> > > When most of the other clocks that we deal with are being requested,
-> > > they rely on being index zero:
-> > > 
-> > >   drivers/i2c/busses/i2c-nomadik.c: dev->clk = clk_get(&adev->dev, NULL);
-> > 
-> > Look at drivers/clk/clkdev.c, there's some fuzzy matching
-> > involved when you pass NULL as connection id.
+>>> +static const struct of_device_id cpsw_of_mtable[] = {
+>>> +	{
+>>> +		.compatible	= "ti,am3352-cpsw",
+>>
+>> I didn't notice this earlier, but can't you use the IP version
+>> as a compatible instead of using a SOC name. Whats really SOC specific
+>> on this IP ? Sorry i have missed any earlier discussion on this but
+>> this approach doesn't seem good. Its like adding SOC checks in the
+>> driver subsystem.
 > 
-> Yes, I've been looking at that. This is why it works currently. I
-> think I need to change all of the drivers to specify which clock they
-> want. At the moment that 'fuzzy matching' is what's saving us. If
-> anyone were to change our DTS file to match what the binding says,
-> then it would cease to work. I'm guessing this is the same for all
-> other DTS files too:
+> As I already mentioned in the cover letter and in the commit message, I
+> just don't know which criteria makes most sense here.
+> 
+> On a general note, I would say that chances that this exactly IP core
+> with the same version number will appear on some other silicon which
+> doesn't support the control mode register in an AM33xx fashion, is not
+> necessarily negligible.
+> 
+> So what that new compatible string denotes is the cpsw in a version as
+> found on am3352 SoCs, which is actually exactly what it does.
+> 
+> I don't have a strong opinion here, but see your point. I just don't
+> have a better idea on how to treat that.
+> 
+So just stick the IP version or call it cpsw-v1... cpsw-v2 etc.
+That way if in future if someone uses those features, they can use
+this compatible if they don't they use the one which suites that
+SOC.
 
-I think if anything, the binding document(s) should be updated to
-describe that apb_pclk is referred to by name, and the names of the
-other clocks should be described in the specific device bindings. We can
-then modify the drivers which grab clock 0 to explicitly grab the first
-clock by name, and backwards compatibility should not be broken.
-
-I don't believe any other OS has implemented the common clock bindings,
-and we've never supported the binding as described. Let's correct the
-de-facto standard into a standard by decree.
-
-Thanks,
-Mark.
-
-> 
-> arch/arm/boot/dts/imx23.dtsi:                clock-names = "uart", "apb_pclk";
-> arch/arm/boot/dts/imx28.dtsi:                clock-names = "uart", "apb_pclk";
-> arch/arm/boot/dts/nspire-cx.dts:             clock-names = "uart_clk", "apb_pclk";
-> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "timclk", "apb_pclk";
-> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "timclk", "apb_pclk";
-> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "uartclk", "apb_pclk";
-> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "uartclk", "apb_pclk";
-> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "uartclk", "apb_pclk";
-> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "rng", "apb_pclk";
-> arch/arm/boot/dts/ste-nomadik-stn8815.dtsi:  clock-names = "mclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "refclk", "timclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "mclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "KMIREFCLK", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "KMIREFCLK", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "uartclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "wdogclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "timclken1", "timclken2", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "timclken1", "timclken2", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m-rs1.dtsi:     clock-names = "clcdclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "refclk", "timclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "mclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "KMIREFCLK", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "KMIREFCLK", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "uartclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "wdogclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "timclken1", "timclken2", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "timclken1", "timclken2", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2m.dtsi:         clock-names = "clcdclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts:  clock-names = "wdogclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2p-ca9.dts:      clock-names = "clcdclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2p-ca9.dts:      clock-names = "timclk", "apb_pclk";
-> arch/arm/boot/dts/vexpress-v2p-ca9.dts:      clock-names = "wdogclk", "apb_pclk";
-> 
-> -- 
-> Lee Jones
-> Linaro ST-Ericsson Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
-> 
+Regards,
+Santosh
