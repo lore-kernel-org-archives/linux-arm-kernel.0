@@ -1,54 +1,51 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Aug 2013 09:32:54 +0200
-Subject: [PATCH v7] ARM: dts: mvebu: Introduce a new compatible string for
- mv64xxx-i2c
-Message-ID: <1377243174-15877-1-git-send-email-gregory.clement@free-electrons.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 23 Aug 2013 09:36:13 +0200
+Subject: [PATCH 4/4] Documentation: Add device tree bindings for
+ Freescale FTM PWM
+In-Reply-To: <20130822062610.GR31036@pengutronix.de>
+References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
+ <1473340.OXSHEp7d4P@flatron>
+ <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20130822062610.GR31036@pengutronix.de>
+Message-ID: <20130823073612.GB3535@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mv64xxx-i2c embedded in the Armada XP have a new feature to
-offload i2c transaction. This new version of the IP come also with
-some errata. This lead to the introduction to a another compatible
-string.
+On Thu, Aug 22, 2013 at 08:26:10AM +0200, Sascha Hauer wrote:
+> On Thu, Aug 22, 2013 at 02:55:42AM +0000, Xiubo Li-B47053 wrote:
+> > Hi Tomasz,
+> > 
+> > Thanks for your comments.
+> > 
+> > 
+> > > Could you explain meaning of this property more precisely? I'm interested
+> > > especially how is this related to the PWM IP block and boards.
+> > > 
+> > 
+> > Yes.
+> > There are 8 channels most. While the pinctrls of 4th and 5th channels could be
+> > used by uart's Rx and Tx, then these 2 channels won't be used for pwm output,
+> > so there will be 6 channels available by the pwm.
+> > Thus, the pwm chip will register only 6 pwms(6 channels) most("fsl,pwm-channel-orders
+> > = {0 1 2 3 6 7}").And also the "fsl,pwm-channel-number" will be 6.
+> 
+> If the chip has eight PWMs I would register all of them. If some of them
+> are not routed out by the pinmux then just nothing happens if you use
+> them. In a sane devicetree they won't be referenced anyway when they are
+> not routed out of the SoC.
 
-This commit updates the Device Tree binding documentation accordingly.
+In that case, shouldn't this be hooked up to the pinctrl subsystem as
+well? As I understand the above, the logical thing would be for each PWM
+channel's .request() operation to configure the pinmuxing appropriately.
+And if it can't be configured as necessary then .request() should return
+an error (or propagate the error from the pinctrl subsystem).
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-Changelog v6 -> v7:
-
-- only keep "marvell,mv7230-i2c" for compatible name
-
-- replace "For a controller which support the I2C Transaction
-  Generator" by "For the Armada XP" in the examples
-
- Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-index 6113f92..73cdc03 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-@@ -5,6 +5,7 @@ Required properties :
- 
-  - reg             : Offset and length of the register set for the device
-  - compatible      : Should be "marvell,mv64xxx-i2c" or "allwinner,sun4i-i2c"
-+                     or "marvell,mv7230-i2c"
-  - interrupts      : The interrupt number
- 
- Optional properties :
-@@ -20,3 +21,12 @@ Examples:
- 		interrupts = <29>;
- 		clock-frequency = <100000>;
- 	};
-+
-+For the Armada XP:
-+
-+	i2c at 11000 {
-+		compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
-+		reg = <0x11000 0x100>;
-+		interrupts = <29>;
-+		clock-frequency = <100000>;
-+	};
--- 
-1.8.1.2
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/be8cb051/attachment-0001.sig>
