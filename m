@@ -1,74 +1,39 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 23 Aug 2013 14:08:52 +0200
-Subject: [PATCH v3 2/5] net: ethernet: cpsw: add optional third memory region
- for CONTROL module
-In-Reply-To: <1377259735-20337-1-git-send-email-zonque@gmail.com>
-References: <1377259735-20337-1-git-send-email-zonque@gmail.com>
-Message-ID: <1377259735-20337-3-git-send-email-zonque@gmail.com>
+Date: Fri, 23 Aug 2013 14:08:50 +0200
+Subject: [PATCH v3 0/5] cpsw: support for control module register
+Message-ID: <1377259735-20337-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At least the AM33xx SoC has a control module register to configure
-details such as the hardware ethernet interface mode.
+v2 -> v3:
+	* swap "ti,am3352-cpsw" and "ti,cpsw" to work around a matching
+	  bug (reported by Sekhar)
 
-I'm not sure whether all SoCs which feature the cpsw block have such a
-register, so that third memory region is considered optional for now.
+v1 -> v2:
+	* combine devm_request_mem_region() and devm_ioremap() and use
+	  devm_ioremap_resource() (reported by Sergei Shtylyov)
+	* fix multi-line comment style (reported by Sergei Shtylyov)
+	* fix ti,rmii-clock-ext property name (reported by Sekhar)
+	* rebased to net-next (reported by Mugunthan V N, David Miller)
+	* add a new compatible type, and handle AM33xx specific
+	  registers that way (reported by Sekhar)
+	* move gmii_sel_reg modifications to the open routine
+	  (reported by Mugunthan V N)
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- Documentation/devicetree/bindings/net/cpsw.txt |  5 ++++-
- drivers/net/ethernet/ti/cpsw.c                 | 16 ++++++++++++++++
- 2 files changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
-index 05d660e..4e5ca54 100644
---- a/Documentation/devicetree/bindings/net/cpsw.txt
-+++ b/Documentation/devicetree/bindings/net/cpsw.txt
-@@ -4,7 +4,10 @@ TI SoC Ethernet Switch Controller Device Tree Bindings
- Required properties:
- - compatible		: Should be "ti,cpsw"
- - reg			: physical base address and size of the cpsw
--			  registers map
-+			  registers map.
-+			  An optional third memory region can be supplied if
-+			  the platform has a control module register to
-+			  configure phy interface details
- - interrupts		: property with a value describing the interrupt
- 			  number
- - interrupt-parent	: The parent interrupt controller
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index 1a91aac..bd0b664 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -372,6 +372,7 @@ struct cpsw_priv {
- 	struct cpsw_platform_data	data;
- 	struct cpsw_ss_regs __iomem	*regs;
- 	struct cpsw_wr_regs __iomem	*wr_regs;
-+	u32 __iomem			*gmii_sel_reg;
- 	u8 __iomem			*hw_stats;
- 	struct cpsw_host_regs __iomem	*host_port_regs;
- 	u32				msg_enable;
-@@ -1999,6 +2000,21 @@ static int cpsw_probe(struct platform_device *pdev)
- 		goto clean_runtime_disable_ret;
- 	}
- 
-+	/* If the control memory region is unspecified, continue without it.
-+	 * If it is specified, but we're unable to reserve it, bail.
-+	 */
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-+	if (!res) {
-+		dev_err(priv->dev, "error getting control i/o resource\n");
-+		goto no_gmii_sel;
-+	}
-+	priv->gmii_sel_reg = devm_ioremap_resource(&pdev->dev, res);
-+	if (!priv->gmii_sel_reg) {
-+		dev_err(priv->dev, "unable to map control i/o region\n");
-+		goto clean_runtime_disable_ret;
-+	}
-+
-+no_gmii_sel:
- 	memset(&dma_params, 0, sizeof(dma_params));
- 	memset(&ale_params, 0, sizeof(ale_params));
- 
+Daniel Mack (5):
+  net: ethernet: cpsw: switch to devres allocations
+  net: ethernet: cpsw: add optional third memory region for CONTROL
+    module
+  net: ethernet: cpsw: introduce ti,am3352-cpsw compatible string
+  net: ethernet: cpsw: add support for hardware interface mode config
+  ARM: dts: am33xx: adopt to cpsw changes
+
+ Documentation/devicetree/bindings/net/cpsw.txt |  10 +-
+ arch/arm/boot/dts/am33xx.dtsi                  |   5 +-
+ drivers/net/ethernet/ti/cpsw.c                 | 254 ++++++++++++++-----------
+ drivers/net/ethernet/ti/cpsw.h                 |   2 +
+ 4 files changed, 159 insertions(+), 112 deletions(-)
+
 -- 
 1.8.3.1
