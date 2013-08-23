@@ -1,35 +1,18 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 23 Aug 2013 14:08:37 +0200
-Subject: [PATCH v2 5/5] ARM: dts: am33xx: adopt to cpsw changes
-In-Reply-To: <52172E12.2000908@ti.com>
-References: <1377247417-27386-1-git-send-email-zonque@gmail.com>
- <1377247417-27386-6-git-send-email-zonque@gmail.com>
- <52172B54.8020201@ti.com> <52172CB0.9030204@gmail.com>
- <52172E12.2000908@ti.com>
-Message-ID: <521750C5.3080209@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 23 Aug 2013 20:09:39 +0800
+Subject: [PATCH] pinctrl: imx: Fix compilation with DEBUG enabled
+In-Reply-To: <1377247137-19582-1-git-send-email-s.hauer@pengutronix.de>
+References: <1377247137-19582-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20130823120937.GB10662@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.08.2013 11:40, Sekhar Nori wrote:
-> On Friday 23 August 2013 03:04 PM, Daniel Mack wrote:
->> On 23.08.2013 11:28, Sekhar Nori wrote:
-
->> Ok, thanks. Given that this last patch will be merged through another
->> tree, can I just resend it separately, while David takes the rest as it is?
+On Fri, Aug 23, 2013 at 10:38:57AM +0200, Sascha Hauer wrote:
+> This became broken with converting the pinmux arrays into struct
+> types. While at it replace the preprocessor magic with a simple
+> dev_dbg.
 > 
-> Ideally you could, but there are some bugs in the way compatible string
-> in handled and due to this I suspect you need to reorder
-> cpsw_of_mtable[] to match correctly. Not sure if the bug has been fixed
-> in recent -rcs. Please check if modifying just this patch works and then
-> go ahead and post.
+> Reported-by: Tushar Behera <tushar.behera@linaro.org>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-No, you're right. I had to swap the two entries. Thanks for mentioning it.
-
-> Please Cc Benoit Cousson <bcousson@baylibre.com> on your next submission
-> as he is the one who picks up DT patches for OMAP.
-
-Will do.
-
-
-
-Daniel
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
