@@ -1,39 +1,51 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 23 Aug 2013 15:55:56 -0600
-Subject: [PATCH RFC v2 5/5] spmi: document the PMIC arbiter SPMI bindings
-In-Reply-To: <ea2d30d47cb54b4322231f5c319663ee9c996784.1377202730.git.joshc@codeaurora.org>
+Date: Fri, 23 Aug 2013 15:58:36 -0600
+Subject: [PATCH RFC v2 3/5] spmi: add generic SPMI controller binding
+ documentation
+In-Reply-To: <e42576b69ef3d4e624fbfa2f32f6f79a931b55d6.1377202730.git.joshc@codeaurora.org>
 References: <cover.1377202730.git.joshc@codeaurora.org>
- <ea2d30d47cb54b4322231f5c319663ee9c996784.1377202730.git.joshc@codeaurora.org>
-Message-ID: <5217DA6C.4060903@wwwdotorg.org>
+ <e42576b69ef3d4e624fbfa2f32f6f79a931b55d6.1377202730.git.joshc@codeaurora.org>
+Message-ID: <5217DB0C.7000101@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/2013 02:37 PM, Josh Cartwright wrote:
+On 08/22/2013 01:59 PM, Josh Cartwright wrote:
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> ---
+> I'm introducing this as an RFC, because there are set of assumptions
+> made in this binding spec, that currently hold true for the supported
+> controller/addressing scheme for the Snapdragon 800 series, but don't
+> necessarily hold true for SPMI in general.
+> 
+>   1. No use of Group Slave Identifiers (GSIDs)
+>      (SPMI allows for a slave to belong to zero or more groups specified
+>      by GSID, however this feature isn't currently implemented)
+> 
+>   2. No specification of Master Identifier (MID)
+>      (A "system integrator" allocates to each master a 2-bit MID, this
+>      currently isn't being specified, as it isn't needed by software for
+>      the PMIC Arb; not sure if this is of use to other SPMI controllers)
+> 
+>   3. Single SPMI master per controller
+> 
+> Effectively, only a subset of possible SPMI configurations are specified
+> in this document.
+> 
+> So, if it's considered necessary to provide a generic SPMI binding
+> specification, is it acceptable to only define a subset at this time,
+> expanding only when necessary, or shall I expand the definition to at
+> least address 1 & 2, even though they are of no use in the current
+> implementation?
 
-Patch description?
+It's best to define the whole thing from the start if possible. It's
+easier to ensure the whole binding is consistent, and nothing has been
+left out.
 
-> diff --git a/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt b/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
+However, it's probably OK to define a subset binding initially and then
+expand it later, as long as some thought it put into how it can be
+expanded in a way that is 100% compatible: old DTs will still operate
+with new kernels and perhaps even new DTs will still operate with old
+kernels.
 
-> +Required properties:
-> +- compatible : should be "qcom,spmi-pmic-arb".
-> +- reg-names  : should be "core", "intr", "cnfg"
-
-> +- reg : offset and length of the PMIC Arbiter Core register map.
-> +- reg : offset and length of the PMIC Arbiter Interrupt controller register map.
-> +- reg : offset and length of the PMIC Arbiter Configuration register map.
-
-This seems like it's defining the "reg" property 3 times each with a
-different meaning. It'd be better to say something like:
-
-reg : register specifier. Must contain 3 entries, in the following
-order: core registers, interrupt register, configuration registers.
-
-> +	qcom,spmi at fc4c0000 {
-...
-> +		qcom,pm8841 at 4 {
-
-Node names typically don't include a vendor prefix. For the first
-instance above, I think just "spmi at fc4c0000" or even just "spmi" would
-be appropriate here; the latter being best in the case where there's
-only 1 SPMI controller and hence no need to include the unit address for
-uniqueness.
+That said, if the thought is put in to ensure that's possible, it's
+probably just as easy to define the whole binding from the start.
