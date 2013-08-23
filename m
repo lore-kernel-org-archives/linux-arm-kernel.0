@@ -1,58 +1,99 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 23 Aug 2013 17:58:00 +0100
-Subject: [alsa-devel] [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM
- links between codec and cpu DAI
-In-Reply-To: <20130823125803.GN6617@n2100.arm.linux.org.uk>
-References: <20130820102555.GZ23006@n2100.arm.linux.org.uk>
- <20130820114421.GN30073@sirena.org.uk>
- <20130820114949.GB23006@n2100.arm.linux.org.uk>
- <20130820133143.GC23006@n2100.arm.linux.org.uk>
- <20130820185019.GP30073@sirena.org.uk>
- <20130820201824.GA17845@n2100.arm.linux.org.uk>
- <1377199370.2618.99.camel@loki>
- <20130822201658.GK6617@n2100.arm.linux.org.uk>
- <1377259994.2444.41.camel@loki>
- <20130823125803.GN6617@n2100.arm.linux.org.uk>
-Message-ID: <20130823165800.GB30617@sirena.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 23 Aug 2013 18:59:36 +0200
+Subject: [PATCH v2 2/4] iio: at91: Use different prescal, startup mask in
+ MR for different IP
+In-Reply-To: <20130823154603.GA7468@ludovic.desroches@atmel.com>
+References: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
+ <1376219071-29946-3-git-send-email-josh.wu@atmel.com>
+ <20130815192044.GD12162@lukather> <5215DF2C.3050502@atmel.com>
+ <5215DF7C.2020909@atmel.com>
+ <20130823154603.GA7468@ludovic.desroches@atmel.com>
+Message-ID: <20130823165936.GC1230@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 01:58:03PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Aug 23, 2013 at 01:13:14PM +0100, Liam Girdwood wrote:
+Hi Ludovic, Josh,
 
-> > You asked me privately to Ack the series so you could carry it in your
-> > own tree for upstreaming. Sorry if I misunderstood this request, but it
-> > seemed straightforward.
+On Fri, Aug 23, 2013 at 05:46:03PM +0200, Desroches, Ludovic wrote:
+> On Thu, Aug 22, 2013 at 05:53:00PM +0800, Josh Wu wrote:
+> > On 8/22/2013 5:51 PM, Josh Wu wrote:
+> > >Hi, Maxime
+> > >
+> > >On 8/16/2013 3:20 AM, Maxime Ripard wrote:
+> > >>Hi Josh,
+> > >>
+> > >>On Sun, Aug 11, 2013 at 07:04:29PM +0800, Josh Wu wrote:
+> > >>>For at91 boards, there are different IPs for adc. Different IPs has
+> > >>>different STARTUP & PRESCAL mask in ADC_MR.
+> > >>>
+> > >>>This patch introduce the multiple compatible string for those
+> > >>>different IPs.
+> > >>>
+> > >>>Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> > >>Overall it looks like the right ways, but I think we can take it a step
+> > >>further.
+> > >>
+> > >>I'd drop at least the atmel,adc-drdy-mask, atmel,adc-num-channels,
+> > >>atmel,adc-status-register, atmel,adc-trigger-register properties (and
+> > >>probably the triggers as well description as well).
+> > >
+> > >yeah, right. Currently I want to drop following:
+> > >
+> > >atmel,adc-drdy-mask, atmel,adc-status-register,
+> > >atmel,adc-trigger-register, atmel,adc-channel-base
+> > >
+> > >For the adc-num-channels, I'd like to leave it in dt parameters.
+> > >It is a description for an adc capablity.
+> 
+> About this parameter, I'll remove it too from the dt bindings. To set it you
+> need to have a look to the datasheet and to copy a constant value into the
+> dt. From my point of view, it means than this parameter should be managed by
+> the driver and by the dt.
+> 
+> On the other side since there are some dynamic allocation depending on this
+> parameter maybe it makes sense to keep it in the dt. If the user wants to use
+> only 2 channels why doing allocation for max channel number. By the way, this
+> case is only valid if he uses the two first channels.
 
-> What I'm after are acks for those patches which are acceptable - which
-> I believe is the entire series with the exception of the HACK patch.
+I don't recall it very well, is there any reason to not have it in the
+DT? Can the ADC channels be used for something else? Or is it just some
+IP-specific number of channels?
 
-If there no dependency then why is that patch included as part of this
-series, especially so early on?  Obviously we shouldn't cause problems
-for existing machines in mainline so I stopped applying patches which
-seemed like they might depend on that one.  I had at the time been
-expecting a revised version of the series to follow in due course with a
-better fix as at the time the hack was sent you'd only just determined
-what the problem was.
+> > >
+> > >For the triggers, I am not decided. An obvious benifit to remove
+> > >trigger in dt will save many lines of code.
+> > >
+> > >>
+> > >>Maxime
+> > >>
+> > >
+> > >Best Regards,
+> > >Josh Wu
+> >
+> 
+> Since we are talking about reworking this binding I was thinking about
+> resolution stuff. Filling atmel,adc-res is also copying constant value from
+> the device datasheet, so if I was consistent I would say it has to be removed
+> too. But I am not consistent! I mean by doing this the only thing the user
+> will have to fill is the resolution value. He can't set the value he wants,
+> there are only two choices. By keeping it into the dt then he will immediately
+> see the choices he has.
 
-> The split of the DMA backend from the CPU DAI backend is something
-> which early ASoC forced, but that has "mostly" been fixed with (as
-> far as I'm currently aware through testing) the problem I've been
+But the resolution should probably be somehow user-defined, probably not
+really related to the DT has well. I think some other IIO ADC drivers
+are using sysfs files for this purpose, maybe that would be a better
+fit?
 
-Essentially all the dmaengine based platforms in mainline use a shared
-device for DMA and DAI; I'm fairly sure someone would have mentioned if
-there were problems.  
+Maxime
 
-As you have been repeatedly told the Kirkwood drivers are the first
-drivers submitted to mainline which use DPCM and therefore it is not
-surprising that there are a few issues which need to be worked through,
-there were a few revisions to the framework which went in as a result of
-review during the mainline merge.  The problem you are seeing here is
-due to this being the first platform with a *shared* device to use DPCM.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/346cbdd5/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/36edda68/attachment.sig>
