@@ -1,47 +1,58 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 23 Aug 2013 12:56:40 -0400
-Subject: [PATCH v4 3/5] net: ethernet: cpsw: introduce ti,am3352-cpsw
- compatible string
-In-Reply-To: <52178E20.5040404@gmail.com>
-References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
- <1377267365-24057-4-git-send-email-zonque@gmail.com>
- <52177052.1030308@ti.com> <52178E20.5040404@gmail.com>
-Message-ID: <52179448.1020906@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 23 Aug 2013 17:58:00 +0100
+Subject: [alsa-devel] [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM
+ links between codec and cpu DAI
+In-Reply-To: <20130823125803.GN6617@n2100.arm.linux.org.uk>
+References: <20130820102555.GZ23006@n2100.arm.linux.org.uk>
+ <20130820114421.GN30073@sirena.org.uk>
+ <20130820114949.GB23006@n2100.arm.linux.org.uk>
+ <20130820133143.GC23006@n2100.arm.linux.org.uk>
+ <20130820185019.GP30073@sirena.org.uk>
+ <20130820201824.GA17845@n2100.arm.linux.org.uk>
+ <1377199370.2618.99.camel@loki>
+ <20130822201658.GK6617@n2100.arm.linux.org.uk>
+ <1377259994.2444.41.camel@loki>
+ <20130823125803.GN6617@n2100.arm.linux.org.uk>
+Message-ID: <20130823165800.GB30617@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 August 2013 12:30 PM, Daniel Mack wrote:
-> On 23.08.2013 16:23, Santosh Shilimkar wrote:
->> On Friday 23 August 2013 10:16 AM, Daniel Mack wrote:
-> 
->>> +static const struct of_device_id cpsw_of_mtable[] = {
->>> +	{
->>> +		.compatible	= "ti,am3352-cpsw",
->>
->> I didn't notice this earlier, but can't you use the IP version
->> as a compatible instead of using a SOC name. Whats really SOC specific
->> on this IP ? Sorry i have missed any earlier discussion on this but
->> this approach doesn't seem good. Its like adding SOC checks in the
->> driver subsystem.
-> 
-> As I already mentioned in the cover letter and in the commit message, I
-> just don't know which criteria makes most sense here.
-> 
-> On a general note, I would say that chances that this exactly IP core
-> with the same version number will appear on some other silicon which
-> doesn't support the control mode register in an AM33xx fashion, is not
-> necessarily negligible.
-> 
-> So what that new compatible string denotes is the cpsw in a version as
-> found on am3352 SoCs, which is actually exactly what it does.
-> 
-> I don't have a strong opinion here, but see your point. I just don't
-> have a better idea on how to treat that.
-> 
-So just stick the IP version or call it cpsw-v1... cpsw-v2 etc.
-That way if in future if someone uses those features, they can use
-this compatible if they don't they use the one which suites that
-SOC.
+On Fri, Aug 23, 2013 at 01:58:03PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Aug 23, 2013 at 01:13:14PM +0100, Liam Girdwood wrote:
 
-Regards,
-Santosh
+> > You asked me privately to Ack the series so you could carry it in your
+> > own tree for upstreaming. Sorry if I misunderstood this request, but it
+> > seemed straightforward.
+
+> What I'm after are acks for those patches which are acceptable - which
+> I believe is the entire series with the exception of the HACK patch.
+
+If there no dependency then why is that patch included as part of this
+series, especially so early on?  Obviously we shouldn't cause problems
+for existing machines in mainline so I stopped applying patches which
+seemed like they might depend on that one.  I had at the time been
+expecting a revised version of the series to follow in due course with a
+better fix as at the time the hack was sent you'd only just determined
+what the problem was.
+
+> The split of the DMA backend from the CPU DAI backend is something
+> which early ASoC forced, but that has "mostly" been fixed with (as
+> far as I'm currently aware through testing) the problem I've been
+
+Essentially all the dmaengine based platforms in mainline use a shared
+device for DMA and DAI; I'm fairly sure someone would have mentioned if
+there were problems.  
+
+As you have been repeatedly told the Kirkwood drivers are the first
+drivers submitted to mainline which use DPCM and therefore it is not
+surprising that there are a few issues which need to be worked through,
+there were a few revisions to the framework which went in as a result of
+review during the mainline merge.  The problem you are seeing here is
+due to this being the first platform with a *shared* device to use DPCM.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/346cbdd5/attachment.sig>
