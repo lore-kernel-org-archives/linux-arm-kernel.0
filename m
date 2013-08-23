@@ -1,115 +1,155 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 23 Aug 2013 10:43:35 +0200
-Subject: [PATCH v2 3/5] net: ethernet: cpsw: introduce ti,
- am3352-cpsw compatible string
+Date: Fri, 23 Aug 2013 10:43:36 +0200
+Subject: [PATCH v2 4/5] net: ethernet: cpsw: add support for hardware
+ interface mode config
 In-Reply-To: <1377247417-27386-1-git-send-email-zonque@gmail.com>
 References: <1377247417-27386-1-git-send-email-zonque@gmail.com>
-Message-ID: <1377247417-27386-4-git-send-email-zonque@gmail.com>
+Message-ID: <1377247417-27386-5-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support features that are specific to the AM335x IP, we have
-to add hardware types and another compatible string.
+The cpsw currently lacks code to properly set up the hardware interface
+mode on AM33xx. Other platforms might be equally affected.
+
+Usually, the bootloader will configure the control module register, so
+probably that's why such support wasn't needed in the past. In suspend
+mode though, this register is modified, and so it needs reprogramming
+after resume.
+
+This patch adds code that makes use of the previously added and optional
+support for passing the control mode register, and configures the
+correct register bits when the slave is opened.
+
+The AM33xx also has a bit for each slave to configure the RMII reference
+clock direction. Setting it is now supported by a per-slave DT property.
+
+This code path introducted by this patch is currently exclusive for
+am33xx.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- Documentation/devicetree/bindings/net/cpsw.txt |  3 ++-
- drivers/net/ethernet/ti/cpsw.c                 | 32 ++++++++++++++++++++------
+ Documentation/devicetree/bindings/net/cpsw.txt |  2 +
+ drivers/net/ethernet/ti/cpsw.c                 | 61 ++++++++++++++++++++++++++
  drivers/net/ethernet/ti/cpsw.h                 |  1 +
- 3 files changed, 28 insertions(+), 8 deletions(-)
+ 3 files changed, 64 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
-index 4e5ca54..b717458 100644
+index b717458..0895a51 100644
 --- a/Documentation/devicetree/bindings/net/cpsw.txt
 +++ b/Documentation/devicetree/bindings/net/cpsw.txt
-@@ -2,7 +2,8 @@ TI SoC Ethernet Switch Controller Device Tree Bindings
- ------------------------------------------------------
+@@ -34,6 +34,8 @@ Required properties:
+ - phy_id		: Specifies slave phy id
+ - phy-mode		: The interface between the SoC and the PHY (a string
+ 			  that of_get_phy_mode() can understand)
++- ti,rmii-clock-ext	: If present, the driver will configure the RMII
++			  interface to external clock usage
+ - mac-address		: Specifies slave MAC address
  
- Required properties:
--- compatible		: Should be "ti,cpsw"
-+- compatible		: Should be "ti,cpsw" for generic cpsw support, or
-+			  "ti,am3352-cpsw" for AM3352 SoCs
- - reg			: physical base address and size of the cpsw
- 			  registers map.
- 			  An optional third memory region can be supplied if
+ Optional properties:
 diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index bd0b664..2e19de0 100644
+index 2e19de0..6e36f49 100644
 --- a/drivers/net/ethernet/ti/cpsw.c
 +++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -155,6 +155,11 @@ do {								\
- 		((priv->data.dual_emac) ? priv->emac_port :	\
- 		priv->data.active_slave)
+@@ -138,6 +138,13 @@ do {								\
+ #define CPSW_CMINTMAX_INTVL	(1000 / CPSW_CMINTMIN_CNT)
+ #define CPSW_CMINTMIN_INTVL	((1000 / CPSW_CMINTMAX_CNT) + 1)
  
-+enum {
-+	CPSW_TYPE_GENERIC,
-+	CPSW_TYPE_AM33XX
-+};
++#define AM33XX_GMII_SEL_MODE_MII	(0)
++#define AM33XX_GMII_SEL_MODE_RMII	(1)
++#define AM33XX_GMII_SEL_MODE_RGMII	(2)
 +
- static int debug_level;
- module_param(debug_level, int, 0);
- MODULE_PARM_DESC(debug_level, "cpsw debug level (NETIF_MSG bits)");
-@@ -1692,17 +1697,36 @@ static void cpsw_slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv,
- 	slave->port_vlan = data->dual_emac_res_vlan;
++#define AM33XX_GMII_SEL_RMII2_IO_CLK_EN	BIT(7)
++#define AM33XX_GMII_SEL_RMII1_IO_CLK_EN	BIT(6)
++
+ #define cpsw_enable_irq(priv)	\
+ 	do {			\
+ 		u32 i;		\
+@@ -980,6 +987,56 @@ static inline void cpsw_add_dual_emac_def_ale_entries(
+ 		priv->host_port, ALE_VLAN, slave->port_vlan);
  }
  
-+static const struct of_device_id cpsw_of_mtable[] = {
-+	{
-+		.compatible	= "ti,cpsw",
-+		.data		= (void *) CPSW_TYPE_GENERIC
-+	}, {
-+		.compatible	= "ti,am3352-cpsw",
-+		.data		= (void *) CPSW_TYPE_AM33XX
-+	},
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, cpsw_of_mtable);
++static void cpsw_set_phy_interface_mode(struct cpsw_slave *slave,
++					struct cpsw_priv *priv)
++{
++	u32 reg, mask, mode = 0;
 +
- static int cpsw_probe_dt(struct cpsw_platform_data *data,
- 			 struct platform_device *pdev)
++	switch (priv->data.hw_type) {
++	case CPSW_TYPE_AM33XX:
++		if (!priv->gmii_sel_reg)
++			break;
++
++		reg = readl(priv->gmii_sel_reg);
++
++		if (slave->phy) {
++			switch (slave->phy->interface) {
++			case PHY_INTERFACE_MODE_MII:
++			default:
++				mode = AM33XX_GMII_SEL_MODE_MII;
++				break;
++			case PHY_INTERFACE_MODE_RMII:
++				mode = AM33XX_GMII_SEL_MODE_RMII;
++				break;
++			case PHY_INTERFACE_MODE_RGMII:
++				mode = AM33XX_GMII_SEL_MODE_RGMII;
++				break;
++			};
++		}
++
++		mask = 0x3 << (slave->slave_num * 2) |
++		       BIT(slave->slave_num + 6);
++		mode <<= slave->slave_num * 2;
++
++		if (slave->data->rmii_clock_external) {
++			if (slave->slave_num == 0)
++				mode |= AM33XX_GMII_SEL_RMII1_IO_CLK_EN;
++			else
++				mode |= AM33XX_GMII_SEL_RMII2_IO_CLK_EN;
++		}
++
++		reg &= ~mask;
++		reg |= mode;
++
++		writel(reg, priv->gmii_sel_reg);
++		break;
++
++	default:
++		break;
++
++	}
++}
++
+ static void cpsw_slave_open(struct cpsw_slave *slave, struct cpsw_priv *priv)
  {
- 	struct device_node *node = pdev->dev.of_node;
-+	const struct of_device_id *match;
- 	struct device_node *slave_node;
-+	unsigned long match_data;
- 	int i = 0, ret;
- 	u32 prop;
- 
--	if (!node)
-+	match = of_match_device(cpsw_of_mtable, &pdev->dev);
+ 	char name[32];
+@@ -1028,6 +1085,8 @@ static void cpsw_slave_open(struct cpsw_slave *slave, struct cpsw_priv *priv)
+ 			 slave->phy->phy_id);
+ 		phy_start(slave->phy);
+ 	}
 +
-+	if (!node || !match)
- 		return -EINVAL;
++	cpsw_set_phy_interface_mode(slave, priv);
+ }
  
-+	match_data = (unsigned long) match->data;
-+	data->hw_type = match_data;
-+
- 	if (of_property_read_u32(node, "slaves", &prop)) {
- 		pr_err("Missing slaves property in the DT.\n");
- 		return -EINVAL;
-@@ -2228,12 +2252,6 @@ static const struct dev_pm_ops cpsw_pm_ops = {
- 	.resume		= cpsw_resume,
- };
+ static inline void cpsw_add_default_vlan(struct cpsw_priv *priv)
+@@ -1823,6 +1882,8 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+ 			memcpy(slave_data->mac_addr, mac_addr, ETH_ALEN);
  
--static const struct of_device_id cpsw_of_mtable[] = {
--	{ .compatible = "ti,cpsw", },
--	{ /* sentinel */ },
--};
--MODULE_DEVICE_TABLE(of, cpsw_of_mtable);
--
- static struct platform_driver cpsw_driver = {
- 	.driver = {
- 		.name	 = "cpsw",
+ 		slave_data->phy_if = of_get_phy_mode(slave_node);
++		if (of_find_property(slave_node, "ti,rmii-clock-ext", NULL))
++			slave_data->rmii_clock_external = true;
+ 
+ 		if (data->dual_emac) {
+ 			if (of_property_read_u32(slave_node, "dual_emac_res_vlan",
 diff --git a/drivers/net/ethernet/ti/cpsw.h b/drivers/net/ethernet/ti/cpsw.h
-index eb3e101..96c374a 100644
+index 96c374a..3baa2350 100644
 --- a/drivers/net/ethernet/ti/cpsw.h
 +++ b/drivers/net/ethernet/ti/cpsw.h
-@@ -37,6 +37,7 @@ struct cpsw_platform_data {
- 	u32	mac_control;	/* Mac control register */
- 	u16	default_vlan;	/* Def VLAN for ALE lookup in VLAN aware mode*/
- 	bool	dual_emac;	/* Enable Dual EMAC mode */
-+	u32	hw_type;	/* hardware type as specified in 'compatible' */
+@@ -19,6 +19,7 @@
+ struct cpsw_slave_data {
+ 	char		phy_id[MII_BUS_ID_SIZE];
+ 	int		phy_if;
++	bool		rmii_clock_external;
+ 	u8		mac_addr[ETH_ALEN];
+ 	u16		dual_emac_res_vlan;	/* Reserved VLAN for DualEMAC */
  };
- 
- #endif /* __CPSW_H__ */
 -- 
 1.8.3.1
