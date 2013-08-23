@@ -1,41 +1,104 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 22 Aug 2013 21:07:14 -0400
-Subject: [PATCH 0/7] Orion watchdog DT changes to support more SoCs
-In-Reply-To: <1377182518-12554-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377182518-12554-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130823010714.GC13964@titan.lakedaemon.net>
+From: rizhao@nvidia.com (Richard Zhao)
+Date: Fri, 23 Aug 2013 09:17:38 +0800
+Subject: [PATCH v2] DMA: add help function to check whether dma
+ controller registered
+In-Reply-To: <52167665.90602@wwwdotorg.org>
+References: <1375423458-6868-1-git-send-email-rizhao@nvidia.com>
+ <1377153781-18006-1-git-send-email-rizhao@nvidia.com>
+ <52167665.90602@wwwdotorg.org>
+Message-ID: <20130823011738.GA17925@rizhao-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 11:41:51AM -0300, Ezequiel Garcia wrote:
-> As part of my work to add watchdog support to Armada 370/XP SoCs,
-> here's some early patches to get early feedback.
+On Fri, Aug 23, 2013 at 04:36:53AM +0800, Stephen Warren wrote:
+> On 08/22/2013 12:43 AM, Richard Zhao wrote:
+> > DMA client device driver usually needs to know at probe time whether
+> > dma controller has been registered to deffer probe. So add a help
+> > function of_dma_check_controller.
+> > 
+> > DMA request channel functions can also used to check it, but they
+> > are usually called at open() time.
 > 
-> This patchset allows to build the orion_wdt driver in any Orion
-> platforms.
-> 
-> To achieve this it's necessary to remove the need for a mach-specific,
-> which in turn is done by splitting the single memory resource into
-> three memory resources: timer control, watchdog counter and RSTOUT registers;
-> and handling each of this resources as independent memory resources (as they
-> really are).
-> 
-> The only drawback with this approach is the breakage of devicetree backwards
-> compatibility such change produces. This is an important issue, and the main
-> reason I'm submitting this patchset: Is it possible to introduce such
-> DT-binding change?
-> 
-> It's worth noting that a similar was proposed in July-15th [1], which received
-> some acceptance [2].
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/183628.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/183857.html
+> This new function is almost identical to the existing
+> of_dma_request_slave_channel(). Surely the code should be shared?
+ofdma->of_dma_xlate(&dma_spec, ofdma);
+The above is called holding of_dma_lock. If I want to abstract the
+common lines, there' two options.
 
-Well, my point was that *if* it needed to be broken, now was the best
-time to do it.
+Option 1:
+static struct of_dma* of_dma_check_controller_locked(np, name)
+{
+	parameter check
+	get dma-names count and check return value
+	for loop to get of_dma
+	return PTR_ERR(err) or of_dma
+}
 
-Please see my other reply for current thoughts.
+struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+					      const char *name)
+{
+	chan = null;
+	mutex_lock(&of_dma_lock);
+	of_dma = of_dma_check_controller_locked(np, name)
+	if(!IS_ERR(of_dma))
+		chan = ofdma->of_dma_xlate(&dma_spec, ofdma);
+	mutex_unlock(&of_dma_lock);
+	return chan;
+}
 
-thx,
+int of_dma_check_controller(struct device *dev, const char *name)
+{
+	mutex_lock(&of_dma_lock);
+	ofdma = of_dma_check_controller_locked(dev->of_node, name);
+	mutex_unlock(&of_dma_lock);
+	if (IS_ERR(ofdma))
+		return ERR_PTR(ofdma);
+	else
+		return 0;
+}
 
-Jason.
+Option 2:
+static struct of_dma* of_dma_check_controller_getlock(np, name)
+{
+	parameter check
+	get dma-names count and check return value
+	for loop to get of_dma, get lock at old place
+	if failed, unlock.
+	return PTR_ERR(err) or of_dma
+}
+
+struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+					      const char *name)
+{
+}	of_dma = of_dma_check_controller_getlock(np, name)
+	if(!IS_ERR(of_dma)) {
+		chan = ofdma->of_dma_xlate(&dma_spec, ofdma);
+		unlock;
+	}
+	return chan;
+}
+
+int of_dma_check_controller(struct device *dev, const char *name)
+	ofdma = of_dma_check_controller_locked(dev->of_node, name);
+
+	if (IS_ERR(ofdma)) {
+		return ERR_PTR(ofdma);
+	} else {
+		unlock;
+		return 0;
+	}
+}
+
+> But that said, I don't see any need for a new function; why can't
+> drivers simply call of_dma_request_slave_channel() at probe time;
+It'll mislead user. channel supposed to be request at open time.
+
+> from
+> what I can see, that function doesn't actually request the channel, but
+> rather simply looks it up, just like this one. The only difference is
+> that of_dma_xlate() is also called, but that's just doing some data
+> transformation, not actually recording channel ownership.
+xlate function request the channel if things go well.
+
+Thanks
+Richard
