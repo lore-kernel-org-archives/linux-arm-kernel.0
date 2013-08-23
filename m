@@ -1,25 +1,32 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 23 Aug 2013 11:52:36 +0200
-Subject: [PATCH v2] i2c: imx: use exact SoC revision to document binding
-In-Reply-To: <1377051119-23004-1-git-send-email-b35083@freescale.com>
-References: <1377051119-23004-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130823095235.GE3035@katana>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 23 Aug 2013 10:56:57 +0100
+Subject: [Patch v3 2/3] ARM: dts: Document the CCI PMU DT bindings
+In-Reply-To: <52168E04.5020406@wwwdotorg.org>
+References: <1377183748-5717-1-git-send-email-punit.agrawal@arm.com>
+ <1377183748-5717-3-git-send-email-punit.agrawal@arm.com>
+ <52168E04.5020406@wwwdotorg.org>
+Message-ID: <521731E9.504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 10:11:59AM +0800, Jingchang Lu wrote:
-> use exact SoC revision instead of wildcard describing
-> the compatible property requirement in the binding
-> document. This will make the binding more clearer.
-> 
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+Hi Stephen,
 
-Applied to for-next, thanks!
+On 22/08/13 23:17, Stephen Warren wrote:
+> On 08/22/2013 09:02 AM, Punit Agrawal wrote:
+>> The CCI PMU can profile bus transactions at the master and slave
+>> interfaces of the CCI. The PMU can be used to observe an aggregated
+>> view of the bus traffic between the various components connected to the
+>> CCI.
+>>
+>> Introduce a binding for the CCI PMU. The PMU node will be a sub-node of
+>> the CCI node.
+>
+> This also seems fine to me.
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+>
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/4f9a7590/attachment.sig>
+Thanks for the Ack on both the patches. I'll get these queued for either 
+3.12 or if it is too late for that then 3.13.
+
+Cheers,
+Punit
