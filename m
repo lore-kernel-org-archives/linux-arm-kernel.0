@@ -1,63 +1,33 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 23 Aug 2013 13:31:31 +0200
-Subject: SHMobile Compatibility String Inconsistencies
-In-Reply-To: <20130823021111.GA2792@voom.redhat.com>
-References: <20130822054639.GE11086@verge.net.au>
- <20130823021111.GA2792@voom.redhat.com>
-Message-ID: <1721850.l3ebodSrXr@avalon>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 23 Aug 2013 12:30:58 +0100
+Subject: [PATCH V1 3/5] mtd: m25p80: add the quad-read support
+In-Reply-To: <52174640.701@gmail.com>
+References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
+ <1376885403-12156-4-git-send-email-b32955@freescale.com>
+ <20130822193453.GB10038@ld-irv-0074.broadcom.com>
+ <20130822195559.GU26118@sirena.org.uk> <52174640.701@gmail.com>
+Message-ID: <20130823113058.GA23465@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Fri, Aug 23, 2013 at 04:23:44AM -0700, Brian Norris wrote:
+> On 08/22/2013 12:55 PM, Mark Brown wrote:
 
-On Friday 23 August 2013 12:11:11 David Gibson wrote:
-> On Thu, Aug 22, 2013 at 02:46:40PM +0900, Simon Horman wrote:
-> > Hi Laurent, Hi Guennadi, Hi All,
-> > 
-> > Olof has brought to my attention that there is some inconsistency
-> > in the way that compatibility strings for SHMobile are named and he
-> > has asked us to clean things up for v3.12.
-> > 
-> > Looking through arch/arm/boot/dts/ I see that we have:
-> > 
-> > 1. {gpio,pfc}-r8aXXXX and;
-> > 2. r8aXXXX-sdhi
-> > 
-> > The inconsistency that Olof has asked us to resolve is that we
-> > should either use r8aXXXX- or -r8aXXXX. Not both.
-> > 
-> > It seems to me that neither option is inherently better than the other
-> > so we should just choose the path of least resistance to make things
-> > consistent.
-> > 
-> > Laurent, Guennadi, do you have any opinions on if it would
-> > be easier to change the GPIO and PFC compatibility strings;
-> > or to change the SDHI compatibility strings?
-> > 
-> > Ideally I would like you to come to some sort of consensus and send
-> > patches.
-> 
-> So, by all means clean this up in the dts.
-> 
-> BUT, in keeping with the recent discussions on improving the DT
-> process, the corresponding drivers must continue to recognize both
-> forms, so that old DTs will still work correctly.
+> >That bit does need to be fixed in this driver, yes.  The SPI core now
+> >has quad mode support.
 
-Given the early state of DT support in arm/mach-shmobile, I'm pretty sure we 
-have no DT-based systems in the wild. The old compatibility string could in my 
-opinion just be dropped.
+> Where? Perhaps I'm missing the obvious, but I don't see SPI core
+> quad support in linux-next or in Linus' tree.
 
-> It's probably also worth putting a note about the deprecated form into
-> the binding description, too.
+It went in yesterday, -next doesn't seem to have been updated today (I
+suspect Stephen may be on vacation, I'd need to check his announcement
+mail from yesterday to confirm).  The SPI tree is:
 
--- 
-Regards,
-
-Laurent Pinchart
+  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git for-next
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/bc3664f1/attachment.sig>
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130823/8f26d531/attachment.sig>
