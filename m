@@ -1,33 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 23 Aug 2013 11:11:14 +0100
-Subject: [GIT PULL 2/5] ARM: imx: soc changes for 3.12
-In-Reply-To: <87li3tvnj8.fsf@linaro.org>
-References: <1376833688-24542-1-git-send-email-shawn.guo@linaro.org>
- <1376833688-24542-2-git-send-email-shawn.guo@linaro.org>
- <87li3tvnj8.fsf@linaro.org>
-Message-ID: <20130823101114.GM6617@n2100.arm.linux.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 23 Aug 2013 07:24:02 -0300
+Subject: [PATCH v3 0/3] Introduce atomic MMIO register modify
+Message-ID: <1377253445-2842-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 06:54:35AM -0700, Kevin Hilman wrote:
-> This patch causes a conflict with Russell's DEBUG_LL cleanup, which is
-> already in linux-next.
-> 
-> For v3.12, I suggest you drop this patch and rework your new DEBUG_LL
-> support on top of Russell's cleanup.  Have a look at that and see if you
-> can reuse the the generic 8250 stuff added by Russell.  While there, you
-> might look at imx.S as well.
+After some discussion about the API semantic and implementation,
+here's a new version, re-working both:
 
-I'm not sure why you think imx.S may be able to use the generic 8250
-stuff, it doesn't seem to have the same register layout or even the
-same bit positions as 8250:
+The semantic has been changed, and the new one is considered cleaner
+(although slighlty less intuitive). In addition, it matches the
+regmap_update_bits() prototype, which should appear nicely consistent
+to our beloved users.
 
-                .macro  senduart,rd,rx
-                str     \rd, [\rx, #0x40]       @ TXDATA
+Following Will Deacon's suggestions, I reworked the implementation
+mainly to reduce the performance penalty. See the previous discussion,
+or the changelog (below) for details.
 
-                .macro  busyuart,rd,rx
-1002:           ldr     \rd, [\rx, #0x98]       @ SR2
-                tst     \rd, #1 << 3            @ TXDC
-                beq     1002b                   @ wait until transmit done
+Changes from v2:
+* As suggested by Will Deacon, dropped the iowmb() barrier
+  and use relaxed variants instead. See Will's explanation for
+  details: http://www.spinics.net/lists/arm-kernel/msg268775.html
 
-I did convert everything which I considered convertable@the time.
+* Use spin_{}_irqsave/restore to allow irq-context usage
+  also suggested by Will Deacon.
+
+* Re-worked the API semantics as proposed by Russell King.
+
+Changes from v1:
+* Added an io barrier iowmb() as suggested by Will Deacon,
+  to ensure the writel gets completed before the spin_unlock().
+
+Russell: If nobody has any objections, I'll add patch 1/3 to the
+tracking system.
+
+Thanks!
+
+Ezequiel Garcia (3):
+  ARM: Introduce atomic MMIO modify
+  clocksource: orion: Use atomic access for shared registers
+  watchdog: orion: Use atomic access for shared registers
+
+ arch/arm/include/asm/io.h        |  6 ++++++
+ arch/arm/kernel/io.c             | 29 +++++++++++++++++++++++++++++
+ drivers/clocksource/time-orion.c | 28 ++++++++++------------------
+ drivers/watchdog/orion_wdt.c     |  8 ++------
+ 4 files changed, 47 insertions(+), 24 deletions(-)
+
+-- 
+1.8.1.5
