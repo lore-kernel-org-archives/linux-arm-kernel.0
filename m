@@ -1,57 +1,55 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 23 Aug 2013 10:38:57 +0200
-Subject: [PATCH] pinctrl: imx: Fix compilation with DEBUG enabled
-Message-ID: <1377247137-19582-1-git-send-email-s.hauer@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 23 Aug 2013 10:41:53 +0200
+Subject: [PATCH 11/12] cpuidle: mvebu: Add initial cpu idle support for
+ Armada 370/XP SoC
+In-Reply-To: <1377240797-4047-12-git-send-email-gregory.clement@free-electrons.com>
+References: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
+ <1377240797-4047-12-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <52172051.2030505@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This became broken with converting the pinmux arrays into struct
-types. While at it replace the preprocessor magic with a simple
-dev_dbg.
+On 23/08/2013 08:53, Gregory CLEMENT wrote:
+> Add wfi/cpu idle/cpu deep idle power states support for Armada XP SoC.
+> 
+> All the latencies and the power consumption values used at the
+> "armada_370_xp_idle_driver" structure are preliminary and will be
+> modified in the future after running some measurements and analysis.
+> 
+> Based on the work of Nadav Haklai.
 
-Reported-by: Tushar Behera <tushar.behera@linaro.org>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/pinctrl/pinctrl-imx.c | 19 +++----------------
- 1 file changed, 3 insertions(+), 16 deletions(-)
+Atsushi Yamagata reported me an kernel crash when pm_support=off.
+Indeed I have lost a small chunk of code during my code reshaping.
+The following code will fix the issue. I will add it in the next
+version of this series.
 
-diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
-index 587dc0a..10d800b 100644
---- a/drivers/pinctrl/pinctrl-imx.c
-+++ b/drivers/pinctrl/pinctrl-imx.c
-@@ -27,18 +27,6 @@
- #include "core.h"
- #include "pinctrl-imx.h"
- 
--#define IMX_PMX_DUMP(info, p, m, c, n)			\
--{							\
--	int i, j;					\
--	printk(KERN_DEBUG "Format: Pin Mux Config\n");	\
--	for (i = 0; i < n; i++) {			\
--		j = p[i];				\
--		printk(KERN_DEBUG "%s %d 0x%lx\n",	\
--			info->pins[j].name,		\
--			m[i], c[i]);			\
--	}						\
--}
--
- /* The bits in CONFIG cell defined in binding doc*/
- #define IMX_NO_PAD_CTL	0x80000000	/* no pin config need */
- #define IMX_PAD_SION 0x40000000		/* set SION */
-@@ -468,11 +456,10 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
- 		if (config & IMX_PAD_SION)
- 			pin->mux_mode |= IOMUXC_CONFIG_SION;
- 		pin->config = config & ~IMX_PAD_SION;
--	}
- 
--#ifdef DEBUG
--	IMX_PMX_DUMP(info, grp->pins, grp->mux_mode, grp->configs, grp->npins);
--#endif
-+		dev_dbg(info->dev, "%s: %d 0x%08lx", info->pins[i].name,
-+				pin->mux_mode, pin->config);
-+	}
- 
- 	return 0;
- }
+[...]
+> +
+> +	if (pm_support == WFI)
+> +		pr_info(" (WFI)\n");
+> +	else if (pm_support == MV_CPU_IDLE)
+> +		pr_info(" (CPU_IDLE)\n");
+> +	else if (pm_support == MV_CPU_DEEP_IDLE)
+> +		pr_info(" (CPU_DEEP_IDLE)\n");
+
+
+> +	else
+> +		pr_info(" (DISABLED)\n");
+Will be replaced by
++       else {
++                       pr_info(" (DISABLED)\n");
++                       return; /* do not register the cpuidle device */
++       }
+
+> +
+> +	armada_370_xp_idle_driver.state_count = pm_support + 1;
+> +
+> +	return cpuidle_register(&armada_370_xp_idle_driver, NULL);
+> +}
+> +
+
 -- 
-1.8.4.rc3
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
