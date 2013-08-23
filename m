@@ -1,53 +1,72 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 23 Aug 2013 23:11:06 +0530
-Subject: [PATCH] ARM: Update SMP_ON_UP code to detect A9MPCore with 1
- CPU devices
-In-Reply-To: <52179927.1020906@ti.com>
-References: <1375381033-13220-1-git-send-email-santosh.shilimkar@ti.com>
- <51FBC610.9030900@arm.com> <51FBCEC3.4030207@ti.com>
- <51FBD42A.9040901@arm.com> <20130802154857.GD5292@mudshark.cambridge.arm.com>
- <52092AA5.3090005@ti.com> <20130813111943.GE30280@mudshark.cambridge.arm.com>
- <520A3518.3030301@ti.com> <52179719.3080609@ti.com> <52179927.1020906@ti.com>
-Message-ID: <52179EB2.2050800@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 23 Aug 2013 19:42:32 +0200
+Subject: [PATCH v2] pinctrl: Pass all configs to driver on pin_config_set()
+In-Reply-To: <1377134300-25480-1-git-send-email-syin@broadcom.com>
+References: <1376606573-15093-1-git-send-email-syin@broadcom.com>
+ <1377134300-25480-1-git-send-email-syin@broadcom.com>
+Message-ID: <CACRpkdZeET601+jOsjQxu-VAhi1owgtMX60Fij=uU489eGVFXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Aug 22, 2013 at 3:18 AM, Sherman Yin <syin@broadcom.com> wrote:
 
+> When setting pin configuration in the pinctrl framework, pin_config_set() or
+> pin_config_group_set() is called in a loop to set one configuration at a time
+> for the specified pin or group.
+>
+> This patch 1) removes the loop and 2) changes the API to pass the whole pin
+> config array to the driver.  It is now up to the driver to loop through the
+> configs.  This allows the driver to potentially combine configs and reduce the
+> number of writes to pin config registers.
+>
+> All c files changed have been build-tested to verify the change compiles and
+> that the corresponding .o is successfully generated.
+>
+> Signed-off-by: Sherman Yin <syin@broadcom.com>
+> Reviewed-by: Christian Daudt <csd@broadcom.com>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
 
-On 8/23/2013 10:47 PM, Santosh Shilimkar wrote:
-> On Friday 23 August 2013 01:08 PM, Sekhar Nori wrote:
->> On 8/13/2013 7:01 PM, Santosh Shilimkar wrote:
->>> On Tuesday 13 August 2013 07:19 AM, Will Deacon wrote:
->>>> On Mon, Aug 12, 2013 at 07:34:13PM +0100, Santosh Shilimkar wrote:
->>>>> On Friday 02 August 2013 11:48 AM, Will Deacon wrote:
->>>>>> I think this an A9-specific register, which reads as 0 on UP A9 and reads as
->>>>>> some form of PERIPH_BASE for SMP parts. The issue I have is when PERIPH_BASE
->>>>>> is zero.
->>>>>>
->>>>> What do we do here ? Should we document this in the code and proceed ?
->>>>> Mostly there is no platform with PERIPH_BASE = 0, so its should be fine but
->>>>> I am open for any other alternative.
->>>>
->>>> The only other alternative I can think of is forcing people to have
->>>> CONFIG_SMP=n, but that blows away single zImage for your platform.
->>>>
->>> Yep which surely we don't want considering after so much effort we
->>> have it working first place. How about going ahead with assumption
->>> that PERIPH_BASE = 0 case doesn't work.
->>
->> I must be missing something but why cannot we use the SCU configuration
->> register "CPU number" field to determine that its a UP? I do not have an
->> OMAP4 board, but on AM437x, it certainly indicates only CPU0 present.
->>
-> Thats what patch does. Yes, you are missing the point of dicussion. 
+Didn't you get review from Stephen Warren?
 
-Right, I see that now after actually reading the complete patch :)
+> ---
+> Please refer to the discussion with Linus W. "[PATCH] ARM: Adds pin config API
+> to set all configs in one function" here:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/166567.html
+>
+> All c files changed have been build-tested to verify the change compiles and
+> that the corresponding .o are successfully generated.
+>
+> [v2]    rebased on LinusW's linux-pinctrl.git "devel" branch.  Fixed and build-
+>         tested pinctrl-sunxi.c
+> ---
+>  drivers/pinctrl/mvebu/pinctrl-mvebu.c |   26 +++--
+>  drivers/pinctrl/pinconf.c             |   42 ++++----
+>  drivers/pinctrl/pinctrl-abx500.c      |  187 ++++++++++++++++++---------------
+>  drivers/pinctrl/pinctrl-at91.c        |   48 +++++----
+>  drivers/pinctrl/pinctrl-bcm2835.c     |   43 ++++----
+>  drivers/pinctrl/pinctrl-exynos5440.c  |  113 +++++++++++---------
+>  drivers/pinctrl/pinctrl-falcon.c      |   63 ++++++-----
+>  drivers/pinctrl/pinctrl-imx.c         |   28 ++---
+>  drivers/pinctrl/pinctrl-mxs.c         |   91 ++++++++--------
+>  drivers/pinctrl/pinctrl-nomadik.c     |  125 ++++++++++++----------
+>  drivers/pinctrl/pinctrl-rockchip.c    |   57 ++++++----
+>  drivers/pinctrl/pinctrl-samsung.c     |   17 ++-
+>  drivers/pinctrl/pinctrl-single.c      |   33 ++++--
+>  drivers/pinctrl/pinctrl-st.c          |   11 +-
+>  drivers/pinctrl/pinctrl-sunxi.c       |   95 +++++++++--------
+>  drivers/pinctrl/pinctrl-tegra.c       |   69 ++++++------
+>  drivers/pinctrl/pinctrl-tz1090-pdc.c  |  135 ++++++++++++++----------
+>  drivers/pinctrl/pinctrl-tz1090.c      |  140 +++++++++++++-----------
+>  drivers/pinctrl/pinctrl-u300.c        |   18 ++--
+>  drivers/pinctrl/pinctrl-xway.c        |  119 +++++++++++++--------
+>  drivers/pinctrl/sh-pfc/pinctrl.c      |   42 ++++----
+>  drivers/pinctrl/vt8500/pinctrl-wmt.c  |   54 +++++-----
+>  include/linux/pinctrl/pinconf.h       |    6 +-
+>  23 files changed, 889 insertions(+), 673 deletions(-)
 
-> On real UP Cortex-A9, the base address read will return '0' which is
-> treated as invalid address in the patch. Will D pointed out that one
+Please try to put all the maintainers for the above files on the To: line
+so they get a chance to review/ack the patch.
 
-Is this something defined by spec for all UP Cortex-A9 or just an
-observation on AM437x implementation? It sounds like the later?
-
-Thanks,
-Sekhar
+Yours,
+Linus Walleij
