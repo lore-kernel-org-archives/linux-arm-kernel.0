@@ -1,117 +1,34 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Sat, 24 Aug 2013 22:53:43 +0200
-Subject: [PATCH v4 1/4] lib: Introduce atomic MMIO modify
-In-Reply-To: <20130824204912.GA9456@localhost>
-References: <1377358532-23802-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377358532-23802-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <CAFLxGvxLyGH1Xgq6=Y5Z9x=DtBmjWnE+x9X-65RKY1=8dhL_OA@mail.gmail.com>
- <20130824195858.GA5957@localhost> <52191916.4080600@nod.at>
- <20130824204912.GA9456@localhost>
-Message-ID: <52191D57.3030906@nod.at>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 24 Aug 2013 23:19:42 +0200
+Subject: [PATCH 21/33] clk: ux500: Add Device Tree support for the PRCC
+ Kernel clock
+In-Reply-To: <201308241000.01649.arnd@arndb.de>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <20130822092130.GB22023@lee--X1>
+ <CACRpkdYLJdmhCqXpQ0s5nbxRoFdZ3bLn+hxAhkoGHYfvugc=7A@mail.gmail.com>
+ <201308241000.01649.arnd@arndb.de>
+Message-ID: <CACRpkdYg=KinRYXd9O9ZdEUfHOHpxh7KJN1TDgTUwP_uFXS6fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 24.08.2013 22:49, schrieb Ezequiel Garcia:
-> On Sat, Aug 24, 2013 at 10:35:34PM +0200, Richard Weinberger wrote:
->> Am 24.08.2013 21:58, schrieb Ezequiel Garcia:
->>> On Sat, Aug 24, 2013 at 08:27:10PM +0200, richard -rw- weinberger wrote:
->>>> On Sat, Aug 24, 2013 at 5:35 PM, Ezequiel Garcia
->>>> <ezequiel.garcia@free-electrons.com> wrote:
->>>>> Some platforms have MMIO regions that are shared across orthogonal
->>>>> subsystems. This commit implements a possible solution for the
->>>>> thread-safe access of such regions through a spinlock-protected API.
->>>>>
->>>>> Concurrent access is protected with a single spinlock for the
->>>>> entire MMIO address space. While this protects shared-registers,
->>>>> it also serializes access to unrelated/unshared registers.
->>>>>
->>>>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->>>>> ---
->>>>>  include/linux/io.h |  5 +++++
->>>>>  lib/Makefile       |  2 +-
->>>>>  lib/atomicio.c     | 27 +++++++++++++++++++++++++++
->>>>>  3 files changed, 33 insertions(+), 1 deletion(-)
->>>>>  create mode 100644 lib/atomicio.c
->>>>>
->>>>> diff --git a/include/linux/io.h b/include/linux/io.h
->>>>> index f4f42fa..c331dcb 100644
->>>>> --- a/include/linux/io.h
->>>>> +++ b/include/linux/io.h
->>>>> @@ -101,4 +101,9 @@ static inline void arch_phys_wc_del(int handle)
->>>>>  #define arch_phys_wc_add arch_phys_wc_add
->>>>>  #endif
->>>>>
->>>>> +#ifndef __HAVE_ARCH_ATOMIC_IO_MODIFY
->>>>> +/* Atomic MMIO-wide IO modify */
->>>>> +extern void atomic_io_modify(void __iomem *reg, u32 mask, u32 set);
->>>>> +#endif
->>>>> +
->>>>>  #endif /* _LINUX_IO_H */
->>>>> diff --git a/lib/Makefile b/lib/Makefile
->>>>> index 7baccfd..695d6e2 100644
->>>>> --- a/lib/Makefile
->>>>> +++ b/lib/Makefile
->>>>> @@ -13,7 +13,7 @@ lib-y := ctype.o string.o vsprintf.o cmdline.o \
->>>>>          sha1.o md5.o irq_regs.o reciprocal_div.o argv_split.o \
->>>>>          proportions.o flex_proportions.o prio_heap.o ratelimit.o show_mem.o \
->>>>>          is_single_threaded.o plist.o decompress.o kobject_uevent.o \
->>>>> -        earlycpio.o percpu-refcount.o
->>>>> +        earlycpio.o percpu-refcount.o atomicio.o
->>>>>
->>>>>  obj-$(CONFIG_ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS) += usercopy.o
->>>>>  lib-$(CONFIG_MMU) += ioremap.o
->>>>> diff --git a/lib/atomicio.c b/lib/atomicio.c
->>>>> new file mode 100644
->>>>> index 0000000..1750f9d
->>>>> --- /dev/null
->>>>> +++ b/lib/atomicio.c
->>>>> @@ -0,0 +1,27 @@
->>>>> +#include <linux/io.h>
->>>>> +#include <linux/spinlock.h>
->>>>> +
->>>>> +#ifndef __HAVE_ARCH_ATOMIC_IO_MODIFY
->>>>> +/*
->>>>> + * Generic atomic MMIO modify.
->>>>> + *
->>>>> + * Allows thread-safe access to registers shared by unrelated subsystems.
->>>>> + * The access is protected by a single MMIO-wide lock.
->>>>> + *
->>>>> + * Optimized variants can be implemented on a per-architecture basis.
->>>>> + */
->>>>> +static DEFINE_RAW_SPINLOCK(__io_lock);
->>>>> +void atomic_io_modify(void __iomem *reg, u32 mask, u32 set)
->>>>> +{
->>>>> +       unsigned long flags;
->>>>> +       u32 value;
->>>>> +
->>>>> +       raw_spin_lock_irqsave(&__io_lock, flags);
->>>>> +       value = readl(reg) & ~mask;
->>>>> +       value |= (set & mask);
->>>>> +       writel(value, reg);
->>>>> +       raw_spin_unlock_irqrestore(&__io_lock, flags);
->>>>> +
->>>>> +}
->>>>> +EXPORT_SYMBOL(atomic_io_modify);
->>>>
->>>> Why not the default case EXPORT_SYMBOL_GPL()?
->>>>
->>>
->>> Because I copy-pasted the export from some other lib/.. :-)
->>>
->>> Mind explaining me the difference, why you say _GPL it's the default,
->>> and why EXPORT_SYMBOL is more frequently used in lib/ ?
->>
->> As the kernel is GPL it is the default case to mark new things as GPL symbols.
->> If your new feature is a core feature which is used by mostly everyone, EXPORT_SYMBOL()
->> is appropriate.
->> I.e. having kmalloc() and friends EXPORT_SYMBOL_GPL() would be a bad idea. :)
->> EXPORT_SYMBOL() seems to be often used in lib/ because most lib/ things are core features.
->>
-> 
-> In that case, EXPORT_SYMBOL is certainly the most appropriate one,
-> for the reasons you stated above.
+On Sat, Aug 24, 2013 at 10:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Okay, did not realize that your feature is that fundamental. :-)
+> You just reminded me that I'm still sitting on this old patch
+> to add lots of #ifdef CONFIG_ATAGS to ux500 in the places that need
+> to get cut out. I don't think I'm able to update that patch at
+> the moment, but I can send you the old version I have if you
+> are interested.
 
-Thanks,
-//richard
+Well, right now we are getting to the point where DT is fully
+functional and Lee has just sent a first round of patches
+to switch clk to DT and then delete all the ATAG code in one
+swift stroke. (With patches to also clean out platform-data
+related cruft in the drivers to follow in the next merge window.)
+
+After that it will actually start to look small and nice,
+so I think we'll take that path for v3.13.
+
+(Famous last words.)
+
+Yours,
+Linus Walleij
