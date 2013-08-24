@@ -1,61 +1,47 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Sat, 24 Aug 2013 13:33:16 -0500
-Subject: [PATCH] ARM: dts: add AM33XX EDMA support
-In-Reply-To: <5218F519.3040409@cogentembedded.com>
-References: <1377284808-32412-1-git-send-email-bigeasy@linutronix.de>
- <5218F519.3040409@cogentembedded.com>
-Message-ID: <5218FC6C.6000002@ti.com>
+From: m.chehab@samsung.com (Mauro Carvalho Chehab)
+Date: Sat, 24 Aug 2013 15:48:26 -0300
+Subject: [PATCH v5 0/3] R8A7779/Marzen R-Car VIN driver support
+In-Reply-To: <5218E1CE.8050600@cogentembedded.com>
+References: <201308230119.13783.sergei.shtylyov@cogentembedded.com>
+ <20130823001140.GD9254@verge.net.au> <5218E1CE.8050600@cogentembedded.com>
+Message-ID: <20130824154826.63c2cf6c@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Updating CC with Matt's current email address.
+Em Sat, 24 Aug 2013 20:39:42 +0400
+Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> escreveu:
 
-On 08/24/2013 01:02 PM, Sergei Shtylyov wrote:
 > Hello.
 > 
-> On 08/23/2013 11:06 PM, Sebastian Andrzej Siewior wrote:
+> On 08/23/2013 04:11 AM, Simon Horman wrote:
 > 
->> From: Matt Porter <mdp@ti.com>
+> >>     [Resending with a real version #.]
 > 
->> Adds AM33XX EDMA support to the am33xx.dtsi as documented in
->> Documentation/devicetree/bindings/dma/ti-edma.txt
+> >>     Here's the set of 3 patches against the Mauro's 'media_tree.git' repo's
+> >> 'master' branch. Here we add the VIN driver platform code for the R8A7779/Marzen
+> >> with ADV7180 I2C video decoder.
 > 
->> Joel: Drop DT entries that are non-hardware-description for now as discussed
->> in [1]
+> >> [1/3] ARM: shmobile: r8a7779: add VIN support
+> >> [2/3] ARM: shmobile: Marzen: add VIN and ADV7180 support
+> >> [3/3] ARM: shmobile: Marzen: enable VIN and ADV7180 in defconfig
 > 
->> [1] https://patchwork.kernel.org/patch/2226761/
+> >>      Mauro has kindly agreed to merge this patchset thru his tree to resolve the
+> >> dependency on the driver's platform data header, provided that the maintainer
+> >> ACKs this. Simon, could you ACK the patchset ASAP -- Mauro expects to close his
+> >> tree for 3.12 this weekend or next Monday?
 > 
->> Signed-off-by: Matt Porter <mporter@ti.com>
->> Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
->> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
->> ---
->> Could someone please pick this up?
+> > All three patches:
 > 
->>   arch/arm/boot/dts/am33xx.dtsi | 12 ++++++++++++
->>   1 file changed, 12 insertions(+)
+> > Acked-by: Simon Horman <horms+renesas@verge.net.au>
 > 
->> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->> index 38b446b..784f774 100644
->> --- a/arch/arm/boot/dts/am33xx.dtsi
->> +++ b/arch/arm/boot/dts/am33xx.dtsi
->> @@ -96,6 +96,18 @@
->>               reg = <0x48200000 0x1000>;
->>           };
->>
->> +        edma: edma at 49000000 {
-> 
->    The node should be named "dma-controller", not "edma",according to ePAPR
-> section 2.2.2:
-> 
-> http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+>     Mauro, I see you have only merged the R8A7778/BOCK-W VIN series and didn't 
+> merge this one, obsoleting its patches in patchwork instead. What's wrong with 
+> them?
 
-So you mean something like the following?
+Sorry... as I saw v5 and v6 versions, one after the other, and both with VIN,
+from you, I assumed that v6 were just an update over v5.
 
-edma: dma-controller at 49000000 {
-  ...
-}
+I re-tagged them as new. I'll handle them on a next spin this weekend.
 
-
-Thanks,
-
--Joel
+Regards,
+Mauro
