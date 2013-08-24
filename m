@@ -1,30 +1,81 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Sat, 24 Aug 2013 17:30:00 +0800
-Subject: [PATCH v8 5/8] ARM: config: enable hi3xxx in multi_v7_defconfig
+Date: Sat, 24 Aug 2013 17:30:01 +0800
+Subject: [PATCH v8 6/8] ARM: config: add defconfig for Hi3xxx
 In-Reply-To: <1377336603-10303-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1377336603-10303-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1377336603-10303-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1377336603-10303-7-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable ARCH_HI3xxx in multi_v7_defconfig.
+Add default config for arch-hi3xxx. It's used for Hisilicon Hi3xxx SoC.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/hi3xxx_defconfig | 56 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+ create mode 100644 arch/arm/configs/hi3xxx_defconfig
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 6e572c6..6855397 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -8,6 +8,7 @@ CONFIG_MACH_ARMADA_XP=y
- CONFIG_ARCH_BCM=y
- CONFIG_GPIO_PCA953X=y
- CONFIG_ARCH_HIGHBANK=y
+diff --git a/arch/arm/configs/hi3xxx_defconfig b/arch/arm/configs/hi3xxx_defconfig
+new file mode 100644
+index 0000000..f186bdf
+--- /dev/null
++++ b/arch/arm/configs/hi3xxx_defconfig
+@@ -0,0 +1,56 @@
++CONFIG_IRQ_DOMAIN_DEBUG=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_RD_LZMA=y
 +CONFIG_ARCH_HI3xxx=y
- CONFIG_ARCH_KEYSTONE=y
- CONFIG_ARCH_MXC=y
- CONFIG_MACH_IMX51_DT=y
++CONFIG_SMP=y
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_NET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_ATA=y
++CONFIG_SATA_AHCI_PLATFORM=y
++CONFIG_NETDEVICES=y
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_I2C_DESIGNWARE_PLATFORM=y
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++CONFIG_PINCTRL_SINGLE=y
++CONFIG_GPIO_GENERIC_PLATFORM=y
++CONFIG_REGULATOR_GPIO=y
++CONFIG_DRM=y
++CONFIG_FB_SIMPLE=y
++CONFIG_USB=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_MXC=y
++CONFIG_USB_EHCI_HCD_PLATFORM=y
++CONFIG_USB_STORAGE=y
++CONFIG_NOP_USB_XCEIV=y
++CONFIG_MMC=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_PL031=y
++CONFIG_DMADEVICES=y
++CONFIG_DW_DMAC=y
++CONFIG_PL330_DMA=y
++CONFIG_PWM=y
++CONFIG_EXT4_FS=y
++CONFIG_TMPFS=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_ROOT_NFS=y
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_LOCKUP_DETECTOR=y
 -- 
 1.8.1.2
