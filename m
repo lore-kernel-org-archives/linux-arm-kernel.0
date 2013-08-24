@@ -1,46 +1,38 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Sat, 24 Aug 2013 00:11:08 -0700
-Subject: [PATCH V1 4/5] spi: Add Freescale QuadSpi driver
-In-Reply-To: <20130823164442.GA30359@sirena.org.uk>
-References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
- <1376885403-12156-5-git-send-email-b32955@freescale.com>
- <20130823164442.GA30359@sirena.org.uk>
-Message-ID: <52185C8C.3090605@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 24 Aug 2013 09:57:53 +0200
+Subject: [PATCH 26/33] ARM: ux500: Remove AUXDATA relating to SDI (MMC)
+ clock-name bindings
+In-Reply-To: <CACRpkdb+WEecBEuFtoDLv9k3vyi=o0nZcLfCeny-7+uxdNBryA@mail.gmail.com>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <1370521041-32318-27-git-send-email-lee.jones@linaro.org>
+ <CACRpkdb+WEecBEuFtoDLv9k3vyi=o0nZcLfCeny-7+uxdNBryA@mail.gmail.com>
+Message-ID: <201308240957.53944.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2013 09:44 AM, Mark Brown wrote:
-> On Mon, Aug 19, 2013 at 12:10:02PM +0800, Huang Shijie wrote:
->> +static int fsl_qspi_wait_till_ready(struct fsl_qspi *q)
->> +{
->> +	unsigned long deadline;
->> +	u32 sr;
->> +
->> +	deadline = jiffies + msecs_to_jiffies(40000);
->> +
->> +	do {
->> +		if ((sr = fsl_qspi_read_sr(q)) < 0)
->> +			break;
->> +		else if (!(sr & SR_WIP))
->> +			return 0;
->> +
->> +		cond_resched();
->> +
->> +	} while (!time_after_eq(jiffies, deadline));
->> +
->> +	return 1;
->> +}
->
-> Return an error code if we time out?
+On Friday 23 August 2013, Linus Walleij wrote:
+> On Thu, Jun 6, 2013 at 2:17 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> (...)
+> >         /* Requires DMA bindings. */
+> >         OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
+> > -       OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
+> > -       OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
+> > -       OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  &mop500_sdi2_data),
+> > -       OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  &mop500_sdi4_data),
+> 
+> This cannot be done. Ulf H would beat me up if I applied this.
+> 
+> The platform data there in the end is actually used.
+> 
+> Especially look at mop500_sdi0_data, it contains a lot of stuff that is
+> not yet DT:ed even (a task in its own right).
+> 
+> But as long as we keep this pdata we can still delete ATAGs support (as
+> per the second patch set pending) and get a clearer picture.
 
-You also need to check that you didn't complete between your last 
-fsl_qspi_read_sr() and the time_arter_eq() check. Theoretically, there 
-could be a lot of time between them (due to cond_resched(), for 
-instance). 40000 milliseconds is also a lot of time, but still...
+Which parts of mop500_sdi0_data are not yet converted? I thought it was all covered
+months ago.
 
-IOW, add a check before the "return -ESOMETHING", something like this:
-
-if (!(fsl_qspi_read_sr(q) & SR_WIP))
-	return 0;
-
-Brian
+	Arnd
