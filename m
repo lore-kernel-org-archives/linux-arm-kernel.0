@@ -1,42 +1,46 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Sat, 24 Aug 2013 12:09:40 +0530
-Subject: [PATCH v2 5/5] clk/exynos5420: assign sclk_pixel id to pixel
- clock divider
-In-Reply-To: <3550203.JkdqaguvYB@flatron>
-References: <1377241078-11808-1-git-send-email-rahul.sharma@samsung.com>
- <1377241078-11808-6-git-send-email-rahul.sharma@samsung.com>
- <3550203.JkdqaguvYB@flatron>
-Message-ID: <CAPdUM4O75Qcv6DD7NNRUG2vf+hs7bs0sFX+MAReS6JH_9B7rhQ@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Sat, 24 Aug 2013 00:11:08 -0700
+Subject: [PATCH V1 4/5] spi: Add Freescale QuadSpi driver
+In-Reply-To: <20130823164442.GA30359@sirena.org.uk>
+References: <1376885403-12156-1-git-send-email-b32955@freescale.com>
+ <1376885403-12156-5-git-send-email-b32955@freescale.com>
+ <20130823164442.GA30359@sirena.org.uk>
+Message-ID: <52185C8C.3090605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 August 2013 01:32, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Rahul,
+On 08/23/2013 09:44 AM, Mark Brown wrote:
+> On Mon, Aug 19, 2013 at 12:10:02PM +0800, Huang Shijie wrote:
+>> +static int fsl_qspi_wait_till_ready(struct fsl_qspi *q)
+>> +{
+>> +	unsigned long deadline;
+>> +	u32 sr;
+>> +
+>> +	deadline = jiffies + msecs_to_jiffies(40000);
+>> +
+>> +	do {
+>> +		if ((sr = fsl_qspi_read_sr(q)) < 0)
+>> +			break;
+>> +		else if (!(sr & SR_WIP))
+>> +			return 0;
+>> +
+>> +		cond_resched();
+>> +
+>> +	} while (!time_after_eq(jiffies, deadline));
+>> +
+>> +	return 1;
+>> +}
 >
-> On Friday 23 of August 2013 12:27:58 Rahul Sharma wrote:
->> sclk_pixel is used to represent pixel clock divider on all exynos
->> SoCs not as a gate clock. It is queried in driver to pass as the
->> parent to hdmi clock while switching between parents. A new ID can
->> be asssigned Pixel gate clock which is currently not in use. Pixel
->> clock gate is default 'on'.
->
-> This doesn't sound like a correct assumption, especially if you recall how
-> common clock framework works - it disables any unclaimed clock
-> automatically. Also we might want to support gating from power management
-> reasons.
->
-> IMHO you should simply export the dout_hdmi_pixel clock, keeping the
-> original sclk_pixel exported as well.
->
+> Return an error code if we time out?
 
-Hi Tomasz,
+You also need to check that you didn't complete between your last 
+fsl_qspi_read_sr() and the time_arter_eq() check. Theoretically, there 
+could be a lot of time between them (due to cond_resched(), for 
+instance). 40000 milliseconds is also a lot of time, but still...
 
-Yea correct. I will export the divider clock and let hdmi driver use that
-to pass as parent opf mout_pixel.
+IOW, add a check before the "return -ESOMETHING", something like this:
 
-Regards,
-Rahul Sharma.
+if (!(fsl_qspi_read_sr(q) & SR_WIP))
+	return 0;
 
-> Best regards,
-> Tomasz
->
+Brian
