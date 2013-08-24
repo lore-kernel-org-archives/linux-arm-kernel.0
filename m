@@ -1,90 +1,45 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 24 Aug 2013 12:35:31 -0300
-Subject: [PATCH v4 3/4] clocksource: orion: Use atomic access for shared
- registers
+Date: Sat, 24 Aug 2013 12:35:32 -0300
+Subject: [PATCH v4 4/4] watchdog: orion: Use atomic access for shared registers
 In-Reply-To: <1377358532-23802-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1377358532-23802-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1377358532-23802-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1377358532-23802-5-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the driver-specific thread-safe shared register API
-by the recently introduced atomic_io_modify().
+Since the timer control register is shared with the clocksource driver,
+use the recently introduced atomic_io_clear_set() to access such register.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/clocksource/time-orion.c | 29 +++++++++++------------------
- 1 file changed, 11 insertions(+), 18 deletions(-)
+ drivers/watchdog/orion_wdt.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clocksource/time-orion.c b/drivers/clocksource/time-orion.c
-index ecbeb68..f69f697 100644
---- a/drivers/clocksource/time-orion.c
-+++ b/drivers/clocksource/time-orion.c
-@@ -18,6 +18,7 @@
- #include <linux/interrupt.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-+#include <linux/io.h>
- #include <linux/spinlock.h>
- #include <asm/sched_clock.h>
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index 4ea5fcc..cfc037d 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -73,9 +73,7 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ 	writel(~WDT_INT_REQ, BRIDGE_CAUSE);
  
-@@ -35,20 +36,6 @@
- #define ORION_ONESHOT_MAX	0xfffffffe
+ 	/* Enable watchdog timer */
+-	reg = readl(wdt_reg + TIMER_CTRL);
+-	reg |= WDT_EN;
+-	writel(reg, wdt_reg + TIMER_CTRL);
++	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, WDT_EN);
  
- static void __iomem *timer_base;
--static DEFINE_SPINLOCK(timer_ctrl_lock);
--
--/*
-- * Thread-safe access to TIMER_CTRL register
-- * (shared with watchdog timer)
-- */
--void orion_timer_ctrl_clrset(u32 clr, u32 set)
--{
--	spin_lock(&timer_ctrl_lock);
--	writel((readl(timer_base + TIMER_CTRL) & ~clr) | set,
--		timer_base + TIMER_CTRL);
--	spin_unlock(&timer_ctrl_lock);
--}
--EXPORT_SYMBOL(orion_timer_ctrl_clrset);
+ 	/* Enable reset on watchdog */
+ 	reg = readl(RSTOUTn_MASK);
+@@ -98,9 +96,7 @@ static int orion_wdt_stop(struct watchdog_device *wdt_dev)
+ 	writel(reg, RSTOUTn_MASK);
  
- /*
-  * Free-running clocksource handling.
-@@ -68,7 +55,8 @@ static int orion_clkevt_next_event(unsigned long delta,
- {
- 	/* setup and enable one-shot timer */
- 	writel(delta, timer_base + TIMER1_VAL);
--	orion_timer_ctrl_clrset(TIMER1_RELOAD_EN, TIMER1_EN);
-+	atomic_io_modify(timer_base + TIMER_CTRL,
-+		TIMER1_RELOAD_EN | TIMER1_EN, TIMER1_EN);
+ 	/* Disable watchdog timer */
+-	reg = readl(wdt_reg + TIMER_CTRL);
+-	reg &= ~WDT_EN;
+-	writel(reg, wdt_reg + TIMER_CTRL);
++	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, 0);
  
+ 	spin_unlock(&wdt_lock);
  	return 0;
- }
-@@ -80,10 +68,13 @@ static void orion_clkevt_mode(enum clock_event_mode mode,
- 		/* setup and enable periodic timer at 1/HZ intervals */
- 		writel(ticks_per_jiffy - 1, timer_base + TIMER1_RELOAD);
- 		writel(ticks_per_jiffy - 1, timer_base + TIMER1_VAL);
--		orion_timer_ctrl_clrset(0, TIMER1_RELOAD_EN | TIMER1_EN);
-+		atomic_io_modify(timer_base + TIMER_CTRL,
-+			TIMER1_RELOAD_EN | TIMER1_EN,
-+			TIMER1_RELOAD_EN | TIMER1_EN);
- 	} else {
- 		/* disable timer */
--		orion_timer_ctrl_clrset(TIMER1_RELOAD_EN | TIMER1_EN, 0);
-+		atomic_io_modify(timer_base + TIMER_CTRL,
-+			TIMER1_RELOAD_EN | TIMER1_EN, 0);
- 	}
- }
- 
-@@ -131,7 +122,9 @@ static void __init orion_timer_init(struct device_node *np)
- 	/* setup timer0 as free-running clocksource */
- 	writel(~0, timer_base + TIMER0_VAL);
- 	writel(~0, timer_base + TIMER0_RELOAD);
--	orion_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | TIMER0_EN);
-+	atomic_io_modify(timer_base + TIMER_CTRL,
-+		TIMER0_RELOAD_EN | TIMER0_EN,
-+		TIMER0_RELOAD_EN | TIMER0_EN);
- 	clocksource_mmio_init(timer_base + TIMER0_VAL, "orion_clocksource",
- 			      clk_get_rate(clk), 300, 32,
- 			      clocksource_mmio_readl_down);
 -- 
 1.8.1.5
