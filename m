@@ -1,35 +1,63 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Sat, 24 Aug 2013 21:21:05 +0200
-Subject: [PATCH] net/cadence/macb: fix kernel Oops if no PHY were discovered
- during probe
-Message-ID: <1377372065-8938-1-git-send-email-b.brezillon@overkiz.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 24 Aug 2013 23:33:06 +0400
+Subject: [PATCH] ARM: dts: add AM33XX EDMA support
+In-Reply-To: <5218FC6C.6000002@ti.com>
+References: <1377284808-32412-1-git-send-email-bigeasy@linutronix.de>
+ <5218F519.3040409@cogentembedded.com> <5218FC6C.6000002@ti.com>
+Message-ID: <52190A72.4070407@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Test the presence of a PHY device before printing attached PHY
-informations.
+Hello.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/net/ethernet/cadence/macb.c |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+On 08/24/2013 10:33 PM, Joel Fernandes wrote:
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index e866608..fd3b67f 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -1868,8 +1868,10 @@ static int __init macb_probe(struct platform_device *pdev)
- 		    dev->irq, dev->dev_addr);
- 
- 	phydev = bp->phy_dev;
--	netdev_info(dev, "attached PHY driver [%s] (mii_bus:phy_addr=%s, irq=%d)\n",
--		    phydev->drv->name, dev_name(&phydev->dev), phydev->irq);
-+	if (phydev)
-+		netdev_info(dev, "attached PHY driver [%s] (mii_bus:phy_addr=%s, irq=%d)\n",
-+			    phydev->drv->name, dev_name(&phydev->dev),
-+			    phydev->irq);
- 
- 	return 0;
- 
--- 
-1.7.9.5
+> Updating CC with Matt's current email address.
+
+>>> From: Matt Porter <mdp@ti.com>
+
+>>> Adds AM33XX EDMA support to the am33xx.dtsi as documented in
+>>> Documentation/devicetree/bindings/dma/ti-edma.txt
+
+>>> Joel: Drop DT entries that are non-hardware-description for now as discussed
+>>> in [1]
+
+>>> [1] https://patchwork.kernel.org/patch/2226761/
+
+>>> Signed-off-by: Matt Porter <mporter@ti.com>
+>>> Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
+>>> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+>>> ---
+>>> Could someone please pick this up?
+
+>>>    arch/arm/boot/dts/am33xx.dtsi | 12 ++++++++++++
+>>>    1 file changed, 12 insertions(+)
+
+>>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+>>> index 38b446b..784f774 100644
+>>> --- a/arch/arm/boot/dts/am33xx.dtsi
+>>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>>> @@ -96,6 +96,18 @@
+>>>                reg = <0x48200000 0x1000>;
+>>>            };
+>>>
+>>> +        edma: edma at 49000000 {
+
+>>     The node should be named "dma-controller", not "edma",according to ePAPR
+>> section 2.2.2:
+
+>> http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+
+> So you mean something like the following?
+
+> edma: dma-controller at 49000000 {
+>    ...
+> }
+
+    Yes, exactly.
+
+> Thanks,
+
+> -Joel
+
+WBR, Sergei
