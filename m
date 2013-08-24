@@ -1,34 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 24 Aug 2013 23:19:42 +0200
-Subject: [PATCH 21/33] clk: ux500: Add Device Tree support for the PRCC
- Kernel clock
-In-Reply-To: <201308241000.01649.arnd@arndb.de>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <20130822092130.GB22023@lee--X1>
- <CACRpkdYLJdmhCqXpQ0s5nbxRoFdZ3bLn+hxAhkoGHYfvugc=7A@mail.gmail.com>
- <201308241000.01649.arnd@arndb.de>
-Message-ID: <CACRpkdYg=KinRYXd9O9ZdEUfHOHpxh7KJN1TDgTUwP_uFXS6fg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 25 Aug 2013 01:33:16 +0400
+Subject: [PATCH v4 0/2] R8A7778/BOCK-W: HPB-DMAC support for SDHI0
+Message-ID: <201308250133.17530.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 24, 2013 at 10:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hello.
 
-> You just reminded me that I'm still sitting on this old patch
-> to add lots of #ifdef CONFIG_ATAGS to ux500 in the places that need
-> to get cut out. I don't think I'm able to update that patch at
-> the moment, but I can send you the old version I have if you
-> are interested.
+   Here's the set of 2 patches against the Simon Horman's 'renesas.git' repo,
+'renesas-next-20130823' tag. Here we add the HPB-DMAC platform code working on
+the R8A7778 and enable DMA for SDHI0 on BOCK-W (Max has fixed the wrong settings
+that led to the SDHI0 DMA working incorrectly). The patchset depends on the
+R-Car HPB-DMAC driver patch posted earlier.
 
-Well, right now we are getting to the point where DT is fully
-functional and Lee has just sent a first round of patches
-to switch clk to DT and then delete all the ATAG code in one
-swift stroke. (With patches to also clean out platform-data
-related cruft in the drivers to follow in the next merge window.)
+[1/2] ARM: shmobile: r8a7778: add HPB-DMAC support
+[2/2] ARM: shmobile: BOCK-W: enable DMA for SDHI0
 
-After that it will actually start to look small and nice,
-so I think we'll take that path for v3.13.
+   The former patch #1 has been merged to the next patch moving the data from
+the now removed <mach/dma.h> to <mach/r8a7778.h>.
 
-(Famous last words.)
-
-Yours,
-Linus Walleij
+WBR, Sergei
