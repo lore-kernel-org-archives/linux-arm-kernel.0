@@ -1,42 +1,78 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 25 Aug 2013 01:36:38 +0400
-Subject: [PATCH v4 2/2] ARM: shmobile: BOCK-W: enable DMA for SDHI0
-In-Reply-To: <201308250133.17530.sergei.shtylyov@cogentembedded.com>
-References: <201308250133.17530.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201308250136.38922.sergei.shtylyov@cogentembedded.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Sat, 24 Aug 2013 23:35:09 +0200
+Subject: [RFC PATCH 1/3] pinctrl: add new generic pinconf config for deglitch
+ filter
+In-Reply-To: <1377379926-11163-1-git-send-email-b.brezillon@overkiz.com>
+References: <1377379926-11163-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1377380109-11247-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Max Filippov <max.filippov@cogentembedded.com>
+Add a new parameter to support deglitch filter configuration.
+A deglitch filter works like a debounce filter but with a smaller
+delay (nanoseconds).
 
-Pass HPB-DMA slave IDs in the SDHI0 platform data to enable DMA in the SDHI
-driver.
-
-Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
-[Sergei: removed #include <mach/dma.h>]
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
-Changes in version 3:
-- resolved reject.
+ .../bindings/pinctrl/pinctrl-bindings.txt          |    1 +
+ drivers/pinctrl/pinconf-generic.c                  |    2 ++
+ include/linux/pinctrl/pinconf-generic.h            |    5 +++++
+ 3 files changed, 8 insertions(+)
 
-Changes in version 2:
-- removed #include <mach/dma.h>;
-- refreshed the patch.
-
- arch/arm/mach-shmobile/board-bockw.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-Index: renesas/arch/arm/mach-shmobile/board-bockw.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
-+++ renesas/arch/arm/mach-shmobile/board-bockw.c
-@@ -89,6 +89,8 @@ static struct rcar_phy_platform_data usb
- 
- /* SDHI */
- static struct sh_mobile_sdhi_info sdhi0_info __initdata = {
-+	.dma_slave_tx	= HPBDMA_SLAVE_SDHI0_TX,
-+	.dma_slave_rx	= HPBDMA_SLAVE_SDHI0_RX,
- 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED,
- 	.tmio_ocr_mask	= MMC_VDD_165_195 | MMC_VDD_32_33 | MMC_VDD_33_34,
- 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
+diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+index 1958ca9..2f7613e 100644
+--- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
++++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+@@ -154,6 +154,7 @@ drive-strength		- sink or source at most X mA
+ input-schmitt-enable	- enable schmitt-trigger mode
+ input-schmitt-disable	- disable schmitt-trigger mode
+ input-debounce		- debounce mode with debound time X
++input-deglitch		- deglitch mode
+ low-power-enable	- enable low power mode
+ low-power-disable	- disable low power mode
+ output-low		- set the pin to output mode with low level
+diff --git a/drivers/pinctrl/pinconf-generic.c b/drivers/pinctrl/pinconf-generic.c
+index 2c62225..f14a386 100644
+--- a/drivers/pinctrl/pinconf-generic.c
++++ b/drivers/pinctrl/pinconf-generic.c
+@@ -51,6 +51,7 @@ static struct pin_config_item conf_items[] = {
+ 	PCONFDUMP(PIN_CONFIG_INPUT_SCHMITT_ENABLE, "input schmitt enabled", NULL),
+ 	PCONFDUMP(PIN_CONFIG_INPUT_SCHMITT, "input schmitt trigger", NULL),
+ 	PCONFDUMP(PIN_CONFIG_INPUT_DEBOUNCE, "input debounce", "usec"),
++	PCONFDUMP(PIN_CONFIG_INPUT_DEGLITCH, "input deglitch", NULL),
+ 	PCONFDUMP(PIN_CONFIG_POWER_SOURCE, "pin power source", "selector"),
+ 	PCONFDUMP(PIN_CONFIG_SLEW_RATE, "slew rate", NULL),
+ 	PCONFDUMP(PIN_CONFIG_LOW_POWER_MODE, "pin low power", "mode"),
+@@ -163,6 +164,7 @@ static struct pinconf_generic_dt_params dt_params[] = {
+ 	{ "input-schmitt-enable", PIN_CONFIG_INPUT_SCHMITT_ENABLE, 1 },
+ 	{ "input-schmitt-disable", PIN_CONFIG_INPUT_SCHMITT_ENABLE, 0 },
+ 	{ "input-debounce", PIN_CONFIG_INPUT_DEBOUNCE, 0 },
++	{ "input-deglitch", PIN_CONFIG_INPUT_DEGLITCH, 0 },
+ 	{ "low-power-enable", PIN_CONFIG_LOW_POWER_MODE, 1 },
+ 	{ "low-power-disable", PIN_CONFIG_LOW_POWER_MODE, 0 },
+ 	{ "output-low", PIN_CONFIG_OUTPUT, 0, },
+diff --git a/include/linux/pinctrl/pinconf-generic.h b/include/linux/pinctrl/pinconf-generic.h
+index fb90ef5..aa06535 100644
+--- a/include/linux/pinctrl/pinconf-generic.h
++++ b/include/linux/pinctrl/pinconf-generic.h
+@@ -72,6 +72,10 @@
+  *	which means it will wait for signals to settle when reading inputs. The
+  *	argument gives the debounce time in usecs. Setting the
+  *	argument to zero turns debouncing off.
++  * @PIN_CONFIG_INPUT_DEGLITCH: this will configure the pin to deglitch mode,
++ *	which means it will wait for signals to settle when reading inputs. The
++ *      If the argument != 0, deglitch mode is enabled. If it's 0, deglitch
++ *      mode is disabled.
+  * @PIN_CONFIG_POWER_SOURCE: if the pin can select between different power
+  *	supplies, the argument to this parameter (on a custom format) tells
+  *	the driver which alternative power source to use.
+@@ -102,6 +106,7 @@ enum pin_config_param {
+ 	PIN_CONFIG_INPUT_SCHMITT_ENABLE,
+ 	PIN_CONFIG_INPUT_SCHMITT,
+ 	PIN_CONFIG_INPUT_DEBOUNCE,
++	PIN_CONFIG_INPUT_DEGLITCH,
+ 	PIN_CONFIG_POWER_SOURCE,
+ 	PIN_CONFIG_SLEW_RATE,
+ 	PIN_CONFIG_LOW_POWER_MODE,
+-- 
+1.7.9.5
