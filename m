@@ -1,22 +1,67 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 25 Aug 2013 01:33:16 +0400
-Subject: [PATCH v4 0/2] R8A7778/BOCK-W: HPB-DMAC support for SDHI0
-Message-ID: <201308250133.17530.sergei.shtylyov@cogentembedded.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Sat, 24 Aug 2013 23:32:06 +0200
+Subject: [RFC PATCH 0/3] pinctrl: at91: add support for generic pinconf
+Message-ID: <1377379926-11163-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hello,
 
-   Here's the set of 2 patches against the Simon Horman's 'renesas.git' repo,
-'renesas-next-20130823' tag. Here we add the HPB-DMAC platform code working on
-the R8A7778 and enable DMA for SDHI0 on BOCK-W (Max has fixed the wrong settings
-that led to the SDHI0 DMA working incorrectly). The patchset depends on the
-R-Car HPB-DMAC driver patch posted earlier.
+This patch series is an attempt to add support for generic pin config
+syntax to at91 pinctrl driver.
 
-[1/2] ARM: shmobile: r8a7778: add HPB-DMAC support
-[2/2] ARM: shmobile: BOCK-W: enable DMA for SDHI0
+My primary goal is to add support for output configuration from dt definition.
+This is needed to fully move at91rm9200ek board to dt (other boards may have
+the same needs).
+This board use a pin to drive an external switch which select between 2
+functionnalities:
+ - mmc interface
+ - spi interface
+The pin level is currently configured in the board init (init_machine) function
+based on user config choices (CONFIG_MTD_AT91_DATAFLASH_CARD).
 
-   The former patch #1 has been merged to the next patch moving the data from
-the now removed <mach/dma.h> to <mach/r8a7778.h>.
+Instead of adding a new flag to the current (native) pin config binding, I
+tried to add support for the generic pin config used by some pinctrl drivers
+(i.e. rockchip).
 
-WBR, Sergei
+Is this the right way to do this or should I add a new at91 native flags for
+output config (OUTPUT_HIGH/LOW) ?
+
+The second patch introduce a new config parameter to add a glitch filter on a
+specific pin.
+Glitch filter is similar to bounce filter (or debounce) but with a smaller
+delay (expressed in nsecs ?).
+
+I'm not sure this is the right approach.
+Maybe we should reuse the debounce parameter and add a flag to specify the delay
+unit (usec or nsec).
+
+What do you think ?
+
+The third patch migrate sama5 dt boards to the new generic config syntax.
+
+Please feel free to share your thoughts.
+
+Best Regards,
+
+Boris
+
+
+Boris BREZILLON (3):
+  pinctrl: add new generic pinconf config for deglitch filter
+  pinctrl: at91: add support for generic pinconf
+  ARM: at91/dt: move sama5 to generic pinconf
+
+ .../bindings/pinctrl/atmel,at91-pinctrl.txt        |   43 ++-
+ .../bindings/pinctrl/pinctrl-bindings.txt          |    1 +
+ arch/arm/boot/dts/sama5d3.dtsi                     |  363 ++++++++++----------
+ arch/arm/boot/dts/sama5d3xdm.dtsi                  |    2 +-
+ arch/arm/boot/dts/sama5d3xmb.dtsi                  |   12 +-
+ drivers/pinctrl/Kconfig                            |    2 +-
+ drivers/pinctrl/pinconf-generic.c                  |    2 +
+ drivers/pinctrl/pinctrl-at91.c                     |  265 +++++++++++++-
+ include/linux/pinctrl/pinconf-generic.h            |    5 +
+ 9 files changed, 494 insertions(+), 201 deletions(-)
+
+-- 
+1.7.9.5
