@@ -1,38 +1,104 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 25 Aug 2013 21:47:26 +0400
-Subject: [PATCH v2 2/2] ARM: shmobile: Marzen: enable DMA for SDHI0
-In-Reply-To: <201308252143.33458.sergei.shtylyov@cogentembedded.com>
-References: <201308252143.33458.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201308252147.27210.sergei.shtylyov@cogentembedded.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 26 Aug 2013 02:47:53 +0900
+Subject: [PATCH V2] ARM: dts: Add DMA controller node info on Exynos5420.
+In-Reply-To: <1376481862-9578-1-git-send-email-padma.v@samsung.com>
+References: <1376481862-9578-1-git-send-email-padma.v@samsung.com>
+Message-ID: <521A4349.7080406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Max Filippov <max.filippov@cogentembedded.com>
+On 08/14/13 21:04, Padmavathi Venna wrote:
+> This patch adds dma controller node info on Exynos5420.
+>
+> Signed-off-by: Padmavathi Venna<padma.v@samsung.com>
+> ---
+>
+> Changes since V1:
+> 	- In V1, dma node common stuff was added in common exynos5.dtsi file.
+> 	  This was removed as per Kukjin comment and added in exynos5420.dtsi.
+>
+> This patch is dependent on audss clk controller patches that were
+> posted in the below link.
+> http://www.spinics.net/lists/linux-samsung-soc/msg20253.html
+>
+So I'm still waiting for above...
 
-Pass HPB-DMA slave IDs in the SDHI0 platform data to enable DMA in the SDHI
-driver.
+- Kukjin
 
-Signed-off-by: Max Filippov <max.filippov@cogentembedded.com>
-[Sergei: removed #include <mach/dma.h>]
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
-Changes in version 2:
-- refreshed the patch.
-
- arch/arm/mach-shmobile/board-marzen.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-Index: renesas/arch/arm/mach-shmobile/board-marzen.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-marzen.c
-+++ renesas/arch/arm/mach-shmobile/board-marzen.c
-@@ -123,6 +123,8 @@ static struct resource sdhi0_resources[]
- };
- 
- static struct sh_mobile_sdhi_info sdhi0_platform_data = {
-+	.dma_slave_tx = HPBDMA_SLAVE_SDHI0_TX,
-+	.dma_slave_rx = HPBDMA_SLAVE_SDHI0_RX,
- 	.tmio_flags = TMIO_MMC_WRPROTECT_DISABLE | TMIO_MMC_HAS_IDLE_WAIT,
- 	.tmio_caps = MMC_CAP_SD_HIGHSPEED,
- };
+>   arch/arm/boot/dts/exynos5420.dtsi |   63 +++++++++++++++++++++++++++++++++++++
+>   1 files changed, 63 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index 9e90d1e..23cfea4 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -126,6 +126,69 @@
+>   		interrupts =<0 47 0>;
+>   	};
+>
+> +	amba {
+> +		#address-cells =<1>;
+> +		#size-cells =<1>;
+> +		compatible = "arm,amba-bus";
+> +		interrupt-parent =<&gic>;
+> +		ranges;
+> +
+> +		pdma0: pdma at 121A0000 {
+> +			compatible = "arm,pl330", "arm,primecell";
+> +			reg =<0x121A0000 0x1000>;
+> +			interrupts =<0 34 0>;
+> +			clocks =<&clock 362>;
+> +			clock-names = "apb_pclk";
+> +			#dma-cells =<1>;
+> +			#dma-channels =<8>;
+> +			#dma-requests =<32>;
+> +		};
+> +
+> +		pdma1: pdma at 121B0000 {
+> +			compatible = "arm,pl330", "arm,primecell";
+> +			reg =<0x121B0000 0x1000>;
+> +			interrupts =<0 35 0>;
+> +			clocks =<&clock 363>;
+> +			clock-names = "apb_pclk";
+> +			#dma-cells =<1>;
+> +			#dma-channels =<8>;
+> +			#dma-requests =<32>;
+> +		};
+> +
+> +		mdma0: mdma at 10800000 {
+> +			compatible = "arm,pl330", "arm,primecell";
+> +			reg =<0x10800000 0x1000>;
+> +			interrupts =<0 33 0>;
+> +			clocks =<&clock 473>;
+> +			clock-names = "apb_pclk";
+> +			#dma-cells =<1>;
+> +			#dma-channels =<8>;
+> +			#dma-requests =<1>;
+> +		};
+> +
+> +		mdma1: mdma at 11C10000 {
+> +			compatible = "arm,pl330", "arm,primecell";
+> +			reg =<0x11C10000 0x1000>;
+> +			interrupts =<0 124 0>;
+> +			clocks =<&clock 442>;
+> +			clock-names = "apb_pclk";
+> +			#dma-cells =<1>;
+> +			#dma-channels =<8>;
+> +			#dma-requests =<1>;
+> +		};
+> +
+> +		adma: adma at 03880000 {
+> +			compatible = "arm,pl330", "arm,primecell";
+> +			reg =<0x03880000 0x1000>;
+> +			interrupts =<0 110 0>;
+> +			clocks =<&clock_audss EXYNOS_ADMA>;
+> +			clock-names = "apb_pclk";
+> +			#dma-cells =<1>;
+> +			#dma-channels =<6>;
+> +			#dma-requests =<16>;
+> +		};
+> +	};
+> +
+>   	serial at 12C00000 {
+>   		clocks =<&clock 257>,<&clock 128>;
+>   		clock-names = "uart", "clk_uart_baud0";
