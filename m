@@ -1,43 +1,70 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 25 Aug 2013 22:54:06 +0200
-Subject: [PATCH v3 00/14] Remove platform callbacks from mmc_spi,
- sh_mmcif and sh_mobile_sdhi drivers
-In-Reply-To: <87ob8mqv55.fsf@octavius.laptop.org>
-References: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <87ob8mqv55.fsf@octavius.laptop.org>
-Message-ID: <1591201.avzdVWpxvg@avalon>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 25 Aug 2013 14:50:08 -0700
+Subject: [PATCHv3 02/10] clk: sunxi: fix initialization of basic clocks
+In-Reply-To: <1375609657-15434-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1375609657-15434-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1375609657-15434-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130825215008.8231.41811@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
-
-On Saturday 24 August 2013 23:58:14 Chris Ball wrote:
-> On Thu, Aug 08 2013, Laurent Pinchart wrote:
-> > This patch set replaces callbacks to board code with regulators and GPIOs
-> > in the mmc_spi, sh_mmcif and sh_mobile_sdhi MMC drivers.
-> > 
-> > Most of the required infrastructure is in place already on the drivers
-> > side, except for CD debouncing support in the MMC core and CD/RO GPIOs
-> > support in the mmc_spi driver. The series thus starts with patches 01/14
-> > and 02/14 that add those features to the MMC core and mmc_spi driver.
-> > 
-> > Patches 03/14 to 07/14 remove the board callbacks from the ecovec24 and
-> > vision_ep9307 boards. The code has been compile-tested only as I don't
-> > have
-> > access to those boards.
-> > 
-> > Patches 08/14 to 14/14 then proceed to remove the callbacks from the
-> > drivers themselves and from the platform data structures.
+Quoting Maxime Ripard (2013-08-04 02:47:29)
+> From: Emilio L?pez <emilio@elopez.com.ar>
 > 
-> arch/arm/mach-shmobile/board-ag5evm.c has been removed from
-> linux-next, so I've dropped patch 7 ("ARM: shmobile: ag5evm: Remove
-> SDHI .set_pwr() callback") but taken all of the other patches into
-> mmc-next for 3.12.
+> With the recent move towards CLK_OF_DECLARE(...), the driver stopped
+> initializing osc32k, which is compatible "fixed-clock". This is because
+> we never called of_clk_init(NULL). Fix this by moving the only other
+> simple clock (osc24M) to use CLK_OF_DECLARE(...) and call of_clk_init(NULL)
+> to initialize both of them.
+> 
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
 
-Patch 7 was only meant to avoid bisection breakages if your tree gets merged 
-before the ARM tree. If it gets merged before you can indeed drop it.
+Taken into clk-next.
 
--- 
 Regards,
+Mike
 
-Laurent Pinchart
+> ---
+>  drivers/clk/sunxi/clk-sunxi.c | 11 +++--------
+>  1 file changed, 3 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index db1c45b..567963f 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -69,6 +69,7 @@ static void __init sunxi_osc_clk_setup(struct device_node *node)
+>                 clk_register_clkdev(clk, clk_name, NULL);
+>         }
+>  }
+> +CLK_OF_DECLARE(sunxi_osc, "allwinner,sun4i-osc-clk", sunxi_osc_clk_setup);
+>  
+>  
+>  
+> @@ -422,12 +423,6 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
+>         of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+>  }
+>  
+> -/* Matches for of_clk_init */
+> -static const __initconst struct of_device_id clk_match[] = {
+> -       {.compatible = "allwinner,sun4i-osc-clk", .data = sunxi_osc_clk_setup,},
+> -       {}
+> -};
+> -
+>  /* Matches for factors clocks */
+>  static const __initconst struct of_device_id clk_factors_match[] = {
+>         {.compatible = "allwinner,sun4i-pll1-clk", .data = &pll1_data,},
+> @@ -482,8 +477,8 @@ static void __init of_sunxi_table_clock_setup(const struct of_device_id *clk_mat
+>  
+>  void __init sunxi_init_clocks(void)
+>  {
+> -       /* Register all the simple sunxi clocks on DT */
+> -       of_clk_init(clk_match);
+> +       /* Register all the simple and basic clocks on DT */
+> +       of_clk_init(NULL);
+>  
+>         /* Register factor clocks */
+>         of_sunxi_table_clock_setup(clk_factors_match, sunxi_factors_clk_setup);
+> -- 
+> 1.8.3.4
