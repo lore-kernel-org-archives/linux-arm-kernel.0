@@ -1,104 +1,19 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 26 Aug 2013 02:47:53 +0900
-Subject: [PATCH V2] ARM: dts: Add DMA controller node info on Exynos5420.
-In-Reply-To: <1376481862-9578-1-git-send-email-padma.v@samsung.com>
-References: <1376481862-9578-1-git-send-email-padma.v@samsung.com>
-Message-ID: <521A4349.7080406@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 25 Aug 2013 19:08:01 +0100
+Subject: [PATCH v5 4/5] dma: mmp_pdma: add support for residue reporting
+In-Reply-To: <1377086938-29145-5-git-send-email-zonque@gmail.com>
+References: <1377086938-29145-1-git-send-email-zonque@gmail.com>
+ <1377086938-29145-5-git-send-email-zonque@gmail.com>
+Message-ID: <20130825180801.GY6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/13 21:04, Padmavathi Venna wrote:
-> This patch adds dma controller node info on Exynos5420.
->
-> Signed-off-by: Padmavathi Venna<padma.v@samsung.com>
-> ---
->
-> Changes since V1:
-> 	- In V1, dma node common stuff was added in common exynos5.dtsi file.
-> 	  This was removed as per Kukjin comment and added in exynos5420.dtsi.
->
-> This patch is dependent on audss clk controller patches that were
-> posted in the below link.
-> http://www.spinics.net/lists/linux-samsung-soc/msg20253.html
->
-So I'm still waiting for above...
+On Wed, Aug 21, 2013 at 02:08:57PM +0200, Daniel Mack wrote:
+> @@ -750,6 +822,7 @@ static enum dma_status mmp_pdma_tx_status(struct dma_chan *dchan,
+>  
+>  	spin_lock_irqsave(&chan->desc_lock, flags);
+>  	ret = dma_cookie_status(dchan, cookie, txstate);
+> +	txstate->residue = mmp_pdma_residue(chan, cookie);
 
-- Kukjin
-
->   arch/arm/boot/dts/exynos5420.dtsi |   63 +++++++++++++++++++++++++++++++++++++
->   1 files changed, 63 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index 9e90d1e..23cfea4 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -126,6 +126,69 @@
->   		interrupts =<0 47 0>;
->   	};
->
-> +	amba {
-> +		#address-cells =<1>;
-> +		#size-cells =<1>;
-> +		compatible = "arm,amba-bus";
-> +		interrupt-parent =<&gic>;
-> +		ranges;
-> +
-> +		pdma0: pdma at 121A0000 {
-> +			compatible = "arm,pl330", "arm,primecell";
-> +			reg =<0x121A0000 0x1000>;
-> +			interrupts =<0 34 0>;
-> +			clocks =<&clock 362>;
-> +			clock-names = "apb_pclk";
-> +			#dma-cells =<1>;
-> +			#dma-channels =<8>;
-> +			#dma-requests =<32>;
-> +		};
-> +
-> +		pdma1: pdma at 121B0000 {
-> +			compatible = "arm,pl330", "arm,primecell";
-> +			reg =<0x121B0000 0x1000>;
-> +			interrupts =<0 35 0>;
-> +			clocks =<&clock 363>;
-> +			clock-names = "apb_pclk";
-> +			#dma-cells =<1>;
-> +			#dma-channels =<8>;
-> +			#dma-requests =<32>;
-> +		};
-> +
-> +		mdma0: mdma at 10800000 {
-> +			compatible = "arm,pl330", "arm,primecell";
-> +			reg =<0x10800000 0x1000>;
-> +			interrupts =<0 33 0>;
-> +			clocks =<&clock 473>;
-> +			clock-names = "apb_pclk";
-> +			#dma-cells =<1>;
-> +			#dma-channels =<8>;
-> +			#dma-requests =<1>;
-> +		};
-> +
-> +		mdma1: mdma at 11C10000 {
-> +			compatible = "arm,pl330", "arm,primecell";
-> +			reg =<0x11C10000 0x1000>;
-> +			interrupts =<0 124 0>;
-> +			clocks =<&clock 442>;
-> +			clock-names = "apb_pclk";
-> +			#dma-cells =<1>;
-> +			#dma-channels =<8>;
-> +			#dma-requests =<1>;
-> +		};
-> +
-> +		adma: adma at 03880000 {
-> +			compatible = "arm,pl330", "arm,primecell";
-> +			reg =<0x03880000 0x1000>;
-> +			interrupts =<0 110 0>;
-> +			clocks =<&clock_audss EXYNOS_ADMA>;
-> +			clock-names = "apb_pclk";
-> +			#dma-cells =<1>;
-> +			#dma-channels =<6>;
-> +			#dma-requests =<16>;
-> +		};
-> +	};
-> +
->   	serial at 12C00000 {
->   		clocks =<&clock 257>,<&clock 128>;
->   		clock-names = "uart", "clk_uart_baud0";
+Please consider using dma_set_residue() here - it is legal to call the
+tx status function with a NULL txstate.
