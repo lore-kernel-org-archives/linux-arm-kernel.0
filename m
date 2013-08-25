@@ -1,99 +1,60 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 25 Aug 2013 20:57:13 +0800
-Subject: [PATCH] dmaengine: sirf: add dmaengine_prep_slave_single/sg support
-Message-ID: <1377435433-23202-1-git-send-email-Baohua.Song@csr.com>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Sun, 25 Aug 2013 17:05:29 +0300
+Subject: [PATCH 2/3] KVM: ARM: Get rid of KVM_HPAGE_ defines
+In-Reply-To: <1376058613-26400-1-git-send-email-christoffer.dall@linaro.org>
+References: <1376021239-10532-1-git-send-email-christoffer.dall@linaro.org>
+ <1376058613-26400-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <20130825140529.GT8218@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the dma engine of sirfsoc supports interleaved mode, but if we set
-xlen=width instead xlen<width, it will work as non-interleaved. as
-most clients of sirf dma driver still don't need interleaved mode,
-so here we still need to implement prep_slave_sg entry so that users
-like uart, spi can use these APIs instead of interleaved API.
+On Fri, Aug 09, 2013 at 07:30:13AM -0700, Christoffer Dall wrote:
+> The KVM_HPAGE_DEFINES are a little artificial on ARM, since the huge
+> page size is statically defined at compile time and there is only a
+> single huge page size.
+> 
+> Now when the main kvm code relying on these defines has been moved to
+> the x86 specific part of the world, we can get rid of these.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> 
+> [Resending this because the KVM list filter caught the subject of the
+> previous message due to the letter X]
+> 
+>  arch/arm/include/asm/kvm_host.h |    5 -----
+>  1 file changed, 5 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 7d22517..e45a74b 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -38,11 +38,6 @@
+>  
+>  #define KVM_VCPU_MAX_FEATURES 1
+>  
+> -/* We don't currently support large pages. */
+> -#define KVM_HPAGE_GFN_SHIFT(x)	0
+> -#define KVM_NR_PAGE_SIZES	1
+With huge page support you do have two different page sizes, but the only
+code that uses those defines currently is in the x86 shadow mmu code,
+so I am fine with moving gfn_to_index() into x86 specific code and getting rid
+of those defines (you will probably need them when you will implement
+nested HYP mode :)). But can you do it as a separate patch series and
+remove the defines for all arches?
 
-the dma engine of sirfsoc doesn't support hardware s/g, so here we
-are using the list of desc nodes to do SW s/g. when dma operations
-finish, driver will re-start the next desc automatically.
+> -#define KVM_PAGES_PER_HPAGE(x)	(1UL<<31)
+> -
+>  #include <kvm/arm_vgic.h>
+>  
+>  struct kvm_vcpu;
+> -- 
+> 1.7.10.4
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/dma/sirf-dma.c | 57 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
-
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 6aec3ad..c226c79 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -577,6 +577,62 @@ err_dir:
- }
- 
- static struct dma_async_tx_descriptor *
-+sirfsoc_dma_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
-+	unsigned int sg_len, enum dma_transfer_direction direction,
-+	unsigned long flags, void *context)
-+{
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-+	struct sirfsoc_dma_desc *first_sdesc;
-+	struct sirfsoc_dma_desc *sdesc;
-+	struct list_head *l;
-+	unsigned long iflags;
-+	struct scatterlist *sg;
-+	int desc_cnt = 0;
-+	int i;
-+	int ret;
-+
-+	/*
-+	 * the hardware doesn't support sg, here we use software list
-+	 * to simulate sg, so make sure we have enough desc nodes
-+	 */
-+	spin_lock_irqsave(&schan->lock, iflags);
-+	list_for_each(l, &schan->free)
-+		desc_cnt++;
-+	if (desc_cnt < sg_len) {
-+		spin_unlock_irqrestore(&schan->lock, iflags);
-+		pr_err("sirfsoc DMA channel busy\n");
-+		ret = -EBUSY;
-+		goto err;
-+	}
-+
-+	first_sdesc = list_first_entry(&schan->free, struct sirfsoc_dma_desc,
-+			node);
-+
-+	for_each_sg(sgl, sg, sg_len, i) {
-+		dma_addr_t addr = sg_dma_address(sg);
-+		unsigned int len = sg_dma_len(sg);
-+
-+		sdesc = list_first_entry(&schan->free, struct sirfsoc_dma_desc,
-+			node);
-+		list_del(&sdesc->node);
-+
-+		sdesc->addr = addr;
-+		sdesc->dir = (direction == DMA_MEM_TO_DEV ? 1 : 0);
-+		sdesc->cyclic = 0;
-+		sdesc->xlen = len / SIRFSOC_DMA_WORD_LEN;
-+		sdesc->width = sdesc->xlen;
-+		sdesc->ylen = 0;
-+
-+		list_add_tail(&sdesc->node, &schan->prepared);
-+	}
-+	spin_unlock_irqrestore(&schan->lock, iflags);
-+
-+	return &first_sdesc->desc;
-+err:
-+	return ERR_PTR(ret);
-+}
-+
-+static struct dma_async_tx_descriptor *
- sirfsoc_dma_prep_cyclic(struct dma_chan *chan, dma_addr_t addr,
- 	size_t buf_len, size_t period_len,
- 	enum dma_transfer_direction direction, unsigned long flags, void *context)
-@@ -711,6 +767,7 @@ static int sirfsoc_dma_probe(struct platform_device *op)
- 	dma->device_control = sirfsoc_dma_control;
- 	dma->device_tx_status = sirfsoc_dma_tx_status;
- 	dma->device_prep_interleaved_dma = sirfsoc_dma_prep_interleaved;
-+	dma->device_prep_slave_sg = sirfsoc_dma_prep_slave_sg;
- 	dma->device_prep_dma_cyclic = sirfsoc_dma_prep_cyclic;
- 
- 	INIT_LIST_HEAD(&dma->channels);
--- 
-1.8.2.3
+--
+			Gleb.
