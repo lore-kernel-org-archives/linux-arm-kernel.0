@@ -1,20 +1,28 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Sun, 25 Aug 2013 15:29:17 +0100
+From: gleb@redhat.com (Gleb Natapov)
+Date: Sun, 25 Aug 2013 17:48:47 +0300
 Subject: [PATCH 2/3] KVM: ARM: Get rid of KVM_HPAGE_ defines
-In-Reply-To: <20130825140529.GT8218@redhat.com>
+In-Reply-To: <CAFEAcA9-hcGHYAKTP4xty1pB-bs=EgATrxKQhCOQ3YZOOpM4wg@mail.gmail.com>
 References: <1376021239-10532-1-git-send-email-christoffer.dall@linaro.org>
  <1376058613-26400-1-git-send-email-christoffer.dall@linaro.org>
  <20130825140529.GT8218@redhat.com>
-Message-ID: <CAFEAcA9-hcGHYAKTP4xty1pB-bs=EgATrxKQhCOQ3YZOOpM4wg@mail.gmail.com>
+ <CAFEAcA9-hcGHYAKTP4xty1pB-bs=EgATrxKQhCOQ3YZOOpM4wg@mail.gmail.com>
+Message-ID: <20130825144847.GV8218@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 August 2013 15:05, Gleb Natapov <gleb@redhat.com> wrote:
-> (you will probably need them when you will implement
-> nested HYP mode :)).
+On Sun, Aug 25, 2013 at 03:29:17PM +0100, Peter Maydell wrote:
+> On 25 August 2013 15:05, Gleb Natapov <gleb@redhat.com> wrote:
+> > (you will probably need them when you will implement
+> > nested HYP mode :)).
+> 
+> Smiley noted, but this is pretty unlikely since it's not possible
+> to lie to the guest about which mode it's in, so you can't make
+> a guest think it's in Hyp mode.
+> 
+I suspected this, but forgot most that I read about Hyp mode by now.
+Need to refresh my memory ASAP. Is it impossible even with a lot of
+emulation? Can guest detect that it is not in a Hyp mode without
+trapping into hypervisor?
 
-Smiley noted, but this is pretty unlikely since it's not possible
-to lie to the guest about which mode it's in, so you can't make
-a guest think it's in Hyp mode.
-
--- PMM
+--
+			Gleb.
