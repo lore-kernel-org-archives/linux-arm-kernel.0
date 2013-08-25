@@ -1,60 +1,189 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Sun, 25 Aug 2013 17:05:29 +0300
-Subject: [PATCH 2/3] KVM: ARM: Get rid of KVM_HPAGE_ defines
-In-Reply-To: <1376058613-26400-1-git-send-email-christoffer.dall@linaro.org>
-References: <1376021239-10532-1-git-send-email-christoffer.dall@linaro.org>
- <1376058613-26400-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20130825140529.GT8218@redhat.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 25 Aug 2013 09:25:47 -0500
+Subject: [PATCH v4] ARM: Add check for Cortex-A15 errata 798181 ECO
+Message-ID: <1377440747-4564-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 09, 2013 at 07:30:13AM -0700, Christoffer Dall wrote:
-> The KVM_HPAGE_DEFINES are a little artificial on ARM, since the huge
-> page size is statically defined at compile time and there is only a
-> single huge page size.
-> 
-> Now when the main kvm code relying on these defines has been moved to
-> the x86 specific part of the world, we can get rid of these.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
-> 
-> [Resending this because the KVM list filter caught the subject of the
-> previous message due to the letter X]
-> 
->  arch/arm/include/asm/kvm_host.h |    5 -----
->  1 file changed, 5 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 7d22517..e45a74b 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -38,11 +38,6 @@
->  
->  #define KVM_VCPU_MAX_FEATURES 1
->  
-> -/* We don't currently support large pages. */
-> -#define KVM_HPAGE_GFN_SHIFT(x)	0
-> -#define KVM_NR_PAGE_SIZES	1
-With huge page support you do have two different page sizes, but the only
-code that uses those defines currently is in the x86 shadow mmu code,
-so I am fine with moving gfn_to_index() into x86 specific code and getting rid
-of those defines (you will probably need them when you will implement
-nested HYP mode :)). But can you do it as a separate patch series and
-remove the defines for all arches?
+From: Rob Herring <rob.herring@calxeda.com>
 
-> -#define KVM_PAGES_PER_HPAGE(x)	(1UL<<31)
-> -
->  #include <kvm/arm_vgic.h>
->  
->  struct kvm_vcpu;
-> -- 
-> 1.7.10.4
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+The work-around for A15 errata 798181 is not needed if appropriate ECO
+fixes have been applied to r3p2 and earlier core revisions. This can be
+checked by reading REVIDR register bits 4 and 9. If only bit 4 is set,
+then the IPI broadcast can be skipped.
 
---
-			Gleb.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+v4:
+- Move code from setup.c back to smp_tlb.c
+- Use IS_ENABLED macro
+
+v3:
+- Rebase to v3.11-rc5 due to commit 1f49856 (ARM: 7789/1: Do not run
+ dummy_flush_tlb_a15_erratum() on non-Cortex-A15)
+- Move the revision checking out of line and use function ptrs.
+
+v2: 
+- Determine the work-around needed and save in a static varible instead 
+of re-reading the ID registers. 
+
+ arch/arm/include/asm/cputype.h  |  1 +
+ arch/arm/include/asm/tlbflush.h | 34 +++++++---------------------------
+ arch/arm/kernel/setup.c         |  2 ++
+ arch/arm/kernel/smp_tlb.c       | 39 +++++++++++++++++++++++++++++++++++++--
+ arch/arm/mm/context.c           |  3 +--
+ 5 files changed, 48 insertions(+), 31 deletions(-)
+
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index 9672e97..acdde76 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -10,6 +10,7 @@
+ #define CPUID_TLBTYPE	3
+ #define CPUID_MPUIR	4
+ #define CPUID_MPIDR	5
++#define CPUID_REVIDR	6
+ 
+ #ifdef CONFIG_CPU_V7M
+ #define CPUID_EXT_PFR0	0x40
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index f467e9b..decff8d 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -443,36 +443,16 @@ static inline void local_flush_bp_all(void)
+ 		isb();
+ }
+ 
+-#include <asm/cputype.h>
+-#ifdef CONFIG_ARM_ERRATA_798181
+-static inline int erratum_a15_798181(void)
+-{
+-	unsigned int midr = read_cpuid_id();
+-
+-	/* Cortex-A15 r0p0..r3p2 affected */
+-	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
+-		return 0;
+-	return 1;
+-}
+-
+-static inline void dummy_flush_tlb_a15_erratum(void)
+-{
+-	/*
+-	 * Dummy TLBIMVAIS. Using the unmapped address 0 and ASID 0.
+-	 */
+-	asm("mcr p15, 0, %0, c8, c3, 1" : : "r" (0));
+-	dsb();
+-}
+-#else
+-static inline int erratum_a15_798181(void)
+-{
+-	return 0;
+-}
++extern void erratum_a15_798181_init(void);
++extern bool (*erratum_a15_798181_handler)(void);
+ 
+-static inline void dummy_flush_tlb_a15_erratum(void)
++static inline bool erratum_a15_798181(void)
+ {
++	if (unlikely(IS_ENABLED(CONFIG_ARM_ERRATA_798181) &&
++		erratum_a15_798181_handler))
++		return erratum_a15_798181_handler();
++	return false;
+ }
+-#endif
+ 
+ /*
+  *	flush_pmd_entry
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index afc2489..f3030e3 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -599,6 +599,8 @@ static void __init setup_processor(void)
+ 	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);
+ #endif
+ 
++	erratum_a15_798181_init();
++
+ 	feat_v6_fixup();
+ 
+ 	cacheid_init();
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index c2edfff..1070621 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -70,6 +70,43 @@ static inline void ipi_flush_bp_all(void *ignored)
+ 	local_flush_bp_all();
+ }
+ 
++bool (*erratum_a15_798181_handler)(void);
++
++static bool erratum_a15_798181_partial(void)
++{
++	asm("mcr p15, 0, %0, c8, c3, 1" : : "r" (0));
++	dsb();
++	return false;
++}
++
++static bool erratum_a15_798181_broadcast(void)
++{
++	asm("mcr p15, 0, %0, c8, c3, 1" : : "r" (0));
++	dsb();
++	return true;
++}
++
++bool (*erratum_a15_798181_handler)(void);
++
++void erratum_a15_798181_init(void)
++{
++	unsigned int midr = read_cpuid_id();
++	unsigned int revidr = read_cpuid(CPUID_REVIDR);
++
++	if (!IS_ENABLED(CONFIG_ARM_ERRATA_798181))
++		return;
++
++	/* Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
++	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2 ||
++	    (revidr & 0x210) == 0x210) {
++		return;
++	}
++	if (revidr & 0x10)
++		erratum_a15_798181_handler = erratum_a15_798181_partial;
++	else
++		erratum_a15_798181_handler = erratum_a15_798181_broadcast;
++}
++
+ static void ipi_flush_tlb_a15_erratum(void *arg)
+ {
+ 	dmb();
+@@ -80,7 +117,6 @@ static void broadcast_tlb_a15_erratum(void)
+ 	if (!erratum_a15_798181())
+ 		return;
+ 
+-	dummy_flush_tlb_a15_erratum();
+ 	smp_call_function(ipi_flush_tlb_a15_erratum, NULL, 1);
+ }
+ 
+@@ -92,7 +128,6 @@ static void broadcast_tlb_mm_a15_erratum(struct mm_struct *mm)
+ 	if (!erratum_a15_798181())
+ 		return;
+ 
+-	dummy_flush_tlb_a15_erratum();
+ 	this_cpu = get_cpu();
+ 	a15_erratum_get_cpumask(this_cpu, mm, &mask);
+ 	smp_call_function_many(&mask, ipi_flush_tlb_a15_erratum, NULL, 1);
+diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+index 4a05444..28daa1c 100644
+--- a/arch/arm/mm/context.c
++++ b/arch/arm/mm/context.c
+@@ -245,8 +245,7 @@ void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk)
+ 	if (cpumask_test_and_clear_cpu(cpu, &tlb_flush_pending)) {
+ 		local_flush_bp_all();
+ 		local_flush_tlb_all();
+-		if (erratum_a15_798181())
+-			dummy_flush_tlb_a15_erratum();
++		erratum_a15_798181();
+ 	}
+ 
+ 	atomic64_set(&per_cpu(active_asids, cpu), asid);
+-- 
+1.8.1.2
