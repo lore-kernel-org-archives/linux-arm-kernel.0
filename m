@@ -1,51 +1,19 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 26 Aug 2013 02:19:42 +0900
-Subject: [PATCH v2 0/8] Common Clock Framework support for Samsung S3C64xx
-In-Reply-To: <18f101ce9d74$34e23450$9ea69cf0$@org>
-References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
- <2956608.dyLtqySMuJ@amdc1227> <20130816210203.4443.43511@quantum>
- <3890424.fJfWX17mED@flatron> <158901ce9b34$c0ac8720$42059560$@org>
- <20130820002258.4443.34197@quantum> <18f101ce9d74$34e23450$9ea69cf0$@org>
-Message-ID: <521A3CAE.7020903@samsung.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sun, 25 Aug 2013 22:05:39 +0530
+Subject: [PATCH v5 0/5] dma: pdma: cyclic, residue, DMA_PRIVATE
+In-Reply-To: <1377086938-29145-1-git-send-email-zonque@gmail.com>
+References: <1377086938-29145-1-git-send-email-zonque@gmail.com>
+Message-ID: <20130825163539.GE2748@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/13 16:09, Kukjin Kim wrote:
-> Mike Turquette wrote:
->>
->
-> [...]
->
->>> OK, if new branch is ready, I will replace with that or if re-merge is
->>> required, I will. Either way, I'm fine and can handle. Mike, let me know
->>> your choice :-)
->>
->> Since I have already published it let's just go with the delta patch.  I
->> can create another stable branch named clk-next-s3c64xx-delta that just
->> has this patch on top of clk-next-s3c64xx OR I can apply it on top of
->> the existing clk-next-s3c64xx and re-merge it.
->>
-> Sounds good to me. If the branch for the delta is ready, let me know.
->
-Mike, I'm waiting for your delta branch which includes following from 
-Tomasz.
+On Wed, Aug 21, 2013 at 02:08:53PM +0200, Daniel Mack wrote:
+> This is v5 of my series to teach the pdma driver more required functions.
+> 
+> In contrast to v4, it has yet again grown by one more patch (2/5),
+> which removes code that clears DCMD_ENDIRQEN at the end of the pending
+> chain. We want to leave of the DCMD_ENDIRQEN intact in order to
+> identify where a transaction ends.
+Applied, 1-3 & 5. The 4th one still needs some work
 
-[PATCH] clk: samsung: pll: Use new registration method for PLL6552 and 
-PLL6553
-
-I couldn't send some branches to arm-soc for upcoming merge window yet 
-because of build compilation breakage of common-clk-s3c64xx branch which 
-has many dependencies...
-
-- Kukjin
-
->> I'm trying to think on whether there are any weird git corner cases with
->> re-merging clk-next-s3c64xx. Let me know if re-merging is somehow unsafe
->> (makes history weird, or whatever).
->>
-> I don't think it causes some problem.
->
->> Let me know what option is better for you. I'll publish as soon as I get
->> the delta patch. Apologies again for creating some extra work!
->>
-> No problem.
+~Vinod
