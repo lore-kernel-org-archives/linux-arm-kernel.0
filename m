@@ -1,54 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 25 Aug 2013 17:38:11 +0200
-Subject: [PATCH RFC 1/2] PM / Hibernate: use name_to_dev_t to parse resume
-In-Reply-To: <1377114413-8521-2-git-send-email-sebastian.capella@linaro.org>
-References: <1377114413-8521-1-git-send-email-sebastian.capella@linaro.org>
- <1377114413-8521-2-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <20130825153811.GA4795@amd.pavel.ucw.cz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 25 Aug 2013 17:19:53 +0100
+Subject: [PATCH v8 1/8] ARM: debug: support debug ll on hisilicon soc
+In-Reply-To: <1377336603-10303-2-git-send-email-haojian.zhuang@linaro.org>
+References: <1377336603-10303-1-git-send-email-haojian.zhuang@linaro.org>
+ <1377336603-10303-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20130825161953.GV6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> Use the name_to_dev_t call to parse the device name echo'd to
-> to /sys/power/resume.  This imitates the method used in hibernate.c
-> in software_resume, and allows the resume partition to be specified
-> using other equivalent device formats as well.  By allowing
-> /sys/debug/resume to accept the same syntax as the resume=device
-> parameter, we can parse the resume=device in the init script and
-> use the resume device directly from the kernel command line.
+On Sat, Aug 24, 2013 at 05:29:56PM +0800, Haojian Zhuang wrote:
+> Support UART0 debug ll on Hisilicon Hi3620 SoC & Hi3716 SoC.
 > 
-> Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 > ---
->  kernel/power/hibernate.c |   14 +++++++++-----
->  1 file changed, 9 insertions(+), 5 deletions(-)
+>  arch/arm/Kconfig.debug | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 > 
-> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-> index b26f5f1..51d4c29 100644
-> --- a/kernel/power/hibernate.c
-> +++ b/kernel/power/hibernate.c
-> @@ -971,15 +971,19 @@ static ssize_t resume_show(struct kobject *kobj, struct kobj_attribute *attr,
->  static ssize_t resume_store(struct kobject *kobj, struct kobj_attribute *attr,
->  			    const char *buf, size_t n)
->  {
-> -	unsigned int maj, min;
->  	dev_t res;
->  	int ret = -EINVAL;
-> +	int len = n;
-> +	char *devcpy;
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 814d224..bba9662 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -194,6 +194,22 @@ choice
+>  		  Say Y here if you want kernel low-level debugging support
+>  		  on HI3716 UART.
 >  
-> -	if (sscanf(buf, "%u:%u", &maj, &min) != 2)
-> -		goto out;
-> +	if (buf[len-1] == '\n')
-> +		len--;
-> +
-> +	devcpy = kstrndup(buf, len, GFP_KERNEL);
-> +	res = name_to_dev_t(devcpy);
-> +	kfree(devcpy);
 
-Is the allocation actually neccessary? At the very least this should
-test for NULL...
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I'm having problems applying this patch - I don't have the above context
+lines in my tree, or anything remotely resembling them.  Neither can I
+find anything remotely similar in mainline.
+
+What did you generate this patch against?  It can't be v3.11-rc6 as you
+put in your KernelVersion: line for the patch system.
+
+Your diff above says that this was generated against blob 814d224, which
+doesn't exist in mainline either.  Neither does it seem to appear in
+my build tree which includes arm-soc's for-next branch.
