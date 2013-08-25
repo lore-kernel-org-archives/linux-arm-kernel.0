@@ -1,61 +1,68 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Sun, 25 Aug 2013 07:35:18 +0200
-Subject: [PATCH v4 2/5] mmc: atmel-mci: prepare clk before calling enable
-In-Reply-To: <87li3qsbk9.fsf@octavius.laptop.org>
-References: <1374132753-15206-1-git-send-email-b.brezillon@overkiz.com>
- <1374133132-17556-1-git-send-email-b.brezillon@overkiz.com>
- <87li3qsbk9.fsf@octavius.laptop.org>
-Message-ID: <52199796.4080800@overkiz.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Sun, 25 Aug 2013 10:08:48 +0100
+Subject: [GIT PULL] ARM: TC2: CPU idle big.LITTLE driver
+In-Reply-To: <20130812153422.GA6426@e102568-lin.cambridge.arm.com>
+References: <20130812153422.GA6426@e102568-lin.cambridge.arm.com>
+Message-ID: <20130825090848.GA12256@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Chris,
+Hi Olof, Kevin,
 
-On 25/08/2013 05:18, Chris Ball wrote:
-> Hi,
->
-> On Thu, Jul 18 2013, Boris BREZILLON wrote:
->> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
->> avoid common clk framework warnings.
->>
->> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Okay, pushed to mmc-next for 3.12.
+On Mon, Aug 12, 2013 at 04:34:22PM +0100, Lorenzo Pieralisi wrote:
+> Hi Olof, Kevin,
+> 
+> please pull this patch series that provides a CPU idle driver for the vexpress
+> TC2 testchip, and it is a stepping stone towards an ARM unified CPU idle driver
+> based on the MCPM framework.
+> 
+> Series is based against this pull request from Pawel which is a strict
+> dependency and they must be merged in order:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/190067.html
 
-Thanks.
+May I ask you please the status of this pull request ? It is to know if
+it is ok as it is or I have to do something on my side, thanks.
 
->
-> Boris, you got feedback from Thomas Petazzoni and Russell King, but
-> you didn't CC either of them on the patch v4
+Thank you,
+Lorenzo
 
-I didn't knew I had to add the reviewers of a patch in the cc list
-of the future versions. I'll do it next time.
-
-> , and you didn't write a
-> changelog explaining the differences between patches v3 and v4 --
-> please do both of those next time.
-
-The changelog is in the cover letter ("Changes since v3").
-But I didn't send you this cover letter.
-
-> Also, it looks like the Ack from Ludovic happened away from the MMC
-> list, since I don't see a message from Ludovic on the thread here.
-> It would be better if the Ack happened somewhere I can see it.
-
-The 'Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>' was added
-in the 2nd version of this patch series.
-But I don't know if I should have kept it in this version since this 
-patch has evolved.
-
-
-Thanks for these feebacks, I'm still learning the good practices of the 
-kernel
-submission process.
-I'll check these points next time.
-
-Best Regards,
-
-Boris
-> Thanks,
->
-> - Chris.
+> Thanks !!
+> Lorenzo
+> 
+> The following changes since commit 2d6746c48076fd56619f11cdd5c74656ea8cde48:
+> 
+>   ARM: vexpress/TC2: implement PM suspend method (2013-08-12 10:59:13 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://linux-arm.org/linux-2.6-lp.git tags/cpuidle-bL
+> 
+> for you to fetch changes up to 04c40064928d3a1eb50e4ea3883765b9cfcb0f73:
+> 
+>   cpuidle: big.LITTLE: vexpress-TC2 CPU idle driver (2013-08-12 10:59:14 +0100)
+> 
+> ----------------------------------------------------------------
+> This patch series contains:
+> 
+> - GIC driver update to add a method to disable the GIC CPU IF
+> - TC2 MCPM update to add GIC CPU disabling to suspend method
+> - TC2 CPU idle big.LITTLE driver
+> 
+> ----------------------------------------------------------------
+> Lorenzo Pieralisi (2):
+>       ARM: vexpress: tc2: disable GIC CPU IF in tc2_pm_suspend
+>       cpuidle: big.LITTLE: vexpress-TC2 CPU idle driver
+> 
+> Nicolas Pitre (1):
+>       drivers: irq-chip: irq-gic: introduce gic_cpu_if_down()
+> 
+>  MAINTAINERS                          |   9 ++
+>  arch/arm/mach-vexpress/tc2_pm.c      |   2 +
+>  drivers/cpuidle/Kconfig              |  10 ++
+>  drivers/cpuidle/Makefile             |   1 +
+>  drivers/cpuidle/cpuidle-big_little.c | 209 +++++++++++++++++++++++++++++++++++
+>  drivers/irqchip/irq-gic.c            |   6 +
+>  include/linux/irqchip/arm-gic.h      |   1 +
+>  7 files changed, 238 insertions(+)
+>  create mode 100644 drivers/cpuidle/cpuidle-big_little.c
