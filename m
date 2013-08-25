@@ -1,35 +1,38 @@
 From: cjb@laptop.org (Chris Ball)
-Date: Sat, 24 Aug 2013 23:18:14 -0400
-Subject: [PATCH v4 2/5] mmc: atmel-mci: prepare clk before calling enable
-In-Reply-To: <1374133132-17556-1-git-send-email-b.brezillon@overkiz.com>
- (Boris BREZILLON's message of "Thu, 18 Jul 2013 09:38:52 +0200")
-References: <1374132753-15206-1-git-send-email-b.brezillon@overkiz.com>
- <1374133132-17556-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <87li3qsbk9.fsf@octavius.laptop.org>
+Date: Sat, 24 Aug 2013 23:58:14 -0400
+Subject: [PATCH v3 00/14] Remove platform callbacks from mmc_spi,
+ sh_mmcif and sh_mobile_sdhi drivers
+In-Reply-To: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ (Laurent Pinchart's message of "Thu, 8 Aug 2013 12:38:30 +0200")
+References: <1375958324-29683-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <87ob8mqv55.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Laurent,
 
-On Thu, Jul 18 2013, Boris BREZILLON wrote:
-> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
-> avoid common clk framework warnings.
+On Thu, Aug 08 2013, Laurent Pinchart wrote:
+> This patch set replaces callbacks to board code with regulators and GPIOs in
+> the mmc_spi, sh_mmcif and sh_mobile_sdhi MMC drivers.
 >
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Most of the required infrastructure is in place already on the drivers side,
+> except for CD debouncing support in the MMC core and CD/RO GPIOs support in
+> the mmc_spi driver. The series thus starts with patches 01/14 and 02/14 that
+> add those features to the MMC core and mmc_spi driver.
+>
+> Patches 03/14 to 07/14 remove the board callbacks from the ecovec24 and
+> vision_ep9307 boards. The code has been compile-tested only as I don't have
+> access to those boards.
+>
+> Patches 08/14 to 14/14 then proceed to remove the callbacks from the drivers
+> themselves and from the platform data structures.
 
-Okay, pushed to mmc-next for 3.12.
+arch/arm/mach-shmobile/board-ag5evm.c has been removed from
+linux-next, so I've dropped patch 7 ("ARM: shmobile: ag5evm: Remove
+SDHI .set_pwr() callback") but taken all of the other patches into
+mmc-next for 3.12.
 
-Boris, you got feedback from Thomas Petazzoni and Russell King, but
-you didn't CC either of them on the patch v4, and you didn't write a
-changelog explaining the differences between patches v3 and v4 --
-please do both of those next time.
-
-Also, it looks like the Ack from Ludovic happened away from the MMC
-list, since I don't see a message from Ludovic on the thread here.
-It would be better if the Ack happened somewhere I can see it.
-
-Thanks,
+Thanks!
 
 - Chris.
 -- 
