@@ -1,282 +1,182 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 26 Aug 2013 16:25:57 +0530
-Subject: [PATCH v3 3/7] ARM: davinci: da8xx: support gpio platform device
-In-Reply-To: <1376803143-13738-4-git-send-email-prabhakar.csengg@gmail.com>
-References: <1376803143-13738-1-git-send-email-prabhakar.csengg@gmail.com>
- <1376803143-13738-4-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <521B343D.8060900@ti.com>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Mon, 26 Aug 2013 16:33:55 +0530
+Subject: [GIT PULL 3/3] 2nd Round Samsung mach-exynos for v3.12
+In-Reply-To: <3145165.ZB7l3vNJ7a@amdc1032>
+References: <1f7701cea1f1$431f2d30$c95d8790$%kim@samsung.com>
+ <3145165.ZB7l3vNJ7a@amdc1032>
+Message-ID: <CADGdYn7_Gm7rwkhRSUmvktB_hHNboY8eB5fi8E62-Br5Vk5D0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 18 August 2013 10:48 AM, Lad, Prabhakar wrote:
-> From: KV Sujith <sujithkv@ti.com>
-> 
-> DaVinci GPIO driver now uses platform device model.
-> Convert DA8XX SoC code to use the new model.
-> 
-> - Add Memory and IRQ resources for da8xx
-> - Add da8xx_register_gpio API to create platform device for da8xx
->   platforms.
-> - Removed unused GPIO initialization in davinci_soc_info structure
-> 
-> Signed-off-by: KV Sujith <sujithkv@ti.com>
-> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> [nsekhar at ti.com: simplify commit message]
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+Hi,
 
-Parts of 5/7 which touch SoC specific portion can be merged into this 
-patch. I did that for you and here is the result.
+On Mon, Aug 26, 2013 at 3:36 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> Hi,
+>
+> On Monday, August 26, 2013 09:14:42 AM Kukjin Kim wrote:
+>> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+>>
+>>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>> tags/samsung-mach-exynos
+>>
+>> for you to fetch changes up to f52616f4233d71d0fb00f06f86d046d18d2b7f3b:
+>>
+>>   ARM: EXYNOS: always enable PM domains support for EXYNOS4X12 (2013-08-19
+>> 05:05:16 +0900)
+>>
+>> ----------------------------------------------------------------
+>> update mach-exynos
+>> - enable ARCH_HAS_BANDGAP for exynos SoCs
+>> - skip C1 cpuidle for exynos5440 because non-supporting
+>> - always enable PM domains for exynos4x12
+>>
+>> ----------------------------------------------------------------
+>> Amit Daniel Kachhap (2):
+>>       ARM: EXYNOS: enable ARCH_HAS_BANDGAP
+>>       ARM: EXYNOS: Skip C1 cpuidle state for exynos5440
+>
+> The patch "ARM: EXYNOS: Skip C1 cpuidle state for exynos5440":
+>
+> --- a/arch/arm/mach-exynos/cpuidle.c
+> +++ b/arch/arm/mach-exynos/cpuidle.c
+> @@ -210,7 +210,7 @@ static int __init exynos4_init_cpuidle(void)
+>                 device->cpu = cpu_id;
+>
+>                 /* Support IDLE only */
+> -               if (cpu_id != 0)
+> +               if (soc_is_exynos5440() || cpu_id != 0)
+>                         device->state_count = 1;
+>
+>                 ret = cpuidle_register_device(device);
+>
+> is incorrect as noted a month ago in:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/186355.html
+>
+> [ Because of the deficiency in the core cpuidle core (device->state_count
+>   not being used by governors' code) only sysfs entries for C1 state will be
+>   disabled and EXYNOS cpuidle driver will still attempt to use C1 state.
+>
+> also non-working device->state_count is planned to be removed by:
+>
+> http://permalink.gmane.org/gmane.linux.power-management.general/37390
+I looked at your patch series and it seems reasonable. I will repost
+this patch on top of yours.
+But I suggest to keep this patch temporary till your patch series gets merged.
 
 Thanks,
-Sekhar
+Amit Daniel
+>
+>
+> To disable C1 state on EXYNOS5440 something like:
+>
+>         static int __init exynos4_init_cpuidle(void)
+>         {
+>         ...
+>                 if (soc_is_exynos5440())
+>                         exynos4_idle_driver.state_count = 1;
+>         ...
+>         }
+>
+> should be done instead.
+>
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
->From 50db0a98a3076a667d85b4009eb3f029a2f51d14 Mon Sep 17 00:00:00 2001
-From: KV Sujith <sujithkv@ti.com>
-Date: Sun, 18 Aug 2013 10:48:59 +0530
-Subject: [PATCH] ARM: davinci: da8xx: support gpio platform device
 
-DaVinci GPIO driver now uses platform device model.
-Convert DA8XX SoC code to use the new model.
-
-Add da8xx_register_gpio() to create platform device for da8xx
-platforms.
-
-While at it, reorder include files in alphabetical order.
-This will eventually help avoid duplicate include files.
-
-Signed-off-by: KV Sujith <sujithkv@ti.com>
-Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-[nsekhar at ti.com: simplify commit message]
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- arch/arm/mach-davinci/da830.c              |   25 ++++++++++++++--------
- arch/arm/mach-davinci/da850.c              |   31 +++++++++++++++++-----------
- arch/arm/mach-davinci/devices-da8xx.c      |   26 +++++++++++++++++++++++
- arch/arm/mach-davinci/include/mach/da8xx.h |   23 ++++++++++++---------
- 4 files changed, 74 insertions(+), 31 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index d6c746e..73c094d 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -8,19 +8,20 @@
-  * is licensed "as is" without any warranty of any kind, whether express
-  * or implied.
-  */
-+#include <linux/clk.h>
- #include <linux/gpio.h>
- #include <linux/init.h>
--#include <linux/clk.h>
-+#include <linux/platform_data/gpio-davinci.h>
- 
- #include <asm/mach/map.h>
- 
--#include <mach/psc.h>
--#include <mach/irqs.h>
--#include <mach/cputype.h>
- #include <mach/common.h>
--#include <mach/time.h>
-+#include <mach/cputype.h>
- #include <mach/da8xx.h>
- #include <mach/gpio-davinci.h>
-+#include <mach/irqs.h>
-+#include <mach/psc.h>
-+#include <mach/time.h>
- 
- #include "clock.h"
- #include "mux.h"
-@@ -1151,6 +1152,16 @@ static struct davinci_id da830_ids[] = {
- 	},
- };
- 
-+static struct davinci_gpio_platform_data da830_gpio_platform_data = {
-+	.ngpio = 128,
-+	.intc_irq_num = DA830_N_CP_INTC_IRQ,
-+};
-+
-+int __init da830_register_gpio(void)
-+{
-+	return da8xx_register_gpio(&da830_gpio_platform_data);
-+}
-+
- static struct davinci_timer_instance da830_timer_instance[2] = {
- 	{
- 		.base		= DA8XX_TIMER64P0_BASE,
-@@ -1196,10 +1207,6 @@ static struct davinci_soc_info davinci_soc_info_da830 = {
- 	.intc_irq_prios		= da830_default_priorities,
- 	.intc_irq_num		= DA830_N_CP_INTC_IRQ,
- 	.timer_info		= &da830_timer_info,
--	.gpio_type		= GPIO_TYPE_DAVINCI,
--	.gpio_base		= DA8XX_GPIO_BASE,
--	.gpio_num		= 128,
--	.gpio_irq		= IRQ_DA8XX_GPIO0,
- 	.emac_pdata		= &da8xx_emac_pdata,
- };
- 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index f56e5fb..bcabb1e 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -11,24 +11,25 @@
-  * is licensed "as is" without any warranty of any kind, whether express
-  * or implied.
-  */
-+#include <linux/clk.h>
-+#include <linux/cpufreq.h>
- #include <linux/gpio.h>
- #include <linux/init.h>
--#include <linux/clk.h>
-+#include <linux/platform_data/gpio-davinci.h>
- #include <linux/platform_device.h>
--#include <linux/cpufreq.h>
- #include <linux/regulator/consumer.h>
- 
- #include <asm/mach/map.h>
- 
--#include <mach/psc.h>
--#include <mach/irqs.h>
--#include <mach/cputype.h>
- #include <mach/common.h>
--#include <mach/time.h>
--#include <mach/da8xx.h>
- #include <mach/cpufreq.h>
--#include <mach/pm.h>
-+#include <mach/cputype.h>
-+#include <mach/da8xx.h>
- #include <mach/gpio-davinci.h>
-+#include <mach/irqs.h>
-+#include <mach/pm.h>
-+#include <mach/psc.h>
-+#include <mach/time.h>
- 
- #include "clock.h"
- #include "mux.h"
-@@ -1281,6 +1282,16 @@ int __init da850_register_vpif_capture(struct vpif_capture_config
- 	return platform_device_register(&da850_vpif_capture_dev);
- }
- 
-+static struct davinci_gpio_platform_data da850_gpio_platform_data = {
-+	.ngpio = 144,
-+	.intc_irq_num = DA850_N_CP_INTC_IRQ,
-+};
-+
-+int __init da850_register_gpio(void)
-+{
-+	return da8xx_register_gpio(&da850_gpio_platform_data);
-+}
-+
- static struct davinci_soc_info davinci_soc_info_da850 = {
- 	.io_desc		= da850_io_desc,
- 	.io_desc_num		= ARRAY_SIZE(da850_io_desc),
-@@ -1298,10 +1309,6 @@ static struct davinci_soc_info davinci_soc_info_da850 = {
- 	.intc_irq_prios		= da850_default_priorities,
- 	.intc_irq_num		= DA850_N_CP_INTC_IRQ,
- 	.timer_info		= &da850_timer_info,
--	.gpio_type		= GPIO_TYPE_DAVINCI,
--	.gpio_base		= DA8XX_GPIO_BASE,
--	.gpio_num		= 144,
--	.gpio_irq		= IRQ_DA8XX_GPIO0,
- 	.emac_pdata		= &da8xx_emac_pdata,
- 	.sram_dma		= DA8XX_SHARED_RAM_BASE,
- 	.sram_len		= SZ_128K,
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 2e473fe..c46eccb 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -665,6 +665,32 @@ int __init da8xx_register_lcdc(struct da8xx_lcdc_platform_data *pdata)
- 	return platform_device_register(&da8xx_lcdc_device);
- }
- 
-+static struct resource da8xx_gpio_resources[] = {
-+	{ /* registers */
-+		.start	= DA8XX_GPIO_BASE,
-+		.end	= DA8XX_GPIO_BASE + SZ_4K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{ /* interrupt */
-+		.start	= IRQ_DA8XX_GPIO0,
-+		.end	= IRQ_DA8XX_GPIO8,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device da8xx_gpio_device = {
-+	.name		= "davinci_gpio",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(da8xx_gpio_resources),
-+	.resource	= da8xx_gpio_resources,
-+};
-+
-+int __init da8xx_register_gpio(void *pdata)
-+{
-+	da8xx_gpio_device.dev.platform_data = pdata;
-+	return platform_device_register(&da8xx_gpio_device);
-+}
-+
- static struct resource da8xx_mmcsd0_resources[] = {
- 	{		/* registers */
- 		.start	= DA8XX_MMCSD0_BASE,
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index aae5307..8642150 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -11,26 +11,26 @@
- #ifndef __ASM_ARCH_DAVINCI_DA8XX_H
- #define __ASM_ARCH_DAVINCI_DA8XX_H
- 
--#include <video/da8xx-fb.h>
--
--#include <linux/platform_device.h>
- #include <linux/davinci_emac.h>
--#include <linux/spi/spi.h>
- #include <linux/platform_data/davinci_asp.h>
--#include <linux/reboot.h>
--#include <linux/videodev2.h>
--
--#include <mach/serial.h>
--#include <mach/pm.h>
- #include <linux/platform_data/edma.h>
- #include <linux/platform_data/i2c-davinci.h>
- #include <linux/platform_data/mmc-davinci.h>
--#include <linux/platform_data/usb-davinci.h>
- #include <linux/platform_data/spi-davinci.h>
- #include <linux/platform_data/uio_pruss.h>
-+#include <linux/platform_data/usb-davinci.h>
-+#include <linux/platform_device.h>
-+#include <linux/reboot.h>
-+#include <linux/spi/spi.h>
-+#include <linux/videodev2.h>
-+
-+#include <mach/pm.h>
-+#include <mach/serial.h>
- 
- #include <media/davinci/vpif_types.h>
- 
-+#include <video/da8xx-fb.h>
-+
- extern void __iomem *da8xx_syscfg0_base;
- extern void __iomem *da8xx_syscfg1_base;
- 
-@@ -97,6 +97,7 @@ int da8xx_register_mmcsd0(struct davinci_mmc_config *config);
- int da850_register_mmcsd1(struct davinci_mmc_config *config);
- void da8xx_register_mcasp(int id, struct snd_platform_data *pdata);
- int da8xx_register_rtc(void);
-+int da8xx_register_gpio(void *pdata);
- int da850_register_cpufreq(char *async_clk);
- int da8xx_register_cpuidle(void);
- void __iomem *da8xx_get_mem_ctlr(void);
-@@ -110,6 +111,8 @@ int da850_register_vpif_capture
- void da8xx_restart(enum reboot_mode mode, const char *cmd);
- void da8xx_rproc_reserve_cma(void);
- int da8xx_register_rproc(void);
-+int da850_register_gpio(void);
-+int da830_register_gpio(void);
- 
- extern struct platform_device da8xx_serial_device[];
- extern struct emac_platform_data da8xx_emac_pdata;
--- 
-1.7.10.1
+On Mon, Aug 26, 2013 at 3:36 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> Hi,
+>
+> On Monday, August 26, 2013 09:14:42 AM Kukjin Kim wrote:
+>> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+>>
+>>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>> tags/samsung-mach-exynos
+>>
+>> for you to fetch changes up to f52616f4233d71d0fb00f06f86d046d18d2b7f3b:
+>>
+>>   ARM: EXYNOS: always enable PM domains support for EXYNOS4X12 (2013-08-19
+>> 05:05:16 +0900)
+>>
+>> ----------------------------------------------------------------
+>> update mach-exynos
+>> - enable ARCH_HAS_BANDGAP for exynos SoCs
+>> - skip C1 cpuidle for exynos5440 because non-supporting
+>> - always enable PM domains for exynos4x12
+>>
+>> ----------------------------------------------------------------
+>> Amit Daniel Kachhap (2):
+>>       ARM: EXYNOS: enable ARCH_HAS_BANDGAP
+>>       ARM: EXYNOS: Skip C1 cpuidle state for exynos5440
+>
+> The patch "ARM: EXYNOS: Skip C1 cpuidle state for exynos5440":
+>
+> --- a/arch/arm/mach-exynos/cpuidle.c
+> +++ b/arch/arm/mach-exynos/cpuidle.c
+> @@ -210,7 +210,7 @@ static int __init exynos4_init_cpuidle(void)
+>                 device->cpu = cpu_id;
+>
+>                 /* Support IDLE only */
+> -               if (cpu_id != 0)
+> +               if (soc_is_exynos5440() || cpu_id != 0)
+>                         device->state_count = 1;
+>
+>                 ret = cpuidle_register_device(device);
+>
+> is incorrect as noted a month ago in:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/186355.html
+>
+> [ Because of the deficiency in the core cpuidle core (device->state_count
+>   not being used by governors' code) only sysfs entries for C1 state will be
+>   disabled and EXYNOS cpuidle driver will still attempt to use C1 state.
+>
+> also non-working device->state_count is planned to be removed by:
+>
+> http://permalink.gmane.org/gmane.linux.power-management.general/37390
+>
+>
+> To disable C1 state on EXYNOS5440 something like:
+>
+>         static int __init exynos4_init_cpuidle(void)
+>         {
+>         ...
+>                 if (soc_is_exynos5440())
+>                         exynos4_idle_driver.state_count = 1;
+>         ...
+>         }
+>
+> should be done instead.
+>
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
