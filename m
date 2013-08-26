@@ -1,139 +1,50 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 26 Aug 2013 13:15:11 +0200
-Subject: [RFC 17/17] clk: zynq: remove call to of_clk_init
-In-Reply-To: <20130823073250.GB30135@pengutronix.de>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1376964271-22715-18-git-send-email-sebastian.hesselbarth@gmail.com>
- <d17acba9-85f9-40cd-a176-2005e3e924f8@CO1EHSMHS002.ehs.local>
- <c4d10bdf-6506-4edc-92cc-2acc67b86602@VA3EHSMHS032.ehs.local>
- <20130823073250.GB30135@pengutronix.de>
-Message-ID: <521B38BF.6040400@monstr.eu>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 Aug 2013 04:17:08 -0700
+Subject: [GIT PULL] ARM: OMAP: miscellaneous PRCM and hwmod updates for
+ v3.12
+In-Reply-To: <alpine.DEB.2.02.1308231932400.22768@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1308231932400.22768@utopia.booyaka.com>
+Message-ID: <20130826111708.GD7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2013 09:32 AM, Steffen Trumtrar wrote:
-> Hi!
+* Paul Walmsley <paul@pwsan.com> [130823 12:40]:
+> Hi Tony
 > 
-> On Thu, Aug 22, 2013 at 05:59:36PM -0700, S?ren Brinkmann wrote:
->> On Thu, Aug 22, 2013 at 05:26:47PM -0700, S?ren Brinkmann wrote:
->>> Hi Sebastian,
->>>
->>> On Tue, Aug 20, 2013 at 04:04:31AM +0200, Sebastian Hesselbarth wrote:
->>>> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
->>>> remove it from corresponding drivers/clk code.
->>>
->>> I think that would break Zynq.
->>> If I see this correctly you call of_clk_init() from common code,
->>> _before_ the SOC specific time init function is called.
->>> The problem is, that we have code setting up a global pointer which is
->>> required by zynq_clk_setup() which is triggered when of_clk_init() is
->>> called.
->>>
->>> Let me try to illustrate the current call graph:
->>>
->>> time_init()
->>> 	zynq_timer_init()		// this machines init_time()
->>> 		zynq_slcr_init()	// setup System Level Control Registers including a global pointer
->>> 			zynq_clock_init()
->>> 				of_clk_init()
->>> 					zynq_clk_setup()   // requires pointer setup in zynq_slcr_init()
->>> 					...
->>>
->>> IIUC, your series would change this to:
->>> time_init()
->>> 	of_clk_init()
->>> 		zynq_clk_setup()	// SLCR pointer is not setup/NULL
->>> 		...
->>> 	zynq_timer_init()
->>> 		zynq_slcr_init()	// now the pointer becomes valid
->>
->> I guess we could move zynq_slcr_init() into init_irq(). I'll give that a
->> shot tomorrow.
->>
+> The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
 > 
-> I propose getting rid of the whole global pointer and let the clkc map the
-> address itself instead.
+>   Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
 > 
-> Then there is no need to shuffle stuff around in the initcalls.
-> I have some WIP patches (not rebased on next and not even tested with it,
-> but with v3.11-rc4)
+> are available in the git repository at:
 > 
-> The dtsi would be something like:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.12/omap-prcm-hwmod
 > 
->        control-register at f8000000 {
-
-This name is incorrect - it still should be slcr (system level control registers)
-
-> 	       compatible = "simple-bus";
-
-I expect that syscon compatible should be here not in the lock part because
-you want to map the whole reg space.
-
->                #address-cells = <1>;
->                #size-cells = <1>;
->                reg = <0xf8000000 0x1000>;
->                ranges;
+> for you to fetch changes up to 4514b4d7fcad2a84066c73966c6a7823ea1b3749:
 > 
->                slcr: slcr at f8000000 {
-
-we should use different name here - lock/locks/etc.
-
->                        compatible = "xlnx,zynq-slcr", "syscon";
->                        reg = <0xf8000000 0x10>;
->                };
-
-
-
+>   Merge branches 'hwmod_devel_v3.12', 'prcm_devel_v3.12' and 'am33xx_devel_v3.12' into prcm_a_for_v3.12 (2013-08-23 12:49:48 -0600)
 > 
->                clkc: clkc at f8000100 {
->                        #clock-cells = <1>;
->                        compatible = "xlnx,ps7-clkc";
->                        reg = <0xf8000100 0x100>;
->                        ps-clk-frequency = <33333333>;
-> 		       xlnx,slcr = <&slcr>;
-
-Currently there is no code which handles locks that's why I think at least
-for now it is not necessary to extend binding which feature which is not used.
-
->                        clock-output-names = "armpll", "ddrpll", "iopll", "cpu_6or4x",
->                                        "cpu_3or2x", "cpu_2x", "cpu_1x", "ddr2x", "ddr3x",
->                                        "dci", "lqspi", "smc", "pcap", "gem0", "gem1",
->                                        "fclk0", "fclk1", "fclk2", "fclk3", "can0", "can1",
->                                        "sdio0", "sdio1", "uart0", "uart1", "spi0", "spi1",
->                                        "dma", "usb0_aper", "usb1_aper", "gem0_aper",
->                                        "gem1_aper", "sdio0_aper", "sdio1_aper",
->                                        "spi0_aper", "spi1_aper", "can0_aper", "can1_aper",
->                                        "i2c0_aper", "i2c1_aper", "uart0_aper", "uart1_aper",
->                                        "gpio_aper", "lqspi_aper", "smc_aper", "swdt",
->                                        "dbg_trc", "dbg_apb";
->                };
+> ----------------------------------------------------------------
 > 
->                mio: pinmux at f8000700 {
->                        compatible = "xlnx,ps7-pinctrl";
+> Various OMAP PRCM & hwmod fixes and improvements.  Notable changes
+> include:
+> 
+> - a fix for OMAP4 PLL locking to avoid a bootloader dependency that
+>   causes nasty log spew on startup
+> 
+> - AM33xx DEBUGSS support fixes in hwmod data
+> 
+> - OMAP5 mailbox support in hwmod data
+> 
+> Basic test logs are here:
+> 
+> http://www.pwsan.com/omap/testlogs/prcm_a_for_v3.12/20130823125002/
+> 
+> Note that the 3530 failure is due to the mysterious transient serial
+> issue affecting 3530 for several releases now, which causes a log
+> parsing failure.  PM still seems to work.
 
-Have you created any driver for pinmuxing stuff?
+Thanks pulling into omap-for-v3.12/prcm.
 
-I agree with Soren - let's fix the current problem and then when Steffen has patches with syscon
-we can look at them.
+Regards,
 
-If there is any discussion about early syscon registration please let me know.
-
-Thanks,
-Michal
-
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130826/afe34678/attachment.sig>
+Tony
