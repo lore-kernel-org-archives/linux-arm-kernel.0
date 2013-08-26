@@ -1,9 +1,9 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 26 Aug 2013 18:08:29 +0300
-Subject: [PATCH v6 4/8] usb: phy: omap-usb3: Don't use omap_get_control_dev()
+Date: Mon, 26 Aug 2013 18:08:28 +0300
+Subject: [PATCH v6 3/8] usb: phy: omap-usb2: Don't use omap_get_control_dev()
 In-Reply-To: <1377529713-19762-1-git-send-email-rogerq@ti.com>
 References: <1377529713-19762-1-git-send-email-rogerq@ti.com>
-Message-ID: <1377529713-19762-5-git-send-email-rogerq@ti.com>
+Message-ID: <1377529713-19762-4-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,29 +17,29 @@ if device node is not present.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/usb/phy/phy-omap-usb3.c |   26 ++++++++++++++++++++------
+ drivers/usb/phy/phy-omap-usb2.c |   26 ++++++++++++++++++++------
  1 files changed, 20 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/usb/phy/phy-omap-usb3.c b/drivers/usb/phy/phy-omap-usb3.c
-index 4a7f27c..4004f82 100644
---- a/drivers/usb/phy/phy-omap-usb3.c
-+++ b/drivers/usb/phy/phy-omap-usb3.c
-@@ -26,6 +26,7 @@
+diff --git a/drivers/usb/phy/phy-omap-usb2.c b/drivers/usb/phy/phy-omap-usb2.c
+index 844ab68..e278a3d 100644
+--- a/drivers/usb/phy/phy-omap-usb2.c
++++ b/drivers/usb/phy/phy-omap-usb2.c
+@@ -28,6 +28,7 @@
  #include <linux/pm_runtime.h>
  #include <linux/delay.h>
  #include <linux/usb/omap_control_usb.h>
 +#include <linux/of_platform.h>
  
- #define	PLL_STATUS		0x00000004
- #define	PLL_GO			0x00000008
-@@ -196,8 +197,14 @@ static int omap_usb3_init(struct usb_phy *x)
+ /**
+  * omap_usb2_set_comparator - links the comparator present in the sytem with
+@@ -121,8 +122,14 @@ static int omap_usb2_suspend(struct usb_phy *x, int suspend)
  
- static int omap_usb3_probe(struct platform_device *pdev)
+ static int omap_usb2_probe(struct platform_device *pdev)
  {
 -	struct omap_usb			*phy;
--	struct resource			*res;
-+	struct omap_usb *phy;
-+	struct resource *res;
+-	struct usb_otg			*otg;
++	struct omap_usb	*phy;
++	struct usb_otg *otg;
 +	struct device_node *node = pdev->dev.of_node;
 +	struct device_node *control_node;
 +	struct platform_device *control_pdev;
@@ -49,9 +49,9 @@ index 4a7f27c..4004f82 100644
  
  	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
  	if (!phy) {
-@@ -239,11 +246,18 @@ static int omap_usb3_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+@@ -144,11 +151,18 @@ static int omap_usb2_probe(struct platform_device *pdev)
+ 	phy->phy.otg		= otg;
+ 	phy->phy.type		= USB_PHY_TYPE_USB2;
  
 -	phy->control_dev = omap_get_control_dev();
 -	if (IS_ERR(phy->control_dev)) {
@@ -70,7 +70,7 @@ index 4a7f27c..4004f82 100644
 +
 +	phy->control_dev = &control_pdev->dev;
  
+ 	phy->is_suspended	= 1;
  	omap_control_usb_phy_power(phy->control_dev, 0);
- 	usb_add_phy_dev(&phy->phy);
 -- 
 1.7.4.1
