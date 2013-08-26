@@ -1,98 +1,34 @@
-From: B18965@freescale.com (Wang Huan-B18965)
-Date: Mon, 26 Aug 2013 09:51:45 +0000
-Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
- Vybrid VF610 platform
-In-Reply-To: <1376553714-25922-1-git-send-email-b18965@freescale.com>
-References: <1376553714-25922-1-git-send-email-b18965@freescale.com>
-Message-ID: <81BA6E5E0BC2344391CABCEE22D1B6D83F448E@039-SN1MPN1-002.039d.mgd.msft.net>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 26 Aug 2013 17:56:18 +0800
+Subject: [PATCH v3 0/3] arm: mvebu: fix resource leak
+Message-ID: <1377510981-1793-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Jean-Christophe, Tomi,
+These patches try to fix resource leak by adding missing of_node_put(),
+iounmap or using devm_ioremap_resource() if available.
 
-       Do you have any comments for these patches?
+v3:
+  - remove the clk patch since it's already taken by Mike
+  - Add Reviewed-by: Ezequiel Garcia
 
-       Thanks!
+v2:
+  - use devm_ioremap_resource() as suggested by Ezequiel Garcia
+  - use gates_out instead of bail_out as suggested by Mike Turquette
 
+Jisheng Zhang (3):
+  arm: mvebu: add missing of_node_put() to fix reference leak
+  bus: mvebu: add missing of_node_put() to fix reference leak
+  pinctrl: mvebu: Convert to use devm_ioremap_resource
 
-Best Regards,
-Alison Wang
+ arch/arm/mach-mvebu/armada-370-xp.c     |  1 +
+ arch/arm/mach-mvebu/coherency.c         |  8 +++++++-
+ arch/arm/mach-mvebu/platsmp.c           |  1 +
+ arch/arm/mach-mvebu/pmsu.c              |  1 +
+ arch/arm/mach-mvebu/system-controller.c |  1 +
+ drivers/bus/mvebu-mbus.c                |  6 +++++-
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c   | 11 +++++------
+ 7 files changed, 21 insertions(+), 8 deletions(-)
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Alison Wang
-> Sent: Thursday, August 15, 2013 4:02 PM
-> To: plagnioj at jcrosoft.com; tomi.valkeinen at ti.com; shawn.guo at linaro.org;
-> Estevam Fabio-R49496; linux-fbdev at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Cc: Jin Zhengxiong-R64188
-> Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
-> Vybrid VF610 platform
-> 
-> This series contain DCU framebuffer driver for Freescale Vybrid VF610
-> platform.
-> 
-> The Display Controller Unit (DCU) module is a system master that
-> fetches graphics stored in internal or external memory and displays
-> them on a TFT LCD panel. A wide range of panel sizes is supported and
-> the timing of the interface signals is highly configurable.
-> Graphics are read directly from memory and then blended in real-time,
-> which allows for dynamic content creation with minimal CPU intervention.
-> 
-> The features:
-> (1) Full RGB888 output to TFT LCD panel.
-> (2) For the current LCD panel, WQVGA "480x272" is tested.
-> (3) Blending of each pixel using up to 4 source layers dependent on
-> size of panel.
-> (4) Each graphic layer can be placed with one pixel resolution in
-> either axis.
-> (5) Each graphic layer support RGB565 and RGB888 direct colors without
-> alpha channel and BGRA8888 direct colors with an alpha channel.
-> (6) Each graphic layer support alpha blending with 8-bit resolution.
-> 
-> Changes in v3:
-> - Correct DCU_MODE_BLEND_ITER macro definition.
-> - Remove hardcode panel description in the driver. Use the videomode
-> helpers to get the relevant data from devicetree.
-> - Correct the wrong indentation.
-> - Use dev_* for printing messages in drivers.
-> - Change calc_div_ratio() to fsl_dcu_calc_div(), and rewrite this
-> function.
-> - Use devm_request_irq() instead of request_irq().
-> - Drop useless code.
-> - Increase the layers number to the maximum 6.
-> - Use dma_alloc_writecombine() instead of dma_alloc_coherent().
-> - Use runtime PM.
-> 
-> Changes in v2:
-> - Add a document for DCU framebuffer driver under
-> Documentation/devicetree/bindings/fb/.
-> 
-> ----------------------------------------------------------------
-> Alison Wang (5):
->       ARM: dts: vf610: Add DCU and TCON nodes
->       ARM: dts: vf610-twr: Enable DCU and TCON devices
->       ARM: clk: vf610: Add DCU and TCON clock support
->       fb: Add DCU framebuffer driver for Vybrid VF610 platform
->       Documentation: DT: Add DCU framebuffer driver
-> 
->  Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt |   67 +++++
->  arch/arm/boot/dts/vf610-twr.dts                     |   32 +++
->  arch/arm/boot/dts/vf610.dtsi                        |   19 +-
->  arch/arm/mach-imx/clk-vf610.c                       |    5 +
->  drivers/video/Kconfig                               |   10 +
->  drivers/video/Makefile                              |    1 +
->  drivers/video/fsl-dcu-fb.c                          | 1095
-> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> +++++++++
->  include/dt-bindings/clock/vf610-clock.h             |    3 +-
->  8 files changed, 1230 insertions(+), 2 deletions(-)  create mode
-> 100644 Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt
->  create mode 100644 drivers/video/fsl-dcu-fb.c
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+1.8.4.rc3
