@@ -1,45 +1,100 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 26 Aug 2013 17:09:42 +0800
-Subject: [PATCH] net/cadence/macb: fix kernel Oops if no PHY were
- discovered during probe
-In-Reply-To: <1377372065-8938-1-git-send-email-b.brezillon@overkiz.com>
-References: <1377372065-8938-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <521B1B56.8060903@atmel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 26 Aug 2013 11:11:09 +0200
+Subject: [PATCH] PCI: tegra: replace devm_request_and_ioremap by
+ devm_ioremap_resource
+Message-ID: <1377508269-9664-1-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-On 08/25/2013 03:21 AM, Boris BREZILLON wrote:
-> Test the presence of a PHY device before printing attached PHY
-> informations.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
->   drivers/net/ethernet/cadence/macb.c |    6 ++++--
->   1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-> index e866608..fd3b67f 100644
-> --- a/drivers/net/ethernet/cadence/macb.c
-> +++ b/drivers/net/ethernet/cadence/macb.c
-> @@ -1868,8 +1868,10 @@ static int __init macb_probe(struct platform_device *pdev)
->   		    dev->irq, dev->dev_addr);
->
->   	phydev = bp->phy_dev;
-> -	netdev_info(dev, "attached PHY driver [%s] (mii_bus:phy_addr=%s, irq=%d)\n",
-> -		    phydev->drv->name, dev_name(&phydev->dev), phydev->irq);
-> +	if (phydev)
-> +		netdev_info(dev, "attached PHY driver [%s] (mii_bus:phy_addr=%s, irq=%d)\n",
-> +			    phydev->drv->name, dev_name(&phydev->dev),
-> +			    phydev->irq);
+Use devm_ioremap_resource instead of devm_request_and_ioremap.
 
-Actually no need this check, if PHY is attached failed, the macb driver 
-probe will fail, then it won't show this message.
+This was done using the semantic patch
+scripts/coccinelle/api/devm_ioremap_resource.cocci
 
->   	return 0;
->
->
+Error-handling code was manually removed from the associated calls to
+platform_get_resource.
 
-Best Regards,
-Bo Shen
+Adjust the comment at the third platform_get_resource_byname to make clear
+why ioremap is not done at this point.
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Acked-by: Thierry Reding <treding@nvidia.com>
+Tested-by: Thierry Reding <treding@nvidia.com>
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+Hi,
+
+This is a small cleanup patch on top of the recently merged Tegra PCIe
+driver. Can someone please apply this to the same branch that Tegra's
+tegra-for-3.12-soc branch was merged? I think Kevin Hilman pulled it
+into next/soc.
+
+Thanks,
+Thierry
+
+ drivers/pci/host/pci-tegra.c | 31 ++++++++++---------------------
+ 1 file changed, 10 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index 7356741..2e9888a 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -1031,32 +1031,21 @@ static int tegra_pcie_get_resources(struct tegra_pcie *pcie)
+ 		return err;
+ 	}
+ 
+-	/* request and remap controller registers */
+ 	pads = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pads");
+-	if (!pads) {
+-		err = -EADDRNOTAVAIL;
++	pcie->pads = devm_ioremap_resource(&pdev->dev, pads);
++	if (IS_ERR(pcie->pads)) {
++		err = PTR_ERR(pcie->pads);
+ 		goto poweroff;
+ 	}
+ 
+ 	afi = platform_get_resource_byname(pdev, IORESOURCE_MEM, "afi");
+-	if (!afi) {
+-		err = -EADDRNOTAVAIL;
+-		goto poweroff;
+-	}
+-
+-	pcie->pads = devm_request_and_ioremap(&pdev->dev, pads);
+-	if (!pcie->pads) {
+-		err = -EADDRNOTAVAIL;
+-		goto poweroff;
+-	}
+-
+-	pcie->afi = devm_request_and_ioremap(&pdev->dev, afi);
+-	if (!pcie->afi) {
+-		err = -EADDRNOTAVAIL;
++	pcie->afi = devm_ioremap_resource(&pdev->dev, afi);
++	if (IS_ERR(pcie->afi)) {
++		err = PTR_ERR(pcie->afi);
+ 		goto poweroff;
+ 	}
+ 
+-	/* request and remap configuration space */
++	/* request configuration space, but remap later, on demand */
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cs");
+ 	if (!res) {
+ 		err = -EADDRNOTAVAIL;
+@@ -1492,9 +1481,9 @@ static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
+ 		rp->lanes = value;
+ 		rp->pcie = pcie;
+ 
+-		rp->base = devm_request_and_ioremap(pcie->dev, &rp->regs);
+-		if (!rp->base)
+-			return -EADDRNOTAVAIL;
++		rp->base = devm_ioremap_resource(pcie->dev, &rp->regs);
++		if (IS_ERR(rp->base))
++			return PTR_ERR(rp->base);
+ 
+ 		list_add_tail(&rp->list, &pcie->ports);
+ 	}
+-- 
+1.8.4
