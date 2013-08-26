@@ -1,29 +1,85 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 26 Aug 2013 10:58:50 -0400
-Subject: [PATCH for v3.12] ARM: dove: Declare symbol __init to avoid
- section mismatch
-In-Reply-To: <1377293027-443-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377293027-443-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130826145850.GA24470@titan.lakedaemon.net>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 26 Aug 2013 18:08:25 +0300
+Subject: [PATCH v6 0/8] phy: omap-usb: Support multiple instances and new types
+Message-ID: <1377529713-19762-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 06:23:47PM -0300, Ezequiel Garcia wrote:
-> Declare dove_mpp_gpio_mode() symbol as __init, since it's only called
-> from __init functions. This removes the following warning:
-> 
-> vmlinux.o(.text.unlikely+0x894): Section mismatch in reference from the
-> function dove_mpp_gpio_mode() to the function .init.text:orion_gpio_set_valid()
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/mach-dove/mpp.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Hi,
 
-doh!  Sebastian beat you to it.  :)  In mvebu/fixes-non-critical:
+This patchset does the following:
 
-  2746a7c ARM: dove: fix missing __init section of dove_mpp_gpio_mode
+* Get rid of omap_control_usb platform data as we support DT only.
 
-thx,
+* Restructure and add support for new PHY types. We now support the follwing
+four types
 
-Jason.
+ TYPE_OMAP - if it has otghs_control mailbox register (e.g. on OMAP4)
+ TYPE_USB2 - if it has Power down bit in control_dev_conf register. e.g. USB2 PHY
+ TYPE_USB3 - if it has DPLL and individual Rx & Tx power control. e.g. USB3 PHY or SATA PHY
+ TYPE_DRA7 - if it has both power down and power aux registers. e.g. USB2 PHY on DRA7
+
+* Get rid of "ti,type" DT property and introduce compatible strings for each type.
+
+* Have only one power control API "omap_control_usb_phy_power()" instead of a
+different one for each PHY type.
+
+* Get rid of omap_get_control_dev() so that we can support multiple instances
+of the control device. We take advantage of the fact that omap control USB device
+is only present on OMAP4 onwards and hence only supports DT boot. The users
+of control USB device can get a reference to it from the device node's phandle.
+
+Patches are based on balbi/next.
+
+Smoke tested on OMAP4 panda with MUSB in gadget mode (g_zero).
+
+You can find the patches in branch
+ usb-control-module
+in git tree
+ git://github.com/rogerq/linux.git
+
+v6:
+- addressed review comment about usage of control_usb before allocation.
+
+v5:
+- fixed whitespace alignment issues.
+
+v4:
+- removed "ti,has-mailbox" from omap-usb binding document example.
+
+v3:
+- return -EINVAL instead of -ENODEV on probe failure.
+- pass device type data through of_device_id table.
+- get rid of "ti,mailbox" property and "has_mailbox" from musb platform data.
+
+v2:
+- get rid of "ti,type" property and introduce compatible strings for each device type.
+
+cheers,
+-roger
+
+---
+Roger Quadros (8):
+  usb: phy: omap-control: Get rid of platform data
+  usb: phy: omap: Add new device types and remove
+    omap_control_usb3_phy_power()
+  usb: phy: omap-usb2: Don't use omap_get_control_dev()
+  usb: phy: omap-usb3: Don't use omap_get_control_dev()
+  usb: musb: omap2430: Don't use omap_get_control_dev()
+  usb: phy: omap: get rid of omap_get_control_dev()
+  ARM: dts: omap4: update omap-control-usb nodes
+  ARM: dts: omap5: update omap-control-usb node
+
+ Documentation/devicetree/bindings/usb/omap-usb.txt |   33 ++--
+ arch/arm/boot/dts/omap4.dtsi                       |   20 ++-
+ arch/arm/boot/dts/omap5.dtsi                       |   20 ++-
+ drivers/usb/musb/omap2430.c                        |   25 ++-
+ drivers/usb/phy/phy-omap-control.c                 |  210 +++++++++++---------
+ drivers/usb/phy/phy-omap-usb2.c                    |   26 ++-
+ drivers/usb/phy/phy-omap-usb3.c                    |   32 +++-
+ include/linux/usb/musb.h                           |    2 -
+ include/linux/usb/omap_control_usb.h               |   33 ++--
+ 9 files changed, 226 insertions(+), 175 deletions(-)
+
+-- 
+1.7.4.1
