@@ -1,77 +1,72 @@
 From: b.brezillon@overkiz.com (boris brezillon)
-Date: Mon, 26 Aug 2013 15:25:40 +0200
-Subject: [PATCH v2 0/4] watchdog: at91sam9_wdt: handle already configured
- wdt
-In-Reply-To: <1371799176-3408-1-git-send-email-b.brezillon@overkiz.com>
-References: <1371799176-3408-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <521B5754.2070603@overkiz.com>
+Date: Mon, 26 Aug 2013 15:33:59 +0200
+Subject: [PATCH v2 2/2] ARM: at91/dt: define phy available on sama5d3
+ mother board
+In-Reply-To: <521B5648.3020608@cogentembedded.com>
+References: <1377520431-21807-1-git-send-email-b.brezillon@overkiz.com>
+ <1377520540-21884-1-git-send-email-b.brezillon@overkiz.com>
+ <521B5648.3020608@cogentembedded.com>
+Message-ID: <521B5947.6050009@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Yang,
+Hello Sergei,
 
-Did you test/review this series ?
+On 26/08/2013 15:21, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 26-08-2013 16:35, Boris BREZILLON wrote:
+>
+>> This patch describe the phy used on atmel sama5d3 mother board:
+>>   - phy address
+>>   - phy interrupt pin
+>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>> ---
+>>   arch/arm/boot/dts/sama5d3xmb.dtsi |    8 ++++++++
+>>   1 file changed, 8 insertions(+)
+>
+>> diff --git a/arch/arm/boot/dts/sama5d3xmb.dtsi 
+>> b/arch/arm/boot/dts/sama5d3xmb.dtsi
+>> index 8a9e05d..e9521d5 100644
+>> --- a/arch/arm/boot/dts/sama5d3xmb.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d3xmb.dtsi
+>> @@ -81,6 +81,14 @@
+>>
+>>               macb1: ethernet at f802c000 {
+>>                   phy-mode = "rmii";
+>> +
+>> +                #address-cells = <1>;
+>> +                #size-cells = <0>;
+>> +                phy0: ethernet-phy at 0 {
+>
+>    Address part of the node name doesn't match the "reg" property.
 
-If you did, could you add your Acked, Reviewed and/or Tested-by.
-I'd really like to get this series merged to mainline.
+Indeed, I based my definition on arch/arc/boot/dts/angel4.dts where phy 
+is registered like this :
 
-Thanks.
+             phy0: ethernet-phy at 0 {
+                 reg = <1>;
+             };
+
+I think it's buggy there too, because I checked other dts files and they 
+all put the same address
+after @ and in reg register.
+
+I'll fix this fot the next version.
+
+Thanks
 
 Best Regards,
 Boris
 
-On 21/06/2013 09:19, Boris BREZILLON wrote:
-> Hello,
+
+
 >
-> This patch series is a porposal to enhance the sam9 watchdog timer support.
+>> +                    interrupt-parent = <&pioE>;
+>> +                    interrupts = <30 IRQ_TYPE_EDGE_FALLING>;
+>> +                    reg = <1>;
+>> +                };
 >
-> The at91sam9 watchdog timer can only be configured once, and the current
-> implementation tries to configure it in a static way:
-> - 2 seconds timeout
-> - wdt restart every 500ms
->
-> If the timer has already been configured with different values, it returns an
-> error and do not create any watchdog device.
->
-> This is not critical if the watchdog is disabled, but if it has been enabled
-> with different timeout values it will lead to a SoC reset.
->
-> This patch series tries to address this issue by adapting the heartbeat value
-> according the WDT timer config:
-> - it first tries to configure the timer as requested.
-> - if it fails it fallbacks to the current config, adapting its heartbeat timer
-> to the needs
->
-> This patch series also move to a dynamically allocated at91wdt device instead
-> of the static instance. I'm not sure this is the best solution, so please tell
-> me if you prefer to keep static instance of watchdog.
->
-> It adds a new at91 wdt type: software. This new type make use of the at91 wdt
-> interrupt to trigger a software reboot.
->
-> Finally it adds several properties to the device tree bindings.
->
-> Best Regards,
-> Boris
->
-> Change since v1:
->   - fix typo in documentaion
->   - fix irq dt definition for sama5d3 SoC
->
-> Boris BREZILLON (4):
->    watchdog: at91sam9_wdt: better watchdog support
->    watchdog: at91sam9_wdt: update device tree doc
->    ARM: at91/dt: add sam9 watchdog default options to SoCs
->    ARM: at91/dt: add watchdog properties to kizbox board
->
->   .../devicetree/bindings/watchdog/atmel-wdt.txt     |   30 +-
->   arch/arm/boot/dts/at91sam9260.dtsi                 |    5 +
->   arch/arm/boot/dts/at91sam9263.dtsi                 |    5 +
->   arch/arm/boot/dts/at91sam9g45.dtsi                 |    5 +
->   arch/arm/boot/dts/at91sam9n12.dtsi                 |    5 +
->   arch/arm/boot/dts/at91sam9x5.dtsi                  |    5 +
->   arch/arm/boot/dts/kizbox.dts                       |    6 +
->   arch/arm/boot/dts/sama5d3.dtsi                     |    5 +
->   drivers/watchdog/at91sam9_wdt.c                    |  319 +++++++++++++++-----
->   9 files changed, 300 insertions(+), 85 deletions(-)
+> WBR, Sergei
 >
