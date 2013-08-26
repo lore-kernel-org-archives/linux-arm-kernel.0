@@ -1,33 +1,38 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 26 Aug 2013 15:53:15 +0400
-Subject: [PATCH v2 0/2] R8A7779/Marzen: HPB-DMAC support for SDHI0
-In-Reply-To: <20130826073626.GB10710@verge.net.au>
-References: <201308252143.33458.sergei.shtylyov@cogentembedded.com>
- <20130826073626.GB10710@verge.net.au>
-Message-ID: <521B41AB.8040005@cogentembedded.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 26 Aug 2013 13:54:59 +0200
+Subject: [RFC] cleanup mach-s5p*
+In-Reply-To: <1f7b01cea1f6$9560aa10$c021fe30$%kim@samsung.com>
+References: <1f7b01cea1f6$9560aa10$c021fe30$%kim@samsung.com>
+Message-ID: <521B4213.8040601@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Kukjin,
 
-On 26-08-2013 11:36, Simon Horman wrote:
+On 8/26/2013 2:52 AM, Kukjin Kim wrote:
+> Hi all,
+>
+> I have a plan to remove supporting following SoCs in mainline in the near
+> future.
+> - s5pc100 - smdkc100
+> - s5pv210(s5c110) - aquial, goni, smdkc110, smdkv210, torbreck
+> - s5p64x0(s5p6440, s5p6450)- smdk6440, smdk6450
+>
+> I think users don't seem to use that any more with mainline. If so, we are
+> able to consider, it is not right now though.
+>
+> How do you think?
 
->>     Here's the set of 2 patches against the Simon Horman's 'renesas.git' repo,
->> 'renesas-devel-20130823' tag. Here we add the HPB-DMAC platform code working on
->> R8A7779 and enable DMA for SDHI0 on Marzen. The patchset depends on the R-Car
->> HPB-DMAC driver patch posted earlier.
+I am against removing support for S5PC110/S5PV210. We still use it for some
+of our internal development. DT support patches will be posted soon (pinctrl
+and clocks). Support for S5PC100 can be easily added the same way (we also
+have DT patches almost ready). S5PV210, S5PC100 and the older S3C64xx can
+all be handled by the same Samsung-DT 'machine file'.
 
->> [1/2] ARM: shmobile: r8a7779: add HPB-DMAC support
->> [2/2] ARM: shmobile: Marzen: enable DMA for SDHI0
+However we don't have any s5p64x0 based boards to develop DT support for
+them.
 
-> Hi Sergei,
-
-> have those patches been merged?
-
-    No. The driver they depend on hasn't been merged yet.
-
-> If so, do you expect them to appear in v3.12-rc1?
-
-    I'm not sure what to expect at this point...
-
-WBR, Sergei
+Best regards
+-- 
+Marek Szyprowski
+Samsung R&D Institute Poland
