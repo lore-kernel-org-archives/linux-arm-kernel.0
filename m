@@ -1,60 +1,48 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 26 Aug 2013 14:26:07 +0530
-Subject: [PATCH] dmaengine: sirf: add dmaengine_prep_slave_single/sg
- support
-In-Reply-To: <1377435433-23202-1-git-send-email-Baohua.Song@csr.com>
-References: <1377435433-23202-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <20130826085607.GN2748@intel.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 26 Aug 2013 11:41:02 +0200
+Subject: [GIT PULL] at91: device tree update for 3.12 #2
+Message-ID: <1377510062-14886-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 25, 2013 at 08:57:13PM +0800, Barry Song wrote:
-> the dma engine of sirfsoc supports interleaved mode, but if we set
-> xlen=width instead xlen<width, it will work as non-interleaved. as
-> most clients of sirf dma driver still don't need interleaved mode,
-> so here we still need to implement prep_slave_sg entry so that users
-> like uart, spi can use these APIs instead of interleaved API.
-Well in that case why dont you just create a wrapper on top of interleaved API
-to make this work without driver changes
+Arnd, Olof, Kevin,
 
-> the dma engine of sirfsoc doesn't support hardware s/g, so here we
-> are using the list of desc nodes to do SW s/g. when dma operations
-> finish, driver will re-start the next desc automatically.
-> 
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  drivers/dma/sirf-dma.c | 57 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 57 insertions(+)
-> 
-> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-> index 6aec3ad..c226c79 100644
-> --- a/drivers/dma/sirf-dma.c
-> +++ b/drivers/dma/sirf-dma.c
-> @@ -577,6 +577,62 @@ err_dir:
->  }
->  
->  static struct dma_async_tx_descriptor *
-> +sirfsoc_dma_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
-> +	unsigned int sg_len, enum dma_transfer_direction direction,
-> +	unsigned long flags, void *context)
-> +{
-> +	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-> +	struct sirfsoc_dma_desc *first_sdesc;
-> +	struct sirfsoc_dma_desc *sdesc;
-> +	struct list_head *l;
-> +	unsigned long iflags;
-> +	struct scatterlist *sg;
-> +	int desc_cnt = 0;
-> +	int i;
-> +	int ret;
-> +
-> +	/*
-> +	 * the hardware doesn't support sg, here we use software list
-> +	 * to simulate sg, so make sure we have enough desc nodes
-> +	 */
-> +	spin_lock_irqsave(&schan->lock, iflags);
-> +	list_for_each(l, &schan->free)
-> +		desc_cnt++;
-why dont you allocate descriptors here. That will remove this limitation..
+This is a second update on the DT front for AT91 on 3.12. This series is
+stacked on top of patches that are already included in your at91/dt branch.
 
-~Vinod
+The inclusion of these Nand Flash Controller properties in DT are related to
+the driver enhancement that is already queued in MTD tree:
+http://git.infradead.org/linux-mtd.git/commit/7dc37de7d59cdd1c4cdd472e1994c31b16d7b874
+
+Thanks, best regards,
+
+The following changes since commit 90d01929ad38259596371c78df8a9ecf37a7f815:
+
+  ARM: at91/dt: sam9x5ek: add sound configuration (2013-08-21 13:33:44 +0200)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-dt
+
+for you to fetch changes up to afa6a2a726766d8145dc87f47073c745aa0f0d01:
+
+  ARM: at91/dt: sama5d3xek: reduce the ROM code mapping for pmecc lookup table (2013-08-23 14:47:22 +0800)
+
+----------------------------------------------------------------
+AT91 DT changes for 3.12, take 2
+- addition of the Nand Flash Controller (NFC) in DT
+  for sama5d3 SoC. This NFC will enhance the traditional
+  Nand Flash handling (SMC + PMECC).
+
+----------------------------------------------------------------
+Josh Wu (3):
+      ARM: at91/dt: sama5d3xek: remove the useless NFC dt parameters
+      ARM: at91/dt: sama5d3xek: Enable NFC support in dts
+      ARM: at91/dt: sama5d3xek: reduce the ROM code mapping for pmecc lookup table
+
+ arch/arm/boot/dts/sama5d3.dtsi    | 19 ++++++++++++++-----
+ arch/arm/boot/dts/sama5d3xcm.dtsi |  2 --
+ 2 files changed, 14 insertions(+), 7 deletions(-)
+
+-- 
+Nicolas Ferre
