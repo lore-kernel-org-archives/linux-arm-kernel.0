@@ -1,80 +1,34 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 26 Aug 2013 19:09:00 +0200
-Subject: [PATCH v2 05/16] clk: samsung: Modify _get_rate() helper to use
- __clk_lookup()
+Date: Mon, 26 Aug 2013 19:08:57 +0200
+Subject: [PATCH v2 02/16] ARM: dts: exynos4: Specify PWM clocks in PWM node
 In-Reply-To: <1377536951-9307-1-git-send-email-t.figa@samsung.com>
 References: <1377536951-9307-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1377536951-9307-6-git-send-email-t.figa@samsung.com>
+Message-ID: <1377536951-9307-3-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to use clkdev inside the clock driver to retrieve the
-clocks for internal use. Instead __clk_lookup() helper can be used to
-look up clocks by their platform name.
-
-This patch modifies the behavior of _get_rate() helper to look up clocks
-by platform name and adjusts all users of it to pass platform names
-instead of clkdev aliases.
+Since pwm-samsung bindings require at least one clock to be specified,
+this patch adds the missing clocks and clock-names properties to specify
+clocks used by PWM block on Exynos4 SoCs.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos4.c    |  4 ++--
- drivers/clk/samsung/clk-exynos5440.c |  2 +-
- drivers/clk/samsung/clk.c            | 10 ++++------
- 3 files changed, 7 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/exynos4.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-index 7de0769..a974a56 100644
---- a/drivers/clk/samsung/clk-exynos4.c
-+++ b/drivers/clk/samsung/clk-exynos4.c
-@@ -1096,9 +1096,9 @@ static void __init exynos4_clk_init(struct device_node *np,
- 	pr_info("%s clocks: sclk_apll = %ld, sclk_mpll = %ld\n"
- 		"\tsclk_epll = %ld, sclk_vpll = %ld, arm_clk = %ld\n",
- 		exynos4_soc == EXYNOS4210 ? "Exynos4210" : "Exynos4x12",
--		_get_rate("sclk_apll"),	_get_rate("mout_mpll"),
-+		_get_rate("sclk_apll"),	_get_rate("sclk_mpll"),
- 		_get_rate("sclk_epll"), _get_rate("sclk_vpll"),
--		_get_rate("armclk"));
-+		_get_rate("arm_clk"));
- }
- 
- 
-diff --git a/drivers/clk/samsung/clk-exynos5440.c b/drivers/clk/samsung/clk-exynos5440.c
-index 4ef38e0..f865894 100644
---- a/drivers/clk/samsung/clk-exynos5440.c
-+++ b/drivers/clk/samsung/clk-exynos5440.c
-@@ -132,7 +132,7 @@ static void __init exynos5440_clk_init(struct device_node *np)
- 	samsung_clk_register_gate(exynos5440_gate_clks,
- 			ARRAY_SIZE(exynos5440_gate_clks));
- 
--	pr_info("Exynos5440: arm_clk = %ldHz\n", _get_rate("armclk"));
-+	pr_info("Exynos5440: arm_clk = %ldHz\n", _get_rate("arm_clk"));
- 	pr_info("exynos5440 clock initialization complete\n");
- }
- CLK_OF_DECLARE(exynos5440_clk, "samsung,exynos5440-clock", exynos5440_clk_init);
-diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-index cd3c40a..f503f32 100644
---- a/drivers/clk/samsung/clk.c
-+++ b/drivers/clk/samsung/clk.c
-@@ -307,14 +307,12 @@ void __init samsung_clk_of_register_fixed_ext(
- unsigned long _get_rate(const char *clk_name)
- {
- 	struct clk *clk;
--	unsigned long rate;
- 
--	clk = clk_get(NULL, clk_name);
--	if (IS_ERR(clk)) {
-+	clk = __clk_lookup(clk_name);
-+	if (!clk) {
- 		pr_err("%s: could not find clock %s\n", __func__, clk_name);
- 		return 0;
- 	}
--	rate = clk_get_rate(clk);
--	clk_put(clk);
--	return rate;
-+
-+	return clk_get_rate(clk);
- }
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 93c2501..caadc02 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -448,6 +448,8 @@
+ 		compatible = "samsung,exynos4210-pwm";
+ 		reg = <0x139D0000 0x1000>;
+ 		interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>, <0 41 0>;
++		clocks = <&clock 336>;
++		clock-names = "timers";
+ 		#pwm-cells = <2>;
+ 		status = "disabled";
+ 	};
 -- 
 1.8.3.2
