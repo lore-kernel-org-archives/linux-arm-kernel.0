@@ -1,101 +1,118 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Mon, 26 Aug 2013 11:52:09 +0530
-Subject: [PATCH v2 4/8] mtd: m25p80: add the DDR quad-read support
-In-Reply-To: <1377492102-23543-5-git-send-email-b32955@freescale.com>
-References: <1377492102-23543-1-git-send-email-b32955@freescale.com>
- <1377492102-23543-5-git-send-email-b32955@freescale.com>
-Message-ID: <521AF411.8000107@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 26 Aug 2013 12:15:24 +0530
+Subject: [PATCH v4 3/5] net: ethernet: cpsw: introduce ti,am3352-cpsw
+ compatible string
+In-Reply-To: <521AEECF.8060606@ti.com>
+References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
+ <1377267365-24057-4-git-send-email-zonque@gmail.com>
+ <52177052.1030308@ti.com> <52178E20.5040404@gmail.com>
+ <52179448.1020906@ti.com> <5217974B.5090503@ti.com> <521799A3.7080706@ti.com>
+ <52179AD6.8090406@gmail.com> <52179BDA.50603@ti.com>
+ <52179E44.5030202@ti.com> <5217A59E.4090700@ti.com> <5217AA15.7010907@ti.com>
+ <5217BDFA.5040904@ti.com> <521AEECF.8060606@ti.com>
+Message-ID: <521AF984.7090405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Monday 26 August 2013 10:11 AM, Huang Shijie wrote:
-> This patch adds the DDR quad read support by:
->
-> (1) Add the relative commands:
->        OPCODE_DDRQIOR, OPCODE_4DDRQIOR
->
-> (2) add the "m25p,ddr-quad-read" property for the m25p80 driver
->      If the dts has the "m25p,ddr-quad-read" property, the kernel will
->      set the Quad bit of the configuration register, and when the
->      setting suceedes, we will set the read opcode with the right
->      spi nor command.
->
-> Signed-off-by: Huang Shijie<b32955@freescale.com>
-> ---
->   Documentation/devicetree/bindings/mtd/m25p80.txt |    5 +++++
->   drivers/mtd/devices/m25p80.c                     |   21 ++++++++++++++++-----
->   include/linux/mtd/spi-nor.h                      |    2 ++
->   3 files changed, 23 insertions(+), 5 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/mtd/m25p80.txt b/Documentation/devicetree/bindings/mtd/m25p80.txt
-> index b33313f..a01c6b7 100644
-> --- a/Documentation/devicetree/bindings/mtd/m25p80.txt
-> +++ b/Documentation/devicetree/bindings/mtd/m25p80.txt
-> @@ -22,6 +22,11 @@ Optional properties:
->                      all chips and support for it can not be detected at runtime.
->                      Refer to your chips' datasheet to check if this is supported
->                      by your chip.
-> +- m25p,ddr-quad-read : Use the "ddr quad read" opcode to read data from the chip
-> +                   instead of the usual "read" opcode. This opcode is not
-> +                   supported by all chips and support for it can not be detected
-> +                   at runtime. Refer to your chips' datasheet to check if this
-> +                   is supported by your chip.
->   Example:
->
->   	flash: m25p80 at 0 {
-> diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
-> index 0645c9f..32ccdc7 100644
-> --- a/drivers/mtd/devices/m25p80.c
-> +++ b/drivers/mtd/devices/m25p80.c
-> @@ -913,7 +913,8 @@ static void m25p80_check_quad_read(struct m25p *flash, struct device_node *np)
->   	int ret;
->   	int sr_cr;
->
-> -	if (of_property_read_bool(np, "m25p,quad-read")) {
-> +	if (of_property_read_bool(np, "m25p,quad-read")
-> +		|| of_property_read_bool(np, "m25p,ddr-quad-read")) {
->   		/* The configuration register is set by the second byte. */
->   		sr_cr = CR_QUAD<<  8;
->
-> @@ -927,10 +928,20 @@ static void m25p80_check_quad_read(struct m25p *flash, struct device_node *np)
->   		if (!(ret>  0&&  (ret&  CR_QUAD)))
->   			return;
->
-> -		if (flash->mtd.size<= SZ_16M)
-> -			flash->read_opcode = OPCODE_QIOR;
-> -		else
-> -			flash->read_opcode = OPCODE_4QIOR;
-> +		if (of_property_read_bool(np, "m25p,quad-read")) {
-> +			if (flash->mtd.size<= SZ_16M)
-> +				flash->read_opcode = OPCODE_QIOR;
-> +			else
-> +				flash->read_opcode = OPCODE_4QIOR;
-> +			return;
-> +		}
-> +
-> +		if (of_property_read_bool(np, "m25p,ddr-quad-read")) {
-> +			if (flash->mtd.size<= SZ_16M)
-> +				flash->read_opcode = OPCODE_DDRQIOR;
-> +			else
-> +				flash->read_opcode = OPCODE_4DDRQIOR;
-> +		}
-I remember this getting asked in some other thread also...
-Quad read need dummy bits before reading out the data, what happens
-when the controller does not have LUT feature.  ?
->   	}
->   }
->
-> diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-> index e6c3309..a985336 100644
-> --- a/include/linux/mtd/spi-nor.h
-> +++ b/include/linux/mtd/spi-nor.h
-> @@ -42,6 +42,8 @@
->   #define	OPCODE_BRWR		0x17	/* Bank register write */
->   #define	OPCODE_QIOR		0xeb	/* Quad read */
->   #define	OPCODE_4QIOR		0xec	/* Quad read (4-byte)*/
-> +#define	OPCODE_DDRQIOR		0xed	/* DDR Quad read */
-> +#define	OPCODE_4DDRQIOR		0xee	/* DDR Quad read (4-byte)*/
->   #define	OPCODE_RDCR		0x35	/* Read configuration register */
->
->   /* Status Register bits. */
+On Monday 26 August 2013 11:29 AM, Mugunthan V N wrote:
+> On Saturday 24 August 2013 01:24 AM, Santosh Shilimkar wrote:
+>> On Friday 23 August 2013 02:29 PM, Mugunthan V N wrote:
+>>> On Friday 23 August 2013 11:40 PM, Santosh Shilimkar wrote:
+>>>> On Friday 23 August 2013 01:39 PM, Sekhar Nori wrote:
+>>>>> On 8/23/2013 10:58 PM, Santosh Shilimkar wrote:
+>>>>>> On Friday 23 August 2013 01:24 PM, Daniel Mack wrote:
+>>>>>>> On 23.08.2013 19:19, Santosh Shilimkar wrote:
+>>>>>>>> On Friday 23 August 2013 01:09 PM, Sekhar Nori wrote:
+>>>>>>>>> On 8/23/2013 10:26 PM, Santosh Shilimkar wrote:
+>>>>>>>>>> So just stick the IP version or call it cpsw-v1... cpsw-v2 etc.
+>>>>>>>>> If this could be handled using IP version then the right way would be to
+>>>>>>>>> just read the IP version from hardware and use it. No need of DT property.
+>>>>>>>>>
+>>>>>>>> Thats fine as well but I thought the patch needed additional properties like
+>>>>>>>> CM reg-address come from DT and hence the separate compatible. If you can
+>>>>>>>> manage without that, thats even better.
+>>>>>>> We can't, that's the whole point :)
+>>>>>>>
+>>>>>> I saw that from the patch :)
+>>>>>>
+>>>>>>> Well, theoretically, we could for now, but that's not a clean solution.
+>>>>>>> Again: the problem here is that the control port is separated from the
+>>>>>>> cpsw core, and so we have to implement something specific for the AM3352
+>>>>>>> SoC. I know that's a violation of clean and generic driver ideas, but
+>>>>>>> there's no way we can assume that every cpsw v2 ip block has a control
+>>>>>>> port that is compatible to the one found on am335x chips.
+>>>>>>>
+>>>>>> But there is a possibility that other SOC will just use the same
+>>>>>> control module approach. So using a revision IP is just fine. BTW,
+>>>>> But this is misleading because it makes appear like the same compatible
+>>>>> can be used on on another SoC like DRA7 which probably has the same
+>>>>> version of IP but a different control module implementation, when in
+>>>>> practice it cannot.
+>>>>>
+>>>>> The fact is we are doing something SoC specific in the driver and we
+>>>>> cannot hide that behind IP versions. If really in practice there comes
+>>>>> another SoC with the same control module definition then it can always
+>>>>> use ti,am3352-cpsw compatible as well. The compatible name does not
+>>>>> preclude its usage.
+>>>>>
+>>>> My point was the CPSW needs a feature which is implemented using
+>>>> control module rather than within the IP itself. Its an implementation
+>>>> detail. As such the additional feature makes sense for that IP. O.w
+>>>> there was no need to do any monkeying with control module.
+>>>>
+>>>> E.g
+>>>> MMC card detect is a basic functionality, implemented by various types
+>>>> like control module, PMIC or MMC IP itself. As such the driver need
+>>>> that support and all the implementation details needs to still handled
+>>>> to make that part work.
+>>>>
+>>>>
+>>> CPSW core as such understands only GMII/MII signals, there is an
+>>> additional module which converts GMII/MII signals to RGMII/RMII signals
+>>> respectively which is called as CPRGMII/CPRMII as specified in the
+>>> AM335x TRM in Figure 14-1. Ethernet Switch Integration.
+>>>
+>>> So to control this sub-module, the control register is used and this has
+>>> to be configured according to the EVM design like what mode of phy is
+>>> connected. CPRGMII and CPRMII is no way related to CPSW core.
+>>>
+>> Ok then why are you polluting cpsw driver with that code which
+>> not realted to CPSW as you said above. You are contradicting what
+>> you said by supporting the SOC usage in the core CPSW driver.
+> This patch series is not from me and because of the reason I mentioned
+> about control module driver, so that cpsw driver can make use control
+> module apis to select phy mode and control module driver takes care of
+> SoC specific register offsets and definitions, but now it is not
+> possible as it is not acceptable in mainline. So other way is to keep
+> these in driver itself as it is done in this patch series with SoC
+> compatibilities.
+
+What is done in this patch is _not_ "SoC compatibilities". SoC
+compatibility would be what was done in v1 of this patch ie, explicit
+check for
+
+	of_machine_is_compatible("ti,am33xx")
+
+"ti,am3352-cpsw" says "CPSW as implemented on AM3352". This is not the
+same as checking if SoC is AM3352.
+
+The example quoted on ePAPR spec for a compatible string is:
+
+	compatible = ?fsl,mpc8641-uart?, ?ns16550";
+
+MPC8641 is freescale PowerPC based SoC[1]. This shows that it is not
+unnatural to use SoC names in compatibles for IPs. That, or the ePAPR
+specification needs to be updated to show the right example of how a
+compatible could be defined. Until then I see no reason of changing what
+is implemented in this patch.
+
+In short, even if there was no control module handling in the driver,
+using "ti,am3352-cpsw" would be just fine.
+
+I have also CCed the DT maintainers for their opinion. They should have
+been explicitly CCed anyway.
+
+Thanks,
+Sekhar
+
+[1] http://www.freescale.com/files/32bit/doc/data_sheet/MPC8641DEC.pdf
