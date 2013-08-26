@@ -1,48 +1,98 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 26 Aug 2013 11:41:02 +0200
-Subject: [GIT PULL] at91: device tree update for 3.12 #2
-Message-ID: <1377510062-14886-1-git-send-email-nicolas.ferre@atmel.com>
+From: B18965@freescale.com (Wang Huan-B18965)
+Date: Mon, 26 Aug 2013 09:51:45 +0000
+Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
+ Vybrid VF610 platform
+In-Reply-To: <1376553714-25922-1-git-send-email-b18965@freescale.com>
+References: <1376553714-25922-1-git-send-email-b18965@freescale.com>
+Message-ID: <81BA6E5E0BC2344391CABCEE22D1B6D83F448E@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Hi, Jean-Christophe, Tomi,
 
-This is a second update on the DT front for AT91 on 3.12. This series is
-stacked on top of patches that are already included in your at91/dt branch.
+       Do you have any comments for these patches?
 
-The inclusion of these Nand Flash Controller properties in DT are related to
-the driver enhancement that is already queued in MTD tree:
-http://git.infradead.org/linux-mtd.git/commit/7dc37de7d59cdd1c4cdd472e1994c31b16d7b874
+       Thanks!
 
-Thanks, best regards,
 
-The following changes since commit 90d01929ad38259596371c78df8a9ecf37a7f815:
+Best Regards,
+Alison Wang
 
-  ARM: at91/dt: sam9x5ek: add sound configuration (2013-08-21 13:33:44 +0200)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-dt
-
-for you to fetch changes up to afa6a2a726766d8145dc87f47073c745aa0f0d01:
-
-  ARM: at91/dt: sama5d3xek: reduce the ROM code mapping for pmecc lookup table (2013-08-23 14:47:22 +0800)
-
-----------------------------------------------------------------
-AT91 DT changes for 3.12, take 2
-- addition of the Nand Flash Controller (NFC) in DT
-  for sama5d3 SoC. This NFC will enhance the traditional
-  Nand Flash handling (SMC + PMECC).
-
-----------------------------------------------------------------
-Josh Wu (3):
-      ARM: at91/dt: sama5d3xek: remove the useless NFC dt parameters
-      ARM: at91/dt: sama5d3xek: Enable NFC support in dts
-      ARM: at91/dt: sama5d3xek: reduce the ROM code mapping for pmecc lookup table
-
- arch/arm/boot/dts/sama5d3.dtsi    | 19 ++++++++++++++-----
- arch/arm/boot/dts/sama5d3xcm.dtsi |  2 --
- 2 files changed, 14 insertions(+), 7 deletions(-)
-
--- 
-Nicolas Ferre
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Alison Wang
+> Sent: Thursday, August 15, 2013 4:02 PM
+> To: plagnioj at jcrosoft.com; tomi.valkeinen at ti.com; shawn.guo at linaro.org;
+> Estevam Fabio-R49496; linux-fbdev at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Cc: Jin Zhengxiong-R64188
+> Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
+> Vybrid VF610 platform
+> 
+> This series contain DCU framebuffer driver for Freescale Vybrid VF610
+> platform.
+> 
+> The Display Controller Unit (DCU) module is a system master that
+> fetches graphics stored in internal or external memory and displays
+> them on a TFT LCD panel. A wide range of panel sizes is supported and
+> the timing of the interface signals is highly configurable.
+> Graphics are read directly from memory and then blended in real-time,
+> which allows for dynamic content creation with minimal CPU intervention.
+> 
+> The features:
+> (1) Full RGB888 output to TFT LCD panel.
+> (2) For the current LCD panel, WQVGA "480x272" is tested.
+> (3) Blending of each pixel using up to 4 source layers dependent on
+> size of panel.
+> (4) Each graphic layer can be placed with one pixel resolution in
+> either axis.
+> (5) Each graphic layer support RGB565 and RGB888 direct colors without
+> alpha channel and BGRA8888 direct colors with an alpha channel.
+> (6) Each graphic layer support alpha blending with 8-bit resolution.
+> 
+> Changes in v3:
+> - Correct DCU_MODE_BLEND_ITER macro definition.
+> - Remove hardcode panel description in the driver. Use the videomode
+> helpers to get the relevant data from devicetree.
+> - Correct the wrong indentation.
+> - Use dev_* for printing messages in drivers.
+> - Change calc_div_ratio() to fsl_dcu_calc_div(), and rewrite this
+> function.
+> - Use devm_request_irq() instead of request_irq().
+> - Drop useless code.
+> - Increase the layers number to the maximum 6.
+> - Use dma_alloc_writecombine() instead of dma_alloc_coherent().
+> - Use runtime PM.
+> 
+> Changes in v2:
+> - Add a document for DCU framebuffer driver under
+> Documentation/devicetree/bindings/fb/.
+> 
+> ----------------------------------------------------------------
+> Alison Wang (5):
+>       ARM: dts: vf610: Add DCU and TCON nodes
+>       ARM: dts: vf610-twr: Enable DCU and TCON devices
+>       ARM: clk: vf610: Add DCU and TCON clock support
+>       fb: Add DCU framebuffer driver for Vybrid VF610 platform
+>       Documentation: DT: Add DCU framebuffer driver
+> 
+>  Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt |   67 +++++
+>  arch/arm/boot/dts/vf610-twr.dts                     |   32 +++
+>  arch/arm/boot/dts/vf610.dtsi                        |   19 +-
+>  arch/arm/mach-imx/clk-vf610.c                       |    5 +
+>  drivers/video/Kconfig                               |   10 +
+>  drivers/video/Makefile                              |    1 +
+>  drivers/video/fsl-dcu-fb.c                          | 1095
+> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+> +++++++++
+>  include/dt-bindings/clock/vf610-clock.h             |    3 +-
+>  8 files changed, 1230 insertions(+), 2 deletions(-)  create mode
+> 100644 Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt
+>  create mode 100644 drivers/video/fsl-dcu-fb.c
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
