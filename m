@@ -1,86 +1,146 @@
-From: B47053@freescale.com (Xiubo Li-B47053)
-Date: Mon, 26 Aug 2013 05:35:53 +0000
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM
-In-Reply-To: <5217B807.7020800@wwwdotorg.org>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
- <1473340.OXSHEp7d4P@flatron>
- <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
- <20130822062610.GR31036@pengutronix.de> <20130823073612.GB3535@ulmo>
- <5217B807.7020800@wwwdotorg.org>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827E11AC@039-SN2MPN1-012.039d.mgd.msft.net>
+From: j-keerthy@ti.com (Keerthy)
+Date: Mon, 26 Aug 2013 11:06:51 +0530
+Subject: [PATCH] ARM: DTS: DRA7: Add TPS659038 PMIC nodes
+Message-ID: <1377495411-21984-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+The Patch adds nodes for TPS659038 PMIC for DRA7 boards.
 
+It is based on top of:
+http://comments.gmane.org/gmane.linux.ports.arm.omap/102459.
 
-> Subject: Re: [PATCH 4/4] Documentation: Add device tree bindings for
-> Freescale FTM PWM
-> 
-> On 08/23/2013 01:36 AM, Thierry Reding wrote:
-> > On Thu, Aug 22, 2013 at 08:26:10AM +0200, Sascha Hauer wrote:
-> >> On Thu, Aug 22, 2013 at 02:55:42AM +0000, Xiubo Li-B47053 wrote:
-> >>> Hi Tomasz,
-> >>>
-> >>> Thanks for your comments.
-> >>>
-> >>>
-> >>>> Could you explain meaning of this property more precisely?
-> >>>> I'm interested especially how is this related to the PWM IP block
-> >>>> and boards.
-> >>>>
-> >>>
-> >>> Yes. There are 8 channels most. While the pinctrls of 4th and 5th
-> >>> channels could be used by uart's Rx and Tx, then these 2 channels
-> >>> won't be used for pwm output, so there will be 6 channels available
-> >>> by the pwm. Thus, the pwm chip will register only 6 pwms(6 channels)
-> >>> most("fsl,pwm-channel-orders = {0 1 2 3
-> >>> 6 7}").And also the "fsl,pwm-channel-number" will be 6.
-> >>
-> >> If the chip has eight PWMs I would register all of them. If some of
-> >> them are not routed out by the pinmux then just nothing happens if
-> >> you use them. In a sane devicetree they won't be referenced anyway
-> >> when they are not routed out of the SoC.
-> >
-> > In that case, shouldn't this be hooked up to the pinctrl subsystem as
-> > well? As I understand the above, the logical thing would be for each
-> > PWM channel's .request() operation to configure the pinmuxing
-> > appropriately. And if it can't be configured as necessary then
-> > .request() should return an error (or propagate the error from the
-> > pinctrl subsystem).
-> 
-> I think the pin-muxing should be static, i.e. set up when the PWM device
-> as a whole probe()s, rather than being twiddled at request/free time.
-> Certainly the pinmux support in the device core is now set up to acquire
-> the default state right before probe(). I don't see a need to do anything
-> custom here.
+Documentation:	Documentation/devicetree/bindings/mfd/palmas.txt
+		Documentation/devicetree/bindings/regulator/palmas-pmic.txt		
 
-As we have tolk about this before in [PATCH 1/4]:
-"
-> > Why do you need to manipulate the pinctrl to en/disable a channel?
-> >
-> 
-> This is because in Vybrid VF610 TOWER board, there are 4 leds, and each
-> led's one point(diode's positive pole) is connected to 3.3V, and the
-> other point is connected to pwm's one channel. When the 4 pinctrls are
-> configured as enable at the same time, the 4 pinctrls is low valtage, and
-> the 4 leds will be lighted up as default, then when you enable/disable
-> one led will effects others.
-> 
-> These pinctrls are belong to pwm, and I don't think led or other customer
-> could control them directly.
-> So, here I authorize the 4 pinctrls to each channel controls.
->
-"
-For the reason above, I have to control the pinctrls separately.
+Boot Tested on DRA7 d1 Board.
 
-If all the pinctrls set as default state, the 8 pinctrls must be controlled together.
-And the 4 leds will all be lighted up as default and will influence each other.
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ arch/arm/boot/dts/dra7-evm.dts |  118 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 118 insertions(+)
 
-Thanks very much.
-
---
-Best Regards.
-Xiubo
+Index: linux/arch/arm/boot/dts/dra7-evm.dts
+===================================================================
+--- linux.orig/arch/arm/boot/dts/dra7-evm.dts	2013-08-26 09:57:52.496173554 +0530
++++ linux/arch/arm/boot/dts/dra7-evm.dts	2013-08-26 10:38:44.995414695 +0530
+@@ -93,6 +93,119 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins>;
+ 	clock-frequency = <400000>;
++
++	tps659038: tps659038 at 58 {
++		compatible = "ti,tps659038";
++		reg = <0x58>;
++
++		tps659038_pmic {
++			compatible = "ti,tps659038-pmic";
++
++			regulators {
++				smps123_reg: smps123 {
++					/* VDD_MPU */
++						regulator-name = "smps123";
++						regulator-min-microvolt = < 850000>;
++						regulator-max-microvolt = <1250000>;
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++				smps45_reg: smps45 {
++						/* VDD_DSPEVE */
++						regulator-name = "smps45";
++						regulator-min-microvolt = < 850000>;
++						regulator-max-microvolt = <1150000>;
++						regulator-boot-on;
++					};
++
++				smps6_reg: smps6 {
++						/* VDD_GPU - over VDD_SMPS6 */
++						regulator-name = "smps6";
++						regulator-min-microvolt = <850000>;
++						regulator-max-microvolt = <12500000>;
++						regulator-boot-on;
++					};
++
++				smps7_reg: smps7 {
++						/* CORE_VDD */
++						regulator-name = "smps7";
++						regulator-min-microvolt = <850000>;
++						regulator-max-microvolt = <1030000>;
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++				smps8_reg: smps8 {
++						/* VDD_IVAHD */
++						regulator-name = "smps8";
++						regulator-min-microvolt = < 850000>;
++						regulator-max-microvolt = <1250000>;
++						regulator-boot-on;
++					};
++
++				smps9_reg: smps9 {
++						/* VDDS1V8 */
++						regulator-name = "smps9";
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <1800000>;
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++				ldo1_reg: ldo1 {
++						/* LDO1_OUT --> SDIO  */
++						regulator-name = "ldo1";
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <3300000>;
++						regulator-boot-on;
++					};
++
++				ldo2_reg: ldo2 {
++						/* VDD_RTCIO */
++						/* LDO2 -> VDDSHV5, LDO2 also goes to CAN_PHY_3V3 */
++						regulator-name = "ldo2";
++						regulator-min-microvolt = <3300000>;
++						regulator-max-microvolt = <3300000>;
++						regulator-boot-on;
++					};
++
++				ldo3_reg: ldo3 {
++						/* VDDA_1V8_PHY */
++						regulator-name = "ldo3";
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <1800000>;
++						regulator-boot-on;
++					};
++
++				ldo9_reg: ldo9 {
++						/* VDD_RTC */
++						regulator-name = "ldo9";
++						regulator-min-microvolt = <1050000>;
++						regulator-max-microvolt = <1050000>;
++						regulator-boot-on;
++					};
++
++				ldoln_reg: ldoln {
++						/* VDDA_1V8_PLL */
++						regulator-name = "ldoln";
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <1800000>;
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++				ldousb_reg: ldousb {
++						/* VDDA_3V_USB: VDDA_USBHS33 */
++						regulator-name = "ldousb";
++						regulator-min-microvolt = <3300000>;
++						regulator-max-microvolt = <3300000>;
++						regulator-boot-on;
++					};
++
++				};
++			};
++		};
+ };
+ 
+ &i2c2 {
