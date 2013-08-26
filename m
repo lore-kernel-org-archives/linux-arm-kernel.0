@@ -1,26 +1,55 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 26 Aug 2013 19:35:24 +0530
-Subject: [PATCH] cpufreq: imx6q: Fix clock enable balance
-In-Reply-To: <1377517716-27470-1-git-send-email-s.hauer@pengutronix.de>
-References: <1377517716-27470-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CAKohponSYhBBBjxUme2bmVNW3HZfWuU=_OeL5HuA6nnVCit3tA@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 26 Aug 2013 10:08:43 -0400
+Subject: [PATCH v2 7/9] watchdog: orion: Update device-tree binding
+ documentation
+In-Reply-To: <1377295942-5955-8-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1377295942-5955-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377295942-5955-8-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130826140843.GI13964@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 August 2013 17:18, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> For changing the cpu frequency the i.MX6q has to be switched to some
-> intermediate clock during the PLL reprogramming. The driver tries
-> to be clever to keep the enable count correct but gets it wrong. If
-> the cpufreq is increased it calls clk_disable_unprepare twice
-> on pll2_pfd2_396m. This puts all other devices which get their clock
-> from pll2_pfd2_396m into a nonworking state.
->
-> Fix this by removing the clk enabling/disabling altogether since the
-> clk core will do this automatically during a reparent.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+On Fri, Aug 23, 2013 at 07:12:20PM -0300, Ezequiel Garcia wrote:
+> Change the 'reg' property meaning, by defining two required cells.
+> It's important to note this commit breaks DT-compatibility for this
+> device.
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > ---
->  drivers/cpufreq/imx6q-cpufreq.c | 17 -----------------
->  1 file changed, 17 deletions(-)
+>  Documentation/devicetree/bindings/watchdog/orion-wdt.txt | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+> index 5dc8d30..a74c9c8 100644
+> --- a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+> @@ -3,7 +3,9 @@
+>  Required Properties:
+>  
+>  - Compatibility : "marvell,orion-wdt"
+> -- reg		: Address of the timer registers
+> +- reg		: Two cells are required:
+> +		  First  cell contains the global timer control register.
+> +		  Second cell contains the watchdog counter register.
+>  
+>  Optional properties:
+>  
+> @@ -13,7 +15,8 @@ Example:
+>  
+>  	wdt at 20300 {
+>  		compatible = "marvell,orion-wdt";
+> -		reg = <0x20300 0x28>;
+> +		reg = <0x20300 0x4
 
-Applied.
+
+> +		       0x20324 0x4>;
+
+Is there a reason we're going this route over adding a new compatible
+string? iow, why can't we keep this knowledge in the driver and have a
+"marvell,armada-wdt" or similar compat string that the orion-wdt driver
+also serves?
+
+thx,
+
+Jason.
