@@ -1,43 +1,68 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 26 Aug 2013 16:39:19 +0200
-Subject: [PATCH v7 4/4] ARM: init: add support for reserved memory defined by
- device tree
-In-Reply-To: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
-References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1377527959-5080-5-git-send-email-m.szyprowski@samsung.com>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Mon, 26 Aug 2013 22:49:05 +0800
+Subject: [PATCH] DMA: let filter functions of of_dma_simple_xlate
+ possible check of_node
+In-Reply-To: <52178677.6090001@wwwdotorg.org>
+References: <1375408800-11789-1-git-send-email-rizhao@nvidia.com>
+ <20130822051904.GA2685@rizhao-lap> <52167213.6090604@wwwdotorg.org>
+ <20130823012911.GB17925@rizhao-lap>
+ <52178677.6090001@wwwdotorg.org>
+Message-ID: <20130826144901.GB2733@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable reserved memory initialization from device tree.
+On Fri, Aug 23, 2013 at 09:57:43AM -0600, Stephen Warren wrote:
+> On 08/22/2013 07:29 PM, Richard Zhao wrote:
+> > On Fri, Aug 23, 2013 at 04:18:27AM +0800, Stephen Warren wrote:
+> >> On 08/21/2013 11:19 PM, Richard Zhao wrote:
+> >>> On Fri, Aug 02, 2013 at 10:00:00AM +0800, Richard Zhao wrote:
+> >>>> pass of_phandle_args dma_spec to dma_request_channel in of_dma_simple_xlate,
+> >>>> so the filter function could access of_node in of_phandle_args.
+> >>>>
+> >>>> It also remove restriction of #dma-cells has to be one.
+> >>>>
+> >>>> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
+> >>>> ---
+> >>>>  drivers/dma/edma.c     |  7 +++++--
+> >>>>  drivers/dma/of-dma.c   | 10 ++++------
+> >>>>  drivers/dma/omap-dma.c |  6 ++++--
+> >>>>  3 files changed, 13 insertions(+), 10 deletions(-)
+> >>>>
+> >>>
+> >>> Hi Vinod,
+> >>>
+> >>> Can you please pick up this change?
+> >>>
+> >>> Hi Stephen,
+> >>>
+> >>> Can you please give a ack or reviewed-by etc?
+> >>
+> >> Hmm. Looking at the patch, I'm not sure it's right.
+> >>
+> >> This patch simply passes all the specfier args to the filter function,
+> >> and the code to check the equality of the of_node to the filter args is
+> >> still duplicated in each DMA driver. Instead, the DMA core should be
+> >> implementing the equality check, and only even calling the
+> >> driver-specific filter function for devices where the client's phandle
+> >> matches the DMA providing device's of_node handle.
+> > 
+> > Filter function is called in dmaengine core code, independent of dt.
+> 
+> The core code can still check if a dmaengine's driver was instantiated
+> from DT and take additional actions in that case.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
-Acked-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/mm/init.c |    3 +++
- 1 file changed, 3 insertions(+)
+>From perspective of core code, the filter function is not attached to
+any dma driver. So it doesn't care whether dt dma driver is instantiated.
+I'm not sure I've got your point. Can you please write pieces of code if
+possible?
+The goal of this patch is to use least changes to add check of dt node.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 15225d8..6a2fe44 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -17,6 +17,7 @@
- #include <linux/nodemask.h>
- #include <linux/initrd.h>
- #include <linux/of_fdt.h>
-+#include <linux/of_reserved_mem.h>
- #include <linux/highmem.h>
- #include <linux/gfp.h>
- #include <linux/memblock.h>
-@@ -377,6 +378,8 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
- 	if (mdesc->reserve)
- 		mdesc->reserve();
- 
-+	early_init_dt_scan_reserved_mem();
-+
- 	/*
- 	 * reserve memory for DMA contigouos allocations,
- 	 * must come from DMA area inside low memory
--- 
-1.7.9.5
+Thanks
+Richard
+> 
+> > And the reason why the driver has to write its own filter function is
+> > it has to store slave id there in its own way.
+> 
+> I'm not saying don't call the driver's filter function, but rather that
+> the dmaengine core should perform the common checks before doing so.
+> 
