@@ -1,55 +1,141 @@
 From: m.krawczuk@partner.samsung.com (Mateusz Krawczuk)
-Date: Mon, 26 Aug 2013 13:38:29 +0200
-Subject: [PATCH RFC 0/5] ARM: s5pv210: move to common clk framework
-Message-ID: <1377517114-20222-1-git-send-email-m.krawczuk@partner.samsung.com>
+Date: Mon, 26 Aug 2013 13:38:30 +0200
+Subject: [PATCH RFC 1/5] media: s5p-tv: Fix sdo driver to work with CCF
+In-Reply-To: <1377517114-20222-1-git-send-email-m.krawczuk@partner.samsung.com>
+References: <1377517114-20222-1-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <1377517114-20222-2-git-send-email-m.krawczuk@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is the new s5pv210 clock implementation
-(using common clk framework).
+Replace clk_enable by clock_enable_prepare and clk_disable with clk_disable_unprepare.
+Clock prepare is required by Clock Common Framework, and old clock driver didn`t support it.
+Without it Common Clock Framework prints a warning.
 
-This implementation is compatible with device tree definition and board files.
+Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+---
+ drivers/media/platform/s5p-tv/sdo_drv.c | 44 +++++++++++++++++++++++++--------
+ 1 file changed, 34 insertions(+), 10 deletions(-)
 
-This patch series is based on linux-next and has been tested on goni and aquila 
-boards using board file.
-
-This patch series require adding new registration method
-for PLL45xx and PLL46xx, which is included in this patch series:
-clk: samsung: pll: Use new registration method for PLL46xx
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg21653.html
-clk: samsung: pll: Use new registration method for PLL45xx
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg21652.html
-clk: samsung: exynos4: Rename exynos4_plls to exynos4x12_plls
-http://www.spinics.net/lists/arm-kernel/msg268486.html
-
-Mateusz Krawczuk (5):
-  media: s5p-tv: Fix sdo driver to work with CCF
-  media: s5p-tv: Fix mixer driver to work with CCF
-  ARM: samsung: add clock setup for FIMC and FIMD
-  clk: samsung: Add clock driver for s5pc110/s5pv210
-  ARM: s5pv210: Migrate clock handling to Common Clock Framework
-
- .../bindings/clock/samsung,s5pv210-clock.txt       |  72 ++
- arch/arm/mach-s5pv210/Kconfig                      |   9 +
- arch/arm/mach-s5pv210/Makefile                     |   4 +-
- arch/arm/mach-s5pv210/common.c                     |  22 +
- arch/arm/mach-s5pv210/common.h                     |  13 +
- arch/arm/mach-s5pv210/mach-aquila.c                |   1 +
- arch/arm/mach-s5pv210/mach-goni.c                  |  51 +-
- arch/arm/mach-s5pv210/mach-smdkc110.c              |   1 +
- arch/arm/mach-s5pv210/mach-smdkv210.c              |   1 +
- arch/arm/mach-s5pv210/mach-torbreck.c              |   1 +
- arch/arm/plat-samsung/Kconfig                      |   2 +-
- arch/arm/plat-samsung/init.c                       |   2 -
- drivers/clk/samsung/Makefile                       |   3 +-
- drivers/clk/samsung/clk-s5pv210.c                  | 732 +++++++++++++++++++++
- drivers/media/platform/s5p-tv/mixer_drv.c          |  33 +-
- drivers/media/platform/s5p-tv/sdo_drv.c            |  44 +-
- include/dt-bindings/clock/samsung,s5pv210-clock.h  | 221 +++++++
- 17 files changed, 1189 insertions(+), 23 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
- create mode 100644 drivers/clk/samsung/clk-s5pv210.c
- create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
-
+diff --git a/drivers/media/platform/s5p-tv/sdo_drv.c b/drivers/media/platform/s5p-tv/sdo_drv.c
+index 0afa90f..77eac6d 100644
+--- a/drivers/media/platform/s5p-tv/sdo_drv.c
++++ b/drivers/media/platform/s5p-tv/sdo_drv.c
+@@ -55,6 +55,8 @@ struct sdo_device {
+ 	struct clk *dacphy;
+ 	/** clock for control of VPLL */
+ 	struct clk *fout_vpll;
++	/** vpll rate before sdo stream was on */
++	int vpll_rate;
+ 	/** regulator for SDO IP power */
+ 	struct regulator *vdac;
+ 	/** regulator for SDO plug detection */
+@@ -193,17 +195,34 @@ static int sdo_s_power(struct v4l2_subdev *sd, int on)
+ 
+ static int sdo_streamon(struct sdo_device *sdev)
+ {
++	int ret = 0;
++
+ 	/* set proper clock for Timing Generator */
+-	clk_set_rate(sdev->fout_vpll, 54000000);
++	sdev->vpll_rate = clk_get_rate(sdev->fout_vpll);
++	ret = clk_set_rate(sdev->fout_vpll, 54000000);
++	if (ret < 0) {
++		dev_err(sdev->dev,
++			"%s: Failed to set vpll rate!\n", __func__);
++		return ret;
++	}
+ 	dev_info(sdev->dev, "fout_vpll.rate = %lu\n",
+ 	clk_get_rate(sdev->fout_vpll));
+ 	/* enable clock in SDO */
+ 	sdo_write_mask(sdev, SDO_CLKCON, ~0, SDO_TVOUT_CLOCK_ON);
+-	clk_enable(sdev->dacphy);
++	ret = clk_prepare_enable(sdev->dacphy);
++	if (ret < 0) {
++		dev_err(sdev->dev,
++			"%s: Failed to prepare and enable clock !\n", __func__);
++		goto fail;
++	}
+ 	/* enable DAC */
+ 	sdo_write_mask(sdev, SDO_DAC, ~0, SDO_POWER_ON_DAC);
+ 	sdo_reg_debug(sdev);
+ 	return 0;
++fail:
++	sdo_write_mask(sdev, SDO_CLKCON, 0, SDO_TVOUT_CLOCK_ON);
++	clk_set_rate(sdev->fout_vpll, sdev->vpll_rate);
++	return ret;
+ }
+ 
+ static int sdo_streamoff(struct sdo_device *sdev)
+@@ -211,7 +230,7 @@ static int sdo_streamoff(struct sdo_device *sdev)
+ 	int tries;
+ 
+ 	sdo_write_mask(sdev, SDO_DAC, 0, SDO_POWER_ON_DAC);
+-	clk_disable(sdev->dacphy);
++	clk_disable_unprepare(sdev->dacphy);
+ 	sdo_write_mask(sdev, SDO_CLKCON, 0, SDO_TVOUT_CLOCK_ON);
+ 	for (tries = 100; tries; --tries) {
+ 		if (sdo_read(sdev, SDO_CLKCON) & SDO_TVOUT_CLOCK_READY)
+@@ -220,6 +239,7 @@ static int sdo_streamoff(struct sdo_device *sdev)
+ 	}
+ 	if (tries == 0)
+ 		dev_err(sdev->dev, "failed to stop streaming\n");
++	clk_set_rate(sdev->fout_vpll, sdev->vpll_rate);
+ 	return tries ? 0 : -EIO;
+ }
+ 
+@@ -254,7 +274,7 @@ static int sdo_runtime_suspend(struct device *dev)
+ 	dev_info(dev, "suspend\n");
+ 	regulator_disable(sdev->vdet);
+ 	regulator_disable(sdev->vdac);
+-	clk_disable(sdev->sclk_dac);
++	clk_disable_unprepare(sdev->sclk_dac);
+ 	return 0;
+ }
+ 
+@@ -266,7 +286,7 @@ static int sdo_runtime_resume(struct device *dev)
+ 
+ 	dev_info(dev, "resume\n");
+ 
+-	ret = clk_enable(sdev->sclk_dac);
++	ret = clk_prepare_enable(sdev->sclk_dac);
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -299,7 +319,7 @@ static int sdo_runtime_resume(struct device *dev)
+ vdac_r_dis:
+ 	regulator_disable(sdev->vdac);
+ dac_clk_dis:
+-	clk_disable(sdev->sclk_dac);
++	clk_disable_unprepare(sdev->sclk_dac);
+ 	return ret;
+ }
+ 
+@@ -403,10 +423,14 @@ static int sdo_probe(struct platform_device *pdev)
+ 		ret = PTR_ERR(sdev->vdet);
+ 		goto fail_fout_vpll;
+ 	}
+-
+ 	/* enable gate for dac clock, because mixer uses it */
+-	clk_enable(sdev->dac);
+-
++	clk_prepare_enable(sdev->dac);
++	if (IS_ERR(sdev->dac)) {
++		dev_err(dev,
++			"%s: Failed to prepare and enable clock !\n", __func__);
++		ret = PTR_ERR(sdev->dac);
++		goto fail_fout_vpll;
++	}
+ 	/* configure power management */
+ 	pm_runtime_enable(dev);
+ 
+@@ -444,7 +468,7 @@ static int sdo_remove(struct platform_device *pdev)
+ 	struct sdo_device *sdev = sd_to_sdev(sd);
+ 
+ 	pm_runtime_disable(&pdev->dev);
+-	clk_disable(sdev->dac);
++	clk_disable_unprepare(sdev->dac);
+ 	clk_put(sdev->fout_vpll);
+ 	clk_put(sdev->dacphy);
+ 	clk_put(sdev->dac);
 -- 
 1.8.1.2
