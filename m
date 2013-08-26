@@ -1,70 +1,34 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 25 Aug 2013 14:50:08 -0700
-Subject: [PATCHv3 02/10] clk: sunxi: fix initialization of basic clocks
-In-Reply-To: <1375609657-15434-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1375609657-15434-1-git-send-email-maxime.ripard@free-electrons.com>
- <1375609657-15434-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130825215008.8231.41811@quantum>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 26 Aug 2013 09:14:31 +0900
+Subject: [GIT PULL 1/3] 2nd Round Samsung defconfig for v3.12
+Message-ID: <1f7501cea1f1$3c7edb60$b57c9220$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2013-08-04 02:47:29)
-> From: Emilio L?pez <emilio@elopez.com.ar>
-> 
-> With the recent move towards CLK_OF_DECLARE(...), the driver stopped
-> initializing osc32k, which is compatible "fixed-clock". This is because
-> we never called of_clk_init(NULL). Fix this by moving the only other
-> simple clock (osc24M) to use CLK_OF_DECLARE(...) and call of_clk_init(NULL)
-> to initialize both of them.
-> 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
-Taken into clk-next.
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
 
-Regards,
-Mike
+are available in the git repository at:
 
-> ---
->  drivers/clk/sunxi/clk-sunxi.c | 11 +++--------
->  1 file changed, 3 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index db1c45b..567963f 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -69,6 +69,7 @@ static void __init sunxi_osc_clk_setup(struct device_node *node)
->                 clk_register_clkdev(clk, clk_name, NULL);
->         }
->  }
-> +CLK_OF_DECLARE(sunxi_osc, "allwinner,sun4i-osc-clk", sunxi_osc_clk_setup);
->  
->  
->  
-> @@ -422,12 +423,6 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
->         of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
->  }
->  
-> -/* Matches for of_clk_init */
-> -static const __initconst struct of_device_id clk_match[] = {
-> -       {.compatible = "allwinner,sun4i-osc-clk", .data = sunxi_osc_clk_setup,},
-> -       {}
-> -};
-> -
->  /* Matches for factors clocks */
->  static const __initconst struct of_device_id clk_factors_match[] = {
->         {.compatible = "allwinner,sun4i-pll1-clk", .data = &pll1_data,},
-> @@ -482,8 +477,8 @@ static void __init of_sunxi_table_clock_setup(const struct of_device_id *clk_mat
->  
->  void __init sunxi_init_clocks(void)
->  {
-> -       /* Register all the simple sunxi clocks on DT */
-> -       of_clk_init(clk_match);
-> +       /* Register all the simple and basic clocks on DT */
-> +       of_clk_init(NULL);
->  
->         /* Register factor clocks */
->         of_sunxi_table_clock_setup(clk_factors_match, sunxi_factors_clk_setup);
-> -- 
-> 1.8.3.4
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+tags/samsung-defconfig-v2
+
+for you to fetch changes up to c3e566d941636c6b1f8849d403b23d83c0e10901:
+
+  ARM: exynos4_defconfig: remove obsolete exynos4_defconfig (2013-07-24
+17:41:50 +0900)
+
+----------------------------------------------------------------
+Remove exynos4_defconfig because,
+- No more used after disabling exynos non-DT
+- exynos_defconfig can support exynos SoCs
+
+----------------------------------------------------------------
+Bartlomiej Zolnierkiewicz (1):
+      ARM: exynos4_defconfig: remove obsolete exynos4_defconfig
+
+ arch/arm/configs/exynos4_defconfig |   68
+------------------------------------
+ 1 file changed, 68 deletions(-)
+ delete mode 100644 arch/arm/configs/exynos4_defconfig
