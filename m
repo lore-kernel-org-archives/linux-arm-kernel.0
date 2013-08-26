@@ -1,50 +1,57 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 26 Aug 2013 19:36:58 +0800
-Subject: [PATCH v4 3/3] pinctrl: mvebu: Convert to use devm_ioremap_resource
-In-Reply-To: <1377517018-7716-1-git-send-email-jszhang@marvell.com>
-References: <1377517018-7716-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1377517018-7716-4-git-send-email-jszhang@marvell.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 26 Aug 2013 13:48:36 +0200
+Subject: [PATCH] cpufreq: imx6q: Fix clock enable balance
+Message-ID: <1377517716-27470-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The resource mapped by of_iomap() isn't unmapped in error path. This
-patch fix the resource leakage by using devm_ioremap_resource() instead
-of of_iomap().
+For changing the cpu frequency the i.MX6q has to be switched to some
+intermediate clock during the PLL reprogramming. The driver tries
+to be clever to keep the enable count correct but gets it wrong. If
+the cpufreq is increased it calls clk_disable_unprepare twice
+on pll2_pfd2_396m. This puts all other devices which get their clock
+from pll2_pfd2_396m into a nonworking state.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Reviewed-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Fix this by removing the clk enabling/disabling altogether since the
+clk core will do this automatically during a reparent.
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/pinctrl/mvebu/pinctrl-mvebu.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+ drivers/cpufreq/imx6q-cpufreq.c | 17 -----------------
+ 1 file changed, 17 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-index bb7ddb1..1caa45f 100644
---- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-@@ -579,7 +579,7 @@ static int mvebu_pinctrl_build_functions(struct platform_device *pdev,
- int mvebu_pinctrl_probe(struct platform_device *pdev)
- {
- 	struct mvebu_pinctrl_soc_info *soc = dev_get_platdata(&pdev->dev);
--	struct device_node *np = pdev->dev.of_node;
-+	struct resource *res;
- 	struct mvebu_pinctrl *pctl;
- 	void __iomem *base;
- 	struct pinctrl_pin_desc *pdesc;
-@@ -591,11 +591,10 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 		return -EINVAL;
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index e37cdae..2971d12 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -117,28 +117,11 @@ static int imx6q_set_target(struct cpufreq_policy *policy,
+ 	 *  - Reprogram pll1_sys_clk and reparent pll1_sw_clk back to it
+ 	 *  - Disable pll2_pfd2_396m_clk
+ 	 */
+-	clk_prepare_enable(pll2_pfd2_396m_clk);
+ 	clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+ 	clk_set_parent(pll1_sw_clk, step_clk);
+ 	if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
+ 		clk_set_rate(pll1_sys_clk, freqs.new * 1000);
+-		/*
+-		 * If we are leaving 396 MHz set-point, we need to enable
+-		 * pll1_sys_clk and disable pll2_pfd2_396m_clk to keep
+-		 * their use count correct.
+-		 */
+-		if (freqs.old * 1000 <= clk_get_rate(pll2_pfd2_396m_clk)) {
+-			clk_prepare_enable(pll1_sys_clk);
+-			clk_disable_unprepare(pll2_pfd2_396m_clk);
+-		}
+ 		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
+-		clk_disable_unprepare(pll2_pfd2_396m_clk);
+-	} else {
+-		/*
+-		 * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
+-		 * to provide the frequency.
+-		 */
+-		clk_disable_unprepare(pll1_sys_clk);
  	}
  
--	base = of_iomap(np, 0);
--	if (!base) {
--		dev_err(&pdev->dev, "unable to get base address\n");
--		return -ENODEV;
--	}
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
- 
- 	pctl = devm_kzalloc(&pdev->dev, sizeof(struct mvebu_pinctrl),
- 			GFP_KERNEL);
+ 	/* Ensure the arm clock divider is what we expect */
 -- 
 1.8.4.rc3
