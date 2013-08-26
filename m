@@ -1,27 +1,16 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Mon, 26 Aug 2013 02:46:56 +0000
-Subject: [PATCH v2] pinctrl: Pass all configs to driver on pin_config_set()
-In-Reply-To: <CACRpkdZeET601+jOsjQxu-VAhi1owgtMX60Fij=uU489eGVFXg@mail.gmail.com>
-References: <1376606573-15093-1-git-send-email-syin@broadcom.com>
- <1377134300-25480-1-git-send-email-syin@broadcom.com>
- <CACRpkdZeET601+jOsjQxu-VAhi1owgtMX60Fij=uU489eGVFXg@mail.gmail.com>
-Message-ID: <051069C10411E24D9749790C498526FA1BDDCD3B@SJEXCHMB12.corp.ad.broadcom.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 26 Aug 2013 10:04:02 +0530
+Subject: [PATCH] pinctrl: spear: Convert to devm_ioremap_resource
+In-Reply-To: <1377476445.9328.1.camel@phoenix>
+References: <1377476445.9328.1.camel@phoenix>
+Message-ID: <CAOh2x==A8kNi_XmHu_BypiBX=TU0csQv77u6hJB7PK9268jCrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon, Aug 26, 2013 at 5:50 AM, Axel Lin <axel.lin@ingics.com> wrote:
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> ---
+>  drivers/pinctrl/spear/pinctrl-spear.c | 13 ++++---------
+>  1 file changed, 4 insertions(+), 9 deletions(-)
 
->Didn't you get review from Stephen Warren?
-
-Yes, just wasn't sure when those tags should be added.  They have been 
-added to v3 now.
-
->Please try to put all the maintainers for the above files on the To: line
->so they get a chance to review/ack the patch.
-
-Ok.  I've added the emails from get_maintainer.pl for each of the files.
-v3 has been rebased today and I also applied the API changes to 
-pinctrl-palmas.c
-
-Regards,
-Sherman
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
