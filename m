@@ -1,50 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Aug 2013 18:15:01 +0100
-Subject: [PATCH 0/3] Interrupt priority patch set
-In-Reply-To: <1377531385-19369-1-git-send-email-tomasz.nowicki@linaro.org>
-References: <1377531385-19369-1-git-send-email-tomasz.nowicki@linaro.org>
-Message-ID: <20130826171501.GD6617@n2100.arm.linux.org.uk>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 26 Aug 2013 19:17:15 +0200
+Subject: [RFC PATCH 2/3] pinctrl: at91: add support for generic pinconf
+In-Reply-To: <521B8822.50304@wwwdotorg.org>
+References: <1377379926-11163-1-git-send-email-b.brezillon@overkiz.com>
+ <1377380259-11290-1-git-send-email-b.brezillon@overkiz.com>
+ <521B8822.50304@wwwdotorg.org>
+Message-ID: <521B8D9B.5020809@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 26, 2013 at 05:36:22PM +0200, Tomasz Nowicki wrote:
-> ACPI spec is x86 oriented thus it use NMI for error reporting as low latency
-> error signalling way. Fast response to error occurrence is what ARM trying to
-> satisfy using interrupt prioritization since there is no NMI direct equivalent
-> for ARM architecture. 
-> 
-> Patch set are divided into three step:
-> 1. Create generic code responsible for setting interrupt priority.
-> 2. Use it in interrupt setup.
-> 3. Example of interrupt controller priority mapping for GIC platform dependent
->    code.
-> 
-> Patch set tries to meet requirements like:
-> - not breaking existing code
-> - easy to expand to new priority levels
-> - easy to map generic priority levels to platform dependent priority values
+On 26/08/2013 18:53, Stephen Warren wrote:
+> On 08/24/2013 03:37 PM, Boris BREZILLON wrote:
+>> Add support for generic pin configuration to pinctrl-at91 driver.
+>> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+>>   Required properties for iomux controller:
+>> -- compatible: "atmel,at91rm9200-pinctrl"
+>> +- compatible: "atmel,at91rm9200-pinctrl" or "atmel,at91sam9x5-pinctrl".
+> You seem to also be adding a second chip name to the list here, which is
+> more than the patch subject/description imply you're doing...
 
-Using the GIC interrupt priority mapping is rather sub-optimal for this -
-on the face of it, it sounds like a sensible solution, and would be with
-an OS which didn't insist on running all interrupt handlers with IRQs
-disabled.
+This is an update of the documentation:
+"atmel,at91sam9x5-pinctrl" compatible is already used in the pinctrl 
+driver but the documention
+was not updated.
 
-Unfortunately, Linux decided that this would be the case for various
-reasons - not only the issue of kernel stack overflow, but also because
-of lockdep requirements.  What this means is that the best you can do is
-to control which interrupt of many pending at the same time gets serviced
-first.
+But I agree, this should not be part of this series.
 
-So... the general principle here is that IRQ priority levels are pretty
-useless in Linux.
+>> +  Add "generic-pinconf" to the compatible string list to use the generic pin
+>> +  configuration syntax.
+> "generic-pinconf" is too generic of a compatible value for this binding
+> to define.
+>
+> Instead, I think you want to either:
+>
+> a)
+>
+> Use compatible="atmel,at91rm9200-pinctrl" for the old binding,
+> use compatible="atmel,at91rm9200-pinctrl-generic" for the new binding
+>
+> or:
+>
+> b)
+>
+> Define Boolean property atmel,generic-pinconf (perhaps a better name
+> could be chosen?). If it's not present, parse the node assuming the old
+> binding. If it is present, parse the node assuming the new binding.
+>
+Okay.
 
-In other words, the error reporting won't work while any interrupt
-handler is running irrespective of how you program the GIC or indeed
-any interrupt disabled region.
+I thought this property string could be generic as it may concern other 
+drivers too
+(in order to keep compatibility with old dt ABI and add support the 
+generic pinconf binding).
 
-The closest we have to NMI is the FIQ, but having the FIQ call kernel
-C code and take locks is very problematic: you end up needing the
-locks and such like to disable FIQs in addition to IRQs, which reduces
-FIQs down to the same level as IRQs.  The other stumbling block here
-is that the FIQ may only be available to the secure world, and not the
-non-secure world.
+Anyway, I prefer the first proposition.
+
+pinctrl single driver is already using these names:
+
+|compatible = "pinctrl-single" for non generic pinconf binding
+||compatible = "pinconf-single" ||for generic pinconf binding|
+
+So I think we should use something similar:
+
+|compatible = "atmel,at91xx-pinctrl" for non generic pinconf binding
+||compatible = "|||atmel,at91xx-|pinconf" ||for generic pinconf binding|
+
+What do you think ?
+
+Best Regards,
+
+Boris
