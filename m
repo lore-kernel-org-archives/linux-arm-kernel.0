@@ -1,21 +1,24 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 26 Aug 2013 16:04:50 -0400 (EDT)
-Subject: [PATCH 0/2] net/cadence/macb: add support for dt phy definition
-In-Reply-To: <1377186980-21902-1-git-send-email-b.brezillon@overkiz.com>
-References: <1377186980-21902-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20130826.160450.2176892065062148718.davem@davemloft.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 26 Aug 2013 16:45:23 -0400
+Subject: [PATCH v4 0/3] arm: mvebu: fix resource leak
+In-Reply-To: <1377517018-7716-1-git-send-email-jszhang@marvell.com>
+References: <1377517018-7716-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20130826204523.GD24470@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <b.brezillon@overkiz.com>
-Date: Thu, 22 Aug 2013 17:56:20 +0200
-
-> This patch series adds support for ethernet phy definition using device
-> tree.
+On Mon, Aug 26, 2013 at 07:36:55PM +0800, Jisheng Zhang wrote:
+> These patches try to fix resource leak by adding missing of_node_put(),
+> iounmap or using devm_ioremap_resource() if available.
 > 
-> This may help in moving some at91 boards to dt (some of them define an
-> interrupt pin).
-> 
-> Tested on samad31ek.
+> v4:
+>   - re-generate since Ezequiel's patches add DT support to the
+> mvebu-mbus driver
 
-Series applied to net-next, thanks.
+grrr.  I hate to ask this, but can you please rebase patches 1 and 2
+against mvebu/fixes-non-critical?  No need to add back in the mvebu-mbus
+hunk.
+
+thx,
+
+Jason.
