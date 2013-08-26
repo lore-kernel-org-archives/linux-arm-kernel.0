@@ -1,105 +1,82 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 26 Aug 2013 18:03:31 +0800
-Subject: [PATCH v2 2/4] iio: at91: Use different prescal, startup mask
- in MR for different IP
-In-Reply-To: <20130826083207.GB7468@ludovic.desroches@atmel.com>
-References: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
- <1376219071-29946-3-git-send-email-josh.wu@atmel.com>
- <20130815192044.GD12162@lukather> <5215DF2C.3050502@atmel.com>
- <5215DF7C.2020909@atmel.com>
- <20130823154603.GA7468@ludovic.desroches@atmel.com>
- <20130823165936.GC1230@lukather>
- <20130826083207.GB7468@ludovic.desroches@atmel.com>
-Message-ID: <521B27F3.1050203@atmel.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 26 Aug 2013 12:06:48 +0200
+Subject: [GIT PULL 3/3] 2nd Round Samsung mach-exynos for v3.12
+In-Reply-To: <1f7701cea1f1$431f2d30$c95d8790$%kim@samsung.com>
+References: <1f7701cea1f1$431f2d30$c95d8790$%kim@samsung.com>
+Message-ID: <3145165.ZB7l3vNJ7a@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Ludovic and Maxime
 
-On 8/26/2013 4:32 PM, Ludovic Desroches wrote:
-> On Fri, Aug 23, 2013 at 06:59:36PM +0200, Maxime Ripard wrote:
->> Hi Ludovic, Josh,
->>
->> On Fri, Aug 23, 2013 at 05:46:03PM +0200, Desroches, Ludovic wrote:
->>> On Thu, Aug 22, 2013 at 05:53:00PM +0800, Josh Wu wrote:
->>>> On 8/22/2013 5:51 PM, Josh Wu wrote:
->>>>> Hi, Maxime
->>>>>
->>>>> On 8/16/2013 3:20 AM, Maxime Ripard wrote:
->>>>>> Hi Josh,
->>>>>>
->>>>>> On Sun, Aug 11, 2013 at 07:04:29PM +0800, Josh Wu wrote:
->>>>>>> For at91 boards, there are different IPs for adc. Different IPs has
->>>>>>> different STARTUP & PRESCAL mask in ADC_MR.
->>>>>>>
->>>>>>> This patch introduce the multiple compatible string for those
->>>>>>> different IPs.
->>>>>>>
->>>>>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->>>>>> Overall it looks like the right ways, but I think we can take it a step
->>>>>> further.
->>>>>>
->>>>>> I'd drop at least the atmel,adc-drdy-mask, atmel,adc-num-channels,
->>>>>> atmel,adc-status-register, atmel,adc-trigger-register properties (and
->>>>>> probably the triggers as well description as well).
->>>>> yeah, right. Currently I want to drop following:
->>>>>
->>>>> atmel,adc-drdy-mask, atmel,adc-status-register,
->>>>> atmel,adc-trigger-register, atmel,adc-channel-base
->>>>>
->>>>> For the adc-num-channels, I'd like to leave it in dt parameters.
->>>>> It is a description for an adc capablity.
->>> About this parameter, I'll remove it too from the dt bindings. To set it you
->>> need to have a look to the datasheet and to copy a constant value into the
->>> dt. From my point of view, it means than this parameter should be managed by
->>> the driver and by the dt.
->>>
->>> On the other side since there are some dynamic allocation depending on this
->>> parameter maybe it makes sense to keep it in the dt. If the user wants to use
->>> only 2 channels why doing allocation for max channel number. By the way, this
->>> case is only valid if he uses the two first channels.
->> I don't recall it very well, is there any reason to not have it in the
->> DT? Can the ADC channels be used for something else? Or is it just some
->> IP-specific number of channels?
->>
-> It is IP-specific. I don't see what benefit we could have to keep it in the DT?
-> But Josh seems to have arguments to keep it.
+Hi,
 
-I'm ok to remove the channel number. What I worried is there also has a 
-channel-used mask in DT.
-This mask should be removed too if channel number is removed.
-So maybe we can also use the sysfs to set the mask.
+On Monday, August 26, 2013 09:14:42 AM Kukjin Kim wrote:
+> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+> 
+>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-mach-exynos
+> 
+> for you to fetch changes up to f52616f4233d71d0fb00f06f86d046d18d2b7f3b:
+> 
+>   ARM: EXYNOS: always enable PM domains support for EXYNOS4X12 (2013-08-19
+> 05:05:16 +0900)
+> 
+> ----------------------------------------------------------------
+> update mach-exynos
+> - enable ARCH_HAS_BANDGAP for exynos SoCs
+> - skip C1 cpuidle for exynos5440 because non-supporting
+> - always enable PM domains for exynos4x12
+> 
+> ----------------------------------------------------------------
+> Amit Daniel Kachhap (2):
+>       ARM: EXYNOS: enable ARCH_HAS_BANDGAP
+>       ARM: EXYNOS: Skip C1 cpuidle state for exynos5440
 
->
->>>>> For the triggers, I am not decided. An obvious benifit to remove
->>>>> trigger in dt will save many lines of code.
->>>>>
->>>>>> Maxime
->>>>>>
->>>>> Best Regards,
->>>>> Josh Wu
->>> Since we are talking about reworking this binding I was thinking about
->>> resolution stuff. Filling atmel,adc-res is also copying constant value from
->>> the device datasheet, so if I was consistent I would say it has to be removed
->>> too. But I am not consistent! I mean by doing this the only thing the user
->>> will have to fill is the resolution value. He can't set the value he wants,
->>> there are only two choices. By keeping it into the dt then he will immediately
->>> see the choices he has.
->> But the resolution should probably be somehow user-defined, probably not
->> really related to the DT has well. I think some other IIO ADC drivers
->> are using sysfs files for this purpose, maybe that would be a better
->> fit?
-> It sounds to be a good solution.
+The patch "ARM: EXYNOS: Skip C1 cpuidle state for exynos5440":
 
-ok, I will check the other IIO ADC driver about this point.
-Maybe this sysfs replacement need a bit more time. I prefer to send out 
-the patches first without the sysfs implement in v3.
-And the sysfs replacement patch will be send out serperately. What do 
-you think? Maxime.
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -210,7 +210,7 @@ static int __init exynos4_init_cpuidle(void)
+                device->cpu = cpu_id;
+ 
+                /* Support IDLE only */
+-               if (cpu_id != 0)
++               if (soc_is_exynos5440() || cpu_id != 0)
+                        device->state_count = 1;
+ 
+                ret = cpuidle_register_device(device);
 
->
->
-> Ludovic
+is incorrect as noted a month ago in:
 
-Best Regards,
-Josh Wu
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/186355.html
+
+[ Because of the deficiency in the core cpuidle core (device->state_count
+  not being used by governors' code) only sysfs entries for C1 state will be
+  disabled and EXYNOS cpuidle driver will still attempt to use C1 state.
+
+also non-working device->state_count is planned to be removed by:
+
+http://permalink.gmane.org/gmane.linux.power-management.general/37390
+
+
+To disable C1 state on EXYNOS5440 something like:
+
+	static int __init exynos4_init_cpuidle(void)
+	{
+	...
+		if (soc_is_exynos5440())
+			exynos4_idle_driver.state_count = 1;
+	...
+	}
+
+should be done instead.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
