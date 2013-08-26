@@ -1,31 +1,55 @@
-From: Alison_Chaiken@mentor.com (Chaiken, Alison)
-Date: Mon, 26 Aug 2013 19:34:10 +0000
-Subject: [PATCH] ARM: i.MX6: dts: change iomuxc pinctrl config to match
- Rev. 0 IMX6DQRM
-In-Reply-To: <CAHCPf3uSf20CJV4x4K3N0DU-nOmguJPrsEZynhXoeEb0eMnP3Q@mail.gmail.com>
-References: <1377495568-9368-1-git-send-email-alison_chaiken@mentor.com>,
- <CAHCPf3uSf20CJV4x4K3N0DU-nOmguJPrsEZynhXoeEb0eMnP3Q@mail.gmail.com>
-Message-ID: <60BA5429A0E1584BA3633194F6F993B502E6B62D@NA-MBX-02.mgc.mentorg.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 27 Aug 2013 01:04:25 +0530
+Subject: [PATCH v2] ARM: EDMA: Fix clearing of unused list for DT DMA
+ resources
+In-Reply-To: <521B87C0.1090507@ti.com>
+References: <1377287613-16491-1-git-send-email-joelf@ti.com>
+ <521B3212.3050405@ti.com> <521B87C0.1090507@ti.com>
+Message-ID: <521BADC1.7000003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matt Sealey [neko at bakuhatsu.net] helpfully inquires:
-        Have these been cross-referenced against the same table in Rev 1 of the manual (4/2013)?
 
-I respond: indeed they have been!    The configs in the patch have been checked against the table in the Rev. 1 April manual, which has a different format but not new values.    I absent-mindedly selected an old version of the commit message, sorry.
+On 8/26/2013 10:22 PM, Joel Fernandes wrote:
+> On 08/26/2013 05:46 AM, Sekhar Nori wrote:
+>> On Saturday 24 August 2013 01:23 AM, Joel Fernandes wrote:
+>>> HWMOD removal for MMC and Crypto is breaking edma_start as the events are
+>>> being manually triggered due to unused channel list not being clear. Atleast
+>>> breakage has been seen on these peripherals, but it is expected Audio (McASP)
+>>> maybe breaking too.
+>>>
+>>> This patch fixes the issue, by reading the "dmas" property from the DT node if
+>>> it exists and clearing the bits in the unused channel list so that these channels
+>>> are not manually triggered.
+>>>
+>>> v2 changes:
+>>> Reduced indendation by returning from if block.
+>>
+>> Is this a v2 or v3 since you already sent a v2 about a month back?
+> 
+> No, there aren't any changes since v2, I just resubmitted the same patch.
 
-In addition, the configs have been tested with kernels older than the older release on multiple reference boards from Freescale and Boundary Devices.   Furthermore, many of the changes were ack'ed by Huang Shijie of FSL in, for example,
+Heh, it does seem to contain some indentation changes per your
+documentation :)
 
-      http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg32771.html
+> 
+>>>
+>>> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+>>> Reported-by: Balaji T K <balajitk@ti.com>
+>>> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
+>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>>> ---
+>>> Note:
+>>> Patch should go in for -rc cycle as it fixes existing crypto drivers.
+>>
+>> We agreed the patch is not needed in -rc cycle since there are no
+>> current EDMA users in DT-boot?
+> 
+> There is now, crypto and EDMA DT patches are being merged in.
 
-In April I submitted a related documentation patch
+They are being merged in v3.12, right? So you meant the -rc cycle of
+v3.12? If yes, no need to wait for a broken v3.12-rc1 to come out. It is
+possible to queue fixes during merge window too.
 
-      http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg30583.html
-
-that has fallen by the wayside.   Sorry for failing to include this information in the original posting, but I could not get "git send-email --compose" to behave properly with emacsclient and employer's SMTP.
-
---
-Alison Chaiken
-Mentor Embedded Software Division
-Fremont, CA USA
-alison_chaiken at mentor.com
+Thanks,
+Sekhar
