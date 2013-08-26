@@ -1,93 +1,84 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 26 Aug 2013 10:44:09 -0600
-Subject: [PATCHv5 2/3] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <1377298903.26742.14.camel@linux-builds1>
-References: <1377272686-13253-1-git-send-email-dinguyen@altera.com>
- <1377272686-13253-2-git-send-email-dinguyen@altera.com>
- <5217E24B.3090302@wwwdotorg.org> <1377298903.26742.14.camel@linux-builds1>
-Message-ID: <521B85D9.4070205@wwwdotorg.org>
+Date: Mon, 26 Aug 2013 10:48:25 -0600
+Subject: [PATCH v7 05/11] ARM: dts: enable hi4511 with device tree
+In-Reply-To: <CAD6h2NTYNSFAQ0NWVwKXEr7BHUikmjROk-i+qYGo0otFPZKu0A@mail.gmail.com>
+References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
+ <1376965873-14431-6-git-send-email-haojian.zhuang@linaro.org>
+ <8761uxsiox.fsf@linaro.org> <52165D5E.7040500@wwwdotorg.org>
+ <CAD6h2NTYNSFAQ0NWVwKXEr7BHUikmjROk-i+qYGo0otFPZKu0A@mail.gmail.com>
+Message-ID: <521B86D9.5060108@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2013 05:01 PM, Dinh Nguyen wrote:
-> On Fri, 2013-08-23 at 16:29 -0600, Stephen Warren wrote:
->> On 08/23/2013 09:44 AM, dinguyen at altera.com wrote:
->>> From: Dinh Nguyen <dinguyen@altera.com>
+On 08/23/2013 09:52 PM, Haojian Zhuang wrote:
+> On 23 August 2013 02:50, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 08/22/2013 12:07 PM, Kevin Hilman wrote:
+>>> [+ DT maintainers]
 >>>
->>> Add bindings for SD/MMC for SOCFPGA.
->>
->>> diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
->>
->>> +* altr,sysmgr: Should be the phandle to the system_mgr node. As this is where
->>> +		this where the register that controls the CIU clock phases
->>> +		reside.
->>> +
->>> +* altr,ciu-clk-offset: The order of the cells should be:
->>> +	- First Cell: Offset of the register in the system_mgr node that controls
->>> +		the smpsel bits.
->>> +	- Second Cell: Shift value of the drvsel bits.
->>> +	- Third Cell: Shift value of the smpsel bits.
->>
->> This almost solves the issues I was thinking of. A few more thoughts though:
->>
->> * What if the sysmgr node has multiple reg entries. Is the offset cell
->> in altr,ciu-clk-offset an offset from the first reg entry, or across all
->> reg entries? It might be better to specify this as a reg index plus
->> offset, or allow the sysmgr node to define the format (#sysmgr-cells
->> perhaps).
->>
->> * What if the drvsel and smpsel bits are in different registers, even
->> different sysmgr blocks? Wouldn't it be better to have 2 separate
->> properties, each one defining the location of one bit-field?
->>
->> * bikeshed: altr,ciu-clk-offset isn't a great name; the value is more
->> than just an offset.
->>
->> Putting those together, I might expect the following properties:
->>
->> sysmgr: sysmgr {
->>     /* binding for sysmgr node must specify what those 3 cells are */
->>     #sysmgr-cells = <3>;
->> }
->>
->> dwmmc {
->>     altr,drvsel-reg-field = <
->>         &sysmgr /* sysmgr phandle */
->>         0 /* reg index */
->>         0 /* reg offset */
->>         0 /* field bit position */
->>         3 /* field bit size */>;
->>     altr,smpsel-reg-field = <
->>         &sysmgr /* sysmgr phandle */
->>         0 /* reg index */
->>         0 /* reg offset */
->>         3 /* field bit position */
->>         3 /* field bit size */>;
->> };
->>
->> That would allow the whole sysmgr concept to be completely generic.
->>
->> But, this is a bit like representing raw register I/O in DT, which has
->> been frowned upon in the past.
->>
->> Finally, what if the values for drvsel, smpsel are different in
->> different sysmgr implementations? Do you need a property that defines
->> that values?
->>
->> Another option might be to define a semantic API between the two, such
->> that you only need a sysmgr=<&sysmgr> property, yet the driver for the
->> sysmgr node exposes a function sysmgr_set_dwmmc_drvsel_smpsel(struct
->> device_node *sysmgr_node, uint drvsel, uint smpsel); Now, the sysmgr
->> driver would have to implement that on any SoC that supported a dwmmc.
-> 
-> I was trying to avoid adding a driver for the sysmgr, as it really does
-> not represent any type of device. It is a merely a register region with
-> miscellaneous registers that controls other IPs in the SOC.
-> 
-> I'm thinking perhaps I can set this register in the arch specific file,
-> then the SD/MMC driver would not need to bother with it at all?
+>>> Haojian Zhuang <haojian.zhuang@linaro.org> writes:
+>>>
+>>>> Enable Hisilicon Hi4511 development platform with device tree support.
+>>>>
+>>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> ...
 
-The problem with hard-coding this in the MMC driver is that it makes the
-MMC driver depend on information outside the MMC HW block. If you do
-that, you may as well just write the "syscon" registers directly in the
-MMC driver.
+>>>> +    osc32k: osc32k {
+>>>> +            compatible = "fixed-clock";
+>>>> +            #clock-cells = <0>;
+>>>> +            clock-frequency = <32768>;
+>>>> +            clock-output-names = "osc32khz";
+>>>> +    };
+>>>
+>>> ...seems many of the recent users of clocks have grouped them into a
+>>> clocks {} grouping on a "simple-bus".
+>>>
+>>> DT folks: is there a rule of thumb on how whether these fixed clocks
+>>> should be grouped on a simple bus?
+>>
+>> I would expect all the clock node names to be just "clock", since the
+>> node names should describe the type of device not their identity (i.e.
+>> clock name).
+>>
+>> In turn, this means that each clock node name needs to use a unit
+>> address ("@nnn") to make them unique. In turn, this means they must have
+>> a reg property since the unit address must match the first entry in the
+>> reg property.
+> 
+> No, it's really bad on using a unit address. The register always contains
+> multiple mux or gate or divider. It would cause duplicated unit address.
+
+There shouldn't be multiple nodes with identical reg values; if that's
+happening, then it seems like the mapping of nodes to HW is incorrect.
+
+Each HW block should have 1 DT node. That way, the reg values won't collide.
+
+> I tried to use index number also. And it's also bad to append new clock nodes.
+> So I use the label name instead.
+> 
+>> Now I assume these clocks don't have any memory-mapped IO registers, so
+>> they would need an arbitrary reg value rather than a real one. So it
+>> doesn't make sense to place them directly under the root DT node, since
+>> their reg values would make no sense within the context of the
+>> CPU-visible MMIO space that the root node describes.
+>>
+>> In this case, it's typical to put all the clock nodes into e.g. a
+>> /clocks node, since that node can introduce a separate numbering-space
+>> for clocks. For example, I'd expect something like:
+>>
+>>         clocks {
+>>                 #address-cells = <1>;
+>>                 #size-cells = <0>;
+>>
+>>                 osc32k: clock at 0 {
+>>                         compatible = "fixed-clock";
+>>                         reg = <0>;
+...
+>>                 osc26m: clock at 1 {
+>>                         compatible = "fixed-clock";
+>>                         reg = <1>;
+...
+
+> Those fixed-clock doesn't contain reg property. Since it needs not to access
+> any clock register. It only provides the clock rate those child clock node.
+
+Inside the clocks node, the reg property is just a dummy value.
