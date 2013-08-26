@@ -1,54 +1,75 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 26 Aug 2013 19:09:11 +0200
-Subject: [PATCH v2 16/16] clk: samsung: exynos5250: Simplify registration of
- PLL rate tables
-In-Reply-To: <1377536951-9307-1-git-send-email-t.figa@samsung.com>
-References: <1377536951-9307-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1377536951-9307-17-git-send-email-t.figa@samsung.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 26 Aug 2013 19:12:35 +0200
+Subject: [PATCH RFC 4/5] clk: samsung: Add clock driver for s5pc110/s5pv210
+In-Reply-To: <1377517114-20222-5-git-send-email-m.krawczuk@partner.samsung.com>
+References: <1377517114-20222-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <1377517114-20222-5-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <1433697.46kixytlq2@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the _get_rate() helper has been modified to use __clk_lookup()
-internally, checking of PLL input rates can be done using it and so the
-registration code can be simplified.
+On Monday, August 26, 2013 01:38:33 PM Mateusz Krawczuk wrote:
+> This patch adds new, Common Clock Framework-based clock driver for Samsung
+> S5PV210 SoCs. The driver is just added, without enabling it yet.
+> 
+> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+> ---
+>  .../bindings/clock/samsung,s5pv210-clock.txt       |  72 ++
+>  drivers/clk/samsung/Makefile                       |   3 +-
+>  drivers/clk/samsung/clk-s5pv210.c                  | 732 +++++++++++++++++++++
+>  include/dt-bindings/clock/samsung,s5pv210-clock.h  | 221 +++++++
+>  4 files changed, 1027 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
+>  create mode 100644 drivers/clk/samsung/clk-s5pv210.c
+>  create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/clk/samsung/clk-exynos5250.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+[...]
 
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index a9916a4..00a80e4 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -543,8 +543,6 @@ static struct of_device_id ext_clk_match[] __initdata = {
- static void __init exynos5250_clk_init(struct device_node *np)
- {
- 	void __iomem *reg_base;
--	struct clk *vpllsrc;
--	unsigned long fin_pll_rate, mout_vpllsrc_rate = 0;
- 
- 	if (np) {
- 		reg_base = of_iomap(np, 0);
-@@ -563,16 +561,10 @@ static void __init exynos5250_clk_init(struct device_node *np)
- 	samsung_clk_register_mux(exynos5250_pll_pmux_clks,
- 				ARRAY_SIZE(exynos5250_pll_pmux_clks));
- 
--	fin_pll_rate = _get_rate("fin_pll");
--
--	if (fin_pll_rate == 24 * MHZ)
-+	if (_get_rate("fin_pll") == 24 * MHZ)
- 		exynos5250_plls[epll].rate_table = epll_24mhz_tbl;
- 
--	vpllsrc = __clk_lookup("mout_vpllsrc");
--	if (vpllsrc)
--		mout_vpllsrc_rate = clk_get_rate(vpllsrc);
--
--	if (mout_vpllsrc_rate == 24 * MHZ)
-+	if (_get_rate("mout_vpllsrc") == 24 * MHZ)
- 		exynos5250_plls[vpll].rate_table =  vpll_24mhz_tbl;
- 
- 	samsung_clk_register_pll(exynos5250_plls, ARRAY_SIZE(exynos5250_plls),
--- 
-1.8.3.2
+> diff --git a/drivers/clk/samsung/clk-s5pv210.c b/drivers/clk/samsung/clk-s5pv210.c
+> new file mode 100644
+> index 0000000..861d37d
+> --- /dev/null
+> +++ b/drivers/clk/samsung/clk-s5pv210.c
+
+[...]
+
+> +static unsigned long s5pv210_get_xom(void)
+
+This function can be marked with __init.
+
+> +{
+> +	unsigned long xom = 1;
+> +	void __iomem *chipid_base;
+> +	struct device_node *np;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "samsung,s5pv210-chipid");
+> +	if (np) {
+> +		chipid_base = of_iomap(np, 0);
+
+How's about printing an error if !chipid_base?
+
+Also the code can be made a bit shorter:
+
+if (np) {
+	void __iomem *chipid_base = of_iomap(np, 0);
+...
+}
+
+> +		if (chipid_base)
+> +			xom = readl(chipid_base + 8);
+> +
+> +		iounmap(chipid_base);
+
+It seems that at least generic iounmap() accepts NULL argument but it 
+will be better not to call it if of_iomap() failed.
+
+> +	}
+> +
+> +	return xom;
+> +}
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
