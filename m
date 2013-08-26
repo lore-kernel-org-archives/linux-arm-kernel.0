@@ -1,130 +1,60 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Mon, 26 Aug 2013 16:49:23 +0200
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <20130826120200.GA15842@ulmo>
-References: <51DD88A4.1030506@keymile.com> <20130731100359.3e789236@skate>
- <51F8CA44.4080802@keymile.com> <20130731110045.2dc84981@skate>
- <20130731205034.GA17615@obsidianresearch.com> <20130809140140.GA14990@ulmo>
- <521B1F6A.1090304@keymile.com> <20130826120200.GA15842@ulmo>
-Message-ID: <521B6AF3.9070909@keymile.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 26 Aug 2013 19:40:57 +0530
+Subject: [PATCH] DMA: let filter functions of of_dma_simple_xlate
+ possible check of_node
+In-Reply-To: <2811939.DFy94j5OEx@avalon>
+References: <1375408800-11789-1-git-send-email-rizhao@nvidia.com>
+ <1441310.1kjKG7uebg@avalon> <20130826125547.GA2733@richard-laptop>
+ <2811939.DFy94j5OEx@avalon>
+Message-ID: <20130826141057.GQ2748@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Mon, Aug 26, 2013 at 03:18:00PM +0200, Laurent Pinchart wrote:
+> Hi Richard,
+> 
+> (Dropping Dan Williams from the CC list as his e-mail address doesn't seem to 
+> be valid anymore)
+> 
+> > > > >> Hmm. Looking at the patch, I'm not sure it's right.
+> > > > >> 
+> > > > >> This patch simply passes all the specfier args to the filter
+> > > > >> function, and the code to check the equality of the of_node to the
+> > > > >> filter args is still duplicated in each DMA driver. Instead, the DMA
+> > > > >> core should be implementing the equality check, and only even calling
+> > > > >> the driver-specific filter function for devices where the client's
+> > > > >> phandle matches the DMA providing device's of_node handle.
+> > > > > 
+> > > > > Filter function is called in dmaengine core code, independent of dt.
+> > > > 
+> > > > The core code can still check if a dmaengine's driver was instantiated
+> > > > from DT and take additional actions in that case.
+> > > > 
+> > > > > And the reason why the driver has to write its own filter function is
+> > > > > it has to store slave id there in its own way.
+> > > > 
+> > > > I'm not saying don't call the driver's filter function, but rather that
+> > > > the dmaengine core should perform the common checks before doing so.
+> > > 
+> > > And it looks to me like the common case could even get rid of the driver's
+> > > filter function:
+> > > 
+> > > https://lkml.org/lkml/2013/5/15/270
+> > > https://lkml.org/lkml/2013/3/25/250
+> > 
+> > For general case, the slave id is not staticly bind to a specific channel.
+> 
+> Certainly not in all cases, but I think it's common enough to deserve a 
+> specific helper function.
+Why does DT need the fliter function in the first place. The DT enabled drivers
+should not even have a filter function...
 
-On 08/26/2013 02:02 PM, Thierry Reding wrote:
-> On Mon, Aug 26, 2013 at 11:27:06AM +0200, Gerlando Falauto wrote:
->> Hi guys [particularly Jason and Thierry],
->>
->> sorry for the prolonged silence, here I am back again...
->>
->> On 08/09/2013 04:01 PM, Thierry Reding wrote:
->>> On Wed, Jul 31, 2013 at 02:50:34PM -0600, Jason Gunthorpe wrote:
->>>> On Wed, Jul 31, 2013 at 11:00:45AM +0200, Thomas Petazzoni wrote:
->>>>
->>>>>> Actually, the main reason for trying to use this driver was because I
->>>>>> wanted to model a PCIe *device* within the device tree, so to expose its
->>>>>> GPIOs and IRQs to be referenced (through phandles) from other device
->>>>>> tree nodes. The way I understand it, turns out this is not the way to
->>>>>> go, as PCI/PCIe are essentially enumerated busses, so you're not
->>>>>> supposed to -and it's not a trivial task to- put any information about
->>>>>> real devices within the device tree.
->>>>>> Do you have any suggestion about that?
->>>>>
->>>>> Indeed, PCI/PCIe devices are enumerated dynamically, so they are not
->>>>> listed in the Device Tree, so there's no way to "attach" more
->>>>> information to them.
->>>>>
->>>>> Device Tree people, any suggestion about the above question?
->>>>
->>>> No, that isn't true.
->>>>
->>>> Device tree can include the discovered PCI devices, you have to use
->>>> the special reg encoding and all that weirdness, but it does work. The
->>>> of_node will be attached to the struct pci device automatically.
->>
->> So you mean that, assuming I knew the topology, I could populate the
->> device tree in advance (e.g. statically), so that it already
->> includes *devices* which will be further discovered during probing?
->> Or else you mean the {firmware,u-boot} can do that prior to starting the OS?
->> If either of the above is true, could you please suggest some
->> example (or some way to get one)?
->> I assume the "reg" property (and the after-"@" node name) will need
->> to encode (at least) the device number, is that right?
->>
->> I tried reading the "PCI Bus Binding to Open Firmware" but I could
->> not make complete sense out of it...
->
-> You can find an example of this here:
->
-> 	https://gitorious.org/thierryreding/linux/commit/b85c03d73288f6e376fc158ceac30f29680b4192
->
+The dmaengine core calls the optional filter function. This needs to be
+implemented in driver in order for driver to check if the channel is what it
+needs or not.
 
-Thanks for your precious feedback. Unfortunately gitorious' servers are 
-offline right now... :-(
+And the selection should be done for the cases where you dont have programmable
+mux in dmac. For programmable ones passing slave_id in dma_slave_config should
+be fine.
 
-> It's been quite some time that I've actually tested that, but it used to
-> work properly. What you basically need to do is represent the whole bus
-> hierarchy within the DT. In the above example there's the top-level root
-> port (pci at 1,0), which provides a bus (1) on which there's a switch named
-> pci at 0,0. That switch provides another bus (2) on which more devices are
-> listed (pci@[012345],0). Those are all downstream ports providing
-> separate busses again and have a single device attached to them.
->
-> You can pretty much arbitrarily nest nodes that way to represent any
-> hierarchy you want. The tricky part is to get the node numbering right
-> but `lspci -t' helps quite a bit with that.
-
-One last question though... what does then the numbering ("@a,b") stand 
-for? I assume if the output of a plain (i.e. no params) 'lspci' is
-
-bb:dd.f (bus:device.function)
-
-I should only have a "pci at dd,f" node, with the bus numbering being 
-imposed by the hierarchy after an actual probing, right?
-So the actual bus number is never listed in the device tree (whereas the 
-"@device,function" is). Is that right?
-
->>>> It is useful for exactly the reason stated - you can describe GPIOs,
->>>> I2C busses, etc, etc in DT and then upon load of the PCI driver engage
->>>> the DT code to populate and connect all that downstream
->>>> infrastructure.
->>
->> I'm not 100% sure I made myself clear though.
->> What I would like to do is to have *other* parts of the device tree
->> be able to reference (i.e., connect to, through phandles) a PCI
->> device (because it provides a GPIO, for instance).
->> Is that also what you mean?
->
-> Yes. In the example above you'll see that there's actually a GPIO
-> controller (pci at 1,0/pci at 0,0/pci at 2,0/pci at 0,0), so you could simply
-> associate a phandle with it, as in:
->
-> 	gpioext: pci at 0,0 {
-> 		...
-> 	};
->
-> And then hook up other devices to it using the regular notation:
->
-> 	foo {
-> 		...
-> 		enable-gpios = <&gpioext 0 0>;
-> 		...
-> 	};
->
-> That's not done in this example but I've actually used something very
-> similar to that on an x86 platform to hook up the reset pin of an I2C
-> touchscreen controller to a GPIO controller, where both the I2C and
-> GPIO controllers were on the PCI bus.
->
-> I can't find that snippet right now, but I can look more thoroughly if
-> the above doesn't help you at all.
->
-> Thierry
->
-
-I guess I'll have to wait until gitorious.org actually does come back 
-up... then you'll definitely hear from me again. :-)
-
-Thanks!
-Gerlando
+~Vinod
