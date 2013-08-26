@@ -1,38 +1,74 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 26 Aug 2013 13:54:59 +0200
-Subject: [RFC] cleanup mach-s5p*
-In-Reply-To: <1f7b01cea1f6$9560aa10$c021fe30$%kim@samsung.com>
-References: <1f7b01cea1f6$9560aa10$c021fe30$%kim@samsung.com>
-Message-ID: <521B4213.8040601@samsung.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 26 Aug 2013 14:01:37 +0200
+Subject: [PATCH] net/cadence/macb: fix kernel Oops if no PHY were
+ discovered during probe
+In-Reply-To: <521B1B56.8060903@atmel.com>
+References: <1377372065-8938-1-git-send-email-b.brezillon@overkiz.com>
+ <521B1B56.8060903@atmel.com>
+Message-ID: <521B43A1.7060406@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hello Bo,
 
-On 8/26/2013 2:52 AM, Kukjin Kim wrote:
-> Hi all,
+On 26/08/2013 11:09, Bo Shen wrote:
+> Hi Boris,
 >
-> I have a plan to remove supporting following SoCs in mainline in the near
-> future.
-> - s5pc100 - smdkc100
-> - s5pv210(s5c110) - aquial, goni, smdkc110, smdkv210, torbreck
-> - s5p64x0(s5p6440, s5p6450)- smdk6440, smdk6450
+> On 08/25/2013 03:21 AM, Boris BREZILLON wrote:
+>> Test the presence of a PHY device before printing attached PHY
+>> informations.
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>> ---
+>>   drivers/net/ethernet/cadence/macb.c |    6 ++++--
+>>   1 file changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/cadence/macb.c 
+>> b/drivers/net/ethernet/cadence/macb.c
+>> index e866608..fd3b67f 100644
+>> --- a/drivers/net/ethernet/cadence/macb.c
+>> +++ b/drivers/net/ethernet/cadence/macb.c
+>> @@ -1868,8 +1868,10 @@ static int __init macb_probe(struct 
+>> platform_device *pdev)
+>>               dev->irq, dev->dev_addr);
+>>
+>>       phydev = bp->phy_dev;
+>> -    netdev_info(dev, "attached PHY driver [%s] (mii_bus:phy_addr=%s, 
+>> irq=%d)\n",
+>> -            phydev->drv->name, dev_name(&phydev->dev), phydev->irq);
+>> +    if (phydev)
+>> +        netdev_info(dev, "attached PHY driver [%s] 
+>> (mii_bus:phy_addr=%s, irq=%d)\n",
+>> +                phydev->drv->name, dev_name(&phydev->dev),
+>> +                phydev->irq);
 >
-> I think users don't seem to use that any more with mainline. If so, we are
-> able to consider, it is not right now though.
+> Actually no need this check, if PHY is attached failed, the macb 
+> driver probe will fail, then it won't show this message.
+
+You're right (thanks for pointing this out).
+Indeed this is a bug I introduced in this patch series ( 
+https://lkml.org/lkml/2013/8/22/381).
+
+In macb_mii_init function, the err field may be set to 0 (instead of the 
+default -ENXIO value) if no PHY
+is discovered.
+As macb_mii_probe return code is not copied to err, this result in a 0 
+return even if macb_mii_probe
+failed.
+
+Nicolas, forget about this patch, I'll fix this in the appropriate patch 
+series (except if you plan to add
+dynamic MAC/PHY association, and treat missing PHY during probe process 
+as an acceptable result :-)).
+
+Best Regards,
+
+Boris BREZILLON
+
 >
-> How do you think?
-
-I am against removing support for S5PC110/S5PV210. We still use it for some
-of our internal development. DT support patches will be posted soon (pinctrl
-and clocks). Support for S5PC100 can be easily added the same way (we also
-have DT patches almost ready). S5PV210, S5PC100 and the older S3C64xx can
-all be handled by the same Samsung-DT 'machine file'.
-
-However we don't have any s5p64x0 based boards to develop DT support for
-them.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung R&D Institute Poland
+>>       return 0;
+>>
+>>
+>
+> Best Regards,
+> Bo Shen
