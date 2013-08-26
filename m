@@ -1,31 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Aug 2013 20:06:46 +0100
-Subject: what about mach-shark?
-In-Reply-To: <CACRpkdb2QQEAt_bpVv9sifEuDfs_8XdDbUtQ9R+cXA-vBWMKmA@mail.gmail.com>
-References: <alpine.LFD.2.00.1107041545480.14596@xanadu.home>
- <CACRpkdb2QQEAt_bpVv9sifEuDfs_8XdDbUtQ9R+cXA-vBWMKmA@mail.gmail.com>
-Message-ID: <20130826190646.GG6617@n2100.arm.linux.org.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 26 Aug 2013 13:16:15 -0600
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <521B6AF3.9070909@keymile.com>
+References: <51DD88A4.1030506@keymile.com> <20130731100359.3e789236@skate>
+ <51F8CA44.4080802@keymile.com> <20130731110045.2dc84981@skate>
+ <20130731205034.GA17615@obsidianresearch.com>
+ <20130809140140.GA14990@ulmo> <521B1F6A.1090304@keymile.com>
+ <20130826120200.GA15842@ulmo> <521B6AF3.9070909@keymile.com>
+Message-ID: <20130826191615.GA20192@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 26, 2013 at 09:04:05PM +0200, Linus Walleij wrote:
-> On Mon, Jul 4, 2011 at 10:08 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> 
-> > Is this used?
-> 
-> This still goes unanswered after two years.
-> 
-> Alexander, are you compiling and booting recent kernels on the Shark?
-> 
-> I recently had a dream to convert some platforms and eventually
-> all of the arch/arm machines to GENERIC_CLOCKEVENTS and
+On Mon, Aug 26, 2013 at 04:49:23PM +0200, Gerlando Falauto wrote:
 
-You're not going to achieve that pipedream.  Really.  There are platforms
-still around which don't have enough timers to be able to do anything but
-periodic interrupts at a fixed rate - with nothing available as a clock
-source other than the kernel jiffy counter incremented by that periodic
-interrupt (which would create a circular dependency.)
+> One last question though... what does then the numbering ("@a,b")
+> stand for? I assume if the output of a plain (i.e. no params)
+> 'lspci' is
 
-Remember: with periodic interrupts, the clock source is read at every
-interrupt to discover how many jiffies have passed since the previous
-interrupt - which is useless if you have just a single reloading timer.
+It is device,function, but it is only descriptive and not used by
+Linux.
+ 
+> I should only have a "pci at dd,f" node, with the bus numbering being
+> imposed by the hierarchy after an actual probing, right?
+> So the actual bus number is never listed in the device tree (whereas
+> the "@device,function" is). Is that right?
+
+The reg must encode the bus number according to the OF format:
+
+               33222222 22221111 11111100 00000000
+               10987654 32109876 54321098 76543210
+ phys.hi cell: npt000ss bbbbbbbb dddddfff rrrrrrrr
+phys.mid cell: hhhhhhhh hhhhhhhh hhhhhhhh hhhhhhhh
+ phys.lo cell: llllllll llllllll llllllll llllllll
+ 
+bbbbbbbb is the 8-bit Bus Number
+ddddd is the 5-bit Device Number
+fff is the 3-bit Function Number
+
+Others are 0.
+
+Jason
