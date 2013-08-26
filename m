@@ -1,43 +1,68 @@
-From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Mon, 26 Aug 2013 17:46:03 +0530
-Subject: [PATCH V2] ARM: EXYNOS: cpuidle: Skip C1 cpuidle state for exynos5440
-In-Reply-To: <4070794.XxjluIqBpK@amdc1032>
-References: <4070794.XxjluIqBpK@amdc1032>
-Message-ID: <1377519363-23077-1-git-send-email-amit.daniel@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 26 Aug 2013 14:17:43 +0200
+Subject: [PATCH] DMA: let filter functions of of_dma_simple_xlate possible
+ check of_node
+In-Reply-To: <52178677.6090001@wwwdotorg.org>
+References: <1375408800-11789-1-git-send-email-rizhao@nvidia.com>
+ <20130823012911.GB17925@rizhao-lap> <52178677.6090001@wwwdotorg.org>
+Message-ID: <1441310.1kjKG7uebg@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch skips the deep C1(AFTR -Arm off top running) state for exynos5440
-soc as this soc does not support this state. The cpu's only allows the basic
-C0 state. The C1 state is filtered by re-initialising the driver state_count
-value to 1.
+On Friday 23 August 2013 09:57:43 Stephen Warren wrote:
+> On 08/22/2013 07:29 PM, Richard Zhao wrote:
+> > On Fri, Aug 23, 2013 at 04:18:27AM +0800, Stephen Warren wrote:
+> >> On 08/21/2013 11:19 PM, Richard Zhao wrote:
+> >>> On Fri, Aug 02, 2013 at 10:00:00AM +0800, Richard Zhao wrote:
+> >>>> pass of_phandle_args dma_spec to dma_request_channel in
+> >>>> of_dma_simple_xlate, so the filter function could access of_node in
+> >>>> of_phandle_args.
+> >>>> 
+> >>>> It also remove restriction of #dma-cells has to be one.
+> >>>> 
+> >>>> Signed-off-by: Richard Zhao <rizhao@nvidia.com>
+> >>>> ---
+> >>>> 
+> >>>>  drivers/dma/edma.c     |  7 +++++--
+> >>>>  drivers/dma/of-dma.c   | 10 ++++------
+> >>>>  drivers/dma/omap-dma.c |  6 ++++--
+> >>>>  3 files changed, 13 insertions(+), 10 deletions(-)
+> >>> 
+> >>> Hi Vinod,
+> >>> 
+> >>> Can you please pick up this change?
+> >>> 
+> >>> Hi Stephen,
+> >>> 
+> >>> Can you please give a ack or reviewed-by etc?
+> >> 
+> >> Hmm. Looking at the patch, I'm not sure it's right.
+> >> 
+> >> This patch simply passes all the specfier args to the filter function,
+> >> and the code to check the equality of the of_node to the filter args is
+> >> still duplicated in each DMA driver. Instead, the DMA core should be
+> >> implementing the equality check, and only even calling the
+> >> driver-specific filter function for devices where the client's phandle
+> >> matches the DMA providing device's of_node handle.
+> > 
+> > Filter function is called in dmaengine core code, independent of dt.
+> 
+> The core code can still check if a dmaengine's driver was instantiated
+> from DT and take additional actions in that case.
+> 
+> > And the reason why the driver has to write its own filter function is
+> > it has to store slave id there in its own way.
+> 
+> I'm not saying don't call the driver's filter function, but rather that
+> the dmaengine core should perform the common checks before doing so.
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
----
+And it looks to me like the common case could even get rid of the driver's 
+filter function:
 
-Changes in V2:
-* Used driver state_count variable to filter the C1 state
- instead of device state count variable. Although this V2 patch is also
- not complete as there are suggestions to make this driver platform driver.
+https://lkml.org/lkml/2013/5/15/270
+https://lkml.org/lkml/2013/3/25/250
 
- arch/arm/mach-exynos/cpuidle.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index 225ee84..ac13922 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -200,6 +200,9 @@ static int __init exynos4_init_cpuidle(void)
- 	if (soc_is_exynos5250())
- 		exynos5_core_down_clk();
- 
-+	if (soc_is_exynos5440())
-+		exynos4_idle_driver.state_count = 1;
-+
- 	ret = cpuidle_register_driver(&exynos4_idle_driver);
- 	if (ret) {
- 		printk(KERN_ERR "CPUidle failed to register driver\n");
 -- 
-1.7.1
+Regards,
+
+Laurent Pinchart
