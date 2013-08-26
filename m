@@ -1,96 +1,67 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 26 Aug 2013 10:32:07 +0200
-Subject: [PATCH v2 2/4] iio: at91: Use different prescal, startup mask in
- MR for different IP
-In-Reply-To: <20130823165936.GC1230@lukather>
-References: <1376219071-29946-1-git-send-email-josh.wu@atmel.com>
- <1376219071-29946-3-git-send-email-josh.wu@atmel.com>
- <20130815192044.GD12162@lukather> <5215DF2C.3050502@atmel.com>
- <5215DF7C.2020909@atmel.com>
- <20130823154603.GA7468@ludovic.desroches@atmel.com>
- <20130823165936.GC1230@lukather>
-Message-ID: <20130826083207.GB7468@ludovic.desroches@atmel.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Mon, 26 Aug 2013 10:33:33 +0200
+Subject: [PATCH] ARM: dts: add AM33XX EDMA support
+In-Reply-To: <1377284808-32412-1-git-send-email-bigeasy@linutronix.de>
+References: <1377284808-32412-1-git-send-email-bigeasy@linutronix.de>
+Message-ID: <521B12DD.8010505@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 23, 2013 at 06:59:36PM +0200, Maxime Ripard wrote:
-> Hi Ludovic, Josh,
-> 
-> On Fri, Aug 23, 2013 at 05:46:03PM +0200, Desroches, Ludovic wrote:
-> > On Thu, Aug 22, 2013 at 05:53:00PM +0800, Josh Wu wrote:
-> > > On 8/22/2013 5:51 PM, Josh Wu wrote:
-> > > >Hi, Maxime
-> > > >
-> > > >On 8/16/2013 3:20 AM, Maxime Ripard wrote:
-> > > >>Hi Josh,
-> > > >>
-> > > >>On Sun, Aug 11, 2013 at 07:04:29PM +0800, Josh Wu wrote:
-> > > >>>For at91 boards, there are different IPs for adc. Different IPs has
-> > > >>>different STARTUP & PRESCAL mask in ADC_MR.
-> > > >>>
-> > > >>>This patch introduce the multiple compatible string for those
-> > > >>>different IPs.
-> > > >>>
-> > > >>>Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> > > >>Overall it looks like the right ways, but I think we can take it a step
-> > > >>further.
-> > > >>
-> > > >>I'd drop at least the atmel,adc-drdy-mask, atmel,adc-num-channels,
-> > > >>atmel,adc-status-register, atmel,adc-trigger-register properties (and
-> > > >>probably the triggers as well description as well).
-> > > >
-> > > >yeah, right. Currently I want to drop following:
-> > > >
-> > > >atmel,adc-drdy-mask, atmel,adc-status-register,
-> > > >atmel,adc-trigger-register, atmel,adc-channel-base
-> > > >
-> > > >For the adc-num-channels, I'd like to leave it in dt parameters.
-> > > >It is a description for an adc capablity.
-> > 
-> > About this parameter, I'll remove it too from the dt bindings. To set it you
-> > need to have a look to the datasheet and to copy a constant value into the
-> > dt. From my point of view, it means than this parameter should be managed by
-> > the driver and by the dt.
-> > 
-> > On the other side since there are some dynamic allocation depending on this
-> > parameter maybe it makes sense to keep it in the dt. If the user wants to use
-> > only 2 channels why doing allocation for max channel number. By the way, this
-> > case is only valid if he uses the two first channels.
-> 
-> I don't recall it very well, is there any reason to not have it in the
-> DT? Can the ADC channels be used for something else? Or is it just some
-> IP-specific number of channels?
-> 
+Hi Sebastian,
 
-It is IP-specific. I don't see what benefit we could have to keep it in the DT?
-But Josh seems to have arguments to keep it.
+Is this patch different from that one:
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg92176.html
 
-> > > >
-> > > >For the triggers, I am not decided. An obvious benifit to remove
-> > > >trigger in dt will save many lines of code.
-> > > >
-> > > >>
-> > > >>Maxime
-> > > >>
-> > > >
-> > > >Best Regards,
-> > > >Josh Wu
-> > >
-> > 
-> > Since we are talking about reworking this binding I was thinking about
-> > resolution stuff. Filling atmel,adc-res is also copying constant value from
-> > the device datasheet, so if I was consistent I would say it has to be removed
-> > too. But I am not consistent! I mean by doing this the only thing the user
-> > will have to fill is the resolution value. He can't set the value he wants,
-> > there are only two choices. By keeping it into the dt then he will immediately
-> > see the choices he has.
-> 
-> But the resolution should probably be somehow user-defined, probably not
-> really related to the DT has well. I think some other IIO ADC drivers
-> are using sysfs files for this purpose, maybe that would be a better
-> fit?
+Lokesh just pointed me this patch because it was missing for the 
+SHAM/AES series from Mark Greer.
 
-It sounds to be a good solution.
+Bottom-line, I've just applied the original one along with a second one 
+that was adding EDMA in SPI.
+
+Regards,
+Benoit
 
 
-Ludovic
+On 23/08/2013 21:06, Sebastian Andrzej Siewior wrote:
+> From: Matt Porter <mdp@ti.com>
+>
+> Adds AM33XX EDMA support to the am33xx.dtsi as documented in
+> Documentation/devicetree/bindings/dma/ti-edma.txt
+>
+> Joel: Drop DT entries that are non-hardware-description for now as discussed in [1]
+>
+> [1] https://patchwork.kernel.org/patch/2226761/
+>
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+> Could someone please pick this up?
+>
+>   arch/arm/boot/dts/am33xx.dtsi | 12 ++++++++++++
+>   1 file changed, 12 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 38b446b..784f774 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -96,6 +96,18 @@
+>   			reg = <0x48200000 0x1000>;
+>   		};
+>
+> +		edma: edma at 49000000 {
+> +			compatible = "ti,edma3";
+> +			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+> +			reg =	<0x49000000 0x10000>,
+> +				<0x44e10f90 0x10>;
+> +			interrupts = <12 13 14>;
+> +			#dma-cells = <1>;
+> +			dma-channels = <64>;
+> +			ti,edma-regions = <4>;
+> +			ti,edma-slots = <256>;
+> +		};
+> +
+>   		gpio0: gpio at 44e07000 {
+>   			compatible = "ti,omap4-gpio";
+>   			ti,hwmods = "gpio1";
+>
