@@ -1,85 +1,86 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Mon, 26 Aug 2013 05:22:54 +0000
-Subject: [PATCH v4 3/5] net: ethernet: cpsw: introduce ti,am3352-cpsw
- compatible string
-In-Reply-To: <52179AA5.3060408@ti.com>
-References: <1377267365-24057-1-git-send-email-zonque@gmail.com>
- <1377267365-24057-4-git-send-email-zonque@gmail.com>
- <52177052.1030308@ti.com> <52178E20.5040404@gmail.com>
- <52179448.1020906@ti.com> <52179AA5.3060408@ti.com>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73E9FA84F@DBDE04.ent.ti.com>
+From: B47053@freescale.com (Xiubo Li-B47053)
+Date: Mon, 26 Aug 2013 05:35:53 +0000
+Subject: [PATCH 4/4] Documentation: Add device tree bindings for
+ Freescale FTM PWM
+In-Reply-To: <5217B807.7020800@wwwdotorg.org>
+References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
+ <1473340.OXSHEp7d4P@flatron>
+ <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20130822062610.GR31036@pengutronix.de> <20130823073612.GB3535@ulmo>
+ <5217B807.7020800@wwwdotorg.org>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827E11AC@039-SN2MPN1-012.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Stephen,
+
+
+> Subject: Re: [PATCH 4/4] Documentation: Add device tree bindings for
+> Freescale FTM PWM
 > 
-> On Friday 23 August 2013 10:26 PM, Santosh Shilimkar wrote:
-> > On Friday 23 August 2013 12:30 PM, Daniel Mack wrote:
-> >> On 23.08.2013 16:23, Santosh Shilimkar wrote:
-> >>> On Friday 23 August 2013 10:16 AM, Daniel Mack wrote:
-> >>>> +static const struct of_device_id cpsw_of_mtable[] = {
-> >>>> +	{
-> >>>> +		.compatible	= "ti,am3352-cpsw",
-> >>> I didn't notice this earlier, but can't you use the IP version
-> >>> as a compatible instead of using a SOC name. Whats really SOC specific
-> >>> on this IP ? Sorry i have missed any earlier discussion on this but
-> >>> this approach doesn't seem good. Its like adding SOC checks in the
-> >>> driver subsystem.
-> >> As I already mentioned in the cover letter and in the commit message, I
-> >> just don't know which criteria makes most sense here.
+> On 08/23/2013 01:36 AM, Thierry Reding wrote:
+> > On Thu, Aug 22, 2013 at 08:26:10AM +0200, Sascha Hauer wrote:
+> >> On Thu, Aug 22, 2013 at 02:55:42AM +0000, Xiubo Li-B47053 wrote:
+> >>> Hi Tomasz,
+> >>>
+> >>> Thanks for your comments.
+> >>>
+> >>>
+> >>>> Could you explain meaning of this property more precisely?
+> >>>> I'm interested especially how is this related to the PWM IP block
+> >>>> and boards.
+> >>>>
+> >>>
+> >>> Yes. There are 8 channels most. While the pinctrls of 4th and 5th
+> >>> channels could be used by uart's Rx and Tx, then these 2 channels
+> >>> won't be used for pwm output, so there will be 6 channels available
+> >>> by the pwm. Thus, the pwm chip will register only 6 pwms(6 channels)
+> >>> most("fsl,pwm-channel-orders = {0 1 2 3
+> >>> 6 7}").And also the "fsl,pwm-channel-number" will be 6.
 > >>
-> >> On a general note, I would say that chances that this exactly IP core
-> >> with the same version number will appear on some other silicon which
-> >> doesn't support the control mode register in an AM33xx fashion, is not
-> >> necessarily negligible.
-> >>
-> >> So what that new compatible string denotes is the cpsw in a version as
-> >> found on am3352 SoCs, which is actually exactly what it does.
-> >>
-> >> I don't have a strong opinion here, but see your point. I just don't
-> >> have a better idea on how to treat that.
-> >>
-> > So just stick the IP version or call it cpsw-v1... cpsw-v2 etc.
-> > That way if in future if someone uses those features, they can use
-> > this compatible if they don't they use the one which suites that
-> > SOC.
+> >> If the chip has eight PWMs I would register all of them. If some of
+> >> them are not routed out by the pinmux then just nothing happens if
+> >> you use them. In a sane devicetree they won't be referenced anyway
+> >> when they are not routed out of the SoC.
 > >
-> We cannot map control module register with CPSW IP version as both comes
-> from different design team and CPSW ip version can be same across SoC
-> and gmii sel register definition can be different. Control module
-> defines may vary in different SoC as per SoC requirements.
+> > In that case, shouldn't this be hooked up to the pinctrl subsystem as
+> > well? As I understand the above, the logical thing would be for each
+> > PWM channel's .request() operation to configure the pinmuxing
+> > appropriately. And if it can't be configured as necessary then
+> > .request() should return an error (or propagate the error from the
+> > pinctrl subsystem).
 > 
-> Adding Pekon Gupta who had worked in Silicon team before.
+> I think the pin-muxing should be static, i.e. set up when the PWM device
+> as a whole probe()s, rather than being twiddled at request/free time.
+> Certainly the pinmux support in the device core is now set up to acquire
+> the default state right before probe(). I don't see a need to do anything
+> custom here.
+
+As we have tolk about this before in [PATCH 1/4]:
+"
+> > Why do you need to manipulate the pinctrl to en/disable a channel?
+> >
 > 
-[Pekon]: My opinion here..
-Uniformity in control module cannot be guaranteed, neither in register
-offsets nor their functionality. Uniformity is usually maintained till the
-point same person is writing the spec, or it?s a derivative device.
-Control-module should not be categorized as IP, instead it?s a group of
-miscellaneous logic usually consisting of following:
-(a) SoC bug-fixes across silicon revisions.
-(b) SoC specific logic like device_type, JTAG-ID.
-(c) IP bug fixes which could not be accommodated in IP address-map.
-(d) IP logic which depends on SoC configurations.
+> This is because in Vybrid VF610 TOWER board, there are 4 leds, and each
+> led's one point(diode's positive pole) is connected to 3.3V, and the
+> other point is connected to pwm's one channel. When the 4 pinctrls are
+> configured as enable at the same time, the 4 pinctrls is low valtage, and
+> the 4 leds will be lighted up as default, then when you enable/disable
+> one led will effects others.
+> 
+> These pinctrls are belong to pwm, and I don't think led or other customer
+> could control them directly.
+> So, here I authorize the 4 pinctrls to each channel controls.
+>
+"
+For the reason above, I have to control the pinctrls separately.
 
-Due to this un-deterministic composition of control-module, having 
-a dedicated driver for control module might not work either, as it
-has to be updated | re-written for every new device.
+If all the pinctrls set as default state, the 8 pinctrls must be controlled together.
+And the 4 leds will all be lighted up as default and will influence each other.
 
-So, Following can be used as guideline to determine compatibility
-string for DT bindings..
-- If binding maps to (a) and (c), .i.e., bug-fixes for SoC or IP, 
- then its most likely that these would change either in next silicon
- revision or in next devices. Hence such bindings should use *not*
- use IP compatibility strings, they _may_ use SoC-name based
- compatibility string.
+Thanks very much.
 
-- Else if binding maps to (b),.i.e., SoC specific configurations.
- then their offsets and functionality should remain same across the
- family of devices at-least, so it should use SoC-name based
- compatibility string.
-- And if binding maps to (d), .i.e., IP feature but depending on SoC
- Then it can use IP based compatibility string, along with IP version.
-
-(same approach can be used for CPSW binding used here,
-
-with regards, pekon
+--
+Best Regards.
+Xiubo
