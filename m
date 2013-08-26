@@ -1,71 +1,43 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 26 Aug 2013 16:16:42 +0530
-Subject: [PATCH v2] ARM: EDMA: Fix clearing of unused list for DT DMA
- resources
-In-Reply-To: <1377287613-16491-1-git-send-email-joelf@ti.com>
-References: <1377287613-16491-1-git-send-email-joelf@ti.com>
-Message-ID: <521B3212.3050405@ti.com>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Mon, 26 Aug 2013 13:55:35 +0300
+Subject: [PATCH 2/3] KVM: ARM: Get rid of KVM_HPAGE_ defines
+In-Reply-To: <2A584690-A736-4DFA-B455-ABBD15298618@suse.de>
+References: <1376021239-10532-1-git-send-email-christoffer.dall@linaro.org>
+ <1376058613-26400-1-git-send-email-christoffer.dall@linaro.org>
+ <20130825140529.GT8218@redhat.com>
+ <CAFEAcA9-hcGHYAKTP4xty1pB-bs=EgATrxKQhCOQ3YZOOpM4wg@mail.gmail.com>
+ <20130825144847.GV8218@redhat.com>
+ <CAFEAcA9jcSby0JTZnEBW5Gwfn0SN770E0nSW3CSiOev16=kp5g@mail.gmail.com>
+ <2A584690-A736-4DFA-B455-ABBD15298618@suse.de>
+Message-ID: <20130826105535.GB8218@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 24 August 2013 01:23 AM, Joel Fernandes wrote:
-> HWMOD removal for MMC and Crypto is breaking edma_start as the events are
-> being manually triggered due to unused channel list not being clear. Atleast
-> breakage has been seen on these peripherals, but it is expected Audio (McASP)
-> maybe breaking too.
+On Sun, Aug 25, 2013 at 04:27:14PM +0100, Alexander Graf wrote:
 > 
-> This patch fixes the issue, by reading the "dmas" property from the DT node if
-> it exists and clearing the bits in the unused channel list so that these channels
-> are not manually triggered.
+> On 25.08.2013, at 16:18, Peter Maydell wrote:
 > 
-> v2 changes:
-> Reduced indendation by returning from if block.
-
-Is this a v2 or v3 since you already sent a v2 about a month back?
-
+> > On 25 August 2013 15:48, Gleb Natapov <gleb@redhat.com> wrote:
+> >> On Sun, Aug 25, 2013 at 03:29:17PM +0100, Peter Maydell wrote:
+> >>> Smiley noted, but this is pretty unlikely since it's not possible
+> >>> to lie to the guest about which mode it's in, so you can't make
+> >>> a guest think it's in Hyp mode.
+> >>> 
+> >> I suspected this, but forgot most that I read about Hyp mode by now.
+> >> Need to refresh my memory ASAP. Is it impossible even with a lot of
+> >> emulation? Can guest detect that it is not in a Hyp mode without
+> >> trapping into hypervisor?
+> > 
+> > Yes. The current mode is in the the low bits of the CPSR, which
+> > is readable without causing a trap. This is just the most obvious
+> > roadblock; I bet there are more. If you really had to run Hyp mode
+> > code in a VM you probably have to do it by having it all emulated
+> > via TCG.
 > 
-> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
-> Reported-by: Balaji T K <balajitk@ti.com>
-> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
-> ---
-> Note:
-> Patch should go in for -rc cycle as it fixes existing crypto drivers.
-
-We agreed the patch is not needed in -rc cycle since there are no
-current EDMA users in DT-boot?
-
+> Or in an in-kernel instruction emulator that we have lying around anyways. For kvm-in-kvm that should be good enough, as we only need to execute a few instructions in HYP mode.
 > 
->  arch/arm/common/edma.c | 22 +++++++++++++++++++---
->  1 file changed, 19 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index 39ad030..3867e7e 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -560,14 +560,30 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
->  static int prepare_unused_channel_list(struct device *dev, void *data)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
-> -	int i, ctlr;
-> +	int i = 0, ctlr;
-> +	u32 dma_chan;
-> +	const __be32 *dma_chan_p;
-> +	struct property *prop;
-> +
-> +	if (dev->of_node) {
-> +		of_property_for_each_u32(dev->of_node, "dmas", prop,
-> +					 dma_chan_p, dma_chan) {
-> +			if (i++ & 1) {
-> +				ctlr = EDMA_CTLR(dma_chan);
-> +				clear_bit(EDMA_CHAN_SLOT(dma_chan),
-> +					  edma_cc[ctlr]->edma_unused);
-> +			}
+Will require emulation on each trap to Hyp mode tough. But since you
+already have ideas about nested Hyp I consider it done :)
 
-I thought we agreed to do this differently using
-of_property_count_strings() and of_parse_phandle_with_args(). I seemed
-to have missed any discussion on why this cannot be done (if such a
-discussion took place on the list).
-
-Thanks,
-Sekhar
+--
+			Gleb.
