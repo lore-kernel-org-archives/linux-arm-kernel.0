@@ -1,48 +1,82 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Mon, 26 Aug 2013 19:23:38 +0530
-Subject: [PATCH 2/2] ARM: dts: dra7-evm: Add mmc2 node for eMMC support
-In-Reply-To: <1377525218-7655-1-git-send-email-balajitk@ti.com>
-References: <1377525218-7655-1-git-send-email-balajitk@ti.com>
-Message-ID: <1377525218-7655-3-git-send-email-balajitk@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 26 Aug 2013 10:00:09 -0400
+Subject: [PATCH 7/7] watchdog: orion: Update device-tree binding
+ documentation
+In-Reply-To: <20130823100450.GA2389@localhost>
+References: <1377182518-12554-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377182518-12554-8-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130823012621.GD13964@titan.lakedaemon.net>
+ <20130823100450.GA2389@localhost>
+Message-ID: <20130826140009.GH13964@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add mmc2 dt node to dra7-evm board
-and model eMMC vcc as fixed regulator.
+On Fri, Aug 23, 2013 at 07:04:51AM -0300, Ezequiel Garcia wrote:
+> On Thu, Aug 22, 2013 at 09:26:21PM -0400, Jason Cooper wrote:
+> > On Thu, Aug 22, 2013 at 11:41:58AM -0300, Ezequiel Garcia wrote:
+> > > Change the 'reg' property meaning, by defining three required cells.
+> > > It's important to note this commit breaks DT-compatibility for this
+> > > device.
+> > > 
+> > > Cc: devicetree at vger.kernel.org
+> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > ---
+> > >  Documentation/devicetree/bindings/watchdog/orion-wdt.txt | 9 +++++++--
+> > >  1 file changed, 7 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+> > > index 5dc8d30..bb7f1a2 100644
+> > > --- a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+> > > +++ b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+> > > @@ -3,7 +3,10 @@
+> > >  Required Properties:
+> > >  
+> > >  - Compatibility : "marvell,orion-wdt"
+> > > -- reg		: Address of the timer registers
+> > > +- reg		: Three cells are required.
+> > > +		  First  cell contains the global timer control register.
+> > > +		  Second cell contains the watchdog counter register.
+> > > +		  Third  cell contains the RSTOUT register.
+> > >  
+> > >  Optional properties:
+> > >  
+> > > @@ -13,7 +16,9 @@ Example:
+> > >  
+> > >  	wdt at 20300 {
+> > >  		compatible = "marvell,orion-wdt";
+> > > -		reg = <0x20300 0x28>;
+> > > +		reg = <0x20300 0x4
+> > > +		       0x20324 0x4
+> > > +		       0x20108 0x4>;
+> > 
+> > I don't like this.  It reaches outside of the wdt register.  I think a
+> > more clean way to do this is to do a provider/consumer relationship as
+> > in reset.txt.  eg, here you would retain the original reg binding, and
+> > add a reset phandle.
+> > 
+> 
+> Mmm... I can't see how this fits a reset-controller usage.
 
-Signed-off-by: Balaji T K <balajitk@ti.com>
----
- arch/arm/boot/dts/dra7-evm.dts |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
+Sorry, I wasn't clear.  'as in reset.txt' should have probably been
+'similar to reset.txt'.
 
-diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index a59bbd0..2062724 100644
---- a/arch/arm/boot/dts/dra7-evm.dts
-+++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -17,6 +17,13 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x60000000>; /* 1536 MB */
- 	};
-+
-+	mmc2_3v3: fixedregulator-mmc2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "mmc2_3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
- };
- 
- &dra7_pmx_core {
-@@ -257,3 +264,10 @@
- 	vmmc-supply = <&ldo1_reg>;
- 	bus-width = <4>;
- };
-+
-+&mmc2 {
-+	status = "okay";
-+	vmmc-supply = <&mmc2_3v3>;
-+	bus-width = <8>;
-+	ti,non-removable;
-+};
--- 
-1.7.5.4
+> The watchdog simply "enables" the RSTOUT bit that allows the whole SoC
+> to be reset when the watchdog counter expires.
+
+right.
+
+> The reset-controller seems to be meant to send reset signals to devices,
+> which is not this case.
+
+yes, I was thinking (and drinking) of a node for the whole register
+(0x20108), with an eventual driver.  Then the phandle in the wdt node.
+This hypothetical driver could also incorporate the CPU_SOFT_RESET
+(0x2010c) register from orion5x...
+
+> What am I missing?
+
+A suitable application of alcohol and Sun. :)
+
+thx,
+
+Jason.
