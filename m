@@ -1,46 +1,38 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 26 Aug 2013 09:14:35 +0900
-Subject: [GIT PULL 2/3] 2nd Round Samsung DT for v3.12
-Message-ID: <1f7601cea1f1$3f2913d0$bd7b3b70$%kim@samsung.com>
+Date: Mon, 26 Aug 2013 09:14:42 +0900
+Subject: [GIT PULL 3/3] 2nd Round Samsung mach-exynos for v3.12
+Message-ID: <1f7701cea1f1$431f2d30$c95d8790$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6f9d02a056fff8e965da0f940a09d4c39a4fe80a:
+The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 
-  ARM: dts: Add USB host node for Exynos4 (2013-08-19 05:07:17 +0900)
+  Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
 
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-dt-2
+tags/samsung-mach-exynos
 
-for you to fetch changes up to f408f9db7deb9ce24b4a8875fdf54483d5068627:
+for you to fetch changes up to f52616f4233d71d0fb00f06f86d046d18d2b7f3b:
 
-  ARM: dts: add ADC device tree node for exynos5420/5250 (2013-08-26
-02:44:30 +0900)
-
-----------------------------------------------------------------
-Update exynos DT:
-- fix the RTC DT node name for exynos5250
-- update the "status" property of RTC DT node for exynos5250
-- add RTC DT node for  exynos5420
-- add ADC DT node for exynos5420 and exynos5250
-
-Based on previouse exynos DT branch, v3.12-next/dt-exynos
+  ARM: EXYNOS: always enable PM domains support for EXYNOS4X12 (2013-08-19
+05:05:16 +0900)
 
 ----------------------------------------------------------------
-Naveen Krishna Chatradhi (1):
-      ARM: dts: add ADC device tree node for exynos5420/5250
+update mach-exynos
+- enable ARCH_HAS_BANDGAP for exynos SoCs
+- skip C1 cpuidle for exynos5440 because non-supporting
+- always enable PM domains for exynos4x12
 
-Vikas Sajjan (3):
-      ARM: dts: Fix the RTC DT node name for Exynos5250
-      ARM: dts: Update the "status" property of RTC DT node for Exynos5250
-SoC
-      ARM: dts: Add RTC DT node to Exynos5420 SoC
+----------------------------------------------------------------
+Amit Daniel Kachhap (2):
+      ARM: EXYNOS: enable ARCH_HAS_BANDGAP
+      ARM: EXYNOS: Skip C1 cpuidle state for exynos5440
 
- arch/arm/boot/dts/exynos5.dtsi           |    2 +-
- arch/arm/boot/dts/exynos5250-arndale.dts |    4 ----
- arch/arm/boot/dts/exynos5250-snow.dts    |    4 ----
- arch/arm/boot/dts/exynos5250.dtsi        |   14 +++++++++++++-
- arch/arm/boot/dts/exynos5420.dtsi        |   17 +++++++++++++++++
- 5 files changed, 31 insertions(+), 10 deletions(-)
+Bartlomiej Zolnierkiewicz (1):
+      ARM: EXYNOS: always enable PM domains support for EXYNOS4X12
+
+ arch/arm/mach-exynos/Kconfig   |    7 +++++++
+ arch/arm/mach-exynos/cpuidle.c |    2 +-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
