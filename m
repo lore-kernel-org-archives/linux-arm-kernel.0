@@ -1,44 +1,39 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 26 Aug 2013 09:43:56 +0200
-Subject: [PATCH] net/cadence/macb: fix kernel Oops if no PHY were
- discovered during probe
-In-Reply-To: <1377372065-8938-1-git-send-email-b.brezillon@overkiz.com>
-References: <1377372065-8938-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <521B073C.3070204@atmel.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 26 Aug 2013 13:44:49 +0530
+Subject: [PATCH v11 0/8] PHY framework
+In-Reply-To: <1377063973-22044-1-git-send-email-kishon@ti.com>
+References: <1377063973-22044-1-git-send-email-kishon@ti.com>
+Message-ID: <521B0E79.6060506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/08/2013 21:21, Boris BREZILLON :
-> Test the presence of a PHY device before printing attached PHY
-> informations.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Hi Greg,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Wednesday 21 August 2013 11:16 AM, Kishon Vijay Abraham I wrote:
+> Added a generic PHY framework that provides a set of APIs for the PHY drivers
+> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
+> the PHY with or without using phandle.
+> 
+> This framework will be of use only to devices that uses external PHY (PHY
+> functionality is not embedded within the controller).
+> 
+> The intention of creating this framework is to bring the phy drivers spread
+> all over the Linux kernel to drivers/phy to increase code re-use and to
+> increase code maintainability.
+> 
+> Comments to make PHY as bus wasn't done because PHY devices can be part of
+> other bus and making a same device attached to multiple bus leads to bad
+> design.
+> 
+> If the PHY driver has to send notification on connect/disconnect, the PHY
+> driver should make use of the extcon framework. Using this susbsystem
+> to use extcon framwork will have to be analysed.
+> 
+> You can find this patch series @
+> git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
 
-> ---
->   drivers/net/ethernet/cadence/macb.c |    6 ++++--
->   1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-> index e866608..fd3b67f 100644
-> --- a/drivers/net/ethernet/cadence/macb.c
-> +++ b/drivers/net/ethernet/cadence/macb.c
-> @@ -1868,8 +1868,10 @@ static int __init macb_probe(struct platform_device *pdev)
->   		    dev->irq, dev->dev_addr);
->
->   	phydev = bp->phy_dev;
-> -	netdev_info(dev, "attached PHY driver [%s] (mii_bus:phy_addr=%s, irq=%d)\n",
-> -		    phydev->drv->name, dev_name(&phydev->dev), phydev->irq);
-> +	if (phydev)
-> +		netdev_info(dev, "attached PHY driver [%s] (mii_bus:phy_addr=%s, irq=%d)\n",
-> +			    phydev->drv->name, dev_name(&phydev->dev),
-> +			    phydev->irq);
->
->   	return 0;
->
->
+Looks like there are not further comments on this series. Can you take this in
+your misc tree?
 
-
--- 
-Nicolas Ferre
+Thanks
+Kishon
