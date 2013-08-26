@@ -1,39 +1,53 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 26 Aug 2013 13:44:49 +0530
-Subject: [PATCH v11 0/8] PHY framework
-In-Reply-To: <1377063973-22044-1-git-send-email-kishon@ti.com>
-References: <1377063973-22044-1-git-send-email-kishon@ti.com>
-Message-ID: <521B0E79.6060506@ti.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 26 Aug 2013 10:29:44 +0200
+Subject: [PATCH v2] ARM: dts: add AM33XX EDMA support
+Message-ID: <1377505784-9820-1-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+From: Matt Porter <mdp@ti.com>
 
-On Wednesday 21 August 2013 11:16 AM, Kishon Vijay Abraham I wrote:
-> Added a generic PHY framework that provides a set of APIs for the PHY drivers
-> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
-> the PHY with or without using phandle.
-> 
-> This framework will be of use only to devices that uses external PHY (PHY
-> functionality is not embedded within the controller).
-> 
-> The intention of creating this framework is to bring the phy drivers spread
-> all over the Linux kernel to drivers/phy to increase code re-use and to
-> increase code maintainability.
-> 
-> Comments to make PHY as bus wasn't done because PHY devices can be part of
-> other bus and making a same device attached to multiple bus leads to bad
-> design.
-> 
-> If the PHY driver has to send notification on connect/disconnect, the PHY
-> driver should make use of the extcon framework. Using this susbsystem
-> to use extcon framwork will have to be analysed.
-> 
-> You can find this patch series @
-> git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
+Adds AM33XX EDMA support to the am33xx.dtsi as documented in
+Documentation/devicetree/bindings/dma/ti-edma.txt
 
-Looks like there are not further comments on this series. Can you take this in
-your misc tree?
+Joel: Drop DT entries that are non-hardware-description for now as discussed in [1]
 
-Thanks
-Kishon
+[1] https://patchwork.kernel.org/patch/2226761/
+
+Signed-off-by: Matt Porter <mporter@ti.com>
+Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+Could someone please pick this up?
+
+v1..v2:
+	- s/edma@/dma-controller@/
+
+ arch/arm/boot/dts/am33xx.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 38b446b..784f774 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -96,6 +96,18 @@
+ 			reg = <0x48200000 0x1000>;
+ 		};
+ 
++		edma: dma-controller at 49000000 {
++			compatible = "ti,edma3";
++			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
++			reg =	<0x49000000 0x10000>,
++				<0x44e10f90 0x10>;
++			interrupts = <12 13 14>;
++			#dma-cells = <1>;
++			dma-channels = <64>;
++			ti,edma-regions = <4>;
++			ti,edma-slots = <256>;
++		};
++
+ 		gpio0: gpio at 44e07000 {
+ 			compatible = "ti,omap4-gpio";
+ 			ti,hwmods = "gpio1";
+-- 
+1.8.4.rc3
