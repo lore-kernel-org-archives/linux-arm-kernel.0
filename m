@@ -1,35 +1,47 @@
-From: B47053@freescale.com (Xiubo Li-B47053)
-Date: Mon, 26 Aug 2013 06:00:59 +0000
-Subject: [PATCH 3/4] ARM: dts: Enables ftm pwm device for Vybrid VF610
- TOWER board.
-In-Reply-To: <20130823091331.GI3535@ulmo>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-4-git-send-email-Li.Xiubo@freescale.com>
- <20130823091331.GI3535@ulmo>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827E4226@039-SN2MPN1-012.039d.mgd.msft.net>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 26 Aug 2013 08:07:34 +0200
+Subject: [PATCH v4 3/4] dma: mmp_pdma: add support for residue reporting
+References: <1376672707-24527-1-git-send-email-zonque@gmail.com>
+ <1376672707-24527-4-git-send-email-zonque@gmail.com>
+ <5214A601.1010607@marvell.com>
+ <CAHp75VfFFq0kaf7wDt3WTwsx6peBmt=rDXaUGXz=cnn4-bBKZw@mail.gmail.com>
+ <5214AC80.2090102@gmail.com> <20130825161104.GC2748@intel.com>
+ <20130825170151.GW6617@n2100.arm.linux.org.uk>
+ <20130825164842.GF2748@intel.com>
+ <20130825180615.GX6617@n2100.arm.linux.org.uk>
+Message-ID: <87vc2touhl.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+Hi Russell,
 
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> Even when there is a callback set, there's no requirement for the DMA
+> engine driver to keep the descriptor around after it has been submitted -
+> it is free to copy that data into whatever internal representation it
+> requires and then discard the descriptor if it so wishes.
 
-> Subject: Re: [PATCH 3/4] ARM: dts: Enables ftm pwm device for Vybrid
-> VF610 TOWER board.
-> 
-> On Wed, Aug 21, 2013 at 11:07:41AM +0800, Xiubo Li wrote:
-> > Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/vf610-twr.dts | 17 +++++++++++++++++
-> >  1 file changed, 17 insertions(+)
-> 
-> Same comments as for patch 2/4.
-> 
+That means that a driver which wished to "resubmit" the descriptor has to
+"rebuild it" again, no ?
 
-Yes, I will revise it then.
+I was under the impression that a descriptor had the guarantee to survive even
+after completion. This comes from include/linux/dmaengine.h:168, in enum
+dma_ctrl_flags comment :
+ * @DMA_CTRL_ACK - if clear, the descriptor cannot be reused until the client
+ *  acknowledges receipt, i.e. has has a chance to establish any dependency
+ *  chains
 
+The sentence "cannot be reused until" meant that after it could be reused.
 
-Thanks very much.
+And there are usecases for that, for example a video capture buffer. The source
+for DMA is always the same (camera FIFO), the destination is always the same
+(ie. the same scatter-gather). Why rebuild all the info to resubmit the same
+descriptor ?
 
---
-Best Regards.
-Xiubo
+So is my understand incorrect, and in that case is there a way with dmaengine to
+"resubmit" a descriptor, without going through the whole preparation ?
+
+Cheers.
+
+-- 
+Robert
