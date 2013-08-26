@@ -1,82 +1,40 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 26 Aug 2013 12:06:48 +0200
-Subject: [GIT PULL 3/3] 2nd Round Samsung mach-exynos for v3.12
-In-Reply-To: <1f7701cea1f1$431f2d30$c95d8790$%kim@samsung.com>
-References: <1f7701cea1f1$431f2d30$c95d8790$%kim@samsung.com>
-Message-ID: <3145165.ZB7l3vNJ7a@amdc1032>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 26 Aug 2013 18:06:36 +0800
+Subject: [PATCH v3 1/3] arm: mvebu: add missing of_node_put() to fix
+ reference leak
+In-Reply-To: <20130826120200.2269ba82@skate>
+References: <1377510981-1793-1-git-send-email-jszhang@marvell.com>
+ <1377510981-1793-2-git-send-email-jszhang@marvell.com>
+ <20130826120200.2269ba82@skate>
+Message-ID: <20130826180636.3e2bdb20@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Thomas,
 
-Hi,
+On Mon, 26 Aug 2013 03:02:00 -0700
+Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-On Monday, August 26, 2013 09:14:42 AM Kukjin Kim wrote:
-> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+> Dear Jisheng Zhang,
 > 
->   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> On Mon, 26 Aug 2013 17:56:19 +0800, Jisheng Zhang wrote:
 > 
-> are available in the git repository at:
+> > diff --git a/arch/arm/mach-mvebu/armada-370-xp.c
+> > b/arch/arm/mach-mvebu/armada-370-xp.c index 97cbb80..8a1ae83 100644
+> > --- a/arch/arm/mach-mvebu/armada-370-xp.c
+> > +++ b/arch/arm/mach-mvebu/armada-370-xp.c
+> > @@ -64,6 +64,7 @@ static void __init armada_370_xp_mbus_init(void)
+> >  			ARMADA_370_XP_MBUS_WINS_SIZE,
+> >  			of_translate_address(dn, &sdram_wins_offs),
+> >  			ARMADA_370_XP_SDRAM_WINS_SIZE);
+> > +	of_node_put(dn);
+> >  }
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-mach-exynos
+> With the integration of Ezequiel patches that add DT support to the
+> mvebu-mbus driver, this chunk of the code is no longer needed, as of
+> linux-next.
 > 
-> for you to fetch changes up to f52616f4233d71d0fb00f06f86d046d18d2b7f3b:
-> 
->   ARM: EXYNOS: always enable PM domains support for EXYNOS4X12 (2013-08-19
-> 05:05:16 +0900)
-> 
-> ----------------------------------------------------------------
-> update mach-exynos
-> - enable ARCH_HAS_BANDGAP for exynos SoCs
-> - skip C1 cpuidle for exynos5440 because non-supporting
-> - always enable PM domains for exynos4x12
-> 
-> ----------------------------------------------------------------
-> Amit Daniel Kachhap (2):
->       ARM: EXYNOS: enable ARCH_HAS_BANDGAP
->       ARM: EXYNOS: Skip C1 cpuidle state for exynos5440
+Got it. Thanks for the information. Will send v4 latter
 
-The patch "ARM: EXYNOS: Skip C1 cpuidle state for exynos5440":
-
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -210,7 +210,7 @@ static int __init exynos4_init_cpuidle(void)
-                device->cpu = cpu_id;
- 
-                /* Support IDLE only */
--               if (cpu_id != 0)
-+               if (soc_is_exynos5440() || cpu_id != 0)
-                        device->state_count = 1;
- 
-                ret = cpuidle_register_device(device);
-
-is incorrect as noted a month ago in:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/186355.html
-
-[ Because of the deficiency in the core cpuidle core (device->state_count
-  not being used by governors' code) only sysfs entries for C1 state will be
-  disabled and EXYNOS cpuidle driver will still attempt to use C1 state.
-
-also non-working device->state_count is planned to be removed by:
-
-http://permalink.gmane.org/gmane.linux.power-management.general/37390
-
-
-To disable C1 state on EXYNOS5440 something like:
-
-	static int __init exynos4_init_cpuidle(void)
-	{
-	...
-		if (soc_is_exynos5440())
-			exynos4_idle_driver.state_count = 1;
-	...
-	}
-
-should be done instead.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Thanks,
+Jisheng
