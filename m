@@ -1,100 +1,66 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 26 Aug 2013 11:11:09 +0200
-Subject: [PATCH] PCI: tegra: replace devm_request_and_ioremap by
- devm_ioremap_resource
-Message-ID: <1377508269-9664-1-git-send-email-treding@nvidia.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Mon, 26 Aug 2013 17:16:28 +1000
+Subject: SHMobile Compatibility String Inconsistencies
+In-Reply-To: <1721850.l3ebodSrXr@avalon>
+References: <20130822054639.GE11086@verge.net.au>
+ <20130823021111.GA2792@voom.redhat.com> <1721850.l3ebodSrXr@avalon>
+Message-ID: <20130826071628.GA9120@voom.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <Julia.Lawall@lip6.fr>
+On Fri, Aug 23, 2013 at 01:31:31PM +0200, Laurent Pinchart wrote:
+> Hi David,
+> 
+> On Friday 23 August 2013 12:11:11 David Gibson wrote:
+> > On Thu, Aug 22, 2013 at 02:46:40PM +0900, Simon Horman wrote:
+> > > Hi Laurent, Hi Guennadi, Hi All,
+> > > 
+> > > Olof has brought to my attention that there is some inconsistency
+> > > in the way that compatibility strings for SHMobile are named and he
+> > > has asked us to clean things up for v3.12.
+> > > 
+> > > Looking through arch/arm/boot/dts/ I see that we have:
+> > > 
+> > > 1. {gpio,pfc}-r8aXXXX and;
+> > > 2. r8aXXXX-sdhi
+> > > 
+> > > The inconsistency that Olof has asked us to resolve is that we
+> > > should either use r8aXXXX- or -r8aXXXX. Not both.
+> > > 
+> > > It seems to me that neither option is inherently better than the other
+> > > so we should just choose the path of least resistance to make things
+> > > consistent.
+> > > 
+> > > Laurent, Guennadi, do you have any opinions on if it would
+> > > be easier to change the GPIO and PFC compatibility strings;
+> > > or to change the SDHI compatibility strings?
+> > > 
+> > > Ideally I would like you to come to some sort of consensus and send
+> > > patches.
+> > 
+> > So, by all means clean this up in the dts.
+> > 
+> > BUT, in keeping with the recent discussions on improving the DT
+> > process, the corresponding drivers must continue to recognize both
+> > forms, so that old DTs will still work correctly.
+> 
+> Given the early state of DT support in arm/mach-shmobile, I'm pretty sure we 
+> have no DT-based systems in the wild. The old compatibility string could in my 
+> opinion just be dropped.
 
-Use devm_ioremap_resource instead of devm_request_and_ioremap.
+Hm, well, ok.  Just remember to always err on the side of broad
+compatiblity.  We've become sloppy with incompatible DT updates and
+its caused us a bunch of grief.
 
-This was done using the semantic patch
-scripts/coccinelle/api/devm_ioremap_resource.cocci
-
-Error-handling code was manually removed from the associated calls to
-platform_get_resource.
-
-Adjust the comment at the third platform_get_resource_byname to make clear
-why ioremap is not done at this point.
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-Acked-by: Thierry Reding <treding@nvidia.com>
-Tested-by: Thierry Reding <treding@nvidia.com>
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-Acked-by: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-Hi,
-
-This is a small cleanup patch on top of the recently merged Tegra PCIe
-driver. Can someone please apply this to the same branch that Tegra's
-tegra-for-3.12-soc branch was merged? I think Kevin Hilman pulled it
-into next/soc.
-
-Thanks,
-Thierry
-
- drivers/pci/host/pci-tegra.c | 31 ++++++++++---------------------
- 1 file changed, 10 insertions(+), 21 deletions(-)
-
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index 7356741..2e9888a 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -1031,32 +1031,21 @@ static int tegra_pcie_get_resources(struct tegra_pcie *pcie)
- 		return err;
- 	}
- 
--	/* request and remap controller registers */
- 	pads = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pads");
--	if (!pads) {
--		err = -EADDRNOTAVAIL;
-+	pcie->pads = devm_ioremap_resource(&pdev->dev, pads);
-+	if (IS_ERR(pcie->pads)) {
-+		err = PTR_ERR(pcie->pads);
- 		goto poweroff;
- 	}
- 
- 	afi = platform_get_resource_byname(pdev, IORESOURCE_MEM, "afi");
--	if (!afi) {
--		err = -EADDRNOTAVAIL;
--		goto poweroff;
--	}
--
--	pcie->pads = devm_request_and_ioremap(&pdev->dev, pads);
--	if (!pcie->pads) {
--		err = -EADDRNOTAVAIL;
--		goto poweroff;
--	}
--
--	pcie->afi = devm_request_and_ioremap(&pdev->dev, afi);
--	if (!pcie->afi) {
--		err = -EADDRNOTAVAIL;
-+	pcie->afi = devm_ioremap_resource(&pdev->dev, afi);
-+	if (IS_ERR(pcie->afi)) {
-+		err = PTR_ERR(pcie->afi);
- 		goto poweroff;
- 	}
- 
--	/* request and remap configuration space */
-+	/* request configuration space, but remap later, on demand */
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cs");
- 	if (!res) {
- 		err = -EADDRNOTAVAIL;
-@@ -1492,9 +1481,9 @@ static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
- 		rp->lanes = value;
- 		rp->pcie = pcie;
- 
--		rp->base = devm_request_and_ioremap(pcie->dev, &rp->regs);
--		if (!rp->base)
--			return -EADDRNOTAVAIL;
-+		rp->base = devm_ioremap_resource(pcie->dev, &rp->regs);
-+		if (IS_ERR(rp->base))
-+			return PTR_ERR(rp->base);
- 
- 		list_add_tail(&rp->list, &pcie->ports);
- 	}
 -- 
-1.8.4
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130826/19bc76a8/attachment.sig>
