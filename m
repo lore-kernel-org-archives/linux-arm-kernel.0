@@ -1,57 +1,69 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 26 Aug 2013 16:23:03 +0200
-Subject: [PATCH V2] ARM: EXYNOS: cpuidle: Skip C1 cpuidle state for
- exynos5440
-In-Reply-To: <1377519363-23077-1-git-send-email-amit.daniel@samsung.com>
-References: <4070794.XxjluIqBpK@amdc1032>
- <1377519363-23077-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <18873465.YOJHgsXmcz@amdc1032>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 26 Aug 2013 17:36:15 +0300
+Subject: [PATCHv5 01/31] CLK: clkdev: add support for looking up clocks
+ from DT
+In-Reply-To: <20130803183143.GE23053@n2100.arm.linux.org.uk>
+References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
+ <1375460751-23676-2-git-send-email-t-kristo@ti.com>
+ <20130803183143.GE23053@n2100.arm.linux.org.uk>
+Message-ID: <521B67DF.4000005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 26, 2013 05:46:03 PM Amit Daniel Kachhap wrote:
-> This patch skips the deep C1(AFTR -Arm off top running) state for exynos5440
-> soc as this soc does not support this state. The cpu's only allows the basic
-> C0 state. The C1 state is filtered by re-initialising the driver state_count
-> value to 1.
-> 
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+On 08/03/2013 09:31 PM, Russell King - ARM Linux wrote:
+> On Fri, Aug 02, 2013 at 07:25:20PM +0300, Tero Kristo wrote:
+>> +
+>> +	if (cl)
+>> +		return cl;
+>> +
+>> +	/* If clock was not found, attempt to look-up from DT */
+>> +	node = of_find_node_by_name(NULL, con_id);
+>
+> This is utterly broken if you're looking up purely by a connection ID.
+> Please, go back and read clk_get()'s documentation in linux/clk.h.
+> It's spelt out very plainly there.
+>
+> NAK.
+>
 
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Hi Russell,
 
-Thanks for fixing this.
+After looking at this a bit more, it seems difficult to get rid of the 
+clk_get -> of_clk_get conversion, however based on this comment I am 
+somewhat stuck. Do you think it would be acceptable if I change the 
+implementation of this patch to work like this:
 
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> ---
-> 
-> Changes in V2:
-> * Used driver state_count variable to filter the C1 state
->  instead of device state count variable. Although this V2 patch is also
->  not complete as there are suggestions to make this driver platform driver.
+1) both dev_id + con_id defined:
+    a) search for device node named dev_id
+    b) check clock-names for matching con_id
+    c) return matching clock
 
-I'm going to look into making it a platform driver later this week.
+    Example in kernel:
+       clocksource-nomadik-mtu.c :
+           clk_get_sys("mtu0", "apb_pclk");
 
->  arch/arm/mach-exynos/cpuidle.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-> index 225ee84..ac13922 100644
-> --- a/arch/arm/mach-exynos/cpuidle.c
-> +++ b/arch/arm/mach-exynos/cpuidle.c
-> @@ -200,6 +200,9 @@ static int __init exynos4_init_cpuidle(void)
->  	if (soc_is_exynos5250())
->  		exynos5_core_down_clk();
->  
-> +	if (soc_is_exynos5440())
-> +		exynos4_idle_driver.state_count = 1;
-> +
->  	ret = cpuidle_register_driver(&exynos4_idle_driver);
->  	if (ret) {
->  		printk(KERN_ERR "CPUidle failed to register driver\n");
+       ste-nomadik-snt8815.dts:
+         mtu0: mtu at 101e2000 {
+                 /* Nomadik system timer */
+                 compatible = "st,nomadik-mtu";
+                 reg = <0x101e2000 0x1000>;
+                 interrupt-parent = <&vica>;
+                 interrupts = <4>;
+                 clocks = <&timclk>, <&pclk>;
+                 clock-names = "timclk", "apb_pclk";
+         };
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+2) dev_id = NULL, con_id defined (current patch implementation, most of 
+the OMAP clocks use this approach):
+    a) search for a device node named con_id
+    b) return corresponding clock from the node
+
+Alternatively I must implement a regression and break some of the OMAP 
+drivers with this set, and also implement omap internal clk_get 
+functionality (basically adding a similar wrapper that I have 
+implemented in this patch) under mach-omap2 to get some basic OMAP infra 
+to work properly (namely, hwmod.) I can probably avoid part of this by 
+adding more beef to the *.dts files for the critical parts to get boot 
+working at least.
+
+-Tero
