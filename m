@@ -1,17 +1,50 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 26 Aug 2013 20:47:54 +0530
-Subject: [PATCH v2] dma: imx-sdma: Add ROM script addresses to driver
-In-Reply-To: <1376985873-25776-1-git-send-email-s.hauer@pengutronix.de>
-References: <1376985873-25776-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130826151754.GR2748@intel.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Mon, 26 Aug 2013 19:02:33 +0300
+Subject: [patch] clk: vt8500: several forever loops
+Message-ID: <20130826154908.GD12428@elgon.mountain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 10:04:30AM +0200, Sascha Hauer wrote:
-> Changes since v1:
-> 
-> - skip handling of SoCs which have a tapeout specific SDMA firmware,
->   namely i.MX31/35
-Applied, with typo fix in patch 1...
+This does a bunch of looping like this:
 
-~Vinod
+	for (div2 = 7; div2 >= 0; div2--)
+
+But unsigned values are always greater than or equal to zero so it just
+loops and loops.  Really "mul", "div1" and "div2" should all be declared
+as int for cleanliness sake.
+
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+---
+Static checker stuff.
+
+diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+index 82306f5..8d5b57c 100644
+--- a/drivers/clk/clk-vt8500.c
++++ b/drivers/clk/clk-vt8500.c
+@@ -363,7 +363,7 @@ static void vt8500_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ static void wm8650_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 				u32 *multiplier, u32 *divisor1, u32 *divisor2)
+ {
+-	u32 mul, div1, div2;
++	int mul, div1, div2;
+ 	u32 best_mul, best_div1, best_div2;
+ 	unsigned long tclk, rate_err, best_err;
+ 
+@@ -431,7 +431,7 @@ static u32 wm8750_get_filter(u32 parent_rate, u32 divisor1)
+ static void wm8750_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 				u32 *filter, u32 *multiplier, u32 *divisor1, u32 *divisor2)
+ {
+-	u32 mul, div1, div2;
++	int mul, div1, div2;
+ 	u32 best_mul, best_div1, best_div2;
+ 	unsigned long tclk, rate_err, best_err;
+ 
+@@ -475,7 +475,7 @@ static void wm8750_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ static void wm8850_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 				u32 *multiplier, u32 *divisor1, u32 *divisor2)
+ {
+-	u32 mul, div1, div2;
++	int mul, div1, div2;
+ 	u32 best_mul, best_div1, best_div2;
+ 	unsigned long tclk, rate_err, best_err;
+ 
