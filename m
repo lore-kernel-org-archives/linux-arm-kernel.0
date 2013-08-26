@@ -1,79 +1,86 @@
 From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Mon, 26 Aug 2013 17:36:24 +0200
-Subject: [PATCH 2/3] kernel,
- irq: Use interrupt prioritization infrastructure during interrupt
- setup.
+Date: Mon, 26 Aug 2013 17:36:25 +0200
+Subject: [PATCH 3/3] irq,
+ gic: Add interrupt priority to the GIC driver using already existing
+ infrastructure.
 In-Reply-To: <1377531385-19369-1-git-send-email-tomasz.nowicki@linaro.org>
 References: <1377531385-19369-1-git-send-email-tomasz.nowicki@linaro.org>
-Message-ID: <1377531385-19369-3-git-send-email-tomasz.nowicki@linaro.org>
+Message-ID: <1377531385-19369-4-git-send-email-tomasz.nowicki@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Once interrupt is shared all actions co-related to given interrupt need
-to have IRQF_HIGH_PRIORITY flag which means that actions have the same
-priority.
+Couple of notes:
+o new handler has been added irq_set_priority
+o this could be an example of how to map generic priority level to
+  architecture priority value (see comments in code)
 
 Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 ---
- include/linux/interrupt.h |    1 +
- kernel/irq/manage.c       |   16 ++++++++++++++--
- 2 files changed, 15 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic.c |   32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index 5fa5afe..a566e54 100644
---- a/include/linux/interrupt.h
-+++ b/include/linux/interrupt.h
-@@ -71,6 +71,7 @@
- #define IRQF_FORCE_RESUME	0x00008000
- #define IRQF_NO_THREAD		0x00010000
- #define IRQF_EARLY_RESUME	0x00020000
-+#define IRQF_HIGH_PRIORITY	0x00040000
- 
- #define IRQF_TIMER		(__IRQF_TIMER | IRQF_NO_SUSPEND | IRQF_NO_THREAD)
- 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 514bcfd..7c80295 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -14,6 +14,7 @@
- #include <linux/module.h>
- #include <linux/random.h>
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 13b2849..97e919f 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -37,6 +37,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/irqdomain.h>
  #include <linux/interrupt.h>
 +#include <linux/irqpriority.h>
+ #include <linux/percpu.h>
  #include <linux/slab.h>
- #include <linux/sched.h>
- #include <linux/sched/rt.h>
-@@ -1006,11 +1007,12 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
- 		 * the same type (level, edge, polarity). So both flag
- 		 * fields must have IRQF_SHARED set and the bits which
- 		 * set the trigger type must match. Also all must
--		 * agree on ONESHOT.
-+		 * agree on ONESHOT and IRQF_HIGH_PRIORITY.
- 		 */
- 		if (!((old->flags & new->flags) & IRQF_SHARED) ||
- 		    ((old->flags ^ new->flags) & IRQF_TRIGGER_MASK) ||
--		    ((old->flags ^ new->flags) & IRQF_ONESHOT))
-+		    ((old->flags ^ new->flags) & IRQF_ONESHOT) ||
-+		    ((old->flags ^ new->flags) & IRQF_HIGH_PRIORITY))
- 			goto mismatch;
+ #include <linux/irqchip/chained_irq.h>
+@@ -93,6 +94,19 @@ struct irq_chip gic_arch_extn = {
+ 	.irq_set_wake	= NULL,
+ };
  
- 		/* All handlers must agree on per-cpuness */
-@@ -1115,6 +1117,16 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
- 		if (new->flags & IRQF_ONESHOT)
- 			desc->istate |= IRQS_ONESHOT;
- 
-+		if (new->flags & IRQF_HIGH_PRIORITY) {
-+			ret = irq_set_priority(desc, IRQP_HIGH);
-+			if (ret)
-+				goto out_mask;
-+		} else {
-+			ret = irq_set_priority(desc, IRQP_DEFAULT);
-+			if (ret && ret != ENOSYS)
-+				goto out_mask;
-+		}
++/*
++ * Map generic interrupt priority levels (irqpriority_t) to GIC_DIST_PRI
++ * register value. Value should be mapped using table index assignment:
++ * [priority level] = <vale for GIC_DIST_PRI> which allow us to be compatible
++ * in case of irqpriority_t (see include/linux/irqpriority.h) further
++ * modification.
++ */
++static unsigned int priority_map [IRQP_LEVELS_NR] = {
++	[IRQP_HIGH]	= 0x00,
++	[IRQP_DEFAULT]	= 0xa0,
++	[IRQP_LOW]	= 0xe0,
++};
 +
- 		if (irq_settings_can_autoenable(desc))
- 			irq_startup(desc, true);
- 		else
+ #ifndef MAX_GIC_NR
+ #define MAX_GIC_NR	1
+ #endif
+@@ -332,12 +346,30 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+ 	chained_irq_exit(chip, desc);
+ }
+ 
++int gic_set_priority(struct irq_data *data, irqpriority_t priority)
++{
++	unsigned int hw_irq = gic_irq(data);
++	u32 cur_priority;
++
++	if (hw_irq < 32)
++		return -EINVAL;
++
++	raw_spin_lock(&irq_controller_lock);
++	cur_priority = readl_relaxed(gic_dist_base(data) + GIC_DIST_PRI + (hw_irq / 4) * 4);
++	cur_priority &= ~(0xff << (hw_irq % 4));
++	cur_priority |= priority_map[priority] << (hw_irq % 4);
++	writel_relaxed(cur_priority, gic_dist_base(data) + GIC_DIST_PRI + (hw_irq / 4) * 4);
++	raw_spin_unlock(&irq_controller_lock);
++	return 0;
++}
++
+ static struct irq_chip gic_chip = {
+ 	.name			= "GIC",
+ 	.irq_mask		= gic_mask_irq,
+ 	.irq_unmask		= gic_unmask_irq,
+ 	.irq_eoi		= gic_eoi_irq,
+ 	.irq_set_type		= gic_set_type,
++	.irq_set_priority	= gic_set_priority,
+ 	.irq_retrigger		= gic_retrigger,
+ #ifdef CONFIG_SMP
+ 	.irq_set_affinity	= gic_set_affinity,
 -- 
 1.7.9.5
