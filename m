@@ -1,60 +1,32 @@
 From: B47053@freescale.com (Xiubo Li-B47053)
-Date: Mon, 26 Aug 2013 05:46:26 +0000
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM
-In-Reply-To: <20130823073612.GB3535@ulmo>
+Date: Mon, 26 Aug 2013 05:58:41 +0000
+Subject: [PATCH 2/4] ARM: dts: Add Freescale ftm pwm node for VF610.
+In-Reply-To: <20130823091309.GH3535@ulmo>
 References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
- <1473340.OXSHEp7d4P@flatron>
- <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
- <20130822062610.GR31036@pengutronix.de> <20130823073612.GB3535@ulmo>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827E41E2@039-SN2MPN1-012.039d.mgd.msft.net>
+ <1377054462-6283-3-git-send-email-Li.Xiubo@freescale.com>
+ <20130823091309.GH3535@ulmo>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827E420C@039-SN2MPN1-012.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Thierry,
 
 
-> Subject: Re: [PATCH 4/4] Documentation: Add device tree bindings for
-> Freescale FTM PWM
+> Subject: Re: [PATCH 2/4] ARM: dts: Add Freescale ftm pwm node for VF610.
 > 
-> On Thu, Aug 22, 2013 at 08:26:10AM +0200, Sascha Hauer wrote:
-> > On Thu, Aug 22, 2013 at 02:55:42AM +0000, Xiubo Li-B47053 wrote:
-> > > Hi Tomasz,
-> > >
-> > > Thanks for your comments.
-> > >
-> > >
-> > > > Could you explain meaning of this property more precisely? I'm
-> > > > interested especially how is this related to the PWM IP block and
-> boards.
-> > > >
-> > >
-> > > Yes.
-> > > There are 8 channels most. While the pinctrls of 4th and 5th
-> > > channels could be used by uart's Rx and Tx, then these 2 channels
-> > > won't be used for pwm output, so there will be 6 channels available
-> by the pwm.
-> > > Thus, the pwm chip will register only 6 pwms(6 channels)
-> > > most("fsl,pwm-channel-orders = {0 1 2 3 6 7}").And also the "fsl,pwm-
-> channel-number" will be 6.
-> >
-> > If the chip has eight PWMs I would register all of them. If some of
-> > them are not routed out by the pinmux then just nothing happens if you
-> > use them. In a sane devicetree they won't be referenced anyway when
-> > they are not routed out of the SoC.
+> On Wed, Aug 21, 2013 at 11:07:40AM +0800, Xiubo Li wrote:
+> > Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/vf610.dtsi | 83
+> > +++++++++++++++++++++++++++++++++++++++++++-
+> >  1 file changed, 82 insertions(+), 1 deletion(-)
 > 
-> In that case, shouldn't this be hooked up to the pinctrl subsystem as
-> well? As I understand the above, the logical thing would be for each PWM
-> channel's .request() operation to configure the pinmuxing appropriately.
-> And if it can't be configured as necessary then .request() should return
-> an error (or propagate the error from the pinctrl subsystem).
+> Please also pay attention to the correct capitalization in the subject
+> here. "FTM" and "PWM". Furthermore this could probably use more than a
+> single line as patch description.
 > 
 
-That's maybe better, if so, the pinctrl configuration must be split into two steps:
-1, get the channel pinctrl "active" and "idle" states by callig pinctrl_lookup_state() in .request().
-2, select the proper state in .enable()/.disable().
-
+Yes, I will revise it in v2.
 
 
 
