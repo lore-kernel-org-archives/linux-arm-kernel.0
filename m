@@ -1,122 +1,71 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 26 Aug 2013 18:35:30 +0800
-Subject: [PATCH v2 4/8] mtd: m25p80: add the DDR quad-read support
-In-Reply-To: <521AF411.8000107@ti.com>
-References: <1377492102-23543-1-git-send-email-b32955@freescale.com>
- <1377492102-23543-5-git-send-email-b32955@freescale.com>
- <521AF411.8000107@ti.com>
-Message-ID: <521B2F72.5070203@freescale.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 26 Aug 2013 16:16:42 +0530
+Subject: [PATCH v2] ARM: EDMA: Fix clearing of unused list for DT DMA
+ resources
+In-Reply-To: <1377287613-16491-1-git-send-email-joelf@ti.com>
+References: <1377287613-16491-1-git-send-email-joelf@ti.com>
+Message-ID: <521B3212.3050405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?08?26? 14:22, Sourav Poddar ??:
-> Hi,
-> On Monday 26 August 2013 10:11 AM, Huang Shijie wrote:
->> This patch adds the DDR quad read support by:
->>
->> (1) Add the relative commands:
->> OPCODE_DDRQIOR, OPCODE_4DDRQIOR
->>
->> (2) add the "m25p,ddr-quad-read" property for the m25p80 driver
->> If the dts has the "m25p,ddr-quad-read" property, the kernel will
->> set the Quad bit of the configuration register, and when the
->> setting suceedes, we will set the read opcode with the right
->> spi nor command.
->>
->> Signed-off-by: Huang Shijie<b32955@freescale.com>
->> ---
->> Documentation/devicetree/bindings/mtd/m25p80.txt | 5 +++++
->> drivers/mtd/devices/m25p80.c | 21 ++++++++++++++++-----
->> include/linux/mtd/spi-nor.h | 2 ++
->> 3 files changed, 23 insertions(+), 5 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/mtd/m25p80.txt 
->> b/Documentation/devicetree/bindings/mtd/m25p80.txt
->> index b33313f..a01c6b7 100644
->> --- a/Documentation/devicetree/bindings/mtd/m25p80.txt
->> +++ b/Documentation/devicetree/bindings/mtd/m25p80.txt
->> @@ -22,6 +22,11 @@ Optional properties:
->> all chips and support for it can not be detected at runtime.
->> Refer to your chips' datasheet to check if this is supported
->> by your chip.
->> +- m25p,ddr-quad-read : Use the "ddr quad read" opcode to read data 
->> from the chip
->> + instead of the usual "read" opcode. This opcode is not
->> + supported by all chips and support for it can not be detected
->> + at runtime. Refer to your chips' datasheet to check if this
->> + is supported by your chip.
->> Example:
->>
->> flash: m25p80 at 0 {
->> diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
->> index 0645c9f..32ccdc7 100644
->> --- a/drivers/mtd/devices/m25p80.c
->> +++ b/drivers/mtd/devices/m25p80.c
->> @@ -913,7 +913,8 @@ static void m25p80_check_quad_read(struct m25p 
->> *flash, struct device_node *np)
->> int ret;
->> int sr_cr;
->>
->> - if (of_property_read_bool(np, "m25p,quad-read")) {
->> + if (of_property_read_bool(np, "m25p,quad-read")
->> + || of_property_read_bool(np, "m25p,ddr-quad-read")) {
->> /* The configuration register is set by the second byte. */
->> sr_cr = CR_QUAD<< 8;
->>
->> @@ -927,10 +928,20 @@ static void m25p80_check_quad_read(struct m25p 
->> *flash, struct device_node *np)
->> if (!(ret> 0&& (ret& CR_QUAD)))
->> return;
->>
->> - if (flash->mtd.size<= SZ_16M)
->> - flash->read_opcode = OPCODE_QIOR;
->> - else
->> - flash->read_opcode = OPCODE_4QIOR;
->> + if (of_property_read_bool(np, "m25p,quad-read")) {
->> + if (flash->mtd.size<= SZ_16M)
->> + flash->read_opcode = OPCODE_QIOR;
->> + else
->> + flash->read_opcode = OPCODE_4QIOR;
->> + return;
->> + }
->> +
->> + if (of_property_read_bool(np, "m25p,ddr-quad-read")) {
->> + if (flash->mtd.size<= SZ_16M)
->> + flash->read_opcode = OPCODE_DDRQIOR;
->> + else
->> + flash->read_opcode = OPCODE_4DDRQIOR;
->> + }
-> I remember this getting asked in some other thread also...
-> Quad read need dummy bits before reading out the data, what happens
-> when the controller does not have LUT feature. ? 
-I think the controller (not the QUADSPI) should submit a patch to fix it.
+On Saturday 24 August 2013 01:23 AM, Joel Fernandes wrote:
+> HWMOD removal for MMC and Crypto is breaking edma_start as the events are
+> being manually triggered due to unused channel list not being clear. Atleast
+> breakage has been seen on these peripherals, but it is expected Audio (McASP)
+> maybe breaking too.
+> 
+> This patch fixes the issue, by reading the "dmas" property from the DT node if
+> it exists and clearing the bits in the unused channel list so that these channels
+> are not manually triggered.
+> 
+> v2 changes:
+> Reduced indendation by returning from if block.
 
-There are many different kinds of READs need the dummy, take S25FSL128S 
-for example :
+Is this a v2 or v3 since you already sent a v2 about a month back?
 
-Fast-Read(dummy = 8),
-Dual-Output Read(dummy = 8),
-Dual I/O read(dummy = 4 for 3-byte; dummy = 2 for 4-byte)
-.......
-Quad i/o Read(dummy = 4)
-DDR QUAD i/o Read(dummy = 8)
-......................
+> 
+> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+> Reported-by: Balaji T K <balajitk@ti.com>
+> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> ---
+> Note:
+> Patch should go in for -rc cycle as it fixes existing crypto drivers.
 
-Even the same spi command such as Dual I/O read (0xBB), different 
-version of chips may require different
-dummies.
+We agreed the patch is not needed in -rc cycle since there are no
+current EDMA users in DT-boot?
 
--------------------------------------------------------------
-So, the dummies are binded with the chips, not binded with the SPI 
-commands.
--------------------------------------------------------------
+> 
+>  arch/arm/common/edma.c | 22 +++++++++++++++++++---
+>  1 file changed, 19 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index 39ad030..3867e7e 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
+> @@ -560,14 +560,30 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
+>  static int prepare_unused_channel_list(struct device *dev, void *data)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+> -	int i, ctlr;
+> +	int i = 0, ctlr;
+> +	u32 dma_chan;
+> +	const __be32 *dma_chan_p;
+> +	struct property *prop;
+> +
+> +	if (dev->of_node) {
+> +		of_property_for_each_u32(dev->of_node, "dmas", prop,
+> +					 dma_chan_p, dma_chan) {
+> +			if (i++ & 1) {
+> +				ctlr = EDMA_CTLR(dma_chan);
+> +				clear_bit(EDMA_CHAN_SLOT(dma_chan),
+> +					  edma_cc[ctlr]->edma_unused);
+> +			}
 
-We can not list all the dummies in the m25p_ids[] . It's not feasible.
+I thought we agreed to do this differently using
+of_property_count_strings() and of_parse_phandle_with_args(). I seemed
+to have missed any discussion on why this cannot be done (if such a
+discussion took place on the list).
 
-An alternate method is to specific the dummy with the DT node, such as:
-"m25p,quad-read = <4>", means this chip's Quad read needs dummy=4.
-
-
-
-thanks
-Huang Shijie
+Thanks,
+Sekhar
