@@ -1,43 +1,21 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 26 Aug 2013 14:01:17 -0600
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for Freescale
- FTM PWM
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F827E11AC@039-SN2MPN1-012.039d.mgd.msft.net>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
- <1473340.OXSHEp7d4P@flatron>
- <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
- <20130822062610.GR31036@pengutronix.de> <20130823073612.GB3535@ulmo>
- <5217B807.7020800@wwwdotorg.org>
- <1DD289F6464F0949A2FCA5AA6DC23F827E11AC@039-SN2MPN1-012.039d.mgd.msft.net>
-Message-ID: <521BB40D.7040001@wwwdotorg.org>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 26 Aug 2013 16:04:50 -0400 (EDT)
+Subject: [PATCH 0/2] net/cadence/macb: add support for dt phy definition
+In-Reply-To: <1377186980-21902-1-git-send-email-b.brezillon@overkiz.com>
+References: <1377186980-21902-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20130826.160450.2176892065062148718.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2013 11:35 PM, Xiubo Li-B47053 wrote:
->> Subject: Re: [PATCH 4/4] Documentation: Add device tree bindings for
-...
->>> Why do you need to manipulate the pinctrl to en/disable a channel?
->>
->> This is because in Vybrid VF610 TOWER board, there are 4 leds, and each
->> led's one point(diode's positive pole) is connected to 3.3V, and the
->> other point is connected to pwm's one channel. When the 4 pinctrls are
->> configured as enable at the same time, the 4 pinctrls is low valtage, and
->> the 4 leds will be lighted up as default, then when you enable/disable
->> one led will effects others.
->>
->> These pinctrls are belong to pwm, and I don't think led or other customer
->> could control them directly.
->> So, here I authorize the 4 pinctrls to each channel controls.
->>
-> "
-> For the reason above, I have to control the pinctrls separately.
-> 
-> If all the pinctrls set as default state, the 8 pinctrls must be controlled together.
-> And the 4 leds will all be lighted up as default and will influence each other.
+From: Boris BREZILLON <b.brezillon@overkiz.com>
+Date: Thu, 22 Aug 2013 17:56:20 +0200
 
-Sorry, that still doesn't make much sense. Either way though, having
-separate pinctrl setup for a single device isn't going to work. You'll
-either need to have all combinations of 4 (8?) PWMs represented as
-pinctrl states(!), or register separate PWM devices so that they get
-independant pinctrl states.
+> This patch series adds support for ethernet phy definition using device
+> tree.
+> 
+> This may help in moving some at91 boards to dt (some of them define an
+> interrupt pin).
+> 
+> Tested on samad31ek.
+
+Series applied to net-next, thanks.
