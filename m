@@ -1,42 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 26 Aug 2013 10:53:54 -0600
-Subject: [RFC PATCH 2/3] pinctrl: at91: add support for generic pinconf
-In-Reply-To: <1377380259-11290-1-git-send-email-b.brezillon@overkiz.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 26 Aug 2013 19:01:05 +0200
+Subject: [RFC PATCH 1/3] pinctrl: add new generic pinconf config for
+ deglitch filter
+In-Reply-To: <521B875E.1010605@wwwdotorg.org>
 References: <1377379926-11163-1-git-send-email-b.brezillon@overkiz.com>
- <1377380259-11290-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <521B8822.50304@wwwdotorg.org>
+ <1377380109-11247-1-git-send-email-b.brezillon@overkiz.com>
+ <521B875E.1010605@wwwdotorg.org>
+Message-ID: <521B89D1.6010902@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2013 03:37 PM, Boris BREZILLON wrote:
-> Add support for generic pin configuration to pinctrl-at91 driver.
+Hello Stephen,
 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+On 26/08/2013 18:50, Stephen Warren wrote:
+> On 08/24/2013 03:35 PM, Boris BREZILLON wrote:
+>> Add a new parameter to support deglitch filter configuration.
+>> A deglitch filter works like a debounce filter but with a smaller
+>> delay (nanoseconds).
+> Why not use the existing debounce property, just with a small delay
+> specified. It seems like that's exactly what the property is for?
+That's one of the question I asked in my cover letter :-)
 
->  Required properties for iomux controller:
-> -- compatible: "atmel,at91rm9200-pinctrl"
-> +- compatible: "atmel,at91rm9200-pinctrl" or "atmel,at91sam9x5-pinctrl".
+Indeed the at91 deglitch filter delay is not configurable and is statically
+assigned to half a master clk cycle (if master clk = 133MHz -> 8 ns).
+The debounce property argument is currently expressed in usecs.
 
-You seem to also be adding a second chip name to the list here, which is
-more than the patch subject/description imply you're doing...
+This will result in always selecting the debounce filter (which is also
+available on at91 SoCs) over the deglitch filter.
 
-> +  Add "generic-pinconf" to the compatible string list to use the generic pin
-> +  configuration syntax.
+Could we add a flag in the deglitch argument to specify the delay unit
+(nsecs or usecs) ?
 
-"generic-pinconf" is too generic of a compatible value for this binding
-to define.
 
-Instead, I think you want to either:
+Best Regards,
 
-a)
-
-Use compatible="atmel,at91rm9200-pinctrl" for the old binding,
-use compatible="atmel,at91rm9200-pinctrl-generic" for the new binding
-
-or:
-
-b)
-
-Define Boolean property atmel,generic-pinconf (perhaps a better name
-could be chosen?). If it's not present, parse the node assuming the old
-binding. If it is present, parse the node assuming the new binding.
+Boris
