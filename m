@@ -1,75 +1,69 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 26 Aug 2013 19:12:35 +0200
-Subject: [PATCH RFC 4/5] clk: samsung: Add clock driver for s5pc110/s5pv210
-In-Reply-To: <1377517114-20222-5-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1377517114-20222-1-git-send-email-m.krawczuk@partner.samsung.com>
- <1377517114-20222-5-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <1433697.46kixytlq2@amdc1032>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 26 Aug 2013 19:13:28 +0200
+Subject: [PATCH] ARM: dts: exynos4210: Work around lack of cpufreq
+ regulator lookup
+In-Reply-To: <1377020136-14838-1-git-send-email-t.figa@samsung.com>
+References: <1377020136-14838-1-git-send-email-t.figa@samsung.com>
+Message-ID: <2243476.800bKojdAz@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 26, 2013 01:38:33 PM Mateusz Krawczuk wrote:
-> This patch adds new, Common Clock Framework-based clock driver for Samsung
-> S5PV210 SoCs. The driver is just added, without enabling it yet.
+On Tuesday 20 of August 2013 19:35:36 Tomasz Figa wrote:
+> Exynos cpufreq drivers does not support device tree based regulator
+> lookup, so it can get the VDD ARM regulator only by its name. To get
+> cpufreq working for now, this patch works this around by renaming the
+> regulator in board dts files to vdd_arm, which is the name expected by
+> the driver.
 > 
-> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  .../bindings/clock/samsung,s5pv210-clock.txt       |  72 ++
->  drivers/clk/samsung/Makefile                       |   3 +-
->  drivers/clk/samsung/clk-s5pv210.c                  | 732 +++++++++++++++++++++
->  include/dt-bindings/clock/samsung,s5pv210-clock.h  | 221 +++++++
->  4 files changed, 1027 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
->  create mode 100644 drivers/clk/samsung/clk-s5pv210.c
->  create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
+>  arch/arm/boot/dts/exynos4210-origen.dts | 7 ++++++-
+>  arch/arm/boot/dts/exynos4210-trats.dts  | 7 ++++++-
+>  2 files changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4210-origen.dts
+> b/arch/arm/boot/dts/exynos4210-origen.dts index 382d8c7..46378fe 100644
+> --- a/arch/arm/boot/dts/exynos4210-origen.dts
+> +++ b/arch/arm/boot/dts/exynos4210-origen.dts
+> @@ -192,7 +192,12 @@
+>  				};
+> 
+>  				buck1_reg: BUCK1 {
+> -					regulator-name = "VDD_ARM_1.2V";
+> +					/*
+> +					* HACK: The real name is VDD_ARM_1.2V,
+> +					* but exynos-cpufreq does not support
+> +					* DT-based regulator lookup yet.
+> +					*/
+> +					regulator-name = "vdd_arm";
+>  					regulator-min-microvolt = <950000>;
+>  					regulator-max-microvolt	= <1350000>;
+>  					regulator-always-on;
+> diff --git a/arch/arm/boot/dts/exynos4210-trats.dts
+> b/arch/arm/boot/dts/exynos4210-trats.dts index 1c164f2..63cc571 100644
+> --- a/arch/arm/boot/dts/exynos4210-trats.dts
+> +++ b/arch/arm/boot/dts/exynos4210-trats.dts
+> @@ -290,7 +290,12 @@
+>  				};
+> 
+>  				varm_breg: BUCK1 {
+> -				     regulator-name = "VARM_1.2V_C210";
+> +				     /*
+> +				      * HACK: The real name is VARM_1.2V_C210,
+> +				      * but exynos-cpufreq does not support
+> +				      * DT-based regulator lookup yet.
+> +				      */
+> +				     regulator-name = "vdd_arm";
+>  				     regulator-min-microvolt = <900000>;
+>  				     regulator-max-microvolt = <1350000>;
+>  				     regulator-always-on;
 
-[...]
+Ping.
 
-> diff --git a/drivers/clk/samsung/clk-s5pv210.c b/drivers/clk/samsung/clk-s5pv210.c
-> new file mode 100644
-> index 0000000..861d37d
-> --- /dev/null
-> +++ b/drivers/clk/samsung/clk-s5pv210.c
-
-[...]
-
-> +static unsigned long s5pv210_get_xom(void)
-
-This function can be marked with __init.
-
-> +{
-> +	unsigned long xom = 1;
-> +	void __iomem *chipid_base;
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "samsung,s5pv210-chipid");
-> +	if (np) {
-> +		chipid_base = of_iomap(np, 0);
-
-How's about printing an error if !chipid_base?
-
-Also the code can be made a bit shorter:
-
-if (np) {
-	void __iomem *chipid_base = of_iomap(np, 0);
-...
-}
-
-> +		if (chipid_base)
-> +			xom = readl(chipid_base + 8);
-> +
-> +		iounmap(chipid_base);
-
-It seems that at least generic iounmap() accepts NULL argument but it 
-will be better not to call it if of_iomap() failed.
-
-> +	}
-> +
-> +	return xom;
-> +}
+This patch fixes broken cpufreq on above two boards, so it would be nice to 
+have it merged for 3.12, even if it's a bit hacky, since it's too late for 
+proper solution at the moment. (It's already in development, though.)
 
 Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Tomasz
