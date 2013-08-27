@@ -1,113 +1,134 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 27 Aug 2013 17:53:10 +0100
-Subject: [PATCH v4 1/5] ARM/ARM64: arch_timer: add macros for bits in
- control register
-In-Reply-To: <521CC368.6050307@arm.com>
-References: <1377274749-6196-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1377274749-6196-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <20130827112144.GG19897@arm.com> <521C8F82.6070301@arm.com>
- <20130827145250.GE27164@darko.cambridge.arm.com>
- <521CC368.6050307@arm.com>
-Message-ID: <20130827165310.GJ19897@arm.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Tue, 27 Aug 2013 12:01:20 -0500
+Subject: [PATCH RFC v2 3/5] spmi: add generic SPMI controller binding
+ documentation
+In-Reply-To: <5217DB0C.7000101@wwwdotorg.org>
+References: <cover.1377202730.git.joshc@codeaurora.org>
+ <e42576b69ef3d4e624fbfa2f32f6f79a931b55d6.1377202730.git.joshc@codeaurora.org>
+ <5217DB0C.7000101@wwwdotorg.org>
+Message-ID: <20130827170120.GR4035@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 04:19:04PM +0100, Sudeep KarkadaNagesha wrote:
-> On 27/08/13 15:52, Catalin Marinas wrote:
-> > On Tue, Aug 27, 2013 at 12:37:38PM +0100, Sudeep KarkadaNagesha wrote:
-> >> On 27/08/13 12:21, Catalin Marinas wrote:
-> >>> On Fri, Aug 23, 2013 at 05:19:05PM +0100, Sudeep KarkadaNagesha wrote:
-> >>>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> >>>>
-> >>>> Add macros to describe the bitfields in the ARM architected timer
-> >>>> control register to make code easy to understand.
-> >>>>
-> >>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >>>> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>>> Reviewed-by: Will Deacon <will.deacon@arm.com>
-> >>>> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> >>>> ---
-> >>>>  arch/arm/include/asm/arch_timer.h    |  9 +++++++--
-> >>>>  arch/arm64/include/asm/arch_timer.h  | 12 ++++++++----
-> >>>>  include/clocksource/arm_arch_timer.h |  8 ++++++++
-> >>>>  3 files changed, 23 insertions(+), 6 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-> >>>> index e406d57..9ef74da 100644
-> >>>> --- a/arch/arm/include/asm/arch_timer.h
-> >>>> +++ b/arch/arm/include/asm/arch_timer.h
-> >>>> @@ -95,8 +95,13 @@ static inline void arch_counter_set_user_access(void)
-> >>>>  
-> >>>>  	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
-> >>>>  
-> >>>> -	/* disable user access to everything */
-> >>>> -	cntkctl &= ~((3 << 8) | (7 << 0));
-> >>>> +	/* Disable user access to both physical/virtual counters/timers. */
-> >>>> +	/* Also disable virtual event stream */
-> >>>> +	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
-> >>>> +			| ARCH_TIMER_USR_VT_ACCESS_EN
-> >>>> +			| ARCH_TIMER_VIRT_EVT_EN
-> >>>> +			| ARCH_TIMER_USR_VCT_ACCESS_EN
-> >>>> +			| ARCH_TIMER_USR_PCT_ACCESS_EN);
-> >>>>  
-> >>>>  	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
-> >>>>  }
-> >>>> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> >>>> index 98abd47..00b09d0 100644
-> >>>> --- a/arch/arm64/include/asm/arch_timer.h
-> >>>> +++ b/arch/arm64/include/asm/arch_timer.h
-> >>>> @@ -101,12 +101,16 @@ static inline void arch_counter_set_user_access(void)
-> >>>>  {
-> >>>>  	u32 cntkctl;
-> >>>>  
-> >>>> -	/* Disable user access to the timers and the physical counter. */
-> >>>>  	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
-> >>>> -	cntkctl &= ~((3 << 8) | (1 << 0));
-> >>>>  
-> >>>> -	/* Enable user access to the virtual counter and frequency. */
-> >>>> -	cntkctl |= (1 << 1);
-> >>>> +	/* Disable user access to the timers and the physical counter. */
-> >>>> +	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
-> >>>> +			| ARCH_TIMER_USR_VT_ACCESS_EN
-> >>>> +			| ARCH_TIMER_USR_PCT_ACCESS_EN);
-> >>>> +
-> >>>> +	/* Enable user access to the virtual counter. */
-> >>>> +	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
-> >>>> +
-> >>>>  	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
-> >>>
-> >>> For consistency with arm, I think we should also disable the event
-> >>> stream explicitly here.
-> >>>
-> >> Yes it's done. In PATCH 3/5, a new function arch_timer_evtstrm_config is
-> >> added which is always called(PATCH 4/5). It's either enabled or disabled
-> >> explicitly based on config option for event stream.
-> > 
-> > OK, just that in this patch arm and arm64 had different settings with
-> > regards to the event stream.
-> 
-> Yes correct but that's how it is currently. This patch is not modifying
-> anything functional, just adding macros.
-> 
-> > BTW, can we not avoid clearing the event stream via the
-> > arch_timer_evtstrm_config(false) and always assume the default as
-> > disabled? Do you ever go back into low power mode with event stream
-> > disabled and come back with it enabled?
-> 
-> Yes that can be done. But since the cold/warm reset involves other
-> firmware which can modify that bit, IMO it would be better to do it
-> explicitly as CONFIG_ARM_ARCH_TIMER_EVTSTREAM=n has to ensure its
-> disabled. Though I don't have a strong opinion on this, the reason for
-> my inclination towards explicit disable is because of platform firmware.
-> e.g. on V2P_CA15_A7/TC2 bootmon/secure firmware enables this bit based
-> on some settings in board.txt
-> I can remove as it's disabled on reset(ARM ARM says its reset value is
-> 0) but with the assumption that other firmware don't modify that bit.
+Hey Stephen-
 
-For initial boot we can initialise it and clear the EVNTEN bit. For
-subsequent CPU low power events I assume we save/restore the cntkctl
-register? If we do, we only need to check
-CONFIG_ARM_ARCH_TIMER_EVTSTREAM once during initialisation.
+Thanks for the comments.
+
+On Fri, Aug 23, 2013 at 03:58:36PM -0600, Stephen Warren wrote:
+> On 08/22/2013 01:59 PM, Josh Cartwright wrote:
+> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> > ---
+> > I'm introducing this as an RFC, because there are set of assumptions
+> > made in this binding spec, that currently hold true for the supported
+> > controller/addressing scheme for the Snapdragon 800 series, but don't
+> > necessarily hold true for SPMI in general.
+> > 
+> >   1. No use of Group Slave Identifiers (GSIDs)
+> >      (SPMI allows for a slave to belong to zero or more groups specified
+> >      by GSID, however this feature isn't currently implemented)
+> > 
+> >   2. No specification of Master Identifier (MID)
+> >      (A "system integrator" allocates to each master a 2-bit MID, this
+> >      currently isn't being specified, as it isn't needed by software for
+> >      the PMIC Arb; not sure if this is of use to other SPMI controllers)
+> > 
+> >   3. Single SPMI master per controller
+> > 
+> > Effectively, only a subset of possible SPMI configurations are specified
+> > in this document.
+> > 
+> > So, if it's considered necessary to provide a generic SPMI binding
+> > specification, is it acceptable to only define a subset at this time,
+> > expanding only when necessary, or shall I expand the definition to at
+> > least address 1 & 2, even though they are of no use in the current
+> > implementation?
+> 
+> It's best to define the whole thing from the start if possible. It's
+> easier to ensure the whole binding is consistent, and nothing has been
+> left out.
+
+That makes sense.  I think I'll go down this route for v3 of this
+patchset:
+
+For #1 above, extend the 'reg' property of a slave node to include the
+group slave ID's in which the slave is a member.  The first 'reg' entry
+will remain the slave's Unique Slave Identifier (USID) as before.
+
+For #2, add additional required 'spmi-mid' property in the
+controller/master node that describes the 2-bit Master Identifier (MID).
+
+For #3, rename the SPMI API's s/controller/master/.  The current
+controller/master terminology difference is confusing and unnecessary.
+
+> However, it's probably OK to define a subset binding initially and then
+> expand it later, as long as some thought it put into how it can be
+> expanded in a way that is 100% compatible: old DTs will still operate
+> with new kernels and perhaps even new DTs will still operate with old
+> kernels.
+>
+> That said, if the thought is put in to ensure that's possible, it's
+> probably just as easy to define the whole binding from the start.
+
+That all makes sense.
+
+If we want to ensure for the generic bindings that we are fulling
+characterizing/describing the SPMI bus, then we'll additionally need to
+tackle an additional identified assumption:
+
+  4. One master per SPMI bus.  (The SPMI spec allows for up to 4
+     masters)
+
+On the Snapdragon 800 series, there exists only one software-controlled
+master, but it is conceivably possible to have a setup with two
+software-controlled masters on the same SPMI bus.
+
+This necessarily means that the description of the slaves and the
+masters will need to be decoupled; I'm imagining a generic binding
+supporting multiple masters would look something like this:
+
+	master0: master at 0 {
+		compatible = "...";
+		#spmi-master-cells = <0>;
+		spmi-mid = <0>;
+
+		...
+	};
+
+	master2: master at 2 {
+		compatible = "...";
+		#spmi-master-cells = <0>;
+		spmi-mid = <2>;
+
+		...
+	};
+
+	spmi_bus {
+		compatible = "...";
+
+		spmi-masters = <&master0 &master2>;
+
+		foo at 0 {
+			compatible = "...";
+			reg = <0 ...>;
+		};
+
+		foo at 8 {
+			compatible = "...";
+			reg = <8 ...>;
+		};
+	};
+
+(This will also necessitate a change in the underlying SPMI driver
+model, in the current implementation, a SPMI master 'owns' a particular
+device.  This is not a valid assumption to make.)
+
+Would this property-containing-phandle-vector be considered the
+canonical way of representing nodes with multiple parents in the device
+tree?
+
+Thanks,
+  Josh
 
 -- 
-Catalin
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
