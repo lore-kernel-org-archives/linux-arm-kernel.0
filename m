@@ -1,85 +1,39 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 27 Aug 2013 05:36:04 -0300
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 27 Aug 2013 10:39:07 +0200
 Subject: [PATCH v2 7/9] watchdog: orion: Update device-tree binding
  documentation
-In-Reply-To: <20130826140843.GI13964@titan.lakedaemon.net>
+In-Reply-To: <20130827083603.GA2286@localhost>
 References: <1377295942-5955-1-git-send-email-ezequiel.garcia@free-electrons.com>
  <1377295942-5955-8-git-send-email-ezequiel.garcia@free-electrons.com>
  <20130826140843.GI13964@titan.lakedaemon.net>
-Message-ID: <20130827083603.GA2286@localhost>
+ <20130827083603.GA2286@localhost>
+Message-ID: <20130827103907.0030c970@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 26, 2013 at 10:08:43AM -0400, Jason Cooper wrote:
-> On Fri, Aug 23, 2013 at 07:12:20PM -0300, Ezequiel Garcia wrote:
-> > Change the 'reg' property meaning, by defining two required cells.
-> > It's important to note this commit breaks DT-compatibility for this
-> > device.
-> > 
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  Documentation/devicetree/bindings/watchdog/orion-wdt.txt | 7 +++++--
-> >  1 file changed, 5 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-> > index 5dc8d30..a74c9c8 100644
-> > --- a/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-> > +++ b/Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-> > @@ -3,7 +3,9 @@
-> >  Required Properties:
-> >  
-> >  - Compatibility : "marvell,orion-wdt"
-> > -- reg		: Address of the timer registers
-> > +- reg		: Two cells are required:
-> > +		  First  cell contains the global timer control register.
-> > +		  Second cell contains the watchdog counter register.
-> >  
-> >  Optional properties:
-> >  
-> > @@ -13,7 +15,8 @@ Example:
-> >  
-> >  	wdt at 20300 {
-> >  		compatible = "marvell,orion-wdt";
-> > -		reg = <0x20300 0x28>;
-> > +		reg = <0x20300 0x4
+Dear Ezequiel Garcia,
+
+On Tue, 27 Aug 2013 05:36:04 -0300, Ezequiel Garcia wrote:
+
+> > Is there a reason we're going this route over adding a new compatible
+> > string?
 > 
-> 
-> > +		       0x20324 0x4>;
-> 
-> Is there a reason we're going this route over adding a new compatible
-> string?
+> Well, it seemed to me that this register splitting was more device-treeish:
+> it prevents you from fixing your driver, adding a new compatible-string,
+> and rebuilding a kernel each time a new SoC appears with a different offset
+> between registers.
 
-Well, it seemed to me that this register splitting was more device-treeish:
-it prevents you from fixing your driver, adding a new compatible-string,
-and rebuilding a kernel each time a new SoC appears with a different offset
-between registers.
+I don't think encoding register offsets in the DT is a good idea. The
+compatible string is here to identify different revisions/versions of
+the same hardware block, and the driver should abstract out the
+details. Otherwise, you'll start encoding bit numbers, mask values, and
+other crazy things in the Device Tree.
 
-Instead, and trying to follow the DT-preachers, we would just change the
-"reg" values and -bang!- have forward-compatibility :-)
+Best regards,
 
-That said...
-
-> iow, why can't we keep this knowledge in the driver and have a
-> "marvell,armada-wdt" or similar compat string that the orion-wdt driver
-> also serves?
-> 
-
-... we still need new compatible strings for armada-xp-wdt and
-armada-370-wdt, for they have differences between each other
-and with the orion-wdt:
-
-* The clock input is obtained in a different way in each case
-
-* The watchdog enable bit inside the timer control register
-  is at a different location.
-
-So, thinking about this again, perhaps we should simply let alone the
-"reg" property and add the watchdog counter offset as yet another field
-in the compatible-data?
-
-What do you think?
+Thomas
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
