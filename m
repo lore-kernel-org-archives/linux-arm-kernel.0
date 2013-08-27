@@ -1,71 +1,38 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 26 Aug 2013 21:26:27 -0500
-Subject: [PATCH] ARM: EDMA: Fix clearing of unused list for DT DMA resources
-Message-ID: <1377570387-10391-1-git-send-email-joelf@ti.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 27 Aug 2013 11:01:20 +0800
+Subject: [PATCH v4 0/3] arm: mvebu: fix resource leak
+In-Reply-To: <20130826204523.GD24470@titan.lakedaemon.net>
+References: <1377517018-7716-1-git-send-email-jszhang@marvell.com>
+ <20130826204523.GD24470@titan.lakedaemon.net>
+Message-ID: <20130827110120.0a9fab2a@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HWMOD removal for MMC is breaking edma_start as the events are being manually
-triggered due to unused channel list not being clear.
+Dear Jason,
 
-This patch fixes the issue, by reading the "dmas" property from the DT node if
-it exists and clearing the bits in the unused channel list. For this purpose
-we use the of_* helpers to parse the arguments in the dmas phandle list.
+On Mon, 26 Aug 2013 13:45:23 -0700
+Jason Cooper <jason@lakedaemon.net> wrote:
 
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
-Reported-by: Balaji T K <balajitk@ti.com>
-Cc: Pantel Antoniou <panto@antoniou-consulting.com>
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
-Changes since v1, in v2 and v3:
-- Reduced indentation of non-of case by returning from of-case
-- Using of_* helpers for parsing
+> On Mon, Aug 26, 2013 at 07:36:55PM +0800, Jisheng Zhang wrote:
+> > These patches try to fix resource leak by adding missing of_node_put(),
+> > iounmap or using devm_ioremap_resource() if available.
+> > 
+> > v4:
+> >   - re-generate since Ezequiel's patches add DT support to the
+> > mvebu-mbus driver
+> 
+> grrr.  I hate to ask this, but can you please rebase patches 1 and 2
+> against mvebu/fixes-non-critical?  No need to add back in the mvebu-mbus
+> hunk.
 
-Note:
-This patch should go into the merge window as it is a critical bug fix.
+patch 1 also fixes one similar trivial issue introduced since 994c8c94b419e
+"ARM: mvebu: Remove the harcoded BootROM window allocation" in linux-next tree
 
- arch/arm/common/edma.c | 23 +++++++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
+patch 2 is updated to fix similar trivial issue introduce since 6839cfa82f99
+"bus: mvebu-mbus: Introduce device tree binding"
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 39ad030..43c7b22 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -560,14 +560,33 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
- static int prepare_unused_channel_list(struct device *dev, void *data)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
--	int i, ctlr;
-+	int i, count, ctlr;
-+	struct of_phandle_args  dma_spec;
- 
-+	if (dev->of_node) {
-+		count = of_property_count_strings(dev->of_node, "dma-names");
-+		if (count < 0)
-+			return 0;
-+		for (i = 0; i < count; i++) {
-+			if (of_parse_phandle_with_args(dev->of_node, "dmas",
-+						       "#dma-cells", i,
-+						       &dma_spec))
-+				continue;
-+
-+			ctlr = EDMA_CTLR(dma_spec.args[0]);
-+			clear_bit(EDMA_CHAN_SLOT(dma_spec.args[0]),
-+				  edma_cc[ctlr]->edma_unused);
-+		}
-+		return 0;
-+	}
-+
-+	/* For non-OF case */
- 	for (i = 0; i < pdev->num_resources; i++) {
- 		if ((pdev->resource[i].flags & IORESOURCE_DMA) &&
- 				(int)pdev->resource[i].start >= 0) {
- 			ctlr = EDMA_CTLR(pdev->resource[i].start);
- 			clear_bit(EDMA_CHAN_SLOT(pdev->resource[i].start),
--					edma_cc[ctlr]->edma_unused);
-+				  edma_cc[ctlr]->edma_unused);
- 		}
- 	}
- 
--- 
-1.8.1.2
+These two commits aren't included in mvebu/fixes-non-criticial yet. Could you
+please give suggestion?
+
+Thanks in advance,
+Jisheng
