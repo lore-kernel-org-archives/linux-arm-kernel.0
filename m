@@ -1,34 +1,57 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 27 Aug 2013 11:57:12 -0700
-Subject: [GIT PULL 3/3] 2nd Round Samsung mach-exynos for v3.12
-In-Reply-To: <521CCC65.3070605@samsung.com>
-References: <1f7701cea1f1$431f2d30$c95d8790$%kim@samsung.com>
- <3145165.ZB7l3vNJ7a@amdc1032>
- <CADGdYn7_Gm7rwkhRSUmvktB_hHNboY8eB5fi8E62-Br5Vk5D0A@mail.gmail.com>
- <4070794.XxjluIqBpK@amdc1032>
- <CADGdYn7YWscQ_EOqjbq29pNHvoxa0qqXHZeOBuz-Wi22H=Dc_w@mail.gmail.com>
- <87bo4j6aii.fsf@linaro.org> <521CCC65.3070605@samsung.com>
-Message-ID: <20130827185712.GD22852@quad.lixom.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 27 Aug 2013 16:13:38 -0300
+Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+In-Reply-To: <20130827152535.GG19598@titan.lakedaemon.net>
+References: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130827163939.24636d80@skate> <20130827151136.GA10084@localhost>
+ <20130827152535.GG19598@titan.lakedaemon.net>
+Message-ID: <20130827191337.GA2339@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 12:57:25AM +0900, Kukjin Kim wrote:
-> On 08/27/13 13:08, Kevin Hilman wrote:
-> >amit daniel kachhap<amit.daniel@samsung.com>  writes:
-> >
-> >>Submitted the V2 version of this patch with your suggestion.
-> >
-> >So will there be an updated branch (and pull request) with these changes?
-> >
-> OK, Bart's concern makes sense so I replaced with Amit's v2 patch.
+On Tue, Aug 27, 2013 at 11:25:35AM -0400, Jason Cooper wrote:
+> On Tue, Aug 27, 2013 at 12:11:37PM -0300, Ezequiel Garcia wrote:
+> > On Tue, Aug 27, 2013 at 04:39:39PM +0200, Thomas Petazzoni wrote:
+> > > Dear Ezequiel Garcia,
+> > > 
+> > > On Tue, 27 Aug 2013 11:34:25 -0300, Ezequiel Garcia wrote:
+> > > > With the introduction of the orion irqchip driver, now the BRIDGE_CAUSE
+> > > > bit is cleared by it. There's no longer a need to do it in the watchdog
+> > > > driver, so we can simply remove it.
+> > > > 
+> > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > 
+> > > Is this going to work with the platforms that use the orion_wdt driver
+> > > but are not using the orion irqchip driver? Take for example
+> > > mach-orion5x, it still uses the plat-orion/irq.c code and not the
+> > > irqchip orion driver, as far as I can see.
+> > > 
+> > > The orion irqchip driver is DT only, so all of the Orion platforms that
+> > > have not been converted to DT are still using the old irq code.
+> > > 
+> > > Any thoughts on the consequences of this in relation with your patch?
+> > > 
+> > 
+> > Argh, you're right, We've completely missed this.
+> > 
+> > And it's a *very* important point because we need this patch
+> > to ultimately get rid of the mach/brideg-regs.h.
+> > 
+> > Quite frankly I'm really out of ideas right now and unless someone
+> > comes up with a smart solution, I see no other way but to:
+> > 
+> > 1. Implement an armada-wdt.c driver and stop trying to fix the world.
+> > 2. Add some ugly ifdefs to avoid the mach-specific header.
+> > 3. ?
 > 
-> Kevin, here is updated branch so please pull following.
+> 3. add a handler to plat-orion/irq.c ?
 > 
-> If any problems, please kindly let me know.
 
-Please don't post pull requests in the middle of a comment thread; start a new
-thread or at least do a new subject for them -- they are much too easy to miss
-otherwise.
+Hm.. first of all: *why* do we need to clear this at all?
 
-
--Olof
+Does anybody has a clear explanation for this?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
