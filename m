@@ -1,47 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 27 Aug 2013 09:11:09 +0100
-Subject: [PATCH 26/33] ARM: ux500: Remove AUXDATA relating to SDI (MMC)
- clock-name bindings
-In-Reply-To: <201308240957.53944.arnd@arndb.de>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-27-git-send-email-lee.jones@linaro.org>
- <CACRpkdb+WEecBEuFtoDLv9k3vyi=o0nZcLfCeny-7+uxdNBryA@mail.gmail.com>
- <201308240957.53944.arnd@arndb.de>
-Message-ID: <20130827081109.GD6152@lee--X1>
+From: hector.palacios@digi.com (Hector Palacios)
+Date: Tue, 27 Aug 2013 10:12:17 +0200
+Subject: [PATCH v15 00/13] Add tested id switch and vbus connect detect
+ support for Chipidea
+In-Reply-To: <87k3j77dwz.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
+ <521B8150.70906@digi.com> <20130827025115.GA6561@shlinux1.ap.freescale.net>
+ <521C4FEF.2010905@digi.com> <87k3j77dwz.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <521C5F61.2080505@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 24 Aug 2013, Arnd Bergmann wrote:
+On 08/27/2013 10:09 AM, Alexander Shishkin wrote:
+> Hector Palacios <hector.palacios@digi.com> writes:
+>
+>> Dear Peter,
+>>
+>> On 08/27/2013 04:51 AM, Peter Chen wrote:
+>>> On Mon, Aug 26, 2013 at 06:24:48PM +0200, Hector Palacios wrote:
+>>>> Dear Peter,
+>>>>
+>>>> On 08/12/2013 03:22 AM, Peter Chen wrote:
+>>>>> This patchset adds tested otg id switch function and vbus connect
+>>>>> and disconnect detection for chipidea driver. And fix kinds of
+>>>>> bugs found at chipidea drivers after enabling id and vbus detection.
+>>>>>
+>>>>> This patch are fully tested at imx6 sabresd and imx28evk platform by me.
+>>>>> Besides, marek tested it on two STMP3780-based boards (not yet mainline)
+>>>>> and two MX28-based boards.
+>>>>>
+>>>>> My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
+>>>>>
+>>>>> Changes for v15:
+>>>>> - Mark otgsc API as static line, and move them to otg.h [4/13]
+>>>>> - Remove some redundant comments [6/13]
+>>>>> - Fix some typos [8/13]
+>>>>> - Retire flag CI_HDRC_PULLUP_ON_VBUS [12/13] [13/13]
+>>>>
+>>>> Patches 6 and 12 in this series seem to be incomplete or malformed. Please check.
+>>>>
+>>>
+>>> Would you post what's the problem for them or what's problem
+>>> at your system after using them?
+>>
+>> I'm sorry, I thought it was evident. Patches 6 and 12 were posted incomplete. See how
+>> they end:
+>> http://permalink.gmane.org/gmane.linux.usb.general/92231
+>> http://permalink.gmane.org/gmane.linux.usb.general/92237
+>>
+>> In patch 12 the modified file include/linux/usb/chipidea.h does not even appear.
+>> Something happened during the generation or posting of these patches.
+>
+> Or something's wrong with gmane.
+>
+> http://www.spinics.net/lists/linux-usb/msg91695.html
 
-> On Friday 23 August 2013, Linus Walleij wrote:
-> > On Thu, Jun 6, 2013 at 2:17 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > 
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > (...)
-> > >         /* Requires DMA bindings. */
-> > >         OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
-> > > -       OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
-> > > -       OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
-> > > -       OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  &mop500_sdi2_data),
-> > > -       OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  &mop500_sdi4_data),
-> > 
-> > This cannot be done. Ulf H would beat me up if I applied this.
-> > 
-> > The platform data there in the end is actually used.
-> > 
-> > Especially look at mop500_sdi0_data, it contains a lot of stuff that is
-> > not yet DT:ed even (a task in its own right).
-> > 
-> > But as long as we keep this pdata we can still delete ATAGs support (as
-> > per the second patch set pending) and get a clearer picture.
-> 
-> Which parts of mop500_sdi0_data are not yet converted? I thought it was all covered
-> months ago.
+Oops. My fault, then. Sorry about that.
 
-Well it would have been if you hadn't have stopped my CAPs patch. ;)
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best regards,
+--
+Hector Palacios
