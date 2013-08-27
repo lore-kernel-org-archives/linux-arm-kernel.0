@@ -1,40 +1,28 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 28 Aug 2013 02:16:14 +0900
-Subject: [PATCH] clk: samsung: pll: Use new registration method for PLL6552
- and PLL6553
-In-Reply-To: <20130827011422.8231.95092@quantum>
-References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
- <158901ce9b34$c0ac8720$42059560$@org> <20130820002258.4443.34197@quantum>
- <1856348.DCxTucbm8V@flatron> <20130827011422.8231.95092@quantum>
-Message-ID: <521CDEDE.1070003@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 27 Aug 2013 19:18:55 +0200
+Subject: [PATCH v5] gpio: pcf857x: Add OF support
+In-Reply-To: <2400176.9Vcd5TUYl9@avalon>
+References: <1377590559-14279-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <521C63A0.10902@ti.com> <1830640.BeoA2uHWDI@amdc1227>
+ <2400176.9Vcd5TUYl9@avalon>
+Message-ID: <20130827171854.GA2988@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/13 10:14, Mike Turquette wrote:
-> Quoting Tomasz Figa (2013-08-20 17:33:21)
->> This patch modifies PLL6552 and PLL6553 clock drivers to use recently
->> added common Samsung PLL registration method.
->>
->> Signed-off-by: Tomasz Figa<tomasz.figa@gmail.com>
->
-> Sigh. This change won't apply on top of clk-next-s3c64xx since it
-> requires Yadwinder's change (amongst) others.
->
-> The best I could do was spin out another topic branch with the relevant
-> changes and apply this patch on top. It is a subset of clk-next but it
-> is almost entirely Samsung patches:
->
-> git://git.linaro.org/people/mturquette/linux.git clk-next-s3c64xx-delta
->
-> Kukjin&  Tomasz, let me know if this OK for you to add as a dependency
-> to the Samsung tree. If it is I will merge it into clk-next, but I want
-> your OK that this branch is OK for you to take.
->
-Hi Mike,
 
-I merged the branch clk-next-s3c64xx-delta you provided on top of 
-previous clk-next-s3c64xx for common-clk-s3c64xx and dt-s3c64xx and it 
-looks fine to me.
+> The driver should support the same chip models reardless of whether it's used 
+> with or without DT. If an entry in the OF table has no corresponding entry in 
+> the I2C table I would consider that as a driver bug.
 
-Thanks,
-Kukjin
+Linus Walleij posted a patch to support DT only probing, but too many
+side-effects showed up. Some were fixable (probe regressions) and some
+need more work, if feasible at all. Most prominent is that runtime
+instantiation of i2c slaves currently needs an entry in the i2c table.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130827/3bc65c4c/attachment-0001.sig>
