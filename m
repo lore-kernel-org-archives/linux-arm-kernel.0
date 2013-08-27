@@ -1,58 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 26 Aug 2013 23:22:37 -0400
-Subject: [PATCH v4 0/3] arm: mvebu: fix resource leak
-In-Reply-To: <20130827110120.0a9fab2a@xhacker>
-References: <1377517018-7716-1-git-send-email-jszhang@marvell.com>
- <20130826204523.GD24470@titan.lakedaemon.net>
- <20130827110120.0a9fab2a@xhacker>
-Message-ID: <20130827032237.GA19598@titan.lakedaemon.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 26 Aug 2013 20:28:01 -0700
+Subject: [PATCH 11/12] cpuidle: mvebu: Add initial cpu idle support for
+ Armada 370/XP SoC
+In-Reply-To: <1377240797-4047-12-git-send-email-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Fri, 23 Aug 2013 08:53:16 +0200")
+References: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
+ <1377240797-4047-12-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <87d2oz7qym.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 11:01:20AM +0800, Jisheng Zhang wrote:
-> Dear Jason,
-> 
-> On Mon, 26 Aug 2013 13:45:23 -0700
-> Jason Cooper <jason@lakedaemon.net> wrote:
-> 
-> > On Mon, Aug 26, 2013 at 07:36:55PM +0800, Jisheng Zhang wrote:
-> > > These patches try to fix resource leak by adding missing of_node_put(),
-> > > iounmap or using devm_ioremap_resource() if available.
-> > > 
-> > > v4:
-> > >   - re-generate since Ezequiel's patches add DT support to the
-> > > mvebu-mbus driver
-> > 
-> > grrr.  I hate to ask this, but can you please rebase patches 1 and 2
-> > against mvebu/fixes-non-critical?  No need to add back in the mvebu-mbus
-> > hunk.
-> 
-> patch 1 also fixes one similar trivial issue introduced since 994c8c94b419e
-> "ARM: mvebu: Remove the harcoded BootROM window allocation" in linux-next tree
-> 
-> patch 2 is updated to fix similar trivial issue introduce since 6839cfa82f99
-> "bus: mvebu-mbus: Introduce device tree binding"
-> 
-> These two commits aren't included in mvebu/fixes-non-criticial yet. Could you
-> please give suggestion?
+Hi Gregory,
 
-Yes, that's correct.  We prefer to have patch submitters base off of a
-mainline tag (eg v3.11-rc7).  conflicts between patchsets are then
-caught and resolved when branches are merged.  If done correctly, the
-merge resolution should be obvious in most cases.
+Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 
-The upstream maintainers _prefer_ to see those conflicts because it
-gives them a better sense of who is tinkering in the same code-paths.
+> Add wfi/cpu idle/cpu deep idle power states support for Armada XP SoC.
+>
+> All the latencies and the power consumption values used at the
+> "armada_370_xp_idle_driver" structure are preliminary and will be
+> modified in the future after running some measurements and analysis.
+>
+> Based on the work of Nadav Haklai.
+>
+> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Trying to base patches off of disparate branches in order to
-'pre-resolve' those conflicts creates unnecessary dependencies and
-non-obvious merge-resolutions.
+[...]
 
-In this case I asked you base off of mvebu/fixes-non-critical because
-that is where I will be applying them for queueing to arm-soc.  You
-could also base off of v3.11-rc7, there's nothing in
-mvebu/fixes-non-critical that should conflict with your changes.
+> +int pm_support = WFI;
+> +static int __init pm_enable_setup(char *str)
+> +{
+> +	if (!strncmp(str, "wfi", 3))
+> +		pm_support = WFI;
+> +	else if (!strncmp(str, "idle", 4))
+> +		pm_support = MV_CPU_IDLE;
+> +	else if (!strncmp(str, "deepidle", 6))
+> +		pm_support = MV_CPU_DEEP_IDLE;
+> +	else if (!strncmp(str, "off", 3))
+> +		pm_support = DISABLED;
+> +
+> +	return 1;
+> +}
+> +__setup("pm_level=", pm_enable_setup);
 
-thx,
+Why is this new (but undocumented) kernel commandline needed when there
+is already a way to configure the deepest C state from userspace?
+(c.f. the 'disable' file under /sys/devices/system/cpu/cpuX/cpuidle/stateY)
 
-Jason.
+Kevin
