@@ -1,38 +1,31 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 27 Aug 2013 09:25:51 -0400
-Subject: [PATCH 0/2] OMAP4+: Get rid of internal SRAM handling
-In-Reply-To: <1377598305-15539-1-git-send-email-rnayak@ti.com>
-References: <1377598305-15539-1-git-send-email-rnayak@ti.com>
-Message-ID: <521CA8DF.9040400@ti.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue, 27 Aug 2013 15:26:05 +0200
+Subject: [PATCH] ARM: at91/at91-pinctrl documentation: add missing sam9x5
+ compatible string
+Message-ID: <1377609965-22154-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Paul,
+Add missing "atmel,at91sam9x5-pinctrl" compatible string to the
+documentation.
 
-On Tuesday 27 August 2013 06:11 AM, Rajendra Nayak wrote:
-> Make all OMAP DT only platforms (am33xx, am43xx, omap4 and omap5)
-> use drivers/misc/sram.c driver instead of the omap internal
-> implementation for SRAM handling.
-> 
-> Rajendra Nayak (2):
->   ARM: AM335x: Get rid of unused sram init function
->   ARM: OMAP4+: Move SRAM data to DT
-> 
->  arch/arm/boot/dts/am33xx.dtsi        |    5 +++++
->  arch/arm/boot/dts/am4372.dtsi        |    5 +++++
->  arch/arm/boot/dts/omap4.dtsi         |    5 +++++
->  arch/arm/boot/dts/omap5.dtsi         |    5 +++++
->  arch/arm/configs/omap2plus_defconfig |    1 +
->  arch/arm/mach-omap2/sram.c           |   39 +---------------------------------
->  arch/arm/mach-omap2/sram.h           |    1 -
->  7 files changed, 22 insertions(+), 39 deletions(-)
-> 
-Really nice to see the SRAM code getting moved now. Thanks
-a lot Rajendra.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ .../bindings/pinctrl/atmel,at91-pinctrl.txt        |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-- The sram_init() seems to be the post core init call.
-Hope this is not a problem for SDRC init which needs to have
-SRAM ready to update the DDR parameters.
-
-Regards,
-Santosh
+diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+index 648d60e..cf7c7bc 100644
+--- a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+@@ -18,7 +18,7 @@ mode) this pin can work on and the 'config' configures various pad settings
+ such as pull-up, multi drive, etc.
+ 
+ Required properties for iomux controller:
+-- compatible: "atmel,at91rm9200-pinctrl"
++- compatible: "atmel,at91rm9200-pinctrl" or "atmel,at91sam9x5-pinctrl"
+ - atmel,mux-mask: array of mask (periph per bank) to describe if a pin can be
+   configured in this periph mode. All the periph and bank need to be describe.
+ 
+-- 
+1.7.9.5
