@@ -1,37 +1,34 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Aug 2013 05:16:23 +0200
-Subject: what about mach-shark?
-In-Reply-To: <20130826190646.GG6617@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1107041545480.14596@xanadu.home>
- <CACRpkdb2QQEAt_bpVv9sifEuDfs_8XdDbUtQ9R+cXA-vBWMKmA@mail.gmail.com>
- <20130826190646.GG6617@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdbrvVsSWFGo1QjDekZRc1svKaOsFpxqQJ0TKHtU2+XgKw@mail.gmail.com>
+Date: Tue, 27 Aug 2013 05:20:45 +0200
+Subject: [PATCH v2] gpio: Enable pcf857x GPIO expander for Device Tree
+In-Reply-To: <1377498081-16358-1-git-send-email-archit@ti.com>
+References: <1370527523-1030-1-git-send-email-archit@ti.com>
+ <1377498081-16358-1-git-send-email-archit@ti.com>
+Message-ID: <CACRpkda5Q-Zs8A2VFPvMc9519QWJ3EH08g4Do0se6BcLEg+rug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 26, 2013 at 9:06 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Aug 26, 2013 at 09:04:05PM +0200, Linus Walleij wrote:
->> On Mon, Jul 4, 2011 at 10:08 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
->>
->> > Is this used?
->>
->> This still goes unanswered after two years.
->>
->> Alexander, are you compiling and booting recent kernels on the Shark?
->>
->> I recently had a dream to convert some platforms and eventually
->> all of the arch/arm machines to GENERIC_CLOCKEVENTS and
->
-> You're not going to achieve that pipedream.  Really.  There are platforms
-> still around which don't have enough timers to be able to do anything but
-> periodic interrupts at a fixed rate - with nothing available as a clock
-> source other than the kernel jiffy counter incremented by that periodic
-> interrupt (which would create a circular dependency.)
+On Mon, Aug 26, 2013 at 8:21 AM, Archit Taneja <archit@ti.com> wrote:
 
-Yes, I guess I will run into them... But I guess it doesn't hurt to
-convert over the remaining machines that can actually do this
-the right way.
+> Add code to parse the GPIO expander Device Tree node and extract platform data
+> out of it, and populate the struct 'pcf857x_platform_data' maintained by the
+> driver. This enables devices to reference the gpio expander from Device Tree.
+>
+> Add DT binding info in Documentation.
+>
+> Signed-off-by: Archit Taneja <archit@ti.com>
+> ---
+> - v2 posted after quite a while, sorry for the delay!
+>
+> Changes in v2:
+> - second gpeio-cell description corrected in Documentation
+> - interrupt controller description removed for now, will be added in a follow
+>   up patch
+> - n_latch description updated
+
+The devicetree portions of this patch needs to be reviewed by
+devicetree at vger.kernel.org, so please repost including that
+list.
 
 Yours,
 Linus Walleij
