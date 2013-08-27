@@ -1,84 +1,30 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 27 Aug 2013 13:55 +0200
-Subject: [PATCH v5] gpio: pcf857x: Add OF support
-In-Reply-To: <521C63A0.10902@ti.com>
-References: <1377590559-14279-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2063335.Uqxok8bYMn@flatron> <521C63A0.10902@ti.com>
-Message-ID: <1830640.BeoA2uHWDI@amdc1227>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue, 27 Aug 2013 14:04:56 +0200
+Subject: [PATCH] ARM: at91/dt: fix phy address to match the reg register
+Message-ID: <1377605096-20903-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 of August 2013 14:00:24 Archit Taneja wrote:
-> Hi,
-> 
-> On Tuesday 27 August 2013 01:44 PM, Tomasz Figa wrote:
-> > Hi Laurent,
-> > 
-> > On Tuesday 27 of August 2013 10:02:39 Laurent Pinchart wrote:
-> >> Add DT bindings for the pcf857x-compatible chips and parse the device
-> >> tree node in the driver.
-> >> 
-> >> Signed-off-by: Laurent Pinchart
-> >> <laurent.pinchart+renesas@ideasonboard.com> ---
-> >> 
-> >>   .../devicetree/bindings/gpio/gpio-pcf857x.txt      | 71
-> >> 
-> >> ++++++++++++++++++++++ drivers/gpio/gpio-pcf857x.c
-> >> 
-> >>    | 44 +++++++++++--- 2 files changed, 107 insertions(+), 8
-> >> 
-> >> deletions(-)
-> >> 
-> >>   create mode 100644
-> >> 
-> >> Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
-> >> 
-> >> Changes since v4:
-> >> 
-> >> - Don't try to get ngpio from of_device_id data, we already get it
-> >> from
-> >> 
-> >>    i2c_device_id
-> > 
-> > Hmm, I'm not sure how this is supposed to work.
-> > 
-> > How does the I2C core resolve OF compatible name to particular entry in
-> > id_table? I believe it simply passes NULL as the second argument of
-> > .probe() if the device is instantiated based on OF compatible string
-> > and
-> > not one in the legacy ID table.
-> 
-> It doesn't pass the second argument as NULL. If you look at
-> i2c_device_probe() in drivers/i2c/i2c-core.c, the second argument to
-> probe is passed as: i2c_match_id(driver->id_table, client)
-> 
-> This will extract the i2c_device_id pointer from the id_table.
+Fix phy0 address to match the reg porperty defined in phy0 node.
 
-Yes, there is a chance that it will not return NULL, but I think that 
-relying on this is rather flawed.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/sama5d3xmb.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-If you look at the whole code path, you can see that it's only a 
-coincidence that this works. See the execution flow:
- - I2C adapter driver calls of_i2c_register_devices(),
- - of_i2c_register_devices() calls of_modalias_node() for every device on 
-this bus,
- - of_modalias_node() stores the second substring of compatible string 
-separated by a comma, if there is one or the whole compatible otherwise to 
-the output buffer (type field of i2c_board_info struct, as passed by 
-of_i2c_register_devices()),
- - of_i2c_register_devices() then calls i2c_new_device() with the resulting 
-info struct,
- - i2c_new_device() takes info->type and copies its contents to client-
->name,
- - then a bit later, I2C core calls i2c_match_id(), which does matching of 
-client->name against id_table of the driver and the resulting i2c_device_id 
-entry (or NULL) is then passed to driver's .probe() callback.
-
-So if it happens that compatible is not equal to "<vendor>,<ID from legacy 
-I2C table>", then the matching will fail and NULL will be passed.
-
-[CCing Wolfram and Grant, as they should now more about this behavior and 
-whether it's intentional or no]
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/boot/dts/sama5d3xmb.dtsi b/arch/arm/boot/dts/sama5d3xmb.dtsi
+index e9521d5..dba739b 100644
+--- a/arch/arm/boot/dts/sama5d3xmb.dtsi
++++ b/arch/arm/boot/dts/sama5d3xmb.dtsi
+@@ -84,7 +84,7 @@
+ 
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-				phy0: ethernet-phy at 0 {
++				phy0: ethernet-phy at 1 {
+ 					interrupt-parent = <&pioE>;
+ 					interrupts = <30 IRQ_TYPE_EDGE_FALLING>;
+ 					reg = <1>;
+-- 
+1.7.9.5
