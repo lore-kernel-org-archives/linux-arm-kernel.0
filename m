@@ -1,29 +1,37 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 27 Aug 2013 12:07:32 +0900
-Subject: [PATCH RFC 3/5] ARM: samsung: add clock setup for FIMC and FIMD
-In-Reply-To: <521BA070.2000800@gmail.com>
-References: <1377517114-20222-1-git-send-email-m.krawczuk@partner.samsung.com>
- <1377517114-20222-4-git-send-email-m.krawczuk@partner.samsung.com>
- <1445676.NMCyFEC5q4@amdc1032> <521BA070.2000800@gmail.com>
-Message-ID: <000201cea2d2$92a43530$b7ec9f90$%han@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Aug 2013 05:16:23 +0200
+Subject: what about mach-shark?
+In-Reply-To: <20130826190646.GG6617@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1107041545480.14596@xanadu.home>
+ <CACRpkdb2QQEAt_bpVv9sifEuDfs_8XdDbUtQ9R+cXA-vBWMKmA@mail.gmail.com>
+ <20130826190646.GG6617@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdbrvVsSWFGo1QjDekZRc1svKaOsFpxqQJ0TKHtU2+XgKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 27, 2013 3:38 AM, Sylwester Nawrocki wrote:
-> On 08/26/2013 06:19 PM, Bartlomiej Zolnierkiewicz wrote:
-> > On Monday, August 26, 2013 01:38:32 PM Mateusz Krawczuk wrote:
-> >> This patch adds code that sets correct parents and rates for clocks
-> >> used by FIMC and FIMD on Goni board.
-> 
-> This patch is supposed to be a workaround to make the display and camera
-> subsystem working even without properly configured parent clocks in the
-> boot-loader, right ? And as such it doesn't really belong to this series
-> and has been written primarily for the clocks testing purposes ?
-> I think it can be dropped in the next iteration of this series.
-> 
+On Mon, Aug 26, 2013 at 9:06 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Aug 26, 2013 at 09:04:05PM +0200, Linus Walleij wrote:
+>> On Mon, Jul 4, 2011 at 10:08 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>>
+>> > Is this used?
+>>
+>> This still goes unanswered after two years.
+>>
+>> Alexander, are you compiling and booting recent kernels on the Shark?
+>>
+>> I recently had a dream to convert some platforms and eventually
+>> all of the arch/arm machines to GENERIC_CLOCKEVENTS and
+>
+> You're not going to achieve that pipedream.  Really.  There are platforms
+> still around which don't have enough timers to be able to do anything but
+> periodic interrupts at a fixed rate - with nothing available as a clock
+> source other than the kernel jiffy counter incremented by that periodic
+> interrupt (which would create a circular dependency.)
 
-Agreed. :-)
-This patch can be dropped next.
+Yes, I guess I will run into them... But I guess it doesn't hurt to
+convert over the remaining machines that can actually do this
+the right way.
 
-Best regards,
-Jingoo Han
+Yours,
+Linus Walleij
