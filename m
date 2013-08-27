@@ -1,59 +1,104 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 27 Aug 2013 23:28:00 +0200
-Subject: [PATCH RFC v2 06/16] ARM: kirkwood: remove custom .init_time hook
+Date: Tue, 27 Aug 2013 23:27:54 +0200
+Subject: [PATCH RFC v2 00/16] ARM: provide common arch init for DT clocks
 In-Reply-To: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1377638890-371-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1377638890-371-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With arch/arm calling of_clk_init(NULL) from time_init(), we can now
-remove custom .init_time hooks.
+This RFC converts arch/arm to provide a common arch init for DT clock
+providers. Currently, the call to of_clk_init(NULL) to initialize DT
+clock providers is spread among several mach-dirs. Since most machs
+require DT clocks initialized before timers, no initcall can be used.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+By adding of_clk_init(NULL) to ARM time_init(), we can remove all
+mach-specific .init_time hooks that basically called of_clk_init before
+starting timers.
+
+Based on the previous version, this one now includes patches provided by
+Stephen Warren for mach-tegra and Soren Brinkmann for mach-zynq.
+
+With mach-tegra now requiring clocks as late as the other machs, the
+patch to protect of_clk_init() from being called twice, has been dropped.
+
+The RFCv2 is based on next-20130827 and has been compile tested for
+multi_v7_defconfig and mach-dove. All single patches have also been sent
+to the respective maintainers and corresponding mailing lists.
+
+Before going for a real patch set after v3.11 drops, I prefer to have
+Tested-by or Acked-by for at least mach-imx, mach-mxs, mach-sti, and
+mach-vexpress. Others are trivial, prepared by maintainers (mach-tegra
+and mach-zynq), or have already been Acked-by (mach-highbank).
+
+Also, I'd like to know if the patches should be grouped by mach- or
+rather been split into mach- preparation and .init_time removal.
+
+Sebastian Hesselbarth (14):
+  ARM: call clk_of_init from time_init
+  ARM: dove: remove custom .init_time hook
+  ARM: exynos: remove custom .init_time hook
+  ARM: highbank: remove custom .init_time hook
+  ARM: imx: remove custom .init_time hook
+  ARM: kirkwood: remove custom .init_time hook
+  ARM: mvebu: remove custom .init_time hook
+  ARM: mxs: remove custom .init_time hook
+  ARM: nspire: remove custom .init_time hook
+  ARM: rockchip: remove custom .init_time hook
+  ARM: socfpga: remove call to of_clk_init
+  ARM: sti: remove custom .init_time hook
+  ARM: vexpress: remove custom .init_time hook
+  clk: vt8500: remove call to of_clk_init
+
+Soren Brinkmann (1):
+  ARM: zynq: Don't call of_clk_init()
+
+Stephen Warren (1):
+  ARM: tegra: split tegra_pmc_init() in two
+
+ arch/arm/kernel/time.c                 |   24 +++++++++++-------
+ arch/arm/mach-dove/board-dt.c          |   17 +------------
+ arch/arm/mach-exynos/common.c          |    7 -----
+ arch/arm/mach-exynos/common.h          |    1 -
+ arch/arm/mach-exynos/mach-exynos4-dt.c |    1 -
+ arch/arm/mach-exynos/mach-exynos5-dt.c |    1 -
+ arch/arm/mach-highbank/highbank.c      |   23 +++++------------
+ arch/arm/mach-imx/clk-imx51-imx53.c    |   29 +++++++--------------
+ arch/arm/mach-imx/common.h             |    4 ---
+ arch/arm/mach-imx/imx51-dt.c           |    6 ----
+ arch/arm/mach-imx/mach-imx53.c         |    6 ----
+ arch/arm/mach-imx/mach-imx6q.c         |   14 ++--------
+ arch/arm/mach-imx/mach-imx6sl.c        |    7 -----
+ arch/arm/mach-imx/mach-vf610.c         |    9 -------
+ arch/arm/mach-kirkwood/board-dt.c      |    8 ------
+ arch/arm/mach-mvebu/armada-370-xp.c    |    2 -
+ arch/arm/mach-mxs/mach-mxs.c           |   13 ----------
+ arch/arm/mach-nspire/nspire.c          |    9 -------
+ arch/arm/mach-rockchip/rockchip.c      |    9 -------
+ arch/arm/mach-socfpga/socfpga.c        |    2 -
+ arch/arm/mach-sti/board-dt.c           |   10 +++----
+ arch/arm/mach-tegra/common.c           |    4 +--
+ arch/arm/mach-tegra/pmc.c              |   41 +++++++++++++++++--------------
+ arch/arm/mach-tegra/pmc.h              |    1 +
+ arch/arm/mach-tegra/tegra.c            |    5 ++-
+ arch/arm/mach-vexpress/v2m.c           |   14 +----------
+ arch/arm/mach-zynq/common.c            |    9 +++----
+ drivers/clk/clk-highbank.c             |   10 +++++--
+ drivers/clk/clk-vt8500.c               |    2 -
+ drivers/clk/mxs/clk-imx23.c            |   16 +++++-------
+ drivers/clk/mxs/clk-imx28.c            |   16 +++++-------
+ drivers/clk/zynq/clkc.c                |    4 ++-
+ include/linux/clk/mxs.h                |    2 -
+ 33 files changed, 95 insertions(+), 231 deletions(-)
+
 ---
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-tegra at vger.kernel.org
+Cc: kernel at stlinux.com
+Cc: linux-samsung-soc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mach-kirkwood/board-dt.c |    8 --------
- 1 files changed, 0 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 82d3ad8..a32a3e5 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -15,7 +15,6 @@
- #include <linux/of.h>
- #include <linux/of_platform.h>
- #include <linux/clk-provider.h>
--#include <linux/clocksource.h>
- #include <linux/dma-mapping.h>
- #include <linux/irqchip.h>
- #include <linux/kexec.h>
-@@ -66,12 +65,6 @@ static void __init kirkwood_legacy_clk_init(void)
- 	clk_prepare_enable(clk);
- }
- 
--static void __init kirkwood_dt_time_init(void)
--{
--	of_clk_init(NULL);
--	clocksource_of_init();
--}
--
- static void __init kirkwood_dt_init_early(void)
- {
- 	mvebu_mbus_init("marvell,kirkwood-mbus",
-@@ -122,7 +115,6 @@ DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)")
- 	/* Maintainer: Jason Cooper <jason@lakedaemon.net> */
- 	.map_io		= kirkwood_map_io,
- 	.init_early	= kirkwood_dt_init_early,
--	.init_time	= kirkwood_dt_time_init,
- 	.init_machine	= kirkwood_dt_init,
- 	.restart	= kirkwood_restart,
- 	.dt_compat	= kirkwood_dt_board_compat,
 -- 
 1.7.2.5
