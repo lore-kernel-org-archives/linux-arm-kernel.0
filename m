@@ -1,97 +1,46 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 27 Aug 2013 22:38:27 +0100
-Subject: [PATCH 17/19] ARM: Correct BUG() assembly to ensure it is
- endian-agnostic
+Date: Tue, 27 Aug 2013 22:38:25 +0100
+Subject: [PATCH 15/19] ARM: hardware: fix endian-ness in <hardware/coresight.h>
 In-Reply-To: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377639509-22778-18-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377639509-22778-16-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently BUG() uses .word or .hword to create the necessary illegal
-instructions. However if we are building BE8 then these get swapped
-by the linker into different illegal instructions in the text. This
-means that the BUG() macro does not get trapped properly.
-
-Change to using <asm/opcodes.h> to provide the necessary ARM instruction
-building as we cannot rely on gcc/gas having the `.inst` instructions
-which where added to try and resolve this issue (reported by Dave Martin
-<Dave.Martin@arm.com>).
+The <hardware/coresight.h> needs to take into account the endian-ness
+of the processor when reading and writing data, so change to using
+the readl/writel relaxed variants from the raw ones.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/include/asm/bug.h |   10 ++++++----
- arch/arm/kernel/traps.c    |    8 +++++---
- 2 files changed, 11 insertions(+), 7 deletions(-)
+ arch/arm/include/asm/hardware/coresight.h |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-index 7af5c6c..b274bde 100644
---- a/arch/arm/include/asm/bug.h
-+++ b/arch/arm/include/asm/bug.h
-@@ -2,6 +2,8 @@
- #define _ASMARM_BUG_H
+diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
+index 0cf7a6b..ad774f3 100644
+--- a/arch/arm/include/asm/hardware/coresight.h
++++ b/arch/arm/include/asm/hardware/coresight.h
+@@ -24,8 +24,8 @@
+ #define TRACER_TIMEOUT 10000
  
- #include <linux/linkage.h>
-+#include <linux/types.h>
-+#include <asm/opcodes.h>
+ #define etm_writel(t, v, x) \
+-	(__raw_writel((v), (t)->etm_regs + (x)))
+-#define etm_readl(t, x) (__raw_readl((t)->etm_regs + (x)))
++	(writel_relaxed((v), (t)->etm_regs + (x)))
++#define etm_readl(t, x) (readl_relaxed((t)->etm_regs + (x)))
  
- #ifdef CONFIG_BUG
+ /* CoreSight Management Registers */
+ #define CSMR_LOCKACCESS 0xfb0
+@@ -142,8 +142,8 @@
+ #define ETBFF_TRIGFL		BIT(10)
  
-@@ -12,10 +14,10 @@
-  */
- #ifdef CONFIG_THUMB2_KERNEL
- #define BUG_INSTR_VALUE 0xde02
--#define BUG_INSTR_TYPE ".hword "
-+#define BUG_INSTR(__value) __inst_thumb16(__value)
- #else
- #define BUG_INSTR_VALUE 0xe7f001f2
--#define BUG_INSTR_TYPE ".word "
-+#define BUG_INSTR(__value) __inst_arm(__value)
- #endif
+ #define etb_writel(t, v, x) \
+-	(__raw_writel((v), (t)->etb_regs + (x)))
+-#define etb_readl(t, x) (__raw_readl((t)->etb_regs + (x)))
++	(writel_relaxed((v), (t)->etb_regs + (x)))
++#define etb_readl(t, x) (readl_relaxed((t)->etb_regs + (x)))
  
- 
-@@ -33,7 +35,7 @@
- 
- #define __BUG(__file, __line, __value)				\
- do {								\
--	asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n"	\
-+	asm volatile("1:\t" BUG_INSTR(__value) "\n"  \
- 		".pushsection .rodata.str, \"aMS\", %progbits, 1\n" \
- 		"2:\t.asciz " #__file "\n" 			\
- 		".popsection\n" 				\
-@@ -48,7 +50,7 @@ do {								\
- 
- #define __BUG(__file, __line, __value)				\
- do {								\
--	asm volatile(BUG_INSTR_TYPE #__value);			\
-+	asm volatile(BUG_INSTR(__value) "\n");			\
- 	unreachable();						\
- } while (0)
- #endif  /* CONFIG_DEBUG_BUGVERBOSE */
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 99bcd0e3..da070db 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -342,15 +342,17 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
- int is_valid_bugaddr(unsigned long pc)
- {
- #ifdef CONFIG_THUMB2_KERNEL
--	unsigned short bkpt;
-+	u16 bkpt;
-+	u16 insn = __opcode_to_mem_thumb16(BUG_INSTR_VALUE);
- #else
--	unsigned long bkpt;
-+	u32 bkpt;
-+	u32 insn = __opcode_to_mem_arm(BUG_INSTR_VALUE);
- #endif
- 
- 	if (probe_kernel_address((unsigned *)pc, bkpt))
- 		return 0;
- 
--	return bkpt == BUG_INSTR_VALUE;
-+	return bkpt == insn;
- }
- 
- #endif
+ #define etm_lock(t) do { etm_writel((t), 0, CSMR_LOCKACCESS); } while (0)
+ #define etm_unlock(t) \
 -- 
 1.7.10.4
