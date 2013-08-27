@@ -1,56 +1,33 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 27 Aug 2013 14:20:59 -0500
-Subject: [PATCH v11 0/8] PHY framework
-In-Reply-To: <521B0E79.6060506@ti.com>
-References: <1377063973-22044-1-git-send-email-kishon@ti.com>
- <521B0E79.6060506@ti.com>
-Message-ID: <20130827192059.GZ3005@radagast>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 27 Aug 2013 21:23:15 +0200
+Subject: linux-next: manual merge of the arm-soc tree with the usb tree
+In-Reply-To: <20130827173732.GC21564@kroah.com>
+References: <20130827181353.319c150858829df1bb68d60b@canb.auug.org.au>
+ <521C6961.9020103@linutronix.de>
+ <CABxcv=mg6t5wPqpF3j5sr_76qfZ7N7KgpWhcKSGoPTOcaR=V6A@mail.gmail.com>
+ <521CA888.1080909@baylibre.com> <521CAF59.1090203@linutronix.de>
+ <521CB046.9070408@baylibre.com> <521CB18B.4080000@linutronix.de>
+ <521CB239.6050409@baylibre.com> <521CB403.8010307@linutronix.de>
+ <20130827173732.GC21564@kroah.com>
+Message-ID: <521CFCA3.30108@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 08/27/2013 07:37 PM, Greg KH wrote:
+> Nor will you, given that I am not the one to take these patches, Felipe
+> is.  I noticed now that you said "please route around Felipe", but
+> sorry, no, I'm not going to do that unless there's a really good reason.
+> Felipe seems to be around at the moment, please work with him on this.
 
-On Mon, Aug 26, 2013 at 01:44:49PM +0530, Kishon Vijay Abraham I wrote:
-> On Wednesday 21 August 2013 11:16 AM, Kishon Vijay Abraham I wrote:
-> > Added a generic PHY framework that provides a set of APIs for the PHY drivers
-> > to create/destroy a PHY and APIs for the PHY users to obtain a reference to
-> > the PHY with or without using phandle.
-> > 
-> > This framework will be of use only to devices that uses external PHY (PHY
-> > functionality is not embedded within the controller).
-> > 
-> > The intention of creating this framework is to bring the phy drivers spread
-> > all over the Linux kernel to drivers/phy to increase code re-use and to
-> > increase code maintainability.
-> > 
-> > Comments to make PHY as bus wasn't done because PHY devices can be part of
-> > other bus and making a same device attached to multiple bus leads to bad
-> > design.
-> > 
-> > If the PHY driver has to send notification on connect/disconnect, the PHY
-> > driver should make use of the extcon framework. Using this susbsystem
-> > to use extcon framwork will have to be analysed.
-> > 
-> > You can find this patch series @
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
+I said that if you prefer to leave this up to Felipe once he gets back,
+then it is okay, too. Letting me know would be nice. By the time of
+writting I did not know when he gets back but knew that I won't be
+around once -rc1 is out to re-ping if necessary.
+Now that he is back, I can work with him.
+
 > 
-> Looks like there are not further comments on this series. Can you take this in
-> your misc tree?
+> sorry,
+> 
+> greg k-h
 
-Do you want me to queue these for you ? There are quite a few users for
-this framework already and I know of at least 2 others which will show
-up for v3.13.
-
-Let me know.
-
-cheers
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130827/4ffdfd07/attachment-0001.sig>
+Sebastian
