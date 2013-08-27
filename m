@@ -1,110 +1,124 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Tue, 27 Aug 2013 17:01:47 +0200
-Subject: [PATCH] pinctrl: at91: add support for OUTPUT config
-In-Reply-To: <1377615082-16808-1-git-send-email-b.brezillon@overkiz.com>
-References: <1377615082-16808-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <521CBF5B.1050009@overkiz.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 27 Aug 2013 11:06:51 -0400
+Subject: [PATCH 00/15] Armada 370/XP watchdog support
+In-Reply-To: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130827150651.GF19598@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was tested on sama5d31ek.
+Ezequiel,
 
-On 27/08/2013 16:51, Boris BREZILLON wrote:
-> Add support for pin output control through the pinctrl config:
->   - support enabling/disabling output on a given pin
->   - support output level setting (high or low)
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
->   .../bindings/pinctrl/atmel,at91-pinctrl.txt        |    2 ++
->   drivers/pinctrl/pinctrl-at91.c                     |   22 ++++++++++++++++++++
->   include/dt-bindings/pinctrl/at91.h                 |    2 ++
->   3 files changed, 26 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-> index cf7c7bc..5a22e0d 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-> @@ -90,6 +90,8 @@ MULTIDRIVE	(1 << 1): indicate this pin need to be configured as multidrive.
->   DEGLITCH	(1 << 2): indicate this pin need deglitch.
->   PULL_DOWN	(1 << 3): indicate this pin need a pull down.
->   DIS_SCHMIT	(1 << 4): indicate this pin need to disable schmit trigger.
-> +OUTPUT		(1 << 5): indicate this pin need to be configured as an output.
-> +OUTPUT_VAL	(0x1 << 6): output val (1 = high, 0 = low)
->   DEBOUNCE	(1 << 16): indicate this pin need debounce.
->   DEBOUNCE_VAL	(0x3fff << 17): debounce val.
->   
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 19afb9a..1578a0d 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -61,6 +61,9 @@ static int gpio_banks;
->   #define DEGLITCH	(1 << 2)
->   #define PULL_DOWN	(1 << 3)
->   #define DIS_SCHMIT	(1 << 4)
-> +#define OUTPUT		(1 << 5)
-> +#define OUTPUT_VAL_SHIFT	6
-> +#define OUTPUT_VAL	(0x1 << OUTPUT_VAL_SHIFT)
->   #define DEBOUNCE	(1 << 16)
->   #define DEBOUNCE_VAL_SHIFT	17
->   #define DEBOUNCE_VAL	(0x3fff << DEBOUNCE_VAL_SHIFT)
-> @@ -333,6 +336,19 @@ static void at91_mux_set_pullup(void __iomem *pio, unsigned mask, bool on)
->   	writel_relaxed(mask, pio + (on ? PIO_PUER : PIO_PUDR));
->   }
->   
-> +static bool at91_mux_get_output(void __iomem *pio, unsigned pin, bool *val)
-> +{
-> +	*val = (readl_relaxed(pio + PIO_ODSR) >> pin) & 0x1;
-> +	return (readl_relaxed(pio + PIO_OSR) >> pin) & 0x1;
-> +}
-> +
-> +static void at91_mux_set_output(void __iomem *pio, unsigned mask, bool is_on,
-> +				bool val)
-> +{
-> +	writel_relaxed(mask, pio + (val ? PIO_SODR : PIO_CODR));
-> +	writel_relaxed(mask, pio + (is_on ? PIO_OER : PIO_ODR));
-> +}
-> +
->   static unsigned at91_mux_get_multidrive(void __iomem *pio, unsigned pin)
->   {
->   	return (readl_relaxed(pio + PIO_MDSR) >> pin) & 0x1;
-> @@ -712,6 +728,7 @@ static int at91_pinconf_get(struct pinctrl_dev *pctldev,
->   	void __iomem *pio;
->   	unsigned pin;
->   	int div;
-> +	bool out;
->   
->   	dev_dbg(info->dev, "%s:%d, pin_id=%d, config=0x%lx", __func__, __LINE__, pin_id, *config);
->   	pio = pin_to_controller(info, pin_to_bank(pin_id));
-> @@ -732,6 +749,9 @@ static int at91_pinconf_get(struct pinctrl_dev *pctldev,
->   	if (info->ops->get_schmitt_trig && info->ops->get_schmitt_trig(pio, pin))
->   		*config |= DIS_SCHMIT;
->   
-> +	if (at91_mux_get_output(pio, pin, &out))
-> +		*config |= OUTPUT | (out << OUTPUT_VAL_SHIFT);
-> +
->   	return 0;
->   }
->   
-> @@ -749,6 +769,8 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
->   	if (config & PULL_UP && config & PULL_DOWN)
->   		return -EINVAL;
->   
-> +	at91_mux_set_output(pio, mask, config & OUTPUT,
-> +			    (config & OUTPUT_VAL) >> OUTPUT_VAL_SHIFT);
->   	at91_mux_set_pullup(pio, mask, config & PULL_UP);
->   	at91_mux_set_multidrive(pio, mask, config & MULTI_DRIVE);
->   	if (info->ops->set_deglitch)
-> diff --git a/include/dt-bindings/pinctrl/at91.h b/include/dt-bindings/pinctrl/at91.h
-> index d7988b4..9fd4d48 100644
-> --- a/include/dt-bindings/pinctrl/at91.h
-> +++ b/include/dt-bindings/pinctrl/at91.h
-> @@ -15,6 +15,8 @@
->   #define AT91_PINCTRL_DEGLITCH		(1 << 2)
->   #define AT91_PINCTRL_PULL_DOWN		(1 << 3)
->   #define AT91_PINCTRL_DIS_SCHMIT		(1 << 4)
-> +#define AT91_PINCTRL_OUTPUT		(1 << 5)
-> +#define AT91_PINCTRL_OUTPUT_VAL(x)	((x & 0x1) << 6)
->   #define AT91_PINCTRL_DEBOUNCE		(1 << 16)
->   #define AT91_PINCTRL_DEBOUNCE_VA(x)	(x << 17)
->   
+it's a good idea to Cc devicetree ML on the coverletter so that folks
+can have the context at hand.
+
+thx,
+
+Jason.
+
+On Tue, Aug 27, 2013 at 11:34:24AM -0300, Ezequiel Garcia wrote:
+> This patchset adds support for Armada 370/XP SoC watchdog using the
+> orion-wdt driver. Several issues were blocking this addition, each
+> of which has timely discussed and (at least initially) agreed.
+> 
+> Namely, the issues are:
+> 
+> * Handling of clock input differences, which was related
+>   to Armada 370/XP clocksource reference 25 MHz issue.
+>   This is already solved by the work in [1] (merge pending).
+> 
+> * Shared register handling. It was agreed to introduce an atomic
+>   read/modify API for such accesses [2]. Once the API is merged we'll use
+>   it to access the timer control register shared between clocksource
+>   and watchdog drivers.
+> 
+> * Watchdog RSTOUT enable. It was decided [3] that this was better
+>   handled at each machine initialization (and so this patchset
+>   does such change). This change allows to remove the mach-specific
+>   header in orion-wdt,  allowing multiplatform build.
+> 
+> The current patchset is based and superseeds the previous v2 on
+> Orion watchdog:
+> 
+>   http://www.spinics.net/lists/arm-kernel/msg269526.html
+> 
+> However, this is a new patchset that allow to support Armada 370/XP
+> watchdog.
+> 
+> Patches 1-5 removes and reworks the orion-wdt to allow to remove the
+> mach-specific header.
+> 
+> Patches 6-9 adds the infrastructure required to support multiple SoCs
+> in the orion-wdt driver, and then uses it to support Armada 370 and
+> Armada XP.
+> 
+> Patches 9-15 completes the support by updating the devicetree binding
+> documentation, devicetree files, and default configuration.
+> 
+> This series is based in v3.11-rc6 and has been tested on:
+> 
+>  * Kirkwood Openblocks A6
+>  * Armada XP Openblocks AX3
+>  * Armada 370 Mirabox
+> 
+> (I must thank Plat'home for donating those beatiful boxes!)
+> 
+> [1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/261861
+> [2] http://lwn.net/Articles/564709/
+> [3] http://www.spinics.net/lists/arm-kernel/msg269994.html
+> 
+> Thanks!
+> 
+> Ezequiel Garcia (15):
+>   watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+>   ARM: orion: Assert watchdog RSTOUT enable bit
+>   ARM: mvebu: Add watchdog RSTOUT enable in system-controller init
+>   watchdog: orion: Remove RSTOUT bit enable/disable
+>   watchdog: orion: Allow to build in any Orion platform
+>   watchdog: orion: Introduce an orion_watchdog device structure
+>   watchdog: orion: Introduce per-compatible of_device_id data
+>   watchdog: orion: Add per-compatible clock initialization
+>   watchdog: orion: Add support for Armada 370 and Armada XP SoC
+>   ARM: mvebu: Add RSTOUT cell to system-controller DT node
+>   ARM: mvebu: Enable Armada 370/XP watchdog in the devicetree
+>   watchdog: orion: Rename device-tree binding documentation
+>   watchdog: orion: Add other compatibles to devicetree binding
+>   ARM: mvebu: system-controller: Add second reg cell devicetree
+>     specification
+>   ARM: mvebu: Enable watchdog in defconfig
+> 
+>  .../bindings/arm/mvebu-system-controller.txt       |   7 +-
+>  .../devicetree/bindings/watchdog/marvel.txt        |  19 --
+>  .../devicetree/bindings/watchdog/orion-wdt.txt     |  34 +++
+>  arch/arm/boot/dts/armada-370-xp.dtsi               |   4 +
+>  arch/arm/boot/dts/armada-370.dtsi                  |   7 +-
+>  arch/arm/boot/dts/armada-xp.dtsi                   |   8 +-
+>  arch/arm/configs/mvebu_defconfig                   |   3 +
+>  arch/arm/mach-dove/board-dt.c                      |   2 +
+>  arch/arm/mach-dove/common.c                        |   2 +
+>  arch/arm/mach-dove/include/mach/bridge-regs.h      |   1 +
+>  arch/arm/mach-kirkwood/board-dt.c                  |   2 +
+>  arch/arm/mach-kirkwood/common.c                    |   2 +
+>  arch/arm/mach-kirkwood/include/mach/bridge-regs.h  |   1 +
+>  arch/arm/mach-mv78xx0/common.c                     |   2 +
+>  arch/arm/mach-mv78xx0/include/mach/bridge-regs.h   |   1 +
+>  arch/arm/mach-mvebu/system-controller.c            |  22 ++
+>  arch/arm/mach-orion5x/board-dt.c                   |   4 +
+>  arch/arm/mach-orion5x/common.c                     |   2 +
+>  arch/arm/mach-orion5x/include/mach/bridge-regs.h   |   1 +
+>  arch/arm/plat-orion/common.c                       |   5 +
+>  arch/arm/plat-orion/include/plat/common.h          |   1 +
+>  drivers/watchdog/Kconfig                           |   2 +-
+>  drivers/watchdog/orion_wdt.c                       | 244 +++++++++++++++------
+>  23 files changed, 283 insertions(+), 93 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/watchdog/marvel.txt
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+> 
+> -- 
+> 1.8.1.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
