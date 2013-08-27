@@ -1,162 +1,125 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 28 Aug 2013 01:14:11 +0200
-Subject: [PATCH v4] pinctrl: Pass all configs to driver on pin_config_set()
-In-Reply-To: <1377628332-12303-1-git-send-email-syin@broadcom.com>
-References: <1377134300-25480-1-git-send-email-syin@broadcom.com>
- <1377628332-12303-1-git-send-email-syin@broadcom.com>
-Message-ID: <12648377.rRBG7cWhRe@avalon>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 Aug 2013 16:13:26 -0700
+Subject: [PATCH RFC v2 04/16] ARM: highbank: remove custom .init_time hook
+In-Reply-To: <1377638890-371-5-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1377638890-371-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130827231326.8231.21675@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 August 2013 11:32:12 Sherman Yin wrote:
-> When setting pin configuration in the pinctrl framework, pin_config_set() or
-> pin_config_group_set() is called in a loop to set one configuration at a
-> time for the specified pin or group.
+Quoting Sebastian Hesselbarth (2013-08-27 14:27:58)
+> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+> remove custom .init_time hooks. Highbank clock provider need a reference
+> to system registers, as a workaround current clk driver maps those
+> independent of arch code now.
 > 
-> This patch 1) removes the loop and 2) changes the API to pass the whole pin
-> config array to the driver.  It is now up to the driver to loop through the
-> configs.  This allows the driver to potentially combine configs and reduce
-> the number of writes to pin config registers.
-> 
-> All c files changed have been build-tested to verify the change compiles and
-> that the corresponding .o is successfully generated.
-> 
-> Signed-off-by: Sherman Yin <syin@broadcom.com>
-> Reviewed-by: Christian Daudt <csd@broadcom.com>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> 
->   drivers/pinctrl/pinconf.c             |   42 ++++----
->   drivers/pinctrl/pinctrl-tegra.c       |   69 ++++++------
->   include/linux/pinctrl/pinconf.h       |    6 +-
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
-> 
->   On Tegra (Tegra114 Dalmore board, on top of next-20130816),
-> Tested-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-For drivers/pinctrl/sh-pfc/pinctrl.c,
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
 > ---
-> Please refer to the discussion with Linus W. "[PATCH] ARM: Adds pin config
-> API to set all configs in one function" here:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/166567.html
-> 
-> All c files changed have been build-tested to verify the change compiles and
-> that the corresponding .o are successfully generated.
-> 
-> [v2]	rebased on LinusW's linux-pinctrl.git "devel" branch.  Fixed and
-> build-tested pinctrl-sunxi.c
-> [v3]	rebased on linux-pinctrl.git:devel as of 2013.08.25. Applied API
-> change to new driver pinctrl-palmas.c. Re build-tested all files.
-> [v4]	Changed int to unsigned int in sh-pfc/pinctrl.c
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
 > ---
->  drivers/pinctrl/mvebu/pinctrl-mvebu.c |   26 +++--
->  drivers/pinctrl/pinconf.c             |   42 ++++----
->  drivers/pinctrl/pinctrl-abx500.c      |  187 ++++++++++++++++--------------
->  drivers/pinctrl/pinctrl-at91.c        |   48 +++++----
->  drivers/pinctrl/pinctrl-bcm2835.c     |   43 ++++----
->  drivers/pinctrl/pinctrl-exynos5440.c  |  113 +++++++++++---------
->  drivers/pinctrl/pinctrl-falcon.c      |   63 ++++++-----
->  drivers/pinctrl/pinctrl-imx.c         |   28 ++---
->  drivers/pinctrl/pinctrl-mxs.c         |   91 ++++++++--------
->  drivers/pinctrl/pinctrl-nomadik.c     |  125 ++++++++++++----------
->  drivers/pinctrl/pinctrl-palmas.c      |  134 ++++++++++++-----------
->  drivers/pinctrl/pinctrl-rockchip.c    |   57 ++++++----
->  drivers/pinctrl/pinctrl-samsung.c     |   17 ++-
->  drivers/pinctrl/pinctrl-single.c      |   33 ++++--
->  drivers/pinctrl/pinctrl-st.c          |   11 +-
->  drivers/pinctrl/pinctrl-sunxi.c       |   77 +++++++-------
->  drivers/pinctrl/pinctrl-tegra.c       |   69 ++++++------
->  drivers/pinctrl/pinctrl-tz1090-pdc.c  |  135 ++++++++++++++----------
->  drivers/pinctrl/pinctrl-tz1090.c      |  140 +++++++++++++-----------
->  drivers/pinctrl/pinctrl-u300.c        |   18 ++--
->  drivers/pinctrl/pinctrl-xway.c        |  119 +++++++++++++--------
->  drivers/pinctrl/sh-pfc/pinctrl.c      |   42 ++++----
->  drivers/pinctrl/vt8500/pinctrl-wmt.c  |   54 +++++-----
->  include/linux/pinctrl/pinconf.h       |    6 +-
->  24 files changed, 952 insertions(+), 726 deletions(-)
-
-[snip]
-
-> diff --git a/drivers/pinctrl/sh-pfc/pinctrl.c
-> b/drivers/pinctrl/sh-pfc/pinctrl.c index 8649ec3..e758af9 100644
-> --- a/drivers/pinctrl/sh-pfc/pinctrl.c
-> +++ b/drivers/pinctrl/sh-pfc/pinctrl.c
-> @@ -529,38 +529,44 @@ static int sh_pfc_pinconf_get(struct pinctrl_dev
-> *pctldev, unsigned _pin, }
+>  arch/arm/mach-highbank/highbank.c |   23 +++++++----------------
+>  drivers/clk/clk-highbank.c        |   10 +++++++---
+>  2 files changed, 14 insertions(+), 19 deletions(-)
 > 
->  static int sh_pfc_pinconf_set(struct pinctrl_dev *pctldev, unsigned _pin,
-> -			      unsigned long config)
-> +			      unsigned long *configs, unsigned num_configs)
+> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+> index 8881579..fa36d14 100644
+> --- a/arch/arm/mach-highbank/highbank.c
+> +++ b/arch/arm/mach-highbank/highbank.c
+> @@ -27,7 +27,6 @@
+>  #include <linux/of_address.h>
+>  #include <linux/smp.h>
+>  #include <linux/amba/bus.h>
+> -#include <linux/clk-provider.h>
+>  
+>  #include <asm/cacheflush.h>
+>  #include <asm/cputype.h>
+> @@ -88,20 +87,6 @@ static void __init highbank_init_irq(void)
+>  #endif
+>  }
+>  
+> -static void __init highbank_timer_init(void)
+> -{
+> -       struct device_node *np;
+> -
+> -       /* Map system registers */
+> -       np = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
+> -       sregs_base = of_iomap(np, 0);
+> -       WARN_ON(!sregs_base);
+> -
+> -       of_clk_init(NULL);
+> -
+> -       clocksource_of_init();
+> -}
+> -
+>  static void highbank_power_off(void)
 >  {
->  	struct sh_pfc_pinctrl *pmx = pinctrl_dev_get_drvdata(pctldev);
->  	struct sh_pfc *pfc = pmx->pfc;
-> -	enum pin_config_param param = pinconf_to_config_param(config);
-> +	enum pin_config_param param;
->  	unsigned long flags;
-> +	unsigned int i;
-> 
-> -	if (!sh_pfc_pinconf_validate(pfc, _pin, param))
-> -		return -ENOTSUPP;
-> +	for (i = 0; i < num_configs; i++) {
-> +		param = pinconf_to_config_param(configs[i]);
-> 
-> -	switch (param) {
-> -	case PIN_CONFIG_BIAS_PULL_UP:
-> -	case PIN_CONFIG_BIAS_PULL_DOWN:
-> -	case PIN_CONFIG_BIAS_DISABLE:
-> -		if (!pfc->info->ops || !pfc->info->ops->set_bias)
-> +		if (!sh_pfc_pinconf_validate(pfc, _pin, param))
->  			return -ENOTSUPP;
-> 
-> -		spin_lock_irqsave(&pfc->lock, flags);
-> -		pfc->info->ops->set_bias(pfc, _pin, param);
-> -		spin_unlock_irqrestore(&pfc->lock, flags);
-> +		switch (param) {
-> +		case PIN_CONFIG_BIAS_PULL_UP:
-> +		case PIN_CONFIG_BIAS_PULL_DOWN:
-> +		case PIN_CONFIG_BIAS_DISABLE:
-> +			if (!pfc->info->ops || !pfc->info->ops->set_bias)
-> +				return -ENOTSUPP;
-> 
-> -		break;
-> +			spin_lock_irqsave(&pfc->lock, flags);
-> +			pfc->info->ops->set_bias(pfc, _pin, param);
-> +			spin_unlock_irqrestore(&pfc->lock, flags);
-> 
-> -	default:
-> -		return -ENOTSUPP;
-> -	}
-> +			break;
+>         highbank_set_pwr_shutdown();
+> @@ -160,6 +145,13 @@ static struct notifier_block highbank_platform_nb = {
+>  
+>  static void __init highbank_init(void)
+>  {
+> +       struct device_node *np;
 > +
-> +		default:
-> +			return -ENOTSUPP;
-> +		}
-> +	} /* for each config */
-> 
->  	return 0;
->  }
-> 
->  static int sh_pfc_pinconf_group_set(struct pinctrl_dev *pctldev, unsigned
-> group, -				    unsigned long config)
-> +				    unsigned long *configs,
-> +				    unsigned num_configs)
->  {
->  	struct sh_pfc_pinctrl *pmx = pinctrl_dev_get_drvdata(pctldev);
->  	const unsigned int *pins;
-> @@ -571,7 +577,7 @@ static int sh_pfc_pinconf_group_set(struct pinctrl_dev
-> *pctldev, unsigned group, num_pins = pmx->pfc->info->groups[group].nr_pins;
-> 
->  	for (i = 0; i < num_pins; ++i)
-> -		sh_pfc_pinconf_set(pctldev, pins[i], config);
-> +		sh_pfc_pinconf_set(pctldev, pins[i], configs, num_configs);
-> 
->  	return 0;
->  }
-
--- 
-Regards,
-
-Laurent Pinchart
+> +       /* Map system registers */
+> +       np = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
+> +       sregs_base = of_iomap(np, 0);
+> +       WARN_ON(!sregs_base);
+> +
+>         pm_power_off = highbank_power_off;
+>         highbank_pm_init();
+>  
+> @@ -178,7 +170,6 @@ static const char *highbank_match[] __initconst = {
+>  DT_MACHINE_START(HIGHBANK, "Highbank")
+>         .smp            = smp_ops(highbank_smp_ops),
+>         .init_irq       = highbank_init_irq,
+> -       .init_time      = highbank_timer_init,
+>         .init_machine   = highbank_init,
+>         .dt_compat      = highbank_match,
+>         .restart        = highbank_restart,
+> diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
+> index 2e08cb0..2e7e9d9 100644
+> --- a/drivers/clk/clk-highbank.c
+> +++ b/drivers/clk/clk-highbank.c
+> @@ -20,8 +20,7 @@
+>  #include <linux/clk-provider.h>
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+> -
+> -extern void __iomem *sregs_base;
+> +#include <linux/of_address.h>
+>  
+>  #define HB_PLL_LOCK_500                0x20000000
+>  #define HB_PLL_LOCK            0x10000000
+> @@ -280,6 +279,7 @@ static __init struct clk *hb_clk_init(struct device_node *node, const struct clk
+>         const char *clk_name = node->name;
+>         const char *parent_name;
+>         struct clk_init_data init;
+> +       struct device_node *srnp;
+>         int rc;
+>  
+>         rc = of_property_read_u32(node, "reg", &reg);
+> @@ -290,7 +290,11 @@ static __init struct clk *hb_clk_init(struct device_node *node, const struct clk
+>         if (WARN_ON(!hb_clk))
+>                 return NULL;
+>  
+> -       hb_clk->reg = sregs_base + reg;
+> +       /* Map system registers */
+> +       srnp = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
+> +       hb_clk->reg = of_iomap(srnp, 0);
+> +       BUG_ON(!hb_clk->reg);
+> +       hb_clk->reg += reg;
+>  
+>         of_property_read_string(node, "clock-output-names", &clk_name);
+>  
+> -- 
+> 1.7.2.5
