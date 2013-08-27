@@ -1,86 +1,120 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 28 Aug 2013 02:58:13 +0530
-Subject: [GIT PULL] DaVinci GPIO driver updates for v3.12
-Message-ID: <521D19ED.5030109@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 27 Aug 2013 23:27:58 +0200
+Subject: [PATCH RFC v2 04/16] ARM: highbank: remove custom .init_time hook
+In-Reply-To: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1377638890-371-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Arnd, Olof,
+With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+remove custom .init_time hooks. Highbank clock provider need a reference
+to system registers, as a workaround current clk driver maps those
+independent of arch code now.
 
-Can you please pull the following GPIO driver updates? The patches have 
-Linus W's ack. I have based the branch on the SoC updates sent earlier 
-to avoid some conflicts. I did a test merge of this branch with latest 
-linux-next/master and there were no conflicts.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+---
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/mach-highbank/highbank.c |   23 +++++++----------------
+ drivers/clk/clk-highbank.c        |   10 +++++++---
+ 2 files changed, 14 insertions(+), 19 deletions(-)
 
-I know its coming late, but hopefully still in time to get merged.
-
-Thanks,
-Sekhar
-
-The following changes since commit 46c1833467c5e555f31cd6f14b342a7383f26885:
-
-  ARM: davinci: fix clock lookup for mdio device (2013-08-22 00:39:01 +0530)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.12/gpio
-
-for you to fetch changes up to 856b63608b6b48dd92c8b41fbbd6a2edde07738d:
-
-  ARM: davinci: gpio: use gpiolib API instead of inline functions (2013-08-28 02:01:37 +0530)
-
-----------------------------------------------------------------
-GPIO driver updates for DaVinci
--------------------------------
-
-This pull request moves DaVinci GPIO
-driver to use platform device framework
-and the corresponding changes needed to
-keep GPIO working on existing DaVinci
-boards.
-
-platform device conversion is needed
-before DT support is enabled for GPIO.
-
-----------------------------------------------------------------
-KV Sujith (2):
-      gpio: davinci: move to platform device
-      ARM: davinci: da8xx: support gpio platform device
-
-Philip Avinash (5):
-      gpio: davinci: coding style correction
-      ARM: davinci: support gpio platform device
-      ARM: davinci: da8xx boards: gpio device creation
-      ARM: davinci: board: gpio device creation
-      ARM: davinci: gpio: use gpiolib API instead of inline functions
-
- arch/arm/Kconfig                                  |    1 -
- arch/arm/mach-davinci/board-da830-evm.c           |   28 ++--
- arch/arm/mach-davinci/board-da850-evm.c           |   16 ++-
- arch/arm/mach-davinci/board-dm355-evm.c           |   33 +++--
- arch/arm/mach-davinci/board-dm355-leopard.c       |   30 +++--
- arch/arm/mach-davinci/board-dm365-evm.c           |   30 +++--
- arch/arm/mach-davinci/board-dm644x-evm.c          |   40 +++---
- arch/arm/mach-davinci/board-dm646x-evm.c          |   37 +++---
- arch/arm/mach-davinci/board-neuros-osd2.c         |   18 ++-
- arch/arm/mach-davinci/board-omapl138-hawk.c       |   10 +-
- arch/arm/mach-davinci/da830.c                     |   26 ++--
- arch/arm/mach-davinci/da850.c                     |   30 +++--
- arch/arm/mach-davinci/davinci.h                   |   20 ++-
- arch/arm/mach-davinci/devices-da8xx.c             |   26 ++++
- arch/arm/mach-davinci/devices.c                   |   13 ++
- arch/arm/mach-davinci/dm355.c                     |   53 +++++---
- arch/arm/mach-davinci/dm365.c                     |   57 +++++---
- arch/arm/mach-davinci/dm644x.c                    |   46 +++++--
- arch/arm/mach-davinci/dm646x.c                    |   46 +++++--
- arch/arm/mach-davinci/include/mach/da8xx.h        |   23 ++--
- arch/arm/mach-davinci/include/mach/gpio-davinci.h |   91 -------------
- arch/arm/mach-davinci/include/mach/gpio.h         |   88 -------------
- arch/arm/mach-davinci/tnetv107x.c                 |   14 +-
- drivers/gpio/gpio-davinci.c                       |  143 ++++++++++++++-------
- drivers/gpio/gpio-tnetv107x.c                     |    5 +-
- include/linux/platform_data/gpio-davinci.h        |   60 +++++++++
- 26 files changed, 558 insertions(+), 426 deletions(-)
- delete mode 100644 arch/arm/mach-davinci/include/mach/gpio-davinci.h
- delete mode 100644 arch/arm/mach-davinci/include/mach/gpio.h
- create mode 100644 include/linux/platform_data/gpio-davinci.h
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 8881579..fa36d14 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -27,7 +27,6 @@
+ #include <linux/of_address.h>
+ #include <linux/smp.h>
+ #include <linux/amba/bus.h>
+-#include <linux/clk-provider.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+@@ -88,20 +87,6 @@ static void __init highbank_init_irq(void)
+ #endif
+ }
+ 
+-static void __init highbank_timer_init(void)
+-{
+-	struct device_node *np;
+-
+-	/* Map system registers */
+-	np = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
+-	sregs_base = of_iomap(np, 0);
+-	WARN_ON(!sregs_base);
+-
+-	of_clk_init(NULL);
+-
+-	clocksource_of_init();
+-}
+-
+ static void highbank_power_off(void)
+ {
+ 	highbank_set_pwr_shutdown();
+@@ -160,6 +145,13 @@ static struct notifier_block highbank_platform_nb = {
+ 
+ static void __init highbank_init(void)
+ {
++	struct device_node *np;
++
++	/* Map system registers */
++	np = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
++	sregs_base = of_iomap(np, 0);
++	WARN_ON(!sregs_base);
++
+ 	pm_power_off = highbank_power_off;
+ 	highbank_pm_init();
+ 
+@@ -178,7 +170,6 @@ static const char *highbank_match[] __initconst = {
+ DT_MACHINE_START(HIGHBANK, "Highbank")
+ 	.smp		= smp_ops(highbank_smp_ops),
+ 	.init_irq	= highbank_init_irq,
+-	.init_time	= highbank_timer_init,
+ 	.init_machine	= highbank_init,
+ 	.dt_compat	= highbank_match,
+ 	.restart	= highbank_restart,
+diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
+index 2e08cb0..2e7e9d9 100644
+--- a/drivers/clk/clk-highbank.c
++++ b/drivers/clk/clk-highbank.c
+@@ -20,8 +20,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
+-
+-extern void __iomem *sregs_base;
++#include <linux/of_address.h>
+ 
+ #define HB_PLL_LOCK_500		0x20000000
+ #define HB_PLL_LOCK		0x10000000
+@@ -280,6 +279,7 @@ static __init struct clk *hb_clk_init(struct device_node *node, const struct clk
+ 	const char *clk_name = node->name;
+ 	const char *parent_name;
+ 	struct clk_init_data init;
++	struct device_node *srnp;
+ 	int rc;
+ 
+ 	rc = of_property_read_u32(node, "reg", &reg);
+@@ -290,7 +290,11 @@ static __init struct clk *hb_clk_init(struct device_node *node, const struct clk
+ 	if (WARN_ON(!hb_clk))
+ 		return NULL;
+ 
+-	hb_clk->reg = sregs_base + reg;
++	/* Map system registers */
++	srnp = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
++	hb_clk->reg = of_iomap(srnp, 0);
++	BUG_ON(!hb_clk->reg);
++	hb_clk->reg += reg;
+ 
+ 	of_property_read_string(node, "clock-output-names", &clk_name);
+ 
+-- 
+1.7.2.5
