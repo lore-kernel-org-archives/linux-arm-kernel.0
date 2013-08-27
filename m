@@ -1,102 +1,35 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 27 Aug 2013 11:37:43 -0300
-Subject: [PATCH v4 1/4] lib: Introduce atomic MMIO modify
-In-Reply-To: <1377358532-23802-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377358532-23802-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377358532-23802-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130827143742.GA6616@localhost>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 27 Aug 2013 16:39:39 +0200
+Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+In-Reply-To: <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130827163939.24636d80@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Adding Andrew Morton in Cc)
+Dear Ezequiel Garcia,
 
-On Sat, Aug 24, 2013 at 12:35:29PM -0300, Ezequiel Garcia wrote:
-> Some platforms have MMIO regions that are shared across orthogonal
-> subsystems. This commit implements a possible solution for the
-> thread-safe access of such regions through a spinlock-protected API.
-> 
-> Concurrent access is protected with a single spinlock for the
-> entire MMIO address space. While this protects shared-registers,
-> it also serializes access to unrelated/unshared registers.
+On Tue, 27 Aug 2013 11:34:25 -0300, Ezequiel Garcia wrote:
+> With the introduction of the orion irqchip driver, now the BRIDGE_CAUSE
+> bit is cleared by it. There's no longer a need to do it in the watchdog
+> driver, so we can simply remove it.
 > 
 > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  include/linux/io.h |  5 +++++
->  lib/Makefile       |  2 +-
->  lib/atomicio.c     | 27 +++++++++++++++++++++++++++
->  3 files changed, 33 insertions(+), 1 deletion(-)
->  create mode 100644 lib/atomicio.c
-> 
-> diff --git a/include/linux/io.h b/include/linux/io.h
-> index f4f42fa..c331dcb 100644
-> --- a/include/linux/io.h
-> +++ b/include/linux/io.h
-> @@ -101,4 +101,9 @@ static inline void arch_phys_wc_del(int handle)
->  #define arch_phys_wc_add arch_phys_wc_add
->  #endif
->  
-> +#ifndef __HAVE_ARCH_ATOMIC_IO_MODIFY
-> +/* Atomic MMIO-wide IO modify */
-> +extern void atomic_io_modify(void __iomem *reg, u32 mask, u32 set);
-> +#endif
-> +
->  #endif /* _LINUX_IO_H */
-> diff --git a/lib/Makefile b/lib/Makefile
-> index 7baccfd..695d6e2 100644
-> --- a/lib/Makefile
-> +++ b/lib/Makefile
-> @@ -13,7 +13,7 @@ lib-y := ctype.o string.o vsprintf.o cmdline.o \
->  	 sha1.o md5.o irq_regs.o reciprocal_div.o argv_split.o \
->  	 proportions.o flex_proportions.o prio_heap.o ratelimit.o show_mem.o \
->  	 is_single_threaded.o plist.o decompress.o kobject_uevent.o \
-> -	 earlycpio.o percpu-refcount.o
-> +	 earlycpio.o percpu-refcount.o atomicio.o
->  
->  obj-$(CONFIG_ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS) += usercopy.o
->  lib-$(CONFIG_MMU) += ioremap.o
-> diff --git a/lib/atomicio.c b/lib/atomicio.c
-> new file mode 100644
-> index 0000000..1750f9d
-> --- /dev/null
-> +++ b/lib/atomicio.c
-> @@ -0,0 +1,27 @@
-> +#include <linux/io.h>
-> +#include <linux/spinlock.h>
-> +
-> +#ifndef __HAVE_ARCH_ATOMIC_IO_MODIFY
-> +/*
-> + * Generic atomic MMIO modify.
-> + *
-> + * Allows thread-safe access to registers shared by unrelated subsystems.
-> + * The access is protected by a single MMIO-wide lock.
-> + *
-> + * Optimized variants can be implemented on a per-architecture basis.
-> + */
-> +static DEFINE_RAW_SPINLOCK(__io_lock);
-> +void atomic_io_modify(void __iomem *reg, u32 mask, u32 set)
-> +{
-> +	unsigned long flags;
-> +	u32 value;
-> +
-> +	raw_spin_lock_irqsave(&__io_lock, flags);
-> +	value = readl(reg) & ~mask;
-> +	value |= (set & mask);
-> +	writel(value, reg);
-> +	raw_spin_unlock_irqrestore(&__io_lock, flags);
-> +
-> +}
-> +EXPORT_SYMBOL(atomic_io_modify);
-> +#endif
-> -- 
-> 1.8.1.5
-> 
 
-So, assuming this is ready to be merged (and knowing right now it's probably
-a very bad time in the release cylce to ask), who is supposed to pick
-this patch?
+Is this going to work with the platforms that use the orion_wdt driver
+but are not using the orion irqchip driver? Take for example
+mach-orion5x, it still uses the plat-orion/irq.c code and not the
+irqchip orion driver, as far as I can see.
 
-Thanks!
+The orion irqchip driver is DT only, so all of the Orion platforms that
+have not been converted to DT are still using the old irq code.
+
+Any thoughts on the consequences of this in relation with your patch?
+
+Thomas
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
