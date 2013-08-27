@@ -1,74 +1,33 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 27 Aug 2013 13:37:32 -0500
-Subject: linux-next: manual merge of the arm-soc tree with the usb tree
-In-Reply-To: <20130827173732.GC21564@kroah.com>
-References: <20130827181353.319c150858829df1bb68d60b@canb.auug.org.au>
- <521C6961.9020103@linutronix.de>
- <CABxcv=mg6t5wPqpF3j5sr_76qfZ7N7KgpWhcKSGoPTOcaR=V6A@mail.gmail.com>
- <521CA888.1080909@baylibre.com> <521CAF59.1090203@linutronix.de>
- <521CB046.9070408@baylibre.com> <521CB18B.4080000@linutronix.de>
- <521CB239.6050409@baylibre.com> <521CB403.8010307@linutronix.de>
- <20130827173732.GC21564@kroah.com>
-Message-ID: <20130827183732.GP3005@radagast>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Aug 2013 20:45:01 +0200
+Subject: [RFC] cleanup mach-s5p*
+In-Reply-To: <14202744.Ci7A03X8EJ@flatron>
+References: <1f7b01cea1f6$9560aa10$c021fe30$%kim@samsung.com>
+ <14202744.Ci7A03X8EJ@flatron>
+Message-ID: <1800157.XgqPQtAyXL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Aug 27, 2013 at 10:37:32AM -0700, Greg KH wrote:
-> On Tue, Aug 27, 2013 at 04:13:23PM +0200, Sebastian Andrzej Siewior wrote:
-> > On 08/27/2013 04:05 PM, Benoit Cousson wrote:
-> > > On 27/08/2013 16:02, Sebastian Andrzej Siewior wrote:
-> > >> On 08/27/2013 03:57 PM, Benoit Cousson wrote:
-> > >>> + Kevin,
-> > >>>
-> > >>> On 27/08/2013 15:53, Sebastian Andrzej Siewior wrote:
-> > >>>> What do we do now?
-> > >>>
-> > >>> Cannot you just merge the stable arm-soc/dt branch into your branch
-> > >>> before applying your patches?
-> > >>
-> > >> That is up to Greg. This changes sat in his usb-next tree for a while
-> > >> now. And before they hit Greg they were in Felipe's tree for a while.
-> > >>
-> > >> To be exact, last .dts change via USB was:
-> > >>
-> > >> Author:     Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> > >> AuthorDate: Thu Jun 20 12:13:04 2013 +0200
-> > >> Commit:     Felipe Balbi <balbi@ti.com>
-> > >> CommitDate: Fri Aug 9 17:40:16 2013 +0300
-> > >>
-> > >>     usb: musb dma: add cppi41 dma driver
-> > > 
-> > > Mmm, if that branch is supposed to be stable, I'm not sure it will be
-> > > doable...
-> > > 
-> > > Maybe we should do the other way around? And merge usb-next into
-> > > arm-soc/dt.
-> > > 
-> > > Kevin, Olof?
-> > 
-> > Please be aware that I have no response so far regarding [0] from Greg.
-> > 
-> > [0] http://www.spinics.net/lists/linux-usb/msg92595.html
+On Tuesday 27 August 2013 02:08:16 Tomasz Figa wrote:
 > 
-> Nor will you, given that I am not the one to take these patches, Felipe
-> is.  I noticed now that you said "please route around Felipe", but
-> sorry, no, I'm not going to do that unless there's a really good reason.
-> Felipe seems to be around at the moment, please work with him on this.
+> Well, if we could drop legacy board file support for them and keep them as 
+> DT only, support for them could be reasonably simple. Basically the code 
+> in arch/arm would be limited to a single .c file per SoC (e.g. mach-
+> s5pv210-dt.c), a bunch of SoC-level .dtsi files and a bunch of board dts 
+> files.
 
-If you will still take a 'part2' pull request from me, I can send you
-urgent bugfixes by friday. If I have some time left, I can even try to
-get that sorted out by tomorrow.
+Sounds good.
 
-cheers
+> IMHO the best thing we could do would be creating a single mach-samsung, 
+> where all the DT-only platforms could be located, including Exynos after 
+> some remaining consolidation.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130827/266a1741/attachment.sig>
+Yes, that seems like a reasonable goal for the long run. I guess the best
+way to get there might be to move the s5pxxxx platforms into mach-exynos
+one by one and make sure they can coexist in a multiplatform kernel.
+Consolidating s3c24xx and exynos into a single platform is less interesting
+because they won't run the same kernel anyway, but I also don't see any
+reason against doing it. Not sure how s3c64xx would fit in then, since
+it's ARMv6 but somewhat closer to the s3c24xx code base than to exynos.
+
+	Arnd
