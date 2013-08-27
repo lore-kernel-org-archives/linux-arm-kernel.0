@@ -1,96 +1,84 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 27 Aug 2013 15:44:55 -0700
-Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
-In-Reply-To: <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
- (Russ Dill's message of "Wed, 14 Aug 2013 15:21:20 -0700")
-References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
- <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
- <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
-Message-ID: <87txiasqhk.fsf@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 28 Aug 2013 00:58:39 +0200
+Subject: [PATCH RFC v2 01/16] ARM: call clk_of_init from time_init
+In-Reply-To: <3837b119-baad-4e68-8805-2bc52c0135f9@DB9EHSMHS031.ehs.local>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1377638890-371-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <3837b119-baad-4e68-8805-2bc52c0135f9@DB9EHSMHS031.ehs.local>
+Message-ID: <521D2F1F.1070103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+Mark Brown for regulator suspend sequence ideas]
-
-Russ Dill <Russ.Dill@ti.com> writes:
-
-> On Wed, Aug 14, 2013 at 6:38 AM, Jan L?bbe <jlu@pengutronix.de> wrote:
->> On Tue, 2013-08-13 at 15:20 -0700, Russ Dill wrote:
->>> The purpose and method of executing these sequences is left up to each
->>> platform. In the case of the am33xx, the CM3 firmware writes out the
->>> simple I2C sequences.
->>>
->>> Each sequence is a series of I2C write commands. The first byte is the
->>> length of the write, the second byte the I2C device to address, and
->>> the following bytes are the message.
+On 08/28/13 00:19, S?ren Brinkmann wrote:
+> On Tue, Aug 27, 2013 at 11:27:55PM +0200, Sebastian Hesselbarth wrote:
+>> Most DT ARM machs require common clock providers initialized before timers.
+>> Currently, arch/arm machs use .init_time to call clk_of_init right before
+>> clocksource_of_init. This prevents to remove that hook and use the default
+>> hook instead. clk_of_init is safe to call for non-DT platforms, so add
+>> the call to ARM arch time_init by default. While at it, also reorder includes
+>> alphabetically.
 >>
->>>         /* Set OPP100 (1.10V) for VDD core */
->>>         wake_sequence = /bits/ 8 <
->>>                 0x02 0x2d 0x25 0x2b /* Set VDD2 to 1.1V */
->>>         >;
->>>
->>>         tps: tps at 2d {
->>>                 reg = <0x2d>;
->>>         };
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> ---
+>> Changelog:
+>> v1->v2:
+>> - reorder includes alphabetically
 >>
->>> In the above example, the sequence "0x25 0x1f" is written to the I2C
->>> device at address 0x2d (the TPS65910 PMIC). The PMIC interprets that
->>> as a write to a register at address 0x25.
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: linux-tegra at vger.kernel.org
+>> Cc: kernel at stlinux.com
+>> Cc: linux-samsung-soc at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> ---
+>>   arch/arm/kernel/time.c |   24 ++++++++++++++----------
+>>   1 files changed, 14 insertions(+), 10 deletions(-)
 >>
->>> I'd really like to get some feedback on the devicetree bindings.
-
-Well the first comment (also made by others) is that the DT should be
-describing the hardware, and by that rule, the wake/sleep sequences are
-not properties of the i2c node but rather properties of the pmic.
-You've pointed out the inconveniences caused by that, but I'm not sure
-that those are enough to break the basic DT rules there.  I'll leave it
-to the DT reviewers to make that decision.
-
->> Shouldn't the TPS driver know how to generate this sequence? It seems
->> fragile to do voltage adjustments behind the back of the regulator
->> framework and the TPS driver. The wake-sequence values should match the
->> (in-memory) regulator configuration on resume (which may have been
->> changed by DVFS).
+>> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+>> index 98aee32..dd1028e 100644
+>> --- a/arch/arm/kernel/time.c
+>> +++ b/arch/arm/kernel/time.c
+>> @@ -11,25 +11,26 @@
+> [ ... ]
+>>   void __init time_init(void)
+>>   {
+>> +	/* initalize common clocks before timers */
+>> +	of_clk_init(NULL);
+>> +
+>>   	if (machine_desc->init_time)
+>>   		machine_desc->init_time();
+>>   	else
 >
-> The sequence is both PMIC specific and board specific. Additionally,
-> the PMICs used aren't am335x specific. It would be nice to have the
-> regulator framework and the driver write all this out, but the
-> sequence is written out by the Cortex-M3 processor running some PM
-> firmware. Even if the code was changed to run on the A8, it'd have to
-> run from a small piece of SRAM.
+> This forces zynq to move some initialization our clock code relies on to
+> init_irq(). Also, the current code already takes an approach of
+> doing either common init or machine specific init.
 
-So, why/how was the decision made to use the M3 instead of the MPU
-running from SRAM?
+Soeren,
 
-As a firmware minimalist, I obviously prefer to do this from the MPU
-side.  But also, because the M3 is reset every suspend sequence, this
-becomes rather heavy to do from the M3. 
+you know that patch 16/16 takes care of zynq's clock init?
 
-Currently voltage scaling is only being proposed for suspend in this
-series, but in theory it's possible from idle as well.  Doing this from
-the MPU/SRAM seems much better suited for idle.
+It's your own patch you provided from the last RFC. Looking at it, it
+moves  zynq_sclr_init() to .init_irq and removes the call to
+of_clk_init() from zynq_clock_init() which is called by
+zynq_sclr_init().
 
-> As far as DVFS, I'm not aware of any DVFS implementations that muck
-> with VDD CORE.
->
->> The CM3 driver needs to figure out where the core regulator is connected
->> using using either DT or the regulator framework and ask the TPS (via a
->> new interface) for register writes for sleep/wake sequences. Then those
->> sequences will actually match the correct voltages configured using
->> DT/DVFS.
->
-> That seems like it'd add a lot of complexity to the regulator
-> subsystem, as well as all the PMIC and other I2C regulators that any
-> users of these device tree properties may end up using for not a lot
-> of gain. There would be two separate code paths for any used
-> I2C regulator or PMIC for setting voltages.
+Isn't that solving the above issues for mach-zynq?
 
-Added Mark for his thoughts on this, but seems like complexity that the
-regulator framework might need to grow anyways.  
+> I think it might be better to move the call to of_clk_init() down into
+> the else branch of the if-else.
 
-The framework already has a concept of suspend voltage, suspend mode
-etc.  Maybe it needs some generalizing so low-level platform code could
-query the framework for the sequence so it can be done late in platform
-idle/suspend paths.  Especially for regmap drivers, this seems feasible.
+Possibly, yes. But we could also unconditionally call of_clk_init() at
+the beginning of time_init() and call clocksource_of_init() at the end.
+That will make .init_time() to some fixup hook between initialization of 
+clocks and timers.
 
-Kevin
+> Though, this probably contradicts the purpose of the whole series.
+
+Hmm, the purpose was to allow most platforms to remove a custom
+.init_time hook only calling of_clk_init() and clocksource_of_init().
+
+If we move of_clk_init() above also in the else-branch the purpose
+is still met.
+
+Sebastian
