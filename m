@@ -1,125 +1,198 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 27 Aug 2013 19:28:50 +0800
-Subject: [PATCH v3 4/6] iio: at91: ADC start-up time calculation changed since
- at91sam9x5
+Date: Tue, 27 Aug 2013 19:28:48 +0800
+Subject: [PATCH v3 2/6] iio: at91: introduce the multiple compatible string
+ for different IPs.
 In-Reply-To: <1377602932-1899-1-git-send-email-josh.wu@atmel.com>
 References: <1377602932-1899-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1377602932-1899-5-git-send-email-josh.wu@atmel.com>
+Message-ID: <1377602932-1899-3-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since in at91sam9x5, sama5d3x chip. the start up time calucation is changed.
-This patch can choose different start up time calculation formula for different
-chips.
+As use the multiple compatible string, we can remove hardware register in dt.
 
+CC: devicetree at vger.kernel.org
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
-v2 --> v3:
- use function pointer for the startup time calculation.
+ .../devicetree/bindings/arm/atmel-adc.txt          |    7 +-
+ arch/arm/mach-at91/include/mach/at91_adc.h         |    9 +++
+ drivers/iio/adc/at91_adc.c                         |   79 ++++++++++----------
+ 3 files changed, 52 insertions(+), 43 deletions(-)
 
- drivers/iio/adc/at91_adc.c |   53 ++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 46 insertions(+), 7 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+index 16769d9..723c205 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+@@ -1,18 +1,15 @@
+ * AT91's Analog to Digital Converter (ADC)
+ 
+ Required properties:
+-  - compatible: Should be "atmel,at91sam9260-adc"
++  - compatible: Should be "atmel,<chip>-adc"
++    <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
+   - reg: Should contain ADC registers location and length
+   - interrupts: Should contain the IRQ line for the ADC
+-  - atmel,adc-channel-base: Offset of the first channel data register
+   - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
+     device
+-  - atmel,adc-drdy-mask: Mask of the DRDY interruption in the ADC
+   - atmel,adc-num-channels: Number of channels available in the ADC
+   - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
+     defined in the datasheet
+-  - atmel,adc-status-register: Offset of the Interrupt Status Register
+-  - atmel,adc-trigger-register: Offset of the Trigger Register
+   - atmel,adc-vref: Reference voltage in millivolts for the conversions
+   - atmel,adc-res: List of resolution in bits supported by the ADC. List size
+ 		   must be two at least.
+diff --git a/arch/arm/mach-at91/include/mach/at91_adc.h b/arch/arm/mach-at91/include/mach/at91_adc.h
+index 8e7ed5c..bea1a20 100644
+--- a/arch/arm/mach-at91/include/mach/at91_adc.h
++++ b/arch/arm/mach-at91/include/mach/at91_adc.h
+@@ -48,6 +48,9 @@
+ #define		AT91_ADC_ENDRX		(1 << 18)	/* End of RX Buffer */
+ #define		AT91_ADC_RXFUFF		(1 << 19)	/* RX Buffer Full */
+ 
++#define AT91_ADC_SR_9X5		0x30		/* Status Register for 9x5 */
++#define		AT91_ADC_SR_DRDY_9X5	(1 << 24)	/* Data Ready */
++
+ #define AT91_ADC_LCDR		0x20		/* Last Converted Data Register */
+ #define		AT91_ADC_LDATA		(0x3ff)
+ 
+@@ -58,4 +61,10 @@
+ #define AT91_ADC_CHR(n)		(0x30 + ((n) * 4))	/* Channel Data Register N */
+ #define		AT91_ADC_DATA		(0x3ff)
+ 
++#define AT91_ADC_CDR0_9X5	(0x50)			/* Channel Data Register 0 for 9X5 */
++
++#define AT91_ADC_TRGR_9260	AT91_ADC_MR
++#define AT91_ADC_TRGR_9G45	0x08
++#define AT91_ADC_TRGR_9X5	0xC0
++
+ #endif
 diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-index bccc407..f32a69d 100644
+index 9cf8ab5..49dd751 100644
 --- a/drivers/iio/adc/at91_adc.c
 +++ b/drivers/iio/adc/at91_adc.c
-@@ -40,6 +40,9 @@
+@@ -39,6 +39,10 @@
+ #define at91_adc_writel(st, reg, val) \
  	(writel_relaxed(val, st->reg_base + reg))
  
- struct at91_adc_caps {
-+	/* startup time calculate function */
-+	u32 (*calc_startup_ticks)(u8 startup_time, u32 adc_clk_khz);
++struct at91_adc_caps {
++	struct at91_adc_reg_desc registers;
++};
 +
- 	struct at91_adc_reg_desc registers;
+ struct at91_adc_state {
+ 	struct clk		*adc_clk;
+ 	u16			*buffer;
+@@ -62,6 +66,7 @@ struct at91_adc_state {
+ 	u32			res;		/* resolution used for convertions */
+ 	bool			low_res;	/* the resolution corresponds to the lowest one */
+ 	wait_queue_head_t	wq_data_avail;
++	struct at91_adc_caps	*caps;
  };
  
-@@ -434,6 +437,45 @@ ret:
+ static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
+@@ -429,6 +434,8 @@ ret:
  	return ret;
  }
  
-+static u32 calc_startup_ticks_9260(u8 startup_time, u32 adc_clk_khz)
-+{
-+	/*
-+	 * Number of ticks needed to cover the startup time of the ADC
-+	 * as defined in the electrical characteristics of the board,
-+	 * divided by 8. The formula thus is :
-+	 *   Startup Time = (ticks + 1) * 8 / ADC Clock
-+	 */
-+	return round_up((startup_time * adc_clk_khz / 1000) - 1, 8) / 8;
-+}
++static const struct of_device_id at91_adc_dt_ids[];
 +
-+static u32 calc_startup_ticks_9x5(u8 startup_time, u32 adc_clk_khz)
-+{
-+	/*
-+	 * For sama5d3x and at91sam9x5, the formula changes to:
-+	 * Startup Time = <lookup_table_value> / ADC Clock
-+	 */
-+	const int startup_lookup[] = {
-+		0  , 8  , 16 , 24 ,
-+		64 , 80 , 96 , 112,
-+		512, 576, 640, 704,
-+		768, 832, 896, 960
-+		};
-+	int i, size = ARRAY_SIZE(startup_lookup);
-+	unsigned int ticks;
-+
-+	ticks = startup_time * adc_clk_khz / 1000;
-+	for (i = 0; i < size; i++)
-+		if (ticks < startup_lookup[i])
-+			break;
-+
-+	ticks = i;
-+	if (ticks == size)
-+		/* Reach the end of lookup table */
-+		ticks = size - 1;
-+
-+	return ticks;
-+}
-+
- static const struct of_device_id at91_adc_dt_ids[];
- 
  static int at91_adc_probe_dt(struct at91_adc_state *st,
-@@ -662,15 +704,9 @@ static int at91_adc_probe(struct platform_device *pdev)
- 		ret = -EINVAL;
- 		goto error_disable_adc_clk;
- 	}
-+	ticks = (*st->caps->calc_startup_ticks)(st->startup_time, adc_clk_khz);
+ 			     struct platform_device *pdev)
+ {
+@@ -441,6 +448,9 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
+ 	if (!node)
+ 		return -EINVAL;
  
- 	/*
--	 * Number of ticks needed to cover the startup time of the ADC as
--	 * defined in the electrical characteristics of the board, divided by 8.
--	 * The formula thus is : Startup Time = (ticks + 1) * 8 / ADC Clock
--	 */
--	ticks = round_up((st->startup_time * adc_clk_khz /
--			  1000) - 1, 8) / 8;
--	/*
- 	 * a minimal Sample and Hold Time is necessary for the ADC to guarantee
- 	 * the best converted final value between two channels selection
- 	 * The formula thus is : Sample and Hold Time = (shtim + 1) / ADCClock
-@@ -751,6 +787,7 @@ static int at91_adc_remove(struct platform_device *pdev)
++	st->caps = (struct at91_adc_caps *)
++		of_match_device(at91_adc_dt_ids, &pdev->dev)->data;
++
+ 	st->use_external = of_property_read_bool(node, "atmel,adc-use-external-triggers");
+ 
+ 	if (of_property_read_u32(node, "atmel,adc-channels-used", &prop)) {
+@@ -481,43 +491,7 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
+ 	if (ret)
+ 		goto error_ret;
+ 
+-	st->registers = devm_kzalloc(&idev->dev,
+-				     sizeof(struct at91_adc_reg_desc),
+-				     GFP_KERNEL);
+-	if (!st->registers) {
+-		dev_err(&idev->dev, "Could not allocate register memory.\n");
+-		ret = -ENOMEM;
+-		goto error_ret;
+-	}
+-
+-	if (of_property_read_u32(node, "atmel,adc-channel-base", &prop)) {
+-		dev_err(&idev->dev, "Missing adc-channel-base property in the DT.\n");
+-		ret = -EINVAL;
+-		goto error_ret;
+-	}
+-	st->registers->channel_base = prop;
+-
+-	if (of_property_read_u32(node, "atmel,adc-drdy-mask", &prop)) {
+-		dev_err(&idev->dev, "Missing adc-drdy-mask property in the DT.\n");
+-		ret = -EINVAL;
+-		goto error_ret;
+-	}
+-	st->registers->drdy_mask = prop;
+-
+-	if (of_property_read_u32(node, "atmel,adc-status-register", &prop)) {
+-		dev_err(&idev->dev, "Missing adc-status-register property in the DT.\n");
+-		ret = -EINVAL;
+-		goto error_ret;
+-	}
+-	st->registers->status_register = prop;
+-
+-	if (of_property_read_u32(node, "atmel,adc-trigger-register", &prop)) {
+-		dev_err(&idev->dev, "Missing adc-trigger-register property in the DT.\n");
+-		ret = -EINVAL;
+-		goto error_ret;
+-	}
+-	st->registers->trigger_register = prop;
+-
++	st->registers = &st->caps->registers;
+ 	st->trigger_number = of_get_child_count(node);
+ 	st->trigger_list = devm_kzalloc(&idev->dev, st->trigger_number *
+ 					sizeof(struct at91_adc_trigger),
+@@ -776,8 +750,37 @@ static int at91_adc_remove(struct platform_device *pdev)
+ }
  
  #ifdef CONFIG_OF
- static struct at91_adc_caps at91sam9260_caps = {
-+	.calc_startup_ticks = calc_startup_ticks_9260,
- 	.registers = {
- 		.channel_base = AT91_ADC_CHR(0),
- 		.drdy_mask = AT91_ADC_DRDY,
-@@ -762,6 +799,7 @@ static struct at91_adc_caps at91sam9260_caps = {
++static struct at91_adc_caps at91sam9260_caps = {
++	.registers = {
++		.channel_base = AT91_ADC_CHR(0),
++		.drdy_mask = AT91_ADC_DRDY,
++		.status_register = AT91_ADC_SR,
++		.trigger_register = AT91_ADC_TRGR_9260,
++	},
++};
++
++static struct at91_adc_caps at91sam9g45_caps = {
++	.registers = {
++		.channel_base = AT91_ADC_CHR(0),
++		.drdy_mask = AT91_ADC_DRDY,
++		.status_register = AT91_ADC_SR,
++		.trigger_register = AT91_ADC_TRGR_9G45,
++	},
++};
++
++static struct at91_adc_caps at91sam9x5_caps = {
++	.registers = {
++		.channel_base = AT91_ADC_CDR0_9X5,
++		.drdy_mask = AT91_ADC_SR_DRDY_9X5,
++		.status_register = AT91_ADC_SR_9X5,
++		.trigger_register = AT91_ADC_TRGR_9X5,
++	},
++};
++
+ static const struct of_device_id at91_adc_dt_ids[] = {
+-	{ .compatible = "atmel,at91sam9260-adc" },
++	{ .compatible = "atmel,at91sam9260-adc", .data = &at91sam9260_caps },
++	{ .compatible = "atmel,at91sam9g45-adc", .data = &at91sam9g45_caps },
++	{ .compatible = "atmel,at91sam9x5-adc", .data = &at91sam9x5_caps },
+ 	{},
  };
- 
- static struct at91_adc_caps at91sam9g45_caps = {
-+	.calc_startup_ticks = calc_startup_ticks_9260,	/* same as 9260 */
- 	.registers = {
- 		.channel_base = AT91_ADC_CHR(0),
- 		.drdy_mask = AT91_ADC_DRDY,
-@@ -773,6 +811,7 @@ static struct at91_adc_caps at91sam9g45_caps = {
- };
- 
- static struct at91_adc_caps at91sam9x5_caps = {
-+	.calc_startup_ticks = calc_startup_ticks_9x5,
- 	.registers = {
- 		.channel_base = AT91_ADC_CDR0_9X5,
- 		.drdy_mask = AT91_ADC_SR_DRDY_9X5,
+ MODULE_DEVICE_TABLE(of, at91_adc_dt_ids);
 -- 
 1.7.10
