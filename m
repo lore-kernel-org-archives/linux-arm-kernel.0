@@ -1,45 +1,47 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 27 Aug 2013 09:46:10 +0200
-Subject: [PATCH] tegra-cpuidle: provide stub when !CONFIG_CPU_IDLE
-In-Reply-To: <521BD48F.1060202@wwwdotorg.org>
-References: <20130826153050.GC8764@redacted.bos.redhat.com>
- <521BD48F.1060202@wwwdotorg.org>
-Message-ID: <20130827074609.GE8686@ulmo>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Tue, 27 Aug 2013 09:48:54 +0200
+Subject: [PATCH v3 0/2] net/cadence/macb: add support for dt phy definition
+In-Reply-To: <1377589007-3684-1-git-send-email-b.brezillon@overkiz.com>
+References: <1377589007-3684-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <521C59E6.2050000@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 26, 2013 at 04:19:59PM -0600, Stephen Warren wrote:
-> On 08/26/2013 09:30 AM, Kyle McMartin wrote:
-> > While poking at something using the for-3.12/* trees, I hit the
-> > following compile error:
-> > drivers/built-in.o: In function `tegra_pcie_map_irq':
-> > /builddir/build/BUILD/kernel-3.10.fc20/linux-3.11.0-0.rc6.git4.1.fc20.armv7hl/drivers/pci/host/pci-tegra.c:640:
-> > undefined reference to `tegra_cpuidle_pcie_irqs_in_use'
-> > drivers/built-in.o: In function `tegra_msi_map':
-> > /builddir/build/BUILD/kernel-3.10.fc20/linux-3.11.0-0.rc6.git4.1.fc20.armv7hl/drivers/pci/host/pci-tegra.c:1227:
-> > undefined reference to `tegra_cpuidle_pcie_irqs_in_use'
-> > make: *** [vmlinux] Error 1
-> > 
-> > Since our .config had CONFIG_CPU_IDLE off. We should probably provide
-> > an empty function to handle this to avoid cluttering up pci-tegra.c
-> > with conditionals.
-> 
-> Another approach would be to use if (IS_ENABLED(CPU_IDLE)) at the call
-> site. I guess the approach in this patch is better than that though,
-> since it doesn't pollute the callers with knowledge of when this
-> function is available.
-> 
-> Thierry, if you're OK with this, I can forward it on to arm-soc.
+Hello David,
 
-I agree. The dummy seems like the better option. Feel free to add my
-Reviewed-by (in my reply to the original patch) when you forward.
+Sorry, I forgot to add your email in the cc list.
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130827/464ff10d/attachment.sig>
+Do you want me to send you the whole series ?
+
+Best Regards,
+
+Boris
+
+On 27/08/2013 09:36, Boris BREZILLON wrote:
+> Hello,
+>
+> This patch series adds support for ethernet phy definition using device
+> tree.
+>
+> This may help in moving some at91 boards to dt (some of them define an
+> interrupt pin).
+>
+> Tested on samad31ek.
+>
+> Best Regards,
+> Boris
+>
+> Changes since v2:
+>   - fix wrong address of phy0 dt node
+>
+> Changes since v1:
+>   - fix wrong macb_mii_init return code when no PHY device is discovered
+>
+> Boris BREZILLON (2):
+>    net/cadence/macb: add support for dt phy definition
+>    ARM: at91/dt: define phy available on sama5d3 mother board
+>
+>   arch/arm/boot/dts/sama5d3xmb.dtsi   |    8 ++++++
+>   drivers/net/ethernet/cadence/macb.c |   48 +++++++++++++++++++++++++++--------
+>   2 files changed, 46 insertions(+), 10 deletions(-)
+>
