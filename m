@@ -1,86 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 27 Aug 2013 15:55:19 -0600
-Subject: [PATCH RFC v2 3/5] spmi: add generic SPMI controller binding
- documentation
-In-Reply-To: <20130827170120.GR4035@joshc.qualcomm.com>
-References: <cover.1377202730.git.joshc@codeaurora.org>
- <e42576b69ef3d4e624fbfa2f32f6f79a931b55d6.1377202730.git.joshc@codeaurora.org>
- <5217DB0C.7000101@wwwdotorg.org> <20130827170120.GR4035@joshc.qualcomm.com>
-Message-ID: <521D2047.8030300@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 27 Aug 2013 23:55:33 +0200
+Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+In-Reply-To: <20130827214121.GI19598@titan.lakedaemon.net>
+References: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130827163939.24636d80@skate> <20130827151136.GA10084@localhost>
+ <20130827152535.GG19598@titan.lakedaemon.net>
+ <20130827191337.GA2339@localhost> <521D063F.4040404@gmail.com>
+ <20130827210248.GA19625@obsidianresearch.com>
+ <20130827214121.GI19598@titan.lakedaemon.net>
+Message-ID: <20130827235533.2cc85d33@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2013 11:01 AM, Josh Cartwright wrote:
-...
-> If we want to ensure for the generic bindings that we are fulling
-> characterizing/describing the SPMI bus, then we'll additionally need to
-> tackle an additional identified assumption:
-> 
->   4. One master per SPMI bus.  (The SPMI spec allows for up to 4
->      masters)
-> 
-> On the Snapdragon 800 series, there exists only one software-controlled
-> master, but it is conceivably possible to have a setup with two
-> software-controlled masters on the same SPMI bus.
-> 
-> This necessarily means that the description of the slaves and the
-> masters will need to be decoupled; I'm imagining a generic binding
-> supporting multiple masters would look something like this:
+Dear Jason Cooper,
 
-Is there a need to represent the other masters in the DT? Sure they're
-there in HW, but if there's no specific way for the
-CPU-to-which-the-DT-applies to actually interact with those other
-masters (except perhaps by experiencing some arbitration delays) then
-presumably there's no need to represent the other masters in DT?
+On Tue, 27 Aug 2013 17:41:21 -0400, Jason Cooper wrote:
+> On Tue, Aug 27, 2013 at 03:02:48PM -0600, Jason Gunthorpe wrote:
+> > Since this is so complex, maybe it is OK to abandon support for non-DT
+> > boards in the WDT driver? Watchdog is not critical functionality, so
+> > nobody should be critically impacted. Boards would have to migrate
+> > to DT to get WDT back?
+> 
+> I'm not 100% opposed to this.  We need to give it careful thought, but
+> it may be a viable solution since we are at the "convert old boards to
+> DT" stage anyhow.  If we had ten more drivers and 6 release cycles in
+> front of us, I'd say no.
 
-> 	master0: master at 0 {
-> 		compatible = "...";
-> 		#spmi-master-cells = <0>;
-> 		spmi-mid = <0>;
-> 
-> 		...
-> 	};
-> 
-> 	master2: master at 2 {
-> 		compatible = "...";
-> 		#spmi-master-cells = <0>;
-> 		spmi-mid = <2>;
-> 
-> 		...
-> 	};
-> 
-> 	spmi_bus {
-> 		compatible = "...";
-> 
-> 		spmi-masters = <&master0 &master2>;
-> 
-> 		foo at 0 {
-> 			compatible = "...";
-> 			reg = <0 ...>;
-> 		};
-> 
-> 		foo at 8 {
-> 			compatible = "...";
-> 			reg = <8 ...>;
-> 		};
-> 	};
-> 
-> (This will also necessitate a change in the underlying SPMI driver
-> model, in the current implementation, a SPMI master 'owns' a particular
-> device.  This is not a valid assumption to make.)
-> 
-> Would this property-containing-phandle-vector be considered the
-> canonical way of representing nodes with multiple parents in the device
-> tree?
+While we're close to full DT for mach-kirkwood and mach-dove, we're
+pretty far from that for mach-orion5x and mach-mv78xx0, and I believe
+both are using the orion_wdt driver.
 
-I don't think I've seen anything like this before, although that
-in-and-of-itself doesn't make it wrong.
-
-Another approach might be to encode master-vs-slave into a cell in the
-reg property? Something like:
-
-cell 0 - address type (0: master, 1: unique ID, 2: group ID, ...)
-cell 1 - address value
-
-I haven't thought much about that; perhaps there are disadvantages doing
-that.
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
