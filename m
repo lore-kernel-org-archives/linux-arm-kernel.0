@@ -1,39 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 27 Aug 2013 10:39:07 +0200
-Subject: [PATCH v2 7/9] watchdog: orion: Update device-tree binding
- documentation
-In-Reply-To: <20130827083603.GA2286@localhost>
-References: <1377295942-5955-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377295942-5955-8-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130826140843.GI13964@titan.lakedaemon.net>
- <20130827083603.GA2286@localhost>
-Message-ID: <20130827103907.0030c970@skate>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 27 Aug 2013 05:52:43 -0300
+Subject: [PATCH v3 0/5] Armada XP clocks for timer
+In-Reply-To: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130827085242.GB2286@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+Hi Jason and Daniel:
 
-On Tue, 27 Aug 2013 05:36:04 -0300, Ezequiel Garcia wrote:
+(I forgot to Cc Daniel on these series, sorry about that!)
 
-> > Is there a reason we're going this route over adding a new compatible
-> > string?
+So, now that we have all the acks we need...
+
+On Tue, Aug 20, 2013 at 12:45:49PM -0300, Ezequiel Garcia wrote:
+[...]
 > 
-> Well, it seemed to me that this register splitting was more device-treeish:
-> it prevents you from fixing your driver, adding a new compatible-string,
-> and rebuilding a kernel each time a new SoC appears with a different offset
-> between registers.
+> Ezequiel Garcia (5):
+>   ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
+>   ARM: mvebu: Add clock properties to Armada XP timer node
 
-I don't think encoding register offsets in the DT is a good idea. The
-compatible string is here to identify different revisions/versions of
-the same hardware block, and the driver should abstract out the
-details. Otherwise, you'll start encoding bit numbers, mask values, and
-other crazy things in the Device Tree.
+Jason: I assume these are ready to get merged through mvebu, right?
 
-Best regards,
+>   clocksource: armada-370-xp: Replace WARN_ON with BUG_ON
+>   clocksource: armada-370-xp: Get reference fixed-clock by name
+>   clocksource: armada-370-xp: Add detailed clock requirements in
+>     devicetree binding
+> 
 
-Thomas
+Daniel: Will you pick these?
+
+BTW: Is there any chance you can add your clocksource tree to linux-next?
+
+Otherwise, our linux-next builds fail to boot whenever Jason pick some
+mvebu commits and therefore appears in linux-next, but the corresponding
+clocksource commit is taken by you and missing from linux-next.
+
+Thanks!
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
 http://free-electrons.com
