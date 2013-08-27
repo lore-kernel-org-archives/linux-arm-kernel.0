@@ -1,98 +1,69 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 27 Aug 2013 22:38:29 +0100
-Subject: [PATCH 19/19] ARM: atomic64: fix endian-ness in atomic.h
+Date: Tue, 27 Aug 2013 22:38:17 +0100
+Subject: [PATCH 07/19] ARM: smp_scu: data endian fixes
 In-Reply-To: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377639509-22778-20-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377639509-22778-8-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Kamensky <victor.kamensky@linaro.org>
+The smp_scu driver needs to use the relaxed readl/write accessors
+to avoid any issues with the endian mode the processor core is in.
 
-Fix inline asm for atomic64_xxx functions in arm atomic.h. Instead of
-%H operand specifiers code should use %Q for least significant part
-of the value, and %R for the most significant part of the value. %H
-always returns the higher of the two register numbers, and therefore
-it is not endian neutral. %H should be used with ldrexd and strexd
-instructions.
-
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/include/asm/atomic.h |   26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ arch/arm/kernel/smp_scu.c |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-index da1c77d..6447a0b 100644
---- a/arch/arm/include/asm/atomic.h
-+++ b/arch/arm/include/asm/atomic.h
-@@ -301,8 +301,8 @@ static inline void atomic64_add(u64 i, atomic64_t *v)
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 5bc1a63..1aafa0d 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -28,7 +28,7 @@
+  */
+ unsigned int __init scu_get_core_count(void __iomem *scu_base)
+ {
+-	unsigned int ncores = __raw_readl(scu_base + SCU_CONFIG);
++	unsigned int ncores = readl_relaxed(scu_base + SCU_CONFIG);
+ 	return (ncores & 0x03) + 1;
+ }
  
- 	__asm__ __volatile__("@ atomic64_add\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	adds	%0, %0, %4\n"
--"	adc	%H0, %H0, %H4\n"
-+"	adds	%Q0, %Q0, %Q4\n"
-+"	adc	%R0, %R0, %R4\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
-@@ -320,8 +320,8 @@ static inline u64 atomic64_add_return(u64 i, atomic64_t *v)
+@@ -42,19 +42,19 @@ void scu_enable(void __iomem *scu_base)
+ #ifdef CONFIG_ARM_ERRATA_764369
+ 	/* Cortex-A9 only */
+ 	if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090) {
+-		scu_ctrl = __raw_readl(scu_base + 0x30);
++		scu_ctrl = readl_relaxed(scu_base + 0x30);
+ 		if (!(scu_ctrl & 1))
+-			__raw_writel(scu_ctrl | 0x1, scu_base + 0x30);
++			writel_relaxed(scu_ctrl | 0x1, scu_base + 0x30);
+ 	}
+ #endif
  
- 	__asm__ __volatile__("@ atomic64_add_return\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	adds	%0, %0, %4\n"
--"	adc	%H0, %H0, %H4\n"
-+"	adds	%Q0, %Q0, %Q4\n"
-+"	adc	%R0, %R0, %R4\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
-@@ -341,8 +341,8 @@ static inline void atomic64_sub(u64 i, atomic64_t *v)
+-	scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
++	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
+ 	/* already enabled? */
+ 	if (scu_ctrl & 1)
+ 		return;
  
- 	__asm__ __volatile__("@ atomic64_sub\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	subs	%0, %0, %4\n"
--"	sbc	%H0, %H0, %H4\n"
-+"	subs	%Q0, %Q0, %Q4\n"
-+"	sbc	%R0, %R0, %R4\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
-@@ -360,8 +360,8 @@ static inline u64 atomic64_sub_return(u64 i, atomic64_t *v)
+ 	scu_ctrl |= 1;
+-	__raw_writel(scu_ctrl, scu_base + SCU_CTRL);
++	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
  
- 	__asm__ __volatile__("@ atomic64_sub_return\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	subs	%0, %0, %4\n"
--"	sbc	%H0, %H0, %H4\n"
-+"	subs	%Q0, %Q0, %Q4\n"
-+"	sbc	%R0, %R0, %R4\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
-@@ -428,9 +428,9 @@ static inline u64 atomic64_dec_if_positive(atomic64_t *v)
+ 	/*
+ 	 * Ensure that the data accessed by CPU0 before the SCU was
+@@ -80,9 +80,9 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
+ 	if (mode > 3 || mode == 1 || cpu > 3)
+ 		return -EINVAL;
  
- 	__asm__ __volatile__("@ atomic64_dec_if_positive\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	subs	%0, %0, #1\n"
--"	sbc	%H0, %H0, #0\n"
--"	teq	%H0, #0\n"
-+"	subs	%Q0, %Q0, #1\n"
-+"	sbc	%R0, %R0, #0\n"
-+"	teq	%R0, #0\n"
- "	bmi	2f\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
-@@ -459,8 +459,8 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
- "	teqeq	%H0, %H5\n"
- "	moveq	%1, #0\n"
- "	beq	2f\n"
--"	adds	%0, %0, %6\n"
--"	adc	%H0, %H0, %H6\n"
-+"	adds	%Q0, %Q0, %Q6\n"
-+"	adc	%R0, %R0, %R6\n"
- "	strexd	%2, %0, %H0, [%4]\n"
- "	teq	%2, #0\n"
- "	bne	1b\n"
+-	val = __raw_readb(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
++	val = readb_relaxed(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
+ 	val |= mode;
+-	__raw_writeb(val, scu_base + SCU_CPU_STATUS + cpu);
++	writeb_relaxed(val, scu_base + SCU_CPU_STATUS + cpu);
+ 
+ 	return 0;
+ }
 -- 
 1.7.10.4
