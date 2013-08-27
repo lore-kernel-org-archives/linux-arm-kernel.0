@@ -1,43 +1,50 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 27 Aug 2013 17:25:23 +0200
-Subject: linux-next: manual merge of the arm-soc tree with the usb tree
-In-Reply-To: <878uznxjnl.fsf@linaro.org>
-References: <20130827181353.319c150858829df1bb68d60b@canb.auug.org.au>
- <521C6961.9020103@linutronix.de>
- <CABxcv=mg6t5wPqpF3j5sr_76qfZ7N7KgpWhcKSGoPTOcaR=V6A@mail.gmail.com>
- <521CA888.1080909@baylibre.com> <521CAF59.1090203@linutronix.de>
- <521CB046.9070408@baylibre.com> <878uznxjnl.fsf@linaro.org>
-Message-ID: <521CC4E3.8030204@linutronix.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 27 Aug 2013 11:25:35 -0400
+Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+In-Reply-To: <20130827151136.GA10084@localhost>
+References: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130827163939.24636d80@skate> <20130827151136.GA10084@localhost>
+Message-ID: <20130827152535.GG19598@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2013 05:01 PM, Kevin Hilman wrote:
->>> What do we do now?
->>
->> Cannot you just merge the stable arm-soc/dt branch into your branch
->> before applying your patches?
+On Tue, Aug 27, 2013 at 12:11:37PM -0300, Ezequiel Garcia wrote:
+> On Tue, Aug 27, 2013 at 04:39:39PM +0200, Thomas Petazzoni wrote:
+> > Dear Ezequiel Garcia,
+> > 
+> > On Tue, 27 Aug 2013 11:34:25 -0300, Ezequiel Garcia wrote:
+> > > With the introduction of the orion irqchip driver, now the BRIDGE_CAUSE
+> > > bit is cleared by it. There's no longer a need to do it in the watchdog
+> > > driver, so we can simply remove it.
+> > > 
+> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > 
+> > Is this going to work with the platforms that use the orion_wdt driver
+> > but are not using the orion irqchip driver? Take for example
+> > mach-orion5x, it still uses the plat-orion/irq.c code and not the
+> > irqchip orion driver, as far as I can see.
+> > 
+> > The orion irqchip driver is DT only, so all of the Orion platforms that
+> > have not been converted to DT are still using the old irq code.
+> > 
+> > Any thoughts on the consequences of this in relation with your patch?
+> > 
 > 
-> Unfortunately, the next/dt branch of arm-soc is not necessarily stable
-> so should *not* be merged.  In fact none of the arm-soc branches should
-> be considered stable.
+> Argh, you're right, We've completely missed this.
 > 
-> As was already mentioned, this should be split up into driver changes
-> and DTS changes through arm-soc.  They'll both merge for v3.12.
-
-But splitting will break the driver until .dts & code is in sync again.
-
-> BTW, how did this patch get merged without a signoff/ack from the OMAP
-> DT maintainer in the first place?  Hmm, looks like Benoit was not copied
-> nor was linux-omap or linux-arm-kernel copied in the original mails.
-
-Hmm. I had Benoit's okay [0] to do the change "as long as Felipe is
-fine with it". I indeed forgot to Cc Benoit on the dts changes.
-For the phy-rename Felipe pinged you and we did the topic-branch, here
-I forgot.
-
+> And it's a *very* important point because we need this patch
+> to ultimately get rid of the mach/brideg-regs.h.
 > 
-> Kevin
+> Quite frankly I'm really out of ideas right now and unless someone
+> comes up with a smart solution, I see no other way but to:
+> 
+> 1. Implement an armada-wdt.c driver and stop trying to fix the world.
+> 2. Add some ugly ifdefs to avoid the mach-specific header.
+> 3. ?
 
-[0] http://www.spinics.net/lists/linux-usb/msg88423.html
+3. add a handler to plat-orion/irq.c ?
 
-Sebastian
+thx,
+
+Jason.
