@@ -1,88 +1,75 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 27 Aug 2013 23:28:10 +0200
-Subject: [PATCH RFC v2 16/16] ARM: zynq: Don't call of_clk_init()
+Date: Tue, 27 Aug 2013 23:28:08 +0200
+Subject: [PATCH RFC v2 14/16] ARM: vexpress: remove custom .init_time hook
 In-Reply-To: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1377638890-371-17-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1377638890-371-15-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Soren Brinkmann <soren.brinkmann@xilinx.com>
+With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+remove custom .init_time hooks. The call to versatile_sched_clock_init
+is moved to .init_early instead, we it is also for non-DT boards.
 
-of_clk_init() has been moved to be called from common code, therefore
-remove it from Zynq's clock init routine. Since the Zynq's clock setup
-routine relies on an initialized SLCR, zynq_slcr_init() is moved to
-init_irq() instead.
-
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mach-zynq/common.c |    9 ++++-----
- drivers/clk/zynq/clkc.c     |    4 +++-
- 2 files changed, 7 insertions(+), 6 deletions(-)
+ arch/arm/mach-vexpress/v2m.c |   14 +-------------
+ 1 files changed, 1 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 5f25256..9f79ebb 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -19,8 +19,7 @@
- #include <linux/cpumask.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
--#include <linux/clk/zynq.h>
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index 95a469e..4f8b8cb 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -1,12 +1,10 @@
+ /*
+  * Versatile Express V2M Motherboard Support
+  */
 -#include <linux/clocksource.h>
-+#include <linux/irqchip.h>
+ #include <linux/device.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/mmci.h>
+ #include <linux/io.h>
+-#include <linux/clocksource.h>
+ #include <linux/smp.h>
+ #include <linux/init.h>
  #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
-@@ -58,10 +57,10 @@ static void __init zynq_init_machine(void)
- 	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
- }
+@@ -22,7 +20,6 @@
+ #include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/vexpress.h>
+-#include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
  
--static void __init zynq_timer_init(void)
-+static void __init zynq_init_irq(void)
- {
-+	irqchip_init();
- 	zynq_slcr_init();
--	clocksource_of_init();
- }
- 
- static struct map_desc zynq_cortex_a9_scu_map __initdata = {
-@@ -104,8 +103,8 @@ static const char * const zynq_dt_match[] = {
- DT_MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
- 	.smp		= smp_ops(zynq_smp_ops),
- 	.map_io		= zynq_map_io,
-+	.init_irq	= zynq_init_irq,
- 	.init_machine	= zynq_init_machine,
--	.init_time	= zynq_timer_init,
- 	.dt_compat	= zynq_dt_match,
- 	.restart	= zynq_system_reset,
- MACHINE_END
-diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
-index 089d3e3..53b851e 100644
---- a/drivers/clk/zynq/clkc.c
-+++ b/drivers/clk/zynq/clkc.c
-@@ -206,6 +206,9 @@ static void __init zynq_clk_setup(struct device_node *np)
- 
- 	pr_info("Zynq clock init\n");
- 
-+	if (WARN_ON(!zynq_slcr_base_priv))
-+		return;
-+
- 	/* get clock output names from DT */
- 	for (i = 0; i < clk_max; i++) {
- 		if (of_property_read_string_index(np, "clock-output-names",
-@@ -532,5 +535,4 @@ CLK_OF_DECLARE(zynq_clkc, "xlnx,ps7-clkc", zynq_clk_setup);
- void __init zynq_clock_init(void __iomem *slcr_base)
- {
- 	zynq_slcr_base_priv = slcr_base;
+ #include <asm/mach-types.h>
+@@ -422,16 +419,8 @@ void __init v2m_dt_init_early(void)
+ 			pr_warning("vexpress: DT HBI (%x) is not matching "
+ 					"hardware (%x)!\n", dt_hbi, hbi);
+ 	}
+-}
+-
+-static void __init v2m_dt_timer_init(void)
+-{
 -	of_clk_init(NULL);
+ 
+-	clocksource_of_init();
+-
+-	versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
+-				24000000);
++	versatile_sched_clock_init(vexpress_get_24mhz_clock_base(), 24000000);
  }
+ 
+ static const struct of_device_id v2m_dt_bus_match[] __initconst = {
+@@ -458,6 +447,5 @@ DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
+ 	.smp_init	= smp_init_ops(vexpress_smp_init_ops),
+ 	.map_io		= v2m_dt_map_io,
+ 	.init_early	= v2m_dt_init_early,
+-	.init_time	= v2m_dt_timer_init,
+ 	.init_machine	= v2m_dt_init,
+ MACHINE_END
 -- 
 1.7.2.5
