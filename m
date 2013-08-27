@@ -1,51 +1,45 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 27 Aug 2013 22:38:20 +0100
-Subject: [PATCH 10/19] vexpress: add big endian support
+Date: Tue, 27 Aug 2013 22:38:26 +0100
+Subject: [PATCH 16/19] ARM: net: fix arm instruction endian-ness in
+ bpf_jit_32.c
 In-Reply-To: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377639509-22778-11-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377639509-22778-17-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the versatile express systems to boot big-endian.
+Use <asm/opcodes.h> to correctly transform instruction byte ordering
+into in-memory ordering.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/mach-vexpress/Kconfig    |    1 +
- arch/arm/plat-versatile/headsmp.S |    2 ++
- 2 files changed, 3 insertions(+)
+ arch/arm/net/bpf_jit_32.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index b8bbabe..d9dc5d2a 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -1,6 +1,7 @@
- config ARCH_VEXPRESS
- 	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7
- 	select ARCH_REQUIRE_GPIOLIB
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ARM_AMBA
- 	select ARM_GIC
- 	select ARM_TIMER_SP804
-diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
-index 2677bc3..40f27e5 100644
---- a/arch/arm/plat-versatile/headsmp.S
-+++ b/arch/arm/plat-versatile/headsmp.S
-@@ -10,6 +10,7 @@
-  */
- #include <linux/linkage.h>
- #include <linux/init.h>
-+#include <asm/assembler.h>
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index f50d223..510d923 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -19,6 +19,7 @@
+ #include <linux/if_vlan.h>
+ #include <asm/cacheflush.h>
+ #include <asm/hwcap.h>
++#include <asm/opcodes.h>
  
- /*
-  * Realview/Versatile Express specific entry point for secondary CPUs.
-@@ -17,6 +18,7 @@
-  * until we're ready for them to initialise.
-  */
- ENTRY(versatile_secondary_startup)
-+ ARM_BE8(setend	be)
- 	mrc	p15, 0, r0, c0, c0, 5
- 	bic	r0, #0xff000000
- 	adr	r4, 1f
+ #include "bpf_jit_32.h"
+ 
+@@ -113,8 +114,11 @@ static u32 jit_udiv(u32 dividend, u32 divisor)
+ 
+ static inline void _emit(int cond, u32 inst, struct jit_ctx *ctx)
+ {
++	inst |= (cond << 28);
++	inst = __opcode_to_mem_arm(inst);
++
+ 	if (ctx->target != NULL)
+-		ctx->target[ctx->idx] = inst | (cond << 28);
++		ctx->target[ctx->idx] = inst;
+ 
+ 	ctx->idx++;
+ }
 -- 
 1.7.10.4
