@@ -1,61 +1,115 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Tue, 27 Aug 2013 11:43:26 +0200
-Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.12
-In-Reply-To: <87fvu0mf87.fsf@linaro.org>
-References: <521384D5.1050607@baylibre.com>
- <20130821071334.GQ7656@atomide.com> <5214D4FD.4060405@baylibre.com>
- <87fvu0mf87.fsf@linaro.org>
-Message-ID: <521C74BE.9080404@baylibre.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 27 Aug 2013 11:47:12 +0200
+Subject: [PATCH v2 2/4] iio: at91: Use different prescal, startup mask in
+ MR for different IP
+In-Reply-To: <521C6BD2.7070602@atmel.com>
+References: <1376219071-29946-3-git-send-email-josh.wu@atmel.com>
+ <20130815192044.GD12162@lukather> <5215DF2C.3050502@atmel.com>
+ <5215DF7C.2020909@atmel.com>
+ <20130823154603.GA7468@ludovic.desroches@atmel.com>
+ <20130823165936.GC1230@lukather>
+ <20130826083207.GB7468@ludovic.desroches@atmel.com>
+ <521B27F3.1050203@atmel.com> <20130827081550.GF2695@lukather>
+ <521C6BD2.7070602@atmel.com>
+Message-ID: <20130827094712.GH2695@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi Nicolas,
 
-On 23/08/2013 20:31, Kevin Hilman wrote:
-> Benoit Cousson <bcousson@baylibre.com> writes:
->
->> Hi Kevin & Olof,
->>
->> I've just updated the branch with the few USB3 patches I missed from Felipe.
->>
->> So here is a new pull-request.
->>
->> Thanks,
->> Benoit
->>
->> ----------------------------------------------------------------
->> Add the minimal DTS support for DRA7xx based SoC core.
->> Add the initial support for N900 and gta04 phones.
->> Enable USB3 on OMAP5 evm board.
->> Do a lot of various cleanups.
->> ----------------------------------------------------------------
->
-> This is a nice description, but would be even better if it was the
-> description of the signed tag.  For future pulls, since we're pulling
-> from you directly into arm-soc, can you start using signed tags please?
->
->
->> The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
->>
->>    Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.12/dts
->>
->> for you to fetch changes up to 5903208d4e2c09a3872feba6b9e2e49c64fd07ad:
->>
->>    ARM: configs: omap2plus_defconfig: enable dwc3 and dependencies (2013-08-21 16:43:21 +0200)
->>
->
-> Pulled into next/dt.
+On Tue, Aug 27, 2013 at 11:05:22AM +0200, Nicolas Ferre wrote:
+> On 27/08/2013 10:15, Maxime Ripard :
+> >On Mon, Aug 26, 2013 at 06:03:31PM +0800, Josh Wu wrote:
+> >>Hi, Ludovic and Maxime
+> >>
+> >>On 8/26/2013 4:32 PM, Ludovic Desroches wrote:
+> >>>On Fri, Aug 23, 2013 at 06:59:36PM +0200, Maxime Ripard wrote:
+> >>>>Hi Ludovic, Josh,
+> >>>>
+> >>>>On Fri, Aug 23, 2013 at 05:46:03PM +0200, Desroches, Ludovic wrote:
+> >>>>>On Thu, Aug 22, 2013 at 05:53:00PM +0800, Josh Wu wrote:
+> >>>>>>On 8/22/2013 5:51 PM, Josh Wu wrote:
+> >>>>>>>Hi, Maxime
+> >>>>>>>
+> >>>>>>>On 8/16/2013 3:20 AM, Maxime Ripard wrote:
+> >>>>>>>>Hi Josh,
+> >>>>>>>>
+> >>>>>>>>On Sun, Aug 11, 2013 at 07:04:29PM +0800, Josh Wu wrote:
+> >>>>>>>>>For at91 boards, there are different IPs for adc. Different IPs has
+> >>>>>>>>>different STARTUP & PRESCAL mask in ADC_MR.
+> >>>>>>>>>
+> >>>>>>>>>This patch introduce the multiple compatible string for those
+> >>>>>>>>>different IPs.
+> >>>>>>>>>
+> >>>>>>>>>Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> >>>>>>>>Overall it looks like the right ways, but I think we can take it a step
+> >>>>>>>>further.
+> >>>>>>>>
+> >>>>>>>>I'd drop at least the atmel,adc-drdy-mask, atmel,adc-num-channels,
+> >>>>>>>>atmel,adc-status-register, atmel,adc-trigger-register properties (and
+> >>>>>>>>probably the triggers as well description as well).
+> >>>>>>>yeah, right. Currently I want to drop following:
+> >>>>>>>
+> >>>>>>>atmel,adc-drdy-mask, atmel,adc-status-register,
+> >>>>>>>atmel,adc-trigger-register, atmel,adc-channel-base
+> >>>>>>>
+> >>>>>>>For the adc-num-channels, I'd like to leave it in dt parameters.
+> >>>>>>>It is a description for an adc capablity.
+> >>>>>About this parameter, I'll remove it too from the dt bindings. To set it you
+> >>>>>need to have a look to the datasheet and to copy a constant value into the
+> >>>>>dt. From my point of view, it means than this parameter should be managed by
+> >>>>>the driver and by the dt.
+> >>>>>
+> >>>>>On the other side since there are some dynamic allocation depending on this
+> >>>>>parameter maybe it makes sense to keep it in the dt. If the user wants to use
+> >>>>>only 2 channels why doing allocation for max channel number. By the way, this
+> >>>>>case is only valid if he uses the two first channels.
+> >>>>I don't recall it very well, is there any reason to not have it in the
+> >>>>DT? Can the ADC channels be used for something else? Or is it just some
+> >>>>IP-specific number of channels?
+> >>>>
+> >>>It is IP-specific. I don't see what benefit we could have to keep it in the DT?
+> >>>But Josh seems to have arguments to keep it.
+> >>
+> >>I'm ok to remove the channel number. What I worried is there also
+> >>has a channel-used mask in DT.
+> >>This mask should be removed too if channel number is removed.
+> >>So maybe we can also use the sysfs to set the mask.
+> >
+> >Indeed, that would make adc-channel-used irrelevant. But I'm not sure
+> >the mask is useful at all. Just enable all the channels and that's it?
+> 
+> On the top of my head: keeping all channels enabled, won't it have
+> an impact on:
+> 1/ power consumption?
+> 2/ minimum period of sampling for a particular channel in case of
+>    continuous ADC trigger?
 
-Thanks.
+I don't know, you tell me ;)
 
-> Benoit, since we're pulling directly from you into arm-soc, can you
-> start using signed tags please?  Thanks.
+This is exactly why I was asking.
 
-OK, no problem, I'll RTFM to see how it works and do that next time.
+> And do not forget that sysfs is an interface that is:
+> - needing a userspace tool to be configured properly (even just an
+>   echo xx)
+> - hard to design
+> - a strict ABI that can't be changed once deployed
+> 
+> But yes, it is true that if the user has to configure ADC at
+> runtime, it is certainly an interface worth considering...
 
-Regards,
-Benoit
+Yes, of course. But the resolution is something I'd expect to be
+user-configurable, probably at runtime, and the DT doesn't make it very
+convenient to achieve.
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130827/155d6cfd/attachment-0001.sig>
