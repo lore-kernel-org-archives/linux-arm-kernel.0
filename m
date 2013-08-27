@@ -1,68 +1,97 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 27 Aug 2013 22:38:22 +0100
-Subject: [PATCH 12/19] ARM: traps: use <asm/opcodes.h> to get correct
- instruction order
+Date: Tue, 27 Aug 2013 22:38:27 +0100
+Subject: [PATCH 17/19] ARM: Correct BUG() assembly to ensure it is
+ endian-agnostic
 In-Reply-To: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377639509-22778-13-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377639509-22778-18-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The trap handler needs to take into account the endian configuration of
-the system when loading instructions. Use <asm/opcodes.h> to provide the
-necessary conversion functions.
+Currently BUG() uses .word or .hword to create the necessary illegal
+instructions. However if we are building BE8 then these get swapped
+by the linker into different illegal instructions in the text. This
+means that the BUG() macro does not get trapped properly.
+
+Change to using <asm/opcodes.h> to provide the necessary ARM instruction
+building as we cannot rely on gcc/gas having the `.inst` instructions
+which where added to try and resolve this issue (reported by Dave Martin
+<Dave.Martin@arm.com>).
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/kernel/traps.c |   16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/bug.h |   10 ++++++----
+ arch/arm/kernel/traps.c    |    8 +++++---
+ 2 files changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index ab517fc..99bcd0e3 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -34,6 +34,7 @@
- #include <asm/unwind.h>
- #include <asm/tls.h>
- #include <asm/system_misc.h>
+diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+index 7af5c6c..b274bde 100644
+--- a/arch/arm/include/asm/bug.h
++++ b/arch/arm/include/asm/bug.h
+@@ -2,6 +2,8 @@
+ #define _ASMARM_BUG_H
+ 
+ #include <linux/linkage.h>
++#include <linux/types.h>
 +#include <asm/opcodes.h>
  
- static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
+ #ifdef CONFIG_BUG
  
-@@ -402,25 +403,28 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 	if (processor_mode(regs) == SVC_MODE) {
+@@ -12,10 +14,10 @@
+  */
  #ifdef CONFIG_THUMB2_KERNEL
- 		if (thumb_mode(regs)) {
--			instr = ((u16 *)pc)[0];
-+			instr = __mem_to_opcode_thumb16(((u16 *)pc)[0]);
- 			if (is_wide_instruction(instr)) {
--				instr <<= 16;
--				instr |= ((u16 *)pc)[1];
-+				u16 inst2;
-+				instr2 = __mem_to_opcode_thumb16(((u16 *)pc)[1]);
-+				instr = __opcode_thumb32_compose(instr, instr2);
- 			}
- 		} else
+ #define BUG_INSTR_VALUE 0xde02
+-#define BUG_INSTR_TYPE ".hword "
++#define BUG_INSTR(__value) __inst_thumb16(__value)
+ #else
+ #define BUG_INSTR_VALUE 0xe7f001f2
+-#define BUG_INSTR_TYPE ".word "
++#define BUG_INSTR(__value) __inst_arm(__value)
  #endif
--			instr = *(u32 *) pc;
-+			instr = __mem_to_opcode_arm(*(u32 *) pc);
- 	} else if (thumb_mode(regs)) {
- 		if (get_user(instr, (u16 __user *)pc))
- 			goto die_sig;
-+		instr = __mem_to_opcode_thumb16(instr);
- 		if (is_wide_instruction(instr)) {
- 			unsigned int instr2;
- 			if (get_user(instr2, (u16 __user *)pc+1))
- 				goto die_sig;
--			instr <<= 16;
--			instr |= instr2;
-+			instr2 = __mem_to_opcode_thumb16(instr2);
-+			instr = __opcode_thumb32_compose(instr, instr2);
- 		}
- 	} else if (get_user(instr, (u32 __user *)pc)) {
-+		instr = __mem_to_opcode_arm(instr);
- 		goto die_sig;
- 	}
  
+ 
+@@ -33,7 +35,7 @@
+ 
+ #define __BUG(__file, __line, __value)				\
+ do {								\
+-	asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n"	\
++	asm volatile("1:\t" BUG_INSTR(__value) "\n"  \
+ 		".pushsection .rodata.str, \"aMS\", %progbits, 1\n" \
+ 		"2:\t.asciz " #__file "\n" 			\
+ 		".popsection\n" 				\
+@@ -48,7 +50,7 @@ do {								\
+ 
+ #define __BUG(__file, __line, __value)				\
+ do {								\
+-	asm volatile(BUG_INSTR_TYPE #__value);			\
++	asm volatile(BUG_INSTR(__value) "\n");			\
+ 	unreachable();						\
+ } while (0)
+ #endif  /* CONFIG_DEBUG_BUGVERBOSE */
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 99bcd0e3..da070db 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -342,15 +342,17 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
+ int is_valid_bugaddr(unsigned long pc)
+ {
+ #ifdef CONFIG_THUMB2_KERNEL
+-	unsigned short bkpt;
++	u16 bkpt;
++	u16 insn = __opcode_to_mem_thumb16(BUG_INSTR_VALUE);
+ #else
+-	unsigned long bkpt;
++	u32 bkpt;
++	u32 insn = __opcode_to_mem_arm(BUG_INSTR_VALUE);
+ #endif
+ 
+ 	if (probe_kernel_address((unsigned *)pc, bkpt))
+ 		return 0;
+ 
+-	return bkpt == BUG_INSTR_VALUE;
++	return bkpt == insn;
+ }
+ 
+ #endif
 -- 
 1.7.10.4
