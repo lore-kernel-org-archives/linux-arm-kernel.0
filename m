@@ -1,98 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 27 Aug 2013 15:35:07 -0600
-Subject: [RFC PATCH 2/3] pinctrl: at91: add support for generic pinconf
-In-Reply-To: <521C49EF.5020403@overkiz.com>
-References: <1377379926-11163-1-git-send-email-b.brezillon@overkiz.com>
- <1377380259-11290-1-git-send-email-b.brezillon@overkiz.com>
- <521B8822.50304@wwwdotorg.org> <521B8D9B.5020809@overkiz.com>
- <521C23AF.2060309@wwwdotorg.org> <521C49EF.5020403@overkiz.com>
-Message-ID: <521D1B8B.7040803@wwwdotorg.org>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 27 Aug 2013 22:38:15 +0100
+Subject: [PATCH 05/19] ARM: pl01x debug code endian fix
+In-Reply-To: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377639509-22778-6-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2013 12:40 AM, boris brezillon wrote:
-> On 27/08/2013 05:57, Stephen Warren wrote:
->> On 08/26/2013 11:17 AM, boris brezillon wrote:
->>> On 26/08/2013 18:53, Stephen Warren wrote:
->>>> On 08/24/2013 03:37 PM, Boris BREZILLON wrote:
->>>>> Add support for generic pin configuration to pinctrl-at91 driver.
->>>>> diff --git
->>>>> a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
->>>>> b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
->>>>>    Required properties for iomux controller:
->>>>> -- compatible: "atmel,at91rm9200-pinctrl"
->>>>> +- compatible: "atmel,at91rm9200-pinctrl" or
->>>>> "atmel,at91sam9x5-pinctrl".
->>>> You seem to also be adding a second chip name to the list here,
->>>> which is
->>>> more than the patch subject/description imply you're doing...
->>> This is an update of the documentation:
->>> "atmel,at91sam9x5-pinctrl" compatible is already used in the pinctrl
->>> driver but the documention
->>> was not updated.
->>>
->>> But I agree, this should not be part of this series.
->>>
->>>>> +  Add "generic-pinconf" to the compatible string list to use the
->>>>> generic pin
->>>>> +  configuration syntax.
->>>> "generic-pinconf" is too generic of a compatible value for this binding
->>>> to define.
->>>>
->>>> Instead, I think you want to either:
->>>>
->>>> a)
->>>>
->>>> Use compatible="atmel,at91rm9200-pinctrl" for the old binding,
->>>> use compatible="atmel,at91rm9200-pinctrl-generic" for the new binding
->>>>
->>>> or:
->>>>
->>>> b)
->>>>
->>>> Define Boolean property atmel,generic-pinconf (perhaps a better name
->>>> could be chosen?). If it's not present, parse the node assuming the old
->>>> binding. If it is present, parse the node assuming the new binding.
->>>>
->>> Okay.
->>>
->>> I thought this property string could be generic as it may concern other
->>> drivers too
->>> (in order to keep compatibility with old dt ABI and add support the
->>> generic pinconf binding).
->>>
->>> Anyway, I prefer the first proposition.
->>>
->>> pinctrl single driver is already using these names:
->>>
->>> |compatible = "pinctrl-single" for non generic pinconf binding
->>> ||compatible = "pinconf-single" ||for generic pinconf binding|
->>>
->>> So I think we should use something similar:
->>>
->>> |compatible = "atmel,at91xx-pinctrl" for non generic pinconf binding
->>> ||compatible = "|||atmel,at91xx-|pinconf" ||for generic pinconf binding|
->>>
->>> What do you think ?
->> Hmmm. It is a little odd to switch out the compatible value and invent a
->> new binding for the same HW. Isn't it possible to define both sets of
->> properties in the binding, and have drivers look for either?
->>
-> 
-> Do you mean something like:
-> 
-> atmel,pins = <xxx>;                /* current dt binding */
-> atmel,generic-pins = <yyy>;    /* new dt binding */
-> 
-> If that's what you had in mind, it will be a little bit tricky to
-> handle, because AFAIK the pinconf_ops
-> callbacks do not give me any element I could use to deduce the type of
-> pinconf (generic or
-> native).
-> This implies I have to know early during the probe process which kind of
-> binding is in use.
-> 
-> Please tell me if I missed some key points, and this can be easily done.
+The PL01X debug code needs to take into account which endian mode the
+processor is running in. If it is big-endian, ensure the data is swapped
+appropriately.
 
-It's probably most compatible to keep all the existing properties, and
-just add new properties for new features.
+Note, we could do this slightly more efficiently if we have an macro to
+do the necessary swap for the bits used by test.
+
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+ arch/arm/include/asm/hardware/debug-pl01x.S |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/include/asm/hardware/debug-pl01x.S b/arch/arm/include/asm/hardware/debug-pl01x.S
+index f9fd083..6489d1f 100644
+--- a/arch/arm/include/asm/hardware/debug-pl01x.S
++++ b/arch/arm/include/asm/hardware/debug-pl01x.S
+@@ -18,12 +18,14 @@
+ 
+ 		.macro	waituart,rd,rx
+ 1001:		ldr	\rd, [\rx, #UART01x_FR]
++ ARM_BE8(	rev	\rd, \rd )
+ 		tst	\rd, #UART01x_FR_TXFF
+ 		bne	1001b
+ 		.endm
+ 
+ 		.macro	busyuart,rd,rx
+ 1001:		ldr	\rd, [\rx, #UART01x_FR]
++ ARM_BE8(	rev	\rd, \rd )
+ 		tst	\rd, #UART01x_FR_BUSY
+ 		bne	1001b
+ 		.endm
+-- 
+1.7.10.4
