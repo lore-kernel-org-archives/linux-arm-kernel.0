@@ -1,111 +1,74 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 27 Aug 2013 13:37:09 -0700
-Subject: [PATCH v4 1/4] lib: Introduce atomic MMIO modify
-In-Reply-To: <1377358532-23802-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377358532-23802-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377358532-23802-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130827133709.64b4743950b911d6dfe7fab8@linux-foundation.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 27 Aug 2013 15:02:48 -0600
+Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+In-Reply-To: <521D063F.4040404@gmail.com>
+References: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130827163939.24636d80@skate> <20130827151136.GA10084@localhost>
+ <20130827152535.GG19598@titan.lakedaemon.net>
+ <20130827191337.GA2339@localhost> <521D063F.4040404@gmail.com>
+Message-ID: <20130827210248.GA19625@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 24 Aug 2013 12:35:29 -0300 Ezequiel Garcia <ezequiel.garcia@free-electrons.com> wrote:
+On Tue, Aug 27, 2013 at 10:04:15PM +0200, Sebastian Hesselbarth wrote:
 
-> Some platforms have MMIO regions that are shared across orthogonal
-> subsystems. This commit implements a possible solution for the
-> thread-safe access of such regions through a spinlock-protected API.
+> In the current use of watchdog even for non-DT boards, you do not
+> have to clear the interrupt cause. It will ultimately lead to a
+> reset in any way. Maybe it is not a big deal to remove it now
+> even without non-DT replacement.
 
-Seem sensible.  Perhaps.
+But that is the likely reason..
 
-It only works if both subsystems agree to use atomic_io_modify().  And
-if they're both capable of doing that, they are both capable of
-implementing an agreed-upon internal locking scheme, so why bother?
+AFAIK, to be immune to bootloader left over you must do these steps in
+order:
+ - Gain control of the WDT timer, so that it doesn't trigger
+ - Clear the cause register
+ - Enable the reset out function
 
-And the advantage of having the two subsystems agree on a locking
-scheme is that they then will not share a lock with all other
-subsystems which use atomic IO.  That lock you use in lib/atomicio.c
-could become heavily contended.  Although such contention problems
-could be easily fixed up by using an array of locks within
-atomic_io_modify(), keyed by a hash of the io address.
+Which is what orion_wdt_start does today.
 
-> Concurrent access is protected with a single spinlock for the
-> entire MMIO address space. While this protects shared-registers,
-> it also serializes access to unrelated/unshared registers.
+If you fiddle with the order you risk creating an errant WDT trigger,
+depending on what the bootloader did.
 
-I'd suggest cc'ing Linus on this material - he might have opinons.
+eg having cause asserted and then setting the reset out bit will
+reboot the board.
 
-> --- a/include/linux/io.h
-> +++ b/include/linux/io.h
-> @@ -101,4 +101,9 @@ static inline void arch_phys_wc_del(int handle)
->  #define arch_phys_wc_add arch_phys_wc_add
->  #endif
->  
-> +#ifndef __HAVE_ARCH_ATOMIC_IO_MODIFY
-> +/* Atomic MMIO-wide IO modify */
-> +extern void atomic_io_modify(void __iomem *reg, u32 mask, u32 set);
-> +#endif
+Hoisting the reset out register write into board code now requires
+that the bootloader left the WDT subsystem in some kind of sane state,
+probably not great..
 
-I disagree with the presence of the ifndef.  If
-__HAVE_ARCH_ATOMIC_IO_MODIFY is undefined, the architecture must still
-implement the identical function signature.  The best way to ensure that
-is to use the same prototype in both cases.
+The cause register clear should be done by the IRQ driver when the
+wdt driver attaches to the interrupt, so the order must be:
+ - program WDT timer registers, zero base counter, halt counting
+ - attach interrupt (clears cause prior to attach)
+ - enable reset out function
+ - enable WDT timers
 
->  #endif /* _LINUX_IO_H */
-> diff --git a/lib/Makefile b/lib/Makefile
-> index 7baccfd..695d6e2 100644
-> --- a/lib/Makefile
-> +++ b/lib/Makefile
-> @@ -13,7 +13,7 @@ lib-y := ctype.o string.o vsprintf.o cmdline.o \
->  	 sha1.o md5.o irq_regs.o reciprocal_div.o argv_split.o \
->  	 proportions.o flex_proportions.o prio_heap.o ratelimit.o show_mem.o \
->  	 is_single_threaded.o plist.o decompress.o kobject_uevent.o \
-> -	 earlycpio.o percpu-refcount.o
-> +	 earlycpio.o percpu-refcount.o atomicio.o
->  
->  obj-$(CONFIG_ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS) += usercopy.o
->  lib-$(CONFIG_MMU) += ioremap.o
-> diff --git a/lib/atomicio.c b/lib/atomicio.c
-> new file mode 100644
-> index 0000000..1750f9d
-> --- /dev/null
-> +++ b/lib/atomicio.c
-> @@ -0,0 +1,27 @@
-> +#include <linux/io.h>
-> +#include <linux/spinlock.h>
-> +
-> +#ifndef __HAVE_ARCH_ATOMIC_IO_MODIFY
-> +/*
-> + * Generic atomic MMIO modify.
-> + *
-> + * Allows thread-safe access to registers shared by unrelated subsystems.
-> + * The access is protected by a single MMIO-wide lock.
-> + *
-> + * Optimized variants can be implemented on a per-architecture basis.
-> + */
+You'll need to hook the WDT interrupt (just call panic) to make this
+work properly.
 
-Some kerneldoc would be nice.
+Our systems have a delay after the RSTOUT pin is asserted but before
+the Armada is reset. This delay is designed to be long enough for an
+oops to make it out of the serial port. Thus, I'm using this as the
+WDT interrupt:
 
-> +static DEFINE_RAW_SPINLOCK(__io_lock);
++static irqreturn_t orion_wdt_handler(int irq, void *arg)
++{
++       console_verbose();
++       pr_crit("Oops: Watchdog Timeout");
++       show_regs(get_irq_regs());
++       panic("Watchdog Timeout");
++       return IRQ_HANDLED;
++}
 
-This could be local to atomic_io_modify().
+Which produces a detailed report of what was holding the CPU and
+preventing userspace from running. On other hardware you can get the
+oops by not enabling RSTOUTn..
 
-> +void atomic_io_modify(void __iomem *reg, u32 mask, u32 set)
-> +{
-> +	unsigned long flags;
-> +	u32 value;
-> +
-> +	raw_spin_lock_irqsave(&__io_lock, flags);
-> +	value = readl(reg) & ~mask;
-> +	value |= (set & mask);
+Since this is so complex, maybe it is OK to abandon support for non-DT
+boards in the WDT driver? Watchdog is not critical functionality, so
+nobody should be critically impacted. Boards would have to migrate
+to DT to get WDT back?
 
-Could just be "value |= set".  The code as you have it permits callers
-to set bits in "set" which aren't permitted in "mask", which would be
-pretty darn stupid of them.
-
-> +	writel(value, reg);
-> +	raw_spin_unlock_irqrestore(&__io_lock, flags);
-> +
-> +}
-> +EXPORT_SYMBOL(atomic_io_modify);
-> +#endif
-
-What about 8, 16 and 64-bit IO addresses?
+Jason
