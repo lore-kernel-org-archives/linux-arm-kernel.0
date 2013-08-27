@@ -1,46 +1,28 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 27 Aug 2013 22:38:25 +0100
-Subject: [PATCH 15/19] ARM: hardware: fix endian-ness in <hardware/coresight.h>
-In-Reply-To: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377639509-22778-16-git-send-email-ben.dooks@codethink.co.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 27 Aug 2013 17:41:21 -0400
+Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+In-Reply-To: <20130827210248.GA19625@obsidianresearch.com>
+References: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130827163939.24636d80@skate> <20130827151136.GA10084@localhost>
+ <20130827152535.GG19598@titan.lakedaemon.net>
+ <20130827191337.GA2339@localhost> <521D063F.4040404@gmail.com>
+ <20130827210248.GA19625@obsidianresearch.com>
+Message-ID: <20130827214121.GI19598@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The <hardware/coresight.h> needs to take into account the endian-ness
-of the processor when reading and writing data, so change to using
-the readl/writel relaxed variants from the raw ones.
+On Tue, Aug 27, 2013 at 03:02:48PM -0600, Jason Gunthorpe wrote:
+> Since this is so complex, maybe it is OK to abandon support for non-DT
+> boards in the WDT driver? Watchdog is not critical functionality, so
+> nobody should be critically impacted. Boards would have to migrate
+> to DT to get WDT back?
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
- arch/arm/include/asm/hardware/coresight.h |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+I'm not 100% opposed to this.  We need to give it careful thought, but
+it may be a viable solution since we are at the "convert old boards to
+DT" stage anyhow.  If we had ten more drivers and 6 release cycles in
+front of us, I'd say no.
 
-diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
-index 0cf7a6b..ad774f3 100644
---- a/arch/arm/include/asm/hardware/coresight.h
-+++ b/arch/arm/include/asm/hardware/coresight.h
-@@ -24,8 +24,8 @@
- #define TRACER_TIMEOUT 10000
- 
- #define etm_writel(t, v, x) \
--	(__raw_writel((v), (t)->etm_regs + (x)))
--#define etm_readl(t, x) (__raw_readl((t)->etm_regs + (x)))
-+	(writel_relaxed((v), (t)->etm_regs + (x)))
-+#define etm_readl(t, x) (readl_relaxed((t)->etm_regs + (x)))
- 
- /* CoreSight Management Registers */
- #define CSMR_LOCKACCESS 0xfb0
-@@ -142,8 +142,8 @@
- #define ETBFF_TRIGFL		BIT(10)
- 
- #define etb_writel(t, v, x) \
--	(__raw_writel((v), (t)->etb_regs + (x)))
--#define etb_readl(t, x) (__raw_readl((t)->etb_regs + (x)))
-+	(writel_relaxed((v), (t)->etb_regs + (x)))
-+#define etb_readl(t, x) (readl_relaxed((t)->etb_regs + (x)))
- 
- #define etm_lock(t) do { etm_writel((t), 0, CSMR_LOCKACCESS); } while (0)
- #define etm_unlock(t) \
--- 
-1.7.10.4
+thx,
+
+Jason.
