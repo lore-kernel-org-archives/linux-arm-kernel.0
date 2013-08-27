@@ -1,54 +1,77 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 27 Aug 2013 11:06:35 -0500
-Subject: [PATCH 1/2] ARM: AM335x: Get rid of unused sram init function
-In-Reply-To: <1377598305-15539-2-git-send-email-rnayak@ti.com>
-References: <1377598305-15539-1-git-send-email-rnayak@ti.com>
- <1377598305-15539-2-git-send-email-rnayak@ti.com>
-Message-ID: <521CCE8B.4050907@ti.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 27 Aug 2013 09:07:34 -0700
+Subject: arm-soc: Xilinx Zynq cleanups for v3.12 v2
+In-Reply-To: <CAHTX3dLYC_pxNFSUYEyYA3dVXBotMOYA6W=LEgsBTX4Ggt5rHg@mail.gmail.com>
+ (Michal Simek's message of "Tue, 27 Aug 2013 17:11:58 +0200")
+References: <52130428.3010205@monstr.eu>
+ <CAHTX3dLYC_pxNFSUYEyYA3dVXBotMOYA6W=LEgsBTX4Ggt5rHg@mail.gmail.com>
+Message-ID: <87mwo3w20p.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2013 05:11 AM, Rajendra Nayak wrote:
-> Remove the empty am33xx_sram_init() function.
->
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->   arch/arm/mach-omap2/sram.c |    7 -------
->   1 file changed, 7 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
-> index 4bd0968..305fc2b 100644
-> --- a/arch/arm/mach-omap2/sram.c
-> +++ b/arch/arm/mach-omap2/sram.c
-> @@ -285,11 +285,6 @@ static inline int omap34xx_sram_init(void)
->   }
->   #endif /* CONFIG_ARCH_OMAP3 */
->
-> -static inline int am33xx_sram_init(void)
-> -{
-> -	return 0;
-> -}
-> -
->   int __init omap_sram_init(void)
->   {
->   	omap_detect_sram();
-> @@ -299,8 +294,6 @@ int __init omap_sram_init(void)
->   		omap242x_sram_init();
->   	else if (cpu_is_omap2430())
->   		omap243x_sram_init();
-> -	else if (soc_is_am33xx())
-> -		am33xx_sram_init();
->   	else if (cpu_is_omap34xx())
->   		omap34xx_sram_init();
->
->
+Michal Simek <monstr@monstr.eu> writes:
 
-Suspend resume for AM33xx as of right now uses this function. This patch 
-[1] uses this function to push the low-level suspend code to sram, it 
-was added here to be consistent with other platforms that utilize the 
-same type of functionality (omap34xx).
+> Hi guys,
+>
+> any update on this?
 
-Regards,
-Dave
+Oops, looks like I forgot to reply, but this was pulled into
+next/cleanup last week.
 
-[1] http://marc.info/?l=linux-omap&m=137581164813160&w=2
+Kevin
+
+
+>
+> 2013/8/20 Michal Simek <monstr@monstr.eu>
+>
+>> Hi Arnd, Kevin and Olof,
+>>
+>> This is the second pull request because Kevin wanted to remove clk changes
+>> and send them through Mike's clk tree.
+>> Please pull these cleanup patches to your tree.
+>>
+>> Thanks,
+>> Michal
+>>
+>> The following changes since commit
+>> 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
+>>
+>>   Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.12
+>>
+>> for you to fetch changes up to b522877b53cf3f26d7f072616a45e10fe579cd19:
+>>
+>>   arm: zynq: hotplug: Remove unreachable code (2013-08-20 07:32:13 +0200)
+>>
+>> ----------------------------------------------------------------
+>> arm: Xilinx Zynq cleanup patches for v3.12
+>>
+>> This branch contains these fixes:
+>> - SLCR cleanup
+>> - Hotplug cleanup
+>>
+>> ----------------------------------------------------------------
+>> Soren Brinkmann (4):
+>>       arm: zynq: slcr: Remove redundant header #includes
+>>       arm: zynq: slcr: Clean up #defines
+>>       arm: zynq: slcr: Use read-modify-write for register writes
+>>       arm: zynq: hotplug: Remove unreachable code
+>>
+>>  arch/arm/mach-zynq/hotplug.c | 55
+>> +++++--------------------------------------------------
+>>  arch/arm/mach-zynq/slcr.c    | 45
+>> +++++++++++++++++----------------------------
+>>  2 files changed, 22 insertions(+), 78 deletions(-)
+>>
+>> --
+>> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+>> w: www.monstr.eu p: +42-0-721842854
+>> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+>> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+>> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+>>
+>>
+>>
