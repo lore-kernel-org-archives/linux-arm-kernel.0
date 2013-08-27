@@ -1,84 +1,84 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 27 Aug 2013 12:37:38 +0100
-Subject: [PATCH v4 1/5] ARM/ARM64: arch_timer: add macros for bits in
- control register
-In-Reply-To: <20130827112144.GG19897@arm.com>
-References: <1377274749-6196-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1377274749-6196-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <20130827112144.GG19897@arm.com>
-Message-ID: <521C8F82.6070301@arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 27 Aug 2013 13:55 +0200
+Subject: [PATCH v5] gpio: pcf857x: Add OF support
+In-Reply-To: <521C63A0.10902@ti.com>
+References: <1377590559-14279-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2063335.Uqxok8bYMn@flatron> <521C63A0.10902@ti.com>
+Message-ID: <1830640.BeoA2uHWDI@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/08/13 12:21, Catalin Marinas wrote:
-> On Fri, Aug 23, 2013 at 05:19:05PM +0100, Sudeep KarkadaNagesha wrote:
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> Add macros to describe the bitfields in the ARM architected timer
->> control register to make code easy to understand.
->>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Reviewed-by: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->> ---
->>  arch/arm/include/asm/arch_timer.h    |  9 +++++++--
->>  arch/arm64/include/asm/arch_timer.h  | 12 ++++++++----
->>  include/clocksource/arm_arch_timer.h |  8 ++++++++
->>  3 files changed, 23 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
->> index e406d57..9ef74da 100644
->> --- a/arch/arm/include/asm/arch_timer.h
->> +++ b/arch/arm/include/asm/arch_timer.h
->> @@ -95,8 +95,13 @@ static inline void arch_counter_set_user_access(void)
->>  
->>  	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
->>  
->> -	/* disable user access to everything */
->> -	cntkctl &= ~((3 << 8) | (7 << 0));
->> +	/* Disable user access to both physical/virtual counters/timers. */
->> +	/* Also disable virtual event stream */
->> +	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
->> +			| ARCH_TIMER_USR_VT_ACCESS_EN
->> +			| ARCH_TIMER_VIRT_EVT_EN
->> +			| ARCH_TIMER_USR_VCT_ACCESS_EN
->> +			| ARCH_TIMER_USR_PCT_ACCESS_EN);
->>  
->>  	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
->>  }
->> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
->> index 98abd47..00b09d0 100644
->> --- a/arch/arm64/include/asm/arch_timer.h
->> +++ b/arch/arm64/include/asm/arch_timer.h
->> @@ -101,12 +101,16 @@ static inline void arch_counter_set_user_access(void)
->>  {
->>  	u32 cntkctl;
->>  
->> -	/* Disable user access to the timers and the physical counter. */
->>  	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
->> -	cntkctl &= ~((3 << 8) | (1 << 0));
->>  
->> -	/* Enable user access to the virtual counter and frequency. */
->> -	cntkctl |= (1 << 1);
->> +	/* Disable user access to the timers and the physical counter. */
->> +	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
->> +			| ARCH_TIMER_USR_VT_ACCESS_EN
->> +			| ARCH_TIMER_USR_PCT_ACCESS_EN);
->> +
->> +	/* Enable user access to the virtual counter. */
->> +	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
->> +
->>  	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+On Tuesday 27 of August 2013 14:00:24 Archit Taneja wrote:
+> Hi,
 > 
-> For consistency with arm, I think we should also disable the event
-> stream explicitly here.
+> On Tuesday 27 August 2013 01:44 PM, Tomasz Figa wrote:
+> > Hi Laurent,
+> > 
+> > On Tuesday 27 of August 2013 10:02:39 Laurent Pinchart wrote:
+> >> Add DT bindings for the pcf857x-compatible chips and parse the device
+> >> tree node in the driver.
+> >> 
+> >> Signed-off-by: Laurent Pinchart
+> >> <laurent.pinchart+renesas@ideasonboard.com> ---
+> >> 
+> >>   .../devicetree/bindings/gpio/gpio-pcf857x.txt      | 71
+> >> 
+> >> ++++++++++++++++++++++ drivers/gpio/gpio-pcf857x.c
+> >> 
+> >>    | 44 +++++++++++--- 2 files changed, 107 insertions(+), 8
+> >> 
+> >> deletions(-)
+> >> 
+> >>   create mode 100644
+> >> 
+> >> Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
+> >> 
+> >> Changes since v4:
+> >> 
+> >> - Don't try to get ngpio from of_device_id data, we already get it
+> >> from
+> >> 
+> >>    i2c_device_id
+> > 
+> > Hmm, I'm not sure how this is supposed to work.
+> > 
+> > How does the I2C core resolve OF compatible name to particular entry in
+> > id_table? I believe it simply passes NULL as the second argument of
+> > .probe() if the device is instantiated based on OF compatible string
+> > and
+> > not one in the legacy ID table.
 > 
-Yes it's done. In PATCH 3/5, a new function arch_timer_evtstrm_config is
-added which is always called(PATCH 4/5). It's either enabled or disabled
-explicitly based on config option for event stream.
+> It doesn't pass the second argument as NULL. If you look at
+> i2c_device_probe() in drivers/i2c/i2c-core.c, the second argument to
+> probe is passed as: i2c_match_id(driver->id_table, client)
+> 
+> This will extract the i2c_device_id pointer from the id_table.
 
-Let me know if you think that's not sufficient.
+Yes, there is a chance that it will not return NULL, but I think that 
+relying on this is rather flawed.
 
-Regards,
-Sudeep
+If you look at the whole code path, you can see that it's only a 
+coincidence that this works. See the execution flow:
+ - I2C adapter driver calls of_i2c_register_devices(),
+ - of_i2c_register_devices() calls of_modalias_node() for every device on 
+this bus,
+ - of_modalias_node() stores the second substring of compatible string 
+separated by a comma, if there is one or the whole compatible otherwise to 
+the output buffer (type field of i2c_board_info struct, as passed by 
+of_i2c_register_devices()),
+ - of_i2c_register_devices() then calls i2c_new_device() with the resulting 
+info struct,
+ - i2c_new_device() takes info->type and copies its contents to client-
+>name,
+ - then a bit later, I2C core calls i2c_match_id(), which does matching of 
+client->name against id_table of the driver and the resulting i2c_device_id 
+entry (or NULL) is then passed to driver's .probe() callback.
+
+So if it happens that compatible is not equal to "<vendor>,<ID from legacy 
+I2C table>", then the matching will fail and NULL will be passed.
+
+[CCing Wolfram and Grant, as they should now more about this behavior and 
+whether it's intentional or no]
+
+Best regards,
+Tomasz
