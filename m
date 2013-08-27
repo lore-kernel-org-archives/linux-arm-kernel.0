@@ -1,58 +1,32 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Tue, 27 Aug 2013 15:24:24 +0200
-Subject: linux-next: manual merge of the arm-soc tree with the usb tree
-In-Reply-To: <CABxcv=mg6t5wPqpF3j5sr_76qfZ7N7KgpWhcKSGoPTOcaR=V6A@mail.gmail.com>
-References: <20130827181353.319c150858829df1bb68d60b@canb.auug.org.au>
- <521C6961.9020103@linutronix.de>
- <CABxcv=mg6t5wPqpF3j5sr_76qfZ7N7KgpWhcKSGoPTOcaR=V6A@mail.gmail.com>
-Message-ID: <521CA888.1080909@baylibre.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 27 Aug 2013 15:40:40 +0200
+Subject: [Patch v2] pinctrl: Add s5pv210 support to pinctrl-exynos
+In-Reply-To: <1377608890-8528-1-git-send-email-m.krawczuk@partner.samsung.com>
+References: <1377608890-8528-1-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <3696905.8yvPmhxxxP@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebatian,
+Hi Mateusz,
 
-On 27/08/2013 15:02, Javier Martinez Canillas wrote:
-> [cc'ing Benoit Cousson (OMAP DT maintainer)]
+On Tuesday 27 of August 2013 15:08:10 Mateusz Krawczuk wrote:
+> This patch implements pinctrl support and adds device tree bindings
+> for s5pv210.
 >
-> On Tue, Aug 27, 2013 at 10:54 AM, Sebastian Andrzej Siewior
-> <bigeasy@linutronix.de> wrote:
->> On 08/27/2013 10:13 AM, Stephen Rothwell wrote:
->>
->>> Today's linux-next merge of the arm-soc tree got a conflict in
->>> arch/arm/boot/dts/am335x-bone.dts between commit 97238b35d5bb
->>> ("usb: musb: dsps: use proper child nodes") from the  tree and
->>> commit 63f6b2550aa0 ("ARM: dts: AM33XX: don't redefine OCP bus and
->>> device nodes") from the arm-soc tree.
->>>
->>> I fixed it up (probably incorrectly - see below) and can carry the
->>> fix as necessary (no action is required).
->>
->> You added the OCP node back and the USB nodes as I had them which
->> should be fine.
->>
->> How do we solve the conflict for the merge window? Is it possible for
->> the ARM-SOC tree to create a topic branch for this commit?
->>
->> Greg: I do have a pending pull / patches [0] which also change the dts
->> nodes according to the latest feedback + enabling an additional USB
->> port in bone.
->> If you take this in I could update the nodes later (with the topic
->> branch merged) accordingly to the way it has been done in the ARM-SOC
->> tree - unless you have other preferences.
->>
->
-> I think that the proper way to handle this is to split the patch-set
-> in two and merge all the OMAP DT related changes
-> (arch/arm/boot/dts/am*) through Benoit's tree and the USB changes
-> (drivers/usb/*) through Greg tree to prevent these kind of merge
-> conflicts.
+> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+> ---
+>  .../bindings/pinctrl/samsung-pinctrl.txt           |  3 +-
+>  drivers/pinctrl/Kconfig                            |  2 +-
+>  drivers/pinctrl/pinctrl-exynos.c                   | 58
+> ++++++++++++++++++++++ drivers/pinctrl/pinctrl-samsung.c                
+>  |  2 +
+>  drivers/pinctrl/pinctrl-samsung.h                  |  1 +
+>  5 files changed, 64 insertions(+), 2 deletions(-)
 
-Yes. DT patches are an endless source of merge conflicts if they are 
-merge throught different trees.
+Acked-by: Tomasz Figa <t.figa@samsung.com>
 
-What was discussed with Olof and Arnd during Connect is that we should 
-avoid merging DT patches outside arm-soc tree to avoid that kind of 
-situation.
+As a side note, please write the PATCH keyword in the topic in upper case 
+next time.
 
-Regards,
-Benoit
+Best regards,
+Tomasz
