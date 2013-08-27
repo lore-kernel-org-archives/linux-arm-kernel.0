@@ -1,45 +1,38 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Tue, 27 Aug 2013 15:57:26 +0200
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 27 Aug 2013 16:02:51 +0200
 Subject: linux-next: manual merge of the arm-soc tree with the usb tree
-In-Reply-To: <521CAF59.1090203@linutronix.de>
+In-Reply-To: <521CB046.9070408@baylibre.com>
 References: <20130827181353.319c150858829df1bb68d60b@canb.auug.org.au>
  <521C6961.9020103@linutronix.de>
  <CABxcv=mg6t5wPqpF3j5sr_76qfZ7N7KgpWhcKSGoPTOcaR=V6A@mail.gmail.com>
  <521CA888.1080909@baylibre.com> <521CAF59.1090203@linutronix.de>
-Message-ID: <521CB046.9070408@baylibre.com>
+ <521CB046.9070408@baylibre.com>
+Message-ID: <521CB18B.4080000@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Kevin,
+On 08/27/2013 03:57 PM, Benoit Cousson wrote:
+> + Kevin,
+> 
+> On 27/08/2013 15:53, Sebastian Andrzej Siewior wrote:
+>> What do we do now?
+> 
+> Cannot you just merge the stable arm-soc/dt branch into your branch
+> before applying your patches?
 
-On 27/08/2013 15:53, Sebastian Andrzej Siewior wrote:
-> On 08/27/2013 03:24 PM, Benoit Cousson wrote:
->> Hi Sebatian,
->
-> Hi Benoit,
->
->> Yes. DT patches are an endless source of merge conflicts if they are
->> merge throught different trees.
->
-> Usually there are small conflicts because two people added / changed a
-> node nearby. This patch turned the .dts file almost upside down.
+That is up to Greg. This changes sat in his usb-next tree for a while
+now. And before they hit Greg they were in Felipe's tree for a while.
 
-Yes, that's true.
+To be exact, last .dts change via USB was:
 
->> What was discussed with Olof and Arnd during Connect is that we should
->> avoid merging DT patches outside arm-soc tree to avoid that kind of
->> situation.
->
-> I am aware of this now. However these changes belonged together because
-> a) they belonged together and b) would break the driver until the .dts
-> changes and driver code is in-sync.
-> In future I am going to ask you for a topic branch so I can get my
-> changes in one piece without breaking stuff in the middle.
->
-> What do we do now?
+Author:     Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+AuthorDate: Thu Jun 20 12:13:04 2013 +0200
+Commit:     Felipe Balbi <balbi@ti.com>
+CommitDate: Fri Aug 9 17:40:16 2013 +0300
 
-Cannot you just merge the stable arm-soc/dt branch into your branch 
-before applying your patches?
+	usb: musb dma: add cppi41 dma driver
 
-Regards
-Benoit
+> Regards
+> Benoit
+
+Sebastian
