@@ -1,106 +1,42 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 27 Aug 2013 11:34:24 -0300
-Subject: [PATCH 00/15] Armada 370/XP watchdog support
-Message-ID: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Tue, 27 Aug 2013 11:34:25 -0300
+Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+In-Reply-To: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for Armada 370/XP SoC watchdog using the
-orion-wdt driver. Several issues were blocking this addition, each
-of which has timely discussed and (at least initially) agreed.
+With the introduction of the orion irqchip driver, now the BRIDGE_CAUSE
+bit is cleared by it. There's no longer a need to do it in the watchdog
+driver, so we can simply remove it.
 
-Namely, the issues are:
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/watchdog/orion_wdt.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-* Handling of clock input differences, which was related
-  to Armada 370/XP clocksource reference 25 MHz issue.
-  This is already solved by the work in [1] (merge pending).
-
-* Shared register handling. It was agreed to introduce an atomic
-  read/modify API for such accesses [2]. Once the API is merged we'll use
-  it to access the timer control register shared between clocksource
-  and watchdog drivers.
-
-* Watchdog RSTOUT enable. It was decided [3] that this was better
-  handled at each machine initialization (and so this patchset
-  does such change). This change allows to remove the mach-specific
-  header in orion-wdt,  allowing multiplatform build.
-
-The current patchset is based and superseeds the previous v2 on
-Orion watchdog:
-
-  http://www.spinics.net/lists/arm-kernel/msg269526.html
-
-However, this is a new patchset that allow to support Armada 370/XP
-watchdog.
-
-Patches 1-5 removes and reworks the orion-wdt to allow to remove the
-mach-specific header.
-
-Patches 6-9 adds the infrastructure required to support multiple SoCs
-in the orion-wdt driver, and then uses it to support Armada 370 and
-Armada XP.
-
-Patches 9-15 completes the support by updating the devicetree binding
-documentation, devicetree files, and default configuration.
-
-This series is based in v3.11-rc6 and has been tested on:
-
- * Kirkwood Openblocks A6
- * Armada XP Openblocks AX3
- * Armada 370 Mirabox
-
-(I must thank Plat'home for donating those beatiful boxes!)
-
-[1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/261861
-[2] http://lwn.net/Articles/564709/
-[3] http://www.spinics.net/lists/arm-kernel/msg269994.html
-
-Thanks!
-
-Ezequiel Garcia (15):
-  watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
-  ARM: orion: Assert watchdog RSTOUT enable bit
-  ARM: mvebu: Add watchdog RSTOUT enable in system-controller init
-  watchdog: orion: Remove RSTOUT bit enable/disable
-  watchdog: orion: Allow to build in any Orion platform
-  watchdog: orion: Introduce an orion_watchdog device structure
-  watchdog: orion: Introduce per-compatible of_device_id data
-  watchdog: orion: Add per-compatible clock initialization
-  watchdog: orion: Add support for Armada 370 and Armada XP SoC
-  ARM: mvebu: Add RSTOUT cell to system-controller DT node
-  ARM: mvebu: Enable Armada 370/XP watchdog in the devicetree
-  watchdog: orion: Rename device-tree binding documentation
-  watchdog: orion: Add other compatibles to devicetree binding
-  ARM: mvebu: system-controller: Add second reg cell devicetree
-    specification
-  ARM: mvebu: Enable watchdog in defconfig
-
- .../bindings/arm/mvebu-system-controller.txt       |   7 +-
- .../devicetree/bindings/watchdog/marvel.txt        |  19 --
- .../devicetree/bindings/watchdog/orion-wdt.txt     |  34 +++
- arch/arm/boot/dts/armada-370-xp.dtsi               |   4 +
- arch/arm/boot/dts/armada-370.dtsi                  |   7 +-
- arch/arm/boot/dts/armada-xp.dtsi                   |   8 +-
- arch/arm/configs/mvebu_defconfig                   |   3 +
- arch/arm/mach-dove/board-dt.c                      |   2 +
- arch/arm/mach-dove/common.c                        |   2 +
- arch/arm/mach-dove/include/mach/bridge-regs.h      |   1 +
- arch/arm/mach-kirkwood/board-dt.c                  |   2 +
- arch/arm/mach-kirkwood/common.c                    |   2 +
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h  |   1 +
- arch/arm/mach-mv78xx0/common.c                     |   2 +
- arch/arm/mach-mv78xx0/include/mach/bridge-regs.h   |   1 +
- arch/arm/mach-mvebu/system-controller.c            |  22 ++
- arch/arm/mach-orion5x/board-dt.c                   |   4 +
- arch/arm/mach-orion5x/common.c                     |   2 +
- arch/arm/mach-orion5x/include/mach/bridge-regs.h   |   1 +
- arch/arm/plat-orion/common.c                       |   5 +
- arch/arm/plat-orion/include/plat/common.h          |   1 +
- drivers/watchdog/Kconfig                           |   2 +-
- drivers/watchdog/orion_wdt.c                       | 244 +++++++++++++++------
- 23 files changed, 283 insertions(+), 93 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/watchdog/marvel.txt
- create mode 100644 Documentation/devicetree/bindings/watchdog/orion-wdt.txt
-
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index 4ea5fcc..74d3b72 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -39,7 +39,6 @@
+ #define WDT_OK_TO_CLOSE		1
+ 
+ #define WDT_RESET_OUT_EN	BIT(1)
+-#define WDT_INT_REQ		BIT(3)
+ 
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+ static int heartbeat = -1;		/* module parameter (seconds) */
+@@ -69,9 +68,6 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ 	/* Set watchdog duration */
+ 	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
+ 
+-	/* Clear watchdog timer interrupt */
+-	writel(~WDT_INT_REQ, BRIDGE_CAUSE);
+-
+ 	/* Enable watchdog timer */
+ 	reg = readl(wdt_reg + TIMER_CTRL);
+ 	reg |= WDT_EN;
 -- 
 1.8.1.5
