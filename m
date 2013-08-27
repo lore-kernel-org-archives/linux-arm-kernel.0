@@ -1,70 +1,105 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 27 Aug 2013 19:28:47 +0800
-Subject: [PATCH v3 1/6] iio: at91: fix adc_clk overflow
+Date: Tue, 27 Aug 2013 19:28:49 +0800
+Subject: [PATCH v3 3/6] iio: at91: Use different prescal,
+ startup mask in MR for different IP
 In-Reply-To: <1377602932-1899-1-git-send-email-josh.wu@atmel.com>
 References: <1377602932-1899-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1377602932-1899-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <1377602932-1899-4-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The adc_clk variable is currently defined using a 32-bits unsigned integer,
-which will overflow under some very valid range of operations.
-
-Such overflow will occur if, for example, the parent clock is set to a
-20MHz frequency and the ADC startup time is larger than 215ns.
-
-To fix this, introduce an intermediate variable holding the clock rate
-in kHz.
+For at91 boards, there are different IPs for adc. Different IPs has different
+STARTUP & PRESCAL mask in ADC_MR.
 
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
-v1 --> v2:
-  refined the commit message.
+ arch/arm/mach-at91/include/mach/at91_adc.h |    7 +++++--
+ drivers/iio/adc/at91_adc.c                 |   11 +++++++++--
+ include/linux/platform_data/at91_adc.h     |    4 ++++
+ 3 files changed, 18 insertions(+), 4 deletions(-)
 
- drivers/iio/adc/at91_adc.c |   11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm/mach-at91/include/mach/at91_adc.h b/arch/arm/mach-at91/include/mach/at91_adc.h
+index bea1a20..048a57f 100644
+--- a/arch/arm/mach-at91/include/mach/at91_adc.h
++++ b/arch/arm/mach-at91/include/mach/at91_adc.h
+@@ -28,9 +28,12 @@
+ #define			AT91_ADC_TRGSEL_EXTERNAL	(6 << 1)
+ #define		AT91_ADC_LOWRES		(1 << 4)	/* Low Resolution */
+ #define		AT91_ADC_SLEEP		(1 << 5)	/* Sleep Mode */
+-#define		AT91_ADC_PRESCAL	(0x3f << 8)	/* Prescalar Rate Selection */
++#define		AT91_ADC_PRESCAL_9260	(0x3f << 8)	/* Prescalar Rate Selection */
++#define		AT91_ADC_PRESCAL_9G45	(0xff << 8)
+ #define			AT91_ADC_PRESCAL_(x)	((x) << 8)
+-#define		AT91_ADC_STARTUP	(0x1f << 16)	/* Startup Up Time */
++#define		AT91_ADC_STARTUP_9260	(0x1f << 16)	/* Startup Up Time */
++#define		AT91_ADC_STARTUP_9G45	(0x7f << 16)
++#define		AT91_ADC_STARTUP_9X5	(0xf << 16)
+ #define			AT91_ADC_STARTUP_(x)	((x) << 16)
+ #define		AT91_ADC_SHTIM		(0xf  << 24)	/* Sample & Hold Time */
+ #define			AT91_ADC_SHTIM_(x)	((x) << 24)
 diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-index b6db6a0..9cf8ab5 100644
+index 49dd751..bccc407 100644
 --- a/drivers/iio/adc/at91_adc.c
 +++ b/drivers/iio/adc/at91_adc.c
-@@ -582,7 +582,7 @@ static const struct iio_info at91_adc_info = {
+@@ -678,8 +678,8 @@ static int at91_adc_probe(struct platform_device *pdev)
+ 	shtim = round_up((st->sample_hold_time * adc_clk_khz /
+ 			  1000) - 1, 1);
  
- static int at91_adc_probe(struct platform_device *pdev)
- {
--	unsigned int prsc, mstrclk, ticks, adc_clk, shtim;
-+	unsigned int prsc, mstrclk, ticks, adc_clk, adc_clk_khz, shtim;
- 	int ret;
- 	struct iio_dev *idev;
- 	struct at91_adc_state *st;
-@@ -680,6 +680,7 @@ static int at91_adc_probe(struct platform_device *pdev)
- 	 */
- 	mstrclk = clk_get_rate(st->clk);
- 	adc_clk = clk_get_rate(st->adc_clk);
-+	adc_clk_khz = adc_clk / 1000;
- 	prsc = (mstrclk / (2 * adc_clk)) - 1;
+-	reg = AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL;
+-	reg |= AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP;
++	reg = AT91_ADC_PRESCAL_(prsc) & st->registers->mr_prescal_mask;
++	reg |= AT91_ADC_STARTUP_(ticks) & st->registers->mr_startup_mask;
+ 	if (st->low_res)
+ 		reg |= AT91_ADC_LOWRES;
+ 	if (st->sleep_mode)
+@@ -756,6 +756,8 @@ static struct at91_adc_caps at91sam9260_caps = {
+ 		.drdy_mask = AT91_ADC_DRDY,
+ 		.status_register = AT91_ADC_SR,
+ 		.trigger_register = AT91_ADC_TRGR_9260,
++		.mr_prescal_mask = AT91_ADC_PRESCAL_9260,
++		.mr_startup_mask = AT91_ADC_STARTUP_9260,
+ 	},
+ };
  
- 	if (!st->startup_time) {
-@@ -693,15 +694,15 @@ static int at91_adc_probe(struct platform_device *pdev)
- 	 * defined in the electrical characteristics of the board, divided by 8.
- 	 * The formula thus is : Startup Time = (ticks + 1) * 8 / ADC Clock
- 	 */
--	ticks = round_up((st->startup_time * adc_clk /
--			  1000000) - 1, 8) / 8;
-+	ticks = round_up((st->startup_time * adc_clk_khz /
-+			  1000) - 1, 8) / 8;
- 	/*
- 	 * a minimal Sample and Hold Time is necessary for the ADC to guarantee
- 	 * the best converted final value between two channels selection
- 	 * The formula thus is : Sample and Hold Time = (shtim + 1) / ADCClock
- 	 */
--	shtim = round_up((st->sample_hold_time * adc_clk /
--			  1000000) - 1, 1);
-+	shtim = round_up((st->sample_hold_time * adc_clk_khz /
-+			  1000) - 1, 1);
+@@ -765,6 +767,8 @@ static struct at91_adc_caps at91sam9g45_caps = {
+ 		.drdy_mask = AT91_ADC_DRDY,
+ 		.status_register = AT91_ADC_SR,
+ 		.trigger_register = AT91_ADC_TRGR_9G45,
++		.mr_prescal_mask = AT91_ADC_PRESCAL_9G45,
++		.mr_startup_mask = AT91_ADC_STARTUP_9G45,
+ 	},
+ };
  
- 	reg = AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL;
- 	reg |= AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP;
+@@ -774,6 +778,9 @@ static struct at91_adc_caps at91sam9x5_caps = {
+ 		.drdy_mask = AT91_ADC_SR_DRDY_9X5,
+ 		.status_register = AT91_ADC_SR_9X5,
+ 		.trigger_register = AT91_ADC_TRGR_9X5,
++		/* prescal mask is same as 9G45 */
++		.mr_prescal_mask = AT91_ADC_PRESCAL_9G45,
++		.mr_startup_mask = AT91_ADC_STARTUP_9X5,
+ 	},
+ };
+ 
+diff --git a/include/linux/platform_data/at91_adc.h b/include/linux/platform_data/at91_adc.h
+index e15745b..b3ca1e9 100644
+--- a/include/linux/platform_data/at91_adc.h
++++ b/include/linux/platform_data/at91_adc.h
+@@ -14,12 +14,16 @@
+ 			(Interruptions registers mostly)
+  * @status_register:	Offset of the Interrupt Status Register
+  * @trigger_register:	Offset of the Trigger setup register
++ * @mr_prescal_mask:	Mask of the PRESCAL field in the adc MR register
++ * @mr_startup_mask:	Mask of the STARTUP field in the adc MR register
+  */
+ struct at91_adc_reg_desc {
+ 	u8	channel_base;
+ 	u32	drdy_mask;
+ 	u8	status_register;
+ 	u8	trigger_register;
++	u32	mr_prescal_mask;
++	u32	mr_startup_mask;
+ };
+ 
+ /**
 -- 
 1.7.10
