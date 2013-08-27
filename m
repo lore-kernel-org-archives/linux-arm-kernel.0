@@ -1,100 +1,81 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 27 Aug 2013 08:46:05 +0200 (CEST)
-Subject: SHMobile Compatibility String Inconsistencies
-In-Reply-To: <4837967.ksf69P4Rut@avalon>
-References: <20130822054639.GE11086@verge.net.au>
- <20130824021323.GC5181@verge.net.au>
- <Pine.LNX.4.64.1308261750340.1767@axis700.grange> <4837967.ksf69P4Rut@avalon>
-Message-ID: <Pine.LNX.4.64.1308270840450.11515@axis700.grange>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 Aug 2013 23:55:18 -0700
+Subject: [PATCHv5 01/31] CLK: clkdev: add support for looking up clocks
+ from DT
+In-Reply-To: <521B9A8C.7090000@ti.com>
+References: <1375460751-23676-1-git-send-email-t-kristo@ti.com>
+ <1375460751-23676-2-git-send-email-t-kristo@ti.com>
+ <20130803183143.GE23053@n2100.arm.linux.org.uk>
+ <521B67DF.4000005@ti.com>
+ <20130826170327.GG25647@n2100.arm.linux.org.uk>
+ <521B9A8C.7090000@ti.com>
+Message-ID: <20130827065517.GJ7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Tue, 27 Aug 2013, Laurent Pinchart wrote:
-
-> Hi Guennadi,
+* Tero Kristo <t-kristo@ti.com> [130826 11:19]:
+> On 08/26/2013 08:03 PM, Russell King - ARM Linux wrote:
+> >On Mon, Aug 26, 2013 at 05:36:15PM +0300, Tero Kristo wrote:
+> >>On 08/03/2013 09:31 PM, Russell King - ARM Linux wrote:
+> >>>On Fri, Aug 02, 2013 at 07:25:20PM +0300, Tero Kristo wrote:
+> >>>>+
+> >>>>+	if (cl)
+> >>>>+		return cl;
+> >>>>+
+> >>>>+	/* If clock was not found, attempt to look-up from DT */
+> >>>>+	node = of_find_node_by_name(NULL, con_id);
+> >>>
+> >>>This is utterly broken if you're looking up purely by a connection ID.
+> >>>Please, go back and read clk_get()'s documentation in linux/clk.h.
+> >>>It's spelt out very plainly there.
+> >>>
+> >>>NAK.
+> >>>
+> >>
+> >>Hi Russell,
+> >>
+> >>After looking at this a bit more, it seems difficult to get rid of the
+> >>clk_get -> of_clk_get conversion, however based on this comment I am
+> >>somewhat stuck. Do you think it would be acceptable if I change the
+> >>implementation of this patch to work like this:
+> >
+> >Firstly, for clk_get(), you don't need to do anything - clk_get() already
+> >deals with DT, and if your DT is correct, it should already be returning
+> >the appropriate clock(s).
+> >
+> >I guess the problem here is clk_get_sys(), because that doesn't take a
+> >struct device (and it doesn't take a struct device because it's used
+> >from code where there is no struct device to use with it.)
 > 
-> On Monday 26 August 2013 18:08:52 Guennadi Liakhovetski wrote:
-> > On Sat, 24 Aug 2013, Simon Horman wrote:
-> > > On Fri, Aug 23, 2013 at 01:31:31PM +0200, Laurent Pinchart wrote:
-> > > > On Friday 23 August 2013 12:11:11 David Gibson wrote:
-> > > > > On Thu, Aug 22, 2013 at 02:46:40PM +0900, Simon Horman wrote:
-> > > > > > Hi Laurent, Hi Guennadi, Hi All,
-> > > > > > 
-> > > > > > Olof has brought to my attention that there is some inconsistency
-> > > > > > in the way that compatibility strings for SHMobile are named and he
-> > > > > > has asked us to clean things up for v3.12.
-> > > > > > 
-> > > > > > Looking through arch/arm/boot/dts/ I see that we have:
-> > > > > > 
-> > > > > > 1. {gpio,pfc}-r8aXXXX and;
-> > 
-> > Add shdma-<soc> to the above
-> > 
-> > > > > > 2. r8aXXXX-sdhi
-> > > > > > 
-> > > > > > The inconsistency that Olof has asked us to resolve is that we
-> > > > > > should either use r8aXXXX- or -r8aXXXX. Not both.
-> > 
-> > Given the 3:1 score the choice seems rather simple to me. So, if we do
-> > have to make those consistent, let's change SDHI.
+> Yeah, most of the OMAP clocks have been traditionally referenced in
+> this way, they are using clk_get_sys and with dev=NULL. conn-id is
+> mostly unique.
 > 
-> Agreed.
+> >
+> >If you have an OF node, what's wrong with using of_clk_get_by_name()?
+> >If you don't have an OF node, how do you expect to find the clock in
+> >the device tree, remembering that clocks are specific to devices, and
+> >the 2nd argument to clk_get()/clk_get_sys() is not a unique identifier.
 > 
-> > > > > > It seems to me that neither option is inherently better than the
-> > > > > > other so we should just choose the path of least resistance to make
-> > > > > > things consistent.
-> > > > > > 
-> > > > > > Laurent, Guennadi, do you have any opinions on if it would
-> > > > > > be easier to change the GPIO and PFC compatibility strings;
-> > > > > > or to change the SDHI compatibility strings?
-> > > > > > 
-> > > > > > Ideally I would like you to come to some sort of consensus and send
-> > > > > > patches.
-> > > > > 
-> > > > > So, by all means clean this up in the dts.
-> > > > > 
-> > > > > BUT, in keeping with the recent discussions on improving the DT
-> > > > > process, the corresponding drivers must continue to recognize both
-> > > > > forms, so that old DTs will still work correctly.
-> > > > 
-> > > > Given the early state of DT support in arm/mach-shmobile, I'm pretty
-> > > > sure we have no DT-based systems in the wild. The old compatibility
-> > > > string could in my opinion just be dropped.
-> > > 
-> > > I tend to agree, though I don't mind either way.
-> > 
-> > So, what path should we choose? I see 2 SDHI users in your current "devel"
-> > brunch: sh73a0 (kzm9g) and r8a73a4 (ape6evm). Should we make a single
-> > patch, changing the driver and both users and push it via ARM with Chris'
-> > ack or shall we add new compats, switch .dtsi's, remove old compats - over
-> > 2 kernel versions?
+> In the legacy code, pretty much all the clocks are mapped through
+> clk_get_sys(NULL, conn), and large amount of the drivers don't even
+> have DT conversion in place yet. I am attempting to handle the cases
+> where we don't have OF nodes.... yet at least, without converting
+> everything to DT, and without causing regressions (also, I don't
+> even pretend to be capable of testing all the potential drivers for
+> this.) Some parts of the basic infra which are using clk_get_sys are
+> pretty silly also, like the ocp_if parts of the hwmod, I haven't
+> figured out yet how to convert that to DT.
 > 
-> I'm fine with both, but in the latter case I don't see a need to spread it 
-> over two kernel versions.
+> Personally I don't mind causing a regressions here though, if I get
+> approval for it from Tony.
 
-The latter only makes sense if we want to push patches via separate trees, 
-i.e.
-DMA
-ARM
-DMA
-and doing this within 1 kernel release would be difficult. Whereas if we 
-want to push all 3 patches via 1 tree, then I'd say just doing 1 patch 
-would be easier.
+No, let's not do that. We don't want to break existing drivers.
 
-Thanks
-Guennadi
+How about initialize the platform driver clocks in the clock driver
+and set up the clock alias? Then when the driver is fixed for DT,
+those can be dropped one at a time.
 
-> > Can we still get anything for this into 3.12 or is it too late? Would it be
-> > a "fix" enough for -rc2 / late -rc1?
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
+Regards,
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Tony
