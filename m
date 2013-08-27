@@ -1,42 +1,70 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 27 Aug 2013 19:28:46 +0800
-Subject: [PATCH v3 0/6] iio: at91: Add touch screen support in at91 adc
-Message-ID: <1377602932-1899-1-git-send-email-josh.wu@atmel.com>
+Date: Tue, 27 Aug 2013 19:28:47 +0800
+Subject: [PATCH v3 1/6] iio: at91: fix adc_clk overflow
+In-Reply-To: <1377602932-1899-1-git-send-email-josh.wu@atmel.com>
+References: <1377602932-1899-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1377602932-1899-2-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series introduce multiple compatible string for different ip.
-So remove some adc dt parameters as it already included in driver code.
+The adc_clk variable is currently defined using a 32-bits unsigned integer,
+which will overflow under some very valid range of operations.
 
-It also touch screen support for at91 adc driver.
-To enable touch screen you need add the touch screen related dt properties.
+Such overflow will occur if, for example, the parent clock is set to a
+20MHz frequency and the ADC startup time is larger than 215ns.
 
-v2 --> v3:
-  1. move the dt parameters to driver itself.
-  2. trival fix in touch driver.
+To fix this, introduce an intermediate variable holding the clock rate
+in kHz.
 
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
 v1 --> v2:
-  1. use multiple compatible string for different ADC IP.
-  2. drop the patch that add the adc-clock in dt since we will move to clock
-     common framework.
-  3. don't expose the driver configuration to dt. Such like sample period,
-     pen detect debounce time and etc.
-  4. add a new dt parameter: ts-pressure-threshold.
+  refined the commit message.
 
-Josh Wu (6):
-  iio: at91: fix adc_clk overflow
-  iio: at91: introduce the multiple compatible string for different
-    IPs.
-  iio: at91: Use different prescal, startup mask in MR for different IP
-  iio: at91: ADC start-up time calculation changed since at91sam9x5
-  iio: at91: move the num_channels from DT to driver itself
-  iio: at91: introduce touch screen support in iio adc driver
+ drivers/iio/adc/at91_adc.c |   11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
- .../devicetree/bindings/arm/atmel-adc.txt          |   15 +-
- arch/arm/mach-at91/include/mach/at91_adc.h         |   50 +-
- drivers/iio/adc/at91_adc.c                         |  550 +++++++++++++++++---
- include/linux/platform_data/at91_adc.h             |    4 +
- 4 files changed, 530 insertions(+), 89 deletions(-)
-
+diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+index b6db6a0..9cf8ab5 100644
+--- a/drivers/iio/adc/at91_adc.c
++++ b/drivers/iio/adc/at91_adc.c
+@@ -582,7 +582,7 @@ static const struct iio_info at91_adc_info = {
+ 
+ static int at91_adc_probe(struct platform_device *pdev)
+ {
+-	unsigned int prsc, mstrclk, ticks, adc_clk, shtim;
++	unsigned int prsc, mstrclk, ticks, adc_clk, adc_clk_khz, shtim;
+ 	int ret;
+ 	struct iio_dev *idev;
+ 	struct at91_adc_state *st;
+@@ -680,6 +680,7 @@ static int at91_adc_probe(struct platform_device *pdev)
+ 	 */
+ 	mstrclk = clk_get_rate(st->clk);
+ 	adc_clk = clk_get_rate(st->adc_clk);
++	adc_clk_khz = adc_clk / 1000;
+ 	prsc = (mstrclk / (2 * adc_clk)) - 1;
+ 
+ 	if (!st->startup_time) {
+@@ -693,15 +694,15 @@ static int at91_adc_probe(struct platform_device *pdev)
+ 	 * defined in the electrical characteristics of the board, divided by 8.
+ 	 * The formula thus is : Startup Time = (ticks + 1) * 8 / ADC Clock
+ 	 */
+-	ticks = round_up((st->startup_time * adc_clk /
+-			  1000000) - 1, 8) / 8;
++	ticks = round_up((st->startup_time * adc_clk_khz /
++			  1000) - 1, 8) / 8;
+ 	/*
+ 	 * a minimal Sample and Hold Time is necessary for the ADC to guarantee
+ 	 * the best converted final value between two channels selection
+ 	 * The formula thus is : Sample and Hold Time = (shtim + 1) / ADCClock
+ 	 */
+-	shtim = round_up((st->sample_hold_time * adc_clk /
+-			  1000000) - 1, 1);
++	shtim = round_up((st->sample_hold_time * adc_clk_khz /
++			  1000) - 1, 1);
+ 
+ 	reg = AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL;
+ 	reg |= AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP;
 -- 
 1.7.10
