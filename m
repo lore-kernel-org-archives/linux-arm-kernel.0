@@ -1,45 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 28 Aug 2013 08:34:58 +0900
-Subject: [GIT PULL V2 3/3] 2nd Round Samsung mach-exynos-v2 for v3.12
-In-Reply-To: <87bo4j6aii.fsf@linaro.org>
-References: <1f7701cea1f1$431f2d30$c95d8790$%kim@samsung.com>
- <3145165.ZB7l3vNJ7a@amdc1032>
- <CADGdYn7_Gm7rwkhRSUmvktB_hHNboY8eB5fi8E62-Br5Vk5D0A@mail.gmail.com>
- <4070794.XxjluIqBpK@amdc1032>
- <CADGdYn7YWscQ_EOqjbq29pNHvoxa0qqXHZeOBuz-Wi22H=Dc_w@mail.gmail.com>
- <87bo4j6aii.fsf@linaro.org>
-Message-ID: <232401cea37e$0afca7a0$20f5f6e0$%kim@samsung.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 Aug 2013 16:45:25 -0700
+Subject: [PATCH] clk: samsung: pll: Use new registration method for
+ PLL6552 and PLL6553
+In-Reply-To: <521CDEDE.1070003@samsung.com>
+References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
+ <158901ce9b34$c0ac8720$42059560$@org> <20130820002258.4443.34197@quantum>
+ <1856348.DCxTucbm8V@flatron> <20130827011422.8231.95092@quantum>
+ <521CDEDE.1070003@samsung.com>
+Message-ID: <20130827234525.8231.17145@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+Quoting Kukjin Kim (2013-08-27 10:16:14)
+> On 08/27/13 10:14, Mike Turquette wrote:
+> > Quoting Tomasz Figa (2013-08-20 17:33:21)
+> >> This patch modifies PLL6552 and PLL6553 clock drivers to use recently
+> >> added common Samsung PLL registration method.
+> >>
+> >> Signed-off-by: Tomasz Figa<tomasz.figa@gmail.com>
+> >
+> > Sigh. This change won't apply on top of clk-next-s3c64xx since it
+> > requires Yadwinder's change (amongst) others.
+> >
+> > The best I could do was spin out another topic branch with the relevant
+> > changes and apply this patch on top. It is a subset of clk-next but it
+> > is almost entirely Samsung patches:
+> >
+> > git://git.linaro.org/people/mturquette/linux.git clk-next-s3c64xx-delta
+> >
+> > Kukjin&  Tomasz, let me know if this OK for you to add as a dependency
+> > to the Samsung tree. If it is I will merge it into clk-next, but I want
+> > your OK that this branch is OK for you to take.
+> >
+> Hi Mike,
+> 
+> I merged the branch clk-next-s3c64xx-delta you provided on top of 
+> previous clk-next-s3c64xx for common-clk-s3c64xx and dt-s3c64xx and it 
+> looks fine to me.
 
-   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+Cool. I've merged it into clk-next as well.
 
-are available in the git repository at:
+Regards,
+Mike
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-mach-exynos-v2
-
-for you to fetch changes up to 1e9fec0e40deff9d18e4197b5f5f99f85f5d36a5:
-
-   ARM: EXYNOS: Skip C1 cpuidle state for exynos5440 (2013-08-28 
-00:51:21 +0900)
-
-----------------------------------------------------------------
-update mach-exynos v2 for v3.12
-- enable ARCH_HAS_BANDGAP for exynos SoCs
-- always enable PM domains for exynos4x12
-- skip C1 cpuidle state for exynos5440
-
-----------------------------------------------------------------
-Amit Daniel Kachhap (2):
-       ARM: EXYNOS: enable ARCH_HAS_BANDGAP
-       ARM: EXYNOS: Skip C1 cpuidle state for exynos5440
-
-Bartlomiej Zolnierkiewicz (1):
-       ARM: EXYNOS: always enable PM domains support for EXYNOS4X12
-
-  arch/arm/mach-exynos/Kconfig   | 7 +++++++
-  arch/arm/mach-exynos/cpuidle.c | 3 +++
-  2 files changed, 10 insertions(+)
+> 
+> Thanks,
+> Kukjin
