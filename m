@@ -1,84 +1,60 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 27 Aug 2013 14:56:52 -0500
-Subject: linux-next: manual merge of the arm-soc tree with the usb tree
-In-Reply-To: <20130827193021.GA30113@kroah.com>
-References: <CABxcv=mg6t5wPqpF3j5sr_76qfZ7N7KgpWhcKSGoPTOcaR=V6A@mail.gmail.com>
- <521CA888.1080909@baylibre.com> <521CAF59.1090203@linutronix.de>
- <521CB046.9070408@baylibre.com> <521CB18B.4080000@linutronix.de>
- <521CB239.6050409@baylibre.com> <521CB403.8010307@linutronix.de>
- <20130827173732.GC21564@kroah.com> <20130827183732.GP3005@radagast>
- <20130827193021.GA30113@kroah.com>
-Message-ID: <20130827195652.GE3005@radagast>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 27 Aug 2013 22:04:15 +0200
+Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+In-Reply-To: <20130827191337.GA2339@localhost>
+References: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130827163939.24636d80@skate> <20130827151136.GA10084@localhost>
+ <20130827152535.GG19598@titan.lakedaemon.net>
+ <20130827191337.GA2339@localhost>
+Message-ID: <521D063F.4040404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 08/27/13 21:13, Ezequiel Garcia wrote:
+> On Tue, Aug 27, 2013 at 11:25:35AM -0400, Jason Cooper wrote:
+>> On Tue, Aug 27, 2013 at 12:11:37PM -0300, Ezequiel Garcia wrote:
+>>> On Tue, Aug 27, 2013 at 04:39:39PM +0200, Thomas Petazzoni wrote:
+>>>> On Tue, 27 Aug 2013 11:34:25 -0300, Ezequiel Garcia wrote:
+>>>>> With the introduction of the orion irqchip driver, now the BRIDGE_CAUSE
+>>>>> bit is cleared by it. There's no longer a need to do it in the watchdog
+>>>>> driver, so we can simply remove it.
+>>>>>
+>>>>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>>>>
+>>>> Is this going to work with the platforms that use the orion_wdt driver
+>>>> but are not using the orion irqchip driver? Take for example
+>>>> mach-orion5x, it still uses the plat-orion/irq.c code and not the
+>>>> irqchip orion driver, as far as I can see.
+>>>>
+>>>> The orion irqchip driver is DT only, so all of the Orion platforms that
+>>>> have not been converted to DT are still using the old irq code.
+>>>>
+>>>> Any thoughts on the consequences of this in relation with your patch?
+>>>>
+>>>
+>>> Argh, you're right, We've completely missed this.
+>>>
+>>> And it's a *very* important point because we need this patch
+>>> to ultimately get rid of the mach/brideg-regs.h.
+>>>
+>>> Quite frankly I'm really out of ideas right now and unless someone
+>>> comes up with a smart solution, I see no other way but to:
+>>>
+>>> 1. Implement an armada-wdt.c driver and stop trying to fix the world.
+>>> 2. Add some ugly ifdefs to avoid the mach-specific header.
+>>> 3. ?
+>>
+>> 3. add a handler to plat-orion/irq.c ?
+>>
+>
+> Hm.. first of all: *why* do we need to clear this at all?
+>
+> Does anybody has a clear explanation for this?
 
-On Tue, Aug 27, 2013 at 12:30:21PM -0700, Greg KH wrote:
-> On Tue, Aug 27, 2013 at 01:37:32PM -0500, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Tue, Aug 27, 2013 at 10:37:32AM -0700, Greg KH wrote:
-> > > On Tue, Aug 27, 2013 at 04:13:23PM +0200, Sebastian Andrzej Siewior wrote:
-> > > > On 08/27/2013 04:05 PM, Benoit Cousson wrote:
-> > > > > On 27/08/2013 16:02, Sebastian Andrzej Siewior wrote:
-> > > > >> On 08/27/2013 03:57 PM, Benoit Cousson wrote:
-> > > > >>> + Kevin,
-> > > > >>>
-> > > > >>> On 27/08/2013 15:53, Sebastian Andrzej Siewior wrote:
-> > > > >>>> What do we do now?
-> > > > >>>
-> > > > >>> Cannot you just merge the stable arm-soc/dt branch into your branch
-> > > > >>> before applying your patches?
-> > > > >>
-> > > > >> That is up to Greg. This changes sat in his usb-next tree for a while
-> > > > >> now. And before they hit Greg they were in Felipe's tree for a while.
-> > > > >>
-> > > > >> To be exact, last .dts change via USB was:
-> > > > >>
-> > > > >> Author:     Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> > > > >> AuthorDate: Thu Jun 20 12:13:04 2013 +0200
-> > > > >> Commit:     Felipe Balbi <balbi@ti.com>
-> > > > >> CommitDate: Fri Aug 9 17:40:16 2013 +0300
-> > > > >>
-> > > > >>     usb: musb dma: add cppi41 dma driver
-> > > > > 
-> > > > > Mmm, if that branch is supposed to be stable, I'm not sure it will be
-> > > > > doable...
-> > > > > 
-> > > > > Maybe we should do the other way around? And merge usb-next into
-> > > > > arm-soc/dt.
-> > > > > 
-> > > > > Kevin, Olof?
-> > > > 
-> > > > Please be aware that I have no response so far regarding [0] from Greg.
-> > > > 
-> > > > [0] http://www.spinics.net/lists/linux-usb/msg92595.html
-> > > 
-> > > Nor will you, given that I am not the one to take these patches, Felipe
-> > > is.  I noticed now that you said "please route around Felipe", but
-> > > sorry, no, I'm not going to do that unless there's a really good reason.
-> > > Felipe seems to be around at the moment, please work with him on this.
-> > 
-> > If you will still take a 'part2' pull request from me, I can send you
-> > urgent bugfixes by friday. If I have some time left, I can even try to
-> > get that sorted out by tomorrow.
-> 
-> For 3.12 stuff, like "fixes", sure, I can take them this week, that
-> should give us a week or so for linux-next testing, right?
+In the current use of watchdog even for non-DT boards, you do not
+have to clear the interrupt cause. It will ultimately lead to a
+reset in any way. Maybe it is not a big deal to remove it now
+even without non-DT replacement.
 
-that's correct. I have most of them already queued up, let me just go
-over my linux-usb maildir again and make sure I got all the important
-stuff in.
-
-cheers, thanks for opening this 'window'.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130827/b87569c5/attachment.sig>
+Sebastian
