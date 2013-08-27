@@ -1,67 +1,32 @@
-From: B47053@freescale.com (Xiubo Li-B47053)
-Date: Tue, 27 Aug 2013 03:48:51 +0000
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM
-In-Reply-To: <521BB40D.7040001@wwwdotorg.org>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
- <1473340.OXSHEp7d4P@flatron>
- <1DD289F6464F0949A2FCA5AA6DC23F827D2244@039-SN2MPN1-013.039d.mgd.msft.net>
- <20130822062610.GR31036@pengutronix.de> <20130823073612.GB3535@ulmo>
- <5217B807.7020800@wwwdotorg.org>
- <1DD289F6464F0949A2FCA5AA6DC23F827E11AC@039-SN2MPN1-012.039d.mgd.msft.net>
- <521BB40D.7040001@wwwdotorg.org>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827E61F2@039-SN2MPN1-012.039d.mgd.msft.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 26 Aug 2013 20:50:43 -0700
+Subject: [PATCHv3 7/8] mailbox/omap: add code to support the wkupm3
+ operations
+In-Reply-To: <1375825238-18299-1-git-send-email-s-anna@ti.com> (Suman Anna's
+ message of "Tue, 6 Aug 2013 16:40:38 -0500")
+References: <1375825238-18299-1-git-send-email-s-anna@ti.com>
+Message-ID: <87li3n6bcc.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Suman Anna <s-anna@ti.com> writes:
 
-
-> Subject: Re: [PATCH 4/4] Documentation: Add device tree bindings for
-> Freescale FTM PWM
-> 
-> On 08/25/2013 11:35 PM, Xiubo Li-B47053 wrote:
-> >> Subject: Re: [PATCH 4/4] Documentation: Add device tree bindings for
-> ...
-> >>> Why do you need to manipulate the pinctrl to en/disable a channel?
-> >>
-> >> This is because in Vybrid VF610 TOWER board, there are 4 leds, and
-> >> each led's one point(diode's positive pole) is connected to 3.3V, and
-> >> the other point is connected to pwm's one channel. When the 4
-> >> pinctrls are configured as enable at the same time, the 4 pinctrls is
-> >> low valtage, and the 4 leds will be lighted up as default, then when
-> >> you enable/disable one led will effects others.
-> >>
-> >> These pinctrls are belong to pwm, and I don't think led or other
-> >> customer could control them directly.
-> >> So, here I authorize the 4 pinctrls to each channel controls.
-> >>
-> > "
-> > For the reason above, I have to control the pinctrls separately.
-> >
-> > If all the pinctrls set as default state, the 8 pinctrls must be
-> controlled together.
-> > And the 4 leds will all be lighted up as default and will influence
-> each other.
-> 
-> Sorry, that still doesn't make much sense. Either way though, having
-> separate pinctrl setup for a single device isn't going to work. You'll
-> either need to have all combinations of 4 (8?) PWMs represented as
-> pinctrl states(!), or register separate PWM devices so that they get
-> independant pinctrl states.
+> The WkupM3 mailbox used for triggering PM operations such as suspend
+> and resume on AM33x/AM43x is special in that the M3 processor cannot
+> access the mailbox registers. However, an interrupt is needed to be
+> sent to request the M3 to perform a desired PM operation. This patch
+> adds the support for this special mailbox through separate ops for
+> this mailbox. These ops are designed to have the WkupM3's Rx interrupt
+> programmed within the driver, during transmission of a message. The
+> message is immediately read back and the internal mailbox interrupt
+> acknowledged as well to avoid triggering any spurious interrupts to
+> the M3.
 >
-Well, I have ever thought about registering separate PWM device for each channel.
-But, if so, how should I control the pinctrl of each PWM(actually one channel of FTM PWM) ?
-I must select "default" state(the "default" state here, the pinctrl must be setup as "dsN" or "chN-idle" state we discussed before) when probing, and when customers .request-->.config-->.enable the PWM I also must select an "active" state to config the pinctrl...
-Thus, this is still not static. I think this isn't much different from the current.
+> Signed-off-by: Suman Anna <s-anna@ti.com>
 
-Also if having all combinations of 8 PWMs represented as pinctrl states, how could I deal with the problem about LEDs ?
+Dumb Q: why does all this extra logic belong in the mailbox driver and
+not in the wkup_m3 driver?  To me, this seems like part of the IPC
+protocol between the MPU and M3 firmware, and not an inherent part of
+the AM33xx mbox.
 
-
-
-Thanks very much,
-
---
-Best Regards,
-Xiubo
+Kevin
