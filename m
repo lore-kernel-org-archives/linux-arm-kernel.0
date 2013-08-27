@@ -1,121 +1,115 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 27 Aug 2013 12:31:00 +0100
-Subject: [PATCH v4 3/5] ARM64: arch_timer: add support to configure and
- enable event stream
-In-Reply-To: <20130827111905.GF19897@arm.com>
-References: <1377274749-6196-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1377274749-6196-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <20130827111905.GF19897@arm.com>
-Message-ID: <521C8DF4.3030209@arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 27 Aug 2013 14:37:14 +0300
+Subject: trinity: kernel warning at
+ drivers/video/omap2/dss/manager-sysfs.c:290
+ manager_alpha_blending_enabled_show+0x3c/0x60()
+In-Reply-To: <20130821223340.GE25647@n2100.arm.linux.org.uk>
+References: <20130821223340.GE25647@n2100.arm.linux.org.uk>
+Message-ID: <521C8F6A.5020804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On 22/08/13 01:33, Russell King - ARM Linux wrote:
+> Trinity found this error on OMAP4430SDP using 3.11-rc4:
+> 
+> WARNING: CPU: 1 PID: 3395 at /home/rmk/git/linux-rmk/drivers/video/omap2/dss/manager-sysfs.c:290 manager_alpha_blending_enabled_show+0x3c/0x60()
+> Modules linked in:
+> CPU: 1 PID: 3395 Comm: trinity-child1 Not tainted 3.11.0-rc4+ #487
+> Backtrace:
+> [<c0016ca8>] (dump_backtrace+0x0/0x110) from [<c0016e44>] (show_stack+0x18/0x1c)
+>  r6:c03dc0d4 r5:00000009 r4:00000000 r3:00400040
+> [<c0016e2c>] (show_stack+0x0/0x1c) from [<c03949ec>] (dump_stack+0x74/0x90)
+> [<c0394978>] (dump_stack+0x0/0x90) from [<c0037a68>] (warn_slowpath_common+0x6c/0x8c)
+>  r4:00000000 r3:deaef800
+> [<c00379fc>] (warn_slowpath_common+0x0/0x8c) from [<c0037aac>] (warn_slowpath_null+0x24/0x2c)
+>  r8:dd4eb718 r7:c03dc2a0 r6:dd629f70 r5:dd4eb700 r4:dd4af000
+> [<c0037a88>] (warn_slowpath_null+0x0/0x2c) from [<c01e4744>] (manager_alpha_blending_enabled_show+0x3c/0x60)
+> [<c01e4708>] (manager_alpha_blending_enabled_show+0x0/0x60) from [<c01e41c0>] (manager_attr_show+0x20/0x2c)
+>  r4:de090cd0
+> [<c01e41a0>] (manager_attr_show+0x0/0x2c) from [<c0126ee4>] (sysfs_read_file+0xc4/0x14c)
+> [<c0126e20>] (sysfs_read_file+0x0/0x14c) from [<c00cef2c>] (do_readv_writev+0x118/0x24c)
+> [<c00cee14>] (do_readv_writev+0x0/0x24c) from [<c00cf140>] (vfs_readv+0x68/0x78)
+> [<c00cf0d8>] (vfs_readv+0x0/0x78) from [<c00cf19c>] (SyS_readv+0x4c/0x74)
+>  r5:00000000 r4:dd5b7700
+> [<c00cf150>] (SyS_readv+0x0/0x74) from [<c0013340>] (ret_fast_syscall+0x0/0x48)
+> 
+> Looking at the code:
+> 
+> static ssize_t manager_alpha_blending_enabled_show(
+>                 struct omap_overlay_manager *mgr, char *buf)
+> {
+>         struct omap_overlay_manager_info info;
+> 
+>         mgr->get_manager_info(mgr, &info);
+> 
+>         WARN_ON(!dss_has_feature(FEAT_ALPHA_FIXED_ZORDER));
+> 
+> -rw-r--r-- 1 root root 4096 Jan  1 00:01 manager0/alpha_blending_enabled
+> -rw-r--r-- 1 root root 4096 Jan  1 00:01 manager1/alpha_blending_enabled
+> -rw-r--r-- 1 root root 4096 Jan  1 00:01 manager2/alpha_blending_enabled
+> 
+> So, any program in userspace can open this sysfs file and on read cause
+> the kernel to print a warning and taint itself if there is no ZORDER
+> feature?  This is not good kernel programming guys.  Please audit your
+> other sysfs files for this bug, thanks.
 
-On 27/08/13 12:19, Catalin Marinas wrote:
-> On Fri, Aug 23, 2013 at 05:19:07PM +0100, Sudeep KarkadaNagesha wrote:
->> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
->> index 00b09d0..0f57158 100644
->> --- a/arch/arm64/include/asm/arch_timer.h
->> +++ b/arch/arm64/include/asm/arch_timer.h
->> @@ -97,21 +97,53 @@ static inline u32 arch_timer_get_cntfrq(void)
->>  	return val;
->>  }
->>  
->> -static inline void arch_counter_set_user_access(void)
->> +static inline u32 arch_timer_get_cntkctl(void)
->>  {
->>  	u32 cntkctl;
->> -
->>  	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
->> +	return cntkctl;
->> +}
->> +
->> +static inline void arch_timer_set_cntkctl(u32 cntkctl)
->> +{
->> +	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
->> +}
->> +
->> +static inline void arch_counter_set_user_access(void)
->> +{
->> +	u32 cntkctl = arch_timer_get_cntkctl();
->>  
->>  	/* Disable user access to the timers and the physical counter. */
->>  	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
->>  			| ARCH_TIMER_USR_VT_ACCESS_EN
->>  			| ARCH_TIMER_USR_PCT_ACCESS_EN);
->>  
->> -	/* Enable user access to the virtual counter. */
->> +	/* Enable user access to the virtual counter */
-> 
-> This change isn't needed here. Just move it to the first patch which
-> adds the comment.
-> 
-It's a mistake, accidentally removed leading '.'
-I will remove this.
+Well that's ugly. Thanks for reporting. The store part of
+alpha_blending_enabled had similar issue, but I didn't find such things
+elsewhere in the driver.
 
->>  	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
->>  
->> -	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
->> +	arch_timer_set_cntkctl(cntkctl);
->> +}
->> +
->> +static inline void arch_timer_evtstrm_config(bool enable, int divider)
->> +{
->> +	u32 cntkctl = arch_timer_get_cntkctl();
->> +	if (enable) {
->> +		cntkctl &= ~ARCH_TIMER_EVT_TRIGGER_MASK;
->> +		/* Set the divider and enable virtual event stream */
->> +		cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
->> +				| ARCH_TIMER_VIRT_EVT_EN;
->> +	} else {
->> +		cntkctl &= ~ARCH_TIMER_VIRT_EVT_EN; /* disable event stream */
->> +	}
->> +	arch_timer_set_cntkctl(cntkctl);
->> +}
->> +
->> +static inline void arch_timer_set_hwcap_evtstrm(void)
->> +{
->> +	elf_hwcap |= HWCAP_EVTSTRM;
->> +#ifdef CONFIG_COMPAT
->> +	compat_dyn_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
->> +#endif
->>  }
->>  
->>  static inline u64 arch_counter_get_cntvct(void)
->> diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
->> index 6d4482f..022d771 100644
->> --- a/arch/arm64/include/asm/hwcap.h
->> +++ b/arch/arm64/include/asm/hwcap.h
->> @@ -30,6 +30,7 @@
->>  #define COMPAT_HWCAP_IDIVA	(1 << 17)
->>  #define COMPAT_HWCAP_IDIVT	(1 << 18)
->>  #define COMPAT_HWCAP_IDIV	(COMPAT_HWCAP_IDIVA|COMPAT_HWCAP_IDIVT)
->> +#define COMPAT_HWCAP_EVTSTRM	(1 << 21)
->>  
->>  #ifndef __ASSEMBLY__
->>  /*
->> @@ -37,11 +38,15 @@
->>   * instruction set this cpu supports.
->>   */
->>  #define ELF_HWCAP		(elf_hwcap)
->> +#ifdef CONFIG_COMPAT
->>  #define COMPAT_ELF_HWCAP	(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
->>  				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
->>  				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
->>  				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
->> -				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV)
->> +				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV|\
->> +				 compat_dyn_elf_hwcap)
->> +extern unsigned int compat_dyn_elf_hwcap;
->> +#endif
-> 
-> Can we just have a compat_elf_hwcap which is initialised to all the
-> above and avoid compat_dyn_elf_hwcap?
-> 
-It was Will's suggestion(https://lkml.org/lkml/2013/8/20/425)
-Moreover with config option now it makes more sense to retain it.
-It avoids having conditional definition. Let me know your opinion.
+I made a fix, below.
 
-Regards,
-Sudeep
+ Tomi
+
+Author: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Date:   Tue Aug 27 14:28:03 2013 +0300
+
+    OMAPDSS: fix WARN_ON in 'alpha_blending_enabled' sysfs file
+    
+    The code handling 'alpha_blending_enabled' sysfs file contains WARN_ONs
+    in case the feature is not supported on the current platform. Even
+    though only root can write to the file, anyone can read it, thus causing
+    the kernel to get tainted and printing an ugly warning.
+    
+    Instead of having WARN_ONs, return a proper error if the feature is not
+    supported.
+    
+    Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+    Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
+
+diff --git a/drivers/video/omap2/dss/manager-sysfs.c b/drivers/video/omap2/dss/manager-sysfs.c
+index de7e7b5..37b59fe 100644
+--- a/drivers/video/omap2/dss/manager-sysfs.c
++++ b/drivers/video/omap2/dss/manager-sysfs.c
+@@ -285,9 +285,10 @@ static ssize_t manager_alpha_blending_enabled_show(
+ {
+ 	struct omap_overlay_manager_info info;
+ 
+-	mgr->get_manager_info(mgr, &info);
++	if(!dss_has_feature(FEAT_ALPHA_FIXED_ZORDER))
++		return -ENODEV;
+ 
+-	WARN_ON(!dss_has_feature(FEAT_ALPHA_FIXED_ZORDER));
++	mgr->get_manager_info(mgr, &info);
+ 
+ 	return snprintf(buf, PAGE_SIZE, "%d\n",
+ 		info.partial_alpha_enabled);
+@@ -301,7 +302,8 @@ static ssize_t manager_alpha_blending_enabled_store(
+ 	bool enable;
+ 	int r;
+ 
+-	WARN_ON(!dss_has_feature(FEAT_ALPHA_FIXED_ZORDER));
++	if(!dss_has_feature(FEAT_ALPHA_FIXED_ZORDER))
++		return -ENODEV;
+ 
+ 	r = strtobool(buf, &enable);
+ 	if (r)
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130827/5ec74a4b/attachment-0001.sig>
