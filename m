@@ -1,48 +1,100 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 27 Aug 2013 08:47:25 +0200
-Subject: [PATCH v2] gpio: Enable pcf857x GPIO expander for Device Tree
-In-Reply-To: <CACRpkda5Q-Zs8A2VFPvMc9519QWJ3EH08g4Do0se6BcLEg+rug@mail.gmail.com>
-References: <1370527523-1030-1-git-send-email-archit@ti.com>
- <1377498081-16358-1-git-send-email-archit@ti.com>
- <CACRpkda5Q-Zs8A2VFPvMc9519QWJ3EH08g4Do0se6BcLEg+rug@mail.gmail.com>
-Message-ID: <7142087.DRSP8TfuKN@avalon>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 27 Aug 2013 08:46:05 +0200 (CEST)
+Subject: SHMobile Compatibility String Inconsistencies
+In-Reply-To: <4837967.ksf69P4Rut@avalon>
+References: <20130822054639.GE11086@verge.net.au>
+ <20130824021323.GC5181@verge.net.au>
+ <Pine.LNX.4.64.1308261750340.1767@axis700.grange> <4837967.ksf69P4Rut@avalon>
+Message-ID: <Pine.LNX.4.64.1308270840450.11515@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 August 2013 05:20:45 Linus Walleij wrote:
-> On Mon, Aug 26, 2013 at 8:21 AM, Archit Taneja <archit@ti.com> wrote:
-> > Add code to parse the GPIO expander Device Tree node and extract platform
-> > data out of it, and populate the struct 'pcf857x_platform_data'
-> > maintained by the driver. This enables devices to reference the gpio
-> > expander from Device Tree.
+Hi Laurent,
+
+On Tue, 27 Aug 2013, Laurent Pinchart wrote:
+
+> Hi Guennadi,
+> 
+> On Monday 26 August 2013 18:08:52 Guennadi Liakhovetski wrote:
+> > On Sat, 24 Aug 2013, Simon Horman wrote:
+> > > On Fri, Aug 23, 2013 at 01:31:31PM +0200, Laurent Pinchart wrote:
+> > > > On Friday 23 August 2013 12:11:11 David Gibson wrote:
+> > > > > On Thu, Aug 22, 2013 at 02:46:40PM +0900, Simon Horman wrote:
+> > > > > > Hi Laurent, Hi Guennadi, Hi All,
+> > > > > > 
+> > > > > > Olof has brought to my attention that there is some inconsistency
+> > > > > > in the way that compatibility strings for SHMobile are named and he
+> > > > > > has asked us to clean things up for v3.12.
+> > > > > > 
+> > > > > > Looking through arch/arm/boot/dts/ I see that we have:
+> > > > > > 
+> > > > > > 1. {gpio,pfc}-r8aXXXX and;
 > > 
-> > Add DT binding info in Documentation.
+> > Add shdma-<soc> to the above
 > > 
-> > Signed-off-by: Archit Taneja <archit@ti.com>
-> > ---
-> > - v2 posted after quite a while, sorry for the delay!
+> > > > > > 2. r8aXXXX-sdhi
+> > > > > > 
+> > > > > > The inconsistency that Olof has asked us to resolve is that we
+> > > > > > should either use r8aXXXX- or -r8aXXXX. Not both.
 > > 
-> > Changes in v2:
-> > - second gpeio-cell description corrected in Documentation
-> > - interrupt controller description removed for now, will be added in a
-> >   follow up patch
-> > - n_latch description updated
+> > Given the 3:1 score the choice seems rather simple to me. So, if we do
+> > have to make those consistent, let's change SDHI.
+> 
+> Agreed.
+> 
+> > > > > > It seems to me that neither option is inherently better than the
+> > > > > > other so we should just choose the path of least resistance to make
+> > > > > > things consistent.
+> > > > > > 
+> > > > > > Laurent, Guennadi, do you have any opinions on if it would
+> > > > > > be easier to change the GPIO and PFC compatibility strings;
+> > > > > > or to change the SDHI compatibility strings?
+> > > > > > 
+> > > > > > Ideally I would like you to come to some sort of consensus and send
+> > > > > > patches.
+> > > > > 
+> > > > > So, by all means clean this up in the dts.
+> > > > > 
+> > > > > BUT, in keeping with the recent discussions on improving the DT
+> > > > > process, the corresponding drivers must continue to recognize both
+> > > > > forms, so that old DTs will still work correctly.
+> > > > 
+> > > > Given the early state of DT support in arm/mach-shmobile, I'm pretty
+> > > > sure we have no DT-based systems in the wild. The old compatibility
+> > > > string could in my opinion just be dropped.
+> > > 
+> > > I tend to agree, though I don't mind either way.
+> > 
+> > So, what path should we choose? I see 2 SDHI users in your current "devel"
+> > brunch: sh73a0 (kzm9g) and r8a73a4 (ape6evm). Should we make a single
+> > patch, changing the driver and both users and push it via ARM with Chris'
+> > ack or shall we add new compats, switch .dtsi's, remove old compats - over
+> > 2 kernel versions?
+> 
+> I'm fine with both, but in the latter case I don't see a need to spread it 
+> over two kernel versions.
 
-And it seems that the patch conflicts with
+The latter only makes sense if we want to push patches via separate trees, 
+i.e.
+DMA
+ARM
+DMA
+and doing this within 1 kernel release would be difficult. Whereas if we 
+want to push all 3 patches via 1 tree, then I'd say just doing 1 patch 
+would be easier.
 
-https://lkml.org/lkml/2013/8/26/248
+Thanks
+Guennadi
 
-:-/
+> > Can we still get anything for this into 3.12 or is it too late? Would it be
+> > a "fix" enough for -rc2 / late -rc1?
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
 
-If we end up merging this one, I'd like to at least rename the DT n-latch 
-property to pin-initial-states as in my patch and update the documentation, as 
-I find it more explicit.
-
-> The devicetree portions of this patch needs to be reviewed by
-> devicetree at vger.kernel.org, so please repost including that
-> list.
-
--- 
-Regards,
-
-Laurent Pinchart
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
