@@ -1,33 +1,110 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 27 Aug 2013 23:02:01 +0100
-Subject: 3.11-rc7 big-endian support
-In-Reply-To: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <521D21D9.8020106@codethink.co.uk>
+From: dorislee@heawe.net (Doris Lee)
+Date: Tue, 27 Aug 2013 16:50:38 -0500
+Subject: Fed Collapses Refinance-Rates
+Message-ID: <0.0.17273125618.5961534058efaf2ymubwh898692.0@heawe.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/08/13 22:38, Ben Dooks wrote:
-> This is a new series of the core work for getting big-endian working
-> nicely on ARM. This is mainly a rebase on 3.11-rc7 and has not had
-> a lot of testing on it.
->
-> It is available on:
->
-> 	git://git.baserock.org/delta/linux.git baserock/311-rc7/be/core-v1
->
-> Since the previous version:
->
-> - Added Victor's atomic64 patch
-> - Fixed BUG() patch to use<asm/opcodes.h>
->
-> I would like to get as much of this merged as possible, so would
-> it be possible
+Notice linux-arm-kernel at lists.infradead.org,
 
-Is it possible to get all or some of this series pulled before the
-next merge window? Do I need to remove the machine specific parts
-of the series?
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Federal Reserve Collapses Refi-Rates
+
+
+Don't miss out, see rates http://www.heawe.net/f093d9/?chac64h4058efaf2h0hca1699
+
+
+New laws passed, you probably qualify for the Presidents Making Homes Affordable Plan.
+
+Calculate A New Lower Housing Payment Now
+
+http://www.heawe.net/f093d9/?chac64h4058efaf2h0hca1699
+
+
+
+
+Best wishes
+Mrs. Doris Lee
+Refinance Expert
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1230-5 Madera Rd,Suite 104 Simi_Valley, CA_93065
+
+
+http://www.heawe.net/f093d9/?mhac64h4058efaf2h0h6a765b
+
+
+http://www.heawe.net/f093d9/?uhac64h4058efaf2h0hd3ad75
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+amused inexpensive cornet doubtfully tortellini can't see take found read glorious link there's vacantly inexpensive married business whereas voice adventurously
+jeep refuse cash gorgeous adorable vibraphone ferociously trail maple dimly
+decide misty oatmeal floor seaplane jacket happy leave filthy
+
+positively distance observation daily anxiously latency move mustn't motionless limit lace never when's disadvantage playfully flat disturbed money meaningfully blindly
+busy release during passenger footnote landmine healthily
