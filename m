@@ -1,61 +1,208 @@
-From: hector.palacios@digi.com (Hector Palacios)
-Date: Tue, 27 Aug 2013 10:12:17 +0200
-Subject: [PATCH v15 00/13] Add tested id switch and vbus connect detect
- support for Chipidea
-In-Reply-To: <87k3j77dwz.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
- <521B8150.70906@digi.com> <20130827025115.GA6561@shlinux1.ap.freescale.net>
- <521C4FEF.2010905@digi.com> <87k3j77dwz.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <521C5F61.2080505@digi.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 27 Aug 2013 10:14:21 +0200
+Subject: [PATCH v5] gpio: pcf857x: Add OF support
+In-Reply-To: <1377590559-14279-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1377590559-14279-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <2063335.Uqxok8bYMn@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2013 10:09 AM, Alexander Shishkin wrote:
-> Hector Palacios <hector.palacios@digi.com> writes:
->
->> Dear Peter,
->>
->> On 08/27/2013 04:51 AM, Peter Chen wrote:
->>> On Mon, Aug 26, 2013 at 06:24:48PM +0200, Hector Palacios wrote:
->>>> Dear Peter,
->>>>
->>>> On 08/12/2013 03:22 AM, Peter Chen wrote:
->>>>> This patchset adds tested otg id switch function and vbus connect
->>>>> and disconnect detection for chipidea driver. And fix kinds of
->>>>> bugs found at chipidea drivers after enabling id and vbus detection.
->>>>>
->>>>> This patch are fully tested at imx6 sabresd and imx28evk platform by me.
->>>>> Besides, marek tested it on two STMP3780-based boards (not yet mainline)
->>>>> and two MX28-based boards.
->>>>>
->>>>> My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
->>>>>
->>>>> Changes for v15:
->>>>> - Mark otgsc API as static line, and move them to otg.h [4/13]
->>>>> - Remove some redundant comments [6/13]
->>>>> - Fix some typos [8/13]
->>>>> - Retire flag CI_HDRC_PULLUP_ON_VBUS [12/13] [13/13]
->>>>
->>>> Patches 6 and 12 in this series seem to be incomplete or malformed. Please check.
->>>>
->>>
->>> Would you post what's the problem for them or what's problem
->>> at your system after using them?
->>
->> I'm sorry, I thought it was evident. Patches 6 and 12 were posted incomplete. See how
->> they end:
->> http://permalink.gmane.org/gmane.linux.usb.general/92231
->> http://permalink.gmane.org/gmane.linux.usb.general/92237
->>
->> In patch 12 the modified file include/linux/usb/chipidea.h does not even appear.
->> Something happened during the generation or posting of these patches.
->
-> Or something's wrong with gmane.
->
-> http://www.spinics.net/lists/linux-usb/msg91695.html
+Hi Laurent,
 
-Oops. My fault, then. Sorry about that.
+On Tuesday 27 of August 2013 10:02:39 Laurent Pinchart wrote:
+> Add DT bindings for the pcf857x-compatible chips and parse the device
+> tree node in the driver.
+> 
+> Signed-off-by: Laurent Pinchart
+> <laurent.pinchart+renesas@ideasonboard.com> ---
+>  .../devicetree/bindings/gpio/gpio-pcf857x.txt      | 71
+> ++++++++++++++++++++++ drivers/gpio/gpio-pcf857x.c                     
+>   | 44 +++++++++++--- 2 files changed, 107 insertions(+), 8
+> deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
+> 
+> Changes since v4:
+> 
+> - Don't try to get ngpio from of_device_id data, we already get it from
+>   i2c_device_id
+
+Hmm, I'm not sure how this is supposed to work.
+
+How does the I2C core resolve OF compatible name to particular entry in 
+id_table? I believe it simply passes NULL as the second argument of 
+.probe() if the device is instantiated based on OF compatible string and 
+not one in the legacy ID table.
+
+> 
+> Changes since v3:
+> 
+> - Get rid of the #ifdef CONFIG_OF in the probe function
+> - Give DT node priority over platform data
+> 
+> Changes since v2:
+> 
+> - Replace mention about interrupts software configuration in DT bindings
+> documentation with an explanation of the hardware configuration.
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
+> b/Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt new file mode
+> 100644
+> index 0000000..d261391
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
+> @@ -0,0 +1,71 @@
+> +* PCF857x-compatible I/O expanders
+> +
+> +The PCF857x-compatible chips have "quasi-bidirectional" I/O pins that
+> can be +driven high by a pull-up current source or driven low to
+> ground. This combines +the direction and output level into a single bit
+> per pin, which can't be read +back. We can't actually know at
+> initialization time whether a pin is configured +(a) as output and
+> driving the signal low/high, or (b) as input and reporting a +low/high
+> value, without knowing the last value written since the chip came out
+> +of reset (if any). The only reliable solution for setting up pin
+> direction is +thus to do it explicitly.
+> +
+> +Required Properties:
+> +
+> +  - compatible: should be one of the following.
+> +    - "maxim,max7328": For the Maxim MAX7378
+> +    - "maxim,max7329": For the Maxim MAX7329
+> +    - "nxp,pca8574": For the NXP PCA8574
+> +    - "nxp,pca8575": For the NXP PCA8575
+> +    - "nxp,pca9670": For the NXP PCA9670
+> +    - "nxp,pca9671": For the NXP PCA9671
+> +    - "nxp,pca9672": For the NXP PCA9672
+> +    - "nxp,pca9673": For the NXP PCA9673
+> +    - "nxp,pca9674": For the NXP PCA9674
+> +    - "nxp,pca9675": For the NXP PCA9675
+> +    - "nxp,pcf8574": For the NXP PCF8574
+> +    - "nxp,pcf8574a": For the NXP PCF8574A
+> +    - "nxp,pcf8575": For the NXP PCF8575
+> +    - "ti,tca9554": For the TI TCA9554
+> +
+> +  - reg: I2C slave address.
+> +
+> +  - gpio-controller: Marks the device node as a gpio controller.
+> +  - #gpio-cells: Should be 2. The first cell is the GPIO number and the
+> second +    cell specifies GPIO flags, as defined in
+> <dt-bindings/gpio/gpio.h>. Only the +    GPIO_ACTIVE_HIGH and
+> GPIO_ACTIVE_LOW flags are supported. +
+> +Optional Properties:
+> +
+> +  - pins-initial-state: Bitmask that specifies the initial state of
+> each pin. +  When a bit is set to zero, the corresponding pin will be
+> initialized to the +  input (pulled-up) state. When the  bit is set to
+> one, the pin will be +  initialized the the low-level output state. If
+> the property is not specified +  all pins will be initialized to the
+> input state.
+> +
+> +  The I/O expander can detect input state changes, and thus optionally
+> act as +  an interrupt controller. When the expander interrupt pin is
+> connected all the +  following properties must be set. For more
+> information please see the +  interrupt controller device tree bindings
+> documentation available at + 
+> Documentation/devicetree/bindings/interrupt-controller/interrupts.txt.
+> +
+> +  - interrupt-controller: Identifies the node as an interrupt
+> controller. +  - #interrupt-cells: Number of cells to encode an
+> interrupt source, shall be 2. +  - interrupt-parent: phandle of the
+> parent interrupt controller. +  - interrupts: Interrupt specifier for
+> the controllers interrupt. +
+> +
+> +Please refer to gpio.txt in this directory for details of the common
+> GPIO +bindings used by client devices.
+> +
+> +Example: PCF8575 I/O expander node
+> +
+> +	pcf8575: gpio at 20 {
+> +		compatible = "nxp,pcf8575";
+> +		reg = <0x20>;
+> +		interrupt-parent = <&irqpin2>;
+> +		interrupts = <3 0>;
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +		interrupt-controller;
+> +		#interrupt-cells = <2>;
+> +	};
+> diff --git a/drivers/gpio/gpio-pcf857x.c b/drivers/gpio/gpio-pcf857x.c
+> index 9e61bb0..864dd8c 100644
+> --- a/drivers/gpio/gpio-pcf857x.c
+> +++ b/drivers/gpio/gpio-pcf857x.c
+> @@ -26,6 +26,8 @@
+>  #include <linux/irqdomain.h>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/slab.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/workqueue.h>
+> @@ -50,6 +52,27 @@ static const struct i2c_device_id pcf857x_id[] = {
+>  };
+>  MODULE_DEVICE_TABLE(i2c, pcf857x_id);
+> 
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id pcf857x_of_table[] = {
+> +	{ .compatible = "nxp,pcf8574" },
+> +	{ .compatible = "nxp,pcf8574a" },
+> +	{ .compatible = "nxp,pca8574" },
+> +	{ .compatible = "nxp,pca9670" },
+> +	{ .compatible = "nxp,pca9672" },
+> +	{ .compatible = "nxp,pca9674" },
+> +	{ .compatible = "nxp,pcf8575" },
+> +	{ .compatible = "nxp,pca8575" },
+> +	{ .compatible = "nxp,pca9671" },
+> +	{ .compatible = "nxp,pca9673" },
+> +	{ .compatible = "nxp,pca9675" },
+> +	{ .compatible = "maxim,max7328" },
+> +	{ .compatible = "maxim,max7329" },
+> +	{ .compatible = "ti,tca9554" },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, pcf857x_of_table);
+> +#endif
+> +
+>  /*
+>   * The pcf857x, pca857x, and pca967x chips only expose one read and one
+> * write register.  Writing a "one" bit (to match the reset state) lets
+> @@ -257,14 +280,18 @@ fail:
+>  static int pcf857x_probe(struct i2c_client *client,
+>  			 const struct i2c_device_id *id)
+>  {
+> -	struct pcf857x_platform_data	*pdata;
+> +	struct pcf857x_platform_data	*pdata = dev_get_platdata(&client-
+>dev);
+> +	struct device_node		*np = client->dev.of_node;
+>  	struct pcf857x			*gpio;
+> +	unsigned int			n_latch = 0;
+>  	int				status;
+> 
+> -	pdata = dev_get_platdata(&client->dev);
+> -	if (!pdata) {
+> +	if (IS_ENABLED(CONFIG_OF) && np)
+> +		of_property_read_u32(np, "pins-initial-state", &n_latch);
+
+I believe the convention is that platform data should be favoured, as you 
+can pass it even if DT is present, using auxdata table.
+
+So this should rather be:
+
+	if (pdata)
+		n_latch = pdata->n_latch;
+	else if (IS_ENABLED(CONFIG_OF) && np)
+		of_property_read_u32(np, "pins-initial-state", &n_latch);
+	else
+		dev_dbg(&client->dev, "no platform data\n");
+
+> +	else if (pdata)
+> +		n_latch = pdata->n_latch;
+> +	else
+>  		dev_dbg(&client->dev, "no platform data\n");
+> -	}
+
+Other than that, the patch looks good.
 
 Best regards,
---
-Hector Palacios
+Tomasz
