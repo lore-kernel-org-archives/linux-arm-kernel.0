@@ -1,79 +1,69 @@
-From: murzin.v@gmail.com (Vladimir Murzin)
-Date: Tue, 27 Aug 2013 12:10:50 +0200
-Subject: [PATCH] ARM: OMAP4: cpuidle: fix: call cpu_cluster_pm_exit
- conditionally
-Message-ID: <1377598250-2355-1-git-send-email-murzin.v@gmail.com>
+From: hector.palacios@digi.com (Hector Palacios)
+Date: Tue, 27 Aug 2013 12:20:21 +0200
+Subject: [PATCH v15 00/13] Add tested id switch and vbus connect detect
+ support for Chipidea
+In-Reply-To: <521C5F61.2080505@digi.com>
+References: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
+ <521B8150.70906@digi.com> <20130827025115.GA6561@shlinux1.ap.freescale.net>
+ <521C4FEF.2010905@digi.com> <87k3j77dwz.fsf@ashishki-desk.ger.corp.intel.com>
+ <521C5F61.2080505@digi.com>
+Message-ID: <521C7D65.5050900@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We call cpu_cluster_pm_enter for dev->cpu == 0 only, but
-cpu_cluster_pm_exit called without that check.
+On 08/27/2013 10:12 AM, Hector Palacios wrote:
+> On 08/27/2013 10:09 AM, Alexander Shishkin wrote:
+>> Hector Palacios <hector.palacios@digi.com> writes:
+>>
+>>> Dear Peter,
+>>>
+>>> On 08/27/2013 04:51 AM, Peter Chen wrote:
+>>>> On Mon, Aug 26, 2013 at 06:24:48PM +0200, Hector Palacios wrote:
+>>>>> Dear Peter,
+>>>>>
+>>>>> On 08/12/2013 03:22 AM, Peter Chen wrote:
+>>>>>> This patchset adds tested otg id switch function and vbus connect
+>>>>>> and disconnect detection for chipidea driver. And fix kinds of
+>>>>>> bugs found at chipidea drivers after enabling id and vbus detection.
+>>>>>>
+>>>>>> This patch are fully tested at imx6 sabresd and imx28evk platform by me.
+>>>>>> Besides, marek tested it on two STMP3780-based boards (not yet mainline)
+>>>>>> and two MX28-based boards.
+>>>>>>
+>>>>>> My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
+>>>>>>
+>>>>>> Changes for v15:
+>>>>>> - Mark otgsc API as static line, and move them to otg.h [4/13]
+>>>>>> - Remove some redundant comments [6/13]
+>>>>>> - Fix some typos [8/13]
+>>>>>> - Retire flag CI_HDRC_PULLUP_ON_VBUS [12/13] [13/13]
+>>>>>
+>>>>> Patches 6 and 12 in this series seem to be incomplete or malformed. Please check.
+>>>>>
+>>>>
+>>>> Would you post what's the problem for them or what's problem
+>>>> at your system after using them?
+>>>
+>>> I'm sorry, I thought it was evident. Patches 6 and 12 were posted incomplete. See how
+>>> they end:
+>>> http://permalink.gmane.org/gmane.linux.usb.general/92231
+>>> http://permalink.gmane.org/gmane.linux.usb.general/92237
+>>>
+>>> In patch 12 the modified file include/linux/usb/chipidea.h does not even appear.
+>>> Something happened during the generation or posting of these patches.
+>>
+>> Or something's wrong with gmane.
+>>
+>> http://www.spinics.net/lists/linux-usb/msg91695.html
+>
+> Oops. My fault, then. Sorry about that.
 
-Because of that unhandled page fault may happen:
+For what is worth, I successfully tested these series with serial, ethernet and mass 
+storage gadget drivers on a custom board (not upstream) based on i.MX28.
 
-[    3.803405] Unable to handle kernel paging request at virtual address 00002500
-[    3.810974] pgd = c0004000
-[    3.813812] [00002500] *pgd=00000000
-[    3.817596] Internal error: Oops: 5 [#1] SMP ARM
-[    3.822418] Modules linked in:
-[    3.825653] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.11.0-rc6+ #21
-[    3.832397] task: ed86ef40 ti: ed896000 task.ti: ed896000
-[    3.838073] PC is at irq_notifier+0x234/0x25c
-[    3.842651] LR is at irq_notifier+0x218/0x25c
-[    3.847229] pc : [<c0029ed8>]    lr : [<c0029ebc>]    psr: 80000193
-[    3.847229] sp : ed897ee8  ip : 00000005  fp : 00000001
-[    3.859283] r10: c0b395f0  r9 : c0b30594  r8 : c0b8c2ac
-[    3.864776] r7 : ffffffff  r6 : 00000000  r5 : 00000005  r4 : 00000000
-[    3.871643] r3 : 00002500  r2 : 00000000  r1 : 00000005  r0 : 44302244
-[    3.878479] Flags: Nzcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-[    3.886260] Control: 10c5387d  Table: 8000404a  DAC: 00000015
-[    3.892272] Process swapper/1 (pid: 0, stack limit = 0xed896240)
-[    3.898590] Stack: (0xed897ee8 to 0xed898000)
-[    3.903167] 7ee0:                   c0979c3a 00000001 ed897ef8 ed896000 c0014f7c 00000000
-[    3.911743] 7f00: 00000005 00000000 ffffffff c0b8c2ac c0b395f0 c077c04c c0c94b48 c0b3953c
-[    3.920318] 7f20: c0bcd928 00000002 c0b39524 c00cfad8 00000000 ffffffff 00000000 c00cfb10
-[    3.928924] 7f40: c14e62c0 c002c1c8 c002c0ac c14e62c0 00000002 e251c37d 00000000 c0b39548
-[    3.937499] 7f60: c0b395f0 c05a1bc4 e251c37d 00000000 00000005 c05a3870 edc90380 edc90380
-[    3.946105] 7f80: edc90394 c14e62c0 c0b39548 00000002 c0784064 c05a3c78 c0b395e0 c14e62c0
-[    3.954681] 7fa0: 00000002 c0b39548 c0bc9db8 00000000 00000001 c05a1dc0 ed896000 00000015
-[    3.963287] 7fc0: c0bc9db8 ed896000 8000406a c0b30594 c0784064 c000e504 00000746 c007a528
-[    3.971862] 7fe0: 00000001 0000001d 600001d3 c0bcc004 00000000 800086c4 ee0aa6a7 d2aabaa9
-[    3.980499] [<c0029ed8>] (irq_notifier+0x234/0x25c) from [<c077c04c>] (notifier_call_chain+0x38/0x68)
-[    3.990173] [<c077c04c>] (notifier_call_chain+0x38/0x68) from [<c00cfad8>] (cpu_pm_notify+0x20/0x38)
-[    3.999786] [<c00cfad8>] (cpu_pm_notify+0x20/0x38) from [<c00cfb10>] (cpu_cluster_pm_exit+0x20/0x50)
-[    4.009399] [<c00cfb10>] (cpu_cluster_pm_exit+0x20/0x50) from [<c002c1c8>] (omap_enter_idle_coupled+0x11c/0x14c)
-[    4.020111] [<c002c1c8>] (omap_enter_idle_coupled+0x11c/0x14c) from [<c05a1bc4>] (cpuidle_enter_state+0x40/0xec)
-[    4.030822] [<c05a1bc4>] (cpuidle_enter_state+0x40/0xec) from [<c05a3c78>] (cpuidle_enter_state_coupled+0x1f4/0x240)
-[    4.041870] [<c05a3c78>] (cpuidle_enter_state_coupled+0x1f4/0x240) from [<c05a1dc0>] (cpuidle_idle_call+0x150/0x228)
-[    4.052947] [<c05a1dc0>] (cpuidle_idle_call+0x150/0x228) from [<c000e504>] (arch_cpu_idle+0x8/0x38)
-[    4.062499] [<c000e504>] (arch_cpu_idle+0x8/0x38) from [<c007a528>] (cpu_startup_entry+0x178/0x1e4)
-[    4.071990] [<c007a528>] (cpu_startup_entry+0x178/0x1e4) from [<800086c4>] (0x800086c4)
-[    4.080383] Code: e5922288 03a03b0a 13a03c25 e0823003 (e5932000)
-[    4.086791] ---[ end trace d83954a84a6fa69e ]---
+Tested-by: Hector Palacios <hector.palacios@digi.com>
 
-It is supposed that sar_base is initialized in irq_save_context, which
-is called on CPU_CLUSTER_PM_ENTER notification. If this notification
-has been missed and CPU_CLUSTER_PM_EXIT is received sar_base is NULL.
 
-Fix it by calling CPU_CLUSTER_PM_{ENTER,EXIT} under the same condition.
-
-Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
----
- arch/arm/mach-omap2/cpuidle44xx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index c443f2e..4c8982a 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -143,7 +143,7 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
- 	 * Call idle CPU cluster PM exit notifier chain
- 	 * to restore GIC and wakeupgen context.
- 	 */
--	if ((cx->mpu_state == PWRDM_POWER_RET) &&
-+	if (dev->cpu == 0 && (cx->mpu_state == PWRDM_POWER_RET) &&
- 		(cx->mpu_logic_state == PWRDM_POWER_OFF))
- 		cpu_cluster_pm_exit();
- 
--- 
-1.8.1.5
+Best regards,
+--
+Hector Palacios
