@@ -1,115 +1,120 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 27 Aug 2013 11:47:12 +0200
-Subject: [PATCH v2 2/4] iio: at91: Use different prescal, startup mask in
- MR for different IP
-In-Reply-To: <521C6BD2.7070602@atmel.com>
-References: <1376219071-29946-3-git-send-email-josh.wu@atmel.com>
- <20130815192044.GD12162@lukather> <5215DF2C.3050502@atmel.com>
- <5215DF7C.2020909@atmel.com>
- <20130823154603.GA7468@ludovic.desroches@atmel.com>
- <20130823165936.GC1230@lukather>
- <20130826083207.GB7468@ludovic.desroches@atmel.com>
- <521B27F3.1050203@atmel.com> <20130827081550.GF2695@lukather>
- <521C6BD2.7070602@atmel.com>
-Message-ID: <20130827094712.GH2695@lukather>
+From: B47053@freescale.com (Xiubo Li-B47053)
+Date: Tue, 27 Aug 2013 09:56:44 +0000
+Subject: [PATCH 1/4] pwm: add freescale ftm pwm driver support
+In-Reply-To: <20130827074057.GC8686@ulmo>
+References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377054462-6283-2-git-send-email-Li.Xiubo@freescale.com>
+ <20130823090523.GF3535@ulmo>
+ <1DD289F6464F0949A2FCA5AA6DC23F827E42BD@039-SN2MPN1-012.039d.mgd.msft.net>
+ <20130827074057.GC8686@ulmo>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827E6994@039-SN2MPN1-012.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+> Actually it should even be:
+> 
+> 	#define FTM_CSC(channel) \
+> 		(FTM_CSC_BASE + ((channel) * 8))
+> 
 
-On Tue, Aug 27, 2013 at 11:05:22AM +0200, Nicolas Ferre wrote:
-> On 27/08/2013 10:15, Maxime Ripard :
-> >On Mon, Aug 26, 2013 at 06:03:31PM +0800, Josh Wu wrote:
-> >>Hi, Ludovic and Maxime
-> >>
-> >>On 8/26/2013 4:32 PM, Ludovic Desroches wrote:
-> >>>On Fri, Aug 23, 2013 at 06:59:36PM +0200, Maxime Ripard wrote:
-> >>>>Hi Ludovic, Josh,
-> >>>>
-> >>>>On Fri, Aug 23, 2013 at 05:46:03PM +0200, Desroches, Ludovic wrote:
-> >>>>>On Thu, Aug 22, 2013 at 05:53:00PM +0800, Josh Wu wrote:
-> >>>>>>On 8/22/2013 5:51 PM, Josh Wu wrote:
-> >>>>>>>Hi, Maxime
-> >>>>>>>
-> >>>>>>>On 8/16/2013 3:20 AM, Maxime Ripard wrote:
-> >>>>>>>>Hi Josh,
-> >>>>>>>>
-> >>>>>>>>On Sun, Aug 11, 2013 at 07:04:29PM +0800, Josh Wu wrote:
-> >>>>>>>>>For at91 boards, there are different IPs for adc. Different IPs has
-> >>>>>>>>>different STARTUP & PRESCAL mask in ADC_MR.
-> >>>>>>>>>
-> >>>>>>>>>This patch introduce the multiple compatible string for those
-> >>>>>>>>>different IPs.
-> >>>>>>>>>
-> >>>>>>>>>Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> >>>>>>>>Overall it looks like the right ways, but I think we can take it a step
-> >>>>>>>>further.
-> >>>>>>>>
-> >>>>>>>>I'd drop at least the atmel,adc-drdy-mask, atmel,adc-num-channels,
-> >>>>>>>>atmel,adc-status-register, atmel,adc-trigger-register properties (and
-> >>>>>>>>probably the triggers as well description as well).
-> >>>>>>>yeah, right. Currently I want to drop following:
-> >>>>>>>
-> >>>>>>>atmel,adc-drdy-mask, atmel,adc-status-register,
-> >>>>>>>atmel,adc-trigger-register, atmel,adc-channel-base
-> >>>>>>>
-> >>>>>>>For the adc-num-channels, I'd like to leave it in dt parameters.
-> >>>>>>>It is a description for an adc capablity.
-> >>>>>About this parameter, I'll remove it too from the dt bindings. To set it you
-> >>>>>need to have a look to the datasheet and to copy a constant value into the
-> >>>>>dt. From my point of view, it means than this parameter should be managed by
-> >>>>>the driver and by the dt.
-> >>>>>
-> >>>>>On the other side since there are some dynamic allocation depending on this
-> >>>>>parameter maybe it makes sense to keep it in the dt. If the user wants to use
-> >>>>>only 2 channels why doing allocation for max channel number. By the way, this
-> >>>>>case is only valid if he uses the two first channels.
-> >>>>I don't recall it very well, is there any reason to not have it in the
-> >>>>DT? Can the ADC channels be used for something else? Or is it just some
-> >>>>IP-specific number of channels?
-> >>>>
-> >>>It is IP-specific. I don't see what benefit we could have to keep it in the DT?
-> >>>But Josh seems to have arguments to keep it.
-> >>
-> >>I'm ok to remove the channel number. What I worried is there also
-> >>has a channel-used mask in DT.
-> >>This mask should be removed too if channel number is removed.
-> >>So maybe we can also use the sysfs to set the mask.
+Well, yes, It should be, as Sascha has comment about this before, I have 
+already revise it.
+
+
+> > Firstly, we should be clear that the fpc->clk is chip's work clock.
+> > If so, after the .request() is called and before .enable() is called,
+> > the custumer will call .config(), in which will read/write the pwm chip
+> registers, if the module clock is still disabled, then the system will
+> hang up.
+> 
+> Okay. In that case perhaps the better thing to do is call clk_prepare()
+> during driver probe and only clk_enable() here.
+> 
+
+Yes, it is.
+
+> > > Perhaps time_ns should be "unsigned long"?
+> > >
 > >
-> >Indeed, that would make adc-channel-used irrelevant. But I'm not sure
-> >the mask is useful at all. Just enable all the channels and that's it?
+> > Shouldn't this be same with "int duty_ns" and "int period_ns", which
+> > are defined by struct pwm_ops { ...
+> > 	int (*config)(struct pwm_chip *chip,
+> >                     struct pwm_device *pwm,
+> >                     int duty_ns, int period_ns); ...
+> > }  ?
 > 
-> On the top of my head: keeping all channels enabled, won't it have
-> an impact on:
-> 1/ power consumption?
-> 2/ minimum period of sampling for a particular channel in case of
->    continuous ADC trigger?
-
-I don't know, you tell me ;)
-
-This is exactly why I was asking.
-
-> And do not forget that sysfs is an interface that is:
-> - needing a userspace tool to be configured properly (even just an
->   echo xx)
-> - hard to design
-> - a strict ABI that can't be changed once deployed
+> Well, the plan is to eventually make duty_ns and period_ns unsigned int
+> or unsigned long because negative values don't make any sense for them.
+> With that in mind I think it makes sense to use the proper type here now.
 > 
-> But yes, it is true that if the user has to configure ADC at
-> runtime, it is certainly an interface worth considering...
 
-Yes, of course. But the resolution is something I'd expect to be
-user-configurable, probably at runtime, and the DT doesn't make it very
-convenient to achieve.
+Okey, I will think it over again and revise it.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130827/155d6cfd/attachment-0001.sig>
+> > > > +static int fsl_pwm_config_channel(struct pwm_chip *chip,
+> > >
+> > > I think you can safely drop the _channel suffix from the PWM
+> operations.
+> > >
+> >
+> > By adding _channel suffix just for more comprehensave about the pwm's
+> muti-channel operation.
+> > If this is redundant here, I will drop it.
+> 
+> The operations are implicitly per-channel operations. So yes, the
+> _channel suffix is redundant here.
+> 
+
+Agree, I will drop it.
+
+> > > > +	fpc = to_fsl_chip(chip);
+> > > > +
+> > > > +	if (WARN_ON(!test_bit(PWMF_REQUESTED, &pwm->flags)))
+> > > > +		return -ESHUTDOWN;
+> > >
+> > > Erm... how do you think this could ever happen? Users need to
+> > > request a PWM to obtain a struct pwm_device, in which case
+> > > PWMF_REQUESTED will always be set. There are a few other occurrences
+> > > throughout the rest of the driver that I haven't pointed out
+> explicitly.
+> > >
+> >
+> > Does the following case is exist ?
+> > The customer in one thread has .free(pwm_1), while in another thread,
+> > which maybe had slept in for some reason, will
+> call .config/.enable/.disable?
+> >
+> > If so, as I have explained before, if the pwm_1 has been freed, the
+> > module clock maybe disabled too, so if the .config is call the system
+> will hang up.
+> 
+> While the above could possibly happen, there's no way the core could
+> prevent it. And your explicit test couldn't either. So what usually
+> happens is that a driver requests a PWM device and then has exclusive
+> access to it. Any other driver that wants to use the same PWM device
+> can't because it will get an -EBUSY return.
+> 
+> So in your hypothetical case above, if one driver does stuff like that
+> with a PWM device then that's a driver bug, not something the PWM core
+> should be required to handle.
+> 
+
+Okey, I will drop this.
+
+> > While I think the following is better in code.
+> >
+> >  		dev_err(fpc->chip.dev,
+> >  			"failed to parse <fsl,pwm-clk-ps> property: %d\n",
+> >  			ret);
+> 
+> Why? You're quoting which property failed to parse so you should use the
+> correct character for quoting, which is either the apostrophe (') or the
+> quotation mark (").
+> 
+
+For my first impression, I just thought that maybe a little better.
+Okey, I will adopt this in the feature.
+
+
+
+--
+Xiubo
