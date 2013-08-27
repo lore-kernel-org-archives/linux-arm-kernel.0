@@ -1,37 +1,25 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 27 Aug 2013 10:31:16 -0700
-Subject: [GIT PULL] ARM: late bcm SOC  for 3.12
-Message-ID: <521CE264.5050308@broadcom.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 27 Aug 2013 10:34:23 -0700
+Subject: SHMobile Compatibility String Inconsistencies
+In-Reply-To: <20130823001934.GA4331@verge.net.au>
+References: <20130822054639.GE11086@verge.net.au> <5813266.Bt0QjqXd25@avalon>
+ <20130823001934.GA4331@verge.net.au>
+Message-ID: <CAOesGMjeRQueYkeo0Qp1uBF_YCLR3vR53OnUGoMQ+ZJg0fxJog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-  Please pull the branch below. It contains a couple of missing patches 
-from last week's (still un-acked) pull requests.
+Hi,
 
-  Thanks,
-    csd
+On Thu, Aug 22, 2013 at 5:19 PM, Simon Horman <horms@verge.net.au> wrote:
 
-The following changes since commit c095ba7224d8edc71dcef0d655911399a8bd4a3f:
+> My understanding from Olof is that it is fine to just make
+> an SH-mobile-wide decision.
 
-   Linux 3.11-rc4 (2013-08-04 13:46:46 -0700)
+Sorry for being vague on this -- you really should try to join in on
+the same conventions as the other platforms (if one gets established).
 
-are available in the git repository at:
+My general opinion is aligned with Stephen Warren's in this case, but
+it's up to the devicetree-maintainers to make final calls.
 
-   git://github.com/broadcom/bcm11351.git tags/bcm-for-3.12-late-soc
 
-for you to fetch changes up to ceb2ea195a4167bc1ee9d78b19220562b1524fba:
-
-   mmc: sdhci-bcm-kona: Staticize sdhci_bcm_kona_card_event (2013-08-27 
-10:17:25 -0700)
-
-----------------------------------------------------------------
-Late changes for 3.12 broadcom driver
-
-----------------------------------------------------------------
-Sachin Kamat (2):
-       mmc: sdhci-bcm-kona: Remove unneeded version.h inclusion
-       mmc: sdhci-bcm-kona: Staticize sdhci_bcm_kona_card_event
-
-  drivers/mmc/host/sdhci-bcm-kona.c |    3 +--
-  1 file changed, 1 insertion(+), 2 deletions(-)
+-Olof
