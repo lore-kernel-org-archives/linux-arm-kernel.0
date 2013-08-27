@@ -1,34 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Aug 2013 05:20:45 +0200
-Subject: [PATCH v2] gpio: Enable pcf857x GPIO expander for Device Tree
-In-Reply-To: <1377498081-16358-1-git-send-email-archit@ti.com>
-References: <1370527523-1030-1-git-send-email-archit@ti.com>
- <1377498081-16358-1-git-send-email-archit@ti.com>
-Message-ID: <CACRpkda5Q-Zs8A2VFPvMc9519QWJ3EH08g4Do0se6BcLEg+rug@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 26 Aug 2013 23:22:37 -0400
+Subject: [PATCH v4 0/3] arm: mvebu: fix resource leak
+In-Reply-To: <20130827110120.0a9fab2a@xhacker>
+References: <1377517018-7716-1-git-send-email-jszhang@marvell.com>
+ <20130826204523.GD24470@titan.lakedaemon.net>
+ <20130827110120.0a9fab2a@xhacker>
+Message-ID: <20130827032237.GA19598@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 26, 2013 at 8:21 AM, Archit Taneja <archit@ti.com> wrote:
+On Tue, Aug 27, 2013 at 11:01:20AM +0800, Jisheng Zhang wrote:
+> Dear Jason,
+> 
+> On Mon, 26 Aug 2013 13:45:23 -0700
+> Jason Cooper <jason@lakedaemon.net> wrote:
+> 
+> > On Mon, Aug 26, 2013 at 07:36:55PM +0800, Jisheng Zhang wrote:
+> > > These patches try to fix resource leak by adding missing of_node_put(),
+> > > iounmap or using devm_ioremap_resource() if available.
+> > > 
+> > > v4:
+> > >   - re-generate since Ezequiel's patches add DT support to the
+> > > mvebu-mbus driver
+> > 
+> > grrr.  I hate to ask this, but can you please rebase patches 1 and 2
+> > against mvebu/fixes-non-critical?  No need to add back in the mvebu-mbus
+> > hunk.
+> 
+> patch 1 also fixes one similar trivial issue introduced since 994c8c94b419e
+> "ARM: mvebu: Remove the harcoded BootROM window allocation" in linux-next tree
+> 
+> patch 2 is updated to fix similar trivial issue introduce since 6839cfa82f99
+> "bus: mvebu-mbus: Introduce device tree binding"
+> 
+> These two commits aren't included in mvebu/fixes-non-criticial yet. Could you
+> please give suggestion?
 
-> Add code to parse the GPIO expander Device Tree node and extract platform data
-> out of it, and populate the struct 'pcf857x_platform_data' maintained by the
-> driver. This enables devices to reference the gpio expander from Device Tree.
->
-> Add DT binding info in Documentation.
->
-> Signed-off-by: Archit Taneja <archit@ti.com>
-> ---
-> - v2 posted after quite a while, sorry for the delay!
->
-> Changes in v2:
-> - second gpeio-cell description corrected in Documentation
-> - interrupt controller description removed for now, will be added in a follow
->   up patch
-> - n_latch description updated
+Yes, that's correct.  We prefer to have patch submitters base off of a
+mainline tag (eg v3.11-rc7).  conflicts between patchsets are then
+caught and resolved when branches are merged.  If done correctly, the
+merge resolution should be obvious in most cases.
 
-The devicetree portions of this patch needs to be reviewed by
-devicetree at vger.kernel.org, so please repost including that
-list.
+The upstream maintainers _prefer_ to see those conflicts because it
+gives them a better sense of who is tinkering in the same code-paths.
 
-Yours,
-Linus Walleij
+Trying to base patches off of disparate branches in order to
+'pre-resolve' those conflicts creates unnecessary dependencies and
+non-obvious merge-resolutions.
+
+In this case I asked you base off of mvebu/fixes-non-critical because
+that is where I will be applying them for queueing to arm-soc.  You
+could also base off of v3.11-rc7, there's nothing in
+mvebu/fixes-non-critical that should conflict with your changes.
+
+thx,
+
+Jason.
