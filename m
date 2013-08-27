@@ -1,48 +1,34 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 27 Aug 2013 16:45:25 -0700
-Subject: [PATCH] clk: samsung: pll: Use new registration method for
- PLL6552 and PLL6553
-In-Reply-To: <521CDEDE.1070003@samsung.com>
-References: <1374536965-3545-1-git-send-email-tomasz.figa@gmail.com>
- <158901ce9b34$c0ac8720$42059560$@org> <20130820002258.4443.34197@quantum>
- <1856348.DCxTucbm8V@flatron> <20130827011422.8231.95092@quantum>
- <521CDEDE.1070003@samsung.com>
-Message-ID: <20130827234525.8231.17145@quantum>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 27 Aug 2013 16:48:44 -0700
+Subject: [PATCH v2 0/5] Document msm_serial bindings and support newer
+ uartdms
+In-Reply-To: <20130827232351.GA27119@kroah.com>
+References: <1377067686-31957-1-git-send-email-sboyd@codeaurora.org>
+ <20130827232351.GA27119@kroah.com>
+Message-ID: <521D3ADC.6050703@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kukjin Kim (2013-08-27 10:16:14)
-> On 08/27/13 10:14, Mike Turquette wrote:
-> > Quoting Tomasz Figa (2013-08-20 17:33:21)
-> >> This patch modifies PLL6552 and PLL6553 clock drivers to use recently
-> >> added common Samsung PLL registration method.
-> >>
-> >> Signed-off-by: Tomasz Figa<tomasz.figa@gmail.com>
-> >
-> > Sigh. This change won't apply on top of clk-next-s3c64xx since it
-> > requires Yadwinder's change (amongst) others.
-> >
-> > The best I could do was spin out another topic branch with the relevant
-> > changes and apply this patch on top. It is a subset of clk-next but it
-> > is almost entirely Samsung patches:
-> >
-> > git://git.linaro.org/people/mturquette/linux.git clk-next-s3c64xx-delta
-> >
-> > Kukjin&  Tomasz, let me know if this OK for you to add as a dependency
-> > to the Samsung tree. If it is I will merge it into clk-next, but I want
-> > your OK that this branch is OK for you to take.
-> >
-> Hi Mike,
-> 
-> I merged the branch clk-next-s3c64xx-delta you provided on top of 
-> previous clk-next-s3c64xx for common-clk-s3c64xx and dt-s3c64xx and it 
-> looks fine to me.
+On 08/27/13 16:23, Greg Kroah-Hartman wrote:
+> On Tue, Aug 20, 2013 at 11:48:01PM -0700, Stephen Boyd wrote:
+>> This patchset aligns the msm_serial driver more with downstream usage and
+>> also documents the msm_serial driver's DT binding. Along the way we
+>> update the clock names and add support for newer UARTDM hardware that
+>> isn't part of a GSBI and make the console layer use the extra registers in
+>> UARTDM.
+>>
+>> Changes since v1:
+>>  * Dropped _clk postfix from {core,iface}_clk
+>>  * Split DT binding into two files
+>>  * Renamed DT binding files to match compatible strings
+>>  * Fixed up DT review comments
+>>  * Added new patch 5/5 (more than 1 char for UARTDM)
+> I took patches 1, 3, and 5 from this series, as it seems that the dt
+> bindings are still being discussed.
 
-Cool. I've merged it into clk-next as well.
+Thanks Greg. I'll resend the patches right now. I got sidetracked on
+other things.
 
-Regards,
-Mike
-
-> 
-> Thanks,
-> Kukjin
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
