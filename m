@@ -1,33 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Aug 2013 20:45:01 +0200
-Subject: [RFC] cleanup mach-s5p*
-In-Reply-To: <14202744.Ci7A03X8EJ@flatron>
-References: <1f7b01cea1f6$9560aa10$c021fe30$%kim@samsung.com>
- <14202744.Ci7A03X8EJ@flatron>
-Message-ID: <1800157.XgqPQtAyXL@wuerfel>
+From: murzin.v@gmail.com (Vladimir Murzin)
+Date: Wed, 28 Aug 2013 02:52:32 +0400
+Subject: [PATCH] arm: bpf_jit: support MOD operation
+Message-ID: <1377643952-10388-1-git-send-email-murzin.v@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 August 2013 02:08:16 Tomasz Figa wrote:
-> 
-> Well, if we could drop legacy board file support for them and keep them as 
-> DT only, support for them could be reasonably simple. Basically the code 
-> in arch/arm would be limited to a single .c file per SoC (e.g. mach-
-> s5pv210-dt.c), a bunch of SoC-level .dtsi files and a bunch of board dts 
-> files.
+commit b6069a9570 (filter: add MOD operation) added generic
+support for modulus operation in BPF.
 
-Sounds good.
+This patch brings JIT support for ARM.
 
-> IMHO the best thing we could do would be creating a single mach-samsung, 
-> where all the DT-only platforms could be located, including Exynos after 
-> some remaining consolidation.
+Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
+---
+ arch/arm/net/bpf_jit_32.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-Yes, that seems like a reasonable goal for the long run. I guess the best
-way to get there might be to move the s5pxxxx platforms into mach-exynos
-one by one and make sure they can coexist in a multiplatform kernel.
-Consolidating s3c24xx and exynos into a single platform is less interesting
-because they won't run the same kernel anyway, but I also don't see any
-reason against doing it. Not sure how s3c64xx would fit in then, since
-it's ARMv6 but somewhat closer to the s3c24xx code base than to exynos.
-
-	Arnd
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index f50d223..0bfff55 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -636,6 +636,24 @@ load_ind:
+ 			update_on_xread(ctx);
+ 			emit(ARM_MUL(r_A, r_A, r_X), ctx);
+ 			break;
++		case BPF_S_ALU_MOD_X: /* A %= X; */
++			update_on_xread(ctx);
++			emit(ARM_CMP_I(r_X, 0), ctx);
++			emit_err_ret(ARM_COND_EQ, ctx);
++			emit_udiv(r_scratch, r_A, r_X, ctx);
++			emit(ARM_MUL(r_scratch, r_X, r_scratch), ctx);
++			emit(ARM_SUB_R(r_A, r_A, r_scratch), ctx);
++			break;
++		case BPF_S_ALU_MOD_K: /* A %= K; */
++			/*
++			 * reuse ARM_R1 as the temp register - it should be safe
++			 * as soon as udiv may touch it too.
++			 */
++			emit_mov_i(ARM_R1, k, ctx);
++			emit_udiv(r_scratch, r_A, ARM_R1, ctx);
++			emit(ARM_MUL(r_scratch, ARM_R1, r_scratch), ctx);
++			emit(ARM_SUB_R(r_A, r_A, r_scratch), ctx);
++			break;
+ 		case BPF_S_ALU_DIV_K:
+ 			/* current k == reciprocal_value(userspace k) */
+ 			emit_mov_i(r_scratch, k, ctx);
+-- 
+1.8.1.5
