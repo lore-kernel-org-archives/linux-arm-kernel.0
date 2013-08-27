@@ -1,104 +1,54 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 27 Aug 2013 23:27:54 +0200
-Subject: [PATCH RFC v2 00/16] ARM: provide common arch init for DT clocks
+Date: Tue, 27 Aug 2013 23:28:04 +0200
+Subject: [PATCH RFC v2 10/16] ARM: rockchip: remove custom .init_time hook
 In-Reply-To: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1377638890-371-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1377638890-371-11-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This RFC converts arch/arm to provide a common arch init for DT clock
-providers. Currently, the call to of_clk_init(NULL) to initialize DT
-clock providers is spread among several mach-dirs. Since most machs
-require DT clocks initialized before timers, no initcall can be used.
+With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+remove custom .init_time hooks.
 
-By adding of_clk_init(NULL) to ARM time_init(), we can remove all
-mach-specific .init_time hooks that basically called of_clk_init before
-starting timers.
-
-Based on the previous version, this one now includes patches provided by
-Stephen Warren for mach-tegra and Soren Brinkmann for mach-zynq.
-
-With mach-tegra now requiring clocks as late as the other machs, the
-patch to protect of_clk_init() from being called twice, has been dropped.
-
-The RFCv2 is based on next-20130827 and has been compile tested for
-multi_v7_defconfig and mach-dove. All single patches have also been sent
-to the respective maintainers and corresponding mailing lists.
-
-Before going for a real patch set after v3.11 drops, I prefer to have
-Tested-by or Acked-by for at least mach-imx, mach-mxs, mach-sti, and
-mach-vexpress. Others are trivial, prepared by maintainers (mach-tegra
-and mach-zynq), or have already been Acked-by (mach-highbank).
-
-Also, I'd like to know if the patches should be grouped by mach- or
-rather been split into mach- preparation and .init_time removal.
-
-Sebastian Hesselbarth (14):
-  ARM: call clk_of_init from time_init
-  ARM: dove: remove custom .init_time hook
-  ARM: exynos: remove custom .init_time hook
-  ARM: highbank: remove custom .init_time hook
-  ARM: imx: remove custom .init_time hook
-  ARM: kirkwood: remove custom .init_time hook
-  ARM: mvebu: remove custom .init_time hook
-  ARM: mxs: remove custom .init_time hook
-  ARM: nspire: remove custom .init_time hook
-  ARM: rockchip: remove custom .init_time hook
-  ARM: socfpga: remove call to of_clk_init
-  ARM: sti: remove custom .init_time hook
-  ARM: vexpress: remove custom .init_time hook
-  clk: vt8500: remove call to of_clk_init
-
-Soren Brinkmann (1):
-  ARM: zynq: Don't call of_clk_init()
-
-Stephen Warren (1):
-  ARM: tegra: split tegra_pmc_init() in two
-
- arch/arm/kernel/time.c                 |   24 +++++++++++-------
- arch/arm/mach-dove/board-dt.c          |   17 +------------
- arch/arm/mach-exynos/common.c          |    7 -----
- arch/arm/mach-exynos/common.h          |    1 -
- arch/arm/mach-exynos/mach-exynos4-dt.c |    1 -
- arch/arm/mach-exynos/mach-exynos5-dt.c |    1 -
- arch/arm/mach-highbank/highbank.c      |   23 +++++------------
- arch/arm/mach-imx/clk-imx51-imx53.c    |   29 +++++++--------------
- arch/arm/mach-imx/common.h             |    4 ---
- arch/arm/mach-imx/imx51-dt.c           |    6 ----
- arch/arm/mach-imx/mach-imx53.c         |    6 ----
- arch/arm/mach-imx/mach-imx6q.c         |   14 ++--------
- arch/arm/mach-imx/mach-imx6sl.c        |    7 -----
- arch/arm/mach-imx/mach-vf610.c         |    9 -------
- arch/arm/mach-kirkwood/board-dt.c      |    8 ------
- arch/arm/mach-mvebu/armada-370-xp.c    |    2 -
- arch/arm/mach-mxs/mach-mxs.c           |   13 ----------
- arch/arm/mach-nspire/nspire.c          |    9 -------
- arch/arm/mach-rockchip/rockchip.c      |    9 -------
- arch/arm/mach-socfpga/socfpga.c        |    2 -
- arch/arm/mach-sti/board-dt.c           |   10 +++----
- arch/arm/mach-tegra/common.c           |    4 +--
- arch/arm/mach-tegra/pmc.c              |   41 +++++++++++++++++--------------
- arch/arm/mach-tegra/pmc.h              |    1 +
- arch/arm/mach-tegra/tegra.c            |    5 ++-
- arch/arm/mach-vexpress/v2m.c           |   14 +----------
- arch/arm/mach-zynq/common.c            |    9 +++----
- drivers/clk/clk-highbank.c             |   10 +++++--
- drivers/clk/clk-vt8500.c               |    2 -
- drivers/clk/mxs/clk-imx23.c            |   16 +++++-------
- drivers/clk/mxs/clk-imx28.c            |   16 +++++-------
- drivers/clk/zynq/clkc.c                |    4 ++-
- include/linux/clk/mxs.h                |    2 -
- 33 files changed, 95 insertions(+), 231 deletions(-)
-
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
-Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-tegra at vger.kernel.org
-Cc: kernel at stlinux.com
-Cc: linux-samsung-soc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/mach-rockchip/rockchip.c |    9 ---------
+ 1 files changed, 0 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index 724d2d8..82c0b07 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -19,18 +19,10 @@
+ #include <linux/init.h>
+ #include <linux/of_platform.h>
+ #include <linux/irqchip.h>
+-#include <linux/dw_apb_timer.h>
+-#include <linux/clk-provider.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/hardware/cache-l2x0.h>
+ 
+-static void __init rockchip_timer_init(void)
+-{
+-	of_clk_init(NULL);
+-	clocksource_of_init();
+-}
+-
+ static void __init rockchip_dt_init(void)
+ {
+ 	l2x0_of_init(0, ~0UL);
+@@ -47,6 +39,5 @@ static const char * const rockchip_board_dt_compat[] = {
+ 
+ DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
+ 	.init_machine	= rockchip_dt_init,
+-	.init_time	= rockchip_timer_init,
+ 	.dt_compat	= rockchip_board_dt_compat,
+ MACHINE_END
 -- 
 1.7.2.5
