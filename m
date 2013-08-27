@@ -1,40 +1,38 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue, 27 Aug 2013 15:19:21 +0200
-Subject: [PATCH] pinctrl: at91: fix get_pullup/down function return
-Message-ID: <1377609561-22054-1-git-send-email-b.brezillon@overkiz.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 27 Aug 2013 09:25:51 -0400
+Subject: [PATCH 0/2] OMAP4+: Get rid of internal SRAM handling
+In-Reply-To: <1377598305-15539-1-git-send-email-rnayak@ti.com>
+References: <1377598305-15539-1-git-send-email-rnayak@ti.com>
+Message-ID: <521CA8DF.9040400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In PIO_PUSR and PIO_PPDSR register if a given bit is set 1 this means the
-pullup/down for this pin (pin is represented as a bit position) is
-disabled.
++ Paul,
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/pinctrl/pinctrl-at91.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On Tuesday 27 August 2013 06:11 AM, Rajendra Nayak wrote:
+> Make all OMAP DT only platforms (am33xx, am43xx, omap4 and omap5)
+> use drivers/misc/sram.c driver instead of the omap internal
+> implementation for SRAM handling.
+> 
+> Rajendra Nayak (2):
+>   ARM: AM335x: Get rid of unused sram init function
+>   ARM: OMAP4+: Move SRAM data to DT
+> 
+>  arch/arm/boot/dts/am33xx.dtsi        |    5 +++++
+>  arch/arm/boot/dts/am4372.dtsi        |    5 +++++
+>  arch/arm/boot/dts/omap4.dtsi         |    5 +++++
+>  arch/arm/boot/dts/omap5.dtsi         |    5 +++++
+>  arch/arm/configs/omap2plus_defconfig |    1 +
+>  arch/arm/mach-omap2/sram.c           |   39 +---------------------------------
+>  arch/arm/mach-omap2/sram.h           |    1 -
+>  7 files changed, 22 insertions(+), 39 deletions(-)
+> 
+Really nice to see the SRAM code getting moved now. Thanks
+a lot Rajendra.
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index b90a3a0..19afb9a 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -325,7 +325,7 @@ static void at91_mux_disable_interrupt(void __iomem *pio, unsigned mask)
- 
- static unsigned at91_mux_get_pullup(void __iomem *pio, unsigned pin)
- {
--	return (readl_relaxed(pio + PIO_PUSR) >> pin) & 0x1;
-+	return !((readl_relaxed(pio + PIO_PUSR) >> pin) & 0x1);
- }
- 
- static void at91_mux_set_pullup(void __iomem *pio, unsigned mask, bool on)
-@@ -445,7 +445,7 @@ static void at91_mux_pio3_set_debounce(void __iomem *pio, unsigned mask,
- 
- static bool at91_mux_pio3_get_pulldown(void __iomem *pio, unsigned pin)
- {
--	return (__raw_readl(pio + PIO_PPDSR) >> pin) & 0x1;
-+	return !((__raw_readl(pio + PIO_PPDSR) >> pin) & 0x1);
- }
- 
- static void at91_mux_pio3_set_pulldown(void __iomem *pio, unsigned mask, bool is_on)
--- 
-1.7.9.5
+- The sram_init() seems to be the post core init call.
+Hope this is not a problem for SDRC init which needs to have
+SRAM ready to update the DDR parameters.
+
+Regards,
+Santosh
