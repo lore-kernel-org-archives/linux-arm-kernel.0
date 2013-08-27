@@ -1,98 +1,86 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 27 Aug 2013 14:25:34 -0700
-Subject: [PATCHv3 7/8] mailbox/omap: add code to support the wkupm3
- operations
-References: <1375825238-18299-1-git-send-email-s-anna@ti.com>
- <87li3n6bcc.fsf@linaro.org> <521CCDCD.90207@ti.com>
-Message-ID: <87haeax1v5.fsf@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 28 Aug 2013 02:58:13 +0530
+Subject: [GIT PULL] DaVinci GPIO driver updates for v3.12
+Message-ID: <521D19ED.5030109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suman Anna <s-anna@ti.com> writes:
+Hi Kevin, Arnd, Olof,
 
-> Kevin,
->
-> On 08/26/2013 10:50 PM, Kevin Hilman wrote:
->> Suman Anna <s-anna@ti.com> writes:
->> 
->>> The WkupM3 mailbox used for triggering PM operations such as suspend
->>> and resume on AM33x/AM43x is special in that the M3 processor cannot
->>> access the mailbox registers. However, an interrupt is needed to be
->>> sent to request the M3 to perform a desired PM operation. This patch
->>> adds the support for this special mailbox through separate ops for
->>> this mailbox. These ops are designed to have the WkupM3's Rx interrupt
->>> programmed within the driver, during transmission of a message. The
->>> message is immediately read back and the internal mailbox interrupt
->>> acknowledged as well to avoid triggering any spurious interrupts to
->>> the M3.
+Can you please pull the following GPIO driver updates? The patches have 
+Linus W's ack. I have based the branch on the SoC updates sent earlier 
+to avoid some conflicts. I did a test merge of this branch with latest 
+linux-next/master and there were no conflicts.
 
-After reading this multiple times, I had to go back to the TRM to try
-and remember what's going on here because this changelog wasn't helping
-me understand.  IIUC, the basic idea is that the mailbox is only used to
-trigger an IRQ to the M3, the messages themselves are dummy.  You
-explained some more of this in subsequent replies, but all of that
-detail should be in the changelogs.
+I know its coming late, but hopefully still in time to get merged.
 
-Remember that changelogs should be written for those who don't have (or
-don't remember) all the internal details that you know off the top of
-your head.  Think of writing a changelog that you'll have to understand
-in a year when you haven't been staring at the hardware and code.  I've
-never seen a changelog with too much detail, so please err on the
-verbose side.
+Thanks,
+Sekhar
 
->>>
->>> Signed-off-by: Suman Anna <s-anna@ti.com>
->> 
->> Dumb Q: why does all this extra logic belong in the mailbox driver and
->> not in the wkup_m3 driver?  To me, this seems like part of the IPC
->> protocol between the MPU and M3 firmware, and not an inherent part of
->> the AM33xx mbox.
->
-> The IPC protocol state machine for the PM operations is still very
-> much handled in the WkupM3 driver.  The IPC registers in Control
-> module provide the messaging payloads, but unfortunately it is not
-> associated with any direct interrupts to make it a separate driver. As
-> far as the WkupM3 driver is concerned, it is just using the mailbox
-> for signalling - the internals of which would involve accessing the
-> various mailbox registers including interrupt configuration and
-> clearing. It is preferable to have the various operations on mailbox
-> registers handled by the mailbox driver with the API supporting the
-> necessary operations.
->
-> The previous version from Vaibhav added a new API to mailbox driver for
-> clearing out the Tx fifo, which is non-standard. The mailboxes on AM335
-> will also be used for IPC with the Programmable Real-time Unit (PRU)
-> subsystem, which will use separate mbox devices. This version handles
-> the wkup_m3 mbox device using its device-specific ops without the need
-> for any new API, and not having to expose the mailbox registers outside.
+The following changes since commit 46c1833467c5e555f31cd6f14b342a7383f26885:
 
-Perhaps I'm misunderstanding all of this (admittedly, I'm not up on the
-details of OMAP mailbox internals), but the changelog and code are not
-helping me understand so I have to ask dumb questions.
+  ARM: davinci: fix clock lookup for mdio device (2013-08-22 00:39:01 +0530)
 
-The more I look at this, the more confused I get.  The wkupm3 mbox is
-defined in the DTS to use usr_id=0 yet internally is
-overridden/hard-coded internally to use usr_id=3 in (at least for
-managing interrupts.)
+are available in the git repository at:
 
-Since only the interrupt management matters anyways (message payload is
-dummy), is there any reason not to define the mbox in DTS using usr_id=3
-so you don't have to do this clumsy override?  IOW, since the M3
-(usr_id=3) can't ever be a real user of the mbox registers, just have
-the MPU drive the mbox as usr_id=3?
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.12/gpio
 
-Even that is a bit hacky IMO, but with proper documentation, is at least
-better than the current approach IMO.
+for you to fetch changes up to 856b63608b6b48dd92c8b41fbbd6a2edde07738d:
 
-That should at least get rid of the need to customize the IRQ management
-functions of mailbox-omap2.c.   After that, the M3 driver could then
-just do:
+  ARM: davinci: gpio: use gpiolib API instead of inline functions (2013-08-28 02:01:37 +0530)
 
-     omap_mbox_enable_irq()
-     omap_mbox_msg_send()
-     omap_mbox_disable_irq()
+----------------------------------------------------------------
+GPIO driver updates for DaVinci
+-------------------------------
 
-and you could get rid of the rest of the custom functions in
-mailbox-omap2.c also.
+This pull request moves DaVinci GPIO
+driver to use platform device framework
+and the corresponding changes needed to
+keep GPIO working on existing DaVinci
+boards.
 
-Kevin
+platform device conversion is needed
+before DT support is enabled for GPIO.
+
+----------------------------------------------------------------
+KV Sujith (2):
+      gpio: davinci: move to platform device
+      ARM: davinci: da8xx: support gpio platform device
+
+Philip Avinash (5):
+      gpio: davinci: coding style correction
+      ARM: davinci: support gpio platform device
+      ARM: davinci: da8xx boards: gpio device creation
+      ARM: davinci: board: gpio device creation
+      ARM: davinci: gpio: use gpiolib API instead of inline functions
+
+ arch/arm/Kconfig                                  |    1 -
+ arch/arm/mach-davinci/board-da830-evm.c           |   28 ++--
+ arch/arm/mach-davinci/board-da850-evm.c           |   16 ++-
+ arch/arm/mach-davinci/board-dm355-evm.c           |   33 +++--
+ arch/arm/mach-davinci/board-dm355-leopard.c       |   30 +++--
+ arch/arm/mach-davinci/board-dm365-evm.c           |   30 +++--
+ arch/arm/mach-davinci/board-dm644x-evm.c          |   40 +++---
+ arch/arm/mach-davinci/board-dm646x-evm.c          |   37 +++---
+ arch/arm/mach-davinci/board-neuros-osd2.c         |   18 ++-
+ arch/arm/mach-davinci/board-omapl138-hawk.c       |   10 +-
+ arch/arm/mach-davinci/da830.c                     |   26 ++--
+ arch/arm/mach-davinci/da850.c                     |   30 +++--
+ arch/arm/mach-davinci/davinci.h                   |   20 ++-
+ arch/arm/mach-davinci/devices-da8xx.c             |   26 ++++
+ arch/arm/mach-davinci/devices.c                   |   13 ++
+ arch/arm/mach-davinci/dm355.c                     |   53 +++++---
+ arch/arm/mach-davinci/dm365.c                     |   57 +++++---
+ arch/arm/mach-davinci/dm644x.c                    |   46 +++++--
+ arch/arm/mach-davinci/dm646x.c                    |   46 +++++--
+ arch/arm/mach-davinci/include/mach/da8xx.h        |   23 ++--
+ arch/arm/mach-davinci/include/mach/gpio-davinci.h |   91 -------------
+ arch/arm/mach-davinci/include/mach/gpio.h         |   88 -------------
+ arch/arm/mach-davinci/tnetv107x.c                 |   14 +-
+ drivers/gpio/gpio-davinci.c                       |  143 ++++++++++++++-------
+ drivers/gpio/gpio-tnetv107x.c                     |    5 +-
+ include/linux/platform_data/gpio-davinci.h        |   60 +++++++++
+ 26 files changed, 558 insertions(+), 426 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/include/mach/gpio-davinci.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/gpio.h
+ create mode 100644 include/linux/platform_data/gpio-davinci.h
