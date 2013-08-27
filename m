@@ -1,52 +1,51 @@
-From: archit@ti.com (Archit Taneja)
-Date: Tue, 27 Aug 2013 12:30:18 +0530
-Subject: [PATCH v2] gpio: Enable pcf857x GPIO expander for Device Tree
-In-Reply-To: <7142087.DRSP8TfuKN@avalon>
-References: <1370527523-1030-1-git-send-email-archit@ti.com>
- <1377498081-16358-1-git-send-email-archit@ti.com>
- <CACRpkda5Q-Zs8A2VFPvMc9519QWJ3EH08g4Do0se6BcLEg+rug@mail.gmail.com>
- <7142087.DRSP8TfuKN@avalon>
-Message-ID: <521C4E82.9040309@ti.com>
+From: hector.palacios@digi.com (Hector Palacios)
+Date: Tue, 27 Aug 2013 09:06:23 +0200
+Subject: [PATCH v15 00/13] Add tested id switch and vbus connect detect
+ support for Chipidea
+In-Reply-To: <20130827025115.GA6561@shlinux1.ap.freescale.net>
+References: <1376270579-13493-1-git-send-email-peter.chen@freescale.com>
+ <521B8150.70906@digi.com> <20130827025115.GA6561@shlinux1.ap.freescale.net>
+Message-ID: <521C4FEF.2010905@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 August 2013 12:17 PM, Laurent Pinchart wrote:
-> On Tuesday 27 August 2013 05:20:45 Linus Walleij wrote:
->> On Mon, Aug 26, 2013 at 8:21 AM, Archit Taneja <archit@ti.com> wrote:
->>> Add code to parse the GPIO expander Device Tree node and extract platform
->>> data out of it, and populate the struct 'pcf857x_platform_data'
->>> maintained by the driver. This enables devices to reference the gpio
->>> expander from Device Tree.
+Dear Peter,
+
+On 08/27/2013 04:51 AM, Peter Chen wrote:
+> On Mon, Aug 26, 2013 at 06:24:48PM +0200, Hector Palacios wrote:
+>> Dear Peter,
+>>
+>> On 08/12/2013 03:22 AM, Peter Chen wrote:
+>>> This patchset adds tested otg id switch function and vbus connect
+>>> and disconnect detection for chipidea driver. And fix kinds of
+>>> bugs found at chipidea drivers after enabling id and vbus detection.
 >>>
->>> Add DT binding info in Documentation.
+>>> This patch are fully tested at imx6 sabresd and imx28evk platform by me.
+>>> Besides, marek tested it on two STMP3780-based boards (not yet mainline)
+>>> and two MX28-based boards.
 >>>
->>> Signed-off-by: Archit Taneja <archit@ti.com>
->>> ---
->>> - v2 posted after quite a while, sorry for the delay!
+>>> My chipidea repo: https://github.com/hzpeterchen/linux-usb.git
 >>>
->>> Changes in v2:
->>> - second gpeio-cell description corrected in Documentation
->>> - interrupt controller description removed for now, will be added in a
->>>    follow up patch
->>> - n_latch description updated
+>>> Changes for v15:
+>>> - Mark otgsc API as static line, and move them to otg.h [4/13]
+>>> - Remove some redundant comments [6/13]
+>>> - Fix some typos [8/13]
+>>> - Retire flag CI_HDRC_PULLUP_ON_VBUS [12/13] [13/13]
+>>
+>> Patches 6 and 12 in this series seem to be incomplete or malformed. Please check.
+>>
 >
-> And it seems that the patch conflicts with
->
-> https://lkml.org/lkml/2013/8/26/248
->
-> :-/
+> Would you post what's the problem for them or what's problem
+> at your system after using them?
 
-:/
+I'm sorry, I thought it was evident. Patches 6 and 12 were posted incomplete. See how 
+they end:
+http://permalink.gmane.org/gmane.linux.usb.general/92231
+http://permalink.gmane.org/gmane.linux.usb.general/92237
 
->
-> If we end up merging this one, I'd like to at least rename the DT n-latch
-> property to pin-initial-states as in my patch and update the documentation, as
-> I find it more explicit.
+In patch 12 the modified file include/linux/usb/chipidea.h does not even appear.
+Something happened during the generation or posting of these patches.
 
-I think your patch is cleaner and more descriptive. The only thing which 
-I am not clear about in your patch is the extra work done in getting 
-ngpio, that should be available in i2c_device_id pointer argument in 
-probe(id points to the array pcf857x_id already available in the driver 
-with the number of gpios for each chip variant).
-
-Archit
+Best regards,
+--
+Hector Palacios
