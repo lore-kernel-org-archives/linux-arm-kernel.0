@@ -1,79 +1,92 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 27 Aug 2013 08:30:49 +0200
-Subject: SHMobile Compatibility String Inconsistencies
-In-Reply-To: <Pine.LNX.4.64.1308261750340.1767@axis700.grange>
-References: <20130822054639.GE11086@verge.net.au>
- <20130824021323.GC5181@verge.net.au>
- <Pine.LNX.4.64.1308261750340.1767@axis700.grange>
-Message-ID: <4837967.ksf69P4Rut@avalon>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Tue, 27 Aug 2013 08:40:47 +0200
+Subject: [RFC PATCH 2/3] pinctrl: at91: add support for generic pinconf
+In-Reply-To: <521C23AF.2060309@wwwdotorg.org>
+References: <1377379926-11163-1-git-send-email-b.brezillon@overkiz.com>
+ <1377380259-11290-1-git-send-email-b.brezillon@overkiz.com>
+ <521B8822.50304@wwwdotorg.org> <521B8D9B.5020809@overkiz.com>
+ <521C23AF.2060309@wwwdotorg.org>
+Message-ID: <521C49EF.5020403@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+On 27/08/2013 05:57, Stephen Warren wrote:
+> On 08/26/2013 11:17 AM, boris brezillon wrote:
+>> On 26/08/2013 18:53, Stephen Warren wrote:
+>>> On 08/24/2013 03:37 PM, Boris BREZILLON wrote:
+>>>> Add support for generic pin configuration to pinctrl-at91 driver.
+>>>> diff --git
+>>>> a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+>>>> b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+>>>>    Required properties for iomux controller:
+>>>> -- compatible: "atmel,at91rm9200-pinctrl"
+>>>> +- compatible: "atmel,at91rm9200-pinctrl" or "atmel,at91sam9x5-pinctrl".
+>>> You seem to also be adding a second chip name to the list here, which is
+>>> more than the patch subject/description imply you're doing...
+>> This is an update of the documentation:
+>> "atmel,at91sam9x5-pinctrl" compatible is already used in the pinctrl
+>> driver but the documention
+>> was not updated.
+>>
+>> But I agree, this should not be part of this series.
+>>
+>>>> +  Add "generic-pinconf" to the compatible string list to use the
+>>>> generic pin
+>>>> +  configuration syntax.
+>>> "generic-pinconf" is too generic of a compatible value for this binding
+>>> to define.
+>>>
+>>> Instead, I think you want to either:
+>>>
+>>> a)
+>>>
+>>> Use compatible="atmel,at91rm9200-pinctrl" for the old binding,
+>>> use compatible="atmel,at91rm9200-pinctrl-generic" for the new binding
+>>>
+>>> or:
+>>>
+>>> b)
+>>>
+>>> Define Boolean property atmel,generic-pinconf (perhaps a better name
+>>> could be chosen?). If it's not present, parse the node assuming the old
+>>> binding. If it is present, parse the node assuming the new binding.
+>>>
+>> Okay.
+>>
+>> I thought this property string could be generic as it may concern other
+>> drivers too
+>> (in order to keep compatibility with old dt ABI and add support the
+>> generic pinconf binding).
+>>
+>> Anyway, I prefer the first proposition.
+>>
+>> pinctrl single driver is already using these names:
+>>
+>> |compatible = "pinctrl-single" for non generic pinconf binding
+>> ||compatible = "pinconf-single" ||for generic pinconf binding|
+>>
+>> So I think we should use something similar:
+>>
+>> |compatible = "atmel,at91xx-pinctrl" for non generic pinconf binding
+>> ||compatible = "|||atmel,at91xx-|pinconf" ||for generic pinconf binding|
+>>
+>> What do you think ?
+> Hmmm. It is a little odd to switch out the compatible value and invent a
+> new binding for the same HW. Isn't it possible to define both sets of
+> properties in the binding, and have drivers look for either?
+>
 
-On Monday 26 August 2013 18:08:52 Guennadi Liakhovetski wrote:
-> On Sat, 24 Aug 2013, Simon Horman wrote:
-> > On Fri, Aug 23, 2013 at 01:31:31PM +0200, Laurent Pinchart wrote:
-> > > On Friday 23 August 2013 12:11:11 David Gibson wrote:
-> > > > On Thu, Aug 22, 2013 at 02:46:40PM +0900, Simon Horman wrote:
-> > > > > Hi Laurent, Hi Guennadi, Hi All,
-> > > > > 
-> > > > > Olof has brought to my attention that there is some inconsistency
-> > > > > in the way that compatibility strings for SHMobile are named and he
-> > > > > has asked us to clean things up for v3.12.
-> > > > > 
-> > > > > Looking through arch/arm/boot/dts/ I see that we have:
-> > > > > 
-> > > > > 1. {gpio,pfc}-r8aXXXX and;
-> 
-> Add shdma-<soc> to the above
-> 
-> > > > > 2. r8aXXXX-sdhi
-> > > > > 
-> > > > > The inconsistency that Olof has asked us to resolve is that we
-> > > > > should either use r8aXXXX- or -r8aXXXX. Not both.
-> 
-> Given the 3:1 score the choice seems rather simple to me. So, if we do
-> have to make those consistent, let's change SDHI.
+Do you mean something like:
 
-Agreed.
+atmel,pins = <xxx>;                /* current dt binding */
+atmel,generic-pins = <yyy>;    /* new dt binding */
 
-> > > > > It seems to me that neither option is inherently better than the
-> > > > > other so we should just choose the path of least resistance to make
-> > > > > things consistent.
-> > > > > 
-> > > > > Laurent, Guennadi, do you have any opinions on if it would
-> > > > > be easier to change the GPIO and PFC compatibility strings;
-> > > > > or to change the SDHI compatibility strings?
-> > > > > 
-> > > > > Ideally I would like you to come to some sort of consensus and send
-> > > > > patches.
-> > > > 
-> > > > So, by all means clean this up in the dts.
-> > > > 
-> > > > BUT, in keeping with the recent discussions on improving the DT
-> > > > process, the corresponding drivers must continue to recognize both
-> > > > forms, so that old DTs will still work correctly.
-> > > 
-> > > Given the early state of DT support in arm/mach-shmobile, I'm pretty
-> > > sure we have no DT-based systems in the wild. The old compatibility
-> > > string could in my opinion just be dropped.
-> > 
-> > I tend to agree, though I don't mind either way.
-> 
-> So, what path should we choose? I see 2 SDHI users in your current "devel"
-> brunch: sh73a0 (kzm9g) and r8a73a4 (ape6evm). Should we make a single
-> patch, changing the driver and both users and push it via ARM with Chris'
-> ack or shall we add new compats, switch .dtsi's, remove old compats - over
-> 2 kernel versions?
+If that's what you had in mind, it will be a little bit tricky to 
+handle, because AFAIK the pinconf_ops
+callbacks do not give me any element I could use to deduce the type of 
+pinconf (generic or
+native).
+This implies I have to know early during the probe process which kind of 
+binding is in use.
 
-I'm fine with both, but in the latter case I don't see a need to spread it 
-over two kernel versions.
-
-> Can we still get anything for this into 3.12 or is it too late? Would it be
-> a "fix" enough for -rc2 / late -rc1?
-
--- 
-Regards,
-
-Laurent Pinchart
+Please tell me if I missed some key points, and this can be easily done.
