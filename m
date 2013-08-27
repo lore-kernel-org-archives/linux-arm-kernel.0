@@ -1,120 +1,67 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 27 Aug 2013 23:27:58 +0200
-Subject: [PATCH RFC v2 04/16] ARM: highbank: remove custom .init_time hook
+Date: Tue, 27 Aug 2013 23:27:56 +0200
+Subject: [PATCH RFC v2 02/16] ARM: dove: remove custom .init_time hook
 In-Reply-To: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1377638890-371-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1377638890-371-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 With arch/arm calling of_clk_init(NULL) from time_init(), we can now
-remove custom .init_time hooks. Highbank clock provider need a reference
-to system registers, as a workaround current clk driver maps those
-independent of arch code now.
+remove custom .init_time hooks. While at it, also remove some obsolete
+includes.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
 ---
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mach-highbank/highbank.c |   23 +++++++----------------
- drivers/clk/clk-highbank.c        |   10 +++++++---
- 2 files changed, 14 insertions(+), 19 deletions(-)
+ arch/arm/mach-dove/board-dt.c |   17 +----------------
+ 1 files changed, 1 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 8881579..fa36d14 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -27,7 +27,6 @@
- #include <linux/of_address.h>
- #include <linux/smp.h>
- #include <linux/amba/bus.h>
+diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
+index 9a116d7..b527728 100644
+--- a/arch/arm/mach-dove/board-dt.c
++++ b/arch/arm/mach-dove/board-dt.c
+@@ -9,26 +9,12 @@
+  */
+ 
+ #include <linux/init.h>
 -#include <linux/clk-provider.h>
+-#include <linux/clocksource.h>
+-#include <linux/irqchip.h>
+-#include <linux/of.h>
++#include <linux/mbus.h>
+ #include <linux/of_platform.h>
+-#include <linux/platform_data/usb-ehci-orion.h>
+ #include <asm/hardware/cache-tauros2.h>
+ #include <asm/mach/arch.h>
+-#include <mach/dove.h>
+-#include <mach/pm.h>
+-#include <plat/common.h>
+-#include <plat/irq.h>
+ #include "common.h"
  
- #include <asm/cacheflush.h>
- #include <asm/cputype.h>
-@@ -88,20 +87,6 @@ static void __init highbank_init_irq(void)
- #endif
- }
- 
--static void __init highbank_timer_init(void)
+-static void __init dove_dt_time_init(void)
 -{
--	struct device_node *np;
--
--	/* Map system registers */
--	np = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
--	sregs_base = of_iomap(np, 0);
--	WARN_ON(!sregs_base);
--
 -	of_clk_init(NULL);
--
 -	clocksource_of_init();
 -}
 -
- static void highbank_power_off(void)
+ static void __init dove_dt_init(void)
  {
- 	highbank_set_pwr_shutdown();
-@@ -160,6 +145,13 @@ static struct notifier_block highbank_platform_nb = {
+ 	pr_info("Dove 88AP510 SoC\n");
+@@ -47,7 +33,6 @@ static const char * const dove_dt_board_compat[] = {
  
- static void __init highbank_init(void)
- {
-+	struct device_node *np;
-+
-+	/* Map system registers */
-+	np = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
-+	sregs_base = of_iomap(np, 0);
-+	WARN_ON(!sregs_base);
-+
- 	pm_power_off = highbank_power_off;
- 	highbank_pm_init();
- 
-@@ -178,7 +170,6 @@ static const char *highbank_match[] __initconst = {
- DT_MACHINE_START(HIGHBANK, "Highbank")
- 	.smp		= smp_ops(highbank_smp_ops),
- 	.init_irq	= highbank_init_irq,
--	.init_time	= highbank_timer_init,
- 	.init_machine	= highbank_init,
- 	.dt_compat	= highbank_match,
- 	.restart	= highbank_restart,
-diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
-index 2e08cb0..2e7e9d9 100644
---- a/drivers/clk/clk-highbank.c
-+++ b/drivers/clk/clk-highbank.c
-@@ -20,8 +20,7 @@
- #include <linux/clk-provider.h>
- #include <linux/io.h>
- #include <linux/of.h>
--
--extern void __iomem *sregs_base;
-+#include <linux/of_address.h>
- 
- #define HB_PLL_LOCK_500		0x20000000
- #define HB_PLL_LOCK		0x10000000
-@@ -280,6 +279,7 @@ static __init struct clk *hb_clk_init(struct device_node *node, const struct clk
- 	const char *clk_name = node->name;
- 	const char *parent_name;
- 	struct clk_init_data init;
-+	struct device_node *srnp;
- 	int rc;
- 
- 	rc = of_property_read_u32(node, "reg", &reg);
-@@ -290,7 +290,11 @@ static __init struct clk *hb_clk_init(struct device_node *node, const struct clk
- 	if (WARN_ON(!hb_clk))
- 		return NULL;
- 
--	hb_clk->reg = sregs_base + reg;
-+	/* Map system registers */
-+	srnp = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
-+	hb_clk->reg = of_iomap(srnp, 0);
-+	BUG_ON(!hb_clk->reg);
-+	hb_clk->reg += reg;
- 
- 	of_property_read_string(node, "clock-output-names", &clk_name);
- 
+ DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
+ 	.map_io		= dove_map_io,
+-	.init_time	= dove_dt_time_init,
+ 	.init_machine	= dove_dt_init,
+ 	.restart	= dove_restart,
+ 	.dt_compat	= dove_dt_board_compat,
 -- 
 1.7.2.5
