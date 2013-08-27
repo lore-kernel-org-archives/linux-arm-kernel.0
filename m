@@ -1,76 +1,76 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 27 Aug 2013 22:38:14 +0100
-Subject: [PATCH 04/19] ARM: set BE8 if LE in head code
+Date: Tue, 27 Aug 2013 22:38:19 +0100
+Subject: [PATCH 09/19] mvebu: support running big-endian
 In-Reply-To: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377639509-22778-5-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377639509-22778-10-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we are booting in LE and compiled for BE8, then add code to
-set the state to bE8. Since the instruction stream is always LE,
-we do not need to do anything special to the instruction.
-
-Also ensure that the secondary processors are started in the same mode.
-
-Note, we do add about 20 bytes to the kernel image, but it seems easier
-to do this than adding another configuration to change.
+Add indication we can run these cores in BE mode, and ensure that the
+secondary CPU is set to big-endian mode in the initialisation code as
+the initial code runs little-endian.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-
-Conflicts:
-	arch/arm/kernel/sleep.S
 ---
- arch/arm/boot/compressed/head.S |    1 +
- arch/arm/kernel/head.S          |    4 ++++
- arch/arm/kernel/sleep.S         |    1 +
- 3 files changed, 6 insertions(+)
+ arch/arm/mach-mvebu/Kconfig        |    1 +
+ arch/arm/mach-mvebu/coherency_ll.S |    3 +++
+ arch/arm/mach-mvebu/headsmp.S      |    4 ++++
+ 3 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index c912c2a..066b034 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -135,6 +135,7 @@ start:
- 		.word	_edata			@ zImage end address
-  THUMB(		.thumb			)
- 1:
-+ ARM_BE8(	setend	be )			@ go BE8 if compiled for BE8
- 		mrs	r9, cpsr
- #ifdef CONFIG_ARM_VIRT_EXT
- 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 9e5906c..a047acf 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -77,6 +77,7 @@
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 9eb63d7..5e269d7 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -1,5 +1,6 @@
+ config ARCH_MVEBU
+ 	bool "Marvell SOCs with Device Tree support" if ARCH_MULTI_V7
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select CLKSRC_MMIO
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+index 5476669..ee7598f 100644
+--- a/arch/arm/mach-mvebu/coherency_ll.S
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -20,6 +20,8 @@
+ #define ARMADA_XP_CFB_CTL_REG_OFFSET 0x0
+ #define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
  
- 	__HEAD
- ENTRY(stext)
-+ ARM_BE8(setend	be )			@ ensure we are in BE8 mode
++#include <asm/assembler.h>
++
+ 	.text
+ /*
+  * r0: Coherency fabric base register address
+@@ -29,6 +31,7 @@ ENTRY(ll_set_cpu_coherent)
+ 	/* Create bit by cpu index */
+ 	mov	r3, #(1 << 24)
+ 	lsl	r1, r3, r1
++ARM_BE8(rev	r1, r1)
  
-  THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
-  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-@@ -352,6 +353,9 @@ ENTRY(secondary_startup)
- 	 * the processor type - there is no need to check the machine type
- 	 * as it has already been validated by the primary processor.
- 	 */
+ 	/* Add CPU to SMP group - Atomic */
+ 	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
+diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
+index 8a1b0c9..3109df0 100644
+--- a/arch/arm/mach-mvebu/headsmp.S
++++ b/arch/arm/mach-mvebu/headsmp.S
+@@ -21,6 +21,8 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ 
++#include <asm/assembler.h>
 +
-+ ARM_BE8(setend	be)				@ ensure we are in BE8 mode
+ /*
+  * Armada XP specific entry point for secondary CPUs.
+  * We add the CPU to the coherency fabric and then jump to secondary
+@@ -32,6 +34,8 @@ ENTRY(armada_xp_secondary_startup)
+ 	ldr	r1, [r0]
+ 	ldr	r0, [r0, r1]
+ 
++ ARM_BE8(setend	be )			@ go BE8 if booted LE
 +
- #ifdef CONFIG_ARM_VIRT_EXT
- 	bl	__hyp_stub_install_secondary
- #endif
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index db1536b..716343c 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -130,6 +130,7 @@ ENDPROC(cpu_resume_after_mmu)
- 	.data
- 	.align
- ENTRY(cpu_resume)
-+ARM_BE8(setend be)			@ ensure we are in BE mode
- 	mov	r1, #0
- 	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
- 	ALT_UP_B(1f)
+ 	/* Read CPU id */
+ 	mrc     p15, 0, r1, c0, c0, 5
+ 	and     r1, r1, #0xF
 -- 
 1.7.10.4
