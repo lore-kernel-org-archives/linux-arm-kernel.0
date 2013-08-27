@@ -1,67 +1,36 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 27 Aug 2013 23:27:56 +0200
-Subject: [PATCH RFC v2 02/16] ARM: dove: remove custom .init_time hook
+Date: Tue, 27 Aug 2013 23:28:09 +0200
+Subject: [PATCH RFC v2 15/16] clk: vt8500: remove call to of_clk_init
 In-Reply-To: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1377638890-371-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1377638890-371-16-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 With arch/arm calling of_clk_init(NULL) from time_init(), we can now
-remove custom .init_time hooks. While at it, also remove some obsolete
-includes.
+remove it from corresponding drivers/clk code.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mach-dove/board-dt.c |   17 +----------------
- 1 files changed, 1 insertions(+), 16 deletions(-)
+ drivers/clk/clk-vt8500.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
-index 9a116d7..b527728 100644
---- a/arch/arm/mach-dove/board-dt.c
-+++ b/arch/arm/mach-dove/board-dt.c
-@@ -9,26 +9,12 @@
-  */
+diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+index 82306f5..218d7ba 100644
+--- a/drivers/clk/clk-vt8500.c
++++ b/drivers/clk/clk-vt8500.c
+@@ -701,6 +701,4 @@ void __init vtwm_clk_init(void __iomem *base)
+ 		return;
  
- #include <linux/init.h>
--#include <linux/clk-provider.h>
--#include <linux/clocksource.h>
--#include <linux/irqchip.h>
--#include <linux/of.h>
-+#include <linux/mbus.h>
- #include <linux/of_platform.h>
--#include <linux/platform_data/usb-ehci-orion.h>
- #include <asm/hardware/cache-tauros2.h>
- #include <asm/mach/arch.h>
--#include <mach/dove.h>
--#include <mach/pm.h>
--#include <plat/common.h>
--#include <plat/irq.h>
- #include "common.h"
- 
--static void __init dove_dt_time_init(void)
--{
--	of_clk_init(NULL);
--	clocksource_of_init();
--}
+ 	pmc_base = base;
 -
- static void __init dove_dt_init(void)
- {
- 	pr_info("Dove 88AP510 SoC\n");
-@@ -47,7 +33,6 @@ static const char * const dove_dt_board_compat[] = {
- 
- DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
- 	.map_io		= dove_map_io,
--	.init_time	= dove_dt_time_init,
- 	.init_machine	= dove_dt_init,
- 	.restart	= dove_restart,
- 	.dt_compat	= dove_dt_board_compat,
+-	of_clk_init(NULL);
+ }
 -- 
 1.7.2.5
