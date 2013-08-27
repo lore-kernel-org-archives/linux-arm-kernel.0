@@ -1,66 +1,58 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 27 Aug 2013 19:17:29 -0300
-Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
-In-Reply-To: <20130827210248.GA19625@obsidianresearch.com>
-References: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130827163939.24636d80@skate> <20130827151136.GA10084@localhost>
- <20130827152535.GG19598@titan.lakedaemon.net>
- <20130827191337.GA2339@localhost> <521D063F.4040404@gmail.com>
- <20130827210248.GA19625@obsidianresearch.com>
-Message-ID: <20130827221729.GA25413@localhost>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 27 Aug 2013 15:19:46 -0700
+Subject: [PATCH RFC v2 01/16] ARM: call clk_of_init from time_init
+In-Reply-To: <1377638890-371-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1377638890-371-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <3837b119-baad-4e68-8805-2bc52c0135f9@DB9EHSMHS031.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 03:02:48PM -0600, Jason Gunthorpe wrote:
-> On Tue, Aug 27, 2013 at 10:04:15PM +0200, Sebastian Hesselbarth wrote:
+On Tue, Aug 27, 2013 at 11:27:55PM +0200, Sebastian Hesselbarth wrote:
+> Most DT ARM machs require common clock providers initialized before timers.
+> Currently, arch/arm machs use .init_time to call clk_of_init right before
+> clocksource_of_init. This prevents to remove that hook and use the default
+> hook instead. clk_of_init is safe to call for non-DT platforms, so add
+> the call to ARM arch time_init by default. While at it, also reorder includes
+> alphabetically.
 > 
-> > In the current use of watchdog even for non-DT boards, you do not
-> > have to clear the interrupt cause. It will ultimately lead to a
-> > reset in any way. Maybe it is not a big deal to remove it now
-> > even without non-DT replacement.
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Changelog:
+> v1->v2:
+> - reorder includes alphabetically
 > 
-> But that is the likely reason..
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-tegra at vger.kernel.org
+> Cc: kernel at stlinux.com
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/kernel/time.c |   24 ++++++++++++++----------
+>  1 files changed, 14 insertions(+), 10 deletions(-)
 > 
-> AFAIK, to be immune to bootloader left over you must do these steps in
-> order:
->  - Gain control of the WDT timer, so that it doesn't trigger
->  - Clear the cause register
->  - Enable the reset out function
-> 
-> Which is what orion_wdt_start does today.
-> 
-> If you fiddle with the order you risk creating an errant WDT trigger,
-> depending on what the bootloader did.
-> 
-> eg having cause asserted and then setting the reset out bit will
-> reboot the board.
-> 
-> Hoisting the reset out register write into board code now requires
-> that the bootloader left the WDT subsystem in some kind of sane state,
-> probably not great..
-> 
+> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+> index 98aee32..dd1028e 100644
+> --- a/arch/arm/kernel/time.c
+> +++ b/arch/arm/kernel/time.c
+> @@ -11,25 +11,26 @@
+[ ... ]
+>  void __init time_init(void)
+>  {
+> +	/* initalize common clocks before timers */
+> +	of_clk_init(NULL);
+> +
+>  	if (machine_desc->init_time)
+>  		machine_desc->init_time();
+>  	else
 
-Hm... that's not nice. And it's just as important as solving the cause
-register clear issue.
+This forces zynq to move some initialization our clock code relies on to
+init_irq(). Also, the current code already takes an approach of
+doing either common init or machine specific init.
+I think it might be better to move the call to of_clk_init() down into
+the else branch of the if-else.
+Though, this probably contradicts the purpose of the whole series.
 
-The problem is: how do we handle the reset out enable in the watchdog
-driver, while removing the hard-coded register (and hence the mach-header)
-*at the same* time?
-
-Should we return to the previously proposed idea of putting that
-in the reg property? IOW:
-
-  watchdog {
-    reg = <timer control>, <rstout>;
-  };
-
-If we *must* access the rstout register from the watchdog driver,
-and we *cannot* have any mach-xxx headers to find base addresses,
-then the only valid solution is to pass this information from the DT.
-
-Right?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+	S?ren
