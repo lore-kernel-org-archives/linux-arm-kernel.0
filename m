@@ -1,35 +1,45 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 27 Aug 2013 16:39:39 +0200
-Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
-In-Reply-To: <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130827163939.24636d80@skate>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 27 Aug 2013 10:42:53 -0400
+Subject: [PATCH v5 0/3] arm: mvebu: fix resource leak
+In-Reply-To: <1377578476-3268-1-git-send-email-jszhang@marvell.com>
+References: <1377578476-3268-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20130827144253.GC19598@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+Jisheng,
 
-On Tue, 27 Aug 2013 11:34:25 -0300, Ezequiel Garcia wrote:
-> With the introduction of the orion irqchip driver, now the BRIDGE_CAUSE
-> bit is cleared by it. There's no longer a need to do it in the watchdog
-> driver, so we can simply remove it.
+On Tue, Aug 27, 2013 at 12:41:13PM +0800, Jisheng Zhang wrote:
+> These patches try to fix resource leak by adding missing of_node_put(),
+> iounmap or using devm_ioremap_resource() if available.
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> v5:
+>   - rebase against mvebu/fixes-non-critical
 
-Is this going to work with the platforms that use the orion_wdt driver
-but are not using the orion irqchip driver? Take for example
-mach-orion5x, it still uses the plat-orion/irq.c code and not the
-irqchip orion driver, as far as I can see.
+Thanks!
 
-The orion irqchip driver is DT only, so all of the Orion platforms that
-have not been converted to DT are still using the old irq code.
+> v4:
+>   - re-generate since Ezequiel's patches add DT support to the
+> mvebu-mbus driver
+> 
+> v3:
+>   - remove the clk patch since it's already taken by Mike
+>   - Add more commit log as suggested by Ezequiel Garcia
+> 
+> v2:
+>   - use devm_ioremap_resource() as suggested by Ezequiel Garcia
+>   - use gates_out instead of bail_out as suggested by Mike Turquette
+> 
+> Jisheng Zhang (3):
+>   arm: mvebu: add missing of_node_put() to fix reference leak
+>   bus: mvebu: add missing of_node_put() to fix reference leak
 
-Any thoughts on the consequences of this in relation with your patch?
+Applied patched 1 and 2 to mvebu/fixes-non-critical,
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>   pinctrl: mvebu: Convert to use devm_ioremap_resource
+
+Previously Acked patch 3 for LinusW
+
+thx,
+
+Jason.
