@@ -1,370 +1,114 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 27 Aug 2013 17:42:13 +0200
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
-In-Reply-To: <1377612785-7868-2-git-send-email-oliver+list@schinagl.nl>
-References: <1377612785-7868-1-git-send-email-oliver+list@schinagl.nl>
- <1377612785-7868-2-git-send-email-oliver+list@schinagl.nl>
-Message-ID: <20130827154213.GL2695@lukather>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 27 Aug 2013 10:51:43 -0500
+Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the
+ DBX500 DT
+In-Reply-To: <20130827140805.GB10210@lee--X1>
+References: <20130820093034.GL31036@pengutronix.de>
+ <20130822133730.GB23152@e106331-lin.cambridge.arm.com>
+ <20130822141900.GB17154@lee--X1>
+ <20130822151723.GE23152@e106331-lin.cambridge.arm.com>
+ <20130822154116.GC17154@lee--X1>
+ <20130822211912.GE31036@pengutronix.de>
+ <20130823075607.GD17154@lee--X1>
+ <20130823165539.GD7015@e106331-lin.cambridge.arm.com>
+ <20130827080635.GC6152@lee--X1>
+ <20130827134621.GJ19893@e106331-lin.cambridge.arm.com>
+ <20130827140805.GB10210@lee--X1>
+Message-ID: <CAL_JsqJU6HA46J2HBRFaOgd_23d4UoLuGtMZYKtsZR1+7brKvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 04:13:04PM +0200, oliver+list at schinagl.nl wrote:
-> From: Oliver Schinagl <oliver@schinagl.nl>
-> 
-> Allwinner has electric fuses (efuse) on their line of chips. This driver
-> reads those fuses, seeds the kernel entropy and exports them as a sysfs
-> node.
-> 
-> These fuses are most likly to be programmed at the factory, encoding
-                       ^ likely
-> things like Chip ID, some sort of serial number etc and appear to be
-> reasonable unique.
-> While in theory, these should be writeable by the user, it will probably
-> be inconvinient to do so. Allwinner recommends that a certain input pin,
-> labeled 'efuse_vddq', be connected to GND. To write these fuses however,
-> a 2.5 V programming voltage needs to be applied to this pin.
-> 
-> Even so, they can still be used to generate a board-unique mac from,
-> board unique RSA key and seed the kernel RNG.
-> 
-> On sun7i additional storage is available, this is initially used for an
-> UEFI BOOT key, Secure JTAG key, HDMI-HDCP key and vendor specific keys.
-> 
-> Currently supported are the following known chips:
-> Allwinner sun4i (A10)
-> Allwinner sun5i (A10s, A13)
+On Tue, Aug 27, 2013 at 9:08 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, 27 Aug 2013, Mark Rutland wrote:
+>
+>> On Tue, Aug 27, 2013 at 09:06:35AM +0100, Lee Jones wrote:
+>> > On Fri, 23 Aug 2013, Mark Rutland wrote:
+>> >
+>> > > On Fri, Aug 23, 2013 at 08:56:07AM +0100, Lee Jones wrote:
+>> > > > I had a short chat with Rob last night about this. I'm going to loop
+>> > > > him in to the conversation, as he wrote the binding.
+>> > > >
+>> > > > > > When most of the other clocks that we deal with are being requested,
+>> > > > > > they rely on being index zero:
+>> > > > > >
+>> > > > > >   drivers/i2c/busses/i2c-nomadik.c: dev->clk = clk_get(&adev->dev, NULL);
+>> > > > >
+>> > > > > Look at drivers/clk/clkdev.c, there's some fuzzy matching
+>> > > > > involved when you pass NULL as connection id.
+>> > > >
+>> > > > Yes, I've been looking at that. This is why it works currently. I
+>> > > > think I need to change all of the drivers to specify which clock they
+>> > > > want. At the moment that 'fuzzy matching' is what's saving us. If
+>> > > > anyone were to change our DTS file to match what the binding says,
+>> > > > then it would cease to work. I'm guessing this is the same for all
+>> > > > other DTS files too:
+>> > >
+>> > > I think if anything, the binding document(s) should be updated to
+>> > > describe that apb_pclk is referred to by name, and the names of the
+>> > > other clocks should be described in the specific device bindings. We can
+>> > > then modify the drivers which grab clock 0 to explicitly grab the first
+>> > > clock by name, and backwards compatibility should not be broken.
+>> > >
+>> > > I don't believe any other OS has implemented the common clock bindings,
+>> > > and we've never supported the binding as described. Let's correct the
+>> > > de-facto standard into a standard by decree.
+>> >
+>> > I think we need to respect, or at least take into consideration the
+>> > reason for the original 'de-facto' standard. Other OSes shouldn't be
+>> > forced to provide a named clock request in order to obtain
+>> > 'apb_pclk'. If the binding says it should be first, then perhaps we
+>> > should do just that. It's simply a matter of naming all subsequent
+>> > clocks related to AMBA devices.
+>>
+>> Ideally, yes. However, we have to be careful to not break compatibility.
+>>
+>> I took a look at existing primecell drivers and what they do. The
+>> situation isn't so bad (with the exception of the
+>> half-dt/half-platform-code mess):
+>>
+>> * Some don't deal with clocks at all (no clk* in the driver). pl320 is
+>>   in the ecx-common dtsi with only apb_pclk but has no binding
+>>   defined. Some have no clocks defined in the dt and are presumably few
+>>   clocks by platform data or are non-functional.
+>>
+>>   I'm not sure how these DTs are going to be supported if and when we
+>>   remove the platform data they depend upon. If we're really going to do
+>>   that, then they are clearly not supported as-is long term.
+>>
+>> * The pl022 driver grabs the first clock to figure out the rate of the
+>>   spi bus (assuming it is SSPCLK). The SSPCLK input is not defined in
+>>   the binding. The ste-u300 dts has two clock-names, "apb_pclk" and
+>>   "spi_clk" (in that order), but they refer to the same clock.
+>>
+>>   Given the existing driver simply grabs the first clock and they're
+>>   both the same, we could re-order the names and make the driver grab
+>>   the second clock. That wouldn't break backwards compatibility with the
+>>   sole dts file we have using the binding, though this assumes no-one
+>>   else has a dt lying around with different clocks.
+>>
+>> * pl010 grabs the first clock given to it to figure out the uart rate
+>>   (assuming it is UARTCLK), but it's only in integratorap.dts, without
+>>   clocks, and is presumably fed by platform data. There is no binding
+>>   document.
+>>
+>>   pl011 grabs the first clock given to figure out the UART rate
+>>   (assuming it is UARTCLK). The binding explicitly states it's only
+>>   given apb_pclk, despite UARTCLK and PCLK being separate inputs to the
+>>   IP block.
+>>
+>>   These two bindings don't describe the hardware, and should be fixed.
+>>   The only way I can think to make this work without breaknig backwards
+>>   compatibility would be to try to grab the second clock and then fall
+>>   back to the first if there isn't one. The other option is to break
+>>   backwards compatibility, but I'm not sure that's much of an option.
 
-Speaking of which, any reason why you didn't add the A10s support in
-your second patch?
+This was an oversight since highbank has a single clock. But yes, this
+should be 2 clocks. It should be fixed and in a compatible way please.
 
-> Allwinner sun7i (A20)
-> 
-> Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
-> ---
->  Documentation/ABI/stable/sysfs-driver-sunxi-sid    |  22 +++
->  .../bindings/misc/allwinner,sunxi-sid.txt          |  16 ++
->  drivers/misc/eeprom/Kconfig                        |  19 +++
->  drivers/misc/eeprom/Makefile                       |   1 +
->  drivers/misc/eeprom/sunxi_sid.c                    | 177 +++++++++++++++++++++
->  5 files changed, 235 insertions(+)
->  create mode 100644 Documentation/ABI/stable/sysfs-driver-sunxi-sid
->  create mode 100644 Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt
->  create mode 100644 drivers/misc/eeprom/sunxi_sid.c
-> 
-> diff --git a/Documentation/ABI/stable/sysfs-driver-sunxi-sid b/Documentation/ABI/stable/sysfs-driver-sunxi-sid
-> new file mode 100644
-> index 0000000..b04ec05
-> --- /dev/null
-> +++ b/Documentation/ABI/stable/sysfs-driver-sunxi-sid
+>> * pl111 has no driver or binding in mainline, but appears in dts files.
+>>   Those dts files clcdclk and apb_pclk, in that order. We could fix
+>>   those before a driver starts using them.
 
-I'm not sure this should go to the stable directory directly. Greg?
-Isn't it suppose to go through testing/ before making it to stable/ ?
+I think this was waiting for some generic display bindings? Pawel may know.
 
-> @@ -0,0 +1,22 @@
-> +What:		/sys/devices/soc.0/1c23800.eeprom/eeprom
-                                     ^ and ^
-are dynamic and depends on the number of instances of your driver, (in
-this case) the base address of the device, the name of the root node in
-the device tree, etc. so I wouldn't hardcode that in the documentation.
-
-Sotheming like /sys/devices/*/<our-device>/eeprom maybe? 
-
-> +Date:		August 2013
-> +Contact:	Oliver Schinagl <oliver@schinagl.nl>
-> +Description:	read-only access to the SID (Security-ID) on current
-> +		A-series SoC's from Allwinner. Currently supports A10, A10s, A13
-> +		and A20 CPU's. The earlier A1x series of SoCs exports 16 bytes,
-> +		whereas the newer A20 SoC exposes 512 bytes split into sections.
-> +		Besides the 16 bytes of SID, there's also an SJTAG area,
-> +		HDMI-HDCP key and some custom keys. Below a quick overview, for
-> +		details see the user manual:
-> +		0x000  128 bit root-key (sun[457]i)
-> +		0x010  128 bit boot-key (sun7i)
-> +		0x020   64 bit security-jtag-key (sun7i)
-> +		0x028   16 bit key configuration (sun7i)
-> +		0x02b   16 bit custom-vendor-key (sun7i)
-> +		0x02c  320 bit low general key (sun7i)
-> +		0x040   32 bit read-control access (sun7i)
-> +		0x064  224 bit low general key (sun7i)
-> +		0x080 2304 bit HDCP-key (sun7i)
-> +		0x1a0  768 bit high general key (sun7i)
-> +Users:		any user space application which wants to read the SID on
-> +		Allwinner's A-series of CPU's.
-> diff --git a/Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt
-> new file mode 100644
-> index 0000000..2103a44
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt
-> @@ -0,0 +1,16 @@
-> +Allwinner sunxi-sid
-> +
-> +Required properties:
-> +- compatible: "allwinner,sun4i-sid" or "allwinner,sun7i-sid".
-> +- reg: Should contain registers location and length
-> +
-> +Example for sun4i:
-> +	sid at 01c23800 {
-> +		compatible = "allwinner,sun4i-sid";
-> +		reg = <0x01c23800 0x10>
-> +	};
-> +Example for sun7i
-> +	sid at 01c23800 {
-> +		compatible = "allwinner,sun7i-sid";
-> +		reg = <0x01c23800 0x200>
-> +	};
-> diff --git a/drivers/misc/eeprom/Kconfig b/drivers/misc/eeprom/Kconfig
-> index 04f2e1f..bc6a14c 100644
-> --- a/drivers/misc/eeprom/Kconfig
-> +++ b/drivers/misc/eeprom/Kconfig
-> @@ -96,4 +96,23 @@ config EEPROM_DIGSY_MTC_CFG
->  
->  	  If unsure, say N.
->  
-> +config EEPROM_SUNXI_SID
-> +	tristate "Allwinner sunxi security ID support"
-> +	depends on ARCH_SUNXI && SYSFS
-> +	help
-> +	  This is a driver for the 'security ID' available on various Allwinner
-> +	  devices.
-> +	  Currently supported are:
-> +		sun4i (A10)
-> +		sun5i (A10s, A13)
-> +		sun7i (A20)
-
-I'm not sure I like the currently supported driver list to be in
-Kconfig. That means that you'll have to duplicate in with the driver and
-the Documentation, I'm not sure it's worth it.
-
-> +	  Due to the potential risks involved with changing e-fuses,
-> +	  this driver is read-only
-> +
-> +	  For more information visit http://linux-sunxi.org/SID
-
-And I'm not very eager about putting URL there either. If the domain
-name ever has to changed, or the wiki page changes, or whatever, you're
-screwed.
-
-> +	  This driver can also be built as a module. If so, the module
-> +	  will be called sunxi_sid.
-> +
->  endmenu
-> diff --git a/drivers/misc/eeprom/Makefile b/drivers/misc/eeprom/Makefile
-> index fc1e81d..9507aec 100644
-> --- a/drivers/misc/eeprom/Makefile
-> +++ b/drivers/misc/eeprom/Makefile
-> @@ -4,4 +4,5 @@ obj-$(CONFIG_EEPROM_LEGACY)	+= eeprom.o
->  obj-$(CONFIG_EEPROM_MAX6875)	+= max6875.o
->  obj-$(CONFIG_EEPROM_93CX6)	+= eeprom_93cx6.o
->  obj-$(CONFIG_EEPROM_93XX46)	+= eeprom_93xx46.o
-> +obj-$(CONFIG_EEPROM_SUNXI_SID)	+= sunxi_sid.o
->  obj-$(CONFIG_EEPROM_DIGSY_MTC_CFG) += digsy_mtc_eeprom.o
-> diff --git a/drivers/misc/eeprom/sunxi_sid.c b/drivers/misc/eeprom/sunxi_sid.c
-> new file mode 100644
-> index 0000000..6fac205
-> --- /dev/null
-> +++ b/drivers/misc/eeprom/sunxi_sid.c
-> @@ -0,0 +1,177 @@
-> +/*
-> + * Copyright (c) 2013 Oliver Schinagl <oliver@schinagl.nl>
-> + * http://www.linux-sunxi.org
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * This driver exposes the Allwinner security ID, efuses exported in byte-
-> + * sized chunks.
-> + */
-> +
-> +#include <linux/compiler.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/export.h>
-> +#include <linux/fs.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/kobject.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/random.h>
-> +#include <linux/slab.h>
-> +#include <linux/stat.h>
-> +#include <linux/sysfs.h>
-> +#include <linux/types.h>
-> +
-> +#define DRV_NAME "sunxi-sid"
-> +
-> +struct sunxi_sid_data {
-> +	void __iomem *reg_base;
-> +	unsigned int keysize;
-> +};
-> +
-> +/* We read the entire key, due to a 32 bit read alignment requirement. Since we
-> + * want to return the requested byte, this resuls in somewhat slower code and
-> + * uses 4 times more reads as needed but keeps code simpler. Since the SID is
-> + * only very rarly probed, this is not really an issue.
-> + */
-> +static u8 sunxi_sid_read_byte(const struct sunxi_sid_data *sid_data,
-> +			      const unsigned int offset)
-> +{
-> +	u32 sid_key;
-> +
-> +	if (offset >= sid_data->keysize)
-> +		return 0;
-> +
-> +	sid_key = ioread32be(sid_data->reg_base + round_down(offset, 4));
-> +	sid_key >>= (offset % 4) * 8;
-> +
-> +	return sid_key; /* Only return the last byte */
-> +}
-> +
-> +static ssize_t sid_read(struct file *fd, struct kobject *kobj,
-> +			struct bin_attribute *attr, char *buf,
-> +			loff_t pos, size_t size)
-> +{
-> +	struct platform_device *pdev;
-> +	struct sunxi_sid_data *sid_data;
-> +	int i;
-> +
-> +	pdev = to_platform_device(kobj_to_dev(kobj));
-> +	sid_data = platform_get_drvdata(pdev);
-> +
-> +	if (pos < 0 || pos >= sid_data->keysize)
-> +		return 0;
-> +	if (size > sid_data->keysize - pos)
-> +		size = sid_data->keysize - pos;
-> +
-> +	for (i = 0; i < size; i++)
-> +		buf[i] = sunxi_sid_read_byte(sid_data, pos + i);
-> +
-> +	return i;
-> +}
-> +
-> +static struct bin_attribute sid_bin_attr = {
-> +	.attr = { .name = "eeprom", .mode = S_IRUGO, },
-> +	.read = sid_read,
-> +};
-> +
-> +static struct bin_attribute *sunxi_sid_bin_attrs[] = {
-> +	&sid_bin_attr,
-> +	NULL,
-> +};
-> +
-> +static const struct attribute_group sunxi_sid_group = {
-> +	.bin_attrs = sunxi_sid_bin_attrs,
-> +};
-> +
-> +static const struct attribute_group *sunxi_sid_groups[] = {
-> +	&sunxi_sid_group,
-> +	NULL,
-> +};
-> +
-> +static int sunxi_sid_remove(struct platform_device *pdev)
-> +{
-> +	struct sunxi_sid_data *sid_data;
-> +
-> +	device_remove_bin_file(&pdev->dev, &sid_bin_attr); /* fixme */
-> +	sid_data = platform_get_drvdata(pdev);
-> +	devm_kfree(&pdev->dev, sid_data);
-> +	dev_dbg(&pdev->dev, "driver unloaded\n");
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id sunxi_sid_of_match[] = {
-> +	{ .compatible = "allwinner,sun4i-sid", .data = (void *)16},
-> +	{ .compatible = "allwinner,sun7i-sid", .data = (void *)512},
-> +	{/* sentinel */},
-> +};
-> +MODULE_DEVICE_TABLE(of, sunxi_sid_of_match);
-> +
-> +static int __init sunxi_sid_probe(struct platform_device *pdev)
-> +{
-> +	struct sunxi_sid_data *sid_data;
-> +	struct resource *res;
-> +	const struct of_device_id *of_dev_id;
-> +	u8 *entropy;
-> +	unsigned int i;
-> +
-> +	sid_data = devm_kzalloc(&pdev->dev, sizeof(struct sunxi_sid_data),
-> +				GFP_KERNEL);
-> +	if (!sid_data)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	sid_data->reg_base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(sid_data->reg_base))
-> +		return PTR_ERR(sid_data->reg_base);
-> +
-> +	of_dev_id = of_match_device(sunxi_sid_of_match, &pdev->dev);
-> +	if (!of_dev_id)
-> +		return -ENODEV;
-> +	sid_data->keysize = (int)of_dev_id->data;
-> +
-> +	platform_set_drvdata(pdev, sid_data);
-> +
-> +	sid_bin_attr.size = sid_data->keysize; /* ugly */
-
-Ugly? Why?
-
-> +	if (device_create_bin_file(&pdev->dev, &sid_bin_attr)) /* fixme */
-
-And what is there to fix here?
-
-For these two comments, either explain what you find so ugly/broken so
-that someone reading your code can get what is wrong, or just remove
-them, because keeping them like that is just confusing.
-
-Maxime
-
-> +		return -ENODEV;
-> +
-> +	entropy = kzalloc(sizeof(u8) * sid_data->keysize, GFP_KERNEL);
-> +	for (i = 0; i < sid_data->keysize; i++)
-> +		entropy[i] = sunxi_sid_read_byte(sid_data, i);
-> +	add_device_randomness(entropy, sid_data->keysize);
-> +	kfree(entropy);
-> +
-> +	dev_dbg(&pdev->dev, "loaded\n");
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver sunxi_sid_driver = {
-> +	.probe = sunxi_sid_probe,
-> +	.remove = sunxi_sid_remove,
-> +	.driver = {
-> +		.name = DRV_NAME,
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = sunxi_sid_of_match,
-> +		/* .groups = sunxi_sid_groups, proper way */
-> +	},
-> +};
-> +module_platform_driver(sunxi_sid_driver);
-> +
-> +MODULE_AUTHOR("Oliver Schinagl <oliver@schinagl.nl>");
-> +MODULE_DESCRIPTION("Allwinner sunxi security id driver");
-> +MODULE_LICENSE("GPL");
-> -- 
-> 1.8.1.5
-> 
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130827/c7835b7a/attachment-0001.sig>
+Rob
