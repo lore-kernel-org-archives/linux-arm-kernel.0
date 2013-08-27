@@ -1,133 +1,110 @@
-From: m.krawczuk@partner.samsung.com (Mateusz Krawczuk)
-Date: Tue, 27 Aug 2013 11:19:31 +0200
-Subject: [PATCH 1/4] pinctrl: Add s5pv210 support to pinctrl-exynos
-Message-ID: <1377595171-31116-1-git-send-email-m.krawczuk@partner.samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 27 Aug 2013 12:20:57 +0300
+Subject: [PATCH 00/21] ARM: OMAP2+: use new display drivers
+In-Reply-To: <5204CA12.5070203@ti.com>
+References: <1374822504-28949-1-git-send-email-tomi.valkeinen@ti.com>
+ <5204CA12.5070203@ti.com>
+Message-ID: <521C6F79.9070806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements pinctrl for s5pv210 and adds required device tree bindings.
+Hi Tony,
 
-Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
----
- drivers/pinctrl/Kconfig           |  2 +-
- drivers/pinctrl/pinctrl-exynos.c  | 58 +++++++++++++++++++++++++++++++++++++++
- drivers/pinctrl/pinctrl-samsung.c |  3 +-
- drivers/pinctrl/pinctrl-samsung.h |  1 +
- 4 files changed, 62 insertions(+), 2 deletions(-)
+Ping again...
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index bdb1a87..ffe4b49 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -252,7 +252,7 @@ config PINCTRL_SAMSUNG
- 
- config PINCTRL_EXYNOS
- 	bool "Pinctrl driver data for Samsung EXYNOS SoCs other than 5440"
--	depends on OF && GPIOLIB && ARCH_EXYNOS
-+	depends on OF && GPIOLIB && (ARCH_EXYNOS || ARCH_S5PV210)
- 	select PINCTRL_SAMSUNG
- 
- config PINCTRL_EXYNOS5440
-diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
-index a74b3cb..fc3e1d7 100644
---- a/drivers/pinctrl/pinctrl-exynos.c
-+++ b/drivers/pinctrl/pinctrl-exynos.c
-@@ -660,6 +660,64 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
- 			exynos_pinctrl_resume_bank(drvdata, bank);
- }
- 
-+/* pin banks of s5pv210 pin-controller */
-+static struct samsung_pin_bank s5pv210_pin_banks0[] = {
-+	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
-+	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpa1", 0x04),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpb", 0x08),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x060, "gpc0", 0x0c),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x080, "gpc1", 0x10),
-+	EXYNOS_PIN_BANK_EINTG(4, 0x0A0, "gpd0", 0x14),
-+	EXYNOS_PIN_BANK_EINTG(4, 0x0C0, "gpd1", 0x18),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x0E0, "gpe0", 0x1c),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x100, "gpe1", 0x20),
-+	EXYNOS_PIN_BANK_EINTG(6, 0x120, "gpf0", 0x24),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x140, "gpf1", 0x28),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x160, "gpf2", 0x2c),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x180, "gpf3", 0x30),
-+	EXYNOS_PIN_BANK_EINTG(7, 0x1A0, "gpg0", 0x34),
-+	EXYNOS_PIN_BANK_EINTG(7, 0x1C0, "gpg1", 0x38),
-+	EXYNOS_PIN_BANK_EINTG(7, 0x1E0, "gpg2", 0x3c),
-+	EXYNOS_PIN_BANK_EINTG(7, 0x200, "gpg3", 0x40),
-+	EXYNOS_PIN_BANK_EINTN(7, 0x220, "gpgi"),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x240, "gpj0", 0x44),
-+	EXYNOS_PIN_BANK_EINTG(6, 0x260, "gpj1", 0x48),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x280, "gpj2", 0x4c),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x2A0, "gpj3", 0x50),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x2C0, "gpj4", 0x54),
-+	EXYNOS_PIN_BANK_EINTN(8, 0x2E0, "mp01"),
-+	EXYNOS_PIN_BANK_EINTN(4, 0x300, "mp02"),
-+	EXYNOS_PIN_BANK_EINTN(8, 0x320, "mp03"),
-+	EXYNOS_PIN_BANK_EINTN(8, 0x340, "mp04"),
-+	EXYNOS_PIN_BANK_EINTN(8, 0x360, "mp05"),
-+	EXYNOS_PIN_BANK_EINTN(8, 0x300, "mp06"),
-+	EXYNOS_PIN_BANK_EINTN(8, 0x320, "mp07"),
-+	EXYNOS_PIN_BANK_EINTW(8, 0xC00, "gph0", 0x00),
-+	EXYNOS_PIN_BANK_EINTW(8, 0xC20, "gph1", 0x04),
-+	EXYNOS_PIN_BANK_EINTW(8, 0xC40, "gph2", 0x08),
-+	EXYNOS_PIN_BANK_EINTW(8, 0xC60, "gph3", 0x0c),
-+};
-+
-+struct samsung_pin_ctrl s5pv210_pin_ctrl[] = {
-+	{
-+		/* pin-controller instance 0 data */
-+		.pin_banks	= s5pv210_pin_banks0,
-+		.nr_banks	= ARRAY_SIZE(s5pv210_pin_banks0),
-+		.geint_con	= EXYNOS_GPIO_ECON_OFFSET,
-+		.geint_mask	= EXYNOS_GPIO_EMASK_OFFSET,
-+		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
-+		.weint_con	= EXYNOS_WKUP_ECON_OFFSET,
-+		.weint_mask	= EXYNOS_WKUP_EMASK_OFFSET,
-+		.weint_pend	= EXYNOS_WKUP_EPEND_OFFSET,
-+		.svc		= EXYNOS_SVC_OFFSET,
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.eint_wkup_init = exynos_eint_wkup_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+		.label		= "s5pv210-gpio-ctrl0",
-+	},
-+};
-+
- /* pin banks of exynos4210 pin-controller 0 */
- static struct samsung_pin_bank exynos4210_pin_banks0[] = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
-diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
-index 439f2ef..f14b379 100644
---- a/drivers/pinctrl/pinctrl-samsung.c
-+++ b/drivers/pinctrl/pinctrl-samsung.c
-@@ -878,7 +878,6 @@ static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
- 	}
- 	match = of_match_node(samsung_pinctrl_dt_match, node);
- 	ctrl = (struct samsung_pin_ctrl *)match->data + id;
--
- 	bank = ctrl->pin_banks;
- 	for (i = 0; i < ctrl->nr_banks; ++i, ++bank) {
- 		spin_lock_init(&bank->slock);
-@@ -1113,6 +1112,8 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
- 		.data = (void *)exynos5250_pin_ctrl },
- 	{ .compatible = "samsung,exynos5420-pinctrl",
- 		.data = (void *)exynos5420_pin_ctrl },
-+	{ .compatible = "samsung,s5pv210-pinctrl",
-+		.data = (void *)s5pv210_pin_ctrl },
- #endif
- #ifdef CONFIG_PINCTRL_S3C64XX
- 	{ .compatible = "samsung,s3c64xx-pinctrl",
-diff --git a/drivers/pinctrl/pinctrl-samsung.h b/drivers/pinctrl/pinctrl-samsung.h
-index 11bb75b..30622d9 100644
---- a/drivers/pinctrl/pinctrl-samsung.h
-+++ b/drivers/pinctrl/pinctrl-samsung.h
-@@ -260,5 +260,6 @@ extern struct samsung_pin_ctrl s3c2412_pin_ctrl[];
- extern struct samsung_pin_ctrl s3c2416_pin_ctrl[];
- extern struct samsung_pin_ctrl s3c2440_pin_ctrl[];
- extern struct samsung_pin_ctrl s3c2450_pin_ctrl[];
-+extern struct samsung_pin_ctrl s5pv210_pin_ctrl[];
- 
- #endif /* __PINCTRL_SAMSUNG_H */
--- 
-1.8.1.2
+ Tomi
+
+On 09/08/13 13:53, Tomi Valkeinen wrote:
+> Hi Tony,
+> 
+> Ping. It'd be nice to get this in for 3.12, so I can remove all the old
+> drivers and the related legacy code.
+> 
+> Note that the first patch "ARM: OMAP: dss-common: fix Panda's DVI DDC
+> channel", is a fix for 3.11, and I've sent a fbdev pull request
+> containing that just now. Merging without that patch will cause a
+> trivial conflict. If you want, I can also create a branch that has these
+> on top of the fbdev-fixes branch.
+> 
+>  Tomi
+> 
+> On 26/07/13 10:08, Tomi Valkeinen wrote:
+>> Hi,
+>>
+>> The display drivers for new OMAP DSS driver model were merged in v3.11, but the
+>> board files were not changed to use them. This series changes the board files
+>> to take those new drivers into use.
+>>
+>> There's mostly nothing special in the patches. One complication is with Overo
+>> board file, which adds two panel devices, located in add-on boards, that use
+>> the same GPIOs, meaning that the two panel devices cannot be probed at the same
+>> time. The solution used here is to parse the kernel command line, and decide
+>> the panel device to be added depending on the given default display.
+>>
+>> The omap2plus_defconfig is changed to include a few most commonly used display
+>> drivers as modules, and the old drivers are removed.
+>>
+>> Note: The first patch in this series has been sent separately
+>> (http://mid.gmane.org/1374570405-8301-2-git-send-email-tomi.valkeinen at ti.com),
+>> and is a fix for v3.11. It's included here as an another patch in the series
+>> depends on it.
+>>
+>> Tested on 4430SDP, Panda, Beagle, Beagle xM, Overo.
+>>
+>>  Tomi
+>>
+>> Tomi Valkeinen (21):
+>>   ARM: OMAP: dss-common: fix Panda's DVI DDC channel
+>>   ARM: OMAP2+: Remove legacy DSS initialization for omap4
+>>   ARM: OMAP2+: Add selected display drivers to omap2plus_defconfig
+>>   ARM: OMAP: dss-common: use new display drivers
+>>   ARM: OMAP: 4430SDP: remove picodlp device data
+>>   ARM: OMAP: overo: use new display drivers
+>>   ARM: OMAP: rx51: use new display drivers
+>>   ARM: OMAP: beagle: use new display drivers
+>>   ARM: OMAP: devkit8000: use new display drivers
+>>   ARM: OMAP: 2430SDP: use new display drivers
+>>   ARM: OMAP: LDP: use new display drivers
+>>   ARM: OMAP: omap3stalker: use new display drivers
+>>   ARM: OMAP: igep0020: use new display drivers
+>>   ARM: OMAP: cm-t35: use new display drivers
+>>   ARM: OMAP: H4: use new display drivers
+>>   ARM: OMAP: 3430SDP: use new display drivers
+>>   ARM: OMAP: OMAP3EVM: use new display drivers
+>>   ARM: OMAP: Pandora: use new display drivers
+>>   ARM: OMAP: Zoom: use new display drivers
+>>   ARM: OMAP: AM3517EVM: use new display drivers
+>>   ARM: OMAP2+: Remove old display drivers from omap2plus_defconfig
+>>
+>>  arch/arm/configs/omap2plus_defconfig         |  12 +-
+>>  arch/arm/mach-omap2/board-2430sdp.c          |  57 ++++---
+>>  arch/arm/mach-omap2/board-3430sdp.c          |  83 +++++----
+>>  arch/arm/mach-omap2/board-am3517evm.c        | 113 +++++++++----
+>>  arch/arm/mach-omap2/board-cm-t35.c           | 100 +++++++----
+>>  arch/arm/mach-omap2/board-devkit8000.c       |  96 +++++++----
+>>  arch/arm/mach-omap2/board-h4.c               |  48 ++++--
+>>  arch/arm/mach-omap2/board-igep0020.c         |  36 ++--
+>>  arch/arm/mach-omap2/board-ldp.c              |  68 +++++---
+>>  arch/arm/mach-omap2/board-omap3beagle.c      |  56 +++---
+>>  arch/arm/mach-omap2/board-omap3evm.c         |  87 ++++++----
+>>  arch/arm/mach-omap2/board-omap3pandora.c     |  48 +++---
+>>  arch/arm/mach-omap2/board-omap3stalker.c     |  61 ++++---
+>>  arch/arm/mach-omap2/board-overo.c            | 160 +++++++++++-------
+>>  arch/arm/mach-omap2/board-rx51-peripherals.c |  12 ++
+>>  arch/arm/mach-omap2/board-rx51-video.c       |  35 ++--
+>>  arch/arm/mach-omap2/board-zoom-display.c     |  30 ++--
+>>  arch/arm/mach-omap2/dss-common.c             | 244 ++++++++++++---------------
+>>  arch/arm/mach-omap2/dss-common.h             |   2 -
+>>  19 files changed, 787 insertions(+), 561 deletions(-)
+>>
+> 
+> 
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130827/0a1ce646/attachment.sig>
