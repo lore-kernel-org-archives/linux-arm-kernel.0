@@ -1,48 +1,35 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Tue, 27 Aug 2013 10:04:48 +0800
-Subject: [PATCH v3 1/2] dmaengine: add interface of dma_get_slave_channel
-In-Reply-To: <20130820081348.GV4713@mwanda>
-References: <1376550163-30145-1-git-send-email-zhangfei.gao@linaro.org>
- <1376550163-30145-2-git-send-email-zhangfei.gao@linaro.org>
- <20130819052516.GT32147@intel.com>
- <CAMj5Bkhq=kvfpYiMX0de3PBaAzOUfgPVELamaeMAWhHaoDgc8g@mail.gmail.com>
- <20130820081348.GV4713@mwanda>
-Message-ID: <521C0940.9000408@linaro.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 26 Aug 2013 19:09:21 -0700
+Subject: [ARM ATTEND] catching up on exploit mitigations
+In-Reply-To: <20130826195632.GG10783@sirena.org.uk>
+References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
+ <5209BB6F.2000208@codeaurora.org> <20130826195632.GG10783@sirena.org.uk>
+Message-ID: <521C0A51.2000908@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-08-20 04:13 PM, Dan Carpenter wrote:
-> On Tue, Aug 20, 2013 at 03:58:41PM +0800, zhangfei gao wrote:
+On 8/26/2013 12:56 PM, Mark Brown wrote:
+> On Mon, Aug 12, 2013 at 09:51:59PM -0700, Laura Abbott wrote:
+>> On 7/30/2013 12:05 PM, Kees Cook wrote:
 >
->> BTW, it is strange I do not see such compile warning here :(
+>>> - RO and W^X kernel page table protections (similar to x86's
+>>> DEBUG_RODATA and DEBUG_SET_MODULE_RONX; it's not clear to me how much
+>>> LPAE and PXN is already handling this, if at all)
 >
-> This was a Smatch static checker warning, not a regular build
-> warning.
+>> We've had support for RO/NX on our tree for a while. I'm interested
+>> in attending the summit to share what we've done and to see how much
+>> of it could be mainlined.
 >
-> regards,
-> dan carpenter
->
-Dear Dan
+> Is that related to the code that Google have in their tree?
 
-Thanks for introducing this valuable tool.
-Have download from git://repo.or.cz/smatch.git
+It's 'related' in that it covers some of the same use cases but the two 
+were developed independently as far as I know.
 
-When trying use this tool, could get some warning,
-make CHECK="~/bin/smatch -p=kernel --no-data" C=1 | tee warns.txt
+Thanks,
+Laura
 
-Also some strange warning, like "SQL error #2: no such table: 
-caller_info", is it ignored?
 
-Besides, when test this case for check smatch setting.
-Still not reproduce the issue, should be not config correct?
 
-Only get
-drivers/dma/dmaengine.c:845 dma_async_device_register() warn: possible 
-memory leak of 'idr_ref'
-drivers/dma/dmaengine.c:866 dma_async_device_register() warn: possible 
-memory leak of 'idr_ref'
-
-Anyway, though config not totally correct, it really could find some 
-warning.
-
-Thanks
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
