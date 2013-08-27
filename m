@@ -1,83 +1,97 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 27 Aug 2013 18:29:35 +1000
-Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
-Message-ID: <20130827182935.ff4005b60cc1ce80d32d5e46@canb.auug.org.au>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Tue, 27 Aug 2013 10:28:16 +0200
+Subject: [RFC PATCH 1/3] pinctrl: add new generic pinconf config for
+ deglitch filter
+In-Reply-To: <521C587E.6050706@atmel.com>
+References: <1377379926-11163-1-git-send-email-b.brezillon@overkiz.com>
+ <1377380109-11247-1-git-send-email-b.brezillon@overkiz.com>
+ <521B875E.1010605@wwwdotorg.org> <521B89D1.6010902@overkiz.com>
+ <521C2347.4080702@wwwdotorg.org> <521C4451.1060908@overkiz.com>
+ <521C587E.6050706@atmel.com>
+Message-ID: <521C6320.4070303@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 27/08/2013 09:42, Nicolas Ferre wrote:
+> On 27/08/2013 08:16, boris brezillon :
+>> On 27/08/2013 05:55, Stephen Warren wrote:
+>>> On 08/26/2013 11:01 AM, boris brezillon wrote:
+>>>> Hello Stephen,
+>>>>
+>>>> On 26/08/2013 18:50, Stephen Warren wrote:
+>>>>> On 08/24/2013 03:35 PM, Boris BREZILLON wrote:
+>>>>>> Add a new parameter to support deglitch filter configuration.
+>>>>>> A deglitch filter works like a debounce filter but with a smaller
+>>>>>> delay (nanoseconds).
+>>>>> Why not use the existing debounce property, just with a small delay
+>>>>> specified. It seems like that's exactly what the property is for?
+>>>> That's one of the question I asked in my cover letter :-)
+>>>>
+>>>> Indeed the at91 deglitch filter delay is not configurable and is 
+>>>> statically
+>>>> assigned to half a master clk cycle (if master clk = 133MHz -> 8 ns).
+>>>> The debounce property argument is currently expressed in usecs.
+>>>>
+>>>> This will result in always selecting the debounce filter (which is 
+>>>> also
+>>>> available on at91 SoCs) over the deglitch filter.
+>>>>
+>>>> Could we add a flag in the deglitch argument to specify the delay unit
+>>>> (nsecs or usecs) ?
+>>> If the value is hard-coded in HW, why not use non-zero (or 1) to enable
+>>> and zero to disable?
+>>
+>> Indeed at91 pins support both deglitch and debounce filter and I have to
+>> choose
+>> between the two given the argument value (in usec).
+>>
+>> Here's what I can do:
+>>
+>> if (arg >= 1/2 * slowclock)    /* debounce case */
+>>       /* choose debounce filter and configure the delay
+>>           according to the given argument value */
+>> else                                          /* deglitch case */
+>>       /* choose deglitch filter */
+>>
+>>
+>> Slow clock is running at 32KHz which gives a 30 usec clock cycle.
+>
+> I am not in favor for this kind of complicated heuristic. Deglitch and 
+> Debounce filters are different features in at91 (even if they pursuit 
+> the same goal). So I do prefer to let the user choose which feature is 
+> preferred for his application and add a different flag.
+>
+>
+>>> (this kind of thing is why I'm not convinced that generic pinconf works
+>>> so well... What if we need psecs in the future?)
+>>
+>> Should I keep the at91 native pinconf binding and add the missing flags
+>> to this binding
+>> (OUTPUT configuration flags) ?
+>>
+>> This was another question I asked in my cover letter: wether or not the
+>> generic pinconf
+>> binding should be used.
+>
+> The question is: how much this "generic" pinconf is... well... 
+> generic! And it is not a answer I can give.
+> On the other hand, if the "generic" is not going to overcome the 
+> native pinctrl, I do not feel like switching to this at the cost of 
+> changing the whole dtsi/dts entries that we already have.
+>
+> So, it is more to Linus and Stephen to give us clues about this...
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/boot/dts/tegra20-trimslice.dts between commit 30ca2226bea6
-("ARM: tegra: always enable USB VBUS regulators") from Linus' tree and
-commit 23f95ef2d951 ("ARM: tegra: use TEGRA_GPIO() in a couple more
-places") from the arm-soc tree.
+Okay.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+I'll propose a new patch series adding native support for OUTPUT 
+configuration of at91 pins (add OUTPUT_HIGH/LOW),
+and put this series in stand-by until a clear decision is made about 
+generic pinconf.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Thanks,
 
-diff --cc arch/arm/boot/dts/tegra20-trimslice.dts
-index 1e9d33a,22e227f..0000000
---- a/arch/arm/boot/dts/tegra20-trimslice.dts
-+++ b/arch/arm/boot/dts/tegra20-trimslice.dts
-@@@ -310,8 -310,19 +310,18 @@@
-  		nvidia,sys-clock-req-active-high;
-  	};
-  
-+ 	pcie-controller {
-+ 		status = "okay";
-+ 		pex-clk-supply = <&pci_clk_reg>;
-+ 		vdd-supply = <&pci_vdd_reg>;
-+ 
-+ 		pci at 1,0 {
-+ 			status = "okay";
-+ 		};
-+ 	};
-+ 
-  	usb at c5000000 {
-  		status = "okay";
- -		nvidia,vbus-gpio = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_HIGH>;
-  	};
-  
-  	usb-phy at c5000000 {
-@@@ -410,10 -421,26 +420,28 @@@
-  			regulator-min-microvolt = <5000000>;
-  			regulator-max-microvolt = <5000000>;
-  			enable-active-high;
-- 			gpio = <&gpio 170 0>; /* PV2 */
-+ 			gpio = <&gpio TEGRA_GPIO(V, 2) 0>;
- +			regulator-always-on;
- +			regulator-boot-on;
-  		};
-+ 
-+ 		pci_clk_reg: regulator at 3 {
-+ 			compatible = "regulator-fixed";
-+ 			reg = <3>;
-+ 			regulator-name = "pci_clk";
-+ 			regulator-min-microvolt = <3300000>;
-+ 			regulator-max-microvolt = <3300000>;
-+ 			regulator-always-on;
-+ 		};
-+ 
-+ 		pci_vdd_reg: regulator at 4 {
-+ 			compatible = "regulator-fixed";
-+ 			reg = <4>;
-+ 			regulator-name = "pci_vdd";
-+ 			regulator-min-microvolt = <1050000>;
-+ 			regulator-max-microvolt = <1050000>;
-+ 			regulator-always-on;
-+ 		};
-  	};
-  
-  	sound {
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130827/2a89a771/attachment-0001.sig>
+Best Regards,
+
+Boris
+>
+> Bye,
