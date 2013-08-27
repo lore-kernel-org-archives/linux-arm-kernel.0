@@ -1,43 +1,36 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 27 Aug 2013 05:52:43 -0300
-Subject: [PATCH v3 0/5] Armada XP clocks for timer
-In-Reply-To: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130827085242.GB2286@localhost>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 27 Aug 2013 10:54:57 +0200
+Subject: linux-next: manual merge of the arm-soc tree with the usb tree
+In-Reply-To: <20130827181353.319c150858829df1bb68d60b@canb.auug.org.au>
+References: <20130827181353.319c150858829df1bb68d60b@canb.auug.org.au>
+Message-ID: <521C6961.9020103@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason and Daniel:
+On 08/27/2013 10:13 AM, Stephen Rothwell wrote:
 
-(I forgot to Cc Daniel on these series, sorry about that!)
-
-So, now that we have all the acks we need...
-
-On Tue, Aug 20, 2013 at 12:45:49PM -0300, Ezequiel Garcia wrote:
-[...]
+> Today's linux-next merge of the arm-soc tree got a conflict in 
+> arch/arm/boot/dts/am335x-bone.dts between commit 97238b35d5bb
+> ("usb: musb: dsps: use proper child nodes") from the  tree and
+> commit 63f6b2550aa0 ("ARM: dts: AM33XX: don't redefine OCP bus and
+> device nodes") from the arm-soc tree.
 > 
-> Ezequiel Garcia (5):
->   ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
->   ARM: mvebu: Add clock properties to Armada XP timer node
+> I fixed it up (probably incorrectly - see below) and can carry the
+> fix as necessary (no action is required).
 
-Jason: I assume these are ready to get merged through mvebu, right?
+You added the OCP node back and the USB nodes as I had them which
+should be fine.
 
->   clocksource: armada-370-xp: Replace WARN_ON with BUG_ON
->   clocksource: armada-370-xp: Get reference fixed-clock by name
->   clocksource: armada-370-xp: Add detailed clock requirements in
->     devicetree binding
-> 
+How do we solve the conflict for the merge window? Is it possible for
+the ARM-SOC tree to create a topic branch for this commit?
 
-Daniel: Will you pick these?
+Greg: I do have a pending pull / patches [0] which also change the dts
+nodes according to the latest feedback + enabling an additional USB
+port in bone.
+If you take this in I could update the nodes later (with the topic
+branch merged) accordingly to the way it has been done in the ARM-SOC
+tree - unless you have other preferences.
 
-BTW: Is there any chance you can add your clocksource tree to linux-next?
+[0] http://www.spinics.net/lists/linux-usb/msg92595.html
 
-Otherwise, our linux-next builds fail to boot whenever Jason pick some
-mvebu commits and therefore appears in linux-next, but the corresponding
-clocksource commit is taken by you and missing from linux-next.
-
-Thanks!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Sebastian
