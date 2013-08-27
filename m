@@ -1,208 +1,166 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 27 Aug 2013 10:14:21 +0200
-Subject: [PATCH v5] gpio: pcf857x: Add OF support
-In-Reply-To: <1377590559-14279-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1377590559-14279-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <2063335.Uqxok8bYMn@flatron>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 27 Aug 2013 18:13:53 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the usb tree
+Message-ID: <20130827181353.319c150858829df1bb68d60b@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi all,
 
-On Tuesday 27 of August 2013 10:02:39 Laurent Pinchart wrote:
-> Add DT bindings for the pcf857x-compatible chips and parse the device
-> tree node in the driver.
-> 
-> Signed-off-by: Laurent Pinchart
-> <laurent.pinchart+renesas@ideasonboard.com> ---
->  .../devicetree/bindings/gpio/gpio-pcf857x.txt      | 71
-> ++++++++++++++++++++++ drivers/gpio/gpio-pcf857x.c                     
->   | 44 +++++++++++--- 2 files changed, 107 insertions(+), 8
-> deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
-> 
-> Changes since v4:
-> 
-> - Don't try to get ngpio from of_device_id data, we already get it from
->   i2c_device_id
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/boot/dts/am335x-bone.dts between commit 97238b35d5bb ("usb:
+musb: dsps: use proper child nodes") from the  tree and commit
+63f6b2550aa0 ("ARM: dts: AM33XX: don't redefine OCP bus and device
+nodes") from the arm-soc tree.
 
-Hmm, I'm not sure how this is supposed to work.
+I fixed it up (probably incorrectly - see below) and can carry the fix as
+necessary (no action is required).
 
-How does the I2C core resolve OF compatible name to particular entry in 
-id_table? I believe it simply passes NULL as the second argument of 
-.probe() if the device is instantiated based on OF compatible string and 
-not one in the legacy ID table.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-> 
-> Changes since v3:
-> 
-> - Get rid of the #ifdef CONFIG_OF in the probe function
-> - Give DT node priority over platform data
-> 
-> Changes since v2:
-> 
-> - Replace mention about interrupts software configuration in DT bindings
-> documentation with an explanation of the hardware configuration.
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
-> b/Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt new file mode
-> 100644
-> index 0000000..d261391
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
-> @@ -0,0 +1,71 @@
-> +* PCF857x-compatible I/O expanders
-> +
-> +The PCF857x-compatible chips have "quasi-bidirectional" I/O pins that
-> can be +driven high by a pull-up current source or driven low to
-> ground. This combines +the direction and output level into a single bit
-> per pin, which can't be read +back. We can't actually know at
-> initialization time whether a pin is configured +(a) as output and
-> driving the signal low/high, or (b) as input and reporting a +low/high
-> value, without knowing the last value written since the chip came out
-> +of reset (if any). The only reliable solution for setting up pin
-> direction is +thus to do it explicitly.
-> +
-> +Required Properties:
-> +
-> +  - compatible: should be one of the following.
-> +    - "maxim,max7328": For the Maxim MAX7378
-> +    - "maxim,max7329": For the Maxim MAX7329
-> +    - "nxp,pca8574": For the NXP PCA8574
-> +    - "nxp,pca8575": For the NXP PCA8575
-> +    - "nxp,pca9670": For the NXP PCA9670
-> +    - "nxp,pca9671": For the NXP PCA9671
-> +    - "nxp,pca9672": For the NXP PCA9672
-> +    - "nxp,pca9673": For the NXP PCA9673
-> +    - "nxp,pca9674": For the NXP PCA9674
-> +    - "nxp,pca9675": For the NXP PCA9675
-> +    - "nxp,pcf8574": For the NXP PCF8574
-> +    - "nxp,pcf8574a": For the NXP PCF8574A
-> +    - "nxp,pcf8575": For the NXP PCF8575
-> +    - "ti,tca9554": For the TI TCA9554
-> +
-> +  - reg: I2C slave address.
-> +
-> +  - gpio-controller: Marks the device node as a gpio controller.
-> +  - #gpio-cells: Should be 2. The first cell is the GPIO number and the
-> second +    cell specifies GPIO flags, as defined in
-> <dt-bindings/gpio/gpio.h>. Only the +    GPIO_ACTIVE_HIGH and
-> GPIO_ACTIVE_LOW flags are supported. +
-> +Optional Properties:
-> +
-> +  - pins-initial-state: Bitmask that specifies the initial state of
-> each pin. +  When a bit is set to zero, the corresponding pin will be
-> initialized to the +  input (pulled-up) state. When the  bit is set to
-> one, the pin will be +  initialized the the low-level output state. If
-> the property is not specified +  all pins will be initialized to the
-> input state.
-> +
-> +  The I/O expander can detect input state changes, and thus optionally
-> act as +  an interrupt controller. When the expander interrupt pin is
-> connected all the +  following properties must be set. For more
-> information please see the +  interrupt controller device tree bindings
-> documentation available at + 
-> Documentation/devicetree/bindings/interrupt-controller/interrupts.txt.
-> +
-> +  - interrupt-controller: Identifies the node as an interrupt
-> controller. +  - #interrupt-cells: Number of cells to encode an
-> interrupt source, shall be 2. +  - interrupt-parent: phandle of the
-> parent interrupt controller. +  - interrupts: Interrupt specifier for
-> the controllers interrupt. +
-> +
-> +Please refer to gpio.txt in this directory for details of the common
-> GPIO +bindings used by client devices.
-> +
-> +Example: PCF8575 I/O expander node
-> +
-> +	pcf8575: gpio at 20 {
-> +		compatible = "nxp,pcf8575";
-> +		reg = <0x20>;
-> +		interrupt-parent = <&irqpin2>;
-> +		interrupts = <3 0>;
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <2>;
-> +	};
-> diff --git a/drivers/gpio/gpio-pcf857x.c b/drivers/gpio/gpio-pcf857x.c
-> index 9e61bb0..864dd8c 100644
-> --- a/drivers/gpio/gpio-pcf857x.c
-> +++ b/drivers/gpio/gpio-pcf857x.c
-> @@ -26,6 +26,8 @@
->  #include <linux/irqdomain.h>
->  #include <linux/kernel.h>
->  #include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
->  #include <linux/workqueue.h>
-> @@ -50,6 +52,27 @@ static const struct i2c_device_id pcf857x_id[] = {
->  };
->  MODULE_DEVICE_TABLE(i2c, pcf857x_id);
-> 
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id pcf857x_of_table[] = {
-> +	{ .compatible = "nxp,pcf8574" },
-> +	{ .compatible = "nxp,pcf8574a" },
-> +	{ .compatible = "nxp,pca8574" },
-> +	{ .compatible = "nxp,pca9670" },
-> +	{ .compatible = "nxp,pca9672" },
-> +	{ .compatible = "nxp,pca9674" },
-> +	{ .compatible = "nxp,pcf8575" },
-> +	{ .compatible = "nxp,pca8575" },
-> +	{ .compatible = "nxp,pca9671" },
-> +	{ .compatible = "nxp,pca9673" },
-> +	{ .compatible = "nxp,pca9675" },
-> +	{ .compatible = "maxim,max7328" },
-> +	{ .compatible = "maxim,max7329" },
-> +	{ .compatible = "ti,tca9554" },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, pcf857x_of_table);
-> +#endif
-> +
->  /*
->   * The pcf857x, pca857x, and pca967x chips only expose one read and one
-> * write register.  Writing a "one" bit (to match the reset state) lets
-> @@ -257,14 +280,18 @@ fail:
->  static int pcf857x_probe(struct i2c_client *client,
->  			 const struct i2c_device_id *id)
->  {
-> -	struct pcf857x_platform_data	*pdata;
-> +	struct pcf857x_platform_data	*pdata = dev_get_platdata(&client-
->dev);
-> +	struct device_node		*np = client->dev.of_node;
->  	struct pcf857x			*gpio;
-> +	unsigned int			n_latch = 0;
->  	int				status;
-> 
-> -	pdata = dev_get_platdata(&client->dev);
-> -	if (!pdata) {
-> +	if (IS_ENABLED(CONFIG_OF) && np)
-> +		of_property_read_u32(np, "pins-initial-state", &n_latch);
-
-I believe the convention is that platform data should be favoured, as you 
-can pass it even if DT is present, using auxdata table.
-
-So this should rather be:
-
-	if (pdata)
-		n_latch = pdata->n_latch;
-	else if (IS_ENABLED(CONFIG_OF) && np)
-		of_property_read_u32(np, "pins-initial-state", &n_latch);
-	else
-		dev_dbg(&client->dev, "no platform data\n");
-
-> +	else if (pdata)
-> +		n_latch = pdata->n_latch;
-> +	else
->  		dev_dbg(&client->dev, "no platform data\n");
-> -	}
-
-Other than that, the patch looks good.
-
-Best regards,
-Tomasz
+diff --cc arch/arm/boot/dts/am335x-bone.dts
+index a8907b5,d99be03..0000000
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@@ -24,132 -24,6 +24,24 @@@
+  		reg = <0x80000000 0x10000000>; /* 256 MB */
+  	};
+  
+- 	am33xx_pinmux: pinmux at 44e10800 {
+- 		pinctrl-names = "default";
+- 		pinctrl-0 = <&clkout2_pin>;
+- 
+- 		user_leds_s0: user_leds_s0 {
+- 			pinctrl-single,pins = <
+- 				0x54 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_a5.gpio1_21 */
+- 				0x58 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_a6.gpio1_22 */
+- 				0x5c (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_a7.gpio1_23 */
+- 				0x60 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_a8.gpio1_24 */
+- 			>;
+- 		};
+- 
+- 		i2c0_pins: pinmux_i2c0_pins {
+- 			pinctrl-single,pins = <
+- 				0x188 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c0_sda.i2c0_sda */
+- 				0x18c (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c0_scl.i2c0_scl */
+- 			>;
+- 		};
+- 
+- 		uart0_pins: pinmux_uart0_pins {
+- 			pinctrl-single,pins = <
+- 				0x170 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart0_rxd.uart0_rxd */
+- 				0x174 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* uart0_txd.uart0_txd */
+- 			>;
+- 		};
+- 
+- 		clkout2_pin: pinmux_clkout2_pin {
+- 			pinctrl-single,pins = <
+- 				0x1b4 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* xdma_event_intr1.clkout2 */
+- 			>;
+- 		};
+- 
+- 		cpsw_default: cpsw_default {
+- 			pinctrl-single,pins = <
+- 				/* Slave 1 */
+- 				0x110 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxerr.mii1_rxerr */
+- 				0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txen.mii1_txen */
+- 				0x118 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxdv.mii1_rxdv */
+- 				0x11c (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txd3.mii1_txd3 */
+- 				0x120 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txd2.mii1_txd2 */
+- 				0x124 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txd1.mii1_txd1 */
+- 				0x128 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txd0.mii1_txd0 */
+- 				0x12c (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_txclk.mii1_txclk */
+- 				0x130 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxclk.mii1_rxclk */
+- 				0x134 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxd3.mii1_rxd3 */
+- 				0x138 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxd2.mii1_rxd2 */
+- 				0x13c (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxd1.mii1_rxd1 */
+- 				0x140 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxd0.mii1_rxd0 */
+- 			>;
+- 		};
+- 
+- 		cpsw_sleep: cpsw_sleep {
+- 			pinctrl-single,pins = <
+- 				/* Slave 1 reset value */
+- 				0x110 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 				0x114 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 				0x118 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 				0x11c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 				0x120 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 				0x124 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 				0x128 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 				0x12c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 				0x130 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 				0x134 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 				0x138 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 				0x13c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 				0x140 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 			>;
+- 		};
+- 
+- 		davinci_mdio_default: davinci_mdio_default {
+- 			pinctrl-single,pins = <
+- 				/* MDIO */
+- 				0x148 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)	/* mdio_data.mdio_data */
+- 				0x14c (PIN_OUTPUT_PULLUP | MUX_MODE0)			/* mdio_clk.mdio_clk */
+- 			>;
+- 		};
+- 
+- 		davinci_mdio_sleep: davinci_mdio_sleep {
+- 			pinctrl-single,pins = <
+- 				/* MDIO reset value */
+- 				0x148 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 				0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+- 			>;
+- 		};
+- 	};
+- 
+ +	ocp {
+- 		uart0: serial at 44e09000 {
+- 			pinctrl-names = "default";
+- 			pinctrl-0 = <&uart0_pins>;
+- 
+- 			status = "okay";
+- 		};
+- 
+ +		musb: usb at 47400000 {
+ +			status = "okay";
+ +
+ +			control at 44e10000 {
+ +				status = "okay";
+ +			};
+ +
+ +			phy at 47401300 {
+ +				status = "okay";
+ +			};
+ +
+ +			usb at 47401000 {
+ +				status = "okay";
+ +			};
+ +		};
+- 
+- 		i2c0: i2c at 44e0b000 {
+- 			pinctrl-names = "default";
+- 			pinctrl-0 = <&i2c0_pins>;
+- 
+- 			status = "okay";
+- 			clock-frequency = <400000>;
+- 
+- 			tps: tps at 24 {
+- 				reg = <0x24>;
+- 			};
+- 
+- 		};
+ +	};
+ +
+  	leds {
+  		pinctrl-names = "default";
+  		pinctrl-0 = <&user_leds_s0>;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130827/345803a4/attachment.sig>
