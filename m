@@ -1,38 +1,61 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 27 Aug 2013 11:39:12 +0200
-Subject: [patch] pinctrl: s3c24xx: off by one in s3c24xx_eint_init()
-In-Reply-To: <20130826233217.GA17061@elgon.mountain>
-References: <20130826233217.GA17061@elgon.mountain>
-Message-ID: <201308271139.13333.heiko@sntech.de>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Tue, 27 Aug 2013 11:43:26 +0200
+Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.12
+In-Reply-To: <87fvu0mf87.fsf@linaro.org>
+References: <521384D5.1050607@baylibre.com>
+ <20130821071334.GQ7656@atomide.com> <5214D4FD.4060405@baylibre.com>
+ <87fvu0mf87.fsf@linaro.org>
+Message-ID: <521C74BE.9080404@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 27. August 2013, 03:11:26 schrieb Dan Carpenter:
-> If "irq == NUM_EINT" then it writes one space beyond the end of the
-> eint_data->domains[] array.
+Hi Kevin,
 
-Thanks for catching this.
+On 23/08/2013 20:31, Kevin Hilman wrote:
+> Benoit Cousson <bcousson@baylibre.com> writes:
+>
+>> Hi Kevin & Olof,
+>>
+>> I've just updated the branch with the few USB3 patches I missed from Felipe.
+>>
+>> So here is a new pull-request.
+>>
+>> Thanks,
+>> Benoit
+>>
+>> ----------------------------------------------------------------
+>> Add the minimal DTS support for DRA7xx based SoC core.
+>> Add the initial support for N900 and gta04 phones.
+>> Enable USB3 on OMAP5 evm board.
+>> Do a lot of various cleanups.
+>> ----------------------------------------------------------------
+>
+> This is a nice description, but would be even better if it was the
+> description of the signed tag.  For future pulls, since we're pulling
+> from you directly into arm-soc, can you start using signed tags please?
+>
+>
+>> The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
+>>
+>>    Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.12/dts
+>>
+>> for you to fetch changes up to 5903208d4e2c09a3872feba6b9e2e49c64fd07ad:
+>>
+>>    ARM: configs: omap2plus_defconfig: enable dwc3 and dependencies (2013-08-21 16:43:21 +0200)
+>>
+>
+> Pulled into next/dt.
 
+Thanks.
 
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Benoit, since we're pulling directly from you into arm-soc, can you
+> start using signed tags please?  Thanks.
 
+OK, no problem, I'll RTFM to see how it works and do that next time.
 
-> 
-> diff --git a/drivers/pinctrl/pinctrl-s3c24xx.c
-> b/drivers/pinctrl/pinctrl-s3c24xx.c index 24446da..ad3eaad 100644
-> --- a/drivers/pinctrl/pinctrl-s3c24xx.c
-> +++ b/drivers/pinctrl/pinctrl-s3c24xx.c
-> @@ -549,7 +549,7 @@ static int s3c24xx_eint_init(struct
-> samsung_pinctrl_drv_data *d) irq = bank->eint_offset;
->  		mask = bank->eint_mask;
->  		for (pin = 0; mask; ++pin, mask >>= 1) {
-> -			if (irq > NUM_EINT)
-> +			if (irq >= NUM_EINT)
->  				break;
->  			if (!(mask & 1))
->  				continue;
-> --
-> To unsubscribe from this list: send the line "unsubscribe
-> linux-samsung-soc" in the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+Benoit
