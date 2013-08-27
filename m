@@ -1,35 +1,42 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 26 Aug 2013 19:09:21 -0700
-Subject: [ARM ATTEND] catching up on exploit mitigations
-In-Reply-To: <20130826195632.GG10783@sirena.org.uk>
-References: <CAGXu5jKv9Vt+Hu0mFYaxggLLDZ46U3KR9MKegUoHH8StXCkBtQ@mail.gmail.com>
- <5209BB6F.2000208@codeaurora.org> <20130826195632.GG10783@sirena.org.uk>
-Message-ID: <521C0A51.2000908@codeaurora.org>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Tue, 27 Aug 2013 10:20:09 +0800
+Subject: [PATCH v4] dmaengine: add k3dma 
+Message-ID: <1377570010-21870-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/26/2013 12:56 PM, Mark Brown wrote:
-> On Mon, Aug 12, 2013 at 09:51:59PM -0700, Laura Abbott wrote:
->> On 7/30/2013 12:05 PM, Kees Cook wrote:
->
->>> - RO and W^X kernel page table protections (similar to x86's
->>> DEBUG_RODATA and DEBUG_SET_MODULE_RONX; it's not clear to me how much
->>> LPAE and PXN is already handling this, if at all)
->
->> We've had support for RO/NX on our tree for a while. I'm interested
->> in attending the summit to share what we've done and to see how much
->> of it could be mainlined.
->
-> Is that related to the code that Google have in their tree?
+change since v3:
+Rebase to slave-dma.git, next branch
+Fix two warnning reported via smatch
 
-It's 'related' in that it covers some of the same use cases but the two 
-were developed independently as far as I know.
+change since v2:
+0002:
+Vinod suggest use __ffl, remove "#ifdef CONFIG_PM_SLEEP" and 
+micro namespace
 
-Thanks,
-Laura
+change since v1:
+Follow Arnd suggestion:
+using dma_get_slave_channel interface
+Correct dma-channels and dma-requests for phy and virt channel
 
+Follow Vinod suggestion:
+add name space
+use SIMPLE_DEV_PM_OPS
 
+Besides:
+add pause/resume
+Using kzalloc instead of dma pool
+
+Zhangfei Gao (1):
+  dmaengine: Add hisilicon k3 DMA engine driver
+
+ Documentation/devicetree/bindings/dma/k3dma.txt |   46 ++
+ drivers/dma/Kconfig                             |    9 +
+ drivers/dma/Makefile                            |    1 +
+ drivers/dma/k3dma.c                             |  837 +++++++++++++++++++++++
+ 4 files changed, 893 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/k3dma.txt
+ create mode 100644 drivers/dma/k3dma.c
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
