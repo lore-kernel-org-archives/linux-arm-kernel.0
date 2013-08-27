@@ -1,47 +1,82 @@
-From: archit@ti.com (Archit Taneja)
-Date: Tue, 27 Aug 2013 14:00:24 +0530
-Subject: [PATCH v5] gpio: pcf857x: Add OF support
-In-Reply-To: <2063335.Uqxok8bYMn@flatron>
-References: <1377590559-14279-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2063335.Uqxok8bYMn@flatron>
-Message-ID: <521C63A0.10902@ti.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 27 Aug 2013 18:33:13 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the pm tree
+Message-ID: <20130827183313.aa7d51c6dd0b21cd8168aa35@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
-On Tuesday 27 August 2013 01:44 PM, Tomasz Figa wrote:
-> Hi Laurent,
->
-> On Tuesday 27 of August 2013 10:02:39 Laurent Pinchart wrote:
->> Add DT bindings for the pcf857x-compatible chips and parse the device
->> tree node in the driver.
->>
->> Signed-off-by: Laurent Pinchart
->> <laurent.pinchart+renesas@ideasonboard.com> ---
->>   .../devicetree/bindings/gpio/gpio-pcf857x.txt      | 71
->> ++++++++++++++++++++++ drivers/gpio/gpio-pcf857x.c
->>    | 44 +++++++++++--- 2 files changed, 107 insertions(+), 8
->> deletions(-)
->>   create mode 100644
->> Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt
->>
->> Changes since v4:
->>
->> - Don't try to get ngpio from of_device_id data, we already get it from
->>    i2c_device_id
->
-> Hmm, I'm not sure how this is supposed to work.
->
-> How does the I2C core resolve OF compatible name to particular entry in
-> id_table? I believe it simply passes NULL as the second argument of
-> .probe() if the device is instantiated based on OF compatible string and
-> not one in the legacy ID table.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-mvebu/platsmp.c between commit f6cec7cd0777 ("ARM: mvebu:
+remove device tree parsing for cpu nodes") from the  tree and commit
+994c8c94b419 ("ARM: mvebu: Remove the harcoded BootROM window
+allocation") from the arm-soc tree.
 
-It doesn't pass the second argument as NULL. If you look at 
-i2c_device_probe() in drivers/i2c/i2c-core.c, the second argument to 
-probe is passed as: i2c_match_id(driver->id_table, client)
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-This will extract the i2c_device_id pointer from the id_table.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-Archit
+diff --cc arch/arm/mach-mvebu/platsmp.c
+index 594b63d,4f960f0..0000000
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@@ -29,28 -30,31 +30,31 @@@
+  #include "pmsu.h"
+  #include "coherency.h"
+  
++ #define AXP_BOOTROM_BASE 0xfff00000
++ #define AXP_BOOTROM_SIZE 0x100000
++ 
+ +static struct clk *__init get_cpu_clk(int cpu)
+ +{
+ +	struct clk *cpu_clk;
+ +	struct device_node *np = of_get_cpu_node(cpu, NULL);
+ +
+ +	if (WARN(!np, "missing cpu node\n"))
+ +		return NULL;
+ +	cpu_clk = of_clk_get(np, 0);
+ +	if (WARN_ON(IS_ERR(cpu_clk)))
+ +		return NULL;
+ +	return cpu_clk;
+ +}
+ +
+  void __init set_secondary_cpus_clock(void)
+  {
+ -	int thiscpu;
+ +	int thiscpu, cpu;
+  	unsigned long rate;
+ -	struct clk *cpu_clk = NULL;
+ -	struct device_node *np = NULL;
+ +	struct clk *cpu_clk;
+  
+  	thiscpu = smp_processor_id();
+ -	for_each_node_by_type(np, "cpu") {
+ -		int err;
+ -		int cpu;
+ -
+ -		err = of_property_read_u32(np, "reg", &cpu);
+ -		if (WARN_ON(err))
+ -			return;
+ -
+ -		if (cpu == thiscpu) {
+ -			cpu_clk = of_clk_get(np, 0);
+ -			break;
+ -		}
+ -	}
+ -	if (WARN_ON(IS_ERR(cpu_clk)))
+ +	cpu_clk = get_cpu_clk(thiscpu);
+ +	if (!cpu_clk)
+  		return;
+  	clk_prepare_enable(cpu_clk);
+  	rate = clk_get_rate(cpu_clk);
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130827/fea86084/attachment.sig>
