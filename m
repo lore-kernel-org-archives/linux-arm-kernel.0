@@ -1,32 +1,46 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 26 Aug 2013 20:50:43 -0700
-Subject: [PATCHv3 7/8] mailbox/omap: add code to support the wkupm3
- operations
-In-Reply-To: <1375825238-18299-1-git-send-email-s-anna@ti.com> (Suman Anna's
- message of "Tue, 6 Aug 2013 16:40:38 -0500")
-References: <1375825238-18299-1-git-send-email-s-anna@ti.com>
-Message-ID: <87li3n6bcc.fsf@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 26 Aug 2013 21:54:18 -0600
+Subject: [RFC PATCH 2/3] pinctrl: at91: add support for generic pinconf
+In-Reply-To: <521BA235.1090104@overkiz.com>
+References: <1377379926-11163-1-git-send-email-b.brezillon@overkiz.com>
+ <1377380259-11290-1-git-send-email-b.brezillon@overkiz.com>
+ <20130826175333.GF18627@ns203013.ovh.net> <521BA235.1090104@overkiz.com>
+Message-ID: <521C22EA.1050908@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suman Anna <s-anna@ti.com> writes:
+On 08/26/2013 12:45 PM, boris brezillon wrote:
+> Hello Jean-Christophe,
+> 
+> Le 26/08/2013 19:53, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
+>> On 23:37 Sat 24 Aug     , Boris BREZILLON wrote:
+>>> Add support for generic pin configuration to pinctrl-at91 driver.
+...
+>>> a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+...
+>>> configures various pad settings
+>>>   such as pull-up, multi drive, etc.
+>>>     Required properties for iomux controller:
+>>> -- compatible: "atmel,at91rm9200-pinctrl"
+>>> +- compatible: "atmel,at91rm9200-pinctrl" or "atmel,at91sam9x5-pinctrl".
+>>> +  Add "generic-pinconf" to the compatible string list to use the
+>>> generic pin
+...
+>>> +pinctrl at fffff400 {
+>>> +    #address-cells = <1>;
+>>> +    #size-cells = <1>;
+>>> +    ranges;
+>>> +    compatible = "atmel,at91rm9200-pinctrl", "generic-pinconf",
+>>> "simple-bus";
+>> nack your break the backword compatibility
+>>
+>> if we use a old kernel with this new dt nothing will work
+>> as the old kernel will never known the the "generic-pinconf" means
+>> anything
+> 
+> Your're right, I didn't think of this case (old kernel with new dt).
 
-> The WkupM3 mailbox used for triggering PM operations such as suspend
-> and resume on AM33x/AM43x is special in that the M3 processor cannot
-> access the mailbox registers. However, an interrupt is needed to be
-> sent to request the M3 to perform a desired PM operation. This patch
-> adds the support for this special mailbox through separate ops for
-> this mailbox. These ops are designed to have the WkupM3's Rx interrupt
-> programmed within the driver, during transmission of a message. The
-> message is immediately read back and the internal mailbox interrupt
-> acknowledged as well to avoid triggering any spurious interrupts to
-> the M3.
->
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-
-Dumb Q: why does all this extra logic belong in the mailbox driver and
-not in the wkup_m3 driver?  To me, this seems like part of the IPC
-protocol between the MPU and M3 firmware, and not an inherent part of
-the AM33xx mbox.
-
-Kevin
+Well, just to be clear: If a new DT uses a new compatible value of any
+kind, be it adding "generic-pinconf" or switching to "foo-yyy" rather
+than "foo-yyy", it won't be compatible... That somewhat implies that you
+can't ever replace an old binding with something new.
