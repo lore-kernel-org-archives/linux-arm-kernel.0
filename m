@@ -1,52 +1,39 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 27 Aug 2013 11:16:42 +0200
-Subject: [PATCH 0/2] net/cadence/macb: add support for dt phy definition
-In-Reply-To: <521C6DD7.8030308@overkiz.com>
-References: <1377186980-21902-1-git-send-email-b.brezillon@overkiz.com>
- <20130826.160450.2176892065062148718.davem@davemloft.net>
- <521C586A.7080604@overkiz.com>
- <CAGVrzcYBT5aCmdaiGTm34kVu1UQssxB_EHvvj+t0phT58hcsZQ@mail.gmail.com>
- <521C6DD7.8030308@overkiz.com>
-Message-ID: <521C6E7A.8090905@atmel.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 27 Aug 2013 18:18:42 +0900
+Subject: [PATCH v2 0/2] R8A7779/Marzen: HPB-DMAC support for SDHI0
+In-Reply-To: <521B41AB.8040005@cogentembedded.com>
+References: <201308252143.33458.sergei.shtylyov@cogentembedded.com>
+ <20130826073626.GB10710@verge.net.au>
+ <521B41AB.8040005@cogentembedded.com>
+Message-ID: <20130827091841.GA30837@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/08/2013 11:13, boris brezillon :
-> On 27/08/2013 11:07, Florian Fainelli wrote:
->> Hello Boris,
->>
->> 2013/8/27 boris brezillon <b.brezillon@overkiz.com>:
->>> Hello Dave,
->>>
->>>
->>> On 26/08/2013 22:04, David Miller wrote:
->>>> From: Boris BREZILLON <b.brezillon@overkiz.com>
->>>> Date: Thu, 22 Aug 2013 17:56:20 +0200
->>>>
->>>>> This patch series adds support for ethernet phy definition using device
->>>>> tree.
->>>>>
->>>>> This may help in moving some at91 boards to dt (some of them define an
->>>>> interrupt pin).
->>>>>
->>>>> Tested on samad31ek.
->>>> Series applied to net-next, thanks.
->>> Could you apply, the 3rd version of this series instead ?
->>>
->>> It fixes one bug when no phy is discovered and use the appropriate address
->>> for the phy dt node.
->>>
->>> Sorry for the inconvenience.
->> You will probably have to resubmit an incremental patch, I have never
->> seen David pick up another version of a patch once it has been pushed
->> out:
->>
->> http://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=8c038e7e14b1c5f156745e3c4df0a3aa46173dd9
->> http://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=148cbb53ace32f584d208764c7f7e6aa8edb970c
-> Okay, I will submit patches (based on net-next branch) to fix those bugs.
+On Mon, Aug 26, 2013 at 03:53:15PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 26-08-2013 11:36, Simon Horman wrote:
+> 
+> >>    Here's the set of 2 patches against the Simon Horman's 'renesas.git' repo,
+> >>'renesas-devel-20130823' tag. Here we add the HPB-DMAC platform code working on
+> >>R8A7779 and enable DMA for SDHI0 on Marzen. The patchset depends on the R-Car
+> >>HPB-DMAC driver patch posted earlier.
+> 
+> >>[1/2] ARM: shmobile: r8a7779: add HPB-DMAC support
+> >>[2/2] ARM: shmobile: Marzen: enable DMA for SDHI0
+> 
+> >Hi Sergei,
+> 
+> >have those patches been merged?
+> 
+>    No. The driver they depend on hasn't been merged yet.
+> 
+> >If so, do you expect them to appear in v3.12-rc1?
+> 
+>    I'm not sure what to expect at this point...
 
-You can add my Acked-by to your fixes...
+Thanks, I understand.
 
-Bye,
--- 
-Nicolas Ferre
+I think that the best thing would be for you to repost this series
+once the dependencies have been merge and are available
+in a stable branch.
