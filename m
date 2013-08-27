@@ -1,67 +1,106 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 27 Aug 2013 16:19:58 +0200
-Subject: [RFC v1 0/5] ARM: Initial support for Marvell Armada 1500
-In-Reply-To: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130827161958.5e71890d@skate>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 27 Aug 2013 11:34:24 -0300
+Subject: [PATCH 00/15] Armada 370/XP watchdog support
+Message-ID: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian Hesselbarth,
+This patchset adds support for Armada 370/XP SoC watchdog using the
+orion-wdt driver. Several issues were blocking this addition, each
+of which has timely discussed and (at least initially) agreed.
 
-On Fri, 16 Aug 2013 21:41:33 +0200, Sebastian Hesselbarth wrote:
-> This is a RFC adding initial support for the Marvell Armada 1500
-> (88DE3100) found on various consumer devices (Chromecast, GoogleTV).
-> 
-> Actually, it is a two-fold RFC also raising discussions on mach-mvebu
-> cleanup roadmap to allow other SoCs to hop into it. While mach-mvebu
-> originally was created to add support for Armada 370/XP and merge
-> existing Marvell Orion familiy into it, I am not so sure about
-> Armada 1500 fits that well (the mbus has gone!).
+Namely, the issues are:
 
-After talking a bit with engineers within Marvell that work on this
-SoC, I'm inclined to think that using mach-mvebu for this family of SoC
-is not a good idea.
+* Handling of clock input differences, which was related
+  to Armada 370/XP clocksource reference 25 MHz issue.
+  This is already solved by the work in [1] (merge pending).
 
-The reasons are:
+* Shared register handling. It was agreed to introduce an atomic
+  read/modify API for such accesses [2]. Once the API is merged we'll use
+  it to access the timer control register shared between clocksource
+  and watchdog drivers.
 
- * This family of SoC is architecturally completely different from the
-   family of Orion SoC: they use completely different hardware blocks
-   (i.e none of the plat-orion stuff would apply, and none of the
-   Orion device drivers would be useful), they don't use the MBus
-   mechanism, etc. They are really a different family of SoC, almost as
-   if they were coming from a different SoC company.
+* Watchdog RSTOUT enable. It was decided [3] that this was better
+  handled at each machine initialization (and so this patchset
+  does such change). This change allows to remove the mach-specific
+  header in orion-wdt,  allowing multiplatform build.
 
- * The SMP and power management code, as well as all the "glue"
-   platform code that typically sits in mach-<foo> is going to be
-   substantially, if not completely different from the one in
-   mach-mvebu. I already believe doing all the "glue" platform code in
-   mach-mvebu for all of Kirkwood, Dove, 370/XP, Orion5x and MV78xx0 is
-   going to be a challenge, so I'd suggest to not add to this challenge
-   a completely separate family of SOCs.
+The current patchset is based and superseeds the previous v2 on
+Orion watchdog:
 
-The codename used for those Armada 1500 SOCs is "Berlin", so a name
-like mach-berlin, or mach-mvberlin (if we want to keep 'mv' to identify
-the founder) seems like a good name.
+  http://www.spinics.net/lists/arm-kernel/msg269526.html
 
-Also, to help us understand the organization of the family of SOCs, I
-asked a few informations to Marvell, and here is what I could collect:
+However, this is a new patchset that allow to support Armada 370/XP
+watchdog.
 
-"""
-BGxname		CPU core	codename	L2 cache controller	internal name
-BG2		PJ4B		Armada1500	Tauros3			MV88DE3100
-BG2-CT		Cortex-A9	N/A		PL310			N/A
-BG3		Cortex-A15	N/A		CA15 integrated		N/A
-"""
+Patches 1-5 removes and reworks the orion-wdt to allow to remove the
+mach-specific header.
 
-As was told that the Armada X or MV88DEx names are not used during
-development, and what Marvell is really using are the BGxx names.
+Patches 6-9 adds the infrastructure required to support multiple SoCs
+in the orion-wdt driver, and then uses it to support Armada 370 and
+Armada XP.
 
-Best regards,
+Patches 9-15 completes the support by updating the devicetree binding
+documentation, devicetree files, and default configuration.
 
-Thomas
+This series is based in v3.11-rc6 and has been tested on:
+
+ * Kirkwood Openblocks A6
+ * Armada XP Openblocks AX3
+ * Armada 370 Mirabox
+
+(I must thank Plat'home for donating those beatiful boxes!)
+
+[1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/261861
+[2] http://lwn.net/Articles/564709/
+[3] http://www.spinics.net/lists/arm-kernel/msg269994.html
+
+Thanks!
+
+Ezequiel Garcia (15):
+  watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+  ARM: orion: Assert watchdog RSTOUT enable bit
+  ARM: mvebu: Add watchdog RSTOUT enable in system-controller init
+  watchdog: orion: Remove RSTOUT bit enable/disable
+  watchdog: orion: Allow to build in any Orion platform
+  watchdog: orion: Introduce an orion_watchdog device structure
+  watchdog: orion: Introduce per-compatible of_device_id data
+  watchdog: orion: Add per-compatible clock initialization
+  watchdog: orion: Add support for Armada 370 and Armada XP SoC
+  ARM: mvebu: Add RSTOUT cell to system-controller DT node
+  ARM: mvebu: Enable Armada 370/XP watchdog in the devicetree
+  watchdog: orion: Rename device-tree binding documentation
+  watchdog: orion: Add other compatibles to devicetree binding
+  ARM: mvebu: system-controller: Add second reg cell devicetree
+    specification
+  ARM: mvebu: Enable watchdog in defconfig
+
+ .../bindings/arm/mvebu-system-controller.txt       |   7 +-
+ .../devicetree/bindings/watchdog/marvel.txt        |  19 --
+ .../devicetree/bindings/watchdog/orion-wdt.txt     |  34 +++
+ arch/arm/boot/dts/armada-370-xp.dtsi               |   4 +
+ arch/arm/boot/dts/armada-370.dtsi                  |   7 +-
+ arch/arm/boot/dts/armada-xp.dtsi                   |   8 +-
+ arch/arm/configs/mvebu_defconfig                   |   3 +
+ arch/arm/mach-dove/board-dt.c                      |   2 +
+ arch/arm/mach-dove/common.c                        |   2 +
+ arch/arm/mach-dove/include/mach/bridge-regs.h      |   1 +
+ arch/arm/mach-kirkwood/board-dt.c                  |   2 +
+ arch/arm/mach-kirkwood/common.c                    |   2 +
+ arch/arm/mach-kirkwood/include/mach/bridge-regs.h  |   1 +
+ arch/arm/mach-mv78xx0/common.c                     |   2 +
+ arch/arm/mach-mv78xx0/include/mach/bridge-regs.h   |   1 +
+ arch/arm/mach-mvebu/system-controller.c            |  22 ++
+ arch/arm/mach-orion5x/board-dt.c                   |   4 +
+ arch/arm/mach-orion5x/common.c                     |   2 +
+ arch/arm/mach-orion5x/include/mach/bridge-regs.h   |   1 +
+ arch/arm/plat-orion/common.c                       |   5 +
+ arch/arm/plat-orion/include/plat/common.h          |   1 +
+ drivers/watchdog/Kconfig                           |   2 +-
+ drivers/watchdog/orion_wdt.c                       | 244 +++++++++++++++------
+ 23 files changed, 283 insertions(+), 93 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/watchdog/marvel.txt
+ create mode 100644 Documentation/devicetree/bindings/watchdog/orion-wdt.txt
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.1.5
