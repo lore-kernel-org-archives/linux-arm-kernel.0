@@ -1,54 +1,46 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 27 Aug 2013 14:26:41 +0200
-Subject: [PATCH 1/4] pinctrl: Add s5pv210 support to pinctrl-exynos
-In-Reply-To: <521C71A1.4070609@samsung.com>
-References: <1377595171-31116-1-git-send-email-m.krawczuk@partner.samsung.com>
- <521C71A1.4070609@samsung.com>
-Message-ID: <1882987.W6oKxzvqXu@amdc1227>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue, 27 Aug 2013 14:36:14 +0200
+Subject: [PATCH] net/cadence/macb: fix invalid 0 return if no phy is
+ discovered on mii init
+Message-ID: <1377606974-21240-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Replace misleading -1 (-EPERM) by a more appropriate return code (-ENXIO)
+in macb_mii_probe function.
+Save macb_mii_probe return before branching to err_out_unregister to avoid
+erronous 0 return.
 
-On Tuesday 27 of August 2013 11:30:09 Sylwester Nawrocki wrote:
-> Hi,
-> 
-> Just a few nits...
-> 
-> On 08/27/2013 11:19 AM, Mateusz Krawczuk wrote:
-> > This patch implements pinctrl for s5pv210 and adds required device tree
-> > bindings.
-> Would be good to wrap this to not exceed 80 columns.
-> 
-> > Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
-> > ---
-> 
-> [...]
-> 
-> > diff --git a/drivers/pinctrl/pinctrl-exynos.c
-> > b/drivers/pinctrl/pinctrl-exynos.c index a74b3cb..fc3e1d7 100644
-> > --- a/drivers/pinctrl/pinctrl-exynos.c
-> > +++ b/drivers/pinctrl/pinctrl-exynos.c
-> > @@ -660,6 +660,64 @@ static void exynos_pinctrl_resume(struct
-> > samsung_pinctrl_drv_data *drvdata)> 
-> >  			exynos_pinctrl_resume_bank(drvdata, bank);
-> >  
-> >  }
-> > 
-> > +/* pin banks of s5pv210 pin-controller */
-> > +static struct samsung_pin_bank s5pv210_pin_banks0[] = {
-> 
-> Couldn't it be 'static const' ?
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/net/ethernet/cadence/macb.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-This driver relies on this array not being const, as it calculates 
-remaining contents of the samsung_pin_bank struct dynamically.
-
-Even though it is far from being elegant, it works correctly, because there 
-is always one separate array per each pin controller instance. This could 
-be improved by separating the constant part from the variable part or by 
-using this array as a template, i.e. marking as __initdata and copying its 
-contents, but I couldn't get myself to do that. Feel free to submit 
-appropriate patches ;).
-
-Best regards,
-Tomasz
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index fe06ab0..7660c45 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -276,7 +276,7 @@ static int macb_mii_probe(struct net_device *dev)
+ 	phydev = phy_find_first(bp->mii_bus);
+ 	if (!phydev) {
+ 		netdev_err(dev, "no PHY found\n");
+-		return -1;
++		return -ENXIO;
+ 	}
+ 
+ 	pdata = dev_get_platdata(&bp->pdev->dev);
+@@ -379,9 +379,9 @@ int macb_mii_init(struct macb *bp)
+ 	if (err)
+ 		goto err_out_free_mdio_irq;
+ 
+-	if (macb_mii_probe(bp->dev) != 0) {
++	err = macb_mii_probe(bp->dev);
++	if (err)
+ 		goto err_out_unregister_bus;
+-	}
+ 
+ 	return 0;
+ 
+-- 
+1.7.9.5
