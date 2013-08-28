@@ -1,147 +1,62 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 28 Aug 2013 12:34:21 +0100
-Subject: [PATCH 2/5] arm: Add {inc,dec}_preempt_count asm macros
+Date: Wed, 28 Aug 2013 12:34:22 +0100
+Subject: [PATCH 3/5] arm: Disable preemption in iwmmxt_task_enable()
 In-Reply-To: <1377689664-27614-1-git-send-email-catalin.marinas@arm.com>
 References: <1377689664-27614-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1377689664-27614-3-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1377689664-27614-4-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds asm macros for inc_preempt_count and dec_preempt_count_ti
-(which also gets the current thread_info) instead of open-coding them in
-arch/arm/vfp/*.S files.
+This patch is in preparation for calling the iwmmxt_task_enable()
+function with interrupts enabled.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/assembler.h | 32 ++++++++++++++++++++++++++++++++
- arch/arm/vfp/entry.S             | 20 +++-----------------
- arch/arm/vfp/vfphw.S             | 14 ++------------
- 3 files changed, 37 insertions(+), 29 deletions(-)
+ arch/arm/kernel/iwmmxt.S | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 8d4d50a..29ec0b6 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -23,6 +23,7 @@
- #include <asm/ptrace.h>
- #include <asm/domain.h>
- #include <asm/opcodes-virt.h>
-+#include <asm/asm-offsets.h>
+diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
+index a087838..c52f3e2 100644
+--- a/arch/arm/kernel/iwmmxt.S
++++ b/arch/arm/kernel/iwmmxt.S
+@@ -65,13 +65,14 @@
+  */
  
- #define IOMEM(x)	(x)
+ ENTRY(iwmmxt_task_enable)
++	inc_preempt_count r10, r3
  
-@@ -177,6 +178,37 @@
- 	mov	\rd, \rd, lsl #13
- 	.endm
+ 	XSC(mrc	p15, 0, r2, c15, c1, 0)
+ 	PJ4(mrc p15, 0, r2, c1, c0, 2)
+ 	@ CP0 and CP1 accessible?
+ 	XSC(tst	r2, #0x3)
+ 	PJ4(tst	r2, #0xf)
+-	movne	pc, lr				@ if so no business here
++	bne	4f				@ if so no business here
+ 	@ enable access to CP0 and CP1
+ 	XSC(orr	r2, r2, #0x3)
+ 	XSC(mcr	p15, 0, r2, c15, c1, 0)
+@@ -132,7 +133,7 @@ concan_dump:
+ 	wstrd	wR15, [r1, #MMX_WR15]
  
-+/*
-+ * Increment/decrement the preempt count.
-+ */
+ 2:	teq	r0, #0				@ anything to load?
+-	moveq	pc, lr
++	beq	3f
+ 
+ concan_load:
+ 
+@@ -165,8 +166,14 @@ concan_load:
+ 	@ clear CUP/MUP (only if r1 != 0)
+ 	teq	r1, #0
+ 	mov 	r2, #0
+-	moveq	pc, lr
++	beq	3f
+ 	tmcr	wCon, r2
++
++3:
 +#ifdef CONFIG_PREEMPT_COUNT
-+	.macro	inc_preempt_count, ti, tmp
-+	ldr	\tmp, [\ti, #TI_PREEMPT]	@ get preempt count
-+	add	\tmp, \tmp, #1			@ increment it
-+	str	\tmp, [\ti, #TI_PREEMPT]
-+	.endm
-+
-+	.macro	dec_preempt_count, ti, tmp
-+	ldr	\tmp, [\ti, #TI_PREEMPT]	@ get preempt count
-+	sub	\tmp, \tmp, #1			@ decrement it
-+	str	\tmp, [\ti, #TI_PREEMPT]
-+	.endm
-+
-+	.macro	dec_preempt_count_ti, ti, tmp
-+	get_thread_info \ti
-+	dec_preempt_count \ti, \tmp
-+	.endm
-+#else
-+	.macro	inc_preempt_count, ti, tmp
-+	.endm
-+
-+	.macro	dec_preempt_count, ti, tmp
-+	.endm
-+
-+	.macro	dec_preempt_count_ti, ti, tmp
-+	.endm
++	get_thread_info r10
 +#endif
-+
- #define USER(x...)				\
- 9999:	x;					\
- 	.pushsection __ex_table,"a";		\
-diff --git a/arch/arm/vfp/entry.S b/arch/arm/vfp/entry.S
-index 9cc290a..f0759e7 100644
---- a/arch/arm/vfp/entry.S
-+++ b/arch/arm/vfp/entry.S
-@@ -25,11 +25,7 @@
- @  IRQs disabled.
- @
- ENTRY(do_vfp)
--#ifdef CONFIG_PREEMPT_COUNT
--	ldr	r4, [r10, #TI_PREEMPT]	@ get preempt count
--	add	r11, r4, #1		@ increment it
--	str	r11, [r10, #TI_PREEMPT]
--#endif
-+	inc_preempt_count r10, r4
- 	enable_irq
-  	ldr	r4, .LCvfp
- 	ldr	r11, [r10, #TI_CPU]	@ CPU number
-@@ -38,12 +34,7 @@ ENTRY(do_vfp)
- ENDPROC(do_vfp)
- 
- ENTRY(vfp_null_entry)
--#ifdef CONFIG_PREEMPT_COUNT
--	get_thread_info	r10
--	ldr	r4, [r10, #TI_PREEMPT]	@ get preempt count
--	sub	r11, r4, #1		@ decrement it
--	str	r11, [r10, #TI_PREEMPT]
--#endif
-+	dec_preempt_count_ti r10, r4
- 	mov	pc, lr
- ENDPROC(vfp_null_entry)
- 
-@@ -56,12 +47,7 @@ ENDPROC(vfp_null_entry)
- 
- 	__INIT
- ENTRY(vfp_testing_entry)
--#ifdef CONFIG_PREEMPT_COUNT
--	get_thread_info	r10
--	ldr	r4, [r10, #TI_PREEMPT]	@ get preempt count
--	sub	r11, r4, #1		@ decrement it
--	str	r11, [r10, #TI_PREEMPT]
--#endif
-+	dec_preempt_count_ti r10, r4
- 	ldr	r0, VFP_arch_address
- 	str	r0, [r0]		@ set to non-zero value
- 	mov	pc, r9			@ we have handled the fault
-diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
-index 33d82aa..ee4c7b6 100644
---- a/arch/arm/vfp/vfphw.S
-+++ b/arch/arm/vfp/vfphw.S
-@@ -177,12 +177,7 @@ vfp_hw_state_valid:
- 					@ else it's one 32-bit instruction, so
- 					@ always subtract 4 from the following
- 					@ instruction address.
--#ifdef CONFIG_PREEMPT_COUNT
--	get_thread_info	r10
--	ldr	r4, [r10, #TI_PREEMPT]	@ get preempt count
--	sub	r11, r4, #1		@ decrement it
--	str	r11, [r10, #TI_PREEMPT]
--#endif
-+	dec_preempt_count_ti r10, r4
- 	mov	pc, r9			@ we think we have handled things
- 
- 
-@@ -201,12 +196,7 @@ look_for_VFP_exceptions:
- 	@ not recognised by VFP
- 
- 	DBGSTR	"not VFP"
--#ifdef CONFIG_PREEMPT_COUNT
--	get_thread_info	r10
--	ldr	r4, [r10, #TI_PREEMPT]	@ get preempt count
--	sub	r11, r4, #1		@ decrement it
--	str	r11, [r10, #TI_PREEMPT]
--#endif
-+	dec_preempt_count_ti r10, r4
++4:	dec_preempt_count r10, r3
  	mov	pc, lr
  
- process_exception:
+ /*
