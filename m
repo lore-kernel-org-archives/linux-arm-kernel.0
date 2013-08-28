@@ -1,51 +1,31 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Aug 2013 12:19:43 +0200
-Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
-In-Reply-To: <521DCD33.2070008@gmail.com>
-References: <20130828113459.48ecbb34@armhf>
-	<521DCD33.2070008@gmail.com>
-Message-ID: <20130828121943.1c8327ca@skate>
+Date: Wed, 28 Aug 2013 12:21:46 +0200
+Subject: [PATCH 04/19] ARM: set BE8 if LE in head code
+In-Reply-To: <1377639509-22778-5-git-send-email-ben.dooks@codethink.co.uk>
+References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1377639509-22778-5-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130828122146.4e30722a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian, Jean-Fran?ois,
+Dear Ben Dooks,
 
-On Wed, 28 Aug 2013 12:13:07 +0200, Sebastian Hesselbarth wrote:
-> On 08/28/2013 11:34 AM, Jean-Francois Moine wrote:
-> > This patch adds the nodes to instantiate the audio devices of the Dove
-> > boards.
-> >
-> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> > ---
-> >   arch/arm/boot/dts/dove.dtsi                  | 18 ++++++++++++++++++
-> >   1 file changed, 18 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> > index 499abad..78227e2 100644
-> > --- a/arch/arm/boot/dts/dove.dtsi
-> > +++ b/arch/arm/boot/dts/dove.dtsi
-> > @@ -573,6 +573,24 @@
-> >   					phy-handle = <&ethphy>;
-> >   				};
-> >   			};
-> > +
-> > +			i2s0: audio-controller at b0000 {
-> > +				compatible = "marvell,mvebu-audio";
+On Tue, 27 Aug 2013 22:38:14 +0100, Ben Dooks wrote:
+> If we are booting in LE and compiled for BE8, then add code to
+> set the state to bE8. Since the instruction stream is always LE,
+> we do not need to do anything special to the instruction.
 > 
-> [added Gregory to Cc]
+> Also ensure that the secondary processors are started in the same mode.
 > 
-> Jean-Francois,
+> Note, we do add about 20 bytes to the kernel image, but it seems easier
+> to do this than adding another configuration to change.
 > 
-> as Mark Brown already took the bindings patch for above generic
-> compatible, how are we going to discriminate different
-> implementations/features of Dove, Kirkwood, and Armada 370?
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> 
+> Conflicts:
+> 	arch/arm/kernel/sleep.S
 
-I agree that mvebu-audio is not a really good compatible string. It
-should use the first SoC that introduced the IP block, so that if
-future SOCs have variations, we can introduce separate compatible
-strings.
-
-So for now, the compatible string should be kirkwood-audio.
+Those two lines probably shouldn't be there.
 
 Thanks,
 
