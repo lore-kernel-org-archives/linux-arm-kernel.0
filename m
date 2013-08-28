@@ -1,46 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 28 Aug 2013 10:42:54 +0900
-Subject: [GIT PULL 0/2] Third round of Renesas ARM based SoC updates for v3.12
-Message-ID: <cover.1377652063.git.horms+renesas@verge.net.au>
+Date: Wed, 28 Aug 2013 10:42:59 +0900
+Subject: [PATCH 1/2] ARM: shmobile: r8a7779: Rename DU device in clock lookups
+ list
+In-Reply-To: <cover.1377652063.git.horms+renesas@verge.net.au>
+References: <cover.1377652063.git.horms+renesas@verge.net.au>
+Message-ID: <f3f4c304dd227f117a3fc3b5d6b57836321bab71.1377652063.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Hi Olof, Hi Arnd,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-please consider this third round of Renesas ARM based SoC updates for v3.12.
+The DU device will be called rcar-du-r8a7779. Rename the clock lookup
+entry accordingly.
 
-It is based on renesas-soc-for-v3.12 ("Second Round of ARM based SoC
-updates for v3.12") which you have previously pulled.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a7779.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I apologise that this and other pull requests that I will send today
-are rather later in the cycle than I would like. This is primarily due
-to a combination of my summer vacation and wanting to let the patches
-sit in next for a while.
-
-
-The following changes since commit d687f4d1993fa046171dbb1ca1970a3172ce11b9:
-
-  ARM: shmobile: r8a7740: Add TPU clock entry for DT platforms (2013-08-06 17:57:09 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc3-for-v3.12
-
-for you to fetch changes up to c223d986b953a4686f2540091f82e44030a50daa:
-
-  ARM: shmobile: r8a7790: Add DU and LVDS clocks (2013-08-22 10:46:46 +0900)
-
-----------------------------------------------------------------
-Third round of Renesas ARM based SoC updates for v3.12
-
-* Increased clock coverage for r8a7790 SoC
-* Rename DU device in clock lookups list of r8a7779 SoC
-
-----------------------------------------------------------------
-Laurent Pinchart (2):
-      ARM: shmobile: r8a7779: Rename DU device in clock lookups list
-      ARM: shmobile: r8a7790: Add DU and LVDS clocks
-
- arch/arm/mach-shmobile/clock-r8a7779.c |  2 +-
- arch/arm/mach-shmobile/clock-r8a7790.c | 12 +++++++++++-
- 2 files changed, 12 insertions(+), 2 deletions(-)
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index 10340f5..21e6364 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -190,7 +190,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.3", &mstp_clks[MSTP320]), /* SDHI3 */
+-	CLKDEV_DEV_ID("rcar-du.0", &mstp_clks[MSTP103]), /* DU */
++	CLKDEV_DEV_ID("rcar-du-r8a7779", &mstp_clks[MSTP103]), /* DU */
+ };
+ 
+ void __init r8a7779_clock_init(void)
+-- 
+1.8.3.2
