@@ -1,44 +1,27 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 28 Aug 2013 12:45:58 +0100
-Subject: [PATCH 18/19] ARM: kdgb: use <asm/opcodes.h> for data to be assembled
- as intruction
-In-Reply-To: <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
- <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377690359-25397-19-git-send-email-ben.dooks@codethink.co.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 28 Aug 2013 13:58:13 +0200
+Subject: [PATCH v5] gpio: pcf857x: Add OF support
+In-Reply-To: <20130827171854.GA2988@katana>
+References: <1377590559-14279-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2400176.9Vcd5TUYl9@avalon> <20130827171854.GA2988@katana>
+Message-ID: <7583101.2yAsZLOucV@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arch_kgdb_breakpoint() function uses an inline assembly directive
-to assemble a specific instruction using .word. This means the linker
-will not treat is as an instruction, and therefore incorrectly swap
-the endian-ness if running BE8.
+On Tuesday 27 August 2013 19:18:55 Wolfram Sang wrote:
+> > The driver should support the same chip models reardless of whether it's
+> > used with or without DT. If an entry in the OF table has no corresponding
+> > entry in the I2C table I would consider that as a driver bug.
+> 
+> Linus Walleij posted a patch to support DT only probing, but too many
+> side-effects showed up. Some were fixable (probe regressions) and some
+> need more work, if feasible at all. Most prominent is that runtime
+> instantiation of i2c slaves currently needs an entry in the i2c table.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
- arch/arm/include/asm/kgdb.h |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Linus, I'd like to get this in v3.12 if it's not too late. Could you please 
+provide your input ?
 
-diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
-index 48066ce..0a9d5dd 100644
---- a/arch/arm/include/asm/kgdb.h
-+++ b/arch/arm/include/asm/kgdb.h
-@@ -11,6 +11,7 @@
- #define __ARM_KGDB_H__
- 
- #include <linux/ptrace.h>
-+#include <asm/opcodes.h>
- 
- /*
-  * GDB assumes that we're a user process being debugged, so
-@@ -41,7 +42,7 @@
- 
- static inline void arch_kgdb_breakpoint(void)
- {
--	asm(".word 0xe7ffdeff");
-+	asm(__inst_arm(0xe7ffdeff));
- }
- 
- extern void kgdb_handle_bus_error(void);
 -- 
-1.7.10.4
+Regards,
+
+Laurent Pinchart
