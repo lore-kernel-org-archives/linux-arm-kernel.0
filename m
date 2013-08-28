@@ -1,32 +1,41 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 28 Aug 2013 21:07:52 +0100
-Subject: [PATCH v4 10/10] xen/arm,arm64: enable SWIOTLB_XEN
-In-Reply-To: <1376600325.9273.223.camel@hastur.hellion.org.uk>
-References: <alpine.DEB.2.02.1308151200580.4470@kaball.uk.xensource.com>
- <1376565054-24153-10-git-send-email-stefano.stabellini@eu.citrix.com>
- <1376600325.9273.223.camel@hastur.hellion.org.uk>
-Message-ID: <alpine.DEB.2.02.1308282104000.6397@kaball.uk.xensource.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 28 Aug 2013 13:32:39 -0700
+Subject: [PATCH v4 0/2] Document msm_serial bindings and support newer uartdms
+Message-ID: <1377721961-3508-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Aug 2013, Ian Campbell wrote:
-> On Thu, 2013-08-15 at 12:10 +0100, Stefano Stabellini wrote:
-> > At the moment always rely on swiotlb-xen, but when Xen starts supporting
-> > hardware IOMMUs we'll be able to avoid it conditionally on the presence
-> > of an IOMMU on the platform.
-> 
-> Do we have any idea how we are going to do this?
-> 
-> It's extra complicated if you consider that on some systems on some of
-> the devices are behind an IOMMU :-/
-> 
-> I wonder if we can enumerate which devices have an IOMMU at boot time
-> and force a ludicrous dma mask (such as 0) if one isn't present in order
-> to force us to always take the exchange_and_pin path?
+This patchset aligns the msm_serial driver more with downstream usage and
+updates the driver's DT bindings.
 
-We don't need to worry about how to specify which devices need to go via
-the swiotlb internally, because we have our own arm specific
-dma_map_ops. At the moment they are just implemented using the
-swiotlb-xen functions, but we could easily provide wrappers that check
-our own internal whitelist/blacklist and go via swiotlb-xen only in
-those cases.
+Changes since v3:
+ * Moved bindings to serial instead of tty/serial
+
+Changes since v2:
+ * Fixed up DT review comments
+ * Dropped patches that were picked up in tty tree
+
+Changes since v1:
+ * Dropped _clk postfix from {core,iface}_clk
+ * Split DT binding into two files
+ * Renamed DT binding files to match compatible strings
+ * Fixed up DT review comments
+ * Added new patch 5/5 (more than 1 char for UARTDM)
+
+Stephen Boyd (2):
+  devicetree: serial: Document msm_serial bindings
+  ARM: dts: msm: Update uartdm compatible strings
+
+ .../devicetree/bindings/serial/qcom,msm-uart.txt   | 25 ++++++++++
+ .../devicetree/bindings/serial/qcom,msm-uartdm.txt | 53 ++++++++++++++++++++++
+ .../devicetree/bindings/tty/serial/msm_serial.txt  | 27 -----------
+ arch/arm/boot/dts/msm8660-surf.dts                 |  2 +-
+ arch/arm/boot/dts/msm8960-cdp.dts                  |  2 +-
+ 5 files changed, 80 insertions(+), 29 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/qcom,msm-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt
+ delete mode 100644 Documentation/devicetree/bindings/tty/serial/msm_serial.txt
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
