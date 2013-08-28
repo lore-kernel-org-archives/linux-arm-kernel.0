@@ -1,50 +1,56 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 28 Aug 2013 09:38:34 -0400
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 28 Aug 2013 19:12:53 +0530
 Subject: [PATCH 0/2] OMAP4+: Get rid of internal SRAM handling
-In-Reply-To: <521D98B9.4070902@ti.com>
+In-Reply-To: <521DFD5A.8050406@ti.com>
 References: <1377598305-15539-1-git-send-email-rnayak@ti.com>
- <521CA8DF.9040400@ti.com> <521D98B9.4070902@ti.com>
-Message-ID: <521DFD5A.8050406@ti.com>
+ <521CA8DF.9040400@ti.com> <521D98B9.4070902@ti.com> <521DFD5A.8050406@ti.com>
+Message-ID: <521DFE5D.8070000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 August 2013 02:29 AM, Nayak, Rajendra wrote:
-> On Tuesday 27 August 2013 06:55 PM, Santosh Shilimkar wrote:
->> + Paul,
+On Wednesday 28 August 2013 07:08 PM, Santosh Shilimkar wrote:
+> On Wednesday 28 August 2013 02:29 AM, Nayak, Rajendra wrote:
+>> On Tuesday 27 August 2013 06:55 PM, Santosh Shilimkar wrote:
+>>> + Paul,
+>>>
+>>> On Tuesday 27 August 2013 06:11 AM, Rajendra Nayak wrote:
+>>>> Make all OMAP DT only platforms (am33xx, am43xx, omap4 and omap5)
+>>>> use drivers/misc/sram.c driver instead of the omap internal
+>>>> implementation for SRAM handling.
+>>>>
+>>>> Rajendra Nayak (2):
+>>>>   ARM: AM335x: Get rid of unused sram init function
+>>>>   ARM: OMAP4+: Move SRAM data to DT
+>>>>
+>>>>  arch/arm/boot/dts/am33xx.dtsi        |    5 +++++
+>>>>  arch/arm/boot/dts/am4372.dtsi        |    5 +++++
+>>>>  arch/arm/boot/dts/omap4.dtsi         |    5 +++++
+>>>>  arch/arm/boot/dts/omap5.dtsi         |    5 +++++
+>>>>  arch/arm/configs/omap2plus_defconfig |    1 +
+>>>>  arch/arm/mach-omap2/sram.c           |   39 +---------------------------------
+>>>>  arch/arm/mach-omap2/sram.h           |    1 -
+>>>>  7 files changed, 22 insertions(+), 39 deletions(-)
+>>>>
+>>> Really nice to see the SRAM code getting moved now. Thanks
+>>> a lot Rajendra.
+>>>
+>>> - The sram_init() seems to be the post core init call.
+>>> Hope this is not a problem for SDRC init which needs to have
+>>> SRAM ready to update the DDR parameters.
 >>
->> On Tuesday 27 August 2013 06:11 AM, Rajendra Nayak wrote:
->>> Make all OMAP DT only platforms (am33xx, am43xx, omap4 and omap5)
->>> use drivers/misc/sram.c driver instead of the omap internal
->>> implementation for SRAM handling.
->>>
->>> Rajendra Nayak (2):
->>>   ARM: AM335x: Get rid of unused sram init function
->>>   ARM: OMAP4+: Move SRAM data to DT
->>>
->>>  arch/arm/boot/dts/am33xx.dtsi        |    5 +++++
->>>  arch/arm/boot/dts/am4372.dtsi        |    5 +++++
->>>  arch/arm/boot/dts/omap4.dtsi         |    5 +++++
->>>  arch/arm/boot/dts/omap5.dtsi         |    5 +++++
->>>  arch/arm/configs/omap2plus_defconfig |    1 +
->>>  arch/arm/mach-omap2/sram.c           |   39 +---------------------------------
->>>  arch/arm/mach-omap2/sram.h           |    1 -
->>>  7 files changed, 22 insertions(+), 39 deletions(-)
->>>
->> Really nice to see the SRAM code getting moved now. Thanks
->> a lot Rajendra.
+>> It should be fine given its needed only during core dvfs. Besides
+>> drivers/misc/sram.c is useful only on DT platforms, so for now OMAP2/3
+>> continue to use the omap specific sram handling.
 >>
->> - The sram_init() seems to be the post core init call.
->> Hope this is not a problem for SDRC init which needs to have
->> SRAM ready to update the DDR parameters.
-> 
-> It should be fine given its needed only during core dvfs. Besides
-> drivers/misc/sram.c is useful only on DT platforms, so for now OMAP2/3
-> continue to use the omap specific sram handling.
-> 
-Its used in early boot to initialize the DDR parameters and then
-later these can be used based on whether core DVFS supported or
-not. Look for _omap2_init_reprogram_sdrc() which has init
-dependency with omap_sram_init().
+> Its used in early boot to initialize the DDR parameters and then
+> later these can be used based on whether core DVFS supported or
+> not. Look for _omap2_init_reprogram_sdrc() which has init
+> dependency with omap_sram_init().
 
-Regards,
-Santosh
+Right, I see that now. With this series (which addresses only DT platforms)
+we would still be fine with the omap2/3 sdrc usage.
+
+> 
+> Regards,
+> Santosh
+> 
