@@ -1,55 +1,76 @@
 From: m.krawczuk@partner.samsung.com (Mateusz Krawczuk)
-Date: Wed, 28 Aug 2013 15:34:27 +0200
-Subject: [PATCH v2 0/5] ARM: S5PV210: move to common clk framework
-Message-ID: <1377696872-32069-1-git-send-email-m.krawczuk@partner.samsung.com>
+Date: Wed, 28 Aug 2013 15:34:28 +0200
+Subject: [PATCH v2 1/5] media: s5p-tv: Restore vpll clock rate
+In-Reply-To: <1377696872-32069-1-git-send-email-m.krawczuk@partner.samsung.com>
+References: <1377696872-32069-1-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <1377696872-32069-2-git-send-email-m.krawczuk@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is the new s5pv210 clock implementation
-(using common clk framework).
+Restore vpll clock rate if start stream fail or stream is off.
 
-This implementation is compatible with device tree definition and board files.
+Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+---
+ drivers/media/platform/s5p-tv/sdo_drv.c | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
 
-This patch series is based on linux-next and has been tested on goni and aquila 
-boards using board file.
-
-This patch series require adding new registration method
-for PLL45xx and PLL46xx, which is included in this patch series:
-clk: samsung: pll: Use new registration method for PLL46xx
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg21653.html
-clk: samsung: pll: Use new registration method for PLL45xx
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg21652.html
-clk: samsung: exynos4: Rename exynos4_plls to exynos4x12_plls
-http://www.spinics.net/lists/arm-kernel/msg268486.html
-
-Mateusz Krawczuk (5):
-  media: s5p-tv: Restore vpll clock rate
-  media: s5p-tv: Fix sdo driver to work with CCF
-  media: s5p-tv: Fix mixer driver to work with CCF
-  clk: samsung: Add clock driver for s5pc110/s5pv210
-  ARM: s5pv210: Migrate clock handling to Common Clock Framework
-
- .../bindings/clock/samsung,s5pv210-clock.txt       |  72 ++
- arch/arm/mach-s5pv210/Kconfig                      |   9 +
- arch/arm/mach-s5pv210/Makefile                     |   4 +-
- arch/arm/mach-s5pv210/common.c                     |  17 +
- arch/arm/mach-s5pv210/common.h                     |  13 +
- arch/arm/mach-s5pv210/mach-aquila.c                |   1 +
- arch/arm/mach-s5pv210/mach-goni.c                  |   3 +-
- arch/arm/mach-s5pv210/mach-smdkc110.c              |   1 +
- arch/arm/mach-s5pv210/mach-smdkv210.c              |   1 +
- arch/arm/mach-s5pv210/mach-torbreck.c              |   1 +
- arch/arm/plat-samsung/Kconfig                      |   2 +-
- arch/arm/plat-samsung/init.c                       |   2 -
- drivers/clk/samsung/Makefile                       |   3 +
- drivers/clk/samsung/clk-s5pv210.c                  | 733 +++++++++++++++++++++
- drivers/media/platform/s5p-tv/mixer_drv.c          |  35 +-
- drivers/media/platform/s5p-tv/sdo_drv.c            |  45 +-
- include/dt-bindings/clock/samsung,s5pv210-clock.h  | 221 +++++++
- 17 files changed, 1140 insertions(+), 23 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
- create mode 100644 drivers/clk/samsung/clk-s5pv210.c
- create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
-
+diff --git a/drivers/media/platform/s5p-tv/sdo_drv.c b/drivers/media/platform/s5p-tv/sdo_drv.c
+index 0afa90f..b919008 100644
+--- a/drivers/media/platform/s5p-tv/sdo_drv.c
++++ b/drivers/media/platform/s5p-tv/sdo_drv.c
+@@ -55,6 +55,8 @@ struct sdo_device {
+ 	struct clk *dacphy;
+ 	/** clock for control of VPLL */
+ 	struct clk *fout_vpll;
++	/** vpll rate before sdo stream was on */
++	int vpll_rate;
+ 	/** regulator for SDO IP power */
+ 	struct regulator *vdac;
+ 	/** regulator for SDO plug detection */
+@@ -193,17 +195,34 @@ static int sdo_s_power(struct v4l2_subdev *sd, int on)
+ 
+ static int sdo_streamon(struct sdo_device *sdev)
+ {
++	int ret;
++
+ 	/* set proper clock for Timing Generator */
+-	clk_set_rate(sdev->fout_vpll, 54000000);
++	sdev->vpll_rate = clk_get_rate(sdev->fout_vpll);
++	ret = clk_set_rate(sdev->fout_vpll, 54000000);
++	if (ret < 0) {
++		dev_err(sdev->dev,
++			"%s: Failed to set vpll rate!\n", __func__);
++		return ret;
++	}
+ 	dev_info(sdev->dev, "fout_vpll.rate = %lu\n",
+ 	clk_get_rate(sdev->fout_vpll));
+ 	/* enable clock in SDO */
+ 	sdo_write_mask(sdev, SDO_CLKCON, ~0, SDO_TVOUT_CLOCK_ON);
+-	clk_enable(sdev->dacphy);
++	ret = clk_prepare_enable(sdev->dacphy);
++	if (ret < 0) {
++		dev_err(sdev->dev,
++			"%s: Failed to prepare and enable clock !\n", __func__);
++		goto fail;
++	}
+ 	/* enable DAC */
+ 	sdo_write_mask(sdev, SDO_DAC, ~0, SDO_POWER_ON_DAC);
+ 	sdo_reg_debug(sdev);
+ 	return 0;
++fail:
++	sdo_write_mask(sdev, SDO_CLKCON, 0, SDO_TVOUT_CLOCK_ON);
++	clk_set_rate(sdev->fout_vpll, sdev->vpll_rate);
++	return ret;
+ }
+ 
+ static int sdo_streamoff(struct sdo_device *sdev)
+@@ -220,6 +239,7 @@ static int sdo_streamoff(struct sdo_device *sdev)
+ 	}
+ 	if (tries == 0)
+ 		dev_err(sdev->dev, "failed to stop streaming\n");
++	clk_set_rate(sdev->fout_vpll, sdev->vpll_rate);
+ 	return tries ? 0 : -EIO;
+ }
+ 
 -- 
 1.8.1.2
