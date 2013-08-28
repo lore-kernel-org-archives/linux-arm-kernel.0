@@ -1,22 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Aug 2013 21:13:36 +0200
-Subject: [PATCH 0/3] ARM: PCI: versatile: fix irqs, I/O
-In-Reply-To: <1377190070-7305-1-git-send-email-peter.maydell@linaro.org>
-References: <1377190070-7305-1-git-send-email-peter.maydell@linaro.org>
-Message-ID: <CACRpkdYZiTRkivBY6ZsroOce9Oj=R86x3q0Pw9G4X=gUWyL6bw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 28 Aug 2013 12:19:53 -0700
+Subject: [PATCH v3 0/2] Document msm_serial bindings and support newer
+ uartdms
+In-Reply-To: <89FFB174-E076-4309-BE9C-7DB24B31599F@codeaurora.org>
+References: <1377648764-23453-1-git-send-email-sboyd@codeaurora.org>
+ <89FFB174-E076-4309-BE9C-7DB24B31599F@codeaurora.org>
+Message-ID: <20130828191952.GC19754@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 6:47 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
+On 08/28, Kumar Gala wrote:
+> 
+> On Aug 27, 2013, at 7:12 PM, Stephen Boyd wrote:
+> 
+> > This patchset aligns the msm_serial driver more with downstream usage and
+> > updates the driver's DT bindings.
+> > 
+> > Changes since v2:
+> > * Fixed up DT review comments
+> > * Dropped patches that were picked up in tty tree
+> > 
+> > Changes since v1:
+> > * Dropped _clk postfix from {core,iface}_clk
+> > * Split DT binding into two files
+> > * Renamed DT binding files to match compatible strings
+> > * Fixed up DT review comments
+> > * Added new patch 5/5 (more than 1 char for UARTDM)
+> > 
+> > Stephen Boyd (2):
+> >  devicetree: serial: Document msm_serial bindings
+> >  ARM: dts: msm: Update uartdm compatible strings
+> > 
+> > .../devicetree/bindings/tty/serial/msm_serial.txt  | 27 -----------
+> > .../bindings/tty/serial/qcom,msm-uart.txt          | 25 ++++++++++
+> > .../bindings/tty/serial/qcom,msm-uartdm.txt        | 53 ++++++++++++++++++++++
+> > arch/arm/boot/dts/msm8660-surf.dts                 |  2 +-
+> > arch/arm/boot/dts/msm8960-cdp.dts                  |  2 +-
+> > 5 files changed, 80 insertions(+), 29 deletions(-)
+> > delete mode 100644 Documentation/devicetree/bindings/tty/serial/msm_serial.txt
+> > create mode 100644 Documentation/devicetree/bindings/tty/serial/qcom,msm-uart.txt
+> > create mode 100644 Documentation/devicetree/bindings/tty/serial/qcom,msm-uartdm.txt
+> 
+> We are going with bindings/serial as one location, can you update this so the bindings are in bindings/serial/qcom...
+> 
 
-> These patches fix a number of issues with the PCI controller
-> code for mach-versatile:
+Ok I can move it. Do I have your ack on patch 2?
 
-All seem sound to me.
-
-Please mark all as Cc: stable at vger.kernel.org
-and push the ARM SoC maintainers to take these three
-patches as fixes.
-
-Yours,
-Linus Walleij
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
