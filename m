@@ -1,108 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 28 Aug 2013 10:39:32 +0900
-Subject: [PATCH 3/3] ARM: shmobile: r8a7790: Constify platform data and
- resources
-In-Reply-To: <cover.1377651687.git.horms+renesas@verge.net.au>
-References: <cover.1377651687.git.horms+renesas@verge.net.au>
-Message-ID: <3cf627b06ffc8f89548941e9cb8e8f1e0fe0f5c5.1377651687.git.horms+renesas@verge.net.au>
+Date: Wed, 28 Aug 2013 10:40:14 +0900
+Subject: [GIT PULL 0/2] Second round of Renesas ARM based SoC defconfig
+ updates for v3.12
+Message-ID: <cover.1377652426.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Kevin, Hi Olof, Hi Arnd,
 
-Platform data and resources for core devices are kmemdup()ed when the
-corresponding devices are registered and can thus be declared as const.
-Do so.
+please consider this second round of Renesas ARM based SoC defconfig
+updates for v3.12.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-r8a7790.c | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
+It is based on renesas-defconfig-for-v3.12 ("ARM based SoC defconfig
+updates for v3.12") which you have previously pulled.
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index a42d1f6..e0d29a2 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -31,17 +31,18 @@
- #include <mach/r8a7790.h>
- #include <asm/mach/arch.h>
- 
--static struct resource pfc_resources[] __initdata = {
-+static const struct resource pfc_resources[] __initconst = {
- 	DEFINE_RES_MEM(0xe6060000, 0x250),
- };
- 
- #define R8A7790_GPIO(idx)						\
--static struct resource r8a7790_gpio##idx##_resources[] __initdata = {	\
-+static const struct resource r8a7790_gpio##idx##_resources[] __initconst = { \
- 	DEFINE_RES_MEM(0xe6050000 + 0x1000 * (idx), 0x50),		\
- 	DEFINE_RES_IRQ(gic_spi(4 + (idx))),				\
- };									\
- 									\
--static struct gpio_rcar_config r8a7790_gpio##idx##_platform_data __initdata = {	\
-+static const struct gpio_rcar_config					\
-+r8a7790_gpio##idx##_platform_data __initconst = {			\
- 	.gpio_base	= 32 * (idx),					\
- 	.irq_base	= 0,						\
- 	.number_of_pins	= 32,						\
-@@ -112,7 +113,7 @@ void __init r8a7790_pinmux_init(void)
- enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFA2, SCIF0, SCIF1,
-        HSCIF0, HSCIF1 };
- 
--static struct plat_sci_port scif[] __initdata = {
-+static const struct plat_sci_port scif[] __initconst = {
- 	SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
- 	SCIFA_DATA(SCIFA1, 0xe6c50000, gic_spi(145)), /* SCIFA1 */
- 	SCIFB_DATA(SCIFB0, 0xe6c20000, gic_spi(148)), /* SCIFB0 */
-@@ -131,11 +132,11 @@ static inline void r8a7790_register_scif(int idx)
- 				      sizeof(struct plat_sci_port));
- }
- 
--static struct renesas_irqc_config irqc0_data __initdata = {
-+static const struct renesas_irqc_config irqc0_data __initconst = {
- 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
- };
- 
--static struct resource irqc0_resources[] __initdata = {
-+static const struct resource irqc0_resources[] __initconst = {
- 	DEFINE_RES_MEM(0xe61c0000, 0x200), /* IRQC Event Detector Block_0 */
- 	DEFINE_RES_IRQ(gic_spi(0)), /* IRQ0 */
- 	DEFINE_RES_IRQ(gic_spi(1)), /* IRQ1 */
-@@ -150,7 +151,7 @@ static struct resource irqc0_resources[] __initdata = {
- 					  &irqc##idx##_data,		\
- 					  sizeof(struct renesas_irqc_config))
- 
--static struct resource thermal_resources[] __initdata = {
-+static const struct resource thermal_resources[] __initconst = {
- 	DEFINE_RES_MEM(0xe61f0000, 0x14),
- 	DEFINE_RES_MEM(0xe61f0100, 0x38),
- 	DEFINE_RES_IRQ(gic_spi(69)),
-@@ -161,13 +162,13 @@ static struct resource thermal_resources[] __initdata = {
- 					thermal_resources,		\
- 					ARRAY_SIZE(thermal_resources))
- 
--static struct sh_timer_config cmt00_platform_data __initdata = {
-+static const struct sh_timer_config cmt00_platform_data __initconst = {
- 	.name = "CMT00",
- 	.timer_bit = 0,
- 	.clockevent_rating = 80,
- };
- 
--static struct resource cmt00_resources[] __initdata = {
-+static const struct resource cmt00_resources[] __initconst = {
- 	DEFINE_RES_MEM(0xffca0510, 0x0c),
- 	DEFINE_RES_MEM(0xffca0500, 0x04),
- 	DEFINE_RES_IRQ(gic_spi(142)), /* CMT0_0 */
-@@ -276,7 +277,7 @@ void __init r8a7790_init_early(void)
- 
- #ifdef CONFIG_USE_OF
- 
--static const char *r8a7790_boards_compat_dt[] __initdata = {
-+static const char * const r8a7790_boards_compat_dt[] __initconst = {
- 	"renesas,r8a7790",
- 	NULL,
- };
--- 
-1.8.3.2
+I apologise that this and other pull requests that I will send today
+are rather later in the cycle than I would like. This is primarily due
+to a combination of my summer vacation and wanting to let the patches
+sit in next for a while.
+
+
+The following changes since commit 461cd47a65f5d8513a983ebd21ef7c23d4b4730f:
+
+  ARM: shmobile: ape6evm: Enable gpio-leds in defconfig (2013-08-06 10:14:09 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v3.12
+
+for you to fetch changes up to d5ba7161270d10df4878762e085889fb8501fcf9:
+
+  ARM: shmobile: lager: Select DRM_RCAR_DU in defconfig (2013-08-22 10:55:03 +0900)
+
+----------------------------------------------------------------
+Second round of Renesas ARM based SoC defconfig updates for v3.12
+
+* Select DRM_RCAR_DU in marzen and lager defconfigs
+
+----------------------------------------------------------------
+Laurent Pinchart (2):
+      ARM: shmobile: marzen: Select DRM_RCAR_DU in defconfig
+      ARM: shmobile: lager: Select DRM_RCAR_DU in defconfig
+
+ arch/arm/configs/lager_defconfig  | 2 ++
+ arch/arm/configs/marzen_defconfig | 2 ++
+ 2 files changed, 4 insertions(+)
