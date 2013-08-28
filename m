@@ -1,83 +1,124 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 28 Aug 2013 12:35:59 +0100
-Subject: [RFC PATCH 07/14] arm64: kernel: implement fpsimd CPU PM notifier
+Date: Wed, 28 Aug 2013 12:35:56 +0100
+Subject: [RFC PATCH 04/14] arm64: kernel: suspend/resume registers save/restore
 In-Reply-To: <1377689766-17642-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1377689766-17642-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1377689766-17642-8-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1377689766-17642-5-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU enters a low power state, its FP register content is lost.
-This patch adds a notifier to save the FP context on CPU shutdown
-and restore it on CPU resume. The context is saved and restored only
-if the suspending thread is not a kernel thread, mirroring the current
-context switch behaviour.
+Power management software requires the kernel to save and restore
+CPU registers while going through suspend and resume operations
+triggered by kernel subsystems like CPU idle and suspend to RAM.
+
+This patch implements code that provides save and restore mechanism
+for the arm v8 implementation. Memory for the context is passed as
+parameter to both cpu_do_suspend and cpu_do_resume functions, and allows
+the callers to implement context allocation as they deem fit.
+
+The registers that are saved and restored correspond to the registers
+actually required by the kernel to be up and running and is by no means
+a complete save and restore of the entire v8 register set.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ arch/arm64/include/asm/proc-fns.h |  3 ++
+ arch/arm64/mm/proc.S              | 64 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 67 insertions(+)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index e8b8357..b5b94f6 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -17,6 +17,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
+index 7cdf466..0c657bb 100644
+--- a/arch/arm64/include/asm/proc-fns.h
++++ b/arch/arm64/include/asm/proc-fns.h
+@@ -26,11 +26,14 @@
+ #include <asm/page.h>
  
-+#include <linux/cpu_pm.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/sched.h>
-@@ -83,6 +84,39 @@ void fpsimd_flush_thread(void)
- 	fpsimd_load_state(&current->thread.fpsimd_state);
- }
+ struct mm_struct;
++struct cpu_suspend_ctx;
  
-+#ifdef CONFIG_CPU_PM
-+static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
-+				  unsigned long cmd, void *v)
-+{
-+	switch (cmd) {
-+	case CPU_PM_ENTER:
-+		if (current->mm)
-+			fpsimd_save_state(&current->thread.fpsimd_state);
-+		break;
-+	case CPU_PM_EXIT:
-+		if (current->mm)
-+			fpsimd_load_state(&current->thread.fpsimd_state);
-+		break;
-+	case CPU_PM_ENTER_FAILED:
-+	default:
-+		return NOTIFY_DONE;
-+	}
-+	return NOTIFY_OK;
-+}
+ extern void cpu_cache_off(void);
+ extern void cpu_do_idle(void);
+ extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+ extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
++extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
++extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+ 
+ #include <asm/memory.h>
+ 
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index a82ae88..193bf98 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -80,6 +80,70 @@ ENTRY(cpu_do_idle)
+ 	ret
+ ENDPROC(cpu_do_idle)
+ 
++#ifdef CONFIG_ARM_CPU_SUSPEND
++/**
++ * cpu_do_suspend - save CPU registers context
++ * x0: virtual address of context pointer
++ */
++ENTRY(cpu_do_suspend)
++	mrs	x1, tpidr_el0
++	str	x1, [x0, #CPU_CTX_TPIDR_EL0]
++	mrs	x2, tpidrro_el0
++	str	x2, [x0, #CPU_CTX_TPIDRRO_EL0]
++	mrs	x3, contextidr_el1
++	str	x3, [x0, #CPU_CTX_CTXIDR_EL1]
++	mrs	x4, mair_el1
++	str	x4, [x0, #CPU_CTX_MAIR_EL1]
++	mrs	x5, cpacr_el1
++	str	x5, [x0, #CPU_CTX_CPACR_EL1]
++	mrs	x6, ttbr1_el1
++	str	x6, [x0, #CPU_CTX_TTBR1_EL1]
++	mrs	x7, tcr_el1
++	str	x7, [x0, #CPU_CTX_TCR_EL1]
++	mrs	x8, vbar_el1
++	str	x8, [x0, #CPU_CTX_VBAR_EL1]
++	mrs	x9, sctlr_el1
++	str	x9, [x0, #CPU_CTX_SCTLR_EL1]
++	ret
++ENDPROC(cpu_do_suspend)
 +
-+static struct notifier_block fpsimd_cpu_pm_notifier_block = {
-+	.notifier_call = fpsimd_cpu_pm_notifier,
-+};
-+
-+static void fpsimd_pm_init(void)
-+{
-+	cpu_pm_register_notifier(&fpsimd_cpu_pm_notifier_block);
-+}
-+
-+#else
-+static inline void fpsimd_pm_init(void) { }
-+#endif /* CONFIG_CPU_PM */
++/**
++ * cpu_do_resume - registers layout should match the corresponding
++ *                 cpu_do_suspend call
++ *
++ * x0: Physical address of context pointer
++ * x1: Should contain the physical address of identity map page tables
++ *     used to turn on the MMU and complete context restore
++ *
++ * Returns:
++ *	sctlr value in x0
++ */
++ENTRY(cpu_do_resume)
++	tlbi	vmalle1is	// make sure tlb entries are invalid
++	ldr	x2, [x0, #CPU_CTX_TPIDR_EL0]
++	msr	tpidr_el0, x2
++	ldr	x3, [x0, #CPU_CTX_TPIDRRO_EL0]
++	msr	tpidrro_el0, x3
++	ldr	x4, [x0, #CPU_CTX_CTXIDR_EL1]
++	msr	contextidr_el1, x4
++	ldr	x5, [x0, #CPU_CTX_MAIR_EL1]
++	msr	mair_el1, x5
++	ldr	x6, [x0, #CPU_CTX_CPACR_EL1]
++	msr	cpacr_el1, x6
++	msr	ttbr0_el1, x1
++	ldr	x7, [x0, #CPU_CTX_TTBR1_EL1]
++	msr	ttbr1_el1, x7
++	ldr	x8, [x0, #CPU_CTX_TCR_EL1]
++	msr	tcr_el1, x8
++	ldr	x9, [x0, #CPU_CTX_VBAR_EL1]
++	msr	vbar_el1, x9
++	ldr	x0, [x0, #CPU_CTX_SCTLR_EL1]
++	isb
++	dsb	sy
++	ret
++ENDPROC(cpu_do_resume)
++#endif
 +
  /*
-  * FP/SIMD support code initialisation.
-  */
-@@ -101,6 +135,8 @@ static int __init fpsimd_init(void)
- 	else
- 		elf_hwcap |= HWCAP_ASIMD;
- 
-+	fpsimd_pm_init();
-+
- 	return 0;
- }
- late_initcall(fpsimd_init);
+  *	cpu_switch_mm(pgd_phys, tsk)
+  *
 -- 
 1.8.3.4
