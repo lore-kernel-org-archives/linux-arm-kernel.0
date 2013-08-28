@@ -1,57 +1,60 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 28 Aug 2013 15:54:24 +0530
-Subject: [PATCH 2/2] ARM: OMAP4+: Move SRAM data to DT
-In-Reply-To: <521D977D.1000305@ti.com>
-References: <1377598305-15539-1-git-send-email-rnayak@ti.com>
- <1377598305-15539-3-git-send-email-rnayak@ti.com> <521C8C47.2000502@ti.com>
- <521D977D.1000305@ti.com>
-Message-ID: <521DCFD8.2020304@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 28 Aug 2013 12:31:12 +0200
+Subject: [PATCH] ARM: DT: Exynos: fix number of interrupt-cells in mct node
+In-Reply-To: <CANuQgHFP2n33neHbW90JZbPmcPkZ-X=NDwXDqQw1sfQUUT_zNQ@mail.gmail.com>
+References: <1371220886-11616-1-git-send-email-chander.kashyap@linaro.org>
+ <52112004.90202@samsung.com>
+ <CANuQgHFP2n33neHbW90JZbPmcPkZ-X=NDwXDqQw1sfQUUT_zNQ@mail.gmail.com>
+Message-ID: <1525883.6gVrCoPa3t@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 August 2013 11:53 AM, Rajendra Nayak wrote:
-> On Tuesday 27 August 2013 04:53 PM, Sekhar Nori wrote:
->> On Tuesday 27 August 2013 03:41 PM, Rajendra Nayak wrote:
->>> Use drivers/misc/sram.c driver to manage SRAM on all DT only
->>> OMAP platforms (am33xx, am43xx, omap4 and omap5) instead of
->>> the existing private implementation.
->>>
->>> Address and size related data  is removed from mach-omap2/sram.c
->>> and now passed to drivers/misc/sram.c from DT.
->>>
->>> Users can hence use general purpose allocator apis instead of
->>> OMAP private ones to manage and use SRAM.
->>>
->>> Currently there are no users on SRAM on these platfoms.
->>>
->>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->>
->> Nice getting rid of code.
->>
->>> diff --git a/arch/arm/mach-omap2/sram.h b/arch/arm/mach-omap2/sram.h
->>> index ca7277c..3f83b80 100644
->>> --- a/arch/arm/mach-omap2/sram.h
->>> +++ b/arch/arm/mach-omap2/sram.h
->>> @@ -80,4 +80,3 @@ static inline void omap_push_sram_idle(void) {}
->>>  #else
->>>  #define OMAP4_SRAM_PA		0x40300000
->>>  #endif
->>> -#define AM33XX_SRAM_PA		0x40300000
->>
->> I guess OMAP4_SRAM_PA is left in the code to take care of errata I688?
-> 
-> right.
-> 
->> How about removing the iotable entry for SRAM on OMAP4 and converting
->> omap_barriers_init() to use the gen_pool API instead of passing an
->> incremented address to DT?
-> 
-> Actually we dont really need to alloc and manage any sram pool for handling
-> the errata. It just needs to know an sram location which it can read and write
-> back into (which can be any sram location used/unused).
+Hi Chander,
 
-But there will be a race with other writes to SRAM since omap_bus_sync()
-is not atomic context.
+On Wednesday 28 of August 2013 15:20:40 Chander Kashyap wrote:
+> On 19 August 2013 00:57, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > On 08/12/13 15:23, Chander Kashyap wrote:
+> >> ping
+> >> 
+> >> On 23 July 2013 15:17, Chander Kashyap<chander.kashyap@linaro.org>  
+wrote:
+> >>> ping.
+> >>> 
+> >>> On 14 June 2013 20:11, Chander Kashyap<chander.kashyap@linaro.org>
+> >>> 
+> >>> wrote:
+> >>>> Two cells were used to specify interrupts in mct node, while second
+> >>>> cell
+> >>>> always remains unused. Hence use only one cell.
+> >>>> Suggested by Tomasz Figa.
+> >>>> 
+> >>>> Signed-off-by: Chander Kashyap<chander.kashyap@linaro.org>
+> >>>> ---
+> >>>> 
+> >>>>   arch/arm/boot/dts/exynos4210.dtsi |   19 +++++++++----------
+> >>>>   arch/arm/boot/dts/exynos4212.dtsi |   19 +++++++++----------
+> >>>>   arch/arm/boot/dts/exynos4412.dtsi |   23 +++++++++++------------
+> >>>>   arch/arm/boot/dts/exynos5250.dtsi |   19 +++++++++----------
+> >>>>   4 files changed, 38 insertions(+), 42 deletions(-)
+> >>>> 
+[snip]
+> > 
+> > Should be updated with regarding Doc.
+> 
+> Will update the document.
 
-Thanks,
-Sekhar
+Apparently I missed your patch and did the same change for Exynos 4 SoCs in 
+my patch series[1] cleaning up Exynos 4 device tree files a bit.
+
+Since in my series it is a part of a more complex change, i.e. moving mct 
+node to exynos4x12.dtsi and update of MCT bindings documentation, would you 
+mind if we could keep with my patch doing this change for Exynos 4 and 
+yours taking care for Exynos 5?
+
+The documentation is already being updated in my series, so you could just 
+drop the changes done to exynos4*.dtsi files in next version.
+
+[1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/22207
+
+Best regards,
+Tomasz
