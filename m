@@ -1,33 +1,58 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 28 Aug 2013 15:11:08 +0200
-Subject: [Patch v2] pinctrl: Add s5pv210 support to pinctrl-exynos
-In-Reply-To: <CACRpkdYiB5OG-YPRozwEurPHECDzZjQUs2s_E8gCdeqDPyr+WA@mail.gmail.com>
-References: <1377608890-8528-1-git-send-email-m.krawczuk@partner.samsung.com>
- <CACRpkdYiB5OG-YPRozwEurPHECDzZjQUs2s_E8gCdeqDPyr+WA@mail.gmail.com>
-Message-ID: <521DF6EC.6030206@samsung.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 28 Aug 2013 21:10:47 +0800
+Subject: [PATCH v9 0/7] enable hi3xxx SoC
+Message-ID: <1377695454-29109-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2013 02:51 PM, Linus Walleij wrote:
-> On Tue, Aug 27, 2013 at 3:08 PM, Mateusz Krawczuk
-> <m.krawczuk@partner.samsung.com> wrote:
-> 
->> This patch implements pinctrl support and adds device tree bindings
->> for s5pv210.
->>
->> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
-> 
-> Oh this one does add bindings, sorry for previous comment.
-> 
-> I want an ACK from Kukjin or Sylwester for this since it's
-> something new for S5P.
+ v9:
+ 1. Clean code in DTS file according to Olof's comments.
+ 2. Since debug ll patch is going through Russell's tree, remove it
+ from this patch set.
 
-I'm happy to see this, it will allow us to clean up some common
-S5P/Exynos drivers by removing non-dt support from them, once
-S5PV210 is converted to DT.
+ v8:
+ 1. Drop to support CLK_GATE_SEPERATED_REG in common clock gate driver.
+ Support this feature in hi3xxx clock driver.
+ 2. Clean unnecessary device node in DTS.
+ 3. Define all clocks in hi3620-clk.dtsi. And all clock nodes are defined
+ in the clocks node.
+ 4. Fix the clock gate & clock mux for timer.
+ 5. Rename timer0~4 to dual_timer0~4 in DTS file. It's used to make
+ name clearer.
 
+ v7:
+ 1. Add hi3xxx_defconfig.
+ 2. Use reg property in clock node.
+ 3. Drop origin clock divider table.
+ 4. Reuse clock divider register helper.
+ 5. Reuse clock gate register helper.
+ 6. Append CLK_GATE_SEPERATED_REG flag in order to support Hisilicon
+    Hi3620 SoC.
+ 7. Rebase DEBUG_LL for Hi3xxx.
+ 8. Add more clock node in DTS file.
 
-Regards,
--- 
-Sylwester Nawrocki
-Samsung R&D Institute Poland
+ v6:
+ 1. Remove hisilicon string from properties in clock driver.
+ 2. Replace array by pointer in clock driver. Since only sctrl parent
+    node exists at this time.
+
+ v5:
+ 1. Remove HIWORD clk patches since they're merged into clk git tree.
+ 2. Set hisilicon,clk-reset property of clkgate node is optional.
+ 3. Update on commandline args in DTS file. Remove earlyprintk, mem, nfs.
+ 4. Move gpio-keys out of amba node in DTS file.
+
+ v4:
+ 1. Add clk gate with HIWORD mask for Rockchip.
+ 2. Update comments and code of HIWORD flags for mux/divider.
+ 3. Append a mux without HIWORD mask in Hisilicon 3620.
+ 4. Fix the pinmux setting in Hi4511.
+
+ v3:
+ 1. Use clk_register_mux_table().
+
+ v2:
+ 1. Reuse mux & divider driver. So append CLK_MUX_HIWORD_MASK &
+ CLK_DIVIDER_HIWORD_MASK for Hi3620 SoC.
+ 2. Fix system timer running too fast because wrong divider is choosen.
+ 3. Remove .init_irq in DT machine descriptor.
