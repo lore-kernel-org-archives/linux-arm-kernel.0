@@ -1,254 +1,69 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 28 Aug 2013 10:50:10 -0500
-Subject: [PATCH v4 3/5] clk: dt: binding for basic multiplexer clock
-In-Reply-To: <1377150793-27864-4-git-send-email-mturquette@linaro.org>
-References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
- <1377150793-27864-4-git-send-email-mturquette@linaro.org>
-Message-ID: <2A930389-012E-45C3-93EB-6B4A41DB2EF5@codeaurora.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 28 Aug 2013 17:55:53 +0200
+Subject: [PATCH v2 0/7] Add device tree support for Exynos4412 Trats2 cameras
+Message-ID: <1377705360-12197-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series is intended to add device tree support for both cameras
+on the Exynos4412 SoC Trats 2 board. It converts related drivers to use
+the v4l2-async API and expose the sensor's master clock supplied by the
+camera host interface through the common clock API.
 
-On Aug 22, 2013, at 12:53 AM, Mike Turquette wrote:
+This changeset is an updated version of my patch series [1] separating
+the sensor subdev driver from the exynos4-fimc-is module and adding
+asynchronous sensor registration support. There is also included next
+iteration of the patch adding DT bits to the rear facing S5C73M3 camera
+module driver [2].
 
-> Device Tree binding for the basic clock multiplexer, plus the setup
-> function to register the clock.  Based on the existing fixed-clock
-> binding.
-> 
-> Includes minor beautification of clk-provider.h where some whitespace is
-> added and of_fixed_factor_clock_setup is relocated to maintain a
-> consistent style.
-> 
-> Tero Kristo contributed helpful bug fixes to this patch.
-> 
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> Changes since v3:
-> * replaced underscores with dashes in DT property names
-> * bail from of clock setup function early if of_iomap fails
-> * removed unecessary explict cast
-> 
-> .../devicetree/bindings/clock/mux-clock.txt        | 79 ++++++++++++++++++++++
-> drivers/clk/clk-mux.c                              | 68 ++++++++++++++++++-
-> include/linux/clk-provider.h                       |  5 +-
-> 3 files changed, 150 insertions(+), 2 deletions(-)
-> create mode 100644 Documentation/devicetree/bindings/clock/mux-clock.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/mux-clock.txt b/Documentation/devicetree/bindings/clock/mux-clock.txt
-> new file mode 100644
-> index 0000000..21eb3b3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/mux-clock.txt
-> @@ -0,0 +1,79 @@
-> +Binding for simple mux clock.
-> +
-> +This binding uses the common clock binding[1].  It assumes a
-> +register-mapped multiplexer with multiple input clock signals or
-> +parents, one of which can be selected as output.  This clock does not
-> +gate or adjust the parent rate via a divider or multiplier.
-> +
-> +By default the "clocks" property lists the parents in the same order
-> +as they are programmed into the regster.  E.g:
-> +
-> +	clocks = <&foo_clock>, <&bar_clock>, <&baz_clock>;
-> +
-> +results in programming the register as follows:
-> +
-> +register value		selected parent clock
-> +0			foo_clock
-> +1			bar_clock
-> +2			baz_clock
-> +
-> +Some clock controller IPs do not allow a value of zero to be programmed
-> +into the register, instead indexing begins at 1.  The optional property
-> +"index-starts-at-one" modified the scheme as follows:
-> +
-> +register value		selected clock parent
-> +1			foo_clock
-> +2			bar_clock
-> +3			baz_clock
-> +
-> +Additionally an optional table of bit and parent pairs may be supplied
-> +like so:
-> +
-> +	table = <&foo_clock 0x0>, <&bar_clock, 0x2>, <&baz_clock, 0x4>;
-> +
+The S5K6A3 is a raw image sensor of the front facing camera connected
+to the SoC local ISP (FIMC-IS).
 
-I think this is going way too far for what should be in a device tree.  Why should this not just be encoded in tables in the code?
+This series depends on my patches adding clk_unregister() implementation
+[3].
 
-> +where the first value in the pair is the parent clock and the second
-> +value is the bitfield to be programmed into the register.
-> +
-> +The binding must provide the register to control the mux and the mask
-> +for the corresponding control bits.  Optionally the number of bits to
-> +shift that mask if necessary.  If the shift value is missing it is the
-> +same as supplying a zero shift.
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Required properties:
-> +- compatible : shall be "mux-clock".
-> +- #clock-cells : from common clock binding; shall be set to 0.
-> +- clocks : link phandles of parent clocks
-> +- reg : base address for register controlling adjustable mux
-> +- bit-mask : arbitrary bitmask for programming the adjustable mux
-> +
-> +Optional properties:
-> +- clock-output-names : From common clock binding.
-> +- table : array of integer pairs defining parents & bitfield values
-> +- bit-shift : number of bits to shift the bit-mask, defaults to
-> +  (ffs(mask) - 1) if not present
-> +- index-starts-at-one : valid input select programming starts at 1, not
-> +  zero
-> +- hiword-mask : lower half of the register programs the mux, upper half
-> +  of the register indicates bits that were updated in the lower half
-> +
-> +Examples:
-> +	clock: clock at 4a008100 {
-> +		compatible = "mux-clock";
-> +		#clock-cells = <0>;
-> +		clocks = <&clock_foo>, <&clock_bar>, <&clock_baz>;
-> +		reg = <0x4a008100 0x4>
-> +		mask = <0x3>;
-> +		index-starts-at-one;
-> +	};
-> +
-> +	clock: clock at 4a008100 {
-> +		#clock-cells = <0>;
-> +		compatible = "mux-clock";
-> +		clocks = <&clock_foo>, <&clock_bar>, <&clock_baz>;
-> +		reg = <0x4a008100 0x4>;
-> +		mask = <0x3>;
-> +		shift = <0>;
-> +		table = <&clock_foo 1>, <&clock_bar 2>, <&clock_baz 3>;
-> +	};
-> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-> index 0811633..9292253 100644
-> --- a/drivers/clk/clk-mux.c
-> +++ b/drivers/clk/clk-mux.c
-> @@ -1,7 +1,7 @@
-> /*
->  * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
->  * Copyright (C) 2011 Richard Zhao, Linaro <richard.zhao@linaro.org>
-> - * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
-> + * Copyright (C) 2011-2013 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
->  *
->  * This program is free software; you can redistribute it and/or modify
->  * it under the terms of the GNU General Public License version 2 as
-> @@ -16,6 +16,8 @@
-> #include <linux/slab.h>
-> #include <linux/io.h>
-> #include <linux/err.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> 
-> /*
->  * DOC: basic adjustable multiplexer clock that cannot gate
-> @@ -177,3 +179,67 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
-> 				      NULL, lock);
-> }
-> EXPORT_SYMBOL_GPL(clk_register_mux);
-> +
-> +#ifdef CONFIG_OF
-> +/**
-> + * of_mux_clk_setup() - Setup function for simple mux rate clock
-> + */
-> +void of_mux_clk_setup(struct device_node *node)
-> +{
-> +	struct clk *clk;
-> +	const char *clk_name = node->name;
-> +	void __iomem *reg;
-> +	int num_parents;
-> +	const char **parent_names;
-> +	int i;
-> +	u8 clk_mux_flags = 0;
-> +	u32 mask = 0;
-> +	u32 shift = 0;
-> +
-> +	of_property_read_string(node, "clock-output-names", &clk_name);
-> +
-> +	num_parents = of_clk_get_parent_count(node);
-> +	if (num_parents < 1) {
-> +		pr_err("%s: mux-clock %s must have parent(s)\n",
-> +				__func__, node->name);
-> +		return;
-> +	}
-> +
-> +	parent_names = kzalloc((sizeof(char*) * num_parents),
-> +			GFP_KERNEL);
-> +
-> +	for (i = 0; i < num_parents; i++)
-> +		parent_names[i] = of_clk_get_parent_name(node, i);
-> +
-> +	reg = of_iomap(node, 0);
-> +	if (!reg) {
-> +		pr_err("%s: no memory mapped for property reg\n", __func__);
-> +		return;
-> +	}
-> +
-> +	if (of_property_read_u32(node, "bit-mask", &mask)) {
-> +		pr_err("%s: missing bit-mask property for %s\n", __func__, node->name);
-> +		return;
-> +	}
-> +
-> +	if (of_property_read_u32(node, "bit-shift", &shift)) {
-> +		shift = __ffs(mask);
-> +		pr_debug("%s: bit-shift property defaults to 0x%x for %s\n",
-> +				__func__, shift, node->name);
-> +	}
-> +
-> +	if (of_property_read_bool(node, "index-starts-at-one"))
-> +		clk_mux_flags |= CLK_MUX_INDEX_ONE;
-> +
-> +	if (of_property_read_bool(node, "hiword-mask"))
-> +		clk_mux_flags |= CLK_MUX_HIWORD_MASK;
-> +
-> +	clk = clk_register_mux_table(NULL, clk_name, parent_names, num_parents,
-> +			0, reg, shift, mask, clk_mux_flags, NULL, NULL);
-> +
-> +	if (!IS_ERR(clk))
-> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +}
-> +EXPORT_SYMBOL_GPL(of_mux_clk_setup);
-> +CLK_OF_DECLARE(mux_clk, "mux-clock", of_mux_clk_setup);
-> +#endif
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 5497739..e019212 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -350,7 +350,7 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
-> 		void __iomem *reg, u8 shift, u32 mask,
-> 		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
-> 
-> -void of_fixed_factor_clk_setup(struct device_node *node);
-> +void of_mux_clk_setup(struct device_node *node);
-> 
-> /**
->  * struct clk_fixed_factor - fixed multiplier and divider clock
-> @@ -371,10 +371,13 @@ struct clk_fixed_factor {
-> };
-> 
-> extern struct clk_ops clk_fixed_factor_ops;
-> +
-> struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
-> 		const char *parent_name, unsigned long flags,
-> 		unsigned int mult, unsigned int div);
-> 
-> +void of_fixed_factor_clk_setup(struct device_node *node);
-> +
-> /***
->  * struct clk_composite - aggregate clock of mux, divider and gate clocks
->  *
-> -- 
-> 1.8.1.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Any feedback, especially on the "s5k6a3: Add DT binding documentation"
+patch where I've described some issue with the common video-interfaces
+binding is welcome.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+[1] http://www.spinics.net/lists/linux-media/msg66073.html
+[2] https://linuxtv.org/patch/19386/
+[3] https://lkml.org/lkml/2013/8/24/63
+
+Thanks.
+Sylwester
+
+Andrzej Hajda (1):
+  V4L: s5c73m3: Add device tree support
+
+Sylwester Nawrocki (6):
+  V4L: s5k6a3: Add DT binding documentation
+  V4L: Add driver for s5k6a3 image sensor
+  V4L: s5k6a3: Add support for asynchronous subdev registration
+  exynos4-is: Add clock provider for the external clocks
+  exynos4-is: Use external s5k6a3 sensor driver
+  exynos4-is: Add support for asynchronous sensor subddevs registration
+
+ .../devicetree/bindings/media/samsung-fimc.txt     |   21 +-
+ .../devicetree/bindings/media/samsung-s5c73m3.txt  |   95 ++++++
+ .../devicetree/bindings/media/samsung-s5k6a3.txt   |   31 ++
+ drivers/media/i2c/Kconfig                          |    8 +
+ drivers/media/i2c/Makefile                         |    1 +
+ drivers/media/i2c/s5c73m3/s5c73m3-core.c           |  206 +++++++++---
+ drivers/media/i2c/s5c73m3/s5c73m3-spi.c            |    6 +
+ drivers/media/i2c/s5c73m3/s5c73m3.h                |    4 +
+ drivers/media/i2c/s5k6a3.c                         |  340 ++++++++++++++++++++
+ drivers/media/platform/exynos4-is/fimc-is-regs.c   |    2 +-
+ drivers/media/platform/exynos4-is/fimc-is-sensor.c |  285 +---------------
+ drivers/media/platform/exynos4-is/fimc-is-sensor.h |   49 +--
+ drivers/media/platform/exynos4-is/fimc-is.c        |   97 +++---
+ drivers/media/platform/exynos4-is/fimc-is.h        |    4 +-
+ drivers/media/platform/exynos4-is/media-dev.c      |  335 +++++++++++++------
+ drivers/media/platform/exynos4-is/media-dev.h      |   31 +-
+ 16 files changed, 984 insertions(+), 531 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/samsung-s5c73m3.txt
+ create mode 100644 Documentation/devicetree/bindings/media/samsung-s5k6a3.txt
+ create mode 100644 drivers/media/i2c/s5k6a3.c
+
+--
+1.7.9.5
