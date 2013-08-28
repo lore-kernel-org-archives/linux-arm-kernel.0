@@ -1,36 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 28 Aug 2013 10:40:30 +0900
-Subject: [PATCH 2/2] ARM: shmobile: lager: Select DRM_RCAR_DU in defconfig
-In-Reply-To: <cover.1377652426.git.horms+renesas@verge.net.au>
-References: <cover.1377652426.git.horms+renesas@verge.net.au>
-Message-ID: <d5ba7161270d10df4878762e085889fb8501fcf9.1377652426.git.horms+renesas@verge.net.au>
+Date: Wed, 28 Aug 2013 10:40:54 +0900
+Subject: [GIT PULL] Third round of Renesas ARM-based SoC DT updates for v3.12
+Message-ID: <cover.1377652718.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Kevin, Hi Olof, Hi Arnd,
 
-A R-Car DU DRM device is registered for the Lager board, select the
-corresponding driver in its defconfig.
+please consider this third round of Renesas ARM based SoC DT updates for v3.12.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/lager_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+It is based on renesas-dt2-for-v3.12 ("Second round of ARM based SoC DT
+updates for v3.12") which you have previously pulled.
 
-diff --git a/arch/arm/configs/lager_defconfig b/arch/arm/configs/lager_defconfig
-index e777ef2..35bff5e 100644
---- a/arch/arm/configs/lager_defconfig
-+++ b/arch/arm/configs/lager_defconfig
-@@ -89,6 +89,8 @@ CONFIG_THERMAL=y
- CONFIG_RCAR_THERMAL=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_DRM=y
-+CONFIG_DRM_RCAR_DU=y
- # CONFIG_USB_SUPPORT is not set
- CONFIG_MMC=y
- CONFIG_MMC_SDHI=y
--- 
-1.8.3.2
+I apologise that this and other pull requests that I will send today
+are rather later in the cycle than I would like. This is primarily due
+to a combination of my summer vacation and wanting to let the patches
+sit in next for a while.
+
+The following changes since commit 8b3e32c1fe5dce55e28e76b20361841dc863ec17:
+
+  ARM: shmobile: r8a7740: Add TPU node to the device tree (2013-08-06 18:06:23 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v3.12
+
+for you to fetch changes up to ba6094d6e8f30a538e08e9a892f3e37debd84413:
+
+  ARM: shmobile: ape6evm-reference: add MMCIF and SDHI DT nodes (2013-08-22 11:37:53 +0900)
+
+----------------------------------------------------------------
+Third round of Renesas ARM-based SoC DT updates for v3.12
+
+* Add MMCIF and SDHI to reference DT nodes of ape6evm board
+
+----------------------------------------------------------------
+Guennadi Liakhovetski (1):
+      ARM: shmobile: ape6evm-reference: add MMCIF and SDHI DT nodes
+
+ arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts | 72 +++++++++++++++++++++++++
+ 1 file changed, 72 insertions(+)
