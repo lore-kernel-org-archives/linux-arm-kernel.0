@@ -1,54 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 28 Aug 2013 12:32:54 -0600
-Subject: [PATCH RFC v2 3/5] spmi: add generic SPMI controller binding
- documentation
-In-Reply-To: <20130828180025.GA808@joshc.qualcomm.com>
-References: <cover.1377202730.git.joshc@codeaurora.org>
- <e42576b69ef3d4e624fbfa2f32f6f79a931b55d6.1377202730.git.joshc@codeaurora.org>
- <5217DB0C.7000101@wwwdotorg.org> <20130827170120.GR4035@joshc.qualcomm.com>
- <521D2047.8030300@wwwdotorg.org> <20130828180025.GA808@joshc.qualcomm.com>
-Message-ID: <521E4256.4070805@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 28 Aug 2013 11:36:24 -0700
+Subject: [GIT PULL] ARM: TC2: CPU idle big.LITTLE driver
+In-Reply-To: <20130825090848.GA12256@e102568-lin.cambridge.arm.com>
+References: <20130812153422.GA6426@e102568-lin.cambridge.arm.com>
+ <20130825090848.GA12256@e102568-lin.cambridge.arm.com>
+Message-ID: <20130828183624.GH8607@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2013 12:00 PM, Josh Cartwright wrote:
-> On Tue, Aug 27, 2013 at 03:55:19PM -0600, Stephen Warren wrote:
->> On 08/27/2013 11:01 AM, Josh Cartwright wrote:
->> ...
->>> If we want to ensure for the generic bindings that we are fulling
->>> characterizing/describing the SPMI bus, then we'll additionally need to
->>> tackle an additional identified assumption:
->>>
->>>   4. One master per SPMI bus.  (The SPMI spec allows for up to 4
->>>      masters)
->>>
->>> On the Snapdragon 800 series, there exists only one software-controlled
->>> master, but it is conceivably possible to have a setup with two
->>> software-controlled masters on the same SPMI bus.
->>>
->>> This necessarily means that the description of the slaves and the
->>> masters will need to be decoupled; I'm imagining a generic binding
->>> supporting multiple masters would look something like this:
->>
->> Is there a need to represent the other masters in the DT? Sure they're
->> there in HW, but if there's no specific way for the
->> CPU-to-which-the-DT-applies to actually interact with those other
->> masters (except perhaps by experiencing some arbitration delays) then
->> presumably there's no need to represent the other masters in DT?
+On Sun, Aug 25, 2013 at 10:08:48AM +0100, Lorenzo Pieralisi wrote:
+> Hi Olof, Kevin,
 > 
-> My example is contrived, but there is nothing in the SPMI spec
-> preventing two masters from being controllable by the same
-> CPU-to-which-the-DT-applies, sharing the same underlying bus.
-
-That's true.
-
-> I would also expect this configuration to be uncommon, I'm checking with
-> some folks with more SPMI experience to make sure they agree.
+> On Mon, Aug 12, 2013 at 04:34:22PM +0100, Lorenzo Pieralisi wrote:
+> > Hi Olof, Kevin,
+> > 
+> > please pull this patch series that provides a CPU idle driver for the vexpress
+> > TC2 testchip, and it is a stepping stone towards an ARM unified CPU idle driver
+> > based on the MCPM framework.
+> > 
+> > Series is based against this pull request from Pawel which is a strict
+> > dependency and they must be merged in order:
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/190067.html
 > 
-> Interestingly, i2c as far as I can tell has also made the same
-> assumption.  There doesn't appear to be any way to express a
-> multi-master i2c setup where both masters are controlled by the same OS.
+> May I ask you please the status of this pull request ? It is to know if
+> it is ok as it is or I have to do something on my side, thanks.
 
-Yes, I think it's a fair assumption that we don't need to represent
-that; I immediately thought about the I2C counter-example after reading
-your first paragraph.
+This needed a rebase on top of the latest version of the mcpm backend branch,
+since it's based on an older version.
+
+I also don't see an ack from any of the cpuidle maintainers, if you want to
+take it through arm-soc you need to get them to ack it for that purpose. I see
+that you got an informal "It sounds good to me" in
+http://www.spinics.net/lists/arm-kernel/msg266442.html, but please be diligent
+in collecting these in the future.
+
+
+So, I've essentially applied the topmost 3 patches in a new branch that's based
+on our version of vexpress/mcpm, and merged that in.
+
+
+-Olof
