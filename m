@@ -1,71 +1,77 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 28 Aug 2013 12:45:41 +0100
-Subject: [PATCH 01/19] ARM: fix ARCH_IXP4xx usage of ARCH_SUPPORTS_BIG_ENDIAN
+Date: Wed, 28 Aug 2013 12:45:49 +0100
+Subject: [PATCH 09/19] mvebu: support running big-endian
 In-Reply-To: <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
  <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377690359-25397-2-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377690359-25397-10-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig for arch/arm/mach-ixp4xx has a local definition
-of ARCH_SUPPORTS_BIG_ENDIAN which could be used elsewhere.
-This means that if IXP4xx is selected and this symbol is
-selected eleswhere then an warning is produced.
-
-Clean the following error up by making the symbol be
-selected by the main ARCH_IXP4XX definition and have a
-common definition in arch/arm/mm/Kconfig
-
-warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
-warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
+Add indication we can run these cores in BE mode, and ensure that the
+secondary CPU is set to big-endian mode in the initialisation code as
+the initial code runs little-endian.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/Kconfig             |    1 +
- arch/arm/mach-ixp4xx/Kconfig |    4 ----
- arch/arm/mm/Kconfig          |    6 ++++++
- 3 files changed, 7 insertions(+), 4 deletions(-)
+ arch/arm/mach-mvebu/Kconfig        |    1 +
+ arch/arm/mach-mvebu/coherency_ll.S |    3 +++
+ arch/arm/mach-mvebu/headsmp.S      |    4 ++++
+ 3 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 43594d5..0628529 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -480,6 +480,7 @@ config ARCH_IXP4XX
- 	bool "IXP4xx-based"
- 	depends on MMU
- 	select ARCH_HAS_DMA_SET_COHERENT_MASK
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 9eb63d7..5e269d7 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -1,5 +1,6 @@
+ config ARCH_MVEBU
+ 	bool "Marvell SOCs with Device Tree support" if ARCH_MULTI_V7
 +	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ARCH_REQUIRE_GPIOLIB
  	select CLKSRC_MMIO
- 	select CPU_XSCALE
-diff --git a/arch/arm/mach-ixp4xx/Kconfig b/arch/arm/mach-ixp4xx/Kconfig
-index 30e1ebe..c342dc4 100644
---- a/arch/arm/mach-ixp4xx/Kconfig
-+++ b/arch/arm/mach-ixp4xx/Kconfig
-@@ -1,9 +1,5 @@
- if ARCH_IXP4XX
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+index 5476669..ee7598f 100644
+--- a/arch/arm/mach-mvebu/coherency_ll.S
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -20,6 +20,8 @@
+ #define ARMADA_XP_CFB_CTL_REG_OFFSET 0x0
+ #define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
  
--config ARCH_SUPPORTS_BIG_ENDIAN
--	bool
--	default y
--
- menu "Intel IXP4xx Implementation Options"
- 
- comment "IXP4xx Platforms"
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index cd2c88e..1f8fed9 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -952,3 +952,9 @@ config ARCH_HAS_BARRIERS
- 	help
- 	  This option allows the use of custom mandatory barriers
- 	  included via the mach/barriers.h file.
++#include <asm/assembler.h>
 +
-+config ARCH_SUPPORTS_BIG_ENDIAN
-+	bool
-+	help
-+	  This option specifies the architecture can support big endian
-+	  operation.
+ 	.text
+ /*
+  * r0: Coherency fabric base register address
+@@ -29,6 +31,7 @@ ENTRY(ll_set_cpu_coherent)
+ 	/* Create bit by cpu index */
+ 	mov	r3, #(1 << 24)
+ 	lsl	r1, r3, r1
++ARM_BE8(rev	r1, r1)
+ 
+ 	/* Add CPU to SMP group - Atomic */
+ 	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
+diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
+index 8a1b0c9..3109df0 100644
+--- a/arch/arm/mach-mvebu/headsmp.S
++++ b/arch/arm/mach-mvebu/headsmp.S
+@@ -21,6 +21,8 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ 
++#include <asm/assembler.h>
++
+ /*
+  * Armada XP specific entry point for secondary CPUs.
+  * We add the CPU to the coherency fabric and then jump to secondary
+@@ -32,6 +34,8 @@ ENTRY(armada_xp_secondary_startup)
+ 	ldr	r1, [r0]
+ 	ldr	r0, [r0, r1]
+ 
++ ARM_BE8(setend	be )			@ go BE8 if booted LE
++
+ 	/* Read CPU id */
+ 	mrc     p15, 0, r1, c0, c0, 5
+ 	and     r1, r1, #0xF
 -- 
 1.7.10.4
