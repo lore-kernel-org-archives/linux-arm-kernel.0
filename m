@@ -1,47 +1,65 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 28 Aug 2013 11:59:13 +0530
-Subject: [PATCH 0/2] OMAP4+: Get rid of internal SRAM handling
-In-Reply-To: <521CA8DF.9040400@ti.com>
-References: <1377598305-15539-1-git-send-email-rnayak@ti.com>
- <521CA8DF.9040400@ti.com>
-Message-ID: <521D98B9.4070902@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 28 Aug 2013 08:37:30 +0200
+Subject: [PATCH 11/12] cpuidle: mvebu: Add initial cpu idle support for
+ Armada 370/XP SoC
+In-Reply-To: <87d2oz7qym.fsf@linaro.org>
+References: <1377240797-4047-1-git-send-email-gregory.clement@free-electrons.com>
+ <1377240797-4047-12-git-send-email-gregory.clement@free-electrons.com>
+ <87d2oz7qym.fsf@linaro.org>
+Message-ID: <521D9AAA.1090408@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 August 2013 06:55 PM, Santosh Shilimkar wrote:
-> + Paul,
-> 
-> On Tuesday 27 August 2013 06:11 AM, Rajendra Nayak wrote:
->> Make all OMAP DT only platforms (am33xx, am43xx, omap4 and omap5)
->> use drivers/misc/sram.c driver instead of the omap internal
->> implementation for SRAM handling.
->>
->> Rajendra Nayak (2):
->>   ARM: AM335x: Get rid of unused sram init function
->>   ARM: OMAP4+: Move SRAM data to DT
->>
->>  arch/arm/boot/dts/am33xx.dtsi        |    5 +++++
->>  arch/arm/boot/dts/am4372.dtsi        |    5 +++++
->>  arch/arm/boot/dts/omap4.dtsi         |    5 +++++
->>  arch/arm/boot/dts/omap5.dtsi         |    5 +++++
->>  arch/arm/configs/omap2plus_defconfig |    1 +
->>  arch/arm/mach-omap2/sram.c           |   39 +---------------------------------
->>  arch/arm/mach-omap2/sram.h           |    1 -
->>  7 files changed, 22 insertions(+), 39 deletions(-)
->>
-> Really nice to see the SRAM code getting moved now. Thanks
-> a lot Rajendra.
-> 
-> - The sram_init() seems to be the post core init call.
-> Hope this is not a problem for SDRC init which needs to have
-> SRAM ready to update the DDR parameters.
+Hi Kevin,
 
-It should be fine given its needed only during core dvfs. Besides
-drivers/misc/sram.c is useful only on DT platforms, so for now OMAP2/3
-continue to use the omap specific sram handling.
+On 27/08/2013 05:28, Kevin Hilman wrote:
+> Hi Gregory,
+> 
+> Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
+> 
+>> Add wfi/cpu idle/cpu deep idle power states support for Armada XP SoC.
+>>
+>> All the latencies and the power consumption values used at the
+>> "armada_370_xp_idle_driver" structure are preliminary and will be
+>> modified in the future after running some measurements and analysis.
+>>
+>> Based on the work of Nadav Haklai.
+>>
+>> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> [...]
+> 
+>> +int pm_support = WFI;
+>> +static int __init pm_enable_setup(char *str)
+>> +{
+>> +	if (!strncmp(str, "wfi", 3))
+>> +		pm_support = WFI;
+>> +	else if (!strncmp(str, "idle", 4))
+>> +		pm_support = MV_CPU_IDLE;
+>> +	else if (!strncmp(str, "deepidle", 6))
+>> +		pm_support = MV_CPU_DEEP_IDLE;
+>> +	else if (!strncmp(str, "off", 3))
+>> +		pm_support = DISABLED;
+>> +
+>> +	return 1;
+>> +}
+>> +__setup("pm_level=", pm_enable_setup);
+> 
+> Why is this new (but undocumented) kernel commandline needed when there
+> is already a way to configure the deepest C state from userspace?
+> (c.f. the 'disable' file under /sys/devices/system/cpu/cpuX/cpuidle/stateY)
 
-> 
-> Regards,
-> Santosh
-> 
-> 
+You're right I should remove this. I wanted look see if we really need it the first
+time I started to work on this series and then I forgot!
+
+Thanks,
+
+Gregory
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
