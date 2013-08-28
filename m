@@ -1,56 +1,65 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 28 Aug 2013 10:06:50 +1000
-Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
-In-Reply-To: <521CD111.9030905@wwwdotorg.org>
-References: <20130827182935.ff4005b60cc1ce80d32d5e46@canb.auug.org.au>
- <521CD111.9030905@wwwdotorg.org>
-Message-ID: <20130828100650.717c22af5bea88e89371393d@canb.auug.org.au>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Wed, 28 Aug 2013 08:13:56 +0800
+Subject: [PATCH 3/5] drivers: thermal: make usage of
+ CONFIG_THERMAL_HWMON optional
+In-Reply-To: <8131326.8QGX41MW6c@vostro.rjw.lan>
+References: <1377295396-17289-1-git-send-email-eduardo.valentin@ti.com>
+ <4832825.8PCMQe7StP@vostro.rjw.lan> <521CEF61.6040504@ti.com>
+ <8131326.8QGX41MW6c@vostro.rjw.lan>
+Message-ID: <1377648836.2335.252.camel@rzhang-lenovo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Tue, 27 Aug 2013 10:17:21 -0600 Stephen Warren <swarren@wwwdotorg.org> wrote:
->
-> On 08/27/2013 02:29 AM, Stephen Rothwell wrote:
+On ?, 2013-08-27 at 23:17 +0200, Rafael J. Wysocki wrote:
+> On Tuesday, August 27, 2013 02:26:41 PM Eduardo Valentin wrote:
+> > On 23-08-2013 19:08, Rafael J. Wysocki wrote:
+> > > On Friday, August 23, 2013 06:03:14 PM Eduardo Valentin wrote:
+> > >> When registering a new thermal_device, the thermal framework
+> > >> will always add a hwmon sysfs interface.
+> > >>
+> > >> This patch adds a flag to make this behavior optional. Now
+> > >> when registering a new thermal device, the caller needs
+> > >> to say if the hwmon interface is required.
+> > >>
+> > >> In order to keep same behavior as of today, all current
+> > >> calls will by default create the hwmon interface.
+> > > 
+> > > Well, instead of modifying all of the callers this way, why don't
+> > > you add new versions taking the additional argument as, for example,
+> > > 
+> > > thermal_zone_device_register_full()
+> > > 
+> > > and redefine the old ones as static inline wrappers, for example
+> > > 
+> > > static inline struct thermal_zone_device *thermal_zone_device_register(args)
+> > > {
+> > > 	return thermal_zone_device_register_full(args, true);
+> > > }
+> > > 
+> > > ?
 > > 
-> > Today's linux-next merge of the arm-soc tree got a conflict in 
-> > arch/arm/boot/dts/tegra20-trimslice.dts between commit
-> > 30ca2226bea6 ("ARM: tegra: always enable USB VBUS regulators") from
-> > Linus' tree and commit 23f95ef2d951 ("ARM: tegra: use TEGRA_GPIO()
-> > in a couple more places") from the arm-soc tree.
+> > Yeah, that is another way to go and I thought of doing it like that. I
+> > just could not come out with a good API naming:
 > > 
-> > I fixed it up (see below) and can carry the fix as necessary (no
-> > action is required).
+> > thermal_zone_device_register_full(all args)
+> > 
+> > thermal_zone_device_register(args) /* on hwmon == true */
+> > thermal_zone_device_register_no_hwmon(args) /* on hwmon == false */
+> > 
+> > Would this sound reasonable naming?
 > 
-> > diff --cc arch/arm/boot/dts/tegra20-trimslice.dts
+> Yeah, sounds good to me.
 > 
-> > usb at c5000000 { status = "okay"; -		nvidia,vbus-gpio = <&gpio
-> > TEGRA_GPIO(V, 2) GPIO_ACTIVE_HIGH>; };
+Well, actually, Tianyu is working on a patch set to move all the
+thermal_zone_device_register() parameters to struct thermal_zone_params.
+
+But with that patch set done, what you need to do next is just to
+introduce a new field in struct thermal_zone_params and make sure 0
+means registering hwmon sysfs I/F.
+
+thanks,
+rui
+
+> Thanks,
+> Rafael
 > 
-> That chunk isn't part of either of the two commits above.
-
-Yeah.
-
-> It is however part of commit 103566e "arm: tegra: Remove obsolete
-> nvidia,vbus-gpio properties" from the USB tree, so it's fine that the
-> change is part of linux-next.
->
-> I'm just not sure if it's expected for that chunk to show up in this
-> merge resolution email? If it's normal, then there's no problem; the
-> issue would be with me not having too much git merge conflict
-> resolution experience:-)
-
-It did not actually cause a conflict that I had to fix manually, but is
-part of the overall merge changes.
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130828/ca816084/attachment.sig>
