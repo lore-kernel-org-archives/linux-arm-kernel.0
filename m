@@ -1,44 +1,41 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 28 Aug 2013 16:03:23 +0900
-Subject: [PATCH 10/14] ARM: shmobile: Rename to emev2_init_early(),
- use smp_set_ops()
-In-Reply-To: <10195347.M6JWNyZrex@avalon>
-References: <20130809094748.6530.16511.sendpatchset@w520>
- <20130809094936.6530.31840.sendpatchset@w520>
- <10195347.M6JWNyZrex@avalon>
-Message-ID: <CANqRtoQSEdam-_VYuo2ECHk4f9JzJ69xdc==U+JZF-7AOcQJQA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 Aug 2013 09:06:27 +0200
+Subject: [PATCH 09/18] ASoC: Samsung: Do not queue cyclic buffers multiple
+ times
+In-Reply-To: <1376243970-6489-10-git-send-email-tomasz.figa@gmail.com>
+References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
+ <1376243970-6489-10-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <CACRpkdZd+LJeZdSjsD6OCLOnZ0VrDg0aa-e163NXsw6ajWf7rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Sun, Aug 11, 2013 at 7:59 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 
-On Fri, Aug 9, 2013 at 7:41 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Magnus,
+> The legacy S3C-DMA API required every period of a cyclic buffer to be
+> queued separately. After conversion of Samsung ASoC to Samsung DMA
+> wrappers somebody made an assumption that the same is needed for DMA
+> engine API, which is not true.
 >
-> Thank you for the patch.
+> In effect, Samsung ASoC DMA code was queuing the whole cyclic buffer
+> multiple times with a shift of one period per iteration, leading to:
+>   a) severe memory waste - up to 13x times more DMA transfer descriptors
+>      are allocated than needed,
+>   b) possible memory corruption, because further cyclic buffers were out
+>      of the original buffers, due to the offset.
 >
-> On Friday 09 August 2013 18:49:36 Magnus Damm wrote:
->> From: Magnus Damm <damm@opensource.se>
->>
->> Rename emev2_init_delay() into emev2_init_early()
->> to make the function name show that more than just
->> delay setup will happen.
->>
->> Also, instead of specifying the smp ops in DT_MACHINE
->> convert the EMEV2 SoC code to install the smp ops
->> from emev2_init_early().
+> This patch fixes this problem by making the legacy S3C-DMA API use the
+> same semantics as DMA engine (the whole cyclic buffer is enqueued at
+> once) and modifying users of Samsung DMA wrappers in cyclic mode to
+> behave appropriately.
 >
-> Could you please explain in the commit message why this is needed ? Same
-> comment for the other patches in this series.
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-I personally think it is neat to use as few callbacks as possible in
-the DT_MACHINE. Hooking in SMP ops in ->init_early() means that the
-boards now are unaware if SMP is used or not - and it makes sense to
-me to write board code that is independent of SMP.
+If patch 1 thru 9 are uncontroversial now, maybe Vinod can apply
+these for v3.12 so we can get less noise and risk of collissions
+in the next merge window?
 
-Anyway, I suspect that Olof prefers to use smp_ops() instead, so I
-think these patches just should be dropped.
+Just an idea.
 
-Cheers,
-/ magnus
+Yours,
+Linus Walleij
