@@ -1,41 +1,50 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 29 Aug 2013 08:10:13 +1000
-Subject: [PATCH v4 09/31] powerpc/fsl-pci: improve clock API use
-In-Reply-To: <20130828155944.GA30987@book.gsilab.sittig.org>
-References: <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1375821851-31609-1-git-send-email-gsi@denx.de>
- <1375821851-31609-10-git-send-email-gsi@denx.de>
- <20130828120827.GB26379@book.gsilab.sittig.org>
- <20130828155944.GA30987@book.gsilab.sittig.org>
-Message-ID: <1377727813.3819.156.camel@pasglop>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Wed, 28 Aug 2013 15:16:10 -0700
+Subject: [PATCH v5 0/3] ARM: bcm281xx: GPIO driver
+Message-ID: <1377728173-30711-1-git-send-email-markus.mayer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-08-28 at 17:59 +0200, Gerhard Sittig wrote:
-> On Wed, Aug 28, 2013 at 14:08 +0200, Gerhard Sittig wrote:
-> > 
-> > [ re-created the Cc: list, this is about the PCI clock exclusively ]
-> 
-> I just noticed by coincidence that the message which I received
-> back from the linuxppc-dev ML appeared to have dropped Benjamin
-> Herrenschmidt and Kumar Gala from the Cc: list -- while they do
-> appear in the header of the message that I have sent and I can't
-> see what might have caused the loss of information. :-O
+This patch series adds the GPIO driver, and its device tree bindings,
+for the Broadcom bcm281xx family of chips.
 
-Don't bother with me. I haven't had the bandwidth to look at that
-at all. I'll leave Anatolij the responsibility here :-)
+Changes since v4:
 
-Cheers,
-Ben.
+- Added "brcm,bcm11351-gpio" to compatible value in device tree binding
+- Added references to other device tree documentation
+- Explicitly mention 1:1 mapping between GPIO banks and IRQs.
+- Select driver in Kconfig, but don't depend on ARCH_BCM & don't default y
+- Changed hex numbers to lower case
+- Removed irq_base/irq_alloc_descs()/irq_free_descs()
+- Added kona_gpio to struct bcm_kona_gpio_bank in lieu of reg_base, so
+  interrupt handler can access irq_domain
+- Removed bcm_kona_count_irq_resources() and switched to using
+  of_irq_count()
+- Switched interrupt handler to use irq_find_mapping() instead of
+  gpio_to_irq()
+- Print no error message if devm_kzalloc() fails
+- Don't check return value of platform_get_resource()
+- Check for maximum bank number
+- Use devm_ioremap_resource() instead of devm_request_and_ioremap()
+- Use bit operations rather than spelling out bit shifts
+- Added a loop to interrupt handler, so it'll handle IRQs that happened
+  during IRQ processing
+- Some formatting clean-up
 
-> Do you want me to re-send the message for the benefit of
-> potential followups, or is it OK that you receive the message via
-> the list but potentially without the Cc: attribute?
-> 
-> The message was mostly "for your information" and contained a
-> status update, while no action is required or problems need to
-> get resolved.
-> 
-> 
-> virtually yours
-> Gerhard Sittig
+Markus Mayer (3):
+  ARM: bcm281xx: Add GPIO driver
+  ARM: bcm281xx: Enable GPIO driver
+  ARM: bcm281xx: Add device node for the GPIO controller
+
+ .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   52 ++
+ arch/arm/boot/dts/bcm11351.dtsi                    |   16 +
+ arch/arm/mach-bcm/Kconfig                          |    2 +-
+ drivers/gpio/Kconfig                               |    5 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-bcm-kona.c                       |  631 ++++++++++++++++++++
+ 6 files changed, 706 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
+ create mode 100644 drivers/gpio/gpio-bcm-kona.c
+
+-- 
+1.7.9.5
