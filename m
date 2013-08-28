@@ -1,49 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Aug 2013 15:22:40 +0200
-Subject: [RFC PATCH 1/3] pinctrl: add new generic pinconf config for
- deglitch filter
-In-Reply-To: <521D1B19.6080204@wwwdotorg.org>
-References: <1377379926-11163-1-git-send-email-b.brezillon@overkiz.com>
- <1377380109-11247-1-git-send-email-b.brezillon@overkiz.com>
- <521B875E.1010605@wwwdotorg.org> <521B89D1.6010902@overkiz.com>
- <521C2347.4080702@wwwdotorg.org> <521C4451.1060908@overkiz.com>
- <521C587E.6050706@atmel.com> <521D1B19.6080204@wwwdotorg.org>
-Message-ID: <CACRpkda+92ZAWs1umtXeemLQu+zzi6iak=Nwb27+SO6oD9TOzg@mail.gmail.com>
+From: alonid@stratoscale.com (Dan Aloni)
+Date: Wed, 28 Aug 2013 16:24:53 +0300
+Subject: [PATCH repost-for-3.12] Move the EM_ARM and EM_AARCH64 definitions
+ to uapi/linux/elf-em.h
+In-Reply-To: <1367742253-22294-1-git-send-email-alonid@stratoscale.com>
+References: <20130502132756.GD20730@arm.com>
+ <1367742253-22294-1-git-send-email-alonid@stratoscale.com>
+Message-ID: <20130828132451.GA9237@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 11:33 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/27/2013 01:42 AM, Nicolas Ferre wrote:
+Signed-off-by: Dan Aloni <alonid@stratoscale.com>
+---
+ arch/arm/include/asm/elf.h   | 2 --
+ arch/arm64/include/asm/elf.h | 3 ---
+ include/uapi/linux/elf-em.h  | 2 ++
+ 3 files changed, 2 insertions(+), 5 deletions(-)
 
->> The question is: how much this "generic" pinconf is... well... generic!
->
-> This is why I don't really like the concept of generic pinconf; it ends
-> up being more: whoever defines something first imposes their SoCs'
-> viewpoint on that feature/property, and then everything else is declared
-> non-generic.
-
-I do not see it that way. For pinconf what we're dealing with is a very
-small community of electrical engineers that produce the cell libraries
-for the pads of these ASICs, and connect some of the control lines to
-software-controlled registers and sometimes hard-code their
-characteristics. Or a mix.
-
-They are all learning from each other and reproducing the design
-patterns of other engineers, much in the same way as software
-engineers do. That is why everyone is implementing some things
-like pull-up/pull-down/drive strength/schmitt-trigger etc.
-
-We already have 7 drivers using GENERIC_PINCONF without
-any ontological conflicts like this so even if the rest of the world
-end up not using it we have already saved a few thousand lines
-of code by not reimplementing this (including DT bindings and
-parsing code) over and over again for each.
-
-And given that pinctrl-single is one of these, I do hope and think
-that the ACPI people are taking notice and in their case, since
-standardized ACPI tables must describe all systems out there,
-a top-down ten commandments type of pin config is necessary
-for their specs. (My interpretation though.)
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index 56211f2..f4b46d3 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -19,8 +19,6 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+ 
+ typedef struct user_fp elf_fpregset_t;
+ 
+-#define EM_ARM	40
+-
+ #define EF_ARM_EABI_MASK	0xff000000
+ #define EF_ARM_EABI_UNKNOWN	0x00000000
+ #define EF_ARM_EABI_VER1	0x01000000
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index fe32c0e..e7fa87f 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -33,8 +33,6 @@ typedef unsigned long elf_greg_t;
+ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+ typedef struct user_fpsimd_state elf_fpregset_t;
+ 
+-#define EM_AARCH64		183
+-
+ /*
+  * AArch64 static relocation types.
+  */
+@@ -151,7 +149,6 @@ extern unsigned long arch_randomize_brk(struct mm_struct *mm);
+ #define arch_randomize_brk arch_randomize_brk
+ 
+ #ifdef CONFIG_COMPAT
+-#define EM_ARM				40
+ #define COMPAT_ELF_PLATFORM		("v8l")
+ 
+ #define COMPAT_ELF_ET_DYN_BASE		(randomize_et_dyn(2 * TASK_SIZE_32 / 3))
+diff --git a/include/uapi/linux/elf-em.h b/include/uapi/linux/elf-em.h
+index 8e2b7ba..59c17a2 100644
+--- a/include/uapi/linux/elf-em.h
++++ b/include/uapi/linux/elf-em.h
+@@ -22,6 +22,7 @@
+ #define EM_PPC		20	/* PowerPC */
+ #define EM_PPC64	21	 /* PowerPC64 */
+ #define EM_SPU		23	/* Cell BE SPU */
++#define EM_ARM		40	/* ARM 32 bit */
+ #define EM_SH		42	/* SuperH */
+ #define EM_SPARCV9	43	/* SPARC v9 64-bit */
+ #define EM_IA_64	50	/* HP/Intel IA-64 */
+@@ -34,6 +35,7 @@
+ #define EM_MN10300	89	/* Panasonic/MEI MN10300, AM33 */
+ #define EM_BLACKFIN     106     /* ADI Blackfin Processor */
+ #define EM_TI_C6000	140	/* TI C6X DSPs */
++#define EM_AARCH64	183	/* ARM 64 bit */
+ #define EM_FRV		0x5441	/* Fujitsu FR-V */
+ #define EM_AVR32	0x18ad	/* Atmel AVR32 */
+ 
+-- 
+1.8.1.4
