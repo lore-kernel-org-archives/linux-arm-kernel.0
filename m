@@ -1,43 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 28 Aug 2013 13:20:03 -0500
-Subject: [PATCH v2] ARM: xen: only set pm function ptrs for Xen guests
-Message-ID: <1377714003-22096-1-git-send-email-robherring2@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 28 Aug 2013 11:24:17 -0700
+Subject: [PATCH] ARM: shmobile: lager: Do not use register_type field of
+ struct sh_eth_plat_data
+In-Reply-To: <1377156998-15421-1-git-send-email-horms+renesas@verge.net.au>
+References: <1377156998-15421-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130828182417.GF8607@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Thu, Aug 22, 2013 at 04:36:38PM +0900, Simon Horman wrote:
+> As of 8d3214c ("sh_eth: remove 'register_type' field from 'struct
+> sh_eth_plat_data'") is is no longer necessary or correct to use the
+> 'register_type' field from 'struct sh_eth_plat_data' and doing so results
+> in a build error.
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> ---
+> 
+> Olof,
+> 
+> as discussed, please apply this to for-next and merge it upstream
+> after the patch mentioned above lands upstream via net-next.
+> ---
 
-xen_pm_init was unconditionally setting pm_power_off and arm_pm_restart
-function pointers. This breaks multi-platform kernels. Make this
-conditional on running as a Xen guest and make it a late_initcall to
-ensure it is setup after platform code for Dom0.
+Thanks, applied. Please help me remember to send this upstream if I forget. :)
 
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/xen/enlighten.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 8a6295c..13a7d1f 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -273,12 +273,15 @@ core_initcall(xen_guest_init);
- 
- static int __init xen_pm_init(void)
- {
-+	if (!of_find_compatible_node(NULL, NULL, "xen,xen"))
-+		return -ENODEV;
-+
- 	pm_power_off = xen_power_off;
- 	arm_pm_restart = xen_restart;
- 
- 	return 0;
- }
--subsys_initcall(xen_pm_init);
-+late_initcall(xen_pm_init);
- 
- static irqreturn_t xen_arm_callback(int irq, void *arg)
- {
--- 
-1.8.1.2
+-Olof
