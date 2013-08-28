@@ -1,89 +1,49 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Wed, 28 Aug 2013 09:15:50 -0400
-Subject: [PATCH 3/5] drivers: thermal: make usage of CONFIG_THERMAL_HWMON
- optional
-In-Reply-To: <1377648836.2335.252.camel@rzhang-lenovo>
-References: <1377295396-17289-1-git-send-email-eduardo.valentin@ti.com>
- <4832825.8PCMQe7StP@vostro.rjw.lan> <521CEF61.6040504@ti.com>
- <8131326.8QGX41MW6c@vostro.rjw.lan> <1377648836.2335.252.camel@rzhang-lenovo>
-Message-ID: <521DF806.4030900@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 Aug 2013 15:22:40 +0200
+Subject: [RFC PATCH 1/3] pinctrl: add new generic pinconf config for
+ deglitch filter
+In-Reply-To: <521D1B19.6080204@wwwdotorg.org>
+References: <1377379926-11163-1-git-send-email-b.brezillon@overkiz.com>
+ <1377380109-11247-1-git-send-email-b.brezillon@overkiz.com>
+ <521B875E.1010605@wwwdotorg.org> <521B89D1.6010902@overkiz.com>
+ <521C2347.4080702@wwwdotorg.org> <521C4451.1060908@overkiz.com>
+ <521C587E.6050706@atmel.com> <521D1B19.6080204@wwwdotorg.org>
+Message-ID: <CACRpkda+92ZAWs1umtXeemLQu+zzi6iak=Nwb27+SO6oD9TOzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27-08-2013 20:13, Zhang Rui wrote:
-> On ?, 2013-08-27 at 23:17 +0200, Rafael J. Wysocki wrote:
->> On Tuesday, August 27, 2013 02:26:41 PM Eduardo Valentin wrote:
->>> On 23-08-2013 19:08, Rafael J. Wysocki wrote:
->>>> On Friday, August 23, 2013 06:03:14 PM Eduardo Valentin wrote:
->>>>> When registering a new thermal_device, the thermal framework
->>>>> will always add a hwmon sysfs interface.
->>>>>
->>>>> This patch adds a flag to make this behavior optional. Now
->>>>> when registering a new thermal device, the caller needs
->>>>> to say if the hwmon interface is required.
->>>>>
->>>>> In order to keep same behavior as of today, all current
->>>>> calls will by default create the hwmon interface.
->>>>
->>>> Well, instead of modifying all of the callers this way, why don't
->>>> you add new versions taking the additional argument as, for example,
->>>>
->>>> thermal_zone_device_register_full()
->>>>
->>>> and redefine the old ones as static inline wrappers, for example
->>>>
->>>> static inline struct thermal_zone_device *thermal_zone_device_register(args)
->>>> {
->>>> 	return thermal_zone_device_register_full(args, true);
->>>> }
->>>>
->>>> ?
->>>
->>> Yeah, that is another way to go and I thought of doing it like that. I
->>> just could not come out with a good API naming:
->>>
->>> thermal_zone_device_register_full(all args)
->>>
->>> thermal_zone_device_register(args) /* on hwmon == true */
->>> thermal_zone_device_register_no_hwmon(args) /* on hwmon == false */
->>>
->>> Would this sound reasonable naming?
->>
->> Yeah, sounds good to me.
->>
-> Well, actually, Tianyu is working on a patch set to move all the
-> thermal_zone_device_register() parameters to struct thermal_zone_params.
-> 
-> But with that patch set done, what you need to do next is just to
-> introduce a new field in struct thermal_zone_params and make sure 0
-> means registering hwmon sysfs I/F.
+On Tue, Aug 27, 2013 at 11:33 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/27/2013 01:42 AM, Nicolas Ferre wrote:
 
-Rui,
+>> The question is: how much this "generic" pinconf is... well... generic!
+>
+> This is why I don't really like the concept of generic pinconf; it ends
+> up being more: whoever defines something first imposes their SoCs'
+> viewpoint on that feature/property, and then everything else is declared
+> non-generic.
 
-Do you have a pointer to his patch?
+I do not see it that way. For pinconf what we're dealing with is a very
+small community of electrical engineers that produce the cell libraries
+for the pads of these ASICs, and connect some of the control lines to
+software-controlled registers and sometimes hard-code their
+characteristics. Or a mix.
 
-> 
-> thanks,
-> rui
-> 
->> Thanks,
->> Rafael
->>
-> 
-> 
-> 
-> 
+They are all learning from each other and reproducing the design
+patterns of other engineers, much in the same way as software
+engineers do. That is why everyone is implementing some things
+like pull-up/pull-down/drive strength/schmitt-trigger etc.
 
+We already have 7 drivers using GENERIC_PINCONF without
+any ontological conflicts like this so even if the rest of the world
+end up not using it we have already saved a few thousand lines
+of code by not reimplementing this (including DT bindings and
+parsing code) over and over again for each.
 
--- 
-You have got to be excited about what you are doing. (L. Lamport)
+And given that pinctrl-single is one of these, I do hope and think
+that the ACPI people are taking notice and in their case, since
+standardized ACPI tables must describe all systems out there,
+a top-down ten commandments type of pin config is necessary
+for their specs. (My interpretation though.)
 
-Eduardo Valentin
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 295 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130828/6397da74/attachment.sig>
+Yours,
+Linus Walleij
