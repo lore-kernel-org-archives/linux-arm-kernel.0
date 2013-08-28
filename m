@@ -1,65 +1,47 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 28 Aug 2013 08:28:25 +0200
-Subject: [PATCH RFC v2 07/16] ARM: mvebu: remove custom .init_time hook
-In-Reply-To: <1377638890-371-8-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1377638890-371-8-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <521D9889.7090109@free-electrons.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 28 Aug 2013 11:59:13 +0530
+Subject: [PATCH 0/2] OMAP4+: Get rid of internal SRAM handling
+In-Reply-To: <521CA8DF.9040400@ti.com>
+References: <1377598305-15539-1-git-send-email-rnayak@ti.com>
+ <521CA8DF.9040400@ti.com>
+Message-ID: <521D98B9.4070902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
-On 27/08/2013 23:28, Sebastian Hesselbarth wrote:
-> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
-> remove custom .init_time hooks.
+On Tuesday 27 August 2013 06:55 PM, Santosh Shilimkar wrote:
+> + Paul,
+> 
+> On Tuesday 27 August 2013 06:11 AM, Rajendra Nayak wrote:
+>> Make all OMAP DT only platforms (am33xx, am43xx, omap4 and omap5)
+>> use drivers/misc/sram.c driver instead of the omap internal
+>> implementation for SRAM handling.
+>>
+>> Rajendra Nayak (2):
+>>   ARM: AM335x: Get rid of unused sram init function
+>>   ARM: OMAP4+: Move SRAM data to DT
+>>
+>>  arch/arm/boot/dts/am33xx.dtsi        |    5 +++++
+>>  arch/arm/boot/dts/am4372.dtsi        |    5 +++++
+>>  arch/arm/boot/dts/omap4.dtsi         |    5 +++++
+>>  arch/arm/boot/dts/omap5.dtsi         |    5 +++++
+>>  arch/arm/configs/omap2plus_defconfig |    1 +
+>>  arch/arm/mach-omap2/sram.c           |   39 +---------------------------------
+>>  arch/arm/mach-omap2/sram.h           |    1 -
+>>  7 files changed, 22 insertions(+), 39 deletions(-)
+>>
+> Really nice to see the SRAM code getting moved now. Thanks
+> a lot Rajendra.
+> 
+> - The sram_init() seems to be the post core init call.
+> Hope this is not a problem for SDRC init which needs to have
+> SRAM ready to update the DDR parameters.
 
-You should update the commit log, the .init_time hooks won't be removed
-with this patch.
-
-Gregory
+It should be fine given its needed only during core dvfs. Besides
+drivers/misc/sram.c is useful only on DT platforms, so for now OMAP2/3
+continue to use the omap specific sram handling.
 
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Changelog:
-> v1->v2:
-> - only remove of_clk_init from custom timer hook, further cleanup
->   will be carried out later (Reported by Gregory Clement)
+> Regards,
+> Santosh
 > 
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/mach-mvebu/armada-370-xp.c |    2 --
->  1 files changed, 0 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-> index 829b573..164c62b 100644
-> --- a/arch/arm/mach-mvebu/armada-370-xp.c
-> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
-> @@ -14,7 +14,6 @@
->  
->  #include <linux/kernel.h>
->  #include <linux/init.h>
-> -#include <linux/clk-provider.h>
->  #include <linux/of_address.h>
->  #include <linux/of_platform.h>
->  #include <linux/io.h>
-> @@ -36,7 +35,6 @@ static void __init armada_370_xp_map_io(void)
->  
->  static void __init armada_370_xp_timer_and_clk_init(void)
->  {
-> -	of_clk_init(NULL);
->  	armada_370_xp_timer_init();
->  	coherency_init();
->  	BUG_ON(mvebu_mbus_dt_init());
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
