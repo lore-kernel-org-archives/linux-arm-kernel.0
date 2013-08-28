@@ -1,72 +1,109 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Wed, 28 Aug 2013 11:44:44 +0100
-Subject: [PATCH v5 0/5] ARM/ARM64 architected timer updates
-Message-ID: <1377686689-30828-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Date: Wed, 28 Aug 2013 11:44:46 +0100
+Subject: [PATCH v5 2/5] ARM: arch_timer: add support to configure and enable
+ event stream
+In-Reply-To: <1377686689-30828-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1377686689-30828-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1377686689-30828-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-This patch series adds support to configure the rate and enable the
-event stream for architected timer. The event streams can be used to
-impose a timeout on a wfe, to safeguard against any programming error
-in case an expected event is not generated or even to implement
-wfe-based timeouts for userspace locking implementations. This feature
-can be disabled(enabled by default).
+This patch adds support for configuring the event stream frequency
+and enabling it.
 
-Since the timer control register is reset to zero on warm boot, CPU
-PM notifier is added to save and restore the value.
+It also adds the hwcaps definitions to the user to detect this event
+stream feature.
 
-Changes v4->v5:
-1. Removed compat_dyn_elf_hwcap and used just compat_elf_hwcap as per
-   Catalin's suggestion
-2. Instead of resetting event stream in CPU PM callbacks, saving and
-   restoring counter control register now.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+---
+ arch/arm/include/asm/arch_timer.h | 33 ++++++++++++++++++++++++++++-----
+ arch/arm/include/uapi/asm/hwcap.h |  1 +
+ arch/arm/kernel/setup.c           |  1 +
+ 3 files changed, 30 insertions(+), 5 deletions(-)
 
-Changes v3->v4:
-1. Added a config option to en/disable the timer event stream feature.
-   Due to this the ordering of the patches as well as some cosmetic
-   code changes are done.( So dropped previous reviewed-by tags)
-2. Removed exporting compat_dyn_elf_hwcap as there are no modules
-   requiring it for now.
-
-Changes v2->v3:
-1. Moved ARM and ARM64 changes into separate patches
-2. Added native hwcaps definations(ARM/ARM64) and compat-specific
-   definitions(ARM64) to the users for the event stream feature. 
-
-Changes v1->v2:
-1. Saved event stream divider value on cold reset path and re-used it
-   in CPU PM notifier instead of calculating every time.
-2. Rebased on v3.11-rc2(to avoid conflicts with __cpuinit* deletion)
-3. Dropped "ARM/ARM64: arch_timer: remove __cpuinit attribute for
-   arch_counter_set_user_access"(already done as part of __cpuinit*
-   deletion)
-
-Regards,
-Sudeep
-
-Sudeep KarkadaNagesha (4):
-  ARM/ARM64: arch_timer: add macros for bits in control register
-  ARM: arch_timer: add support to configure and enable event stream
-  ARM64: arch_timer: add support to configure and enable event stream
-  drivers: clocksource: add CPU PM notifier for ARM architected timer
-
-Will Deacon (1):
-  drivers: clocksource: add support for ARM architected timer event
-    stream
-
- arch/arm/include/asm/arch_timer.h    | 38 +++++++++++++++++++++----
- arch/arm/include/uapi/asm/hwcap.h    |  1 +
- arch/arm/kernel/setup.c              |  1 +
- arch/arm64/include/asm/arch_timer.h  | 44 +++++++++++++++++++++++++----
- arch/arm64/include/asm/hwcap.h       |  8 +++++-
- arch/arm64/include/uapi/asm/hwcap.h  |  1 +
- arch/arm64/kernel/setup.c            |  5 ++++
- drivers/clocksource/Kconfig          | 14 +++++++++
- drivers/clocksource/arm_arch_timer.c | 55 ++++++++++++++++++++++++++++++++++++
- include/clocksource/arm_arch_timer.h | 10 +++++++
- 10 files changed, 165 insertions(+), 12 deletions(-)
-
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index 1a3e967..4e38609 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -89,22 +89,45 @@ static inline u64 arch_counter_get_cntvct(void)
+ 	return cval;
+ }
+ 
+-static inline void arch_counter_set_user_access(void)
++static inline u32 arch_timer_get_cntkctl(void)
+ {
+ 	u32 cntkctl;
+-
+ 	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
++	return cntkctl;
++}
++
++static inline void arch_timer_set_cntkctl(u32 cntkctl)
++{
++	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
++}
++
++static inline void arch_counter_set_user_access(void)
++{
++	u32 cntkctl = arch_timer_get_cntkctl();
+ 
+ 	/* Disable user access to both physical/virtual counters/timers */
+-	/* Also disable virtual event stream */
+ 	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
+ 			| ARCH_TIMER_USR_VT_ACCESS_EN
+-			| ARCH_TIMER_VIRT_EVT_EN
+ 			| ARCH_TIMER_USR_VCT_ACCESS_EN
+ 			| ARCH_TIMER_USR_PCT_ACCESS_EN);
++	arch_timer_set_cntkctl(cntkctl);
++}
+ 
+-	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
++static inline void arch_timer_evtstrm_config(bool enable, int divider)
++{
++	u32 cntkctl = arch_timer_get_cntkctl();
++	if (enable) {
++		cntkctl &= ~ARCH_TIMER_EVT_TRIGGER_MASK;
++		/* Set the divider and enable virtual event stream */
++		cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
++				| ARCH_TIMER_VIRT_EVT_EN;
++		elf_hwcap |= HWCAP_EVTSTRM;
++	} else {
++		cntkctl &= ~ARCH_TIMER_VIRT_EVT_EN; /* disable event stream */
++	}
++	arch_timer_set_cntkctl(cntkctl);
+ }
++
+ #endif
+ 
+ #endif
+diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
+index 6d34d08..7dcc10d 100644
+--- a/arch/arm/include/uapi/asm/hwcap.h
++++ b/arch/arm/include/uapi/asm/hwcap.h
+@@ -26,5 +26,6 @@
+ #define HWCAP_VFPD32	(1 << 19)	/* set if VFP has 32 regs (not 16) */
+ #define HWCAP_IDIV	(HWCAP_IDIVA | HWCAP_IDIVT)
+ #define HWCAP_LPAE	(1 << 20)
++#define HWCAP_EVTSTRM	(1 << 21)
+ 
+ #endif /* _UAPI__ASMARM_HWCAP_H */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index afc2489..305ffc9 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -975,6 +975,7 @@ static const char *hwcap_str[] = {
+ 	"idivt",
+ 	"vfpd32",
+ 	"lpae",
++	"evtstrm",
+ 	NULL
+ };
+ 
 -- 
 1.8.1.2
