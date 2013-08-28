@@ -1,151 +1,73 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Wed, 28 Aug 2013 11:44:47 +0100
-Subject: [PATCH v5 3/5] ARM64: arch_timer: add support to configure and enable
- event stream
-In-Reply-To: <1377686689-30828-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1377686689-30828-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1377686689-30828-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Wed, 28 Aug 2013 16:18:58 +0530
+Subject: [PATCH] ARM: DT: Exynos: fix number of interrupt-cells in mct node
+In-Reply-To: <1525883.6gVrCoPa3t@amdc1227>
+References: <1371220886-11616-1-git-send-email-chander.kashyap@linaro.org>
+ <52112004.90202@samsung.com>
+ <CANuQgHFP2n33neHbW90JZbPmcPkZ-X=NDwXDqQw1sfQUUT_zNQ@mail.gmail.com>
+ <1525883.6gVrCoPa3t@amdc1227>
+Message-ID: <CANuQgHF=P7gV5aU81T5Y9OyxBy9TFkeJXBJHp6iXVs6epknRYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+On 28 August 2013 16:01, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Chander,
+>
+> On Wednesday 28 of August 2013 15:20:40 Chander Kashyap wrote:
+>> On 19 August 2013 00:57, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > On 08/12/13 15:23, Chander Kashyap wrote:
+>> >> ping
+>> >>
+>> >> On 23 July 2013 15:17, Chander Kashyap<chander.kashyap@linaro.org>
+> wrote:
+>> >>> ping.
+>> >>>
+>> >>> On 14 June 2013 20:11, Chander Kashyap<chander.kashyap@linaro.org>
+>> >>>
+>> >>> wrote:
+>> >>>> Two cells were used to specify interrupts in mct node, while second
+>> >>>> cell
+>> >>>> always remains unused. Hence use only one cell.
+>> >>>> Suggested by Tomasz Figa.
+>> >>>>
+>> >>>> Signed-off-by: Chander Kashyap<chander.kashyap@linaro.org>
+>> >>>> ---
+>> >>>>
+>> >>>>   arch/arm/boot/dts/exynos4210.dtsi |   19 +++++++++----------
+>> >>>>   arch/arm/boot/dts/exynos4212.dtsi |   19 +++++++++----------
+>> >>>>   arch/arm/boot/dts/exynos4412.dtsi |   23 +++++++++++------------
+>> >>>>   arch/arm/boot/dts/exynos5250.dtsi |   19 +++++++++----------
+>> >>>>   4 files changed, 38 insertions(+), 42 deletions(-)
+>> >>>>
+> [snip]
+>> >
+>> > Should be updated with regarding Doc.
+>>
+>> Will update the document.
+>
+> Apparently I missed your patch and did the same change for Exynos 4 SoCs in
+> my patch series[1] cleaning up Exynos 4 device tree files a bit.
+>
+> Since in my series it is a part of a more complex change, i.e. moving mct
+> node to exynos4x12.dtsi and update of MCT bindings documentation, would you
+> mind if we could keep with my patch doing this change for Exynos 4 and
+> yours taking care for Exynos 5?
+>
+> The documentation is already being updated in my series, so you could just
+> drop the changes done to exynos4*.dtsi files in next version.
 
-This patch adds support for configuring the event stream frequency
-and enabling it.
+Ok, That make sense.
+I will post patche with changes for exynos5, only
 
-It also adds the hwcaps as well as compat-specific definitions to
-the user to detect this event stream feature.
+>
+> [1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/22207
+>
+> Best regards,
+> Tomasz
+>
 
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
----
- arch/arm64/include/asm/arch_timer.h | 34 +++++++++++++++++++++++++++++++---
- arch/arm64/include/asm/hwcap.h      |  8 +++++++-
- arch/arm64/include/uapi/asm/hwcap.h |  1 +
- arch/arm64/kernel/setup.c           |  5 +++++
- 4 files changed, 44 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index fa4af76..b27e0a5 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -97,11 +97,21 @@ static inline u32 arch_timer_get_cntfrq(void)
- 	return val;
- }
- 
--static inline void arch_counter_set_user_access(void)
-+static inline u32 arch_timer_get_cntkctl(void)
- {
- 	u32 cntkctl;
--
- 	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
-+	return cntkctl;
-+}
-+
-+static inline void arch_timer_set_cntkctl(u32 cntkctl)
-+{
-+	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
-+}
-+
-+static inline void arch_counter_set_user_access(void)
-+{
-+	u32 cntkctl = arch_timer_get_cntkctl();
- 
- 	/* Disable user access to the timers and the physical counter */
- 	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
-@@ -111,7 +121,25 @@ static inline void arch_counter_set_user_access(void)
- 	/* Enable user access to the virtual counter */
- 	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
- 
--	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
-+	arch_timer_set_cntkctl(cntkctl);
-+}
-+
-+static inline void arch_timer_evtstrm_config(bool enable, int divider)
-+{
-+	u32 cntkctl = arch_timer_get_cntkctl();
-+	if (enable) {
-+		cntkctl &= ~ARCH_TIMER_EVT_TRIGGER_MASK;
-+		/* Set the divider and enable virtual event stream */
-+		cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
-+				| ARCH_TIMER_VIRT_EVT_EN;
-+		elf_hwcap |= HWCAP_EVTSTRM;
-+#ifdef CONFIG_COMPAT
-+		compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
-+#endif
-+	} else {
-+		cntkctl &= ~ARCH_TIMER_VIRT_EVT_EN; /* disable event stream */
-+	}
-+	arch_timer_set_cntkctl(cntkctl);
- }
- 
- static inline u64 arch_counter_get_cntvct(void)
-diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
-index 6d4482f..530fa879 100644
---- a/arch/arm64/include/asm/hwcap.h
-+++ b/arch/arm64/include/asm/hwcap.h
-@@ -30,6 +30,7 @@
- #define COMPAT_HWCAP_IDIVA	(1 << 17)
- #define COMPAT_HWCAP_IDIVT	(1 << 18)
- #define COMPAT_HWCAP_IDIV	(COMPAT_HWCAP_IDIVA|COMPAT_HWCAP_IDIVT)
-+#define COMPAT_HWCAP_EVTSTRM	(1 << 21)
- 
- #ifndef __ASSEMBLY__
- /*
-@@ -37,11 +38,16 @@
-  * instruction set this cpu supports.
-  */
- #define ELF_HWCAP		(elf_hwcap)
--#define COMPAT_ELF_HWCAP	(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
-+#ifdef CONFIG_COMPAT
-+#define COMPAT_ELF_HWCAP	(compat_elf_hwcap)
-+#define COMPAT_ELF_HWCAP_DEFAULT	\
-+				(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
- 				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
- 				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
- 				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
- 				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV)
-+extern unsigned int compat_elf_hwcap;
-+#endif
- 
- extern unsigned int elf_hwcap;
- #endif
-diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-index eea4975..9b12476 100644
---- a/arch/arm64/include/uapi/asm/hwcap.h
-+++ b/arch/arm64/include/uapi/asm/hwcap.h
-@@ -21,6 +21,7 @@
-  */
- #define HWCAP_FP		(1 << 0)
- #define HWCAP_ASIMD		(1 << 1)
-+#define HWCAP_EVTSTRM		(1 << 2)
- 
- 
- #endif /* _UAPI__ASM_HWCAP_H */
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index add6ea6..e5c1725 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -60,6 +60,10 @@ EXPORT_SYMBOL(processor_id);
- unsigned int elf_hwcap __read_mostly;
- EXPORT_SYMBOL_GPL(elf_hwcap);
- 
-+#ifdef CONFIG_COMPAT
-+unsigned int compat_elf_hwcap __read_mostly = COMPAT_ELF_HWCAP_DEFAULT;
-+#endif
-+
- static const char *cpu_name;
- static const char *machine_name;
- phys_addr_t __fdt_pointer __initdata;
-@@ -309,6 +313,7 @@ subsys_initcall(topology_init);
- static const char *hwcap_str[] = {
- 	"fp",
- 	"asimd",
-+	"evtstrm",
- 	NULL
- };
- 
+
 -- 
-1.8.1.2
+with warm regards,
+Chander Kashyap
