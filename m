@@ -1,60 +1,88 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 28 Aug 2013 12:31:12 +0200
-Subject: [PATCH] ARM: DT: Exynos: fix number of interrupt-cells in mct node
-In-Reply-To: <CANuQgHFP2n33neHbW90JZbPmcPkZ-X=NDwXDqQw1sfQUUT_zNQ@mail.gmail.com>
-References: <1371220886-11616-1-git-send-email-chander.kashyap@linaro.org>
- <52112004.90202@samsung.com>
- <CANuQgHFP2n33neHbW90JZbPmcPkZ-X=NDwXDqQw1sfQUUT_zNQ@mail.gmail.com>
-Message-ID: <1525883.6gVrCoPa3t@amdc1227>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 28 Aug 2013 10:37:17 +0000 (UTC)
+Subject: OMAP baseline test results for v3.11-rc7
+Message-ID: <alpine.DEB.2.02.1308281036110.22040@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chander,
 
-On Wednesday 28 of August 2013 15:20:40 Chander Kashyap wrote:
-> On 19 August 2013 00:57, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > On 08/12/13 15:23, Chander Kashyap wrote:
-> >> ping
-> >> 
-> >> On 23 July 2013 15:17, Chander Kashyap<chander.kashyap@linaro.org>  
-wrote:
-> >>> ping.
-> >>> 
-> >>> On 14 June 2013 20:11, Chander Kashyap<chander.kashyap@linaro.org>
-> >>> 
-> >>> wrote:
-> >>>> Two cells were used to specify interrupts in mct node, while second
-> >>>> cell
-> >>>> always remains unused. Hence use only one cell.
-> >>>> Suggested by Tomasz Figa.
-> >>>> 
-> >>>> Signed-off-by: Chander Kashyap<chander.kashyap@linaro.org>
-> >>>> ---
-> >>>> 
-> >>>>   arch/arm/boot/dts/exynos4210.dtsi |   19 +++++++++----------
-> >>>>   arch/arm/boot/dts/exynos4212.dtsi |   19 +++++++++----------
-> >>>>   arch/arm/boot/dts/exynos4412.dtsi |   23 +++++++++++------------
-> >>>>   arch/arm/boot/dts/exynos5250.dtsi |   19 +++++++++----------
-> >>>>   4 files changed, 38 insertions(+), 42 deletions(-)
-> >>>> 
-[snip]
-> > 
-> > Should be updated with regarding Doc.
-> 
-> Will update the document.
+Here are some basic OMAP test results for Linux v3.11-rc7.
+Logs and other details at:
 
-Apparently I missed your patch and did the same change for Exynos 4 SoCs in 
-my patch series[1] cleaning up Exynos 4 device tree files a bit.
+    http://www.pwsan.com/omap/testlogs/test_v3.11-rc7/20130825195715/
 
-Since in my series it is a part of a more complex change, i.e. moving mct 
-node to exynos4x12.dtsi and update of MCT bindings documentation, would you 
-mind if we could keep with my patch doing this change for Exynos 4 and 
-yours taking care for Exynos 5?
 
-The documentation is already being updated in my series, so you could just 
-drop the changes done to exynos4*.dtsi files in next version.
+Test summary
+------------
 
-[1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/22207
+Build: uImage:
+    Pass (14/14): n800_multi_omap2xxx, n800_only_a, omap1_defconfig,
+		  omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig
 
-Best regards,
-Tomasz
+Build: uImage+dtb:
+    Pass ( 3/ 3): am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es
+
+Build: zImage:
+    Pass ( 1/ 1): omap2plus_defconfig
+
+Boot to userspace:
+    skip ( 1/ 1): 5912osk
+    Pass (10/10): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
+		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+		  am335xbonelt, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 3/ 6): 2430sdp, 4430es2panda, 4460pandaes
+    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 37xxevm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 3/ 6): 2430sdp, 4430es2panda, 4460pandaes
+    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 37xxevm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 2/ 4): 4430es2panda, 4460pandaes
+    Pass ( 2/ 4): 3530es3beagle, 37xxevm
+
+PM: chip off via dynamic idle:
+    FAIL ( 2/ 4): 4430es2panda, 4460pandaes
+    Pass ( 2/ 4): 3530es3beagle, 37xxevm
+
+
+vmlinux object size
+(delta in bytes from test_v3.11-rc6 (b36f4be3de1b123d8601de062e7dbfc904f305fb)):
+   text     data      bss    total  kernel
+    +32       -8        0      +24  n800_multi_omap2xxx
+    +32      +16        0      +48  n800_only_a
+   +464       -8        0     +456  omap1_defconfig
+   +528       -8        0     +520  omap1_defconfig_1510innovator_only
+   +496       -8        0     +488  omap1_defconfig_5912osk_only
+   +296      +24        0     +320  omap2plus_defconfig
+   +232       -8        0     +224  omap2plus_defconfig_2430sdp_only
+   +296      +24        0     +320  omap2plus_defconfig_cpupm
+   +296       -8        0     +288  omap2plus_defconfig_no_pm
+   +296       -8        0     +288  omap2plus_defconfig_omap2_4_only
+   +296      +24        0     +320  omap2plus_defconfig_omap3_4_only
+   +312       -8      +16     +320  rmk_omap3430_ldp_allnoconfig
+    +32        0        0      +32  rmk_omap3430_ldp_oldconfig
+   +312      +24      +16     +352  rmk_omap4430_sdp_allnoconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.11-rc6 (b36f4be3de1b123d8601de062e7dbfc904f305fb))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
