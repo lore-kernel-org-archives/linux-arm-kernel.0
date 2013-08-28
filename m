@@ -1,91 +1,94 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Wed, 28 Aug 2013 11:44:45 +0100
-Subject: [PATCH v5 1/5] ARM/ARM64: arch_timer: add macros for bits in control
- register
+Date: Wed, 28 Aug 2013 11:44:49 +0100
+Subject: [PATCH v5 5/5] drivers: clocksource: add CPU PM notifier for ARM
+ architected timer
 In-Reply-To: <1377686689-30828-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1377686689-30828-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1377686689-30828-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1377686689-30828-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Add macros to describe the bitfields in the ARM architected timer
-control register to make code easy to understand.
+Few control settings done in architected timer as part of initialisation
+can be lost when CPU enters deeper power states. They need to be
+re-initialised when the CPU is (warm)reset again.
+
+This patch adds CPU PM notifiers to do the timer initialisation on warm
+resets. It also save the event stream divider value calculated during
+cold reset and uses the same in warm reset path.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- arch/arm/include/asm/arch_timer.h    |  9 +++++++--
- arch/arm64/include/asm/arch_timer.h  | 12 ++++++++----
- include/clocksource/arm_arch_timer.h |  8 ++++++++
- 3 files changed, 23 insertions(+), 6 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index e406d57..1a3e967 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -95,8 +95,13 @@ static inline void arch_counter_set_user_access(void)
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index f42bef4..ffb0bfb 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -13,6 +13,7 @@
+ #include <linux/device.h>
+ #include <linux/smp.h>
+ #include <linux/cpu.h>
++#include <linux/cpu_pm.h>
+ #include <linux/clockchips.h>
+ #include <linux/interrupt.h>
+ #include <linux/of_irq.h>
+@@ -281,6 +282,33 @@ static struct notifier_block arch_timer_cpu_nb = {
+ 	.notifier_call = arch_timer_cpu_notify,
+ };
  
- 	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
- 
--	/* disable user access to everything */
--	cntkctl &= ~((3 << 8) | (7 << 0));
-+	/* Disable user access to both physical/virtual counters/timers */
-+	/* Also disable virtual event stream */
-+	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
-+			| ARCH_TIMER_USR_VT_ACCESS_EN
-+			| ARCH_TIMER_VIRT_EVT_EN
-+			| ARCH_TIMER_USR_VCT_ACCESS_EN
-+			| ARCH_TIMER_USR_PCT_ACCESS_EN);
- 
- 	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
- }
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index 98abd47..fa4af76 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -101,12 +101,16 @@ static inline void arch_counter_set_user_access(void)
++#ifdef CONFIG_CPU_PM
++static unsigned int saved_cntkctl;
++static int arch_timer_cpu_pm_notify(struct notifier_block *self,
++				    unsigned long action, void *hcpu)
++{
++	if (action == CPU_PM_ENTER)
++		saved_cntkctl = arch_timer_get_cntkctl();
++	else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT)
++		arch_timer_set_cntkctl(saved_cntkctl);
++	return NOTIFY_OK;
++}
++
++static struct notifier_block arch_timer_cpu_pm_notifier = {
++	.notifier_call = arch_timer_cpu_pm_notify,
++};
++
++static int __init arch_timer_cpu_pm_init(void)
++{
++	return cpu_pm_register_notifier(&arch_timer_cpu_pm_notifier);
++}
++#else
++static int __init arch_timer_cpu_pm_init(void)
++{
++	return 0;
++}
++#endif
++
+ static int __init arch_timer_register(void)
  {
- 	u32 cntkctl;
+ 	int err;
+@@ -330,11 +358,17 @@ static int __init arch_timer_register(void)
+ 	if (err)
+ 		goto out_free_irq;
  
--	/* Disable user access to the timers and the physical counter. */
- 	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
--	cntkctl &= ~((3 << 8) | (1 << 0));
- 
--	/* Enable user access to the virtual counter and frequency. */
--	cntkctl |= (1 << 1);
-+	/* Disable user access to the timers and the physical counter */
-+	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
-+			| ARCH_TIMER_USR_VT_ACCESS_EN
-+			| ARCH_TIMER_USR_PCT_ACCESS_EN);
++	err = arch_timer_cpu_pm_init();
++	if (err)
++		goto out_unreg_notify;
 +
-+	/* Enable user access to the virtual counter */
-+	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
-+
- 	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
- }
+ 	/* Immediately configure the timer on the boot CPU */
+ 	arch_timer_setup(this_cpu_ptr(arch_timer_evt));
  
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index c463ce9..551f7e9 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -29,6 +29,14 @@
- #define ARCH_TIMER_PHYS_ACCESS		0
- #define ARCH_TIMER_VIRT_ACCESS		1
+ 	return 0;
  
-+#define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter */
-+#define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
-+#define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
-+#define ARCH_TIMER_EVT_TRIGGER_SHIFT	(4)
-+#define ARCH_TIMER_EVT_TRIGGER_MASK	(0xF << ARCH_TIMER_EVT_TRIGGER_SHIFT)
-+#define ARCH_TIMER_USR_VT_ACCESS_EN	(1 << 8) /* virtual timer registers */
-+#define ARCH_TIMER_USR_PT_ACCESS_EN	(1 << 9) /* physical timer registers */
-+
- #ifdef CONFIG_ARM_ARCH_TIMER
- 
- extern u32 arch_timer_get_rate(void);
++out_unreg_notify:
++	unregister_cpu_notifier(&arch_timer_cpu_nb);
+ out_free_irq:
+ 	if (arch_timer_use_virtual)
+ 		free_percpu_irq(arch_timer_ppi[VIRT_PPI], arch_timer_evt);
 -- 
 1.8.1.2
