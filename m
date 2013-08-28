@@ -1,88 +1,102 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 28 Aug 2013 10:37:17 +0000 (UTC)
-Subject: OMAP baseline test results for v3.11-rc7
-Message-ID: <alpine.DEB.2.02.1308281036110.22040@utopia.booyaka.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 28 Aug 2013 07:37:33 -0300
+Subject: [PATCH v4 1/4] lib: Introduce atomic MMIO modify
+In-Reply-To: <1377358532-23802-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1377358532-23802-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377358532-23802-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130828103732.GB2348@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Linus,
 
-Here are some basic OMAP test results for Linux v3.11-rc7.
-Logs and other details at:
+Andrew suggested you might have opinions on this, so I'm cc'ing you.
+Since you'll probably want some better context, here it is:
 
-    http://www.pwsan.com/omap/testlogs/test_v3.11-rc7/20130825195715/
+http://lwn.net/Articles/564709/
 
+On Sat, Aug 24, 2013 at 12:35:29PM -0300, Ezequiel Garcia wrote:
+> Some platforms have MMIO regions that are shared across orthogonal
+> subsystems. This commit implements a possible solution for the
+> thread-safe access of such regions through a spinlock-protected API.
+> 
+> Concurrent access is protected with a single spinlock for the
+> entire MMIO address space. While this protects shared-registers,
+> it also serializes access to unrelated/unshared registers.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  include/linux/io.h |  5 +++++
+>  lib/Makefile       |  2 +-
+>  lib/atomicio.c     | 27 +++++++++++++++++++++++++++
+>  3 files changed, 33 insertions(+), 1 deletion(-)
+>  create mode 100644 lib/atomicio.c
+> 
+> diff --git a/include/linux/io.h b/include/linux/io.h
+> index f4f42fa..c331dcb 100644
+> --- a/include/linux/io.h
+> +++ b/include/linux/io.h
+> @@ -101,4 +101,9 @@ static inline void arch_phys_wc_del(int handle)
+>  #define arch_phys_wc_add arch_phys_wc_add
+>  #endif
+>  
+> +#ifndef __HAVE_ARCH_ATOMIC_IO_MODIFY
+> +/* Atomic MMIO-wide IO modify */
+> +extern void atomic_io_modify(void __iomem *reg, u32 mask, u32 set);
+> +#endif
+> +
+>  #endif /* _LINUX_IO_H */
+> diff --git a/lib/Makefile b/lib/Makefile
+> index 7baccfd..695d6e2 100644
+> --- a/lib/Makefile
+> +++ b/lib/Makefile
+> @@ -13,7 +13,7 @@ lib-y := ctype.o string.o vsprintf.o cmdline.o \
+>  	 sha1.o md5.o irq_regs.o reciprocal_div.o argv_split.o \
+>  	 proportions.o flex_proportions.o prio_heap.o ratelimit.o show_mem.o \
+>  	 is_single_threaded.o plist.o decompress.o kobject_uevent.o \
+> -	 earlycpio.o percpu-refcount.o
+> +	 earlycpio.o percpu-refcount.o atomicio.o
+>  
+>  obj-$(CONFIG_ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS) += usercopy.o
+>  lib-$(CONFIG_MMU) += ioremap.o
+> diff --git a/lib/atomicio.c b/lib/atomicio.c
+> new file mode 100644
+> index 0000000..1750f9d
+> --- /dev/null
+> +++ b/lib/atomicio.c
+> @@ -0,0 +1,27 @@
+> +#include <linux/io.h>
+> +#include <linux/spinlock.h>
+> +
+> +#ifndef __HAVE_ARCH_ATOMIC_IO_MODIFY
+> +/*
+> + * Generic atomic MMIO modify.
+> + *
+> + * Allows thread-safe access to registers shared by unrelated subsystems.
+> + * The access is protected by a single MMIO-wide lock.
+> + *
+> + * Optimized variants can be implemented on a per-architecture basis.
+> + */
+> +static DEFINE_RAW_SPINLOCK(__io_lock);
+> +void atomic_io_modify(void __iomem *reg, u32 mask, u32 set)
+> +{
+> +	unsigned long flags;
+> +	u32 value;
+> +
+> +	raw_spin_lock_irqsave(&__io_lock, flags);
+> +	value = readl(reg) & ~mask;
+> +	value |= (set & mask);
+> +	writel(value, reg);
+> +	raw_spin_unlock_irqrestore(&__io_lock, flags);
+> +
+> +}
+> +EXPORT_SYMBOL(atomic_io_modify);
+> +#endif
+> -- 
+> 1.8.1.5
+> 
 
-Test summary
-------------
-
-Build: uImage:
-    Pass (14/14): n800_multi_omap2xxx, n800_only_a, omap1_defconfig,
-		  omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig
-
-Build: uImage+dtb:
-    Pass ( 3/ 3): am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es
-
-Build: zImage:
-    Pass ( 1/ 1): omap2plus_defconfig
-
-Boot to userspace:
-    skip ( 1/ 1): 5912osk
-    Pass (10/10): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 6): 2430sdp, 4430es2panda, 4460pandaes
-    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 37xxevm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 3/ 6): 2430sdp, 4430es2panda, 4460pandaes
-    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 37xxevm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 2/ 4): 4430es2panda, 4460pandaes
-    Pass ( 2/ 4): 3530es3beagle, 37xxevm
-
-PM: chip off via dynamic idle:
-    FAIL ( 2/ 4): 4430es2panda, 4460pandaes
-    Pass ( 2/ 4): 3530es3beagle, 37xxevm
-
-
-vmlinux object size
-(delta in bytes from test_v3.11-rc6 (b36f4be3de1b123d8601de062e7dbfc904f305fb)):
-   text     data      bss    total  kernel
-    +32       -8        0      +24  n800_multi_omap2xxx
-    +32      +16        0      +48  n800_only_a
-   +464       -8        0     +456  omap1_defconfig
-   +528       -8        0     +520  omap1_defconfig_1510innovator_only
-   +496       -8        0     +488  omap1_defconfig_5912osk_only
-   +296      +24        0     +320  omap2plus_defconfig
-   +232       -8        0     +224  omap2plus_defconfig_2430sdp_only
-   +296      +24        0     +320  omap2plus_defconfig_cpupm
-   +296       -8        0     +288  omap2plus_defconfig_no_pm
-   +296       -8        0     +288  omap2plus_defconfig_omap2_4_only
-   +296      +24        0     +320  omap2plus_defconfig_omap3_4_only
-   +312       -8      +16     +320  rmk_omap3430_ldp_allnoconfig
-    +32        0        0      +32  rmk_omap3430_ldp_oldconfig
-   +312      +24      +16     +352  rmk_omap4430_sdp_allnoconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.11-rc6 (b36f4be3de1b123d8601de062e7dbfc904f305fb))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
