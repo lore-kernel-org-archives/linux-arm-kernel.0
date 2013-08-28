@@ -1,37 +1,61 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Wed, 28 Aug 2013 17:59:44 +0200
-Subject: [PATCH v4 09/31] powerpc/fsl-pci: improve clock API use
-In-Reply-To: <20130828120827.GB26379@book.gsilab.sittig.org>
-References: <1374495298-22019-1-git-send-email-gsi@denx.de>
- <1375821851-31609-1-git-send-email-gsi@denx.de>
- <1375821851-31609-10-git-send-email-gsi@denx.de>
- <20130828120827.GB26379@book.gsilab.sittig.org>
-Message-ID: <20130828155944.GA30987@book.gsilab.sittig.org>
+From: m.krawczuk@partner.samsung.com (Mateusz Krawczuk)
+Date: Wed, 28 Aug 2013 18:12:58 +0200
+Subject: [PATCH v3 0/6] ARM: S5PV210: move to common clk framework
+Message-ID: <1377706384-3697-1-git-send-email-m.krawczuk@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 14:08 +0200, Gerhard Sittig wrote:
-> 
-> [ re-created the Cc: list, this is about the PCI clock exclusively ]
+This patch series is the new s5pv210 clock implementation
+(using common clk framework).
 
-I just noticed by coincidence that the message which I received
-back from the linuxppc-dev ML appeared to have dropped Benjamin
-Herrenschmidt and Kumar Gala from the Cc: list -- while they do
-appear in the header of the message that I have sent and I can't
-see what might have caused the loss of information. :-O
+This implementation is compatible with device tree definition and board files.
 
-Do you want me to re-send the message for the benefit of
-potential followups, or is it OK that you receive the message via
-the list but potentially without the Cc: attribute?
+This patch series is based on linux-next and has been tested on goni and aquila 
+boards using board file.
 
-The message was mostly "for your information" and contained a
-status update, while no action is required or problems need to
-get resolved.
+This patch series require adding new registration method
+for PLL45xx and PLL46xx, which is included in this patch series:
+clk: samsung: pll: Use new registration method for PLL46xx
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg21653.html
+clk: samsung: pll: Use new registration method for PLL45xx
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg21652.html
+clk: samsung: exynos4: Rename exynos4_plls to exynos4x12_plls
+http://www.spinics.net/lists/arm-kernel/msg268486.html
 
+Mateusz Krawczuk (6):
+  media: s5p-tv: Replace mxr_ macro by default dev_
+  media: s5p-tv: Restore vpll clock rate
+  media: s5p-tv: Fix sdo driver to work with CCF
+  media: s5p-tv: Fix mixer driver to work with CCF
+  clk: samsung: Add clock driver for s5pc110/s5pv210
+  ARM: s5pv210: Migrate clock handling to Common Clock Framework
 
-virtually yours
-Gerhard Sittig
+ .../bindings/clock/samsung,s5pv210-clock.txt       |  72 ++
+ arch/arm/mach-s5pv210/Kconfig                      |   9 +
+ arch/arm/mach-s5pv210/Makefile                     |   4 +-
+ arch/arm/mach-s5pv210/common.c                     |  17 +
+ arch/arm/mach-s5pv210/common.h                     |  13 +
+ arch/arm/mach-s5pv210/mach-aquila.c                |   1 +
+ arch/arm/mach-s5pv210/mach-goni.c                  |   3 +-
+ arch/arm/mach-s5pv210/mach-smdkc110.c              |   1 +
+ arch/arm/mach-s5pv210/mach-smdkv210.c              |   1 +
+ arch/arm/mach-s5pv210/mach-torbreck.c              |   1 +
+ arch/arm/plat-samsung/Kconfig                      |   2 +-
+ arch/arm/plat-samsung/init.c                       |   2 -
+ drivers/clk/samsung/Makefile                       |   3 +
+ drivers/clk/samsung/clk-s5pv210.c                  | 732 +++++++++++++++++++++
+ drivers/media/platform/s5p-tv/mixer.h              |  12 -
+ drivers/media/platform/s5p-tv/mixer_drv.c          |  80 ++-
+ drivers/media/platform/s5p-tv/mixer_grp_layer.c    |   2 +-
+ drivers/media/platform/s5p-tv/mixer_reg.c          |   6 +-
+ drivers/media/platform/s5p-tv/mixer_video.c        | 100 +--
+ drivers/media/platform/s5p-tv/mixer_vp_layer.c     |   2 +-
+ drivers/media/platform/s5p-tv/sdo_drv.c            |  45 +-
+ include/dt-bindings/clock/samsung,s5pv210-clock.h  | 221 +++++++
+ 22 files changed, 1216 insertions(+), 113 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
+ create mode 100644 drivers/clk/samsung/clk-s5pv210.c
+ create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
+
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+1.8.1.2
