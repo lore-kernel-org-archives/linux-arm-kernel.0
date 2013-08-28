@@ -1,37 +1,132 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Aug 2013 12:21:46 +0200
-Subject: [PATCH 04/19] ARM: set BE8 if LE in head code
-In-Reply-To: <1377639509-22778-5-git-send-email-ben.dooks@codethink.co.uk>
-References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
- <1377639509-22778-5-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130828122146.4e30722a@skate>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 28 Aug 2013 07:24:23 -0300
+Subject: [PATCH v4 1/4] lib: Introduce atomic MMIO modify
+In-Reply-To: <20130827133709.64b4743950b911d6dfe7fab8@linux-foundation.org>
+References: <1377358532-23802-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377358532-23802-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130827133709.64b4743950b911d6dfe7fab8@linux-foundation.org>
+Message-ID: <20130828102422.GA2348@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ben Dooks,
-
-On Tue, 27 Aug 2013 22:38:14 +0100, Ben Dooks wrote:
-> If we are booting in LE and compiled for BE8, then add code to
-> set the state to bE8. Since the instruction stream is always LE,
-> we do not need to do anything special to the instruction.
+On Tue, Aug 27, 2013 at 01:37:09PM -0700, Andrew Morton wrote:
+> On Sat, 24 Aug 2013 12:35:29 -0300 Ezequiel Garcia <ezequiel.garcia@free-electrons.com> wrote:
 > 
-> Also ensure that the secondary processors are started in the same mode.
+> > Some platforms have MMIO regions that are shared across orthogonal
+> > subsystems. This commit implements a possible solution for the
+> > thread-safe access of such regions through a spinlock-protected API.
 > 
-> Note, we do add about 20 bytes to the kernel image, but it seems easier
-> to do this than adding another configuration to change.
+> Seem sensible.  Perhaps.
 > 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> It only works if both subsystems agree to use atomic_io_modify().  And
+> if they're both capable of doing that, they are both capable of
+> implementing an agreed-upon internal locking scheme, so why bother?
 > 
-> Conflicts:
-> 	arch/arm/kernel/sleep.S
 
-Those two lines probably shouldn't be there.
+One of the scenarios where this could be helpful and an agreed-upon
+lock seemed difficult to design is this: a watchdog driver that shares
+some control register with *two* different clocksource drivers.
 
-Thanks,
+So, one first solution is to have a function in the two clocksource
+drivers (with matching prototype) and have the watchdog access
+the register through it.
 
-Thomas
+However, because of multiplatform builds, both these clocksource drivers
+could be built at the same time. Therefore we would have a symbol
+collision, doubly-defined, in each driver.
+
+How would that work? What other internal locking scheme could we
+implement?
+
+BTW, this is the current use case we are trying to fix.
+This atomic function seemed like a simpler (perhaps cleaner?) approach.
+
+[..]
+> 
+> I disagree with the presence of the ifndef.  If
+> __HAVE_ARCH_ATOMIC_IO_MODIFY is undefined, the architecture must still
+> implement the identical function signature.  The best way to ensure that
+> is to use the same prototype in both cases.
+> 
+
+I agree, but how can this be done?
+
+I'm looking at examples, such as include/asm-generic/atomic.h or
+include/linux/string.h and they all do this sort of trick.
+
+> >  #endif /* _LINUX_IO_H */
+> > diff --git a/lib/Makefile b/lib/Makefile
+> > index 7baccfd..695d6e2 100644
+> > --- a/lib/Makefile
+> > +++ b/lib/Makefile
+> > @@ -13,7 +13,7 @@ lib-y := ctype.o string.o vsprintf.o cmdline.o \
+> >  	 sha1.o md5.o irq_regs.o reciprocal_div.o argv_split.o \
+> >  	 proportions.o flex_proportions.o prio_heap.o ratelimit.o show_mem.o \
+> >  	 is_single_threaded.o plist.o decompress.o kobject_uevent.o \
+> > -	 earlycpio.o percpu-refcount.o
+> > +	 earlycpio.o percpu-refcount.o atomicio.o
+> >  
+> >  obj-$(CONFIG_ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS) += usercopy.o
+> >  lib-$(CONFIG_MMU) += ioremap.o
+> > diff --git a/lib/atomicio.c b/lib/atomicio.c
+> > new file mode 100644
+> > index 0000000..1750f9d
+> > --- /dev/null
+> > +++ b/lib/atomicio.c
+> > @@ -0,0 +1,27 @@
+> > +#include <linux/io.h>
+> > +#include <linux/spinlock.h>
+> > +
+> > +#ifndef __HAVE_ARCH_ATOMIC_IO_MODIFY
+> > +/*
+> > + * Generic atomic MMIO modify.
+> > + *
+> > + * Allows thread-safe access to registers shared by unrelated subsystems.
+> > + * The access is protected by a single MMIO-wide lock.
+> > + *
+> > + * Optimized variants can be implemented on a per-architecture basis.
+> > + */
+> 
+> Some kerneldoc would be nice.
+> 
+
+Ok.
+
+> > +static DEFINE_RAW_SPINLOCK(__io_lock);
+> 
+> This could be local to atomic_io_modify().
+> 
+
+Ok.
+
+> > +void atomic_io_modify(void __iomem *reg, u32 mask, u32 set)
+> > +{
+> > +	unsigned long flags;
+> > +	u32 value;
+> > +
+> > +	raw_spin_lock_irqsave(&__io_lock, flags);
+> > +	value = readl(reg) & ~mask;
+> > +	value |= (set & mask);
+> 
+> Could just be "value |= set".  The code as you have it permits callers
+> to set bits in "set" which aren't permitted in "mask", which would be
+> pretty darn stupid of them.
+> 
+
+Right.
+
+> > +	writel(value, reg);
+> > +	raw_spin_unlock_irqrestore(&__io_lock, flags);
+> > +
+> > +}
+> > +EXPORT_SYMBOL(atomic_io_modify);
+> > +#endif
+> 
+> What about 8, 16 and 64-bit IO addresses?
+> 
+
+Right, forgot about these. I guess we can add those if we agree about the approach.
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
 http://free-electrons.com
