@@ -1,49 +1,41 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 28 Aug 2013 13:02:22 +0200
-Subject: [PATCH 1/9] ARM: at91/dt: add rm9200 spi0 chip select pins definitions
+Date: Wed, 28 Aug 2013 13:03:39 +0200
+Subject: [PATCH 2/9] ARM: at91/dt: add ethernet phy to at91rm9200ek board
 In-Reply-To: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
 References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1377687742-10618-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1377687819-10653-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add spi0 cs pinctrl pins definitions.
+Add ethernet phy node in at91rm9200ek.dts.
+The reg register is not specified, as it may differ depending on the init
+process of the board:
+ADDR0/1 phy pins are connected to PA13/14 rm9200 pins. Which means the phy
+will take its address from these pins during the reset process.
+
+The macb driver will launch a full scan on the mdio bus to discover the phy
+address.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- arch/arm/boot/dts/at91rm9200.dtsi |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/at91rm9200ek.dts |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-index f770655..69b76c7 100644
---- a/arch/arm/boot/dts/at91rm9200.dtsi
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -486,6 +486,26 @@
- 							 AT91_PIOA 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PA1 periph A SPI0_MOSI pin */
- 							 AT91_PIOA 2 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PA2 periph A SPI0_SPCK pin */
- 					};
+diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
+index d2d72c3..37b0880 100644
+--- a/arch/arm/boot/dts/at91rm9200ek.dts
++++ b/arch/arm/boot/dts/at91rm9200ek.dts
+@@ -47,6 +47,11 @@
+ 			macb0: ethernet at fffbc000 {
+ 				phy-mode = "rmii";
+ 				status = "okay";
 +
-+					pinctrl_spi0_cs0: spi0_cs0-0 {
-+						atmel,pins =
-+							<AT91_PIOA 3 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PA3 periph A SPI0_NPCS0 pin */
-+					};
-+
-+					pinctrl_spi0_cs1: spi0_cs1-0 {
-+						atmel,pins =
-+							<AT91_PIOA 4 AT91_PERIPH_GPIO AT91_PINCTRL_MULTI_DRIVE>;	/* PA4 GPIO SPI0_NPCS1 pin */
-+					};
-+
-+					pinctrl_spi0_cs2: spi0_cs2-0 {
-+						atmel,pins =
-+							<AT91_PIOA 5 AT91_PERIPH_GPIO AT91_PINCTRL_MULTI_DRIVE>;	/* PA5 GPIO SPI0_NPCS2 pin */
-+					};
-+
-+					pinctrl_spi0_cs3: spi0_cs3-0 {
-+						atmel,pins =
-+							<AT91_PIOA 6 AT91_PERIPH_GPIO AT91_PINCTRL_MULTI_DRIVE>;	/* PA6 GPIO SPI0_NPCS3 pin */
-+					};
- 				};
++				phy0: ethernet-phy {
++					interrupt-parent = <&pioC>;
++					interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
++				};
+ 			};
  
- 				pioA: gpio at fffff400 {
+ 			usb1: gadget at fffb0000 {
 -- 
 1.7.9.5
