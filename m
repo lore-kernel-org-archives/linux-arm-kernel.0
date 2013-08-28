@@ -1,61 +1,40 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 28 Aug 2013 17:38:48 -0500
-Subject: [GIT PULL] arm: dts: SOCFPGA updates for v3.12
-Message-ID: <1377729528-24305-1-git-send-email-dinguyen@altera.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 29 Aug 2013 08:21:48 +0900
+Subject: [PATCH v2 00/03] ARM: shmobile: r8a7790 APMU SMP support
+Message-ID: <20130828232148.7321.45739.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+ARM: shmobile: r8a7790 APMU SMP support
 
-Hi Olof/Kevin,
+[PATCH v2 01/03] ARM: shmobile: Shared APMU SMP support code without DT
+[PATCH v2 02/03] ARM: shmobile: Add r8a7790 SMP support using APMU code
+[PATCH v2 03/03] ARM: shmobile: Add r8a7790 CA15 CPU cores
 
-This is my first pull request to you guys, so I apologize in advance if
-something is not correct.
+This series adds SMP support to r8a7790 using the included APMU code.
+The previous version of r8a7790 support depended on the APMU code in 
+"[PATCH] ARM: shmobile: Shared APMU SMP support code", but in this
+version the APMU code has been reworked to not use DT. In the future
+r8a73a4 and other SoCs may make use of the APMU as well, but the 
+r8a73a4 code first needs to be adjusted to work with the CCI driver.
 
-Here is a short description of the ACKs for the 3 patches:
-of: add vendor prefix for Altera Corp.
-	Acked-by: Mark Rutland <mark.rutland@arm.com>
-	Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-dts: Deprecate ALTR as a vendor prefix
-	Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-arm: dts: Change dw-apb-timer-osc and dw-apb-timer-sp to just dw-apb-timer
-	Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+With these patches applied r8a7790 CA15 support for SMP boot
+and CPU Hotplug is known to be working.
 
-Thanks,
-Dinh
---------------------------------------------------------------
+Thanks to Sudeep for his feedback.
 
-The following changes since commit fa8218def1b1a16f0a410e2c1c767b4738cc81fa:
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-  Merge tag 'regmap-v3.11-rc7' of git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap (2013-08-27 10:10:30 -0700)
+ Written against renesas.git renesas-devel-20130829
 
-are available in the git repository at:
-
-
-  git://git.rocketboards.org/linux-socfpga-next.git next-dt
-
-for you to fetch changes up to 4d4dd417b8c0ba99c68038ccf2d0256dcd460ead:
-
-  arm: dts: Change dw-apb-timer-osc and dw-apb-timer-sp to  just dw-apb-timer (2013-08-28 17:11:25 -0500)
-
----------------------------------------------------------------
-SOCFPGA DT changes for v3.12 merge window.
-
-----------------------------------------------------------------
-Dinh Nguyen (3):
-      of: add vendor prefix for Altera Corp.
-      dts: Deprecate ALTR as a vendor prefix
-      arm: dts: Change dw-apb-timer-osc and dw-apb-timer-sp to      just dw-apb-timer
-
- Documentation/devicetree/bindings/rtc/dw-apb.txt   |   34 +++++++-------------
- .../devicetree/bindings/serial/altera_jtaguart.txt |    3 +-
- .../devicetree/bindings/serial/altera_uart.txt     |    3 +-
- .../devicetree/bindings/serio/altera_ps2.txt       |    3 +-
- .../devicetree/bindings/spi/spi_altera.txt         |    3 +-
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- arch/arm/boot/dts/socfpga.dtsi                     |    8 ++---
- drivers/input/serio/altera_ps2.c                   |    1 +
- drivers/spi/spi-altera.c                           |    1 +
- drivers/tty/serial/altera_jtaguart.c               |    1 +
- drivers/tty/serial/altera_uart.c                   |    1 +
- 11 files changed, 28 insertions(+), 31 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi                 |   21 ++
+ arch/arm/mach-shmobile/Makefile                |    1 
+ arch/arm/mach-shmobile/board-lager-reference.c |    1 
+ arch/arm/mach-shmobile/board-lager.c           |    1 
+ arch/arm/mach-shmobile/include/mach/common.h   |    6 
+ arch/arm/mach-shmobile/include/mach/r8a7790.h  |    1 
+ arch/arm/mach-shmobile/platsmp-apmu.c          |  178 ++++++++++++++++++++++++
+ arch/arm/mach-shmobile/setup-r8a7790.c         |    1 
+ arch/arm/mach-shmobile/smp-r8a7790.c           |   67 +++++++++
+ 9 files changed, 277 insertions(+)
