@@ -1,125 +1,173 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 28 Aug 2013 15:04:05 +0900
-Subject: [PATCH] ARM: shmobile: Shared APMU SMP support code
-In-Reply-To: <52091660.5030201@arm.com>
-References: <20130807224510.9832.38560.sendpatchset@w520>
- <52091660.5030201@arm.com>
-Message-ID: <CANqRtoSFKvXbuEb7G=DcmZCmZogjpU16RjSna3Lz-1YZLdin7A@mail.gmail.com>
+Date: Wed, 28 Aug 2013 15:13:17 +0900
+Subject: [PATCH 01/02] ARM: shmobile: Add r8a73a4 SMP support using APMU
+ code
+In-Reply-To: <52162638.5080107@arm.com>
+References: <20130807225531.9856.18974.sendpatchset@w520>
+ <20130807225540.9856.67383.sendpatchset@w520>
+ <52162638.5080107@arm.com>
+Message-ID: <CANqRtoQaSJN+DSv9Uj=Dxv6RutS4aYVY8AM9J=6LqUQjyo3STw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+Hi again Sudeep,
 
-On Tue, Aug 13, 2013 at 2:07 AM, Sudeep KarkadaNagesha
+On Thu, Aug 22, 2013 at 11:54 PM, Sudeep KarkadaNagesha
 <Sudeep.KarkadaNagesha@arm.com> wrote:
-> On 07/08/13 23:45, Magnus Damm wrote:
+> On 07/08/13 23:55, Magnus Damm wrote:
 >> From: Magnus Damm <damm@opensource.se>
 >>
->> Introduce shared APMU SMP code for mach-shmobile. Both SMP boot up
->> and CPU Hotplug is supported. DT is used for configuration of the
->> APMU hardware block, as the following r8a73a4 example shows:
+>> Add r8a73a4 SMP support using the shared APMU code. To enable
+>> SMP the r8a73a4 specific DTS needs to be updated to include
+>> CPU cores, and this is happening in a separate patch.
 >>
->>        apmu at e6152000 {
->>                compatible = "renesas,r8a73a4-apmu", "renesas,apmu";
->>                reg = <0 0xe6152000 0 0x88>;
->>                cpus = <&cpu0 &cpu1 &cpu2 &cpu3>;
->>        };
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> ---
 >>
-> This is introducing a new DT binding which needs to be documented. Also
-> you need to cc devicetree mailing list in case you need to add new
-> bindings. But I think you should not require this new binding.
-
-Good idea, I have no objections against DT binding documentation. So
-if future versions end up using DT then those bindings surely need to
-be documented.
-
-The reason behind using DT here is that it was recommended to me
-during the review of an earlier SMP prototype version. The base
-addresses for the Renesas-specific APMU hardware needs to be
-configured somehow and using DT may not be such a bad idea.
-
->> The code is designed around CONFIG_NR_CPUS and should in theory support
->> any number of APMUs. At this point only the APMU that includes the
->> boot CPU is enabled - this to prevent non-deterministic scheduling on
->> upstream in case of multi-cluster hardware with varying performance.
+>>  arch/arm/mach-shmobile/Makefile               |    1
+>>  arch/arm/mach-shmobile/include/mach/r8a73a4.h |    1
+>>  arch/arm/mach-shmobile/setup-r8a73a4.c        |    3 +
+>>  arch/arm/mach-shmobile/smp-r8a73a4.c          |   75 +++++++++++++++++++++++++
+>>  4 files changed, 80 insertions(+)
 >>
-> I couldn't understand this patch completely but I believe you are
-> trying to solve multi-cluster power management and in your own custom
-> way.
->
-> But there are 2 ways to handle this in a generic way:
-> 1. If Linux runs in non-secure mode, you need to use PSCI.
->    You can refer Calxeda platform for reference[1]
-> 2. If Linux runs in secure mode, you need to use MPCM
->    You can refer Vexpress CA15_CA7/TC2 platform for reference[2]
+>> --- 0001/arch/arm/mach-shmobile/Makefile
+>> +++ work/arch/arm/mach-shmobile/Makefile      2013-08-07 20:07:31.000000000 +0900
+>> @@ -33,6 +33,7 @@ endif
+>>  # SMP objects
+>>  smp-y                                := platsmp.o headsmp.o
+>>  smp-$(CONFIG_ARCH_SH73A0)    += smp-sh73a0.o headsmp-scu.o platsmp-scu.o
+>> +smp-$(CONFIG_ARCH_R8A73A4)   += smp-r8a73a4.o platsmp-apmu.o
+> platsmp-apmu.c is introducing new bindings which IMO is not required.
 
-Thanks for this information. I'm not really trying to do any custom
-multi-cluster power management here, only provide software support for
-our APMU hardware block. The APMU hardware block is used in several
-SoCs from Renesas - for instance in single-cluster CA15-only
-configurations or multi-cluster CA15 and CA7 configurations.
+I guess we will have to discuss a bit more how to support the APMU
+hardware. Regarding using DT or static configuration, I believe
+starting out with static and incrementally adding DT binding support
+is the easiest way forward.
 
-So regardless of PSCI or MPCM it seems to me that the APMU hardware
-needs to be supported somewhere. I would like to have the APMU
-software support in Linux to follow the same style as our other SoCs.
-Having dependencies on binary blobs is something that I would like to
-avoid unless it is absolutely necessary. Regarding secure vs
-non-secure mode, as you may have guessed by now - the hardware on my
-desk runs in non-secure mode.
+> I have responded to that patch, but it would be nice to combine that
+> patch in a single series for easier review for at least one platform
+> using it.
 
-As for PSCI, I wonder how that is supposed to work when power domains
-are shared between I/O devices and CPUs? I can understand the benefits
-of using PSCI to share independent CPU core PM support code outside of
-Linux if multiple OS would be supported perhaps together with TOS. But
-if there is no TOS and only a single OS and/or the hardware power
-domains include CPU cores and I/O devices driven by the OS then the
-merits of PSCI become less clear to me.
+Good idea. I will resend a the next version as a single series to make
+future review easier.
 
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +/* nicked from arch/arm/mach-exynos/hotplug.c */
->> +static inline void cpu_enter_lowpower_a15(void)
+>>  smp-$(CONFIG_ARCH_R8A7779)   += smp-r8a7779.o headsmp-scu.o platsmp-scu.o
+>>  smp-$(CONFIG_ARCH_EMEV2)     += smp-emev2.o headsmp-scu.o platsmp-scu.o
+>>
+>> --- 0008/arch/arm/mach-shmobile/include/mach/r8a73a4.h
+>> +++ work/arch/arm/mach-shmobile/include/mach/r8a73a4.h        2013-08-07 20:08:02.000000000 +0900
+>> @@ -6,5 +6,6 @@ void r8a73a4_add_dt_devices(void);
+>>  void r8a73a4_clock_init(void);
+>>  void r8a73a4_pinmux_init(void);
+>>  void r8a73a4_init_early(void);
+>> +extern struct smp_operations r8a73a4_smp_ops;
+>>
+>>  #endif /* __ASM_R8A73A4_H__ */
+>> --- 0008/arch/arm/mach-shmobile/setup-r8a73a4.c
+>> +++ work/arch/arm/mach-shmobile/setup-r8a73a4.c       2013-08-07 20:07:48.000000000 +0900
+>> @@ -212,6 +212,9 @@ void __init r8a73a4_init_early(void)
+>>  #ifndef CONFIG_ARM_ARCH_TIMER
+>>       shmobile_setup_delay(1500, 2, 4); /* Cortex-A15 @ 1500MHz */
+>>  #endif
+>> +#ifdef CONFIG_SMP
+>> +     smp_set_ops(&r8a73a4_smp_ops);
+>> +#endif
+>>  }
+>>
+>>  #ifdef CONFIG_USE_OF
+>> --- /dev/null
+>> +++ work/arch/arm/mach-shmobile/smp-r8a73a4.c 2013-08-07 20:09:10.000000000 +0900
+>> @@ -0,0 +1,75 @@
+>> +/*
+>> + * SMP support for r8a73a4
+>> + *
+>> + * Copyright (C) 2012-2013 Renesas Solutions Corp.
+>> + * Copyright (C) 2012 Takashi Yoshii <takashi.yoshii.ze@renesas.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; version 2 of the License.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +#include <linux/init.h>
+>> +#include <linux/io.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/smp.h>
+>> +#include <asm/smp_plat.h>
+>> +#include <mach/common.h>
+>> +
+>> +#define SYSC         0xe6180000
+>> +#define CA7BAR               0x4020
+>> +#define CA15BAR              0x6020
+>> +#define RESCNT               0x801c
+>> +#define MERAM                0xe8080000
+>> +#define CCI_BASE     0xf0190000
+>> +#define CCI_SLAVE3   0x4000
+>> +#define CCI_SLAVE4   0x5000
+>> +#define CCI_SNOOP    0x0000
+>> +#define CCI_STATUS   0x000c
+> Have a look at cci driver and its bindings, these slave addresses needs
+> to be part of DTS.
+
+Ok, I will look into how we can make use of the CCI driver.
+
+>> +
+>> +static void __init r8a73a4_smp_prepare_cpus(unsigned int max_cpus)
 >> +{
->> +     unsigned int v;
+>> +     u32 bar;
+>> +     void __iomem *p;
 >> +
->> +     asm volatile(
->> +     "       mrc     p15, 0, %0, c1, c0, 0\n"
->> +     "       bic     %0, %0, %1\n"
->> +     "       mcr     p15, 0, %0, c1, c0, 0\n"
->> +     : "=&r" (v)
->> +     : "Ir" (CR_C)
->> +     : "cc");
+>> +     /* let APMU code install data related to shmobile_boot_vector */
+>> +     shmobile_smp_apmu_prepare_cpus(max_cpus);
 >> +
->> +     flush_cache_louis();
+>> +     /* MERAM for jump stub, because BAR requires 256KB aligned address */
+>> +     p = ioremap_nocache(MERAM, shmobile_boot_size);
+>> +     memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
+>> +     iounmap(p);
 >> +
->> +     asm volatile(
->> +     /*
->> +      * Turn off coherency
->> +      */
->> +     "       mrc     p15, 0, %0, c1, c0, 1\n"
->> +     "       bic     %0, %0, %1\n"
->> +     "       mcr     p15, 0, %0, c1, c0, 1\n"
->> +     : "=&r" (v)
->> +     : "Ir" (0x40)
->> +     : "cc");
+>> +     /* setup reset vector and disable reset */
+>> +     p = ioremap_nocache(SYSC, 0x9000);
+>> +     bar = (MERAM >> 8) & 0xfffffc00;
+>> +     writel_relaxed(bar, p + CA15BAR);
+>> +     writel_relaxed(bar, p + CA7BAR);
+>> +     writel_relaxed(bar | 0x10, p + CA15BAR);
+>> +     writel_relaxed(bar | 0x10, p + CA7BAR);
+>> +     writel_relaxed(readl_relaxed(p + RESCNT) & ~(1 << 10), p + RESCNT);
+>> +     writel_relaxed(readl_relaxed(p + RESCNT) & ~(1 << 9), p + RESCNT);
+>> +     iounmap(p);
 >> +
->> +     isb();
->> +     dsb();
+>> +     /* enable snoop and DVM */
+>> +     p = ioremap_nocache(CCI_BASE, 0x8000);
+>> +     writel_relaxed(3, p + CCI_SLAVE3 + CCI_SNOOP);  /* CA15 */
+>> +     writel_relaxed(3, p + CCI_SLAVE4 + CCI_SNOOP);  /* CA7 */
+>> +     while (readl_relaxed(p + CCI_STATUS))
+>> +             /* wait for pending bit low */;
+>> +     iounmap(p);
+> You can use cci driver APIs for CCI control.
+
+Ok!
+
 >> +}
->
-> This sequences exactly matches the power-down sequence for CA15/A7.
-> (implemented in [2]). Unless your platform needs a different sequence,
-> you can re-use the code. Nico was trying to consolidate the power-down
-> sequence for all ARM Cortex-A15/A7 implementations[3].
+>> +
+>> +struct smp_operations r8a73a4_smp_ops __initdata = {
+>> +     .smp_prepare_cpus       = r8a73a4_smp_prepare_cpus,
+>> +     .smp_boot_secondary     = shmobile_smp_apmu_boot_secondary,
+>> +#ifdef CONFIG_HOTPLUG_CPU
+>> +     .cpu_disable            = shmobile_smp_cpu_disable,
+>> +     .cpu_die                = shmobile_smp_apmu_cpu_die,
+>> +     .cpu_kill               = shmobile_smp_apmu_cpu_kill,
+>> +#endif
+>> +};
+> If you are running Linux in secure mode, you can reuse mcpm_smp_ops and
+> define these as part of mcpm_platform_ops
 
-Yes, thanks, reusing that code sounds like a good plan.
+Thanks for pointing that out, but we're not running in secure more.
 
-> [1]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/187130.html
-> [2]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/184372.html
-> [3] http://www.spinics.net/lists/arm-kernel/msg260472.html
-
-Thanks for your help!
+Thanks for the review!
 
 Cheers,
 
