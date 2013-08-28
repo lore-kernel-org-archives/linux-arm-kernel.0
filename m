@@ -1,109 +1,91 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Wed, 28 Aug 2013 11:44:46 +0100
-Subject: [PATCH v5 2/5] ARM: arch_timer: add support to configure and enable
- event stream
+Date: Wed, 28 Aug 2013 11:44:45 +0100
+Subject: [PATCH v5 1/5] ARM/ARM64: arch_timer: add macros for bits in control
+ register
 In-Reply-To: <1377686689-30828-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1377686689-30828-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1377686689-30828-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1377686689-30828-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-This patch adds support for configuring the event stream frequency
-and enabling it.
+Add macros to describe the bitfields in the ARM architected timer
+control register to make code easy to understand.
 
-It also adds the hwcaps definitions to the user to detect this event
-stream feature.
-
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 ---
- arch/arm/include/asm/arch_timer.h | 33 ++++++++++++++++++++++++++++-----
- arch/arm/include/uapi/asm/hwcap.h |  1 +
- arch/arm/kernel/setup.c           |  1 +
- 3 files changed, 30 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/arch_timer.h    |  9 +++++++--
+ arch/arm64/include/asm/arch_timer.h  | 12 ++++++++----
+ include/clocksource/arm_arch_timer.h |  8 ++++++++
+ 3 files changed, 23 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index 1a3e967..4e38609 100644
+index e406d57..1a3e967 100644
 --- a/arch/arm/include/asm/arch_timer.h
 +++ b/arch/arm/include/asm/arch_timer.h
-@@ -89,22 +89,45 @@ static inline u64 arch_counter_get_cntvct(void)
- 	return cval;
- }
+@@ -95,8 +95,13 @@ static inline void arch_counter_set_user_access(void)
  
--static inline void arch_counter_set_user_access(void)
-+static inline u32 arch_timer_get_cntkctl(void)
+ 	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
+ 
+-	/* disable user access to everything */
+-	cntkctl &= ~((3 << 8) | (7 << 0));
++	/* Disable user access to both physical/virtual counters/timers */
++	/* Also disable virtual event stream */
++	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
++			| ARCH_TIMER_USR_VT_ACCESS_EN
++			| ARCH_TIMER_VIRT_EVT_EN
++			| ARCH_TIMER_USR_VCT_ACCESS_EN
++			| ARCH_TIMER_USR_PCT_ACCESS_EN);
+ 
+ 	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
+ }
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index 98abd47..fa4af76 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -101,12 +101,16 @@ static inline void arch_counter_set_user_access(void)
  {
  	u32 cntkctl;
--
- 	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
-+	return cntkctl;
-+}
-+
-+static inline void arch_timer_set_cntkctl(u32 cntkctl)
-+{
-+	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
-+}
-+
-+static inline void arch_counter_set_user_access(void)
-+{
-+	u32 cntkctl = arch_timer_get_cntkctl();
  
- 	/* Disable user access to both physical/virtual counters/timers */
--	/* Also disable virtual event stream */
- 	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
- 			| ARCH_TIMER_USR_VT_ACCESS_EN
--			| ARCH_TIMER_VIRT_EVT_EN
- 			| ARCH_TIMER_USR_VCT_ACCESS_EN
- 			| ARCH_TIMER_USR_PCT_ACCESS_EN);
-+	arch_timer_set_cntkctl(cntkctl);
-+}
+-	/* Disable user access to the timers and the physical counter. */
+ 	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
+-	cntkctl &= ~((3 << 8) | (1 << 0));
  
--	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
-+static inline void arch_timer_evtstrm_config(bool enable, int divider)
-+{
-+	u32 cntkctl = arch_timer_get_cntkctl();
-+	if (enable) {
-+		cntkctl &= ~ARCH_TIMER_EVT_TRIGGER_MASK;
-+		/* Set the divider and enable virtual event stream */
-+		cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
-+				| ARCH_TIMER_VIRT_EVT_EN;
-+		elf_hwcap |= HWCAP_EVTSTRM;
-+	} else {
-+		cntkctl &= ~ARCH_TIMER_VIRT_EVT_EN; /* disable event stream */
-+	}
-+	arch_timer_set_cntkctl(cntkctl);
+-	/* Enable user access to the virtual counter and frequency. */
+-	cntkctl |= (1 << 1);
++	/* Disable user access to the timers and the physical counter */
++	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
++			| ARCH_TIMER_USR_VT_ACCESS_EN
++			| ARCH_TIMER_USR_PCT_ACCESS_EN);
++
++	/* Enable user access to the virtual counter */
++	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
++
+ 	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
  }
+ 
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index c463ce9..551f7e9 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -29,6 +29,14 @@
+ #define ARCH_TIMER_PHYS_ACCESS		0
+ #define ARCH_TIMER_VIRT_ACCESS		1
+ 
++#define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter */
++#define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
++#define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
++#define ARCH_TIMER_EVT_TRIGGER_SHIFT	(4)
++#define ARCH_TIMER_EVT_TRIGGER_MASK	(0xF << ARCH_TIMER_EVT_TRIGGER_SHIFT)
++#define ARCH_TIMER_USR_VT_ACCESS_EN	(1 << 8) /* virtual timer registers */
++#define ARCH_TIMER_USR_PT_ACCESS_EN	(1 << 9) /* physical timer registers */
 +
- #endif
+ #ifdef CONFIG_ARM_ARCH_TIMER
  
- #endif
-diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
-index 6d34d08..7dcc10d 100644
---- a/arch/arm/include/uapi/asm/hwcap.h
-+++ b/arch/arm/include/uapi/asm/hwcap.h
-@@ -26,5 +26,6 @@
- #define HWCAP_VFPD32	(1 << 19)	/* set if VFP has 32 regs (not 16) */
- #define HWCAP_IDIV	(HWCAP_IDIVA | HWCAP_IDIVT)
- #define HWCAP_LPAE	(1 << 20)
-+#define HWCAP_EVTSTRM	(1 << 21)
- 
- #endif /* _UAPI__ASMARM_HWCAP_H */
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index afc2489..305ffc9 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -975,6 +975,7 @@ static const char *hwcap_str[] = {
- 	"idivt",
- 	"vfpd32",
- 	"lpae",
-+	"evtstrm",
- 	NULL
- };
- 
+ extern u32 arch_timer_get_rate(void);
 -- 
 1.8.1.2
