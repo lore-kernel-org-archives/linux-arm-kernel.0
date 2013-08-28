@@ -1,73 +1,162 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 28 Aug 2013 17:44:50 +0100
-Subject: [PATCH 11/19] ARM: alignment: correctly decode instructions in
- BE8 mode.
-In-Reply-To: <1377639509-22778-12-git-send-email-ben.dooks@codethink.co.uk>
+Date: Wed, 28 Aug 2013 17:46:39 +0100
+Subject: [PATCH 13/19] ARM: module: correctly relocate instructions in BE8
+In-Reply-To: <1377639509-22778-14-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
- <1377639509-22778-12-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130828164450.GD3842@localhost.localdomain>
+ <1377639509-22778-14-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130828164638.GE3842@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 10:38:21PM +0100, Ben Dooks wrote:
-> If we are in BE8 mode, we must deal with the instruction stream being
-> in LE order when data is being loaded in BE order. Ensure the data is
-> swapped before processing to avoid thre following:
+On Tue, Aug 27, 2013 at 10:38:23PM +0100, Ben Dooks wrote:
+> When in BE8 mode, our instructions are not in the same ordering as the
+> data, so use <asm/opcodes.h> to take this into account.
 > 
-> Change to using <asm/opcodes.h> to provide the necessary conversion
-> functions to change the byte ordering.
+> Note, also requires modules to be built --be8
 > 
-> Alignment trap: not handling instruction 030091e8 at [<80333e8c>]
-> Unhandled fault: alignment exception (0x001) at 0xbfa09567
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
 Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 > ---
->  arch/arm/mm/alignment.c |    9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
+>  arch/arm/kernel/module.c |   57 +++++++++++++++++++++++++++-------------------
+>  1 file changed, 34 insertions(+), 23 deletions(-)
 > 
-> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> index 6f4585b..9240364 100644
-> --- a/arch/arm/mm/alignment.c
-> +++ b/arch/arm/mm/alignment.c
-> @@ -25,6 +25,7 @@
->  #include <asm/cp15.h>
->  #include <asm/system_info.h>
->  #include <asm/unaligned.h>
+> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+> index 85c3fb6..a1045a7 100644
+> --- a/arch/arm/kernel/module.c
+> +++ b/arch/arm/kernel/module.c
+> @@ -24,6 +24,7 @@
+>  #include <asm/sections.h>
+>  #include <asm/smp_plat.h>
+>  #include <asm/unwind.h>
 > +#include <asm/opcodes.h>
 >  
->  #include "fault.h"
+>  #ifdef CONFIG_XIP_KERNEL
+>  /*
+> @@ -60,6 +61,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+>  		Elf32_Sym *sym;
+>  		const char *symname;
+>  		s32 offset;
+> +		u32 tmp;
+>  #ifdef CONFIG_THUMB2_KERNEL
+>  		u32 upper, lower, sign, j1, j2;
+>  #endif
+> @@ -95,7 +97,8 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+>  		case R_ARM_PC24:
+>  		case R_ARM_CALL:
+>  		case R_ARM_JUMP24:
+> -			offset = (*(u32 *)loc & 0x00ffffff) << 2;
+> +			offset = __mem_to_opcode_arm(*(u32 *)loc);
+> +			offset = (offset & 0x00ffffff) << 2;
+>  			if (offset & 0x02000000)
+>  				offset -= 0x04000000;
 >  
-> @@ -762,21 +763,25 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
->  	if (thumb_mode(regs)) {
->  		u16 *ptr = (u16 *)(instrptr & ~1);
->  		fault = probe_kernel_address(ptr, tinstr);
-> +		tinstr = __mem_to_opcode_thumb16(tinstr);
->  		if (!fault) {
->  			if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
->  			    IS_T32(tinstr)) {
->  				/* Thumb-2 32-bit */
->  				u16 tinst2 = 0;
->  				fault = probe_kernel_address(ptr + 1, tinst2);
-> -				instr = (tinstr << 16) | tinst2;
-> +				tinst2 = __mem_to_opcode_thumb16(tinst2);
-> +				instr = __opcode_thumb32_compose(tinstr, tinst2);
->  				thumb2_32b = 1;
->  			} else {
->  				isize = 2;
->  				instr = thumb2arm(tinstr);
+> @@ -111,9 +114,10 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 >  			}
->  		}
-> -	} else
-> +	} else {
->  		fault = probe_kernel_address(instrptr, instr);
-> +		instr = __mem_to_opcode_arm(instr);
-> +	}
 >  
->  	if (fault) {
->  		type = TYPE_FAULT;
+>  			offset >>= 2;
+> +			offset &= 0x00ffffff;
+>  
+> -			*(u32 *)loc &= 0xff000000;
+> -			*(u32 *)loc |= offset & 0x00ffffff;
+> +			*(u32 *)loc &= __opcode_to_mem_arm(0xff000000);
+> +			*(u32 *)loc |= __opcode_to_mem_arm(offset);
+>  			break;
+>  
+>  	       case R_ARM_V4BX:
+> @@ -121,8 +125,8 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+>  			* other bits to re-code instruction as
+>  			* MOV PC,Rm.
+>  			*/
+> -		       *(u32 *)loc &= 0xf000000f;
+> -		       *(u32 *)loc |= 0x01a0f000;
+> +		       *(u32 *)loc &= __opcode_to_mem_arm(0xf000000f);
+> +		       *(u32 *)loc |= __opcode_to_mem_arm(0x01a0f000);
+>  		       break;
+>  
+>  		case R_ARM_PREL31:
+> @@ -132,7 +136,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+>  
+>  		case R_ARM_MOVW_ABS_NC:
+>  		case R_ARM_MOVT_ABS:
+> -			offset = *(u32 *)loc;
+> +			offset = tmp = __mem_to_opcode_arm(*(u32 *)loc);
+>  			offset = ((offset & 0xf0000) >> 4) | (offset & 0xfff);
+>  			offset = (offset ^ 0x8000) - 0x8000;
+>  
+> @@ -140,16 +144,18 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+>  			if (ELF32_R_TYPE(rel->r_info) == R_ARM_MOVT_ABS)
+>  				offset >>= 16;
+>  
+> -			*(u32 *)loc &= 0xfff0f000;
+> -			*(u32 *)loc |= ((offset & 0xf000) << 4) |
+> -					(offset & 0x0fff);
+> +			tmp &= 0xfff0f000;
+> +			tmp |= ((offset & 0xf000) << 4) |
+> +				(offset & 0x0fff);
+> +
+> +			*(u32 *)loc = __opcode_to_mem_arm(tmp);
+>  			break;
+>  
+>  #ifdef CONFIG_THUMB2_KERNEL
+>  		case R_ARM_THM_CALL:
+>  		case R_ARM_THM_JUMP24:
+> -			upper = *(u16 *)loc;
+> -			lower = *(u16 *)(loc + 2);
+> +			upper = __mem_to_opcode_thumb16(*(u16 *)loc);
+> +			lower = __mem_to_opcode_thumb16(*(u16 *)(loc + 2));
+>  
+>  			/*
+>  			 * 25 bit signed address range (Thumb-2 BL and B.W
+> @@ -198,17 +204,20 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+>  			sign = (offset >> 24) & 1;
+>  			j1 = sign ^ (~(offset >> 23) & 1);
+>  			j2 = sign ^ (~(offset >> 22) & 1);
+> -			*(u16 *)loc = (u16)((upper & 0xf800) | (sign << 10) |
+> +			upper = (u16)((upper & 0xf800) | (sign << 10) |
+>  					    ((offset >> 12) & 0x03ff));
+> -			*(u16 *)(loc + 2) = (u16)((lower & 0xd000) |
+> -						  (j1 << 13) | (j2 << 11) |
+> -						  ((offset >> 1) & 0x07ff));
+> +			lower = (u16)((lower & 0xd000) |
+> +				      (j1 << 13) | (j2 << 11) |
+> +				      ((offset >> 1) & 0x07ff));
+> +
+> +			*(u16 *)loc = __opcode_to_mem_thumb16(upper);
+> +			*(u16 *)(loc + 2) = __opcode_to_mem_thumb16(lower);
+>  			break;
+>  
+>  		case R_ARM_THM_MOVW_ABS_NC:
+>  		case R_ARM_THM_MOVT_ABS:
+> -			upper = *(u16 *)loc;
+> -			lower = *(u16 *)(loc + 2);
+> +			upper = __mem_to_opcode_thumb16(*(u16 *)loc);
+> +			lower = __mem_to_opcode_thumb16(*(u16 *)(loc + 2));
+>  
+>  			/*
+>  			 * MOVT/MOVW instructions encoding in Thumb-2:
+> @@ -229,12 +238,14 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+>  			if (ELF32_R_TYPE(rel->r_info) == R_ARM_THM_MOVT_ABS)
+>  				offset >>= 16;
+>  
+> -			*(u16 *)loc = (u16)((upper & 0xfbf0) |
+> -					    ((offset & 0xf000) >> 12) |
+> -					    ((offset & 0x0800) >> 1));
+> -			*(u16 *)(loc + 2) = (u16)((lower & 0x8f00) |
+> -						  ((offset & 0x0700) << 4) |
+> -						  (offset & 0x00ff));
+> +			upper = (u16)((upper & 0xfbf0) |
+> +				      ((offset & 0xf000) >> 12) |
+> +				      ((offset & 0x0800) >> 1));
+> +			lower = (u16)((lower & 0x8f00) |
+> +				      ((offset & 0x0700) << 4) |
+> +				      (offset & 0x00ff));
+> +			*(u16 *)loc = __opcode_to_mem_thumb16(upper);
+> +			*(u16 *)(loc + 2) = __opcode_to_mem_thumb16(lower);
+>  			break;
+>  #endif
+>  
 > -- 
 > 1.7.10.4
 > 
