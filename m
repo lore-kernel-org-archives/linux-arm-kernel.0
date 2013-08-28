@@ -1,64 +1,50 @@
 From: markus.mayer@linaro.org (Markus Mayer)
-Date: Wed, 28 Aug 2013 15:16:12 -0700
-Subject: [PATCH v5 2/3] ARM: bcm281xx: Enable GPIO driver
+Date: Wed, 28 Aug 2013 15:16:13 -0700
+Subject: [PATCH v5 3/3] ARM: bcm281xx: Add device node for the GPIO controller
 In-Reply-To: <1377728173-30711-1-git-send-email-markus.mayer@linaro.org>
 References: <1377728173-30711-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <1377728173-30711-3-git-send-email-markus.mayer@linaro.org>
+Message-ID: <1377728173-30711-4-git-send-email-markus.mayer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Kconfig and Makefile glue to compile the GPIO
-driver for bcm281xx when CONFIG_GPIO_BCM=y.
+Add the GPIO controller device node for the Broadcom bcm281xx family of
+chips
 
 Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
 Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
 Reviewed-by: Matt Porter <matt.porter@linaro.org>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-bcm/Kconfig |    2 +-
- drivers/gpio/Kconfig      |    5 +++++
- drivers/gpio/Makefile     |    1 +
- 3 files changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/bcm11351.dtsi |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index f112895..5819126 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -9,7 +9,7 @@ config ARCH_BCM
- 	select CLKSRC_OF
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_TIME
--	select GPIO_BCM
-+	select GPIO_BCM_KONA
- 	select SPARSE_IRQ
- 	select TICK_ONESHOT
- 	help
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index b2450ba..b68e9b5 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -714,6 +714,11 @@ config GPIO_MSIC
- 	  Enable support for GPIO on intel MSIC controllers found in
- 	  intel MID devices
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index c0cdf66..a3945e3 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -63,6 +63,22 @@
+ 		clock-frequency = <32768>;
+ 	};
  
-+config GPIO_BCM_KONA
-+	bool "Broadcom Kona GPIO"
-+	help
-+	  Turn on GPIO support for Broadcom "Kona" chips.
++	gpio: gpio at 35003000 {
++		compatible = "brcm,bcm11351-gpio", "brcm,kona-gpio";
++		reg = <0x35003000 0x800>;
++		interrupts =
++		       <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH
++			GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH
++			GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH
++			GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
++			GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH
++			GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
++		#gpio-cells = <2>;
++		#interrupt-cells = <2>;
++		gpio-controller;
++		interrupt-controller;
++	};
 +
- comment "USB GPIO expanders:"
- 
- config GPIO_VIPERBOARD
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index ef3e983..fcd0751 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -16,6 +16,7 @@ obj-$(CONFIG_GPIO_ADP5520)	+= gpio-adp5520.o
- obj-$(CONFIG_GPIO_ADP5588)	+= gpio-adp5588.o
- obj-$(CONFIG_GPIO_AMD8111)	+= gpio-amd8111.o
- obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
-+obj-$(CONFIG_GPIO_BCM_KONA)	+= gpio-bcm-kona.o
- obj-$(CONFIG_GPIO_BT8XX)	+= gpio-bt8xx.o
- obj-$(CONFIG_GPIO_CLPS711X)	+= gpio-clps711x.o
- obj-$(CONFIG_GPIO_CS5535)	+= gpio-cs5535.o
+ 	sdio0: sdio at 0x3f180000 {
+ 		compatible = "bcm,kona-sdhci";
+ 		reg = <0x3f180000 0x10000>;
 -- 
 1.7.9.5
