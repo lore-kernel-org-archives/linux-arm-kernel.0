@@ -1,66 +1,91 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Wed, 28 Aug 2013 17:33:46 +0530
-Subject: [PATCH v2 06/13] ARM: OMAP2+: PRCM: AM43x definitions
-In-Reply-To: <alpine.DEB.2.02.1308210313410.6426@utopia.booyaka.com>
-References: <cover.1375443858.git.afzal@ti.com>
- <ec65e24f1637245257f55906e5533ca54b010418.1375443858.git.afzal@ti.com>
- <alpine.DEB.2.02.1308210313410.6426@utopia.booyaka.com>
-Message-ID: <521DE722.1050700@ti.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Wed, 28 Aug 2013 17:36:50 +0530
+Subject: [PATCH] ARM: DT: Exynos5250: fix number of interrupt-cells in mct
+ node
+In-Reply-To: <6294395.8UjbZM2KH4@amdc1227>
+References: <1377687641-15376-1-git-send-email-chander.kashyap@linaro.org>
+ <6294395.8UjbZM2KH4@amdc1227>
+Message-ID: <CANuQgHG03q5mZALdyOaQv3ndD45n4UjmsuoHE7F96WM0ueKw0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On 28 August 2013 16:48, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Chander,
+>
+> On Wednesday 28 of August 2013 16:30:41 Chander Kashyap wrote:
+>> Two cells were used to specify interrupts in mct node, while second cell
+>> always remains unused. Hence use only one cell.
+>> Suggested by Tomasz Figa.
+>>
+>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> ---
+>> changes in v2:
+>>       - Drop Changes for Exynos4 as done in separate patch by Tomasz
+>>
+>>  arch/arm/boot/dts/exynos5250.dtsi |   19 +++++++++----------
+>>  1 file changed, 9 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+>> b/arch/arm/boot/dts/exynos5250.dtsi index ef57277..f2f178a 100644
+>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>> @@ -102,23 +102,22 @@
+>>               compatible = "samsung,exynos4210-mct";
+>>               reg = <0x101C0000 0x800>;
+>>               interrupt-controller;
+>> -             #interrups-cells = <2>;
+>> +             #interrups-cells = <1>;
+>
+> Those two properties above are unused and in fact incorrect, because MCT is
+> not an interrupt controller, so they could be removed in a follow-up patch.
 
-On Wednesday 21 August 2013 08:50 AM, Paul Walmsley wrote:
+Thanks for the correction. I will remove them.
 
->> +/* PRM instances */
->> +#define AM43XX_PRM_OCP_SOCKET_INST			0x0000
->> +#define AM43XX_PRM_MPU_INST				0x0300
->> +#define AM43XX_PRM_GFX_INST				0x0400
->> +#define AM43XX_PRM_RTC_INST				0x0500
->> +#define AM43XX_PRM_TAMPER_INST				0x0600
->> +#define AM43XX_PRM_CEFUSE_INST				0x0700
->> +#define AM43XX_PRM_PER_INST				0x0800
->> +#define AM43XX_PRM_WKUP_INST				0x2000
->> +#define AM43XX_PRM_DEVICE_INST				0x4000
->> +
-> 
-> ...
-> 
->> +/* CM instances */
->> +#define AM43XX_CM_WKUP_INST				0x2800
->> +#define AM43XX_CM_DEVICE_INST				0x4100
->> +#define AM43XX_CM_DPLL_INST				0x4200
->> +#define AM43XX_CM_MPU_INST				0x8300
->> +#define AM43XX_CM_GFX_INST				0x8400
->> +#define AM43XX_CM_RTC_INST				0x8500
->> +#define AM43XX_CM_TAMPER_INST				0x8600
->> +#define AM43XX_CM_CEFUSE_INST				0x8700
->> +#define AM43XX_CM_PER_INST				0x8800
-> 
-> That's a pretty broad address range to span, in PRCM terms.  Seems pretty 
-> unlikely that the whole area is really decoded to a single PRCM IP block?  
-> Or is it actually decoded into smaller PRM and CM sub-blocks, similar to 
-> OMAP4?
-> 
-> Just by looking at the offsets, it looks to me like you've got:
-> 
-> 1. one IP block at 0x0000-0x1fff? that covers system PRM
-> 
-> 2. one IP block at 0x2000-0x3fff? that covers WKUP PRM & CM
->   
-> 3. one IP block at 0x4000-? that covers device & PLL PRM & CM
-> 
-> 4. one IP block at 0x8000-? that covers system CM
+>
+> You can also check out the clean-up series I mentioned for other things
+> that could be cleaned up in Exynos 5 dtsi files.
 
-In AM43x, PRCM is a single entity as in AM335x, but with a mixed address
-space for PRM & CM instances.
+ok
 
-On AM335x, from the header files, it can be seen that PRM & CM base is
-0x44e00000, here it is similar case except that the base for both is
-0x44df0000 instead.
+>
+>>               interrupt-parent = <&mct_map>;
+>> -             interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
+>> -                          <4 0>, <5 0>;
+>> +             interrupts = <0>, <1>, <2>, <3>, <4>, <5>;
+>>               clocks = <&clock 1>, <&clock 335>;
+>>               clock-names = "fin_pll", "mct";
+>>
+>>               mct_map: mct-map {
+>> -                     #interrupt-cells = <2>;
+>> +                     #interrupt-cells = <1>;
+>>                       #address-cells = <0>;
+>>                       #size-cells = <0>;
+>> -                     interrupt-map = <0x0 0 &combiner 23 3>,
+>> -                                     <0x1 0 &combiner 23 4>,
+>> -                                     <0x2 0 &combiner 25 2>,
+>> -                                     <0x3 0 &combiner 25 3>,
+>> -                                     <0x4 0 &gic 0 120 0>,
+>> -                                     <0x5 0 &gic 0 121 0>;
+>> +                     interrupt-map = <0 &combiner 23 3>,
+>> +                                     <1 &combiner 23 4>,
+>> +                                     <2 &combiner 25 2>,
+>> +                                     <3 &combiner 25 3>,
+>> +                                     <4 &gic 0 120 0>,
+>> +                                     <5 &gic 0 121 0>;
+>>               };
+>>       };
+>
+> Otherwise, looks fine. Thanks.
 
-Also, script too generated the macros as in this change.
+Thanks
 
-Regards
-Afzal
+>
+> Best regards,
+> Tomasz
+>
+
+
+
+-- 
+with warm regards,
+Chander Kashyap
