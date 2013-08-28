@@ -1,57 +1,73 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 28 Aug 2013 10:33:34 -0600
-Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
-In-Reply-To: <20130828120801.GC2348@localhost>
-References: <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130827163939.24636d80@skate> <20130827151136.GA10084@localhost>
- <20130827152535.GG19598@titan.lakedaemon.net>
- <20130827191337.GA2339@localhost> <521D063F.4040404@gmail.com>
- <20130827210248.GA19625@obsidianresearch.com>
- <20130827221729.GA25413@localhost>
- <20130827222532.GA1632@obsidianresearch.com>
- <20130828120801.GC2348@localhost>
-Message-ID: <20130828163334.GB31381@obsidianresearch.com>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Wed, 28 Aug 2013 17:32:53 +0100
+Subject: [Xen-devel] [PATCH] ARM: xen: only set pm function ptrs for Xen
+ guests
+In-Reply-To: <1377706794-8481-1-git-send-email-robherring2@gmail.com>
+References: <1377706794-8481-1-git-send-email-robherring2@gmail.com>
+Message-ID: <521E2635.4070800@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 09:08:02AM -0300, Ezequiel Garcia wrote:
-
-> Hm.. but in order to make this work, we need the bridge interrupt
-> controller introduced by Sebastian, but not available in the "older"
-> platforms (right?).
-
-TBH, I'm not sure of the state of this - I thought the last patches I
-saw covered everything (though perhaps DT bindings are needed for some
-platforms)?
-
-Some platforms don't have a bridge cause register, the WDT comes
-directly off the main interrupt controller and the write to a 'bridge
-cause regsiter' in the wdt driver is already completely bogus. This is
-why the irq chip driver needs to take care of this.
-
-> So, in order to add support to Armada 370/XP watchdog (which was the
-> initial goal of all of this) I think our sane option reduce to two:
+On 08/28/2013 05:19 PM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> * Drop watchdog support on non-DT platforms and add support for
->   A370/XP in the orion-wdt driver.
->   I don't quite like the idea of dropping support on anything,
->   so I can't say I'm thrilled by this idea.
+> xen_pm_init was unconditionally setting pm_power_off and arm_pm_restart
+> function pointers. This breaks multi-platform kernels. Move this
+> initialization into xen_guest_init, so it is conditional on running as a
+> Xen guest.
+> 
+> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+> This breaks reset and poweroff for Midway when Xen is enabled. This 
+> should go into 3.11 or stable.
+> Rob
+> 
+>  arch/arm/xen/enlighten.c | 12 +++---------
+>  1 file changed, 3 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index 8a6295c..fa86452 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -263,6 +263,9 @@ static int __init xen_guest_init(void)
+>  	if (xen_vcpu_info == NULL)
+>  		return -ENOMEM;
+>  
+> +	pm_power_off = xen_power_off;
+> +	arm_pm_restart = xen_restart;
+> +
 
-Well, can you pass all the register addresess and interrupts in
-through platform_data on these unconverted boards?
+I think it's too early to set pm callbacks. If Linux is running as dom0,
+xen needs to overwrite the power management callback. Otherwise, dom0
+could shutdown/restart the whole platform, that is annoying.
+For instance, on the versatile express, the power management callback
+are set very late (ie during driver initialization).
 
-Maybe a config switch 'CONFIG_ARMADA_WATCHDOG_SINGLE_PLATFORM' to
-enable the old behavior and include the mach headers, otherwise the
-driver is multiplatform and DT only?
+pm callbacks should be updated by a late initcall and check if xen is
+enabled.
 
-But I don't see alot of value in doing this work, since I doubt anyone
-will ever use it :(
+>  	gnttab_init();
+>  	if (!xen_initial_domain())
+>  		xenbus_probe(NULL);
+> @@ -271,15 +274,6 @@ static int __init xen_guest_init(void)
+>  }
+>  core_initcall(xen_guest_init);
+>  
+> -static int __init xen_pm_init(void)
+> -{
+> -	pm_power_off = xen_power_off;
+> -	arm_pm_restart = xen_restart;
+> -
+> -	return 0;
+> -}
+> -subsys_initcall(xen_pm_init);
+> -
+>  static irqreturn_t xen_arm_callback(int irq, void *arg)
+>  {
+>  	xen_hvm_evtchn_do_upcall();
+> 
 
-> * Support A370/AXP in a different and new armada-wdt driver.
->   The differences between the SoC might be small, but maybe
->   enough to justify a separate driver and avoid more problems.
 
-But A370/AXP isn't really different, it just doesn't have to be
-compatible with boards that haven't finished DT conversion..
-
-Jason
+-- 
+Julien Grall
