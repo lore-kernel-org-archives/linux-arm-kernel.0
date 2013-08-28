@@ -1,31 +1,44 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 28 Aug 2013 23:40:36 +0400
-Subject: [PATCH 11/19] ARM: alignment: correctly decode instructions in
- BE8 mode.
-In-Reply-To: <1377690359-25397-12-git-send-email-ben.dooks@codethink.co.uk>
-References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
- <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
- <1377690359-25397-12-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <521E5234.1010008@cogentembedded.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 28 Aug 2013 20:45:58 +0100
+Subject: [PATCH 1/2] Documentation: devicetree: arm: cpus/cpu nodes
+ bindings updates
+In-Reply-To: <1376559743-31848-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1376559743-31848-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1376559743-31848-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20130828194558.568303E0A6F@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, 15 Aug 2013 10:42:22 +0100, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> +=====================================
+> +cpus and cpu node bindings definition
+> +=====================================
+> +
+> +The ARM architecture, in accordance with the ePAPR, requires the cpus and cpu
+> +nodes to be present and contain the properties described below.
+> +
+> +- cpus node
+> +
+> +	Description: Container of cpu nodes
+> +
+> +	The node name must be "cpus".
+> +
+> +	A cpus node must define the following properties:
+> +
+> +	- #address-cells
+> +		Usage: required
+> +		Value type: <u32>
+> +
+> +		Definition depends on ARM architecture version and
+> +		configuration:
+> +
+> +			# On uniprocessor ARM architectures previous to v7
+> +			  value must be 0, since they have no register
+> +			  providing CPU identification.
 
-On 08/28/2013 03:45 PM, Ben Dooks wrote:
+Just clued into this point from the other thread; Don't do this.
+Uniprocessor should follow the same rules as 32bit or 64bit for the
+value of #address-cells, and cpu nodes should have a reg property, even
+if it is merely set to '0'.
 
-> If we are in BE8 mode, we must deal with the instruction stream being
-> in LE order when data is being loaded in BE order. Ensure the data is
-> swapped before processing to avoid thre following:
-
-> Change to using <asm/opcodes.h> to provide the necessary conversion
-> functions to change the byte ordering.
-
-> Alignment trap: not handling instruction 030091e8 at [<80333e8c>]
-> Unhandled fault: alignment exception (0x001) at 0xbfa09567
-
-    I guess the above 2 paragraphs are swapped.
-
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-
-WBR, Sergei
+g.
