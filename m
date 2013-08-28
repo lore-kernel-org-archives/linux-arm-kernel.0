@@ -1,29 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 28 Aug 2013 11:50:45 -0700
-Subject: [GIT PULL] non-critical omap fixes for v3.12 merge window
-In-Reply-To: <20130823054609.GW7656@atomide.com>
-References: <20130823054609.GW7656@atomide.com>
-Message-ID: <20130828185045.GI8607@quad.lixom.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 Aug 2013 21:09:44 +0200
+Subject: [PATCH 1/3] ARM: PCI: versatile: Fix map_irq function to match
+ hardware
+In-Reply-To: <1377190070-7305-2-git-send-email-peter.maydell@linaro.org>
+References: <1377190070-7305-1-git-send-email-peter.maydell@linaro.org>
+ <1377190070-7305-2-git-send-email-peter.maydell@linaro.org>
+Message-ID: <CACRpkdb5Bgn_7cDf35f2=DCun6ZRRbW6WaWPuVCnqndhxW11Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 10:46:10PM -0700, Tony Lindgren wrote:
+On Thu, Aug 22, 2013 at 6:47 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
 
-> Matus Ujhelyi (1):
->       ARM: OMAP2+: am33xx-restart: trigger warm reset on omap2+ boards
+> The PCI controller code for the Versatile board has never had the
+> correct IRQ mapping for hardware.  For many years it had an odd
+> mapping ("all interrupts are int 27") which aligned with the
+> equivalent bug in QEMU.  However as of commit 1bc39ac5dab265
+> the mapping changed and no longer matched either hardware or QEMU,
+> with the result that any PCI card beyond the first in QEMU would
+> not have functioning interrupts; for example a boot with a SCSI
+> controller would time out as follows:
+>
+>  ------------
+>  sym0: <895a> rev 0x0 at pci 0000:00:0d.0 irq 92
+>  sym0: SCSI BUS has been reset.
+>  scsi0 : sym-2.2.3
+>  [...]
+>  scsi 0:0:0:0: ABORT operation started
+>  scsi 0:0:0:0: ABORT operation timed-out.
+>  scsi 0:0:0:0: DEVICE RESET operation started
+>  scsi 0:0:0:0: DEVICE RESET operation timed-out.
+>  scsi 0:0:0:0: BUS RESET operation started
+>  scsi 0:0:0:0: BUS RESET operation timed-out.
+>  scsi 0:0:0:0: HOST RESET operation started
+>  sym0: SCSI BUS has been reset
+>  ------------
+>
+> Fix the mapping so that it matches real hardware (checked against the
+> schematics for PB926 and backplane, and tested against the hardware).
+> This allows PCI cards using interrupts to work on hardware for the
+> first time; this change will also work with QEMU 1.5 or later, where
+> the equivalent bugs in the modelling of the hardware have been fixed.
+>
+> Although QEMU will attempt to autodetect whether the kernel is
+> expecting the long-standing "everything is int 27" mapping or the one
+> hardware has, for certainty we force it into "definitely behave like
+> hardware mode"; this will avoid unexpected surprises later if we
+> implement sparse irqs. This is harmless on hardware.
+>
+> Thanks to Paul Gortmaker for bisecting the problem and finding an initial
+> solution, to Russell King for providing the correct interrupt mapping,
+> and to Guenter Roeck for providing an initial version of this patch
+> and prodding me into relocating the hardware and retesting everything.
+>
+> Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
 
-Sigh. am33xx has been a bit of a pain this release cycle. Can you please
-start double-checking builds when you apply am33xx stuff? :(
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-This breaks with:
-
-        multi_v7_defconfig:
-arch/arm/mach-omap2/am33xx-restart.c:27:26: error: 'AM33XX_RST_GLOBAL_WARM_SW_MASK' undeclared (first use in this function)
-
-        omap2plus_defconfig:
-arch/arm/mach-omap2/am33xx-restart.c:27:26: error: 'AM33XX_RST_GLOBAL_WARM_SW_MASK' undeclared (first use in this function)
-
-
-I've unmerged the branch until that's resolved.
-
--Olof
+Yours,
+Linus Walleij
