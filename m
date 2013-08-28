@@ -1,48 +1,29 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 28 Aug 2013 13:49:39 -0500
-Subject: [PATCH v3 0/2] Document msm_serial bindings and support newer
- uartdms
-In-Reply-To: <1377648764-23453-1-git-send-email-sboyd@codeaurora.org>
-References: <1377648764-23453-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <89FFB174-E076-4309-BE9C-7DB24B31599F@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 28 Aug 2013 11:50:45 -0700
+Subject: [GIT PULL] non-critical omap fixes for v3.12 merge window
+In-Reply-To: <20130823054609.GW7656@atomide.com>
+References: <20130823054609.GW7656@atomide.com>
+Message-ID: <20130828185045.GI8607@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Aug 22, 2013 at 10:46:10PM -0700, Tony Lindgren wrote:
 
-On Aug 27, 2013, at 7:12 PM, Stephen Boyd wrote:
+> Matus Ujhelyi (1):
+>       ARM: OMAP2+: am33xx-restart: trigger warm reset on omap2+ boards
 
-> This patchset aligns the msm_serial driver more with downstream usage and
-> updates the driver's DT bindings.
-> 
-> Changes since v2:
-> * Fixed up DT review comments
-> * Dropped patches that were picked up in tty tree
-> 
-> Changes since v1:
-> * Dropped _clk postfix from {core,iface}_clk
-> * Split DT binding into two files
-> * Renamed DT binding files to match compatible strings
-> * Fixed up DT review comments
-> * Added new patch 5/5 (more than 1 char for UARTDM)
-> 
-> Stephen Boyd (2):
->  devicetree: serial: Document msm_serial bindings
->  ARM: dts: msm: Update uartdm compatible strings
-> 
-> .../devicetree/bindings/tty/serial/msm_serial.txt  | 27 -----------
-> .../bindings/tty/serial/qcom,msm-uart.txt          | 25 ++++++++++
-> .../bindings/tty/serial/qcom,msm-uartdm.txt        | 53 ++++++++++++++++++++++
-> arch/arm/boot/dts/msm8660-surf.dts                 |  2 +-
-> arch/arm/boot/dts/msm8960-cdp.dts                  |  2 +-
-> 5 files changed, 80 insertions(+), 29 deletions(-)
-> delete mode 100644 Documentation/devicetree/bindings/tty/serial/msm_serial.txt
-> create mode 100644 Documentation/devicetree/bindings/tty/serial/qcom,msm-uart.txt
-> create mode 100644 Documentation/devicetree/bindings/tty/serial/qcom,msm-uartdm.txt
+Sigh. am33xx has been a bit of a pain this release cycle. Can you please
+start double-checking builds when you apply am33xx stuff? :(
 
-We are going with bindings/serial as one location, can you update this so the bindings are in bindings/serial/qcom...
+This breaks with:
 
-- k
+        multi_v7_defconfig:
+arch/arm/mach-omap2/am33xx-restart.c:27:26: error: 'AM33XX_RST_GLOBAL_WARM_SW_MASK' undeclared (first use in this function)
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+        omap2plus_defconfig:
+arch/arm/mach-omap2/am33xx-restart.c:27:26: error: 'AM33XX_RST_GLOBAL_WARM_SW_MASK' undeclared (first use in this function)
+
+
+I've unmerged the branch until that's resolved.
+
+-Olof
