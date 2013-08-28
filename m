@@ -1,65 +1,38 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Wed, 28 Aug 2013 08:13:56 +0800
-Subject: [PATCH 3/5] drivers: thermal: make usage of
- CONFIG_THERMAL_HWMON optional
-In-Reply-To: <8131326.8QGX41MW6c@vostro.rjw.lan>
-References: <1377295396-17289-1-git-send-email-eduardo.valentin@ti.com>
- <4832825.8PCMQe7StP@vostro.rjw.lan> <521CEF61.6040504@ti.com>
- <8131326.8QGX41MW6c@vostro.rjw.lan>
-Message-ID: <1377648836.2335.252.camel@rzhang-lenovo>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 27 Aug 2013 17:12:42 -0700
+Subject: [PATCH v3 0/2] Document msm_serial bindings and support newer uartdms
+Message-ID: <1377648764-23453-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?, 2013-08-27 at 23:17 +0200, Rafael J. Wysocki wrote:
-> On Tuesday, August 27, 2013 02:26:41 PM Eduardo Valentin wrote:
-> > On 23-08-2013 19:08, Rafael J. Wysocki wrote:
-> > > On Friday, August 23, 2013 06:03:14 PM Eduardo Valentin wrote:
-> > >> When registering a new thermal_device, the thermal framework
-> > >> will always add a hwmon sysfs interface.
-> > >>
-> > >> This patch adds a flag to make this behavior optional. Now
-> > >> when registering a new thermal device, the caller needs
-> > >> to say if the hwmon interface is required.
-> > >>
-> > >> In order to keep same behavior as of today, all current
-> > >> calls will by default create the hwmon interface.
-> > > 
-> > > Well, instead of modifying all of the callers this way, why don't
-> > > you add new versions taking the additional argument as, for example,
-> > > 
-> > > thermal_zone_device_register_full()
-> > > 
-> > > and redefine the old ones as static inline wrappers, for example
-> > > 
-> > > static inline struct thermal_zone_device *thermal_zone_device_register(args)
-> > > {
-> > > 	return thermal_zone_device_register_full(args, true);
-> > > }
-> > > 
-> > > ?
-> > 
-> > Yeah, that is another way to go and I thought of doing it like that. I
-> > just could not come out with a good API naming:
-> > 
-> > thermal_zone_device_register_full(all args)
-> > 
-> > thermal_zone_device_register(args) /* on hwmon == true */
-> > thermal_zone_device_register_no_hwmon(args) /* on hwmon == false */
-> > 
-> > Would this sound reasonable naming?
-> 
-> Yeah, sounds good to me.
-> 
-Well, actually, Tianyu is working on a patch set to move all the
-thermal_zone_device_register() parameters to struct thermal_zone_params.
+This patchset aligns the msm_serial driver more with downstream usage and
+updates the driver's DT bindings.
 
-But with that patch set done, what you need to do next is just to
-introduce a new field in struct thermal_zone_params and make sure 0
-means registering hwmon sysfs I/F.
+Changes since v2:
+ * Fixed up DT review comments
+ * Dropped patches that were picked up in tty tree
 
-thanks,
-rui
+Changes since v1:
+ * Dropped _clk postfix from {core,iface}_clk
+ * Split DT binding into two files
+ * Renamed DT binding files to match compatible strings
+ * Fixed up DT review comments
+ * Added new patch 5/5 (more than 1 char for UARTDM)
 
-> Thanks,
-> Rafael
-> 
+Stephen Boyd (2):
+  devicetree: serial: Document msm_serial bindings
+  ARM: dts: msm: Update uartdm compatible strings
+
+ .../devicetree/bindings/tty/serial/msm_serial.txt  | 27 -----------
+ .../bindings/tty/serial/qcom,msm-uart.txt          | 25 ++++++++++
+ .../bindings/tty/serial/qcom,msm-uartdm.txt        | 53 ++++++++++++++++++++++
+ arch/arm/boot/dts/msm8660-surf.dts                 |  2 +-
+ arch/arm/boot/dts/msm8960-cdp.dts                  |  2 +-
+ 5 files changed, 80 insertions(+), 29 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/tty/serial/msm_serial.txt
+ create mode 100644 Documentation/devicetree/bindings/tty/serial/qcom,msm-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/tty/serial/qcom,msm-uartdm.txt
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
