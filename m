@@ -1,67 +1,89 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Aug 2013 15:13:58 +0200
-Subject: [RFC PATCH 1/3] pinctrl: add new generic pinconf config for
- deglitch filter
-In-Reply-To: <521C587E.6050706@atmel.com>
-References: <1377379926-11163-1-git-send-email-b.brezillon@overkiz.com>
- <1377380109-11247-1-git-send-email-b.brezillon@overkiz.com>
- <521B875E.1010605@wwwdotorg.org> <521B89D1.6010902@overkiz.com>
- <521C2347.4080702@wwwdotorg.org> <521C4451.1060908@overkiz.com>
- <521C587E.6050706@atmel.com>
-Message-ID: <CACRpkdaRBSGJYrCgOC-dSPEeEMWZ1N=aqhM9O-ZO+mGnEBQ=1g@mail.gmail.com>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Wed, 28 Aug 2013 09:15:50 -0400
+Subject: [PATCH 3/5] drivers: thermal: make usage of CONFIG_THERMAL_HWMON
+ optional
+In-Reply-To: <1377648836.2335.252.camel@rzhang-lenovo>
+References: <1377295396-17289-1-git-send-email-eduardo.valentin@ti.com>
+ <4832825.8PCMQe7StP@vostro.rjw.lan> <521CEF61.6040504@ti.com>
+ <8131326.8QGX41MW6c@vostro.rjw.lan> <1377648836.2335.252.camel@rzhang-lenovo>
+Message-ID: <521DF806.4030900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 9:42 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> On 27/08/2013 08:16, boris brezillon :
+On 27-08-2013 20:13, Zhang Rui wrote:
+> On ?, 2013-08-27 at 23:17 +0200, Rafael J. Wysocki wrote:
+>> On Tuesday, August 27, 2013 02:26:41 PM Eduardo Valentin wrote:
+>>> On 23-08-2013 19:08, Rafael J. Wysocki wrote:
+>>>> On Friday, August 23, 2013 06:03:14 PM Eduardo Valentin wrote:
+>>>>> When registering a new thermal_device, the thermal framework
+>>>>> will always add a hwmon sysfs interface.
+>>>>>
+>>>>> This patch adds a flag to make this behavior optional. Now
+>>>>> when registering a new thermal device, the caller needs
+>>>>> to say if the hwmon interface is required.
+>>>>>
+>>>>> In order to keep same behavior as of today, all current
+>>>>> calls will by default create the hwmon interface.
+>>>>
+>>>> Well, instead of modifying all of the callers this way, why don't
+>>>> you add new versions taking the additional argument as, for example,
+>>>>
+>>>> thermal_zone_device_register_full()
+>>>>
+>>>> and redefine the old ones as static inline wrappers, for example
+>>>>
+>>>> static inline struct thermal_zone_device *thermal_zone_device_register(args)
+>>>> {
+>>>> 	return thermal_zone_device_register_full(args, true);
+>>>> }
+>>>>
+>>>> ?
+>>>
+>>> Yeah, that is another way to go and I thought of doing it like that. I
+>>> just could not come out with a good API naming:
+>>>
+>>> thermal_zone_device_register_full(all args)
+>>>
+>>> thermal_zone_device_register(args) /* on hwmon == true */
+>>> thermal_zone_device_register_no_hwmon(args) /* on hwmon == false */
+>>>
+>>> Would this sound reasonable naming?
+>>
+>> Yeah, sounds good to me.
+>>
+> Well, actually, Tianyu is working on a patch set to move all the
+> thermal_zone_device_register() parameters to struct thermal_zone_params.
+> 
+> But with that patch set done, what you need to do next is just to
+> introduce a new field in struct thermal_zone_params and make sure 0
+> means registering hwmon sysfs I/F.
 
-> Deglitch and
-> Debounce filters are different features in at91 (even if they pursuit the
-> same goal). So I do prefer to let the user choose which feature is preferred
-> for his application and add a different flag.
+Rui,
 
-Electrically speaking debounce and deglitch are totally different things.
+Do you have a pointer to his patch?
 
-Debounce is for, well debouncing. To even out the effect of pressing
-a button which due to mechanical characteristics create a sharp
-series of spikes like that:
-  _   _
-_| |_| |_
+> 
+> thanks,
+> rui
+> 
+>> Thanks,
+>> Rafael
+>>
+> 
+> 
+> 
+> 
 
-I highly suspect that "deglitch" is either:
 
-- A one-spike version of the above (in which case a custom config
-  may be warranted) or
+-- 
+You have got to be excited about what you are doing. (L. Lamport)
 
-- What we usually call schmitt-trigger, i.e. handling of analog
-  swing-in.
+Eduardo Valentin
 
-Can you describe exactly what the two features do, in electrical
-terms?
-
-> The question is: how much this "generic" pinconf is... well... generic! And
-> it is not a answer I can give.
-
-The generic configs are defined from electrical use-cases that
-appear in practice and also have the character of appearing in
-similar implementations in I/O cells of several vendors, to the point
-that from a software perspective they are identical.
-
-> On the other hand, if the "generic" is not going to overcome the native
-> pinctrl, I do not feel like switching to this at the cost of changing the
-> whole dtsi/dts entries that we already have.
-
-The question we ask in this case is whether the electrical construction
-is so fantastically unique and ingenious that no other ASIC pad
-implementer sitting in his chamber working on I/O cells would
-possibly ever come up with the same concept.
-
-If that is true, then it warrants its own, custom binding.
-
-If you ask some other randong cell implementer whether this is
-something they would do, and they say "yeah I have that in the
-next version of my cell library" then it is generic, because we will
-see the same thing in other systems as time moves on.
-
-Yours,
-Linus Walleij
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 295 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130828/6397da74/attachment.sig>
