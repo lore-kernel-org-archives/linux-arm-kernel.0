@@ -1,60 +1,79 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 28 Aug 2013 10:46:15 -0400
-Subject: [PATCH 0/2] OMAP4+: Get rid of internal SRAM handling
-In-Reply-To: <521DFE5D.8070000@ti.com>
-References: <1377598305-15539-1-git-send-email-rnayak@ti.com>
- <521CA8DF.9040400@ti.com> <521D98B9.4070902@ti.com> <521DFD5A.8050406@ti.com>
- <521DFE5D.8070000@ti.com>
-Message-ID: <521E0D37.3010909@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 28 Aug 2013 15:47:57 +0100
+Subject: [PATCH repost-for-3.12] Move the EM_ARM and EM_AARCH64
+ definitions to uapi/linux/elf-em.h
+In-Reply-To: <20130828132451.GA9237@gmail.com>
+References: <20130502132756.GD20730@arm.com>
+ <1367742253-22294-1-git-send-email-alonid@stratoscale.com>
+ <20130828132451.GA9237@gmail.com>
+Message-ID: <20130828144756.GA31817@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 August 2013 09:42 AM, Rajendra Nayak wrote:
-> On Wednesday 28 August 2013 07:08 PM, Santosh Shilimkar wrote:
->> On Wednesday 28 August 2013 02:29 AM, Nayak, Rajendra wrote:
->>> On Tuesday 27 August 2013 06:55 PM, Santosh Shilimkar wrote:
->>>> + Paul,
->>>>
->>>> On Tuesday 27 August 2013 06:11 AM, Rajendra Nayak wrote:
->>>>> Make all OMAP DT only platforms (am33xx, am43xx, omap4 and omap5)
->>>>> use drivers/misc/sram.c driver instead of the omap internal
->>>>> implementation for SRAM handling.
->>>>>
->>>>> Rajendra Nayak (2):
->>>>>   ARM: AM335x: Get rid of unused sram init function
->>>>>   ARM: OMAP4+: Move SRAM data to DT
->>>>>
->>>>>  arch/arm/boot/dts/am33xx.dtsi        |    5 +++++
->>>>>  arch/arm/boot/dts/am4372.dtsi        |    5 +++++
->>>>>  arch/arm/boot/dts/omap4.dtsi         |    5 +++++
->>>>>  arch/arm/boot/dts/omap5.dtsi         |    5 +++++
->>>>>  arch/arm/configs/omap2plus_defconfig |    1 +
->>>>>  arch/arm/mach-omap2/sram.c           |   39 +---------------------------------
->>>>>  arch/arm/mach-omap2/sram.h           |    1 -
->>>>>  7 files changed, 22 insertions(+), 39 deletions(-)
->>>>>
->>>> Really nice to see the SRAM code getting moved now. Thanks
->>>> a lot Rajendra.
->>>>
->>>> - The sram_init() seems to be the post core init call.
->>>> Hope this is not a problem for SDRC init which needs to have
->>>> SRAM ready to update the DDR parameters.
->>>
->>> It should be fine given its needed only during core dvfs. Besides
->>> drivers/misc/sram.c is useful only on DT platforms, so for now OMAP2/3
->>> continue to use the omap specific sram handling.
->>>
->> Its used in early boot to initialize the DDR parameters and then
->> later these can be used based on whether core DVFS supported or
->> not. Look for _omap2_init_reprogram_sdrc() which has init
->> dependency with omap_sram_init().
+On Wed, Aug 28, 2013 at 02:24:53PM +0100, Dan Aloni wrote:
+> Signed-off-by: Dan Aloni <alonid@stratoscale.com>
+> ---
+>  arch/arm/include/asm/elf.h   | 2 --
+>  arch/arm64/include/asm/elf.h | 3 ---
+>  include/uapi/linux/elf-em.h  | 2 ++
+>  3 files changed, 2 insertions(+), 5 deletions(-)
 > 
-> Right, I see that now. With this series (which addresses only DT platforms)
-> we would still be fine with the omap2/3 sdrc usage.
-> 
-Yep. When OMAP3 becomes DT only then this could become problem. Actually
-the SDRC init can be moved bit further down to solve that one as well so
-should be ok I guess.
+> diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+> index 56211f2..f4b46d3 100644
+> --- a/arch/arm/include/asm/elf.h
+> +++ b/arch/arm/include/asm/elf.h
+> @@ -19,8 +19,6 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+>  
+>  typedef struct user_fp elf_fpregset_t;
+>  
+> -#define EM_ARM	40
+> -
+>  #define EF_ARM_EABI_MASK	0xff000000
+>  #define EF_ARM_EABI_UNKNOWN	0x00000000
+>  #define EF_ARM_EABI_VER1	0x01000000
+> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> index fe32c0e..e7fa87f 100644
+> --- a/arch/arm64/include/asm/elf.h
+> +++ b/arch/arm64/include/asm/elf.h
+> @@ -33,8 +33,6 @@ typedef unsigned long elf_greg_t;
+>  typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+>  typedef struct user_fpsimd_state elf_fpregset_t;
+>  
+> -#define EM_AARCH64		183
+> -
+>  /*
+>   * AArch64 static relocation types.
+>   */
+> @@ -151,7 +149,6 @@ extern unsigned long arch_randomize_brk(struct mm_struct *mm);
+>  #define arch_randomize_brk arch_randomize_brk
+>  
+>  #ifdef CONFIG_COMPAT
+> -#define EM_ARM				40
+>  #define COMPAT_ELF_PLATFORM		("v8l")
+>  
+>  #define COMPAT_ELF_ET_DYN_BASE		(randomize_et_dyn(2 * TASK_SIZE_32 / 3))
+> diff --git a/include/uapi/linux/elf-em.h b/include/uapi/linux/elf-em.h
+> index 8e2b7ba..59c17a2 100644
+> --- a/include/uapi/linux/elf-em.h
+> +++ b/include/uapi/linux/elf-em.h
+> @@ -22,6 +22,7 @@
+>  #define EM_PPC		20	/* PowerPC */
+>  #define EM_PPC64	21	 /* PowerPC64 */
+>  #define EM_SPU		23	/* Cell BE SPU */
+> +#define EM_ARM		40	/* ARM 32 bit */
+>  #define EM_SH		42	/* SuperH */
+>  #define EM_SPARCV9	43	/* SPARC v9 64-bit */
+>  #define EM_IA_64	50	/* HP/Intel IA-64 */
+> @@ -34,6 +35,7 @@
+>  #define EM_MN10300	89	/* Panasonic/MEI MN10300, AM33 */
+>  #define EM_BLACKFIN     106     /* ADI Blackfin Processor */
+>  #define EM_TI_C6000	140	/* TI C6X DSPs */
+> +#define EM_AARCH64	183	/* ARM 64 bit */
+>  #define EM_FRV		0x5441	/* Fujitsu FR-V */
+>  #define EM_AVR32	0x18ad	/* Atmel AVR32 */
 
-Regards,
-Santosh
+The patch is fine. I can push it if Russell acks the arm parts (or the
+other way around, I don't have any preference).
+
+-- 
+Catalin
