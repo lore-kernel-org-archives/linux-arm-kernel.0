@@ -1,48 +1,36 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 28 Aug 2013 09:55:50 +0200
-Subject: [PATCH] ARM: integrator: Make sure INTEGRATOR_AP depends on PCI
-In-Reply-To: <CACRpkdZVAG=0zvLbR4E+UEjHUaYOgqUxsfGoZybPtm1DwDAJ1Q@mail.gmail.com>
-References: <1376509818-22163-1-git-send-email-joro@8bytes.org>
- <20130814195701.GY23006@n2100.arm.linux.org.uk>
- <20130814200442.GA20372@8bytes.org>
- <CACRpkdZVAG=0zvLbR4E+UEjHUaYOgqUxsfGoZybPtm1DwDAJ1Q@mail.gmail.com>
-Message-ID: <20130828075549.GF20372@8bytes.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 28 Aug 2013 10:02:00 +0200
+Subject: [PATCH v3 2/6] iio: at91: introduce the multiple compatible
+ string for different IPs.
+In-Reply-To: <1377602932-1899-3-git-send-email-josh.wu@atmel.com>
+References: <1377602932-1899-1-git-send-email-josh.wu@atmel.com>
+ <1377602932-1899-3-git-send-email-josh.wu@atmel.com>
+Message-ID: <20130828080200.GM2695@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 09:26:57AM +0200, Linus Walleij wrote:
-> On Wed, Aug 14, 2013 at 10:04 PM, Joerg Roedel <joro@8bytes.org> wrote:
-> 
-> > So when integrator does not depend on PCI this diff is more appropriate?
-> >
-> > diff --git a/arch/arm/mach-integrator/pci_v3.h b/arch/arm/mach-integrator/pci_v3.h
-> > index 755fd29..51738e0 100644
-> > --- a/arch/arm/mach-integrator/pci_v3.h
-> > +++ b/arch/arm/mach-integrator/pci_v3.h
-> > @@ -1,2 +1,9 @@
-> > -/* Simple oneliner include to the PCIv3 early init */
-> > +/* Define PCIv3 early init */
-> > +#ifdef CONFIG_PCI
-> >  extern int pci_v3_early_init(void);
-> > +#else
-> > +static inline int pci_v3_early_init(void)
-> > +{
-> > +       return 0;
-> > +}
-> > +#endif
-> 
-> Yes.
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> And can you please create and send a proper patch with this
-> content to arm at kernel.org and the mailing list on CC, with
-> a request for the ARM SoC maintainers to apply it directly
-> as a fix?
-> 
-> You might as well add Cc: stable at vger.kernel.org as well.
+Hi Josh,
 
-Will do, thanks for your review.
+On Tue, Aug 27, 2013 at 07:28:48PM +0800, Josh Wu wrote:
+> As use the multiple compatible string, we can remove hardware register in dt.
+> 
+> CC: devicetree at vger.kernel.org
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-Cheers,
+It's ok for me. You can add my
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-	Joerg
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130828/76598e98/attachment.sig>
