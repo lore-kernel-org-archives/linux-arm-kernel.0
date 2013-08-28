@@ -1,50 +1,72 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 28 Aug 2013 16:13:58 +0530
-Subject: [PATCH v11 0/8] PHY framework
-In-Reply-To: <20130827192059.GZ3005@radagast>
-References: <1377063973-22044-1-git-send-email-kishon@ti.com>
- <521B0E79.6060506@ti.com> <20130827192059.GZ3005@radagast>
-Message-ID: <521DD46E.9090202@ti.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Wed, 28 Aug 2013 11:44:44 +0100
+Subject: [PATCH v5 0/5] ARM/ARM64 architected timer updates
+Message-ID: <1377686689-30828-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-On Wednesday 28 August 2013 12:50 AM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Mon, Aug 26, 2013 at 01:44:49PM +0530, Kishon Vijay Abraham I wrote:
->> On Wednesday 21 August 2013 11:16 AM, Kishon Vijay Abraham I wrote:
->>> Added a generic PHY framework that provides a set of APIs for the PHY drivers
->>> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
->>> the PHY with or without using phandle.
->>>
->>> This framework will be of use only to devices that uses external PHY (PHY
->>> functionality is not embedded within the controller).
->>>
->>> The intention of creating this framework is to bring the phy drivers spread
->>> all over the Linux kernel to drivers/phy to increase code re-use and to
->>> increase code maintainability.
->>>
->>> Comments to make PHY as bus wasn't done because PHY devices can be part of
->>> other bus and making a same device attached to multiple bus leads to bad
->>> design.
->>>
->>> If the PHY driver has to send notification on connect/disconnect, the PHY
->>> driver should make use of the extcon framework. Using this susbsystem
->>> to use extcon framwork will have to be analysed.
->>>
->>> You can find this patch series @
->>> git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
->>
->> Looks like there are not further comments on this series. Can you take this in
->> your misc tree?
-> 
-> Do you want me to queue these for you ? There are quite a few users for
-> this framework already and I know of at least 2 others which will show
-> up for v3.13.
+This patch series adds support to configure the rate and enable the
+event stream for architected timer. The event streams can be used to
+impose a timeout on a wfe, to safeguard against any programming error
+in case an expected event is not generated or even to implement
+wfe-based timeouts for userspace locking implementations. This feature
+can be disabled(enabled by default).
 
-yeah sure. That would be better I think.
+Since the timer control register is reset to zero on warm boot, CPU
+PM notifier is added to save and restore the value.
 
-Thanks
-Kishon
+Changes v4->v5:
+1. Removed compat_dyn_elf_hwcap and used just compat_elf_hwcap as per
+   Catalin's suggestion
+2. Instead of resetting event stream in CPU PM callbacks, saving and
+   restoring counter control register now.
+
+Changes v3->v4:
+1. Added a config option to en/disable the timer event stream feature.
+   Due to this the ordering of the patches as well as some cosmetic
+   code changes are done.( So dropped previous reviewed-by tags)
+2. Removed exporting compat_dyn_elf_hwcap as there are no modules
+   requiring it for now.
+
+Changes v2->v3:
+1. Moved ARM and ARM64 changes into separate patches
+2. Added native hwcaps definations(ARM/ARM64) and compat-specific
+   definitions(ARM64) to the users for the event stream feature. 
+
+Changes v1->v2:
+1. Saved event stream divider value on cold reset path and re-used it
+   in CPU PM notifier instead of calculating every time.
+2. Rebased on v3.11-rc2(to avoid conflicts with __cpuinit* deletion)
+3. Dropped "ARM/ARM64: arch_timer: remove __cpuinit attribute for
+   arch_counter_set_user_access"(already done as part of __cpuinit*
+   deletion)
+
+Regards,
+Sudeep
+
+Sudeep KarkadaNagesha (4):
+  ARM/ARM64: arch_timer: add macros for bits in control register
+  ARM: arch_timer: add support to configure and enable event stream
+  ARM64: arch_timer: add support to configure and enable event stream
+  drivers: clocksource: add CPU PM notifier for ARM architected timer
+
+Will Deacon (1):
+  drivers: clocksource: add support for ARM architected timer event
+    stream
+
+ arch/arm/include/asm/arch_timer.h    | 38 +++++++++++++++++++++----
+ arch/arm/include/uapi/asm/hwcap.h    |  1 +
+ arch/arm/kernel/setup.c              |  1 +
+ arch/arm64/include/asm/arch_timer.h  | 44 +++++++++++++++++++++++++----
+ arch/arm64/include/asm/hwcap.h       |  8 +++++-
+ arch/arm64/include/uapi/asm/hwcap.h  |  1 +
+ arch/arm64/kernel/setup.c            |  5 ++++
+ drivers/clocksource/Kconfig          | 14 +++++++++
+ drivers/clocksource/arm_arch_timer.c | 55 ++++++++++++++++++++++++++++++++++++
+ include/clocksource/arm_arch_timer.h | 10 +++++++
+ 10 files changed, 165 insertions(+), 12 deletions(-)
+
+-- 
+1.8.1.2
