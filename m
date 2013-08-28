@@ -1,63 +1,129 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Aug 2013 14:28:02 +0200
-Subject: [RFC PATCH 3/3] ARM: at91/dt: move sama5 to generic pinconf
-In-Reply-To: <1377380400-11331-1-git-send-email-b.brezillon@overkiz.com>
-References: <1377379926-11163-1-git-send-email-b.brezillon@overkiz.com>
- <1377380400-11331-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <CACRpkdbGWAg19Redc-KB4=dUnNOqCVvFN4H=wAAoki6Y=Zp-wA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 28 Aug 2013 14:29:09 +0200
+Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
+In-Reply-To: <20130828121320.GK6617@n2100.arm.linux.org.uk>
+References: <20130828113459.48ecbb34@armhf> <521DCD33.2070008@gmail.com>
+ <20130828121943.1c8327ca@skate> <521DD057.4040208@gmail.com>
+ <20130828131548.0009d613@skate> <521DE2B3.9050508@gmail.com>
+ <20130828135827.2307c89e@skate>
+ <20130828121320.GK6617@n2100.arm.linux.org.uk>
+Message-ID: <20130828142909.3521064b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 24, 2013 at 11:40 PM, Boris BREZILLON
-<b.brezillon@overkiz.com> wrote:
+Dear Russell King - ARM Linux,
 
-> Add generic pinconf definitions and reference appropriate configs in
-> atmel,pins properties.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-(...)
->                         pinctrl at fffff200 {
->                                 #address-cells = <1>;
->                                 #size-cells = <1>;
-> -                               compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus";
-> +                               compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "generic-pinconf", "simple-bus";
+On Wed, 28 Aug 2013 13:13:20 +0100, Russell King - ARM Linux wrote:
 
-What kind of compatible string is that "generic-pinconf"?
+> > > I guess, yes.
+> > 
+> > Jean-Fran?ois, could you cook and submit a patch to change the
+> > compatible string?
+> 
+> I don't think this is a good idea.  The configuration of this IP is
+> not based on the SoC as a single SoC can have a mixture of different
+> configurations.
 
-There is no driver that can instantiate against this string but I'm not
-100% sure about such things. Is there some other driver doing this?
+Using the name of the oldest SoC in the family that had the IP block is
+the norm, because it's really what "compatible" means: the IP block in
+Dove is *compatible* with the one that was originally introduced in
+Kirkwood.
 
-Else I think it'd just be removed.
+See what Rob Herring (one of the DT maintainer) says in
+http://lists.infradead.org/pipermail/linux-mtd/2012-March/040417.html:
 
-> +                               pcfg_none: pcfg_none {
-> +                                       bias-disable;
-> +                               };
-> +
-> +                               pcfg_pull_up: pcfg_pull_up {
-> +                                       bias-pull-up;
-> +                               };
+"""
+There is no reason all machines can't use "st,spear600-smi" in their
+dts. It doesn't have to be a spear600, just compatible with it. Really
+you want the string to be the oldest SOC the block is in and then newer
+SOCs can claim compatibility with the old version.
+"""
 
-Nice.
+The thread was precisely about replacing a SoC-specific compatible
+string "st,spear600-smi" by a more generic "st,spear-smi" and Rob
+Herring (above) was opposing to that.
 
-> +                               pcfg_deglitch: pcfg_deglitch {
-> +                                       input-deglitch = <1>;
-> +                               };
-> +
-> +                               pcfg_pull_up_deglitch: pcfg_pull_up_deglitch {
-> +                                       bias-pull-up;
-> +                                       input-deglitch = <1>;
-> +                               };
+> I think marvell,mvebu-audio is a reasonable compatible string for this,
+> and that the different configurations should be described by properties
+> indicating which inputs and outputs have been implemented.
+> 
+> For instance, on the Dove, there are two of these blocks.  One has I2S
+> in and out only, but the other block has I2S in and out, and SPDIF out.
+> On some other Marvell devices, this block has I2S in and out and SPDIF
+> in and out.
+> 
+> Otherwise, they're functionally the same.
 
-input-deglitch seems like a proposed generic binding but I haven't seen
-these yet?
+Right, that's why they can both use "kirkwood-audio" as the compatible
+string.
 
-(It might be in my violently exploding INBOX though sorry in that case.)
+> > Though, if the difference between the two units is the availability of
+> > SPDIF support, then we shouldn't encode the channel number, but instead
+> > the availability of SPDIF, i.e:
+> > 
+> > 	audio0 {
+> > 		reg = <... ...>;
+> > 		compatible = "marvell,kirkwood-audio";
+> > 		marvell,has-spdif;
+> > 	};
+> > 
+> > 	audio1 {
+> > 		reg = <... ...>;
+> > 		compatible = "marvell,kirkwood-audio";
+> > 	};
+> 
+> ... which means there's no problem with using marvell,mvebu-audio as the
+> compatible string if you're going to use properties to describe what
+> facilities are available.
 
-This would need adding to
-Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-Plus changes to pinctrl core for handling.
+I disagree, because how do you know if a future "mvebu" SOC such as
+Armada 370, or one that doesn't exist yet, will not have a different
+audio IP block? It will still be audio, it will still be mvebu, but it
+will not be able to use a "marvell,mvebu-audio" driver. Or maybe it can
+use the same driver, but with a few variations, so a different
+compatible string will be needed to identify the original IP
+("marvell,kirkwood-audio", used on Kirkwood/Dove) and slightly newer
+versions of the IP ("marvell,some-funky-soc-audio").
 
-BTW: this is really moving in the right direction!
+> In any case "marvell,has-spdif" is too generic - as I've indicated above,
+> there's versions with spdif out, and other versions with spdif in and
+> out.
 
-Yours,
-Linus Walleij
+Right, the above was just an example to illustrate that we can have
+additional properties to encode the differences between each instance
+of the audio devices.
+
+For example, for XOR engines, we have:
+
+                        xor at 60900 {
+                                compatible = "marvell,orion-xor";
+                                reg = <0x60900 0x100
+                                       0x60b00 0x100>;
+                                clocks = <&gateclk 22>;
+                                status = "okay";
+
+                                xor10 {
+                                        interrupts = <51>;
+                                        dmacap,memcpy;
+                                        dmacap,xor;
+                                };
+                                xor11 {
+                                        interrupts = <52>;
+                                        dmacap,memcpy;
+                                        dmacap,xor;
+                                        dmacap,memset;
+                                };
+                        };
+
+because the first channel of each XOR engine has only memcpy and xor
+capabilities, while the second channel has memcpy, xor and memset
+capabilities.
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
