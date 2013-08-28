@@ -1,55 +1,47 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 28 Aug 2013 10:23:34 +0200
-Subject: [PATCH 09/18] ASoC: Samsung: Do not queue cyclic buffers multiple
- times
-In-Reply-To: <CACRpkdZd+LJeZdSjsD6OCLOnZ0VrDg0aa-e163NXsw6ajWf7rA@mail.gmail.com>
-References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
- <1376243970-6489-10-git-send-email-tomasz.figa@gmail.com>
- <CACRpkdZd+LJeZdSjsD6OCLOnZ0VrDg0aa-e163NXsw6ajWf7rA@mail.gmail.com>
-Message-ID: <3566701.5anQOxoFga@flatron>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 28 Aug 2013 10:30:12 +0200
+Subject: [PATCH] i2c-pnx: fix error return code in i2c_pnx_probe()
+In-Reply-To: <CAPgLHd9W5GtFtt6yCHRJ2mmuy2ha2u_utF9jR3yLY5O_oYpLWg@mail.gmail.com>
+References: <CAPgLHd9W5GtFtt6yCHRJ2mmuy2ha2u_utF9jR3yLY5O_oYpLWg@mail.gmail.com>
+Message-ID: <20130828083012.GA4086@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 of August 2013 09:06:27 Linus Walleij wrote:
-> On Sun, Aug 11, 2013 at 7:59 PM, Tomasz Figa <tomasz.figa@gmail.com> 
-wrote:
-> > The legacy S3C-DMA API required every period of a cyclic buffer to be
-> > queued separately. After conversion of Samsung ASoC to Samsung DMA
-> > wrappers somebody made an assumption that the same is needed for DMA
-> > engine API, which is not true.
-> > 
-> > In effect, Samsung ASoC DMA code was queuing the whole cyclic buffer
-> > 
-> > multiple times with a shift of one period per iteration, leading to:
-> >   a) severe memory waste - up to 13x times more DMA transfer
-> >   descriptors
-> >   
-> >      are allocated than needed,
-> >   
-> >   b) possible memory corruption, because further cyclic buffers were
-> >   out
-> >   
-> >      of the original buffers, due to the offset.
-> > 
-> > This patch fixes this problem by making the legacy S3C-DMA API use the
-> > same semantics as DMA engine (the whole cyclic buffer is enqueued at
-> > once) and modifying users of Samsung DMA wrappers in cyclic mode to
-> > behave appropriately.
-> > 
-> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+On Fri, Aug 23, 2013 at 10:55:51AM +0800, Wei Yongjun wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > 
-> If patch 1 thru 9 are uncontroversial now, maybe Vinod can apply
-> these for v3.12 so we can get less noise and risk of collissions
-> in the next merge window?
+> Fix to return a negative error code in the irq get error handling
+> case instead of 0, as done elsewhere in this function.
 > 
-> Just an idea.
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-That would be nice, leaving only Samsung-specific patches for the next 
-merge window.
+Moved it to for-next, since...
 
-(That would be patches 1 to 8, though, as 9 is a patch for ASoC that could 
-be picked up by Mark Brown independently.)
+> ---
+>  drivers/i2c/busses/i2c-pnx.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/i2c/busses/i2c-pnx.c b/drivers/i2c/busses/i2c-pnx.c
+> index 5f39c6d..d2f02b3 100644
+> --- a/drivers/i2c/busses/i2c-pnx.c
+> +++ b/drivers/i2c/busses/i2c-pnx.c
+> @@ -727,6 +727,7 @@ static int i2c_pnx_probe(struct platform_device *pdev)
+>  	alg_data->irq = platform_get_irq(pdev, 0);
+>  	if (alg_data->irq < 0) {
+>  		dev_err(&pdev->dev, "Failed to get IRQ from platform resource\n");
+> +		ret = alg_data->irq;
+>  		goto out_irq;
 
-Best regards,
-Tomasz
+... this surely needs to beu 'out_clock'. Fixed it here. If somebody
+wants to convert it to devm_*, much appreciated.
+
+>  	}
+>  	ret = request_irq(alg_data->irq, i2c_pnx_interrupt,
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130828/4c2f106b/attachment.sig>
