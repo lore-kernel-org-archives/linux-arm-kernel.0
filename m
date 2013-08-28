@@ -1,49 +1,56 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 28 Aug 2013 09:41:37 +0800
-Subject: [PATCH v8 1/8] ARM: debug: support debug ll on hisilicon soc
-In-Reply-To: <20130825161953.GV6617@n2100.arm.linux.org.uk>
-References: <1377336603-10303-1-git-send-email-haojian.zhuang@linaro.org>
- <1377336603-10303-2-git-send-email-haojian.zhuang@linaro.org>
- <20130825161953.GV6617@n2100.arm.linux.org.uk>
-Message-ID: <CAD6h2NQv737n9h+QZLo7f35G-sTOVzpO+Xe2gXDizo0hz8geJg@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 28 Aug 2013 10:41:59 +0900
+Subject: [GIT PULL 0/5] Second Round of Renesas ARM based SoC SMP updates for
+ v3.12
+Message-ID: <cover.1377651075.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 August 2013 00:19, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Aug 24, 2013 at 05:29:56PM +0800, Haojian Zhuang wrote:
->> Support UART0 debug ll on Hisilicon Hi3620 SoC & Hi3716 SoC.
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->> ---
->>  arch/arm/Kconfig.debug | 19 +++++++++++++++++++
->>  1 file changed, 19 insertions(+)
->>
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index 814d224..bba9662 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -194,6 +194,22 @@ choice
->>                 Say Y here if you want kernel low-level debugging support
->>                 on HI3716 UART.
->>
->
-> I'm having problems applying this patch - I don't have the above context
-> lines in my tree, or anything remotely resembling them.  Neither can I
-> find anything remotely similar in mainline.
->
-> What did you generate this patch against?  It can't be v3.11-rc6 as you
-> put in your KernelVersion: line for the patch system.
->
-> Your diff above says that this was generated against blob 814d224, which
-> doesn't exist in mainline either.  Neither does it seem to appear in
-> my build tree which includes arm-soc's for-next branch.
+Hi Kevin, Hi Olof, Hi Arnd,
 
-Because there's some optimization on debug ll in your tree, I only find those
-commits in linux-next git tree. So I based this commit in linux-next.
+please consider this second round of Renesas ARM based SoC SMP updates for
+v3.12.
 
-Could you help me to figure out which branch should I base in your git tree?
-Since I can't find a right one.
+It is based on renesas-smp-for-v3.12 ("ARM based SoC SMP updates for
+v3.12") which you have previously pulled.
 
-Regards
-Haojian
+I apologise that this and other pull requests that I will send today
+are rather later in the cycle than I would like. This is primarily due
+to a combination of my summer vacation and wanting to let the patches
+sit in next for a while.
+
+
+The following changes since commit 1d33a354bbb618ba578bb372ebc18fe58457f6f3:
+
+  ARM: shmobile: Per-CPU SMP boot / sleep code for SCU SoCs (2013-08-06 18:07:26 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-smp2-for-v3.12
+
+for you to fetch changes up to c46a8cdf3e1ce9a79f58dca178da9e83138c0c01:
+
+  ARM: shmobile: Introduce shmobile_boot_size (2013-08-21 17:53:34 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM based SoC SMP updates for v3.12
+
+A continuation of Magnus's ongoing re-working of SMP on shmobile:
+* Introduce shmobile_boot_size
+* Expose shmobile_invalidate_start()
+* Remove unused shmobile_smp_init_cpus()
+* Introduce shmobile_smp_cpu_disable() and use on sh73a0 SoC
+
+----------------------------------------------------------------
+Magnus Damm (5):
+      ARM: shmobile: Introduce shmobile_smp_cpu_disable()
+      ARM: shmobile: Use shmobile_smp_cpu_disable() on sh73a0
+      ARM: shmobile: Remove unused shmobile_smp_init_cpus()
+      ARM: shmobile: Expose shmobile_invalidate_start()
+      ARM: shmobile: Introduce shmobile_boot_size
+
+ arch/arm/mach-shmobile/headsmp.S             |  3 +++
+ arch/arm/mach-shmobile/include/mach/common.h |  4 +++-
+ arch/arm/mach-shmobile/platsmp.c             | 22 +++++++---------------
+ arch/arm/mach-shmobile/smp-sh73a0.c          |  9 +--------
+ 4 files changed, 14 insertions(+), 24 deletions(-)
