@@ -1,58 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 28 Aug 2013 23:49:12 +0400
-Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
-In-Reply-To: <20130828113459.48ecbb34@armhf>
-References: <20130828113459.48ecbb34@armhf>
-Message-ID: <521E5438.90109@cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 Aug 2013 21:50:09 +0200
+Subject: [PATCH v4 1/3] ARM: bcm281xx: Add GPIO driver
+In-Reply-To: <CAPdLdq=atsbY8QDzH-aaHJvLk1CDe5qK3phSGLVZSvm=FoncjA@mail.gmail.com>
+References: <1376938761-13657-1-git-send-email-markus.mayer@linaro.org>
+ <1376938761-13657-2-git-send-email-markus.mayer@linaro.org>
+ <CACRpkdbm2cKpz2SrUgsUpB4x5xjm=Bz=VCu279sEAKFJ1x9SPg@mail.gmail.com>
+ <CAPdLdqm+r1P=48Aujz9nuDb_vpFj-wBvmCV=oOKNZ0YENmbL1g@mail.gmail.com>
+ <CAPdLdq=atsbY8QDzH-aaHJvLk1CDe5qK3phSGLVZSvm=FoncjA@mail.gmail.com>
+Message-ID: <CACRpkdb1wjJh1qCq1Zke0MmL0WZsMKqA5NSJF571aMAKY1mOuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Aug 23, 2013 at 9:30 PM, Markus Mayer <markus.mayer@linaro.org> wrote:
 
-On 08/28/2013 01:34 PM, Jean-Francois Moine wrote:
+> I have a follow-up question regarding status reads for each iteration.
+> Is this what you are looking for?
+>
+>         for (;;) {
+>                 sta = readl(reg_base + GPIO_INT_STATUS(bank_id)) &
+>                     (~(readl(reg_base + GPIO_INT_MASK(bank_id))));
+>                 if (sta == 0)
+>                         break;
 
-> This patch adds the nodes to instantiate the audio devices of the Dove
-> boards.
+Yes, but follow the design pattern of other drivers such as the
+drivers/irqchip/irq-vic.c:
 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
->   arch/arm/boot/dts/dove.dtsi                  | 18 ++++++++++++++++++
->   1 file changed, 18 insertions(+)
+static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
+{
+        u32 stat, irq;
+        int handled = 0;
 
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index 499abad..78227e2 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -573,6 +573,24 @@
->   					phy-handle = <&ethphy>;
->   				};
->   			};
-> +
-> +			i2s0: audio-controller at b0000 {
+        while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
+                irq = ffs(stat) - 1;
+                handle_IRQ(irq_find_mapping(vic->domain, irq), regs);
+                handled = 1;
+        }
+}
 
-     According to ePAPR [1] the node should be called "sound", not 
-"audio-controller".
+I.e use that nice while-construction.
 
-> +				compatible = "marvell,mvebu-audio";
-> +				reg = <0xb0000 0x2210>;
-> +				interrupts = <19>, <20>;
-> +				clocks = <&gate_clk 12>;
-> +				clock-names = "internal";
-> +				status = "disabled";
-> +			};
-> +
-> +			i2s1: audio-controller at b4000 {
-
-    Same comment.
-
-> +				compatible = "marvell,mvebu-audio";
-> +				reg = <0xb4000 0x2210>;
-> +				interrupts = <21>, <22>;
-> +				clocks = <&gate_clk 13>;
-> +				clock-names = "internal";
-> +				status = "disabled";
-> +			};
-
-[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
-
-WBR, Sergei
+Yours,
+Linus Walleij
