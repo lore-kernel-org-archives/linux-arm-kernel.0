@@ -1,174 +1,59 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 28 Aug 2013 15:13:17 +0900
-Subject: [PATCH 01/02] ARM: shmobile: Add r8a73a4 SMP support using APMU
- code
-In-Reply-To: <52162638.5080107@arm.com>
-References: <20130807225531.9856.18974.sendpatchset@w520>
- <20130807225540.9856.67383.sendpatchset@w520>
- <52162638.5080107@arm.com>
-Message-ID: <CANqRtoQaSJN+DSv9Uj=Dxv6RutS4aYVY8AM9J=6LqUQjyo3STw@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 28 Aug 2013 11:47:06 +0530
+Subject: [PATCH 1/2] ARM: AM335x: Get rid of unused sram init function
+In-Reply-To: <521CCE8B.4050907@ti.com>
+References: <1377598305-15539-1-git-send-email-rnayak@ti.com>
+ <1377598305-15539-2-git-send-email-rnayak@ti.com> <521CCE8B.4050907@ti.com>
+Message-ID: <521D95E2.3060309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again Sudeep,
-
-On Thu, Aug 22, 2013 at 11:54 PM, Sudeep KarkadaNagesha
-<Sudeep.KarkadaNagesha@arm.com> wrote:
-> On 07/08/13 23:55, Magnus Damm wrote:
->> From: Magnus Damm <damm@opensource.se>
+On Tuesday 27 August 2013 09:36 PM, Dave Gerlach wrote:
+> On 08/27/2013 05:11 AM, Rajendra Nayak wrote:
+>> Remove the empty am33xx_sram_init() function.
 >>
->> Add r8a73a4 SMP support using the shared APMU code. To enable
->> SMP the r8a73a4 specific DTS needs to be updated to include
->> CPU cores, and this is happening in a separate patch.
->>
->> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 >> ---
+>>   arch/arm/mach-omap2/sram.c |    7 -------
+>>   1 file changed, 7 deletions(-)
 >>
->>  arch/arm/mach-shmobile/Makefile               |    1
->>  arch/arm/mach-shmobile/include/mach/r8a73a4.h |    1
->>  arch/arm/mach-shmobile/setup-r8a73a4.c        |    3 +
->>  arch/arm/mach-shmobile/smp-r8a73a4.c          |   75 +++++++++++++++++++++++++
->>  4 files changed, 80 insertions(+)
+>> diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
+>> index 4bd0968..305fc2b 100644
+>> --- a/arch/arm/mach-omap2/sram.c
+>> +++ b/arch/arm/mach-omap2/sram.c
+>> @@ -285,11 +285,6 @@ static inline int omap34xx_sram_init(void)
+>>   }
+>>   #endif /* CONFIG_ARCH_OMAP3 */
 >>
->> --- 0001/arch/arm/mach-shmobile/Makefile
->> +++ work/arch/arm/mach-shmobile/Makefile      2013-08-07 20:07:31.000000000 +0900
->> @@ -33,6 +33,7 @@ endif
->>  # SMP objects
->>  smp-y                                := platsmp.o headsmp.o
->>  smp-$(CONFIG_ARCH_SH73A0)    += smp-sh73a0.o headsmp-scu.o platsmp-scu.o
->> +smp-$(CONFIG_ARCH_R8A73A4)   += smp-r8a73a4.o platsmp-apmu.o
-> platsmp-apmu.c is introducing new bindings which IMO is not required.
-
-I guess we will have to discuss a bit more how to support the APMU
-hardware. Regarding using DT or static configuration, I believe
-starting out with static and incrementally adding DT binding support
-is the easiest way forward.
-
-> I have responded to that patch, but it would be nice to combine that
-> patch in a single series for easier review for at least one platform
-> using it.
-
-Good idea. I will resend a the next version as a single series to make
-future review easier.
-
->>  smp-$(CONFIG_ARCH_R8A7779)   += smp-r8a7779.o headsmp-scu.o platsmp-scu.o
->>  smp-$(CONFIG_ARCH_EMEV2)     += smp-emev2.o headsmp-scu.o platsmp-scu.o
+>> -static inline int am33xx_sram_init(void)
+>> -{
+>> -    return 0;
+>> -}
+>> -
+>>   int __init omap_sram_init(void)
+>>   {
+>>       omap_detect_sram();
+>> @@ -299,8 +294,6 @@ int __init omap_sram_init(void)
+>>           omap242x_sram_init();
+>>       else if (cpu_is_omap2430())
+>>           omap243x_sram_init();
+>> -    else if (soc_is_am33xx())
+>> -        am33xx_sram_init();
+>>       else if (cpu_is_omap34xx())
+>>           omap34xx_sram_init();
 >>
->> --- 0008/arch/arm/mach-shmobile/include/mach/r8a73a4.h
->> +++ work/arch/arm/mach-shmobile/include/mach/r8a73a4.h        2013-08-07 20:08:02.000000000 +0900
->> @@ -6,5 +6,6 @@ void r8a73a4_add_dt_devices(void);
->>  void r8a73a4_clock_init(void);
->>  void r8a73a4_pinmux_init(void);
->>  void r8a73a4_init_early(void);
->> +extern struct smp_operations r8a73a4_smp_ops;
 >>
->>  #endif /* __ASM_R8A73A4_H__ */
->> --- 0008/arch/arm/mach-shmobile/setup-r8a73a4.c
->> +++ work/arch/arm/mach-shmobile/setup-r8a73a4.c       2013-08-07 20:07:48.000000000 +0900
->> @@ -212,6 +212,9 @@ void __init r8a73a4_init_early(void)
->>  #ifndef CONFIG_ARM_ARCH_TIMER
->>       shmobile_setup_delay(1500, 2, 4); /* Cortex-A15 @ 1500MHz */
->>  #endif
->> +#ifdef CONFIG_SMP
->> +     smp_set_ops(&r8a73a4_smp_ops);
->> +#endif
->>  }
->>
->>  #ifdef CONFIG_USE_OF
->> --- /dev/null
->> +++ work/arch/arm/mach-shmobile/smp-r8a73a4.c 2013-08-07 20:09:10.000000000 +0900
->> @@ -0,0 +1,75 @@
->> +/*
->> + * SMP support for r8a73a4
->> + *
->> + * Copyright (C) 2012-2013 Renesas Solutions Corp.
->> + * Copyright (C) 2012 Takashi Yoshii <takashi.yoshii.ze@renesas.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; version 2 of the License.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +#include <linux/init.h>
->> +#include <linux/io.h>
->> +#include <linux/kernel.h>
->> +#include <linux/smp.h>
->> +#include <asm/smp_plat.h>
->> +#include <mach/common.h>
->> +
->> +#define SYSC         0xe6180000
->> +#define CA7BAR               0x4020
->> +#define CA15BAR              0x6020
->> +#define RESCNT               0x801c
->> +#define MERAM                0xe8080000
->> +#define CCI_BASE     0xf0190000
->> +#define CCI_SLAVE3   0x4000
->> +#define CCI_SLAVE4   0x5000
->> +#define CCI_SNOOP    0x0000
->> +#define CCI_STATUS   0x000c
-> Have a look at cci driver and its bindings, these slave addresses needs
-> to be part of DTS.
+> 
+> Suspend resume for AM33xx as of right now uses this function. This patch [1] uses this function to push the low-level suspend code to sram, it was added here to be consistent with other platforms that utilize the same type of functionality (omap34xx).
 
-Ok, I will look into how we can make use of the CCI driver.
+Right, but if you look at patch 2/2 in the series, that basically moves all OMAP DT only platforms from using legacy
+OMAP private apis to push code/manage sram to using the generic gen_pool apis to manage sram.
+Can you look at how you can use gen_pool for am33xx instead of the way omap3 does it, since we want to completely
+get rid of the internal sram management apis (or atleast have them only for legacy non-DT OMAP platforms).
 
->> +
->> +static void __init r8a73a4_smp_prepare_cpus(unsigned int max_cpus)
->> +{
->> +     u32 bar;
->> +     void __iomem *p;
->> +
->> +     /* let APMU code install data related to shmobile_boot_vector */
->> +     shmobile_smp_apmu_prepare_cpus(max_cpus);
->> +
->> +     /* MERAM for jump stub, because BAR requires 256KB aligned address */
->> +     p = ioremap_nocache(MERAM, shmobile_boot_size);
->> +     memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
->> +     iounmap(p);
->> +
->> +     /* setup reset vector and disable reset */
->> +     p = ioremap_nocache(SYSC, 0x9000);
->> +     bar = (MERAM >> 8) & 0xfffffc00;
->> +     writel_relaxed(bar, p + CA15BAR);
->> +     writel_relaxed(bar, p + CA7BAR);
->> +     writel_relaxed(bar | 0x10, p + CA15BAR);
->> +     writel_relaxed(bar | 0x10, p + CA7BAR);
->> +     writel_relaxed(readl_relaxed(p + RESCNT) & ~(1 << 10), p + RESCNT);
->> +     writel_relaxed(readl_relaxed(p + RESCNT) & ~(1 << 9), p + RESCNT);
->> +     iounmap(p);
->> +
->> +     /* enable snoop and DVM */
->> +     p = ioremap_nocache(CCI_BASE, 0x8000);
->> +     writel_relaxed(3, p + CCI_SLAVE3 + CCI_SNOOP);  /* CA15 */
->> +     writel_relaxed(3, p + CCI_SLAVE4 + CCI_SNOOP);  /* CA7 */
->> +     while (readl_relaxed(p + CCI_STATUS))
->> +             /* wait for pending bit low */;
->> +     iounmap(p);
-> You can use cci driver APIs for CCI control.
 
-Ok!
-
->> +}
->> +
->> +struct smp_operations r8a73a4_smp_ops __initdata = {
->> +     .smp_prepare_cpus       = r8a73a4_smp_prepare_cpus,
->> +     .smp_boot_secondary     = shmobile_smp_apmu_boot_secondary,
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +     .cpu_disable            = shmobile_smp_cpu_disable,
->> +     .cpu_die                = shmobile_smp_apmu_cpu_die,
->> +     .cpu_kill               = shmobile_smp_apmu_cpu_kill,
->> +#endif
->> +};
-> If you are running Linux in secure mode, you can reuse mcpm_smp_ops and
-> define these as part of mcpm_platform_ops
-
-Thanks for pointing that out, but we're not running in secure more.
-
-Thanks for the review!
-
-Cheers,
-
-/ magnus
+> 
+> Regards,
+> Dave
+> 
+> [1] http://marc.info/?l=linux-omap&m=137581164813160&w=2
