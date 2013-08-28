@@ -1,59 +1,57 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 28 Aug 2013 12:26:31 +0200
-Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
-In-Reply-To: <20130828121943.1c8327ca@skate>
-References: <20130828113459.48ecbb34@armhf> <521DCD33.2070008@gmail.com>
- <20130828121943.1c8327ca@skate>
-Message-ID: <521DD057.4040208@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 28 Aug 2013 15:54:24 +0530
+Subject: [PATCH 2/2] ARM: OMAP4+: Move SRAM data to DT
+In-Reply-To: <521D977D.1000305@ti.com>
+References: <1377598305-15539-1-git-send-email-rnayak@ti.com>
+ <1377598305-15539-3-git-send-email-rnayak@ti.com> <521C8C47.2000502@ti.com>
+ <521D977D.1000305@ti.com>
+Message-ID: <521DCFD8.2020304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2013 12:19 PM, Thomas Petazzoni wrote:
-> Sebastian, Jean-Fran?ois,
->
-> On Wed, 28 Aug 2013 12:13:07 +0200, Sebastian Hesselbarth wrote:
->> On 08/28/2013 11:34 AM, Jean-Francois Moine wrote:
->>> This patch adds the nodes to instantiate the audio devices of the Dove
->>> boards.
+On Wednesday 28 August 2013 11:53 AM, Rajendra Nayak wrote:
+> On Tuesday 27 August 2013 04:53 PM, Sekhar Nori wrote:
+>> On Tuesday 27 August 2013 03:41 PM, Rajendra Nayak wrote:
+>>> Use drivers/misc/sram.c driver to manage SRAM on all DT only
+>>> OMAP platforms (am33xx, am43xx, omap4 and omap5) instead of
+>>> the existing private implementation.
 >>>
->>> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
->>> ---
->>>    arch/arm/boot/dts/dove.dtsi                  | 18 ++++++++++++++++++
->>>    1 file changed, 18 insertions(+)
+>>> Address and size related data  is removed from mach-omap2/sram.c
+>>> and now passed to drivers/misc/sram.c from DT.
 >>>
->>> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
->>> index 499abad..78227e2 100644
->>> --- a/arch/arm/boot/dts/dove.dtsi
->>> +++ b/arch/arm/boot/dts/dove.dtsi
->>> @@ -573,6 +573,24 @@
->>>    					phy-handle = <&ethphy>;
->>>    				};
->>>    			};
->>> +
->>> +			i2s0: audio-controller at b0000 {
->>> +				compatible = "marvell,mvebu-audio";
+>>> Users can hence use general purpose allocator apis instead of
+>>> OMAP private ones to manage and use SRAM.
+>>>
+>>> Currently there are no users on SRAM on these platfoms.
+>>>
+>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 >>
->> [added Gregory to Cc]
+>> Nice getting rid of code.
 >>
->> Jean-Francois,
+>>> diff --git a/arch/arm/mach-omap2/sram.h b/arch/arm/mach-omap2/sram.h
+>>> index ca7277c..3f83b80 100644
+>>> --- a/arch/arm/mach-omap2/sram.h
+>>> +++ b/arch/arm/mach-omap2/sram.h
+>>> @@ -80,4 +80,3 @@ static inline void omap_push_sram_idle(void) {}
+>>>  #else
+>>>  #define OMAP4_SRAM_PA		0x40300000
+>>>  #endif
+>>> -#define AM33XX_SRAM_PA		0x40300000
 >>
->> as Mark Brown already took the bindings patch for above generic
->> compatible, how are we going to discriminate different
->> implementations/features of Dove, Kirkwood, and Armada 370?
->
-> I agree that mvebu-audio is not a really good compatible string. It
-> should use the first SoC that introduced the IP block, so that if
-> future SOCs have variations, we can introduce separate compatible
-> strings.
->
-> So for now, the compatible string should be kirkwood-audio.
+>> I guess OMAP4_SRAM_PA is left in the code to take care of errata I688?
+> 
+> right.
+> 
+>> How about removing the iotable entry for SRAM on OMAP4 and converting
+>> omap_barriers_init() to use the gen_pool API instead of passing an
+>> incremented address to DT?
+> 
+> Actually we dont really need to alloc and manage any sram pool for handling
+> the errata. It just needs to know an sram location which it can read and write
+> back into (which can be any sram location used/unused).
 
-Unfortunately, mvebu-audio has already been taken by Mark. Also, we
-know the differences for the three SoCs now and should have a compatible
-for each (and maybe mvebu-audio for fallback).
+But there will be a race with other writes to SRAM since omap_bus_sync()
+is not atomic context.
 
-Also, we'll need to distinguish between the different audio controllers
-on a single SoC, i.e. i2s0 and i2s1. I suggest checking the (phys) reg
-base passed.
-
-Sebastian
+Thanks,
+Sekhar
