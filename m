@@ -1,129 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Aug 2013 14:29:09 +0200
-Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
-In-Reply-To: <20130828121320.GK6617@n2100.arm.linux.org.uk>
-References: <20130828113459.48ecbb34@armhf> <521DCD33.2070008@gmail.com>
- <20130828121943.1c8327ca@skate> <521DD057.4040208@gmail.com>
- <20130828131548.0009d613@skate> <521DE2B3.9050508@gmail.com>
- <20130828135827.2307c89e@skate>
- <20130828121320.GK6617@n2100.arm.linux.org.uk>
-Message-ID: <20130828142909.3521064b@skate>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Wed, 28 Aug 2013 17:59:48 +0530
+Subject: [PATCH v2 10/13] ARM: OMAP2+: hwmod: AM43x operations
+In-Reply-To: <5214A4D5.4000700@ti.com>
+References: <cover.1375443858.git.afzal@ti.com>
+ <838ab5ad788f64cef1e8859409490aa2b495d1ee.1375443858.git.afzal@ti.com>
+ <5214A4D5.4000700@ti.com>
+Message-ID: <521DED3C.2040407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell King - ARM Linux,
+Hi Rajendra,
 
-On Wed, 28 Aug 2013 13:13:20 +0100, Russell King - ARM Linux wrote:
+On Wednesday 21 August 2013 05:00 PM, Rajendra Nayak wrote:
+> On Friday 02 August 2013 07:08 PM, Afzal Mohammed wrote:
 
-> > > I guess, yes.
-> > 
-> > Jean-Fran?ois, could you cook and submit a patch to change the
-> > compatible string?
+>> Reuse OMAP4 operations on AM43x.
+>>
+>> Signed-off-by: Ambresh K <ambresh@ti.com>
+>> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/omap_hwmod.c |    8 ++++++++
+>>  1 file changed, 8 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+>> index 7f4db12..a1b7e20 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>> @@ -4123,6 +4123,14 @@ void __init omap_hwmod_init(void)
+>>  		soc_ops.init_clkdm = _init_clkdm;
+>>  		soc_ops.update_context_lost = _omap4_update_context_lost;
+>>  		soc_ops.get_context_lost = _omap4_get_context_lost;
+>> +	} else if (soc_is_am43xx()) {
+>> +		soc_ops.enable_module = _omap4_enable_module;
+>> +		soc_ops.disable_module = _omap4_disable_module;
+>> +		soc_ops.wait_target_ready = _omap4_wait_target_ready;
+>> +		soc_ops.assert_hardreset = _omap4_assert_hardreset;
+>> +		soc_ops.deassert_hardreset = _omap4_deassert_hardreset;
+>> +		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
+>> +		soc_ops.init_clkdm = _init_clkdm;
 > 
-> I don't think this is a good idea.  The configuration of this IP is
-> not based on the SoC as a single SoC can have a mixture of different
-> configurations.
+> Did you leave out soc_ops.update_context_lost and soc_ops.get_context_lost on
+> purpose?
 
-Using the name of the oldest SoC in the family that had the IP block is
-the norm, because it's really what "compatible" means: the IP block in
-Dove is *compatible* with the one that was originally introduced in
-Kirkwood.
+As far as I understand, primarily driver make use of this with the help
+of function pointers passed through platform data. And as am43x is a DT
+only platform, it was left out.
 
-See what Rob Herring (one of the DT maintainer) says in
-http://lists.infradead.org/pipermail/linux-mtd/2012-March/040417.html:
-
-"""
-There is no reason all machines can't use "st,spear600-smi" in their
-dts. It doesn't have to be a spear600, just compatible with it. Really
-you want the string to be the oldest SOC the block is in and then newer
-SOCs can claim compatibility with the old version.
-"""
-
-The thread was precisely about replacing a SoC-specific compatible
-string "st,spear600-smi" by a more generic "st,spear-smi" and Rob
-Herring (above) was opposing to that.
-
-> I think marvell,mvebu-audio is a reasonable compatible string for this,
-> and that the different configurations should be described by properties
-> indicating which inputs and outputs have been implemented.
-> 
-> For instance, on the Dove, there are two of these blocks.  One has I2S
-> in and out only, but the other block has I2S in and out, and SPDIF out.
-> On some other Marvell devices, this block has I2S in and out and SPDIF
-> in and out.
-> 
-> Otherwise, they're functionally the same.
-
-Right, that's why they can both use "kirkwood-audio" as the compatible
-string.
-
-> > Though, if the difference between the two units is the availability of
-> > SPDIF support, then we shouldn't encode the channel number, but instead
-> > the availability of SPDIF, i.e:
-> > 
-> > 	audio0 {
-> > 		reg = <... ...>;
-> > 		compatible = "marvell,kirkwood-audio";
-> > 		marvell,has-spdif;
-> > 	};
-> > 
-> > 	audio1 {
-> > 		reg = <... ...>;
-> > 		compatible = "marvell,kirkwood-audio";
-> > 	};
-> 
-> ... which means there's no problem with using marvell,mvebu-audio as the
-> compatible string if you're going to use properties to describe what
-> facilities are available.
-
-I disagree, because how do you know if a future "mvebu" SOC such as
-Armada 370, or one that doesn't exist yet, will not have a different
-audio IP block? It will still be audio, it will still be mvebu, but it
-will not be able to use a "marvell,mvebu-audio" driver. Or maybe it can
-use the same driver, but with a few variations, so a different
-compatible string will be needed to identify the original IP
-("marvell,kirkwood-audio", used on Kirkwood/Dove) and slightly newer
-versions of the IP ("marvell,some-funky-soc-audio").
-
-> In any case "marvell,has-spdif" is too generic - as I've indicated above,
-> there's versions with spdif out, and other versions with spdif in and
-> out.
-
-Right, the above was just an example to illustrate that we can have
-additional properties to encode the differences between each instance
-of the audio devices.
-
-For example, for XOR engines, we have:
-
-                        xor at 60900 {
-                                compatible = "marvell,orion-xor";
-                                reg = <0x60900 0x100
-                                       0x60b00 0x100>;
-                                clocks = <&gateclk 22>;
-                                status = "okay";
-
-                                xor10 {
-                                        interrupts = <51>;
-                                        dmacap,memcpy;
-                                        dmacap,xor;
-                                };
-                                xor11 {
-                                        interrupts = <52>;
-                                        dmacap,memcpy;
-                                        dmacap,xor;
-                                        dmacap,memset;
-                                };
-                        };
-
-because the first channel of each XOR engine has only memcpy and xor
-capabilities, while the second channel has memcpy, xor and memset
-capabilities.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards
+Afzal
