@@ -1,227 +1,150 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 29 Aug 2013 08:21:58 +0900
-Subject: [PATCH v2 01/03] ARM: shmobile: Shared APMU SMP support code without
- DT
+Date: Thu, 29 Aug 2013 08:22:07 +0900
+Subject: [PATCH v2 02/03] ARM: shmobile: Add r8a7790 SMP support using APMU
+ code
 In-Reply-To: <20130828232148.7321.45739.sendpatchset@w520>
 References: <20130828232148.7321.45739.sendpatchset@w520>
-Message-ID: <20130828232158.7321.6048.sendpatchset@w520>
+Message-ID: <20130828232207.7321.10230.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Introduce shared APMU SMP code for mach-shmobile. Both SMP boot up
-and CPU Hotplug is supported. This version does not use DT but
-if needed this will be added as an incremental feature patch.
+Add r8a7790 SMP support using the shared APMU code. To enable
+SMP the r8a7790 specific DTS needs to be updated to include
+CPU cores, and this is happening in a separate patch.
 
-The code is designed around CONFIG_NR_CPUS and should in theory support
-any number of APMUs, however due to the current DT-less static design
-only a single APMU is supported.
- 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
  Changes since V1:
- - Replaced DT bindings with static configuration
- - Removed multi-APMU support
+ - use DT_MACHINE ->smp = smp_ops() over set_smp_ops() from ->init_early()
 
- arch/arm/mach-shmobile/include/mach/common.h |    6 
- arch/arm/mach-shmobile/platsmp-apmu.c        |  178 ++++++++++++++++++++++++++
- 2 files changed, 184 insertions(+)
+ arch/arm/mach-shmobile/Makefile                |    1 
+ arch/arm/mach-shmobile/board-lager-reference.c |    1 
+ arch/arm/mach-shmobile/board-lager.c           |    1 
+ arch/arm/mach-shmobile/include/mach/r8a7790.h  |    1 
+ arch/arm/mach-shmobile/setup-r8a7790.c         |    1 
+ arch/arm/mach-shmobile/smp-r8a7790.c           |   67 ++++++++++++++++++++++++
+ 6 files changed, 72 insertions(+)
 
---- 0001/arch/arm/mach-shmobile/include/mach/common.h
-+++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-08-28 20:59:58.000000000 +0900
-@@ -22,6 +22,12 @@ extern int shmobile_smp_scu_boot_seconda
- 					   struct task_struct *idle);
- extern void shmobile_smp_scu_cpu_die(unsigned int cpu);
- extern int shmobile_smp_scu_cpu_kill(unsigned int cpu);
-+extern void shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus);
-+extern int shmobile_smp_apmu_boot_secondary(unsigned int cpu,
-+					    struct task_struct *idle);
-+extern void shmobile_smp_apmu_cpu_die(unsigned int cpu);
-+extern int shmobile_smp_apmu_cpu_kill(unsigned int cpu);
-+extern void shmobile_invalidate_start(void);
- struct clk;
- extern int shmobile_clk_init(void);
- extern void shmobile_handle_irq_intc(struct pt_regs *);
+--- 0001/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2013-08-28 21:00:09.000000000 +0900
+@@ -34,6 +34,7 @@ endif
+ smp-y				:= platsmp.o headsmp.o
+ smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
+ smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
++smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o platsmp-apmu.o
+ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
+ 
+ # IRQ objects
+--- 0001/arch/arm/mach-shmobile/board-lager-reference.c
++++ work/arch/arm/mach-shmobile/board-lager-reference.c	2013-08-28 21:06:36.000000000 +0900
+@@ -38,6 +38,7 @@ static const char *lager_boards_compat_d
+ };
+ 
+ DT_MACHINE_START(LAGER_DT, "lager")
++	.smp		= smp_ops(r8a7790_smp_ops),
+ 	.init_early	= r8a7790_init_early,
+ 	.init_machine	= lager_add_standard_devices,
+ 	.init_time	= r8a7790_timer_init,
+--- 0001/arch/arm/mach-shmobile/board-lager.c
++++ work/arch/arm/mach-shmobile/board-lager.c	2013-08-28 21:06:28.000000000 +0900
+@@ -228,6 +228,7 @@ static const char * const lager_boards_c
+ };
+ 
+ DT_MACHINE_START(LAGER_DT, "lager")
++	.smp		= smp_ops(r8a7790_smp_ops),
+ 	.init_early	= r8a7790_init_early,
+ 	.init_time	= r8a7790_timer_init,
+ 	.init_machine	= lager_add_standard_devices,
+--- 0001/arch/arm/mach-shmobile/include/mach/r8a7790.h
++++ work/arch/arm/mach-shmobile/include/mach/r8a7790.h	2013-08-28 21:00:09.000000000 +0900
+@@ -7,6 +7,7 @@ void r8a7790_clock_init(void);
+ void r8a7790_pinmux_init(void);
+ void r8a7790_init_early(void);
+ void r8a7790_timer_init(void);
++extern struct smp_operations r8a7790_smp_ops;
+ 
+ #define MD(nr) BIT(nr)
+ u32 r8a7790_read_mode_pins(void);
+--- 0001/arch/arm/mach-shmobile/setup-r8a7790.c
++++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-08-28 21:06:15.000000000 +0900
+@@ -283,6 +283,7 @@ static const char * const r8a7790_boards
+ };
+ 
+ DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
++	.smp		= smp_ops(r8a7790_smp_ops),
+ 	.init_early	= r8a7790_init_early,
+ 	.init_time	= r8a7790_timer_init,
+ 	.dt_compat	= r8a7790_boards_compat_dt,
 --- /dev/null
-+++ work/arch/arm/mach-shmobile/platsmp-apmu.c	2013-08-29 08:03:02.000000000 +0900
-@@ -0,0 +1,178 @@
++++ work/arch/arm/mach-shmobile/smp-r8a7790.c	2013-08-28 21:00:10.000000000 +0900
+@@ -0,0 +1,67 @@
 +/*
-+ * SMP support for SoCs with APMU
++ * SMP support for r8a7790
 + *
-+ * Copyright (C) 2013  Magnus Damm
++ * Copyright (C) 2012-2013 Renesas Solutions Corp.
++ * Copyright (C) 2012 Takashi Yoshii <takashi.yoshii.ze@renesas.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+#include <linux/delay.h>
++#include <linux/kernel.h>
 +#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/ioport.h>
-+#include <linux/of_address.h>
 +#include <linux/smp.h>
-+#include <asm/cacheflush.h>
-+#include <asm/cp15.h>
++#include <linux/io.h>
 +#include <asm/smp_plat.h>
 +#include <mach/common.h>
 +
-+static struct {
-+	void __iomem *iomem;
-+	int bit;
-+} apmu_cpus[CONFIG_NR_CPUS];
++#define RST		0xe6160000
++#define CA15BAR		0x0020
++#define CA7BAR		0x0030
++#define CA15RESCNT	0x0040
++#define CA7RESCNT	0x0044
++#define MERAM		0xe8080000
 +
-+#define WUPCR_OFFS 0x10
-+#define PSTR_OFFS 0x40
-+#define CPUNCR_OFFS(n) (0x100 + (0x10 * (n)))
-+
-+static int apmu_power_on(void __iomem *p, int bit)
++static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
 +{
-+	/* request power on */
-+	writel_relaxed(BIT(bit), p + WUPCR_OFFS);
++	void __iomem *p;
++	u32 bar;
 +
-+	/* wait for APMU to finish */
-+	while (readl_relaxed(p + WUPCR_OFFS) != 0)
-+		;
++	/* let APMU code install data related to shmobile_boot_vector */
++	shmobile_smp_apmu_prepare_cpus(max_cpus);
 +
-+	return 0;
++	/* MERAM for jump stub, because BAR requires 256KB aligned address */
++	p = ioremap_nocache(MERAM, shmobile_boot_size);
++	memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
++	iounmap(p);
++
++	/* setup reset vectors */
++	p = ioremap_nocache(RST, 0x63);
++	bar = (MERAM >> 8) & 0xfffffc00;
++	writel_relaxed(bar, p + CA15BAR);
++	writel_relaxed(bar, p + CA7BAR);
++	writel_relaxed(bar | 0x10, p + CA15BAR);
++	writel_relaxed(bar | 0x10, p + CA7BAR);
++
++	/* enable clocks to all CPUs */
++	writel_relaxed((readl_relaxed(p + CA15RESCNT) & ~0x0f) | 0xa5a50000,
++		       p + CA15RESCNT);
++	writel_relaxed((readl_relaxed(p + CA7RESCNT) & ~0x0f) | 0x5a5a0000,
++		       p + CA7RESCNT);
++	iounmap(p);
 +}
 +
-+static int apmu_power_off(void __iomem *p, int bit)
-+{
-+	/* request Core Standby for next WFI */
-+	writel_relaxed(3, p + CPUNCR_OFFS(bit));
-+	return 0;
-+}
-+
-+static int apmu_power_off_poll(void __iomem *p, int bit)
-+{
-+	int k;
-+
-+	for (k = 0; k < 1000; k++) {
-+		if (((readl_relaxed(p + PSTR_OFFS) >> (bit * 4)) & 0x03) == 3)
-+			return 1;
-+
-+		mdelay(1);
-+	}
-+
-+	return 0;
-+}
-+
-+static int apmu_wrap(int cpu, int (*fn)(void __iomem *p, int cpu))
-+{
-+	void __iomem *p = apmu_cpus[cpu].iomem;
-+
-+	return p ? fn(p, apmu_cpus[cpu].bit) : -EINVAL;
-+}
-+
-+static void apmu_init_cpu(struct resource *res, int cpu, int bit)
-+{
-+	if (apmu_cpus[cpu].iomem)
-+		return;
-+
-+	apmu_cpus[cpu].iomem = ioremap_nocache(res->start, resource_size(res));
-+	apmu_cpus[cpu].bit = bit;
-+
-+	pr_debug("apmu ioremap %d %d 0x%08x 0x%08x\n", cpu, bit,
-+		 res->start, resource_size(res));
-+}
-+
-+static struct {
-+	struct resource iomem;
-+	int cpus[4];
-+} apmu_config[] = {
-+	{
-+		.iomem = DEFINE_RES_MEM(0xe6152000, 0x88),
-+		.cpus = { 0, 1, 2, 3 },
-+	}
-+};
-+
-+static void apmu_parse_cfg(void (*fn)(struct resource *res, int cpu, int bit))
-+{
-+	u32 id;
-+	int k;
-+	int bit, index;
-+
-+	for (k = 0; k < ARRAY_SIZE(apmu_config); k++) {
-+		for (bit = 0; bit < ARRAY_SIZE(apmu_config[k].cpus); bit++) {
-+			id = apmu_config[k].cpus[bit];
-+			if (id >= 0) {
-+				index = get_logical_index(id);
-+				if (index >= 0)
-+					fn(&apmu_config[k].iomem, index, bit);
-+			}
-+		}
-+	}
-+}
-+
-+void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus)
-+{
-+	/* install boot code shared by all CPUs */
-+	shmobile_boot_fn = virt_to_phys(shmobile_smp_boot);
-+	shmobile_boot_arg = MPIDR_HWID_BITMASK;
-+
-+	/* perform per-cpu setup */
-+	apmu_parse_cfg(apmu_init_cpu);
-+}
-+
-+int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	/* For this particular CPU register boot vector */
-+	shmobile_smp_hook(cpu, virt_to_phys(shmobile_invalidate_start), 0);
-+
-+	return apmu_wrap(cpu, apmu_power_on);
-+}
-+
++struct smp_operations r8a7790_smp_ops __initdata = {
++	.smp_prepare_cpus	= r8a7790_smp_prepare_cpus,
++	.smp_boot_secondary	= shmobile_smp_apmu_boot_secondary,
 +#ifdef CONFIG_HOTPLUG_CPU
-+/* nicked from arch/arm/mach-exynos/hotplug.c */
-+static inline void cpu_enter_lowpower_a15(void)
-+{
-+	unsigned int v;
-+
-+	asm volatile(
-+	"       mrc     p15, 0, %0, c1, c0, 0\n"
-+	"       bic     %0, %0, %1\n"
-+	"       mcr     p15, 0, %0, c1, c0, 0\n"
-+		: "=&r" (v)
-+		: "Ir" (CR_C)
-+		: "cc");
-+
-+	flush_cache_louis();
-+
-+	asm volatile(
-+	/*
-+	 * Turn off coherency
-+	 */
-+	"       mrc     p15, 0, %0, c1, c0, 1\n"
-+	"       bic     %0, %0, %1\n"
-+	"       mcr     p15, 0, %0, c1, c0, 1\n"
-+		: "=&r" (v)
-+		: "Ir" (0x40)
-+		: "cc");
-+
-+	isb();
-+	dsb();
-+}
-+
-+void shmobile_smp_apmu_cpu_die(unsigned int cpu)
-+{
-+	/* For this particular CPU deregister boot vector */
-+	shmobile_smp_hook(cpu, 0, 0);
-+
-+	/* Select next sleep mode using the APMU */
-+	apmu_wrap(cpu, apmu_power_off);
-+
-+	/* Do ARM specific CPU shutdown */
-+	cpu_enter_lowpower_a15();
-+
-+	/* jump to shared mach-shmobile sleep / reset code */
-+	shmobile_smp_sleep();
-+}
-+
-+int shmobile_smp_apmu_cpu_kill(unsigned int cpu)
-+{
-+	return apmu_wrap(cpu, apmu_power_off_poll);
-+}
++	.cpu_disable		= shmobile_smp_cpu_disable,
++	.cpu_die		= shmobile_smp_apmu_cpu_die,
++	.cpu_kill		= shmobile_smp_apmu_cpu_kill,
 +#endif
++};
