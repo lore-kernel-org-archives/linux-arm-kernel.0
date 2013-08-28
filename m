@@ -1,54 +1,159 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 28 Aug 2013 13:44:51 +0200
-Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
-In-Reply-To: <20130828131548.0009d613@skate>
-References: <20130828113459.48ecbb34@armhf> <521DCD33.2070008@gmail.com>
- <20130828121943.1c8327ca@skate> <521DD057.4040208@gmail.com>
- <20130828131548.0009d613@skate>
-Message-ID: <521DE2B3.9050508@gmail.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Wed, 28 Aug 2013 19:45:03 +0800
+Subject: [PATCH v7 09/11] ARM: hi3xxx: add hotplug support
+In-Reply-To: <20130828022100.GG22852@quad.lixom.net>
+References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
+ <1376965873-14431-10-git-send-email-haojian.zhuang@linaro.org>
+ <20130828022100.GG22852@quad.lixom.net>
+Message-ID: <CAMj5Bkh170sr-Bs28LExtYcVoAUOCVTG8H60Kaoj3S2Een=JDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/13 13:15, Thomas Petazzoni wrote:
-> On Wed, 28 Aug 2013 12:26:31 +0200, Sebastian Hesselbarth wrote:
->>>> as Mark Brown already took the bindings patch for above generic
->>>> compatible, how are we going to discriminate different
->>>> implementations/features of Dove, Kirkwood, and Armada 370?
->>>
->>> I agree that mvebu-audio is not a really good compatible string. It
->>> should use the first SoC that introduced the IP block, so that if
->>> future SOCs have variations, we can introduce separate compatible
->>> strings.
->>>
->>> So for now, the compatible string should be kirkwood-audio.
->>
->> Unfortunately, mvebu-audio has already been taken by Mark. Also, we
->> know the differences for the three SoCs now and should have a compatible
->> for each (and maybe mvebu-audio for fallback).
+Dear Olof
+
+Thanks for the good suggestion.
+All the comments make sense, will update in new version.
+
+>> +void hs_set_cpu(int cpu, bool enable)
+>> +{
+>> +     u32 val = 0;
+>> +
+>> +     if (!ctrl_base)
+>> +             return;
+>> +
+>> +     if (id == HI3620_CTRL) {
+>> +             if (enable) {
+>> +                     /* MTCMOS */
+>> +                     writel_relaxed((0x01 << (cpu + 3)), ctrl_base + 0xD0);
 >
-> For 3.12, right? So 3.12 hasn't been released yet, so it's still time
-> to fix this.
-
-I guess, yes.
-
->> Also, we'll need to distinguish between the different audio controllers
->> on a single SoC, i.e. i2s0 and i2s1. I suggest checking the (phys) reg
->> base passed.
+> 0xD0 should be 0xd0 (we usually don't use all-caps hex)
 >
-> For what reason does the driver needs to know whether it's the instance
-> 0 or instance 1 ? If it's needed for some specific reason, then there
-> should probably be something like marvell,i2s-channel-id = <0> and
-> marvell,i2s-channel-id = <1>.
+>> +                     writel_relaxed((0x1011 << cpu), ctrl_base + 0x414);
+>> +                     writel_relaxed((0x401011 << cpu), ctrl_base + 0x410);
+>
+> You can skip the outermost parens here.
+>
+> These numbers look pretty magic. Can you make it slightly easier for someone
+> reading the code to figure out what's going on?
+>
+>> +                     /* ISO disable */
+>> +                     writel((0x01 << (cpu + 3)), ctrl_base + 0x0C4);
+>
+> 0x0C4 should be 0xc4. Also, it's clearer if you use 0x8 << cpu  instead.
+>
+>
+>> +
+>> +                     /* WFI Mask */
+>> +                     val = readl(ctrl_base + 0x200);
+>> +                     val &= ~(0x1 << (cpu+28));
+>
+> Same here, don't use cpu + 28, modify the constant instead. Same for the other
+> occurrances below.
+>
+>> +                     writel(val, ctrl_base + 0x200);
+>> +
+>> +                     /* Enable core */
+>> +                     writel_relaxed((0x01 << cpu), ctrl_base + 0xf4);
+>> +                     /* Unreset */
+>> +                     writel_relaxed((0x401011 << cpu), ctrl_base + 0x414);
+>> +             } else {
+>> +                     /* iso enable */
+>> +                     writel_relaxed((0x01 << (cpu + 3)), ctrl_base + 0xC0);
+>> +
+>> +                     /* MTCMOS */
+>> +                     writel_relaxed((0x01 << (cpu + 3)), ctrl_base + 0xD4);
+>> +
+>> +                     /* wfi mask */
+>> +                     val = readl_relaxed(ctrl_base + 0x200);
+>> +                     val |= (0x1 << (cpu+28));
+>> +                     writel_relaxed(val, ctrl_base + 0x200);
+>> +
+>> +                     /* disable core*/
+>> +                     writel_relaxed((0x01 << cpu), ctrl_base + 0xf8);
+>> +                     /* Reset */
+>> +                     writel_relaxed((0x401011 << cpu), ctrl_base + 0x410);
+>> +             }
+>> +     } else if (id == HI3716_CTRL) {
+>> +             if (enable) {
+>> +                     /* power on cpu1 */
+>> +                     val = readl_relaxed(ctrl_base + 0x1000);
+>> +                     val &=  ~(0x1 << 8);
+>> +                     val |= (0x1 << 7);
+>> +                     val &= ~(0x1 << 3);
+>> +                     writel_relaxed(val, ctrl_base + 0x1000);
+>> +
+>> +                     /* unreset */
+>> +                     val = readl_relaxed(ctrl_base + 0x50);
+>> +                     val &= ~(0x1 << 17);
+>> +                     writel_relaxed(val, ctrl_base + 0x50);
+>> +             } else {
+>> +                     /* power down cpu1 */
+>> +                     val = readl_relaxed(ctrl_base + 0x1000);
+>> +                     val &=  ~(0x1 << 8);
+>> +                     val |= (0x1 << 7);
+>> +                     val |= (0x1 << 3);
+>> +                     writel_relaxed(val, ctrl_base + 0x1000);
+>> +
+>> +                     /* reset */
+>> +                     val = readl_relaxed(ctrl_base + 0x50);
+>> +                     val |= (0x1 << 17);
+>> +                     writel_relaxed(val, ctrl_base + 0x50);
+>> +             }
+>> +     }
+>
+> So the function above really shares no code path between the different SoCs.
+> Instead of doing it all in nested if/else bodies, please split it up in two
+> functions, one for each SoC. You can still keep the enable/disable paths under
+> if/else though.
+>
+>> +}
+>> +
+>> +void __init hs_hotplug_init(void)
+>> +{
+>> +     struct device_node *node;
+>> +
+>> +     node = of_find_compatible_node(NULL, NULL, "hisilicon,cpuctrl");
+>> +     if (node) {
+>> +             ctrl_base = of_iomap(node, 0);
+>> +             id = HI3716_CTRL;
+>
+> You should use something more specific than just hisilicon,cpuctrl here, if
+> it's truly tied to the SoC (i.e. this ID here).
+>
+> hisilicon,hi3716-cpuctrl seems appropriate. Note that the bindings need
+> to be revised for this.
+>
+>> +             return;
+>> +     }
+>> +     node = of_find_compatible_node(NULL, NULL, "hisilicon,sctrl");
+>> +     if (node) {
+>> +             ctrl_base = of_iomap(node, 0);
+>> +             id = HI3620_CTRL;
+>
+> Same here.
 
-On Dove, audio1 has SPDIF out, audio0 hasn't. Russell also mentioned to
-get rid of "i2s" and use "audio" instead. Most SoC's controllers are
-i2s only but as soon as SPDIF comes into play, it is a different
-interface protocol.
+Will use "hisilicon,hi3716-cpuctrl", which is specific to hi3716,
+and we use this as flag to indicate hi3716 soc
 
-I am fine with having a "marvell,channel-id" (no "i2s") to discriminate
-the instances, although reg offset should be sufficient.
+Will use "hisilicon,sysctrl", however, it exists on both hi3620 and hi3716.
+So use as a flag of hi3620 after check hi3716.
 
-Jean-Francois: Can you please also rename the DT nodes to "audio0" and
-"audio1" instead?
+>
+>> +             return;
+>> +     }
+>> +}
+>> +
+>> +static inline void cpu_enter_lowpower(void)
+>> +{
+>> +     unsigned int v;
+>> +
+>> +     flush_cache_all();
+>> +     asm volatile(
+>> +     /*
+>> +      * Turn off coherency and L1 D-cache
+>> +      */
+>
+> Move the comment up above the asm volatile
+>
 
-Sebastian
+Thanks
