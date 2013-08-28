@@ -1,34 +1,75 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 28 Aug 2013 10:06:39 -0700
-Subject: [GIT PULL 0/9] Renesas ARM based SoC SMP updates for v3.12
-In-Reply-To: <cover.1375841380.git.horms+renesas@verge.net.au>
-References: <cover.1375841380.git.horms+renesas@verge.net.au>
-Message-ID: <20130828170639.GC8607@quad.lixom.net>
+Date: Wed, 28 Aug 2013 10:19:07 -0700
+Subject: [PATCH v7 08/11] ARM: hi3xxx: add smp support
+In-Reply-To: <CAMj5BkjJXeYd4Gh2+DKiJo60ftTSf0vnAiApH86+-zdsoVqXog@mail.gmail.com>
+References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
+ <1376965873-14431-9-git-send-email-haojian.zhuang@linaro.org>
+ <20130828021211.GF22852@quad.lixom.net>
+ <CAMj5BkjJXeYd4Gh2+DKiJo60ftTSf0vnAiApH86+-zdsoVqXog@mail.gmail.com>
+Message-ID: <20130828171907.GD8607@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 07, 2013 at 01:39:28PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
+On Wed, Aug 28, 2013 at 07:53:03PM +0800, zhangfei gao wrote:
+> Thanks Olof, will update with your comments.
 > 
-> please consider these Renesas ARM based SoC SMP updates for v3.12.
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> >> index 3be60c8..4cc5c57 100644
+> >> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> >> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> >> @@ -8,3 +8,50 @@ Required root node properties:
+> >>  Hi4511 Board
+> >>  Required root node properties:
+> >>       - compatible = "hisilicon,hi3620-hi4511";
+> >> +
+> >> +
+> >> +Hisilicon sctrl resiter
+> >
+> > Resiter seems like odd naming here.
+> >
+> >> +
+> >> +Required properties:
+> >> +- compatible : "hisilicon,sctrl"
+> >> +- reg : Address and size of sysctrl.
+> >
+> > sysctrl or sctrl? sysctrl isn't really too long, might as well use that.
+> >
+> >> +
+> >> +Optional properties:
+> >> +- smp_reg : offset in sysctrl for notifying slave cpu booting
+> >> +             cpu 1, reg;
+> >> +             cpu 2, reg + 0x4;
+> >> +             cpu 3, reg + 0x8;
+> >> +             If reg value is not zero, cpun exit wfi and go
+> >> +- resume_reg : offset in sysctrl for notifying cpu0 when resume
+> >> +- reset_reg : offset in sysctrl for system reset
+> >
+> > Underscores are usually not used in properties, you use dashes instead.
+> >
+> > Anyway, I suggest defining those as the different cells in a regular 'reg'
+> > property instead.
 > 
-> This pull-request is based on renesas-dt2-for-v3.12, which I have
-> previously sent a pull-request for.
+> Will update with
 > 
+> Required properties:
+> - compatible : "hisilicon,sysctrl"
+> - reg : Register address and size
 > 
-> The following changes since commit 8b3e32c1fe5dce55e28e76b20361841dc863ec17:
-> 
->   ARM: shmobile: r8a7740: Add TPU node to the device tree (2013-08-06 18:06:23 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-smp-for-v3.12
-> 
-> for you to fetch changes up to 1d33a354bbb618ba578bb372ebc18fe58457f6f3:
-> 
->   ARM: shmobile: Per-CPU SMP boot / sleep code for SCU SoCs (2013-08-06 18:07:26 +0900)
+> Optional properties:
+> - smp-off : offset in sysctrl for notifying slave cpu booting
+>                 cpu 1, reg;
+>                 cpu 2, reg + 0x4;
+>                 cpu 3, reg + 0x8;
+>                 If reg value is not zero, cpun exit wfi and go
+> - resume-off : offset in sysctrl for notifying cpu0 when resume
+> - reboot-off : offset in sysctrl for system reboot
 
-Pulled, thanks.
+Unabbreviated "offset" would be better than "off" here.
+
+Do you even need this in the device tree? Do you have different implementations
+of this IP that has the same programming model but just with a couple of
+different offsets?
 
 
 -Olof
