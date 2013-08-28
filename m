@@ -1,150 +1,30 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 28 Aug 2013 21:10:49 +0800
-Subject: [PATCH v9 2/7] ARM: hi3xxx: add board support with device tree
+Date: Wed, 28 Aug 2013 21:10:51 +0800
+Subject: [PATCH v9 4/7] ARM: config: enable hi3xxx in multi_v7_defconfig
 In-Reply-To: <1377695454-29109-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1377695454-29109-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1377695454-29109-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1377695454-29109-5-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add board support with device tree for Hisilicon Hi36xx/Hi37xx platform.
-
-Changelog:
-v3:
-1. Remove .map_io() in DT machine descriptor. Since debug_ll_io_init()
-is called by default.
-2. Remove .init_machine() in DT machine descriptor. Since
-of_platform_populate() is called by default in DT mode.
-
-v2:
-1. Remove .init_irq() in DT machine descriptor. Since irqchip_init()
-is called by default in DT mode.
+Enable ARCH_HI3xxx in multi_v7_defconfig.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- .../bindings/arm/hisilicon/hisilicon.txt           | 10 ++++++
- arch/arm/Kconfig                                   |  2 ++
- arch/arm/Makefile                                  |  1 +
- arch/arm/mach-hi3xxx/Kconfig                       | 12 ++++++++
- arch/arm/mach-hi3xxx/Makefile                      |  5 +++
- arch/arm/mach-hi3xxx/hi3xxx.c                      | 36 ++++++++++++++++++++++
- 6 files changed, 66 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
- create mode 100644 arch/arm/mach-hi3xxx/Kconfig
- create mode 100644 arch/arm/mach-hi3xxx/Makefile
- create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-new file mode 100644
-index 0000000..3be60c8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -0,0 +1,10 @@
-+Hisilicon Platforms Device Tree Bindings
-+----------------------------------------------------
-+
-+Hi3716 Development Board
-+Required root node properties:
-+	- compatible = "hisilicon,hi3716-dkb";
-+
-+Hi4511 Board
-+Required root node properties:
-+	- compatible = "hisilicon,hi3620-hi4511";
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ba412e0..29e119d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -944,6 +944,8 @@ source "arch/arm/mach-footbridge/Kconfig"
- 
- source "arch/arm/mach-gemini/Kconfig"
- 
-+source "arch/arm/mach-hi3xxx/Kconfig"
-+
- source "arch/arm/mach-highbank/Kconfig"
- 
- source "arch/arm/mach-integrator/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index c0ac0f5..bc69205 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -154,6 +154,7 @@ machine-$(CONFIG_ARCH_DOVE)		+= dove
- machine-$(CONFIG_ARCH_EBSA110)		+= ebsa110
- machine-$(CONFIG_ARCH_EP93XX)		+= ep93xx
- machine-$(CONFIG_ARCH_GEMINI)		+= gemini
-+machine-$(CONFIG_ARCH_HI3xxx)		+= hi3xxx
- machine-$(CONFIG_ARCH_HIGHBANK)		+= highbank
- machine-$(CONFIG_ARCH_INTEGRATOR)	+= integrator
- machine-$(CONFIG_ARCH_IOP13XX)		+= iop13xx
-diff --git a/arch/arm/mach-hi3xxx/Kconfig b/arch/arm/mach-hi3xxx/Kconfig
-new file mode 100644
-index 0000000..68bd26c
---- /dev/null
-+++ b/arch/arm/mach-hi3xxx/Kconfig
-@@ -0,0 +1,12 @@
-+config ARCH_HI3xxx
-+	bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
-+	select ARM_AMBA
-+	select ARM_GIC
-+	select ARM_TIMER_SP804
-+	select CACHE_L2X0
-+	select CLKSRC_OF
-+	select GENERIC_CLOCKEVENTS
-+	select PINCTRL
-+	select PINCTRL_SINGLE
-+	help
-+	  Support for Hisilicon Hi36xx/Hi37xx processor family
-diff --git a/arch/arm/mach-hi3xxx/Makefile b/arch/arm/mach-hi3xxx/Makefile
-new file mode 100644
-index 0000000..d68ebb3
---- /dev/null
-+++ b/arch/arm/mach-hi3xxx/Makefile
-@@ -0,0 +1,5 @@
-+#
-+# Makefile for Hisilicon Hi36xx/Hi37xx processors line
-+#
-+
-+obj-y	+= hi3xxx.o
-diff --git a/arch/arm/mach-hi3xxx/hi3xxx.c b/arch/arm/mach-hi3xxx/hi3xxx.c
-new file mode 100644
-index 0000000..e7c54bc
---- /dev/null
-+++ b/arch/arm/mach-hi3xxx/hi3xxx.c
-@@ -0,0 +1,36 @@
-+/*
-+ * (Hisilicon's Hi36xx/Hi37xx SoC based) flattened device tree enabled machine
-+ *
-+ * Copyright (c) 2012-2013 Hisilicon Ltd.
-+ * Copyright (c) 2012-2013 Linaro Ltd.
-+ *
-+ * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clocksource.h>
-+#include <linux/irqchip.h>
-+#include <linux/of_platform.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+
-+static void __init hi3xxx_timer_init(void)
-+{
-+	of_clk_init(NULL);
-+	clocksource_of_init();
-+}
-+
-+static const char *hs_compat[] __initdata = {
-+	"hisilicon,hi3620-hi4511",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(HI3xxx, "Hisilicon Hi36xx/Hi37xx (Flattened Device Tree)")
-+	.init_time	= hi3xxx_timer_init,
-+	.dt_compat	= hs_compat,
-+MACHINE_END
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index fe0bdc3..c7b5247 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -8,6 +8,7 @@ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_ARCH_BCM=y
+ CONFIG_GPIO_PCA953X=y
+ CONFIG_ARCH_HIGHBANK=y
++CONFIG_ARCH_HI3xxx=y
+ CONFIG_ARCH_KEYSTONE=y
+ CONFIG_ARCH_MXC=y
+ CONFIG_MACH_IMX51_DT=y
 -- 
 1.8.1.2
