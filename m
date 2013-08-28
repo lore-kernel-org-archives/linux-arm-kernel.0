@@ -1,34 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 28 Aug 2013 22:43:13 +0200
-Subject: [PATCH] ARM: new platform for Energy Micro's EFM32 Cortex-M3 SoCs
-In-Reply-To: <20130828195054.GJ8607@quad.lixom.net>
-References: <1376552964-16296-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20130815084259.GG30496@pengutronix.de>
- <20130828195054.GJ8607@quad.lixom.net>
-Message-ID: <20130828204313.GE24802@pengutronix.de>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Wed, 28 Aug 2013 22:22:02 +0100
+Subject: [PATCH v2] ARM: xen: only set pm function ptrs for Xen guests
+In-Reply-To: <1377714003-22096-1-git-send-email-robherring2@gmail.com>
+References: <1377714003-22096-1-git-send-email-robherring2@gmail.com>
+Message-ID: <CAPnVf8xczxPDucWMPcJ-Rre9uBXWAtHA0NkT62xu5ZghvpsFRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I already told Olof via irc, but for the protocol:
+On 28 August 2013 19:20, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> xen_pm_init was unconditionally setting pm_power_off and arm_pm_restart
+> function pointers. This breaks multi-platform kernels. Make this
+> conditional on running as a Xen guest and make it a late_initcall to
+> ensure it is setup after platform code for Dom0.
+>
+> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  arch/arm/xen/enlighten.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index 8a6295c..13a7d1f 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -273,12 +273,15 @@ core_initcall(xen_guest_init);
+>
+>  static int __init xen_pm_init(void)
+>  {
+> +       if (!of_find_compatible_node(NULL, NULL, "xen,xen"))
+> +               return -ENODEV;
+> +
 
-On Wed, Aug 28, 2013 at 12:50:54PM -0700, Olof Johansson wrote:
-> On Thu, Aug 15, 2013 at 10:42:59AM +0200, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > I forgot to mention that this patch depends on the following patches:
-> > 
-> >  - ARM: ARMv7-M: implement restart routine common to all v7-M machines
-> >    sent with Message-Id: 1376494305-24270-1-git-send-email-u.kleine-koenig at pengutronix.de; and
-> 
-> Seems like you addressed Russell's comments here, so hopefully he's ok with us
-> picking it up directly as a prereq.
-It was Jonathan Austin who commented, but anyhow as I don't think to get
-all three patches ready in time for 3.12-rc1 I posted that one to
-Russell's patch tracker.
- 
-Best regards
-Uwe
+You should use the macro xen_domain() to check if we are running
+in a Xen guest.
+
+Cheers,
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Julien Grall
