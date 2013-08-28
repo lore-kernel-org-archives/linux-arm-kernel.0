@@ -1,27 +1,104 @@
-From: greg@kroah.com (Greg KH)
-Date: Wed, 28 Aug 2013 10:26:44 -0700
-Subject: linux-next: manual merge of the arm-soc tree with the usb tree
-In-Reply-To: <20130828164506.3f8497c59e07b0ccaaa44aec@canb.auug.org.au>
-References: <20130828164506.3f8497c59e07b0ccaaa44aec@canb.auug.org.au>
-Message-ID: <20130828172644.GD5012@kroah.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Wed, 28 Aug 2013 13:00:25 -0500
+Subject: [PATCH RFC v2 3/5] spmi: add generic SPMI controller binding
+ documentation
+In-Reply-To: <521D2047.8030300@wwwdotorg.org>
+References: <cover.1377202730.git.joshc@codeaurora.org>
+ <e42576b69ef3d4e624fbfa2f32f6f79a931b55d6.1377202730.git.joshc@codeaurora.org>
+ <5217DB0C.7000101@wwwdotorg.org>
+ <20130827170120.GR4035@joshc.qualcomm.com>
+ <521D2047.8030300@wwwdotorg.org>
+Message-ID: <20130828180025.GA808@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 04:45:06PM +1000, Stephen Rothwell wrote:
-> Hi all,
-> 
-> Today's linux-next merge of the arm-soc tree got conflicts in
-> arch/arm/boot/dts/am335x-bone.dts, arch/arm/boot/dts/am335x-evm.dts and
-> arch/arm/boot/dts/am335x-evmsk.dts between commit c031a7d41934 ("usb:
-> usb: dsps: update code according to the binding document") from the usb
-> tree and commits 63f6b2550aa0 ("ARM: dts: AM33XX: don't redefine OCP bus
-> and device nodes"), 781f17983015 ("usb: musb: am335x-evm: Do not remove
-> the session bit HOST-only mode") and 2ae847a1b10f ("usb: musb: am335x:
-> add second port to beagle bone") from the arm-soc tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+On Tue, Aug 27, 2013 at 03:55:19PM -0600, Stephen Warren wrote:
+> On 08/27/2013 11:01 AM, Josh Cartwright wrote:
+> ...
+> > If we want to ensure for the generic bindings that we are fulling
+> > characterizing/describing the SPMI bus, then we'll additionally need to
+> > tackle an additional identified assumption:
+> >
+> >   4. One master per SPMI bus.  (The SPMI spec allows for up to 4
+> >      masters)
+> >
+> > On the Snapdragon 800 series, there exists only one software-controlled
+> > master, but it is conceivably possible to have a setup with two
+> > software-controlled masters on the same SPMI bus.
+> >
+> > This necessarily means that the description of the slaves and the
+> > masters will need to be decoupled; I'm imagining a generic binding
+> > supporting multiple masters would look something like this:
+>
+> Is there a need to represent the other masters in the DT? Sure they're
+> there in HW, but if there's no specific way for the
+> CPU-to-which-the-DT-applies to actually interact with those other
+> masters (except perhaps by experiencing some arbitration delays) then
+> presumably there's no need to represent the other masters in DT?
 
-Thanks, that looks good.
+My example is contrived, but there is nothing in the SPMI spec
+preventing two masters from being controllable by the same
+CPU-to-which-the-DT-applies, sharing the same underlying bus.
 
-greg k-h
+I would also expect this configuration to be uncommon, I'm checking with
+some folks with more SPMI experience to make sure they agree.
+
+Interestingly, i2c as far as I can tell has also made the same
+assumption.  There doesn't appear to be any way to express a
+multi-master i2c setup where both masters are controlled by the same OS.
+
+> > 	master0: master at 0 {
+> > 		compatible = "...";
+> > 		#spmi-master-cells = <0>;
+> > 		spmi-mid = <0>;
+> > 
+> > 		...
+> > 	};
+> > 
+> > 	master2: master at 2 {
+> > 		compatible = "...";
+> > 		#spmi-master-cells = <0>;
+> > 		spmi-mid = <2>;
+> > 
+> > 		...
+> > 	};
+> > 
+> > 	spmi_bus {
+> > 		compatible = "...";
+> > 
+> > 		spmi-masters = <&master0 &master2>;
+> > 
+> > 		foo at 0 {
+> > 			compatible = "...";
+> > 			reg = <0 ...>;
+> > 		};
+> > 
+> > 		foo at 8 {
+> > 			compatible = "...";
+> > 			reg = <8 ...>;
+> > 		};
+> > 	};
+> > 
+> > (This will also necessitate a change in the underlying SPMI driver
+> > model, in the current implementation, a SPMI master 'owns' a particular
+> > device.  This is not a valid assumption to make.)
+> > 
+> > Would this property-containing-phandle-vector be considered the
+> > canonical way of representing nodes with multiple parents in the device
+> > tree?
+> 
+> I don't think I've seen anything like this before, although that
+> in-and-of-itself doesn't make it wrong.
+> 
+> Another approach might be to encode master-vs-slave into a cell in the
+> reg property? Something like:
+> 
+> cell 0 - address type (0: master, 1: unique ID, 2: group ID, ...)
+> cell 1 - address value
+> 
+> I haven't thought much about that; perhaps there are disadvantages doing
+> that.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
