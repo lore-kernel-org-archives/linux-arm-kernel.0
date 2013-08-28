@@ -1,90 +1,74 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Tue, 27 Aug 2013 18:05:34 -0700
-Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
-In-Reply-To: <87txiasqhk.fsf@linaro.org>
-References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
- <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
- <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
- <87txiasqhk.fsf@linaro.org>
-Message-ID: <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 Aug 2013 18:12:04 -0700
+Subject: [GIT PULL] Allwinner sunXi clock patches for 3.12
+In-Reply-To: <20130826091434.GA4980@lukather>
+References: <20130826091434.GA4980@lukather>
+Message-ID: <20130828011204.8231.86567@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 3:44 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> [+Mark Brown for regulator suspend sequence ideas]
->
-> Russ Dill <Russ.Dill@ti.com> writes:
->
->> On Wed, Aug 14, 2013 at 6:38 AM, Jan L?bbe <jlu@pengutronix.de> wrote:
->>> On Tue, 2013-08-13 at 15:20 -0700, Russ Dill wrote:
-[snip]
->>> Shouldn't the TPS driver know how to generate this sequence? It seems
->>> fragile to do voltage adjustments behind the back of the regulator
->>> framework and the TPS driver. The wake-sequence values should match the
->>> (in-memory) regulator configuration on resume (which may have been
->>> changed by DVFS).
->>
->> The sequence is both PMIC specific and board specific. Additionally,
->> the PMICs used aren't am335x specific. It would be nice to have the
->> regulator framework and the driver write all this out, but the
->> sequence is written out by the Cortex-M3 processor running some PM
->> firmware. Even if the code was changed to run on the A8, it'd have to
->> run from a small piece of SRAM.
->
-> So, why/how was the decision made to use the M3 instead of the MPU
-> running from SRAM?
->
-> As a firmware minimalist, I obviously prefer to do this from the MPU
-> side.  But also, because the M3 is reset every suspend sequence, this
-> becomes rather heavy to do from the M3.
+Quoting Maxime Ripard (2013-08-26 02:14:34)
+> Hi Mike,
+> 
+> Please pull the following branch with the sunxi additions to the clk
+> driver for the 3.12 merge window, based on your current clk-next.
+> 
+> Please note that the patch "clk: sunxi: fix initialization of basic
+> clocks" from Emilio, that you told was applied, wasn't in your clk-next
+> branch, so I took it, as it conflicted with later patches.
 
-After the feedback Vaibhav Bedia received on v2 of his suspend/resume
-patchset for am335x, he decided to move many of the operations from
-sleep33xx.S into the M3 firmware.
+Ah, right. I had that patch in my local branch so I got a conflict with
+OF_CLK_DECLARE for the osc clock. I went with the version in your pull
+request ("sun4i_osc" versus "sunxi_osc").
 
-See the commit message here:
-http://arago-project.org/git/projects/?p=am33x-cm3.git;a=commit;h=a972ce2f6
+Regards,
+Mike
 
-I need to wait until after the PLLs are put into bypass, which is now
-done in the M3 firmware. It also ends up being a lot easier to write
-the I2C writer code there in C rather than in assembly in sleep33xx.S.
-
-> Currently voltage scaling is only being proposed for suspend in this
-> series, but in theory it's possible from idle as well.  Doing this from
-> the MPU/SRAM seems much better suited for idle.
-
-The M3 firmware will also handle any cpuidle modes deeper than just
-putting SDRAM into self refresh. This is actually the only way of
-doing things like turning the MPU domain off on am335x.
-
->> As far as DVFS, I'm not aware of any DVFS implementations that muck
->> with VDD CORE.
->>
->>> The CM3 driver needs to figure out where the core regulator is connected
->>> using using either DT or the regulator framework and ask the TPS (via a
->>> new interface) for register writes for sleep/wake sequences. Then those
->>> sequences will actually match the correct voltages configured using
->>> DT/DVFS.
->>
->> That seems like it'd add a lot of complexity to the regulator
->> subsystem, as well as all the PMIC and other I2C regulators that any
->> users of these device tree properties may end up using for not a lot
->> of gain. There would be two separate code paths for any used
->> I2C regulator or PMIC for setting voltages.
->
-> Added Mark for his thoughts on this, but seems like complexity that the
-> regulator framework might need to grow anyways.
->
-> The framework already has a concept of suspend voltage, suspend mode
-> etc.  Maybe it needs some generalizing so low-level platform code could
-> query the framework for the sequence so it can be done late in platform
-> idle/suspend paths.  Especially for regmap drivers, this seems feasible.
-
-Yes, my main hesitation for going down this path is possible lack of
-support for such an interface upstream.
-
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> Thanks!
+> Maxime
+> 
+> The following changes since commit bddbd13453d838a30baf84869c56076c8ce2b211:
+> 
+>   Merge tag 'zynq-clk-for-3.12' of git://git.xilinx.com/linux-xlnx into clk-next (2013-08-20 14:58:48 -0700)
+> 
+> are available in the git repository at:
+> 
+> 
+>   https://github.com/mripard/linux.git tags/sunxi-clk-for-3.12
+> 
+> for you to fetch changes up to 1fb2e4aab8b31b15e6be5debacb4203333360fd2:
+> 
+>   clk: sunxi: Add Allwinner A20 gates (2013-08-26 10:58:21 +0200)
+> 
+> ----------------------------------------------------------------
+> Allwinner clock changes for 3.12
+> 
+> These patches mostly do some cleanup to introduce the basic gated clocks for
+> the Allwinner A10s, A20 and A31 SoCs.
+> 
+> ----------------------------------------------------------------
+> Emilio L?pez (1):
+>       clk: sunxi: fix initialization of basic clocks
+> 
+> Maxime Ripard (5):
+>       clk: sunxi: Add A10s gates
+>       clk: sunxi: Rename the structure to prepare the addition of sun6i
+>       clk: sunxi: Allow to specify the divider width from the dividers data
+>       clk: sunxi: Add A31 clocks support
+>       clk: sunxi: Add Allwinner A20 gates
+> 
+>  Documentation/devicetree/bindings/clock/sunxi.txt  |  12 +
+>  .../bindings/clock/sunxi/sun5i-a10s-gates.txt      |  75 +++++++
+>  .../bindings/clock/sunxi/sun6i-a31-gates.txt       |  83 +++++++
+>  .../bindings/clock/sunxi/sun7i-a20-gates.txt       |  98 +++++++++
+>  drivers/clk/sunxi/clk-sunxi.c                      | 241 +++++++++++++++++----
+>  5 files changed, 464 insertions(+), 45 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun5i-a10s-gates.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
