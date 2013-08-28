@@ -1,39 +1,43 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 28 Aug 2013 08:02:42 -0400
-Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
-In-Reply-To: <20130827221117.GA1324@obsidianresearch.com>
-References: <20130827163939.24636d80@skate> <20130827151136.GA10084@localhost>
- <20130827152535.GG19598@titan.lakedaemon.net>
- <20130827191337.GA2339@localhost> <521D063F.4040404@gmail.com>
- <20130827210248.GA19625@obsidianresearch.com>
- <20130827214121.GI19598@titan.lakedaemon.net>
- <20130827235533.2cc85d33@skate>
- <20130827220431.GJ19598@titan.lakedaemon.net>
- <20130827221117.GA1324@obsidianresearch.com>
-Message-ID: <20130828120242.GK19598@titan.lakedaemon.net>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Wed, 28 Aug 2013 17:33:00 +0530
+Subject: [PATCH v2 00/13] ARM: OMAP2+: AM43x PRCM support
+In-Reply-To: <alpine.DEB.2.02.1308210249260.6426@utopia.booyaka.com>
+References: <cover.1375443858.git.afzal@ti.com>
+ <alpine.DEB.2.02.1308210249260.6426@utopia.booyaka.com>
+Message-ID: <521DE6F4.9060804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 04:11:17PM -0600, Jason Gunthorpe wrote:
-> On Tue, Aug 27, 2013 at 06:04:31PM -0400, Jason Cooper wrote:
-> > </pokes self> Once pxa-impedance-matcher can edit the dtb, those users
-> > would have a means to upgrade to a DT enabled kernel without bootloader
-> > modifications...  I really gotta get back to that. :)
+Hi Paul,
+
+On Wednesday 21 August 2013 08:23 AM, Paul Walmsley wrote:
+
+>> Currently there is no public TRM available for AM43x.
 > 
-> Doesn't appended dtb already work?
+> Can you think of any way that the data can be doublechecked against some 
+> reference or against the reality of the chip?
 
-Yes, but this allows you to append N dtbs, and select from them based on
-any silly code you need to overcome vendor 'creativeness'.  Also, you
-can handle non-standard atags without polluting (or at least attempting
-to) atags_to_fdt.c.  eg ethernet address passing.
+This series has been tested on a pre-silicon platform, and boots to
+prompt (along with DT clocks from Tero).
 
-It should also allow Thomas to implement his CP15 hack to detect where
-the bootloader mapped the register base address, and update the dtb
-accordingly.
+> Can development boards be made available to the OMAP maintainers so we can 
+> ensure that the code, once merged, continues to work?
 
-iow, it's a dirty place to work around any unforseen bootloader code
-without polluting the kernel.
+Silicon & boards are not yet ready. I checked internally about your
+request, I had been told that once boards are ready, it can be made
+available to the maintainers.
 
-thx,
+>> Powerdomain & Clockdomain data has been added separately as it was not
+>> giving much advantage reusing AM335x ones (runtime updates required
+>> was getting too ugly). But as AM43x PRCM functionality is similar to
+>> OMAP4, power domain, clock domain & hwmod operations are reused from
+>> OMAP4.
+> 
+> Is the AM43xx PRCM design and IP derived from AM33xx, or from OMAP4, or 
+> from something else?
 
-Jason.
+PRCM is derived from AM335x, but modified such that it is more aligned
+with OMAP4 (especially w.r.t register offsets)
+
+Regards
+Afzal
