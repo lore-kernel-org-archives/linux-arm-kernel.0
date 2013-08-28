@@ -1,147 +1,125 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Aug 2013 14:47:33 +0200
-Subject: [PATCH 1/4] pinctrl: Add s5pv210 support to pinctrl-exynos
-In-Reply-To: <1377595171-31116-1-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1377595171-31116-1-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <CACRpkdbeHte_GNYh_5uMzM64yqhm2qmm1=N=3sv69Lo+_Z_QvA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 28 Aug 2013 13:42:55 +0100
+Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
+In-Reply-To: <20130828142909.3521064b@skate>
+References: <20130828113459.48ecbb34@armhf> <521DCD33.2070008@gmail.com>
+ <20130828121943.1c8327ca@skate> <521DD057.4040208@gmail.com>
+ <20130828131548.0009d613@skate> <521DE2B3.9050508@gmail.com>
+ <20130828135827.2307c89e@skate>
+ <20130828121320.GK6617@n2100.arm.linux.org.uk>
+ <20130828142909.3521064b@skate>
+Message-ID: <20130828124255.GL6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 11:19 AM, Mateusz Krawczuk
-<m.krawczuk@partner.samsung.com> wrote:
+On Wed, Aug 28, 2013 at 02:29:09PM +0200, Thomas Petazzoni wrote:
+> Dear Russell King - ARM Linux,
+> 
+> On Wed, 28 Aug 2013 13:13:20 +0100, Russell King - ARM Linux wrote:
+> 
+> > > > I guess, yes.
+> > > 
+> > > Jean-Fran?ois, could you cook and submit a patch to change the
+> > > compatible string?
+> > 
+> > I don't think this is a good idea.  The configuration of this IP is
+> > not based on the SoC as a single SoC can have a mixture of different
+> > configurations.
+> 
+> Using the name of the oldest SoC in the family that had the IP block is
+> the norm, because it's really what "compatible" means: the IP block in
+> Dove is *compatible* with the one that was originally introduced in
+> Kirkwood.
+> 
+> See what Rob Herring (one of the DT maintainer) says in
+> http://lists.infradead.org/pipermail/linux-mtd/2012-March/040417.html:
+> 
+> """
+> There is no reason all machines can't use "st,spear600-smi" in their
+> dts. It doesn't have to be a spear600, just compatible with it. Really
+> you want the string to be the oldest SOC the block is in and then newer
+> SOCs can claim compatibility with the old version.
+> """
+> 
+> The thread was precisely about replacing a SoC-specific compatible
+> string "st,spear600-smi" by a more generic "st,spear-smi" and Rob
+> Herring (above) was opposing to that.
 
-> This patch implements pinctrl for s5pv210 and adds required device tree bindings.
->
-> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+We're not talking about replacing a pre-existing string, we're talking
+about adding one, which is a different situation.
 
-Bindings is something you add in Documentation/devicetree/bindings,
-so atleast alter the commit message. This merely *uses* some
-device tree bindings.
+> > I think marvell,mvebu-audio is a reasonable compatible string for this,
+> > and that the different configurations should be described by properties
+> > indicating which inputs and outputs have been implemented.
+> > 
+> > For instance, on the Dove, there are two of these blocks.  One has I2S
+> > in and out only, but the other block has I2S in and out, and SPDIF out.
+> > On some other Marvell devices, this block has I2S in and out and SPDIF
+> > in and out.
+> > 
+> > Otherwise, they're functionally the same.
+> 
+> Right, that's why they can both use "kirkwood-audio" as the compatible
+> string.
+> 
+> > > Though, if the difference between the two units is the availability of
+> > > SPDIF support, then we shouldn't encode the channel number, but instead
+> > > the availability of SPDIF, i.e:
+> > > 
+> > > 	audio0 {
+> > > 		reg = <... ...>;
+> > > 		compatible = "marvell,kirkwood-audio";
+> > > 		marvell,has-spdif;
+> > > 	};
+> > > 
+> > > 	audio1 {
+> > > 		reg = <... ...>;
+> > > 		compatible = "marvell,kirkwood-audio";
+> > > 	};
+> > 
+> > ... which means there's no problem with using marvell,mvebu-audio as the
+> > compatible string if you're going to use properties to describe what
+> > facilities are available.
+> 
+> I disagree, because how do you know if a future "mvebu" SOC such as
+> Armada 370, or one that doesn't exist yet, will not have a different
+> audio IP block?
 
-Yours,
-Linus Walleij
+The Dove already contains _three_ audio blocks, two of which are this
+one, and another which is block for driving an AC'97 codec (which doesn't
+have a driver.)  That's no problem because you won't call that one an
+"audio" block but an AC'97 block.  So...
 
-> ---
->  drivers/pinctrl/Kconfig           |  2 +-
->  drivers/pinctrl/pinctrl-exynos.c  | 58 +++++++++++++++++++++++++++++++++++++++
->  drivers/pinctrl/pinctrl-samsung.c |  3 +-
->  drivers/pinctrl/pinctrl-samsung.h |  1 +
->  4 files changed, 62 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-> index bdb1a87..ffe4b49 100644
-> --- a/drivers/pinctrl/Kconfig
-> +++ b/drivers/pinctrl/Kconfig
-> @@ -252,7 +252,7 @@ config PINCTRL_SAMSUNG
->
->  config PINCTRL_EXYNOS
->         bool "Pinctrl driver data for Samsung EXYNOS SoCs other than 5440"
-> -       depends on OF && GPIOLIB && ARCH_EXYNOS
-> +       depends on OF && GPIOLIB && (ARCH_EXYNOS || ARCH_S5PV210)
->         select PINCTRL_SAMSUNG
->
->  config PINCTRL_EXYNOS5440
-> diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
-> index a74b3cb..fc3e1d7 100644
-> --- a/drivers/pinctrl/pinctrl-exynos.c
-> +++ b/drivers/pinctrl/pinctrl-exynos.c
-> @@ -660,6 +660,64 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
->                         exynos_pinctrl_resume_bank(drvdata, bank);
->  }
->
-> +/* pin banks of s5pv210 pin-controller */
-> +static struct samsung_pin_bank s5pv210_pin_banks0[] = {
-> +       EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
-> +       EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpa1", 0x04),
-> +       EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpb", 0x08),
-> +       EXYNOS_PIN_BANK_EINTG(5, 0x060, "gpc0", 0x0c),
-> +       EXYNOS_PIN_BANK_EINTG(5, 0x080, "gpc1", 0x10),
-> +       EXYNOS_PIN_BANK_EINTG(4, 0x0A0, "gpd0", 0x14),
-> +       EXYNOS_PIN_BANK_EINTG(4, 0x0C0, "gpd1", 0x18),
-> +       EXYNOS_PIN_BANK_EINTG(5, 0x0E0, "gpe0", 0x1c),
-> +       EXYNOS_PIN_BANK_EINTG(8, 0x100, "gpe1", 0x20),
-> +       EXYNOS_PIN_BANK_EINTG(6, 0x120, "gpf0", 0x24),
-> +       EXYNOS_PIN_BANK_EINTG(8, 0x140, "gpf1", 0x28),
-> +       EXYNOS_PIN_BANK_EINTG(8, 0x160, "gpf2", 0x2c),
-> +       EXYNOS_PIN_BANK_EINTG(8, 0x180, "gpf3", 0x30),
-> +       EXYNOS_PIN_BANK_EINTG(7, 0x1A0, "gpg0", 0x34),
-> +       EXYNOS_PIN_BANK_EINTG(7, 0x1C0, "gpg1", 0x38),
-> +       EXYNOS_PIN_BANK_EINTG(7, 0x1E0, "gpg2", 0x3c),
-> +       EXYNOS_PIN_BANK_EINTG(7, 0x200, "gpg3", 0x40),
-> +       EXYNOS_PIN_BANK_EINTN(7, 0x220, "gpgi"),
-> +       EXYNOS_PIN_BANK_EINTG(8, 0x240, "gpj0", 0x44),
-> +       EXYNOS_PIN_BANK_EINTG(6, 0x260, "gpj1", 0x48),
-> +       EXYNOS_PIN_BANK_EINTG(8, 0x280, "gpj2", 0x4c),
-> +       EXYNOS_PIN_BANK_EINTG(8, 0x2A0, "gpj3", 0x50),
-> +       EXYNOS_PIN_BANK_EINTG(5, 0x2C0, "gpj4", 0x54),
-> +       EXYNOS_PIN_BANK_EINTN(8, 0x2E0, "mp01"),
-> +       EXYNOS_PIN_BANK_EINTN(4, 0x300, "mp02"),
-> +       EXYNOS_PIN_BANK_EINTN(8, 0x320, "mp03"),
-> +       EXYNOS_PIN_BANK_EINTN(8, 0x340, "mp04"),
-> +       EXYNOS_PIN_BANK_EINTN(8, 0x360, "mp05"),
-> +       EXYNOS_PIN_BANK_EINTN(8, 0x300, "mp06"),
-> +       EXYNOS_PIN_BANK_EINTN(8, 0x320, "mp07"),
-> +       EXYNOS_PIN_BANK_EINTW(8, 0xC00, "gph0", 0x00),
-> +       EXYNOS_PIN_BANK_EINTW(8, 0xC20, "gph1", 0x04),
-> +       EXYNOS_PIN_BANK_EINTW(8, 0xC40, "gph2", 0x08),
-> +       EXYNOS_PIN_BANK_EINTW(8, 0xC60, "gph3", 0x0c),
-> +};
-> +
-> +struct samsung_pin_ctrl s5pv210_pin_ctrl[] = {
-> +       {
-> +               /* pin-controller instance 0 data */
-> +               .pin_banks      = s5pv210_pin_banks0,
-> +               .nr_banks       = ARRAY_SIZE(s5pv210_pin_banks0),
-> +               .geint_con      = EXYNOS_GPIO_ECON_OFFSET,
-> +               .geint_mask     = EXYNOS_GPIO_EMASK_OFFSET,
-> +               .geint_pend     = EXYNOS_GPIO_EPEND_OFFSET,
-> +               .weint_con      = EXYNOS_WKUP_ECON_OFFSET,
-> +               .weint_mask     = EXYNOS_WKUP_EMASK_OFFSET,
-> +               .weint_pend     = EXYNOS_WKUP_EPEND_OFFSET,
-> +               .svc            = EXYNOS_SVC_OFFSET,
-> +               .eint_gpio_init = exynos_eint_gpio_init,
-> +               .eint_wkup_init = exynos_eint_wkup_init,
-> +               .suspend        = exynos_pinctrl_suspend,
-> +               .resume         = exynos_pinctrl_resume,
-> +               .label          = "s5pv210-gpio-ctrl0",
-> +       },
-> +};
-> +
->  /* pin banks of exynos4210 pin-controller 0 */
->  static struct samsung_pin_bank exynos4210_pin_banks0[] = {
->         EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
-> diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
-> index 439f2ef..f14b379 100644
-> --- a/drivers/pinctrl/pinctrl-samsung.c
-> +++ b/drivers/pinctrl/pinctrl-samsung.c
-> @@ -878,7 +878,6 @@ static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
->         }
->         match = of_match_node(samsung_pinctrl_dt_match, node);
->         ctrl = (struct samsung_pin_ctrl *)match->data + id;
-> -
->         bank = ctrl->pin_banks;
->         for (i = 0; i < ctrl->nr_banks; ++i, ++bank) {
->                 spin_lock_init(&bank->slock);
-> @@ -1113,6 +1112,8 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
->                 .data = (void *)exynos5250_pin_ctrl },
->         { .compatible = "samsung,exynos5420-pinctrl",
->                 .data = (void *)exynos5420_pin_ctrl },
-> +       { .compatible = "samsung,s5pv210-pinctrl",
-> +               .data = (void *)s5pv210_pin_ctrl },
->  #endif
->  #ifdef CONFIG_PINCTRL_S3C64XX
->         { .compatible = "samsung,s3c64xx-pinctrl",
-> diff --git a/drivers/pinctrl/pinctrl-samsung.h b/drivers/pinctrl/pinctrl-samsung.h
-> index 11bb75b..30622d9 100644
-> --- a/drivers/pinctrl/pinctrl-samsung.h
-> +++ b/drivers/pinctrl/pinctrl-samsung.h
-> @@ -260,5 +260,6 @@ extern struct samsung_pin_ctrl s3c2412_pin_ctrl[];
->  extern struct samsung_pin_ctrl s3c2416_pin_ctrl[];
->  extern struct samsung_pin_ctrl s3c2440_pin_ctrl[];
->  extern struct samsung_pin_ctrl s3c2450_pin_ctrl[];
-> +extern struct samsung_pin_ctrl s5pv210_pin_ctrl[];
->
->  #endif /* __PINCTRL_SAMSUNG_H */
-> --
-> 1.8.1.2
->
+> It will still be audio, it will still be mvebu, but it
+> will not be able to use a "marvell,mvebu-audio" driver. Or maybe it can
+> use the same driver, but with a few variations, so a different
+> compatible string will be needed to identify the original IP
+> ("marvell,kirkwood-audio", used on Kirkwood/Dove) and slightly newer
+> versions of the IP ("marvell,some-funky-soc-audio").
+
+I don't think this really applies.
+
+> > In any case "marvell,has-spdif" is too generic - as I've indicated above,
+> > there's versions with spdif out, and other versions with spdif in and
+> > out.
+> 
+> Right, the above was just an example to illustrate that we can have
+> additional properties to encode the differences between each instance
+> of the audio devices.
+
+I think this is a mistake too: these properties will just tell us what
+may be possible, and the driver will take no real action on them.  I
+suppose that a property specifying whether there is a SPDIF output could
+be used to control whether the IEC958 channel status controls are
+registered.  However...
+
+What's more important is which outputs are actually wired up, and
+therefore which bits of this hardware are enabled.  Even then, we
+wouldn't want to expose (eg) the IEC958 channel status controls if
+the SPDIF output isn't wired.  So all in all, I don't see any point
+to a set of properties saying "we have SPDIF" etc.  That information
+should come solely from whether the SPDIF output has been "wired up".
+
+Let me put that another way: we _can_ provide those properties to
+indicate what facilities the hardware has, we just wouldn't use them
+at all - and to provide them seems like over-design to me.
