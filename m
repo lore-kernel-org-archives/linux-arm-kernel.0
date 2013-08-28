@@ -1,9 +1,9 @@
 From: m.krawczuk@partner.samsung.com (Mateusz Krawczuk)
-Date: Wed, 28 Aug 2013 18:13:01 +0200
-Subject: [PATCH v3 3/6] media: s5p-tv: Fix sdo driver to work with CCF
+Date: Wed, 28 Aug 2013 18:13:02 +0200
+Subject: [PATCH v3 4/6] media: s5p-tv: Fix mixer driver to work with CCF
 In-Reply-To: <1377706384-3697-1-git-send-email-m.krawczuk@partner.samsung.com>
 References: <1377706384-3697-1-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <1377706384-3697-4-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <1377706384-3697-5-git-send-email-m.krawczuk@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,95 +13,70 @@ Without it Common Clock Framework prints a warning.
 
 Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
 ---
- drivers/media/platform/s5p-tv/sdo_drv.c | 25 +++++++++++++++----------
- 1 file changed, 15 insertions(+), 10 deletions(-)
+ drivers/media/platform/s5p-tv/mixer_drv.c | 35 ++++++++++++++++++++++++-------
+ 1 file changed, 28 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/media/platform/s5p-tv/sdo_drv.c b/drivers/media/platform/s5p-tv/sdo_drv.c
-index 9dbdfe6..a79e620 100644
---- a/drivers/media/platform/s5p-tv/sdo_drv.c
-+++ b/drivers/media/platform/s5p-tv/sdo_drv.c
-@@ -209,10 +209,10 @@ static int sdo_streamon(struct sdo_device *sdev)
- 	clk_get_rate(sdev->fout_vpll));
- 	/* enable clock in SDO */
- 	sdo_write_mask(sdev, SDO_CLKCON, ~0, SDO_TVOUT_CLOCK_ON);
--	ret = clk_enable(sdev->dacphy);
-+	ret = clk_prepare_enable(sdev->dacphy);
- 	if (ret < 0) {
- 		dev_err(sdev->dev,
--			"clk_enable(dacphy) failed !\n");
-+			"clk_prepare_enable(dacphy) failed !\n");
- 		goto fail;
- 	}
- 	/* enable DAC */
-@@ -230,7 +230,7 @@ static int sdo_streamoff(struct sdo_device *sdev)
- 	int tries;
- 
- 	sdo_write_mask(sdev, SDO_DAC, 0, SDO_POWER_ON_DAC);
--	clk_disable(sdev->dacphy);
-+	clk_disable_unprepare(sdev->dacphy);
- 	sdo_write_mask(sdev, SDO_CLKCON, 0, SDO_TVOUT_CLOCK_ON);
- 	for (tries = 100; tries; --tries) {
- 		if (sdo_read(sdev, SDO_CLKCON) & SDO_TVOUT_CLOCK_READY)
-@@ -274,7 +274,7 @@ static int sdo_runtime_suspend(struct device *dev)
- 	dev_info(dev, "suspend\n");
- 	regulator_disable(sdev->vdet);
- 	regulator_disable(sdev->vdac);
--	clk_disable(sdev->sclk_dac);
-+	clk_disable_unprepare(sdev->sclk_dac);
- 	return 0;
- }
- 
-@@ -286,7 +286,7 @@ static int sdo_runtime_resume(struct device *dev)
- 
- 	dev_info(dev, "resume\n");
- 
--	ret = clk_enable(sdev->sclk_dac);
-+	ret = clk_prepare_enable(sdev->sclk_dac);
- 	if (ret < 0)
- 		return ret;
- 
-@@ -319,7 +319,7 @@ static int sdo_runtime_resume(struct device *dev)
- vdac_r_dis:
- 	regulator_disable(sdev->vdac);
- dac_clk_dis:
--	clk_disable(sdev->sclk_dac);
-+	clk_disable_unprepare(sdev->sclk_dac);
- 	return ret;
- }
- 
-@@ -333,7 +333,7 @@ static int sdo_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct sdo_device *sdev;
- 	struct resource *res;
--	int ret = 0;
+diff --git a/drivers/media/platform/s5p-tv/mixer_drv.c b/drivers/media/platform/s5p-tv/mixer_drv.c
+index 8ce7c3e..3b2b305 100644
+--- a/drivers/media/platform/s5p-tv/mixer_drv.c
++++ b/drivers/media/platform/s5p-tv/mixer_drv.c
+@@ -347,19 +347,40 @@ static int mxr_runtime_resume(struct device *dev)
+ {
+ 	struct mxr_device *mdev = to_mdev(dev);
+ 	struct mxr_resources *res = &mdev->res;
 +	int ret;
- 	struct clk *sclk_vpll;
  
- 	dev_info(dev, "probe start\n");
-@@ -425,8 +425,13 @@ static int sdo_probe(struct platform_device *pdev)
- 	}
- 
- 	/* enable gate for dac clock, because mixer uses it */
--	clk_enable(sdev->dac);
--
-+	ret = clk_prepare_enable(sdev->dac);
+ 	dev_dbg(mdev->dev, "resume - start\n");
+ 	mutex_lock(&mdev->mutex);
+ 	/* turn clocks on */
+-	clk_enable(res->mixer);
+-	clk_enable(res->vp);
+-	clk_enable(res->sclk_mixer);
++	ret = clk_prepare_enable(res->mixer);
 +	if (ret < 0) {
-+		dev_err(dev,
-+			"clk_prepare_enable_enable(dac) failed !\n");
-+		ret = PTR_ERR(sdev->dac);
-+		goto fail_fout_vpll;
++		dev_err(mdev->dev, "clk_prepare_enable(mixer) failed\n");
++		goto fail;
 +	}
- 	/* configure power management */
- 	pm_runtime_enable(dev);
++	ret = clk_prepare_enable(res->vp);
++	if (ret < 0) {
++		dev_err(mdev->dev, "clk_prepare_enable(vp) failed\n");
++		goto fail_mixer;
++	}
++	ret = clk_prepare_enable(res->sclk_mixer);
++	if (ret < 0) {
++		dev_err(mdev->dev, "clk_prepare_enable(sclk_mixer) failed\n");
++		goto fail_vp;
++	}
+ 	/* apply default configuration */
+ 	mxr_reg_reset(mdev);
+-	dev_dbg(mdev->dev, "resume - finished\n");
  
-@@ -464,7 +469,7 @@ static int sdo_remove(struct platform_device *pdev)
- 	struct sdo_device *sdev = sd_to_sdev(sd);
+ 	mutex_unlock(&mdev->mutex);
++	dev_dbg(mdev->dev, "resume - finished\n");
+ 	return 0;
++fail_vp:
++	clk_disable_unprepare(res->vp);
++fail_mixer:
++	clk_disable_unprepare(res->mixer);
++fail:
++	mutex_unlock(&mdev->mutex);
++	dev_info(mdev->dev, "resume failed\n");
++	return ret;
+ }
  
- 	pm_runtime_disable(&pdev->dev);
--	clk_disable(sdev->dac);
-+	clk_disable_unprepare(sdev->dac);
- 	clk_put(sdev->fout_vpll);
- 	clk_put(sdev->dacphy);
- 	clk_put(sdev->dac);
+ static int mxr_runtime_suspend(struct device *dev)
+@@ -369,9 +390,9 @@ static int mxr_runtime_suspend(struct device *dev)
+ 	dev_dbg(mdev->dev, "suspend - start\n");
+ 	mutex_lock(&mdev->mutex);
+ 	/* turn clocks off */
+-	clk_disable(res->sclk_mixer);
+-	clk_disable(res->vp);
+-	clk_disable(res->mixer);
++	clk_disable_unprepare(res->sclk_mixer);
++	clk_disable_unprepare(res->vp);
++	clk_disable_unprepare(res->mixer);
+ 	mutex_unlock(&mdev->mutex);
+ 	dev_dbg(mdev->dev, "suspend - finished\n");
+ 	return 0;
 -- 
 1.8.1.2
