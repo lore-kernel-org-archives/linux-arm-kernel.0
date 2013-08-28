@@ -1,77 +1,71 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 28 Aug 2013 12:45:44 +0100
-Subject: [PATCH 04/19] ARM: set BE8 if LE in head code
+Date: Wed, 28 Aug 2013 12:45:41 +0100
+Subject: [PATCH 01/19] ARM: fix ARCH_IXP4xx usage of ARCH_SUPPORTS_BIG_ENDIAN
 In-Reply-To: <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
  <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377690359-25397-5-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377690359-25397-2-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we are booting in LE and compiled for BE8, then add code to
-set the state to bE8. Since the instruction stream is always LE,
-we do not need to do anything special to the instruction.
+The Kconfig for arch/arm/mach-ixp4xx has a local definition
+of ARCH_SUPPORTS_BIG_ENDIAN which could be used elsewhere.
+This means that if IXP4xx is selected and this symbol is
+selected eleswhere then an warning is produced.
 
-Also ensure that the secondary processors are started in the same mode.
+Clean the following error up by making the symbol be
+selected by the main ARCH_IXP4XX definition and have a
+common definition in arch/arm/mm/Kconfig
 
-Note, we do add about 20 bytes to the kernel image, but it seems easier
-to do this than adding another configuration to change.
+warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
+warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-
-Conflicts:
-	arch/arm/kernel/sleep.S
 ---
- arch/arm/boot/compressed/head.S |    1 +
- arch/arm/kernel/head.S          |    4 ++++
- arch/arm/kernel/sleep.S         |    1 +
- 3 files changed, 6 insertions(+)
+ arch/arm/Kconfig             |    1 +
+ arch/arm/mach-ixp4xx/Kconfig |    4 ----
+ arch/arm/mm/Kconfig          |    6 ++++++
+ 3 files changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index c912c2a..066b034 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -135,6 +135,7 @@ start:
- 		.word	_edata			@ zImage end address
-  THUMB(		.thumb			)
- 1:
-+ ARM_BE8(	setend	be )			@ go BE8 if compiled for BE8
- 		mrs	r9, cpsr
- #ifdef CONFIG_ARM_VIRT_EXT
- 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 9e5906c..a047acf 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -77,6 +77,7 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 43594d5..0628529 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -480,6 +480,7 @@ config ARCH_IXP4XX
+ 	bool "IXP4xx-based"
+ 	depends on MMU
+ 	select ARCH_HAS_DMA_SET_COHERENT_MASK
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKSRC_MMIO
+ 	select CPU_XSCALE
+diff --git a/arch/arm/mach-ixp4xx/Kconfig b/arch/arm/mach-ixp4xx/Kconfig
+index 30e1ebe..c342dc4 100644
+--- a/arch/arm/mach-ixp4xx/Kconfig
++++ b/arch/arm/mach-ixp4xx/Kconfig
+@@ -1,9 +1,5 @@
+ if ARCH_IXP4XX
  
- 	__HEAD
- ENTRY(stext)
-+ ARM_BE8(setend	be )			@ ensure we are in BE8 mode
+-config ARCH_SUPPORTS_BIG_ENDIAN
+-	bool
+-	default y
+-
+ menu "Intel IXP4xx Implementation Options"
  
-  THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
-  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-@@ -352,6 +353,9 @@ ENTRY(secondary_startup)
- 	 * the processor type - there is no need to check the machine type
- 	 * as it has already been validated by the primary processor.
- 	 */
+ comment "IXP4xx Platforms"
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index cd2c88e..1f8fed9 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -952,3 +952,9 @@ config ARCH_HAS_BARRIERS
+ 	help
+ 	  This option allows the use of custom mandatory barriers
+ 	  included via the mach/barriers.h file.
 +
-+ ARM_BE8(setend	be)				@ ensure we are in BE8 mode
-+
- #ifdef CONFIG_ARM_VIRT_EXT
- 	bl	__hyp_stub_install_secondary
- #endif
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index db1536b..716343c 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -130,6 +130,7 @@ ENDPROC(cpu_resume_after_mmu)
- 	.data
- 	.align
- ENTRY(cpu_resume)
-+ARM_BE8(setend be)			@ ensure we are in BE mode
- 	mov	r1, #0
- 	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
- 	ALT_UP_B(1f)
++config ARCH_SUPPORTS_BIG_ENDIAN
++	bool
++	help
++	  This option specifies the architecture can support big endian
++	  operation.
 -- 
 1.7.10.4
