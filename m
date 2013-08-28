@@ -1,42 +1,118 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 28 Aug 2013 10:40:54 +0900
-Subject: [GIT PULL] Third round of Renesas ARM-based SoC DT updates for v3.12
-Message-ID: <cover.1377652718.git.horms+renesas@verge.net.au>
+Date: Wed, 28 Aug 2013 10:41:09 +0900
+Subject: [PATCH] ARM: shmobile: ape6evm-reference: add MMCIF and SDHI DT nodes
+In-Reply-To: <cover.1377652718.git.horms+renesas@verge.net.au>
+References: <cover.1377652718.git.horms+renesas@verge.net.au>
+Message-ID: <ba6094d6e8f30a538e08e9a892f3e37debd84413.1377652718.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Hi Olof, Hi Arnd,
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-please consider this third round of Renesas ARM based SoC DT updates for v3.12.
+This patch adds MMCIF0, SDHI0 and SDHI1 DT nodes and a fixed voltage
+reglator for them to the ape6evm-reference platform.
 
-It is based on renesas-dt2-for-v3.12 ("Second round of ARM based SoC DT
-updates for v3.12") which you have previously pulled.
-
-I apologise that this and other pull requests that I will send today
-are rather later in the cycle than I would like. This is primarily due
-to a combination of my summer vacation and wanting to let the patches
-sit in next for a while.
-
-The following changes since commit 8b3e32c1fe5dce55e28e76b20361841dc863ec17:
-
-  ARM: shmobile: r8a7740: Add TPU node to the device tree (2013-08-06 18:06:23 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v3.12
-
-for you to fetch changes up to ba6094d6e8f30a538e08e9a892f3e37debd84413:
-
-  ARM: shmobile: ape6evm-reference: add MMCIF and SDHI DT nodes (2013-08-22 11:37:53 +0900)
-
-----------------------------------------------------------------
-Third round of Renesas ARM-based SoC DT updates for v3.12
-
-* Add MMCIF and SDHI to reference DT nodes of ape6evm board
-
-----------------------------------------------------------------
-Guennadi Liakhovetski (1):
-      ARM: shmobile: ape6evm-reference: add MMCIF and SDHI DT nodes
-
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts | 72 +++++++++++++++++++++++++
  1 file changed, 72 insertions(+)
+
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
+index f444624..2b49b05 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
+@@ -10,6 +10,7 @@
+ 
+ /dts-v1/;
+ /include/ "r8a73a4.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "APE6EVM";
+@@ -24,6 +25,34 @@
+ 		reg = <0 0x40000000 0 0x40000000>;
+ 	};
+ 
++	vcc_mmc0: regulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "MMC0 Vcc";
++		regulator-min-microvolt = <2800000>;
++		regulator-max-microvolt = <2800000>;
++		regulator-always-on;
++	};
++
++	vcc_sdhi0: regulator at 1 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI0 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&pfc 76 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	/* Common 3.3V rail, used by several devices on APE6EVM */
++	ape6evm_fixed_3v3: regulator at 2 {
++		compatible = "regulator-fixed";
++		regulator-name = "3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
+ 	lbsc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -62,4 +91,47 @@
+ 		renesas,groups = "scifa0_data";
+ 		renesas,function = "scifa0";
+ 	};
++
++	mmc0_pins: mmcif {
++		renesas,groups = "mmc0_data8", "mmc0_ctrl";
++		renesas,function = "mmc0";
++	};
++
++	sdhi0_pins: sdhi0 {
++		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
++		renesas,function = "sdhi0";
++	};
++
++	sdhi1_pins: sdhi1 {
++		renesas,groups = "sdhi1_data4", "sdhi1_ctrl";
++		renesas,function = "sdhi1";
++	};
++};
++
++&mmcif0 {
++	vmmc-supply = <&vcc_mmc0>;
++	bus-width = <8>;
++	non-removable;
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	status = "okay";
++};
++
++&sdhi0 {
++	vmmc-supply = <&vcc_sdhi0>;
++	bus-width = <4>;
++	toshiba,mmc-wrprotect-disable;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdhi0_pins>;
++	status = "okay";
++};
++
++&sdhi1 {
++	vmmc-supply = <&ape6evm_fixed_3v3>;
++	bus-width = <4>;
++	broken-cd;
++	toshiba,mmc-wrprotect-disable;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdhi1_pins>;
++	status = "okay";
+ };
+-- 
+1.8.3.2
