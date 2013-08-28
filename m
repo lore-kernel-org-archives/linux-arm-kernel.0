@@ -1,158 +1,83 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 27 Aug 2013 17:12:43 -0700
-Subject: [PATCH v3 1/2] devicetree: serial: Document msm_serial bindings
-In-Reply-To: <1377648764-23453-1-git-send-email-sboyd@codeaurora.org>
-References: <1377648764-23453-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1377648764-23453-2-git-send-email-sboyd@codeaurora.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 28 Aug 2013 02:14:28 +0200
+Subject: [PATCH RFC v2 0/6] ARM: Initial support for Marvell Armada 1500
+In-Reply-To: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376682098-10580-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1377648874-6714-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's fix up the msm serial device bindings so that it's clearer
-what hardware is supported. Instead of using hsuart (for high
-speed uart) let's use uartdm because that matches the actual name
-of the hardware. Also, let's add the version information in case
-we need to differentiate between different versions of the
-hardware in the future. Finally, lets specify that clocks are
-required (the clock bindings didn't exist when the original
-binding was written) and also specify dma bindings just in case
-we want to use it in software. We split the binding into two
-files to make it clearer what's required and not required.
+This is the second RFC to add initial support for the Marvell Armada 1500
+(88DE3100) found on various consumer devices. The changes compared to v1
+have been quite fundamental, so I'll also summarize them in this cover letter.
 
-Cc: David Brown <davidb@codeaurora.org>
-Cc: <devicetree@vger.kernel.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+I have addressed the following comments given during v1:
+- moved to new mach-berlin subdir to reflect the difference from Armada 370/XP.
+- removed redundant map_io hook and reduced DT soc range
+- added SoC binding documentation
+- added to Marvell SoC documentation
+- have extra DEBUG_ Kconfig option for Marvell Berlin SoCs
+- build with multi_v7_defconfig
+- reorder things alphabetically
+
+Comments I have not addressed:
+- left .init_time hook as common arch clock init is currently under
+  discussion in a separate patch set (comment added)
+- left non-DT l2x0_of_init as I was allowed to choose only one cleanup
+  out of the two prerequesites (comment added)
+
+Also, I added copyright credits to the Asus Cube GPL'ed 2.6 kernel
+source I was using as datasheet replacement. I have taken virtually
+nothing out of it except register offsets, irq numbers, and clock
+hierarchy. Actually, I would even put Marvell's direct copyright into
+it just because I'd love to see them to continue their community efforts
+they have started in the past. Anyway, I am not affiliated with Marvell,
+so I cannot just make them resposible for the current, rudimentary SoC
+skeleton patches.
+
+This time the patches have been based on linux-next's next-20130827
+tag, which better reflects the targeted 1 or 2 merge windows.
+
+Sebastian Hesselbarth (6):
+  irqchip: add DesignWare APB ICTL interrupt controller
+  ARM: add Marvell Berlin SoC familiy to Marvell doc
+  ARM: add Marvell Berlin and Armada 1500 to multi_v7_defconfig
+  ARM: add Marvell Berlin UART0 lowlevel debug
+  ARM: add Armada 1500 and Sony NSZ-GS7 device tree files
+  ARM: add initial support for Marvell Berlin SoCs
+
+ Documentation/arm/Marvell/README                   |   22 ++
+ .../devicetree/bindings/arm/marvell,berlin.txt     |   23 ++
+ .../interrupt-controller/snps,dw-apb-ictl.txt      |   29 +++
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/Kconfig.debug                             |   10 +
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/Makefile                         |    2 +
+ arch/arm/boot/dts/mv88de3100-sony-nsz-gs7.dts      |   29 +++
+ arch/arm/boot/dts/mv88de3100.dtsi                  |  222 ++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig                |    2 +
+ arch/arm/mach-berlin/Kconfig                       |   24 ++
+ arch/arm/mach-berlin/Makefile                      |    1 +
+ arch/arm/mach-berlin/berlin.c                      |   49 +++++
+ drivers/irqchip/Kconfig                            |    4 +
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-dw-apb-ictl.c                  |  142 +++++++++++++
+ 16 files changed, 563 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell,berlin.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
+ create mode 100644 arch/arm/boot/dts/mv88de3100-sony-nsz-gs7.dts
+ create mode 100644 arch/arm/boot/dts/mv88de3100.dtsi
+ create mode 100644 arch/arm/mach-berlin/Kconfig
+ create mode 100644 arch/arm/mach-berlin/Makefile
+ create mode 100644 arch/arm/mach-berlin/berlin.c
+ create mode 100644 drivers/irqchip/irq-dw-apb-ictl.c
+
 ---
- .../devicetree/bindings/tty/serial/msm_serial.txt  | 27 -----------
- .../bindings/tty/serial/qcom,msm-uart.txt          | 25 ++++++++++
- .../bindings/tty/serial/qcom,msm-uartdm.txt        | 53 ++++++++++++++++++++++
- 3 files changed, 78 insertions(+), 27 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/tty/serial/msm_serial.txt
- create mode 100644 Documentation/devicetree/bindings/tty/serial/qcom,msm-uart.txt
- create mode 100644 Documentation/devicetree/bindings/tty/serial/qcom,msm-uartdm.txt
-
-diff --git a/Documentation/devicetree/bindings/tty/serial/msm_serial.txt b/Documentation/devicetree/bindings/tty/serial/msm_serial.txt
-deleted file mode 100644
-index aef383e..0000000
---- a/Documentation/devicetree/bindings/tty/serial/msm_serial.txt
-+++ /dev/null
-@@ -1,27 +0,0 @@
--* Qualcomm MSM UART
--
--Required properties:
--- compatible :
--	- "qcom,msm-uart", and one of "qcom,msm-hsuart" or
--	  "qcom,msm-lsuart".
--- reg : offset and length of the register set for the device
--	for the hsuart operating in compatible mode, there should be a
--	second pair describing the gsbi registers.
--- interrupts : should contain the uart interrupt.
--
--There are two different UART blocks used in MSM devices,
--"qcom,msm-hsuart" and "qcom,msm-lsuart".  The msm-serial driver is
--able to handle both of these, and matches against the "qcom,msm-uart"
--as the compatibility.
--
--The registers for the "qcom,msm-hsuart" device need to specify both
--register blocks, even for the common driver.
--
--Example:
--
--	uart at 19c400000 {
--		compatible = "qcom,msm-hsuart", "qcom,msm-uart";
--		reg = <0x19c40000 0x1000>,
--		      <0x19c00000 0x1000>;
--		interrupts = <195>;
--	};
-diff --git a/Documentation/devicetree/bindings/tty/serial/qcom,msm-uart.txt b/Documentation/devicetree/bindings/tty/serial/qcom,msm-uart.txt
-new file mode 100644
-index 0000000..ce8c901
---- /dev/null
-+++ b/Documentation/devicetree/bindings/tty/serial/qcom,msm-uart.txt
-@@ -0,0 +1,25 @@
-+* MSM Serial UART
-+
-+The MSM serial UART hardware is designed for low-speed use cases where a
-+dma-engine isn't needed. From a software perspective it's mostly compatible
-+with the MSM serial UARTDM except that it only supports reading and writing one
-+character at a time.
-+
-+Required properties:
-+- compatible: Should contain "qcom,msm-uart"
-+- reg: Should contain UART register location and length.
-+- interrupts: Should contain UART interrupt.
-+- clocks: Should contain the core clock.
-+- clock-names: Should be "core".
-+
-+Example:
-+
-+A uart device at 0xa9c00000 with interrupt 11.
-+
-+serial at a9c00000 {
-+	compatible = "qcom,msm-uart";
-+	reg = <0xa9c00000 0x1000>;
-+	interrupts = <11>;
-+	clocks = <&uart_cxc>;
-+	clock-names = "core";
-+};
-diff --git a/Documentation/devicetree/bindings/tty/serial/qcom,msm-uartdm.txt b/Documentation/devicetree/bindings/tty/serial/qcom,msm-uartdm.txt
-new file mode 100644
-index 0000000..ffa5b78
---- /dev/null
-+++ b/Documentation/devicetree/bindings/tty/serial/qcom,msm-uartdm.txt
-@@ -0,0 +1,53 @@
-+* MSM Serial UARTDM
-+
-+The MSM serial UARTDM hardware is designed for high-speed use cases where the
-+transmit and/or receive channels can be offloaded to a dma-engine. From a
-+software perspective it's mostly compatible with the MSM serial UART except
-+that it supports reading and writing multiple characters at a time.
-+
-+Required properties:
-+- compatible: Should contain at least "qcom,msm-uartdm".
-+              A more specific property should be specified as follows depending
-+	      on the version:
-+		"qcom,msm-uartdm-v1.1"
-+		"qcom,msm-uartdm-v1.2"
-+		"qcom,msm-uartdm-v1.3"
-+		"qcom,msm-uartdm-v1.4"
-+- reg: Should contain UART register locations and lengths. The first
-+       register shall specify the main control registers. An optional second
-+       register location shall specify the GSBI control region.
-+       "qcom,msm-uartdm-v1.3" is the only compatible value that might
-+       need the GSBI control region.
-+- interrupts: Should contain UART interrupt.
-+- clocks: Should contain the core clock and the AHB clock.
-+- clock-names: Should be "core" for the core clock and "iface" for the
-+	       AHB clock.
-+
-+Optional properties:
-+- dmas: Should contain dma specifiers for transmit and receive channels
-+- dma-names: Should contain "tx" for transmit and "rx" for receive channels
-+
-+Examples:
-+
-+A uartdm v1.4 device with dma capabilities.
-+
-+serial at f991e000 {
-+	compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-+	reg = <0xf991e000 0x1000>;
-+	interrupts = <0 108 0x0>;
-+	clocks = <&blsp1_uart2_apps_cxc>, <&blsp1_ahb_cxc>;
-+	clock-names = "core", "iface";
-+	dmas = <&dma0 0>, <&dma0 1>;
-+	dma-names = "tx", "rx";
-+};
-+
-+A uartdm v1.3 device without dma capabilities and part of a GSBI complex.
-+
-+serial at 19c40000 {
-+	compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
-+	reg = <0x19c40000 0x1000>,
-+	      <0x19c00000 0x1000>;
-+	interrupts = <0 195 0x0>;
-+	clocks = <&gsbi5_uart_cxc>, <&gsbi5_ahb_cxc>;
-+	clock-names = "core", "iface";
-+};
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.2.5
