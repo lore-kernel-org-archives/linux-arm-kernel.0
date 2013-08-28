@@ -1,72 +1,45 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 27 Aug 2013 17:43:41 -0700
-Subject: [PATCH V2 2/4] clk: exynos-audss: set correct parent clocks
-In-Reply-To: <1376639378-20707-3-git-send-email-padma.v@samsung.com>
-References: <1376639378-20707-1-git-send-email-padma.v@samsung.com>
- <1376639378-20707-3-git-send-email-padma.v@samsung.com>
-Message-ID: <20130828004341.8231.3654@quantum>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 27 Aug 2013 21:48:08 -0300
+Subject: imx-ldb: "mx-ldb ldb.10: adding encoder failed with -16"
+In-Reply-To: <CAOMZO5CjgfRLfcgRjO2eAx4ZQkZNHVe7tLqeCacJndTJiDGg_w@mail.gmail.com>
+References: <CAOMZO5CjgfRLfcgRjO2eAx4ZQkZNHVe7tLqeCacJndTJiDGg_w@mail.gmail.com>
+Message-ID: <CAOMZO5DzVNy-Qe4SyTPvuGdBO-ev=K+gyWSGosTmRpGzfOjBEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Padmavathi Venna (2013-08-16 00:49:36)
-> From: Andrew Bresticker <abrestic@chromium.org>
-> 
-> Different Exynos SoCs have different names for certain input clocks
-> to the AudioSS block.  Since the order in which clock providers are
-> probed is not guaranteed, we can't use the device-tree to pass the
-> correct input clocks.
+On Tue, Aug 27, 2013 at 9:35 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi,
+>
+> Running next-20130827 I get the following probe failure on mx6:
+>
+> [drm] Supports vblank timestamp caching Rev 1 (10.10.2010).
+> [drm] No driver support for vblank timestamp query.
+> [drm] Initialized imx-drm 1.0.0 20120507 on minor 0
+> imx-ldb ldb.10: adding encoder failed with -16
 
-Why not? Could your audss binding include something like a "clocks"
-property with phandles to the input clocks? Then your audss clock driver
-could just use clk_get like a regular driver to get the parents.
+If I revert this commit:
 
-Regards,
-Mike
+commit b5dc0d108cd3c0b50ddcb6f6c54be1bea4c39e01
+Author: Daniel Vetter <daniel.vetter@ffwll.ch>
+Date:   Thu Aug 8 15:41:13 2013 +0200
 
-> Instead, use the compatibility string to
-> determine what the correct parent clocks should be.
-> 
-> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> ---
->  drivers/clk/samsung/clk-exynos-audss.c |   12 +++++++++++-
->  1 files changed, 11 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
-> index 86d2606..d81c5f8 100644
-> --- a/drivers/clk/samsung/clk-exynos-audss.c
-> +++ b/drivers/clk/samsung/clk-exynos-audss.c
-> @@ -35,6 +35,7 @@ static unsigned long reg_save[][2] = {
->  /* list of all parent clock list */
->  static const char *mout_audss_p[] = { "fin_pll", "fout_epll" };
->  static const char *mout_i2s_p[] = { "mout_audss", "cdclk0", "sclk_audio0" };
-> +static const char *sclk_pcm_p = "sclk_pcm0";
->  
->  #ifdef CONFIG_PM_SLEEP
->  static int exynos_audss_clk_suspend(void)
-> @@ -77,6 +78,15 @@ void __init exynos_audss_clk_init(struct device_node *np)
->                 return;
->         }
->  
-> +       /* fix up clock parent names based on SoC */
-> +       if (of_device_is_compatible(np, "samsung,exynos5420-audss-clock")) {
-> +               mout_i2s_p[2] = "sclk_maudio0";
-> +               sclk_pcm_p = "sclk_maupcm0";
-> +       } else if (of_device_is_compatible(np,
-> +                                       "samsung,exynos5250-audss-clock")) {
-> +               sclk_pcm_p = "div_pcm0";
-> +       }
-> +
->         clk_data.clks = clk_table;
->         clk_data.clk_num = EXYNOS_AUDSS_MAX_CLKS;
->         of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-> @@ -118,7 +128,7 @@ void __init exynos_audss_clk_init(struct device_node *np)
->                                 reg_base + ASS_CLK_GATE, 4, 0, &lock);
->  
->         clk_table[EXYNOS_SCLK_PCM] = clk_register_gate(NULL, "sclk_pcm",
-> -                               "div_pcm0", CLK_SET_RATE_PARENT,
-> +                               sclk_pcm_p, CLK_SET_RATE_PARENT,
->                                 reg_base + ASS_CLK_GATE, 5, 0, &lock);
->  
->         if (of_device_is_compatible(np, "samsung,exynos5420-audss-clock")) {
-> -- 
-> 1.7.4.4
+    drm/imx: kill firstopen callback
+
+    This thing seems to do some kind of delayed setup. Really, real kms
+    drivers shouldn't do that at all. Either stuff needs to be dynamically
+    hotplugged or the driver setup sequence needs to be fixed.
+
+    This patch here just moves the setup at the very end of the driver
+    load callback, with the locking adjusted accordingly.
+
+    v2: Also move the corresponding put from ->lastclose to ->unload.
+
+    Cc: Sascha Hauer <s.hauer@pengutronix.de>
+    Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+    Signed-off-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+    Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+    Signed-off-by: Dave Airlie <airlied@redhat.com>
+
+,then the probe error does not happen.
+
+Will look into in it and discuss at the dri-devel at lists.freedesktop.org list.
