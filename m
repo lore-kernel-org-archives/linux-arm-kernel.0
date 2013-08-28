@@ -1,42 +1,41 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Wed, 28 Aug 2013 22:22:02 +0100
-Subject: [PATCH v2] ARM: xen: only set pm function ptrs for Xen guests
-In-Reply-To: <1377714003-22096-1-git-send-email-robherring2@gmail.com>
-References: <1377714003-22096-1-git-send-email-robherring2@gmail.com>
-Message-ID: <CAPnVf8xczxPDucWMPcJ-Rre9uBXWAtHA0NkT62xu5ZghvpsFRg@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 29 Aug 2013 08:10:13 +1000
+Subject: [PATCH v4 09/31] powerpc/fsl-pci: improve clock API use
+In-Reply-To: <20130828155944.GA30987@book.gsilab.sittig.org>
+References: <1374495298-22019-1-git-send-email-gsi@denx.de>
+ <1375821851-31609-1-git-send-email-gsi@denx.de>
+ <1375821851-31609-10-git-send-email-gsi@denx.de>
+ <20130828120827.GB26379@book.gsilab.sittig.org>
+ <20130828155944.GA30987@book.gsilab.sittig.org>
+Message-ID: <1377727813.3819.156.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 August 2013 19:20, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> xen_pm_init was unconditionally setting pm_power_off and arm_pm_restart
-> function pointers. This breaks multi-platform kernels. Make this
-> conditional on running as a Xen guest and make it a late_initcall to
-> ensure it is setup after platform code for Dom0.
->
-> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  arch/arm/xen/enlighten.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 8a6295c..13a7d1f 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -273,12 +273,15 @@ core_initcall(xen_guest_init);
->
->  static int __init xen_pm_init(void)
->  {
-> +       if (!of_find_compatible_node(NULL, NULL, "xen,xen"))
-> +               return -ENODEV;
-> +
+On Wed, 2013-08-28 at 17:59 +0200, Gerhard Sittig wrote:
+> On Wed, Aug 28, 2013 at 14:08 +0200, Gerhard Sittig wrote:
+> > 
+> > [ re-created the Cc: list, this is about the PCI clock exclusively ]
+> 
+> I just noticed by coincidence that the message which I received
+> back from the linuxppc-dev ML appeared to have dropped Benjamin
+> Herrenschmidt and Kumar Gala from the Cc: list -- while they do
+> appear in the header of the message that I have sent and I can't
+> see what might have caused the loss of information. :-O
 
-You should use the macro xen_domain() to check if we are running
-in a Xen guest.
+Don't bother with me. I haven't had the bandwidth to look at that
+at all. I'll leave Anatolij the responsibility here :-)
 
 Cheers,
+Ben.
 
--- 
-Julien Grall
+> Do you want me to re-send the message for the benefit of
+> potential followups, or is it OK that you receive the message via
+> the list but potentially without the Cc: attribute?
+> 
+> The message was mostly "for your information" and contained a
+> status update, while no action is required or problems need to
+> get resolved.
+> 
+> 
+> virtually yours
+> Gerhard Sittig
