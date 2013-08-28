@@ -1,79 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 28 Aug 2013 15:47:57 +0100
-Subject: [PATCH repost-for-3.12] Move the EM_ARM and EM_AARCH64
- definitions to uapi/linux/elf-em.h
-In-Reply-To: <20130828132451.GA9237@gmail.com>
-References: <20130502132756.GD20730@arm.com>
- <1367742253-22294-1-git-send-email-alonid@stratoscale.com>
- <20130828132451.GA9237@gmail.com>
-Message-ID: <20130828144756.GA31817@darko.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 28 Aug 2013 16:48:29 +0200
+Subject: [PATCH 0/2] ARM: Dove: Add audio to the DT
+In-Reply-To: <20130828113438.0a77fd54@armhf>
+References: <20130828113438.0a77fd54@armhf>
+Message-ID: <20130828164829.14256ce2@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 02:24:53PM +0100, Dan Aloni wrote:
-> Signed-off-by: Dan Aloni <alonid@stratoscale.com>
-> ---
->  arch/arm/include/asm/elf.h   | 2 --
->  arch/arm64/include/asm/elf.h | 3 ---
->  include/uapi/linux/elf-em.h  | 2 ++
->  3 files changed, 2 insertions(+), 5 deletions(-)
+Dear Jean-Francois Moine,
+
+On Wed, 28 Aug 2013 11:34:38 +0200, Jean-Francois Moine wrote:
+> This patch series adds audio DT to the Dove boards and activates the
+> Cubox audio device.
 > 
-> diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-> index 56211f2..f4b46d3 100644
-> --- a/arch/arm/include/asm/elf.h
-> +++ b/arch/arm/include/asm/elf.h
-> @@ -19,8 +19,6 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
->  
->  typedef struct user_fp elf_fpregset_t;
->  
-> -#define EM_ARM	40
-> -
->  #define EF_ARM_EABI_MASK	0xff000000
->  #define EF_ARM_EABI_UNKNOWN	0x00000000
->  #define EF_ARM_EABI_VER1	0x01000000
-> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> index fe32c0e..e7fa87f 100644
-> --- a/arch/arm64/include/asm/elf.h
-> +++ b/arch/arm64/include/asm/elf.h
-> @@ -33,8 +33,6 @@ typedef unsigned long elf_greg_t;
->  typedef elf_greg_t elf_gregset_t[ELF_NGREG];
->  typedef struct user_fpsimd_state elf_fpregset_t;
->  
-> -#define EM_AARCH64		183
-> -
->  /*
->   * AArch64 static relocation types.
->   */
-> @@ -151,7 +149,6 @@ extern unsigned long arch_randomize_brk(struct mm_struct *mm);
->  #define arch_randomize_brk arch_randomize_brk
->  
->  #ifdef CONFIG_COMPAT
-> -#define EM_ARM				40
->  #define COMPAT_ELF_PLATFORM		("v8l")
->  
->  #define COMPAT_ELF_ET_DYN_BASE		(randomize_et_dyn(2 * TASK_SIZE_32 / 3))
-> diff --git a/include/uapi/linux/elf-em.h b/include/uapi/linux/elf-em.h
-> index 8e2b7ba..59c17a2 100644
-> --- a/include/uapi/linux/elf-em.h
-> +++ b/include/uapi/linux/elf-em.h
-> @@ -22,6 +22,7 @@
->  #define EM_PPC		20	/* PowerPC */
->  #define EM_PPC64	21	 /* PowerPC64 */
->  #define EM_SPU		23	/* Cell BE SPU */
-> +#define EM_ARM		40	/* ARM 32 bit */
->  #define EM_SH		42	/* SuperH */
->  #define EM_SPARCV9	43	/* SPARC v9 64-bit */
->  #define EM_IA_64	50	/* HP/Intel IA-64 */
-> @@ -34,6 +35,7 @@
->  #define EM_MN10300	89	/* Panasonic/MEI MN10300, AM33 */
->  #define EM_BLACKFIN     106     /* ADI Blackfin Processor */
->  #define EM_TI_C6000	140	/* TI C6X DSPs */
-> +#define EM_AARCH64	183	/* ARM 64 bit */
->  #define EM_FRV		0x5441	/* Fujitsu FR-V */
->  #define EM_AVR32	0x18ad	/* Atmel AVR32 */
+> Full audio in the Cubox will work when the DT extension of the generic
+> simple audio card will be complete.
 
-The patch is fine. I can push it if Russell acks the arm parts (or the
-other way around, I don't have any preference).
+What is the status of this generic simple audio card effort? I've seen
+the patch you had posted at https://lkml.org/lkml/2013/7/20/128 and the
+following discussion. Has anyone picked up the work of Kuninori
+Morimoto?
 
+Thomas
 -- 
-Catalin
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
