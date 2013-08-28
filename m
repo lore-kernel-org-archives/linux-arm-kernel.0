@@ -1,81 +1,48 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 28 Aug 2013 10:52:11 +0300
-Subject: [GIT PULL] OMAPDSS: use new display drivers
-Message-ID: <521DAC2B.4080100@ti.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 28 Aug 2013 09:55:50 +0200
+Subject: [PATCH] ARM: integrator: Make sure INTEGRATOR_AP depends on PCI
+In-Reply-To: <CACRpkdZVAG=0zvLbR4E+UEjHUaYOgqUxsfGoZybPtm1DwDAJ1Q@mail.gmail.com>
+References: <1376509818-22163-1-git-send-email-joro@8bytes.org>
+ <20130814195701.GY23006@n2100.arm.linux.org.uk>
+ <20130814200442.GA20372@8bytes.org>
+ <CACRpkdZVAG=0zvLbR4E+UEjHUaYOgqUxsfGoZybPtm1DwDAJ1Q@mail.gmail.com>
+Message-ID: <20130828075549.GF20372@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Aug 28, 2013 at 09:26:57AM +0200, Linus Walleij wrote:
+> On Wed, Aug 14, 2013 at 10:04 PM, Joerg Roedel <joro@8bytes.org> wrote:
+> 
+> > So when integrator does not depend on PCI this diff is more appropriate?
+> >
+> > diff --git a/arch/arm/mach-integrator/pci_v3.h b/arch/arm/mach-integrator/pci_v3.h
+> > index 755fd29..51738e0 100644
+> > --- a/arch/arm/mach-integrator/pci_v3.h
+> > +++ b/arch/arm/mach-integrator/pci_v3.h
+> > @@ -1,2 +1,9 @@
+> > -/* Simple oneliner include to the PCIv3 early init */
+> > +/* Define PCIv3 early init */
+> > +#ifdef CONFIG_PCI
+> >  extern int pci_v3_early_init(void);
+> > +#else
+> > +static inline int pci_v3_early_init(void)
+> > +{
+> > +       return 0;
+> > +}
+> > +#endif
+> 
+> Yes.
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> And can you please create and send a proper patch with this
+> content to arm at kernel.org and the mailing list on CC, with
+> a request for the ARM SoC maintainers to apply it directly
+> as a fix?
+> 
+> You might as well add Cc: stable at vger.kernel.org as well.
 
-Here's a pull request for the board file changes to take the new display
-drivers into use.
+Will do, thanks for your review.
 
-If there's an "early" pull request going to Linus during the merge window, it'd
-be nice to have these in that request. That would give me time to send a pull
-request to Linus containing removal of the old, no longer used, drivers.
+Cheers,
 
- Tomi
-
-The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
-
-  Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git 3.12/linux-omap
-
-for you to fetch changes up to d7b8eafbf513e414fa09dde61630b93be93a23a1:
-
-  ARM: OMAP2+: Remove old display drivers from omap2plus_defconfig (2013-08-28 10:23:22 +0300)
-
-----------------------------------------------------------------
-Tomi Valkeinen (20):
-      ARM: OMAP2+: Remove legacy DSS initialization for omap4
-      ARM: OMAP2+: Add selected display drivers to omap2plus_defconfig
-      ARM: OMAP: dss-common: use new display drivers
-      ARM: OMAP: 4430SDP: remove picodlp device data
-      ARM: OMAP: overo: use new display drivers
-      ARM: OMAP: rx51: use new display drivers
-      ARM: OMAP: beagle: use new display drivers
-      ARM: OMAP: devkit8000: use new display drivers
-      ARM: OMAP: 2430SDP: use new display drivers
-      ARM: OMAP: LDP: use new display drivers
-      ARM: OMAP: omap3stalker: use new display drivers
-      ARM: OMAP: igep0020: use new display drivers
-      ARM: OMAP: cm-t35: use new display drivers
-      ARM: OMAP: H4: use new display drivers
-      ARM: OMAP: 3430SDP: use new display drivers
-      ARM: OMAP: OMAP3EVM: use new display drivers
-      ARM: OMAP: Pandora: use new display drivers
-      ARM: OMAP: Zoom: use new display drivers
-      ARM: OMAP: AM3517EVM: use new display drivers
-      ARM: OMAP2+: Remove old display drivers from omap2plus_defconfig
-
- arch/arm/configs/omap2plus_defconfig         |  12 +-
- arch/arm/mach-omap2/board-2430sdp.c          |  57 ++++---
- arch/arm/mach-omap2/board-3430sdp.c          |  83 +++++----
- arch/arm/mach-omap2/board-am3517evm.c        | 113 +++++++++----
- arch/arm/mach-omap2/board-cm-t35.c           | 100 +++++++----
- arch/arm/mach-omap2/board-devkit8000.c       |  96 +++++++----
- arch/arm/mach-omap2/board-h4.c               |  48 ++++--
- arch/arm/mach-omap2/board-igep0020.c         |  36 ++--
- arch/arm/mach-omap2/board-ldp.c              |  68 +++++---
- arch/arm/mach-omap2/board-omap3beagle.c      |  56 +++---
- arch/arm/mach-omap2/board-omap3evm.c         |  87 ++++++----
- arch/arm/mach-omap2/board-omap3pandora.c     |  48 +++---
- arch/arm/mach-omap2/board-omap3stalker.c     |  61 ++++---
- arch/arm/mach-omap2/board-overo.c            | 160 +++++++++++-------
- arch/arm/mach-omap2/board-rx51-peripherals.c |  12 ++
- arch/arm/mach-omap2/board-rx51-video.c       |  35 ++--
- arch/arm/mach-omap2/board-zoom-display.c     |  30 ++--
- arch/arm/mach-omap2/dss-common.c             | 244 ++++++++++++---------------
- arch/arm/mach-omap2/dss-common.h             |   2 -
- 19 files changed, 787 insertions(+), 561 deletions(-)
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130828/a217aa50/attachment.sig>
+	Joerg
