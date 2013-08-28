@@ -1,51 +1,60 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 28 Aug 2013 12:01:22 +0200
-Subject: [PATCH v4 2/4] ARM: Add atomic_io_modify optimized routines
-In-Reply-To: <20130828094907.GB2343@localhost>
-References: <1377358532-23802-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377358532-23802-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130828085340.GB58219@MacBook-Pro.local>
- <20130828094907.GB2343@localhost>
-Message-ID: <20130828120122.487e6ed6@skate>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 28 Aug 2013 12:13:07 +0200
+Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
+In-Reply-To: <20130828113459.48ecbb34@armhf>
+References: <20130828113459.48ecbb34@armhf>
+Message-ID: <521DCD33.2070008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+On 08/28/2013 11:34 AM, Jean-Francois Moine wrote:
+> This patch adds the nodes to instantiate the audio devices of the Dove
+> boards.
+>
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>   arch/arm/boot/dts/dove.dtsi                  | 18 ++++++++++++++++++
+>   1 file changed, 18 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index 499abad..78227e2 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -573,6 +573,24 @@
+>   					phy-handle = <&ethphy>;
+>   				};
+>   			};
+> +
+> +			i2s0: audio-controller at b0000 {
+> +				compatible = "marvell,mvebu-audio";
 
-On Wed, 28 Aug 2013 06:49:08 -0300, Ezequiel Garcia wrote:
+[added Gregory to Cc]
 
-> > Is this any different from the generic one introduced in patch 1/4? I
-> > would rather just use the generic definition.
-> 
-> Well, according to Will Deacon (and as documented in the commit log)
-> we can optimize in ARM by using readl_relaxed instead of readl.
-> 
-> Now, I'm sure you now better than me if that results (or not) in any
-> significant optimization.
-> 
-> > Similarly, a generic
-> > atomic_io_modify_relaxed() but guarded with something like
-> > __HAVE_ARCH_RELAXED_IO.
-> > 
-> 
-> No, that's not possible. As far as I understand, there's no guarantee
-> of _relaxed variants to be available architecture-wide.
+Jean-Francois,
 
-I think what Catalin was suggesting is that atomic_io_modify() should
-use readl() and writel() (i.e *not* the relaxed variants), and that a
-separate atomic_io_modify_relaxed() could be added on architectures
-that define __HAVE_ARCH_RELAXED_IO.
+as Mark Brown already took the bindings patch for above generic
+compatible, how are we going to discriminate different
+implementations/features of Dove, Kirkwood, and Armada 370?
 
-I think you misread Catalin's comment when you say there's no guarantee
-of _relaxed variants to be available architecture-wide, since Catalin
-precisely suggested to guard that with __HAVE_ARCH_RELAXED_IO, which
-indicates that _relaxed variants are available.
+Sebastian
 
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> +				reg = <0xb0000 0x2210>;
+> +				interrupts = <19>, <20>;
+> +				clocks = <&gate_clk 12>;
+> +				clock-names = "internal";
+> +				status = "disabled";
+> +			};
+> +
+> +			i2s1: audio-controller at b4000 {
+> +				compatible = "marvell,mvebu-audio";
+> +				reg = <0xb4000 0x2210>;
+> +				interrupts = <21>, <22>;
+> +				clocks = <&gate_clk 13>;
+> +				clock-names = "internal";
+> +				status = "disabled";
+> +			};
+>   		};
+>   	};
+>   };
+>
+>
