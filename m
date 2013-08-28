@@ -1,132 +1,59 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 28 Aug 2013 07:24:23 -0300
-Subject: [PATCH v4 1/4] lib: Introduce atomic MMIO modify
-In-Reply-To: <20130827133709.64b4743950b911d6dfe7fab8@linux-foundation.org>
-References: <1377358532-23802-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377358532-23802-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130827133709.64b4743950b911d6dfe7fab8@linux-foundation.org>
-Message-ID: <20130828102422.GA2348@localhost>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 28 Aug 2013 12:26:31 +0200
+Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
+In-Reply-To: <20130828121943.1c8327ca@skate>
+References: <20130828113459.48ecbb34@armhf> <521DCD33.2070008@gmail.com>
+ <20130828121943.1c8327ca@skate>
+Message-ID: <521DD057.4040208@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 01:37:09PM -0700, Andrew Morton wrote:
-> On Sat, 24 Aug 2013 12:35:29 -0300 Ezequiel Garcia <ezequiel.garcia@free-electrons.com> wrote:
-> 
-> > Some platforms have MMIO regions that are shared across orthogonal
-> > subsystems. This commit implements a possible solution for the
-> > thread-safe access of such regions through a spinlock-protected API.
-> 
-> Seem sensible.  Perhaps.
-> 
-> It only works if both subsystems agree to use atomic_io_modify().  And
-> if they're both capable of doing that, they are both capable of
-> implementing an agreed-upon internal locking scheme, so why bother?
-> 
+On 08/28/2013 12:19 PM, Thomas Petazzoni wrote:
+> Sebastian, Jean-Fran?ois,
+>
+> On Wed, 28 Aug 2013 12:13:07 +0200, Sebastian Hesselbarth wrote:
+>> On 08/28/2013 11:34 AM, Jean-Francois Moine wrote:
+>>> This patch adds the nodes to instantiate the audio devices of the Dove
+>>> boards.
+>>>
+>>> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+>>> ---
+>>>    arch/arm/boot/dts/dove.dtsi                  | 18 ++++++++++++++++++
+>>>    1 file changed, 18 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+>>> index 499abad..78227e2 100644
+>>> --- a/arch/arm/boot/dts/dove.dtsi
+>>> +++ b/arch/arm/boot/dts/dove.dtsi
+>>> @@ -573,6 +573,24 @@
+>>>    					phy-handle = <&ethphy>;
+>>>    				};
+>>>    			};
+>>> +
+>>> +			i2s0: audio-controller at b0000 {
+>>> +				compatible = "marvell,mvebu-audio";
+>>
+>> [added Gregory to Cc]
+>>
+>> Jean-Francois,
+>>
+>> as Mark Brown already took the bindings patch for above generic
+>> compatible, how are we going to discriminate different
+>> implementations/features of Dove, Kirkwood, and Armada 370?
+>
+> I agree that mvebu-audio is not a really good compatible string. It
+> should use the first SoC that introduced the IP block, so that if
+> future SOCs have variations, we can introduce separate compatible
+> strings.
+>
+> So for now, the compatible string should be kirkwood-audio.
 
-One of the scenarios where this could be helpful and an agreed-upon
-lock seemed difficult to design is this: a watchdog driver that shares
-some control register with *two* different clocksource drivers.
+Unfortunately, mvebu-audio has already been taken by Mark. Also, we
+know the differences for the three SoCs now and should have a compatible
+for each (and maybe mvebu-audio for fallback).
 
-So, one first solution is to have a function in the two clocksource
-drivers (with matching prototype) and have the watchdog access
-the register through it.
+Also, we'll need to distinguish between the different audio controllers
+on a single SoC, i.e. i2s0 and i2s1. I suggest checking the (phys) reg
+base passed.
 
-However, because of multiplatform builds, both these clocksource drivers
-could be built at the same time. Therefore we would have a symbol
-collision, doubly-defined, in each driver.
-
-How would that work? What other internal locking scheme could we
-implement?
-
-BTW, this is the current use case we are trying to fix.
-This atomic function seemed like a simpler (perhaps cleaner?) approach.
-
-[..]
-> 
-> I disagree with the presence of the ifndef.  If
-> __HAVE_ARCH_ATOMIC_IO_MODIFY is undefined, the architecture must still
-> implement the identical function signature.  The best way to ensure that
-> is to use the same prototype in both cases.
-> 
-
-I agree, but how can this be done?
-
-I'm looking at examples, such as include/asm-generic/atomic.h or
-include/linux/string.h and they all do this sort of trick.
-
-> >  #endif /* _LINUX_IO_H */
-> > diff --git a/lib/Makefile b/lib/Makefile
-> > index 7baccfd..695d6e2 100644
-> > --- a/lib/Makefile
-> > +++ b/lib/Makefile
-> > @@ -13,7 +13,7 @@ lib-y := ctype.o string.o vsprintf.o cmdline.o \
-> >  	 sha1.o md5.o irq_regs.o reciprocal_div.o argv_split.o \
-> >  	 proportions.o flex_proportions.o prio_heap.o ratelimit.o show_mem.o \
-> >  	 is_single_threaded.o plist.o decompress.o kobject_uevent.o \
-> > -	 earlycpio.o percpu-refcount.o
-> > +	 earlycpio.o percpu-refcount.o atomicio.o
-> >  
-> >  obj-$(CONFIG_ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS) += usercopy.o
-> >  lib-$(CONFIG_MMU) += ioremap.o
-> > diff --git a/lib/atomicio.c b/lib/atomicio.c
-> > new file mode 100644
-> > index 0000000..1750f9d
-> > --- /dev/null
-> > +++ b/lib/atomicio.c
-> > @@ -0,0 +1,27 @@
-> > +#include <linux/io.h>
-> > +#include <linux/spinlock.h>
-> > +
-> > +#ifndef __HAVE_ARCH_ATOMIC_IO_MODIFY
-> > +/*
-> > + * Generic atomic MMIO modify.
-> > + *
-> > + * Allows thread-safe access to registers shared by unrelated subsystems.
-> > + * The access is protected by a single MMIO-wide lock.
-> > + *
-> > + * Optimized variants can be implemented on a per-architecture basis.
-> > + */
-> 
-> Some kerneldoc would be nice.
-> 
-
-Ok.
-
-> > +static DEFINE_RAW_SPINLOCK(__io_lock);
-> 
-> This could be local to atomic_io_modify().
-> 
-
-Ok.
-
-> > +void atomic_io_modify(void __iomem *reg, u32 mask, u32 set)
-> > +{
-> > +	unsigned long flags;
-> > +	u32 value;
-> > +
-> > +	raw_spin_lock_irqsave(&__io_lock, flags);
-> > +	value = readl(reg) & ~mask;
-> > +	value |= (set & mask);
-> 
-> Could just be "value |= set".  The code as you have it permits callers
-> to set bits in "set" which aren't permitted in "mask", which would be
-> pretty darn stupid of them.
-> 
-
-Right.
-
-> > +	writel(value, reg);
-> > +	raw_spin_unlock_irqrestore(&__io_lock, flags);
-> > +
-> > +}
-> > +EXPORT_SYMBOL(atomic_io_modify);
-> > +#endif
-> 
-> What about 8, 16 and 64-bit IO addresses?
-> 
-
-Right, forgot about these. I guess we can add those if we agree about the approach.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Sebastian
