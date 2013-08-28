@@ -1,52 +1,43 @@
-From: b44548@freescale.com (Chao Fu)
-Date: Wed, 28 Aug 2013 15:08:44 +0800
-Subject: [PATCH v3 resend 2/2] ARM:dts:vf610-twr:Enable DSPI0 devices and
- Flash at26df081a
-In-Reply-To: <1377673724-32468-1-git-send-email-b44548@freescale.com>
-References: <1377673724-32468-1-git-send-email-b44548@freescale.com>
-Message-ID: <1377673724-32468-2-git-send-email-b44548@freescale.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 Aug 2013 09:26:57 +0200
+Subject: [PATCH] ARM: integrator: Make sure INTEGRATOR_AP depends on PCI
+In-Reply-To: <20130814200442.GA20372@8bytes.org>
+References: <1376509818-22163-1-git-send-email-joro@8bytes.org>
+ <20130814195701.GY23006@n2100.arm.linux.org.uk>
+ <20130814200442.GA20372@8bytes.org>
+Message-ID: <CACRpkdZVAG=0zvLbR4E+UEjHUaYOgqUxsfGoZybPtm1DwDAJ1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Fu <B44548@freescale.com>
+On Wed, Aug 14, 2013 at 10:04 PM, Joerg Roedel <joro@8bytes.org> wrote:
 
-This patch enables DSPI0 and at26df081a flash device for Vybrid VF610
-TOWER board.
+> So when integrator does not depend on PCI this diff is more appropriate?
+>
+> diff --git a/arch/arm/mach-integrator/pci_v3.h b/arch/arm/mach-integrator/pci_v3.h
+> index 755fd29..51738e0 100644
+> --- a/arch/arm/mach-integrator/pci_v3.h
+> +++ b/arch/arm/mach-integrator/pci_v3.h
+> @@ -1,2 +1,9 @@
+> -/* Simple oneliner include to the PCIv3 early init */
+> +/* Define PCIv3 early init */
+> +#ifdef CONFIG_PCI
+>  extern int pci_v3_early_init(void);
+> +#else
+> +static inline int pci_v3_early_init(void)
+> +{
+> +       return 0;
+> +}
+> +#endif
 
-Signed-off-by: Chao Fu <b44548@freescale.com>
----
- arch/arm/boot/dts/vf610-twr.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+Yes.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index b3905f5..d29226c 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -36,6 +36,25 @@
- 
- };
- 
-+&dspi0 {
-+	bus-num = <0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_dspi0_1>;
-+	status = "okay";
-+
-+	sflash: at26df081a at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "atmel,at26df081a";
-+		spi-max-frequency = <16000000>;
-+		spi-cpol;
-+		spi-cpha;
-+		reg = <0>;
-+		linux,modalias = "m25p80";
-+		modal = "at26df081a";
-+	};
-+};
-+
- &fec0 {
- 	phy-mode = "rmii";
- 	pinctrl-names = "default";
--- 
-1.8.0
+And can you please create and send a proper patch with this
+content to arm at kernel.org and the mailing list on CC, with
+a request for the ARM SoC maintainers to apply it directly
+as a fix?
+
+You might as well add Cc: stable at vger.kernel.org as well.
+
+Yours,
+Linus Walleij
