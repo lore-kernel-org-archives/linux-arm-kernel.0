@@ -1,103 +1,55 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 28 Aug 2013 17:48:46 +0100
-Subject: [PATCH 17/19] ARM: Correct BUG() assembly to ensure it is
- endian-agnostic
-In-Reply-To: <1377639509-22778-18-git-send-email-ben.dooks@codethink.co.uk>
+Date: Wed, 28 Aug 2013 17:50:18 +0100
+Subject: [PATCH 18/19] ARM: kdgb: use <asm/opcodes.h> for data to be
+ assembled as intruction
+In-Reply-To: <1377639509-22778-19-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
- <1377639509-22778-18-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130828164846.GG3842@localhost.localdomain>
+ <1377639509-22778-19-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130828165018.GH3842@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 10:38:27PM +0100, Ben Dooks wrote:
-> Currently BUG() uses .word or .hword to create the necessary illegal
-> instructions. However if we are building BE8 then these get swapped
-> by the linker into different illegal instructions in the text. This
-> means that the BUG() macro does not get trapped properly.
-> 
-> Change to using <asm/opcodes.h> to provide the necessary ARM instruction
-> building as we cannot rely on gcc/gas having the `.inst` instructions
-> which where added to try and resolve this issue (reported by Dave Martin
-> <Dave.Martin@arm.com>).
+On Tue, Aug 27, 2013 at 10:38:28PM +0100, Ben Dooks wrote:
+> The arch_kgdb_breakpoint() function uses an inline assembly directive
+> to assemble a specific instruction using .word. This means the linker
+> will not treat is as an instruction, and therefore incorrectly swap
+> the endian-ness if running BE8.
 
 Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+I wonder whether KGDB works with Thumb-2 kernels... but this patch
+shouldn't make things any worse, anyway.
+
+Cheers
+---Dave
 
 > 
 > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 > ---
->  arch/arm/include/asm/bug.h |   10 ++++++----
->  arch/arm/kernel/traps.c    |    8 +++++---
->  2 files changed, 11 insertions(+), 7 deletions(-)
+>  arch/arm/include/asm/kgdb.h |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-> index 7af5c6c..b274bde 100644
-> --- a/arch/arm/include/asm/bug.h
-> +++ b/arch/arm/include/asm/bug.h
-> @@ -2,6 +2,8 @@
->  #define _ASMARM_BUG_H
+> diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
+> index 48066ce..0a9d5dd 100644
+> --- a/arch/arm/include/asm/kgdb.h
+> +++ b/arch/arm/include/asm/kgdb.h
+> @@ -11,6 +11,7 @@
+>  #define __ARM_KGDB_H__
 >  
->  #include <linux/linkage.h>
-> +#include <linux/types.h>
+>  #include <linux/ptrace.h>
 > +#include <asm/opcodes.h>
 >  
->  #ifdef CONFIG_BUG
+>  /*
+>   * GDB assumes that we're a user process being debugged, so
+> @@ -41,7 +42,7 @@
 >  
-> @@ -12,10 +14,10 @@
->   */
->  #ifdef CONFIG_THUMB2_KERNEL
->  #define BUG_INSTR_VALUE 0xde02
-> -#define BUG_INSTR_TYPE ".hword "
-> +#define BUG_INSTR(__value) __inst_thumb16(__value)
->  #else
->  #define BUG_INSTR_VALUE 0xe7f001f2
-> -#define BUG_INSTR_TYPE ".word "
-> +#define BUG_INSTR(__value) __inst_arm(__value)
->  #endif
->  
->  
-> @@ -33,7 +35,7 @@
->  
->  #define __BUG(__file, __line, __value)				\
->  do {								\
-> -	asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n"	\
-> +	asm volatile("1:\t" BUG_INSTR(__value) "\n"  \
->  		".pushsection .rodata.str, \"aMS\", %progbits, 1\n" \
->  		"2:\t.asciz " #__file "\n" 			\
->  		".popsection\n" 				\
-> @@ -48,7 +50,7 @@ do {								\
->  
->  #define __BUG(__file, __line, __value)				\
->  do {								\
-> -	asm volatile(BUG_INSTR_TYPE #__value);			\
-> +	asm volatile(BUG_INSTR(__value) "\n");			\
->  	unreachable();						\
->  } while (0)
->  #endif  /* CONFIG_DEBUG_BUGVERBOSE */
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index 99bcd0e3..da070db 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -342,15 +342,17 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
->  int is_valid_bugaddr(unsigned long pc)
+>  static inline void arch_kgdb_breakpoint(void)
 >  {
->  #ifdef CONFIG_THUMB2_KERNEL
-> -	unsigned short bkpt;
-> +	u16 bkpt;
-> +	u16 insn = __opcode_to_mem_thumb16(BUG_INSTR_VALUE);
->  #else
-> -	unsigned long bkpt;
-> +	u32 bkpt;
-> +	u32 insn = __opcode_to_mem_arm(BUG_INSTR_VALUE);
->  #endif
->  
->  	if (probe_kernel_address((unsigned *)pc, bkpt))
->  		return 0;
->  
-> -	return bkpt == BUG_INSTR_VALUE;
-> +	return bkpt == insn;
+> -	asm(".word 0xe7ffdeff");
+> +	asm(__inst_arm(0xe7ffdeff));
 >  }
 >  
->  #endif
+>  extern void kgdb_handle_bus_error(void);
 > -- 
 > 1.7.10.4
 > 
