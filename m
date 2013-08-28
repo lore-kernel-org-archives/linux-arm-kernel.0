@@ -1,67 +1,74 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 28 Aug 2013 14:08:24 +0200
-Subject: [PATCH 04/14] ARM: shmobile: sh73a0: Remove ->init_machine()
- special case
-In-Reply-To: <CANqRtoT1a7Ge2dBvNhAFK+Fpv_xC3QE_O-y6MxajwQfnbaVYHA@mail.gmail.com>
-References: <20130809094748.6530.16511.sendpatchset@w520>
- <1580455.O5Pubhdtgp@avalon>
- <CANqRtoT1a7Ge2dBvNhAFK+Fpv_xC3QE_O-y6MxajwQfnbaVYHA@mail.gmail.com>
-Message-ID: <1634183.WaD7XDSkzI@avalon>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 28 Aug 2013 09:08:02 -0300
+Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+In-Reply-To: <20130827222532.GA1632@obsidianresearch.com>
+References: <1377614079-10000-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377614079-10000-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130827163939.24636d80@skate> <20130827151136.GA10084@localhost>
+ <20130827152535.GG19598@titan.lakedaemon.net>
+ <20130827191337.GA2339@localhost> <521D063F.4040404@gmail.com>
+ <20130827210248.GA19625@obsidianresearch.com>
+ <20130827221729.GA25413@localhost>
+ <20130827222532.GA1632@obsidianresearch.com>
+Message-ID: <20130828120801.GC2348@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
-
-On Wednesday 28 August 2013 15:40:50 Magnus Damm wrote:
-> On Fri, Aug 9, 2013 at 7:47 PM, Laurent Pinchart wrote:
-> > On Friday 09 August 2013 18:48:32 Magnus Damm wrote:
-> >> From: Magnus Damm <damm@opensource.se>
-> >> 
-> >> No need to special case sh73a0 ->init_machine(),
-> >> so get rid of undesired cpufreq platform device
-> >> from the generic long term sh73a0 DT support code.
-> >> 
-> >> For short term support on KZM9D the DT reference
-> >> implementation now adds a "cpufreq-cpu0" platform
-> >> device so that can be used for development.
+On Tue, Aug 27, 2013 at 04:25:32PM -0600, Jason Gunthorpe wrote:
+> On Tue, Aug 27, 2013 at 07:17:29PM -0300, Ezequiel Garcia wrote:
+> 
+> > The problem is: how do we handle the reset out enable in the watchdog
+> > driver, while removing the hard-coded register (and hence the mach-header)
+> > *at the same* time?
 > > 
-> > Doesn't this go against the spirit of the -reference platforms that don't
-> > use DT devices in board code ? I don't see an urgent need for this, how
-> > far along are the DT cpufreq-related bindings ?
+> > Should we return to the previously proposed idea of putting that
+> > in the reg property? IOW:
+> > 
+> >   watchdog {
+> >     reg = <timer control>, <rstout>;
+> >   };
+> > 
+> > If we *must* access the rstout register from the watchdog driver,
+> > and we *cannot* have any mach-xxx headers to find base addresses,
+> > then the only valid solution is to pass this information from the DT.
 > 
-> I'm not sure what the latest state of DT cpufreq bindings are. Actually, it
-> seems to me that the cpufreq platform device is a software policy that
-> shouldn't be described with DT. And to be honest, I can't really see how
-> this policy has anything to do with any particular SoC.
+> Makes sense to me..
+> 
 
-I'm no cpufreq expert, but if we need to register the device in C code, I'm 
-pretty uneasy with having that code in board files. One of the DT goals is to 
-get rid of most board files.
+Ok, good.
 
-> Regarding MACHINE_START on mach-shmobile I'd like to have 3 levels:
+> I think the need for strong ordering between the timer control and the
+> rstout registers trumps other considerations.
 > 
-> 1) MACHINE_START in setup-xxxx.c
-> 
-> This is where we aim to be in the long term. We should be as
-> theoretically correct as ever possible here. I'd like to avoid all
-> platform devices here. Also, I'd like to avoid short term random
-> policy setting here.
-> 
-> 2) MACHINE_START in board-xxx-reference.c
-> 
-> This is where we build DT support for the board. In case we don't have
-> DT bindings for a certain device then using platform device here is
-> acceptable. Other short term workarounds are also acceptable here.
-> 
-> 3) MACHINE_START in board-xxx.c
-> 
-> This is the location of the C-based board support. Some SoC-specific
-> bits like CPU cores and interrupt controllers may be initialized via
-> DT. Otherwise platform devices are used.
-> 
-> Hope this clarifies my view!
 
+Agreed.
+
+> Ditto for the interrupt, specify the interrupt in the DT, and request
+> it in the driver. Ensure that the irq driver clears the cause register
+> bit for an interrupt before attaching an irq (this is fairly standard
+> irq practice).
+> 
+
+Hm.. but in order to make this work, we need the bridge interrupt
+controller introduced by Sebastian, but not available in the "older"
+platforms (right?).
+
+So, in order to add support to Armada 370/XP watchdog (which was the
+initial goal of all of this) I think our sane option reduce to two:
+
+* Drop watchdog support on non-DT platforms and add support for
+  A370/XP in the orion-wdt driver.
+  I don't quite like the idea of dropping support on anything,
+  so I can't say I'm thrilled by this idea.
+
+Or,
+
+* Support A370/AXP in a different and new armada-wdt driver.
+  The differences between the SoC might be small, but maybe
+  enough to justify a separate driver and avoid more problems.
+
+Ideas?
 -- 
-Regards,
-
-Laurent Pinchart
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
