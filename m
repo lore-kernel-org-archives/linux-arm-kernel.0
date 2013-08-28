@@ -1,74 +1,157 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 28 Aug 2013 13:55:36 +0200
-Subject: [PATCH v3 4/5] clk/exynos5420: add hdmi mux to change parents in
- hdmi driver
-In-Reply-To: <CAPdUM4MUvzyAjyFwuYyBY6C-nn_VHttwf=ebAZLgc4VTNgS05A@mail.gmail.com>
-References: <1377508383-15185-1-git-send-email-rahul.sharma@samsung.com>
- <1919681.jqCQjHmyQW@flatron>
- <CAPdUM4MUvzyAjyFwuYyBY6C-nn_VHttwf=ebAZLgc4VTNgS05A@mail.gmail.com>
-Message-ID: <3222483.BXBstlS3j6@amdc1227>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 28 Aug 2013 12:45:53 +0100
+Subject: [PATCH 13/19] ARM: module: correctly relocate instructions in BE8
+In-Reply-To: <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377690359-25397-14-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 of August 2013 10:14:01 Rahul Sharma wrote:
-> On 27 August 2013 05:16, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> > Hi Rahul,
-> > 
-> > On Monday 26 of August 2013 14:43:02 Rahul Sharma wrote:
-> >> hdmi driver needs to change the parent of hdmi clock
-> >> to pixel clock or hdmiphy clock, based on the stability
-> >> of hdmiphy. This patch is exposing the mux for changing
-> >> the parent.
-> >> 
-> >> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> >> ---
-> >> 
-> >>  Documentation/devicetree/bindings/clock/exynos5420-clock.txt |    5
-> >> 
-> >> +++++ drivers/clk/samsung/clk-exynos5420.c                         |
-> >> 5 ++++- 2 files changed, 9 insertions(+), 1 deletion(-)
-> >> 
-> >> diff --git
-> >> a/Documentation/devicetree/bindings/clock/exynos5420-clock.txt
-> >> b/Documentation/devicetree/bindings/clock/exynos5420-clock.txt index
-> >> 5758a69..6f16aa8 100644
-> >> --- a/Documentation/devicetree/bindings/clock/exynos5420-clock.txt
-> >> +++ b/Documentation/devicetree/bindings/clock/exynos5420-clock.txt
-> >> @@ -182,6 +182,11 @@ clock which they consume.
-> >> 
-> >>    g3d                        501
-> >>    smmu_mixer         502
-> >> 
-> >> +  Mux                        ID
-> >> +  ----------------------------
-> >> +
-> >> +  mout_hdmi          1024
-> > 
-> > Is there a need for such big hole between smm_mixer and this clock? I
-> > believe that based on the documentation, the total amount of clocks
-> > that
-> > can be defined may be approximated and some extra margin added, so you
-> > don't waste so much of numbering space and memory used for lookup
-> > array.
-> 
-> Total number of Gates are coming upto the enum value 540. I can leave gap
-> of 64 in between for first mux. Similarly, total muxes in system are
-> 118. Optimum gab would be between 128~150. What you say about these
-> values?
+When in BE8 mode, our instructions are not in the same ordering as the
+data, so use <asm/opcodes.h> to take this into account.
 
-OK, so let's say that muxes should start at 640 and dividers at 768.
+Note, also requires modules to be built --be8
 
-Anyway, ideally, we should break from this idea of grouping and convert 
-this way of definition to normal preprocessor macros that could be used 
-inside dts files as well. Then we could detach ourselves from referring to 
-clocks by numbers, because those macros would do that for us, without the 
-need to group clocks together for better readability. See clock driver for 
-S3C64xx [1].
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+ arch/arm/kernel/module.c |   57 +++++++++++++++++++++++++++-------------------
+ 1 file changed, 34 insertions(+), 23 deletions(-)
 
-This is an idea for further work, though. For now the values I proposed 
-should be more than enough.
-
-[1] http://thread.gmane.org/gmane.linux.usb.general/90493/focus=21090
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 85c3fb6..a1045a7 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -24,6 +24,7 @@
+ #include <asm/sections.h>
+ #include <asm/smp_plat.h>
+ #include <asm/unwind.h>
++#include <asm/opcodes.h>
+ 
+ #ifdef CONFIG_XIP_KERNEL
+ /*
+@@ -60,6 +61,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 		Elf32_Sym *sym;
+ 		const char *symname;
+ 		s32 offset;
++		u32 tmp;
+ #ifdef CONFIG_THUMB2_KERNEL
+ 		u32 upper, lower, sign, j1, j2;
+ #endif
+@@ -95,7 +97,8 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 		case R_ARM_PC24:
+ 		case R_ARM_CALL:
+ 		case R_ARM_JUMP24:
+-			offset = (*(u32 *)loc & 0x00ffffff) << 2;
++			offset = __mem_to_opcode_arm(*(u32 *)loc);
++			offset = (offset & 0x00ffffff) << 2;
+ 			if (offset & 0x02000000)
+ 				offset -= 0x04000000;
+ 
+@@ -111,9 +114,10 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			}
+ 
+ 			offset >>= 2;
++			offset &= 0x00ffffff;
+ 
+-			*(u32 *)loc &= 0xff000000;
+-			*(u32 *)loc |= offset & 0x00ffffff;
++			*(u32 *)loc &= __opcode_to_mem_arm(0xff000000);
++			*(u32 *)loc |= __opcode_to_mem_arm(offset);
+ 			break;
+ 
+ 	       case R_ARM_V4BX:
+@@ -121,8 +125,8 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			* other bits to re-code instruction as
+ 			* MOV PC,Rm.
+ 			*/
+-		       *(u32 *)loc &= 0xf000000f;
+-		       *(u32 *)loc |= 0x01a0f000;
++		       *(u32 *)loc &= __opcode_to_mem_arm(0xf000000f);
++		       *(u32 *)loc |= __opcode_to_mem_arm(0x01a0f000);
+ 		       break;
+ 
+ 		case R_ARM_PREL31:
+@@ -132,7 +136,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 
+ 		case R_ARM_MOVW_ABS_NC:
+ 		case R_ARM_MOVT_ABS:
+-			offset = *(u32 *)loc;
++			offset = tmp = __mem_to_opcode_arm(*(u32 *)loc);
+ 			offset = ((offset & 0xf0000) >> 4) | (offset & 0xfff);
+ 			offset = (offset ^ 0x8000) - 0x8000;
+ 
+@@ -140,16 +144,18 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			if (ELF32_R_TYPE(rel->r_info) == R_ARM_MOVT_ABS)
+ 				offset >>= 16;
+ 
+-			*(u32 *)loc &= 0xfff0f000;
+-			*(u32 *)loc |= ((offset & 0xf000) << 4) |
+-					(offset & 0x0fff);
++			tmp &= 0xfff0f000;
++			tmp |= ((offset & 0xf000) << 4) |
++				(offset & 0x0fff);
++
++			*(u32 *)loc = __opcode_to_mem_arm(tmp);
+ 			break;
+ 
+ #ifdef CONFIG_THUMB2_KERNEL
+ 		case R_ARM_THM_CALL:
+ 		case R_ARM_THM_JUMP24:
+-			upper = *(u16 *)loc;
+-			lower = *(u16 *)(loc + 2);
++			upper = __mem_to_opcode_thumb16(*(u16 *)loc);
++			lower = __mem_to_opcode_thumb16(*(u16 *)(loc + 2));
+ 
+ 			/*
+ 			 * 25 bit signed address range (Thumb-2 BL and B.W
+@@ -198,17 +204,20 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			sign = (offset >> 24) & 1;
+ 			j1 = sign ^ (~(offset >> 23) & 1);
+ 			j2 = sign ^ (~(offset >> 22) & 1);
+-			*(u16 *)loc = (u16)((upper & 0xf800) | (sign << 10) |
++			upper = (u16)((upper & 0xf800) | (sign << 10) |
+ 					    ((offset >> 12) & 0x03ff));
+-			*(u16 *)(loc + 2) = (u16)((lower & 0xd000) |
+-						  (j1 << 13) | (j2 << 11) |
+-						  ((offset >> 1) & 0x07ff));
++			lower = (u16)((lower & 0xd000) |
++				      (j1 << 13) | (j2 << 11) |
++				      ((offset >> 1) & 0x07ff));
++
++			*(u16 *)loc = __opcode_to_mem_thumb16(upper);
++			*(u16 *)(loc + 2) = __opcode_to_mem_thumb16(lower);
+ 			break;
+ 
+ 		case R_ARM_THM_MOVW_ABS_NC:
+ 		case R_ARM_THM_MOVT_ABS:
+-			upper = *(u16 *)loc;
+-			lower = *(u16 *)(loc + 2);
++			upper = __mem_to_opcode_thumb16(*(u16 *)loc);
++			lower = __mem_to_opcode_thumb16(*(u16 *)(loc + 2));
+ 
+ 			/*
+ 			 * MOVT/MOVW instructions encoding in Thumb-2:
+@@ -229,12 +238,14 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			if (ELF32_R_TYPE(rel->r_info) == R_ARM_THM_MOVT_ABS)
+ 				offset >>= 16;
+ 
+-			*(u16 *)loc = (u16)((upper & 0xfbf0) |
+-					    ((offset & 0xf000) >> 12) |
+-					    ((offset & 0x0800) >> 1));
+-			*(u16 *)(loc + 2) = (u16)((lower & 0x8f00) |
+-						  ((offset & 0x0700) << 4) |
+-						  (offset & 0x00ff));
++			upper = (u16)((upper & 0xfbf0) |
++				      ((offset & 0xf000) >> 12) |
++				      ((offset & 0x0800) >> 1));
++			lower = (u16)((lower & 0x8f00) |
++				      ((offset & 0x0700) << 4) |
++				      (offset & 0x00ff));
++			*(u16 *)loc = __opcode_to_mem_thumb16(upper);
++			*(u16 *)(loc + 2) = __opcode_to_mem_thumb16(lower);
+ 			break;
+ #endif
+ 
+-- 
+1.7.10.4
