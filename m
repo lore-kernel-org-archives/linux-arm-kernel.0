@@ -1,75 +1,71 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 28 Aug 2013 13:03:27 -0500
-Subject: [Xen-devel] [PATCH] ARM: xen: only set pm function ptrs for Xen
- guests
-In-Reply-To: <521E2635.4070800@linaro.org>
-References: <1377706794-8481-1-git-send-email-robherring2@gmail.com>
- <521E2635.4070800@linaro.org>
-Message-ID: <CAL_JsqKx0NBeC6kDjpZEwO1Liu44Uztuq9n-gNNcoV0CH4KGMQ@mail.gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 28 Aug 2013 13:04:57 -0500
+Subject: [PATCH v3 2/2] ARM: dts: msm: Update uartdm compatible strings
+In-Reply-To: <1377648764-23453-3-git-send-email-sboyd@codeaurora.org>
+References: <1377648764-23453-1-git-send-email-sboyd@codeaurora.org>
+ <1377648764-23453-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <0092782E-9E89-4350-B3B5-EB1275F2F8E3@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 11:32 AM, Julien Grall <julien.grall@linaro.org> wrote:
-> On 08/28/2013 05:19 PM, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> xen_pm_init was unconditionally setting pm_power_off and arm_pm_restart
->> function pointers. This breaks multi-platform kernels. Move this
->> initialization into xen_guest_init, so it is conditional on running as a
->> Xen guest.
->>
->> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> ---
->> This breaks reset and poweroff for Midway when Xen is enabled. This
->> should go into 3.11 or stable.
->> Rob
->>
->>  arch/arm/xen/enlighten.c | 12 +++---------
->>  1 file changed, 3 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
->> index 8a6295c..fa86452 100644
->> --- a/arch/arm/xen/enlighten.c
->> +++ b/arch/arm/xen/enlighten.c
->> @@ -263,6 +263,9 @@ static int __init xen_guest_init(void)
->>       if (xen_vcpu_info == NULL)
->>               return -ENOMEM;
->>
->> +     pm_power_off = xen_power_off;
->> +     arm_pm_restart = xen_restart;
->> +
->
-> I think it's too early to set pm callbacks. If Linux is running as dom0,
-> xen needs to overwrite the power management callback. Otherwise, dom0
-> could shutdown/restart the whole platform, that is annoying.
-> For instance, on the versatile express, the power management callback
-> are set very late (ie during driver initialization).
->
-> pm callbacks should be updated by a late initcall and check if xen is
-> enabled.
->
->>       gnttab_init();
->>       if (!xen_initial_domain())
->>               xenbus_probe(NULL);
->> @@ -271,15 +274,6 @@ static int __init xen_guest_init(void)
->>  }
->>  core_initcall(xen_guest_init);
->>
->> -static int __init xen_pm_init(void)
->> -{
->> -     pm_power_off = xen_power_off;
->> -     arm_pm_restart = xen_restart;
->> -
->> -     return 0;
->> -}
->> -subsys_initcall(xen_pm_init);
->> -
->>  static irqreturn_t xen_arm_callback(int irq, void *arg)
->>  {
->>       xen_hvm_evtchn_do_upcall();
->>
->
->
+
+On Aug 27, 2013, at 7:12 PM, Stephen Boyd wrote:
+
+> Let's follow the ratified DT binding and use uartdm instead of
+> hsuart. This does break backwards compatibility but this
+> shouldn't be a problem because the uart driver isn't probing on
+> these devices without adding clock support (which isn't merged so
+> far).
+
+I'm not seeing any driver upstream even using the compatibles so might be worth adding that we aren't even breaking anything upstream.
+
+Otherwise you can add:
+
+Acked-by: Kumar Gala <galak@codeaurora.org>
+
+> 
+> Cc: David Brown <davidb@codeaurora.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+> arch/arm/boot/dts/msm8660-surf.dts | 2 +-
+> arch/arm/boot/dts/msm8960-cdp.dts  | 2 +-
+> 2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/msm8660-surf.dts b/arch/arm/boot/dts/msm8660-surf.dts
+> index cdc010e..386d428 100644
+> --- a/arch/arm/boot/dts/msm8660-surf.dts
+> +++ b/arch/arm/boot/dts/msm8660-surf.dts
+> @@ -38,7 +38,7 @@
+> 	};
+> 
+> 	serial at 19c40000 {
+> -		compatible = "qcom,msm-hsuart", "qcom,msm-uart";
+> +		compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+> 		reg = <0x19c40000 0x1000>,
+> 		      <0x19c00000 0x1000>;
+> 		interrupts = <0 195 0x0>;
+> diff --git a/arch/arm/boot/dts/msm8960-cdp.dts b/arch/arm/boot/dts/msm8960-cdp.dts
+> index db2060c..532050b 100644
+> --- a/arch/arm/boot/dts/msm8960-cdp.dts
+> +++ b/arch/arm/boot/dts/msm8960-cdp.dts
+> @@ -38,7 +38,7 @@
+> 	};
+> 
+> 	serial at 16440000 {
+> -		compatible = "qcom,msm-hsuart", "qcom,msm-uart";
+> +		compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+> 		reg = <0x16440000 0x1000>,
+> 		      <0x16400000 0x1000>;
+> 		interrupts = <0 154 0x0>;
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
 > --
-> Julien Grall
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
