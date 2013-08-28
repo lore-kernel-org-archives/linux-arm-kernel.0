@@ -1,83 +1,39 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 28 Aug 2013 17:54:27 +0100
-Subject: [PATCH 03/19] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
-In-Reply-To: <1377639509-22778-4-git-send-email-ben.dooks@codethink.co.uk>
-References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
- <1377639509-22778-4-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130828165427.GI3842@localhost.localdomain>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 28 Aug 2013 09:59:40 -0700
+Subject: [GIT 00/14] Second round of Renesas ARM based SoC cleanups for
+ v3.12
+In-Reply-To: <cover.1375344714.git.horms+renesas@verge.net.au>
+References: <cover.1375344714.git.horms+renesas@verge.net.au>
+Message-ID: <20130828165940.GA8607@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 10:38:13PM +0100, Ben Dooks wrote:
-> The fixup_pv_table assumes that the instructions are in the same
-> endian configuration as the data, but when the CPU is running in
-> BE8 the instructions stay in little-endian format.
+On Thu, Aug 01, 2013 at 05:26:14PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
-> Make sure if CONFIG_CPU_ENDIAN_BE8 is set that we do all the
-> alterations to the instructions taking in to account the LDR/STR
-> will be swapping the data endian-ness.
+> Please consider this second round of Renesas ARM based SoC cleanups for
+> v3.12.
 > 
-> Since the code is only modifying a byte, we avoid dual-swapping
-> the data, and just change the bits we clear and ORR in (in the
-> case where the code is not thumb2).
+> This pull-request is based on a merge of renesas-tpu-pwm-for-v3.12,
+> renesas-backlight-for-v3.12 and renesas-soc-for-v3.12, each of which
+> I have previously sent a pull-request for, in order to provide
+> the pre-requisite code that that is being removed or cleaned up.
 > 
-> For thumb2, we add the necessary rev16 instructions to ensure that
-> the instructions are processed in the correct format, as it was
-> easier than re-writing the code to contain a mask and shift.
+> The following changes since commit 4431374926363df1d907d9c8783f473eb7facf42:
+> 
+>   Merge branches 'tpu-pwm', 'backlight' and 'soc' into cleanup2-base (2013-07-24 16:35:12 +0900)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup2-for-v3.12
 
-Shame about the ifdef, but ARM_LE_OR_BE32(...) or ARM_NOT_BE8(...) seems
-too contrived to be practical...
+Pulled.
 
-We could probably do bitfield clobber more neatly with BFI, but
-unfortunately v6 plain doesn't have that.  Only v6T2 or v7 and later
-have it.
+Given that you have inversed the chain of dependencies, I'll just keep
+all the "late" (inverted and actual late) renesas branches in one topic
+now, since it's just busy work to create next/cleanup2, next/soc2,
+next/boards2, etc, just for renesas.
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 
-Cheers
----Dave
-
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
->  arch/arm/kernel/head.S |    8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 2c7cc1e..9e5906c 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -582,8 +582,10 @@ __fixup_a_pv_table:
->  	b	2f
->  1:	add     r7, r3
->  	ldrh	ip, [r7, #2]
-> +ARM_BE8(rev16	ip, ip)
->  	and	ip, 0x8f00
->  	orr	ip, r6	@ mask in offset bits 31-24
-> +ARM_BE8(rev16	ip, ip)
->  	strh	ip, [r7, #2]
->  2:	cmp	r4, r5
->  	ldrcc	r7, [r4], #4	@ use branch for delay slot
-> @@ -592,8 +594,14 @@ __fixup_a_pv_table:
->  #else
->  	b	2f
->  1:	ldr	ip, [r7, r3]
-> +#ifdef CONFIG_CPU_ENDIAN_BE8
-> +	@ in BE8, we load data in BE, but instructions still in LE
-> +	bic	ip, ip, #0xff000000
-> +	orr	ip, ip, r6, lsl#24
-> +#else
->  	bic	ip, ip, #0x000000ff
->  	orr	ip, ip, r6	@ mask in offset bits 31-24
-> +#endif
->  	str	ip, [r7, r3]
->  2:	cmp	r4, r5
->  	ldrcc	r7, [r4], #4	@ use branch for delay slot
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-Olof
