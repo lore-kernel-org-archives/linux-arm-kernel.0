@@ -1,57 +1,66 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 28 Aug 2013 11:19:54 -0500
-Subject: [PATCH] ARM: xen: only set pm function ptrs for Xen guests
-Message-ID: <1377706794-8481-1-git-send-email-robherring2@gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 28 Aug 2013 18:21:35 +0200 (CEST)
+Subject: [PATCH v2 4/7] V4L: s5k6a3: Add support for asynchronous subdev
+ registration
+In-Reply-To: <1377705360-12197-5-git-send-email-s.nawrocki@samsung.com>
+References: <1377705360-12197-1-git-send-email-s.nawrocki@samsung.com>
+ <1377705360-12197-5-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <Pine.LNX.4.64.1308281819520.22743@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Hi Sylwester,
 
-xen_pm_init was unconditionally setting pm_power_off and arm_pm_restart
-function pointers. This breaks multi-platform kernels. Move this
-initialization into xen_guest_init, so it is conditional on running as a
-Xen guest.
+Just one doubt below
 
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+On Wed, 28 Aug 2013, Sylwester Nawrocki wrote:
+
+> This patch converts the driver to use v4l2 asynchronous subdev
+> registration API an the clock API to control the external master
+> clock directly.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/media/i2c/s5k6a3.c |   36 ++++++++++++++++++++++++++----------
+>  1 file changed, 26 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/media/i2c/s5k6a3.c b/drivers/media/i2c/s5k6a3.c
+> index ba86e24..f65a4f8 100644
+> --- a/drivers/media/i2c/s5k6a3.c
+> +++ b/drivers/media/i2c/s5k6a3.c
+
+[snip]
+
+> @@ -282,7 +297,7 @@ static int s5k6a3_probe(struct i2c_client *client,
+>  	pm_runtime_no_callbacks(dev);
+>  	pm_runtime_enable(dev);
+>  
+> -	return 0;
+> +	return v4l2_async_register_subdev(sd);
+
+If the above fails - don't you have to do any clean up? E.g. below you do 
+disable runtime PM and clean up the media entity.
+
+Thanks
+Guennadi
+
+>  }
+>  
+>  static int s5k6a3_remove(struct i2c_client *client)
+> @@ -290,6 +305,7 @@ static int s5k6a3_remove(struct i2c_client *client)
+>  	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+>  
+>  	pm_runtime_disable(&client->dev);
+> +	v4l2_async_unregister_subdev(sd);
+>  	media_entity_cleanup(&sd->entity);
+>  	return 0;
+>  }
+> -- 
+> 1.7.9.5
+> 
+
 ---
-This breaks reset and poweroff for Midway when Xen is enabled. This 
-should go into 3.11 or stable.
-
-Rob
-
- arch/arm/xen/enlighten.c | 12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 8a6295c..fa86452 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -263,6 +263,9 @@ static int __init xen_guest_init(void)
- 	if (xen_vcpu_info == NULL)
- 		return -ENOMEM;
- 
-+	pm_power_off = xen_power_off;
-+	arm_pm_restart = xen_restart;
-+
- 	gnttab_init();
- 	if (!xen_initial_domain())
- 		xenbus_probe(NULL);
-@@ -271,15 +274,6 @@ static int __init xen_guest_init(void)
- }
- core_initcall(xen_guest_init);
- 
--static int __init xen_pm_init(void)
--{
--	pm_power_off = xen_power_off;
--	arm_pm_restart = xen_restart;
--
--	return 0;
--}
--subsys_initcall(xen_pm_init);
--
- static irqreturn_t xen_arm_callback(int irq, void *arg)
- {
- 	xen_hvm_evtchn_do_upcall();
--- 
-1.8.1.2
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
