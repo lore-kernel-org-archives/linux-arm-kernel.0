@@ -1,36 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 28 Aug 2013 11:03:54 +0200
-Subject: [PATCH v3 4/6] iio: at91: ADC start-up time calculation changed
- since at91sam9x5
-In-Reply-To: <1377602932-1899-5-git-send-email-josh.wu@atmel.com>
-References: <1377602932-1899-1-git-send-email-josh.wu@atmel.com>
- <1377602932-1899-5-git-send-email-josh.wu@atmel.com>
-Message-ID: <20130828090354.GP2695@lukather>
+From: alex@shark-linux.de (Alexander Schulz)
+Date: Wed, 28 Aug 2013 11:05:14 +0200
+Subject: what about =?utf-8?Q?mach-shark=3F?=
+In-Reply-To: <CACRpkdb2QQEAt_bpVv9sifEuDfs_8XdDbUtQ9R+cXA-vBWMKmA@mail.gmail.com>
+References: <alpine.LFD.2.00.1107041545480.14596@xanadu.home>
+ <CACRpkdb2QQEAt_bpVv9sifEuDfs_8XdDbUtQ9R+cXA-vBWMKmA@mail.gmail.com>
+Message-ID: <courier.521DBD4A.00000AD8@shark-linux.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+Linus Walleij writes:
 
-On Tue, Aug 27, 2013 at 07:28:50PM +0800, Josh Wu wrote:
-> Since in at91sam9x5, sama5d3x chip. the start up time calucation is changed.
-> This patch can choose different start up time calculation formula for different
-> chips.
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> On Mon, Jul 4, 2011 at 10:08 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>
+>> Is this used?
+>
+> This still goes unanswered after two years.
+>
+> Alexander, are you compiling and booting recent kernels on the Shark?
+>
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Sorry, it must have slipped through somehow, I would have answered it if I  
+had seen it. I still have an eye on the list but haven't found the time to  
+really do anything with the shark in the recent time.
 
-Thanks for your work,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130828/29aaa6f1/attachment.sig>
+Best regards
+   Alexander
