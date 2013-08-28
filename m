@@ -1,74 +1,49 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 27 Aug 2013 18:12:04 -0700
-Subject: [GIT PULL] Allwinner sunXi clock patches for 3.12
-In-Reply-To: <20130826091434.GA4980@lukather>
-References: <20130826091434.GA4980@lukather>
-Message-ID: <20130828011204.8231.86567@quantum>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Tue, 27 Aug 2013 18:13:55 -0700
+Subject: [PATCH v2 RFT 0/2] PM / Hibernate: sysfs resume 
+Message-ID: <1377652437-2379-1-git-send-email-sebastian.capella@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2013-08-26 02:14:34)
-> Hi Mike,
-> 
-> Please pull the following branch with the sunxi additions to the clk
-> driver for the 3.12 merge window, based on your current clk-next.
-> 
-> Please note that the patch "clk: sunxi: fix initialization of basic
-> clocks" from Emilio, that you told was applied, wasn't in your clk-next
-> branch, so I took it, as it conflicted with later patches.
+Patchset related to hibernation resume: one enhancement to make the use
+of an existing file more general and one documentation update.
 
-Ah, right. I had that patch in my local branch so I got a conflict with
-OF_CLK_DECLARE for the osc clock. I went with the version in your pull
-request ("sun4i_osc" versus "sunxi_osc").
+Both patches are based on the 3.11-rc6 tag.  This was tested on a
+Pandaboard with partial hibernation support, and compiled on x86.
 
-Regards,
-Mike
+Further testing is needed on other platforms.  Please let me know if
+you're able to verify this on any other systems.
 
-> 
-> Thanks!
-> Maxime
-> 
-> The following changes since commit bddbd13453d838a30baf84869c56076c8ce2b211:
-> 
->   Merge tag 'zynq-clk-for-3.12' of git://git.xilinx.com/linux-xlnx into clk-next (2013-08-20 14:58:48 -0700)
-> 
-> are available in the git repository at:
-> 
-> 
->   https://github.com/mripard/linux.git tags/sunxi-clk-for-3.12
-> 
-> for you to fetch changes up to 1fb2e4aab8b31b15e6be5debacb4203333360fd2:
-> 
->   clk: sunxi: Add Allwinner A20 gates (2013-08-26 10:58:21 +0200)
-> 
-> ----------------------------------------------------------------
-> Allwinner clock changes for 3.12
-> 
-> These patches mostly do some cleanup to introduce the basic gated clocks for
-> the Allwinner A10s, A20 and A31 SoCs.
-> 
-> ----------------------------------------------------------------
-> Emilio L?pez (1):
->       clk: sunxi: fix initialization of basic clocks
-> 
-> Maxime Ripard (5):
->       clk: sunxi: Add A10s gates
->       clk: sunxi: Rename the structure to prepare the addition of sun6i
->       clk: sunxi: Allow to specify the divider width from the dividers data
->       clk: sunxi: Add A31 clocks support
->       clk: sunxi: Add Allwinner A20 gates
-> 
->  Documentation/devicetree/bindings/clock/sunxi.txt  |  12 +
->  .../bindings/clock/sunxi/sun5i-a10s-gates.txt      |  75 +++++++
->  .../bindings/clock/sunxi/sun6i-a31-gates.txt       |  83 +++++++
->  .../bindings/clock/sunxi/sun7i-a20-gates.txt       |  98 +++++++++
->  drivers/clk/sunxi/clk-sunxi.c                      | 241 +++++++++++++++++----
->  5 files changed, 464 insertions(+), 45 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun5i-a10s-gates.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun6i-a31-gates.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun7i-a20-gates.txt
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+[PATCH 1/2] PM / Hibernate: use name_to_dev_t to parse resume
+  Use name_to_dev_t to parse the /sys/power/resume file making the
+  syntax more flexible.  It supports the previous use syntax
+  and additionally can support other formats such as
+  /dev/devicenode and UUID= formats.
+
+  By changing /sys/debug/resume to accept the same syntax as
+  the resume=device parameter, we can parse the resume=device
+  in the initrd init script and use the resume device directly
+  from the kernel command line.
+
+  kernel/power/hibernate.c |   18 +++++++++++++-----
+  1 file changed, 13 insertions(+), 5 deletions(-)
+
+[PATCH 2/2] PM / Hibernate: add section for resume options
+  This adds a small section to the swsusp.txt file to address the
+  options for resuming.  This comments on the manual resume
+  option which is used when resorting to an initrd or initramfs
+  for resuming.  Resuming from late init is discussed later in
+  the document, but it seemed appropriate to list them together.
+
+  Documentation/power/swsusp.txt |   15 ++++++++++++++-
+  1 file changed, 14 insertions(+), 1 deletion(-)
+
+Changes in v2:
+--------------
+
+* Added check for null return of kstrndup in hibernate.c
+
+
+Thanks,
+
+Sebastian
