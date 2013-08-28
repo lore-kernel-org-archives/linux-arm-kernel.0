@@ -1,118 +1,49 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 28 Aug 2013 10:41:09 +0900
-Subject: [PATCH] ARM: shmobile: ape6evm-reference: add MMCIF and SDHI DT nodes
-In-Reply-To: <cover.1377652718.git.horms+renesas@verge.net.au>
-References: <cover.1377652718.git.horms+renesas@verge.net.au>
-Message-ID: <ba6094d6e8f30a538e08e9a892f3e37debd84413.1377652718.git.horms+renesas@verge.net.au>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 28 Aug 2013 09:41:37 +0800
+Subject: [PATCH v8 1/8] ARM: debug: support debug ll on hisilicon soc
+In-Reply-To: <20130825161953.GV6617@n2100.arm.linux.org.uk>
+References: <1377336603-10303-1-git-send-email-haojian.zhuang@linaro.org>
+ <1377336603-10303-2-git-send-email-haojian.zhuang@linaro.org>
+ <20130825161953.GV6617@n2100.arm.linux.org.uk>
+Message-ID: <CAD6h2NQv737n9h+QZLo7f35G-sTOVzpO+Xe2gXDizo0hz8geJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+On 26 August 2013 00:19, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Aug 24, 2013 at 05:29:56PM +0800, Haojian Zhuang wrote:
+>> Support UART0 debug ll on Hisilicon Hi3620 SoC & Hi3716 SoC.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> ---
+>>  arch/arm/Kconfig.debug | 19 +++++++++++++++++++
+>>  1 file changed, 19 insertions(+)
+>>
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index 814d224..bba9662 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -194,6 +194,22 @@ choice
+>>                 Say Y here if you want kernel low-level debugging support
+>>                 on HI3716 UART.
+>>
+>
+> I'm having problems applying this patch - I don't have the above context
+> lines in my tree, or anything remotely resembling them.  Neither can I
+> find anything remotely similar in mainline.
+>
+> What did you generate this patch against?  It can't be v3.11-rc6 as you
+> put in your KernelVersion: line for the patch system.
+>
+> Your diff above says that this was generated against blob 814d224, which
+> doesn't exist in mainline either.  Neither does it seem to appear in
+> my build tree which includes arm-soc's for-next branch.
 
-This patch adds MMCIF0, SDHI0 and SDHI1 DT nodes and a fixed voltage
-reglator for them to the ape6evm-reference platform.
+Because there's some optimization on debug ll in your tree, I only find those
+commits in linux-next git tree. So I based this commit in linux-next.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts | 72 +++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
+Could you help me to figure out which branch should I base in your git tree?
+Since I can't find a right one.
 
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-index f444624..2b49b05 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-@@ -10,6 +10,7 @@
- 
- /dts-v1/;
- /include/ "r8a73a4.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "APE6EVM";
-@@ -24,6 +25,34 @@
- 		reg = <0 0x40000000 0 0x40000000>;
- 	};
- 
-+	vcc_mmc0: regulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "MMC0 Vcc";
-+		regulator-min-microvolt = <2800000>;
-+		regulator-max-microvolt = <2800000>;
-+		regulator-always-on;
-+	};
-+
-+	vcc_sdhi0: regulator at 1 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI0 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&pfc 76 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	/* Common 3.3V rail, used by several devices on APE6EVM */
-+	ape6evm_fixed_3v3: regulator at 2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+
- 	lbsc {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -62,4 +91,47 @@
- 		renesas,groups = "scifa0_data";
- 		renesas,function = "scifa0";
- 	};
-+
-+	mmc0_pins: mmcif {
-+		renesas,groups = "mmc0_data8", "mmc0_ctrl";
-+		renesas,function = "mmc0";
-+	};
-+
-+	sdhi0_pins: sdhi0 {
-+		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
-+		renesas,function = "sdhi0";
-+	};
-+
-+	sdhi1_pins: sdhi1 {
-+		renesas,groups = "sdhi1_data4", "sdhi1_ctrl";
-+		renesas,function = "sdhi1";
-+	};
-+};
-+
-+&mmcif0 {
-+	vmmc-supply = <&vcc_mmc0>;
-+	bus-width = <8>;
-+	non-removable;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins>;
-+	status = "okay";
-+};
-+
-+&sdhi0 {
-+	vmmc-supply = <&vcc_sdhi0>;
-+	bus-width = <4>;
-+	toshiba,mmc-wrprotect-disable;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdhi0_pins>;
-+	status = "okay";
-+};
-+
-+&sdhi1 {
-+	vmmc-supply = <&ape6evm_fixed_3v3>;
-+	bus-width = <4>;
-+	broken-cd;
-+	toshiba,mmc-wrprotect-disable;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdhi1_pins>;
-+	status = "okay";
- };
--- 
-1.8.3.2
+Regards
+Haojian
