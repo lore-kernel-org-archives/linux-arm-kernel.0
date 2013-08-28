@@ -1,36 +1,72 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 27 Aug 2013 21:35:29 -0300
-Subject: imx-ldb: "mx-ldb ldb.10: adding encoder failed with -16"
-Message-ID: <CAOMZO5CjgfRLfcgRjO2eAx4ZQkZNHVe7tLqeCacJndTJiDGg_w@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 Aug 2013 17:43:41 -0700
+Subject: [PATCH V2 2/4] clk: exynos-audss: set correct parent clocks
+In-Reply-To: <1376639378-20707-3-git-send-email-padma.v@samsung.com>
+References: <1376639378-20707-1-git-send-email-padma.v@samsung.com>
+ <1376639378-20707-3-git-send-email-padma.v@samsung.com>
+Message-ID: <20130828004341.8231.3654@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Quoting Padmavathi Venna (2013-08-16 00:49:36)
+> From: Andrew Bresticker <abrestic@chromium.org>
+> 
+> Different Exynos SoCs have different names for certain input clocks
+> to the AudioSS block.  Since the order in which clock providers are
+> probed is not guaranteed, we can't use the device-tree to pass the
+> correct input clocks.
 
-Running next-20130827 I get the following probe failure on mx6:
-
-[drm] Supports vblank timestamp caching Rev 1 (10.10.2010).
-[drm] No driver support for vblank timestamp query.
-[drm] Initialized imx-drm 1.0.0 20120507 on minor 0
-imx-ldb ldb.10: adding encoder failed with -16
-imx-ldb: probe of ldb.10 failed with error -16
-imx-ipuv3 2400000.ipu: IPUv3H probed
-imx-ipuv3 2800000.ipu: IPUv3H probed
-imx-ipuv3-crtc imx-ipuv3-crtc.0: adding crtc failed with -16.
-imx-ipuv3-crtc: probe of imx-ipuv3-crtc.0 failed with error -16
-imx-ipuv3-crtc imx-ipuv3-crtc.1: adding crtc failed with -16.
-mmc0: new SDHC card at address b5a1
-mmcblk0: mmc0:b5a1 SD04G 3.69 GiB
-imx-ipuv3-crtc: probe of imx-ipuv3-crtc.1 failed with error -16
- mmcblk0: p1
-imx-ipuv3-crtc imx-ipuv3-crtc.2: adding crtc failed with -16.
-imx-ipuv3-crtc: probe of imx-ipuv3-crtc.2 failed with error -16
-imx-ipuv3-crtc imx-ipuv3-crtc.3: adding crtc failed with -16.
-imx-ipuv3-crtc: probe of imx-ipuv3-crtc.3 failed with error -16
-
-I haven't started debugging it yet, but just wanted to know if someone
-has already seen this problem or have any suggestions.
+Why not? Could your audss binding include something like a "clocks"
+property with phandles to the input clocks? Then your audss clock driver
+could just use clk_get like a regular driver to get the parents.
 
 Regards,
+Mike
 
-Fabio Estevam
+> Instead, use the compatibility string to
+> determine what the correct parent clocks should be.
+> 
+> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> ---
+>  drivers/clk/samsung/clk-exynos-audss.c |   12 +++++++++++-
+>  1 files changed, 11 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+> index 86d2606..d81c5f8 100644
+> --- a/drivers/clk/samsung/clk-exynos-audss.c
+> +++ b/drivers/clk/samsung/clk-exynos-audss.c
+> @@ -35,6 +35,7 @@ static unsigned long reg_save[][2] = {
+>  /* list of all parent clock list */
+>  static const char *mout_audss_p[] = { "fin_pll", "fout_epll" };
+>  static const char *mout_i2s_p[] = { "mout_audss", "cdclk0", "sclk_audio0" };
+> +static const char *sclk_pcm_p = "sclk_pcm0";
+>  
+>  #ifdef CONFIG_PM_SLEEP
+>  static int exynos_audss_clk_suspend(void)
+> @@ -77,6 +78,15 @@ void __init exynos_audss_clk_init(struct device_node *np)
+>                 return;
+>         }
+>  
+> +       /* fix up clock parent names based on SoC */
+> +       if (of_device_is_compatible(np, "samsung,exynos5420-audss-clock")) {
+> +               mout_i2s_p[2] = "sclk_maudio0";
+> +               sclk_pcm_p = "sclk_maupcm0";
+> +       } else if (of_device_is_compatible(np,
+> +                                       "samsung,exynos5250-audss-clock")) {
+> +               sclk_pcm_p = "div_pcm0";
+> +       }
+> +
+>         clk_data.clks = clk_table;
+>         clk_data.clk_num = EXYNOS_AUDSS_MAX_CLKS;
+>         of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+> @@ -118,7 +128,7 @@ void __init exynos_audss_clk_init(struct device_node *np)
+>                                 reg_base + ASS_CLK_GATE, 4, 0, &lock);
+>  
+>         clk_table[EXYNOS_SCLK_PCM] = clk_register_gate(NULL, "sclk_pcm",
+> -                               "div_pcm0", CLK_SET_RATE_PARENT,
+> +                               sclk_pcm_p, CLK_SET_RATE_PARENT,
+>                                 reg_base + ASS_CLK_GATE, 5, 0, &lock);
+>  
+>         if (of_device_is_compatible(np, "samsung,exynos5420-audss-clock")) {
+> -- 
+> 1.7.4.4
