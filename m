@@ -1,153 +1,97 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 28 Aug 2013 09:43:36 +0200
-Subject: [PATCH] pinctrl: at91: add support for OUTPUT config
-In-Reply-To: <521DA82C.7020905@overkiz.com>
-References: <1377615082-16808-1-git-send-email-b.brezillon@overkiz.com>
- <521DA744.1020807@atmel.com> <521DA82C.7020905@overkiz.com>
-Message-ID: <521DAA28.2070507@atmel.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 28 Aug 2013 15:42:50 +0800
+Subject: [resend][PATCH v3 5/6] iio: at91: move the num_channels from DT to
+ driver itself
+In-Reply-To: <1377602932-1899-6-git-send-email-josh.wu@atmel.com>
+References: <1377602932-1899-6-git-send-email-josh.wu@atmel.com>
+Message-ID: <1377675770-30813-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/08/2013 09:35, boris brezillon :
-> On 28/08/2013 09:31, Nicolas Ferre wrote:
->> On 27/08/2013 16:51, Boris BREZILLON :
->>> Add support for pin output control through the pinctrl config:
->>>    - support enabling/disabling output on a given pin
->>>    - support output level setting (high or low)
->>>
->>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->>> ---
->>>    .../bindings/pinctrl/atmel,at91-pinctrl.txt        |    2 ++
->>>    drivers/pinctrl/pinctrl-at91.c                     |   22
->>> ++++++++++++++++++++
->>>    include/dt-bindings/pinctrl/at91.h                 |    2 ++
->>>    3 files changed, 26 insertions(+)
->>>
->>> diff --git
->>> a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
->>> b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
->>> index cf7c7bc..5a22e0d 100644
->>> --- a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
->>> +++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
->>> @@ -90,6 +90,8 @@ MULTIDRIVE    (1 << 1): indicate this pin need to
->>> be configured as multidrive.
->>>    DEGLITCH    (1 << 2): indicate this pin need deglitch.
->>>    PULL_DOWN    (1 << 3): indicate this pin need a pull down.
->>>    DIS_SCHMIT    (1 << 4): indicate this pin need to disable schmit
->>> trigger.
->>> +OUTPUT        (1 << 5): indicate this pin need to be configured as
->>> an output.
->>> +OUTPUT_VAL    (0x1 << 6): output val (1 = high, 0 = low)
->>>    DEBOUNCE    (1 << 16): indicate this pin need debounce.
->>>    DEBOUNCE_VAL    (0x3fff << 17): debounce val.
->>>
->>> diff --git a/drivers/pinctrl/pinctrl-at91.c
->>> b/drivers/pinctrl/pinctrl-at91.c
->>> index 19afb9a..1578a0d 100644
->>> --- a/drivers/pinctrl/pinctrl-at91.c
->>> +++ b/drivers/pinctrl/pinctrl-at91.c
->>> @@ -61,6 +61,9 @@ static int gpio_banks;
->>>    #define DEGLITCH    (1 << 2)
->>>    #define PULL_DOWN    (1 << 3)
->>>    #define DIS_SCHMIT    (1 << 4)
->>> +#define OUTPUT        (1 << 5)
->>> +#define OUTPUT_VAL_SHIFT    6
->>> +#define OUTPUT_VAL    (0x1 << OUTPUT_VAL_SHIFT)
->>>    #define DEBOUNCE    (1 << 16)
->>>    #define DEBOUNCE_VAL_SHIFT    17
->>>    #define DEBOUNCE_VAL    (0x3fff << DEBOUNCE_VAL_SHIFT)
->>> @@ -333,6 +336,19 @@ static void at91_mux_set_pullup(void __iomem
->>> *pio, unsigned mask, bool on)
->>>        writel_relaxed(mask, pio + (on ? PIO_PUER : PIO_PUDR));
->>>    }
->>>
->>> +static bool at91_mux_get_output(void __iomem *pio, unsigned pin,
->>> bool *val)
->>> +{
->>> +    *val = (readl_relaxed(pio + PIO_ODSR) >> pin) & 0x1;
->>> +    return (readl_relaxed(pio + PIO_OSR) >> pin) & 0x1;
->>> +}
->>> +
->>> +static void at91_mux_set_output(void __iomem *pio, unsigned mask,
->>> bool is_on,
->>> +                bool val)
->>> +{
->>> +    writel_relaxed(mask, pio + (val ? PIO_SODR : PIO_CODR));
->>> +    writel_relaxed(mask, pio + (is_on ? PIO_OER : PIO_ODR));
->>> +}
->>> +
->>>    static unsigned at91_mux_get_multidrive(void __iomem *pio, unsigned
->>> pin)
->>>    {
->>>        return (readl_relaxed(pio + PIO_MDSR) >> pin) & 0x1;
->>> @@ -712,6 +728,7 @@ static int at91_pinconf_get(struct pinctrl_dev
->>> *pctldev,
->>>        void __iomem *pio;
->>>        unsigned pin;
->>>        int div;
->>> +    bool out;
->>>
->>>        dev_dbg(info->dev, "%s:%d, pin_id=%d, config=0x%lx", __func__,
->>> __LINE__, pin_id, *config);
->>>        pio = pin_to_controller(info, pin_to_bank(pin_id));
->>> @@ -732,6 +749,9 @@ static int at91_pinconf_get(struct pinctrl_dev
->>> *pctldev,
->>>        if (info->ops->get_schmitt_trig &&
->>> info->ops->get_schmitt_trig(pio, pin))
->>>            *config |= DIS_SCHMIT;
->>>
->>> +    if (at91_mux_get_output(pio, pin, &out))
->>> +        *config |= OUTPUT | (out << OUTPUT_VAL_SHIFT);
->>> +
->>>        return 0;
->>>    }
->>>
->>> @@ -749,6 +769,8 @@ static int at91_pinconf_set(struct pinctrl_dev
->>> *pctldev,
->>>        if (config & PULL_UP && config & PULL_DOWN)
->>>            return -EINVAL;
->>>
->>> +    at91_mux_set_output(pio, mask, config & OUTPUT,
->>> +                (config & OUTPUT_VAL) >> OUTPUT_VAL_SHIFT);
->>>        at91_mux_set_pullup(pio, mask, config & PULL_UP);
->>>        at91_mux_set_multidrive(pio, mask, config & MULTI_DRIVE);
->>>        if (info->ops->set_deglitch)
->>> diff --git a/include/dt-bindings/pinctrl/at91.h
->>> b/include/dt-bindings/pinctrl/at91.h
->>> index d7988b4..9fd4d48 100644
->>> --- a/include/dt-bindings/pinctrl/at91.h
->>> +++ b/include/dt-bindings/pinctrl/at91.h
->>> @@ -15,6 +15,8 @@
->>>    #define AT91_PINCTRL_DEGLITCH        (1 << 2)
->>>    #define AT91_PINCTRL_PULL_DOWN        (1 << 3)
->>>    #define AT91_PINCTRL_DIS_SCHMIT        (1 << 4)
->>> +#define AT91_PINCTRL_OUTPUT        (1 << 5)
->>> +#define AT91_PINCTRL_OUTPUT_VAL(x)    ((x & 0x1) << 6)
->>
->> Can you add this change to the documentation as well:
->> Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
->>
->>
->>>    #define AT91_PINCTRL_DEBOUNCE        (1 << 16)
->>>    #define AT91_PINCTRL_DEBOUNCE_VA(x)    (x << 17)
->>
->> Oh, we have a nice typo here! ---^^^^^^
->> And moreover it would be good to add the mask as well.
->
-> Do you want me to fix this typo and add mask for DEBOUNCE
-> in a separate patch ?
+CC: devicetree at vger.kernel.org
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+Sorry for not testing the previous email for this patch.
+Now I find the compiling error in the patch, so I resend a fix version of this
+patch.
 
-Yep, if you want.
+In this resended version:
+  - fix the compile error the typo.
+  - fix the num_channels assignment type error.
 
->> Once the documentation added, you can stick my:
->>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>
->> Thanks, bye,
->
->
->
+ Documentation/devicetree/bindings/arm/atmel-adc.txt |    1 -
+ drivers/iio/adc/at91_adc.c                          |   12 +++++-------
+ 2 files changed, 5 insertions(+), 8 deletions(-)
 
-
+diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+index 723c205..0e65e01 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+@@ -7,7 +7,6 @@ Required properties:
+   - interrupts: Should contain the IRQ line for the ADC
+   - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
+     device
+-  - atmel,adc-num-channels: Number of channels available in the ADC
+   - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
+     defined in the datasheet
+   - atmel,adc-vref: Reference voltage in millivolts for the conversions
+diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+index f32a69d..0f4621a 100644
+--- a/drivers/iio/adc/at91_adc.c
++++ b/drivers/iio/adc/at91_adc.c
+@@ -43,6 +43,7 @@ struct at91_adc_caps {
+ 	/* startup time calculate function */
+ 	u32 (*calc_startup_ticks)(u8 startup_time, u32 adc_clk_khz);
+ 
++	u8	num_channels;
+ 	struct at91_adc_reg_desc registers;
+ };
+ 
+@@ -502,13 +503,6 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
+ 	}
+ 	st->channels_mask = prop;
+ 
+-	if (of_property_read_u32(node, "atmel,adc-num-channels", &prop)) {
+-		dev_err(&idev->dev, "Missing adc-num-channels property in the DT.\n");
+-		ret = -EINVAL;
+-		goto error_ret;
+-	}
+-	st->num_channels = prop;
+-
+ 	st->sleep_mode = of_property_read_bool(node, "atmel,adc-sleep-mode");
+ 
+ 	if (of_property_read_u32(node, "atmel,adc-startup-time", &prop)) {
+@@ -534,6 +528,7 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
+ 		goto error_ret;
+ 
+ 	st->registers = &st->caps->registers;
++	st->num_channels = st->caps->num_channels;
+ 	st->trigger_number = of_get_child_count(node);
+ 	st->trigger_list = devm_kzalloc(&idev->dev, st->trigger_number *
+ 					sizeof(struct at91_adc_trigger),
+@@ -788,6 +783,7 @@ static int at91_adc_remove(struct platform_device *pdev)
+ #ifdef CONFIG_OF
+ static struct at91_adc_caps at91sam9260_caps = {
+ 	.calc_startup_ticks = calc_startup_ticks_9260,
++	.num_channels = 4,
+ 	.registers = {
+ 		.channel_base = AT91_ADC_CHR(0),
+ 		.drdy_mask = AT91_ADC_DRDY,
+@@ -800,6 +796,7 @@ static struct at91_adc_caps at91sam9260_caps = {
+ 
+ static struct at91_adc_caps at91sam9g45_caps = {
+ 	.calc_startup_ticks = calc_startup_ticks_9260,	/* same as 9260 */
++	.num_channels = 8,
+ 	.registers = {
+ 		.channel_base = AT91_ADC_CHR(0),
+ 		.drdy_mask = AT91_ADC_DRDY,
+@@ -812,6 +809,7 @@ static struct at91_adc_caps at91sam9g45_caps = {
+ 
+ static struct at91_adc_caps at91sam9x5_caps = {
+ 	.calc_startup_ticks = calc_startup_ticks_9x5,
++	.num_channels = 12,
+ 	.registers = {
+ 		.channel_base = AT91_ADC_CDR0_9X5,
+ 		.drdy_mask = AT91_ADC_SR_DRDY_9X5,
 -- 
-Nicolas Ferre
+1.7.10
