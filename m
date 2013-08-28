@@ -1,58 +1,28 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 27 Aug 2013 23:33:37 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6q-sabrelite: Add LVDS support
-In-Reply-To: <1377657217-6701-1-git-send-email-festevam@gmail.com>
-References: <1377657217-6701-1-git-send-email-festevam@gmail.com>
-Message-ID: <1377657217-6701-2-git-send-email-festevam@gmail.com>
+From: alison_chaiken@mentor.com (alison_chaiken at mentor.com)
+Date: Tue, 27 Aug 2013 20:17:33 -0700
+Subject: [PATCH 0/2] 
+In-Reply-To: <521C40D9.3070802@freescale.com>
+References: <521C40D9.3070802@freescale.com>
+Message-ID: <1377659855-9573-1-git-send-email-alison_chaiken@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+From: Alison Chaiken <alison_chaiken@mentor.com>
 
-imx6q-sabrelite board can be connected to a 1024x768 Hannstar LVDS panel.
+Tested on a variety of i.MX6 reference boards with older kernels.    Newly added
+pinctrl configuration settings that are not tested are not modified.
 
-Add support for it.
+Changes since v1:
+ * Now rebased on linux-next.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6q-sabrelite.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+Alison Chaiken (2):
+  ARM: i.MX6: dts: change iomuxc pinctrl config to match Rev. 1 IMX6DQRM
+  i.MX6: Documentation: Change fsl,imx-pinctrl.txt to match i.MX6 TRM
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index b96a72e..e1c1777 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -128,6 +128,31 @@
- 	};
- };
- 
-+&ldb {
-+	status = "okay";
-+
-+	lvds-channel at 0 {
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <18>;
-+		status = "okay";
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: hsd100pxn1 {
-+				clock-frequency = <65000000>;
-+				hactive = <1024>;
-+				vactive = <768>;
-+				hback-porch = <220>;
-+				hfront-porch = <40>;
-+				vback-porch = <21>;
-+				vfront-porch = <7>;
-+				hsync-len = <60>;
-+				vsync-len = <10>;
-+			};
-+		};
-+	};
-+};
-+
- &sata {
- 	status = "okay";
- };
+ .../bindings/pinctrl/fsl,imx-pinctrl.txt           |  25 +-
+ arch/arm/boot/dts/imx6qdl.dtsi                     | 354 ++++++++++-----------
+ arch/arm/boot/dts/imx6sl.dtsi                      |  48 +--
+ 3 files changed, 214 insertions(+), 213 deletions(-)
+
 -- 
-1.8.1.2
+1.8.4
