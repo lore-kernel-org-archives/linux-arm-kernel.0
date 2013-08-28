@@ -1,36 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 28 Aug 2013 18:48:40 +0000 (UTC)
-Subject: [PATCH 1/3] ARM: AM33xx: hwmod: Add RNG module data
-In-Reply-To: <1375777984-6267-2-git-send-email-lokeshvutla@ti.com>
-References: <1375777984-6267-1-git-send-email-lokeshvutla@ti.com>
- <1375777984-6267-2-git-send-email-lokeshvutla@ti.com>
-Message-ID: <alpine.DEB.2.02.1308281845560.22040@utopia.booyaka.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 28 Aug 2013 13:49:39 -0500
+Subject: [PATCH v3 0/2] Document msm_serial bindings and support newer
+ uartdms
+In-Reply-To: <1377648764-23453-1-git-send-email-sboyd@codeaurora.org>
+References: <1377648764-23453-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <89FFB174-E076-4309-BE9C-7DB24B31599F@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
 
-On Tue, 6 Aug 2013, Lokesh Vutla wrote:
+On Aug 27, 2013, at 7:12 PM, Stephen Boyd wrote:
 
-> Add RNG hwmod data for AM33xx SoC.
+> This patchset aligns the msm_serial driver more with downstream usage and
+> updates the driver's DT bindings.
 > 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Changes since v2:
+> * Fixed up DT review comments
+> * Dropped patches that were picked up in tty tree
+> 
+> Changes since v1:
+> * Dropped _clk postfix from {core,iface}_clk
+> * Split DT binding into two files
+> * Renamed DT binding files to match compatible strings
+> * Fixed up DT review comments
+> * Added new patch 5/5 (more than 1 char for UARTDM)
+> 
+> Stephen Boyd (2):
+>  devicetree: serial: Document msm_serial bindings
+>  ARM: dts: msm: Update uartdm compatible strings
+> 
+> .../devicetree/bindings/tty/serial/msm_serial.txt  | 27 -----------
+> .../bindings/tty/serial/qcom,msm-uart.txt          | 25 ++++++++++
+> .../bindings/tty/serial/qcom,msm-uartdm.txt        | 53 ++++++++++++++++++++++
+> arch/arm/boot/dts/msm8660-surf.dts                 |  2 +-
+> arch/arm/boot/dts/msm8960-cdp.dts                  |  2 +-
+> 5 files changed, 80 insertions(+), 29 deletions(-)
+> delete mode 100644 Documentation/devicetree/bindings/tty/serial/msm_serial.txt
+> create mode 100644 Documentation/devicetree/bindings/tty/serial/qcom,msm-uart.txt
+> create mode 100644 Documentation/devicetree/bindings/tty/serial/qcom,msm-uartdm.txt
 
-I tried to queue this one, but it caused AM33xx boots to hang.  
-Thought it might be related to the patch ordering -- seems to me that 
-the clock change patch needed to come before this patch -- but if I 
-recall correctly, both BeagleBone and BeagleBone-LT still hung.  
+We are going with bindings/serial as one location, can you update this so the bindings are in bindings/serial/qcom...
 
-Also, this patch created a sparse warning.
+- k
 
-Could you take another look at this patch?  Maybe try basing off of this 
-tag:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.12/omap-prcm-hwmod
-
-Fix the sparse problem, and see if the patch boots for you?
-
-thanks
-
-
-- Paul
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
