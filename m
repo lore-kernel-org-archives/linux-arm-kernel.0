@@ -1,75 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 28 Aug 2013 10:19:07 -0700
-Subject: [PATCH v7 08/11] ARM: hi3xxx: add smp support
-In-Reply-To: <CAMj5BkjJXeYd4Gh2+DKiJo60ftTSf0vnAiApH86+-zdsoVqXog@mail.gmail.com>
-References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
- <1376965873-14431-9-git-send-email-haojian.zhuang@linaro.org>
- <20130828021211.GF22852@quad.lixom.net>
- <CAMj5BkjJXeYd4Gh2+DKiJo60ftTSf0vnAiApH86+-zdsoVqXog@mail.gmail.com>
-Message-ID: <20130828171907.GD8607@quad.lixom.net>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 28 Aug 2013 10:26:44 -0700
+Subject: linux-next: manual merge of the arm-soc tree with the usb tree
+In-Reply-To: <20130828164506.3f8497c59e07b0ccaaa44aec@canb.auug.org.au>
+References: <20130828164506.3f8497c59e07b0ccaaa44aec@canb.auug.org.au>
+Message-ID: <20130828172644.GD5012@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 07:53:03PM +0800, zhangfei gao wrote:
-> Thanks Olof, will update with your comments.
+On Wed, Aug 28, 2013 at 04:45:06PM +1000, Stephen Rothwell wrote:
+> Hi all,
 > 
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> >> index 3be60c8..4cc5c57 100644
-> >> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> >> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> >> @@ -8,3 +8,50 @@ Required root node properties:
-> >>  Hi4511 Board
-> >>  Required root node properties:
-> >>       - compatible = "hisilicon,hi3620-hi4511";
-> >> +
-> >> +
-> >> +Hisilicon sctrl resiter
-> >
-> > Resiter seems like odd naming here.
-> >
-> >> +
-> >> +Required properties:
-> >> +- compatible : "hisilicon,sctrl"
-> >> +- reg : Address and size of sysctrl.
-> >
-> > sysctrl or sctrl? sysctrl isn't really too long, might as well use that.
-> >
-> >> +
-> >> +Optional properties:
-> >> +- smp_reg : offset in sysctrl for notifying slave cpu booting
-> >> +             cpu 1, reg;
-> >> +             cpu 2, reg + 0x4;
-> >> +             cpu 3, reg + 0x8;
-> >> +             If reg value is not zero, cpun exit wfi and go
-> >> +- resume_reg : offset in sysctrl for notifying cpu0 when resume
-> >> +- reset_reg : offset in sysctrl for system reset
-> >
-> > Underscores are usually not used in properties, you use dashes instead.
-> >
-> > Anyway, I suggest defining those as the different cells in a regular 'reg'
-> > property instead.
+> Today's linux-next merge of the arm-soc tree got conflicts in
+> arch/arm/boot/dts/am335x-bone.dts, arch/arm/boot/dts/am335x-evm.dts and
+> arch/arm/boot/dts/am335x-evmsk.dts between commit c031a7d41934 ("usb:
+> usb: dsps: update code according to the binding document") from the usb
+> tree and commits 63f6b2550aa0 ("ARM: dts: AM33XX: don't redefine OCP bus
+> and device nodes"), 781f17983015 ("usb: musb: am335x-evm: Do not remove
+> the session bit HOST-only mode") and 2ae847a1b10f ("usb: musb: am335x:
+> add second port to beagle bone") from the arm-soc tree.
 > 
-> Will update with
-> 
-> Required properties:
-> - compatible : "hisilicon,sysctrl"
-> - reg : Register address and size
-> 
-> Optional properties:
-> - smp-off : offset in sysctrl for notifying slave cpu booting
->                 cpu 1, reg;
->                 cpu 2, reg + 0x4;
->                 cpu 3, reg + 0x8;
->                 If reg value is not zero, cpun exit wfi and go
-> - resume-off : offset in sysctrl for notifying cpu0 when resume
-> - reboot-off : offset in sysctrl for system reboot
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 
-Unabbreviated "offset" would be better than "off" here.
+Thanks, that looks good.
 
-Do you even need this in the device tree? Do you have different implementations
-of this IP that has the same programming model but just with a couple of
-different offsets?
-
-
--Olof
+greg k-h
