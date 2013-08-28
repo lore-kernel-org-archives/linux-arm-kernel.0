@@ -1,85 +1,120 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 28 Aug 2013 10:37:52 +0900
-Subject: [PATCH 2/5] ARM: shmobile: lager: Constify platform data and resources
+Date: Wed, 28 Aug 2013 10:37:53 +0900
+Subject: [PATCH 3/5] ARM: shmobile: lager: Add Display Unit support
 In-Reply-To: <cover.1377653181.git.horms+renesas@verge.net.au>
 References: <cover.1377653181.git.horms+renesas@verge.net.au>
-Message-ID: <7db0d5c128bef96df72a33142dc651b39e6c11c2.1377653181.git.horms+renesas@verge.net.au>
+Message-ID: <f631fa0e380a76504bd65545ed094f04b5c6559a.1377653181.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Platform data and resources for Lager devices are kmemdup()ed when the
-corresponding devices are registered and can thus be declared as const.
-Do so.
+Only the VGA output is currently supported.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/mach-shmobile/board-lager.c | 66 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 66 insertions(+)
 
 diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index b161379..9806ca0 100644
+index 9806ca0..5facfc9 100644
 --- a/arch/arm/mach-shmobile/board-lager.c
 +++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -55,7 +55,7 @@ static struct gpio_led lager_leds[] = {
- 	},
+@@ -28,6 +28,7 @@
+ #include <linux/mmc/sh_mmcif.h>
+ #include <linux/pinctrl/machine.h>
+ #include <linux/platform_data/gpio-rcar.h>
++#include <linux/platform_data/rcar-du.h>
+ #include <linux/platform_device.h>
+ #include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
+@@ -38,6 +39,62 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
++/* DU */
++static struct rcar_du_encoder_data lager_du_encoders[] = {
++	{
++		.type = RCAR_DU_ENCODER_VGA,
++		.output = RCAR_DU_OUTPUT_DPAD0,
++	}, {
++		.type = RCAR_DU_ENCODER_NONE,
++		.output = RCAR_DU_OUTPUT_LVDS1,
++		.connector.lvds.panel = {
++			.width_mm = 210,
++			.height_mm = 158,
++			.mode = {
++				.clock = 65000,
++				.hdisplay = 1024,
++				.hsync_start = 1048,
++				.hsync_end = 1184,
++				.htotal = 1344,
++				.vdisplay = 768,
++				.vsync_start = 771,
++				.vsync_end = 777,
++				.vtotal = 806,
++				.flags = 0,
++			},
++		},
++	},
++};
++
++static const struct rcar_du_platform_data lager_du_pdata __initconst = {
++	.encoders = lager_du_encoders,
++	.num_encoders = ARRAY_SIZE(lager_du_encoders),
++};
++
++static const struct resource du_resources[] __initconst = {
++	DEFINE_RES_MEM(0xfeb00000, 0x70000),
++	DEFINE_RES_MEM_NAMED(0xfeb90000, 0x1c, "lvds.0"),
++	DEFINE_RES_MEM_NAMED(0xfeb94000, 0x1c, "lvds.1"),
++	DEFINE_RES_IRQ(gic_spi(256)),
++	DEFINE_RES_IRQ(gic_spi(268)),
++	DEFINE_RES_IRQ(gic_spi(269)),
++};
++
++static void __init lager_add_du_device(void)
++{
++	struct platform_device_info info = {
++		.name = "rcar-du-r8a7790",
++		.id = -1,
++		.res = du_resources,
++		.num_res = ARRAY_SIZE(du_resources),
++		.data = &du_resources,
++		.size_data = sizeof(du_resources),
++		.dma_mask = DMA_BIT_MASK(32),
++	};
++
++	platform_device_register_full(&info);
++}
++
+ /* LEDS */
+ static struct gpio_led lager_leds[] = {
+ 	{
+@@ -107,6 +164,13 @@ static const struct resource ether_resources[] __initconst = {
  };
  
--static __initdata struct gpio_led_platform_data lager_leds_pdata = {
-+static const struct gpio_led_platform_data lager_leds_pdata __initconst = {
- 	.leds		= lager_leds,
- 	.num_leds	= ARRAY_SIZE(lager_leds),
- };
-@@ -71,7 +71,7 @@ static __initdata struct gpio_keys_button gpio_buttons[] = {
- 	GPIO_KEY(KEY_1,		RCAR_GP_PIN(1, 14),	"SW2-pin1"),
- };
- 
--static __initdata struct gpio_keys_platform_data lager_keys_pdata = {
-+static const struct gpio_keys_platform_data lager_keys_pdata __initconst = {
- 	.buttons	= gpio_buttons,
- 	.nbuttons	= ARRAY_SIZE(gpio_buttons),
- };
-@@ -83,17 +83,17 @@ static struct regulator_consumer_supply fixed3v3_power_consumers[] =
- };
- 
- /* MMCIF */
--static struct sh_mmcif_plat_data mmcif1_pdata __initdata = {
-+static const struct sh_mmcif_plat_data mmcif1_pdata __initconst = {
- 	.caps		= MMC_CAP_8_BIT_DATA | MMC_CAP_NONREMOVABLE,
- };
- 
--static struct resource mmcif1_resources[] __initdata = {
-+static const struct resource mmcif1_resources[] __initconst = {
- 	DEFINE_RES_MEM_NAMED(0xee220000, 0x80, "MMCIF1"),
- 	DEFINE_RES_IRQ(gic_spi(170)),
- };
- 
- /* Ether */
--static struct sh_eth_plat_data ether_pdata __initdata = {
-+static const struct sh_eth_plat_data ether_pdata __initconst = {
- 	.phy			= 0x1,
- 	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
- 	.register_type		= SH_ETH_REG_FAST_RCAR,
-@@ -101,7 +101,7 @@ static struct sh_eth_plat_data ether_pdata __initdata = {
- 	.ether_link_active_low	= 1,
- };
- 
--static struct resource ether_resources[] __initdata = {
-+static const struct resource ether_resources[] __initconst = {
- 	DEFINE_RES_MEM(0xee700000, 0x400),
- 	DEFINE_RES_IRQ(gic_spi(162)),
- };
-@@ -156,7 +156,7 @@ static void __init lager_add_standard_devices(void)
+ static const struct pinctrl_map lager_pinctrl_map[] = {
++	/* DU (CN10: ARGB0, CN13: LVDS) */
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
++				  "du_rgb666", "du"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
++				  "du_sync_1", "du"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
++				  "du_clk_out_0", "du"),
+ 	/* SCIF0 (CN19: DEBUG SERIAL0) */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
+ 				  "scif0_data", "scif0"),
+@@ -154,6 +218,8 @@ static void __init lager_add_standard_devices(void)
+ 					  ether_resources,
+ 					  ARRAY_SIZE(ether_resources),
  					  &ether_pdata, sizeof(ether_pdata));
++
++	lager_add_du_device();
  }
  
--static const char *lager_boards_compat_dt[] __initdata = {
-+static const char * const lager_boards_compat_dt[] __initconst = {
- 	"renesas,lager",
- 	NULL,
- };
+ static const char * const lager_boards_compat_dt[] __initconst = {
 -- 
 1.8.3.2
