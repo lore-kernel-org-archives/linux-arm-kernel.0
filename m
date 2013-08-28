@@ -1,101 +1,136 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 28 Aug 2013 08:20:18 -0600
-Subject: [PATCH v7 05/11] ARM: dts: enable hi4511 with device tree
-In-Reply-To: <CAD6h2NSdk0fs-Z=Es9bOkwUEaubDTmAjv3hLDkrS3m1yshrbtQ@mail.gmail.com>
-References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
- <1376965873-14431-6-git-send-email-haojian.zhuang@linaro.org>
- <8761uxsiox.fsf@linaro.org> <52165D5E.7040500@wwwdotorg.org>
- <CAD6h2NTYNSFAQ0NWVwKXEr7BHUikmjROk-i+qYGo0otFPZKu0A@mail.gmail.com>
- <521B86D9.5060108@wwwdotorg.org>
- <CAD6h2NSdk0fs-Z=Es9bOkwUEaubDTmAjv3hLDkrS3m1yshrbtQ@mail.gmail.com>
-Message-ID: <521E0722.9040206@wwwdotorg.org>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 27 Aug 2013 19:08:52 -0700
+Subject: [PATCH] checkpatch:  Add test for positional misuse of section
+ specifiers like __initdata
+Message-ID: <1377655732.3619.19.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2013 08:17 PM, Haojian Zhuang wrote:
-> On 27 August 2013 00:48, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 08/23/2013 09:52 PM, Haojian Zhuang wrote:
->>> On 23 August 2013 02:50, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>> On 08/22/2013 12:07 PM, Kevin Hilman wrote:
->>>>> [+ DT maintainers]
->>>>>
->>>>> Haojian Zhuang <haojian.zhuang@linaro.org> writes:
->>>>>
->>>>>> Enable Hisilicon Hi4511 development platform with device tree support.
->>>>>>
->>>>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->>>> ...
->>
->>>>>> +    osc32k: osc32k {
->>>>>> +            compatible = "fixed-clock";
->>>>>> +            #clock-cells = <0>;
->>>>>> +            clock-frequency = <32768>;
->>>>>> +            clock-output-names = "osc32khz";
->>>>>> +    };
->>>>>
->>>>> ...seems many of the recent users of clocks have grouped them into a
->>>>> clocks {} grouping on a "simple-bus".
->>>>>
->>>>> DT folks: is there a rule of thumb on how whether these fixed clocks
->>>>> should be grouped on a simple bus?
->>>>
->>>> I would expect all the clock node names to be just "clock", since the
->>>> node names should describe the type of device not their identity (i.e.
->>>> clock name).
->>>>
->>>> In turn, this means that each clock node name needs to use a unit
->>>> address ("@nnn") to make them unique. In turn, this means they must have
->>>> a reg property since the unit address must match the first entry in the
->>>> reg property.
->>>
->>> No, it's really bad on using a unit address. The register always contains
->>> multiple mux or gate or divider. It would cause duplicated unit address.
->>
->> There shouldn't be multiple nodes with identical reg values; if that's
->> happening, then it seems like the mapping of nodes to HW is incorrect.
->>
->> Each HW block should have 1 DT node. That way, the reg values won't collide.
-> 
-> At here, I emphasize each clock node is one clock node. They are organized in
-> tree. The same register integrates multiple clock gate/clock mux/clock divider.
-> If each clock node is depend on reg, maybe it's not easy to read and the clock
-> driver will be more complex.
+As discussed recently on the arm [1] and lm-sensors [2] lists, it is
+possible to use section markers on variables in a way which gcc doesn't
+understand (or at least not the way the developer intended):
 
-If there's a single HW block (or single register) that provides multiple
-clocks, there should be a single DT node and a single device that
-provides multiple clocks.
+static struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = {
 
->>> I tried to use index number also. And it's also bad to append new clock nodes.
->>> So I use the label name instead.
->>>
->>>> Now I assume these clocks don't have any memory-mapped IO registers, so
->>>> they would need an arbitrary reg value rather than a real one. So it
->>>> doesn't make sense to place them directly under the root DT node, since
->>>> their reg values would make no sense within the context of the
->>>> CPU-visible MMIO space that the root node describes.
->>>>
->>>> In this case, it's typical to put all the clock nodes into e.g. a
->>>> /clocks node, since that node can introduce a separate numbering-space
->>>> for clocks. For example, I'd expect something like:
->>>>
->>>>         clocks {
->>>>                 #address-cells = <1>;
->>>>                 #size-cells = <0>;
->>>>
->>>>                 osc32k: clock at 0 {
->>>>                         compatible = "fixed-clock";
->>>>                         reg = <0>;
->> ...
->>>>                 osc26m: clock at 1 {
->>>>                         compatible = "fixed-clock";
->>>>                         reg = <1>;
->> ...
->>
->>> Those fixed-clock doesn't contain reg property. Since it needs not to access
->>> any clock register. It only provides the clock rate those child clock node.
->>
->> Inside the clocks node, the reg property is just a dummy value.
-> 
-> Is a dummy value helpful? I don't think so.
+does NOT put exynos4_plls in the .initdata section. The __initdata
+marker can be virtually anywhere on the line, EXCEPT right after
+"struct". The preferred location is before the "=" sign if there is
+one, or before the trailing ";" otherwise.
 
-It's not a matter of whether it's helpful; it's just how DT works.
+[1] http://permalink.gmane.org/gmane.linux.ports.arm.kernel/258149
+[2] http://lists.lm-sensors.org/pipermail/lm-sensors/2013-August/039836.html
+
+So, update checkpatch to find these misuses and report an
+error when it's immediately after struct or union, and a
+warning when it's otherwise not immediately before the ; or =.
+
+A similar patch was suggested by Andi Kleen
+https://lkml.org/lkml/2013/8/5/648
+
+Suggested-by: Jean Delvare <khali@linux-fr.org>
+Signed-off-by: Joe Perches <joe@perches.com>
+Tested-by: Guenter Roeck <linux@roeck-us.net>
+---
+ scripts/checkpatch.pl | 47 ++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 46 insertions(+), 1 deletion(-)
+
+diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
+index 9ba4fc4..47016c3 100755
+--- a/scripts/checkpatch.pl
++++ b/scripts/checkpatch.pl
+@@ -242,6 +242,8 @@ our $Sparse	= qr{
+ 			__rcu
+ 		}x;
+ 
++our $InitAttribute = qr{__(?:mem|cpu|dev|net_|)(?:initdata|initconst|init\b)};
++
+ # Notes to $Attribute:
+ # We need \b after 'init' otherwise 'initconst' will cause a false positive in a check
+ our $Attribute	= qr{
+@@ -262,7 +264,7 @@ our $Attribute	= qr{
+ 			__deprecated|
+ 			__read_mostly|
+ 			__kprobes|
+-			__(?:mem|cpu|dev|)(?:initdata|initconst|init\b)|
++			$InitAttribute|
+ 			____cacheline_aligned|
+ 			____cacheline_aligned_in_smp|
+ 			____cacheline_internodealigned_in_smp|
+@@ -292,6 +294,7 @@ our $Operators	= qr{
+ 		  }x;
+ 
+ our $NonptrType;
++our $NonptrTypeWithAttr;
+ our $Type;
+ our $Declare;
+ 
+@@ -354,6 +357,12 @@ our @typeList = (
+ 	qr{${Ident}_handler},
+ 	qr{${Ident}_handler_fn},
+ );
++our @typeListWithAttr = (
++	@typeList,
++	qr{struct\s+$InitAttribute\s+$Ident},
++	qr{union\s+$InitAttribute\s+$Ident},
++);
++
+ our @modifierList = (
+ 	qr{fastcall},
+ );
+@@ -367,6 +376,7 @@ our $allowed_asm_includes = qr{(?x:
+ sub build_types {
+ 	my $mods = "(?x:  \n" . join("|\n  ", @modifierList) . "\n)";
+ 	my $all = "(?x:  \n" . join("|\n  ", @typeList) . "\n)";
++	my $allWithAttr = "(?x:  \n" . join("|\n  ", @typeListWithAttr) . "\n)";
+ 	$Modifier	= qr{(?:$Attribute|$Sparse|$mods)};
+ 	$NonptrType	= qr{
+ 			(?:$Modifier\s+|const\s+)*
+@@ -377,6 +387,15 @@ sub build_types {
+ 			)
+ 			(?:\s+$Modifier|\s+const)*
+ 		  }x;
++	$NonptrTypeWithAttr	= qr{
++			(?:$Modifier\s+|const\s+)*
++			(?:
++				(?:typeof|__typeof__)\s*\([^\)]*\)|
++				(?:$typeTypedefs\b)|
++				(?:${allWithAttr}\b)
++			)
++			(?:\s+$Modifier|\s+const)*
++		  }x;
+ 	$Type	= qr{
+ 			$NonptrType
+ 			(?:(?:\s|\*|\[\])+\s*const|(?:\s|\*|\[\])+|(?:\s*\[\s*\])+)?
+@@ -3706,6 +3725,32 @@ sub process {
+ 			}
+ 		}
+ 
++sub string_find_replace {
++	my ($string, $find, $replace) = @_;
++
++	$string =~ s/$find/$replace/g;
++
++	return $string;
++}
++
++# check for bad placement of section $InitAttribute (e.g.: __initdata)
++		if ($line =~ /(\b$InitAttribute\b)/) {
++			my $attr = $1;
++			if ($line =~ /^\+\s*static\s+(?:const\s+)?(?:$attr\s+)?($NonptrTypeWithAttr)\s+(?:$attr\s+)?($Ident(?:\[[^]]*\])?)\s*[=;]/) {
++				my $ptr = $1;
++				my $var = $2;
++				if ((($ptr =~ /\b(union|struct)\s+$attr\b/ &&
++				      ERROR("MISPLACED_INIT",
++					    "$attr should be placed after $var\n" . $herecurr)) ||
++				     ($ptr !~ /\b(union|struct)\s+$attr\b/ &&
++				      WARN("MISPLACED_INIT",
++					   "$attr should be placed after $var\n" . $herecurr))) &&
++				    $fix) {
++					$fixed[$linenr - 1] =~ s/(\bstatic\s+(?:const\s+)?)(?:$attr\s+)?($NonptrTypeWithAttr)\s+(?:$attr\s+)?($Ident(?:\[[^]]*\])?)\s*([=;])\s*/"$1" . trim(string_find_replace($2, "\\s*$attr\\s*", " ")) . " " . trim(string_find_replace($3, "\\s*$attr\\s*", "")) . " $attr" . ("$4" eq ";" ? ";" : " = ")/e;
++				}
++			}
++		}
++
+ # prefer usleep_range over udelay
+ 		if ($line =~ /\budelay\s*\(\s*(\d+)\s*\)/) {
+ 			# ignore udelay's < 10, however
