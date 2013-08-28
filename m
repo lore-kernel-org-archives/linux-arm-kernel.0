@@ -1,107 +1,57 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 28 Aug 2013 12:34:20 +0100
-Subject: [PATCH 1/5] arm: Move asm macro get_thread_info to asm/assembler.h
+Date: Wed, 28 Aug 2013 12:34:23 +0100
+Subject: [PATCH 4/5] arm: Disable preemption in crunch_task_enable()
 In-Reply-To: <1377689664-27614-1-git-send-email-catalin.marinas@arm.com>
 References: <1377689664-27614-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1377689664-27614-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1377689664-27614-5-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-asm/assembler.h is a better place for this macro since it is used by
-asm files outside arch/arm/kernel/
+This patch is in preparation for calling the crunch_task_enable()
+function with interrupts enabled.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/assembler.h | 10 ++++++++++
- arch/arm/kernel/entry-header.S   | 11 -----------
- arch/arm/vfp/entry.S             |  5 ++++-
- arch/arm/vfp/vfphw.S             |  5 ++++-
- 4 files changed, 18 insertions(+), 13 deletions(-)
+ arch/arm/mach-ep93xx/crunch-bits.S | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index a5fef71..8d4d50a 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -167,6 +167,16 @@
- 	restore_irqs_notrace \oldcpsr
- 	.endm
- 
-+/*
-+ * Get current thread_info.
-+ */
-+	.macro	get_thread_info, rd
-+ ARM(	mov	\rd, sp, lsr #13	)
-+ THUMB(	mov	\rd, sp			)
-+ THUMB(	lsr	\rd, \rd, #13		)
-+	mov	\rd, \rd, lsl #13
-+	.endm
+diff --git a/arch/arm/mach-ep93xx/crunch-bits.S b/arch/arm/mach-ep93xx/crunch-bits.S
+index 0ec9bb4..890c5df 100644
+--- a/arch/arm/mach-ep93xx/crunch-bits.S
++++ b/arch/arm/mach-ep93xx/crunch-bits.S
+@@ -65,11 +65,13 @@
+  * called from prefetch exception handler with interrupts disabled
+  */
+ ENTRY(crunch_task_enable)
++	inc_preempt_count r10, r3
 +
- #define USER(x...)				\
- 9999:	x;					\
- 	.pushsection __ex_table,"a";		\
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index de23a9b..592d58e 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -236,11 +236,6 @@
- 	movs	pc, lr				@ return & move spsr_svc into cpsr
- 	.endm
+ 	ldr	r8, =(EP93XX_APB_VIRT_BASE + 0x00130000)	@ syscon addr
  
--	.macro	get_thread_info, rd
--	mov	\rd, sp, lsr #13
--	mov	\rd, \rd, lsl #13
--	.endm
--
- 	@
- 	@ 32-bit wide "mov pc, reg"
- 	@
-@@ -306,12 +301,6 @@
- 	.endm
- #endif	/* ifdef CONFIG_CPU_V7M / else */
+ 	ldr	r1, [r8, #0x80]
+ 	tst	r1, #0x00800000			@ access to crunch enabled?
+-	movne	pc, lr				@ if so no business here
++	bne	2f				@ if so no business here
+ 	mov	r3, #0xaa			@ unlock syscon swlock
+ 	str	r3, [r8, #0xc0]
+ 	orr	r1, r1, #0x00800000		@ enable access to crunch
+@@ -142,7 +144,7 @@ crunch_save:
  
--	.macro	get_thread_info, rd
--	mov	\rd, sp
--	lsr	\rd, \rd, #13
--	mov	\rd, \rd, lsl #13
--	.endm
--
- 	@
- 	@ 32-bit wide "mov pc, reg"
- 	@
-diff --git a/arch/arm/vfp/entry.S b/arch/arm/vfp/entry.S
-index 46e1749..9cc290a 100644
---- a/arch/arm/vfp/entry.S
-+++ b/arch/arm/vfp/entry.S
-@@ -8,9 +8,12 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/init.h>
-+#include <linux/linkage.h>
- #include <asm/thread_info.h>
- #include <asm/vfpmacros.h>
--#include "../kernel/entry-header.S"
-+#include <asm/assembler.h>
-+#include <asm/asm-offsets.h>
+ 	teq		r0, #0				@ anything to load?
+ 	cfldr64eq	mvdx0, [r1, #CRUNCH_MVDX0]	@ mvdx0 was clobbered
+-	moveq		pc, lr
++	beq		1f
  
- @ VFP entry point.
- @
-diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
-index 8d10dc8..33d82aa 100644
---- a/arch/arm/vfp/vfphw.S
-+++ b/arch/arm/vfp/vfphw.S
-@@ -14,10 +14,13 @@
-  * r10 points at the start of the private FP workspace in the thread structure
-  * sp points to a struct pt_regs (as defined in include/asm/proc/ptrace.h)
-  */
-+#include <linux/init.h>
-+#include <linux/linkage.h>
- #include <asm/thread_info.h>
- #include <asm/vfpmacros.h>
- #include <linux/kern_levels.h>
--#include "../kernel/entry-header.S"
-+#include <asm/assembler.h>
-+#include <asm/asm-offsets.h>
+ crunch_load:
+ 	cfldr64		mvdx0, [r0, #CRUNCH_DSPSC]	@ load status word
+@@ -190,6 +192,11 @@ crunch_load:
+ 	cfldr64		mvdx14, [r0, #CRUNCH_MVDX14]
+ 	cfldr64		mvdx15, [r0, #CRUNCH_MVDX15]
  
- 	.macro	DBGSTR, str
- #ifdef DEBUG
++1:
++#ifdef CONFIG_PREEMPT_COUNT
++	get_thread_info r10
++#endif
++2:	dec_preempt_count r10, r3
+ 	mov	pc, lr
+ 
+ /*
