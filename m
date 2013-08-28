@@ -1,52 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 28 Aug 2013 17:28:24 -0600
-Subject: 32337ea "ASoC: warn if we will overwrite the DAI stream widgets"
-Message-ID: <521E8798.10206@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 28 Aug 2013 16:58:55 -0700
+Subject: [GIT PULL] at91: soc update for 3.12 #1
+In-Reply-To: <1377532543-349-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1377532543-349-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20130828235855.GM8607@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, if the warning in commit 32337ea "ASoC: warn if we will
-overwrite the DAI stream widgets" fires, what do I need to do to the
-ASoC driver to fix it? (I'm deliberately ignoring any other issues with
-this patch, and looking only to discover what is apparently wrong with
-my driver that's triggering this...).
+On Mon, Aug 26, 2013 at 05:55:43PM +0200, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
+> 
+> Here is AT91 SoC updates for 3.12 kernel. It is the first pull-request for
+> this topic and it is based on 3.11-rc5 like your next/soc branch.
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+> 
+>   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-soc
+> 
+> for you to fetch changes up to 99eb3b40ec42e7fce1fc58429bf9b26c17973c12:
+> 
+>   ARM: at91: at91_dt_defconfig: enable rm9200 support (2013-08-26 09:58:29 +0200)
+> 
+> ----------------------------------------------------------------
+> AT91 SoC update for 3.12 take 1
+> - enable kernel uncompress information output for
+>   SoC where it was missing: at91sam9n12 and sama5d3
+> - addition of at91rm9200 to the generic at91_dt_defconfig
+> 
+> ----------------------------------------------------------------
+> Jean-Christophe PLAGNIOL-VILLARD (1):
+>       ARM: at91: at91_dt_defconfig: enable rm9200 support
+> 
+> voice (4):
+>       ARM: at91: sama5d3: add definition for usart base address
+>       ARM: at91: include sama5d3.h into hardware.h
+>       ARM: at91: sama5: enable kernel uncompress info output
+>       ARM: at91: sam9n12: enable kernel uncompress info output
 
-Steev Klimaszewski reported this warning to me, and I've repro'd it
-running next-20130827 on a couple of Tegra systems (TrimSlice and
-Seaboard at least), using sound/soc/tegra/tegra_{trimslice,wm8903}.c,
-and associated ASoC components.
+That doesn't look right. Author should probably be "Bo Shen
+<voice.shen@atmel.com>" instead. Can you fixup and respin, please?
 
-For the record, the commit description is:
->     ASoC: warn if we will overwrite the DAI stream widgets
->     
->     The DAI stream widgets can end up being created multiple times if the
->     CPU DAI and DMA/platform components share the same struct device.  This
->     bug has been reported in various forms to the ASoC maintainer(s) several
->     times, yet they refuse to acknowledge this:
->     
->     > Essentially all the dmaengine based platforms in mainline use a shared
->     > device for DMA and DAI; I'm fairly sure someone would have mentioned if
->     > there were problems.
->     >
->     > As you have been repeatedly told the Kirkwood drivers are the first
->     > drivers submitted to mainline which use DPCM and therefore it is not
->     > surprising that there are a few issues which need to be worked through,
->     > there were a few revisions to the framework which went in as a result of
->     > review during the mainline merge.  The problem you are seeing here is
->     > due to this being the first platform with a *shared* device to use DPCM.
->     
->     This is inspite of stating multiple times that this has nothing to do
->     with DPCM what so ever.  So, having tried to convince them over the
->     last month that this is the case, and them being obstructive and/or
->     obtuse, this is the only way left open to convince them that there is
->     a problem here.
->     
->     It is only through complete frustration over their inability to recognise
->     that there could be a problem that I am putting this into linux-next;
->     this is not something I want to do, but they leave me no other choice.
->     
->     If they are correct, then this patch will have no effect what so ever.
->     If I am correct, there will be warnings produced where a CPU DAI and
->     DMA/platform component shares the same struct device.
->     
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+-Olof
