@@ -1,29 +1,46 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 28 Aug 2013 12:45:48 +0100
-Subject: [PATCH 08/19] highbank: enable big-endian
+Date: Wed, 28 Aug 2013 12:45:56 +0100
+Subject: [PATCH 16/19] ARM: net: fix arm instruction endian-ness in
+ bpf_jit_32.c
 In-Reply-To: <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
  <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377690359-25397-9-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377690359-25397-17-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apart from a xgmac driver issue, the highbank seems to work correctly in
-big-endian mode. Allow the selection of big-endian in the system.
+Use <asm/opcodes.h> to correctly transform instruction byte ordering
+into in-memory ordering.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/mach-highbank/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/net/bpf_jit_32.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
-index cd9fcb1..4f57554 100644
---- a/arch/arm/mach-highbank/Kconfig
-+++ b/arch/arm/mach-highbank/Kconfig
-@@ -18,3 +18,4 @@ config ARCH_HIGHBANK
- 	select PL320_MBOX
- 	select SPARSE_IRQ
- 	select USE_OF
-+	select ARCH_SUPPORTS_BIG_ENDIAN
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index f50d223..510d923 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -19,6 +19,7 @@
+ #include <linux/if_vlan.h>
+ #include <asm/cacheflush.h>
+ #include <asm/hwcap.h>
++#include <asm/opcodes.h>
+ 
+ #include "bpf_jit_32.h"
+ 
+@@ -113,8 +114,11 @@ static u32 jit_udiv(u32 dividend, u32 divisor)
+ 
+ static inline void _emit(int cond, u32 inst, struct jit_ctx *ctx)
+ {
++	inst |= (cond << 28);
++	inst = __opcode_to_mem_arm(inst);
++
+ 	if (ctx->target != NULL)
+-		ctx->target[ctx->idx] = inst | (cond << 28);
++		ctx->target[ctx->idx] = inst;
+ 
+ 	ctx->idx++;
+ }
 -- 
 1.7.10.4
