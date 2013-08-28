@@ -1,46 +1,47 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 28 Aug 2013 12:45:56 +0100
-Subject: [PATCH 16/19] ARM: net: fix arm instruction endian-ness in
- bpf_jit_32.c
+Date: Wed, 28 Aug 2013 12:45:55 +0100
+Subject: [PATCH 15/19] ARM: hardware: fix endian-ness in <hardware/coresight.h>
 In-Reply-To: <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
  <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377690359-25397-17-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377690359-25397-16-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use <asm/opcodes.h> to correctly transform instruction byte ordering
-into in-memory ordering.
+The <hardware/coresight.h> needs to take into account the endian-ness
+of the processor when reading and writing data, so change to using
+the readl/writel relaxed variants from the raw ones.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/net/bpf_jit_32.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/hardware/coresight.h |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index f50d223..510d923 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -19,6 +19,7 @@
- #include <linux/if_vlan.h>
- #include <asm/cacheflush.h>
- #include <asm/hwcap.h>
-+#include <asm/opcodes.h>
+diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
+index 0cf7a6b..ad774f3 100644
+--- a/arch/arm/include/asm/hardware/coresight.h
++++ b/arch/arm/include/asm/hardware/coresight.h
+@@ -24,8 +24,8 @@
+ #define TRACER_TIMEOUT 10000
  
- #include "bpf_jit_32.h"
+ #define etm_writel(t, v, x) \
+-	(__raw_writel((v), (t)->etm_regs + (x)))
+-#define etm_readl(t, x) (__raw_readl((t)->etm_regs + (x)))
++	(writel_relaxed((v), (t)->etm_regs + (x)))
++#define etm_readl(t, x) (readl_relaxed((t)->etm_regs + (x)))
  
-@@ -113,8 +114,11 @@ static u32 jit_udiv(u32 dividend, u32 divisor)
+ /* CoreSight Management Registers */
+ #define CSMR_LOCKACCESS 0xfb0
+@@ -142,8 +142,8 @@
+ #define ETBFF_TRIGFL		BIT(10)
  
- static inline void _emit(int cond, u32 inst, struct jit_ctx *ctx)
- {
-+	inst |= (cond << 28);
-+	inst = __opcode_to_mem_arm(inst);
-+
- 	if (ctx->target != NULL)
--		ctx->target[ctx->idx] = inst | (cond << 28);
-+		ctx->target[ctx->idx] = inst;
+ #define etb_writel(t, v, x) \
+-	(__raw_writel((v), (t)->etb_regs + (x)))
+-#define etb_readl(t, x) (__raw_readl((t)->etb_regs + (x)))
++	(writel_relaxed((v), (t)->etb_regs + (x)))
++#define etb_readl(t, x) (readl_relaxed((t)->etb_regs + (x)))
  
- 	ctx->idx++;
- }
+ #define etm_lock(t) do { etm_writel((t), 0, CSMR_LOCKACCESS); } while (0)
+ #define etm_unlock(t) \
 -- 
 1.7.10.4
