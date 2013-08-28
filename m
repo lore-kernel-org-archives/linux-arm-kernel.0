@@ -1,27 +1,36 @@
-From: anton@enomsg.org (Anton Vorontsov)
-Date: Tue, 27 Aug 2013 18:35:38 -0700
-Subject: [PATCH] power/reset: Make vexpress driver depend on required
- infrastructure
-In-Reply-To: <1376580952-21677-1-git-send-email-pawel.moll@arm.com>
-References: <20130815114401.GD23006@n2100.arm.linux.org.uk>
- <1376580952-21677-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20130828013538.GF10506@lizard>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 28 Aug 2013 10:40:29 +0900
+Subject: [PATCH 1/2] ARM: shmobile: marzen: Select DRM_RCAR_DU in defconfig
+In-Reply-To: <cover.1377652426.git.horms+renesas@verge.net.au>
+References: <cover.1377652426.git.horms+renesas@verge.net.au>
+Message-ID: <febedc9c9fe334dbb8810c47a178e6b7ff917d09.1377652426.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 15, 2013 at 04:35:52PM +0100, Pawel Moll wrote:
-> ARM Versatile Express reset driver requires platform-specific
-> config infrastructure to be present in the kernel. When
-> VEXPRESS_CONFIG is not selected, the build will fail like this:
-> 
-> drivers/built-in.o: In function `vexpress_reset_do.clone.0':
-> iio-trig-interrupt.c:(.text+0x1aff38): undefined reference to `__vexpress_config_func_get'
-> iio-trig-interrupt.c:(.text+0x1aff4c): undefined reference to `vexpress_config_write'
-> 
-> Added required dependency to the Kconfig entry.
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Applied, thanks!
+A R-Car DU DRM device is registered for the Marzen board, select the
+corresponding driver in its defconfig.
 
-Anton
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/marzen_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
+index 82e4040..26f30be 100644
+--- a/arch/arm/configs/marzen_defconfig
++++ b/arch/arm/configs/marzen_defconfig
+@@ -85,6 +85,8 @@ CONFIG_GPIO_RCAR=y
+ CONFIG_THERMAL=y
+ CONFIG_RCAR_THERMAL=y
+ CONFIG_SSB=y
++CONFIG_DRM=y
++CONFIG_DRM_RCAR_DU=y
+ CONFIG_USB=y
+ CONFIG_USB_RCAR_PHY=y
+ CONFIG_MMC=y
+-- 
+1.8.3.2
