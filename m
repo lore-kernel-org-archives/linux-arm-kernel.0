@@ -1,50 +1,49 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Wed, 28 Aug 2013 17:59:48 +0530
-Subject: [PATCH v2 10/13] ARM: OMAP2+: hwmod: AM43x operations
-In-Reply-To: <5214A4D5.4000700@ti.com>
-References: <cover.1375443858.git.afzal@ti.com>
- <838ab5ad788f64cef1e8859409490aa2b495d1ee.1375443858.git.afzal@ti.com>
- <5214A4D5.4000700@ti.com>
-Message-ID: <521DED3C.2040407@ti.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Wed, 28 Aug 2013 14:37:36 +0200
+Subject: [PATCH 8/9] ARM: at91/dt: add new at91rm9200ek_mmc board
+In-Reply-To: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
+References: <1377687640-10529-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1377693456-11133-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
+Add a new at91rm9200ek_mmc board (based on at91rm9200ek board) which enables
+mmc0/slot0.
 
-On Wednesday 21 August 2013 05:00 PM, Rajendra Nayak wrote:
-> On Friday 02 August 2013 07:08 PM, Afzal Mohammed wrote:
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/boot/dts/at91rm9200ek_mmc.dts |   23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91rm9200ek_mmc.dts
 
->> Reuse OMAP4 operations on AM43x.
->>
->> Signed-off-by: Ambresh K <ambresh@ti.com>
->> Signed-off-by: Afzal Mohammed <afzal@ti.com>
->> ---
->>  arch/arm/mach-omap2/omap_hwmod.c |    8 ++++++++
->>  1 file changed, 8 insertions(+)
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
->> index 7f4db12..a1b7e20 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->> @@ -4123,6 +4123,14 @@ void __init omap_hwmod_init(void)
->>  		soc_ops.init_clkdm = _init_clkdm;
->>  		soc_ops.update_context_lost = _omap4_update_context_lost;
->>  		soc_ops.get_context_lost = _omap4_get_context_lost;
->> +	} else if (soc_is_am43xx()) {
->> +		soc_ops.enable_module = _omap4_enable_module;
->> +		soc_ops.disable_module = _omap4_disable_module;
->> +		soc_ops.wait_target_ready = _omap4_wait_target_ready;
->> +		soc_ops.assert_hardreset = _omap4_assert_hardreset;
->> +		soc_ops.deassert_hardreset = _omap4_deassert_hardreset;
->> +		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
->> +		soc_ops.init_clkdm = _init_clkdm;
-> 
-> Did you leave out soc_ops.update_context_lost and soc_ops.get_context_lost on
-> purpose?
-
-As far as I understand, primarily driver make use of this with the help
-of function pointers passed through platform data. And as am43x is a DT
-only platform, it was left out.
-
-Regards
-Afzal
+diff --git a/arch/arm/boot/dts/at91rm9200ek_mmc.dts b/arch/arm/boot/dts/at91rm9200ek_mmc.dts
+new file mode 100644
+index 0000000..c87a861
+--- /dev/null
++++ b/arch/arm/boot/dts/at91rm9200ek_mmc.dts
+@@ -0,0 +1,23 @@
++/*
++ * at91rm9200ek.dts - Device Tree file for Atmel AT91RM9200 evaluation kit with
++ *                    an MMC slot
++ *
++ *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
++ *
++ * Licensed under GPLv2 only
++ */
++/dts-v1/;
++#include "at91rm9200ek.dts"
++
++/ {
++	model = "Atmel AT91RM9200 evaluation kit with MMC slot";
++	compatible = "atmel,at91rm9200ek-mmc", "atmel,at91rm9200ek", "atmel,at91rm9200";
++
++	ahb {
++		apb {
++			mmc0: mmc at fffb4000 {
++				status = "okay";
++			};
++		};
++	};
++};
+-- 
+1.7.9.5
