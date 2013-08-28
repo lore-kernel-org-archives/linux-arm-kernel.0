@@ -1,91 +1,67 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 28 Aug 2013 17:36:50 +0530
-Subject: [PATCH] ARM: DT: Exynos5250: fix number of interrupt-cells in mct
- node
-In-Reply-To: <6294395.8UjbZM2KH4@amdc1227>
-References: <1377687641-15376-1-git-send-email-chander.kashyap@linaro.org>
- <6294395.8UjbZM2KH4@amdc1227>
-Message-ID: <CANuQgHG03q5mZALdyOaQv3ndD45n4UjmsuoHE7F96WM0ueKw0g@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 28 Aug 2013 14:08:24 +0200
+Subject: [PATCH 04/14] ARM: shmobile: sh73a0: Remove ->init_machine()
+ special case
+In-Reply-To: <CANqRtoT1a7Ge2dBvNhAFK+Fpv_xC3QE_O-y6MxajwQfnbaVYHA@mail.gmail.com>
+References: <20130809094748.6530.16511.sendpatchset@w520>
+ <1580455.O5Pubhdtgp@avalon>
+ <CANqRtoT1a7Ge2dBvNhAFK+Fpv_xC3QE_O-y6MxajwQfnbaVYHA@mail.gmail.com>
+Message-ID: <1634183.WaD7XDSkzI@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 August 2013 16:48, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Chander,
->
-> On Wednesday 28 of August 2013 16:30:41 Chander Kashyap wrote:
->> Two cells were used to specify interrupts in mct node, while second cell
->> always remains unused. Hence use only one cell.
->> Suggested by Tomasz Figa.
->>
->> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->> ---
->> changes in v2:
->>       - Drop Changes for Exynos4 as done in separate patch by Tomasz
->>
->>  arch/arm/boot/dts/exynos5250.dtsi |   19 +++++++++----------
->>  1 file changed, 9 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
->> b/arch/arm/boot/dts/exynos5250.dtsi index ef57277..f2f178a 100644
->> --- a/arch/arm/boot/dts/exynos5250.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->> @@ -102,23 +102,22 @@
->>               compatible = "samsung,exynos4210-mct";
->>               reg = <0x101C0000 0x800>;
->>               interrupt-controller;
->> -             #interrups-cells = <2>;
->> +             #interrups-cells = <1>;
->
-> Those two properties above are unused and in fact incorrect, because MCT is
-> not an interrupt controller, so they could be removed in a follow-up patch.
+Hi Magnus,
 
-Thanks for the correction. I will remove them.
+On Wednesday 28 August 2013 15:40:50 Magnus Damm wrote:
+> On Fri, Aug 9, 2013 at 7:47 PM, Laurent Pinchart wrote:
+> > On Friday 09 August 2013 18:48:32 Magnus Damm wrote:
+> >> From: Magnus Damm <damm@opensource.se>
+> >> 
+> >> No need to special case sh73a0 ->init_machine(),
+> >> so get rid of undesired cpufreq platform device
+> >> from the generic long term sh73a0 DT support code.
+> >> 
+> >> For short term support on KZM9D the DT reference
+> >> implementation now adds a "cpufreq-cpu0" platform
+> >> device so that can be used for development.
+> > 
+> > Doesn't this go against the spirit of the -reference platforms that don't
+> > use DT devices in board code ? I don't see an urgent need for this, how
+> > far along are the DT cpufreq-related bindings ?
+> 
+> I'm not sure what the latest state of DT cpufreq bindings are. Actually, it
+> seems to me that the cpufreq platform device is a software policy that
+> shouldn't be described with DT. And to be honest, I can't really see how
+> this policy has anything to do with any particular SoC.
 
->
-> You can also check out the clean-up series I mentioned for other things
-> that could be cleaned up in Exynos 5 dtsi files.
+I'm no cpufreq expert, but if we need to register the device in C code, I'm 
+pretty uneasy with having that code in board files. One of the DT goals is to 
+get rid of most board files.
 
-ok
-
->
->>               interrupt-parent = <&mct_map>;
->> -             interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
->> -                          <4 0>, <5 0>;
->> +             interrupts = <0>, <1>, <2>, <3>, <4>, <5>;
->>               clocks = <&clock 1>, <&clock 335>;
->>               clock-names = "fin_pll", "mct";
->>
->>               mct_map: mct-map {
->> -                     #interrupt-cells = <2>;
->> +                     #interrupt-cells = <1>;
->>                       #address-cells = <0>;
->>                       #size-cells = <0>;
->> -                     interrupt-map = <0x0 0 &combiner 23 3>,
->> -                                     <0x1 0 &combiner 23 4>,
->> -                                     <0x2 0 &combiner 25 2>,
->> -                                     <0x3 0 &combiner 25 3>,
->> -                                     <0x4 0 &gic 0 120 0>,
->> -                                     <0x5 0 &gic 0 121 0>;
->> +                     interrupt-map = <0 &combiner 23 3>,
->> +                                     <1 &combiner 23 4>,
->> +                                     <2 &combiner 25 2>,
->> +                                     <3 &combiner 25 3>,
->> +                                     <4 &gic 0 120 0>,
->> +                                     <5 &gic 0 121 0>;
->>               };
->>       };
->
-> Otherwise, looks fine. Thanks.
-
-Thanks
-
->
-> Best regards,
-> Tomasz
->
-
-
+> Regarding MACHINE_START on mach-shmobile I'd like to have 3 levels:
+> 
+> 1) MACHINE_START in setup-xxxx.c
+> 
+> This is where we aim to be in the long term. We should be as
+> theoretically correct as ever possible here. I'd like to avoid all
+> platform devices here. Also, I'd like to avoid short term random
+> policy setting here.
+> 
+> 2) MACHINE_START in board-xxx-reference.c
+> 
+> This is where we build DT support for the board. In case we don't have
+> DT bindings for a certain device then using platform device here is
+> acceptable. Other short term workarounds are also acceptable here.
+> 
+> 3) MACHINE_START in board-xxx.c
+> 
+> This is the location of the C-based board support. Some SoC-specific
+> bits like CPU cores and interrupt controllers may be initialized via
+> DT. Otherwise platform devices are used.
+> 
+> Hope this clarifies my view!
 
 -- 
-with warm regards,
-Chander Kashyap
+Regards,
+
+Laurent Pinchart
