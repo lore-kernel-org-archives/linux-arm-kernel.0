@@ -1,105 +1,44 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 28 Aug 2013 12:45:46 +0100
-Subject: [PATCH 06/19] ARM: twd: data endian fix
+Date: Wed, 28 Aug 2013 12:45:58 +0100
+Subject: [PATCH 18/19] ARM: kdgb: use <asm/opcodes.h> for data to be assembled
+ as intruction
 In-Reply-To: <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
  <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377690359-25397-7-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377690359-25397-19-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure the twd driver uses the correct calls to access the hardware
-to ensure that we do not end up with data in the wrong endian format.
+The arch_kgdb_breakpoint() function uses an inline assembly directive
+to assemble a specific instruction using .word. This means the linker
+will not treat is as an instruction, and therefore incorrectly swap
+the endian-ness if running BE8.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/kernel/smp_twd.c |   24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/kgdb.h |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 2595620..0804013 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -45,7 +45,7 @@ static void twd_set_mode(enum clock_event_mode mode,
- 	case CLOCK_EVT_MODE_PERIODIC:
- 		ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
- 			| TWD_TIMER_CONTROL_PERIODIC;
--		__raw_writel(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
-+		writel_relaxed(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
- 			twd_base + TWD_TIMER_LOAD);
- 		break;
- 	case CLOCK_EVT_MODE_ONESHOT:
-@@ -58,18 +58,18 @@ static void twd_set_mode(enum clock_event_mode mode,
- 		ctrl = 0;
- 	}
+diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
+index 48066ce..0a9d5dd 100644
+--- a/arch/arm/include/asm/kgdb.h
++++ b/arch/arm/include/asm/kgdb.h
+@@ -11,6 +11,7 @@
+ #define __ARM_KGDB_H__
  
--	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
-+	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
+ #include <linux/ptrace.h>
++#include <asm/opcodes.h>
+ 
+ /*
+  * GDB assumes that we're a user process being debugged, so
+@@ -41,7 +42,7 @@
+ 
+ static inline void arch_kgdb_breakpoint(void)
+ {
+-	asm(".word 0xe7ffdeff");
++	asm(__inst_arm(0xe7ffdeff));
  }
  
- static int twd_set_next_event(unsigned long evt,
- 			struct clock_event_device *unused)
- {
--	unsigned long ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
-+	unsigned long ctrl = readl_relaxed(twd_base + TWD_TIMER_CONTROL);
- 
- 	ctrl |= TWD_TIMER_CONTROL_ENABLE;
- 
--	__raw_writel(evt, twd_base + TWD_TIMER_COUNTER);
--	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
-+	writel_relaxed(evt, twd_base + TWD_TIMER_COUNTER);
-+	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
- 
- 	return 0;
- }
-@@ -82,8 +82,8 @@ static int twd_set_next_event(unsigned long evt,
-  */
- static int twd_timer_ack(void)
- {
--	if (__raw_readl(twd_base + TWD_TIMER_INTSTAT)) {
--		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
-+	if (readl_relaxed(twd_base + TWD_TIMER_INTSTAT)) {
-+		writel_relaxed(1, twd_base + TWD_TIMER_INTSTAT);
- 		return 1;
- 	}
- 
-@@ -209,15 +209,15 @@ static void twd_calibrate_rate(void)
- 		waitjiffies += 5;
- 
- 				 /* enable, no interrupt or reload */
--		__raw_writel(0x1, twd_base + TWD_TIMER_CONTROL);
-+		writel_relaxed(0x1, twd_base + TWD_TIMER_CONTROL);
- 
- 				 /* maximum value */
--		__raw_writel(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
-+		writel_relaxed(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
- 
- 		while (get_jiffies_64() < waitjiffies)
- 			udelay(10);
- 
--		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
-+		count = readl_relaxed(twd_base + TWD_TIMER_COUNTER);
- 
- 		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
- 
-@@ -275,7 +275,7 @@ static int twd_timer_setup(struct clock_event_device *clk)
- 	 * bother with the below.
- 	 */
- 	if (per_cpu(percpu_setup_called, cpu)) {
--		__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
-+		writel_relaxed(0, twd_base + TWD_TIMER_CONTROL);
- 		clockevents_register_device(*__this_cpu_ptr(twd_evt));
- 		enable_percpu_irq(clk->irq, 0);
- 		return 0;
-@@ -288,7 +288,7 @@ static int twd_timer_setup(struct clock_event_device *clk)
- 	 * The following is done once per CPU the first time .setup() is
- 	 * called.
- 	 */
--	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
-+	writel_relaxed(0, twd_base + TWD_TIMER_CONTROL);
- 
- 	clk->name = "local_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+ extern void kgdb_handle_bus_error(void);
 -- 
 1.7.10.4
