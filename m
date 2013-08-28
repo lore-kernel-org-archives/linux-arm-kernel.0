@@ -1,44 +1,25 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 28 Aug 2013 12:45:45 +0100
-Subject: [PATCH 05/19] ARM: pl01x debug code endian fix
-In-Reply-To: <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
- <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377690359-25397-6-git-send-email-ben.dooks@codethink.co.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 Aug 2013 14:18:07 +0200
+Subject: [PATCH v5 3/3] pinctrl: mvebu: Convert to use
+ devm_ioremap_resource
+In-Reply-To: <1377578476-3268-4-git-send-email-jszhang@marvell.com>
+References: <1377578476-3268-1-git-send-email-jszhang@marvell.com>
+ <1377578476-3268-4-git-send-email-jszhang@marvell.com>
+Message-ID: <CACRpkdZ_RJpqm-TzuEt7_g7kaPhQJ3PZPK1kYxp3UkSZNSbX-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PL01X debug code needs to take into account which endian mode the
-processor is running in. If it is big-endian, ensure the data is swapped
-appropriately.
+On Tue, Aug 27, 2013 at 6:41 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
 
-Note, we could do this slightly more efficiently if we have an macro to
-do the necessary swap for the bits used by test.
+> The resource mapped by of_iomap() isn't unmapped in error path. This
+> patch fix the resource leakage by using devm_ioremap_resource() instead
+> of of_iomap().
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Reviewed-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
- arch/arm/include/asm/hardware/debug-pl01x.S |    2 ++
- 1 file changed, 2 insertions(+)
+Patch applied.
 
-diff --git a/arch/arm/include/asm/hardware/debug-pl01x.S b/arch/arm/include/asm/hardware/debug-pl01x.S
-index f9fd083..6489d1f 100644
---- a/arch/arm/include/asm/hardware/debug-pl01x.S
-+++ b/arch/arm/include/asm/hardware/debug-pl01x.S
-@@ -18,12 +18,14 @@
- 
- 		.macro	waituart,rd,rx
- 1001:		ldr	\rd, [\rx, #UART01x_FR]
-+ ARM_BE8(	rev	\rd, \rd )
- 		tst	\rd, #UART01x_FR_TXFF
- 		bne	1001b
- 		.endm
- 
- 		.macro	busyuart,rd,rx
- 1001:		ldr	\rd, [\rx, #UART01x_FR]
-+ ARM_BE8(	rev	\rd, \rd )
- 		tst	\rd, #UART01x_FR_BUSY
- 		bne	1001b
- 		.endm
--- 
-1.7.10.4
+Yours,
+Linus Walleij
