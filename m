@@ -1,86 +1,87 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 28 Aug 2013 10:39:30 +0900
-Subject: [PATCH 1/3] ARM: shmobile: Rename to r8a73a4_init_early()
+Date: Wed, 28 Aug 2013 10:39:31 +0900
+Subject: [PATCH 2/3] ARM: shmobile: Rename to r8a7790_init_early()
 In-Reply-To: <cover.1377651687.git.horms+renesas@verge.net.au>
 References: <cover.1377651687.git.horms+renesas@verge.net.au>
-Message-ID: <c8da0f79f931d1f94618fa42797281e6bc1d19d8.1377651687.git.horms+renesas@verge.net.au>
+Message-ID: <d5aa61c56ef4e965a9190eef3d8d8fb6eb6cadd4.1377651687.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Rename r8a73a4_init_delay() into r8a73a4_init_early()
+Rename r8a7790_init_delay() into r8a7790_init_early()
 to make the function name show that more than just
 delay setup may happen in the future.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-ape6evm-reference.c | 2 +-
- arch/arm/mach-shmobile/board-ape6evm.c           | 2 +-
- arch/arm/mach-shmobile/include/mach/r8a73a4.h    | 2 +-
- arch/arm/mach-shmobile/setup-r8a73a4.c           | 4 ++--
+ arch/arm/mach-shmobile/board-lager-reference.c | 2 +-
+ arch/arm/mach-shmobile/board-lager.c           | 2 +-
+ arch/arm/mach-shmobile/include/mach/r8a7790.h  | 2 +-
+ arch/arm/mach-shmobile/setup-r8a7790.c         | 4 ++--
  4 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-ape6evm-reference.c b/arch/arm/mach-shmobile/board-ape6evm-reference.c
-index a23fa71..3276afc 100644
---- a/arch/arm/mach-shmobile/board-ape6evm-reference.c
-+++ b/arch/arm/mach-shmobile/board-ape6evm-reference.c
-@@ -57,7 +57,7 @@ static const char *ape6evm_boards_compat_dt[] __initdata = {
+diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
+index 9c316a1..2856f51 100644
+--- a/arch/arm/mach-shmobile/board-lager-reference.c
++++ b/arch/arm/mach-shmobile/board-lager-reference.c
+@@ -38,7 +38,7 @@ static const char *lager_boards_compat_dt[] __initdata = {
  };
  
- DT_MACHINE_START(APE6EVM_DT, "ape6evm")
--	.init_early	= r8a73a4_init_delay,
-+	.init_early	= r8a73a4_init_early,
- 	.init_machine	= ape6evm_add_standard_devices,
- 	.dt_compat	= ape6evm_boards_compat_dt,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
-index 57e66eb..9f1aeb3 100644
---- a/arch/arm/mach-shmobile/board-ape6evm.c
-+++ b/arch/arm/mach-shmobile/board-ape6evm.c
-@@ -101,7 +101,7 @@ static const char *ape6evm_boards_compat_dt[] __initdata = {
+ DT_MACHINE_START(LAGER_DT, "lager")
+-	.init_early	= r8a7790_init_delay,
++	.init_early	= r8a7790_init_early,
+ 	.init_machine	= lager_add_standard_devices,
+ 	.init_time	= r8a7790_timer_init,
+ 	.dt_compat	= lager_boards_compat_dt,
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index d0da052..b56422d 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -102,7 +102,7 @@ static const char *lager_boards_compat_dt[] __initdata = {
  };
  
- DT_MACHINE_START(APE6EVM_DT, "ape6evm")
--	.init_early	= r8a73a4_init_delay,
-+	.init_early	= r8a73a4_init_early,
- 	.init_machine	= ape6evm_add_standard_devices,
- 	.dt_compat	= ape6evm_boards_compat_dt,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a73a4.h b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-index f3a9b70..5214338 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-@@ -5,6 +5,6 @@ void r8a73a4_add_standard_devices(void);
- void r8a73a4_add_dt_devices(void);
- void r8a73a4_clock_init(void);
- void r8a73a4_pinmux_init(void);
--void r8a73a4_init_delay(void);
-+void r8a73a4_init_early(void);
+ DT_MACHINE_START(LAGER_DT, "lager")
+-	.init_early	= r8a7790_init_delay,
++	.init_early	= r8a7790_init_early,
+ 	.init_time	= r8a7790_timer_init,
+ 	.init_machine	= lager_add_standard_devices,
+ 	.dt_compat	= lager_boards_compat_dt,
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+index 788d559..177a837 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+@@ -5,7 +5,7 @@ void r8a7790_add_standard_devices(void);
+ void r8a7790_add_dt_devices(void);
+ void r8a7790_clock_init(void);
+ void r8a7790_pinmux_init(void);
+-void r8a7790_init_delay(void);
++void r8a7790_init_early(void);
+ void r8a7790_timer_init(void);
  
- #endif /* __ASM_R8A73A4_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
-index 8949170..53a8962 100644
---- a/arch/arm/mach-shmobile/setup-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
-@@ -207,7 +207,7 @@ void __init r8a73a4_add_standard_devices(void)
- 	r8a73a4_register_thermal();
+ #define MD(nr) BIT(nr)
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index d0f5c9f..a42d1f6 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -267,7 +267,7 @@ void __init r8a7790_timer_init(void)
+ 	clocksource_of_init();
  }
  
--void __init r8a73a4_init_delay(void)
-+void __init r8a73a4_init_early(void)
+-void __init r8a7790_init_delay(void)
++void __init r8a7790_init_early(void)
  {
  #ifndef CONFIG_ARM_ARCH_TIMER
- 	shmobile_setup_delay(1500, 2, 4); /* Cortex-A15 @ 1500MHz */
-@@ -222,7 +222,7 @@ static const char *r8a73a4_boards_compat_dt[] __initdata = {
+ 	shmobile_setup_delay(1300, 2, 4); /* Cortex-A15 @ 1300MHz */
+@@ -282,7 +282,7 @@ static const char *r8a7790_boards_compat_dt[] __initdata = {
  };
  
- DT_MACHINE_START(R8A73A4_DT, "Generic R8A73A4 (Flattened Device Tree)")
--	.init_early	= r8a73a4_init_delay,
-+	.init_early	= r8a73a4_init_early,
- 	.dt_compat	= r8a73a4_boards_compat_dt,
+ DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
+-	.init_early	= r8a7790_init_delay,
++	.init_early	= r8a7790_init_early,
+ 	.init_time	= r8a7790_timer_init,
+ 	.dt_compat	= r8a7790_boards_compat_dt,
  MACHINE_END
- #endif /* CONFIG_USE_OF */
 -- 
 1.8.3.2
