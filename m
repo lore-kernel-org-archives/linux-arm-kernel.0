@@ -1,33 +1,81 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 28 Aug 2013 10:39:13 +0200
-Subject: [resend][PATCH v3 5/6] iio: at91: move the num_channels from DT
- to driver itself
-In-Reply-To: <1377675770-30813-1-git-send-email-josh.wu@atmel.com>
-References: <1377602932-1899-6-git-send-email-josh.wu@atmel.com>
- <1377675770-30813-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20130828083913.GN2695@lukather>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 28 Aug 2013 09:53:40 +0100
+Subject: [PATCH v4 2/4] ARM: Add atomic_io_modify optimized routines
+In-Reply-To: <1377358532-23802-3-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1377358532-23802-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377358532-23802-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130828085340.GB58219@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+On Sat, Aug 24, 2013 at 04:35:30PM +0100, Ezequiel Garcia wrote:
+> Implement arch-specific atomic_io_modify and atomic_io_modify_relaxed,
+> which are based on writel/readl_relaxed and writel_relaxed/readl_relaxed,
+> respectively.
+> In both cases, by relaxing the readl, perfomance can be improved.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/include/asm/io.h |  4 ++++
+>  arch/arm/kernel/io.c      | 29 +++++++++++++++++++++++++++++
+>  2 files changed, 33 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index d070741..53637b6 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -397,5 +397,9 @@ extern int devmem_is_allowed(unsigned long pfn);
+>  extern void register_isa_ports(unsigned int mmio, unsigned int io,
+>  			       unsigned int io_shift);
+>  
+> +#define __HAVE_ARCH_ATOMIC_IO_MODIFY
+> +extern void atomic_io_modify(void __iomem *reg, u32 mask, u32 set);
+> +extern void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set);
+> +
+>  #endif	/* __KERNEL__ */
+>  #endif	/* __ASM_ARM_IO_H */
+> diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
+> index dcd5b4d..a8c9c9b 100644
+> --- a/arch/arm/kernel/io.c
+> +++ b/arch/arm/kernel/io.c
+> @@ -1,6 +1,35 @@
+>  #include <linux/export.h>
+>  #include <linux/types.h>
+>  #include <linux/io.h>
+> +#include <linux/spinlock.h>
+> +
+> +static DEFINE_RAW_SPINLOCK(__io_lock);
+> +
+> +void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set)
+> +{
+> +	unsigned long flags;
+> +	u32 value;
+> +
+> +	raw_spin_lock_irqsave(&__io_lock, flags);
+> +	value = readl_relaxed(reg) & ~mask;
+> +	value |= (set & mask);
+> +	writel_relaxed(value, reg);
+> +	raw_spin_unlock_irqrestore(&__io_lock, flags);
+> +}
+> +EXPORT_SYMBOL(atomic_io_modify_relaxed);
+> +
+> +void atomic_io_modify(void __iomem *reg, u32 mask, u32 set)
+> +{
+> +	unsigned long flags;
+> +	u32 value;
+> +
+> +	raw_spin_lock_irqsave(&__io_lock, flags);
+> +	value = readl_relaxed(reg) & ~mask;
+> +	value |= (set & mask);
+> +	writel(value, reg);
+> +	raw_spin_unlock_irqrestore(&__io_lock, flags);
+> +}
+> +EXPORT_SYMBOL(atomic_io_modify);
 
-On Wed, Aug 28, 2013 at 03:42:50PM +0800, Josh Wu wrote:
-> CC: devicetree at vger.kernel.org
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Thanks!
-Maxime
+Is this any different from the generic one introduced in patch 1/4? I
+would rather just use the generic definition. Similarly, a generic
+atomic_io_modify_relaxed() but guarded with something like
+__HAVE_ARCH_RELAXED_IO.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130828/6e3f0f9a/attachment.sig>
+Catalin
