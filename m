@@ -1,84 +1,73 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 28 Aug 2013 17:42:26 +0100
-Subject: [PATCH 04/19] ARM: set BE8 if LE in head code
-In-Reply-To: <1377639509-22778-5-git-send-email-ben.dooks@codethink.co.uk>
+Date: Wed, 28 Aug 2013 17:44:50 +0100
+Subject: [PATCH 11/19] ARM: alignment: correctly decode instructions in
+ BE8 mode.
+In-Reply-To: <1377639509-22778-12-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
- <1377639509-22778-5-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20130828164226.GC3842@localhost.localdomain>
+ <1377639509-22778-12-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20130828164450.GD3842@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 10:38:14PM +0100, Ben Dooks wrote:
-> If we are booting in LE and compiled for BE8, then add code to
-> set the state to bE8. Since the instruction stream is always LE,
-> we do not need to do anything special to the instruction.
+On Tue, Aug 27, 2013 at 10:38:21PM +0100, Ben Dooks wrote:
+> If we are in BE8 mode, we must deal with the instruction stream being
+> in LE order when data is being loaded in BE order. Ensure the data is
+> swapped before processing to avoid thre following:
 > 
-> Also ensure that the secondary processors are started in the same mode.
+> Change to using <asm/opcodes.h> to provide the necessary conversion
+> functions to change the byte ordering.
 > 
-> Note, we do add about 20 bytes to the kernel image, but it seems easier
-> to do this than adding another configuration to change.
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> Alignment trap: not handling instruction 030091e8 at [<80333e8c>]
+> Unhandled fault: alignment exception (0x001) at 0xbfa09567
 
 Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 
-(Lose the merge conflicts lines, though)
-
 > 
-> Conflicts:
-> 	arch/arm/kernel/sleep.S
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 > ---
->  arch/arm/boot/compressed/head.S |    1 +
->  arch/arm/kernel/head.S          |    4 ++++
->  arch/arm/kernel/sleep.S         |    1 +
->  3 files changed, 6 insertions(+)
+>  arch/arm/mm/alignment.c |    9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index c912c2a..066b034 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -135,6 +135,7 @@ start:
->  		.word	_edata			@ zImage end address
->   THUMB(		.thumb			)
->  1:
-> + ARM_BE8(	setend	be )			@ go BE8 if compiled for BE8
->  		mrs	r9, cpsr
->  #ifdef CONFIG_ARM_VIRT_EXT
->  		bl	__hyp_stub_install	@ get into SVC mode, reversibly
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 9e5906c..a047acf 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -77,6 +77,7 @@
+> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+> index 6f4585b..9240364 100644
+> --- a/arch/arm/mm/alignment.c
+> +++ b/arch/arm/mm/alignment.c
+> @@ -25,6 +25,7 @@
+>  #include <asm/cp15.h>
+>  #include <asm/system_info.h>
+>  #include <asm/unaligned.h>
+> +#include <asm/opcodes.h>
 >  
->  	__HEAD
->  ENTRY(stext)
-> + ARM_BE8(setend	be )			@ ensure we are in BE8 mode
+>  #include "fault.h"
 >  
->   THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
->   THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-> @@ -352,6 +353,9 @@ ENTRY(secondary_startup)
->  	 * the processor type - there is no need to check the machine type
->  	 * as it has already been validated by the primary processor.
->  	 */
-> +
-> + ARM_BE8(setend	be)				@ ensure we are in BE8 mode
-> +
->  #ifdef CONFIG_ARM_VIRT_EXT
->  	bl	__hyp_stub_install_secondary
->  #endif
-> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-> index db1536b..716343c 100644
-> --- a/arch/arm/kernel/sleep.S
-> +++ b/arch/arm/kernel/sleep.S
-> @@ -130,6 +130,7 @@ ENDPROC(cpu_resume_after_mmu)
->  	.data
->  	.align
->  ENTRY(cpu_resume)
-> +ARM_BE8(setend be)			@ ensure we are in BE mode
->  	mov	r1, #0
->  	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
->  	ALT_UP_B(1f)
+> @@ -762,21 +763,25 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  	if (thumb_mode(regs)) {
+>  		u16 *ptr = (u16 *)(instrptr & ~1);
+>  		fault = probe_kernel_address(ptr, tinstr);
+> +		tinstr = __mem_to_opcode_thumb16(tinstr);
+>  		if (!fault) {
+>  			if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
+>  			    IS_T32(tinstr)) {
+>  				/* Thumb-2 32-bit */
+>  				u16 tinst2 = 0;
+>  				fault = probe_kernel_address(ptr + 1, tinst2);
+> -				instr = (tinstr << 16) | tinst2;
+> +				tinst2 = __mem_to_opcode_thumb16(tinst2);
+> +				instr = __opcode_thumb32_compose(tinstr, tinst2);
+>  				thumb2_32b = 1;
+>  			} else {
+>  				isize = 2;
+>  				instr = thumb2arm(tinstr);
+>  			}
+>  		}
+> -	} else
+> +	} else {
+>  		fault = probe_kernel_address(instrptr, instr);
+> +		instr = __mem_to_opcode_arm(instr);
+> +	}
+>  
+>  	if (fault) {
+>  		type = TYPE_FAULT;
 > -- 
 > 1.7.10.4
 > 
