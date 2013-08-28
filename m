@@ -1,380 +1,97 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 27 Aug 2013 19:12:11 -0700
-Subject: [PATCH v7 08/11] ARM: hi3xxx: add smp support
-In-Reply-To: <1376965873-14431-9-git-send-email-haojian.zhuang@linaro.org>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 28 Aug 2013 10:17:14 +0800
+Subject: [PATCH v7 05/11] ARM: dts: enable hi4511 with device tree
+In-Reply-To: <521B86D9.5060108@wwwdotorg.org>
 References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
- <1376965873-14431-9-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20130828021211.GF22852@quad.lixom.net>
+ <1376965873-14431-6-git-send-email-haojian.zhuang@linaro.org>
+ <8761uxsiox.fsf@linaro.org> <52165D5E.7040500@wwwdotorg.org>
+ <CAD6h2NTYNSFAQ0NWVwKXEr7BHUikmjROk-i+qYGo0otFPZKu0A@mail.gmail.com>
+ <521B86D9.5060108@wwwdotorg.org>
+Message-ID: <CAD6h2NSdk0fs-Z=Es9bOkwUEaubDTmAjv3hLDkrS3m1yshrbtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 27 August 2013 00:48, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/23/2013 09:52 PM, Haojian Zhuang wrote:
+>> On 23 August 2013 02:50, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> On 08/22/2013 12:07 PM, Kevin Hilman wrote:
+>>>> [+ DT maintainers]
+>>>>
+>>>> Haojian Zhuang <haojian.zhuang@linaro.org> writes:
+>>>>
+>>>>> Enable Hisilicon Hi4511 development platform with device tree support.
+>>>>>
+>>>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>>> ...
+>
+>>>>> +    osc32k: osc32k {
+>>>>> +            compatible = "fixed-clock";
+>>>>> +            #clock-cells = <0>;
+>>>>> +            clock-frequency = <32768>;
+>>>>> +            clock-output-names = "osc32khz";
+>>>>> +    };
+>>>>
+>>>> ...seems many of the recent users of clocks have grouped them into a
+>>>> clocks {} grouping on a "simple-bus".
+>>>>
+>>>> DT folks: is there a rule of thumb on how whether these fixed clocks
+>>>> should be grouped on a simple bus?
+>>>
+>>> I would expect all the clock node names to be just "clock", since the
+>>> node names should describe the type of device not their identity (i.e.
+>>> clock name).
+>>>
+>>> In turn, this means that each clock node name needs to use a unit
+>>> address ("@nnn") to make them unique. In turn, this means they must have
+>>> a reg property since the unit address must match the first entry in the
+>>> reg property.
+>>
+>> No, it's really bad on using a unit address. The register always contains
+>> multiple mux or gate or divider. It would cause duplicated unit address.
+>
+> There shouldn't be multiple nodes with identical reg values; if that's
+> happening, then it seems like the mapping of nodes to HW is incorrect.
+>
+> Each HW block should have 1 DT node. That way, the reg values won't collide.
+>
 
-Some comments below.
+At here, I emphasize each clock node is one clock node. They are organized in
+tree. The same register integrates multiple clock gate/clock mux/clock divider.
+If each clock node is depend on reg, maybe it's not easy to read and the clock
+driver will be more complex.
 
-On Tue, Aug 20, 2013 at 10:31:10AM +0800, Haojian Zhuang wrote:
-> From: Zhangfei Gao <zhangfei.gao@linaro.org>
-> 
-> Enable SMP support on hi3xxx platform
-> 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Tested-by: Zhang Mingjun <zhang.mingjun@linaro.org>
-> Tested-by: Li Xin <li.xin@linaro.org>
-> ---
->  .../bindings/arm/hisilicon/hisilicon.txt           | 47 ++++++++++++++++
->  arch/arm/boot/dts/hi3620.dtsi                      | 28 +++++++++-
->  arch/arm/boot/dts/hi4511.dts                       |  2 +-
->  arch/arm/mach-hi3xxx/Kconfig                       |  2 +
->  arch/arm/mach-hi3xxx/Makefile                      |  3 +-
->  arch/arm/mach-hi3xxx/core.h                        | 14 +++++
->  arch/arm/mach-hi3xxx/hi3xxx.c                      |  5 ++
->  arch/arm/mach-hi3xxx/platsmp.c                     | 43 ++++++++++++++
->  arch/arm/mach-hi3xxx/system.c                      | 65 ++++++++++++++++++++++
->  9 files changed, 206 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/mach-hi3xxx/core.h
->  create mode 100644 arch/arm/mach-hi3xxx/platsmp.c
->  create mode 100644 arch/arm/mach-hi3xxx/system.c
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> index 3be60c8..4cc5c57 100644
-> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> @@ -8,3 +8,50 @@ Required root node properties:
->  Hi4511 Board
->  Required root node properties:
->  	- compatible = "hisilicon,hi3620-hi4511";
-> +
-> +
-> +Hisilicon sctrl resiter
+>> I tried to use index number also. And it's also bad to append new clock nodes.
+>> So I use the label name instead.
+>>
+>>> Now I assume these clocks don't have any memory-mapped IO registers, so
+>>> they would need an arbitrary reg value rather than a real one. So it
+>>> doesn't make sense to place them directly under the root DT node, since
+>>> their reg values would make no sense within the context of the
+>>> CPU-visible MMIO space that the root node describes.
+>>>
+>>> In this case, it's typical to put all the clock nodes into e.g. a
+>>> /clocks node, since that node can introduce a separate numbering-space
+>>> for clocks. For example, I'd expect something like:
+>>>
+>>>         clocks {
+>>>                 #address-cells = <1>;
+>>>                 #size-cells = <0>;
+>>>
+>>>                 osc32k: clock at 0 {
+>>>                         compatible = "fixed-clock";
+>>>                         reg = <0>;
+> ...
+>>>                 osc26m: clock at 1 {
+>>>                         compatible = "fixed-clock";
+>>>                         reg = <1>;
+> ...
+>
+>> Those fixed-clock doesn't contain reg property. Since it needs not to access
+>> any clock register. It only provides the clock rate those child clock node.
+>
+> Inside the clocks node, the reg property is just a dummy value.
 
-Resiter seems like odd naming here.
+Is a dummy value helpful? I don't think so.
 
-> +
-> +Required properties:
-> +- compatible : "hisilicon,sctrl"
-> +- reg : Address and size of sysctrl.
-
-sysctrl or sctrl? sysctrl isn't really too long, might as well use that.
-
-> +
-> +Optional properties:
-> +- smp_reg : offset in sysctrl for notifying slave cpu booting
-> +		cpu 1, reg;
-> +		cpu 2, reg + 0x4;
-> +		cpu 3, reg + 0x8;
-> +		If reg value is not zero, cpun exit wfi and go
-> +- resume_reg : offset in sysctrl for notifying cpu0 when resume
-> +- reset_reg : offset in sysctrl for system reset
-
-Underscores are usually not used in properties, you use dashes instead.
-
-Anyway, I suggest defining those as the different cells in a regular 'reg'
-property instead.
-
-> +
-> +Example:
-> +	hi3716:
-> +	sctrl at f8000000 {
-
-Labels are usually not done on a separate line before.
-
-Common node names would be more clear-text than this. Maybe "system-controller"
-in this case.
-
-
-> +		compatible = "hisilicon,sctrl";
-> +		reg = <0xf8000000 0x1000>;
-> +		smp_reg = <0xc0>;
-> +		reboot_reg = <0x4>;
-> +	};
-> +
-> +	hi3620:
-> +	sctrl at fc802000 {
-> +		compatible = "hisilicon,sctrl";
-> +		reg = <0xfc802000 0x1000>;
-> +		smp_reg = <0x31c>;
-> +		resume_reg = <0x308>;
-> +		reboot_reg = <0x4>;
-> +	};
-> +
-> +Hi3716 cpuctrl register
-> +Required properties:
-> +- compatible : "hisilicon,cpuctrl"
-> +- reg : Address and size of cpuctrl.
-> +
-> +Hi3716 specific cpuctrl register, control hotplug info etc.
-
-Controlling hotplug _info_? Seems like odd wording here.
-
-> +Example:
-> +	hi3716:
-> +	cpuctrl at f8a22000 {
-> +		compatible = "hisilicon,cpuctrl";
-> +		reg = <0xf8a22000 0x2000>;
-> +	};
-> diff --git a/arch/arm/boot/dts/hi3620.dtsi b/arch/arm/boot/dts/hi3620.dtsi
-> index 39fa37f..ee81192 100644
-> --- a/arch/arm/boot/dts/hi3620.dtsi
-> +++ b/arch/arm/boot/dts/hi3620.dtsi
-> @@ -32,6 +32,24 @@
->  			reg = <0x0>;
->  			next-level-cache = <&L2>;
->  		};
-> +		cpu1: cpu at 1 {
-
-Do you need labels here? I don't think these are referred to as phandles
-anywhere?
-
-> +			compatible = "arm,cortex-a9";
-> +			device_type = "cpu";
-> +			reg = <1>;
-> +			next-level-cache = <&L2>;
-> +		};
-> +		cpu2: cpu at 2 {
-> +			compatible = "arm,cortex-a9";
-> +			device_type = "cpu";
-> +			reg = <2>;
-> +			next-level-cache = <&L2>;
-> +		};
-> +		cpu3: cpu at 3 {
-> +			compatible = "arm,cortex-a9";
-> +			device_type = "cpu";
-> +			reg = <3>;
-> +			next-level-cache = <&L2>;
-> +		};
->  	};
->  
->  	osc32k: osc32k {
-> @@ -130,7 +148,9 @@
->  			reg = <0xfc802000 0x1000>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> -
-> +			smp_reg = <0x31c>;
-> +			resume_reg = <0x308>;
-> +			reboot_reg = <0x4>;
->  
->  			timer0_mux: timer0_mux {
->  				compatible = "hisilicon,clk-mux";
-> @@ -1242,6 +1262,12 @@
->  			status = "disabled";
->  		};
->  
-> +		timer5: timer at fc000600 {
-> +			compatible = "arm,cortex-a9-twd-timer";
-> +			reg = <0xfc000600 0x20>;
-> +			interrupts = <1 13 0xf01>;
-> +		};
-> +
->  		uart0: uart at fcb00000 {
->  			compatible = "arm,pl011", "arm,primecell";
->  			reg = <0xfcb00000 0x1000>;
-> diff --git a/arch/arm/boot/dts/hi4511.dts b/arch/arm/boot/dts/hi4511.dts
-> index 7e67564..c9fd329 100644
-> --- a/arch/arm/boot/dts/hi4511.dts
-> +++ b/arch/arm/boot/dts/hi4511.dts
-> @@ -15,7 +15,7 @@
->  	compatible = "hisilicon,hi3620-hi4511";
->  
->  	chosen {
-> -		bootargs = "console=ttyAMA0,115200 root=/dev/ram0 earlyprintk";
-> +		bootargs = "console=ttyAMA0,115200 root=/dev/ram0 nr_cpus=4 earlyprintk";
-
-nr_cpus should not be needed on the command line.
-
->  	};
->  
->  	memory {
-> diff --git a/arch/arm/mach-hi3xxx/Kconfig b/arch/arm/mach-hi3xxx/Kconfig
-> index 68bd26c..d2e7d57 100644
-> --- a/arch/arm/mach-hi3xxx/Kconfig
-> +++ b/arch/arm/mach-hi3xxx/Kconfig
-> @@ -6,6 +6,8 @@ config ARCH_HI3xxx
->  	select CACHE_L2X0
->  	select CLKSRC_OF
->  	select GENERIC_CLOCKEVENTS
-> +	select HAVE_ARM_SCU
-> +	select HAVE_SMP
->  	select PINCTRL
->  	select PINCTRL_SINGLE
->  	help
-> diff --git a/arch/arm/mach-hi3xxx/Makefile b/arch/arm/mach-hi3xxx/Makefile
-> index d68ebb3..0917f1c 100644
-> --- a/arch/arm/mach-hi3xxx/Makefile
-> +++ b/arch/arm/mach-hi3xxx/Makefile
-> @@ -2,4 +2,5 @@
->  # Makefile for Hisilicon Hi36xx/Hi37xx processors line
->  #
->  
-> -obj-y	+= hi3xxx.o
-> +obj-y	+= hi3xxx.o system.o
-> +obj-$(CONFIG_SMP)		+= platsmp.o
-> diff --git a/arch/arm/mach-hi3xxx/core.h b/arch/arm/mach-hi3xxx/core.h
-> new file mode 100644
-> index 0000000..2cfd643
-> --- /dev/null
-> +++ b/arch/arm/mach-hi3xxx/core.h
-> @@ -0,0 +1,14 @@
-> +#ifndef __HISILICON_CORE_H
-> +#define __HISILICON_CORE_H
-> +
-> +#include <linux/init.h>
-
-I don't think you need linux/init.h here?
-
-> +#include <linux/reboot.h>
-> +
-> +extern void hs_set_cpu_jump(int cpu, void *jump_addr);
-> +extern int hs_get_cpu_jump(int cpu);
-> +extern void secondary_startup(void);
-> +extern void hs_map_io(void);
-> +extern void hs_restart(enum reboot_mode, const char *cmd);
-> +extern struct smp_operations hs_smp_ops;
-> +
-> +#endif
-> diff --git a/arch/arm/mach-hi3xxx/hi3xxx.c b/arch/arm/mach-hi3xxx/hi3xxx.c
-> index e7c54bc..567a0d5 100644
-> --- a/arch/arm/mach-hi3xxx/hi3xxx.c
-> +++ b/arch/arm/mach-hi3xxx/hi3xxx.c
-> @@ -19,8 +19,11 @@
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
->  
-> +#include "core.h"
-> +
->  static void __init hi3xxx_timer_init(void)
->  {
-> +	hs_map_io();
->  	of_clk_init(NULL);
->  	clocksource_of_init();
->  }
-> @@ -33,4 +36,6 @@ static const char *hs_compat[] __initdata = {
->  DT_MACHINE_START(HI3xxx, "Hisilicon Hi36xx/Hi37xx (Flattened Device Tree)")
->  	.init_time	= hi3xxx_timer_init,
->  	.dt_compat	= hs_compat,
-> +	.smp		= smp_ops(hs_smp_ops),
-> +	.restart	= hs_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-hi3xxx/platsmp.c b/arch/arm/mach-hi3xxx/platsmp.c
-> new file mode 100644
-> index 0000000..a76a3cc
-> --- /dev/null
-> +++ b/arch/arm/mach-hi3xxx/platsmp.c
-> @@ -0,0 +1,43 @@
-> +/*
-> + * Copyright (c) 2013 Linaro Ltd.
-> + * Copyright (c) 2013 Hisilicon Limited.
-> + * Based on platsmp.c, Copyright (C) 2002 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + */
-> +#include <linux/smp.h>
-> +#include <linux/io.h>
-> +#include <asm/smp_scu.h>
-> +
-> +#include "core.h"
-> +
-> +static void __init hs_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +	unsigned long base;
-> +	void __iomem *scu_base;
-> +
-> +	if (scu_a9_has_base()) {
-> +		base = scu_a9_get_base();
-> +		scu_base = ioremap(base, SZ_4K);
-> +		if (!scu_base) {
-> +			pr_err("ioremap(scu_base) failed\n");
-> +			return;
-> +		}
-> +		scu_enable(scu_base);
-> +		iounmap(scu_base);
-> +	}
-> +}
-> +
-> +static int hs_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> +	hs_set_cpu_jump(cpu, secondary_startup);
-> +	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-> +	return 0;
-> +}
-> +
-> +struct smp_operations hs_smp_ops __initdata = {
-> +	.smp_prepare_cpus	= hs_smp_prepare_cpus,
-> +	.smp_boot_secondary	= hs_boot_secondary,
-> +};
-> diff --git a/arch/arm/mach-hi3xxx/system.c b/arch/arm/mach-hi3xxx/system.c
-> new file mode 100644
-> index 0000000..51bb247
-> --- /dev/null
-> +++ b/arch/arm/mach-hi3xxx/system.c
-> @@ -0,0 +1,65 @@
-> +/*
-> + * Copyright (c) 2013 Linaro Ltd.
-> + * Copyright (c) 2013 Hisilicon Limited.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + */
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_platform.h>
-> +
-> +#include <asm/proc-fns.h>
-> +#include <asm/smp_plat.h>
-> +
-> +#include "core.h"
-> +
-> +static void __iomem *hs_sctrl_base;
-> +static int hs_smp_reg;
-> +static int hs_resume_reg;
-> +static int hs_reboot_reg;
-> +
-> +void hs_map_io(void)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "hisilicon,sctrl");
-> +	if (np) {
-> +		hs_sctrl_base = of_iomap(np, 0);
-> +		if (!hs_sctrl_base)
-> +			pr_err("of_iomap(sctrl_base) failed\n");
-> +		of_property_read_u32(np, "smp_reg", &hs_smp_reg);
-> +		of_property_read_u32(np, "resume_reg", &hs_resume_reg);
-> +		of_property_read_u32(np, "reboot_reg", &hs_reboot_reg);
-> +	}
-> +}
-> +
-> +void hs_set_cpu_jump(int cpu, void *jump_addr)
-> +{
-> +	int offset = hs_smp_reg;
-> +
-> +	cpu = cpu_logical_map(cpu);
-> +	if (cpu > 0)
-> +		offset +=  0x04 * (cpu - 1);
-> +	writel_relaxed(virt_to_phys(jump_addr), hs_sctrl_base + offset);
-> +}
-> +
-> +int hs_get_cpu_jump(int cpu)
-> +{
-> +	int offset = hs_smp_reg;
-> +
-> +	cpu = cpu_logical_map(cpu);
-> +	if (cpu > 0)
-> +		offset +=  0x04 * (cpu - 1);
-> +	return readl_relaxed(hs_sctrl_base + offset);
-> +}
-> +
-> +void hs_restart(enum reboot_mode mode, const char *cmd)
-> +{
-> +	writel_relaxed(0xdeadbeef, hs_sctrl_base + hs_reboot_reg);
-> +
-> +	while (1)
-> +		cpu_do_idle();
-> +}
-> +
-> -- 
-> 1.8.1.2
-> 
+Regards
+Haojian
