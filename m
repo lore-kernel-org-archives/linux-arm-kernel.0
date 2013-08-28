@@ -1,52 +1,57 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 28 Aug 2013 09:16:48 -0700
-Subject: [PATCH v4 1/4] lib: Introduce atomic MMIO modify
-In-Reply-To: <20130828103732.GB2348@localhost>
-References: <1377358532-23802-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377358532-23802-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130828103732.GB2348@localhost>
-Message-ID: <CA+55aFzbSKH+N2Yt2zoth6tmbTp6GpxHP8KuT7jzgQD58T6yHQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 28 Aug 2013 11:19:54 -0500
+Subject: [PATCH] ARM: xen: only set pm function ptrs for Xen guests
+Message-ID: <1377706794-8481-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 3:37 AM, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> Linus,
->
-> Andrew suggested you might have opinions on this, so I'm cc'ing you.
-> Since you'll probably want some better context, here it is:
->
-> http://lwn.net/Articles/564709/
->
-> On Sat, Aug 24, 2013 at 12:35:29PM -0300, Ezequiel Garcia wrote:
->> Some platforms have MMIO regions that are shared across orthogonal
->> subsystems. This commit implements a possible solution for the
->> thread-safe access of such regions through a spinlock-protected API.
->>
->> Concurrent access is protected with a single spinlock for the
->> entire MMIO address space. While this protects shared-registers,
->> it also serializes access to unrelated/unshared registers.
+From: Rob Herring <rob.herring@calxeda.com>
 
-I have nothing against this, except that
-"__HAVE_ARCH_ATOMIC_IO_MODIFY" needs to die, along with the #ifdef.
+xen_pm_init was unconditionally setting pm_power_off and arm_pm_restart
+function pointers. This breaks multi-platform kernels. Move this
+initialization into xen_guest_init, so it is conditional on running as a
+Xen guest.
 
-It should be a CONFIG_xyz option that gets set by the architectures
-that have it, and then instead of an #ifdef in code, the Makefile
-should make the generic target be conditional.
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+This breaks reset and poweroff for Midway when Xen is enabled. This 
+should go into 3.11 or stable.
 
-So add a generic
+Rob
 
-    bool GENERIC_ATOMIC_MMIO_MODIFY
-        depends on !ARCH_ATOMIC_MMIO_MODIFY
-        default y
+ arch/arm/xen/enlighten.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-to the lib/Kconfig file, and then lib/Makefile just does
-
-    obj-$(CONFIG_GENERIC_ATOMIC_MMIO_MODIFY) += atomic_io.o
-
-After that, ARM can then implement some architecture-optimized
-version, and in its own Kconfig file just do "select
-ARCH_ATOMIC_MMIO_MODIFY" to let the generic code know that it should
-disable that generic version.
-
-                 Linus
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 8a6295c..fa86452 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -263,6 +263,9 @@ static int __init xen_guest_init(void)
+ 	if (xen_vcpu_info == NULL)
+ 		return -ENOMEM;
+ 
++	pm_power_off = xen_power_off;
++	arm_pm_restart = xen_restart;
++
+ 	gnttab_init();
+ 	if (!xen_initial_domain())
+ 		xenbus_probe(NULL);
+@@ -271,15 +274,6 @@ static int __init xen_guest_init(void)
+ }
+ core_initcall(xen_guest_init);
+ 
+-static int __init xen_pm_init(void)
+-{
+-	pm_power_off = xen_power_off;
+-	arm_pm_restart = xen_restart;
+-
+-	return 0;
+-}
+-subsys_initcall(xen_pm_init);
+-
+ static irqreturn_t xen_arm_callback(int irq, void *arg)
+ {
+ 	xen_hvm_evtchn_do_upcall();
+-- 
+1.8.1.2
