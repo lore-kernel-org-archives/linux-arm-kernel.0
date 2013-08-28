@@ -1,139 +1,58 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 27 Aug 2013 23:33:36 -0300
-Subject: [PATCH 1/2] ARM: dts: imx6q-sabrelite: Put the nodes in alphabetical
- order
-Message-ID: <1377657217-6701-1-git-send-email-festevam@gmail.com>
+Date: Tue, 27 Aug 2013 23:33:37 -0300
+Subject: [PATCH 2/2] ARM: dts: imx6q-sabrelite: Add LVDS support
+In-Reply-To: <1377657217-6701-1-git-send-email-festevam@gmail.com>
+References: <1377657217-6701-1-git-send-email-festevam@gmail.com>
+Message-ID: <1377657217-6701-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Put the nodes in alphabetical order so that further node additions can be better
-organized.
+imx6q-sabrelite board can be connected to a 1024x768 Hannstar LVDS panel.
+
+Add support for it.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx6q-sabrelite.dts | 78 +++++++++++++++++------------------
- 1 file changed, 39 insertions(+), 39 deletions(-)
+ arch/arm/boot/dts/imx6q-sabrelite.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 3530280..b96a72e 100644
+index b96a72e..e1c1777 100644
 --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
 +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -65,8 +65,10 @@
+@@ -128,6 +128,31 @@
  	};
  };
  
--&sata {
-+&audmux {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux_1>;
- };
- 
- &ecspi1 {
-@@ -83,11 +85,29 @@
- 	};
- };
- 
--&ssi1 {
--	fsl,mode = "i2s-slave";
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet_1>;
-+	phy-mode = "rgmii";
-+	phy-reset-gpios = <&gpio3 23 0>;
- 	status = "okay";
- };
- 
-+&i2c1 {
++&ldb {
 +	status = "okay";
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1_1>;
 +
-+	codec: sgtl5000 at 0a {
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		clocks = <&clks 201>;
-+		VDDA-supply = <&reg_2p5v>;
-+		VDDIO-supply = <&reg_3p3v>;
++	lvds-channel at 0 {
++		fsl,data-mapping = "spwg";
++		fsl,data-width = <18>;
++		status = "okay";
++
++		display-timings {
++			native-mode = <&timing0>;
++			timing0: hsd100pxn1 {
++				clock-frequency = <65000000>;
++				hactive = <1024>;
++				vactive = <768>;
++				hback-porch = <220>;
++				hfront-porch = <40>;
++				vback-porch = <21>;
++				vfront-porch = <7>;
++				hsync-len = <60>;
++				vsync-len = <10>;
++			};
++		};
 +	};
 +};
 +
- &iomuxc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hog>;
-@@ -108,23 +128,30 @@
- 	};
- };
- 
--&usbotg {
--	vbus-supply = <&reg_usb_otg_vbus>;
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_usbotg_1>;
--	disable-over-current;
-+&sata {
-+	status = "okay";
-+};
-+
-+&ssi1 {
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
-+
-+&uart2 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2_1>;
- };
- 
- &usbh1 {
+ &sata {
  	status = "okay";
  };
- 
--&fec {
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_enet_1>;
--	phy-mode = "rgmii";
--	phy-reset-gpios = <&gpio3 23 0>;
-+	pinctrl-0 = <&pinctrl_usbotg_1>;
-+	disable-over-current;
- 	status = "okay";
- };
- 
-@@ -145,30 +172,3 @@
- 	vmmc-supply = <&reg_3p3v>;
- 	status = "okay";
- };
--
--&audmux {
--	status = "okay";
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_audmux_1>;
--};
--
--&uart2 {
--	status = "okay";
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_uart2_1>;
--};
--
--&i2c1 {
--	status = "okay";
--	clock-frequency = <100000>;
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_i2c1_1>;
--
--	codec: sgtl5000 at 0a {
--		compatible = "fsl,sgtl5000";
--		reg = <0x0a>;
--		clocks = <&clks 201>;
--		VDDA-supply = <&reg_2p5v>;
--		VDDIO-supply = <&reg_3p3v>;
--	};
--};
 -- 
 1.8.1.2
