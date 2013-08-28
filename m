@@ -1,96 +1,213 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 28 Aug 2013 06:49:08 -0300
-Subject: [PATCH v4 2/4] ARM: Add atomic_io_modify optimized routines
-In-Reply-To: <20130828085340.GB58219@MacBook-Pro.local>
-References: <1377358532-23802-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377358532-23802-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130828085340.GB58219@MacBook-Pro.local>
-Message-ID: <20130828094907.GB2343@localhost>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Wed, 28 Aug 2013 15:20:40 +0530
+Subject: [PATCH] ARM: DT: Exynos: fix number of interrupt-cells in mct node
+In-Reply-To: <52112004.90202@samsung.com>
+References: <1371220886-11616-1-git-send-email-chander.kashyap@linaro.org>
+ <CANuQgHH+nebJf4HPrsWPLECyvWO8OGJj=YeDG4GQAmLHM8GrPw@mail.gmail.com>
+ <CANuQgHEq3QA_zE1axnXqCdv8RLXHTfv3wVn59gHSk3jEPtLiXQ@mail.gmail.com>
+ <52112004.90202@samsung.com>
+Message-ID: <CANuQgHFP2n33neHbW90JZbPmcPkZ-X=NDwXDqQw1sfQUUT_zNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 09:53:40AM +0100, Catalin Marinas wrote:
-> On Sat, Aug 24, 2013 at 04:35:30PM +0100, Ezequiel Garcia wrote:
-> > Implement arch-specific atomic_io_modify and atomic_io_modify_relaxed,
-> > which are based on writel/readl_relaxed and writel_relaxed/readl_relaxed,
-> > respectively.
-> > In both cases, by relaxing the readl, perfomance can be improved.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  arch/arm/include/asm/io.h |  4 ++++
-> >  arch/arm/kernel/io.c      | 29 +++++++++++++++++++++++++++++
-> >  2 files changed, 33 insertions(+)
-> > 
-> > diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> > index d070741..53637b6 100644
-> > --- a/arch/arm/include/asm/io.h
-> > +++ b/arch/arm/include/asm/io.h
-> > @@ -397,5 +397,9 @@ extern int devmem_is_allowed(unsigned long pfn);
-> >  extern void register_isa_ports(unsigned int mmio, unsigned int io,
-> >  			       unsigned int io_shift);
-> >  
-> > +#define __HAVE_ARCH_ATOMIC_IO_MODIFY
-> > +extern void atomic_io_modify(void __iomem *reg, u32 mask, u32 set);
-> > +extern void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set);
-> > +
-> >  #endif	/* __KERNEL__ */
-> >  #endif	/* __ASM_ARM_IO_H */
-> > diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
-> > index dcd5b4d..a8c9c9b 100644
-> > --- a/arch/arm/kernel/io.c
-> > +++ b/arch/arm/kernel/io.c
-> > @@ -1,6 +1,35 @@
-> >  #include <linux/export.h>
-> >  #include <linux/types.h>
-> >  #include <linux/io.h>
-> > +#include <linux/spinlock.h>
-> > +
-> > +static DEFINE_RAW_SPINLOCK(__io_lock);
-> > +
-> > +void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set)
-> > +{
-> > +	unsigned long flags;
-> > +	u32 value;
-> > +
-> > +	raw_spin_lock_irqsave(&__io_lock, flags);
-> > +	value = readl_relaxed(reg) & ~mask;
-> > +	value |= (set & mask);
-> > +	writel_relaxed(value, reg);
-> > +	raw_spin_unlock_irqrestore(&__io_lock, flags);
-> > +}
-> > +EXPORT_SYMBOL(atomic_io_modify_relaxed);
-> > +
-> > +void atomic_io_modify(void __iomem *reg, u32 mask, u32 set)
-> > +{
-> > +	unsigned long flags;
-> > +	u32 value;
-> > +
-> > +	raw_spin_lock_irqsave(&__io_lock, flags);
-> > +	value = readl_relaxed(reg) & ~mask;
-> > +	value |= (set & mask);
-> > +	writel(value, reg);
-> > +	raw_spin_unlock_irqrestore(&__io_lock, flags);
-> > +}
-> > +EXPORT_SYMBOL(atomic_io_modify);
-> 
-> Is this any different from the generic one introduced in patch 1/4? I
-> would rather just use the generic definition.
+On 19 August 2013 00:57, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 08/12/13 15:23, Chander Kashyap wrote:
+>>
+>> ping
+>>
+>> On 23 July 2013 15:17, Chander Kashyap<chander.kashyap@linaro.org>  wrote:
+>>>
+>>> ping.
+>>>
+>>> On 14 June 2013 20:11, Chander Kashyap<chander.kashyap@linaro.org>
+>>> wrote:
+>>>>
+>>>> Two cells were used to specify interrupts in mct node, while second cell
+>>>> always remains unused. Hence use only one cell.
+>>>> Suggested by Tomasz Figa.
+>>>>
+>>>> Signed-off-by: Chander Kashyap<chander.kashyap@linaro.org>
+>>>> ---
+>>>>   arch/arm/boot/dts/exynos4210.dtsi |   19 +++++++++----------
+>>>>   arch/arm/boot/dts/exynos4212.dtsi |   19 +++++++++----------
+>>>>   arch/arm/boot/dts/exynos4412.dtsi |   23 +++++++++++------------
+>>>>   arch/arm/boot/dts/exynos5250.dtsi |   19 +++++++++----------
+>>>>   4 files changed, 38 insertions(+), 42 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos4210.dtsi
+>>>> b/arch/arm/boot/dts/exynos4210.dtsi
+>>>> index 54710de..ad50010 100644
+>>>> --- a/arch/arm/boot/dts/exynos4210.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+>>>> @@ -52,23 +52,22 @@
+>>>>                  compatible = "samsung,exynos4210-mct";
+>>>>                  reg =<0x10050000 0x800>;
+>>>>                  interrupt-controller;
+>>>> -               #interrups-cells =<2>;
+>>>> +               #interrups-cells =<1>;
+>>>>                  interrupt-parent =<&mct_map>;
+>>>> -               interrupts =<0 0>,<1 0>,<2 0>,<3 0>,
+>>>> -<4 0>,<5 0>;
+>>>> +               interrupts =<0>,<1>,<2>,<3>,<4>,<5>;
+>>>>                  clocks =<&clock 3>,<&clock 344>;
+>>>>                  clock-names = "fin_pll", "mct";
+>>>>
+>>>>                  mct_map: mct-map {
+>>>> -                       #interrupt-cells =<2>;
+>>>> +                       #interrupt-cells =<1>;
+>>>>                          #address-cells =<0>;
+>>>>                          #size-cells =<0>;
+>>>> -                       interrupt-map =<0x0 0&gic 0 57 0>,
+>>>> -<0x1 0&gic 0 69 0>,
+>>>> -<0x2 0&combiner 12 6>,
+>>>> -<0x3 0&combiner 12 7>,
+>>>> -<0x4 0&gic 0 42 0>,
+>>>> -<0x5 0&gic 0 48 0>;
+>>>> +                       interrupt-map =<0&gic 0 57 0>,
+>>>> +<1&gic 0 69 0>,
+>>>>
+>>>> +<2&combiner 12 6>,
+>>>> +<3&combiner 12 7>,
+>>>> +<4&gic 0 42 0>,
+>>>> +<5&gic 0 48 0>;
+>>>>
+>>>>                  };
+>>>>          };
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos4212.dtsi
+>>>> b/arch/arm/boot/dts/exynos4212.dtsi
+>>>> index c0f60f4..ba9ada1 100644
+>>>> --- a/arch/arm/boot/dts/exynos4212.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos4212.dtsi
+>>>> @@ -39,21 +39,20 @@
+>>>>                  compatible = "samsung,exynos4412-mct";
+>>>>                  reg =<0x10050000 0x800>;
+>>>>                  interrupt-controller;
+>>>> -               #interrups-cells =<2>;
+>>>> +               #interrups-cells =<1>;
+>>>>                  interrupt-parent =<&mct_map>;
+>>>> -               interrupts =<0 0>,<1 0>,<2 0>,<3 0>,
+>>>> -<4 0>,<5 0>;
+>>>> +               interrupts =<0>,<1>,<2>,<3>,<4>,<5>;
+>>>>
+>>>>                  mct_map: mct-map {
+>>>> -                       #interrupt-cells =<2>;
+>>>> +                       #interrupt-cells =<>;
+>>>>                          #address-cells =<0>;
+>>>>                          #size-cells =<0>;
+>>>> -                       interrupt-map =<0x0 0&gic 0 57 0>,
+>>>> -<0x1 0&combiner 12 5>,
+>>>> -<0x2 0&combiner 12 6>,
+>>>> -<0x3 0&combiner 12 7>,
+>>>> -<0x4 0&gic 1 12 0>,
+>>>> -<0x5 0&gic 1 12 0>;
+>>>> +                       interrupt-map =<0&gic 0 57 0>,
+>>>> +<1&combiner 12 5>,
+>>>> +<2&combiner 12 6>,
+>>>> +<3&combiner 12 7>,
+>>>> +<4&gic 1 12 0>,
+>>>> +<5&gic 1 12 0>;
+>>>>
+>>>>                  };
+>>>>          };
+>>>>   };
+>>>> diff --git a/arch/arm/boot/dts/exynos4412.dtsi
+>>>> b/arch/arm/boot/dts/exynos4412.dtsi
+>>>> index 270b389..a680de7 100644
+>>>> --- a/arch/arm/boot/dts/exynos4412.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos4412.dtsi
+>>>> @@ -39,25 +39,24 @@
+>>>>                  compatible = "samsung,exynos4412-mct";
+>>>>                  reg =<0x10050000 0x800>;
+>>>>                  interrupt-controller;
+>>>> -               #interrups-cells =<2>;
+>>>> +               #interrups-cells =<1>;
+>>>>                  interrupt-parent =<&mct_map>;
+>>>> -               interrupts =<0 0>,<1 0>,<2 0>,<3 0>,
+>>>> -<4 0>,<5 0>,<6 0>,<7 0>;
+>>>> +               interrupts =<0>,<1>,<2>,<3>,<4>,<5>,<6>,<7>;
+>>>>                  clocks =<&clock 3>,<&clock 344>;
+>>>>                  clock-names = "fin_pll", "mct";
+>>>>
+>>>>                  mct_map: mct-map {
+>>>> -                       #interrupt-cells =<2>;
+>>>> +                       #interrupt-cells =<1>;
+>>>>                          #address-cells =<0>;
+>>>>                          #size-cells =<0>;
+>>>> -                       interrupt-map =<0x0 0&gic 0 57 0>,
+>>>> -<0x1 0&combiner 12 5>,
+>>>> -<0x2 0&combiner 12 6>,
+>>>> -<0x3 0&combiner 12 7>,
+>>>> -<0x4 0&gic 1 12 0>,
+>>>> -<0x5 0&gic 1 12 0>,
+>>>> -<0x6 0&gic 1 12 0>,
+>>>> -<0x7 0&gic 1 12 0>;
+>>>> +                       interrupt-map =<0&gic 0 57 0>,
+>>>> +<1&combiner 12 5>,
+>>>> +<2&combiner 12 6>,
+>>>> +<3&combiner 12 7>,
+>>>> +<4&gic 1 12 0>,
+>>>> +<5&gic 1 12 0>,
+>>>> +<6&gic 1 12 0>,
+>>>> +<7&gic 1 12 0>;
+>>>>
+>>>>                  };
+>>>>          };
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+>>>> b/arch/arm/boot/dts/exynos5250.dtsi
+>>>> index a7cf3f5..4e633ef 100644
+>>>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>>>> @@ -94,23 +94,22 @@
+>>>>                  compatible = "samsung,exynos4210-mct";
+>>>>                  reg =<0x101C0000 0x800>;
+>>>>                  interrupt-controller;
+>>>> -               #interrups-cells =<2>;
+>>>> +               #interrups-cells =<1>;
+>>>>                  interrupt-parent =<&mct_map>;
+>>>> -               interrupts =<0 0>,<1 0>,<2 0>,<3 0>,
+>>>> -<4 0>,<5 0>;
+>>>> +               interrupts =<0>,<1>,<2>,<3>,<4>,<5>;
+>>>>                  clocks =<&clock 1>,<&clock 335>;
+>>>>                  clock-names = "fin_pll", "mct";
+>>>>
+>>>>                  mct_map: mct-map {
+>>>> -                       #interrupt-cells =<2>;
+>>>> +                       #interrupt-cells =<1>;
+>>>>                          #address-cells =<0>;
+>>>>                          #size-cells =<0>;
+>>>> -                       interrupt-map =<0x0 0&combiner 23 3>,
+>>>> -<0x1 0&combiner 23 4>,
+>>>> -<0x2 0&combiner 25 2>,
+>>>> -<0x3 0&combiner 25 3>,
+>>>> -<0x4 0&gic 0 120 0>,
+>>>> -<0x5 0&gic 0 121 0>;
+>>>>
+>>>> +                       interrupt-map =<0&combiner 23 3>,
+>>>> +<1&combiner 23 4>,
+>>>> +<2&combiner 25 2>,
+>>>> +<3&combiner 25 3>,
+>>>> +<4&gic 0 120 0>,
+>>>> +<5&gic 0 121 0>;
+>>>>                  };
+>>>>          };
+>>>>
+>>>> --
+>>>> 1.7.9.5
+>
+>
+> Should be updated with regarding Doc.
 
-Well, according to Will Deacon (and as documented in the commit log)
-we can optimize in ARM by using readl_relaxed instead of readl.
+Will update the document.
 
-Now, I'm sure you now better than me if that results (or not) in any
-significant optimization.
+Thanks.
 
-> Similarly, a generic
-> atomic_io_modify_relaxed() but guarded with something like
-> __HAVE_ARCH_RELAXED_IO.
-> 
+>
+> Kukjin
 
-No, that's not possible. As far as I understand, there's no guarantee
-of _relaxed variants to be available architecture-wide.
+
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+with warm regards,
+Chander Kashyap
