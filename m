@@ -1,69 +1,70 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 28 Aug 2013 12:45:52 +0100
-Subject: [PATCH 12/19] ARM: traps: use <asm/opcodes.h> to get correct
- instruction order
+Date: Wed, 28 Aug 2013 12:45:47 +0100
+Subject: [PATCH 07/19] ARM: smp_scu: data endian fixes
 In-Reply-To: <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
  <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377690359-25397-13-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377690359-25397-8-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The trap handler needs to take into account the endian configuration of
-the system when loading instructions. Use <asm/opcodes.h> to provide the
-necessary conversion functions.
+The smp_scu driver needs to use the relaxed readl/write accessors
+to avoid any issues with the endian mode the processor core is in.
 
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/kernel/traps.c |   16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+ arch/arm/kernel/smp_scu.c |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index ab517fc..99bcd0e3 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -34,6 +34,7 @@
- #include <asm/unwind.h>
- #include <asm/tls.h>
- #include <asm/system_misc.h>
-+#include <asm/opcodes.h>
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 5bc1a63..1aafa0d 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -28,7 +28,7 @@
+  */
+ unsigned int __init scu_get_core_count(void __iomem *scu_base)
+ {
+-	unsigned int ncores = __raw_readl(scu_base + SCU_CONFIG);
++	unsigned int ncores = readl_relaxed(scu_base + SCU_CONFIG);
+ 	return (ncores & 0x03) + 1;
+ }
  
- static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
- 
-@@ -402,25 +403,28 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 	if (processor_mode(regs) == SVC_MODE) {
- #ifdef CONFIG_THUMB2_KERNEL
- 		if (thumb_mode(regs)) {
--			instr = ((u16 *)pc)[0];
-+			instr = __mem_to_opcode_thumb16(((u16 *)pc)[0]);
- 			if (is_wide_instruction(instr)) {
--				instr <<= 16;
--				instr |= ((u16 *)pc)[1];
-+				u16 inst2;
-+				instr2 = __mem_to_opcode_thumb16(((u16 *)pc)[1]);
-+				instr = __opcode_thumb32_compose(instr, instr2);
- 			}
- 		} else
- #endif
--			instr = *(u32 *) pc;
-+			instr = __mem_to_opcode_arm(*(u32 *) pc);
- 	} else if (thumb_mode(regs)) {
- 		if (get_user(instr, (u16 __user *)pc))
- 			goto die_sig;
-+		instr = __mem_to_opcode_thumb16(instr);
- 		if (is_wide_instruction(instr)) {
- 			unsigned int instr2;
- 			if (get_user(instr2, (u16 __user *)pc+1))
- 				goto die_sig;
--			instr <<= 16;
--			instr |= instr2;
-+			instr2 = __mem_to_opcode_thumb16(instr2);
-+			instr = __opcode_thumb32_compose(instr, instr2);
- 		}
- 	} else if (get_user(instr, (u32 __user *)pc)) {
-+		instr = __mem_to_opcode_arm(instr);
- 		goto die_sig;
+@@ -42,19 +42,19 @@ void scu_enable(void __iomem *scu_base)
+ #ifdef CONFIG_ARM_ERRATA_764369
+ 	/* Cortex-A9 only */
+ 	if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090) {
+-		scu_ctrl = __raw_readl(scu_base + 0x30);
++		scu_ctrl = readl_relaxed(scu_base + 0x30);
+ 		if (!(scu_ctrl & 1))
+-			__raw_writel(scu_ctrl | 0x1, scu_base + 0x30);
++			writel_relaxed(scu_ctrl | 0x1, scu_base + 0x30);
  	}
+ #endif
  
+-	scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
++	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
+ 	/* already enabled? */
+ 	if (scu_ctrl & 1)
+ 		return;
+ 
+ 	scu_ctrl |= 1;
+-	__raw_writel(scu_ctrl, scu_base + SCU_CTRL);
++	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
+ 
+ 	/*
+ 	 * Ensure that the data accessed by CPU0 before the SCU was
+@@ -80,9 +80,9 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
+ 	if (mode > 3 || mode == 1 || cpu > 3)
+ 		return -EINVAL;
+ 
+-	val = __raw_readb(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
++	val = readb_relaxed(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
+ 	val |= mode;
+-	__raw_writeb(val, scu_base + SCU_CPU_STATUS + cpu);
++	writeb_relaxed(val, scu_base + SCU_CPU_STATUS + cpu);
+ 
+ 	return 0;
+ }
 -- 
 1.7.10.4
