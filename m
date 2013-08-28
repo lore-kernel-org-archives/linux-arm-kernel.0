@@ -1,50 +1,61 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Wed, 28 Aug 2013 15:16:13 -0700
-Subject: [PATCH v5 3/3] ARM: bcm281xx: Add device node for the GPIO controller
-In-Reply-To: <1377728173-30711-1-git-send-email-markus.mayer@linaro.org>
-References: <1377728173-30711-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <1377728173-30711-4-git-send-email-markus.mayer@linaro.org>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 28 Aug 2013 17:38:48 -0500
+Subject: [GIT PULL] arm: dts: SOCFPGA updates for v3.12
+Message-ID: <1377729528-24305-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the GPIO controller device node for the Broadcom bcm281xx family of
-chips
+From: Dinh Nguyen <dinguyen@altera.com>
 
-Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Hi Olof/Kevin,
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index c0cdf66..a3945e3 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -63,6 +63,22 @@
- 		clock-frequency = <32768>;
- 	};
- 
-+	gpio: gpio at 35003000 {
-+		compatible = "brcm,bcm11351-gpio", "brcm,kona-gpio";
-+		reg = <0x35003000 0x800>;
-+		interrupts =
-+		       <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		#interrupt-cells = <2>;
-+		gpio-controller;
-+		interrupt-controller;
-+	};
-+
- 	sdio0: sdio at 0x3f180000 {
- 		compatible = "bcm,kona-sdhci";
- 		reg = <0x3f180000 0x10000>;
--- 
-1.7.9.5
+This is my first pull request to you guys, so I apologize in advance if
+something is not correct.
+
+Here is a short description of the ACKs for the 3 patches:
+of: add vendor prefix for Altera Corp.
+	Acked-by: Mark Rutland <mark.rutland@arm.com>
+	Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+dts: Deprecate ALTR as a vendor prefix
+	Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+arm: dts: Change dw-apb-timer-osc and dw-apb-timer-sp to just dw-apb-timer
+	Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+
+Thanks,
+Dinh
+--------------------------------------------------------------
+
+The following changes since commit fa8218def1b1a16f0a410e2c1c767b4738cc81fa:
+
+  Merge tag 'regmap-v3.11-rc7' of git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap (2013-08-27 10:10:30 -0700)
+
+are available in the git repository at:
+
+
+  git://git.rocketboards.org/linux-socfpga-next.git next-dt
+
+for you to fetch changes up to 4d4dd417b8c0ba99c68038ccf2d0256dcd460ead:
+
+  arm: dts: Change dw-apb-timer-osc and dw-apb-timer-sp to  just dw-apb-timer (2013-08-28 17:11:25 -0500)
+
+---------------------------------------------------------------
+SOCFPGA DT changes for v3.12 merge window.
+
+----------------------------------------------------------------
+Dinh Nguyen (3):
+      of: add vendor prefix for Altera Corp.
+      dts: Deprecate ALTR as a vendor prefix
+      arm: dts: Change dw-apb-timer-osc and dw-apb-timer-sp to      just dw-apb-timer
+
+ Documentation/devicetree/bindings/rtc/dw-apb.txt   |   34 +++++++-------------
+ .../devicetree/bindings/serial/altera_jtaguart.txt |    3 +-
+ .../devicetree/bindings/serial/altera_uart.txt     |    3 +-
+ .../devicetree/bindings/serio/altera_ps2.txt       |    3 +-
+ .../devicetree/bindings/spi/spi_altera.txt         |    3 +-
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ arch/arm/boot/dts/socfpga.dtsi                     |    8 ++---
+ drivers/input/serio/altera_ps2.c                   |    1 +
+ drivers/spi/spi-altera.c                           |    1 +
+ drivers/tty/serial/altera_jtaguart.c               |    1 +
+ drivers/tty/serial/altera_uart.c                   |    1 +
+ 11 files changed, 28 insertions(+), 31 deletions(-)
