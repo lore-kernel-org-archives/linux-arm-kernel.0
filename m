@@ -1,56 +1,39 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 29 Aug 2013 10:53:09 -0700
-Subject: [PATCH RFC 2/3] clocksource/cadence_ttc: Make clocksource optional
+Date: Thu, 29 Aug 2013 10:53:10 -0700
+Subject: [PATCH RFC 3/3] arm: dt: zynq: Mark TTC input clock as unstable
 In-Reply-To: <1377798790-28927-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1377798790-28927-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1377798790-28927-3-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1377798790-28927-4-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms, like Zynq, the input clock for the TTC is directly
-derived from the CPU clock, which means it scales when cpufreq adjusts
-the CPU frequency.
-At the same time the clocksource core expects a clocksource to be
-stable and doesn't allow frequency adjustments.
-
-Therefore a new flag - 'input-clock-unstable' - is added to the DT
-bindings for this driver. In case the flag is present the driver does
-not register the timer as clocksource.
+On Zynq the TTC's input clock is directly derived from the CPU clock.
+I.e. the input clock is not constant but scales with the CPU frequency.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt | 4 ++++
- drivers/clocksource/cadence_ttc_timer.c                       | 3 ++-
- 2 files changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/zynq-7000.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt b/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt
-index 993695c..a936c0a 100644
---- a/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt
-@@ -6,6 +6,10 @@ Required properties:
- - interrupts : A list of 3 interrupts; one per timer channel.
- - clocks: phandle to the source clock
- 
-+Optional properties:
-+- input-clock-unstable : Mark the timer's input clock as unstable. E.g. it
-+			 scales with cpufreq.
-+
- Example:
- 
- ttc0: ttc0 at f8001000 {
-diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
-index 99ec898..66aaf6a 100644
---- a/drivers/clocksource/cadence_ttc_timer.c
-+++ b/drivers/clocksource/cadence_ttc_timer.c
-@@ -407,7 +407,8 @@ static void __init ttc_timer_init(struct device_node *timer)
- 		BUG();
- 	}
- 
--	ttc_setup_clocksource(clk_cs, timer_baseaddr);
-+	if (!of_property_read_bool(timer, "input-clock-unstable"))
-+		ttc_setup_clocksource(clk_cs, timer_baseaddr);
- 	ttc_setup_clockevent(clk_ce, timer_baseaddr + 4, irq);
- 
- 	pr_info("%s #0 at %p, irq=%d\n", timer->name, timer_baseaddr, irq);
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index 6f54a64..c4d4e59 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -97,6 +97,7 @@
+ 			interrupts = < 0 10 4 0 11 4 0 12 4 >;
+ 			compatible = "cdns,ttc";
+ 			clocks = <&clkc 6>;
++			input-clock-unstable;
+ 			reg = <0xF8001000 0x1000>;
+ 			clock-ranges;
+ 		};
+@@ -107,6 +108,7 @@
+ 			compatible = "cdns,ttc";
+ 			clocks = <&clkc 6>;
+ 			reg = <0xF8002000 0x1000>;
++			input-clock-unstable;
+ 			clock-ranges;
+ 		};
+ 		scutimer: scutimer at f8f00600 {
 -- 
 1.8.4
