@@ -1,46 +1,42 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 29 Aug 2013 16:16:16 +0300
-Subject: [PATCHv6 24/45] ARM: OMAP3: hwmod: initialize clkdm from clkdm_name
+Date: Thu, 29 Aug 2013 16:16:25 +0300
+Subject: [PATCHv6 33/45] ARM: OMAP2+: hwmod: fix opt_clk handling with DT
 In-Reply-To: <1377782197-10611-1-git-send-email-t-kristo@ti.com>
 References: <1377782197-10611-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1377782197-10611-25-git-send-email-t-kristo@ti.com>
+Message-ID: <1377782197-10611-34-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT clocks are mostly missing clkdm info now, and this causes an issue with
-counter32k which makes its slave idlemode wrong and prevents core idle.
-
-Fixed by initializing the hwmod clkdm pointers for omap3 also which makes
-sure the clkdm flag matching logic works properly.
-
-This patch also changes the return value for _init_clkdm to 0 for
-incorrect clkdm_name, as this a warning, not a fatal error.
+Rajendra's patch had a bug which caused opt clocks to fail initialize
+completely, causing boot warnings with devices that depend on them.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/omap_hwmod.c |    5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index ec82989..ef61582 100644
+index 116219e..f24246c 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1544,7 +1544,7 @@ static int _init_clkdm(struct omap_hwmod *oh)
- 	if (!oh->clkdm) {
- 		pr_warning("omap_hwmod: %s: could not associate to clkdm %s\n",
- 			oh->name, oh->clkdm_name);
--		return -EINVAL;
-+		return 0;
+@@ -827,8 +827,7 @@ static const char **_parse_opt_clks_dt(struct omap_hwmod *oh,
+ 		of_property_read_string_index(np, "clock-names", i, &clk_name);
+ 		if (!strcmp(clk_name, "fck"))
+ 			continue;
+-		opt_clks_cnt++;
+-		opt_clk_names[i] = clk_name;
++		opt_clk_names[(*opt_clks_cnt)++] = clk_name;
  	}
+ 	return opt_clk_names;
+ }
+@@ -851,7 +850,7 @@ static int _init_opt_clks_dt(struct omap_hwmod *oh, struct device_node *np)
  
- 	pr_debug("omap_hwmod: %s: associated to clkdm %s\n",
-@@ -4115,6 +4115,7 @@ void __init omap_hwmod_init(void)
- 		soc_ops.assert_hardreset = _omap2_assert_hardreset;
- 		soc_ops.deassert_hardreset = _omap2_deassert_hardreset;
- 		soc_ops.is_hardreset_asserted = _omap2_is_hardreset_asserted;
-+		soc_ops.init_clkdm = _init_clkdm;
- 	} else if (cpu_is_omap44xx() || soc_is_omap54xx() || soc_is_dra7xx()) {
- 		soc_ops.enable_module = _omap4_enable_module;
- 		soc_ops.disable_module = _omap4_disable_module;
+ 	oh->opt_clks_cnt = opt_clks_cnt;
+ 
+-	for (i = 0; i < oh->opt_clks_cnt; i++) {
++	for (i = 0; i < opt_clks_cnt; i++) {
+ 		c = of_clk_get_by_name(np, opt_clk_names[i]);
+ 		if (IS_ERR(c)) {
+ 			pr_warn("omap_hwmod: %s: cannot clk_get opt_clk %s\n",
 -- 
 1.7.9.5
