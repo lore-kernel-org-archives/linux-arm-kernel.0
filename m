@@ -1,60 +1,46 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 29 Aug 2013 17:35:03 +0530
-Subject: [PATCH 1/3] ARM: AM33xx: hwmod: Add RNG module data
-In-Reply-To: <alpine.DEB.2.02.1308291127250.19789@utopia.booyaka.com>
-References: <1375777984-6267-1-git-send-email-lokeshvutla@ti.com>
- <1375777984-6267-2-git-send-email-lokeshvutla@ti.com>
- <alpine.DEB.2.02.1308281845560.22040@utopia.booyaka.com>
- <521F12CA.8010608@ti.com>
- <alpine.DEB.2.02.1308291127250.19789@utopia.booyaka.com>
-Message-ID: <521F38EF.4040203@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 29 Aug 2013 14:30:41 +0200
+Subject: [PATCH v4 0/5] clk/exynos5420: add clocks for hdmi subsystem
+In-Reply-To: <1377754629-31465-1-git-send-email-rahul.sharma@samsung.com>
+References: <1377754629-31465-1-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1873021.WMcNDqLpjt@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Rahul,
 
-On Thursday 29 August 2013 05:00 PM, Paul Walmsley wrote:
-> Hi
+On Thursday 29 of August 2013 11:07:04 Rahul Sharma wrote:
+> Add clock changes for hdmi subsystem for exynos5250 SoC. These
+> include addition of new clocks like mout_hdmi and smmu_tv, associating
+> ID to clk_hdmiphy and some essential corrections.
 > 
-> On Thu, 29 Aug 2013, Lokesh Vutla wrote:
+> V4:
+> 1) Optimised gaps between Gate, Muxes and Dividers.
 > 
->> On Thursday 29 August 2013 12:18 AM, Paul Walmsley wrote:
->>> Hi
->>>
->>> On Tue, 6 Aug 2013, Lokesh Vutla wrote:
->>>
->>>> Add RNG hwmod data for AM33xx SoC.
->>>>
->>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->>>
->>> I tried to queue this one, but it caused AM33xx boots to hang.  
->>> Thought it might be related to the patch ordering -- seems to me that 
->>> the clock change patch needed to come before this patch -- but if I 
->>> recall correctly, both BeagleBone and BeagleBone-LT still hung. 
->> This is because register address space is not passed in hwmod_data as it
->> is passed from dt. So we need to include 3/3 patch in this series to boot.
+> V3:
+> 1) Assign new ID to divider clock keeping sclk_pixel gate same.
 > 
-> So this patch has a dependency on a DT data patch?  If so then please 
-> upstream that through Benoit, and put in the patch description on this 
-> patch that there's a dependency on that patch.  If you post those together 
-> in a series, please make sure that the DT patch comes first so it doesn't 
-> break 'git bisect'.
-Ok, Ill repost these two patches and make sure that DT patch comes first
-so that 'git bisect' will not break..
- 
+> V2:
+> 1) Rebase to Mike's Tree.
+> 2) Change smmu_tv to smmu_mixer.
 > 
-> I've already queued the clock change patch for upstream.
+> This set is based on Mike's clk-next branch at
+> https://git.linaro.org/gitweb?p=people/mturquette/linux.git
 > 
->> PS: Probe for this driver will be failed even after this. Support for 
->> this version of rng ip is already posted and pushed into cryptodev-2.6 
->> tree.
+> Rahul Sharma (5):
+>   clk/exynos5420: add sclk_hdmiphy to the list of special clocks
+>   clk/exynos5420: add gate clock for mixer sysmmu
+>   clk/exynos5420: fix the order of parents of hdmi mux
+>   clk/exynos5420: add hdmi mux to change parents in hdmi driver
+>   clk/exynos5420: assign dout_pixel id to pixel clock divider
 > 
-> I don't quite understand, could you please rephrase?
-I just meant that with these patches RNG IP as such is not functional
-without the driver changes. 
+>  .../devicetree/bindings/clock/exynos5420-clock.txt  |   12 ++++++++++++
+>  drivers/clk/samsung/clk-exynos5420.c                |   19
+> +++++++++++++------ 2 files changed, 25 insertions(+), 6 deletions(-)
 
-Thanks and Regards,
-Lokesh
-> 
-> - Paul
-> 
+For the whole series:
+
+Acked-by: Tomasz Figa <t.figa@samsung.com>
+
+Best regards,
+Tomasz
