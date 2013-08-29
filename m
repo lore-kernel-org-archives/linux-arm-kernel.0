@@ -1,26 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Aug 2013 10:15:20 -0700
-Subject: [GIT PULL 2/2] ARM: mvebu: MSI mvebu changes for v3.12
-In-Reply-To: <20130814192317.GE13964@titan.lakedaemon.net>
-References: <20130814191011.GD13964@titan.lakedaemon.net>
- <20130814192317.GE13964@titan.lakedaemon.net>
-Message-ID: <20130829171520.GE18542@quad.lixom.net>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 29 Aug 2013 18:17:02 +0100
+Subject: 3.11-rc7 big-endian support
+In-Reply-To: <CAA3XUr1tW8tra+4G2Fcwsb7tasZZLfCrR8e=4j+LWUcbhQZF=Q@mail.gmail.com>
+References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
+ <521D21D9.8020106@codethink.co.uk> <20130829115951.4d6df89b@skate>
+ <521F2119.8080204@codethink.co.uk> <20130829122810.6f4c4e7a@skate>
+ <CAA3XUr1tW8tra+4G2Fcwsb7tasZZLfCrR8e=4j+LWUcbhQZF=Q@mail.gmail.com>
+Message-ID: <521F820E.5080500@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 03:23:17PM -0400, Jason Cooper wrote:
-> Arnd, Olof,
-> 
-> This branch has a conflict with mvebu/drivers (the MBus dt binding work)
-> that is rather extensive.  I've attached the resolution that has been
-> in -next below the summary.
+On 29/08/13 16:53, Victor Kamensky wrote:
+> Hi Ben,
+>
+> I wonder is it possible for you to review,
+> pick up, and include into your series this patch
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/195176.html
+> ([PATCH v3 0/1] ARM: signal: sigreturn_codes should be endian neutral
+> to work in BE8)
+>
+> I think it is very much relevant to the effort.
+>
+> It was tested on top of your series. And as far as I know
+> it is single patch outside of your series needed so BE
+> Linux LTP testing result will match LE results on the
+> same kernel h/w.
+>
+> Thanks,
+> Victor
 
-So this is a textbook example of when you should resolve the conflicts in your
-own tree by building the branches on top of each other.
+I have added it to my latest tree, and will re-post once the
+reviews are in tomorrow.
 
-Your proposed resolutions don't match what I get in my tree, and don't match
-what is in linux-next right now. Please resend this based on top of
-mvebu/drivers and I'll pull it in as a late branch for 3.12.
-
-
--Olof
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
