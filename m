@@ -1,135 +1,212 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 29 Aug 2013 17:05:45 +0200
-Subject: [RFC 3/3] ARM: s5pc100: Migrate clock handling to Common Clock
- Framework
-In-Reply-To: <1377707357-4902-4-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1377707357-4902-1-git-send-email-m.krawczuk@partner.samsung.com>
- <1377707357-4902-4-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <1406622.PIapD4Dc4U@amdc1227>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 29 Aug 2013 17:14:49 +0200 (CEST)
+Subject: [PATCH] ARM: shmobile: update SDHI DT compatibility string to the
+ <unit>-<soc> format
+Message-ID: <Pine.LNX.4.64.1308291650120.3786@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 of August 2013 18:29:17 Mateusz Krawczuk wrote:
-> This patch migrates the s5pc100 platform to use new clock driver
-> using Common Clock Framework.
-> 
-> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
-> ---
->  arch/arm/mach-s5pc100/Kconfig         |  8 ++++++++
->  arch/arm/mach-s5pc100/Makefile        |  4 ++--
->  arch/arm/mach-s5pc100/common.c        | 23 ++++++++++++++++++++++-
->  arch/arm/mach-s5pc100/common.h        | 13 +++++++++++++
->  arch/arm/mach-s5pc100/mach-smdkc100.c |  3 ++-
->  arch/arm/plat-samsung/Kconfig         |  2 +-
->  6 files changed, 48 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pc100/Kconfig
-> b/arch/arm/mach-s5pc100/Kconfig index 15170be..ed50897 100644
-> --- a/arch/arm/mach-s5pc100/Kconfig
-> +++ b/arch/arm/mach-s5pc100/Kconfig
-> @@ -11,6 +11,7 @@ config CPU_S5PC100
->  	bool
->  	select S5P_EXT_INT
->  	select SAMSUNG_DMADEV
-> +	select S5P_CLOCK if !COMMON_CLK_S5PC100
->  	help
->  	  Enable S5PC100 CPU support
-> 
-> @@ -50,6 +51,13 @@ config S5PC100_SETUP_SPI
->  	help
->  	  Common setup code for SPI GPIO configurations.
-> 
-> +config COMMON_CLK_S5PC100
-> +	bool "Common Clock Framework support"
-> +	default y
-> +	select COMMON_CLK
-> +	help
-> +	  Common setup code for common clock framework.
-> +
->  config MACH_SMDKC100
->  	bool "SMDKC100"
->  	select CPU_S5PC100
-> diff --git a/arch/arm/mach-s5pc100/Makefile
-> b/arch/arm/mach-s5pc100/Makefile index 118c711..74b90ec 100644
-> --- a/arch/arm/mach-s5pc100/Makefile
-> +++ b/arch/arm/mach-s5pc100/Makefile
-> @@ -11,8 +11,8 @@ obj-				:=
-> 
->  # Core
-> 
-> -obj-y				+= common.o clock.o
-> -
-> +obj-y				+= common.o
-> +obj-$(CONFIG_S5P_CLOCK)	+= clock.o
->  obj-y				+= dma.o
-> 
->  # machine support
-> diff --git a/arch/arm/mach-s5pc100/common.c
-> b/arch/arm/mach-s5pc100/common.c index c5a8eea..d8db7b2 100644
-> --- a/arch/arm/mach-s5pc100/common.c
-> +++ b/arch/arm/mach-s5pc100/common.c
-> @@ -40,7 +40,13 @@
-> 
->  #include <plat/cpu.h>
->  #include <plat/devs.h>
-> +
-> +#ifdef CONFIG_S5P_CLOCK
->  #include <plat/clock.h>
-> +#else
-> +#include <linux/clk-provider.h>
-> +#endif
-> +
->  #include <plat/sdhci.h>
->  #include <plat/adc-core.h>
->  #include <plat/ata-core.h>
-> @@ -54,6 +60,18 @@
-> 
->  #include "common.h"
-> 
-> +static unsigned long xxti_f, xusbxti_f;
-> +
-> +void __init s5pc100_set_xxti_freq(unsigned long freq)
-> +{
-> +	xxti_f = freq;
-> +}
-> +
-> +void __init s5pc100_set_xusbxti_freq(unsigned long freq)
-> +{
-> +	xusbxti_f = freq;
-> +}
-> +
+Currently DT compatibility strings of both types can be found in the kernel
+sources: <unit>-<soc> and <soc>-<unit>, whereas a unique format should be
+followed and the former one is preferred. This patch converts the SDHI
+MMC driver and its users to the common standard. This is safe for now, since
+ATM no real products are using this driver with DT.
 
-You might consolidate the two functions above into one - 
-s5pc100_init_external_clocks() taking two arguments.
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+---
 
->  static const char name_s5pc100[] = "S5PC100";
-> 
->  static struct cpu_table cpu_ids[] __initdata = {
-> @@ -201,13 +219,14 @@ void __init s5pc100_map_io(void)
-> 
->  void __init s5pc100_init_clocks(int xtal)
->  {
-> +#ifdef CONFIG_S5P_CLOCK
->  	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
-> 
->  	s3c24xx_register_baseclocks(xtal);
->  	s5p_register_clocks(xtal);
->  	s5pc100_register_clocks();
->  	s5pc100_setup_clocks();
-> -	samsung_wdt_reset_init(S3C_VA_WATCHDOG);
-> +#endif
->  }
-> 
->  void __init s5pc100_init_irq(void)
-> @@ -216,6 +235,8 @@ void __init s5pc100_init_irq(void)
-> 
->  	/* VIC0, VIC1, and VIC2 are fully populated. */
->  	s5p_init_irq(vic, ARRAY_SIZE(vic));
-> +	s5pc100_clk_init(NULL, xxti_f, xusbxti_f, S3C_VA_SYS);
-> +	samsung_wdt_reset_init(S3C_VA_WATCHDOG);
+Ok, the "no real products" is an assumption, that Laurent and Simon kind 
+of agreed upon, so, I'm using it here to avoid having to carry old 
+compatibility strings with us around. If anyone has other information - 
+please shout. Otherwise, I think, it would be the easiest for Chris to ack 
+this and for Simon to pull this via the ARM tree for late 3.12 (possibly, 
+post -rc1) inclusion.
 
-This change (moving WDT reset initialization) should be noted in patch 
-description, along with the reason to do so.
+ Documentation/devicetree/bindings/mmc/tmio_mmc.txt |   17 ++++++++++-------
+ arch/arm/boot/dts/r8a73a4.dtsi                     |    6 +++---
+ arch/arm/boot/dts/r8a7740.dtsi                     |    4 ++--
+ arch/arm/boot/dts/r8a7790.dtsi                     |    8 ++++----
+ arch/arm/boot/dts/sh73a0.dtsi                      |    6 +++---
+ drivers/mmc/host/sh_mobile_sdhi.c                  |   16 ++++++++--------
+ 6 files changed, 30 insertions(+), 27 deletions(-)
 
-Best regards,
-Tomasz
+diff --git a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+index df204e1..6a2a116 100644
+--- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
++++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+@@ -9,12 +9,15 @@ compulsory and any optional properties, common to all SD/MMC drivers, as
+ described in mmc.txt, can be used. Additionally the following tmio_mmc-specific
+ optional bindings can be used.
+ 
++Required properties:
++- compatible:	"renesas,sdhi-shmobile" - a generic sh-mobile SDHI unit
++		"renesas,sdhi-sh7372" - SDHI IP on SH7372 SoC
++		"renesas,sdhi-sh73a0" - SDHI IP on SH73A0 SoC
++		"renesas,sdhi-r8a73a4" - SDHI IP on R8A73A4 SoC
++		"renesas,sdhi-r8a7740" - SDHI IP on R8A7740 SoC
++		"renesas,sdhi-r8a7778" - SDHI IP on R8A7778 SoC
++		"renesas,sdhi-r8a7779" - SDHI IP on R8A7779 SoC
++		"renesas,sdhi-r8a7790" - SDHI IP on R8A7790 SoC
++
+ Optional properties:
+ - toshiba,mmc-wrprotect-disable: write-protect detection is unavailable
+-
+-When used with Renesas SDHI hardware, the following compatibility strings
+-configure various model-specific properties:
+-
+-"renesas,sh7372-sdhi":	(default) compatible with SH7372
+-"renesas,r8a7740-sdhi":	compatible with R8A7740: certain MMC/SD commands have to
+-			wait for the interface to become idle.
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index b0511b1..cc7211b 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -236,7 +236,7 @@
+ 	};
+ 
+ 	sdhi0: sdhi at ee100000 {
+-		compatible = "renesas,r8a73a4-sdhi";
++		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee100000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 165 4>;
+@@ -245,7 +245,7 @@
+ 	};
+ 
+ 	sdhi1: sdhi at ee120000 {
+-		compatible = "renesas,r8a73a4-sdhi";
++		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee120000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 166 4>;
+@@ -254,7 +254,7 @@
+ 	};
+ 
+ 	sdhi2: sdhi at ee140000 {
+-		compatible = "renesas,r8a73a4-sdhi";
++		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee140000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 167 4>;
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index 8fc4a5d..c4992b5 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -155,7 +155,7 @@
+ 	};
+ 
+ 	sdhi0: sdhi at e6850000 {
+-		compatible = "renesas,r8a7740-sdhi";
++		compatible = "renesas,sdhi-r8a7740";
+ 		reg = <0xe6850000 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 117 4
+@@ -167,7 +167,7 @@
+ 	};
+ 
+ 	sdhi1: sdhi@e6860000 {
+-		compatible = "renesas,r8a7740-sdhi";
++		compatible = "renesas,sdhi-r8a7740";
+ 		reg = <0xe6860000 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 121 4
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 3b879e7..885f9f4 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -152,7 +152,7 @@
+ 	};
+ 
+ 	sdhi0: sdhi@ee100000 {
+-		compatible = "renesas,r8a7790-sdhi";
++		compatible = "renesas,sdhi-r8a7790";
+ 		reg = <0 0xee100000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 165 4>;
+@@ -161,7 +161,7 @@
+ 	};
+ 
+ 	sdhi1: sdhi at ee120000 {
+-		compatible = "renesas,r8a7790-sdhi";
++		compatible = "renesas,sdhi-r8a7790";
+ 		reg = <0 0xee120000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 166 4>;
+@@ -170,7 +170,7 @@
+ 	};
+ 
+ 	sdhi2: sdhi at ee140000 {
+-		compatible = "renesas,r8a7790-sdhi";
++		compatible = "renesas,sdhi-r8a7790";
+ 		reg = <0 0xee140000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 167 4>;
+@@ -179,7 +179,7 @@
+ 	};
+ 
+ 	sdhi3: sdhi at ee160000 {
+-		compatible = "renesas,r8a7790-sdhi";
++		compatible = "renesas,sdhi-r8a7790";
+ 		reg = <0 0xee160000 0 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 168 4>;
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index ba59a58..3955c76 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -196,7 +196,7 @@
+ 	};
+ 
+ 	sdhi0: sdhi at ee100000 {
+-		compatible = "renesas,r8a7740-sdhi";
++		compatible = "renesas,sdhi-r8a7740";
+ 		reg = <0xee100000 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 83 4
+@@ -208,7 +208,7 @@
+ 
+ 	/* SDHI1 and SDHI2 have no CD pins, no need for CD IRQ */
+ 	sdhi1: sdhi@ee120000 {
+-		compatible = "renesas,r8a7740-sdhi";
++		compatible = "renesas,sdhi-r8a7740";
+ 		reg = <0xee120000 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 88 4
+@@ -219,7 +219,7 @@
+ 	};
+ 
+ 	sdhi2: sdhi@ee140000 {
+-		compatible = "renesas,r8a7740-sdhi";
++		compatible = "renesas,sdhi-r8a7740";
+ 		reg = <0xee140000 0x100>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 104 4
+diff --git a/drivers/mmc/host/sh_mobile_sdhi.c b/drivers/mmc/host/sh_mobile_sdhi.c
+index 87ed3fb..f344659 100644
+--- a/drivers/mmc/host/sh_mobile_sdhi.c
++++ b/drivers/mmc/host/sh_mobile_sdhi.c
+@@ -113,14 +113,14 @@ static const struct sh_mobile_sdhi_ops sdhi_ops = {
+ };
+ 
+ static const struct of_device_id sh_mobile_sdhi_of_match[] = {
+-	{ .compatible = "renesas,shmobile-sdhi" },
+-	{ .compatible = "renesas,sh7372-sdhi" },
+-	{ .compatible = "renesas,sh73a0-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
+-	{ .compatible = "renesas,r8a73a4-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
+-	{ .compatible = "renesas,r8a7740-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
+-	{ .compatible = "renesas,r8a7778-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
+-	{ .compatible = "renesas,r8a7779-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
+-	{ .compatible = "renesas,r8a7790-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
++	{ .compatible = "renesas,sdhi-shmobile" },
++	{ .compatible = "renesas,sdhi-sh7372" },
++	{ .compatible = "renesas,sdhi-sh73a0", .data = &sh_mobile_sdhi_of_cfg[0], },
++	{ .compatible = "renesas,sdhi-r8a73a4", .data = &sh_mobile_sdhi_of_cfg[0], },
++	{ .compatible = "renesas,sdhi-r8a7740", .data = &sh_mobile_sdhi_of_cfg[0], },
++	{ .compatible = "renesas,sdhi-r8a7778", .data = &sh_mobile_sdhi_of_cfg[0], },
++	{ .compatible = "renesas,sdhi-r8a7779", .data = &sh_mobile_sdhi_of_cfg[0], },
++	{ .compatible = "renesas,sdhi-r8a7790", .data = &sh_mobile_sdhi_of_cfg[0], },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, sh_mobile_sdhi_of_match);
+-- 
+1.7.2.5
