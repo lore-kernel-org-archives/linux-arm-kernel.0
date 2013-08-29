@@ -1,30 +1,31 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 29 Aug 2013 11:24:06 -0700
-Subject: [PATCH v9 6/7] ARM: hi3xxx: add smp support
-In-Reply-To: <1377695454-29109-7-git-send-email-haojian.zhuang@linaro.org>
- (Haojian Zhuang's message of "Wed, 28 Aug 2013 21:10:53 +0800")
-References: <1377695454-29109-1-git-send-email-haojian.zhuang@linaro.org>
- <1377695454-29109-7-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <87wqn4z77d.fsf@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 29 Aug 2013 20:24:32 +0200
+Subject: [PATCH v5] gpio: pcf857x: Add OF support
+In-Reply-To: <7583101.2yAsZLOucV@avalon>
+References: <1377590559-14279-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2400176.9Vcd5TUYl9@avalon> <20130827171854.GA2988@katana>
+ <7583101.2yAsZLOucV@avalon>
+Message-ID: <CACRpkda=pZ6xQ2XJke=MBLiH_DAS8CXW+JOZ856ohGZi+fOCzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang <haojian.zhuang@linaro.org> writes:
-
-> From: Zhangfei Gao <zhangfei.gao@linaro.org>
+On Wed, Aug 28, 2013 at 1:58 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Tuesday 27 August 2013 19:18:55 Wolfram Sang wrote:
+>> > The driver should support the same chip models reardless of whether it's
+>> > used with or without DT. If an entry in the OF table has no corresponding
+>> > entry in the I2C table I would consider that as a driver bug.
+>>
+>> Linus Walleij posted a patch to support DT only probing, but too many
+>> side-effects showed up. Some were fixable (probe regressions) and some
+>> need more work, if feasible at all. Most prominent is that runtime
+>> instantiation of i2c slaves currently needs an entry in the i2c table.
 >
-> Enable SMP support on hi3xxx platform
->
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Tested-by: Zhang Mingjun <zhang.mingjun@linaro.org>
-> Tested-by: Li Xin <li.xin@linaro.org>
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Linus, I'd like to get this in v3.12 if it's not too late. Could you please
+> provide your input ?
 
-> ---
->  .../bindings/arm/hisilicon/hisilicon.txt           | 50 +++++++++++++++++
+Provided some input on the v4 version, due to being a bit overloaded
+my patch queue is overloaded...
 
-New/extended bindings need review/ack from the DT maintainers.  Please
-be sure to Cc: devicetree at vger.kernel.org on patches with new/updated
-bindings.
-
-Kevin
+Yours,
+Linus Walleij
