@@ -1,46 +1,81 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 28 Aug 2013 19:24:07 -0700
-Subject: [PATCH] clk/exynos5250: change parent to aclk200_disp1 for hdmi
- subsystem
-In-Reply-To: <1377242219-30831-1-git-send-email-rahul.sharma@samsung.com>
-References: <1377242219-30831-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <20130829022407.8231.37926@quantum>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 28 Aug 2013 21:53:16 -0500
+Subject: [RESEND PATCHv3 2/2] clocksource: dw_apb_timer_of: Fix
+ read_sched_clock
+In-Reply-To: <1377744796-22175-1-git-send-email-dinguyen@altera.com>
+References: <1377744796-22175-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1377744796-22175-2-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rahul Sharma (2013-08-23 00:16:59)
-> parent of hdmi and mixer block is mentioned as aclk200 which is
-> not correct. It is clocked by the ouput of aclk200_disp1. Hence
-> parent for mixer and hdmi clocks is changed to aclk200_disp1.
-> 
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+From: Dinh Nguyen <dinguyen@altera.com>
 
-Taken into clk-next.
+The read_sched_clock should return the ~value because the clock is a
+countdown implementation. read_sched_clock() should be the same as
+__apbt_read_clocksource().
 
-Thanks,
-Mike
+If a separate timer for the sched_clock exist, then read_sched_clock()
+will return an incorrect value. The (sched_io_base + 0x4) needs to be in
+the function for both cases.
 
-> ---
-> This set is based on Mike's clk-next branch at
-> https://git.linaro.org/gitweb?p=people/mturquette/linux.git
-> 
->  drivers/clk/samsung/clk-exynos5250.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-> index a9916a4..d90e593 100644
-> --- a/drivers/clk/samsung/clk-exynos5250.c
-> +++ b/drivers/clk/samsung/clk-exynos5250.c
-> @@ -489,8 +489,8 @@ static struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
->         GATE(mie1, "mie1", "aclk200", GATE_IP_DISP1, 1, 0, 0),
->         GATE(dsim0, "dsim0", "aclk200", GATE_IP_DISP1, 3, 0, 0),
->         GATE(dp, "dp", "aclk200", GATE_IP_DISP1, 4, 0, 0),
-> -       GATE(mixer, "mixer", "aclk200", GATE_IP_DISP1, 5, 0, 0),
-> -       GATE(hdmi, "hdmi", "aclk200", GATE_IP_DISP1, 6, 0, 0),
-> +       GATE(mixer, "mixer", "mout_aclk200_disp1", GATE_IP_DISP1, 5, 0, 0),
-> +       GATE(hdmi, "hdmi", "mout_aclk200_disp1", GATE_IP_DISP1, 6, 0, 0),
->         GATE(g2d, "g2d", "aclk200", GATE_IP_ACP, 3, 0, 0),
->  };
->  
-> -- 
-> 1.7.10.4
+Maintain backwards compatibility for "dw-apb-timer-sp" and
+"dw-apb-timer-osc".
+
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Acked-by: Jamie Iles <jamie@jamieiles.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+CC: Rob Herring <rob.herring@calxeda.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Pavel Machek <pavel@denx.de>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: linux-arm-kernel at lists.infradead.org
+
+v3:
+- Use APBTMR_N_CURRENT_VALUE define in read_sched_clock()
+
+v2:
+- Maintain backwards compatibility for "dw-apb-timer-sp" and
+  "dw-apb-timer-osc".
+---
+ drivers/clocksource/dw_apb_timer_of.c |    9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index 4cbae4f..01c1238 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -102,18 +102,17 @@ static void add_clocksource(struct device_node *source_timer)
+ 	 * timer is found. sched_io_base then points to the current_value
+ 	 * register of the clocksource timer.
+ 	 */
+-	sched_io_base = iobase + 0x04;
++	sched_io_base = iobase;
+ 	sched_rate = rate;
+ }
+ 
+ static u32 read_sched_clock(void)
+ {
+-	return __raw_readl(sched_io_base);
++	return ~__raw_readl(sched_io_base + APBTMR_N_CURRENT_VALUE);
+ }
+ 
+ static const struct of_device_id sptimer_ids[] __initconst = {
+ 	{ .compatible = "picochip,pc3x2-rtc" },
+-	{ .compatible = "snps,dw-apb-timer-sp" },
+ 	{ /* Sentinel */ },
+ };
+ 
+@@ -153,4 +152,6 @@ static void __init dw_apb_timer_init(struct device_node *timer)
+ 	num_called++;
+ }
+ CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
+-CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer-osc", dw_apb_timer_init);
++CLOCKSOURCE_OF_DECLARE(apb_timer_osc, "snps,dw-apb-timer-osc", dw_apb_timer_init);
++CLOCKSOURCE_OF_DECLARE(apb_timer_sp, "snps,dw-apb-timer-sp", dw_apb_timer_init);
++CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer", dw_apb_timer_init);
+-- 
+1.7.9.5
