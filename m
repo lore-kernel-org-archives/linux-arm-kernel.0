@@ -1,46 +1,37 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 29 Aug 2013 18:31:12 -0500
-Subject: [PATCH 1/3] crypto: omap-des: Add omap-des driver for OMAP4/AM43xx
-In-Reply-To: <1377818873-21174-2-git-send-email-joelf@ti.com>
-References: <1377818873-21174-1-git-send-email-joelf@ti.com>
- <1377818873-21174-2-git-send-email-joelf@ti.com>
-Message-ID: <521FD9C0.6020302@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 29 Aug 2013 19:36:40 -0400
+Subject: [PATCH v2 0/4] ARM: keystone: clock tree and PM bus support
+Message-ID: <1377819404-9671-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/2013 06:27 PM, Joel Fernandes wrote:
-> Add omap-des driver with platform data for OMAP4. Support added for DES
-> ECB and CBC modes.
-> 
-> Where possible, code is reused from omap-aes driver with changes made for
-> adjusting key size, block size, removing non-existent encryption modes
-> and adding support for OMAP4 platform data and offsets.
-> 
-> Tests have been conducted with the CRYPTO test manager, and functionality
-> is verified at different page length alignments.
-> 
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
-> ---
->  drivers/crypto/omap-des.c | 1192 +++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 1192 insertions(+)
->  create mode 100644 drivers/crypto/omap-des.c
-> 
-> diff --git a/drivers/crypto/omap-des.c b/drivers/crypto/omap-des.c
-> new file mode 100644
-> index 0000000..6a9a25f
-> --- /dev/null
-> +++ b/drivers/crypto/omap-des.c
-> @@ -0,0 +1,1192 @@
-> +/*
-> + * Cryptographic API.
-> + *
-> + * Support for OMAP DES and Triple DES HW acceleration.
-> + *
-> + * Copyright (c) 2012 Texas Instruments Incorporated
-> + * Author: Joel Fernandes <joelf@ti.com>
+Refreshed version of the ealier patch series against the updated
+clock dt bidnings series[1] and [2]
 
-Have to change this to 2013. Will do so if there are no other comments.
+Tested on Keystone EVM with [1] [2] integrated.
+
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: arm at kernel.org
+
+Santosh Shilimkar (4):
+  ARM: dts: keystone: Add clock tree data to devicetree
+  ARM: dts: keystone: Add clock phandle to UART nodes
+  ARM: keystone: Enable clock drivers
+  ARM: keystone: add PM bus support for clock management
+
+ arch/arm/boot/dts/keystone-clocks.dtsi |  821 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/keystone.dts         |    4 +
+ arch/arm/mach-keystone/Kconfig         |    1 +
+ drivers/bus/Makefile                   |    2 +
+ drivers/bus/keystone_pm_bus.c          |   70 +++
+ 5 files changed, 898 insertions(+)
+ create mode 100644 arch/arm/boot/dts/keystone-clocks.dtsi
+ create mode 100644 drivers/bus/keystone_pm_bus.c
 
 Regards,
+Santosh
 
--Joel
+[1] http://lkml.org/lkml/2013/8/22/52 
+[2] http://www.spinics.net/lists/arm-kernel/msg270884.html
+-- 
+1.7.9.5
