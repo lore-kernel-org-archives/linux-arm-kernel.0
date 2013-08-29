@@ -1,73 +1,83 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Thu, 29 Aug 2013 21:32:50 +0530
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
- with external L3-cache.
-In-Reply-To: <20130829125337.GG13704@arm.com>
-References: <3ebe469fcf451cc7396dd2a5d3f01272@www.loen.fr>
- <CAAhSdy3WwZcLW6s05mV=Mn8=w8TcubTdYrgNqAChqiHxXC53eg@mail.gmail.com>
- <747a0675165da4ef147bbda4e140549b@www.loen.fr>
- <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
- <5935339137684ecf90dd484cc5739548@www.loen.fr>
- <20130815165344.GA3853@cbox>
- <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
- <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
- <20130829105235.GC13704@arm.com>
- <CAAhSdy0NgSchR1p_HJTUMMV2h7f7beFMnN3Md4xEp=EGRiXVMg@mail.gmail.com>
- <20130829125337.GG13704@arm.com>
-Message-ID: <CAAhSdy3076pYM=nh0OTm_pxBdPAtCPbw96zExYuRvcdYD656PA@mail.gmail.com>
+From: grygorii.strashko@ti.com (Strashko, Grygorii)
+Date: Thu, 29 Aug 2013 16:03:47 +0000
+Subject: [PATCH] ARM: OMAP4: cpuidle: fix: call cpu_cluster_pm_exit
+ conditionally
+In-Reply-To: <521F6812.7080305@ti.com>
+References: <1377598250-2355-1-git-send-email-murzin.v@gmail.com>,
+ <87sixvw2n5.fsf@linaro.org>
+ <902E09E6452B0E43903E4F2D568737AB35C674@DNCE04.ent.ti.com>,
+ <521F6812.7080305@ti.com>
+Message-ID: <902E09E6452B0E43903E4F2D568737AB35C6CD@DNCE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 6:23 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Aug 29, 2013 at 01:31:43PM +0100, Anup Patel wrote:
->> On Thu, Aug 29, 2013 at 4:22 PM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->> > On Fri, Aug 16, 2013 at 07:57:55AM +0100, Anup Patel wrote:
->> >> The approach of flushing d-cache by set/way upon first run of VCPU will
->> >> not work because for set/way operations ARM ARM says: "For set/way
->> >> operations, and for All (entire cache) operations, the point is defined to be
->> >> to the next level of caching". In other words, set/way operations work upto
->> >> point of unification.
->> >
->> > I don't understand where you got the idea that set/way operations work
->> > up to the point of unification. This is incorrect, the set/way
->> > operations work on the level of cache specified by bits 3:1 in the
->> > register passed to the DC CISW instruction. For your L3 cache, those
->> > bits would be 2 (and __flush_dcache_all() implementation does this
->> > dynamically).
+Hi 
+
+On 08/29/2013 06:26 PM, Santosh Shilimkar wrote:> On Thursday 29 August 2013 11:20 AM, Strashko, Grygorii wrote:
+>> Hi Vladimir, Kevin
 >>
->> The L3-cache is not visible to CPU. It is totally independent and transparent
->> to CPU.
->
-> OK. But you say that operations like DC CIVAC actually flush the L3? So
-> I don't see it as completely transparent to the CPU.
+>> On 08/27/2013 06:54 PM, Kevin Hilman wrote:
+>>> Vladimir Murzin <murzin.v@gmail.com> writes:
+>>>
+>>>> We call cpu_cluster_pm_enter for dev->cpu == 0 only, but
+>>>> cpu_cluster_pm_exit called without that check.
+>>>>
+>>>> Because of that unhandled page fault may happen:
+>>>>
+>>
+>> [...]
+>>
+>>>>
+>>>> It is supposed that sar_base is initialized in irq_save_context, which
+>>>> is called on CPU_CLUSTER_PM_ENTER notification. If this notification
+>>>> has been missed and CPU_CLUSTER_PM_EXIT is received sar_base is NULL.
+>>>>
+>>>> Fix it by calling CPU_CLUSTER_PM_{ENTER,EXIT} under the same condition.
+>>
+>> Could you check, if revert of the following patch will solve the issue, pls?
+>> commit e7457253494fff660a72bc0cedeee97491ccd173
+>> "ARM: OMAP4+: CPUidle: Deprecate use of omap4_mpuss_read_prev_context_state()"
+>>
+>>>>
+>>>> Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
+>>>
+>>> Good catch.
+>>
+>> Yes, but It seems, that CPUIdle logic is unclear for OAMP4 .
+>> The above issue may happen if CPU1 enter/exit LP while CPU0:
+>> - not enter at all (somewhere inside "coupled" core);
+>> - still entering LP (somewhere before call to omap4_enter_lowpower());
+>>
+>> The question is - Should first CPUx, who exited from LP(C3) state,
+>> restore Cluster context, or it should be done by CPU0 only?
+>> (on OMAP4 CPUs may return from C3 async).
+>>
+>>
+> Looks like I missed this thread completely. The cluster restore
+> on purpose was not tied to any CPU considering some OMAPs may
+> support such thing in future but for couple idle we anyway
+> synchronize the CPUs at the idle exit so doing either way should be fine.
+> 
+> I think the sar_base bug should be fixed regardless of whether we
+> change idle code.
 
-It is transparent from CPU perspective. In other words, there is nothing in
-CPU for controlling/monitoring L3-cache.
+Thanks for clarification. 
 
->
-> Do you have any configuration bits which would make the L3 completely
-> transparent like always caching even when accesses are non-cacheable and
-> DC ops to PoC ignoring it?
+I know about couple CPU sync, but .. CPUIdle is so fragile :)
 
-Actually, L3-cache monitors the types of read/write generated by CPU (i.e.
-whether the request is cacheable/non-cacheable or whether the request is
-due to DC ops to PoC, or ...).
+So wouldn't it be good to fix/protect omap-wakeupgen.c/irq_sar_clear() too.
 
-To answer your query, there is no configuration to have L3 caching when
-accesses are non-cacheable and DC ops to PoC.
+Like:
+	if (!sar_base)
+		return;
 
->
-> Now, back to the idea of outer_cache framework for arm64. Does your CPU
-> have separate instructions for flushing this L3 cache?
+Also, without this patch cpu_cluster_pm_exit() will be called twice by each CPU.
 
-No, CPU does not have separate instruction for flushing L3-cache. On the
-other hand, L3-cache has MMIO registers which can be use to explicitly
-flush L3-cache.
+No questions to this patch any more.
 
->
-> --
-> Catalin
+> 
+> Regards,
+> Santosh
 
---Anup
+Regards,
+-grygorii
