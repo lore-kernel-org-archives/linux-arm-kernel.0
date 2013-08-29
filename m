@@ -1,114 +1,23 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 29 Aug 2013 19:36:44 -0400
-Subject: [PATCH v2 4/4] ARM: keystone: add PM bus support for clock management
-In-Reply-To: <1377819404-9671-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1377819404-9671-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1377819404-9671-5-git-send-email-santosh.shilimkar@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 29 Aug 2013 16:36:47 -0700
+Subject: [PATCH v3 5/5] ARM: bcm4760: Add restart hook
+In-Reply-To: <20130814221238.291003843@gmail.com>
+References: <20130814221043.528864175@gmail.com>
+ <20130814221238.291003843@gmail.com>
+Message-ID: <20130829233647.GC29606@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add runtime PM core support to Keystone SOCs by using the pm_clk
-infrastructure of the PM core. Patch is based on Kevin's pm_domain
-work on DaVinci SOCs.
+Hi,
 
-Keystone SOC doesn't have depedency to enable clocks in early
-in the boot and hence the clock and PM bus initialisation is done
-at subsys_init() level.
+On Thu, Aug 15, 2013 at 12:10:48AM +0200, Domenico Andreoli wrote:
+> From: Domenico Andreoli <domenico.andreoli@linux.com>
+> 
+> Restart hook implementation for the Broadcom BCM4760 based ARM11 SoCs.
 
-Cc: Kevin Hilman <khilman@linaro.org>
+This essentially implements a wdt driver under mach-bcm. It'd be better
+to contain this under drivers/watchdog and use the reboot notifier to
+do the restart from there.
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- drivers/bus/Makefile          |    2 ++
- drivers/bus/keystone_pm_bus.c |   70 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 72 insertions(+)
- create mode 100644 drivers/bus/keystone_pm_bus.c
 
-diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-index 8947bdd..cb7f304 100644
---- a/drivers/bus/Makefile
-+++ b/drivers/bus/Makefile
-@@ -10,3 +10,5 @@ obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
- obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
- # CCI cache coherent interconnect for ARM platforms
- obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
-+# PM bus driver for Keystone SOCs
-+obj-$(CONFIG_ARCH_KEYSTONE)	+= keystone_pm_bus.o
-diff --git a/drivers/bus/keystone_pm_bus.c b/drivers/bus/keystone_pm_bus.c
-new file mode 100644
-index 0000000..6cc56f1
---- /dev/null
-+++ b/drivers/bus/keystone_pm_bus.c
-@@ -0,0 +1,70 @@
-+/*
-+ * PM Bus driver for Keystone2 devices
-+ *
-+ * Copyright 2013 Texas Instruments, Inc.
-+ *	Santosh Shilimkar <santosh.shillimkar@ti.com>
-+ *
-+ * Based on Kevins work on DAVINCI SOCs
-+ *	Kevin Hilman <khilman@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/pm_clock.h>
-+#include <linux/platform_device.h>
-+#include <linux/clk-provider.h>
-+
-+#ifdef CONFIG_PM_RUNTIME
-+static int keystone_pm_runtime_suspend(struct device *dev)
-+{
-+	int ret;
-+
-+	dev_dbg(dev, "%s\n", __func__);
-+
-+	ret = pm_generic_runtime_suspend(dev);
-+	if (ret)
-+		return ret;
-+
-+	ret = pm_clk_suspend(dev);
-+	if (ret) {
-+		pm_generic_runtime_resume(dev);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int keystone_pm_runtime_resume(struct device *dev)
-+{
-+	dev_dbg(dev, "%s\n", __func__);
-+
-+	pm_clk_resume(dev);
-+
-+	return pm_generic_runtime_resume(dev);
-+}
-+#endif
-+
-+static struct dev_pm_domain keystone_pm_bus = {
-+	.ops = {
-+		SET_RUNTIME_PM_OPS(keystone_pm_runtime_suspend,
-+				   keystone_pm_runtime_resume, NULL)
-+		USE_PLATFORM_PM_SLEEP_OPS
-+	},
-+};
-+
-+static struct pm_clk_notifier_block platform_bus_notifier = {
-+	.pm_domain = &keystone_pm_bus,
-+};
-+
-+int __init keystone_pm_runtime_init(void)
-+{
-+	of_clk_init(NULL);
-+	pm_clk_add_notifier(&platform_bus_type, &platform_bus_notifier);
-+
-+	return 0;
-+}
-+subsys_initcall(keystone_pm_runtime_init);
--- 
-1.7.9.5
+-Olof
