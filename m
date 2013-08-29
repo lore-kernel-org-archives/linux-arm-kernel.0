@@ -1,25 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Aug 2013 19:20:13 +0200
-Subject: [PATCH RFC v2 16/16] ARM: zynq: Don't call of_clk_init()
-In-Reply-To: <89b68978-7eeb-43e1-a456-d864ed313da5@DB8EHSMHS026.ehs.local>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <201308291537.54608.arnd@arndb.de>
- <89b68978-7eeb-43e1-a456-d864ed313da5@DB8EHSMHS026.ehs.local>
-Message-ID: <201308291920.13983.arnd@arndb.de>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Thu, 29 Aug 2013 12:23:02 -0500
+Subject: [PATCH] dma: imx-sdma: Add ROM script addresses to driver
+In-Reply-To: <20130820150252.GB31060@pengutronix.de>
+References: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
+ <CAHCPf3t1_5zhSOrfVFHgeVPa25sT+ewv1=OZA8X4_YZXb9cSeA@mail.gmail.com>
+ <20130820070039.GH31036@pengutronix.de>
+ <CAHCPf3sJDRXUkrkRtku06OvBav2idFvJwThsxsrHngXg3mEXJA@mail.gmail.com>
+ <20130820150252.GB31060@pengutronix.de>
+Message-ID: <CAHCPf3vYTW7=s663+mEnesRX=MoSc8VwN5i=RB0Zm3J727_t2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 August 2013, Michal Simek wrote:
-> Is there any plan to remove all of them?
-> I expect that on almost all platforms it is a need to have at least one
-> early hook to be able to setup things.
+On Tue, Aug 20, 2013 at 10:02 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>
+>> What I'd really like to see is the "waiting on a firmware that doesn't
+>> exist when there is a working ROM version of those scripts in the SoC"
+>
+> Then this patch is for you. This is exactly what the patch solves.
 
-In an ideal world, we wouldn't need any, and on arm64 we don't plan to
-introduce callbacks in the first place. We don't put a lot of effort
-into eliminating all the ones from existing platforms in the near future,
-but but I do hope to have a situation where we don't use any callbacks
-for newly introduced 32-bit platforms soon, and remove a lot of the
-existing callbacks over time when we have the chance (like now for the
-clk init).
+Only by changing the device tree and not specifying a firmware
+filename. The driver probes, knows about ROM script addresses as per
+your patch, tries to load a new file from disk; same hang. What you
+have now is a way to use a potentially buggy script with several
+functions missing (ROM script isn't as full-featured as the file-based
+one on some chips) or a hang on boot if you misplaced a firmware which
+is notoriously hard to get hold of..
 
-	Arnd
+How do we resolve this except to load the firmware pre-Linux (or put
+the firmware in the tree, argh) and describe the loaded firmware and
+offsets? Once it's in the internal SDMA code RAM all the versioning
+and headers go away..
