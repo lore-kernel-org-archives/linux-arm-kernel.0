@@ -1,68 +1,40 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 29 Aug 2013 16:32:52 +0530
-Subject: [PATCH 2/2] ARM: OMAP4+: Move SRAM data to DT
-In-Reply-To: <521DCFD8.2020304@ti.com>
-References: <1377598305-15539-1-git-send-email-rnayak@ti.com>
- <1377598305-15539-3-git-send-email-rnayak@ti.com> <521C8C47.2000502@ti.com>
- <521D977D.1000305@ti.com> <521DCFD8.2020304@ti.com>
-Message-ID: <521F2A5C.80404@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 29 Aug 2013 12:05:34 +0100
+Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
+In-Reply-To: <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
+References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
+ <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
+ <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
+ <87txiasqhk.fsf@linaro.org>
+ <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
+Message-ID: <20130829110534.GV10783@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 August 2013 03:54 PM, Sekhar Nori wrote:
-> On Wednesday 28 August 2013 11:53 AM, Rajendra Nayak wrote:
->> On Tuesday 27 August 2013 04:53 PM, Sekhar Nori wrote:
->>> On Tuesday 27 August 2013 03:41 PM, Rajendra Nayak wrote:
->>>> Use drivers/misc/sram.c driver to manage SRAM on all DT only
->>>> OMAP platforms (am33xx, am43xx, omap4 and omap5) instead of
->>>> the existing private implementation.
->>>>
->>>> Address and size related data  is removed from mach-omap2/sram.c
->>>> and now passed to drivers/misc/sram.c from DT.
->>>>
->>>> Users can hence use general purpose allocator apis instead of
->>>> OMAP private ones to manage and use SRAM.
->>>>
->>>> Currently there are no users on SRAM on these platfoms.
->>>>
->>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->>>
->>> Nice getting rid of code.
->>>
->>>> diff --git a/arch/arm/mach-omap2/sram.h b/arch/arm/mach-omap2/sram.h
->>>> index ca7277c..3f83b80 100644
->>>> --- a/arch/arm/mach-omap2/sram.h
->>>> +++ b/arch/arm/mach-omap2/sram.h
->>>> @@ -80,4 +80,3 @@ static inline void omap_push_sram_idle(void) {}
->>>>  #else
->>>>  #define OMAP4_SRAM_PA		0x40300000
->>>>  #endif
->>>> -#define AM33XX_SRAM_PA		0x40300000
->>>
->>> I guess OMAP4_SRAM_PA is left in the code to take care of errata I688?
->>
->> right.
->>
->>> How about removing the iotable entry for SRAM on OMAP4 and converting
->>> omap_barriers_init() to use the gen_pool API instead of passing an
->>> incremented address to DT?
->>
->> Actually we dont really need to alloc and manage any sram pool for handling
->> the errata. It just needs to know an sram location which it can read and write
->> back into (which can be any sram location used/unused).
-> 
-> But there will be a race with other writes to SRAM since omap_bus_sync()
-> is not atomic context.
+On Tue, Aug 27, 2013 at 06:05:34PM -0700, Russ Dill wrote:
+> On Tue, Aug 27, 2013 at 3:44 PM, Kevin Hilman <khilman@linaro.org> wrote:
 
-Right, I completely overlooked the fact that omap_bus_sync() is also done every
-wmb(). I was thinking its needed only just before a wfi.
+> > The framework already has a concept of suspend voltage, suspend mode
+> > etc.  Maybe it needs some generalizing so low-level platform code could
+> > query the framework for the sequence so it can be done late in platform
+> > idle/suspend paths.  Especially for regmap drivers, this seems feasible.
 
-I will repost a v2 using gen_pool to allocate sram space to handle errata I688
-and get rid of all the static mappings.
+> Yes, my main hesitation for going down this path is possible lack of
+> support for such an interface upstream.
 
-regards,
-Rajendra
-> 
-> Thanks,
-> Sekhar
-> 
+Someone is going to have to walk me through the context for me to fully
+understand what this is all about - what's the problem?
+
+Generally for suspend if the sequencing is being done by the processor
+it's been handled by the drivers for the components in question.  For
+sequencing beyond that you're into hardware features which aren't all
+that regular sadly and often aren't controllable either.  It sounds like
+this is the latter case but the thing that manages some of the late
+power down stages does so using a firmware we can rewrite?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130829/03182f12/attachment.sig>
