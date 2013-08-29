@@ -1,124 +1,78 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 29 Aug 2013 11:32:48 +0200
-Subject: [RESEND PATCH v2 4/7] V4L: s5k6a3: Add support for asynchronous subdev
- registration
-Message-ID: <1377768768-16013-1-git-send-email-s.nawrocki@samsung.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Thu, 29 Aug 2013 15:04:32 +0530
+Subject: [PATCH V2 1/3] ARM: AM33xx: hwmod: Add RNG module data
+In-Reply-To: <1375777984-6267-2-git-send-email-lokeshvutla@ti.com>
+References: <1375777984-6267-2-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1377768872-1609-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch converts the driver to use v4l2 asynchronous subdev
-registration API an the clock API to control the external master
-clock directly.
+Add RNG hwmod data for AM33xx SoC.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- drivers/media/i2c/s5k6a3.c |   36 ++++++++++++++++++++++++++----------
- 1 file changed, 26 insertions(+), 10 deletions(-)
+Changes since V1:
+* Rebased on top of Paul's tree:
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.12/omap-prcm-hwmod 
+* Made am33xx_l4_per__rng structure as static to fix sparse warning
+* Updated am33xx_rng_hwmod flags
 
-diff --git a/drivers/media/i2c/s5k6a3.c b/drivers/media/i2c/s5k6a3.c
-index ba86e24..f65a4f8 100644
---- a/drivers/media/i2c/s5k6a3.c
-+++ b/drivers/media/i2c/s5k6a3.c
-@@ -34,6 +34,7 @@
- #define S5K6A3_DEFAULT_HEIGHT		732
- 
- #define S5K6A3_DRV_NAME			"S5K6A3"
-+#define S5K6A3_CLK_NAME			"extclk"
- #define S5K6A3_DEFAULT_CLK_FREQ		24000000U
- 
- #define S5K6A3_NUM_SUPPLIES		2
-@@ -56,6 +57,7 @@ struct s5k6a3 {
- 	int gpio_reset;
- 	struct mutex lock;
- 	struct v4l2_mbus_framefmt format;
-+	struct clk *clock;
- 	u32 clock_frequency;
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   36 ++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index 215894f..3e32f45 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -2480,6 +2480,41 @@ static struct omap_hwmod_ocp_if am33xx_l3_main__aes0 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
  };
  
-@@ -181,19 +183,25 @@ static int s5k6a3_s_power(struct v4l2_subdev *sd, int on)
- {
- 	struct s5k6a3 *sensor = sd_to_s5k6a3(sd);
- 	int gpio = sensor->gpio_reset;
--	int ret;
-+	int ret = 0;
- 
- 	if (on) {
-+		ret = clk_set_rate(sensor->clock, sensor->clock_frequency);
-+		if (ret < 0)
-+			return ret;
++/* rng */
++static struct omap_hwmod_class_sysconfig am33xx_rng_sysc = {
++	.rev_offs	= 0x1fe0,
++	.sysc_offs	= 0x1fe4,
++	.sysc_flags	= SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE,
++	.idlemodes	= SIDLE_FORCE | SIDLE_NO,
++	.sysc_fields	= &omap_hwmod_sysc_type1,
++};
 +
- 		ret = pm_runtime_get(sensor->dev);
- 		if (ret < 0)
- 			return ret;
- 
- 		ret = regulator_bulk_enable(S5K6A3_NUM_SUPPLIES,
- 					    sensor->supplies);
--		if (ret < 0) {
--			pm_runtime_put(sensor->dev);
--			return ret;
--		}
-+		if (ret < 0)
-+			goto rpm_put;
++static struct omap_hwmod_class am33xx_rng_hwmod_class = {
++	.name		= "rng",
++	.sysc		= &am33xx_rng_sysc,
++};
 +
-+		ret = clk_prepare_enable(sensor->clock);
-+		if (ret < 0)
-+			goto reg_dis;
- 
- 		if (gpio_is_valid(gpio)) {
- 			gpio_set_value(gpio, 1);
-@@ -209,10 +217,12 @@ static int s5k6a3_s_power(struct v4l2_subdev *sd, int on)
- 		if (gpio_is_valid(gpio))
- 			gpio_set_value(gpio, 0);
- 
--		ret = regulator_bulk_disable(S5K6A3_NUM_SUPPLIES,
--					     sensor->supplies);
--		if (!ret)
--			pm_runtime_put(sensor->dev);
-+		clk_disable_unprepare(sensor->clock);
-+reg_dis:
-+		regulator_bulk_disable(S5K6A3_NUM_SUPPLIES,
-+						sensor->supplies);
-+rpm_put:
-+		pm_runtime_put(sensor->dev);
- 	}
- 	return ret;
- }
-@@ -240,6 +250,7 @@ static int s5k6a3_probe(struct i2c_client *client,
- 
- 	mutex_init(&sensor->lock);
- 	sensor->gpio_reset = -EINVAL;
-+	sensor->clock = ERR_PTR(-EINVAL);
- 	sensor->dev = dev;
- 
- 	gpio = of_get_gpio_flags(dev->of_node, 0, NULL);
-@@ -266,6 +277,10 @@ static int s5k6a3_probe(struct i2c_client *client,
- 	if (ret < 0)
- 		return ret;
- 
-+	sensor->clock = devm_clk_get(dev, S5K6A3_CLK_NAME);
-+	if (IS_ERR(sensor->clock))
-+		return -EPROBE_DEFER;
++static struct omap_hwmod am33xx_rng_hwmod = {
++	.name		= "rng",
++	.class		= &am33xx_rng_hwmod_class,
++	.clkdm_name	= "l4ls_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE,
++	.main_clk	= "rng_fck",
++	.prcm		= {
++		.omap4	= {
++			.clkctrl_offs	= AM33XX_CM_PER_RNG_CLKCTRL_OFFSET,
++			.modulemode	= MODULEMODE_SWCTRL,
++		},
++	},
++};
 +
- 	sd = &sensor->subdev;
- 	v4l2_i2c_subdev_init(sd, client, &s5k6a3_subdev_ops);
- 	sensor->subdev.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
-@@ -282,7 +297,7 @@ static int s5k6a3_probe(struct i2c_client *client,
- 	pm_runtime_no_callbacks(dev);
- 	pm_runtime_enable(dev);
++static struct omap_hwmod_ocp_if am33xx_l4_per__rng = {
++	.master		= &am33xx_l4_ls_hwmod,
++	.slave		= &am33xx_rng_hwmod,
++	.clk		= "rng_fck",
++	.user		= OCP_USER_MPU,
++};
++
+ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_l3_main__emif,
+ 	&am33xx_mpu__l3_main,
+@@ -2559,6 +2594,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_cpgmac0__mdio,
+ 	&am33xx_l3_main__sha0,
+ 	&am33xx_l3_main__aes0,
++	&am33xx_l4_per__rng,
+ 	NULL,
+ };
  
--	return 0;
-+	return v4l2_async_register_subdev(sd);
- }
- 
- static int s5k6a3_remove(struct i2c_client *client)
-@@ -290,6 +305,7 @@ static int s5k6a3_remove(struct i2c_client *client)
- 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
- 
- 	pm_runtime_disable(&client->dev);
-+	v4l2_async_unregister_subdev(sd);
- 	media_entity_cleanup(&sd->entity);
- 	return 0;
- }
 -- 
 1.7.9.5
