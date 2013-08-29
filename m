@@ -1,212 +1,80 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 29 Aug 2013 17:14:49 +0200 (CEST)
-Subject: [PATCH] ARM: shmobile: update SDHI DT compatibility string to the
- <unit>-<soc> format
-Message-ID: <Pine.LNX.4.64.1308291650120.3786@axis700.grange>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 29 Aug 2013 08:17:57 -0700
+Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
+In-Reply-To: <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
+ (Russ Dill's message of "Tue, 27 Aug 2013 18:05:34 -0700")
+References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
+ <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
+ <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
+ <87txiasqhk.fsf@linaro.org>
+ <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
+Message-ID: <87ppsw7cgq.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently DT compatibility strings of both types can be found in the kernel
-sources: <unit>-<soc> and <soc>-<unit>, whereas a unique format should be
-followed and the former one is preferred. This patch converts the SDHI
-MMC driver and its users to the common standard. This is safe for now, since
-ATM no real products are using this driver with DT.
+Russ Dill <Russ.Dill@ti.com> writes:
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
----
+> On Tue, Aug 27, 2013 at 3:44 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>> [+Mark Brown for regulator suspend sequence ideas]
+>>
+>> Russ Dill <Russ.Dill@ti.com> writes:
+>>
+>>> On Wed, Aug 14, 2013 at 6:38 AM, Jan L?bbe <jlu@pengutronix.de> wrote:
+>>>> On Tue, 2013-08-13 at 15:20 -0700, Russ Dill wrote:
+> [snip]
+>>>> Shouldn't the TPS driver know how to generate this sequence? It seems
+>>>> fragile to do voltage adjustments behind the back of the regulator
+>>>> framework and the TPS driver. The wake-sequence values should match the
+>>>> (in-memory) regulator configuration on resume (which may have been
+>>>> changed by DVFS).
+>>>
+>>> The sequence is both PMIC specific and board specific. Additionally,
+>>> the PMICs used aren't am335x specific. It would be nice to have the
+>>> regulator framework and the driver write all this out, but the
+>>> sequence is written out by the Cortex-M3 processor running some PM
+>>> firmware. Even if the code was changed to run on the A8, it'd have to
+>>> run from a small piece of SRAM.
+>>
+>> So, why/how was the decision made to use the M3 instead of the MPU
+>> running from SRAM?
+>>
+>> As a firmware minimalist, I obviously prefer to do this from the MPU
+>> side.  But also, because the M3 is reset every suspend sequence, this
+>> becomes rather heavy to do from the M3.
+>
+> After the feedback Vaibhav Bedia received on v2 of his suspend/resume
+> patchset for am335x, he decided to move many of the operations from
+> sleep33xx.S into the M3 firmware.
+>
+> See the commit message here:
+> http://arago-project.org/git/projects/?p=am33x-cm3.git;a=commit;h=a972ce2f6
 
-Ok, the "no real products" is an assumption, that Laurent and Simon kind 
-of agreed upon, so, I'm using it here to avoid having to carry old 
-compatibility strings with us around. If anyone has other information - 
-please shout. Otherwise, I think, it would be the easiest for Chris to ack 
-this and for Simon to pull this via the ARM tree for late 3.12 (possibly, 
-post -rc1) inclusion.
+Was this feedback on the public lists?  That patch has never been posted
+to linux-omap AFAICT.
 
- Documentation/devicetree/bindings/mmc/tmio_mmc.txt |   17 ++++++++++-------
- arch/arm/boot/dts/r8a73a4.dtsi                     |    6 +++---
- arch/arm/boot/dts/r8a7740.dtsi                     |    4 ++--
- arch/arm/boot/dts/r8a7790.dtsi                     |    8 ++++----
- arch/arm/boot/dts/sh73a0.dtsi                      |    6 +++---
- drivers/mmc/host/sh_mobile_sdhi.c                  |   16 ++++++++--------
- 6 files changed, 30 insertions(+), 27 deletions(-)
+> I need to wait until after the PLLs are put into bypass, which is now
+> done in the M3 firmware. It also ends up being a lot easier to write
+> the I2C writer code there in C rather than in assembly in sleep33xx.S.
 
-diff --git a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-index df204e1..6a2a116 100644
---- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-@@ -9,12 +9,15 @@ compulsory and any optional properties, common to all SD/MMC drivers, as
- described in mmc.txt, can be used. Additionally the following tmio_mmc-specific
- optional bindings can be used.
- 
-+Required properties:
-+- compatible:	"renesas,sdhi-shmobile" - a generic sh-mobile SDHI unit
-+		"renesas,sdhi-sh7372" - SDHI IP on SH7372 SoC
-+		"renesas,sdhi-sh73a0" - SDHI IP on SH73A0 SoC
-+		"renesas,sdhi-r8a73a4" - SDHI IP on R8A73A4 SoC
-+		"renesas,sdhi-r8a7740" - SDHI IP on R8A7740 SoC
-+		"renesas,sdhi-r8a7778" - SDHI IP on R8A7778 SoC
-+		"renesas,sdhi-r8a7779" - SDHI IP on R8A7779 SoC
-+		"renesas,sdhi-r8a7790" - SDHI IP on R8A7790 SoC
-+
- Optional properties:
- - toshiba,mmc-wrprotect-disable: write-protect detection is unavailable
--
--When used with Renesas SDHI hardware, the following compatibility strings
--configure various model-specific properties:
--
--"renesas,sh7372-sdhi":	(default) compatible with SH7372
--"renesas,r8a7740-sdhi":	compatible with R8A7740: certain MMC/SD commands have to
--			wait for the interface to become idle.
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index b0511b1..cc7211b 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -236,7 +236,7 @@
- 	};
- 
- 	sdhi0: sdhi at ee100000 {
--		compatible = "renesas,r8a73a4-sdhi";
-+		compatible = "renesas,sdhi-r8a73a4";
- 		reg = <0 0xee100000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 165 4>;
-@@ -245,7 +245,7 @@
- 	};
- 
- 	sdhi1: sdhi at ee120000 {
--		compatible = "renesas,r8a73a4-sdhi";
-+		compatible = "renesas,sdhi-r8a73a4";
- 		reg = <0 0xee120000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 166 4>;
-@@ -254,7 +254,7 @@
- 	};
- 
- 	sdhi2: sdhi at ee140000 {
--		compatible = "renesas,r8a73a4-sdhi";
-+		compatible = "renesas,sdhi-r8a73a4";
- 		reg = <0 0xee140000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 167 4>;
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 8fc4a5d..c4992b5 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -155,7 +155,7 @@
- 	};
- 
- 	sdhi0: sdhi at e6850000 {
--		compatible = "renesas,r8a7740-sdhi";
-+		compatible = "renesas,sdhi-r8a7740";
- 		reg = <0xe6850000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 117 4
-@@ -167,7 +167,7 @@
- 	};
- 
- 	sdhi1: sdhi@e6860000 {
--		compatible = "renesas,r8a7740-sdhi";
-+		compatible = "renesas,sdhi-r8a7740";
- 		reg = <0xe6860000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 121 4
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 3b879e7..885f9f4 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -152,7 +152,7 @@
- 	};
- 
- 	sdhi0: sdhi@ee100000 {
--		compatible = "renesas,r8a7790-sdhi";
-+		compatible = "renesas,sdhi-r8a7790";
- 		reg = <0 0xee100000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 165 4>;
-@@ -161,7 +161,7 @@
- 	};
- 
- 	sdhi1: sdhi at ee120000 {
--		compatible = "renesas,r8a7790-sdhi";
-+		compatible = "renesas,sdhi-r8a7790";
- 		reg = <0 0xee120000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 166 4>;
-@@ -170,7 +170,7 @@
- 	};
- 
- 	sdhi2: sdhi at ee140000 {
--		compatible = "renesas,r8a7790-sdhi";
-+		compatible = "renesas,sdhi-r8a7790";
- 		reg = <0 0xee140000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 167 4>;
-@@ -179,7 +179,7 @@
- 	};
- 
- 	sdhi3: sdhi at ee160000 {
--		compatible = "renesas,r8a7790-sdhi";
-+		compatible = "renesas,sdhi-r8a7790";
- 		reg = <0 0xee160000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 168 4>;
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index ba59a58..3955c76 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -196,7 +196,7 @@
- 	};
- 
- 	sdhi0: sdhi at ee100000 {
--		compatible = "renesas,r8a7740-sdhi";
-+		compatible = "renesas,sdhi-r8a7740";
- 		reg = <0xee100000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 83 4
-@@ -208,7 +208,7 @@
- 
- 	/* SDHI1 and SDHI2 have no CD pins, no need for CD IRQ */
- 	sdhi1: sdhi@ee120000 {
--		compatible = "renesas,r8a7740-sdhi";
-+		compatible = "renesas,sdhi-r8a7740";
- 		reg = <0xee120000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 88 4
-@@ -219,7 +219,7 @@
- 	};
- 
- 	sdhi2: sdhi@ee140000 {
--		compatible = "renesas,r8a7740-sdhi";
-+		compatible = "renesas,sdhi-r8a7740";
- 		reg = <0xee140000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 104 4
-diff --git a/drivers/mmc/host/sh_mobile_sdhi.c b/drivers/mmc/host/sh_mobile_sdhi.c
-index 87ed3fb..f344659 100644
---- a/drivers/mmc/host/sh_mobile_sdhi.c
-+++ b/drivers/mmc/host/sh_mobile_sdhi.c
-@@ -113,14 +113,14 @@ static const struct sh_mobile_sdhi_ops sdhi_ops = {
- };
- 
- static const struct of_device_id sh_mobile_sdhi_of_match[] = {
--	{ .compatible = "renesas,shmobile-sdhi" },
--	{ .compatible = "renesas,sh7372-sdhi" },
--	{ .compatible = "renesas,sh73a0-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
--	{ .compatible = "renesas,r8a73a4-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
--	{ .compatible = "renesas,r8a7740-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
--	{ .compatible = "renesas,r8a7778-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
--	{ .compatible = "renesas,r8a7779-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
--	{ .compatible = "renesas,r8a7790-sdhi", .data = &sh_mobile_sdhi_of_cfg[0], },
-+	{ .compatible = "renesas,sdhi-shmobile" },
-+	{ .compatible = "renesas,sdhi-sh7372" },
-+	{ .compatible = "renesas,sdhi-sh73a0", .data = &sh_mobile_sdhi_of_cfg[0], },
-+	{ .compatible = "renesas,sdhi-r8a73a4", .data = &sh_mobile_sdhi_of_cfg[0], },
-+	{ .compatible = "renesas,sdhi-r8a7740", .data = &sh_mobile_sdhi_of_cfg[0], },
-+	{ .compatible = "renesas,sdhi-r8a7778", .data = &sh_mobile_sdhi_of_cfg[0], },
-+	{ .compatible = "renesas,sdhi-r8a7779", .data = &sh_mobile_sdhi_of_cfg[0], },
-+	{ .compatible = "renesas,sdhi-r8a7790", .data = &sh_mobile_sdhi_of_cfg[0], },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, sh_mobile_sdhi_of_match);
--- 
-1.7.2.5
+hmm, (carefully) written functions in C can still be copied to SRAM.  I
+dont' see that as an obstacle.
+
+>> Currently voltage scaling is only being proposed for suspend in this
+>> series, but in theory it's possible from idle as well.  Doing this from
+>> the MPU/SRAM seems much better suited for idle.
+>
+> The M3 firmware will also handle any cpuidle modes deeper than just
+> putting SDRAM into self refresh. This is actually the only way of
+> doing things like turning the MPU domain off on am335x.
+
+Yes, it will have to handle the MPU/interconnect off parts but other
+than that, that's the only thing it *has* to do (well, and handle wakeup
+from the deep state.)  The rest of the stuff being piled into the M3 is
+a result of software/firmware design decisions AFAICT.  As I predicted
+when I first saw this SoC design, the firmware is getting bigger and
+bigger.  Initially it was argued that it would be tiny, and only handle
+the things it had to do.  Now it's growing due to "convenience".  IMO,
+this is a bad trend, and one that will make this code more and more
+difficult to maintain upstream (assuming that's a goal.)
+
+Kevin
