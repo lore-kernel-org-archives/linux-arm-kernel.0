@@ -1,75 +1,144 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 29 Aug 2013 20:10:51 +0100
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 29 Aug 2013 12:11:42 -0700
 Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
-In-Reply-To: <CA+Bv8XavoekzHM6DU3BFdq8W+XK6aGr7bvW60W3L6gR2Cu2p4Q@mail.gmail.com>
+In-Reply-To: <CA+Bv8XbxV=BFjcSsUMX2pz9LeCkSwrjzZmj_=YbHGzyfbLXmaQ@mail.gmail.com>
+ (Russ Dill's message of "Thu, 29 Aug 2013 09:10:51 -0700")
 References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
  <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
  <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
  <87txiasqhk.fsf@linaro.org>
  <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
- <20130829110534.GV10783@sirena.org.uk>
- <CA+Bv8XaX6v7wH0d1c2S7RzFDx6rAueHi1ZkmkGMpvcNDypXvzQ@mail.gmail.com>
- <20130829180101.GO10783@sirena.org.uk>
- <CA+Bv8XavoekzHM6DU3BFdq8W+XK6aGr7bvW60W3L6gR2Cu2p4Q@mail.gmail.com>
-Message-ID: <20130829191051.GT10783@sirena.org.uk>
+ <87ppsw7cgq.fsf@linaro.org>
+ <CA+Bv8XbxV=BFjcSsUMX2pz9LeCkSwrjzZmj_=YbHGzyfbLXmaQ@mail.gmail.com>
+Message-ID: <874na8xqfl.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 11:25:43AM -0700, Russ Dill wrote:
-> On Thu, Aug 29, 2013 at 11:01 AM, Mark Brown <broonie@kernel.org> wrote:
+Russ Dill <Russ.Dill@ti.com> writes:
 
-> > Making it write only seems to be a mistake - like I said in my other
-> > mail I'd expect you'd want bitfield updates here.  The read and modify
-> > could be done earlier by Linux though.
+> On Thu, Aug 29, 2013 at 8:17 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Russ Dill <Russ.Dill@ti.com> writes:
+>>
+>>> On Tue, Aug 27, 2013 at 3:44 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>>>> [+Mark Brown for regulator suspend sequence ideas]
+>>>>
+>>>> Russ Dill <Russ.Dill@ti.com> writes:
+>>>>
+>>>>> On Wed, Aug 14, 2013 at 6:38 AM, Jan L?bbe <jlu@pengutronix.de> wrote:
+>>>>>> On Tue, 2013-08-13 at 15:20 -0700, Russ Dill wrote:
+>>> [snip]
+>>>>>> Shouldn't the TPS driver know how to generate this sequence? It seems
+>>>>>> fragile to do voltage adjustments behind the back of the regulator
+>>>>>> framework and the TPS driver. The wake-sequence values should match the
+>>>>>> (in-memory) regulator configuration on resume (which may have been
+>>>>>> changed by DVFS).
+>>>>>
+>>>>> The sequence is both PMIC specific and board specific. Additionally,
+>>>>> the PMICs used aren't am335x specific. It would be nice to have the
+>>>>> regulator framework and the driver write all this out, but the
+>>>>> sequence is written out by the Cortex-M3 processor running some PM
+>>>>> firmware. Even if the code was changed to run on the A8, it'd have to
+>>>>> run from a small piece of SRAM.
+>>>>
+>>>> So, why/how was the decision made to use the M3 instead of the MPU
+>>>> running from SRAM?
+>>>>
+>>>> As a firmware minimalist, I obviously prefer to do this from the MPU
+>>>> side.  But also, because the M3 is reset every suspend sequence, this
+>>>> becomes rather heavy to do from the M3.
+>>>
+>>> After the feedback Vaibhav Bedia received on v2 of his suspend/resume
+>>> patchset for am335x, he decided to move many of the operations from
+>>> sleep33xx.S into the M3 firmware.
+>>>
+>>> See the commit message here:
+>>> http://arago-project.org/git/projects/?p=am33x-cm3.git;a=commit;h=a972ce2f6
+>>
+>> Was this feedback on the public lists?  That patch has never been posted
+>> to linux-omap AFAICT.
+>>
+>>> I need to wait until after the PLLs are put into bypass, which is now
+>>> done in the M3 firmware. It also ends up being a lot easier to write
+>>> the I2C writer code there in C rather than in assembly in sleep33xx.S.
+>>
+>> hmm, (carefully) written functions in C can still be copied to SRAM.  I
+>> dont' see that as an obstacle.
+>>
+>>>> Currently voltage scaling is only being proposed for suspend in this
+>>>> series, but in theory it's possible from idle as well.  Doing this from
+>>>> the MPU/SRAM seems much better suited for idle.
+>>>
+>>> The M3 firmware will also handle any cpuidle modes deeper than just
+>>> putting SDRAM into self refresh. This is actually the only way of
+>>> doing things like turning the MPU domain off on am335x.
+>>
+>> Yes, it will have to handle the MPU/interconnect off parts but other
+>> than that, that's the only thing it *has* to do (well, and handle wakeup
+>> from the deep state.)  The rest of the stuff being piled into the M3 is
+>> a result of software/firmware design decisions AFAICT.  As I predicted
+>> when I first saw this SoC design, the firmware is getting bigger and
+>> bigger.  Initially it was argued that it would be tiny, and only handle
+>> the things it had to do.  Now it's growing due to "convenience".  IMO,
+>> this is a bad trend, and one that will make this code more and more
+>> difficult to maintain upstream (assuming that's a goal.)
+>
+> Do you mean upstream as in the firmware upstream, or upstream as in
+> the kernel upstream? Upstream kernel is really easy to maintain
+> because sleep33xx.S just puts the SDRAM into self-refresh.
 
-> Updating bitfields in memory is pretty basic, but with I2C, each
-> device has its own register sizes and methods of accessing registers.
-> The first byte of an I2C sequence being a register address is pretty
-> common though. You'd need a method of defining in the device tree
-> piece how to modify bitfields.
+I mean making the kernel "simple" at the price of more complicated (and
+much less reviewed) firmware code is a bad trend.  I understand the
+desire to move this stuff into firmware and bypass the kernel review
+process, but I predict it will backfire.
 
-I'd not assume byte based addressing for a PMIC, it's very common but
-not universal.  The difficulties here assume putting this in the device
-tree as explicit register I/O - I do tend to agree with Kevin that this
-doesn't seem like the right abstraction.
+> The code to perform these transitions is going to exist, either in
+> kernel or in firmware. If you are looking for this to be maintainable
+> C code that is copied into SRAM, it will need to be built much like a
+> firmware, with it's elf sections being copied into SRAM properly. 
 
-> > If it's just setting a single voltage then extracting the bitfield to
-> > update shouldn't be too hard for regmap based regulators.  Off the top
-> > of my head I'd expect either the driver for the M3 or the cpuidle driver
-> > that talks to it to be a consumer of the regulator and then go from
-> > there.
+You're making it too complicated.  No need for ELF, etc.
 
-> It'd be a list of bitfields. So are you suggesting a regulator_ops
-> call that would return a list of bitfield updates along with an I2C
-> controller, an I2C device address, I2C register addressing scheme (8
-> bit, 16 bit, or other) and the info for each bitfield (register size)?
-> And then each regulator driver would be updated as needed with this
-> code. Would this be a way forward? Would regmap actually tie into this
-> at all?
+So the argument for moving much of the stuff from the kernel (in the
+patch you referenced above) was that the "assembly code is quite big and
+folks have found it hard to review and fixup issues in this dense piece
+of code."  (interestingly, it was moved to firmware where it will see
+even less review, but that's off topic.)
 
-I was thinking about the majority of regulators where setting a voltage
-would be a single bitfield update (plus ramp delay, which is going to
-need to be accounted for in the power on case).  If we need to do longer
-sequences things get a bit more tricky in terms of interface but it
-seems doable.
+My idea was that if reviewing assembly is the issue, why not carefully
+write a self-contained C function that can be copied to SRAM.  It might
+need a little stub in SRAM to setup the stack etc., but it should be
+quite doable.  That eliminates the problem cited as the reason for the
+move to M3.
 
-regmap would tie in in that it already has a way of describing the
-format for interactions with the device so we could just reuse the same
-description, and with some work we can probably reuse the code that
-generates the bitstreams for sending to the devices too (though I don't
-immediately see a nice way of doing that).
+> I'm not sure how much it complicates things, but the code needs to be
+> able to run with the MMU on and MMU off. The C code would be a
+> minimalized duplication of much of what is already in
+> mach-omap2. Because you are proposing to split this up between A8 and
+> M3, much of that code would then be duplicated again within the M3
+> firmware.
+>
+> And don't forget that am335x is just the first platform with such a PM scheme.
 
-Not sure if this is worth the effort or not though, but then there's the
-whole DT as ABI thing to worry about...
+IMO, all the more reason to handle it in Linux, not in platform-specific firmware.
 
-> This is VDD core, so its not related to cpuidle or the M3.
+> Because the M3 firmware already has to manage power domains, hwmods,
+> plls, and clockdomains, adding or removing which ones it handles
+> doesn't really change the size or complexity of the firmware. 
 
-It's related to the M3 if the M3 is managing it; you can have multiple
-consumers for a regulator so it doesn't need to be one or the other.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130829/606d058c/attachment.sig>
+No, but it significantly complicates its interaction with Linux, which
+also has to know about all these things already.  IMO, as I've stated
+from the very beginning of this SoC, there should be a very clean split.
+M3 should only handle the minimum, what the MPU simply cannot do
+(MPU/interconnect off, wakeup).  MPU/Linux should handle the rest.
+
+> In fact, because so much of the code is common code, moving this into
+> kernel would just mean making two copies of the firmware with
+> different steps to be run, one for the A8 SRAM, one for the M3.
+
+Maybe I'm getting confused, but the more you talk about the linux and
+the firmware doing the same code, the more I think the firmware is
+(trying) to do too much.  If this is going to be understandable (and
+maintainable), there needs to be a clean split of roles between the MPU
+and the M3.
+
+Kevin
