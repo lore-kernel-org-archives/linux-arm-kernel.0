@@ -1,61 +1,66 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 29 Aug 2013 11:07:09 +0530
-Subject: [PATCH v4 5/5] clk/exynos5420: assign dout_pixel id to pixel clock
- divider
-In-Reply-To: <1377754629-31465-1-git-send-email-rahul.sharma@samsung.com>
-References: <1377754629-31465-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1377754629-31465-6-git-send-email-rahul.sharma@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 28 Aug 2013 22:37:06 -0700
+Subject: [GIT PULL] non-critical omap fixes for v3.12 merge window
+In-Reply-To: <20130828185045.GI8607@quad.lixom.net>
+References: <20130823054609.GW7656@atomide.com>
+ <20130828185045.GI8607@quad.lixom.net>
+Message-ID: <20130829053705.GL7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dout_pixel is a new ID allocated for pixel clock divider. It is
-queried in the driver to pass as the parent to hdmi clock while
-switching between parents.
+* Olof Johansson <olof@lixom.net> [130828 11:58]:
+> On Thu, Aug 22, 2013 at 10:46:10PM -0700, Tony Lindgren wrote:
+> 
+> > Matus Ujhelyi (1):
+> >       ARM: OMAP2+: am33xx-restart: trigger warm reset on omap2+ boards
+> 
+> Sigh. am33xx has been a bit of a pain this release cycle. Can you please
+> start double-checking builds when you apply am33xx stuff? :(
+> 
+> This breaks with:
+> 
+>         multi_v7_defconfig:
+> arch/arm/mach-omap2/am33xx-restart.c:27:26: error: 'AM33XX_RST_GLOBAL_WARM_SW_MASK' undeclared (first use in this function)
+> 
+>         omap2plus_defconfig:
+> arch/arm/mach-omap2/am33xx-restart.c:27:26: error: 'AM33XX_RST_GLOBAL_WARM_SW_MASK' undeclared (first use in this function)
 
-Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
----
- Documentation/devicetree/bindings/clock/exynos5420-clock.txt |    5 +++++
- drivers/clk/samsung/clk-exynos5420.c                         |    5 ++++-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+Oops sorry, I see what's going on. It builds fine against v3.11-rc6, but
+has a dependency for v3.12 for the cleanup branch that removed all the
+unused defines. 
+ 
+> I've unmerged the branch until that's resolved.
 
-diff --git a/Documentation/devicetree/bindings/clock/exynos5420-clock.txt b/Documentation/devicetree/bindings/clock/exynos5420-clock.txt
-index 343430b..32aa34e 100644
---- a/Documentation/devicetree/bindings/clock/exynos5420-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/exynos5420-clock.txt
-@@ -187,6 +187,11 @@ clock which they consume.
- 
-   mout_hdmi		640
- 
-+  Divider		ID
-+  ----------------------------
-+
-+  dout_pixel		768
-+
- Example 1: An example of a clock controller node is listed below.
- 
- 	clock: clock-controller at 0x10010000 {
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 78465a5..48c4a93 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -143,6 +143,9 @@ enum exynos5420_clks {
- 	/* mux clocks */
- 	mout_hdmi = 640,
- 
-+	/* divider clocks */
-+	dout_pixel = 768,
-+
- 	nr_clks,
- };
- 
-@@ -463,7 +466,7 @@ static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
- 	DIV(none, "dout_fimd1", "mout_fimd1", DIV_DISP10, 0, 4),
- 	DIV(none, "dout_mipi1", "mout_mipi1", DIV_DISP10, 16, 8),
- 	DIV(none, "dout_dp1", "mout_dp1", DIV_DISP10, 24, 4),
--	DIV(none, "dout_hdmi_pixel", "mout_pixel", DIV_DISP10, 28, 4),
-+	DIV(dout_pixel, "dout_hdmi_pixel", "mout_pixel", DIV_DISP10, 28, 4),
- 
- 	/* Audio Block */
- 	DIV(none, "dout_maudio0", "mout_maudio0", DIV_MAU, 20, 4),
--- 
-1.7.10.4
+Care to apply the following fix to the cleanup branch?
+
+This way this fixes branch keeps working both against v3.11 and the
+patches queued for v3.12.
+
+Regards,
+
+Tony
+
+
+8< ---------
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 28 Aug 2013 22:24:13 -0700
+Subject: [PATCH] ARM: OMAP2+: Add back the define for AM33XX_RST_GLOBAL_WARM_SW_MASK
+
+This is needed to prevent a build error with a patch queued for fixes
+"ARM: OMAP2+: am33xx-restart: trigger warm reset on omap2+ boards".
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap2/prm-regbits-33xx.h b/arch/arm/mach-omap2/prm-regbits-33xx.h
+index bbffc03..84feece 100644
+--- a/arch/arm/mach-omap2/prm-regbits-33xx.h
++++ b/arch/arm/mach-omap2/prm-regbits-33xx.h
+@@ -22,6 +22,7 @@
+ #define AM33XX_GFX_MEM_RETSTATE_MASK			(1 << 6)
+ #define AM33XX_GFX_MEM_STATEST_MASK			(0x3 << 4)
+ #define AM33XX_GLOBAL_WARM_SW_RST_MASK			(1 << 1)
++#define AM33XX_RST_GLOBAL_WARM_SW_MASK			(1 << 0)
+ #define AM33XX_PRUSS_MEM_ONSTATE_MASK			(0x3 << 5)
+ #define AM33XX_PRUSS_MEM_RETSTATE_MASK			(1 << 7)
+ #define AM33XX_PRUSS_MEM_STATEST_MASK			(0x3 << 23)
