@@ -1,80 +1,78 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 29 Aug 2013 10:50:23 +0100
-Subject: [RFC PATCH v2 3/4] powerpc: refactor of_get_cpu_node to support
- other architectures
-In-Reply-To: <20130828194638.AB78E3E0A6F@localhost>
-References: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376674791-28244-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376674791-28244-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <2032060.4bgTKOdEX2@flatron> <1376777376.25016.11.camel@pasglop>
- <20130819101922.GI3719@e106331-lin.cambridge.arm.com>
- <5212177C.8000709@gmail.com> <521223FA.5050903@arm.com>
- <20130822135930.GC23152@e106331-lin.cambridge.arm.com>
- <20130828194638.AB78E3E0A6F@localhost>
-Message-ID: <20130829095023.GB2878@e102568-lin.cambridge.arm.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Thu, 29 Aug 2013 18:57:46 +0900
+Subject: [PATCH v4 3/5] ARM: tegra: split setting of CPU reset handler
+In-Reply-To: <1377770268-14014-1-git-send-email-acourbot@nvidia.com>
+References: <1377770268-14014-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <1377770268-14014-4-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 08:46:38PM +0100, Grant Likely wrote:
-> On Thu, 22 Aug 2013 14:59:30 +0100, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Mon, Aug 19, 2013 at 02:56:10PM +0100, Sudeep KarkadaNagesha wrote:
-> > > On 19/08/13 14:02, Rob Herring wrote:
-> > > > On 08/19/2013 05:19 AM, Mark Rutland wrote:
-> > > >> On Sat, Aug 17, 2013 at 11:09:36PM +0100, Benjamin Herrenschmidt wrote:
-> > > >>> On Sat, 2013-08-17 at 12:50 +0200, Tomasz Figa wrote:
-> > > >>>> I wonder how would this handle uniprocessor ARM (pre-v7) cores, for
-> > > >>>> which 
-> > > >>>> the updated bindings[1] define #address-cells = <0> and so no reg 
-> > > >>>> property.
-> > > >>>>
-> > > >>>> [1] - http://thread.gmane.org/gmane.linux.ports.arm.kernel/260795
-> > > >>>
-> > > >>> Why did you do that in the binding ? That sounds like looking to create
-> > > >>> problems ... 
-> > > >>>
-> > > >>> Traditionally, UP setups just used "0" as the "reg" property on other
-> > > >>> architectures, why do differently ?
-> > > >>
-> > > >> The decision was taken because we defined our reg property to refer to
-> > > >> the MPIDR register's Aff{2,1,0} bitfields, and on UP cores before v7
-> > > >> there's no MPIDR register at all. Given there can only be a single CPU
-> > > >> in that case, describing a register that wasn't present didn't seem
-> > > >> necessary or helpful.
-> > > > 
-> > > > What exactly reg represents is up to the binding definition, but it
-> > > > still should be present IMO. I don't see any issue with it being
-> > > > different for pre-v7.
-> > > > 
-> > > Yes it's better to have 'reg' with value 0 than not having it.
-> > > Otherwise this generic of_get_cpu_node implementation would need some
-> > > _hack_ to handle that case.
-> > 
-> > I'm not sure that having some code to handle a difference in standard
-> > between two architectures is a hack. If anything, I'd argue encoding a
-> > reg of 0 that corresponds to a nonexistent MPIDR value (given that's
-> > what the reg property is defined to map to on ARM) is more of a hack ;)
-> > 
-> > I'm not averse to having a reg value of 0 for this case, but given that
-> > there are existing devicetrees without it, requiring a reg property will
-> > break compatibility with them.
-> 
-> Then special cases those device trees, but you changing existing
-> convention really needs to be avoided. The referenced documentation
-> change is brand new, so we're not stuck with it.
+Not all Tegra devices can set the CPU reset handler in the same way.
+In particular, devices using a TrustZone secure monitor cannot set the
+reset handler directly and need to do it through a firmware operation.
 
-I have no problem with changing the bindings and forcing:
+This patch separates the act of setting the reset handler from its
+preparation, so the former can be implemented in a different way.
 
-#address-cells = <1>;
-reg = <0>;
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+ arch/arm/mach-tegra/reset.c | 27 +++++++++++++++++----------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
 
-for UP predating v7, my big worry is related to in-kernel dts that we
-already patched to follow the #address-cells = <0> rule (and we had to
-do it since we got asked that question multiple times on the public
-lists).
-
-What do you mean by "special case those device trees" ? I have not
-planned to patch them again, unless we really consider that a necessary
-evil.
-
-Thanks,
-Lorenzo
+diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
+index 1ac434e..6964117 100644
+--- a/arch/arm/mach-tegra/reset.c
++++ b/arch/arm/mach-tegra/reset.c
+@@ -33,26 +33,18 @@
+ 
+ static bool is_enabled;
+ 
+-static void __init tegra_cpu_reset_handler_enable(void)
++static void __init tegra_cpu_reset_handler_set(const u32 reset_address)
+ {
+-	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
+ 	void __iomem *evp_cpu_reset =
+ 		IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE + 0x100);
+ 	void __iomem *sb_ctrl = IO_ADDRESS(TEGRA_SB_BASE);
+ 	u32 reg;
+ 
+-	BUG_ON(is_enabled);
+-	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
+-
+-	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
+-			tegra_cpu_reset_handler_size);
+-
+ 	/*
+ 	 * NOTE: This must be the one and only write to the EVP CPU reset
+ 	 *       vector in the entire system.
+ 	 */
+-	writel(TEGRA_IRAM_RESET_BASE + tegra_cpu_reset_handler_offset,
+-			evp_cpu_reset);
++	writel(reset_address, evp_cpu_reset);
+ 	wmb();
+ 	reg = readl(evp_cpu_reset);
+ 
+@@ -66,6 +58,21 @@ static void __init tegra_cpu_reset_handler_enable(void)
+ 		writel(reg, sb_ctrl);
+ 		wmb();
+ 	}
++}
++
++static void __init tegra_cpu_reset_handler_enable(void)
++{
++	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
++	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
++						tegra_cpu_reset_handler_offset;
++
++	BUG_ON(is_enabled);
++	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
++
++	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
++			tegra_cpu_reset_handler_size);
++
++	tegra_cpu_reset_handler_set(reset_address);
+ 
+ 	is_enabled = true;
+ }
+-- 
+1.8.4
