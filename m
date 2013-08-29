@@ -1,98 +1,147 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 29 Aug 2013 19:32:22 +0100
-Subject: [PATCH v5 01/13] arm: make SWIOTLB available
+Date: Thu, 29 Aug 2013 19:32:26 +0100
+Subject: [PATCH v5 05/13] xen/arm,arm64: move Xen initialization earlier
 In-Reply-To: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
-Message-ID: <1377801154-29215-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1377801154-29215-5-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU_HELPER is needed because SWIOTLB calls iommu_is_span_boundary,
-provided by lib/iommu_helper.c.
+Move Xen initialization earlier, before any DMA requests can be made.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-CC: will.deacon at arm.com
-CC: linux at arm.linux.org.uk
 
-
-Changes in v5:
-- implement dma_mark_clean using dmac_flush_range.
 
 Changes in v3:
-- dma_capable: do not treat dma_mask as a limit;
-- remove SWIOTLB dependency on NEED_SG_DMA_LENGTH.
+- add missing __init in xen_early_init declaration.
 ---
- arch/arm/Kconfig                   |    6 ++++++
- arch/arm/include/asm/dma-mapping.h |   32 ++++++++++++++++++++++++++++++++
- 2 files changed, 38 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
+ arch/arm/kernel/setup.c               |    2 ++
+ arch/arm/xen/enlighten.c              |   21 ++++++++++++++-------
+ arch/arm64/kernel/setup.c             |    2 ++
+ 4 files changed, 26 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ba412e0..c0bfb33 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1832,6 +1832,12 @@ config CC_STACKPROTECTOR
- 	  neutralized via a kernel panic.
- 	  This feature requires gcc version 4.2 or above.
+diff --git a/arch/arm/include/asm/xen/hypervisor.h b/arch/arm/include/asm/xen/hypervisor.h
+index d7ab99a..2782591 100644
+--- a/arch/arm/include/asm/xen/hypervisor.h
++++ b/arch/arm/include/asm/xen/hypervisor.h
+@@ -1,6 +1,8 @@
+ #ifndef _ASM_ARM_XEN_HYPERVISOR_H
+ #define _ASM_ARM_XEN_HYPERVISOR_H
  
-+config SWIOTLB
-+	def_bool y
++#include <linux/init.h>
 +
-+config IOMMU_HELPER
-+	def_bool SWIOTLB
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 5b579b9..0982206 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -10,6 +10,7 @@
+ extern struct shared_info *HYPERVISOR_shared_info;
+ extern struct start_info *xen_start_info;
  
- #include <asm-generic/dma-coherent.h>
- #include <asm/memory.h>
-+#include <asm/cacheflush.h>
- 
- #define DMA_ERROR_CODE	(~0)
- extern struct dma_map_ops arm_dma_ops;
-@@ -86,6 +87,37 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+@@ -16,4 +18,10 @@ static inline enum paravirt_lazy_mode paravirt_get_lazy_mode(void)
+ 	return PARAVIRT_LAZY_NONE;
  }
- #endif
  
-+static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-+{
-+	unsigned int offset = paddr & ~PAGE_MASK;
-+	return pfn_to_dma(dev, paddr >> PAGE_SHIFT) + offset;
-+}
++#ifdef CONFIG_XEN
++void __init xen_early_init(void);
++#else
++static inline void xen_early_init(void) { return; }
++#endif
 +
-+static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
-+{
-+	unsigned int offset = dev_addr & ~PAGE_MASK;
-+	return (dma_to_pfn(dev, dev_addr) << PAGE_SHIFT) + offset;
-+}
-+
-+static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
-+{
-+	u64 limit, mask = *dev->dma_mask;
-+
-+	limit = (mask + 1) & ~mask;
-+	if (limit && size > limit)
-+		return 0;
-+
-+	if ((addr | (addr + size - 1)) & ~mask)
-+		return 0;
-+
-+	return 1;
-+}
-+
-+static inline void dma_mark_clean(void *addr, size_t size)
-+{
-+	dmac_flush_range(addr, addr + size);
-+}
-+
- /*
-  * DMA errors are defined by all-bits-set in the DMA address.
+ #endif /* _ASM_ARM_XEN_HYPERVISOR_H */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 63af9a7..cb7b8e2 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -45,6 +45,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/cachetype.h>
+ #include <asm/tlbflush.h>
++#include <asm/xen/hypervisor.h>
+ 
+ #include <asm/prom.h>
+ #include <asm/mach/arch.h>
+@@ -889,6 +890,7 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	arm_dt_init_cpu_maps();
+ 	psci_init();
++	xen_early_init();
+ #ifdef CONFIG_SMP
+ 	if (is_smp()) {
+ 		if (!mdesc->smp_init || !mdesc->smp_init()) {
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index c9770ba..14d17ab 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -195,21 +195,19 @@ static void xen_power_off(void)
+  * documentation of the Xen Device Tree format.
   */
+ #define GRANT_TABLE_PHYSADDR 0
+-static int __init xen_guest_init(void)
++void __init xen_early_init(void)
+ {
+-	struct xen_add_to_physmap xatp;
+-	static struct shared_info *shared_info_page = 0;
++	struct resource res;
+ 	struct device_node *node;
+ 	int len;
+ 	const char *s = NULL;
+ 	const char *version = NULL;
+ 	const char *xen_prefix = "xen,xen-";
+-	struct resource res;
+ 
+ 	node = of_find_compatible_node(NULL, NULL, "xen,xen");
+ 	if (!node) {
+ 		pr_debug("No Xen support\n");
+-		return 0;
++		return;
+ 	}
+ 	s = of_get_property(node, "compatible", &len);
+ 	if (strlen(xen_prefix) + 3  < len &&
+@@ -217,10 +215,10 @@ static int __init xen_guest_init(void)
+ 		version = s + strlen(xen_prefix);
+ 	if (version == NULL) {
+ 		pr_debug("Xen version not found\n");
+-		return 0;
++		return;
+ 	}
+ 	if (of_address_to_resource(node, GRANT_TABLE_PHYSADDR, &res))
+-		return 0;
++		return;
+ 	xen_hvm_resume_frames = res.start >> PAGE_SHIFT;
+ 	xen_events_irq = irq_of_parse_and_map(node, 0);
+ 	pr_info("Xen %s support found, events_irq=%d gnttab_frame_pfn=%lx\n",
+@@ -232,6 +230,15 @@ static int __init xen_guest_init(void)
+ 		xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
+ 	else
+ 		xen_start_info->flags &= ~(SIF_INITDOMAIN|SIF_PRIVILEGED);
++}
++
++static int __init xen_guest_init(void)
++{
++	struct xen_add_to_physmap xatp;
++	static struct shared_info *shared_info_page = 0;
++
++	if (!xen_domain())
++		return 0;
+ 
+ 	if (!shared_info_page)
+ 		shared_info_page = (struct shared_info *)
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index add6ea6..e0d438a 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -53,6 +53,7 @@
+ #include <asm/traps.h>
+ #include <asm/memblock.h>
+ #include <asm/psci.h>
++#include <asm/xen/hypervisor.h>
+ 
+ unsigned int processor_id;
+ EXPORT_SYMBOL(processor_id);
+@@ -267,6 +268,7 @@ void __init setup_arch(char **cmdline_p)
+ 	unflatten_device_tree();
+ 
+ 	psci_init();
++	xen_early_init();
+ 
+ 	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+ #ifdef CONFIG_SMP
 -- 
 1.7.2.5
