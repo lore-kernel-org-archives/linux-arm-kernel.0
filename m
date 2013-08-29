@@ -1,46 +1,95 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 29 Aug 2013 14:30:41 +0200
-Subject: [PATCH v4 0/5] clk/exynos5420: add clocks for hdmi subsystem
-In-Reply-To: <1377754629-31465-1-git-send-email-rahul.sharma@samsung.com>
-References: <1377754629-31465-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1873021.WMcNDqLpjt@amdc1227>
+From: anup@brainfault.org (Anup Patel)
+Date: Thu, 29 Aug 2013 18:01:43 +0530
+Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
+ with external L3-cache.
+In-Reply-To: <20130829105235.GC13704@arm.com>
+References: <da83e967f5a266ca28ee54638a4a9be9@www.loen.fr>
+ <CAAhSdy3-+tJ34QQgieifo931pfGoYt3RAqr8OkVtkxO6jgGdHQ@mail.gmail.com>
+ <3ebe469fcf451cc7396dd2a5d3f01272@www.loen.fr>
+ <CAAhSdy3WwZcLW6s05mV=Mn8=w8TcubTdYrgNqAChqiHxXC53eg@mail.gmail.com>
+ <747a0675165da4ef147bbda4e140549b@www.loen.fr>
+ <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
+ <5935339137684ecf90dd484cc5739548@www.loen.fr>
+ <20130815165344.GA3853@cbox>
+ <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
+ <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
+ <20130829105235.GC13704@arm.com>
+Message-ID: <CAAhSdy0NgSchR1p_HJTUMMV2h7f7beFMnN3Md4xEp=EGRiXVMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
+On Thu, Aug 29, 2013 at 4:22 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> Hi Anup,
+>
+> Jumping late into this thread (holidays).
+>
+> On Fri, Aug 16, 2013 at 07:57:55AM +0100, Anup Patel wrote:
+>> The approach of flushing d-cache by set/way upon first run of VCPU will
+>> not work because for set/way operations ARM ARM says: "For set/way
+>> operations, and for All (entire cache) operations, the point is defined to be
+>> to the next level of caching". In other words, set/way operations work upto
+>> point of unification.
+>
+> I don't understand where you got the idea that set/way operations work
+> up to the point of unification. This is incorrect, the set/way
+> operations work on the level of cache specified by bits 3:1 in the
+> register passed to the DC CISW instruction. For your L3 cache, those
+> bits would be 2 (and __flush_dcache_all() implementation does this
+> dynamically).
 
-On Thursday 29 of August 2013 11:07:04 Rahul Sharma wrote:
-> Add clock changes for hdmi subsystem for exynos5250 SoC. These
-> include addition of new clocks like mout_hdmi and smmu_tv, associating
-> ID to clk_hdmiphy and some essential corrections.
-> 
-> V4:
-> 1) Optimised gaps between Gate, Muxes and Dividers.
-> 
-> V3:
-> 1) Assign new ID to divider clock keeping sclk_pixel gate same.
-> 
-> V2:
-> 1) Rebase to Mike's Tree.
-> 2) Change smmu_tv to smmu_mixer.
-> 
-> This set is based on Mike's clk-next branch at
-> https://git.linaro.org/gitweb?p=people/mturquette/linux.git
-> 
-> Rahul Sharma (5):
->   clk/exynos5420: add sclk_hdmiphy to the list of special clocks
->   clk/exynos5420: add gate clock for mixer sysmmu
->   clk/exynos5420: fix the order of parents of hdmi mux
->   clk/exynos5420: add hdmi mux to change parents in hdmi driver
->   clk/exynos5420: assign dout_pixel id to pixel clock divider
-> 
->  .../devicetree/bindings/clock/exynos5420-clock.txt  |   12 ++++++++++++
->  drivers/clk/samsung/clk-exynos5420.c                |   19
-> +++++++++++++------ 2 files changed, 25 insertions(+), 6 deletions(-)
+The L3-cache is not visible to CPU. It is totally independent and transparent
+to CPU.
 
-For the whole series:
+>
+> For the I-cache all operation, that's correct, it only invalidates to
+> the PoU but it doesn't need to go any further, you do the D-cache
+> maintenance for this (no point in duplicating functionality).
+>
+>> Also, Guest Linux already does __flush_dcache_all() from __cpu_setup()
+>> at bootup time which does not work for us when L3-cache is enabled so,
+>> there is no point is adding one more __flush_dcache_all() upon first run of
+>> VCPU in KVM ARM64.
+>
+> Do you mean the CPU is not aware of the L3 cache? Does CLIDR_EL1 report
+> an L3 cache on your implementation?
 
-Acked-by: Tomasz Figa <t.figa@samsung.com>
+Yes, CPU is not aware of L3-cache and its state.
 
-Best regards,
-Tomasz
+In our case, CLIDR_EL1 does not report L3-cache.
+
+>
+> It's not clear to me whether your L3 cache is inner or outer (or a mix).
+> You say that D-cache maintenance to PoC flushes the L3 which looks to me
+> like an inner cache, in which cache it should be reported in the LoC
+> bits in CLIDR_EL1.
+>
+>> IMHO, we are left with following options:
+>> 1. Flush all RAM regions of VCPU using __flush_dcache_range()
+>>     upon first run of VCPU
+>> 2. Implement outer-cache framework for ARM64 and flush all
+>>     caches + outer cache (i.e. L3-cache) upon first run of VCPU
+>
+> Do you have specific instructions for flushing the L3 cache only? It's
+> not clear to me what an outer-cache framework would to on AArch64. It
+> was added on AArch32 for the L2x0/PL310 which need separate instructions
+> by physical address for flushing the cache. I really hope we don't get
+> these again on ARMv8 hardware.
+>
+>> 3. Use an alternate version of flush_icache_range() which will
+>>     flush d-cache by PoC instead of PoU. We can also ensure
+>>     that coherent_icache_guest_page() function will be called
+>>     upon Stage2 prefetch aborts only.
+>
+> flush_icache_range() is meant to flush only to the PoU to ensure the I-D
+> cache coherency. I don't think we should change this.
+
+We did not mean to change flush_icache_range() instead we suggest
+to have separate flush_icache_range_kvm() for KVM ARM64 which flushes
+d-cache to PoC.
+
+>
+> --
+> Catalin
+
+--Anup
