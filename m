@@ -1,45 +1,77 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 29 Aug 2013 15:20:27 -0700
-Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <521FBD6B.3020208@ti.com> (Dave Gerlach's message of "Thu, 29 Aug
- 2013 16:30:19 -0500")
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <5211E3F6.6090108@ti.com> <52125A39.3010008@ti.com>
- <87vc2qyjao.fsf@linaro.org> <521FBD6B.3020208@ti.com>
-Message-ID: <87mwo0rvf8.fsf@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 30 Aug 2013 00:32:42 +0200
+Subject: [GIT PULL] ARM/ARM64 architected timer updates for v3.12
+In-Reply-To: <521F8157.20203@arm.com>
+References: <521F8157.20203@arm.com>
+Message-ID: <521FCC0A.80302@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Gerlach <d-gerlach@ti.com> writes:
+On 08/29/2013 07:13 PM, Sudeep KarkadaNagesha wrote:
+> Hi Daniel,
+> 
+> These are the ARM/ARM64 arch timer updates for v3.12.
+> I have re-based the changes on tip/timers/core as there are conflicts
+> with memory mapped arch_timers support queued recently.
+> Since this series adds CPU PM notifiers for arch_timers, it is required
+> to enable ARM bL cpuidle drivers(already queued for v3.12)
+> 
+> Regards,
+> Sudeep
+> 
+> The following changes since commit cfb6d656d569510ac9239583ce09e4c92ad54719:
+> 
+>   Merge branch 'timers/clockevents-next' of
+> git://git.linaro.org/people/dlezcano/clockevents into timers/core
+> (2013-08-21 14:59:23 +0200)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://linux-arm.org/linux-skn.git timer_evtstrm
+> 
+> for you to fetch changes up to f74f198e540c160b1db9470b679dbeb72339829b:
+> 
+>   drivers: clocksource: add CPU PM notifier for ARM architected timer
+> (2013-08-29 17:43:08 +0100)
 
-[...]
 
->>>
->>> The working repo for this version of the patch series can be found here:
->>>
->>> git://github.com/dgerlach/linux-pm.git am335x-3.11rc4-suspend-resume
->>
->> I tried this branch on my beaglebone black, and it's not fully resuming.
->> Suspend seems to be working (power draw goes from ~1W to ~130mW) and
->> pressing a key on the UART seems to be waking up the SoC (power draw
->> goes to ~600mW) but I don't ever get the console back.
->>
->> Is there a specific version of the firmware I should be using?
->>
->> Kevin
->>
->
-> Kevin, I agree there does seem to be some issues with Beaglebone
-> black. I can confirm it works on BeagleBone White and the large am335
-> EVM, I am working on pinpointing the issue on beaglebone black, seems
-> that support isn't quite there yet.
+Hi Sudeep,
 
-OK, I tried the above branch on my BB white, using prebuilt firmware
-from the next3 branch of the am33x-cm3 repo and it's suspending/resuming
-fine.  Thanks for the pointer.
+I need the acked-by from Olof or Kevin for the arch/arm[64] changes.
 
-FYI, measuring at the 5V supply, it goes from ~1.6W at idle down to
-~700mW in suspend.  The black goes from ~1W down to an impressive 130mW
-but of course, it doesn't wake up so maybe it's not that impressive. ;)
+Thanks
+  -- Daniel
 
-Kevin
+> ----------------------------------------------------------------
+> Sudeep KarkadaNagesha (4):
+>    ARM/ARM64: arch_timer: add macros for bits in control register
+>    ARM: arch_timer: add support to configure and enable event stream
+>    ARM64: arch_timer: add support to configure and enable event stream
+>    drivers: clocksource: add CPU PM notifier for ARM architected timer
+> 
+> Will Deacon (1):
+>    drivers: clocksource: add support for ARM architected timer event stream
+> q
+>  arch/arm/include/asm/arch_timer.h    | 36 ++++++++++++++++---
+>  arch/arm/include/uapi/asm/hwcap.h    |  1 +
+>  arch/arm/kernel/setup.c              |  1 +
+>  arch/arm64/include/asm/arch_timer.h  | 42 ++++++++++++++++++---
+>  arch/arm64/include/asm/hwcap.h       | 11 +++---
+>  arch/arm64/include/uapi/asm/hwcap.h  |  1 +
+>  arch/arm64/kernel/setup.c            | 11 ++++++
+>  drivers/clocksource/Kconfig          | 15 ++++++++
+>  drivers/clocksource/arm_arch_timer.c | 49 +++++++++++++++++++++++++
+>  include/clocksource/arm_arch_timer.h | 10 +++++
+>  10 files changed, 161 insertions(+), 16 deletions(-)
+> 
+> 
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
