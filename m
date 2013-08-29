@@ -1,52 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 29 Aug 2013 20:42:18 +0800
-Subject: [PATCH v3 resend 1/2] ARM:dts: vf610: Add DSPI nodes
-In-Reply-To: <1377673724-32468-1-git-send-email-b44548@freescale.com>
-References: <1377673724-32468-1-git-send-email-b44548@freescale.com>
-Message-ID: <20130829124216.GH18729@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 29 Aug 2013 14:42:25 +0200
+Subject: [PATCH] gpio: samsung: Drop support for Exynos SoCs
+In-Reply-To: <1377538555-14901-1-git-send-email-t.figa@samsung.com>
+References: <1377538555-14901-1-git-send-email-t.figa@samsung.com>
+Message-ID: <CACRpkdbUo2t1gT8=6UpjiXs4Sd-1xLpEqOqdA220L0wgVC-4uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 03:08:43PM +0800, Chao Fu wrote:
-> From: Chao Fu <B44548@freescale.com>
-> 
-> Add Freescale DSPI node into vf610 dts.
-> 
-> Signed-off-by: Chao Fu <b44548@freescale.com>
-> ---
->  arch/arm/boot/dts/vf610.dtsi | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-> index 67d929c..af687a4 100644
-> --- a/arch/arm/boot/dts/vf610.dtsi
-> +++ b/arch/arm/boot/dts/vf610.dtsi
-> @@ -87,6 +87,18 @@
->  				arm,tag-latency = <2 2 2>;
->  			};
->  
-> +			dspi0: dspi0 at 4002c000 {
+On Mon, Aug 26, 2013 at 7:35 PM, Tomasz Figa <t.figa@samsung.com> wrote:
 
-The node should be sorted in address.  That said, it should be put after
-uart3.
+> GPIO support on Exynos SoCs is provided by pinctrl-samsung driver,
+> leaving all the support code in gpio-samsung driver unused.
 
-Shawn
+Just double checking: you mean it is unused in v3.11-rc7 OK?
+Not in Linux-next?
 
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "fsl,vf610-dspi";
-> +				reg = <0x4002c000 0x1000>;
-> +				interrupts = <0 67 0x04>;
-> +				clocks = <&clks VF610_CLK_DSPI0>;
-> +				clock-names = "dspi";
-> +				spi-num-chipselects = <5>;
-> +				status = "disabled";
-> +			};
-> +
->  			uart0: serial at 40027000 {
->  				compatible = "fsl,vf610-lpuart";
->  				reg = <0x40027000 0x1000>;
-> -- 
-> 1.8.0
-> 
-> 
+In the former case I can merge it into the GPIO tree and in the
+latter case I need to merge it into the pinctrl tree.
+
+> This dead
+> code can be safely removed and so it is done by this patch.
+>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+
+Tentatively applied to the gpio tree.
+
+Yours,
+Linus Walleij
