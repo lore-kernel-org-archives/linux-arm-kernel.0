@@ -1,126 +1,263 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 29 Aug 2013 21:20:42 +0200
-Subject: [PATCHv3 1/4] arm: dts: Add clock entries for timers in SOCFPGA
-In-Reply-To: <1377791718.26261.16.camel@linux-builds1>
-References: <1377118427-20644-1-git-send-email-dinguyen@altera.com>
- <20130828153127.GA17806@pengutronix.de>
- <1377791718.26261.16.camel@linux-builds1>
-Message-ID: <20130829192042.GC10398@pengutronix.de>
+From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
+Date: Thu, 29 Aug 2013 15:24:14 -0400
+Subject: [PATCH RESEND] gpio: (gpio-pca953x) move header to
+ linux/platform_data/
+Message-ID: <1377804254-15955-1-git-send-email-vivien.didelot@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+This patch moves the pca953x.h header from include/linux/i2c to
+include/linux/platform_data and updates existing support accordingly.
 
-On Thu, Aug 29, 2013 at 10:55:18AM -0500, Dinh Nguyen wrote:
-> Hi Steffen,
-> > > @@ -486,28 +482,32 @@
-> > >  			interrupts = <1 13 0xf04>;
-> > >  		};
-> > >  
-> > > -		timer0: timer0 at ffc08000 {
-> > > +		timer at ffc08000 {
-> > 
-> > No. Why? Than I can not write something like
-> > 
-> > &timer0 {
-> > 	clock-frequency = <100000000>;
-> > };
-> > 
-> > and would have to reference the whole tree ala
-> > 
-> > / {
-> > 	soc {
-> > 		timer at ffc08000 {
-> > 			clock-frequency = <100000000>;
-> > 		};
-> > 	};
-> > };
-> > 
-> > in a boardspecific or SoC specific file (see below).
-> 
-> Agreed. Will adjust accordingly.
-> 
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+---
+ arch/arm/mach-at91/board-snapper9260.c         | 2 +-
+ arch/arm/mach-davinci/board-da850-evm.c        | 2 +-
+ arch/arm/mach-ep93xx/vision_ep9307.c           | 2 +-
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c    | 2 +-
+ arch/arm/mach-imx/mach-mxt_td60.c              | 2 +-
+ arch/arm/mach-ks8695/board-acs5k.c             | 2 +-
+ arch/arm/mach-mmp/ttc_dkb.c                    | 2 +-
+ arch/arm/mach-omap2/board-am3517evm.c          | 2 +-
+ arch/arm/mach-pxa/cm-x300.c                    | 2 +-
+ arch/arm/mach-pxa/em-x270.c                    | 2 +-
+ arch/arm/mach-pxa/pcm990-baseboard.c           | 2 +-
+ arch/arm/mach-pxa/spitz.c                      | 2 +-
+ arch/arm/mach-pxa/zeus.c                       | 2 +-
+ arch/arm/mach-pxa/zylonite_pxa300.c            | 2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410.c          | 2 +-
+ arch/x86/platform/mrst/mrst.c                  | 2 +-
+ drivers/gpio/gpio-pca953x.c                    | 2 +-
+ include/linux/{i2c => platform_data}/pca953x.h | 0
+ 18 files changed, 17 insertions(+), 17 deletions(-)
+ rename include/linux/{i2c => platform_data}/pca953x.h (100%)
 
-Good.
-
-> > 
-> > > diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
-> > > index 698dde9..c1af01c 100644
-> > > --- a/arch/arm/boot/dts/socfpga_cyclone5.dts
-> > > +++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
-> > >  
-> > > diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-> > > index 6f23121..72ff14c 100644
-> > > --- a/arch/arm/boot/dts/socfpga_vt.dts
-> > > +++ b/arch/arm/boot/dts/socfpga_vt.dts
-> > 
-> > Leads me to a question about terminology: Is the cyclone5 an actual board?
-> > AFAIK it is. And the Cyclone 5 FPGA is also called socfpga? Is that correct?
-> > But then, seeing that, in an other patch, you add two different sysmgr addresses to
-> > the socfpga_vt and socfpga_cyclone5, there are different socfpgas?
-> 
-> Yes, sofpga_cyclone5.dts is the devkit that is manufactured by Altera.
-> socfpga_vt.dts is a virtual platform for SOCFPGA. You can get the
-> virtual platform from Synopsis. It mimics everything except the FPGA. 
-> 
-
-Uh, nice. I will check out the vt.
-
-> socfpga is the base SOC with a Cyclone 5 FPGA on it. I'll be upstreaming
-> socfpga_arria5 soon, which has the SOCFPGA + Arria 5 FPGA.
-> 
-
-Hm, okay. That might lead to confusion then...
-
-> > 
-> > I want to write a devicetree for the SoCkit. It has a Cyclone 5 on it.
-> > So naturally I would now go and include the socfpga_cyclone5.dtsi, with all the
-> > cyclone5 stuff and just add my board specific stuff in a socfpga_sockit.dts.
-> > But there is no socfpga_cyclone5.dtsi, just the socfpga_cyclone5.dts, which itself
-> > seems to be a board...
-> 
-> socfpga.dtsi is the base DTSI for the platform. In hindsight, I should
-> have named it a bit different, but for now socfpga_cyclone5 is for the
-> board.
-> 
-
-and we should make the socfpga_cyclone5 a dtsi. I can do that.
-It's early in development and I see no reason not to fix it now.
-We have seen quite a lot of rearrangment with the imx6 for example. No need to
-duplicate it, if we know it beforehand.
-
-
-> > 
-> > So, how should we reorder the current dts (as I tested with current mainline, the
-> > support is completely broken out of the box, but works fine with your patches that
-> > are floating around, there should be no users as of now)?
-> 
-> Not sure what you mean by broken. I was able to boot 3.11-rc7 just now
-> using an initramfs. As you can already tell, I'm doing my best to get
-> more support for the platform upstream, but it will take time.
-> 
-
-Yeah, broken might have been a bit harsh :-D
-But my first experience with the mainline kernel was a scrambled serial console
-and hanging system as soon as you use the ethernet/ip=dhcp.
-And the SD wasn't working for me, too. But those SD cards are really more problematic
-than one might think, so...
-
-But as I said: with your patch series, both is working. Looking forward to your
-next versions of those patches.
-Now I have a hanging system, when I add the at24 on i2c-0, what ever might be
-the reason for that :-D
-
-BTW: you don't happen to have any insight in what crazy things you do with the CRC32
-in your prebootloader, do you? Been trying some time to calculate the crc, but never
-got to the one the mkpimage generates. It doesn't seem to be what crc32 or chksum
-calculate or the datasheet is missing some essential info for me to understand it.
-
-Regards,
-Steffen
-
+diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
+index 3aaa978..f1d49e9 100644
+--- a/arch/arm/mach-at91/board-snapper9260.c
++++ b/arch/arm/mach-at91/board-snapper9260.c
+@@ -26,7 +26,7 @@
+ #include <linux/gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/spi/spi.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index bea6793..af6dafb 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -19,7 +19,7 @@
+ #include <linux/kernel.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/at24.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ #include <linux/input.h>
+ #include <linux/input/tps6507x-ts.h>
+ #include <linux/mfd/tps6507x.h>
+diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
+index 605956f..64f2e50 100644
+--- a/arch/arm/mach-ep93xx/vision_ep9307.c
++++ b/arch/arm/mach-ep93xx/vision_ep9307.c
+@@ -23,7 +23,7 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c-gpio.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/flash.h>
+ #include <linux/spi/mmc_spi.h>
+diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+index 29ac8ee6..97f9c62 100644
+--- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
++++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+@@ -26,7 +26,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/mtd/physmap.h>
+ #include <linux/i2c.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ #include <linux/input.h>
+ #include <linux/gpio.h>
+ #include <linux/delay.h>
+diff --git a/arch/arm/mach-imx/mach-mxt_td60.c b/arch/arm/mach-imx/mach-mxt_td60.c
+index a27faab..c918940 100644
+--- a/arch/arm/mach-imx/mach-mxt_td60.c
++++ b/arch/arm/mach-imx/mach-mxt_td60.c
+@@ -26,7 +26,7 @@
+ #include <asm/mach/time.h>
+ #include <asm/mach/map.h>
+ #include <linux/gpio.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ 
+ #include "common.h"
+ #include "devices-imx27.h"
+diff --git a/arch/arm/mach-ks8695/board-acs5k.c b/arch/arm/mach-ks8695/board-acs5k.c
+index 456d638..9f9c044 100644
+--- a/arch/arm/mach-ks8695/board-acs5k.c
++++ b/arch/arm/mach-ks8695/board-acs5k.c
+@@ -20,7 +20,7 @@
+ #include <linux/i2c.h>
+ #include <linux/i2c-algo-bit.h>
+ #include <linux/i2c-gpio.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ 
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/map.h>
+diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+index 8483906..7022329 100644
+--- a/arch/arm/mach-mmp/ttc_dkb.c
++++ b/arch/arm/mach-mmp/ttc_dkb.c
+@@ -15,7 +15,7 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/mtd/onenand.h>
+ #include <linux/interrupt.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ #include <linux/gpio.h>
+ #include <linux/gpio-pxa.h>
+ #include <linux/mfd/88pm860x.h>
+diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+index d63f14b..c7196a6 100644
+--- a/arch/arm/mach-omap2/board-am3517evm.c
++++ b/arch/arm/mach-omap2/board-am3517evm.c
+@@ -21,7 +21,7 @@
+ #include <linux/clk.h>
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ #include <linux/can/platform/ti_hecc.h>
+ #include <linux/davinci_emac.h>
+ #include <linux/mmc/host.h>
+diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
+index 8091aac..f942349 100644
+--- a/arch/arm/mach-pxa/cm-x300.c
++++ b/arch/arm/mach-pxa/cm-x300.c
+@@ -29,7 +29,7 @@
+ #include <linux/pwm_backlight.h>
+ 
+ #include <linux/i2c.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ #include <linux/i2c/pxa-i2c.h>
+ 
+ #include <linux/mfd/da903x.h>
+diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
+index 3a3362f..8eb4e23 100644
+--- a/arch/arm/mach-pxa/em-x270.c
++++ b/arch/arm/mach-pxa/em-x270.c
+@@ -30,7 +30,7 @@
+ #include <linux/power_supply.h>
+ #include <linux/apm-emulation.h>
+ #include <linux/i2c.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ #include <linux/i2c/pxa-i2c.h>
+ #include <linux/regulator/userspace-consumer.h>
+ 
+diff --git a/arch/arm/mach-pxa/pcm990-baseboard.c b/arch/arm/mach-pxa/pcm990-baseboard.c
+index 13e5b00..3133ba8 100644
+--- a/arch/arm/mach-pxa/pcm990-baseboard.c
++++ b/arch/arm/mach-pxa/pcm990-baseboard.c
+@@ -408,7 +408,7 @@ struct pxacamera_platform_data pcm990_pxacamera_platform_data = {
+ 	.mclk_10khz = 1000,
+ };
+ 
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ 
+ static struct pca953x_platform_data pca9536_data = {
+ 	.gpio_base	= PXA_NR_BUILTIN_GPIO,
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index 4c29173..0b11c1a 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -20,7 +20,7 @@
+ #include <linux/leds.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/pxa-i2c.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/ads7846.h>
+ #include <linux/spi/corgi_lcd.h>
+diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
+index f5d4364..126e4a8 100644
+--- a/arch/arm/mach-pxa/zeus.c
++++ b/arch/arm/mach-pxa/zeus.c
+@@ -26,7 +26,7 @@
+ #include <linux/mtd/physmap.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/pxa-i2c.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ #include <linux/apm-emulation.h>
+ #include <linux/can/platform/mcp251x.h>
+ 
+diff --git a/arch/arm/mach-pxa/zylonite_pxa300.c b/arch/arm/mach-pxa/zylonite_pxa300.c
+index 86e59c0..869bce7 100644
+--- a/arch/arm/mach-pxa/zylonite_pxa300.c
++++ b/arch/arm/mach-pxa/zylonite_pxa300.c
+@@ -18,7 +18,7 @@
+ #include <linux/init.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/pxa-i2c.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ #include <linux/gpio.h>
+ 
+ #include <mach/pxa300.h>
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index 8ad88ac..007fc53 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -30,7 +30,7 @@
+ #include <linux/basic_mmio_gpio.h>
+ #include <linux/spi/spi.h>
+ 
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ #include <linux/platform_data/s3c-hsotg.h>
+ 
+ #include <video/platform_lcd.h>
+diff --git a/arch/x86/platform/mrst/mrst.c b/arch/x86/platform/mrst/mrst.c
+index 47fe66f..3ca5957 100644
+--- a/arch/x86/platform/mrst/mrst.c
++++ b/arch/x86/platform/mrst/mrst.c
+@@ -20,7 +20,7 @@
+ #include <linux/intel_pmic_gpio.h>
+ #include <linux/spi/spi.h>
+ #include <linux/i2c.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/platform_device.h>
+diff --git a/drivers/gpio/gpio-pca953x.c b/drivers/gpio/gpio-pca953x.c
+index 426c51d..8804aec 100644
+--- a/drivers/gpio/gpio-pca953x.c
++++ b/drivers/gpio/gpio-pca953x.c
+@@ -18,7 +18,7 @@
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/i2c.h>
+-#include <linux/i2c/pca953x.h>
++#include <linux/platform_data/pca953x.h>
+ #include <linux/slab.h>
+ #ifdef CONFIG_OF_GPIO
+ #include <linux/of_platform.h>
+diff --git a/include/linux/i2c/pca953x.h b/include/linux/platform_data/pca953x.h
+similarity index 100%
+rename from include/linux/i2c/pca953x.h
+rename to include/linux/platform_data/pca953x.h
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.4
