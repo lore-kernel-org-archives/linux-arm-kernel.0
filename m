@@ -1,74 +1,51 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 29 Aug 2013 18:22:10 +0530
-Subject: [RESEND PATCH V2 2/2] ARM: AM33xx: hwmod: Add RNG module data
-In-Reply-To: <1377780731-3648-1-git-send-email-lokeshvutla@ti.com>
-References: <1377780731-3648-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1377780731-3648-3-git-send-email-lokeshvutla@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 29 Aug 2013 13:53:37 +0100
+Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
+ with external L3-cache.
+In-Reply-To: <CAAhSdy0NgSchR1p_HJTUMMV2h7f7beFMnN3Md4xEp=EGRiXVMg@mail.gmail.com>
+References: <3ebe469fcf451cc7396dd2a5d3f01272@www.loen.fr>
+ <CAAhSdy3WwZcLW6s05mV=Mn8=w8TcubTdYrgNqAChqiHxXC53eg@mail.gmail.com>
+ <747a0675165da4ef147bbda4e140549b@www.loen.fr>
+ <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
+ <5935339137684ecf90dd484cc5739548@www.loen.fr>
+ <20130815165344.GA3853@cbox>
+ <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
+ <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
+ <20130829105235.GC13704@arm.com>
+ <CAAhSdy0NgSchR1p_HJTUMMV2h7f7beFMnN3Md4xEp=EGRiXVMg@mail.gmail.com>
+Message-ID: <20130829125337.GG13704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add RNG hwmod data for AM33xx SoC.
+On Thu, Aug 29, 2013 at 01:31:43PM +0100, Anup Patel wrote:
+> On Thu, Aug 29, 2013 at 4:22 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Fri, Aug 16, 2013 at 07:57:55AM +0100, Anup Patel wrote:
+> >> The approach of flushing d-cache by set/way upon first run of VCPU will
+> >> not work because for set/way operations ARM ARM says: "For set/way
+> >> operations, and for All (entire cache) operations, the point is defined to be
+> >> to the next level of caching". In other words, set/way operations work upto
+> >> point of unification.
+> >
+> > I don't understand where you got the idea that set/way operations work
+> > up to the point of unification. This is incorrect, the set/way
+> > operations work on the level of cache specified by bits 3:1 in the
+> > register passed to the DC CISW instruction. For your L3 cache, those
+> > bits would be 2 (and __flush_dcache_all() implementation does this
+> > dynamically).
+> 
+> The L3-cache is not visible to CPU. It is totally independent and transparent
+> to CPU.
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
-* Made am33xx_l4_per__rng structure as static to fix sparse warning
+OK. But you say that operations like DC CIVAC actually flush the L3? So
+I don't see it as completely transparent to the CPU.
 
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   36 ++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+Do you have any configuration bits which would make the L3 completely
+transparent like always caching even when accesses are non-cacheable and
+DC ops to PoC ignoring it?
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 215894f..3e32f45 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -2480,6 +2480,41 @@ static struct omap_hwmod_ocp_if am33xx_l3_main__aes0 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* rng */
-+static struct omap_hwmod_class_sysconfig am33xx_rng_sysc = {
-+	.rev_offs	= 0x1fe0,
-+	.sysc_offs	= 0x1fe4,
-+	.sysc_flags	= SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE,
-+	.idlemodes	= SIDLE_FORCE | SIDLE_NO,
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class am33xx_rng_hwmod_class = {
-+	.name		= "rng",
-+	.sysc		= &am33xx_rng_sysc,
-+};
-+
-+static struct omap_hwmod am33xx_rng_hwmod = {
-+	.name		= "rng",
-+	.class		= &am33xx_rng_hwmod_class,
-+	.clkdm_name	= "l4ls_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE,
-+	.main_clk	= "rng_fck",
-+	.prcm		= {
-+		.omap4	= {
-+			.clkctrl_offs	= AM33XX_CM_PER_RNG_CLKCTRL_OFFSET,
-+			.modulemode	= MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
-+static struct omap_hwmod_ocp_if am33xx_l4_per__rng = {
-+	.master		= &am33xx_l4_ls_hwmod,
-+	.slave		= &am33xx_rng_hwmod,
-+	.clk		= "rng_fck",
-+	.user		= OCP_USER_MPU,
-+};
-+
- static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
- 	&am33xx_l3_main__emif,
- 	&am33xx_mpu__l3_main,
-@@ -2559,6 +2594,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
- 	&am33xx_cpgmac0__mdio,
- 	&am33xx_l3_main__sha0,
- 	&am33xx_l3_main__aes0,
-+	&am33xx_l4_per__rng,
- 	NULL,
- };
- 
+Now, back to the idea of outer_cache framework for arm64. Does your CPU
+have separate instructions for flushing this L3 cache?
+
 -- 
-1.7.9.5
+Catalin
