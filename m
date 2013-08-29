@@ -1,95 +1,52 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Thu, 29 Aug 2013 18:01:43 +0530
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
- with external L3-cache.
-In-Reply-To: <20130829105235.GC13704@arm.com>
-References: <da83e967f5a266ca28ee54638a4a9be9@www.loen.fr>
- <CAAhSdy3-+tJ34QQgieifo931pfGoYt3RAqr8OkVtkxO6jgGdHQ@mail.gmail.com>
- <3ebe469fcf451cc7396dd2a5d3f01272@www.loen.fr>
- <CAAhSdy3WwZcLW6s05mV=Mn8=w8TcubTdYrgNqAChqiHxXC53eg@mail.gmail.com>
- <747a0675165da4ef147bbda4e140549b@www.loen.fr>
- <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
- <5935339137684ecf90dd484cc5739548@www.loen.fr>
- <20130815165344.GA3853@cbox>
- <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
- <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
- <20130829105235.GC13704@arm.com>
-Message-ID: <CAAhSdy0NgSchR1p_HJTUMMV2h7f7beFMnN3Md4xEp=EGRiXVMg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 29 Aug 2013 20:42:18 +0800
+Subject: [PATCH v3 resend 1/2] ARM:dts: vf610: Add DSPI nodes
+In-Reply-To: <1377673724-32468-1-git-send-email-b44548@freescale.com>
+References: <1377673724-32468-1-git-send-email-b44548@freescale.com>
+Message-ID: <20130829124216.GH18729@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 4:22 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> Hi Anup,
->
-> Jumping late into this thread (holidays).
->
-> On Fri, Aug 16, 2013 at 07:57:55AM +0100, Anup Patel wrote:
->> The approach of flushing d-cache by set/way upon first run of VCPU will
->> not work because for set/way operations ARM ARM says: "For set/way
->> operations, and for All (entire cache) operations, the point is defined to be
->> to the next level of caching". In other words, set/way operations work upto
->> point of unification.
->
-> I don't understand where you got the idea that set/way operations work
-> up to the point of unification. This is incorrect, the set/way
-> operations work on the level of cache specified by bits 3:1 in the
-> register passed to the DC CISW instruction. For your L3 cache, those
-> bits would be 2 (and __flush_dcache_all() implementation does this
-> dynamically).
+On Wed, Aug 28, 2013 at 03:08:43PM +0800, Chao Fu wrote:
+> From: Chao Fu <B44548@freescale.com>
+> 
+> Add Freescale DSPI node into vf610 dts.
+> 
+> Signed-off-by: Chao Fu <b44548@freescale.com>
+> ---
+>  arch/arm/boot/dts/vf610.dtsi | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+> index 67d929c..af687a4 100644
+> --- a/arch/arm/boot/dts/vf610.dtsi
+> +++ b/arch/arm/boot/dts/vf610.dtsi
+> @@ -87,6 +87,18 @@
+>  				arm,tag-latency = <2 2 2>;
+>  			};
+>  
+> +			dspi0: dspi0 at 4002c000 {
 
-The L3-cache is not visible to CPU. It is totally independent and transparent
-to CPU.
+The node should be sorted in address.  That said, it should be put after
+uart3.
 
->
-> For the I-cache all operation, that's correct, it only invalidates to
-> the PoU but it doesn't need to go any further, you do the D-cache
-> maintenance for this (no point in duplicating functionality).
->
->> Also, Guest Linux already does __flush_dcache_all() from __cpu_setup()
->> at bootup time which does not work for us when L3-cache is enabled so,
->> there is no point is adding one more __flush_dcache_all() upon first run of
->> VCPU in KVM ARM64.
->
-> Do you mean the CPU is not aware of the L3 cache? Does CLIDR_EL1 report
-> an L3 cache on your implementation?
+Shawn
 
-Yes, CPU is not aware of L3-cache and its state.
-
-In our case, CLIDR_EL1 does not report L3-cache.
-
->
-> It's not clear to me whether your L3 cache is inner or outer (or a mix).
-> You say that D-cache maintenance to PoC flushes the L3 which looks to me
-> like an inner cache, in which cache it should be reported in the LoC
-> bits in CLIDR_EL1.
->
->> IMHO, we are left with following options:
->> 1. Flush all RAM regions of VCPU using __flush_dcache_range()
->>     upon first run of VCPU
->> 2. Implement outer-cache framework for ARM64 and flush all
->>     caches + outer cache (i.e. L3-cache) upon first run of VCPU
->
-> Do you have specific instructions for flushing the L3 cache only? It's
-> not clear to me what an outer-cache framework would to on AArch64. It
-> was added on AArch32 for the L2x0/PL310 which need separate instructions
-> by physical address for flushing the cache. I really hope we don't get
-> these again on ARMv8 hardware.
->
->> 3. Use an alternate version of flush_icache_range() which will
->>     flush d-cache by PoC instead of PoU. We can also ensure
->>     that coherent_icache_guest_page() function will be called
->>     upon Stage2 prefetch aborts only.
->
-> flush_icache_range() is meant to flush only to the PoU to ensure the I-D
-> cache coherency. I don't think we should change this.
-
-We did not mean to change flush_icache_range() instead we suggest
-to have separate flush_icache_range_kvm() for KVM ARM64 which flushes
-d-cache to PoC.
-
->
-> --
-> Catalin
-
---Anup
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "fsl,vf610-dspi";
+> +				reg = <0x4002c000 0x1000>;
+> +				interrupts = <0 67 0x04>;
+> +				clocks = <&clks VF610_CLK_DSPI0>;
+> +				clock-names = "dspi";
+> +				spi-num-chipselects = <5>;
+> +				status = "disabled";
+> +			};
+> +
+>  			uart0: serial at 40027000 {
+>  				compatible = "fsl,vf610-lpuart";
+>  				reg = <0x40027000 0x1000>;
+> -- 
+> 1.8.0
+> 
+> 
