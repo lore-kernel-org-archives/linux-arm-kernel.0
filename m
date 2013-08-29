@@ -1,39 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 29 Aug 2013 19:20:11 +0100
-Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
-In-Reply-To: <521F8CB3.5060407@gmail.com>
-References: <20130828113459.48ecbb34@armhf> <521DCD33.2070008@gmail.com>
- <20130828121943.1c8327ca@skate> <521DD057.4040208@gmail.com>
- <20130829161217.GK10783@sirena.org.uk>
- <20130829163358.GS6617@n2100.arm.linux.org.uk>
- <20130829171210.GM10783@sirena.org.uk> <521F8CB3.5060407@gmail.com>
-Message-ID: <20130829182010.GQ10783@sirena.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 29 Aug 2013 20:20:48 +0200
+Subject: [PATCH RFC v2 16/16] ARM: zynq: Don't call of_clk_init()
+In-Reply-To: <201308291537.54608.arnd@arndb.de>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1377638890-371-17-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201308291537.54608.arnd@arndb.de>
+Message-ID: <521F9100.4070107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 08:02:27PM +0200, Sebastian Hesselbarth wrote:
-> 
-> it is referring the same differences Russell already mentioned. But I
-> already came to the conclusion, that we don't need the information in
-> the binding. For example, if you use that controller on Dove and you
-> hook it up for SPDIF-in (which it hasn't), than I consider this a
-> DT bug. No need to double-check that in the driver. From that p-o-v,
-> please just let the current binding as is.
+On 08/29/13 15:37, Arnd Bergmann wrote:
+> On Tuesday 27 August 2013, Sebastian Hesselbarth wrote:
+>> @@ -58,10 +57,10 @@ static void __init zynq_init_machine(void)
+>>          of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+>>   }
+>>
+>> -static void __init zynq_timer_init(void)
+>> +static void __init zynq_init_irq(void)
+>>   {
+>> +       irqchip_init();
+>>          zynq_slcr_init();
+>> -       clocksource_of_init();
+>>   }
+>>
+>>   static struct map_desc zynq_cortex_a9_scu_map __initdata = {
+>> @@ -104,8 +103,8 @@ static const char * const zynq_dt_match[] = {
+>>   DT_MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
+>>          .smp            = smp_ops(zynq_smp_ops),
+>>          .map_io         = zynq_map_io,
+>> +       .init_irq       = zynq_init_irq,
+>>          .init_machine   = zynq_init_machine,
+>> -       .init_time      = zynq_timer_init,
+>>          .dt_compat      = zynq_dt_match,
+>>          .restart        = zynq_system_reset,
+>>   MACHINE_END
+>
+> It looks like we are not getting any closer to removing all callbacks here,
+> since you add one in order to remove another, and after the patch we do
+> more things "early", which we try to avoid. I think we're better off without
+> this particular patch.
 
-OK, great - none of these devices have any differences which are visible
-only within the controller, they're all extra external interfaces?
+Right.
 
-> Thomas Petazzoni mentioned earlier, that the _usual_ procedure to
-> name the compatibles is to pick the SoC that the IP appeared in first.
-> But I am also fine with "marvell,mvebu-audio" and adding compatibles
-> for dove or kirkwood _if_ we will ever need them.
+Have you seen Soeren requesting to move of_clk_init(NULL) under the
+else branch of arch-wide .init_time? In the proposed patch it is called
+unconditionally before any mach specific callback.
 
-Yeah, it doesn't make much difference either way so long as the base
-name isn't utterly confusing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130829/45a71d28/attachment.sig>
+Moving it to what gets called if no mach specific callback is set,
+would allow zynq (and others) to still have their own callback where
+they can probe clocks whenever they want to.
+
+Sebastian
