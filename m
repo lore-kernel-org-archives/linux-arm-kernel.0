@@ -1,30 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Aug 2013 10:07:18 -0700
-Subject: [GIT PULL 1/2] ARM: mvebu: MSI/PCI changes for v3.12
-In-Reply-To: <20130816125502.GR13964@titan.lakedaemon.net>
-References: <20130814191011.GD13964@titan.lakedaemon.net>
- <20130816062609.GF7035@quad.lixom.net>
- <20130816125502.GR13964@titan.lakedaemon.net>
-Message-ID: <20130829170718.GD18542@quad.lixom.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 29 Aug 2013 19:11:48 +0200
+Subject: getting rid of subsys_initcall usage? (was: Re: [PATCH RESEND]
+ i2c: designware: use module_platform_driver)
+In-Reply-To: <CAMj5BkhQkwb+T9VepN7UrWNRSgtv=Dw-Sa-gv0orOANo55iqNw@mail.gmail.com>
+References: <1376987548-12366-1-git-send-email-zhangfei.gao@linaro.org>
+ <20130828095706.GH4086@katana>
+ <CACRpkdb1p1=3a0PM+r2ZrMN+ECv5BAZFdv2omDK5npaer4ddcw@mail.gmail.com>
+ <CAMj5BkhQkwb+T9VepN7UrWNRSgtv=Dw-Sa-gv0orOANo55iqNw@mail.gmail.com>
+Message-ID: <CACRpkdZKV_7QaK6dg5LkbSXrTRoPUr-oT0NXVbwhEw0DBMawPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 16, 2013 at 08:55:02AM -0400, Jason Cooper wrote:
-> On Thu, Aug 15, 2013 at 11:26:09PM -0700, Olof Johansson wrote:
-> > Hi,
-> > 
-> > On Wed, Aug 14, 2013 at 03:10:11PM -0400, Jason Cooper wrote:
-> > 
-> > >       PCI: msi: add default MSI operations for !HAVE_GENERIC_HARDIRQS platforms
-> > 
-> > I can't find this patch posted anywhere, and it lacks acks. For trivial code in
-> > your own subsystem that's sometimes ok, but this cuts across to PCI.
-> 
-> oops, you're right.  I've forwarded the email where Bjorn said the
-> change looked ok.  I missed that the original build failure didn't Cc:
-> any MLs.
+On Thu, Aug 29, 2013 at 12:55 PM, zhangfei gao <zhangfei.gao@gmail.com> wrote:
 
-Pulled in under next/drivers.
+> Besides, also find platform_driver_probe is used in
+> drivers/i2c/busses/i2c-imx.c and drivers/i2c/busses/i2c-stu300.c.
 
+The platform_driver_probe() is basically a footprint
+optimization (more code can be discarded after boot)
+and I'm happy to patch it if it disturbs anything, it is
+*really* not important for this driver.
 
--Olof
+Do you guys need a low footprint? Else there is no
+use to have platform_driver_probe() in there.
+
+Yours,
+Linus Walleij
