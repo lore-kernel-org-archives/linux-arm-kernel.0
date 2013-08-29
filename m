@@ -1,73 +1,35 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 29 Aug 2013 11:24:31 +0200
-Subject: [RESEND PATCH v2 0/7] Add device tree support for Exynos4412 Trats2
- cameras
-Message-ID: <1377768278-15391-1-git-send-email-s.nawrocki@samsung.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 29 Aug 2013 11:27:01 +0200
+Subject: [PATCH 0/2] ARM: Dove: Add audio to the DT
+In-Reply-To: <20130828164829.14256ce2@skate>
+References: <20130828113438.0a77fd54@armhf>
+	<20130828164829.14256ce2@skate>
+Message-ID: <20130829112701.3bd32fa0@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Sigh, I've forgotten to Cc some mailing lists when submitting this
- previously, resending with device tree and samsung-soc ML added]
+On Wed, 28 Aug 2013 16:48:29 +0200
+Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-This series is intended to add device tree support for both cameras
-on the Exynos4412 SoC Trats 2 board. It converts related drivers to use
-the v4l2-async API and expose the sensor's master clock supplied by the
-camera host interface through the common clock API.
+> On Wed, 28 Aug 2013 11:34:38 +0200, Jean-Francois Moine wrote:
+> > This patch series adds audio DT to the Dove boards and activates the
+> > Cubox audio device.
+> > 
+> > Full audio in the Cubox will work when the DT extension of the generic
+> > simple audio card will be complete.  
+> 
+> What is the status of this generic simple audio card effort? I've seen
+> the patch you had posted at https://lkml.org/lkml/2013/7/20/128 and the
+> following discussion. Has anyone picked up the work of Kuninori
+> Morimoto?
 
-This changeset is an updated version of my patch series [1] separating
-the sensor subdev driver from the exynos4-fimc-is module and adding
-asynchronous sensor registration support. There is also included next
-iteration of the patch adding DT bits to the rear facing S5C73M3 camera
-module driver [2].
+Hi Thomas,
 
-The S5K6A3 is a raw image sensor of the front facing camera connected
-to the SoC local ISP (FIMC-IS).
+I don't feel able yet to enter the ALSA internals.
+Otherwise, there is this message from Lars:
 
-This series has run-time dependency on the patches adding clk_unregister()
-implementation [3].
+http://mailman.alsa-project.org/pipermail/alsa-devel/2013-August/064951.html
 
-Any feedback, especially on the "s5k6a3: Add DT binding documentation"
-patch, where I've described some issue with the common video-interfaces
-binding is welcome.
-
-[1] http://www.spinics.net/lists/linux-media/msg66073.html
-[2] https://linuxtv.org/patch/19386/
-[3] https://lkml.org/lkml/2013/8/24/63
-
-Thanks,
-Sylwester
-
-Andrzej Hajda (1):
-  V4L: s5c73m3: Add device tree support
-
-Sylwester Nawrocki (6):
-  V4L: s5k6a3: Add DT binding documentation
-  V4L: Add driver for s5k6a3 image sensor
-  V4L: s5k6a3: Add support for asynchronous subdev registration
-  exynos4-is: Add clock provider for the external clocks
-  exynos4-is: Use external s5k6a3 sensor driver
-  exynos4-is: Add support for asynchronous sensor subddevs registration
-
- .../devicetree/bindings/media/samsung-fimc.txt     |   21 +-
- .../devicetree/bindings/media/samsung-s5c73m3.txt  |   95 ++++++
- .../devicetree/bindings/media/samsung-s5k6a3.txt   |   31 ++
- drivers/media/i2c/Kconfig                          |    8 +
- drivers/media/i2c/Makefile                         |    1 +
- drivers/media/i2c/s5c73m3/s5c73m3-core.c           |  206 +++++++++---
- drivers/media/i2c/s5c73m3/s5c73m3-spi.c            |    6 +
- drivers/media/i2c/s5c73m3/s5c73m3.h                |    4 +
- drivers/media/i2c/s5k6a3.c                         |  340 ++++++++++++++++++++
- drivers/media/platform/exynos4-is/fimc-is-regs.c   |    2 +-
- drivers/media/platform/exynos4-is/fimc-is-sensor.c |  285 +---------------
- drivers/media/platform/exynos4-is/fimc-is-sensor.h |   49 +--
- drivers/media/platform/exynos4-is/fimc-is.c        |   97 +++---
- drivers/media/platform/exynos4-is/fimc-is.h        |    4 +-
- drivers/media/platform/exynos4-is/media-dev.c      |  335 +++++++++++++------
- drivers/media/platform/exynos4-is/media-dev.h      |   31 +-
- 16 files changed, 984 insertions(+), 531 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/media/samsung-s5c73m3.txt
- create mode 100644 Documentation/devicetree/bindings/media/samsung-s5k6a3.txt
- create mode 100644 drivers/media/i2c/s5k6a3.c
-
---
-1.7.9.5
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
