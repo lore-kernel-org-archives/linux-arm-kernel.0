@@ -1,32 +1,44 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Thu, 29 Aug 2013 12:23:02 -0500
-Subject: [PATCH] dma: imx-sdma: Add ROM script addresses to driver
-In-Reply-To: <20130820150252.GB31060@pengutronix.de>
-References: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
- <CAHCPf3t1_5zhSOrfVFHgeVPa25sT+ewv1=OZA8X4_YZXb9cSeA@mail.gmail.com>
- <20130820070039.GH31036@pengutronix.de>
- <CAHCPf3sJDRXUkrkRtku06OvBav2idFvJwThsxsrHngXg3mEXJA@mail.gmail.com>
- <20130820150252.GB31060@pengutronix.de>
-Message-ID: <CAHCPf3vYTW7=s663+mEnesRX=MoSc8VwN5i=RB0Zm3J727_t2Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 29 Aug 2013 19:23:12 +0200
+Subject: [PATCH RFC v2 11/16] ARM: socfpga: remove call to of_clk_init
+In-Reply-To: <1377790696.26261.3.camel@linux-builds1>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1377638890-371-12-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1377790696.26261.3.camel@linux-builds1>
+Message-ID: <201308291923.13151.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 20, 2013 at 10:02 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->
->> What I'd really like to see is the "waiting on a firmware that doesn't
->> exist when there is a working ROM version of those scripts in the SoC"
->
-> Then this patch is for you. This is exactly what the patch solves.
+On Thursday 29 August 2013, Dinh Nguyen wrote:
+> On Tue, 2013-08-27 at 23:28 +0200, Sebastian Hesselbarth wrote:
 
-Only by changing the device tree and not specifying a firmware
-filename. The driver probes, knows about ROM script addresses as per
-your patch, tries to load a new file from disk; same hang. What you
-have now is a way to use a potentially buggy script with several
-functions missing (ROM script isn't as full-featured as the file-based
-one on some chips) or a hang on boot if you misplaced a firmware which
-is notoriously hard to get hold of..
+> > @@ -107,7 +106,6 @@ static void __init socfpga_cyclone5_init(void)
+> >  {
+> >  	l2x0_of_init(0, ~0UL);
+> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > -	of_clk_init(NULL);
+> >  	socfpga_init_clocks();
+> >  }
+> >  
+> 
+> Acked-by: Dinh Nguyen <dinguyen@altera.com>
 
-How do we resolve this except to load the firmware pre-Linux (or put
-the firmware in the tree, argh) and describe the loaded firmware and
-offsets? Once it's in the internal SDMA code RAM all the versioning
-and headers go away..
+I saw that your socfpga_init_clocks() function only has these contents:
+
+void __init socfpga_init_clocks(void)
+{
+        struct clk *clk;
+        int ret;
+
+        clk = clk_register_fixed_factor(NULL, "smp_twd", "mpuclk", 0, 1, 4);
+        ret = clk_register_clkdev(clk, NULL, "smp_twd");
+        if (ret)
+                pr_err("smp_twd alias not registered\n");
+}
+
+
+I think that can easily be expressed with DT syntax now (correct me if I'm wrong), so
+you should be able to kill this off as well. Once somebody gets around to automate
+the l2x0 setup, the entire socfpga_cyclone5_init() function can go away too.
+
+	Arnd
