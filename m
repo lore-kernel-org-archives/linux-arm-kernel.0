@@ -1,31 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Aug 2013 14:02:52 -0700
-Subject: [GIT PULL] Allwinner sunXi DT additions for 3.12, take 4
-In-Reply-To: <20130826092028.GA5109@lukather>
-References: <20130826092028.GA5109@lukather>
-Message-ID: <20130829210252.GU18542@quad.lixom.net>
+Date: Thu, 29 Aug 2013 14:08:09 -0700
+Subject: [GIT PULL v2] at91: soc update for 3.12 #1
+In-Reply-To: <1377765162-1659-1-git-send-email-nicolas.ferre@atmel.com>
+References: <20130828235855.GM8607@quad.lixom.net>
+ <1377765162-1659-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20130829210809.GV18542@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 26, 2013 at 11:20:28AM +0200, Maxime Ripard wrote:
-> Hi Arnd, Kevin, Olof,
+On Thu, Aug 29, 2013 at 10:32:42AM +0200, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> Please pull the following tag on top of the one I previously sent you.
+> (respin of previous pull-request with author name fixed)
 > 
-> Thanks!
-> Maxime
+> Here is AT91 SoC updates for 3.12 kernel. It is the first pull-request for
+> this topic and it is based on 3.11-rc5 like your next/soc branch.
 > 
-> The following changes since commit 82abe5294aeadc42508c7944f3a9aec0eece214c:
+> Thanks, best regards,
 > 
->   ARM: sun7i: Add Cubieboard2 Device Tree (2013-08-22 00:19:19 +0200)
+> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+> 
+>   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
 > 
 > are available in the git repository at:
 > 
->   https://github.com/mripard/linux.git tags/sunxi-dt-for-3.12-4
+>   git://github.com/at91linux/linux-at91.git tags/at91-soc
 
-Pulled into late/all. Since we hadn't taken "take 3" yet, I pulled just
-this one and amended the merge description to include both updates.
+Thanks, pulled into late/all.
 
-(Now I'll go enable the cubie2 as part of my boot test farm too).
 
 -Olof
