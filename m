@@ -1,63 +1,161 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 29 Aug 2013 18:05:39 -0500
-Subject: [PATCH v4 0/6] dma: edma: Support scatter-lists of any length
-Message-ID: <1377817545-18015-1-git-send-email-joelf@ti.com>
+Date: Thu, 29 Aug 2013 18:05:41 -0500
+Subject: [PATCH v4 2/6] dma: edma: Write out and handle MAX_NR_SG at a given
+ time
+In-Reply-To: <1377817545-18015-1-git-send-email-joelf@ti.com>
+References: <1377817545-18015-1-git-send-email-joelf@ti.com>
+Message-ID: <1377817545-18015-3-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series adds support to EDMA driver to enable DMA of
-scatter-gather lists of arbitrary length, but still make use of only
-a certain MAX number of slots at a time for a given channel. Thus
-free-ing up the rest of the slots to other slaves/channels.  With this
-there is no need for slave drivers to query the EDMA driver about how
-much is the MAX it can send at a time as done in [1]. Drivers can send
-SG lists of any number of entries to DMA. Reference discussion at [2].
+Process SG-elements in batches of MAX_NR_SG if they are greater
+than MAX_NR_SG. Due to this, at any given time only those many
+slots will be used in the given channel no matter how long the
+scatter list is. We keep track of how much has been written
+inorder to process the next batch of elements in the scatter-list
+and detect completion.
 
-With this, all the patches for MMC and EDMA related to "sg limits" can be
-dropped.
+For such intermediate transfer completions (one batch of MAX_NR_SG),
+make use of pause and resume functions instead of start and stop
+when such intermediate transfer is in progress or completed as we
+donot want to clear any pending events.
 
-Tested omap-aes and omap_hsmmc drivers with different MAX number of slots,
-even just 1. In the case where it is 1, only 1-slot is used to DMA an
-entire scatter list of arbitrary length.
-Since this series touches EDMA private API code also shared with davinci-pcm,
-playback of a 16-bit 44.1KHz audio file with davinci-pcm has been tested.
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
+ drivers/dma/edma.c | 79 ++++++++++++++++++++++++++++++++++++------------------
+ 1 file changed, 53 insertions(+), 26 deletions(-)
 
-Sample test run with 1 vs 16 (MAX number of slots/SG) in omap-aes driver:
-MAX slots = 1:
- (128 bit key, 8192 byte blocks): 1266 operations in 1 seconds (10371072 bytes)
-MAX slots = 16:
- (128 bit key, 8192 byte blocks): 1601 operations in 1 seconds (13115392 bytes)
-
-Note: For the above test, 8K buffer is mapped into SG list of size 2 so
-only 2 slots are required. So beyond size 2, there will not be any noticeable
-performance improvement. But above experiment just shows as proof of concept
-that even using 1 slot is managed by just DMA'ing 1 SG entry at a time.
-
-Patch series history:
-v1: The initial patch series
-v2: Several style related cleanups.
-v3: Rewrote major portions of the series to avoid usage of error interrupts.
-v4: Go back to v1: After performing tests, it is determined that the v1
-series is a good enough approach and that v3 triggers problems in certain cases.
-Tests have shown that there is not any noticeable performance difference between
-using vs not using error interrupts. v4 also squashes some patches in v1.
-At this point, we are freezing the overall architecture of the patch series to v4.
-
-[1] https://lkml.org/lkml/2013/7/18/432
-[2] http://marc.info/?l=linux-omap&m=137416733628831&w=2
-
-Joel Fernandes (6):
-  dma: edma: Setup parameters to DMA MAX_NR_SG at a time
-  dma: edma: Write out and handle MAX_NR_SG at a given time
-  ARM: edma: Add function to manually trigger an EDMA channel
-  dma: edma: Find missed events and issue them
-  dma: edma: Leave linked to Null slot instead of DUMMY slot
-  dma: edma: Remove limits on number of slots
-
- arch/arm/common/edma.c             |  17 ++++
- drivers/dma/edma.c                 | 164 ++++++++++++++++++++++++++++---------
- include/linux/platform_data/edma.h |   2 +
- 3 files changed, 144 insertions(+), 39 deletions(-)
-
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index e522ad5..732829b 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -56,6 +56,7 @@ struct edma_desc {
+ 	struct list_head		node;
+ 	int				absync;
+ 	int				pset_nr;
++	int				processed;
+ 	struct edmacc_param		pset[0];
+ };
+ 
+@@ -104,22 +105,34 @@ static void edma_desc_free(struct virt_dma_desc *vdesc)
+ /* Dispatch a queued descriptor to the controller (caller holds lock) */
+ static void edma_execute(struct edma_chan *echan)
+ {
+-	struct virt_dma_desc *vdesc = vchan_next_desc(&echan->vchan);
++	struct virt_dma_desc *vdesc;
+ 	struct edma_desc *edesc;
+-	int i;
+-
+-	if (!vdesc) {
+-		echan->edesc = NULL;
+-		return;
++	struct device *dev = echan->vchan.chan.device->dev;
++	int i, j, left, nslots;
++
++	/* If either we processed all psets or we're still not started */
++	if (!echan->edesc ||
++	    echan->edesc->pset_nr == echan->edesc->processed) {
++		/* Get next vdesc */
++		vdesc = vchan_next_desc(&echan->vchan);
++		if (!vdesc) {
++			echan->edesc = NULL;
++			return;
++		}
++		list_del(&vdesc->node);
++		echan->edesc = to_edma_desc(&vdesc->tx);
+ 	}
+ 
+-	list_del(&vdesc->node);
++	edesc = echan->edesc;
+ 
+-	echan->edesc = edesc = to_edma_desc(&vdesc->tx);
++	/* Find out how many left */
++	left = edesc->pset_nr - edesc->processed;
++	nslots = min(MAX_NR_SG, left);
+ 
+ 	/* Write descriptor PaRAM set(s) */
+-	for (i = 0; i < edesc->pset_nr; i++) {
+-		edma_write_slot(echan->slot[i], &edesc->pset[i]);
++	for (i = 0; i < nslots; i++) {
++		j = i + edesc->processed;
++		edma_write_slot(echan->slot[i], &edesc->pset[j]);
+ 		dev_dbg(echan->vchan.chan.device->dev,
+ 			"\n pset[%d]:\n"
+ 			"  chnum\t%d\n"
+@@ -132,24 +145,31 @@ static void edma_execute(struct edma_chan *echan)
+ 			"  bidx\t%08x\n"
+ 			"  cidx\t%08x\n"
+ 			"  lkrld\t%08x\n",
+-			i, echan->ch_num, echan->slot[i],
+-			edesc->pset[i].opt,
+-			edesc->pset[i].src,
+-			edesc->pset[i].dst,
+-			edesc->pset[i].a_b_cnt,
+-			edesc->pset[i].ccnt,
+-			edesc->pset[i].src_dst_bidx,
+-			edesc->pset[i].src_dst_cidx,
+-			edesc->pset[i].link_bcntrld);
++			j, echan->ch_num, echan->slot[i],
++			edesc->pset[j].opt,
++			edesc->pset[j].src,
++			edesc->pset[j].dst,
++			edesc->pset[j].a_b_cnt,
++			edesc->pset[j].ccnt,
++			edesc->pset[j].src_dst_bidx,
++			edesc->pset[j].src_dst_cidx,
++			edesc->pset[j].link_bcntrld);
+ 		/* Link to the previous slot if not the last set */
+-		if (i != (edesc->pset_nr - 1))
++		if (i != (nslots - 1))
+ 			edma_link(echan->slot[i], echan->slot[i+1]);
+ 		/* Final pset links to the dummy pset */
+ 		else
+ 			edma_link(echan->slot[i], echan->ecc->dummy_slot);
+ 	}
+ 
+-	edma_start(echan->ch_num);
++	edesc->processed += nslots;
++
++	edma_resume(echan->ch_num);
++
++	if (edesc->processed <= MAX_NR_SG) {
++		dev_dbg(dev, "first transfer starting %d\n", echan->ch_num);
++		edma_start(echan->ch_num);
++	}
+ }
+ 
+ static int edma_terminate_all(struct edma_chan *echan)
+@@ -368,19 +388,26 @@ static void edma_callback(unsigned ch_num, u16 ch_status, void *data)
+ 	struct edma_desc *edesc;
+ 	unsigned long flags;
+ 
+-	/* Stop the channel */
+-	edma_stop(echan->ch_num);
++	/* Pause the channel */
++	edma_pause(echan->ch_num);
+ 
+ 	switch (ch_status) {
+ 	case DMA_COMPLETE:
+-		dev_dbg(dev, "transfer complete on channel %d\n", ch_num);
+-
+ 		spin_lock_irqsave(&echan->vchan.lock, flags);
+ 
+ 		edesc = echan->edesc;
+ 		if (edesc) {
++			if (edesc->processed == edesc->pset_nr) {
++				dev_dbg(dev, "transfer complete." \
++					" stopping channel %d\n", ch_num);
++				edma_stop(echan->ch_num);
++				vchan_cookie_complete(&edesc->vdesc);
++			} else {
++				dev_dbg(dev, "Intermediate transfer complete" \
++					" on channel %d\n", ch_num);
++			}
++
+ 			edma_execute(echan);
+-			vchan_cookie_complete(&edesc->vdesc);
+ 		}
+ 
+ 		spin_unlock_irqrestore(&echan->vchan.lock, flags);
 -- 
 1.8.1.2
