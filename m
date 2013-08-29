@@ -1,51 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Aug 2013 10:57:15 -0700
-Subject: linux-next: manual merge of the arm-soc tree with the pm tree
-In-Reply-To: <20130829180425.4aa3d164f01cc65b215187fe@canb.auug.org.au>
-References: <20130829180425.4aa3d164f01cc65b215187fe@canb.auug.org.au>
-Message-ID: <20130829175715.GH18542@quad.lixom.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 29 Aug 2013 19:03:53 +0100
+Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
+In-Reply-To: <CA+Bv8Xb38bwby78Q--nEGffBknj5ZD98x0OuRX5N1EFNjbh7zA@mail.gmail.com>
+References: <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
+ <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
+ <87txiasqhk.fsf@linaro.org>
+ <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
+ <20130829110534.GV10783@sirena.org.uk>
+ <CAGa+x85u0OpB9o71xUTs15wt8Te-o5f0C9o22GHzZwOjn5F6=w@mail.gmail.com>
+ <20130829154929.GJ10783@sirena.org.uk>
+ <CA+Bv8XYbpqQAYwJ3=vkP0gXDMTp7_VNVzB0NXLG6GHDi=Z1img@mail.gmail.com>
+ <20130829173022.GN10783@sirena.org.uk>
+ <CA+Bv8Xb38bwby78Q--nEGffBknj5ZD98x0OuRX5N1EFNjbh7zA@mail.gmail.com>
+Message-ID: <20130829180353.GP10783@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 06:04:25PM +1000, Stephen Rothwell wrote:
-> Hi all,
-> 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> drivers/cpuidle/Makefile between commits b98e01ad4ed9 ("cpuidle: Add
-> Kconfig.arm and move calxeda, kirkwood and zynq") and d3f2950f2ade ("ARM:
-> ux500: cpuidle: Move ux500 cpuidle driver to drivers/cpuidle") from the
-> pm tree and commit 14d2c34cfa00 ("cpuidle: big.LITTLE: vexpress-TC2 CPU
-> idle driver") from the arm-soc tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
-> 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc drivers/cpuidle/Makefile
-> index 0b9d200,3b6445c..0000000
-> --- a/drivers/cpuidle/Makefile
-> +++ b/drivers/cpuidle/Makefile
-> @@@ -5,9 -5,7 +5,10 @@@
->   obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
->   obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
->   
->  -obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
->  -obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
->  -obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
->  -obj-$(CONFIG_CPU_IDLE_BIG_LITTLE) += cpuidle-big_little.o
->  +##################################################################################
->  +# ARM SoC drivers
->  +obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
->  +obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
->  +obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
->  +obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
-> ++obj-$(CONFIG_CPU_IDLE_BIG_LITTLE)       += cpuidle-big_little.o
+On Thu, Aug 29, 2013 at 10:47:04AM -0700, Russ Dill wrote:
+> On Thu, Aug 29, 2013 at 10:30 AM, Mark Brown <broonie@kernel.org> wrote:
 
+> > So this is done from cpuidle rather than system suspend.
 
-Might want to sort u8500 before zynq, but otherwise looks fine.
+> It is done for system suspend. It isn't possible to do this in a
+> cpuidle use case as the memory controller would need to come out of
+> idle automatically to service DMA requests.
 
+OK, so it's all part of the core power down sequence for the SoC?  I'm
+not sure that makes a big difference but it at least means that there
+are fewer runtime interactions to worry about.
 
--Olof
+> > I mean describe the intended sequence of events in the system rather
+> > than the raw register commands to accomplish them.
+
+> I'm still not sure what you mean.
+
+Say "set voltage X" or even "regulator X supplies Y" not "send this
+bytestream to the device".
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130829/047e1eca/attachment.sig>
