@@ -1,194 +1,83 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 29 Aug 2013 19:26:43 +0530
-Subject: [PATCH v2 3/3] ARM: OMAP4+: Remove static iotable mappings for
- SRAM
-In-Reply-To: <521F4B5B.1080004@ti.com>
-References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
- <1377775391-13103-4-git-send-email-rnayak@ti.com> <521F4B5B.1080004@ti.com>
-Message-ID: <521F531B.6070409@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 29 Aug 2013 22:01:25 +0800
+Subject: [PATCH] cpufreq: imx6q: Fix clock enable balance
+In-Reply-To: <1377517716-27470-1-git-send-email-s.hauer@pengutronix.de>
+References: <1377517716-27470-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20130829140123.GM18729@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 August 2013 06:53 PM, Santosh Shilimkar wrote:
-> On Thursday 29 August 2013 07:23 AM, Rajendra Nayak wrote:
->> In order to handle errata I688, a page of sram was reserved by doing a
->> static iotable map. Now that we use gen_pool to manage sram, we can
->> completely remove all of these static mappings and use gen_pool_alloc()
->> to get the one page of sram space needed to implement errata I688.
->>
->> Suggested-by: Sekhar Nori <nsekhar@ti.com>
->> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->> ---
->>  Documentation/devicetree/bindings/arm/omap/mpu.txt |    5 ++++-
->>  arch/arm/boot/dts/omap4.dtsi                       |    1 +
->>  arch/arm/boot/dts/omap5.dtsi                       |    3 ++-
->>  arch/arm/mach-omap2/io.c                           |   17 -----------------
->>  arch/arm/mach-omap2/omap4-common.c                 |   17 ++++++++++++++++-
->>  arch/arm/mach-omap2/sram.c                         |    6 ------
->>  arch/arm/mach-omap2/sram.h                         |    6 ------
->>  7 files changed, 23 insertions(+), 32 deletions(-)
->>
-> Add a note in the change-log about about omap_bus_sync() being NOP till the
-> SRAM is initialized. Its not a problem since the idle loop hasn't
-> started yet.
+On Mon, Aug 26, 2013 at 01:48:36PM +0200, Sascha Hauer wrote:
+> For changing the cpu frequency the i.MX6q has to be switched to some
+> intermediate clock during the PLL reprogramming. The driver tries
+> to be clever to keep the enable count correct but gets it wrong. If
+> the cpufreq is increased it calls clk_disable_unprepare twice
+> on pll2_pfd2_396m. This puts all other devices which get their clock
+> from pll2_pfd2_396m into a nonworking state.
 
-ok, will update the changelog, thanks.
+So you're running into a problem in real?  The clk_disable_unprepare on
+pll2_pfd2_396m below will only be executed when are leaving 396MHz
+set-point.  It's there to balance the clk_prepare_enable on
+pll2_pfd2_396m when we enters 396MHz set-point.
+
+	if (freqs.old * 1000 <= clk_get_rate(pll2_pfd2_396m_clk)) {
+		clk_prepare_enable(pll1_sys_clk);
+		clk_disable_unprepare(pll2_pfd2_396m_clk);
+	}
 
 > 
-> Other than that looks fine.
+> Fix this by removing the clk enabling/disabling altogether since the
+> clk core will do this automatically during a reparent.
+
+It seems clk core will only enable the parent clock during the
+clk_set_parent() call, and only in case that the child clock is
+prepared.  For example, I do not think pll2_pfd2_396m_clk and step_clk
+will be altered to ON state.  Or am I missing something?
+
+	clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+	clk_set_parent(pll1_sw_clk, step_clk);
+
+Shawn
+
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/cpufreq/imx6q-cpufreq.c | 17 -----------------
+>  1 file changed, 17 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> index e37cdae..2971d12 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -117,28 +117,11 @@ static int imx6q_set_target(struct cpufreq_policy *policy,
+>  	 *  - Reprogram pll1_sys_clk and reparent pll1_sw_clk back to it
+>  	 *  - Disable pll2_pfd2_396m_clk
+>  	 */
+> -	clk_prepare_enable(pll2_pfd2_396m_clk);
+>  	clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+>  	clk_set_parent(pll1_sw_clk, step_clk);
+>  	if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
+>  		clk_set_rate(pll1_sys_clk, freqs.new * 1000);
+> -		/*
+> -		 * If we are leaving 396 MHz set-point, we need to enable
+> -		 * pll1_sys_clk and disable pll2_pfd2_396m_clk to keep
+> -		 * their use count correct.
+> -		 */
+> -		if (freqs.old * 1000 <= clk_get_rate(pll2_pfd2_396m_clk)) {
+> -			clk_prepare_enable(pll1_sys_clk);
+> -			clk_disable_unprepare(pll2_pfd2_396m_clk);
+> -		}
+>  		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
+> -		clk_disable_unprepare(pll2_pfd2_396m_clk);
+> -	} else {
+> -		/*
+> -		 * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
+> -		 * to provide the frequency.
+> -		 */
+> -		clk_disable_unprepare(pll1_sys_clk);
+>  	}
 >  
->> diff --git a/Documentation/devicetree/bindings/arm/omap/mpu.txt b/Documentation/devicetree/bindings/arm/omap/mpu.txt
->> index 1a5a42c..8915ba3 100644
->> --- a/Documentation/devicetree/bindings/arm/omap/mpu.txt
->> +++ b/Documentation/devicetree/bindings/arm/omap/mpu.txt
->> @@ -6,9 +6,12 @@ The MPU contain CPUs, GIC, L2 cache and a local PRCM.
->>  
->>  Required properties:
->>  - compatible : Should be "ti,omap3-mpu" for OMAP3
->> -               Should be "ti,omap4-mpu" for OMAP4
->> +               Should be "ti,omap4-mpu" for OMAP4 and OMAP5
->>  - ti,hwmods: "mpu"
->>  
->> +Optional properties:
->> +- sram:	Phandle to the ocmcram node
->> +
->>  Examples:
->>  
->>  - For an OMAP4 SMP system:
->> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->> index 1ba6a77..9114241 100644
->> --- a/arch/arm/boot/dts/omap4.dtsi
->> +++ b/arch/arm/boot/dts/omap4.dtsi
->> @@ -71,6 +71,7 @@
->>  		mpu {
->>  			compatible = "ti,omap4-mpu";
->>  			ti,hwmods = "mpu";
->> +			sram = <&ocmcram>;
->>  		};
->>  
->>  		dsp {
->> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
->> index 461ffd8..e9b735b 100644
->> --- a/arch/arm/boot/dts/omap5.dtsi
->> +++ b/arch/arm/boot/dts/omap5.dtsi
->> @@ -72,8 +72,9 @@
->>  	soc {
->>  		compatible = "ti,omap-infra";
->>  		mpu {
->> -			compatible = "ti,omap5-mpu";
->> +			compatible = "ti,omap4-mpu";
->>  			ti,hwmods = "mpu";
->> +			sram = <&ocmcram>;
->>  		};
->>  	};
->>  
->> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
->> index 4a3f06f..8b2334e 100644
->> --- a/arch/arm/mach-omap2/io.c
->> +++ b/arch/arm/mach-omap2/io.c
->> @@ -239,15 +239,6 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
->>  		.length		= L4_PER_44XX_SIZE,
->>  		.type		= MT_DEVICE,
->>  	},
->> -#ifdef CONFIG_OMAP4_ERRATA_I688
->> -	{
->> -		.virtual	= OMAP4_SRAM_VA,
->> -		.pfn		= __phys_to_pfn(OMAP4_SRAM_PA),
->> -		.length		= PAGE_SIZE,
->> -		.type		= MT_MEMORY_SO,
->> -	},
->> -#endif
->> -
->>  };
->>  #endif
->>  
->> @@ -277,14 +268,6 @@ static struct map_desc omap54xx_io_desc[] __initdata = {
->>  		.length		= L4_PER_54XX_SIZE,
->>  		.type		= MT_DEVICE,
->>  	},
->> -#ifdef CONFIG_OMAP4_ERRATA_I688
->> -	{
->> -		.virtual	= OMAP4_SRAM_VA,
->> -		.pfn		= __phys_to_pfn(OMAP4_SRAM_PA),
->> -		.length		= PAGE_SIZE,
->> -		.type		= MT_MEMORY_SO,
->> -	},
->> -#endif
->>  };
->>  #endif
->>  
->> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
->> index 5791143..6b5ffb3 100644
->> --- a/arch/arm/mach-omap2/omap4-common.c
->> +++ b/arch/arm/mach-omap2/omap4-common.c
->> @@ -24,6 +24,7 @@
->>  #include <linux/irqchip/arm-gic.h>
->>  #include <linux/of_address.h>
->>  #include <linux/reboot.h>
->> +#include <linux/genalloc.h>
->>  
->>  #include <asm/hardware/cache-l2x0.h>
->>  #include <asm/mach/map.h>
->> @@ -71,6 +72,21 @@ void omap_bus_sync(void)
->>  }
->>  EXPORT_SYMBOL(omap_bus_sync);
->>  
->> +static int __init omap4_sram_init(void)
->> +{
->> +	struct device_node *np;
->> +	struct gen_pool *sram_pool;
->> +
->> +	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
->> +	if (!np)
->> +		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
->> +			 __func__);
->> +	sram_pool = of_get_named_gen_pool(np, "sram", 0);
->> +	sram_sync = (void *)gen_pool_alloc(sram_pool, PAGE_SIZE);
->> +	return 0;
->> +}
->> +omap_arch_initcall(omap4_sram_init);
->> +
->>  /* Steal one page physical memory for barrier implementation */
->>  int __init omap_barrier_reserve_memblock(void)
->>  {
->> @@ -91,7 +107,6 @@ void __init omap_barriers_init(void)
->>  	dram_io_desc[0].type = MT_MEMORY_SO;
->>  	iotable_init(dram_io_desc, ARRAY_SIZE(dram_io_desc));
->>  	dram_sync = (void __iomem *) dram_io_desc[0].virtual;
->> -	sram_sync = (void __iomem *) OMAP4_SRAM_VA;
->>  
->>  	pr_info("OMAP4: Map 0x%08llx to 0x%08lx for dram barrier\n",
->>  		(long long) paddr, dram_io_desc[0].virtual);
->> diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
->> index d5ecb75..8591044 100644
->> --- a/arch/arm/mach-omap2/sram.c
->> +++ b/arch/arm/mach-omap2/sram.c
->> @@ -124,12 +124,6 @@ static void __init omap2_map_sram(void)
->>  {
->>  	int cached = 1;
->>  
->> -#ifdef CONFIG_OMAP4_ERRATA_I688
->> -	if (cpu_is_omap44xx()) {
->> -		omap_sram_start += PAGE_SIZE;
->> -		omap_sram_size -= SZ_16K;
->> -	}
->> -#endif
->>  	if (cpu_is_omap34xx()) {
->>  		/*
->>  		 * SRAM must be marked as non-cached on OMAP3 since the
->> diff --git a/arch/arm/mach-omap2/sram.h b/arch/arm/mach-omap2/sram.h
->> index 3f83b80..948d3ed 100644
->> --- a/arch/arm/mach-omap2/sram.h
->> +++ b/arch/arm/mach-omap2/sram.h
->> @@ -74,9 +74,3 @@ static inline void omap_push_sram_idle(void) {}
->>   */
->>  #define OMAP2_SRAM_PA		0x40200000
->>  #define OMAP3_SRAM_PA           0x40200000
->> -#ifdef CONFIG_OMAP4_ERRATA_I688
->> -#define OMAP4_SRAM_PA		0x40304000
->> -#define OMAP4_SRAM_VA		0xfe404000
->> -#else
->> -#define OMAP4_SRAM_PA		0x40300000
->> -#endif
->>
+>  	/* Ensure the arm clock divider is what we expect */
+> -- 
+> 1.8.4.rc3
 > 
