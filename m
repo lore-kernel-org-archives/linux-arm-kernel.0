@@ -1,77 +1,22 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 30 Aug 2013 00:32:42 +0200
-Subject: [GIT PULL] ARM/ARM64 architected timer updates for v3.12
-In-Reply-To: <521F8157.20203@arm.com>
-References: <521F8157.20203@arm.com>
-Message-ID: <521FCC0A.80302@linaro.org>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Fri, 30 Aug 2013 01:41:28 +0300
+Subject: [Query] CPUFreq: Does these machines have separate clock domains
+ for CPUs?
+In-Reply-To: <CAKohponWn-RN7-6sdhghd6RGCOd357G+TKLsxHfqnSCuMD7xxw@mail.gmail.com>
+References: <CAKohponWn-RN7-6sdhghd6RGCOd357G+TKLsxHfqnSCuMD7xxw@mail.gmail.com>
+Message-ID: <20130829224127.GA15841@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/2013 07:13 PM, Sudeep KarkadaNagesha wrote:
-> Hi Daniel,
-> 
-> These are the ARM/ARM64 arch timer updates for v3.12.
-> I have re-based the changes on tip/timers/core as there are conflicts
-> with memory mapped arch_timers support queued recently.
-> Since this series adds CPU PM notifiers for arch_timers, it is required
-> to enable ARM bL cpuidle drivers(already queued for v3.12)
-> 
-> Regards,
-> Sudeep
-> 
-> The following changes since commit cfb6d656d569510ac9239583ce09e4c92ad54719:
-> 
->   Merge branch 'timers/clockevents-next' of
-> git://git.linaro.org/people/dlezcano/clockevents into timers/core
-> (2013-08-21 14:59:23 +0200)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://linux-arm.org/linux-skn.git timer_evtstrm
-> 
-> for you to fetch changes up to f74f198e540c160b1db9470b679dbeb72339829b:
-> 
->   drivers: clocksource: add CPU PM notifier for ARM architected timer
-> (2013-08-29 17:43:08 +0100)
+Hi,
 
+On Thu, Aug 29, 2013 at 03:45:58PM +0530, Viresh Kumar wrote:
+> I have been doing some CPUFreq cleanup work and
+> wanted to know if the below mentioned machines have separate
+> clock domains for their CPUs or all share the same domain?
+[...]
+> drivers/cpufreq/loongson2_cpufreq.c
 
-Hi Sudeep,
+Loongson2 is UP only.
 
-I need the acked-by from Olof or Kevin for the arch/arm[64] changes.
-
-Thanks
-  -- Daniel
-
-> ----------------------------------------------------------------
-> Sudeep KarkadaNagesha (4):
->    ARM/ARM64: arch_timer: add macros for bits in control register
->    ARM: arch_timer: add support to configure and enable event stream
->    ARM64: arch_timer: add support to configure and enable event stream
->    drivers: clocksource: add CPU PM notifier for ARM architected timer
-> 
-> Will Deacon (1):
->    drivers: clocksource: add support for ARM architected timer event stream
-> q
->  arch/arm/include/asm/arch_timer.h    | 36 ++++++++++++++++---
->  arch/arm/include/uapi/asm/hwcap.h    |  1 +
->  arch/arm/kernel/setup.c              |  1 +
->  arch/arm64/include/asm/arch_timer.h  | 42 ++++++++++++++++++---
->  arch/arm64/include/asm/hwcap.h       | 11 +++---
->  arch/arm64/include/uapi/asm/hwcap.h  |  1 +
->  arch/arm64/kernel/setup.c            | 11 ++++++
->  drivers/clocksource/Kconfig          | 15 ++++++++
->  drivers/clocksource/arm_arch_timer.c | 49 +++++++++++++++++++++++++
->  include/clocksource/arm_arch_timer.h | 10 +++++
->  10 files changed, 161 insertions(+), 16 deletions(-)
-> 
-> 
-> 
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+A.
