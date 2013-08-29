@@ -1,34 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 Aug 2013 20:46:04 +0200
-Subject: [PATCH] gpio: (gpio-pca953x) move header to linux/platform_data/
-In-Reply-To: <20130829180040.GI18542@quad.lixom.net>
-References: <ADE657CA350FB648AAC2C43247A983F0021DAC7DA184@AUSP01VMBX24.collaborationhost.net>
- <1859873512.636800.1377798778897.JavaMail.root@mail>
- <20130829180040.GI18542@quad.lixom.net>
-Message-ID: <CACRpkdaK4XBPejAC6EezhTi_CkWZpj4A9+FzAhzSDib9dhJJNw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 29 Aug 2013 20:10:51 +0100
+Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
+In-Reply-To: <CA+Bv8XavoekzHM6DU3BFdq8W+XK6aGr7bvW60W3L6gR2Cu2p4Q@mail.gmail.com>
+References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
+ <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
+ <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
+ <87txiasqhk.fsf@linaro.org>
+ <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
+ <20130829110534.GV10783@sirena.org.uk>
+ <CA+Bv8XaX6v7wH0d1c2S7RzFDx6rAueHi1ZkmkGMpvcNDypXvzQ@mail.gmail.com>
+ <20130829180101.GO10783@sirena.org.uk>
+ <CA+Bv8XavoekzHM6DU3BFdq8W+XK6aGr7bvW60W3L6gR2Cu2p4Q@mail.gmail.com>
+Message-ID: <20130829191051.GT10783@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 8:00 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, Aug 29, 2013 at 01:52:58PM -0400, Vivien Didelot wrote:
->> As this patch mainly touches arch/arm/*, Olof/Kevin, would you mind
->> applying it?
->>
->> The first message in thread is here: https://lkml.org/lkml/2013/7/31/552
->> Here are the previous ACKs:
->>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->
-> Looks like i2c or gpio maintainers should be taking it, but since Linus acked
-> it instead of applied it, I guess we can take it. :)
->
-> I'll apply it to next/cleanup for 3.12 if you resend me the patch with the
-> acks. Thanks!
+On Thu, Aug 29, 2013 at 11:25:43AM -0700, Russ Dill wrote:
+> On Thu, Aug 29, 2013 at 11:01 AM, Mark Brown <broonie@kernel.org> wrote:
 
-Thanks a lot Olof, I worried about all the hunks hitting the arch/arm/*
-hierarchy, and not much is happening in drivers/gpio this cycle
-so think it is better off in ARM SoC.
+> > Making it write only seems to be a mistake - like I said in my other
+> > mail I'd expect you'd want bitfield updates here.  The read and modify
+> > could be done earlier by Linux though.
 
-Yours,
-Linus Walleij
+> Updating bitfields in memory is pretty basic, but with I2C, each
+> device has its own register sizes and methods of accessing registers.
+> The first byte of an I2C sequence being a register address is pretty
+> common though. You'd need a method of defining in the device tree
+> piece how to modify bitfields.
+
+I'd not assume byte based addressing for a PMIC, it's very common but
+not universal.  The difficulties here assume putting this in the device
+tree as explicit register I/O - I do tend to agree with Kevin that this
+doesn't seem like the right abstraction.
+
+> > If it's just setting a single voltage then extracting the bitfield to
+> > update shouldn't be too hard for regmap based regulators.  Off the top
+> > of my head I'd expect either the driver for the M3 or the cpuidle driver
+> > that talks to it to be a consumer of the regulator and then go from
+> > there.
+
+> It'd be a list of bitfields. So are you suggesting a regulator_ops
+> call that would return a list of bitfield updates along with an I2C
+> controller, an I2C device address, I2C register addressing scheme (8
+> bit, 16 bit, or other) and the info for each bitfield (register size)?
+> And then each regulator driver would be updated as needed with this
+> code. Would this be a way forward? Would regmap actually tie into this
+> at all?
+
+I was thinking about the majority of regulators where setting a voltage
+would be a single bitfield update (plus ramp delay, which is going to
+need to be accounted for in the power on case).  If we need to do longer
+sequences things get a bit more tricky in terms of interface but it
+seems doable.
+
+regmap would tie in in that it already has a way of describing the
+format for interactions with the device so we could just reuse the same
+description, and with some work we can probably reuse the code that
+generates the bitstreams for sending to the devices too (though I don't
+immediately see a nice way of doing that).
+
+Not sure if this is worth the effort or not though, but then there's the
+whole DT as ABI thing to worry about...
+
+> This is VDD core, so its not related to cpuidle or the M3.
+
+It's related to the M3 if the M3 is managing it; you can have multiple
+consumers for a regulator so it doesn't need to be one or the other.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130829/606d058c/attachment.sig>
