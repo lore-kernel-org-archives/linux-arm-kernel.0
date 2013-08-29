@@ -1,263 +1,80 @@
-From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
-Date: Thu, 29 Aug 2013 15:24:14 -0400
-Subject: [PATCH RESEND] gpio: (gpio-pca953x) move header to
- linux/platform_data/
-Message-ID: <1377804254-15955-1-git-send-email-vivien.didelot@savoirfairelinux.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Thu, 29 Aug 2013 21:43:22 +0100
+Subject: [PATCH v3 1/6] iio: at91: fix adc_clk overflow
+In-Reply-To: <1377602932-1899-2-git-send-email-josh.wu@atmel.com>
+References: <1377602932-1899-1-git-send-email-josh.wu@atmel.com>
+ <1377602932-1899-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <521FB26A.504@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves the pca953x.h header from include/linux/i2c to
-include/linux/platform_data and updates existing support accordingly.
+On 08/27/13 12:28, Josh Wu wrote:
+> The adc_clk variable is currently defined using a 32-bits unsigned integer,
+> which will overflow under some very valid range of operations.
+> 
+> Such overflow will occur if, for example, the parent clock is set to a
+> 20MHz frequency and the ADC startup time is larger than 215ns.
+> 
+> To fix this, introduce an intermediate variable holding the clock rate
+> in kHz.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Applied to the fixes-togreg branch of iio.git
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
----
- arch/arm/mach-at91/board-snapper9260.c         | 2 +-
- arch/arm/mach-davinci/board-da850-evm.c        | 2 +-
- arch/arm/mach-ep93xx/vision_ep9307.c           | 2 +-
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c    | 2 +-
- arch/arm/mach-imx/mach-mxt_td60.c              | 2 +-
- arch/arm/mach-ks8695/board-acs5k.c             | 2 +-
- arch/arm/mach-mmp/ttc_dkb.c                    | 2 +-
- arch/arm/mach-omap2/board-am3517evm.c          | 2 +-
- arch/arm/mach-pxa/cm-x300.c                    | 2 +-
- arch/arm/mach-pxa/em-x270.c                    | 2 +-
- arch/arm/mach-pxa/pcm990-baseboard.c           | 2 +-
- arch/arm/mach-pxa/spitz.c                      | 2 +-
- arch/arm/mach-pxa/zeus.c                       | 2 +-
- arch/arm/mach-pxa/zylonite_pxa300.c            | 2 +-
- arch/arm/mach-s3c64xx/mach-crag6410.c          | 2 +-
- arch/x86/platform/mrst/mrst.c                  | 2 +-
- drivers/gpio/gpio-pca953x.c                    | 2 +-
- include/linux/{i2c => platform_data}/pca953x.h | 0
- 18 files changed, 17 insertions(+), 17 deletions(-)
- rename include/linux/{i2c => platform_data}/pca953x.h (100%)
+Please in future separate out new stuff and fixes into separate series.
+I tend to leave large series to review when I have time to do the whole
+thing whereas little fixes in theory at least get picked up fast.
 
-diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
-index 3aaa978..f1d49e9 100644
---- a/arch/arm/mach-at91/board-snapper9260.c
-+++ b/arch/arm/mach-at91/board-snapper9260.c
-@@ -26,7 +26,7 @@
- #include <linux/gpio.h>
- #include <linux/platform_device.h>
- #include <linux/spi/spi.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index bea6793..af6dafb 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -19,7 +19,7 @@
- #include <linux/kernel.h>
- #include <linux/i2c.h>
- #include <linux/i2c/at24.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- #include <linux/input.h>
- #include <linux/input/tps6507x-ts.h>
- #include <linux/mfd/tps6507x.h>
-diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
-index 605956f..64f2e50 100644
---- a/arch/arm/mach-ep93xx/vision_ep9307.c
-+++ b/arch/arm/mach-ep93xx/vision_ep9307.c
-@@ -23,7 +23,7 @@
- #include <linux/mtd/partitions.h>
- #include <linux/i2c.h>
- #include <linux/i2c-gpio.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/flash.h>
- #include <linux/spi/mmc_spi.h>
-diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-index 29ac8ee6..97f9c62 100644
---- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-+++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-@@ -26,7 +26,7 @@
- #include <linux/platform_device.h>
- #include <linux/mtd/physmap.h>
- #include <linux/i2c.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- #include <linux/input.h>
- #include <linux/gpio.h>
- #include <linux/delay.h>
-diff --git a/arch/arm/mach-imx/mach-mxt_td60.c b/arch/arm/mach-imx/mach-mxt_td60.c
-index a27faab..c918940 100644
---- a/arch/arm/mach-imx/mach-mxt_td60.c
-+++ b/arch/arm/mach-imx/mach-mxt_td60.c
-@@ -26,7 +26,7 @@
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
- #include <linux/gpio.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- 
- #include "common.h"
- #include "devices-imx27.h"
-diff --git a/arch/arm/mach-ks8695/board-acs5k.c b/arch/arm/mach-ks8695/board-acs5k.c
-index 456d638..9f9c044 100644
---- a/arch/arm/mach-ks8695/board-acs5k.c
-+++ b/arch/arm/mach-ks8695/board-acs5k.c
-@@ -20,7 +20,7 @@
- #include <linux/i2c.h>
- #include <linux/i2c-algo-bit.h>
- #include <linux/i2c-gpio.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- 
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/map.h>
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index 8483906..7022329 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -15,7 +15,7 @@
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/onenand.h>
- #include <linux/interrupt.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- #include <linux/gpio.h>
- #include <linux/gpio-pxa.h>
- #include <linux/mfd/88pm860x.h>
-diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
-index d63f14b..c7196a6 100644
---- a/arch/arm/mach-omap2/board-am3517evm.c
-+++ b/arch/arm/mach-omap2/board-am3517evm.c
-@@ -21,7 +21,7 @@
- #include <linux/clk.h>
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- #include <linux/can/platform/ti_hecc.h>
- #include <linux/davinci_emac.h>
- #include <linux/mmc/host.h>
-diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
-index 8091aac..f942349 100644
---- a/arch/arm/mach-pxa/cm-x300.c
-+++ b/arch/arm/mach-pxa/cm-x300.c
-@@ -29,7 +29,7 @@
- #include <linux/pwm_backlight.h>
- 
- #include <linux/i2c.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- #include <linux/i2c/pxa-i2c.h>
- 
- #include <linux/mfd/da903x.h>
-diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
-index 3a3362f..8eb4e23 100644
---- a/arch/arm/mach-pxa/em-x270.c
-+++ b/arch/arm/mach-pxa/em-x270.c
-@@ -30,7 +30,7 @@
- #include <linux/power_supply.h>
- #include <linux/apm-emulation.h>
- #include <linux/i2c.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- #include <linux/i2c/pxa-i2c.h>
- #include <linux/regulator/userspace-consumer.h>
- 
-diff --git a/arch/arm/mach-pxa/pcm990-baseboard.c b/arch/arm/mach-pxa/pcm990-baseboard.c
-index 13e5b00..3133ba8 100644
---- a/arch/arm/mach-pxa/pcm990-baseboard.c
-+++ b/arch/arm/mach-pxa/pcm990-baseboard.c
-@@ -408,7 +408,7 @@ struct pxacamera_platform_data pcm990_pxacamera_platform_data = {
- 	.mclk_10khz = 1000,
- };
- 
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- 
- static struct pca953x_platform_data pca9536_data = {
- 	.gpio_base	= PXA_NR_BUILTIN_GPIO,
-diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-index 4c29173..0b11c1a 100644
---- a/arch/arm/mach-pxa/spitz.c
-+++ b/arch/arm/mach-pxa/spitz.c
-@@ -20,7 +20,7 @@
- #include <linux/leds.h>
- #include <linux/i2c.h>
- #include <linux/i2c/pxa-i2c.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/ads7846.h>
- #include <linux/spi/corgi_lcd.h>
-diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-index f5d4364..126e4a8 100644
---- a/arch/arm/mach-pxa/zeus.c
-+++ b/arch/arm/mach-pxa/zeus.c
-@@ -26,7 +26,7 @@
- #include <linux/mtd/physmap.h>
- #include <linux/i2c.h>
- #include <linux/i2c/pxa-i2c.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- #include <linux/apm-emulation.h>
- #include <linux/can/platform/mcp251x.h>
- 
-diff --git a/arch/arm/mach-pxa/zylonite_pxa300.c b/arch/arm/mach-pxa/zylonite_pxa300.c
-index 86e59c0..869bce7 100644
---- a/arch/arm/mach-pxa/zylonite_pxa300.c
-+++ b/arch/arm/mach-pxa/zylonite_pxa300.c
-@@ -18,7 +18,7 @@
- #include <linux/init.h>
- #include <linux/i2c.h>
- #include <linux/i2c/pxa-i2c.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- #include <linux/gpio.h>
- 
- #include <mach/pxa300.h>
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index 8ad88ac..007fc53 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -30,7 +30,7 @@
- #include <linux/basic_mmio_gpio.h>
- #include <linux/spi/spi.h>
- 
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- #include <linux/platform_data/s3c-hsotg.h>
- 
- #include <video/platform_lcd.h>
-diff --git a/arch/x86/platform/mrst/mrst.c b/arch/x86/platform/mrst/mrst.c
-index 47fe66f..3ca5957 100644
---- a/arch/x86/platform/mrst/mrst.c
-+++ b/arch/x86/platform/mrst/mrst.c
-@@ -20,7 +20,7 @@
- #include <linux/intel_pmic_gpio.h>
- #include <linux/spi/spi.h>
- #include <linux/i2c.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
- #include <linux/platform_device.h>
-diff --git a/drivers/gpio/gpio-pca953x.c b/drivers/gpio/gpio-pca953x.c
-index 426c51d..8804aec 100644
---- a/drivers/gpio/gpio-pca953x.c
-+++ b/drivers/gpio/gpio-pca953x.c
-@@ -18,7 +18,7 @@
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
- #include <linux/i2c.h>
--#include <linux/i2c/pca953x.h>
-+#include <linux/platform_data/pca953x.h>
- #include <linux/slab.h>
- #ifdef CONFIG_OF_GPIO
- #include <linux/of_platform.h>
-diff --git a/include/linux/i2c/pca953x.h b/include/linux/platform_data/pca953x.h
-similarity index 100%
-rename from include/linux/i2c/pca953x.h
-rename to include/linux/platform_data/pca953x.h
--- 
-1.8.4
+Thanks,
+
+Jonathan
+> ---
+> v1 --> v2:
+>   refined the commit message.
+> 
+>  drivers/iio/adc/at91_adc.c |   11 ++++++-----
+>  1 file changed, 6 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+> index b6db6a0..9cf8ab5 100644
+> --- a/drivers/iio/adc/at91_adc.c
+> +++ b/drivers/iio/adc/at91_adc.c
+> @@ -582,7 +582,7 @@ static const struct iio_info at91_adc_info = {
+>  
+>  static int at91_adc_probe(struct platform_device *pdev)
+>  {
+> -	unsigned int prsc, mstrclk, ticks, adc_clk, shtim;
+> +	unsigned int prsc, mstrclk, ticks, adc_clk, adc_clk_khz, shtim;
+>  	int ret;
+>  	struct iio_dev *idev;
+>  	struct at91_adc_state *st;
+> @@ -680,6 +680,7 @@ static int at91_adc_probe(struct platform_device *pdev)
+>  	 */
+>  	mstrclk = clk_get_rate(st->clk);
+>  	adc_clk = clk_get_rate(st->adc_clk);
+> +	adc_clk_khz = adc_clk / 1000;
+>  	prsc = (mstrclk / (2 * adc_clk)) - 1;
+>  
+>  	if (!st->startup_time) {
+> @@ -693,15 +694,15 @@ static int at91_adc_probe(struct platform_device *pdev)
+>  	 * defined in the electrical characteristics of the board, divided by 8.
+>  	 * The formula thus is : Startup Time = (ticks + 1) * 8 / ADC Clock
+>  	 */
+> -	ticks = round_up((st->startup_time * adc_clk /
+> -			  1000000) - 1, 8) / 8;
+> +	ticks = round_up((st->startup_time * adc_clk_khz /
+> +			  1000) - 1, 8) / 8;
+>  	/*
+>  	 * a minimal Sample and Hold Time is necessary for the ADC to guarantee
+>  	 * the best converted final value between two channels selection
+>  	 * The formula thus is : Sample and Hold Time = (shtim + 1) / ADCClock
+>  	 */
+> -	shtim = round_up((st->sample_hold_time * adc_clk /
+> -			  1000000) - 1, 1);
+> +	shtim = round_up((st->sample_hold_time * adc_clk_khz /
+> +			  1000) - 1, 1);
+>  
+>  	reg = AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL;
+>  	reg |= AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP;
+> 
