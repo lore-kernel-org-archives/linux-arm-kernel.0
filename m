@@ -1,165 +1,115 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 29 Aug 2013 22:40:07 +0100
-Subject: [PATCH v7 2/4] drivers: of: add function to scan fdt nodes given
- by path
-In-Reply-To: <1377527959-5080-3-git-send-email-m.szyprowski@samsung.com>
-References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
- <1377527959-5080-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20130829214007.CDB813E1222@localhost>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 29 Aug 2013 16:41:20 -0500
+Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <87mwo2vmds.fsf@linaro.org>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
+ <87mwo2vmds.fsf@linaro.org>
+Message-ID: <521FC000.6080900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Aug 2013 16:39:17 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Add a function to scan the flattened device-tree starting from the
-> node given by the path. It is used to extract information (like reserved
-> memory), which is required on early boot before we can unflatten the tree.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Michal Nazarewicz <mina86@mina86.com>
-> Acked-by: Tomasz Figa <t.figa@samsung.com>
-> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+On 08/27/2013 04:45 PM, Kevin Hilman wrote:
+> Dave Gerlach <d-gerlach@ti.com> writes:
+>
+>> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>
+>> AM335x supports various low power modes as documented
+>> in section 8.1.4.3 of the AM335x TRM which is available
+>> @ http://www.ti.com/litv/pdf/spruh73f
+>>
+>> DeepSleep0 mode offers the lowest power mode with limited
+>> wakeup sources without a system reboot and is mapped as
+>> the suspend state in the kernel. In this state, MPU and
+>> PER domains are turned off with the internal RAM held in
+>> retention to facilitate resume process. As part of the boot
+>> process, the assembly code is copied over to OCMCRAM using
+>> the OMAP SRAM code.
+>>
+>> AM335x has a Cortex-M3 (WKUP_M3) which assists the MPU
+>> in DeepSleep0 entry and exit. WKUP_M3 takes care of the
+>> clockdomain and powerdomain transitions based on the
+>> intended low power state. MPU needs to load the appropriate
+>> WKUP_M3 binary onto the WKUP_M3 memory space before it can
+>> leverage any of the PM features like DeepSleep.
+>>
+>> The IPC mechanism between MPU and WKUP_M3 uses a mailbox
+>> sub-module and 8 IPC registers in the Control module. MPU
+>> uses the assigned Mailbox for issuing an interrupt to
+>> WKUP_M3 which then goes and checks the IPC registers for
+>> the payload. WKUP_M3 has the ability to trigger on interrupt
+>
+> s/trigger on interrupt/trigger an interrupt/  ??
 
-Some nits below, but otherwise:
+Oops I will fix that.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+>
+>> to MPU by executing the "sev" instruction.
+>>
+>> In the current implementation when the suspend process
+>> is initiated MPU interrupts the WKUP_M3 to let it know about
+>> the intent of entering DeepSleep0 and waits for an ACK. When
+>> the ACK is received MPU continues with its suspend process
+>> to suspend all the drivers and then jumps to assembly in
+>> OCMC RAM. The assembly code puts the PLLs in bypass, puts the
+>> external RAM in self-refresh mode and then finally execute the
+>> WFI instruction. Execution of the WFI instruction triggers another
+>> interrupt to the WKUP_M3 which then continues wiht the power down
+>> sequence wherein the clockdomain and powerdomain transition takes
+>> place. As part of the sleep sequence, WKUP_M3 unmasks the interrupt
+>> lines for the wakeup sources. WFI execution on WKUP_M3 causes the
+>> hardware to disable the main oscillator of the SoC.
+>>
+>> When a wakeup event occurs, WKUP_M3 starts the power-up
+>> sequence by switching on the power domains and finally
+>> enabling the clock to MPU. Since the MPU gets powered down
+>> as part of the sleep sequence in the resume path ROM code
+>> starts executing. The ROM code detects a wakeup from sleep
+>> and then jumps to the resume location in OCMC which was
+>> populated in one of the IPC registers as part of the suspend
+>> sequence.
+>>
+>> The low level code in OCMC relocks the PLLs, enables access
+>> to external RAM and then jumps to the cpu_resume code of
+>> the kernel to finish the resume process.
+>
+> [...]
+>
+>>   arch/arm/mach-omap2/pm33xx.c  |  474 +++++++++++++++++++++++++++++++++++++++++
+>>   arch/arm/mach-omap2/pm33xx.h  |   77 +++++++
+>>   arch/arm/mach-omap2/wkup_m3.c |  183 ++++++++++++++++
+>
+>
+> Looking closer at this code as I'm trying to fully get my head around
+> all the IPC, I have some more comments.
+>
+> I think the split between pm33xx.c and the M3 driver is still confusing
+> here.  For example, am33xx_ping_wkup_m3(),
+> am33xx_m3_state_machine_reset() and the guts of am33xx_pm_begin() all
+> belong inside the M3 driver, along with all the wakeup_src stuff, which
+> is info coming from the M3.
+>
+> IOW, the communication with M3 should be abstracted from pm33xx by the
+> M3 driver (or possibly an eventual remoteproc/rpmsg implementation) with
+> a well defined API.  In this implementation, the interface is pretty
+> fuzzy and mixed between pm33xx.c and wkup_m3.c.
 
-I'm happy to take this through the DT tree, or have you take it via the
-CMA tree.
+I have since moved much more of the m3 functionality, including the ping 
+and wakeup src code, into the wkup_m3 driver to make the split more 
+clear but I haven't yet moved the state machine portion into the wkup_m3 
+driver. I feel that this is the portion of the IPC that could 
+potentially be the most variant between different SoC implementations so 
+leaving this in the pm code should allow for more flexibility.
 
-> ---
->  drivers/of/fdt.c       |   76 ++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_fdt.h |    3 ++
->  2 files changed, 79 insertions(+)
-> 
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index b10ba00..4fb06f3 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -545,6 +545,82 @@ int __init of_flat_dt_match(unsigned long node, const char *const *compat)
->  	return of_fdt_match(initial_boot_params, node, compat);
->  }
->  
-> +struct fdt_scan_status {
-> +	const char *name;
-> +	int namelen;
-> +	int depth;
-> +	int found;
-> +	int (*iterator)(unsigned long node, const char *uname, int depth, void *data);
-> +	void *data;
-> +};
-> +
-> +/**
-> + * fdt_scan_node_by_path - iterator for of_scan_flat_dt_by_path function
-> + */
-> +static int __init fdt_scan_node_by_path(unsigned long node, const char *uname,
-> +					int depth, void *data)
+>
+> Kevin
+>
+> P.S. I'd also suggest renaming wakeup_src to something else since
+> it's close to wakeup_source which has a rather different meaning in the
+> kernel (c.f. linux/pm_wakeup.h)
+>
 
-Nit: since this is an iterator, I'd like to see "iter" in the function
-name.
+I will rename this to tie it into the M3 code.
 
-> +{
-> +	struct fdt_scan_status *st = data;
-> +
-> +	/*
-> +	 * if scan at the requested fdt node has been completed,
-> +	 * return -ENXIO to abort further scanning
-> +	 */
-> +	if (depth <= st->depth)
-> +		return -ENXIO;
-> +
-> +	/* requested fdt node has been found, so call iterator function */
-> +	if (st->found)
-> +		return st->iterator(node, uname, depth, st->data);
-> +
-> +	/* check if scanning automata is entering next level of fdt nodes */
-> +	if (depth == st->depth + 1 &&
-> +	    strncmp(st->name, uname, st->namelen) == 0 &&
-> +	    uname[st->namelen] == 0) {
-> +		st->depth += 1;
-> +		if (st->name[st->namelen] == 0) {
-> +			st->found = 1;
-> +		} else {
-> +			const char *next = st->name + st->namelen + 1;
-> +			st->name = next;
-> +			st->namelen = strcspn(next, "/");
-> +		}
-> +		return 0;
-
-The above return statement is redundant.
-
-> +	}
-> +
-> +	/* scan next fdt node */
-> +	return 0;
-> +}
-> +
-> +/**
-> + * of_scan_flat_dt_by_path - scan flattened tree blob and call callback on each
-> + *			     child of the given path.
-> + * @path: path to start searching for children
-> + * @it: callback function
-> + * @data: context data pointer
-> + *
-> + * This function is used to scan the flattened device-tree starting from the
-> + * node given by path. It is used to extract information (like reserved
-> + * memory), which is required on ealy boot before we can unflatten the tree.
-> + */
-> +int __init of_scan_flat_dt_by_path(const char *path,
-> +	int (*it)(unsigned long node, const char *name, int depth, void *data),
-> +	void *data)
-
-Nit: Please match the indentation convention used by of_scan_flat_dt().
-This current version is really hard to read.
-
-> +{
-> +	struct fdt_scan_status st = {path, 0, -1, 0, it, data};
-
-This is a little fragile. If the structure gets modified, this line
-will break. I know it results in more text, but please use explicit data
-member assignments in initializers.
-
-> +	int ret = 0;
-> +
-> +	if (initial_boot_params)
-
-Nit:
-	if (!initial_boot_params)
-		return 0;
-
-> +                ret = of_scan_flat_dt(fdt_scan_node_by_path, &st);
-
-Nit: inconsitent indentation (tabs vs. spaces)
-
-> +
-> +	if (!st.found)
-> +		return -ENOENT;
-> +	else if (ret == -ENXIO)	/* scan has been completed */
-> +		return 0;
-> +	else
-> +		return ret;
-
-Both uses of 'else' above are redundant. The only way the execution will
-pass that point is if it was the else case!
-
-> +}
-> +
->  #ifdef CONFIG_BLK_DEV_INITRD
->  /**
->   * early_init_dt_check_for_initrd - Decode initrd location from flat tree
-> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-> index ed136ad..19f26f8 100644
-> --- a/include/linux/of_fdt.h
-> +++ b/include/linux/of_fdt.h
-> @@ -90,6 +90,9 @@ extern void *of_get_flat_dt_prop(unsigned long node, const char *name,
->  extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
->  extern int of_flat_dt_match(unsigned long node, const char *const *matches);
->  extern unsigned long of_get_flat_dt_root(void);
-> +extern int of_scan_flat_dt_by_path(const char *path,
-> +	int (*it)(unsigned long node, const char *name, int depth, void *data),
-> +	void *data);
->  
->  extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
->  				     int depth, void *data);
-> -- 
-> 1.7.9.5
-> 
+Regards,
+Dave
