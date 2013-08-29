@@ -1,43 +1,64 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 29 Aug 2013 07:43:52 -0500
-Subject: [PATCH v3] ARM: xen: only set pm function ptrs for Xen guests
-Message-ID: <1377780232-13545-1-git-send-email-robherring2@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 29 Aug 2013 20:49:32 +0800
+Subject: [PATCH v3 resend 2/2] ARM:dts:vf610-twr:Enable DSPI0 devices and
+ Flash at26df081a
+In-Reply-To: <1377673724-32468-2-git-send-email-b44548@freescale.com>
+References: <1377673724-32468-1-git-send-email-b44548@freescale.com>
+ <1377673724-32468-2-git-send-email-b44548@freescale.com>
+Message-ID: <20130829124930.GI18729@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Wed, Aug 28, 2013 at 03:08:44PM +0800, Chao Fu wrote:
+> From: Chao Fu <B44548@freescale.com>
+> 
+> This patch enables DSPI0 and at26df081a flash device for Vybrid VF610
+> TOWER board.
+> 
+> Signed-off-by: Chao Fu <b44548@freescale.com>
+> ---
+>  arch/arm/boot/dts/vf610-twr.dts | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+> index b3905f5..d29226c 100644
+> --- a/arch/arm/boot/dts/vf610-twr.dts
+> +++ b/arch/arm/boot/dts/vf610-twr.dts
+> @@ -36,6 +36,25 @@
+>  
+>  };
+>  
+> +&dspi0 {
+> +	bus-num = <0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_dspi0_1>;
+> +	status = "okay";
+> +
+> +	sflash: at26df081a at 0 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "atmel,at26df081a";
+> +		spi-max-frequency = <16000000>;
+> +		spi-cpol;
+> +		spi-cpha;
+> +		reg = <0>;
 
-xen_pm_init was unconditionally setting pm_power_off and arm_pm_restart
-function pointers. This breaks multi-platform kernels. Make this
-conditional on running as a Xen guest and make it a late_initcall to
-ensure it is setup after platform code for Dom0.
+> +		linux,modalias = "m25p80";
+> +		modal = "at26df081a";
 
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/xen/enlighten.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+I can not see these two properties documented in
+Documentation/devicetree/bindings/ anywhere.  I'm not sure if we need
+them.
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 8a6295c..7071fca 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -273,12 +273,15 @@ core_initcall(xen_guest_init);
- 
- static int __init xen_pm_init(void)
- {
-+	if (!xen_domain())
-+		return -ENODEV;
-+
- 	pm_power_off = xen_power_off;
- 	arm_pm_restart = xen_restart;
- 
- 	return 0;
- }
--subsys_initcall(xen_pm_init);
-+late_initcall(xen_pm_init);
- 
- static irqreturn_t xen_arm_callback(int irq, void *arg)
- {
--- 
-1.8.1.2
+Shawn
+
+> +	};
+> +};
+> +
+>  &fec0 {
+>  	phy-mode = "rmii";
+>  	pinctrl-names = "default";
+> -- 
+> 1.8.0
+> 
+> 
