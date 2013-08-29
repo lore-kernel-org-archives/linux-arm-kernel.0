@@ -1,54 +1,62 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 29 Aug 2013 09:18:35 +0900
-Subject: [PATCH v2 00/03] ARM: shmobile: r8a7790 APMU SMP support
-In-Reply-To: <20130828232148.7321.45739.sendpatchset@w520>
-References: <20130828232148.7321.45739.sendpatchset@w520>
-Message-ID: <20130829001834.GD10207@verge.net.au>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 29 Aug 2013 09:09:22 +0800
+Subject: [GIT PULL] at91: soc update for 3.12 #1
+In-Reply-To: <20130828235855.GM8607@quad.lixom.net>
+References: <1377532543-349-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130828235855.GM8607@quad.lixom.net>
+Message-ID: <521E9F42.6090604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 08:21:48AM +0900, Magnus Damm wrote:
-> ARM: shmobile: r8a7790 APMU SMP support
-> 
-> [PATCH v2 01/03] ARM: shmobile: Shared APMU SMP support code without DT
-> [PATCH v2 02/03] ARM: shmobile: Add r8a7790 SMP support using APMU code
-> [PATCH v2 03/03] ARM: shmobile: Add r8a7790 CA15 CPU cores
-> 
-> This series adds SMP support to r8a7790 using the included APMU code.
-> The previous version of r8a7790 support depended on the APMU code in 
-> "[PATCH] ARM: shmobile: Shared APMU SMP support code", but in this
-> version the APMU code has been reworked to not use DT. In the future
-> r8a73a4 and other SoCs may make use of the APMU as well, but the 
-> r8a73a4 code first needs to be adjusted to work with the CCI driver.
-> 
-> With these patches applied r8a7790 CA15 support for SMP boot
-> and CPU Hotplug is known to be working.
-> 
-> Thanks to Sudeep for his feedback.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+Hi Olof,
 
-Hi Magnus,
+On 08/29/2013 07:58 AM, Olof Johansson wrote:
+> On Mon, Aug 26, 2013 at 05:55:43PM +0200, Nicolas Ferre wrote:
+>> Arnd, Olof, Kevin,
+>>
+>> Here is AT91 SoC updates for 3.12 kernel. It is the first pull-request for
+>> this topic and it is based on 3.11-rc5 like your next/soc branch.
+>>
+>> Thanks, best regards,
+>>
+>> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+>>
+>>    Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>    git://github.com/at91linux/linux-at91.git tags/at91-soc
+>>
+>> for you to fetch changes up to 99eb3b40ec42e7fce1fc58429bf9b26c17973c12:
+>>
+>>    ARM: at91: at91_dt_defconfig: enable rm9200 support (2013-08-26 09:58:29 +0200)
+>>
+>> ----------------------------------------------------------------
+>> AT91 SoC update for 3.12 take 1
+>> - enable kernel uncompress information output for
+>>    SoC where it was missing: at91sam9n12 and sama5d3
+>> - addition of at91rm9200 to the generic at91_dt_defconfig
+>>
+>> ----------------------------------------------------------------
+>> Jean-Christophe PLAGNIOL-VILLARD (1):
+>>        ARM: at91: at91_dt_defconfig: enable rm9200 support
+>>
+>> voice (4):
+>>        ARM: at91: sama5d3: add definition for usart base address
+>>        ARM: at91: include sama5d3.h into hardware.h
+>>        ARM: at91: sama5: enable kernel uncompress info output
+>>        ARM: at91: sam9n12: enable kernel uncompress info output
+>
+> That doesn't look right. Author should probably be "Bo Shen
+> <voice.shen@atmel.com>" instead. Can you fixup and respin, please?
 
-can I clarify that these patches are targeted at mainline?
+I don't know why on the patchwork it show my name as voice.
+So, if get patch from patchwork and apply it will show my name as voice.
+So, would it be possible to show the name as Bo Shen on patchwork?
 
-> ---
-> 
->  Written against renesas.git renesas-devel-20130829
-> 
->  arch/arm/boot/dts/r8a7790.dtsi                 |   21 ++
->  arch/arm/mach-shmobile/Makefile                |    1 
->  arch/arm/mach-shmobile/board-lager-reference.c |    1 
->  arch/arm/mach-shmobile/board-lager.c           |    1 
->  arch/arm/mach-shmobile/include/mach/common.h   |    6 
->  arch/arm/mach-shmobile/include/mach/r8a7790.h  |    1 
->  arch/arm/mach-shmobile/platsmp-apmu.c          |  178 ++++++++++++++++++++++++
->  arch/arm/mach-shmobile/setup-r8a7790.c         |    1 
->  arch/arm/mach-shmobile/smp-r8a7790.c           |   67 +++++++++
->  9 files changed, 277 insertions(+)
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+>
+> -Olof
+>
+
+Best Regards,
+Bo Shen
