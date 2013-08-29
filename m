@@ -1,58 +1,50 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 29 Aug 2013 11:13:42 +0200
-Subject: [GIT PULL] ARM: TC2: CPU idle big.LITTLE driver
-In-Reply-To: <20130828183624.GH8607@quad.lixom.net>
-References: <20130812153422.GA6426@e102568-lin.cambridge.arm.com>
- <20130825090848.GA12256@e102568-lin.cambridge.arm.com>
- <20130828183624.GH8607@quad.lixom.net>
-Message-ID: <521F10C6.3000409@linaro.org>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Thu, 29 Aug 2013 14:52:18 +0530
+Subject: [PATCH 1/3] ARM: AM33xx: hwmod: Add RNG module data
+In-Reply-To: <alpine.DEB.2.02.1308281845560.22040@utopia.booyaka.com>
+References: <1375777984-6267-1-git-send-email-lokeshvutla@ti.com>
+ <1375777984-6267-2-git-send-email-lokeshvutla@ti.com>
+ <alpine.DEB.2.02.1308281845560.22040@utopia.booyaka.com>
+Message-ID: <521F12CA.8010608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2013 08:36 PM, Olof Johansson wrote:
-> On Sun, Aug 25, 2013 at 10:08:48AM +0100, Lorenzo Pieralisi wrote:
->> Hi Olof, Kevin,
->>
->> On Mon, Aug 12, 2013 at 04:34:22PM +0100, Lorenzo Pieralisi wrote:
->>> Hi Olof, Kevin,
->>>
->>> please pull this patch series that provides a CPU idle driver for the vexpress
->>> TC2 testchip, and it is a stepping stone towards an ARM unified CPU idle driver
->>> based on the MCPM framework.
->>>
->>> Series is based against this pull request from Pawel which is a strict
->>> dependency and they must be merged in order:
->>>
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/190067.html
->>
->> May I ask you please the status of this pull request ? It is to know if
->> it is ok as it is or I have to do something on my side, thanks.
+Hi Paul,
+On Thursday 29 August 2013 12:18 AM, Paul Walmsley wrote:
+> Hi
 > 
-> This needed a rebase on top of the latest version of the mcpm backend branch,
-> since it's based on an older version.
+> On Tue, 6 Aug 2013, Lokesh Vutla wrote:
 > 
-> I also don't see an ack from any of the cpuidle maintainers, if you want to
-> take it through arm-soc you need to get them to ack it for that purpose. I see
-> that you got an informal "It sounds good to me" in
-> http://www.spinics.net/lists/arm-kernel/msg266442.html, but please be diligent
-> in collecting these in the future.
+>> Add RNG hwmod data for AM33xx SoC.
+>>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> 
+> I tried to queue this one, but it caused AM33xx boots to hang.  
+> Thought it might be related to the patch ordering -- seems to me that 
+> the clock change patch needed to come before this patch -- but if I 
+> recall correctly, both BeagleBone and BeagleBone-LT still hung. 
+This is because register address space is not passed in hwmod_data as it
+is passed from dt. So we need to include 3/3 patch in this series to boot.
 
-Hi Olof,
+Ill fix this sparse warning and post a v2.
 
-there is my signed-off for the cpuidle patch because I wrote part of it
-and Lorenzo finished it. This is why I thought it was not necessary to
-add my acked-by.
+PS: Probe for this driver will be failed even after this. Support for this version
+of rng ip is already posted and pushed into cryptodev-2.6 tree.
 
-> So, I've essentially applied the topmost 3 patches in a new branch that's based
-> on our version of vexpress/mcpm, and merged that in.
-
-Cool thanks !
-
-  -- Daniel
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks and regards,
+Lokesh
+> 
+> Also, this patch created a sparse warning.
+> 
+> Could you take another look at this patch?  Maybe try basing off of this 
+> tag:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.12/omap-prcm-hwmod
+> 
+> Fix the sparse problem, and see if the patch boots for you?
+> 
+> thanks
+> 
+> 
+> - Paul
+> 
