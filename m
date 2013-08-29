@@ -1,83 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 29 Aug 2013 22:01:25 +0800
-Subject: [PATCH] cpufreq: imx6q: Fix clock enable balance
-In-Reply-To: <1377517716-27470-1-git-send-email-s.hauer@pengutronix.de>
-References: <1377517716-27470-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130829140123.GM18729@S2101-09.ap.freescale.net>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Thu, 29 Aug 2013 19:30:57 +0530
+Subject: [PATCH v2 00/13] ARM: OMAP2+: AM43x PRCM support
+In-Reply-To: <5214A83A.5080701@ti.com>
+References: <cover.1375443858.git.afzal@ti.com> <5214A83A.5080701@ti.com>
+Message-ID: <521F5419.2060801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 26, 2013 at 01:48:36PM +0200, Sascha Hauer wrote:
-> For changing the cpu frequency the i.MX6q has to be switched to some
-> intermediate clock during the PLL reprogramming. The driver tries
-> to be clever to keep the enable count correct but gets it wrong. If
-> the cpufreq is increased it calls clk_disable_unprepare twice
-> on pll2_pfd2_396m. This puts all other devices which get their clock
-> from pll2_pfd2_396m into a nonworking state.
+Hi Paul, Benoit,
 
-So you're running into a problem in real?  The clk_disable_unprepare on
-pll2_pfd2_396m below will only be executed when are leaving 396MHz
-set-point.  It's there to balance the clk_prepare_enable on
-pll2_pfd2_396m when we enters 396MHz set-point.
+On Wednesday 21 August 2013 05:14 PM, Rajendra Nayak wrote:
+> On Friday 02 August 2013 07:05 PM, Afzal Mohammed wrote:
 
-	if (freqs.old * 1000 <= clk_get_rate(pll2_pfd2_396m_clk)) {
-		clk_prepare_enable(pll1_sys_clk);
-		clk_disable_unprepare(pll2_pfd2_396m_clk);
-	}
-
+>> Hwmod database of AM335x is reused by moving common elements to a new
+>> array (most of AM335x IP's are present in AM43x) and keeping separate
+>> arrays for elements that are specific only to either one of AM335x or
+>> AM43x. And in the cases where relevant IP is present in both that has
+>> difference in details like CLKCTRL register offsets, it is being
+>> updated at runtime based on the SoC detected.
 > 
-> Fix this by removing the clk enabling/disabling altogether since the
-> clk core will do this automatically during a reparent.
-
-It seems clk core will only enable the parent clock during the
-clk_set_parent() call, and only in case that the child clock is
-prepared.  For example, I do not think pll2_pfd2_396m_clk and step_clk
-will be altered to ON state.  Or am I missing something?
-
-	clk_set_parent(step_clk, pll2_pfd2_396m_clk);
-	clk_set_parent(pll1_sw_clk, step_clk);
-
-Shawn
-
+> I feel the reuse part is good but we need to structure them such that we
+> don't compromise too much on readability of the data.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/cpufreq/imx6q-cpufreq.c | 17 -----------------
->  1 file changed, 17 deletions(-)
+> So what I suggest is
+> 1. Create something like omap_hwmod_am43_am33_interconnect_data.c and have all common
+> interconnect ocp_if structs
+> 2. Create something like omap_hwmod_am43_am33_ipblock_data.c and have all common
+> hwmod structs.
+> 3. Since most PRCM register offsets are different, have them all inited in *one* place
+> (even for the ones which are common), instead of common ones being statically defined
+> and others dynamically inited.
+> 4. For instances like clkdm being different or clock topology has changed (which is in
+> rare cases) have seperate structures for am33xx and am43xx. Once we move some of the clocks etc
+> to DT we can then move them into common files if needed.
 > 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index e37cdae..2971d12 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -117,28 +117,11 @@ static int imx6q_set_target(struct cpufreq_policy *policy,
->  	 *  - Reprogram pll1_sys_clk and reparent pll1_sw_clk back to it
->  	 *  - Disable pll2_pfd2_396m_clk
->  	 */
-> -	clk_prepare_enable(pll2_pfd2_396m_clk);
->  	clk_set_parent(step_clk, pll2_pfd2_396m_clk);
->  	clk_set_parent(pll1_sw_clk, step_clk);
->  	if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
->  		clk_set_rate(pll1_sys_clk, freqs.new * 1000);
-> -		/*
-> -		 * If we are leaving 396 MHz set-point, we need to enable
-> -		 * pll1_sys_clk and disable pll2_pfd2_396m_clk to keep
-> -		 * their use count correct.
-> -		 */
-> -		if (freqs.old * 1000 <= clk_get_rate(pll2_pfd2_396m_clk)) {
-> -			clk_prepare_enable(pll1_sys_clk);
-> -			clk_disable_unprepare(pll2_pfd2_396m_clk);
-> -		}
->  		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> -		clk_disable_unprepare(pll2_pfd2_396m_clk);
-> -	} else {
-> -		/*
-> -		 * Disable pll1_sys_clk if pll2_pfd2_396m_clk is sufficient
-> -		 * to provide the frequency.
-> -		 */
-> -		clk_disable_unprepare(pll1_sys_clk);
->  	}
->  
->  	/* Ensure the arm clock divider is what we expect */
-> -- 
-> 1.8.4.rc3
-> 
+> Paul/Benoit, does the above make sense?
+
+I plan to proceed as per the above 4 points mentioned by Rajendra (that
+includes his comments on patches 2,3 & 13), is that okay ?
+
+Regards
+Afzal
