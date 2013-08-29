@@ -1,19 +1,117 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 29 Aug 2013 19:19:49 +0800
-Subject: [PATCH 1/3] ARM: dts: i.MX51: Separate TXD/RXD and RTS/CTS
- pinmux entries for UARTs
-In-Reply-To: <1377070105-15902-1-git-send-email-shc_work@mail.ru>
-References: <1377070105-15902-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20130829111947.GC18729@S2101-09.ap.freescale.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 29 Aug 2013 12:19:35 +0100
+Subject: [PATCH v5 4/5] drivers: clocksource: add support for ARM
+ architected timer event stream
+In-Reply-To: <1377686689-30828-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1377686689-30828-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1377686689-30828-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <20130829111935.GD13704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 11:28:23AM +0400, Alexander Shiyan wrote:
-> RTS/CTS pins can be used for different purposes, so create separate
-> definitions for these pins.
+On Wed, Aug 28, 2013 at 11:44:48AM +0100, Sudeep KarkadaNagesha wrote:
+> From: Will Deacon <will.deacon@arm.com>
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> The ARM architected timer can generate events (used for waking up
+> CPUs executing the wfe instruction) at a frequency represented as a
+> power-of-2 divisor of the clock rate.
+> 
+> An event stream might be used:
+> - To impose a time-out on a wfe polling loop.
+> - To safeguard against any programming error in case an expected event
+>   is not generated.
+> - To implement wfe-based timeouts for userspace locking implementations.
+> 
+> This patch computes the event stream frequency aiming for a period
+> of 100us between events. It uses ARM/ARM64 specific backends to configure
+> and enable the event stream.
+> 
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> [sudeep: moving ARM/ARM64 changes into separate patches
+>          and adding Kconfig option]
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> ---
+>  drivers/clocksource/Kconfig          | 14 ++++++++++++++
+>  drivers/clocksource/arm_arch_timer.c | 21 +++++++++++++++++++++
+>  include/clocksource/arm_arch_timer.h |  2 ++
+>  3 files changed, 37 insertions(+)
+> 
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index b7b9b04..74946ca 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -74,6 +74,20 @@ config ARM_ARCH_TIMER
+>  	bool
+>  	select CLKSRC_OF if OF
+>  
+> +config ARM_ARCH_TIMER_EVTSTREAM
+> +	bool "Support for ARM architected timer event stream generation"
+> +	default y if ARM_ARCH_TIMER
+> +	help
+> +	  This option enables support for event stream generation based on
+> +	  the ARM architected timer. It is used for waking up CPUs executing
+> +	  the wfe instruction at a frequency represented as a power-of-2
+> +	  divisor of the clock rate. An event stream might be useful for
+> +	  imposing timeout on a wfe, safeguarding against any programming
+> +	  errors in case an expected event is not generated or even to
+> +	  implement wfe-based timeouts for userspace locking implementations.
+> +	  This can be disabled for hardware validation purposes to detect any
+> +	  hardware anomalies of missing events.
 
-Applied all 3, thanks.
+Maybe we should reorder this a bit and make the wfe-based timeouts as
+the main reason.
 
-Shawn
+> +
+>  config ARM_GLOBAL_TIMER
+>  	bool
+>  	select CLKSRC_OF if OF
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index ffadd83..f42bef4 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -123,6 +123,26 @@ static int arch_timer_set_next_event_phys(unsigned long evt,
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_ARM_ARCH_TIMER_EVTSTREAM
+> +static void arch_timer_setup_evtstream(void)
+> +{
+> +	int evt_stream_div, pos;
+> +
+> +	/* Find the closest power of two to the divisor */
+> +	evt_stream_div = arch_timer_rate / ARCH_TIMER_EVT_STREAM_FREQ;
+> +	pos = fls(evt_stream_div);
+> +	if (pos > 1 && !(evt_stream_div & (1 << (pos - 2))))
+> +		pos--;
+> +	/* enable event stream */
+> +	arch_timer_evtstrm_config(true, min(pos, 15));
+> +}
+> +#else
+> +static void arch_timer_setup_evtstream(void)
+> +{
+> +	arch_timer_evtstrm_config(false, 0);
+> +}
+> +#endif
+
+I think we only need an arch_timer_evtstrm_enable() function without the
+bool argument. We don't need to disable it at run-time.
+
+> +
+>  static int arch_timer_setup(struct clock_event_device *clk)
+>  {
+>  	clk->features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_C3STOP;
+> @@ -154,6 +174,7 @@ static int arch_timer_setup(struct clock_event_device *clk)
+>  	}
+>  
+>  	arch_counter_set_user_access();
+> +	arch_timer_setup_evtstream();
+
+and here just:
+
+	if (IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM))
+		arch_timer_evtstrm_enable();
+
+-- 
+Catalin
