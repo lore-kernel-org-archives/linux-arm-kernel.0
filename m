@@ -1,139 +1,64 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 29 Aug 2013 10:46:28 +0900
-Subject: [PATCH/RFC] ARM: shmobile: r8a7779: Update early timer
- initialisation order
-In-Reply-To: <CANqRtoSionozCqag0nxRbmC19ic5RUb7DOpeaGHThjNoeRpBOg@mail.gmail.com>
-References: <1375952357-22938-1-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoSpOWOp3GhsvvwQwyWtPi3wXG0MmECkf90SPBRoPmq4DQ@mail.gmail.com>
- <20130822073904.GB32091@verge.net.au>
- <CANqRtoSionozCqag0nxRbmC19ic5RUb7DOpeaGHThjNoeRpBOg@mail.gmail.com>
-Message-ID: <20130829014627.GD20425@verge.net.au>
+Date: Thu, 29 Aug 2013 10:53:28 +0900
+Subject: [PATCH] clocksource: em_sti: Adjust clock event rating to fix
+ SMP broadcast
+In-Reply-To: <20130805014541.GD28465@verge.net.au>
+References: <1375251940-7809-1-git-send-email-horms+renesas@verge.net.au>
+ <51F94A35.2020907@codeaurora.org>
+ <CANqRtoR0Wwctor1mpM+8nuC0_pZsPHUSShPuZFX4FVtoVKEuNw@mail.gmail.com>
+ <51F9777B.2080500@codeaurora.org>
+ <20130805014541.GD28465@verge.net.au>
+Message-ID: <20130829015328.GA5199@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 03:58:39PM +0900, Magnus Damm wrote:
-> Hi Simon,
+On Mon, Aug 05, 2013 at 10:45:42AM +0900, Simon Horman wrote:
+> On Wed, Jul 31, 2013 at 01:45:47PM -0700, Stephen Boyd wrote:
+> > On 07/31/13 12:17, Magnus Damm wrote:
+> > > Hi Stephen,
+> > >
+> > > On Thu, Aug 1, 2013 at 2:32 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > >> On 07/30/13 23:25, Simon Horman wrote:
+> > >>> From: Magnus Damm <damm@opensource.se>
+> > >>>
+> > >>> Update the STI rating from 200 to 80 to fix SMP operation with
+> > >>> the ARM broadcast timer. This breakage was introduced by:
+> > >>>
+> > >>> f7db706 ARM: 7674/1: smp: Avoid dummy clockevent being preferred over real hardware clock-event
+> > >>>
+> > >>> Without this fix SMP operation is broken on EMEV2 since no
+> > >>> broadcast timer interrupts trigger on the secondary CPU cores.
+> > >>>
+> > >>> Signed-off-by: Magnus Damm <damm@opensource.se>
+> > >>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > >>> ---
+> > >> This looks suspicious. Are you're purposefully deflating the rating so
+> > >> that the STI timer fills in the broadcast position? Why not make the STI
+> > >> cpumask be all possible CPUs? Presumably the interrupt can target all
+> > >> CPUs since it isn't a per-cpu interrupt and doing this would cause the
+> > >> STI to fill in the broadcast slot, leaving the per-cpu dummys in the
+> > >> tick position.
+> > > While letting the timer broadcast to all CPUs sounds interesting the
+> > > STI driver has so far only been used to drive a single CPU core. This
+> > > used to work well for us but has since some time unfortunately been
+> > > broken. I agree that it may be suboptimal with a single timer like STI
+> > > and using IPI for broadcast, but for more efficient SMP we already
+> > > have TWD or arch timer.
+> > 
+> > I think there is some confusion. The mask field says what CPUs the timer
+> > can possibly interrupt and for non-percpu interrupts this should be all
+> > possible CPUs (unless we're talking clusters, etc. but I don't think we
+> > are). Can you please give the output of /proc/timer_list or confirm that
+> > the STI is your broadcast source? If so you should probably be marking
+> > the cpumask for all possible CPUs so that the clockevent core knows to
+> > prefer this clockevent for the broadcast source and not a per-cpu
+> > source. Then you can leave the rating as is.
 > 
-> On Thu, Aug 22, 2013 at 4:39 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Fri, Aug 09, 2013 at 05:37:39PM +0900, Magnus Damm wrote:
-> >> On Thu, Aug 8, 2013 at 5:59 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> >> > a894fcc2d01a89e6fe3da0845a4d80a5312e1124 ("ARM: smp_twd: Divorce smp_twd
-> >> > from local timer API") altered twd_local_timer_common_register() so that it
-> >> > may make use of late_timer_init.
-> >> >
-> >> > This is problematic on marzen with Magnus's recent patch "ARM: shmobile:
-> >> > marzen: Switch to DT_MACHINE_START" which switches marzen around to enable
-> >> > USE_OF and thus shmobile_timer_init(), which is registered as
-> >> > late_time_init by shmobile_earlytimer_init() stops being a no-op.
-> >> >
-> >> > As a work-around I have updated r8a7779_earlytimer_init() so that
-> >> > shmobile_earlytimer_init() is called after r8a7779_register_twd().
-> >> > Or in other words, the shmobile_earlytimer_init() setting of
-> >> > late_time_init overwrites that of twd_local_timer_common_register().
-> >> >
-> >> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> >> > Cc: Magnus Damm <magnus.damm@gmail.com>
-> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >> >
-> >> > ---
-> >> >
-> >> > This patch was created on top of a merge of next-20130807 from the
-> >> > linux-next tree and renesas-next-20130807 from my renesas tree.
-> >> >
-> >> > I expect the problem describe above to be present in the
-> >> > next version of linux-next as it will include renesas-next-20130807.
-> >> >
-> >> > I rather suspect that this fix is just papers over the problem
-> >> > at hand rather than fixing it. But it does at least fix the problem
-> >> > to the extent where the marzen board at least boots.
-> >> >
-> >> > For reference the output of /proc/interrupts after such a boot is below.
-> >> >
-> >> >             CPU0       CPU1       CPU2       CPU3
-> >> >   29:          0       9365       9363       9359       GIC   29  twd
-> >> >   59:          0          0          0          0       GIC   59  renesas_intc_irqpin.0
-> >> >   60:          5          0          0          0       GIC   60  renesas_intc_irqpin.0
-> >> >   61:          0          0          0          0       GIC   61  renesas_intc_irqpin.0
-> >> >   62:          0          0          0          0       GIC   62  renesas_intc_irqpin.0
-> >> >   64:        278          0          0          0       GIC   64  sh_tmu.0
-> >> >   76:          1          0          0          0       GIC   76  ehci_hcd:usb1, ohci_hcd:usb3
-> >> >   77:          1          0          0          0       GIC   77  ehci_hcd:usb2, ohci_hcd:usb4
-> >> >  111:          0          0          0          0       GIC  111  i2c-rcar.0
-> >> >  112:          0          0          0          0       GIC  112  i2c-rcar.2
-> >> >  113:          0          0          0          0       GIC  113  i2c-rcar.3
-> >> >  114:          0          0          0          0       GIC  114  i2c-rcar.1
-> >> >  122:         45          0          0          0       GIC  122  sh-sci.2:mux
-> >> >  132:          0          0          0          0       GIC  132  sata_rcar
-> >> >  173:          0          0          0          0       GIC  173  gpio_rcar.0
-> >> >  174:          0          0          0          0       GIC  174  gpio_rcar.1
-> >> >  175:          0          0          0          0       GIC  175  gpio_rcar.2
-> >> >  176:          0          0          0          0       GIC  176  gpio_rcar.3
-> >> >  177:          0          0          0          0       GIC  177  gpio_rcar.4
-> >> >  178:          0          0          0          0       GIC  178  gpio_rcar.5
-> >> >  179:          0          0          0          0       GIC  179  gpio_rcar.6
-> >> > 2001:          5          0          0          0  renesas_intc_irqpin.0    1  eth0
-> >> > IPI0:          0          0          0          0  CPU wakeup interrupts
-> >> > IPI1:          0          0          0          0  Timer broadcast interrupts
-> >> > IPI2:        314        340         58         33  Rescheduling interrupts
-> >> > IPI3:         22         56         34         56  Function call interrupts
-> >> > IPI4:          0          0          0          0  Single function call interrupts
-> >> > IPI5:          0          0          0          0  CPU stop interrupts
-> >> >  Err:          0
-> >> > ---
-> >> >  arch/arm/mach-shmobile/setup-r8a7779.c | 2 +-
-> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >> >
-> >> > diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-> >> > index ddee4aa..b0f56d6 100644
-> >> > --- a/arch/arm/mach-shmobile/setup-r8a7779.c
-> >> > +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-> >> > @@ -597,8 +597,8 @@ void __init __weak r8a7779_register_twd(void) { }
-> >> >  void __init r8a7779_earlytimer_init(void)
-> >> >  {
-> >> >         r8a7779_clock_init();
-> >> > -       shmobile_earlytimer_init();
-> >> >         r8a7779_register_twd();
-> >> > +       shmobile_earlytimer_init();
-> >> >  }
-> >> >
-> >> >  void __init r8a7779_add_early_devices(void)
-> >> > --
-> >> > 1.8.3.2
-> >> >
-> >>
-> >> Hi Simon,
-> >>
-> >> Thanks for tracking down this issue. I think your patch looks fine to
-> >> me.
-> >
-> > Thanks, could I get an acked-by ?
-> 
-> Yes, of course.
-> 
-> Acked-by: Magnus Damm <damm@opensource.se>
-> 
-> >> Regarding Marzen DT reference, I don't think TWD is used there yet
-> >> so I doubt that it will have the same problem as the C version of the
-> >> marzen board code.
-> >
-> > Agreed.
-> >
-> >> One related worry is that sh73a0 may have the same
-> >> issue - or rather - judging by the code in sh73a0_earlytimer_init() it
-> >> most certainly is affected by this too. So KZM9G should also fail as
-> >> Marzen which means we need to fix sh73a0 too.
-> >
-> > Curiously I do not seem to see the problem on the kzm9d.
-> > Would you like me to prepare a patch anyway?
-> 
-> I meant kzm9g, not kzm9d. =)
+> >From my point of view this seems to be a case of fixing a regression
+> by adjusting the code so it has its previous working behaviour.
+> I think that any work on altering the behaviour of the code
+> through masks should be considered as future work.
 
-I meant kzm9g too.
+Hi Magnus,
 
-> I believe emev2 and kzm9d is most likely OK as-is. (except for the STI
-> broadcast issue that still is on my TODO)
-> 
-> However sh73a0 and kzm9g probably needs a similar fix as this patch.
-> When you have time, can you please check?
-
-I am not seeing the problem on kzm9g.
+I think this problem still needs a resolution.
