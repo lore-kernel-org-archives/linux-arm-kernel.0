@@ -1,50 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 28 Aug 2013 16:58:55 -0700
-Subject: [GIT PULL] at91: soc update for 3.12 #1
-In-Reply-To: <1377532543-349-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1377532543-349-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20130828235855.GM8607@quad.lixom.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Aug 2013 01:01:26 +0100
+Subject: 32337ea "ASoC: warn if we will overwrite the DAI stream widgets"
+In-Reply-To: <521E8798.10206@wwwdotorg.org>
+References: <521E8798.10206@wwwdotorg.org>
+Message-ID: <20130829000126.GQ6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 26, 2013 at 05:55:43PM +0200, Nicolas Ferre wrote:
-> Arnd, Olof, Kevin,
+On Wed, Aug 28, 2013 at 05:28:24PM -0600, Stephen Warren wrote:
+> Russell, if the warning in commit 32337ea "ASoC: warn if we will
+> overwrite the DAI stream widgets" fires, what do I need to do to the
+> ASoC driver to fix it? (I'm deliberately ignoring any other issues with
+> this patch, and looking only to discover what is apparently wrong with
+> my driver that's triggering this...).
 > 
-> Here is AT91 SoC updates for 3.12 kernel. It is the first pull-request for
-> this topic and it is based on 3.11-rc5 like your next/soc branch.
-> 
-> Thanks, best regards,
-> 
-> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
-> 
->   Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-soc
-> 
-> for you to fetch changes up to 99eb3b40ec42e7fce1fc58429bf9b26c17973c12:
-> 
->   ARM: at91: at91_dt_defconfig: enable rm9200 support (2013-08-26 09:58:29 +0200)
-> 
-> ----------------------------------------------------------------
-> AT91 SoC update for 3.12 take 1
-> - enable kernel uncompress information output for
->   SoC where it was missing: at91sam9n12 and sama5d3
-> - addition of at91rm9200 to the generic at91_dt_defconfig
-> 
-> ----------------------------------------------------------------
-> Jean-Christophe PLAGNIOL-VILLARD (1):
->       ARM: at91: at91_dt_defconfig: enable rm9200 support
-> 
-> voice (4):
->       ARM: at91: sama5d3: add definition for usart base address
->       ARM: at91: include sama5d3.h into hardware.h
->       ARM: at91: sama5: enable kernel uncompress info output
->       ARM: at91: sam9n12: enable kernel uncompress info output
+> Steev Klimaszewski reported this warning to me, and I've repro'd it
+> running next-20130827 on a couple of Tegra systems (TrimSlice and
+> Seaboard at least), using sound/soc/tegra/tegra_{trimslice,wm8903}.c,
+> and associated ASoC components.
 
-That doesn't look right. Author should probably be "Bo Shen
-<voice.shen@atmel.com>" instead. Can you fixup and respin, please?
+I chucked this into linux-next in order to prove that the issue I had
+been reporting was not specific to my systems here (because I was making
+absolutely no useful progress with Mark.)  Mark finally admitted for the
+first time that there's a bug here yesterday, so I've now dropped the
+patch out of linux-next (either that's coincidental or cause and effect).
+In any case, it's served its purpose.
 
+As for how to solve the underlying problem, I have no idea - I've been
+asking the same question of Mark for the last three weeks and just been
+getting a load of drivel about "it's because you're using DPCM" and
+other *totally useless* suggestions about the code I'm trying to get
+working.
 
--Olof
+Liam says he's working on "a patch" last week, so I assume that this
+issue will eventually be resolved.
