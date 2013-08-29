@@ -1,97 +1,84 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Thu, 29 Aug 2013 08:53:18 -0700
-Subject: 3.11-rc7 big-endian support
-In-Reply-To: <20130829122810.6f4c4e7a@skate>
-References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
- <521D21D9.8020106@codethink.co.uk> <20130829115951.4d6df89b@skate>
- <521F2119.8080204@codethink.co.uk> <20130829122810.6f4c4e7a@skate>
-Message-ID: <CAA3XUr1tW8tra+4G2Fcwsb7tasZZLfCrR8e=4j+LWUcbhQZF=Q@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 29 Aug 2013 16:54:21 +0100
+Subject: [PATCH v4 07/10] xen: introduce XENMEM_exchange_and_pin and
+ XENMEM_unpin
+In-Reply-To: <20130815195051.GC5337@konrad-lan.dumpdata.com>
+References: <alpine.DEB.2.02.1308151200580.4470@kaball.uk.xensource.com>
+ <1376565054-24153-7-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130815195051.GC5337@konrad-lan.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1308291646130.6397@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+On Thu, 15 Aug 2013, Konrad Rzeszutek Wilk wrote:
+> On Thu, Aug 15, 2013 at 12:10:51PM +0100, Stefano Stabellini wrote:
+> > XENMEM_exchange can't be used by autotranslate guests because of two
+> > severe limitations:
+> > 
+> > - it does not copy back the mfns into the out field for autotranslate
+> >   guests;
+> > 
+> > - it does not guarantee that the hypervisor won't change the p2m
+> >   mappings for the exchanged pages while the guest is using them. Xen
+> >   never promises to keep the p2m mapping stable for autotranslate guests
+> >   in general.  In practice it won't happen unless one uses uncommon
+> >   features like memory sharing or paging.
+> > 
+> > To overcome these problems I am introducing two new hypercalls.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > 
+> > 
+> > Changes in v4:
+> > - rename XENMEM_get_dma_buf to XENMEM_exchange_and_pin;
+> > - rename XENMEM_put_dma_buf to XENMEM_unpin;
+> > - improve the documentation of the new hypercalls;
+> > - add a note about out.address_bits for XENMEM_exchange.
+> > ---
+> >  include/xen/interface/memory.h |   37 +++++++++++++++++++++++++++++++++++++
+> >  1 files changed, 37 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+> > index 2ecfe4f..5708ff8 100644
+> > --- a/include/xen/interface/memory.h
+> > +++ b/include/xen/interface/memory.h
+> > @@ -66,6 +66,7 @@ struct xen_memory_exchange {
+> >      /*
+> >       * [IN] Details of memory extents to be exchanged (GMFN bases).
+> >       * Note that @in.address_bits is ignored and unused.
+> > +     * @out.address_bits should contain the address mask for the new pages.
+> >       */
+> >      struct xen_memory_reservation in;
+> >  
+> > @@ -263,4 +264,40 @@ struct xen_remove_from_physmap {
+> >  };
+> >  DEFINE_GUEST_HANDLE_STRUCT(xen_remove_from_physmap);
+> >  
+> > +#define XENMEM_exchange_and_pin             26
+> > +/*
+> > + * This hypercall is similar to XENMEM_exchange: it takes the same
+> > + * struct as an argument and it exchanges the pages passed in with a new
+> > + * set of pages. The new pages are going to be "pinned": it's guaranteed
+> > + * that their p2m mapping won't be changed until explicitly "unpinned".
+> > + * The content of the exchanged pages is lost.
+> > + * Only normal guest r/w memory can be pinned: no granted pages or
+> > + * ballooned pages.
+> > + * If return code is zero then @out.extent_list provides the DMA frame
+> > + * numbers of the newly-allocated memory.
+> > + * Returns zero on complete success, otherwise a negative error code:
+> > + *   -ENOSYS if not implemented
+> > + *   -EINVAL if the page is already pinned
+> > + *   -EFAULT if the physical to machine walk fails
+> 
+> I don't know what that means. Physical to machine walk? That sounds like
+> you are trying to do some form of mind melt between robots and humans
+> while walking around the office.
+> 
+> Could you expand this a bit please?
 
-I wonder is it possible for you to review,
-pick up, and include into your series this patch
+Actually pfn to mfn resolution is not the only possible cause of
+-EFAULT, for example all the copy_to/from_guest failures return
+-EFAULT.
+I am just going to go for the generic
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/195176.html
-([PATCH v3 0/1] ARM: signal: sigreturn_codes should be endian neutral
-to work in BE8)
-
-I think it is very much relevant to the effort.
-
-It was tested on top of your series. And as far as I know
-it is single patch outside of your series needed so BE
-Linux LTP testing result will match LE results on the
-same kernel h/w.
-
-Thanks,
-Victor
-
-
-On 29 August 2013 03:28, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Dear Ben Dooks,
->
-> On Thu, 29 Aug 2013 11:23:21 +0100, Ben Dooks wrote:
->
->> > I believe your patch series would get more attention if the cover
->> > letter was a bit better. It lacks a version number and a changelog. The
->> > new posting you made as "re-send patch series due to mta issues" does
->> > not even have a cover letter.
->>
->> That was in-reply to as it seems that some of the messages never made
->> it back to me due to a mta issue at my end that needed fixing.
->
-> Agreed, but even your original cover letter "3.11-rc7 big-endian
-> support" is far from containing the needed information: a title that
-> contains a version number, and proper changelog with all the changes
-> between all the different versions. You've been in the kernel
-> community for a much longer time than me, I'm sure you know perfectly
-> how to do this properly.
->
->> > Also, none of the patches are Cc'ed to the relevant maintainers, so I'm
->> > not sure how you expect those maintainers to look at your patches?
->>
->> I actually left the machine specific ones in this series as a convenient
->> place to keep them before producing a tree for submission.
->
-> Still, I believe the relevant maintainers should be Cc'ed so that you
-> can start collecting their Acked-by/Tested-by.
->
->> > Regarding mvebu, the below patch is needed to get the secondary CPUs to
->> > boot. Other than that, on Armada XP:
->> >
->> > Tested-by: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
->>
->> I will fix up the original patch, as it seems to have gotten out of sync
->> with the change to add the coherency fabric code.
->
-> Yeah, the automatic merge with the coherency fabric changes did the
-> wrong choice. Anyway, not a big issue.
->
->> > It doesn't work yet on Armada 370, but I'm not sure it's due to your
->> > patches and anyway isn't a regression since LE continues to work fine
->> > on Armada 370.
->>
->> I wonder if it is due to a bootloader issue. I will push out the atags
->> branch later today and you can try that.
->
-> I might try some of your earlier branches that are based on 3.10 and
-> have the ATAGS thing, just to see how it behaves on Armada 370. But I'm
-> not using ATAG_DTB_COMPAT, so normally ATAGS endianness should not be a
-> problem.
->
-> Thanks,
->
-> Thomas
-> --
-> Thomas Petazzoni, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+"if an internal error occurs"
