@@ -1,50 +1,80 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 29 Aug 2013 11:47:13 +0200
-Subject: [PATCH v2 4/7] V4L: s5k6a3: Add support for asynchronous subdev
- registration
-In-Reply-To: <Pine.LNX.4.64.1308281819520.22743@axis700.grange>
-References: <1377705360-12197-1-git-send-email-s.nawrocki@samsung.com>
- <1377705360-12197-5-git-send-email-s.nawrocki@samsung.com>
- <Pine.LNX.4.64.1308281819520.22743@axis700.grange>
-Message-ID: <521F18A1.2000805@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 29 Aug 2013 10:50:23 +0100
+Subject: [RFC PATCH v2 3/4] powerpc: refactor of_get_cpu_node to support
+ other architectures
+In-Reply-To: <20130828194638.AB78E3E0A6F@localhost>
+References: <1376586580-5409-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376674791-28244-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376674791-28244-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <2032060.4bgTKOdEX2@flatron> <1376777376.25016.11.camel@pasglop>
+ <20130819101922.GI3719@e106331-lin.cambridge.arm.com>
+ <5212177C.8000709@gmail.com> <521223FA.5050903@arm.com>
+ <20130822135930.GC23152@e106331-lin.cambridge.arm.com>
+ <20130828194638.AB78E3E0A6F@localhost>
+Message-ID: <20130829095023.GB2878@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2013 06:21 PM, Guennadi Liakhovetski wrote:
-> Hi Sylwester,
+On Wed, Aug 28, 2013 at 08:46:38PM +0100, Grant Likely wrote:
+> On Thu, 22 Aug 2013 14:59:30 +0100, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Mon, Aug 19, 2013 at 02:56:10PM +0100, Sudeep KarkadaNagesha wrote:
+> > > On 19/08/13 14:02, Rob Herring wrote:
+> > > > On 08/19/2013 05:19 AM, Mark Rutland wrote:
+> > > >> On Sat, Aug 17, 2013 at 11:09:36PM +0100, Benjamin Herrenschmidt wrote:
+> > > >>> On Sat, 2013-08-17 at 12:50 +0200, Tomasz Figa wrote:
+> > > >>>> I wonder how would this handle uniprocessor ARM (pre-v7) cores, for
+> > > >>>> which 
+> > > >>>> the updated bindings[1] define #address-cells = <0> and so no reg 
+> > > >>>> property.
+> > > >>>>
+> > > >>>> [1] - http://thread.gmane.org/gmane.linux.ports.arm.kernel/260795
+> > > >>>
+> > > >>> Why did you do that in the binding ? That sounds like looking to create
+> > > >>> problems ... 
+> > > >>>
+> > > >>> Traditionally, UP setups just used "0" as the "reg" property on other
+> > > >>> architectures, why do differently ?
+> > > >>
+> > > >> The decision was taken because we defined our reg property to refer to
+> > > >> the MPIDR register's Aff{2,1,0} bitfields, and on UP cores before v7
+> > > >> there's no MPIDR register at all. Given there can only be a single CPU
+> > > >> in that case, describing a register that wasn't present didn't seem
+> > > >> necessary or helpful.
+> > > > 
+> > > > What exactly reg represents is up to the binding definition, but it
+> > > > still should be present IMO. I don't see any issue with it being
+> > > > different for pre-v7.
+> > > > 
+> > > Yes it's better to have 'reg' with value 0 than not having it.
+> > > Otherwise this generic of_get_cpu_node implementation would need some
+> > > _hack_ to handle that case.
+> > 
+> > I'm not sure that having some code to handle a difference in standard
+> > between two architectures is a hack. If anything, I'd argue encoding a
+> > reg of 0 that corresponds to a nonexistent MPIDR value (given that's
+> > what the reg property is defined to map to on ARM) is more of a hack ;)
+> > 
+> > I'm not averse to having a reg value of 0 for this case, but given that
+> > there are existing devicetrees without it, requiring a reg property will
+> > break compatibility with them.
 > 
-> Just one doubt below
-> 
-> On Wed, 28 Aug 2013, Sylwester Nawrocki wrote:
-> 
->> > This patch converts the driver to use v4l2 asynchronous subdev
->> > registration API an the clock API to control the external master
->> > clock directly.
->> > 
->> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> > ---
->> >  drivers/media/i2c/s5k6a3.c |   36 ++++++++++++++++++++++++++----------
->> >  1 file changed, 26 insertions(+), 10 deletions(-)
->> > 
->> > diff --git a/drivers/media/i2c/s5k6a3.c b/drivers/media/i2c/s5k6a3.c
->> > index ba86e24..f65a4f8 100644
->> > --- a/drivers/media/i2c/s5k6a3.c
->> > +++ b/drivers/media/i2c/s5k6a3.c
-> [snip]
-> 
->> > @@ -282,7 +297,7 @@ static int s5k6a3_probe(struct i2c_client *client,
->> >  	pm_runtime_no_callbacks(dev);
->> >  	pm_runtime_enable(dev);
->> >  
->> > -	return 0;
->> > +	return v4l2_async_register_subdev(sd);
->
-> If the above fails - don't you have to do any clean up? E.g. below you do 
-> disable runtime PM and clean up the media entity.
+> Then special cases those device trees, but you changing existing
+> convention really needs to be avoided. The referenced documentation
+> change is brand new, so we're not stuck with it.
 
-You're right, the clean up steps are missing. Thanks for pointing out,
-I've corrected this for the next iteration.
+I have no problem with changing the bindings and forcing:
+
+#address-cells = <1>;
+reg = <0>;
+
+for UP predating v7, my big worry is related to in-kernel dts that we
+already patched to follow the #address-cells = <0> rule (and we had to
+do it since we got asked that question multiple times on the public
+lists).
+
+What do you mean by "special case those device trees" ? I have not
+planned to patch them again, unless we really consider that a necessary
+evil.
 
 Thanks,
-Sylwester
+Lorenzo
