@@ -1,58 +1,81 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 29 Aug 2013 17:59:32 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the v4l-dvb tree
-Message-ID: <20130829175932.de8fe48f48a152172dd3d770@canb.auug.org.au>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 29 Aug 2013 10:03:20 +0200
+Subject: [PATCH v4 1/4] lib: Introduce atomic MMIO modify
+In-Reply-To: <20130828123352.b9beff5237dfde2571a5779e@linux-foundation.org>
+References: <1377358532-23802-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377358532-23802-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130827133709.64b4743950b911d6dfe7fab8@linux-foundation.org>
+ <20130828102422.GA2348@localhost>
+ <20130828123352.b9beff5237dfde2571a5779e@linux-foundation.org>
+Message-ID: <20130829100320.0b86e1f9@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Dear Andrew Morton,
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-shmobile/setup-r8a7779.c between commit 4714a0255eee
-("[media] ARM: shmobile: r8a7779: add VIN support") from the v4l-dvb tree
-and commit fee529df76ff ("ARM: shmobile: r8a7779: cleanup registration of
-usb phy") from the arm-soc tree.
+On Wed, 28 Aug 2013 12:33:52 -0700, Andrew Morton wrote:
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+> > > It only works if both subsystems agree to use atomic_io_modify().  And
+> > > if they're both capable of doing that, they are both capable of
+> > > implementing an agreed-upon internal locking scheme, so why bother?
+> > > 
+> > 
+> > One of the scenarios where this could be helpful and an agreed-upon
+> > lock seemed difficult to design is this: a watchdog driver that shares
+> > some control register with *two* different clocksource drivers.
+> > 
+> > So, one first solution is to have a function in the two clocksource
+> > drivers (with matching prototype) and have the watchdog access
+> > the register through it.
+> > 
+> > However, because of multiplatform builds, both these clocksource drivers
+> > could be built at the same time. Therefore we would have a symbol
+> > collision, doubly-defined, in each driver.
+> > 
+> > How would that work? What other internal locking scheme could we
+> > implement?
+> 
+> I guess the locking would need to be in a standalone module which the
+> various driver modules would then depend upon.  I'm not really
+> advocating doing this - I'm just making noise.
 
+I think the idea of this "atomic MMIO modify" function was precisely to
+solve the situations where one or two "misc" registers need to be
+accessed by various unrelated drivers, and having a separate standalone
+module to control those one or two "misc" registers would be a bit too
+annoying.
+
+This is a situation that we have fairly often at least in some ARM
+SoCs: the registers of the various IP blocks are generally nicely
+organized in "regions", where all the registers for each UART are
+grouped together, for each I2C controller, each SPI controller and so
+on. But there are always a bunch of misc, system control registers that
+do not really belong to any particular IP block, but some of the device
+drivers sometimes need to set/clear a bit in such registers. Of course,
+when those "system control" registers control a clock, or pin muxing,
+or something well-known, we have existing frameworks in the kernel to
+support that. But there is always this bizarre "system control"
+feature, that does not fit into an existing kernel framework, and for
+which writing an entirely separate driver is really overkill.
+
+The case highlighted by the patches 3/4 and 4/4 of Ezequiel are I
+believe a good example. While each timer and the watchdog each have
+their own "region" of registers to be controlled, there is also one
+single global register to enable/disable the different timers and
+watchdog (with one bit per timer or watchdog). So this register needs
+to be accessed by both the timer (clocksource) and watchdog drivers,
+even though they are otherwise completely unrelated. Writing a separate
+driver just to control this register, that is accessed infrequently
+(i.e only when the kernel boots essentially), would require a lot of
+code for no real benefit.
+
+Does that clarify the intended usage?
+
+Thanks for your feedback,
+
+Thomas
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-shmobile/setup-r8a7779.c
-index 3d89288,6a99333..0000000
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@@ -629,24 -648,6 +675,16 @@@ void __init r8a7779_add_ether_device(st
-  					  pdata, sizeof(*pdata));
-  }
-  
-- void __init r8a7779_add_usb_phy_device(struct rcar_phy_platform_data *pdata)
-- {
-- 	platform_device_register_resndata(&platform_bus, "rcar_usb_phy", -1,
-- 					  usb_phy_resources,
-- 					  ARRAY_SIZE(usb_phy_resources),
-- 					  pdata, sizeof(*pdata));
-- }
-- 
- +void __init r8a7779_add_vin_device(int id, struct rcar_vin_platform_data *pdata)
- +{
- +	BUG_ON(id < 0 || id > 3);
- +
- +	vin_info_table[id]->data = pdata;
- +	vin_info_table[id]->size_data = sizeof(*pdata);
- +
- +	platform_device_register_full(vin_info_table[id]);
- +}
- +
-  /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
-  void __init __weak r8a7779_register_twd(void) { }
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130829/10407caf/attachment.sig>
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
