@@ -1,84 +1,150 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 29 Aug 2013 16:54:21 +0100
-Subject: [PATCH v4 07/10] xen: introduce XENMEM_exchange_and_pin and
- XENMEM_unpin
-In-Reply-To: <20130815195051.GC5337@konrad-lan.dumpdata.com>
-References: <alpine.DEB.2.02.1308151200580.4470@kaball.uk.xensource.com>
- <1376565054-24153-7-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130815195051.GC5337@konrad-lan.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1308291646130.6397@kaball.uk.xensource.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Thu, 29 Aug 2013 10:55:18 -0500
+Subject: [PATCHv3 1/4] arm: dts: Add clock entries for timers in SOCFPGA
+In-Reply-To: <20130828153127.GA17806@pengutronix.de>
+References: <1377118427-20644-1-git-send-email-dinguyen@altera.com>
+ <20130828153127.GA17806@pengutronix.de>
+Message-ID: <1377791718.26261.16.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Aug 2013, Konrad Rzeszutek Wilk wrote:
-> On Thu, Aug 15, 2013 at 12:10:51PM +0100, Stefano Stabellini wrote:
-> > XENMEM_exchange can't be used by autotranslate guests because of two
-> > severe limitations:
+Hi Steffen,
+
+On Wed, 2013-08-28 at 17:31 +0200, Steffen Trumtrar wrote:
+> Hi!
+> 
+> On Wed, Aug 21, 2013 at 03:53:44PM -0500, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
 > > 
-> > - it does not copy back the mfns into the out field for autotranslate
-> >   guests;
+> > Set the correct clock entries for the the timers, and also clean up
+> > the timer entries for SOCFPGA by removing timer<n> in the timer entry.
 > > 
-> > - it does not guarantee that the hypervisor won't change the p2m
-> >   mappings for the exchanged pages while the guest is using them. Xen
-> >   never promises to keep the p2m mapping stable for autotranslate guests
-> >   in general.  In practice it won't happen unless one uses uncommon
-> >   features like memory sharing or paging.
-> > 
-> > To overcome these problems I am introducing two new hypercalls.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > 
-> > 
-> > Changes in v4:
-> > - rename XENMEM_get_dma_buf to XENMEM_exchange_and_pin;
-> > - rename XENMEM_put_dma_buf to XENMEM_unpin;
-> > - improve the documentation of the new hypercalls;
-> > - add a note about out.address_bits for XENMEM_exchange.
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > CC: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Pawel Moll <pawel.moll@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > Cc: Ian Campbell <ian.campbell@citrix.com>
+> > CC: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > CC: Jamie Iles <jamie@jamieiles.com>
+> > Cc: John Stultz <john.stultz@linaro.org>
+> > Cc: Heiko Stuebner <heiko@sntech.de>
+> > Cc: Pavel Machek <pavel@denx.de>
+> > Cc: devicetree at vger.kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org
 > > ---
-> >  include/xen/interface/memory.h |   37 +++++++++++++++++++++++++++++++++++++
-> >  1 files changed, 37 insertions(+), 0 deletions(-)
+> >  arch/arm/boot/dts/socfpga.dtsi         |   16 ++++++++--------
+> >  arch/arm/boot/dts/socfpga_cyclone5.dts |    8 ++++----
+> >  arch/arm/boot/dts/socfpga_vt.dts       |    8 ++++----
+> >  3 files changed, 16 insertions(+), 16 deletions(-)
 > > 
-> > diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
-> > index 2ecfe4f..5708ff8 100644
-> > --- a/include/xen/interface/memory.h
-> > +++ b/include/xen/interface/memory.h
-> > @@ -66,6 +66,7 @@ struct xen_memory_exchange {
-> >      /*
-> >       * [IN] Details of memory extents to be exchanged (GMFN bases).
-> >       * Note that @in.address_bits is ignored and unused.
-> > +     * @out.address_bits should contain the address mask for the new pages.
-> >       */
-> >      struct xen_memory_reservation in;
-> >  
-> > @@ -263,4 +264,40 @@ struct xen_remove_from_physmap {
-> >  };
-> >  DEFINE_GUEST_HANDLE_STRUCT(xen_remove_from_physmap);
-> >  
-> > +#define XENMEM_exchange_and_pin             26
-> > +/*
-> > + * This hypercall is similar to XENMEM_exchange: it takes the same
-> > + * struct as an argument and it exchanges the pages passed in with a new
-> > + * set of pages. The new pages are going to be "pinned": it's guaranteed
-> > + * that their p2m mapping won't be changed until explicitly "unpinned".
-> > + * The content of the exchanged pages is lost.
-> > + * Only normal guest r/w memory can be pinned: no granted pages or
-> > + * ballooned pages.
-> > + * If return code is zero then @out.extent_list provides the DMA frame
-> > + * numbers of the newly-allocated memory.
-> > + * Returns zero on complete success, otherwise a negative error code:
-> > + *   -ENOSYS if not implemented
-> > + *   -EINVAL if the page is already pinned
-> > + *   -EFAULT if the physical to machine walk fails
+> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> > index 9706767..9957bae 100644
+> > --- a/arch/arm/boot/dts/socfpga.dtsi
+> > +++ b/arch/arm/boot/dts/socfpga.dtsi
+> > @@ -26,10 +26,6 @@
+> >  		ethernet1 = &gmac1;
+> >  		serial0 = &uart0;
+> >  		serial1 = &uart1;
+> > -		timer0 = &timer0;
+> > -		timer1 = &timer1;
+> > -		timer2 = &timer2;
+> > -		timer3 = &timer3;
+> >  	};
+> >
 > 
-> I don't know what that means. Physical to machine walk? That sounds like
-> you are trying to do some form of mind melt between robots and humans
-> while walking around the office.
+> Yes. Do that.
 > 
-> Could you expand this a bit please?
+> >  	cpus {
+> > @@ -486,28 +482,32 @@
+> >  			interrupts = <1 13 0xf04>;
+> >  		};
+> >  
+> > -		timer0: timer0 at ffc08000 {
+> > +		timer at ffc08000 {
+> 
+> No. Why? Than I can not write something like
+> 
+> &timer0 {
+> 	clock-frequency = <100000000>;
+> };
+> 
+> and would have to reference the whole tree ala
+> 
+> / {
+> 	soc {
+> 		timer at ffc08000 {
+> 			clock-frequency = <100000000>;
+> 		};
+> 	};
+> };
+> 
+> in a boardspecific or SoC specific file (see below).
 
-Actually pfn to mfn resolution is not the only possible cause of
--EFAULT, for example all the copy_to/from_guest failures return
--EFAULT.
-I am just going to go for the generic
+Agreed. Will adjust accordingly.
 
-"if an internal error occurs"
+> 
+> > diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
+> > index 698dde9..c1af01c 100644
+> > --- a/arch/arm/boot/dts/socfpga_cyclone5.dts
+> > +++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
+> >  
+> > diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+> > index 6f23121..72ff14c 100644
+> > --- a/arch/arm/boot/dts/socfpga_vt.dts
+> > +++ b/arch/arm/boot/dts/socfpga_vt.dts
+> 
+> Leads me to a question about terminology: Is the cyclone5 an actual board?
+> AFAIK it is. And the Cyclone 5 FPGA is also called socfpga? Is that correct?
+> But then, seeing that, in an other patch, you add two different sysmgr addresses to
+> the socfpga_vt and socfpga_cyclone5, there are different socfpgas?
+
+Yes, sofpga_cyclone5.dts is the devkit that is manufactured by Altera.
+socfpga_vt.dts is a virtual platform for SOCFPGA. You can get the
+virtual platform from Synopsis. It mimics everything except the FPGA. 
+
+socfpga is the base SOC with a Cyclone 5 FPGA on it. I'll be upstreaming
+socfpga_arria5 soon, which has the SOCFPGA + Arria 5 FPGA.
+
+> 
+> I want to write a devicetree for the SoCkit. It has a Cyclone 5 on it.
+> So naturally I would now go and include the socfpga_cyclone5.dtsi, with all the
+> cyclone5 stuff and just add my board specific stuff in a socfpga_sockit.dts.
+> But there is no socfpga_cyclone5.dtsi, just the socfpga_cyclone5.dts, which itself
+> seems to be a board...
+
+socfpga.dtsi is the base DTSI for the platform. In hindsight, I should
+have named it a bit different, but for now socfpga_cyclone5 is for the
+board.
+
+> 
+> So, how should we reorder the current dts (as I tested with current mainline, the
+> support is completely broken out of the box, but works fine with your patches that
+> are floating around, there should be no users as of now)?
+
+Not sure what you mean by broken. I was able to boot 3.11-rc7 just now
+using an initramfs. As you can already tell, I'm doing my best to get
+more support for the platform upstream, but it will take time.
+
+In the meantim, you get our latest downstream kernel at:
+
+git://git.rocketboards.org/linux-socfpga.git
+
+Dinh
+
+> 
+> Something like:
+> 
+> socfpga.dtsi
+>  -> socfpga_cyclone5.dtsi
+>  --> socfpga_cyclone5_devboard.dts (?)
+>  --> socfpga_sockit.dts
+>  -> socfpga_???.dtsi
+>  --> socfpga_vt.dts
+> 
+> ?
+> 
+> Thanks and regards,
+> Steffen
+> 
