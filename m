@@ -1,46 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 29 Aug 2013 12:22:39 +0100
-Subject: [PATCH v5 3/5] ARM64: arch_timer: add support to configure and
- enable event stream
-In-Reply-To: <1377686689-30828-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1377686689-30828-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1377686689-30828-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <20130829112239.GE13704@arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 29 Aug 2013 16:53:08 +0530
+Subject: [PATCH v2 0/3] OMAP4+: Get rid of internal SRAM handling
+Message-ID: <1377775391-13103-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 11:44:47AM +0100, Sudeep KarkadaNagesha wrote:
->  static inline u64 arch_counter_get_cntvct(void)
-> diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
-> index 6d4482f..530fa879 100644
-> --- a/arch/arm64/include/asm/hwcap.h
-> +++ b/arch/arm64/include/asm/hwcap.h
-> @@ -30,6 +30,7 @@
->  #define COMPAT_HWCAP_IDIVA	(1 << 17)
->  #define COMPAT_HWCAP_IDIVT	(1 << 18)
->  #define COMPAT_HWCAP_IDIV	(COMPAT_HWCAP_IDIVA|COMPAT_HWCAP_IDIVT)
-> +#define COMPAT_HWCAP_EVTSTRM	(1 << 21)
->  
->  #ifndef __ASSEMBLY__
->  /*
-> @@ -37,11 +38,16 @@
->   * instruction set this cpu supports.
->   */
->  #define ELF_HWCAP		(elf_hwcap)
-> -#define COMPAT_ELF_HWCAP	(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
-> +#ifdef CONFIG_COMPAT
-> +#define COMPAT_ELF_HWCAP	(compat_elf_hwcap)
-> +#define COMPAT_ELF_HWCAP_DEFAULT	\
-> +				(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
->  				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
->  				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
->  				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
->  				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV)
-> +extern unsigned int compat_elf_hwcap;
-> +#endif
+v2:
+Removed the static iotable mapping for sram done to handle
+errata I688, and used gen_pool instead.
 
-I think you can move the default to the setup.c file, it's not of any
-use apart from initialisation.
+Make all OMAP DT only platforms (am33xx, am43xx, omap4 and omap5)
+use drivers/misc/sram.c driver instead of the omap internal
+implementation for SRAM handling.
+
+Rajendra Nayak (3):
+  ARM: AM335x: Get rid of unused sram init function
+  ARM: OMAP4+: Move SRAM data to DT
+  ARM: OMAP4+: Remove static iotable mappings for SRAM
+
+ Documentation/devicetree/bindings/arm/omap/mpu.txt |    5 ++-
+ arch/arm/boot/dts/am33xx.dtsi                      |    5 +--
+ arch/arm/boot/dts/am4372.dtsi                      |    5 +++
+ arch/arm/boot/dts/omap4.dtsi                       |    6 +++
+ arch/arm/boot/dts/omap5.dtsi                       |    8 +++-
+ arch/arm/configs/omap2plus_defconfig               |    1 +
+ arch/arm/mach-omap2/io.c                           |   17 ---------
+ arch/arm/mach-omap2/omap4-common.c                 |   17 ++++++++-
+ arch/arm/mach-omap2/sram.c                         |   39 +-------------------
+ arch/arm/mach-omap2/sram.h                         |    7 ----
+ 10 files changed, 42 insertions(+), 68 deletions(-)
 
 -- 
-Catalin
+1.7.9.5
