@@ -1,49 +1,25 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 29 Aug 2013 10:20:25 -0700
-Subject: [PATCH v2 3/3] ARM: OMAP4+: Remove static iotable mappings for
- SRAM
-In-Reply-To: <1377775391-13103-4-git-send-email-rnayak@ti.com> (Rajendra
- Nayak's message of "Thu, 29 Aug 2013 16:53:11 +0530")
-References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
- <1377775391-13103-4-git-send-email-rnayak@ti.com>
-Message-ID: <871u5c2z3a.fsf@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 29 Aug 2013 19:20:13 +0200
+Subject: [PATCH RFC v2 16/16] ARM: zynq: Don't call of_clk_init()
+In-Reply-To: <89b68978-7eeb-43e1-a456-d864ed313da5@DB8EHSMHS026.ehs.local>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201308291537.54608.arnd@arndb.de>
+ <89b68978-7eeb-43e1-a456-d864ed313da5@DB8EHSMHS026.ehs.local>
+Message-ID: <201308291920.13983.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@ti.com> writes:
+On Thursday 29 August 2013, Michal Simek wrote:
+> Is there any plan to remove all of them?
+> I expect that on almost all platforms it is a need to have at least one
+> early hook to be able to setup things.
 
-> In order to handle errata I688, a page of sram was reserved by doing a
-> static iotable map. Now that we use gen_pool to manage sram, we can
-> completely remove all of these static mappings and use gen_pool_alloc()
-> to get the one page of sram space needed to implement errata I688.
->
-> Suggested-by: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+In an ideal world, we wouldn't need any, and on arm64 we don't plan to
+introduce callbacks in the first place. We don't put a lot of effort
+into eliminating all the ones from existing platforms in the near future,
+but but I do hope to have a situation where we don't use any callbacks
+for newly introduced 32-bit platforms soon, and remove a lot of the
+existing callbacks over time when we have the chance (like now for the
+clk init).
 
-[...]
-
-> @@ -71,6 +72,21 @@ void omap_bus_sync(void)
->  }
->  EXPORT_SYMBOL(omap_bus_sync);
->  
-> +static int __init omap4_sram_init(void)
-> +{
-> +	struct device_node *np;
-> +	struct gen_pool *sram_pool;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
-> +	if (!np)
-> +		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
-> +			 __func__);
-> +	sram_pool = of_get_named_gen_pool(np, "sram", 0);
-
-I haven't actually tested this, but if there is no 'sram' property defined...
-  
-> +	sram_sync = (void *)gen_pool_alloc(sram_pool, PAGE_SIZE);
-
-... does this still behave properly?
-
-> +	return 0;
-> +}
-
-Kevin
+	Arnd
