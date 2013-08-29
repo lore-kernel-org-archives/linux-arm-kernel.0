@@ -1,51 +1,49 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Thu, 29 Aug 2013 18:20:45 +0100
-Subject: [PATCH v2 00/03] ARM: shmobile: r8a7790 APMU SMP support
-In-Reply-To: <20130828232148.7321.45739.sendpatchset@w520>
-References: <20130828232148.7321.45739.sendpatchset@w520>
-Message-ID: <521F82ED.7020901@arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 29 Aug 2013 10:20:25 -0700
+Subject: [PATCH v2 3/3] ARM: OMAP4+: Remove static iotable mappings for
+ SRAM
+In-Reply-To: <1377775391-13103-4-git-send-email-rnayak@ti.com> (Rajendra
+ Nayak's message of "Thu, 29 Aug 2013 16:53:11 +0530")
+References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
+ <1377775391-13103-4-git-send-email-rnayak@ti.com>
+Message-ID: <871u5c2z3a.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/08/13 00:21, Magnus Damm wrote:
-> ARM: shmobile: r8a7790 APMU SMP support
-> 
-> [PATCH v2 01/03] ARM: shmobile: Shared APMU SMP support code without DT
-> [PATCH v2 02/03] ARM: shmobile: Add r8a7790 SMP support using APMU code
-> [PATCH v2 03/03] ARM: shmobile: Add r8a7790 CA15 CPU cores
-> 
-> This series adds SMP support to r8a7790 using the included APMU code.
-> The previous version of r8a7790 support depended on the APMU code in 
-> "[PATCH] ARM: shmobile: Shared APMU SMP support code", but in this
-> version the APMU code has been reworked to not use DT.
-You have misunderstood my comments. I clearly said I am not against
-using DT for APMU. I objected only the new property 'cpus' added to the
-APMU node(mainly because it's not needed IMO or it was not documented
-well to explain the need for it)
+Rajendra Nayak <rnayak@ti.com> writes:
 
-> In the future
-> r8a73a4 and other SoCs may make use of the APMU as well, but the 
-> r8a73a4 code first needs to be adjusted to work with the CCI driver.
-> 
-> With these patches applied r8a7790 CA15 support for SMP boot
-> and CPU Hotplug is known to be working.
-> 
-> Thanks to Sudeep for his feedback.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  Written against renesas.git renesas-devel-20130829
-> 
->  arch/arm/boot/dts/r8a7790.dtsi                 |   21 ++
->  arch/arm/mach-shmobile/Makefile                |    1 
->  arch/arm/mach-shmobile/board-lager-reference.c |    1 
->  arch/arm/mach-shmobile/board-lager.c           |    1 
->  arch/arm/mach-shmobile/include/mach/common.h   |    6 
->  arch/arm/mach-shmobile/include/mach/r8a7790.h  |    1 
->  arch/arm/mach-shmobile/platsmp-apmu.c          |  178 ++++++++++++++++++++++++
->  arch/arm/mach-shmobile/setup-r8a7790.c         |    1 
->  arch/arm/mach-shmobile/smp-r8a7790.c           |   67 +++++++++
->  9 files changed, 277 insertions(+)
-> 
-> 
+> In order to handle errata I688, a page of sram was reserved by doing a
+> static iotable map. Now that we use gen_pool to manage sram, we can
+> completely remove all of these static mappings and use gen_pool_alloc()
+> to get the one page of sram space needed to implement errata I688.
+>
+> Suggested-by: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+
+[...]
+
+> @@ -71,6 +72,21 @@ void omap_bus_sync(void)
+>  }
+>  EXPORT_SYMBOL(omap_bus_sync);
+>  
+> +static int __init omap4_sram_init(void)
+> +{
+> +	struct device_node *np;
+> +	struct gen_pool *sram_pool;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
+> +	if (!np)
+> +		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
+> +			 __func__);
+> +	sram_pool = of_get_named_gen_pool(np, "sram", 0);
+
+I haven't actually tested this, but if there is no 'sram' property defined...
+  
+> +	sram_sync = (void *)gen_pool_alloc(sram_pool, PAGE_SIZE);
+
+... does this still behave properly?
+
+> +	return 0;
+> +}
+
+Kevin
