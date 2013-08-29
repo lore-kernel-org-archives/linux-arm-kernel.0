@@ -1,51 +1,22 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 29 Aug 2013 13:53:37 +0100
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
- with external L3-cache.
-In-Reply-To: <CAAhSdy0NgSchR1p_HJTUMMV2h7f7beFMnN3Md4xEp=EGRiXVMg@mail.gmail.com>
-References: <3ebe469fcf451cc7396dd2a5d3f01272@www.loen.fr>
- <CAAhSdy3WwZcLW6s05mV=Mn8=w8TcubTdYrgNqAChqiHxXC53eg@mail.gmail.com>
- <747a0675165da4ef147bbda4e140549b@www.loen.fr>
- <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
- <5935339137684ecf90dd484cc5739548@www.loen.fr>
- <20130815165344.GA3853@cbox>
- <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
- <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
- <20130829105235.GC13704@arm.com>
- <CAAhSdy0NgSchR1p_HJTUMMV2h7f7beFMnN3Md4xEp=EGRiXVMg@mail.gmail.com>
-Message-ID: <20130829125337.GG13704@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 29 Aug 2013 20:58:55 +0800
+Subject: [PATCH RFC v2 08/16] ARM: mxs: remove custom .init_time hook
+In-Reply-To: <521F3151.1030704@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1377638890-371-9-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130829110849.GB18729@S2101-09.ap.freescale.net>
+ <521F3151.1030704@gmail.com>
+Message-ID: <20130829125851.GK18729@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 01:31:43PM +0100, Anup Patel wrote:
-> On Thu, Aug 29, 2013 at 4:22 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Fri, Aug 16, 2013 at 07:57:55AM +0100, Anup Patel wrote:
-> >> The approach of flushing d-cache by set/way upon first run of VCPU will
-> >> not work because for set/way operations ARM ARM says: "For set/way
-> >> operations, and for All (entire cache) operations, the point is defined to be
-> >> to the next level of caching". In other words, set/way operations work upto
-> >> point of unification.
-> >
-> > I don't understand where you got the idea that set/way operations work
-> > up to the point of unification. This is incorrect, the set/way
-> > operations work on the level of cache specified by bits 3:1 in the
-> > register passed to the DC CISW instruction. For your L3 cache, those
-> > bits would be 2 (and __flush_dcache_all() implementation does this
-> > dynamically).
-> 
-> The L3-cache is not visible to CPU. It is totally independent and transparent
-> to CPU.
+On Thu, Aug 29, 2013 at 01:32:33PM +0200, Sebastian Hesselbarth wrote:
+> Ok, will take care of it. I assume you are fine with having an extra
+> struct device_node pointer for the sake of readability instead of
+> reusing the same pointer.
 
-OK. But you say that operations like DC CIVAC actually flush the L3? So
-I don't see it as completely transparent to the CPU.
+Yeah, something like np_digctl for digctl node.
 
-Do you have any configuration bits which would make the L3 completely
-transparent like always caching even when accesses are non-cacheable and
-DC ops to PoC ignoring it?
+Thanks for your work.
 
-Now, back to the idea of outer_cache framework for arm64. Does your CPU
-have separate instructions for flushing this L3 cache?
-
--- 
-Catalin
+Shawn
