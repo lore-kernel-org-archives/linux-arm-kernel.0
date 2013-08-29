@@ -1,275 +1,139 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 28 Aug 2013 18:14:25 -0700
-Subject: [PATCH v4 3/5] clk: dt: binding for basic multiplexer clock
-In-Reply-To: <2A930389-012E-45C3-93EB-6B4A41DB2EF5@codeaurora.org>
-References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
- <1377150793-27864-4-git-send-email-mturquette@linaro.org>
- <2A930389-012E-45C3-93EB-6B4A41DB2EF5@codeaurora.org>
-Message-ID: <20130829011425.8231.78802@quantum>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 29 Aug 2013 10:46:28 +0900
+Subject: [PATCH/RFC] ARM: shmobile: r8a7779: Update early timer
+ initialisation order
+In-Reply-To: <CANqRtoSionozCqag0nxRbmC19ic5RUb7DOpeaGHThjNoeRpBOg@mail.gmail.com>
+References: <1375952357-22938-1-git-send-email-horms+renesas@verge.net.au>
+ <CANqRtoSpOWOp3GhsvvwQwyWtPi3wXG0MmECkf90SPBRoPmq4DQ@mail.gmail.com>
+ <20130822073904.GB32091@verge.net.au>
+ <CANqRtoSionozCqag0nxRbmC19ic5RUb7DOpeaGHThjNoeRpBOg@mail.gmail.com>
+Message-ID: <20130829014627.GD20425@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kumar Gala (2013-08-28 08:50:10)
-> On Aug 22, 2013, at 12:53 AM, Mike Turquette wrote:
+On Wed, Aug 28, 2013 at 03:58:39PM +0900, Magnus Damm wrote:
+> Hi Simon,
 > 
-> > Device Tree binding for the basic clock multiplexer, plus the setup
-> > function to register the clock.  Based on the existing fixed-clock
-> > binding.
-> > 
-> > Includes minor beautification of clk-provider.h where some whitespace is
-> > added and of_fixed_factor_clock_setup is relocated to maintain a
-> > consistent style.
-> > 
-> > Tero Kristo contributed helpful bug fixes to this patch.
-> > 
-> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> > Tested-by: Heiko Stuebner <heiko@sntech.de>
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > Changes since v3:
-> > * replaced underscores with dashes in DT property names
-> > * bail from of clock setup function early if of_iomap fails
-> > * removed unecessary explict cast
-> > 
-> > .../devicetree/bindings/clock/mux-clock.txt        | 79 ++++++++++++++++++++++
-> > drivers/clk/clk-mux.c                              | 68 ++++++++++++++++++-
-> > include/linux/clk-provider.h                       |  5 +-
-> > 3 files changed, 150 insertions(+), 2 deletions(-)
-> > create mode 100644 Documentation/devicetree/bindings/clock/mux-clock.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/clock/mux-clock.txt b/Documentation/devicetree/bindings/clock/mux-clock.txt
-> > new file mode 100644
-> > index 0000000..21eb3b3
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/mux-clock.txt
-> > @@ -0,0 +1,79 @@
-> > +Binding for simple mux clock.
-> > +
-> > +This binding uses the common clock binding[1].  It assumes a
-> > +register-mapped multiplexer with multiple input clock signals or
-> > +parents, one of which can be selected as output.  This clock does not
-> > +gate or adjust the parent rate via a divider or multiplier.
-> > +
-> > +By default the "clocks" property lists the parents in the same order
-> > +as they are programmed into the regster.  E.g:
-> > +
-> > +     clocks = <&foo_clock>, <&bar_clock>, <&baz_clock>;
-> > +
-> > +results in programming the register as follows:
-> > +
-> > +register value               selected parent clock
-> > +0                    foo_clock
-> > +1                    bar_clock
-> > +2                    baz_clock
-> > +
-> > +Some clock controller IPs do not allow a value of zero to be programmed
-> > +into the register, instead indexing begins at 1.  The optional property
-> > +"index-starts-at-one" modified the scheme as follows:
-> > +
-> > +register value               selected clock parent
-> > +1                    foo_clock
-> > +2                    bar_clock
-> > +3                    baz_clock
-> > +
-> > +Additionally an optional table of bit and parent pairs may be supplied
-> > +like so:
-> > +
-> > +     table = <&foo_clock 0x0>, <&bar_clock, 0x2>, <&baz_clock, 0x4>;
-> > +
+> On Thu, Aug 22, 2013 at 4:39 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Fri, Aug 09, 2013 at 05:37:39PM +0900, Magnus Damm wrote:
+> >> On Thu, Aug 8, 2013 at 5:59 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> >> > a894fcc2d01a89e6fe3da0845a4d80a5312e1124 ("ARM: smp_twd: Divorce smp_twd
+> >> > from local timer API") altered twd_local_timer_common_register() so that it
+> >> > may make use of late_timer_init.
+> >> >
+> >> > This is problematic on marzen with Magnus's recent patch "ARM: shmobile:
+> >> > marzen: Switch to DT_MACHINE_START" which switches marzen around to enable
+> >> > USE_OF and thus shmobile_timer_init(), which is registered as
+> >> > late_time_init by shmobile_earlytimer_init() stops being a no-op.
+> >> >
+> >> > As a work-around I have updated r8a7779_earlytimer_init() so that
+> >> > shmobile_earlytimer_init() is called after r8a7779_register_twd().
+> >> > Or in other words, the shmobile_earlytimer_init() setting of
+> >> > late_time_init overwrites that of twd_local_timer_common_register().
+> >> >
+> >> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> >> > Cc: Magnus Damm <magnus.damm@gmail.com>
+> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >> >
+> >> > ---
+> >> >
+> >> > This patch was created on top of a merge of next-20130807 from the
+> >> > linux-next tree and renesas-next-20130807 from my renesas tree.
+> >> >
+> >> > I expect the problem describe above to be present in the
+> >> > next version of linux-next as it will include renesas-next-20130807.
+> >> >
+> >> > I rather suspect that this fix is just papers over the problem
+> >> > at hand rather than fixing it. But it does at least fix the problem
+> >> > to the extent where the marzen board at least boots.
+> >> >
+> >> > For reference the output of /proc/interrupts after such a boot is below.
+> >> >
+> >> >             CPU0       CPU1       CPU2       CPU3
+> >> >   29:          0       9365       9363       9359       GIC   29  twd
+> >> >   59:          0          0          0          0       GIC   59  renesas_intc_irqpin.0
+> >> >   60:          5          0          0          0       GIC   60  renesas_intc_irqpin.0
+> >> >   61:          0          0          0          0       GIC   61  renesas_intc_irqpin.0
+> >> >   62:          0          0          0          0       GIC   62  renesas_intc_irqpin.0
+> >> >   64:        278          0          0          0       GIC   64  sh_tmu.0
+> >> >   76:          1          0          0          0       GIC   76  ehci_hcd:usb1, ohci_hcd:usb3
+> >> >   77:          1          0          0          0       GIC   77  ehci_hcd:usb2, ohci_hcd:usb4
+> >> >  111:          0          0          0          0       GIC  111  i2c-rcar.0
+> >> >  112:          0          0          0          0       GIC  112  i2c-rcar.2
+> >> >  113:          0          0          0          0       GIC  113  i2c-rcar.3
+> >> >  114:          0          0          0          0       GIC  114  i2c-rcar.1
+> >> >  122:         45          0          0          0       GIC  122  sh-sci.2:mux
+> >> >  132:          0          0          0          0       GIC  132  sata_rcar
+> >> >  173:          0          0          0          0       GIC  173  gpio_rcar.0
+> >> >  174:          0          0          0          0       GIC  174  gpio_rcar.1
+> >> >  175:          0          0          0          0       GIC  175  gpio_rcar.2
+> >> >  176:          0          0          0          0       GIC  176  gpio_rcar.3
+> >> >  177:          0          0          0          0       GIC  177  gpio_rcar.4
+> >> >  178:          0          0          0          0       GIC  178  gpio_rcar.5
+> >> >  179:          0          0          0          0       GIC  179  gpio_rcar.6
+> >> > 2001:          5          0          0          0  renesas_intc_irqpin.0    1  eth0
+> >> > IPI0:          0          0          0          0  CPU wakeup interrupts
+> >> > IPI1:          0          0          0          0  Timer broadcast interrupts
+> >> > IPI2:        314        340         58         33  Rescheduling interrupts
+> >> > IPI3:         22         56         34         56  Function call interrupts
+> >> > IPI4:          0          0          0          0  Single function call interrupts
+> >> > IPI5:          0          0          0          0  CPU stop interrupts
+> >> >  Err:          0
+> >> > ---
+> >> >  arch/arm/mach-shmobile/setup-r8a7779.c | 2 +-
+> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> >
+> >> > diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+> >> > index ddee4aa..b0f56d6 100644
+> >> > --- a/arch/arm/mach-shmobile/setup-r8a7779.c
+> >> > +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+> >> > @@ -597,8 +597,8 @@ void __init __weak r8a7779_register_twd(void) { }
+> >> >  void __init r8a7779_earlytimer_init(void)
+> >> >  {
+> >> >         r8a7779_clock_init();
+> >> > -       shmobile_earlytimer_init();
+> >> >         r8a7779_register_twd();
+> >> > +       shmobile_earlytimer_init();
+> >> >  }
+> >> >
+> >> >  void __init r8a7779_add_early_devices(void)
+> >> > --
+> >> > 1.8.3.2
+> >> >
+> >>
+> >> Hi Simon,
+> >>
+> >> Thanks for tracking down this issue. I think your patch looks fine to
+> >> me.
+> >
+> > Thanks, could I get an acked-by ?
 > 
-> I think this is going way too far for what should be in a device tree.  Why should this not just be encoded in tables in the code?
-
-To reduce kernel data bloat.
-
-The mux-clock binding covers a quite a few platforms that have similar
-mux-clock programming requirements. If the DT binding is verbose enough
-then the basic mux clock driver is sufficient to initialize all of the
-mux clocks from DT: no new platform-specific clock driver with a bunch
-of data is necessary.
-
-On the other hand if we rely on tables in C to define how mux-clock
-parents are selected then every platform will have to write their own
-clock driver just to define their clock data.
-
-Having drivers written for the sole purpose of listing out a bunch of
-data sounds like something that DT was meant to solve, even if this
-isn't at the board level and is at the SoC level.
-
-Regards,
-Mike
-
+> Yes, of course.
 > 
-> > +where the first value in the pair is the parent clock and the second
-> > +value is the bitfield to be programmed into the register.
-> > +
-> > +The binding must provide the register to control the mux and the mask
-> > +for the corresponding control bits.  Optionally the number of bits to
-> > +shift that mask if necessary.  If the shift value is missing it is the
-> > +same as supplying a zero shift.
-> > +
-> > +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +
-> > +Required properties:
-> > +- compatible : shall be "mux-clock".
-> > +- #clock-cells : from common clock binding; shall be set to 0.
-> > +- clocks : link phandles of parent clocks
-> > +- reg : base address for register controlling adjustable mux
-> > +- bit-mask : arbitrary bitmask for programming the adjustable mux
-> > +
-> > +Optional properties:
-> > +- clock-output-names : From common clock binding.
-> > +- table : array of integer pairs defining parents & bitfield values
-> > +- bit-shift : number of bits to shift the bit-mask, defaults to
-> > +  (ffs(mask) - 1) if not present
-> > +- index-starts-at-one : valid input select programming starts at 1, not
-> > +  zero
-> > +- hiword-mask : lower half of the register programs the mux, upper half
-> > +  of the register indicates bits that were updated in the lower half
-> > +
-> > +Examples:
-> > +     clock: clock at 4a008100 {
-> > +             compatible = "mux-clock";
-> > +             #clock-cells = <0>;
-> > +             clocks = <&clock_foo>, <&clock_bar>, <&clock_baz>;
-> > +             reg = <0x4a008100 0x4>
-> > +             mask = <0x3>;
-> > +             index-starts-at-one;
-> > +     };
-> > +
-> > +     clock: clock at 4a008100 {
-> > +             #clock-cells = <0>;
-> > +             compatible = "mux-clock";
-> > +             clocks = <&clock_foo>, <&clock_bar>, <&clock_baz>;
-> > +             reg = <0x4a008100 0x4>;
-> > +             mask = <0x3>;
-> > +             shift = <0>;
-> > +             table = <&clock_foo 1>, <&clock_bar 2>, <&clock_baz 3>;
-> > +     };
-> > diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-> > index 0811633..9292253 100644
-> > --- a/drivers/clk/clk-mux.c
-> > +++ b/drivers/clk/clk-mux.c
-> > @@ -1,7 +1,7 @@
-> > /*
-> >  * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
-> >  * Copyright (C) 2011 Richard Zhao, Linaro <richard.zhao@linaro.org>
-> > - * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
-> > + * Copyright (C) 2011-2013 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
-> >  *
-> >  * This program is free software; you can redistribute it and/or modify
-> >  * it under the terms of the GNU General Public License version 2 as
-> > @@ -16,6 +16,8 @@
-> > #include <linux/slab.h>
-> > #include <linux/io.h>
-> > #include <linux/err.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > 
-> > /*
-> >  * DOC: basic adjustable multiplexer clock that cannot gate
-> > @@ -177,3 +179,67 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
-> >                                     NULL, lock);
-> > }
-> > EXPORT_SYMBOL_GPL(clk_register_mux);
-> > +
-> > +#ifdef CONFIG_OF
-> > +/**
-> > + * of_mux_clk_setup() - Setup function for simple mux rate clock
-> > + */
-> > +void of_mux_clk_setup(struct device_node *node)
-> > +{
-> > +     struct clk *clk;
-> > +     const char *clk_name = node->name;
-> > +     void __iomem *reg;
-> > +     int num_parents;
-> > +     const char **parent_names;
-> > +     int i;
-> > +     u8 clk_mux_flags = 0;
-> > +     u32 mask = 0;
-> > +     u32 shift = 0;
-> > +
-> > +     of_property_read_string(node, "clock-output-names", &clk_name);
-> > +
-> > +     num_parents = of_clk_get_parent_count(node);
-> > +     if (num_parents < 1) {
-> > +             pr_err("%s: mux-clock %s must have parent(s)\n",
-> > +                             __func__, node->name);
-> > +             return;
-> > +     }
-> > +
-> > +     parent_names = kzalloc((sizeof(char*) * num_parents),
-> > +                     GFP_KERNEL);
-> > +
-> > +     for (i = 0; i < num_parents; i++)
-> > +             parent_names[i] = of_clk_get_parent_name(node, i);
-> > +
-> > +     reg = of_iomap(node, 0);
-> > +     if (!reg) {
-> > +             pr_err("%s: no memory mapped for property reg\n", __func__);
-> > +             return;
-> > +     }
-> > +
-> > +     if (of_property_read_u32(node, "bit-mask", &mask)) {
-> > +             pr_err("%s: missing bit-mask property for %s\n", __func__, node->name);
-> > +             return;
-> > +     }
-> > +
-> > +     if (of_property_read_u32(node, "bit-shift", &shift)) {
-> > +             shift = __ffs(mask);
-> > +             pr_debug("%s: bit-shift property defaults to 0x%x for %s\n",
-> > +                             __func__, shift, node->name);
-> > +     }
-> > +
-> > +     if (of_property_read_bool(node, "index-starts-at-one"))
-> > +             clk_mux_flags |= CLK_MUX_INDEX_ONE;
-> > +
-> > +     if (of_property_read_bool(node, "hiword-mask"))
-> > +             clk_mux_flags |= CLK_MUX_HIWORD_MASK;
-> > +
-> > +     clk = clk_register_mux_table(NULL, clk_name, parent_names, num_parents,
-> > +                     0, reg, shift, mask, clk_mux_flags, NULL, NULL);
-> > +
-> > +     if (!IS_ERR(clk))
-> > +             of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> > +}
-> > +EXPORT_SYMBOL_GPL(of_mux_clk_setup);
-> > +CLK_OF_DECLARE(mux_clk, "mux-clock", of_mux_clk_setup);
-> > +#endif
-> > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> > index 5497739..e019212 100644
-> > --- a/include/linux/clk-provider.h
-> > +++ b/include/linux/clk-provider.h
-> > @@ -350,7 +350,7 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
-> >               void __iomem *reg, u8 shift, u32 mask,
-> >               u8 clk_mux_flags, u32 *table, spinlock_t *lock);
-> > 
-> > -void of_fixed_factor_clk_setup(struct device_node *node);
-> > +void of_mux_clk_setup(struct device_node *node);
-> > 
-> > /**
-> >  * struct clk_fixed_factor - fixed multiplier and divider clock
-> > @@ -371,10 +371,13 @@ struct clk_fixed_factor {
-> > };
-> > 
-> > extern struct clk_ops clk_fixed_factor_ops;
-> > +
-> > struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
-> >               const char *parent_name, unsigned long flags,
-> >               unsigned int mult, unsigned int div);
-> > 
-> > +void of_fixed_factor_clk_setup(struct device_node *node);
-> > +
-> > /***
-> >  * struct clk_composite - aggregate clock of mux, divider and gate clocks
-> >  *
-> > -- 
-> > 1.8.1.2
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Acked-by: Magnus Damm <damm@opensource.se>
 > 
-> -- 
-> Employee of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> >> Regarding Marzen DT reference, I don't think TWD is used there yet
+> >> so I doubt that it will have the same problem as the C version of the
+> >> marzen board code.
+> >
+> > Agreed.
+> >
+> >> One related worry is that sh73a0 may have the same
+> >> issue - or rather - judging by the code in sh73a0_earlytimer_init() it
+> >> most certainly is affected by this too. So KZM9G should also fail as
+> >> Marzen which means we need to fix sh73a0 too.
+> >
+> > Curiously I do not seem to see the problem on the kzm9d.
+> > Would you like me to prepare a patch anyway?
+> 
+> I meant kzm9g, not kzm9d. =)
+
+I meant kzm9g too.
+
+> I believe emev2 and kzm9d is most likely OK as-is. (except for the STI
+> broadcast issue that still is on my TODO)
+> 
+> However sh73a0 and kzm9g probably needs a similar fix as this patch.
+> When you have time, can you please check?
+
+I am not seeing the problem on kzm9g.
