@@ -1,75 +1,74 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 29 Aug 2013 13:45:56 +0530
-Subject: [PATCH v4 02/10] ARM: dts: list the CPU nodes for Exynos5250
-In-Reply-To: <1371536962-13322-3-git-send-email-chander.kashyap@linaro.org>
-References: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
- <1371536962-13322-3-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <CAOh2x=nsQ5paiMHSH8z9drsqr7_+TvMtNefczf8QNQNbYo0y=Q@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 29 Aug 2013 10:27:27 +0200
+Subject: [GIT PULL] at91: soc update for 3.12 #1
+In-Reply-To: <521E9F42.6090604@atmel.com>
+References: <1377532543-349-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130828235855.GM8607@quad.lixom.net> <521E9F42.6090604@atmel.com>
+Message-ID: <521F05EF.3060804@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 11:59 AM, Chander Kashyap
-<chander.kashyap@linaro.org> wrote:
-> Instead of having to specify the number for CPUs in Exynos5250 in platsmp.c
-> file, let the number of CPUs be determined by having this information listed
-> in Exynos5250 device tree file.
+On 29/08/2013 03:09, Bo Shen :
+> Hi Olof,
 >
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi |   16 ++++++++++++++++
->  arch/arm/mach-exynos/platsmp.c    |   10 +++++++---
->  2 files changed, 23 insertions(+), 3 deletions(-)
+> On 08/29/2013 07:58 AM, Olof Johansson wrote:
+>> On Mon, Aug 26, 2013 at 05:55:43PM +0200, Nicolas Ferre wrote:
+>>> Arnd, Olof, Kevin,
+>>>
+>>> Here is AT91 SoC updates for 3.12 kernel. It is the first pull-request for
+>>> this topic and it is based on 3.11-rc5 like your next/soc branch.
+>>>
+>>> Thanks, best regards,
+>>>
+>>> The following changes since commit d4e4ab86bcba5a72779c43dc1459f71fea3d89c8:
+>>>
+>>>     Linux 3.11-rc5 (2013-08-11 18:04:20 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>     git://github.com/at91linux/linux-at91.git tags/at91-soc
+>>>
+>>> for you to fetch changes up to 99eb3b40ec42e7fce1fc58429bf9b26c17973c12:
+>>>
+>>>     ARM: at91: at91_dt_defconfig: enable rm9200 support (2013-08-26 09:58:29 +0200)
+>>>
+>>> ----------------------------------------------------------------
+>>> AT91 SoC update for 3.12 take 1
+>>> - enable kernel uncompress information output for
+>>>     SoC where it was missing: at91sam9n12 and sama5d3
+>>> - addition of at91rm9200 to the generic at91_dt_defconfig
+>>>
+>>> ----------------------------------------------------------------
+>>> Jean-Christophe PLAGNIOL-VILLARD (1):
+>>>         ARM: at91: at91_dt_defconfig: enable rm9200 support
+>>>
+>>> voice (4):
+>>>         ARM: at91: sama5d3: add definition for usart base address
+>>>         ARM: at91: include sama5d3.h into hardware.h
+>>>         ARM: at91: sama5: enable kernel uncompress info output
+>>>         ARM: at91: sam9n12: enable kernel uncompress info output
+>>
+>> That doesn't look right. Author should probably be "Bo Shen
+>> <voice.shen@atmel.com>" instead. Can you fixup and respin, please?
 >
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 63ca03d..1aeef98 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -50,6 +50,22 @@
->                 pinctrl3 = &pinctrl_3;
->         };
->
-> +       cpus {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               cpu at 0 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a15";
-> +                       reg = <0>;
-> +               };
-> +               cpu at 1 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a15";
-> +                       reg = <1>;
-> +               };
-> +       };
-> +
->         pd_gsc: gsc-power-domain at 0x10044000 {
->                 compatible = "samsung,exynos4210-pd";
->                 reg = <0x10044000 0x20>;
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index 1a4e4e5..85ea4ca 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -180,10 +180,14 @@ static void __init exynos_smp_init_cpus(void)
->         void __iomem *scu_base = scu_base_addr();
->         unsigned int i, ncores;
->
-> -       if (soc_is_exynos5250())
-> -               ncores = 2;
-> -       else
-> +       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->                 ncores = scu_base ? scu_get_core_count(scu_base) : 1;
-> +       else
-> +               /*
-> +                * CPU Nodes are passed thru DT and set_cpu_possible
-> +                * is set by "arm_dt_init_cpu_maps".
-> +                */
-> +               return;
->
->         /* sanity check */
->         if (ncores > nr_cpu_ids) {
+> I don't know why on the patchwork it show my name as voice.
+> So, if get patch from patchwork and apply it will show my name as voice.
+> So, would it be possible to show the name as Bo Shen on patchwork?
 
-After this patch only one cpu is coming up for me on my Arndale board..
-Revert of this one fixes the issue though (Tested over v3.11-rc7)
+I to not know if patchwork has modified something but it seems a matter 
+of $GIT_AUTHOR_NAME that is not well positioned.
+
+For the record, here is the line for correcting this:
+
+git filter-branch -f --env-filter '
+	if test "$GIT_AUTHOR_NAME" = "voice"; then
+		GIT_AUTHOR_NAME="Bo Shen"
+		export GIT_AUTHOR_NAME
+	fi
+' v3.11-rc5..HEAD
+
+But I advice you to define correctly all git environment variables.
+
+Bye,
+-- 
+Nicolas Ferre
