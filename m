@@ -1,23 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Aug 2013 16:36:47 -0700
-Subject: [PATCH v3 5/5] ARM: bcm4760: Add restart hook
-In-Reply-To: <20130814221238.291003843@gmail.com>
-References: <20130814221043.528864175@gmail.com>
- <20130814221238.291003843@gmail.com>
-Message-ID: <20130829233647.GC29606@quad.lixom.net>
+Date: Thu, 29 Aug 2013 16:38:47 -0700
+Subject: [GIT PULL 1/2] late omap PRCM and hwmod changes for v3.12 merge
+ window
+In-Reply-To: <521b6475.4f2f310a.3f18.45a9SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <521b6475.4f2f310a.3f18.45a9SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20130829233847.GD29606@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Aug 15, 2013 at 12:10:48AM +0200, Domenico Andreoli wrote:
-> From: Domenico Andreoli <domenico.andreoli@linux.com>
+On Mon, Aug 26, 2013 at 07:21:36AM -0700, Tony Lindgren wrote:
+> The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
 > 
-> Restart hook implementation for the Broadcom BCM4760 based ARM11 SoCs.
+>   Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.12/prcm-signed
 
-This essentially implements a wdt driver under mach-bcm. It'd be better
-to contain this under drivers/watchdog and use the reboot notifier to
-do the restart from there.
+Merged into late/all.
 
 
 -Olof
