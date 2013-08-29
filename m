@@ -1,48 +1,73 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 29 Aug 2013 13:25:04 -0400
-Subject: [PATCH v2 3/3] ARM: OMAP4+: Remove static iotable mappings for
- SRAM
-In-Reply-To: <871u5c2z3a.fsf@linaro.org>
-References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
- <1377775391-13103-4-git-send-email-rnayak@ti.com> <871u5c2z3a.fsf@linaro.org>
-Message-ID: <521F83F0.9080503@ti.com>
+Date: Thu, 29 Aug 2013 13:29:24 -0400
+Subject: [PATCH] ARM: OMAP4: cpuidle: fix: call cpu_cluster_pm_exit
+ conditionally
+In-Reply-To: <8761uo2zbb.fsf@linaro.org>
+References: <1377598250-2355-1-git-send-email-murzin.v@gmail.com>
+ <87sixvw2n5.fsf@linaro.org>
+ <902E09E6452B0E43903E4F2D568737AB35C674@DNCE04.ent.ti.com>
+ <8761uo2zbb.fsf@linaro.org>
+Message-ID: <521F84F4.4090601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 August 2013 01:20 PM, Kevin Hilman wrote:
-> Rajendra Nayak <rnayak@ti.com> writes:
+On Thursday 29 August 2013 01:15 PM, Kevin Hilman wrote:
+> +Santosh
 > 
->> In order to handle errata I688, a page of sram was reserved by doing a
->> static iotable map. Now that we use gen_pool to manage sram, we can
->> completely remove all of these static mappings and use gen_pool_alloc()
->> to get the one page of sram space needed to implement errata I688.
+> "Strashko, Grygorii" <grygorii.strashko@ti.com> writes:
+> 
+>> Hi Vladimir, Kevin
 >>
->> Suggested-by: Sekhar Nori <nsekhar@ti.com>
->> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> On 08/27/2013 06:54 PM, Kevin Hilman wrote:
+>>> Vladimir Murzin <murzin.v@gmail.com> writes:
+>>>
+>>>> We call cpu_cluster_pm_enter for dev->cpu == 0 only, but
+>>>> cpu_cluster_pm_exit called without that check.
+>>>>
+>>>> Because of that unhandled page fault may happen:
+>>>>
+>>
+>> [...]
+>>
+>>>>
+>>>> It is supposed that sar_base is initialized in irq_save_context, which
+>>>> is called on CPU_CLUSTER_PM_ENTER notification. If this notification
+>>>> has been missed and CPU_CLUSTER_PM_EXIT is received sar_base is NULL.
+>>>>
+>>>> Fix it by calling CPU_CLUSTER_PM_{ENTER,EXIT} under the same condition.
+>>
+>> Could you check, if revert of the following patch will solve the issue, pls?
+>> commit e7457253494fff660a72bc0cedeee97491ccd173
+>> "ARM: OMAP4+: CPUidle: Deprecate use of omap4_mpuss_read_prev_context_state()"
+>>
+>>>>
+>>>> Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
+>>>
+>>> Good catch.
+>>
+>> Yes, but It seems, that CPUIdle logic is unclear for OAMP4 .
+>> The above issue may happen if CPU1 enter/exit LP while CPU0:
+>> - not enter at all (somewhere inside "coupled" core);
+>> - still entering LP (somewhere before call to omap4_enter_lowpower());
+>>
+>> The question is - Should first CPUx, who exited from LP(C3) state,
+>> restore Cluster context, or it should be done by CPU0 only?
+>> (on OMAP4 CPUs may return from C3 async).
 > 
-> [...]
+> Well, they're not *supposed* to return async on OMAP4.  IIUC, only CPU0
+> wakes up and then it's CPU0s job to wake up CPU1. However, the crash
+> reported here certainly suggests that CPU1 exiting before CPU0, so
+> one of the possibilities you suggest above is probably happening (I
+> suspect the latter.)
 > 
->> @@ -71,6 +72,21 @@ void omap_bus_sync(void)
->>  }
->>  EXPORT_SYMBOL(omap_bus_sync);
->>  
->> +static int __init omap4_sram_init(void)
->> +{
->> +	struct device_node *np;
->> +	struct gen_pool *sram_pool;
->> +
->> +	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
->> +	if (!np)
->> +		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
->> +			 __func__);
->> +	sram_pool = of_get_named_gen_pool(np, "sram", 0);
+> It looks like we might still need to check the actual hardware state
+> there to avoid those potential cases.
 > 
-> I haven't actually tested this, but if there is no 'sram' property defined...
->   
-If the sram property is not defined, the bus_sync will be just a nop. Below
-check will take care of it.
+The subject patch is good enough to avoid the double notifier call chain
+even though its not harmful its UN-necessary.
 
- if (dram_sync && sram_sync)
+And then the sar_base check should be in place as well to avoid the
+reported issue.
 
 Regards,
 Santosh
