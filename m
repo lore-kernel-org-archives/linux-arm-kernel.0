@@ -1,331 +1,126 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 29 Aug 2013 15:14:21 -0400
-Subject: [PATCH 2/3 v2] clk: keystone: Add gate control clock driver
-In-Reply-To: <1377803662-3509-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1377803662-3509-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1377803662-3509-3-git-send-email-santosh.shilimkar@ti.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Thu, 29 Aug 2013 21:20:42 +0200
+Subject: [PATCHv3 1/4] arm: dts: Add clock entries for timers in SOCFPGA
+In-Reply-To: <1377791718.26261.16.camel@linux-builds1>
+References: <1377118427-20644-1-git-send-email-dinguyen@altera.com>
+ <20130828153127.GA17806@pengutronix.de>
+ <1377791718.26261.16.camel@linux-builds1>
+Message-ID: <20130829192042.GC10398@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the driver for the clock gate control which uses PSC (Power Sleep
-Controller) IP on Keystone 2 based SOCs. It is responsible for enabling and
-disabling of the clocks for different IPs present in the SoC.
+Hi Dinh,
 
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
+On Thu, Aug 29, 2013 at 10:55:18AM -0500, Dinh Nguyen wrote:
+> Hi Steffen,
+> > > @@ -486,28 +482,32 @@
+> > >  			interrupts = <1 13 0xf04>;
+> > >  		};
+> > >  
+> > > -		timer0: timer0 at ffc08000 {
+> > > +		timer at ffc08000 {
+> > 
+> > No. Why? Than I can not write something like
+> > 
+> > &timer0 {
+> > 	clock-frequency = <100000000>;
+> > };
+> > 
+> > and would have to reference the whole tree ala
+> > 
+> > / {
+> > 	soc {
+> > 		timer at ffc08000 {
+> > 			clock-frequency = <100000000>;
+> > 		};
+> > 	};
+> > };
+> > 
+> > in a boardspecific or SoC specific file (see below).
+> 
+> Agreed. Will adjust accordingly.
+> 
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- .../devicetree/bindings/clock/keystone-gate.txt    |   29 +++
- drivers/clk/keystone/gate.c                        |  264 ++++++++++++++++++++
- 2 files changed, 293 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/keystone-gate.txt
- create mode 100644 drivers/clk/keystone/gate.c
+Good.
 
-diff --git a/Documentation/devicetree/bindings/clock/keystone-gate.txt b/Documentation/devicetree/bindings/clock/keystone-gate.txt
-new file mode 100644
-index 0000000..c5aa187
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/keystone-gate.txt
-@@ -0,0 +1,29 @@
-+Status: Unstable - ABI compatibility may be broken in the future
-+
-+Binding for Keystone gate control driver which uses PSC controller IP.
-+
-+This binding uses the common clock binding[1].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Required properties:
-+- compatible : shall be "ti,keystone,psc-clock".
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- clocks : parent clock phandle
-+- reg :	psc control and domain address address space
-+- reg-names : psc control and domain registers
-+- domain-id : psc domain id needed to check the transition state register
-+
-+Optional properties:
-+- clock-output-names : From common clock binding to override the
-+			default output clock name
-+Example:
-+	clkusb: clkusb {
-+		#clock-cells = <0>;
-+		compatible = "ti,keystone,psc-clock";
-+		clocks = <&chipclk16>;
-+		clock-output-names = "usb";
-+		reg = <0x02350008 0xb00>, <0x02350000 0x400>;
-+		reg-names = "control", "domain";
-+		domain-id = <0>;
-+	};
-diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
-new file mode 100644
-index 0000000..1f333bc
---- /dev/null
-+++ b/drivers/clk/keystone/gate.c
-@@ -0,0 +1,264 @@
-+/*
-+ * Clock driver for Keystone 2 based devices
-+ *
-+ * Copyright (C) 2013 Texas Instruments.
-+ *	Murali Karicheri <m-karicheri2@ti.com>
-+ *	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/of_address.h>
-+#include <linux/of.h>
-+#include <linux/module.h>
-+
-+/* PSC register offsets */
-+#define PTCMD			0x120
-+#define PTSTAT			0x128
-+#define PDSTAT			0x200
-+#define PDCTL			0x300
-+#define MDSTAT			0x800
-+#define MDCTL			0xa00
-+
-+/* PSC module states */
-+#define PSC_STATE_SWRSTDISABLE	0
-+#define PSC_STATE_SYNCRST	1
-+#define PSC_STATE_DISABLE	2
-+#define PSC_STATE_ENABLE	3
-+
-+#define MDSTAT_STATE_MASK	0x3f
-+#define MDSTAT_MCKOUT		BIT(12)
-+#define PDSTAT_STATE_MASK	0x1f
-+#define MDCTL_FORCE		BIT(31)
-+#define MDCTL_LRESET		BIT(8)
-+#define PDCTL_NEXT		BIT(0)
-+
-+/* Maximum timeout to bail out state transition for module */
-+#define STATE_TRANS_MAX_COUNT	0xffff
-+
-+static void __iomem *domain_transition_base;
-+
-+/**
-+ * struct clk_psc_data - PSC data
-+ * @control_base: Base address for a PSC control
-+ * @domain_base: Base address for a PSC domain
-+ * @domain_id: PSC domain id number
-+ */
-+struct clk_psc_data {
-+	void __iomem *control_base;
-+	void __iomem *domain_base;
-+	u32 domain_id;
-+};
-+
-+/**
-+ * struct clk_psc - PSC clock structure
-+ * @hw: clk_hw for the psc
-+ * @psc_data: PSC driver specific data
-+ * @lock: Spinlock used by the driver
-+ */
-+struct clk_psc {
-+	struct clk_hw hw;
-+	struct clk_psc_data *psc_data;
-+	spinlock_t *lock;
-+};
-+
-+static DEFINE_SPINLOCK(psc_lock);
-+
-+#define to_clk_psc(_hw) container_of(_hw, struct clk_psc, hw)
-+
-+static void psc_config(void __iomem *control_base, void __iomem *domain_base,
-+						u32 next_state, u32 domain_id)
-+{
-+	u32 ptcmd, pdstat, pdctl, mdstat, mdctl, ptstat;
-+	u32 count = STATE_TRANS_MAX_COUNT;
-+
-+	mdctl = readl(control_base + MDCTL);
-+	mdctl &= ~MDSTAT_STATE_MASK;
-+	mdctl |= next_state;
-+	/* For disable, we always put the module in local reset */
-+	if (next_state == PSC_STATE_DISABLE)
-+		mdctl &= ~MDCTL_LRESET;
-+	writel(mdctl, control_base + MDCTL);
-+
-+	pdstat = readl(domain_base + PDSTAT);
-+	if (!(pdstat & PDSTAT_STATE_MASK)) {
-+		pdctl = readl(domain_base + PDCTL);
-+		pdctl |= PDCTL_NEXT;
-+		writel(pdctl, domain_base + PDCTL);
-+	}
-+
-+	ptcmd = 1 << domain_id;
-+	writel(ptcmd, domain_transition_base + PTCMD);
-+	do {
-+		ptstat = readl(domain_transition_base + PTSTAT);
-+	} while (((ptstat >> domain_id) & 1) && count--);
-+
-+	count = STATE_TRANS_MAX_COUNT;
-+	do {
-+		mdstat = readl(control_base + MDSTAT);
-+	} while (!((mdstat & MDSTAT_STATE_MASK) == next_state) && count--);
-+}
-+
-+static int keystone_clk_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_psc *psc = to_clk_psc(hw);
-+	struct clk_psc_data *data = psc->psc_data;
-+	u32 mdstat = readl(data->control_base + MDSTAT);
-+
-+	return (mdstat & MDSTAT_MCKOUT) ? 1 : 0;
-+}
-+
-+static int keystone_clk_enable(struct clk_hw *hw)
-+{
-+	struct clk_psc *psc = to_clk_psc(hw);
-+	struct clk_psc_data *data = psc->psc_data;
-+	unsigned long flags = 0;
-+
-+	if (psc->lock)
-+		spin_lock_irqsave(psc->lock, flags);
-+
-+	psc_config(data->control_base, data->domain_base,
-+				PSC_STATE_ENABLE, data->domain_id);
-+
-+	if (psc->lock)
-+		spin_unlock_irqrestore(psc->lock, flags);
-+
-+	return 0;
-+}
-+
-+static void keystone_clk_disable(struct clk_hw *hw)
-+{
-+	struct clk_psc *psc = to_clk_psc(hw);
-+	struct clk_psc_data *data = psc->psc_data;
-+	unsigned long flags = 0;
-+
-+	if (psc->lock)
-+		spin_lock_irqsave(psc->lock, flags);
-+
-+	psc_config(data->control_base, data->domain_base,
-+				PSC_STATE_DISABLE, data->domain_id);
-+
-+	if (psc->lock)
-+		spin_unlock_irqrestore(psc->lock, flags);
-+}
-+
-+static const struct clk_ops clk_psc_ops = {
-+	.enable = keystone_clk_enable,
-+	.disable = keystone_clk_disable,
-+	.is_enabled = keystone_clk_is_enabled,
-+};
-+
-+/**
-+ * clk_register_psc - register psc clock
-+ * @dev: device that is registering this clock
-+ * @name: name of this clock
-+ * @parent_name: name of clock's parent
-+ * @psc_data: platform data to configure this clock
-+ * @lock: spinlock used by this clock
-+ */
-+static struct clk *clk_register_psc(struct device *dev,
-+			const char *name,
-+			const char *parent_name,
-+			struct clk_psc_data *psc_data,
-+			spinlock_t *lock)
-+{
-+	struct clk_init_data init;
-+	struct clk_psc *psc;
-+	struct clk *clk;
-+
-+	psc = kzalloc(sizeof(*psc), GFP_KERNEL);
-+	if (!psc)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &clk_psc_ops;
-+	init.parent_names = (parent_name ? &parent_name : NULL);
-+	init.num_parents = (parent_name ? 1 : 0);
-+
-+	psc->psc_data = psc_data;
-+	psc->lock = lock;
-+	psc->hw.init = &init;
-+
-+	clk = clk_register(NULL, &psc->hw);
-+	if (IS_ERR(clk))
-+		kfree(psc);
-+
-+	return clk;
-+}
-+
-+/**
-+ * of_psc_clk_init - initialize psc clock through DT
-+ * @node: device tree node for this clock
-+ * @lock: spinlock used by this clock
-+ */
-+static void __init of_psc_clk_init(struct device_node *node, spinlock_t *lock)
-+{
-+	const char *clk_name = node->name;
-+	const char *parent_name;
-+	struct clk_psc_data *data;
-+	struct clk *clk;
-+	int i;
-+
-+	data = kzalloc(sizeof(*data), GFP_KERNEL);
-+	if (!data) {
-+		pr_err("%s: Out of memory\n", __func__);
-+		return;
-+	}
-+
-+	i = of_property_match_string(node, "reg-names", "control");
-+	data->control_base = of_iomap(node, i);
-+	if (!data->control_base) {
-+		pr_err("%s: control ioremap failed\n", __func__);
-+		goto out;
-+	}
-+
-+	i = of_property_match_string(node, "reg-names", "domain");
-+	data->domain_base = of_iomap(node, i);
-+	if (!data->domain_base) {
-+		pr_err("%s: domain ioremap failed\n", __func__);
-+		iounmap(data->control_base);
-+		goto out;
-+	}
-+
-+	of_property_read_u32(node, "domain-id", &data->domain_id);
-+
-+	/* Domain transition registers at fixed address space of domain_id 0 */
-+	if (!domain_transition_base && !data->domain_id)
-+		domain_transition_base = data->domain_base;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+	parent_name = of_clk_get_parent_name(node, 0);
-+	if (!parent_name) {
-+		pr_err("%s: Parent clock not found\n", __func__);
-+		goto out;
-+	}
-+
-+	clk = clk_register_psc(NULL, clk_name, parent_name, data, lock);
-+	if (clk) {
-+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+		return;
-+	}
-+
-+	pr_err("%s: error registering clk %s\n", __func__, node->name);
-+out:
-+	kfree(data);
-+	return;
-+}
-+
-+/**
-+ * of_keystone_psc_clk_init - initialize psc clock through DT
-+ * @node: device tree node for this clock
-+ */
-+static void __init of_keystone_psc_clk_init(struct device_node *node)
-+{
-+	of_psc_clk_init(node, &psc_lock);
-+}
-+CLK_OF_DECLARE(keystone_gate_clk, "ti,keystone,psc-clock",
-+					of_keystone_psc_clk_init);
+> > 
+> > > diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
+> > > index 698dde9..c1af01c 100644
+> > > --- a/arch/arm/boot/dts/socfpga_cyclone5.dts
+> > > +++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
+> > >  
+> > > diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+> > > index 6f23121..72ff14c 100644
+> > > --- a/arch/arm/boot/dts/socfpga_vt.dts
+> > > +++ b/arch/arm/boot/dts/socfpga_vt.dts
+> > 
+> > Leads me to a question about terminology: Is the cyclone5 an actual board?
+> > AFAIK it is. And the Cyclone 5 FPGA is also called socfpga? Is that correct?
+> > But then, seeing that, in an other patch, you add two different sysmgr addresses to
+> > the socfpga_vt and socfpga_cyclone5, there are different socfpgas?
+> 
+> Yes, sofpga_cyclone5.dts is the devkit that is manufactured by Altera.
+> socfpga_vt.dts is a virtual platform for SOCFPGA. You can get the
+> virtual platform from Synopsis. It mimics everything except the FPGA. 
+> 
+
+Uh, nice. I will check out the vt.
+
+> socfpga is the base SOC with a Cyclone 5 FPGA on it. I'll be upstreaming
+> socfpga_arria5 soon, which has the SOCFPGA + Arria 5 FPGA.
+> 
+
+Hm, okay. That might lead to confusion then...
+
+> > 
+> > I want to write a devicetree for the SoCkit. It has a Cyclone 5 on it.
+> > So naturally I would now go and include the socfpga_cyclone5.dtsi, with all the
+> > cyclone5 stuff and just add my board specific stuff in a socfpga_sockit.dts.
+> > But there is no socfpga_cyclone5.dtsi, just the socfpga_cyclone5.dts, which itself
+> > seems to be a board...
+> 
+> socfpga.dtsi is the base DTSI for the platform. In hindsight, I should
+> have named it a bit different, but for now socfpga_cyclone5 is for the
+> board.
+> 
+
+and we should make the socfpga_cyclone5 a dtsi. I can do that.
+It's early in development and I see no reason not to fix it now.
+We have seen quite a lot of rearrangment with the imx6 for example. No need to
+duplicate it, if we know it beforehand.
+
+
+> > 
+> > So, how should we reorder the current dts (as I tested with current mainline, the
+> > support is completely broken out of the box, but works fine with your patches that
+> > are floating around, there should be no users as of now)?
+> 
+> Not sure what you mean by broken. I was able to boot 3.11-rc7 just now
+> using an initramfs. As you can already tell, I'm doing my best to get
+> more support for the platform upstream, but it will take time.
+> 
+
+Yeah, broken might have been a bit harsh :-D
+But my first experience with the mainline kernel was a scrambled serial console
+and hanging system as soon as you use the ethernet/ip=dhcp.
+And the SD wasn't working for me, too. But those SD cards are really more problematic
+than one might think, so...
+
+But as I said: with your patch series, both is working. Looking forward to your
+next versions of those patches.
+Now I have a hanging system, when I add the at24 on i2c-0, what ever might be
+the reason for that :-D
+
+BTW: you don't happen to have any insight in what crazy things you do with the CRC32
+in your prebootloader, do you? Been trying some time to calculate the crc, but never
+got to the one the mkpimage generates. It doesn't seem to be what crc32 or chksum
+calculate or the datasheet is missing some essential info for me to understand it.
+
+Regards,
+Steffen
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
