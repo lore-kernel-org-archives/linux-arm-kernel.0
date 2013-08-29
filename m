@@ -1,50 +1,59 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 29 Aug 2013 14:52:18 +0530
-Subject: [PATCH 1/3] ARM: AM33xx: hwmod: Add RNG module data
-In-Reply-To: <alpine.DEB.2.02.1308281845560.22040@utopia.booyaka.com>
-References: <1375777984-6267-1-git-send-email-lokeshvutla@ti.com>
- <1375777984-6267-2-git-send-email-lokeshvutla@ti.com>
- <alpine.DEB.2.02.1308281845560.22040@utopia.booyaka.com>
-Message-ID: <521F12CA.8010608@ti.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 29 Aug 2013 10:24:17 +0100
+Subject: [RESEND RFC 0/2] ARM: mm: HugeTLB + THP support for non-LPAE
+Message-ID: <1377768259-19269-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-On Thursday 29 August 2013 12:18 AM, Paul Walmsley wrote:
-> Hi
-> 
-> On Tue, 6 Aug 2013, Lokesh Vutla wrote:
-> 
->> Add RNG hwmod data for AM33xx SoC.
->>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> 
-> I tried to queue this one, but it caused AM33xx boots to hang.  
-> Thought it might be related to the patch ordering -- seems to me that 
-> the clock change patch needed to come before this patch -- but if I 
-> recall correctly, both BeagleBone and BeagleBone-LT still hung. 
-This is because register address space is not passed in hwmod_data as it
-is passed from dt. So we need to include 3/3 patch in this series to boot.
+Hello,
 
-Ill fix this sparse warning and post a v2.
+I'm resending this series to try and provoke some discussion.
 
-PS: Probe for this driver will be failed even after this. Support for this version
-of rng ip is already posted and pushed into cryptodev-2.6 tree.
+--  
 
-Thanks and regards,
-Lokesh
-> 
-> Also, this patch created a sparse warning.
-> 
-> Could you take another look at this patch?  Maybe try basing off of this 
-> tag:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.12/omap-prcm-hwmod
-> 
-> Fix the sparse problem, and see if the patch boots for you?
-> 
-> thanks
-> 
-> 
-> - Paul
-> 
+The following patches bring both HugeTLB support and Transparent
+HugePage (THP) support to ARM for 2 levels of paging (i.e. without
+LPAE).
+
+This code has been tested on an Arndale board (Exynos 5250), and
+is based on 3.11-rc1, with the hugepage simplification patch:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/184117.html
+
+HugeTLB and THP support for LPAE has already been merged in 3.11-rc1.
+
+Hugepages can give nice performance boosts to workloads that put
+pressure on the TLBs. I've observed uplifts of ~5% to some tasks
+just by enabling hugepages via the libhugetlbfs tools. Other
+people have observed decent performance boosts when huge pages
+are enabled:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148835.html
+
+I would appreciate any discussion on these patches, as there are
+people who have an interest in having huge page support in
+non-LPAE kernels.
+
+Cheers,
+-- 
+Steve
+
+Steve Capper (2):
+  ARM: mm: HugeTLB support for non-LPAE systems.
+  ARM: mm: Transparent huge page support for non-LPAE systems.
+
+ arch/arm/Kconfig                      |   4 +-
+ arch/arm/include/asm/hugetlb-2level.h | 126 +++++++++++++++++++++++++
+ arch/arm/include/asm/hugetlb.h        |   4 +
+ arch/arm/include/asm/pgtable-2level.h | 170 ++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/pgtable-3level.h |   6 ++
+ arch/arm/include/asm/pgtable.h        |   7 +-
+ arch/arm/include/asm/tlb.h            |  10 +-
+ arch/arm/kernel/head.S                |  10 +-
+ arch/arm/mm/fault.c                   |  13 ---
+ arch/arm/mm/fsr-2level.c              |   4 +-
+ arch/arm/mm/hugetlbpage.c             |   2 +-
+ arch/arm/mm/mmu.c                     |  27 ++++++
+ 12 files changed, 360 insertions(+), 23 deletions(-)
+ create mode 100644 arch/arm/include/asm/hugetlb-2level.h
+
+-- 
+1.8.1.4
