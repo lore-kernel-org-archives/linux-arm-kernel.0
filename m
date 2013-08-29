@@ -1,27 +1,25 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Thu, 29 Aug 2013 17:35:08 +0000
-Subject: [PATCH] pinctrl: sunxi: drop lock on error path
-In-Reply-To: <1377796784-31147-1-git-send-email-linus.walleij@linaro.org>
-References: <1377796784-31147-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <051069C10411E24D9749790C498526FA1BDE04FD@SJEXCHMB12.corp.ad.broadcom.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 29 Aug 2013 19:36:38 +0200
+Subject: [alsa-devel] [PATCH 09/18] ASoC: Samsung: Do not queue cyclic
+ buffers multiple times
+In-Reply-To: <20130829163611.GL10783@sirena.org.uk>
+References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
+ <1376243970-6489-10-git-send-email-tomasz.figa@gmail.com>
+ <20130829163611.GL10783@sirena.org.uk>
+Message-ID: <CACRpkdavSeiraVhjdaitLxBg+RE8h+N33uvddaCQGRcoui7=5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->@@ -291,8 +291,10 @@ static int sunxi_pconf_group_set(struct pinctrl_dev
->*pctldev,
-> 		switch (pinconf_to_config_param(configs[i])) {
-> 		case PIN_CONFIG_DRIVE_STRENGTH:
-> 			strength = pinconf_to_config_argument(configs[i]);
->-			if (strength > 40)
->+			if (strength > 40) {
->+				spin_unlock_irqrestore(&pctl->lock, flags);
-> 				return -EINVAL;
->+			}
-> 			/*
-> 			 * We convert from mA to what the register expects:
-> 			 *   0: 10mA
+On Thu, Aug 29, 2013 at 6:36 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Sun, Aug 11, 2013 at 07:59:21PM +0200, Tomasz Figa wrote:
+>> The legacy S3C-DMA API required every period of a cyclic buffer to be
+>> queued separately. After conversion of Samsung ASoC to Samsung DMA
+>> wrappers somebody made an assumption that the same is needed for DMA
+>> engine API, which is not true.
+>
+> Applied, thanks.
 
-Looks good.
+OK Vinod can you take in patch 1 thru 8?
 
-Regards,
-Sherman
+Yours,
+Linus Walleij
