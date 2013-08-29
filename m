@@ -1,155 +1,135 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 29 Aug 2013 13:36:04 +0900
-Subject: [PATCH/RFC] ARM: shmobile: r8a7779: Update early timer
- initialisation order
-In-Reply-To: <CANqRtoRsG_4=Gk2myunwVvRY0opmzy9xAy4ZCdpFy5jgeE1RUQ@mail.gmail.com>
-References: <1375952357-22938-1-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoSpOWOp3GhsvvwQwyWtPi3wXG0MmECkf90SPBRoPmq4DQ@mail.gmail.com>
- <20130822073904.GB32091@verge.net.au>
- <CANqRtoSionozCqag0nxRbmC19ic5RUb7DOpeaGHThjNoeRpBOg@mail.gmail.com>
- <20130829014627.GD20425@verge.net.au>
- <CANqRtoRsG_4=Gk2myunwVvRY0opmzy9xAy4ZCdpFy5jgeE1RUQ@mail.gmail.com>
-Message-ID: <20130829043603.GB20593@verge.net.au>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 29 Aug 2013 13:37:00 +0900
+Subject: [PATCH 01/02] ARM: shmobile: Add r8a73a4 SMP support using APMU
+ code
+In-Reply-To: <20130828181631.GE8607@quad.lixom.net>
+References: <20130807225531.9856.18974.sendpatchset@w520>
+ <20130807225540.9856.67383.sendpatchset@w520>
+ <CANqRtoQmoOWwTyed4-KnWPJfWV8rLMHLCSiN1a5v6=4Bmj7Z6A@mail.gmail.com>
+ <20130821085714.GH20014@verge.net.au>
+ <20130822054834.GG5151@quad.lixom.net>
+ <CANqRtoTCiRzJFjHX2xvyPdz4EnJspMTfRt_a9tL3qszfFFzpRw@mail.gmail.com>
+ <20130828181631.GE8607@quad.lixom.net>
+Message-ID: <CANqRtoT_Un+Yf-x1_Qz4Tsy+MUUAKChz93G0fm2d755J0jxMww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 01:13:58PM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> On Thu, Aug 29, 2013 at 10:46 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Wed, Aug 28, 2013 at 03:58:39PM +0900, Magnus Damm wrote:
-> >> Hi Simon,
-> >>
-> >> On Thu, Aug 22, 2013 at 4:39 PM, Simon Horman <horms@verge.net.au> wrote:
-> >> > On Fri, Aug 09, 2013 at 05:37:39PM +0900, Magnus Damm wrote:
-> >> >> On Thu, Aug 8, 2013 at 5:59 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> >> >> > a894fcc2d01a89e6fe3da0845a4d80a5312e1124 ("ARM: smp_twd: Divorce smp_twd
-> >> >> > from local timer API") altered twd_local_timer_common_register() so that it
-> >> >> > may make use of late_timer_init.
-> >> >> >
-> >> >> > This is problematic on marzen with Magnus's recent patch "ARM: shmobile:
-> >> >> > marzen: Switch to DT_MACHINE_START" which switches marzen around to enable
-> >> >> > USE_OF and thus shmobile_timer_init(), which is registered as
-> >> >> > late_time_init by shmobile_earlytimer_init() stops being a no-op.
-> >> >> >
-> >> >> > As a work-around I have updated r8a7779_earlytimer_init() so that
-> >> >> > shmobile_earlytimer_init() is called after r8a7779_register_twd().
-> >> >> > Or in other words, the shmobile_earlytimer_init() setting of
-> >> >> > late_time_init overwrites that of twd_local_timer_common_register().
-> >> >> >
-> >> >> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> >> >> > Cc: Magnus Damm <magnus.damm@gmail.com>
-> >> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >> >> >
-> >> >> > ---
-> >> >> >
-> >> >> > This patch was created on top of a merge of next-20130807 from the
-> >> >> > linux-next tree and renesas-next-20130807 from my renesas tree.
-> >> >> >
-> >> >> > I expect the problem describe above to be present in the
-> >> >> > next version of linux-next as it will include renesas-next-20130807.
-> >> >> >
-> >> >> > I rather suspect that this fix is just papers over the problem
-> >> >> > at hand rather than fixing it. But it does at least fix the problem
-> >> >> > to the extent where the marzen board at least boots.
-> >> >> >
-> >> >> > For reference the output of /proc/interrupts after such a boot is below.
-> >> >> >
-> >> >> >             CPU0       CPU1       CPU2       CPU3
-> >> >> >   29:          0       9365       9363       9359       GIC   29  twd
-> >> >> >   59:          0          0          0          0       GIC   59  renesas_intc_irqpin.0
-> >> >> >   60:          5          0          0          0       GIC   60  renesas_intc_irqpin.0
-> >> >> >   61:          0          0          0          0       GIC   61  renesas_intc_irqpin.0
-> >> >> >   62:          0          0          0          0       GIC   62  renesas_intc_irqpin.0
-> >> >> >   64:        278          0          0          0       GIC   64  sh_tmu.0
-> >> >> >   76:          1          0          0          0       GIC   76  ehci_hcd:usb1, ohci_hcd:usb3
-> >> >> >   77:          1          0          0          0       GIC   77  ehci_hcd:usb2, ohci_hcd:usb4
-> >> >> >  111:          0          0          0          0       GIC  111  i2c-rcar.0
-> >> >> >  112:          0          0          0          0       GIC  112  i2c-rcar.2
-> >> >> >  113:          0          0          0          0       GIC  113  i2c-rcar.3
-> >> >> >  114:          0          0          0          0       GIC  114  i2c-rcar.1
-> >> >> >  122:         45          0          0          0       GIC  122  sh-sci.2:mux
-> >> >> >  132:          0          0          0          0       GIC  132  sata_rcar
-> >> >> >  173:          0          0          0          0       GIC  173  gpio_rcar.0
-> >> >> >  174:          0          0          0          0       GIC  174  gpio_rcar.1
-> >> >> >  175:          0          0          0          0       GIC  175  gpio_rcar.2
-> >> >> >  176:          0          0          0          0       GIC  176  gpio_rcar.3
-> >> >> >  177:          0          0          0          0       GIC  177  gpio_rcar.4
-> >> >> >  178:          0          0          0          0       GIC  178  gpio_rcar.5
-> >> >> >  179:          0          0          0          0       GIC  179  gpio_rcar.6
-> >> >> > 2001:          5          0          0          0  renesas_intc_irqpin.0    1  eth0
-> >> >> > IPI0:          0          0          0          0  CPU wakeup interrupts
-> >> >> > IPI1:          0          0          0          0  Timer broadcast interrupts
-> >> >> > IPI2:        314        340         58         33  Rescheduling interrupts
-> >> >> > IPI3:         22         56         34         56  Function call interrupts
-> >> >> > IPI4:          0          0          0          0  Single function call interrupts
-> >> >> > IPI5:          0          0          0          0  CPU stop interrupts
-> >> >> >  Err:          0
-> >> >> > ---
-> >> >> >  arch/arm/mach-shmobile/setup-r8a7779.c | 2 +-
-> >> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >> >> >
-> >> >> > diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-> >> >> > index ddee4aa..b0f56d6 100644
-> >> >> > --- a/arch/arm/mach-shmobile/setup-r8a7779.c
-> >> >> > +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-> >> >> > @@ -597,8 +597,8 @@ void __init __weak r8a7779_register_twd(void) { }
-> >> >> >  void __init r8a7779_earlytimer_init(void)
-> >> >> >  {
-> >> >> >         r8a7779_clock_init();
-> >> >> > -       shmobile_earlytimer_init();
-> >> >> >         r8a7779_register_twd();
-> >> >> > +       shmobile_earlytimer_init();
-> >> >> >  }
-> >> >> >
-> >> >> >  void __init r8a7779_add_early_devices(void)
-> >> >> > --
-> >> >> > 1.8.3.2
-> >> >> >
-> >> >>
-> >> >> Hi Simon,
-> >> >>
-> >> >> Thanks for tracking down this issue. I think your patch looks fine to
-> >> >> me.
-> >> >
-> >> > Thanks, could I get an acked-by ?
-> >>
-> >> Yes, of course.
-> >>
-> >> Acked-by: Magnus Damm <damm@opensource.se>
-> >>
-> >> >> Regarding Marzen DT reference, I don't think TWD is used there yet
-> >> >> so I doubt that it will have the same problem as the C version of the
-> >> >> marzen board code.
-> >> >
-> >> > Agreed.
-> >> >
-> >> >> One related worry is that sh73a0 may have the same
-> >> >> issue - or rather - judging by the code in sh73a0_earlytimer_init() it
-> >> >> most certainly is affected by this too. So KZM9G should also fail as
-> >> >> Marzen which means we need to fix sh73a0 too.
-> >> >
-> >> > Curiously I do not seem to see the problem on the kzm9d.
-> >> > Would you like me to prepare a patch anyway?
-> >>
-> >> I meant kzm9g, not kzm9d. =)
-> >
-> > I meant kzm9g too.
-> >
-> >> I believe emev2 and kzm9d is most likely OK as-is. (except for the STI
-> >> broadcast issue that still is on my TODO)
-> >>
-> >> However sh73a0 and kzm9g probably needs a similar fix as this patch.
-> >> When you have time, can you please check?
-> >
-> > I am not seeing the problem on kzm9g.
-> 
-> That's odd. Isn't the early timer init order the same? Is the timer
-> driver and kernel configuration for timer portion the same when you
-> compare?
+Hi Olof,
 
-Yes it is odd.
+On Thu, Aug 29, 2013 at 3:16 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Wed, Aug 28, 2013 at 03:26:56PM +0900, Magnus Damm wrote:
+>> Hi Olof,
+>>
+>> On Thu, Aug 22, 2013 at 2:48 PM, Olof Johansson <olof@lixom.net> wrote:
+>> > [+khilman]
+>> >
+>> > Hi,
+>> >
+>> > On Wed, Aug 21, 2013 at 05:57:15PM +0900, Simon Horman wrote:
+>> >> On Thu, Aug 08, 2013 at 02:52:32PM +0900, Magnus Damm wrote:
+>> >> > Hi Arnd and Olof,
+>> >> >
+>> >> > On Thu, Aug 8, 2013 at 7:55 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>> >> > > From: Magnus Damm <damm@opensource.se>
+>> >> > >
+>> >> > > Add r8a73a4 SMP support using the shared APMU code. To enable
+>> >> > > SMP the r8a73a4 specific DTS needs to be updated to include
+>> >> > > CPU cores, and this is happening in a separate patch.
+>> >> > >
+>> >> > > Signed-off-by: Magnus Damm <damm@opensource.se>
+>> >> > > ---
+>> >> > >
+>> >> > >  arch/arm/mach-shmobile/Makefile               |    1
+>> >> > >  arch/arm/mach-shmobile/include/mach/r8a73a4.h |    1
+>> >> > >  arch/arm/mach-shmobile/setup-r8a73a4.c        |    3 +
+>> >> > >  arch/arm/mach-shmobile/smp-r8a73a4.c          |   75 +++++++++++++++++++++++++
+>> >> > >  4 files changed, 80 insertions(+)
+>> >> > >
+>> >> > > --- 0001/arch/arm/mach-shmobile/Makefile
+>> >> > > +++ work/arch/arm/mach-shmobile/Makefile        2013-08-07 20:07:31.000000000 +0900
+>> >> > > @@ -33,6 +33,7 @@ endif
+>> >> > >  # SMP objects
+>> >> > >  smp-y                          := platsmp.o headsmp.o
+>> >> > >  smp-$(CONFIG_ARCH_SH73A0)      += smp-sh73a0.o headsmp-scu.o platsmp-scu.o
+>> >> > > +smp-$(CONFIG_ARCH_R8A73A4)     += smp-r8a73a4.o platsmp-apmu.o
+>> >> > >  smp-$(CONFIG_ARCH_R8A7779)     += smp-r8a7779.o headsmp-scu.o platsmp-scu.o
+>> >> > >  smp-$(CONFIG_ARCH_EMEV2)       += smp-emev2.o headsmp-scu.o platsmp-scu.o
+>> >> > >
+>> >> > > --- 0008/arch/arm/mach-shmobile/include/mach/r8a73a4.h
+>> >> > > +++ work/arch/arm/mach-shmobile/include/mach/r8a73a4.h  2013-08-07 20:08:02.000000000 +0900
+>> >> > > @@ -6,5 +6,6 @@ void r8a73a4_add_dt_devices(void);
+>> >> > >  void r8a73a4_clock_init(void);
+>> >> > >  void r8a73a4_pinmux_init(void);
+>> >> > >  void r8a73a4_init_early(void);
+>> >> > > +extern struct smp_operations r8a73a4_smp_ops;
+>> >> > >
+>> >> > >  #endif /* __ASM_R8A73A4_H__ */
+>> >> > > --- 0008/arch/arm/mach-shmobile/setup-r8a73a4.c
+>> >> > > +++ work/arch/arm/mach-shmobile/setup-r8a73a4.c 2013-08-07 20:07:48.000000000 +0900
+>> >> > > @@ -212,6 +212,9 @@ void __init r8a73a4_init_early(void)
+>> >> > >  #ifndef CONFIG_ARM_ARCH_TIMER
+>> >> > >         shmobile_setup_delay(1500, 2, 4); /* Cortex-A15 @ 1500MHz */
+>> >> > >  #endif
+>> >> > > +#ifdef CONFIG_SMP
+>> >> > > +       smp_set_ops(&r8a73a4_smp_ops);
+>> >> > > +#endif
+>> >> > >  }
+>> >> >
+>> >> > Arnd or Olof, may I ask for your advice here?
+>> >> >
+>> >> > I think it's quite nice to use smp_set_ops() in ->init_early() to
+>> >> > install the per-SoC SMP operations. I prefer that over using the
+>> >> > smp_ops directly in the per-board DT_MACHINE_START. Which way do you
+>> >> > prefer?
+>> >>
+>> >> Olof, Arnd, Ping.
+>> >
+>> >
+>> > Sorry, missed the original question when it was posted.
+>> >
+>> > I guess I don't see the benefit of doing it in code vs smp_init? You
+>> > already have a DT_MACHINE section for r8a73a4 in this case.
+>>
+>> The benefit would be to reduce the number of callbacks used in
+>> DT_MACHINE. Today on mach-shmobile we are already using ->init_early()
+>> for delay and timer setup, and if we also can invoke smp_set_ops()
+>> there then we would have per-SoC SMP support hooked in without having
+>> to use either ->smp or ->smp_init() for every board.
+>>
+>> As you may have seen we have quite a few DT_MACHINE entires in
+>> mach-shmobile, and I'd like to keep them as small and consistent as
+>> ever possible. I can't really see how a board specific DT_MACHINE has
+>> anything to do with state of SMP on a particular SoC, so for any given
+>> board I'd prefer to keep the board code without any SMP dependencies
+>> and simply use ->init_early() to setup delay, timers and SMP.
+>>
+>> > If you use .smp_init = smp_init_ops(r8a73a4_smp_ops) then there's no
+>> > ifdef needed down in the DT_MACHINE section either.
+>>
+>> It's nice to not use the #ifdefs, I agree. I'd like to have a dummy
+>> stub for smp_set_ops() too in the case of CONFIG_SMP=n, that would
+>> make the above code a bit prettier.
+>>
+>> I hope this clarifies the reasons behind my question!
+>>
+>> If I understand you correctly then I guess you prefer keeping the code
+>> as is with DT_MACHINE ->smp = smp_ops(foo) over using smp_set_ops() in
+>> ->init_early()?
+>
+> Yes, that was my initial preference. However, that was based on the assumption
+> that you would keep the current setup with several DT_MACHINE entries.
+>
+> If you think you will shortly start to distill down and only keep a couple of
+> DT_MACHINE structures (and start sharing them between SoCs), then doing this in
+> code makes sense. However, if that is further out than a release or two then
+> I think doing it in DT_MACHINE makes more sense.
 
-Are there any CONFIG options in particular that I should check.
+Thanks for your reply. I believe reducing the number of DT_MACHINE
+will surely happen in 2014 but will still be relatively far away, so I
+doubt anything will change in 1-2 releases. Based on that I will keep
+the same approach as-is with DT_MACHINE .smp pointing to per-soc smp
+ops.
 
-I am using the defconfigs for my testing.
+Cheers,
+
+/ magnus
