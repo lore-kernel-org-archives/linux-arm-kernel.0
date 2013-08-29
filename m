@@ -1,89 +1,49 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 29 Aug 2013 11:13:55 -0700
-Subject: [PATCH v9 3/7] ARM: dts: enable hi4511 with device tree
-In-Reply-To: <1377695454-29109-4-git-send-email-haojian.zhuang@linaro.org>
- (Haojian Zhuang's message of "Wed, 28 Aug 2013 21:10:50 +0800")
-References: <1377695454-29109-1-git-send-email-haojian.zhuang@linaro.org>
- <1377695454-29109-4-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <87eh9c1i1o.fsf@linaro.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 29 Aug 2013 18:14:38 +0000
+Subject: [PATCH RFC v2 16/16] ARM: zynq: Don't call of_clk_init()
+In-Reply-To: <201308291920.13983.arnd@arndb.de>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201308291537.54608.arnd@arndb.de>
+ <89b68978-7eeb-43e1-a456-d864ed313da5@DB8EHSMHS026.ehs.local>
+ <201308291920.13983.arnd@arndb.de>
+Message-ID: <8bcbe8e7-65c9-48b2-a854-f3bec600c6a8@DB9EHSMHS025.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang <haojian.zhuang@linaro.org> writes:
+Hi.
 
-> Enable Hisilicon Hi4511 development platform with device tree support.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Thursday, August 29, 2013 7:20 PM
+> To: Michal Simek
+> Cc: Sebastian Hesselbarth; Soren Brinkmann; Mike Turquette; Russell King;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH RFC v2 16/16] ARM: zynq: Don't call of_clk_init()
 >
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-
-This still doesn't look quite right... 
-
-> ---
->  arch/arm/boot/dts/Makefile        |    1 +
->  arch/arm/boot/dts/hi3620-clk.dtsi | 1058 +++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/hi3620.dtsi     |  513 ++++++++++++++++++
->  arch/arm/boot/dts/hi4511.dts      |  648 +++++++++++++++++++++++
->  4 files changed, 2220 insertions(+)
->  create mode 100644 arch/arm/boot/dts/hi3620-clk.dtsi
->  create mode 100644 arch/arm/boot/dts/hi3620.dtsi
->  create mode 100644 arch/arm/boot/dts/hi4511.dts
+> On Thursday 29 August 2013, Michal Simek wrote:
+> > Is there any plan to remove all of them?
+> > I expect that on almost all platforms it is a need to have at least
+> > one early hook to be able to setup things.
 >
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 641b3c9..6e7c1ca 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -61,6 +61,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
->  	exynos5250-snow.dtb \
->  	exynos5420-smdk5420.dtb \
->  	exynos5440-ssdk5440.dtb
-> +dtb-$(CONFIG_ARCH_HI3xxx) += hi4511.dtb
->  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
->  	ecx-2000.dtb
->  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
-> diff --git a/arch/arm/boot/dts/hi3620-clk.dtsi b/arch/arm/boot/dts/hi3620-clk.dtsi
-> new file mode 100644
-> index 0000000..78307c6
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/hi3620-clk.dtsi
-> @@ -0,0 +1,1058 @@
-> +/*
-> + * Hisilicon Ltd. Hi3620 SoC
-> + *
-> + * Copyright (C) 2012-2013 Hisilicon Ltd.
-> + * Copyright (C) 2012-2013 Linaro Ltd.
-> + *
-> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * publishhed by the Free Software Foundation.
-> + */
-> +
-> +/ {
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		osc32k: osc32k {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <32768>;
-> +			clock-output-names = "osc32khz";
-> +		};
+> In an ideal world, we wouldn't need any, and on arm64 we don't plan to
+> introduce callbacks in the first place. We don't put a lot of effort into eliminating
+> all the ones from existing platforms in the near future, but but I do hope to have
+> a situation where we don't use any callbacks for newly introduced 32-bit
+> platforms soon, and remove a lot of the existing callbacks over time when we
+> have the chance (like now for the clk init).
 
-So you've now moved these all under the clocks node, but this still
-isn't addressing Stephen's comments about using the
-node-name at unit-address and the reg property in each node.
+As you know we are open to change this when we have alternative for doing that.
+I have read discussion about early device probing. Especially for this slcr case.
+It is giant IP where generic locking is, clock stuff, pin muxing, reset, cpu startup.
+It points to use syscon and regmap and I would love to use better solution
+but slcr unlocking must be done very early for clock setup and smp startup.
+If you know how to do it let me know. I am definitely open to try that solution.
 
-[...]
+I expect that this topic will be discussed on ksummit or at least on arm minisummit.
 
-> +		sysctrl: system-controller at fc802000 {
-> +			compatible = "hisilicon,sysctrl";
-> +			reg = <0xfc802000 0x1000>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-
-Why is sysctrl and all of its children now under the clocks node?
+Thanks,
+Michal
 
 
-Kevin
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
