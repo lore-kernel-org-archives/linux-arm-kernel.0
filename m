@@ -1,40 +1,28 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Thu, 29 Aug 2013 12:13:40 +0100
-Subject: clk: add support for clock reparent on set_rate
-In-Reply-To: <20130828143652.GA27272@elgon.mountain>
-References: <20130828143652.GA27272@elgon.mountain>
-Message-ID: <521F2CE4.6090107@imgtec.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu, 29 Aug 2013 16:29:48 +0530
+Subject: [PATCH 1/1] clk: bcm2835: Remove duplicate inclusion of clk-provider.h
+Message-ID: <1377773988-32575-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/08/13 15:36, Dan Carpenter wrote:
-> Hello James Hogan,
-> 
-> This is a semi-automatic email about new static checker warnings.
-> 
-> The patch 71472c0c06cf: "clk: add support for clock reparent on 
-> set_rate" from Jul 29, 2013, leads to the following Smatch complaint:
-> 
-> drivers/clk/clk.c:1117 clk_reparent()
-> 	 warn: variable dereferenced before check 'new_parent' (see line 1113)
-> 
-> drivers/clk/clk.c
->   1112		if (new_parent->new_child == clk)
->                     ^^^^^^^^^^^^^^^^^^^^^
-> Patch addes dereference.
-> 
->   1113			new_parent->new_child = NULL;
->   1114	
->   1115		hlist_del(&clk->child_node);
->   1116	
->   1117		if (new_parent)
->                     ^^^^^^^^^^
-> Existing check.
-> 
->   1118			hlist_add_head(&clk->child_node, &new_parent->children);
->   1119		else
+clk-provider.h was included twice.
 
-Thanks for reporting this Dan - much appreciated. I've submitted a fix.
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ drivers/clk/clk-bcm2835.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-Cheers
-James
+diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
+index 5fb4ff5..676077d 100644
+--- a/drivers/clk/clk-bcm2835.c
++++ b/drivers/clk/clk-bcm2835.c
+@@ -20,7 +20,6 @@
+ #include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+ #include <linux/clk/bcm2835.h>
+-#include <linux/clk-provider.h>
+ #include <linux/of.h>
+ 
+ static const struct of_device_id clk_match[] __initconst = {
+-- 
+1.7.9.5
