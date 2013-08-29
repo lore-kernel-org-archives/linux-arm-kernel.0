@@ -1,33 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 29 Aug 2013 09:31:45 -0400
-Subject: [PATCH v2 2/3] ARM: OMAP4+: Move SRAM data to DT
-In-Reply-To: <521F4BE9.60004@ti.com>
-References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
- <1377775391-13103-3-git-send-email-rnayak@ti.com> <521F4BE9.60004@ti.com>
-Message-ID: <521F4D41.4010303@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 29 Aug 2013 15:35:52 +0200
+Subject: [PATCH RFC v2 14/16] ARM: vexpress: remove custom .init_time hook
+In-Reply-To: <1377638890-371-15-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1377638890-371-15-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <201308291535.53005.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 August 2013 09:26 AM, Sekhar Nori wrote:
-> On 8/29/2013 4:53 PM, Rajendra Nayak wrote:
->> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->> index 22d9f2b..1ba6a77 100644
->> --- a/arch/arm/boot/dts/omap4.dtsi
->> +++ b/arch/arm/boot/dts/omap4.dtsi
->> @@ -126,6 +126,11 @@
->>  			pinctrl-single,function-mask = <0x7fff>;
->>  		};
->>  
->> +		ocmcram: ocmcram at 40304000 {
-> 
-> This can now be changed to 0x40300000 now that you have moved to
-> gen_pool_alloc()?
-> 
-NO.
-It won't work on secure devices since first 16 KB is occupied for
-default configuration. Its not worth trouble also to handle
-secure/non-secure considering the use of SRAM which is actually just
-limited to errata. 40304000 will work for both devices.
+On Tuesday 27 August 2013, Sebastian Hesselbarth wrote:
+> @@ -422,16 +419,8 @@ void __init v2m_dt_init_early(void)
+>                         pr_warning("vexpress: DT HBI (%x) is not matching "
+>                                         "hardware (%x)!\n", dt_hbi, hbi);
+>         }
+> -}
+> -
+> -static void __init v2m_dt_timer_init(void)
+> -{
+> -       of_clk_init(NULL);
+>  
+> -       clocksource_of_init();
+> -
+> -       versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
+> -                               24000000);
+> +       versatile_sched_clock_init(vexpress_get_24mhz_clock_base(), 24000000);
+>  }
 
-Regards,
-Santosh
+
+You are moving versatile_sched_clock_init() ahead of clocksource_of_init(), which I suspect
+won't work. Have you checked this?
+
+	Arnd
