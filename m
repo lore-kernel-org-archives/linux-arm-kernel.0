@@ -1,42 +1,120 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 29 Aug 2013 16:16:25 +0300
-Subject: [PATCHv6 33/45] ARM: OMAP2+: hwmod: fix opt_clk handling with DT
+Date: Thu, 29 Aug 2013 16:16:24 +0300
+Subject: [PATCHv6 32/45] ARM: OMAP2+: Add support to parse optional clk info
+ from DT
 In-Reply-To: <1377782197-10611-1-git-send-email-t-kristo@ti.com>
 References: <1377782197-10611-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1377782197-10611-34-git-send-email-t-kristo@ti.com>
+Message-ID: <1377782197-10611-33-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra's patch had a bug which caused opt clocks to fail initialize
-completely, causing boot warnings with devices that depend on them.
+From: Rajendra Nayak <rnayak@ti.com>
 
+With clocks for OMAP moving to DT, its now possible to pass all optional clock
+data for each device from DT instead of having it in hwmod.
+
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |    5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   66 ++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 64 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 116219e..f24246c 100644
+index 838af96..116219e 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -827,8 +827,7 @@ static const char **_parse_opt_clks_dt(struct omap_hwmod *oh,
- 		of_property_read_string_index(np, "clock-names", i, &clk_name);
- 		if (!strcmp(clk_name, "fck"))
- 			continue;
--		opt_clks_cnt++;
--		opt_clk_names[i] = clk_name;
-+		opt_clk_names[(*opt_clks_cnt)++] = clk_name;
- 	}
- 	return opt_clk_names;
+@@ -807,6 +807,65 @@ static int _init_interface_clks(struct omap_hwmod *oh)
+ 	return ret;
  }
-@@ -851,7 +850,7 @@ static int _init_opt_clks_dt(struct omap_hwmod *oh, struct device_node *np)
  
- 	oh->opt_clks_cnt = opt_clks_cnt;
++static const char **_parse_opt_clks_dt(struct omap_hwmod *oh,
++				       struct device_node *np,
++				       int *opt_clks_cnt)
++{
++	int i, clks_cnt;
++	const char *clk_name;
++	const char **opt_clk_names;
++
++	clks_cnt = of_property_count_strings(np, "clock-names");
++	if (!clks_cnt)
++		return NULL;
++
++	opt_clk_names = kzalloc(sizeof(char *)*clks_cnt, GFP_KERNEL);
++	if (!opt_clk_names)
++		return NULL;
++
++	for (i = 0; i < clks_cnt; i++) {
++		of_property_read_string_index(np, "clock-names", i, &clk_name);
++		if (!strcmp(clk_name, "fck"))
++			continue;
++		opt_clks_cnt++;
++		opt_clk_names[i] = clk_name;
++	}
++	return opt_clk_names;
++}
++
++static int _init_opt_clks_dt(struct omap_hwmod *oh, struct device_node *np)
++{
++	struct clk *c;
++	int i, opt_clks_cnt = 0;
++	int ret = 0;
++	const char **opt_clk_names;
++
++	opt_clk_names = _parse_opt_clks_dt(oh, np, &opt_clks_cnt);
++	if (!opt_clk_names)
++		return -EINVAL;
++
++	oh->opt_clks = kzalloc(sizeof(struct omap_hwmod_opt_clk *)
++			       * opt_clks_cnt, GFP_KERNEL);
++	if (!oh->opt_clks)
++		return -ENOMEM;
++
++	oh->opt_clks_cnt = opt_clks_cnt;
++
++	for (i = 0; i < oh->opt_clks_cnt; i++) {
++		c = of_clk_get_by_name(np, opt_clk_names[i]);
++		if (IS_ERR(c)) {
++			pr_warn("omap_hwmod: %s: cannot clk_get opt_clk %s\n",
++				oh->name, opt_clk_names[i]);
++			ret = -EINVAL;
++		}
++		oh->opt_clks[i]._clk = c;
++		oh->opt_clks[i].role = opt_clk_names[i];
++		oh->opt_clks_cnt++;
++		clk_prepare(oh->opt_clks[i]._clk);
++	}
++	return ret;
++}
++
+ /**
+  * _init_opt_clk - get a struct clk * for the the hwmod's optional clocks
+  * @oh: struct omap_hwmod *
+@@ -814,13 +873,16 @@ static int _init_interface_clks(struct omap_hwmod *oh)
+  * Called from _init_clocks().  Populates the @oh omap_hwmod_opt_clk
+  * clock pointers.  Returns 0 on success or -EINVAL on error.
+  */
+-static int _init_opt_clks(struct omap_hwmod *oh)
++static int _init_opt_clks(struct omap_hwmod *oh, struct device_node *np)
+ {
+ 	struct omap_hwmod_opt_clk *oc;
+ 	struct clk *c;
+ 	int i;
+ 	int ret = 0;
  
--	for (i = 0; i < oh->opt_clks_cnt; i++) {
-+	for (i = 0; i < opt_clks_cnt; i++) {
- 		c = of_clk_get_by_name(np, opt_clk_names[i]);
++	if (of_get_property(np, "clocks", NULL))
++		return _init_opt_clks_dt(oh, np);
++
+ 	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++) {
+ 		c = clk_get(NULL, oc->clk);
  		if (IS_ERR(c)) {
- 			pr_warn("omap_hwmod: %s: cannot clk_get opt_clk %s\n",
+@@ -1582,7 +1644,7 @@ static int _init_clocks(struct omap_hwmod *oh, void *data,
+ 
+ 	ret |= _init_main_clk(oh, np);
+ 	ret |= _init_interface_clks(oh);
+-	ret |= _init_opt_clks(oh);
++	ret |= _init_opt_clks(oh, np);
+ 
+ 	if (!ret)
+ 		oh->_state = _HWMOD_STATE_CLKS_INITED;
 -- 
 1.7.9.5
