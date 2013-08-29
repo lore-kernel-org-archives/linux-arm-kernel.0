@@ -1,36 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 Aug 2013 19:19:44 +0200
-Subject: [PATCH] pinctrl: sunxi: drop lock on error path
-Message-ID: <1377796784-31147-1-git-send-email-linus.walleij@linaro.org>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Thu, 29 Aug 2013 18:20:45 +0100
+Subject: [PATCH v2 00/03] ARM: shmobile: r8a7790 APMU SMP support
+In-Reply-To: <20130828232148.7321.45739.sendpatchset@w520>
+References: <20130828232148.7321.45739.sendpatchset@w520>
+Message-ID: <521F82ED.7020901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I forgot to drop the lock for the return inside the loop
-protected by the spinlock in the pin config routine when
-merging in -rc7 in commit 6ad30ce046aefbdc3848232c665a728860d7bb68
+On 29/08/13 00:21, Magnus Damm wrote:
+> ARM: shmobile: r8a7790 APMU SMP support
+> 
+> [PATCH v2 01/03] ARM: shmobile: Shared APMU SMP support code without DT
+> [PATCH v2 02/03] ARM: shmobile: Add r8a7790 SMP support using APMU code
+> [PATCH v2 03/03] ARM: shmobile: Add r8a7790 CA15 CPU cores
+> 
+> This series adds SMP support to r8a7790 using the included APMU code.
+> The previous version of r8a7790 support depended on the APMU code in 
+> "[PATCH] ARM: shmobile: Shared APMU SMP support code", but in this
+> version the APMU code has been reworked to not use DT.
+You have misunderstood my comments. I clearly said I am not against
+using DT for APMU. I objected only the new property 'cpus' added to the
+APMU node(mainly because it's not needed IMO or it was not documented
+well to explain the need for it)
 
-Reported-by: Sherman Yin <syin@broadcom.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinctrl-sunxi.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-index 532202b..4432e5e 100644
---- a/drivers/pinctrl/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/pinctrl-sunxi.c
-@@ -291,8 +291,10 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
- 		switch (pinconf_to_config_param(configs[i])) {
- 		case PIN_CONFIG_DRIVE_STRENGTH:
- 			strength = pinconf_to_config_argument(configs[i]);
--			if (strength > 40)
-+			if (strength > 40) {
-+				spin_unlock_irqrestore(&pctl->lock, flags);
- 				return -EINVAL;
-+			}
- 			/*
- 			 * We convert from mA to what the register expects:
- 			 *   0: 10mA
--- 
-1.8.3.1
+> In the future
+> r8a73a4 and other SoCs may make use of the APMU as well, but the 
+> r8a73a4 code first needs to be adjusted to work with the CCI driver.
+> 
+> With these patches applied r8a7790 CA15 support for SMP boot
+> and CPU Hotplug is known to be working.
+> 
+> Thanks to Sudeep for his feedback.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  Written against renesas.git renesas-devel-20130829
+> 
+>  arch/arm/boot/dts/r8a7790.dtsi                 |   21 ++
+>  arch/arm/mach-shmobile/Makefile                |    1 
+>  arch/arm/mach-shmobile/board-lager-reference.c |    1 
+>  arch/arm/mach-shmobile/board-lager.c           |    1 
+>  arch/arm/mach-shmobile/include/mach/common.h   |    6 
+>  arch/arm/mach-shmobile/include/mach/r8a7790.h  |    1 
+>  arch/arm/mach-shmobile/platsmp-apmu.c          |  178 ++++++++++++++++++++++++
+>  arch/arm/mach-shmobile/setup-r8a7790.c         |    1 
+>  arch/arm/mach-shmobile/smp-r8a7790.c           |   67 +++++++++
+>  9 files changed, 277 insertions(+)
+> 
+> 
