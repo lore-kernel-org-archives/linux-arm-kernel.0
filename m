@@ -1,22 +1,91 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 29 Aug 2013 20:58:55 +0800
-Subject: [PATCH RFC v2 08/16] ARM: mxs: remove custom .init_time hook
-In-Reply-To: <521F3151.1030704@gmail.com>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1377638890-371-9-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130829110849.GB18729@S2101-09.ap.freescale.net>
- <521F3151.1030704@gmail.com>
-Message-ID: <20130829125851.GK18729@S2101-09.ap.freescale.net>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 29 Aug 2013 15:07:52 +0200
+Subject: [PATCH v3 2/6] media: s5p-tv: Restore vpll clock rate
+In-Reply-To: <1377706384-3697-3-git-send-email-m.krawczuk@partner.samsung.com>
+References: <1377706384-3697-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <1377706384-3697-3-git-send-email-m.krawczuk@partner.samsung.com>
+Message-ID: <6294819.7vFezjQcVy@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 01:32:33PM +0200, Sebastian Hesselbarth wrote:
-> Ok, will take care of it. I assume you are fine with having an extra
-> struct device_node pointer for the sake of readability instead of
-> reusing the same pointer.
+Hi Mateusz,
 
-Yeah, something like np_digctl for digctl node.
+Generally this patch looks good, but I have some minor nitpicks, that I 
+would like to be fixed.
 
-Thanks for your work.
+On Wednesday 28 of August 2013 18:13:00 Mateusz Krawczuk wrote:
+> Restore vpll clock rate if start stream fail or stream is off.
+> 
+> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
+> ---
+>  drivers/media/platform/s5p-tv/sdo_drv.c | 24 ++++++++++++++++++++++--
+>  1 file changed, 22 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/media/platform/s5p-tv/sdo_drv.c
+> b/drivers/media/platform/s5p-tv/sdo_drv.c index 0afa90f..9dbdfe6 100644
+> --- a/drivers/media/platform/s5p-tv/sdo_drv.c
+> +++ b/drivers/media/platform/s5p-tv/sdo_drv.c
+> @@ -55,6 +55,8 @@ struct sdo_device {
+>  	struct clk *dacphy;
+>  	/** clock for control of VPLL */
+>  	struct clk *fout_vpll;
+> +	/** vpll rate before sdo stream was on */
+> +	int vpll_rate;
 
-Shawn
+Clock frequency should be stored in an unsigned long. (See the return type 
+of clk_get_rate().)
+
+>  	/** regulator for SDO IP power */
+>  	struct regulator *vdac;
+>  	/** regulator for SDO plug detection */
+> @@ -193,17 +195,34 @@ static int sdo_s_power(struct v4l2_subdev *sd, int
+> on)
+> 
+>  static int sdo_streamon(struct sdo_device *sdev)
+>  {
+> +	int ret;
+> +
+>  	/* set proper clock for Timing Generator */
+> -	clk_set_rate(sdev->fout_vpll, 54000000);
+> +	sdev->vpll_rate = clk_get_rate(sdev->fout_vpll);
+> +	ret = clk_set_rate(sdev->fout_vpll, 54000000);
+> +	if (ret < 0) {
+> +		dev_err(sdev->dev,
+> +			"Failed to set vpll rate!\n");
+> +		return ret;
+> +	}
+>  	dev_info(sdev->dev, "fout_vpll.rate = %lu\n",
+>  	clk_get_rate(sdev->fout_vpll));
+>  	/* enable clock in SDO */
+>  	sdo_write_mask(sdev, SDO_CLKCON, ~0, SDO_TVOUT_CLOCK_ON);
+> -	clk_enable(sdev->dacphy);
+> +	ret = clk_enable(sdev->dacphy);
+> +	if (ret < 0) {
+> +		dev_err(sdev->dev,
+> +			"clk_enable(dacphy) failed !\n");
+> +		goto fail;
+> +	}
+>  	/* enable DAC */
+>  	sdo_write_mask(sdev, SDO_DAC, ~0, SDO_POWER_ON_DAC);
+>  	sdo_reg_debug(sdev);
+>  	return 0;
+
+nit: Please insert a blank line here.
+
+Best regards,
+Tomasz
+
+> +fail:
+> +	sdo_write_mask(sdev, SDO_CLKCON, 0, SDO_TVOUT_CLOCK_ON);
+> +	clk_set_rate(sdev->fout_vpll, sdev->vpll_rate);
+> +	return ret;
+>  }
+> 
+>  static int sdo_streamoff(struct sdo_device *sdev)
+> @@ -220,6 +239,7 @@ static int sdo_streamoff(struct sdo_device *sdev)
+>  	}
+>  	if (tries == 0)
+>  		dev_err(sdev->dev, "failed to stop streaming\n");
+> +	clk_set_rate(sdev->fout_vpll, sdev->vpll_rate);
+>  	return tries ? 0 : -EIO;
+>  }
