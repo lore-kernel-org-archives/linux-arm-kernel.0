@@ -1,122 +1,55 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 29 Aug 2013 15:02:47 -0700
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <521FC000.6080900@ti.com> (Dave Gerlach's message of "Thu, 29 Aug
- 2013 16:41:20 -0500")
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <87mwo2vmds.fsf@linaro.org> <521FC000.6080900@ti.com>
-Message-ID: <87y57krw8o.fsf@linaro.org>
+From: john.stultz@linaro.org (John Stultz)
+Date: Thu, 29 Aug 2013 14:56:21 -0700
+Subject: [GIT PULL] 64bit friendly generic sched_clock() base for 3.12
+In-Reply-To: <51F80B09.8060509@linaro.org>
+References: <51F80B09.8060509@linaro.org>
+Message-ID: <521FC385.90903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Gerlach <d-gerlach@ti.com> writes:
-
-> On 08/27/2013 04:45 PM, Kevin Hilman wrote:
->> Dave Gerlach <d-gerlach@ti.com> writes:
->>
->>> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
->>>
->>> AM335x supports various low power modes as documented
->>> in section 8.1.4.3 of the AM335x TRM which is available
->>> @ http://www.ti.com/litv/pdf/spruh73f
->>>
->>> DeepSleep0 mode offers the lowest power mode with limited
->>> wakeup sources without a system reboot and is mapped as
->>> the suspend state in the kernel. In this state, MPU and
->>> PER domains are turned off with the internal RAM held in
->>> retention to facilitate resume process. As part of the boot
->>> process, the assembly code is copied over to OCMCRAM using
->>> the OMAP SRAM code.
->>>
->>> AM335x has a Cortex-M3 (WKUP_M3) which assists the MPU
->>> in DeepSleep0 entry and exit. WKUP_M3 takes care of the
->>> clockdomain and powerdomain transitions based on the
->>> intended low power state. MPU needs to load the appropriate
->>> WKUP_M3 binary onto the WKUP_M3 memory space before it can
->>> leverage any of the PM features like DeepSleep.
->>>
->>> The IPC mechanism between MPU and WKUP_M3 uses a mailbox
->>> sub-module and 8 IPC registers in the Control module. MPU
->>> uses the assigned Mailbox for issuing an interrupt to
->>> WKUP_M3 which then goes and checks the IPC registers for
->>> the payload. WKUP_M3 has the ability to trigger on interrupt
->>
->> s/trigger on interrupt/trigger an interrupt/  ??
+On 07/30/2013 11:50 AM, John Stultz wrote:
+> Hey Thomas, Olof,
+>     Here is the common base changes in Stephen's "64bit friendly
+> generic sched_clock()" patch series. This common base will be needed
+> so that following patch series can be merged via both the
+> tip/timers/core and arm-soc trees independently.
 >
-> Oops I will fix that.
+> Please let me know if you have any issues or objections with this set.
 >
->>
->>> to MPU by executing the "sev" instruction.
->>>
->>> In the current implementation when the suspend process
->>> is initiated MPU interrupts the WKUP_M3 to let it know about
->>> the intent of entering DeepSleep0 and waits for an ACK. When
->>> the ACK is received MPU continues with its suspend process
->>> to suspend all the drivers and then jumps to assembly in
->>> OCMC RAM. The assembly code puts the PLLs in bypass, puts the
->>> external RAM in self-refresh mode and then finally execute the
->>> WFI instruction. Execution of the WFI instruction triggers another
->>> interrupt to the WKUP_M3 which then continues wiht the power down
->>> sequence wherein the clockdomain and powerdomain transition takes
->>> place. As part of the sleep sequence, WKUP_M3 unmasks the interrupt
->>> lines for the wakeup sources. WFI execution on WKUP_M3 causes the
->>> hardware to disable the main oscillator of the SoC.
->>>
->>> When a wakeup event occurs, WKUP_M3 starts the power-up
->>> sequence by switching on the power domains and finally
->>> enabling the clock to MPU. Since the MPU gets powered down
->>> as part of the sleep sequence in the resume path ROM code
->>> starts executing. The ROM code detects a wakeup from sleep
->>> and then jumps to the resume location in OCMC which was
->>> populated in one of the IPC registers as part of the suspend
->>> sequence.
->>>
->>> The low level code in OCMC relocks the PLLs, enables access
->>> to external RAM and then jumps to the cpu_resume code of
->>> the kernel to finish the resume process.
->>
->> [...]
->>
->>>   arch/arm/mach-omap2/pm33xx.c  |  474 +++++++++++++++++++++++++++++++++++++++++
->>>   arch/arm/mach-omap2/pm33xx.h  |   77 +++++++
->>>   arch/arm/mach-omap2/wkup_m3.c |  183 ++++++++++++++++
->>
->>
->> Looking closer at this code as I'm trying to fully get my head around
->> all the IPC, I have some more comments.
->>
->> I think the split between pm33xx.c and the M3 driver is still confusing
->> here.  For example, am33xx_ping_wkup_m3(),
->> am33xx_m3_state_machine_reset() and the guts of am33xx_pm_begin() all
->> belong inside the M3 driver, along with all the wakeup_src stuff, which
->> is info coming from the M3.
->>
->> IOW, the communication with M3 should be abstracted from pm33xx by the
->> M3 driver (or possibly an eventual remoteproc/rpmsg implementation) with
->> a well defined API.  In this implementation, the interface is pretty
->> fuzzy and mixed between pm33xx.c and wkup_m3.c.
+> thanks
+> -john
 >
-> I have since moved much more of the m3 functionality, including the
-> ping and wakeup src code, into the wkup_m3 driver to make the split
-> more clear but I haven't yet moved the state machine portion into the
-> wkup_m3 driver. I feel that this is the portion of the IPC that could
-> potentially be the most variant between different SoC implementations
-> so leaving this in the pm code should allow for more flexibility.
-
-I still think this belogs in the M3 driver, because AFAICT, it's
-specific to the M3 firmware, not to the SoC.
-
->>
->> Kevin
->>
->> P.S. I'd also suggest renaming wakeup_src to something else since
->> it's close to wakeup_source which has a rather different meaning in the
->> kernel (c.f. linux/pm_wakeup.h)
->>
 >
-> I will rename this to tie it into the M3 code.
+> The following changes since commit
+> ad81f0545ef01ea651886dddac4bef6cec930092:
+>
+>   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/people/jstultz/linux.git
+> fortglx/3.12/sched-clock64-base
+>
+> for you to fetch changes up to e7e3ff1bfe9c42ee31172e9afdc0383a9e595e29:
+>
+>   sched_clock: Add support for >32 bit sched_clock (2013-07-30
+> 11:24:21 -0700)
+>
+> ----------------------------------------------------------------
+> Stephen Boyd (4):
+>       clocksource: Extract max nsec calculation into separate function
+>       sched_clock: Use seqcount instead of rolling our own
+>       sched_clock: Use an hrtimer instead of timer
+>       sched_clock: Add support for >32 bit sched_clock
+>
+>  include/linux/clocksource.h |   2 +
+>  include/linux/sched_clock.h |   2 +
+>  kernel/time/clocksource.c   |  45 ++++++++++++------
+>  kernel/time/sched_clock.c   | 111
+> ++++++++++++++++++++++++--------------------
+>  4 files changed, 95 insertions(+), 65 deletions(-)
 
-Great, thanks.
+Ping? Thomas?
 
-Kevin
+thanks
+-john
