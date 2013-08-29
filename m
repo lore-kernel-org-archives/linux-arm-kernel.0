@@ -1,78 +1,60 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Thu, 29 Aug 2013 18:57:46 +0900
-Subject: [PATCH v4 3/5] ARM: tegra: split setting of CPU reset handler
-In-Reply-To: <1377770268-14014-1-git-send-email-acourbot@nvidia.com>
-References: <1377770268-14014-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1377770268-14014-4-git-send-email-acourbot@nvidia.com>
+Date: Thu, 29 Aug 2013 18:57:43 +0900
+Subject: [PATCH v4 0/5] ARM: tegra: support for Trusted Foundations
+Message-ID: <1377770268-14014-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all Tegra devices can set the CPU reset handler in the same way.
-In particular, devices using a TrustZone secure monitor cannot set the
-reset handler directly and need to do it through a firmware operation.
+New version revised according to comments received for v3. Hopefully
+it will be good enough to be merged.
 
-This patch separates the act of setting the reset handler from its
-preparation, so the former can be implemented in a different way.
+Changes since v3:
+- Added of_register_trusted_foundations() function to avoid duplicate
+  device tree parsing code in arch files
+- Added ability to initialize Trusted Foundations through platform data
+- Changed TF version number to integers
+- Refactored Kconfig menu for more clarity
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
----
- arch/arm/mach-tegra/reset.c | 27 +++++++++++++++++----------
- 1 file changed, 17 insertions(+), 10 deletions(-)
+A few requests could not reasonably be implemented:
 
-diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index 1ac434e..6964117 100644
---- a/arch/arm/mach-tegra/reset.c
-+++ b/arch/arm/mach-tegra/reset.c
-@@ -33,26 +33,18 @@
- 
- static bool is_enabled;
- 
--static void __init tegra_cpu_reset_handler_enable(void)
-+static void __init tegra_cpu_reset_handler_set(const u32 reset_address)
- {
--	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
- 	void __iomem *evp_cpu_reset =
- 		IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE + 0x100);
- 	void __iomem *sb_ctrl = IO_ADDRESS(TEGRA_SB_BASE);
- 	u32 reg;
- 
--	BUG_ON(is_enabled);
--	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
--
--	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
--			tegra_cpu_reset_handler_size);
--
- 	/*
- 	 * NOTE: This must be the one and only write to the EVP CPU reset
- 	 *       vector in the entire system.
- 	 */
--	writel(TEGRA_IRAM_RESET_BASE + tegra_cpu_reset_handler_offset,
--			evp_cpu_reset);
-+	writel(reset_address, evp_cpu_reset);
- 	wmb();
- 	reg = readl(evp_cpu_reset);
- 
-@@ -66,6 +58,21 @@ static void __init tegra_cpu_reset_handler_enable(void)
- 		writel(reg, sb_ctrl);
- 		wmb();
- 	}
-+}
-+
-+static void __init tegra_cpu_reset_handler_enable(void)
-+{
-+	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
-+	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
-+						tegra_cpu_reset_handler_offset;
-+
-+	BUG_ON(is_enabled);
-+	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
-+
-+	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
-+			tegra_cpu_reset_handler_size);
-+
-+	tegra_cpu_reset_handler_set(reset_address);
- 
- 	is_enabled = true;
- }
+TF version probing at runtime (requested by Dave) seems impossible
+unfortunately. TF just does not provide an interface that allows such
+queries. In the downstream Tegra kernel the TF version is
+even hardcoded into the kernel.
+
+Use of a firmware_op instance for non-firmware behavior (requested by
+Stephen) would make it necessary to have a dedicated non-firmware
+registration function that takes implementations from various different
+files and would require these implementations to be exported. Checking
+the return code of call_firmware_op() at call sites seems to be easier
+to handle and is how current users of firmware_ops do.
+
+Alexandre Courbot (5):
+  ARM: add basic Trusted Foundations support
+  ARM: tegra: add support for Trusted Foundations
+  ARM: tegra: split setting of CPU reset handler
+  ARM: tegra: set CPU reset handler with firmware op
+  ARM: tegra: support Trusted Foundations by default
+
+ .../arm/firmware/tl,trusted-foundations.txt        | 17 +++++
+ Documentation/devicetree/bindings/arm/tegra.txt    |  5 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm/Kconfig                                   |  2 +
+ arch/arm/Makefile                                  |  1 +
+ arch/arm/configs/tegra_defconfig                   |  1 +
+ arch/arm/firmware/Kconfig                          | 26 +++++++
+ arch/arm/firmware/Makefile                         |  1 +
+ arch/arm/firmware/trusted_foundations.c            | 83 ++++++++++++++++++++++
+ arch/arm/include/asm/trusted_foundations.h         | 48 +++++++++++++
+ arch/arm/mach-tegra/Kconfig                        |  1 +
+ arch/arm/mach-tegra/common.c                       |  2 +
+ arch/arm/mach-tegra/reset.c                        | 40 ++++++++---
+ 13 files changed, 217 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+ create mode 100644 arch/arm/firmware/Kconfig
+ create mode 100644 arch/arm/firmware/Makefile
+ create mode 100644 arch/arm/firmware/trusted_foundations.c
+ create mode 100644 arch/arm/include/asm/trusted_foundations.h
+
 -- 
 1.8.4
