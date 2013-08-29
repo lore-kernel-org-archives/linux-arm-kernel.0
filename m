@@ -1,76 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 29 Aug 2013 11:52:35 +0100
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
- with external L3-cache.
-In-Reply-To: <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
-References: <da83e967f5a266ca28ee54638a4a9be9@www.loen.fr>
- <CAAhSdy3-+tJ34QQgieifo931pfGoYt3RAqr8OkVtkxO6jgGdHQ@mail.gmail.com>
- <3ebe469fcf451cc7396dd2a5d3f01272@www.loen.fr>
- <CAAhSdy3WwZcLW6s05mV=Mn8=w8TcubTdYrgNqAChqiHxXC53eg@mail.gmail.com>
- <747a0675165da4ef147bbda4e140549b@www.loen.fr>
- <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
- <5935339137684ecf90dd484cc5739548@www.loen.fr>
- <20130815165344.GA3853@cbox>
- <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
- <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
-Message-ID: <20130829105235.GC13704@arm.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Thu, 29 Aug 2013 18:55:40 +0800
+Subject: getting rid of subsys_initcall usage? (was: Re: [PATCH RESEND]
+ i2c: designware: use module_platform_driver)
+In-Reply-To: <CACRpkdb1p1=3a0PM+r2ZrMN+ECv5BAZFdv2omDK5npaer4ddcw@mail.gmail.com>
+References: <1376987548-12366-1-git-send-email-zhangfei.gao@linaro.org>
+ <20130828095706.GH4086@katana>
+ <CACRpkdb1p1=3a0PM+r2ZrMN+ECv5BAZFdv2omDK5npaer4ddcw@mail.gmail.com>
+Message-ID: <CAMj5BkhQkwb+T9VepN7UrWNRSgtv=Dw-Sa-gv0orOANo55iqNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anup,
+On Thu, Aug 29, 2013 at 4:58 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Aug 28, 2013 at 11:57 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>> On Tue, Aug 20, 2013 at 04:32:28PM +0800, Zhangfei Gao wrote:
+>
+>>> Instead of use platform_driver_probe, use module_platform_driver
+>>> To support deferred probing
+>>> Also subsys_initcall may too early to auto set pinctl
+>>>
+>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>> Acked-by: Baruch Siach <baruch@tkos.co.il>
+>>
+>> This patch is tougher than it looks. You need it, because
+>> subsys_initcall may be too early for pinctrl.
+>
+> pinctrl is initialized very early, core_initcall().
+>
+> This is more a question of individual pin control drivers
+> and when they probe, and dependencies trying to take
+> a pinctrl handle before the pin controller is available
+> will be deferred. Even by those grabbed in the core
+> by drivers/base/pinctrl.c.
 
-Jumping late into this thread (holidays).
+Thanks Linus.
+Your explanation is really make sense.
 
-On Fri, Aug 16, 2013 at 07:57:55AM +0100, Anup Patel wrote:
-> The approach of flushing d-cache by set/way upon first run of VCPU will
-> not work because for set/way operations ARM ARM says: "For set/way
-> operations, and for All (entire cache) operations, the point is defined to be
-> to the next level of caching". In other words, set/way operations work upto
-> point of unification.
+We use drivers/pinctrl/pinctrl-single.c, if subsys_initcall for
+pinctrl-single, no issue at all.
 
-I don't understand where you got the idea that set/way operations work
-up to the point of unification. This is incorrect, the set/way
-operations work on the level of cache specified by bits 3:1 in the
-register passed to the DC CISW instruction. For your L3 cache, those
-bits would be 2 (and __flush_dcache_all() implementation does this
-dynamically).
+Checked in 3.11-rc4, there is really deferring probe happen.
+i2c_designware fcb08000.i2c: could not find pctldev for node
+/amba/pinmux at fc803000/i2c0
+_pmx_func, deferring probe
 
-For the I-cache all operation, that's correct, it only invalidates to
-the PoU but it doesn't need to go any further, you do the D-cache
-maintenance for this (no point in duplicating functionality).
+However, bus_probe_device failed, since the drv name list does not
+have i2c_designware.
+deferred_probe_work_func -> bus_probe_device -> device_attach ->
+bus_for_each_drv -> __device_attach
 
-> Also, Guest Linux already does __flush_dcache_all() from __cpu_setup()
-> at bootup time which does not work for us when L3-cache is enabled so,
-> there is no point is adding one more __flush_dcache_all() upon first run of
-> VCPU in KVM ARM64.
+It can be solved change
+return platform_driver_probe(&dw_i2c_driver, dw_i2c_probe);
+to
+return platform_driver_register(&dw_i2c_driver);
+static struct platform_driver dw_i2c_driver = {
+        .probe          = dw_i2c_probe,
+~
 
-Do you mean the CPU is not aware of the L3 cache? Does CLIDR_EL1 report
-an L3 cache on your implementation?
+Dear Wolfram
 
-It's not clear to me whether your L3 cache is inner or outer (or a mix).
-You say that D-cache maintenance to PoC flushes the L3 which looks to me
-like an inner cache, in which cache it should be reported in the LoC
-bits in CLIDR_EL1.
+Thanks for telling me the dependency about subsys_initcall.
+Should I resubmit one patch using platform_driver_register while
+keeping subsys_initcall?
 
-> IMHO, we are left with following options:
-> 1. Flush all RAM regions of VCPU using __flush_dcache_range()
->     upon first run of VCPU
-> 2. Implement outer-cache framework for ARM64 and flush all
->     caches + outer cache (i.e. L3-cache) upon first run of VCPU
+Besides, also find platform_driver_probe is used in
+drivers/i2c/busses/i2c-imx.c and drivers/i2c/busses/i2c-stu300.c.
 
-Do you have specific instructions for flushing the L3 cache only? It's
-not clear to me what an outer-cache framework would to on AArch64. It
-was added on AArch32 for the L2x0/PL310 which need separate instructions
-by physical address for flushing the cache. I really hope we don't get
-these again on ARMv8 hardware.
-
-> 3. Use an alternate version of flush_icache_range() which will
->     flush d-cache by PoC instead of PoU. We can also ensure
->     that coherent_icache_guest_page() function will be called
->     upon Stage2 prefetch aborts only.
-
-flush_icache_range() is meant to flush only to the PoU to ensure the I-D
-cache coherency. I don't think we should change this.
-
--- 
-Catalin
+Thanks
