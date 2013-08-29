@@ -1,164 +1,102 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 29 Aug 2013 17:05:39 +0100
-Subject: [PATCH v4 09/10] swiotlb-xen: support autotranslate guests
-In-Reply-To: <20130815200738.GD5337@konrad-lan.dumpdata.com>
-References: <alpine.DEB.2.02.1308151200580.4470@kaball.uk.xensource.com>
- <1376565054-24153-9-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130815200738.GD5337@konrad-lan.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1308282112300.6397@kaball.uk.xensource.com>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Thu, 29 Aug 2013 09:10:51 -0700
+Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
+In-Reply-To: <87ppsw7cgq.fsf@linaro.org>
+References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
+ <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
+ <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
+ <87txiasqhk.fsf@linaro.org>
+ <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
+ <87ppsw7cgq.fsf@linaro.org>
+Message-ID: <CA+Bv8XbxV=BFjcSsUMX2pz9LeCkSwrjzZmj_=YbHGzyfbLXmaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Aug 2013, Konrad Rzeszutek Wilk wrote:
-> On Thu, Aug 15, 2013 at 12:10:53PM +0100, Stefano Stabellini wrote:
-> > Support autotranslate guests in swiotlb-xen by keeping track of the
-> > phys-to-bus and bus-to-phys mappings of the swiotlb buffer
-> > (xen_io_tlb_start-xen_io_tlb_end).
-> > 
-> > Use a simple direct access on a pre-allocated array for phys-to-bus
-> > queries. Use a red-black tree for bus-to-phys queries.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > Reviewed-by: David Vrabel <david.vrabel@citrix.com>
-> > 
-> > 
-> > Changes in v4:
-> > - add err_out label in xen_dma_add_entry;
-> > - remove INVALID_ADDRESS, use DMA_ERROR_CODE instead;
-> > - code style fixes;
-> > - add in-code comments regarding the usage of xen_dma_seg[0].dma_addr.
-> > 
-> > Changes in v3:
-> > - many code style and name changes;
-> > - improve error checks in xen_dma_add_entry.
-> > ---
-> >  drivers/xen/swiotlb-xen.c |  172 ++++++++++++++++++++++++++++++++++++++++----
-> >  1 files changed, 156 insertions(+), 16 deletions(-)
-> > 
-> > diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-> > index b72f31c..8a403a0 100644
-> > --- a/drivers/xen/swiotlb-xen.c
-> > +++ b/drivers/xen/swiotlb-xen.c
-> > @@ -38,32 +38,148 @@
-> >  #include <linux/bootmem.h>
-> >  #include <linux/dma-mapping.h>
-> >  #include <linux/export.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/spinlock_types.h>
-> > +#include <linux/rbtree.h>
-> >  #include <xen/swiotlb-xen.h>
-> >  #include <xen/page.h>
-> >  #include <xen/xen-ops.h>
-> >  #include <xen/hvc-console.h>
-> > +#include <xen/features.h>
-> >  /*
-> >   * Used to do a quick range check in swiotlb_tbl_unmap_single and
-> >   * swiotlb_tbl_sync_single_*, to see if the memory was in fact allocated by this
-> >   * API.
-> >   */
-> >  
-> > +#define NR_DMA_SEGS  ((xen_io_tlb_nslabs + IO_TLB_SEGSIZE - 1) / IO_TLB_SEGSIZE)
-> >  static char *xen_io_tlb_start, *xen_io_tlb_end;
-> >  static unsigned long xen_io_tlb_nslabs;
-> >  /*
-> >   * Quick lookup value of the bus address of the IOTLB.
-> >   */
-> >  
-> > -static u64 start_dma_addr;
-> > +struct xen_dma_info {
-> > +	dma_addr_t dma_addr;
-> > +	phys_addr_t phys_addr;
-> > +	size_t size;
-> > +	struct rb_node rbnode;
-> > +};
-> > +
-> > +/*
-> > + * This array of struct xen_dma_info is indexed by physical addresses,
-> > + * starting from virt_to_phys(xen_io_tlb_start). Each entry maps
-> > + * (IO_TLB_SEGSIZE << IO_TLB_SHIFT) bytes, except the last one that is
-> > + * smaller. Getting the dma address corresponding to a given physical
-> > + * address can be done by direct access with the right index on the
-> > + * array.
-> > + */
-> > +static struct xen_dma_info *xen_dma_seg;
-> > +/* 
-> > + * This tree keeps track of bus address to physical address
-> > + * mappings.
-> > + */
-> > +static struct rb_root bus_to_phys = RB_ROOT;
-> > +/* This lock protects operations on the bus_to_phys tree */
-> > +static DEFINE_SPINLOCK(xen_bus_to_phys_lock);
-> > +
-> > +static int xen_dma_add_entry(struct xen_dma_info *new)
-> > +{
-> > +	struct rb_node **link = &bus_to_phys.rb_node;
-> > +	struct rb_node *parent = NULL;
-> > +	struct xen_dma_info *entry;
-> > +	int rc = 0;
-> > +
-> > +	spin_lock(&xen_bus_to_phys_lock);
-> > +
-> > +	while (*link) {
-> > +		parent = *link;
-> > +		entry = rb_entry(parent, struct xen_dma_info, rbnode);
-> > +
-> > +		if (new->dma_addr == entry->dma_addr) {
-> > +			spin_unlock(&xen_bus_to_phys_lock);
-> > +			pr_warn("%s: cannot add phys=0x%pa -> dma=0x%pa, the dma address is already present, mapping to 0x%pa\n",
-> > +					__func__, &new->phys_addr,
-> > +					&new->dma_addr, &entry->phys_addr);
-> > +			rc = -EINVAL;
-> > +			goto err_out;
-> > +		}
-> > +		if (new->phys_addr == entry->phys_addr) {
-> > +			spin_unlock(&xen_bus_to_phys_lock);
-> > +			pr_warn("%s: cannot add phys=0x%pa -> dma=0x%pa, the phys address is already present, mapping to 0x%pa\n",
-> > +					__func__, &new->phys_addr,
-> > +					&new->dma_addr, &entry->dma_addr);
-> > +			rc = -EINVAL;
-> 
-> You didn't test this logic path, did you :-)
-> 
-> See the double spin_unlock?
-> 
-> I was thinking you could have the pr_warn in the err_out
-> label code.
+On Thu, Aug 29, 2013 at 8:17 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> Russ Dill <Russ.Dill@ti.com> writes:
+>
+>> On Tue, Aug 27, 2013 at 3:44 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>>> [+Mark Brown for regulator suspend sequence ideas]
+>>>
+>>> Russ Dill <Russ.Dill@ti.com> writes:
+>>>
+>>>> On Wed, Aug 14, 2013 at 6:38 AM, Jan L?bbe <jlu@pengutronix.de> wrote:
+>>>>> On Tue, 2013-08-13 at 15:20 -0700, Russ Dill wrote:
+>> [snip]
+>>>>> Shouldn't the TPS driver know how to generate this sequence? It seems
+>>>>> fragile to do voltage adjustments behind the back of the regulator
+>>>>> framework and the TPS driver. The wake-sequence values should match the
+>>>>> (in-memory) regulator configuration on resume (which may have been
+>>>>> changed by DVFS).
+>>>>
+>>>> The sequence is both PMIC specific and board specific. Additionally,
+>>>> the PMICs used aren't am335x specific. It would be nice to have the
+>>>> regulator framework and the driver write all this out, but the
+>>>> sequence is written out by the Cortex-M3 processor running some PM
+>>>> firmware. Even if the code was changed to run on the A8, it'd have to
+>>>> run from a small piece of SRAM.
+>>>
+>>> So, why/how was the decision made to use the M3 instead of the MPU
+>>> running from SRAM?
+>>>
+>>> As a firmware minimalist, I obviously prefer to do this from the MPU
+>>> side.  But also, because the M3 is reset every suspend sequence, this
+>>> becomes rather heavy to do from the M3.
+>>
+>> After the feedback Vaibhav Bedia received on v2 of his suspend/resume
+>> patchset for am335x, he decided to move many of the operations from
+>> sleep33xx.S into the M3 firmware.
+>>
+>> See the commit message here:
+>> http://arago-project.org/git/projects/?p=am33x-cm3.git;a=commit;h=a972ce2f6
+>
+> Was this feedback on the public lists?  That patch has never been posted
+> to linux-omap AFAICT.
+>
+>> I need to wait until after the PLLs are put into bypass, which is now
+>> done in the M3 firmware. It also ends up being a lot easier to write
+>> the I2C writer code there in C rather than in assembly in sleep33xx.S.
+>
+> hmm, (carefully) written functions in C can still be copied to SRAM.  I
+> dont' see that as an obstacle.
+>
+>>> Currently voltage scaling is only being proposed for suspend in this
+>>> series, but in theory it's possible from idle as well.  Doing this from
+>>> the MPU/SRAM seems much better suited for idle.
+>>
+>> The M3 firmware will also handle any cpuidle modes deeper than just
+>> putting SDRAM into self refresh. This is actually the only way of
+>> doing things like turning the MPU domain off on am335x.
+>
+> Yes, it will have to handle the MPU/interconnect off parts but other
+> than that, that's the only thing it *has* to do (well, and handle wakeup
+> from the deep state.)  The rest of the stuff being piled into the M3 is
+> a result of software/firmware design decisions AFAICT.  As I predicted
+> when I first saw this SoC design, the firmware is getting bigger and
+> bigger.  Initially it was argued that it would be tiny, and only handle
+> the things it had to do.  Now it's growing due to "convenience".  IMO,
+> this is a bad trend, and one that will make this code more and more
+> difficult to maintain upstream (assuming that's a goal.)
 
-good suggestion, I'll do that
+Do you mean upstream as in the firmware upstream, or upstream as in
+the kernel upstream? Upstream kernel is really easy to maintain
+because sleep33xx.S just puts the SDRAM into self-refresh.
 
+The code to perform these transitions is going to exist, either in
+kernel or in firmware. If you are looking for this to be maintainable
+C code that is copied into SRAM, it will need to be built much like a
+firmware, with it's elf sections being copied into SRAM properly. I'm
+not sure how much it complicates things, but the code needs to be able
+to run with the MMU on and MMU off. The C code would be a minimalized
+duplication of much of what is already in mach-omap2. Because you are
+proposing to split this up between A8 and M3, much of that code would
+then be duplicated again within the M3 firmware.
 
-> Did you run any performance tests to see if adding the extra
-> spinlock (as the native SWIOTLB already has its own lock) and handling
-> of the tree is affecting it?
-> 
-> In the worst case when we do need to use the bounce buffer we end
-> up using two spinlocks.
-> 
-> Is there perhaps a better way? Could we eliminate the usage of the
-> spinlocks by doing some hashing and on the red-black trees having
-> a lock? And moving that in the SWIOTLB generic code? Similar to how
-> we do M2P or tmem does it? That would mean we could split up the
-> mega 64MB buffer in smaller chunks - as the code (swiotlb) already
-> assumes IO_TLB_SEGSIZE (128) slabs to allocate - which is 512kB
-> contingous memory (If memory serves right). Altering the underlaying
-> code from using an array to using an  hash and from the hash
-> entries use the red-black trees. Or perhaps another array.
-> Obviously you still need to reference the dma to virtual address
-> lookup from the tree (as you have done here).
-> 
-> P.S.
-> I am also the SWIOTLB maintainer, so it is OK to modify the SWIOTLB
-> to be faster.
+And don't forget that am335x is just the first platform with such a PM scheme.
 
-I haven't done any measurements but consider that the spin_lock is
-already only used to access the red-black tree that keeps track of
-dma_addr -> phys_addr mappings.
-So it's taken at setup time once, then every time we call
-xen_bus_to_phys and the guest is an autotraslate guest.
-If the guest is not autotraslate there are no additional locks.
-
-That makes me realize that we don't need any spin_locks at all: there
-are no risks of concurrent accesses and modifications of the tree
-because there are no changes on the tree once it's setup at boot time.
-We can get rid of the spin_lock entirely as concurrent read accesses on
-the tree are obviously fine.
+Because the M3 firmware already has to manage power domains, hwmods,
+plls, and clockdomains, adding or removing which ones it handles
+doesn't really change the size or complexity of the firmware. In fact,
+because so much of the code is common code, moving this into kernel
+would just mean making two copies of the firmware with different steps
+to be run, one for the A8 SRAM, one for the M3.
