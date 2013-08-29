@@ -1,48 +1,97 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 29 Aug 2013 16:49:29 +0100
-Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
-In-Reply-To: <CAGa+x85u0OpB9o71xUTs15wt8Te-o5f0C9o22GHzZwOjn5F6=w@mail.gmail.com>
-References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
- <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
- <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
- <87txiasqhk.fsf@linaro.org>
- <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
- <20130829110534.GV10783@sirena.org.uk>
- <CAGa+x85u0OpB9o71xUTs15wt8Te-o5f0C9o22GHzZwOjn5F6=w@mail.gmail.com>
-Message-ID: <20130829154929.GJ10783@sirena.org.uk>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Thu, 29 Aug 2013 08:53:18 -0700
+Subject: 3.11-rc7 big-endian support
+In-Reply-To: <20130829122810.6f4c4e7a@skate>
+References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
+ <521D21D9.8020106@codethink.co.uk> <20130829115951.4d6df89b@skate>
+ <521F2119.8080204@codethink.co.uk> <20130829122810.6f4c4e7a@skate>
+Message-ID: <CAA3XUr1tW8tra+4G2Fcwsb7tasZZLfCrR8e=4j+LWUcbhQZF=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 08:29:37AM -0700, Kevin Hilman wrote:
-> On Thu, Aug 29, 2013 at 4:05 AM, Mark Brown <broonie@kernel.org> wrote:
+Hi Ben,
 
-> > Someone is going to have to walk me through the context for me to fully
-> > understand what this is all about - what's the problem?
+I wonder is it possible for you to review,
+pick up, and include into your series this patch
 
-> The basic problem is how to have low-level platform code (or possibly
-> firmware) send commands to a regulator to scale voltage.  This has to
-> happen *very* late in the suspend process, so having the drivers do it
-> themselves is not feasible.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/195176.html
+([PATCH v3 0/1] ARM: signal: sigreturn_codes should be endian neutral
+to work in BE8)
 
-Why does it have to happen this late and are the sequences definitely
-fixed ones not ones that could depend on the system state at the time
-we suspend?  It'd help to know what exactly is being controlled here...
+I think it is very much relevant to the effort.
 
-> The proposal in this series is to define the i2c commands sequence to
-> be sent to the regulator in the i2c node of the DT.  The
-> platform-specific code then reads the sequence from the DT and sends
-> the commands (or in in the case of the current series, passes the
-> sequence to some firmware on a microcontroller which does the
-> sequence.)
+It was tested on top of your series. And as far as I know
+it is single patch outside of your series needed so BE
+Linux LTP testing result will match LE results on the
+same kernel h/w.
 
-Surely specifying things in terms of the actual sequence would be better
-than trying to specify the I2C commands if you want this to be done from
-Linux?  If the firmware has to cope directly then this would require the
-firmware to understand what it's doing of course.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130829/36460f8a/attachment.sig>
+Thanks,
+Victor
+
+
+On 29 August 2013 03:28, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Dear Ben Dooks,
+>
+> On Thu, 29 Aug 2013 11:23:21 +0100, Ben Dooks wrote:
+>
+>> > I believe your patch series would get more attention if the cover
+>> > letter was a bit better. It lacks a version number and a changelog. The
+>> > new posting you made as "re-send patch series due to mta issues" does
+>> > not even have a cover letter.
+>>
+>> That was in-reply to as it seems that some of the messages never made
+>> it back to me due to a mta issue at my end that needed fixing.
+>
+> Agreed, but even your original cover letter "3.11-rc7 big-endian
+> support" is far from containing the needed information: a title that
+> contains a version number, and proper changelog with all the changes
+> between all the different versions. You've been in the kernel
+> community for a much longer time than me, I'm sure you know perfectly
+> how to do this properly.
+>
+>> > Also, none of the patches are Cc'ed to the relevant maintainers, so I'm
+>> > not sure how you expect those maintainers to look at your patches?
+>>
+>> I actually left the machine specific ones in this series as a convenient
+>> place to keep them before producing a tree for submission.
+>
+> Still, I believe the relevant maintainers should be Cc'ed so that you
+> can start collecting their Acked-by/Tested-by.
+>
+>> > Regarding mvebu, the below patch is needed to get the secondary CPUs to
+>> > boot. Other than that, on Armada XP:
+>> >
+>> > Tested-by: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
+>>
+>> I will fix up the original patch, as it seems to have gotten out of sync
+>> with the change to add the coherency fabric code.
+>
+> Yeah, the automatic merge with the coherency fabric changes did the
+> wrong choice. Anyway, not a big issue.
+>
+>> > It doesn't work yet on Armada 370, but I'm not sure it's due to your
+>> > patches and anyway isn't a regression since LE continues to work fine
+>> > on Armada 370.
+>>
+>> I wonder if it is due to a bootloader issue. I will push out the atags
+>> branch later today and you can try that.
+>
+> I might try some of your earlier branches that are based on 3.10 and
+> have the ATAGS thing, just to see how it behaves on Armada 370. But I'm
+> not using ATAG_DTB_COMPAT, so normally ATAGS endianness should not be a
+> problem.
+>
+> Thanks,
+>
+> Thomas
+> --
+> Thomas Petazzoni, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
