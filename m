@@ -1,150 +1,73 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 29 Aug 2013 10:55:18 -0500
-Subject: [PATCHv3 1/4] arm: dts: Add clock entries for timers in SOCFPGA
-In-Reply-To: <20130828153127.GA17806@pengutronix.de>
-References: <1377118427-20644-1-git-send-email-dinguyen@altera.com>
- <20130828153127.GA17806@pengutronix.de>
-Message-ID: <1377791718.26261.16.camel@linux-builds1>
+From: anup@brainfault.org (Anup Patel)
+Date: Thu, 29 Aug 2013 21:32:50 +0530
+Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
+ with external L3-cache.
+In-Reply-To: <20130829125337.GG13704@arm.com>
+References: <3ebe469fcf451cc7396dd2a5d3f01272@www.loen.fr>
+ <CAAhSdy3WwZcLW6s05mV=Mn8=w8TcubTdYrgNqAChqiHxXC53eg@mail.gmail.com>
+ <747a0675165da4ef147bbda4e140549b@www.loen.fr>
+ <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
+ <5935339137684ecf90dd484cc5739548@www.loen.fr>
+ <20130815165344.GA3853@cbox>
+ <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
+ <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
+ <20130829105235.GC13704@arm.com>
+ <CAAhSdy0NgSchR1p_HJTUMMV2h7f7beFMnN3Md4xEp=EGRiXVMg@mail.gmail.com>
+ <20130829125337.GG13704@arm.com>
+Message-ID: <CAAhSdy3076pYM=nh0OTm_pxBdPAtCPbw96zExYuRvcdYD656PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steffen,
+On Thu, Aug 29, 2013 at 6:23 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Thu, Aug 29, 2013 at 01:31:43PM +0100, Anup Patel wrote:
+>> On Thu, Aug 29, 2013 at 4:22 PM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>> > On Fri, Aug 16, 2013 at 07:57:55AM +0100, Anup Patel wrote:
+>> >> The approach of flushing d-cache by set/way upon first run of VCPU will
+>> >> not work because for set/way operations ARM ARM says: "For set/way
+>> >> operations, and for All (entire cache) operations, the point is defined to be
+>> >> to the next level of caching". In other words, set/way operations work upto
+>> >> point of unification.
+>> >
+>> > I don't understand where you got the idea that set/way operations work
+>> > up to the point of unification. This is incorrect, the set/way
+>> > operations work on the level of cache specified by bits 3:1 in the
+>> > register passed to the DC CISW instruction. For your L3 cache, those
+>> > bits would be 2 (and __flush_dcache_all() implementation does this
+>> > dynamically).
+>>
+>> The L3-cache is not visible to CPU. It is totally independent and transparent
+>> to CPU.
+>
+> OK. But you say that operations like DC CIVAC actually flush the L3? So
+> I don't see it as completely transparent to the CPU.
 
-On Wed, 2013-08-28 at 17:31 +0200, Steffen Trumtrar wrote:
-> Hi!
-> 
-> On Wed, Aug 21, 2013 at 03:53:44PM -0500, dinguyen at altera.com wrote:
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > Set the correct clock entries for the the timers, and also clean up
-> > the timer entries for SOCFPGA by removing timer<n> in the timer entry.
-> > 
-> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > CC: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Pawel Moll <pawel.moll@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > Cc: Ian Campbell <ian.campbell@citrix.com>
-> > CC: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Olof Johansson <olof@lixom.net>
-> > CC: Jamie Iles <jamie@jamieiles.com>
-> > Cc: John Stultz <john.stultz@linaro.org>
-> > Cc: Heiko Stuebner <heiko@sntech.de>
-> > Cc: Pavel Machek <pavel@denx.de>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > ---
-> >  arch/arm/boot/dts/socfpga.dtsi         |   16 ++++++++--------
-> >  arch/arm/boot/dts/socfpga_cyclone5.dts |    8 ++++----
-> >  arch/arm/boot/dts/socfpga_vt.dts       |    8 ++++----
-> >  3 files changed, 16 insertions(+), 16 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> > index 9706767..9957bae 100644
-> > --- a/arch/arm/boot/dts/socfpga.dtsi
-> > +++ b/arch/arm/boot/dts/socfpga.dtsi
-> > @@ -26,10 +26,6 @@
-> >  		ethernet1 = &gmac1;
-> >  		serial0 = &uart0;
-> >  		serial1 = &uart1;
-> > -		timer0 = &timer0;
-> > -		timer1 = &timer1;
-> > -		timer2 = &timer2;
-> > -		timer3 = &timer3;
-> >  	};
-> >
-> 
-> Yes. Do that.
-> 
-> >  	cpus {
-> > @@ -486,28 +482,32 @@
-> >  			interrupts = <1 13 0xf04>;
-> >  		};
-> >  
-> > -		timer0: timer0 at ffc08000 {
-> > +		timer at ffc08000 {
-> 
-> No. Why? Than I can not write something like
-> 
-> &timer0 {
-> 	clock-frequency = <100000000>;
-> };
-> 
-> and would have to reference the whole tree ala
-> 
-> / {
-> 	soc {
-> 		timer at ffc08000 {
-> 			clock-frequency = <100000000>;
-> 		};
-> 	};
-> };
-> 
-> in a boardspecific or SoC specific file (see below).
+It is transparent from CPU perspective. In other words, there is nothing in
+CPU for controlling/monitoring L3-cache.
 
-Agreed. Will adjust accordingly.
+>
+> Do you have any configuration bits which would make the L3 completely
+> transparent like always caching even when accesses are non-cacheable and
+> DC ops to PoC ignoring it?
 
-> 
-> > diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
-> > index 698dde9..c1af01c 100644
-> > --- a/arch/arm/boot/dts/socfpga_cyclone5.dts
-> > +++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
-> >  
-> > diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-> > index 6f23121..72ff14c 100644
-> > --- a/arch/arm/boot/dts/socfpga_vt.dts
-> > +++ b/arch/arm/boot/dts/socfpga_vt.dts
-> 
-> Leads me to a question about terminology: Is the cyclone5 an actual board?
-> AFAIK it is. And the Cyclone 5 FPGA is also called socfpga? Is that correct?
-> But then, seeing that, in an other patch, you add two different sysmgr addresses to
-> the socfpga_vt and socfpga_cyclone5, there are different socfpgas?
+Actually, L3-cache monitors the types of read/write generated by CPU (i.e.
+whether the request is cacheable/non-cacheable or whether the request is
+due to DC ops to PoC, or ...).
 
-Yes, sofpga_cyclone5.dts is the devkit that is manufactured by Altera.
-socfpga_vt.dts is a virtual platform for SOCFPGA. You can get the
-virtual platform from Synopsis. It mimics everything except the FPGA. 
+To answer your query, there is no configuration to have L3 caching when
+accesses are non-cacheable and DC ops to PoC.
 
-socfpga is the base SOC with a Cyclone 5 FPGA on it. I'll be upstreaming
-socfpga_arria5 soon, which has the SOCFPGA + Arria 5 FPGA.
+>
+> Now, back to the idea of outer_cache framework for arm64. Does your CPU
+> have separate instructions for flushing this L3 cache?
 
-> 
-> I want to write a devicetree for the SoCkit. It has a Cyclone 5 on it.
-> So naturally I would now go and include the socfpga_cyclone5.dtsi, with all the
-> cyclone5 stuff and just add my board specific stuff in a socfpga_sockit.dts.
-> But there is no socfpga_cyclone5.dtsi, just the socfpga_cyclone5.dts, which itself
-> seems to be a board...
+No, CPU does not have separate instruction for flushing L3-cache. On the
+other hand, L3-cache has MMIO registers which can be use to explicitly
+flush L3-cache.
 
-socfpga.dtsi is the base DTSI for the platform. In hindsight, I should
-have named it a bit different, but for now socfpga_cyclone5 is for the
-board.
+>
+> --
+> Catalin
 
-> 
-> So, how should we reorder the current dts (as I tested with current mainline, the
-> support is completely broken out of the box, but works fine with your patches that
-> are floating around, there should be no users as of now)?
-
-Not sure what you mean by broken. I was able to boot 3.11-rc7 just now
-using an initramfs. As you can already tell, I'm doing my best to get
-more support for the platform upstream, but it will take time.
-
-In the meantim, you get our latest downstream kernel at:
-
-git://git.rocketboards.org/linux-socfpga.git
-
-Dinh
-
-> 
-> Something like:
-> 
-> socfpga.dtsi
->  -> socfpga_cyclone5.dtsi
->  --> socfpga_cyclone5_devboard.dts (?)
->  --> socfpga_sockit.dts
->  -> socfpga_???.dtsi
->  --> socfpga_vt.dts
-> 
-> ?
-> 
-> Thanks and regards,
-> Steffen
-> 
+--Anup
