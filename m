@@ -1,91 +1,53 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 29 Aug 2013 15:07:52 +0200
-Subject: [PATCH v3 2/6] media: s5p-tv: Restore vpll clock rate
-In-Reply-To: <1377706384-3697-3-git-send-email-m.krawczuk@partner.samsung.com>
-References: <1377706384-3697-1-git-send-email-m.krawczuk@partner.samsung.com>
- <1377706384-3697-3-git-send-email-m.krawczuk@partner.samsung.com>
-Message-ID: <6294819.7vFezjQcVy@amdc1227>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 29 Aug 2013 14:10:43 +0100
+Subject: [PATCH v3] ARM: xen: only set pm function ptrs for Xen guests
+In-Reply-To: <1377780232-13545-1-git-send-email-robherring2@gmail.com>
+References: <1377780232-13545-1-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.DEB.2.02.1308291409470.6397@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mateusz,
-
-Generally this patch looks good, but I have some minor nitpicks, that I 
-would like to be fixed.
-
-On Wednesday 28 of August 2013 18:13:00 Mateusz Krawczuk wrote:
-> Restore vpll clock rate if start stream fail or stream is off.
+On Thu, 29 Aug 2013, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Signed-off-by: Mateusz Krawczuk <m.krawczuk@partner.samsung.com>
-> ---
->  drivers/media/platform/s5p-tv/sdo_drv.c | 24 ++++++++++++++++++++++--
->  1 file changed, 22 insertions(+), 2 deletions(-)
+> xen_pm_init was unconditionally setting pm_power_off and arm_pm_restart
+> function pointers. This breaks multi-platform kernels. Make this
+> conditional on running as a Xen guest and make it a late_initcall to
+> ensure it is setup after platform code for Dom0.
 > 
-> diff --git a/drivers/media/platform/s5p-tv/sdo_drv.c
-> b/drivers/media/platform/s5p-tv/sdo_drv.c index 0afa90f..9dbdfe6 100644
-> --- a/drivers/media/platform/s5p-tv/sdo_drv.c
-> +++ b/drivers/media/platform/s5p-tv/sdo_drv.c
-> @@ -55,6 +55,8 @@ struct sdo_device {
->  	struct clk *dacphy;
->  	/** clock for control of VPLL */
->  	struct clk *fout_vpll;
-> +	/** vpll rate before sdo stream was on */
-> +	int vpll_rate;
+> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 
-Clock frequency should be stored in an unsigned long. (See the return type 
-of clk_get_rate().)
 
->  	/** regulator for SDO IP power */
->  	struct regulator *vdac;
->  	/** regulator for SDO plug detection */
-> @@ -193,17 +195,34 @@ static int sdo_s_power(struct v4l2_subdev *sd, int
-> on)
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+Added to my queue.
+
+
+>  arch/arm/xen/enlighten.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
->  static int sdo_streamon(struct sdo_device *sdev)
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index 8a6295c..7071fca 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -273,12 +273,15 @@ core_initcall(xen_guest_init);
+>  
+>  static int __init xen_pm_init(void)
 >  {
-> +	int ret;
+> +	if (!xen_domain())
+> +		return -ENODEV;
 > +
->  	/* set proper clock for Timing Generator */
-> -	clk_set_rate(sdev->fout_vpll, 54000000);
-> +	sdev->vpll_rate = clk_get_rate(sdev->fout_vpll);
-> +	ret = clk_set_rate(sdev->fout_vpll, 54000000);
-> +	if (ret < 0) {
-> +		dev_err(sdev->dev,
-> +			"Failed to set vpll rate!\n");
-> +		return ret;
-> +	}
->  	dev_info(sdev->dev, "fout_vpll.rate = %lu\n",
->  	clk_get_rate(sdev->fout_vpll));
->  	/* enable clock in SDO */
->  	sdo_write_mask(sdev, SDO_CLKCON, ~0, SDO_TVOUT_CLOCK_ON);
-> -	clk_enable(sdev->dacphy);
-> +	ret = clk_enable(sdev->dacphy);
-> +	if (ret < 0) {
-> +		dev_err(sdev->dev,
-> +			"clk_enable(dacphy) failed !\n");
-> +		goto fail;
-> +	}
->  	/* enable DAC */
->  	sdo_write_mask(sdev, SDO_DAC, ~0, SDO_POWER_ON_DAC);
->  	sdo_reg_debug(sdev);
+>  	pm_power_off = xen_power_off;
+>  	arm_pm_restart = xen_restart;
+>  
 >  	return 0;
-
-nit: Please insert a blank line here.
-
-Best regards,
-Tomasz
-
-> +fail:
-> +	sdo_write_mask(sdev, SDO_CLKCON, 0, SDO_TVOUT_CLOCK_ON);
-> +	clk_set_rate(sdev->fout_vpll, sdev->vpll_rate);
-> +	return ret;
 >  }
+> -subsys_initcall(xen_pm_init);
+> +late_initcall(xen_pm_init);
+>  
+>  static irqreturn_t xen_arm_callback(int irq, void *arg)
+>  {
+> -- 
+> 1.8.1.2
 > 
->  static int sdo_streamoff(struct sdo_device *sdev)
-> @@ -220,6 +239,7 @@ static int sdo_streamoff(struct sdo_device *sdev)
->  	}
->  	if (tries == 0)
->  		dev_err(sdev->dev, "failed to stop streaming\n");
-> +	clk_set_rate(sdev->fout_vpll, sdev->vpll_rate);
->  	return tries ? 0 : -EIO;
->  }
