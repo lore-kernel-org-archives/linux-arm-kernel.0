@@ -1,171 +1,66 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 29 Aug 2013 16:16:20 +0300
-Subject: [PATCHv6 28/45] ARM: dts: AM35xx: use DT clock data
-In-Reply-To: <1377782197-10611-1-git-send-email-t-kristo@ti.com>
-References: <1377782197-10611-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1377782197-10611-29-git-send-email-t-kristo@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 29 Aug 2013 09:51:50 -0400
+Subject: [PATCH v2 2/3] ARM: OMAP4+: Move SRAM data to DT
+In-Reply-To: <521F519E.9040204@ti.com>
+References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
+ <1377775391-13103-3-git-send-email-rnayak@ti.com> <521F4BE9.60004@ti.com>
+ <521F4D41.4010303@ti.com> <521F519E.9040204@ti.com>
+Message-ID: <521F51F6.90405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM35xx now uses the clock data from device tree. Most of the data is
-shared with OMAP3xxx, but as there is some delta, a new base .dtsi
-file is also created for the SoC.
-
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/boot/dts/am3517-evm.dts        |    2 +-
- arch/arm/boot/dts/am3517.dtsi           |  116 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/am3517_mt_ventoux.dts |    2 +-
- 3 files changed, 118 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/am3517.dtsi
-
-diff --git a/arch/arm/boot/dts/am3517-evm.dts b/arch/arm/boot/dts/am3517-evm.dts
-index e99dfaf..9ff51d7 100644
---- a/arch/arm/boot/dts/am3517-evm.dts
-+++ b/arch/arm/boot/dts/am3517-evm.dts
-@@ -7,7 +7,7 @@
-  */
- /dts-v1/;
- 
--#include "omap34xx.dtsi"
-+#include "am3517.dtsi"
- 
- / {
- 	model = "TI AM3517 EVM (AM3517/05)";
-diff --git a/arch/arm/boot/dts/am3517.dtsi b/arch/arm/boot/dts/am3517.dtsi
-new file mode 100644
-index 0000000..47aa7c2
---- /dev/null
-+++ b/arch/arm/boot/dts/am3517.dtsi
-@@ -0,0 +1,116 @@
-+/*
-+ * Device Tree Source for AM3517 SoC
-+ *
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+#include "omap3.dtsi"
-+
-+/ {
-+	cpus {
-+		cpu at 0 {
-+			/* OMAP343x/OMAP35xx variants OPP1-5 */
-+			operating-points = <
-+				/* kHz    uV */
-+				125000   975000
-+				250000  1075000
-+				500000  1200000
-+				550000  1270000
-+				600000  1350000
-+			>;
-+			clock-latency = <300000>; /* From legacy driver */
-+		};
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		/include/ "am35xx-clocks.dtsi"
-+		/include/ "omap36xx-am35xx-omap3430es2plus-clocks.dtsi"
-+	};
-+
-+	clockdomains {
-+		dss_clkdm: dss_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&dss1_alwon_fck_3430es2>, <&dss_ick_3430es2>;
-+		};
-+
-+		usbhost_clkdm: usbhost_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&usbhost_48m_fck>, <&usbhost_ick>;
-+		};
-+
-+		core_l4_clkdm: core_l4_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&mmchs1_ick>, <&mmchs2_ick>, <&hdq_fck>,
-+				 <&uart1_ick>, <&mcspi4_fck>, <&i2c3_fck>,
-+				 <&mcspi2_ick>, <&uart2_ick>, <&mcspi3_ick>,
-+				 <&i2c1_fck>, <&hdq_ick>, <&sha12_ick>,
-+				 <&mcbsp5_ick>, <&mcspi3_fck>, <&aes2_ick>,
-+				 <&mcspi1_ick>, <&uart2_fck>, <&mmchs2_fck>,
-+				 <&mmchs1_fck>, <&i2c3_ick>, <&mcspi1_fck>,
-+				 <&mcspi4_ick>, <&omapctrl_ick>, <&mcbsp1_ick>,
-+				 <&mcspi2_fck>, <&gpt10_ick>, <&i2c2_fck>,
-+				 <&i2c2_ick>, <&gpt11_ick>, <&i2c1_ick>,
-+				 <&uart1_fck>;
-+		};
-+
-+		wkup_clkdm: wkup_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&wdt1_ick>, <&gpt12_ick>, <&gpio1_ick>,
-+				 <&gpt1_ick>, <&omap_32ksync_ick>, <&wdt2_ick>,
-+				 <&wdt2_fck>;
-+		};
-+
-+		dpll4_clkdm: dpll4_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&dpll4_ck>;
-+		};
-+
-+		core_l3_clkdm: core_l3_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&sdrc_ick>;
-+		};
-+
-+		per_clkdm: per_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&gpt2_ick>, <&uart3_fck>, <&gpio3_ick>,
-+				 <&mcbsp2_ick>, <&gpt6_ick>, <&mcbsp4_ick>,
-+				 <&gpt4_ick>, <&mcbsp3_ick>, <&gpt8_ick>,
-+				 <&uart3_ick>, <&gpt5_ick>, <&gpt7_ick>,
-+				 <&gpio2_ick>, <&gpio6_ick>, <&gpt9_ick>,
-+				 <&gpt3_ick>, <&gpio5_ick>, <&wdt3_ick>,
-+				 <&gpio4_ick>, <&wdt3_fck>, <&uart4_ick>;
-+		};
-+
-+		emu_clkdm: emu_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&emu_src_ck>;
-+		};
-+
-+		sgx_clkdm: sgx_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&sgx_ick>;
-+		};
-+
-+		dpll3_clkdm: dpll3_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&dpll3_ck>;
-+		};
-+
-+		dpll5_clkdm: dpll5_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&dpll5_ck>;
-+		};
-+
-+		dpll1_clkdm: dpll1_clkdm {
-+			compatible = "ti,clockdomain";
-+			clocks = <&dpll1_ck>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/am3517_mt_ventoux.dts b/arch/arm/boot/dts/am3517_mt_ventoux.dts
-index fdf5ce6..d00e934 100644
---- a/arch/arm/boot/dts/am3517_mt_ventoux.dts
-+++ b/arch/arm/boot/dts/am3517_mt_ventoux.dts
-@@ -7,7 +7,7 @@
-  */
- /dts-v1/;
- 
--#include "omap34xx.dtsi"
-+#include "am3517.dtsi"
- 
- / {
- 	model = "TeeJet Mt.Ventoux";
--- 
-1.7.9.5
+On Thursday 29 August 2013 09:50 AM, Rajendra Nayak wrote:
+> On Thursday 29 August 2013 07:01 PM, Santosh Shilimkar wrote:
+>> On Thursday 29 August 2013 09:26 AM, Sekhar Nori wrote:
+>>> On 8/29/2013 4:53 PM, Rajendra Nayak wrote:
+>>>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>>>> index 22d9f2b..1ba6a77 100644
+>>>> --- a/arch/arm/boot/dts/omap4.dtsi
+>>>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>>>> @@ -126,6 +126,11 @@
+>>>>  			pinctrl-single,function-mask = <0x7fff>;
+>>>>  		};
+>>>>  
+>>>> +		ocmcram: ocmcram at 40304000 {
+>>>
+>>> This can now be changed to 0x40300000 now that you have moved to
+>>> gen_pool_alloc()?
+>>>
+>> NO.
+>> It won't work on secure devices since first 16 KB is occupied for
+>> default configuration. Its not worth trouble also to handle
+>> secure/non-secure considering the use of SRAM which is actually just
+>> limited to errata. 40304000 will work for both devices.
+> 
+> Right. Sekhar, you might have confused because of the existing buggy code
+> in sram.c and sram.h which did this (and is removed in this series)
+> 
+> from sram.c
+> -----------
+>  #define OMAP2_SRAM_PUB_PA	(OMAP2_SRAM_PA + 0xf800)
+>  #define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
+> -#ifdef CONFIG_OMAP4_ERRATA_I688
+> -#define OMAP4_SRAM_PUB_PA	OMAP4_SRAM_PA
+> -#else
+> -#define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
+> -#endif
+> -#define OMAP5_SRAM_PA		0x40300000
+>  
+> from sram.h
+> -----------
+>  #define OMAP2_SRAM_PA		0x40200000
+>  #define OMAP3_SRAM_PA           0x40200000
+> -#ifdef CONFIG_OMAP4_ERRATA_I688
+> -#define OMAP4_SRAM_PA		0x40304000
+> -#define OMAP4_SRAM_VA		0xfe404000
+> -#else
+> -#define OMAP4_SRAM_PA		0x40300000
+> -#endif
+> 
+> I am not sure where the checks for CONFIG_OMAP4_ERRATA_I688
+> came in from, but these are done, like Santosh said, to handle
+> secure and non-secure sram across GP and HS devices and in
+> no way related to handling errata I688.
+> 
+The check was to ensure that with errata enabled, we don't care
+about first 16 KB ;-)
