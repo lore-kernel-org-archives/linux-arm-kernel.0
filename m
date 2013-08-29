@@ -1,59 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Aug 2013 13:20:45 -0700
-Subject: [GIT PULL] late ux500 changes for v3.12
-In-Reply-To: <CACRpkdYOoG87uvgB5e4DdVJqrzFwOVRv6pgiUq2P-zz_gxPTCw@mail.gmail.com>
-References: <CACRpkdYOoG87uvgB5e4DdVJqrzFwOVRv6pgiUq2P-zz_gxPTCw@mail.gmail.com>
-Message-ID: <20130829202045.GN18542@quad.lixom.net>
+Date: Thu, 29 Aug 2013 13:29:51 -0700
+Subject: [GIT PULL V2 3/3] 2nd Round Samsung mach-exynos-v2 for v3.12
+In-Reply-To: <232401cea37e$0afca7a0$20f5f6e0$%kim@samsung.com>
+References: <1f7701cea1f1$431f2d30$c95d8790$%kim@samsung.com>
+ <3145165.ZB7l3vNJ7a@amdc1032>
+ <CADGdYn7_Gm7rwkhRSUmvktB_hHNboY8eB5fi8E62-Br5Vk5D0A@mail.gmail.com>
+ <4070794.XxjluIqBpK@amdc1032>
+ <CADGdYn7YWscQ_EOqjbq29pNHvoxa0qqXHZeOBuz-Wi22H=Dc_w@mail.gmail.com>
+ <87bo4j6aii.fsf@linaro.org>
+ <232401cea37e$0afca7a0$20f5f6e0$%kim@samsung.com>
+Message-ID: <20130829202951.GR18542@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Aug 23, 2013 at 03:14:05PM +0200, Linus Walleij wrote:
-> Hi ARM SoC folks,
+On Wed, Aug 28, 2013 at 08:34:58AM +0900, Kukjin Kim wrote:
+> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
 > 
-> here is a late pull request for some cleanup for ux500 to be pulled
-> into the next-soc branch (this is based on the same branch as the
-> previous pull request for ux500-core).
-> 
-> Should be harmless: two fixes that would have gone into the -rc:s
-> anyway, and a cleanout of totally unused code.
-> 
-> Please pull it in.
-> 
-> Yours,
-> Linus Walleij
-> 
-> 
-> The following changes since commit 0a429fd15ecb05d7d5fa8eb4adaff69c7a00984b:
-> 
->   ARM: ux500: set coherent_dma_mask for dma40 (2013-08-19 22:49:25 +0200)
+>    Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-core-for-arm-soc-2
+>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+> tags/samsung-mach-exynos-v2
 > 
-> for you to fetch changes up to 1e66a3da4f7d73c027200fb18bb452fbde17fbd7:
-> 
->   ARM: ux500: fix up the I2C devices (2013-08-20 13:58:25 +0200)
-> 
-> ----------------------------------------------------------------
-> Ux500 core changes for ARM SoC:
-> - Cleanup from Julia Lawall
-> - Clean out old pin definitions
-> - Fix the I2C devices
-> 
-> ----------------------------------------------------------------
-> Julia Lawall (1):
->       arch/arm/mach-ux500/cpu-db8500.c: Avoid using ARRAY_AND_SIZE(e)
-> as a function argument
 
-This is a pretty unusual patch subject, feel free to rename them in the future
-when you apply patches.
-
-I've merged this in under a late/all branch, which we'll send up lateish in the
-merge window.
+Pulled into late/all.
 
 
 -Olof
