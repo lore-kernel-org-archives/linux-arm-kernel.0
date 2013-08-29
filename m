@@ -1,60 +1,51 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 29 Aug 2013 20:02:27 +0200
-Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
-In-Reply-To: <20130829171210.GM10783@sirena.org.uk>
-References: <20130828113459.48ecbb34@armhf> <521DCD33.2070008@gmail.com>
- <20130828121943.1c8327ca@skate> <521DD057.4040208@gmail.com>
- <20130829161217.GK10783@sirena.org.uk>
- <20130829163358.GS6617@n2100.arm.linux.org.uk>
- <20130829171210.GM10783@sirena.org.uk>
-Message-ID: <521F8CB3.5060407@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 29 Aug 2013 10:57:15 -0700
+Subject: linux-next: manual merge of the arm-soc tree with the pm tree
+In-Reply-To: <20130829180425.4aa3d164f01cc65b215187fe@canb.auug.org.au>
+References: <20130829180425.4aa3d164f01cc65b215187fe@canb.auug.org.au>
+Message-ID: <20130829175715.GH18542@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/13 19:12, Mark Brown wrote:
-> On Thu, Aug 29, 2013 at 05:33:58PM +0100, Russell King - ARM Linux wrote:
->> On Thu, Aug 29, 2013 at 05:12:17PM +0100, Mark Brown wrote:
->>> On Wed, Aug 28, 2013 at 12:26:31PM +0200, Sebastian Hesselbarth wrote:
->
->>>> Also, we'll need to distinguish between the different audio controllers
->>>> on a single SoC, i.e. i2s0 and i2s1. I suggest checking the (phys) reg
->>>> base passed.
->
->>> Why is this required - ideally this would have been mentioned in some of
->>> the previous reviews...
->
->> I've mentioned the differences between the blocks to you repeatedly in
->> our massive thread, including that some contain the block with different
->
-> You have described some additional features which will require
-> additional driver support.  I would expect that the device tree bindings
-> for these features would be added as the features are added and the DTS
-> files updated, for example by listing additional compatible strings if
-> that was the binding update, as is the normal practice.  Obviously any
-> hardware which is not compatible with the current binding should not be
-> being registered using the current binding.
->
-> It is not clear from the above comment by Sebastian if he is referring
-> to the same set of hardware differences or something new - doing things
-> based on device address is highly unusual, it sounds like something to
-> do with the integration into the SoC rather than to do with the IP.
->
+On Thu, Aug 29, 2013 at 06:04:25PM +1000, Stephen Rothwell wrote:
+> Hi all,
+> 
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> drivers/cpuidle/Makefile between commits b98e01ad4ed9 ("cpuidle: Add
+> Kconfig.arm and move calxeda, kirkwood and zynq") and d3f2950f2ade ("ARM:
+> ux500: cpuidle: Move ux500 cpuidle driver to drivers/cpuidle") from the
+> pm tree and commit 14d2c34cfa00 ("cpuidle: big.LITTLE: vexpress-TC2 CPU
+> idle driver") from the arm-soc tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
+> 
+> diff --cc drivers/cpuidle/Makefile
+> index 0b9d200,3b6445c..0000000
+> --- a/drivers/cpuidle/Makefile
+> +++ b/drivers/cpuidle/Makefile
+> @@@ -5,9 -5,7 +5,10 @@@
+>   obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
+>   obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+>   
+>  -obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
+>  -obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
+>  -obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
+>  -obj-$(CONFIG_CPU_IDLE_BIG_LITTLE) += cpuidle-big_little.o
+>  +##################################################################################
+>  +# ARM SoC drivers
+>  +obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
+>  +obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
+>  +obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
+>  +obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
+> ++obj-$(CONFIG_CPU_IDLE_BIG_LITTLE)       += cpuidle-big_little.o
 
-Mark,
 
-it is referring the same differences Russell already mentioned. But I
-already came to the conclusion, that we don't need the information in
-the binding. For example, if you use that controller on Dove and you
-hook it up for SPDIF-in (which it hasn't), than I consider this a
-DT bug. No need to double-check that in the driver. From that p-o-v,
-please just let the current binding as is.
+Might want to sort u8500 before zynq, but otherwise looks fine.
 
-Thomas Petazzoni mentioned earlier, that the _usual_ procedure to
-name the compatibles is to pick the SoC that the IP appeared in first.
-But I am also fine with "marvell,mvebu-audio" and adding compatibles
-for dove or kirkwood _if_ we will ever need them.
 
-Please, just stop fighting over this again - it is not getting anything
-any further.
-
-Sebastian
+-Olof
