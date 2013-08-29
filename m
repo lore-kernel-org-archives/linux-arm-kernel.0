@@ -1,48 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Aug 2013 19:34:32 +0100
-Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
-In-Reply-To: <20130829182010.GQ10783@sirena.org.uk>
-References: <20130828113459.48ecbb34@armhf> <521DCD33.2070008@gmail.com>
- <20130828121943.1c8327ca@skate> <521DD057.4040208@gmail.com>
- <20130829161217.GK10783@sirena.org.uk>
- <20130829163358.GS6617@n2100.arm.linux.org.uk>
- <20130829171210.GM10783@sirena.org.uk> <521F8CB3.5060407@gmail.com>
- <20130829182010.GQ10783@sirena.org.uk>
-Message-ID: <20130829183432.GT6617@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 29 Aug 2013 20:40:41 +0200
+Subject: [PATCH v5 2/3] ARM: bcm281xx: Enable GPIO driver
+In-Reply-To: <1377728173-30711-3-git-send-email-markus.mayer@linaro.org>
+References: <1377728173-30711-1-git-send-email-markus.mayer@linaro.org>
+ <1377728173-30711-3-git-send-email-markus.mayer@linaro.org>
+Message-ID: <CACRpkdbWnzcgjRZnUj5x6a42SZc2+fr5etT3_Z9zqjTz+qQB5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 07:20:11PM +0100, Mark Brown wrote:
-> On Thu, Aug 29, 2013 at 08:02:27PM +0200, Sebastian Hesselbarth wrote:
-> > 
-> > it is referring the same differences Russell already mentioned. But I
-> > already came to the conclusion, that we don't need the information in
-> > the binding. For example, if you use that controller on Dove and you
-> > hook it up for SPDIF-in (which it hasn't), than I consider this a
-> > DT bug. No need to double-check that in the driver. From that p-o-v,
-> > please just let the current binding as is.
-> 
-> OK, great - none of these devices have any differences which are visible
-> only within the controller, they're all extra external interfaces?
+On Thu, Aug 29, 2013 at 12:16 AM, Markus Mayer <markus.mayer@linaro.org> wrote:
 
-Dove Audio 0:
-	- I2S in
-	- I2S out
-	- No SPDIF
+> This patch adds the Kconfig and Makefile glue to compile the GPIO
+> driver for bcm281xx when CONFIG_GPIO_BCM=y.
+>
+> Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+(...)
 
-Dove Audio 1:
-	- I2S in
-	- I2S out
-	- SPDIF out only
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index b2450ba..b68e9b5 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -714,6 +714,11 @@ config GPIO_MSIC
+>           Enable support for GPIO on intel MSIC controllers found in
+>           intel MID devices
+>
+> +config GPIO_BCM_KONA
+> +       bool "Broadcom Kona GPIO"
+> +       help
+> +         Turn on GPIO support for Broadcom "Kona" chips.
+> +
+>  comment "USB GPIO expanders:"
+>
+>  config GPIO_VIPERBOARD
+> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+> index ef3e983..fcd0751 100644
+> --- a/drivers/gpio/Makefile
+> +++ b/drivers/gpio/Makefile
+> @@ -16,6 +16,7 @@ obj-$(CONFIG_GPIO_ADP5520)    += gpio-adp5520.o
+>  obj-$(CONFIG_GPIO_ADP5588)     += gpio-adp5588.o
+>  obj-$(CONFIG_GPIO_AMD8111)     += gpio-amd8111.o
+>  obj-$(CONFIG_GPIO_ARIZONA)     += gpio-arizona.o
+> +obj-$(CONFIG_GPIO_BCM_KONA)    += gpio-bcm-kona.o
+>  obj-$(CONFIG_GPIO_BT8XX)       += gpio-bt8xx.o
+>  obj-$(CONFIG_GPIO_CLPS711X)    += gpio-clps711x.o
+>  obj-$(CONFIG_GPIO_CS5535)      += gpio-cs5535.o
 
-Both these variants occur on the same SoC.
+Move these two hunks of the patch over to patch 1.
 
-Kirkwood:
-	- I2S in
-	- SPDIF in
-	- I2S out
-	- SPDIF out
+I prefer to have the driver added along with the Kconfig and
+Makefile changes.
 
-Preconditions:
-1. Only one input can be used at any one time.
-2. One output can be used or both if enabled simultaneously.
+Yours,
+Linus Walleij
