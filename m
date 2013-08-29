@@ -1,81 +1,128 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 29 Aug 2013 16:16:21 +0300
-Subject: [PATCHv6 29/45] ARM: OMAP3: use DT clock init if DT data is available
+Date: Thu, 29 Aug 2013 16:16:19 +0300
+Subject: [PATCHv6 27/45] ARM: dts: AM35xx clock data
 In-Reply-To: <1377782197-10611-1-git-send-email-t-kristo@ti.com>
 References: <1377782197-10611-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1377782197-10611-30-git-send-email-t-kristo@ti.com>
+Message-ID: <1377782197-10611-28-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP3 platforms support both DT and non-DT boot at the moment, make
-the clock init work according to the used setup.
+This patch creates a unique node for each AM35xx specific clock in the
+AM35xx power, reset and clock manager (PRCM). Most of the AM35xx clock
+data is shared with OMAP3xxx, this patch only creates the delta.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/clock3xxx.h |    4 ++++
- arch/arm/mach-omap2/io.c        |   13 ++++++++++++-
- 2 files changed, 16 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/am35xx-clocks.dtsi |  101 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 101 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am35xx-clocks.dtsi
 
-diff --git a/arch/arm/mach-omap2/clock3xxx.h b/arch/arm/mach-omap2/clock3xxx.h
-index 78d9f56..a5e2308 100644
---- a/arch/arm/mach-omap2/clock3xxx.h
-+++ b/arch/arm/mach-omap2/clock3xxx.h
-@@ -9,6 +9,10 @@
- #define __ARCH_ARM_MACH_OMAP2_CLOCK3XXX_H
- 
- int omap3xxx_clk_init(void);
-+int omap3430_clk_init(void);
-+int omap3630_clk_init(void);
-+int ti81xx_clk_init(void);
-+int am35xx_clk_init(void);
- int omap3_core_dpll_m2_set_rate(struct clk_hw *clk, unsigned long rate,
- 					unsigned long parent_rate);
- 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 205bb1d..fd4bb71 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -488,21 +488,29 @@ void __init omap3_init_early(void)
- void __init omap3430_init_early(void)
- {
- 	omap3_init_early();
-+	if (of_have_populated_dt())
-+		omap_clk_init = omap3430_clk_init;
- }
- 
- void __init omap35xx_init_early(void)
- {
- 	omap3_init_early();
-+	if (of_have_populated_dt())
-+		omap_clk_init = omap3430_clk_init;
- }
- 
- void __init omap3630_init_early(void)
- {
- 	omap3_init_early();
-+	if (of_have_populated_dt())
-+		omap_clk_init = omap3630_clk_init;
- }
- 
- void __init am35xx_init_early(void)
- {
- 	omap3_init_early();
-+	if (of_have_populated_dt())
-+		omap_clk_init = am35xx_clk_init;
- }
- 
- void __init ti81xx_init_early(void)
-@@ -520,7 +528,10 @@ void __init ti81xx_init_early(void)
- 	omap3xxx_clockdomains_init();
- 	omap3xxx_hwmod_init();
- 	omap_hwmod_init_postsetup();
--	omap_clk_init = omap3xxx_clk_init;
-+	if (of_have_populated_dt())
-+		omap_clk_init = ti81xx_clk_init;
-+	else
-+		omap_clk_init = omap3xxx_clk_init;
- }
- 
- void __init omap3_init_late(void)
+diff --git a/arch/arm/boot/dts/am35xx-clocks.dtsi b/arch/arm/boot/dts/am35xx-clocks.dtsi
+new file mode 100644
+index 0000000..7749413
+--- /dev/null
++++ b/arch/arm/boot/dts/am35xx-clocks.dtsi
+@@ -0,0 +1,101 @@
++/*
++ * Device Tree Source for AM35xx clock data
++ *
++ * Copyright (C) 2013 Texas Instruments, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++ipss_ick: ipss_ick at 48004a10 {
++	#clock-cells = <0>;
++	compatible = "ti,am35xx-interface-clock";
++	clocks = <&core_l3_ick>;
++	reg = <0x48004a10 0x4>;
++	ti,enable-bit = <4>;
++};
++
++rmii_ck: rmii_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <50000000>;
++};
++
++pclk_ck: pclk_ck {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <27000000>;
++};
++
++emac_ick: emac_ick at 4800259c {
++	#clock-cells = <0>;
++	compatible = "ti,am35xx-gate-clock";
++	clocks = <&ipss_ick>;
++	reg = <0x4800259c 0x4>;
++	ti,enable-bit = <1>;
++};
++
++emac_fck: emac_fck at 4800259c {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&rmii_ck>;
++	reg = <0x4800259c 0x4>;
++	bit-shift = <9>;
++};
++
++vpfe_ick: vpfe_ick at 4800259c {
++	#clock-cells = <0>;
++	compatible = "ti,am35xx-gate-clock";
++	clocks = <&ipss_ick>;
++	reg = <0x4800259c 0x4>;
++	ti,enable-bit = <2>;
++};
++
++vpfe_fck: vpfe_fck at 4800259c {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&pclk_ck>;
++	reg = <0x4800259c 0x4>;
++	bit-shift = <10>;
++};
++
++hsotgusb_ick: hsotgusb_ick at 4800259c {
++	#clock-cells = <0>;
++	compatible = "ti,am35xx-gate-clock";
++	clocks = <&ipss_ick>;
++	reg = <0x4800259c 0x4>;
++	ti,enable-bit = <0>;
++};
++
++hsotgusb_fck_am35xx: hsotgusb_fck_am35xx at 4800259c {
++	#clock-cells = <0>;
++	compatible = "gate-clock";
++	clocks = <&sys_ck>;
++	reg = <0x4800259c 0x4>;
++	bit-shift = <8>;
++};
++
++hecc_ck: hecc_ck at 4800259c {
++	#clock-cells = <0>;
++	compatible = "ti,am35xx-gate-clock";
++	clocks = <&sys_ck>;
++	reg = <0x4800259c 0x4>;
++	ti,enable-bit = <3>;
++};
++
++uart4_ick_am35xx: uart4_ick_am35xx at 48004a10 {
++	#clock-cells = <0>;
++	compatible = "ti,omap3-interface-clock";
++	clocks = <&core_l4_ick>;
++	reg = <0x48004a10 0x4>;
++	ti,enable-bit = <23>;
++};
++
++uart4_fck_am35xx: uart4_fck_am35xx at 48004a00 {
++	#clock-cells = <0>;
++	compatible = "ti,gate-clock";
++	clocks = <&core_48m_fck>;
++	reg = <0x48004a00 0x4>;
++	ti,enable-bit = <23>;
++};
 -- 
 1.7.9.5
