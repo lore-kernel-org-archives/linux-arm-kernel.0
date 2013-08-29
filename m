@@ -1,167 +1,73 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 29 Aug 2013 16:53:10 +0530
-Subject: [PATCH v2 2/3] ARM: OMAP4+: Move SRAM data to DT
-In-Reply-To: <1377775391-13103-1-git-send-email-rnayak@ti.com>
-References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
-Message-ID: <1377775391-13103-3-git-send-email-rnayak@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 29 Aug 2013 12:24:21 +0100
+Subject: [PATCH v5 2/5] ARM: arch_timer: add support to configure and
+ enable event stream
+In-Reply-To: <1377686689-30828-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1377686689-30828-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1377686689-30828-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <20130829112421.GF13704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use drivers/misc/sram.c driver to manage SRAM on all DT only
-OMAP platforms (am33xx, am43xx, omap4 and omap5) instead of
-the existing private plat-omap/sram.c
+On Wed, Aug 28, 2013 at 11:44:46AM +0100, Sudeep KarkadaNagesha wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> This patch adds support for configuring the event stream frequency
+> and enabling it.
+> 
+> It also adds the hwcaps definitions to the user to detect this event
+> stream feature.
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> ---
+>  arch/arm/include/asm/arch_timer.h | 33 ++++++++++++++++++++++++++++-----
+>  arch/arm/include/uapi/asm/hwcap.h |  1 +
+>  arch/arm/kernel/setup.c           |  1 +
+>  3 files changed, 30 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+> index 1a3e967..4e38609 100644
+> --- a/arch/arm/include/asm/arch_timer.h
+> +++ b/arch/arm/include/asm/arch_timer.h
+> @@ -89,22 +89,45 @@ static inline u64 arch_counter_get_cntvct(void)
+>  	return cval;
+>  }
+>  
+> -static inline void arch_counter_set_user_access(void)
+> +static inline u32 arch_timer_get_cntkctl(void)
+>  {
+>  	u32 cntkctl;
+> -
+>  	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
+> +	return cntkctl;
+> +}
+> +
+> +static inline void arch_timer_set_cntkctl(u32 cntkctl)
+> +{
+> +	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
+> +}
+> +
+> +static inline void arch_counter_set_user_access(void)
+> +{
+> +	u32 cntkctl = arch_timer_get_cntkctl();
+>  
+>  	/* Disable user access to both physical/virtual counters/timers */
+> -	/* Also disable virtual event stream */
+>  	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
+>  			| ARCH_TIMER_USR_VT_ACCESS_EN
+> -			| ARCH_TIMER_VIRT_EVT_EN
+>  			| ARCH_TIMER_USR_VCT_ACCESS_EN
+>  			| ARCH_TIMER_USR_PCT_ACCESS_EN);
+> +	arch_timer_set_cntkctl(cntkctl);
+> +}
 
-Address and size related data  is removed from mach-omap2/sram.c
-and now passed to drivers/misc/sram.c from DT.
+You can keep the ARCH_TIMER_VIRT_EVT_EN clearing here, especially if we
+drop the bool enable argument to arch_timer_evtstrm_config(). You can
+add the same clearing to arm64 in one of the latter patches.
 
-Users can hence use general purpose allocator apis instead of
-OMAP private ones to manage and use SRAM.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/boot/dts/am33xx.dtsi        |    5 ++---
- arch/arm/boot/dts/am4372.dtsi        |    5 +++++
- arch/arm/boot/dts/omap4.dtsi         |    5 +++++
- arch/arm/boot/dts/omap5.dtsi         |    5 +++++
- arch/arm/configs/omap2plus_defconfig |    1 +
- arch/arm/mach-omap2/sram.c           |   26 +-------------------------
- arch/arm/mach-omap2/sram.h           |    1 -
- 7 files changed, 19 insertions(+), 29 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 38b446b..69cbce9 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -482,9 +482,8 @@
- 		};
- 
- 		ocmcram: ocmcram at 40300000 {
--			compatible = "ti,am3352-ocmcram";
--			reg = <0x40300000 0x10000>;
--			ti,hwmods = "ocmcram";
-+			compatible = "mmio-sram";
-+			reg = <0x40300000 0x10000>; /* 64k */
- 		};
- 
- 		wkup_m3: wkup_m3 at 44d00000 {
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index ddc1df7..5c8cee1 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -64,5 +64,10 @@
- 			compatible = "ti,am4372-counter32k","ti,omap-counter32k";
- 			reg = <0x44e86000 0x40>;
- 		};
-+
-+		ocmcram: ocmcram at 40300000 {
-+			compatible = "mmio-sram";
-+			reg = <0x40300000 0x40000>; /* 256k */
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 22d9f2b..1ba6a77 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -126,6 +126,11 @@
- 			pinctrl-single,function-mask = <0x7fff>;
- 		};
- 
-+		ocmcram: ocmcram at 40304000 {
-+			compatible = "mmio-sram";
-+			reg = <0x40304000 0xa000>; /* 40k */
-+		};
-+
- 		sdma: dma-controller at 4a056000 {
- 			compatible = "ti,omap4430-sdma";
- 			reg = <0x4a056000 0x1000>;
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index e643620..461ffd8 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -119,6 +119,11 @@
- 			pinctrl-single,function-mask = <0x7fff>;
- 		};
- 
-+		ocmcram: ocmcram at 40300000 {
-+			compatible = "mmio-sram";
-+			reg = <0x40300000 0x20000>; /* 128k */
-+		};
-+
- 		sdma: dma-controller at 4a056000 {
- 			compatible = "ti,omap4430-sdma";
- 			reg = <0x4a056000 0x1000>;
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 5339e6a..5d4c9b8 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -101,6 +101,7 @@ CONFIG_SENSORS_LIS3LV02D=m
- CONFIG_SENSORS_TSL2550=m
- CONFIG_SENSORS_LIS3_I2C=m
- CONFIG_BMP085_I2C=m
-+CONFIG_SRAM=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_MULTI_LUN=y
-diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
-index 305fc2b..d5ecb75 100644
---- a/arch/arm/mach-omap2/sram.c
-+++ b/arch/arm/mach-omap2/sram.c
-@@ -32,12 +32,6 @@
- 
- #define OMAP2_SRAM_PUB_PA	(OMAP2_SRAM_PA + 0xf800)
- #define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
--#ifdef CONFIG_OMAP4_ERRATA_I688
--#define OMAP4_SRAM_PUB_PA	OMAP4_SRAM_PA
--#else
--#define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
--#endif
--#define OMAP5_SRAM_PA		0x40300000
- 
- #define SRAM_BOOTLOADER_SZ	0x00
- 
-@@ -105,32 +99,14 @@ static void __init omap_detect_sram(void)
- 			} else {
- 				omap_sram_size = 0x8000; /* 32K */
- 			}
--		} else if (cpu_is_omap44xx()) {
--			omap_sram_start = OMAP4_SRAM_PUB_PA;
--			omap_sram_size = 0xa000; /* 40K */
--		} else if (soc_is_omap54xx()) {
--			omap_sram_start = OMAP5_SRAM_PA;
--			omap_sram_size = SZ_128K; /* 128KB */
- 		} else {
- 			omap_sram_start = OMAP2_SRAM_PUB_PA;
- 			omap_sram_size = 0x800; /* 2K */
- 		}
- 	} else {
--		if (soc_is_am33xx()) {
--			omap_sram_start = AM33XX_SRAM_PA;
--			omap_sram_size = 0x10000; /* 64K */
--		} else if (soc_is_am43xx()) {
--			omap_sram_start = AM33XX_SRAM_PA;
--			omap_sram_size = SZ_256K;
--		} else if (cpu_is_omap34xx()) {
-+		if (cpu_is_omap34xx()) {
- 			omap_sram_start = OMAP3_SRAM_PA;
- 			omap_sram_size = 0x10000; /* 64K */
--		} else if (cpu_is_omap44xx()) {
--			omap_sram_start = OMAP4_SRAM_PA;
--			omap_sram_size = 0xe000; /* 56K */
--		} else if (soc_is_omap54xx()) {
--			omap_sram_start = OMAP5_SRAM_PA;
--			omap_sram_size = SZ_128K; /* 128KB */
- 		} else {
- 			omap_sram_start = OMAP2_SRAM_PA;
- 			if (cpu_is_omap242x())
-diff --git a/arch/arm/mach-omap2/sram.h b/arch/arm/mach-omap2/sram.h
-index ca7277c..3f83b80 100644
---- a/arch/arm/mach-omap2/sram.h
-+++ b/arch/arm/mach-omap2/sram.h
-@@ -80,4 +80,3 @@ static inline void omap_push_sram_idle(void) {}
- #else
- #define OMAP4_SRAM_PA		0x40300000
- #endif
--#define AM33XX_SRAM_PA		0x40300000
 -- 
-1.7.9.5
+Catalin
