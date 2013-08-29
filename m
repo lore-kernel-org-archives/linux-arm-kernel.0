@@ -1,33 +1,37 @@
-From: ynezz@true.cz (=?UTF-8?q?Petr=20=C5=A0tetiar?=)
-Date: Thu, 29 Aug 2013 16:28:11 +0200
-Subject: [PATCH] ARM: ep93xx: Don't use modem interface on the second UART
-Message-ID: <1377786491-15759-1-git-send-email-ynezz@true.cz>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 29 Aug 2013 16:35:44 +0200
+Subject: [PATCH] gpio: samsung: Drop support for Exynos SoCs
+In-Reply-To: <CACRpkdbUo2t1gT8=6UpjiXs4Sd-1xLpEqOqdA220L0wgVC-4uw@mail.gmail.com>
+References: <1377538555-14901-1-git-send-email-t.figa@samsung.com>
+ <CACRpkdbUo2t1gT8=6UpjiXs4Sd-1xLpEqOqdA220L0wgVC-4uw@mail.gmail.com>
+Message-ID: <3799135.ZH1kjyjuQO@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Second UART doesn't have modem interface, so any attempt to use set_mctrl() it
-produce unwanted garbage on the line. There's no such 0x100 register offset
-for the second UART either.
+On Thursday 29 of August 2013 14:42:25 Linus Walleij wrote:
+> On Mon, Aug 26, 2013 at 7:35 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> > GPIO support on Exynos SoCs is provided by pinctrl-samsung driver,
+> > leaving all the support code in gpio-samsung driver unused.
+> 
+> Just double checking: you mean it is unused in v3.11-rc7 OK?
 
-Signed-off-by: Petr ?tetiar <ynezz@true.cz>
-Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <rmallon@gmail.com>
----
- arch/arm/mach-ep93xx/core.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+That's correct. Non-DT support for Exynos (and so need for this driver to 
+be used on Exynos) has been dropped in 3.11.
 
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index df8612f..3f12b88 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -281,7 +281,7 @@ static AMBA_APB_DEVICE(uart1, "apb:uart1", 0x00041010, EP93XX_UART1_PHYS_BASE,
- 	{ IRQ_EP93XX_UART1 }, &ep93xx_uart_data);
- 
- static AMBA_APB_DEVICE(uart2, "apb:uart2", 0x00041010, EP93XX_UART2_PHYS_BASE,
--	{ IRQ_EP93XX_UART2 }, &ep93xx_uart_data);
-+	{ IRQ_EP93XX_UART2 }, NULL);
- 
- static AMBA_APB_DEVICE(uart3, "apb:uart3", 0x00041010, EP93XX_UART3_PHYS_BASE,
- 	{ IRQ_EP93XX_UART3 }, &ep93xx_uart_data);
--- 
-1.7.9.5
+> Not in Linux-next?
+> 
+> In the former case I can merge it into the GPIO tree and in the
+> latter case I need to merge it into the pinctrl tree.
+> 
+> > This dead
+> > code can be safely removed and so it is done by this patch.
+> > 
+> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> Tentatively applied to the gpio tree.
+
+Thanks.
+
+Best regards,
+Tomasz
