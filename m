@@ -1,20 +1,53 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Aug 2013 16:21:51 -0700
-Subject: [PATCH v3 3/5] ARM: bcm4760: Add system timer
-In-Reply-To: <20130829232011.GB29606@quad.lixom.net>
-References: <20130814221043.528864175@gmail.com>
- <20130814221237.695587612@gmail.com>
- <20130829232011.GB29606@quad.lixom.net>
-Message-ID: <CAOesGMgBOuLDznpBwt0Yrv_DcnxF3pMvzHoh2cS470ugTPMQZw@mail.gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 29 Aug 2013 18:27:52 -0500
+Subject: [PATCH 2/3] crypto: omap-des: Add config and build options
+In-Reply-To: <1377818873-21174-1-git-send-email-joelf@ti.com>
+References: <1377818873-21174-1-git-send-email-joelf@ti.com>
+Message-ID: <1377818873-21174-3-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 4:20 PM, Olof Johansson <olof@lixom.net> wrote:
+Add config and build options for the newly added omap-des driver.
 
-> Acked-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
+ drivers/crypto/Kconfig  | 11 +++++++++++
+ drivers/crypto/Makefile |  1 +
+ 2 files changed, 12 insertions(+)
 
-Sorry, should have clarified: Acked if the changes requested by
-Stephen are done.
-
-
--Olof
+diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+index e289afa..119a8e5 100644
+--- a/drivers/crypto/Kconfig
++++ b/drivers/crypto/Kconfig
+@@ -259,6 +259,17 @@ config CRYPTO_DEV_OMAP_AES
+ 	  OMAP processors have AES module accelerator. Select this if you
+ 	  want to use the OMAP module for AES algorithms.
+ 
++config CRYPTO_DEV_OMAP_DES
++	tristate "Support for OMAP DES3DES hw engine"
++	depends on ARCH_OMAP2PLUS
++	select CRYPTO_DES
++	select CRYPTO_BLKCIPHER2
++	help
++	  OMAP processors have DES/3DES module accelerator. Select this if you
++	  want to use the OMAP module for DES and 3DES algorithms. Currently
++	  the ECB and CBC modes of operation supported by the driver. Also
++	  accesses made on unaligned boundaries are also supported.
++
+ config CRYPTO_DEV_PICOXCELL
+ 	tristate "Support for picoXcell IPSEC and Layer2 crypto engines"
+ 	depends on ARCH_PICOXCELL && HAVE_CLK
+diff --git a/drivers/crypto/Makefile b/drivers/crypto/Makefile
+index 38ce13d..ada440f 100644
+--- a/drivers/crypto/Makefile
++++ b/drivers/crypto/Makefile
+@@ -11,6 +11,7 @@ obj-$(CONFIG_CRYPTO_DEV_IXP4XX) += ixp4xx_crypto.o
+ obj-$(CONFIG_CRYPTO_DEV_PPC4XX) += amcc/
+ obj-$(CONFIG_CRYPTO_DEV_OMAP_SHAM) += omap-sham.o
+ obj-$(CONFIG_CRYPTO_DEV_OMAP_AES) += omap-aes.o
++obj-$(CONFIG_CRYPTO_DEV_OMAP_DES) += omap-des.o
+ obj-$(CONFIG_CRYPTO_DEV_PICOXCELL) += picoxcell_crypto.o
+ obj-$(CONFIG_CRYPTO_DEV_SAHARA) += sahara.o
+ obj-$(CONFIG_CRYPTO_DEV_S5P) += s5p-sss.o
+-- 
+1.8.1.2
