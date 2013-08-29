@@ -1,106 +1,46 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 29 Aug 2013 18:27:53 -0500
-Subject: [PATCH 3/3] crypto: omap-des: Add triple DES (des3_ede) support to
- driver
-In-Reply-To: <1377818873-21174-1-git-send-email-joelf@ti.com>
+Date: Thu, 29 Aug 2013 18:31:12 -0500
+Subject: [PATCH 1/3] crypto: omap-des: Add omap-des driver for OMAP4/AM43xx
+In-Reply-To: <1377818873-21174-2-git-send-email-joelf@ti.com>
 References: <1377818873-21174-1-git-send-email-joelf@ti.com>
-Message-ID: <1377818873-21174-4-git-send-email-joelf@ti.com>
+ <1377818873-21174-2-git-send-email-joelf@ti.com>
+Message-ID: <521FD9C0.6020302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP DES module supports 3DES operation where 3 64-bit keys are used to
-perform a DES encrypt-decrypt-encrypt (ede) operation on a buffer.
+On 08/29/2013 06:27 PM, Joel Fernandes wrote:
+> Add omap-des driver with platform data for OMAP4. Support added for DES
+> ECB and CBC modes.
+> 
+> Where possible, code is reused from omap-aes driver with changes made for
+> adjusting key size, block size, removing non-existent encryption modes
+> and adding support for OMAP4 platform data and offsets.
+> 
+> Tests have been conducted with the CRYPTO test manager, and functionality
+> is verified at different page length alignments.
+> 
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> ---
+>  drivers/crypto/omap-des.c | 1192 +++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 1192 insertions(+)
+>  create mode 100644 drivers/crypto/omap-des.c
+> 
+> diff --git a/drivers/crypto/omap-des.c b/drivers/crypto/omap-des.c
+> new file mode 100644
+> index 0000000..6a9a25f
+> --- /dev/null
+> +++ b/drivers/crypto/omap-des.c
+> @@ -0,0 +1,1192 @@
+> +/*
+> + * Cryptographic API.
+> + *
+> + * Support for OMAP DES and Triple DES HW acceleration.
+> + *
+> + * Copyright (c) 2012 Texas Instruments Incorporated
+> + * Author: Joel Fernandes <joelf@ti.com>
 
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
- drivers/crypto/omap-des.c | 53 ++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 50 insertions(+), 3 deletions(-)
+Have to change this to 2013. Will do so if there are no other comments.
 
-diff --git a/drivers/crypto/omap-des.c b/drivers/crypto/omap-des.c
-index 6a9a25f..0df60cb 100644
---- a/drivers/crypto/omap-des.c
-+++ b/drivers/crypto/omap-des.c
-@@ -83,7 +83,7 @@ struct omap_des_ctx {
- 	struct omap_des_dev *dd;
- 
- 	int		keylen;
--	u32		key[DES_KEY_SIZE / sizeof(u32)];
-+	u32		key[(3 * DES_KEY_SIZE) / sizeof(u32)];
- 	unsigned long	flags;
- };
- 
-@@ -265,8 +265,10 @@ static int omap_des_write_ctrl(struct omap_des_dev *dd)
- 		val |= DES_REG_CTRL_CBC;
- 	if (dd->flags & FLAGS_ENCRYPT)
- 		val |= DES_REG_CTRL_DIRECTION;
-+	if (key32 == 6)
-+		val |= DES_REG_CTRL_TDES;
- 
--	mask |= DES_REG_CTRL_CBC | DES_REG_CTRL_DIRECTION;
-+	mask |= DES_REG_CTRL_CBC | DES_REG_CTRL_DIRECTION | DES_REG_CTRL_TDES;
- 
- 	omap_des_write_mask(dd, DES_REG_CTRL(dd), val, mask);
- 
-@@ -725,7 +727,7 @@ static int omap_des_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
- {
- 	struct omap_des_ctx *ctx = crypto_ablkcipher_ctx(tfm);
- 
--	if (keylen != DES_KEY_SIZE)
-+	if (keylen != DES_KEY_SIZE && keylen != (3*DES_KEY_SIZE))
- 		return -EINVAL;
- 
- 	pr_debug("enter, keylen: %d\n", keylen);
-@@ -817,6 +819,51 @@ static struct crypto_alg algs_ecb_cbc[] = {
- 		.encrypt	= omap_des_cbc_encrypt,
- 		.decrypt	= omap_des_cbc_decrypt,
- 	}
-+},
-+{
-+	.cra_name		= "ecb(des3_ede)",
-+	.cra_driver_name	= "ecb-des3-omap",
-+	.cra_priority		= 100,
-+	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER |
-+				  CRYPTO_ALG_KERN_DRIVER_ONLY |
-+				  CRYPTO_ALG_ASYNC,
-+	.cra_blocksize		= DES_BLOCK_SIZE,
-+	.cra_ctxsize		= sizeof(struct omap_des_ctx),
-+	.cra_alignmask		= 0,
-+	.cra_type		= &crypto_ablkcipher_type,
-+	.cra_module		= THIS_MODULE,
-+	.cra_init		= omap_des_cra_init,
-+	.cra_exit		= omap_des_cra_exit,
-+	.cra_u.ablkcipher = {
-+		.min_keysize	= 3*DES_KEY_SIZE,
-+		.max_keysize	= 3*DES_KEY_SIZE,
-+		.setkey		= omap_des_setkey,
-+		.encrypt	= omap_des_ecb_encrypt,
-+		.decrypt	= omap_des_ecb_decrypt,
-+	}
-+},
-+{
-+	.cra_name		= "cbc(des3_ede)",
-+	.cra_driver_name	= "cbc-des3-omap",
-+	.cra_priority		= 100,
-+	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER |
-+				  CRYPTO_ALG_KERN_DRIVER_ONLY |
-+				  CRYPTO_ALG_ASYNC,
-+	.cra_blocksize		= DES_BLOCK_SIZE,
-+	.cra_ctxsize		= sizeof(struct omap_des_ctx),
-+	.cra_alignmask		= 0,
-+	.cra_type		= &crypto_ablkcipher_type,
-+	.cra_module		= THIS_MODULE,
-+	.cra_init		= omap_des_cra_init,
-+	.cra_exit		= omap_des_cra_exit,
-+	.cra_u.ablkcipher = {
-+		.min_keysize	= 3*DES_KEY_SIZE,
-+		.max_keysize	= 3*DES_KEY_SIZE,
-+		.ivsize		= DES_BLOCK_SIZE,
-+		.setkey		= omap_des_setkey,
-+		.encrypt	= omap_des_cbc_encrypt,
-+		.decrypt	= omap_des_cbc_decrypt,
-+	}
- }
- };
- 
--- 
-1.8.1.2
+Regards,
+
+-Joel
