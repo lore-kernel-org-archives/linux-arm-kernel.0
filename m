@@ -1,85 +1,131 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Thu, 29 Aug 2013 08:52:42 +0530
-Subject: [PATCH v3 4/5] clk/exynos5420: add hdmi mux to change parents in
- hdmi driver
-In-Reply-To: <3222483.BXBstlS3j6@amdc1227>
-References: <1377508383-15185-1-git-send-email-rahul.sharma@samsung.com>
- <1919681.jqCQjHmyQW@flatron>
- <CAPdUM4MUvzyAjyFwuYyBY6C-nn_VHttwf=ebAZLgc4VTNgS05A@mail.gmail.com>
- <3222483.BXBstlS3j6@amdc1227>
-Message-ID: <CAPdUM4MLz8FapYSr35O_1rZmAw-XvgM6w+7OUKdufJk8hQQPVQ@mail.gmail.com>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Thu, 29 Aug 2013 03:32:04 +0000
+Subject: [PATCH v4 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <20130828081742.GC11414@intel.com>
+References: <1376633274-17850-1-git-send-email-b35083@freescale.com>
+ <20130828081742.GC11414@intel.com>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E8520A8C7@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Tomasz,
+> > +		} else {
+> since you support cyclic, is there a reasonw why you dont support
+> pause/resume?
+> is it hw issue or planned in future?
+[Lu Jingchang] 
+The HW supports start/stop request from the peripheral dma request, I had planned to add this in future as requested.
+I will add this in the next version patch.
+Thanks.
 
-I will post the reworked patches with above change.
+> 
+> > +			return -EINVAL;
+> > +		}
+> > +		return 0;
+> > +
+> > +	default:
+> > +		return -ENXIO;
+> > +	}
+> > +}
+> > +
+> > +static enum dma_status fsl_edma_tx_status(struct dma_chan *chan,
+> > +		dma_cookie_t cookie, struct dma_tx_state *txstate)
+> > +{
+> > +	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+> > +
+> > +	if (fsl_chan->status == DMA_ERROR)
+> > +		return DMA_ERROR;
+> > +
+> > +	return dma_cookie_status(chan, cookie, txstate);
+> this will tell if the DMA is completed or not only.
+> You also need to calculate residue for the pending dma
+> 
+> Since you support cyclic this should be done properly...
+> 
+> also you cna take more help from vchan support to make your life
+> simpler...
+[Lu Jingchang] 
+Ok, if it is needed, I will add residue calculation in the next version. 
+Thanks.
+> 
+[...]
+> > +static struct dma_async_tx_descriptor *fsl_edma_prep_dma_cyclic(
+> > +		struct dma_chan *chan, dma_addr_t dma_addr, size_t buf_len,
+> > +		size_t period_len, enum dma_transfer_direction direction,
+> > +		unsigned long flags, void *context)
+> > +{
+> > +	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+> > +	struct fsl_edma_desc *fsl_desc;
+> > +	dma_addr_t dma_buf_next;
+> > +	int sg_len, i;
+> > +	u32 src_addr, dst_addr, last_sg, nbytes;
+> > +	u16 soff, doff, iter;
+> > +
+> > +	if (!fsl_chan->fsc.dir == DMA_MEM_TO_DEV &&
+> > +			!fsl_chan->fsc.dir == DMA_DEV_TO_MEM)
+> > +		return NULL;
+> you are ignoring the direction arg. Also use is_slave_direction() helper
 
-regards,
-Rahul Sharma
+[...]
+
+> > +	if (!fsl_chan->fsc.dir == DMA_MEM_TO_DEV &&
+> > +			!fsl_chan->fsc.dir == DMA_DEV_TO_MEM)
+> > +		return NULL;
+> ditto
+[Lu Jingchang] 
+Thanks. I will call the helper function instead.
 
 
-On 28 August 2013 17:25, Tomasz Figa <t.figa@samsung.com> wrote:
-> On Tuesday 27 of August 2013 10:14:01 Rahul Sharma wrote:
->> On 27 August 2013 05:16, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> > Hi Rahul,
->> >
->> > On Monday 26 of August 2013 14:43:02 Rahul Sharma wrote:
->> >> hdmi driver needs to change the parent of hdmi clock
->> >> to pixel clock or hdmiphy clock, based on the stability
->> >> of hdmiphy. This patch is exposing the mux for changing
->> >> the parent.
->> >>
->> >> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
->> >> ---
->> >>
->> >>  Documentation/devicetree/bindings/clock/exynos5420-clock.txt |    5
->> >>
->> >> +++++ drivers/clk/samsung/clk-exynos5420.c                         |
->> >> 5 ++++- 2 files changed, 9 insertions(+), 1 deletion(-)
->> >>
->> >> diff --git
->> >> a/Documentation/devicetree/bindings/clock/exynos5420-clock.txt
->> >> b/Documentation/devicetree/bindings/clock/exynos5420-clock.txt index
->> >> 5758a69..6f16aa8 100644
->> >> --- a/Documentation/devicetree/bindings/clock/exynos5420-clock.txt
->> >> +++ b/Documentation/devicetree/bindings/clock/exynos5420-clock.txt
->> >> @@ -182,6 +182,11 @@ clock which they consume.
->> >>
->> >>    g3d                        501
->> >>    smmu_mixer         502
->> >>
->> >> +  Mux                        ID
->> >> +  ----------------------------
->> >> +
->> >> +  mout_hdmi          1024
->> >
->> > Is there a need for such big hole between smm_mixer and this clock? I
->> > believe that based on the documentation, the total amount of clocks
->> > that
->> > can be defined may be approximated and some extra margin added, so you
->> > don't waste so much of numbering space and memory used for lookup
->> > array.
->>
->> Total number of Gates are coming upto the enum value 540. I can leave gap
->> of 64 in between for first mux. Similarly, total muxes in system are
->> 118. Optimum gab would be between 128~150. What you say about these
->> values?
+[...]
+
+> > +static bool fsl_edma_filter_fn(struct dma_chan *chan, void *fn_param)
+> > +{
+> > +	struct fsl_edma_filter_param *fparam = fn_param;
+> > +	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+> > +
+> > +	if (fsl_chan->edmamux->mux_id != fparam->mux_id)
+> > +		return false;
+> > +
+> > +	fsl_chan->slot_id = fparam->slot_id;
+> > +	chan->private = fn_param;
+> why do you need to use chan->private?
+[Lu Jingchang] 
+The private used here is to store the slot_id information, which must be used by the DMAMUX in alloc_chan_resources function. Thanks.
+
+> > +	return true;
+> > +}
+> > +
+> > +static struct dma_chan *fsl_edma_xlate(struct of_phandle_args
+> *dma_spec,
+> > +		struct of_dma *ofdma)
+> > +{
+> > +	dma_cap_mask_t mask;
+> > +	struct fsl_edma_filter_param fparam;
+> > +
+> > +	if (dma_spec->args_count != 2)
+> > +		return NULL;
+> > +
+> > +	fparam.mux_id = dma_spec->args[0];
+> > +	fparam.slot_id = dma_spec->args[1];
+> > +
+> > +	dma_cap_zero(mask);
+> > +	dma_cap_set(DMA_SLAVE, mask);
+> > +	dma_cap_set(DMA_CYCLIC, mask);
+> > +	return dma_request_channel(mask, fsl_edma_filter_fn, (void
+> *)&fparam);
+> > +}
+> > +
+> > +static int fsl_edma_alloc_chan_resources(struct dma_chan *chan)
+> > +{
+> > +	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+> > +	struct fsl_edma_filter_param *data = chan->private;
+> > +	unsigned char val;
+> > +
+> > +	val = EDMAMUX_CHCFG_ENBL | EDMAMUX_CHCFG_SOURCE(data->slot_id);
+> okay, so what does the slot_id mean?
 >
-> OK, so let's say that muxes should start at 640 and dividers at 768.
->
-> Anyway, ideally, we should break from this idea of grouping and convert
-> this way of definition to normal preprocessor macros that could be used
-> inside dts files as well. Then we could detach ourselves from referring to
-> clocks by numbers, because those macros would do that for us, without the
-> need to group clocks together for better readability. See clock driver for
-> S3C64xx [1].
->
-> This is an idea for further work, though. For now the values I proposed
-> should be more than enough.
->
-> [1] http://thread.gmane.org/gmane.linux.usb.general/90493/focus=21090
->
-> Best regards,
-> Tomasz
->
+[Lu Jingchang] 
+slot_id is the request source id, a peripheral device ID. Each peripheral using DMA has a ID that can be identified by the DMA engine. the peripheral ID must be written to the DMAMUX configuration register to route the peripheral to DMA engine channel. Thanks.
+
+
+Best Regards,
+Jingchang
