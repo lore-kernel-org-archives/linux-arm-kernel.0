@@ -1,59 +1,73 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 29 Aug 2013 10:24:17 +0100
-Subject: [RESEND RFC 0/2] ARM: mm: HugeTLB + THP support for non-LPAE
-Message-ID: <1377768259-19269-1-git-send-email-steve.capper@linaro.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 29 Aug 2013 11:24:31 +0200
+Subject: [RESEND PATCH v2 0/7] Add device tree support for Exynos4412 Trats2
+ cameras
+Message-ID: <1377768278-15391-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+[Sigh, I've forgotten to Cc some mailing lists when submitting this
+ previously, resending with device tree and samsung-soc ML added]
 
-I'm resending this series to try and provoke some discussion.
+This series is intended to add device tree support for both cameras
+on the Exynos4412 SoC Trats 2 board. It converts related drivers to use
+the v4l2-async API and expose the sensor's master clock supplied by the
+camera host interface through the common clock API.
 
---  
+This changeset is an updated version of my patch series [1] separating
+the sensor subdev driver from the exynos4-fimc-is module and adding
+asynchronous sensor registration support. There is also included next
+iteration of the patch adding DT bits to the rear facing S5C73M3 camera
+module driver [2].
 
-The following patches bring both HugeTLB support and Transparent
-HugePage (THP) support to ARM for 2 levels of paging (i.e. without
-LPAE).
+The S5K6A3 is a raw image sensor of the front facing camera connected
+to the SoC local ISP (FIMC-IS).
 
-This code has been tested on an Arndale board (Exynos 5250), and
-is based on 3.11-rc1, with the hugepage simplification patch:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/184117.html
+This series has run-time dependency on the patches adding clk_unregister()
+implementation [3].
 
-HugeTLB and THP support for LPAE has already been merged in 3.11-rc1.
+Any feedback, especially on the "s5k6a3: Add DT binding documentation"
+patch, where I've described some issue with the common video-interfaces
+binding is welcome.
 
-Hugepages can give nice performance boosts to workloads that put
-pressure on the TLBs. I've observed uplifts of ~5% to some tasks
-just by enabling hugepages via the libhugetlbfs tools. Other
-people have observed decent performance boosts when huge pages
-are enabled:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148835.html
+[1] http://www.spinics.net/lists/linux-media/msg66073.html
+[2] https://linuxtv.org/patch/19386/
+[3] https://lkml.org/lkml/2013/8/24/63
 
-I would appreciate any discussion on these patches, as there are
-people who have an interest in having huge page support in
-non-LPAE kernels.
+Thanks,
+Sylwester
 
-Cheers,
--- 
-Steve
+Andrzej Hajda (1):
+  V4L: s5c73m3: Add device tree support
 
-Steve Capper (2):
-  ARM: mm: HugeTLB support for non-LPAE systems.
-  ARM: mm: Transparent huge page support for non-LPAE systems.
+Sylwester Nawrocki (6):
+  V4L: s5k6a3: Add DT binding documentation
+  V4L: Add driver for s5k6a3 image sensor
+  V4L: s5k6a3: Add support for asynchronous subdev registration
+  exynos4-is: Add clock provider for the external clocks
+  exynos4-is: Use external s5k6a3 sensor driver
+  exynos4-is: Add support for asynchronous sensor subddevs registration
 
- arch/arm/Kconfig                      |   4 +-
- arch/arm/include/asm/hugetlb-2level.h | 126 +++++++++++++++++++++++++
- arch/arm/include/asm/hugetlb.h        |   4 +
- arch/arm/include/asm/pgtable-2level.h | 170 ++++++++++++++++++++++++++++++++++
- arch/arm/include/asm/pgtable-3level.h |   6 ++
- arch/arm/include/asm/pgtable.h        |   7 +-
- arch/arm/include/asm/tlb.h            |  10 +-
- arch/arm/kernel/head.S                |  10 +-
- arch/arm/mm/fault.c                   |  13 ---
- arch/arm/mm/fsr-2level.c              |   4 +-
- arch/arm/mm/hugetlbpage.c             |   2 +-
- arch/arm/mm/mmu.c                     |  27 ++++++
- 12 files changed, 360 insertions(+), 23 deletions(-)
- create mode 100644 arch/arm/include/asm/hugetlb-2level.h
+ .../devicetree/bindings/media/samsung-fimc.txt     |   21 +-
+ .../devicetree/bindings/media/samsung-s5c73m3.txt  |   95 ++++++
+ .../devicetree/bindings/media/samsung-s5k6a3.txt   |   31 ++
+ drivers/media/i2c/Kconfig                          |    8 +
+ drivers/media/i2c/Makefile                         |    1 +
+ drivers/media/i2c/s5c73m3/s5c73m3-core.c           |  206 +++++++++---
+ drivers/media/i2c/s5c73m3/s5c73m3-spi.c            |    6 +
+ drivers/media/i2c/s5c73m3/s5c73m3.h                |    4 +
+ drivers/media/i2c/s5k6a3.c                         |  340 ++++++++++++++++++++
+ drivers/media/platform/exynos4-is/fimc-is-regs.c   |    2 +-
+ drivers/media/platform/exynos4-is/fimc-is-sensor.c |  285 +---------------
+ drivers/media/platform/exynos4-is/fimc-is-sensor.h |   49 +--
+ drivers/media/platform/exynos4-is/fimc-is.c        |   97 +++---
+ drivers/media/platform/exynos4-is/fimc-is.h        |    4 +-
+ drivers/media/platform/exynos4-is/media-dev.c      |  335 +++++++++++++------
+ drivers/media/platform/exynos4-is/media-dev.h      |   31 +-
+ 16 files changed, 984 insertions(+), 531 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/samsung-s5c73m3.txt
+ create mode 100644 Documentation/devicetree/bindings/media/samsung-s5k6a3.txt
+ create mode 100644 drivers/media/i2c/s5k6a3.c
 
--- 
-1.8.1.4
+--
+1.7.9.5
