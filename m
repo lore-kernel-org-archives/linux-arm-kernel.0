@@ -1,23 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Aug 2013 16:38:47 -0700
-Subject: [GIT PULL 1/2] late omap PRCM and hwmod changes for v3.12 merge
- window
-In-Reply-To: <521b6475.4f2f310a.3f18.45a9SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <521b6475.4f2f310a.3f18.45a9SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20130829233847.GD29606@quad.lixom.net>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 30 Aug 2013 01:44:50 +0200
+Subject: [PATCH v5] gpio: pcf857x: Add OF support
+In-Reply-To: <CACRpkda=pZ6xQ2XJke=MBLiH_DAS8CXW+JOZ856ohGZi+fOCzA@mail.gmail.com>
+References: <1377590559-14279-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <7583101.2yAsZLOucV@avalon>
+ <CACRpkda=pZ6xQ2XJke=MBLiH_DAS8CXW+JOZ856ohGZi+fOCzA@mail.gmail.com>
+Message-ID: <35333449.0R3QP6op66@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 26, 2013 at 07:21:36AM -0700, Tony Lindgren wrote:
-> The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
-> 
->   Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.12/prcm-signed
+Hi Linus,
 
-Merged into late/all.
+On Thursday 29 August 2013 20:24:32 Linus Walleij wrote:
+> On Wed, Aug 28, 2013 at 1:58 PM, Laurent Pinchart wrote:
+> > On Tuesday 27 August 2013 19:18:55 Wolfram Sang wrote:
+> >> > The driver should support the same chip models reardless of whether
+> >> > it's used with or without DT. If an entry in the OF table has no
+> >> > corresponding entry in the I2C table I would consider that as a driver
+> >> > bug.
+> >> 
+> >> Linus Walleij posted a patch to support DT only probing, but too many
+> >> side-effects showed up. Some were fixable (probe regressions) and some
+> >> need more work, if feasible at all. Most prominent is that runtime
+> >> instantiation of i2c slaves currently needs an entry in the i2c table.
+> > 
+> > Linus, I'd like to get this in v3.12 if it's not too late. Could you
+> > please provide your input ?
+> 
+> Provided some input on the v4 version,
 
+Do you mean v4 of this patch ? I can't find your reply.
 
--Olof
+> due to being a bit overloaded my patch queue is overloaded...
+
+No worries. We can delay this one until v3.13.
+
+-- 
+Regards,
+
+Laurent Pinchart
