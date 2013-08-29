@@ -1,101 +1,33 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 29 Aug 2013 09:23:02 -0500
-Subject: linux-next: manual merge of the arm-soc tree with the usb tree
-In-Reply-To: <521F1D28.7070003@baylibre.com>
-References: <521CAF59.1090203@linutronix.de> <521CB046.9070408@baylibre.com>
- <521CB18B.4080000@linutronix.de> <521CB239.6050409@baylibre.com>
- <521CB403.8010307@linutronix.de> <20130827173732.GC21564@kroah.com>
- <20130827183732.GP3005@radagast> <20130827193021.GA30113@kroah.com>
- <20130827195652.GE3005@radagast> <521F1D28.7070003@baylibre.com>
-Message-ID: <20130829142302.GJ9325@radagast>
+From: ynezz@true.cz (=?UTF-8?q?Petr=20=C5=A0tetiar?=)
+Date: Thu, 29 Aug 2013 16:28:11 +0200
+Subject: [PATCH] ARM: ep93xx: Don't use modem interface on the second UART
+Message-ID: <1377786491-15759-1-git-send-email-ynezz@true.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 12:06:32PM +0200, Benoit Cousson wrote:
-> Hi Felipe
-> 
-> On 27/08/2013 21:56, Felipe Balbi wrote:
-> >Hi,
-> >
-> >On Tue, Aug 27, 2013 at 12:30:21PM -0700, Greg KH wrote:
-> >>On Tue, Aug 27, 2013 at 01:37:32PM -0500, Felipe Balbi wrote:
-> >>>Hi,
-> >>>
-> >>>On Tue, Aug 27, 2013 at 10:37:32AM -0700, Greg KH wrote:
-> >>>>On Tue, Aug 27, 2013 at 04:13:23PM +0200, Sebastian Andrzej Siewior wrote:
-> >>>>>On 08/27/2013 04:05 PM, Benoit Cousson wrote:
-> >>>>>>On 27/08/2013 16:02, Sebastian Andrzej Siewior wrote:
-> >>>>>>>On 08/27/2013 03:57 PM, Benoit Cousson wrote:
-> >>>>>>>>+ Kevin,
-> >>>>>>>>
-> >>>>>>>>On 27/08/2013 15:53, Sebastian Andrzej Siewior wrote:
-> >>>>>>>>>What do we do now?
-> >>>>>>>>
-> >>>>>>>>Cannot you just merge the stable arm-soc/dt branch into your branch
-> >>>>>>>>before applying your patches?
-> >>>>>>>
-> >>>>>>>That is up to Greg. This changes sat in his usb-next tree for a while
-> >>>>>>>now. And before they hit Greg they were in Felipe's tree for a while.
-> >>>>>>>
-> >>>>>>>To be exact, last .dts change via USB was:
-> >>>>>>>
-> >>>>>>>Author:     Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> >>>>>>>AuthorDate: Thu Jun 20 12:13:04 2013 +0200
-> >>>>>>>Commit:     Felipe Balbi <balbi@ti.com>
-> >>>>>>>CommitDate: Fri Aug 9 17:40:16 2013 +0300
-> >>>>>>>
-> >>>>>>>     usb: musb dma: add cppi41 dma driver
-> >>>>>>
-> >>>>>>Mmm, if that branch is supposed to be stable, I'm not sure it will be
-> >>>>>>doable...
-> >>>>>>
-> >>>>>>Maybe we should do the other way around? And merge usb-next into
-> >>>>>>arm-soc/dt.
-> >>>>>>
-> >>>>>>Kevin, Olof?
-> >>>>>
-> >>>>>Please be aware that I have no response so far regarding [0] from Greg.
-> >>>>>
-> >>>>>[0] http://www.spinics.net/lists/linux-usb/msg92595.html
-> >>>>
-> >>>>Nor will you, given that I am not the one to take these patches, Felipe
-> >>>>is.  I noticed now that you said "please route around Felipe", but
-> >>>>sorry, no, I'm not going to do that unless there's a really good reason.
-> >>>>Felipe seems to be around at the moment, please work with him on this.
-> >>>
-> >>>If you will still take a 'part2' pull request from me, I can send you
-> >>>urgent bugfixes by friday. If I have some time left, I can even try to
-> >>>get that sorted out by tomorrow.
-> >>
-> >>For 3.12 stuff, like "fixes", sure, I can take them this week, that
-> >>should give us a week or so for linux-next testing, right?
-> >
-> >that's correct. I have most of them already queued up, let me just go
-> >over my linux-usb maildir again and make sure I got all the important
-> >stuff in.
-> >
-> >cheers, thanks for opening this 'window'.
-> 
-> There are two patches in my DTS tree that conflict with the usb-next.
-> 
-> I will remove that one (ARM: dts: AM33XX: don't redefine OCP bus and
-> device nodes) , as suggested by Olof, since it is the biggest source
-> of conflict from my tree.
-> 
-> The second one is easily fixable, and Stephen already did it, but it
-> will be even better it you could take it in your tree.
-> This is the patch you did that I just slightly renamed (ARM: OMAP5:
-> dts: fix reg property size).
+Second UART doesn't have modem interface, so any attempt to use set_mctrl() it
+produce unwanted garbage on the line. There's no such 0x100 register offset
+for the second UART either.
 
-I'm done with Pull requests for Greg. If the conflict is easy to solve,
-what's the problem in having the conflict to start with ?
+Signed-off-by: Petr ?tetiar <ynezz@true.cz>
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
+---
+ arch/arm/mach-ep93xx/core.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index df8612f..3f12b88 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -281,7 +281,7 @@ static AMBA_APB_DEVICE(uart1, "apb:uart1", 0x00041010, EP93XX_UART1_PHYS_BASE,
+ 	{ IRQ_EP93XX_UART1 }, &ep93xx_uart_data);
+ 
+ static AMBA_APB_DEVICE(uart2, "apb:uart2", 0x00041010, EP93XX_UART2_PHYS_BASE,
+-	{ IRQ_EP93XX_UART2 }, &ep93xx_uart_data);
++	{ IRQ_EP93XX_UART2 }, NULL);
+ 
+ static AMBA_APB_DEVICE(uart3, "apb:uart3", 0x00041010, EP93XX_UART3_PHYS_BASE,
+ 	{ IRQ_EP93XX_UART3 }, &ep93xx_uart_data);
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130829/777bdfea/attachment.sig>
+1.7.9.5
