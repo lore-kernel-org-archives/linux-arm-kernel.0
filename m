@@ -1,137 +1,63 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 29 Aug 2013 18:05:43 -0500
-Subject: [PATCH v4 4/6] dma: edma: Find missed events and issue them
-In-Reply-To: <1377817545-18015-1-git-send-email-joelf@ti.com>
-References: <1377817545-18015-1-git-send-email-joelf@ti.com>
-Message-ID: <1377817545-18015-5-git-send-email-joelf@ti.com>
+Date: Thu, 29 Aug 2013 18:05:39 -0500
+Subject: [PATCH v4 0/6] dma: edma: Support scatter-lists of any length
+Message-ID: <1377817545-18015-1-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In an effort to move to using Scatter gather lists of any size with
-EDMA as discussed at [1] instead of placing limitations on the driver,
-we work through the limitations of the EDMAC hardware to find missed
-events and issue them.
+The following series adds support to EDMA driver to enable DMA of
+scatter-gather lists of arbitrary length, but still make use of only
+a certain MAX number of slots at a time for a given channel. Thus
+free-ing up the rest of the slots to other slaves/channels.  With this
+there is no need for slave drivers to query the EDMA driver about how
+much is the MAX it can send at a time as done in [1]. Drivers can send
+SG lists of any number of entries to DMA. Reference discussion at [2].
 
-The sequence of events that require this are:
+With this, all the patches for MMC and EDMA related to "sg limits" can be
+dropped.
 
-For the scenario where MAX slots for an EDMA channel is 3:
+Tested omap-aes and omap_hsmmc drivers with different MAX number of slots,
+even just 1. In the case where it is 1, only 1-slot is used to DMA an
+entire scatter list of arbitrary length.
+Since this series touches EDMA private API code also shared with davinci-pcm,
+playback of a 16-bit 44.1KHz audio file with davinci-pcm has been tested.
 
-SG1 -> SG2 -> SG3 -> SG4 -> SG5 -> SG6 -> Null
+Sample test run with 1 vs 16 (MAX number of slots/SG) in omap-aes driver:
+MAX slots = 1:
+ (128 bit key, 8192 byte blocks): 1266 operations in 1 seconds (10371072 bytes)
+MAX slots = 16:
+ (128 bit key, 8192 byte blocks): 1601 operations in 1 seconds (13115392 bytes)
 
-The above SG list will have to be DMA'd in 2 sets:
+Note: For the above test, 8K buffer is mapped into SG list of size 2 so
+only 2 slots are required. So beyond size 2, there will not be any noticeable
+performance improvement. But above experiment just shows as proof of concept
+that even using 1 slot is managed by just DMA'ing 1 SG entry at a time.
 
-(1) SG1 -> SG2 -> SG3 -> Null
-(2) SG4 -> SG5 -> SG6 -> Null
+Patch series history:
+v1: The initial patch series
+v2: Several style related cleanups.
+v3: Rewrote major portions of the series to avoid usage of error interrupts.
+v4: Go back to v1: After performing tests, it is determined that the v1
+series is a good enough approach and that v3 triggers problems in certain cases.
+Tests have shown that there is not any noticeable performance difference between
+using vs not using error interrupts. v4 also squashes some patches in v1.
+At this point, we are freezing the overall architecture of the patch series to v4.
 
-After (1) is succesfully transferred, the events from the MMC controller
-donot stop coming and are missed by the time we have setup the transfer
-for (2). So here, we catch the events missed as an error condition and
-issue them manually.
+[1] https://lkml.org/lkml/2013/7/18/432
+[2] http://marc.info/?l=linux-omap&m=137416733628831&w=2
 
-In the second part of the patch, we make handle the NULL slot cases:
-For crypto IP, we continue to receive events even continuously in
-NULL slot, the setup of the next set of SG elements happens after
-the error handler executes. This is results in some recursion problems.
-Due to this, we continously receive error interrupts when we manually
-trigger an event from the error handler.
+Joel Fernandes (6):
+  dma: edma: Setup parameters to DMA MAX_NR_SG at a time
+  dma: edma: Write out and handle MAX_NR_SG at a given time
+  ARM: edma: Add function to manually trigger an EDMA channel
+  dma: edma: Find missed events and issue them
+  dma: edma: Leave linked to Null slot instead of DUMMY slot
+  dma: edma: Remove limits on number of slots
 
-We fix this, by first detecting if the Channel is currently transferring
-from a NULL slot or not, that's where the edma_read_slot in the error
-callback from interrupt handler comes in. With this we can determine if
-the set up of the next SG list has completed, and we manually trigger
-only in this case. If the setup has _not_ completed, we are still in NULL
-so we just set a missed flag and allow the manual triggerring to happen
-in edma_execute which will be eventually called. This fixes the above
-mentioned race conditions seen with the crypto drivers.
+ arch/arm/common/edma.c             |  17 ++++
+ drivers/dma/edma.c                 | 164 ++++++++++++++++++++++++++++---------
+ include/linux/platform_data/edma.h |   2 +
+ 3 files changed, 144 insertions(+), 39 deletions(-)
 
-[1] http://marc.info/?l=linux-omap&m=137416733628831&w=2
-
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
- drivers/dma/edma.c | 50 +++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 49 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 732829b..0e77b57 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -70,6 +70,7 @@ struct edma_chan {
- 	int				ch_num;
- 	bool				alloced;
- 	int				slot[EDMA_MAX_SLOTS];
-+	int				missed;
- 	struct dma_slave_config		cfg;
- };
- 
-@@ -170,6 +171,20 @@ static void edma_execute(struct edma_chan *echan)
- 		dev_dbg(dev, "first transfer starting %d\n", echan->ch_num);
- 		edma_start(echan->ch_num);
- 	}
-+
-+	/*
-+	 * This happens due to setup times between intermediate transfers
-+	 * in long SG lists which have to be broken up into transfers of
-+	 * MAX_NR_SG
-+	 */
-+	if (echan->missed) {
-+		dev_dbg(dev, "missed event in execute detected\n");
-+		edma_clean_channel(echan->ch_num);
-+		edma_stop(echan->ch_num);
-+		edma_start(echan->ch_num);
-+		edma_trigger_channel(echan->ch_num);
-+		echan->missed = 0;
-+	}
- }
- 
- static int edma_terminate_all(struct edma_chan *echan)
-@@ -387,6 +402,7 @@ static void edma_callback(unsigned ch_num, u16 ch_status, void *data)
- 	struct device *dev = echan->vchan.chan.device->dev;
- 	struct edma_desc *edesc;
- 	unsigned long flags;
-+	struct edmacc_param p;
- 
- 	/* Pause the channel */
- 	edma_pause(echan->ch_num);
-@@ -414,7 +430,39 @@ static void edma_callback(unsigned ch_num, u16 ch_status, void *data)
- 
- 		break;
- 	case DMA_CC_ERROR:
--		dev_dbg(dev, "transfer error on channel %d\n", ch_num);
-+		spin_lock_irqsave(&echan->vchan.lock, flags);
-+
-+		edma_read_slot(EDMA_CHAN_SLOT(echan->slot[0]), &p);
-+
-+		/*
-+		 * Issue later based on missed flag which will be sure
-+		 * to happen as:
-+		 * (1) we finished transmitting an intermediate slot and
-+		 *     edma_execute is coming up.
-+		 * (2) or we finished current transfer and issue will
-+		 *     call edma_execute.
-+		 *
-+		 * Important note: issuing can be dangerous here and
-+		 * lead to some nasty recursion when we are in a NULL
-+		 * slot. So we avoid doing so and set the missed flag.
-+		 */
-+		if (p.a_b_cnt == 0 && p.ccnt == 0) {
-+			dev_dbg(dev, "Error occurred, looks like slot is null, just setting miss\n");
-+			echan->missed = 1;
-+		} else {
-+			/*
-+			 * The slot is already programmed but the event got
-+			 * missed, so its safe to issue it here.
-+			 */
-+			dev_dbg(dev, "Error occurred but slot is non-null, TRIGGERING\n");
-+			edma_clean_channel(echan->ch_num);
-+			edma_stop(echan->ch_num);
-+			edma_start(echan->ch_num);
-+			edma_trigger_channel(echan->ch_num);
-+		}
-+
-+		spin_unlock_irqrestore(&echan->vchan.lock, flags);
-+
- 		break;
- 	default:
- 		break;
 -- 
 1.8.1.2
