@@ -1,94 +1,227 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 28 Aug 2013 21:53:15 -0500
-Subject: [RESEND PATCHv3 1/2] clocksource: dw_apb_timer: Move timer defines to
- header file.
-Message-ID: <1377744796-22175-1-git-send-email-dinguyen@altera.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 29 Aug 2013 11:19:21 +0800
+Subject: [PATCH] watchdog: sirf: add watchdog driver of CSR SiRFprimaII
+ and SiRFatlasVI
+In-Reply-To: <20130821195502.GA815@spo001.leaseweb.com>
+References: <1368536872-2189-1-git-send-email-21cnbao@gmail.com>
+ <20130821195502.GA815@spo001.leaseweb.com>
+Message-ID: <CAGsJ_4xHf43sWTD4SUG-PX4yhS2ntXFDj0r43aaHtNpN4W_zbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+Hi Wim,
 
-Move all dw_apb_timer defines to include/linux/dw_apb_timer.h.
+thanks for reviewing. xianglong, will you do some update according to
+Wim's comments.
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-CC: Rob Herring <rob.herring@calxeda.com>
-CC: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-CC: Jamie Iles <jamie@jamieiles.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Pavel Machek <pavel@denx.de>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: linux-arm-kernel at lists.infradead.org
+> >
+> > +config SIRFSOC_WATCHDOG
+> > +     tristate "SiRFSOC watchdog"
+> > +     depends on ARCH_SIRF
+>
+> You are missing a:
+>         select WATCHDOG_CORE
+> here.
 
-v2:
-- Remove the defines in dw_apb_timer.c
----
- drivers/clocksource/dw_apb_timer.c |   19 -------------------
- include/linux/dw_apb_timer.h       |   19 +++++++++++++++++++
- 2 files changed, 19 insertions(+), 19 deletions(-)
+ok. it was done by changing defconfig:
++CONFIG_WATCHDOG=y
++CONFIG_WATCHDOG_CORE=y
+but we can move to your solution.
 
-diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-index e54ca10..c3a8f52 100644
---- a/drivers/clocksource/dw_apb_timer.c
-+++ b/drivers/clocksource/dw_apb_timer.c
-@@ -18,25 +18,6 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- 
--#define APBT_MIN_PERIOD			4
--#define APBT_MIN_DELTA_USEC		200
--
--#define APBTMR_N_LOAD_COUNT		0x00
--#define APBTMR_N_CURRENT_VALUE		0x04
--#define APBTMR_N_CONTROL		0x08
--#define APBTMR_N_EOI			0x0c
--#define APBTMR_N_INT_STATUS		0x10
--
--#define APBTMRS_INT_STATUS		0xa0
--#define APBTMRS_EOI			0xa4
--#define APBTMRS_RAW_INT_STATUS		0xa8
--#define APBTMRS_COMP_VERSION		0xac
--
--#define APBTMR_CONTROL_ENABLE		(1 << 0)
--/* 1: periodic, 0:free running. */
--#define APBTMR_CONTROL_MODE_PERIODIC	(1 << 1)
--#define APBTMR_CONTROL_INT		(1 << 2)
--
- static inline struct dw_apb_clock_event_device *
- ced_to_dw_apb_ced(struct clock_event_device *evt)
- {
-diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
-index 1f79b20..1d2b949 100644
---- a/include/linux/dw_apb_timer.h
-+++ b/include/linux/dw_apb_timer.h
-@@ -19,6 +19,25 @@
- 
- #define APBTMRS_REG_SIZE       0x14
- 
-+#define APBT_MIN_PERIOD                 4
-+#define APBT_MIN_DELTA_USEC             200
-+
-+#define APBTMR_N_LOAD_COUNT             0x00
-+#define APBTMR_N_CURRENT_VALUE          0x04
-+#define APBTMR_N_CONTROL                0x08
-+#define APBTMR_N_EOI                    0x0c
-+#define APBTMR_N_INT_STATUS             0x10
-+
-+#define APBTMRS_INT_STATUS              0xa0
-+#define APBTMRS_EOI                     0xa4
-+#define APBTMRS_RAW_INT_STATUS          0xa8
-+#define APBTMRS_COMP_VERSION            0xac
-+
-+#define APBTMR_CONTROL_ENABLE           (1 << 0)
-+/* 1: periodic, 0:free running. */
-+#define APBTMR_CONTROL_MODE_PERIODIC    (1 << 1)
-+#define APBTMR_CONTROL_INT              (1 << 2)
-+
- struct dw_apb_timer {
- 	void __iomem				*base;
- 	unsigned long				freq;
--- 
-1.7.9.5
+> > +
+> > +
+> > +static unsigned int default_timeout = SIRFSOC_WDT_DEFAULT_TIMEOUT;
+> > +module_param(default_timeout, uint, 0);
+> > +MODULE_PARM_DESC(default_timeout, "Default watchdog timeout (in seconds)");
+>
+> Preferred module parameter name is timeout .
+>
+
+ok.
+
+> > +static unsigned int sirfsoc_wdt_gettimeleft(struct watchdog_device *wdd)
+> > +{
+> > +     u32 counter, match;
+> > +     int time_left;
+> > +
+> > +     counter = readl(watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_COUNTER_LO);
+> > +     match = readl(watchdog_get_drvdata(wdd) +
+> > +             SIRFSOC_TIMER_MATCH_0 + (SIRFSOC_TIMER_WDT_INDEX << 2));
+> > +
+> > +     if (match >= counter) {
+> > +             time_left = match-counter;
+> > +     } else {
+> > +             /* rollover */
+> > +             time_left = (0xffffffffUL - counter) + match;
+> > +     }
+>
+> should be:
+>         if (match >= counter)
+>                 time_left = match-counter;
+>         else
+>                 /* rollover */
+>                 time_left = (0xffffffffUL - counter) + match;
+>
+> according to coding style.
+
+yes. need fix.
+
+>
+> > +
+> > +     return time_left / CLOCK_TICK_RATE;
+> > +}
+> > +
+> > +static int sirfsoc_wdt_updatetimeout(struct watchdog_device *wdd)
+> > +{
+> > +     u32 counter, timeout_ticks;
+> > +
+> > +     timeout_ticks = wdd->timeout * CLOCK_TICK_RATE;
+> > +
+> > +     /* Enable the latch before reading the LATCH_LO register */
+> > +     writel(1, watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_LATCH);
+> > +
+> > +     /* Set the TO value */
+> > +     counter = readl(watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_LATCHED_LO);
+> > +
+> > +     if ((0xffffffffUL - counter) >= timeout_ticks) {
+> > +             counter += timeout_ticks;
+> > +     } else {
+> > +             /* Rollover */
+> > +             counter = timeout_ticks - (0xffffffffUL - counter);
+> > +     }
+>
+> Same here (coding style).
+
+agree.
+
+>
+> > +     writel(counter, watchdog_get_drvdata(wdd) +
+> > +             SIRFSOC_TIMER_MATCH_0 + (SIRFSOC_TIMER_WDT_INDEX << 2));
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +static int sirfsoc_wdt_enable(struct watchdog_device *wdd)
+> > +{
+> > +     sirfsoc_wdt_updatetimeout(wdd);
+> > +
+> > +     /*
+> > +      * NOTE: If interrupt is not enabled
+> > +      * then WD-Reset doesn't get generated at all.
+> > +      */
+> > +     writel(readl(watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_INT_EN)
+> > +             | (1 << SIRFSOC_TIMER_WDT_INDEX),
+> > +             watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_INT_EN);
+> > +     writel(1, watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_WATCHDOG_EN);
+>
+> Wouldn't it be better to define a local variable first that get's the value
+> of watchdog_get_drvdata(wdd)? This would definitely improve readability.
+> Goes also for other functions (like sirfsoc_wdt_gettimeleft and
+> sirfsoc_wdt_disable).
+>
+
+ok
+
+> > +
+> > +static int sirfsoc_wdt_settimeout(struct watchdog_device *wdd, unsigned int to)
+> > +{
+> > +     if (to < SIRFSOC_WDT_MIN_TIMEOUT)
+> > +             to = SIRFSOC_WDT_MIN_TIMEOUT;
+> > +     if (to > SIRFSOC_WDT_MAX_TIMEOUT)
+> > +             to = SIRFSOC_WDT_MAX_TIMEOUT;
+>
+> Hmm, since SIRFSOC_WDT_MIN_TIMEOUT and SIRFSOC_WDT_MAX_TIMEOUT are defined:
+> setting the timeout will call watchdog_set_timeout and that function will do a:
+> if (watchdog_timeout_invalid(wddev, timeout))
+>                 return -EINVAL;
+>
+> with watchdog_timeout_invalid returning:
+>         ((wdd->max_timeout != 0) && (t < wdd->min_timeout || t > wdd->max_timeout));
+>
+> So this will never happen...
+
+so we will drop this.
+
+>
+>
+> > +     wdd->timeout = to;
+> > +     sirfsoc_wdt_updatetimeout(wdd);
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +#define OPTIONS (WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE)
+> > +
+> > +static const struct watchdog_info sirfsoc_wdt_ident = {
+> > +     .options          =     OPTIONS,
+> > +     .firmware_version =     0,
+> > +     .identity         =     "SiRFSOC Watchdog",
+> > +};
+> > +
+> > +static struct watchdog_ops sirfsoc_wdt_ops = {
+> > +     .owner = THIS_MODULE,
+> > +     .start = sirfsoc_wdt_enable,
+> > +     .stop = sirfsoc_wdt_disable,
+> > +     .get_timeleft = sirfsoc_wdt_gettimeleft,
+> > +     .ping = sirfsoc_wdt_updatetimeout,
+> > +     .set_timeout = sirfsoc_wdt_settimeout,
+> > +};
+> > +
+> > +static struct watchdog_device sirfsoc_wdd = {
+> > +     .info = &sirfsoc_wdt_ident,
+> > +     .ops = &sirfsoc_wdt_ops,
+> > +     .timeout = SIRFSOC_WDT_DEFAULT_TIMEOUT,
+> > +     .min_timeout = SIRFSOC_WDT_MIN_TIMEOUT,
+> > +     .max_timeout = SIRFSOC_WDT_MAX_TIMEOUT,
+> > +};
+> > +
+> > +static int sirfsoc_wdt_probe(struct platform_device *pdev)
+> > +{
+> > +     struct resource *res;
+> > +     int ret;
+> > +     void __iomem *base;
+> > +
+> > +     /* reserve static register mappings */
+> > +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +     if (!res) {
+> > +             dev_err(&pdev->dev, "sirfsoc wdt: could not get mem resources\n");
+> > +             ret = -ENOMEM;
+> > +             goto out;
+> > +     }
+> > +
+> > +     base = devm_ioremap_resource(&pdev->dev, res);
+> > +     if (!base) {
+> > +             dev_err(&pdev->dev, "sirfsoc wdt: could not remap the mem\n");
+> > +             ret = -EADDRNOTAVAIL;
+> > +             goto out;
+> > +     }
+> > +     watchdog_set_drvdata(&sirfsoc_wdd, base);
+> > +
+> > +     sirfsoc_wdd.timeout = default_timeout;
+>
+> You can consider using watchdog_init_timeout here.
+> I would also advice to add watchdog_set_nowayout and use the nowayout functionality.
+
+agree.
+
+> > +
+> > +MODULE_DESCRIPTION("SiRF SoC watchdog driver");
+> > +MODULE_AUTHOR("Xianglong Du <Xianglong.Du@csr.com>");
+> > +MODULE_LICENSE("GPL v2");
+> > +MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
+>
+> This alias can be removed if you have the platform alias (like listed in the following line).
+>
+> > +MODULE_ALIAS("platform:sirfsoc-wdt");
+
+agree.
+
+
+> > --
+> > 1.7.4.1
+>
+> Kind regards,
+> Wim.
+>
+
+-barry
