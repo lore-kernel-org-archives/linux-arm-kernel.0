@@ -1,51 +1,111 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Thu, 29 Aug 2013 11:28:17 -0700
-Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
-In-Reply-To: <20130829180353.GP10783@sirena.org.uk>
-References: <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
- <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
- <87txiasqhk.fsf@linaro.org>
- <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
- <20130829110534.GV10783@sirena.org.uk>
- <CAGa+x85u0OpB9o71xUTs15wt8Te-o5f0C9o22GHzZwOjn5F6=w@mail.gmail.com>
- <20130829154929.GJ10783@sirena.org.uk>
- <CA+Bv8XYbpqQAYwJ3=vkP0gXDMTp7_VNVzB0NXLG6GHDi=Z1img@mail.gmail.com>
- <20130829173022.GN10783@sirena.org.uk>
- <CA+Bv8Xb38bwby78Q--nEGffBknj5ZD98x0OuRX5N1EFNjbh7zA@mail.gmail.com>
- <20130829180353.GP10783@sirena.org.uk>
-Message-ID: <CA+Bv8XaquSBKUpDbVZwcGEbmDB2Lw1ZaZu3gSU4FnG9qBKTViA@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 29 Aug 2013 19:31:10 +0100
+Subject: [PATCH v5 0/13] enable swiotlb-xen on arm and arm64
+Message-ID: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 11:03 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Aug 29, 2013 at 10:47:04AM -0700, Russ Dill wrote:
->> On Thu, Aug 29, 2013 at 10:30 AM, Mark Brown <broonie@kernel.org> wrote:
->
->> > So this is done from cpuidle rather than system suspend.
->
->> It is done for system suspend. It isn't possible to do this in a
->> cpuidle use case as the memory controller would need to come out of
->> idle automatically to service DMA requests.
->
-> OK, so it's all part of the core power down sequence for the SoC?  I'm
-> not sure that makes a big difference but it at least means that there
-> are fewer runtime interactions to worry about.
+Hi all,
+this patch series enables xen-swiotlb on arm and arm64.
 
- Well, core suspend sequence for the SoC.
+Considering that all guests, including dom0, run on xen on arm with
+second stage translation enabled, it follows that without an IOMMU no
+guests could actually drive the hardware.
 
->> > I mean describe the intended sequence of events in the system rather
->> > than the raw register commands to accomplish them.
->
->> I'm still not sure what you mean.
->
-> Say "set voltage X" or even "regulator X supplies Y" not "send this
-> bytestream to the device".
+The solution for platforms without an IOMMU is to use swiotlb-xen,
+adapted to autotranslate guests. swiotlb-xen provides a set of dma_ops
+that can be used by Linux to setup a contiguous buffer in stage-2
+addresses and use it for dma operations.
+Basically Linux asks Xen to make a buffer contiguous and gets the
+machine address for it. This buffer is going to be used by lib/swiotlb.c
+to allocate bounce buffers.
 
-That's already known at the SoC level, "set the vdd core regulator to
-0.95V". What isn't known is how to do that for each board.
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Feedback is very welcome.
+Cheers,
+
+Stefano
+
+
+
+Changes in v5:
+- dropped the first two patches, already in the Xen tree;
+- implement dma_mark_clean using dmac_flush_range on arm;
+- add "arm64: define DMA_ERROR_CODE"
+- better comment for XENMEM_exchange_and_pin return codes;
+- fix xen_dma_add_entry error path;
+- remove the spin_lock: the red-black tree is not modified at run time;
+- add "swiotlb-xen: introduce xen_swiotlb_set_dma_mask";
+- add "xen: introduce xen_alloc/free_coherent_pages";
+- add "swiotlb-xen: use xen_alloc/free_coherent_pages";
+- add "swiotlb: don't assume that io_tlb_start-io_tlb_end is coherent".
+
+Changes in v4:
+- rename XENMEM_get_dma_buf to XENMEM_exchange_and_pin;
+- rename XENMEM_put_dma_buf to XENMEM_unpin;
+- improve the documentation of the new hypercalls;
+- add a note about out.address_bits for XENMEM_exchange;
+- code style fixes;
+- add err_out label in xen_dma_add_entry;
+- remove INVALID_ADDRESS, use DMA_ERROR_CODE instead;
+- add in-code comments regarding the usage of xen_dma_seg[0].dma_addr.
+
+Changes in v3:
+- add a patch to compile SWIOTLB without CONFIG_NEED_SG_DMA_LENGTH;
+- add a patch to compile SWIOTLB_XEN without CONFIG_NEED_SG_DMA_LENGTH;
+- arm/dma_capable: do not treat dma_mask as a limit;
+- arm/dmabounce: keep using arm_dma_ops;
+- add missing __init in xen_early_init declaration;
+- many code style and name changes in swiotlb-xen.c;
+- improve error checks in xen_dma_add_entry;
+- warn on XENMEM_put_dma_buf failures.
+
+Changes in v2:
+- fixed a couple of errors in xen_bus_to_phys, xen_phys_to_bus and
+xen_swiotlb_fixup.
+
+
+
+Stefano Stabellini (13):
+      arm: make SWIOTLB available
+      arm: introduce a global dma_ops pointer
+      arm64: define DMA_ERROR_CODE
+      arm64: do not initialize arm64_swiotlb if dma_ops is already set
+      xen/arm,arm64: move Xen initialization earlier
+      xen: introduce XENMEM_exchange_and_pin and XENMEM_unpin
+      xen: make xen_create_contiguous_region return the dma address
+      swiotlb-xen: support autotranslate guests
+      xen/arm,arm64: enable SWIOTLB_XEN
+      swiotlb-xen: introduce xen_swiotlb_set_dma_mask
+      xen: introduce xen_alloc/free_coherent_pages
+      swiotlb-xen: use xen_alloc/free_coherent_pages
+      swiotlb: don't assume that io_tlb_start-io_tlb_end is coherent
+
+ arch/arm/Kconfig                           |    7 +
+ arch/arm/include/asm/dma-mapping.h         |   35 +++++-
+ arch/arm/include/asm/xen/hypervisor.h      |    8 +
+ arch/arm/include/asm/xen/page-coherent.h   |   22 +++
+ arch/arm/include/asm/xen/page.h            |    2 +
+ arch/arm/kernel/setup.c                    |    2 +
+ arch/arm/mm/dma-mapping.c                  |    3 +
+ arch/arm/xen/Makefile                      |    2 +-
+ arch/arm/xen/enlighten.c                   |   24 +++-
+ arch/arm/xen/mm.c                          |  117 ++++++++++++++++
+ arch/arm64/Kconfig                         |    1 +
+ arch/arm64/include/asm/dma-mapping.h       |    1 +
+ arch/arm64/include/asm/xen/page-coherent.h |   24 +++
+ arch/arm64/kernel/setup.c                  |    2 +
+ arch/arm64/mm/dma-mapping.c                |    2 +
+ arch/arm64/xen/Makefile                    |    2 +-
+ arch/ia64/include/asm/xen/page-coherent.h  |   24 +++
+ arch/x86/include/asm/xen/page-coherent.h   |   24 +++
+ arch/x86/xen/mmu.c                         |   11 +-
+ drivers/xen/Kconfig                        |    1 -
+ drivers/xen/swiotlb-xen.c                  |  209 ++++++++++++++++++++++++----
+ include/xen/interface/memory.h             |   37 +++++
+ include/xen/swiotlb-xen.h                  |    2 +
+ include/xen/xen-ops.h                      |    7 +-
+ lib/swiotlb.c                              |   12 ++-
+ 25 files changed, 535 insertions(+), 46 deletions(-)
+
+git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git swiotlb-xen-5
