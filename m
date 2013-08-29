@@ -1,55 +1,86 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Thu, 29 Aug 2013 14:56:21 -0700
-Subject: [GIT PULL] 64bit friendly generic sched_clock() base for 3.12
-In-Reply-To: <51F80B09.8060509@linaro.org>
-References: <51F80B09.8060509@linaro.org>
-Message-ID: <521FC385.90903@linaro.org>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 29 Aug 2013 17:20:29 -0500
+Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
+In-Reply-To: <877gf4tb9q.fsf@linaro.org>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <5211E3F6.6090108@ti.com> <52125A39.3010008@ti.com>
+ <87vc2qyjao.fsf@linaro.org> <521FBD6B.3020208@ti.com>
+ <877gf4tb9q.fsf@linaro.org>
+Message-ID: <521FC92D.1080601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2013 11:50 AM, John Stultz wrote:
-> Hey Thomas, Olof,
->     Here is the common base changes in Stephen's "64bit friendly
-> generic sched_clock()" patch series. This common base will be needed
-> so that following patch series can be merged via both the
-> tip/timers/core and arm-soc trees independently.
+On 08/29/2013 04:52 PM, Kevin Hilman wrote:
+> Dave Gerlach <d-gerlach@ti.com> writes:
 >
-> Please let me know if you have any issues or objections with this set.
+>> On 08/27/2013 03:23 PM, Kevin Hilman wrote:
+>>> Hi Dave,
+>>>
+>>> Dave Gerlach <d-gerlach@ti.com> writes:
+>>>
+>>>> On 08/19/2013 04:23 AM, Gururaja Hebbar wrote:
+>>>>> On 8/6/2013 11:19 PM, Dave Gerlach wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> This is the third version of the patch series for adding basic suspend-resume
+>>>>>> support for AM33XX, previously submitted by Vaibhav Bedia. This patchset
+>>>>>> is based on 3.11-rc4 and depends on a forthcoming patchset from Suman Anna
+>>>>>> that adds mailbox support for the wkup_m3. The patches at [1], [2], and [3] are
+>>>>>> required for the pm code to properly suspend and resume.
+>>>>>>
+>>>>>> The PM code uses the firmware interface and expects the userspace to load
+>>>>>> the WKUP_M3 binary before the suspend-resume functionality is made available.
+>>>>>> The binary file (and the source-code for WKUP_M3) can be obtained from the
+>>>>>> 'next2' branch at [4]. The WKUP_M3 binary can either be loaded post bootup
+>>>>>> via the sysfs entry './sys/devices/ocp.2/wkup_m3.4/firmware' or it can be
+>>>>>> included in the kernel image as part of the build process.
+>>>>>>
+>>>>>> Suspend to mem is tested on am335x-bone and am335x-evm.
+>>>>>>
+>>>>>> More details on AM335x suspend-resume are provided within the commit logs
+>>>>>> for each patch.
+>>>>>
+>>>>> can you share the working repo which has all these patches applied?
+>>>>>
+>>>>> Thanks & Regards
+>>>>> Gururaja
+>>>>>
+>>>>
+>>>> The working repo for this version of the patch series can be found here:
+>>>>
+>>>> git://github.com/dgerlach/linux-pm.git am335x-3.11rc4-suspend-resume
+>>>
+>>> I tried this branch on my beaglebone black, and it's not fully resuming.
+>>> Suspend seems to be working (power draw goes from ~1W to ~130mW) and
+>>> pressing a key on the UART seems to be waking up the SoC (power draw
+>>> goes to ~600mW) but I don't ever get the console back.
+>>>
+>>> Is there a specific version of the firmware I should be using?
+>>>
+>>> Kevin
+>>>
+>>
+>> Kevin, I agree there does seem to be some issues with Beaglebone
+>> black. I can confirm it works on BeagleBone White and the large am335
+>> EVM, I am working on pinpointing the issue on beaglebone black, seems
+>> that support isn't quite there yet.
 >
-> thanks
-> -john
+> OK, I didn't realize that.  I'll give it a try on my BB white.
 >
+> Is there a specific version/branch of the firmware I should be using?
 >
-> The following changes since commit
-> ad81f0545ef01ea651886dddac4bef6cec930092:
+> Thanks,
 >
->   Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> Kevin
 >
-> are available in the git repository at:
->
->   git://git.linaro.org/people/jstultz/linux.git
-> fortglx/3.12/sched-clock64-base
->
-> for you to fetch changes up to e7e3ff1bfe9c42ee31172e9afdc0383a9e595e29:
->
->   sched_clock: Add support for >32 bit sched_clock (2013-07-30
-> 11:24:21 -0700)
->
-> ----------------------------------------------------------------
-> Stephen Boyd (4):
->       clocksource: Extract max nsec calculation into separate function
->       sched_clock: Use seqcount instead of rolling our own
->       sched_clock: Use an hrtimer instead of timer
->       sched_clock: Add support for >32 bit sched_clock
->
->  include/linux/clocksource.h |   2 +
->  include/linux/sched_clock.h |   2 +
->  kernel/time/clocksource.c   |  45 ++++++++++++------
->  kernel/time/sched_clock.c   | 111
-> ++++++++++++++++++++++++--------------------
->  4 files changed, 95 insertions(+), 65 deletions(-)
 
-Ping? Thomas?
+Kevin,
 
-thanks
--john
+The next2 branch, which you can find here [1], is what this revision of 
+the series was developed against and is tested and works.
+
+Regards,
+Dave
+
+[1] 
+http://arago-project.org/git/projects/?p=am33x-cm3.git;a=shortlog;h=refs/heads/next2
