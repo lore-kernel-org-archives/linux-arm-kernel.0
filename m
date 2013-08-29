@@ -1,64 +1,55 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 29 Aug 2013 16:16:03 +0300
-Subject: [PATCHv6 11/45] CLK: TI: omap5: Initialize USB_DPLL at boot
+Date: Thu, 29 Aug 2013 16:16:07 +0300
+Subject: [PATCHv6 15/45] ARM: dts: DRA7: Add PCIe related clock nodes
 In-Reply-To: <1377782197-10611-1-git-send-email-t-kristo@ti.com>
 References: <1377782197-10611-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1377782197-10611-12-git-send-email-t-kristo@ti.com>
+Message-ID: <1377782197-10611-16-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roger Quadros <rogerq@ti.com>
+From: Keerthy <j-keerthy@ti.com>
 
-USB_DPLL must be initialized and locked at boot so that
-USB modules can work.
+This patch adds optfclk_pciephy_clk and optfclk_pciephy_div_clk
+which are used by PCIe phy. It also adds a mux clock to choose
+the source of optfclk_pciephy_div_clk clock.
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/ti/clk-54xx.c |   18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/dra7xx-clocks.dtsi |   24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/drivers/clk/ti/clk-54xx.c b/drivers/clk/ti/clk-54xx.c
-index bf9dc00..b1163b7 100644
---- a/drivers/clk/ti/clk-54xx.c
-+++ b/drivers/clk/ti/clk-54xx.c
-@@ -19,6 +19,12 @@
- 
- #define OMAP5_DPLL_ABE_DEFFREQ				98304000
- 
-+/*
-+ * OMAP543x TRM, section "3.6.3.9.5 DPLL_USB Preferred Settings"
-+ * states it must be at 960MHz
-+ */
-+#define OMAP5_DPLL_USB_DEFFREQ				960000000
+diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+index 397a60a..6a53d3b 100644
+--- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
++++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+@@ -2061,3 +2061,27 @@ vip3_gclk_mux: vip3_gclk_mux at 4a009030 {
+ 	reg = <0x4a009030 0x4>;
+ 	bit-mask = <0x1>;
+ };
 +
- static struct omap_dt_clk omap54xx_clks[] = {
- 	DT_CLK(NULL, "pad_clks_src_ck", "pad_clks_src_ck"),
- 	DT_CLK(NULL, "pad_clks_ck", "pad_clks_ck"),
-@@ -194,7 +200,7 @@ static struct omap_dt_clk omap54xx_clks[] = {
- int __init omap5xxx_clk_init(void)
- {
- 	int rc;
--	struct clk *abe_dpll_ref, *abe_dpll, *sys_32k_ck;
-+	struct clk *abe_dpll_ref, *abe_dpll, *sys_32k_ck, *usb_dpll;
- 
- 	of_clk_init(NULL);
- 
-@@ -211,5 +217,15 @@ int __init omap5xxx_clk_init(void)
- 	if (rc)
- 		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
- 
-+	usb_dpll = clk_get_sys(NULL, "dpll_usb_ck");
-+	rc = clk_set_rate(usb_dpll, OMAP5_DPLL_USB_DEFFREQ);
-+	if (rc)
-+		pr_err("%s: failed to configure USB DPLL!\n", __func__);
++optfclk_pciephy_div: optfclk_pciephy_div at 4a00821c {
++	compatible = "divider-clock";
++	clocks = <&apll_pcie_ck>;
++	#clock-cells = <0>;
++	reg = <0x4a00821c 0x4>;
++	bit-mask = <0x100>;
++};
 +
-+	usb_dpll = clk_get_sys(NULL, "dpll_usb_m2_ck");
-+	rc = clk_set_rate(usb_dpll, OMAP5_DPLL_USB_DEFFREQ/2);
-+	if (rc)
-+		pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
++optfclk_pciephy_clk: optfclk_pciephy_clk at 4a0093b0 {
++	compatible = "gate-clock";
++	clocks = <&apll_pcie_ck>;
++	#clock-cells = <0>;
++	reg = <0x4a0093b0 0x4>;
++	bit-shift = <9>;
++};
 +
- 	return 0;
- }
++optfclk_pciephy_div_clk: optfclk_pciephy_div_clk at 4a0093b0 {
++	compatible = "gate-clock";
++	clocks = <&optfclk_pciephy_div>;
++	#clock-cells = <0>;
++	reg = <0x4a0093b0 0x4>;
++	bit-shift = <10>;
++};
 -- 
 1.7.9.5
