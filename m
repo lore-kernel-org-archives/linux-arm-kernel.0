@@ -1,44 +1,50 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 29 Aug 2013 16:38:17 +0100
-Subject: [PATCH v4 10/10] xen/arm,arm64: enable SWIOTLB_XEN
-In-Reply-To: <1377765650.11455.7.camel@kazak.uk.xensource.com>
-References: <alpine.DEB.2.02.1308151200580.4470@kaball.uk.xensource.com>
- <1376565054-24153-10-git-send-email-stefano.stabellini@eu.citrix.com>
- <1376600325.9273.223.camel@hastur.hellion.org.uk>
- <alpine.DEB.2.02.1308282104000.6397@kaball.uk.xensource.com>
- <1377765650.11455.7.camel@kazak.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1308291637230.6397@kaball.uk.xensource.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Thu, 29 Aug 2013 10:38:16 -0500
+Subject: [PATCH RFC v2 11/16] ARM: socfpga: remove call to of_clk_init
+In-Reply-To: <1377638890-371-12-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1377638890-371-12-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1377790696.26261.3.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Aug 2013, Ian Campbell wrote:
-> On Wed, 2013-08-28 at 21:07 +0100, Stefano Stabellini wrote:
-> > On Thu, 15 Aug 2013, Ian Campbell wrote:
-> > > On Thu, 2013-08-15 at 12:10 +0100, Stefano Stabellini wrote:
-> > > > At the moment always rely on swiotlb-xen, but when Xen starts supporting
-> > > > hardware IOMMUs we'll be able to avoid it conditionally on the presence
-> > > > of an IOMMU on the platform.
-> > > 
-> > > Do we have any idea how we are going to do this?
-> > > 
-> > > It's extra complicated if you consider that on some systems on some of
-> > > the devices are behind an IOMMU :-/
-> > > 
-> > > I wonder if we can enumerate which devices have an IOMMU at boot time
-> > > and force a ludicrous dma mask (such as 0) if one isn't present in order
-> > > to force us to always take the exchange_and_pin path?
-> > 
-> > We don't need to worry about how to specify which devices need to go via
-> > the swiotlb internally, because we have our own arm specific
-> > dma_map_ops. At the moment they are just implemented using the
-> > swiotlb-xen functions, but we could easily provide wrappers that check
-> > our own internal whitelist/blacklist and go via swiotlb-xen only in
-> > those cases.
+On Tue, 2013-08-27 at 23:28 +0200, Sebastian Hesselbarth wrote:
+> With arch/arm calling of_clk_init(NULL) from time_init(), we can now
+> remove mach specific calls to it.
 > 
-> OK, but how do we decide which devices go on those lists? We need some
-> sort of indication from the hypervisor, don't we? Only Xen knows if it
-> has an iommu it can use because the iommu must necessarily be hidden
-> from Linux.
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Dinh Nguyen <dinguyen@altera.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/mach-socfpga/socfpga.c |    2 --
+>  1 files changed, 0 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+> index bfce964..dd0d49c 100644
+> --- a/arch/arm/mach-socfpga/socfpga.c
+> +++ b/arch/arm/mach-socfpga/socfpga.c
+> @@ -14,7 +14,6 @@
+>   * You should have received a copy of the GNU General Public License
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+> -#include <linux/clk-provider.h>
+>  #include <linux/irqchip.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+> @@ -107,7 +106,6 @@ static void __init socfpga_cyclone5_init(void)
+>  {
+>  	l2x0_of_init(0, ~0UL);
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> -	of_clk_init(NULL);
+>  	socfpga_init_clocks();
+>  }
+>  
 
-Right. Maybe Xen could mark the devices that are safe to use without
-swiotlb-xen on device tree? Adding a property to the node?
+Acked-by: Dinh Nguyen <dinguyen@altera.com>
+
+Thanks,
+Dinh
