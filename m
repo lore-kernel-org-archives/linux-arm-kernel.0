@@ -1,25 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 29 Aug 2013 17:36:11 +0100
-Subject: [alsa-devel] [PATCH 09/18] ASoC: Samsung: Do not queue cyclic
- buffers multiple times
-In-Reply-To: <1376243970-6489-10-git-send-email-tomasz.figa@gmail.com>
-References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
- <1376243970-6489-10-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <20130829163611.GL10783@sirena.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 29 Aug 2013 09:39:07 -0700
+Subject: [PATCH v7 0/3] mmc: dw_mmc: fixes for suspend/resume on exynos
+In-Reply-To: <1377188348-3418-1-git-send-email-dianders@chromium.org>
+References: <1377188348-3418-1-git-send-email-dianders@chromium.org>
+Message-ID: <1377794350-12335-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 11, 2013 at 07:59:21PM +0200, Tomasz Figa wrote:
-> The legacy S3C-DMA API required every period of a cyclic buffer to be
-> queued separately. After conversion of Samsung ASoC to Samsung DMA
-> wrappers somebody made an assumption that the same is needed for DMA
-> engine API, which is not true.
+This series of patches addresses some suspend/resume problems with
+dw_mmc on exynos platforms, espeically exynos5420.  This patchset was
+tested on the current ToT Chromeos 3.8 tree (which has lots of
+backports from 3.10/3.11) and on ToT Linux (v3.11-rc6).  I have
+confirmed basic booting and that SD cards work across suspend/resume
+(both if they are plugged in and if they are not plugged in).
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130829/fc388564/attachment.sig>
+I have received confirmation from Samsung that the problem solved for
+exynos5420 is a silicon errata and that this is a good fix.
+
+Changes in v7:
+- Avoid printing the same clock over and over again w/ MMC_CLKGATE.
+
+Changes in v6:
+- Took out TODO comment copied from main platform code.
+- Replaces previous pathes that ensured saving/restoring clocks.
+
+Changes in v5:
+- Cleaned up dw_mci_exynos_resume_noirq() comment as per Seungwon.
+- Don't memcpy dev_pm_ops structure, define a new one.
+
+Changes in v4:
+- Take Seungwon's suggestion and don't add any dw_mmc-pltfm code.
+
+Changes in v3:
+- Add freeze/thaw and poweroff/restore noirq entries.
+
+Changes in v2:
+- Use suspend_noirq as per James Hogan.
+
+Doug Anderson (3):
+  mmc: dw_mmc: Add exynos resume_noirq callback to clear WAKEUP_INT
+  mmc: dw_mmc: Honor requests to set the clock to 0 (turn off clock)
+  mmc: dw_mmc: Set timeout to max upon resume
+
+ drivers/mmc/host/dw_mmc-exynos.c | 53 +++++++++++++++++++++++++++++++++++++++-
+ drivers/mmc/host/dw_mmc.c        | 39 ++++++++++++++++++-----------
+ 2 files changed, 77 insertions(+), 15 deletions(-)
+
+-- 
+1.8.4
