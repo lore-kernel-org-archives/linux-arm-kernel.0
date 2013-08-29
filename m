@@ -1,55 +1,137 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 29 Aug 2013 16:02:26 -0700
-Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <CA+Bv8Xamd7e24nswG4QhLDNhHXs92EfXcfu8E2uL=XLhsL70Hw@mail.gmail.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <5211E3F6.6090108@ti.com> <52125A39.3010008@ti.com>
- <87vc2qyjao.fsf@linaro.org> <521FBD6B.3020208@ti.com>
- <87mwo0rvf8.fsf@linaro.org>
- <CA+Bv8Xamd7e24nswG4QhLDNhHXs92EfXcfu8E2uL=XLhsL70Hw@mail.gmail.com>
-Message-ID: <CAGa+x84okZ_j71=oOnK5c43T9L3gmsGcQjWSxZSchfzheA_2HQ@mail.gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 29 Aug 2013 18:05:43 -0500
+Subject: [PATCH v4 4/6] dma: edma: Find missed events and issue them
+In-Reply-To: <1377817545-18015-1-git-send-email-joelf@ti.com>
+References: <1377817545-18015-1-git-send-email-joelf@ti.com>
+Message-ID: <1377817545-18015-5-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 3:43 PM, Russ Dill <Russ.Dill@ti.com> wrote:
-> On Thu, Aug 29, 2013 at 3:20 PM, Kevin Hilman <khilman@linaro.org> wrote:
->> Dave Gerlach <d-gerlach@ti.com> writes:
->>
->> [...]
->>
->>>>>
->>>>> The working repo for this version of the patch series can be found here:
->>>>>
->>>>> git://github.com/dgerlach/linux-pm.git am335x-3.11rc4-suspend-resume
->>>>
->>>> I tried this branch on my beaglebone black, and it's not fully resuming.
->>>> Suspend seems to be working (power draw goes from ~1W to ~130mW) and
->>>> pressing a key on the UART seems to be waking up the SoC (power draw
->>>> goes to ~600mW) but I don't ever get the console back.
->>>>
->>>> Is there a specific version of the firmware I should be using?
->>>>
->>>> Kevin
->>>>
->>>
->>> Kevin, I agree there does seem to be some issues with Beaglebone
->>> black. I can confirm it works on BeagleBone White and the large am335
->>> EVM, I am working on pinpointing the issue on beaglebone black, seems
->>> that support isn't quite there yet.
->>
->> OK, I tried the above branch on my BB white, using prebuilt firmware
->> from the next3 branch of the am33x-cm3 repo and it's suspending/resuming
->> fine.  Thanks for the pointer.
->>
->> FYI, measuring at the 5V supply, it goes from ~1.6W at idle down to
->> ~700mW in suspend.  The black goes from ~1W down to an impressive 130mW
->> but of course, it doesn't wake up so maybe it's not that impressive. ;)
->
-> Just a reminder, the next3 firmware is built to be compatible with
-> older kernel revisions whereas the next2 firmware is not. In order for
-> that compatibility to work, the CMD_ID_DS0 that mainline uses should
-> change from 0x3 to 0x4
+In an effort to move to using Scatter gather lists of any size with
+EDMA as discussed at [1] instead of placing limitations on the driver,
+we work through the limitations of the EDMAC hardware to find missed
+events and issue them.
 
-Thanks, i switched to the next2 firmware since I'm only using current kernels.
+The sequence of events that require this are:
 
-Kevin
+For the scenario where MAX slots for an EDMA channel is 3:
+
+SG1 -> SG2 -> SG3 -> SG4 -> SG5 -> SG6 -> Null
+
+The above SG list will have to be DMA'd in 2 sets:
+
+(1) SG1 -> SG2 -> SG3 -> Null
+(2) SG4 -> SG5 -> SG6 -> Null
+
+After (1) is succesfully transferred, the events from the MMC controller
+donot stop coming and are missed by the time we have setup the transfer
+for (2). So here, we catch the events missed as an error condition and
+issue them manually.
+
+In the second part of the patch, we make handle the NULL slot cases:
+For crypto IP, we continue to receive events even continuously in
+NULL slot, the setup of the next set of SG elements happens after
+the error handler executes. This is results in some recursion problems.
+Due to this, we continously receive error interrupts when we manually
+trigger an event from the error handler.
+
+We fix this, by first detecting if the Channel is currently transferring
+from a NULL slot or not, that's where the edma_read_slot in the error
+callback from interrupt handler comes in. With this we can determine if
+the set up of the next SG list has completed, and we manually trigger
+only in this case. If the setup has _not_ completed, we are still in NULL
+so we just set a missed flag and allow the manual triggerring to happen
+in edma_execute which will be eventually called. This fixes the above
+mentioned race conditions seen with the crypto drivers.
+
+[1] http://marc.info/?l=linux-omap&m=137416733628831&w=2
+
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
+ drivers/dma/edma.c | 50 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 49 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 732829b..0e77b57 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -70,6 +70,7 @@ struct edma_chan {
+ 	int				ch_num;
+ 	bool				alloced;
+ 	int				slot[EDMA_MAX_SLOTS];
++	int				missed;
+ 	struct dma_slave_config		cfg;
+ };
+ 
+@@ -170,6 +171,20 @@ static void edma_execute(struct edma_chan *echan)
+ 		dev_dbg(dev, "first transfer starting %d\n", echan->ch_num);
+ 		edma_start(echan->ch_num);
+ 	}
++
++	/*
++	 * This happens due to setup times between intermediate transfers
++	 * in long SG lists which have to be broken up into transfers of
++	 * MAX_NR_SG
++	 */
++	if (echan->missed) {
++		dev_dbg(dev, "missed event in execute detected\n");
++		edma_clean_channel(echan->ch_num);
++		edma_stop(echan->ch_num);
++		edma_start(echan->ch_num);
++		edma_trigger_channel(echan->ch_num);
++		echan->missed = 0;
++	}
+ }
+ 
+ static int edma_terminate_all(struct edma_chan *echan)
+@@ -387,6 +402,7 @@ static void edma_callback(unsigned ch_num, u16 ch_status, void *data)
+ 	struct device *dev = echan->vchan.chan.device->dev;
+ 	struct edma_desc *edesc;
+ 	unsigned long flags;
++	struct edmacc_param p;
+ 
+ 	/* Pause the channel */
+ 	edma_pause(echan->ch_num);
+@@ -414,7 +430,39 @@ static void edma_callback(unsigned ch_num, u16 ch_status, void *data)
+ 
+ 		break;
+ 	case DMA_CC_ERROR:
+-		dev_dbg(dev, "transfer error on channel %d\n", ch_num);
++		spin_lock_irqsave(&echan->vchan.lock, flags);
++
++		edma_read_slot(EDMA_CHAN_SLOT(echan->slot[0]), &p);
++
++		/*
++		 * Issue later based on missed flag which will be sure
++		 * to happen as:
++		 * (1) we finished transmitting an intermediate slot and
++		 *     edma_execute is coming up.
++		 * (2) or we finished current transfer and issue will
++		 *     call edma_execute.
++		 *
++		 * Important note: issuing can be dangerous here and
++		 * lead to some nasty recursion when we are in a NULL
++		 * slot. So we avoid doing so and set the missed flag.
++		 */
++		if (p.a_b_cnt == 0 && p.ccnt == 0) {
++			dev_dbg(dev, "Error occurred, looks like slot is null, just setting miss\n");
++			echan->missed = 1;
++		} else {
++			/*
++			 * The slot is already programmed but the event got
++			 * missed, so its safe to issue it here.
++			 */
++			dev_dbg(dev, "Error occurred but slot is non-null, TRIGGERING\n");
++			edma_clean_channel(echan->ch_num);
++			edma_stop(echan->ch_num);
++			edma_start(echan->ch_num);
++			edma_trigger_channel(echan->ch_num);
++		}
++
++		spin_unlock_irqrestore(&echan->vchan.lock, flags);
++
+ 		break;
+ 	default:
+ 		break;
+-- 
+1.8.1.2
