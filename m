@@ -1,57 +1,76 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Thu, 29 Aug 2013 19:06:51 +0530
-Subject: [PATCH v4 0/5] clk/exynos5420: add clocks for hdmi subsystem
-In-Reply-To: <1873021.WMcNDqLpjt@amdc1227>
-References: <1377754629-31465-1-git-send-email-rahul.sharma@samsung.com>
- <1873021.WMcNDqLpjt@amdc1227>
-Message-ID: <CAPdUM4Mf4pv031-W0X0EAJe7R=8xtqnNbbLyoo+O6LV0d-H0GA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 29 Aug 2013 09:37:12 -0400
+Subject: [PATCH 02/10] cpufreq: OMAP: Add SMP support for OMAP4+
+In-Reply-To: <CAOh2x=k11EivJoy5-PMXnE5JGDc=DcJKhae7qoh6tNc4L63VnA@mail.gmail.com>
+References: <1316725648-26710-1-git-send-email-khilman@ti.com>
+ <1316725648-26710-3-git-send-email-khilman@ti.com>
+ <CAOh2x=k11EivJoy5-PMXnE5JGDc=DcJKhae7qoh6tNc4L63VnA@mail.gmail.com>
+Message-ID: <521F4E88.1000709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 August 2013 18:00, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Rahul,
+On Thursday 29 August 2013 06:02 AM, Viresh Kumar wrote:
+> On Fri, Sep 23, 2011 at 2:37 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> From: Russell King <rmk+kernel@arm.linux.org.uk>
+>>
+>> On OMAP SMP configuartion, both processors share the voltage
+>> and clock. So both CPUs needs to be scaled together and hence
+>> needs software co-ordination.
+>>
+>> Also, update lpj with reference value to avoid progressive error.
+>>
+>> Adjust _both_ the per-cpu loops_per_jiffy and global lpj. Calibrate
+>> them with with reference to the initial values to avoid a
+>> progressively bigger and bigger error in the value over time.
+>>
+>> While at this, re-use the notifiers for UP/SMP since on UP machine or
+>> UP_ON_SMP policy->cpus mask would contain only the boot CPU.
+>>
+>> Based on initial SMP support by Santosh Shilimkar.
+>>
+>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> [khilman at ti.com: due to overlap/rework, combined original Santosh patch
+>>                  and Russell's rework]
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>>  drivers/cpufreq/omap-cpufreq.c |   80 +++++++++++++++++++++++++++++++++++-----
+>>  1 files changed, 70 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
+> 
+>> +       /*
+>> +        * On OMAP SMP configuartion, both processors share the voltage
+>> +        * and clock. So both CPUs needs to be scaled together and hence
+>> +        * needs software co-ordination. Use cpufreq affected_cpus
+>> +        * interface to handle this scenario. Additional is_smp() check
+>> +        * is to keep SMP_ON_UP build working.
+>> +        */
+>> +       if (is_smp()) {
+>> +               policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
+>> +               cpumask_or(cpumask, cpumask_of(policy->cpu), cpumask);
+>> +               cpumask_copy(policy->cpus, cpumask);
+>> +       }
+> 
+> Does somebody remember importance of is_smp() here??
 >
-> On Thursday 29 of August 2013 11:07:04 Rahul Sharma wrote:
->> Add clock changes for hdmi subsystem for exynos5250 SoC. These
->> include addition of new clocks like mout_hdmi and smmu_tv, associating
->> ID to clk_hdmiphy and some essential corrections.
->>
->> V4:
->> 1) Optimised gaps between Gate, Muxes and Dividers.
->>
->> V3:
->> 1) Assign new ID to divider clock keeping sclk_pixel gate same.
->>
->> V2:
->> 1) Rebase to Mike's Tree.
->> 2) Change smmu_tv to smmu_mixer.
->>
->> This set is based on Mike's clk-next branch at
->> https://git.linaro.org/gitweb?p=people/mturquette/linux.git
->>
->> Rahul Sharma (5):
->>   clk/exynos5420: add sclk_hdmiphy to the list of special clocks
->>   clk/exynos5420: add gate clock for mixer sysmmu
->>   clk/exynos5420: fix the order of parents of hdmi mux
->>   clk/exynos5420: add hdmi mux to change parents in hdmi driver
->>   clk/exynos5420: assign dout_pixel id to pixel clock divider
->>
->>  .../devicetree/bindings/clock/exynos5420-clock.txt  |   12 ++++++++++++
->>  drivers/clk/samsung/clk-exynos5420.c                |   19
->> +++++++++++++------ 2 files changed, 25 insertions(+), 6 deletions(-)
->
-> For the whole series:
->
-> Acked-by: Tomasz Figa <t.figa@samsung.com>
->
+Above code was under #ifdef CONFIG_SMP and SMP_ON_UP where config
+SMP was enabled as well above steps were not needed.
+ 
+> Current code looks like:
+> 
+> if (is_smp())
+>     cpumask_setall(policy->cpus);
+> 
+> And I was looking to remove this check if it is no more useful.. And
+> so simply do
+> 
+> cpumask_setall(policy->cpus);
+> 
+Thats should work I guess. Infact I changed this i downstream kernel
+a while back but forgot to send a patch. Just see if for some reason
+above can break UP machine since this driver is used on UP machines
+as well. Other than that, it should be fine
 
-Thanks Tomasz,
-
-Mike ! please consider it for clk-next branch.
-
-regards,
-Rahul Sharma.
-
-> Best regards,
-> Tomasz
->
+Regards,
+Santosh
