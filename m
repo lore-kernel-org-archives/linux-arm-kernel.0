@@ -1,63 +1,53 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 29 Aug 2013 15:32:55 +0530
-Subject: [PATCH 02/10] cpufreq: OMAP: Add SMP support for OMAP4+
-In-Reply-To: <1316725648-26710-3-git-send-email-khilman@ti.com>
-References: <1316725648-26710-1-git-send-email-khilman@ti.com>
- <1316725648-26710-3-git-send-email-khilman@ti.com>
-Message-ID: <CAOh2x=k11EivJoy5-PMXnE5JGDc=DcJKhae7qoh6tNc4L63VnA@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 29 Aug 2013 12:07:04 +0200
+Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
+In-Reply-To: <521DEA20.8020103@gmail.com>
+References: <20130828113459.48ecbb34@armhf> <521DCD33.2070008@gmail.com>
+ <20130828121943.1c8327ca@skate> <521DD057.4040208@gmail.com>
+ <20130828131548.0009d613@skate> <521DE2B3.9050508@gmail.com>
+ <20130828135827.2307c89e@skate> <521DEA20.8020103@gmail.com>
+Message-ID: <20130829120704.410ad309@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2011 at 2:37 AM, Kevin Hilman <khilman@ti.com> wrote:
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
->
-> On OMAP SMP configuartion, both processors share the voltage
-> and clock. So both CPUs needs to be scaled together and hence
-> needs software co-ordination.
->
-> Also, update lpj with reference value to avoid progressive error.
->
-> Adjust _both_ the per-cpu loops_per_jiffy and global lpj. Calibrate
-> them with with reference to the initial values to avoid a
-> progressively bigger and bigger error in the value over time.
->
-> While at this, re-use the notifiers for UP/SMP since on UP machine or
-> UP_ON_SMP policy->cpus mask would contain only the boot CPU.
->
-> Based on initial SMP support by Santosh Shilimkar.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> [khilman at ti.com: due to overlap/rework, combined original Santosh patch
->                  and Russell's rework]
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
->  drivers/cpufreq/omap-cpufreq.c |   80 +++++++++++++++++++++++++++++++++++-----
->  1 files changed, 70 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
+On Wed, 28 Aug 2013 14:16:32 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-> +       /*
-> +        * On OMAP SMP configuartion, both processors share the voltage
-> +        * and clock. So both CPUs needs to be scaled together and hence
-> +        * needs software co-ordination. Use cpufreq affected_cpus
-> +        * interface to handle this scenario. Additional is_smp() check
-> +        * is to keep SMP_ON_UP build working.
-> +        */
-> +       if (is_smp()) {
-> +               policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
-> +               cpumask_or(cpumask, cpumask_of(policy->cpu), cpumask);
-> +               cpumask_copy(policy->cpus, cpumask);
-> +       }
+	[snip]
+> > Though, if the difference between the two units is the availability of
+> > SPDIF support, then we shouldn't encode the channel number, but instead
+> > the availability of SPDIF, i.e:
+> >
+> > 	audio0 {
+> > 		reg = <... ...>;
+> > 		compatible = "marvell,kirkwood-audio";
+> > 		marvell,has-spdif;  
+> 
+> Agree, if you make it "marvell,has-spdif-in" and "marvell,has-spdif-out"
+> Dove has either i2s-only or i2s+spdifo, kirkwood has i2s+spdifo+spdifi
+> for the one audio controller available. Can't tell for Armada 370.
+> 
+> BTW, you might have followed some of the DT discussions with Mark
+> before; as he insists on having a separate sound card node, he might
+> argue that above property should be part of that node instead.
 
-Does somebody remember importance of is_smp() here??
+Yes. For the Cubox, the card will be described by something like:
 
-Current code looks like:
+	sound {
+		compatible = "simple-audio";
+		audio-controller = <&audio1>;
+		audio-codec = <&spdif>;
+		codec-dai-name = "dit-hifi";
+	};
 
-if (is_smp())
-    cpumask_setall(policy->cpus);
+with:
 
-And I was looking to remove this check if it is no more useful.. And
-so simply do
+	spdif: spdif {
+ 		compatible = "linux,spdif-dit";
+	};
 
-cpumask_setall(policy->cpus);
+Then, the audio driver will know about s/pdif on the first open.
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
