@@ -1,64 +1,71 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 29 Aug 2013 20:49:32 +0800
-Subject: [PATCH v3 resend 2/2] ARM:dts:vf610-twr:Enable DSPI0 devices and
- Flash at26df081a
-In-Reply-To: <1377673724-32468-2-git-send-email-b44548@freescale.com>
-References: <1377673724-32468-1-git-send-email-b44548@freescale.com>
- <1377673724-32468-2-git-send-email-b44548@freescale.com>
-Message-ID: <20130829124930.GI18729@S2101-09.ap.freescale.net>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Thu, 29 Aug 2013 18:22:09 +0530
+Subject: [RESEND PATCH V2 1/2] ARM: dts: AM33xx: Add RNG node
+In-Reply-To: <1377780731-3648-1-git-send-email-lokeshvutla@ti.com>
+References: <1377780731-3648-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1377780731-3648-2-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 03:08:44PM +0800, Chao Fu wrote:
-> From: Chao Fu <B44548@freescale.com>
-> 
-> This patch enables DSPI0 and at26df081a flash device for Vybrid VF610
-> TOWER board.
-> 
-> Signed-off-by: Chao Fu <b44548@freescale.com>
-> ---
->  arch/arm/boot/dts/vf610-twr.dts | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-> index b3905f5..d29226c 100644
-> --- a/arch/arm/boot/dts/vf610-twr.dts
-> +++ b/arch/arm/boot/dts/vf610-twr.dts
-> @@ -36,6 +36,25 @@
->  
->  };
->  
-> +&dspi0 {
-> +	bus-num = <0>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_dspi0_1>;
-> +	status = "okay";
-> +
-> +	sflash: at26df081a at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "atmel,at26df081a";
-> +		spi-max-frequency = <16000000>;
-> +		spi-cpol;
-> +		spi-cpha;
-> +		reg = <0>;
+Add the AM33xx RNG module's device tree data.
+Also add Documentation file describing the data
+for the RNG module.
 
-> +		linux,modalias = "m25p80";
-> +		modal = "at26df081a";
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+Changes since V1:
+- Drop "status=disabled" entry in dt node, Since
+  RNG is present on all AM33xx platforms.
 
-I can not see these two properties documented in
-Documentation/devicetree/bindings/ anywhere.  I'm not sure if we need
-them.
+ .../devicetree/bindings/hwrng/omap_rng.txt         |   22 ++++++++++++++++++++
+ arch/arm/boot/dts/am33xx.dtsi                      |    7 +++++++
+ 2 files changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwrng/omap_rng.txt
 
-Shawn
-
-> +	};
-> +};
-> +
->  &fec0 {
->  	phy-mode = "rmii";
->  	pinctrl-names = "default";
-> -- 
-> 1.8.0
-> 
-> 
+diff --git a/Documentation/devicetree/bindings/hwrng/omap_rng.txt b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
+new file mode 100644
+index 0000000..6a62acd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
+@@ -0,0 +1,22 @@
++OMAP SoC HWRNG Module
++
++Required properties:
++
++- compatible : Should contain entries for this and backward compatible
++  RNG versions:
++  - "ti,omap2-rng" for OMAP2.
++  - "ti,omap4-rng" for OMAP4, OMAP5 and AM33XX.
++  Note that these two versions are incompatible.
++- ti,hwmods: Name of the hwmod associated with the RNG module
++- reg : Offset and length of the register set for the module
++- interrupts : the interrupt number for the RNG module.
++		Only used for "ti,omap4-rng".
++
++Example:
++/* AM335x */
++rng: rng at 48310000 {
++	compatible = "ti,omap4-rng";
++	ti,hwmods = "rng";
++	reg = <0x48310000 0x2000>;
++	interrupts = <111>;
++};
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 38b446b..26ebe30 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -530,5 +530,12 @@
+ 			#size-cells = <1>;
+ 			status = "disabled";
+ 		};
++
++		rng: rng at 48310000 {
++			compatible = "ti,omap4-rng";
++			ti,hwmods = "rng";
++			reg = <0x48310000 0x2000>;
++			interrupts = <111>;
++		};
+ 	};
+ };
+-- 
+1.7.9.5
