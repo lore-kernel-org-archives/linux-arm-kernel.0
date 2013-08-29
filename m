@@ -1,64 +1,86 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 29 Aug 2013 10:53:28 +0900
-Subject: [PATCH] clocksource: em_sti: Adjust clock event rating to fix
- SMP broadcast
-In-Reply-To: <20130805014541.GD28465@verge.net.au>
-References: <1375251940-7809-1-git-send-email-horms+renesas@verge.net.au>
- <51F94A35.2020907@codeaurora.org>
- <CANqRtoR0Wwctor1mpM+8nuC0_pZsPHUSShPuZFX4FVtoVKEuNw@mail.gmail.com>
- <51F9777B.2080500@codeaurora.org>
- <20130805014541.GD28465@verge.net.au>
-Message-ID: <20130829015328.GA5199@verge.net.au>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Thu, 29 Aug 2013 09:54:16 +0800
+Subject: [PATCH v7 08/11] ARM: hi3xxx: add smp support
+In-Reply-To: <20130828171907.GD8607@quad.lixom.net>
+References: <1376965873-14431-1-git-send-email-haojian.zhuang@linaro.org>
+ <1376965873-14431-9-git-send-email-haojian.zhuang@linaro.org>
+ <20130828021211.GF22852@quad.lixom.net>
+ <CAMj5BkjJXeYd4Gh2+DKiJo60ftTSf0vnAiApH86+-zdsoVqXog@mail.gmail.com>
+ <20130828171907.GD8607@quad.lixom.net>
+Message-ID: <521EA9C8.7060607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 05, 2013 at 10:45:42AM +0900, Simon Horman wrote:
-> On Wed, Jul 31, 2013 at 01:45:47PM -0700, Stephen Boyd wrote:
-> > On 07/31/13 12:17, Magnus Damm wrote:
-> > > Hi Stephen,
-> > >
-> > > On Thu, Aug 1, 2013 at 2:32 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > >> On 07/30/13 23:25, Simon Horman wrote:
-> > >>> From: Magnus Damm <damm@opensource.se>
-> > >>>
-> > >>> Update the STI rating from 200 to 80 to fix SMP operation with
-> > >>> the ARM broadcast timer. This breakage was introduced by:
-> > >>>
-> > >>> f7db706 ARM: 7674/1: smp: Avoid dummy clockevent being preferred over real hardware clock-event
-> > >>>
-> > >>> Without this fix SMP operation is broken on EMEV2 since no
-> > >>> broadcast timer interrupts trigger on the secondary CPU cores.
-> > >>>
-> > >>> Signed-off-by: Magnus Damm <damm@opensource.se>
-> > >>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > >>> ---
-> > >> This looks suspicious. Are you're purposefully deflating the rating so
-> > >> that the STI timer fills in the broadcast position? Why not make the STI
-> > >> cpumask be all possible CPUs? Presumably the interrupt can target all
-> > >> CPUs since it isn't a per-cpu interrupt and doing this would cause the
-> > >> STI to fill in the broadcast slot, leaving the per-cpu dummys in the
-> > >> tick position.
-> > > While letting the timer broadcast to all CPUs sounds interesting the
-> > > STI driver has so far only been used to drive a single CPU core. This
-> > > used to work well for us but has since some time unfortunately been
-> > > broken. I agree that it may be suboptimal with a single timer like STI
-> > > and using IPI for broadcast, but for more efficient SMP we already
-> > > have TWD or arch timer.
-> > 
-> > I think there is some confusion. The mask field says what CPUs the timer
-> > can possibly interrupt and for non-percpu interrupts this should be all
-> > possible CPUs (unless we're talking clusters, etc. but I don't think we
-> > are). Can you please give the output of /proc/timer_list or confirm that
-> > the STI is your broadcast source? If so you should probably be marking
-> > the cpumask for all possible CPUs so that the clockevent core knows to
-> > prefer this clockevent for the broadcast source and not a per-cpu
-> > source. Then you can leave the rating as is.
-> 
-> >From my point of view this seems to be a case of fixing a regression
-> by adjusting the code so it has its previous working behaviour.
-> I think that any work on altering the behaviour of the code
-> through masks should be considered as future work.
+On 13-08-29 01:19 AM, Olof Johansson wrote:
+> On Wed, Aug 28, 2013 at 07:53:03PM +0800, zhangfei gao wrote:
+>> Thanks Olof, will update with your comments.
+>>
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>>>> index 3be60c8..4cc5c57 100644
+>>>> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>>>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>>>> @@ -8,3 +8,50 @@ Required root node properties:
+>>>>   Hi4511 Board
+>>>>   Required root node properties:
+>>>>        - compatible = "hisilicon,hi3620-hi4511";
+>>>> +
+>>>> +
+>>>> +Hisilicon sctrl resiter
+>>>
+>>> Resiter seems like odd naming here.
+>>>
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible : "hisilicon,sctrl"
+>>>> +- reg : Address and size of sysctrl.
+>>>
+>>> sysctrl or sctrl? sysctrl isn't really too long, might as well use that.
+>>>
+>>>> +
+>>>> +Optional properties:
+>>>> +- smp_reg : offset in sysctrl for notifying slave cpu booting
+>>>> +             cpu 1, reg;
+>>>> +             cpu 2, reg + 0x4;
+>>>> +             cpu 3, reg + 0x8;
+>>>> +             If reg value is not zero, cpun exit wfi and go
+>>>> +- resume_reg : offset in sysctrl for notifying cpu0 when resume
+>>>> +- reset_reg : offset in sysctrl for system reset
+>>>
+>>> Underscores are usually not used in properties, you use dashes instead.
+>>>
+>>> Anyway, I suggest defining those as the different cells in a regular 'reg'
+>>> property instead.
+>>
+>> Will update with
+>>
+>> Required properties:
+>> - compatible : "hisilicon,sysctrl"
+>> - reg : Register address and size
+>>
+>> Optional properties:
+>> - smp-off : offset in sysctrl for notifying slave cpu booting
+>>                  cpu 1, reg;
+>>                  cpu 2, reg + 0x4;
+>>                  cpu 3, reg + 0x8;
+>>                  If reg value is not zero, cpun exit wfi and go
+>> - resume-off : offset in sysctrl for notifying cpu0 when resume
+>> - reboot-off : offset in sysctrl for system reboot
+>
+> Unabbreviated "offset" would be better than "off" here.
 
-Hi Magnus,
+:(
+Have updated with off in Haojian's v9, since find such vector in 
+/Document/devicetree
+Do I need update to offset?
+Will update to offset if there are newer version.
 
-I think this problem still needs a resolution.
+>
+> Do you even need this in the device tree? Do you have different implementations
+> of this IP that has the same programming model but just with a couple of
+> different offsets?
+
+Yes, they are different offsets value in hi3716 and hi3620.
+Same implementation, only different offset value in different soc.
+
+Thanks
