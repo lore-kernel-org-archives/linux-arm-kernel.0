@@ -1,28 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Aug 2013 13:29:51 -0700
-Subject: [GIT PULL V2 3/3] 2nd Round Samsung mach-exynos-v2 for v3.12
-In-Reply-To: <232401cea37e$0afca7a0$20f5f6e0$%kim@samsung.com>
-References: <1f7701cea1f1$431f2d30$c95d8790$%kim@samsung.com>
- <3145165.ZB7l3vNJ7a@amdc1032>
- <CADGdYn7_Gm7rwkhRSUmvktB_hHNboY8eB5fi8E62-Br5Vk5D0A@mail.gmail.com>
- <4070794.XxjluIqBpK@amdc1032>
- <CADGdYn7YWscQ_EOqjbq29pNHvoxa0qqXHZeOBuz-Wi22H=Dc_w@mail.gmail.com>
- <87bo4j6aii.fsf@linaro.org>
- <232401cea37e$0afca7a0$20f5f6e0$%kim@samsung.com>
-Message-ID: <20130829202951.GR18542@quad.lixom.net>
+Date: Thu, 29 Aug 2013 13:32:04 -0700
+Subject: [GIT PULL] at91: device tree update for 3.12 #2
+In-Reply-To: <1377510062-14886-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1377510062-14886-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20130829203204.GS18542@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 08:34:58AM +0900, Kukjin Kim wrote:
-> The following changes since commit ad81f0545ef01ea651886dddac4bef6cec930092:
+On Mon, Aug 26, 2013 at 11:41:02AM +0200, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
->    Linux 3.11-rc1 (2013-07-14 15:18:27 -0700)
+> This is a second update on the DT front for AT91 on 3.12. This series is
+> stacked on top of patches that are already included in your at91/dt branch.
+> 
+> The inclusion of these Nand Flash Controller properties in DT are related to
+> the driver enhancement that is already queued in MTD tree:
+> http://git.infradead.org/linux-mtd.git/commit/7dc37de7d59cdd1c4cdd472e1994c31b16d7b874
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit 90d01929ad38259596371c78df8a9ecf37a7f815:
+> 
+>   ARM: at91/dt: sam9x5ek: add sound configuration (2013-08-21 13:33:44 +0200)
 > 
 > are available in the git repository at:
 > 
->    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-> tags/samsung-mach-exynos-v2
-> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-dt
 
 Pulled into late/all.
 
