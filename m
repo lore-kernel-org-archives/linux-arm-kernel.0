@@ -1,50 +1,32 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Thu, 29 Aug 2013 16:51:07 -0700
-Subject: [PATCH v6 2/2] gpio: bcm281xx: Add device node for the GPIO controller
-In-Reply-To: <1377820267-20050-1-git-send-email-markus.mayer@linaro.org>
-References: <1377820267-20050-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <1377820267-20050-3-git-send-email-markus.mayer@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 29 Aug 2013 16:57:35 -0700
+Subject: [GIT PULL 0/2] 3rd Round Samsung stuff for v3.12
+In-Reply-To: <235001cea389$b2059380$1610ba80$%kim@samsung.com>
+References: <235001cea389$b2059380$1610ba80$%kim@samsung.com>
+Message-ID: <20130829235735.GG29606@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the GPIO controller device node for the Broadcom bcm281xx family of
-mobile SoCs.
+On Wed, Aug 28, 2013 at 09:58:23AM +0900, Kukjin Kim wrote:
+> Hi Arnd, Olof and Kevin,
+> 
+> Sorry for a bit late pull-request.
+> 
+> Here is s3c64xx DT series and common clk stuff. It took some time due to
+> dependency problem with the clk tree, and fixed now by merge clk-s3c64xx
+> branch in Mike's clk tree. So many clock patches are included in 1st
+> pull-request but most of them are for Samsung clk stuff.
+> 
+> So I think, this branches would be sent to mainline after clk stuff during
+> merge window. Anyway, Tomasz's s3c64xx patches have been posted long time
+> and look nice to support for s3c64xx with DT.
+> 
+> If any problems, please kindly let me know.
 
-Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Hi,
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index c0cdf66..a3945e3 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -63,6 +63,22 @@
- 		clock-frequency = <32768>;
- 	};
- 
-+	gpio: gpio at 35003000 {
-+		compatible = "brcm,bcm11351-gpio", "brcm,kona-gpio";
-+		reg = <0x35003000 0x800>;
-+		interrupts =
-+		       <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		#interrupt-cells = <2>;
-+		gpio-controller;
-+		interrupt-controller;
-+	};
-+
- 	sdio0: sdio at 0x3f180000 {
- 		compatible = "bcm,kona-sdhci";
- 		reg = <0x3f180000 0x10000>;
--- 
-1.7.9.5
+We're out of time for 3.12 now. Please send these as soon as -rc1 is cut and
+we'll queue them up for 3.13.
+
+
+-Olof
