@@ -1,44 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Aug 2013 19:23:12 +0200
-Subject: [PATCH RFC v2 11/16] ARM: socfpga: remove call to of_clk_init
-In-Reply-To: <1377790696.26261.3.camel@linux-builds1>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1377638890-371-12-git-send-email-sebastian.hesselbarth@gmail.com>
- <1377790696.26261.3.camel@linux-builds1>
-Message-ID: <201308291923.13151.arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 29 Aug 2013 13:25:04 -0400
+Subject: [PATCH v2 3/3] ARM: OMAP4+: Remove static iotable mappings for
+ SRAM
+In-Reply-To: <871u5c2z3a.fsf@linaro.org>
+References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
+ <1377775391-13103-4-git-send-email-rnayak@ti.com> <871u5c2z3a.fsf@linaro.org>
+Message-ID: <521F83F0.9080503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 August 2013, Dinh Nguyen wrote:
-> On Tue, 2013-08-27 at 23:28 +0200, Sebastian Hesselbarth wrote:
-
-> > @@ -107,7 +106,6 @@ static void __init socfpga_cyclone5_init(void)
-> >  {
-> >  	l2x0_of_init(0, ~0UL);
-> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> > -	of_clk_init(NULL);
-> >  	socfpga_init_clocks();
-> >  }
-> >  
+On Thursday 29 August 2013 01:20 PM, Kevin Hilman wrote:
+> Rajendra Nayak <rnayak@ti.com> writes:
 > 
-> Acked-by: Dinh Nguyen <dinguyen@altera.com>
+>> In order to handle errata I688, a page of sram was reserved by doing a
+>> static iotable map. Now that we use gen_pool to manage sram, we can
+>> completely remove all of these static mappings and use gen_pool_alloc()
+>> to get the one page of sram space needed to implement errata I688.
+>>
+>> Suggested-by: Sekhar Nori <nsekhar@ti.com>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> 
+> [...]
+> 
+>> @@ -71,6 +72,21 @@ void omap_bus_sync(void)
+>>  }
+>>  EXPORT_SYMBOL(omap_bus_sync);
+>>  
+>> +static int __init omap4_sram_init(void)
+>> +{
+>> +	struct device_node *np;
+>> +	struct gen_pool *sram_pool;
+>> +
+>> +	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
+>> +	if (!np)
+>> +		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
+>> +			 __func__);
+>> +	sram_pool = of_get_named_gen_pool(np, "sram", 0);
+> 
+> I haven't actually tested this, but if there is no 'sram' property defined...
+>   
+If the sram property is not defined, the bus_sync will be just a nop. Below
+check will take care of it.
 
-I saw that your socfpga_init_clocks() function only has these contents:
+ if (dram_sync && sram_sync)
 
-void __init socfpga_init_clocks(void)
-{
-        struct clk *clk;
-        int ret;
-
-        clk = clk_register_fixed_factor(NULL, "smp_twd", "mpuclk", 0, 1, 4);
-        ret = clk_register_clkdev(clk, NULL, "smp_twd");
-        if (ret)
-                pr_err("smp_twd alias not registered\n");
-}
-
-
-I think that can easily be expressed with DT syntax now (correct me if I'm wrong), so
-you should be able to kill this off as well. Once somebody gets around to automate
-the l2x0 setup, the entire socfpga_cyclone5_init() function can go away too.
-
-	Arnd
+Regards,
+Santosh
