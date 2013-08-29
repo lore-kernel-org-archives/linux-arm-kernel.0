@@ -1,35 +1,65 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 29 Aug 2013 22:20:54 +0100
-Subject: [PATCH v6 3/4] drivers: of: add initialization code for dma
- reserved memory
-In-Reply-To: <2011590.EGDykoeEOS@amdc1227>
-References: <1376924669-28873-1-git-send-email-m.szyprowski@samsung.com>
- <52134B92.10308@samsung.com> <52139AE7.4050300@wwwdotorg.org>
- <2011590.EGDykoeEOS@amdc1227>
-Message-ID: <20130829212054.568123E1222@localhost>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 29 Aug 2013 16:30:19 -0500
+Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
+In-Reply-To: <87vc2qyjao.fsf@linaro.org>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <5211E3F6.6090108@ti.com> <52125A39.3010008@ti.com>
+ <87vc2qyjao.fsf@linaro.org>
+Message-ID: <521FBD6B.3020208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Aug 2013 17:39:48 +0200, Tomasz Figa <t.figa@samsung.com> wrote:
-> On Tuesday 20 of August 2013 10:35:51 Stephen Warren wrote:
-> > >> a) Adjust memory.txt to allow multiple entries in memory-regions, and
-> > >> add an associated memory-region-names property.
-> > >> 
-> > I don't believe that's a good approach unless you have at least a
-> > partial idea of how the current bindings will be extended to support
-> > multiple memory regions.
-> 
-> I believe that at least three "at least partial" ideas have been brought in 
-> this thread. Moreover, I don't think that defining the simple binding now 
-> would stop us from extending it according to any of those ideas in any way.
+On 08/27/2013 03:23 PM, Kevin Hilman wrote:
+> Hi Dave,
+>
+> Dave Gerlach <d-gerlach@ti.com> writes:
+>
+>> On 08/19/2013 04:23 AM, Gururaja Hebbar wrote:
+>>> On 8/6/2013 11:19 PM, Dave Gerlach wrote:
+>>>> Hi,
+>>>>
+>>>> This is the third version of the patch series for adding basic suspend-resume
+>>>> support for AM33XX, previously submitted by Vaibhav Bedia. This patchset
+>>>> is based on 3.11-rc4 and depends on a forthcoming patchset from Suman Anna
+>>>> that adds mailbox support for the wkup_m3. The patches at [1], [2], and [3] are
+>>>> required for the pm code to properly suspend and resume.
+>>>>
+>>>> The PM code uses the firmware interface and expects the userspace to load
+>>>> the WKUP_M3 binary before the suspend-resume functionality is made available.
+>>>> The binary file (and the source-code for WKUP_M3) can be obtained from the
+>>>> 'next2' branch at [4]. The WKUP_M3 binary can either be loaded post bootup
+>>>> via the sysfs entry './sys/devices/ocp.2/wkup_m3.4/firmware' or it can be
+>>>> included in the kernel image as part of the build process.
+>>>>
+>>>> Suspend to mem is tested on am335x-bone and am335x-evm.
+>>>>
+>>>> More details on AM335x suspend-resume are provided within the commit logs
+>>>> for each patch.
+>>>
+>>> can you share the working repo which has all these patches applied?
+>>>
+>>> Thanks & Regards
+>>> Gururaja
+>>>
+>>
+>> The working repo for this version of the patch series can be found here:
+>>
+>> git://github.com/dgerlach/linux-pm.git am335x-3.11rc4-suspend-resume
+>
+> I tried this branch on my beaglebone black, and it's not fully resuming.
+> Suspend seems to be working (power draw goes from ~1W to ~130mW) and
+> pressing a key on the UART seems to be waking up the SoC (power draw
+> goes to ~600mW) but I don't ever get the console back.
+>
+> Is there a specific version of the firmware I should be using?
+>
+> Kevin
+>
 
-I would plan on extending later with suggestion 'a)' above. Making the
-memory-region an array of phandles is a better match with how most of
-the core bindings work.  I actually regret the *-gpio properties that
-were defined earlier becasue it makes it harder for software to look at
-a tree and determine if there are any gpio references.
+Kevin, I agree there does seem to be some issues with Beaglebone black. 
+I can confirm it works on BeagleBone White and the large am335 EVM, I am 
+working on pinpointing the issue on beaglebone black, seems that support 
+isn't quite there yet.
 
-It of course doesn't need to be done immediately, only when it becomes
-required.
-
-g.
+Regards,
+Dave
