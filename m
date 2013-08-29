@@ -1,34 +1,43 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 29 Aug 2013 16:53:08 +0530
-Subject: [PATCH v2 0/3] OMAP4+: Get rid of internal SRAM handling
-Message-ID: <1377775391-13103-1-git-send-email-rnayak@ti.com>
+Date: Thu, 29 Aug 2013 16:53:09 +0530
+Subject: [PATCH v2 1/3] ARM: AM335x: Get rid of unused sram init function
+In-Reply-To: <1377775391-13103-1-git-send-email-rnayak@ti.com>
+References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
+Message-ID: <1377775391-13103-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2:
-Removed the static iotable mapping for sram done to handle
-errata I688, and used gen_pool instead.
+Remove the empty am33xx_sram_init() function.
 
-Make all OMAP DT only platforms (am33xx, am43xx, omap4 and omap5)
-use drivers/misc/sram.c driver instead of the omap internal
-implementation for SRAM handling.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/sram.c |    7 -------
+ 1 file changed, 7 deletions(-)
 
-Rajendra Nayak (3):
-  ARM: AM335x: Get rid of unused sram init function
-  ARM: OMAP4+: Move SRAM data to DT
-  ARM: OMAP4+: Remove static iotable mappings for SRAM
-
- Documentation/devicetree/bindings/arm/omap/mpu.txt |    5 ++-
- arch/arm/boot/dts/am33xx.dtsi                      |    5 +--
- arch/arm/boot/dts/am4372.dtsi                      |    5 +++
- arch/arm/boot/dts/omap4.dtsi                       |    6 +++
- arch/arm/boot/dts/omap5.dtsi                       |    8 +++-
- arch/arm/configs/omap2plus_defconfig               |    1 +
- arch/arm/mach-omap2/io.c                           |   17 ---------
- arch/arm/mach-omap2/omap4-common.c                 |   17 ++++++++-
- arch/arm/mach-omap2/sram.c                         |   39 +-------------------
- arch/arm/mach-omap2/sram.h                         |    7 ----
- 10 files changed, 42 insertions(+), 68 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
+index 4bd0968..305fc2b 100644
+--- a/arch/arm/mach-omap2/sram.c
++++ b/arch/arm/mach-omap2/sram.c
+@@ -285,11 +285,6 @@ static inline int omap34xx_sram_init(void)
+ }
+ #endif /* CONFIG_ARCH_OMAP3 */
+ 
+-static inline int am33xx_sram_init(void)
+-{
+-	return 0;
+-}
+-
+ int __init omap_sram_init(void)
+ {
+ 	omap_detect_sram();
+@@ -299,8 +294,6 @@ int __init omap_sram_init(void)
+ 		omap242x_sram_init();
+ 	else if (cpu_is_omap2430())
+ 		omap243x_sram_init();
+-	else if (soc_is_am33xx())
+-		am33xx_sram_init();
+ 	else if (cpu_is_omap34xx())
+ 		omap34xx_sram_init();
+ 
 -- 
 1.7.9.5
