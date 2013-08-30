@@ -1,70 +1,43 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 30 Aug 2013 20:10:47 +0100
-Subject: [PATCH 11/20] ARM: alignment: correctly decode instructions in BE8
- mode.
+Date: Fri, 30 Aug 2013 20:10:41 +0100
+Subject: [PATCH 05/20] ARM: pl01x debug code endian fix
 In-Reply-To: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377889856-9447-12-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377889856-9447-6-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we are in BE8 mode, we must deal with the instruction stream being
-in LE order when data is being loaded in BE order. Ensure the data is
-swapped before processing to avoid thre following:
+The PL01X debug code needs to take into account which endian mode the
+processor is running in. If it is big-endian, ensure the data is swapped
+appropriately.
 
-Change to using <asm/opcodes.h> to provide the necessary conversion
-functions to change the byte ordering.
+Note, we could do this slightly more efficiently if we have an macro to
+do the necessary swap for the bits used by test.
 
-This stops the following warning messages from the kernel on a fault:
-
-Unhandled fault: alignment exception (0x001) at 0xbfa09567
-Alignment trap: not handling instruction 030091e8 at [<80333e8c>]
-
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm/mm/alignment.c |    9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/hardware/debug-pl01x.S |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index 6f4585b..9240364 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -25,6 +25,7 @@
- #include <asm/cp15.h>
- #include <asm/system_info.h>
- #include <asm/unaligned.h>
-+#include <asm/opcodes.h>
+diff --git a/arch/arm/include/asm/hardware/debug-pl01x.S b/arch/arm/include/asm/hardware/debug-pl01x.S
+index f9fd083..6489d1f 100644
+--- a/arch/arm/include/asm/hardware/debug-pl01x.S
++++ b/arch/arm/include/asm/hardware/debug-pl01x.S
+@@ -18,12 +18,14 @@
  
- #include "fault.h"
+ 		.macro	waituart,rd,rx
+ 1001:		ldr	\rd, [\rx, #UART01x_FR]
++ ARM_BE8(	rev	\rd, \rd )
+ 		tst	\rd, #UART01x_FR_TXFF
+ 		bne	1001b
+ 		.endm
  
-@@ -762,21 +763,25 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 	if (thumb_mode(regs)) {
- 		u16 *ptr = (u16 *)(instrptr & ~1);
- 		fault = probe_kernel_address(ptr, tinstr);
-+		tinstr = __mem_to_opcode_thumb16(tinstr);
- 		if (!fault) {
- 			if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
- 			    IS_T32(tinstr)) {
- 				/* Thumb-2 32-bit */
- 				u16 tinst2 = 0;
- 				fault = probe_kernel_address(ptr + 1, tinst2);
--				instr = (tinstr << 16) | tinst2;
-+				tinst2 = __mem_to_opcode_thumb16(tinst2);
-+				instr = __opcode_thumb32_compose(tinstr, tinst2);
- 				thumb2_32b = 1;
- 			} else {
- 				isize = 2;
- 				instr = thumb2arm(tinstr);
- 			}
- 		}
--	} else
-+	} else {
- 		fault = probe_kernel_address(instrptr, instr);
-+		instr = __mem_to_opcode_arm(instr);
-+	}
- 
- 	if (fault) {
- 		type = TYPE_FAULT;
+ 		.macro	busyuart,rd,rx
+ 1001:		ldr	\rd, [\rx, #UART01x_FR]
++ ARM_BE8(	rev	\rd, \rd )
+ 		tst	\rd, #UART01x_FR_BUSY
+ 		bne	1001b
+ 		.endm
 -- 
 1.7.10.4
