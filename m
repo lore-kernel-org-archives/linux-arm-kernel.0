@@ -1,81 +1,58 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Fri, 30 Aug 2013 16:14:30 +0530
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
- with external L3-cache.
-In-Reply-To: <20130830095215.GC62188@MacBook-Pro.local>
-References: <747a0675165da4ef147bbda4e140549b@www.loen.fr>
- <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
- <5935339137684ecf90dd484cc5739548@www.loen.fr>
- <20130815165344.GA3853@cbox>
- <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
- <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
- <20130816171912.GB20246@cbox>
- <CAAhSdy2bk6Ou=326cYJW2wKvm9pffbRRmO2ABFwF9dmqwWdKqQ@mail.gmail.com>
- <20130816175034.GE20246@cbox>
- <CAAhSdy3B5JTcd7==u_QzS3V5k7pYkymtiLa7X=yZH+=eSBAw8w@mail.gmail.com>
- <20130830095215.GC62188@MacBook-Pro.local>
-Message-ID: <CAAhSdy0Hm1k+mWGGxUOzAA=5yVGNOERfo=36jcE1cvkUM=xtVg@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 30 Aug 2013 11:46:13 +0100
+Subject: [PATCH v7 2/4] drivers: of: add function to scan fdt nodes given
+ by path
+In-Reply-To: <5220770F.9080806@samsung.com>
+References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
+ <1377527959-5080-3-git-send-email-m.szyprowski@samsung.com>
+ <20130829214007.CDB813E1222@localhost> <5220770F.9080806@samsung.com>
+Message-ID: <CACxGe6tdk8JbtfrB4s8BoRiAVN5KKUo=5C3AXH7qHBNkzT-VSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 3:22 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Fri, Aug 16, 2013 at 07:11:51PM +0100, Anup Patel wrote:
->> On Fri, Aug 16, 2013 at 11:20 PM, Christoffer Dall
->> <christoffer.dall@linaro.org> wrote:
->> > On Fri, Aug 16, 2013 at 11:12:08PM +0530, Anup Patel wrote:
->> >> Discussion here is about getting KVM ARM64 working in-presence
->> >> of an external L3-cache (i.e. not part of CPU). Before starting a VCPU
->> >> user-space typically loads images to guest RAM so, in-presence of
->> >> huge L3-cache (few MBs). When the VCPU starts running some of the
->> >> contents guest RAM will be still in L3-cache and VCPU runs with
->> >> MMU off (i.e. cacheing off) hence VCPU will bypass L3-cache and
->> >> see incorrect contents. To solve this problem we need to flush the
->> >> guest RAM contents before they are accessed by first time by VCPU.
->> >>
->> > ok, I'm with you that far.
->> >
->> > But is it also not true that we need to decide between:
->> >
->> >   A.1: Flush the entire guest RAM before running the VCPU
->> >   A.2: Flush the pages as we fault them in
+On Fri, Aug 30, 2013 at 11:42 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
+>
+>
+> On 8/29/2013 11:40 PM, Grant Likely wrote:
 >>
->> Yes, thats the decision we have to make.
->>
+>> On Mon, 26 Aug 2013 16:39:17 +0200, Marek Szyprowski
+>> <m.szyprowski@samsung.com> wrote:
+>> > Add a function to scan the flattened device-tree starting from the
+>> > node given by the path. It is used to extract information (like reserved
+>> > memory), which is required on early boot before we can unflatten the
+>> > tree.
 >> >
->> > And (independently):
->> >
->> >   B.1: Use __flush_dcache_range
->> >   B.2: Use something else + outer cache framework for arm64
+>> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> > Acked-by: Michal Nazarewicz <mina86@mina86.com>
+>> > Acked-by: Tomasz Figa <t.figa@samsung.com>
+>> > Reviewed-by: Rob Herring <rob.herring@calxeda.com>
 >>
->> This would be __flush_dcache_all() + outer cache flush all.
+>> Some nits below, but otherwise:
+>>
+>> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 >
-> We need to be careful here since the __flush_dcache_all() operation uses
-> cache maintenance by set/way and these are *local* to a CPU (IOW not
-> broadcast). Do you have any guarantee that dirty cache lines don't
-> migrate between CPUs and __flush_dcache_all() wouldn't miss them?
-> Architecturally we don't, so this is not a safe operation that would
-> guarantee L1 cache flushing (we probably need to revisit some of the
-> __flush_dcache_all() calls in KVM, I haven't looked into this).
 >
-> So I think we are left to the range operation where the DC ops to PoC
-> would be enough for your L3.
-
-If __flush_dcache_all() is *local" to a CPU then I guess DC ops to PoC
-by range would be the only option.
-
+> Thanks!
 >
-> An outer cache flush all is probably only needed for cpuidle/suspend
-> (the booting part should be handled by the boot loader).
-
-Yes, cpuidle/suspend would definitely require outer cache maintenance.
-
-For KVM, we can avoid flushing d-cache to PoC every time in
-coherent_icache_guest_page() by only doing it when Guest MMU is
-turned-off. This may reduce the performance penalty.
-
 >
-> --
-> Catalin
+>> I'm happy to take this through the DT tree, or have you take it via the
+>> CMA tree.
+>
+>
+> I have already put the whole patchset in linux-next via my dma-mapping/cma
+> tree,
+> so I would like to keep it there to avoid further confusion.
+>
+> I only wonder how to handle the patches to get them merged to v3.12-rc1.
+> After your review there will be some changes to the binding, its
+> documentation
+> and the code itself. Would you mind if I send pull request with the current
+> version and then provide incremental patches to fix the issues you have
+> reported? Or should we delay this patchset till v3.13-rc1?
 
---Anup
+Merge the series as-is and send follow-on patches. If you can get the
+fixups done quickly, then we can get them merged for v3.12 also.
+
+g.
