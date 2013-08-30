@@ -1,113 +1,45 @@
-From: wujianguo@huawei.com (Jianguo Wu)
-Date: Fri, 30 Aug 2013 10:06:51 +0800
-Subject: [PATCH 4/4] mm/arch: use NUMA_NODE
-Message-ID: <521FFE3B.7040801@huawei.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 29 Aug 2013 19:11:42 -0700
+Subject: [GIT PULL] non-critical omap fixes for v3.12 merge window
+In-Reply-To: <20130829053705.GL7656@atomide.com>
+References: <20130823054609.GW7656@atomide.com>
+ <20130828185045.GI8607@quad.lixom.net>
+ <20130829053705.GL7656@atomide.com>
+Message-ID: <20130830021142.GA2579@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use more appropriate NUMA_NO_NODE instead of -1 in some archs' module_alloc()
+On Wed, Aug 28, 2013 at 10:37:06PM -0700, Tony Lindgren wrote:
+> * Olof Johansson <olof@lixom.net> [130828 11:58]:
+> > On Thu, Aug 22, 2013 at 10:46:10PM -0700, Tony Lindgren wrote:
+> > 
+> > > Matus Ujhelyi (1):
+> > >       ARM: OMAP2+: am33xx-restart: trigger warm reset on omap2+ boards
+> > 
+> > Sigh. am33xx has been a bit of a pain this release cycle. Can you please
+> > start double-checking builds when you apply am33xx stuff? :(
+> > 
+> > This breaks with:
+> > 
+> >         multi_v7_defconfig:
+> > arch/arm/mach-omap2/am33xx-restart.c:27:26: error: 'AM33XX_RST_GLOBAL_WARM_SW_MASK' undeclared (first use in this function)
+> > 
+> >         omap2plus_defconfig:
+> > arch/arm/mach-omap2/am33xx-restart.c:27:26: error: 'AM33XX_RST_GLOBAL_WARM_SW_MASK' undeclared (first use in this function)
+> 
+> Oops sorry, I see what's going on. It builds fine against v3.11-rc6, but
+> has a dependency for v3.12 for the cleanup branch that removed all the
+> unused defines. 
+>  
+> > I've unmerged the branch until that's resolved.
+> 
+> Care to apply the following fix to the cleanup branch?
+> 
+> This way this fixes branch keeps working both against v3.11 and the
+> patches queued for v3.12.
 
-Signed-off-by: Jianguo Wu <wujianguo@huawei.com>
----
- arch/arm/kernel/module.c    |    2 +-
- arch/arm64/kernel/module.c  |    2 +-
- arch/mips/kernel/module.c   |    2 +-
- arch/parisc/kernel/module.c |    2 +-
- arch/s390/kernel/module.c   |    2 +-
- arch/sparc/kernel/module.c  |    2 +-
- arch/x86/kernel/module.c    |    2 +-
- 7 files changed, 7 insertions(+), 7 deletions(-)
+Ah, yeah. Applied. And fixes branch pulled, since we'd otherwise just get most
+of them during 3.12-rc. :)
 
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 85c3fb6..8f4cff3 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -40,7 +40,7 @@
- void *module_alloc(unsigned long size)
- {
- 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
--				GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
-+				GFP_KERNEL, PAGE_KERNEL_EXEC, NUMA_NO_NODE,
- 				__builtin_return_address(0));
- }
- #endif
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index ca0e3d5..8f898bd 100644
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -29,7 +29,7 @@
- void *module_alloc(unsigned long size)
- {
- 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
--				    GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
-+				    GFP_KERNEL, PAGE_KERNEL_EXEC, NUMA_NO_NODE,
- 				    __builtin_return_address(0));
- }
- 
-diff --git a/arch/mips/kernel/module.c b/arch/mips/kernel/module.c
-index 977a623..b507e07 100644
---- a/arch/mips/kernel/module.c
-+++ b/arch/mips/kernel/module.c
-@@ -46,7 +46,7 @@ static DEFINE_SPINLOCK(dbe_lock);
- void *module_alloc(unsigned long size)
- {
- 	return __vmalloc_node_range(size, 1, MODULE_START, MODULE_END,
--				GFP_KERNEL, PAGE_KERNEL, -1,
-+				GFP_KERNEL, PAGE_KERNEL, NUMA_NO_NODE,
- 				__builtin_return_address(0));
- }
- #endif
-diff --git a/arch/parisc/kernel/module.c b/arch/parisc/kernel/module.c
-index 2a625fb..50dfafc 100644
---- a/arch/parisc/kernel/module.c
-+++ b/arch/parisc/kernel/module.c
-@@ -219,7 +219,7 @@ void *module_alloc(unsigned long size)
- 	 * init_data correctly */
- 	return __vmalloc_node_range(size, 1, VMALLOC_START, VMALLOC_END,
- 				    GFP_KERNEL | __GFP_HIGHMEM,
--				    PAGE_KERNEL_RWX, -1,
-+				    PAGE_KERNEL_RWX, NUMA_NO_NODE,
- 				    __builtin_return_address(0));
- }
- 
-diff --git a/arch/s390/kernel/module.c b/arch/s390/kernel/module.c
-index 7845e15..b89b591 100644
---- a/arch/s390/kernel/module.c
-+++ b/arch/s390/kernel/module.c
-@@ -50,7 +50,7 @@ void *module_alloc(unsigned long size)
- 	if (PAGE_ALIGN(size) > MODULES_LEN)
- 		return NULL;
- 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
--				    GFP_KERNEL, PAGE_KERNEL, -1,
-+				    GFP_KERNEL, PAGE_KERNEL, NUMA_NO_NODE,
- 				    __builtin_return_address(0));
- }
- #endif
-diff --git a/arch/sparc/kernel/module.c b/arch/sparc/kernel/module.c
-index 4435488..97655e0 100644
---- a/arch/sparc/kernel/module.c
-+++ b/arch/sparc/kernel/module.c
-@@ -29,7 +29,7 @@ static void *module_map(unsigned long size)
- 	if (PAGE_ALIGN(size) > MODULES_LEN)
- 		return NULL;
- 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
--				GFP_KERNEL, PAGE_KERNEL, -1,
-+				GFP_KERNEL, PAGE_KERNEL, NUMA_NO_NODE,
- 				__builtin_return_address(0));
- }
- #else
-diff --git a/arch/x86/kernel/module.c b/arch/x86/kernel/module.c
-index 216a4d7..18be189 100644
---- a/arch/x86/kernel/module.c
-+++ b/arch/x86/kernel/module.c
-@@ -49,7 +49,7 @@ void *module_alloc(unsigned long size)
- 		return NULL;
- 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
- 				GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL_EXEC,
--				-1, __builtin_return_address(0));
-+				NUMA_NO_NODE, __builtin_return_address(0));
- }
- 
- #ifdef CONFIG_X86_32
--- 
-1.7.1
+
+-Olof
