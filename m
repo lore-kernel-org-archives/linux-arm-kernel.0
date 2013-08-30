@@ -1,58 +1,44 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 30 Aug 2013 10:18:12 +0300
-Subject: [PATCH v4 3/5] at91/avr32/atmel_lcdfb: prepare clk before calling
- enable
-In-Reply-To: <1374133225-19141-1-git-send-email-b.brezillon@overkiz.com>
-References: <1374132753-15206-1-git-send-email-b.brezillon@overkiz.com>
- <1374133225-19141-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <52204734.3010603@ti.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Fri, 30 Aug 2013 00:20:47 -0700 (PDT)
+Subject: [alsa-devel] [PATCH RFC 00/13] Adding SPDIF support
+ to	kirkwood-i2s
+In-Reply-To: <87wqnzhek5.wl%kuninori.morimoto.gx@renesas.com>
+References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
+ <51FECB7A.6010208@gmail.com> <20130805115947.GA9858@sirena.org.uk>
+ <51FFA348.2010503@gmail.com> <51FFB267.3030107@metafoo.de>
+ <87wqnzhek5.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87li3jr6et.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/13 10:40, Boris BREZILLON wrote:
-> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
-> avoid common clk framework warnings.
+
+Hi
+
+> > Kuninori Morimoto started working on a xlate callback for CODECs and DAIs
+> > some time ago[1]. If nobody else is going to pick this up I'm probably going
+> > to continue his work on this.
 > 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  drivers/video/atmel_lcdfb.c |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-> index ece49d5..bf9c5d0 100644
-> --- a/drivers/video/atmel_lcdfb.c
-> +++ b/drivers/video/atmel_lcdfb.c
-> @@ -954,14 +954,14 @@ static int __init atmel_lcdfb_init_fbinfo(struct atmel_lcdfb_info *sinfo)
->  
->  static void atmel_lcdfb_start_clock(struct atmel_lcdfb_info *sinfo)
->  {
-> -	clk_enable(sinfo->bus_clk);
-> -	clk_enable(sinfo->lcdc_clk);
-> +	clk_prepare_enable(sinfo->bus_clk);
-> +	clk_prepare_enable(sinfo->lcdc_clk);
->  }
->  
->  static void atmel_lcdfb_stop_clock(struct atmel_lcdfb_info *sinfo)
->  {
-> -	clk_disable(sinfo->bus_clk);
-> -	clk_disable(sinfo->lcdc_clk);
-> +	clk_disable_unprepare(sinfo->bus_clk);
-> +	clk_disable_unprepare(sinfo->lcdc_clk);
->  }
->  
->  #ifdef CONFIG_OF
+> Thank you for your offer about above.
+> I'm sorry for my late work for xlate callback.
+> but, unfortunately, I busy now, so, I can't work for it now.
+> I'm very happy if someone/you can work for it.
 
-Thanks, queued this for 3.12.
+My understanding for this ASoC DT support milestone is that
 
- Tomi
+ 1) merge codec/component
+ 2) add .of_xlate_dai_name on it
+ 3) add DT support
 
+But, do you think 1) is possible ?
+Becouse, now, too many functions are based on/using "codec"
+struct snd_soc_codec / struct snd_soc_codec_driver.
+In reality, merging these is super difficult IMO.
 
+But adding .of_xlate_dai_name on each codec/component
+is not difficult, and, I can do it immediately.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130830/396f8749/attachment-0001.sig>
+what is your opinion ?
+
+Best regards
+---
+Kuninori Morimoto
