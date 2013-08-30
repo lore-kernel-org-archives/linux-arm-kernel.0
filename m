@@ -1,97 +1,46 @@
-From: galak@kernel.crashing.org (Kumar Gala)
-Date: Fri, 30 Aug 2013 14:19:12 -0500
-Subject: [PATCH 4/4] Documentation: Add device tree bindings for Freescale
- FTM PWM
-In-Reply-To: <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
-References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
- <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <5EFBF478-CFCC-4E66-A279-25F4A338B05B@kernel.crashing.org>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 30 Aug 2013 20:10:51 +0100
+Subject: [PATCH 15/20] ARM: hardware: fix endian-ness in <hardware/coresight.h>
+In-Reply-To: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377889856-9447-16-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Should have at least something w/regards to a commit message.
+The <hardware/coresight.h> needs to take into account the endian-ness
+of the processor when reading and writing data, so change to using
+the readl/writel relaxed variants from the raw ones.
 
-On Aug 20, 2013, at 10:07 PM, Xiubo Li wrote:
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+ arch/arm/include/asm/hardware/coresight.h |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> ---
-> .../devicetree/bindings/pwm/fsl-ftm-pwm.txt        | 52 ++++++++++++++++++++++
-> 1 file changed, 52 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt b/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
-> new file mode 100644
-> index 0000000..698965b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
-> @@ -0,0 +1,52 @@
-> +Freescale FTM PWM controller
-> +
-> +Required properties:
-> +- compatible: should be "fsl,vf610-ftm-pwm"
-> +- reg: physical base address and length of the controller's registers
-> +- #pwm-cells: Should be 3. Number of cells being used to specify PWM property.
-> +  First cell specifies the per-chip channel index of the PWM to use, the
-> +  second cell is the period in nanoseconds and bit 0 in the third cell is
-> +  used to encode the polarity of PWM output. Set bit 0 of the third in PWM
-> +  specifier to 1 for inverse polarity & set to 0 for normal polarity.
-> +- fsl,pwm-clk-ps: the ftm0 pwm clock's prescaler, divide-by 2^n(n = 0 ~ 7).
-> +- fsl,pwm-cpwm: Center-Aligned PWM (CPWM) mode.
-
-Should describe this in more detail, what does the value actually mean for what modes there are?
-
-> +- fsl,pwm-number: the number of PWM devices, and is must equal to the number
-> +  of "fsl,pwm-channels".
-
-If they must be equal why do we need both?
-
-> +- fsl,pwm-channels: the channels' order which is be used for pwm in ftm0
-> +  module, and they must be one or some of 0 ~ 7, because the ftm0 only has
-> +  8 channels can be used.
-> +- for very channel, the revlatived the pinctrl should be at least two state
-
-revlatived?
-
-> +  {"enN", "dsN"}, which "en" means "enable", "ds" means "disable" and "N"
-> +  means the order of the channel.
-> +
-> +Example:
-> +
-> +pwm0: pwm at 40038000 {
-> +	      compatible = "fsl,vf610-ftm-pwm";
-> +	      reg = <0x40038000 0x1000>;
-> +	      #pwm-cells = <3>;
-> +	      pinctrl-names = "en0", "ds0", "en3", "ds3";
-> +	      pinctrl-0 = <&pinctrl_pwm0_ch0_en>;
-> +	      pinctrl-1 = <&pinctrl_pwm0_ch0_ds>;
-> +	      pinctrl-2 = <&pinctrl_pwm0_ch3_en>;
-> +	      pinctrl-3 = <&pinctrl_pwm0_ch3_ds>;
-> +	      fsl,pwm-clk-ps = <7>;
-> +	      fsl,pwm-cpwm = <0>;
-> +	      fsl,pwm-number = <2>;
-> +	      fsl,pwm-channels = <0 3>;
-> +	      ...
-> +      };
-> +
-> +leds {
-> +	compatible = "pwm-leds";
-> +	led {
-> +		label = "fsl_led";
-> +		pwms = <&pwm0 0 10000000 0>;
-> +		max-brightness = <127>;
-> +	};
-> +	backlight {
-> +		label = "fsl_backlight";
-> +		pwms = <&pwm0 3 10000000 1>;
-> +		max-brightness = <100>;
-> +	};
-> +};
-> -- 
-> 1.8.0
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
+index 0cf7a6b..ad774f3 100644
+--- a/arch/arm/include/asm/hardware/coresight.h
++++ b/arch/arm/include/asm/hardware/coresight.h
+@@ -24,8 +24,8 @@
+ #define TRACER_TIMEOUT 10000
+ 
+ #define etm_writel(t, v, x) \
+-	(__raw_writel((v), (t)->etm_regs + (x)))
+-#define etm_readl(t, x) (__raw_readl((t)->etm_regs + (x)))
++	(writel_relaxed((v), (t)->etm_regs + (x)))
++#define etm_readl(t, x) (readl_relaxed((t)->etm_regs + (x)))
+ 
+ /* CoreSight Management Registers */
+ #define CSMR_LOCKACCESS 0xfb0
+@@ -142,8 +142,8 @@
+ #define ETBFF_TRIGFL		BIT(10)
+ 
+ #define etb_writel(t, v, x) \
+-	(__raw_writel((v), (t)->etb_regs + (x)))
+-#define etb_readl(t, x) (__raw_readl((t)->etb_regs + (x)))
++	(writel_relaxed((v), (t)->etb_regs + (x)))
++#define etb_readl(t, x) (readl_relaxed((t)->etb_regs + (x)))
+ 
+ #define etm_lock(t) do { etm_writel((t), 0, CSMR_LOCKACCESS); } while (0)
+ #define etm_unlock(t) \
+-- 
+1.7.10.4
