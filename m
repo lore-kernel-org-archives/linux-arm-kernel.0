@@ -1,166 +1,52 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 30 Aug 2013 16:02:39 +0900
-Subject: [PATCH] clocksource: em_sti: Adjust clock event rating to fix SMP
- broadcast
-In-Reply-To: <521F7C42.7060108@codeaurora.org>
-References: <1375251940-7809-1-git-send-email-horms+renesas@verge.net.au>
- <51F94A35.2020907@codeaurora.org>
- <CANqRtoR0Wwctor1mpM+8nuC0_pZsPHUSShPuZFX4FVtoVKEuNw@mail.gmail.com>
- <51F9777B.2080500@codeaurora.org>
- <CANqRtoT=gMKBHG8qJWc7FjcYFaaf5hBzzv8=AOLneoveasmKoA@mail.gmail.com>
- <521F7C42.7060108@codeaurora.org>
-Message-ID: <CANqRtoSVg=801TetBMcyAAQykHK4bB0bHLwj=htq26badguOYA@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 30 Aug 2013 10:05:34 +0300
+Subject: [PATCH v4 0/5] clk: dt: bindings for mux, divider & gate clocks
+In-Reply-To: <521F91B0.6030204@ti.com>
+References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
+ <521F91B0.6030204@ti.com>
+Message-ID: <5220443E.3050205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 1:52 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 08/29/13 01:41, Magnus Damm wrote:
->> Thanks for your suggestion. Yes, there was indeed some confusion. Now
->> after diving into the code a bit deeper I can finally understand what
->> you mean.
->>
->> Instead of adjusting the rating I've changed the cpumask member like this:
->>
->> --- 0001/drivers/clocksource/em_sti.c
->> +++ work/drivers/clocksource/em_sti.c    2013-08-29 17:33:16.000000000 +0900
->> @@ -301,7 +301,7 @@ static void em_sti_register_clockevent(s
->>      ced->name = dev_name(&p->pdev->dev);
->>      ced->features = CLOCK_EVT_FEAT_ONESHOT;
->>      ced->rating = 200;
->> -    ced->cpumask = cpumask_of(0);
->> +    ced->cpumask = cpu_all_mask;
+On 08/29/2013 09:23 PM, Santosh Shilimkar wrote:
+> Mike,
 >
-> It would be better to use cpu_possible_mask.
-
-I agree, thanks.
-
->>      ced->set_next_event = em_sti_clock_event_next;
->>      ced->set_mode = em_sti_clock_event_mode;
+> On Thursday 22 August 2013 01:53 AM, Mike Turquette wrote:
+>> This series introduces binding definitions for common register-mapped
+>> clock multiplexer, divider and gate IP blocks along with the
+>> corresponding setup functions for matching DT data.  The bindings are
+>> similar to the struct definitions but please don't hold that against the
+>> binding: the struct definitions closely model the hardware register
+>> layout.
 >>
->> Without the cpumask fix or without the earlier rating fix the
->> following interrupt count can be seen in /proc/interrupts on KZM9D:
+>> The delta from v3 is very small and only consists of cosmetic changes
+>> and one functional change for better error handling.
 >>
->> 157:        140          0       GIC 157  e0180000.sti
->> 160:          0          0  e0050000.gpio   1  eth0
->> IPI0:          0          0  CPU wakeup interrupts
->> IPI1:          0          0  Timer broadcast interrupts
+>> Changes since v3:
+>> * added Tested-by & Reviewed-by from Heiko
+>> * replaced underscores with dashes in DT property names
+>> * bail from of clock setup function early if of_iomap fails
+>> * removed unecessary explict cast
 >>
->> Above, notice how no IPI1 interrupts seem to be arriving.
+>> Mike Turquette (5):
+>>    clk: divider: replace bitfield width with mask
+>>    clk: of: helper for determining number of parent clocks
+>>    clk: dt: binding for basic multiplexer clock
+>>    clk: dt: binding for basic divider clock
+>>    clk: dt: binding for basic gate clock
 >>
->> With the cpumask fix above the interrupt count becomes like this:
->>
->>  157:        559          0       GIC 157  e0180000.sti
->> 160:          0          0  e0050000.gpio   1  eth0
->> IPI0:          0          0  CPU wakeup interrupts
->> IPI1:          0        601  Timer broadcast interrupts
->>
->> Would this be in line with your expectation?
+> I have used $subject series as the base for the Keystone
+> ccf support and tested these patches on Keystone EVM. Will
+> post those patches soon on the lists.
 >
-> Yes that is what I'm saying. What is the output of cat /proc/timer_list?
+> For the series if you need more tested-by tags, feel free to
+> add,
+> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>
+>
 
-/ # head -n 60 foo
-Timer List Version: v0.7
-HRTIMER_MAX_CLOCK_BASES: 4
-now at 543066528320 nsecs
+Oh yea, same for my set I posted yesterday. Used this as basis for 
+O3/O4/O5/DRA7/AM335x tests, so you can also add my Tested-by tag if you 
+need one.
 
-cpu: 0
- clock 0:
-  .base:       c066f5f8
-  .index:      0
-  .resolution: 7812500 nsecs
-  .get_time:   ktime_get
-active timers:
- #0: <c0670148>, menu_hrtimer_notify, S:01
- # expires at 543066282109-543066282109 nsecs [in -246211 to -246211 nsecs]
- clock 1:
-  .base:       c066f630
-  .index:      1
-  .resolution: 7812500 nsecs
-  .get_time:   ktime_get_real
-active timers:
- clock 2:
-  .base:       c066f668
-  .index:      2
-  .resolution: 7812500 nsecs
-  .get_time:   ktime_get_boottime
-active timers:
- clock 3:
-  .base:       c066f6a0
-  .index:      3
-  .resolution: 7812500 nsecs
-  .get_time:   ktime_get_clocktai
-active timers:
-
-cpu: 1
- clock 0:
-  .base:       c06775f8
-  .index:      0
-  .resolution: 7812500 nsecs
-  .get_time:   ktime_get
-active timers:
- clock 1:
-  .base:       c0677630
-  .index:      1
-  .resolution: 7812500 nsecs
-  .get_time:   ktime_get_real
-active timers:
- clock 2:
-  .base:       c0677668
-  .index:      2
-  .resolution: 7812500 nsecs
-  .get_time:   ktime_get_boottime
-active timers:
- clock 3:
-  .base:       c06776a0
-  .index:      3
-  .resolution: 7812500 nsecs
-  .get_time:   ktime_get_clocktai
-active timers:
-
-Tick Device: mode:     0
-Broadcast device
-Clock Event Device: e0180000.sti
- max_delta_ns:   131071523464981
- min_delta_ns:   61034
- mult:           70369
- shift:          31
- mode:           3
- next_event:     543070312500 nsecs
- set_next_event: em_sti_clock_event_next
- set_mode:       em_sti_clock_event_mode
- event_handler:  tick_handle_periodic_broadcast
- retries:        0
-
-tick_broadcast_mask: 00000003
-
-Tick Device: mode:     0
-Per CPU device: 0
-Clock Event Device: dummy_timer
- max_delta_ns:   0
- min_delta_ns:   0
- mult:           1
- shift:          0
- mode:           1
- next_event:     9223372036854775807 nsecs
- set_next_event: <00000000>
- set_mode:       broadcast_timer_set_mode
- event_handler:  tick_handle_periodic
- retries:        0
-
-Tick Device: mode:     0
-Per CPU device: 1
-Clock Event Device: dummy_timer
- max_delta_ns:   0
- min_delta_ns:   0
- mult:           0
- shift:          0
- mode:           1
- next_event:     9223372036854775807 nsecs
- set_next_event: <00000000>
- set_mode:       dummy_timer_set_mode
- event_handler:  tick_handle_periodic
- retries:        0
-
-Thanks for your help!
-
-/ magnus
+-Tero
