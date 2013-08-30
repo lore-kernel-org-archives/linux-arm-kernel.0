@@ -1,83 +1,75 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 30 Aug 2013 19:55:26 +0100
-Subject: [PATCH 14/19] ARM: set --be8 when linking modules
-In-Reply-To: <20130828163852.GB3842@localhost.localdomain>
-References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
- <1377639509-22778-15-git-send-email-ben.dooks@codethink.co.uk>
- <20130828163852.GB3842@localhost.localdomain>
-Message-ID: <5220EA9E.7080000@codethink.co.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 30 Aug 2013 21:00:19 +0200
+Subject: [PATCH] cpufreq: imx6q: Fix clock enable balance
+In-Reply-To: <20130829140123.GM18729@S2101-09.ap.freescale.net>
+References: <1377517716-27470-1-git-send-email-s.hauer@pengutronix.de>
+ <20130829140123.GM18729@S2101-09.ap.freescale.net>
+Message-ID: <20130830190019.GG30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/08/13 17:38, Dave Martin wrote:
-> On Tue, Aug 27, 2013 at 10:38:24PM +0100, Ben Dooks wrote:
->> To avoid having to make every text section swap the instruction order
->> of all instructions, make sure modules are built also built with --be8
->> (as is the current kernel final link).
->>
->> If we do not do this, we would end up having to swap all instructions
->> when loading a module, instead of just the instructions that we are
->> applying ELF relocations to.
->
-> Someone on one of the previous threads asked about whether we need
-> module vermagic for BE8.
+On Thu, Aug 29, 2013 at 10:01:25PM +0800, Shawn Guo wrote:
+> On Mon, Aug 26, 2013 at 01:48:36PM +0200, Sascha Hauer wrote:
+> > For changing the cpu frequency the i.MX6q has to be switched to some
+> > intermediate clock during the PLL reprogramming. The driver tries
+> > to be clever to keep the enable count correct but gets it wrong. If
+> > the cpufreq is increased it calls clk_disable_unprepare twice
+> > on pll2_pfd2_396m. This puts all other devices which get their clock
+> > from pll2_pfd2_396m into a nonworking state.
+> 
+> So you're running into a problem in real?  The clk_disable_unprepare on
+> pll2_pfd2_396m below will only be executed when are leaving 396MHz
+> set-point.
 
-Don't think so, although we could do this if needed. I would like to
-get this series merged and then think about updates.
+And that's when my SD card stops working. On my board the SD clock is
+derived from pll2_pfd2_396m. I used the userspace cpufreq governor
+and scaled down to 396MHz. When I scale up again the SDHC driver times
+out while waiting for interrupts. This is because the cpufreq driver
+disables the clock twice.
 
-> I'm a bit hazy on whether this is needed.  The interesting scenario
-> would be if someone tried to load a BE32 module into a BE8 kernel
-> or vice versa.
->
-> Currently the kernel does not seem to check ELF endianness at all
-> either for modules or userspace binaries -- they load get loaded/
-> fixed up/executed just is if they were native endianness.
+> It's there to balance the clk_prepare_enable on
+> pll2_pfd2_396m when we enters 396MHz set-point.
+> 
+> 	if (freqs.old * 1000 <= clk_get_rate(pll2_pfd2_396m_clk)) {
+> 		clk_prepare_enable(pll1_sys_clk);
+> 		clk_disable_unprepare(pll2_pfd2_396m_clk);
+> 	}
+> 
+> > 
+> > Fix this by removing the clk enabling/disabling altogether since the
+> > clk core will do this automatically during a reparent.
+> 
+> It seems clk core will only enable the parent clock during the
+> clk_set_parent() call, and only in case that the child clock is
+> prepared.  For example, I do not think pll2_pfd2_396m_clk and step_clk
+> will be altered to ON state.  Or am I missing something?
+> 
 
-I've not tried BE32 binaries on BE8 kernels, although it would
-probably produce an undefined instruction quite quickly.
+It seems so, yes. Reparenting takes the prepare/enable state
+of a clock with it. See __clk_set_parent, it starts with:
 
-> So BE8 doesn't add any new brokenness here.  Fixing all that stuff
-> falls outside the scope of this series.
+	if (clk->prepare_count) {
+		__clk_prepare(parent);
+		clk_enable(parent);
+		clk_enable(clk);
+	}
 
-think so.
+So if the clock to be reparent is enabled then the new parent
+gets enabled aswell. And it ends with:
 
-> Any thoughts?
->
->
-> For this patch though:
->
-> Reviewed-by: Dave Martin<Dave.Martin@arm.com>
->
-> Cheers
-> ---Dave
->
->> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
->> ---
->>   arch/arm/Makefile |    1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
->> index 6fd2cea..2c659f9 100644
->> --- a/arch/arm/Makefile
->> +++ b/arch/arm/Makefile
->> @@ -16,6 +16,7 @@ LDFLAGS		:=
->>   LDFLAGS_vmlinux	:=-p --no-undefined -X
->>   ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
->>   LDFLAGS_vmlinux	+= --be8
->> +LDFLAGS_MODULE	+= --be8
->>   endif
->>
->>   OBJCOPYFLAGS	:=-O binary -R .comment -S
->> --
->> 1.7.10.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	if (clk->prepare_count) {
+		clk_disable(clk);
+		clk_disable(old_parent);
+		__clk_unprepare(old_parent);
+	}
 
+So if the clock is enabled the old parent now decreases its enable
+count.
+
+Sascha
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
