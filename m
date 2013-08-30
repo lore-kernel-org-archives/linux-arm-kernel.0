@@ -1,29 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 30 Aug 2013 10:11:00 +0100
-Subject: [PATCH v4] ARM: Add check for Cortex-A15 errata 798181 ECO
-In-Reply-To: <1377440747-4564-1-git-send-email-robherring2@gmail.com>
-References: <1377440747-4564-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20130830091100.GC25628@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 30 Aug 2013 10:15:36 +0100
+Subject: [PATCH v3 1/3] ARM: Introduce atomic MMIO modify
+In-Reply-To: <20130830090807.GB25628@mudshark.cambridge.arm.com>
+References: <1377253445-2842-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130823103802.GO4600@tarshish> <20130823110748.GD2389@localhost>
+ <20130823113225.GF2389@localhost> <20130823114805.GF10971@arm.com>
+ <20130830090807.GB25628@mudshark.cambridge.arm.com>
+Message-ID: <20130830091534.GA62188@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 25, 2013 at 03:25:47PM +0100, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Fri, Aug 30, 2013 at 10:08:07AM +0100, Will Deacon wrote:
+> On Fri, Aug 23, 2013 at 12:48:05PM +0100, Catalin Marinas wrote:
+> > On Fri, Aug 23, 2013 at 12:32:26PM +0100, Ezequiel Garcia wrote:
+> > > On Fri, Aug 23, 2013 at 08:07:50AM -0300, Ezequiel Garcia wrote:
+> > > > On Fri, Aug 23, 2013 at 01:38:02PM +0300, Baruch Siach wrote:
+> > > > > On Fri, Aug 23, 2013 at 07:24:03AM -0300, Ezequiel Garcia wrote:
+> > > > > > Some SoC have MMIO regions that are shared across orthogonal
+> > > > > > subsystems. This commit implements a possible solution for the
+> > > > > > thread-safe access of such regions through a spinlock-protected API.
+> > > > > > 
+> > > > > > Concurrent access is protected with a single spinlock for the
+> > > > > > entire MMIO address space. While this protects shared-registers,
+> > > > > > it also serializes access to unrelated/unshared registers.
+> > > > > > 
+> > > > > > We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
+> > > > > > respectively. The rationale for this is that some users may not require
+> > > > > > register write completion but only thread-safe access to a register.
+> > > > > > 
+> > > > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > > > 
+> > > > > Is there a reason why this should be limited to ARM? I haven't found anything 
+> > > > > ARM specific in the code.
+> > > > 
+> > > > I guess not.
+> > > 
+> > > ... or maybe yes. I'm not seeing {readl,writel}_relaxed as guaranteed
+> > > to exist in every architecture. So, indeed, this seems to be ARM-dependent.
+> > 
+> > There was a discussion couple of years ago to make these part of the IO
+> > specification since many architectures define them:
+> > 
+> > http://thread.gmane.org/gmane.linux.ports.arm.kernel/117626
+> > 
+> > (and some older threads on linux-arch which I haven't searched)
+> > 
+> > We could have some default implementation pointing to readl/writel while
+> > letting the arch code to define more optimised variants.
 > 
-> The work-around for A15 errata 798181 is not needed if appropriate ECO
-> fixes have been applied to r3p2 and earlier core revisions. This can be
-> checked by reading REVIDR register bits 4 and 9. If only bit 4 is set,
-> then the IPI broadcast can be skipped.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
-> v4:
-> - Move code from setup.c back to smp_tlb.c
-> - Use IS_ENABLED macro
+> The main thing I dislike about that is the back-to-back dsbs that you will
+> get from the read-(modify)-write. It really makes the non-optimised version
+> needlessly expensive.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+Yes, it's pretty bad. But we don't have relaxed (write) accessors on
+other architectures and I'm not sure about their semantics either. I
+guess here it's a data dependency so you cannot write the value before
+reading it, especially since sane architectures should speculate reads
+or writes to device memory.
 
-Note that you might get some trivial conflicts with my barriers series,
-which is merged in rmk/devel-stable (and therefore -next).
+What about making it always use *_relaxed() accessors if the
+architecture provides them? No need for atomic_io_modify_relaxed().
 
-Will
+-- 
+Catalin
