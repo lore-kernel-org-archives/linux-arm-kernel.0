@@ -1,36 +1,92 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 Aug 2013 18:19:00 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.11
-Message-ID: <20130830011900.GA1752@quad.lixom.net>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 30 Aug 2013 09:19:56 +0800
+Subject: [PATCH v9 3/7] ARM: dts: enable hi4511 with device tree
+In-Reply-To: <87eh9c1i1o.fsf@linaro.org>
+References: <1377695454-29109-1-git-send-email-haojian.zhuang@linaro.org>
+ <1377695454-29109-4-git-send-email-haojian.zhuang@linaro.org>
+ <87eh9c1i1o.fsf@linaro.org>
+Message-ID: <CAD6h2NRnjme1Hdc+5oMzrR8LYb7_rk13OeVfo0qFT=_jAbMoJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 30 August 2013 02:13, Kevin Hilman <khilman@linaro.org> wrote:
+> Haojian Zhuang <haojian.zhuang@linaro.org> writes:
+>
+>> Enable Hisilicon Hi4511 development platform with device tree support.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>
+> This still doesn't look quite right...
+>
+>> ---
+>>  arch/arm/boot/dts/Makefile        |    1 +
+>>  arch/arm/boot/dts/hi3620-clk.dtsi | 1058 +++++++++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/hi3620.dtsi     |  513 ++++++++++++++++++
+>>  arch/arm/boot/dts/hi4511.dts      |  648 +++++++++++++++++++++++
+>>  4 files changed, 2220 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/hi3620-clk.dtsi
+>>  create mode 100644 arch/arm/boot/dts/hi3620.dtsi
+>>  create mode 100644 arch/arm/boot/dts/hi4511.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 641b3c9..6e7c1ca 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -61,6 +61,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+>>       exynos5250-snow.dtb \
+>>       exynos5420-smdk5420.dtb \
+>>       exynos5440-ssdk5440.dtb
+>> +dtb-$(CONFIG_ARCH_HI3xxx) += hi4511.dtb
+>>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+>>       ecx-2000.dtb
+>>  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+>> diff --git a/arch/arm/boot/dts/hi3620-clk.dtsi b/arch/arm/boot/dts/hi3620-clk.dtsi
+>> new file mode 100644
+>> index 0000000..78307c6
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/hi3620-clk.dtsi
+>> @@ -0,0 +1,1058 @@
+>> +/*
+>> + * Hisilicon Ltd. Hi3620 SoC
+>> + *
+>> + * Copyright (C) 2012-2013 Hisilicon Ltd.
+>> + * Copyright (C) 2012-2013 Linaro Ltd.
+>> + *
+>> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * publishhed by the Free Software Foundation.
+>> + */
+>> +
+>> +/ {
+>> +     clocks {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <1>;
+>> +             ranges;
+>> +
+>> +             osc32k: osc32k {
+>> +                     compatible = "fixed-clock";
+>> +                     #clock-cells = <0>;
+>> +                     clock-frequency = <32768>;
+>> +                     clock-output-names = "osc32khz";
+>> +             };
+>
+> So you've now moved these all under the clocks node, but this still
+> isn't addressing Stephen's comments about using the
+> node-name at unit-address and the reg property in each node.
+>
+> [...]
+>
+>> +             sysctrl: system-controller at fc802000 {
+>> +                     compatible = "hisilicon,sysctrl";
+>> +                     reg = <0xfc802000 0x1000>;
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>
+> Why is sysctrl and all of its children now under the clocks node?
+>
+>
+> Kevin
 
-The following changes since commit 30ca2226bea6f0db519dc53381b893cd66cb5b66:
-
-  ARM: tegra: always enable USB VBUS regulators (2013-08-21 21:36:19 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to f8ab658b5da3fd11893cad085e0e21b67987c10b:
-
-  arm: prima2: drop nr_irqs in mach as we moved to linear irqdomain (2013-08-29 09:48:36 -0700)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 3.11
-
-Two straggling fixes that I had missed as they were posted a couple of
-weeks ago, causing problems with interrupts (breaking them completely)
-on the CSR SiRF platforms.
-
-----------------------------------------------------------------
-Barry Song (2):
-      irqchip: sirf: move from legacy mode to linear irqdomain
-      arm: prima2: drop nr_irqs in mach as we moved to linear irqdomain
-
- arch/arm/mach-prima2/common.c |  2 --
- drivers/irqchip/irq-sirfsoc.c | 18 ++++++++++--------
- 2 files changed, 10 insertions(+), 10 deletions(-)
+SMP registers and clock registers are sharing the system controller.
