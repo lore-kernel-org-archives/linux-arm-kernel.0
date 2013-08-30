@@ -1,292 +1,135 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 30 Aug 2013 15:02:42 -0500
-Subject: [PATCH v4 3/5] clk: dt: binding for basic multiplexer clock
-In-Reply-To: <20130829011425.8231.78802@quantum>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 30 Aug 2013 14:06:32 -0600
+Subject: [PATCH v4 5/5] clk: dt: binding for basic gate clock
+In-Reply-To: <CAD6h2NRBq8hD8J5+P4NBZJZsPo4QAebgGaxmAn5TL0c2Cc5ULQ@mail.gmail.com>
 References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
- <1377150793-27864-4-git-send-email-mturquette@linaro.org>
- <2A930389-012E-45C3-93EB-6B4A41DB2EF5@codeaurora.org>
- <20130829011425.8231.78802@quantum>
-Message-ID: <39BAF1F8-41AD-4667-BF76-22BDF709415A@codeaurora.org>
+ <1377150793-27864-6-git-send-email-mturquette@linaro.org>
+ <CAD6h2NRBq8hD8J5+P4NBZJZsPo4QAebgGaxmAn5TL0c2Cc5ULQ@mail.gmail.com>
+Message-ID: <5220FB48.7080607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/29/2013 07:45 PM, Haojian Zhuang wrote:
+> On 22 August 2013 13:53, Mike Turquette <mturquette@linaro.org> wrote:
+>> Device Tree binding for the basic clock gate, plus the setup function to
+>> register the clock.  Based on the existing fixed-clock binding.
+>>
+>> A different approach to this was proposed in 2012[1] and a similar
+>> binding was proposed more recently[2] if anyone wants some extra
+>> reading.
 
-On Aug 28, 2013, at 8:14 PM, Mike Turquette wrote:
+>> diff --git a/Documentation/devicetree/bindings/clock/gate-clock.txt b/Documentation/devicetree/bindings/clock/gate-clock.txt
 
-> Quoting Kumar Gala (2013-08-28 08:50:10)
->> On Aug 22, 2013, at 12:53 AM, Mike Turquette wrote:
->> 
->>> Device Tree binding for the basic clock multiplexer, plus the setup
->>> function to register the clock.  Based on the existing fixed-clock
->>> binding.
->>> 
->>> Includes minor beautification of clk-provider.h where some whitespace is
->>> added and of_fixed_factor_clock_setup is relocated to maintain a
->>> consistent style.
->>> 
->>> Tero Kristo contributed helpful bug fixes to this patch.
->>> 
->>> Signed-off-by: Mike Turquette <mturquette@linaro.org>
->>> Tested-by: Heiko Stuebner <heiko@sntech.de>
->>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
->>> ---
->>> Changes since v3:
->>> * replaced underscores with dashes in DT property names
->>> * bail from of clock setup function early if of_iomap fails
->>> * removed unecessary explict cast
->>> 
->>> .../devicetree/bindings/clock/mux-clock.txt        | 79 ++++++++++++++++++++++
->>> drivers/clk/clk-mux.c                              | 68 ++++++++++++++++++-
->>> include/linux/clk-provider.h                       |  5 +-
->>> 3 files changed, 150 insertions(+), 2 deletions(-)
->>> create mode 100644 Documentation/devicetree/bindings/clock/mux-clock.txt
->>> 
->>> diff --git a/Documentation/devicetree/bindings/clock/mux-clock.txt b/Documentation/devicetree/bindings/clock/mux-clock.txt
->>> new file mode 100644
->>> index 0000000..21eb3b3
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/clock/mux-clock.txt
->>> @@ -0,0 +1,79 @@
->>> +Binding for simple mux clock.
->>> +
->>> +This binding uses the common clock binding[1].  It assumes a
->>> +register-mapped multiplexer with multiple input clock signals or
->>> +parents, one of which can be selected as output.  This clock does not
->>> +gate or adjust the parent rate via a divider or multiplier.
->>> +
->>> +By default the "clocks" property lists the parents in the same order
->>> +as they are programmed into the regster.  E.g:
->>> +
->>> +     clocks = <&foo_clock>, <&bar_clock>, <&baz_clock>;
->>> +
->>> +results in programming the register as follows:
->>> +
->>> +register value               selected parent clock
->>> +0                    foo_clock
->>> +1                    bar_clock
->>> +2                    baz_clock
->>> +
->>> +Some clock controller IPs do not allow a value of zero to be programmed
->>> +into the register, instead indexing begins at 1.  The optional property
->>> +"index-starts-at-one" modified the scheme as follows:
->>> +
->>> +register value               selected clock parent
->>> +1                    foo_clock
->>> +2                    bar_clock
->>> +3                    baz_clock
->>> +
->>> +Additionally an optional table of bit and parent pairs may be supplied
->>> +like so:
->>> +
->>> +     table = <&foo_clock 0x0>, <&bar_clock, 0x2>, <&baz_clock, 0x4>;
->>> +
->> 
->> I think this is going way too far for what should be in a device tree.  Why should this not just be encoded in tables in the code?
+>> +Binding for simple gate clock.
+...
+>> +       clock_foo: clock_foo at 4a008100 {
+>> +               compatible = "gate-clock";
+>> +               #clock-cells = <0>;
+>> +               clocks = <&clock_bar>;
+>> +               reg = <0x4a008100 0x4>
+>> +               bit-shift = <3>
 > 
-> To reduce kernel data bloat.
-
-Why is this really an issue, for systems that are concerned about kernel size, they are going to be built targeting the HW platform of choice, for one's like a server, the bloat isn't going to be significant, and if so we can look at mechanisms like __init section that would free up after boot.
-
-> The mux-clock binding covers a quite a few platforms that have similar
-> mux-clock programming requirements. If the DT binding is verbose enough
-> then the basic mux clock driver is sufficient to initialize all of the
-> mux clocks from DT: no new platform-specific clock driver with a bunch
-> of data is necessary.
-
-The same could be said of just embedded this info in a C struct that is well known, I don't need the data in the dt for bits and shifts.
-
-> On the other hand if we rely on tables in C to define how mux-clock
-> parents are selected then every platform will have to write their own
-> clock driver just to define their clock data.
-
-Why?  If you can have a common mechanism in the device tree there isn't any reason you can't have a common struct that looks similar in C.
-
-> Having drivers written for the sole purpose of listing out a bunch of
-> data sounds like something that DT was meant to solve, even if this
-> isn't at the board level and is at the SoC level.
-
-I just don't see the need for the data to be in the DT.  You can get the same goal w/a standard struct defined in C.
-
+> There's some argument on my clock binding patch set of Hi3620.
 > 
-> Regards,
-> Mike
-> 
->> 
->>> +where the first value in the pair is the parent clock and the second
->>> +value is the bitfield to be programmed into the register.
->>> +
->>> +The binding must provide the register to control the mux and the mask
->>> +for the corresponding control bits.  Optionally the number of bits to
->>> +shift that mask if necessary.  If the shift value is missing it is the
->>> +same as supplying a zero shift.
->>> +
->>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->>> +
->>> +Required properties:
->>> +- compatible : shall be "mux-clock".
->>> +- #clock-cells : from common clock binding; shall be set to 0.
->>> +- clocks : link phandles of parent clocks
->>> +- reg : base address for register controlling adjustable mux
->>> +- bit-mask : arbitrary bitmask for programming the adjustable mux
->>> +
->>> +Optional properties:
->>> +- clock-output-names : From common clock binding.
->>> +- table : array of integer pairs defining parents & bitfield values
->>> +- bit-shift : number of bits to shift the bit-mask, defaults to
->>> +  (ffs(mask) - 1) if not present
->>> +- index-starts-at-one : valid input select programming starts at 1, not
->>> +  zero
->>> +- hiword-mask : lower half of the register programs the mux, upper half
->>> +  of the register indicates bits that were updated in the lower half
->>> +
->>> +Examples:
->>> +     clock: clock at 4a008100 {
->>> +             compatible = "mux-clock";
->>> +             #clock-cells = <0>;
->>> +             clocks = <&clock_foo>, <&clock_bar>, <&clock_baz>;
->>> +             reg = <0x4a008100 0x4>
->>> +             mask = <0x3>;
->>> +             index-starts-at-one;
->>> +     };
->>> +
->>> +     clock: clock at 4a008100 {
->>> +             #clock-cells = <0>;
->>> +             compatible = "mux-clock";
->>> +             clocks = <&clock_foo>, <&clock_bar>, <&clock_baz>;
->>> +             reg = <0x4a008100 0x4>;
->>> +             mask = <0x3>;
->>> +             shift = <0>;
->>> +             table = <&clock_foo 1>, <&clock_bar 2>, <&clock_baz 3>;
->>> +     };
->>> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
->>> index 0811633..9292253 100644
->>> --- a/drivers/clk/clk-mux.c
->>> +++ b/drivers/clk/clk-mux.c
->>> @@ -1,7 +1,7 @@
->>> /*
->>> * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
->>> * Copyright (C) 2011 Richard Zhao, Linaro <richard.zhao@linaro.org>
->>> - * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
->>> + * Copyright (C) 2011-2013 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
->>> *
->>> * This program is free software; you can redistribute it and/or modify
->>> * it under the terms of the GNU General Public License version 2 as
->>> @@ -16,6 +16,8 @@
->>> #include <linux/slab.h>
->>> #include <linux/io.h>
->>> #include <linux/err.h>
->>> +#include <linux/of.h>
->>> +#include <linux/of_address.h>
->>> 
->>> /*
->>> * DOC: basic adjustable multiplexer clock that cannot gate
->>> @@ -177,3 +179,67 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
->>>                                    NULL, lock);
->>> }
->>> EXPORT_SYMBOL_GPL(clk_register_mux);
->>> +
->>> +#ifdef CONFIG_OF
->>> +/**
->>> + * of_mux_clk_setup() - Setup function for simple mux rate clock
->>> + */
->>> +void of_mux_clk_setup(struct device_node *node)
->>> +{
->>> +     struct clk *clk;
->>> +     const char *clk_name = node->name;
->>> +     void __iomem *reg;
->>> +     int num_parents;
->>> +     const char **parent_names;
->>> +     int i;
->>> +     u8 clk_mux_flags = 0;
->>> +     u32 mask = 0;
->>> +     u32 shift = 0;
->>> +
->>> +     of_property_read_string(node, "clock-output-names", &clk_name);
->>> +
->>> +     num_parents = of_clk_get_parent_count(node);
->>> +     if (num_parents < 1) {
->>> +             pr_err("%s: mux-clock %s must have parent(s)\n",
->>> +                             __func__, node->name);
->>> +             return;
->>> +     }
->>> +
->>> +     parent_names = kzalloc((sizeof(char*) * num_parents),
->>> +                     GFP_KERNEL);
->>> +
->>> +     for (i = 0; i < num_parents; i++)
->>> +             parent_names[i] = of_clk_get_parent_name(node, i);
->>> +
->>> +     reg = of_iomap(node, 0);
->>> +     if (!reg) {
->>> +             pr_err("%s: no memory mapped for property reg\n", __func__);
->>> +             return;
->>> +     }
->>> +
->>> +     if (of_property_read_u32(node, "bit-mask", &mask)) {
->>> +             pr_err("%s: missing bit-mask property for %s\n", __func__, node->name);
->>> +             return;
->>> +     }
->>> +
->>> +     if (of_property_read_u32(node, "bit-shift", &shift)) {
->>> +             shift = __ffs(mask);
->>> +             pr_debug("%s: bit-shift property defaults to 0x%x for %s\n",
->>> +                             __func__, shift, node->name);
->>> +     }
->>> +
->>> +     if (of_property_read_bool(node, "index-starts-at-one"))
->>> +             clk_mux_flags |= CLK_MUX_INDEX_ONE;
->>> +
->>> +     if (of_property_read_bool(node, "hiword-mask"))
->>> +             clk_mux_flags |= CLK_MUX_HIWORD_MASK;
->>> +
->>> +     clk = clk_register_mux_table(NULL, clk_name, parent_names, num_parents,
->>> +                     0, reg, shift, mask, clk_mux_flags, NULL, NULL);
->>> +
->>> +     if (!IS_ERR(clk))
->>> +             of_clk_add_provider(node, of_clk_src_simple_get, clk);
->>> +}
->>> +EXPORT_SYMBOL_GPL(of_mux_clk_setup);
->>> +CLK_OF_DECLARE(mux_clk, "mux-clock", of_mux_clk_setup);
->>> +#endif
->>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->>> index 5497739..e019212 100644
->>> --- a/include/linux/clk-provider.h
->>> +++ b/include/linux/clk-provider.h
->>> @@ -350,7 +350,7 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
->>>              void __iomem *reg, u8 shift, u32 mask,
->>>              u8 clk_mux_flags, u32 *table, spinlock_t *lock);
->>> 
->>> -void of_fixed_factor_clk_setup(struct device_node *node);
->>> +void of_mux_clk_setup(struct device_node *node);
->>> 
->>> /**
->>> * struct clk_fixed_factor - fixed multiplier and divider clock
->>> @@ -371,10 +371,13 @@ struct clk_fixed_factor {
->>> };
->>> 
->>> extern struct clk_ops clk_fixed_factor_ops;
->>> +
->>> struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
->>>              const char *parent_name, unsigned long flags,
->>>              unsigned int mult, unsigned int div);
->>> 
->>> +void of_fixed_factor_clk_setup(struct device_node *node);
->>> +
->>> /***
->>> * struct clk_composite - aggregate clock of mux, divider and gate clocks
->>> *
->>> -- 
->>> 1.8.1.2
->>> 
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> 
->> -- 
->> Employee of Qualcomm Innovation Center, Inc.
->> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> I defined each clock as one clock node and some of them are sharing one
+> register. Stephen attacked on this since it means multiple clock node sharing
+> one register.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+s/attacked/disagreed with/ I think:-)
+
+> Now the same thing also exists in Mike's patch. Mike's patch could also
+> support this behavior. And it's very common that one register is sharing among
+> multiple clocks in every SoC. Which one should I follow?
+
+I believe it's a matter of how the HW is structured.
+
+If the HW truly has segregated register regions for each individual
+clock, and is documented in a way that implies each individual clock is
+a separate HW module, then it makes sense to describe each clock as a
+separate DT node.
+
+However, if the HW simply has a "clock module" that provides many
+clocks, with inter-mingled registers all over the place, and is
+documented as a single module that generates lots of clocks, then it
+makes sense to describe that one module as a single DT node.
+
+In other words, the DT representation should match the HW design and
+documentation.
+
+This is exactly why we have the #clock-cells property in DT; so that a
+clock provider can provide multiple clocks if that's the way the HW is
+designed.
+
+>> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+
+>> +void of_gate_clk_setup(struct device_node *node)
+>> +{
+>> +       struct clk *clk;
+>> +       const char *clk_name = node->name;
+>> +       void __iomem *reg;
+>> +       const char *parent_name;
+>> +       u8 clk_gate_flags = 0;
+>> +       u32 bit_idx = 0;
+>> +
+>> +       of_property_read_string(node, "clock-output-names", &clk_name);
+>> +
+>> +       parent_name = of_clk_get_parent_name(node, 0);
+>> +
+>> +       reg = of_iomap(node, 0);
+> 
+> I suggest not using of_iomap for each clock node.
+> 
+> If each clock is one node, it means hundreds of clock node existing in
+> device tree. Hundreds of mapping page only cost unnecessary mapping.
+
+The page table entries will get re-used. I'm not familiar with the mm
+code, but multiple of_iomap() for the exact same range probably just map
+down to incrementing a refcount on some kernel data structure, so
+actually has zero overhead?
+
+
+> Maybe we can resolve it by this way.
+> 
+> DTS file:
+>         clock register bank {
+
+You need a compatible value here, in order to instantiate the top-level
+driver for the "clock generator" HW block.
+
+>                 reg = <{start} {size}>;
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;             /* each clock only
+> exists in one register */
+
+You would need a ranges property here, to map the child reg properties
+into the parent node's address space.
+
+>                 clock node {
+>                         compatible = "xxx";
+>                         #clock-cells = <0>;
+>                         clock-output-names = yyy";
+>                         reg = <{offset}>;
+>                         ... other properties ...
+>                 };
+>          };
+
+That could be a reasonable solution; the existence of a single "clock
+generator" HW block is clearly called out by the existing of the
+top-level DT node, yet the internals of that node are free to be
+whatever you want, since this is purely defined by the binding
+definition for that top-level "clock generator" node.
+
+That all said, I see almost zero value in having all these child nodes,
+since the top-level compatible value implies every single detail about
+the HW, so the list of clocks and their parameters could just as easily
+be a table in the driver for the HW, in order to avoid having to parse
+that data every boot just to end up with the same table...
+
+The only exception would be if the SoC designer truly had composed the
+top-level "clock generator" HW block out of many completely independent
+re-usable clock IP blocks, and many SoCs existed that used those
+individual clock blocks completely unchanged, without any SoC-specific
+differences such as additional SoC-specific clock block types, so that
+one could get greater re-use by parametrizing everything in DT. In my
+(perhaps limited) experience of SoCS, this seems like an /extremely/
+unlikely situation.
