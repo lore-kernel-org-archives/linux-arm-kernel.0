@@ -1,80 +1,58 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 30 Aug 2013 14:06:14 +0100
-Subject: [PATCH 05/16] rename __get_map() to efi_get_memory_map(),
- add parameter to optionally return mmap key. The mmap key is required
- to exit EFI boot services,
- and allows efi_get_memory_map() to be used for getting final memory map.
-In-Reply-To: <1376090777-20090-6-git-send-email-roy.franz@linaro.org>
-References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <1376090777-20090-6-git-send-email-roy.franz@linaro.org>
-Message-ID: <20130830130614.C6D2F3E102A@localhost>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 30 Aug 2013 14:12:10 +0100
+Subject: [PATCH RFC v2 14/16] ARM: vexpress: remove custom .init_time hook
+In-Reply-To: <1377856951.3655.34.camel@linaro1.home>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1377638890-371-15-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201308291535.53005.arnd@arndb.de> <521F901B.3090305@gmail.com>
+ <1377856951.3655.34.camel@linaro1.home>
+Message-ID: <1377868330.3342.10.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  9 Aug 2013 16:26:06 -0700, Roy Franz <roy.franz@linaro.org> wrote:
-> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+On Fri, 2013-08-30 at 11:02 +0100, Jon Medhurst (Tixy) wrote:
+> On Thu, 2013-08-29 at 20:16 +0200, Sebastian Hesselbarth wrote:
+> > On 08/29/13 15:35, Arnd Bergmann wrote:
+> > > On Tuesday 27 August 2013, Sebastian Hesselbarth wrote:
+> > >> @@ -422,16 +419,8 @@ void __init v2m_dt_init_early(void)
+> > >>                          pr_warning("vexpress: DT HBI (%x) is not matching "
+> > >>                                          "hardware (%x)!\n", dt_hbi, hbi);
+> > >>          }
+> > >> -}
+> > >> -
+> > >> -static void __init v2m_dt_timer_init(void)
+> > >> -{
+> > >> -       of_clk_init(NULL);
+> > >>
+> > >> -       clocksource_of_init();
+> > >> -
+> > >> -       versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
+> > >> -                               24000000);
+> > >> +       versatile_sched_clock_init(vexpress_get_24mhz_clock_base(), 24000000);
+> > >>   }
+> > >
+> > > You are moving versatile_sched_clock_init() ahead of clocksource_of_init(), which I suspect
+> > > won't work. Have you checked this?
+> > 
+> > "Checked" as in "Tested", no I haven't.
+> > 
+> > But non-DT v2m has it in v2m_init_early also, while v2m_sp804_init()
+> > is called in v2m_timer_init().
+> > 
+> > That matches the above approach taken for DT v2m where
+> > versatile_sched_clock_init() is now called from v2m_dt_init_early()
+> > and clocksource_of_init() called from arch-wide .timer_init.
+> > 
+> > get_maintainer.pl did not spit out any additional maintainer except
+> > Russell of course. You know someone who can test the above?
+> 
+> After adding of_clk_init(NULL) to time_init() things boot OK for me with
+> this patch. However, do we know that sched_clock is never going to get
+> read before time_init() has actually started the clock it reads? Are we
+> making things more fragile?
 
-Same issue with the commit message here as for patch 4. Please include a
-comment stating what is intended to use this new feature.
+The versatile_sched_clock_init() is currently completely independent of
+the clocksource infrastructure, so no harm should be done at all by
+moving it.
 
-> ---
->  drivers/firmware/efi/efi-stub-helper.c |   17 +++++++++++------
->  1 file changed, 11 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
-> index 40cd16e..1d0a079 100644
-> --- a/drivers/firmware/efi/efi-stub-helper.c
-> +++ b/drivers/firmware/efi/efi-stub-helper.c
-> @@ -46,10 +46,11 @@ static void efi_printk(efi_system_table_t *sys_table_arg, char *str)
->  }
->  
->  
-> -static efi_status_t __get_map(efi_system_table_t *sys_table_arg,
-> -			      efi_memory_desc_t **map,
-> -			      unsigned long *map_size,
-> -			      unsigned long *desc_size)
-> +static efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
-> +				       efi_memory_desc_t **map,
-> +				       unsigned long *map_size,
-> +				       unsigned long *desc_size,
-> +				       unsigned long *key_ptr)
->  {
->  	efi_memory_desc_t *m = NULL;
->  	efi_status_t status;
-> @@ -77,6 +78,8 @@ again:
->  
->  	if (status != EFI_SUCCESS)
->  		efi_call_phys1(sys_table_arg->boottime->free_pool, m);
-> +	if (key_ptr && status == EFI_SUCCESS)
-> +		*key_ptr = key;
->  
->  fail:
->  	*map = m;
-> @@ -97,7 +100,8 @@ static efi_status_t efi_high_alloc(efi_system_table_t *sys_table_arg,
->  	u64 max_addr = 0;
->  	int i;
->  
-> -	status = __get_map(sys_table_arg, &map, &map_size, &desc_size);
-> +	status = efi_get_memory_map(sys_table_arg, &map, &map_size, &desc_size,
-> +				    NULL);
->  	if (status != EFI_SUCCESS)
->  		goto fail;
->  
-> @@ -175,7 +179,8 @@ static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
->  	unsigned long nr_pages;
->  	int i;
->  
-> -	status = __get_map(sys_table_arg, &map, &map_size, &desc_size);
-> +	status = efi_get_memory_map(sys_table_arg, &map, &map_size, &desc_size,
-> +				    NULL);
->  	if (status != EFI_SUCCESS)
->  		goto fail;
->  
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Pawe?
