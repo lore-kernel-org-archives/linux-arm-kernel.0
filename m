@@ -1,97 +1,65 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 29 Aug 2013 17:30:21 -0700
-Subject: [PATCH] clk: wm831x: Provide is_prepared() rather than
- is_enabled()
-In-Reply-To: <1377785608-30625-1-git-send-email-broonie@kernel.org>
-References: <1377785608-30625-1-git-send-email-broonie@kernel.org>
-Message-ID: <20130830003021.10934.15324@quantum>
+Date: Thu, 29 Aug 2013 18:04:36 -0700
+Subject: [PATCH v4 0/5] clk/exynos5420: add clocks for hdmi subsystem
+In-Reply-To: <CAPdUM4Mf4pv031-W0X0EAJe7R=8xtqnNbbLyoo+O6LV0d-H0GA@mail.gmail.com>
+References: <1377754629-31465-1-git-send-email-rahul.sharma@samsung.com>
+ <1873021.WMcNDqLpjt@amdc1227>
+ <CAPdUM4Mf4pv031-W0X0EAJe7R=8xtqnNbbLyoo+O6LV0d-H0GA@mail.gmail.com>
+Message-ID: <20130830010436.10934.31643@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mark Brown (2013-08-29 07:13:28)
-> From: Mark Brown <broonie@linaro.org>
+Quoting Rahul Sharma (2013-08-29 06:36:51)
+> On 29 August 2013 18:00, Tomasz Figa <t.figa@samsung.com> wrote:
+> > Hi Rahul,
+> >
+> > On Thursday 29 of August 2013 11:07:04 Rahul Sharma wrote:
+> >> Add clock changes for hdmi subsystem for exynos5250 SoC. These
+> >> include addition of new clocks like mout_hdmi and smmu_tv, associating
+> >> ID to clk_hdmiphy and some essential corrections.
+> >>
+> >> V4:
+> >> 1) Optimised gaps between Gate, Muxes and Dividers.
+> >>
+> >> V3:
+> >> 1) Assign new ID to divider clock keeping sclk_pixel gate same.
+> >>
+> >> V2:
+> >> 1) Rebase to Mike's Tree.
+> >> 2) Change smmu_tv to smmu_mixer.
+> >>
+> >> This set is based on Mike's clk-next branch at
+> >> https://git.linaro.org/gitweb?p=people/mturquette/linux.git
+> >>
+> >> Rahul Sharma (5):
+> >>   clk/exynos5420: add sclk_hdmiphy to the list of special clocks
+> >>   clk/exynos5420: add gate clock for mixer sysmmu
+> >>   clk/exynos5420: fix the order of parents of hdmi mux
+> >>   clk/exynos5420: add hdmi mux to change parents in hdmi driver
+> >>   clk/exynos5420: assign dout_pixel id to pixel clock divider
+> >>
+> >>  .../devicetree/bindings/clock/exynos5420-clock.txt  |   12 ++++++++++++
+> >>  drivers/clk/samsung/clk-exynos5420.c                |   19
+> >> +++++++++++++------ 2 files changed, 25 insertions(+), 6 deletions(-)
+> >
+> > For the whole series:
+> >
+> > Acked-by: Tomasz Figa <t.figa@samsung.com>
+> >
 > 
-> Since the driver was written an is_prepared() operation has been made
-> possible. Since the driver uses I2C I/O only prepare operations are
-> provided so move the is_enabled() operation over to is_prepared().
+> Thanks Tomasz,
 > 
-> Signed-off-by: Mark Brown <broonie@linaro.org>
+> Mike ! please consider it for clk-next branch.
 
 Taken into clk-next.
 
-Thanks,
+Regards,
 Mike
 
-> ---
->  drivers/clk/clk-wm831x.c | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
 > 
-> diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
-> index 1d5af3f..805b4c3 100644
-> --- a/drivers/clk/clk-wm831x.c
-> +++ b/drivers/clk/clk-wm831x.c
-> @@ -31,7 +31,7 @@ struct wm831x_clk {
->         bool xtal_ena;
->  };
->  
-> -static int wm831x_xtal_is_enabled(struct clk_hw *hw)
-> +static int wm831x_xtal_is_prepared(struct clk_hw *hw)
->  {
->         struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
->                                                   xtal_hw);
-> @@ -52,7 +52,7 @@ static unsigned long wm831x_xtal_recalc_rate(struct clk_hw *hw,
->  }
->  
->  static const struct clk_ops wm831x_xtal_ops = {
-> -       .is_enabled = wm831x_xtal_is_enabled,
-> +       .is_prepared = wm831x_xtal_is_prepared,
->         .recalc_rate = wm831x_xtal_recalc_rate,
->  };
->  
-> @@ -73,7 +73,7 @@ static const unsigned long wm831x_fll_auto_rates[] = {
->         24576000,
->  };
->  
-> -static int wm831x_fll_is_enabled(struct clk_hw *hw)
-> +static int wm831x_fll_is_prepared(struct clk_hw *hw)
->  {
->         struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
->                                                   fll_hw);
-> @@ -170,7 +170,7 @@ static int wm831x_fll_set_rate(struct clk_hw *hw, unsigned long rate,
->         if (i == ARRAY_SIZE(wm831x_fll_auto_rates))
->                 return -EINVAL;
->  
-> -       if (wm831x_fll_is_enabled(hw))
-> +       if (wm831x_fll_is_prepared(hw))
->                 return -EPERM;
->  
->         return wm831x_set_bits(wm831x, WM831X_CLOCK_CONTROL_2,
-> @@ -220,7 +220,7 @@ static u8 wm831x_fll_get_parent(struct clk_hw *hw)
->  }
->  
->  static const struct clk_ops wm831x_fll_ops = {
-> -       .is_enabled = wm831x_fll_is_enabled,
-> +       .is_prepared = wm831x_fll_is_prepared,
->         .prepare = wm831x_fll_prepare,
->         .unprepare = wm831x_fll_unprepare,
->         .round_rate = wm831x_fll_round_rate,
-> @@ -237,7 +237,7 @@ static struct clk_init_data wm831x_fll_init = {
->         .flags = CLK_SET_RATE_GATE,
->  };
->  
-> -static int wm831x_clkout_is_enabled(struct clk_hw *hw)
-> +static int wm831x_clkout_is_prepared(struct clk_hw *hw)
->  {
->         struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
->                                                   clkout_hw);
-> @@ -335,7 +335,7 @@ static int wm831x_clkout_set_parent(struct clk_hw *hw, u8 parent)
->  }
->  
->  static const struct clk_ops wm831x_clkout_ops = {
-> -       .is_enabled = wm831x_clkout_is_enabled,
-> +       .is_prepared = wm831x_clkout_is_prepared,
->         .prepare = wm831x_clkout_prepare,
->         .unprepare = wm831x_clkout_unprepare,
->         .get_parent = wm831x_clkout_get_parent,
-> -- 
-> 1.8.4.rc3
+> regards,
+> Rahul Sharma.
+> 
+> > Best regards,
+> > Tomasz
+> >
