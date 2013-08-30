@@ -1,69 +1,70 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 30 Aug 2013 20:10:43 +0100
-Subject: [PATCH 07/20] ARM: smp_scu: data endian fixes
+Date: Fri, 30 Aug 2013 20:10:37 +0100
+Subject: [PATCH 01/20] ARM: fix ARCH_IXP4xx usage of ARCH_SUPPORTS_BIG_ENDIAN
 In-Reply-To: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377889856-9447-8-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377889856-9447-2-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The smp_scu driver needs to use the relaxed readl/write accessors
-to avoid any issues with the endian mode the processor core is in.
+The Kconfig for arch/arm/mach-ixp4xx has a local definition
+of ARCH_SUPPORTS_BIG_ENDIAN which could be used elsewhere.
+This means that if IXP4xx is selected and this symbol is
+selected eleswhere then an warning is produced.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+Clean the following error up by making the symbol be
+selected by the main ARCH_IXP4XX definition and have a
+common definition in arch/arm/mm/Kconfig
+
+warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
+warning: (ARCH_xxx) selects ARCH_SUPPORTS_BIG_ENDIAN which has unmet direct dependencies (ARCH_IXP4XX)
+
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/kernel/smp_scu.c |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/Kconfig             |    1 +
+ arch/arm/mach-ixp4xx/Kconfig |    4 ----
+ arch/arm/mm/Kconfig          |    6 ++++++
+ 3 files changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-index 5bc1a63..1aafa0d 100644
---- a/arch/arm/kernel/smp_scu.c
-+++ b/arch/arm/kernel/smp_scu.c
-@@ -28,7 +28,7 @@
-  */
- unsigned int __init scu_get_core_count(void __iomem *scu_base)
- {
--	unsigned int ncores = __raw_readl(scu_base + SCU_CONFIG);
-+	unsigned int ncores = readl_relaxed(scu_base + SCU_CONFIG);
- 	return (ncores & 0x03) + 1;
- }
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 43594d5..0628529 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -480,6 +480,7 @@ config ARCH_IXP4XX
+ 	bool "IXP4xx-based"
+ 	depends on MMU
+ 	select ARCH_HAS_DMA_SET_COHERENT_MASK
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKSRC_MMIO
+ 	select CPU_XSCALE
+diff --git a/arch/arm/mach-ixp4xx/Kconfig b/arch/arm/mach-ixp4xx/Kconfig
+index 30e1ebe..c342dc4 100644
+--- a/arch/arm/mach-ixp4xx/Kconfig
++++ b/arch/arm/mach-ixp4xx/Kconfig
+@@ -1,9 +1,5 @@
+ if ARCH_IXP4XX
  
-@@ -42,19 +42,19 @@ void scu_enable(void __iomem *scu_base)
- #ifdef CONFIG_ARM_ERRATA_764369
- 	/* Cortex-A9 only */
- 	if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090) {
--		scu_ctrl = __raw_readl(scu_base + 0x30);
-+		scu_ctrl = readl_relaxed(scu_base + 0x30);
- 		if (!(scu_ctrl & 1))
--			__raw_writel(scu_ctrl | 0x1, scu_base + 0x30);
-+			writel_relaxed(scu_ctrl | 0x1, scu_base + 0x30);
- 	}
- #endif
+-config ARCH_SUPPORTS_BIG_ENDIAN
+-	bool
+-	default y
+-
+ menu "Intel IXP4xx Implementation Options"
  
--	scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
-+	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
- 	/* already enabled? */
- 	if (scu_ctrl & 1)
- 		return;
- 
- 	scu_ctrl |= 1;
--	__raw_writel(scu_ctrl, scu_base + SCU_CTRL);
-+	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
- 
- 	/*
- 	 * Ensure that the data accessed by CPU0 before the SCU was
-@@ -80,9 +80,9 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
- 	if (mode > 3 || mode == 1 || cpu > 3)
- 		return -EINVAL;
- 
--	val = __raw_readb(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
-+	val = readb_relaxed(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
- 	val |= mode;
--	__raw_writeb(val, scu_base + SCU_CPU_STATUS + cpu);
-+	writeb_relaxed(val, scu_base + SCU_CPU_STATUS + cpu);
- 
- 	return 0;
- }
+ comment "IXP4xx Platforms"
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index cd2c88e..1f8fed9 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -952,3 +952,9 @@ config ARCH_HAS_BARRIERS
+ 	help
+ 	  This option allows the use of custom mandatory barriers
+ 	  included via the mach/barriers.h file.
++
++config ARCH_SUPPORTS_BIG_ENDIAN
++	bool
++	help
++	  This option specifies the architecture can support big endian
++	  operation.
 -- 
 1.7.10.4
