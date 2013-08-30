@@ -1,63 +1,75 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 30 Aug 2013 20:10:39 +0100
-Subject: [PATCH 03/20] ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
+Date: Fri, 30 Aug 2013 20:10:45 +0100
+Subject: [PATCH 09/20] mvebu: support running big-endian
 In-Reply-To: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377889856-9447-4-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377889856-9447-10-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fixup_pv_table assumes that the instructions are in the same
-endian configuration as the data, but when the CPU is running in
-BE8 the instructions stay in little-endian format.
-
-Make sure if CONFIG_CPU_ENDIAN_BE8 is set that we do all the
-alterations to the instructions taking in to account the LDR/STR
-will be swapping the data endian-ness.
-
-Since the code is only modifying a byte, we avoid dual-swapping
-the data, and just change the bits we clear and ORR in (in the
-case where the code is not thumb2).
-
-For thumb2, we add the necessary rev16 instructions to ensure that
-the instructions are processed in the correct format, as it was
-easier than re-writing the code to contain a mask and shift.
+Add indication we can run these cores in BE mode, and ensure that the
+secondary CPU is set to big-endian mode in the initialisation code as
+the initial code runs little-endian.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm/kernel/head.S |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-mvebu/Kconfig        |    1 +
+ arch/arm/mach-mvebu/coherency_ll.S |    3 +++
+ arch/arm/mach-mvebu/headsmp.S      |    4 ++++
+ 3 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 2c7cc1e..9e5906c 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -582,8 +582,10 @@ __fixup_a_pv_table:
- 	b	2f
- 1:	add     r7, r3
- 	ldrh	ip, [r7, #2]
-+ARM_BE8(rev16	ip, ip)
- 	and	ip, 0x8f00
- 	orr	ip, r6	@ mask in offset bits 31-24
-+ARM_BE8(rev16	ip, ip)
- 	strh	ip, [r7, #2]
- 2:	cmp	r4, r5
- 	ldrcc	r7, [r4], #4	@ use branch for delay slot
-@@ -592,8 +594,14 @@ __fixup_a_pv_table:
- #else
- 	b	2f
- 1:	ldr	ip, [r7, r3]
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+	@ in BE8, we load data in BE, but instructions still in LE
-+	bic	ip, ip, #0xff000000
-+	orr	ip, ip, r6, lsl#24
-+#else
- 	bic	ip, ip, #0x000000ff
- 	orr	ip, ip, r6	@ mask in offset bits 31-24
-+#endif
- 	str	ip, [r7, r3]
- 2:	cmp	r4, r5
- 	ldrcc	r7, [r4], #4	@ use branch for delay slot
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 9eb63d7..5e269d7 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -1,5 +1,6 @@
+ config ARCH_MVEBU
+ 	bool "Marvell SOCs with Device Tree support" if ARCH_MULTI_V7
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select CLKSRC_MMIO
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+index 5476669..ee7598f 100644
+--- a/arch/arm/mach-mvebu/coherency_ll.S
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -20,6 +20,8 @@
+ #define ARMADA_XP_CFB_CTL_REG_OFFSET 0x0
+ #define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
+ 
++#include <asm/assembler.h>
++
+ 	.text
+ /*
+  * r0: Coherency fabric base register address
+@@ -29,6 +31,7 @@ ENTRY(ll_set_cpu_coherent)
+ 	/* Create bit by cpu index */
+ 	mov	r3, #(1 << 24)
+ 	lsl	r1, r3, r1
++ARM_BE8(rev	r1, r1)
+ 
+ 	/* Add CPU to SMP group - Atomic */
+ 	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
+diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
+index 8a1b0c9..3dd80df4 100644
+--- a/arch/arm/mach-mvebu/headsmp.S
++++ b/arch/arm/mach-mvebu/headsmp.S
+@@ -21,12 +21,16 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ 
++#include <asm/assembler.h>
++
+ /*
+  * Armada XP specific entry point for secondary CPUs.
+  * We add the CPU to the coherency fabric and then jump to secondary
+  * startup
+  */
+ ENTRY(armada_xp_secondary_startup)
++ ARM_BE8(setend	be )			@ go BE8 if entered LE
++
+ 	/* Get coherency fabric base physical address */
+ 	adr	r0, 1f
+ 	ldr	r1, [r0]
 -- 
 1.7.10.4
