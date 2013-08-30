@@ -1,67 +1,65 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Fri, 30 Aug 2013 17:48:52 +0800
-Subject: [PATCHv2 4/4] Documentation: Add device tree bindings for Freescale
- FTM PWM.
-In-Reply-To: <1377856132-11290-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1377856132-11290-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1377856132-11290-5-git-send-email-Li.Xiubo@freescale.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 30 Aug 2013 10:52:15 +0100
+Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
+ with external L3-cache.
+In-Reply-To: <CAAhSdy3B5JTcd7==u_QzS3V5k7pYkymtiLa7X=yZH+=eSBAw8w@mail.gmail.com>
+References: <747a0675165da4ef147bbda4e140549b@www.loen.fr>
+ <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
+ <5935339137684ecf90dd484cc5739548@www.loen.fr>
+ <20130815165344.GA3853@cbox>
+ <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
+ <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
+ <20130816171912.GB20246@cbox>
+ <CAAhSdy2bk6Ou=326cYJW2wKvm9pffbRRmO2ABFwF9dmqwWdKqQ@mail.gmail.com>
+ <20130816175034.GE20246@cbox>
+ <CAAhSdy3B5JTcd7==u_QzS3V5k7pYkymtiLa7X=yZH+=eSBAw8w@mail.gmail.com>
+Message-ID: <20130830095215.GC62188@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the document for Freescale FTM PWM driver under
-Documentation/devicetree/bindings/pwm/.
+On Fri, Aug 16, 2013 at 07:11:51PM +0100, Anup Patel wrote:
+> On Fri, Aug 16, 2013 at 11:20 PM, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > On Fri, Aug 16, 2013 at 11:12:08PM +0530, Anup Patel wrote:
+> >> Discussion here is about getting KVM ARM64 working in-presence
+> >> of an external L3-cache (i.e. not part of CPU). Before starting a VCPU
+> >> user-space typically loads images to guest RAM so, in-presence of
+> >> huge L3-cache (few MBs). When the VCPU starts running some of the
+> >> contents guest RAM will be still in L3-cache and VCPU runs with
+> >> MMU off (i.e. cacheing off) hence VCPU will bypass L3-cache and
+> >> see incorrect contents. To solve this problem we need to flush the
+> >> guest RAM contents before they are accessed by first time by VCPU.
+> >>
+> > ok, I'm with you that far.
+> >
+> > But is it also not true that we need to decide between:
+> >
+> >   A.1: Flush the entire guest RAM before running the VCPU
+> >   A.2: Flush the pages as we fault them in
+> 
+> Yes, thats the decision we have to make.
+> 
+> >
+> > And (independently):
+> >
+> >   B.1: Use __flush_dcache_range
+> >   B.2: Use something else + outer cache framework for arm64
+> 
+> This would be __flush_dcache_all() + outer cache flush all.
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
----
- .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 40 ++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+We need to be careful here since the __flush_dcache_all() operation uses
+cache maintenance by set/way and these are *local* to a CPU (IOW not
+broadcast). Do you have any guarantee that dirty cache lines don't
+migrate between CPUs and __flush_dcache_all() wouldn't miss them?
+Architecturally we don't, so this is not a safe operation that would
+guarantee L1 cache flushing (we probably need to revisit some of the
+__flush_dcache_all() calls in KVM, I haven't looked into this).
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-new file mode 100644
-index 0000000..b2b5214
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-@@ -0,0 +1,40 @@
-+Freescale FTM PWM controller
-+
-+Required properties:
-+- compatible: Should be "fsl,vf610-ftm-pwm"
-+- reg: Physical base address and length of the controller's registers
-+- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-+  the cells format.
-+- clock-names : Includes the following module clock source entries:
-+    "ftm0" (system clock),
-+    "ftm0_fix_sel" (fixed frequency clock),
-+    "ftm0_ext_sel" (external clock)
-+- clocks : Must contain an entry list for entries in clock-names.
-+- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be one of the
-+  entries in clock-names.
-+- fsl,pwm-avaliable-chs: The FTM channels ID list of current board which are
-+  available as PWM function.
-+- For each channel's pinctrl, the "chN-active" and "chN-idle" states should be
-+  implemented at same time.
-+
-+Example:
-+
-+pwm0: pwm at 40038000 {
-+		compatible = "fsl,vf610-ftm-pwm";
-+		reg = <0x40038000 0x1000>;
-+		#pwm-cells = <3>;
-+		clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
-+		clocks = <&clks VF610_CLK_FTM0>,
-+			<&clks VF610_CLK_FTM0_FIX_SEL>,
-+			<&clks VF610_CLK_FTM0_EXT_SEL>;
-+		pinctrl-names = "ch0-active", "ch0-idle", "ch1-active", "ch1-idle",
-+		....;
-+		pinctrl-0 = <&pinctrl_pwm0_ch0_active>;
-+		pinctrl-1 = <&pinctrl_pwm0_ch0_idle>;
-+		pinctrl-2 = <&pinctrl_pwm0_ch1_active>;
-+		pinctrl-3 = <&pinctrl_pwm0_ch1_idle>;
-+		...
-+		fsl,pwm-counter-clk = "ftm0_ext_sel";
-+		fsl,pwm-avaliable-chs = <0 3 5 6>;
-+		...
-+};
+So I think we are left to the range operation where the DC ops to PoC
+would be enough for your L3.
+
+An outer cache flush all is probably only needed for cpuidle/suspend
+(the booting part should be handled by the boot loader).
+
 -- 
-1.8.0
+Catalin
