@@ -1,52 +1,33 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Fri, 30 Aug 2013 16:16:53 -0700
-Subject: [PATCH 12/16] Fix types in EFI calls to match EFI function
- definitions.
-In-Reply-To: <CACxGe6tJyGDN5nTePuwcV_W44Fk+mku+V8EoOvPaos72mbKdEw@mail.gmail.com>
-References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <1376090777-20090-13-git-send-email-roy.franz@linaro.org>
- <20130830133902.AEA7A3E102A@localhost>
- <CAFECyb-J4gTiAQkKVT8qt94Tk6-_jVdX=sNM7VkXkyvPdEeZFA@mail.gmail.com>
- <CACxGe6tJyGDN5nTePuwcV_W44Fk+mku+V8EoOvPaos72mbKdEw@mail.gmail.com>
-Message-ID: <CAFECyb8Jz7BatDUzdaiPvAvJg11-zWwAv5ZN1soMcXCvGPPHCw@mail.gmail.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Fri, 30 Aug 2013 16:16:55 -0700
+Subject: [PATCH v7 2/3] ARM: bcm281xx: Enable GPIO driver
+In-Reply-To: <1377882914-30152-3-git-send-email-markus.mayer@linaro.org>
+References: <1377882914-30152-1-git-send-email-markus.mayer@linaro.org>
+ <1377882914-30152-3-git-send-email-markus.mayer@linaro.org>
+Message-ID: <522127E7.6090501@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 4:14 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Sat, Aug 31, 2013 at 12:12 AM, Roy Franz <roy.franz@linaro.org> wrote:
->> On Fri, Aug 30, 2013 at 6:39 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>> I think you need some description in the commit text about why the type
->>> of chunksize is changing. It's not clear why you're making this change.
->>> It is a bug fix?
->>
->> The type was changed to match the EFI_FILE_PROTOCOL specification -
->> chunk size is
->> defined as a native width unsigned integer.  So yes, this is a bug in
->> that this is wrong for
->> ia32, since that really should be a u32 in that case.
->> Since the x86 wrappers break type checking by the compiler these types
->> were never checked at compile time
->> before.  chunksize is the the only change that isn't a cast to a type
->> of void pointer.
->>
->> I can break this change out as a separate patch if desired.
+On 13-08-30 10:15 AM, Markus Mayer wrote:
+> Turn on the bcm281xx GPIO driver in the kernel configuration.
+> ---
+>   arch/arm/mach-bcm/Kconfig |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> I don't think it needs to be in a separate patch, but it does need to
-> be described in the patch description.
->
-> g.
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index f112895..5819126 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -9,7 +9,7 @@ config ARCH_BCM
+>   	select CLKSRC_OF
+>   	select GENERIC_CLOCKEVENTS
+>   	select GENERIC_TIME
+> -	select GPIO_BCM
+> +	select GPIO_BCM_KONA
+>   	select SPARSE_IRQ
+>   	select TICK_ONESHOT
+>   	help
+Reviewed-by: Christian Daudt <csd@broadcom.com>
 
-Did that - how about:
-
-Fix types in EFI calls to match EFI function definitions.
-
-EFI calls can made directly on ARM, so the function pointers
-are directly invoked.  This allows types to be checked at
-compile time, so here we ensure that the parameters match
-the function signature. The wrappers used by x86 prevent
-any type checking.
-Correct the type of chunksize to be based on native
-width as specified by the EFI_FILE_PROTOCOL read()
-function.
-
-Signed-off-by: Roy Franz <roy.franz@linaro.org>
+  Thanks,
+    csd
