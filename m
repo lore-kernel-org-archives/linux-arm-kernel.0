@@ -1,101 +1,54 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 30 Aug 2013 07:44:29 -0700
-Subject: [PATCH v9 3/7] ARM: dts: enable hi4511 with device tree
-In-Reply-To: <CAD6h2NRnjme1Hdc+5oMzrR8LYb7_rk13OeVfo0qFT=_jAbMoJg@mail.gmail.com>
- (Haojian Zhuang's message of "Fri, 30 Aug 2013 09:19:56 +0800")
-References: <1377695454-29109-1-git-send-email-haojian.zhuang@linaro.org>
- <1377695454-29109-4-git-send-email-haojian.zhuang@linaro.org>
- <87eh9c1i1o.fsf@linaro.org>
- <CAD6h2NRnjme1Hdc+5oMzrR8LYb7_rk13OeVfo0qFT=_jAbMoJg@mail.gmail.com>
-Message-ID: <87d2ovs0fm.fsf@linaro.org>
+From: anup@brainfault.org (Anup Patel)
+Date: Fri, 30 Aug 2013 20:22:25 +0530
+Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
+ with external L3-cache.
+In-Reply-To: <20130830143052.GH12160@mudshark.cambridge.arm.com>
+References: <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
+ <20130816171912.GB20246@cbox>
+ <CAAhSdy2bk6Ou=326cYJW2wKvm9pffbRRmO2ABFwF9dmqwWdKqQ@mail.gmail.com>
+ <20130816175034.GE20246@cbox>
+ <CAAhSdy3B5JTcd7==u_QzS3V5k7pYkymtiLa7X=yZH+=eSBAw8w@mail.gmail.com>
+ <20130830095215.GC62188@MacBook-Pro.local>
+ <CAAhSdy0Hm1k+mWGGxUOzAA=5yVGNOERfo=36jcE1cvkUM=xtVg@mail.gmail.com>
+ <bc23926cb9f202d8b63d729c584af791@www.loen.fr>
+ <20130830140446.GA14125@darko.cambridge.arm.com>
+ <ac8cf7fa4f4bced56856c58ef335d7a9@www.loen.fr>
+ <20130830143052.GH12160@mudshark.cambridge.arm.com>
+Message-ID: <CAAhSdy2KjyS2VZZ6ZQxLT1Q6n=8pept+RA00V3UNuXXrbWe3oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang <haojian.zhuang@linaro.org> writes:
+Hi Will,
 
-> On 30 August 2013 02:13, Kevin Hilman <khilman@linaro.org> wrote:
->> Haojian Zhuang <haojian.zhuang@linaro.org> writes:
+On Fri, Aug 30, 2013 at 8:00 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Aug 30, 2013 at 03:22:11PM +0100, Marc Zyngier wrote:
+>> On 2013-08-30 15:04, Catalin Marinas wrote:
+>> > On Fri, Aug 30, 2013 at 02:21:57PM +0100, Marc Zyngier wrote:
+>> >> On 2013-08-30 11:44, Anup Patel wrote:
+>> >> > For KVM, we can avoid flushing d-cache to PoC every time in
+>> >> > coherent_icache_guest_page() by only doing it when Guest MMU is
+>> >> > turned-off. This may reduce the performance penalty.
+>> >>
+>> >> What about the I and C bits in SCTLR_EL1? Does L3 also honour these
+>> >> bits?
+>> >
+>> > I would think so, it probably cares about how the transactions are
+>> > presented at the bus level by the CPU.
 >>
->>> Enable Hisilicon Hi4511 development platform with device tree support.
->>>
->>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->>
->> This still doesn't look quite right...
->>
->>> ---
->>>  arch/arm/boot/dts/Makefile        |    1 +
->>>  arch/arm/boot/dts/hi3620-clk.dtsi | 1058 +++++++++++++++++++++++++++++++++++++
->>>  arch/arm/boot/dts/hi3620.dtsi     |  513 ++++++++++++++++++
->>>  arch/arm/boot/dts/hi4511.dts      |  648 +++++++++++++++++++++++
->>>  4 files changed, 2220 insertions(+)
->>>  create mode 100644 arch/arm/boot/dts/hi3620-clk.dtsi
->>>  create mode 100644 arch/arm/boot/dts/hi3620.dtsi
->>>  create mode 100644 arch/arm/boot/dts/hi4511.dts
->>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index 641b3c9..6e7c1ca 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -61,6 +61,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
->>>       exynos5250-snow.dtb \
->>>       exynos5420-smdk5420.dtb \
->>>       exynos5440-ssdk5440.dtb
->>> +dtb-$(CONFIG_ARCH_HI3xxx) += hi4511.dtb
->>>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
->>>       ecx-2000.dtb
->>>  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
->>> diff --git a/arch/arm/boot/dts/hi3620-clk.dtsi b/arch/arm/boot/dts/hi3620-clk.dtsi
->>> new file mode 100644
->>> index 0000000..78307c6
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/hi3620-clk.dtsi
->>> @@ -0,0 +1,1058 @@
->>> +/*
->>> + * Hisilicon Ltd. Hi3620 SoC
->>> + *
->>> + * Copyright (C) 2012-2013 Hisilicon Ltd.
->>> + * Copyright (C) 2012-2013 Linaro Ltd.
->>> + *
->>> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * publishhed by the Free Software Foundation.
->>> + */
->>> +
->>> +/ {
->>> +     clocks {
->>> +             #address-cells = <1>;
->>> +             #size-cells = <1>;
->>> +             ranges;
->>> +
->>> +             osc32k: osc32k {
->>> +                     compatible = "fixed-clock";
->>> +                     #clock-cells = <0>;
->>> +                     clock-frequency = <32768>;
->>> +                     clock-output-names = "osc32khz";
->>> +             };
->>
->> So you've now moved these all under the clocks node, but this still
->> isn't addressing Stephen's comments about using the
->> node-name at unit-address and the reg property in each node.
->>
->> [...]
->>
->>> +             sysctrl: system-controller at fc802000 {
->>> +                     compatible = "hisilicon,sysctrl";
->>> +                     reg = <0xfc802000 0x1000>;
->>> +                     #address-cells = <1>;
->>> +                     #size-cells = <0>;
->>
->> Why is sysctrl and all of its children now under the clocks node?
->>
->>
->> Kevin
+>> That'd make sense indeed. So we need to track both SCTLR_EL1.{I,C,M} in
+>> order to find out whether or not we need to clean the cache.
 >
-> SMP registers and clock registers are sharing the system controller.
+> <horrible hack>
+> Could you use a dummy ATS_* operation, then read the cacheability attributes
+> out of the PAR?
+> </horrible hack>
 
-That suggest the clock node should be a child of the sysctrl node, not
-the other way around.
+We will have to use ATS12xxx operation which can only be executed from EL2
+or EL3. The host kernel runs at EL1 hence we will need to use HVC call to
+execute ATS12xxx operation in EL2 mode which in-turn means a world-switch
+overhead just to execute ATS12xxx operation.
 
-Kevin
+>
+> Will
+
+--Anup
