@@ -1,58 +1,68 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 30 Aug 2013 14:33:02 +0100
-Subject: [PATCH 10/16] Move EFI_READ_CHUNK_SIZE define to shared location.
-In-Reply-To: <1376090777-20090-11-git-send-email-roy.franz@linaro.org>
+Date: Fri, 30 Aug 2013 14:08:11 +0100
+Subject: [PATCH 06/16] Enforce minimum alignment of 1 page on allocations.
+ The efi_high_alloc() and efi_low_alloc() functions use the
+ EFI_ALLOCATE_ADDRESS option to the EFI function allocate_pages(),
+ which requires a minimum of page alignment, and rejects all other requests.
+In-Reply-To: <1376090777-20090-7-git-send-email-roy.franz@linaro.org>
 References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <1376090777-20090-11-git-send-email-roy.franz@linaro.org>
-Message-ID: <20130830133302.E163A3E102A@localhost>
+ <1376090777-20090-7-git-send-email-roy.franz@linaro.org>
+Message-ID: <20130830130811.7D7453E102A@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  9 Aug 2013 16:26:11 -0700, Roy Franz <roy.franz@linaro.org> wrote:
-> This #define is only used the the shared code, so move
-> it there.
-> 
+On Fri,  9 Aug 2013 16:26:07 -0700, Roy Franz <roy.franz@linaro.org> wrote:
+> The existing code could fail to allocate depending
+> on allocation size, as although repeated allocation
+> attempts were made, none were guaranteed to be page
+> aligned.
+
+Commit message. Otherwise looks reasonable.
+
+Reviewed-by: Grant Likely <grant.likely@linaro.org>
+
 > Signed-off-by: Roy Franz <roy.franz@linaro.org>
-
-Can this be squashed into patch 1?
-
-g.
-
 > ---
->  arch/x86/boot/compressed/eboot.h       |    1 -
->  drivers/firmware/efi/efi-stub-helper.c |    2 +-
->  2 files changed, 1 insertion(+), 2 deletions(-)
+>  drivers/firmware/efi/efi-stub-helper.c |   14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
 > 
-> diff --git a/arch/x86/boot/compressed/eboot.h b/arch/x86/boot/compressed/eboot.h
-> index faa0bdf..bafbd94 100644
-> --- a/arch/x86/boot/compressed/eboot.h
-> +++ b/arch/x86/boot/compressed/eboot.h
-> @@ -12,7 +12,6 @@
->  #define DESC_TYPE_CODE_DATA	(1 << 0)
->  
->  #define EFI_PAGE_SIZE		(1UL << EFI_PAGE_SHIFT)
-> -#define EFI_READ_CHUNK_SIZE	(1024 * 1024)
->  
->  #define EFI_CONSOLE_OUT_DEVICE_GUID    \
->  	EFI_GUID(0xd3b36f2c, 0xd551, 0x11d4, 0x9a, 0x46, 0x0, 0x90, 0x27, \
 > diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
-> index 0f4d6e6..b707a9f 100644
+> index 1d0a079..647b3ba 100644
 > --- a/drivers/firmware/efi/efi-stub-helper.c
 > +++ b/drivers/firmware/efi/efi-stub-helper.c
-> @@ -9,7 +9,7 @@
->   * under the terms of the GNU General Public License version 2.
->   *
->   */
-> -
-> +#define EFI_READ_CHUNK_SIZE	(1024 * 1024)
+> @@ -105,6 +105,13 @@ static efi_status_t efi_high_alloc(efi_system_table_t *sys_table_arg,
+>  	if (status != EFI_SUCCESS)
+>  		goto fail;
 >  
->  struct file_info {
->  	efi_file_handle_t *handle;
+> +	/* Enforce minimum alignment that EFI requires when requesting
+> +	 * a specific address.  We are doing page-based allocations,
+> +	 * so we must be aligned to a page.
+> +	 */
+> +	if (align < EFI_PAGE_SIZE)
+> +		align = EFI_PAGE_SIZE;
+> +
+>  	nr_pages = round_up(size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
+>  again:
+>  	for (i = 0; i < map_size / desc_size; i++) {
+> @@ -184,6 +191,13 @@ static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
+>  	if (status != EFI_SUCCESS)
+>  		goto fail;
+>  
+> +	/* Enforce minimum alignment that EFI requires when requesting
+> +	 * a specific address.  We are doing page-based allocations,
+> +	 * so we must be aligned to a page.
+> +	 */
+> +	if (align < EFI_PAGE_SIZE)
+> +		align = EFI_PAGE_SIZE;
+> +
+>  	nr_pages = round_up(size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
+>  	for (i = 0; i < map_size / desc_size; i++) {
+>  		efi_memory_desc_t *desc;
 > -- 
 > 1.7.10.4
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
