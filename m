@@ -1,29 +1,50 @@
 From: markus.mayer@linaro.org (Markus Mayer)
-Date: Fri, 30 Aug 2013 10:15:13 -0700
-Subject: [PATCH v7 2/3] ARM: bcm281xx: Enable GPIO driver
+Date: Fri, 30 Aug 2013 10:15:14 -0700
+Subject: [PATCH v7 3/3] ARM: bcm281xx: Add device node for the GPIO controller
 In-Reply-To: <1377882914-30152-1-git-send-email-markus.mayer@linaro.org>
 References: <1377882914-30152-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <1377882914-30152-3-git-send-email-markus.mayer@linaro.org>
+Message-ID: <1377882914-30152-4-git-send-email-markus.mayer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Turn on the bcm281xx GPIO driver in the kernel configuration.
----
- arch/arm/mach-bcm/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Add the GPIO controller device node for the Broadcom bcm281xx family of
+mobile SoCs.
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index f112895..5819126 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -9,7 +9,7 @@ config ARCH_BCM
- 	select CLKSRC_OF
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_TIME
--	select GPIO_BCM
-+	select GPIO_BCM_KONA
- 	select SPARSE_IRQ
- 	select TICK_ONESHOT
- 	help
+Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+Reviewed-by: Matt Porter <matt.porter@linaro.org>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/bcm11351.dtsi |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index c0cdf66..a3945e3 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -63,6 +63,22 @@
+ 		clock-frequency = <32768>;
+ 	};
+ 
++	gpio: gpio at 35003000 {
++		compatible = "brcm,bcm11351-gpio", "brcm,kona-gpio";
++		reg = <0x35003000 0x800>;
++		interrupts =
++		       <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH
++			GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH
++			GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH
++			GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
++			GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH
++			GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
++		#gpio-cells = <2>;
++		#interrupt-cells = <2>;
++		gpio-controller;
++		interrupt-controller;
++	};
++
+ 	sdio0: sdio at 0x3f180000 {
+ 		compatible = "bcm,kona-sdhci";
+ 		reg = <0x3f180000 0x10000>;
 -- 
 1.7.9.5
