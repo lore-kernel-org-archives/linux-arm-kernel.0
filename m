@@ -1,66 +1,26 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 30 Aug 2013 14:43:25 +0100
-Subject: [PATCH 14/16] Add strstr to compressed string.c for ARM.
-In-Reply-To: <1376090777-20090-15-git-send-email-roy.franz@linaro.org>
-References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <1376090777-20090-15-git-send-email-roy.franz@linaro.org>
-Message-ID: <20130830134325.51DC83E102A@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 30 Aug 2013 14:44:49 +0100
+Subject: [PATCHv3 2/5] arm64: factor out spin-table boot method
+In-Reply-To: <alpine.LFD.2.03.1308141348130.14472@syhkavp.arg>
+References: <1376497228-20543-1-git-send-email-mark.rutland@arm.com>
+ <1376497228-20543-3-git-send-email-mark.rutland@arm.com>
+ <alpine.LFD.2.03.1308141348130.14472@syhkavp.arg>
+Message-ID: <20130830134449.GE4650@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  9 Aug 2013 16:26:15 -0700, Roy Franz <roy.franz@linaro.org> wrote:
-> The shared efi-stub-helper.c functions require a strstr
-> implementation.
-> Implementation copied from arch/x86/boot/string.c
+On Wed, Aug 14, 2013 at 06:51:09PM +0100, Nicolas Pitre wrote:
+> On Wed, 14 Aug 2013, Mark Rutland wrote:
+> > The smp.pen.text section is also removed, as the pen can live in
+> > head.text without problem.
 > 
-> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+> Why was there a special section for the pen code initially?
 
-Okay, but at some point arch/arm/boot/compressed/string.c should be
-reworked into a common place.
+Grep'ing the old git logs for the arm64 development, it looks like it
+was introduced as part of the first proposal for the booting protocol
+where all the CPUs got into the kernel at the same time (secondaries at
+offset 0x80). IIRC you nak'ed this during the private review but we
+forgot about this section.
 
-Reviewed-by: Grant Likely <grant.likely@linaro.org>
-
-> ---
->  arch/arm/boot/compressed/string.c |   21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm/boot/compressed/string.c b/arch/arm/boot/compressed/string.c
-> index 36e53ef..5397792 100644
-> --- a/arch/arm/boot/compressed/string.c
-> +++ b/arch/arm/boot/compressed/string.c
-> @@ -111,6 +111,27 @@ char *strchr(const char *s, int c)
->  	return (char *)s;
->  }
->  
-> +/**
-> + * strstr - Find the first substring in a %NUL terminated string
-> + * @s1: The string to be searched
-> + * @s2: The string to search for
-> + */
-> +char *strstr(const char *s1, const char *s2)
-> +{
-> +	size_t l1, l2;
-> +
-> +	l2 = strlen(s2);
-> +	if (!l2)
-> +		return (char *)s1;
-> +	l1 = strlen(s1);
-> +	while (l1 >= l2) {
-> +		l1--;
-> +		if (!memcmp(s1, s2, l2))
-> +			return (char *)s1;
-> +		s1++;
-> +	}
-> +	return NULL;
-> +}
->  #undef memset
->  
->  void *memset(void *s, int c, size_t count)
-> -- 
-> 1.7.10.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+-- 
+Catalin
