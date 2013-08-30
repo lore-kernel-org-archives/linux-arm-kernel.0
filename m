@@ -1,62 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 30 Aug 2013 18:27:56 +0100
-Subject: [RFC PATCH 05/14] arm64: kernel: cpu_{suspend/resume}
- implementation
-In-Reply-To: <1377689766-17642-6-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1377689766-17642-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1377689766-17642-6-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130830172756.GK4650@arm.com>
+From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
+Date: Fri, 30 Aug 2013 13:29:13 -0400
+Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <87pptndbtj.fsf@kernel.org>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
+ <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
+ <52038E88.2050604@ti.com> <5203B336.90102@ti.com>
+ <5203C211.7040207@ti.com> <87iozfga1t.fsf@kernel.org>
+ <52040E67.4050402@ti.com> <87pptndbtj.fsf@kernel.org>
+Message-ID: <CANacCWzRcyU1wA07X8Q4bCfUOQe-gXSSM0jfMw6uyLiab1r9SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 28, 2013 at 12:35:57PM +0100, Lorenzo Pieralisi wrote:
-> Kernel subsystems like CPU idle and suspend to RAM require a generic
-> mechanism to suspend a processor, save its context and put it into
-> a quiescent state. The cpu_{suspend}/{resume} implementation provides
-> such a framework through a kernel interface allowing to save/restore
-> registers, flush the context to DRAM and suspend/resume to/from
-> low-power states where processor context may be lost.
-> 
-> Different SoCs might require different operations to be carried out
-> before a power down request is committed. For this reason the kernel
-> allows the caller of cpu_suspend to provide a function pointer (fn in
-> the cpu_suspend prototype below),
-> 
-> int cpu_suspend(unsigned long arg, int (*fn)(unsigned long));
-> 
-> called suspend finisher, that is executed after the context is saved and
-> flushed to DRAM, so that SoC/platform specific operations can be carried out
-> before issuing power down commands.
-> 
-> Context memory is allocated on the stack, whose address is stashed in a
-> per-cpu variable to keep track of it and passed to core functions that
-> save/restore the registers required by the architecture.
-> 
-> Even though, upon successful execution, the cpu_suspend function shuts
-> down the suspending processor, the warm boot resume mechanism, based
-> on the cpu_resume function, makes the resume path operate as a
-> cpu_suspend function return, so that cpu_suspend can be treated as a C
-> function by the caller, which simplifies coding the PM drivers that rely
-> on the cpu_suspend API.
-> 
-> Upon context save, the minimal amount of memory is flushed to DRAM so
-> that it can be retrieved when the MMU is off and caches are not searched.
-> 
-> The suspend finisher, depending on the required operations (eg CPU vs
-> Cluster shutdown) is in charge of flushing the cache hierarchy either
-> implicitly (by calling firmware implementations like PSCI) or explicitly
-> by executing the required cache maintainance functions.
+(picking up an old thread, again)
 
-As we discussed, I would like the finisher argument to cpu_suspend() to be
-removed and just use the default cpu_operations.cpu_suspend (currently
-smp_operations) which is populated from DT and uses PSCI as the default
-finisher. The cpuidle drivers can still pass arguments that would make
-their way into the PSCI CPU_SUSPEND call (like how deep to go) but I
-would like to avoid each cpuidle driver implementing a finisher that
-does the PSCI call.
+On Thu, Aug 8, 2013 at 7:04 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>
+> I disagree here.  I'm a firmware minimalist, and hiding bugs like this
+> in the firmware is wrong when Linux is otherwise managing these devices.
+> It also imposes criteria on the firmware of future SoCs that doesn't
+> belong there either.  IMO, the only stuff the firmware should do is what
+> Linux *cannot* do.
+>
+> Remember, this only needs to happen when there isn't a driver for these
+> devices.  Should we communicate to the firmware that the OS has no
+> driver, so please enable the hack?  I think not.
+>
 
-If PSCI is not available, the cpuidle driver can register a different
-cpu_suspend method.
+Agreed on not hiding the bugs in the firmware. Moreover, M3 can't access
+the IPs in PER domain which is where the bad modules are, so the h/w
+doesn't support such hackery (+1 for the h/w after all the -1's that it gets ;)
 
--- 
-Catalin
+[...]
+
+>>> That being said, IMO, the kernel (specifically omap_device) should
+>>> handle this, and it should be rather easy to do in the omap_device layer
+>>> and keep the SoC suspend/resume core code simple and ignorant of these
+>>> "quirks."
+>>>
+>>> AFAICT, there's no reason these quirks need to be dealt with immediatly
+>>> on suspend.  A slight delay should be fine, as long as it's before the
+>>> next suspend/idle attempt, right?
+>>>
+>>> Given that, what we need to do (and by we, I mean you) is to flag all
+>>> broken IP blocks, and let omap_device handle them in a suspend/resume
+>>> notifier (c.f. register_pm_notifier() and PM_POST_SUSPEND.)
+>>
+>> yes - that is the alternate that comes to mind.
+>
+> In the earlier reviews of this series (many months ago now), I
+> complained about the presence of this device specific handling in the
+> core MPU PM code.  I'm somewhat troubled by the fact that nobody explored
+> alternatives that so easily come to mind.
+>
+
+My bad. I was thinking along those lines [1] but after the suggestion on
+using the driver bound status i just went with that suggestion in the dumbest
+possible manner.
+
+Regards,
+Vaibhav
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/129676.html
