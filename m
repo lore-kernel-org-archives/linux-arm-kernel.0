@@ -1,63 +1,41 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 29 Aug 2013 22:48:58 -0700
-Subject: getting rid of subsys_initcall usage? (was: Re: [PATCH RESEND]
- i2c: designware: use module_platform_driver)
-In-Reply-To: <CAMj5BkhQkwb+T9VepN7UrWNRSgtv=Dw-Sa-gv0orOANo55iqNw@mail.gmail.com>
-References: <1376987548-12366-1-git-send-email-zhangfei.gao@linaro.org>
- <20130828095706.GH4086@katana>
- <CACRpkdb1p1=3a0PM+r2ZrMN+ECv5BAZFdv2omDK5npaer4ddcw@mail.gmail.com>
- <CAMj5BkhQkwb+T9VepN7UrWNRSgtv=Dw-Sa-gv0orOANo55iqNw@mail.gmail.com>
-Message-ID: <20130830054858.GR7656@atomide.com>
+Date: Thu, 29 Aug 2013 22:54:22 -0700
+Subject: [PATCH v4 3/5] clk: dt: binding for basic multiplexer clock
+In-Reply-To: <521EF109.3010500@ti.com>
+References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
+ <1377150793-27864-4-git-send-email-mturquette@linaro.org>
+ <2A930389-012E-45C3-93EB-6B4A41DB2EF5@codeaurora.org>
+ <20130829011425.8231.78802@quantum> <521EF109.3010500@ti.com>
+Message-ID: <20130830055422.GS7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* zhangfei gao <zhangfei.gao@gmail.com> [130829 04:03]:
-> On Thu, Aug 29, 2013 at 4:58 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Wed, Aug 28, 2013 at 11:57 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> >> On Tue, Aug 20, 2013 at 04:32:28PM +0800, Zhangfei Gao wrote:
+* Tero Kristo <t-kristo@ti.com> [130829 00:06]:
+> On 08/29/2013 04:14 AM, Mike Turquette wrote:
 > >
-> >>> Instead of use platform_driver_probe, use module_platform_driver
-> >>> To support deferred probing
-> >>> Also subsys_initcall may too early to auto set pinctl
-> >>>
-> >>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> >>> Acked-by: Baruch Siach <baruch@tkos.co.il>
-> >>
-> >> This patch is tougher than it looks. You need it, because
-> >> subsys_initcall may be too early for pinctrl.
+> >The mux-clock binding covers a quite a few platforms that have similar
+> >mux-clock programming requirements. If the DT binding is verbose enough
+> >then the basic mux clock driver is sufficient to initialize all of the
+> >mux clocks from DT: no new platform-specific clock driver with a bunch
+> >of data is necessary.
 > >
-> > pinctrl is initialized very early, core_initcall().
+> >On the other hand if we rely on tables in C to define how mux-clock
+> >parents are selected then every platform will have to write their own
+> >clock driver just to define their clock data.
 > >
-> > This is more a question of individual pin control drivers
-> > and when they probe, and dependencies trying to take
-> > a pinctrl handle before the pin controller is available
-> > will be deferred. Even by those grabbed in the core
-> > by drivers/base/pinctrl.c.
+> >Having drivers written for the sole purpose of listing out a bunch of
+> >data sounds like something that DT was meant to solve, even if this
+> >isn't at the board level and is at the SoC level.
 > 
-> Thanks Linus.
-> Your explanation is really make sense.
-> 
-> We use drivers/pinctrl/pinctrl-single.c, if subsys_initcall for
-> pinctrl-single, no issue at all.
+> +1. For my work this helps quite a bit at least.
 
-So far we've seen that if you have issues with this, the real
-problem is that some other driver is trying to initialize way
-too early probably because of legacy reasons that no longer
-apply.
+Yes this is the way to do it. Please don't do drivers where the index
+to some data table is passed in device tree. That's going to be a
+nightmare in the long run.
 
-FYI, it's best to have all the drivers initialize with just
-module_init and make them work as loadable modules because of
-the following reasons:
-
-1. You will get real console error messages when something
-   goes wrong with no need for debug_ll and earlyprintk
-
-2. By creating loadable driver modules you're already getting
-   some protection from spaghetti code as the interfaces
-   are defined
-
-3. It will be easier for distros to support various ARM SoCs
-   with loadable driver modules
+The binding should describe a type of hardware like a dpll or a mux,
+and then you just define as many instances of those as needed in the
+.dts files.
 
 Regards,
 
