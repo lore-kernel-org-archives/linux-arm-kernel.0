@@ -1,189 +1,81 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 30 Aug 2013 12:42:23 +0200
-Subject: [PATCH v7 2/4] drivers: of: add function to scan fdt nodes given
- by path
-In-Reply-To: <20130829214007.CDB813E1222@localhost>
-References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
- <1377527959-5080-3-git-send-email-m.szyprowski@samsung.com>
- <20130829214007.CDB813E1222@localhost>
-Message-ID: <5220770F.9080806@samsung.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Fri, 30 Aug 2013 16:14:30 +0530
+Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
+ with external L3-cache.
+In-Reply-To: <20130830095215.GC62188@MacBook-Pro.local>
+References: <747a0675165da4ef147bbda4e140549b@www.loen.fr>
+ <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
+ <5935339137684ecf90dd484cc5739548@www.loen.fr>
+ <20130815165344.GA3853@cbox>
+ <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
+ <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
+ <20130816171912.GB20246@cbox>
+ <CAAhSdy2bk6Ou=326cYJW2wKvm9pffbRRmO2ABFwF9dmqwWdKqQ@mail.gmail.com>
+ <20130816175034.GE20246@cbox>
+ <CAAhSdy3B5JTcd7==u_QzS3V5k7pYkymtiLa7X=yZH+=eSBAw8w@mail.gmail.com>
+ <20130830095215.GC62188@MacBook-Pro.local>
+Message-ID: <CAAhSdy0Hm1k+mWGGxUOzAA=5yVGNOERfo=36jcE1cvkUM=xtVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Aug 30, 2013 at 3:22 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Fri, Aug 16, 2013 at 07:11:51PM +0100, Anup Patel wrote:
+>> On Fri, Aug 16, 2013 at 11:20 PM, Christoffer Dall
+>> <christoffer.dall@linaro.org> wrote:
+>> > On Fri, Aug 16, 2013 at 11:12:08PM +0530, Anup Patel wrote:
+>> >> Discussion here is about getting KVM ARM64 working in-presence
+>> >> of an external L3-cache (i.e. not part of CPU). Before starting a VCPU
+>> >> user-space typically loads images to guest RAM so, in-presence of
+>> >> huge L3-cache (few MBs). When the VCPU starts running some of the
+>> >> contents guest RAM will be still in L3-cache and VCPU runs with
+>> >> MMU off (i.e. cacheing off) hence VCPU will bypass L3-cache and
+>> >> see incorrect contents. To solve this problem we need to flush the
+>> >> guest RAM contents before they are accessed by first time by VCPU.
+>> >>
+>> > ok, I'm with you that far.
+>> >
+>> > But is it also not true that we need to decide between:
+>> >
+>> >   A.1: Flush the entire guest RAM before running the VCPU
+>> >   A.2: Flush the pages as we fault them in
+>>
+>> Yes, thats the decision we have to make.
+>>
+>> >
+>> > And (independently):
+>> >
+>> >   B.1: Use __flush_dcache_range
+>> >   B.2: Use something else + outer cache framework for arm64
+>>
+>> This would be __flush_dcache_all() + outer cache flush all.
+>
+> We need to be careful here since the __flush_dcache_all() operation uses
+> cache maintenance by set/way and these are *local* to a CPU (IOW not
+> broadcast). Do you have any guarantee that dirty cache lines don't
+> migrate between CPUs and __flush_dcache_all() wouldn't miss them?
+> Architecturally we don't, so this is not a safe operation that would
+> guarantee L1 cache flushing (we probably need to revisit some of the
+> __flush_dcache_all() calls in KVM, I haven't looked into this).
+>
+> So I think we are left to the range operation where the DC ops to PoC
+> would be enough for your L3.
 
-On 8/29/2013 11:40 PM, Grant Likely wrote:
-> On Mon, 26 Aug 2013 16:39:17 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > Add a function to scan the flattened device-tree starting from the
-> > node given by the path. It is used to extract information (like reserved
-> > memory), which is required on early boot before we can unflatten the tree.
-> >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Acked-by: Michal Nazarewicz <mina86@mina86.com>
-> > Acked-by: Tomasz Figa <t.figa@samsung.com>
-> > Reviewed-by: Rob Herring <rob.herring@calxeda.com>
->
-> Some nits below, but otherwise:
->
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+If __flush_dcache_all() is *local" to a CPU then I guess DC ops to PoC
+by range would be the only option.
 
-Thanks!
+>
+> An outer cache flush all is probably only needed for cpuidle/suspend
+> (the booting part should be handled by the boot loader).
 
-> I'm happy to take this through the DT tree, or have you take it via the
-> CMA tree.
+Yes, cpuidle/suspend would definitely require outer cache maintenance.
 
-I have already put the whole patchset in linux-next via my 
-dma-mapping/cma tree,
-so I would like to keep it there to avoid further confusion.
+For KVM, we can avoid flushing d-cache to PoC every time in
+coherent_icache_guest_page() by only doing it when Guest MMU is
+turned-off. This may reduce the performance penalty.
 
-I only wonder how to handle the patches to get them merged to v3.12-rc1.
-After your review there will be some changes to the binding, its 
-documentation
-and the code itself. Would you mind if I send pull request with the current
-version and then provide incremental patches to fix the issues you have
-reported? Or should we delay this patchset till v3.13-rc1?
+>
+> --
+> Catalin
 
-> > ---
-> >  drivers/of/fdt.c       |   76 ++++++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/of_fdt.h |    3 ++
-> >  2 files changed, 79 insertions(+)
-> >
-> > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> > index b10ba00..4fb06f3 100644
-> > --- a/drivers/of/fdt.c
-> > +++ b/drivers/of/fdt.c
-> > @@ -545,6 +545,82 @@ int __init of_flat_dt_match(unsigned long node, const char *const *compat)
-> >  	return of_fdt_match(initial_boot_params, node, compat);
-> >  }
-> >
-> > +struct fdt_scan_status {
-> > +	const char *name;
-> > +	int namelen;
-> > +	int depth;
-> > +	int found;
-> > +	int (*iterator)(unsigned long node, const char *uname, int depth, void *data);
-> > +	void *data;
-> > +};
-> > +
-> > +/**
-> > + * fdt_scan_node_by_path - iterator for of_scan_flat_dt_by_path function
-> > + */
-> > +static int __init fdt_scan_node_by_path(unsigned long node, const char *uname,
-> > +					int depth, void *data)
->
-> Nit: since this is an iterator, I'd like to see "iter" in the function
-> name.
->
-> > +{
-> > +	struct fdt_scan_status *st = data;
-> > +
-> > +	/*
-> > +	 * if scan at the requested fdt node has been completed,
-> > +	 * return -ENXIO to abort further scanning
-> > +	 */
-> > +	if (depth <= st->depth)
-> > +		return -ENXIO;
-> > +
-> > +	/* requested fdt node has been found, so call iterator function */
-> > +	if (st->found)
-> > +		return st->iterator(node, uname, depth, st->data);
-> > +
-> > +	/* check if scanning automata is entering next level of fdt nodes */
-> > +	if (depth == st->depth + 1 &&
-> > +	    strncmp(st->name, uname, st->namelen) == 0 &&
-> > +	    uname[st->namelen] == 0) {
-> > +		st->depth += 1;
-> > +		if (st->name[st->namelen] == 0) {
-> > +			st->found = 1;
-> > +		} else {
-> > +			const char *next = st->name + st->namelen + 1;
-> > +			st->name = next;
-> > +			st->namelen = strcspn(next, "/");
-> > +		}
-> > +		return 0;
->
-> The above return statement is redundant.
->
-> > +	}
-> > +
-> > +	/* scan next fdt node */
-> > +	return 0;
-> > +}
-> > +
-> > +/**
-> > + * of_scan_flat_dt_by_path - scan flattened tree blob and call callback on each
-> > + *			     child of the given path.
-> > + * @path: path to start searching for children
-> > + * @it: callback function
-> > + * @data: context data pointer
-> > + *
-> > + * This function is used to scan the flattened device-tree starting from the
-> > + * node given by path. It is used to extract information (like reserved
-> > + * memory), which is required on ealy boot before we can unflatten the tree.
-> > + */
-> > +int __init of_scan_flat_dt_by_path(const char *path,
-> > +	int (*it)(unsigned long node, const char *name, int depth, void *data),
-> > +	void *data)
->
-> Nit: Please match the indentation convention used by of_scan_flat_dt().
-> This current version is really hard to read.
->
-> > +{
-> > +	struct fdt_scan_status st = {path, 0, -1, 0, it, data};
->
-> This is a little fragile. If the structure gets modified, this line
-> will break. I know it results in more text, but please use explicit data
-> member assignments in initializers.
->
-> > +	int ret = 0;
-> > +
-> > +	if (initial_boot_params)
->
-> Nit:
-> 	if (!initial_boot_params)
-> 		return 0;
->
-> > +                ret = of_scan_flat_dt(fdt_scan_node_by_path, &st);
->
-> Nit: inconsitent indentation (tabs vs. spaces)
->
-> > +
-> > +	if (!st.found)
-> > +		return -ENOENT;
-> > +	else if (ret == -ENXIO)	/* scan has been completed */
-> > +		return 0;
-> > +	else
-> > +		return ret;
->
-> Both uses of 'else' above are redundant. The only way the execution will
-> pass that point is if it was the else case!
->
-> > +}
-> > +
-> >  #ifdef CONFIG_BLK_DEV_INITRD
-> >  /**
-> >   * early_init_dt_check_for_initrd - Decode initrd location from flat tree
-> > diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-> > index ed136ad..19f26f8 100644
-> > --- a/include/linux/of_fdt.h
-> > +++ b/include/linux/of_fdt.h
-> > @@ -90,6 +90,9 @@ extern void *of_get_flat_dt_prop(unsigned long node, const char *name,
-> >  extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
-> >  extern int of_flat_dt_match(unsigned long node, const char *const *matches);
-> >  extern unsigned long of_get_flat_dt_root(void);
-> > +extern int of_scan_flat_dt_by_path(const char *path,
-> > +	int (*it)(unsigned long node, const char *name, int depth, void *data),
-> > +	void *data);
-> >
-> >  extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
-> >  				     int depth, void *data);
-> > --
-> > 1.7.9.5
-> >
->
->
-
-Best regards
--- 
-Marek Szyprowski
-Samsung R&D Institute Poland
+--Anup
