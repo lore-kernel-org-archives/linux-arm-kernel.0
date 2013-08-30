@@ -1,57 +1,56 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 30 Aug 2013 10:07:27 +0800
-Subject: [PATCH v3 6/8] Documentation: add the binding file for Quadspi driver
+Date: Fri, 30 Aug 2013 10:07:28 +0800
+Subject: [PATCH v3 7/8] ARM: dts: vf610: change the PAD values for Quadspi
 In-Reply-To: <1377828449-18912-1-git-send-email-b32955@freescale.com>
 References: <1377828449-18912-1-git-send-email-b32955@freescale.com>
-Message-ID: <1377828449-18912-7-git-send-email-b32955@freescale.com>
+Message-ID: <1377828449-18912-8-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the binding file for Freescale Quadspi driver.
+Current pad values do not works in the 66M DDR quad read mode.
+
+This patch adjusts this pad values, and tested in the 66M DDR quad read
+mode with S25FL128S.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- .../devicetree/bindings/spi/fsl-quadspi.txt        |   32 ++++++++++++++++++++
- 1 files changed, 32 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/spi/fsl-quadspi.txt
+ arch/arm/boot/dts/vf610.dtsi |   24 ++++++++++++------------
+ 1 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/fsl-quadspi.txt b/Documentation/devicetree/bindings/spi/fsl-quadspi.txt
-new file mode 100644
-index 0000000..d86ee84
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/fsl-quadspi.txt
-@@ -0,0 +1,32 @@
-+* Freescale Quad Serial Peripheral Interface(QuadSPI)
-+
-+Required properties:
-+- compatible : Should be "fsl,vf610-qspi"
-+- reg : Offset and length of the register set for the device
-+- interrupts : Should contain the interrupt for the device
-+- clocks : The clocks needed by the QuadSPI controller
-+- clock-names : the name of the clocks
-+- num-cs : Contains the number of the chip selects
-+
-+Optional properties:
-+- fsl,nor-size : If You set this property, it means that you connect the NOR
-+                 flash to QuadSPI. This property is mainly used by the QuadSPI
-+                 to map an AHB bus accessible address.
-+
-+Example:
-+
-+qspi0: quadspi at 40044000 {
-+	compatible = "fsl,vf610-qspi";
-+	reg = <0x40044000 0x1000>;
-+	interrupts = <0 24 0x04>;
-+	clocks = <&clks VF610_CLK_QSPI0_EN>,
-+		<&clks VF610_CLK_QSPI0>;
-+	clock-names = "qspi_en", "qspi";
-+	fsl,nor-size = <0x1000000>;
-+	num-cs = <1>;
-+	status = "disabled";
-+
-+	flash0: s25fl128s at 0 {
-+		....
-+	};
-+};
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 67d929c..c622562 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -285,18 +285,18 @@
+ 				qspi0 {
+ 					pinctrl_qspi0_1: qspi0grp_1 {
+ 						fsl,pins = <
+-						VF610_PAD_PTD0__QSPI0_A_QSCK	0x307b
+-						VF610_PAD_PTD1__QSPI0_A_CS0	0x307f
+-						VF610_PAD_PTD2__QSPI0_A_DATA3	0x3073
+-						VF610_PAD_PTD3__QSPI0_A_DATA2	0x3073
+-						VF610_PAD_PTD4__QSPI0_A_DATA1	0x3073
+-						VF610_PAD_PTD5__QSPI0_A_DATA0	0x307b
+-						VF610_PAD_PTD7__QSPI0_B_QSCK	0x307b
+-						VF610_PAD_PTD8__QSPI0_B_CS0	0x307f
+-						VF610_PAD_PTD9__QSPI0_B_DATA3	0x3073
+-						VF610_PAD_PTD10__QSPI0_B_DATA2	0x3073
+-						VF610_PAD_PTD11__QSPI0_B_DATA1	0x3073
+-						VF610_PAD_PTD12__QSPI0_B_DATA0	0x307b
++						VF610_PAD_PTD0__QSPI0_A_QSCK	0x31c3
++						VF610_PAD_PTD1__QSPI0_A_CS0	0x31ff
++						VF610_PAD_PTD2__QSPI0_A_DATA3	0x31c3
++						VF610_PAD_PTD3__QSPI0_A_DATA2	0x31c3
++						VF610_PAD_PTD4__QSPI0_A_DATA1	0x31c3
++						VF610_PAD_PTD5__QSPI0_A_DATA0	0x31c3
++						VF610_PAD_PTD7__QSPI0_B_QSCK	0x31c3
++						VF610_PAD_PTD8__QSPI0_B_CS0	0x31ff
++						VF610_PAD_PTD9__QSPI0_B_DATA3	0x31c3
++						VF610_PAD_PTD10__QSPI0_B_DATA2	0x31c3
++						VF610_PAD_PTD11__QSPI0_B_DATA1	0x31c3
++						VF610_PAD_PTD12__QSPI0_B_DATA0	0x31c3
+ 						>;
+ 					};
+ 				};
 -- 
 1.7.1
