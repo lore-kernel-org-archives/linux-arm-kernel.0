@@ -1,58 +1,56 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 30 Aug 2013 11:46:13 +0100
-Subject: [PATCH v7 2/4] drivers: of: add function to scan fdt nodes given
- by path
-In-Reply-To: <5220770F.9080806@samsung.com>
-References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
- <1377527959-5080-3-git-send-email-m.szyprowski@samsung.com>
- <20130829214007.CDB813E1222@localhost> <5220770F.9080806@samsung.com>
-Message-ID: <CACxGe6tdk8JbtfrB4s8BoRiAVN5KKUo=5C3AXH7qHBNkzT-VSQ@mail.gmail.com>
+Date: Fri, 30 Aug 2013 12:17:10 +0100
+Subject: [PATCH 16/16] Add config EFI_STUB for ARM to Kconfig
+In-Reply-To: <CAFECyb8m=5kExhusmepcebyUyBN5R9f7Kjah8NzXJ26Pmo=MNA@mail.gmail.com>
+References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
+ <1376090777-20090-17-git-send-email-roy.franz@linaro.org>
+ <20130813131857.GE2823@localhost.localdomain>
+ <CAFECyb8m=5kExhusmepcebyUyBN5R9f7Kjah8NzXJ26Pmo=MNA@mail.gmail.com>
+Message-ID: <20130830111710.911FC3E102A@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 11:42 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
->
-> On 8/29/2013 11:40 PM, Grant Likely wrote:
->>
->> On Mon, 26 Aug 2013 16:39:17 +0200, Marek Szyprowski
->> <m.szyprowski@samsung.com> wrote:
->> > Add a function to scan the flattened device-tree starting from the
->> > node given by the path. It is used to extract information (like reserved
->> > memory), which is required on early boot before we can unflatten the
->> > tree.
->> >
->> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> > Acked-by: Michal Nazarewicz <mina86@mina86.com>
->> > Acked-by: Tomasz Figa <t.figa@samsung.com>
->> > Reviewed-by: Rob Herring <rob.herring@calxeda.com>
->>
->> Some nits below, but otherwise:
->>
->> Acked-by: Grant Likely <grant.likely@secretlab.ca>
->
->
-> Thanks!
->
->
->> I'm happy to take this through the DT tree, or have you take it via the
->> CMA tree.
->
->
-> I have already put the whole patchset in linux-next via my dma-mapping/cma
-> tree,
-> so I would like to keep it there to avoid further confusion.
->
-> I only wonder how to handle the patches to get them merged to v3.12-rc1.
-> After your review there will be some changes to the binding, its
-> documentation
-> and the code itself. Would you mind if I send pull request with the current
-> version and then provide incremental patches to fix the issues you have
-> reported? Or should we delay this patchset till v3.13-rc1?
+On Tue, 13 Aug 2013 10:37:13 -0700, Roy Franz <roy.franz@linaro.org> wrote:
+> On Tue, Aug 13, 2013 at 6:18 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Fri, Aug 09, 2013 at 04:26:17PM -0700, Roy Franz wrote:
+> >> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+> >> ---
+> >>  arch/arm/Kconfig |   11 +++++++++++
+> >>  1 file changed, 11 insertions(+)
+> >>
+> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >> index 43594d5..8607d03 100644
+> >> --- a/arch/arm/Kconfig
+> >> +++ b/arch/arm/Kconfig
+> >> @@ -1805,6 +1805,17 @@ config UACCESS_WITH_MEMCPY
+> >>         However, if the CPU data cache is using a write-allocate mode,
+> >>         this option is unlikely to provide any performance gain.
+> >>
+> >> +config EFI_STUB
+> >> +     bool "EFI stub support"
+> >> +     depends on EFI
+> >
+> > && !CPU_BIG_ENDIAN, in case you didn't get around to that.
+> >
+> > Sooner or later, someone may try to fix that, so there should be a
+> > comment somewhere explaining what is broken for BE.
+> >
+> > Either in efi-stub.c or in the commit message accompanying this patch, I
+> > guess.
+> >
+> EFI will be !CPU_BIG_ENDIAN, so we will get the dependency
+> transitively through EFI.
+> That said, I think it may be better to have both be explicitly
+> !CPU_BIG_ENDIAN, as even
+> though the underlying reasons are the same (EFI services calls being
+> little endian), both
+> the stub and runtime services would need to be fixed to enable the
+> stub to run in BE mode.
+> I'll make this explicit in the stub Kconfig, and add a comment by the
+> PE/COFF magic number
+> regarding the LE requirement.
 
-Merge the series as-is and send follow-on patches. If you can get the
-fixups done quickly, then we can get them merged for v3.12 also.
+Actually, not true! Steve McIntyre is currently doing some of the BE
+porting work on TC2 running UEFI. Eventually he will need this.
 
 g.
