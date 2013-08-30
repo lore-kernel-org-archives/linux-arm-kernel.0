@@ -1,36 +1,26 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 30 Aug 2013 13:35:33 +0200
-Subject: [PATCH RFC 1/2] PM / Hibernate: use name_to_dev_t to parse resume
-In-Reply-To: <20130826174050.16429.7419@capellas-linux>
-References: <1377114413-8521-1-git-send-email-sebastian.capella@linaro.org>
- <1377114413-8521-2-git-send-email-sebastian.capella@linaro.org>
- <20130825153811.GA4795@amd.pavel.ucw.cz>
- <20130826174050.16429.7419@capellas-linux>
-Message-ID: <20130830113533.GA7226@amd.pavel.ucw.cz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 30 Aug 2013 12:39:18 +0100
+Subject: [PATCH RFC v2 14/16] ARM: vexpress: remove custom .init_time hook
+In-Reply-To: <1377856951.3655.34.camel@linaro1.home>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1377638890-371-15-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201308291535.53005.arnd@arndb.de> <521F901B.3090305@gmail.com>
+ <1377856951.3655.34.camel@linaro1.home>
+Message-ID: <20130830113918.GV6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2013-08-26 10:40:50, Sebastian Capella wrote:
-> Apologies for my previous top post reply...
-> 
-> Quoting Pavel Machek (2013-08-25 08:38:11)
-> > Is the allocation actually neccessary? At the very least this should
-> > test for NULL...
-> 
-> 
-> Thanks Pavel!  I'll add the check for NULL.
-> 
-> name_to_dev_t expects a non-const name, but the buffer passed in
-> is const.  I also am removing the '\n' if found at the end of the
-> string which would violate the const.
+On Fri, Aug 30, 2013 at 11:02:31AM +0100, Jon Medhurst (Tixy) wrote:
+> After adding of_clk_init(NULL) to time_init() things boot OK for me with
+> this patch. However, do we know that sched_clock is never going to get
+> read before time_init() has actually started the clock it reads? Are we
+> making things more fragile?
 
-Fix name_to_dev_t, then. No need to do memory allocation just to work
-around const.
+As I've been saying for years, sched_clock gets read for the first time
+in sched_init() -> init_idle() which occurs before time_init().
 
-[You can also take a look why it is const in the first place. I don't
-think it needs to be.]
+Whether that matters or not is debatable, but the first read should return
+zero, and it will return zero after initialization - so I think all we end
+up losing is some accounting of the time taken in the early kernel boot.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+If we wish to talk about correctness, then arguably it isn't correct.
