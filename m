@@ -1,99 +1,98 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 30 Aug 2013 20:10:55 +0100
-Subject: [PATCH 19/20] ARM: atomic64: fix endian-ness in atomic.h
+Date: Fri, 30 Aug 2013 20:10:53 +0100
+Subject: [PATCH 17/20] ARM: Correct BUG() assembly to ensure it is
+ endian-agnostic
 In-Reply-To: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377889856-9447-20-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377889856-9447-18-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Kamensky <victor.kamensky@linaro.org>
+Currently BUG() uses .word or .hword to create the necessary illegal
+instructions. However if we are building BE8 then these get swapped
+by the linker into different illegal instructions in the text. This
+means that the BUG() macro does not get trapped properly.
 
-Fix inline asm for atomic64_xxx functions in arm atomic.h. Instead of
-%H operand specifiers code should use %Q for least significant part
-of the value, and %R for the most significant part of the value. %H
-always returns the higher of the two register numbers, and therefore
-it is not endian neutral. %H should be used with ldrexd and strexd
-instructions.
+Change to using <asm/opcodes.h> to provide the necessary ARM instruction
+building as we cannot rely on gcc/gas having the `.inst` instructions
+which where added to try and resolve this issue (reported by Dave Martin
+<Dave.Martin@arm.com>).
 
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm/include/asm/atomic.h |   26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ arch/arm/include/asm/bug.h |   10 ++++++----
+ arch/arm/kernel/traps.c    |    8 +++++---
+ 2 files changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-index da1c77d..6447a0b 100644
---- a/arch/arm/include/asm/atomic.h
-+++ b/arch/arm/include/asm/atomic.h
-@@ -301,8 +301,8 @@ static inline void atomic64_add(u64 i, atomic64_t *v)
+diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+index 7af5c6c..b274bde 100644
+--- a/arch/arm/include/asm/bug.h
++++ b/arch/arm/include/asm/bug.h
+@@ -2,6 +2,8 @@
+ #define _ASMARM_BUG_H
  
- 	__asm__ __volatile__("@ atomic64_add\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	adds	%0, %0, %4\n"
--"	adc	%H0, %H0, %H4\n"
-+"	adds	%Q0, %Q0, %Q4\n"
-+"	adc	%R0, %R0, %R4\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
-@@ -320,8 +320,8 @@ static inline u64 atomic64_add_return(u64 i, atomic64_t *v)
+ #include <linux/linkage.h>
++#include <linux/types.h>
++#include <asm/opcodes.h>
  
- 	__asm__ __volatile__("@ atomic64_add_return\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	adds	%0, %0, %4\n"
--"	adc	%H0, %H0, %H4\n"
-+"	adds	%Q0, %Q0, %Q4\n"
-+"	adc	%R0, %R0, %R4\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
-@@ -341,8 +341,8 @@ static inline void atomic64_sub(u64 i, atomic64_t *v)
+ #ifdef CONFIG_BUG
  
- 	__asm__ __volatile__("@ atomic64_sub\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	subs	%0, %0, %4\n"
--"	sbc	%H0, %H0, %H4\n"
-+"	subs	%Q0, %Q0, %Q4\n"
-+"	sbc	%R0, %R0, %R4\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
-@@ -360,8 +360,8 @@ static inline u64 atomic64_sub_return(u64 i, atomic64_t *v)
+@@ -12,10 +14,10 @@
+  */
+ #ifdef CONFIG_THUMB2_KERNEL
+ #define BUG_INSTR_VALUE 0xde02
+-#define BUG_INSTR_TYPE ".hword "
++#define BUG_INSTR(__value) __inst_thumb16(__value)
+ #else
+ #define BUG_INSTR_VALUE 0xe7f001f2
+-#define BUG_INSTR_TYPE ".word "
++#define BUG_INSTR(__value) __inst_arm(__value)
+ #endif
  
- 	__asm__ __volatile__("@ atomic64_sub_return\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	subs	%0, %0, %4\n"
--"	sbc	%H0, %H0, %H4\n"
-+"	subs	%Q0, %Q0, %Q4\n"
-+"	sbc	%R0, %R0, %R4\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
- "	bne	1b"
-@@ -428,9 +428,9 @@ static inline u64 atomic64_dec_if_positive(atomic64_t *v)
  
- 	__asm__ __volatile__("@ atomic64_dec_if_positive\n"
- "1:	ldrexd	%0, %H0, [%3]\n"
--"	subs	%0, %0, #1\n"
--"	sbc	%H0, %H0, #0\n"
--"	teq	%H0, #0\n"
-+"	subs	%Q0, %Q0, #1\n"
-+"	sbc	%R0, %R0, #0\n"
-+"	teq	%R0, #0\n"
- "	bmi	2f\n"
- "	strexd	%1, %0, %H0, [%3]\n"
- "	teq	%1, #0\n"
-@@ -459,8 +459,8 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
- "	teqeq	%H0, %H5\n"
- "	moveq	%1, #0\n"
- "	beq	2f\n"
--"	adds	%0, %0, %6\n"
--"	adc	%H0, %H0, %H6\n"
-+"	adds	%Q0, %Q0, %Q6\n"
-+"	adc	%R0, %R0, %R6\n"
- "	strexd	%2, %0, %H0, [%4]\n"
- "	teq	%2, #0\n"
- "	bne	1b\n"
+@@ -33,7 +35,7 @@
+ 
+ #define __BUG(__file, __line, __value)				\
+ do {								\
+-	asm volatile("1:\t" BUG_INSTR_TYPE #__value "\n"	\
++	asm volatile("1:\t" BUG_INSTR(__value) "\n"  \
+ 		".pushsection .rodata.str, \"aMS\", %progbits, 1\n" \
+ 		"2:\t.asciz " #__file "\n" 			\
+ 		".popsection\n" 				\
+@@ -48,7 +50,7 @@ do {								\
+ 
+ #define __BUG(__file, __line, __value)				\
+ do {								\
+-	asm volatile(BUG_INSTR_TYPE #__value);			\
++	asm volatile(BUG_INSTR(__value) "\n");			\
+ 	unreachable();						\
+ } while (0)
+ #endif  /* CONFIG_DEBUG_BUGVERBOSE */
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 99bcd0e3..da070db 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -342,15 +342,17 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
+ int is_valid_bugaddr(unsigned long pc)
+ {
+ #ifdef CONFIG_THUMB2_KERNEL
+-	unsigned short bkpt;
++	u16 bkpt;
++	u16 insn = __opcode_to_mem_thumb16(BUG_INSTR_VALUE);
+ #else
+-	unsigned long bkpt;
++	u32 bkpt;
++	u32 insn = __opcode_to_mem_arm(BUG_INSTR_VALUE);
+ #endif
+ 
+ 	if (probe_kernel_address((unsigned *)pc, bkpt))
+ 		return 0;
+ 
+-	return bkpt == BUG_INSTR_VALUE;
++	return bkpt == insn;
+ }
+ 
+ #endif
 -- 
 1.7.10.4
