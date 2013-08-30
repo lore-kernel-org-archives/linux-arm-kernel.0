@@ -1,77 +1,166 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 30 Aug 2013 15:58:07 +0900
-Subject: [PATCH 04/14] ARM: shmobile: sh73a0: Remove ->init_machine()
- special case
-In-Reply-To: <2171121.JyqUPDDIrz@avalon>
-References: <20130809094748.6530.16511.sendpatchset@w520>
- <1634183.WaD7XDSkzI@avalon>
- <CANqRtoSrfUaMYqADNP9d5+ourtWuhgscvAVVW-nCVXFyYsCfFQ@mail.gmail.com>
- <2171121.JyqUPDDIrz@avalon>
-Message-ID: <CANqRtoTOU1CAGUKmAe__WL+KGBU=ZH81qO=cyiX69F8DVEK1qw@mail.gmail.com>
+Date: Fri, 30 Aug 2013 16:02:39 +0900
+Subject: [PATCH] clocksource: em_sti: Adjust clock event rating to fix SMP
+ broadcast
+In-Reply-To: <521F7C42.7060108@codeaurora.org>
+References: <1375251940-7809-1-git-send-email-horms+renesas@verge.net.au>
+ <51F94A35.2020907@codeaurora.org>
+ <CANqRtoR0Wwctor1mpM+8nuC0_pZsPHUSShPuZFX4FVtoVKEuNw@mail.gmail.com>
+ <51F9777B.2080500@codeaurora.org>
+ <CANqRtoT=gMKBHG8qJWc7FjcYFaaf5hBzzv8=AOLneoveasmKoA@mail.gmail.com>
+ <521F7C42.7060108@codeaurora.org>
+Message-ID: <CANqRtoSVg=801TetBMcyAAQykHK4bB0bHLwj=htq26badguOYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Fri, Aug 30, 2013 at 9:30 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Magnus,
+On Fri, Aug 30, 2013 at 1:52 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 08/29/13 01:41, Magnus Damm wrote:
+>> Thanks for your suggestion. Yes, there was indeed some confusion. Now
+>> after diving into the code a bit deeper I can finally understand what
+>> you mean.
+>>
+>> Instead of adjusting the rating I've changed the cpumask member like this:
+>>
+>> --- 0001/drivers/clocksource/em_sti.c
+>> +++ work/drivers/clocksource/em_sti.c    2013-08-29 17:33:16.000000000 +0900
+>> @@ -301,7 +301,7 @@ static void em_sti_register_clockevent(s
+>>      ced->name = dev_name(&p->pdev->dev);
+>>      ced->features = CLOCK_EVT_FEAT_ONESHOT;
+>>      ced->rating = 200;
+>> -    ced->cpumask = cpumask_of(0);
+>> +    ced->cpumask = cpu_all_mask;
 >
-> On Wednesday 28 August 2013 21:19:50 Magnus Damm wrote:
->> On Wed, Aug 28, 2013 at 9:08 PM, Laurent Pinchart wrote:
->> > On Wednesday 28 August 2013 15:40:50 Magnus Damm wrote:
->> >> On Fri, Aug 9, 2013 at 7:47 PM, Laurent Pinchart wrote:
->> >> > On Friday 09 August 2013 18:48:32 Magnus Damm wrote:
->> >> >> From: Magnus Damm <damm@opensource.se>
->> >> >>
->> >> >> No need to special case sh73a0 ->init_machine(),
->> >> >> so get rid of undesired cpufreq platform device
->> >> >> from the generic long term sh73a0 DT support code.
->> >> >>
->> >> >> For short term support on KZM9D the DT reference
->> >> >> implementation now adds a "cpufreq-cpu0" platform
->> >> >> device so that can be used for development.
->> >> >
->> >> > Doesn't this go against the spirit of the -reference platforms that
->> >> > don't use DT devices in board code ? I don't see an urgent need for
->> >> > this, how far along are the DT cpufreq-related bindings ?
->> >>
->> >> I'm not sure what the latest state of DT cpufreq bindings are. Actually,
->> >> it seems to me that the cpufreq platform device is a software policy that
->> >> shouldn't be described with DT. And to be honest, I can't really see how
->> >> this policy has anything to do with any particular SoC.
->> >
->> > I'm no cpufreq expert, but if we need to register the device in C code,
->> > I'm pretty uneasy with having that code in board files. One of the DT
->> > goals is to get rid of most board files.
+> It would be better to use cpu_possible_mask.
+
+I agree, thanks.
+
+>>      ced->set_next_event = em_sti_clock_event_next;
+>>      ced->set_mode = em_sti_clock_event_mode;
 >>
->> I'm not sure if we actually _have_to_ register via the platform device, or
->> if it just happens to be like that today because no one has bothered
->> creating a better abstraction. It is a mystery to me that both a platform
->> device is used to select actual driver, and then DT is used to provide
->> frequency and voltage information.
+>> Without the cpumask fix or without the earlier rating fix the
+>> following interrupt count can be seen in /proc/interrupts on KZM9D:
 >>
->> The cpufreq software policy is neither board nor SoC specific. It must be
->> application specific. I can understand that putting it in a board file seems
->> odd, but putting it in a SoC file is IMO equally odd, and with the added
->> damage that people starting to write generic DT code may assume that the SoC
->> will keep on using the same cpufreq software policy in the future.
+>> 157:        140          0       GIC 157  e0180000.sti
+>> 160:          0          0  e0050000.gpio   1  eth0
+>> IPI0:          0          0  CPU wakeup interrupts
+>> IPI1:          0          0  Timer broadcast interrupts
 >>
->> Perhaps the cpufreq registration interface should be reworked somehow?
+>> Above, notice how no IPI1 interrupts seem to be arriving.
+>>
+>> With the cpumask fix above the interrupt count becomes like this:
+>>
+>>  157:        559          0       GIC 157  e0180000.sti
+>> 160:          0          0  e0050000.gpio   1  eth0
+>> IPI0:          0          0  CPU wakeup interrupts
+>> IPI1:          0        601  Timer broadcast interrupts
+>>
+>> Would this be in line with your expectation?
 >
-> Perhaps :-) The situation needs to be at least clarified. Feel free to CC me
-> :-)
+> Yes that is what I'm saying. What is the output of cat /proc/timer_list?
 
-Thanks. =)
+/ # head -n 60 foo
+Timer List Version: v0.7
+HRTIMER_MAX_CLOCK_BASES: 4
+now at 543066528320 nsecs
 
-There are CPUFreq dependencies on SMP and multi-cluster frequency
-scaling for some SoCs, so to begin with I prefer to allow selected
-boards use whatever old interface that is available now and over time
-incrementally improve the situation. I don't however want the shared
-per-SoC DT_MACHINE code in setup-xxx.c to enable anything by default
-for now though - this portion we can modify when we have SMP and
-multi-cluster working.
+cpu: 0
+ clock 0:
+  .base:       c066f5f8
+  .index:      0
+  .resolution: 7812500 nsecs
+  .get_time:   ktime_get
+active timers:
+ #0: <c0670148>, menu_hrtimer_notify, S:01
+ # expires at 543066282109-543066282109 nsecs [in -246211 to -246211 nsecs]
+ clock 1:
+  .base:       c066f630
+  .index:      1
+  .resolution: 7812500 nsecs
+  .get_time:   ktime_get_real
+active timers:
+ clock 2:
+  .base:       c066f668
+  .index:      2
+  .resolution: 7812500 nsecs
+  .get_time:   ktime_get_boottime
+active timers:
+ clock 3:
+  .base:       c066f6a0
+  .index:      3
+  .resolution: 7812500 nsecs
+  .get_time:   ktime_get_clocktai
+active timers:
 
-Cheers,
+cpu: 1
+ clock 0:
+  .base:       c06775f8
+  .index:      0
+  .resolution: 7812500 nsecs
+  .get_time:   ktime_get
+active timers:
+ clock 1:
+  .base:       c0677630
+  .index:      1
+  .resolution: 7812500 nsecs
+  .get_time:   ktime_get_real
+active timers:
+ clock 2:
+  .base:       c0677668
+  .index:      2
+  .resolution: 7812500 nsecs
+  .get_time:   ktime_get_boottime
+active timers:
+ clock 3:
+  .base:       c06776a0
+  .index:      3
+  .resolution: 7812500 nsecs
+  .get_time:   ktime_get_clocktai
+active timers:
+
+Tick Device: mode:     0
+Broadcast device
+Clock Event Device: e0180000.sti
+ max_delta_ns:   131071523464981
+ min_delta_ns:   61034
+ mult:           70369
+ shift:          31
+ mode:           3
+ next_event:     543070312500 nsecs
+ set_next_event: em_sti_clock_event_next
+ set_mode:       em_sti_clock_event_mode
+ event_handler:  tick_handle_periodic_broadcast
+ retries:        0
+
+tick_broadcast_mask: 00000003
+
+Tick Device: mode:     0
+Per CPU device: 0
+Clock Event Device: dummy_timer
+ max_delta_ns:   0
+ min_delta_ns:   0
+ mult:           1
+ shift:          0
+ mode:           1
+ next_event:     9223372036854775807 nsecs
+ set_next_event: <00000000>
+ set_mode:       broadcast_timer_set_mode
+ event_handler:  tick_handle_periodic
+ retries:        0
+
+Tick Device: mode:     0
+Per CPU device: 1
+Clock Event Device: dummy_timer
+ max_delta_ns:   0
+ min_delta_ns:   0
+ mult:           0
+ shift:          0
+ mode:           1
+ next_event:     9223372036854775807 nsecs
+ set_next_event: <00000000>
+ set_mode:       dummy_timer_set_mode
+ event_handler:  tick_handle_periodic
+ retries:        0
+
+Thanks for your help!
 
 / magnus
