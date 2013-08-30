@@ -1,51 +1,63 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Thu, 29 Aug 2013 17:25:24 -0700
-Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
-In-Reply-To: <87hae8tc6e.fsf@linaro.org>
-References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
- <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
- <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
- <87txiasqhk.fsf@linaro.org>
- <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
- <87ppsw7cgq.fsf@linaro.org>
- <CA+Bv8XbxV=BFjcSsUMX2pz9LeCkSwrjzZmj_=YbHGzyfbLXmaQ@mail.gmail.com>
- <874na8xqfl.fsf@linaro.org>
- <CANacCWzK1w9+XKEoUfS4ZB7QGxi_0JkVWBLs_wsaUjrzW2QB+A@mail.gmail.com>
- <87hae8tc6e.fsf@linaro.org>
-Message-ID: <CA+Bv8XaQgOiSiScQW=CVxzXBuG0soafQotApjoVEZ0P9U3netg@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 30 Aug 2013 02:30:33 +0200
+Subject: [PATCH 04/14] ARM: shmobile: sh73a0: Remove ->init_machine()
+ special case
+In-Reply-To: <CANqRtoSrfUaMYqADNP9d5+ourtWuhgscvAVVW-nCVXFyYsCfFQ@mail.gmail.com>
+References: <20130809094748.6530.16511.sendpatchset@w520>
+ <1634183.WaD7XDSkzI@avalon>
+ <CANqRtoSrfUaMYqADNP9d5+ourtWuhgscvAVVW-nCVXFyYsCfFQ@mail.gmail.com>
+Message-ID: <2171121.JyqUPDDIrz@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 2:33 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> Vaibhav Bedia <vaibhav.bedia@gmail.com> writes:
-[snip]
->> Morevoer, all the suggestions on how to keep the code in Linux working
->> around the complications due to the main memory not being accessible
->> will need to be replicated on the non-Linux s/w stacks and that's just
->> make it more difficult for them.
->
-> The linux code has to be very self-contained (in assembler or C), so I'm
-> not sure how it's difficult to replicated in any other OS (or non-OS.)
+Hi Magnus,
 
-Let me pull on this thread a little bit. Would this involve defining a
-bunch of different sections for each arch so that I could do:
+On Wednesday 28 August 2013 21:19:50 Magnus Damm wrote:
+> On Wed, Aug 28, 2013 at 9:08 PM, Laurent Pinchart wrote:
+> > On Wednesday 28 August 2013 15:40:50 Magnus Damm wrote:
+> >> On Fri, Aug 9, 2013 at 7:47 PM, Laurent Pinchart wrote:
+> >> > On Friday 09 August 2013 18:48:32 Magnus Damm wrote:
+> >> >> From: Magnus Damm <damm@opensource.se>
+> >> >> 
+> >> >> No need to special case sh73a0 ->init_machine(),
+> >> >> so get rid of undesired cpufreq platform device
+> >> >> from the generic long term sh73a0 DT support code.
+> >> >> 
+> >> >> For short term support on KZM9D the DT reference
+> >> >> implementation now adds a "cpufreq-cpu0" platform
+> >> >> device so that can be used for development.
+> >> > 
+> >> > Doesn't this go against the spirit of the -reference platforms that
+> >> > don't use DT devices in board code ? I don't see an urgent need for
+> >> > this, how far along are the DT cpufreq-related bindings ?
+> >> 
+> >> I'm not sure what the latest state of DT cpufreq bindings are. Actually,
+> >> it seems to me that the cpufreq platform device is a software policy that
+> >> shouldn't be described with DT. And to be honest, I can't really see how
+> >> this policy has anything to do with any particular SoC.
+> > 
+> > I'm no cpufreq expert, but if we need to register the device in C code,
+> > I'm pretty uneasy with having that code in board files. One of the DT
+> > goals is to get rid of most board files.
+> 
+> I'm not sure if we actually _have_to_ register via the platform device, or
+> if it just happens to be like that today because no one has bothered
+> creating a better abstraction. It is a mystery to me that both a platform
+> device is used to select actual driver, and then DT is used to provide
+> frequency and voltage information.
+> 
+> The cpufreq software policy is neither board nor SoC specific. It must be
+> application specific. I can understand that putting it in a board file seems
+> odd, but putting it in a SoC file is IMO equally odd, and with the added
+> damage that people starting to write generic DT code may assume that the SoC
+> will keep on using the same cpufreq software policy in the future.
+> 
+> Perhaps the cpufreq registration interface should be reworked somehow?
 
-void __sram_am33xx am33xx_some_pm_function(args....)
-{
-}
+Perhaps :-) The situation needs to be at least clarified. Feel free to CC me 
+:-)
 
-static struct am33xx_foo_dyn *blargity __sramdata_am33xx = { ...};
+-- 
+Regards,
 
-static const struct am33xx_foo_const *blarg __sramconst_am33xx = { ... };
-
-The sram push code could then push these sections into sram. There
-would then be a set of inlines or macros for converting addresses
-within these sections to SRAM addresses, maybe also inlines or macros
-for calling code that has been pushed into sram by wrapping the
-original function pointer. The macros or inlines that call SRAM code
-could perform the trampoline as well.
-
-Would there be much general interest in a scheme like this? Is there
-already I scheme like this I haven't noticed. Would such an explosion
-of sections be a problem if all platforms started using this for SRAM
-code?
+Laurent Pinchart
