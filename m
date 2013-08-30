@@ -1,83 +1,80 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 30 Aug 2013 14:02:38 +0100
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
- with external L3-cache.
-In-Reply-To: <CAAhSdy0Hm1k+mWGGxUOzAA=5yVGNOERfo=36jcE1cvkUM=xtVg@mail.gmail.com>
-References: <5935339137684ecf90dd484cc5739548@www.loen.fr>
- <20130815165344.GA3853@cbox>
- <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
- <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
- <20130816171912.GB20246@cbox>
- <CAAhSdy2bk6Ou=326cYJW2wKvm9pffbRRmO2ABFwF9dmqwWdKqQ@mail.gmail.com>
- <20130816175034.GE20246@cbox>
- <CAAhSdy3B5JTcd7==u_QzS3V5k7pYkymtiLa7X=yZH+=eSBAw8w@mail.gmail.com>
- <20130830095215.GC62188@MacBook-Pro.local>
- <CAAhSdy0Hm1k+mWGGxUOzAA=5yVGNOERfo=36jcE1cvkUM=xtVg@mail.gmail.com>
-Message-ID: <20130830130238.GB4650@arm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 30 Aug 2013 14:06:14 +0100
+Subject: [PATCH 05/16] rename __get_map() to efi_get_memory_map(),
+ add parameter to optionally return mmap key. The mmap key is required
+ to exit EFI boot services,
+ and allows efi_get_memory_map() to be used for getting final memory map.
+In-Reply-To: <1376090777-20090-6-git-send-email-roy.franz@linaro.org>
+References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
+ <1376090777-20090-6-git-send-email-roy.franz@linaro.org>
+Message-ID: <20130830130614.C6D2F3E102A@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 11:44:30AM +0100, Anup Patel wrote:
-> On Fri, Aug 30, 2013 at 3:22 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Fri, Aug 16, 2013 at 07:11:51PM +0100, Anup Patel wrote:
-> >> On Fri, Aug 16, 2013 at 11:20 PM, Christoffer Dall
-> >> <christoffer.dall@linaro.org> wrote:
-> >> > On Fri, Aug 16, 2013 at 11:12:08PM +0530, Anup Patel wrote:
-> >> >> Discussion here is about getting KVM ARM64 working in-presence
-> >> >> of an external L3-cache (i.e. not part of CPU). Before starting a VCPU
-> >> >> user-space typically loads images to guest RAM so, in-presence of
-> >> >> huge L3-cache (few MBs). When the VCPU starts running some of the
-> >> >> contents guest RAM will be still in L3-cache and VCPU runs with
-> >> >> MMU off (i.e. cacheing off) hence VCPU will bypass L3-cache and
-> >> >> see incorrect contents. To solve this problem we need to flush the
-> >> >> guest RAM contents before they are accessed by first time by VCPU.
-> >> >>
-> >> > ok, I'm with you that far.
-> >> >
-> >> > But is it also not true that we need to decide between:
-> >> >
-> >> >   A.1: Flush the entire guest RAM before running the VCPU
-> >> >   A.2: Flush the pages as we fault them in
-> >>
-> >> Yes, thats the decision we have to make.
-> >>
-> >> >
-> >> > And (independently):
-> >> >
-> >> >   B.1: Use __flush_dcache_range
-> >> >   B.2: Use something else + outer cache framework for arm64
-> >>
-> >> This would be __flush_dcache_all() + outer cache flush all.
-> >
-> > We need to be careful here since the __flush_dcache_all() operation uses
-> > cache maintenance by set/way and these are *local* to a CPU (IOW not
-> > broadcast). Do you have any guarantee that dirty cache lines don't
-> > migrate between CPUs and __flush_dcache_all() wouldn't miss them?
-> > Architecturally we don't, so this is not a safe operation that would
-> > guarantee L1 cache flushing (we probably need to revisit some of the
-> > __flush_dcache_all() calls in KVM, I haven't looked into this).
-> >
-> > So I think we are left to the range operation where the DC ops to PoC
-> > would be enough for your L3.
+On Fri,  9 Aug 2013 16:26:06 -0700, Roy Franz <roy.franz@linaro.org> wrote:
+> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+
+Same issue with the commit message here as for patch 4. Please include a
+comment stating what is intended to use this new feature.
+
+> ---
+>  drivers/firmware/efi/efi-stub-helper.c |   17 +++++++++++------
+>  1 file changed, 11 insertions(+), 6 deletions(-)
 > 
-> If __flush_dcache_all() is *local" to a CPU then I guess DC ops to PoC
-> by range would be the only option.
-
-Yes. In the (upcoming) ARM ARMv8 there is a clear note that set/way
-operations to flush the whole cache must not be used for the maintenance
-of large buffer but only during power-down/power-up code sequences.
-
-> > An outer cache flush all is probably only needed for cpuidle/suspend
-> > (the booting part should be handled by the boot loader).
+> diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
+> index 40cd16e..1d0a079 100644
+> --- a/drivers/firmware/efi/efi-stub-helper.c
+> +++ b/drivers/firmware/efi/efi-stub-helper.c
+> @@ -46,10 +46,11 @@ static void efi_printk(efi_system_table_t *sys_table_arg, char *str)
+>  }
+>  
+>  
+> -static efi_status_t __get_map(efi_system_table_t *sys_table_arg,
+> -			      efi_memory_desc_t **map,
+> -			      unsigned long *map_size,
+> -			      unsigned long *desc_size)
+> +static efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
+> +				       efi_memory_desc_t **map,
+> +				       unsigned long *map_size,
+> +				       unsigned long *desc_size,
+> +				       unsigned long *key_ptr)
+>  {
+>  	efi_memory_desc_t *m = NULL;
+>  	efi_status_t status;
+> @@ -77,6 +78,8 @@ again:
+>  
+>  	if (status != EFI_SUCCESS)
+>  		efi_call_phys1(sys_table_arg->boottime->free_pool, m);
+> +	if (key_ptr && status == EFI_SUCCESS)
+> +		*key_ptr = key;
+>  
+>  fail:
+>  	*map = m;
+> @@ -97,7 +100,8 @@ static efi_status_t efi_high_alloc(efi_system_table_t *sys_table_arg,
+>  	u64 max_addr = 0;
+>  	int i;
+>  
+> -	status = __get_map(sys_table_arg, &map, &map_size, &desc_size);
+> +	status = efi_get_memory_map(sys_table_arg, &map, &map_size, &desc_size,
+> +				    NULL);
+>  	if (status != EFI_SUCCESS)
+>  		goto fail;
+>  
+> @@ -175,7 +179,8 @@ static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
+>  	unsigned long nr_pages;
+>  	int i;
+>  
+> -	status = __get_map(sys_table_arg, &map, &map_size, &desc_size);
+> +	status = efi_get_memory_map(sys_table_arg, &map, &map_size, &desc_size,
+> +				    NULL);
+>  	if (status != EFI_SUCCESS)
+>  		goto fail;
+>  
+> -- 
+> 1.7.10.4
 > 
-> Yes, cpuidle/suspend would definitely require outer cache maintenance.
 > 
-> For KVM, we can avoid flushing d-cache to PoC every time in
-> coherent_icache_guest_page() by only doing it when Guest MMU is
-> turned-off. This may reduce the performance penalty.
-
-That's for the KVM guys to decide ;)
-
--- 
-Catalin
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
