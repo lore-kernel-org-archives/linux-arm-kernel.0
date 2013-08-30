@@ -1,51 +1,92 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Fri, 30 Aug 2013 09:22:10 -0400
-Subject: [PATCH v4 10/10] xen/arm,arm64: enable SWIOTLB_XEN
-In-Reply-To: <alpine.DEB.2.02.1308291637230.6397@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1308151200580.4470@kaball.uk.xensource.com>
- <1376565054-24153-10-git-send-email-stefano.stabellini@eu.citrix.com>
- <1376600325.9273.223.camel@hastur.hellion.org.uk>
- <alpine.DEB.2.02.1308282104000.6397@kaball.uk.xensource.com>
- <1377765650.11455.7.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1308291637230.6397@kaball.uk.xensource.com>
-Message-ID: <20130830132210.GE21239@phenom.dumpdata.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 30 Aug 2013 14:21:57 +0100
+Subject: [PATCH] ARM64: KVM: Fix =?UTF-8?Q?coherent=5Ficache=5Fguest?=
+ =?UTF-8?Q?=5Fpage=28=29=20for=20host=20with=20external=20L=33-cache=2E?=
+In-Reply-To: <CAAhSdy0Hm1k+mWGGxUOzAA=5yVGNOERfo=36jcE1cvkUM=xtVg@mail.gmail.com>
+References: <747a0675165da4ef147bbda4e140549b@www.loen.fr>
+ <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
+ <5935339137684ecf90dd484cc5739548@www.loen.fr> <20130815165344.GA3853@cbox>
+ <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
+ <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
+ <20130816171912.GB20246@cbox>
+ <CAAhSdy2bk6Ou=326cYJW2wKvm9pffbRRmO2ABFwF9dmqwWdKqQ@mail.gmail.com>
+ <20130816175034.GE20246@cbox>
+ <CAAhSdy3B5JTcd7==u_QzS3V5k7pYkymtiLa7X=yZH+=eSBAw8w@mail.gmail.com>
+ <20130830095215.GC62188@MacBook-Pro.local>
+ <CAAhSdy0Hm1k+mWGGxUOzAA=5yVGNOERfo=36jcE1cvkUM=xtVg@mail.gmail.com>
+Message-ID: <bc23926cb9f202d8b63d729c584af791@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 04:38:17PM +0100, Stefano Stabellini wrote:
-> On Thu, 29 Aug 2013, Ian Campbell wrote:
-> > On Wed, 2013-08-28 at 21:07 +0100, Stefano Stabellini wrote:
-> > > On Thu, 15 Aug 2013, Ian Campbell wrote:
-> > > > On Thu, 2013-08-15 at 12:10 +0100, Stefano Stabellini wrote:
-> > > > > At the moment always rely on swiotlb-xen, but when Xen starts supporting
-> > > > > hardware IOMMUs we'll be able to avoid it conditionally on the presence
-> > > > > of an IOMMU on the platform.
-> > > > 
-> > > > Do we have any idea how we are going to do this?
-> > > > 
-> > > > It's extra complicated if you consider that on some systems on some of
-> > > > the devices are behind an IOMMU :-/
-> > > > 
-> > > > I wonder if we can enumerate which devices have an IOMMU at boot time
-> > > > and force a ludicrous dma mask (such as 0) if one isn't present in order
-> > > > to force us to always take the exchange_and_pin path?
-> > > 
-> > > We don't need to worry about how to specify which devices need to go via
-> > > the swiotlb internally, because we have our own arm specific
-> > > dma_map_ops. At the moment they are just implemented using the
-> > > swiotlb-xen functions, but we could easily provide wrappers that check
-> > > our own internal whitelist/blacklist and go via swiotlb-xen only in
-> > > those cases.
-> > 
-> > OK, but how do we decide which devices go on those lists? We need some
-> > sort of indication from the hypervisor, don't we? Only Xen knows if it
-> > has an iommu it can use because the iommu must necessarily be hidden
-> > from Linux.
-> 
-> Right. Maybe Xen could mark the devices that are safe to use without
-> swiotlb-xen on device tree? Adding a property to the node?
+On 2013-08-30 11:44, Anup Patel wrote:
+> On Fri, Aug 30, 2013 at 3:22 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+>> On Fri, Aug 16, 2013 at 07:11:51PM +0100, Anup Patel wrote:
+>>> On Fri, Aug 16, 2013 at 11:20 PM, Christoffer Dall
+>>> <christoffer.dall@linaro.org> wrote:
+>>> > On Fri, Aug 16, 2013 at 11:12:08PM +0530, Anup Patel wrote:
+>>> >> Discussion here is about getting KVM ARM64 working in-presence
+>>> >> of an external L3-cache (i.e. not part of CPU). Before starting 
+>>> a VCPU
+>>> >> user-space typically loads images to guest RAM so, in-presence 
+>>> of
+>>> >> huge L3-cache (few MBs). When the VCPU starts running some of 
+>>> the
+>>> >> contents guest RAM will be still in L3-cache and VCPU runs with
+>>> >> MMU off (i.e. cacheing off) hence VCPU will bypass L3-cache and
+>>> >> see incorrect contents. To solve this problem we need to flush 
+>>> the
+>>> >> guest RAM contents before they are accessed by first time by 
+>>> VCPU.
+>>> >>
+>>> > ok, I'm with you that far.
+>>> >
+>>> > But is it also not true that we need to decide between:
+>>> >
+>>> >   A.1: Flush the entire guest RAM before running the VCPU
+>>> >   A.2: Flush the pages as we fault them in
+>>>
+>>> Yes, thats the decision we have to make.
+>>>
+>>> >
+>>> > And (independently):
+>>> >
+>>> >   B.1: Use __flush_dcache_range
+>>> >   B.2: Use something else + outer cache framework for arm64
+>>>
+>>> This would be __flush_dcache_all() + outer cache flush all.
+>>
+>> We need to be careful here since the __flush_dcache_all() operation 
+>> uses
+>> cache maintenance by set/way and these are *local* to a CPU (IOW not
+>> broadcast). Do you have any guarantee that dirty cache lines don't
+>> migrate between CPUs and __flush_dcache_all() wouldn't miss them?
+>> Architecturally we don't, so this is not a safe operation that would
+>> guarantee L1 cache flushing (we probably need to revisit some of the
+>> __flush_dcache_all() calls in KVM, I haven't looked into this).
+>>
+>> So I think we are left to the range operation where the DC ops to 
+>> PoC
+>> would be enough for your L3.
+>
+> If __flush_dcache_all() is *local" to a CPU then I guess DC ops to 
+> PoC
+> by range would be the only option.
+>
+>>
+>> An outer cache flush all is probably only needed for cpuidle/suspend
+>> (the booting part should be handled by the boot loader).
+>
+> Yes, cpuidle/suspend would definitely require outer cache 
+> maintenance.
+>
+> For KVM, we can avoid flushing d-cache to PoC every time in
+> coherent_icache_guest_page() by only doing it when Guest MMU is
+> turned-off. This may reduce the performance penalty.
 
-We do a hypercall for adding devices (See drivers/xen/pci.c). Perhaps
-you can piggyback on that one and on ARM return 0 for the devices that
-are under Xen control (so IOMMU) and for non-Xen control (those
-that will need SWIOTLB) return -EYOUNEEDTOHANDLEIT and use it?
+What about the I and C bits in SCTLR_EL1? Does L3 also honour these 
+bits?
+
+         M.
+-- 
+Fast, cheap, reliable. Pick two.
