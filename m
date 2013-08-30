@@ -1,64 +1,76 @@
-From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
-Date: Fri, 30 Aug 2013 13:29:13 -0400
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <87pptndbtj.fsf@kernel.org>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <CA+Bv8XbK+=pvG+bbvfCtS2Rtg-YoAhuUbWjSro9m4xWjw=Cr8A@mail.gmail.com>
- <52038E88.2050604@ti.com> <5203B336.90102@ti.com>
- <5203C211.7040207@ti.com> <87iozfga1t.fsf@kernel.org>
- <52040E67.4050402@ti.com> <87pptndbtj.fsf@kernel.org>
-Message-ID: <CANacCWzRcyU1wA07X8Q4bCfUOQe-gXSSM0jfMw6uyLiab1r9SQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 30 Aug 2013 19:30:08 +0200
+Subject: [PATCHv2 4/4] Documentation: Add device tree bindings for
+ Freescale FTM PWM.
+In-Reply-To: <1377856132-11290-5-git-send-email-Li.Xiubo@freescale.com>
+References: <1377856132-11290-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377856132-11290-5-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20130830173008.GC30069@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(picking up an old thread, again)
+On Fri, Aug 30, 2013 at 05:48:52PM +0800, Xiubo Li wrote:
+> This patch adds the document for Freescale FTM PWM driver under
+> Documentation/devicetree/bindings/pwm/.
+> 
+> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> ---
+>  .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 40 ++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+> new file mode 100644
+> index 0000000..b2b5214
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+> @@ -0,0 +1,40 @@
+> +Freescale FTM PWM controller
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,vf610-ftm-pwm"
+> +- reg: Physical base address and length of the controller's registers
+> +- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
+> +  the cells format.
+> +- clock-names : Includes the following module clock source entries:
+> +    "ftm0" (system clock),
+> +    "ftm0_fix_sel" (fixed frequency clock),
+> +    "ftm0_ext_sel" (external clock)
+> +- clocks : Must contain an entry list for entries in clock-names.
+> +- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be one of the
+> +  entries in clock-names.
+> +- fsl,pwm-avaliable-chs: The FTM channels ID list of current board which are
+> +  available as PWM function.
+> +- For each channel's pinctrl, the "chN-active" and "chN-idle" states should be
+> +  implemented at same time.
+> +
+> +Example:
+> +
+> +pwm0: pwm at 40038000 {
+> +		compatible = "fsl,vf610-ftm-pwm";
+> +		reg = <0x40038000 0x1000>;
+> +		#pwm-cells = <3>;
+> +		clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
+> +		clocks = <&clks VF610_CLK_FTM0>,
+> +			<&clks VF610_CLK_FTM0_FIX_SEL>,
+> +			<&clks VF610_CLK_FTM0_EXT_SEL>;
+> +		pinctrl-names = "ch0-active", "ch0-idle", "ch1-active", "ch1-idle",
+> +		....;
+> +		pinctrl-0 = <&pinctrl_pwm0_ch0_active>;
+> +		pinctrl-1 = <&pinctrl_pwm0_ch0_idle>;
+> +		pinctrl-2 = <&pinctrl_pwm0_ch1_active>;
+> +		pinctrl-3 = <&pinctrl_pwm0_ch1_idle>;
+> +		...
+> +		fsl,pwm-counter-clk = "ftm0_ext_sel";
+> +		fsl,pwm-avaliable-chs = <0 3 5 6>;
 
-On Thu, Aug 8, 2013 at 7:04 PM, Kevin Hilman <khilman@linaro.org> wrote:
->
-> I disagree here.  I'm a firmware minimalist, and hiding bugs like this
-> in the firmware is wrong when Linux is otherwise managing these devices.
-> It also imposes criteria on the firmware of future SoCs that doesn't
-> belong there either.  IMO, the only stuff the firmware should do is what
-> Linux *cannot* do.
->
-> Remember, this only needs to happen when there isn't a driver for these
-> devices.  Should we communicate to the firmware that the OS has no
-> driver, so please enable the hack?  I think not.
->
+I don't think this proerty is useful. Just enable all channels. I think
+this was mentioned before.
 
-Agreed on not hiding the bugs in the firmware. Moreover, M3 can't access
-the IPs in PER domain which is where the bad modules are, so the h/w
-doesn't support such hackery (+1 for the h/w after all the -1's that it gets ;)
+Sascha
 
-[...]
-
->>> That being said, IMO, the kernel (specifically omap_device) should
->>> handle this, and it should be rather easy to do in the omap_device layer
->>> and keep the SoC suspend/resume core code simple and ignorant of these
->>> "quirks."
->>>
->>> AFAICT, there's no reason these quirks need to be dealt with immediatly
->>> on suspend.  A slight delay should be fine, as long as it's before the
->>> next suspend/idle attempt, right?
->>>
->>> Given that, what we need to do (and by we, I mean you) is to flag all
->>> broken IP blocks, and let omap_device handle them in a suspend/resume
->>> notifier (c.f. register_pm_notifier() and PM_POST_SUSPEND.)
->>
->> yes - that is the alternate that comes to mind.
->
-> In the earlier reviews of this series (many months ago now), I
-> complained about the presence of this device specific handling in the
-> core MPU PM code.  I'm somewhat troubled by the fact that nobody explored
-> alternatives that so easily come to mind.
->
-
-My bad. I was thinking along those lines [1] but after the suggestion on
-using the driver bound status i just went with that suggestion in the dumbest
-possible manner.
-
-Regards,
-Vaibhav
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/129676.html
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
