@@ -1,76 +1,56 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 30 Aug 2013 19:30:08 +0200
-Subject: [PATCHv2 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM.
-In-Reply-To: <1377856132-11290-5-git-send-email-Li.Xiubo@freescale.com>
-References: <1377856132-11290-1-git-send-email-Li.Xiubo@freescale.com>
- <1377856132-11290-5-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20130830173008.GC30069@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 30 Aug 2013 18:32:30 +0100
+Subject: [RFC PATCH 12/14] arm64: kernel: add cpu_{suspend}/{resume}
+ build infrastructure
+In-Reply-To: <1377689766-17642-13-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1377689766-17642-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1377689766-17642-13-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20130830173230.GL4650@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 05:48:52PM +0800, Xiubo Li wrote:
-> This patch adds the document for Freescale FTM PWM driver under
-> Documentation/devicetree/bindings/pwm/.
+On Wed, Aug 28, 2013 at 12:36:04PM +0100, Lorenzo Pieralisi wrote:
+> To enable the suspend infrastructure for the ARM64 kernel the
+> corresponding Kconfig and Makefile entries must be updated.
 > 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> This patch adds a menu entry for power management options and
+> entries to enable newly added suspend/resume implementation.
+> 
+> Makefile changes add appropriate entries to include corresponding
+> files in the kernel image.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > ---
->  .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 40 ++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+>  arch/arm64/Kconfig         | 12 ++++++++++++
+>  arch/arm64/kernel/Makefile |  1 +
+>  2 files changed, 13 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-> new file mode 100644
-> index 0000000..b2b5214
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-> @@ -0,0 +1,40 @@
-> +Freescale FTM PWM controller
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 5855519..827d95e 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -272,6 +272,18 @@ config SYSVIPC_COMPAT
+>  
+>  endmenu
+>  
+> +menu "Power management options"
 > +
-> +Required properties:
-> +- compatible: Should be "fsl,vf610-ftm-pwm"
-> +- reg: Physical base address and length of the controller's registers
-> +- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-> +  the cells format.
-> +- clock-names : Includes the following module clock source entries:
-> +    "ftm0" (system clock),
-> +    "ftm0_fix_sel" (fixed frequency clock),
-> +    "ftm0_ext_sel" (external clock)
-> +- clocks : Must contain an entry list for entries in clock-names.
-> +- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be one of the
-> +  entries in clock-names.
-> +- fsl,pwm-avaliable-chs: The FTM channels ID list of current board which are
-> +  available as PWM function.
-> +- For each channel's pinctrl, the "chN-active" and "chN-idle" states should be
-> +  implemented at same time.
+> +source "kernel/power/Kconfig"
 > +
-> +Example:
+> +config ARCH_SUSPEND_POSSIBLE
+> +	def_bool y
 > +
-> +pwm0: pwm at 40038000 {
-> +		compatible = "fsl,vf610-ftm-pwm";
-> +		reg = <0x40038000 0x1000>;
-> +		#pwm-cells = <3>;
-> +		clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
-> +		clocks = <&clks VF610_CLK_FTM0>,
-> +			<&clks VF610_CLK_FTM0_FIX_SEL>,
-> +			<&clks VF610_CLK_FTM0_EXT_SEL>;
-> +		pinctrl-names = "ch0-active", "ch0-idle", "ch1-active", "ch1-idle",
-> +		....;
-> +		pinctrl-0 = <&pinctrl_pwm0_ch0_active>;
-> +		pinctrl-1 = <&pinctrl_pwm0_ch0_idle>;
-> +		pinctrl-2 = <&pinctrl_pwm0_ch1_active>;
-> +		pinctrl-3 = <&pinctrl_pwm0_ch1_idle>;
-> +		...
-> +		fsl,pwm-counter-clk = "ftm0_ext_sel";
-> +		fsl,pwm-avaliable-chs = <0 3 5 6>;
+> +config ARM_CPU_SUSPEND
+> +	def_bool y
 
-I don't think this proerty is useful. Just enable all channels. I think
-this was mentioned before.
+I think we should call this ARM64_CPU_SUSPEND. The cpuidle drivers need
+to be modified anyway since things like set_cr(), scu_power_mode() etc.
+no longer apply. If a driver supports both, that's great, it can select
+both ARM and ARM64.
 
-Sascha
+Longer term, I would like a generic cpuidle driver for PSCI with DT
+bindings for describing the sleep states, target residency (not sure how
+this would look like yet).
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Catalin
