@@ -1,34 +1,102 @@
-From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
-Date: Fri, 30 Aug 2013 14:04:23 -0400
-Subject: [PATCH v2 01/13] ARM: OMAP2+: CM: reintroduce SW_SLEEP for OMAP4
-In-Reply-To: <5214688C.9030801@ti.com>
-References: <cover.1375443858.git.afzal@ti.com>
- <cfcae1c52efc51786878c60b75cc3c182bcd50a5.1375443858.git.afzal@ti.com>
- <5214688C.9030801@ti.com>
-Message-ID: <CANacCWxziz5rcvsuhCDdWFb5eC=UCg8FHxO6xbPVw2rVO3gpXQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 30 Aug 2013 15:26:05 -0300
+Subject: [PATCH] ARM: imx6qdl-wandboard: Add spdif support
+Message-ID: <1377887165-22377-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 3:13 AM, Rajendra Nayak <rnayak@ti.com> wrote:
-[...]
->> +/**
->> + * omap4_cminst_clkdm_force_sleep - try to put a clockdomain to idle
->> + * @part: PRCM partition ID that the clockdomain registers exist in
->> + * @inst: CM instance register offset (*_INST macro)
->> + * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
->> + *
->> + * Put a clockdomain referred to by (@part, @inst, @cdoffs) to idle,
->> + * forcing it to sleep.  No return value.
->> + */
->> +void omap4_cminst_clkdm_force_sleep(u8 part, s16 inst, u16 cdoffs)
->> +{
->> +     _clktrctrl_write(OMAP34XX_CLKSTCTRL_FORCE_SLEEP, part, inst, cdoffs);
->
-> I guess this won't work on omap4/5 where some clockdomains do not support
-> SW_SLEEP and only support HW_AUTO. We might need to have different clkdm
-> operations for the different omap4 variants.
->
->
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-I am probably missing something here but doesn't omap4_clkdm_clk_disable() from
-where this gets invoked have the appropriate flags in place already?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+I can see the spdif card getting probed. When I run 'aplay the spdif
+light turns on, but I cannot test it due to the lack of spdif equipment at the
+moment.
+
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 13 +++++++++++++
+ arch/arm/boot/dts/imx6qdl.dtsi           | 32 ++++++++++++++++++++++++++++----
+ 2 files changed, 41 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index a55113e..6ab91be 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -43,6 +43,13 @@
+ 		mux-int-port = <1>;
+ 		mux-ext-port = <3>;
+ 	};
++
++	sound-spdif {
++		compatible = "fsl,imx-audio-spdif";
++		model = "imx-spdif";
++		spdif-controller = <&spdif>;
++		spdif-out;
++	};
+ };
+ 
+ &audmux {
+@@ -93,6 +100,12 @@
+ 	status = "okay";
+ };
+ 
++&spdif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_spdif_3>;
++	status = "okay";
++};
++
+ &ssi1 {
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index ccd55c2..d0324ba 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -135,10 +135,27 @@
+ 				reg = <0x02000000 0x40000>;
+ 				ranges;
+ 
+-				spdif: spdif at 02004000 {
+-					reg = <0x02004000 0x4000>;
+-					interrupts = <0 52 0x04>;
+-				};
++			spdif: spdif at 02004000 {
++				compatible = "fsl,imx35-spdif";
++				reg = <0x02004000 0x4000>;
++				interrupts = <0 52 0x04>;
++				dmas = <&sdma 14 18 0>,
++				       <&sdma 15 18 0>;
++				dma-names = "rx", "tx";
++
++				clocks = <&clks 197>, <&clks 3>,
++					 <&clks 197>, <&clks 107>,
++					 <&clks 0>, <&clks 118>,
++					 <&clks 62>, <&clks 139>,
++					 <&clks 0>;
++				clock-names = "core", "rxtx0",
++					      "rxtx1", "rxtx2",
++					      "rxtx3", "rxtx4",
++					      "rxtx5", "rxtx6",
++					      "rxtx7";
++
++				status = "disabled";
++			};
+ 
+ 				ecspi1: ecspi at 02008000 {
+ 					#address-cells = <1>;
+@@ -1010,6 +1027,13 @@
+ 							MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x1b0b0
+ 						>;
+ 					};
++
++					pinctrl_spdif_3: spdifgrp-3 {
++						fsl,pins = <
++							MX6QDL_PAD_ENET_RXD0__SPDIF_OUT 0x1b0b0
++						>;
++					};
++
+ 				};
+ 
+ 				uart1 {
+-- 
+1.8.1.2
