@@ -1,82 +1,131 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 30 Aug 2013 11:09:08 +0100
-Subject: [PATCH repost-for-3.12] Move the EM_ARM and EM_AARCH64
- definitions to uapi/linux/elf-em.h
-In-Reply-To: <20130828132451.GA9237@gmail.com>
-References: <20130502132756.GD20730@arm.com>
- <1367742253-22294-1-git-send-email-alonid@stratoscale.com>
- <20130828132451.GA9237@gmail.com>
-Message-ID: <20130830100908.GF62188@MacBook-Pro.local>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 30 Aug 2013 12:15:04 +0200
+Subject: [PATCH 1/2] ARM: EXYNOS: convert cpuidle driver to be a platform
+ driver
+Message-ID: <86136702.IKrZfWSsO8@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, are you ok with the patch below? I can push it upstream if you
-ack it (I don't think it's worth splitting in two patches since arm64
-needs EM_ARM for compat as well).
+ARM EXYNOS cpuidle driver is currently not multiplatform support ready
+(as it uses device_initcall() for initialization and doesn't check on
+what platform it is running). Fix it by converting the driver to be
+a platform driver and registering exynos_cpuidle platform device from
+exynos[4,5]_dt_machine_init().
 
-Thanks.
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Tomasz Figa <t.figa@samsung.com>
+Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
+---
+ arch/arm/mach-exynos/common.c          | 11 +++++++++++
+ arch/arm/mach-exynos/common.h          |  1 +
+ arch/arm/mach-exynos/cpuidle.c         | 14 ++++++++++++--
+ arch/arm/mach-exynos/mach-exynos4-dt.c |  2 ++
+ arch/arm/mach-exynos/mach-exynos5-dt.c |  2 ++
+ 5 files changed, 28 insertions(+), 2 deletions(-)
 
-On Wed, Aug 28, 2013 at 02:24:53PM +0100, Dan Aloni wrote:
-> Signed-off-by: Dan Aloni <alonid@stratoscale.com>
-> ---
->  arch/arm/include/asm/elf.h   | 2 --
->  arch/arm64/include/asm/elf.h | 3 ---
->  include/uapi/linux/elf-em.h  | 2 ++
->  3 files changed, 2 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-> index 56211f2..f4b46d3 100644
-> --- a/arch/arm/include/asm/elf.h
-> +++ b/arch/arm/include/asm/elf.h
-> @@ -19,8 +19,6 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
->  
->  typedef struct user_fp elf_fpregset_t;
->  
-> -#define EM_ARM	40
-> -
->  #define EF_ARM_EABI_MASK	0xff000000
->  #define EF_ARM_EABI_UNKNOWN	0x00000000
->  #define EF_ARM_EABI_VER1	0x01000000
-> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> index fe32c0e..e7fa87f 100644
-> --- a/arch/arm64/include/asm/elf.h
-> +++ b/arch/arm64/include/asm/elf.h
-> @@ -33,8 +33,6 @@ typedef unsigned long elf_greg_t;
->  typedef elf_greg_t elf_gregset_t[ELF_NGREG];
->  typedef struct user_fpsimd_state elf_fpregset_t;
->  
-> -#define EM_AARCH64		183
-> -
->  /*
->   * AArch64 static relocation types.
->   */
-> @@ -151,7 +149,6 @@ extern unsigned long arch_randomize_brk(struct mm_struct *mm);
->  #define arch_randomize_brk arch_randomize_brk
->  
->  #ifdef CONFIG_COMPAT
-> -#define EM_ARM				40
->  #define COMPAT_ELF_PLATFORM		("v8l")
->  
->  #define COMPAT_ELF_ET_DYN_BASE		(randomize_et_dyn(2 * TASK_SIZE_32 / 3))
-> diff --git a/include/uapi/linux/elf-em.h b/include/uapi/linux/elf-em.h
-> index 8e2b7ba..59c17a2 100644
-> --- a/include/uapi/linux/elf-em.h
-> +++ b/include/uapi/linux/elf-em.h
-> @@ -22,6 +22,7 @@
->  #define EM_PPC		20	/* PowerPC */
->  #define EM_PPC64	21	 /* PowerPC64 */
->  #define EM_SPU		23	/* Cell BE SPU */
-> +#define EM_ARM		40	/* ARM 32 bit */
->  #define EM_SH		42	/* SuperH */
->  #define EM_SPARCV9	43	/* SPARC v9 64-bit */
->  #define EM_IA_64	50	/* HP/Intel IA-64 */
-> @@ -34,6 +35,7 @@
->  #define EM_MN10300	89	/* Panasonic/MEI MN10300, AM33 */
->  #define EM_BLACKFIN     106     /* ADI Blackfin Processor */
->  #define EM_TI_C6000	140	/* TI C6X DSPs */
-> +#define EM_AARCH64	183	/* ARM 64 bit */
->  #define EM_FRV		0x5441	/* Fujitsu FR-V */
->  #define EM_AVR32	0x18ad	/* Atmel AVR32 */
->  
-> -- 
-> 1.8.1.4
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index ba95e5d..c17407b 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -30,6 +30,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/irqchip/arm-gic.h>
+ #include <linux/irqchip/chained_irq.h>
++#include <linux/platform_device.h>
+ 
+ #include <asm/proc-fns.h>
+ #include <asm/exception.h>
+@@ -294,6 +295,16 @@ void exynos5_restart(enum reboot_mode mode, const char *cmd)
+ 	__raw_writel(val, addr);
+ }
+ 
++static struct platform_device exynos_cpuidle = {
++	.name		= "exynos_cpuidle",
++	.id		= -1,
++};
++
++void __init exynos_cpuidle_init(void)
++{
++	platform_device_register(&exynos_cpuidle);
++}
++
+ void __init exynos_init_late(void)
+ {
+ 	if (of_machine_is_compatible("samsung,exynos5440"))
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 8646a14..b2ac188 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -22,6 +22,7 @@ struct map_desc;
+ void exynos_init_io(void);
+ void exynos4_restart(enum reboot_mode mode, const char *cmd);
+ void exynos5_restart(enum reboot_mode mode, const char *cmd);
++void exynos_cpuidle_init(void);
+ void exynos_init_late(void);
+ 
+ void exynos_firmware_init(void);
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index 225ee84..8e881e0 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -15,6 +15,7 @@
+ #include <linux/io.h>
+ #include <linux/export.h>
+ #include <linux/time.h>
++#include <linux/platform_device.h>
+ 
+ #include <asm/proc-fns.h>
+ #include <asm/smp_scu.h>
+@@ -192,7 +193,7 @@ static void __init exynos5_core_down_clk(void)
+ 	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+ }
+ 
+-static int __init exynos4_init_cpuidle(void)
++static int __init exynos_cpuidle_probe(struct platform_device *pdev)
+ {
+ 	int cpu_id, ret;
+ 	struct cpuidle_device *device;
+@@ -223,4 +224,13 @@ static int __init exynos4_init_cpuidle(void)
+ 
+ 	return 0;
+ }
+-device_initcall(exynos4_init_cpuidle);
++
++static struct platform_driver exynos_cpuidle_driver = {
++	.probe	= exynos_cpuidle_probe,
++	.driver = {
++		.name = "exynos_cpuidle",
++		.owner = THIS_MODULE,
++	},
++};
++
++module_platform_driver(exynos_cpuidle_driver);
+diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
+index 0099c6c..53a3dc3 100644
+--- a/arch/arm/mach-exynos/mach-exynos4-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+@@ -25,6 +25,8 @@
+ 
+ static void __init exynos4_dt_machine_init(void)
+ {
++	exynos_cpuidle_init();
++
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index f874b77..c9f7dd1 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -47,6 +47,8 @@ static void __init exynos5_dt_machine_init(void)
+ 		}
+ 	}
+ 
++	exynos_cpuidle_init();
++
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-- 
+1.8.2.3
