@@ -1,139 +1,189 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Fri, 30 Aug 2013 16:06:30 +0530
-Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
- with external L3-cache.
-In-Reply-To: <20130830094443.GB62188@MacBook-Pro.local>
-References: <747a0675165da4ef147bbda4e140549b@www.loen.fr>
- <CAAhSdy3t1B_94qiYiLeR2-imQU0KCct6+76kjW_FS=QgAtTb3g@mail.gmail.com>
- <5935339137684ecf90dd484cc5739548@www.loen.fr>
- <20130815165344.GA3853@cbox>
- <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
- <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
- <20130829105235.GC13704@arm.com>
- <CAAhSdy0NgSchR1p_HJTUMMV2h7f7beFMnN3Md4xEp=EGRiXVMg@mail.gmail.com>
- <20130829125337.GG13704@arm.com>
- <CAAhSdy3076pYM=nh0OTm_pxBdPAtCPbw96zExYuRvcdYD656PA@mail.gmail.com>
- <20130830094443.GB62188@MacBook-Pro.local>
-Message-ID: <CAAhSdy2gsJHjEsB01v+jJwhY6pt6Y2m9L+kdw45P3NX0aYVLDg@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 30 Aug 2013 12:42:23 +0200
+Subject: [PATCH v7 2/4] drivers: of: add function to scan fdt nodes given
+ by path
+In-Reply-To: <20130829214007.CDB813E1222@localhost>
+References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
+ <1377527959-5080-3-git-send-email-m.szyprowski@samsung.com>
+ <20130829214007.CDB813E1222@localhost>
+Message-ID: <5220770F.9080806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 3:14 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Aug 29, 2013 at 05:02:50PM +0100, Anup Patel wrote:
->> On Thu, Aug 29, 2013 at 6:23 PM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->> > On Thu, Aug 29, 2013 at 01:31:43PM +0100, Anup Patel wrote:
->> >> On Thu, Aug 29, 2013 at 4:22 PM, Catalin Marinas
->> >> <catalin.marinas@arm.com> wrote:
->> >> > On Fri, Aug 16, 2013 at 07:57:55AM +0100, Anup Patel wrote:
->> >> >> The approach of flushing d-cache by set/way upon first run of VCPU will
->> >> >> not work because for set/way operations ARM ARM says: "For set/way
->> >> >> operations, and for All (entire cache) operations, the point is defined to be
->> >> >> to the next level of caching". In other words, set/way operations work upto
->> >> >> point of unification.
->> >> >
->> >> > I don't understand where you got the idea that set/way operations work
->> >> > up to the point of unification. This is incorrect, the set/way
->> >> > operations work on the level of cache specified by bits 3:1 in the
->> >> > register passed to the DC CISW instruction. For your L3 cache, those
->> >> > bits would be 2 (and __flush_dcache_all() implementation does this
->> >> > dynamically).
->> >>
->> >> The L3-cache is not visible to CPU. It is totally independent and transparent
->> >> to CPU.
->> >
->> > OK. But you say that operations like DC CIVAC actually flush the L3? So
->> > I don't see it as completely transparent to the CPU.
->>
->> It is transparent from CPU perspective. In other words, there is nothing in
->> CPU for controlling/monitoring L3-cache.
+Hello,
+
+On 8/29/2013 11:40 PM, Grant Likely wrote:
+> On Mon, 26 Aug 2013 16:39:17 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > Add a function to scan the flattened device-tree starting from the
+> > node given by the path. It is used to extract information (like reserved
+> > memory), which is required on early boot before we can unflatten the tree.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Acked-by: Michal Nazarewicz <mina86@mina86.com>
+> > Acked-by: Tomasz Figa <t.figa@samsung.com>
+> > Reviewed-by: Rob Herring <rob.herring@calxeda.com>
 >
-> We probably have a different understanding of "transparent". It doesn't
-> look to me like any more transparent than the L1 or L2 cache. Basically,
-> from a software perspective, it needs maintenance. Whether the CPU
-> explicitly asks the L3 cache for this or the L3 cache figures it on its
-> own based on the L1/L2 operations is irrelevant.
-
-Yes, we have a different understanding regarding "transparent". The goal
-behind our L3 is to have external cache such that CPU is not aware of it
-and CPU would work fine even if L3 is turned-off on-the-fly. Further such
-L3 has to be smarter than normal outer-caches because it will be
-maintained automatically by observing CPU operations.
-
+> Some nits below, but otherwise:
 >
-> It would have been transparent if the software didn't need to know about
-> it at all, but it's not the case.
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-Currently, KVM is the only place where we need L3 maintenance because
-Guest starts with MMU turned-off otherwise we don't need L3 maintenance
-in kernel for any kind of IO or Subsystem.
+Thanks!
 
+> I'm happy to take this through the DT tree, or have you take it via the
+> CMA tree.
+
+I have already put the whole patchset in linux-next via my 
+dma-mapping/cma tree,
+so I would like to keep it there to avoid further confusion.
+
+I only wonder how to handle the patches to get them merged to v3.12-rc1.
+After your review there will be some changes to the binding, its 
+documentation
+and the code itself. Would you mind if I send pull request with the current
+version and then provide incremental patches to fix the issues you have
+reported? Or should we delay this patchset till v3.13-rc1?
+
+> > ---
+> >  drivers/of/fdt.c       |   76 ++++++++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/of_fdt.h |    3 ++
+> >  2 files changed, 79 insertions(+)
+> >
+> > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> > index b10ba00..4fb06f3 100644
+> > --- a/drivers/of/fdt.c
+> > +++ b/drivers/of/fdt.c
+> > @@ -545,6 +545,82 @@ int __init of_flat_dt_match(unsigned long node, const char *const *compat)
+> >  	return of_fdt_match(initial_boot_params, node, compat);
+> >  }
+> >
+> > +struct fdt_scan_status {
+> > +	const char *name;
+> > +	int namelen;
+> > +	int depth;
+> > +	int found;
+> > +	int (*iterator)(unsigned long node, const char *uname, int depth, void *data);
+> > +	void *data;
+> > +};
+> > +
+> > +/**
+> > + * fdt_scan_node_by_path - iterator for of_scan_flat_dt_by_path function
+> > + */
+> > +static int __init fdt_scan_node_by_path(unsigned long node, const char *uname,
+> > +					int depth, void *data)
 >
->> > Do you have any configuration bits which would make the L3 completely
->> > transparent like always caching even when accesses are non-cacheable and
->> > DC ops to PoC ignoring it?
->>
->> Actually, L3-cache monitors the types of read/write generated by CPU (i.e.
->> whether the request is cacheable/non-cacheable or whether the request is
->> due to DC ops to PoC, or ...).
->>
->> To answer your query, there is no configuration to have L3 caching when
->> accesses are non-cacheable and DC ops to PoC.
+> Nit: since this is an iterator, I'd like to see "iter" in the function
+> name.
 >
-> So it's an outer cache with some "improvements" to handle DC ops to PoC.
-> I think it was a pretty bad decision on the hardware side as we really
-> try to get rid of outer caches for many reasons:
-
-Getting rid off outer-caches (such as in this context) may make sense for
-Embedded/Low-end systems but for Servers L3-cache makes lot of sense.
-
-Claiming this to be a bad decision all depends on what end application
-you are looking at.
-
+> > +{
+> > +	struct fdt_scan_status *st = data;
+> > +
+> > +	/*
+> > +	 * if scan at the requested fdt node has been completed,
+> > +	 * return -ENXIO to abort further scanning
+> > +	 */
+> > +	if (depth <= st->depth)
+> > +		return -ENXIO;
+> > +
+> > +	/* requested fdt node has been found, so call iterator function */
+> > +	if (st->found)
+> > +		return st->iterator(node, uname, depth, st->data);
+> > +
+> > +	/* check if scanning automata is entering next level of fdt nodes */
+> > +	if (depth == st->depth + 1 &&
+> > +	    strncmp(st->name, uname, st->namelen) == 0 &&
+> > +	    uname[st->namelen] == 0) {
+> > +		st->depth += 1;
+> > +		if (st->name[st->namelen] == 0) {
+> > +			st->found = 1;
+> > +		} else {
+> > +			const char *next = st->name + st->namelen + 1;
+> > +			st->name = next;
+> > +			st->namelen = strcspn(next, "/");
+> > +		}
+> > +		return 0;
 >
-> 1. Non-standard cache flushing operations (MMIO-based)
-> 2. It may require cache maintenance by physical address - something
->    hard to get in a guest OS (unless you virtualise L3 cache
->    maintenance)
-
-We don't have cache maintenance by physical address in our L3-cache.
-
-> 3. Are barriers like DSB propagated correctly? Does a DC op to PoC
->    followed by DSB ensure that the L3 drained the cachelines to RAM?
-
-Yes, DSB works perfectly fine for us with L3.
-Yes, DC op to PoC followed by DSB works fine with L3 too.
-
+> The above return statement is redundant.
 >
-> I think point 2 isn't required because your L3 detects DC ops to PoC. I
-> hope point 3 is handled correctly (otherwise look how "nice" the mb()
-> macro on arm is to cope with L2x0).
+> > +	}
+> > +
+> > +	/* scan next fdt node */
+> > +	return 0;
+> > +}
+> > +
+> > +/**
+> > + * of_scan_flat_dt_by_path - scan flattened tree blob and call callback on each
+> > + *			     child of the given path.
+> > + * @path: path to start searching for children
+> > + * @it: callback function
+> > + * @data: context data pointer
+> > + *
+> > + * This function is used to scan the flattened device-tree starting from the
+> > + * node given by path. It is used to extract information (like reserved
+> > + * memory), which is required on ealy boot before we can unflatten the tree.
+> > + */
+> > +int __init of_scan_flat_dt_by_path(const char *path,
+> > +	int (*it)(unsigned long node, const char *name, int depth, void *data),
+> > +	void *data)
 >
-> If only 1 is left, we don't need the full outer_cache framework but it
-> still needs to be addressed since the assumption is that flush_cache_all
-> (or __flush_dcache_all) flushes all cache levels. These are not used in
-> generic code but are used during kernel booting, KVM and cpuidle
-> drivers.
+> Nit: Please match the indentation convention used by of_scan_flat_dt().
+> This current version is really hard to read.
 >
->> > Now, back to the idea of outer_cache framework for arm64. Does your CPU
->> > have separate instructions for flushing this L3 cache?
->>
->> No, CPU does not have separate instruction for flushing L3-cache. On the
->> other hand, L3-cache has MMIO registers which can be use to explicitly
->> flush L3-cache.
+> > +{
+> > +	struct fdt_scan_status st = {path, 0, -1, 0, it, data};
 >
-> I guess you use those in your firmware or boot loader since Linux
-> requires clean/invalidated caches at boot (and I plan to push a patch
-> which removes kernel D-cache cleaning during boot to spot such problems
-> early). A cpuidle driver would probably need this as well.
+> This is a little fragile. If the structure gets modified, this line
+> will break. I know it results in more text, but please use explicit data
+> member assignments in initializers.
+>
+> > +	int ret = 0;
+> > +
+> > +	if (initial_boot_params)
+>
+> Nit:
+> 	if (!initial_boot_params)
+> 		return 0;
+>
+> > +                ret = of_scan_flat_dt(fdt_scan_node_by_path, &st);
+>
+> Nit: inconsitent indentation (tabs vs. spaces)
+>
+> > +
+> > +	if (!st.found)
+> > +		return -ENOENT;
+> > +	else if (ret == -ENXIO)	/* scan has been completed */
+> > +		return 0;
+> > +	else
+> > +		return ret;
+>
+> Both uses of 'else' above are redundant. The only way the execution will
+> pass that point is if it was the else case!
+>
+> > +}
+> > +
+> >  #ifdef CONFIG_BLK_DEV_INITRD
+> >  /**
+> >   * early_init_dt_check_for_initrd - Decode initrd location from flat tree
+> > diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+> > index ed136ad..19f26f8 100644
+> > --- a/include/linux/of_fdt.h
+> > +++ b/include/linux/of_fdt.h
+> > @@ -90,6 +90,9 @@ extern void *of_get_flat_dt_prop(unsigned long node, const char *name,
+> >  extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
+> >  extern int of_flat_dt_match(unsigned long node, const char *const *matches);
+> >  extern unsigned long of_get_flat_dt_root(void);
+> > +extern int of_scan_flat_dt_by_path(const char *path,
+> > +	int (*it)(unsigned long node, const char *name, int depth, void *data),
+> > +	void *data);
+> >
+> >  extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
+> >  				     int depth, void *data);
+> > --
+> > 1.7.9.5
+> >
+>
+>
 
-Yes, cpuidle would be another place where we may need L3-cache
-maintenance. In other words, if we need to power-off L3-cache from
-kernel then we need to first flush it.
-
->
-> --
-> Catalin
-
---Anup
+Best regards
+-- 
+Marek Szyprowski
+Samsung R&D Institute Poland
