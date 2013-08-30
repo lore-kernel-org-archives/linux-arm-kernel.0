@@ -1,88 +1,82 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Fri, 30 Aug 2013 11:07:28 +0100
-Subject: [PATCH v6 0/5] ARM/ARM64 architected timer updates
-In-Reply-To: <1377788142-21388-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1377788142-21388-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <52206EE0.5020907@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 30 Aug 2013 11:09:08 +0100
+Subject: [PATCH repost-for-3.12] Move the EM_ARM and EM_AARCH64
+ definitions to uapi/linux/elf-em.h
+In-Reply-To: <20130828132451.GA9237@gmail.com>
+References: <20130502132756.GD20730@arm.com>
+ <1367742253-22294-1-git-send-email-alonid@stratoscale.com>
+ <20130828132451.GA9237@gmail.com>
+Message-ID: <20130830100908.GF62188@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/08/13 15:55, Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> 
-> This patch series adds support to configure the rate and enable the
-> event stream for architected timer. The event streams can be used to
-> impose a timeout on a wfe, to safeguard against any programming error
-> in case an expected event is not generated or even to implement
-> wfe-based timeouts for userspace locking implementations. This feature
-> can be disabled(enabled by default).
-> 
-> Since the timer control register is reset to zero on warm boot, CPU
-> PM notifier is added to save and restore the value.
-> 
-Hi Russell,
+Russell, are you ok with the patch below? I can push it upstream if you
+ack it (I don't think it's worth splitting in two patches since arm64
+needs EM_ARM for compat as well).
 
-Can you have a look at this series ?
-If you are OK, can I have your ACK on arm specific changes(PATCH 2/5) ?
+Thanks.
 
-Regards,
-Sudeep
-
-> Changes v5->v6:
-> 1. Disabling event stream by default on boot and enable it
->    only if CONFIG_ARM_ARCH_TIMER_EVTSTREAM=y
->    This removes runtime configuration of timer event stream.
-> 2. Moved COMPAT_ELF_HWCAP_DEFAULT to arch/arm64/kernel/setup.c
+On Wed, Aug 28, 2013 at 02:24:53PM +0100, Dan Aloni wrote:
+> Signed-off-by: Dan Aloni <alonid@stratoscale.com>
+> ---
+>  arch/arm/include/asm/elf.h   | 2 --
+>  arch/arm64/include/asm/elf.h | 3 ---
+>  include/uapi/linux/elf-em.h  | 2 ++
+>  3 files changed, 2 insertions(+), 5 deletions(-)
 > 
-> Changes v4->v5:
-> 1. Removed compat_dyn_elf_hwcap and used just compat_elf_hwcap as per
->    Catalin's suggestion
-> 2. Instead of resetting event stream in CPU PM callbacks, saving and
->    restoring counter control register now.
-> 
-> Changes v3->v4:
-> 1. Added a config option to en/disable the timer event stream feature.
->    Due to this the ordering of the patches as well as some cosmetic
->    code changes are done.( So dropped previous reviewed-by tags)
-> 2. Removed exporting compat_dyn_elf_hwcap as there are no modules
->    requiring it for now.
-> 
-> Changes v2->v3:
-> 1. Moved ARM and ARM64 changes into separate patches
-> 2. Added native hwcaps definations(ARM/ARM64) and compat-specific
->    definitions(ARM64) to the users for the event stream feature. 
-> 
-> Changes v1->v2:
-> 1. Saved event stream divider value on cold reset path and re-used it
->    in CPU PM notifier instead of calculating every time.
-> 2. Rebased on v3.11-rc2(to avoid conflicts with __cpuinit* deletion)
-> 3. Dropped "ARM/ARM64: arch_timer: remove __cpuinit attribute for
->    arch_counter_set_user_access"(already done as part of __cpuinit*
->    deletion)
-> 
-> Regards,
-> Sudeep
-> 
-> 
-> Sudeep KarkadaNagesha (4):
->   ARM/ARM64: arch_timer: add macros for bits in control register
->   ARM: arch_timer: add support to configure and enable event stream
->   ARM64: arch_timer: add support to configure and enable event stream
->   drivers: clocksource: add CPU PM notifier for ARM architected timer
-> 
-> Will Deacon (1):
->   drivers: clocksource: add support for ARM architected timer event
->     stream
-> 
->  arch/arm/include/asm/arch_timer.h    | 36 ++++++++++++++++++++++----
->  arch/arm/include/uapi/asm/hwcap.h    |  1 +
->  arch/arm/kernel/setup.c              |  1 +
->  arch/arm64/include/asm/arch_timer.h  | 42 ++++++++++++++++++++++++++-----
->  arch/arm64/include/asm/hwcap.h       | 11 ++++----
->  arch/arm64/include/uapi/asm/hwcap.h  |  1 +
->  arch/arm64/kernel/setup.c            | 11 ++++++++
->  drivers/clocksource/Kconfig          | 14 +++++++++++
->  drivers/clocksource/arm_arch_timer.c | 49 ++++++++++++++++++++++++++++++++++++
->  include/clocksource/arm_arch_timer.h | 10 ++++++++
->  10 files changed, 160 insertions(+), 16 deletions(-)
-> 
+> diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+> index 56211f2..f4b46d3 100644
+> --- a/arch/arm/include/asm/elf.h
+> +++ b/arch/arm/include/asm/elf.h
+> @@ -19,8 +19,6 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+>  
+>  typedef struct user_fp elf_fpregset_t;
+>  
+> -#define EM_ARM	40
+> -
+>  #define EF_ARM_EABI_MASK	0xff000000
+>  #define EF_ARM_EABI_UNKNOWN	0x00000000
+>  #define EF_ARM_EABI_VER1	0x01000000
+> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> index fe32c0e..e7fa87f 100644
+> --- a/arch/arm64/include/asm/elf.h
+> +++ b/arch/arm64/include/asm/elf.h
+> @@ -33,8 +33,6 @@ typedef unsigned long elf_greg_t;
+>  typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+>  typedef struct user_fpsimd_state elf_fpregset_t;
+>  
+> -#define EM_AARCH64		183
+> -
+>  /*
+>   * AArch64 static relocation types.
+>   */
+> @@ -151,7 +149,6 @@ extern unsigned long arch_randomize_brk(struct mm_struct *mm);
+>  #define arch_randomize_brk arch_randomize_brk
+>  
+>  #ifdef CONFIG_COMPAT
+> -#define EM_ARM				40
+>  #define COMPAT_ELF_PLATFORM		("v8l")
+>  
+>  #define COMPAT_ELF_ET_DYN_BASE		(randomize_et_dyn(2 * TASK_SIZE_32 / 3))
+> diff --git a/include/uapi/linux/elf-em.h b/include/uapi/linux/elf-em.h
+> index 8e2b7ba..59c17a2 100644
+> --- a/include/uapi/linux/elf-em.h
+> +++ b/include/uapi/linux/elf-em.h
+> @@ -22,6 +22,7 @@
+>  #define EM_PPC		20	/* PowerPC */
+>  #define EM_PPC64	21	 /* PowerPC64 */
+>  #define EM_SPU		23	/* Cell BE SPU */
+> +#define EM_ARM		40	/* ARM 32 bit */
+>  #define EM_SH		42	/* SuperH */
+>  #define EM_SPARCV9	43	/* SPARC v9 64-bit */
+>  #define EM_IA_64	50	/* HP/Intel IA-64 */
+> @@ -34,6 +35,7 @@
+>  #define EM_MN10300	89	/* Panasonic/MEI MN10300, AM33 */
+>  #define EM_BLACKFIN     106     /* ADI Blackfin Processor */
+>  #define EM_TI_C6000	140	/* TI C6X DSPs */
+> +#define EM_AARCH64	183	/* ARM 64 bit */
+>  #define EM_FRV		0x5441	/* Fujitsu FR-V */
+>  #define EM_AVR32	0x18ad	/* Atmel AVR32 */
+>  
+> -- 
+> 1.8.1.4
