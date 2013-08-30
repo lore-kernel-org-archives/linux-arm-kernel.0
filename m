@@ -1,90 +1,42 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 30 Aug 2013 15:26:00 +0100
-Subject: [PATCH] ARM: dts: vexpress: Add CCI node to TC2 device-tree
-Message-ID: <1377872760.3655.48.camel@linaro1.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 30 Aug 2013 15:30:52 +0100
+Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
+ with external L3-cache.
+In-Reply-To: <ac8cf7fa4f4bced56856c58ef335d7a9@www.loen.fr>
+References: <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
+ <20130816171912.GB20246@cbox>
+ <CAAhSdy2bk6Ou=326cYJW2wKvm9pffbRRmO2ABFwF9dmqwWdKqQ@mail.gmail.com>
+ <20130816175034.GE20246@cbox>
+ <CAAhSdy3B5JTcd7==u_QzS3V5k7pYkymtiLa7X=yZH+=eSBAw8w@mail.gmail.com>
+ <20130830095215.GC62188@MacBook-Pro.local>
+ <CAAhSdy0Hm1k+mWGGxUOzAA=5yVGNOERfo=36jcE1cvkUM=xtVg@mail.gmail.com>
+ <bc23926cb9f202d8b63d729c584af791@www.loen.fr>
+ <20130830140446.GA14125@darko.cambridge.arm.com>
+ <ac8cf7fa4f4bced56856c58ef335d7a9@www.loen.fr>
+Message-ID: <20130830143052.GH12160@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Versatile Express V2P-CA15_A7 (aka TC2) has a CCI-400 which is
-needed to get Multi-Cluster Power Management (MCPM) working.
+On Fri, Aug 30, 2013 at 03:22:11PM +0100, Marc Zyngier wrote:
+> On 2013-08-30 15:04, Catalin Marinas wrote:
+> > On Fri, Aug 30, 2013 at 02:21:57PM +0100, Marc Zyngier wrote:
+> >> On 2013-08-30 11:44, Anup Patel wrote:
+> >> > For KVM, we can avoid flushing d-cache to PoC every time in
+> >> > coherent_icache_guest_page() by only doing it when Guest MMU is
+> >> > turned-off. This may reduce the performance penalty.
+> >>
+> >> What about the I and C bits in SCTLR_EL1? Does L3 also honour these
+> >> bits?
+> >
+> > I would think so, it probably cares about how the transactions are
+> > presented at the bus level by the CPU.
+> 
+> That'd make sense indeed. So we need to track both SCTLR_EL1.{I,C,M} in 
+> order to find out whether or not we need to clean the cache.
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
+<horrible hack>
+Could you use a dummy ATS_* operation, then read the cacheability attributes
+out of the PAR?
+</horrible hack>
 
-I was unsure if the devicetree list should be cc'd when making use of
-already agreed and documented bindings, so I erred on the side of
-caution and added it. Please say if this is unnecessary noise, or is
-expected for all device-tree changes, thanks.
-
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-index d2803be..12bd4ea 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-@@ -37,30 +37,35 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
-+			cci-control-port = <&cci_control1>;
- 		};
- 
- 		cpu1: cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <1>;
-+			cci-control-port = <&cci_control1>;
- 		};
- 
- 		cpu2: cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x100>;
-+			cci-control-port = <&cci_control2>;
- 		};
- 
- 		cpu3: cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x101>;
-+			cci-control-port = <&cci_control2>;
- 		};
- 
- 		cpu4: cpu at 4 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x102>;
-+			cci-control-port = <&cci_control2>;
- 		};
- 	};
- 
-@@ -104,6 +109,26 @@
- 		interrupts = <1 9 0xf04>;
- 	};
- 
-+	cci at 2c090000 {
-+		compatible = "arm,cci-400";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0 0x2c090000 0 0x1000>;
-+		ranges = <0x0 0x0 0x2c090000 0x10000>;
-+
-+		cci_control1: slave-if at 4000 {
-+			compatible = "arm,cci-400-ctrl-if";
-+			interface-type = "ace";
-+			reg = <0x4000 0x1000>;
-+		};
-+
-+		cci_control2: slave-if at 5000 {
-+			compatible = "arm,cci-400-ctrl-if";
-+			interface-type = "ace";
-+			reg = <0x5000 0x1000>;
-+		};
-+	};
-+
- 	memory-controller at 7ffd0000 {
- 		compatible = "arm,pl354", "arm,primecell";
- 		reg = <0 0x7ffd0000 0 0x1000>;
--- 
-1.7.10.4
+Will
