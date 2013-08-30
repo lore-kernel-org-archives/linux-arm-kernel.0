@@ -1,181 +1,103 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 30 Aug 2013 20:10:04 -0300
-Subject: [PATCH v3 2/2] ARM: kirkwood: Add standby support
-In-Reply-To: <1377186547-14284-3-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1377186547-14284-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377186547-14284-3-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130830231003.GA2398@localhost>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Fri, 30 Aug 2013 16:12:24 -0700
+Subject: [PATCH 12/16] Fix types in EFI calls to match EFI function
+ definitions.
+In-Reply-To: <20130830133902.AEA7A3E102A@localhost>
+References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
+ <1376090777-20090-13-git-send-email-roy.franz@linaro.org>
+ <20130830133902.AEA7A3E102A@localhost>
+Message-ID: <CAFECyb-J4gTiAQkKVT8qt94Tk6-_jVdX=sNM7VkXkyvPdEeZFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 22, 2013 at 12:49:07PM -0300, Ezequiel Garcia wrote:
-> Implements standby support for Kirkwood SoC. When the SoC enters
-> standby state the memory PM units are disabled, the DDR is set
-> in self-refresh mode, and the CPU is set in WFI.
-> 
-> At this point there's no clock gating, as that is considered each
-> driver's task.
-> 
-> Signed-off-by: Simon Guinot <sguinot@lacie.com>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/mach-kirkwood/Makefile                   |  2 +
->  arch/arm/mach-kirkwood/board-dt.c                 |  1 +
->  arch/arm/mach-kirkwood/common.c                   |  1 +
->  arch/arm/mach-kirkwood/common.h                   |  6 ++
->  arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  2 +
->  arch/arm/mach-kirkwood/pm.c                       | 73 +++++++++++++++++++++++
->  6 files changed, 85 insertions(+)
->  create mode 100644 arch/arm/mach-kirkwood/pm.c
-> 
-> diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-> index ac4cd75..ac78dcc 100644
-> --- a/arch/arm/mach-kirkwood/Makefile
-> +++ b/arch/arm/mach-kirkwood/Makefile
-> @@ -1,4 +1,6 @@
->  obj-y				+= common.o irq.o pcie.o mpp.o
-> +obj-$(CONFIG_PM)		+= pm.o
-> +
->  
->  obj-$(CONFIG_MACH_D2NET_V2)		+= d2net_v2-setup.o lacie_v2-common.o
->  obj-$(CONFIG_MACH_DOCKSTAR)		+= dockstar-setup.o
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index 6e122ed..2d4a4aa 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -96,6 +96,7 @@ static void __init kirkwood_dt_init(void)
->  	/* Setup root of clk tree */
->  	kirkwood_of_clk_init();
->  
-> +	kirkwood_pm_init();
->  	kirkwood_cpuidle_init();
->  
->  #ifdef CONFIG_KEXEC
-> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-> index e9238b5..aceb68a 100644
-> --- a/arch/arm/mach-kirkwood/common.c
-> +++ b/arch/arm/mach-kirkwood/common.c
-> @@ -717,6 +717,7 @@ void __init kirkwood_init(void)
->  	kirkwood_xor1_init();
->  	kirkwood_crypto_init();
->  
-> +	kirkwood_pm_init();
->  	kirkwood_cpuidle_init();
->  #ifdef CONFIG_KEXEC
->  	kexec_reinit = kirkwood_enable_pcie;
-> diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-> index fcf3ba6..2be1226 100644
-> --- a/arch/arm/mach-kirkwood/common.h
-> +++ b/arch/arm/mach-kirkwood/common.h
-> @@ -58,6 +58,12 @@ void kirkwood_cpufreq_init(void);
->  void kirkwood_restart(enum reboot_mode, const char *);
->  void kirkwood_clk_init(void);
->  
-> +#ifdef CONFIG_PM
-> +void kirkwood_pm_init(void);
-> +#else
-> +static inline void kirkwood_pm_init(void) {};
-> +#endif
-> +
->  /* board init functions for boards not fully converted to fdt */
->  #ifdef CONFIG_MACH_DREAMPLUG_DT
->  void dreamplug_init(void);
-> diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-> index 91242c9..8b9d1c9 100644
-> --- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-> +++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-> @@ -78,4 +78,6 @@
->  #define CGC_TDM			(1 << 20)
->  #define CGC_RESERVED		(0x6 << 21)
->  
-> +#define MEMORY_PM_CTRL		(BRIDGE_VIRT_BASE + 0x118)
-> +
->  #endif
-> diff --git a/arch/arm/mach-kirkwood/pm.c b/arch/arm/mach-kirkwood/pm.c
-> new file mode 100644
-> index 0000000..8783a71
-> --- /dev/null
-> +++ b/arch/arm/mach-kirkwood/pm.c
-> @@ -0,0 +1,73 @@
-> +/*
-> + * Power Management driver for Marvell Kirkwood SoCs
-> + *
-> + * Copyright (C) 2013 Ezequiel Garcia <ezequiel@free-electrons.com>
-> + * Copyright (C) 2010 Simon Guinot <sguinot@lacie.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License,
-> + * version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/suspend.h>
-> +#include <linux/io.h>
-> +#include <mach/bridge-regs.h>
-> +
-> +static void __iomem *ddr_operation_base;
-> +
-> +static void kirkwood_low_power(void)
-> +{
-> +	u32 mem_pm_ctrl;
-> +
-> +	mem_pm_ctrl = readl(MEMORY_PM_CTRL);
-> +
-> +	/* Set peripherals to low-power mode */
-> +	writel_relaxed(~0, MEMORY_PM_CTRL);
-> +
-> +	/* Set DDR in self-refresh */
-> +	writel_relaxed(0x7, ddr_operation_base);
-> +
-> +	/*
-> +	 * Set CPU in wait-for-interrupt state.
-> +	 * This disables the CPU core clocks,
-> +	 * the array clocks, and also the L2 controller.
-> +	 */
-> +	cpu_do_idle();
-> +
-> +	writel_relaxed(mem_pm_ctrl, MEMORY_PM_CTRL);
-> +}
-> +
-> +static int kirkwood_suspend_enter(suspend_state_t state)
-> +{
-> +	switch (state) {
-> +	case PM_SUSPEND_STANDBY:
-> +		kirkwood_low_power();
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +	return 0;
-> +}
-> +
-> +static int kirkwood_pm_valid_standby(suspend_state_t state)
-> +{
-> +	return state == PM_SUSPEND_STANDBY;
-> +}
-> +
-> +static const struct platform_suspend_ops kirkwood_suspend_ops = {
-> +	.enter = kirkwood_suspend_enter,
-> +	.valid = kirkwood_pm_valid_standby,
-> +};
-> +
-> +int __init kirkwood_pm_init(void)
-> +{
-> +	ddr_operation_base = ioremap(DDR_OPERATION_BASE, 4);
-> +	suspend_set_ops(&kirkwood_suspend_ops);
-> +	return 0;
-> +}
-> -- 
-> 1.8.1.5
-> 
+On Fri, Aug 30, 2013 at 6:39 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Fri,  9 Aug 2013 16:26:13 -0700, Roy Franz <roy.franz@linaro.org> wrote:
+>> EFI calls can made directly on ARM, so the function pointers
+>> are directly invoked.  This allows types to be checked at
+>> compile time, so here we ensure that the parameters match
+>> the function signature.
+>>
+>> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+>> ---
+>>  drivers/firmware/efi/efi-stub-helper.c |   15 +++++++++------
+>>  1 file changed, 9 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
+>> index b707a9f..4bb542f 100644
+>> --- a/drivers/firmware/efi/efi-stub-helper.c
+>> +++ b/drivers/firmware/efi/efi-stub-helper.c
+>> @@ -321,7 +321,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
+>>       status = efi_call_phys3(sys_table_arg->boottime->allocate_pool,
+>>                               EFI_LOADER_DATA,
+>>                               nr_files * sizeof(*files),
+>> -                             &files);
+>> +                             (void **)&files);
+>>       if (status != EFI_SUCCESS) {
+>>               efi_printk(sys_table_arg, "Failed to alloc mem for file handle list\n");
+>>               goto fail;
+>> @@ -372,7 +372,8 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
+>>                       boottime = sys_table_arg->boottime;
+>>
+>>                       status = efi_call_phys3(boottime->handle_protocol,
+>> -                                     image->device_handle, &fs_proto, &io);
+>> +                                     image->device_handle, &fs_proto,
+>> +                                             (void **)&io);
+>>                       if (status != EFI_SUCCESS) {
+>>                               efi_printk(sys_table_arg, "Failed to handle fs_proto\n");
+>>                               goto free_files;
+>> @@ -406,7 +407,8 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
+>>
+>>  grow:
+>>               status = efi_call_phys3(sys_table_arg->boottime->allocate_pool,
+>> -                                     EFI_LOADER_DATA, info_sz, &info);
+>> +                                     EFI_LOADER_DATA, info_sz,
+>> +                                     (void **)&info);
+>>               if (status != EFI_SUCCESS) {
+>>                       efi_printk(sys_table_arg, "Failed to alloc mem for file info\n");
+>>                       goto close_handles;
+>> @@ -456,18 +458,19 @@ grow:
+>>
+>>               addr = file_addr;
+>>               for (j = 0; j < nr_files; j++) {
+>> -                     u64 size;
+>> +                     unsigned long size;
+>>
+>>                       size = files[j].size;
+>>                       while (size) {
+>> -                             u64 chunksize;
+>> +                             unsigned long chunksize;
+>>                               if (size > EFI_READ_CHUNK_SIZE)
+>>                                       chunksize = EFI_READ_CHUNK_SIZE;
+>>                               else
+>>                                       chunksize = size;
+>>                               status = efi_call_phys3(fh->read,
+>>                                                       files[j].handle,
+>> -                                                     &chunksize, addr);
+>> +                                                     &chunksize,
+>> +                                                     (void *)addr);
+>
+> I think you need some description in the commit text about why the type
+> of chunksize is changing. It's not clear why you're making this change.
+> It is a bug fix?
 
-Any comments on this?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+The type was changed to match the EFI_FILE_PROTOCOL specification -
+chunk size is
+defined as a native width unsigned integer.  So yes, this is a bug in
+that this is wrong for
+ia32, since that really should be a u32 in that case.
+Since the x86 wrappers break type checking by the compiler these types
+were never checked at compile time
+before.  chunksize is the the only change that isn't a cast to a type
+of void pointer.
+
+I can break this change out as a separate patch if desired.
+
+Matt - would you like me to split the chunksize type change into a
+separate patch from the arm EFI stub series?
+
+Roy
+
+
+
+>
+> g.
