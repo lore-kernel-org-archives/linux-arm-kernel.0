@@ -1,59 +1,31 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Fri, 30 Aug 2013 17:52:40 +0100
-Subject: [GIT PULL] ARM/ARM64 architected timer updates for v3.12, take 2
-Message-ID: <5220CDD8.6090903@arm.com>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Fri, 30 Aug 2013 10:15:11 -0700
+Subject: [PATCH v7 0/3] gpio: bcm281xx: GPIO driver
+Message-ID: <1377882914-30152-1-git-send-email-markus.mayer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+This patch series adds the GPIO driver, and its device tree bindings,
+for the Broadcom bcm281xx family of mobile SoCs.
 
-These are the ARM/ARM64 arch timer updates for v3.12.
-I have re-based the changes on tip/timers/core as there are conflicts
-with memory mapped arch_timers support queued recently.
-Since this series adds CPU PM notifiers for arch_timers, it is required
-to enable ARM bL cpuidle drivers(already queued for v3.12)
+Changes since v6:
+- Broke out arch/arm/mach-bcm/Kconfig into its own patch
+- Changed commit title messages accordingly
 
-Russell said he wants someone from ARM to ack it, Will did the same.
-For ARM64, Catalin acked. I have updated the branch accordingly.
-If not too late, please do consider it for v3.12
+Markus Mayer (3):
+  gpio: bcm281xx: Add GPIO driver
+  ARM: bcm281xx: Enable GPIO driver
+  ARM: bcm281xx: Add device node for the GPIO controller
 
-Regards,
-Sudeep
+ .../devicetree/bindings/gpio/gpio-bcm-kona.txt     |   52 ++
+ arch/arm/boot/dts/bcm11351.dtsi                    |   16 +
+ arch/arm/mach-bcm/Kconfig                          |    2 +-
+ drivers/gpio/Kconfig                               |    5 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-bcm-kona.c                       |  631 ++++++++++++++++++++
+ 6 files changed, 706 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
+ create mode 100644 drivers/gpio/gpio-bcm-kona.c
 
-The following changes since commit cfb6d656d569510ac9239583ce09e4c92ad54719:
-
-  Merge branch 'timers/clockevents-next' of
-git://git.linaro.org/people/dlezcano/clockevents into timers/core
-(2013-08-21 14:59:23 +0200)
-
-are available in the git repository at:
-
-
-  git://linux-arm.org/linux-skn.git timer_evtstrm
-
-for you to fetch changes up to c213e17db6904bb593fd26894091103554eaca09:
-
-  drivers: clocksource: add CPU PM notifier for ARM architected timer
-(2013-08-30 17:40:26 +0100)
-
-----------------------------------------------------------------
-Sudeep KarkadaNagesha (4):
-  ARM/ARM64: arch_timer: add macros for bits in control register
-  ARM: arch_timer: add support to configure and enable event stream
-  ARM64: arch_timer: add support to configure and enable event stream
-  drivers: clocksource: add CPU PM notifier for ARM architected timer
-
-Will Deacon (1):
-  drivers: clocksource: add support for ARM architected timer event stream
-
- arch/arm/include/asm/arch_timer.h    | 36 +++++++++++--
- arch/arm/include/uapi/asm/hwcap.h    |  1 +
- arch/arm/kernel/setup.c              |  1 +
- arch/arm64/include/asm/arch_timer.h  | 42 +++++++++++++---
- arch/arm64/include/asm/hwcap.h       | 11 ++--
- arch/arm64/include/uapi/asm/hwcap.h  |  1 +
- arch/arm64/kernel/setup.c            | 11 ++++
- drivers/clocksource/Kconfig          | 15 ++++++
- drivers/clocksource/arm_arch_timer.c | 49 ++++++++++++++++++
- include/clocksource/arm_arch_timer.h | 10 ++++
- 10 files changed, 161 insertions(+), 16 deletions(-)
+-- 
+1.7.9.5
