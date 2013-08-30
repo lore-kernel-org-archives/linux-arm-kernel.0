@@ -1,31 +1,20 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 30 Aug 2013 09:30:17 -0700
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 30 Aug 2013 17:36:20 +0100
 Subject: [PATCH] ARM: dts: vexpress: Add CCI node to TC2 device-tree
-In-Reply-To: <20130830161327.GA10045@e102568-lin.cambridge.arm.com>
+In-Reply-To: <CAOesGMhwqqOuSwVEukpfqM00BV2i=fQRhLUaf-wf-iVGR_mNbg@mail.gmail.com>
 References: <1377872760.3655.48.camel@linaro1.home>
  <20130830161327.GA10045@e102568-lin.cambridge.arm.com>
-Message-ID: <CAOesGMhwqqOuSwVEukpfqM00BV2i=fQRhLUaf-wf-iVGR_mNbg@mail.gmail.com>
+ <CAOesGMhwqqOuSwVEukpfqM00BV2i=fQRhLUaf-wf-iVGR_mNbg@mail.gmail.com>
+Message-ID: <1377880580.10738.14.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 9:13 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
+On Fri, 2013-08-30 at 17:30 +0100, Olof Johansson wrote:
+> Shouldn't you be updating some vexpress_defconfig and probably
+> multi_v7_defconfig to at least get some build coverage for this as
+> well, by the way?
 
-> Now that MCPM and CPU idle are heading to mainline, it should get queued asap,
-> thanks for that, probably as a fix at -rc1, since it is quite late now.
+Yeah, I've been told not to kill vexpress_defconfig after all, so I'll
+refresh it in the next cycle.
 
-This is not a regression, it's a missing piece of a feature. It's not
-post-rc1 material.
-
-It's also an indication that nobody actually tested the feature branch
-before the pull request was sent. Hrmpf.
-
-Shouldn't you be updating some vexpress_defconfig and probably
-multi_v7_defconfig to at least get some build coverage for this as
-well, by the way?
-
-I really should hold this off for 3.13, but I'll apply it to the late/
-branch anyway.
-
-
--Olof
+Pawel 
