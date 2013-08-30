@@ -1,133 +1,61 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Fri, 30 Aug 2013 15:12:44 -0700
-Subject: [PATCH 04/16] Add minimum address parameter to efi_low_alloc()
-In-Reply-To: <20130830130131.D7CE63E102A@localhost>
-References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <1376090777-20090-5-git-send-email-roy.franz@linaro.org>
- <20130830130131.D7CE63E102A@localhost>
-Message-ID: <CAFECyb_FkxzmbFJhMO8L1T2ZKV1OOru3uqpQOfou6NwugF3+tg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 30 Aug 2013 23:18:32 +0100
+Subject: [PATCH v3 1/3] ARM: Introduce atomic MMIO modify
+In-Reply-To: <20130830200830.GB6368@obsidianresearch.com>
+References: <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130823103802.GO4600@tarshish> <20130823110748.GD2389@localhost>
+ <20130823113225.GF2389@localhost> <20130823114805.GF10971@arm.com>
+ <20130830090807.GB25628@mudshark.cambridge.arm.com>
+ <20130830091534.GA62188@MacBook-Pro.local>
+ <20130830092032.GD25628@mudshark.cambridge.arm.com>
+ <20130830100342.GD62188@MacBook-Pro.local>
+ <20130830200830.GB6368@obsidianresearch.com>
+Message-ID: <20130830221832.GC6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 6:01 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Fri,  9 Aug 2013 16:26:05 -0700, Roy Franz <roy.franz@linaro.org> wrote:
->> This allows allocations to be made low in memory while
->> avoiding allocations at the base of memory.
->
-> Your commit message should include /why/ the change is needed. From the
-> above I understand what the patch does, but I don't understand why it is
-> necessary.
+On Fri, Aug 30, 2013 at 02:08:30PM -0600, Jason Gunthorpe wrote:
+> On Fri, Aug 30, 2013 at 11:03:42AM +0100, Catalin Marinas wrote:
+> 
+> > > Perhaps we should just bit the bullet and define relaxed accessors for all
+> > > architectures? It's not difficult to default them to the non-relaxed
+> > > variants if the architecture doesn't provide an optimised implementation.
+> > 
+> > Yes, an asm-generic default relaxed would be good (that's what I
+> > suggested earlier in this thread and it was discussed in the past). But
+> > no-one volunteered ;).
+> 
+> Something I've always been confused about..
+> 
+> Do these _relaxed operators on ARM differ from the PCI-X definition of
+> relaxed ordering, and are they expected to generate a PCI TLP with
+> the relaxed ordering bit set?
 
-This was used to avoid relocating the zImage so low in memory that it
-would conflict
-with memory range that it was decompressed into.  This is now handled
-by allocating
-the memory for the decompressed kernel, so the lower limit is no
-longer required.
-I'll remove it, as it is not necessary any more.
+It's more to do with the memory model.  The _relaxed IO accessors just
+read/write to the desired IO location without any ordering with respect
+to memory - so if you have for instance DMA coherent memory, and you've
+written a set of descriptors to that memory, there is no implicit
+guarantee that those writes will be visible to the DMA engine if you
+enable it using a relaxed operator unless you use an appropriate barrier
+between the two.
 
->
-> The patch looks fine to me, but it would be worth investigating merging
-> alloc_low and alloc_high. It looks like they both do pretty close to the
-> same calculations. A single core function could do both, could have both
-> minimum and maximum constraints, and could have a flag to determine if
-> low or high addresses should be preferred.
->
-> g.
->
-> Reviewed-by: Grant Likely <grant.likely@linaro.org>
->
->>
->> Signed-off-by: Roy Franz <roy.franz@linaro.org>
->> ---
->>  arch/x86/boot/compressed/eboot.c       |   11 ++++++-----
->>  drivers/firmware/efi/efi-stub-helper.c |    7 +++++--
->>  2 files changed, 11 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/x86/boot/compressed/eboot.c b/arch/x86/boot/compressed/eboot.c
->> index 2a4430a..f44ef2f 100644
->> --- a/arch/x86/boot/compressed/eboot.c
->> +++ b/arch/x86/boot/compressed/eboot.c
->> @@ -458,7 +458,7 @@ struct boot_params *make_boot_params(void *handle, efi_system_table_t *_table)
->>       }
->>
->>       status = efi_low_alloc(sys_table, 0x4000, 1,
->> -                            (unsigned long *)&boot_params);
->> +                            (unsigned long *)&boot_params, 0);
->>       if (status != EFI_SUCCESS) {
->>               efi_printk(sys_table, "Failed to alloc lowmem for boot params\n");
->>               return NULL;
->> @@ -505,7 +505,7 @@ struct boot_params *make_boot_params(void *handle, efi_system_table_t *_table)
->>                       options_size++; /* NUL termination */
->>
->>                       status = efi_low_alloc(sys_table, options_size, 1,
->> -                                        &cmdline);
->> +                                        &cmdline, 0);
->>                       if (status != EFI_SUCCESS) {
->>                               efi_printk(sys_table, "Failed to alloc mem for cmdline\n");
->>                               goto fail;
->> @@ -563,7 +563,8 @@ static efi_status_t exit_boot(struct boot_params *boot_params,
->>  again:
->>       size += sizeof(*mem_map) * 2;
->>       _size = size;
->> -     status = efi_low_alloc(sys_table, size, 1, (unsigned long *)&mem_map);
->> +     status = efi_low_alloc(sys_table, size, 1,
->> +                            (unsigned long *)&mem_map, 0);
->>       if (status != EFI_SUCCESS)
->>               return status;
->>
->> @@ -697,7 +698,7 @@ static efi_status_t relocate_kernel(struct setup_header *hdr)
->>                               nr_pages, &start);
->>       if (status != EFI_SUCCESS) {
->>               status = efi_low_alloc(sys_table, hdr->init_size,
->> -                                hdr->kernel_alignment, &start);
->> +                                hdr->kernel_alignment, &start, 0);
->>               if (status != EFI_SUCCESS)
->>                       efi_printk(sys_table, "Failed to alloc mem for kernel\n");
->>       }
->> @@ -745,7 +746,7 @@ struct boot_params *efi_main(void *handle, efi_system_table_t *_table,
->>
->>       gdt->size = 0x800;
->>       status = efi_low_alloc(sys_table, gdt->size, 8,
->> -                        (unsigned long *)&gdt->address);
->> +                        (unsigned long *)&gdt->address, 0);
->>       if (status != EFI_SUCCESS) {
->>               efi_printk(sys_table, "Failed to alloc mem for gdt\n");
->>               goto fail;
->> diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
->> index 0218d535..40cd16e 100644
->> --- a/drivers/firmware/efi/efi-stub-helper.c
->> +++ b/drivers/firmware/efi/efi-stub-helper.c
->> @@ -163,11 +163,11 @@ fail:
->>  }
->>
->>  /*
->> - * Allocate at the lowest possible address.
->> + * Allocate at the lowest possible address, that is not below min.
->>   */
->>  static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
->>                             unsigned long size, unsigned long align,
->> -                           unsigned long *addr)
->> +                           unsigned long *addr, unsigned long min)
->>  {
->>       unsigned long map_size, desc_size;
->>       efi_memory_desc_t *map;
->> @@ -204,6 +204,9 @@ static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
->>               if (start == 0x0)
->>                       start += 8;
->>
->> +             if (start < min)
->> +                     start = min;
->> +
->>               start = round_up(start, align);
->>               if ((start + size) > end)
->>                       continue;
->> --
->> 1.7.10.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Conversely, reading a register and then accessing memory, there is no
+guarantee that you will have read the register before the memory access
+has been performed with the relaxed IO.
+
+The standard IO operations (readl, writel) contain barriers which ensure
+correct ordering - the write*() have a barrier before their write, and
+the read*() have a barrier after their read.  This ensures correct and
+expected ordering with DMA coherent memory.
+
+However, those barriers can be very expensive - they end up having to
+themselves issue a write to the L2 cache controller (which obviously
+can't use the standard IO operations).
+
+> AFAIK, on x86 read_relaxed is expected to cause the PCI behavior.
+> Documentation/DocBook/deviceiobook.tmpl seems to confirm this.
+
+I guess our read* is compatible with that (even though it has nothing
+to do with PCI) - the issues in Docbook appear to suggest similar
+behaviours from the CPU point of view - IOW, the visibility of DMA vs
+the read transaction.  The write is just an extension of that.
