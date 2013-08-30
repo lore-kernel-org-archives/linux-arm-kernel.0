@@ -1,51 +1,171 @@
-From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
-Date: Fri, 30 Aug 2013 13:39:21 -0400
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <87mwo2vmds.fsf@linaro.org>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <87mwo2vmds.fsf@linaro.org>
-Message-ID: <CANacCWwNp4yg0e_9HPJCGJgQkaYP1n=b6Kjmw9KYjp6HoOY0og@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 30 Aug 2013 19:49:09 +0200
+Subject: [PATCHv2 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <1377856132-11290-2-git-send-email-Li.Xiubo@freescale.com>
+References: <1377856132-11290-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377856132-11290-2-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20130830174909.GF30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 5:45 PM, Kevin Hilman <khilman@linaro.org> wrote:
+On Fri, Aug 30, 2013 at 05:48:49PM +0800, Xiubo Li wrote:
+> +
+> +#define FTM_CSC_BASE        0x0C
+> +#define FTM_CSC(_channel) \
+> +	(FTM_CSC_BASE + ((_channel) * 8))
+
+Put into a single line.
+
+> +#define FTMCnSC_MSB         BIT(5)
+> +#define FTMCnSC_MSA         BIT(4)
+> +#define FTMCnSC_ELSB        BIT(3)
+> +#define FTMCnSC_ELSA        BIT(2)
+> +
+> +#define FTM_CV_BASE         0x10
+> +#define FTM_CV(_channel) \
+> +	(FTM_CV_BASE + ((_channel) * 8))
+
+ditto.
+
+> +static int fsl_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +	int ret;
+> +	struct fsl_pwm_chip *fpc;
+> +	struct fsl_pwm_data *pwm_data;
+> +
+> +	fpc = to_fsl_chip(chip);
+> +
+> +	pwm_data = pwm_get_chip_data(pwm);
+> +	if (!pwm_data)
+> +		return -EINVAL;
+> +
+> +	if (pwm_data->available != FSL_AVAILABLE)
+> +		return -EINVAL;
+> +
+> +	ret = clk_enable(fpc->sys_clk);
+> +	if (ret)
+> +		return ret;
+
+This is non atomic context. You can also prepare the clocks here instead
+of doing it in probe().
+
+> +
+> +	return 0;
+> +}
+> +
+> +static void fsl_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +	struct fsl_pwm_chip *fpc;
+> +	struct fsl_pwm_data *pwm_data;
+> +
+> +	fpc = to_fsl_chip(chip);
+> +
+> +	pwm_data = pwm_get_chip_data(pwm);
+> +	if (!pwm_data)
+> +		return;
+
+THis check seems unnecessary.
+
+> +
+> +	if (pwm_data->available != FSL_AVAILABLE)
+> +		return;
+> +
+> +	clk_disable(fpc->sys_clk);
+> +}
+> +
+
 [...]
->
-> Looking closer at this code as I'm trying to fully get my head around
-> all the IPC, I have some more comments.
->
-> I think the split between pm33xx.c and the M3 driver is still confusing
-> here.  For example, am33xx_ping_wkup_m3(),
-> am33xx_m3_state_machine_reset() and the guts of am33xx_pm_begin() all
-> belong inside the M3 driver, along with all the wakeup_src stuff, which
-> is info coming from the M3.
->
-> IOW, the communication with M3 should be abstracted from pm33xx by the
-> M3 driver (or possibly an eventual remoteproc/rpmsg implementation) with
-> a well defined API.  In this implementation, the interface is pretty
-> fuzzy and mixed between pm33xx.c and wkup_m3.c.
->
->
 
-The reason for the current split was to have the M3 driver just do the minimal
-that's needed to talk to get M3 and MPU talking. What made me do it this way
-was to attempt to address a previous comment on keeping options open for folks
-to use M3 for things other than PM stuff. The IPC stuff is how
-implementors of the
-firmware (anything other than the PM one that TI provides) want it to be.
+> +
+> +
+> +	pwm_data->period_cycles = period_cycles;
+> +	pwm_data->duty_cycles = duty_cycles;
 
-The top level idea was to have the users of the firmware (PM in this case)
-decide what functionality they want when talking to M3. They are also free to
-decide the register bitfield layout and other IPC details.
+These fields are set but never read. Please drop them.
 
-This was also a feeble attempt to keep things extensible for AM437x where
-in addition to the broken mailbox usage there's now a control module bit
-to trigger the interrupt to M3 (what's worse? pick one that you hate more ;)
-The AM437x PM routines could then just register different callbacks that
-are triggered when the M3 interrupts the MPU.
+If you drop the 'available' field also the you can drop chip_data
+completely.
 
-Hope this clears up some of the confusion.
+> +
+> +	writel(FTMCnSC_MSB | FTMCnSC_ELSB, fpc->base + FTM_CSC(pwm->hwpwm));
+> +
+> +	writel(0xF0, fpc->base + FTM_OUTMASK);
+> +	writel(0x0F, fpc->base + FTM_OUTINIT);
+> +	writel(FTM_CNTIN_VAL, fpc->base + FTM_CNTIN);
+> +
+> +	writel(period_cycles + cntin - 1, fpc->base + FTM_MOD);
+> +	writel(duty_cycles + cntin, fpc->base + FTM_CV(pwm->hwpwm));
+> +
+> +	return 0;
+> +}
+> +
+> +static int fsl_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+> +				enum pwm_polarity polarity)
+> +{
+> +	unsigned long reg;
+> +	struct fsl_pwm_data *pwm_data;
+> +	struct fsl_pwm_chip *fpc;
+> +
+> +	fpc = to_fsl_chip(chip);
+> +
+> +	pwm_data = pwm_get_chip_data(pwm);
+> +	if (!pwm_data)
+> +		return -EINVAL;
+> +
+> +	if (pwm_data->available != FSL_AVAILABLE)
+> +		return -EINVAL;
+> +
+> +	reg = readl(fpc->base + FTM_POL);
+> +	reg &= ~BIT(pwm->hwpwm);
 
-Regards,
-Vaibhav
+Either drop this line...
+
+> +	if (polarity == PWM_POLARITY_INVERSED)
+> +		reg |= BIT(pwm->hwpwm);
+> +	else
+> +		reg &= ~BIT(pwm->hwpwm);
+
+...or this one
+
+> +static int fsl_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +	int ret;
+> +	struct fsl_pwm_chip *fpc;
+> +	struct pinctrl_state *pins_state;
+> +	struct fsl_pwm_data *pwm_data;
+> +	const char *statename;
+> +
+> +	fpc = to_fsl_chip(chip);
+> +
+> +	pwm_data = pwm_get_chip_data(pwm);
+> +	if (!pwm_data)
+> +		return -EINVAL;
+> +
+> +	if (pwm_data->available != FSL_AVAILABLE)
+> +		return -EINVAL;
+> +
+> +	statename = kasprintf(GFP_KERNEL, "ch%d-active", pwm->hwpwm);
+
+You loose memory here and in fsl_pwm_disable aswell.
+
+> +	pins_state = pinctrl_lookup_state(fpc->pinctrl,
+> +			statename);
+> +	/* enable pins to be muxed in and configured */
+> +	if (!IS_ERR(pins_state)) {
+> +		ret = pinctrl_select_state(fpc->pinctrl, pins_state);
+> +		if (ret)
+> +			dev_warn(chip->dev, "could not set default pins\n");
+> +	} else
+> +		dev_warn(chip->dev, "could not get default pinstate\n");
+
+Either it's ok to do without pinctrl or it's not ok, so either return
+an error or drop the warnings. Polluting the kernel log with such
+messages from a frequently called function is not a good idea.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
