@@ -1,35 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 30 Aug 2013 22:47:44 +0100
-Subject: [PATCH] clk: s3c64xx: Fix aliases for SPI devices
-Message-ID: <1377899264-5917-1-git-send-email-broonie@kernel.org>
+From: csd@broadcom.com (Christian Daudt)
+Date: Fri, 30 Aug 2013 14:52:27 -0700
+Subject: [PATCH v3 2/5] ARM: bcm4760: Add platform infrastructure
+In-Reply-To: <20130830075312.GA2447@glitch>
+References: <20130814221043.528864175@gmail.com>
+ <20130814221237.350904818@gmail.com>
+ <20130829231729.GA29606@quad.lixom.net> <20130830075312.GA2447@glitch>
+Message-ID: <5221141B.5020105@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On 13-08-30 12:53 AM, Domenico Andreoli wrote:
+>>> Index: b/arch/arm/mach-bcm/Kconfig
+>>> ===================================================================
+>>> --- a/arch/arm/mach-bcm/Kconfig
+>>> +++ b/arch/arm/mach-bcm/Kconfig
+>>> @@ -17,3 +17,10 @@ config ARCH_BCM
+>>>   	  It currently supports the 'BCM281XX' family, which includes
+>>>   	  BCM11130, BCM11140, BCM11351, BCM28145 and
+>>>   	  BCM28155 variants.
+>>> +
+>>> +config ARCH_BCM4760
+>>> +	bool "Broadcom BCM4760 based SoCs (ARM11)" if ARCH_MULTI_V6
+>>> +	select ARM_AMBA
+>>> +	select ARM_VIC
+>>> +	select CLKSRC_OF
+>>> +	select SOC_BUS
+>> So I think I mentioned this during previous discussions, but I think this
+>> should be solved by having:
+>>
+>> config ARCH_BCM
+>> 	bool "Broadcom platforms"
+>> 	help
+>> 	  This enables support for Broadcom based systems
+>>
+>> menu "Broadcom platform selection"
+>> 	depends on ARCH_BCM
+>>
+>> config ARCH_BCM281XX
+>> 	... current ARCH_BCM contents
+>>
+>> config ARCH_BCM4760
+>> 	... above conents
+>> endmenu
+> got it.
+>
+> need to sync with Christian, the current owner of ARCH_BCM.
+This is fine, but it is better to name it MOBILEBCM instead for our 
+platform, as it plan to keep it single zImage. My plan was to switch the 
+current usage of ARCH_BCM for chips to ARCH_MOBILEBCM, and then leave 
+ARCH_BCM as a generic BCM menu option as above. I can send a patch to 
+that effect if everyone is okay with that.
 
-The clock aliases for SPI devices do not reflect the actual usage in the
-driver causing the SPI controller to fail to probe when the clock driver
-is in use, fix this up.
-
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- drivers/clk/samsung/clk-s3c64xx.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
-index eeda567..d4f4f70 100644
---- a/drivers/clk/samsung/clk-s3c64xx.c
-+++ b/drivers/clk/samsung/clk-s3c64xx.c
-@@ -356,8 +356,8 @@ static struct samsung_clock_alias s3c64xx_clock_aliases[] = {
- 	ALIAS(SCLK_MMC2, "s3c-sdhci.2", "mmc_busclk.2"),
- 	ALIAS(SCLK_MMC1, "s3c-sdhci.1", "mmc_busclk.2"),
- 	ALIAS(SCLK_MMC0, "s3c-sdhci.0", "mmc_busclk.2"),
--	ALIAS(SCLK_SPI1, "s3c6410-spi.1", "spi-bus"),
--	ALIAS(SCLK_SPI0, "s3c6410-spi.0", "spi-bus"),
-+	ALIAS(SCLK_SPI1, "s3c6410-spi.1", "spi_busclk1"),
-+	ALIAS(SCLK_SPI0, "s3c6410-spi.0", "spi_busclk0"),
- 	ALIAS(SCLK_AUDIO1, "samsung-pcm.1", "audio-bus"),
- 	ALIAS(SCLK_AUDIO1, "samsung-i2s.1", "audio-bus"),
- 	ALIAS(SCLK_AUDIO0, "samsung-pcm.0", "audio-bus"),
--- 
-1.8.4.rc3
+  thanks,
+    csd
