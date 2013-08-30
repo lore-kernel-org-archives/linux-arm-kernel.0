@@ -1,46 +1,51 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 30 Aug 2013 20:10:51 +0100
-Subject: [PATCH 15/20] ARM: hardware: fix endian-ness in <hardware/coresight.h>
+Date: Fri, 30 Aug 2013 20:10:46 +0100
+Subject: [PATCH 10/20] vexpress: add big endian support
 In-Reply-To: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377889856-9447-16-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377889856-9447-11-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The <hardware/coresight.h> needs to take into account the endian-ness
-of the processor when reading and writing data, so change to using
-the readl/writel relaxed variants from the raw ones.
+Add support for the versatile express systems to boot big-endian.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/include/asm/hardware/coresight.h |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-vexpress/Kconfig    |    1 +
+ arch/arm/plat-versatile/headsmp.S |    2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
-index 0cf7a6b..ad774f3 100644
---- a/arch/arm/include/asm/hardware/coresight.h
-+++ b/arch/arm/include/asm/hardware/coresight.h
-@@ -24,8 +24,8 @@
- #define TRACER_TIMEOUT 10000
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index b8bbabe..d9dc5d2a 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -1,6 +1,7 @@
+ config ARCH_VEXPRESS
+ 	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARM_AMBA
+ 	select ARM_GIC
+ 	select ARM_TIMER_SP804
+diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
+index 2677bc3..40f27e5 100644
+--- a/arch/arm/plat-versatile/headsmp.S
++++ b/arch/arm/plat-versatile/headsmp.S
+@@ -10,6 +10,7 @@
+  */
+ #include <linux/linkage.h>
+ #include <linux/init.h>
++#include <asm/assembler.h>
  
- #define etm_writel(t, v, x) \
--	(__raw_writel((v), (t)->etm_regs + (x)))
--#define etm_readl(t, x) (__raw_readl((t)->etm_regs + (x)))
-+	(writel_relaxed((v), (t)->etm_regs + (x)))
-+#define etm_readl(t, x) (readl_relaxed((t)->etm_regs + (x)))
- 
- /* CoreSight Management Registers */
- #define CSMR_LOCKACCESS 0xfb0
-@@ -142,8 +142,8 @@
- #define ETBFF_TRIGFL		BIT(10)
- 
- #define etb_writel(t, v, x) \
--	(__raw_writel((v), (t)->etb_regs + (x)))
--#define etb_readl(t, x) (__raw_readl((t)->etb_regs + (x)))
-+	(writel_relaxed((v), (t)->etb_regs + (x)))
-+#define etb_readl(t, x) (readl_relaxed((t)->etb_regs + (x)))
- 
- #define etm_lock(t) do { etm_writel((t), 0, CSMR_LOCKACCESS); } while (0)
- #define etm_unlock(t) \
+ /*
+  * Realview/Versatile Express specific entry point for secondary CPUs.
+@@ -17,6 +18,7 @@
+  * until we're ready for them to initialise.
+  */
+ ENTRY(versatile_secondary_startup)
++ ARM_BE8(setend	be)
+ 	mrc	p15, 0, r0, c0, c0, 5
+ 	bic	r0, #0xff000000
+ 	adr	r4, 1f
 -- 
 1.7.10.4
