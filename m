@@ -1,78 +1,68 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 30 Aug 2013 16:54:02 -0400
-Subject: [GIT PULL V2] ARM: mvebu: dove changes for v3.12
-In-Reply-To: <20130814203326.GJ13964@titan.lakedaemon.net>
-References: <20130814203326.GJ13964@titan.lakedaemon.net>
-Message-ID: <20130830205402.GX19598@titan.lakedaemon.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 30 Aug 2013 14:18:38 -0700
+Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <CANacCWwNp4yg0e_9HPJCGJgQkaYP1n=b6Kjmw9KYjp6HoOY0og@mail.gmail.com>
+ (Vaibhav Bedia's message of "Fri, 30 Aug 2013 13:39:21 -0400")
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
+ <87mwo2vmds.fsf@linaro.org>
+ <CANacCWwNp4yg0e_9HPJCGJgQkaYP1n=b6Kjmw9KYjp6HoOY0og@mail.gmail.com>
+Message-ID: <87ioymop1t.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Vaibhav Bedia <vaibhav.bedia@gmail.com> writes:
 
-Sending V2 based on the new mvebu/msi_mvebu (rebased onto
-mvebu/drivers).
+> On Tue, Aug 27, 2013 at 5:45 PM, Kevin Hilman <khilman@linaro.org> wrote:
+> [...]
+>>
+>> Looking closer at this code as I'm trying to fully get my head around
+>> all the IPC, I have some more comments.
+>>
+>> I think the split between pm33xx.c and the M3 driver is still confusing
+>> here.  For example, am33xx_ping_wkup_m3(),
+>> am33xx_m3_state_machine_reset() and the guts of am33xx_pm_begin() all
+>> belong inside the M3 driver, along with all the wakeup_src stuff, which
+>> is info coming from the M3.
+>>
+>> IOW, the communication with M3 should be abstracted from pm33xx by the
+>> M3 driver (or possibly an eventual remoteproc/rpmsg implementation) with
+>> a well defined API.  In this implementation, the interface is pretty
+>> fuzzy and mixed between pm33xx.c and wkup_m3.c.
+>>
+>>
+>
+> The reason for the current split was to have the M3 driver just do the minimal
+> that's needed to talk to get M3 and MPU talking. What made me do it this way
+> was to attempt to address a previous comment on keeping options open for folks
+> to use M3 for things other than PM stuff. The IPC stuff is how
+> implementors of the
+> firmware (anything other than the PM one that TI provides) want it to be.
 
-thx,
+IMO, there should actually be 3 levels. the SoC PM implementation
+(pm33xx.c), the M3 driver where the protocol, state-machine, etc. are
+handled, and the messaging layer.  In the current proposal, the last 2
+are combined, but I'd really like to see a generalized messaging layer
+that everyone else using an M3 coprocessor might use as well.  As
+mentioned already, I think that should be rpmsg, but that still needs
+some exploration.
 
-Jason.
+> The top level idea was to have the users of the firmware (PM in this case)
+> decide what functionality they want when talking to M3. They are also free to
+> decide the register bitfield layout and other IPC details.
+>
+> This was also a feeble attempt to keep things extensible for AM437x where
+> in addition to the broken mailbox usage there's now a control module bit
+> to trigger the interrupt to M3 (what's worse? pick one that you hate more ;)
 
+Sounds like AM43xx is better.  If you have a control module bit to
+trigger an interrupt, why do you need the mailbox at all?
 
-The following changes since commit 9f494449cc34b1896e38c1e7da3a774d072ade8f:
+> The AM437x PM routines could then just register different callbacks that
+> are triggered when the M3 interrupts the MPU.
+>
+> Hope this clears up some of the confusion.
 
-  Merge branch 'mvebu/msi_mvebu' into mvebu/dove_pcie-mbus-dt (2013-08-30 20:29:27 +0000)
+Thanks,
 
-are available in the git repository at:
-
-
-  git://git.infradead.org/linux-mvebu.git tags/dove-all-3.12
-
-for you to fetch changes up to 8e6397a5ce592ba0dfed29c708654e96888c0068:
-
-  ARM: dove: remove legacy pcie and clock init (2013-08-30 20:31:51 +0000)
-
-----------------------------------------------------------------
-mvebu dove changes for v3.12
-
- - various PCI mvebu fixes and features
- - dove
-    - init MBus, PCI, ethernet and clock via DT
-
-V2:
- - mvebu/msi_mvebu was rebased onto mvebu/drivers to resolve conflicts
-   internally.  This branch is rebased on that work.
-
-Depends:
- - mvebu/boards
- - mvebu/msi_mvebu
-    - mvebu/msi_pci
-    - mvebu/drivers
-
-----------------------------------------------------------------
-Sebastian Hesselbarth (13):
-      PCI: mvebu: move clock enable before register access
-      PCI: mvebu: increment nports only for registered ports
-      PCI: mvebu: remove subsys_initcall
-      PCI: mvebu: add support for reset on GPIO
-      PCI: mvebu: add support for Marvell Dove SoCs
-      ARM: dove: use preprocessor on device tree files
-      ARM: dove: add MBUS_ID macro to Dove DT
-      ARM: dove: add MBus DT node
-      ARM: dove: relocate internal registers device nodes
-      ARM: dove: switch to DT probed mbus address windows
-      ARM: dove: add PCIe controllers to SoC DT
-      ARM: dove: add initial DT file for Globalscale D3Plug
-      ARM: dove: remove legacy pcie and clock init
-
- .../devicetree/bindings/pci/mvebu-pci.txt          |    7 +
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/dove-cm-a510.dts                 |    2 +-
- arch/arm/boot/dts/dove-cubox.dts                   |    2 +-
- arch/arm/boot/dts/dove-d2plug.dts                  |    2 +-
- arch/arm/boot/dts/dove-d3plug.dts                  |  103 ++
- arch/arm/boot/dts/dove-dove-db.dts                 |    2 +-
- arch/arm/boot/dts/dove.dtsi                        | 1009 +++++++++++---------
- arch/arm/mach-dove/board-dt.c                      |   39 +-
- drivers/pci/host/Kconfig                           |    2 +-
- drivers/pci/host/pci-mvebu.c                       |   99 +-
- 11 files changed, 719 insertions(+), 549 deletions(-)
- create mode 100644 arch/arm/boot/dts/dove-d3plug.dts
+Kevin
