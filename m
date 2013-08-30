@@ -1,43 +1,34 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 30 Aug 2013 15:24:45 +0200
-Subject: Clock framework deadlock with external SPI clockchip
-Message-ID: <52209D1D.3080102@metafoo.de>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Fri, 30 Aug 2013 09:23:12 -0400
+Subject: [PATCH v4 09/10] swiotlb-xen: support autotranslate guests
+In-Reply-To: <alpine.DEB.2.02.1308282112300.6397@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1308151200580.4470@kaball.uk.xensource.com>
+ <1376565054-24153-9-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130815200738.GD5337@konrad-lan.dumpdata.com>
+ <alpine.DEB.2.02.1308282112300.6397@kaball.uk.xensource.com>
+Message-ID: <20130830132312.GF21239@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> > Did you run any performance tests to see if adding the extra
+> > spinlock (as the native SWIOTLB already has its own lock) and handling
+> > of the tree is affecting it?
 
-I'm currently facing a deadlock in the common clock framework that
-unfortunately is not addressed by the reentrancy patches. I have a external
-clock chip that is controlled via SPI. So for example to configure the rate
-of the clock chip you need to send a SPI message. Naturally the clock
-framework will hold the prepare lock while configuring the rate.
-Communication in the SPI framework happens asynchronously, spi_sync() will
-enqueue a message in the SPI masters queue and then wait using
-wait_for_completion(). The master will call complete() once the transfer has
-been finished. The SPI master runs in it's own thread in which it processes
-the messages. In this thread it also calls clk_set_rate() to configure the
-SPI transfer clock rate based on what the message says. Now the deadlock
-happens as we try to take the prepare_lock again and since the clock chip
-and the SPI master run in different threads the reentrancy code does not
-kick in.
+.. bla bla..
 
-The basic sequence is like this:
+> I haven't done any measurements but consider that the spin_lock is
+> already only used to access the red-black tree that keeps track of
+> dma_addr -> phys_addr mappings.
+> So it's taken at setup time once, then every time we call
+> xen_bus_to_phys and the guest is an autotraslate guest.
+> If the guest is not autotraslate there are no additional locks.
+> 
+> That makes me realize that we don't need any spin_locks at all: there
+> are no risks of concurrent accesses and modifications of the tree
+> because there are no changes on the tree once it's setup at boot time.
+> We can get rid of the spin_lock entirely as concurrent read accesses on
+> the tree are obviously fine.
 
-=== Clock chip driver ===        === SPI master driver ===
- clk_prepare_lock()
- spi_sync()
-   wait_for_completion(X)
-                                 clk_get_rate()
-			           clk_prepare_lock() <--- DEADLOCK
-				   clk_prepare_unlock()
-				 ...
-				 complete(X)
- ...
- clk_prepare_unlock()
+Nice :-) I think that (and the goto) were the only concerns I had.
 
-I'm wondering if you have any idea how this can be fixed. In my opinion we'd
-need a per clock mutex to address this properly.
-
-Thanks,
-- Lars
+Thanks!
