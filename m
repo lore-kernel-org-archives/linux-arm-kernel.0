@@ -1,45 +1,84 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 30 Aug 2013 10:56:59 +0100
-Subject: [alsa-devel] [PATCH RFC 00/13] Adding SPDIF support to
- kirkwood-i2s
-In-Reply-To: <5220571F.5020006@metafoo.de>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <51FECB7A.6010208@gmail.com> <20130805115947.GA9858@sirena.org.uk>
- <51FFA348.2010503@gmail.com> <51FFB267.3030107@metafoo.de>
- <87wqnzhek5.wl%kuninori.morimoto.gx@renesas.com>
- <87li3jr6et.wl%kuninori.morimoto.gx@renesas.com>
- <5220571F.5020006@metafoo.de>
-Message-ID: <20130830095659.GV10783@sirena.org.uk>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Fri, 30 Aug 2013 11:00:05 +0100
+Subject: [GIT PULL] ARM/ARM64 architected timer updates for v3.12
+In-Reply-To: <521FCC0A.80302@linaro.org>
+References: <521F8157.20203@arm.com> <521FCC0A.80302@linaro.org>
+Message-ID: <52206D25.6080808@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 10:26:07AM +0200, Lars-Peter Clausen wrote:
-> On 08/30/2013 09:20 AM, Kuninori Morimoto wrote:
+Ccing Catalin,Russell
 
-> > My understanding for this ASoC DT support milestone is that
+On 29/08/13 23:32, Daniel Lezcano wrote:
+> On 08/29/2013 07:13 PM, Sudeep KarkadaNagesha wrote:
+>> Hi Daniel,
+>>
+>> These are the ARM/ARM64 arch timer updates for v3.12.
+>> I have re-based the changes on tip/timers/core as there are conflicts
+>> with memory mapped arch_timers support queued recently.
+>> Since this series adds CPU PM notifiers for arch_timers, it is required
+>> to enable ARM bL cpuidle drivers(already queued for v3.12)
+>>
+>> Regards,
+>> Sudeep
+>>
+>> The following changes since commit cfb6d656d569510ac9239583ce09e4c92ad54719:
+>>
+>>   Merge branch 'timers/clockevents-next' of
+>> git://git.linaro.org/people/dlezcano/clockevents into timers/core
+>> (2013-08-21 14:59:23 +0200)
+>>
+>> are available in the git repository at:
+>>
+>>
+>>   git://linux-arm.org/linux-skn.git timer_evtstrm
+>>
+>> for you to fetch changes up to f74f198e540c160b1db9470b679dbeb72339829b:
+>>
+>>   drivers: clocksource: add CPU PM notifier for ARM architected timer
+>> (2013-08-29 17:43:08 +0100)
+> 
+> 
+> Hi Sudeep,
+> 
+> I need the acked-by from Olof or Kevin for the arch/arm[64] changes.
+> 
+Hi Daniel,
 
-> >  1) merge codec/component
-> >  2) add .of_xlate_dai_name on it
-> >  3) add DT support
+I think the changes are more generic to arm/arm64, rather not SoC
+specific. Catalin has reviewed the series. I can check with Russell(for
+arm) and Catalin(for arm64) for Acks.
+I do understand that it may be late for v3.12
 
-> > But, do you think 1) is possible ?
-> > Becouse, now, too many functions are based on/using "codec"
-> > struct snd_soc_codec / struct snd_soc_codec_driver.
-> > In reality, merging these is super difficult IMO.
+Regards,
+Sudeep
 
-> The idea is to use the component struct as a base class for the codec and
-> platform struct. So drivers will keep seeing what they see now and don't
-> need to be updated. Lots of the fields that can be shared between component,
-> platform and codec are only used by the core.
-
-Indeed, and doing things that can be done with a direct search and
-replace is not so bad.  Splitting  things up makes life easier too.  I'd
-been planning to start looking at the merge of CODEC and component
-myself during the next release cycle.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130830/2711b8cf/attachment.sig>
+> Thanks
+>   -- Daniel
+> 
+>> ----------------------------------------------------------------
+>> Sudeep KarkadaNagesha (4):
+>>    ARM/ARM64: arch_timer: add macros for bits in control register
+>>    ARM: arch_timer: add support to configure and enable event stream
+>>    ARM64: arch_timer: add support to configure and enable event stream
+>>    drivers: clocksource: add CPU PM notifier for ARM architected timer
+>>
+>> Will Deacon (1):
+>>    drivers: clocksource: add support for ARM architected timer event stream
+>> q
+>>  arch/arm/include/asm/arch_timer.h    | 36 ++++++++++++++++---
+>>  arch/arm/include/uapi/asm/hwcap.h    |  1 +
+>>  arch/arm/kernel/setup.c              |  1 +
+>>  arch/arm64/include/asm/arch_timer.h  | 42 ++++++++++++++++++---
+>>  arch/arm64/include/asm/hwcap.h       | 11 +++---
+>>  arch/arm64/include/uapi/asm/hwcap.h  |  1 +
+>>  arch/arm64/kernel/setup.c            | 11 ++++++
+>>  drivers/clocksource/Kconfig          | 15 ++++++++
+>>  drivers/clocksource/arm_arch_timer.c | 49 +++++++++++++++++++++++++
+>>  include/clocksource/arm_arch_timer.h | 10 +++++
+>>  10 files changed, 161 insertions(+), 16 deletions(-)
+>>
+>>
+>>
+> 
+> 
