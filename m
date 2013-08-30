@@ -1,26 +1,102 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 30 Aug 2013 14:44:49 +0100
-Subject: [PATCHv3 2/5] arm64: factor out spin-table boot method
-In-Reply-To: <alpine.LFD.2.03.1308141348130.14472@syhkavp.arg>
-References: <1376497228-20543-1-git-send-email-mark.rutland@arm.com>
- <1376497228-20543-3-git-send-email-mark.rutland@arm.com>
- <alpine.LFD.2.03.1308141348130.14472@syhkavp.arg>
-Message-ID: <20130830134449.GE4650@arm.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Fri, 30 Aug 2013 09:45:11 -0400
+Subject: [PATCH v5 07/13] xen: make xen_create_contiguous_region return
+ the dma address
+In-Reply-To: <1377801154-29215-7-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
+ <1377801154-29215-7-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130830134511.GJ21239@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 14, 2013 at 06:51:09PM +0100, Nicolas Pitre wrote:
-> On Wed, 14 Aug 2013, Mark Rutland wrote:
-> > The smp.pen.text section is also removed, as the pen can live in
-> > head.text without problem.
+On Thu, Aug 29, 2013 at 07:32:28PM +0100, Stefano Stabellini wrote:
+> Modify xen_create_contiguous_region to return the dma address of the
+> newly contiguous buffer.
 > 
-> Why was there a special section for the pen code initially?
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 
-Grep'ing the old git logs for the arm64 development, it looks like it
-was introduced as part of the first proposal for the booting protocol
-where all the CPUs got into the kernel at the same time (secondaries at
-offset 0x80). IIRC you nak'ed this during the private review but we
-forgot about this section.
-
--- 
-Catalin
+Acked-by or Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> 
+> 
+> Changes in v4:
+> - use virt_to_machine instead of virt_to_bus.
+> ---
+>  arch/x86/xen/mmu.c        |    4 +++-
+>  drivers/xen/swiotlb-xen.c |    6 +++---
+>  include/xen/xen-ops.h     |    3 ++-
+>  3 files changed, 8 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/x86/xen/mmu.c b/arch/x86/xen/mmu.c
+> index fdc3ba2..6c34d7c 100644
+> --- a/arch/x86/xen/mmu.c
+> +++ b/arch/x86/xen/mmu.c
+> @@ -2329,7 +2329,8 @@ static int xen_exchange_memory(unsigned long extents_in, unsigned int order_in,
+>  }
+>  
+>  int xen_create_contiguous_region(unsigned long vstart, unsigned int order,
+> -				 unsigned int address_bits)
+> +				 unsigned int address_bits,
+> +				 dma_addr_t *dma_handle)
+>  {
+>  	unsigned long *in_frames = discontig_frames, out_frame;
+>  	unsigned long  flags;
+> @@ -2368,6 +2369,7 @@ int xen_create_contiguous_region(unsigned long vstart, unsigned int order,
+>  
+>  	spin_unlock_irqrestore(&xen_reservation_lock, flags);
+>  
+> +	*dma_handle = virt_to_machine(vstart).maddr;
+>  	return success ? 0 : -ENOMEM;
+>  }
+>  EXPORT_SYMBOL_GPL(xen_create_contiguous_region);
+> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+> index 1b2277c..b72f31c 100644
+> --- a/drivers/xen/swiotlb-xen.c
+> +++ b/drivers/xen/swiotlb-xen.c
+> @@ -126,6 +126,7 @@ xen_swiotlb_fixup(void *buf, size_t size, unsigned long nslabs)
+>  {
+>  	int i, rc;
+>  	int dma_bits;
+> +	dma_addr_t dma_handle;
+>  
+>  	dma_bits = get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT) + PAGE_SHIFT;
+>  
+> @@ -137,7 +138,7 @@ xen_swiotlb_fixup(void *buf, size_t size, unsigned long nslabs)
+>  			rc = xen_create_contiguous_region(
+>  				(unsigned long)buf + (i << IO_TLB_SHIFT),
+>  				get_order(slabs << IO_TLB_SHIFT),
+> -				dma_bits);
+> +				dma_bits, &dma_handle);
+>  		} while (rc && dma_bits++ < max_dma_bits);
+>  		if (rc)
+>  			return rc;
+> @@ -294,11 +295,10 @@ xen_swiotlb_alloc_coherent(struct device *hwdev, size_t size,
+>  		*dma_handle = dev_addr;
+>  	else {
+>  		if (xen_create_contiguous_region(vstart, order,
+> -						 fls64(dma_mask)) != 0) {
+> +						 fls64(dma_mask), dma_handle) != 0) {
+>  			free_pages(vstart, order);
+>  			return NULL;
+>  		}
+> -		*dma_handle = virt_to_machine(ret).maddr;
+>  	}
+>  	memset(ret, 0, size);
+>  	return ret;
+> diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
+> index d6fe062..9ef704d 100644
+> --- a/include/xen/xen-ops.h
+> +++ b/include/xen/xen-ops.h
+> @@ -20,7 +20,8 @@ int xen_setup_shutdown_event(void);
+>  
+>  extern unsigned long *xen_contiguous_bitmap;
+>  int xen_create_contiguous_region(unsigned long vstart, unsigned int order,
+> -				unsigned int address_bits);
+> +				unsigned int address_bits,
+> +				dma_addr_t *dma_handle);
+>  
+>  void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order);
+>  
+> -- 
+> 1.7.2.5
+> 
