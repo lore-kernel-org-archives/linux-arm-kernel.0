@@ -1,43 +1,49 @@
 From: b44548@freescale.com (Chao Fu)
-Date: Fri, 30 Aug 2013 11:19:48 +0800
-Subject: [PATCH v4 1/2] ARM:dts: vf610: Add DSPI nodes
+Date: Fri, 30 Aug 2013 11:19:49 +0800
+Subject: [PATCH v4 2/2] ARM:dts:vf610-twr:Enable DSPI0 devices and Flash
+ at26df081a
 In-Reply-To: <1377832789-5238-1-git-send-email-b44548@freescale.com>
 References: <1377832789-5238-1-git-send-email-b44548@freescale.com>
-Message-ID: <1377832789-5238-2-git-send-email-b44548@freescale.com>
+Message-ID: <1377832789-5238-3-git-send-email-b44548@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chao Fu <B44548@freescale.com>
 
-Add Freescale DSPI node into vf610 dts.
+This patch enables DSPI0 and at26df081a flash device for Vybrid VF610 TOWER board.
 
 Signed-off-by: Chao Fu <b44548@freescale.com>
 ---
- arch/arm/boot/dts/vf610.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/vf610-twr.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 67d929c..d31ce1b 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -123,6 +123,18 @@
- 				status = "disabled";
- 			};
+diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+index b3905f5..6b522cc 100644
+--- a/arch/arm/boot/dts/vf610-twr.dts
++++ b/arch/arm/boot/dts/vf610-twr.dts
+@@ -36,6 +36,23 @@
  
-+			dspi0: dspi0 at 4002c000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,vf610-dspi";
-+				reg = <0x4002c000 0x1000>;
-+				interrupts = <0 67 0x04>;
-+				clocks = <&clks VF610_CLK_DSPI0>;
-+				clock-names = "dspi";
-+				spi-num-chipselects = <5>;
-+				status = "disabled";
-+			};
+ };
+ 
++&dspi0 {
++	bus-num = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_dspi0_1>;
++	status = "okay";
 +
- 			sai2: sai at 40031000 {
- 				compatible = "fsl,vf610-sai";
- 				reg = <0x40031000 0x1000>;
++	sflash: at26df081a at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "atmel,at26df081a";
++		spi-max-frequency = <16000000>;
++		spi-cpol;
++		spi-cpha;
++		reg = <0>;
++	};
++};
++
+ &fec0 {
+ 	phy-mode = "rmii";
+ 	pinctrl-names = "default";
 -- 
 1.8.0
