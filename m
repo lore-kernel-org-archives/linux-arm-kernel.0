@@ -1,102 +1,52 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 30 Aug 2013 15:26:05 -0300
-Subject: [PATCH] ARM: imx6qdl-wandboard: Add spdif support
-Message-ID: <1377887165-22377-1-git-send-email-festevam@gmail.com>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Fri, 30 Aug 2013 11:42:30 -0700
+Subject: [PATCH RFC 1/2] PM / Hibernate: use name_to_dev_t to parse resume
+In-Reply-To: <20130830113533.GA7226@amd.pavel.ucw.cz>
+References: <1377114413-8521-1-git-send-email-sebastian.capella@linaro.org>
+ <1377114413-8521-2-git-send-email-sebastian.capella@linaro.org>
+ <20130825153811.GA4795@amd.pavel.ucw.cz>
+ <20130826174050.16429.7419@capellas-linux>
+ <20130830113533.GA7226@amd.pavel.ucw.cz>
+Message-ID: <20130830184230.28518.71814@capellas-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Quoting Pavel Machek (2013-08-30 04:35:33)
+> On Mon 2013-08-26 10:40:50, Sebastian Capella wrote:
+> > Quoting Pavel Machek (2013-08-25 08:38:11)
+> > > Is the allocation actually neccessary? At the very least this should
+> > > test for NULL...
+> > 
+> > name_to_dev_t expects a non-const name, but the buffer passed in
+> > is const.  I also am removing the '\n' if found at the end of the
+> > string which would violate the const.
+> 
+> Fix name_to_dev_t, then. No need to do memory allocation just to work
+> around const.
+> 
+Hi Pavel,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-I can see the spdif card getting probed. When I run 'aplay the spdif
-light turns on, but I cannot test it due to the lack of spdif equipment at the
-moment.
+The issue is really Removing the \n from the user space input.  The
+flow is:
+const input buf -> copy to work buffer, remove newline -> name_to_dev_t
 
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 13 +++++++++++++
- arch/arm/boot/dts/imx6qdl.dtsi           | 32 ++++++++++++++++++++++++++++----
- 2 files changed, 41 insertions(+), 4 deletions(-)
+  ssize_t resume_store(..., const char *buf, size_t n)
+  // copy buf, strip off trailing newline, pass to name_to_dev_t
+  dev_t name_to_dev_t(char *name)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-index a55113e..6ab91be 100644
---- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-@@ -43,6 +43,13 @@
- 		mux-int-port = <1>;
- 		mux-ext-port = <3>;
- 	};
-+
-+	sound-spdif {
-+		compatible = "fsl,imx-audio-spdif";
-+		model = "imx-spdif";
-+		spdif-controller = <&spdif>;
-+		spdif-out;
-+	};
- };
- 
- &audmux {
-@@ -93,6 +100,12 @@
- 	status = "okay";
- };
- 
-+&spdif {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_spdif_3>;
-+	status = "okay";
-+};
-+
- &ssi1 {
- 	fsl,mode = "i2s-slave";
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index ccd55c2..d0324ba 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -135,10 +135,27 @@
- 				reg = <0x02000000 0x40000>;
- 				ranges;
- 
--				spdif: spdif at 02004000 {
--					reg = <0x02004000 0x4000>;
--					interrupts = <0 52 0x04>;
--				};
-+			spdif: spdif at 02004000 {
-+				compatible = "fsl,imx35-spdif";
-+				reg = <0x02004000 0x4000>;
-+				interrupts = <0 52 0x04>;
-+				dmas = <&sdma 14 18 0>,
-+				       <&sdma 15 18 0>;
-+				dma-names = "rx", "tx";
-+
-+				clocks = <&clks 197>, <&clks 3>,
-+					 <&clks 197>, <&clks 107>,
-+					 <&clks 0>, <&clks 118>,
-+					 <&clks 62>, <&clks 139>,
-+					 <&clks 0>;
-+				clock-names = "core", "rxtx0",
-+					      "rxtx1", "rxtx2",
-+					      "rxtx3", "rxtx4",
-+					      "rxtx5", "rxtx6",
-+					      "rxtx7";
-+
-+				status = "disabled";
-+			};
- 
- 				ecspi1: ecspi at 02008000 {
- 					#address-cells = <1>;
-@@ -1010,6 +1027,13 @@
- 							MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x1b0b0
- 						>;
- 					};
-+
-+					pinctrl_spdif_3: spdifgrp-3 {
-+						fsl,pins = <
-+							MX6QDL_PAD_ENET_RXD0__SPDIF_OUT 0x1b0b0
-+						>;
-+					};
-+
- 				};
- 
- 				uart1 {
--- 
-1.8.1.2
+The const in the restore_store buffer comes from the function type of the
+store member of the kobj_attribute.  I don't believe this should be changed.
+
+Currently, name_to_dev_t will fail in some cases if a trailing \n is present.
+Is it more appropriate to handle stripping the newline in the store
+function rather than modifying name_to_dev_t to clean it up?
+
+It seems logical for name_to_dev_t to take a const name parameter as
+there should be no reason to modify the name buffer passed to it.
+I'll be happy to make a patch to do this, but without hardening
+name_to_dev_t against trailing newlines, it would not be neccesary for
+this problem.
+
+Thanks for your time and comments!
+
+Sebastian
