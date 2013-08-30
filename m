@@ -1,43 +1,149 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 30 Aug 2013 20:10:41 +0100
-Subject: [PATCH 05/20] ARM: pl01x debug code endian fix
+Date: Fri, 30 Aug 2013 20:10:38 +0100
+Subject: [PATCH 02/20] ARM: asm: Add ARM_BE8() assembly helper
 In-Reply-To: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1377889856-9447-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1377889856-9447-6-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1377889856-9447-3-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PL01X debug code needs to take into account which endian mode the
-processor is running in. If it is big-endian, ensure the data is swapped
-appropriately.
+Add ARM_BE8() helper to wrap any code conditional on being
+compile when CONFIG_ARM_ENDIAN_BE8 is selected and convert
+existing places where this is to use it.
 
-Note, we could do this slightly more efficiently if we have an macro to
-do the necessary swap for the bits used by test.
-
+Acked-by: Nicolas Pitre <nico@linaro.org>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/include/asm/hardware/debug-pl01x.S |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/compressed/head.S  |    8 ++------
+ arch/arm/include/asm/assembler.h |    7 +++++++
+ arch/arm/kernel/entry-armv.S     |    5 ++---
+ arch/arm/kernel/entry-common.S   |    4 +---
+ arch/arm/mm/abort-ev6.S          |    5 ++---
+ arch/arm/mm/proc-v6.S            |    4 +---
+ arch/arm/mm/proc-v7.S            |    4 +---
+ 7 files changed, 16 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardware/debug-pl01x.S b/arch/arm/include/asm/hardware/debug-pl01x.S
-index f9fd083..6489d1f 100644
---- a/arch/arm/include/asm/hardware/debug-pl01x.S
-+++ b/arch/arm/include/asm/hardware/debug-pl01x.S
-@@ -18,12 +18,14 @@
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 75189f1..c912c2a 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -699,9 +699,7 @@ __armv4_mmu_cache_on:
+ 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
+ 		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
+ 		orr	r0, r0, #0x0030
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-		orr	r0, r0, #1 << 25	@ big-endian page tables
+-#endif
++ ARM_BE8(	orr	r0, r0, #1 << 25 )	@ big-endian page tables
+ 		bl	__common_mmu_cache_on
+ 		mov	r0, #0
+ 		mcr	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
+@@ -728,9 +726,7 @@ __armv7_mmu_cache_on:
+ 		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
+ 						@ (needed for ARM1176)
+ #ifdef CONFIG_MMU
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-		orr	r0, r0, #1 << 25	@ big-endian page tables
+-#endif
++ ARM_BE8(	orr	r0, r0, #1 << 25 )	@ big-endian page tables
+ 		mrcne   p15, 0, r6, c2, c0, 2   @ read ttb control reg
+ 		orrne	r0, r0, #1		@ MMU enabled
+ 		movne	r1, #0xfffffffd		@ domain 0 = client
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index a5fef71..5350f83 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -53,6 +53,13 @@
+ #define put_byte_3      lsl #0
+ #endif
  
- 		.macro	waituart,rd,rx
- 1001:		ldr	\rd, [\rx, #UART01x_FR]
-+ ARM_BE8(	rev	\rd, \rd )
- 		tst	\rd, #UART01x_FR_TXFF
- 		bne	1001b
- 		.endm
++/* Select code for any configuration running in BE8 mode */
++#ifdef CONFIG_CPU_ENDIAN_BE8
++#define ARM_BE8(code...) code
++#else
++#define ARM_BE8(code...)
++#endif
++
+ /*
+  * Data preload for architectures that support it
+  */
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 9cbe70c..55090fb 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -416,9 +416,8 @@ __und_usr:
+ 	bne	__und_usr_thumb
+ 	sub	r4, r2, #4			@ ARM instr@LR - 4
+ 1:	ldrt	r0, [r4]
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-	rev	r0, r0				@ little endian instruction
+-#endif
++ ARM_BE8(rev	r0, r0)				@ little endian instruction
++
+ 	@ r0 = 32-bit ARM instruction which caused the exception
+ 	@ r2 = PC value for the following instruction (:= regs->ARM_pc)
+ 	@ r4 = PC value for the faulting instruction
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 94104bf..cc318cd 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -393,9 +393,7 @@ ENTRY(vector_swi)
+ #else
+  USER(	ldr	r10, [lr, #-4]		)	@ get SWI instruction
+ #endif
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-	rev	r10, r10			@ little endian instruction
+-#endif
++ ARM_BE8(rev	r10, r10)			@ little endian instruction
  
- 		.macro	busyuart,rd,rx
- 1001:		ldr	\rd, [\rx, #UART01x_FR]
-+ ARM_BE8(	rev	\rd, \rd )
- 		tst	\rd, #UART01x_FR_BUSY
- 		bne	1001b
- 		.endm
+ #elif defined(CONFIG_AEABI)
+ 
+diff --git a/arch/arm/mm/abort-ev6.S b/arch/arm/mm/abort-ev6.S
+index 8074199..3815a82 100644
+--- a/arch/arm/mm/abort-ev6.S
++++ b/arch/arm/mm/abort-ev6.S
+@@ -38,9 +38,8 @@ ENTRY(v6_early_abort)
+ 	bne	do_DataAbort
+ 	bic	r1, r1, #1 << 11		@ clear bit 11 of FSR
+ 	ldr	r3, [r4]			@ read aborted ARM instruction
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-	rev	r3, r3
+-#endif
++ ARM_BE8(rev	r3, r3)
++
+ 	do_ldrd_abort tmp=ip, insn=r3
+ 	tst	r3, #1 << 20			@ L = 0 -> write
+ 	orreq	r1, r1, #1 << 11		@ yes.
+diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+index 1128064..45dc29f 100644
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -220,9 +220,7 @@ __v6_setup:
+ #endif /* CONFIG_MMU */
+ 	adr	r5, v6_crval
+ 	ldmia	r5, {r5, r6}
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-	orr	r6, r6, #1 << 25		@ big-endian page tables
+-#endif
++ ARM_BE8(orr	r6, r6, #1 << 25)		@ big-endian page tables
+ 	mrc	p15, 0, r0, c1, c0, 0		@ read control register
+ 	bic	r0, r0, r5			@ clear bits them
+ 	orr	r0, r0, r6			@ set them
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 73398bc..03978e3 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -355,9 +355,7 @@ __v7_setup:
+ #endif
+ 	adr	r5, v7_crval
+ 	ldmia	r5, {r5, r6}
+-#ifdef CONFIG_CPU_ENDIAN_BE8
+-	orr	r6, r6, #1 << 25		@ big-endian page tables
+-#endif
++ ARM_BE8(orr	r6, r6, #1 << 25)		@ big-endian page tables
+ #ifdef CONFIG_SWP_EMULATE
+ 	orr     r5, r5, #(1 << 10)              @ set SW bit in "clear"
+ 	bic     r6, r6, #(1 << 10)              @ clear it in "mmuset"
 -- 
 1.7.10.4
