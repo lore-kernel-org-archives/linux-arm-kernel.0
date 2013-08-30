@@ -1,118 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 Aug 2013 16:08:41 +0100
-Subject: [PATCH 1/2] ARM: Dove: Add the audio devices in DT
-In-Reply-To: <521F2A03.8000905@gmail.com>
-References: <521DCD33.2070008@gmail.com> <20130828121943.1c8327ca@skate>
- <521DD057.4040208@gmail.com> <20130828131548.0009d613@skate>
- <521DE2B3.9050508@gmail.com> <20130828135827.2307c89e@skate>
- <521DEA20.8020103@gmail.com> <20130829120704.410ad309@armhf>
- <20130829101303.GR6617@n2100.arm.linux.org.uk> <521F2A03.8000905@gmail.com>
-Message-ID: <20130830150841.GY6617@n2100.arm.linux.org.uk>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Fri, 30 Aug 2013 16:46:17 +0100
+Subject: [PATCH v6 0/5] ARM/ARM64 architected timer updates
+In-Reply-To: <20130830140406.GE12160@mudshark.cambridge.arm.com>
+References: <1377788142-21388-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <52206EE0.5020907@arm.com> <20130830114309.GW6617@n2100.arm.linux.org.uk>
+ <20130830140406.GE12160@mudshark.cambridge.arm.com>
+Message-ID: <5220BE49.2030409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 01:01:23PM +0200, Sebastian Hesselbarth wrote:
-> Taking the sound node above:
->
-> sound {
-> 	compatible = "whatever-audio";
-> 	...
-> 	audio-codec = <&rt1234 1>, <&spdif 0>;
-> 	audio-codec-names = "i2s", "spdifo";
-> 	...
-> };
->
-> Each audio-codec phandle with arg links to one specific "port" at some
-> "codec". The audio-codec-names property allows the ASoC driver to
-> determine the local "ports" where the above codecs are connected.
-> The dummy codecs are ASoC specific and must be added by the driver.
+On 30/08/13 15:04, Will Deacon wrote:
+> On Fri, Aug 30, 2013 at 12:43:09PM +0100, Russell King - ARM Linux wrote:
+>> On Fri, Aug 30, 2013 at 11:07:28AM +0100, Sudeep KarkadaNagesha wrote:
+>>> On 29/08/13 15:55, Sudeep KarkadaNagesha wrote:
+>>>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>>>>
+>>>> This patch series adds support to configure the rate and enable the
+>>>> event stream for architected timer. The event streams can be used to
+>>>> impose a timeout on a wfe, to safeguard against any programming error
+>>>> in case an expected event is not generated or even to implement
+>>>> wfe-based timeouts for userspace locking implementations. This feature
+>>>> can be disabled(enabled by default).
+>>>>
+>>>> Since the timer control register is reset to zero on warm boot, CPU
+>>>> PM notifier is added to save and restore the value.
+>>>>
+>>> Hi Russell,
+>>>
+>>> Can you have a look at this series ?
+>>> If you are OK, can I have your ACK on arm specific changes(PATCH 2/5) ?
+>>
+>> I think it would be more value to have someone from ARM Ltd ack it,
+>> because they will know the code much better than I do.
+> 
+> Looks good to me, so for patch 2/5:
+> 
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+Thanks Will and Russell.
 
-I think it's slightly more complicated than that.  Here's what needs to
-be setup with DPCM - when it eventually works:
+Hi Catalin,
 
-1. Two DAI links need to be setup:
-1a:             .name = "S/PDIF1",
-                .stream_name = "Audio Playback",
-                .platform_name = "mvebu-audio.1",
-                .cpu_dai_name = "mvebu-audio.1",
-                .codec_name = "snd-soc-dummy",
-                .codec_dai_name = "snd-soc-dummy-dai",
-                .dynamic = 1,
+Can I have your ACK for ARM64 changes(PATCH 3/5) so that Daniel can
+accept my pull request ?
 
-1b:             .name = "Codec",
-                .stream_name = "IEC958 Playback",
-                .cpu_dai_name = "snd-soc-dummy-dai",
-                .platform_name = "snd-soc-dummy",
-                .no_pcm = 1,
-                .codec_dai_name = "dit-hifi",
-                .codec_name = "spdif-dit",
-
-   This separates the CPU DAI from the codec DAI - the important thing
-   seems to be that the first entry (which connects the CPU DAI to the
-   dummy codec) breaks the automatic DAPM routes between the CPU streams
-   and the codec streams.
-
-2. DAPM routes need to be created between the CPU DAI and Codec DAIs to
-   wire the back together:
-
-	static const struct snd_soc_dapm_route routes[] = {
-	        { "spdif-Playback", NULL, "spdifdo" },
-	};
-
-"spdif-Playback" is the stream name in the spdif-dit codec (I had to change
-the name from merely "Playback" as otherwise the route gets bound to the
-dummy codec instead.)  "spdifdo" is the audio interface widget name in the
-CPU DAI, which is connected to the CPU DAI playback stream.
-
-So, if we wanted two codecs, one spdif and one i2s, we would need something
-like this:
-
-DAI links:
-                .name = "CPU",
-                .stream_name = "Audio Playback",
-                .platform_name = "mvebu-audio.1",
-                .cpu_dai_name = "mvebu-audio.1",
-                .codec_name = "snd-soc-dummy",
-                .codec_dai_name = "snd-soc-dummy-dai",
-                .dynamic = 1,
-
-                .name = "I2S",
-                .stream_name = "PCM Playback",
-                .cpu_dai_name = "snd-soc-dummy-dai",
-                .platform_name = "snd-soc-dummy",
-                .no_pcm = 1,
-                .codec_dai_name = "i2s-codec-dai-name",
-                .codec_name = "i2s-codec-name",
-                .ops = &..._ops,
-
-                .name = "SPDIF",
-                .stream_name = "IEC958 Playback",
-                .cpu_dai_name = "snd-soc-dummy-dai",
-                .platform_name = "snd-soc-dummy",
-                .no_pcm = 1,
-                .codec_dai_name = "dit-hifi",
-                .codec_name = "spdif-dit",
-
-with routes like this:
-
-static const struct snd_soc_dapm_route routes[] = {
-	{ "i2sdi", NULL, "i2s-codec-Capture" },
-	{ "i2s-codec-Playback", NULL, "i2sdo" },
-        { "spdif-Playback", NULL, "spdifdo" },
-};
-
-If we were to add support for SPDIF recording mode, then we'd need to add
-an additional route for that.
-
-The pitfalls here are:
-1. if we are going to refer to codec streams in DAPM routes, we need all
-   codec implementations to have unique names, or some way for DAPM routes
-   to refer to specific codec streams.
-
-2. being able to effectively represent this in DT.
-
-I think we need a flag in DT to indicate a DPCM configuration, which would
-trigger the creation of the first DAI link.  The second and (optionally)
-third can be generated from knowing the codec DAI name and the codec
-name.  I think we also need a way to specify arbitary DAPM routes in DT
-as well.
+Regards,
+Sudeep
