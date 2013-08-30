@@ -1,38 +1,113 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Fri, 30 Aug 2013 09:51:47 +0800
-Subject: getting rid of subsys_initcall usage?
-In-Reply-To: <20130828095706.GH4086@katana>
-References: <1376987548-12366-1-git-send-email-zhangfei.gao@linaro.org>
- <20130828095706.GH4086@katana>
-Message-ID: <521FFAB3.2080405@linaro.org>
+From: wujianguo@huawei.com (Jianguo Wu)
+Date: Fri, 30 Aug 2013 10:06:51 +0800
+Subject: [PATCH 4/4] mm/arch: use NUMA_NODE
+Message-ID: <521FFE3B.7040801@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-08-28 05:57 PM, Wolfram Sang wrote:
-> On Tue, Aug 20, 2013 at 04:32:28PM +0800, Zhangfei Gao wrote:
->> Instead of use platform_driver_probe, use module_platform_driver
->> To support deferred probing
->> Also subsys_initcall may too early to auto set pinctl
->>
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> Acked-by: Baruch Siach <baruch@tkos.co.il>
->
-> This patch is tougher than it looks. You need it, because
-> subsys_initcall may be too early for pinctrl. Other people might be
-> depending on subsys_initcall to get I2C active before they want to
-> activate, say, PMICs. So, I fear regressions, since deferred probing
-> might not be available in the needed places to avoid these regressions.
-> I am all ears for a nice transition away from subsys_initcall, anyone?
+Use more appropriate NUMA_NO_NODE instead of -1 in some archs' module_alloc()
 
-Dear Wolfram,
+Signed-off-by: Jianguo Wu <wujianguo@huawei.com>
+---
+ arch/arm/kernel/module.c    |    2 +-
+ arch/arm64/kernel/module.c  |    2 +-
+ arch/mips/kernel/module.c   |    2 +-
+ arch/parisc/kernel/module.c |    2 +-
+ arch/s390/kernel/module.c   |    2 +-
+ arch/sparc/kernel/module.c  |    2 +-
+ arch/x86/kernel/module.c    |    2 +-
+ 7 files changed, 7 insertions(+), 7 deletions(-)
 
-The deferred probe will be successful if change platform_driver_probe to 
-platform_driver_register, to register itself to drv name list.
-
-However, the effect is subsys_initcall is postponed, until pin control 
-driver is probed successfully.
-If the pin is specific and does not need configure, there is no issue.
-There may still have issue if the mulit-function pin need be configured 
-via pinctrl, except put pin control driver earlier too.
-
-Thanks
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 85c3fb6..8f4cff3 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -40,7 +40,7 @@
+ void *module_alloc(unsigned long size)
+ {
+ 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+-				GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
++				GFP_KERNEL, PAGE_KERNEL_EXEC, NUMA_NO_NODE,
+ 				__builtin_return_address(0));
+ }
+ #endif
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index ca0e3d5..8f898bd 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -29,7 +29,7 @@
+ void *module_alloc(unsigned long size)
+ {
+ 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+-				    GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
++				    GFP_KERNEL, PAGE_KERNEL_EXEC, NUMA_NO_NODE,
+ 				    __builtin_return_address(0));
+ }
+ 
+diff --git a/arch/mips/kernel/module.c b/arch/mips/kernel/module.c
+index 977a623..b507e07 100644
+--- a/arch/mips/kernel/module.c
++++ b/arch/mips/kernel/module.c
+@@ -46,7 +46,7 @@ static DEFINE_SPINLOCK(dbe_lock);
+ void *module_alloc(unsigned long size)
+ {
+ 	return __vmalloc_node_range(size, 1, MODULE_START, MODULE_END,
+-				GFP_KERNEL, PAGE_KERNEL, -1,
++				GFP_KERNEL, PAGE_KERNEL, NUMA_NO_NODE,
+ 				__builtin_return_address(0));
+ }
+ #endif
+diff --git a/arch/parisc/kernel/module.c b/arch/parisc/kernel/module.c
+index 2a625fb..50dfafc 100644
+--- a/arch/parisc/kernel/module.c
++++ b/arch/parisc/kernel/module.c
+@@ -219,7 +219,7 @@ void *module_alloc(unsigned long size)
+ 	 * init_data correctly */
+ 	return __vmalloc_node_range(size, 1, VMALLOC_START, VMALLOC_END,
+ 				    GFP_KERNEL | __GFP_HIGHMEM,
+-				    PAGE_KERNEL_RWX, -1,
++				    PAGE_KERNEL_RWX, NUMA_NO_NODE,
+ 				    __builtin_return_address(0));
+ }
+ 
+diff --git a/arch/s390/kernel/module.c b/arch/s390/kernel/module.c
+index 7845e15..b89b591 100644
+--- a/arch/s390/kernel/module.c
++++ b/arch/s390/kernel/module.c
+@@ -50,7 +50,7 @@ void *module_alloc(unsigned long size)
+ 	if (PAGE_ALIGN(size) > MODULES_LEN)
+ 		return NULL;
+ 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+-				    GFP_KERNEL, PAGE_KERNEL, -1,
++				    GFP_KERNEL, PAGE_KERNEL, NUMA_NO_NODE,
+ 				    __builtin_return_address(0));
+ }
+ #endif
+diff --git a/arch/sparc/kernel/module.c b/arch/sparc/kernel/module.c
+index 4435488..97655e0 100644
+--- a/arch/sparc/kernel/module.c
++++ b/arch/sparc/kernel/module.c
+@@ -29,7 +29,7 @@ static void *module_map(unsigned long size)
+ 	if (PAGE_ALIGN(size) > MODULES_LEN)
+ 		return NULL;
+ 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+-				GFP_KERNEL, PAGE_KERNEL, -1,
++				GFP_KERNEL, PAGE_KERNEL, NUMA_NO_NODE,
+ 				__builtin_return_address(0));
+ }
+ #else
+diff --git a/arch/x86/kernel/module.c b/arch/x86/kernel/module.c
+index 216a4d7..18be189 100644
+--- a/arch/x86/kernel/module.c
++++ b/arch/x86/kernel/module.c
+@@ -49,7 +49,7 @@ void *module_alloc(unsigned long size)
+ 		return NULL;
+ 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+ 				GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL_EXEC,
+-				-1, __builtin_return_address(0));
++				NUMA_NO_NODE, __builtin_return_address(0));
+ }
+ 
+ #ifdef CONFIG_X86_32
+-- 
+1.7.1
