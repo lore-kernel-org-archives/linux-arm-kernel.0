@@ -1,151 +1,78 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 30 Aug 2013 15:48:30 -0500
-Subject: [PATCH v4 3/5] clk: dt: binding for basic multiplexer clock
-In-Reply-To: <20130830203334.10934.10011@quantum>
-References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
- <1377150793-27864-4-git-send-email-mturquette@linaro.org>
- <2A930389-012E-45C3-93EB-6B4A41DB2EF5@codeaurora.org>
- <20130829011425.8231.78802@quantum>
- <39BAF1F8-41AD-4667-BF76-22BDF709415A@codeaurora.org>
- <20130830203334.10934.10011@quantum>
-Message-ID: <2B0F4B98-5738-48FF-BE30-36115FFCFF0C@codeaurora.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 30 Aug 2013 16:54:02 -0400
+Subject: [GIT PULL V2] ARM: mvebu: dove changes for v3.12
+In-Reply-To: <20130814203326.GJ13964@titan.lakedaemon.net>
+References: <20130814203326.GJ13964@titan.lakedaemon.net>
+Message-ID: <20130830205402.GX19598@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Arnd, Olof,
 
-On Aug 30, 2013, at 3:33 PM, Mike Turquette wrote:
+Sending V2 based on the new mvebu/msi_mvebu (rebased onto
+mvebu/drivers).
 
-> Quoting Kumar Gala (2013-08-30 13:02:42)
->> On Aug 28, 2013, at 8:14 PM, Mike Turquette wrote:
->> 
->>> Quoting Kumar Gala (2013-08-28 08:50:10)
->>>> On Aug 22, 2013, at 12:53 AM, Mike Turquette wrote:
->>>> 
->>>>> Device Tree binding for the basic clock multiplexer, plus the setup
->>>>> function to register the clock.  Based on the existing fixed-clock
->>>>> binding.
->>>>> 
->>>>> Includes minor beautification of clk-provider.h where some whitespace is
->>>>> added and of_fixed_factor_clock_setup is relocated to maintain a
->>>>> consistent style.
->>>>> 
->>>>> Tero Kristo contributed helpful bug fixes to this patch.
->>>>> 
->>>>> Signed-off-by: Mike Turquette <mturquette@linaro.org>
->>>>> Tested-by: Heiko Stuebner <heiko@sntech.de>
->>>>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
->>>>> ---
->>>>> Changes since v3:
->>>>> * replaced underscores with dashes in DT property names
->>>>> * bail from of clock setup function early if of_iomap fails
->>>>> * removed unecessary explict cast
->>>>> 
->>>>> .../devicetree/bindings/clock/mux-clock.txt        | 79 ++++++++++++++++++++++
->>>>> drivers/clk/clk-mux.c                              | 68 ++++++++++++++++++-
->>>>> include/linux/clk-provider.h                       |  5 +-
->>>>> 3 files changed, 150 insertions(+), 2 deletions(-)
->>>>> create mode 100644 Documentation/devicetree/bindings/clock/mux-clock.txt
->>>>> 
->>>>> diff --git a/Documentation/devicetree/bindings/clock/mux-clock.txt b/Documentation/devicetree/bindings/clock/mux-clock.txt
->>>>> new file mode 100644
->>>>> index 0000000..21eb3b3
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/clock/mux-clock.txt
->>>>> @@ -0,0 +1,79 @@
->>>>> +Binding for simple mux clock.
->>>>> +
->>>>> +This binding uses the common clock binding[1].  It assumes a
->>>>> +register-mapped multiplexer with multiple input clock signals or
->>>>> +parents, one of which can be selected as output.  This clock does not
->>>>> +gate or adjust the parent rate via a divider or multiplier.
->>>>> +
->>>>> +By default the "clocks" property lists the parents in the same order
->>>>> +as they are programmed into the regster.  E.g:
->>>>> +
->>>>> +     clocks = <&foo_clock>, <&bar_clock>, <&baz_clock>;
->>>>> +
->>>>> +results in programming the register as follows:
->>>>> +
->>>>> +register value               selected parent clock
->>>>> +0                    foo_clock
->>>>> +1                    bar_clock
->>>>> +2                    baz_clock
->>>>> +
->>>>> +Some clock controller IPs do not allow a value of zero to be programmed
->>>>> +into the register, instead indexing begins at 1.  The optional property
->>>>> +"index-starts-at-one" modified the scheme as follows:
->>>>> +
->>>>> +register value               selected clock parent
->>>>> +1                    foo_clock
->>>>> +2                    bar_clock
->>>>> +3                    baz_clock
->>>>> +
->>>>> +Additionally an optional table of bit and parent pairs may be supplied
->>>>> +like so:
->>>>> +
->>>>> +     table = <&foo_clock 0x0>, <&bar_clock, 0x2>, <&baz_clock, 0x4>;
->>>>> +
->>>> 
->>>> I think this is going way too far for what should be in a device tree.  Why should this not just be encoded in tables in the code?
->>> 
->>> To reduce kernel data bloat.
->> 
->> Why is this really an issue, for systems that are concerned about kernel size, they are going to be built targeting the HW platform of choice, for one's like a server, the bloat isn't going to be significant, and if so we can look at mechanisms like __init section that would free up after boot.
-> 
-> s/bloat/churn/
-> 
-> The clock _data_ seems to always have some churn to it. Moving it out to
-> DT reduces that churn from Linux. My concern above is not about kernel
-> data size.
+thx,
 
-And we have numerous concerns about DTs be non-changeable on shipping systems where kernels still seem to be viewed as acceptable to change.
+Jason.
 
-Not sure I really get this argument about churn.  The churn still exists you've just shifted it.
 
->>> The mux-clock binding covers a quite a few platforms that have similar
->>> mux-clock programming requirements. If the DT binding is verbose enough
->>> then the basic mux clock driver is sufficient to initialize all of the
->>> mux clocks from DT: no new platform-specific clock driver with a bunch
->>> of data is necessary.
->> 
->> The same could be said of just embedded this info in a C struct that is well known, I don't need the data in the dt for bits and shifts.
->> 
->>> On the other hand if we rely on tables in C to define how mux-clock
->>> parents are selected then every platform will have to write their own
->>> clock driver just to define their clock data.
->> 
->> Why?  If you can have a common mechanism in the device tree there isn't any reason you can't have a common struct that looks similar in C.
->> 
->>> Having drivers written for the sole purpose of listing out a bunch of
->>> data sounds like something that DT was meant to solve, even if this
->>> isn't at the board level and is at the SoC level.
->> 
->> I just don't see the need for the data to be in the DT.  You can get the same goal w/a standard struct defined in C.
-> 
-> Absolutely you could put this stuff in C. Originally all of the clock
-> registration mechanisms in the common clock implementation assumed
-> static data in the kernel. That's how it used to be.
-> 
-> However DT came along to ARM and the clock framework and these "clock
-> mapping" bindings started popping up, which are fragile. Adding a clock
-> requires changes both to the DT binding AND to the kernel. That sucks.
+The following changes since commit 9f494449cc34b1896e38c1e7da3a774d072ade8f:
 
-Sure, we learn things as we see more patterns from how different implementations work.  It seems like you've figured out a good pattern, just don't see why it would need to be in the DT.
+  Merge branch 'mvebu/msi_mvebu' into mvebu/dove_pcie-mbus-dt (2013-08-30 20:29:27 +0000)
 
-> Once again I'll point out that this binding (mux-clock) makes it so that
-> devices with simpler clock trees do not need to merge any code into the
-> kernel. What value does device tree bring to me if for every platform
-> with 8 clocks I have to write a new Linux clock driver with that static
-> data in it? That also sucks. In that case DT brings almost zero value,
-> with the exception of linking clock phandles to clock consumers, which
-> clkdev had been doing for us already.
+are available in the git repository at:
 
-Do you believe that we will ever get to a point that a new SoC will be supported w/o some new coded added into the kernel?  I don't see that ever happening for embedded systems.
 
-I think this is about where to draw the line, I just very concerned about the pandora's box this potentially opens up.
+  git://git.infradead.org/linux-mvebu.git tags/dove-all-3.12
 
-- k
+for you to fetch changes up to 8e6397a5ce592ba0dfed29c708654e96888c0068:
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+  ARM: dove: remove legacy pcie and clock init (2013-08-30 20:31:51 +0000)
+
+----------------------------------------------------------------
+mvebu dove changes for v3.12
+
+ - various PCI mvebu fixes and features
+ - dove
+    - init MBus, PCI, ethernet and clock via DT
+
+V2:
+ - mvebu/msi_mvebu was rebased onto mvebu/drivers to resolve conflicts
+   internally.  This branch is rebased on that work.
+
+Depends:
+ - mvebu/boards
+ - mvebu/msi_mvebu
+    - mvebu/msi_pci
+    - mvebu/drivers
+
+----------------------------------------------------------------
+Sebastian Hesselbarth (13):
+      PCI: mvebu: move clock enable before register access
+      PCI: mvebu: increment nports only for registered ports
+      PCI: mvebu: remove subsys_initcall
+      PCI: mvebu: add support for reset on GPIO
+      PCI: mvebu: add support for Marvell Dove SoCs
+      ARM: dove: use preprocessor on device tree files
+      ARM: dove: add MBUS_ID macro to Dove DT
+      ARM: dove: add MBus DT node
+      ARM: dove: relocate internal registers device nodes
+      ARM: dove: switch to DT probed mbus address windows
+      ARM: dove: add PCIe controllers to SoC DT
+      ARM: dove: add initial DT file for Globalscale D3Plug
+      ARM: dove: remove legacy pcie and clock init
+
+ .../devicetree/bindings/pci/mvebu-pci.txt          |    7 +
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/dove-cm-a510.dts                 |    2 +-
+ arch/arm/boot/dts/dove-cubox.dts                   |    2 +-
+ arch/arm/boot/dts/dove-d2plug.dts                  |    2 +-
+ arch/arm/boot/dts/dove-d3plug.dts                  |  103 ++
+ arch/arm/boot/dts/dove-dove-db.dts                 |    2 +-
+ arch/arm/boot/dts/dove.dtsi                        | 1009 +++++++++++---------
+ arch/arm/mach-dove/board-dt.c                      |   39 +-
+ drivers/pci/host/Kconfig                           |    2 +-
+ drivers/pci/host/pci-mvebu.c                       |   99 +-
+ 11 files changed, 719 insertions(+), 549 deletions(-)
+ create mode 100644 arch/arm/boot/dts/dove-d3plug.dts
