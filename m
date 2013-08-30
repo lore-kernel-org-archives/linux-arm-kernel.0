@@ -1,49 +1,40 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 30 Aug 2013 10:26:07 +0200
-Subject: [alsa-devel] [PATCH RFC 00/13] Adding SPDIF support
- to	kirkwood-i2s
-In-Reply-To: <87li3jr6et.wl%kuninori.morimoto.gx@renesas.com>
-References: <20130804192136.GK23006@n2100.arm.linux.org.uk>
- <51FECB7A.6010208@gmail.com> <20130805115947.GA9858@sirena.org.uk>
- <51FFA348.2010503@gmail.com> <51FFB267.3030107@metafoo.de>
- <87wqnzhek5.wl%kuninori.morimoto.gx@renesas.com>
- <87li3jr6et.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <5220571F.5020006@metafoo.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 30 Aug 2013 01:27:13 -0700
+Subject: getting rid of subsys_initcall usage? (was: Re: [PATCH RESEND]
+ i2c: designware: use module_platform_driver)
+In-Reply-To: <CAMj5BkiDExikXi3JcVhO7RN8_82eGYhq3i6oPf5Wbipy=N+iHQ@mail.gmail.com>
+References: <1376987548-12366-1-git-send-email-zhangfei.gao@linaro.org>
+ <20130828095706.GH4086@katana>
+ <CACRpkdb1p1=3a0PM+r2ZrMN+ECv5BAZFdv2omDK5npaer4ddcw@mail.gmail.com>
+ <CAMj5BkhQkwb+T9VepN7UrWNRSgtv=Dw-Sa-gv0orOANo55iqNw@mail.gmail.com>
+ <20130830054858.GR7656@atomide.com>
+ <CAMj5BkiDExikXi3JcVhO7RN8_82eGYhq3i6oPf5Wbipy=N+iHQ@mail.gmail.com>
+Message-ID: <20130830082712.GT7656@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/2013 09:20 AM, Kuninori Morimoto wrote:
-> 
-> Hi
-> 
->>> Kuninori Morimoto started working on a xlate callback for CODECs and DAIs
->>> some time ago[1]. If nobody else is going to pick this up I'm probably going
->>> to continue his work on this.
->>
->> Thank you for your offer about above.
->> I'm sorry for my late work for xlate callback.
->> but, unfortunately, I busy now, so, I can't work for it now.
->> I'm very happy if someone/you can work for it.
-> 
-> My understanding for this ASoC DT support milestone is that
-> 
->  1) merge codec/component
->  2) add .of_xlate_dai_name on it
->  3) add DT support
-> 
-> But, do you think 1) is possible ?
-> Becouse, now, too many functions are based on/using "codec"
-> struct snd_soc_codec / struct snd_soc_codec_driver.
-> In reality, merging these is super difficult IMO.
-> 
-> But adding .of_xlate_dai_name on each codec/component
-> is not difficult, and, I can do it immediately.
-> 
-> what is your opinion ?
+* zhangfei gao <zhangfei.gao@gmail.com> [130829 23:36]:
+> What about concerns from Wolfram:
+> " Other people might be
+> depending on subsys_initcall to get I2C active before they want to
+> activate, say, PMICs. So, I fear regressions, since deferred probing
+> might not be available in the needed places to avoid these regressions."
 
-The idea is to use the component struct as a base class for the codec and
-platform struct. So drivers will keep seeing what they see now and don't
-need to be updated. Lots of the fields that can be shared between component,
-platform and codec are only used by the core.
+There should not be any reason to get a PMIC activated
+early on. The system should be booting already at that point,
+and the PMIC related init can be done later on.
+ 
+> Is it too late using module_init for PMIC?
 
-- Lars
+You can probably do it as a fix early on during the -rc
+cycle too. Of course it needs to be verified to work first :)
+ 
+> Besides, the deferred probing still there if depend on late registered
+> pin control driver.
+
+At least for omaps we have things working just fine with
+pinctrl-single and a PMIC on I2C controller.
+
+Regards,
+
+Tony
