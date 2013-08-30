@@ -1,59 +1,101 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 30 Aug 2013 10:41:16 -0400
-Subject: [PATCH v2 3/3] ARM: OMAP4+: Remove static iotable mappings for
- SRAM
-In-Reply-To: <87hae7s0nv.fsf@linaro.org>
-References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
- <1377775391-13103-4-git-send-email-rnayak@ti.com> <871u5c2z3a.fsf@linaro.org>
- <5220658A.2030806@ti.com> <87hae7s0nv.fsf@linaro.org>
-Message-ID: <5220AF0C.2000007@ti.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 30 Aug 2013 07:44:29 -0700
+Subject: [PATCH v9 3/7] ARM: dts: enable hi4511 with device tree
+In-Reply-To: <CAD6h2NRnjme1Hdc+5oMzrR8LYb7_rk13OeVfo0qFT=_jAbMoJg@mail.gmail.com>
+ (Haojian Zhuang's message of "Fri, 30 Aug 2013 09:19:56 +0800")
+References: <1377695454-29109-1-git-send-email-haojian.zhuang@linaro.org>
+ <1377695454-29109-4-git-send-email-haojian.zhuang@linaro.org>
+ <87eh9c1i1o.fsf@linaro.org>
+ <CAD6h2NRnjme1Hdc+5oMzrR8LYb7_rk13OeVfo0qFT=_jAbMoJg@mail.gmail.com>
+Message-ID: <87d2ovs0fm.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 August 2013 10:39 AM, Kevin Hilman wrote:
-> Rajendra Nayak <rnayak@ti.com> writes:
-> 
->> On Thursday 29 August 2013 10:50 PM, Kevin Hilman wrote:
->>> Rajendra Nayak <rnayak@ti.com> writes:
->>>
->>>> In order to handle errata I688, a page of sram was reserved by doing a
->>>> static iotable map. Now that we use gen_pool to manage sram, we can
->>>> completely remove all of these static mappings and use gen_pool_alloc()
->>>> to get the one page of sram space needed to implement errata I688.
->>>>
->>>> Suggested-by: Sekhar Nori <nsekhar@ti.com>
->>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->>>
->>> [...]
->>>
->>>> @@ -71,6 +72,21 @@ void omap_bus_sync(void)
->>>>  }
->>>>  EXPORT_SYMBOL(omap_bus_sync);
->>>>  
->>>> +static int __init omap4_sram_init(void)
->>>> +{
->>>> +	struct device_node *np;
->>>> +	struct gen_pool *sram_pool;
->>>> +
->>>> +	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
->>>> +	if (!np)
->>>> +		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
->>>> +			 __func__);
->>>> +	sram_pool = of_get_named_gen_pool(np, "sram", 0);
->>>
->>> I haven't actually tested this, but if there is no 'sram' property defined...
->>>   
->>>> +	sram_sync = (void *)gen_pool_alloc(sram_pool, PAGE_SIZE);
->>>
->>> ... does this still behave properly?
->>
->> I guess not :(
->> of_get_named_gen_pool() ends up returning NULL, but passing NULL to gen_pool_alloc()
->> crashes. Will fix with the additional check for non-NULL sram_pool, thanks.
-> 
-> OK, that's what I suspected.  Thanks for checking/testing.
-> 
-I miss-understood your comment initially. Now re-reading it, its clear now.
+Haojian Zhuang <haojian.zhuang@linaro.org> writes:
 
-Regards,
-Santosh
+> On 30 August 2013 02:13, Kevin Hilman <khilman@linaro.org> wrote:
+>> Haojian Zhuang <haojian.zhuang@linaro.org> writes:
+>>
+>>> Enable Hisilicon Hi4511 development platform with device tree support.
+>>>
+>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>>
+>> This still doesn't look quite right...
+>>
+>>> ---
+>>>  arch/arm/boot/dts/Makefile        |    1 +
+>>>  arch/arm/boot/dts/hi3620-clk.dtsi | 1058 +++++++++++++++++++++++++++++++++++++
+>>>  arch/arm/boot/dts/hi3620.dtsi     |  513 ++++++++++++++++++
+>>>  arch/arm/boot/dts/hi4511.dts      |  648 +++++++++++++++++++++++
+>>>  4 files changed, 2220 insertions(+)
+>>>  create mode 100644 arch/arm/boot/dts/hi3620-clk.dtsi
+>>>  create mode 100644 arch/arm/boot/dts/hi3620.dtsi
+>>>  create mode 100644 arch/arm/boot/dts/hi4511.dts
+>>>
+>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>> index 641b3c9..6e7c1ca 100644
+>>> --- a/arch/arm/boot/dts/Makefile
+>>> +++ b/arch/arm/boot/dts/Makefile
+>>> @@ -61,6 +61,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+>>>       exynos5250-snow.dtb \
+>>>       exynos5420-smdk5420.dtb \
+>>>       exynos5440-ssdk5440.dtb
+>>> +dtb-$(CONFIG_ARCH_HI3xxx) += hi4511.dtb
+>>>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+>>>       ecx-2000.dtb
+>>>  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+>>> diff --git a/arch/arm/boot/dts/hi3620-clk.dtsi b/arch/arm/boot/dts/hi3620-clk.dtsi
+>>> new file mode 100644
+>>> index 0000000..78307c6
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/hi3620-clk.dtsi
+>>> @@ -0,0 +1,1058 @@
+>>> +/*
+>>> + * Hisilicon Ltd. Hi3620 SoC
+>>> + *
+>>> + * Copyright (C) 2012-2013 Hisilicon Ltd.
+>>> + * Copyright (C) 2012-2013 Linaro Ltd.
+>>> + *
+>>> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * publishhed by the Free Software Foundation.
+>>> + */
+>>> +
+>>> +/ {
+>>> +     clocks {
+>>> +             #address-cells = <1>;
+>>> +             #size-cells = <1>;
+>>> +             ranges;
+>>> +
+>>> +             osc32k: osc32k {
+>>> +                     compatible = "fixed-clock";
+>>> +                     #clock-cells = <0>;
+>>> +                     clock-frequency = <32768>;
+>>> +                     clock-output-names = "osc32khz";
+>>> +             };
+>>
+>> So you've now moved these all under the clocks node, but this still
+>> isn't addressing Stephen's comments about using the
+>> node-name at unit-address and the reg property in each node.
+>>
+>> [...]
+>>
+>>> +             sysctrl: system-controller at fc802000 {
+>>> +                     compatible = "hisilicon,sysctrl";
+>>> +                     reg = <0xfc802000 0x1000>;
+>>> +                     #address-cells = <1>;
+>>> +                     #size-cells = <0>;
+>>
+>> Why is sysctrl and all of its children now under the clocks node?
+>>
+>>
+>> Kevin
+>
+> SMP registers and clock registers are sharing the system controller.
+
+That suggest the clock node should be a child of the sysctrl node, not
+the other way around.
+
+Kevin
