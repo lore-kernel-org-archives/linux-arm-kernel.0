@@ -1,63 +1,133 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 30 Aug 2013 14:58:58 -0700
-Subject: [PATCH v3 2/5] ARM: bcm4760: Add platform infrastructure
-In-Reply-To: <5221141B.5020105@broadcom.com>
-References: <20130814221043.528864175@gmail.com>
- <20130814221237.350904818@gmail.com>
- <20130829231729.GA29606@quad.lixom.net>
- <20130830075312.GA2447@glitch> <5221141B.5020105@broadcom.com>
-Message-ID: <CAOesGMh=jdTacefrEo8pcwAOggqmOypz3dZuORdHJS9F2vKjcQ@mail.gmail.com>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Fri, 30 Aug 2013 15:12:44 -0700
+Subject: [PATCH 04/16] Add minimum address parameter to efi_low_alloc()
+In-Reply-To: <20130830130131.D7CE63E102A@localhost>
+References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
+ <1376090777-20090-5-git-send-email-roy.franz@linaro.org>
+ <20130830130131.D7CE63E102A@localhost>
+Message-ID: <CAFECyb_FkxzmbFJhMO8L1T2ZKV1OOru3uqpQOfou6NwugF3+tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 2:52 PM, Christian Daudt <csd@broadcom.com> wrote:
-> On 13-08-30 12:53 AM, Domenico Andreoli wrote:
->>>>
->>>> Index: b/arch/arm/mach-bcm/Kconfig
->>>> ===================================================================
->>>> --- a/arch/arm/mach-bcm/Kconfig
->>>> +++ b/arch/arm/mach-bcm/Kconfig
->>>> @@ -17,3 +17,10 @@ config ARCH_BCM
->>>>           It currently supports the 'BCM281XX' family, which includes
->>>>           BCM11130, BCM11140, BCM11351, BCM28145 and
->>>>           BCM28155 variants.
->>>> +
->>>> +config ARCH_BCM4760
->>>> +       bool "Broadcom BCM4760 based SoCs (ARM11)" if ARCH_MULTI_V6
->>>> +       select ARM_AMBA
->>>> +       select ARM_VIC
->>>> +       select CLKSRC_OF
->>>> +       select SOC_BUS
->>>
->>> So I think I mentioned this during previous discussions, but I think this
->>> should be solved by having:
->>>
->>> config ARCH_BCM
->>>         bool "Broadcom platforms"
->>>         help
->>>           This enables support for Broadcom based systems
->>>
->>> menu "Broadcom platform selection"
->>>         depends on ARCH_BCM
->>>
->>> config ARCH_BCM281XX
->>>         ... current ARCH_BCM contents
->>>
->>> config ARCH_BCM4760
->>>         ... above conents
->>> endmenu
->>
->> got it.
->>
->> need to sync with Christian, the current owner of ARCH_BCM.
+On Fri, Aug 30, 2013 at 6:01 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Fri,  9 Aug 2013 16:26:05 -0700, Roy Franz <roy.franz@linaro.org> wrote:
+>> This allows allocations to be made low in memory while
+>> avoiding allocations at the base of memory.
 >
-> This is fine, but it is better to name it MOBILEBCM instead for our
-> platform, as it plan to keep it single zImage. My plan was to switch the
-> current usage of ARCH_BCM for chips to ARCH_MOBILEBCM, and then leave
-> ARCH_BCM as a generic BCM menu option as above. I can send a patch to that
-> effect if everyone is okay with that.
+> Your commit message should include /why/ the change is needed. From the
+> above I understand what the patch does, but I don't understand why it is
+> necessary.
 
-Sounds good. Let's do that for 2.13.
+This was used to avoid relocating the zImage so low in memory that it
+would conflict
+with memory range that it was decompressed into.  This is now handled
+by allocating
+the memory for the decompressed kernel, so the lower limit is no
+longer required.
+I'll remove it, as it is not necessary any more.
 
-
--Olof
+>
+> The patch looks fine to me, but it would be worth investigating merging
+> alloc_low and alloc_high. It looks like they both do pretty close to the
+> same calculations. A single core function could do both, could have both
+> minimum and maximum constraints, and could have a flag to determine if
+> low or high addresses should be preferred.
+>
+> g.
+>
+> Reviewed-by: Grant Likely <grant.likely@linaro.org>
+>
+>>
+>> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+>> ---
+>>  arch/x86/boot/compressed/eboot.c       |   11 ++++++-----
+>>  drivers/firmware/efi/efi-stub-helper.c |    7 +++++--
+>>  2 files changed, 11 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/x86/boot/compressed/eboot.c b/arch/x86/boot/compressed/eboot.c
+>> index 2a4430a..f44ef2f 100644
+>> --- a/arch/x86/boot/compressed/eboot.c
+>> +++ b/arch/x86/boot/compressed/eboot.c
+>> @@ -458,7 +458,7 @@ struct boot_params *make_boot_params(void *handle, efi_system_table_t *_table)
+>>       }
+>>
+>>       status = efi_low_alloc(sys_table, 0x4000, 1,
+>> -                            (unsigned long *)&boot_params);
+>> +                            (unsigned long *)&boot_params, 0);
+>>       if (status != EFI_SUCCESS) {
+>>               efi_printk(sys_table, "Failed to alloc lowmem for boot params\n");
+>>               return NULL;
+>> @@ -505,7 +505,7 @@ struct boot_params *make_boot_params(void *handle, efi_system_table_t *_table)
+>>                       options_size++; /* NUL termination */
+>>
+>>                       status = efi_low_alloc(sys_table, options_size, 1,
+>> -                                        &cmdline);
+>> +                                        &cmdline, 0);
+>>                       if (status != EFI_SUCCESS) {
+>>                               efi_printk(sys_table, "Failed to alloc mem for cmdline\n");
+>>                               goto fail;
+>> @@ -563,7 +563,8 @@ static efi_status_t exit_boot(struct boot_params *boot_params,
+>>  again:
+>>       size += sizeof(*mem_map) * 2;
+>>       _size = size;
+>> -     status = efi_low_alloc(sys_table, size, 1, (unsigned long *)&mem_map);
+>> +     status = efi_low_alloc(sys_table, size, 1,
+>> +                            (unsigned long *)&mem_map, 0);
+>>       if (status != EFI_SUCCESS)
+>>               return status;
+>>
+>> @@ -697,7 +698,7 @@ static efi_status_t relocate_kernel(struct setup_header *hdr)
+>>                               nr_pages, &start);
+>>       if (status != EFI_SUCCESS) {
+>>               status = efi_low_alloc(sys_table, hdr->init_size,
+>> -                                hdr->kernel_alignment, &start);
+>> +                                hdr->kernel_alignment, &start, 0);
+>>               if (status != EFI_SUCCESS)
+>>                       efi_printk(sys_table, "Failed to alloc mem for kernel\n");
+>>       }
+>> @@ -745,7 +746,7 @@ struct boot_params *efi_main(void *handle, efi_system_table_t *_table,
+>>
+>>       gdt->size = 0x800;
+>>       status = efi_low_alloc(sys_table, gdt->size, 8,
+>> -                        (unsigned long *)&gdt->address);
+>> +                        (unsigned long *)&gdt->address, 0);
+>>       if (status != EFI_SUCCESS) {
+>>               efi_printk(sys_table, "Failed to alloc mem for gdt\n");
+>>               goto fail;
+>> diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
+>> index 0218d535..40cd16e 100644
+>> --- a/drivers/firmware/efi/efi-stub-helper.c
+>> +++ b/drivers/firmware/efi/efi-stub-helper.c
+>> @@ -163,11 +163,11 @@ fail:
+>>  }
+>>
+>>  /*
+>> - * Allocate at the lowest possible address.
+>> + * Allocate at the lowest possible address, that is not below min.
+>>   */
+>>  static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
+>>                             unsigned long size, unsigned long align,
+>> -                           unsigned long *addr)
+>> +                           unsigned long *addr, unsigned long min)
+>>  {
+>>       unsigned long map_size, desc_size;
+>>       efi_memory_desc_t *map;
+>> @@ -204,6 +204,9 @@ static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
+>>               if (start == 0x0)
+>>                       start += 8;
+>>
+>> +             if (start < min)
+>> +                     start = min;
+>> +
+>>               start = round_up(start, align);
+>>               if ((start + size) > end)
+>>                       continue;
+>> --
+>> 1.7.10.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
