@@ -1,52 +1,40 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Fri, 30 Aug 2013 11:42:30 -0700
-Subject: [PATCH RFC 1/2] PM / Hibernate: use name_to_dev_t to parse resume
-In-Reply-To: <20130830113533.GA7226@amd.pavel.ucw.cz>
-References: <1377114413-8521-1-git-send-email-sebastian.capella@linaro.org>
- <1377114413-8521-2-git-send-email-sebastian.capella@linaro.org>
- <20130825153811.GA4795@amd.pavel.ucw.cz>
- <20130826174050.16429.7419@capellas-linux>
- <20130830113533.GA7226@amd.pavel.ucw.cz>
-Message-ID: <20130830184230.28518.71814@capellas-linux>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 30 Aug 2013 19:47:17 +0100
+Subject: [PATCH 11/19] ARM: alignment: correctly decode instructions in
+ BE8 mode.
+In-Reply-To: <521E5234.1010008@cogentembedded.com>
+References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1377690359-25397-12-git-send-email-ben.dooks@codethink.co.uk>
+ <521E5234.1010008@cogentembedded.com>
+Message-ID: <5220E8B5.1000408@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Pavel Machek (2013-08-30 04:35:33)
-> On Mon 2013-08-26 10:40:50, Sebastian Capella wrote:
-> > Quoting Pavel Machek (2013-08-25 08:38:11)
-> > > Is the allocation actually neccessary? At the very least this should
-> > > test for NULL...
-> > 
-> > name_to_dev_t expects a non-const name, but the buffer passed in
-> > is const.  I also am removing the '\n' if found at the end of the
-> > string which would violate the const.
-> 
-> Fix name_to_dev_t, then. No need to do memory allocation just to work
-> around const.
-> 
-Hi Pavel,
+On 28/08/13 20:40, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 08/28/2013 03:45 PM, Ben Dooks wrote:
+>
+>> If we are in BE8 mode, we must deal with the instruction stream being
+>> in LE order when data is being loaded in BE order. Ensure the data is
+>> swapped before processing to avoid thre following:
+>
+>> Change to using <asm/opcodes.h> to provide the necessary conversion
+>> functions to change the byte ordering.
+>
+>> Alignment trap: not handling instruction 030091e8 at [<80333e8c>]
+>> Unhandled fault: alignment exception (0x001) at 0xbfa09567
+>
+> I guess the above 2 paragraphs are swapped.
+>
+>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>
+> WBR, Sergei
 
-The issue is really Removing the \n from the user space input.  The
-flow is:
-const input buf -> copy to work buffer, remove newline -> name_to_dev_t
+thanks, I also forgot to put a sentence to say that these where
+kernel messages.
 
-  ssize_t resume_store(..., const char *buf, size_t n)
-  // copy buf, strip off trailing newline, pass to name_to_dev_t
-  dev_t name_to_dev_t(char *name)
-
-The const in the restore_store buffer comes from the function type of the
-store member of the kobj_attribute.  I don't believe this should be changed.
-
-Currently, name_to_dev_t will fail in some cases if a trailing \n is present.
-Is it more appropriate to handle stripping the newline in the store
-function rather than modifying name_to_dev_t to clean it up?
-
-It seems logical for name_to_dev_t to take a const name parameter as
-there should be no reason to modify the name buffer passed to it.
-I'll be happy to make a patch to do this, but without hardening
-name_to_dev_t against trailing newlines, it would not be neccesary for
-this problem.
-
-Thanks for your time and comments!
-
-Sebastian
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
