@@ -1,68 +1,164 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 30 Aug 2013 14:08:11 +0100
-Subject: [PATCH 06/16] Enforce minimum alignment of 1 page on allocations.
- The efi_high_alloc() and efi_low_alloc() functions use the
- EFI_ALLOCATE_ADDRESS option to the EFI function allocate_pages(),
- which requires a minimum of page alignment, and rejects all other requests.
-In-Reply-To: <1376090777-20090-7-git-send-email-roy.franz@linaro.org>
+Date: Fri, 30 Aug 2013 14:34:08 +0100
+Subject: [PATCH 11/16] Add proper definitions for some EFI function
+ pointers.
+In-Reply-To: <1376090777-20090-12-git-send-email-roy.franz@linaro.org>
 References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <1376090777-20090-7-git-send-email-roy.franz@linaro.org>
-Message-ID: <20130830130811.7D7453E102A@localhost>
+ <1376090777-20090-12-git-send-email-roy.franz@linaro.org>
+Message-ID: <20130830133408.14CCD3E102A@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  9 Aug 2013 16:26:07 -0700, Roy Franz <roy.franz@linaro.org> wrote:
-> The existing code could fail to allocate depending
-> on allocation size, as although repeated allocation
-> attempts were made, none were guaranteed to be page
-> aligned.
+On Fri,  9 Aug 2013 16:26:12 -0700, Roy Franz <roy.franz@linaro.org> wrote:
+> The x86/AMD64 EFI stubs must us a call wrapper to convert between
+> the Linux and EFI ABIs, so void pointers are sufficient.  For ARM,
+> the ABIs are compatible, so we can directly invoke the function
+> pointers.  The functions that are used by the ARM stub are updated
+> to match the EFI definitions.
+> 
+> Signed-off-by: Roy Franz <roy.franz@linaro.org>
 
-Commit message. Otherwise looks reasonable.
+Looks reasonable.
 
 Reviewed-by: Grant Likely <grant.likely@linaro.org>
 
-> Signed-off-by: Roy Franz <roy.franz@linaro.org>
 > ---
->  drivers/firmware/efi/efi-stub-helper.c |   14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+>  arch/x86/boot/compressed/eboot.h |    2 --
+>  include/linux/efi.h              |   45 ++++++++++++++++++++++++--------------
+>  2 files changed, 28 insertions(+), 19 deletions(-)
 > 
-> diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
-> index 1d0a079..647b3ba 100644
-> --- a/drivers/firmware/efi/efi-stub-helper.c
-> +++ b/drivers/firmware/efi/efi-stub-helper.c
-> @@ -105,6 +105,13 @@ static efi_status_t efi_high_alloc(efi_system_table_t *sys_table_arg,
->  	if (status != EFI_SUCCESS)
->  		goto fail;
+> diff --git a/arch/x86/boot/compressed/eboot.h b/arch/x86/boot/compressed/eboot.h
+> index bafbd94..81b6b65 100644
+> --- a/arch/x86/boot/compressed/eboot.h
+> +++ b/arch/x86/boot/compressed/eboot.h
+> @@ -11,8 +11,6 @@
 >  
-> +	/* Enforce minimum alignment that EFI requires when requesting
-> +	 * a specific address.  We are doing page-based allocations,
-> +	 * so we must be aligned to a page.
-> +	 */
-> +	if (align < EFI_PAGE_SIZE)
-> +		align = EFI_PAGE_SIZE;
-> +
->  	nr_pages = round_up(size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
->  again:
->  	for (i = 0; i < map_size / desc_size; i++) {
-> @@ -184,6 +191,13 @@ static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
->  	if (status != EFI_SUCCESS)
->  		goto fail;
+>  #define DESC_TYPE_CODE_DATA	(1 << 0)
 >  
-> +	/* Enforce minimum alignment that EFI requires when requesting
-> +	 * a specific address.  We are doing page-based allocations,
-> +	 * so we must be aligned to a page.
-> +	 */
-> +	if (align < EFI_PAGE_SIZE)
-> +		align = EFI_PAGE_SIZE;
+> -#define EFI_PAGE_SIZE		(1UL << EFI_PAGE_SHIFT)
+> -
+>  #define EFI_CONSOLE_OUT_DEVICE_GUID    \
+>  	EFI_GUID(0xd3b36f2c, 0xd551, 0x11d4, 0x9a, 0x46, 0x0, 0x90, 0x27, \
+>  		  0x3f, 0xc1, 0x4d)
+> diff --git a/include/linux/efi.h b/include/linux/efi.h
+> index 51f5641..1a7ae34 100644
+> --- a/include/linux/efi.h
+> +++ b/include/linux/efi.h
+> @@ -39,6 +39,8 @@
+>  typedef unsigned long efi_status_t;
+>  typedef u8 efi_bool_t;
+>  typedef u16 efi_char16_t;		/* UNICODE character */
+> +typedef u64 efi_physical_addr_t;
+> +typedef void *efi_handle_t;
+>  
+>  
+>  typedef struct {
+> @@ -96,6 +98,7 @@ typedef	struct {
+>  #define EFI_MEMORY_DESCRIPTOR_VERSION	1
+>  
+>  #define EFI_PAGE_SHIFT		12
+> +#define EFI_PAGE_SIZE		(1UL << EFI_PAGE_SHIFT)
+>  
+>  typedef struct {
+>  	u32 type;
+> @@ -157,11 +160,13 @@ typedef struct {
+>  	efi_table_hdr_t hdr;
+>  	void *raise_tpl;
+>  	void *restore_tpl;
+> -	void *allocate_pages;
+> -	void *free_pages;
+> -	void *get_memory_map;
+> -	void *allocate_pool;
+> -	void *free_pool;
+> +	efi_status_t (*allocate_pages)(int, int, unsigned long,
+> +				       efi_physical_addr_t *);
+> +	efi_status_t (*free_pages)(efi_physical_addr_t, unsigned long);
+> +	efi_status_t (*get_memory_map)(unsigned long *, void *, unsigned long *,
+> +				       unsigned long *, u32 *);
+> +	efi_status_t (*allocate_pool)(int, unsigned long, void **);
+> +	efi_status_t (*free_pool)(void *);
+>  	void *create_event;
+>  	void *set_timer;
+>  	void *wait_for_event;
+> @@ -171,7 +176,7 @@ typedef struct {
+>  	void *install_protocol_interface;
+>  	void *reinstall_protocol_interface;
+>  	void *uninstall_protocol_interface;
+> -	void *handle_protocol;
+> +	efi_status_t (*handle_protocol)(efi_handle_t, efi_guid_t *, void **);
+>  	void *__reserved;
+>  	void *register_protocol_notify;
+>  	void *locate_handle;
+> @@ -181,7 +186,7 @@ typedef struct {
+>  	void *start_image;
+>  	void *exit;
+>  	void *unload_image;
+> -	void *exit_boot_services;
+> +	efi_status_t (*exit_boot_services)(efi_handle_t, unsigned long);
+>  	void *get_next_monotonic_count;
+>  	void *stall;
+>  	void *set_watchdog_timer;
+> @@ -488,10 +493,6 @@ typedef struct {
+>  	unsigned long unload;
+>  } efi_loaded_image_t;
+>  
+> -typedef struct {
+> -	u64 revision;
+> -	void *open_volume;
+> -} efi_file_io_interface_t;
+>  
+>  typedef struct {
+>  	u64 size;
+> @@ -504,20 +505,30 @@ typedef struct {
+>  	efi_char16_t filename[1];
+>  } efi_file_info_t;
+>  
+> -typedef struct {
+> +typedef struct _efi_file_handle {
+>  	u64 revision;
+> -	void *open;
+> -	void *close;
+> +	efi_status_t (*open)(struct _efi_file_handle *,
+> +			     struct _efi_file_handle **,
+> +			     efi_char16_t *, u64, u64);
+> +	efi_status_t (*close)(struct _efi_file_handle *);
+>  	void *delete;
+> -	void *read;
+> +	efi_status_t (*read)(struct _efi_file_handle *, unsigned long *,
+> +			     void *);
+>  	void *write;
+>  	void *get_position;
+>  	void *set_position;
+> -	void *get_info;
+> +	efi_status_t (*get_info)(struct _efi_file_handle *, efi_guid_t *,
+> +			unsigned long *, void *);
+>  	void *set_info;
+>  	void *flush;
+>  } efi_file_handle_t;
+>  
+> +typedef struct _efi_file_io_interface {
+> +	u64 revision;
+> +	int (*open_volume)(struct _efi_file_io_interface *,
+> +			   efi_file_handle_t **);
+> +} efi_file_io_interface_t;
 > +
->  	nr_pages = round_up(size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
->  	for (i = 0; i < map_size / desc_size; i++) {
->  		efi_memory_desc_t *desc;
+>  #define EFI_FILE_MODE_READ	0x0000000000000001
+>  #define EFI_FILE_MODE_WRITE	0x0000000000000002
+>  #define EFI_FILE_MODE_CREATE	0x8000000000000000
+> @@ -787,7 +798,7 @@ struct efivar_entry {
+>  
+>  struct efi_simple_text_output_protocol {
+>  	void *reset;
+> -	void *output_string;
+> +	efi_status_t (*output_string)(void *, void *);
+>  	void *test_string;
+>  };
+>  
 > -- 
 > 1.7.10.4
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
