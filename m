@@ -1,84 +1,57 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Fri, 30 Aug 2013 11:00:05 +0100
-Subject: [GIT PULL] ARM/ARM64 architected timer updates for v3.12
-In-Reply-To: <521FCC0A.80302@linaro.org>
-References: <521F8157.20203@arm.com> <521FCC0A.80302@linaro.org>
-Message-ID: <52206D25.6080808@arm.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 30 Aug 2013 11:02:31 +0100
+Subject: [PATCH RFC v2 14/16] ARM: vexpress: remove custom .init_time hook
+In-Reply-To: <521F901B.3090305@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1377638890-371-15-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201308291535.53005.arnd@arndb.de> <521F901B.3090305@gmail.com>
+Message-ID: <1377856951.3655.34.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ccing Catalin,Russell
+On Thu, 2013-08-29 at 20:16 +0200, Sebastian Hesselbarth wrote:
+> On 08/29/13 15:35, Arnd Bergmann wrote:
+> > On Tuesday 27 August 2013, Sebastian Hesselbarth wrote:
+> >> @@ -422,16 +419,8 @@ void __init v2m_dt_init_early(void)
+> >>                          pr_warning("vexpress: DT HBI (%x) is not matching "
+> >>                                          "hardware (%x)!\n", dt_hbi, hbi);
+> >>          }
+> >> -}
+> >> -
+> >> -static void __init v2m_dt_timer_init(void)
+> >> -{
+> >> -       of_clk_init(NULL);
+> >>
+> >> -       clocksource_of_init();
+> >> -
+> >> -       versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
+> >> -                               24000000);
+> >> +       versatile_sched_clock_init(vexpress_get_24mhz_clock_base(), 24000000);
+> >>   }
+> >
+> > You are moving versatile_sched_clock_init() ahead of clocksource_of_init(), which I suspect
+> > won't work. Have you checked this?
+> 
+> "Checked" as in "Tested", no I haven't.
+> 
+> But non-DT v2m has it in v2m_init_early also, while v2m_sp804_init()
+> is called in v2m_timer_init().
+> 
+> That matches the above approach taken for DT v2m where
+> versatile_sched_clock_init() is now called from v2m_dt_init_early()
+> and clocksource_of_init() called from arch-wide .timer_init.
+> 
+> get_maintainer.pl did not spit out any additional maintainer except
+> Russell of course. You know someone who can test the above?
 
-On 29/08/13 23:32, Daniel Lezcano wrote:
-> On 08/29/2013 07:13 PM, Sudeep KarkadaNagesha wrote:
->> Hi Daniel,
->>
->> These are the ARM/ARM64 arch timer updates for v3.12.
->> I have re-based the changes on tip/timers/core as there are conflicts
->> with memory mapped arch_timers support queued recently.
->> Since this series adds CPU PM notifiers for arch_timers, it is required
->> to enable ARM bL cpuidle drivers(already queued for v3.12)
->>
->> Regards,
->> Sudeep
->>
->> The following changes since commit cfb6d656d569510ac9239583ce09e4c92ad54719:
->>
->>   Merge branch 'timers/clockevents-next' of
->> git://git.linaro.org/people/dlezcano/clockevents into timers/core
->> (2013-08-21 14:59:23 +0200)
->>
->> are available in the git repository at:
->>
->>
->>   git://linux-arm.org/linux-skn.git timer_evtstrm
->>
->> for you to fetch changes up to f74f198e540c160b1db9470b679dbeb72339829b:
->>
->>   drivers: clocksource: add CPU PM notifier for ARM architected timer
->> (2013-08-29 17:43:08 +0100)
-> 
-> 
-> Hi Sudeep,
-> 
-> I need the acked-by from Olof or Kevin for the arch/arm[64] changes.
-> 
-Hi Daniel,
+After adding of_clk_init(NULL) to time_init() things boot OK for me with
+this patch. However, do we know that sched_clock is never going to get
+read before time_init() has actually started the clock it reads? Are we
+making things more fragile?
 
-I think the changes are more generic to arm/arm64, rather not SoC
-specific. Catalin has reviewed the series. I can check with Russell(for
-arm) and Catalin(for arm64) for Acks.
-I do understand that it may be late for v3.12
+(My testing was on a 3.11-rc6 based Linaro kernel on TC2 because that's
+what I had to hand. So it's not a vanilla mainline kernel and I have
+other vexpress changes in my tree.)
 
-Regards,
-Sudeep
-
-> Thanks
->   -- Daniel
-> 
->> ----------------------------------------------------------------
->> Sudeep KarkadaNagesha (4):
->>    ARM/ARM64: arch_timer: add macros for bits in control register
->>    ARM: arch_timer: add support to configure and enable event stream
->>    ARM64: arch_timer: add support to configure and enable event stream
->>    drivers: clocksource: add CPU PM notifier for ARM architected timer
->>
->> Will Deacon (1):
->>    drivers: clocksource: add support for ARM architected timer event stream
->> q
->>  arch/arm/include/asm/arch_timer.h    | 36 ++++++++++++++++---
->>  arch/arm/include/uapi/asm/hwcap.h    |  1 +
->>  arch/arm/kernel/setup.c              |  1 +
->>  arch/arm64/include/asm/arch_timer.h  | 42 ++++++++++++++++++---
->>  arch/arm64/include/asm/hwcap.h       | 11 +++---
->>  arch/arm64/include/uapi/asm/hwcap.h  |  1 +
->>  arch/arm64/kernel/setup.c            | 11 ++++++
->>  drivers/clocksource/Kconfig          | 15 ++++++++
->>  drivers/clocksource/arm_arch_timer.c | 49 +++++++++++++++++++++++++
->>  include/clocksource/arm_arch_timer.h | 10 +++++
->>  10 files changed, 161 insertions(+), 16 deletions(-)
->>
->>
->>
-> 
-> 
+-- 
+Tixy
