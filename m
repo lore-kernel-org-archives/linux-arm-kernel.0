@@ -1,49 +1,52 @@
-From: b44548@freescale.com (Chao Fu)
-Date: Fri, 30 Aug 2013 11:19:49 +0800
-Subject: [PATCH v4 2/2] ARM:dts:vf610-twr:Enable DSPI0 devices and Flash
- at26df081a
-In-Reply-To: <1377832789-5238-1-git-send-email-b44548@freescale.com>
-References: <1377832789-5238-1-git-send-email-b44548@freescale.com>
-Message-ID: <1377832789-5238-3-git-send-email-b44548@freescale.com>
+From: mikael.starvik@axis.com (Mikael Starvik)
+Date: Fri, 30 Aug 2013 06:21:19 +0200
+Subject: [Query] CPUFreq: Does these machines have separate clock
+ domains for CPUs?
+In-Reply-To: <CAKohponWn-RN7-6sdhghd6RGCOd357G+TKLsxHfqnSCuMD7xxw@mail.gmail.com>
+References: <CAKohponWn-RN7-6sdhghd6RGCOd357G+TKLsxHfqnSCuMD7xxw@mail.gmail.com>
+Message-ID: <D9E0917B-058A-4F22-87EF-15F26ED46F35@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Fu <B44548@freescale.com>
+Cris are also UP
 
-This patch enables DSPI0 and at26df081a flash device for Vybrid VF610 TOWER board.
+29 aug 2013 kl. 12:16 skrev "Viresh Kumar" <viresh.kumar@linaro.org>:
 
-Signed-off-by: Chao Fu <b44548@freescale.com>
----
- arch/arm/boot/dts/vf610-twr.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index b3905f5..6b522cc 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -36,6 +36,23 @@
- 
- };
- 
-+&dspi0 {
-+	bus-num = <0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_dspi0_1>;
-+	status = "okay";
-+
-+	sflash: at26df081a at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "atmel,at26df081a";
-+		spi-max-frequency = <16000000>;
-+		spi-cpol;
-+		spi-cpha;
-+		reg = <0>;
-+	};
-+};
-+
- &fec0 {
- 	phy-mode = "rmii";
- 	pinctrl-names = "default";
--- 
-1.8.0
+> Hi,
+> 
+> I have been doing some CPUFreq cleanup work and
+> wanted to know if the below mentioned machines have separate
+> clock domains for their CPUs or all share the same domain?
+> 
+> So, that we can use some generic routines for these drivers which
+> would eventually do:
+> 
+> cpumask_setall(policy->cpus);
+> 
+> And I wanted to make sure that this doesn't break them.. :)
+> 
+> ......
+> 
+> The drivers are:
+> 
+> drivers/cpufreq/at32ap-cpufreq.c
+> drivers/cpufreq/blackfin-cpufreq.c
+> drivers/cpufreq/cris-artpec3-cpufreq.c
+> drivers/cpufreq/cris-etraxfs-cpufreq.c
+> drivers/cpufreq/davinci-cpufreq.c
+> drivers/cpufreq/e_powersaver.c
+> drivers/cpufreq/elanfreq.c
+> drivers/cpufreq/longhaul.c
+> drivers/cpufreq/loongson2_cpufreq.c
+> drivers/cpufreq/pmac32-cpufreq.c
+> drivers/cpufreq/powernow-k6.c
+> drivers/cpufreq/powernow-k7.c
+> drivers/cpufreq/pxa2xx-cpufreq.c
+> drivers/cpufreq/pxa3xx-cpufreq.c
+> drivers/cpufreq/sc520_freq.c
+> drivers/cpufreq/sh-cpufreq.c
+> drivers/cpufreq/sparc-us2e-cpufreq.c
+> drivers/cpufreq/sparc-us3-cpufreq.c
+> 
+> --
+> Viresh
