@@ -1,39 +1,39 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 30 Aug 2013 19:47:17 +0100
-Subject: [PATCH 11/19] ARM: alignment: correctly decode instructions in
- BE8 mode.
-In-Reply-To: <521E5234.1010008@cogentembedded.com>
+Date: Fri, 30 Aug 2013 19:50:15 +0100
+Subject: [PATCH 08/19] highbank: enable big-endian
+In-Reply-To: <CAL_Jsq+htCWwNjq31RcO2YR4cjM+p3cr8r6Nedk-kngFJkQ5=A@mail.gmail.com>
 References: <1377639509-22778-1-git-send-email-ben.dooks@codethink.co.uk>
- <1377690359-25397-1-git-send-email-ben.dooks@codethink.co.uk>
- <1377690359-25397-12-git-send-email-ben.dooks@codethink.co.uk>
- <521E5234.1010008@cogentembedded.com>
-Message-ID: <5220E8B5.1000408@codethink.co.uk>
+ <1377639509-22778-9-git-send-email-ben.dooks@codethink.co.uk>
+ <CAL_Jsq+htCWwNjq31RcO2YR4cjM+p3cr8r6Nedk-kngFJkQ5=A@mail.gmail.com>
+Message-ID: <5220E967.6020902@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/08/13 20:40, Sergei Shtylyov wrote:
-> Hello.
+On 28/08/13 16:21, Rob Herring wrote:
+> On Tue, Aug 27, 2013 at 4:38 PM, Ben Dooks<ben.dooks@codethink.co.uk>  wrote:
+>> Apart from a xgmac driver issue, the highbank seems to work correctly in
+>> big-endian mode. Allow the selection of big-endian in the system.
+>>
+>> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
+>> ---
+>>   arch/arm/mach-highbank/Kconfig |    1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
+>> index cd9fcb1..4f57554 100644
+>> --- a/arch/arm/mach-highbank/Kconfig
+>> +++ b/arch/arm/mach-highbank/Kconfig
+>> @@ -18,3 +18,4 @@ config ARCH_HIGHBANK
+>>          select PL320_MBOX
+>>          select SPARSE_IRQ
+>>          select USE_OF
+>> +       select ARCH_SUPPORTS_BIG_ENDIAN
 >
-> On 08/28/2013 03:45 PM, Ben Dooks wrote:
+> The select entries should be sorted.
 >
->> If we are in BE8 mode, we must deal with the instruction stream being
->> in LE order when data is being loaded in BE order. Ensure the data is
->> swapped before processing to avoid thre following:
->
->> Change to using <asm/opcodes.h> to provide the necessary conversion
->> functions to change the byte ordering.
->
->> Alignment trap: not handling instruction 030091e8 at [<80333e8c>]
->> Unhandled fault: alignment exception (0x001) at 0xbfa09567
->
-> I guess the above 2 paragraphs are swapped.
->
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->
-> WBR, Sergei
+> Rob
 
-thanks, I also forgot to put a sentence to say that these where
-kernel messages.
+Ok, will sort this out.
 
 -- 
 Ben Dooks				http://www.codethink.co.uk/
