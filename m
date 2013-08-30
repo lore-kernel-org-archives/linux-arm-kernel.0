@@ -1,39 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 30 Aug 2013 15:04:06 +0100
-Subject: [PATCH v6 0/5] ARM/ARM64 architected timer updates
-In-Reply-To: <20130830114309.GW6617@n2100.arm.linux.org.uk>
-References: <1377788142-21388-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <52206EE0.5020907@arm.com>
- <20130830114309.GW6617@n2100.arm.linux.org.uk>
-Message-ID: <20130830140406.GE12160@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 30 Aug 2013 15:04:46 +0100
+Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
+ with external L3-cache.
+In-Reply-To: <bc23926cb9f202d8b63d729c584af791@www.loen.fr>
+References: <20130815165344.GA3853@cbox>
+ <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
+ <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
+ <20130816171912.GB20246@cbox>
+ <CAAhSdy2bk6Ou=326cYJW2wKvm9pffbRRmO2ABFwF9dmqwWdKqQ@mail.gmail.com>
+ <20130816175034.GE20246@cbox>
+ <CAAhSdy3B5JTcd7==u_QzS3V5k7pYkymtiLa7X=yZH+=eSBAw8w@mail.gmail.com>
+ <20130830095215.GC62188@MacBook-Pro.local>
+ <CAAhSdy0Hm1k+mWGGxUOzAA=5yVGNOERfo=36jcE1cvkUM=xtVg@mail.gmail.com>
+ <bc23926cb9f202d8b63d729c584af791@www.loen.fr>
+Message-ID: <20130830140446.GA14125@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 12:43:09PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Aug 30, 2013 at 11:07:28AM +0100, Sudeep KarkadaNagesha wrote:
-> > On 29/08/13 15:55, Sudeep KarkadaNagesha wrote:
-> > > From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> > > 
-> > > This patch series adds support to configure the rate and enable the
-> > > event stream for architected timer. The event streams can be used to
-> > > impose a timeout on a wfe, to safeguard against any programming error
-> > > in case an expected event is not generated or even to implement
-> > > wfe-based timeouts for userspace locking implementations. This feature
-> > > can be disabled(enabled by default).
-> > > 
-> > > Since the timer control register is reset to zero on warm boot, CPU
-> > > PM notifier is added to save and restore the value.
-> > > 
-> > Hi Russell,
-> > 
-> > Can you have a look at this series ?
-> > If you are OK, can I have your ACK on arm specific changes(PATCH 2/5) ?
+On Fri, Aug 30, 2013 at 02:21:57PM +0100, Marc Zyngier wrote:
+> On 2013-08-30 11:44, Anup Patel wrote:
+> > For KVM, we can avoid flushing d-cache to PoC every time in
+> > coherent_icache_guest_page() by only doing it when Guest MMU is
+> > turned-off. This may reduce the performance penalty.
 > 
-> I think it would be more value to have someone from ARM Ltd ack it,
-> because they will know the code much better than I do.
+> What about the I and C bits in SCTLR_EL1? Does L3 also honour these 
+> bits?
 
-Looks good to me, so for patch 2/5:
+I would think so, it probably cares about how the transactions are
+presented at the bus level by the CPU.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+-- 
+Catalin
