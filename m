@@ -1,197 +1,563 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 30 Aug 2013 14:17:32 +0200
-Subject: [PATCH v2 1/7] pinctrl: imx1 core driver
-In-Reply-To: <20130820125614.GE29114@S2101-09.ap.freescale.net>
-References: <1376921234-26682-1-git-send-email-mpa@pengutronix.de>
- <1376921234-26682-2-git-send-email-mpa@pengutronix.de>
- <20130820125614.GE29114@S2101-09.ap.freescale.net>
-Message-ID: <20130830121732.GN20071@s25.your-server.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 30 Aug 2013 14:39:20 +0200
+Subject: [PATCH v7 3/4] drivers: of: add initialization code for dma
+ reserved memory
+In-Reply-To: <20130829224637.D09183E1222@localhost>
+References: <1377527959-5080-1-git-send-email-m.szyprowski@samsung.com>
+ <1377527959-5080-4-git-send-email-m.szyprowski@samsung.com>
+ <20130829224637.D09183E1222@localhost>
+Message-ID: <52209278.8040106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-sorry for the late response, I moved last week.
+On 8/30/2013 12:46 AM, Grant Likely wrote:
+> On Mon, 26 Aug 2013 16:39:18 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > This patch adds device tree support for contiguous and reserved memory
+> > regions defined in device tree.
+> >
+> > Large memory blocks can be reliably reserved only during early boot.
+> > This must happen before the whole memory management subsystem is
+> > initialized, because we need to ensure that the given contiguous blocks
+> > are not yet allocated by kernel. Also it must happen before kernel
+> > mappings for the whole low memory are created, to ensure that there will
+> > be no mappings (for reserved blocks) or mapping with special properties
+> > can be created (for CMA blocks). This all happens before device tree
+> > structures are unflattened, so we need to get reserved memory layout
+> > directly from fdt.
+> >
+> > Later, those reserved memory regions are assigned to devices on each
+> > device structure initialization.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Acked-by: Michal Nazarewicz <mina86@mina86.com>
+> > Acked-by: Tomasz Figa <t.figa@samsung.com>
+> > Acked-by: Stephen Warren <swarren@nvidia.com>
+> > Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+>
+> Hi Marek,
+>
+> This patch is in good shape, but I have some comments below and a few
+> concerns about the binding....
+>
+> g.
+>
+> > ---
+> >  Documentation/devicetree/bindings/memory.txt |  168 +++++++++++++++++++++++++
+> >  drivers/of/Kconfig                           |    6 +
+> >  drivers/of/Makefile                          |    1 +
+> >  drivers/of/of_reserved_mem.c                 |  175 ++++++++++++++++++++++++++
+> >  drivers/of/platform.c                        |    4 +
+> >  include/linux/of_reserved_mem.h              |   14 +++
+> >  6 files changed, 368 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/memory.txt
+> >  create mode 100644 drivers/of/of_reserved_mem.c
+> >  create mode 100644 include/linux/of_reserved_mem.h
+> >
+> > diff --git a/Documentation/devicetree/bindings/memory.txt b/Documentation/devicetree/bindings/memory.txt
+> > new file mode 100644
+> > index 0000000..eb24693
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/memory.txt
+> > @@ -0,0 +1,168 @@
+> > +*** Memory binding ***
+> > +
+> > +The /memory node provides basic information about the address and size
+> > +of the physical memory. This node is usually filled or updated by the
+> > +bootloader, depending on the actual memory configuration of the given
+> > +hardware.
+> > +
+> > +The memory layout is described by the following node:
+> > +
+> > +/ {
+> > +	#address-cells = <(n)>;
+> > +	#size-cells = <(m)>;
+> > +	memory {
+> > +		device_type = "memory";
+> > +		reg =  <(baseaddr1) (size1)
+> > +			(baseaddr2) (size2)
+> > +			...
+> > +			(baseaddrN) (sizeN)>;
+> > +	};
+> > +	...
+> > +};
+> > +
+> > +A memory node follows the typical device tree rules for "reg" property:
+> > +n:		number of cells used to store base address value
+> > +m:		number of cells used to store size value
+> > +baseaddrX:	defines a base address of the defined memory bank
+> > +sizeX:		the size of the defined memory bank
+> > +
+> > +
+> > +More than one memory bank can be defined.
+> > +
+> > +
+> > +*** Reserved memory regions ***
+> > +
+> > +In /memory/reserved-memory node one can create child nodes describing
+> > +particular reserved (excluded from normal use) memory regions. Such
+> > +memory regions are usually designed for the special usage by various
+> > +device drivers. A good example are contiguous memory allocations or
+> > +memory sharing with other operating system on the same hardware board.
+> > +Those special memory regions might depend on the board configuration and
+> > +devices used on the target system.
+> > +
+> > +Parameters for each memory region can be encoded into the device tree
+> > +with the following convention:
+> > +
+> > +[(label):] (name) {
+> > +	compatible = "linux,contiguous-memory-region", "reserved-memory-region";
+> > +	reg = <(address) (size)>;
+> > +	(linux,default-contiguous-region);
+> > +};
+> > +
+> > +compatible:	one or more of:
+>
+> It's unclear what the meaning of having both values means for the
+> kernel. Does it mean the regions is sharable with the kernel or not? I
+> would think they are mutually exclusive.
 
-On Tue, Aug 20, 2013 at 08:56:17PM +0800, Shawn Guo wrote:
-> Looks good to me.  A couple of small comments below.
-> 
-> On Mon, Aug 19, 2013 at 04:07:08PM +0200, Markus Pargmann wrote:
+I consider CMA ("linux,contiguous-memory-region") as a special case of the
+reserved memory driver. The main advantage is the ability of sharing the 
+memory
+with the system instead of just allocating it from the carved out memory
+region. From the device and hardware perspective there is no difference
+if the buffer comes from CMA or reserved memory. However if you insist, I
+can change it to something different, like "shareable-memory-region".
+
+Specifying both compatible values would let kernel to bind the more specific
+driver (cma, if available) over the generic one (simple reserved memory
+carve-out allocator based on dma_coherent).
+
+> > +	- "linux,contiguous-memory-region" - enables binding of this
+> > +	  region to Contiguous Memory Allocator (special region for
+> > +	  contiguous memory allocations, shared with movable system
+> > +	  memory, Linux kernel-specific).
+>
+> As mentioned in the older thread, you can drop the 'linux,' prefix here.
+> Perhaps something like "shareable-memory-region" or merely
+> "memory-region". It is reasonable for any kernel (not just Linux) to use
+> marked regions for movable pages until it gets requested by a driver, in
+> which case a rather generic "memory-region" makes a lot of sense as a
+> name.
+>
+> > +	- "reserved-memory-region" - compatibility is defined, given
+> > +	  region is assigned for exclusive usage for by the respective
+> > +	  devices.
+>
+> BTW, just so you're aware there is already a binding for marking regions
+> as reserved. It was recently added to arch/powerpc/kernel/prom.c.
+> Unfortunately it doesn't look like it got documented. Search for
+> "reserved-ranges". However, I don't think it blocks your work here. That
+> binding doesn't provide any way for matching devices to reserved ranges.
+> It is only for telling the kernel "hands of that memory".
+
+ok, good to know.
+
+> > +
+> > +reg:	standard property defining the base address and size of
+> > +	the memory region
+> > +
+> > +linux,default-contiguous-region: property indicating that the region
+> > +	is the default region for all contiguous memory
+> > +	allocations, Linux specific (optional)
+> > +
+> > +It is optional to specify the base address, so if one wants to use
+> > +autoconfiguration of the base address, '0' can be specified as a base
+> > +address in the 'reg' property.
+>
+> I don't understand this. What does autoconfiguration of the base address
+> actually do? If this is intended to dynamically allocate a region of RAM
+> for contiguous allocations, then don't use 'reg'. Use a different
+> property that only specifies the size.
+
+Ok, I will try to make a patch which removes special 'zero' base address
+handling and adds separate 'size' property for automatically configured
+regions.
+
+> > +The /memory/reserved-memory node must contain the same #address-cells
+> > +and #size-cells value as the root node.
+>
+> That seems to be an arbitrary restriction. Why does the reserved-memory
+> node need to have exactly the same #address/size values? The 'reg'
+> property binding quite easily handles different values at different
+> levels of the tree. More below....
+
+Does it really makes sense to have such configuration with different
+#address-cells/#size-cells than the root memory node?
+
+> > +/ {
+> > +	#address-cells = <1>;
+> > +	#size-cells = <1>;
+> > +
+> > +	/* ... */
+> > +
+> > +	memory {
+> > +		reg =  <0x40000000 0x10000000
+> > +			0x50000000 0x10000000
+> > +			0x60000000 0x10000000
+> > +			0x70000000 0x10000000>;
+> > +
+> > +		reserved-memory {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +
+> > +			/*
+> > +			 * global autoconfigured region for contiguous allocations
+> > +			 * (used only with Contiguous Memory Allocator)
+> > +			 */
+> > +			contig_region at 0 {
+>
+> I would expect this to be "region at 0", not "contig_region". Also, the '_'
+> character is strongly discouraged in node names.
+>
+> > +				compatible = "linux,contiguous-memory-region";
+> > +				reg = <0x0 0x4000000>;
+>
+> As written, this example tree is abusing the 'reg' binding. Whenever a
+> node has a mappable 'reg' propertie, then all of the parent nodes above
+> it need to have 'ranges' properties. In this case it is pretty easy to
+> fix by simply adding "ranges;" to the reserved-memory and memory nodes.
+> An empty ranges property simply means that all addresses are 1:1 mapped
+> if #address/size are the same between each parent/child.
+>
+> The documentation above should specify that both memory and
+> reserved-memory need to have 'ranges', but can suggest that the best
+> use-case is for ranges to be empty.
+>
+> I mentioned above that #address/#size can actually be different. If
+> someone wants to do that, then they need to have a fully specified
+> ranges property that declares the mapping from one address space to
+> another.
+>
+> I'm okay with the implementation as it currently stands, but only if you
+> make it test for the presence of an empty ranges property. If ranges is
+> missing, or if it has data in it then it should throw an error that it
+> cannot be parsed.
+
+Ok, now I see the problem. Too bad that the ranges and #address/#size
+cells need to be parsed from FDT, what makes the code much more complicated,
+especially because there is almost no infrastructure for parsing it. I can
+resurrect the simple code for parsing FDT from V5 of the patches (see
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/259278/focus=259281 ),
+but Rob already pointed that such code is quite hard to understand.
+
+> > +				linux,default-contiguous-region;
+> > +			};
+> > +
+> > +			/*
+> > +			 * special region for framebuffer
+> > +			 */
+> > +			display_region: region at 78000000 {
+> > +				compatible = "linux,contiguous-memory-region", "reserved-memory-region";
+> > +				reg = <0x78000000 0x800000>;
+> > +			};
+> > +
+> > +			/*
+> > +			 * special region for multimedia processing devices
+> > +			 */
+> > +			multimedia_region: region at 77000000 {
+> > +				compatible = "linux,contiguous-memory-region";
+> > +				reg = <0x77000000 0x4000000>;
+> > +			};
+> > +		};
+> > +	};
+> > +
+> > +	/* ... */
+> > +
+> > +	fb0: fb at 12300000 {
+> > +		status = "okay";
+> > +		memory-region = <&display_region>;
+> > +	};
+> > +
+> > +	scaler: scaler at 12500000 {
+> > +		status = "okay";
+> > +		memory-region = <&multimedia_region>;
+> > +	};
+> > +
+> > +	codec: codec at 12600000 {
+> > +		status = "okay";
+> > +		memory-region = <&multimedia_region>;
+> > +	};
+> > +};
+> > diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+> > index 80e5c13..f7107fa 100644
+> > --- a/drivers/of/Kconfig
+> > +++ b/drivers/of/Kconfig
+> > @@ -80,4 +80,10 @@ config OF_MTD
+> >  	depends on MTD
+> >  	def_bool y
+> >
+> > +config OF_RESERVED_MEM
+> > +	depends on DMA_CMA || (HAVE_GENERIC_DMA_COHERENT && HAVE_MEMBLOCK)
+> > +	def_bool y
+> > +	help
+> > +	  Initialization code for DMA reserved memory
+> > +
+> >  endmenu # OF
+> > diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+> > index 1f9c0c4..e7e3322 100644
+> > --- a/drivers/of/Makefile
+> > +++ b/drivers/of/Makefile
+> > @@ -10,3 +10,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
+> >  obj-$(CONFIG_OF_PCI)	+= of_pci.o
+> >  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+> >  obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+> > +obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
+> > diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+> > new file mode 100644
+> > index 0000000..a754b84
+> > --- /dev/null
+> > +++ b/drivers/of/of_reserved_mem.c
+> > @@ -0,0 +1,175 @@
 > > +/*
-> > + * Write to a register with 2 bits per pin. The function will automatically
-> > + * use the next register if the pin is managed in the second register.
+> > + * Device tree based initialization code for reserved memory.
+> > + *
+> > + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+> > + *		http://www.samsung.com
+> > + * Author: Marek Szyprowski <m.szyprowski@samsung.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation; either version 2 of the
+> > + * License or (at your optional) any later version of the license.
 > > + */
-> > +static void imx1_write_2bit(struct imx1_pinctrl *ipctl, unsigned int pin_id,
-> > +		u32 value, u32 reg_offset)
+> > +
+> > +#include <asm/dma-contiguous.h>
+> > +
+> > +#include <linux/memblock.h>
+> > +#include <linux/err.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_fdt.h>
+> > +#include <linux/of_platform.h>
+> > +#include <linux/mm.h>
+> > +#include <linux/sizes.h>
+> > +#include <linux/mm_types.h>
+> > +#include <linux/dma-contiguous.h>
+> > +#include <linux/dma-mapping.h>
+> > +#include <linux/of_reserved_mem.h>
+> > +
+> > +#define MAX_RESERVED_REGIONS	16
+>
+> Nit: This seems a little arbitrary. I would expect the reserved_mem
+> array to be dynamically allocated. I'm not going to force you to change
+> this, but it should be revisited with a follow-on patch.
+>
+> > +struct reserved_mem {
+> > +	phys_addr_t		base;
+> > +	unsigned long		size;
+> > +	struct cma		*cma;
+> > +	char			name[32];
+>
+> Why is name a fixed size string? And why is it a magic size of 32?
+>
+> > +};
+> > +static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
+> > +static int reserved_mem_count;
+> > +
+> > +static int __init fdt_scan_reserved_mem(unsigned long node, const char *uname,
+> > +					int depth, void *data)
 > > +{
-> > +	void __iomem *reg = imx1_mem(ipctl, pin_id) + reg_offset;
-> > +	int offset = (pin_id % 16) * 2; /* offset, regardless of register used */
-> > +	int mask = ~(0x3 << offset); /* Mask for 2 bits@offset */
-> > +	u32 old_val;
-> > +	u32 new_val;
+> > +	struct reserved_mem *rmem = &reserved_mem[reserved_mem_count];
+> > +	phys_addr_t base, size;
+> > +	int is_cma, is_reserved;
+> > +	unsigned long len;
+> > +	const char *status;
+> > +	__be32 *prop;
 > > +
-> > +	dev_dbg(ipctl->dev, "write: register 0x%p offset %d value 0x%x\n",
-> > +			reg, offset, value);
+> > +	is_cma = IS_ENABLED(CONFIG_DMA_CMA) &&
+> > +	       of_flat_dt_is_compatible(node, "linux,contiguous-memory-region");
+>
+> Nit: Indentation by tabs.
+>
+> > +	is_reserved = of_flat_dt_is_compatible(node, "reserved-memory-region");
 > > +
-> > +	/* Use the next register if the pin's port pin number is >=16 */
-> > +	if (pin_id % 32 >= 16)
-> > +		reg += 0x04;
+> > +	if (!is_reserved && !is_cma) {
+> > +		/* ignore node and scan next one */
+> > +		return 0;
+> > +	}
 > > +
-> > +	/* Get current state of pins */
-> > +	old_val = readl(reg);
-> > +	old_val &= mask;
+> > +	status = of_get_flat_dt_prop(node, "status", &len);
+> > +	if (status && strcmp(status, "okay") != 0) {
+> > +		/* ignore disabled node nad scan next one */
+> > +		return 0;
+> > +	}
 > > +
-> > +	new_val = value & 0x3; /* Make sure value is really 2 bit */
-> > +	new_val <<= offset;
-> > +	new_val |= old_val;/* Set new state for pin_id */
+> > +	prop = of_get_flat_dt_prop(node, "reg", &len);
+> > +	if (!prop || (len < (dt_root_size_cells + dt_root_addr_cells) *
+> > +			     sizeof(__be32))) {
+> > +		pr_err("Reserved mem: node %s, incorrect \"reg\" property\n",
+> > +		       uname);
+> > +		/* ignore node and scan next one */
+> > +		return 0;
+> > +	}
+> > +	base = dt_mem_next_cell(dt_root_addr_cells, &prop);
+> > +	size = dt_mem_next_cell(dt_root_size_cells, &prop);
 > > +
-> > +	writel(new_val, reg);
+> > +	if (!size) {
+> > +		/* ignore node and scan next one */
+> > +		return 0;
+> > +	}
+> > +
+> > +	pr_info("Reserved mem: found %s, memory base %lx, size %ld MiB\n",
+> > +		uname, (unsigned long)base, (unsigned long)size / SZ_1M);
+> > +
+> > +	if (reserved_mem_count == ARRAY_SIZE(reserved_mem))
+> > +		return -ENOSPC;
+> > +
+> > +	rmem->base = base;
+> > +	rmem->size = size;
+> > +	strlcpy(rmem->name, uname, sizeof(rmem->name));
+>
+> If I'm reading the code correctly, uname is directly from the flattened
+> device tree and is safe to keep a pointer to. Can you make rmem->name a
+> char* and merely do a rmem->name = uname;?
+
+Ok, I didn't know it is safe to keep a pointer to FDT.
+
+> > +
+> > +	if (is_cma) {
+> > +		struct cma *cma;
+> > +		if (dma_contiguous_reserve_area(size, base, 0, &cma) == 0) {
+> > +			rmem->cma = cma;
+> > +			reserved_mem_count++;
+> > +			if (of_get_flat_dt_prop(node,
+> > +						"linux,default-contiguous-region",
+> > +						NULL))
+> > +				dma_contiguous_set_default(cma);
+> > +		}
+> > +	} else if (is_reserved) {
+> > +		if (memblock_remove(base, size) == 0)
+> > +			reserved_mem_count++;
+> > +		else
+> > +			pr_err("Failed to reserve memory for %s\n", uname);
+> > +	}
+> > +
+> > +	return 0;
 > > +}
 > > +
-> > +static void imx1_write_bit(struct imx1_pinctrl *ipctl, unsigned int pin_id,
-> > +		u32 value, u32 reg_offset)
+> > +static struct reserved_mem *get_dma_memory_region(struct device *dev)
 > > +{
-> > +	void __iomem *reg = imx1_mem(ipctl, pin_id) + reg_offset;
-> > +	int offset = pin_id % 32;
-> > +	int mask = ~BIT_MASK(offset);
-> > +	u32 old_val;
-> > +	u32 new_val;
-> > +
-> > +	/* Get current state of pins */
-> > +	old_val = readl(reg);
-> > +	old_val &= mask;
-> > +
-> > +	new_val = value & 0x1; /* Make sure value is really 2 bit */
-> 
-> Copy&past error in comment.
-> 
-> > +	new_val <<= offset;
-> > +	new_val |= old_val;/* Set new state for pin_id */
-> > +
-> > +	writel(new_val, reg);
-> > +}
-> 
-> <snip>
-> 
-> > +static int imx1_pinctrl_parse_groups(struct device_node *np,
-> > +				    struct imx1_pin_group *grp,
-> > +				    struct imx1_pinctrl_soc_info *info,
-> > +				    u32 index)
-> > +{
-> > +	int size;
-> > +	const __be32 *list;
+> > +	struct device_node *node;
+> > +	const char *name;
 > > +	int i;
 > > +
-> > +	dev_dbg(info->dev, "group(%d): %s\n", index, np->name);
+> > +	node = of_parse_phandle(dev->of_node, "memory-region", 0);
+> > +	if (!node)
+> > +		return NULL;
 > > +
-> > +	/* Initialise group */
-> > +	grp->name = np->name;
-> > +
-> > +	/*
-> > +	 * the binding format is fsl,pins = <PIN_FUNC_ID CONFIG ...>,
-> 
-> It does not match the bindings.
-> 
-> > +	 * do sanity check and calculate pins number
-> > +	 */
-> > +	list = of_get_property(np, "fsl,pins", &size);
-> > +	/* we do not check return since it's safe node passed down */
-> > +	if (!size || size % 12) {
-> > +		dev_notice(info->dev, "Not a valid fsl,pins property (%s)\n",
-> > +				np->name);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	grp->npins = size / 12;
-> > +	grp->pins = devm_kzalloc(info->dev,
-> > +			grp->npins * sizeof(struct imx1_pin), GFP_KERNEL);
-> > +	grp->pin_ids = devm_kzalloc(info->dev,
-> > +			grp->npins * sizeof(unsigned int), GFP_KERNEL);
-> > +
-> > +	if (!grp->pins || !grp->pin_ids)
-> > +		return -ENOMEM;
-> > +
-> > +	for (i = 0; i < grp->npins; i++) {
-> > +		grp->pins[i].pin_id = be32_to_cpu(*list++);
-> > +		grp->pins[i].mux_id = be32_to_cpu(*list++);
-> > +		grp->pins[i].config = be32_to_cpu(*list++);
-> > +
-> > +		grp->pin_ids[i] = grp->pins[i].pin_id;
-> > +	}
-> > +
-> > +	return 0;
+> > +	name = kbasename(node->full_name);
+> > +	for (i = 0; i < reserved_mem_count; i++)
+> > +		if (strcmp(name, reserved_mem[i].name) == 0)
+> > +			return &reserved_mem[i];
+> > +	return NULL;
 > > +}
-> 
-> <snip>
-> 
-> > +static int imx1_pinctrl_parse_dt(struct platform_device *pdev,
-> > +		struct imx1_pinctrl *pctl, struct imx1_pinctrl_soc_info *info)
+> > +
+> > +/**
+> > + * of_reserved_mem_device_init() - assign reserved memory region to given device
+> > + *
+> > + * This function assign memory region pointed by "memory-region" device tree
+> > + * property to the given device.
+> > + */
+> > +void of_reserved_mem_device_init(struct device *dev)
 > > +{
-> > +	struct device_node *np = pdev->dev.of_node;
-> > +	struct device_node *child;
-> > +	int ret;
-> > +	u32 nfuncs = 0;
-> > +	u32 ngroups = 0;
-> > +	u32 ifunc = 0;
-> > +	u32 base_addr;
+> > +	struct reserved_mem *region = get_dma_memory_region(dev);
+> > +	if (!region)
+> > +		return;
 > > +
-> > +	if (!np)
-> > +		return -ENODEV;
-> > +
-> > +	ret = of_property_read_u32(np, "reg", &base_addr);
-> 
-> It seems base_addr is used nowhere?
-
-It's not used anymore. Some old code I forgot to remove from the gpio
-subdevices.
-
-I also fixed the comments you mentioned.
-
-Thanks,
-
-Markus
-
-> 
-> Shawn
-> 
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	for_each_child_of_node(np, child) {
-> > +		++nfuncs;
-> > +		ngroups += of_get_child_count(child);
+> > +	if (region->cma) {
+> > +		dev_set_cma_area(dev, region->cma);
+> > +		pr_info("Assigned CMA %s to %s device\n", region->name,
+> > +			dev_name(dev));
+> > +	} else {
+> > +		if (dma_declare_coherent_memory(dev, region->base, region->base,
+> > +		    region->size, DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE) != 0)
+> > +			pr_info("Declared reserved memory %s to %s device\n",
+> > +				region->name, dev_name(dev));
 > > +	}
-> > +
-> > +	if (!nfuncs) {
-> > +		dev_err(&pdev->dev, "No pin functions defined\n");
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	info->nfunctions = nfuncs;
-> > +	info->functions = devm_kzalloc(&pdev->dev,
-> > +			nfuncs * sizeof(struct imx1_pmx_func), GFP_KERNEL);
-> > +
-> > +	info->ngroups = ngroups;
-> > +	info->groups = devm_kzalloc(&pdev->dev,
-> > +			ngroups * sizeof(struct imx1_pin_group), GFP_KERNEL);
-> > +
-> > +
-> > +	if (!info->functions || !info->groups)
-> > +		return -ENOMEM;
-> > +
-> > +	for_each_child_of_node(np, child) {
-> > +		ret = imx1_pinctrl_parse_functions(child, info, ifunc++);
-> > +		if (ret == -ENOMEM)
-> > +			return -ENOMEM;
-> > +	}
-> > +
-> > +	return 0;
 > > +}
-> 
-> 
+> > +
+> > +/**
+> > + * of_reserved_mem_device_release() - release reserved memory device structures
+> > + *
+> > + * This function releases structures allocated for memory region handling for
+> > + * the given device.
+> > + */
+> > +void of_reserved_mem_device_release(struct device *dev)
+> > +{
+> > +	struct reserved_mem *region = get_dma_memory_region(dev);
+> > +	if (!region && !region->cma)
+> > +		dma_release_declared_memory(dev);
+> > +}
+> > +
+> > +/**
+> > + * early_init_dt_scan_reserved_mem() - create reserved memory regions
+> > + *
+> > + * This function grabs memory from early allocator for device exclusive use
+> > + * defined in device tree structures. It should be called by arch specific code
+> > + * once the early allocator (memblock) has been activated and all other
+> > + * subsystems have already allocated/reserved memory.
+> > + */
+> > +void __init early_init_dt_scan_reserved_mem(void)
+> > +{
+> > +	of_scan_flat_dt_by_path("/memory/reserved-memory",
+> > +				fdt_scan_reserved_mem, NULL);
+> > +}
+> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> > index e0a6514..eeca8a5 100644
+> > --- a/drivers/of/platform.c
+> > +++ b/drivers/of/platform.c
+> > @@ -21,6 +21,7 @@
+> >  #include <linux/of_device.h>
+> >  #include <linux/of_irq.h>
+> >  #include <linux/of_platform.h>
+> > +#include <linux/of_reserved_mem.h>
+> >  #include <linux/platform_device.h>
+> >
+> >  const struct of_device_id of_default_bus_match_table[] = {
+> > @@ -218,6 +219,8 @@ struct platform_device *of_platform_device_create_pdata(
+> >  	dev->dev.bus = &platform_bus_type;
+> >  	dev->dev.platform_data = platform_data;
+> >
+> > +	of_reserved_mem_device_init(&dev->dev);
+> > +
+> >  	/* We do not fill the DMA ops for platform devices by default.
+> >  	 * This is currently the responsibility of the platform code
+> >  	 * to do such, possibly using a device notifier
+> > @@ -225,6 +228,7 @@ struct platform_device *of_platform_device_create_pdata(
+> >
+> >  	if (of_device_add(dev) != 0) {
+> >  		platform_device_put(dev);
+> > +		of_reserved_mem_device_release(&dev->dev);
+> >  		return NULL;
+> >  	}
+> >
+> > diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
+> > new file mode 100644
+> > index 0000000..c841282
+> > --- /dev/null
+> > +++ b/include/linux/of_reserved_mem.h
+> > @@ -0,0 +1,14 @@
+> > +#ifndef __OF_RESERVED_MEM_H
+> > +#define __OF_RESERVED_MEM_H
+> > +
+> > +#ifdef CONFIG_OF_RESERVED_MEM
+> > +void of_reserved_mem_device_init(struct device *dev);
+> > +void of_reserved_mem_device_release(struct device *dev);
+> > +void early_init_dt_scan_reserved_mem(void);
+> > +#else
+> > +static inline void of_reserved_mem_device_init(struct device *dev) { }
+> > +static inline void of_reserved_mem_device_release(struct device *dev) { }
+> > +static inline void early_init_dt_scan_reserved_mem(void) { }
+> > +#endif
+> > +
+> > +#endif /* __OF_RESERVED_MEM_H */
+> > --
+> > 1.7.9.5
 
+Best regards
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Marek Szyprowski
+Samsung R&D Institute Poland
