@@ -1,63 +1,97 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 30 Aug 2013 02:30:33 +0200
-Subject: [PATCH 04/14] ARM: shmobile: sh73a0: Remove ->init_machine()
- special case
-In-Reply-To: <CANqRtoSrfUaMYqADNP9d5+ourtWuhgscvAVVW-nCVXFyYsCfFQ@mail.gmail.com>
-References: <20130809094748.6530.16511.sendpatchset@w520>
- <1634183.WaD7XDSkzI@avalon>
- <CANqRtoSrfUaMYqADNP9d5+ourtWuhgscvAVVW-nCVXFyYsCfFQ@mail.gmail.com>
-Message-ID: <2171121.JyqUPDDIrz@avalon>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 29 Aug 2013 17:30:21 -0700
+Subject: [PATCH] clk: wm831x: Provide is_prepared() rather than
+ is_enabled()
+In-Reply-To: <1377785608-30625-1-git-send-email-broonie@kernel.org>
+References: <1377785608-30625-1-git-send-email-broonie@kernel.org>
+Message-ID: <20130830003021.10934.15324@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
-
-On Wednesday 28 August 2013 21:19:50 Magnus Damm wrote:
-> On Wed, Aug 28, 2013 at 9:08 PM, Laurent Pinchart wrote:
-> > On Wednesday 28 August 2013 15:40:50 Magnus Damm wrote:
-> >> On Fri, Aug 9, 2013 at 7:47 PM, Laurent Pinchart wrote:
-> >> > On Friday 09 August 2013 18:48:32 Magnus Damm wrote:
-> >> >> From: Magnus Damm <damm@opensource.se>
-> >> >> 
-> >> >> No need to special case sh73a0 ->init_machine(),
-> >> >> so get rid of undesired cpufreq platform device
-> >> >> from the generic long term sh73a0 DT support code.
-> >> >> 
-> >> >> For short term support on KZM9D the DT reference
-> >> >> implementation now adds a "cpufreq-cpu0" platform
-> >> >> device so that can be used for development.
-> >> > 
-> >> > Doesn't this go against the spirit of the -reference platforms that
-> >> > don't use DT devices in board code ? I don't see an urgent need for
-> >> > this, how far along are the DT cpufreq-related bindings ?
-> >> 
-> >> I'm not sure what the latest state of DT cpufreq bindings are. Actually,
-> >> it seems to me that the cpufreq platform device is a software policy that
-> >> shouldn't be described with DT. And to be honest, I can't really see how
-> >> this policy has anything to do with any particular SoC.
-> > 
-> > I'm no cpufreq expert, but if we need to register the device in C code,
-> > I'm pretty uneasy with having that code in board files. One of the DT
-> > goals is to get rid of most board files.
+Quoting Mark Brown (2013-08-29 07:13:28)
+> From: Mark Brown <broonie@linaro.org>
 > 
-> I'm not sure if we actually _have_to_ register via the platform device, or
-> if it just happens to be like that today because no one has bothered
-> creating a better abstraction. It is a mystery to me that both a platform
-> device is used to select actual driver, and then DT is used to provide
-> frequency and voltage information.
+> Since the driver was written an is_prepared() operation has been made
+> possible. Since the driver uses I2C I/O only prepare operations are
+> provided so move the is_enabled() operation over to is_prepared().
 > 
-> The cpufreq software policy is neither board nor SoC specific. It must be
-> application specific. I can understand that putting it in a board file seems
-> odd, but putting it in a SoC file is IMO equally odd, and with the added
-> damage that people starting to write generic DT code may assume that the SoC
-> will keep on using the same cpufreq software policy in the future.
+> Signed-off-by: Mark Brown <broonie@linaro.org>
+
+Taken into clk-next.
+
+Thanks,
+Mike
+
+> ---
+>  drivers/clk/clk-wm831x.c | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
 > 
-> Perhaps the cpufreq registration interface should be reworked somehow?
-
-Perhaps :-) The situation needs to be at least clarified. Feel free to CC me 
-:-)
-
--- 
-Regards,
-
-Laurent Pinchart
+> diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
+> index 1d5af3f..805b4c3 100644
+> --- a/drivers/clk/clk-wm831x.c
+> +++ b/drivers/clk/clk-wm831x.c
+> @@ -31,7 +31,7 @@ struct wm831x_clk {
+>         bool xtal_ena;
+>  };
+>  
+> -static int wm831x_xtal_is_enabled(struct clk_hw *hw)
+> +static int wm831x_xtal_is_prepared(struct clk_hw *hw)
+>  {
+>         struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
+>                                                   xtal_hw);
+> @@ -52,7 +52,7 @@ static unsigned long wm831x_xtal_recalc_rate(struct clk_hw *hw,
+>  }
+>  
+>  static const struct clk_ops wm831x_xtal_ops = {
+> -       .is_enabled = wm831x_xtal_is_enabled,
+> +       .is_prepared = wm831x_xtal_is_prepared,
+>         .recalc_rate = wm831x_xtal_recalc_rate,
+>  };
+>  
+> @@ -73,7 +73,7 @@ static const unsigned long wm831x_fll_auto_rates[] = {
+>         24576000,
+>  };
+>  
+> -static int wm831x_fll_is_enabled(struct clk_hw *hw)
+> +static int wm831x_fll_is_prepared(struct clk_hw *hw)
+>  {
+>         struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
+>                                                   fll_hw);
+> @@ -170,7 +170,7 @@ static int wm831x_fll_set_rate(struct clk_hw *hw, unsigned long rate,
+>         if (i == ARRAY_SIZE(wm831x_fll_auto_rates))
+>                 return -EINVAL;
+>  
+> -       if (wm831x_fll_is_enabled(hw))
+> +       if (wm831x_fll_is_prepared(hw))
+>                 return -EPERM;
+>  
+>         return wm831x_set_bits(wm831x, WM831X_CLOCK_CONTROL_2,
+> @@ -220,7 +220,7 @@ static u8 wm831x_fll_get_parent(struct clk_hw *hw)
+>  }
+>  
+>  static const struct clk_ops wm831x_fll_ops = {
+> -       .is_enabled = wm831x_fll_is_enabled,
+> +       .is_prepared = wm831x_fll_is_prepared,
+>         .prepare = wm831x_fll_prepare,
+>         .unprepare = wm831x_fll_unprepare,
+>         .round_rate = wm831x_fll_round_rate,
+> @@ -237,7 +237,7 @@ static struct clk_init_data wm831x_fll_init = {
+>         .flags = CLK_SET_RATE_GATE,
+>  };
+>  
+> -static int wm831x_clkout_is_enabled(struct clk_hw *hw)
+> +static int wm831x_clkout_is_prepared(struct clk_hw *hw)
+>  {
+>         struct wm831x_clk *clkdata = container_of(hw, struct wm831x_clk,
+>                                                   clkout_hw);
+> @@ -335,7 +335,7 @@ static int wm831x_clkout_set_parent(struct clk_hw *hw, u8 parent)
+>  }
+>  
+>  static const struct clk_ops wm831x_clkout_ops = {
+> -       .is_enabled = wm831x_clkout_is_enabled,
+> +       .is_prepared = wm831x_clkout_is_prepared,
+>         .prepare = wm831x_clkout_prepare,
+>         .unprepare = wm831x_clkout_unprepare,
+>         .get_parent = wm831x_clkout_get_parent,
+> -- 
+> 1.8.4.rc3
