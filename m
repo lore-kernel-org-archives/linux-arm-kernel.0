@@ -1,42 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 Aug 2013 17:10:05 +0100
-Subject: [alsa-devel] [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM
- links between codec and cpu DAI
-In-Reply-To: <20130830112705.GU6617@n2100.arm.linux.org.uk>
-References: <20130820185019.GP30073@sirena.org.uk>
- <20130820201824.GA17845@n2100.arm.linux.org.uk>
- <1377199370.2618.99.camel@loki>
- <20130822201658.GK6617@n2100.arm.linux.org.uk>
- <1377259994.2444.41.camel@loki>
- <20130823125803.GN6617@n2100.arm.linux.org.uk>
- <20130823165800.GB30617@sirena.org.uk>
- <20130823174505.GQ6617@n2100.arm.linux.org.uk>
- <CAOyKLY_mQzPxHAg2RFSMY89uxp-0-OAf6fC=gVY0i+pQhv4iHQ@mail.gmail.com>
- <20130830112705.GU6617@n2100.arm.linux.org.uk>
-Message-ID: <20130830161005.GZ6617@n2100.arm.linux.org.uk>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 30 Aug 2013 11:17:08 -0500
+Subject: [Patch v3 2/3] ARM: dts: Document the CCI PMU DT bindings
+In-Reply-To: <1377183748-5717-3-git-send-email-punit.agrawal@arm.com>
+References: <1377183748-5717-1-git-send-email-punit.agrawal@arm.com>
+ <1377183748-5717-3-git-send-email-punit.agrawal@arm.com>
+Message-ID: <938AAABA-BE7E-48ED-82D6-61A35B6D9774@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 12:27:05PM +0100, Russell King - ARM Linux wrote:
-> 1. The combining of the CPU and platform code(s) under one device is
->    absolutely no problem for ASoC, there's multiple drivers which do this
->    already.  While this is a true statement, it creates the bug at the
->    heart of this thread - and the bug _occuring_ has nothing to do with
->    DPCM.  The bug is caused solely by the combining of the two components.
 
-Right, having gone back and looked at this in-depth again, and tried some
-experiments, I no longer need this problem fixed for the non-DPCM code
-to work, but I do still need to do this:
+On Aug 22, 2013, at 10:02 AM, Punit Agrawal wrote:
 
-> 4. By adding the AIFs and routes, I'm bypassing/abusing the ASoC DAI core.
->    If this were to be the case, why does your DPCM driver set them up.
->    Therefore, my conclusion is that Mark was wrong about this too.  Yes,
->    it may be that for the time being it's not that appealing, because as
->    DPCM doesn't work in mainline, I'm unable to separate the DAI link
->    between the CPU and the Codec.  That doesn't make the creation of
->    the routes any more wrong when they're the exact same routes which
->    need to be created for DPCM - especially when they're relied upon for
->    there to be any audio output what so ever from the driver.
+> The CCI PMU can profile bus transactions at the master and slave
+> interfaces of the CCI. The PMU can be used to observe an aggregated
+> view of the bus traffic between the various components connected to the
+> CCI.
+> 
+> Introduce a binding for the CCI PMU. The PMU node will be a sub-node of
+> the CCI node.
+> 
+> Cc: devicetree at vger.kernel.org
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> ---
+> Documentation/devicetree/bindings/arm/cci.txt |   46 +++++++++++++++++++++++++
+> 1 file changed, 46 insertions(+)
 
-so I can detect which output paths to enable.  I will be posting updated
-patches shortly, which will just be those which Mark hasn't taken yet.
+Acked-by: Kumar Gala <galak@codeaurora.org>
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
