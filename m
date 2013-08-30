@@ -1,50 +1,130 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Fri, 30 Aug 2013 10:15:14 -0700
-Subject: [PATCH v7 3/3] ARM: bcm281xx: Add device node for the GPIO controller
-In-Reply-To: <1377882914-30152-1-git-send-email-markus.mayer@linaro.org>
-References: <1377882914-30152-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <1377882914-30152-4-git-send-email-markus.mayer@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 30 Aug 2013 18:23:10 +0100
+Subject: [RFC PATCH 04/14] arm64: kernel: suspend/resume registers
+ save/restore
+In-Reply-To: <1377689766-17642-5-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1377689766-17642-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1377689766-17642-5-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20130830172310.GJ4650@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the GPIO controller device node for the Broadcom bcm281xx family of
-mobile SoCs.
+On Wed, Aug 28, 2013 at 12:35:56PM +0100, Lorenzo Pieralisi wrote:
+> Power management software requires the kernel to save and restore
+> CPU registers while going through suspend and resume operations
+> triggered by kernel subsystems like CPU idle and suspend to RAM.
+> 
+> This patch implements code that provides save and restore mechanism
+> for the arm v8 implementation. Memory for the context is passed as
+> parameter to both cpu_do_suspend and cpu_do_resume functions, and allows
+> the callers to implement context allocation as they deem fit.
+> 
+> The registers that are saved and restored correspond to the registers
+> actually required by the kernel to be up and running and is by no means
+> a complete save and restore of the entire v8 register set.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm64/include/asm/proc-fns.h |  3 ++
+>  arch/arm64/mm/proc.S              | 64 +++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 67 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
+> index 7cdf466..0c657bb 100644
+> --- a/arch/arm64/include/asm/proc-fns.h
+> +++ b/arch/arm64/include/asm/proc-fns.h
+> @@ -26,11 +26,14 @@
+>  #include <asm/page.h>
+>  
+>  struct mm_struct;
+> +struct cpu_suspend_ctx;
+>  
+>  extern void cpu_cache_off(void);
+>  extern void cpu_do_idle(void);
+>  extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+>  extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
+> +extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
+> +extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+>  
+>  #include <asm/memory.h>
+>  
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index a82ae88..193bf98 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -80,6 +80,70 @@ ENTRY(cpu_do_idle)
+>  	ret
+>  ENDPROC(cpu_do_idle)
+>  
+> +#ifdef CONFIG_ARM_CPU_SUSPEND
+> +/**
+> + * cpu_do_suspend - save CPU registers context
+> + * x0: virtual address of context pointer
+> + */
+> +ENTRY(cpu_do_suspend)
+> +	mrs	x1, tpidr_el0
+> +	str	x1, [x0, #CPU_CTX_TPIDR_EL0]
+> +	mrs	x2, tpidrro_el0
+> +	str	x2, [x0, #CPU_CTX_TPIDRRO_EL0]
+> +	mrs	x3, contextidr_el1
+> +	str	x3, [x0, #CPU_CTX_CTXIDR_EL1]
+> +	mrs	x4, mair_el1
+> +	str	x4, [x0, #CPU_CTX_MAIR_EL1]
+> +	mrs	x5, cpacr_el1
+> +	str	x5, [x0, #CPU_CTX_CPACR_EL1]
+> +	mrs	x6, ttbr1_el1
+> +	str	x6, [x0, #CPU_CTX_TTBR1_EL1]
+> +	mrs	x7, tcr_el1
+> +	str	x7, [x0, #CPU_CTX_TCR_EL1]
+> +	mrs	x8, vbar_el1
+> +	str	x8, [x0, #CPU_CTX_VBAR_EL1]
+> +	mrs	x9, sctlr_el1
+> +	str	x9, [x0, #CPU_CTX_SCTLR_EL1]
+> +	ret
+> +ENDPROC(cpu_do_suspend)
 
-Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Can you read all the registers a once and do some stp to save them?
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index c0cdf66..a3945e3 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -63,6 +63,22 @@
- 		clock-frequency = <32768>;
- 	};
- 
-+	gpio: gpio at 35003000 {
-+		compatible = "brcm,bcm11351-gpio", "brcm,kona-gpio";
-+		reg = <0x35003000 0x800>;
-+		interrupts =
-+		       <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		#interrupt-cells = <2>;
-+		gpio-controller;
-+		interrupt-controller;
-+	};
-+
- 	sdio0: sdio at 0x3f180000 {
- 		compatible = "bcm,kona-sdhci";
- 		reg = <0x3f180000 0x10000>;
+> +
+> +/**
+> + * cpu_do_resume - registers layout should match the corresponding
+> + *                 cpu_do_suspend call
+> + *
+> + * x0: Physical address of context pointer
+> + * x1: Should contain the physical address of identity map page tables
+> + *     used to turn on the MMU and complete context restore
+> + *
+> + * Returns:
+> + *	sctlr value in x0
+> + */
+> +ENTRY(cpu_do_resume)
+> +	tlbi	vmalle1is	// make sure tlb entries are invalid
+> +	ldr	x2, [x0, #CPU_CTX_TPIDR_EL0]
+> +	msr	tpidr_el0, x2
+> +	ldr	x3, [x0, #CPU_CTX_TPIDRRO_EL0]
+> +	msr	tpidrro_el0, x3
+> +	ldr	x4, [x0, #CPU_CTX_CTXIDR_EL1]
+> +	msr	contextidr_el1, x4
+> +	ldr	x5, [x0, #CPU_CTX_MAIR_EL1]
+> +	msr	mair_el1, x5
+> +	ldr	x6, [x0, #CPU_CTX_CPACR_EL1]
+> +	msr	cpacr_el1, x6
+> +	msr	ttbr0_el1, x1
+> +	ldr	x7, [x0, #CPU_CTX_TTBR1_EL1]
+> +	msr	ttbr1_el1, x7
+> +	ldr	x8, [x0, #CPU_CTX_TCR_EL1]
+> +	msr	tcr_el1, x8
+> +	ldr	x9, [x0, #CPU_CTX_VBAR_EL1]
+> +	msr	vbar_el1, x9
+> +	ldr	x0, [x0, #CPU_CTX_SCTLR_EL1]
+> +	isb
+> +	dsb	sy
+> +	ret
+> +ENDPROC(cpu_do_resume)
+
+Same here, use ldp.
+
+BTW, do we need the DSB here or just the ISB?
+
 -- 
-1.7.9.5
+Catalin
