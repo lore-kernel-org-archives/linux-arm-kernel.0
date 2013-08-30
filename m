@@ -1,59 +1,96 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 30 Aug 2013 09:06:50 -0700
-Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
-In-Reply-To: <CA+Bv8XaQgOiSiScQW=CVxzXBuG0soafQotApjoVEZ0P9U3netg@mail.gmail.com>
- (Russ Dill's message of "Thu, 29 Aug 2013 17:25:24 -0700")
-References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
- <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
- <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
- <87txiasqhk.fsf@linaro.org>
- <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
- <87ppsw7cgq.fsf@linaro.org>
- <CA+Bv8XbxV=BFjcSsUMX2pz9LeCkSwrjzZmj_=YbHGzyfbLXmaQ@mail.gmail.com>
- <874na8xqfl.fsf@linaro.org>
- <CANacCWzK1w9+XKEoUfS4ZB7QGxi_0JkVWBLs_wsaUjrzW2QB+A@mail.gmail.com>
- <87hae8tc6e.fsf@linaro.org>
- <CA+Bv8XaQgOiSiScQW=CVxzXBuG0soafQotApjoVEZ0P9U3netg@mail.gmail.com>
-Message-ID: <87eh9bqi1x.fsf@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 30 Aug 2013 17:13:28 +0100
+Subject: [PATCH] ARM: dts: vexpress: Add CCI node to TC2 device-tree
+In-Reply-To: <1377872760.3655.48.camel@linaro1.home>
+References: <1377872760.3655.48.camel@linaro1.home>
+Message-ID: <20130830161327.GA10045@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russ Dill <Russ.Dill@ti.com> writes:
+On Fri, Aug 30, 2013 at 03:26:00PM +0100, Jon Medhurst (Tixy) wrote:
+> The Versatile Express V2P-CA15_A7 (aka TC2) has a CCI-400 which is
+> needed to get Multi-Cluster Power Management (MCPM) working.
+> 
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> ---
+> 
+> I was unsure if the devicetree list should be cc'd when making use of
+> already agreed and documented bindings, so I erred on the side of
+> caution and added it. Please say if this is unnecessary noise, or is
+> expected for all device-tree changes, thanks.
+> 
+>  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts |   25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> index d2803be..12bd4ea 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> @@ -37,30 +37,35 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a15";
+>  			reg = <0>;
+> +			cci-control-port = <&cci_control1>;
+>  		};
+>  
+>  		cpu1: cpu at 1 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a15";
+>  			reg = <1>;
+> +			cci-control-port = <&cci_control1>;
+>  		};
+>  
+>  		cpu2: cpu at 2 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a7";
+>  			reg = <0x100>;
+> +			cci-control-port = <&cci_control2>;
+>  		};
+>  
+>  		cpu3: cpu at 3 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a7";
+>  			reg = <0x101>;
+> +			cci-control-port = <&cci_control2>;
+>  		};
+>  
+>  		cpu4: cpu at 4 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a7";
+>  			reg = <0x102>;
+> +			cci-control-port = <&cci_control2>;
+>  		};
+>  	};
+>  
+> @@ -104,6 +109,26 @@
+>  		interrupts = <1 9 0xf04>;
+>  	};
+>  
+> +	cci at 2c090000 {
+> +		compatible = "arm,cci-400";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0 0x2c090000 0 0x1000>;
+> +		ranges = <0x0 0x0 0x2c090000 0x10000>;
+> +
+> +		cci_control1: slave-if at 4000 {
+> +			compatible = "arm,cci-400-ctrl-if";
+> +			interface-type = "ace";
+> +			reg = <0x4000 0x1000>;
+> +		};
+> +
+> +		cci_control2: slave-if at 5000 {
+> +			compatible = "arm,cci-400-ctrl-if";
+> +			interface-type = "ace";
+> +			reg = <0x5000 0x1000>;
+> +		};
+> +	};
+> +
+>  	memory-controller at 7ffd0000 {
+>  		compatible = "arm,pl354", "arm,primecell";
+>  		reg = <0 0x7ffd0000 0 0x1000>;
 
-> On Thu, Aug 29, 2013 at 2:33 PM, Kevin Hilman <khilman@linaro.org> wrote:
->> Vaibhav Bedia <vaibhav.bedia@gmail.com> writes:
-> [snip]
->>> Morevoer, all the suggestions on how to keep the code in Linux working
->>> around the complications due to the main memory not being accessible
->>> will need to be replicated on the non-Linux s/w stacks and that's just
->>> make it more difficult for them.
->>
->> The linux code has to be very self-contained (in assembler or C), so I'm
->> not sure how it's difficult to replicated in any other OS (or non-OS.)
->
-> Let me pull on this thread a little bit. Would this involve defining a
-> bunch of different sections for each arch so that I could do:
->
-> void __sram_am33xx am33xx_some_pm_function(args....)
-> {
-> }
->
-> static struct am33xx_foo_dyn *blargity __sramdata_am33xx = { ...};
->
-> static const struct am33xx_foo_const *blarg __sramconst_am33xx = { ... };
->
-> The sram push code could then push these sections into sram. There
-> would then be a set of inlines or macros for converting addresses
-> within these sections to SRAM addresses, maybe also inlines or macros
-> for calling code that has been pushed into sram by wrapping the
-> original function pointer. The macros or inlines that call SRAM code
-> could perform the trampoline as well.
+Now that MCPM and CPU idle are heading to mainline, it should get queued asap,
+thanks for that, probably as a fix at -rc1, since it is quite late now.
 
-Well, I was thinking of something much dumber.
-
-I was thinking about just _carefully_ writing a single, self-contained C
-function, with all of its data on the stack (and consts as #defines).
-Think of it is a step up in readability from straight assembly (which
-was the stated reason for moving the code to the M3 in the first place.)
-
-Kevin
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
