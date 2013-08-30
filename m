@@ -1,57 +1,61 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 30 Aug 2013 11:02:31 +0100
-Subject: [PATCH RFC v2 14/16] ARM: vexpress: remove custom .init_time hook
-In-Reply-To: <521F901B.3090305@gmail.com>
-References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1377638890-371-15-git-send-email-sebastian.hesselbarth@gmail.com>
- <201308291535.53005.arnd@arndb.de> <521F901B.3090305@gmail.com>
-Message-ID: <1377856951.3655.34.camel@linaro1.home>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 30 Aug 2013 11:03:42 +0100
+Subject: [PATCH v3 1/3] ARM: Introduce atomic MMIO modify
+In-Reply-To: <20130830092032.GD25628@mudshark.cambridge.arm.com>
+References: <1377253445-2842-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130823103802.GO4600@tarshish> <20130823110748.GD2389@localhost>
+ <20130823113225.GF2389@localhost> <20130823114805.GF10971@arm.com>
+ <20130830090807.GB25628@mudshark.cambridge.arm.com>
+ <20130830091534.GA62188@MacBook-Pro.local>
+ <20130830092032.GD25628@mudshark.cambridge.arm.com>
+Message-ID: <20130830100342.GD62188@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-08-29 at 20:16 +0200, Sebastian Hesselbarth wrote:
-> On 08/29/13 15:35, Arnd Bergmann wrote:
-> > On Tuesday 27 August 2013, Sebastian Hesselbarth wrote:
-> >> @@ -422,16 +419,8 @@ void __init v2m_dt_init_early(void)
-> >>                          pr_warning("vexpress: DT HBI (%x) is not matching "
-> >>                                          "hardware (%x)!\n", dt_hbi, hbi);
-> >>          }
-> >> -}
-> >> -
-> >> -static void __init v2m_dt_timer_init(void)
-> >> -{
-> >> -       of_clk_init(NULL);
-> >>
-> >> -       clocksource_of_init();
-> >> -
-> >> -       versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
-> >> -                               24000000);
-> >> +       versatile_sched_clock_init(vexpress_get_24mhz_clock_base(), 24000000);
-> >>   }
-> >
-> > You are moving versatile_sched_clock_init() ahead of clocksource_of_init(), which I suspect
-> > won't work. Have you checked this?
+On Fri, Aug 30, 2013 at 10:20:33AM +0100, Will Deacon wrote:
+> On Fri, Aug 30, 2013 at 10:15:36AM +0100, Catalin Marinas wrote:
+> > On Fri, Aug 30, 2013 at 10:08:07AM +0100, Will Deacon wrote:
+> > > On Fri, Aug 23, 2013 at 12:48:05PM +0100, Catalin Marinas wrote:
+> > > > On Fri, Aug 23, 2013 at 12:32:26PM +0100, Ezequiel Garcia wrote:
+> > > > > ... or maybe yes. I'm not seeing {readl,writel}_relaxed as guaranteed
+> > > > > to exist in every architecture. So, indeed, this seems to be ARM-dependent.
+> > > > 
+> > > > There was a discussion couple of years ago to make these part of the IO
+> > > > specification since many architectures define them:
+> > > > 
+> > > > http://thread.gmane.org/gmane.linux.ports.arm.kernel/117626
+> > > > 
+> > > > (and some older threads on linux-arch which I haven't searched)
+> > > > 
+> > > > We could have some default implementation pointing to readl/writel while
+> > > > letting the arch code to define more optimised variants.
+> > > 
+> > > The main thing I dislike about that is the back-to-back dsbs that you will
+> > > get from the read-(modify)-write. It really makes the non-optimised version
+> > > needlessly expensive.
+> > 
+> > Yes, it's pretty bad. But we don't have relaxed (write) accessors on
+> > other architectures and I'm not sure about their semantics either. I
+> > guess here it's a data dependency so you cannot write the value before
+> > reading it, especially since sane architectures should speculate reads
+> > or writes to device memory.
+> > 
+> > What about making it always use *_relaxed() accessors if the
+> > architecture provides them? No need for atomic_io_modify_relaxed().
 > 
-> "Checked" as in "Tested", no I haven't.
+> The only potential problem there is if somebody uses this function to kick
+> off a DMA. That would require explicit barriers to enforce ordering against
+> population of normal, cacheable buffers, which isn't usually the case in
+> driver code (since we have the dsb/outer_sync in the accessor).
 > 
-> But non-DT v2m has it in v2m_init_early also, while v2m_sp804_init()
-> is called in v2m_timer_init().
-> 
-> That matches the above approach taken for DT v2m where
-> versatile_sched_clock_init() is now called from v2m_dt_init_early()
-> and clocksource_of_init() called from arch-wide .timer_init.
-> 
-> get_maintainer.pl did not spit out any additional maintainer except
-> Russell of course. You know someone who can test the above?
+> Perhaps we should just bit the bullet and define relaxed accessors for all
+> architectures? It's not difficult to default them to the non-relaxed
+> variants if the architecture doesn't provide an optimised implementation.
 
-After adding of_clk_init(NULL) to time_init() things boot OK for me with
-this patch. However, do we know that sched_clock is never going to get
-read before time_init() has actually started the clock it reads? Are we
-making things more fragile?
-
-(My testing was on a 3.11-rc6 based Linaro kernel on TC2 because that's
-what I had to hand. So it's not a vanilla mainline kernel and I have
-other vexpress changes in my tree.)
+Yes, an asm-generic default relaxed would be good (that's what I
+suggested earlier in this thread and it was discussed in the past). But
+no-one volunteered ;).
 
 -- 
-Tixy
+Catalin
