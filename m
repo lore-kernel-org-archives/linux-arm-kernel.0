@@ -1,124 +1,320 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Fri, 30 Aug 2013 22:30:55 +0200
-Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.12 take #2
-Message-ID: <522100FF.5030204@baylibre.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 30 Aug 2013 13:33:34 -0700
+Subject: [PATCH v4 3/5] clk: dt: binding for basic multiplexer clock
+In-Reply-To: <39BAF1F8-41AD-4667-BF76-22BDF709415A@codeaurora.org>
+References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
+ <1377150793-27864-4-git-send-email-mturquette@linaro.org>
+ <2A930389-012E-45C3-93EB-6B4A41DB2EF5@codeaurora.org>
+ <20130829011425.8231.78802@quantum>
+ <39BAF1F8-41AD-4667-BF76-22BDF709415A@codeaurora.org>
+Message-ID: <20130830203334.10934.10011@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin & Olof,
+Quoting Kumar Gala (2013-08-30 13:02:42)
+> On Aug 28, 2013, at 8:14 PM, Mike Turquette wrote:
+> 
+> > Quoting Kumar Gala (2013-08-28 08:50:10)
+> >> On Aug 22, 2013, at 12:53 AM, Mike Turquette wrote:
+> >> 
+> >>> Device Tree binding for the basic clock multiplexer, plus the setup
+> >>> function to register the clock.  Based on the existing fixed-clock
+> >>> binding.
+> >>> 
+> >>> Includes minor beautification of clk-provider.h where some whitespace is
+> >>> added and of_fixed_factor_clock_setup is relocated to maintain a
+> >>> consistent style.
+> >>> 
+> >>> Tero Kristo contributed helpful bug fixes to this patch.
+> >>> 
+> >>> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> >>> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> >>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> >>> ---
+> >>> Changes since v3:
+> >>> * replaced underscores with dashes in DT property names
+> >>> * bail from of clock setup function early if of_iomap fails
+> >>> * removed unecessary explict cast
+> >>> 
+> >>> .../devicetree/bindings/clock/mux-clock.txt        | 79 ++++++++++++++++++++++
+> >>> drivers/clk/clk-mux.c                              | 68 ++++++++++++++++++-
+> >>> include/linux/clk-provider.h                       |  5 +-
+> >>> 3 files changed, 150 insertions(+), 2 deletions(-)
+> >>> create mode 100644 Documentation/devicetree/bindings/clock/mux-clock.txt
+> >>> 
+> >>> diff --git a/Documentation/devicetree/bindings/clock/mux-clock.txt b/Documentation/devicetree/bindings/clock/mux-clock.txt
+> >>> new file mode 100644
+> >>> index 0000000..21eb3b3
+> >>> --- /dev/null
+> >>> +++ b/Documentation/devicetree/bindings/clock/mux-clock.txt
+> >>> @@ -0,0 +1,79 @@
+> >>> +Binding for simple mux clock.
+> >>> +
+> >>> +This binding uses the common clock binding[1].  It assumes a
+> >>> +register-mapped multiplexer with multiple input clock signals or
+> >>> +parents, one of which can be selected as output.  This clock does not
+> >>> +gate or adjust the parent rate via a divider or multiplier.
+> >>> +
+> >>> +By default the "clocks" property lists the parents in the same order
+> >>> +as they are programmed into the regster.  E.g:
+> >>> +
+> >>> +     clocks = <&foo_clock>, <&bar_clock>, <&baz_clock>;
+> >>> +
+> >>> +results in programming the register as follows:
+> >>> +
+> >>> +register value               selected parent clock
+> >>> +0                    foo_clock
+> >>> +1                    bar_clock
+> >>> +2                    baz_clock
+> >>> +
+> >>> +Some clock controller IPs do not allow a value of zero to be programmed
+> >>> +into the register, instead indexing begins at 1.  The optional property
+> >>> +"index-starts-at-one" modified the scheme as follows:
+> >>> +
+> >>> +register value               selected clock parent
+> >>> +1                    foo_clock
+> >>> +2                    bar_clock
+> >>> +3                    baz_clock
+> >>> +
+> >>> +Additionally an optional table of bit and parent pairs may be supplied
+> >>> +like so:
+> >>> +
+> >>> +     table = <&foo_clock 0x0>, <&bar_clock, 0x2>, <&baz_clock, 0x4>;
+> >>> +
+> >> 
+> >> I think this is going way too far for what should be in a device tree.  Why should this not just be encoded in tables in the code?
+> > 
+> > To reduce kernel data bloat.
+> 
+> Why is this really an issue, for systems that are concerned about kernel size, they are going to be built targeting the HW platform of choice, for one's like a server, the bloat isn't going to be significant, and if so we can look at mechanisms like __init section that would free up after boot.
 
-Here is the updated version without the conflicting patch (ARM: dts: AM33XX: don't redefine OCP bus and device nodes) and with the signed tag.
-There is still a small conflict with usb-next, but it is easily fixable, and already fixed by Stephen.
+s/bloat/churn/
 
-Thanks,
-Benoit
+The clock _data_ seems to always have some churn to it. Moving it out to
+DT reduces that churn from Linux. My concern above is not about kernel
+data size.
 
+> 
+> > The mux-clock binding covers a quite a few platforms that have similar
+> > mux-clock programming requirements. If the DT binding is verbose enough
+> > then the basic mux clock driver is sufficient to initialize all of the
+> > mux clocks from DT: no new platform-specific clock driver with a bunch
+> > of data is necessary.
+> 
+> The same could be said of just embedded this info in a C struct that is well known, I don't need the data in the dt for bits and shifts.
+> 
+> > On the other hand if we rely on tables in C to define how mux-clock
+> > parents are selected then every platform will have to write their own
+> > clock driver just to define their clock data.
+> 
+> Why?  If you can have a common mechanism in the device tree there isn't any reason you can't have a common struct that looks similar in C.
+> 
+> > Having drivers written for the sole purpose of listing out a bunch of
+> > data sounds like something that DT was meant to solve, even if this
+> > isn't at the board level and is at the SoC level.
+> 
+> I just don't see the need for the data to be in the DT.  You can get the same goal w/a standard struct defined in C.
 
-The following changes since commit b36f4be3de1b123d8601de062e7dbfc904f305fb:
+Absolutely you could put this stuff in C. Originally all of the clock
+registration mechanisms in the common clock implementation assumed
+static data in the kernel. That's how it used to be.
 
-  Linux 3.11-rc6 (2013-08-18 14:36:53 -0700)
+However DT came along to ARM and the clock framework and these "clock
+mapping" bindings started popping up, which are fragile. Adding a clock
+requires changes both to the DT binding AND to the kernel. That sucks.
 
-are available in the git repository at:
+Once again I'll point out that this binding (mux-clock) makes it so that
+devices with simpler clock trees do not need to merge any code into the
+kernel. What value does device tree bring to me if for every platform
+with 8 clocks I have to write a new Linux clock driver with that static
+data in it? That also sucks. In that case DT brings almost zero value,
+with the exception of linking clock phandles to clock consumers, which
+clkdev had been doing for us already.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git tags/for_3.12/dts_signed
+Regards,
+Mike
 
-for you to fetch changes up to 4843be165c10f9886c87eeb20acf19a3ddec6653:
-
-  ARM: configs: omap2plus_defconfig: enable dwc3 and dependencies (2013-08-30 21:33:13 +0200)
-
-----------------------------------------------------------------
-Add the minimal DTS support for DRA7xx based SoC core.
-Add the initial support for N900 and gta04 phones.
-Enable USB3 on OMAP5 evm board.
-Do a lot of various cleanups.
-
-----------------------------------------------------------------
-Afzal Mohammed (2):
-      ARM: dts: AM4372: cpu(s) node per latest binding
-      ARM: dts: AM4372: add few nodes
-
-Alexandre Belloni (1):
-      ARM: dts: AM33XX: Add PMU support
-
-Benoit Cousson (1):
-      ARM: OMAP5: hwmod: add missing ocp2scp hwmod data
-
-Felipe Balbi (4):
-      ARM: OMAP5: dts: fix reg property size
-      ARM: OMAP5: dts: fix ocp2scp DTS data
-      ARM: OMAP5: dts: add palmas-usb node
-      ARM: configs: omap2plus_defconfig: enable dwc3 and dependencies
-
-Javier Martinez Canillas (4):
-      ARM: dts: omap3-igep: add pinmux node for GPIO LED configuration
-      ARM: dts: omap3-igep0020: add mux conf for GPIO LEDs
-      ARM: dts: omap3-igep0030: add mux conf for GPIO LED
-      ARM: dts: AM33XX: use pinmux node defined in included file
-
-Kishon Vijay Abraham I (1):
-      ARM: dts: omap5-uevm: Split SMPS10 in two nodes
-
-Lars Poeschel (1):
-      ARM: dts: AM33xx: Correct gpio #interrupt-cells property
-
-Lee Jones (7):
-      ARM: dts: Remove '0x's from OMAP2420 H4 DTS file
-      ARM: dts: Remove '0x's from OMAP3 IGEP0020 DTS file
-      ARM: dts: Remove '0x's from OMAP3 IGEP0030 DTS file
-      ARM: dts: Remove '0x's from OMAP3 DTS file
-      ARM: dts: Remove '0x's from OMAP3430 SDP DTS file
-      ARM: dts: Remove '0x's from OMAP4 DTS file
-      ARM: dts: Remove '0x's from OMAP5 DTS file
-
-Marek Belisko (1):
-      ARM: dts: Add devicetree for gta04 board.
-
-Pavel Machek (1):
-      ARM: dts: N900: Add device tree
-
-R Sricharan (1):
-      ARM: dts: DRA7: Add the dts files for dra7 SoC and dra7-evm board
-
-Robert Nelson (1):
-      ARM: dts: omap3-beagle-xm: fix string error in compatible property
-
-Roger Quadros (1):
-      ARM: dts: omap3-beagle: Make USB host pin naming consistent
-
-Ruslan Bilovol (1):
-      ARM: dts: twl6030: Move common configuration for OMAP4 boards in a separate dtsi file
-
- arch/arm/boot/dts/Makefile                 |   5 +-
- arch/arm/boot/dts/am335x-bone.dts          | 176 ++++-----
- arch/arm/boot/dts/am335x-evm.dts           | 254 ++++++-------
- arch/arm/boot/dts/am335x-evmsk.dts         | 258 ++++++-------
- arch/arm/boot/dts/am33xx.dtsi              |  13 +-
- arch/arm/boot/dts/am4372.dtsi              | 347 +++++++++++++++++
- arch/arm/boot/dts/dra7-evm.dts             | 140 +++++++
- arch/arm/boot/dts/dra7.dtsi                | 575 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap2420-h4.dts          |   6 +-
- arch/arm/boot/dts/omap3-beagle-xm.dts      |   2 +-
- arch/arm/boot/dts/omap3-beagle.dts         |  24 +-
- arch/arm/boot/dts/omap3-gta04.dts          | 168 +++++++++
- arch/arm/boot/dts/omap3-igep.dtsi          |   2 +
- arch/arm/boot/dts/omap3-igep0020.dts       |  19 +-
- arch/arm/boot/dts/omap3-igep0030.dts       |  17 +-
- arch/arm/boot/dts/omap3-n900.dts           |  92 +++++
- arch/arm/boot/dts/omap3.dtsi               |   2 +-
- arch/arm/boot/dts/omap3430-sdp.dts         |  22 +-
- arch/arm/boot/dts/omap4-panda-common.dtsi  |  21 +-
- arch/arm/boot/dts/omap4-sdp.dts            |  21 +-
- arch/arm/boot/dts/omap4.dtsi               |   2 +-
- arch/arm/boot/dts/omap5-uevm.dts           |  25 +-
- arch/arm/boot/dts/omap5.dtsi               |  13 +-
- arch/arm/boot/dts/twl6030_omap4.dtsi       |  38 ++
- arch/arm/configs/omap2plus_defconfig       |   9 +
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c |  45 +++
- include/dt-bindings/pinctrl/dra.h          |  50 +++
- 27 files changed, 1912 insertions(+), 434 deletions(-)
- create mode 100644 arch/arm/boot/dts/dra7-evm.dts
- create mode 100644 arch/arm/boot/dts/dra7.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-gta04.dts
- create mode 100644 arch/arm/boot/dts/omap3-n900.dts
- create mode 100644 arch/arm/boot/dts/twl6030_omap4.dtsi
- create mode 100644 include/dt-bindings/pinctrl/dra.h
+> 
+> > 
+> > Regards,
+> > Mike
+> > 
+> >> 
+> >>> +where the first value in the pair is the parent clock and the second
+> >>> +value is the bitfield to be programmed into the register.
+> >>> +
+> >>> +The binding must provide the register to control the mux and the mask
+> >>> +for the corresponding control bits.  Optionally the number of bits to
+> >>> +shift that mask if necessary.  If the shift value is missing it is the
+> >>> +same as supplying a zero shift.
+> >>> +
+> >>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >>> +
+> >>> +Required properties:
+> >>> +- compatible : shall be "mux-clock".
+> >>> +- #clock-cells : from common clock binding; shall be set to 0.
+> >>> +- clocks : link phandles of parent clocks
+> >>> +- reg : base address for register controlling adjustable mux
+> >>> +- bit-mask : arbitrary bitmask for programming the adjustable mux
+> >>> +
+> >>> +Optional properties:
+> >>> +- clock-output-names : From common clock binding.
+> >>> +- table : array of integer pairs defining parents & bitfield values
+> >>> +- bit-shift : number of bits to shift the bit-mask, defaults to
+> >>> +  (ffs(mask) - 1) if not present
+> >>> +- index-starts-at-one : valid input select programming starts at 1, not
+> >>> +  zero
+> >>> +- hiword-mask : lower half of the register programs the mux, upper half
+> >>> +  of the register indicates bits that were updated in the lower half
+> >>> +
+> >>> +Examples:
+> >>> +     clock: clock at 4a008100 {
+> >>> +             compatible = "mux-clock";
+> >>> +             #clock-cells = <0>;
+> >>> +             clocks = <&clock_foo>, <&clock_bar>, <&clock_baz>;
+> >>> +             reg = <0x4a008100 0x4>
+> >>> +             mask = <0x3>;
+> >>> +             index-starts-at-one;
+> >>> +     };
+> >>> +
+> >>> +     clock: clock at 4a008100 {
+> >>> +             #clock-cells = <0>;
+> >>> +             compatible = "mux-clock";
+> >>> +             clocks = <&clock_foo>, <&clock_bar>, <&clock_baz>;
+> >>> +             reg = <0x4a008100 0x4>;
+> >>> +             mask = <0x3>;
+> >>> +             shift = <0>;
+> >>> +             table = <&clock_foo 1>, <&clock_bar 2>, <&clock_baz 3>;
+> >>> +     };
+> >>> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+> >>> index 0811633..9292253 100644
+> >>> --- a/drivers/clk/clk-mux.c
+> >>> +++ b/drivers/clk/clk-mux.c
+> >>> @@ -1,7 +1,7 @@
+> >>> /*
+> >>> * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
+> >>> * Copyright (C) 2011 Richard Zhao, Linaro <richard.zhao@linaro.org>
+> >>> - * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
+> >>> + * Copyright (C) 2011-2013 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
+> >>> *
+> >>> * This program is free software; you can redistribute it and/or modify
+> >>> * it under the terms of the GNU General Public License version 2 as
+> >>> @@ -16,6 +16,8 @@
+> >>> #include <linux/slab.h>
+> >>> #include <linux/io.h>
+> >>> #include <linux/err.h>
+> >>> +#include <linux/of.h>
+> >>> +#include <linux/of_address.h>
+> >>> 
+> >>> /*
+> >>> * DOC: basic adjustable multiplexer clock that cannot gate
+> >>> @@ -177,3 +179,67 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+> >>>                                    NULL, lock);
+> >>> }
+> >>> EXPORT_SYMBOL_GPL(clk_register_mux);
+> >>> +
+> >>> +#ifdef CONFIG_OF
+> >>> +/**
+> >>> + * of_mux_clk_setup() - Setup function for simple mux rate clock
+> >>> + */
+> >>> +void of_mux_clk_setup(struct device_node *node)
+> >>> +{
+> >>> +     struct clk *clk;
+> >>> +     const char *clk_name = node->name;
+> >>> +     void __iomem *reg;
+> >>> +     int num_parents;
+> >>> +     const char **parent_names;
+> >>> +     int i;
+> >>> +     u8 clk_mux_flags = 0;
+> >>> +     u32 mask = 0;
+> >>> +     u32 shift = 0;
+> >>> +
+> >>> +     of_property_read_string(node, "clock-output-names", &clk_name);
+> >>> +
+> >>> +     num_parents = of_clk_get_parent_count(node);
+> >>> +     if (num_parents < 1) {
+> >>> +             pr_err("%s: mux-clock %s must have parent(s)\n",
+> >>> +                             __func__, node->name);
+> >>> +             return;
+> >>> +     }
+> >>> +
+> >>> +     parent_names = kzalloc((sizeof(char*) * num_parents),
+> >>> +                     GFP_KERNEL);
+> >>> +
+> >>> +     for (i = 0; i < num_parents; i++)
+> >>> +             parent_names[i] = of_clk_get_parent_name(node, i);
+> >>> +
+> >>> +     reg = of_iomap(node, 0);
+> >>> +     if (!reg) {
+> >>> +             pr_err("%s: no memory mapped for property reg\n", __func__);
+> >>> +             return;
+> >>> +     }
+> >>> +
+> >>> +     if (of_property_read_u32(node, "bit-mask", &mask)) {
+> >>> +             pr_err("%s: missing bit-mask property for %s\n", __func__, node->name);
+> >>> +             return;
+> >>> +     }
+> >>> +
+> >>> +     if (of_property_read_u32(node, "bit-shift", &shift)) {
+> >>> +             shift = __ffs(mask);
+> >>> +             pr_debug("%s: bit-shift property defaults to 0x%x for %s\n",
+> >>> +                             __func__, shift, node->name);
+> >>> +     }
+> >>> +
+> >>> +     if (of_property_read_bool(node, "index-starts-at-one"))
+> >>> +             clk_mux_flags |= CLK_MUX_INDEX_ONE;
+> >>> +
+> >>> +     if (of_property_read_bool(node, "hiword-mask"))
+> >>> +             clk_mux_flags |= CLK_MUX_HIWORD_MASK;
+> >>> +
+> >>> +     clk = clk_register_mux_table(NULL, clk_name, parent_names, num_parents,
+> >>> +                     0, reg, shift, mask, clk_mux_flags, NULL, NULL);
+> >>> +
+> >>> +     if (!IS_ERR(clk))
+> >>> +             of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> >>> +}
+> >>> +EXPORT_SYMBOL_GPL(of_mux_clk_setup);
+> >>> +CLK_OF_DECLARE(mux_clk, "mux-clock", of_mux_clk_setup);
+> >>> +#endif
+> >>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> >>> index 5497739..e019212 100644
+> >>> --- a/include/linux/clk-provider.h
+> >>> +++ b/include/linux/clk-provider.h
+> >>> @@ -350,7 +350,7 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+> >>>              void __iomem *reg, u8 shift, u32 mask,
+> >>>              u8 clk_mux_flags, u32 *table, spinlock_t *lock);
+> >>> 
+> >>> -void of_fixed_factor_clk_setup(struct device_node *node);
+> >>> +void of_mux_clk_setup(struct device_node *node);
+> >>> 
+> >>> /**
+> >>> * struct clk_fixed_factor - fixed multiplier and divider clock
+> >>> @@ -371,10 +371,13 @@ struct clk_fixed_factor {
+> >>> };
+> >>> 
+> >>> extern struct clk_ops clk_fixed_factor_ops;
+> >>> +
+> >>> struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+> >>>              const char *parent_name, unsigned long flags,
+> >>>              unsigned int mult, unsigned int div);
+> >>> 
+> >>> +void of_fixed_factor_clk_setup(struct device_node *node);
+> >>> +
+> >>> /***
+> >>> * struct clk_composite - aggregate clock of mux, divider and gate clocks
+> >>> *
+> >>> -- 
+> >>> 1.8.1.2
+> >>> 
+> >>> --
+> >>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> >>> the body of a message to majordomo at vger.kernel.org
+> >>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >> 
+> >> -- 
+> >> Employee of Qualcomm Innovation Center, Inc.
+> >> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> 
+> -- 
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
