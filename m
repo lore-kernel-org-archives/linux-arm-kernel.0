@@ -1,42 +1,51 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 30 Aug 2013 18:36:37 +0100
-Subject: [PATCH] ARM: dts: vexpress: Add CCI node to TC2 device-tree
-In-Reply-To: <CAOesGMhwqqOuSwVEukpfqM00BV2i=fQRhLUaf-wf-iVGR_mNbg@mail.gmail.com>
-References: <1377872760.3655.48.camel@linaro1.home>
- <20130830161327.GA10045@e102568-lin.cambridge.arm.com>
- <CAOesGMhwqqOuSwVEukpfqM00BV2i=fQRhLUaf-wf-iVGR_mNbg@mail.gmail.com>
-Message-ID: <20130830173636.GB10045@e102568-lin.cambridge.arm.com>
+From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
+Date: Fri, 30 Aug 2013 13:39:21 -0400
+Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <87mwo2vmds.fsf@linaro.org>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
+ <87mwo2vmds.fsf@linaro.org>
+Message-ID: <CANacCWwNp4yg0e_9HPJCGJgQkaYP1n=b6Kjmw9KYjp6HoOY0og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 05:30:17PM +0100, Olof Johansson wrote:
-> On Fri, Aug 30, 2013 at 9:13 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> 
-> > Now that MCPM and CPU idle are heading to mainline, it should get queued asap,
-> > thanks for that, probably as a fix at -rc1, since it is quite late now.
-> 
-> This is not a regression, it's a missing piece of a feature. It's not
-> post-rc1 material.
+On Tue, Aug 27, 2013 at 5:45 PM, Kevin Hilman <khilman@linaro.org> wrote:
+[...]
+>
+> Looking closer at this code as I'm trying to fully get my head around
+> all the IPC, I have some more comments.
+>
+> I think the split between pm33xx.c and the M3 driver is still confusing
+> here.  For example, am33xx_ping_wkup_m3(),
+> am33xx_m3_state_machine_reset() and the guts of am33xx_pm_begin() all
+> belong inside the M3 driver, along with all the wakeup_src stuff, which
+> is info coming from the M3.
+>
+> IOW, the communication with M3 should be abstracted from pm33xx by the
+> M3 driver (or possibly an eventual remoteproc/rpmsg implementation) with
+> a well defined API.  In this implementation, the interface is pretty
+> fuzzy and mixed between pm33xx.c and wkup_m3.c.
+>
+>
 
-It is an incomplete dts, which has been true since the dts file for TC2 has
-been merged in the kernel or better since the CCI bindings got merged in
-the kernel.
+The reason for the current split was to have the M3 driver just do the minimal
+that's needed to talk to get M3 and MPU talking. What made me do it this way
+was to attempt to address a previous comment on keeping options open for folks
+to use M3 for things other than PM stuff. The IPC stuff is how
+implementors of the
+firmware (anything other than the PM one that TI provides) want it to be.
 
-> It's also an indication that nobody actually tested the feature branch
-> before the pull request was sent. Hrmpf.
+The top level idea was to have the users of the firmware (PM in this case)
+decide what functionality they want when talking to M3. They are also free to
+decide the register bitfield layout and other IPC details.
 
-It has been tested and we were aware that the dts in the kernel was missing
-the CCI node, we were not really sure about what to do given the ongoing
-discussions on dts in the kernel and so on and considered that we might
-get the patch in as a fix eventually; we made a mistake, sorry.
+This was also a feeble attempt to keep things extensible for AM437x where
+in addition to the broken mailbox usage there's now a control module bit
+to trigger the interrupt to M3 (what's worse? pick one that you hate more ;)
+The AM437x PM routines could then just register different callbacks that
+are triggered when the M3 interrupts the MPU.
 
-> Shouldn't you be updating some vexpress_defconfig and probably
-> multi_v7_defconfig to at least get some build coverage for this as
-> well, by the way?
-> 
-> I really should hold this off for 3.13, but I'll apply it to the late/
-> branch anyway.
+Hope this clears up some of the confusion.
 
-Thanks,
-Lorenzo
+Regards,
+Vaibhav
