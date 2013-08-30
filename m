@@ -1,56 +1,93 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 30 Aug 2013 12:17:10 +0100
-Subject: [PATCH 16/16] Add config EFI_STUB for ARM to Kconfig
-In-Reply-To: <CAFECyb8m=5kExhusmepcebyUyBN5R9f7Kjah8NzXJ26Pmo=MNA@mail.gmail.com>
-References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <1376090777-20090-17-git-send-email-roy.franz@linaro.org>
- <20130813131857.GE2823@localhost.localdomain>
- <CAFECyb8m=5kExhusmepcebyUyBN5R9f7Kjah8NzXJ26Pmo=MNA@mail.gmail.com>
-Message-ID: <20130830111710.911FC3E102A@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 30 Aug 2013 12:24:48 +0100
+Subject: [Patch v3 3/3] drivers: CCI: add ARM CCI PMU support
+In-Reply-To: <1377183748-5717-4-git-send-email-punit.agrawal@arm.com>
+References: <1377183748-5717-1-git-send-email-punit.agrawal@arm.com>
+ <1377183748-5717-4-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20130830112448.GC12160@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Aug 2013 10:37:13 -0700, Roy Franz <roy.franz@linaro.org> wrote:
-> On Tue, Aug 13, 2013 at 6:18 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> > On Fri, Aug 09, 2013 at 04:26:17PM -0700, Roy Franz wrote:
-> >> Signed-off-by: Roy Franz <roy.franz@linaro.org>
-> >> ---
-> >>  arch/arm/Kconfig |   11 +++++++++++
-> >>  1 file changed, 11 insertions(+)
-> >>
-> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> >> index 43594d5..8607d03 100644
-> >> --- a/arch/arm/Kconfig
-> >> +++ b/arch/arm/Kconfig
-> >> @@ -1805,6 +1805,17 @@ config UACCESS_WITH_MEMCPY
-> >>         However, if the CPU data cache is using a write-allocate mode,
-> >>         this option is unlikely to provide any performance gain.
-> >>
-> >> +config EFI_STUB
-> >> +     bool "EFI stub support"
-> >> +     depends on EFI
-> >
-> > && !CPU_BIG_ENDIAN, in case you didn't get around to that.
-> >
-> > Sooner or later, someone may try to fix that, so there should be a
-> > comment somewhere explaining what is broken for BE.
-> >
-> > Either in efi-stub.c or in the commit message accompanying this patch, I
-> > guess.
-> >
-> EFI will be !CPU_BIG_ENDIAN, so we will get the dependency
-> transitively through EFI.
-> That said, I think it may be better to have both be explicitly
-> !CPU_BIG_ENDIAN, as even
-> though the underlying reasons are the same (EFI services calls being
-> little endian), both
-> the stub and runtime services would need to be fixed to enable the
-> stub to run in BE mode.
-> I'll make this explicit in the stub Kconfig, and add a comment by the
-> PE/COFF magic number
-> regarding the LE requirement.
+Hi Punit,
 
-Actually, not true! Steve McIntyre is currently doing some of the BE
-porting work on TC2 running UEFI. Eventually he will need this.
+On Thu, Aug 22, 2013 at 04:02:28PM +0100, Punit Agrawal wrote:
+> Extend the existing CCI driver to support the PMU by registering a perf
+> backend for it.
+> 
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Cc: Dave Martin <dave.martin@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/bus/arm-cci.c |  628 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 628 insertions(+)
 
-g.
+[...]
+
+> +static int cci_platform_probe(struct platform_device *pdev)
+> +{
+> +       if (!cci_probed())
+> +               return -ENODEV;
+> +
+> +       return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+> +}
+
+cci_probed is marked as __init, so you have a section mismatch here:
+
+  arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO: return_address should use unwind tables" [-Wcpp]
+  WARNING: drivers/bus/built-in.o(.text+0xb48): Section mismatch in reference from the function cci_platform_probe() to the function .init.text:cci_probed()
+  The function cci_platform_probe() references
+  the function __init cci_probed().
+  This is often because cci_platform_probe lacks a __init
+  annotation or the annotation of cci_probed is wrong.
+
+Unfortunately, resolving this requires removing a bunch of annotations (see
+patch below), so you might want to reconsider how the probe checking is
+handled (by moving the cci_init_status check out of cci_init).
+
+Will
+
+--->8
+
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index ddc36f6..4816759 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -711,7 +711,7 @@ int cci_ace_get_port(struct device_node *dn)
+ }
+ EXPORT_SYMBOL_GPL(cci_ace_get_port);
+ 
+-static void __init cci_ace_init_ports(void)
++static void cci_ace_init_ports(void)
+ {
+        int port, ac, cpu;
+        u64 hwid;
+@@ -991,7 +991,7 @@ static const struct of_device_id arm_cci_ctrl_if_matches[] = {
+        {},
+ };
+ 
+-static int __init cci_probe(void)
++static int cci_probe(void)
+ {
+        struct cci_nb_ports const *cci_config;
+        int ret, i, nb_ace = 0, nb_ace_lite = 0;
+@@ -1095,7 +1095,7 @@ memalloc_err:
+ static int cci_init_status = -EAGAIN;
+ static DEFINE_MUTEX(cci_probing);
+ 
+-static int __init cci_init(void)
++static int cci_init(void)
+ {
+        if (cci_init_status != -EAGAIN)
+                return cci_init_status;
+@@ -1149,7 +1149,7 @@ static int __init cci_platform_init(void)
+  * has been initialized, if not it calls the init function that probes
+  * the driver and updates the return value.
+  */
+-bool __init cci_probed(void)
++bool cci_probed(void)
+ {
+        return cci_init() == 0;
+ }
