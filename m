@@ -1,48 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 30 Aug 2013 15:37:36 +0100
-Subject: [Patch v3 3/3] drivers: CCI: add ARM CCI PMU support
-In-Reply-To: <5220AD5B.2090300@arm.com>
-References: <1377183748-5717-1-git-send-email-punit.agrawal@arm.com>
- <1377183748-5717-4-git-send-email-punit.agrawal@arm.com>
- <20130830112448.GC12160@mudshark.cambridge.arm.com>
- <5220AD5B.2090300@arm.com>
-Message-ID: <20130830143736.GI12160@mudshark.cambridge.arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 30 Aug 2013 07:39:32 -0700
+Subject: [PATCH v2 3/3] ARM: OMAP4+: Remove static iotable mappings for
+ SRAM
+In-Reply-To: <5220658A.2030806@ti.com> (Rajendra Nayak's message of "Fri, 30
+ Aug 2013 14:57:38 +0530")
+References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
+ <1377775391-13103-4-git-send-email-rnayak@ti.com>
+ <871u5c2z3a.fsf@linaro.org> <5220658A.2030806@ti.com>
+Message-ID: <87hae7s0nv.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 03:34:03PM +0100, Punit Agrawal wrote:
-> On 30/08/13 12:24, Will Deacon wrote:
-> > cci_probed is marked as __init, so you have a section mismatch here:
-> >
-> >    arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO: return_address should use unwind tables" [-Wcpp]
-> >    WARNING: drivers/bus/built-in.o(.text+0xb48): Section mismatch in reference from the function cci_platform_probe() to the function .init.text:cci_probed()
-> >    The function cci_platform_probe() references
-> >    the function __init cci_probed().
-> >    This is often because cci_platform_probe lacks a __init
-> >    annotation or the annotation of cci_probed is wrong.
-> >
-> 
-> Good catch. Missed this one.
-> 
-> > Unfortunately, resolving this requires removing a bunch of annotations (see
-> > patch below), so you might want to reconsider how the probe checking is
-> > handled (by moving the cci_init_status check out of cci_init).
-> >
-> 
-> In cci_platform_probe, cci_probed is called to check whether the CCI has 
-> been initialised, and also to initialise it if required.
-> 
-> Even if the check for cci_init_status is moved out, I'll still need to 
-> call cci_init which will again cause a section mis-match.
+Rajendra Nayak <rnayak@ti.com> writes:
 
-Ok.
+> On Thursday 29 August 2013 10:50 PM, Kevin Hilman wrote:
+>> Rajendra Nayak <rnayak@ti.com> writes:
+>> 
+>>> In order to handle errata I688, a page of sram was reserved by doing a
+>>> static iotable map. Now that we use gen_pool to manage sram, we can
+>>> completely remove all of these static mappings and use gen_pool_alloc()
+>>> to get the one page of sram space needed to implement errata I688.
+>>>
+>>> Suggested-by: Sekhar Nori <nsekhar@ti.com>
+>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> 
+>> [...]
+>> 
+>>> @@ -71,6 +72,21 @@ void omap_bus_sync(void)
+>>>  }
+>>>  EXPORT_SYMBOL(omap_bus_sync);
+>>>  
+>>> +static int __init omap4_sram_init(void)
+>>> +{
+>>> +	struct device_node *np;
+>>> +	struct gen_pool *sram_pool;
+>>> +
+>>> +	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
+>>> +	if (!np)
+>>> +		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
+>>> +			 __func__);
+>>> +	sram_pool = of_get_named_gen_pool(np, "sram", 0);
+>> 
+>> I haven't actually tested this, but if there is no 'sram' property defined...
+>>   
+>>> +	sram_sync = (void *)gen_pool_alloc(sram_pool, PAGE_SIZE);
+>> 
+>> ... does this still behave properly?
+>
+> I guess not :(
+> of_get_named_gen_pool() ends up returning NULL, but passing NULL to gen_pool_alloc()
+> crashes. Will fix with the additional check for non-NULL sram_pool, thanks.
 
-> I think removing the annotations is the way to go. Is it OK to fold your 
-> patch into the CCI PMU patch, or you prefer to keep it separate?
+OK, that's what I suspected.  Thanks for checking/testing.
 
-I can just merge it in when I take your patches into my tree (which I'll do
-now...).
-
-Cheers,
-
-Will
+Kevin
