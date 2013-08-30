@@ -1,121 +1,83 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 30 Aug 2013 14:01:31 +0100
-Subject: [PATCH 04/16] Add minimum address parameter to efi_low_alloc()
-In-Reply-To: <1376090777-20090-5-git-send-email-roy.franz@linaro.org>
-References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <1376090777-20090-5-git-send-email-roy.franz@linaro.org>
-Message-ID: <20130830130131.D7CE63E102A@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 30 Aug 2013 14:02:38 +0100
+Subject: [PATCH] ARM64: KVM: Fix coherent_icache_guest_page() for host
+ with external L3-cache.
+In-Reply-To: <CAAhSdy0Hm1k+mWGGxUOzAA=5yVGNOERfo=36jcE1cvkUM=xtVg@mail.gmail.com>
+References: <5935339137684ecf90dd484cc5739548@www.loen.fr>
+ <20130815165344.GA3853@cbox>
+ <CAAhSdy0mMAkziHQOYBw1yT1-h2N6vpQQdn_f25BEJpv2qYOHxA@mail.gmail.com>
+ <CAAhSdy3W+q4yk992ajnHBb23SVDqmfe_4BiGfH9XTYkwfVmC-A@mail.gmail.com>
+ <20130816171912.GB20246@cbox>
+ <CAAhSdy2bk6Ou=326cYJW2wKvm9pffbRRmO2ABFwF9dmqwWdKqQ@mail.gmail.com>
+ <20130816175034.GE20246@cbox>
+ <CAAhSdy3B5JTcd7==u_QzS3V5k7pYkymtiLa7X=yZH+=eSBAw8w@mail.gmail.com>
+ <20130830095215.GC62188@MacBook-Pro.local>
+ <CAAhSdy0Hm1k+mWGGxUOzAA=5yVGNOERfo=36jcE1cvkUM=xtVg@mail.gmail.com>
+Message-ID: <20130830130238.GB4650@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  9 Aug 2013 16:26:05 -0700, Roy Franz <roy.franz@linaro.org> wrote:
-> This allows allocations to be made low in memory while
-> avoiding allocations at the base of memory.
-
-Your commit message should include /why/ the change is needed. From the
-above I understand what the patch does, but I don't understand why it is
-necessary.
-
-The patch looks fine to me, but it would be worth investigating merging
-alloc_low and alloc_high. It looks like they both do pretty close to the
-same calculations. A single core function could do both, could have both
-minimum and maximum constraints, and could have a flag to determine if
-low or high addresses should be preferred.
-
-g.
-
-Reviewed-by: Grant Likely <grant.likely@linaro.org>
-
+On Fri, Aug 30, 2013 at 11:44:30AM +0100, Anup Patel wrote:
+> On Fri, Aug 30, 2013 at 3:22 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Fri, Aug 16, 2013 at 07:11:51PM +0100, Anup Patel wrote:
+> >> On Fri, Aug 16, 2013 at 11:20 PM, Christoffer Dall
+> >> <christoffer.dall@linaro.org> wrote:
+> >> > On Fri, Aug 16, 2013 at 11:12:08PM +0530, Anup Patel wrote:
+> >> >> Discussion here is about getting KVM ARM64 working in-presence
+> >> >> of an external L3-cache (i.e. not part of CPU). Before starting a VCPU
+> >> >> user-space typically loads images to guest RAM so, in-presence of
+> >> >> huge L3-cache (few MBs). When the VCPU starts running some of the
+> >> >> contents guest RAM will be still in L3-cache and VCPU runs with
+> >> >> MMU off (i.e. cacheing off) hence VCPU will bypass L3-cache and
+> >> >> see incorrect contents. To solve this problem we need to flush the
+> >> >> guest RAM contents before they are accessed by first time by VCPU.
+> >> >>
+> >> > ok, I'm with you that far.
+> >> >
+> >> > But is it also not true that we need to decide between:
+> >> >
+> >> >   A.1: Flush the entire guest RAM before running the VCPU
+> >> >   A.2: Flush the pages as we fault them in
+> >>
+> >> Yes, thats the decision we have to make.
+> >>
+> >> >
+> >> > And (independently):
+> >> >
+> >> >   B.1: Use __flush_dcache_range
+> >> >   B.2: Use something else + outer cache framework for arm64
+> >>
+> >> This would be __flush_dcache_all() + outer cache flush all.
+> >
+> > We need to be careful here since the __flush_dcache_all() operation uses
+> > cache maintenance by set/way and these are *local* to a CPU (IOW not
+> > broadcast). Do you have any guarantee that dirty cache lines don't
+> > migrate between CPUs and __flush_dcache_all() wouldn't miss them?
+> > Architecturally we don't, so this is not a safe operation that would
+> > guarantee L1 cache flushing (we probably need to revisit some of the
+> > __flush_dcache_all() calls in KVM, I haven't looked into this).
+> >
+> > So I think we are left to the range operation where the DC ops to PoC
+> > would be enough for your L3.
 > 
-> Signed-off-by: Roy Franz <roy.franz@linaro.org>
-> ---
->  arch/x86/boot/compressed/eboot.c       |   11 ++++++-----
->  drivers/firmware/efi/efi-stub-helper.c |    7 +++++--
->  2 files changed, 11 insertions(+), 7 deletions(-)
+> If __flush_dcache_all() is *local" to a CPU then I guess DC ops to PoC
+> by range would be the only option.
+
+Yes. In the (upcoming) ARM ARMv8 there is a clear note that set/way
+operations to flush the whole cache must not be used for the maintenance
+of large buffer but only during power-down/power-up code sequences.
+
+> > An outer cache flush all is probably only needed for cpuidle/suspend
+> > (the booting part should be handled by the boot loader).
 > 
-> diff --git a/arch/x86/boot/compressed/eboot.c b/arch/x86/boot/compressed/eboot.c
-> index 2a4430a..f44ef2f 100644
-> --- a/arch/x86/boot/compressed/eboot.c
-> +++ b/arch/x86/boot/compressed/eboot.c
-> @@ -458,7 +458,7 @@ struct boot_params *make_boot_params(void *handle, efi_system_table_t *_table)
->  	}
->  
->  	status = efi_low_alloc(sys_table, 0x4000, 1,
-> -			       (unsigned long *)&boot_params);
-> +			       (unsigned long *)&boot_params, 0);
->  	if (status != EFI_SUCCESS) {
->  		efi_printk(sys_table, "Failed to alloc lowmem for boot params\n");
->  		return NULL;
-> @@ -505,7 +505,7 @@ struct boot_params *make_boot_params(void *handle, efi_system_table_t *_table)
->  			options_size++;	/* NUL termination */
->  
->  			status = efi_low_alloc(sys_table, options_size, 1,
-> -					   &cmdline);
-> +					   &cmdline, 0);
->  			if (status != EFI_SUCCESS) {
->  				efi_printk(sys_table, "Failed to alloc mem for cmdline\n");
->  				goto fail;
-> @@ -563,7 +563,8 @@ static efi_status_t exit_boot(struct boot_params *boot_params,
->  again:
->  	size += sizeof(*mem_map) * 2;
->  	_size = size;
-> -	status = efi_low_alloc(sys_table, size, 1, (unsigned long *)&mem_map);
-> +	status = efi_low_alloc(sys_table, size, 1,
-> +			       (unsigned long *)&mem_map, 0);
->  	if (status != EFI_SUCCESS)
->  		return status;
->  
-> @@ -697,7 +698,7 @@ static efi_status_t relocate_kernel(struct setup_header *hdr)
->  				nr_pages, &start);
->  	if (status != EFI_SUCCESS) {
->  		status = efi_low_alloc(sys_table, hdr->init_size,
-> -				   hdr->kernel_alignment, &start);
-> +				   hdr->kernel_alignment, &start, 0);
->  		if (status != EFI_SUCCESS)
->  			efi_printk(sys_table, "Failed to alloc mem for kernel\n");
->  	}
-> @@ -745,7 +746,7 @@ struct boot_params *efi_main(void *handle, efi_system_table_t *_table,
->  
->  	gdt->size = 0x800;
->  	status = efi_low_alloc(sys_table, gdt->size, 8,
-> -			   (unsigned long *)&gdt->address);
-> +			   (unsigned long *)&gdt->address, 0);
->  	if (status != EFI_SUCCESS) {
->  		efi_printk(sys_table, "Failed to alloc mem for gdt\n");
->  		goto fail;
-> diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
-> index 0218d535..40cd16e 100644
-> --- a/drivers/firmware/efi/efi-stub-helper.c
-> +++ b/drivers/firmware/efi/efi-stub-helper.c
-> @@ -163,11 +163,11 @@ fail:
->  }
->  
->  /*
-> - * Allocate at the lowest possible address.
-> + * Allocate at the lowest possible address, that is not below min.
->   */
->  static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
->  			      unsigned long size, unsigned long align,
-> -			      unsigned long *addr)
-> +			      unsigned long *addr, unsigned long min)
->  {
->  	unsigned long map_size, desc_size;
->  	efi_memory_desc_t *map;
-> @@ -204,6 +204,9 @@ static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
->  		if (start == 0x0)
->  			start += 8;
->  
-> +		if (start < min)
-> +			start = min;
-> +
->  		start = round_up(start, align);
->  		if ((start + size) > end)
->  			continue;
-> -- 
-> 1.7.10.4
+> Yes, cpuidle/suspend would definitely require outer cache maintenance.
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> For KVM, we can avoid flushing d-cache to PoC every time in
+> coherent_icache_guest_page() by only doing it when Guest MMU is
+> turned-off. This may reduce the performance penalty.
+
+That's for the KVM guys to decide ;)
+
+-- 
+Catalin
