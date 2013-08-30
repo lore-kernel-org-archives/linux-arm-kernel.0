@@ -1,68 +1,115 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 30 Aug 2013 14:18:38 -0700
-Subject: [PATCHv3 8/9] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <CANacCWwNp4yg0e_9HPJCGJgQkaYP1n=b6Kjmw9KYjp6HoOY0og@mail.gmail.com>
- (Vaibhav Bedia's message of "Fri, 30 Aug 2013 13:39:21 -0400")
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <1375811376-49985-9-git-send-email-d-gerlach@ti.com>
- <87mwo2vmds.fsf@linaro.org>
- <CANacCWwNp4yg0e_9HPJCGJgQkaYP1n=b6Kjmw9KYjp6HoOY0og@mail.gmail.com>
-Message-ID: <87ioymop1t.fsf@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 30 Aug 2013 15:37:46 -0600
+Subject: [PATCH v4 3/5] clk: dt: binding for basic multiplexer clock
+In-Reply-To: <20130830203334.10934.10011@quantum>
+References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
+ <1377150793-27864-4-git-send-email-mturquette@linaro.org>
+ <2A930389-012E-45C3-93EB-6B4A41DB2EF5@codeaurora.org>
+ <20130829011425.8231.78802@quantum>
+ <39BAF1F8-41AD-4667-BF76-22BDF709415A@codeaurora.org>
+ <20130830203334.10934.10011@quantum>
+Message-ID: <522110AA.7040700@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav Bedia <vaibhav.bedia@gmail.com> writes:
-
-> On Tue, Aug 27, 2013 at 5:45 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> [...]
+On 08/30/2013 02:33 PM, Mike Turquette wrote:
+> Quoting Kumar Gala (2013-08-30 13:02:42)
+>> On Aug 28, 2013, at 8:14 PM, Mike Turquette wrote:
 >>
->> Looking closer at this code as I'm trying to fully get my head around
->> all the IPC, I have some more comments.
+>>> Quoting Kumar Gala (2013-08-28 08:50:10)
+>>>> On Aug 22, 2013, at 12:53 AM, Mike Turquette wrote:
+>>>>
+>>>>> Device Tree binding for the basic clock multiplexer, plus the setup
+>>>>> function to register the clock.  Based on the existing fixed-clock
+>>>>> binding.
+>>>>>
+>>>>> Includes minor beautification of clk-provider.h where some whitespace is
+>>>>> added and of_fixed_factor_clock_setup is relocated to maintain a
+>>>>> consistent style.
+>>>>>
+>>>>> Tero Kristo contributed helpful bug fixes to this patch.
+>>>>>
+>>>>> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+>>>>> Tested-by: Heiko Stuebner <heiko@sntech.de>
+>>>>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+>>>>> ---
+>>>>> Changes since v3:
+>>>>> * replaced underscores with dashes in DT property names
+>>>>> * bail from of clock setup function early if of_iomap fails
+>>>>> * removed unecessary explict cast
+>>>>>
+>>>>> .../devicetree/bindings/clock/mux-clock.txt        | 79 ++++++++++++++++++++++
+>>>>> drivers/clk/clk-mux.c                              | 68 ++++++++++++++++++-
+>>>>> include/linux/clk-provider.h                       |  5 +-
+>>>>> 3 files changed, 150 insertions(+), 2 deletions(-)
+>>>>> create mode 100644 Documentation/devicetree/bindings/clock/mux-clock.txt
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/clock/mux-clock.txt b/Documentation/devicetree/bindings/clock/mux-clock.txt
+>>>>> new file mode 100644
+>>>>> index 0000000..21eb3b3
+>>>>> --- /dev/null
+>>>>> +++ b/Documentation/devicetree/bindings/clock/mux-clock.txt
+>>>>> @@ -0,0 +1,79 @@
+>>>>> +Binding for simple mux clock.
+>>>>> +
+>>>>> +This binding uses the common clock binding[1].  It assumes a
+>>>>> +register-mapped multiplexer with multiple input clock signals or
+>>>>> +parents, one of which can be selected as output.  This clock does not
+>>>>> +gate or adjust the parent rate via a divider or multiplier.
+>>>>> +
+>>>>> +By default the "clocks" property lists the parents in the same order
+>>>>> +as they are programmed into the regster.  E.g:
+>>>>> +
+>>>>> +     clocks = <&foo_clock>, <&bar_clock>, <&baz_clock>;
+>>>>> +
+>>>>> +results in programming the register as follows:
+>>>>> +
+>>>>> +register value               selected parent clock
+>>>>> +0                    foo_clock
+>>>>> +1                    bar_clock
+>>>>> +2                    baz_clock
+>>>>> +
+>>>>> +Some clock controller IPs do not allow a value of zero to be programmed
+>>>>> +into the register, instead indexing begins at 1.  The optional property
+>>>>> +"index-starts-at-one" modified the scheme as follows:
+>>>>> +
+>>>>> +register value               selected clock parent
+>>>>> +1                    foo_clock
+>>>>> +2                    bar_clock
+>>>>> +3                    baz_clock
+>>>>> +
+>>>>> +Additionally an optional table of bit and parent pairs may be supplied
+>>>>> +like so:
+>>>>> +
+>>>>> +     table = <&foo_clock 0x0>, <&bar_clock, 0x2>, <&baz_clock, 0x4>;
+>>>>> +
+>>>>
+>>>> I think this is going way too far for what should be in a device tree.  Why should this not just be encoded in tables in the code?
+>>>
+>>> To reduce kernel data bloat.
 >>
->> I think the split between pm33xx.c and the M3 driver is still confusing
->> here.  For example, am33xx_ping_wkup_m3(),
->> am33xx_m3_state_machine_reset() and the guts of am33xx_pm_begin() all
->> belong inside the M3 driver, along with all the wakeup_src stuff, which
->> is info coming from the M3.
->>
->> IOW, the communication with M3 should be abstracted from pm33xx by the
->> M3 driver (or possibly an eventual remoteproc/rpmsg implementation) with
->> a well defined API.  In this implementation, the interface is pretty
->> fuzzy and mixed between pm33xx.c and wkup_m3.c.
->>
->>
->
-> The reason for the current split was to have the M3 driver just do the minimal
-> that's needed to talk to get M3 and MPU talking. What made me do it this way
-> was to attempt to address a previous comment on keeping options open for folks
-> to use M3 for things other than PM stuff. The IPC stuff is how
-> implementors of the
-> firmware (anything other than the PM one that TI provides) want it to be.
+>> Why is this really an issue, for systems that are concerned about kernel size, they are going to be built targeting the HW platform of choice, for one's like a server, the bloat isn't going to be significant, and if so we can look at mechanisms like __init section that would free up after boot.
+> 
+> s/bloat/churn/
+> 
+> The clock _data_ seems to always have some churn to it. Moving it out to
+> DT reduces that churn from Linux. My concern above is not about kernel
+> data size.
 
-IMO, there should actually be 3 levels. the SoC PM implementation
-(pm33xx.c), the M3 driver where the protocol, state-machine, etc. are
-handled, and the messaging layer.  In the current proposal, the last 2
-are combined, but I'd really like to see a generalized messaging layer
-that everyone else using an M3 coprocessor might use as well.  As
-mentioned already, I think that should be rpmsg, but that still needs
-some exploration.
+That sounds like the opposite of what we should be doing.
 
-> The top level idea was to have the users of the firmware (PM in this case)
-> decide what functionality they want when talking to M3. They are also free to
-> decide the register bitfield layout and other IPC details.
->
-> This was also a feeble attempt to keep things extensible for AM437x where
-> in addition to the broken mailbox usage there's now a control module bit
-> to trigger the interrupt to M3 (what's worse? pick one that you hate more ;)
+It's fine for kernel code/data to change; that's a natural part of
+development. Obviously, we should minimize churn, through thorough
+review, domain knowledge, etc.
 
-Sounds like AM43xx is better.  If you have a control module bit to
-trigger an interrupt, why do you need the mailbox at all?
+Saying that we must shove the data out into DT because it changes
+pre-supposes that we should be changing the DT!
 
-> The AM437x PM routines could then just register different callbacks that
-> are triggered when the M3 interrupts the MPU.
->
-> Hope this clears up some of the confusion.
+We should strive to write the DT for a particular piece of HW once, and
+have it be a complete and accurate description of the HW. That's hard
+enough to do with small amounts of simple data. Deliberately pushing
+data that's known to be hard to get right and churn a lot into DT seems
+to be destined to make most DTs contain incorrect data.
 
-Thanks,
-
-Kevin
+DT-as-an-ABI works both ways; the binding definition needs to stay
+constant /and/ the data in any particular DT needs to be accurate too.
