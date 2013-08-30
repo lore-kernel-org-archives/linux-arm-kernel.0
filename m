@@ -1,96 +1,42 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 30 Aug 2013 17:13:28 +0100
-Subject: [PATCH] ARM: dts: vexpress: Add CCI node to TC2 device-tree
-In-Reply-To: <1377872760.3655.48.camel@linaro1.home>
-References: <1377872760.3655.48.camel@linaro1.home>
-Message-ID: <20130830161327.GA10045@e102568-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 30 Aug 2013 17:10:05 +0100
+Subject: [alsa-devel] [PATCH RFC 10/13] ASoC: kirkwood-t5325: add DAPM
+ links between codec and cpu DAI
+In-Reply-To: <20130830112705.GU6617@n2100.arm.linux.org.uk>
+References: <20130820185019.GP30073@sirena.org.uk>
+ <20130820201824.GA17845@n2100.arm.linux.org.uk>
+ <1377199370.2618.99.camel@loki>
+ <20130822201658.GK6617@n2100.arm.linux.org.uk>
+ <1377259994.2444.41.camel@loki>
+ <20130823125803.GN6617@n2100.arm.linux.org.uk>
+ <20130823165800.GB30617@sirena.org.uk>
+ <20130823174505.GQ6617@n2100.arm.linux.org.uk>
+ <CAOyKLY_mQzPxHAg2RFSMY89uxp-0-OAf6fC=gVY0i+pQhv4iHQ@mail.gmail.com>
+ <20130830112705.GU6617@n2100.arm.linux.org.uk>
+Message-ID: <20130830161005.GZ6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 03:26:00PM +0100, Jon Medhurst (Tixy) wrote:
-> The Versatile Express V2P-CA15_A7 (aka TC2) has a CCI-400 which is
-> needed to get Multi-Cluster Power Management (MCPM) working.
-> 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> ---
-> 
-> I was unsure if the devicetree list should be cc'd when making use of
-> already agreed and documented bindings, so I erred on the side of
-> caution and added it. Please say if this is unnecessary noise, or is
-> expected for all device-tree changes, thanks.
-> 
->  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts |   25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-> index d2803be..12bd4ea 100644
-> --- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-> @@ -37,30 +37,35 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a15";
->  			reg = <0>;
-> +			cci-control-port = <&cci_control1>;
->  		};
->  
->  		cpu1: cpu at 1 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a15";
->  			reg = <1>;
-> +			cci-control-port = <&cci_control1>;
->  		};
->  
->  		cpu2: cpu at 2 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a7";
->  			reg = <0x100>;
-> +			cci-control-port = <&cci_control2>;
->  		};
->  
->  		cpu3: cpu at 3 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a7";
->  			reg = <0x101>;
-> +			cci-control-port = <&cci_control2>;
->  		};
->  
->  		cpu4: cpu at 4 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a7";
->  			reg = <0x102>;
-> +			cci-control-port = <&cci_control2>;
->  		};
->  	};
->  
-> @@ -104,6 +109,26 @@
->  		interrupts = <1 9 0xf04>;
->  	};
->  
-> +	cci at 2c090000 {
-> +		compatible = "arm,cci-400";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		reg = <0 0x2c090000 0 0x1000>;
-> +		ranges = <0x0 0x0 0x2c090000 0x10000>;
-> +
-> +		cci_control1: slave-if at 4000 {
-> +			compatible = "arm,cci-400-ctrl-if";
-> +			interface-type = "ace";
-> +			reg = <0x4000 0x1000>;
-> +		};
-> +
-> +		cci_control2: slave-if at 5000 {
-> +			compatible = "arm,cci-400-ctrl-if";
-> +			interface-type = "ace";
-> +			reg = <0x5000 0x1000>;
-> +		};
-> +	};
-> +
->  	memory-controller at 7ffd0000 {
->  		compatible = "arm,pl354", "arm,primecell";
->  		reg = <0 0x7ffd0000 0 0x1000>;
+On Fri, Aug 30, 2013 at 12:27:05PM +0100, Russell King - ARM Linux wrote:
+> 1. The combining of the CPU and platform code(s) under one device is
+>    absolutely no problem for ASoC, there's multiple drivers which do this
+>    already.  While this is a true statement, it creates the bug at the
+>    heart of this thread - and the bug _occuring_ has nothing to do with
+>    DPCM.  The bug is caused solely by the combining of the two components.
 
-Now that MCPM and CPU idle are heading to mainline, it should get queued asap,
-thanks for that, probably as a fix at -rc1, since it is quite late now.
+Right, having gone back and looked at this in-depth again, and tried some
+experiments, I no longer need this problem fixed for the non-DPCM code
+to work, but I do still need to do this:
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> 4. By adding the AIFs and routes, I'm bypassing/abusing the ASoC DAI core.
+>    If this were to be the case, why does your DPCM driver set them up.
+>    Therefore, my conclusion is that Mark was wrong about this too.  Yes,
+>    it may be that for the time being it's not that appealing, because as
+>    DPCM doesn't work in mainline, I'm unable to separate the DAI link
+>    between the CPU and the Codec.  That doesn't make the creation of
+>    the routes any more wrong when they're the exact same routes which
+>    need to be created for DPCM - especially when they're relied upon for
+>    there to be any audio output what so ever from the driver.
+
+so I can detect which output paths to enable.  I will be posting updated
+patches shortly, which will just be those which Mark hasn't taken yet.
