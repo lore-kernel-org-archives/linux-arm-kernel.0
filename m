@@ -1,34 +1,18 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Sat, 31 Aug 2013 19:09:44 +0530
-Subject: Query about include/linux/mailbox.h
-In-Reply-To: <5221D15B.4050507@yahoo.com.au>
-References: <522177C4.8060205@yahoo.com.au>
- <CABb+yY3wX2=1zh-F81YhhhgM6m+m4+fpVoKDn94m-febAhZGRg@mail.gmail.com>
- <5221D15B.4050507@yahoo.com.au>
-Message-ID: <CABb+yY0FRYgGSmfSXG+vWcsK0aqg_BwULtH7xY6fqFhLF_i5OA@mail.gmail.com>
+From: andi@firstfloor.org (Andi Kleen)
+Date: Sat, 31 Aug 2013 16:31:23 +0200
+Subject: [PATCH] checkpatch:  Add test for positional misuse of section
+ specifiers like __initdata
+In-Reply-To: <1377655732.3619.19.camel@joe-AO722>
+References: <1377655732.3619.19.camel@joe-AO722>
+Message-ID: <20130831143123.GC19750@two.firstfloor.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 31, 2013 at 4:49 PM, Craig McGeachie <slapdau@yahoo.com.au> wrote:
-> On 08/31/2013 05:33 PM, Jassi Brar wrote:
->>
->> It wasn't dropped.
->> Just the development was taken offline by the three of us I (for
->> Fujitsu), Suman Anna (for TI) and Loic (for STE).  Later we were
->> joined by LF.Tan (for Intel). Please join us.
->>   https://github.com/sumananna/mailbox/commits/jassiv3-3.10-omap should
->> be good to base on.
->
->
-> So, this would be a good place to start?
->
-> https://github.com/sumananna/mailbox/commit/635c24eba19f67d1eb1ef7e7447f319c850b01e5#drivers/mailbox
->
-> See if I can get my head around that framework and what it does, and try
-> fitting the BCM2835 mailbox into it?
->
-Yes. If you point me to your mailbox client drivers, I could also give
-it a look to see if we need some changes.
+> A similar patch was suggested by Andi Kleen
+> https://lkml.org/lkml/2013/8/5/648
 
-Regards
-Jassi
+My patch checked for const <-> initdata / non const initconst  mistakes.
+
+I don't think your patch does that?
+
+-Andi
