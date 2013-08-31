@@ -1,30 +1,66 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Sat, 31 Aug 2013 11:03:29 +0530
-Subject: Query about include/linux/mailbox.h
-In-Reply-To: <522177C4.8060205@yahoo.com.au>
-References: <522177C4.8060205@yahoo.com.au>
-Message-ID: <CABb+yY3wX2=1zh-F81YhhhgM6m+m4+fpVoKDn94m-febAhZGRg@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sat, 31 Aug 2013 08:29:37 +0200
+Subject: [PATCH v2 4/7] ARM: dts: imx27 pinctrl
+In-Reply-To: <20130820071411.GI31036@pengutronix.de>
+References: <1376921234-26682-1-git-send-email-mpa@pengutronix.de>
+ <1376921234-26682-5-git-send-email-mpa@pengutronix.de>
+ <20130820071411.GI31036@pengutronix.de>
+Message-ID: <20130831062937.GU20071@s25.your-server.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 31, 2013 at 10:27 AM, Craig McGeachie <slapdau@yahoo.com.au> wrote:
->
-> Hello,
->
-> At the end of all this, my question is should I put the BCM2835 mailbox driver in drivers somewhere, and try to make use of include/linux/mailbox.h, or should go with the view that mailbox drivers are inherently machine specific, have no common driver framework, and belongs in arch/arm/mach-bcm2835?
->
-> The background to this is that I'm trying to help bring Raspberry Pi support into the mainline kernel. Lubomir Rintel coded a mailbox driver [1] that I liked the look off and want to fix up and push upstream. Stephen Warren suggested that Lubmir's patch had the benefit of using a new mailbox sub-system [2] and that I should have a look at that.
->
-> I've looked at include/linux/mailbox.h, and it only has 3 function declarations, which are all specific to the PL320.  Unless there is something I've missed, then there is no mailbox sub-system to speak of.  Just a header file that will quickly a dependency nightmare.
->
-> I found a patch submission series from Jassi Brar [3] that looks like the start of an actual mailbox framework, but there is no indication of it in the current kernel source.  I assume it was dropped for some reason.
->
-It wasn't dropped.
-Just the development was taken offline by the three of us I (for
-Fujitsu), Suman Anna (for TI) and Loic (for STE).  Later we were
-joined by LF.Tan (for Intel). Please join us.
- https://github.com/sumananna/mailbox/commits/jassiv3-3.10-omap should
-be good to base on.
+Hi Sascha,
+
+On Tue, Aug 20, 2013 at 09:14:11AM +0200, Sascha Hauer wrote:
+> On Mon, Aug 19, 2013 at 04:07:11PM +0200, Markus Pargmann wrote:
+> > Pinctrl driver node and pin group definitions for other driver nodes.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> > +					pinctrl_uart_1: uart-1 {
+> > +						fsl,pins = <
+> > +							MX27_PAD_UART1_TXD__UART1_TXD 0x0
+> > +							MX27_PAD_UART1_RXD__UART1_RXD 0x0
+> > +							MX27_PAD_UART1_CTS__UART1_CTS 0x0
+> > +							MX27_PAD_UART1_RTS__UART1_RTS 0x0
+> > +						>;
+> > +					};
+> 
+> The above either misses a group number or an uart number. We need
+> pinctrl_uart<uartno>_<groupno>
+
+Fixed.
+
+> 
+> Also this doesn't scale very good. For boards without RTS/CTS we would have
+> to add a completely different group. For the FEC I've seen different
+> groups with a dozen pins each which differ in only a single pin.
+> 
+> I therefore suggest (and Shawn acked the general idea already) to
+> do this:
+> 
+> 	pinctrl_uart1_1: uart1-1 {
+> 		fsl,pins = <
+> 			MX27_PAD_UART1_TXD__UART1_TXD 0x0
+> 			MX27_PAD_UART1_RXD__UART1_RXD 0x0
+> 		>;
+> 	};
+> 
+> 	pinctrl_uart1_rtscts_1: uart1-rtscts-1 {
+> 		fsl,pins = <
+> 			MX27_PAD_UART1_CTS__UART1_CTS 0x0
+> 			MX27_PAD_UART1_RTS__UART1_RTS 0x0
+> 		>;
+> 	};
+
+I changed the uart groups accordingly.
 
 Thanks,
-Jassi
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
