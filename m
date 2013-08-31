@@ -1,39 +1,27 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 31 Aug 2013 12:51:28 +0200
-Subject: [PATCH 2/2] ARM: Dove: Add the audio device to the Cubox DT
-In-Reply-To: <521DCD80.9010105@gmail.com>
-References: <20130828113521.35c53365@armhf>
-	<521DCD80.9010105@gmail.com>
-Message-ID: <20130831125128.0e3a23c7@armhf>
+From: slapdau@yahoo.com.au (Craig McGeachie)
+Date: Sat, 31 Aug 2013 23:19:55 +1200
+Subject: Query about include/linux/mailbox.h
+In-Reply-To: <CABb+yY3wX2=1zh-F81YhhhgM6m+m4+fpVoKDn94m-febAhZGRg@mail.gmail.com>
+References: <522177C4.8060205@yahoo.com.au>
+ <CABb+yY3wX2=1zh-F81YhhhgM6m+m4+fpVoKDn94m-febAhZGRg@mail.gmail.com>
+Message-ID: <5221D15B.4050507@yahoo.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Aug 2013 12:14:24 +0200
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+On 08/31/2013 05:33 PM, Jassi Brar wrote:
+> It wasn't dropped.
+> Just the development was taken offline by the three of us I (for
+> Fujitsu), Suman Anna (for TI) and Loic (for STE).  Later we were
+> joined by LF.Tan (for Intel). Please join us.
+>   https://github.com/sumananna/mailbox/commits/jassiv3-3.10-omap should
+> be good to base on.
 
-> > +&i2s1 {
-> > +	status = "okay";
-> > +	pinctrl-0 = <&pmx_audio1_i2s1_spdifo>;
-> > +	pinctrl-names = "default";
-> > +};  
-> 
-> Please also add the external clock connected from si5351.
+So, this would be a good place to start?
 
-Hi Sebastian and Russell,
+https://github.com/sumananna/mailbox/commit/635c24eba19f67d1eb1ef7e7447f319c850b01e5#drivers/mailbox
 
-I tried it on my Cubox (<&si5351 2>), and I have problems with HDMI
-output and some audio streams like webradios with sample rates 32 or
-22.05 kHz.
+See if I can get my head around that framework and what it does, and try 
+fitting the BCM2835 mailbox into it?
 
-According to the Dove specification, the audio controller works with
-the samples rates 44.1, 48 and 96 kHz, so, I don't see the usage of the
-external clock, except when using the two audio controllers with
-different sample rates.
-
-But, BTW, as the kirkwood-i2 driver is written, this last case does not
-work: for 44.1, 48 and 96 kHz, the external clock is never used and
-there is only one DCO.
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Cheers,
+Craig.
