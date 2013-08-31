@@ -1,47 +1,85 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 31 Aug 2013 13:37:34 +0100
-Subject: [PATCH 03/14] ASoC: avoid duplicated DAI routes
+Date: Sat, 31 Aug 2013 13:38:34 +0100
+Subject: [PATCH 04/14] ASoC: kirkwood: provide KIRKWOOD_PLAYCTL_ENABLE_MASK
 In-Reply-To: <20130831123458.GF6617@n2100.arm.linux.org.uk>
 References: <20130831123458.GF6617@n2100.arm.linux.org.uk>
-Message-ID: <E1VFkQo-0003IE-Bw@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1VFkRm-0003IL-PQ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ASoC automatically creates snd_soc_dapm_dai_in and snd_soc_dapm_dai_out
-widgets for DAI drivers, and adds them to the list.  Later on, ASoC
-creates automatic routes between these widgets and a widget with a
-stream name.
-
-We look for a snd_soc_dapm_dai_in or snd_soc_dapm_dai_out widget, and
-use this to obtain the DAI structure.  We then scan all widgets for
-any with a stream name refering to either the capture or the playback
-stream, and create routes.
-
-If you have both a snd_soc_dapm_dai_in and a snd_soc_dapm_dai_out
-referring to the same DAI structure, this ends up creating one set of
-routes for the DAI for the snd_soc_dapm_dai_in widget, and a duplicated
-set of routes for the snd_soc_dapm_dai_out widget.
-
-Fix this by checking that the stream name for the widget matches the
-DAI widget name.
+Provide a helper macro which includes the sum of all enable bits in
+the playback control register.  This simplifies the code a little.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- sound/soc/soc-dapm.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ sound/soc/kirkwood/kirkwood-i2s.c |   10 ++++------
+ sound/soc/kirkwood/kirkwood.h     |    5 ++++-
+ 2 files changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/sound/soc/soc-dapm.c b/sound/soc/soc-dapm.c
-index c7051c4..9f67976 100644
---- a/sound/soc/soc-dapm.c
-+++ b/sound/soc/soc-dapm.c
-@@ -3439,7 +3439,7 @@ int snd_soc_dapm_link_dai_widgets(struct snd_soc_card *card)
- 				break;
- 			}
+diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
+index ee27981..f39e57c 100644
+--- a/sound/soc/kirkwood/kirkwood-i2s.c
++++ b/sound/soc/kirkwood/kirkwood-i2s.c
+@@ -199,8 +199,7 @@ static int kirkwood_i2s_hw_params(struct snd_pcm_substream *substream,
+ 			ctl_play |= KIRKWOOD_PLAYCTL_MONO_OFF;
  
--			if (!w->sname)
-+			if (!w->sname || !strstr(w->sname, dai_w->name))
- 				continue;
+ 		priv->ctl_play &= ~(KIRKWOOD_PLAYCTL_MONO_MASK |
+-				    KIRKWOOD_PLAYCTL_I2S_EN |
+-				    KIRKWOOD_PLAYCTL_SPDIF_EN |
++				    KIRKWOOD_PLAYCTL_ENABLE_MASK |
+ 				    KIRKWOOD_PLAYCTL_SIZE_MASK);
+ 		priv->ctl_play |= ctl_play;
+ 	} else {
+@@ -244,8 +243,7 @@ static int kirkwood_i2s_play_trigger(struct snd_pcm_substream *substream,
+ 	case SNDRV_PCM_TRIGGER_START:
+ 		/* configure */
+ 		ctl = priv->ctl_play;
+-		value = ctl & ~(KIRKWOOD_PLAYCTL_I2S_EN |
+-				KIRKWOOD_PLAYCTL_SPDIF_EN);
++		value = ctl & ~KIRKWOOD_PLAYCTL_ENABLE_MASK;
+ 		writel(value, priv->io + KIRKWOOD_PLAYCTL);
  
- 			if (dai->driver->playback.stream_name &&
+ 		/* enable interrupts */
+@@ -267,7 +265,7 @@ static int kirkwood_i2s_play_trigger(struct snd_pcm_substream *substream,
+ 		writel(value, priv->io + KIRKWOOD_INT_MASK);
+ 
+ 		/* disable all playbacks */
+-		ctl &= ~(KIRKWOOD_PLAYCTL_I2S_EN | KIRKWOOD_PLAYCTL_SPDIF_EN);
++		ctl &= ~KIRKWOOD_PLAYCTL_ENABLE_MASK;
+ 		writel(ctl, priv->io + KIRKWOOD_PLAYCTL);
+ 		break;
+ 
+@@ -387,7 +385,7 @@ static int kirkwood_i2s_probe(struct snd_soc_dai *dai)
+ 
+ 	/* disable playback/record */
+ 	value = readl(priv->io + KIRKWOOD_PLAYCTL);
+-	value &= ~(KIRKWOOD_PLAYCTL_I2S_EN|KIRKWOOD_PLAYCTL_SPDIF_EN);
++	value &= ~KIRKWOOD_PLAYCTL_ENABLE_MASK;
+ 	writel(value, priv->io + KIRKWOOD_PLAYCTL);
+ 
+ 	value = readl(priv->io + KIRKWOOD_RECCTL);
+diff --git a/sound/soc/kirkwood/kirkwood.h b/sound/soc/kirkwood/kirkwood.h
+index 10a3aaa..9a50607 100644
+--- a/sound/soc/kirkwood/kirkwood.h
++++ b/sound/soc/kirkwood/kirkwood.h
+@@ -54,7 +54,7 @@
+ #define KIRKWOOD_PLAYCTL_MONO_OFF		(0<<5)
+ #define KIRKWOOD_PLAYCTL_I2S_MUTE		(1<<7)
+ #define KIRKWOOD_PLAYCTL_SPDIF_EN		(1<<4)
+-#define KIRKWOOD_PLAYCTL_I2S_EN		(1<<3)
++#define KIRKWOOD_PLAYCTL_I2S_EN			(1<<3)
+ #define KIRKWOOD_PLAYCTL_SIZE_MASK		(7<<0)
+ #define KIRKWOOD_PLAYCTL_SIZE_16		(7<<0)
+ #define KIRKWOOD_PLAYCTL_SIZE_16_C		(3<<0)
+@@ -62,6 +62,9 @@
+ #define KIRKWOOD_PLAYCTL_SIZE_24		(1<<0)
+ #define KIRKWOOD_PLAYCTL_SIZE_32		(0<<0)
+ 
++#define KIRKWOOD_PLAYCTL_ENABLE_MASK		(KIRKWOOD_PLAYCTL_SPDIF_EN | \
++						 KIRKWOOD_PLAYCTL_I2S_EN)
++
+ #define KIRKWOOD_PLAY_BUF_ADDR			0x1104
+ #define KIRKWOOD_PLAY_BUF_SIZE			0x1108
+ #define KIRKWOOD_PLAY_BYTE_COUNT		0x110C
 -- 
 1.7.4.4
