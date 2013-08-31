@@ -1,54 +1,35 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sat, 31 Aug 2013 08:49:40 +0200
-Subject: [PATCH v2 2/7] pinctrl: imx27: imx27 pincontrol driver
-In-Reply-To: <20130821012301.GA30533@S2101-09.ap.freescale.net>
-References: <1376921234-26682-1-git-send-email-mpa@pengutronix.de>
- <1376921234-26682-3-git-send-email-mpa@pengutronix.de>
- <20130821012301.GA30533@S2101-09.ap.freescale.net>
-Message-ID: <20130831064940.GW20071@s25.your-server.de>
+Date: Sat, 31 Aug 2013 09:17:52 +0200
+Subject: [PATCH v11 3/8] ASoC: generic: simple DT sound card
+In-Reply-To: <20130823095816.GF25263@sirena.org.uk>
+References: <1376924761-4054-1-git-send-email-mpa@pengutronix.de>
+ <1376924761-4054-4-git-send-email-mpa@pengutronix.de>
+ <20130823095816.GF25263@sirena.org.uk>
+Message-ID: <20130831071752.GX20071@s25.your-server.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 21, 2013 at 09:23:03AM +0800, Shawn Guo wrote:
-> On Mon, Aug 19, 2013 at 04:07:09PM +0200, Markus Pargmann wrote:
-> > imx27 pincontrol driver using the imx1 core driver. The DT bindings are
-> > similar to other imx pincontrol drivers.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  53 +++
-> >  drivers/pinctrl/Kconfig                            |   8 +
-> >  drivers/pinctrl/Makefile                           |   1 +
-> >  drivers/pinctrl/pinctrl-imx27.c                    | 477 +++++++++++++++++++++
-> >  4 files changed, 539 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
-> >  create mode 100644 drivers/pinctrl/pinctrl-imx27.c
-> > 
-> > diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
-> > new file mode 100644
-> > index 0000000..016fc89
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
-> > @@ -0,0 +1,53 @@
-> > +* Freescale IMX27 IOMUX Controller
-> > +
-> > +Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
-> > +and usage.
+Hi,
+
+On Fri, Aug 23, 2013 at 10:58:16AM +0100, Mark Brown wrote:
+> On Mon, Aug 19, 2013 at 05:05:56PM +0200, Markus Pargmann wrote:
+> > Simple sound card initialized using DT. When used with AC97, ac97-codec
+> > is used to automatically discover the used codec.
 > 
-> Since imx-pinctrl and imx1-pinctrl are now two completely different
-> drivers/bindings, is there actually anything from fsl,imx-pinctrl.txt
-> could be referred to here?
+> I've held back a bit on this one.  The reason is that it's adding a
+> separate card to the generic card which doesn't seem like the obvious
+> thing to do - obviously they have very similar goals, it's just that one
+> is for DT usage and the other isn't.  What's the reason for not adding
+> DT support to the generic card?
 
-No, fixed, thanks.
+There was no code I could reuse from the existing simple card driver, so
+I decided to seperate the DT part.
 
-Regards,
+I will move the DT driver code into simple card and resend the patch.
+
+Thanks,
 
 Markus
-
-> 
-> Shawn
-> 
-> 
 
 -- 
 Pengutronix e.K.                           |                             |
