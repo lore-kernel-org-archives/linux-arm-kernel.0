@@ -1,48 +1,127 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 31 Aug 2013 10:56:36 +0200
-Subject: [PATCH] dma: imx-sdma: Add ROM script addresses to driver
-In-Reply-To: <CAHCPf3vYTW7=s663+mEnesRX=MoSc8VwN5i=RB0Zm3J727_t2Q@mail.gmail.com>
-References: <1376914563-10912-1-git-send-email-s.hauer@pengutronix.de>
- <CAHCPf3t1_5zhSOrfVFHgeVPa25sT+ewv1=OZA8X4_YZXb9cSeA@mail.gmail.com>
- <20130820070039.GH31036@pengutronix.de>
- <CAHCPf3sJDRXUkrkRtku06OvBav2idFvJwThsxsrHngXg3mEXJA@mail.gmail.com>
- <20130820150252.GB31060@pengutronix.de>
- <CAHCPf3vYTW7=s663+mEnesRX=MoSc8VwN5i=RB0Zm3J727_t2Q@mail.gmail.com>
-Message-ID: <20130831085636.GA30197@pengutronix.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sat, 31 Aug 2013 12:44:36 +0200
+Subject: [PATCH 1/3] ASoC: generic: simple card, use private data
+In-Reply-To: <1377945878-13322-1-git-send-email-mpa@pengutronix.de>
+References: <1377945878-13322-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1377945878-13322-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 12:23:02PM -0500, Matt Sealey wrote:
-> On Tue, Aug 20, 2013 at 10:02 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >
-> >> What I'd really like to see is the "waiting on a firmware that doesn't
-> >> exist when there is a working ROM version of those scripts in the SoC"
-> >
-> > Then this patch is for you. This is exactly what the patch solves.
-> 
-> Only by changing the device tree and not specifying a firmware
-> filename. The driver probes, knows about ROM script addresses as per
-> your patch, tries to load a new file from disk; same hang. What you
-> have now is a way to use a potentially buggy script with several
-> functions missing (ROM script isn't as full-featured as the file-based
-> one on some chips) or a hang on boot if you misplaced a firmware which
-> is notoriously hard to get hold of..
-> 
-> How do we resolve this except to load the firmware pre-Linux (or put
-> the firmware in the tree, argh) and describe the loaded firmware and
-> offsets? Once it's in the internal SDMA code RAM all the versioning
-> and headers go away..
+Move snd_link and snd_card from platform data to private data.
 
-This seems quite academic. In theory there are many fancy things you can
-do with the SDMA engine. In practice it is only used for audio. This
-usecase is covered well by the current code and now even without loading
-additional firmware. If you have the need for improvements feel free to
-send patches.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ include/sound/simple_card.h     |  4 ----
+ sound/soc/generic/simple-card.c | 44 ++++++++++++++++++++++++++---------------
+ 2 files changed, 28 insertions(+), 20 deletions(-)
 
-Sascha
-
+diff --git a/include/sound/simple_card.h b/include/sound/simple_card.h
+index 6c74527..e1ac996 100644
+--- a/include/sound/simple_card.h
++++ b/include/sound/simple_card.h
+@@ -29,10 +29,6 @@ struct asoc_simple_card_info {
+ 	unsigned int daifmt;
+ 	struct asoc_simple_dai cpu_dai;
+ 	struct asoc_simple_dai codec_dai;
+-
+-	/* used in simple-card.c */
+-	struct snd_soc_dai_link snd_link;
+-	struct snd_soc_card snd_card;
+ };
+ 
+ #endif /* __SIMPLE_CARD_H */
+diff --git a/sound/soc/generic/simple-card.c b/sound/soc/generic/simple-card.c
+index 6cf8355..63cbf3e 100644
+--- a/sound/soc/generic/simple-card.c
++++ b/sound/soc/generic/simple-card.c
+@@ -15,6 +15,10 @@
+ 
+ #define asoc_simple_get_card_info(p) \
+ 	container_of(p->dai_link, struct asoc_simple_card_info, snd_link)
++struct asoc_simple_card_data {
++	struct snd_soc_dai_link snd_link;
++	struct snd_soc_card snd_card;
++};
+ 
+ static int __asoc_simple_card_dai_init(struct snd_soc_dai *dai,
+ 				       struct asoc_simple_dai *set,
+@@ -35,7 +39,8 @@ static int __asoc_simple_card_dai_init(struct snd_soc_dai *dai,
+ 
+ static int asoc_simple_card_dai_init(struct snd_soc_pcm_runtime *rtd)
+ {
+-	struct asoc_simple_card_info *info = asoc_simple_get_card_info(rtd);
++	struct device *dev = rtd->card->dev;
++	struct asoc_simple_card_info *info = dev->platform_data;
+ 	struct snd_soc_dai *codec = rtd->codec_dai;
+ 	struct snd_soc_dai *cpu = rtd->cpu_dai;
+ 	unsigned int daifmt = info->daifmt;
+@@ -55,6 +60,7 @@ static int asoc_simple_card_dai_init(struct snd_soc_pcm_runtime *rtd)
+ static int asoc_simple_card_probe(struct platform_device *pdev)
+ {
+ 	struct asoc_simple_card_info *cinfo = pdev->dev.platform_data;
++	struct asoc_simple_card_data *priv;
+ 	struct device *dev = &pdev->dev;
+ 
+ 	if (!cinfo) {
+@@ -62,6 +68,10 @@ static int asoc_simple_card_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
++	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
+ 	if (!cinfo->name	||
+ 	    !cinfo->card	||
+ 	    !cinfo->codec	||
+@@ -75,31 +85,33 @@ static int asoc_simple_card_probe(struct platform_device *pdev)
+ 	/*
+ 	 * init snd_soc_dai_link
+ 	 */
+-	cinfo->snd_link.name		= cinfo->name;
+-	cinfo->snd_link.stream_name	= cinfo->name;
+-	cinfo->snd_link.cpu_dai_name	= cinfo->cpu_dai.name;
+-	cinfo->snd_link.platform_name	= cinfo->platform;
+-	cinfo->snd_link.codec_name	= cinfo->codec;
+-	cinfo->snd_link.codec_dai_name	= cinfo->codec_dai.name;
+-	cinfo->snd_link.init		= asoc_simple_card_dai_init;
++	priv->snd_link.name		= cinfo->name;
++	priv->snd_link.stream_name	= cinfo->name;
++	priv->snd_link.cpu_dai_name	= cinfo->cpu_dai.name;
++	priv->snd_link.platform_name	= cinfo->platform;
++	priv->snd_link.codec_name	= cinfo->codec;
++	priv->snd_link.codec_dai_name	= cinfo->codec_dai.name;
++	priv->snd_link.init		= asoc_simple_card_dai_init;
+ 
+ 	/*
+ 	 * init snd_soc_card
+ 	 */
+-	cinfo->snd_card.name		= cinfo->card;
+-	cinfo->snd_card.owner		= THIS_MODULE;
+-	cinfo->snd_card.dai_link	= &cinfo->snd_link;
+-	cinfo->snd_card.num_links	= 1;
+-	cinfo->snd_card.dev		= &pdev->dev;
++	priv->snd_card.name		= cinfo->card;
++	priv->snd_card.owner		= THIS_MODULE;
++	priv->snd_card.dai_link		= &priv->snd_link;
++	priv->snd_card.num_links	= 1;
++	priv->snd_card.dev		= &pdev->dev;
+ 
+-	return snd_soc_register_card(&cinfo->snd_card);
++	dev_set_drvdata(&pdev->dev, priv);
++
++	return snd_soc_register_card(&priv->snd_card);
+ }
+ 
+ static int asoc_simple_card_remove(struct platform_device *pdev)
+ {
+-	struct asoc_simple_card_info *cinfo = pdev->dev.platform_data;
++	struct asoc_simple_card_data *priv = dev_get_drvdata(&pdev->dev);
+ 
+-	return snd_soc_unregister_card(&cinfo->snd_card);
++	return snd_soc_unregister_card(&priv->snd_card);
+ }
+ 
+ static struct platform_driver asoc_simple_card = {
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.4.rc3
