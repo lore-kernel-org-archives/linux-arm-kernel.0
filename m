@@ -1,36 +1,31 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 1 Sep 2013 03:22:05 +0400
-Subject: [PATCH 3/4] ARM: shmobile: bockw-reference: add Ether DT support
+Date: Sun, 1 Sep 2013 03:24:49 +0400
+Subject: [PATCH 4/4] ARM: shmobile: BOCK-W reference: add Ether PFC settings
 In-Reply-To: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
 References: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201309010322.06135.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201309010324.50159.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the BOCK-W board dependent part of the Ether device node. 
+Add the Ether pin group to bockw_pinctrl_map[].
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm/boot/dts/r8a7778-bockw-reference.dts |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/mach-shmobile/board-bockw-reference.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-Index: renesas/arch/arm/boot/dts/r8a7778-bockw-reference.dts
+Index: renesas/arch/arm/mach-shmobile/board-bockw-reference.c
 ===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-+++ renesas/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-@@ -30,3 +30,14 @@
- 		reg = <0x60000000 0x10000000>;
- 	};
- };
-+
-+&ether {
-+	status = "ok";
-+	phy-mode = "rmii";
-+	phy-handle = <&phy1>;
-+	renesas,no-ether-link;
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
+--- renesas.orig/arch/arm/mach-shmobile/board-bockw-reference.c
++++ renesas/arch/arm/mach-shmobile/board-bockw-reference.c
+@@ -29,6 +29,9 @@
+  */
+ 
+ static const struct pinctrl_map bockw_pinctrl_map[] = {
++	/* Ether */
++	PIN_MAP_MUX_GROUP_DEFAULT("fde00000.ethernet", "pfc-r8a7778",
++				  "ether_rmii", "ether"),
+ 	/* SCIF0 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
+ 				  "scif0_data_a", "scif0"),
