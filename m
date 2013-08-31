@@ -1,29 +1,36 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 1 Sep 2013 03:18:09 +0400
-Subject: [PATCH 2/4] ARM: shmobile: r8a7778: add Ether clock for DT case
+Date: Sun, 1 Sep 2013 03:22:05 +0400
+Subject: [PATCH 3/4] ARM: shmobile: bockw-reference: add Ether DT support
 In-Reply-To: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
 References: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201309010318.10337.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201309010322.06135.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add extra Ether clock lookup entry in the device tree case.
+Define the BOCK-W board dependent part of the Ether device node. 
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm/mach-shmobile/clock-r8a7778.c |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/r8a7778-bockw-reference.dts |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Index: renesas/arch/arm/mach-shmobile/clock-r8a7778.c
+Index: renesas/arch/arm/boot/dts/r8a7778-bockw-reference.dts
 ===================================================================
---- renesas.orig/arch/arm/mach-shmobile/clock-r8a7778.c
-+++ renesas/arch/arm/mach-shmobile/clock-r8a7778.c
-@@ -146,6 +146,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
- 	CLKDEV_DEV_ID("r8a777x-ether", &mstp_clks[MSTP114]), /* Ether */
-+	CLKDEV_DEV_ID("fde00000.ethernet", &mstp_clks[MSTP114]), /* Ether w/DT */
- 	CLKDEV_DEV_ID("ehci-platform", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
- 	CLKDEV_DEV_ID("ohci-platform", &mstp_clks[MSTP100]), /* USB OHCI port0/1 */
- 	CLKDEV_DEV_ID("i2c-rcar.0", &mstp_clks[MSTP030]), /* I2C0 */
+--- renesas.orig/arch/arm/boot/dts/r8a7778-bockw-reference.dts
++++ renesas/arch/arm/boot/dts/r8a7778-bockw-reference.dts
+@@ -30,3 +30,14 @@
+ 		reg = <0x60000000 0x10000000>;
+ 	};
+ };
++
++&ether {
++	status = "ok";
++	phy-mode = "rmii";
++	phy-handle = <&phy1>;
++	renesas,no-ether-link;
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
