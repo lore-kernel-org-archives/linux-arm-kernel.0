@@ -1,83 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 1 Sep 2013 13:15:18 +0100
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 1 Sep 2013 13:19:28 +0100
 Subject: [alsa-devel] [PATCH 00/14] SPDIF support
-In-Reply-To: <20130901115116.GB3084@sirena.org.uk>
+In-Reply-To: <20130831210518.GK6617@n2100.arm.linux.org.uk>
 References: <20130831123458.GF6617@n2100.arm.linux.org.uk>
- <52220B9A.9000007@metafoo.de> <20130831172853.GL18608@sirena.org.uk>
- <20130831191956.GH6617@n2100.arm.linux.org.uk> <5222562B.8010001@metafoo.de>
- <20130901064216.GN6617@n2100.arm.linux.org.uk> <5222EFE5.3010306@metafoo.de>
- <20130901085121.GO6617@n2100.arm.linux.org.uk>
- <20130901115116.GB3084@sirena.org.uk>
-Message-ID: <20130901121518.GQ6617@n2100.arm.linux.org.uk>
+ <52220B9A.9000007@metafoo.de>
+ <20130831172853.GL18608@sirena.org.uk>
+ <20130831191956.GH6617@n2100.arm.linux.org.uk>
+ <5222562B.8010001@metafoo.de>
+ <20130831210518.GK6617@n2100.arm.linux.org.uk>
+Message-ID: <20130901121928.GC3084@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 01, 2013 at 12:51:16PM +0100, Mark Brown wrote:
-> Like Lars-Peter says it really, really shouldn't be - what moving to
-> DPCM should be doing with this code is mostly moving the code around a
-> bit to pull the bits that are shared into a front end DAI.  The most
-> substantial change should be handling the enables but that shouldn't
-> take much code at all, your curent patch does it in 35 lines and I'd not
-> expect it to be much different in a DPCM world.
+On Sat, Aug 31, 2013 at 10:05:18PM +0100, Russell King - ARM Linux wrote:
 
-The delta between the DPCM version and the dual-DAI version is over 300
-lines of change - the methods employed by these two methods are completely
-different.
+> I'm not the only one: I've heard other people complain about the _exact_
+> same issue with ASoC: ASoC is difficult to work with, and many people
+> just seem to give up with it - or keep their stuff in their own trees
+> locally.  I can very well see why that happens.
 
-Maybe you could look at the patch and suggest where I'm going wrong?
+We do appear to have a fairly good success rate with systems working
+with mainline; I can only think of one driver that didn't make it in and
+that was one where we had a bit of an issue getting the code to visually
+resemble Linux code so I don't feel too bad about it.  I am aware of
+some people who didn't work upstream, we've generally had some useful
+discussions with them once we've found each other.
 
-> On Sun, Sep 01, 2013 at 09:51:21AM +0100, Russell King - ARM Linux wrote:
-> > Can you then please explain why when I ask for help understanding DAPM
-> > in a "nice" way, the response I get is just "it's just a graph walk"
-> > and no further technical details?
-> 
-> Ask more detailed questions and engage in a discussion; the reason you
-> keep on getting the same responses is that you tend to repeat the same
-> requests a lot.  Something like "I understand the big picture but I am
-> trying to do X and need to know Y because Z" (with all of X, Y and Z
-> being important) is usually a good approach.
+> As for "This is the either/or approach I've been suggesting."  No, that's
+> another false statement from Mark.  What Mark has been suggesting all
+> along is to use DPCM - and that's something which I tried for ages to
+> get working, and it just doesn't work (as evidenced by the oopses and
+> warnings that get spat out of the kernel.)
 
-When you don't even understand the "big picture", it's hard to know
-where to start.  That's why starting off with a simple question is
-the right thing to do - and you expect to get a simple but informative
-response, so that helps you to frame more specific questions later.
+While it is correct that I have been saying the final result should use
+DPCM (since this is what the hardware looks like) you will recall that I
+did recently suggest either/or as a stepping stone towards a full
+implementation, allowing systems with only S/PDIF to be supported while
+the other issues are still being worked on.
 
-If you start from a position of knowing very little, it's exceedingly
-difficult to ask specific questions.
+> There are two choices in how the hardware is used: either one output
+> only is used, or if both outputs are used, they must be used "as one" -
+> both outputs must be simultaneously enabled and disabled.  As far as
+> I know, that's not possible with two DAIs.
 
-> The public interface for DAPM is that the widgets get created with
-> sensible types and hooked up together then powered up as needed, if
-> something needs to know specifics of that process like exactly when a
-> given register will be written that's a worrying implementation detail.
-> 
-> > | DAPM is a set of "widgets" representing various components of an
-> > | audio system.  The widgets are linked together by a graph.  Each
-> > | widget lives in a context - cpu, platform or codec.  Some bindings
-> > | only happen within a context, others cross contexts (so linking the
-> > | CPU audio stream to the codec for example)
-> 
-> This last statement is not the case; you can see the route connecting
-> code in snd_soc_dapm_add_route() - there is no case in which it will
-> only try to match within a single context.
-> 
-> As I have said to you without more information it is hard to tell what
-> problems you are seeing when you are trying this.  It could be a case of
-> trying to create routes before the widgets are added, or it could be a
-> case of trying to create inter device links with widgets with globally
-> duplicated names (though that would give wrong routes rather than no
-> routes so I suspect sequencing).
+That is correct, this is why I call it an either/or approach - a system
+would be able to use either I2S or S/PDIF but not both.  For systems
+with both I2S and S/PDIF connected one or the other would have to be
+chosen by the machine driver.
 
-Right, so, I have a widget with a stream name, and the stream name matches
-a CPU DAI stream.
+> And here's the patch I tried.
 
-If I register this widget against the platform DAPM context, then there is
-no connection between this widget and the CPU DAI streams.  (Bear in mind
-that at the time I tried this, I had disabled the creation of the stream
-widgets that were overwriting the platform stream widgets - because you
-were not providing any useful information to work around that problem.)
+Ah, I'm not sure that I have seen this before (it's certainly not been
+submitted).  Just looking at the diff this all seems fine for an
+either/or approach though...
 
-If I register this widget against the CPU DAI DAPM context, the stream
-name is matched to the CPU DAI streams, and a connection is made between
-the stream widgets and my widget.
+> index 2c459c1..62e5b62 100644
+> --- a/sound/soc/kirkwood/kirkwood-spdif.c
+> +++ b/sound/soc/kirkwood/kirkwood-spdif.c
+> @@ -61,7 +61,7 @@ static struct snd_soc_dai_link kirkwood_spdif_dai0[] = {
+>  		.name = "S/PDIF0",
+>  		.stream_name = "S/PDIF0 PCM Playback",
+>  		.platform_name = "kirkwood-pcm-audio.0",
+> -		.cpu_dai_name = "kirkwood-i2s.0",
+> +		.cpu_dai_name = "kirkwood-spdif.0",
+>  		.codec_dai_name = "dit-hifi",
+>  		.codec_name = "spdif-dit",
+>  		.ops = &kirkwood_spdif_ops,
+> @@ -73,7 +73,7 @@ static struct snd_soc_dai_link kirkwood_spdif_dai1[] = {
+>  		.name = "S/PDIF1",
+>  		.stream_name = "IEC958 Playback",
+>  		.platform_name = "kirkwood-pcm-audio.1",
+> -		.cpu_dai_name = "kirkwood-i2s.1",
+> +		.cpu_dai_name = "kirkwood-spdif.1",
+>  		.codec_dai_name = "dit-hifi",
+>  		.codec_name = "spdif-dit",
+>  		.ops = &kirkwood_spdif_ops,
 
-This is what I mean by "some bindings only happen within a context".
+...this file does not appear to be in mainline and some of the rest of
+the context suggested this was based off something old.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130901/2ecf5768/attachment.sig>
