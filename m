@@ -1,23 +1,89 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 1 Sep 2013 13:23:48 +0200
-Subject: [PATCH 2/2] ARM: Dove: Add the audio device to the Cubox DT
-In-Reply-To: <140d8d8a23f.2784.107cef0f820c2f5d7b7f41463071c310@gmail.com>
-References: <20130828113521.35c53365@armhf> <521DCD80.9010105@gmail.com>
- <20130831125128.0e3a23c7@armhf>
- <140d8d8a23f.2784.107cef0f820c2f5d7b7f41463071c310@gmail.com>
-Message-ID: <20130901132348.63e98d35@armhf>
+From: oliver+list@schinagl.nl (oliver+list at schinagl.nl)
+Date: Sun,  1 Sep 2013 13:30:19 +0200
+Subject: [PATCHv6 2/2] ARM: sunxi: dt: Add sunxi-sid to dts for sun4i,
+ sun5i and sun7i
+In-Reply-To: <1378035019-9649-1-git-send-email-oliver+list@schinagl.nl>
+References: <1378035019-9649-1-git-send-email-oliver+list@schinagl.nl>
+Message-ID: <1378035019-9649-3-git-send-email-oliver+list@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 01 Sep 2013 11:26:54 +0200
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+From: Oliver Schinagl <oliver@schinagl.nl>
 
-> Can you please try <&si5351 1>, iirc audio ist connected to it. I will also 
-> look it up later.
+This patch shall add support for the sunxi-sid driver to the device
+tree for A10, A10s, A13 and A20.
 
-I applied Russell's patch to always use an external clock, and none
-(<&si5351 1> or <&si5351 2>) work! (si5351 from kernel 3.11.0-rc5)
+Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi  | 5 +++++
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 5 +++++
+ arch/arm/boot/dts/sun5i-a13.dtsi  | 5 +++++
+ arch/arm/boot/dts/sun7i-a20.dtsi  | 5 +++++
+ 4 files changed, 20 insertions(+)
 
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index b2bd6e1..179e024 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -267,6 +267,11 @@
+ 			reg = <0x01c20c90 0x10>;
+ 		};
+ 
++		sid: eeprom at 01c23800 {
++			compatible = "allwinner,sun4i-sid";
++			reg = <0x01c23800 0x10>;
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index b8fc1c2..724285cc 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -256,6 +256,11 @@
+ 			reg = <0x01c20c90 0x10>;
+ 		};
+ 
++		sid: eeprom at 01c23800 {
++			compatible = "allwinner,sun4i-sid";
++			reg = <0x01c23800 0x10>;
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index 7363211..999fdb3 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -223,6 +223,11 @@
+ 			reg = <0x01c20c90 0x10>;
+ 		};
+ 
++		sid: eeprom at 01c23800 {
++			compatible = "allwinner,sun4i-sid";
++			reg = <0x01c23800 0x10>;
++		};
++
+ 		uart1: serial at 01c28400 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28400 0x400>;
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index fb81e78..ff3cc90 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -217,6 +217,11 @@
+ 			reg = <0x01c20c90 0x10>;
+ 		};
+ 
++		sid: eeprom at 01c23800 {
++			compatible = "allwinner,sun7i-a20-sid";
++			reg = <0x01c23800 0x200>;
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.8.1.5
