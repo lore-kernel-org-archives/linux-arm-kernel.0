@@ -1,341 +1,99 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Sun, 01 Sep 2013 13:47:59 -0300
-Subject: [PATCHv6 1/2] ARM: sunxi: Initial support for Allwinner's Security
- ID fuses
-In-Reply-To: <1378035019-9649-2-git-send-email-oliver+list@schinagl.nl>
-References: <1378035019-9649-1-git-send-email-oliver+list@schinagl.nl>
- <1378035019-9649-2-git-send-email-oliver+list@schinagl.nl>
-Message-ID: <52236FBF.2090705@elopez.com.ar>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 1 Sep 2013 18:05:46 +0100
+Subject: [alsa-devel] [PATCH 00/14] SPDIF support
+In-Reply-To: <20130901121518.GQ6617@n2100.arm.linux.org.uk>
+References: <20130831123458.GF6617@n2100.arm.linux.org.uk>
+ <52220B9A.9000007@metafoo.de>
+ <20130831172853.GL18608@sirena.org.uk>
+ <20130831191956.GH6617@n2100.arm.linux.org.uk>
+ <5222562B.8010001@metafoo.de>
+ <20130901064216.GN6617@n2100.arm.linux.org.uk>
+ <5222EFE5.3010306@metafoo.de>
+ <20130901085121.GO6617@n2100.arm.linux.org.uk>
+ <20130901115116.GB3084@sirena.org.uk>
+ <20130901121518.GQ6617@n2100.arm.linux.org.uk>
+Message-ID: <20130901170546.GI3084@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oliver,
+On Sun, Sep 01, 2013 at 01:15:18PM +0100, Russell King - ARM Linux wrote:
+> On Sun, Sep 01, 2013 at 12:51:16PM +0100, Mark Brown wrote:
+> > Like Lars-Peter says it really, really shouldn't be - what moving to
+> > DPCM should be doing with this code is mostly moving the code around a
+> > bit to pull the bits that are shared into a front end DAI.  The most
+> > substantial change should be handling the enables but that shouldn't
+> > take much code at all, your curent patch does it in 35 lines and I'd not
+> > expect it to be much different in a DPCM world.
 
-Most of my comments on this are nitpicks, overall it looks good to me
+> The delta between the DPCM version and the dual-DAI version is over 300
+> lines of change - the methods employed by these two methods are completely
+> different.
 
-El 01/09/13 08:30, oliver+list at schinagl.nl escribi?:
-> From: Oliver Schinagl <oliver@schinagl.nl>
->
-> Allwinner has electric fuses (efuse) on their line of chips. This driver
-> reads those fuses, seeds the kernel entropy and exports them as a sysfs
-> node.
->
-> These fuses are most likely to be programmed at the factory, encoding
-> things like Chip ID, some sort of serial number etc and appear to be
+> Maybe you could look at the patch and suggest where I'm going wrong?
 
-"..number, etc. and appear.."
+The diff doesn't look that worrying to me - a large chunk of it is about
+moving code around to register multiple DAIs which is something that the
+final DPCM code is going to want to do anyway.  A lot of the changes in
+the hw_params() function would probably stay the same too, though the
+function would move to the front end DAI I expect.
 
-> reasonable unique.
+> > Ask more detailed questions and engage in a discussion; the reason you
+> > keep on getting the same responses is that you tend to repeat the same
+> > requests a lot.  Something like "I understand the big picture but I am
+> > trying to do X and need to know Y because Z" (with all of X, Y and Z
+> > being important) is usually a good approach.
 
-reasonably
+> When you don't even understand the "big picture", it's hard to know
+> where to start.  That's why starting off with a simple question is
+> the right thing to do - and you expect to get a simple but informative
+> response, so that helps you to frame more specific questions later.
 
-> While in theory, these should be writeable by the user, it will probably
-> be inconvinient to do so. Allwinner recommends that a certain input pin,
+> If you start from a position of knowing very little, it's exceedingly
+> difficult to ask specific questions.
 
-inconvenient
+So say that - explain that you find it hard to relate the answer to what
+you're trying to accomplish, doing things like providing more detail on
+the problem you're trying to solve and highlighting anything that you've
+noticed is unusual to try to help people understand what might be
+missing from their answers.
 
-> labeled 'efuse_vddq', be connected to GND. To write these fuses however,
-> a 2.5 V programming voltage needs to be applied to this pin.
->
-> Even so, they can still be used to generate a board-unique mac from,
-> board unique RSA key and seed the kernel RNG.
->
-> On sun7i additional storage is available, this is initially used for an
-> UEFI BOOT key, Secure JTAG key, HDMI-HDCP key and vendor specific keys.
->
-> Currently supported are the following known chips:
-> Allwinner sun4i (A10)
-> Allwinner sun5i (A10s, A13)
-> Allwinner sun7i (A20)
->
-> Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
-> ---
->   Documentation/ABI/testing/sysfs-driver-sunxi-sid   |  22 +++
->   .../bindings/misc/allwinner,sunxi-sid.txt          |  17 ++
->   drivers/misc/eeprom/Kconfig                        |  13 ++
->   drivers/misc/eeprom/Makefile                       |   1 +
->   drivers/misc/eeprom/sunxi_sid.c                    | 177 +++++++++++++++++++++
->   5 files changed, 230 insertions(+)
->   create mode 100644 Documentation/ABI/testing/sysfs-driver-sunxi-sid
->   create mode 100644 Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt
->   create mode 100644 drivers/misc/eeprom/sunxi_sid.c
->
-> diff --git a/Documentation/ABI/testing/sysfs-driver-sunxi-sid b/Documentation/ABI/testing/sysfs-driver-sunxi-sid
-> new file mode 100644
-> index 0000000..ffb9536
-> --- /dev/null
-> +++ b/Documentation/ABI/testing/sysfs-driver-sunxi-sid
-> @@ -0,0 +1,22 @@
-> +What:		/sys/devices/*/<our-device>/eeprom
-> +Date:		August 2013
-> +Contact:	Oliver Schinagl <oliver@schinagl.nl>
-> +Description:	read-only access to the SID (Security-ID) on current
-> +		A-series SoC's from Allwinner. Currently supports A10, A10s, A13
-> +		and A20 CPU's. The earlier A1x series of SoCs exports 16 bytes,
-> +		whereas the newer A20 SoC exposes 512 bytes split into sections.
-> +		Besides the 16 bytes of SID, there's also an SJTAG area,
-> +		HDMI-HDCP key and some custom keys. Below a quick overview, for
-> +		details see the user manual:
-> +		0x000  128 bit root-key (sun[457]i)
-> +		0x010  128 bit boot-key (sun7i)
-> +		0x020   64 bit security-jtag-key (sun7i)
-> +		0x028   16 bit key configuration (sun7i)
-> +		0x02b   16 bit custom-vendor-key (sun7i)
-> +		0x02c  320 bit low general key (sun7i)
-> +		0x040   32 bit read-control access (sun7i)
-> +		0x064  224 bit low general key (sun7i)
-> +		0x080 2304 bit HDCP-key (sun7i)
-> +		0x1a0  768 bit high general key (sun7i)
-> +Users:		any user space application which wants to read the SID on
-> +		Allwinner's A-series of CPU's.
-> diff --git a/Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt
-> new file mode 100644
-> index 0000000..68ba372
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt
-> @@ -0,0 +1,17 @@
-> +Allwinner sunxi-sid
-> +
-> +Required properties:
-> +- compatible: "allwinner,sun4i-sid" or "allwinner,sun7i-a20-sid".
-> +- reg: Should contain registers location and length
-> +
-> +Example for sun4i:
-> +	sid at 01c23800 {
-> +		compatible = "allwinner,sun4i-sid";
-> +		reg = <0x01c23800 0x10>
-> +	};
-> +
-> +Example for sun7i:
-> +	sid at 01c23800 {
-> +		compatible = "allwinner,sun7i-a20-sid";
-> +		reg = <0x01c23800 0x200>
-> +	};
-> diff --git a/drivers/misc/eeprom/Kconfig b/drivers/misc/eeprom/Kconfig
-> index 04f2e1f..9536852f 100644
-> --- a/drivers/misc/eeprom/Kconfig
-> +++ b/drivers/misc/eeprom/Kconfig
-> @@ -96,4 +96,17 @@ config EEPROM_DIGSY_MTC_CFG
->
->   	  If unsure, say N.
->
-> +config EEPROM_SUNXI_SID
-> +	tristate "Allwinner sunxi security ID support"
-> +	depends on ARCH_SUNXI && SYSFS
-> +	help
-> +	  This is a driver for the 'security ID' available on various Allwinner
-> +	  devices.
-> +
-> +	  Due to the potential risks involved with changing e-fuses,
-> +	  this driver is read-only.
-> +
-> +	  This driver can also be built as a module. If so, the module
-> +	  will be called sunxi_sid.
-> +
->   endmenu
-> diff --git a/drivers/misc/eeprom/Makefile b/drivers/misc/eeprom/Makefile
-> index fc1e81d..9507aec 100644
-> --- a/drivers/misc/eeprom/Makefile
-> +++ b/drivers/misc/eeprom/Makefile
-> @@ -4,4 +4,5 @@ obj-$(CONFIG_EEPROM_LEGACY)	+= eeprom.o
->   obj-$(CONFIG_EEPROM_MAX6875)	+= max6875.o
->   obj-$(CONFIG_EEPROM_93CX6)	+= eeprom_93cx6.o
->   obj-$(CONFIG_EEPROM_93XX46)	+= eeprom_93xx46.o
-> +obj-$(CONFIG_EEPROM_SUNXI_SID)	+= sunxi_sid.o
->   obj-$(CONFIG_EEPROM_DIGSY_MTC_CFG) += digsy_mtc_eeprom.o
-> diff --git a/drivers/misc/eeprom/sunxi_sid.c b/drivers/misc/eeprom/sunxi_sid.c
-> new file mode 100644
-> index 0000000..39a9a62
-> --- /dev/null
-> +++ b/drivers/misc/eeprom/sunxi_sid.c
-> @@ -0,0 +1,177 @@
-> +/*
-> + * Copyright (c) 2013 Oliver Schinagl <oliver@schinagl.nl>
-> + * http://www.linux-sunxi.org
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * This driver exposes the Allwinner security ID, efuses exported in byte-
-> + * sized chunks.
-> + */
-> +
-> +#include <linux/compiler.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/export.h>
-> +#include <linux/fs.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/kobject.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/random.h>
-> +#include <linux/slab.h>
-> +#include <linux/stat.h>
-> +#include <linux/sysfs.h>
-> +#include <linux/types.h>
-> +
-> +#define DRV_NAME "sunxi-sid"
-> +
-> +struct sunxi_sid_data {
-> +	void __iomem *reg_base;
-> +	unsigned int keysize;
-> +};
-> +
-> +/* We read the entire key, due to a 32 bit read alignment requirement. Since we
-> + * want to return the requested byte, this resuls in somewhat slower code and
-> + * uses 4 times more reads as needed but keeps code simpler. Since the SID is
-> + * only very rarly probed, this is not really an issue.
+> Right, so, I have a widget with a stream name, and the stream name matches
+> a CPU DAI stream.
 
-rarely
+Ah, this is stream names not regular routes - new code should just use a
+normal DAPM route to connect to the AIF widgets.  Stream names are being
+phased out now that we can just use DAPM routes (which mean that we
+don't need to go through every single widget doing string checks every
+time we start or stop a stream).
 
-> + */
-> +static u8 sunxi_sid_read_byte(const struct sunxi_sid_data *sid_data,
-> +			      const unsigned int offset)
-> +{
-> +	u32 sid_key;
-> +
-> +	if (offset >= sid_data->keysize)
-> +		return 0;
-> +
-> +	sid_key = ioread32be(sid_data->reg_base + round_down(offset, 4));
-> +	sid_key >>= (offset % 4) * 8;
-> +
-> +	return sid_key; /* Only return the last byte */
-> +}
-> +
-> +static ssize_t sid_read(struct file *fd, struct kobject *kobj,
-> +			struct bin_attribute *attr, char *buf,
-> +			loff_t pos, size_t size)
-> +{
-> +	struct platform_device *pdev;
-> +	struct sunxi_sid_data *sid_data;
-> +	int i;
-> +
-> +	pdev = to_platform_device(kobj_to_dev(kobj));
-> +	sid_data = platform_get_drvdata(pdev);
-> +
-> +	if (pos < 0 || pos >= sid_data->keysize)
-> +		return 0;
-> +	if (size > sid_data->keysize - pos)
-> +		size = sid_data->keysize - pos;
-> +
-> +	for (i = 0; i < size; i++)
-> +		buf[i] = sunxi_sid_read_byte(sid_data, pos + i);
-> +
-> +	return i;
-> +}
-> +
-> +static struct bin_attribute sid_bin_attr = {
-> +	.attr = { .name = "eeprom", .mode = S_IRUGO, },
-> +	.read = sid_read,
-> +};
-> +
-> +static struct bin_attribute *sunxi_sid_bin_attrs[] = {
-> +	&sid_bin_attr,
-> +	NULL,
-> +};
-> +
-> +static const struct attribute_group sunxi_sid_group = {
-> +	.bin_attrs = sunxi_sid_bin_attrs,
-> +};
-> +
-> +/* fixme: Unused struct to be used with proper sysfs bin_attr groups */
-> +static const struct attribute_group *sunxi_sid_groups[] = {
-> +	&sunxi_sid_group,
-> +	NULL,
-> +};
-> +
-> +static int sunxi_sid_remove(struct platform_device *pdev)
-> +{
-> +	struct sunxi_sid_data *sid_data;
-> +
-> +	device_remove_bin_file(&pdev->dev, &sid_bin_attr); /* fixme: remove when using sysfs bin attrs */
-> +	sid_data = platform_get_drvdata(pdev);
-> +	dev_dbg(&pdev->dev, "driver unloaded\n");
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id sunxi_sid_of_match[] = {
-> +	{ .compatible = "allwinner,sun4i-sid", .data = (void *)16},
-> +	{ .compatible = "allwinner,sun7i-a20-sid", .data = (void *)512},
-> +	{/* sentinel */},
-> +};
-> +MODULE_DEVICE_TABLE(of, sunxi_sid_of_match);
-> +
-> +static int __init sunxi_sid_probe(struct platform_device *pdev)
-> +{
-> +	struct sunxi_sid_data *sid_data;
-> +	struct resource *res;
-> +	const struct of_device_id *of_dev_id;
-> +	u8 *entropy;
-> +	unsigned int i;
-> +
-> +	sid_data = devm_kzalloc(&pdev->dev, sizeof(struct sunxi_sid_data),
-> +				GFP_KERNEL);
-> +	if (!sid_data)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	sid_data->reg_base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(sid_data->reg_base))
-> +		return PTR_ERR(sid_data->reg_base);
-> +
-> +	of_dev_id = of_match_device(sunxi_sid_of_match, &pdev->dev);
-> +	if (!of_dev_id)
-> +		return -ENODEV;
-> +	sid_data->keysize = (int)of_dev_id->data;
-> +
-> +	platform_set_drvdata(pdev, sid_data);
-> +
-> +	sid_bin_attr.size = sid_data->keysize; /* fixme: this should be properly set by the sysfs bin attr groups later */
-> +	if (device_create_bin_file(&pdev->dev, &sid_bin_attr)) /* fixme: this will need to be removed when using sysfs bin attr groups */
-> +		return -ENODEV;
-> +
-> +	entropy = kzalloc(sizeof(u8) * sid_data->keysize, GFP_KERNEL);
-> +	for (i = 0; i < sid_data->keysize; i++)
-> +		entropy[i] = sunxi_sid_read_byte(sid_data, i);
-> +	add_device_randomness(entropy, sid_data->keysize);
-> +	kfree(entropy);
-> +
-> +	dev_dbg(&pdev->dev, "loaded\n");
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver sunxi_sid_driver = {
-> +	.probe = sunxi_sid_probe,
-> +	.remove = sunxi_sid_remove,
-> +	.driver = {
-> +		.name = DRV_NAME,
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = sunxi_sid_of_match,
-> +		/* .groups = sunxi_sid_groups, fixme: this is the proper way using bin attr groups */
-> +	},
-> +};
-> +module_platform_driver(sunxi_sid_driver);
+> If I register this widget against the platform DAPM context, then there is
+> no connection between this widget and the CPU DAI streams.  (Bear in mind
+> that at the time I tried this, I had disabled the creation of the stream
+> widgets that were overwriting the platform stream widgets - because you
+> were not providing any useful information to work around that problem.)
 
-As the probe function is marked __init, and this is a non-hotpluggable 
-device, I think you should use module_platform_driver_probe(...) instead 
-of module_platform_driver(...)
+> If I register this widget against the CPU DAI DAPM context, the stream
+> name is matched to the CPU DAI streams, and a connection is made between
+> the stream widgets and my widget.
 
-> +
-> +MODULE_AUTHOR("Oliver Schinagl <oliver@schinagl.nl>");
-> +MODULE_DESCRIPTION("Allwinner sunxi security id driver");
-> +MODULE_LICENSE("GPL");
->
+> This is what I mean by "some bindings only happen within a context".
 
-Thanks for working on this!
+This is happening because you're doing things based on the stream name -
+stream names aren't really DAPM routes, they're magic things which only
+work on the same DAPM context.  Previously we used to go through and do
+the string compare to look up widgets outside of DAPM at runtime which
+on a per device basis (though that made little difference since the only
+devices supported were CODECs which are always a single device and
+context), the current implementation replicates this functionality
+exactly using DAPM routes and the long term plan is that no stream names
+will be specified in widgets.
 
-Emilio
+If you omit the stream name and add the routes via a routing table you
+should at least get some error messages.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130901/6ff3aedc/attachment.sig>
