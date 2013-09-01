@@ -1,67 +1,54 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 1 Sep 2013 09:04:20 +0200
-Subject: [PATCH 2/2] ARM: Dove: Add the audio device to the Cubox DT
-In-Reply-To: <20130831112430.GD6617@n2100.arm.linux.org.uk>
-References: <20130828113521.35c53365@armhf> <521DCD80.9010105@gmail.com>
- <20130831125128.0e3a23c7@armhf>
- <20130831112430.GD6617@n2100.arm.linux.org.uk>
-Message-ID: <20130901090420.526e3bc3@armhf>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sun,  1 Sep 2013 09:28:01 +0200
+Subject: [PATCH v3 0/7] ARM: imx27 pinctrl
+Message-ID: <1378020488-21129-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 31 Aug 2013 12:24:31 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Hi,
 
-> > According to the Dove specification, the audio controller works with
-> > the samples rates 44.1, 48 and 96 kHz, so, I don't see the usage of the
-> > external clock, except when using the two audio controllers with
-> > different sample rates.  
-> 
-> I don't see what the Dove specification has to do with that statement:
-> what the Dove spec says is that if you use just the internal DCO, then
-> only 44.1kHz, 48kHz and 96kHz are supported (with some trimming of that.)
-> However, the use of an external clock allows further rates to be supported.
-> If you have an external clock, there is no requirement to use the DCO for
-> those sample rates - you can if you wish, or you can use the external clock.
-> 
-> The mainline driver implements the use of the DCO for the standard 44.1,
-> 48 and 96kHz rates, otherwise it uses the external clock if present.  This
-> is entirely conformant with the Dove spec.
+this series implements a imx27 pinctrl driver. imx1/21/27 have a register
+format that is not compatible with the rest of imx series processors. The
+series adds a imx1 core driver for the different register layout.
 
-Russell,
+Regards,
 
-I looked again at the Armada-510-Functional-Spec, and I found:
+Markus
 
-- section 12.1
-	...
-	I2S Supported Features
-		An audio sample rate (Fs) of 44.1/48/96 kHz.
-		...
-	S/PDIF Supported Features
-		The IEC60958-1, IEC60958-3, and IEC61937 specifications.
-		An audio sample rate (Fs) of 44.1/48/96 kHz.
-		...
+Changes since v2:
+ - Some fixes in dts files and documentation
 
-- Table 436: Clocks Control Register
-	     Offset: Unit0: 0x000B1230, Unit1: 0x000B5230
-	...
-	1:0 MCLK source RW  MCLK = 256 Fs, where Fs = 44.1 kHz, 48 kHz, 96 kHz.
-			0x0 Playback should not be active when selecting an external MCLK, or moving
-			    from one external MCLK to another MCLK source.
-			    0 = DCO: MCLK is from DCO.
-			    1 = Reserved
-			    2 = Reserved
-			    3 = External: MCLK is from an external source.
+Changes since v1:
+ - Removed changes of gpio-mxc driver
+ - imx and imx1-core drivers are completely seperated now
+ - Splitted DT pinctrl entries into imx27.dtsi and board files
+ - Other style changes
 
-As they don't work with my TV set, may you confirm that these webradios
+Markus Pargmann (7):
+      pinctrl: imx1 core driver
+      pinctrl: imx27: imx27 pincontrol driver
+      ARM: dts: imx27 pin functions
+      ARM: dts: imx27 pinctrl
+      ARM: dts: imx27 phyCARD-S pinctrl
+      ARM: dts: imx27 phycore pinctrl
+      ARM: imx27: enable pinctrl
 
-	http://kerne.online.stalig.net/live-ori.ogg
-	http://www.tv-radio.com/station/france_bleu_breiz_izel_mp3/france_bleu_breiz_izel_mp3-32k.m3u
-	http://plumfm.online.stalig.net/live-ori.ogg
-
-work for you with the external clock? (sample rates resp. 33.075, 24
-and 22.05 kHz)
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+ .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  50 ++
+ arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts   |  10 +
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts   |   4 +
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts     |   2 +
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dts     |   6 +
+ arch/arm/boot/dts/imx27-pinfunc.h                  | 524 +++++++++++++++++
+ arch/arm/boot/dts/imx27.dtsi                       | 102 ++++
+ arch/arm/mach-imx/Kconfig                          |   2 +
+ drivers/pinctrl/Kconfig                            |  13 +
+ drivers/pinctrl/Makefile                           |   2 +
+ drivers/pinctrl/pinctrl-imx1-core.c                | 649 +++++++++++++++++++++
+ drivers/pinctrl/pinctrl-imx1.h                     |  73 +++
+ drivers/pinctrl/pinctrl-imx27.c                    | 477 +++++++++++++++
+ 13 files changed, 1914 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+ create mode 100644 arch/arm/boot/dts/imx27-pinfunc.h
+ create mode 100644 drivers/pinctrl/pinctrl-imx1-core.c
+ create mode 100644 drivers/pinctrl/pinctrl-imx1.h
+ create mode 100644 drivers/pinctrl/pinctrl-imx27.c
