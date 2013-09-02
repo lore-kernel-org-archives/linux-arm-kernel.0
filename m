@@ -1,50 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 2 Sep 2013 10:37:47 +0100
-Subject: [GIT PULL] Final pull-request due for the v3.12 merge window
-Message-ID: <20130902093747.GI12341@lee--X1>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 02 Sep 2013 11:41:29 +0200
+Subject: [PATCH 2/2] ARM: EXYNOS: add cpuidle-exynos.max_states kernel
+ parameter
+In-Reply-To: <52245239.4000903@linaro.org>
+References: <4002844.4ZqqJexTv4@amdc1032> <52245239.4000903@linaro.org>
+Message-ID: <7429815.RzOHxBbusd@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2b274fe522e9d5ac7397e07e3516bb10e3c2ee92:
+On Monday, September 02, 2013 10:54:17 AM Daniel Lezcano wrote:
+> On 08/30/2013 12:21 PM, Bartlomiej Zolnierkiewicz wrote:
+> > Add "cpuidle-exynos.max_states=" parameter to allow user to specify
+> > the maximum of allowed CPU idle states for ARM EXYNOS cpuidle driver.
+> > 
+> > This change is needed because C1 state (AFTR mode) is often not able
+> > to work properly due to incompatibility with some bootloader versions.
+> > 
+> > Usage examples:
+> > 
+> > "cpuidle-exynos.max_states=1" disables C1 state (AFTR mode).
+> > 
+> > "cpuidle-exynos.max_states=0" disables the driver completely.
+> > 
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Cc: Tomasz Figa <t.figa@samsung.com>
+> > Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> 
+> There is a max_cstate option for acpi and intel idle. There is also the
+> cpuidle.off=1 option. As the semantic is the same, I think adding a
+> common cpuidle option usable for all the drivers is better.
 
-  mfd: 88pm805: Fix potential NULL pdata dereference (2013-09-02 11:00:16 +0200)
+I thought about making the option common for all cpuidle drivers first
+but due to support for multiple cpuidle drivers on one machine (i.e.
+big.LITTLE), per-driver option looked like a better approach.
 
-are available in the git repository at:
+Should I make the option common and not worry about multiple drivers on
+one machine support?
 
-  git://git.linaro.org/people/ljones/mfd.git tags/mfd-lee-3.12-2
-
-for you to fetch changes up to 02a0bf6e351de6bcda4ddeeb2af34197a4e6d591:
-
-  mfd: ucb1x00-core: Rewrite ucb1x00_add_dev() (2013-09-02 10:22:46 +0100)
-
-----------------------------------------------------------------
-mfd-lee-3.12-2
-
-These are the final patches due for the v3.12 merge window.
-
-----------------------------------------------------------------
-Lee Jones (3):
-      mfd: ab8500-debugfs: Apply a check for -ENOMEM after allocating memory for sysfs
-      mfd: ab8500-debugfs: Apply a check for -ENOMEM after allocating memory for event name
-      mfd: ucb1x00-core: Rewrite ucb1x00_add_dev()
-
-Sachin Kamat (7):
-      mfd: omap-usb-host: Staticize usbhs_driver_name
-      mfd: db8500-prcmu: Use ANSI function declaration
-      mfd: db8500-prcmu: Staticize clk_mgt
-      mfd: ab8500-debugfs: Staticize local variables
-      mfd: timberdale: Staticize local variables
-      mfd: timberdale: Remove redundant break
-      mfd: timberdale: Use module_pci_driver
-
- drivers/mfd/ab8500-debugfs.c | 14 ++++++++++----
- drivers/mfd/db8500-prcmu.c   |  4 ++--
- drivers/mfd/omap-usb-host.c  |  2 +-
- drivers/mfd/timberdale.c     | 34 +++-------------------------------
- drivers/mfd/ucb1x00-core.c   | 28 +++++++++++++++-------------
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
