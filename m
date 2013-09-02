@@ -1,25 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Sep 2013 13:48:28 +0100
-Subject: [PATCH v2] ARM: highbank: fix debug uart virtual address for LPAE
-In-Reply-To: <1376784748-31914-1-git-send-email-robherring2@gmail.com>
-References: <1376784748-31914-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20130902124828.GT6617@n2100.arm.linux.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 02 Sep 2013 15:14:37 +0200
+Subject: [PATCH 1/4] ARM: shmobile: r8a7778: add Ether DT support
+In-Reply-To: <201309010315.49763.sergei.shtylyov@cogentembedded.com>
+References: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
+ <201309010315.49763.sergei.shtylyov@cogentembedded.com>
+Message-ID: <1643070.uIkONXsrBj@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 17, 2013 at 07:12:28PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+Hi Sergei,
+
+Thank you for the patch.
+
+On Sunday 01 September 2013 03:15:48 Sergei Shtylyov wrote:
+> Define the generic R8A777x part of the Ether device node.
 > 
-> Section entries are 2MB on LPAE, so the DEBUG_LL virtual address must
-> have the same offset in the 2MB section as the physical address. This
-> fixes async external aborts when DEBUG_LL is enabled on Midway.
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 > ---
-> v2: Rebase on Russell's DEBUG_LL clean-up
+>  arch/arm/boot/dts/r8a7778.dtsi |   11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> Index: renesas/arch/arm/boot/dts/r8a7778.dtsi
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7778.dtsi
+> +++ renesas/arch/arm/boot/dts/r8a7778.dtsi
+> @@ -98,4 +98,15 @@
+>  		reg = <0xfffc000 0x118>;
+>  		#gpio-range-cells = <3>;
+>  	};
+> +
+> +	ether: ethernet at fde00000 {
+> +		device_type = "network";
 
-Do you also want to do a patch for this for v3.11, because if it's wrong
-in my series, it's wrong in mainline at the moment:
+Documentation/devicetree/bindings/net/sh_eth.txt from "[PATCH 2/2] sh_eth: add 
+device tree support" doesn't document this property, should you update it ?
 
--               ldr     \rv, =0xfee36000
--               ldr     \rp, =0xfff36000
+> +		compatible = "renesas,ether-r8a7779";
+> +		reg = <0xfde00000 0x400>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 105 0x4>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		status = "disabled";
+> +	};
+>  };
+
+-- 
+Regards,
+
+Laurent Pinchart
