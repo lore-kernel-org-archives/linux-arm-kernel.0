@@ -1,48 +1,93 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 2 Sep 2013 17:41:34 +0100
-Subject: [alsa-devel] [PATCH 00/14] SPDIF support
-In-Reply-To: <20130902145722.GA12808@n2100.arm.linux.org.uk>
-References: <20130831123458.GF6617@n2100.arm.linux.org.uk>
- <52220B9A.9000007@metafoo.de>
- <20130831191414.GG6617@n2100.arm.linux.org.uk>
- <20130831193431.GI6617@n2100.arm.linux.org.uk>
- <20130902144713.GR3084@sirena.org.uk>
- <20130902145207.GY6617@n2100.arm.linux.org.uk>
- <20130902145722.GA12808@n2100.arm.linux.org.uk>
-Message-ID: <20130902164134.GU3084@sirena.org.uk>
+From: drasko.draskovic@gmail.com (Drasko DRASKOVIC)
+Date: Mon, 2 Sep 2013 19:01:04 +0200
+Subject: No subject
+Message-ID: <CAEk6gTAXpp1XBM5SNf73NtZF2H28NaUnDJfJDE+b=GPy6pC3Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 02, 2013 at 03:57:22PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 02, 2013 at 03:52:07PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Sep 02, 2013 at 03:47:13PM +0100, Mark Brown wrote:
+Hi all,
+In socfpga.dts I can see following definitions :
 
-> > > > This is caused because substream->ops is NULL.  Why that's the case,
-> > > > I don't know, but I believe the PCM which is trying to be operated on
-> > > > is the one registered against the backend (by snd_pcm_new_internal).
+/* Local timer */
+timer at fffec600 {
+compatible = "arm,cortex-a9-twd-timer";
+reg = <0xfffec600 0x100>;
+interrupts = <1 13 0xf04>;
+};
 
-> > > Liam did provide you with a workaround for this one along with a
-> > > suggested proper fix.  Have you had any success in using this
-> > > workaround, or with implementing the proper fix for that matter?  I
-> > > don't recall seeing any feedback on the results but perhaps I missed it.
+timer0: timer0 at ffc08000 {
+compatible = "snps,dw-apb-timer-sp";
+interrupts = <0 167 4>;
+reg = <0xffc08000 0x1000>;
+};
 
-> > I am not aware of any such patch.
+timer1: timer1 at ffc09000 {
+compatible = "snps,dw-apb-timer-sp";
+interrupts = <0 168 4>;
+reg = <0xffc09000 0x1000>;
+};
 
-> That was a little hasty - I should say: I have not received any such patch
-> and I have nothing which suggests that a solution to this problem was even
-> outlined.  (I have checked my mailbox for anything from Liam, of which
-> there are a very small number of such mails.)
+timer2: timer2 at ffd00000 {
+compatible = "snps,dw-apb-timer-osc";
+interrupts = <0 169 4>;
+reg = <0xffd00000 0x1000>;
+};
 
-I was thinking of this:
+timer3: timer3 at ffd01000 {
+compatible = "snps,dw-apb-timer-osc";
+interrupts = <0 170 4>;
+reg = <0xffd01000 0x1000>;
+};
 
-   http://article.gmane.org/gmane.linux.alsa.devel/111647
 
-where Liam suggests setting some ops as a workaround and that the
-framework should just check for them before dereferencing otherwise.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130902/996d10ea/attachment-0001.sig>
+However, from my board's shell :
+root at socfpga_cyclone5:~# cat /proc/interrupts
+           CPU0       CPU1
+525:      24935      24717       GIC  twd
+648:        801          0       GIC  eth0
+653:          0          0       GIC  dwc_otg, dwc_otg_pcd, dwc_otg_hcd:usb1
+656:          0          0       GIC  dwc_otg, dwc_otg_pcd, dwc_otg_hcd:usb2
+667:     163006          0       GIC  dw-mci
+679:          0          0       GIC  ff705000.spi
+682:          0          0       GIC  dw_spi0
+684:          0          0       GIC  dw_spi1
+686:          6          0       GIC  ffc04000.i2c
+687:          0          0       GIC  ffc05000.i2c
+690:       2390          0       GIC  serial
+697:          9          0       GIC  timer2
+IPI0:          0          0  CPU wakeup interrupts
+IPI1:          0          0  Timer broadcast interrupts
+IPI2:       1268       1289  Rescheduling interrupts
+IPI3:          0          0  Function call interrupts
+IPI4:          3          1  Single function call interrupts
+IPI5:          0          0  CPU stop interrupts
+Err:          0
+
+So, I can see only timer2.
+
+root at socfpga_cyclone5:~# find / -name "timer*"
+/proc/timer_list
+/proc/device-tree/soc/timer3 at ffd01000
+/proc/device-tree/soc/timer2 at ffd00000
+/proc/device-tree/soc/timer1 at ffc09000
+/proc/device-tree/soc/timer0 at ffc08000
+/proc/device-tree/soc/timer at fffec600
+/proc/device-tree/aliases/timer3
+/proc/device-tree/aliases/timer2
+/proc/device-tree/aliases/timer1
+/proc/device-tree/aliases/timer0
+/sys/kernel/debug/tracing/events/timer
+/sys/kernel/debug/tracing/events/timer/timer_cancel
+/sys/kernel/debug/tracing/events/timer/timer_expire_exit
+/sys/kernel/debug/tracing/events/timer/timer_expire_entry
+/sys/kernel/debug/tracing/events/timer/timer_start
+/sys/kernel/debug/tracing/events/timer/timer_init
+/sys/module/oprofile/parameters/timer
+root at socfpga_cyclone5:~#
+
+Where is defined which timer will be present, activated and
+initialized on the board - i.e. only timer2 is active in this case,
+and I would like to use timer1.
+
+BR,
+Drasko
