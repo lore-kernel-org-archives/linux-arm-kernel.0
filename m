@@ -1,35 +1,32 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 02 Sep 2013 10:28:39 +0900
-Subject: [PATCH] iommu/arm-smmu: use devm_ioremap_resource() instead of
- devm_request_and_ioremap()
-Message-ID: <005201cea77b$c0e14d90$42a3e8b0$%han@samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun,  1 Sep 2013 23:11:08 -0300
+Subject: [PATCH] ARM: mxs: pm: Include "pm.h"
+Message-ID: <1378087868-29744-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_ioremap_resource() because devm_request_and_ioremap() is
-obsoleted by devm_ioremap_resource().
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+Include "pm.h" in order to fix the following sparse warning:
+
+arch/arm/mach-mxs/pm.c:37:13: warning: symbol 'mxs_pm_init' was not declared. Should it be static?
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- drivers/iommu/arm-smmu.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-mxs/pm.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index f417e89..31c709c 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1786,9 +1786,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	}
+diff --git a/arch/arm/mach-mxs/pm.c b/arch/arm/mach-mxs/pm.c
+index b2494d2..0170e99 100644
+--- a/arch/arm/mach-mxs/pm.c
++++ b/arch/arm/mach-mxs/pm.c
+@@ -15,6 +15,7 @@
+ #include <linux/kernel.h>
+ #include <linux/suspend.h>
+ #include <linux/io.h>
++#include "pm.h"
  
- 	smmu->size = resource_size(res);
--	smmu->base = devm_request_and_ioremap(dev, res);
--	if (!smmu->base)
--		return -EADDRNOTAVAIL;
-+	smmu->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(smmu->base))
-+		return PTR_ERR(smmu->base);
- 
- 	if (of_property_read_u32(dev->of_node, "#global-interrupts",
- 				 &smmu->num_global_irqs)) {
+ static int mxs_suspend_enter(suspend_state_t state)
+ {
 -- 
-1.7.10.4
+1.8.1.2
