@@ -1,68 +1,40 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 02 Sep 2013 15:48:12 +0200
-Subject: [PATCH 2/2] ARM: EXYNOS: add cpuidle-exynos.max_states kernel
- parameter
-In-Reply-To: <5224903B.9050404@linaro.org>
-References: <4002844.4ZqqJexTv4@amdc1032> <7429815.RzOHxBbusd@amdc1032>
- <5224903B.9050404@linaro.org>
-Message-ID: <2459763.PzPngK0oec@amdc1032>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Sep 2013 14:58:42 +0100
+Subject: [PATCH v4] ARM: Add check for Cortex-A15 errata 798181 ECO
+In-Reply-To: <1377440747-4564-1-git-send-email-robherring2@gmail.com>
+References: <1377440747-4564-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20130902135842.GU6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 02, 2013 03:18:51 PM Daniel Lezcano wrote:
-> On 09/02/2013 11:41 AM, Bartlomiej Zolnierkiewicz wrote:
-> > On Monday, September 02, 2013 10:54:17 AM Daniel Lezcano wrote:
-> >> On 08/30/2013 12:21 PM, Bartlomiej Zolnierkiewicz wrote:
-> >>> Add "cpuidle-exynos.max_states=" parameter to allow user to specify
-> >>> the maximum of allowed CPU idle states for ARM EXYNOS cpuidle driver.
-> >>>
-> >>> This change is needed because C1 state (AFTR mode) is often not able
-> >>> to work properly due to incompatibility with some bootloader versions.
-> >>>
-> >>> Usage examples:
-> >>>
-> >>> "cpuidle-exynos.max_states=1" disables C1 state (AFTR mode).
-> >>>
-> >>> "cpuidle-exynos.max_states=0" disables the driver completely.
-> >>>
-> >>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> >>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> >>> Cc: Tomasz Figa <t.figa@samsung.com>
-> >>> Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> >>
-> >> There is a max_cstate option for acpi and intel idle. There is also the
-> >> cpuidle.off=1 option. As the semantic is the same, I think adding a
-> >> common cpuidle option usable for all the drivers is better.
-> > 
-> > I thought about making the option common for all cpuidle drivers first
-> > but due to support for multiple cpuidle drivers on one machine (i.e.
-> > big.LITTLE), per-driver option looked like a better approach.
-> > 
-> > Should I make the option common and not worry about multiple drivers on
-> > one machine support?
+On Sun, Aug 25, 2013 at 09:25:47AM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Mmh, that's a good point.
+> The work-around for A15 errata 798181 is not needed if appropriate ECO
+> fixes have been applied to r3p2 and earlier core revisions. This can be
+> checked by reading REVIDR register bits 4 and 9. If only bit 4 is set,
+> then the IPI broadcast can be skipped.
 > 
-> I am not in favor of multiple options spread across the different
-> drivers. Furthermore the max_cstate is used in the intel platform to
-> 'discover' what states the firmware supports which is not the case of
-> the cpuidle ARM drivers (except new PSCI based). This option does not
-> really fits well here.
-> 
-> There is the kernel parameter 'cpuidle.off', so disabling the driver is ok.
-> 
-> You converted the cpuidle driver to a platform driver. Isn't possible to
-> pass information in the platform data field at boot time to tell AFTR is
-> not supported and then act on the 'disabled' field of this state ?
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 
-It might be possible but I don't know where the source of this data would
-be, platform specific kernel parameter? It sounds just like moving the code
-around and adding superfluous platform->driver code because the similar
-kernel parameter to disable just AFTR can be added in cpuidle-exynos driver
-as well.
+So, this patch in the patch system claims to be against v3.11-rc2:
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+$ git checkout v3.11-rc2
+...
+$ pdb gitapply 7804/2
+Patching 7804/2...
+git apply --whitespace=fix -p1 --index --check > /tmp/pdb.15757 2>&1 exited with non-zero status: 256
+error: patch failed: arch/arm/include/asm/tlbflush.h:443
+error: arch/arm/include/asm/tlbflush.h: patch does not apply
+error: patch failed: arch/arm/kernel/smp_tlb.c:70
+error: arch/arm/kernel/smp_tlb.c: patch does not apply
+error: patch failed: arch/arm/mm/context.c:245
+error: arch/arm/mm/context.c: patch does not apply
+
+> v3:
+> - Rebase to v3.11-rc5 due to commit 1f49856 (ARM: 7789/1: Do not run
+>  dummy_flush_tlb_a15_erratum() on non-Cortex-A15)
+> - Move the revision checking out of line and use function ptrs.
+
+Hmm, so -rc5 not -rc2 that you put into the patch system...  Also, the
+patch you put into the patch system didn't have Will's ack on it.
