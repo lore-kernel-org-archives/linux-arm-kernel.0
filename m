@@ -1,21 +1,41 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 2 Sep 2013 10:46:21 +0100
-Subject: [PATCH v2] arm64: add support for kernel mode NEON
-In-Reply-To: <CAKv+Gu_KsXMM=ax4+0ozZchEidZ=6NktWQ+iw1Q45xUEtCYi7A@mail.gmail.com>
-References: <1373375892-25390-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_KsXMM=ax4+0ozZchEidZ=6NktWQ+iw1Q45xUEtCYi7A@mail.gmail.com>
-Message-ID: <20130902094620.GE64064@MacBook-Pro.local>
+Date: Mon, 2 Sep 2013 12:28:27 +0100
+Subject: [PATCH 1/1] arm64: Align an assembler string properly
+In-Reply-To: <CAC8NTUWvEYpugbUfZ3A54zFbS71mnChfCk2sVKUxxxWAHz+nRw@mail.gmail.com>
+References: <CAC8NTUWvEYpugbUfZ3A54zFbS71mnChfCk2sVKUxxxWAHz+nRw@mail.gmail.com>
+Message-ID: <20130902112827.GG64064@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 02, 2013 at 08:13:16AM +0100, Ard Biesheuvel wrote:
-> Now that the ARM version of this patch has been accepted by Russell,
-> would you please consider taking this in as well?
+On Mon, Sep 02, 2013 at 11:48:02AM +0100, Radha Mohan wrote:
+> From: Corey Minyard <cminyard@mvista.com>
+> 
+> Do a proper align and put it in the right section.
+> 
+> Signed-off-by: Corey Minyard <cminyard@mvista.com>
+> ---
+>  arch/arm64/mm/proc.S |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 76d8320..1f89adc 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -95,10 +95,11 @@ ENTRY(cpu_do_switch_mm)
+>         ret
+>  ENDPROC(cpu_do_switch_mm)
+> 
+> +       .section ".rodata"
+>  cpu_name:
+>         .ascii  "AArch64 Processor"
+> -       .align
+> 
+> +       .align 3
+>         .section ".text.init", #alloc, #execinstr
 
-It's already in my 'upstream' branch (and linux-next). It will get into
-3.12.
-
-Thanks.
+Oh, we still have this in proc.S. I moved it long time ago to
+arch/arm64/kernel/cputable.c but forgot about this. It compiles fine
+after removing it completely.
 
 -- 
 Catalin
