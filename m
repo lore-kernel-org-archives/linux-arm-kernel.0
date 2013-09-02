@@ -1,7 +1,7 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 2 Sep 2013 23:35:00 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Sep 2013 00:00:11 +0100
 Subject: [alsa-devel] [PATCH 00/14] SPDIF support
-In-Reply-To: <20130902211830.GA6617@n2100.arm.linux.org.uk>
+In-Reply-To: <20130902223500.GA3084@sirena.org.uk>
 References: <20130901123433.GR6617@n2100.arm.linux.org.uk>
  <20130902140632.GQ3084@sirena.org.uk>
  <20130902141631.GV6617@n2100.arm.linux.org.uk>
@@ -9,109 +9,160 @@ References: <20130901123433.GR6617@n2100.arm.linux.org.uk>
  <20130902165932.GZ6617@n2100.arm.linux.org.uk>
  <20130902204421.GW3084@sirena.org.uk>
  <20130902211830.GA6617@n2100.arm.linux.org.uk>
-Message-ID: <20130902223500.GA3084@sirena.org.uk>
+ <20130902223500.GA3084@sirena.org.uk>
+Message-ID: <20130902230011.GC6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 02, 2013 at 10:18:30PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 02, 2013 at 09:44:21PM +0100, Mark Brown wrote:
+On Mon, Sep 02, 2013 at 11:35:00PM +0100, Mark Brown wrote:
+> Not in this patch series as far as I can see, there appear to be no
+> references to the dummy DAI in it.  From a comment later on in your mail
+> I suspect you're thinking of the result of adding some additional
+> changes to the series, please squash those into the existing patches
+> appropriately and resubmit.
 
-> > If the binding is representing the differences between those two in the
-> > DT then the DT binding is clearly not good since it is exposing Linux
-> > implementation details - all the binding needs to say is that there's
-> > something connected to the S/PDIF output of the audio controller.
+I'm thinking of making _no_ changes to this series at present, because
+I fail to see anything wrong with it.
 
-> Can you explain how the kernel would know the difference between a DPCM
-> and a non-DPCM setup from just the information in the DT please?
+As for "no references to the dummy DAI in it" - I did mention the
+additional patch which is _not_ part of this series which contains
+the changes to enable DPCM.  Here's an extract which I posted just
+two messages before this one of the resulting DAI link structure:
 
-In the short term from the machine driver of course - linking things
-together is what it's there for.  In the longer term I'd expect that the
-compatible string could be moved over to a generic machine driver which
-can understand the way we're representing the device internally, or
-perhaps we'll change that internal representation and it'd do something
-totally different anyway, but no need to worry about that for now.
+Here's the DPCM version:                                                        
+                                                                                
+        {                                                                       
+                .name = "S/PDIF1",                                              
+                .stream_name = "Audio Playback",                                
+                .platform_name = "mvebu-audio.1",                               
+                .cpu_dai_name = "mvebu-audio.1",                                
+                .codec_name = "snd-soc-dummy",                                  
+                .codec_dai_name = "snd-soc-dummy-dai",                          
+                .dynamic = 1,                                                   
+        }, {                                                                    
+                .name = "Codec",                                                
+                .stream_name = "IEC958 Playback",                               
+                .cpu_dai_name = "snd-soc-dummy-dai",                            
+                .platform_name = "snd-soc-dummy",                               
+                .no_pcm = 1,                                                    
+                .codec_dai_name = "dit-hifi",                                   
+                .codec_name = "spdif-dit",                                      
+        },                                                                      
 
-> > > > What we have been telling you is that if there is a DAI link present
-> > > > (there should be one for each physical DAI link) then this should be
-> > > > enough information for the framework to know that the two DAIs are
-> > > > linked and if any routes are needed in DAPM these should be added
-> > > > automatically in the same way that we add links for CODEC<->CODEC links
-> > > > at present.
+Please see the second entry.  This is the backend DAI setup.  This refers
+to the dummy DAI for the CPU, and has 'no_pcm' set - both of which I
+believe are required to indicate that this is representing a backend DAI.
 
-> Your reply to my question about DPCM seems to be talking about the
-> dual-DAI solution.  Maybe you need to be more specific about what
-> "two DAIs" you are referring to.
+As I've said before, the reason I haven't included this file is that it
+is unclear that it is useful for non-DT setups.  As there is no non-DT
+Cubox support in the kernel and never will be, I don't see any point
+submitting it as part of this series.
 
-The two DAIs that are linked by a DAI link are the two DAIs at either
-end of the link, for example the I2S DAI on the SoC and the I2S DAI on
-the CODEC.
+Secondly, I don't see the point of it being part of this series, because
+if we merge the changes for DPCM support, the thing falls apart - I'm
+not going to list the problems yet again.
 
-> > As you are aware DPCM supports multiple DAIs and a good DPCM
-> > implementation for this hardware will have one front end DAI for the DMA
-> > and two back end DAIs, one for the S/PDIF interface and one for the I2S
-> > interface.
+> > Notice that for the DPCM BE, there is no CPU-layer involvement here.
+> 
+> > The difference here is that at the moment, with this patch series plus
+> > the DPCM add-on patch, I am only creating one BE, but that BE is being
+> > created in exactly the same way as the above is doing.
+> 
+> You should have one back end DAI per physical DAI.
 
-> Isn't that what this patch series creates - the front end DAI is the CPU
-> DAI, and the backend DAIs are provided by the snd-soc-dummy-dai.  I
+What do you mean "physical DAI"?  Do you mean "CPU DAI" which would be a
+front end DAI?
 
-Not in this patch series as far as I can see, there appear to be no
-references to the dummy DAI in it.  From a comment later on in your mail
-I suspect you're thinking of the result of adding some additional
-changes to the series, please squash those into the existing patches
-appropriately and resubmit.
+Liam told me that it was possible to have multiple backends for a single
+front end.  You've also told me on IRC:
 
-> Notice that for the DPCM BE, there is no CPU-layer involvement here.
+16:29 < broonie> I have a pretty good idea of how I'd expect to see the
+ hardware represented - two BEs for the DAIs connected to a FE for the DMA.
 
-> The difference here is that at the moment, with this patch series plus
-> the DPCM add-on patch, I am only creating one BE, but that BE is being
-> created in exactly the same way as the above is doing.
+That isn't two FEs.  You explicitly state there "two BEs" for a single FE.
 
-You should have one back end DAI per physical DAI.
+> > > This is why in the above message I reminded you of the suggestion that
+> > > until the framework does automatically figure out that those routes
+> > > should be there the routes are manually added in the driver clearly
+> > > marked so they can easily be removed when the framework does the right
+> > > thing here.
+> 
+> > I'm not sure how the framework could figure out these things
+> > automatically.  If you go back to the diagram which I drew you for
+> > Liam's driver, it's not a simple CPU-AIF to Codec linkage - there's
+> > a mixer in the middle of it as well.  There's also feedback from that
+> 
+> This is not correct, there is no mixer in the link between the back end
+> and the CODEC.
 
-> > This is why in the above message I reminded you of the suggestion that
-> > until the framework does automatically figure out that those routes
-> > should be there the routes are manually added in the driver clearly
-> > marked so they can easily be removed when the framework does the right
-> > thing here.
+Let me re-post the structure of the widgets linking the codecs streams and
+CPU streams in Liam's driver then.
 
-> I'm not sure how the framework could figure out these things
-> automatically.  If you go back to the diagram which I drew you for
-> Liam's driver, it's not a simple CPU-AIF to Codec linkage - there's
-> a mixer in the middle of it as well.  There's also feedback from that
+CPU DAI drivers:    DAI stream names:
+--------------------------------------
+System Pin          System Playback
+Offload0 Pin        Offload0 Playback
+Offload1 Pin        Offload1 Playback
+Loopback Pin        Loopback Capture
+Capture Pin         Analog Capture
 
-This is not correct, there is no mixer in the link between the back end
-and the CODEC.
+DAPM routes:
+[s]System Playback   --------v           .----> [aif]SSP0 CODEC OUT
+[s]Offload0 Playback ---> [w]Playback VMixer
+[s]Offload1 Playback --------^           `----> [s]Loopback Capture
+ 
+[aif]SSP0 CODEC IN ---> [s]Analog Capture
 
-> mixer (which is on the output side) to an input stream to the CPU DAI
-> side.
+where [s] is a stream widget, [w] is a DAPM widget, and [aif] is an
+AIF widget.
 
-> Liam also suggested that there could be DAPM routing which can control
-> how the FE and BEs are linked together.
+Looks like there's a mixer in there to me.  It may not be a bit of
+hardware which actually does mixing or anything (I don't know what it
+does) but that appears to be DAPM structure which Liam creates between
+the CPU streams and the codecs.
 
-This is correct, it is in fact required for operation - you are of
-course well aware that front ends and back ends are not connected using
-DAI links but are instead connected using normal DAPM links.  This
-should all be very simple for Kirkwood.
+> > mixer (which is on the output side) to an input stream to the CPU DAI
+> > side.
+> 
+> > Liam also suggested that there could be DAPM routing which can control
+> > how the FE and BEs are linked together.
+> 
+> This is correct, it is in fact required for operation - you are of
+> course well aware that front ends and back ends are not connected using
+> DAI links but are instead connected using normal DAPM links.  This
+> should all be very simple for Kirkwood.
 
-> So, I still don't see that there is anything wrong with my patch series
-> plus DPCM-enabling patch, apart from the issues which I've reported.
-> Maybe you could review it and provide specific comments against the
-> patches highlighting the code which you have issues with.
+And these are the DAPM routes which you're telling me to put a comment
+against because they will need to be removed.  I can't see why they'd
+ever need to be removed, and I can't see how ASoC could possibly
+know the structure between the CPU and codec in DPCM solutions.
 
-I think the most serious issues with the current series were already
-covered by Lars-Peter and the discussion in these subtreads, no need to
-repeat things.
+> > So, I still don't see that there is anything wrong with my patch series
+> > plus DPCM-enabling patch, apart from the issues which I've reported.
+> > Maybe you could review it and provide specific comments against the
+> > patches highlighting the code which you have issues with.
+> 
+> I think the most serious issues with the current series were already
+> covered by Lars-Peter and the discussion in these subtreads, no need to
+> repeat things.
 
-> As for providing ALSA with a set of PCM operations, I'm not sure what
-> they should be for a DPCM backend.
+Sorry, I thought Lars-Peter's comments were about getting something that
+would be acceptable to go in _before_ DPCM was in a working state.
 
-Unless there is a need to actually take some action you can, naturally,
-provide stubs.  You should provide the minimal set of stubs required for
-operation in your testing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130902/25592c19/attachment.sig>
+So, I'll re-state again.  I see nothing wrong with my patch series plus
+the DPCM-enabling patch.  I see this as a complete and proper DPCM
+solution with no flaws in the driver code what so ever.  I don't see
+Lars-Peter's comments being relevant to the DPCM solution, but only to
+a stop-gap solution.
+
+> > As for providing ALSA with a set of PCM operations, I'm not sure what
+> > they should be for a DPCM backend.
+> 
+> Unless there is a need to actually take some action you can, naturally,
+> provide stubs.  You should provide the minimal set of stubs required for
+> operation in your testing.
+
+That needs to go in the ASoC code though - I don't think I have access
+to the ALSA PCM which has been created for the backend DAI(s).  Remember,
+the backend DAIs are "owned" by the dummy DAI driver, not the CPU driver,
+so the CPU driver doesn't get to see any operations for that.
