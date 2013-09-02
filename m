@@ -1,7 +1,7 @@
 From: drasko.draskovic@gmail.com (Drasko DRASKOVIC)
-Date: Mon, 2 Sep 2013 19:01:04 +0200
-Subject: No subject
-Message-ID: <CAEk6gTAXpp1XBM5SNf73NtZF2H28NaUnDJfJDE+b=GPy6pC3Lg@mail.gmail.com>
+Date: Mon, 2 Sep 2013 19:02:59 +0200
+Subject: Socfpga timer1 activation
+Message-ID: <CAEk6gTDuqB2pKCw-Ht0RW9d2B2tsQYSCAQm8Y-O=gGbFNXnE5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
