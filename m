@@ -1,74 +1,97 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 2 Sep 2013 22:33:33 +0530
-Subject: [PATCH v2 2/3] ARM: OMAP4+: Move SRAM data to DT
-In-Reply-To: <521F51F6.90405@ti.com>
-References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
- <1377775391-13103-3-git-send-email-rnayak@ti.com> <521F4BE9.60004@ti.com>
- <521F4D41.4010303@ti.com> <521F519E.9040204@ti.com> <521F51F6.90405@ti.com>
-Message-ID: <5224C4E5.7020002@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Sep 2013 17:59:33 +0100
+Subject: [alsa-devel] [PATCH 00/14] SPDIF support
+In-Reply-To: <20130902162729.GT3084@sirena.org.uk>
+References: <20130901123433.GR6617@n2100.arm.linux.org.uk>
+ <20130902140632.GQ3084@sirena.org.uk>
+ <20130902141631.GV6617@n2100.arm.linux.org.uk>
+ <20130902162729.GT3084@sirena.org.uk>
+Message-ID: <20130902165932.GZ6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/29/2013 7:21 PM, Santosh Shilimkar wrote:
-> On Thursday 29 August 2013 09:50 AM, Rajendra Nayak wrote:
->> On Thursday 29 August 2013 07:01 PM, Santosh Shilimkar wrote:
->>> On Thursday 29 August 2013 09:26 AM, Sekhar Nori wrote:
->>>> On 8/29/2013 4:53 PM, Rajendra Nayak wrote:
->>>>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->>>>> index 22d9f2b..1ba6a77 100644
->>>>> --- a/arch/arm/boot/dts/omap4.dtsi
->>>>> +++ b/arch/arm/boot/dts/omap4.dtsi
->>>>> @@ -126,6 +126,11 @@
->>>>>  			pinctrl-single,function-mask = <0x7fff>;
->>>>>  		};
->>>>>  
->>>>> +		ocmcram: ocmcram at 40304000 {
->>>>
->>>> This can now be changed to 0x40300000 now that you have moved to
->>>> gen_pool_alloc()?
->>>>
->>> NO.
->>> It won't work on secure devices since first 16 KB is occupied for
->>> default configuration. Its not worth trouble also to handle
->>> secure/non-secure considering the use of SRAM which is actually just
->>> limited to errata. 40304000 will work for both devices.
->>
->> Right. Sekhar, you might have confused because of the existing buggy code
->> in sram.c and sram.h which did this (and is removed in this series)
->>
->> from sram.c
->> -----------
->>  #define OMAP2_SRAM_PUB_PA	(OMAP2_SRAM_PA + 0xf800)
->>  #define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
->> -#ifdef CONFIG_OMAP4_ERRATA_I688
->> -#define OMAP4_SRAM_PUB_PA	OMAP4_SRAM_PA
->> -#else
->> -#define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
->> -#endif
->> -#define OMAP5_SRAM_PA		0x40300000
->>  
->> from sram.h
->> -----------
->>  #define OMAP2_SRAM_PA		0x40200000
->>  #define OMAP3_SRAM_PA           0x40200000
->> -#ifdef CONFIG_OMAP4_ERRATA_I688
->> -#define OMAP4_SRAM_PA		0x40304000
->> -#define OMAP4_SRAM_VA		0xfe404000
->> -#else
->> -#define OMAP4_SRAM_PA		0x40300000
->> -#endif
->>
->> I am not sure where the checks for CONFIG_OMAP4_ERRATA_I688
->> came in from, but these are done, like Santosh said, to handle
->> secure and non-secure sram across GP and HS devices and in
->> no way related to handling errata I688.
->>
-> The check was to ensure that with errata enabled, we don't care
-> about first 16 KB ;-)
+On Mon, Sep 02, 2013 at 05:27:29PM +0100, Mark Brown wrote:
+> On Mon, Sep 02, 2013 at 03:16:31PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Sep 02, 2013 at 03:06:32PM +0100, Mark Brown wrote:
+> 
+> > > Yes, and this is one of the reasons for suggesting getting either/or
+> > > support merged - it will help things like the binding definition
+> > > progress (as well as being useful for any users with a S/PDIF only
+> > > system).
+> 
+> > Sorry, but I believe the exact opposite:
+> 
+> > 1. The DAI link binding created for a dual-DAI driver is completely
+> >    different from the DAI link binding for a DPCM driver.  The dual
+> >    DAI link binding will have to be completely rewritten when the
+> >    driver is converted to DPCM.
+> 
+> That seems like overstating the difficulties.  The updates for any new
+> S/PDIF drivers will be pretty much the same as those for the existing
+> I2S drivers and should just be mechanical changes, nothing too taxing.
 
-Hi Rajendra, thanks for the explanation. Other devices like AM437x which
-have HS variants might need such adjustment too. It will be nice to
-check that.
+Sorry, you need to explain more.
 
-Thanks,
-Sekhar
+Here's the dual-DAI version:
+
+                .name = "S/PDIF1",
+                .stream_name = "IEC958 Playback",
+                .platform_name = "mvebu-audio.1",
+                .cpu_dai_name = "kirkwood-spdif.1",
+                .codec_dai_name = "dit-hifi",
+                .codec_name = "spdif-dit",
+
+Here's the DPCM version:
+
+        {
+                .name = "S/PDIF1",
+                .stream_name = "Audio Playback",
+                .platform_name = "mvebu-audio.1",
+                .cpu_dai_name = "mvebu-audio.1",
+                .codec_name = "snd-soc-dummy",
+                .codec_dai_name = "snd-soc-dummy-dai",
+                .dynamic = 1,
+        }, {
+                .name = "Codec",
+                .stream_name = "IEC958 Playback",
+                .cpu_dai_name = "snd-soc-dummy-dai",
+                .platform_name = "snd-soc-dummy",
+                .no_pcm = 1,
+                .codec_dai_name = "dit-hifi",
+                .codec_name = "spdif-dit",
+        },
+
+The above are two completely different beasts.  Please explain how the DT
+representation for those DAI links can be the same.
+
+> > 2. When the driver is converted to DPCM, it must use DPCM for
+> >    everything, otherwise it has no way to know which of SPDIF or I2S to
+> >    enable.  The only way I know to work around that is to add additional
+> >    routes to link up the AIF widgets, and that's the solution you're all
+> >    telling me is not acceptable, as per the patch set at the start of
+> >    this thread.
+> 
+> What we have been telling you is that if there is a DAI link present
+> (there should be one for each physical DAI link) then this should be
+> enough information for the framework to know that the two DAIs are
+> linked and if any routes are needed in DAPM these should be added
+> automatically in the same way that we add links for CODEC<->CODEC links
+> at present.
+> 
+> It's been said to you off-list that having the links manually added
+> but marking them for removal when the framework figures out how to do
+> that should be OK.
+
+Sorry, I just don't get this.  What you seem to be telling me here is to
+forget DPCM, and just go with the dual DAI solution.
+
+If I have separate CPU DAI links, then I can't do simultaneous operation,
+because both DAI links are entirely separate entities which are activated
+entirely separately.  The only way I know how to handle this is with the
+patch set I've already posted.
+
+We've been through this before: this is also not how Liam's example DPCM
+driver works - please go back and look at those diagrams I drew you of
+how Liam's driver is setup.  I've also said to you that from what I can
+see, the routes are still required for DPCM - those routes are in Liam's
+DPCM driver as well.
