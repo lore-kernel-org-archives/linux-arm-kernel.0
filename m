@@ -1,41 +1,64 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 02 Sep 2013 10:54:17 +0200
-Subject: [PATCH 2/2] ARM: EXYNOS: add cpuidle-exynos.max_states kernel
- parameter
-In-Reply-To: <4002844.4ZqqJexTv4@amdc1032>
-References: <4002844.4ZqqJexTv4@amdc1032>
-Message-ID: <52245239.4000903@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 2 Sep 2013 10:56:31 +0200
+Subject: [PATCHv2 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F827F785F@039-SN2MPN1-011.039d.mgd.msft.net>
+References: <1377856132-11290-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377856132-11290-2-git-send-email-Li.Xiubo@freescale.com>
+ <20130830174909.GF30088@pengutronix.de>
+ <1DD289F6464F0949A2FCA5AA6DC23F827F785F@039-SN2MPN1-011.039d.mgd.msft.net>
+Message-ID: <20130902085630.GS30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/2013 12:21 PM, Bartlomiej Zolnierkiewicz wrote:
-> Add "cpuidle-exynos.max_states=" parameter to allow user to specify
-> the maximum of allowed CPU idle states for ARM EXYNOS cpuidle driver.
+On Mon, Sep 02, 2013 at 03:33:37AM +0000, Xiubo Li-B47053 wrote:
 > 
-> This change is needed because C1 state (AFTR mode) is often not able
-> to work properly due to incompatibility with some bootloader versions.
+> > > +static void fsl_pwm_free(struct pwm_chip *chip, struct pwm_device
+> > > +*pwm) {
+> > > +	struct fsl_pwm_chip *fpc;
+> > > +	struct fsl_pwm_data *pwm_data;
+> > > +
+> > > +	fpc = to_fsl_chip(chip);
+> > > +
+> > > +	pwm_data = pwm_get_chip_data(pwm);
+> > > +	if (!pwm_data)
+> > > +		return;
+> > 
+> > THis check seems unnecessary.
+> > 
 > 
-> Usage examples:
+> But if do not check it here, I must check it in the following code.
 > 
-> "cpuidle-exynos.max_states=1" disables C1 state (AFTR mode).
+> > > +
+> > > +	if (pwm_data->available != FSL_AVAILABLE)
+> > > +		return;
+> > > +
 > 
-> "cpuidle-exynos.max_states=0" disables the driver completely.
+> So the ' struct fsl_pwm_data' may be removed in the future.
 > 
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> > 
+> > > +
+> > > +
+> > > +	pwm_data->period_cycles = period_cycles;
+> > > +	pwm_data->duty_cycles = duty_cycles;
+> > 
+> > These fields are set but never read. Please drop them.
+> > 
+> > If you drop the 'available' field also the you can drop chip_data
+> > completely.
+> > 
+> 
+> I think I may move the 'available' field to the PWM driver data struct.
 
-There is a max_cstate option for acpi and intel idle. There is also the
-cpuidle.off=1 option. As the semantic is the same, I think adding a
-common cpuidle option usable for all the drivers is better.
+You simply don't need the available field. You don't need to track
+whether they are available. If a user enables a pwm which is not routed
+out of the SoC (disabled in the iomux) simply nothing will happen except
+for a slightly increased power consumption.
 
-Thanks
-  -- Daniel
+Sascha
+
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
