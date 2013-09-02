@@ -1,45 +1,68 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 2 Sep 2013 13:51:26 +0200
-Subject: [PULL REQUEST] big-endian updates for ARM
-In-Reply-To: <52247567.8060504@codethink.co.uk>
-References: <52247567.8060504@codethink.co.uk>
-Message-ID: <20130902135126.1a297f99@skate>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 2 Sep 2013 16:42:00 +0530
+Subject: [PATCH v4 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E8520F101@039-SN1MPN1-004.039d.mgd.msft.net>
+References: <1376633274-17850-1-git-send-email-b35083@freescale.com>
+ <20130828081742.GC11414@intel.com>
+ <B56CDBE15CE27145A4B77D2D24263E8520A8C7@039-SN1MPN1-003.039d.mgd.msft.net>
+ <20130902045050.GE7376@intel.com>
+ <B56CDBE15CE27145A4B77D2D24263E8520D0D4@039-SN1MPN1-004.039d.mgd.msft.net>
+ <20130902063721.GK7376@intel.com>
+ <B56CDBE15CE27145A4B77D2D24263E8520F101@039-SN1MPN1-004.039d.mgd.msft.net>
+Message-ID: <20130902111200.GP7376@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ben Dooks,
+On Mon, Sep 02, 2013 at 07:32:53AM +0000, Lu Jingchang-B35083 wrote:
+> > > > > > > +	chan->private = fn_param;
+> > > > > > why do you need to use chan->private?
+> > > > > [Lu Jingchang]
+> > > > > The private used here is to store the slot_id information, which
+> > must
+> > > > be used
+> > > > > by the DMAMUX in alloc_chan_resources function. Thanks.
+> > > > Why dont you pass this in struct dma_slave_config memeber slave_id
+> > for
+> > > > this.
+> > > [Lu Jingchang-b35083]
+> > > I will drop this private and setup the slave_id directly in the filter
+> > function.
+> > why in filter? before calling prepare function you can set the slave
+> > config
+> How about change the filter_fn to follow:
+> static bool fsl_edma_filter_fn(struct dma_chan *chan, void *fn_param)
+> {
+>         struct fsl_edma_filter_param *fparam = fn_param;
+>         struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+>         unsigned char val;
+> 
+>         if (fsl_chan->edmamux->mux_id != fparam->mux_id)
+>                 return false;
+> 
+>         val = EDMAMUX_CHCFG_ENBL | EDMAMUX_CHCFG_SOURCE(fparam->slot_id);
+>         fsl_edmamux_config_chan(fsl_chan, val);
+>         return true;
+> }
+> In fact the slot_id isn't need elsewhere, and if the filter return true, 
+> This channel should be to this request. So no need to save the slave id, Right?
+something like
 
-On Mon, 02 Sep 2013 12:24:23 +0100, Ben Dooks wrote:
-> With the last ack added, the following series is ready to be pulled.
-> 
-> The following changes since commit fa8218def1b1a16f0a410e2c1c767b4738cc81fa:
-> 
->    Merge tag 'regmap-v3.11-rc7' of 
-> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap (2013-08-27 
-> 10:10:30 -0700)
-> 
-> are available in the git repository at:
-> 
-> 
->    git://git.baserock.org/delta/linux.git baserock/311-rc7/be/core-v3
-> 
-> for you to fetch changes up to 5217543fe4605fa91065acf5141d88949cd3da1e:
-> 
->    ARM: signal: sigreturn_codes should be endian neutral to work in BE8 
-> (2013-09-02 11:53:53 +0100)
+static bool fsl_edma_filter_fn(struct dma_chan *chan, void *fn_param)
+{
+	struct fsl_edma_filter_param *fparam = fn_param;
+	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
 
-Successfully boot tested in LE and BE modes on Armada XP hardware:
+	if (fsl_chan->edmamux->mux_id != fparam->mux_id)
+		return false;
+	return true;
+}
 
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+in thedriver which calls this:
 
-Jason, Greg or Andrew, can you give your formal Acked-by as mach-mvebu
-maintainers for "mvebu: support running big-endian" in this series?
+before prep:
 
-Thanks,
+	config->slave_id = val;
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	dma_set_slave_config(chan, slave);
+
+~Vinod
