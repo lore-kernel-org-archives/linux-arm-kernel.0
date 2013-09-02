@@ -1,33 +1,72 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 2 Sep 2013 10:02:21 +0530
-Subject: [GIT PULL] DaVinci GPIO driver updates for v3.12
-In-Reply-To: <20130829235824.GH29606@quad.lixom.net>
-References: <521D19ED.5030109@ti.com> <20130829235824.GH29606@quad.lixom.net>
-Message-ID: <522414D5.7000108@ti.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 2 Sep 2013 13:01:39 +0800
+Subject: [PATCH 1/2] ARM: i.MX6: dts: change iomuxc pinctrl config to
+ match Rev. 1 IMX6DQRM
+In-Reply-To: <1377659855-9573-2-git-send-email-alison_chaiken@mentor.com>
+References: <521C40D9.3070802@freescale.com>
+ <1377659855-9573-1-git-send-email-alison_chaiken@mentor.com>
+ <1377659855-9573-2-git-send-email-alison_chaiken@mentor.com>
+Message-ID: <52241BB3.5030909@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 August 2013 05:28 AM, Olof Johansson wrote:
-> On Wed, Aug 28, 2013 at 02:58:13AM +0530, Sekhar Nori wrote:
->> Hi Kevin, Arnd, Olof,
->>
->> Can you please pull the following GPIO driver updates? The patches have 
->> Linus W's ack. I have based the branch on the SoC updates sent earlier 
->> to avoid some conflicts. I did a test merge of this branch with latest 
->> linux-next/master and there were no conflicts.
->>
->> I know its coming late, but hopefully still in time to get merged.
-> 
-> Hi,
-> 
-> It's unfortunately time to start saying no to branches for 3.12. I've done
-> a sweep and queued up anything that was posted right around -rc7, but we'll
-> hold this one off for 3.13.
-> 
-> Please send me a new pull request as soon as -rc1 is has been cut and we'll be
-> happy to merge it for 3.13.
+? 2013?08?28? 11:17, alison_chaiken at mentor.com ??:
+> @@ -759,23 +759,23 @@
+>  				gpmi-nand {
+>  					pinctrl_gpmi_nand_1: gpmi-nand-1 {
+>  						fsl,pins = <
+> -							MX6QDL_PAD_NANDF_CLE__NAND_CLE     0xb0b1
+> -							MX6QDL_PAD_NANDF_ALE__NAND_ALE     0xb0b1
+> -							MX6QDL_PAD_NANDF_WP_B__NAND_WP_B   0xb0b1
+> -							MX6QDL_PAD_NANDF_RB0__NAND_READY_B 0xb000
+> -							MX6QDL_PAD_NANDF_CS0__NAND_CE0_B   0xb0b1
+> -							MX6QDL_PAD_NANDF_CS1__NAND_CE1_B   0xb0b1
+> -							MX6QDL_PAD_SD4_CMD__NAND_RE_B      0xb0b1
+> -							MX6QDL_PAD_SD4_CLK__NAND_WE_B      0xb0b1
+> -							MX6QDL_PAD_NANDF_D0__NAND_DATA00   0xb0b1
+> -							MX6QDL_PAD_NANDF_D1__NAND_DATA01   0xb0b1
+> -							MX6QDL_PAD_NANDF_D2__NAND_DATA02   0xb0b1
+> -							MX6QDL_PAD_NANDF_D3__NAND_DATA03   0xb0b1
+> -							MX6QDL_PAD_NANDF_D4__NAND_DATA04   0xb0b1
+> -							MX6QDL_PAD_NANDF_D5__NAND_DATA05   0xb0b1
+> -							MX6QDL_PAD_NANDF_D6__NAND_DATA06   0xb0b1
+> -							MX6QDL_PAD_NANDF_D7__NAND_DATA07   0xb0b1
+> -							MX6QDL_PAD_SD4_DAT0__NAND_DQS      0x00b1
+> +							MX6QDL_PAD_NANDF_CLE__NAND_CLE     0x1b0b0
+> +							MX6QDL_PAD_NANDF_ALE__NAND_ALE     0x1b0b0
+> +							MX6QDL_PAD_NANDF_WP_B__NAND_WP_B   0x1b0b0
+> +							MX6QDL_PAD_NANDF_RB0__NAND_READY_B 0x1b0b0
+> +							MX6QDL_PAD_NANDF_CS0__NAND_CE0_B   0x1b0b0
+> +							MX6QDL_PAD_NANDF_CS1__NAND_CE1_B   0x1b0b0
+> +							MX6QDL_PAD_SD4_CMD__NAND_RE_B      0x1b0b0
+> +							MX6QDL_PAD_SD4_CLK__NAND_WE_B      0x1b0b0
+> +							MX6QDL_PAD_NANDF_D0__NAND_DATA00   0x1b0b0
+> +							MX6QDL_PAD_NANDF_D1__NAND_DATA01   0x1b0b0
+> +							MX6QDL_PAD_NANDF_D2__NAND_DATA02   0x1b0b0
+> +							MX6QDL_PAD_NANDF_D3__NAND_DATA03   0x1b0b0
+> +							MX6QDL_PAD_NANDF_D4__NAND_DATA04   0x1b0b0
+> +							MX6QDL_PAD_NANDF_D5__NAND_DATA05   0x1b0b0
+> +							MX6QDL_PAD_NANDF_D6__NAND_DATA06   0x1b0b0
+> +							MX6QDL_PAD_NANDF_D7__NAND_DATA07   0x1b0b0
+> +							MX6QDL_PAD_SD4_DAT0__NAND_DQS      0x1b0b0
+>  						>;
+>  					};
+>  				};
+I tested this patch with the imx6q-ard board and imx6dl-ard board.
 
-Olof, no problem. I will send this again after -rc1 is out.
+For the gpmi nand test result:
+[1] imx6q-ard: We can pass the bonie++ stress test with the imx6q-ard board.
 
-Thanks,
-Sekhar
+[2] imx6dl-ard: But we fails to read the nand ID with the imx6dl-ard board.
+In other word, this gpmi can _not_ works with this patch.
+
+But without this patch, the imx6dl-ard works fine.
+
+In section 4.1, the spec tells us that the 0x1b0b0 is just the "default
+settings for the each pad",
+not the right settings for the each pad.
+
+
+
+thanks
+Huang Shijie
