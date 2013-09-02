@@ -1,72 +1,108 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 2 Sep 2013 13:01:39 +0800
-Subject: [PATCH 1/2] ARM: i.MX6: dts: change iomuxc pinctrl config to
- match Rev. 1 IMX6DQRM
-In-Reply-To: <1377659855-9573-2-git-send-email-alison_chaiken@mentor.com>
-References: <521C40D9.3070802@freescale.com>
- <1377659855-9573-1-git-send-email-alison_chaiken@mentor.com>
- <1377659855-9573-2-git-send-email-alison_chaiken@mentor.com>
-Message-ID: <52241BB3.5030909@freescale.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 2 Sep 2013 10:20:50 +0530
+Subject: [PATCH v4 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E8520A8C7@039-SN1MPN1-003.039d.mgd.msft.net>
+References: <1376633274-17850-1-git-send-email-b35083@freescale.com>
+ <20130828081742.GC11414@intel.com>
+ <B56CDBE15CE27145A4B77D2D24263E8520A8C7@039-SN1MPN1-003.039d.mgd.msft.net>
+Message-ID: <20130902045050.GE7376@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?08?28? 11:17, alison_chaiken at mentor.com ??:
-> @@ -759,23 +759,23 @@
->  				gpmi-nand {
->  					pinctrl_gpmi_nand_1: gpmi-nand-1 {
->  						fsl,pins = <
-> -							MX6QDL_PAD_NANDF_CLE__NAND_CLE     0xb0b1
-> -							MX6QDL_PAD_NANDF_ALE__NAND_ALE     0xb0b1
-> -							MX6QDL_PAD_NANDF_WP_B__NAND_WP_B   0xb0b1
-> -							MX6QDL_PAD_NANDF_RB0__NAND_READY_B 0xb000
-> -							MX6QDL_PAD_NANDF_CS0__NAND_CE0_B   0xb0b1
-> -							MX6QDL_PAD_NANDF_CS1__NAND_CE1_B   0xb0b1
-> -							MX6QDL_PAD_SD4_CMD__NAND_RE_B      0xb0b1
-> -							MX6QDL_PAD_SD4_CLK__NAND_WE_B      0xb0b1
-> -							MX6QDL_PAD_NANDF_D0__NAND_DATA00   0xb0b1
-> -							MX6QDL_PAD_NANDF_D1__NAND_DATA01   0xb0b1
-> -							MX6QDL_PAD_NANDF_D2__NAND_DATA02   0xb0b1
-> -							MX6QDL_PAD_NANDF_D3__NAND_DATA03   0xb0b1
-> -							MX6QDL_PAD_NANDF_D4__NAND_DATA04   0xb0b1
-> -							MX6QDL_PAD_NANDF_D5__NAND_DATA05   0xb0b1
-> -							MX6QDL_PAD_NANDF_D6__NAND_DATA06   0xb0b1
-> -							MX6QDL_PAD_NANDF_D7__NAND_DATA07   0xb0b1
-> -							MX6QDL_PAD_SD4_DAT0__NAND_DQS      0x00b1
-> +							MX6QDL_PAD_NANDF_CLE__NAND_CLE     0x1b0b0
-> +							MX6QDL_PAD_NANDF_ALE__NAND_ALE     0x1b0b0
-> +							MX6QDL_PAD_NANDF_WP_B__NAND_WP_B   0x1b0b0
-> +							MX6QDL_PAD_NANDF_RB0__NAND_READY_B 0x1b0b0
-> +							MX6QDL_PAD_NANDF_CS0__NAND_CE0_B   0x1b0b0
-> +							MX6QDL_PAD_NANDF_CS1__NAND_CE1_B   0x1b0b0
-> +							MX6QDL_PAD_SD4_CMD__NAND_RE_B      0x1b0b0
-> +							MX6QDL_PAD_SD4_CLK__NAND_WE_B      0x1b0b0
-> +							MX6QDL_PAD_NANDF_D0__NAND_DATA00   0x1b0b0
-> +							MX6QDL_PAD_NANDF_D1__NAND_DATA01   0x1b0b0
-> +							MX6QDL_PAD_NANDF_D2__NAND_DATA02   0x1b0b0
-> +							MX6QDL_PAD_NANDF_D3__NAND_DATA03   0x1b0b0
-> +							MX6QDL_PAD_NANDF_D4__NAND_DATA04   0x1b0b0
-> +							MX6QDL_PAD_NANDF_D5__NAND_DATA05   0x1b0b0
-> +							MX6QDL_PAD_NANDF_D6__NAND_DATA06   0x1b0b0
-> +							MX6QDL_PAD_NANDF_D7__NAND_DATA07   0x1b0b0
-> +							MX6QDL_PAD_SD4_DAT0__NAND_DQS      0x1b0b0
->  						>;
->  					};
->  				};
-I tested this patch with the imx6q-ard board and imx6dl-ard board.
+On Thu, Aug 29, 2013 at 03:32:04AM +0000, Lu Jingchang-B35083 wrote:
 
-For the gpmi nand test result:
-[1] imx6q-ard: We can pass the bonie++ stress test with the imx6q-ard board.
+Please use a right MUA and wrap your lines at 80chars...
 
-[2] imx6dl-ard: But we fails to read the nand ID with the imx6dl-ard board.
-In other word, this gpmi can _not_ works with this patch.
+> 
+> > 
+> > > +			return -EINVAL;
+> > > +		}
+> > > +		return 0;
+> > > +
+> > > +	default:
+> > > +		return -ENXIO;
+> > > +	}
+> > > +}
+> > > +
+> > > +static enum dma_status fsl_edma_tx_status(struct dma_chan *chan,
+> > > +		dma_cookie_t cookie, struct dma_tx_state *txstate)
+> > > +{
+> > > +	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+> > > +
+> > > +	if (fsl_chan->status == DMA_ERROR)
+> > > +		return DMA_ERROR;
+> > > +
+> > > +	return dma_cookie_status(chan, cookie, txstate);
+> > this will tell if the DMA is completed or not only.
+> > You also need to calculate residue for the pending dma
+> > 
+> > Since you support cyclic this should be done properly...
+> > 
+> > also you cna take more help from vchan support to make your life
+> > simpler...
+> [Lu Jingchang]
+No need to put your name :)
+ 
+> Ok, if it is needed, I will add residue calculation in the next version. 
+Yes this is needed
 
-But without this patch, the imx6dl-ard works fine.
+> > > +static bool fsl_edma_filter_fn(struct dma_chan *chan, void *fn_param)
+> > > +{
+> > > +	struct fsl_edma_filter_param *fparam = fn_param;
+> > > +	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+> > > +
+> > > +	if (fsl_chan->edmamux->mux_id != fparam->mux_id)
+> > > +		return false;
+> > > +
+> > > +	fsl_chan->slot_id = fparam->slot_id;
+> > > +	chan->private = fn_param;
+> > why do you need to use chan->private?
+> [Lu Jingchang] 
+> The private used here is to store the slot_id information, which must be used
+> by the DMAMUX in alloc_chan_resources function. Thanks.
+Why dont you pass this in struct dma_slave_config memeber slave_id for this.
 
-In section 4.1, the spec tells us that the 0x1b0b0 is just the "default
-settings for the each pad",
-not the right settings for the each pad.
+> 
+> > > +	return true;
+> > > +}
+> > > +
+> > > +static struct dma_chan *fsl_edma_xlate(struct of_phandle_args
+> > *dma_spec,
+> > > +		struct of_dma *ofdma)
+> > > +{
+> > > +	dma_cap_mask_t mask;
+> > > +	struct fsl_edma_filter_param fparam;
+> > > +
+> > > +	if (dma_spec->args_count != 2)
+> > > +		return NULL;
+> > > +
+> > > +	fparam.mux_id = dma_spec->args[0];
+> > > +	fparam.slot_id = dma_spec->args[1];
+> > > +
+> > > +	dma_cap_zero(mask);
+> > > +	dma_cap_set(DMA_SLAVE, mask);
+> > > +	dma_cap_set(DMA_CYCLIC, mask);
+> > > +	return dma_request_channel(mask, fsl_edma_filter_fn, (void
+> > *)&fparam);
+> > > +}
+> > > +
+> > > +static int fsl_edma_alloc_chan_resources(struct dma_chan *chan)
+> > > +{
+> > > +	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+> > > +	struct fsl_edma_filter_param *data = chan->private;
+> > > +	unsigned char val;
+> > > +
+> > > +	val = EDMAMUX_CHCFG_ENBL | EDMAMUX_CHCFG_SOURCE(data->slot_id);
+> > okay, so what does the slot_id mean?
+> >
+> [Lu Jingchang] 
+> slot_id is the request source id, a peripheral device ID. Each peripheral
+> using DMA has a ID that can be identified by the DMA engine. the peripheral ID
+> must be written to the DMAMUX configuration register to route the peripheral
+> to DMA engine channel. Thanks.
+And thanks makes me belive you dont need this way, slave_id is the thing for
+you...
 
+~Vinod
 
-
-thanks
-Huang Shijie
+-- 
