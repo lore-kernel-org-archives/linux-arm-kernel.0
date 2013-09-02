@@ -1,72 +1,47 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 2 Sep 2013 21:13:09 +0530
-Subject: [PATCH 5/7] phy: omap-usb2: move omap_usb.h from linux/usb/ to
- linux/phy/
+Date: Mon, 2 Sep 2013 21:13:10 +0530
+Subject: [PATCH 6/7] arm/dts: added dt properties to adapt to the new phy
+ framwork
 In-Reply-To: <1378136591-7463-1-git-send-email-kishon@ti.com>
 References: <1378136591-7463-1-git-send-email-kishon@ti.com>
-Message-ID: <1378136591-7463-6-git-send-email-kishon@ti.com>
+Message-ID: <1378136591-7463-7-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional change. Moved omap_usb.h from linux/usb/ to linux/phy/.
-Also removed the unused members of struct omap_usb (after phy-omap-pipe3
-started using it's own header file)
-
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/phy/phy-omap-usb2.c           |    2 +-
- drivers/usb/phy/phy-twl6030-usb.c     |    2 +-
- include/linux/{usb => phy}/omap_usb.h |    3 ---
- 3 files changed, 2 insertions(+), 5 deletions(-)
- rename include/linux/{usb => phy}/omap_usb.h (95%)
+ arch/arm/boot/dts/omap5.dtsi |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/phy/phy-omap-usb2.c b/drivers/phy/phy-omap-usb2.c
-index b25d623..6c78584 100644
---- a/drivers/phy/phy-omap-usb2.c
-+++ b/drivers/phy/phy-omap-usb2.c
-@@ -21,7 +21,7 @@
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/io.h>
--#include <linux/usb/omap_usb.h>
-+#include <linux/phy/omap_usb.h>
- #include <linux/usb/phy_companion.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-diff --git a/drivers/usb/phy/phy-twl6030-usb.c b/drivers/usb/phy/phy-twl6030-usb.c
-index 16dbc93..b5ad3eb 100644
---- a/drivers/usb/phy/phy-twl6030-usb.c
-+++ b/drivers/usb/phy/phy-twl6030-usb.c
-@@ -26,8 +26,8 @@
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/usb/musb-omap.h>
-+#include <linux/phy/omap_usb.h>
- #include <linux/usb/phy_companion.h>
--#include <linux/usb/omap_usb.h>
- #include <linux/i2c/twl.h>
- #include <linux/regulator/consumer.h>
- #include <linux/err.h>
-diff --git a/include/linux/usb/omap_usb.h b/include/linux/phy/omap_usb.h
-similarity index 95%
-rename from include/linux/usb/omap_usb.h
-rename to include/linux/phy/omap_usb.h
-index 6ae2936..19d343c3 100644
---- a/include/linux/usb/omap_usb.h
-+++ b/include/linux/phy/omap_usb.h
-@@ -33,13 +33,10 @@ struct usb_dpll_params {
- struct omap_usb {
- 	struct usb_phy		phy;
- 	struct phy_companion	*comparator;
--	void __iomem		*pll_ctrl_base;
- 	struct device		*dev;
- 	struct device		*control_dev;
- 	struct clk		*wkupclk;
--	struct clk		*sys_clk;
- 	struct clk		*optclk;
--	u8			is_suspended:1;
- };
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 94abef5..9fe71ff 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -651,7 +651,8 @@
+ 				compatible = "snps,dwc3";
+ 				reg = <0x4a030000 0x10000>;
+ 				interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
+-				usb-phy = <&usb2_phy>, <&usb3_phy>;
++				phys = <&usb2_phy>, <&usb3_phy>;
++				phy-names = "usb2-phy", "usb3-phy";
+ 				tx-fifo-resize;
+ 			};
+ 		};
+@@ -667,6 +668,7 @@
+ 				compatible = "ti,omap-usb2";
+ 				reg = <0x4a084000 0x7c>;
+ 				ctrl-module = <&omap_control_usb2phy>;
++				#phy-cells = <0>;
+ 			};
  
- #define	phy_to_omapusb(x)	container_of((x), struct omap_usb, phy)
+ 			usb3_phy: usb3phy at 4a084400 {
+@@ -676,6 +678,7 @@
+ 				      <0x4a084c00 0x40>;
+ 				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
+ 				ctrl-module = <&omap_control_usb3phy>;
++				#phy-cells = <0>;
+ 			};
+ 		};
+ 
 -- 
 1.7.10.4
