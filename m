@@ -1,25 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Sep 2013 15:17:32 +0100
-Subject: [PATCH 08/14] ASoC: kirkwood: prefer external clock over
- internal clock
-In-Reply-To: <20130902110105.GN3084@sirena.org.uk>
-References: <20130831123458.GF6617@n2100.arm.linux.org.uk>
- <E1VFkVg-0003Ip-G7@rmk-PC.arm.linux.org.uk> <20130901184153.353c644f@armhf>
- <20130902110105.GN3084@sirena.org.uk>
-Message-ID: <20130902141732.GW6617@n2100.arm.linux.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 02 Sep 2013 16:18:41 +0200
+Subject: [PATCH 1/4] ARM: shmobile: r8a7778: add Ether DT support
+In-Reply-To: <52249B16.8010409@cogentembedded.com>
+References: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
+ <1643070.uIkONXsrBj@avalon> <52249B16.8010409@cogentembedded.com>
+Message-ID: <1738124.5rApJWhXUN@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 02, 2013 at 12:01:05PM +0100, Mark Brown wrote:
-> On Sun, Sep 01, 2013 at 06:41:53PM +0200, Jean-Francois Moine wrote:
-> > Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> 
-> > > +	} else if (rate == 44100 || rate == 48000 || rate == 96000) {
-> 
-> > The rate is always good, and having this test raises a compilation warning
-> > (clks_ctrl may be not initialized).
-> 
-> That should be fixed - it might be worth keeping the test and adding an
-> else with an error return for robustness.
+On Monday 02 September 2013 18:05:10 Sergei Shtylyov wrote:
+> On 09/02/2013 05:14 PM, Laurent Pinchart wrote:
+> >> Define the generic R8A777x part of the Ether device node.
+> >> 
+> >> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >> 
+> >> ---
+> >> 
+> >>   arch/arm/boot/dts/r8a7778.dtsi |   11 +++++++++++
+> >>   1 file changed, 11 insertions(+)
+> >> 
+> >> Index: renesas/arch/arm/boot/dts/r8a7778.dtsi
+> >> ===================================================================
+> >> --- renesas.orig/arch/arm/boot/dts/r8a7778.dtsi
+> >> +++ renesas/arch/arm/boot/dts/r8a7778.dtsi
+> >> @@ -98,4 +98,15 @@
+> >> 
+> >>   		reg = <0xfffc000 0x118>;
+> >>   		#gpio-range-cells = <3>;
+> >>   	
+> >>   	};
+> >> 
+> >> +
+> >> +	ether: ethernet at fde00000 {
+> >> +		device_type = "network";
+> > 
+> > Documentation/devicetree/bindings/net/sh_eth.txt from "[PATCH 2/2] sh_eth:
+> > add device tree support" doesn't document this property, should you
+> > update it ?
+>     It's a standard property but completely optional for non-OF systems.
+> I've not seen anybody document it but I should grep for it...
 
-I believe you already have a fix merged.  I don't have that fix in my tree.
+Documentation/devicetree/booting-without-of.txt mentions it, as well as a 
+couple of other DT bindings document, but there's no clear documentation of 
+what device_type should be for network device, and whether the property is 
+mandatory or optional. Clarifying the documentation would be great.
+
+-- 
+Regards,
+
+Laurent Pinchart
