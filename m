@@ -1,40 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Sep 2013 14:58:42 +0100
-Subject: [PATCH v4] ARM: Add check for Cortex-A15 errata 798181 ECO
-In-Reply-To: <1377440747-4564-1-git-send-email-robherring2@gmail.com>
-References: <1377440747-4564-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20130902135842.GU6617@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 02 Sep 2013 18:05:10 +0400
+Subject: [PATCH 1/4] ARM: shmobile: r8a7778: add Ether DT support
+In-Reply-To: <1643070.uIkONXsrBj@avalon>
+References: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
+ <201309010315.49763.sergei.shtylyov@cogentembedded.com>
+ <1643070.uIkONXsrBj@avalon>
+Message-ID: <52249B16.8010409@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 25, 2013 at 09:25:47AM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> The work-around for A15 errata 798181 is not needed if appropriate ECO
-> fixes have been applied to r3p2 and earlier core revisions. This can be
-> checked by reading REVIDR register bits 4 and 9. If only bit 4 is set,
-> then the IPI broadcast can be skipped.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+On 09/02/2013 05:14 PM, Laurent Pinchart wrote:
 
-So, this patch in the patch system claims to be against v3.11-rc2:
+>> Define the generic R8A777x part of the Ether device node.
 
-$ git checkout v3.11-rc2
-...
-$ pdb gitapply 7804/2
-Patching 7804/2...
-git apply --whitespace=fix -p1 --index --check > /tmp/pdb.15757 2>&1 exited with non-zero status: 256
-error: patch failed: arch/arm/include/asm/tlbflush.h:443
-error: arch/arm/include/asm/tlbflush.h: patch does not apply
-error: patch failed: arch/arm/kernel/smp_tlb.c:70
-error: arch/arm/kernel/smp_tlb.c: patch does not apply
-error: patch failed: arch/arm/mm/context.c:245
-error: arch/arm/mm/context.c: patch does not apply
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> v3:
-> - Rebase to v3.11-rc5 due to commit 1f49856 (ARM: 7789/1: Do not run
->  dummy_flush_tlb_a15_erratum() on non-Cortex-A15)
-> - Move the revision checking out of line and use function ptrs.
+>> ---
+>>   arch/arm/boot/dts/r8a7778.dtsi |   11 +++++++++++
+>>   1 file changed, 11 insertions(+)
 
-Hmm, so -rc5 not -rc2 that you put into the patch system...  Also, the
-patch you put into the patch system didn't have Will's ack on it.
+>> Index: renesas/arch/arm/boot/dts/r8a7778.dtsi
+>> ===================================================================
+>> --- renesas.orig/arch/arm/boot/dts/r8a7778.dtsi
+>> +++ renesas/arch/arm/boot/dts/r8a7778.dtsi
+>> @@ -98,4 +98,15 @@
+>>   		reg = <0xfffc000 0x118>;
+>>   		#gpio-range-cells = <3>;
+>>   	};
+>> +
+>> +	ether: ethernet at fde00000 {
+>> +		device_type = "network";
+
+> Documentation/devicetree/bindings/net/sh_eth.txt from "[PATCH 2/2] sh_eth: add
+> device tree support" doesn't document this property, should you update it ?
+
+    It's a standard property but completely optional for non-OF systems. I've 
+not seen anybody document it but I should grep for it...
+
+WBR, Sergei
