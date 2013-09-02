@@ -1,87 +1,65 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 2 Sep 2013 15:45:14 +0100
-Subject: [Xen-devel] [PATCH v5 02/13] arm: introduce a global dma_ops
- pointer
-In-Reply-To: <1377801154-29215-2-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
- <1377801154-29215-2-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <5224A47A.3010704@citrix.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 2 Sep 2013 15:47:13 +0100
+Subject: [alsa-devel] [PATCH 00/14] SPDIF support
+In-Reply-To: <20130831193431.GI6617@n2100.arm.linux.org.uk>
+References: <20130831123458.GF6617@n2100.arm.linux.org.uk>
+ <52220B9A.9000007@metafoo.de>
+ <20130831191414.GG6617@n2100.arm.linux.org.uk>
+ <20130831193431.GI6617@n2100.arm.linux.org.uk>
+Message-ID: <20130902144713.GR3084@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/2013 07:32 PM, Stefano Stabellini wrote:
-> Initially set dma_ops to arm_dma_ops.
-> 
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> CC: will.deacon at arm.com
-> CC: linux at arm.linux.org.uk
-> 
-> 
-> Changes in v3:
-> -  keep using arm_dma_ops in dmabounce.
-> ---
->  arch/arm/include/asm/dma-mapping.h |    3 ++-
->  arch/arm/mm/dma-mapping.c          |    3 +++
->  2 files changed, 5 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index 0982206..7d6e4f9 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -13,6 +13,7 @@
->  #include <asm/cacheflush.h>
->  
->  #define DMA_ERROR_CODE	(~0)
-> +extern struct dma_map_ops *dma_ops;
+On Sat, Aug 31, 2013 at 08:34:31PM +0100, Russell King - ARM Linux wrote:
 
-Hi,
+> Here's the warning I get - I've left the syslog stamp in these as
+> evidence for how long this has been known - and I reported these to
+> Mark when I found them:
 
-I tried to build your swiotlb patch series for the Arndale. I have a compilation
-error because dma_ops is already used in samsung sound driver (sound/soc/samsung/dma.c).
+> Aug 10 15:17:18 cubox kernel: WARNING: at /home/rmk/git/linux-cubox/fs/proc/generic.c:356 proc_register+0xac/0x128()
+> Aug 10 15:17:18 cubox kernel: proc_dir_entry 'asound/oss' already registered
 
-This small fix allow me to built this serie for the Arndale.
-Do I need to send it separately?
+You will recall that when you reported this I told you that OSS
+emulation is not really supported with ASoC and that I would expect a
+large proportion of drivers to fail when used with it.  There was no
+remaining interest in OSS, the use cases that did exist were all desktop
+based but those all seem to have gone away too now.
 
-=======================================================================
-commit 73d4ceded87f52fa958b92d8d8d65be485e90857
-Author: Julien Grall <julien.grall@linaro.org>
-Date:   Mon Sep 2 15:36:35 2013 +0100
+To clarify what this means is that if you want to use to use the
+in-kernel OSS emulation you are pretty much on your own.
 
-    ASoC: Samsung: Rename dma_ops by samsung_dma_ops
-    
-    The commit "arm: introduce a global dma_ops pointer" introduce compilation issue
-    when CONFIG_SND_SOC_SAMSUNG is enabled.
-    
-    sound/soc/samsung/dma.c:345:27: error: conflicting types for 'dma_ops'
-    /local/home/julien/works/arndale/linux/arch/arm/include/asm/dma-mapping.h:16:28:
-    note: previous declaration of 'dma_ops' was here
-    
-    Signed-off-by: Julien Grall <julien.grall@linaro.org>
+> I also get a load of these:
 
-diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-index ddea134..c341603 100644
---- a/sound/soc/samsung/dma.c
-+++ b/sound/soc/samsung/dma.c
-@@ -342,7 +342,7 @@ static int dma_mmap(struct snd_pcm_substream *substream,
-                                     runtime->dma_bytes);
- }
- 
--static struct snd_pcm_ops dma_ops = {
-+static struct snd_pcm_ops samsung_dma_ops = {
-        .open           = dma_open,
-        .close          = dma_close,
-        .ioctl          = snd_pcm_lib_ioctl,
-@@ -429,7 +429,7 @@ out:
- }
- 
- static struct snd_soc_platform_driver samsung_asoc_platform = {
--       .ops            = &dma_ops,
-+       .ops            = &samsung_dma_ops,
-        .pcm_new        = dma_new,
-        .pcm_free       = dma_free_dma_buffers,
- };
+> Aug 10 16:09:27 cubox kernel: S!PDIF1: ASoC: no backend DAIs enabled for S/PDIF1
 
--- 
-Julien Grall
+> from time to time as there's no way to tell ASoC in a DPCM confirmation
+> that although the CPU DAI has capture capability, the capture side is
+> not connected to any codec.
+
+Yup, as I've said that's an issue.  There should be no need to tell the
+framework anything extra, it should be able to figure it out for itself
+based on information it already has - I've suggested just going through
+and looking to see if there are any DAIs that could possibly be
+connected before printing the warning, only checking if the user is
+actually trying to do a capture should also do the trick.
+
+> And here's the oops:
+
+> Aug 10 22:06:17 cubox kernel: [<c030f724>] (snd_pcm_info+0xc8/0xd8) from [<c030f768>] (snd_pcm_info_user+0x34/0x9c)
+> Aug 10 22:06:17 cubox kernel: [<c030f768>] (snd_pcm_info_user+0x34/0x9c) from [<c030a67c>] (snd_pcm_control_ioctl+0x274/0x280)
+
+> This is caused because substream->ops is NULL.  Why that's the case,
+> I don't know, but I believe the PCM which is trying to be operated on
+> is the one registered against the backend (by snd_pcm_new_internal).
+
+Liam did provide you with a workaround for this one along with a
+suggested proper fix.  Have you had any success in using this
+workaround, or with implementing the proper fix for that matter?  I
+don't recall seeing any feedback on the results but perhaps I missed it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130902/63141e20/attachment.sig>
