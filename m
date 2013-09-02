@@ -1,178 +1,54 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 2 Sep 2013 17:24:40 +0100
-Subject: [RFC PATCH 04/14] arm64: kernel: suspend/resume registers
- save/restore
-In-Reply-To: <20130902111716.GF64064@MacBook-Pro.local>
-References: <1377689766-17642-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1377689766-17642-5-git-send-email-lorenzo.pieralisi@arm.com>
- <20130830172310.GJ4650@arm.com>
- <20130902095728.GB2500@e102568-lin.cambridge.arm.com>
- <20130902111716.GF64064@MacBook-Pro.local>
-Message-ID: <20130902162440.GA11030@e102568-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 2 Sep 2013 17:27:29 +0100
+Subject: [alsa-devel] [PATCH 00/14] SPDIF support
+In-Reply-To: <20130902141631.GV6617@n2100.arm.linux.org.uk>
+References: <20130901123433.GR6617@n2100.arm.linux.org.uk>
+ <20130902140632.GQ3084@sirena.org.uk>
+ <20130902141631.GV6617@n2100.arm.linux.org.uk>
+Message-ID: <20130902162729.GT3084@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 02, 2013 at 12:17:17PM +0100, Catalin Marinas wrote:
-> On Mon, Sep 02, 2013 at 10:57:28AM +0100, Lorenzo Pieralisi wrote:
-> > On Fri, Aug 30, 2013 at 06:23:10PM +0100, Catalin Marinas wrote:
-> > > On Wed, Aug 28, 2013 at 12:35:56PM +0100, Lorenzo Pieralisi wrote:
-> > > > Power management software requires the kernel to save and restore
-> > > > CPU registers while going through suspend and resume operations
-> > > > triggered by kernel subsystems like CPU idle and suspend to RAM.
-> > > > 
-> > > > This patch implements code that provides save and restore mechanism
-> > > > for the arm v8 implementation. Memory for the context is passed as
-> > > > parameter to both cpu_do_suspend and cpu_do_resume functions, and allows
-> > > > the callers to implement context allocation as they deem fit.
-> > > > 
-> > > > The registers that are saved and restored correspond to the registers
-> > > > actually required by the kernel to be up and running and is by no means
-> > > > a complete save and restore of the entire v8 register set.
-> > > > 
-> > > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > > ---
-> > > >  arch/arm64/include/asm/proc-fns.h |  3 ++
-> > > >  arch/arm64/mm/proc.S              | 64 +++++++++++++++++++++++++++++++++++++++
-> > > >  2 files changed, 67 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-> > > > index 7cdf466..0c657bb 100644
-> > > > --- a/arch/arm64/include/asm/proc-fns.h
-> > > > +++ b/arch/arm64/include/asm/proc-fns.h
-> > > > @@ -26,11 +26,14 @@
-> > > >  #include <asm/page.h>
-> > > >  
-> > > >  struct mm_struct;
-> > > > +struct cpu_suspend_ctx;
-> > > >  
-> > > >  extern void cpu_cache_off(void);
-> > > >  extern void cpu_do_idle(void);
-> > > >  extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
-> > > >  extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
-> > > > +extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
-> > > > +extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
-> > > >  
-> > > >  #include <asm/memory.h>
-> > > >  
-> > > > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> > > > index a82ae88..193bf98 100644
-> > > > --- a/arch/arm64/mm/proc.S
-> > > > +++ b/arch/arm64/mm/proc.S
-> > > > @@ -80,6 +80,70 @@ ENTRY(cpu_do_idle)
-> > > >  	ret
-> > > >  ENDPROC(cpu_do_idle)
-> > > >  
-> > > > +#ifdef CONFIG_ARM_CPU_SUSPEND
-> > > > +/**
-> > > > + * cpu_do_suspend - save CPU registers context
-> > > > + * x0: virtual address of context pointer
-> > > > + */
-> > > > +ENTRY(cpu_do_suspend)
-> > > > +	mrs	x1, tpidr_el0
-> > > > +	str	x1, [x0, #CPU_CTX_TPIDR_EL0]
-> > > > +	mrs	x2, tpidrro_el0
-> > > > +	str	x2, [x0, #CPU_CTX_TPIDRRO_EL0]
-> > > > +	mrs	x3, contextidr_el1
-> > > > +	str	x3, [x0, #CPU_CTX_CTXIDR_EL1]
-> > > > +	mrs	x4, mair_el1
-> > > > +	str	x4, [x0, #CPU_CTX_MAIR_EL1]
-> > > > +	mrs	x5, cpacr_el1
-> > > > +	str	x5, [x0, #CPU_CTX_CPACR_EL1]
-> > > > +	mrs	x6, ttbr1_el1
-> > > > +	str	x6, [x0, #CPU_CTX_TTBR1_EL1]
-> > > > +	mrs	x7, tcr_el1
-> > > > +	str	x7, [x0, #CPU_CTX_TCR_EL1]
-> > > > +	mrs	x8, vbar_el1
-> > > > +	str	x8, [x0, #CPU_CTX_VBAR_EL1]
-> > > > +	mrs	x9, sctlr_el1
-> > > > +	str	x9, [x0, #CPU_CTX_SCTLR_EL1]
-> > > > +	ret
-> > > > +ENDPROC(cpu_do_suspend)
-> > > 
-> > > Can you read all the registers a once and do some stp to save them?
-> > 
-> > Yes, absolutely. In a way the store pair will require an assumption on
-> > the context structure layout - eg:
-> > 
-> > 	mrs	x1, tpidr_el0
-> > 	mrs	x2, tpidrro_el0
-> > 	stp	x1, x2, [x0, #CPU_CTX_TPIDR_EL0]
-> > 
-> > implicitly assumes that the storage for TPIDR_EL0 and TPIDRRO_EL0 is
-> > contiguous, we can't change the layout later, but I guess we can live
-> > with that.
-> 
-> Do we need to access the individual saved registers from this structure,
-> outside the suspend/resume code? Otherwise we could simply have a plain
-> array to save the registers.
+On Mon, Sep 02, 2013 at 03:16:31PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Sep 02, 2013 at 03:06:32PM +0100, Mark Brown wrote:
 
-Well, there are some registers in the struct that need to be accessed
-from C code through pointer dereference (eg ttbr0), but actually for
-the registers that I save and restore in this snippet of code I do not see a
-point in creating the assembly immediates.
+> > Yes, and this is one of the reasons for suggesting getting either/or
+> > support merged - it will help things like the binding definition
+> > progress (as well as being useful for any users with a S/PDIF only
+> > system).
 
-Hence answer is no. I could make the struct context something like:
+> Sorry, but I believe the exact opposite:
 
-struct cpu_suspend_context {
-	/*
-	 * first two are named members so that they can be easily
-	 * accessed in C and through assembly immediates
-	 */
-	unsigned long sp;
-	unsigned long ttbr0;
-	unsigned long saved_regs[10];  //regs to be saved restored
-};
+> 1. The DAI link binding created for a dual-DAI driver is completely
+>    different from the DAI link binding for a DPCM driver.  The dual
+>    DAI link binding will have to be completely rewritten when the
+>    driver is converted to DPCM.
 
-or encapsulate the saved_regs in a struct, even though for the time being it
-is not really needed.
+That seems like overstating the difficulties.  The updates for any new
+S/PDIF drivers will be pretty much the same as those for the existing
+I2S drivers and should just be mechanical changes, nothing too taxing.
 
-> > > > +/**
-> > > > + * cpu_do_resume - registers layout should match the corresponding
-> > > > + *                 cpu_do_suspend call
-> > > > + *
-> > > > + * x0: Physical address of context pointer
-> > > > + * x1: Should contain the physical address of identity map page tables
-> > > > + *     used to turn on the MMU and complete context restore
-> > > > + *
-> > > > + * Returns:
-> > > > + *	sctlr value in x0
-> > > > + */
-> > > > +ENTRY(cpu_do_resume)
-> > > > +	tlbi	vmalle1is	// make sure tlb entries are invalid
-> > > > +	ldr	x2, [x0, #CPU_CTX_TPIDR_EL0]
-> > > > +	msr	tpidr_el0, x2
-> > > > +	ldr	x3, [x0, #CPU_CTX_TPIDRRO_EL0]
-> > > > +	msr	tpidrro_el0, x3
-> > > > +	ldr	x4, [x0, #CPU_CTX_CTXIDR_EL1]
-> > > > +	msr	contextidr_el1, x4
-> > > > +	ldr	x5, [x0, #CPU_CTX_MAIR_EL1]
-> > > > +	msr	mair_el1, x5
-> > > > +	ldr	x6, [x0, #CPU_CTX_CPACR_EL1]
-> > > > +	msr	cpacr_el1, x6
-> > > > +	msr	ttbr0_el1, x1
-> > > > +	ldr	x7, [x0, #CPU_CTX_TTBR1_EL1]
-> > > > +	msr	ttbr1_el1, x7
-> > > > +	ldr	x8, [x0, #CPU_CTX_TCR_EL1]
-> > > > +	msr	tcr_el1, x8
-> > > > +	ldr	x9, [x0, #CPU_CTX_VBAR_EL1]
-> > > > +	msr	vbar_el1, x9
-> > > > +	ldr	x0, [x0, #CPU_CTX_SCTLR_EL1]
-> > > > +	isb
-> > > > +	dsb	sy
-> > > > +	ret
-> > > > +ENDPROC(cpu_do_resume)
-> > > 
-> > > Same here, use ldp.
-> > > 
-> > > BTW, do we need the DSB here or just the ISB?
-> > 
-> > A dsb is required to ensure that the tlb invalidate has completed, I
-> > think it is mandatory from an architectural standpoint but please
-> > correct me if I am wrong.
-> 
-> Yes, it's needed for that (though usually it comes before isb, but in
-> this case the MMU is disabled anyway, so it doesn't matter).
+> 2. When the driver is converted to DPCM, it must use DPCM for
+>    everything, otherwise it has no way to know which of SPDIF or I2S to
+>    enable.  The only way I know to work around that is to add additional
+>    routes to link up the AIF widgets, and that's the solution you're all
+>    telling me is not acceptable, as per the patch set at the start of
+>    this thread.
 
-Ok, thanks.
+What we have been telling you is that if there is a DAI link present
+(there should be one for each physical DAI link) then this should be
+enough information for the framework to know that the two DAIs are
+linked and if any routes are needed in DAPM these should be added
+automatically in the same way that we add links for CODEC<->CODEC links
+at present.
 
-Lorenzo
+It's been said to you off-list that having the links manually added
+but marking them for removal when the framework figures out how to do
+that should be OK.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130902/8a631a0f/attachment.sig>
