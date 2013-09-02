@@ -1,45 +1,25 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Mon, 02 Sep 2013 17:29:53 +0530
-Subject: [PATCH v4 0/6] dma: edma: Support scatter-lists of any length
-In-Reply-To: <1377817545-18015-1-git-send-email-joelf@ti.com>
-References: <1377817545-18015-1-git-send-email-joelf@ti.com>
-Message-ID: <1378123193.9854.1.camel@vkoul-udesk3>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Sep 2013 13:48:28 +0100
+Subject: [PATCH v2] ARM: highbank: fix debug uart virtual address for LPAE
+In-Reply-To: <1376784748-31914-1-git-send-email-robherring2@gmail.com>
+References: <1376784748-31914-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20130902124828.GT6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-08-29 at 18:05 -0500, Joel Fernandes wrote:
-> The following series adds support to EDMA driver to enable DMA of
-> scatter-gather lists of arbitrary length, but still make use of only
-> a certain MAX number of slots at a time for a given channel. Thus
-> free-ing up the rest of the slots to other slaves/channels.  With this
-> there is no need for slave drivers to query the EDMA driver about how
-> much is the MAX it can send at a time as done in [1]. Drivers can send
-> SG lists of any number of entries to DMA. Reference discussion at [2].
+On Sat, Aug 17, 2013 at 07:12:28PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> With this, all the patches for MMC and EDMA related to "sg limits" can be
-> dropped.
+> Section entries are 2MB on LPAE, so the DEBUG_LL virtual address must
+> have the same offset in the 2MB section as the physical address. This
+> fixes async external aborts when DEBUG_LL is enabled on Midway.
 > 
-> Tested omap-aes and omap_hsmmc drivers with different MAX number of slots,
-> even just 1. In the case where it is 1, only 1-slot is used to DMA an
-> entire scatter list of arbitrary length.
-> Since this series touches EDMA private API code also shared with davinci-pcm,
-> playback of a 16-bit 44.1KHz audio file with davinci-pcm has been tested.
-> 
-> Sample test run with 1 vs 16 (MAX number of slots/SG) in omap-aes driver:
-> MAX slots = 1:
->  (128 bit key, 8192 byte blocks): 1266 operations in 1 seconds (10371072 bytes)
-> MAX slots = 16:
->  (128 bit key, 8192 byte blocks): 1601 operations in 1 seconds (13115392 bytes)
-> 
-> Note: For the above test, 8K buffer is mapped into SG list of size 2 so
-> only 2 slots are required. So beyond size 2, there will not be any noticeable
-> performance improvement. But above experiment just shows as proof of concept
-> that even using 1 slot is managed by just DMA'ing 1 SG entry at a time.
-much better series, thanks
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+> v2: Rebase on Russell's DEBUG_LL clean-up
 
-I think i am okay with this, if anyone has objections pls speak up. Also
-I need ack on the ARM patch 3/6 before I can carry this.
+Do you also want to do a patch for this for v3.11, because if it's wrong
+in my series, it's wrong in mainline at the moment:
 
--- 
-Vinod Koul
-Intel Corp.
+-               ldr     \rv, =0xfee36000
+-               ldr     \rp, =0xfff36000
