@@ -1,46 +1,117 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 2 Sep 2013 11:55:49 +0530
-Subject: [PATCH] dmaengine: sirf: add dmaengine_prep_slave_single/sg
- support
-In-Reply-To: <CAGsJ_4yhVFL+j9PV-srAXdYkbEN62X18n-_+cXa+xy4wcOF7Qw@mail.gmail.com>
-References: <1377435433-23202-1-git-send-email-Baohua.Song@csr.com>
- <20130826085607.GN2748@intel.com>
- <CAGsJ_4yhVFL+j9PV-srAXdYkbEN62X18n-_+cXa+xy4wcOF7Qw@mail.gmail.com>
-Message-ID: <20130902062549.GG7376@intel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 2 Sep 2013 09:13:16 +0200
+Subject: [PATCH v2] arm64: add support for kernel mode NEON
+In-Reply-To: <1373375892-25390-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1373375892-25390-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu_KsXMM=ax4+0ozZchEidZ=6NktWQ+iw1Q45xUEtCYi7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 01, 2013 at 09:02:01PM +0800, Barry Song wrote:
-> 2013/8/26 Vinod Koul <vinod.koul@intel.com>:
-> > On Sun, Aug 25, 2013 at 08:57:13PM +0800, Barry Song wrote:
-> >> the dma engine of sirfsoc supports interleaved mode, but if we set
-> >> xlen=width instead xlen<width, it will work as non-interleaved. as
-> >> most clients of sirf dma driver still don't need interleaved mode,
-> >> so here we still need to implement prep_slave_sg entry so that users
-> >> like uart, spi can use these APIs instead of interleaved API.
-> > Well in that case why dont you just create a wrapper on top of interleaved API
-> > to make this work without driver changes
-> 
-> Vinod, do you mean using interleaved API to provide sg/single API if
-> specific drivers implement interleaved_dma but not implement sg_dma?
-> 
-> the problem is that is difficult to set right legal sgl[i].size,
-> sgl[i].icg and numf for all dmaengines as that depends on specific dma
-> hardware limitation.
-The whole premise of doing the generic interleaved api was to ensure we can use
-any of the usuages as a case of interleaved api. Can you explain how it would be
-difficult?
+Hello Catalin,
 
-> >> +     spin_lock_irqsave(&schan->lock, iflags);
-> >> +     list_for_each(l, &schan->free)
-> >> +             desc_cnt++;
-> > why dont you allocate descriptors here. That will remove this limitation..
-> 
-> i understand. here sirf user scenerios will never be over the
-> limitation of SIRFSOC_DMA_DESCRIPTORS = 16. so i don't want to make it
-> too complex.
-I think you can make code simler by dynamically allocating and freeing
-descriptors...
+Now that the ARM version of this patch has been accepted by Russell,
+would you please consider taking this in as well?
 
-~Vinod
--- 
+Regards,
+Ard.
+
+
+On 9 July 2013 15:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Add <asm/neon.h> containing kernel_neon_begin/kernel_neon_end function
+> declarations and corresponding definitions in fpsimd.c
+>
+> These are needed to wrap uses of NEON in kernel mode. The names are
+> identical to the ones used in arm/ so code using intrinsics or
+> vectorized by GCC can be shared between arm and arm64.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/Kconfig            |  3 +++
+>  arch/arm64/include/asm/neon.h | 14 ++++++++++++++
+>  arch/arm64/kernel/fpsimd.c    | 28 ++++++++++++++++++++++++++++
+>  3 files changed, 45 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/neon.h
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 56b3f6d..46ba680 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -95,6 +95,9 @@ config SWIOTLB
+>  config IOMMU_HELPER
+>         def_bool SWIOTLB
+>
+> +config KERNEL_MODE_NEON
+> +       def_bool y
+> +
+>  source "init/Kconfig"
+>
+>  source "kernel/Kconfig.freezer"
+> diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
+> new file mode 100644
+> index 0000000..b0cc58a9
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/neon.h
+> @@ -0,0 +1,14 @@
+> +/*
+> + * linux/arch/arm64/include/asm/neon.h
+> + *
+> + * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#define cpu_has_neon()         (1)
+> +
+> +void kernel_neon_begin(void);
+> +void kernel_neon_end(void);
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index e8b8357..1f2e4d5 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/init.h>
+>  #include <linux/sched.h>
+>  #include <linux/signal.h>
+> +#include <linux/hardirq.h>
+>
+>  #include <asm/fpsimd.h>
+>  #include <asm/cputype.h>
+> @@ -83,6 +84,33 @@ void fpsimd_flush_thread(void)
+>         fpsimd_load_state(&current->thread.fpsimd_state);
+>  }
+>
+> +#ifdef CONFIG_KERNEL_MODE_NEON
+> +
+> +/*
+> + * Kernel-side NEON support functions
+> + */
+> +void kernel_neon_begin(void)
+> +{
+> +       /* Avoid using the NEON in interrupt context */
+> +       BUG_ON(in_interrupt());
+> +       preempt_disable();
+> +
+> +       if (current->mm)
+> +               fpsimd_save_state(&current->thread.fpsimd_state);
+> +}
+> +EXPORT_SYMBOL(kernel_neon_begin);
+> +
+> +void kernel_neon_end(void)
+> +{
+> +       if (current->mm)
+> +               fpsimd_load_state(&current->thread.fpsimd_state);
+> +
+> +       preempt_enable();
+> +}
+> +EXPORT_SYMBOL(kernel_neon_end);
+> +
+> +#endif /* CONFIG_KERNEL_MODE_NEON */
+> +
+>  /*
+>   * FP/SIMD support code initialisation.
+>   */
+> --
+> 1.8.1.2
+>
