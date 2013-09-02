@@ -1,43 +1,98 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Mon, 2 Sep 2013 08:49:52 -0700
-Subject: [PATCH V3 RFC 00/16] EFI stub for ARM
-In-Reply-To: <20130902103310.GF28598@console-pimps.org>
-References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <CAFECyb_OMY6eEbkbYTC4sE56Za0rC+KFNFRbGWb2ECEqhiKbTQ@mail.gmail.com>
- <20130902103310.GF28598@console-pimps.org>
-Message-ID: <CAFECyb8u0oZAGMx2M4QbnF7CjXT=3K+cmUUWbQY_1=5WmkGvCQ@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 02 Sep 2013 17:52:15 +0200
+Subject: [PATCH 2/2] ARM: EXYNOS: add cpuidle-exynos.max_states kernel
+ parameter
+In-Reply-To: <3870129.vNtjevCIAF@amdc1032>
+References: <4002844.4ZqqJexTv4@amdc1032> <2459763.PzPngK0oec@amdc1032>
+ <52249F97.4080807@linaro.org> <3870129.vNtjevCIAF@amdc1032>
+Message-ID: <5224B42F.3090500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 2, 2013 at 3:33 AM, Matt Fleming <matt@console-pimps.org> wrote:
-> On Tue, 13 Aug, at 10:58:16AM, Roy Franz wrote:
->> Hi Matt,
+On 09/02/2013 04:43 PM, Bartlomiej Zolnierkiewicz wrote:
+> On Monday, September 02, 2013 04:24:23 PM Daniel Lezcano wrote:
+>> On 09/02/2013 03:48 PM, Bartlomiej Zolnierkiewicz wrote:
+>>> On Monday, September 02, 2013 03:18:51 PM Daniel Lezcano wrote:
+>>>> On 09/02/2013 11:41 AM, Bartlomiej Zolnierkiewicz wrote:
+>>>>> On Monday, September 02, 2013 10:54:17 AM Daniel Lezcano wrote:
+>>>>>> On 08/30/2013 12:21 PM, Bartlomiej Zolnierkiewicz wrote:
+>>>>>>> Add "cpuidle-exynos.max_states=" parameter to allow user to specify
+>>>>>>> the maximum of allowed CPU idle states for ARM EXYNOS cpuidle driver.
+>>>>>>>
+>>>>>>> This change is needed because C1 state (AFTR mode) is often not able
+>>>>>>> to work properly due to incompatibility with some bootloader versions.
+>>>>>>>
+>>>>>>> Usage examples:
+>>>>>>>
+>>>>>>> "cpuidle-exynos.max_states=1" disables C1 state (AFTR mode).
+>>>>>>>
+>>>>>>> "cpuidle-exynos.max_states=0" disables the driver completely.
+>>>>>>>
+>>>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>>>>>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>>>>>> Cc: Tomasz Figa <t.figa@samsung.com>
+>>>>>>> Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>>>>>>
+>>>>>> There is a max_cstate option for acpi and intel idle. There is also the
+>>>>>> cpuidle.off=1 option. As the semantic is the same, I think adding a
+>>>>>> common cpuidle option usable for all the drivers is better.
+>>>>>
+>>>>> I thought about making the option common for all cpuidle drivers first
+>>>>> but due to support for multiple cpuidle drivers on one machine (i.e.
+>>>>> big.LITTLE), per-driver option looked like a better approach.
+>>>>>
+>>>>> Should I make the option common and not worry about multiple drivers on
+>>>>> one machine support?
+>>>>
+>>>> Mmh, that's a good point.
+>>>>
+>>>> I am not in favor of multiple options spread across the different
+>>>> drivers. Furthermore the max_cstate is used in the intel platform to
+>>>> 'discover' what states the firmware supports which is not the case of
+>>>> the cpuidle ARM drivers (except new PSCI based). This option does not
+>>>> really fits well here.
+>>>>
+>>>> There is the kernel parameter 'cpuidle.off', so disabling the driver is ok.
+>>>>
+>>>> You converted the cpuidle driver to a platform driver. Isn't possible to
+>>>> pass information in the platform data field at boot time to tell AFTR is
+>>>> not supported and then act on the 'disabled' field of this state ?
+>>>
+>>> It might be possible but I don't know where the source of this data would
+>>> be, platform specific kernel parameter? It sounds just like moving the code
+>>> around and adding superfluous platform->driver code because the similar
+>>> kernel parameter to disable just AFTR can be added in cpuidle-exynos driver
+>>> as well.
 >>
->>    Do you have any more feedback on the X86 and common code (patches
->> 1-13) that needs to be addressed?  Mark Salter has a working ARM64 EFI
->> stub implemented based on these patches, so the common code has now
->> been tested with another architecture, and he has acked these patches.
->> If the current patches are OK, can this be queued for 3.12? (and into
->> linux-next, if appropriate)
->> The ARM portion may take a little longer based on the EFI runtime
->> services patch dependencies, but getting the common code merged would
->> allow the ARM64 EFI stub work to go forward independently.
->>
->> I can resend patches 1-13 as a new series of x86/common only changes
->> if you would like.
->
-> I think resending the common patches as a new series, including Acked-by
-> and Reviewed-by tags, and after addressing Grant's comments is the best
-> idea.
->
-> We've missed the v3.12 merge window now, but we can certainly get these
-> into linux-next for some testing.
->
-> --
-> Matt Fleming, Intel Open Source Technology Center
+>> It is to prevent to add a new kernel parameter (with the documentation)
+>> for a single driver which has a bogus idle state. If that could be
+>> handled internally that would be cleaner.
+> 
+> If I believed that it could be handled internally I wouldn't be trying to
+> add a kernel parameter to handle it.. Would I? ;)
+> 
+>> Can you shortly describe what happens with the bootloader and AFTR ?
+> 
+> AFTR just doesn't work with the custom U-Boot version that we are using
+> (attempts to go into AFTR mode result in lockup) and using the upstream
+> version of U-Boot is not an option since it doesn't support the hardware
+> that we are using AFAIK. I also don't know exactly why it doesn't work
+> (I just suspect that it reuses INFORM registers for some other purposes).
 
-Thanks Matt - I'll split the common patches out to a new series and resubmit
-after taking care of Grant's feeback.
+You want to add a kernel option as a work around for a bug in U-Boot ?
 
-Thanks,
-Roy
+IMO, you should drop the hot potato to the u-boot guys :)
+
+>> I guess you are not interested in cpuidle.off=1 because you want cpuidle
+>> statistics for WFI, right ?
+> 
+> Right. :)
+
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
