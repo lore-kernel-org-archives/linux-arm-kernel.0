@@ -1,58 +1,87 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 02 Sep 2013 16:39:40 +0200
-Subject: Clock framework deadlock with external SPI clockchip
-In-Reply-To: <20130902111850.GN9594@tbergstrom-lnx.Nvidia.com>
-References: <52209D1D.3080102@metafoo.de>
- <20130902111850.GN9594@tbergstrom-lnx.Nvidia.com>
-Message-ID: <5224A32C.6070508@metafoo.de>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 2 Sep 2013 15:45:14 +0100
+Subject: [Xen-devel] [PATCH v5 02/13] arm: introduce a global dma_ops
+ pointer
+In-Reply-To: <1377801154-29215-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
+ <1377801154-29215-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <5224A47A.3010704@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2013 01:18 PM, Peter De Schrijver wrote:
-> On Fri, Aug 30, 2013 at 03:24:45PM +0200, Lars-Peter Clausen wrote:
->> Hi,
->>
->> I'm currently facing a deadlock in the common clock framework that
->> unfortunately is not addressed by the reentrancy patches. I have a external
->> clock chip that is controlled via SPI. So for example to configure the rate
->> of the clock chip you need to send a SPI message. Naturally the clock
->> framework will hold the prepare lock while configuring the rate.
->> Communication in the SPI framework happens asynchronously, spi_sync() will
->> enqueue a message in the SPI masters queue and then wait using
->> wait_for_completion(). The master will call complete() once the transfer has
->> been finished. The SPI master runs in it's own thread in which it processes
->> the messages. In this thread it also calls clk_set_rate() to configure the
->> SPI transfer clock rate based on what the message says. Now the deadlock
->> happens as we try to take the prepare_lock again and since the clock chip
->> and the SPI master run in different threads the reentrancy code does not
->> kick in.
->>
->> The basic sequence is like this:
->>
->> === Clock chip driver ===        === SPI master driver ===
->>  clk_prepare_lock()
->>  spi_sync()
->>    wait_for_completion(X)
->>                                  clk_get_rate()
->> 			           clk_prepare_lock() <--- DEADLOCK
->> 				   clk_prepare_unlock()
->> 				 ...
->> 				 complete(X)
->>  ...
->>  clk_prepare_unlock()
->>
->> I'm wondering if you have any idea how this can be fixed. In my opinion we'd
->> need a per clock mutex to address this properly.
+On 08/29/2013 07:32 PM, Stefano Stabellini wrote:
+> Initially set dma_ops to arm_dma_ops.
 > 
-> One workaround is to leave the SPI masters clock always prepared. A similar
-> problem can occur with I2C and DVFS using notifiers.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> CC: will.deacon at arm.com
+> CC: linux at arm.linux.org.uk
+> 
+> 
+> Changes in v3:
+> -  keep using arm_dma_ops in dmabounce.
+> ---
+>  arch/arm/include/asm/dma-mapping.h |    3 ++-
+>  arch/arm/mm/dma-mapping.c          |    3 +++
+>  2 files changed, 5 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 0982206..7d6e4f9 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -13,6 +13,7 @@
+>  #include <asm/cacheflush.h>
+>  
+>  #define DMA_ERROR_CODE	(~0)
+> +extern struct dma_map_ops *dma_ops;
 
+Hi,
 
-That's kind of what I'm doing right now as a temporary solution. But we'd
-basically need to have all SPI or I2C master drivers to be aware that they
-might be used for controlling a external clock chip. And there are also
-situations where the workaround does not work. E.g. if the clk API is used
-to configure the rate of the SPI SCK signal, since the rate can be set by
-the spi message.
+I tried to build your swiotlb patch series for the Arndale. I have a compilation
+error because dma_ops is already used in samsung sound driver (sound/soc/samsung/dma.c).
 
-- Lars
+This small fix allow me to built this serie for the Arndale.
+Do I need to send it separately?
+
+=======================================================================
+commit 73d4ceded87f52fa958b92d8d8d65be485e90857
+Author: Julien Grall <julien.grall@linaro.org>
+Date:   Mon Sep 2 15:36:35 2013 +0100
+
+    ASoC: Samsung: Rename dma_ops by samsung_dma_ops
+    
+    The commit "arm: introduce a global dma_ops pointer" introduce compilation issue
+    when CONFIG_SND_SOC_SAMSUNG is enabled.
+    
+    sound/soc/samsung/dma.c:345:27: error: conflicting types for 'dma_ops'
+    /local/home/julien/works/arndale/linux/arch/arm/include/asm/dma-mapping.h:16:28:
+    note: previous declaration of 'dma_ops' was here
+    
+    Signed-off-by: Julien Grall <julien.grall@linaro.org>
+
+diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
+index ddea134..c341603 100644
+--- a/sound/soc/samsung/dma.c
++++ b/sound/soc/samsung/dma.c
+@@ -342,7 +342,7 @@ static int dma_mmap(struct snd_pcm_substream *substream,
+                                     runtime->dma_bytes);
+ }
+ 
+-static struct snd_pcm_ops dma_ops = {
++static struct snd_pcm_ops samsung_dma_ops = {
+        .open           = dma_open,
+        .close          = dma_close,
+        .ioctl          = snd_pcm_lib_ioctl,
+@@ -429,7 +429,7 @@ out:
+ }
+ 
+ static struct snd_soc_platform_driver samsung_asoc_platform = {
+-       .ops            = &dma_ops,
++       .ops            = &samsung_dma_ops,
+        .pcm_new        = dma_new,
+        .pcm_free       = dma_free_dma_buffers,
+ };
+
+-- 
+Julien Grall
