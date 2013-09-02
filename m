@@ -1,97 +1,36 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 2 Sep 2013 19:45:14 +0530
-Subject: [PATCH RFC 1/6] reset: is_reset and clear_reset api's
-In-Reply-To: <cover.1378129416.git.afzal@ti.com>
-References: <cover.1378129416.git.afzal@ti.com>
-Message-ID: <5dcf227d360f748ddc965f6c13ff0b31c3e90dab.1378129416.git.afzal@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Sep 2013 15:16:31 +0100
+Subject: [alsa-devel] [PATCH 00/14] SPDIF support
+In-Reply-To: <20130902140632.GQ3084@sirena.org.uk>
+References: <20130901123433.GR6617@n2100.arm.linux.org.uk>
+ <20130902140632.GQ3084@sirena.org.uk>
+Message-ID: <20130902141631.GV6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enhance reset framework with "is_reset" and "clear_reset" api's.
-is_reset - used by client driver to know reset status
-clear_reset - used by client driver to clear reset status
+On Mon, Sep 02, 2013 at 03:06:32PM +0100, Mark Brown wrote:
+> On Sun, Sep 01, 2013 at 01:34:33PM +0100, Russell King - ARM Linux wrote:
+> > This is where those who are using mainline kernels with DT on Dove
+> > platforms (like Jean-Francois and Sebastian) need a working solution to
+> > this in a form which they can come up with a representative DT solution.
+> > This is not a one-person effort - there's multiple efforts working on
+> > this, and it's all inter-linked.
+> 
+> Yes, and this is one of the reasons for suggesting getting either/or
+> support merged - it will help things like the binding definition
+> progress (as well as being useful for any users with a S/PDIF only
+> system).
 
-These functionalities may sometimes be achieved by using existing api
-like deassert. But in some scenarios, steps to achieve reset requires
-clearing reset, deassert reset, enabling clock to module and then
-checking reset status. Here enabling clock module is coming in between
-reset procedure, hence enhance framework with additional api's.
+Sorry, but I believe the exact opposite:
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- drivers/reset/core.c             | 32 ++++++++++++++++++++++++++++++++
- include/linux/reset-controller.h |  2 ++
- include/linux/reset.h            |  2 ++
- 3 files changed, 36 insertions(+)
+1. The DAI link binding created for a dual-DAI driver is completely
+   different from the DAI link binding for a DPCM driver.  The dual
+   DAI link binding will have to be completely rewritten when the
+   driver is converted to DPCM.
 
-diff --git a/drivers/reset/core.c b/drivers/reset/core.c
-index d1b6089..ba12171 100644
---- a/drivers/reset/core.c
-+++ b/drivers/reset/core.c
-@@ -127,6 +127,38 @@ int reset_control_deassert(struct reset_control *rstc)
- EXPORT_SYMBOL_GPL(reset_control_deassert);
- 
- /**
-+ * reset_control_is_reset - check reset status
-+ * @rstc: reset controller
-+ *
-+ * Returns a boolean or negative error code
-+ *
-+ */
-+int reset_control_is_reset(struct reset_control *rstc)
-+{
-+	if (rstc->rcdev->ops->is_reset)
-+		return rstc->rcdev->ops->is_reset(rstc->rcdev, rstc->id);
-+
-+	return -ENOSYS;
-+}
-+EXPORT_SYMBOL_GPL(reset_control_is_reset);
-+
-+/**
-+ * reset_control_clear_reset - clear the reset
-+ * @rstc: reset controller
-+ *
-+ * Returns zero on success or negative error code
-+ *
-+ */
-+int reset_control_clear_reset(struct reset_control *rstc)
-+{
-+	if (rstc->rcdev->ops->clear_reset)
-+		return rstc->rcdev->ops->clear_reset(rstc->rcdev, rstc->id);
-+
-+	return -ENOSYS;
-+}
-+EXPORT_SYMBOL_GPL(reset_control_clear_reset);
-+
-+/**
-  * reset_control_get - Lookup and obtain a reference to a reset controller.
-  * @dev: device to be reset by the controller
-  * @id: reset line name
-diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
-index 2f61311..c9bbadb 100644
---- a/include/linux/reset-controller.h
-+++ b/include/linux/reset-controller.h
-@@ -17,6 +17,8 @@ struct reset_control_ops {
- 	int (*reset)(struct reset_controller_dev *rcdev, unsigned long id);
- 	int (*assert)(struct reset_controller_dev *rcdev, unsigned long id);
- 	int (*deassert)(struct reset_controller_dev *rcdev, unsigned long id);
-+	int (*is_reset)(struct reset_controller_dev *rcdev, unsigned long id);
-+	int (*clear_reset)(struct reset_controller_dev *rcdev, unsigned long i);
- };
- 
- struct module;
-diff --git a/include/linux/reset.h b/include/linux/reset.h
-index 6082247..da59f9f 100644
---- a/include/linux/reset.h
-+++ b/include/linux/reset.h
-@@ -7,6 +7,8 @@ struct reset_control;
- int reset_control_reset(struct reset_control *rstc);
- int reset_control_assert(struct reset_control *rstc);
- int reset_control_deassert(struct reset_control *rstc);
-+int reset_control_is_reset(struct reset_control *rstc);
-+int reset_control_clear_reset(struct reset_control *rstc);
- 
- struct reset_control *reset_control_get(struct device *dev, const char *id);
- void reset_control_put(struct reset_control *rstc);
--- 
-1.8.3.4
+2. When the driver is converted to DPCM, it must use DPCM for
+   everything, otherwise it has no way to know which of SPDIF or I2S to
+   enable.  The only way I know to work around that is to add additional
+   routes to link up the AIF widgets, and that's the solution you're all
+   telling me is not acceptable, as per the patch set at the start of
+   this thread.
