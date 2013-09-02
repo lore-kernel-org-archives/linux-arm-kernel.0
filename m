@@ -1,52 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 02 Sep 2013 15:14:37 +0200
-Subject: [PATCH 1/4] ARM: shmobile: r8a7778: add Ether DT support
-In-Reply-To: <201309010315.49763.sergei.shtylyov@cogentembedded.com>
-References: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
- <201309010315.49763.sergei.shtylyov@cogentembedded.com>
-Message-ID: <1643070.uIkONXsrBj@avalon>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 02 Sep 2013 15:25:35 +0200
+Subject: [PATCH 1/2] ARM: EXYNOS: convert cpuidle driver to be a platform
+ driver
+In-Reply-To: <522455E3.4020500@linaro.org>
+References: <86136702.IKrZfWSsO8@amdc1032> <522455E3.4020500@linaro.org>
+Message-ID: <196900375.6gVKreRJct@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-Thank you for the patch.
-
-On Sunday 01 September 2013 03:15:48 Sergei Shtylyov wrote:
-> Define the generic R8A777x part of the Ether device node.
+On Monday, September 02, 2013 11:09:55 AM Daniel Lezcano wrote:
+> On 08/30/2013 12:15 PM, Bartlomiej Zolnierkiewicz wrote:
+> > ARM EXYNOS cpuidle driver is currently not multiplatform support ready
+> > (as it uses device_initcall() for initialization and doesn't check on
+> > what platform it is running). Fix it by converting the driver to be
+> > a platform driver and registering exynos_cpuidle platform device from
+> > exynos[4,5]_dt_machine_init().
+> > 
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Cc: Tomasz Figa <t.figa@samsung.com>
+> > Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> > ---
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> ---
->  arch/arm/boot/dts/r8a7778.dtsi |   11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> Index: renesas/arch/arm/boot/dts/r8a7778.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7778.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7778.dtsi
-> @@ -98,4 +98,15 @@
->  		reg = <0xfffc000 0x118>;
->  		#gpio-range-cells = <3>;
->  	};
-> +
-> +	ether: ethernet at fde00000 {
-> +		device_type = "network";
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Documentation/devicetree/bindings/net/sh_eth.txt from "[PATCH 2/2] sh_eth: add 
-device tree support" doesn't document this property, should you update it ?
+Queued up for 3.13, thanks!
 
-> +		compatible = "renesas,ether-r8a7779";
-> +		reg = <0xfde00000 0x400>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <0 105 0x4>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		status = "disabled";
-> +	};
->  };
 
 -- 
-Regards,
-
-Laurent Pinchart
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
