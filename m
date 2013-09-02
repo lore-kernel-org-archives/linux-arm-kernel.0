@@ -1,57 +1,66 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 2 Sep 2013 19:09:00 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the pm tree
-In-Reply-To: <20130829175715.GH18542@quad.lixom.net>
-References: <20130829180425.4aa3d164f01cc65b215187fe@canb.auug.org.au>
- <20130829175715.GH18542@quad.lixom.net>
-Message-ID: <20130902180900.GC11030@e102568-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 2 Sep 2013 20:27:47 +0200
+Subject: [PATCH] cpufreq: imx6q: Fix clock enable balance
+In-Reply-To: <20130902150256.GA17900@S2101-09.ap.freescale.net>
+References: <1377517716-27470-1-git-send-email-s.hauer@pengutronix.de>
+ <20130829140123.GM18729@S2101-09.ap.freescale.net>
+ <20130830190019.GG30088@pengutronix.de>
+ <20130902150256.GA17900@S2101-09.ap.freescale.net>
+Message-ID: <20130902182747.GA30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 06:57:15PM +0100, Olof Johansson wrote:
-> On Thu, Aug 29, 2013 at 06:04:25PM +1000, Stephen Rothwell wrote:
-> > Hi all,
+On Mon, Sep 02, 2013 at 11:02:58PM +0800, Shawn Guo wrote:
+> On Fri, Aug 30, 2013 at 09:00:19PM +0200, Sascha Hauer wrote:
+> > On Thu, Aug 29, 2013 at 10:01:25PM +0800, Shawn Guo wrote:
+> > > On Mon, Aug 26, 2013 at 01:48:36PM +0200, Sascha Hauer wrote:
+> > > > For changing the cpu frequency the i.MX6q has to be switched to some
+> > > > intermediate clock during the PLL reprogramming. The driver tries
+> > > > to be clever to keep the enable count correct but gets it wrong. If
+> > > > the cpufreq is increased it calls clk_disable_unprepare twice
+> > > > on pll2_pfd2_396m. This puts all other devices which get their clock
+> > > > from pll2_pfd2_396m into a nonworking state.
+> > > 
+> > > So you're running into a problem in real?  The clk_disable_unprepare on
+> > > pll2_pfd2_396m below will only be executed when are leaving 396MHz
+> > > set-point.
 > > 
-> > Today's linux-next merge of the arm-soc tree got a conflict in
-> > drivers/cpuidle/Makefile between commits b98e01ad4ed9 ("cpuidle: Add
-> > Kconfig.arm and move calxeda, kirkwood and zynq") and d3f2950f2ade ("ARM:
-> > ux500: cpuidle: Move ux500 cpuidle driver to drivers/cpuidle") from the
-> > pm tree and commit 14d2c34cfa00 ("cpuidle: big.LITTLE: vexpress-TC2 CPU
-> > idle driver") from the arm-soc tree.
-> > 
-> > I fixed it up (see below) and can carry the fix as necessary (no action
-> > is required).
-> > 
-> > -- 
-> > Cheers,
-> > Stephen Rothwell                    sfr at canb.auug.org.au
-> > 
-> > diff --cc drivers/cpuidle/Makefile
-> > index 0b9d200,3b6445c..0000000
-> > --- a/drivers/cpuidle/Makefile
-> > +++ b/drivers/cpuidle/Makefile
-> > @@@ -5,9 -5,7 +5,10 @@@
-> >   obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
-> >   obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
-> >   
-> >  -obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
-> >  -obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
-> >  -obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
-> >  -obj-$(CONFIG_CPU_IDLE_BIG_LITTLE) += cpuidle-big_little.o
-> >  +##################################################################################
-> >  +# ARM SoC drivers
-> >  +obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
-> >  +obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
-> >  +obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
-> >  +obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
-> > ++obj-$(CONFIG_CPU_IDLE_BIG_LITTLE)       += cpuidle-big_little.o
+> > And that's when my SD card stops working. On my board the SD clock is
+> > derived from pll2_pfd2_396m. I used the userspace cpufreq governor
+> > and scaled down to 396MHz. When I scale up again the SDHC driver times
+> > out while waiting for interrupts. This is because the cpufreq driver
+> > disables the clock twice.
 > 
+> So when you scale down to 396MHz, the following function sequence is all
+> what you will call.
 > 
-> Might want to sort u8500 before zynq, but otherwise looks fine.
+>         clk_prepare_enable(pll2_pfd2_396m_clk);
+>         clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+>         clk_set_parent(pll1_sw_clk, step_clk);
+>         if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
+>                 ...
+>         } else {
+>                 clk_disable_unprepare(pll1_sys_clk);
+>         }
+> 
+> You will leave imx6q_set_target() with use count of pll2_pfd2_396m_clk
+> increased.  Then when you scale up, you call clk_prepare_enable() once
+> and clk_disable_unprepare() twice on pll2_pfd2_396m_clk, and you get
+> the use count balanced in the end.  Isn't that the case for you?
 
-I noticed that owing to the merge, CONFIG_CPU_IDLE_BIG_LITTLE should be moved
-to the newly introduced Kconfig.arm. How are we going to handle this ? It is
-just a matter of renaming the config entry and moving it to Kconfig.arm.
+I see what you mean. I looked a bit deeper.
 
-Thanks,
-Lorenzo
+The issue seems to be that my board comes up with 396MHz. The code
+assumes that it switches to 396MHz and back again. When imx6q_set_target
+is entered with 396MHz for the first time after startup then it calls
+clk_disable_unprepare twice without having called clk_prepare_enable
+twice before.
+
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
