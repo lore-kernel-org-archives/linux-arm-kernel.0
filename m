@@ -1,36 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Sep 2013 15:16:31 +0100
-Subject: [alsa-devel] [PATCH 00/14] SPDIF support
-In-Reply-To: <20130902140632.GQ3084@sirena.org.uk>
-References: <20130901123433.GR6617@n2100.arm.linux.org.uk>
- <20130902140632.GQ3084@sirena.org.uk>
-Message-ID: <20130902141631.GV6617@n2100.arm.linux.org.uk>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Mon, 2 Sep 2013 19:46:56 +0530
+Subject: [PATCH RFC 2/6] doc: dt: binding: omap: am43x/am335x prcm reset
+In-Reply-To: <cover.1378129416.git.afzal@ti.com>
+References: <cover.1378129416.git.afzal@ti.com>
+Message-ID: <4aa6c41809a53c6e91dacae9fc52e40c3ccf61c4.1378129416.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 02, 2013 at 03:06:32PM +0100, Mark Brown wrote:
-> On Sun, Sep 01, 2013 at 01:34:33PM +0100, Russell King - ARM Linux wrote:
-> > This is where those who are using mainline kernels with DT on Dove
-> > platforms (like Jean-Francois and Sebastian) need a working solution to
-> > this in a form which they can come up with a representative DT solution.
-> > This is not a one-person effort - there's multiple efforts working on
-> > this, and it's all inter-linked.
-> 
-> Yes, and this is one of the reasons for suggesting getting either/or
-> support merged - it will help things like the binding definition
-> progress (as well as being useful for any users with a S/PDIF only
-> system).
+prcm reset binding for AM43x/AM335x SoC's.
 
-Sorry, but I believe the exact opposite:
+This was started with an attempt to add reset binding without a clear
+idea on the device node where binding should appear. So a new node
+with compatible "am4372-reset" to represent reset managment in prcm
+was added. But finally ended up with a node to represent prcm (with
+compatible "am4372-prcm") which was felt to be the natural one.
 
-1. The DAI link binding created for a dual-DAI driver is completely
-   different from the DAI link binding for a DPCM driver.  The dual
-   DAI link binding will have to be completely rewritten when the
-   driver is converted to DPCM.
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+---
+ Documentation/devicetree/bindings/arm/omap/prcm.txt | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/prcm.txt
 
-2. When the driver is converted to DPCM, it must use DPCM for
-   everything, otherwise it has no way to know which of SPDIF or I2S to
-   enable.  The only way I know to work around that is to add additional
-   routes to link up the AIF widgets, and that's the solution you're all
-   telling me is not acceptable, as per the patch set at the start of
-   this thread.
+diff --git a/Documentation/devicetree/bindings/arm/omap/prcm.txt b/Documentation/devicetree/bindings/arm/omap/prcm.txt
+new file mode 100644
+index 0000000..ad25abc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/omap/prcm.txt
+@@ -0,0 +1,13 @@
++TI Power Reset Clock Manager (PRCM)
++
++Properties:
++- compatible:	"ti,am4372-prcm" for prcm in am43x SoC's
++		"ti,am3352-prcm" for prcm in am335x SoC's
++- #reset-cells: 1 (refer generic reset bindings for details)
++
++example:
++	prcm: prcm at 44df0000 {
++		compatible = "ti,am4372-prcm";
++		reg = <0x44df0000 0xa000>;
++		#reset-cells = <1>;
++	};
+-- 
+1.8.3.4
