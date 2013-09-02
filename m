@@ -1,44 +1,26 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 2 Sep 2013 13:22:43 -0400
-Subject: [PULL REQUEST] big-endian updates for ARM
-In-Reply-To: <20130902135126.1a297f99@skate>
-References: <52247567.8060504@codethink.co.uk> <20130902135126.1a297f99@skate>
-Message-ID: <20130902172243.GC19598@titan.lakedaemon.net>
+Date: Mon, 2 Sep 2013 13:25:48 -0400
+Subject: [PATCH v6 4/4] ARM: dts: mvebu: Update with the new compatible
+ string for mv64xxx-i2c
+In-Reply-To: <52247A2D.9090400@free-electrons.com>
+References: <1377181169-17483-1-git-send-email-gregory.clement@free-electrons.com>
+ <1377181169-17483-2-git-send-email-gregory.clement@free-electrons.com>
+ <52247A2D.9090400@free-electrons.com>
+Message-ID: <20130902172548.GD19598@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 02, 2013 at 01:51:26PM +0200, Thomas Petazzoni wrote:
-> Dear Ben Dooks,
+On Mon, Sep 02, 2013 at 01:44:45PM +0200, Gregory CLEMENT wrote:
+> Hi Jason,
 > 
-> On Mon, 02 Sep 2013 12:24:23 +0100, Ben Dooks wrote:
-> > With the last ack added, the following series is ready to be pulled.
-> > 
-> > The following changes since commit fa8218def1b1a16f0a410e2c1c767b4738cc81fa:
-> > 
-> >    Merge tag 'regmap-v3.11-rc7' of 
-> > git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap (2013-08-27 
-> > 10:10:30 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> > 
-> >    git://git.baserock.org/delta/linux.git baserock/311-rc7/be/core-v3
-> > 
-> > for you to fetch changes up to 5217543fe4605fa91065acf5141d88949cd3da1e:
-> > 
-> >    ARM: signal: sigreturn_codes should be endian neutral to work in BE8 
-> > (2013-09-02 11:53:53 +0100)
-> 
-> Successfully boot tested in LE and BE modes on Armada XP hardware:
-> 
-> Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> 
-> Jason, Greg or Andrew, can you give your formal Acked-by as mach-mvebu
-> maintainers for "mvebu: support running big-endian" in this series?
+> Unless I missed it I didn't see this patch in your last pull request.
+> Wolfram took the 3 others patches and Mark Rutland agreed with the binding
+> introduced in the patch 3. So I think we are fine to take this patch
+> in mvebu.
 
-No problem.
-
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Ahh, good.  Thanks for keeping an eye on this.  I'll submit a PR tonight
+or tomorrow.  And for the couple of patches remaining in
+mvebu/fixes-non-critical...
 
 thx,
 
