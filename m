@@ -1,43 +1,19 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 2 Sep 2013 11:46:56 +0530
-Subject: [PATCH 00/18] ARM: s3c64xx: Let amba-pl08x driver handle DMA
-In-Reply-To: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
-References: <1376243970-6489-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <20130902061656.GF7376@intel.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 2 Sep 2013 12:40:39 +0530
+Subject: [PATCH v4 02/10] ARM: dts: list the CPU nodes for Exynos5250
+In-Reply-To: <CANuQgHE8Z5P0BpP0jtRjqPGOSxT07DF-pVNjnwbcpTSjxQ8dZg@mail.gmail.com>
+References: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
+ <1371536962-13322-3-git-send-email-chander.kashyap@linaro.org>
+ <CAOh2x=nsQ5paiMHSH8z9drsqr7_+TvMtNefczf8QNQNbYo0y=Q@mail.gmail.com>
+ <1440260.Z9PFmnVfM0@amdc1227>
+ <CANuQgHE8Z5P0BpP0jtRjqPGOSxT07DF-pVNjnwbcpTSjxQ8dZg@mail.gmail.com>
+Message-ID: <CAKohpokHBRc7b3aahaWtug3S5EzVgCOFdXdF3s8gq9TsvnYgKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 11, 2013 at 07:59:12PM +0200, Tomasz Figa wrote:
-> This is first non-RFC version of my patches extending support of
-> amba-pl08x DMA engine driver to PL080S DMA engine (PL080 modified by
-> Samsung) found in Samsung S3C64xx SoCs.
-> 
-> Due to changes scattered across different areas of kernel, patches are
-> based on merged 3 branches:
->  - for-next of Kgene's Samsung tree,
->  - clk-next of Mike's clock tree,
->  - next of Vinod's slave DMA tree.
-> 
-> To ease testing I have prepared a branch in my private tree for anyone
-> willing to check the patches out:
-> 	git://github.com/tom3q/linux.git v3.12-pl080
-> 
-> Dependencies (already applied in my branch):
->  - for patches 14 and 16 - CCF-based clock driver for s3c64xx.
->  
-> Some of the patches not related to the amba-pl08x driver itself
-> can be likely applied into appropriate trees separately, namely:
->  - 09/18 - ASoC: Samsung: Do not queue cyclic buffers multiple times,
->  - 14/18 - clk: samsung: s3c64xx: Add aliases for DMA clocks.
->  
-> After patch 14/18, both old and new DMA drivers can be supported on
-> S3C64xx, depending on Kconfig options. Patches 15-18 remove the old driver
-> leaving support only for the generic pl08x driver. Feel free to drop those
-> patches for now if we want more testing, but I don't suspect any problems.
-> 
-> On S3C64xx-based Mini6410 and SMDK6410 boards, with I2S audio
-> playback and capture (including full duplex operation) and also SPI
-> using spidev:
-Applied 1-8 to slave-dma tree, thanks
+On 2 September 2013 12:07, Chander Kashyap <chander.kashyap@linaro.org> wrote:
+> I tested on 3.11-rc7.
+> Both the cpu's are booting. I didnet see any issue.
 
-~Vinod
+Strange.. I am sure about the problem I reported.. Please share your .config
+and I will give it a try..
