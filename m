@@ -1,140 +1,33 @@
-From: B47053@freescale.com (Xiubo Li-B47053)
-Date: Mon, 2 Sep 2013 03:33:37 +0000
-Subject: [PATCHv2 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <20130830174909.GF30088@pengutronix.de>
-References: <1377856132-11290-1-git-send-email-Li.Xiubo@freescale.com>
- <1377856132-11290-2-git-send-email-Li.Xiubo@freescale.com>
- <20130830174909.GF30088@pengutronix.de>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827F785F@039-SN2MPN1-011.039d.mgd.msft.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 2 Sep 2013 10:02:21 +0530
+Subject: [GIT PULL] DaVinci GPIO driver updates for v3.12
+In-Reply-To: <20130829235824.GH29606@quad.lixom.net>
+References: <521D19ED.5030109@ti.com> <20130829235824.GH29606@quad.lixom.net>
+Message-ID: <522414D5.7000108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > +static void fsl_pwm_free(struct pwm_chip *chip, struct pwm_device
-> > +*pwm) {
-> > +	struct fsl_pwm_chip *fpc;
-> > +	struct fsl_pwm_data *pwm_data;
-> > +
-> > +	fpc = to_fsl_chip(chip);
-> > +
-> > +	pwm_data = pwm_get_chip_data(pwm);
-> > +	if (!pwm_data)
-> > +		return;
+On Friday 30 August 2013 05:28 AM, Olof Johansson wrote:
+> On Wed, Aug 28, 2013 at 02:58:13AM +0530, Sekhar Nori wrote:
+>> Hi Kevin, Arnd, Olof,
+>>
+>> Can you please pull the following GPIO driver updates? The patches have 
+>> Linus W's ack. I have based the branch on the SoC updates sent earlier 
+>> to avoid some conflicts. I did a test merge of this branch with latest 
+>> linux-next/master and there were no conflicts.
+>>
+>> I know its coming late, but hopefully still in time to get merged.
 > 
-> THis check seems unnecessary.
+> Hi,
 > 
-
-But if do not check it here, I must check it in the following code.
-
-> > +
-> > +	if (pwm_data->available != FSL_AVAILABLE)
-> > +		return;
-> > +
-
-So the ' struct fsl_pwm_data' may be removed in the future.
-
+> It's unfortunately time to start saying no to branches for 3.12. I've done
+> a sweep and queued up anything that was posted right around -rc7, but we'll
+> hold this one off for 3.13.
 > 
-> > +
-> > +
-> > +	pwm_data->period_cycles = period_cycles;
-> > +	pwm_data->duty_cycles = duty_cycles;
-> 
-> These fields are set but never read. Please drop them.
-> 
-> If you drop the 'available' field also the you can drop chip_data
-> completely.
-> 
+> Please send me a new pull request as soon as -rc1 is has been cut and we'll be
+> happy to merge it for 3.13.
 
-I think I may move the 'available' field to the PWM driver data struct.
+Olof, no problem. I will send this again after -rc1 is out.
 
-> > +
-> > +	writel(FTMCnSC_MSB | FTMCnSC_ELSB, fpc->base + FTM_CSC(pwm->hwpwm));
-> > +
-> > +	writel(0xF0, fpc->base + FTM_OUTMASK);
-> > +	writel(0x0F, fpc->base + FTM_OUTINIT);
-> > +	writel(FTM_CNTIN_VAL, fpc->base + FTM_CNTIN);
-> > +
-> > +	writel(period_cycles + cntin - 1, fpc->base + FTM_MOD);
-> > +	writel(duty_cycles + cntin, fpc->base + FTM_CV(pwm->hwpwm));
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int fsl_pwm_set_polarity(struct pwm_chip *chip, struct
-> pwm_device *pwm,
-> > +				enum pwm_polarity polarity)
-> > +{
-> > +	unsigned long reg;
-> > +	struct fsl_pwm_data *pwm_data;
-> > +	struct fsl_pwm_chip *fpc;
-> > +
-> > +	fpc = to_fsl_chip(chip);
-> > +
-> > +	pwm_data = pwm_get_chip_data(pwm);
-> > +	if (!pwm_data)
-> > +		return -EINVAL;
-> > +
-> > +	if (pwm_data->available != FSL_AVAILABLE)
-> > +		return -EINVAL;
-> > +
-> > +	reg = readl(fpc->base + FTM_POL);
-> > +	reg &= ~BIT(pwm->hwpwm);
-> 
-> Either drop this line...
-> 
-
-This is just for unmasking this bit field.
-Here it's not needed, so I will revise it.
-
-> > +	if (polarity == PWM_POLARITY_INVERSED)
-> > +		reg |= BIT(pwm->hwpwm);
-> > +	else
-> > +		reg &= ~BIT(pwm->hwpwm);
-> 
-> ...or this one
-> 
-
-> > +static int fsl_pwm_enable(struct pwm_chip *chip, struct pwm_device
-> > +*pwm) {
-> > +	int ret;
-> > +	struct fsl_pwm_chip *fpc;
-> > +	struct pinctrl_state *pins_state;
-> > +	struct fsl_pwm_data *pwm_data;
-> > +	const char *statename;
-> > +
-> > +	fpc = to_fsl_chip(chip);
-> > +
-> > +	pwm_data = pwm_get_chip_data(pwm);
-> > +	if (!pwm_data)
-> > +		return -EINVAL;
-> > +
-> > +	if (pwm_data->available != FSL_AVAILABLE)
-> > +		return -EINVAL;
-> > +
-> > +	statename = kasprintf(GFP_KERNEL, "ch%d-active", pwm->hwpwm);
-> 
-> You loose memory here and in fsl_pwm_disable aswell.
-> 
-
-Yes, I will revise it.
-
-> > +	pins_state = pinctrl_lookup_state(fpc->pinctrl,
-> > +			statename);
-> > +	/* enable pins to be muxed in and configured */
-> > +	if (!IS_ERR(pins_state)) {
-> > +		ret = pinctrl_select_state(fpc->pinctrl, pins_state);
-> > +		if (ret)
-> > +			dev_warn(chip->dev, "could not set default pins\n");
-> > +	} else
-> > +		dev_warn(chip->dev, "could not get default pinstate\n");
-> 
-> Either it's ok to do without pinctrl or it's not ok, so either return an
-> error or drop the warnings. Polluting the kernel log with such messages
-> from a frequently called function is not a good idea.
-> 
-
-Well, I will just print out some error logs and return the error.
-
---
-Best Regards.
-Xiubo
+Thanks,
+Sekhar
