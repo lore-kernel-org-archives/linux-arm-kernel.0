@@ -1,22 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 2 Sep 2013 12:02:02 +0100
-Subject: [PATCH 09/14] ASoC: kirkwood-dma: remove IEC958_SUBFRAME formats
-In-Reply-To: <E1VFkWe-0003Iw-UI@rmk-PC.arm.linux.org.uk>
-References: <20130831123458.GF6617@n2100.arm.linux.org.uk>
- <E1VFkWe-0003Iw-UI@rmk-PC.arm.linux.org.uk>
-Message-ID: <20130902110202.GO3084@sirena.org.uk>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 2 Sep 2013 14:18:50 +0300
+Subject: Clock framework deadlock with external SPI clockchip
+In-Reply-To: <52209D1D.3080102@metafoo.de>
+References: <52209D1D.3080102@metafoo.de>
+Message-ID: <20130902111850.GN9594@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 31, 2013 at 01:43:36PM +0100, Russell King wrote:
-> The Audio block does not support IEC958 subframes as formatted by
-> ALSA: they're very close, but not close enough.  The formats differ
+On Fri, Aug 30, 2013 at 03:24:45PM +0200, Lars-Peter Clausen wrote:
+> Hi,
+> 
+> I'm currently facing a deadlock in the common clock framework that
+> unfortunately is not addressed by the reentrancy patches. I have a external
+> clock chip that is controlled via SPI. So for example to configure the rate
+> of the clock chip you need to send a SPI message. Naturally the clock
+> framework will hold the prepare lock while configuring the rate.
+> Communication in the SPI framework happens asynchronously, spi_sync() will
+> enqueue a message in the SPI masters queue and then wait using
+> wait_for_completion(). The master will call complete() once the transfer has
+> been finished. The SPI master runs in it's own thread in which it processes
+> the messages. In this thread it also calls clk_set_rate() to configure the
+> SPI transfer clock rate based on what the message says. Now the deadlock
+> happens as we try to take the prepare_lock again and since the clock chip
+> and the SPI master run in different threads the reentrancy code does not
+> kick in.
+> 
+> The basic sequence is like this:
+> 
+> === Clock chip driver ===        === SPI master driver ===
+>  clk_prepare_lock()
+>  spi_sync()
+>    wait_for_completion(X)
+>                                  clk_get_rate()
+> 			           clk_prepare_lock() <--- DEADLOCK
+> 				   clk_prepare_unlock()
+> 				 ...
+> 				 complete(X)
+>  ...
+>  clk_prepare_unlock()
+> 
+> I'm wondering if you have any idea how this can be fixed. In my opinion we'd
+> need a per clock mutex to address this properly.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130902/e9924e23/attachment.sig>
+One workaround is to leave the SPI masters clock always prepared. A similar
+problem can occur with I2C and DVFS using notifiers.
+
+Cheers,
+
+Peter.
