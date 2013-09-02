@@ -1,27 +1,54 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 2 Sep 2013 13:25:48 -0400
-Subject: [PATCH v6 4/4] ARM: dts: mvebu: Update with the new compatible
- string for mv64xxx-i2c
-In-Reply-To: <52247A2D.9090400@free-electrons.com>
-References: <1377181169-17483-1-git-send-email-gregory.clement@free-electrons.com>
- <1377181169-17483-2-git-send-email-gregory.clement@free-electrons.com>
- <52247A2D.9090400@free-electrons.com>
-Message-ID: <20130902172548.GD19598@titan.lakedaemon.net>
+From: murzin.v@gmail.com (Vladimir Murzin)
+Date: Mon, 2 Sep 2013 19:49:32 +0200
+Subject: [PATCH] arm: bpf_jit: support MOD operation
+In-Reply-To: <1377643952-10388-1-git-send-email-murzin.v@gmail.com>
+References: <1377643952-10388-1-git-send-email-murzin.v@gmail.com>
+Message-ID: <20130902174928.GB1866@hp530>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 02, 2013 at 01:44:45PM +0200, Gregory CLEMENT wrote:
-> Hi Jason,
+Ping
+
+On Wed, Aug 28, 2013 at 02:52:32AM +0400, Vladimir Murzin wrote:
+> commit b6069a9570 (filter: add MOD operation) added generic
+> support for modulus operation in BPF.
 > 
-> Unless I missed it I didn't see this patch in your last pull request.
-> Wolfram took the 3 others patches and Mark Rutland agreed with the binding
-> introduced in the patch 3. So I think we are fine to take this patch
-> in mvebu.
-
-Ahh, good.  Thanks for keeping an eye on this.  I'll submit a PR tonight
-or tomorrow.  And for the couple of patches remaining in
-mvebu/fixes-non-critical...
-
-thx,
-
-Jason.
+> This patch brings JIT support for ARM.
+> 
+> Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
+> ---
+>  arch/arm/net/bpf_jit_32.c | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+> index f50d223..0bfff55 100644
+> --- a/arch/arm/net/bpf_jit_32.c
+> +++ b/arch/arm/net/bpf_jit_32.c
+> @@ -636,6 +636,24 @@ load_ind:
+>  			update_on_xread(ctx);
+>  			emit(ARM_MUL(r_A, r_A, r_X), ctx);
+>  			break;
+> +		case BPF_S_ALU_MOD_X: /* A %= X; */
+> +			update_on_xread(ctx);
+> +			emit(ARM_CMP_I(r_X, 0), ctx);
+> +			emit_err_ret(ARM_COND_EQ, ctx);
+> +			emit_udiv(r_scratch, r_A, r_X, ctx);
+> +			emit(ARM_MUL(r_scratch, r_X, r_scratch), ctx);
+> +			emit(ARM_SUB_R(r_A, r_A, r_scratch), ctx);
+> +			break;
+> +		case BPF_S_ALU_MOD_K: /* A %= K; */
+> +			/*
+> +			 * reuse ARM_R1 as the temp register - it should be safe
+> +			 * as soon as udiv may touch it too.
+> +			 */
+> +			emit_mov_i(ARM_R1, k, ctx);
+> +			emit_udiv(r_scratch, r_A, ARM_R1, ctx);
+> +			emit(ARM_MUL(r_scratch, ARM_R1, r_scratch), ctx);
+> +			emit(ARM_SUB_R(r_A, r_A, r_scratch), ctx);
+> +			break;
+>  		case BPF_S_ALU_DIV_K:
+>  			/* current k == reciprocal_value(userspace k) */
+>  			emit_mov_i(r_scratch, k, ctx);
+> -- 
+> 1.8.1.5
+> 
