@@ -1,35 +1,35 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Mon, 2 Sep 2013 11:33:10 +0100
-Subject: [PATCH V3 RFC 00/16] EFI stub for ARM
-In-Reply-To: <CAFECyb_OMY6eEbkbYTC4sE56Za0rC+KFNFRbGWb2ECEqhiKbTQ@mail.gmail.com>
-References: <1376090777-20090-1-git-send-email-roy.franz@linaro.org>
- <CAFECyb_OMY6eEbkbYTC4sE56Za0rC+KFNFRbGWb2ECEqhiKbTQ@mail.gmail.com>
-Message-ID: <20130902103310.GF28598@console-pimps.org>
+From: mohun106@gmail.com (Radha Mohan)
+Date: Mon, 2 Sep 2013 16:18:02 +0530
+Subject: [PATCH 1/1] arm64: Align an assembler string properly
+Message-ID: <CAC8NTUWvEYpugbUfZ3A54zFbS71mnChfCk2sVKUxxxWAHz+nRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Aug, at 10:58:16AM, Roy Franz wrote:
-> Hi Matt,
-> 
->    Do you have any more feedback on the X86 and common code (patches
-> 1-13) that needs to be addressed?  Mark Salter has a working ARM64 EFI
-> stub implemented based on these patches, so the common code has now
-> been tested with another architecture, and he has acked these patches.
-> If the current patches are OK, can this be queued for 3.12? (and into
-> linux-next, if appropriate)
-> The ARM portion may take a little longer based on the EFI runtime
-> services patch dependencies, but getting the common code merged would
-> allow the ARM64 EFI stub work to go forward independently.
-> 
-> I can resend patches 1-13 as a new series of x86/common only changes
-> if you would like.
+From: Corey Minyard <cminyard@mvista.com>
 
-I think resending the common patches as a new series, including Acked-by
-and Reviewed-by tags, and after addressing Grant's comments is the best
-idea.
+Do a proper align and put it in the right section.
 
-We've missed the v3.12 merge window now, but we can certainly get these
-into linux-next for some testing.
+Signed-off-by: Corey Minyard <cminyard@mvista.com>
+---
+ arch/arm64/mm/proc.S |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
--- 
-Matt Fleming, Intel Open Source Technology Center
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 76d8320..1f89adc 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -95,10 +95,11 @@ ENTRY(cpu_do_switch_mm)
+        ret
+ ENDPROC(cpu_do_switch_mm)
+
++       .section ".rodata"
+ cpu_name:
+        .ascii  "AArch64 Processor"
+-       .align
+
++       .align 3
+        .section ".text.init", #alloc, #execinstr
+
+ /*
+--
+1.7.1
