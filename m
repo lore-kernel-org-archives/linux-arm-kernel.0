@@ -1,64 +1,31 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 2 Sep 2013 10:56:31 +0200
-Subject: [PATCHv2 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F827F785F@039-SN2MPN1-011.039d.mgd.msft.net>
-References: <1377856132-11290-1-git-send-email-Li.Xiubo@freescale.com>
- <1377856132-11290-2-git-send-email-Li.Xiubo@freescale.com>
- <20130830174909.GF30088@pengutronix.de>
- <1DD289F6464F0949A2FCA5AA6DC23F827F785F@039-SN2MPN1-011.039d.mgd.msft.net>
-Message-ID: <20130902085630.GS30088@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 02 Sep 2013 11:09:55 +0200
+Subject: [PATCH 1/2] ARM: EXYNOS: convert cpuidle driver to be a platform
+ driver
+In-Reply-To: <86136702.IKrZfWSsO8@amdc1032>
+References: <86136702.IKrZfWSsO8@amdc1032>
+Message-ID: <522455E3.4020500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 02, 2013 at 03:33:37AM +0000, Xiubo Li-B47053 wrote:
+On 08/30/2013 12:15 PM, Bartlomiej Zolnierkiewicz wrote:
+> ARM EXYNOS cpuidle driver is currently not multiplatform support ready
+> (as it uses device_initcall() for initialization and doesn't check on
+> what platform it is running). Fix it by converting the driver to be
+> a platform driver and registering exynos_cpuidle platform device from
+> exynos[4,5]_dt_machine_init().
 > 
-> > > +static void fsl_pwm_free(struct pwm_chip *chip, struct pwm_device
-> > > +*pwm) {
-> > > +	struct fsl_pwm_chip *fpc;
-> > > +	struct fsl_pwm_data *pwm_data;
-> > > +
-> > > +	fpc = to_fsl_chip(chip);
-> > > +
-> > > +	pwm_data = pwm_get_chip_data(pwm);
-> > > +	if (!pwm_data)
-> > > +		return;
-> > 
-> > THis check seems unnecessary.
-> > 
-> 
-> But if do not check it here, I must check it in the following code.
-> 
-> > > +
-> > > +	if (pwm_data->available != FSL_AVAILABLE)
-> > > +		return;
-> > > +
-> 
-> So the ' struct fsl_pwm_data' may be removed in the future.
-> 
-> > 
-> > > +
-> > > +
-> > > +	pwm_data->period_cycles = period_cycles;
-> > > +	pwm_data->duty_cycles = duty_cycles;
-> > 
-> > These fields are set but never read. Please drop them.
-> > 
-> > If you drop the 'available' field also the you can drop chip_data
-> > completely.
-> > 
-> 
-> I think I may move the 'available' field to the PWM driver data struct.
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
 
-You simply don't need the available field. You don't need to track
-whether they are available. If a user enables a pwm which is not routed
-out of the SoC (disabled in the iomux) simply nothing will happen except
-for a slightly increased power consumption.
-
-Sascha
-
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
