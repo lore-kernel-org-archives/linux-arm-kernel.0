@@ -1,35 +1,29 @@
-From: mohun106@gmail.com (Radha Mohan)
-Date: Mon, 2 Sep 2013 16:18:02 +0530
-Subject: [PATCH 1/1] arm64: Align an assembler string properly
-Message-ID: <CAC8NTUWvEYpugbUfZ3A54zFbS71mnChfCk2sVKUxxxWAHz+nRw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 2 Sep 2013 12:01:05 +0100
+Subject: [PATCH 08/14] ASoC: kirkwood: prefer external clock over
+ internal clock
+In-Reply-To: <20130901184153.353c644f@armhf>
+References: <20130831123458.GF6617@n2100.arm.linux.org.uk>
+ <E1VFkVg-0003Ip-G7@rmk-PC.arm.linux.org.uk>
+ <20130901184153.353c644f@armhf>
+Message-ID: <20130902110105.GN3084@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Corey Minyard <cminyard@mvista.com>
+On Sun, Sep 01, 2013 at 06:41:53PM +0200, Jean-Francois Moine wrote:
+> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
 
-Do a proper align and put it in the right section.
+> > +	} else if (rate == 44100 || rate == 48000 || rate == 96000) {
 
-Signed-off-by: Corey Minyard <cminyard@mvista.com>
----
- arch/arm64/mm/proc.S |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+> The rate is always good, and having this test raises a compilation warning
+> (clks_ctrl may be not initialized).
 
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 76d8320..1f89adc 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -95,10 +95,11 @@ ENTRY(cpu_do_switch_mm)
-        ret
- ENDPROC(cpu_do_switch_mm)
-
-+       .section ".rodata"
- cpu_name:
-        .ascii  "AArch64 Processor"
--       .align
-
-+       .align 3
-        .section ".text.init", #alloc, #execinstr
-
- /*
---
-1.7.1
+That should be fixed - it might be worth keeping the test and adding an
+else with an error return for robustness.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130902/1e9ebb66/attachment-0001.sig>
