@@ -1,122 +1,158 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon, 2 Sep 2013 12:07:43 +0530
-Subject: [PATCH v4 02/10] ARM: dts: list the CPU nodes for Exynos5250
-In-Reply-To: <1440260.Z9PFmnVfM0@amdc1227>
-References: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
- <1371536962-13322-3-git-send-email-chander.kashyap@linaro.org>
- <CAOh2x=nsQ5paiMHSH8z9drsqr7_+TvMtNefczf8QNQNbYo0y=Q@mail.gmail.com>
- <1440260.Z9PFmnVfM0@amdc1227>
-Message-ID: <CANuQgHE8Z5P0BpP0jtRjqPGOSxT07DF-pVNjnwbcpTSjxQ8dZg@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 2 Sep 2013 15:02:00 +0800
+Subject: [PATCH] mtd: atmel_nand: fix the warning when CONFIG_OF is not
+ defined
+In-Reply-To: <20130831170422.GA21617@localhost>
+References: <1375846569-9499-1-git-send-email-josh.wu@atmel.com>
+ <1377894233.22372.86.camel@shinybook.infradead.org>
+ <20130831170422.GA21617@localhost>
+Message-ID: <522437E8.1050604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Hi, Ezequiel
 
-On 29 August 2013 17:21, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Viresh,
->
-> On Thursday 29 of August 2013 13:45:56 Viresh Kumar wrote:
->> On Tue, Jun 18, 2013 at 11:59 AM, Chander Kashyap
+On 9/1/2013 1:04 AM, Ezequiel Garcia wrote:
+> On Fri, Aug 30, 2013 at 09:23:53PM +0100, David Woodhouse wrote:
+>> On Wed, 2013-08-07 at 11:36 +0800, Josh Wu wrote:
+>>> This patch fix following warning:
+>>>
+>>> drivers/mtd/nand/atmel_nand.c:2007: warning: 'atmel_nand_nfc_match' defined but not used
+>>>
+>>> This patch add '#if defined(CONFIG_OF)' block to guard around the definition of
+>>> atmel_nand_nfc_match, in order to avoid the warning when kernel is configurated
+>>> as non-dt supported.
+>> Ick. This driver is littered with CONFIG_OF checks. Yet I've just seen a
+>> patch to pxa3xx_nand which *removes* ifdefs, on the basis that all the
+>> of_match_ functions/macros will just 'do the right thing'. Can't we do
+>> that here too? We might just need to add __maybe_unused?
 >>
->> <chander.kashyap@linaro.org> wrote:
->> > Instead of having to specify the number for CPUs in Exynos5250 in
->> > platsmp.c file, let the number of CPUs be determined by having this
->> > information listed in Exynos5250 device tree file.
->> >
->> > Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->> > ---
->> >
->> >  arch/arm/boot/dts/exynos5250.dtsi |   16 ++++++++++++++++
->> >  arch/arm/mach-exynos/platsmp.c    |   10 +++++++---
->> >  2 files changed, 23 insertions(+), 3 deletions(-)
->> >
->> > diff --git a/arch/arm/boot/dts/exynos5250.dtsi
->> > b/arch/arm/boot/dts/exynos5250.dtsi index 63ca03d..1aeef98 100644
->> > --- a/arch/arm/boot/dts/exynos5250.dtsi
->> > +++ b/arch/arm/boot/dts/exynos5250.dtsi
->> > @@ -50,6 +50,22 @@
->> >
->> >                 pinctrl3 = &pinctrl_3;
->> >
->> >         };
->> >
->> > +       cpus {
->> > +               #address-cells = <1>;
->> > +               #size-cells = <0>;
->> > +
->> > +               cpu at 0 {
->> > +                       device_type = "cpu";
->> > +                       compatible = "arm,cortex-a15";
->> > +                       reg = <0>;
->> > +               };
->> > +               cpu at 1 {
->> > +                       device_type = "cpu";
->> > +                       compatible = "arm,cortex-a15";
->> > +                       reg = <1>;
->> > +               };
->> > +       };
->> > +
->> >
->> >         pd_gsc: gsc-power-domain at 0x10044000 {
->> >
->> >                 compatible = "samsung,exynos4210-pd";
->> >                 reg = <0x10044000 0x20>;
->> >
->> > diff --git a/arch/arm/mach-exynos/platsmp.c
->> > b/arch/arm/mach-exynos/platsmp.c index 1a4e4e5..85ea4ca 100644
->> > --- a/arch/arm/mach-exynos/platsmp.c
->> > +++ b/arch/arm/mach-exynos/platsmp.c
->> > @@ -180,10 +180,14 @@ static void __init exynos_smp_init_cpus(void)
->> >
->> >         void __iomem *scu_base = scu_base_addr();
->> >         unsigned int i, ncores;
->> >
->> > -       if (soc_is_exynos5250())
->> > -               ncores = 2;
->> > -       else
->> > +       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->> >
->> >                 ncores = scu_base ? scu_get_core_count(scu_base) : 1;
->> >
->> > +       else
->> > +               /*
->> > +                * CPU Nodes are passed thru DT and set_cpu_possible
->> > +                * is set by "arm_dt_init_cpu_maps".
->> > +                */
->> > +               return;
->> >
->> >         /* sanity check */
->> >         if (ncores > nr_cpu_ids) {
+> We can. We just need to provide a few dummy functions in linux/of_mtd.h
+> just like the other of_xxx() are doing. See below!
+>
+>>> +#if defined(CONFIG_OF)
+>>>   static struct of_device_id atmel_nand_nfc_match[] = {
+>>>   	{ .compatible = "atmel,sama5d3-nfc" },
+>>>   	{ /* sentinel */ }
+>>>   };
+>>> +#endif
+>> Also, why doesn't this one appear in a MODULE_DEVICE_TABLE() ?
 >>
->> After this patch only one cpu is coming up for me on my Arndale board..
->> Revert of this one fixes the issue though (Tested over v3.11-rc7)
->
-I tested on 3.11-rc7.
-Both the cpu's are booting. I didnet see any issue.
+> Indeed. And why doesn't it have a "const" keyword?
 
-> It is quite likely that 0 and 1 are not real MPIDR values for CPU cores on
-> Exynos5250, because cluster ID might not be 0, as one could expect.
->
-@Tomasz:
-Mpidr values are correct.
-
-> This is what I found out on Exynos4210 and 4x12, when trying to add CPU
-> nodes in DT for them, leading in turn to a series of regressions, for which
-> it was to late to do all the necessary code rework to fix them for 3.12, so
-> I had to defer this work for next release.
-
-Exynos4210 and 4x12 mpidr values have issue. They do start from
-cluster ID 9, which breaks the gic init code.
-But that is not the case with exynos 5250.
+Thanks to point these out.
 
 >
-> Best regards,
-> Tomasz
+> So, in order to remove the CONFIG_OF safely from this driver,
+> and avoid any stupid warnings, we need to first implement
+> these dummies:
 >
+> --------------------------------8<-----------------------------------
+> diff --git a/include/linux/of_mtd.h b/include/linux/of_mtd.h
+> index ed7f267..66f173e 100644
+> --- a/include/linux/of_mtd.h
+> +++ b/include/linux/of_mtd.h
+> @@ -14,6 +14,21 @@
+>   int of_get_nand_ecc_mode(struct device_node *np);
+>   int of_get_nand_bus_width(struct device_node *np);
+>   bool of_get_nand_on_flash_bbt(struct device_node *np);
+> +#else
+> +static inline int of_get_nand_ecc_mode(struct device_node *np)
+> +{
+> +	return -ENOSYS;
+> +}
+> +
+> +static inline int of_get_nand_bus_width(struct device_node *np)
+> +{
+> +	return -ENOSYS;
+> +}
+> +
+> +static inline bool of_get_nand_on_flash_bbt(struct device_node *np)
+> +{
+> +	return false;
+> +}
+>   #endif
+>   
+>   #endif /* __LINUX_OF_MTD_H */
+> -------------------------------->8-----------------------------------
+>
+> And then, with this little patch, we get rid of the ugly CONFIG_OF check
+> from the atmel_nand driver:
+>
+> --------------------------------8<-----------------------------------
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index 0e365da..ac58098 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -1448,7 +1448,6 @@ static void atmel_nand_hwctl(struct mtd_info *mtd, int mode)
+>   		ecc_writel(host->ecc, CR, ATMEL_ECC_RST);
+>   }
+>   
+> -#if defined(CONFIG_OF)
+>   static int atmel_of_init_port(struct atmel_nand_host *host,
+>   			      struct device_node *np)
+>   {
+> @@ -1456,7 +1455,7 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
+>   	u32 offset[2];
+>   	int ecc_mode;
+>   	struct atmel_nand_data *board = &host->board;
+> -	enum of_gpio_flags flags;
+> +	enum of_gpio_flags flags = 0;
+>   
+>   	if (of_property_read_u32(np, "atmel,nand-addr-offset", &val) == 0) {
+>   		if (val >= 32) {
+> @@ -1539,13 +1538,6 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
+>   
+>   	return 0;
+>   }
+> -#else
+> -static int atmel_of_init_port(struct atmel_nand_host *host,
+> -			      struct device_node *np)
+> -{
+> -	return -EINVAL;
+> -}
+> -#endif
+>   
+>   static int __init atmel_hw_nand_init_params(struct platform_device *pdev,
+>   					 struct atmel_nand_host *host)
+> @@ -2205,14 +2197,12 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
+>   	return 0;
+>   }
+>   
+> -#if defined(CONFIG_OF)
+>   static const struct of_device_id atmel_nand_dt_ids[] = {
+>   	{ .compatible = "atmel,at91rm9200-nand" },
+>   	{ /* sentinel */ }
+>   };
+>   
+>   MODULE_DEVICE_TABLE(of, atmel_nand_dt_ids);
+> -#endif
+>   
+>   static int atmel_nand_nfc_probe(struct platform_device *pdev)
+>   {
+> @@ -2251,12 +2241,11 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+>   	return 0;
+>   }
+>   
+> -#if defined(CONFIG_OF)
+> -static struct of_device_id atmel_nand_nfc_match[] = {
+> +static const struct of_device_id atmel_nand_nfc_match[] = {
+>   	{ .compatible = "atmel,sama5d3-nfc" },
+>   	{ /* sentinel */ }
+>   };
+> -#endif
+> +MODULE_DEVICE_TABLE(of, atmel_nand_nfc_match);
+>   
+>   static struct platform_driver atmel_nand_nfc_driver = {
+>   	.driver = {
+> -------------------------------->8-----------------------------------
+>
+> Of course, these are untested. If they look OK and don't cause any trouble,
+> then I'll prepare proper patches.
 
+Looks nice to me. Your proposal patch does the right thing to remove the 
+CONFIG_OF.
+So please sent them out. ;)
 
-
--- 
-with warm regards,
-Chander Kashyap
+Best Regards,
+Josh Wu
