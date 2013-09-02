@@ -1,93 +1,74 @@
-From: drasko.draskovic@gmail.com (Drasko DRASKOVIC)
-Date: Mon, 2 Sep 2013 19:02:59 +0200
-Subject: Socfpga timer1 activation
-Message-ID: <CAEk6gTDuqB2pKCw-Ht0RW9d2B2tsQYSCAQm8Y-O=gGbFNXnE5Q@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 2 Sep 2013 22:33:33 +0530
+Subject: [PATCH v2 2/3] ARM: OMAP4+: Move SRAM data to DT
+In-Reply-To: <521F51F6.90405@ti.com>
+References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
+ <1377775391-13103-3-git-send-email-rnayak@ti.com> <521F4BE9.60004@ti.com>
+ <521F4D41.4010303@ti.com> <521F519E.9040204@ti.com> <521F51F6.90405@ti.com>
+Message-ID: <5224C4E5.7020002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-In socfpga.dts I can see following definitions :
+On 8/29/2013 7:21 PM, Santosh Shilimkar wrote:
+> On Thursday 29 August 2013 09:50 AM, Rajendra Nayak wrote:
+>> On Thursday 29 August 2013 07:01 PM, Santosh Shilimkar wrote:
+>>> On Thursday 29 August 2013 09:26 AM, Sekhar Nori wrote:
+>>>> On 8/29/2013 4:53 PM, Rajendra Nayak wrote:
+>>>>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>>>>> index 22d9f2b..1ba6a77 100644
+>>>>> --- a/arch/arm/boot/dts/omap4.dtsi
+>>>>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>>>>> @@ -126,6 +126,11 @@
+>>>>>  			pinctrl-single,function-mask = <0x7fff>;
+>>>>>  		};
+>>>>>  
+>>>>> +		ocmcram: ocmcram at 40304000 {
+>>>>
+>>>> This can now be changed to 0x40300000 now that you have moved to
+>>>> gen_pool_alloc()?
+>>>>
+>>> NO.
+>>> It won't work on secure devices since first 16 KB is occupied for
+>>> default configuration. Its not worth trouble also to handle
+>>> secure/non-secure considering the use of SRAM which is actually just
+>>> limited to errata. 40304000 will work for both devices.
+>>
+>> Right. Sekhar, you might have confused because of the existing buggy code
+>> in sram.c and sram.h which did this (and is removed in this series)
+>>
+>> from sram.c
+>> -----------
+>>  #define OMAP2_SRAM_PUB_PA	(OMAP2_SRAM_PA + 0xf800)
+>>  #define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
+>> -#ifdef CONFIG_OMAP4_ERRATA_I688
+>> -#define OMAP4_SRAM_PUB_PA	OMAP4_SRAM_PA
+>> -#else
+>> -#define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
+>> -#endif
+>> -#define OMAP5_SRAM_PA		0x40300000
+>>  
+>> from sram.h
+>> -----------
+>>  #define OMAP2_SRAM_PA		0x40200000
+>>  #define OMAP3_SRAM_PA           0x40200000
+>> -#ifdef CONFIG_OMAP4_ERRATA_I688
+>> -#define OMAP4_SRAM_PA		0x40304000
+>> -#define OMAP4_SRAM_VA		0xfe404000
+>> -#else
+>> -#define OMAP4_SRAM_PA		0x40300000
+>> -#endif
+>>
+>> I am not sure where the checks for CONFIG_OMAP4_ERRATA_I688
+>> came in from, but these are done, like Santosh said, to handle
+>> secure and non-secure sram across GP and HS devices and in
+>> no way related to handling errata I688.
+>>
+> The check was to ensure that with errata enabled, we don't care
+> about first 16 KB ;-)
 
-/* Local timer */
-timer at fffec600 {
-compatible = "arm,cortex-a9-twd-timer";
-reg = <0xfffec600 0x100>;
-interrupts = <1 13 0xf04>;
-};
+Hi Rajendra, thanks for the explanation. Other devices like AM437x which
+have HS variants might need such adjustment too. It will be nice to
+check that.
 
-timer0: timer0 at ffc08000 {
-compatible = "snps,dw-apb-timer-sp";
-interrupts = <0 167 4>;
-reg = <0xffc08000 0x1000>;
-};
-
-timer1: timer1 at ffc09000 {
-compatible = "snps,dw-apb-timer-sp";
-interrupts = <0 168 4>;
-reg = <0xffc09000 0x1000>;
-};
-
-timer2: timer2 at ffd00000 {
-compatible = "snps,dw-apb-timer-osc";
-interrupts = <0 169 4>;
-reg = <0xffd00000 0x1000>;
-};
-
-timer3: timer3 at ffd01000 {
-compatible = "snps,dw-apb-timer-osc";
-interrupts = <0 170 4>;
-reg = <0xffd01000 0x1000>;
-};
-
-
-However, from my board's shell :
-root at socfpga_cyclone5:~# cat /proc/interrupts
-           CPU0       CPU1
-525:      24935      24717       GIC  twd
-648:        801          0       GIC  eth0
-653:          0          0       GIC  dwc_otg, dwc_otg_pcd, dwc_otg_hcd:usb1
-656:          0          0       GIC  dwc_otg, dwc_otg_pcd, dwc_otg_hcd:usb2
-667:     163006          0       GIC  dw-mci
-679:          0          0       GIC  ff705000.spi
-682:          0          0       GIC  dw_spi0
-684:          0          0       GIC  dw_spi1
-686:          6          0       GIC  ffc04000.i2c
-687:          0          0       GIC  ffc05000.i2c
-690:       2390          0       GIC  serial
-697:          9          0       GIC  timer2
-IPI0:          0          0  CPU wakeup interrupts
-IPI1:          0          0  Timer broadcast interrupts
-IPI2:       1268       1289  Rescheduling interrupts
-IPI3:          0          0  Function call interrupts
-IPI4:          3          1  Single function call interrupts
-IPI5:          0          0  CPU stop interrupts
-Err:          0
-
-So, I can see only timer2.
-
-root at socfpga_cyclone5:~# find / -name "timer*"
-/proc/timer_list
-/proc/device-tree/soc/timer3 at ffd01000
-/proc/device-tree/soc/timer2 at ffd00000
-/proc/device-tree/soc/timer1 at ffc09000
-/proc/device-tree/soc/timer0 at ffc08000
-/proc/device-tree/soc/timer at fffec600
-/proc/device-tree/aliases/timer3
-/proc/device-tree/aliases/timer2
-/proc/device-tree/aliases/timer1
-/proc/device-tree/aliases/timer0
-/sys/kernel/debug/tracing/events/timer
-/sys/kernel/debug/tracing/events/timer/timer_cancel
-/sys/kernel/debug/tracing/events/timer/timer_expire_exit
-/sys/kernel/debug/tracing/events/timer/timer_expire_entry
-/sys/kernel/debug/tracing/events/timer/timer_start
-/sys/kernel/debug/tracing/events/timer/timer_init
-/sys/module/oprofile/parameters/timer
-root at socfpga_cyclone5:~#
-
-Where is defined which timer will be present, activated and
-initialized on the board - i.e. only timer2 is active in this case,
-and I would like to use timer1.
-
-BR,
-Drasko
+Thanks,
+Sekhar
