@@ -1,107 +1,45 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 02 Sep 2013 13:44:45 +0200
-Subject: [PATCH v6 4/4] ARM: dts: mvebu: Update with the new compatible
- string for mv64xxx-i2c
-In-Reply-To: <1377181169-17483-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1377181169-17483-1-git-send-email-gregory.clement@free-electrons.com>
- <1377181169-17483-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <52247A2D.9090400@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 2 Sep 2013 13:51:26 +0200
+Subject: [PULL REQUEST] big-endian updates for ARM
+In-Reply-To: <52247567.8060504@codethink.co.uk>
+References: <52247567.8060504@codethink.co.uk>
+Message-ID: <20130902135126.1a297f99@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Dear Ben Dooks,
 
-Unless I missed it I didn't see this patch in your last pull request.
-Wolfram took the 3 others patches and Mark Rutland agreed with the binding
-introduced in the patch 3. So I think we are fine to take this patch
-in mvebu.
+On Mon, 02 Sep 2013 12:24:23 +0100, Ben Dooks wrote:
+> With the last ack added, the following series is ready to be pulled.
+> 
+> The following changes since commit fa8218def1b1a16f0a410e2c1c767b4738cc81fa:
+> 
+>    Merge tag 'regmap-v3.11-rc7' of 
+> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap (2013-08-27 
+> 10:10:30 -0700)
+> 
+> are available in the git repository at:
+> 
+> 
+>    git://git.baserock.org/delta/linux.git baserock/311-rc7/be/core-v3
+> 
+> for you to fetch changes up to 5217543fe4605fa91065acf5141d88949cd3da1e:
+> 
+>    ARM: signal: sigreturn_codes should be endian neutral to work in BE8 
+> (2013-09-02 11:53:53 +0100)
+
+Successfully boot tested in LE and BE modes on Armada XP hardware:
+
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Jason, Greg or Andrew, can you give your formal Acked-by as mach-mvebu
+maintainers for "mvebu: support running big-endian" in this series?
 
 Thanks,
 
-On 22/08/2013 16:19, Gregory CLEMENT wrote:
-> The mv64xxx-i2c embedded in the Armada XP have a new feature to
-> offload i2c transaction. This new version of the IP come also with
-> some errata. This lead to the introduction to a another compatible
-> string.
-> 
-> This commit split the i2c information into armada-370.dtsi and
-> armada-xp.dtsi. Most of the data remains the same and stay in the
-> common file Armada-370-xp.dtsi. With this new feature the size of the
-> registers are bigger for Armada XP and the new compatible string is
-> used.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-370-xp.dtsi |  2 --
->  arch/arm/boot/dts/armada-370.dtsi    |  8 ++++++++
->  arch/arm/boot/dts/armada-xp.dtsi     | 10 ++++++++++
->  3 files changed, 18 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 90b1176..d8b24c9 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -121,7 +121,6 @@
->  
->  			i2c0: i2c at 11000 {
->  				compatible = "marvell,mv64xxx-i2c";
-> -				reg = <0x11000 0x20>;
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				interrupts = <31>;
-> @@ -132,7 +131,6 @@
->  
->  			i2c1: i2c at 11100 {
->  				compatible = "marvell,mv64xxx-i2c";
-> -				reg = <0x11100 0x20>;
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				interrupts = <32>;
-> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> index fa3dfc6..0e2eefa 100644
-> --- a/arch/arm/boot/dts/armada-370.dtsi
-> +++ b/arch/arm/boot/dts/armada-370.dtsi
-> @@ -155,6 +155,14 @@
->  				};
->  			};
->  
-> +			i2c0: i2c at 11000 {
-> +				reg = <0x11000 0x20>;
-> +			};
-> +
-> +			i2c1: i2c at 11100 {
-> +				reg = <0x11100 0x20>;
-> +			};
-> +
->  			usb at 50000 {
->  				clocks = <&coreclk 0>;
->  			};
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index 416eb94..e1f2547 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -138,6 +138,16 @@
->  				};
->  			};
->  
-> +			i2c0: i2c at 11000 {
-> +				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
-> +				reg = <0x11000 0x100>;
-> +			};
-> +
-> +			i2c1: i2c at 11100 {
-> +				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
-> +				reg = <0x11100 0x100>;
-> +			};
-> +
->  			usb at 50000 {
->  				clocks = <&gateclk 18>;
->  			};
-> 
-
-
+Thomas
 -- 
-Gregory Clement, Free Electrons
+Thomas Petazzoni, Free Electrons
 Kernel, drivers, real-time and embedded Linux
 development, consulting, training and support.
 http://free-electrons.com
