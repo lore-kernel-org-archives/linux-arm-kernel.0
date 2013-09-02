@@ -1,32 +1,30 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon,  2 Sep 2013 13:44:59 +0530
-Subject: [PATCH 2/2] dma: ste_dma40: Fix potential null pointer dereference
-In-Reply-To: <1378109699-25245-1-git-send-email-sachin.kamat@linaro.org>
-References: <1378109699-25245-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1378109699-25245-2-git-send-email-sachin.kamat@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 2 Sep 2013 10:33:28 +0200
+Subject: [PATCH v9 3/7] ARM: dts: enable hi4511 with device tree
+In-Reply-To: <87d2ovs0fm.fsf@linaro.org>
+References: <1377695454-29109-1-git-send-email-haojian.zhuang@linaro.org>
+ <1377695454-29109-4-git-send-email-haojian.zhuang@linaro.org>
+ <87eh9c1i1o.fsf@linaro.org>
+ <CAD6h2NRnjme1Hdc+5oMzrR8LYb7_rk13OeVfo0qFT=_jAbMoJg@mail.gmail.com>
+ <87d2ovs0fm.fsf@linaro.org>
+Message-ID: <CACRpkdbQKOdgOzSwK=TvkDdv-mp=Mn6sTTwtUoRUzi9=PrkqDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kcalloc can return NULL. Check the pointer before dereferencing.
+On Fri, Aug 30, 2013 at 4:44 PM, Kevin Hilman <khilman@linaro.org> wrote:
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
- drivers/dma/ste_dma40.c |    3 +++
- 1 file changed, 3 insertions(+)
+>>> Why is sysctrl and all of its children now under the clocks node?
+>>>
+>>> Kevin
+>>
+>> SMP registers and clock registers are sharing the system controller.
+>
+> That suggest the clock node should be a child of the sysctrl node, not
+> the other way around.
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index df0a606..82d2b97 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -2591,6 +2591,9 @@ dma40_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t dma_addr,
- 	int i;
- 
- 	sg = kcalloc(periods + 1, sizeof(struct scatterlist), GFP_NOWAIT);
-+	if (!sg)
-+		return NULL;
-+
- 	for (i = 0; i < periods; i++) {
- 		sg_dma_address(&sg[i]) = dma_addr;
- 		sg_dma_len(&sg[i]) = period_len;
--- 
-1.7.9.5
+That is the way we do it for the Nomadik in
+arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+so a precedent exist. (SRC is system reset and control).
+
+Yours,
+Linus Walleij
