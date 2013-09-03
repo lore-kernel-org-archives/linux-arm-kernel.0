@@ -1,41 +1,126 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 3 Sep 2013 09:50:50 +0200
-Subject: pinctrl-mxs fails to parse function definitions from different
- .dts files
-In-Reply-To: <20130830115127.GP18729@S2101-09.ap.freescale.net>
-References: <20130830092725.GG24802@pengutronix.de>
- <20130830115127.GP18729@S2101-09.ap.freescale.net>
-Message-ID: <20130903075050.GL24802@pengutronix.de>
+From: B18965@freescale.com (Wang Huan-B18965)
+Date: Tue, 3 Sep 2013 08:21:34 +0000
+Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
+ Vybrid VF610 platform
+In-Reply-To: <81BA6E5E0BC2344391CABCEE22D1B6D83F448E@039-SN1MPN1-002.039d.mgd.msft.net>
+References: <1376553714-25922-1-git-send-email-b18965@freescale.com>
+ <81BA6E5E0BC2344391CABCEE22D1B6D83F448E@039-SN1MPN1-002.039d.mgd.msft.net>
+Message-ID: <81BA6E5E0BC2344391CABCEE22D1B6D8403CB3@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+Hi, Jean-Christophe, Tomi,
 
-On Fri, Aug 30, 2013 at 07:51:29PM +0800, Shawn Guo wrote:
-> On Fri, Aug 30, 2013 at 11:27:25AM +0200, Uwe Kleine-K?nig wrote:
-> > while when I move the definition of i2c1 at 1 into imx28.dtsi after i2c1 at 0
-> > i2c1 probes just fine and also the pinmux-functions look right:
-> > 	
-> > 	# grep i2c1 /sys/kernel/debug/pinctrl/80018000.pinctrl/pinmux-functions
-> > 	function: i2c1, groups = [ i2c1.0 i2c1.1 ]
-> > 
-> > This is not intended, is it?
+      Could you please help to review these patches?
+      Thanks!
+
+
+Best Regards,
+Alison Wang
+
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Wang Huan-B18965
+> Sent: Monday, August 26, 2013 5:52 PM
+> To: plagnioj at jcrosoft.com; tomi.valkeinen at ti.com; linux-
+> fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Cc: Jin Zhengxiong-R64188; Estevam Fabio-R49496; shawn.guo at linaro.org
+> Subject: RE: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
+> Vybrid VF610 platform
 > 
-> Sorry.  I should have documented it somewhere, but this is intended.
-> The driver requires all the pin groups for given function be sorted
-> together in 'reg'.
-The groups for the function i2c1 are sorted, i.e. i2c1.0 comes before
-i2c1.1 :-) But honestly, it's very unconvenient to require this
-grouping. It makes it impossible to define i2c1.1 in myimx28machine.dts
-and so a nice advantage of being able to just include the vanilla
-imx28.dtsi in my external dts file goes away :-(
-
-So I would prefer a patch that gets rid of this restriction instead of a
-patch that documents it.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Hi, Jean-Christophe, Tomi,
+> 
+>        Do you have any comments for these patches?
+> 
+>        Thanks!
+> 
+> 
+> Best Regards,
+> Alison Wang
+> 
+> > -----Original Message-----
+> > From: linux-arm-kernel [mailto:linux-arm-kernel-
+> > bounces at lists.infradead.org] On Behalf Of Alison Wang
+> > Sent: Thursday, August 15, 2013 4:02 PM
+> > To: plagnioj at jcrosoft.com; tomi.valkeinen at ti.com;
+> > shawn.guo at linaro.org; Estevam Fabio-R49496;
+> > linux-fbdev at vger.kernel.org; linux-arm- kernel at lists.infradead.org
+> > Cc: Jin Zhengxiong-R64188
+> > Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
+> > Vybrid VF610 platform
+> >
+> > This series contain DCU framebuffer driver for Freescale Vybrid VF610
+> > platform.
+> >
+> > The Display Controller Unit (DCU) module is a system master that
+> > fetches graphics stored in internal or external memory and displays
+> > them on a TFT LCD panel. A wide range of panel sizes is supported and
+> > the timing of the interface signals is highly configurable.
+> > Graphics are read directly from memory and then blended in real-time,
+> > which allows for dynamic content creation with minimal CPU
+> intervention.
+> >
+> > The features:
+> > (1) Full RGB888 output to TFT LCD panel.
+> > (2) For the current LCD panel, WQVGA "480x272" is tested.
+> > (3) Blending of each pixel using up to 4 source layers dependent on
+> > size of panel.
+> > (4) Each graphic layer can be placed with one pixel resolution in
+> > either axis.
+> > (5) Each graphic layer support RGB565 and RGB888 direct colors
+> without
+> > alpha channel and BGRA8888 direct colors with an alpha channel.
+> > (6) Each graphic layer support alpha blending with 8-bit resolution.
+> >
+> > Changes in v3:
+> > - Correct DCU_MODE_BLEND_ITER macro definition.
+> > - Remove hardcode panel description in the driver. Use the videomode
+> > helpers to get the relevant data from devicetree.
+> > - Correct the wrong indentation.
+> > - Use dev_* for printing messages in drivers.
+> > - Change calc_div_ratio() to fsl_dcu_calc_div(), and rewrite this
+> > function.
+> > - Use devm_request_irq() instead of request_irq().
+> > - Drop useless code.
+> > - Increase the layers number to the maximum 6.
+> > - Use dma_alloc_writecombine() instead of dma_alloc_coherent().
+> > - Use runtime PM.
+> >
+> > Changes in v2:
+> > - Add a document for DCU framebuffer driver under
+> > Documentation/devicetree/bindings/fb/.
+> >
+> > ----------------------------------------------------------------
+> > Alison Wang (5):
+> >       ARM: dts: vf610: Add DCU and TCON nodes
+> >       ARM: dts: vf610-twr: Enable DCU and TCON devices
+> >       ARM: clk: vf610: Add DCU and TCON clock support
+> >       fb: Add DCU framebuffer driver for Vybrid VF610 platform
+> >       Documentation: DT: Add DCU framebuffer driver
+> >
+> >  Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt |   67 +++++
+> >  arch/arm/boot/dts/vf610-twr.dts                     |   32 +++
+> >  arch/arm/boot/dts/vf610.dtsi                        |   19 +-
+> >  arch/arm/mach-imx/clk-vf610.c                       |    5 +
+> >  drivers/video/Kconfig                               |   10 +
+> >  drivers/video/Makefile                              |    1 +
+> >  drivers/video/fsl-dcu-fb.c                          | 1095
+> >
+> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+> > +++++++++
+> >  include/dt-bindings/clock/vf610-clock.h             |    3 +-
+> >  8 files changed, 1230 insertions(+), 2 deletions(-)  create mode
+> > 100644 Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt
+> >  create mode 100644 drivers/video/fsl-dcu-fb.c
+> >
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
