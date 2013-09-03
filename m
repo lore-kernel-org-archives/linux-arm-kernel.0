@@ -1,67 +1,36 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue,  3 Sep 2013 14:04:48 +0200
-Subject: [PATCH V4 3/4] mmc: mmci: Adapt to register write restrictions
-Message-ID: <1378209888-16874-1-git-send-email-ulf.hansson@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 03 Sep 2013 14:11:17 +0200
+Subject: [PATCH 1/4] ARM: shmobile: r8a7778: add Ether DT support
+In-Reply-To: <1378135954.3321.5.camel@hornet>
+References: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
+ <1738124.5rApJWhXUN@avalon> <1378135954.3321.5.camel@hornet>
+Message-ID: <2922765.My7X58lhxd@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After a write to the MMCICLOCK register data cannot be written to this
-register for three feedback clock cycles. Writes to the MMCIPOWER
-register must be separated by three MCLK cycles. Previously no issues
-has been observered, but using higher ARM clock frequencies on STE-
-platforms has triggered this problem.
+Hi Pawe?,
 
-The MMCICLOCK register is written to in .set_ios and for some data
-transmissions for SDIO. We do not need a delay at the data transmission
-path, because sending and receiving data will require more than three
-clock cycles. Then we use a simple logic to only delay in .set_ios and
-thus we don't affect throughput performance.
+On Monday 02 September 2013 16:32:34 Pawel Moll wrote:
+> On Mon, 2013-09-02 at 15:18 +0100, Laurent Pinchart wrote:
+> > Documentation/devicetree/booting-without-of.txt mentions it, as well as a
+> > couple of other DT bindings document, but there's no clear documentation
+> > of what device_type should be for network device, and whether the property
+> > is mandatory or optional. Clarifying the documentation would be great.
+> 
+> It's documented in the ePAPR spec:
+> 
+> "The device_type property was used in IEEE 1275 to describe the device?s
+> FCode programming model. Because ePAPR does not have FCode, new use of
+> the property is deprecated, and it should be included only on cpu and
+> memory nodes for compatibility with IEEE 1275?derived device trees."
 
-Signed-off-by: Johan Rudholm <jrudholm@gmail.com>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Rickard Andersson <rickard.andersson@stericsson.com>
----
+Thank you for the clarification.
 
-Changes in v4:
-	- Fixed typo of 25 MHz instead of 20 MHz
+> The bottom line is - don't use it, unless you've good good reasons?
 
----
- drivers/mmc/host/mmci.c |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+I'll let Sergei share his opinion on whether we've got good reasons :-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index c550b3e..604e41d 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -189,6 +189,21 @@ static int mmci_validate_data(struct mmci_host *host,
- 	return 0;
- }
- 
-+static void mmci_reg_delay(struct mmci_host *host)
-+{
-+	/*
-+	 * According to the spec, at least three feedback clock cycles
-+	 * of max 52 MHz must pass between two writes to the MMCICLOCK reg.
-+	 * Three MCLK clock cycles must pass between two MMCIPOWER reg writes.
-+	 * Worst delay time during card init is at 100 kHz => 30 us.
-+	 * Worst delay time when up and running is at 25 MHz => 120 ns.
-+	 */
-+	if (host->cclk < 25000000)
-+		udelay(30);
-+	else
-+		ndelay(120);
-+}
-+
- /*
-  * This must be called with host->lock held
-  */
-@@ -1264,6 +1279,7 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 
- 	mmci_set_clkreg(host, ios->clock);
- 	mmci_write_pwrreg(host, pwr);
-+	mmci_reg_delay(host);
- 
- 	spin_unlock_irqrestore(&host->lock, flags);
- 
 -- 
-1.7.9.5
+Regards,
+
+Laurent Pinchart
