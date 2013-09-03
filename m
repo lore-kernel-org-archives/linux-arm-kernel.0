@@ -1,72 +1,92 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Tue,  3 Sep 2013 09:44:21 -0700
-Subject: [RFC 0/4] Create infrastructure for running C code from SRAM.
-Message-ID: <1378226665-27090-1-git-send-email-Russ.Dill@ti.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 3 Sep 2013 18:14:40 +0100
+Subject: [PULL REQUEST v2] big-endian support
+Message-ID: <20130903171440.GA19528@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This RFC patchset explores an idea for loading C code into SRAM.
-Currently, all the code I'm aware of that needs to run from SRAM is written
-in assembler. The most common reason for code needing to run from SRAM is
-that the memory controller is being disabled/ enabled or is already
-disabled. arch/arm has by far the most examples, but code also exists in
-powerpc and sh.
+The following pull request is an update of the previous big-endian
+series. The chnages since v1 are:
 
-The code is written in asm for two primary reasons. First so that markers
-can be put in indicating the size of the code they it can be copied. Second
-so that data can be placed along with text and accessed in a position
-independant manner.
+- Fix issue with THUMB2 reported by Dave Martin
+- Added Jason's ack for the mvebu
+- Added Thomas' tested by for several patches
 
-SRAM handling code is in the process of being moved from arch directories
-into drivers/misc/sram.c using device tree and genalloc [1] [2]. This RFC
-patchset builds on that, including the limitation that the SRAM address is
-not known at compile time. Because the SRAM address is not known at compile
-time, the code that runs from SRAM must be compiled with -fPIC. Even if
-the code were loaded to a fixed virtual address, portions of the code must
-often be run with the MMU disabled.
+If possible, it would be great to get this in this merge window.
 
-The general idea is that for each SRAM user (such as an SoC specific
-suspend/resume mechanism) to create a group of sections. The section group
-is created with a single macro for each user, but end up looking like this:
+The following changes since commit fa8218def1b1a16f0a410e2c1c767b4738cc81fa:
 
-.sram.am33xx : AT(ADDR(.sram.am33xx) - 0) {
-  __sram_am33xx_start = .;
-  *(.sram.am33xx.*)
-  __sram_am33xx_end = .;
-}
+  Merge tag 'regmap-v3.11-rc7' of git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap (2013-08-27 10:10:30 -0700)
 
-Any data or functions that should be copied to SRAM for this use should be
-maked with an appropriate __section() attribute. A helper is then added for
-translating between the original kernel symbol, and the address of that
-function or variable once it has been copied into SRAM. Once control is
-passed to a function within the SRAM section grouping, it can access any
-variables or functions within that same SRAM section grouping without
-translation.
+are available in the git repository at:
 
-[1] http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4984c6
-[2] http://www.spinics.net/lists/linux-omap/msg96504.html
+  git://git.baserock.org/delta/linux.git baserock/311-rc7/be/core-v5
 
-Russ Dill (4):
-  Misc: SRAM: Create helpers for loading C code into SRAM
-  ARM: SRAM: Add macro for generating SRAM resume trampoline
-  Misc: SRAM: Hack for allowing executable code in SRAM.
-  ARM: AM33XX: Move suspend/resume assembly to C
+for you to fetch changes up to 297ad14ccf68a5ee75d7a1a8bd434e03b4bbae56:
 
- arch/arm/include/asm/suspend.h    |  14 ++
- arch/arm/kernel/vmlinux.lds.S     |   2 +
- arch/arm/mach-omap2/Makefile      |   2 +-
- arch/arm/mach-omap2/pm33xx.c      |  50 ++---
- arch/arm/mach-omap2/pm33xx.h      |  23 +--
- arch/arm/mach-omap2/sleep33xx.S   | 394 --------------------------------------
- arch/arm/mach-omap2/sleep33xx.c   | 309 ++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/sram.c        |  15 --
- drivers/misc/sram.c               | 106 +++++++++-
- include/asm-generic/vmlinux.lds.h |   7 +
- include/linux/sram.h              |  44 +++++
- 11 files changed, 509 insertions(+), 457 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/sleep33xx.S
- create mode 100644 arch/arm/mach-omap2/sleep33xx.c
- create mode 100644 include/linux/sram.h
+  ARM: signal: sigreturn_codes should be endian neutral to work in BE8 (2013-09-03 17:37:01 +0100)
+
+----------------------------------------------------------------
+Ben Dooks (18):
+      ARM: fix ARCH_IXP4xx usage of ARCH_SUPPORTS_BIG_ENDIAN
+      ARM: asm: Add ARM_BE8() assembly helper
+      ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
+      ARM: set BE8 if LE in head code
+      ARM: pl01x debug code endian fix
+      ARM: twd: data endian fix
+      ARM: smp_scu: data endian fixes
+      ARM: highbank: enable big-endian
+      ARM: mvebu: support running big-endian
+      ARM: vexpress: add big endian support
+      ARM: alignment: correctly decode instructions in BE8 mode.
+      ARM: traps: use <asm/opcodes.h> to get correct instruction order
+      ARM: module: correctly relocate instructions in BE8
+      ARM: set --be8 when linking modules
+      ARM: hardware: fix endian-ness in <hardware/coresight.h>
+      ARM: net: fix arm instruction endian-ness in bpf_jit_32.c
+      ARM: Correct BUG() assembly to ensure it is endian-agnostic
+      ARM: kdgb: use <asm/opcodes.h> for data to be assembled as intruction
+
+Victor Kamensky (2):
+      ARM: atomic64: fix endian-ness in atomic.h
+      ARM: signal: sigreturn_codes should be endian neutral to work in BE8
+
+ arch/arm/Kconfig                            |  1 +
+ arch/arm/Makefile                           |  1 +
+ arch/arm/boot/compressed/head.S             |  9 ++--
+ arch/arm/include/asm/assembler.h            |  7 +++
+ arch/arm/include/asm/atomic.h               | 26 +++++------
+ arch/arm/include/asm/bug.h                  | 10 +++--
+ arch/arm/include/asm/hardware/coresight.h   |  8 ++--
+ arch/arm/include/asm/hardware/debug-pl01x.S |  2 +
+ arch/arm/include/asm/kgdb.h                 |  3 +-
+ arch/arm/kernel/Makefile                    |  3 +-
+ arch/arm/kernel/entry-armv.S                |  5 +--
+ arch/arm/kernel/entry-common.S              |  4 +-
+ arch/arm/kernel/head.S                      | 12 +++++
+ arch/arm/kernel/module.c                    | 57 ++++++++++++++----------
+ arch/arm/kernel/signal.c                    | 24 +---------
+ arch/arm/kernel/sigreturn_codes.S           | 69 +++++++++++++++++++++++++++++
+ arch/arm/kernel/sleep.S                     |  1 +
+ arch/arm/kernel/smp_scu.c                   | 14 +++---
+ arch/arm/kernel/smp_twd.c                   | 24 +++++-----
+ arch/arm/kernel/traps.c                     | 24 ++++++----
+ arch/arm/mach-highbank/Kconfig              |  1 +
+ arch/arm/mach-ixp4xx/Kconfig                |  4 --
+ arch/arm/mach-mvebu/Kconfig                 |  1 +
+ arch/arm/mach-mvebu/coherency_ll.S          |  3 ++
+ arch/arm/mach-mvebu/headsmp.S               |  4 ++
+ arch/arm/mach-vexpress/Kconfig              |  1 +
+ arch/arm/mm/Kconfig                         |  6 +++
+ arch/arm/mm/abort-ev6.S                     |  5 +--
+ arch/arm/mm/alignment.c                     |  9 +++-
+ arch/arm/mm/proc-v6.S                       |  4 +-
+ arch/arm/mm/proc-v7.S                       |  4 +-
+ arch/arm/net/bpf_jit_32.c                   |  6 ++-
+ arch/arm/plat-versatile/headsmp.S           |  2 +
+ 33 files changed, 229 insertions(+), 125 deletions(-)
+ create mode 100644 arch/arm/kernel/sigreturn_codes.S
 
 -- 
-1.8.3.2
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
