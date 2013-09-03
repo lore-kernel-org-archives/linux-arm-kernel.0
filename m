@@ -1,64 +1,111 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Sep 2013 13:25:09 -0600
-Subject: [alsa-devel] [PATCH 2/3] ASoC: generic simple sound card DT
- bindings
-In-Reply-To: <52220766.1040504@metafoo.de>
-References: <1377945878-13322-1-git-send-email-mpa@pengutronix.de>
- <1377945878-13322-3-git-send-email-mpa@pengutronix.de>
- <52220766.1040504@metafoo.de>
-Message-ID: <52263795.8010600@wwwdotorg.org>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Tue,  3 Sep 2013 12:23:53 -0700
+Subject: [PATCH] pwm: pxa: add device tree support to pwm driver
+Message-ID: <1378236233-15637-1-git-send-email-mikedunn@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/2013 09:10 AM, Lars-Peter Clausen wrote:
-> On 08/31/2013 12:44 PM, Markus Pargmann wrote:
->> Simple sound card initialized using DT. When used with AC97, ac97-codec
->> is used to automatically discover the used codec.
+This patch adds device tree support to the pxa's pwm driver.  Only an OF match
+table is added; nothing needs to be extracted from the device tree node.  The
+existing platform_device id table is reused for the match table data.
 
->> diff --git a/Documentation/devicetree/bindings/sound/generic,simple-dt-card.txt b/Documentation/devicetree/bindings/sound/generic,simple-dt-card.txt
+Tested on a Palm Treo 680 (both platform data and DT cases).
 
->> +ASoC Simple Sound Card
+Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
+---
 
-As Lars mentions below, we shouldn't have bindings for ASoC; we should
-have bindings that describe the HW. Bindings are supposed to be
-OS-agnostic, whereas "ASoC" is Linux-specific.
+I don't have data sheets handy for the newer Marvell pxa's (and I'm confused
+about the presence of a pwm unit on pxa25x), so only pxa27x.dtsi was updated.
+Thanks for looking!
 
->> +
->> +A simple generic driver that connects a CPU DAI with a CODEC.
->> +
->> +Required properties:
->> + - compatible: "asoc-simple-card" used for standard ssi, codec
->> +   combinations, or "asoc-simple-ac97-card" to use ac97 to discover the
->> +   codec.
->> + - cpu-dai: CPU DAI connected to the codec.
->> +
->> +Required properties for "asoc-simple-card":
->> + - audio-codec: Codec phandle.
->> + - codec-dai-name: DAI name within the codec.
-> 
-> In my opinion this binding exposes way to much of the ASoC internal data
-> structures. E.g. CODECs are referenced by phandle, but the DAI of the CODEC
-> is reference by a string. This string is completely ASoC internal.
+ arch/arm/boot/dts/pxa27x.dtsi | 12 ++++++++++++
+ drivers/pwm/pwm-pxa.c         | 31 +++++++++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+)
 
-Mark has made the argument that (at least for CODEC analog pins) we can
-simply put those strings into the binding document, and make them as
-much a part of the binding as anything else. After all, (at least for
-CODEC analog pins) the values are simply the names of the pins on the
-package, as listed by the HW documentation itself.
-
-We could presumably do the same thing for DAIs; in DT, use a
-string-based DAI name derived directly from the HW documentation, rather
-than the current intra-ASoC DAI name strings.
-
-That said, I will admit that I personally don't really like the idea of
-using strings in bindings. That opinion certainly isn't universal though.
-
-> The
-> binding also assumes that a CPU controller may have one DAI at most. In my
-> opinion this binding ought to use the upcoming of_xlate stuff for ASoC
-> components.
-
-That restriction seems reasonable for a *simple* DT sound binding. For
-more complex cards, one could presumably create more complex bindings,
-be they generic bindings that cover arbitrary more complex cases, or
-bindings for specific configurations that happen to include multiple DAIs.
+diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+index d7c5d72..4031dce 100644
+--- a/arch/arm/boot/dts/pxa27x.dtsi
++++ b/arch/arm/boot/dts/pxa27x.dtsi
+@@ -10,5 +10,17 @@
+ 			marvell,intc-priority;
+ 			marvell,intc-nr-irqs = <34>;
+ 		};
++
++		pwm0: pwm at 40b00000 {
++			compatible = "marvell,pxa27x-pwm";
++			reg = <0x40b00000 0x100000>;
++			#pwm-cells = <2>;
++		};
++
++		pwm1: pwm at 40c00000 {
++			compatible = "marvell,pxa27x-pwm";
++			reg = <0x40c00000 0x100000>;
++			#pwm-cells = <2>;
++		};
+ 	};
+ };
+diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
+index a4d2164..be5f914 100644
+--- a/drivers/pwm/pwm-pxa.c
++++ b/drivers/pwm/pwm-pxa.c
+@@ -19,6 +19,7 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/pwm.h>
++#include <linux/of_device.h>
+ 
+ #include <asm/div64.h>
+ 
+@@ -124,6 +125,30 @@ static struct pwm_ops pxa_pwm_ops = {
+ 	.owner = THIS_MODULE,
+ };
+ 
++#ifdef CONFIG_OF
++/* use the platform_device id table for OF match table data */
++static struct of_device_id pwm_of_match[] = {
++	{ .compatible = "marvell,pxa25x-pwm", .data = &pwm_id_table[0] },
++	{ .compatible = "marvell,pxa27x-pwm", .data = &pwm_id_table[1] },
++	{ .compatible = "marvell,pxa168-pwm", .data = &pwm_id_table[2] },
++	{ .compatible = "marvell,pxa910-pwm", .data = &pwm_id_table[3] },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, pwm_of_match);
++
++static const struct platform_device_id *pxa_pwm_get_id_dt(struct device *dev)
++{
++	const struct of_device_id *pwm_pxa_devid =
++		of_match_device(pwm_of_match, dev);
++	if (pwm_pxa_devid)
++		return (const struct platform_device_id *)pwm_pxa_devid->data;
++	else
++		return NULL;
++}
++#else  /* !CONFIG_OF */
++#define pxa_pwm_get_id_dt(dev) ((const struct platform_device_id *)NULL)
++#endif
++
+ static int pwm_probe(struct platform_device *pdev)
+ {
+ 	const struct platform_device_id *id = platform_get_device_id(pdev);
+@@ -131,6 +156,11 @@ static int pwm_probe(struct platform_device *pdev)
+ 	struct resource *r;
+ 	int ret = 0;
+ 
++	if (id == NULL)		/* using device tree */
++		id = pxa_pwm_get_id_dt(&pdev->dev);
++	if (id == NULL)
++		return -ENODEV;
++
+ 	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
+ 	if (pwm == NULL) {
+ 		dev_err(&pdev->dev, "failed to allocate memory\n");
+@@ -176,6 +206,7 @@ static struct platform_driver pwm_driver = {
+ 	.driver		= {
+ 		.name	= "pxa25x-pwm",
+ 		.owner	= THIS_MODULE,
++		.of_match_table	= of_match_ptr(pwm_of_match),
+ 	},
+ 	.probe		= pwm_probe,
+ 	.remove		= pwm_remove,
+-- 
+1.8.1.5
