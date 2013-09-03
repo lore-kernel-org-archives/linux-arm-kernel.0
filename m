@@ -1,43 +1,64 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 3 Sep 2013 12:07:16 -0700
-Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
-In-Reply-To: <CA+Bv8XakgQZoeB8OTWsq1uUTcPfuxcD1qP9wnhu4HK22FMxFNQ@mail.gmail.com>
-References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
- <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
- <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
- <87txiasqhk.fsf@linaro.org>
- <CA+Bv8XZagHZ9mUuZB49hrH=901fXzoAcV8C0Fm3EfLa2eiBu0w@mail.gmail.com>
- <87ppsw7cgq.fsf@linaro.org>
- <CA+Bv8XbxV=BFjcSsUMX2pz9LeCkSwrjzZmj_=YbHGzyfbLXmaQ@mail.gmail.com>
- <874na8xqfl.fsf@linaro.org>
- <CANacCWzK1w9+XKEoUfS4ZB7QGxi_0JkVWBLs_wsaUjrzW2QB+A@mail.gmail.com>
- <87hae8tc6e.fsf@linaro.org>
- <CA+Bv8XaQgOiSiScQW=CVxzXBuG0soafQotApjoVEZ0P9U3netg@mail.gmail.com>
- <87eh9bqi1x.fsf@linaro.org>
- <CA+Bv8XakgQZoeB8OTWsq1uUTcPfuxcD1qP9wnhu4HK22FMxFNQ@mail.gmail.com>
-Message-ID: <CAGa+x86XVetqMGMTh7LoX6VAEb-d0W67_SbgTCxk4Q=QovpKTQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 03 Sep 2013 13:25:09 -0600
+Subject: [alsa-devel] [PATCH 2/3] ASoC: generic simple sound card DT
+ bindings
+In-Reply-To: <52220766.1040504@metafoo.de>
+References: <1377945878-13322-1-git-send-email-mpa@pengutronix.de>
+ <1377945878-13322-3-git-send-email-mpa@pengutronix.de>
+ <52220766.1040504@metafoo.de>
+Message-ID: <52263795.8010600@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 3, 2013 at 11:55 AM, Russ Dill <Russ.Dill@ti.com> wrote:
-> On Fri, Aug 30, 2013 at 9:06 AM, Kevin Hilman <khilman@linaro.org> wrote:
->> Well, I was thinking of something much dumber.
->>
->> I was thinking about just _carefully_ writing a single, self-contained C
->> function, with all of its data on the stack (and consts as #defines).
->> Think of it is a step up in readability from straight assembly (which
->> was the stated reason for moving the code to the M3 in the first place.)
->>
->> Kevin
->
-> That can only give you your suspend function. You need a resume
-> function to undo everything before calling cpu_resume, and the resume
-> function needs access to the data that was in the suspend function.
+On 08/31/2013 09:10 AM, Lars-Peter Clausen wrote:
+> On 08/31/2013 12:44 PM, Markus Pargmann wrote:
+>> Simple sound card initialized using DT. When used with AC97, ac97-codec
+>> is used to automatically discover the used codec.
 
-Well, it can be done (and I've seen it done) with various hacks, but I
-agree it's not pretty, but it is at least slightly prettier than piles
-of asm.  That being said, I saw you posted a more generic solution
-that looks like a real solution that can scale.  I'll have a closer
-look at that.  Thanks for working on it.
+>> diff --git a/Documentation/devicetree/bindings/sound/generic,simple-dt-card.txt b/Documentation/devicetree/bindings/sound/generic,simple-dt-card.txt
 
-Kevin
+>> +ASoC Simple Sound Card
+
+As Lars mentions below, we shouldn't have bindings for ASoC; we should
+have bindings that describe the HW. Bindings are supposed to be
+OS-agnostic, whereas "ASoC" is Linux-specific.
+
+>> +
+>> +A simple generic driver that connects a CPU DAI with a CODEC.
+>> +
+>> +Required properties:
+>> + - compatible: "asoc-simple-card" used for standard ssi, codec
+>> +   combinations, or "asoc-simple-ac97-card" to use ac97 to discover the
+>> +   codec.
+>> + - cpu-dai: CPU DAI connected to the codec.
+>> +
+>> +Required properties for "asoc-simple-card":
+>> + - audio-codec: Codec phandle.
+>> + - codec-dai-name: DAI name within the codec.
+> 
+> In my opinion this binding exposes way to much of the ASoC internal data
+> structures. E.g. CODECs are referenced by phandle, but the DAI of the CODEC
+> is reference by a string. This string is completely ASoC internal.
+
+Mark has made the argument that (at least for CODEC analog pins) we can
+simply put those strings into the binding document, and make them as
+much a part of the binding as anything else. After all, (at least for
+CODEC analog pins) the values are simply the names of the pins on the
+package, as listed by the HW documentation itself.
+
+We could presumably do the same thing for DAIs; in DT, use a
+string-based DAI name derived directly from the HW documentation, rather
+than the current intra-ASoC DAI name strings.
+
+That said, I will admit that I personally don't really like the idea of
+using strings in bindings. That opinion certainly isn't universal though.
+
+> The
+> binding also assumes that a CPU controller may have one DAI at most. In my
+> opinion this binding ought to use the upcoming of_xlate stuff for ASoC
+> components.
+
+That restriction seems reasonable for a *simple* DT sound binding. For
+more complex cards, one could presumably create more complex bindings,
+be they generic bindings that cover arbitrary more complex cases, or
+bindings for specific configurations that happen to include multiple DAIs.
