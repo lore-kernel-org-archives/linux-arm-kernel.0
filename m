@@ -1,52 +1,56 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 3 Sep 2013 11:47:08 -0400
-Subject: [GIT PULL V2 2/2] ARM: mvebu: MSI mvebu changes for v3.12
-In-Reply-To: <CAOesGMhRJjB9veSVMYHMFPqWYeMd8n9YcnKVtZxav1vyfKnbhw@mail.gmail.com>
-References: <20130814191011.GD13964@titan.lakedaemon.net>
- <20130814192317.GE13964@titan.lakedaemon.net>
- <20130830202526.GW19598@titan.lakedaemon.net>
- <CAOesGMhRJjB9veSVMYHMFPqWYeMd8n9YcnKVtZxav1vyfKnbhw@mail.gmail.com>
-Message-ID: <20130903154708.GJ19598@titan.lakedaemon.net>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 3 Sep 2013 08:50:30 -0700
+Subject: [PATCH v11 0/8] PHY framework
+In-Reply-To: <5225FF63.6080608@ti.com>
+References: <1377063973-22044-1-git-send-email-kishon@ti.com>
+ <521B0E79.6060506@ti.com> <20130827192059.GZ3005@radagast>
+ <5225FF63.6080608@ti.com>
+Message-ID: <20130903155030.GA21525@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 03, 2013 at 08:04:51AM -0700, Olof Johansson wrote:
-> On Fri, Aug 30, 2013 at 1:25 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > Arnd, Olof,
-> >
-> > As requested, rebased on top of mvebu/drivers to resolve conflicts
-> > internally.
+On Tue, Sep 03, 2013 at 08:55:23PM +0530, Kishon Vijay Abraham I wrote:
+> Hi Greg,
 > 
-> Sorry, I didn't have a chance to pull this in before the last -next
-> before the merge window (which was already very late), so it'll have
-> to wait for 3.13. Please send a fresh pull request of this branch once
-> -rc1 is out.
+> On Wednesday 28 August 2013 12:50 AM, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Mon, Aug 26, 2013 at 01:44:49PM +0530, Kishon Vijay Abraham I wrote:
+> >> On Wednesday 21 August 2013 11:16 AM, Kishon Vijay Abraham I wrote:
+> >>> Added a generic PHY framework that provides a set of APIs for the PHY drivers
+> >>> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
+> >>> the PHY with or without using phandle.
+> >>>
+> >>> This framework will be of use only to devices that uses external PHY (PHY
+> >>> functionality is not embedded within the controller).
+> >>>
+> >>> The intention of creating this framework is to bring the phy drivers spread
+> >>> all over the Linux kernel to drivers/phy to increase code re-use and to
+> >>> increase code maintainability.
+> >>>
+> >>> Comments to make PHY as bus wasn't done because PHY devices can be part of
+> >>> other bus and making a same device attached to multiple bus leads to bad
+> >>> design.
+> >>>
+> >>> If the PHY driver has to send notification on connect/disconnect, the PHY
+> >>> driver should make use of the extcon framework. Using this susbsystem
+> >>> to use extcon framwork will have to be analysed.
+> >>>
+> >>> You can find this patch series @
+> >>> git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
+> >>
+> >> Looks like there are not further comments on this series. Can you take this in
+> >> your misc tree?
+> > 
+> > Do you want me to queue these for you ? There are quite a few users for
+> > this framework already and I know of at least 2 others which will show
+> > up for v3.13.
+> 
+> Can you queue this patch series? There are quite a few users already for this
+> framework.
 
-I'm sorry Olof, but I have to call bullshit.  I originally sent this
-pull-request on August 14th (3 _weeks_ ago):
+It will have to wait for 3.13 as the merge window for new features has
+been closed for a week or so.  Sorry, I'll queue this up after 3.12-rc1
+is out.
 
-http://www.spinics.net/lists/arm-kernel/msg267243.html
-
-I heard crickets until your reply on August 29th (2 _weeks_ later):
-
-http://www.spinics.net/lists/arm-kernel/msg270826.html
-
-Which I respun and resent within a day on August 30th:
-
-http://www.spinics.net/lists/arm-kernel/msg271170.html
-
-
-Also, these patches were in -next for at least a week _before_ I sent my
-first pull request on August 14th.  So they've been tested for
-_four_weeks_ ...
-
-I understand you're busy with other work, like all of us, but it would
-seem that the baton passing between you, Arnd, and Kevin could use some
-tweaking.
-
-The situation is the exact same for the dove branch.
-
-
-:(
-
-Jason.
+greg k-h
