@@ -1,87 +1,72 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 03 Sep 2013 11:50:39 +0200
-Subject: [PATCH V3 3/4] mmc: mmci: Adapt to register write restrictions
-In-Reply-To: <1378200576-13413-4-git-send-email-ulf.hansson@linaro.org>
-References: <1378200576-13413-1-git-send-email-ulf.hansson@linaro.org>
- <1378200576-13413-4-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <5225B0EF.7030006@linaro.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 3 Sep 2013 18:06:44 +0800
+Subject: [PATCH] dmaengine: sirf: add dmaengine_prep_slave_single/sg
+ support
+In-Reply-To: <20130902062549.GG7376@intel.com>
+References: <1377435433-23202-1-git-send-email-Baohua.Song@csr.com>
+ <20130826085607.GN2748@intel.com>
+ <CAGsJ_4yhVFL+j9PV-srAXdYkbEN62X18n-_+cXa+xy4wcOF7Qw@mail.gmail.com>
+ <20130902062549.GG7376@intel.com>
+Message-ID: <CAGsJ_4w4dNOy=8HMQqy9sCL=UVWXSgADjoqBD9FmSxdoyzZ6pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2013 11:29 AM, Ulf Hansson wrote:
-> After a write to the MMCICLOCK register data cannot be written to this
-> register for three feedback clock cycles. Writes to the MMCIPOWER
-> register must be separated by three MCLK cycles. Previously no issues
-> has been observered, but using higher ARM clock frequencies on STE-
-> platforms has triggered this problem.
-> 
-> The MMCICLOCK register is written to in .set_ios and for some data
-> transmissions for SDIO. We do not need a delay at the data transmission
-> path, because sending and receiving data will require more than three
-> clock cycles. Then we use a simple logic to only delay in .set_ios and
-> thus we don't affect throughput performance.
-> 
-> Signed-off-by: Johan Rudholm <jrudholm@gmail.com>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Acked-by: Rickard Andersson <rickard.andersson@stericsson.com>
-> ---
+2013/9/2 Vinod Koul <vinod.koul@intel.com>:
+> On Sun, Sep 01, 2013 at 09:02:01PM +0800, Barry Song wrote:
+>> 2013/8/26 Vinod Koul <vinod.koul@intel.com>:
+>> > On Sun, Aug 25, 2013 at 08:57:13PM +0800, Barry Song wrote:
+>> >> the dma engine of sirfsoc supports interleaved mode, but if we set
+>> >> xlen=width instead xlen<width, it will work as non-interleaved. as
+>> >> most clients of sirf dma driver still don't need interleaved mode,
+>> >> so here we still need to implement prep_slave_sg entry so that users
+>> >> like uart, spi can use these APIs instead of interleaved API.
+>> > Well in that case why dont you just create a wrapper on top of interleaved API
+>> > to make this work without driver changes
+>>
+>> Vinod, do you mean using interleaved API to provide sg/single API if
+>> specific drivers implement interleaved_dma but not implement sg_dma?
+>>
+>> the problem is that is difficult to set right legal sgl[i].size,
+>> sgl[i].icg and numf for all dmaengines as that depends on specific dma
+>> hardware limitation.
+> The whole premise of doing the generic interleaved api was to ensure we can use
+> any of the usuages as a case of interleaved api. Can you explain how it would be
+> difficult?
 
-Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+for example, if someone wants to do a 16Kbytes single transfer. how
+will interleaved dma set transfer length and interval between every
+row?
+if it sets the transfer length to 16KB directly, the dma hardware
+might not support such long a transfer at all.
+so it might want to set as two 8KB transfer without interval between them.
+0~8KB                empty interval
+8KB-16KB          empty interval
+or four 4KB transfer as
+0~4KB                empty interval
+4KB-8KB          empty interval
+8KB-12KB          empty interval
+12KB-16KB          empty interval
 
-+ two questions below.
+the problem is we don't know the hardware limitation of every dma
+controllers for transferring length of each row.
 
->  drivers/mmc/host/mmci.c |   16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index c550b3e..82afcd3 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -189,6 +189,21 @@ static int mmci_validate_data(struct mmci_host *host,
->  	return 0;
->  }
->  
-> +static void mmci_reg_delay(struct mmci_host *host)
-> +{
-> +	/*
-> +	 * According to the spec, at least three feedback clock cycles
-> +	 * of max 52 MHz must pass between two writes to the MMCICLOCK reg.
-> +	 * Three MCLK clock cycles must pass between two MMCIPOWER reg writes.
-> +	 * Worst delay time during card init is at 100 kHz => 30 us.
-> +	 * Worst delay time when up and running is at 25 MHz => 120 ns.
-> +	 */
-> +	if (host->cclk < 20000000)
+>
+>> >> +     spin_lock_irqsave(&schan->lock, iflags);
+>> >> +     list_for_each(l, &schan->free)
+>> >> +             desc_cnt++;
+>> > why dont you allocate descriptors here. That will remove this limitation..
+>>
+>> i understand. here sirf user scenerios will never be over the
+>> limitation of SIRFSOC_DMA_DESCRIPTORS = 16. so i don't want to make it
+>> too complex.
+> I think you can make code simler by dynamically allocating and freeing
+> descriptors...
 
-Shouldn't it be 25000000 ?
+when do you think is the right time to free? while the whole sg
+finished? i always think the code will be ugly.
 
-What about using macros ?
+>
+> ~Vinod
+> --
 
-#define MMC_CLOCK 25000000
-#define MMCINIT_DELAY 30
-#define MMCUP_DELAY 120
-
-> +		udelay(30);
-> +	else
-> +		ndelay(120);
-> +}
-> +
->  /*
->   * This must be called with host->lock held
->   */
-> @@ -1264,6 +1279,7 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->  
->  	mmci_set_clkreg(host, ios->clock);
->  	mmci_write_pwrreg(host, pwr);
-> +	mmci_reg_delay(host);
->  
->  	spin_unlock_irqrestore(&host->lock, flags);
->  
-> 
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+-barry
