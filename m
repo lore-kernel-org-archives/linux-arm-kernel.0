@@ -1,38 +1,51 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 03 Sep 2013 16:21:10 +0100
-Subject: [PULL REQUEST] big-endian updates for ARM
-In-Reply-To: <20130903145529.631ae5cb@skate>
-References: <20130903101332.GA26613@localhost.localdomain>
- <5225C714.3090504@codethink.co.uk> <20130903134546.5240306b@skate>
- <5225DB5C.1070903@codethink.co.uk> <20130903145529.631ae5cb@skate>
-Message-ID: <5225FE66.9070205@codethink.co.uk>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 3 Sep 2013 20:55:23 +0530
+Subject: [PATCH v11 0/8] PHY framework
+In-Reply-To: <20130827192059.GZ3005@radagast>
+References: <1377063973-22044-1-git-send-email-kishon@ti.com>
+ <521B0E79.6060506@ti.com> <20130827192059.GZ3005@radagast>
+Message-ID: <5225FF63.6080608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/13 13:55, Thomas Petazzoni wrote:
-> Dear Ben Dooks,
->
-> On Tue, 03 Sep 2013 13:51:40 +0100, Ben Dooks wrote:
->
->>>> I have fixed it and now on:
->>>>
->>>> 	git://git.baserock.org/delta/linux baserock/311-rc7/be/core-v4
+Hi Greg,
+
+On Wednesday 28 August 2013 12:50 AM, Felipe Balbi wrote:
+> Hi,
+> 
+> On Mon, Aug 26, 2013 at 01:44:49PM +0530, Kishon Vijay Abraham I wrote:
+>> On Wednesday 21 August 2013 11:16 AM, Kishon Vijay Abraham I wrote:
+>>> Added a generic PHY framework that provides a set of APIs for the PHY drivers
+>>> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
+>>> the PHY with or without using phandle.
 >>>
->>> Can you resend a proper pull request for this core-v4 branch? There has
->>> been two fixes since the v3, the Acked-by from one of the mach-mvebu
->>> maintainers, and my Tested-by.
+>>> This framework will be of use only to devices that uses external PHY (PHY
+>>> functionality is not embedded within the controller).
+>>>
+>>> The intention of creating this framework is to bring the phy drivers spread
+>>> all over the Linux kernel to drivers/phy to increase code re-use and to
+>>> increase code maintainability.
+>>>
+>>> Comments to make PHY as bus wasn't done because PHY devices can be part of
+>>> other bus and making a same device attached to multiple bus leads to bad
+>>> design.
+>>>
+>>> If the PHY driver has to send notification on connect/disconnect, the PHY
+>>> driver should make use of the extcon framework. Using this susbsystem
+>>> to use extcon framwork will have to be analysed.
+>>>
+>>> You can find this patch series @
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
 >>
->> that was just a confirmation for Dave to test. I will sort out a new
->> pull request later.
->
-> Excellent, thanks!
->
-> Thomas
+>> Looks like there are not further comments on this series. Can you take this in
+>> your misc tree?
+> 
+> Do you want me to queue these for you ? There are quite a few users for
+> this framework already and I know of at least 2 others which will show
+> up for v3.13.
 
-Out of interest, should all patches in the series have the
-Tested-by line added to them, or just the top-level pull request?
+Can you queue this patch series? There are quite a few users already for this
+framework.
 
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Thanks
+Kishon
