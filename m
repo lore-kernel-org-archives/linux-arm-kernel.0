@@ -1,157 +1,41 @@
-From: a0393675@ti.com (Keerthy)
-Date: Tue, 3 Sep 2013 12:03:58 +0530
-Subject: [PATCH] ARM: DTS: DRA7: Add TPS659038 PMIC nodes
-In-Reply-To: <1377495411-21984-1-git-send-email-j-keerthy@ti.com>
-References: <1377495411-21984-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <522582D6.4020800@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 3 Sep 2013 08:58:32 +0200
+Subject: [PATCHv2 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F827F7C59@039-SN2MPN1-011.039d.mgd.msft.net>
+References: <1377856132-11290-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377856132-11290-2-git-send-email-Li.Xiubo@freescale.com>
+ <20130830174909.GF30088@pengutronix.de>
+ <1DD289F6464F0949A2FCA5AA6DC23F827F785F@039-SN2MPN1-011.039d.mgd.msft.net>
+ <20130902085630.GS30088@pengutronix.de>
+ <1DD289F6464F0949A2FCA5AA6DC23F827F7C59@039-SN2MPN1-011.039d.mgd.msft.net>
+Message-ID: <20130903065832.GB30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+On Tue, Sep 03, 2013 at 04:17:09AM +0000, Xiubo Li-B47053 wrote:
+> > Subject: Re: [PATCHv2 1/4] pwm: Add Freescale FTM PWM driver support
+> > 
+> > You simply don't need the available field. You don't need to track
+> > whether they are available. If a user enables a pwm which is not routed
+> > out of the SoC (disabled in the iomux) simply nothing will happen except
+> > for a slightly increased power consumption.
+> > 
+> If the there is not need to explicitly specify the channels are
+> available or not, so there is no doubt that the 'available' field will
+> be dropt.  Why I added this here is because that the 4th and 5th
+> channels' pinctrls are used as UART TX and RX as I have mentioned
+> before, so here if you configure these two pinctrls, the UART TX and
+> RX will be polluted, there maybe some other cases like this.
 
+If you misconfigure your iomux then usually unexptected things happen.
+That is not the problem of the PWM driver, but the problem of the one
+writing the devicetree. The kernel will print a message for conflicting
+iomux settings. That should be hint enough to fix it.
 
-On Monday 26 August 2013 11:06 AM, Keerthy wrote:
-> The Patch adds nodes for TPS659038 PMIC for DRA7 boards.
->
-> It is based on top of:
-> http://comments.gmane.org/gmane.linux.ports.arm.omap/102459.
->
-> Documentation:	Documentation/devicetree/bindings/mfd/palmas.txt
-> 		Documentation/devicetree/bindings/regulator/palmas-pmic.txt		
->
-> Boot Tested on DRA7 d1 Board.
+Sascha
 
-Any comments on this patch?
-
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
->   arch/arm/boot/dts/dra7-evm.dts |  118 ++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 118 insertions(+)
->
-> Index: linux/arch/arm/boot/dts/dra7-evm.dts
-> ===================================================================
-> --- linux.orig/arch/arm/boot/dts/dra7-evm.dts	2013-08-26 09:57:52.496173554 +0530
-> +++ linux/arch/arm/boot/dts/dra7-evm.dts	2013-08-26 10:38:44.995414695 +0530
-> @@ -93,6 +93,119 @@
->   	pinctrl-names = "default";
->   	pinctrl-0 = <&i2c1_pins>;
->   	clock-frequency = <400000>;
-> +
-> +	tps659038: tps659038 at 58 {
-> +		compatible = "ti,tps659038";
-> +		reg = <0x58>;
-> +
-> +		tps659038_pmic {
-> +			compatible = "ti,tps659038-pmic";
-> +
-> +			regulators {
-> +				smps123_reg: smps123 {
-> +					/* VDD_MPU */
-> +						regulator-name = "smps123";
-> +						regulator-min-microvolt = < 850000>;
-> +						regulator-max-microvolt = <1250000>;
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				smps45_reg: smps45 {
-> +						/* VDD_DSPEVE */
-> +						regulator-name = "smps45";
-> +						regulator-min-microvolt = < 850000>;
-> +						regulator-max-microvolt = <1150000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				smps6_reg: smps6 {
-> +						/* VDD_GPU - over VDD_SMPS6 */
-> +						regulator-name = "smps6";
-> +						regulator-min-microvolt = <850000>;
-> +						regulator-max-microvolt = <12500000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				smps7_reg: smps7 {
-> +						/* CORE_VDD */
-> +						regulator-name = "smps7";
-> +						regulator-min-microvolt = <850000>;
-> +						regulator-max-microvolt = <1030000>;
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				smps8_reg: smps8 {
-> +						/* VDD_IVAHD */
-> +						regulator-name = "smps8";
-> +						regulator-min-microvolt = < 850000>;
-> +						regulator-max-microvolt = <1250000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				smps9_reg: smps9 {
-> +						/* VDDS1V8 */
-> +						regulator-name = "smps9";
-> +						regulator-min-microvolt = <1800000>;
-> +						regulator-max-microvolt = <1800000>;
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				ldo1_reg: ldo1 {
-> +						/* LDO1_OUT --> SDIO  */
-> +						regulator-name = "ldo1";
-> +						regulator-min-microvolt = <1800000>;
-> +						regulator-max-microvolt = <3300000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				ldo2_reg: ldo2 {
-> +						/* VDD_RTCIO */
-> +						/* LDO2 -> VDDSHV5, LDO2 also goes to CAN_PHY_3V3 */
-> +						regulator-name = "ldo2";
-> +						regulator-min-microvolt = <3300000>;
-> +						regulator-max-microvolt = <3300000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				ldo3_reg: ldo3 {
-> +						/* VDDA_1V8_PHY */
-> +						regulator-name = "ldo3";
-> +						regulator-min-microvolt = <1800000>;
-> +						regulator-max-microvolt = <1800000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				ldo9_reg: ldo9 {
-> +						/* VDD_RTC */
-> +						regulator-name = "ldo9";
-> +						regulator-min-microvolt = <1050000>;
-> +						regulator-max-microvolt = <1050000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				ldoln_reg: ldoln {
-> +						/* VDDA_1V8_PLL */
-> +						regulator-name = "ldoln";
-> +						regulator-min-microvolt = <1800000>;
-> +						regulator-max-microvolt = <1800000>;
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				ldousb_reg: ldousb {
-> +						/* VDDA_3V_USB: VDDA_USBHS33 */
-> +						regulator-name = "ldousb";
-> +						regulator-min-microvolt = <3300000>;
-> +						regulator-max-microvolt = <3300000>;
-> +						regulator-boot-on;
-> +					};
-> +
-> +				};
-> +			};
-> +		};
->   };
->   
->   &i2c2 {
-
-Regards,
-Keerthy
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
