@@ -1,60 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Sep 2013 10:20:49 +0100
-Subject: [PATCH v4] ARM: Add check for Cortex-A15 errata 798181 ECO
-In-Reply-To: <20130903091347.GB6128@mudshark.cambridge.arm.com>
-References: <1377440747-4564-1-git-send-email-robherring2@gmail.com>
- <20130902135842.GU6617@n2100.arm.linux.org.uk>
- <20130902213125.GB6617@n2100.arm.linux.org.uk>
- <20130903091347.GB6128@mudshark.cambridge.arm.com>
-Message-ID: <20130903092049.GE6617@n2100.arm.linux.org.uk>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 3 Sep 2013 17:20:27 +0800
+Subject: [PATCH 1/2] mtd: atmel_nand: remove unneeded ifdef CONFIG_OF
+Message-ID: <1378200028-15415-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 03, 2013 at 10:13:47AM +0100, Will Deacon wrote:
-> On Mon, Sep 02, 2013 at 10:31:25PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Sep 02, 2013 at 02:58:42PM +0100, Russell King - ARM Linux wrote:
-> > > On Sun, Aug 25, 2013 at 09:25:47AM -0500, Rob Herring wrote:
-> > > > From: Rob Herring <rob.herring@calxeda.com>
-> > > > 
-> > > > The work-around for A15 errata 798181 is not needed if appropriate ECO
-> > > > fixes have been applied to r3p2 and earlier core revisions. This can be
-> > > > checked by reading REVIDR register bits 4 and 9. If only bit 4 is set,
-> > > > then the IPI broadcast can be skipped.
-> > > > 
-> > > > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > > 
-> > > So, this patch in the patch system claims to be against v3.11-rc2:
-> > > 
-> > > $ git checkout v3.11-rc2
-> > > ...
-> > > $ pdb gitapply 7804/2
-> > > Patching 7804/2...
-> > > git apply --whitespace=fix -p1 --index --check > /tmp/pdb.15757 2>&1 exited with non-zero status: 256
-> > > error: patch failed: arch/arm/include/asm/tlbflush.h:443
-> > > error: arch/arm/include/asm/tlbflush.h: patch does not apply
-> > > error: patch failed: arch/arm/kernel/smp_tlb.c:70
-> > > error: arch/arm/kernel/smp_tlb.c: patch does not apply
-> > > error: patch failed: arch/arm/mm/context.c:245
-> > > error: arch/arm/mm/context.c: patch does not apply
-> > > 
-> > > > v3:
-> > > > - Rebase to v3.11-rc5 due to commit 1f49856 (ARM: 7789/1: Do not run
-> > > >  dummy_flush_tlb_a15_erratum() on non-Cortex-A15)
-> > > > - Move the revision checking out of line and use function ptrs.
-> > > 
-> > > Hmm, so -rc5 not -rc2 that you put into the patch system...  Also, the
-> > > patch you put into the patch system didn't have Will's ack on it.
-> > 
-> > And... merging everything together tonight gives me a conflict with Will's
-> > barriers patches, which I've resolved like this - this will need to be
-> > checked:
-> 
-> Thanks Russell; looks ok from my side.
+Since following commit
+  f3b391425d21e6138e57b2432d91134e0bc2b975
+  (of_mtd: Add no-op stubs to support CONFIG_OF=n)
 
-It turns out that it's not quite okay - sfr reported failures this morning
-which are reflected in the nightly build, so I think I'm going to drop
-Rob's patch.  It looks like the case where the workaround is disabled
-hasn't been tested, which means almost everything fails with:
+implements the stub for CONFIG_OF=n. Now we can safely remove all
+CONFIG_OF in atmel_nand. (Thanks to Ezequiel Garcia's for this protype)
 
-arch/arm/kernel/built-in.o: In function `setup_processor':
-io.c:(.init.text+0x72c): undefined reference to `erratum_a15_798181_init'
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+ drivers/mtd/nand/atmel_nand.c |   14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
+
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 060feea..1ca0724 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -1449,7 +1449,6 @@ static void atmel_nand_hwctl(struct mtd_info *mtd, int mode)
+ 		ecc_writel(host->ecc, CR, ATMEL_ECC_RST);
+ }
+ 
+-#if defined(CONFIG_OF)
+ static int atmel_of_init_port(struct atmel_nand_host *host,
+ 			      struct device_node *np)
+ {
+@@ -1457,7 +1456,7 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
+ 	u32 offset[2];
+ 	int ecc_mode;
+ 	struct atmel_nand_data *board = &host->board;
+-	enum of_gpio_flags flags;
++	enum of_gpio_flags flags = 0;
+ 
+ 	if (of_property_read_u32(np, "atmel,nand-addr-offset", &val) == 0) {
+ 		if (val >= 32) {
+@@ -1540,13 +1539,6 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
+ 
+ 	return 0;
+ }
+-#else
+-static int atmel_of_init_port(struct atmel_nand_host *host,
+-			      struct device_node *np)
+-{
+-	return -EINVAL;
+-}
+-#endif
+ 
+ static int __init atmel_hw_nand_init_params(struct platform_device *pdev,
+ 					 struct atmel_nand_host *host)
+@@ -2207,14 +2199,12 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#if defined(CONFIG_OF)
+ static const struct of_device_id atmel_nand_dt_ids[] = {
+ 	{ .compatible = "atmel,at91rm9200-nand" },
+ 	{ /* sentinel */ }
+ };
+ 
+ MODULE_DEVICE_TABLE(of, atmel_nand_dt_ids);
+-#endif
+ 
+ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+ {
+@@ -2253,12 +2243,10 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#if defined(CONFIG_OF)
+ static struct of_device_id atmel_nand_nfc_match[] = {
+ 	{ .compatible = "atmel,sama5d3-nfc" },
+ 	{ /* sentinel */ }
+ };
+-#endif
+ 
+ static struct platform_driver atmel_nand_nfc_driver = {
+ 	.driver = {
+-- 
+1.7.9.5
