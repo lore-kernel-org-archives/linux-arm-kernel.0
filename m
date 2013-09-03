@@ -1,41 +1,41 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 3 Sep 2013 20:38:09 +0800
+Date: Tue, 3 Sep 2013 20:42:36 +0800
 Subject: [PATCH] dmaengine: sirf: add dmaengine_prep_slave_single/sg
  support
-In-Reply-To: <CAJe_Zhfo0502tvd-0Rt-0kEKn+Z_S-B+JSAVd4=UNpneQ5GSvw@mail.gmail.com>
+In-Reply-To: <20130903113925.GF15824@intel.com>
 References: <1377435433-23202-1-git-send-email-Baohua.Song@csr.com>
  <20130826085607.GN2748@intel.com>
  <CAGsJ_4yhVFL+j9PV-srAXdYkbEN62X18n-_+cXa+xy4wcOF7Qw@mail.gmail.com>
  <20130902062549.GG7376@intel.com>
  <CAGsJ_4w4dNOy=8HMQqy9sCL=UVWXSgADjoqBD9FmSxdoyzZ6pQ@mail.gmail.com>
- <CAJe_Zhfo0502tvd-0Rt-0kEKn+Z_S-B+JSAVd4=UNpneQ5GSvw@mail.gmail.com>
-Message-ID: <CAGsJ_4wfpb6WYB_sExxZc-UOKXkbGx_G3k=fHUwGTW-TmcsL1A@mail.gmail.com>
+ <20130903113925.GF15824@intel.com>
+Message-ID: <CAGsJ_4wpFNq7Rv3Y9keJjko70VKnsiivwpzGM2YT_pROo59Xtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/9/3 Jassi Brar <jaswinder.singh@linaro.org>:
-> On 3 September 2013 15:36, Barry Song <21cnbao@gmail.com> wrote:
+2013/9/3 Vinod Koul <vinod.koul@intel.com>:
+> On Tue, Sep 03, 2013 at 06:06:44PM +0800, Barry Song wrote:
 >> 2013/9/2 Vinod Koul <vinod.koul@intel.com>:
->>> On Sun, Sep 01, 2013 at 09:02:01PM +0800, Barry Song wrote:
->>>> 2013/8/26 Vinod Koul <vinod.koul@intel.com>:
->>>> > On Sun, Aug 25, 2013 at 08:57:13PM +0800, Barry Song wrote:
->>>> >> the dma engine of sirfsoc supports interleaved mode, but if we set
->>>> >> xlen=width instead xlen<width, it will work as non-interleaved. as
->>>> >> most clients of sirf dma driver still don't need interleaved mode,
->>>> >> so here we still need to implement prep_slave_sg entry so that users
->>>> >> like uart, spi can use these APIs instead of interleaved API.
->>>> > Well in that case why dont you just create a wrapper on top of interleaved API
->>>> > to make this work without driver changes
->>>>
->>>> Vinod, do you mean using interleaved API to provide sg/single API if
->>>> specific drivers implement interleaved_dma but not implement sg_dma?
->>>>
->>>> the problem is that is difficult to set right legal sgl[i].size,
->>>> sgl[i].icg and numf for all dmaengines as that depends on specific dma
->>>> hardware limitation.
->>> The whole premise of doing the generic interleaved api was to ensure we can use
->>> any of the usuages as a case of interleaved api. Can you explain how it would be
->>> difficult?
+>> > On Sun, Sep 01, 2013 at 09:02:01PM +0800, Barry Song wrote:
+>> >> 2013/8/26 Vinod Koul <vinod.koul@intel.com>:
+>> >> > On Sun, Aug 25, 2013 at 08:57:13PM +0800, Barry Song wrote:
+>> >> >> the dma engine of sirfsoc supports interleaved mode, but if we set
+>> >> >> xlen=width instead xlen<width, it will work as non-interleaved. as
+>> >> >> most clients of sirf dma driver still don't need interleaved mode,
+>> >> >> so here we still need to implement prep_slave_sg entry so that users
+>> >> >> like uart, spi can use these APIs instead of interleaved API.
+>> >> > Well in that case why dont you just create a wrapper on top of interleaved API
+>> >> > to make this work without driver changes
+>> >>
+>> >> Vinod, do you mean using interleaved API to provide sg/single API if
+>> >> specific drivers implement interleaved_dma but not implement sg_dma?
+>> >>
+>> >> the problem is that is difficult to set right legal sgl[i].size,
+>> >> sgl[i].icg and numf for all dmaengines as that depends on specific dma
+>> >> hardware limitation.
+>> > The whole premise of doing the generic interleaved api was to ensure we can use
+>> > any of the usuages as a case of interleaved api. Can you explain how it would be
+>> > difficult?
 >>
 >> for example, if someone wants to do a 16Kbytes single transfer. how
 >> will interleaved dma set transfer length and interval between every
@@ -53,25 +53,46 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >>
 >> the problem is we don't know the hardware limitation of every dma
 >> controllers for transferring length of each row.
->>
-> A client is only interested in transferring the total amount data and
-> if/when it wants notified. How the dma controller divides the big
-> transfer, shouldn't matter to the client. In fact it would be bad for
-> a client to care about the working of a dma controller.
-> IOW, the 16KB transfer could be divided into 4 parts by the dmac that
-> supports max 4KB transfers, into 8 parts if max is 2KB and so on...
-> the client shouldn't care.
+> Why not:
+>
+> Okay there are two ways to this
+> 1. Advertize your capablity and let client use that to break. You cna do so
+> using dma_set/get_max_seg_size().
+>
 
-here my point is that we don't expose dma transferring hardware
-details to clients. i actually wanted to hide that in dma driver not
-dma client.
-the only difference between vinod and me is that Vinod's point is
-hiding that in dma core, my way is hiding it in dma driver.
+this way is ok. does max_seg also match with interleaved mode?
 
-btw, interleaved_dma clients do care about how the interleaved
-transfer will happen. but single_dma client doesn't care.
+
+> 2. in DMAC, nothing stops you from breaking the given sg_list into smaller
+> chunks. So if you get a buffer exceeding what you do, you cna internally split
+> to multiple descriptors and chain those to parent one.
+
+this way still need hacking in dmac driver.
 
 >
-> -jassi
+>>
+>> >
+>> >> >> +     spin_lock_irqsave(&schan->lock, iflags);
+>> >> >> +     list_for_each(l, &schan->free)
+>> >> >> +             desc_cnt++;
+>> >> > why dont you allocate descriptors here. That will remove this limitation..
+>> >>
+>> >> i understand. here sirf user scenerios will never be over the
+>> >> limitation of SIRFSOC_DMA_DESCRIPTORS = 16. so i don't want to make it
+>> >> too complex.
+>> > I think you can make code simler by dynamically allocating and freeing
+>> > descriptors...
+>>
+>> when do you think is the right time to free? while the whole sg
+>> finished? i always think the code will be ugly.
+> when the descriptor has been completed. You allocate in prepare. Bunch of driver
+> already do so... I dont think its so complicated
+
+here sirf dmac alloc all 16 desc in alloc_resoures and free all in
+free_resources. if we can move the way you said, it is fine.
+but it seems it means another separate patch for that.
+>
+> ~Vinod
+> --
 
 -barry
