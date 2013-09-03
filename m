@@ -1,47 +1,38 @@
-From: B47053@freescale.com (Xiubo Li-B47053)
-Date: Tue, 3 Sep 2013 07:40:06 +0000
-Subject: [PATCHv2 1/4] pwm: Add Freescale FTM PWM driver support
-In-Reply-To: <20130903065832.GB30088@pengutronix.de>
-References: <1377856132-11290-1-git-send-email-Li.Xiubo@freescale.com>
- <1377856132-11290-2-git-send-email-Li.Xiubo@freescale.com>
- <20130830174909.GF30088@pengutronix.de>
- <1DD289F6464F0949A2FCA5AA6DC23F827F785F@039-SN2MPN1-011.039d.mgd.msft.net>
- <20130902085630.GS30088@pengutronix.de>
- <1DD289F6464F0949A2FCA5AA6DC23F827F7C59@039-SN2MPN1-011.039d.mgd.msft.net>
- <20130903065832.GB30088@pengutronix.de>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827F8D57@039-SN2MPN1-011.039d.mgd.msft.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue,  3 Sep 2013 09:43:51 +0200
+Subject: [PATCH] clk: Move symbol export to proper location
+Message-ID: <1378194231-26828-1-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCHv2 1/4] pwm: Add Freescale FTM PWM driver support
-> 
-> On Tue, Sep 03, 2013 at 04:17:09AM +0000, Xiubo Li-B47053 wrote:
-> > > Subject: Re: [PATCHv2 1/4] pwm: Add Freescale FTM PWM driver support
-> > >
-> > > You simply don't need the available field. You don't need to track
-> > > whether they are available. If a user enables a pwm which is not
-> > > routed out of the SoC (disabled in the iomux) simply nothing will
-> > > happen except for a slightly increased power consumption.
-> > >
-> > If the there is not need to explicitly specify the channels are
-> > available or not, so there is no doubt that the 'available' field will
-> > be dropt.  Why I added this here is because that the 4th and 5th
-> > channels' pinctrls are used as UART TX and RX as I have mentioned
-> > before, so here if you configure these two pinctrls, the UART TX and
-> > RX will be polluted, there maybe some other cases like this.
-> 
-> If you misconfigure your iomux then usually unexptected things happen.
-> That is not the problem of the PWM driver, but the problem of the one
-> writing the devicetree. The kernel will print a message for conflicting
-> iomux settings. That should be hint enough to fix it.
-> 
+The __clk_get_flags() symbol is exported immediately following the
+clk_unprepare_unused_subtree() function. This is unusual, since a symbol
+export typically follows body of the function that it exports.
 
-That sounds good.
-Actully there isn't any conflicting messages will be printed.
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ drivers/clk/clk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I will think it over.
-
-
---
-Best Regards,
-Xiubo 
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 2db08c0..b49c9ee 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -458,7 +458,6 @@ static void clk_unprepare_unused_subtree(struct clk *clk)
+ 			clk->ops->unprepare(clk->hw);
+ 	}
+ }
+-EXPORT_SYMBOL_GPL(__clk_get_flags);
+ 
+ /* caller must hold prepare_lock */
+ static void clk_disable_unused_subtree(struct clk *clk)
+@@ -607,6 +606,7 @@ unsigned long __clk_get_flags(struct clk *clk)
+ {
+ 	return !clk ? 0 : clk->flags;
+ }
++EXPORT_SYMBOL_GPL(__clk_get_flags);
+ 
+ bool __clk_is_prepared(struct clk *clk)
+ {
+-- 
+1.8.4
