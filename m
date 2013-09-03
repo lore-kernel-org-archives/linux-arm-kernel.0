@@ -1,43 +1,98 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 3 Sep 2013 08:54:56 +0800
-Subject: [PATCH] ARM: mxs: pm: Include "pm.h"
-In-Reply-To: <1378087868-29744-1-git-send-email-festevam@gmail.com>
-References: <1378087868-29744-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130903005454.GF17900@S2101-09.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  2 Sep 2013 22:01:02 -0300
+Subject: [PATCH v2] ARM: imx6qdl-wandboard: Add spdif support
+Message-ID: <1378170062-30518-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 01, 2013 at 11:11:08PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Include "pm.h" in order to fix the following sparse warning:
-> 
-> arch/arm/mach-mxs/pm.c:37:13: warning: symbol 'mxs_pm_init' was not declared. Should it be static?
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Why do you resend a patch that I already applied [1]?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+I can see the spdif card getting probed. When I run 'aplay the spdif
+light turns on, but I cannot test it due to the lack of spdif equipment at the
+moment.
 
-Shawn
+Changes since v1:
+- Fix the identation level os spdif node
+- Remove unneeded blank lines
 
-[1] http://www.spinics.net/lists/arm-kernel/msg259101.html
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 13 +++++++++++++
+ arch/arm/boot/dts/imx6qdl.dtsi           | 22 ++++++++++++++++++++++
+ 2 files changed, 35 insertions(+)
 
-> ---
->  arch/arm/mach-mxs/pm.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-mxs/pm.c b/arch/arm/mach-mxs/pm.c
-> index b2494d2..0170e99 100644
-> --- a/arch/arm/mach-mxs/pm.c
-> +++ b/arch/arm/mach-mxs/pm.c
-> @@ -15,6 +15,7 @@
->  #include <linux/kernel.h>
->  #include <linux/suspend.h>
->  #include <linux/io.h>
-> +#include "pm.h"
->  
->  static int mxs_suspend_enter(suspend_state_t state)
->  {
-> -- 
-> 1.8.1.2
-> 
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index b462080..df42d3c 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -43,6 +43,13 @@
+ 		mux-int-port = <1>;
+ 		mux-ext-port = <3>;
+ 	};
++
++	sound-spdif {
++		compatible = "fsl,imx-audio-spdif";
++		model = "imx-spdif";
++		spdif-controller = <&spdif>;
++		spdif-out;
++	};
+ };
+ 
+ &audmux {
+@@ -93,6 +100,12 @@
+ 	status = "okay";
+ };
+ 
++&spdif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_spdif_3>;
++	status = "okay";
++};
++
+ &ssi1 {
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index ccd55c2..d06c059 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -136,8 +136,23 @@
+ 				ranges;
+ 
+ 				spdif: spdif at 02004000 {
++					compatible = "fsl,imx35-spdif";
+ 					reg = <0x02004000 0x4000>;
+ 					interrupts = <0 52 0x04>;
++					dmas = <&sdma 14 18 0>,
++					       <&sdma 15 18 0>;
++					dma-names = "rx", "tx";
++					clocks = <&clks 197>, <&clks 3>,
++						 <&clks 197>, <&clks 107>,
++						 <&clks 0>,   <&clks 118>,
++						 <&clks 62>,  <&clks 139>,
++						 <&clks 0>;
++					clock-names = "core",  "rxtx0",
++						      "rxtx1", "rxtx2",
++						      "rxtx3", "rxtx4",
++						      "rxtx5", "rxtx6",
++						      "rxtx7";
++					status = "disabled";
+ 				};
+ 
+ 				ecspi1: ecspi at 02008000 {
+@@ -1010,6 +1025,13 @@
+ 							MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x1b0b0
+ 						>;
+ 					};
++
++					pinctrl_spdif_3: spdifgrp-3 {
++						fsl,pins = <
++							MX6QDL_PAD_ENET_RXD0__SPDIF_OUT 0x1b0b0
++						>;
++					};
++
+ 				};
+ 
+ 				uart1 {
+-- 
+1.8.1.2
