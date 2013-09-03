@@ -1,88 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 2 Sep 2013 23:31:18 +0000 (UTC)
-Subject: OMAP baseline test results for v3.11
-Message-ID: <alpine.DEB.2.02.1309022330350.4234@utopia.booyaka.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 3 Sep 2013 08:31:36 +0800
+Subject: [PATCH v4 0/2]Add Freescale DSPI driver for Vybrid VF610 platform
+In-Reply-To: <1377832789-5238-1-git-send-email-b44548@freescale.com>
+References: <1377832789-5238-1-git-send-email-b44548@freescale.com>
+Message-ID: <20130903003133.GD17900@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Aug 30, 2013 at 11:19:47AM +0800, Chao Fu wrote:
+> This driver is the SPI master mode driver and has been tested on Vybrid 
+> VF610TWR board.
 
-Here are some basic OMAP test results for Linux v3.11.
-Logs and other details at:
+Applied both, thanks.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.11/20130902150604/
+Shawn
 
-
-Test summary
-------------
-
-Build: zImage:
-    Pass ( 1/ 1): omap2plus_defconfig
-
-Build: uImage:
-    Pass (14/14): n800_multi_omap2xxx, n800_only_a, omap1_defconfig,
-		  omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig
-
-Build: uImage+dtb:
-    Pass ( 3/ 3): am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es
-
-Boot to userspace:
-    skip ( 1/ 1): 5912osk
-    Pass (10/10): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 2/ 6): 2430sdp, 4430es2panda
-    Pass ( 4/ 6): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 3/ 6): 2430sdp, 4430es2panda, 4460pandaes
-    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 37xxevm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 2/ 4): 4430es2panda, 4460pandaes
-    Pass ( 2/ 4): 3530es3beagle, 37xxevm
-
-PM: chip off via dynamic idle:
-    FAIL ( 2/ 4): 4430es2panda, 4460pandaes
-    Pass ( 2/ 4): 3530es3beagle, 37xxevm
-
-
-vmlinux object size
-(delta in bytes from test_v3.11-rc7 (d8dfad3876e4386666b759da3c833d62fb8b2267)):
-   text     data      bss    total  kernel
-    +56        0        0      +56  n800_multi_omap2xxx
-    +56        0        0      +56  n800_only_a
-   +849       +8        0     +857  omap1_defconfig
-   +785       +8        0     +793  omap1_defconfig_1510innovator_only
-   +817      +16        0     +833  omap1_defconfig_5912osk_only
-   +633      -24        0     +609  omap2plus_defconfig
-   +625       +8        0     +633  omap2plus_defconfig_2430sdp_only
-   +633      -24        0     +609  omap2plus_defconfig_cpupm
-   +633       +8        0     +641  omap2plus_defconfig_no_pm
-   +633       +8        0     +641  omap2plus_defconfig_omap2_4_only
-   +697      -24        0     +673  omap2plus_defconfig_omap3_4_only
-   +236        0      +20     +256  rmk_omap3430_ldp_allnoconfig
-   +341       +8        0     +349  rmk_omap3430_ldp_oldconfig
-   +228        0      +28     +256  rmk_omap4430_sdp_allnoconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.11-rc7 (d8dfad3876e4386666b759da3c833d62fb8b2267))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+> Changes in v2:
+> - Add a document for DSPI driver under Documentation/devicetree/bindings/spi/.
+> - Move spi-num-chipselects info dtsi nodes.
+> Changes in v3:
+> - Remove two dts properties(dbr,pbr) from  documentation bindings, they will be 
+> calculated in code.
+> - Update driver code in bitbang framework.
+> - Brief some functions in driver code.
+> Changes in v4:
+> - Correct new dtsi node (DSPI0) in order.
+> - Remove two unnecessary dts properties. 
+> 
+> 
