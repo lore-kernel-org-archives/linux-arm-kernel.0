@@ -1,7 +1,7 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Tue, 3 Sep 2013 11:55:48 -0700
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 3 Sep 2013 12:07:16 -0700
 Subject: [PATCH v4 0/4] ARM: OMAP2+: AM33XX: VDD CORE OPP50 support
-In-Reply-To: <87eh9bqi1x.fsf@linaro.org>
+In-Reply-To: <CA+Bv8XakgQZoeB8OTWsq1uUTcPfuxcD1qP9wnhu4HK22FMxFNQ@mail.gmail.com>
 References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
  <1376487480.3889.64.camel@coredoba.hi.pengutronix.de>
  <CA+Bv8XYe0UzBkjqtO7bNkgNVTQtxiM7Hv93BOu8Lw1=pESOwLA@mail.gmail.com>
@@ -14,20 +14,30 @@ References: <1376432412-8509-1-git-send-email-Russ.Dill@ti.com>
  <87hae8tc6e.fsf@linaro.org>
  <CA+Bv8XaQgOiSiScQW=CVxzXBuG0soafQotApjoVEZ0P9U3netg@mail.gmail.com>
  <87eh9bqi1x.fsf@linaro.org>
-Message-ID: <CA+Bv8XakgQZoeB8OTWsq1uUTcPfuxcD1qP9wnhu4HK22FMxFNQ@mail.gmail.com>
+ <CA+Bv8XakgQZoeB8OTWsq1uUTcPfuxcD1qP9wnhu4HK22FMxFNQ@mail.gmail.com>
+Message-ID: <CAGa+x86XVetqMGMTh7LoX6VAEb-d0W67_SbgTCxk4Q=QovpKTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 9:06 AM, Kevin Hilman <khilman@linaro.org> wrote:
-> Well, I was thinking of something much dumber.
+On Tue, Sep 3, 2013 at 11:55 AM, Russ Dill <Russ.Dill@ti.com> wrote:
+> On Fri, Aug 30, 2013 at 9:06 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Well, I was thinking of something much dumber.
+>>
+>> I was thinking about just _carefully_ writing a single, self-contained C
+>> function, with all of its data on the stack (and consts as #defines).
+>> Think of it is a step up in readability from straight assembly (which
+>> was the stated reason for moving the code to the M3 in the first place.)
+>>
+>> Kevin
 >
-> I was thinking about just _carefully_ writing a single, self-contained C
-> function, with all of its data on the stack (and consts as #defines).
-> Think of it is a step up in readability from straight assembly (which
-> was the stated reason for moving the code to the M3 in the first place.)
->
-> Kevin
+> That can only give you your suspend function. You need a resume
+> function to undo everything before calling cpu_resume, and the resume
+> function needs access to the data that was in the suspend function.
 
-That can only give you your suspend function. You need a resume
-function to undo everything before calling cpu_resume, and the resume
-function needs access to the data that was in the suspend function.
+Well, it can be done (and I've seen it done) with various hacks, but I
+agree it's not pretty, but it is at least slightly prettier than piles
+of asm.  That being said, I saw you posted a more generic solution
+that looks like a real solution that can scale.  I'll have a closer
+look at that.  Thanks for working on it.
+
+Kevin
