@@ -1,46 +1,42 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 3 Sep 2013 07:55:20 -0300
-Subject: [PATCH 2/2] mtd: atmel_nand: add MODULE_DEVICE_TABLE for nfc
- driver
-In-Reply-To: <1378200028-15415-2-git-send-email-josh.wu@atmel.com>
-References: <1378200028-15415-1-git-send-email-josh.wu@atmel.com>
- <1378200028-15415-2-git-send-email-josh.wu@atmel.com>
-Message-ID: <20130903105519.GC2355@localhost>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 3 Sep 2013 16:29:26 +0530
+Subject: [PATCH] ARM: dts: AM4372: Add node for dma-controller
+Message-ID: <1378205966-3683-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 03, 2013 at 05:20:28PM +0800, Josh Wu wrote:
-> This patch also add a const keyword for the of_device_id of nfc.
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->  drivers/mtd/nand/atmel_nand.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index 1ca0724..ea5b185 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -2243,10 +2243,11 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static struct of_device_id atmel_nand_nfc_match[] = {
-> +static const struct of_device_id atmel_nand_nfc_match[] = {
->  	{ .compatible = "atmel,sama5d3-nfc" },
->  	{ /* sentinel */ }
->  };
-> +MODULE_DEVICE_TABLE(of, atmel_nand_nfc_match);
->  
->  static struct platform_driver atmel_nand_nfc_driver = {
->  	.driver = {
-> -- 
-> 1.7.9.5
-> 
+Adds AM4372 EDMA support to the am4372.dtsi as documented in
+Documentation/devicetree/bindings/dma/ti-edma.txt
 
-Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ arch/arm/boot/dts/am4372.dtsi |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index ddc1df7..bfc556c 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -41,6 +41,20 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		edma: dma-controller at 49000000 {
++			compatible = "ti,edma3";
++			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
++			reg =	<0x49000000 0x10000>,
++				<0x44e10f90 0x10>;
++			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
++			#dma-cells = <1>;
++			dma-channels = <64>;
++			ti,edma-regions = <4>;
++			ti,edma-slots = <256>;
++		};
++
+ 		uart0: serial at 44e09000 {
+ 			compatible = "ti,am4372-uart","ti,omap2-uart";
+ 			reg = <0x44e09000 0x2000>;
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.7.9.5
