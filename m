@@ -1,32 +1,52 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 3 Sep 2013 17:29:38 +0200
-Subject: [PULL REQUEST] big-endian updates for ARM
-In-Reply-To: <5225FE66.9070205@codethink.co.uk>
-References: <20130903101332.GA26613@localhost.localdomain>
- <5225C714.3090504@codethink.co.uk> <20130903134546.5240306b@skate>
- <5225DB5C.1070903@codethink.co.uk> <20130903145529.631ae5cb@skate>
- <5225FE66.9070205@codethink.co.uk>
-Message-ID: <20130903172938.1244acc9@skate>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 3 Sep 2013 11:47:08 -0400
+Subject: [GIT PULL V2 2/2] ARM: mvebu: MSI mvebu changes for v3.12
+In-Reply-To: <CAOesGMhRJjB9veSVMYHMFPqWYeMd8n9YcnKVtZxav1vyfKnbhw@mail.gmail.com>
+References: <20130814191011.GD13964@titan.lakedaemon.net>
+ <20130814192317.GE13964@titan.lakedaemon.net>
+ <20130830202526.GW19598@titan.lakedaemon.net>
+ <CAOesGMhRJjB9veSVMYHMFPqWYeMd8n9YcnKVtZxav1vyfKnbhw@mail.gmail.com>
+Message-ID: <20130903154708.GJ19598@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ben Dooks,
+On Tue, Sep 03, 2013 at 08:04:51AM -0700, Olof Johansson wrote:
+> On Fri, Aug 30, 2013 at 1:25 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > Arnd, Olof,
+> >
+> > As requested, rebased on top of mvebu/drivers to resolve conflicts
+> > internally.
+> 
+> Sorry, I didn't have a chance to pull this in before the last -next
+> before the merge window (which was already very late), so it'll have
+> to wait for 3.13. Please send a fresh pull request of this branch once
+> -rc1 is out.
 
-On Tue, 03 Sep 2013 16:21:10 +0100, Ben Dooks wrote:
+I'm sorry Olof, but I have to call bullshit.  I originally sent this
+pull-request on August 14th (3 _weeks_ ago):
 
-> Out of interest, should all patches in the series have the
-> Tested-by line added to them, or just the top-level pull request?
+http://www.spinics.net/lists/arm-kernel/msg267243.html
 
-I believe the Tested-by normall goes to the individual patches.
-However, my testing on Armada XP obviously didn't exercise all the
-patches (I haven't tested modules, I haven't used the bpf_jit thing, I
-haven't tested the twd, smp_scu and pl01x fixes, etc.).
+I heard crickets until your reply on August 29th (2 _weeks_ later):
 
-Thanks,
+http://www.spinics.net/lists/arm-kernel/msg270826.html
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Which I respun and resent within a day on August 30th:
+
+http://www.spinics.net/lists/arm-kernel/msg271170.html
+
+
+Also, these patches were in -next for at least a week _before_ I sent my
+first pull request on August 14th.  So they've been tested for
+_four_weeks_ ...
+
+I understand you're busy with other work, like all of us, but it would
+seem that the baton passing between you, Arnd, and Kevin could use some
+tweaking.
+
+The situation is the exact same for the dove branch.
+
+
+:(
+
+Jason.
