@@ -1,52 +1,64 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 03 Sep 2013 17:15:42 +0100
-Subject: 3.11-rc7 big endian - atags and bootloader updates
-In-Reply-To: <20130903104027.GB26613@localhost.localdomain>
-References: <20130903104027.GB26613@localhost.localdomain>
-Message-ID: <52260B2E.3060806@codethink.co.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 3 Sep 2013 09:21:51 -0700
+Subject: [GIT PULL V2 2/2] ARM: mvebu: MSI mvebu changes for v3.12
+In-Reply-To: <20130903154708.GJ19598@titan.lakedaemon.net>
+References: <20130814191011.GD13964@titan.lakedaemon.net>
+ <20130814192317.GE13964@titan.lakedaemon.net>
+ <20130830202526.GW19598@titan.lakedaemon.net>
+ <CAOesGMhRJjB9veSVMYHMFPqWYeMd8n9YcnKVtZxav1vyfKnbhw@mail.gmail.com>
+ <20130903154708.GJ19598@titan.lakedaemon.net>
+Message-ID: <CAOesGMiLURZGhHTh15QsLRFoY8iJU4QC36FrGUsd5jUu9JMm7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/13 11:40, Dave Martin wrote:
-> On Fri, Aug 30, 2013 at 08:17:56PM +0100, Ben Dooks wrote:
->> This series is to better support older bootloaders, especially the
->> ones that still pass some information in the ATAGS structure used
->> by pre-fdt booting. The series is available at:
+Jason,
+
+No code is lost, no code is rejected, it's just going to wait for 3.13.
+
+Stirring up drama over this is just going to be counterproductive for
+all parties.
+
+
+-Olof
+
+On Tue, Sep 3, 2013 at 8:47 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Tue, Sep 03, 2013 at 08:04:51AM -0700, Olof Johansson wrote:
+>> On Fri, Aug 30, 2013 at 1:25 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+>> > Arnd, Olof,
+>> >
+>> > As requested, rebased on top of mvebu/drivers to resolve conflicts
+>> > internally.
 >>
->> 	git://git.baserock.org/delta/linux baserock/311-rc7/be/atags-v2
+>> Sorry, I didn't have a chance to pull this in before the last -next
+>> before the merge window (which was already very late), so it'll have
+>> to wait for 3.13. Please send a fresh pull request of this branch once
+>> -rc1 is out.
 >
-> This seems a good idea, but it is a change to the boot protocol which
-> may break any existing BE bootloader today.  Are you sure this won't
-> cause problems for anyone?
-
-You have to manually select it, so not really.
-
-> One partial solution could be to make the ATAGs endianness-agnostic.
+> I'm sorry Olof, but I have to call bullshit.  I originally sent this
+> pull-request on August 14th (3 _weeks_ ago):
 >
-> Since the ATAGs start with ATAG core, we know that the word at offset
-> <atags base + 4>  must have the value 0x54410001.  If we see a backwards
-> value, we know the ATAGs are wrong-endian and every word must must be
-> swabbed.
-
-That would be possible, I will look into that.
-
-> What to do about the zImage magic is less clear.  Up to this point,
-> BE kernels have always had backwards magic.  Changing the magic might
-> upset existing bootloaders, but I've never used a BE be bootloader, so
-> I can't really comment on that...
-
-This series uses a specific configuration to change both the ATAG
-and magic if the system is meant to be big-endian, but booted on
-a little-endian system.
-
+> http://www.spinics.net/lists/arm-kernel/msg267243.html
 >
-> Documentation/arm/Booting should also be updated to reflect any change.
-> In fact, what's already there could use clarification, since there is
-> no statement about endianness at all yet.
-
-Ok, good idea.
-
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+> I heard crickets until your reply on August 29th (2 _weeks_ later):
+>
+> http://www.spinics.net/lists/arm-kernel/msg270826.html
+>
+> Which I respun and resent within a day on August 30th:
+>
+> http://www.spinics.net/lists/arm-kernel/msg271170.html
+>
+>
+> Also, these patches were in -next for at least a week _before_ I sent my
+> first pull request on August 14th.  So they've been tested for
+> _four_weeks_ ...
+>
+> I understand you're busy with other work, like all of us, but it would
+> seem that the baton passing between you, Arnd, and Kevin could use some
+> tweaking.
+>
+> The situation is the exact same for the dove branch.
+>
+>
+> :(
+>
+> Jason.
