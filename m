@@ -1,54 +1,58 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 3 Sep 2013 08:45:15 -0400
-Subject: [GIT PULL] ARM: mvebu: dt changes for v3.12 (round 2)
-Message-ID: <20130903124515.GH19598@titan.lakedaemon.net>
+Date: Tue, 3 Sep 2013 08:46:33 -0400
+Subject: [PATCH v3 0/5] Armada XP clocks for timer
+In-Reply-To: <20130902142625.GA15975@localhost>
+References: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130827085242.GB2286@localhost>
+ <20130902142625.GA15975@localhost>
+Message-ID: <20130903124633.GI19598@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Mon, Sep 02, 2013 at 11:26:26AM -0300, Ezequiel Garcia wrote:
+> On Tue, Aug 27, 2013 at 05:52:42AM -0300, Ezequiel Garcia wrote:
+> > Hi Jason and Daniel:
+> > 
+> > (I forgot to Cc Daniel on these series, sorry about that!)
+> > 
+> > So, now that we have all the acks we need...
+> > 
+> > On Tue, Aug 20, 2013 at 12:45:49PM -0300, Ezequiel Garcia wrote:
+> > [...]
+> > > 
+> > > Ezequiel Garcia (5):
+> > >   ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
+> > >   ARM: mvebu: Add clock properties to Armada XP timer node
+> > 
+> > Jason: I assume these are ready to get merged through mvebu, right?
+> > 
+> > >   clocksource: armada-370-xp: Replace WARN_ON with BUG_ON
+> > >   clocksource: armada-370-xp: Get reference fixed-clock by name
+> > >   clocksource: armada-370-xp: Add detailed clock requirements in
+> > >     devicetree binding
+> > > 
+> > 
+> > Daniel: Will you pick these?
+> > 
+> > BTW: Is there any chance you can add your clocksource tree to linux-next?
+> > 
+> > Otherwise, our linux-next builds fail to boot whenever Jason pick some
+> > mvebu commits and therefore appears in linux-next, but the corresponding
+> > clocksource commit is taken by you and missing from linux-next.
+> > 
+> 
+> Daniel,
+> 
+> Any updates on this? The merge is really close now, and I'd like
+> to know if you're going to pick these (and where!) for v3.12.
+> 
+> Notice that Jason already took the devicetree patches, so unless
+> you merge the clocksource driver changes for v3.12, we'll have
+> to revert the former.
 
-Here's the last few changes for mvebu/dt for v3.12.  The mv64xxx-i2c
-driver changes were accepted by Wolfram, and the binding changes were
-Acked by Mark Rutland, so I added the corresponding dts changes back in.
-
-Daniel Lezcano just sent the pull including the mvebu clocksource
-changes yesterday.  While there's no build dependency between those
-changes and the dts changes here, both will be needed in order for
-v3.12-rc1 to boot.
+I saw Daniel's pull, so I just sent the last pull for mvebu/dt including
+these changes.
 
 thx,
 
 Jason.
-
-
-The following changes since commit 5d3b883071763e6448386b875f04fcb201b6e12d:
-
-  ARM: mvebu: Fix the Armada 370/XP timer compatible strings (2013-08-16 13:02:11 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/dt-3.12-2
-
-for you to fetch changes up to b52bc325ffc093283baf054cb690bbaeaf360d51:
-
-  ARM: dts: mvebu: Update with the new compatible string for mv64xxx-i2c (2013-09-03 12:28:54 +0000)
-
-----------------------------------------------------------------
-mvebu dt changes for v3.12 (round 2)
-
- - mvebu
-    - add clock properties for Armada XP
-    - update compatible string for mv64xxx-i2c
-
-----------------------------------------------------------------
-Ezequiel Garcia (2):
-      ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
-      ARM: mvebu: Add clock properties to Armada XP timer node
-
-Gregory CLEMENT (1):
-      ARM: dts: mvebu: Update with the new compatible string for mv64xxx-i2c
-
- arch/arm/boot/dts/armada-370-xp.dtsi |  2 --
- arch/arm/boot/dts/armada-370.dtsi    |  8 ++++++++
- arch/arm/boot/dts/armada-xp.dtsi     | 21 +++++++++++++++++++++
- 3 files changed, 29 insertions(+), 2 deletions(-)
