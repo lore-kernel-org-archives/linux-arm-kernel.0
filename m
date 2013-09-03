@@ -1,43 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Sep 2013 12:38:32 +0100
-Subject: [PATCH 13/14] ASoC: kirkwood: add SPDIF output support
-In-Reply-To: <20130903111720.GF3084@sirena.org.uk>
-References: <20130831123458.GF6617@n2100.arm.linux.org.uk>
- <E1VFkaX-0003JN-DQ@rmk-PC.arm.linux.org.uk>
- <20130903111720.GF3084@sirena.org.uk>
-Message-ID: <20130903113832.GF6617@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 3 Sep 2013 13:45:46 +0200
+Subject: [PULL REQUEST] big-endian updates for ARM
+In-Reply-To: <5225C714.3090504@codethink.co.uk>
+References: <20130903101332.GA26613@localhost.localdomain>
+ <5225C714.3090504@codethink.co.uk>
+Message-ID: <20130903134546.5240306b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 03, 2013 at 12:17:20PM +0100, Mark Brown wrote:
-> On Sat, Aug 31, 2013 at 01:47:37PM +0100, Russell King wrote:
-> > Add support for SPDIF output.  This is enabled via a widget being
-> > connected to an output.  When this widget is not connected, SPDIF
-> > output will remain disabled.
+Dear Ben Dooks,
+
+On Tue, 03 Sep 2013 12:25:08 +0100, Ben Dooks wrote:
+
+> Sorry, I thought that had been fixed, thanks for reminding me.
 > 
-> This is still not a good approach to adding a new digital audio
-> interface since it does not create a DAI but instead adds it like an
-> analogue link (but hooked inside the CPU using the DPCM DAPM hooks).
-
-This is the way Liam's Haswell DPCM driver works.
-
-> While this may work right now but will not be robust as the framework is
-> developed and can cause problems in system integration.
+> I have fixed it and now on:
 > 
-> A new DAI should be being added for the S/PDIF interface, this should
-> fully utilise DPCM but an either/or approach would be OK as a stepping
-> stone.
+> 	git://git.baserock.org/delta/linux baserock/311-rc7/be/core-v4
 
-A new CPU DAI will be a front end DAI.  So what you're saying here is
-that your earlier statement where you clearly said "one front end and
-two back ends" was wrong.
+Can you resend a proper pull request for this core-v4 branch? There has
+been two fixes since the v3, the Acked-by from one of the mach-mvebu
+maintainers, and my Tested-by.
 
-Sorry, I'm not playing your game anymore.  I'm not interested in trying
-to work with you anymore, because its totally impossible.  You're being
-as obstructive as you have been from the very start, and as demonstrated
-last night when you said "there is no mixer" in Liam's DPCM driver, you
-don't know what you're talking about half the time.  Or, you're
-intentionally making false statements.
+Also, as indicated on IRC, I confirm that this patch set also works on
+Armada 370. It doesn't work on one particular Armada 370 board that I
+have, but it's using an old bootloader that may be the cause of the
+issue. The BE kernel works fine on the two other Armada 370 boards I've
+tested.
 
-There is no point persuing this any further; I'm not wasting any more
-time on playing your stupid games.
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
