@@ -1,48 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Sep 2013 14:45:16 +0100
-Subject: Inte IOP Xscale updates
-In-Reply-To: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
-References: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
-Message-ID: <20130903134516.GH6617@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 03 Sep 2013 17:53:13 +0400
+Subject: [PATCH 1/4] ARM: shmobile: r8a7778: add Ether DT support
+In-Reply-To: <2922765.My7X58lhxd@avalon>
+References: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
+ <1738124.5rApJWhXUN@avalon> <1378135954.3321.5.camel@hornet>
+ <2922765.My7X58lhxd@avalon>
+Message-ID: <5225E9C9.2060906@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 03, 2013 at 02:01:45PM +0200, Linus Walleij wrote:
-> Hi XScale folks,
-> 
-> I haven't really seen any functional patches or confirmation that the
-> XScale machines in arch/arm/iop* are even booting since 2010 or
-> so.
-> 
-> Can you confirm that you boot-test these machines regularly?
-> 
-> I am worried that we maintain code that is not used or even working
-> see.
-> 
-> What are your thought about multiplatform and device tree? I am
-> pretty certain that if the iop machines were converted to device tree
-> we could collapse these machines into one directory with few files,
-> but I may be wrong.
+Hello.
 
-Just because code doesn't get touched doesn't mean it doesn't work.  In
-some cases, that means that the code has reached stability.
+On 03-09-2013 16:11, Laurent Pinchart wrote:
 
-The IOP platforms are in regular use.  IOP platforms include such
-things as TheCUS machines such as the N2100 and others.  The two N2100s
-I have here run 3.1.8 and 3.9.5.  3.9.5 did not require any changes to
-arch/arm code for it to work - though it did require a minor change
-to the IOP watchdog driver so it would build, namely:
+>>> Documentation/devicetree/booting-without-of.txt mentions it, as well as a
+>>> couple of other DT bindings document, but there's no clear documentation
+>>> of what device_type should be for network device, and whether the property
+>>> is mandatory or optional. Clarifying the documentation would be great.
 
-diff --git a/drivers/watchdog/iop_wdt.c b/drivers/watchdog/iop_wdt.c
-index d964faf..3841120 100644
---- a/drivers/watchdog/iop_wdt.c
-+++ b/drivers/watchdog/iop_wdt.c
-@@ -234,7 +234,7 @@ static int __init iop_wdt_init(void)
-        /* Configure Watchdog Timeout to cause an Internal Bus (IB) Reset
-         * NOTE: An IB Reset will Reset both cores in the IOP342
-         */
--       write_wdtsr(IOP13XX_WDTCR_IB_RESET);
-+//     write_wdtsr(IOP13XX_WDTCR_IB_RESET);
- 
-        /* Register after we have the device set up so we cannot race
-           with an open */
+>> It's documented in the ePAPR spec:
+
+>> "The device_type property was used in IEEE 1275 to describe the device?s
+>> FCode programming model. Because ePAPR does not have FCode, new use of
+>> the property is deprecated, and it should be included only on cpu and
+>> memory nodes for compatibility with IEEE 1275?derived device trees."
+
+> Thank you for the clarification.
+
+>> The bottom line is - don't use it, unless you've good good reasons?
+
+> I'll let Sergei share his opinion on whether we've got good reasons :-)
+
+    No, we don't, I'll remove the prop.
+
+WBR, Sergei
