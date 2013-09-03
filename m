@@ -1,72 +1,89 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 3 Sep 2013 18:06:44 +0800
-Subject: [PATCH] dmaengine: sirf: add dmaengine_prep_slave_single/sg
- support
-In-Reply-To: <20130902062549.GG7376@intel.com>
-References: <1377435433-23202-1-git-send-email-Baohua.Song@csr.com>
- <20130826085607.GN2748@intel.com>
- <CAGsJ_4yhVFL+j9PV-srAXdYkbEN62X18n-_+cXa+xy4wcOF7Qw@mail.gmail.com>
- <20130902062549.GG7376@intel.com>
-Message-ID: <CAGsJ_4w4dNOy=8HMQqy9sCL=UVWXSgADjoqBD9FmSxdoyzZ6pQ@mail.gmail.com>
+From: oliver+list@schinagl.nl (oliver+list at schinagl.nl)
+Date: Tue,  3 Sep 2013 12:33:28 +0200
+Subject: [PATCHv7 2/2] ARM: sunxi: dt: Add sunxi-sid to dts for sun4i,
+ sun5i and sun7i
+In-Reply-To: <1378204408-1415-1-git-send-email-oliver+list@schinagl.nl>
+References: <1378204408-1415-1-git-send-email-oliver+list@schinagl.nl>
+Message-ID: <1378204408-1415-3-git-send-email-oliver+list@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/9/2 Vinod Koul <vinod.koul@intel.com>:
-> On Sun, Sep 01, 2013 at 09:02:01PM +0800, Barry Song wrote:
->> 2013/8/26 Vinod Koul <vinod.koul@intel.com>:
->> > On Sun, Aug 25, 2013 at 08:57:13PM +0800, Barry Song wrote:
->> >> the dma engine of sirfsoc supports interleaved mode, but if we set
->> >> xlen=width instead xlen<width, it will work as non-interleaved. as
->> >> most clients of sirf dma driver still don't need interleaved mode,
->> >> so here we still need to implement prep_slave_sg entry so that users
->> >> like uart, spi can use these APIs instead of interleaved API.
->> > Well in that case why dont you just create a wrapper on top of interleaved API
->> > to make this work without driver changes
->>
->> Vinod, do you mean using interleaved API to provide sg/single API if
->> specific drivers implement interleaved_dma but not implement sg_dma?
->>
->> the problem is that is difficult to set right legal sgl[i].size,
->> sgl[i].icg and numf for all dmaengines as that depends on specific dma
->> hardware limitation.
-> The whole premise of doing the generic interleaved api was to ensure we can use
-> any of the usuages as a case of interleaved api. Can you explain how it would be
-> difficult?
+From: Oliver Schinagl <oliver@schinagl.nl>
 
-for example, if someone wants to do a 16Kbytes single transfer. how
-will interleaved dma set transfer length and interval between every
-row?
-if it sets the transfer length to 16KB directly, the dma hardware
-might not support such long a transfer at all.
-so it might want to set as two 8KB transfer without interval between them.
-0~8KB                empty interval
-8KB-16KB          empty interval
-or four 4KB transfer as
-0~4KB                empty interval
-4KB-8KB          empty interval
-8KB-12KB          empty interval
-12KB-16KB          empty interval
+This patch shall add support for the sunxi-sid driver to the device
+tree for A10, A10s, A13 and A20.
 
-the problem is we don't know the hardware limitation of every dma
-controllers for transferring length of each row.
+Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi  | 5 +++++
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 5 +++++
+ arch/arm/boot/dts/sun5i-a13.dtsi  | 5 +++++
+ arch/arm/boot/dts/sun7i-a20.dtsi  | 5 +++++
+ 4 files changed, 20 insertions(+)
 
->
->> >> +     spin_lock_irqsave(&schan->lock, iflags);
->> >> +     list_for_each(l, &schan->free)
->> >> +             desc_cnt++;
->> > why dont you allocate descriptors here. That will remove this limitation..
->>
->> i understand. here sirf user scenerios will never be over the
->> limitation of SIRFSOC_DMA_DESCRIPTORS = 16. so i don't want to make it
->> too complex.
-> I think you can make code simler by dynamically allocating and freeing
-> descriptors...
-
-when do you think is the right time to free? while the whole sg
-finished? i always think the code will be ugly.
-
->
-> ~Vinod
-> --
-
--barry
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index b2bd6e1..179e024 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -267,6 +267,11 @@
+ 			reg = <0x01c20c90 0x10>;
+ 		};
+ 
++		sid: eeprom at 01c23800 {
++			compatible = "allwinner,sun4i-sid";
++			reg = <0x01c23800 0x10>;
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index b8fc1c2..724285cc 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -256,6 +256,11 @@
+ 			reg = <0x01c20c90 0x10>;
+ 		};
+ 
++		sid: eeprom at 01c23800 {
++			compatible = "allwinner,sun4i-sid";
++			reg = <0x01c23800 0x10>;
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index 7363211..999fdb3 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -223,6 +223,11 @@
+ 			reg = <0x01c20c90 0x10>;
+ 		};
+ 
++		sid: eeprom at 01c23800 {
++			compatible = "allwinner,sun4i-sid";
++			reg = <0x01c23800 0x10>;
++		};
++
+ 		uart1: serial at 01c28400 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28400 0x400>;
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index fb81e78..ff3cc90 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -217,6 +217,11 @@
+ 			reg = <0x01c20c90 0x10>;
+ 		};
+ 
++		sid: eeprom at 01c23800 {
++			compatible = "allwinner,sun7i-a20-sid";
++			reg = <0x01c23800 0x200>;
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+-- 
+1.8.1.5
