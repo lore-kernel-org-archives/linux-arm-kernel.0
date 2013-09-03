@@ -1,51 +1,45 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 3 Sep 2013 13:19:54 +0200
-Subject: [PATCHv6 1/2] ARM: sunxi: Initial support for Allwinner's
+Date: Tue, 3 Sep 2013 13:21:36 +0200
+Subject: [PATCHv7 1/2] ARM: sunxi: Initial support for Allwinner's
  Security ID fuses
-In-Reply-To: <20130902161232.GA23912@kroah.com>
-References: <1378035019-9649-1-git-send-email-oliver+list@schinagl.nl>
- <1378035019-9649-2-git-send-email-oliver+list@schinagl.nl>
- <20130902080812.GA2630@lukather> <20130902161232.GA23912@kroah.com>
-Message-ID: <20130903111954.GB2630@lukather>
+In-Reply-To: <1378204408-1415-2-git-send-email-oliver+list@schinagl.nl>
+References: <1378204408-1415-1-git-send-email-oliver+list@schinagl.nl>
+ <1378204408-1415-2-git-send-email-oliver+list@schinagl.nl>
+Message-ID: <20130903112136.GC2630@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-
-On Mon, Sep 02, 2013 at 09:12:32AM -0700, Greg KH wrote:
-> > What I wanted was a (pretty long, I agree) summing up the whole
-> > discussion we had.
-> > 
-> > Something like:
-> > 
-> > /*
-> >  * Be aware that this will generate a race with userspace. By the time
-> >  * it gets called, udev has already been notified of the device
-> >  * addition, and will never be notified that this file has been added.
-> >  *
-> >  * It should be properly fixed by having some way to attach a sysfs
-> >  * attribute group to the device structure before the probe.
-> >  * Unfortunately, this is both not possible for platform devices at the
-> >  * moment and not trivial to do, so this will need a proper fix later
-> >  * on.
-> >  */
-> > 
-> > And just like the comment quoted above, you can remove the useless fixme
-> > comments you added everywhere.
+On Tue, Sep 03, 2013 at 12:33:27PM +0200, oliver+list at schinagl.nl wrote:
+> From: Oliver Schinagl <oliver@schinagl.nl>
 > 
-> There's no need for any of this, including the "FIXME" comments.  I know
-> what the problem is here, and until the driver core changes get merged
-> upstream in order to fix it, there's no need to worry about "broken"
-> drivers, as everything is "broken".
+> Allwinner has electric fuses (efuse) on their line of chips. This driver
+> reads those fuses, seeds the kernel entropy and exports them as a sysfs
+> node.
 > 
-> I'll just take this as-is and remove the "fixme" comments, ok?
+> These fuses are most likely to be programmed at the factory, encoding
+> things like Chip ID, some sort of serial number, etc. and appear to be
+> reasonably unique.
+> While in theory, these should be writeable by the user, it will probably
+> be inconvenient to do so. Allwinner recommends that a certain input pin,
+> labeled 'efuse_vddq', be connected to GND. To write these fuses however,
+> a 2.5 V programming voltage needs to be applied to this pin.
+> 
+> Even so, they can still be used to generate a board-unique mac from,
+> board unique RSA key and seed the kernel RNG.
+> 
+> On sun7i additional storage is available, this is initially used for an
+> UEFI BOOT key, Secure JTAG key, HDMI-HDCP key and vendor specific keys.
+> 
+> Currently supported are the following known chips:
+> Allwinner sun4i (A10)
+> Allwinner sun5i (A10s, A13)
+> Allwinner sun7i (A20)
+> 
+> Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
 
-It's your call :)
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-We had a few other comments, that will probably be fixed in the v7
-oliver just sent, so you'd probably want to merge the v7 instead.
-
-Thanks,
+Thanks!
 Maxime
 
 -- 
@@ -58,4 +52,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130903/abf0d2db/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130903/5b9f368b/attachment.sig>
