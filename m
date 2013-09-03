@@ -1,52 +1,41 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Sep 2013 10:13:47 +0100
-Subject: [PATCH v4] ARM: Add check for Cortex-A15 errata 798181 ECO
-In-Reply-To: <20130902213125.GB6617@n2100.arm.linux.org.uk>
-References: <1377440747-4564-1-git-send-email-robherring2@gmail.com>
- <20130902135842.GU6617@n2100.arm.linux.org.uk>
- <20130902213125.GB6617@n2100.arm.linux.org.uk>
-Message-ID: <20130903091347.GB6128@mudshark.cambridge.arm.com>
+Date: Tue, 3 Sep 2013 10:18:41 +0100
+Subject: [PATCH] iommu/arm-smmu: use devm_ioremap_resource() instead of
+ devm_request_and_ioremap()
+In-Reply-To: <005201cea77b$c0e14d90$42a3e8b0$%han@samsung.com>
+References: <005201cea77b$c0e14d90$42a3e8b0$%han@samsung.com>
+Message-ID: <20130903091841.GA6635@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 02, 2013 at 10:31:25PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 02, 2013 at 02:58:42PM +0100, Russell King - ARM Linux wrote:
-> > On Sun, Aug 25, 2013 at 09:25:47AM -0500, Rob Herring wrote:
-> > > From: Rob Herring <rob.herring@calxeda.com>
-> > > 
-> > > The work-around for A15 errata 798181 is not needed if appropriate ECO
-> > > fixes have been applied to r3p2 and earlier core revisions. This can be
-> > > checked by reading REVIDR register bits 4 and 9. If only bit 4 is set,
-> > > then the IPI broadcast can be skipped.
-> > > 
-> > > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > So, this patch in the patch system claims to be against v3.11-rc2:
-> > 
-> > $ git checkout v3.11-rc2
-> > ...
-> > $ pdb gitapply 7804/2
-> > Patching 7804/2...
-> > git apply --whitespace=fix -p1 --index --check > /tmp/pdb.15757 2>&1 exited with non-zero status: 256
-> > error: patch failed: arch/arm/include/asm/tlbflush.h:443
-> > error: arch/arm/include/asm/tlbflush.h: patch does not apply
-> > error: patch failed: arch/arm/kernel/smp_tlb.c:70
-> > error: arch/arm/kernel/smp_tlb.c: patch does not apply
-> > error: patch failed: arch/arm/mm/context.c:245
-> > error: arch/arm/mm/context.c: patch does not apply
-> > 
-> > > v3:
-> > > - Rebase to v3.11-rc5 due to commit 1f49856 (ARM: 7789/1: Do not run
-> > >  dummy_flush_tlb_a15_erratum() on non-Cortex-A15)
-> > > - Move the revision checking out of line and use function ptrs.
-> > 
-> > Hmm, so -rc5 not -rc2 that you put into the patch system...  Also, the
-> > patch you put into the patch system didn't have Will's ack on it.
-> 
-> And... merging everything together tonight gives me a conflict with Will's
-> barriers patches, which I've resolved like this - this will need to be
-> checked:
+[Apologies if you receive this twice -- I've been having issues with email]
 
-Thanks Russell; looks ok from my side.
+On Mon, Sep 02, 2013 at 02:28:39AM +0100, Jingoo Han wrote:
+> Use devm_ioremap_resource() because devm_request_and_ioremap() is
+> obsoleted by devm_ioremap_resource().
+> 
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> ---
+>  drivers/iommu/arm-smmu.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index f417e89..31c709c 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1786,9 +1786,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	smmu->size = resource_size(res);
+> -	smmu->base = devm_request_and_ioremap(dev, res);
+> -	if (!smmu->base)
+> -		return -EADDRNOTAVAIL;
+> +	smmu->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(smmu->base))
+> +		return PTR_ERR(smmu->base);
+
+Cheers, but I've already got a patch like this queued from Julia. I was
+going to send a pull request to Joerg after the merge window, since it's a
+bit late in the day for things like this at the moment.
 
 Will
