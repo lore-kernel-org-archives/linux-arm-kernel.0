@@ -1,41 +1,18 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Sep 2013 10:47:01 -0700
-Subject: [GIT PULL V2 2/2] ARM: mvebu: MSI mvebu changes for v3.12
-In-Reply-To: <20130903173546.GK19598@titan.lakedaemon.net>
-References: <20130814191011.GD13964@titan.lakedaemon.net>
- <20130814192317.GE13964@titan.lakedaemon.net>
- <20130830202526.GW19598@titan.lakedaemon.net>
- <CAOesGMhRJjB9veSVMYHMFPqWYeMd8n9YcnKVtZxav1vyfKnbhw@mail.gmail.com>
- <20130903154708.GJ19598@titan.lakedaemon.net>
- <CAOesGMiLURZGhHTh15QsLRFoY8iJU4QC36FrGUsd5jUu9JMm7Q@mail.gmail.com>
- <20130903173546.GK19598@titan.lakedaemon.net>
-Message-ID: <CAOesGMhbXZKntSYh+9iRMMX-2dbQtz+-SKjzybWWJryDknhX2w@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 03 Sep 2013 11:57:05 -0600
+Subject: [PATCH] clk: tegra: replace enum tegra114_clk by binding header
+In-Reply-To: <1378213915-10222-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1378213915-10222-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <522622F1.70008@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 3, 2013 at 10:35 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+On 09/03/2013 07:11 AM, Peter De Schrijver wrote:
+> As the clock IDs are now specified in a header file, we can use those
+> definitions instead of maintaining an internal enum.
 
-> Usually one of you pokes me within a few days if something is wrong.
-> Had that happened, we wouldn't be here right now.
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-Yes, we usually try to be quicker at doing merges. We had a few that
-took quite long this merge cycle. Summer breaks, travel, and
-maintainer handoff and getting up to speed are all factors in that.
+I assume this will go through Mike's clock tree for 3.13.
 
-> So, my more rational response to this is: How do we prevent this in the
-> future?  If I don't hear anything from you in a few days, should I poke
-> Arnd/Kevin to take a look at it?  I'm not really keen on making noise
-> like that by default.  Any other ideas?
-
-Always send your merge requests to arm at kernel.org, that way everybody
-gets them. Just as the rule of thumb with patches, if you haven't
-heard back within a week, please ping us to see if we missed it.
-Especially true when -rc7 rolls around.
-
-Send those pings to the same alias. It's possible that we handed off
-between each other so that the other person is handling merge requests
-at that time, but you don't have to worry about that if you use the
-alias.
-
-
--Olof
+I assume similar patches will follow for Tegra20/30?
