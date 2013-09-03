@@ -1,76 +1,157 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Tue, 3 Sep 2013 05:43:21 +0000
-Subject: [PATCH v4 3/3] dma: Add Freescale eDMA engine driver support
-In-Reply-To: <20130902111200.GP7376@intel.com>
-References: <1376633274-17850-1-git-send-email-b35083@freescale.com>
- <20130828081742.GC11414@intel.com>
- <B56CDBE15CE27145A4B77D2D24263E8520A8C7@039-SN1MPN1-003.039d.mgd.msft.net>
- <20130902045050.GE7376@intel.com>
- <B56CDBE15CE27145A4B77D2D24263E8520D0D4@039-SN1MPN1-004.039d.mgd.msft.net>
- <20130902063721.GK7376@intel.com>
- <B56CDBE15CE27145A4B77D2D24263E8520F101@039-SN1MPN1-004.039d.mgd.msft.net>
- <20130902111200.GP7376@intel.com>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E852102A1@039-SN1MPN1-004.039d.mgd.msft.net>
+From: a0393675@ti.com (Keerthy)
+Date: Tue, 3 Sep 2013 12:03:58 +0530
+Subject: [PATCH] ARM: DTS: DRA7: Add TPS659038 PMIC nodes
+In-Reply-To: <1377495411-21984-1-git-send-email-j-keerthy@ti.com>
+References: <1377495411-21984-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <522582D6.4020800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > How about change the filter_fn to follow:
-> > static bool fsl_edma_filter_fn(struct dma_chan *chan, void *fn_param)
-> > {
-> >         struct fsl_edma_filter_param *fparam = fn_param;
-> >         struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-> >         unsigned char val;
-> >
-> >         if (fsl_chan->edmamux->mux_id != fparam->mux_id)
-> >                 return false;
-> >
-> >         val = EDMAMUX_CHCFG_ENBL | EDMAMUX_CHCFG_SOURCE(fparam-
-> >slot_id);
-> >         fsl_edmamux_config_chan(fsl_chan, val);
-> >         return true;
-> > }
-> > In fact the slot_id isn't need elsewhere, and if the filter return true,
-> > This channel should be to this request. So no need to save the slave id,
-> Right?
-> something like
-> 
-> static bool fsl_edma_filter_fn(struct dma_chan *chan, void *fn_param)
-> {
-> 	struct fsl_edma_filter_param *fparam = fn_param;
-> 	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-> 
-> 	if (fsl_chan->edmamux->mux_id != fparam->mux_id)
-> 		return false;
-> 	return true;
-> }
-> 
-> in thedriver which calls this:
-> 
-> before prep:
-> 
-> 	config->slave_id = val;
-> 
-> 	dma_set_slave_config(chan, slave);
-> 
-  Do you mean the DMA_SLAVE_CONFIG device_control? Yeah, the slave driver could pass
-the slave_id. But the DMA_SLAVE_CONFIG may be called more than once, and the eDMA
-driver just needs to set the slave id once for any given channel, after that the 
-transfer is transparent to the device. 
-  On the other hand, the DMAMUX's setting procedure requires first disable the dmamux
-before setting, then if it is set in DMA_SLAVE_CONFIG, the repeated setting may be
-complex and unnecessary. The channel is occupied exclusively by the peripheral.
-  So, according the HW feature, I think the eDMA needs only set the slave id once,
-and since the of_dma helper has pass the slave id in on xlate, we can get and set
-the slave id here. How do you think about this?
-  Thanks!
+Benoit,
 
 
+On Monday 26 August 2013 11:06 AM, Keerthy wrote:
+> The Patch adds nodes for TPS659038 PMIC for DRA7 boards.
+>
+> It is based on top of:
+> http://comments.gmane.org/gmane.linux.ports.arm.omap/102459.
+>
+> Documentation:	Documentation/devicetree/bindings/mfd/palmas.txt
+> 		Documentation/devicetree/bindings/regulator/palmas-pmic.txt		
+>
+> Boot Tested on DRA7 d1 Board.
 
+Any comments on this patch?
 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+>   arch/arm/boot/dts/dra7-evm.dts |  118 ++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 118 insertions(+)
+>
+> Index: linux/arch/arm/boot/dts/dra7-evm.dts
+> ===================================================================
+> --- linux.orig/arch/arm/boot/dts/dra7-evm.dts	2013-08-26 09:57:52.496173554 +0530
+> +++ linux/arch/arm/boot/dts/dra7-evm.dts	2013-08-26 10:38:44.995414695 +0530
+> @@ -93,6 +93,119 @@
+>   	pinctrl-names = "default";
+>   	pinctrl-0 = <&i2c1_pins>;
+>   	clock-frequency = <400000>;
+> +
+> +	tps659038: tps659038 at 58 {
+> +		compatible = "ti,tps659038";
+> +		reg = <0x58>;
+> +
+> +		tps659038_pmic {
+> +			compatible = "ti,tps659038-pmic";
+> +
+> +			regulators {
+> +				smps123_reg: smps123 {
+> +					/* VDD_MPU */
+> +						regulator-name = "smps123";
+> +						regulator-min-microvolt = < 850000>;
+> +						regulator-max-microvolt = <1250000>;
+> +						regulator-always-on;
+> +						regulator-boot-on;
+> +					};
+> +
+> +				smps45_reg: smps45 {
+> +						/* VDD_DSPEVE */
+> +						regulator-name = "smps45";
+> +						regulator-min-microvolt = < 850000>;
+> +						regulator-max-microvolt = <1150000>;
+> +						regulator-boot-on;
+> +					};
+> +
+> +				smps6_reg: smps6 {
+> +						/* VDD_GPU - over VDD_SMPS6 */
+> +						regulator-name = "smps6";
+> +						regulator-min-microvolt = <850000>;
+> +						regulator-max-microvolt = <12500000>;
+> +						regulator-boot-on;
+> +					};
+> +
+> +				smps7_reg: smps7 {
+> +						/* CORE_VDD */
+> +						regulator-name = "smps7";
+> +						regulator-min-microvolt = <850000>;
+> +						regulator-max-microvolt = <1030000>;
+> +						regulator-always-on;
+> +						regulator-boot-on;
+> +					};
+> +
+> +				smps8_reg: smps8 {
+> +						/* VDD_IVAHD */
+> +						regulator-name = "smps8";
+> +						regulator-min-microvolt = < 850000>;
+> +						regulator-max-microvolt = <1250000>;
+> +						regulator-boot-on;
+> +					};
+> +
+> +				smps9_reg: smps9 {
+> +						/* VDDS1V8 */
+> +						regulator-name = "smps9";
+> +						regulator-min-microvolt = <1800000>;
+> +						regulator-max-microvolt = <1800000>;
+> +						regulator-always-on;
+> +						regulator-boot-on;
+> +					};
+> +
+> +				ldo1_reg: ldo1 {
+> +						/* LDO1_OUT --> SDIO  */
+> +						regulator-name = "ldo1";
+> +						regulator-min-microvolt = <1800000>;
+> +						regulator-max-microvolt = <3300000>;
+> +						regulator-boot-on;
+> +					};
+> +
+> +				ldo2_reg: ldo2 {
+> +						/* VDD_RTCIO */
+> +						/* LDO2 -> VDDSHV5, LDO2 also goes to CAN_PHY_3V3 */
+> +						regulator-name = "ldo2";
+> +						regulator-min-microvolt = <3300000>;
+> +						regulator-max-microvolt = <3300000>;
+> +						regulator-boot-on;
+> +					};
+> +
+> +				ldo3_reg: ldo3 {
+> +						/* VDDA_1V8_PHY */
+> +						regulator-name = "ldo3";
+> +						regulator-min-microvolt = <1800000>;
+> +						regulator-max-microvolt = <1800000>;
+> +						regulator-boot-on;
+> +					};
+> +
+> +				ldo9_reg: ldo9 {
+> +						/* VDD_RTC */
+> +						regulator-name = "ldo9";
+> +						regulator-min-microvolt = <1050000>;
+> +						regulator-max-microvolt = <1050000>;
+> +						regulator-boot-on;
+> +					};
+> +
+> +				ldoln_reg: ldoln {
+> +						/* VDDA_1V8_PLL */
+> +						regulator-name = "ldoln";
+> +						regulator-min-microvolt = <1800000>;
+> +						regulator-max-microvolt = <1800000>;
+> +						regulator-always-on;
+> +						regulator-boot-on;
+> +					};
+> +
+> +				ldousb_reg: ldousb {
+> +						/* VDDA_3V_USB: VDDA_USBHS33 */
+> +						regulator-name = "ldousb";
+> +						regulator-min-microvolt = <3300000>;
+> +						regulator-max-microvolt = <3300000>;
+> +						regulator-boot-on;
+> +					};
+> +
+> +				};
+> +			};
+> +		};
+>   };
+>   
+>   &i2c2 {
 
-
-
-
-
-Best Regards,
-Jingchang
+Regards,
+Keerthy
