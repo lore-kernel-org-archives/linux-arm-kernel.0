@@ -1,126 +1,52 @@
-From: B18965@freescale.com (Wang Huan-B18965)
-Date: Tue, 3 Sep 2013 08:21:34 +0000
-Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
- Vybrid VF610 platform
-In-Reply-To: <81BA6E5E0BC2344391CABCEE22D1B6D83F448E@039-SN1MPN1-002.039d.mgd.msft.net>
-References: <1376553714-25922-1-git-send-email-b18965@freescale.com>
- <81BA6E5E0BC2344391CABCEE22D1B6D83F448E@039-SN1MPN1-002.039d.mgd.msft.net>
-Message-ID: <81BA6E5E0BC2344391CABCEE22D1B6D8403CB3@039-SN1MPN1-002.039d.mgd.msft.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 3 Sep 2013 10:13:47 +0100
+Subject: [PATCH v4] ARM: Add check for Cortex-A15 errata 798181 ECO
+In-Reply-To: <20130902213125.GB6617@n2100.arm.linux.org.uk>
+References: <1377440747-4564-1-git-send-email-robherring2@gmail.com>
+ <20130902135842.GU6617@n2100.arm.linux.org.uk>
+ <20130902213125.GB6617@n2100.arm.linux.org.uk>
+Message-ID: <20130903091347.GB6128@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Jean-Christophe, Tomi,
+On Mon, Sep 02, 2013 at 10:31:25PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Sep 02, 2013 at 02:58:42PM +0100, Russell King - ARM Linux wrote:
+> > On Sun, Aug 25, 2013 at 09:25:47AM -0500, Rob Herring wrote:
+> > > From: Rob Herring <rob.herring@calxeda.com>
+> > > 
+> > > The work-around for A15 errata 798181 is not needed if appropriate ECO
+> > > fixes have been applied to r3p2 and earlier core revisions. This can be
+> > > checked by reading REVIDR register bits 4 and 9. If only bit 4 is set,
+> > > then the IPI broadcast can be skipped.
+> > > 
+> > > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> > 
+> > So, this patch in the patch system claims to be against v3.11-rc2:
+> > 
+> > $ git checkout v3.11-rc2
+> > ...
+> > $ pdb gitapply 7804/2
+> > Patching 7804/2...
+> > git apply --whitespace=fix -p1 --index --check > /tmp/pdb.15757 2>&1 exited with non-zero status: 256
+> > error: patch failed: arch/arm/include/asm/tlbflush.h:443
+> > error: arch/arm/include/asm/tlbflush.h: patch does not apply
+> > error: patch failed: arch/arm/kernel/smp_tlb.c:70
+> > error: arch/arm/kernel/smp_tlb.c: patch does not apply
+> > error: patch failed: arch/arm/mm/context.c:245
+> > error: arch/arm/mm/context.c: patch does not apply
+> > 
+> > > v3:
+> > > - Rebase to v3.11-rc5 due to commit 1f49856 (ARM: 7789/1: Do not run
+> > >  dummy_flush_tlb_a15_erratum() on non-Cortex-A15)
+> > > - Move the revision checking out of line and use function ptrs.
+> > 
+> > Hmm, so -rc5 not -rc2 that you put into the patch system...  Also, the
+> > patch you put into the patch system didn't have Will's ack on it.
+> 
+> And... merging everything together tonight gives me a conflict with Will's
+> barriers patches, which I've resolved like this - this will need to be
+> checked:
 
-      Could you please help to review these patches?
-      Thanks!
+Thanks Russell; looks ok from my side.
 
-
-Best Regards,
-Alison Wang
-
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Wang Huan-B18965
-> Sent: Monday, August 26, 2013 5:52 PM
-> To: plagnioj at jcrosoft.com; tomi.valkeinen at ti.com; linux-
-> fbdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Cc: Jin Zhengxiong-R64188; Estevam Fabio-R49496; shawn.guo at linaro.org
-> Subject: RE: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
-> Vybrid VF610 platform
-> 
-> Hi, Jean-Christophe, Tomi,
-> 
->        Do you have any comments for these patches?
-> 
->        Thanks!
-> 
-> 
-> Best Regards,
-> Alison Wang
-> 
-> > -----Original Message-----
-> > From: linux-arm-kernel [mailto:linux-arm-kernel-
-> > bounces at lists.infradead.org] On Behalf Of Alison Wang
-> > Sent: Thursday, August 15, 2013 4:02 PM
-> > To: plagnioj at jcrosoft.com; tomi.valkeinen at ti.com;
-> > shawn.guo at linaro.org; Estevam Fabio-R49496;
-> > linux-fbdev at vger.kernel.org; linux-arm- kernel at lists.infradead.org
-> > Cc: Jin Zhengxiong-R64188
-> > Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for
-> > Vybrid VF610 platform
-> >
-> > This series contain DCU framebuffer driver for Freescale Vybrid VF610
-> > platform.
-> >
-> > The Display Controller Unit (DCU) module is a system master that
-> > fetches graphics stored in internal or external memory and displays
-> > them on a TFT LCD panel. A wide range of panel sizes is supported and
-> > the timing of the interface signals is highly configurable.
-> > Graphics are read directly from memory and then blended in real-time,
-> > which allows for dynamic content creation with minimal CPU
-> intervention.
-> >
-> > The features:
-> > (1) Full RGB888 output to TFT LCD panel.
-> > (2) For the current LCD panel, WQVGA "480x272" is tested.
-> > (3) Blending of each pixel using up to 4 source layers dependent on
-> > size of panel.
-> > (4) Each graphic layer can be placed with one pixel resolution in
-> > either axis.
-> > (5) Each graphic layer support RGB565 and RGB888 direct colors
-> without
-> > alpha channel and BGRA8888 direct colors with an alpha channel.
-> > (6) Each graphic layer support alpha blending with 8-bit resolution.
-> >
-> > Changes in v3:
-> > - Correct DCU_MODE_BLEND_ITER macro definition.
-> > - Remove hardcode panel description in the driver. Use the videomode
-> > helpers to get the relevant data from devicetree.
-> > - Correct the wrong indentation.
-> > - Use dev_* for printing messages in drivers.
-> > - Change calc_div_ratio() to fsl_dcu_calc_div(), and rewrite this
-> > function.
-> > - Use devm_request_irq() instead of request_irq().
-> > - Drop useless code.
-> > - Increase the layers number to the maximum 6.
-> > - Use dma_alloc_writecombine() instead of dma_alloc_coherent().
-> > - Use runtime PM.
-> >
-> > Changes in v2:
-> > - Add a document for DCU framebuffer driver under
-> > Documentation/devicetree/bindings/fb/.
-> >
-> > ----------------------------------------------------------------
-> > Alison Wang (5):
-> >       ARM: dts: vf610: Add DCU and TCON nodes
-> >       ARM: dts: vf610-twr: Enable DCU and TCON devices
-> >       ARM: clk: vf610: Add DCU and TCON clock support
-> >       fb: Add DCU framebuffer driver for Vybrid VF610 platform
-> >       Documentation: DT: Add DCU framebuffer driver
-> >
-> >  Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt |   67 +++++
-> >  arch/arm/boot/dts/vf610-twr.dts                     |   32 +++
-> >  arch/arm/boot/dts/vf610.dtsi                        |   19 +-
-> >  arch/arm/mach-imx/clk-vf610.c                       |    5 +
-> >  drivers/video/Kconfig                               |   10 +
-> >  drivers/video/Makefile                              |    1 +
-> >  drivers/video/fsl-dcu-fb.c                          | 1095
-> >
-> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> > +++++++++
-> >  include/dt-bindings/clock/vf610-clock.h             |    3 +-
-> >  8 files changed, 1230 insertions(+), 2 deletions(-)  create mode
-> > 100644 Documentation/devicetree/bindings/fb/fsl-dcu-fb.txt
-> >  create mode 100644 drivers/video/fsl-dcu-fb.c
-> >
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Will
