@@ -1,49 +1,41 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Tue, 3 Sep 2013 10:44:27 -0700
-Subject: [PATCH v7 2/3] ARM: bcm281xx: Enable GPIO driver
-In-Reply-To: <522127E7.6090501@broadcom.com>
-References: <1377882914-30152-1-git-send-email-markus.mayer@linaro.org>
- <1377882914-30152-3-git-send-email-markus.mayer@linaro.org>
- <522127E7.6090501@broadcom.com>
-Message-ID: <CAPdLdqm-M=ZZiHp1zr8_6Xst7WFq6w2o6k07ZArbiovyB9Yj1w@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 3 Sep 2013 10:47:01 -0700
+Subject: [GIT PULL V2 2/2] ARM: mvebu: MSI mvebu changes for v3.12
+In-Reply-To: <20130903173546.GK19598@titan.lakedaemon.net>
+References: <20130814191011.GD13964@titan.lakedaemon.net>
+ <20130814192317.GE13964@titan.lakedaemon.net>
+ <20130830202526.GW19598@titan.lakedaemon.net>
+ <CAOesGMhRJjB9veSVMYHMFPqWYeMd8n9YcnKVtZxav1vyfKnbhw@mail.gmail.com>
+ <20130903154708.GJ19598@titan.lakedaemon.net>
+ <CAOesGMiLURZGhHTh15QsLRFoY8iJU4QC36FrGUsd5jUu9JMm7Q@mail.gmail.com>
+ <20130903173546.GK19598@titan.lakedaemon.net>
+Message-ID: <CAOesGMhbXZKntSYh+9iRMMX-2dbQtz+-SKjzybWWJryDknhX2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 August 2013 16:16, Christian Daudt <csd@broadcom.com> wrote:
-> On 13-08-30 10:15 AM, Markus Mayer wrote:
->>
->> Turn on the bcm281xx GPIO driver in the kernel configuration.
->> ---
->>   arch/arm/mach-bcm/Kconfig |    2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
->> index f112895..5819126 100644
->> --- a/arch/arm/mach-bcm/Kconfig
->> +++ b/arch/arm/mach-bcm/Kconfig
->> @@ -9,7 +9,7 @@ config ARCH_BCM
->>         select CLKSRC_OF
->>         select GENERIC_CLOCKEVENTS
->>         select GENERIC_TIME
->> -       select GPIO_BCM
->> +       select GPIO_BCM_KONA
->>         select SPARSE_IRQ
->>         select TICK_ONESHOT
->>         help
->
-> Reviewed-by: Christian Daudt <csd@broadcom.com>
+On Tue, Sep 3, 2013 at 10:35 AM, Jason Cooper <jason@lakedaemon.net> wrote:
 
-Also
+> Usually one of you pokes me within a few days if something is wrong.
+> Had that happened, we wouldn't be here right now.
 
-Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
+Yes, we usually try to be quicker at doing merges. We had a few that
+took quite long this merge cycle. Summer breaks, travel, and
+maintainer handoff and getting up to speed are all factors in that.
 
-Looks like I forgot to add the sign-off to this re-introduced patch.
-Please let me know if you want me to re-send rather than just adding
-it here on the mailing list.
+> So, my more rational response to this is: How do we prevent this in the
+> future?  If I don't hear anything from you in a few days, should I poke
+> Arnd/Kevin to take a look at it?  I'm not really keen on making noise
+> like that by default.  Any other ideas?
 
-Regards,
--Markus
+Always send your merge requests to arm at kernel.org, that way everybody
+gets them. Just as the rule of thumb with patches, if you haven't
+heard back within a week, please ping us to see if we missed it.
+Especially true when -rc7 rolls around.
 
--- 
-Markus Mayer
-Broadcom Landing Team
+Send those pings to the same alias. It's possible that we handed off
+between each other so that the other person is handling merge requests
+at that time, but you don't have to worry about that if you use the
+alias.
+
+
+-Olof
