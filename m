@@ -1,55 +1,85 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 3 Sep 2013 13:21:36 +0200
-Subject: [PATCHv7 1/2] ARM: sunxi: Initial support for Allwinner's
- Security ID fuses
-In-Reply-To: <1378204408-1415-2-git-send-email-oliver+list@schinagl.nl>
-References: <1378204408-1415-1-git-send-email-oliver+list@schinagl.nl>
- <1378204408-1415-2-git-send-email-oliver+list@schinagl.nl>
-Message-ID: <20130903112136.GC2630@lukather>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 03 Sep 2013 12:25:08 +0100
+Subject: [PULL REQUEST] big-endian updates for ARM
+In-Reply-To: <20130903101332.GA26613@localhost.localdomain>
+References: <20130903101332.GA26613@localhost.localdomain>
+Message-ID: <5225C714.3090504@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 03, 2013 at 12:33:27PM +0200, oliver+list at schinagl.nl wrote:
-> From: Oliver Schinagl <oliver@schinagl.nl>
-> 
-> Allwinner has electric fuses (efuse) on their line of chips. This driver
-> reads those fuses, seeds the kernel entropy and exports them as a sysfs
-> node.
-> 
-> These fuses are most likely to be programmed at the factory, encoding
-> things like Chip ID, some sort of serial number, etc. and appear to be
-> reasonably unique.
-> While in theory, these should be writeable by the user, it will probably
-> be inconvenient to do so. Allwinner recommends that a certain input pin,
-> labeled 'efuse_vddq', be connected to GND. To write these fuses however,
-> a 2.5 V programming voltage needs to be applied to this pin.
-> 
-> Even so, they can still be used to generate a board-unique mac from,
-> board unique RSA key and seed the kernel RNG.
-> 
-> On sun7i additional storage is available, this is initially used for an
-> UEFI BOOT key, Secure JTAG key, HDMI-HDCP key and vendor specific keys.
-> 
-> Currently supported are the following known chips:
-> Allwinner sun4i (A10)
-> Allwinner sun5i (A10s, A13)
-> Allwinner sun7i (A20)
-> 
-> Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
+On 03/09/13 11:13, Dave Martin wrote:
+> On Mon, Sep 02, 2013 at 12:24:23PM +0100, Ben Dooks wrote:
+>> With the last ack added, the following series is ready to be pulled.
+>>
+>> The following changes since commit fa8218def1b1a16f0a410e2c1c767b4738cc81fa:
+>>
+>>    Merge tag 'regmap-v3.11-rc7' of
+>> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap
+>> (2013-08-27 10:10:30 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>
+>>    git://git.baserock.org/delta/linux.git baserock/311-rc7/be/core-v3
+>>
+>> for you to fetch changes up to 5217543fe4605fa91065acf5141d88949cd3da1e:
+>>
+>>    ARM: signal: sigreturn_codes should be endian neutral to work in BE8
+>> (2013-09-02 11:53:53 +0100)
+>>
+>> ----------------------------------------------------------------
+>> Ben Dooks (19):
+>>        ARM: fix ARCH_IXP4xx usage of ARCH_SUPPORTS_BIG_ENDIAN
+>>        ARM: asm: Add ARM_BE8() assembly helper
+>>        ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
+>>        ARM: set BE8 if LE in head code
+>>        ARM: pl01x debug code endian fix
+>>        ARM: twd: data endian fix
+>>        ARM: smp_scu: data endian fixes
+>>        highbank: enable big-endian
+>>        fix highbank
+>>        mvebu: support running big-endian
+>>        vexpress: add big endian support
+>>        ARM: alignment: correctly decode instructions in BE8 mode.
+>>        ARM: traps: use<asm/opcodes.h>  to get correct instruction order
+>
+> As I repoerted in [1], this is patch broken for CONFIG_THUMB2_KERNEL due
+> to a typo:
+>
+> arch/arm/kernel/traps.c: In function 'do_undefinstr':
+> arch/arm/kernel/traps.c:411:5: error: 'instr2' undeclared (first use in this function)
+>       instr2 = __mem_to_opcode_thumb16(((u16 *)pc)[1]);
+>       ^
+> arch/arm/kernel/traps.c:411:5: note: each undeclared identifier is reported only once for each function it appears in
+> arch/arm/kernel/traps.c:410:9: warning: unused variable 'inst2' [-Wunused-variable]
+>       u16 inst2;
+>           ^
+> make[1]: *** [arch/arm/kernel/traps.o] Error 1
+>
+>
+> The following should be enough to fix it:
+>
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index da070db..d3806aa 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -407,7 +407,7 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+>   		if (thumb_mode(regs)) {
+>   			instr = __mem_to_opcode_thumb16(((u16 *)pc)[0]);
+>   			if (is_wide_instruction(instr)) {
+> -				u16 inst2;
+> +				u16 instr2;
+>   				instr2 = __mem_to_opcode_thumb16(((u16 *)pc)[1]);
+>   				instr = __opcode_thumb32_compose(instr, instr2);
+>   			}
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Thanks!
-Maxime
+Sorry, I thought that had been fixed, thanks for reminding me.
+
+I have fixed it and now on:
+
+	git://git.baserock.org/delta/linux baserock/311-rc7/be/core-v4
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130903/5b9f368b/attachment.sig>
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
