@@ -1,86 +1,47 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 4 Sep 2013 00:20:54 +0200
-Subject: [PATCH] pwm: pxa: add device tree support to pwm driver
-In-Reply-To: <1378236233-15637-1-git-send-email-mikedunn@newsguy.com>
-References: <1378236233-15637-1-git-send-email-mikedunn@newsguy.com>
-Message-ID: <201309040020.55029.marex@denx.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 04 Sep 2013 00:36:50 +0200
+Subject: [RFC Patch v2 0/3] add temporary parent migration support
+In-Reply-To: <1378208072-10173-1-git-send-email-chander.kashyap@linaro.org>
+References: <1378208072-10173-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <3927125.3UOplv4uU5@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mike Dunn,
+Hi Chander,
 
-> This patch adds device tree support to the pxa's pwm driver.  Only an OF
-> match table is added; nothing needs to be extracted from the device tree
-> node.  The existing platform_device id table is reused for the match table
-> data.
+On Tuesday 03 of September 2013 17:04:28 Chander Kashyap wrote:
+> Some platform has provision to change cpu parent clock during
+> cpu frequency scaling. This patch series provides a mechanism to
+> implement the same using CCF.
 > 
-> Tested on a Palm Treo 680 (both platform data and DT cases).
+> Patch1 provides mechanism to migrate to new parent temporarily.
 > 
-> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
-> ---
+> Patch2 updates the user of clk_register_mux and DEFINE_CLK_MUX which are
+> modified to add support for clk migration.
 > 
-> I don't have data sheets handy for the newer Marvell pxa's (and I'm
-> confused about the presence of a pwm unit on pxa25x), so only pxa27x.dtsi
-> was updated. Thanks for looking!
-> 
->  arch/arm/boot/dts/pxa27x.dtsi | 12 ++++++++++++
->  drivers/pwm/pwm-pxa.c         | 31 +++++++++++++++++++++++++++++++
->  2 files changed, 43 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-> index d7c5d72..4031dce 100644
-> --- a/arch/arm/boot/dts/pxa27x.dtsi
-> +++ b/arch/arm/boot/dts/pxa27x.dtsi
-> @@ -10,5 +10,17 @@
->  			marvell,intc-priority;
->  			marvell,intc-nr-irqs = <34>;
->  		};
-> +
-> +		pwm0: pwm at 40b00000 {
-> +			compatible = "marvell,pxa27x-pwm";
-> +			reg = <0x40b00000 0x100000>;
-> +			#pwm-cells = <2>;
-> +		};
-> +
-> +		pwm1: pwm at 40c00000 {
-> +			compatible = "marvell,pxa27x-pwm";
-> +			reg = <0x40c00000 0x100000>;
-> +			#pwm-cells = <2>;
-> +		};
->  	};
->  };
-> diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
-> index a4d2164..be5f914 100644
-> --- a/drivers/pwm/pwm-pxa.c
-> +++ b/drivers/pwm/pwm-pxa.c
-> @@ -19,6 +19,7 @@
->  #include <linux/clk.h>
->  #include <linux/io.h>
->  #include <linux/pwm.h>
-> +#include <linux/of_device.h>
-> 
->  #include <asm/div64.h>
-> 
-> @@ -124,6 +125,30 @@ static struct pwm_ops pxa_pwm_ops = {
->  	.owner = THIS_MODULE,
->  };
-> 
-> +#ifdef CONFIG_OF
-> +/* use the platform_device id table for OF match table data */
-> +static struct of_device_id pwm_of_match[] = {
-> +	{ .compatible = "marvell,pxa25x-pwm", .data = &pwm_id_table[0] },
-> +	{ .compatible = "marvell,pxa27x-pwm", .data = &pwm_id_table[1] },
-> +	{ .compatible = "marvell,pxa168-pwm", .data = &pwm_id_table[2] },
-> +	{ .compatible = "marvell,pxa910-pwm", .data = &pwm_id_table[3] },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, pwm_of_match);
+> Patch3 adds support to Exynos5250 to use the clock parent migration
+> feature implemented in CCF.
 
-Are PXA2xx and PXA3xx PWM impleemntations not all the same ? If so, why not just 
-stick with pxa25x-pwm only for all of the CPUs (aka. the lowest CPU model). Then 
-the table would have but a single entry.
+I don't really like this approach. A need to change mux setting 
+temporarily is heavily platform-specific and I don't think it should be 
+handled by generic code. First of all there are many factor that you would 
+have to account for to make this solution generic, such as:
+ - board specific alternative parents,
+ - exact moment of parent change,
+ - some other platform specific conditions, like CPU voltage that must be 
+changed when mux is changed, because it changes CPU frequency,
+ - and probably a lot of more factors that only people working with all 
+the platforms supported (and unsupported yet) by Linux.
 
-[...]
+I can see at least two solutions for this problem that don't require 
+changing core code of common clock framework:
+
+1) Implementing a special clock type using normal mux ops, but also 
+registering a notifier for its PRE_RATE_CHANGE and POST_RATE_CHANGE events 
+to perform parent switching.
+
+2) Using normal mux clock, but registering such notifiers in clock 
+controller or cpufreq driver.
 
 Best regards,
-Marek Vasut
+Tomasz
