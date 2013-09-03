@@ -1,54 +1,60 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 3 Sep 2013 14:25:16 -0400
-Subject: [GIT PULL V2 2/2] ARM: mvebu: MSI mvebu changes for v3.12
-In-Reply-To: <CAOesGMhbXZKntSYh+9iRMMX-2dbQtz+-SKjzybWWJryDknhX2w@mail.gmail.com>
-References: <20130814191011.GD13964@titan.lakedaemon.net>
- <20130814192317.GE13964@titan.lakedaemon.net>
- <20130830202526.GW19598@titan.lakedaemon.net>
- <CAOesGMhRJjB9veSVMYHMFPqWYeMd8n9YcnKVtZxav1vyfKnbhw@mail.gmail.com>
- <20130903154708.GJ19598@titan.lakedaemon.net>
- <CAOesGMiLURZGhHTh15QsLRFoY8iJU4QC36FrGUsd5jUu9JMm7Q@mail.gmail.com>
- <20130903173546.GK19598@titan.lakedaemon.net>
- <CAOesGMhbXZKntSYh+9iRMMX-2dbQtz+-SKjzybWWJryDknhX2w@mail.gmail.com>
-Message-ID: <20130903182516.GL19598@titan.lakedaemon.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 03 Sep 2013 22:27:39 +0400
+Subject: [PATCH 1/4] ARM: shmobile: r8a7778: add Ether DT support
+In-Reply-To: <CANqRtoQFYFva9msdoEWdU2Z7_=jOtZwvXgL7OqUKhVMO3NOPzg@mail.gmail.com>
+References: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
+ <201309010315.49763.sergei.shtylyov@cogentembedded.com>
+ <CANqRtoQFYFva9msdoEWdU2Z7_=jOtZwvXgL7OqUKhVMO3NOPzg@mail.gmail.com>
+Message-ID: <52262A1B.4050406@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 03, 2013 at 10:47:01AM -0700, Olof Johansson wrote:
-> On Tue, Sep 3, 2013 at 10:35 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> 
-> > Usually one of you pokes me within a few days if something is wrong.
-> > Had that happened, we wouldn't be here right now.
-> 
-> Yes, we usually try to be quicker at doing merges. We had a few that
-> took quite long this merge cycle. Summer breaks, travel, and
-> maintainer handoff and getting up to speed are all factors in that.
+Hello.
 
-Fair enough.
+On 09/03/2013 07:17 PM, Magnus Damm wrote:
 
-> > So, my more rational response to this is: How do we prevent this in the
-> > future?  If I don't hear anything from you in a few days, should I poke
-> > Arnd/Kevin to take a look at it?  I'm not really keen on making noise
-> > like that by default.  Any other ideas?
-> 
-> Always send your merge requests to arm at kernel.org, that way everybody
-> gets them. 
+>> Define the generic R8A777x part of the Ether device node.
 
-Hmm... This is the first I heard of that alias.  I've always sent to
-both of you (Arnd and Olof) regardless of who looked to be more active.
-I'll add that to my alias list.
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> Just as the rule of thumb with patches, if you haven't heard back
-> within a week, please ping us to see if we missed it.  Especially true
-> when -rc7 rolls around.
-> 
-> Send those pings to the same alias. It's possible that we handed off
-> between each other so that the other person is handling merge requests
-> at that time, but you don't have to worry about that if you use the
-> alias.
+>> ---
+>>   arch/arm/boot/dts/r8a7778.dtsi |   11 +++++++++++
+>>   1 file changed, 11 insertions(+)
+>>
+>> Index: renesas/arch/arm/boot/dts/r8a7778.dtsi
+>> ===================================================================
+>> --- renesas.orig/arch/arm/boot/dts/r8a7778.dtsi
+>> +++ renesas/arch/arm/boot/dts/r8a7778.dtsi
+>> @@ -98,4 +98,15 @@
+>>                  reg = <0xfffc000 0x118>;
+>>                  #gpio-range-cells = <3>;
+>>          };
+>> +
+>> +       ether: ethernet at fde00000 {
+>> +               device_type = "network";
+>> +               compatible = "renesas,ether-r8a7779";
 
-Will do.
+> Hi Sergei,
 
-thx,
+> Thanks for your patch. What's the reason behind the r8a7778 SoC using
+> a compatible string for r8a7779 like "renesas,ether-r8a7779"?
 
-Jason.
+    R8A7779 support has appeared first in Linux and as R8A7778 Ether is 
+identical to R8A7779 and no wildcards are allowed in the device tree, I 
+decided to use this "compatible" prop.
+
+> It seems that you assume that the r8a7778 ethernet controller is 100%
+> compatible with r8a7779. Is that really true? For earlier versions the
+> sh_eth hardware documentation was anything but accurate, so it seems
+> to me that it must be more safe that r8a7778 would be using
+> "renesas,ether-r8a7778". What do you think?
+
+    I think R8A7778 and R8A7779 EtherMACs are identical. I've cross checked 
+the documentation at the start of the development and the registers appeared 
+to be the same.
+
+> Thanks,
+
+> / magnus
+
+WBR, Sergei
