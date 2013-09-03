@@ -1,47 +1,38 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 4 Sep 2013 00:17:44 +0900
-Subject: [PATCH 1/4] ARM: shmobile: r8a7778: add Ether DT support
-In-Reply-To: <201309010315.49763.sergei.shtylyov@cogentembedded.com>
-References: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
- <201309010315.49763.sergei.shtylyov@cogentembedded.com>
-Message-ID: <CANqRtoQFYFva9msdoEWdU2Z7_=jOtZwvXgL7OqUKhVMO3NOPzg@mail.gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 03 Sep 2013 16:21:10 +0100
+Subject: [PULL REQUEST] big-endian updates for ARM
+In-Reply-To: <20130903145529.631ae5cb@skate>
+References: <20130903101332.GA26613@localhost.localdomain>
+ <5225C714.3090504@codethink.co.uk> <20130903134546.5240306b@skate>
+ <5225DB5C.1070903@codethink.co.uk> <20130903145529.631ae5cb@skate>
+Message-ID: <5225FE66.9070205@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 1, 2013 at 8:15 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Define the generic R8A777x part of the Ether device node.
+On 03/09/13 13:55, Thomas Petazzoni wrote:
+> Dear Ben Dooks,
 >
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> On Tue, 03 Sep 2013 13:51:40 +0100, Ben Dooks wrote:
 >
-> ---
->  arch/arm/boot/dts/r8a7778.dtsi |   11 +++++++++++
->  1 file changed, 11 insertions(+)
+>>>> I have fixed it and now on:
+>>>>
+>>>> 	git://git.baserock.org/delta/linux baserock/311-rc7/be/core-v4
+>>>
+>>> Can you resend a proper pull request for this core-v4 branch? There has
+>>> been two fixes since the v3, the Acked-by from one of the mach-mvebu
+>>> maintainers, and my Tested-by.
+>>
+>> that was just a confirmation for Dave to test. I will sort out a new
+>> pull request later.
 >
-> Index: renesas/arch/arm/boot/dts/r8a7778.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7778.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7778.dtsi
-> @@ -98,4 +98,15 @@
->                 reg = <0xfffc000 0x118>;
->                 #gpio-range-cells = <3>;
->         };
-> +
-> +       ether: ethernet at fde00000 {
-> +               device_type = "network";
-> +               compatible = "renesas,ether-r8a7779";
+> Excellent, thanks!
+>
+> Thomas
 
-Hi Sergei,
+Out of interest, should all patches in the series have the
+Tested-by line added to them, or just the top-level pull request?
 
-Thanks for your patch. What's the reason behind the r8a7778 SoC using
-a compatible string for r8a7779 like "renesas,ether-r8a7779"?
 
-It seems that you assume that the r8a7778 ethernet controller is 100%
-compatible with r8a7779. Is that really true? For earlier versions the
-sh_eth hardware documentation was anything but accurate, so it seems
-to me that it must be more safe that r8a7778 would be using
-"renesas,ether-r8a7778". What do you think?
-
-Thanks,
-
-/ magnus
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
