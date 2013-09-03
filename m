@@ -1,56 +1,77 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 3 Sep 2013 08:50:30 -0700
-Subject: [PATCH v11 0/8] PHY framework
-In-Reply-To: <5225FF63.6080608@ti.com>
-References: <1377063973-22044-1-git-send-email-kishon@ti.com>
- <521B0E79.6060506@ti.com> <20130827192059.GZ3005@radagast>
- <5225FF63.6080608@ti.com>
-Message-ID: <20130903155030.GA21525@kroah.com>
+From: andre.przywara@linaro.org (Andre Przywara)
+Date: Tue, 03 Sep 2013 17:53:44 +0200
+Subject: [PROPOSAL] ARM/FDT: passing multiple binaries to a kernel
+Message-ID: <52260608.2030202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 03, 2013 at 08:55:23PM +0530, Kishon Vijay Abraham I wrote:
-> Hi Greg,
-> 
-> On Wednesday 28 August 2013 12:50 AM, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Mon, Aug 26, 2013 at 01:44:49PM +0530, Kishon Vijay Abraham I wrote:
-> >> On Wednesday 21 August 2013 11:16 AM, Kishon Vijay Abraham I wrote:
-> >>> Added a generic PHY framework that provides a set of APIs for the PHY drivers
-> >>> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
-> >>> the PHY with or without using phandle.
-> >>>
-> >>> This framework will be of use only to devices that uses external PHY (PHY
-> >>> functionality is not embedded within the controller).
-> >>>
-> >>> The intention of creating this framework is to bring the phy drivers spread
-> >>> all over the Linux kernel to drivers/phy to increase code re-use and to
-> >>> increase code maintainability.
-> >>>
-> >>> Comments to make PHY as bus wasn't done because PHY devices can be part of
-> >>> other bus and making a same device attached to multiple bus leads to bad
-> >>> design.
-> >>>
-> >>> If the PHY driver has to send notification on connect/disconnect, the PHY
-> >>> driver should make use of the extcon framework. Using this susbsystem
-> >>> to use extcon framwork will have to be analysed.
-> >>>
-> >>> You can find this patch series @
-> >>> git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
-> >>
-> >> Looks like there are not further comments on this series. Can you take this in
-> >> your misc tree?
-> > 
-> > Do you want me to queue these for you ? There are quite a few users for
-> > this framework already and I know of at least 2 others which will show
-> > up for v3.13.
-> 
-> Can you queue this patch series? There are quite a few users already for this
-> framework.
+Hi,
 
-It will have to wait for 3.13 as the merge window for new features has
-been closed for a week or so.  Sorry, I'll queue this up after 3.12-rc1
-is out.
+a normal Linux kernel currently supports reading the start and end 
+address of a single binary blob via the FDT's /chosen node.
+This will be interpreted as the location of an initial RAM disk.
 
-greg k-h
+The Xen hypervisor itself is a kernel, but needs up to _two_ binaries 
+for proper operation: a Dom0 Linux kernel and it's associated initrd.
+On x86 this is solved via the multiboot protocol used by the Grub 
+bootloader, which supports to pass an arbitrary number of binary modules 
+to any kernel.
+
+Since in the ARM world we have the versatile device tree, we don't need 
+to implement the mulitboot protocol.
+
+So I'd like to propose a new binding which denotes binary modules a 
+kernel can use at it's own discretion.
+The need is triggered by the Xen hypervisor (which already uses a very 
+similar scheme), but the approach is deliberately chosen to be as 
+generic as possible to allow future uses (like passing firmware blobs 
+for devices or the like).
+Credits for this go to Ian Campbell, who started something very similar 
+[1] for the Xen hypervisor. The intention of this proposal is to make 
+this generic and publicly documented.
+
+Looking forward to any comments!
+
+Thanks,
+Andre.
+
+[1] 
+http://xenbits.xen.org/gitweb/?p=xen.git;a=blob;f=docs/misc/arm/device-tree/booting.txt;h=94cd3f18a4e1317a35e1255bf5c6e1e091001d1a;hb=HEAD
+----------------------------
+* Multiple boot modules device tree bindings
+
+Boot loaders wanting to pass multiple additional binaries to a kernel 
+shall add a node "module" for each binary blob under the /chosen node 
+with the following properties:
+
+- compatible:
+     compatible = "boot,module";
+   A bootloader may add names to more specifically describe the module,
+   e.g. Xen may use "xen,dom0-kernel" or "xen,dom0-ramdisk".
+   If possible a kernel should be able to use modules even without a
+   descriptive naming, by enumerating them in order and using hard-coded
+   meanings for each module (e.g. first is kernel, second is initrd).
+
+- reg: specifies the base physical address and size of a region in
+   memory where the bootloader loaded the respective binary data to.
+
+- bootargs:
+   An optional property describing arguments to use for this module.
+   Could be a command line or configuration data.
+
+Example:
+/chosen {
+     #size-cells = <0x1>;
+     #address-cells = <0x1>;
+     module at 0 {
+         compatible = "xen,linux-zimage", "xen,multiboot-module", 
+"boot,module";
+         reg = <0x80000000 0x003dcff8>;
+         bootargs = "console=hvc0 earlyprintk ro root=/dev/sda1 nosmp";
+     };
+     module at 1 {
+         compatible = "xen,linux-initrd", "xen,multiboot-module", 
+"boot,module";
+         reg = <0x08000000 0x00123456>;
+     };
+...
