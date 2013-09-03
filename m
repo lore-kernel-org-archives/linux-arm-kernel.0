@@ -1,47 +1,47 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Tue, 3 Sep 2013 23:39:05 +0300
-Subject: [PATCH v3 1/2] dmaengine: add interface of dma_get_slave_channel
-In-Reply-To: <521C0940.9000408@linaro.org>
-References: <1376550163-30145-1-git-send-email-zhangfei.gao@linaro.org>
- <1376550163-30145-2-git-send-email-zhangfei.gao@linaro.org>
- <20130819052516.GT32147@intel.com>
- <CAMj5Bkhq=kvfpYiMX0de3PBaAzOUfgPVELamaeMAWhHaoDgc8g@mail.gmail.com>
- <20130820081348.GV4713@mwanda> <521C0940.9000408@linaro.org>
-Message-ID: <20130903203905.GA21040@mwanda>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 03 Sep 2013 13:42:07 -0700
+Subject: [PATCH] clk: Move symbol export to proper location
+In-Reply-To: <1378194231-26828-1-git-send-email-treding@nvidia.com>
+References: <1378194231-26828-1-git-send-email-treding@nvidia.com>
+Message-ID: <20130903204207.10934.53389@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 27, 2013 at 10:04:48AM +0800, zhangfei wrote:
-> On 13-08-20 04:13 PM, Dan Carpenter wrote:
-> >On Tue, Aug 20, 2013 at 03:58:41PM +0800, zhangfei gao wrote:
-> >
-> >>BTW, it is strange I do not see such compile warning here :(
-> >
-> >This was a Smatch static checker warning, not a regular build
-> >warning.
-> >
-> >regards,
-> >dan carpenter
-> >
-> Dear Dan
+Quoting Thierry Reding (2013-09-03 00:43:51)
+> The __clk_get_flags() symbol is exported immediately following the
+> clk_unprepare_unused_subtree() function. This is unusual, since a symbol
+> export typically follows body of the function that it exports.
 > 
-> Thanks for introducing this valuable tool.
-> Have download from git://repo.or.cz/smatch.git
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+
+Thanks for the cleanup. Applied.
+
+Regards,
+Mike
+
+> ---
+>  drivers/clk/clk.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> When trying use this tool, could get some warning,
-> make CHECK="~/bin/smatch -p=kernel --no-data" C=1 | tee warns.txt
-> 
-> Also some strange warning, like "SQL error #2: no such table:
-> caller_info", is it ignored?
-> 
-
-Oops.  I'll fix that.  The problem is that I don't normally test with
---no-data.  Sorry about that.
-
-> Besides, when test this case for check smatch setting.
-> Still not reproduce the issue, should be not config correct?
-
-This warning requires that the cross function database be set up.
-
-regards,
-dan carpenter
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 2db08c0..b49c9ee 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -458,7 +458,6 @@ static void clk_unprepare_unused_subtree(struct clk *clk)
+>                         clk->ops->unprepare(clk->hw);
+>         }
+>  }
+> -EXPORT_SYMBOL_GPL(__clk_get_flags);
+>  
+>  /* caller must hold prepare_lock */
+>  static void clk_disable_unused_subtree(struct clk *clk)
+> @@ -607,6 +606,7 @@ unsigned long __clk_get_flags(struct clk *clk)
+>  {
+>         return !clk ? 0 : clk->flags;
+>  }
+> +EXPORT_SYMBOL_GPL(__clk_get_flags);
+>  
+>  bool __clk_is_prepared(struct clk *clk)
+>  {
+> -- 
+> 1.8.4
