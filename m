@@ -1,51 +1,43 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 03 Sep 2013 12:36:06 -0600
+Date: Tue, 03 Sep 2013 12:40:20 -0600
 Subject: [PATCH v4 1/5] ARM: add basic Trusted Foundations support
-In-Reply-To: <CAAVeFuJ=z-29gp9=caQaxRGCiOQSnPLfafia3eCgWAUuny3GBg@mail.gmail.com>
+In-Reply-To: <1377770268-14014-2-git-send-email-acourbot@nvidia.com>
 References: <1377770268-14014-1-git-send-email-acourbot@nvidia.com>
  <1377770268-14014-2-git-send-email-acourbot@nvidia.com>
- <2081838.eZHRxlDf7s@flatron>
- <CAAVeFuJ=z-29gp9=caQaxRGCiOQSnPLfafia3eCgWAUuny3GBg@mail.gmail.com>
-Message-ID: <52262C16.3020406@wwwdotorg.org>
+Message-ID: <52262D14.4000907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2013 01:28 AM, Alexandre Courbot wrote:
-> Hi Tomasz!
-> 
-> On Fri, Aug 30, 2013 at 5:20 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>> +Required properties:
->>> +- compatible : "tl,trusted-foundations"
->>> +- version-major : major version number of Trusted Foundations firmware
->>> +- version-minor: minor version number of Trusted Foundations firmware
->>
->> Hmm, maybe you could simply define a single version property that could
->> have multiple cells? Like:
->>
->>         firmware {
->>                 compatible = "tl,trusted-foundations";
->>                 version = <2 8>;
->>         };
-> 
-> I'm fine this way too, but do we have other bindings that use the same
-> scheme? What is the general convention for version number bindings?
+On 08/29/2013 03:57 AM, Alexandre Courbot wrote:
+> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+> can be invoked  using a consistent smc-based API on all supported
 
-I don't know if there are enough cases of this for there to be a
-convention. A 2-cell property seems fine to me.
+Nit: s/smc/SMC/?
 
->>> +       This option allows the kernel to invoke the secure monitor whenever
->>> +       required on devices using Trusted Foundations.
->>> +
->>> +       Devices using Trusted Foundations should pass a device tree
->>> containing +    a node compatible with "tl,trusted-foundations" to
->>> signal the presence +   of the secure monitor.
->>
->> What about pointing to the documentation file instead?
-> 
-> Yes, that would make more sense.
+> diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
 
-Possibly. What about when the binding document is no longer part of the
-kernel though? Perhaps we could reference the documentation in some way
-other than by the pathname within the kernel source tree though, e.g.
-'see the device tree binding documentation for
-compatible="tl,trusted-foundations"'?
+> +#if IS_ENABLED(CONFIG_TRUSTED_FOUNDATIONS)
+> +
+> +void register_trusted_foundations(struct trusted_foundations_platform_data *pd);
+> +void of_register_trusted_foundations(void);
+> +
+> +#else
+> +
+> +static inline void register_trusted_foundations(
+> +				   struct trusted_foundations_platform_data *pd)
+> +{
+> +	pr_crit("No support for Trusted Foundations, stopping...\n");
+> +	BUG();
+> +}
+> +
+> +static inline void of_register_trusted_foundations(void)
+> +{
+> +	register_trusted_foundations(NULL);
+
+That will cause a hard-fail. I assume that should only happen if the TL
+DT node is present; if there's no DT node, it's fine for a kernel
+without any TL support to run.
+
+> +}
+> +
+> +#endif /* IS_ENABLED(CONFIG_TRUSTED_FOUNDATIONS) */
