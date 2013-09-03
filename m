@@ -1,51 +1,32 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 3 Sep 2013 20:55:23 +0530
-Subject: [PATCH v11 0/8] PHY framework
-In-Reply-To: <20130827192059.GZ3005@radagast>
-References: <1377063973-22044-1-git-send-email-kishon@ti.com>
- <521B0E79.6060506@ti.com> <20130827192059.GZ3005@radagast>
-Message-ID: <5225FF63.6080608@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 3 Sep 2013 17:29:38 +0200
+Subject: [PULL REQUEST] big-endian updates for ARM
+In-Reply-To: <5225FE66.9070205@codethink.co.uk>
+References: <20130903101332.GA26613@localhost.localdomain>
+ <5225C714.3090504@codethink.co.uk> <20130903134546.5240306b@skate>
+ <5225DB5C.1070903@codethink.co.uk> <20130903145529.631ae5cb@skate>
+ <5225FE66.9070205@codethink.co.uk>
+Message-ID: <20130903172938.1244acc9@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Dear Ben Dooks,
 
-On Wednesday 28 August 2013 12:50 AM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Mon, Aug 26, 2013 at 01:44:49PM +0530, Kishon Vijay Abraham I wrote:
->> On Wednesday 21 August 2013 11:16 AM, Kishon Vijay Abraham I wrote:
->>> Added a generic PHY framework that provides a set of APIs for the PHY drivers
->>> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
->>> the PHY with or without using phandle.
->>>
->>> This framework will be of use only to devices that uses external PHY (PHY
->>> functionality is not embedded within the controller).
->>>
->>> The intention of creating this framework is to bring the phy drivers spread
->>> all over the Linux kernel to drivers/phy to increase code re-use and to
->>> increase code maintainability.
->>>
->>> Comments to make PHY as bus wasn't done because PHY devices can be part of
->>> other bus and making a same device attached to multiple bus leads to bad
->>> design.
->>>
->>> If the PHY driver has to send notification on connect/disconnect, the PHY
->>> driver should make use of the extcon framework. Using this susbsystem
->>> to use extcon framwork will have to be analysed.
->>>
->>> You can find this patch series @
->>> git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
->>
->> Looks like there are not further comments on this series. Can you take this in
->> your misc tree?
-> 
-> Do you want me to queue these for you ? There are quite a few users for
-> this framework already and I know of at least 2 others which will show
-> up for v3.13.
+On Tue, 03 Sep 2013 16:21:10 +0100, Ben Dooks wrote:
 
-Can you queue this patch series? There are quite a few users already for this
-framework.
+> Out of interest, should all patches in the series have the
+> Tested-by line added to them, or just the top-level pull request?
 
-Thanks
-Kishon
+I believe the Tested-by normall goes to the individual patches.
+However, my testing on Armada XP obviously didn't exercise all the
+patches (I haven't tested modules, I haven't used the bpf_jit thing, I
+haven't tested the twd, smp_scu and pl01x fixes, etc.).
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
