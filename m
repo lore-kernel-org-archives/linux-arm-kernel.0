@@ -1,65 +1,42 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 3 Sep 2013 09:51:11 -0300
-Subject: [PATCH v3 0/5] Armada XP clocks for timer
-In-Reply-To: <20130903124633.GI19598@titan.lakedaemon.net>
-References: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130827085242.GB2286@localhost>
- <20130902142625.GA15975@localhost>
- <20130903124633.GI19598@titan.lakedaemon.net>
-Message-ID: <20130903125110.GA3389@localhost>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 03 Sep 2013 13:51:40 +0100
+Subject: [PULL REQUEST] big-endian updates for ARM
+In-Reply-To: <20130903134546.5240306b@skate>
+References: <20130903101332.GA26613@localhost.localdomain>
+ <5225C714.3090504@codethink.co.uk> <20130903134546.5240306b@skate>
+Message-ID: <5225DB5C.1070903@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 03, 2013 at 08:46:33AM -0400, Jason Cooper wrote:
-> On Mon, Sep 02, 2013 at 11:26:26AM -0300, Ezequiel Garcia wrote:
-> > On Tue, Aug 27, 2013 at 05:52:42AM -0300, Ezequiel Garcia wrote:
-> > > Hi Jason and Daniel:
-> > > 
-> > > (I forgot to Cc Daniel on these series, sorry about that!)
-> > > 
-> > > So, now that we have all the acks we need...
-> > > 
-> > > On Tue, Aug 20, 2013 at 12:45:49PM -0300, Ezequiel Garcia wrote:
-> > > [...]
-> > > > 
-> > > > Ezequiel Garcia (5):
-> > > >   ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
-> > > >   ARM: mvebu: Add clock properties to Armada XP timer node
-> > > 
-> > > Jason: I assume these are ready to get merged through mvebu, right?
-> > > 
-> > > >   clocksource: armada-370-xp: Replace WARN_ON with BUG_ON
-> > > >   clocksource: armada-370-xp: Get reference fixed-clock by name
-> > > >   clocksource: armada-370-xp: Add detailed clock requirements in
-> > > >     devicetree binding
-> > > > 
-> > > 
-> > > Daniel: Will you pick these?
-> > > 
-> > > BTW: Is there any chance you can add your clocksource tree to linux-next?
-> > > 
-> > > Otherwise, our linux-next builds fail to boot whenever Jason pick some
-> > > mvebu commits and therefore appears in linux-next, but the corresponding
-> > > clocksource commit is taken by you and missing from linux-next.
-> > > 
-> > 
-> > Daniel,
-> > 
-> > Any updates on this? The merge is really close now, and I'd like
-> > to know if you're going to pick these (and where!) for v3.12.
-> > 
-> > Notice that Jason already took the devicetree patches, so unless
-> > you merge the clocksource driver changes for v3.12, we'll have
-> > to revert the former.
-> 
-> I saw Daniel's pull, so I just sent the last pull for mvebu/dt including
-> these changes.
-> 
+On 03/09/13 12:45, Thomas Petazzoni wrote:
+> Dear Ben Dooks,
+>
+> On Tue, 03 Sep 2013 12:25:08 +0100, Ben Dooks wrote:
+>
+>> Sorry, I thought that had been fixed, thanks for reminding me.
+>>
+>> I have fixed it and now on:
+>>
+>> 	git://git.baserock.org/delta/linux baserock/311-rc7/be/core-v4
+>
+> Can you resend a proper pull request for this core-v4 branch? There has
+> been two fixes since the v3, the Acked-by from one of the mach-mvebu
+> maintainers, and my Tested-by.
 
-Aweseome.
+that was just a confirmation for Dave to test. I will sort out a new
+pull request later.
 
-Thanks,
+> Also, as indicated on IRC, I confirm that this patch set also works on
+> Armada 370. It doesn't work on one particular Armada 370 board that I
+> have, but it's using an old bootloader that may be the cause of the
+> issue. The BE kernel works fine on the two other Armada 370 boards I've
+> tested.
+>
+> Thanks!
+>
+> Thomas
+
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
