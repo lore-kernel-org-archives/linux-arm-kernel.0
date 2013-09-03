@@ -1,180 +1,72 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 3 Sep 2013 09:38:15 +0530
-Subject: [PATCH v4 2/6] dma: edma: Write out and handle MAX_NR_SG at a
- given time
-In-Reply-To: <1377817545-18015-3-git-send-email-joelf@ti.com>
-References: <1377817545-18015-1-git-send-email-joelf@ti.com>
- <1377817545-18015-3-git-send-email-joelf@ti.com>
-Message-ID: <20130903040815.GC15824@intel.com>
+From: B47053@freescale.com (Xiubo Li-B47053)
+Date: Tue, 3 Sep 2013 05:25:05 +0000
+Subject: [PATCH 4/4] Documentation: Add device tree bindings for
+ Freescale FTM PWM
+In-Reply-To: <5220FC8C.90908@wwwdotorg.org>
+References: <1377054462-6283-1-git-send-email-Li.Xiubo@freescale.com>
+ <1377054462-6283-5-git-send-email-Li.Xiubo@freescale.com>
+ <5EFBF478-CFCC-4E66-A279-25F4A338B05B@kernel.crashing.org>
+ <5220FC8C.90908@wwwdotorg.org>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F827F7CCF@039-SN2MPN1-011.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 06:05:41PM -0500, Joel Fernandes wrote:
-> Process SG-elements in batches of MAX_NR_SG if they are greater
-> than MAX_NR_SG. Due to this, at any given time only those many
-> slots will be used in the given channel no matter how long the
-> scatter list is. We keep track of how much has been written
-> inorder to process the next batch of elements in the scatter-list
-> and detect completion.
+> Subject: Re: [PATCH 4/4] Documentation: Add device tree bindings for
+> Freescale FTM PWM
 > 
-> For such intermediate transfer completions (one batch of MAX_NR_SG),
-> make use of pause and resume functions instead of start and stop
-> when such intermediate transfer is in progress or completed as we
-> donot want to clear any pending events.
+> On 08/30/2013 01:19 PM, Kumar Gala wrote:
+> > Should have at least something w/regards to a commit message.
+> >
+> > On Aug 20, 2013, at 10:07 PM, Xiubo Li wrote:
+> >
+> >> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> >> ---
+> >> .../devicetree/bindings/pwm/fsl-ftm-pwm.txt        | 52
+> ++++++++++++++++++++++
+> >> 1 file changed, 52 insertions(+)
+> >> create mode 100644
+> >> Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
+> >> b/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
+> >> new file mode 100644
+> >> index 0000000..698965b
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/pwm/fsl-ftm-pwm.txt
+> >> @@ -0,0 +1,52 @@
+> >> +Freescale FTM PWM controller
+> >> +
+> >> +Required properties:
+> >> +- compatible: should be "fsl,vf610-ftm-pwm"
+> >> +- reg: physical base address and length of the controller's
+> >> +registers
+> >> +- #pwm-cells: Should be 3. Number of cells being used to specify PWM
+> property.
+> >> +  First cell specifies the per-chip channel index of the PWM to use,
+> >> +the
+> >> +  second cell is the period in nanoseconds and bit 0 in the third
+> >> +cell is
+> >> +  used to encode the polarity of PWM output. Set bit 0 of the third
+> >> +in PWM
+> >> +  specifier to 1 for inverse polarity & set to 0 for normal polarity.
+> >> +- fsl,pwm-clk-ps: the ftm0 pwm clock's prescaler, divide-by 2^n(n = 0
+> ~ 7).
+> >> +- fsl,pwm-cpwm: Center-Aligned PWM (CPWM) mode.
+> >
+> > Should describe this in more detail, what does the value actually mean
+> for what modes there are?
 > 
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
-> ---
->  drivers/dma/edma.c | 79 ++++++++++++++++++++++++++++++++++++------------------
->  1 file changed, 53 insertions(+), 26 deletions(-)
-> 
-> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-> index e522ad5..732829b 100644
-> --- a/drivers/dma/edma.c
-> +++ b/drivers/dma/edma.c
-> @@ -56,6 +56,7 @@ struct edma_desc {
->  	struct list_head		node;
->  	int				absync;
->  	int				pset_nr;
-> +	int				processed;
->  	struct edmacc_param		pset[0];
->  };
->  
-> @@ -104,22 +105,34 @@ static void edma_desc_free(struct virt_dma_desc *vdesc)
->  /* Dispatch a queued descriptor to the controller (caller holds lock) */
->  static void edma_execute(struct edma_chan *echan)
->  {
-> -	struct virt_dma_desc *vdesc = vchan_next_desc(&echan->vchan);
-> +	struct virt_dma_desc *vdesc;
->  	struct edma_desc *edesc;
-> -	int i;
-> -
-> -	if (!vdesc) {
-> -		echan->edesc = NULL;
-> -		return;
-> +	struct device *dev = echan->vchan.chan.device->dev;
-> +	int i, j, left, nslots;
-> +
-> +	/* If either we processed all psets or we're still not started */
-> +	if (!echan->edesc ||
-> +	    echan->edesc->pset_nr == echan->edesc->processed) {
-> +		/* Get next vdesc */
-> +		vdesc = vchan_next_desc(&echan->vchan);
-> +		if (!vdesc) {
-> +			echan->edesc = NULL;
-> +			return;
-> +		}
-> +		list_del(&vdesc->node);
-> +		echan->edesc = to_edma_desc(&vdesc->tx);
->  	}
->  
-> -	list_del(&vdesc->node);
-> +	edesc = echan->edesc;
->  
-> -	echan->edesc = edesc = to_edma_desc(&vdesc->tx);
-> +	/* Find out how many left */
-> +	left = edesc->pset_nr - edesc->processed;
-> +	nslots = min(MAX_NR_SG, left);
->  
->  	/* Write descriptor PaRAM set(s) */
-> -	for (i = 0; i < edesc->pset_nr; i++) {
-> -		edma_write_slot(echan->slot[i], &edesc->pset[i]);
-> +	for (i = 0; i < nslots; i++) {
-> +		j = i + edesc->processed;
-> +		edma_write_slot(echan->slot[i], &edesc->pset[j]);
->  		dev_dbg(echan->vchan.chan.device->dev,
->  			"\n pset[%d]:\n"
->  			"  chnum\t%d\n"
-> @@ -132,24 +145,31 @@ static void edma_execute(struct edma_chan *echan)
->  			"  bidx\t%08x\n"
->  			"  cidx\t%08x\n"
->  			"  lkrld\t%08x\n",
-> -			i, echan->ch_num, echan->slot[i],
-> -			edesc->pset[i].opt,
-> -			edesc->pset[i].src,
-> -			edesc->pset[i].dst,
-> -			edesc->pset[i].a_b_cnt,
-> -			edesc->pset[i].ccnt,
-> -			edesc->pset[i].src_dst_bidx,
-> -			edesc->pset[i].src_dst_cidx,
-> -			edesc->pset[i].link_bcntrld);
-> +			j, echan->ch_num, echan->slot[i],
-> +			edesc->pset[j].opt,
-> +			edesc->pset[j].src,
-> +			edesc->pset[j].dst,
-> +			edesc->pset[j].a_b_cnt,
-> +			edesc->pset[j].ccnt,
-> +			edesc->pset[j].src_dst_bidx,
-> +			edesc->pset[j].src_dst_cidx,
-> +			edesc->pset[j].link_bcntrld);
->  		/* Link to the previous slot if not the last set */
-> -		if (i != (edesc->pset_nr - 1))
-> +		if (i != (nslots - 1))
->  			edma_link(echan->slot[i], echan->slot[i+1]);
->  		/* Final pset links to the dummy pset */
->  		else
->  			edma_link(echan->slot[i], echan->ecc->dummy_slot);
->  	}
->  
-> -	edma_start(echan->ch_num);
-> +	edesc->processed += nslots;
-> +
-> +	edma_resume(echan->ch_num);
-> +
-> +	if (edesc->processed <= MAX_NR_SG) {
-> +		dev_dbg(dev, "first transfer starting %d\n", echan->ch_num);
-> +		edma_start(echan->ch_num);
-> +	}
->  }
->  
->  static int edma_terminate_all(struct edma_chan *echan)
-> @@ -368,19 +388,26 @@ static void edma_callback(unsigned ch_num, u16 ch_status, void *data)
->  	struct edma_desc *edesc;
->  	unsigned long flags;
->  
-> -	/* Stop the channel */
-> -	edma_stop(echan->ch_num);
-> +	/* Pause the channel */
-> +	edma_pause(echan->ch_num);
->  
->  	switch (ch_status) {
->  	case DMA_COMPLETE:
-> -		dev_dbg(dev, "transfer complete on channel %d\n", ch_num);
-> -
->  		spin_lock_irqsave(&echan->vchan.lock, flags);
->  
->  		edesc = echan->edesc;
->  		if (edesc) {
-> +			if (edesc->processed == edesc->pset_nr) {
-> +				dev_dbg(dev, "transfer complete." \
-> +					" stopping channel %d\n", ch_num);
-> +				edma_stop(echan->ch_num);
-> +				vchan_cookie_complete(&edesc->vdesc);
-> +			} else {
-> +				dev_dbg(dev, "Intermediate transfer complete" \
-> +					" on channel %d\n", ch_num);
-No, these two not right... Consider someone seeing this message will try to
-grep "transfer complete stopping channel" and will fail miserable to find the
-offending line. And this makes it uglier...
+> Assuming "CPWM" is clearly explained in the HW documentation for this
+> chip (I have no idea if that's actually the case), then is it still
+> necessary to explain what this means in *detail*? Perhaps simply "see
+> section XXX in the TRM" or "see register XXX, bit YYY in the HW
+> documentation" would be enough?
+>
+If to clearly explain the 'CPWM' mode, there maybe need much more words, I think just simply explain it, and then for more detail information "see section XXX in the TRM" or "see register XXX, bit YYY in HW documentation".
 
-Also I believe checkpatch has this check, don't you run that before sending
-patches?
 
-Quoting CodingStyle:
+Thanks.
 
-                Chapter 2: Breaking long lines and strings
-
-Coding style is all about readability and maintainability using commonly
-available tools.
-
-The limit on the length of lines is 80 columns and this is a strongly
-preferred limit.
-
-Statements longer than 80 columns will be broken into sensible chunks, unless
-exceeding 80 columns significantly increases readability and does not hide
-information. Descendants are always substantially shorter than the parent and
-are placed substantially to the right. The same applies to function headers
-with a long argument list. However, never break user-visible strings such as
-printk messages, because that breaks the ability to grep for them.
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-~Vinod
+--
+Best Regards,
+Xiubo
