@@ -1,64 +1,18 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Sep 2013 09:21:51 -0700
-Subject: [GIT PULL V2 2/2] ARM: mvebu: MSI mvebu changes for v3.12
-In-Reply-To: <20130903154708.GJ19598@titan.lakedaemon.net>
-References: <20130814191011.GD13964@titan.lakedaemon.net>
- <20130814192317.GE13964@titan.lakedaemon.net>
- <20130830202526.GW19598@titan.lakedaemon.net>
- <CAOesGMhRJjB9veSVMYHMFPqWYeMd8n9YcnKVtZxav1vyfKnbhw@mail.gmail.com>
- <20130903154708.GJ19598@titan.lakedaemon.net>
-Message-ID: <CAOesGMiLURZGhHTh15QsLRFoY8iJU4QC36FrGUsd5jUu9JMm7Q@mail.gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Tue, 03 Sep 2013 09:34:20 -0700
+Subject: [ARM ATTEND] DT from the driver perspective
+Message-ID: <52260F8C.6060108@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+I would like to request an invite to the ARM Kernel Summit.
 
-No code is lost, no code is rejected, it's just going to wait for 3.13.
+I have seen a lot of documentation, discussion, and presentations on what the
+.dts files should look like, but very little on how drivers should use the
+device tree API.  As I am diving into the device tree world with some hardware
+with many layers of dependencies and cross function interactions I am finding
+that the device tree implementation is not as complete and robust as I had
+expected.  Of course, I am also interested in discussions about .dts files.
 
-Stirring up drama over this is just going to be counterproductive for
-all parties.
-
-
--Olof
-
-On Tue, Sep 3, 2013 at 8:47 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Tue, Sep 03, 2013 at 08:04:51AM -0700, Olof Johansson wrote:
->> On Fri, Aug 30, 2013 at 1:25 PM, Jason Cooper <jason@lakedaemon.net> wrote:
->> > Arnd, Olof,
->> >
->> > As requested, rebased on top of mvebu/drivers to resolve conflicts
->> > internally.
->>
->> Sorry, I didn't have a chance to pull this in before the last -next
->> before the merge window (which was already very late), so it'll have
->> to wait for 3.13. Please send a fresh pull request of this branch once
->> -rc1 is out.
->
-> I'm sorry Olof, but I have to call bullshit.  I originally sent this
-> pull-request on August 14th (3 _weeks_ ago):
->
-> http://www.spinics.net/lists/arm-kernel/msg267243.html
->
-> I heard crickets until your reply on August 29th (2 _weeks_ later):
->
-> http://www.spinics.net/lists/arm-kernel/msg270826.html
->
-> Which I respun and resent within a day on August 30th:
->
-> http://www.spinics.net/lists/arm-kernel/msg271170.html
->
->
-> Also, these patches were in -next for at least a week _before_ I sent my
-> first pull request on August 14th.  So they've been tested for
-> _four_weeks_ ...
->
-> I understand you're busy with other work, like all of us, but it would
-> seem that the baton passing between you, Arnd, and Kevin could use some
-> tweaking.
->
-> The situation is the exact same for the dove branch.
->
->
-> :(
->
-> Jason.
+-Frank Rowand
+Sony Mobile Communications
