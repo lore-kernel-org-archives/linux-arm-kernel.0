@@ -1,111 +1,63 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Tue,  3 Sep 2013 12:23:53 -0700
-Subject: [PATCH] pwm: pxa: add device tree support to pwm driver
-Message-ID: <1378236233-15637-1-git-send-email-mikedunn@newsguy.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 3 Sep 2013 15:26:32 -0400
+Subject: [PATCH v3 0/5] Armada XP clocks for timer
+In-Reply-To: <20130903124633.GI19598@titan.lakedaemon.net>
+References: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130827085242.GB2286@localhost>
+ <20130902142625.GA15975@localhost>
+ <20130903124633.GI19598@titan.lakedaemon.net>
+Message-ID: <20130903192632.GM19598@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree support to the pxa's pwm driver.  Only an OF match
-table is added; nothing needs to be extracted from the device tree node.  The
-existing platform_device id table is reused for the match table data.
+On Tue, Sep 03, 2013 at 08:46:33AM -0400, Jason Cooper wrote:
+> On Mon, Sep 02, 2013 at 11:26:26AM -0300, Ezequiel Garcia wrote:
+> > On Tue, Aug 27, 2013 at 05:52:42AM -0300, Ezequiel Garcia wrote:
+> > > Hi Jason and Daniel:
+> > > 
+> > > (I forgot to Cc Daniel on these series, sorry about that!)
+> > > 
+> > > So, now that we have all the acks we need...
+> > > 
+> > > On Tue, Aug 20, 2013 at 12:45:49PM -0300, Ezequiel Garcia wrote:
+> > > [...]
+> > > > 
+> > > > Ezequiel Garcia (5):
+> > > >   ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
+> > > >   ARM: mvebu: Add clock properties to Armada XP timer node
+> > > 
+> > > Jason: I assume these are ready to get merged through mvebu, right?
+> > > 
+> > > >   clocksource: armada-370-xp: Replace WARN_ON with BUG_ON
+> > > >   clocksource: armada-370-xp: Get reference fixed-clock by name
+> > > >   clocksource: armada-370-xp: Add detailed clock requirements in
+> > > >     devicetree binding
+> > > > 
+> > > 
+> > > Daniel: Will you pick these?
+> > > 
+> > > BTW: Is there any chance you can add your clocksource tree to linux-next?
+> > > 
+> > > Otherwise, our linux-next builds fail to boot whenever Jason pick some
+> > > mvebu commits and therefore appears in linux-next, but the corresponding
+> > > clocksource commit is taken by you and missing from linux-next.
+> > > 
+> > 
+> > Daniel,
+> > 
+> > Any updates on this? The merge is really close now, and I'd like
+> > to know if you're going to pick these (and where!) for v3.12.
+> > 
+> > Notice that Jason already took the devicetree patches, so unless
+> > you merge the clocksource driver changes for v3.12, we'll have
+> > to revert the former.
+> 
+> I saw Daniel's pull, so I just sent the last pull for mvebu/dt including
+> these changes.
 
-Tested on a Palm Treo 680 (both platform data and DT cases).
+Daniel, did your changes make it in?  If so, I'll have to send these as a
+fix for -rc1...
 
-Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
----
+thx,
 
-I don't have data sheets handy for the newer Marvell pxa's (and I'm confused
-about the presence of a pwm unit on pxa25x), so only pxa27x.dtsi was updated.
-Thanks for looking!
-
- arch/arm/boot/dts/pxa27x.dtsi | 12 ++++++++++++
- drivers/pwm/pwm-pxa.c         | 31 +++++++++++++++++++++++++++++++
- 2 files changed, 43 insertions(+)
-
-diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index d7c5d72..4031dce 100644
---- a/arch/arm/boot/dts/pxa27x.dtsi
-+++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -10,5 +10,17 @@
- 			marvell,intc-priority;
- 			marvell,intc-nr-irqs = <34>;
- 		};
-+
-+		pwm0: pwm at 40b00000 {
-+			compatible = "marvell,pxa27x-pwm";
-+			reg = <0x40b00000 0x100000>;
-+			#pwm-cells = <2>;
-+		};
-+
-+		pwm1: pwm at 40c00000 {
-+			compatible = "marvell,pxa27x-pwm";
-+			reg = <0x40c00000 0x100000>;
-+			#pwm-cells = <2>;
-+		};
- 	};
- };
-diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
-index a4d2164..be5f914 100644
---- a/drivers/pwm/pwm-pxa.c
-+++ b/drivers/pwm/pwm-pxa.c
-@@ -19,6 +19,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/pwm.h>
-+#include <linux/of_device.h>
- 
- #include <asm/div64.h>
- 
-@@ -124,6 +125,30 @@ static struct pwm_ops pxa_pwm_ops = {
- 	.owner = THIS_MODULE,
- };
- 
-+#ifdef CONFIG_OF
-+/* use the platform_device id table for OF match table data */
-+static struct of_device_id pwm_of_match[] = {
-+	{ .compatible = "marvell,pxa25x-pwm", .data = &pwm_id_table[0] },
-+	{ .compatible = "marvell,pxa27x-pwm", .data = &pwm_id_table[1] },
-+	{ .compatible = "marvell,pxa168-pwm", .data = &pwm_id_table[2] },
-+	{ .compatible = "marvell,pxa910-pwm", .data = &pwm_id_table[3] },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, pwm_of_match);
-+
-+static const struct platform_device_id *pxa_pwm_get_id_dt(struct device *dev)
-+{
-+	const struct of_device_id *pwm_pxa_devid =
-+		of_match_device(pwm_of_match, dev);
-+	if (pwm_pxa_devid)
-+		return (const struct platform_device_id *)pwm_pxa_devid->data;
-+	else
-+		return NULL;
-+}
-+#else  /* !CONFIG_OF */
-+#define pxa_pwm_get_id_dt(dev) ((const struct platform_device_id *)NULL)
-+#endif
-+
- static int pwm_probe(struct platform_device *pdev)
- {
- 	const struct platform_device_id *id = platform_get_device_id(pdev);
-@@ -131,6 +156,11 @@ static int pwm_probe(struct platform_device *pdev)
- 	struct resource *r;
- 	int ret = 0;
- 
-+	if (id == NULL)		/* using device tree */
-+		id = pxa_pwm_get_id_dt(&pdev->dev);
-+	if (id == NULL)
-+		return -ENODEV;
-+
- 	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
- 	if (pwm == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate memory\n");
-@@ -176,6 +206,7 @@ static struct platform_driver pwm_driver = {
- 	.driver		= {
- 		.name	= "pxa25x-pwm",
- 		.owner	= THIS_MODULE,
-+		.of_match_table	= of_match_ptr(pwm_of_match),
- 	},
- 	.probe		= pwm_probe,
- 	.remove		= pwm_remove,
--- 
-1.8.1.5
+Jason.
