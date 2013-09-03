@@ -1,83 +1,48 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 3 Sep 2013 19:07:54 +0530
-Subject: [PATCH v2 2/3] ARM: OMAP4+: Move SRAM data to DT
-In-Reply-To: <5224C4E5.7020002@ti.com>
-References: <1377775391-13103-1-git-send-email-rnayak@ti.com>
- <1377775391-13103-3-git-send-email-rnayak@ti.com> <521F4BE9.60004@ti.com>
- <521F4D41.4010303@ti.com> <521F519E.9040204@ti.com> <521F51F6.90405@ti.com>
- <5224C4E5.7020002@ti.com>
-Message-ID: <5225E632.7010707@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Sep 2013 14:45:16 +0100
+Subject: Inte IOP Xscale updates
+In-Reply-To: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
+References: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
+Message-ID: <20130903134516.GH6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/2/2013 10:33 PM, Sekhar Nori wrote:
-> On 8/29/2013 7:21 PM, Santosh Shilimkar wrote:
->> On Thursday 29 August 2013 09:50 AM, Rajendra Nayak wrote:
->>> On Thursday 29 August 2013 07:01 PM, Santosh Shilimkar wrote:
->>>> On Thursday 29 August 2013 09:26 AM, Sekhar Nori wrote:
->>>>> On 8/29/2013 4:53 PM, Rajendra Nayak wrote:
->>>>>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->>>>>> index 22d9f2b..1ba6a77 100644
->>>>>> --- a/arch/arm/boot/dts/omap4.dtsi
->>>>>> +++ b/arch/arm/boot/dts/omap4.dtsi
->>>>>> @@ -126,6 +126,11 @@
->>>>>>  			pinctrl-single,function-mask = <0x7fff>;
->>>>>>  		};
->>>>>>  
->>>>>> +		ocmcram: ocmcram at 40304000 {
->>>>>
->>>>> This can now be changed to 0x40300000 now that you have moved to
->>>>> gen_pool_alloc()?
->>>>>
->>>> NO.
->>>> It won't work on secure devices since first 16 KB is occupied for
->>>> default configuration. Its not worth trouble also to handle
->>>> secure/non-secure considering the use of SRAM which is actually just
->>>> limited to errata. 40304000 will work for both devices.
->>>
->>> Right. Sekhar, you might have confused because of the existing buggy code
->>> in sram.c and sram.h which did this (and is removed in this series)
->>>
->>> from sram.c
->>> -----------
->>>  #define OMAP2_SRAM_PUB_PA	(OMAP2_SRAM_PA + 0xf800)
->>>  #define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
->>> -#ifdef CONFIG_OMAP4_ERRATA_I688
->>> -#define OMAP4_SRAM_PUB_PA	OMAP4_SRAM_PA
->>> -#else
->>> -#define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
->>> -#endif
->>> -#define OMAP5_SRAM_PA		0x40300000
->>>  
->>> from sram.h
->>> -----------
->>>  #define OMAP2_SRAM_PA		0x40200000
->>>  #define OMAP3_SRAM_PA           0x40200000
->>> -#ifdef CONFIG_OMAP4_ERRATA_I688
->>> -#define OMAP4_SRAM_PA		0x40304000
->>> -#define OMAP4_SRAM_VA		0xfe404000
->>> -#else
->>> -#define OMAP4_SRAM_PA		0x40300000
->>> -#endif
->>>
->>> I am not sure where the checks for CONFIG_OMAP4_ERRATA_I688
->>> came in from, but these are done, like Santosh said, to handle
->>> secure and non-secure sram across GP and HS devices and in
->>> no way related to handling errata I688.
->>>
->> The check was to ensure that with errata enabled, we don't care
->> about first 16 KB ;-)
+On Tue, Sep 03, 2013 at 02:01:45PM +0200, Linus Walleij wrote:
+> Hi XScale folks,
 > 
-> Hi Rajendra, thanks for the explanation. Other devices like AM437x which
-> have HS variants might need such adjustment too. It will be nice to
-> check that.
+> I haven't really seen any functional patches or confirmation that the
+> XScale machines in arch/arm/iop* are even booting since 2010 or
+> so.
+> 
+> Can you confirm that you boot-test these machines regularly?
+> 
+> I am worried that we maintain code that is not used or even working
+> see.
+> 
+> What are your thought about multiplatform and device tree? I am
+> pretty certain that if the iop machines were converted to device tree
+> we could collapse these machines into one directory with few files,
+> but I may be wrong.
 
-So I checked with folks working on the HS variant and what you have for
-AM437x is just fine. The secure runtime uses a different SRAM bank and
-even if there is a need to use the GP SRAM, the space will first be
-carved using gen_pool APIs on Linux. Only requirement from secure
-runtime software is physically contiguous area - which I think
-gen_pool_alloc() guarantees.
+Just because code doesn't get touched doesn't mean it doesn't work.  In
+some cases, that means that the code has reached stability.
 
-Thanks,
-Sekhar
+The IOP platforms are in regular use.  IOP platforms include such
+things as TheCUS machines such as the N2100 and others.  The two N2100s
+I have here run 3.1.8 and 3.9.5.  3.9.5 did not require any changes to
+arch/arm code for it to work - though it did require a minor change
+to the IOP watchdog driver so it would build, namely:
+
+diff --git a/drivers/watchdog/iop_wdt.c b/drivers/watchdog/iop_wdt.c
+index d964faf..3841120 100644
+--- a/drivers/watchdog/iop_wdt.c
++++ b/drivers/watchdog/iop_wdt.c
+@@ -234,7 +234,7 @@ static int __init iop_wdt_init(void)
+        /* Configure Watchdog Timeout to cause an Internal Bus (IB) Reset
+         * NOTE: An IB Reset will Reset both cores in the IOP342
+         */
+-       write_wdtsr(IOP13XX_WDTCR_IB_RESET);
++//     write_wdtsr(IOP13XX_WDTCR_IB_RESET);
+ 
+        /* Register after we have the device set up so we cannot race
+           with an open */
