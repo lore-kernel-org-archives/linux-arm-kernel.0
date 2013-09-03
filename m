@@ -1,98 +1,54 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 3 Sep 2013 20:42:36 +0800
-Subject: [PATCH] dmaengine: sirf: add dmaengine_prep_slave_single/sg
- support
-In-Reply-To: <20130903113925.GF15824@intel.com>
-References: <1377435433-23202-1-git-send-email-Baohua.Song@csr.com>
- <20130826085607.GN2748@intel.com>
- <CAGsJ_4yhVFL+j9PV-srAXdYkbEN62X18n-_+cXa+xy4wcOF7Qw@mail.gmail.com>
- <20130902062549.GG7376@intel.com>
- <CAGsJ_4w4dNOy=8HMQqy9sCL=UVWXSgADjoqBD9FmSxdoyzZ6pQ@mail.gmail.com>
- <20130903113925.GF15824@intel.com>
-Message-ID: <CAGsJ_4wpFNq7Rv3Y9keJjko70VKnsiivwpzGM2YT_pROo59Xtg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 3 Sep 2013 08:45:15 -0400
+Subject: [GIT PULL] ARM: mvebu: dt changes for v3.12 (round 2)
+Message-ID: <20130903124515.GH19598@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/9/3 Vinod Koul <vinod.koul@intel.com>:
-> On Tue, Sep 03, 2013 at 06:06:44PM +0800, Barry Song wrote:
->> 2013/9/2 Vinod Koul <vinod.koul@intel.com>:
->> > On Sun, Sep 01, 2013 at 09:02:01PM +0800, Barry Song wrote:
->> >> 2013/8/26 Vinod Koul <vinod.koul@intel.com>:
->> >> > On Sun, Aug 25, 2013 at 08:57:13PM +0800, Barry Song wrote:
->> >> >> the dma engine of sirfsoc supports interleaved mode, but if we set
->> >> >> xlen=width instead xlen<width, it will work as non-interleaved. as
->> >> >> most clients of sirf dma driver still don't need interleaved mode,
->> >> >> so here we still need to implement prep_slave_sg entry so that users
->> >> >> like uart, spi can use these APIs instead of interleaved API.
->> >> > Well in that case why dont you just create a wrapper on top of interleaved API
->> >> > to make this work without driver changes
->> >>
->> >> Vinod, do you mean using interleaved API to provide sg/single API if
->> >> specific drivers implement interleaved_dma but not implement sg_dma?
->> >>
->> >> the problem is that is difficult to set right legal sgl[i].size,
->> >> sgl[i].icg and numf for all dmaengines as that depends on specific dma
->> >> hardware limitation.
->> > The whole premise of doing the generic interleaved api was to ensure we can use
->> > any of the usuages as a case of interleaved api. Can you explain how it would be
->> > difficult?
->>
->> for example, if someone wants to do a 16Kbytes single transfer. how
->> will interleaved dma set transfer length and interval between every
->> row?
->> if it sets the transfer length to 16KB directly, the dma hardware
->> might not support such long a transfer at all.
->> so it might want to set as two 8KB transfer without interval between them.
->> 0~8KB                empty interval
->> 8KB-16KB          empty interval
->> or four 4KB transfer as
->> 0~4KB                empty interval
->> 4KB-8KB          empty interval
->> 8KB-12KB          empty interval
->> 12KB-16KB          empty interval
->>
->> the problem is we don't know the hardware limitation of every dma
->> controllers for transferring length of each row.
-> Why not:
->
-> Okay there are two ways to this
-> 1. Advertize your capablity and let client use that to break. You cna do so
-> using dma_set/get_max_seg_size().
->
+Arnd, Olof, Kevin,
 
-this way is ok. does max_seg also match with interleaved mode?
+Here's the last few changes for mvebu/dt for v3.12.  The mv64xxx-i2c
+driver changes were accepted by Wolfram, and the binding changes were
+Acked by Mark Rutland, so I added the corresponding dts changes back in.
+
+Daniel Lezcano just sent the pull including the mvebu clocksource
+changes yesterday.  While there's no build dependency between those
+changes and the dts changes here, both will be needed in order for
+v3.12-rc1 to boot.
+
+thx,
+
+Jason.
 
 
-> 2. in DMAC, nothing stops you from breaking the given sg_list into smaller
-> chunks. So if you get a buffer exceeding what you do, you cna internally split
-> to multiple descriptors and chain those to parent one.
+The following changes since commit 5d3b883071763e6448386b875f04fcb201b6e12d:
 
-this way still need hacking in dmac driver.
+  ARM: mvebu: Fix the Armada 370/XP timer compatible strings (2013-08-16 13:02:11 +0000)
 
->
->>
->> >
->> >> >> +     spin_lock_irqsave(&schan->lock, iflags);
->> >> >> +     list_for_each(l, &schan->free)
->> >> >> +             desc_cnt++;
->> >> > why dont you allocate descriptors here. That will remove this limitation..
->> >>
->> >> i understand. here sirf user scenerios will never be over the
->> >> limitation of SIRFSOC_DMA_DESCRIPTORS = 16. so i don't want to make it
->> >> too complex.
->> > I think you can make code simler by dynamically allocating and freeing
->> > descriptors...
->>
->> when do you think is the right time to free? while the whole sg
->> finished? i always think the code will be ugly.
-> when the descriptor has been completed. You allocate in prepare. Bunch of driver
-> already do so... I dont think its so complicated
+are available in the git repository at:
 
-here sirf dmac alloc all 16 desc in alloc_resoures and free all in
-free_resources. if we can move the way you said, it is fine.
-but it seems it means another separate patch for that.
->
-> ~Vinod
-> --
+  git://git.infradead.org/linux-mvebu.git tags/dt-3.12-2
 
--barry
+for you to fetch changes up to b52bc325ffc093283baf054cb690bbaeaf360d51:
+
+  ARM: dts: mvebu: Update with the new compatible string for mv64xxx-i2c (2013-09-03 12:28:54 +0000)
+
+----------------------------------------------------------------
+mvebu dt changes for v3.12 (round 2)
+
+ - mvebu
+    - add clock properties for Armada XP
+    - update compatible string for mv64xxx-i2c
+
+----------------------------------------------------------------
+Ezequiel Garcia (2):
+      ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
+      ARM: mvebu: Add clock properties to Armada XP timer node
+
+Gregory CLEMENT (1):
+      ARM: dts: mvebu: Update with the new compatible string for mv64xxx-i2c
+
+ arch/arm/boot/dts/armada-370-xp.dtsi |  2 --
+ arch/arm/boot/dts/armada-370.dtsi    |  8 ++++++++
+ arch/arm/boot/dts/armada-xp.dtsi     | 21 +++++++++++++++++++++
+ 3 files changed, 29 insertions(+), 2 deletions(-)
