@@ -1,40 +1,52 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 3 Sep 2013 18:14:28 +0200
-Subject: Unhandled prefetch abort on mirabox with 3.11-rc7
-In-Reply-To: <52260977.9090103@leahnim.org>
-References: <52253229.2050103@leahnim.org>
- <20130903104817.GE19598@titan.lakedaemon.net>
- <20130903155537.GI6617@n2100.arm.linux.org.uk>
- <52260977.9090103@leahnim.org>
-Message-ID: <20130903181428.150556af@skate>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 03 Sep 2013 17:15:42 +0100
+Subject: 3.11-rc7 big endian - atags and bootloader updates
+In-Reply-To: <20130903104027.GB26613@localhost.localdomain>
+References: <20130903104027.GB26613@localhost.localdomain>
+Message-ID: <52260B2E.3060806@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jochen De Smet,
+On 03/09/13 11:40, Dave Martin wrote:
+> On Fri, Aug 30, 2013 at 08:17:56PM +0100, Ben Dooks wrote:
+>> This series is to better support older bootloaders, especially the
+>> ones that still pass some information in the ATAGS structure used
+>> by pre-fdt booting. The series is available at:
+>>
+>> 	git://git.baserock.org/delta/linux baserock/311-rc7/be/atags-v2
+>
+> This seems a good idea, but it is a change to the boot protocol which
+> may break any existing BE bootloader today.  Are you sure this won't
+> cause problems for anyone?
 
-On Tue, 03 Sep 2013 12:08:23 -0400, Jochen De Smet wrote:
+You have to manually select it, so not really.
 
-> >>> Keep on posting the oopses though, there may be a pattern to them.
-> Another clue in the heat direction might be that with the rain the last 
-> few days things seem
-> at least a bit better, though it's probably too early to draw 
-> conclusions.  First box's been up
-> for 2 days 10 hours now, and the with this oops above 18 hours.
+> One partial solution could be to make the ATAGs endianness-agnostic.
+>
+> Since the ATAGs start with ATAG core, we know that the word at offset
+> <atags base + 4>  must have the value 0x54410001.  If we see a backwards
+> value, we know the ATAGs are wrong-endian and every word must must be
+> swabbed.
 
-Sorry if those questions have already been posted in the previous
-thread. What kind of tests / workload are you running on your Mirabox
-to trigger the crash? I might be able to get one or two Mirabox running
-here, so I could see if the problem is reproducible.
+That would be possible, I will look into that.
 
-Also, is this something you're seeing only since 3.11-rc7 ? Is the
-kernel originally provided with the Mirabox more stable ? Are earlier
-kernel versions (such as 3.10 or earlier) more stable ?
+> What to do about the zImage magic is less clear.  Up to this point,
+> BE kernels have always had backwards magic.  Changing the magic might
+> upset existing bootloaders, but I've never used a BE be bootloader, so
+> I can't really comment on that...
 
-Thanks,
+This series uses a specific configuration to change both the ATAG
+and magic if the system is meant to be big-endian, but booted on
+a little-endian system.
 
-Thomas
+>
+> Documentation/arm/Booting should also be updated to reflect any change.
+> In fact, what's already there could use clarification, since there is
+> no statement about endianness at all yet.
+
+Ok, good idea.
+
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
