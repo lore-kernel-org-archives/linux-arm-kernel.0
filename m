@@ -1,63 +1,41 @@
 From: B38611@freescale.com (Fugang Duan)
-Date: Tue, 3 Sep 2013 12:26:25 +0800
-Subject: [PATCH v2 4/4] ARM: imx6sl: config iomux-gpr1 to select clock for fec
+Date: Tue, 3 Sep 2013 12:26:23 +0800
+Subject: [PATCH v2 2/4] ARM: dts: add fec phy reset for imx6sl evk board
 In-Reply-To: <1378182385-9205-1-git-send-email-B38611@freescale.com>
 References: <1378182385-9205-1-git-send-email-B38611@freescale.com>
-Message-ID: <1378182385-9205-5-git-send-email-B38611@freescale.com>
+Message-ID: <1378182385-9205-3-git-send-email-B38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Config iomux-gpr1 to select clock source for fec system clock.
-Clear gpr1[14], gpr1[18-17] bit to select the fec clock source
-from internal anatop PLL.
+Add fec phy gpio reset for imx6sl evk board. imx6sl evk board
+use GPIO4_21 to do phy reset, so add phy-reset-gpios and
+phy-reset-duration propery initial for fec device node.
 
 Signed-off-by: Fugang Duan  <B38611@freescale.com>
 ---
- arch/arm/mach-imx/mach-imx6sl.c |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6sl-evk.dts |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index 132db26..96fb816 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -11,17 +11,38 @@
- #include <linux/irqchip.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
-+#include <linux/regmap.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+index 2886a59..c4d32a5 100644
+--- a/arch/arm/boot/dts/imx6sl-evk.dts
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -23,6 +23,8 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec_1>;
+ 	phy-mode = "rmii";
++	phy-reset-gpios = <&gpio4 21 0>; /* GPIO4_21 */
++	phy-reset-duration = <1>;
+ 	status = "okay";
+ };
  
- #include "common.h"
- 
-+static void __init imx6sl_fec_init(void)
-+{
-+	struct regmap *gpr;
-+
-+	/* set FEC clock from internal PLL clock source */
-+	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6sl-iomuxc-gpr");
-+	if (!IS_ERR(gpr)) {
-+		regmap_update_bits(gpr, IOMUXC_GPR1,
-+			IMX6SL_GPR1_FEC_CLOCK_MUX2_SEL_MASK, 0);
-+		regmap_update_bits(gpr, IOMUXC_GPR1,
-+			IMX6SL_GPR1_FEC_CLOCK_MUX1_SEL_MASK, 0);
-+	} else {
-+		pr_err("failed to find fsl,imx6sl-iomux-gpr regmap\n");
-+	}
-+}
-+
- static void __init imx6sl_init_machine(void)
- {
- 	mxc_arch_reset_init_dt();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+
-+	imx6sl_fec_init();
- }
- 
- static void __init imx6sl_init_irq(void)
+@@ -38,6 +40,7 @@
+ 				MX6SL_PAD_SD2_DAT7__GPIO5_IO00    0x17059
+ 				MX6SL_PAD_SD2_DAT6__GPIO4_IO29    0x17059
+ 				MX6SL_PAD_REF_CLK_32K__GPIO3_IO22 0x17059
++				MX6SL_PAD_FEC_TX_CLK__GPIO4_IO21  0x80000000
+ 			>;
+ 		};
+ 	};
 -- 
 1.7.1
