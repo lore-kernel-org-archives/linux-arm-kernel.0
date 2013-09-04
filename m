@@ -1,24 +1,35 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 4 Sep 2013 10:55:23 +0100
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <522697E9.1050208@freescale.com>
-References: <1377828449-18912-1-git-send-email-b32955@freescale.com>
- <522697E9.1050208@freescale.com>
-Message-ID: <20130904095523.GT3084@sirena.org.uk>
+Date: Wed, 4 Sep 2013 11:06:06 +0100
+Subject: Clock framework deadlock with external SPI clockchip
+In-Reply-To: <20130903232229.10934.60438@quantum>
+References: <52209D1D.3080102@metafoo.de> <20130903232229.10934.60438@quantum>
+Message-ID: <20130904100606.GU3084@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 04, 2013 at 10:16:09AM +0800, Huang Shijie wrote:
+On Tue, Sep 03, 2013 at 04:22:29PM -0700, Mike Turquette wrote:
+> Quoting Lars-Peter Clausen (2013-08-30 06:24:45)
 
-> Since this quadspi driver depends on the mtd code, could this driver
-> goes to the kernel by
-> the l2-mtd tree?
+> > === Clock chip driver ===        === SPI master driver ===
+> >  clk_prepare_lock()
+> >  spi_sync()
+> >    wait_for_completion(X)
 
-Why would a SPI driver depend on MTD?
+> Is there a synchronous equivalent to spi_sync()?
+
+spi_sync() is synchronous?  Obviously everything is asynchronous up to
+that point but the only way the driver can tell if the I/O completed is
+using spi_sync() or the equivalent thereof.
+
+If you're asking if there is a way of doing SPI I/O that isn't multi
+threaded then there isn't, in order to keep pushing transfers into the
+SPI controller to saturate the bus we have a high priority task to push
+more data in.  SPI buses can be quite high bandwidth in some
+applications.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130904/a0bb2746/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130904/e2ce5315/attachment-0001.sig>
