@@ -1,53 +1,94 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Wed, 04 Sep 2013 07:23:26 -0700
-Subject: [PATCH] pwm: pxa: add device tree support to pwm driver
-In-Reply-To: <201309040020.55029.marex@denx.de>
-References: <1378236233-15637-1-git-send-email-mikedunn@newsguy.com>
- <201309040020.55029.marex@denx.de>
-Message-ID: <5227425E.7030806@newsguy.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 4 Sep 2013 17:23:56 +0300
+Subject: [PATCH v2 4/4 Resend] clk: tegra114: table driven PMC clock init
+Message-ID: <1378304641-7992-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2013 03:20 PM, Marek Vasut wrote:
+This patch converts the Tegra114 PMC clock registration to be table driven
+like the periph clocks.
 
-[...]
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
 
->>
->> +#ifdef CONFIG_OF
->> +/* use the platform_device id table for OF match table data */
->> +static struct of_device_id pwm_of_match[] = {
->> +	{ .compatible = "marvell,pxa25x-pwm", .data = &pwm_id_table[0] },
->> +	{ .compatible = "marvell,pxa27x-pwm", .data = &pwm_id_table[1] },
->> +	{ .compatible = "marvell,pxa168-pwm", .data = &pwm_id_table[2] },
->> +	{ .compatible = "marvell,pxa910-pwm", .data = &pwm_id_table[3] },
->> +	{ }
->> +};
->> +MODULE_DEVICE_TABLE(of, pwm_of_match);
-> 
-> Are PXA2xx and PXA3xx PWM impleemntations not all the same ? If so, why not just 
-> stick with pxa25x-pwm only for all of the CPUs (aka. the lowest CPU model). Then 
-> the table would have but a single entry.
+Fix comment :)
 
+---
+ drivers/clk/tegra/clk-tegra114.c |   58 +++++++++++++++-----------------------
+ 1 files changed, 23 insertions(+), 35 deletions(-)
 
-I'm just echoing the existing platform_device_id table...
-
-static const struct platform_device_id pwm_id_table[] = {
-	/*   PWM    has_secondary_pwm? */
-	{ "pxa25x-pwm", 0 },
-	{ "pxa27x-pwm", HAS_SECONDARY_PWM },
-	{ "pxa168-pwm", 0 },
-	{ "pxa910-pwm", 0 },
-	{ },
-};
-MODULE_DEVICE_TABLE(platform, pwm_id_table);
-
-... so that my changes to the driver are minimal.  Yes, apparently the only
-difference is the existance of a "secondary" pwm for pxa27x.
-
-BTW, the pxa27x actually has four pwms, which is why the addition I made to
-pxa27x.dtsi has two nodes (the driver handles two pwms for each device instance
-in the pxa27x case).
-
-Thanks Marek.
-
-Mike
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index 0379a19..44ba713 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -1583,45 +1583,33 @@ static void __init tegra114_audio_clk_init(void __iomem *clk_base)
+ 	}
+ }
+ 
++static struct pmc_clk_init_data tegra_pmc_clk_init_data[] = {
++	TEGRA_INIT_PMC_CLK("clk_out_1", "extern1", clk_out1_parents, 6, 2, TEGRA114_CLK_CLK_OUT_1),
++	TEGRA_INIT_PMC_CLK("clk_out_2", "extern2", clk_out2_parents, 14, 10, TEGRA114_CLK_CLK_OUT_2),
++	TEGRA_INIT_PMC_CLK("clk_out_3", "extern3", clk_out3_parents, 22, 18, TEGRA114_CLK_CLK_OUT_3),
++};
++
+ static void __init tegra114_pmc_clk_init(void __iomem *pmc_base)
+ {
+ 	struct clk *clk;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(tegra_pmc_clk_init_data); i++) {
++		struct pmc_clk_init_data *data;
+ 
+-	/* clk_out_1 */
+-	clk = clk_register_mux(NULL, "clk_out_1_mux", clk_out1_parents,
+-			       ARRAY_SIZE(clk_out1_parents), 0,
+-			       pmc_base + PMC_CLK_OUT_CNTRL, 6, 3, 0,
+-			       &clk_out_lock);
+-	clks[TEGRA114_CLK_CLK_OUT_1_MUX] = clk;
+-	clk = clk_register_gate(NULL, "clk_out_1", "clk_out_1_mux", 0,
+-				pmc_base + PMC_CLK_OUT_CNTRL, 2, 0,
+-				&clk_out_lock);
+-	clk_register_clkdev(clk, "extern1", "clk_out_1");
+-	clks[TEGRA114_CLK_CLK_OUT_1] = clk;
+-
+-	/* clk_out_2 */
+-	clk = clk_register_mux(NULL, "clk_out_2_mux", clk_out2_parents,
+-			       ARRAY_SIZE(clk_out2_parents), 0,
+-			       pmc_base + PMC_CLK_OUT_CNTRL, 14, 3, 0,
+-			       &clk_out_lock);
+-	clks[TEGRA114_CLK_CLK_OUT_2_MUX] = clk;
+-	clk = clk_register_gate(NULL, "clk_out_2", "clk_out_2_mux", 0,
+-				pmc_base + PMC_CLK_OUT_CNTRL, 10, 0,
+-				&clk_out_lock);
+-	clk_register_clkdev(clk, "extern2", "clk_out_2");
+-	clks[TEGRA114_CLK_CLK_OUT_2] = clk;
+-
+-	/* clk_out_3 */
+-	clk = clk_register_mux(NULL, "clk_out_3_mux", clk_out3_parents,
+-			       ARRAY_SIZE(clk_out3_parents), 0,
+-			       pmc_base + PMC_CLK_OUT_CNTRL, 22, 3, 0,
+-			       &clk_out_lock);
+-	clks[TEGRA114_CLK_CLK_OUT_3_MUX] = clk;
+-	clk = clk_register_gate(NULL, "clk_out_3", "clk_out_3_mux", 0,
+-				pmc_base + PMC_CLK_OUT_CNTRL, 18, 0,
+-				&clk_out_lock);
+-	clk_register_clkdev(clk, "extern3", "clk_out_3");
+-	clks[TEGRA114_CLK_CLK_OUT_3] = clk;
++		data = &tegra_pmc_clk_init_data[i];
++
++		clk = clk_register_mux(NULL, data->mux_name, data->parents,
++				data->num_parents, 0,
++				pmc_base + PMC_CLK_OUT_CNTRL, data->mux_shift,
++				3, 0, &clk_out_lock);
++		clks[data->mux_id] = clk;
++		clk = clk_register_gate(NULL, data->gate_name, data->mux_name,
++					0, pmc_base + PMC_CLK_OUT_CNTRL,
++					data->gate_shift, 0, &clk_out_lock);
++		clks[data->gate_id] = clk;
++		clk_register_clkdev(clk, data->dev_name, data->gate_name);
++	}
+ 
+ 	/* blink */
+ 	/* clear the blink timer register to directly output clk_32k */
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
