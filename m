@@ -1,35 +1,34 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 4 Sep 2013 13:33:21 +0300
-Subject: [PATCH v3 0/5] ARM: vf610: Add DCU framebuffer driver for Vybrid
- VF610 platform
-In-Reply-To: <81BA6E5E0BC2344391CABCEE22D1B6D8403CB3@039-SN1MPN1-002.039d.mgd.msft.net>
-References: <1376553714-25922-1-git-send-email-b18965@freescale.com>
- <81BA6E5E0BC2344391CABCEE22D1B6D83F448E@039-SN1MPN1-002.039d.mgd.msft.net>
- <81BA6E5E0BC2344391CABCEE22D1B6D8403CB3@039-SN1MPN1-002.039d.mgd.msft.net>
-Message-ID: <52270C71.7080805@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Sep 2013 12:33:22 +0100
+Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
+In-Reply-To: <52270B8E.5080402@freescale.com>
+References: <1377828449-18912-1-git-send-email-b32955@freescale.com>
+ <522697E9.1050208@freescale.com>
+ <20130904095523.GT3084@sirena.org.uk>
+ <52270B8E.5080402@freescale.com>
+Message-ID: <20130904113322.GA5859@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Sep 04, 2013 at 06:29:34PM +0800, Huang Shijie wrote:
+> ? 2013?09?04? 17:55, Mark Brown ??:
+> > On Wed, Sep 04, 2013 at 10:16:09AM +0800, Huang Shijie wrote:
 
-On 03/09/13 11:21, Wang Huan-B18965 wrote:
-> Hi, Jean-Christophe, Tomi,
-> 
->       Could you please help to review these patches?
->       Thanks!
+> >> Since this quadspi driver depends on the mtd code, could this driver
+> >> goes to the kernel by
+> >> the l2-mtd tree?
 
-There seemed to be some strong opinions that there should be a drm
-driver for this hardware, instead of an fb driver. So as there seems to
-be disagreements about this, I'll leave this series to Jean-Christophe,
-who's the primary maintainer.
+> > Why would a SPI driver depend on MTD?
 
- Tomi
+> The patch 1-4 are for m25p80.c, and this quadspi controller drivers
+> depends on the
+> patch 1-4.
 
-
+In what way does the controller driver depend on those changes?
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130904/90321e33/attachment.sig>
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130904/b4e2264d/attachment.sig>
