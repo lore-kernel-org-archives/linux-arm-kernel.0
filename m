@@ -1,65 +1,67 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 4 Sep 2013 15:50:59 +0100
-Subject: [PATCH 1/1] arm64: Align an assembler string properly
-In-Reply-To: <CAC8NTUUdpUxfzn4_nrvMxj_otGmXROEKwio7DQ27BoMv0vwsAw@mail.gmail.com>
-References: <CAC8NTUWvEYpugbUfZ3A54zFbS71mnChfCk2sVKUxxxWAHz+nRw@mail.gmail.com>
- <CAC8NTUUdpUxfzn4_nrvMxj_otGmXROEKwio7DQ27BoMv0vwsAw@mail.gmail.com>
-Message-ID: <20130904145059.GC2369@localhost.localdomain>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 04 Sep 2013 17:04:33 +0200
+Subject: 3.12 merge window exynos cpufreq driver fails to build
+In-Reply-To: <CA+5PVA7T4P9vMH0r8p78aZYUrL8gzbpY9MmW9=nV3X0tE-e4NA@mail.gmail.com>
+References: <CA+5PVA6SQ9JGBD3F=u5ysch-agp91oTK8ZbKsdQkz57yZ8OUHQ@mail.gmail.com>
+ <7035644.8Kb1gDYsCf@amdc1227>
+ <CA+5PVA7T4P9vMH0r8p78aZYUrL8gzbpY9MmW9=nV3X0tE-e4NA@mail.gmail.com>
+Message-ID: <1480759.MNj1g1yX4l@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 04, 2013 at 06:22:44PM +0530, Radha Mohan wrote:
-> Hi Catalin,
-> Can you please review this?
+On Wednesday 04 of September 2013 10:41:31 Josh Boyer wrote:
+> On Wed, Sep 4, 2013 at 10:36 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+> > Hi Josh,
+> > 
+> > On Wednesday 04 of September 2013 10:13:16 Josh Boyer wrote:
+> >> Using Linus' tree as of this morning (v3.11-2654-g458c3f6), the
+> >> exynos-cpufreq driver doesn't build because it includes a file that
+> >> doesn't exist.
+> >> 
+> >> + make -s ARCH=arm V=1 -j4 bzImage KALLSYMS_EXTRA_PASS=1
+> >> arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO:
+> >> return_address should use unwind tables" [-Wcpp]
+> >> 
+> >>  #warning "TODO: return_address should use unwind tables"
+> >>  
+> >>   ^
+> >> 
+> >> arch/arm/mm/dma-mapping.c:253:2: warning: #warning ARM Coherent DMA
+> >> allocator does not (yet) support huge TLB [-Wcpp]
+> >> 
+> >>  #warning ARM Coherent DMA allocator does not (yet) support huge TLB
+> >>  
+> >>   ^
+> >> 
+> >> drivers/cpufreq/exynos-cpufreq.c:21:22: fatal error: plat/cpu.h: No
+> >> such file or directory
+> >> 
+> >>  #include <plat/cpu.h>
+> >>  
+> >>                       ^
+> >> 
+> >> compilation terminated.
+> >> make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
+> >> 
+> >> I'm guessing that <plat/cpu.h> file is supposed to come from
+> >> arch/arm/plat-samsung/include/plat/, but I don't see anything that
+> >> specifies a -I there.
+> >> 
+> >> Thoughts?
+> > 
+> > Could you attach config that could be used to trigger this? Thanks in
+> > advance.
 > 
-> regards,
-> Radha Mohan
-> 
-> On Mon, Sep 2, 2013 at 4:18 PM, Radha Mohan <mohun106@gmail.com> wrote:
-> > From: Corey Minyard <cminyard@mvista.com>
-> >
-> > Do a proper align and put it in the right section.
-> >
-> > Signed-off-by: Corey Minyard <cminyard@mvista.com>
-> > ---
-> >  arch/arm64/mm/proc.S |    3 ++-
-> >  1 files changed, 2 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> > index 76d8320..1f89adc 100644
-> > --- a/arch/arm64/mm/proc.S
-> > +++ b/arch/arm64/mm/proc.S
-> > @@ -95,10 +95,11 @@ ENTRY(cpu_do_switch_mm)
-> >         ret
-> >  ENDPROC(cpu_do_switch_mm)
-> >
-> > +       .section ".rodata"
-> >  cpu_name:
-> >         .ascii  "AArch64 Processor"
-> > -       .align
-> >
-> > +       .align 3
+> Attached.
 
-Since cpu_name is local, not referenced, and not next to anything
-noteworthy (so, unlikely to be found implicitly), I wonder why it's
-needed at all.
+Hmm, this does not look like config for kernel neither from Linus' nor 
+linux-next tree. The first thing I can see is CONFIG_ARCH_EXYNOS_MULTI 
+selected, which is not available in any mainline tree.
 
-cputable.c:cpu_table just has a C string literal instead, with the same
-content.
+As for the build error itself, headers from plat/ are available for drivers 
+only in single platform builds, they can't be included when multiplatform 
+is enabled. The exynos-cpufreq driver is not multiplatform-aware yet and so 
+you get the failure.
 
-Perhaps proc.S:cpu_name is used in some other way, but I can't see it.
-The kernel still builds if it is deleted.
-
-Cheers
----Dave
-
-> >         .section ".text.init", #alloc, #execinstr
-> >
-> >  /*
-> > --
-> > 1.7.1
-> 
-> _______________________________________________
-> linaro-kernel mailing list
-> linaro-kernel at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-kernel
+Best regards,
+Tomasz
