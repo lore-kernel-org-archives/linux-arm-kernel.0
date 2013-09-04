@@ -1,21 +1,41 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  4 Sep 2013 10:31:32 +0100
-Subject: [PATCH 00/11] iio: ST clean-ups and new pressure sensor device
-Message-ID: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
+Date: Wed,  4 Sep 2013 10:31:34 +0100
+Subject: [PATCH 02/11] ARM: ux500: Enable the LPS001WP Pressure & Temperature
+ sensor from DT
+In-Reply-To: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
+References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378287103-21765-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set includes a few clean-ups surrounding error handling and
-non-mandatory functionality along with regulator support and the addition
-of a new pressure/temperature sensor (LPS001WP). Everything has been
-tested with Device Tree.
+After applying this node the LPS001WP sensor chip should probe
+successfully once the driver support has also been applied.
 
- arch/arm/boot/dts/ste-dbx5x0.dtsi               |   5 --
- arch/arm/boot/dts/ste-snowball.dts              |  10 ++++
- arch/arm/configs/u8500_defconfig                |   4 ++
- drivers/iio/common/st_sensors/st_sensors_core.c |  11 ++--
- drivers/iio/pressure/st_pressure.h              |   1 +
- drivers/iio/pressure/st_pressure_core.c         | 276 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------
- drivers/iio/pressure/st_pressure_i2c.c          |  18 +++----
- include/linux/iio/common/st_sensors.h           |   4 ++
- 8 files changed, 230 insertions(+), 99 deletions(-)
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/ste-snowball.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+index cf9b16e..aad8f54 100644
+--- a/arch/arm/boot/dts/ste-snowball.dts
++++ b/arch/arm/boot/dts/ste-snowball.dts
+@@ -153,6 +153,16 @@
+ 			status = "okay";
+ 		};
+ 
++		i2c at 80128000 {
++			lps001wp at 5c {
++				compatible = "lps001wp";
++				reg = <0x5c>;
++
++				vdd-supply = <&ab8500_ldo_aux1_reg>;
++				vms-supply = <&db8500_vsmps2_reg>;
++			};
++		};
++
+ 		uart at 80120000 {
+ 			status = "okay";
+ 		};
+-- 
+1.8.1.2
