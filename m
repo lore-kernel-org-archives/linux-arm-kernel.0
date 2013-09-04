@@ -1,74 +1,51 @@
-From: jwboyer@fedoraproject.org (Josh Boyer)
-Date: Wed, 4 Sep 2013 11:08:15 -0400
-Subject: 3.12 merge window exynos cpufreq driver fails to build
-In-Reply-To: <1480759.MNj1g1yX4l@amdc1227>
-References: <CA+5PVA6SQ9JGBD3F=u5ysch-agp91oTK8ZbKsdQkz57yZ8OUHQ@mail.gmail.com>
- <7035644.8Kb1gDYsCf@amdc1227>
- <CA+5PVA7T4P9vMH0r8p78aZYUrL8gzbpY9MmW9=nV3X0tE-e4NA@mail.gmail.com>
- <1480759.MNj1g1yX4l@amdc1227>
-Message-ID: <CA+5PVA5mz-420Rnuf8KD3xoKf8zYs9gP_8r3_QNCdo7mKEsczA@mail.gmail.com>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Wed, 4 Sep 2013 08:12:58 -0700
+Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
+In-Reply-To: <CAGa+x85D2tnX_9QDNb6s1LQCpAz_kGUiOK82C7fPLVTmiZMEFg@mail.gmail.com>
+References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
+ <5211E3F6.6090108@ti.com> <52125A39.3010008@ti.com>
+ <87vc2qyjao.fsf@linaro.org> <521FBD6B.3020208@ti.com>
+ <87mwo0rvf8.fsf@linaro.org>
+ <CA+Bv8Xamd7e24nswG4QhLDNhHXs92EfXcfu8E2uL=XLhsL70Hw@mail.gmail.com>
+ <CAGa+x84okZ_j71=oOnK5c43T9L3gmsGcQjWSxZSchfzheA_2HQ@mail.gmail.com>
+ <52261B34.60206@ti.com>
+ <CAGa+x85D2tnX_9QDNb6s1LQCpAz_kGUiOK82C7fPLVTmiZMEFg@mail.gmail.com>
+Message-ID: <CA+Bv8Xac-HdLU5Cx=zi9=eVmd-hx+xJKVxBVHTaXuoM1c94c=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 4, 2013 at 11:04 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> On Wednesday 04 of September 2013 10:41:31 Josh Boyer wrote:
->> On Wed, Sep 4, 2013 at 10:36 AM, Tomasz Figa <t.figa@samsung.com> wrote:
->> > Hi Josh,
->> >
->> > On Wednesday 04 of September 2013 10:13:16 Josh Boyer wrote:
->> >> Using Linus' tree as of this morning (v3.11-2654-g458c3f6), the
->> >> exynos-cpufreq driver doesn't build because it includes a file that
->> >> doesn't exist.
->> >>
->> >> + make -s ARCH=arm V=1 -j4 bzImage KALLSYMS_EXTRA_PASS=1
->> >> arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO:
->> >> return_address should use unwind tables" [-Wcpp]
->> >>
->> >>  #warning "TODO: return_address should use unwind tables"
->> >>
->> >>   ^
->> >>
->> >> arch/arm/mm/dma-mapping.c:253:2: warning: #warning ARM Coherent DMA
->> >> allocator does not (yet) support huge TLB [-Wcpp]
->> >>
->> >>  #warning ARM Coherent DMA allocator does not (yet) support huge TLB
->> >>
->> >>   ^
->> >>
->> >> drivers/cpufreq/exynos-cpufreq.c:21:22: fatal error: plat/cpu.h: No
->> >> such file or directory
->> >>
->> >>  #include <plat/cpu.h>
->> >>
->> >>                       ^
->> >>
->> >> compilation terminated.
->> >> make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
->> >>
->> >> I'm guessing that <plat/cpu.h> file is supposed to come from
->> >> arch/arm/plat-samsung/include/plat/, but I don't see anything that
->> >> specifies a -I there.
->> >>
->> >> Thoughts?
->> >
->> > Could you attach config that could be used to trigger this? Thanks in
->> > advance.
->>
->> Attached.
+On Wed, Sep 4, 2013 at 8:01 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> Hi Dave,
 >
-> Hmm, this does not look like config for kernel neither from Linus' nor
-> linux-next tree. The first thing I can see is CONFIG_ARCH_EXYNOS_MULTI
-> selected, which is not available in any mainline tree.
+>> Thanks for taking the time to try this out, it does seem there are a few
+>> kinks with BeagleBone Black but we'll get those worked out.
+>
+> I also just noticed that wake from RTC isn't working, but wake from
+> serial console does.  Does RTC wake work for you?  (I use rtcwake -m
+> mem -s4)
+>
+> Kevin
 
-Sigh.  Yes, I see the issue now.
+On Beaglebone white or black? For PG 1.0 (Beaglebone white) there is
+the following errata:
 
-> As for the build error itself, headers from plat/ are available for drivers
-> only in single platform builds, they can't be included when multiplatform
-> is enabled. The exynos-cpufreq driver is not multiplatform-aware yet and so
-> you get the failure.
+"RTC: 32.768-kHZ Clock is Gating Off"
 
-Someone added some exynos multiplatform patches to the Fedora kernel.
-That seems to have caused these build failures.  Our mistake and my
-apologies for the inconvenience.  Thank you for the quick response.
+Details The RTC has a clock gating issue that stops the internal
+32.768-kHz clock when the VDD_CORE voltage domain drops below the
+recommended operating range or the PWRONRSTn input terminal is held
+low. This issue has the following side effects:
 
-josh
+- The RTC counters stop incrementing when the 32.768-kHz clock is
+gated. This causes the RTC to lose time while the clock is gated.
+
+- A wakeup event applied to the EXT_WAKEUP input terminal is masked if
+the EXT_WAKEUP_DB_EN bit in the RTC PMIC register (0x98) is set to 1
+which enables the de-bounce function for the EXT_WAKEUP input. This
+occurs because the 32.768-kHz clock is being used to clock the
+de-bounce circuit.
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
