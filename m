@@ -1,206 +1,143 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 04 Sep 2013 12:46:08 +0900
-Subject: [PATCH 02/04] ARM: shmobile: r8a7791 SCIF support
+Date: Wed, 04 Sep 2013 12:46:17 +0900
+Subject: [PATCH 03/04] ARM: shmobile: r8a7791 CMT support
 In-Reply-To: <20130904034525.12546.24775.sendpatchset@w520>
 References: <20130904034525.12546.24775.sendpatchset@w520>
-Message-ID: <20130904034608.12546.79411.sendpatchset@w520>
+Message-ID: <20130904034617.12546.91307.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yoshikazu Fujikawa <yoshikazu.fujikawa.ue@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-Add SCIF serial port support to the r8a7791 SoC by
-adding platform devices for SCIFA0 -> SCIFA5 as well
-as SCIFB0 -> SCIFB2 and SCIF0 -> SCIF5 together with
-clock bindings. DT device description is excluded at
-this point since such bindings are still under
-development.
+Add r8a7791 CMT support via channel 0 of CMT0. At this
+point the CMT is used for clock event operation, but in
+the future the arch timer will be the main timer and the
+CMT will be used for deep sleep wake up only.
 
-Signed-off-by: Yoshikazu Fujikawa <yoshikazu.fujikawa.ue@renesas.com>
-Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
-[damm at opensource.se: Forward ported to upstream, dropped holes in enum]
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/clock-r8a7791.c        |   36 ++++++++++
+ arch/arm/mach-shmobile/clock-r8a7791.c        |    7 +++++-
  arch/arm/mach-shmobile/include/mach/r8a7791.h |    1 
- arch/arm/mach-shmobile/setup-r8a7791.c        |   82 +++++++++++++++++++++++++
- 3 files changed, 118 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/setup-r8a7791.c        |   29 +++++++++++++++++++++++++
+ 3 files changed, 36 insertions(+), 1 deletion(-)
 
---- 0003/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ work/arch/arm/mach-shmobile/clock-r8a7791.c	2013-09-03 20:54:28.000000000 +0900
-@@ -48,6 +48,7 @@
- #define CPG_BASE 0xe6150000
- #define CPG_LEN 0x1000
+--- 0004/arch/arm/mach-shmobile/clock-r8a7791.c
++++ work/arch/arm/mach-shmobile/clock-r8a7791.c	2013-09-03 21:02:44.000000000 +0900
+@@ -101,7 +101,7 @@ SH_FIXED_RATIO_CLK_SET(cp_clk,			extal_c
+ SH_FIXED_RATIO_CLK_SET(pll1_div2_clk,		pll1_clk,	1, 2);
+ SH_FIXED_RATIO_CLK_SET(hp_clk,			pll1_clk,	1, 12);
+ SH_FIXED_RATIO_CLK_SET(p_clk,			pll1_clk,	1, 24);
+-
++SH_FIXED_RATIO_CLK_SET(rclk_clk,		pll1_clk,	1, (48 * 1024));
+ SH_FIXED_RATIO_CLK_SET(mp_clk,			pll1_div2_clk,	1, 15);
  
-+#define SMSTPCR0	0xE6150130
- #define SMSTPCR1	0xE6150134
- #define SMSTPCR2	0xe6150138
- #define SMSTPCR3	0xE615013C
-@@ -56,6 +57,7 @@
- #define SMSTPCR8	0xE6150990
- #define SMSTPCR9	0xE6150994
- #define SMSTPCR10	0xE6150998
-+#define SMSTPCR11	0xE615099C
- 
- #define MODEMR		0xE6160060
- #define SDCKCR		0xE6150074
-@@ -118,13 +120,28 @@ static struct clk *main_clks[] = {
- /* MSTP */
- enum {
- 	MSTP721, MSTP720,
--/*	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202,*/
-+	MSTP719, MSTP718, MSTP715, MSTP714,
-+	MSTP216, MSTP207, MSTP206,
-+	MSTP204, MSTP203, MSTP202, MSTP1105, MSTP1106, MSTP1107,
+ static struct clk *main_clks[] = {
+@@ -113,6 +113,7 @@ static struct clk *main_clks[] = {
+ 	&pll3_clk,
+ 	&hp_clk,
+ 	&p_clk,
++	&rclk_clk,
+ 	&mp_clk,
+ 	&cp_clk,
+ };
+@@ -123,6 +124,7 @@ enum {
+ 	MSTP719, MSTP718, MSTP715, MSTP714,
+ 	MSTP216, MSTP207, MSTP206,
+ 	MSTP204, MSTP203, MSTP202, MSTP1105, MSTP1106, MSTP1107,
++	MSTP124,
  	MSTP_NR
  };
  
- static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
- 	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
-+	[MSTP719] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 19, 0), /* SCIF2 */
-+	[MSTP718] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 18, 0), /* SCIF3 */
-+	[MSTP715] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 15, 0), /* SCIF4 */
-+	[MSTP714] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 14, 0), /* SCIF5 */
-+	[MSTP216] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 16, 0), /* SCIFB2 */
-+	[MSTP207] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 7, 0), /* SCIFB1 */
-+	[MSTP206] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 6, 0), /* SCIFB0 */
-+	[MSTP204] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 4, 0), /* SCIFA0 */
-+	[MSTP203] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 3, 0), /* SCIFA1 */
-+	[MSTP202] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 2, 0), /* SCIFA2 */
-+	[MSTP1105] = SH_CLK_MSTP32(&mp_clk, SMSTPCR11, 5, 0), /* SCIFA3 */
-+	[MSTP1106] = SH_CLK_MSTP32(&mp_clk, SMSTPCR11, 6, 0), /* SCIFA4 */
-+	[MSTP1107] = SH_CLK_MSTP32(&mp_clk, SMSTPCR11, 7, 0), /* SCIFA5 */
+@@ -142,6 +144,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP1105] = SH_CLK_MSTP32(&mp_clk, SMSTPCR11, 5, 0), /* SCIFA3 */
+ 	[MSTP1106] = SH_CLK_MSTP32(&mp_clk, SMSTPCR11, 6, 0), /* SCIFA4 */
+ 	[MSTP1107] = SH_CLK_MSTP32(&mp_clk, SMSTPCR11, 7, 0), /* SCIFA5 */
++	[MSTP124] = SH_CLK_MSTP32(&rclk_clk, SMSTPCR1, 24, 0), /* CMT0 */
  };
  
  static struct clk_lookup lookups[] = {
-@@ -141,6 +158,23 @@ static struct clk_lookup lookups[] = {
+@@ -155,6 +158,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("pll3",		&pll3_clk),
+ 	CLKDEV_CON_ID("hp",		&hp_clk),
+ 	CLKDEV_CON_ID("p",		&p_clk),
++	CLKDEV_CON_ID("rclk",		&rclk_clk),
  	CLKDEV_CON_ID("mp",		&mp_clk),
  	CLKDEV_CON_ID("cp",		&cp_clk),
  	CLKDEV_CON_ID("peripheral_clk", &hp_clk),
-+
-+	/* MSTP */
-+	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]), /* SCIFA0 */
-+	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]), /* SCIFA1 */
-+	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]), /* SCIFB0 */
-+	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP207]), /* SCIFB1 */
-+	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP216]), /* SCIFB2 */
-+	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP202]), /* SCIFA2 */
-+	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP721]), /* SCIF0 */
-+	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]), /* SCIF1 */
-+	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP719]), /* SCIF2 */
-+	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP718]), /* SCIF3 */
-+	CLKDEV_DEV_ID("sh-sci.10", &mstp_clks[MSTP715]), /* SCIF4 */
-+	CLKDEV_DEV_ID("sh-sci.11", &mstp_clks[MSTP714]), /* SCIF5 */
-+	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1105]), /* SCIFA3 */
-+	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
-+	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
+@@ -175,6 +179,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1105]), /* SCIFA3 */
+ 	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
+ 	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
++	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
  };
  
  #define R8A7791_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
---- 0003/arch/arm/mach-shmobile/include/mach/r8a7791.h
-+++ work/arch/arm/mach-shmobile/include/mach/r8a7791.h	2013-09-03 20:49:08.000000000 +0900
-@@ -1,6 +1,7 @@
- #ifndef __ASM_R8A7791_H__
- #define __ASM_R8A7791_H__
+--- 0004/arch/arm/mach-shmobile/include/mach/r8a7791.h
++++ work/arch/arm/mach-shmobile/include/mach/r8a7791.h	2013-09-03 20:56:52.000000000 +0900
+@@ -3,5 +3,6 @@
  
-+void r8a7791_add_dt_devices(void);
+ void r8a7791_add_dt_devices(void);
  void r8a7791_clock_init(void);
++void r8a7791_init_early(void);
  
  #endif /* __ASM_R8A7791_H__ */
---- 0003/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7791.c	2013-09-03 20:49:08.000000000 +0900
-@@ -22,10 +22,92 @@
- #include <linux/irq.h>
+--- 0004/arch/arm/mach-shmobile/setup-r8a7791.c
++++ work/arch/arm/mach-shmobile/setup-r8a7791.c	2013-09-03 20:57:19.000000000 +0900
+@@ -23,6 +23,7 @@
  #include <linux/kernel.h>
  #include <linux/of_platform.h>
-+#include <linux/serial_sci.h>
+ #include <linux/serial_sci.h>
++#include <linux/sh_timer.h>
  #include <mach/common.h>
-+#include <mach/irqs.h>
+ #include <mach/irqs.h>
  #include <mach/r8a7791.h>
- #include <asm/mach/arch.h>
+@@ -89,6 +90,25 @@ static inline void r8a7791_register_scif
+ 				      sizeof(struct plat_sci_port));
+ }
  
-+#define SCIF_COMMON(scif_type, baseaddr, irq)			\
-+	.type		= scif_type,				\
-+	.mapbase	= baseaddr,				\
-+	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,	\
-+	.irqs		= SCIx_IRQ_MUXED(irq)
-+
-+#define SCIFA_DATA(index, baseaddr, irq)		\
-+[index] = {						\
-+	SCIF_COMMON(PORT_SCIFA, baseaddr, irq),		\
-+	.scbrr_algo_id	= SCBRR_ALGO_4,			\
-+	.scscr = SCSCR_RE | SCSCR_TE,	\
-+}
-+
-+#define SCIFB_DATA(index, baseaddr, irq)	\
-+[index] = {					\
-+	SCIF_COMMON(PORT_SCIFB, baseaddr, irq),	\
-+	.scbrr_algo_id	= SCBRR_ALGO_4,		\
-+	.scscr = SCSCR_RE | SCSCR_TE,		\
-+}
-+
-+#define SCIF_DATA(index, baseaddr, irq)		\
-+[index] = {						\
-+	SCIF_COMMON(PORT_SCIF, baseaddr, irq),		\
-+	.scbrr_algo_id	= SCBRR_ALGO_2,			\
-+	.scscr = SCSCR_RE | SCSCR_TE,	\
-+}
-+
-+#define HSCIF_DATA(index, baseaddr, irq)		\
-+[index] = {						\
-+	SCIF_COMMON(PORT_HSCIF, baseaddr, irq),		\
-+	.scbrr_algo_id	= SCBRR_ALGO_6,			\
-+	.scscr = SCSCR_RE | SCSCR_TE,	\
-+}
-+
-+enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFA2, SCIF0, SCIF1,
-+	SCIF2, SCIF3, SCIF4, SCIF5, SCIFA3, SCIFA4, SCIFA5 };
-+
-+static const struct plat_sci_port scif[] __initconst = {
-+	SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
-+	SCIFA_DATA(SCIFA1, 0xe6c50000, gic_spi(145)), /* SCIFA1 */
-+	SCIFB_DATA(SCIFB0, 0xe6c20000, gic_spi(148)), /* SCIFB0 */
-+	SCIFB_DATA(SCIFB1, 0xe6c30000, gic_spi(149)), /* SCIFB1 */
-+	SCIFB_DATA(SCIFB2, 0xe6ce0000, gic_spi(150)), /* SCIFB2 */
-+	SCIFA_DATA(SCIFA2, 0xe6c60000, gic_spi(151)), /* SCIFA2 */
-+	SCIF_DATA(SCIF0, 0xe6e60000, gic_spi(152)), /* SCIF0 */
-+	SCIF_DATA(SCIF1, 0xe6e68000, gic_spi(153)), /* SCIF1 */
-+	SCIF_DATA(SCIF2, 0xe6e58000, gic_spi(22)), /* SCIF2 */
-+	SCIF_DATA(SCIF3, 0xe6ea8000, gic_spi(23)), /* SCIF3 */
-+	SCIF_DATA(SCIF4, 0xe6ee0000, gic_spi(24)), /* SCIF4 */
-+	SCIF_DATA(SCIF5, 0xe6ee8000, gic_spi(25)), /* SCIF5 */
-+	SCIFA_DATA(SCIFA3, 0xe6c70000, gic_spi(29)), /* SCIFA3 */
-+	SCIFA_DATA(SCIFA4, 0xe6c78000, gic_spi(30)), /* SCIFA4 */
-+	SCIFA_DATA(SCIFA5, 0xe6c80000, gic_spi(31)), /* SCIFA5 */
++static const struct sh_timer_config cmt00_platform_data __initconst = {
++	.name = "CMT00",
++	.timer_bit = 0,
++	.clockevent_rating = 80,
 +};
 +
-+static inline void r8a7791_register_scif(int idx)
-+{
-+	platform_device_register_data(&platform_bus, "sh-sci", idx, &scif[idx],
-+				      sizeof(struct plat_sci_port));
++static const struct resource cmt00_resources[] __initconst = {
++	DEFINE_RES_MEM(0xffca0510, 0x0c),
++	DEFINE_RES_MEM(0xffca0500, 0x04),
++	DEFINE_RES_IRQ(gic_spi(142)), /* CMT0_0 */
++};
++
++#define r8a7791_register_cmt(idx)					\
++	platform_device_register_resndata(&platform_bus, "sh_cmt",	\
++					  idx, cmt##idx##_resources,	\
++					  ARRAY_SIZE(cmt##idx##_resources), \
++					  &cmt##idx##_platform_data,	\
++					  sizeof(struct sh_timer_config))
++
+ void __init r8a7791_add_dt_devices(void)
+ {
+ 	r8a7791_register_scif(SCIFA0);
+@@ -106,6 +126,14 @@ void __init r8a7791_add_dt_devices(void)
+ 	r8a7791_register_scif(SCIFA3);
+ 	r8a7791_register_scif(SCIFA4);
+ 	r8a7791_register_scif(SCIFA5);
++	r8a7791_register_cmt(00);
 +}
 +
-+void __init r8a7791_add_dt_devices(void)
++void __init r8a7791_init_early(void)
 +{
-+	r8a7791_register_scif(SCIFA0);
-+	r8a7791_register_scif(SCIFA1);
-+	r8a7791_register_scif(SCIFB0);
-+	r8a7791_register_scif(SCIFB1);
-+	r8a7791_register_scif(SCIFB2);
-+	r8a7791_register_scif(SCIFA2);
-+	r8a7791_register_scif(SCIF0);
-+	r8a7791_register_scif(SCIF1);
-+	r8a7791_register_scif(SCIF2);
-+	r8a7791_register_scif(SCIF3);
-+	r8a7791_register_scif(SCIF4);
-+	r8a7791_register_scif(SCIF5);
-+	r8a7791_register_scif(SCIFA3);
-+	r8a7791_register_scif(SCIFA4);
-+	r8a7791_register_scif(SCIFA5);
-+}
-+
++#ifndef CONFIG_ARM_ARCH_TIMER
++	shmobile_setup_delay(1300, 2, 4); /* Cortex-A15 @ 1300MHz */
++#endif
+ }
+ 
  #ifdef CONFIG_USE_OF
- static const char *r8a7791_boards_compat_dt[] __initdata = {
- 	"renesas,r8a7791",
+@@ -115,6 +143,7 @@ static const char *r8a7791_boards_compat
+ };
+ 
+ DT_MACHINE_START(R8A7791_DT, "Generic R8A7791 (Flattened Device Tree)")
++	.init_early	= r8a7791_init_early,
+ 	.dt_compat	= r8a7791_boards_compat_dt,
+ MACHINE_END
+ #endif /* CONFIG_USE_OF */
