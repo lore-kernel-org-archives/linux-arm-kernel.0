@@ -1,52 +1,80 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  4 Sep 2013 16:26:52 +0200
-Subject: [PATCH] net: mvneta: implement ->ndo_do_ioctl() to support PHY ioctls
-Message-ID: <1378304812-21390-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Wed, 4 Sep 2013 17:27:39 +0300
+Subject: [PATCH 3/5] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
+ to the LRADC driver
+In-Reply-To: <1378299706-6742-4-git-send-email-jbe@pengutronix.de>
+References: <1378299706-6742-1-git-send-email-jbe@pengutronix.de>
+ <1378299706-6742-4-git-send-email-jbe@pengutronix.de>
+Message-ID: <20130904142738.GH6329@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit implements the ->ndo_do_ioctl() operation so that the
-PHY-related ioctl() calls can work from userspace, which allows
-applications like mii-tool or mii-diag to do their job.
+On Wed, Sep 04, 2013 at 03:01:44PM +0200, Juergen Beisert wrote:
+> @@ -323,10 +338,17 @@ static int mxs_lradc_ts_touched(struct mxs_lradc *lradc)
+>  	uint32_t reg;
+>  
+>  	/* Enable touch detection. */
+> -	writel(LRADC_CTRL0_MX28_PLATE_MASK,
+> -		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
+> -	writel(LRADC_CTRL0_MX28_TOUCH_DETECT_ENABLE,
+> -		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
+> +	if (lradc->soc == IMX28_LRADC) {
+> +		writel(LRADC_CTRL0_MX28_PLATE_MASK,
+> +			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
+> +		writel(LRADC_CTRL0_MX28_TOUCH_DETECT_ENABLE,
+> +			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
+> +	} else {
+> +		writel(LRADC_CTRL0_MX23_PLATE_MASK,
+> +			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
+> +		writel(LRADC_CTRL0_MX23_TOUCH_DETECT_ENABLE,
+> +			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
+> +	}
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvneta.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+I don't like the way this patch takes the driver and makes every line
+an if else statement.  It would be cleaner to do this:
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 90ab292..389a854 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -2451,6 +2451,21 @@ static int mvneta_stop(struct net_device *dev)
- 	return 0;
- }
- 
-+static int mvneta_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
-+{
-+	struct mvneta_port *pp = netdev_priv(dev);
-+	int ret;
-+
-+	if (!pp->phy_dev)
-+		return -ENOTSUPP;
-+
-+	ret = phy_mii_ioctl(pp->phy_dev, ifr, cmd);
-+	if (!ret)
-+		mvneta_adjust_link(dev);
-+
-+	return ret;
-+}
-+
- /* Ethtool methods */
- 
- /* Get settings (phy address, speed) for ethtools */
-@@ -2569,6 +2584,7 @@ static const struct net_device_ops mvneta_netdev_ops = {
- 	.ndo_change_mtu      = mvneta_change_mtu,
- 	.ndo_tx_timeout      = mvneta_tx_timeout,
- 	.ndo_get_stats64     = mvneta_get_stats64,
-+	.ndo_do_ioctl        = mvneta_ioctl,
- };
- 
- const struct ethtool_ops mvneta_eth_tool_ops = {
--- 
-1.8.1.2
+	writel(lradc_plate_mask(lradc),
+		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
+	writel(lradc_touch_detect_enable(lradc),
+		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
+
+Btw, LRADC_CTRL0_MX23_TOUCH_DETECT_ENABLE just enables the touch screen
+to detect touches?  It seems like we could leave the "DETECT_" out of
+the name.
+
+Actually it would better yet if there were a function:
+
+static inline void lradc_writel(struct mxs_lradc *lradc, u32 val,
+				size_t chan, size_t offset)
+{
+	writel(val, lradc->base + chan + offset);
+}
+
+That way we could do:
+
+	lradc_writel(lradc_enable_touch(lradc), LRADC_CTRL0,
+		     STMP_OFFSET_REG_SET);
+
+ACTUALLY!  When I look at it now the third argument is almost always
+"set", "clear" or "toggle".
+
+So we could do:
+
+static inline void lradc_reg_set(struct mxs_lradc *lradc, u32 val,
+				size_t chan)
+{
+	writel(val, lradc->base + chan + STMP_OFFSET_REG_SET);
+}
+
+So then it would be:
+
+	lradc_reg_clear(lradc_plate_mask(lradc), LRADC_CTRL0);
+	lradc_reg_set(lradc_enable_touch(lradc), LRADC_CTRL0);
+
+I've just changed 11 lines of code down to 2 lines of code by hiding the
+if statement in the header file.
+
+Please redo this patch along those lines.
+
+regards,
+dan carpenter
