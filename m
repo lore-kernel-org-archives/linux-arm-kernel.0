@@ -1,58 +1,71 @@
 From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Wed,  4 Sep 2013 06:54:39 +0200
-Subject: [PATCH][RESEND] ARM: at91: remove IRQF_DISABLED
-Message-ID: <1378270479-24628-1-git-send-email-michael.opdenacker@free-electrons.com>
+Date: Wed,  4 Sep 2013 06:59:01 +0200
+Subject: [PATCH][RESEND] ARM: footbridge: remove obsolete IRQF_DISABLED
+Message-ID: <1378270741-24785-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This flag is a NOOP since 2.6.36 and can be removed.
+This patch proposes to remove the IRQF_DISABLED flag from footbridge
+code. It's a NOOP since 2.6.35.
 
 This is an update for 3.11 of a patch already sent for 3.10
 
 Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
 ---
- arch/arm/mach-at91/at91rm9200_time.c  | 2 +-
- arch/arm/mach-at91/at91sam926x_time.c | 2 +-
- arch/arm/mach-at91/at91x40_time.c     | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-footbridge/dc21285-timer.c |  2 +-
+ arch/arm/mach-footbridge/dc21285.c       | 10 +++++-----
+ arch/arm/mach-footbridge/isa-timer.c     |  2 +-
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-index 180b302..f607deb 100644
---- a/arch/arm/mach-at91/at91rm9200_time.c
-+++ b/arch/arm/mach-at91/at91rm9200_time.c
-@@ -93,7 +93,7 @@ static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
- 
- static struct irqaction at91rm9200_timer_irq = {
- 	.name		= "at91_tick",
--	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags		= IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
- 	.handler	= at91rm9200_timer_interrupt,
- 	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
+diff --git a/arch/arm/mach-footbridge/dc21285-timer.c b/arch/arm/mach-footbridge/dc21285-timer.c
+index 9ee78f7..892d550 100644
+--- a/arch/arm/mach-footbridge/dc21285-timer.c
++++ b/arch/arm/mach-footbridge/dc21285-timer.c
+@@ -86,7 +86,7 @@ static irqreturn_t timer1_interrupt(int irq, void *dev_id)
+ static struct irqaction footbridge_timer_irq = {
+ 	.name		= "dc21285_timer1",
+ 	.handler	= timer1_interrupt,
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+ 	.dev_id		= &ckevt_dc21285,
  };
-diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-index 3a4bc2e..bb39232 100644
---- a/arch/arm/mach-at91/at91sam926x_time.c
-+++ b/arch/arm/mach-at91/at91sam926x_time.c
-@@ -171,7 +171,7 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
  
- static struct irqaction at91sam926x_pit_irq = {
- 	.name		= "at91_tick",
--	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags		= IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
- 	.handler	= at91sam926x_pit_interrupt,
- 	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
- };
-diff --git a/arch/arm/mach-at91/at91x40_time.c b/arch/arm/mach-at91/at91x40_time.c
-index 2919eba..c0e637a 100644
---- a/arch/arm/mach-at91/at91x40_time.c
-+++ b/arch/arm/mach-at91/at91x40_time.c
-@@ -57,7 +57,7 @@ static irqreturn_t at91x40_timer_interrupt(int irq, void *dev_id)
+diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
+index 3490a24..cc52e6c 100644
+--- a/arch/arm/mach-footbridge/dc21285.c
++++ b/arch/arm/mach-footbridge/dc21285.c
+@@ -336,15 +336,15 @@ void __init dc21285_preinit(void)
+ 	/*
+ 	 * We don't care if these fail.
+ 	 */
+-	dc21285_request_irq(IRQ_PCI_SERR, dc21285_serr_irq, IRQF_DISABLED,
++	dc21285_request_irq(IRQ_PCI_SERR, dc21285_serr_irq, 0,
+ 			    "PCI system error", &serr_timer);
+-	dc21285_request_irq(IRQ_PCI_PERR, dc21285_parity_irq, IRQF_DISABLED,
++	dc21285_request_irq(IRQ_PCI_PERR, dc21285_parity_irq, 0,
+ 			    "PCI parity error", &perr_timer);
+-	dc21285_request_irq(IRQ_PCI_ABORT, dc21285_abort_irq, IRQF_DISABLED,
++	dc21285_request_irq(IRQ_PCI_ABORT, dc21285_abort_irq, 0,
+ 			    "PCI abort", NULL);
+-	dc21285_request_irq(IRQ_DISCARD_TIMER, dc21285_discard_irq, IRQF_DISABLED,
++	dc21285_request_irq(IRQ_DISCARD_TIMER, dc21285_discard_irq, 0,
+ 			    "Discard timer", NULL);
+-	dc21285_request_irq(IRQ_PCI_DPERR, dc21285_dparity_irq, IRQF_DISABLED,
++	dc21285_request_irq(IRQ_PCI_DPERR, dc21285_dparity_irq, 0,
+ 			    "PCI data parity", NULL);
  
- static struct irqaction at91x40_timer_irq = {
- 	.name		= "at91_tick",
--	.flags		= IRQF_DISABLED | IRQF_TIMER,
-+	.flags		= IRQF_TIMER,
- 	.handler	= at91x40_timer_interrupt
+ 	if (cfn_mode) {
+diff --git a/arch/arm/mach-footbridge/isa-timer.c b/arch/arm/mach-footbridge/isa-timer.c
+index d9301dd..b73f52e 100644
+--- a/arch/arm/mach-footbridge/isa-timer.c
++++ b/arch/arm/mach-footbridge/isa-timer.c
+@@ -27,7 +27,7 @@ static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
+ static struct irqaction pit_timer_irq = {
+ 	.name		= "pit",
+ 	.handler	= pit_timer_interrupt,
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+ 	.dev_id		= &i8253_clockevent,
  };
  
 -- 
