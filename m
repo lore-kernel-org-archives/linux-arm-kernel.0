@@ -1,74 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Sep 2013 14:36:54 +0100
-Subject: [PATCH 02/11] ARM: ux500: Enable the LPS001WP Pressure &
- Temperature sensor from DT
-In-Reply-To: <20130904123850.GI18206@e106331-lin.cambridge.arm.com>
-References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
- <1378287103-21765-3-git-send-email-lee.jones@linaro.org>
- <20130904123850.GI18206@e106331-lin.cambridge.arm.com>
-Message-ID: <20130904133654.GH20150@lee--X1>
+From: jwboyer@redhat.com (Josh Boyer)
+Date: Wed, 4 Sep 2013 09:38:50 -0400
+Subject: ARM: OMAP2: Make MACH_OMAP3EVM select NOP_USB_XCEIV
+Message-ID: <20130904133850.GC12834@hansolo.jdub.homelinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Sep 2013, Mark Rutland wrote:
+The board-omap3evm.c file unconditionally calls usb_nop_xceiv_register but
+doesn't ensure this is built-in.  This can lead to build failures like:
 
-> Hi Lee,
-> 
-> On Wed, Sep 04, 2013 at 10:31:34AM +0100, Lee Jones wrote:
-> > After applying this node the LPS001WP sensor chip should probe
-> > successfully once the driver support has also been applied.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/ste-snowball.dts | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-> > index cf9b16e..aad8f54 100644
-> > --- a/arch/arm/boot/dts/ste-snowball.dts
-> > +++ b/arch/arm/boot/dts/ste-snowball.dts
-> > @@ -153,6 +153,16 @@
-> >  			status = "okay";
-> >  		};
-> >  
-> > +		i2c at 80128000 {
-> > +			lps001wp at 5c {
-> > +				compatible = "lps001wp";
-> > +				reg = <0x5c>;
-> > +
-> > +				vdd-supply = <&ab8500_ldo_aux1_reg>;
-> > +				vms-supply = <&db8500_vsmps2_reg>;
-> > +			};
-> > +		};
-> > +
-> 
-> This appears to be missing a binding document. I couldn't see one
-> anywhere in this series, or in mainline already).
-> 
-> As far as I can see, the compatible string should be "st,lps001wp".
+arch/arm/mach-omap2/built-in.o: In function `omap3_evm_init':
+linux-3.12.0-0.rc0.git2.1.fc21.armv7hl/arch/arm/mach-omap2/board-omap3evm.c:686: undefined reference to `usb_nop_xceiv_register'
+make: *** [vmlinux] Error 1
 
-The I2C subsystem doesn't actually care about vendor prefixes. They
-are all stripped before use in all cases. However, I'm happy to
-provide one if for no other reason than to stick to convention.
+Make MACH_OMAP3EVM select NOP_USB_XCEIV to avoid this.
 
-> Please produce a binding document.
+Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
+---
+ arch/arm/mach-omap2/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Again, I'm happy to provide a boilerplate document, but there's
-nothing special happening here.
-
-> Is there any publicly available documentation on the chip?
-
-If you Google the device name, it will be the first hit.
-
-> >  		uart at 80120000 {
-> >  			status = "okay";
-> >  		};
-
-Kind regards,
-Lee
-
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 3eed000..3350389 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -258,6 +258,7 @@ config MACH_OMAP3EVM
+ 	depends on ARCH_OMAP3
+ 	default y
+ 	select OMAP_PACKAGE_CBB
++	select NOP_USB_XCEIV
+ 
+ config MACH_OMAP3517EVM
+ 	bool "OMAP3517/ AM3517 EVM board"
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.3.1
