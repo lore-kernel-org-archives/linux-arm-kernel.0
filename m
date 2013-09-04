@@ -1,70 +1,61 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 04 Sep 2013 10:21:34 +0200
-Subject: [PATCH v3 0/5] Armada XP clocks for timer
-In-Reply-To: <20130903192632.GM19598@titan.lakedaemon.net>
-References: <1377013554-23389-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130827085242.GB2286@localhost> <20130902142625.GA15975@localhost>
- <20130903124633.GI19598@titan.lakedaemon.net>
- <20130903192632.GM19598@titan.lakedaemon.net>
-Message-ID: <5226ED8E.6010308@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 4 Sep 2013 17:38:35 +0900
+Subject: [PATCH 00/04] ARM: shmobile: Initial r8a7791 SoC and Koelsch
+ board support
+In-Reply-To: <20130904034525.12546.24775.sendpatchset@w520>
+References: <20130904034525.12546.24775.sendpatchset@w520>
+Message-ID: <20130904083833.GF17329@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2013 09:26 PM, Jason Cooper wrote:
-> On Tue, Sep 03, 2013 at 08:46:33AM -0400, Jason Cooper wrote:
->> On Mon, Sep 02, 2013 at 11:26:26AM -0300, Ezequiel Garcia wrote:
->>> On Tue, Aug 27, 2013 at 05:52:42AM -0300, Ezequiel Garcia wrote:
->>>> Hi Jason and Daniel:
->>>>
->>>> (I forgot to Cc Daniel on these series, sorry about that!)
->>>>
->>>> So, now that we have all the acks we need...
->>>>
->>>> On Tue, Aug 20, 2013 at 12:45:49PM -0300, Ezequiel Garcia wrote:
->>>> [...]
->>>>>
->>>>> Ezequiel Garcia (5):
->>>>>   ARM: mvebu: Add the reference 25 MHz fixed-clock to Armada XP
->>>>>   ARM: mvebu: Add clock properties to Armada XP timer node
->>>>
->>>> Jason: I assume these are ready to get merged through mvebu, right?
->>>>
->>>>>   clocksource: armada-370-xp: Replace WARN_ON with BUG_ON
->>>>>   clocksource: armada-370-xp: Get reference fixed-clock by name
->>>>>   clocksource: armada-370-xp: Add detailed clock requirements in
->>>>>     devicetree binding
->>>>>
->>>>
->>>> Daniel: Will you pick these?
->>>>
->>>> BTW: Is there any chance you can add your clocksource tree to linux-next?
->>>>
->>>> Otherwise, our linux-next builds fail to boot whenever Jason pick some
->>>> mvebu commits and therefore appears in linux-next, but the corresponding
->>>> clocksource commit is taken by you and missing from linux-next.
->>>>
->>>
->>> Daniel,
->>>
->>> Any updates on this? The merge is really close now, and I'd like
->>> to know if you're going to pick these (and where!) for v3.12.
->>>
->>> Notice that Jason already took the devicetree patches, so unless
->>> you merge the clocksource driver changes for v3.12, we'll have
->>> to revert the former.
->>
->> I saw Daniel's pull, so I just sent the last pull for mvebu/dt including
->> these changes.
+On Wed, Sep 04, 2013 at 12:45:25PM +0900, Magnus Damm wrote:
+> ARM: shmobile: Initial r8a7791 SoC and Koelsch board supp
 > 
-> Daniel, did your changes make it in?  If so, I'll have to send these as a
-> fix for -rc1...
+> [PATCH 01/04] ARM: shmobile: Initial r8a7791 SoC support
+> [PATCH 02/04] ARM: shmobile: r8a7791 SCIF support
+> [PATCH 03/04] ARM: shmobile: r8a7791 CMT support
+> [PATCH 04/04] ARM: shmobile: Koelsch support
+> 
+> This series adds initial support for r8a7791 and Koelsch. The SoC
+> is known as r8a7791 which is based on a single cluster Cortex-A15
+> and makes use of SCIF for serial and CMT for timer. Many other
+> on-chip I/O devices are available, and support for those will be
+> added by incremental feature patches.
+> 
+> This initial SoC and board support is providing limited DT-only
+> support and a very basic C-version of board support. In the future
+> improved PINCTRL and clock framework support will be added together
+> with arch timer and SMP support.
+> 
+> Implemented in same style as r8a7790 SoC V1.
+> 
+> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> Signed-off-by: Yoshikazu Fujikawa <yoshikazu.fujikawa.ue@renesas.com>
+> Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+> [damm at opensource.se: forward porting, cleanups, commit logs, CMT support]
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-Not yet.
+I have lightly tested these and they seem good to me.
+I have posted a defconfig patch as a follow-up.
+I would to let these sit for a little bit to give them time to
+be reviewed by others.
 
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> ---
+> 
+>  Written against renesas.git tag renesas-devel-20130822
+> 
+>  arch/arm/boot/dts/Makefile                    |    1 
+>  arch/arm/boot/dts/r8a7791-koelsch.dts         |   32 +++
+>  arch/arm/boot/dts/r8a7791.dtsi                |   41 ++++
+>  arch/arm/mach-shmobile/Kconfig                |   11 +
+>  arch/arm/mach-shmobile/Makefile               |    3 
+>  arch/arm/mach-shmobile/Makefile.boot          |    1 
+>  arch/arm/mach-shmobile/board-koelsch.c        |   44 ++++
+>  arch/arm/mach-shmobile/clock-r8a7791.c        |  241 ++++++++++++++++++++++++-
+>  arch/arm/mach-shmobile/include/mach/r8a7791.h |    8 
+>  arch/arm/mach-shmobile/setup-r8a7791.c        |  149 +++++++++++++++
+>  10 files changed, 529 insertions(+), 2 deletions(-)
+> 
+> 
