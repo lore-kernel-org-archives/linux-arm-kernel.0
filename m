@@ -1,81 +1,86 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Sep 2013 17:30:31 +0100
-Subject: [PATCH 04/11] iio: pressure-i2c: st: Simplify error checking in
- probe()
-In-Reply-To: <19108ebc-3e17-4b85-a82c-c55132443a6f@email.android.com>
-References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
- <1378287103-21765-5-git-send-email-lee.jones@linaro.org>
- <19108ebc-3e17-4b85-a82c-c55132443a6f@email.android.com>
-Message-ID: <20130904163031.GB8980@lee--X1>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Wed, 04 Sep 2013 18:31:53 +0200
+Subject: [PATCH v2] ARM: dts: add AM33XX EDMA support
+In-Reply-To: <522144AB.9010802@ti.com>
+References: <1377505784-9820-1-git-send-email-bigeasy@linutronix.de>
+ <521B1380.3030908@baylibre.com> <522144AB.9010802@ti.com>
+Message-ID: <52276079.5020101@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Joel,
 
-> Hi Lee. This won't apply as this driver has already been cleaned up using devm_iio_device_alloc.
-> 
-> Guessing you are basing on an old tree? 
-> Always use at least staging-next for IIO patches.
+On 31/08/2013 03:19, Joel Fernandes wrote:
+> Hi Benoit,
+>
+> On 08/26/2013 03:36 AM, Benoit Cousson wrote:
+>> - minus all the TI emails which are not working anymore :-(
+>>
+>> I've just sent my previous email too soon...
+>>
+>> Now the patch is different :-) I'll take that one.
+>
+> Unfortunately this patch is still missing from your latest pull request:
 
-Sure, I'll rebase and resubmit the set once all the other creases have
-been ironed out.
+Indeed, it was supposed to be applied on 3.13 only. It just came too 
+late for 3.12.
 
-> I think this one will hit mainline in next few days.
+Regards,
+Benoit
 
-Okay, great.
-
-> Lee Jones <lee.jones@linaro.org> wrote:
-> >Strip out all the unnecessary gotos and check for NULL returns in the
-> >usual manner.
-> >
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >---
-> > drivers/iio/pressure/st_pressure_i2c.c | 17 ++++++-----------
-> > 1 file changed, 6 insertions(+), 11 deletions(-)
-> >
-> >diff --git a/drivers/iio/pressure/st_pressure_i2c.c
-> >b/drivers/iio/pressure/st_pressure_i2c.c
-> >index 7cebcc7..2ace770 100644
-> >--- a/drivers/iio/pressure/st_pressure_i2c.c
-> >+++ b/drivers/iio/pressure/st_pressure_i2c.c
-> >@@ -26,10 +26,8 @@ static int st_press_i2c_probe(struct i2c_client
-> >*client,
-> > 	int err;
-> > 
-> > 	indio_dev = iio_device_alloc(sizeof(*pdata));
-> >-	if (indio_dev == NULL) {
-> >-		err = -ENOMEM;
-> >-		goto iio_device_alloc_error;
-> >-	}
-> >+	if (!indio_dev)
-> >+		return -ENOMEM;
-> > 
-> > 	pdata = iio_priv(indio_dev);
-> > 	pdata->dev = &client->dev;
-> >@@ -37,15 +35,12 @@ static int st_press_i2c_probe(struct i2c_client
-> >*client,
-> > 	st_sensors_i2c_configure(indio_dev, client, pdata);
-> > 
-> > 	err = st_press_common_probe(indio_dev);
-> >-	if (err < 0)
-> >-		goto st_press_common_probe_error;
-> >+	if (err < 0) {
-> >+		iio_device_free(indio_dev);
-> >+		return err;
-> >+	}
-> > 
-> > 	return 0;
-> >-
-> >-st_press_common_probe_error:
-> >-	iio_device_free(indio_dev);
-> >-iio_device_alloc_error:
-> >-	return err;
-> > }
-> > 
-> > static int st_press_i2c_remove(struct i2c_client *client)
-> 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> Subject "[GIT PULL] ARM: OMAP: Device Tree for 3.12 take #2"
+>    git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+> tags/for_3.12/dts_signed  (commit 4843be165c10f9886c87eeb20acf19a3ddec6653)
+>
+> Below is a scissor patch that cleanly applies on above branch.
+>
+> Thanks,
+>
+> -Joel
+>
+> --->8----
+> From: Matt Porter <mporter@ti.com>
+> Subject: [PATCH] ARM: dts: add AM33XX EDMA support
+>
+> Adds AM33XX EDMA support to the am33xx.dtsi as documented in
+> Documentation/devicetree/bindings/dma/ti-edma.txt
+>
+> v2 changes:
+> Drop DT entries that are non-hardware-description Joel Fernandes <joelf@ti.com>
+> Discussion in [1].
+>
+> v3 changes: Changed node name from "edma: edma@" to "edma: dma-controller@"
+> by Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+>
+> [1] https://patchwork.kernel.org/patch/2226761/
+>
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
+> ---
+>   arch/arm/boot/dts/am33xx.dtsi | 12 ++++++++++++
+>   1 file changed, 12 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 5996d63..f5869ed 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -101,6 +101,18 @@
+>   			reg = <0x48200000 0x1000>;
+>   		};
+>
+> +		edma: dma-controller at 49000000 {
+> +			compatible = "ti,edma3";
+> +			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+> +			reg =	<0x49000000 0x10000>,
+> +				<0x44e10f90 0x10>;
+> +			interrupts = <12 13 14>;
+> +			#dma-cells = <1>;
+> +			dma-channels = <64>;
+> +			ti,edma-regions = <4>;
+> +			ti,edma-slots = <256>;
+> +		};
+> +
+>   		gpio0: gpio at 44e07000 {
+>   			compatible = "ti,omap4-gpio";
+>   			ti,hwmods = "gpio1";
+>
