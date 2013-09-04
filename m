@@ -1,256 +1,36 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed,  4 Sep 2013 16:44:52 +0200
-Subject: [RFC PATCH] amba: Ensure drvdata is NULL
-Message-ID: <346db238d6c8c418bddb1e8a166e9818b5074c06.1378305864.git.michal.simek@xilinx.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 04 Sep 2013 10:10:02 -0400
+Subject: [PATCH] Documentation/arm64: clarify requirements for DTB placement
+Message-ID: <1378303802.3485.36.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is inpired by the patch for drvdata
-"device-core: Ensure drvdata = NULL when no driver is bound"
-(sha1: 0998d0631001288a5974afc0b2a5f568bcdecb4d)
+The current description of DTB placement requirements does not quite
+match the kernel code in head.S: __vet_fdt and __create_page_tables.
+This patch tweaks the text to match the actual requirements placed on
+it by the code.
 
-Also it fixes all occurences in drivers.
-
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Signed-off-by: Mark Salter <msalter@redhat.com>
 ---
- arch/arm/kernel/etm.c           | 6 ------
- drivers/amba/bus.c              | 2 ++
- drivers/dma/pl330.c             | 3 ---
- drivers/input/serio/ambakmi.c   | 2 --
- drivers/mmc/host/mmci.c         | 2 --
- drivers/rtc/rtc-pl030.c         | 2 --
- drivers/rtc/rtc-pl031.c         | 2 --
- drivers/spi/spi-pl022.c         | 1 -
- drivers/tty/serial/amba-pl010.c | 3 ---
- drivers/tty/serial/amba-pl011.c | 3 ---
- drivers/video/amba-clcd.c       | 2 --
- drivers/watchdog/sp805_wdt.c    | 1 -
- 12 files changed, 2 insertions(+), 27 deletions(-)
+ Documentation/arm64/booting.txt | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-index 8ff0ecd..131a6ab 100644
---- a/arch/arm/kernel/etm.c
-+++ b/arch/arm/kernel/etm.c
-@@ -385,7 +385,6 @@ out:
- 	return ret;
-
- out_unmap:
--	amba_set_drvdata(dev, NULL);
- 	iounmap(t->etb_regs);
-
- out_release:
-@@ -398,8 +397,6 @@ static int etb_remove(struct amba_device *dev)
- {
- 	struct tracectx *t = amba_get_drvdata(dev);
-
--	amba_set_drvdata(dev, NULL);
--
- 	iounmap(t->etb_regs);
- 	t->etb_regs = NULL;
-
-@@ -588,7 +585,6 @@ out:
- 	return ret;
-
- out_unmap:
--	amba_set_drvdata(dev, NULL);
- 	iounmap(t->etm_regs);
-
- out_release:
-@@ -601,8 +597,6 @@ static int etm_remove(struct amba_device *dev)
- {
- 	struct tracectx *t = amba_get_drvdata(dev);
-
--	amba_set_drvdata(dev, NULL);
--
- 	iounmap(t->etm_regs);
- 	t->etm_regs = NULL;
-
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index c670727..9762090 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -373,6 +373,7 @@ static int amba_probe(struct device *dev)
- 		if (ret == 0)
- 			break;
-
-+		amba_set_drvdata(pcdev, NULL);
- 		pm_runtime_disable(dev);
- 		pm_runtime_set_suspended(dev);
- 		pm_runtime_put_noidle(dev);
-@@ -391,6 +392,7 @@ static int amba_remove(struct device *dev)
-
- 	pm_runtime_get_sync(dev);
- 	ret = drv->remove(pcdev);
-+	amba_set_drvdata(pcdev, NULL);
- 	pm_runtime_put_noidle(dev);
-
- 	/* Undo the runtime PM settings in amba_probe() */
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index fa645d8..626f99e 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -3026,8 +3026,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
-
- 	return 0;
- probe_err3:
--	amba_set_drvdata(adev, NULL);
--
- 	/* Idle the DMAC */
- 	list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
- 			chan.device_node) {
-@@ -3061,7 +3059,6 @@ static int pl330_remove(struct amba_device *adev)
- 		of_dma_controller_free(adev->dev.of_node);
-
- 	dma_async_device_unregister(&pdmac->ddma);
--	amba_set_drvdata(adev, NULL);
-
- 	/* Idle the DMAC */
- 	list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
-diff --git a/drivers/input/serio/ambakmi.c b/drivers/input/serio/ambakmi.c
-index 4e2fd44..b7c206d 100644
---- a/drivers/input/serio/ambakmi.c
-+++ b/drivers/input/serio/ambakmi.c
-@@ -167,8 +167,6 @@ static int amba_kmi_remove(struct amba_device *dev)
- {
- 	struct amba_kmi_port *kmi = amba_get_drvdata(dev);
-
--	amba_set_drvdata(dev, NULL);
--
- 	serio_unregister_port(kmi->io);
- 	clk_put(kmi->clk);
- 	iounmap(kmi->base);
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index c3785ed..07e17f1 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1678,8 +1678,6 @@ static int mmci_remove(struct amba_device *dev)
- {
- 	struct mmc_host *mmc = amba_get_drvdata(dev);
-
--	amba_set_drvdata(dev, NULL);
--
- 	if (mmc) {
- 		struct mmci_host *host = mmc_priv(mmc);
-
-diff --git a/drivers/rtc/rtc-pl030.c b/drivers/rtc/rtc-pl030.c
-index 22bacdb..a804f75 100644
---- a/drivers/rtc/rtc-pl030.c
-+++ b/drivers/rtc/rtc-pl030.c
-@@ -153,8 +153,6 @@ static int pl030_remove(struct amba_device *dev)
- {
- 	struct pl030_rtc *rtc = amba_get_drvdata(dev);
-
--	amba_set_drvdata(dev, NULL);
--
- 	writel(0, rtc->base + RTC_CR);
-
- 	free_irq(dev->irq[0], rtc);
-diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 0f0609b..c9ca86e 100644
---- a/drivers/rtc/rtc-pl031.c
-+++ b/drivers/rtc/rtc-pl031.c
-@@ -305,7 +305,6 @@ static int pl031_remove(struct amba_device *adev)
- {
- 	struct pl031_local *ldata = dev_get_drvdata(&adev->dev);
-
--	amba_set_drvdata(adev, NULL);
- 	free_irq(adev->irq[0], ldata);
- 	rtc_device_unregister(ldata->rtc);
- 	iounmap(ldata->base);
-@@ -392,7 +391,6 @@ out_no_irq:
- 	rtc_device_unregister(ldata->rtc);
- out_no_rtc:
- 	iounmap(ldata->base);
--	amba_set_drvdata(adev, NULL);
- out_no_remap:
- 	kfree(ldata);
- out:
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index abef061..e12813e 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2306,7 +2306,6 @@ pl022_remove(struct amba_device *adev)
- 	amba_release_regions(adev);
- 	tasklet_disable(&pl022->pump_transfers);
- 	spi_unregister_master(pl022->master);
--	amba_set_drvdata(adev, NULL);
- 	return 0;
- }
-
-diff --git a/drivers/tty/serial/amba-pl010.c b/drivers/tty/serial/amba-pl010.c
-index c368405..f630b78 100644
---- a/drivers/tty/serial/amba-pl010.c
-+++ b/drivers/tty/serial/amba-pl010.c
-@@ -728,7 +728,6 @@ static int pl010_probe(struct amba_device *dev, const struct amba_id *id)
- 	amba_set_drvdata(dev, uap);
- 	ret = uart_add_one_port(&amba_reg, &uap->port);
- 	if (ret) {
--		amba_set_drvdata(dev, NULL);
- 		amba_ports[i] = NULL;
- 		clk_put(uap->clk);
-  unmap:
-@@ -745,8 +744,6 @@ static int pl010_remove(struct amba_device *dev)
- 	struct uart_amba_port *uap = amba_get_drvdata(dev);
- 	int i;
-
--	amba_set_drvdata(dev, NULL);
--
- 	uart_remove_one_port(&amba_reg, &uap->port);
-
- 	for (i = 0; i < ARRAY_SIZE(amba_ports); i++)
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 28b35ad..2a1efe0 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2143,7 +2143,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 	amba_set_drvdata(dev, uap);
- 	ret = uart_add_one_port(&amba_reg, &uap->port);
- 	if (ret) {
--		amba_set_drvdata(dev, NULL);
- 		amba_ports[i] = NULL;
- 		pl011_dma_remove(uap);
- 	}
-@@ -2156,8 +2155,6 @@ static int pl011_remove(struct amba_device *dev)
- 	struct uart_amba_port *uap = amba_get_drvdata(dev);
- 	int i;
-
--	amba_set_drvdata(dev, NULL);
--
- 	uart_remove_one_port(&amba_reg, &uap->port);
-
- 	for (i = 0; i < ARRAY_SIZE(amba_ports); i++)
-diff --git a/drivers/video/amba-clcd.c b/drivers/video/amba-clcd.c
-index 0a2cce7..0bab6ab 100644
---- a/drivers/video/amba-clcd.c
-+++ b/drivers/video/amba-clcd.c
-@@ -594,8 +594,6 @@ static int clcdfb_remove(struct amba_device *dev)
- {
- 	struct clcd_fb *fb = amba_get_drvdata(dev);
-
--	amba_set_drvdata(dev, NULL);
--
- 	clcdfb_disable(fb);
- 	unregister_framebuffer(&fb->fb);
- 	if (fb->fb.cmap.len)
-diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
-index 58df98a..3f786ce 100644
---- a/drivers/watchdog/sp805_wdt.c
-+++ b/drivers/watchdog/sp805_wdt.c
-@@ -268,7 +268,6 @@ static int sp805_wdt_remove(struct amba_device *adev)
- 	struct sp805_wdt *wdt = amba_get_drvdata(adev);
-
- 	watchdog_unregister_device(&wdt->wdd);
--	amba_set_drvdata(adev, NULL);
- 	watchdog_set_drvdata(&wdt->wdd, NULL);
-
- 	return 0;
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130904/2fce6c10/attachment-0001.sig>
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 5273c4d..98df4a0 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -45,9 +45,9 @@ sees fit.)
+ 
+ Requirement: MANDATORY
+ 
+-The device tree blob (dtb) must be no bigger than 2 megabytes in size
+-and placed at a 2-megabyte boundary within the first 512 megabytes from
+-the start of the kernel image. This is to allow the kernel to map the
++The device tree blob (dtb) must be placed on an 8-byte boundary within
++the first 512 megabytes from the start of the kernel image and must not
++cross a 2-megabyte boundary. This is to allow the kernel to map the
+ blob using a single section mapping in the initial page tables.
+ 
+ 
+-- 
+1.8.3.1
