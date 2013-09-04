@@ -1,62 +1,30 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 04 Sep 2013 15:18:18 +0200
-Subject: [PATCH 11/11] iio: pressure-core: st: Provide correct regulator
- support
-In-Reply-To: <20130904131111.GJ18206@e106331-lin.cambridge.arm.com>
-References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
- <1378287103-21765-12-git-send-email-lee.jones@linaro.org>
- <20130904131111.GJ18206@e106331-lin.cambridge.arm.com>
-Message-ID: <5227331A.5050507@metafoo.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 4 Sep 2013 21:19:49 +0800
+Subject: [PATCH v2 0/4] *** ARM: imx6sl: add FEC support for imx6sl evk
+ platform ***
+In-Reply-To: <1378182385-9205-1-git-send-email-B38611@freescale.com>
+References: <1378182385-9205-1-git-send-email-B38611@freescale.com>
+Message-ID: <20130904131947.GA16797@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2013 03:11 PM, Mark Rutland wrote:
-> Hi Lee,
+On Tue, Sep 03, 2013 at 12:26:21PM +0800, Fugang Duan wrote:
+> Changelog:
 > 
-> On Wed, Sep 04, 2013 at 10:31:43AM +0100, Lee Jones wrote:
->> The power to some of the sensors are controlled by regulators. In most
->> cases these are 'always on', but if not they will fail to work until
->> the regulator is enabled using the relevant APIs.
->>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> ---
->>  drivers/iio/pressure/st_pressure_core.c | 13 +++++++++++++
->>  include/linux/iio/common/st_sensors.h   |  3 +++
->>  2 files changed, 16 insertions(+)
->>
->> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
->> index f452417..7beed89 100644
->> --- a/drivers/iio/pressure/st_pressure_core.c
->> +++ b/drivers/iio/pressure/st_pressure_core.c
->> @@ -23,6 +23,7 @@
->>  #include <linux/iio/sysfs.h>
->>  #include <linux/iio/trigger.h>
->>  #include <linux/iio/buffer.h>
->> +#include <linux/regulator/consumer.h>
->>  #include <asm/unaligned.h>
->>  
->>  #include <linux/iio/common/st_sensors.h>
->> @@ -315,6 +316,15 @@ int st_press_common_probe(struct iio_dev *indio_dev)
->>  	indio_dev->modes = INDIO_DIRECT_MODE;
->>  	indio_dev->info = &press_info;
->>  
->> +	/* Regulator not mandatory, but if requested we should enable it. */
->> +	pdata->regulator = regulator_get(&indio_dev->dev, "vdd");
->> +	if (!IS_ERR_OR_NULL(pdata->regulator)) {
+> V2:
+>  * Split iomuxc-gpr and fec phy gpio reset dts patch
+>  * Sort included header file
 > 
-> Can regulator_get return NULL? As far as I can see, it either returns a
-> valid reulator pointer or an ERR_PTR value.
+> v1:
+>  * Add iomuxc-gpr device node
+>  * Add imx6sl evk fec phy gpio reset
+>  * Add imx6sl iomuxc-gpr fec gpr field define
+>  * Add fec init function to select clock source.
 > 
-> When you say "if requested", do you mean "if described in the dt"? If
-> so, the above doesn't distunguish between a regulator not being listed
-> and one failing to be got (e.g. if we got EPROBE_DEFER from
-> regulator_get).
-> 
-> I think this would be better handled with something like Mark Brown's
-> suggested regulator_get_optional [1,2].
+> Fugang Duan (4):
+>   ARM: dts: add iomuxc-gpr device node for imx6sl
+>   ARM: dts: add fec phy reset for imx6sl evk board
+>   ARM: imx6sl: add imx6sl iomux-gpr field define
+>   ARM: imx6sl: config iomux-gpr1 to select clock for fec
 
-It can return NULL, but NULL is actually a valid regulator in that case, so
-the check should only be IS_ERR. And yes regulator_get_optional is what
-should be used here.
-
-- Lars
+Applied all, thanks.
