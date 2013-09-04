@@ -1,166 +1,27 @@
-From: denis.ciocca@st.com (Denis CIOCCA)
-Date: Wed, 4 Sep 2013 22:10:17 +0200
-Subject: [PATCH 05/11] iio: pressure-core: st: Describe LPS331AP defines
- by name
-In-Reply-To: <1378287103-21765-6-git-send-email-lee.jones@linaro.org>
-References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
- <1378287103-21765-6-git-send-email-lee.jones@linaro.org>
-Message-ID: <522793A9.8040300@st.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 04 Sep 2013 14:11:19 -0600
+Subject: [PATCH v2 0/4] Introduce table driven initializations
+In-Reply-To: <1378304438-7780-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1378304438-7780-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <522793E7.3020000@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-> They're currently named *_1_*, for 'Sensor 1', but the code will be much
-> more readable if we use the naming convention *_LPS331AP_* instead.
-You are right, but the reason is to maintain the same structure of the 
-other sensors drivers (like accel, gyro and magn). Often some sensors 
-can use the same data and using 1,2,... I think it's more general.
+On 09/04/2013 08:20 AM, Peter De Schrijver wrote:
+> This patchset introduces a table driven initialization method for the
+> audio, PMC and gate clocks. It's similar to the table we already have for                                                                                      
+> the periph clocks.                                                                                                                                             
+> 
+> Changes since v1:
+> 
+> * Use parent names directly in TEGRA_INIT_DATA_GATE()
 
-Denis
+For the record, I said the following in response to V1 which still applies:
 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   drivers/iio/pressure/st_pressure_core.c | 90 ++++++++++++++++-----------------
->   1 file changed, 44 insertions(+), 46 deletions(-)
->
-> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
-> index 9c343b4..becfb25 100644
-> --- a/drivers/iio/pressure/st_pressure_core.c
-> +++ b/drivers/iio/pressure/st_pressure_core.c
-> @@ -31,92 +31,90 @@
->   #define ST_PRESS_MBAR_TO_KPASCAL(x)		(x * 10)
->   #define ST_PRESS_NUMBER_DATA_CHANNELS		1
->   
-> -/* DEFAULT VALUE FOR SENSORS */
-> -#define ST_PRESS_DEFAULT_OUT_XL_ADDR		0x28
-> -#define ST_TEMP_DEFAULT_OUT_L_ADDR		0x2b
-> -
->   /* FULLSCALE */
->   #define ST_PRESS_FS_AVL_1260MB			1260
->   
-> -/* CUSTOM VALUES FOR SENSOR 1 */
-> -#define ST_PRESS_1_WAI_EXP			0xbb
-> -#define ST_PRESS_1_ODR_ADDR			0x20
-> -#define ST_PRESS_1_ODR_MASK			0x70
-> -#define ST_PRESS_1_ODR_AVL_1HZ_VAL		0x01
-> -#define ST_PRESS_1_ODR_AVL_7HZ_VAL		0x05
-> -#define ST_PRESS_1_ODR_AVL_13HZ_VAL		0x06
-> -#define ST_PRESS_1_ODR_AVL_25HZ_VAL		0x07
-> -#define ST_PRESS_1_PW_ADDR			0x20
-> -#define ST_PRESS_1_PW_MASK			0x80
-> -#define ST_PRESS_1_FS_ADDR			0x23
-> -#define ST_PRESS_1_FS_MASK			0x30
-> -#define ST_PRESS_1_FS_AVL_1260_VAL		0x00
-> -#define ST_PRESS_1_FS_AVL_1260_GAIN		ST_PRESS_MBAR_TO_KPASCAL(244141)
-> -#define ST_PRESS_1_FS_AVL_TEMP_GAIN		2083000
-> -#define ST_PRESS_1_BDU_ADDR			0x20
-> -#define ST_PRESS_1_BDU_MASK			0x04
-> -#define ST_PRESS_1_DRDY_IRQ_ADDR		0x22
-> -#define ST_PRESS_1_DRDY_IRQ_MASK		0x04
-> -#define ST_PRESS_1_MULTIREAD_BIT		true
-> -#define ST_PRESS_1_TEMP_OFFSET			42500
-> +/* CUSTOM VALUES FOR LPS331AP SENSOR */
-> +#define ST_PRESS_LPS331AP_WAI_EXP		0xbb
-> +#define ST_PRESS_LPS331AP_ODR_ADDR		0x20
-> +#define ST_PRESS_LPS331AP_ODR_MASK		0x70
-> +#define ST_PRESS_LPS331AP_ODR_AVL_1HZ_VAL	0x01
-> +#define ST_PRESS_LPS331AP_ODR_AVL_7HZ_VAL	0x05
-> +#define ST_PRESS_LPS331AP_ODR_AVL_13HZ_VAL	0x06
-> +#define ST_PRESS_LPS331AP_ODR_AVL_25HZ_VAL	0x07
-> +#define ST_PRESS_LPS331AP_PW_ADDR		0x20
-> +#define ST_PRESS_LPS331AP_PW_MASK		0x80
-> +#define ST_PRESS_LPS331AP_FS_ADDR		0x23
-> +#define ST_PRESS_LPS331AP_FS_MASK		0x30
-> +#define ST_PRESS_LPS331AP_FS_AVL_1260_VAL	0x00
-> +#define ST_PRESS_LPS331AP_FS_AVL_1260_GAIN	ST_PRESS_MBAR_TO_KPASCAL(244141)
-> +#define ST_PRESS_LPS331AP_FS_AVL_TEMP_GAIN	2083000
-> +#define ST_PRESS_LPS331AP_BDU_ADDR		0x20
-> +#define ST_PRESS_LPS331AP_BDU_MASK		0x04
-> +#define ST_PRESS_LPS331AP_DRDY_IRQ_ADDR		0x22
-> +#define ST_PRESS_LPS331AP_DRDY_IRQ_MASK		0x04
-> +#define ST_PRESS_LPS331AP_MULTIREAD_BIT		true
-> +#define ST_PRESS_LPS331AP_TEMP_OFFSET		42500
-> +#define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
-> +#define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
->   
->   static const struct iio_chan_spec st_press_channels[] = {
->   	ST_SENSORS_LSM_CHANNELS(IIO_PRESSURE,
->   			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
->   			ST_SENSORS_SCAN_X, 0, IIO_NO_MOD, 'u', IIO_LE, 24, 24,
-> -			ST_PRESS_DEFAULT_OUT_XL_ADDR),
-> +			ST_PRESS_LPS331AP_OUT_XL_ADDR),
->   	ST_SENSORS_LSM_CHANNELS(IIO_TEMP,
->   			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE) |
->   						BIT(IIO_CHAN_INFO_OFFSET),
->   			-1, 0, IIO_NO_MOD, 's', IIO_LE, 16, 16,
-> -			ST_TEMP_DEFAULT_OUT_L_ADDR),
-> +			ST_TEMP_LPS331AP_OUT_L_ADDR),
->   	IIO_CHAN_SOFT_TIMESTAMP(1)
->   };
->   
->   static const struct st_sensors st_press_sensors[] = {
->   	{
-> -		.wai = ST_PRESS_1_WAI_EXP,
-> +		.wai = ST_PRESS_LPS331AP_WAI_EXP,
->   		.sensors_supported = {
->   			[0] = LPS331AP_PRESS_DEV_NAME,
->   		},
->   		.ch = (struct iio_chan_spec *)st_press_channels,
->   		.odr = {
-> -			.addr = ST_PRESS_1_ODR_ADDR,
-> -			.mask = ST_PRESS_1_ODR_MASK,
-> +			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
-> +			.mask = ST_PRESS_LPS331AP_ODR_MASK,
->   			.odr_avl = {
-> -				{ 1, ST_PRESS_1_ODR_AVL_1HZ_VAL, },
-> -				{ 7, ST_PRESS_1_ODR_AVL_7HZ_VAL, },
-> -				{ 13, ST_PRESS_1_ODR_AVL_13HZ_VAL, },
-> -				{ 25, ST_PRESS_1_ODR_AVL_25HZ_VAL, },
-> +				{ 1, ST_PRESS_LPS331AP_ODR_AVL_1HZ_VAL, },
-> +				{ 7, ST_PRESS_LPS331AP_ODR_AVL_7HZ_VAL, },
-> +				{ 13, ST_PRESS_LPS331AP_ODR_AVL_13HZ_VAL, },
-> +				{ 25, ST_PRESS_LPS331AP_ODR_AVL_25HZ_VAL, },
->   			},
->   		},
->   		.pw = {
-> -			.addr = ST_PRESS_1_PW_ADDR,
-> -			.mask = ST_PRESS_1_PW_MASK,
-> +			.addr = ST_PRESS_LPS331AP_PW_ADDR,
-> +			.mask = ST_PRESS_LPS331AP_PW_MASK,
->   			.value_on = ST_SENSORS_DEFAULT_POWER_ON_VALUE,
->   			.value_off = ST_SENSORS_DEFAULT_POWER_OFF_VALUE,
->   		},
->   		.fs = {
-> -			.addr = ST_PRESS_1_FS_ADDR,
-> -			.mask = ST_PRESS_1_FS_MASK,
-> +			.addr = ST_PRESS_LPS331AP_FS_ADDR,
-> +			.mask = ST_PRESS_LPS331AP_FS_MASK,
->   			.fs_avl = {
->   				[0] = {
->   					.num = ST_PRESS_FS_AVL_1260MB,
-> -					.value = ST_PRESS_1_FS_AVL_1260_VAL,
-> -					.gain = ST_PRESS_1_FS_AVL_1260_GAIN,
-> -					.gain2 = ST_PRESS_1_FS_AVL_TEMP_GAIN,
-> +					.value = ST_PRESS_LPS331AP_FS_AVL_1260_VAL,
-> +					.gain = ST_PRESS_LPS331AP_FS_AVL_1260_GAIN,
-> +					.gain2 = ST_PRESS_LPS331AP_FS_AVL_TEMP_GAIN,
->   				},
->   			},
->   		},
->   		.bdu = {
-> -			.addr = ST_PRESS_1_BDU_ADDR,
-> -			.mask = ST_PRESS_1_BDU_MASK,
-> +			.addr = ST_PRESS_LPS331AP_BDU_ADDR,
-> +			.mask = ST_PRESS_LPS331AP_BDU_MASK,
->   		},
->   		.drdy_irq = {
-> -			.addr = ST_PRESS_1_DRDY_IRQ_ADDR,
-> -			.mask = ST_PRESS_1_DRDY_IRQ_MASK,
-> +			.addr = ST_PRESS_LPS331AP_DRDY_IRQ_ADDR,
-> +			.mask = ST_PRESS_LPS331AP_DRDY_IRQ_MASK,
->   		},
-> -		.multi_read_bit = ST_PRESS_1_MULTIREAD_BIT,
-> +		.multi_read_bit = ST_PRESS_LPS331AP_MULTIREAD_BIT,
->   		.bootime = 2,
->   	},
->   };
+I assume these patches will all go through Mike's clock tree for 3.13.
+
+Aside from the one issue I mentioned, the series,
+Acked-by: Stephen Warren <swarren@nvidia.com>
+
+I assume this will be followed by changes to convert the Tegra20/30
+clock drivers to be table-based too?
