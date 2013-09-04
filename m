@@ -1,43 +1,38 @@
-From: thomas.langer@lantiq.com (thomas.langer at lantiq.com)
-Date: Wed, 4 Sep 2013 13:45:40 +0000
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <20130905014350.GA2261@gmail.com>
-References: <1377828449-18912-1-git-send-email-b32955@freescale.com>
- <522697E9.1050208@freescale.com> <20130904095523.GT3084@sirena.org.uk>
- <52270B8E.5080402@freescale.com> <20130904113322.GA5859@sirena.org.uk>
- <20130905014350.GA2261@gmail.com>
-Message-ID: <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 4 Sep 2013 21:48:31 +0800
+Subject: [PATCH 1/2] ARM: i.MX6: dts: change iomuxc pinctrl config to
+ match Rev. 1 IMX6DQRM
+In-Reply-To: <52241BB3.5030909@freescale.com>
+References: <521C40D9.3070802@freescale.com>
+ <1377659855-9573-1-git-send-email-alison_chaiken@mentor.com>
+ <1377659855-9573-2-git-send-email-alison_chaiken@mentor.com>
+ <52241BB3.5030909@freescale.com>
+Message-ID: <20130904134828.GA16815@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Huang,
-
-Huang Shijie wrote on?2013-09-05:
-> On Wed, Sep 04, 2013 at 12:33:22PM +0100, Mark Brown wrote:
->> On Wed, Sep 04, 2013 at 06:29:34PM +0800, Huang Shijie wrote:
->>> ? 2013?09?04? 17:55, Mark Brown ??:
->>>> On Wed, Sep 04, 2013 at 10:16:09AM +0800, Huang Shijie wrote:
->> 
->>>>> Since this quadspi driver depends on the mtd code, could this driver
->>>>> goes to the kernel by
->>>>> the l2-mtd tree?
->> 
->>>> Why would a SPI driver depend on MTD?
->> 
->>> The patch 1-4 are for m25p80.c, and this quadspi controller drivers
->>> depends on the
->>> patch 1-4.
->> 
->> In what way does the controller driver depend on those changes?
-> This driver needs the spi nor command to fill the LUT register, such as
-> OPCODE_WREN(0x06), so the patch 1 moves the spi nor command to a seprate
-> header spi-nor.h, and this driver includes this new header.
+On Mon, Sep 02, 2013 at 01:01:39PM +0800, Huang Shijie wrote:
+> I tested this patch with the imx6q-ard board and imx6dl-ard board.
 > 
-Then some questions come up: 
-- Why does the spi controller need to know this?
-- What is this LUT register at all?
-- What happens if something different that a flash is connected and 
-   the data starts with one of these opcodes?
+> For the gpmi nand test result:
+> [1] imx6q-ard: We can pass the bonie++ stress test with the imx6q-ard board.
+> 
+> [2] imx6dl-ard: But we fails to read the nand ID with the imx6dl-ard board.
+> In other word, this gpmi can _not_ works with this patch.
 
-Best Regards,
-Thomas
+The reason I'm not keen on merging this patch is just because I'm
+concerned by such breakages that it could possibly bring us.
+
+Do you actually see any issue in real with using the existing pad
+settings on your board?
+
+> But without this patch, the imx6dl-ard works fine.
+> 
+> In section 4.1, the spec tells us that the 0x1b0b0 is just the "default
+> settings for the each pad",
+> not the right settings for the each pad.
+
++1, the default setting != the best setting for boards, and that's why
+the design leaves the pad settings configurable.
+
+Shawn
