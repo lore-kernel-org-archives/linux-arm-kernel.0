@@ -1,86 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Sep 2013 15:08:44 +0100
-Subject: [PATCH 02/11] ARM: ux500: Enable the LPS001WP Pressure &
- Temperature sensor from DT
-In-Reply-To: <20130904133654.GH20150@lee--X1>
-References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
- <1378287103-21765-3-git-send-email-lee.jones@linaro.org>
- <20130904123850.GI18206@e106331-lin.cambridge.arm.com>
- <20130904133654.GH20150@lee--X1>
-Message-ID: <20130904140844.GL18206@e106331-lin.cambridge.arm.com>
+From: jwboyer@fedoraproject.org (Josh Boyer)
+Date: Wed, 4 Sep 2013 10:13:16 -0400
+Subject: 3.12 merge window exynos cpufreq driver fails to build
+Message-ID: <CA+5PVA6SQ9JGBD3F=u5ysch-agp91oTK8ZbKsdQkz57yZ8OUHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 04, 2013 at 02:36:54PM +0100, Lee Jones wrote:
-> On Wed, 04 Sep 2013, Mark Rutland wrote:
-> 
-> > Hi Lee,
-> > 
-> > On Wed, Sep 04, 2013 at 10:31:34AM +0100, Lee Jones wrote:
-> > > After applying this node the LPS001WP sensor chip should probe
-> > > successfully once the driver support has also been applied.
-> > > 
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  arch/arm/boot/dts/ste-snowball.dts | 10 ++++++++++
-> > >  1 file changed, 10 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-> > > index cf9b16e..aad8f54 100644
-> > > --- a/arch/arm/boot/dts/ste-snowball.dts
-> > > +++ b/arch/arm/boot/dts/ste-snowball.dts
-> > > @@ -153,6 +153,16 @@
-> > >  			status = "okay";
-> > >  		};
-> > >  
-> > > +		i2c at 80128000 {
-> > > +			lps001wp at 5c {
-> > > +				compatible = "lps001wp";
-> > > +				reg = <0x5c>;
-> > > +
-> > > +				vdd-supply = <&ab8500_ldo_aux1_reg>;
-> > > +				vms-supply = <&db8500_vsmps2_reg>;
-> > > +			};
-> > > +		};
-> > > +
-> > 
-> > This appears to be missing a binding document. I couldn't see one
-> > anywhere in this series, or in mainline already).
-> > 
-> > As far as I can see, the compatible string should be "st,lps001wp".
-> 
-> The I2C subsystem doesn't actually care about vendor prefixes. They
-> are all stripped before use in all cases. However, I'm happy to
-> provide one if for no other reason than to stick to convention.
+Using Linus' tree as of this morning (v3.11-2654-g458c3f6), the
+exynos-cpufreq driver doesn't build because it includes a file that
+doesn't exist.
 
-I'd prefer if we did document this. Just because Linux doesn't care
-about this at the moment doesn't mean we (or another OS) might want to
-handle it differently in future. It also gives us a semblance of
-consistency.
++ make -s ARCH=arm V=1 -j4 bzImage KALLSYMS_EXTRA_PASS=1
+arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO:
+return_address should use unwind tables" [-Wcpp]
+ #warning "TODO: return_address should use unwind tables"
+  ^
+arch/arm/mm/dma-mapping.c:253:2: warning: #warning ARM Coherent DMA
+allocator does not (yet) support huge TLB [-Wcpp]
+ #warning ARM Coherent DMA allocator does not (yet) support huge TLB
+  ^
+drivers/cpufreq/exynos-cpufreq.c:21:22: fatal error: plat/cpu.h: No
+such file or directory
+ #include <plat/cpu.h>
+                      ^
+compilation terminated.
+make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
 
-> 
-> > Please produce a binding document.
-> 
-> Again, I'm happy to provide a boilerplate document, but there's
-> nothing special happening here.
+I'm guessing that <plat/cpu.h> file is supposed to come from
+arch/arm/plat-samsung/include/plat/, but I don't see anything that
+specifies a -I there.
 
-That's not true. The names of the regulators should be documented. One
-seems to be optional for some reason.
+Thoughts?
 
-> 
-> > Is there any publicly available documentation on the chip?
-> 
-> If you Google the device name, it will be the first hit.
-
-Ok, I'll take a look.
-
-> 
-> > >  		uart at 80120000 {
-> > >  			status = "okay";
-> > >  		};
-> 
-> Kind regards,
-> Lee
-
-Cheers,
-Mark.
+josh
