@@ -1,47 +1,181 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 04 Sep 2013 12:36:47 -0600
-Subject: [PATCH v4 3/5] clk: dt: binding for basic multiplexer clock
-In-Reply-To: <20130903232219.10934.67434@quantum>
-References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
- <1377150793-27864-4-git-send-email-mturquette@linaro.org>
- <2A930389-012E-45C3-93EB-6B4A41DB2EF5@codeaurora.org>
- <20130829011425.8231.78802@quantum>
- <39BAF1F8-41AD-4667-BF76-22BDF709415A@codeaurora.org>
- <20130830203334.10934.10011@quantum> <522110AA.7040700@wwwdotorg.org>
- <20130903232219.10934.67434@quantum>
-Message-ID: <52277DBF.7080104@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed,  4 Sep 2013 14:31:43 -0500
+Subject: [PATCH v5] ARM: Add check for Cortex-A15 errata 798181 ECO
+Message-ID: <1378323103-5940-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2013 05:22 PM, Mike Turquette wrote:
-> Quoting Stephen Warren (2013-08-30 14:37:46)
->> On 08/30/2013 02:33 PM, Mike Turquette wrote:
-...
->>> The clock _data_ seems to always have some churn to it. Moving it out to
->>> DT reduces that churn from Linux. My concern above is not about kernel
->>> data size.
->>
->> That sounds like the opposite of what we should be doing.
->>
->> It's fine for kernel code/data to change; that's a natural part of
->> development. Obviously, we should minimize churn, through thorough
->> review, domain knowledge, etc.
-> 
-> And with the "clock mapping" style bindings we'll end up changing both
-> the DT binding definition and the kernel. Not great.
+From: Rob Herring <rob.herring@calxeda.com>
 
-What's a "clock mapping" style binding? I guess that means the style
-where you have a single DT node that provides multiple clocks, rather
-than one DT node per clock?
+The work-around for A15 errata 798181 is not needed if appropriate ECO
+fixes have been applied to r3p2 and earlier core revisions. This can be
+checked by reading REVIDR register bits 4 and 9. If only bit 4 is set,
+then the IPI broadcast can be skipped.
 
-If the kernel driver changes its internal data, I don't see why that
-would have any impact at all on the DT binding definition. We should be
-able to use one DT binding definition with arbitrary drivers.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+---
 
-> And I'll respond to your points below but the whole "relocate the
-> problem to DT" argument is simply not my main point. What I want to do
-> is increase the usefulness of DT by allowing register-level details into
-> the binding which can 
+v5:
+- Rebase on Russell's devel-stable 
+- Fix !SMP builds (add back #ifdefs)
+- Compiled on !SMP and SMP with and without errata work-around enabled.
 
-Can you expand upon why a DT that encodes register-level details is more
-useful? I can't see why there would be any difference in usefulness.
+v4:
+- Move code from setup.c back to smp_tlb.c
+- Use IS_ENABLED macro
+
+v3:
+- Rebase to v3.11-rc5 due to commit 1f49856 (ARM: 7789/1: Do not run
+ dummy_flush_tlb_a15_erratum() on non-Cortex-A15)
+- Move the revision checking out of line and use function ptrs.
+
+v2: 
+- Determine the work-around needed and save in a static varible instead 
+of re-reading the ID registers. 
+
+
+ arch/arm/include/asm/cputype.h  |  1 +
+ arch/arm/include/asm/tlbflush.h | 34 +++++++++-------------------------
+ arch/arm/kernel/setup.c         |  2 ++
+ arch/arm/kernel/smp_tlb.c       | 36 ++++++++++++++++++++++++++++++++++--
+ 4 files changed, 46 insertions(+), 27 deletions(-)
+
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index 9672e97..acdde76 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -10,6 +10,7 @@
+ #define CPUID_TLBTYPE	3
+ #define CPUID_MPUIR	4
+ #define CPUID_MPIDR	5
++#define CPUID_REVIDR	6
+ 
+ #ifdef CONFIG_CPU_V7M
+ #define CPUID_EXT_PFR0	0x40
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index 3896026..dfad966 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -560,36 +560,20 @@ static inline void __flush_bp_all(void)
+ 		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
+ }
+ 
+-#include <asm/cputype.h>
+ #ifdef CONFIG_ARM_ERRATA_798181
+-static inline int erratum_a15_798181(void)
+-{
+-	unsigned int midr = read_cpuid_id();
+-
+-	/* Cortex-A15 r0p0..r3p2 affected */
+-	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
+-		return 0;
+-	return 1;
+-}
+-
+-static inline void dummy_flush_tlb_a15_erratum(void)
+-{
+-	/*
+-	 * Dummy TLBIMVAIS. Using the unmapped address 0 and ASID 0.
+-	 */
+-	asm("mcr p15, 0, %0, c8, c3, 1" : : "r" (0));
+-	dsb(ish);
+-}
++extern void erratum_a15_798181_init(void);
+ #else
+-static inline int erratum_a15_798181(void)
+-{
+-	return 0;
+-}
++static inline void erratum_a15_798181_init(void) {}
++#endif
++extern bool (*erratum_a15_798181_handler)(void);
+ 
+-static inline void dummy_flush_tlb_a15_erratum(void)
++static inline bool erratum_a15_798181(void)
+ {
++	if (unlikely(IS_ENABLED(CONFIG_ARM_ERRATA_798181) &&
++		erratum_a15_798181_handler))
++		return erratum_a15_798181_handler();
++	return false;
+ }
+-#endif
+ 
+ /*
+  *	flush_pmd_entry
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index afc2489..f3030e3 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -599,6 +599,8 @@ static void __init setup_processor(void)
+ 	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);
+ #endif
+ 
++	erratum_a15_798181_init();
++
+ 	feat_v6_fixup();
+ 
+ 	cacheid_init();
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index 83ccca3..95d0636 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -70,6 +70,40 @@ static inline void ipi_flush_bp_all(void *ignored)
+ 	local_flush_bp_all();
+ }
+ 
++#ifdef CONFIG_ARM_ERRATA_798181
++bool (*erratum_a15_798181_handler)(void);
++
++static bool erratum_a15_798181_partial(void)
++{
++	asm("mcr p15, 0, %0, c8, c3, 1" : : "r" (0));
++	dsb(ish);
++	return false;
++}
++
++static bool erratum_a15_798181_broadcast(void)
++{
++	asm("mcr p15, 0, %0, c8, c3, 1" : : "r" (0));
++	dsb(ish);
++	return true;
++}
++
++void erratum_a15_798181_init(void)
++{
++	unsigned int midr = read_cpuid_id();
++	unsigned int revidr = read_cpuid(CPUID_REVIDR);
++
++	/* Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
++	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2 ||
++	    (revidr & 0x210) == 0x210) {
++		return;
++	}
++	if (revidr & 0x10)
++		erratum_a15_798181_handler = erratum_a15_798181_partial;
++	else
++		erratum_a15_798181_handler = erratum_a15_798181_broadcast;
++}
++#endif
++
+ static void ipi_flush_tlb_a15_erratum(void *arg)
+ {
+ 	dmb();
+@@ -80,7 +114,6 @@ static void broadcast_tlb_a15_erratum(void)
+ 	if (!erratum_a15_798181())
+ 		return;
+ 
+-	dummy_flush_tlb_a15_erratum();
+ 	smp_call_function(ipi_flush_tlb_a15_erratum, NULL, 1);
+ }
+ 
+@@ -92,7 +125,6 @@ static void broadcast_tlb_mm_a15_erratum(struct mm_struct *mm)
+ 	if (!erratum_a15_798181())
+ 		return;
+ 
+-	dummy_flush_tlb_a15_erratum();
+ 	this_cpu = get_cpu();
+ 	a15_erratum_get_cpumask(this_cpu, mm, &mask);
+ 	smp_call_function_many(&mask, ipi_flush_tlb_a15_erratum, NULL, 1);
+-- 
+1.8.1.2
