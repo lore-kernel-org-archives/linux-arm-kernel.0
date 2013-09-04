@@ -1,57 +1,76 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 4 Sep 2013 16:35:26 +0200
-Subject: [PATCH] pwm: pxa: add device tree support to pwm driver
-In-Reply-To: <5227425E.7030806@newsguy.com>
-References: <1378236233-15637-1-git-send-email-mikedunn@newsguy.com>
- <201309040020.55029.marex@denx.de> <5227425E.7030806@newsguy.com>
-Message-ID: <201309041635.26695.marex@denx.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed,  4 Sep 2013 16:33:28 +0200
+Subject: [PATCH] ARM: LPC32xx: Fix reset function
+Message-ID: <1378305208-5330-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mike Dunn,
+In the recent change to the reset function API (commit
+7b6d864b48d95e6ea1df7df64475b9cb9616dcf9), the mode argument changed from a
+char to an enum. lpc23xx_restart() only handles REBOOT_SOFT and REBOOT_HARD,
+but the new kernel code emits REBOOT_COLD (0) on reboots now which leads to
+lpc32xx simply not rebooting (but halting).
 
-> On 09/03/2013 03:20 PM, Marek Vasut wrote:
-> 
-> [...]
-> 
-> >> +#ifdef CONFIG_OF
-> >> +/* use the platform_device id table for OF match table data */
-> >> +static struct of_device_id pwm_of_match[] = {
-> >> +	{ .compatible = "marvell,pxa25x-pwm", .data = &pwm_id_table[0] },
-> >> +	{ .compatible = "marvell,pxa27x-pwm", .data = &pwm_id_table[1] },
-> >> +	{ .compatible = "marvell,pxa168-pwm", .data = &pwm_id_table[2] },
-> >> +	{ .compatible = "marvell,pxa910-pwm", .data = &pwm_id_table[3] },
-> >> +	{ }
-> >> +};
-> >> +MODULE_DEVICE_TABLE(of, pwm_of_match);
-> > 
-> > Are PXA2xx and PXA3xx PWM impleemntations not all the same ? If so, why
-> > not just stick with pxa25x-pwm only for all of the CPUs (aka. the lowest
-> > CPU model). Then the table would have but a single entry.
-> 
-> I'm just echoing the existing platform_device_id table...
-> 
-> static const struct platform_device_id pwm_id_table[] = {
-> 	/*   PWM    has_secondary_pwm? */
-> 	{ "pxa25x-pwm", 0 },
-> 	{ "pxa27x-pwm", HAS_SECONDARY_PWM },
-> 	{ "pxa168-pwm", 0 },
-> 	{ "pxa910-pwm", 0 },
-> 	{ },
-> };
-> MODULE_DEVICE_TABLE(platform, pwm_id_table);
-> 
-> ... so that my changes to the driver are minimal.  Yes, apparently the only
-> difference is the existance of a "secondary" pwm for pxa27x.
-> 
-> BTW, the pxa27x actually has four pwms, which is why the addition I made to
-> pxa27x.dtsi has two nodes (the driver handles two pwms for each device
-> instance in the pxa27x case).
-> 
+This patch fixes this by just resetting unconditionally as on other platforms
+(e.g. mach-bcm2835).
 
-What's that "secondary PWM" there? I no longer remember, sorry. The question 
-remains still, we can have two entries there (pxa25x and pxa27x) ORR have one 
-entry (pxa25x) + mrvl,has-secondary-pwm entry.
+Pulling lpc32xx_watchdog_reset() into lpc23xx_restart() since the while() in
+lpc23xx_restart() is part of the procedure anyway and lpc32xx_watchdog_reset()
+isn't used anywhere else anymore.
 
-Best regards,
-Marek Vasut
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+
+--
+
+Will provide a pull request for arm-soc when someone commented on this one.
+
+---
+ arch/arm/mach-lpc32xx/common.c |   29 ++++++-----------------------
+ 1 file changed, 6 insertions(+), 23 deletions(-)
+
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/common.c
++++ linux-2.6/arch/arm/mach-lpc32xx/common.c
+@@ -57,20 +57,6 @@ int clk_is_sysclk_mainosc(void)
+ }
+ 
+ /*
+- * System reset via the watchdog timer
+- */
+-static void lpc32xx_watchdog_reset(void)
+-{
+-	/* Make sure WDT clocks are enabled */
+-	__raw_writel(LPC32XX_CLKPWR_PWMCLK_WDOG_EN,
+-		LPC32XX_CLKPWR_TIMER_CLK_CTRL);
+-
+-	/* Instant assert of RESETOUT_N with pulse length 1mS */
+-	__raw_writel(13000, io_p2v(LPC32XX_WDTIM_BASE + 0x18));
+-	__raw_writel(0x70, io_p2v(LPC32XX_WDTIM_BASE + 0xC));
+-}
+-
+-/*
+  * Detects and returns IRAM size for the device variation
+  */
+ #define LPC32XX_IRAM_BANK_SIZE SZ_128K
+@@ -209,16 +195,13 @@ void __init lpc32xx_map_io(void)
+ 
+ void lpc23xx_restart(enum reboot_mode mode, const char *cmd)
+ {
+-	switch (mode) {
+-	case REBOOT_SOFT:
+-	case REBOOT_HARD:
+-		lpc32xx_watchdog_reset();
+-		break;
++	/* Make sure WDT clocks are enabled */
++	__raw_writel(LPC32XX_CLKPWR_PWMCLK_WDOG_EN,
++		LPC32XX_CLKPWR_TIMER_CLK_CTRL);
+ 
+-	default:
+-		/* Do nothing */
+-		break;
+-	}
++	/* Instant assert of RESETOUT_N with pulse length 1mS */
++	__raw_writel(13000, io_p2v(LPC32XX_WDTIM_BASE + 0x18));
++	__raw_writel(0x70, io_p2v(LPC32XX_WDTIM_BASE + 0xC));
+ 
+ 	/* Wait for watchdog to reset system */
+ 	while (1)
