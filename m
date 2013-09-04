@@ -1,29 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 4 Sep 2013 10:59:09 -0700
-Subject: [PATCH v4 5/5] clk: dt: binding for basic gate clock
-In-Reply-To: <CAD6h2NSr0cM_SWqniC30pYm0mCeziBOzVg-46-814qPMxUwDCQ@mail.gmail.com>
-References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
- <1377150793-27864-6-git-send-email-mturquette@linaro.org>
- <CAD6h2NRBq8hD8J5+P4NBZJZsPo4QAebgGaxmAn5TL0c2Cc5ULQ@mail.gmail.com>
- <5220FB48.7080607@wwwdotorg.org>
- <CAD6h2NSr0cM_SWqniC30pYm0mCeziBOzVg-46-814qPMxUwDCQ@mail.gmail.com>
-Message-ID: <20130904175909.GB31541@atomide.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed,  4 Sep 2013 11:00:46 -0700
+Subject: [PATCH] arm: mach-davinci: mark __maybe_unused struct
+Message-ID: <1378317646-21262-1-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Haojian Zhuang <haojian.zhuang@linaro.org> [130903 20:11]:
-> 
-> We can see that it'll try to find static mapping. What's the static mapping?
-> If we define iotable in machine driver, we have the static mapping, just like
-> debug_ll. If we parse everything from DTS file, it'll always get a new virtual
-> address from vm area. So it always create a new page mapping even for one
-> register.
+If neither CONFIG_SND_DM365_AIC3X_CODEC nor CONFIG_SND_DM365_VOICE_CODEC
+are defined, we may get warnings like:
 
-I may not follow you here.. But it seems that you've missing something with
-the static mapping: It's found based on the physical address. So if you
-create static mappings for your SoC with iotable_init(), those mappings
-will be available everywhere including drivers when you do ioremap().
+    arch/arm/mach-davinci/board-dm365-evm.c:179:33: warning: 'dm365_evm_snd_data' defined but not used [-Wunused-variable]
 
-Regards,
+To fix this, just mark the struct as __maybe_unused.
 
-Tony
+Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
+ arch/arm/mach-davinci/board-dm365-evm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 4cdb61c..9be953e 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -176,7 +176,7 @@ static struct at24_platform_data eeprom_info = {
+ 	.context	= (void *)0x7f00,
+ };
+ 
+-static struct snd_platform_data dm365_evm_snd_data = {
++static struct snd_platform_data dm365_evm_snd_data __maybe_unused = {
+ 	.asp_chan_q = EVENTQ_3,
+ };
+ 
+-- 
+1.8.4
