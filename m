@@ -1,76 +1,43 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed,  4 Sep 2013 16:33:28 +0200
-Subject: [PATCH] ARM: LPC32xx: Fix reset function
-Message-ID: <1378305208-5330-1-git-send-email-stigge@antcom.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 04 Sep 2013 16:36:25 +0200
+Subject: 3.12 merge window exynos cpufreq driver fails to build
+In-Reply-To: <CA+5PVA6SQ9JGBD3F=u5ysch-agp91oTK8ZbKsdQkz57yZ8OUHQ@mail.gmail.com>
+References: <CA+5PVA6SQ9JGBD3F=u5ysch-agp91oTK8ZbKsdQkz57yZ8OUHQ@mail.gmail.com>
+Message-ID: <7035644.8Kb1gDYsCf@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the recent change to the reset function API (commit
-7b6d864b48d95e6ea1df7df64475b9cb9616dcf9), the mode argument changed from a
-char to an enum. lpc23xx_restart() only handles REBOOT_SOFT and REBOOT_HARD,
-but the new kernel code emits REBOOT_COLD (0) on reboots now which leads to
-lpc32xx simply not rebooting (but halting).
+Hi Josh,
 
-This patch fixes this by just resetting unconditionally as on other platforms
-(e.g. mach-bcm2835).
+On Wednesday 04 of September 2013 10:13:16 Josh Boyer wrote:
+> Using Linus' tree as of this morning (v3.11-2654-g458c3f6), the
+> exynos-cpufreq driver doesn't build because it includes a file that
+> doesn't exist.
+> 
+> + make -s ARCH=arm V=1 -j4 bzImage KALLSYMS_EXTRA_PASS=1
+> arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO:
+> return_address should use unwind tables" [-Wcpp]
+>  #warning "TODO: return_address should use unwind tables"
+>   ^
+> arch/arm/mm/dma-mapping.c:253:2: warning: #warning ARM Coherent DMA
+> allocator does not (yet) support huge TLB [-Wcpp]
+>  #warning ARM Coherent DMA allocator does not (yet) support huge TLB
+>   ^
+> drivers/cpufreq/exynos-cpufreq.c:21:22: fatal error: plat/cpu.h: No
+> such file or directory
+>  #include <plat/cpu.h>
+>                       ^
+> compilation terminated.
+> make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
+> 
+> I'm guessing that <plat/cpu.h> file is supposed to come from
+> arch/arm/plat-samsung/include/plat/, but I don't see anything that
+> specifies a -I there.
+> 
+> Thoughts?
 
-Pulling lpc32xx_watchdog_reset() into lpc23xx_restart() since the while() in
-lpc23xx_restart() is part of the procedure anyway and lpc32xx_watchdog_reset()
-isn't used anywhere else anymore.
+Could you attach config that could be used to trigger this? Thanks in 
+advance.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-
---
-
-Will provide a pull request for arm-soc when someone commented on this one.
-
----
- arch/arm/mach-lpc32xx/common.c |   29 ++++++-----------------------
- 1 file changed, 6 insertions(+), 23 deletions(-)
-
---- linux-2.6.orig/arch/arm/mach-lpc32xx/common.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/common.c
-@@ -57,20 +57,6 @@ int clk_is_sysclk_mainosc(void)
- }
- 
- /*
-- * System reset via the watchdog timer
-- */
--static void lpc32xx_watchdog_reset(void)
--{
--	/* Make sure WDT clocks are enabled */
--	__raw_writel(LPC32XX_CLKPWR_PWMCLK_WDOG_EN,
--		LPC32XX_CLKPWR_TIMER_CLK_CTRL);
--
--	/* Instant assert of RESETOUT_N with pulse length 1mS */
--	__raw_writel(13000, io_p2v(LPC32XX_WDTIM_BASE + 0x18));
--	__raw_writel(0x70, io_p2v(LPC32XX_WDTIM_BASE + 0xC));
--}
--
--/*
-  * Detects and returns IRAM size for the device variation
-  */
- #define LPC32XX_IRAM_BANK_SIZE SZ_128K
-@@ -209,16 +195,13 @@ void __init lpc32xx_map_io(void)
- 
- void lpc23xx_restart(enum reboot_mode mode, const char *cmd)
- {
--	switch (mode) {
--	case REBOOT_SOFT:
--	case REBOOT_HARD:
--		lpc32xx_watchdog_reset();
--		break;
-+	/* Make sure WDT clocks are enabled */
-+	__raw_writel(LPC32XX_CLKPWR_PWMCLK_WDOG_EN,
-+		LPC32XX_CLKPWR_TIMER_CLK_CTRL);
- 
--	default:
--		/* Do nothing */
--		break;
--	}
-+	/* Instant assert of RESETOUT_N with pulse length 1mS */
-+	__raw_writel(13000, io_p2v(LPC32XX_WDTIM_BASE + 0x18));
-+	__raw_writel(0x70, io_p2v(LPC32XX_WDTIM_BASE + 0xC));
- 
- 	/* Wait for watchdog to reset system */
- 	while (1)
+Best regards,
+Tomasz
