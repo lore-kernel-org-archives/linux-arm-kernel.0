@@ -1,50 +1,65 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 04 Sep 2013 13:26:17 +0100
-Subject: [Patch v3 2/3] ARM: dts: Document the CCI PMU DT bindings
-In-Reply-To: <938AAABA-BE7E-48ED-82D6-61A35B6D9774@codeaurora.org>
-References: <1377183748-5717-1-git-send-email-punit.agrawal@arm.com>
- <1377183748-5717-3-git-send-email-punit.agrawal@arm.com>
- <938AAABA-BE7E-48ED-82D6-61A35B6D9774@codeaurora.org>
-Message-ID: <522726E9.8050406@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 Sep 2013 13:38:50 +0100
+Subject: [PATCH 02/11] ARM: ux500: Enable the LPS001WP Pressure &
+ Temperature sensor from DT
+In-Reply-To: <1378287103-21765-3-git-send-email-lee.jones@linaro.org>
+References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
+ <1378287103-21765-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130904123850.GI18206@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(adding Will, as these patches will be going via his tree.)
+Hi Lee,
 
-Hi Will,
+On Wed, Sep 04, 2013 at 10:31:34AM +0100, Lee Jones wrote:
+> After applying this node the LPS001WP sensor chip should probe
+> successfully once the driver support has also been applied.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/ste-snowball.dts | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+> index cf9b16e..aad8f54 100644
+> --- a/arch/arm/boot/dts/ste-snowball.dts
+> +++ b/arch/arm/boot/dts/ste-snowball.dts
+> @@ -153,6 +153,16 @@
+>  			status = "okay";
+>  		};
+>  
+> +		i2c at 80128000 {
+> +			lps001wp at 5c {
+> +				compatible = "lps001wp";
+> +				reg = <0x5c>;
+> +
+> +				vdd-supply = <&ab8500_ldo_aux1_reg>;
+> +				vms-supply = <&db8500_vsmps2_reg>;
+> +			};
+> +		};
+> +
 
-On 30/08/13 17:17, Kumar Gala wrote:
->
-> On Aug 22, 2013, at 10:02 AM, Punit Agrawal wrote:
->
->> The CCI PMU can profile bus transactions at the master and slave
->> interfaces of the CCI. The PMU can be used to observe an aggregated
->> view of the bus traffic between the various components connected to the
->> CCI.
->>
->> Introduce a binding for the CCI PMU. The PMU node will be a sub-node of
->> the CCI node.
->>
->> Cc: devicetree at vger.kernel.org
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
->> Cc: Stephen Warren <swarren@wwwdotorg.org>
->> Cc: Kumar Gala <galak@codeaurora.org>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> ---
->> Documentation/devicetree/bindings/arm/cci.txt |   46 +++++++++++++++++++++++++
->> 1 file changed, 46 insertions(+)
->
-> Acked-by: Kumar Gala <galak@codeaurora.org>
->
+This appears to be missing a binding document. I couldn't see one
+anywhere in this series, or in mainline already).
 
-Can you pick Kumar's ack for the second patch before you send a pull 
-request for the CCI PMU patches? Let me know if you prefer for me to 
-post patches with the Acks applied.
+As far as I can see, the compatible string should be "st,lps001wp".
 
-Cheers,
-Punit
+Please produce a binding document.
 
-> - k
->
+Is there any publicly available documentation on the chip?
+
+Thanks,
+Mark.
+
+>  		uart at 80120000 {
+>  			status = "okay";
+>  		};
+> -- 
+> 1.8.1.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
