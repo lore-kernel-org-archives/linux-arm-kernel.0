@@ -1,111 +1,46 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 04 Sep 2013 20:01:51 +0200
-Subject: [RFC Patch v2 0/3] add temporary parent migration support
-In-Reply-To: <20130904174328.10934.18433@quantum>
-References: <1378208072-10173-1-git-send-email-chander.kashyap@linaro.org>
- <3927125.3UOplv4uU5@localhost> <20130904174328.10934.18433@quantum>
-Message-ID: <8013969.VJd4Ll2ItG@localhost>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Wed,  4 Sep 2013 20:04:11 +0200
+Subject: [PATCH 0/3] perf: parse the dwarf backtrace info from .debug_frame
+ section
+Message-ID: <1378317854-25965-1-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 of September 2013 10:43:28 Mike Turquette wrote:
-> Quoting Tomasz Figa (2013-09-03 15:36:50)
-> 
-> > Hi Chander,
-> > 
-> > On Tuesday 03 of September 2013 17:04:28 Chander Kashyap wrote:
-> > > Some platform has provision to change cpu parent clock during
-> > > cpu frequency scaling. This patch series provides a mechanism to
-> > > implement the same using CCF.
-> > > 
-> > > Patch1 provides mechanism to migrate to new parent temporarily.
-> > > 
-> > > Patch2 updates the user of clk_register_mux and DEFINE_CLK_MUX which
-> > > are modified to add support for clk migration.
-> > > 
-> > > Patch3 adds support to Exynos5250 to use the clock parent migration
-> > > feature implemented in CCF.
-> > 
-> > I don't really like this approach. A need to change mux setting
-> > temporarily is heavily platform-specific and I don't think it should
-> > be
-> > handled by generic code.
-> 
-> I agree with Tomasz.
-> 
-> > First of all there are many factor that you would
-> > 
-> > have to account for to make this solution generic, such as:
-> >  - board specific alternative parents,
-> >  - exact moment of parent change,
-> >  - some other platform specific conditions, like CPU voltage that must
-> >  be> 
-> > changed when mux is changed, because it changes CPU frequency,
-> > 
-> >  - and probably a lot of more factors that only people working with
-> >  all
-> > 
-> > the platforms supported (and unsupported yet) by Linux.
-> > 
-> > I can see at least two solutions for this problem that don't require
-> > changing core code of common clock framework:
-> > 
-> > 1) Implementing a special clock type using normal mux ops, but also
-> > registering a notifier for its PRE_RATE_CHANGE and POST_RATE_CHANGE
-> > events to perform parent switching.
-> 
-> Creating a custom clock type is the way to go here. It is possible to
-> wrap the mux clk_ops to re-use that code, or just write a custom clock
-> type from scratch.
-> 
-> I do not like using the clock rate-change notifiers for this purpose.
-> The notifiers provide hooks to drivers that need to take care around
-> clock transitions. Using the notifiers from within the clock framework
-> indicates poor design.
+On ARM the debug info is not present in the .eh_frame sections but
+in .debug_frame instead.
 
-I was not sure how a .set_parent() from inside a .set_rate() would 
-interact with rate setting, so I mentioned notifiers here, but now as I 
-think of it, CCF is supposed to be re-entrant, so things should be fine.
+This patch uses libunwind to load and parse the dwarf debug info from
+the .debug_frame section if no .eh_frame_hdr section is found; also it
+sets the hooks in the perf_regs and libunwind code for ARM.
 
-> > 2) Using normal mux clock, but registering such notifiers in clock
-> > controller or cpufreq driver.
-> 
-> This depends on what the data sheet or reference manual states. If using
-> a temporary parent is a property of the clock programming sequence
-> (e.g. to have a glitch-less transition) then that logic belongs in the
-> clock provider driver (i.e. a custom clock type needs to be created
-> with this logic).
-> 
-> However if using a temporary parent is not required for programming the
-> clock, but is instead a requirement of the clock consumer (e.g. a CPU,
-> or some I/O controller) then perhaps putting this logic in that driver
-> is the right way to go. In that case the logic could be explicit:
-> 
-> 	clk_set_parent(clk, temp_parent);
-> 	clk_set_rate(clk, target_rate);
-> 	clk_set_parent(clk, target_parent);
-> 
-> Or it could implicit with the use of rate-change notifiers. Again the
-> rate-change notifiers exist for clock consumer drivers to use, so this
-> is OK.
-> 
-> I have a hunch that the right way to do this is for a custom clock type
-> to be created which simply calls clk_set_parent from within the clock's
-> .set_rate callback, but I'll wait on feedback from Chander on the needs
-> of his platform.
+The generated perf has been tested on ARM/OMAP4 and x86_64, using the
+following commands:
+ perf record -g [dwarf] -- <binary>
+ perf report --sort symbol --call-graph --stdio
 
-I believe Chander has exactly the same use case for this as we have for 
-Exynos 4210 and 4x12.
 
-On these SoCs, CPU frequency is being scaled by reconfiguring PLL, which 
-needs to be masked for locking time. To let the CPU operate normally, a 
-mux that allows switching CPU clock domain between two PLLs can be 
-switched to the other PLL (MPLL) until the main ARM PLL (APLL) starts 
-operating again.
+Jean Pihet (1):
+  perf: parse the .debug_frame section in case .eh_frame is not present
 
-However this issue is not limited to clocks, because there must be also a 
-voltage transition involved if the utility PLL has frequency higher than 
-the one currently being reconfigured.
+Will Deacon (2):
+  ARM: perf: add support for perf regs API
+  ARM: perf: wire up perf_regs and unwind support for ARM
 
-Best regards,
-Tomasz
+ arch/arm/Kconfig                        |  2 +
+ arch/arm/include/uapi/asm/Kbuild        |  1 +
+ arch/arm/include/uapi/asm/perf_regs.h   | 23 +++++++++++
+ arch/arm/kernel/Makefile                |  1 +
+ arch/arm/kernel/perf_regs.c             | 30 ++++++++++++++
+ tools/perf/arch/arm/Makefile            |  3 ++
+ tools/perf/arch/arm/include/perf_regs.h | 54 +++++++++++++++++++++++++
+ tools/perf/arch/arm/util/unwind.c       | 48 ++++++++++++++++++++++
+ tools/perf/config/Makefile              |  7 +++-
+ tools/perf/util/unwind.c                | 70 +++++++++++++++++++++++++--------
+ 10 files changed, 221 insertions(+), 18 deletions(-)
+ create mode 100644 arch/arm/include/uapi/asm/perf_regs.h
+ create mode 100644 arch/arm/kernel/perf_regs.c
+ create mode 100644 tools/perf/arch/arm/include/perf_regs.h
+ create mode 100644 tools/perf/arch/arm/util/unwind.c
+
+-- 
+1.7.11.7
