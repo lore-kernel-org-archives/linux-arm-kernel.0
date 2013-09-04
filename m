@@ -1,43 +1,65 @@
-From: andre.przywara@linaro.org (Andre Przywara)
-Date: Wed, 04 Sep 2013 11:14:08 +0200
-Subject: [PROPOSAL] ARM/FDT: passing multiple binaries to a kernel
-In-Reply-To: <1378284955.17510.64.camel@kazak.uk.xensource.com>
-References: <52260608.2030202@linaro.org>
- <CAL_JsqK9PjpScRO8561PhcyKkxhuL4pgMTCh2-UG_ubybJTcCw@mail.gmail.com>
- <5226F2B3.10606@linaro.org>
- <1378284955.17510.64.camel@kazak.uk.xensource.com>
-Message-ID: <5226F9E0.9070307@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  4 Sep 2013 10:31:33 +0100
+Subject: [PATCH 01/11] ARM: ux500: Remove PrimeCell IDs from Nomadik I2C DT
+ nodes
+In-Reply-To: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
+References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378287103-21765-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2013 10:55 AM, Ian Campbell wrote:
-> On Wed, 2013-09-04 at 10:43 +0200, Andre Przywara wrote:
->
->> I am about to write up a more elaborate technical rationale describing
->> the problems with multiboot on ARM:
->>
->> https://wiki.linaro.org/AndrePrzywara/Multiboot
->
-> Doesn't seem to exist? A search for "mulitboot" doesn't seem to throw up
-> the one you meant either.
+Turns out that they're actually not required and the driver probes just
+fine without them. The ID is incorrect at the moment anyway. They actually
+currently specify the stn8815.
 
-Try again now. As mentioned "I am about to write ..." ;-)
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 5 -----
+ 1 file changed, 5 deletions(-)
 
-Thanks,
-Andre.
-
->>> So, is having a more generic solution really needed?
->>
->> Not necessarily needed, but useful, I think. As described above I don't
->> see any technical obstacles of doing it in a more generic way, so we
->> could as well go ahead with this. On x86 from time to time the need for
->> additional binaries pops up (early microcode loading, for instance), so
->> why not be be prepared.
->
-> I agree. There have also been occasions where people doing
-> disaggregation have wanted to start multiple initial domains, requiring
-> additional modules at load time. I don't think being generic and
-> extensible is costing too much here.
->
-> Ian.
->
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index a152945..9c01d66 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -531,7 +531,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80004000 0x1000>;
+ 			interrupts = <0 21 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -544,7 +543,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80122000 0x1000>;
+ 			interrupts = <0 22 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -557,7 +555,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80128000 0x1000>;
+ 			interrupts = <0 55 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -570,7 +567,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80110000 0x1000>;
+ 			interrupts = <0 12 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -583,7 +579,6 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x8012a000 0x1000>;
+ 			interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
+-			arm,primecell-periphid = <0x180024>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-- 
+1.8.1.2
