@@ -1,25 +1,80 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 4 Sep 2013 08:01:32 -0700
-Subject: [PATCHv3 0/9] ARM: OMAP2+: AM33XX: Add suspend-resume support
-In-Reply-To: <52261B34.60206@ti.com>
-References: <1375811376-49985-1-git-send-email-d-gerlach@ti.com>
- <5211E3F6.6090108@ti.com> <52125A39.3010008@ti.com>
- <87vc2qyjao.fsf@linaro.org> <521FBD6B.3020208@ti.com>
- <87mwo0rvf8.fsf@linaro.org>
- <CA+Bv8Xamd7e24nswG4QhLDNhHXs92EfXcfu8E2uL=XLhsL70Hw@mail.gmail.com>
- <CAGa+x84okZ_j71=oOnK5c43T9L3gmsGcQjWSxZSchfzheA_2HQ@mail.gmail.com>
- <52261B34.60206@ti.com>
-Message-ID: <CAGa+x85D2tnX_9QDNb6s1LQCpAz_kGUiOK82C7fPLVTmiZMEFg@mail.gmail.com>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Wed, 04 Sep 2013 08:41:23 -0700
+Subject: [PATCH] pwm: pxa: add device tree support to pwm driver
+In-Reply-To: <201309041635.26695.marex@denx.de>
+References: <1378236233-15637-1-git-send-email-mikedunn@newsguy.com>
+ <201309040020.55029.marex@denx.de> <5227425E.7030806@newsguy.com>
+ <201309041635.26695.marex@denx.de>
+Message-ID: <522754A3.8010602@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On 09/04/2013 07:35 AM, Marek Vasut wrote:
+> Dear Mike Dunn,
+> 
+>> On 09/03/2013 03:20 PM, Marek Vasut wrote:
+>>
+>> [...]
+>>
+>>>> +#ifdef CONFIG_OF
+>>>> +/* use the platform_device id table for OF match table data */
+>>>> +static struct of_device_id pwm_of_match[] = {
+>>>> +	{ .compatible = "marvell,pxa25x-pwm", .data = &pwm_id_table[0] },
+>>>> +	{ .compatible = "marvell,pxa27x-pwm", .data = &pwm_id_table[1] },
+>>>> +	{ .compatible = "marvell,pxa168-pwm", .data = &pwm_id_table[2] },
+>>>> +	{ .compatible = "marvell,pxa910-pwm", .data = &pwm_id_table[3] },
+>>>> +	{ }
+>>>> +};
+>>>> +MODULE_DEVICE_TABLE(of, pwm_of_match);
+>>>
+>>> Are PXA2xx and PXA3xx PWM impleemntations not all the same ? If so, why
+>>> not just stick with pxa25x-pwm only for all of the CPUs (aka. the lowest
+>>> CPU model). Then the table would have but a single entry.
+>>
+>> I'm just echoing the existing platform_device_id table...
+>>
+>> static const struct platform_device_id pwm_id_table[] = {
+>> 	/*   PWM    has_secondary_pwm? */
+>> 	{ "pxa25x-pwm", 0 },
+>> 	{ "pxa27x-pwm", HAS_SECONDARY_PWM },
+>> 	{ "pxa168-pwm", 0 },
+>> 	{ "pxa910-pwm", 0 },
+>> 	{ },
+>> };
+>> MODULE_DEVICE_TABLE(platform, pwm_id_table);
+>>
+>> ... so that my changes to the driver are minimal.  Yes, apparently the only
+>> difference is the existance of a "secondary" pwm for pxa27x.
+>>
+>> BTW, the pxa27x actually has four pwms, which is why the addition I made to
+>> pxa27x.dtsi has two nodes (the driver handles two pwms for each device
+>> instance in the pxa27x case).
+>>
+> 
+> What's that "secondary PWM" there? I no longer remember, sorry. 
 
-> Thanks for taking the time to try this out, it does seem there are a few
-> kinks with BeagleBone Black but we'll get those worked out.
 
-I also just noticed that wake from RTC isn't working, but wake from
-serial console does.  Does RTC wake work for you?  (I use rtcwake -m
-mem -s4)
+If pdev->id_entry->driver_data == HAS_SECONDARY_PWM, then pwm_chip->npwm=2 when
+pwmchip_add() is called.  Otherwise pwm_chip->npwm=1.  The driver knows that the
+second pwm's registers are at a fixed offset from the first.  For compatibility,
+the pxa27x maps the registers for the third pwm at a distant offset, and makes
+the offset between 3 and 4 the same as between 1 and 2.  Yes, the driver mkes
+this unnecessarily complicated.  There should just be one device instance per
+pwm, and dispense with the whole driver_data thing.  I guess there's some
+history there.
 
-Kevin
+
+> The question 
+> remains still, we can have two entries there (pxa25x and pxa27x) ORR have one 
+> entry (pxa25x) + mrvl,has-secondary-pwm entry.
+
+
+It looks like defining "compatible" properties that mirror the old
+platform_device_id names won't fly... wildcards are verboten (see Sergei's
+comment).  So your inclination to use one value for the "compatible" property is
+correct.  I think the way to go is to forget the whole HAS_SECONDARY_PWM in the
+DT case, have one device instance per pwm, and use "compatible=marvell,pwm".
+Other suggestions welcome.
+
+Thanks,
+Mike
