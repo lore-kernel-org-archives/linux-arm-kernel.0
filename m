@@ -1,65 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Sep 2013 13:38:50 +0100
-Subject: [PATCH 02/11] ARM: ux500: Enable the LPS001WP Pressure &
- Temperature sensor from DT
-In-Reply-To: <1378287103-21765-3-git-send-email-lee.jones@linaro.org>
-References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
- <1378287103-21765-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130904123850.GI18206@e106331-lin.cambridge.arm.com>
+From: mohun106@gmail.com (Radha Mohan)
+Date: Wed, 4 Sep 2013 18:22:44 +0530
+Subject: [PATCH 1/1] arm64: Align an assembler string properly
+In-Reply-To: <CAC8NTUWvEYpugbUfZ3A54zFbS71mnChfCk2sVKUxxxWAHz+nRw@mail.gmail.com>
+References: <CAC8NTUWvEYpugbUfZ3A54zFbS71mnChfCk2sVKUxxxWAHz+nRw@mail.gmail.com>
+Message-ID: <CAC8NTUUdpUxfzn4_nrvMxj_otGmXROEKwio7DQ27BoMv0vwsAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Catalin,
+Can you please review this?
 
-On Wed, Sep 04, 2013 at 10:31:34AM +0100, Lee Jones wrote:
-> After applying this node the LPS001WP sensor chip should probe
-> successfully once the driver support has also been applied.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+regards,
+Radha Mohan
+
+On Mon, Sep 2, 2013 at 4:18 PM, Radha Mohan <mohun106@gmail.com> wrote:
+> From: Corey Minyard <cminyard@mvista.com>
+>
+> Do a proper align and put it in the right section.
+>
+> Signed-off-by: Corey Minyard <cminyard@mvista.com>
 > ---
->  arch/arm/boot/dts/ste-snowball.dts | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-> index cf9b16e..aad8f54 100644
-> --- a/arch/arm/boot/dts/ste-snowball.dts
-> +++ b/arch/arm/boot/dts/ste-snowball.dts
-> @@ -153,6 +153,16 @@
->  			status = "okay";
->  		};
->  
-> +		i2c at 80128000 {
-> +			lps001wp at 5c {
-> +				compatible = "lps001wp";
-> +				reg = <0x5c>;
-> +
-> +				vdd-supply = <&ab8500_ldo_aux1_reg>;
-> +				vms-supply = <&db8500_vsmps2_reg>;
-> +			};
-> +		};
-> +
-
-This appears to be missing a binding document. I couldn't see one
-anywhere in this series, or in mainline already).
-
-As far as I can see, the compatible string should be "st,lps001wp".
-
-Please produce a binding document.
-
-Is there any publicly available documentation on the chip?
-
-Thanks,
-Mark.
-
->  		uart at 80120000 {
->  			status = "okay";
->  		};
-> -- 
-> 1.8.1.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>  arch/arm64/mm/proc.S |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 76d8320..1f89adc 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -95,10 +95,11 @@ ENTRY(cpu_do_switch_mm)
+>         ret
+>  ENDPROC(cpu_do_switch_mm)
+>
+> +       .section ".rodata"
+>  cpu_name:
+>         .ascii  "AArch64 Processor"
+> -       .align
+>
+> +       .align 3
+>         .section ".text.init", #alloc, #execinstr
+>
+>  /*
+> --
+> 1.7.1
