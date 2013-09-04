@@ -1,44 +1,45 @@
-From: mohun106@gmail.com (Radha Mohan)
-Date: Wed, 4 Sep 2013 18:22:44 +0530
-Subject: [PATCH 1/1] arm64: Align an assembler string properly
-In-Reply-To: <CAC8NTUWvEYpugbUfZ3A54zFbS71mnChfCk2sVKUxxxWAHz+nRw@mail.gmail.com>
-References: <CAC8NTUWvEYpugbUfZ3A54zFbS71mnChfCk2sVKUxxxWAHz+nRw@mail.gmail.com>
-Message-ID: <CAC8NTUUdpUxfzn4_nrvMxj_otGmXROEKwio7DQ27BoMv0vwsAw@mail.gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 4 Sep 2013 20:54:09 +0800
+Subject: [PATCH 0/8] mmc: sdhci-esdhc-imx: add SD3.0 support
+Message-ID: <1378299257-2980-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-Can you please review this?
+This patch series add SD3.0 support for i.MX6Q/DL.
+Since freescale i.MX6Q/DL uSDHC clock tuning progress is a little different from
+the standard tuning process defined in host controller spec v3.0.
+So we add a hook to allow execute platform specific tuning instead of
+standard host controller tuning.
 
-regards,
-Radha Mohan
+The main difference are:
+1) not only generate Buffer Read Ready interrupt when tuning is performing.
+It generates all other DATA interrupts like the normal data command.
+2) SDHCI_CTRL_EXEC_TUNING is not automatically cleared by HW,
+instead it's controlled by SW.
+3) SDHCI_CTRL_TUNED_CLK is not automatically set by HW,
+it's controlled by SW.
+4) the clock delay for every tuning is set by SW.
 
-On Mon, Sep 2, 2013 at 4:18 PM, Radha Mohan <mohun106@gmail.com> wrote:
-> From: Corey Minyard <cminyard@mvista.com>
->
-> Do a proper align and put it in the right section.
->
-> Signed-off-by: Corey Minyard <cminyard@mvista.com>
-> ---
->  arch/arm64/mm/proc.S |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index 76d8320..1f89adc 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -95,10 +95,11 @@ ENTRY(cpu_do_switch_mm)
->         ret
->  ENDPROC(cpu_do_switch_mm)
->
-> +       .section ".rodata"
->  cpu_name:
->         .ascii  "AArch64 Processor"
-> -       .align
->
-> +       .align 3
->         .section ".text.init", #alloc, #execinstr
->
->  /*
-> --
-> 1.7.1
+Tested on i.MX6Q Sabreauto board.
+
+The series is based on latest Linus tree.
+
+Dong Aisheng (8):
+  mmc: sdhci: add hooks for platform specific tuning
+  mmc: sdhci: allow platform access of sdhci_send_command
+  sdhci: sdhci-esdhc-imx: support real clock on and off for imx6q
+  sdhci: sdhci-esdhci-imx: add sd3.0 clock tuning support
+  sdhci: sdhci-esdhc-imx: change pinctrl state according to uhs mode
+  mmc: sdhci-esdhc: correct pre_div for imx6q
+  mmc: sdhci-esdhc: set actual_clock in clock setting
+  ARM: dts: imx6qdl: add uhs pinctrl state for usdhc3
+
+ arch/arm/boot/dts/imx6dl.dtsi               |   33 +++
+ arch/arm/boot/dts/imx6q.dtsi                |   33 +++
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi    |    4 +-
+ drivers/mmc/host/sdhci-esdhc-imx.c          |  307 ++++++++++++++++++++++++++-
+ drivers/mmc/host/sdhci-esdhc.h              |   35 +++-
+ drivers/mmc/host/sdhci.c                    |   12 +-
+ drivers/mmc/host/sdhci.h                    |    3 +
+ include/linux/platform_data/mmc-esdhc-imx.h |    4 +
+ 8 files changed, 419 insertions(+), 12 deletions(-)
