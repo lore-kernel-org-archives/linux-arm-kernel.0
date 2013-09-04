@@ -1,61 +1,51 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 4 Sep 2013 17:38:35 +0900
-Subject: [PATCH 00/04] ARM: shmobile: Initial r8a7791 SoC and Koelsch
- board support
-In-Reply-To: <20130904034525.12546.24775.sendpatchset@w520>
-References: <20130904034525.12546.24775.sendpatchset@w520>
-Message-ID: <20130904083833.GF17329@verge.net.au>
+Date: Wed, 4 Sep 2013 17:39:35 +0900
+Subject: [PATCH v2 00/03] ARM: shmobile: r8a7790 APMU SMP support
+In-Reply-To: <20130829043424.GA20593@verge.net.au>
+References: <20130828232148.7321.45739.sendpatchset@w520>
+ <20130829001834.GD10207@verge.net.au>
+ <CANqRtoTq=w-dsK-fkfWTO+B+VoOMRkuFjCpY=+5qjBZGxDxd+Q@mail.gmail.com>
+ <20130829043424.GA20593@verge.net.au>
+Message-ID: <20130904083934.GG17329@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 04, 2013 at 12:45:25PM +0900, Magnus Damm wrote:
-> ARM: shmobile: Initial r8a7791 SoC and Koelsch board supp
+On Thu, Aug 29, 2013 at 01:34:28PM +0900, Simon Horman wrote:
+> On Thu, Aug 29, 2013 at 01:11:37PM +0900, Magnus Damm wrote:
+> > On Thu, Aug 29, 2013 at 9:18 AM, Simon Horman <horms@verge.net.au> wrote:
+> > > On Thu, Aug 29, 2013 at 08:21:48AM +0900, Magnus Damm wrote:
+> > >> ARM: shmobile: r8a7790 APMU SMP support
+> > >>
+> > >> [PATCH v2 01/03] ARM: shmobile: Shared APMU SMP support code without DT
+> > >> [PATCH v2 02/03] ARM: shmobile: Add r8a7790 SMP support using APMU code
+> > >> [PATCH v2 03/03] ARM: shmobile: Add r8a7790 CA15 CPU cores
+> > >>
+> > >> This series adds SMP support to r8a7790 using the included APMU code.
+> > >> The previous version of r8a7790 support depended on the APMU code in
+> > >> "[PATCH] ARM: shmobile: Shared APMU SMP support code", but in this
+> > >> version the APMU code has been reworked to not use DT. In the future
+> > >> r8a73a4 and other SoCs may make use of the APMU as well, but the
+> > >> r8a73a4 code first needs to be adjusted to work with the CCI driver.
+> > >>
+> > >> With these patches applied r8a7790 CA15 support for SMP boot
+> > >> and CPU Hotplug is known to be working.
+> > >>
+> > >> Thanks to Sudeep for his feedback.
+> > >>
+> > >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> > >
+> > > Hi Magnus,
+> > >
+> > > can I clarify that these patches are targeted at mainline?
+> > 
+> > Hi Simon, yes, that's correct. It's possible to back port too if needed.
 > 
-> [PATCH 01/04] ARM: shmobile: Initial r8a7791 SoC support
-> [PATCH 02/04] ARM: shmobile: r8a7791 SCIF support
-> [PATCH 03/04] ARM: shmobile: r8a7791 CMT support
-> [PATCH 04/04] ARM: shmobile: Koelsch support
+> Thanks for the clarification.
 > 
-> This series adds initial support for r8a7791 and Koelsch. The SoC
-> is known as r8a7791 which is based on a single cluster Cortex-A15
-> and makes use of SCIF for serial and CMT for timer. Many other
-> on-chip I/O devices are available, and support for those will be
-> added by incremental feature patches.
+> > Actual merge is not rushing though, so please don't interpret this as
+> > any last minute v3.12 merge attempt.
 > 
-> This initial SoC and board support is providing limited DT-only
-> support and a very basic C-version of board support. In the future
-> improved PINCTRL and clock framework support will be added together
-> with arch timer and SMP support.
-> 
-> Implemented in same style as r8a7790 SoC V1.
-> 
-> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> Signed-off-by: Yoshikazu Fujikawa <yoshikazu.fujikawa.ue@renesas.com>
-> Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
-> [damm at opensource.se: forward porting, cleanups, commit logs, CMT support]
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+> No problem, I didn't interpret it that way.
 
-I have lightly tested these and they seem good to me.
-I have posted a defconfig patch as a follow-up.
-I would to let these sit for a little bit to give them time to
-be reviewed by others.
-
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
-
-> ---
-> 
->  Written against renesas.git tag renesas-devel-20130822
-> 
->  arch/arm/boot/dts/Makefile                    |    1 
->  arch/arm/boot/dts/r8a7791-koelsch.dts         |   32 +++
->  arch/arm/boot/dts/r8a7791.dtsi                |   41 ++++
->  arch/arm/mach-shmobile/Kconfig                |   11 +
->  arch/arm/mach-shmobile/Makefile               |    3 
->  arch/arm/mach-shmobile/Makefile.boot          |    1 
->  arch/arm/mach-shmobile/board-koelsch.c        |   44 ++++
->  arch/arm/mach-shmobile/clock-r8a7791.c        |  241 ++++++++++++++++++++++++-
->  arch/arm/mach-shmobile/include/mach/r8a7791.h |    8 
->  arch/arm/mach-shmobile/setup-r8a7791.c        |  149 +++++++++++++++
->  10 files changed, 529 insertions(+), 2 deletions(-)
-> 
-> 
+I have queued these up for v3.13 and they are present
+in the freshly baked renesas-devel-20130904 tag.
