@@ -1,88 +1,80 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  4 Sep 2013 10:31:43 +0100
-Subject: [PATCH 11/11] iio: pressure-core: st: Provide correct regulator
- support
-In-Reply-To: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
-References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1378287103-21765-12-git-send-email-lee.jones@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 04 Sep 2013 11:39:59 +0200
+Subject: [PATCH 1/4] ARM: shmobile: r8a7778: add Ether DT support
+In-Reply-To: <CANqRtoSfsEwqJhh9DgX6jxK5DjH5FeroMAcsvss5o2vAzFk-pg@mail.gmail.com>
+References: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
+ <52262A1B.4050406@cogentembedded.com>
+ <CANqRtoSfsEwqJhh9DgX6jxK5DjH5FeroMAcsvss5o2vAzFk-pg@mail.gmail.com>
+Message-ID: <76573995.iPm3QS0b9I@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power to some of the sensors are controlled by regulators. In most
-cases these are 'always on', but if not they will fail to work until
-the regulator is enabled using the relevant APIs.
+On Wednesday 04 September 2013 14:35:14 Magnus Damm wrote:
+> On Wed, Sep 4, 2013 at 3:27 AM, Sergei Shtylyov wrote:
+> > On 09/03/2013 07:17 PM, Magnus Damm wrote:
+> >>> Define the generic R8A777x part of the Ether device node.
+> >>> 
+> >>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>> 
+> >>> ---
+> >>> 
+> >>>   arch/arm/boot/dts/r8a7778.dtsi |   11 +++++++++++
+> >>>   1 file changed, 11 insertions(+)
+> >>> 
+> >>> Index: renesas/arch/arm/boot/dts/r8a7778.dtsi
+> >>> ===================================================================
+> >>> --- renesas.orig/arch/arm/boot/dts/r8a7778.dtsi
+> >>> +++ renesas/arch/arm/boot/dts/r8a7778.dtsi
+> >>> @@ -98,4 +98,15 @@
+> >>>                  reg = <0xfffc000 0x118>;
+> >>>                  #gpio-range-cells = <3>;
+> >>>          };
+> >>> +
+> >>> +       ether: ethernet at fde00000 {
+> >>> +               device_type = "network";
+> >>> +               compatible = "renesas,ether-r8a7779";
+> >> 
+> >> Hi Sergei,
+> >> 
+> >> Thanks for your patch. What's the reason behind the r8a7778 SoC using
+> >> a compatible string for r8a7779 like "renesas,ether-r8a7779"?
+> >
+> > R8A7779 support has appeared first in Linux and as R8A7778 Ether is
+> > identical to R8A7779 and no wildcards are allowed in the device tree, I
+> > decided to use this "compatible" prop.
+> 
+> Thanks for your reply, I see.
+> 
+> >> It seems that you assume that the r8a7778 ethernet controller is 100%
+> >> compatible with r8a7779. Is that really true? For earlier versions the
+> >> sh_eth hardware documentation was anything but accurate, so it seems
+> >> to me that it must be more safe that r8a7778 would be using
+> >> "renesas,ether-r8a7778". What do you think?
+> >
+> > I think R8A7778 and R8A7779 EtherMACs are identical. I've cross checked
+> > the documentation at the start of the development and the registers
+> > appeared to be the same.
+> 
+> But even if the current version of the documentation happens to be
+> similar in it still doesn't guarantee that the IP is the same. And
+> using the "correct" SoC compatible value doesn't really hurt in any
+> way, does it?
+> 
+> My feeling is that using the identical SoC as compatible value must be
+> the best option - unless we know for sure they are identical that is.
+> 
+> So unless we're 100% certain about IP compatibility I'm trying to
+> enforce that we either use a strict matching for exactly the same SoC
+> version or IP block. Using a different maybe-compatible SoC string
+> seems to be begging for future trouble IMO.
+> 
+> Laurent, any opinion?
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/iio/pressure/st_pressure_core.c | 13 +++++++++++++
- include/linux/iio/common/st_sensors.h   |  3 +++
- 2 files changed, 16 insertions(+)
+I agree. If we had access to IP version information we could use that to 
+construct the compatible name. As we don't, the SoC name is the best option, 
+and to ensure future compatibility we should use the exact SoC version.
 
-diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
-index f452417..7beed89 100644
---- a/drivers/iio/pressure/st_pressure_core.c
-+++ b/drivers/iio/pressure/st_pressure_core.c
-@@ -23,6 +23,7 @@
- #include <linux/iio/sysfs.h>
- #include <linux/iio/trigger.h>
- #include <linux/iio/buffer.h>
-+#include <linux/regulator/consumer.h>
- #include <asm/unaligned.h>
- 
- #include <linux/iio/common/st_sensors.h>
-@@ -315,6 +316,15 @@ int st_press_common_probe(struct iio_dev *indio_dev)
- 	indio_dev->modes = INDIO_DIRECT_MODE;
- 	indio_dev->info = &press_info;
- 
-+	/* Regulator not mandatory, but if requested we should enable it. */
-+	pdata->regulator = regulator_get(&indio_dev->dev, "vdd");
-+	if (!IS_ERR_OR_NULL(pdata->regulator)) {
-+		err = regulator_enable(pdata->regulator);
-+		if (err != 0)
-+			dev_warn(&indio_dev->dev,
-+				 "Failed to enable specified vdd regulator\n");
-+	}
-+
- 	err = st_sensors_check_device_support(indio_dev,
- 					      ARRAY_SIZE(st_press_sensors),
- 					      st_press_sensors);
-@@ -363,6 +373,9 @@ void st_press_common_remove(struct iio_dev *indio_dev)
- {
- 	struct st_sensor_data *pdata = iio_priv(indio_dev);
- 
-+	if (!IS_ERR_OR_NULL(pdata->regulator))
-+		regulator_disable(pdata->regulator);
-+
- 	iio_device_unregister(indio_dev);
- 	if (pdata->get_irq_data_ready(indio_dev) > 0) {
- 		st_sensors_deallocate_trigger(indio_dev);
-diff --git a/include/linux/iio/common/st_sensors.h b/include/linux/iio/common/st_sensors.h
-index 4aef925..eb6ef3f 100644
---- a/include/linux/iio/common/st_sensors.h
-+++ b/include/linux/iio/common/st_sensors.h
-@@ -16,6 +16,7 @@
- #include <linux/irqreturn.h>
- #include <linux/iio/trigger.h>
- #include <linux/bitops.h>
-+#include <linux/regulator/consumer.h>
- 
- #define ST_SENSORS_TX_MAX_LENGTH		2
- #define ST_SENSORS_RX_MAX_LENGTH		6
-@@ -197,6 +198,7 @@ struct st_sensors {
-  * @trig: The trigger in use by the core driver.
-  * @sensor: Pointer to the current sensor struct in use.
-  * @current_fullscale: Maximum range of measure by the sensor.
-+ * @regulator: Pointer to sensor's power supply
-  * @enabled: Status of the sensor (false->off, true->on).
-  * @multiread_bit: Use or not particular bit for [I2C/SPI] multiread.
-  * @buffer_data: Data used by buffer part.
-@@ -211,6 +213,7 @@ struct st_sensor_data {
- 	struct iio_trigger *trig;
- 	struct st_sensors *sensor;
- 	struct st_sensor_fullscale_avl *current_fullscale;
-+	struct regulator *regulator;
- 
- 	bool enabled;
- 	bool multiread_bit;
 -- 
-1.8.1.2
+Regards,
+
+Laurent Pinchart
