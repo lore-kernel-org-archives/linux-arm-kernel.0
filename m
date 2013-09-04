@@ -1,60 +1,34 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 4 Sep 2013 16:27:37 +0900
-Subject: [Query] CPUFreq: Does these machines have separate clock domains
- for CPUs?
-In-Reply-To: <CAKohpom06N4DNZxrQcey-73o1jpQkNpCce2=-Wn+mDHLG9r-3g@mail.gmail.com>
-References: <CAKohponWn-RN7-6sdhghd6RGCOd357G+TKLsxHfqnSCuMD7xxw@mail.gmail.com>
- <CANqRtoTSO2yyP35naDe4y6a7rL99=cSs4-bJAWOxR5HL2gbpuw@mail.gmail.com>
- <CAKohpom06N4DNZxrQcey-73o1jpQkNpCce2=-Wn+mDHLG9r-3g@mail.gmail.com>
-Message-ID: <CANqRtoQF8-W=EFcV+LEPGbJf=h_yfyjVg=+0F5Sif15jB8XjBg@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed,  4 Sep 2013 15:27:46 +0800
+Subject: [PATCH] ASoC: atmel: disable error interrupt
+Message-ID: <1378279666-19873-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+As once the error interrupt is triggered, it can not be cleared.
+So, disable it.
 
-On Fri, Aug 30, 2013 at 4:33 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 30 August 2013 12:18, Magnus Damm <magnus.damm@gmail.com> wrote:
->> Hi Viresh,
->>
->> On Thu, Aug 29, 2013 at 7:15 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->>> Hi,
->>>
->>> I have been doing some CPUFreq cleanup work and
->>> wanted to know if the below mentioned machines have separate
->>> clock domains for their CPUs or all share the same domain?
->>>
->>> So, that we can use some generic routines for these drivers which
->>> would eventually do:
->>>
->>> cpumask_setall(policy->cpus);
->>>
->>> And I wanted to make sure that this doesn't break them.. :)
->>>
->>> ......
->>>
->>> The drivers are:
->> ...
->>> drivers/cpufreq/sh-cpufreq.c
->> ...
->>
->> The above SH cpufreq driver seems to be written with SMP in mind, but
->> I would say SMP is a very rare case for SH. So I believe it can be
->> considered as UP-only at this point. If Paul disagrees I'm quite sure
->> he will tell us.
->
-> Okay.. The problem isn't really SMP but different clock domains for CPUs
-> in a SMP system..
->
-> So, even if we have a SMP SH machine, will it have same clock line for
-> all CPUs?
+No side effect found while testing on sama5d3xek and at91sam9x5ek
+boards.
 
-Yeah, I understand your question but I'm afraid that I don't know the
-answer myself.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ sound/soc/atmel/atmel_ssc_dai.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> I will go with the change anyway..
-
-Good plan. Thanks for cleaning up the cpufreq bits.
-
-Cheers,
-
-/ magnus
+diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+index 0ecf356..bb53dea 100644
+--- a/sound/soc/atmel/atmel_ssc_dai.c
++++ b/sound/soc/atmel/atmel_ssc_dai.c
+@@ -649,7 +649,7 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
+ 	dma_params = ssc_p->dma_params[dir];
+ 
+ 	ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_enable);
+-	ssc_writel(ssc_p->ssc->regs, IER, dma_params->mask->ssc_error);
++	ssc_writel(ssc_p->ssc->regs, IDR, dma_params->mask->ssc_error);
+ 
+ 	pr_debug("%s enabled SSC_SR=0x%08x\n",
+ 			dir ? "receive" : "transmit",
+-- 
+1.7.9.5
