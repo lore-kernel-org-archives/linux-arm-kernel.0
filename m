@@ -1,139 +1,65 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 4 Sep 2013 10:50:51 -0400
-Subject: [PATCH] net: mvneta: properly disable HW PHY polling and
- ensure adjust_link() works
-In-Reply-To: <1378304478-21237-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1378304478-21237-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130904145051.GO19598@titan.lakedaemon.net>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 4 Sep 2013 15:50:59 +0100
+Subject: [PATCH 1/1] arm64: Align an assembler string properly
+In-Reply-To: <CAC8NTUUdpUxfzn4_nrvMxj_otGmXROEKwio7DQ27BoMv0vwsAw@mail.gmail.com>
+References: <CAC8NTUWvEYpugbUfZ3A54zFbS71mnChfCk2sVKUxxxWAHz+nRw@mail.gmail.com>
+ <CAC8NTUUdpUxfzn4_nrvMxj_otGmXROEKwio7DQ27BoMv0vwsAw@mail.gmail.com>
+Message-ID: <20130904145059.GC2369@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 04, 2013 at 04:21:18PM +0200, Thomas Petazzoni wrote:
-> This commit fixes a long-standing bug that has been reported by many
-> users: on some Armada 370 platforms, only the network interface that
-> has been used in U-Boot to tftp the kernel works properly in
-> Linux. The other network interfaces can see a 'link up', but are
-> unable to transmit data. The reports were generally made on the Armada
-> 370-based Mirabox, but have also been given on the Armada 370-RD
-> board.
+On Wed, Sep 04, 2013 at 06:22:44PM +0530, Radha Mohan wrote:
+> Hi Catalin,
+> Can you please review this?
 > 
-> The network MAC in the Armada 370/XP (supported by the mvneta driver
-> in Linux) has a functionality that allows it to continuously poll the
-> PHY and directly update the MAC configuration accordingly (speed,
-> duplex, etc.). The very first versions of the driver submitted for
-> review were using this hardware mechanism, but due to this, the driver
-> was not integrated with the kernel phylib. Following reviews, the
-> driver was changed to use the phylib, and therefore a software based
-> polling. In software based polling, Linux regularly talks to the PHY
-> over the MDIO bus, and sees if the link status has changed. If it's
-> the case then the adjust_link() callback of the driver is called to
-> update the MAC configuration accordingly.
+> regards,
+> Radha Mohan
 > 
-> However, it turns out that the adjust_link() callback was not
-> configuring the hardware in a completely correct way: while it was
-> setting the speed and duplex bits correctly, it wasn't telling the
-> hardware to actually take into account those bits rather than what the
-> hardware-based PHY polling mechanism has concluded. So, in fact the
-> adjust_link() callback was basically a no-op.
-> 
-> However, the network happened to be working because on the network
-> interfaces used by U-Boot for tftp on Armada 370 platforms because the
-> hardware PHY polling was enabled by the bootloader, and left enabled
-> by Linux. However, the second network interface not used for tftp (or
-> both network interfaces if the kernel is loaded from USB, NAND or SD
-> card) didn't had the hardware PHY polling enabled.
-> 
-> This patch fixes this situation by:
-> 
->  (1) Making sure that the hardware PHY polling is disabled by clearing
->      the MVNETA_PHY_POLLING_ENABLE bit in the MVNETA_UNIT_CONTROL
->      register in the driver ->probe() function.
-> 
->  (2) Making sure that the duplex and speed selections made by the
->      adjust_link() callback are taken into account by clearing the
->      MVNETA_GMAC_AN_SPEED_EN and MVNETA_GMAC_AN_DUPLEX_EN bits in the
->      MVNETA_GMAC_AUTONEG_CONFIG register.
-> 
-> This patch has been tested on Armada 370 Mirabox, and now both network
-> interfaces are usable after boot.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Willy Tarreau <w@1wt.eu>
-> Cc: Jochen De Smet <jochen.armkernel@leahnim.org>
-> Cc: Peter Sanford <psanford@nearbuy.io>
-> Cc: Ethan Tuttle <ethan@ethantuttle.com>
-> Cc: Ch?ny Yves-Gael <yves@cheny.fr>
-> Cc: Ryan Press <ryan@presslab.us>
-> Cc: Simon Guinot <simon.guinot@sequanux.org>
-> Cc: vdonnefort at lacie.com
-> Cc: stable at vger.kernel.org
-> ---
-> David, this patch is a fix for a problem that has been here since 3.8
-> (when the mvneta driver was introduced), so I've Cc'ed stable@ and if
-> possible I'd like to patch to be included for 3.12.
+> On Mon, Sep 2, 2013 at 4:18 PM, Radha Mohan <mohun106@gmail.com> wrote:
+> > From: Corey Minyard <cminyard@mvista.com>
+> >
+> > Do a proper align and put it in the right section.
+> >
+> > Signed-off-by: Corey Minyard <cminyard@mvista.com>
+> > ---
+> >  arch/arm64/mm/proc.S |    3 ++-
+> >  1 files changed, 2 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> > index 76d8320..1f89adc 100644
+> > --- a/arch/arm64/mm/proc.S
+> > +++ b/arch/arm64/mm/proc.S
+> > @@ -95,10 +95,11 @@ ENTRY(cpu_do_switch_mm)
+> >         ret
+> >  ENDPROC(cpu_do_switch_mm)
+> >
+> > +       .section ".rodata"
+> >  cpu_name:
+> >         .ascii  "AArch64 Processor"
+> > -       .align
+> >
+> > +       .align 3
 
-David,
+Since cpu_name is local, not referenced, and not next to anything
+noteworthy (so, unlikely to be found implicitly), I wonder why it's
+needed at all.
 
-Offending patch is:
+cputable.c:cpu_table just has a C string literal instead, with the same
+content.
 
-  c5aff18 net: mvneta: driver for Marvell Armada 370/XP network unit
+Perhaps proc.S:cpu_name is used in some other way, but I can't see it.
+The kernel still builds if it is deleted.
 
-Applies and builds cleanly against v3.8.13, v3.9.11, v3.10.10, and v3.11
+Cheers
+---Dave
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
-
-> ---
->  drivers/net/ethernet/marvell/mvneta.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index b017818..90ab292 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -138,7 +138,9 @@
->  #define      MVNETA_GMAC_FORCE_LINK_PASS         BIT(1)
->  #define      MVNETA_GMAC_CONFIG_MII_SPEED        BIT(5)
->  #define      MVNETA_GMAC_CONFIG_GMII_SPEED       BIT(6)
-> +#define      MVNETA_GMAC_AN_SPEED_EN             BIT(7)
->  #define      MVNETA_GMAC_CONFIG_FULL_DUPLEX      BIT(12)
-> +#define      MVNETA_GMAC_AN_DUPLEX_EN            BIT(13)
->  #define MVNETA_MIB_COUNTERS_BASE                 0x3080
->  #define      MVNETA_MIB_LATE_COLLISION           0x7c
->  #define MVNETA_DA_FILT_SPEC_MCAST                0x3400
-> @@ -915,6 +917,13 @@ static void mvneta_defaults_set(struct mvneta_port *pp)
->  	/* Assign port SDMA configuration */
->  	mvreg_write(pp, MVNETA_SDMA_CONFIG, val);
->  
-> +	/* Disable PHY polling in hardware, since we're using the
-> +	 * kernel phylib to do this.
-> +	 */
-> +	val = mvreg_read(pp, MVNETA_UNIT_CONTROL);
-> +	val &= ~MVNETA_PHY_POLLING_ENABLE;
-> +	mvreg_write(pp, MVNETA_UNIT_CONTROL, val);
-> +
->  	mvneta_set_ucast_table(pp, -1);
->  	mvneta_set_special_mcast_table(pp, -1);
->  	mvneta_set_other_mcast_table(pp, -1);
-> @@ -2307,7 +2316,9 @@ static void mvneta_adjust_link(struct net_device *ndev)
->  			val = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
->  			val &= ~(MVNETA_GMAC_CONFIG_MII_SPEED |
->  				 MVNETA_GMAC_CONFIG_GMII_SPEED |
-> -				 MVNETA_GMAC_CONFIG_FULL_DUPLEX);
-> +				 MVNETA_GMAC_CONFIG_FULL_DUPLEX |
-> +				 MVNETA_GMAC_AN_SPEED_EN |
-> +				 MVNETA_GMAC_AN_DUPLEX_EN);
->  
->  			if (phydev->duplex)
->  				val |= MVNETA_GMAC_CONFIG_FULL_DUPLEX;
-> -- 
-> 1.8.1.2
-> 
+> >         .section ".text.init", #alloc, #execinstr
+> >
+> >  /*
+> > --
+> > 1.7.1
 > 
 > _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> linaro-kernel mailing list
+> linaro-kernel at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-kernel
