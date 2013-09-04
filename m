@@ -1,69 +1,25 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 04 Sep 2013 18:45:02 +0200
-Subject: [PATCH] net: mvneta: implement ->ndo_do_ioctl() to support PHY
- ioctls
-In-Reply-To: <1378304812-21390-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1378304812-21390-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5227638E.1070905@free-electrons.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 04 Sep 2013 13:18:37 -0400 (EDT)
+Subject: [PATCH 2/2] drivers:net: delete premature free_irq
+In-Reply-To: <1378115661-5371-3-git-send-email-Julia.Lawall@lip6.fr>
+References: <1378115661-5371-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1378115661-5371-3-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20130904.131837.936191711263259013.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2013 16:26, Thomas Petazzoni wrote:
-> This commit implements the ->ndo_do_ioctl() operation so that the
-> PHY-related ioctl() calls can work from userspace, which allows
-> applications like mii-tool or mii-diag to do their job.
+From: Julia Lawall <Julia.Lawall@lip6.fr>
+Date: Mon,  2 Sep 2013 11:54:21 +0200
+
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
 > 
-
-I tested it successfully with mii-diag for the Armada 370 on Mirabox
-and for the Armada XP on Open Blocks AX3-4
-
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/net/ethernet/marvell/mvneta.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+> Free_irq is not needed if there has been no request_irq.  Free_irq is
+> removed from both the probe and remove functions.  The correct request_irq
+> and free_irq are found in the open and close functions.
 > 
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index 90ab292..389a854 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -2451,6 +2451,21 @@ static int mvneta_stop(struct net_device *dev)
->  	return 0;
->  }
->  
-> +static int mvneta_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
-> +{
-> +	struct mvneta_port *pp = netdev_priv(dev);
-> +	int ret;
-> +
-> +	if (!pp->phy_dev)
-> +		return -ENOTSUPP;
-> +
-> +	ret = phy_mii_ioctl(pp->phy_dev, ifr, cmd);
-> +	if (!ret)
-> +		mvneta_adjust_link(dev);
-> +
-> +	return ret;
-> +}
-> +
->  /* Ethtool methods */
->  
->  /* Get settings (phy address, speed) for ethtools */
-> @@ -2569,6 +2584,7 @@ static const struct net_device_ops mvneta_netdev_ops = {
->  	.ndo_change_mtu      = mvneta_change_mtu,
->  	.ndo_tx_timeout      = mvneta_tx_timeout,
->  	.ndo_get_stats64     = mvneta_get_stats64,
-> +	.ndo_do_ioctl        = mvneta_ioctl,
->  };
->  
->  const struct ethtool_ops mvneta_eth_tool_ops = {
-> 
+> A simplified version of the semantic match that finds this problem is as
+> follows: (http://coccinelle.lip6.fr/)
+ ...
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Applied, thank you.
