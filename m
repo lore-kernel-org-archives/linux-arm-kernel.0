@@ -1,32 +1,57 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  4 Sep 2013 10:31:35 +0100
-Subject: [PATCH 03/11] ARM: ux500: CONFIG: Enable ST's IIO Pressure Sensors by
- default
+Date: Wed,  4 Sep 2013 10:31:36 +0100
+Subject: [PATCH 04/11] iio: pressure-i2c: st: Simplify error checking in
+ probe()
 In-Reply-To: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
 References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1378287103-21765-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378287103-21765-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Strip out all the unnecessary gotos and check for NULL returns in the
+usual manner.
+
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/configs/u8500_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/iio/pressure/st_pressure_i2c.c | 17 ++++++-----------
+ 1 file changed, 6 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index a0025dc..d77aa57 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -37,6 +37,10 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=65536
- CONFIG_SENSORS_BH1780=y
-+CONFIG_IIO=y
-+CONFIG_IIO_ST_PRESS=y
-+CONFIG_IIO_ST_PRESS_I2C=y
-+CONFIG_IIO_ST_SENSORS_I2C=y
- CONFIG_NETDEVICES=y
- CONFIG_SMSC911X=y
- CONFIG_SMSC_PHY=y
+diff --git a/drivers/iio/pressure/st_pressure_i2c.c b/drivers/iio/pressure/st_pressure_i2c.c
+index 7cebcc7..2ace770 100644
+--- a/drivers/iio/pressure/st_pressure_i2c.c
++++ b/drivers/iio/pressure/st_pressure_i2c.c
+@@ -26,10 +26,8 @@ static int st_press_i2c_probe(struct i2c_client *client,
+ 	int err;
+ 
+ 	indio_dev = iio_device_alloc(sizeof(*pdata));
+-	if (indio_dev == NULL) {
+-		err = -ENOMEM;
+-		goto iio_device_alloc_error;
+-	}
++	if (!indio_dev)
++		return -ENOMEM;
+ 
+ 	pdata = iio_priv(indio_dev);
+ 	pdata->dev = &client->dev;
+@@ -37,15 +35,12 @@ static int st_press_i2c_probe(struct i2c_client *client,
+ 	st_sensors_i2c_configure(indio_dev, client, pdata);
+ 
+ 	err = st_press_common_probe(indio_dev);
+-	if (err < 0)
+-		goto st_press_common_probe_error;
++	if (err < 0) {
++		iio_device_free(indio_dev);
++		return err;
++	}
+ 
+ 	return 0;
+-
+-st_press_common_probe_error:
+-	iio_device_free(indio_dev);
+-iio_device_alloc_error:
+-	return err;
+ }
+ 
+ static int st_press_i2c_remove(struct i2c_client *client)
 -- 
 1.8.1.2
