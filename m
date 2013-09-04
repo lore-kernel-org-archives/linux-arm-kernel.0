@@ -1,57 +1,161 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  4 Sep 2013 10:31:40 +0100
-Subject: [PATCH 08/11] iio: pressure-core: st: Allow for number of channels to
- vary
+Date: Wed,  4 Sep 2013 10:31:37 +0100
+Subject: [PATCH 05/11] iio: pressure-core: st: Describe LPS331AP defines by
+ name
 In-Reply-To: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
 References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1378287103-21765-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378287103-21765-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment the number of channels specified is dictated by the first
-sensor supported by the driver. As we add support for more sensors this
-is likely to vary. Instead of using the ARRAY_SIZE() of the LPS331AP's
-channel specifier we'll use a new adaptable 'struct st_sensors' element
-instead.
+They're currently named *_1_*, for 'Sensor 1', but the code will be much
+more readable if we use the naming convention *_LPS331AP_* instead.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/iio/pressure/st_pressure_core.c | 3 ++-
- include/linux/iio/common/st_sensors.h   | 1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ drivers/iio/pressure/st_pressure_core.c | 90 ++++++++++++++++-----------------
+ 1 file changed, 44 insertions(+), 46 deletions(-)
 
 diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
-index 423ed6a..3cf54ed 100644
+index 9c343b4..becfb25 100644
 --- a/drivers/iio/pressure/st_pressure_core.c
 +++ b/drivers/iio/pressure/st_pressure_core.c
-@@ -101,6 +101,7 @@ static const struct st_sensors st_press_sensors[] = {
+@@ -31,92 +31,90 @@
+ #define ST_PRESS_MBAR_TO_KPASCAL(x)		(x * 10)
+ #define ST_PRESS_NUMBER_DATA_CHANNELS		1
+ 
+-/* DEFAULT VALUE FOR SENSORS */
+-#define ST_PRESS_DEFAULT_OUT_XL_ADDR		0x28
+-#define ST_TEMP_DEFAULT_OUT_L_ADDR		0x2b
+-
+ /* FULLSCALE */
+ #define ST_PRESS_FS_AVL_1260MB			1260
+ 
+-/* CUSTOM VALUES FOR SENSOR 1 */
+-#define ST_PRESS_1_WAI_EXP			0xbb
+-#define ST_PRESS_1_ODR_ADDR			0x20
+-#define ST_PRESS_1_ODR_MASK			0x70
+-#define ST_PRESS_1_ODR_AVL_1HZ_VAL		0x01
+-#define ST_PRESS_1_ODR_AVL_7HZ_VAL		0x05
+-#define ST_PRESS_1_ODR_AVL_13HZ_VAL		0x06
+-#define ST_PRESS_1_ODR_AVL_25HZ_VAL		0x07
+-#define ST_PRESS_1_PW_ADDR			0x20
+-#define ST_PRESS_1_PW_MASK			0x80
+-#define ST_PRESS_1_FS_ADDR			0x23
+-#define ST_PRESS_1_FS_MASK			0x30
+-#define ST_PRESS_1_FS_AVL_1260_VAL		0x00
+-#define ST_PRESS_1_FS_AVL_1260_GAIN		ST_PRESS_MBAR_TO_KPASCAL(244141)
+-#define ST_PRESS_1_FS_AVL_TEMP_GAIN		2083000
+-#define ST_PRESS_1_BDU_ADDR			0x20
+-#define ST_PRESS_1_BDU_MASK			0x04
+-#define ST_PRESS_1_DRDY_IRQ_ADDR		0x22
+-#define ST_PRESS_1_DRDY_IRQ_MASK		0x04
+-#define ST_PRESS_1_MULTIREAD_BIT		true
+-#define ST_PRESS_1_TEMP_OFFSET			42500
++/* CUSTOM VALUES FOR LPS331AP SENSOR */
++#define ST_PRESS_LPS331AP_WAI_EXP		0xbb
++#define ST_PRESS_LPS331AP_ODR_ADDR		0x20
++#define ST_PRESS_LPS331AP_ODR_MASK		0x70
++#define ST_PRESS_LPS331AP_ODR_AVL_1HZ_VAL	0x01
++#define ST_PRESS_LPS331AP_ODR_AVL_7HZ_VAL	0x05
++#define ST_PRESS_LPS331AP_ODR_AVL_13HZ_VAL	0x06
++#define ST_PRESS_LPS331AP_ODR_AVL_25HZ_VAL	0x07
++#define ST_PRESS_LPS331AP_PW_ADDR		0x20
++#define ST_PRESS_LPS331AP_PW_MASK		0x80
++#define ST_PRESS_LPS331AP_FS_ADDR		0x23
++#define ST_PRESS_LPS331AP_FS_MASK		0x30
++#define ST_PRESS_LPS331AP_FS_AVL_1260_VAL	0x00
++#define ST_PRESS_LPS331AP_FS_AVL_1260_GAIN	ST_PRESS_MBAR_TO_KPASCAL(244141)
++#define ST_PRESS_LPS331AP_FS_AVL_TEMP_GAIN	2083000
++#define ST_PRESS_LPS331AP_BDU_ADDR		0x20
++#define ST_PRESS_LPS331AP_BDU_MASK		0x04
++#define ST_PRESS_LPS331AP_DRDY_IRQ_ADDR		0x22
++#define ST_PRESS_LPS331AP_DRDY_IRQ_MASK		0x04
++#define ST_PRESS_LPS331AP_MULTIREAD_BIT		true
++#define ST_PRESS_LPS331AP_TEMP_OFFSET		42500
++#define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
++#define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
+ 
+ static const struct iio_chan_spec st_press_channels[] = {
+ 	ST_SENSORS_LSM_CHANNELS(IIO_PRESSURE,
+ 			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
+ 			ST_SENSORS_SCAN_X, 0, IIO_NO_MOD, 'u', IIO_LE, 24, 24,
+-			ST_PRESS_DEFAULT_OUT_XL_ADDR),
++			ST_PRESS_LPS331AP_OUT_XL_ADDR),
+ 	ST_SENSORS_LSM_CHANNELS(IIO_TEMP,
+ 			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE) |
+ 						BIT(IIO_CHAN_INFO_OFFSET),
+ 			-1, 0, IIO_NO_MOD, 's', IIO_LE, 16, 16,
+-			ST_TEMP_DEFAULT_OUT_L_ADDR),
++			ST_TEMP_LPS331AP_OUT_L_ADDR),
+ 	IIO_CHAN_SOFT_TIMESTAMP(1)
+ };
+ 
+ static const struct st_sensors st_press_sensors[] = {
+ 	{
+-		.wai = ST_PRESS_1_WAI_EXP,
++		.wai = ST_PRESS_LPS331AP_WAI_EXP,
+ 		.sensors_supported = {
  			[0] = LPS331AP_PRESS_DEV_NAME,
  		},
- 		.ch = (struct iio_chan_spec *)st_press_lsp331ap_channels,
-+		.num_ch = ARRAY_SIZE(st_press_lsp331ap_channels),
+ 		.ch = (struct iio_chan_spec *)st_press_channels,
  		.odr = {
- 			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
- 			.mask = ST_PRESS_LPS331AP_ODR_MASK,
-@@ -237,7 +238,7 @@ int st_press_common_probe(struct iio_dev *indio_dev)
- 	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
- 	pdata->multiread_bit = pdata->sensor->multi_read_bit;
- 	indio_dev->channels = pdata->sensor->ch;
--	indio_dev->num_channels = ARRAY_SIZE(st_press_lsp331ap_channels);
-+	indio_dev->num_channels = pdata->sensor->num_ch;
- 
- 	if (pdata->sensor->fs.addr != 0)
- 		pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
-diff --git a/include/linux/iio/common/st_sensors.h b/include/linux/iio/common/st_sensors.h
-index 72b2694..4aef925 100644
---- a/include/linux/iio/common/st_sensors.h
-+++ b/include/linux/iio/common/st_sensors.h
-@@ -180,6 +180,7 @@ struct st_sensors {
- 	u8 wai;
- 	char sensors_supported[ST_SENSORS_MAX_4WAI][ST_SENSORS_MAX_NAME];
- 	struct iio_chan_spec *ch;
-+	int num_ch;
- 	struct st_sensor_odr odr;
- 	struct st_sensor_power pw;
- 	struct st_sensor_axis enable_axis;
+-			.addr = ST_PRESS_1_ODR_ADDR,
+-			.mask = ST_PRESS_1_ODR_MASK,
++			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
++			.mask = ST_PRESS_LPS331AP_ODR_MASK,
+ 			.odr_avl = {
+-				{ 1, ST_PRESS_1_ODR_AVL_1HZ_VAL, },
+-				{ 7, ST_PRESS_1_ODR_AVL_7HZ_VAL, },
+-				{ 13, ST_PRESS_1_ODR_AVL_13HZ_VAL, },
+-				{ 25, ST_PRESS_1_ODR_AVL_25HZ_VAL, },
++				{ 1, ST_PRESS_LPS331AP_ODR_AVL_1HZ_VAL, },
++				{ 7, ST_PRESS_LPS331AP_ODR_AVL_7HZ_VAL, },
++				{ 13, ST_PRESS_LPS331AP_ODR_AVL_13HZ_VAL, },
++				{ 25, ST_PRESS_LPS331AP_ODR_AVL_25HZ_VAL, },
+ 			},
+ 		},
+ 		.pw = {
+-			.addr = ST_PRESS_1_PW_ADDR,
+-			.mask = ST_PRESS_1_PW_MASK,
++			.addr = ST_PRESS_LPS331AP_PW_ADDR,
++			.mask = ST_PRESS_LPS331AP_PW_MASK,
+ 			.value_on = ST_SENSORS_DEFAULT_POWER_ON_VALUE,
+ 			.value_off = ST_SENSORS_DEFAULT_POWER_OFF_VALUE,
+ 		},
+ 		.fs = {
+-			.addr = ST_PRESS_1_FS_ADDR,
+-			.mask = ST_PRESS_1_FS_MASK,
++			.addr = ST_PRESS_LPS331AP_FS_ADDR,
++			.mask = ST_PRESS_LPS331AP_FS_MASK,
+ 			.fs_avl = {
+ 				[0] = {
+ 					.num = ST_PRESS_FS_AVL_1260MB,
+-					.value = ST_PRESS_1_FS_AVL_1260_VAL,
+-					.gain = ST_PRESS_1_FS_AVL_1260_GAIN,
+-					.gain2 = ST_PRESS_1_FS_AVL_TEMP_GAIN,
++					.value = ST_PRESS_LPS331AP_FS_AVL_1260_VAL,
++					.gain = ST_PRESS_LPS331AP_FS_AVL_1260_GAIN,
++					.gain2 = ST_PRESS_LPS331AP_FS_AVL_TEMP_GAIN,
+ 				},
+ 			},
+ 		},
+ 		.bdu = {
+-			.addr = ST_PRESS_1_BDU_ADDR,
+-			.mask = ST_PRESS_1_BDU_MASK,
++			.addr = ST_PRESS_LPS331AP_BDU_ADDR,
++			.mask = ST_PRESS_LPS331AP_BDU_MASK,
+ 		},
+ 		.drdy_irq = {
+-			.addr = ST_PRESS_1_DRDY_IRQ_ADDR,
+-			.mask = ST_PRESS_1_DRDY_IRQ_MASK,
++			.addr = ST_PRESS_LPS331AP_DRDY_IRQ_ADDR,
++			.mask = ST_PRESS_LPS331AP_DRDY_IRQ_MASK,
+ 		},
+-		.multi_read_bit = ST_PRESS_1_MULTIREAD_BIT,
++		.multi_read_bit = ST_PRESS_LPS331AP_MULTIREAD_BIT,
+ 		.bootime = 2,
+ 	},
+ };
 -- 
 1.8.1.2
