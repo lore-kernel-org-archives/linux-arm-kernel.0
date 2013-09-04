@@ -1,30 +1,47 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 04 Sep 2013 12:25:06 -0600
-Subject: [PATCH v4 0/5] ARM: tegra: support for Trusted Foundations
-In-Reply-To: <52269B92.3070304@nvidia.com>
-References: <1377770268-14014-1-git-send-email-acourbot@nvidia.com>
- <52262D8F.9060706@wwwdotorg.org> <52269B92.3070304@nvidia.com>
-Message-ID: <52277B02.9010707@wwwdotorg.org>
+Date: Wed, 04 Sep 2013 12:36:47 -0600
+Subject: [PATCH v4 3/5] clk: dt: binding for basic multiplexer clock
+In-Reply-To: <20130903232219.10934.67434@quantum>
+References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
+ <1377150793-27864-4-git-send-email-mturquette@linaro.org>
+ <2A930389-012E-45C3-93EB-6B4A41DB2EF5@codeaurora.org>
+ <20130829011425.8231.78802@quantum>
+ <39BAF1F8-41AD-4667-BF76-22BDF709415A@codeaurora.org>
+ <20130830203334.10934.10011@quantum> <522110AA.7040700@wwwdotorg.org>
+ <20130903232219.10934.67434@quantum>
+Message-ID: <52277DBF.7080104@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2013 08:31 PM, Alex Courbot wrote:
-> On 09/04/2013 03:42 AM, Stephen Warren wrote:
->> On 08/29/2013 03:57 AM, Alexandre Courbot wrote:
->>> New version revised according to comments received for v3. Hopefully
->>> it will be good enough to be merged.
+On 09/03/2013 05:22 PM, Mike Turquette wrote:
+> Quoting Stephen Warren (2013-08-30 14:37:46)
+>> On 08/30/2013 02:33 PM, Mike Turquette wrote:
+...
+>>> The clock _data_ seems to always have some churn to it. Moving it out to
+>>> DT reduces that churn from Linux. My concern above is not about kernel
+>>> data size.
 >>
->> Aside from the small issue in patch 1/5, the series,
->> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>> That sounds like the opposite of what we should be doing.
+>>
+>> It's fine for kernel code/data to change; that's a natural part of
+>> development. Obviously, we should minimize churn, through thorough
+>> review, domain knowledge, etc.
 > 
-> Thanks! I have adressed the issues you mentioned and will submit v5
-> soon. Despite the fact this adds some non-Tegra stuff, will you be able
-> to take it into your tree, or should I ask someone else?
+> And with the "clock mapping" style bindings we'll end up changing both
+> the DT binding definition and the kernel. Not great.
 
-I would like to see an ack from the core ARM maintainer (Russell) on
-patch 1/5 (also CC'ing arm-soc maintainers for their opinion).
+What's a "clock mapping" style binding? I guess that means the style
+where you have a single DT node that provides multiple clocks, rather
+than one DT node per clock?
 
-If I get that, I think it makes sense to take the series through the
-Tegra tree. I can always create a stable branch for patch 1/5 if needed
-to resolve conflicts elsewhere (e.g. Russell's trees or arm-soc) and/or
-allow other people to build on top of that patch.
+If the kernel driver changes its internal data, I don't see why that
+would have any impact at all on the DT binding definition. We should be
+able to use one DT binding definition with arbitrary drivers.
+
+> And I'll respond to your points below but the whole "relocate the
+> problem to DT" argument is simply not my main point. What I want to do
+> is increase the usefulness of DT by allowing register-level details into
+> the binding which can 
+
+Can you expand upon why a DT that encodes register-level details is more
+useful? I can't see why there would be any difference in usefulness.
