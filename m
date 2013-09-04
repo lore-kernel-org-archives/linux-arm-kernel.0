@@ -1,45 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 4 Sep 2013 21:23:36 +0800
-Subject: [PATCH v2 1/4] ARM: dts: add iomuxc-gpr device node for imx6sl
-In-Reply-To: <1378182385-9205-2-git-send-email-B38611@freescale.com>
-References: <1378182385-9205-1-git-send-email-B38611@freescale.com>
- <1378182385-9205-2-git-send-email-B38611@freescale.com>
-Message-ID: <20130904132334.GB16797@S2101-09.ap.freescale.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Sep 2013 14:24:39 +0100
+Subject: [PATCH 11/11] iio: pressure-core: st: Provide correct regulator
+ support
+In-Reply-To: <20130904131111.GJ18206@e106331-lin.cambridge.arm.com>
+References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
+ <1378287103-21765-12-git-send-email-lee.jones@linaro.org>
+ <20130904131111.GJ18206@e106331-lin.cambridge.arm.com>
+Message-ID: <20130904132439.GA10155@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 03, 2013 at 12:26:22PM +0800, Fugang Duan wrote:
-> Add iomuxc gpr device node for imx6sl.
-> 
-> Signed-off-by: Fugang Duan  <B38611@freescale.com>
-                            ^^
-We generally have only one space between name and email address.  You
-may want to fix it in your git setup to follow the common pattern for
-future patches.
+On Wed, Sep 04, 2013 at 02:11:11PM +0100, Mark Rutland wrote:
+> On Wed, Sep 04, 2013 at 10:31:43AM +0100, Lee Jones wrote:
 
-Shawn
+> > +	/* Regulator not mandatory, but if requested we should enable it. */
+> > +	pdata->regulator = regulator_get(&indio_dev->dev, "vdd");
+> > +	if (!IS_ERR_OR_NULL(pdata->regulator)) {
 
-> ---
->  arch/arm/boot/dts/imx6sl.dtsi |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index c5e5da0..abd1eb9 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -504,6 +504,11 @@
->  				interrupts = <0 89 0x04>;
->  			};
->  
-> +			gpr: iomuxc-gpr at 020e0000 {
-> +				compatible = "fsl,imx6sl-iomuxc-gpr", "syscon";
-> +				reg = <0x020e0000 0x38>;
-> +			};
-> +
->  			iomuxc: iomuxc at 020e0000 {
->  				compatible = "fsl,imx6sl-iomuxc";
->  				reg = <0x020e0000 0x4000>;
-> -- 
-> 1.7.1
-> 
-> 
+> Can regulator_get return NULL? As far as I can see, it either returns a
+> valid reulator pointer or an ERR_PTR value.
+
+Yes, NULL is a valid regulator.
+
+> When you say "if requested", do you mean "if described in the dt"? If
+> so, the above doesn't distunguish between a regulator not being listed
+> and one failing to be got (e.g. if we got EPROBE_DEFER from
+> regulator_get).
+
+> I think this would be better handled with something like Mark Brown's
+> suggested regulator_get_optional [1,2].
+
+If the regulator may genuinely be absent from the system then it should
+be being requested using regulator_get_optional().  Otherwise it should
+be being requested using regulator_get().  In both cases it is important 
+that the driver pays attention to errors.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130904/2740eea2/attachment.sig>
