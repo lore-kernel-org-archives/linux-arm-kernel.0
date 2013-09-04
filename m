@@ -1,134 +1,58 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Wed,  4 Sep 2013 20:04:14 +0200
-Subject: [PATCH 3/3] perf: parse the .debug_frame section in case .eh_frame is
- not present
-In-Reply-To: <1378317854-25965-1-git-send-email-jean.pihet@linaro.org>
-References: <1378317854-25965-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1378317854-25965-4-git-send-email-jean.pihet@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 Sep 2013 11:06:39 -0700
+Subject: [RFC 3/4] Misc: SRAM: Hack for allowing executable code in SRAM.
+In-Reply-To: <1378226665-27090-4-git-send-email-Russ.Dill@ti.com>
+References: <1378226665-27090-1-git-send-email-Russ.Dill@ti.com>
+ <1378226665-27090-4-git-send-email-Russ.Dill@ti.com>
+Message-ID: <20130904180638.GC31541@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM the debug info is not present in the .eh_frame sections but
-instead in .debug_frame.
-Use libunwind to load and parse the debug info.
+* Russ Dill <Russ.Dill@ti.com> [130903 09:52]:
+> The generic SRAM mechanism does not ioremap memory in a
+> manner that allows code to be executed from SRAM. There is
+> currently no generic way to request ioremap to return a
+> memory area with execution allowed.
+> 
+> Insert a temporary hack for proof of concept on ARM.
+> 
+> Signed-off-by: Russ Dill <Russ.Dill@ti.com>
+> ---
+>  drivers/misc/sram.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+> index 08baaab..e059a23 100644
+> --- a/drivers/misc/sram.c
+> +++ b/drivers/misc/sram.c
+> @@ -31,6 +31,7 @@
+>  #include <linux/genalloc.h>
+>  #include <linux/sram.h>
+>  #include <asm-generic/cacheflush.h>
+> +#include <asm/io.h>
+>  
+>  #define SRAM_GRANULARITY	32
+>  
+> @@ -138,7 +139,7 @@ static int sram_probe(struct platform_device *pdev)
+>  	int ret;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	virt_base = devm_ioremap_resource(&pdev->dev, res);
+> +	virt_base = __arm_ioremap_exec(res->start, resource_size(res), false);
+>  	if (IS_ERR(virt_base))
+>  		return PTR_ERR(virt_base);
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
----
- tools/perf/util/unwind.c | 70 +++++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 54 insertions(+), 16 deletions(-)
+You can get rid of this hack by defining ioremap_exec in
+include/asm-generic/io.h the same way as ioremap_nocache
+is done:
 
-diff --git a/tools/perf/util/unwind.c b/tools/perf/util/unwind.c
-index 958723b..5353b32 100644
---- a/tools/perf/util/unwind.c
-+++ b/tools/perf/util/unwind.c
-@@ -39,6 +39,14 @@ UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
- 
- #define dwarf_search_unwind_table UNW_OBJ(dwarf_search_unwind_table)
- 
-+extern int
-+UNW_OBJ(dwarf_find_debug_frame) (int found, unw_dyn_info_t *di_debug,
-+								 unw_word_t ip, unw_word_t segbase,
-+								 const char *obj_name, unw_word_t start,
-+								 unw_word_t end);
-+
-+#define dwarf_find_debug_frame UNW_OBJ(dwarf_find_debug_frame)
-+
- #define DW_EH_PE_FORMAT_MASK	0x0f	/* format of the encoded value */
- #define DW_EH_PE_APPL_MASK	0x70	/* how the value is to be applied */
- 
-@@ -245,8 +253,9 @@ static int unwind_spec_ehframe(struct dso *dso, struct machine *machine,
- 	return 0;
- }
- 
--static int read_unwind_spec(struct dso *dso, struct machine *machine,
--			    u64 *table_data, u64 *segbase, u64 *fde_count)
-+static int read_unwind_spec_eh_frame(struct dso *dso, struct machine *machine,
-+				     u64 *table_data, u64 *segbase,
-+				     u64 *fde_count)
- {
- 	int ret = -EINVAL, fd;
- 	u64 offset;
-@@ -255,6 +264,7 @@ static int read_unwind_spec(struct dso *dso, struct machine *machine,
- 	if (fd < 0)
- 		return -EINVAL;
- 
-+	/* Check the .eh_frame section for unwinding info */
- 	offset = elf_section_offset(fd, ".eh_frame_hdr");
- 	close(fd);
- 
-@@ -263,10 +273,27 @@ static int read_unwind_spec(struct dso *dso, struct machine *machine,
- 					  table_data, segbase,
- 					  fde_count);
- 
--	/* TODO .debug_frame check if eh_frame_hdr fails */
- 	return ret;
- }
- 
-+static int read_unwind_spec_debug_frame(struct dso *dso,
-+										struct machine *machine, u64 *offset)
-+{
-+	int fd = dso__data_fd(dso, machine);
-+
-+	if (fd < 0)
-+		return -EINVAL;
-+
-+	/* Check the .debug_frame section for unwinding info */
-+	*offset = elf_section_offset(fd, ".debug_frame");
-+	close(fd);
-+
-+	if (*offset)
-+		return 0;
-+
-+	return -EINVAL;
-+}
-+
- static struct map *find_map(unw_word_t ip, struct unwind_info *ui)
- {
- 	struct addr_location al;
-@@ -291,20 +318,31 @@ find_proc_info(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
- 
- 	pr_debug("unwind: find_proc_info dso %s\n", map->dso->name);
- 
--	if (read_unwind_spec(map->dso, ui->machine,
--			     &table_data, &segbase, &fde_count))
--		return -EINVAL;
-+	/* Check the .eh_frame section for unwinding info */
-+	if (!read_unwind_spec_eh_frame(map->dso, ui->machine,
-+								   &table_data, &segbase, &fde_count)) {
-+		memset(&di, 0, sizeof(di));
-+		di.format   = UNW_INFO_FORMAT_REMOTE_TABLE;
-+		di.start_ip = map->start;
-+		di.end_ip   = map->end;
-+		di.u.rti.segbase    = map->start + segbase;
-+		di.u.rti.table_data = map->start + table_data;
-+		di.u.rti.table_len  = fde_count * sizeof(struct table_entry)
-+							  / sizeof(unw_word_t);
-+	    return dwarf_search_unwind_table(as, ip, &di, pi,
-+										 need_unwind_info, arg);
-+	}
-+
-+	/* Check the .debug_frame section for unwinding info */
-+	if (!read_unwind_spec_debug_frame(map->dso, ui->machine, &segbase)) {
-+		memset(&di, 0, sizeof(di));
-+		dwarf_find_debug_frame(0, &di, ip, 0, map->dso->name,
-+							   map->start, map->end);
-+		return dwarf_search_unwind_table(as, ip, &di, pi,
-+										 need_unwind_info, arg);
-+	}
- 
--	memset(&di, 0, sizeof(di));
--	di.format   = UNW_INFO_FORMAT_REMOTE_TABLE;
--	di.start_ip = map->start;
--	di.end_ip   = map->end;
--	di.u.rti.segbase    = map->start + segbase;
--	di.u.rti.table_data = map->start + table_data;
--	di.u.rti.table_len  = fde_count * sizeof(struct table_entry)
--			      / sizeof(unw_word_t);
--	return dwarf_search_unwind_table(as, ip, &di, pi,
--					 need_unwind_info, arg);
-+	return -EINVAL;
- }
- 
- static int access_fpreg(unw_addr_space_t __maybe_unused as,
--- 
-1.7.11.7
+#ifndef ioremap_exec
+#define ioremap_exec ioremap
+#endif
+
+Then the arch that need ioremap_exec can define and
+implement it. Needs to be reviewed on LKML naturally :)
+
+Regards,
+
+Tony
