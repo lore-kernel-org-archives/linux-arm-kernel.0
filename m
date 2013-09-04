@@ -1,80 +1,57 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Wed, 4 Sep 2013 17:27:39 +0300
-Subject: [PATCH 3/5] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
- to the LRADC driver
-In-Reply-To: <1378299706-6742-4-git-send-email-jbe@pengutronix.de>
-References: <1378299706-6742-1-git-send-email-jbe@pengutronix.de>
- <1378299706-6742-4-git-send-email-jbe@pengutronix.de>
-Message-ID: <20130904142738.GH6329@mwanda>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 4 Sep 2013 16:35:26 +0200
+Subject: [PATCH] pwm: pxa: add device tree support to pwm driver
+In-Reply-To: <5227425E.7030806@newsguy.com>
+References: <1378236233-15637-1-git-send-email-mikedunn@newsguy.com>
+ <201309040020.55029.marex@denx.de> <5227425E.7030806@newsguy.com>
+Message-ID: <201309041635.26695.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 04, 2013 at 03:01:44PM +0200, Juergen Beisert wrote:
-> @@ -323,10 +338,17 @@ static int mxs_lradc_ts_touched(struct mxs_lradc *lradc)
->  	uint32_t reg;
->  
->  	/* Enable touch detection. */
-> -	writel(LRADC_CTRL0_MX28_PLATE_MASK,
-> -		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
-> -	writel(LRADC_CTRL0_MX28_TOUCH_DETECT_ENABLE,
-> -		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
-> +	if (lradc->soc == IMX28_LRADC) {
-> +		writel(LRADC_CTRL0_MX28_PLATE_MASK,
-> +			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
-> +		writel(LRADC_CTRL0_MX28_TOUCH_DETECT_ENABLE,
-> +			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
-> +	} else {
-> +		writel(LRADC_CTRL0_MX23_PLATE_MASK,
-> +			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
-> +		writel(LRADC_CTRL0_MX23_TOUCH_DETECT_ENABLE,
-> +			lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
-> +	}
+Dear Mike Dunn,
 
-I don't like the way this patch takes the driver and makes every line
-an if else statement.  It would be cleaner to do this:
+> On 09/03/2013 03:20 PM, Marek Vasut wrote:
+> 
+> [...]
+> 
+> >> +#ifdef CONFIG_OF
+> >> +/* use the platform_device id table for OF match table data */
+> >> +static struct of_device_id pwm_of_match[] = {
+> >> +	{ .compatible = "marvell,pxa25x-pwm", .data = &pwm_id_table[0] },
+> >> +	{ .compatible = "marvell,pxa27x-pwm", .data = &pwm_id_table[1] },
+> >> +	{ .compatible = "marvell,pxa168-pwm", .data = &pwm_id_table[2] },
+> >> +	{ .compatible = "marvell,pxa910-pwm", .data = &pwm_id_table[3] },
+> >> +	{ }
+> >> +};
+> >> +MODULE_DEVICE_TABLE(of, pwm_of_match);
+> > 
+> > Are PXA2xx and PXA3xx PWM impleemntations not all the same ? If so, why
+> > not just stick with pxa25x-pwm only for all of the CPUs (aka. the lowest
+> > CPU model). Then the table would have but a single entry.
+> 
+> I'm just echoing the existing platform_device_id table...
+> 
+> static const struct platform_device_id pwm_id_table[] = {
+> 	/*   PWM    has_secondary_pwm? */
+> 	{ "pxa25x-pwm", 0 },
+> 	{ "pxa27x-pwm", HAS_SECONDARY_PWM },
+> 	{ "pxa168-pwm", 0 },
+> 	{ "pxa910-pwm", 0 },
+> 	{ },
+> };
+> MODULE_DEVICE_TABLE(platform, pwm_id_table);
+> 
+> ... so that my changes to the driver are minimal.  Yes, apparently the only
+> difference is the existance of a "secondary" pwm for pxa27x.
+> 
+> BTW, the pxa27x actually has four pwms, which is why the addition I made to
+> pxa27x.dtsi has two nodes (the driver handles two pwms for each device
+> instance in the pxa27x case).
+> 
 
-	writel(lradc_plate_mask(lradc),
-		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
-	writel(lradc_touch_detect_enable(lradc),
-		lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_SET);
+What's that "secondary PWM" there? I no longer remember, sorry. The question 
+remains still, we can have two entries there (pxa25x and pxa27x) ORR have one 
+entry (pxa25x) + mrvl,has-secondary-pwm entry.
 
-Btw, LRADC_CTRL0_MX23_TOUCH_DETECT_ENABLE just enables the touch screen
-to detect touches?  It seems like we could leave the "DETECT_" out of
-the name.
-
-Actually it would better yet if there were a function:
-
-static inline void lradc_writel(struct mxs_lradc *lradc, u32 val,
-				size_t chan, size_t offset)
-{
-	writel(val, lradc->base + chan + offset);
-}
-
-That way we could do:
-
-	lradc_writel(lradc_enable_touch(lradc), LRADC_CTRL0,
-		     STMP_OFFSET_REG_SET);
-
-ACTUALLY!  When I look at it now the third argument is almost always
-"set", "clear" or "toggle".
-
-So we could do:
-
-static inline void lradc_reg_set(struct mxs_lradc *lradc, u32 val,
-				size_t chan)
-{
-	writel(val, lradc->base + chan + STMP_OFFSET_REG_SET);
-}
-
-So then it would be:
-
-	lradc_reg_clear(lradc_plate_mask(lradc), LRADC_CTRL0);
-	lradc_reg_set(lradc_enable_touch(lradc), LRADC_CTRL0);
-
-I've just changed 11 lines of code down to 2 lines of code by hiding the
-if statement in the header file.
-
-Please redo this patch along those lines.
-
-regards,
-dan carpenter
+Best regards,
+Marek Vasut
