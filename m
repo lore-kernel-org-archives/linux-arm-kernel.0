@@ -1,118 +1,89 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Wed,  4 Sep 2013 07:04:39 +0200
-Subject: [PATCH][RESEND] ARM: imx: remove IRQF_DISABLED
-Message-ID: <1378271079-24945-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 4 Sep 2013 14:35:14 +0900
+Subject: [PATCH 1/4] ARM: shmobile: r8a7778: add Ether DT support
+In-Reply-To: <52262A1B.4050406@cogentembedded.com>
+References: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
+ <201309010315.49763.sergei.shtylyov@cogentembedded.com>
+ <CANqRtoQFYFva9msdoEWdU2Z7_=jOtZwvXgL7OqUKhVMO3NOPzg@mail.gmail.com>
+ <52262A1B.4050406@cogentembedded.com>
+Message-ID: <CANqRtoSfsEwqJhh9DgX6jxK5DjH5FeroMAcsvss5o2vAzFk-pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This flag is a NOOP since 2.6.35 and can be removed.
+Hi Sergei,
 
-This is an update for 3.11 of a patch already sent for 3.10
+[CC Laurent]
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- arch/arm/mach-imx/Kconfig             | 2 +-
- arch/arm/mach-imx/epit.c              | 2 +-
- arch/arm/mach-imx/mach-armadillo5x0.c | 3 +--
- arch/arm/mach-imx/mach-mx31_3ds.c     | 2 +-
- arch/arm/mach-imx/mach-pcm037.c       | 3 +--
- arch/arm/mach-imx/mx31lilly-db.c      | 3 +--
- arch/arm/mach-imx/time.c              | 2 +-
- 7 files changed, 7 insertions(+), 10 deletions(-)
+On Wed, Sep 4, 2013 at 3:27 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Hello.
+>
+>
+> On 09/03/2013 07:17 PM, Magnus Damm wrote:
+>
+>>> Define the generic R8A777x part of the Ether device node.
+>
+>
+>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+>
+>>> ---
+>>>   arch/arm/boot/dts/r8a7778.dtsi |   11 +++++++++++
+>>>   1 file changed, 11 insertions(+)
+>>>
+>>> Index: renesas/arch/arm/boot/dts/r8a7778.dtsi
+>>> ===================================================================
+>>> --- renesas.orig/arch/arm/boot/dts/r8a7778.dtsi
+>>> +++ renesas/arch/arm/boot/dts/r8a7778.dtsi
+>>> @@ -98,4 +98,15 @@
+>>>                  reg = <0xfffc000 0x118>;
+>>>                  #gpio-range-cells = <3>;
+>>>          };
+>>> +
+>>> +       ether: ethernet at fde00000 {
+>>> +               device_type = "network";
+>>> +               compatible = "renesas,ether-r8a7779";
+>
+>
+>> Hi Sergei,
+>
+>
+>> Thanks for your patch. What's the reason behind the r8a7778 SoC using
+>> a compatible string for r8a7779 like "renesas,ether-r8a7779"?
+>
+>
+>    R8A7779 support has appeared first in Linux and as R8A7778 Ether is
+> identical to R8A7779 and no wildcards are allowed in the device tree, I
+> decided to use this "compatible" prop.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index f546560..799a92f 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -22,7 +22,7 @@ config MXC_IRQ_PRIOR
- 	help
- 	  Select this if you want to use prioritized IRQ handling.
- 	  This feature prevents higher priority ISR to be interrupted
--	  by lower priority IRQ even IRQF_DISABLED flag is not set.
-+	  by lower priority IRQ.
- 	  This may be useful in embedded applications, where are strong
- 	  requirements for timing.
- 	  Say N here, unless you have a specialized requirement.
-diff --git a/arch/arm/mach-imx/epit.c b/arch/arm/mach-imx/epit.c
-index e02de18..074b1a8 100644
---- a/arch/arm/mach-imx/epit.c
-+++ b/arch/arm/mach-imx/epit.c
-@@ -171,7 +171,7 @@ static irqreturn_t epit_timer_interrupt(int irq, void *dev_id)
- 
- static struct irqaction epit_timer_irq = {
- 	.name		= "i.MX EPIT Timer Tick",
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
- 	.handler	= epit_timer_interrupt,
- };
- 
-diff --git a/arch/arm/mach-imx/mach-armadillo5x0.c b/arch/arm/mach-imx/mach-armadillo5x0.c
-index 368a6e3..58b864a 100644
---- a/arch/arm/mach-imx/mach-armadillo5x0.c
-+++ b/arch/arm/mach-imx/mach-armadillo5x0.c
-@@ -404,8 +404,7 @@ static int armadillo5x0_sdhc1_init(struct device *dev,
- 
- 	/* When supported the trigger type have to be BOTH */
- 	ret = request_irq(gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_ATA_DMACK)),
--			  detect_irq,
--			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
-+			  detect_irq, IRQF_TRIGGER_FALLING,
- 			  "sdhc-detect", data);
- 
- 	if (ret)
-diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-index 1ed9161..50044a2 100644
---- a/arch/arm/mach-imx/mach-mx31_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-@@ -311,7 +311,7 @@ static int mx31_3ds_sdhc1_init(struct device *dev,
- 	}
- 
- 	ret = request_irq(gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO3_1)),
--			  detect_irq, IRQF_DISABLED |
-+			  detect_irq,
- 			  IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
- 			  "sdhc1-detect", data);
- 	if (ret) {
-diff --git a/arch/arm/mach-imx/mach-pcm037.c b/arch/arm/mach-imx/mach-pcm037.c
-index bc0261e..45303bd6 100644
---- a/arch/arm/mach-imx/mach-pcm037.c
-+++ b/arch/arm/mach-imx/mach-pcm037.c
-@@ -371,8 +371,7 @@ static int pcm970_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
- #endif
- 
- 	ret = request_irq(gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_SCK6)), detect_irq,
--			IRQF_DISABLED | IRQF_TRIGGER_FALLING,
--				"sdhc-detect", data);
-+			IRQF_TRIGGER_FALLING, "sdhc-detect", data);
- 	if (ret)
- 		goto err_gpio_free_2;
- 
-diff --git a/arch/arm/mach-imx/mx31lilly-db.c b/arch/arm/mach-imx/mx31lilly-db.c
-index d4361b8..649fe49 100644
---- a/arch/arm/mach-imx/mx31lilly-db.c
-+++ b/arch/arm/mach-imx/mx31lilly-db.c
-@@ -130,8 +130,7 @@ static int mxc_mmc1_init(struct device *dev,
- 	gpio_direction_input(gpio_wp);
- 
- 	ret = request_irq(gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_1)),
--			  detect_irq,
--			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
-+			  detect_irq, IRQF_TRIGGER_FALLING,
- 			  "MMC detect", data);
- 	if (ret)
- 		goto exit_free_wp;
-diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index cd46529..9b6638a 100644
---- a/arch/arm/mach-imx/time.c
-+++ b/arch/arm/mach-imx/time.c
-@@ -250,7 +250,7 @@ static irqreturn_t mxc_timer_interrupt(int irq, void *dev_id)
- 
- static struct irqaction mxc_timer_irq = {
- 	.name		= "i.MX Timer Tick",
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
- 	.handler	= mxc_timer_interrupt,
- };
- 
--- 
-1.8.1.2
+Thanks for your reply, I see.
+
+>> It seems that you assume that the r8a7778 ethernet controller is 100%
+>> compatible with r8a7779. Is that really true? For earlier versions the
+>> sh_eth hardware documentation was anything but accurate, so it seems
+>> to me that it must be more safe that r8a7778 would be using
+>> "renesas,ether-r8a7778". What do you think?
+>
+>
+>    I think R8A7778 and R8A7779 EtherMACs are identical. I've cross checked
+> the documentation at the start of the development and the registers appeared
+> to be the same.
+
+But even if the current version of the documentation happens to be
+similar in it still doesn't guarantee that the IP is the same. And
+using the "correct" SoC compatible value doesn't really hurt in any
+way, does it?
+
+My feeling is that using the identical SoC as compatible value must be
+the best option - unless we know for sure they are identical that is.
+
+So unless we're 100% certain about IP compatibility I'm trying to
+enforce that we either use a strict matching for exactly the same SoC
+version or IP block. Using a different maybe-compatible SoC string
+seems to be begging for future trouble IMO.
+
+Laurent, any opinion?
+
+Cheers,
+
+/ manus
