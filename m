@@ -1,55 +1,117 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 4 Sep 2013 21:06:29 +0800
-Subject: [PATCH] ARM: imx: initialize clk_init_data.flags for clk-fixup-mux
-Message-ID: <1378299990-16746-1-git-send-email-shawn.guo@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 Sep 2013 14:11:11 +0100
+Subject: [PATCH 11/11] iio: pressure-core: st: Provide correct
+ regulator support
+In-Reply-To: <1378287103-21765-12-git-send-email-lee.jones@linaro.org>
+References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
+ <1378287103-21765-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130904131111.GJ18206@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clk_init_data.flags of clk-fixup-mux is left there without
-initialization.  It may hold some random data and cause clock framework
-interpret the clock in an unexpected way.  At least on imx6sl, the
-following division by zero error with sched_clock is seen because of it.
+Hi Lee,
 
-Division by zero in kernel.
-CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.11.0-rc3+ #19
-Backtrace:
-[<80011af0>] (dump_backtrace+0x0/0x10c) from [<80011c90>] (show_stack+0x18/0x1c)
- r6:3b9aca00 r5:00000020 r4:00000000 r3:00000000
-[<80011c78>] (show_stack+0x0/0x1c) from [<8055e02c>] (dump_stack+0x78/0x94)
-[<8055dfb4>] (dump_stack+0x0/0x94) from [<80011924>] (__div0+0x18/0x20)
- r4:00000000 r3:00000000
-[<8001190c>] (__div0+0x0/0x20) from [<8026c408>] (Ldiv0_64+0x8/0x18)
-[<8006330c>] (clocks_calc_mult_shift+0x0/0xf8) from [<8072f604>] (setup_sched_clock+0x88/0x1f0)
-[<8072f57c>] (setup_sched_clock+0x0/0x1f0) from [<8071ad48>] (mxc_timer_init+0xe8/0x17c)
-[<8071ac60>] (mxc_timer_init+0x0/0x17c) from [<807290b0>] (imx6sl_clocks_init+0x1db8/0x1dc0)
- r8:807a9ca4 r7:00000000 r6:80777564 r5:8100c1f4 r4:c0820000
-[<807272f8>] (imx6sl_clocks_init+0x0/0x1dc0) from [<807420ac>] (of_clk_init+0x40/0x6c)
-[<8074206c>] (of_clk_init+0x0/0x6c) from [<807290cc>] (imx6sl_timer_init+0x14/0x18)
- r5:807a8e80 r4:ffffffff
-[<807290b8>] (imx6sl_timer_init+0x0/0x18) from [<80716e1c>] (time_init+0x24/0x34)
-[<80716df8>] (time_init+0x0/0x34) from [<80713738>] (start_kernel+0x1b0/0x310)
-[<80713588>] (start_kernel+0x0/0x310) from [<80008074>] (0x80008074)
- r7:80770b08 r6:80754cd4 r5:8076c8c4 r4:10c53c7d
-sched_clock: 32 bits at 0 Hz, resolution 0ns, wraps every 0ms
+On Wed, Sep 04, 2013 at 10:31:43AM +0100, Lee Jones wrote:
+> The power to some of the sensors are controlled by regulators. In most
+> cases these are 'always on', but if not they will fail to work until
+> the regulator is enabled using the relevant APIs.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/iio/pressure/st_pressure_core.c | 13 +++++++++++++
+>  include/linux/iio/common/st_sensors.h   |  3 +++
+>  2 files changed, 16 insertions(+)
+> 
+> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
+> index f452417..7beed89 100644
+> --- a/drivers/iio/pressure/st_pressure_core.c
+> +++ b/drivers/iio/pressure/st_pressure_core.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/iio/sysfs.h>
+>  #include <linux/iio/trigger.h>
+>  #include <linux/iio/buffer.h>
+> +#include <linux/regulator/consumer.h>
+>  #include <asm/unaligned.h>
+>  
+>  #include <linux/iio/common/st_sensors.h>
+> @@ -315,6 +316,15 @@ int st_press_common_probe(struct iio_dev *indio_dev)
+>  	indio_dev->modes = INDIO_DIRECT_MODE;
+>  	indio_dev->info = &press_info;
+>  
+> +	/* Regulator not mandatory, but if requested we should enable it. */
+> +	pdata->regulator = regulator_get(&indio_dev->dev, "vdd");
+> +	if (!IS_ERR_OR_NULL(pdata->regulator)) {
 
-Fix the bug by initializing init.flags as zero.
+Can regulator_get return NULL? As far as I can see, it either returns a
+valid reulator pointer or an ERR_PTR value.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/clk-fixup-mux.c |    1 +
- 1 file changed, 1 insertion(+)
+When you say "if requested", do you mean "if described in the dt"? If
+so, the above doesn't distunguish between a regulator not being listed
+and one failing to be got (e.g. if we got EPROBE_DEFER from
+regulator_get).
 
-diff --git a/arch/arm/mach-imx/clk-fixup-mux.c b/arch/arm/mach-imx/clk-fixup-mux.c
-index deb4b80..0d40b35 100644
---- a/arch/arm/mach-imx/clk-fixup-mux.c
-+++ b/arch/arm/mach-imx/clk-fixup-mux.c
-@@ -90,6 +90,7 @@ struct clk *imx_clk_fixup_mux(const char *name, void __iomem *reg,
- 	init.ops = &clk_fixup_mux_ops;
- 	init.parent_names = parents;
- 	init.num_parents = num_parents;
-+	init.flags = 0;
- 
- 	fixup_mux->mux.reg = reg;
- 	fixup_mux->mux.shift = shift;
--- 
-1.7.9.5
+I think this would be better handled with something like Mark Brown's
+suggested regulator_get_optional [1,2].
+
+Thanks,
+Mark.
+
+[1] https://lkml.org/lkml/2013/7/30/328 (cover)
+[2] https://lkml.org/lkml/2013/7/30/334 (patches)
+
+> +		err = regulator_enable(pdata->regulator);
+> +		if (err != 0)
+> +			dev_warn(&indio_dev->dev,
+> +				 "Failed to enable specified vdd regulator\n");
+> +	}
+> +
+>  	err = st_sensors_check_device_support(indio_dev,
+>  					      ARRAY_SIZE(st_press_sensors),
+>  					      st_press_sensors);
+> @@ -363,6 +373,9 @@ void st_press_common_remove(struct iio_dev *indio_dev)
+>  {
+>  	struct st_sensor_data *pdata = iio_priv(indio_dev);
+>  
+> +	if (!IS_ERR_OR_NULL(pdata->regulator))
+> +		regulator_disable(pdata->regulator);
+> +
+>  	iio_device_unregister(indio_dev);
+>  	if (pdata->get_irq_data_ready(indio_dev) > 0) {
+>  		st_sensors_deallocate_trigger(indio_dev);
+> diff --git a/include/linux/iio/common/st_sensors.h b/include/linux/iio/common/st_sensors.h
+> index 4aef925..eb6ef3f 100644
+> --- a/include/linux/iio/common/st_sensors.h
+> +++ b/include/linux/iio/common/st_sensors.h
+> @@ -16,6 +16,7 @@
+>  #include <linux/irqreturn.h>
+>  #include <linux/iio/trigger.h>
+>  #include <linux/bitops.h>
+> +#include <linux/regulator/consumer.h>
+>  
+>  #define ST_SENSORS_TX_MAX_LENGTH		2
+>  #define ST_SENSORS_RX_MAX_LENGTH		6
+> @@ -197,6 +198,7 @@ struct st_sensors {
+>   * @trig: The trigger in use by the core driver.
+>   * @sensor: Pointer to the current sensor struct in use.
+>   * @current_fullscale: Maximum range of measure by the sensor.
+> + * @regulator: Pointer to sensor's power supply
+>   * @enabled: Status of the sensor (false->off, true->on).
+>   * @multiread_bit: Use or not particular bit for [I2C/SPI] multiread.
+>   * @buffer_data: Data used by buffer part.
+> @@ -211,6 +213,7 @@ struct st_sensor_data {
+>  	struct iio_trigger *trig;
+>  	struct st_sensors *sensor;
+>  	struct st_sensor_fullscale_avl *current_fullscale;
+> +	struct regulator *regulator;
+>  
+>  	bool enabled;
+>  	bool multiread_bit;
+> -- 
+> 1.8.1.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
