@@ -1,60 +1,60 @@
-From: zhoujiewu@gmail.com (zhoujie wu)
-Date: Wed, 4 Sep 2013 14:59:34 +0800
-Subject: question about clk notifier in common clock tree
-Message-ID: <CAAXpJNvOHWhOF9R7xADzTeYvM1JPFC+sJ6zZej9Ym5vab7D7VQ@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 4 Sep 2013 16:27:37 +0900
+Subject: [Query] CPUFreq: Does these machines have separate clock domains
+ for CPUs?
+In-Reply-To: <CAKohpom06N4DNZxrQcey-73o1jpQkNpCce2=-Wn+mDHLG9r-3g@mail.gmail.com>
+References: <CAKohponWn-RN7-6sdhghd6RGCOd357G+TKLsxHfqnSCuMD7xxw@mail.gmail.com>
+ <CANqRtoTSO2yyP35naDe4y6a7rL99=cSs4-bJAWOxR5HL2gbpuw@mail.gmail.com>
+ <CAKohpom06N4DNZxrQcey-73o1jpQkNpCce2=-Wn+mDHLG9r-3g@mail.gmail.com>
+Message-ID: <CANqRtoQF8-W=EFcV+LEPGbJf=h_yfyjVg=+0F5Sif15jB8XjBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Viresh,
 
-Now in our platform, we are using clk notifer to adjust voltage before
-clock rate change or after rate change.
+On Fri, Aug 30, 2013 at 4:33 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 30 August 2013 12:18, Magnus Damm <magnus.damm@gmail.com> wrote:
+>> Hi Viresh,
+>>
+>> On Thu, Aug 29, 2013 at 7:15 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>>> Hi,
+>>>
+>>> I have been doing some CPUFreq cleanup work and
+>>> wanted to know if the below mentioned machines have separate
+>>> clock domains for their CPUs or all share the same domain?
+>>>
+>>> So, that we can use some generic routines for these drivers which
+>>> would eventually do:
+>>>
+>>> cpumask_setall(policy->cpus);
+>>>
+>>> And I wanted to make sure that this doesn't break them.. :)
+>>>
+>>> ......
+>>>
+>>> The drivers are:
+>> ...
+>>> drivers/cpufreq/sh-cpufreq.c
+>> ...
+>>
+>> The above SH cpufreq driver seems to be written with SMP in mind, but
+>> I would say SMP is a very rare case for SH. So I believe it can be
+>> considered as UP-only at this point. If Paul disagrees I'm quite sure
+>> he will tell us.
+>
+> Okay.. The problem isn't really SMP but different clock domains for CPUs
+> in a SMP system..
+>
+> So, even if we have a SMP SH machine, will it have same clock line for
+> all CPUs?
 
-But for some clock modules, it even have to adjust voltage when clock
-enable and disable.
-For example, when it is working(clock enabled), it requires voltage
-1.2V. When it finished its work, it could release it's voltage
-requirement.
-Do you think if it is ok we also send out notifier in __clk_prepare
-and __clk_unprepare as below?
+Yeah, I understand your question but I'm afraid that I don't know the
+answer myself.
 
-Thanks.
+> I will go with the change anyway..
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 54a191c..2f64f1e 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -34,6 +34,9 @@ static HLIST_HEAD(clk_root_list);
- static HLIST_HEAD(clk_orphan_list);
- static LIST_HEAD(clk_notifier_list);
+Good plan. Thanks for cleaning up the cpufreq bits.
 
-+static int __clk_notify(struct clk *clk, unsigned long msg,
-+ unsigned long old_rate, unsigned long new_rate);
-+
- /***           locking             ***/
- static void clk_prepare_lock(void)
- {
-@@ -697,6 +700,9 @@ void __clk_unprepare(struct clk *clk)
-  if (clk->ops->unprepare)
-  clk->ops->unprepare(clk->hw);
+Cheers,
 
-+ /* send out notifier for dvfs */
-+ __clk_notify(clk, POST_RATE_CHANGE, clk->rate, 0);
-+
-  __clk_unprepare(clk->parent);
- }
-
-@@ -738,6 +744,9 @@ int __clk_prepare(struct clk *clk)
-  return ret;
-  }
-  }
-+
-+ /* send out notifier for dvfs */
-+ __clk_notify(clk, PRE_RATE_CHANGE, 0, clk->rate);
-  }
-
-  clk->prepare_count++;
-
-
--- 
-Zhoujie Wu
+/ magnus
