@@ -1,94 +1,52 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 4 Sep 2013 17:23:56 +0300
-Subject: [PATCH v2 4/4 Resend] clk: tegra114: table driven PMC clock init
-Message-ID: <1378304641-7992-1-git-send-email-pdeschrijver@nvidia.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed,  4 Sep 2013 16:26:52 +0200
+Subject: [PATCH] net: mvneta: implement ->ndo_do_ioctl() to support PHY ioctls
+Message-ID: <1378304812-21390-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch converts the Tegra114 PMC clock registration to be table driven
-like the periph clocks.
+This commit implements the ->ndo_do_ioctl() operation so that the
+PHY-related ioctl() calls can work from userspace, which allows
+applications like mii-tool or mii-diag to do their job.
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
+ drivers/net/ethernet/marvell/mvneta.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Fix comment :)
-
----
- drivers/clk/tegra/clk-tegra114.c |   58 +++++++++++++++-----------------------
- 1 files changed, 23 insertions(+), 35 deletions(-)
-
-diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-index 0379a19..44ba713 100644
---- a/drivers/clk/tegra/clk-tegra114.c
-+++ b/drivers/clk/tegra/clk-tegra114.c
-@@ -1583,45 +1583,33 @@ static void __init tegra114_audio_clk_init(void __iomem *clk_base)
- 	}
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 90ab292..389a854 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -2451,6 +2451,21 @@ static int mvneta_stop(struct net_device *dev)
+ 	return 0;
  }
  
-+static struct pmc_clk_init_data tegra_pmc_clk_init_data[] = {
-+	TEGRA_INIT_PMC_CLK("clk_out_1", "extern1", clk_out1_parents, 6, 2, TEGRA114_CLK_CLK_OUT_1),
-+	TEGRA_INIT_PMC_CLK("clk_out_2", "extern2", clk_out2_parents, 14, 10, TEGRA114_CLK_CLK_OUT_2),
-+	TEGRA_INIT_PMC_CLK("clk_out_3", "extern3", clk_out3_parents, 22, 18, TEGRA114_CLK_CLK_OUT_3),
-+};
++static int mvneta_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
++{
++	struct mvneta_port *pp = netdev_priv(dev);
++	int ret;
 +
- static void __init tegra114_pmc_clk_init(void __iomem *pmc_base)
- {
- 	struct clk *clk;
-+	int i;
++	if (!pp->phy_dev)
++		return -ENOTSUPP;
 +
-+	for (i = 0; i < ARRAY_SIZE(tegra_pmc_clk_init_data); i++) {
-+		struct pmc_clk_init_data *data;
++	ret = phy_mii_ioctl(pp->phy_dev, ifr, cmd);
++	if (!ret)
++		mvneta_adjust_link(dev);
++
++	return ret;
++}
++
+ /* Ethtool methods */
  
--	/* clk_out_1 */
--	clk = clk_register_mux(NULL, "clk_out_1_mux", clk_out1_parents,
--			       ARRAY_SIZE(clk_out1_parents), 0,
--			       pmc_base + PMC_CLK_OUT_CNTRL, 6, 3, 0,
--			       &clk_out_lock);
--	clks[TEGRA114_CLK_CLK_OUT_1_MUX] = clk;
--	clk = clk_register_gate(NULL, "clk_out_1", "clk_out_1_mux", 0,
--				pmc_base + PMC_CLK_OUT_CNTRL, 2, 0,
--				&clk_out_lock);
--	clk_register_clkdev(clk, "extern1", "clk_out_1");
--	clks[TEGRA114_CLK_CLK_OUT_1] = clk;
--
--	/* clk_out_2 */
--	clk = clk_register_mux(NULL, "clk_out_2_mux", clk_out2_parents,
--			       ARRAY_SIZE(clk_out2_parents), 0,
--			       pmc_base + PMC_CLK_OUT_CNTRL, 14, 3, 0,
--			       &clk_out_lock);
--	clks[TEGRA114_CLK_CLK_OUT_2_MUX] = clk;
--	clk = clk_register_gate(NULL, "clk_out_2", "clk_out_2_mux", 0,
--				pmc_base + PMC_CLK_OUT_CNTRL, 10, 0,
--				&clk_out_lock);
--	clk_register_clkdev(clk, "extern2", "clk_out_2");
--	clks[TEGRA114_CLK_CLK_OUT_2] = clk;
--
--	/* clk_out_3 */
--	clk = clk_register_mux(NULL, "clk_out_3_mux", clk_out3_parents,
--			       ARRAY_SIZE(clk_out3_parents), 0,
--			       pmc_base + PMC_CLK_OUT_CNTRL, 22, 3, 0,
--			       &clk_out_lock);
--	clks[TEGRA114_CLK_CLK_OUT_3_MUX] = clk;
--	clk = clk_register_gate(NULL, "clk_out_3", "clk_out_3_mux", 0,
--				pmc_base + PMC_CLK_OUT_CNTRL, 18, 0,
--				&clk_out_lock);
--	clk_register_clkdev(clk, "extern3", "clk_out_3");
--	clks[TEGRA114_CLK_CLK_OUT_3] = clk;
-+		data = &tegra_pmc_clk_init_data[i];
-+
-+		clk = clk_register_mux(NULL, data->mux_name, data->parents,
-+				data->num_parents, 0,
-+				pmc_base + PMC_CLK_OUT_CNTRL, data->mux_shift,
-+				3, 0, &clk_out_lock);
-+		clks[data->mux_id] = clk;
-+		clk = clk_register_gate(NULL, data->gate_name, data->mux_name,
-+					0, pmc_base + PMC_CLK_OUT_CNTRL,
-+					data->gate_shift, 0, &clk_out_lock);
-+		clks[data->gate_id] = clk;
-+		clk_register_clkdev(clk, data->dev_name, data->gate_name);
-+	}
+ /* Get settings (phy address, speed) for ethtools */
+@@ -2569,6 +2584,7 @@ static const struct net_device_ops mvneta_netdev_ops = {
+ 	.ndo_change_mtu      = mvneta_change_mtu,
+ 	.ndo_tx_timeout      = mvneta_tx_timeout,
+ 	.ndo_get_stats64     = mvneta_get_stats64,
++	.ndo_do_ioctl        = mvneta_ioctl,
+ };
  
- 	/* blink */
- 	/* clear the blink timer register to directly output clk_32k */
+ const struct ethtool_ops mvneta_eth_tool_ops = {
 -- 
-1.7.7.rc0.72.g4b5ea.dirty
+1.8.1.2
