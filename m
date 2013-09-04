@@ -1,51 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  4 Sep 2013 22:25:24 +0200
-Subject: [PATCH] ARM: omap2: throw the die id into the entropy pool
-Message-ID: <1378326324-7170-1-git-send-email-linus.walleij@linaro.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 4 Sep 2013 13:41:52 -0700
+Subject: [PATCH RFC v2 01/16] ARM: call clk_of_init from time_init
+In-Reply-To: <52278AC8.5080103@gmail.com>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <3837b119-baad-4e68-8805-2bc52c0135f9@DB9EHSMHS031.ehs.local>
+ <521D2F1F.1070103@gmail.com> <201308291545.37520.arnd@arndb.de>
+ <52278AC8.5080103@gmail.com>
+Message-ID: <6ba67c93-e0d0-42d4-b0a5-55c06938a15e@DB9EHSMHS013.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Atleast eight bytes of this number are totally unique for the device
-it seems, so this is a perfect candidate for feeding the entropy
-pool. One byte more or less of constants does not matter so feed in
-the entire OID struct.
+Hi Sebastian,
 
-Cc: Theodore Ts'o <tytso@mit.edu>
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-omap2/id.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
++Michal
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 2dc62a2..fc03cc6 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -18,6 +18,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/random.h>
- #include <linux/slab.h>
- 
- #ifdef CONFIG_SOC_BUS
-@@ -130,6 +131,17 @@ void omap_get_die_id(struct omap_die_id *odi)
- 	odi->id_3 = read_tap_reg(OMAP_TAP_DIE_ID_3);
- }
- 
-+static int __init omap_feed_randpool(void)
-+{
-+	struct omap_die_id odi;
-+
-+	/* Throw the die ID into the entropy pool at boot */
-+	omap_get_die_id(&odi);
-+	add_device_randomness(&odi, sizeof(odi));
-+	return 0;
-+}
-+device_initcall(omap_feed_randpool);
-+
- void __init omap2xxx_check_revision(void)
- {
- 	int i, j;
--- 
-1.8.1.4
+On Wed, Sep 04, 2013 at 09:32:24PM +0200, Sebastian Hesselbarth wrote:
+
+[ ... ]
+
+> For mach-zynq I prepared a patch set that brings it close to .init_time
+> removal. I have pushed it to
+>   https://github.com/shesselba/linux-dove.git zynq-clk-init-v1
+> and will maybe post a patch set after this one is done.
+
+I think Steffen had a similar approach and we turned it down:
+Your proposal lets the clkc map the SLCR's registers. I think
+that approach is not right. It might be okay now, since the
+SLCR driver is pretty much a useless skeleton. But in general,
+there is a driver for the SLCR which maps that register
+region. No other driver should mess with it.
+
+Actually, one early version of my clkc looked pretty much like what you
+propose now and we changed it because of above reason.
+
+	S?ren
