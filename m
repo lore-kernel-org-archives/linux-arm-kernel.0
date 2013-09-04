@@ -1,143 +1,155 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 04 Sep 2013 12:46:17 +0900
-Subject: [PATCH 03/04] ARM: shmobile: r8a7791 CMT support
+Date: Wed, 04 Sep 2013 12:46:49 +0900
+Subject: [PATCH 04/04] ARM: shmobile: Koelsch support
 In-Reply-To: <20130904034525.12546.24775.sendpatchset@w520>
 References: <20130904034525.12546.24775.sendpatchset@w520>
-Message-ID: <20130904034617.12546.91307.sendpatchset@w520>
+Message-ID: <20130904034649.12546.87340.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
 
-Add r8a7791 CMT support via channel 0 of CMT0. At this
-point the CMT is used for clock event operation, but in
-the future the arch timer will be the main timer and the
-CMT will be used for deep sleep wake up only.
+Koelsch base board support making use of 2 GiB of memory,
+the r8a7791 SoC with the SCIF0 serial port and CA15 with
+CMT timer.
 
+Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+[damm at opensource.se: Forward ported to upstream, dropped not-yet-ready SMP/PFC]
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/clock-r8a7791.c        |    7 +++++-
- arch/arm/mach-shmobile/include/mach/r8a7791.h |    1 
- arch/arm/mach-shmobile/setup-r8a7791.c        |   29 +++++++++++++++++++++++++
- 3 files changed, 36 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile             |    1 
+ arch/arm/boot/dts/r8a7791-koelsch.dts  |   32 +++++++++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig         |    5 +++
+ arch/arm/mach-shmobile/Makefile        |    1 
+ arch/arm/mach-shmobile/Makefile.boot   |    1 
+ arch/arm/mach-shmobile/board-koelsch.c |   44 ++++++++++++++++++++++++++++++++
+ 6 files changed, 84 insertions(+)
 
---- 0004/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ work/arch/arm/mach-shmobile/clock-r8a7791.c	2013-09-03 21:02:44.000000000 +0900
-@@ -101,7 +101,7 @@ SH_FIXED_RATIO_CLK_SET(cp_clk,			extal_c
- SH_FIXED_RATIO_CLK_SET(pll1_div2_clk,		pll1_clk,	1, 2);
- SH_FIXED_RATIO_CLK_SET(hp_clk,			pll1_clk,	1, 12);
- SH_FIXED_RATIO_CLK_SET(p_clk,			pll1_clk,	1, 24);
--
-+SH_FIXED_RATIO_CLK_SET(rclk_clk,		pll1_clk,	1, (48 * 1024));
- SH_FIXED_RATIO_CLK_SET(mp_clk,			pll1_div2_clk,	1, 15);
- 
- static struct clk *main_clks[] = {
-@@ -113,6 +113,7 @@ static struct clk *main_clks[] = {
- 	&pll3_clk,
- 	&hp_clk,
- 	&p_clk,
-+	&rclk_clk,
- 	&mp_clk,
- 	&cp_clk,
- };
-@@ -123,6 +124,7 @@ enum {
- 	MSTP719, MSTP718, MSTP715, MSTP714,
- 	MSTP216, MSTP207, MSTP206,
- 	MSTP204, MSTP203, MSTP202, MSTP1105, MSTP1106, MSTP1107,
-+	MSTP124,
- 	MSTP_NR
- };
- 
-@@ -142,6 +144,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP1105] = SH_CLK_MSTP32(&mp_clk, SMSTPCR11, 5, 0), /* SCIFA3 */
- 	[MSTP1106] = SH_CLK_MSTP32(&mp_clk, SMSTPCR11, 6, 0), /* SCIFA4 */
- 	[MSTP1107] = SH_CLK_MSTP32(&mp_clk, SMSTPCR11, 7, 0), /* SCIFA5 */
-+	[MSTP124] = SH_CLK_MSTP32(&rclk_clk, SMSTPCR1, 24, 0), /* CMT0 */
- };
- 
- static struct clk_lookup lookups[] = {
-@@ -155,6 +158,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("pll3",		&pll3_clk),
- 	CLKDEV_CON_ID("hp",		&hp_clk),
- 	CLKDEV_CON_ID("p",		&p_clk),
-+	CLKDEV_CON_ID("rclk",		&rclk_clk),
- 	CLKDEV_CON_ID("mp",		&mp_clk),
- 	CLKDEV_CON_ID("cp",		&cp_clk),
- 	CLKDEV_CON_ID("peripheral_clk", &hp_clk),
-@@ -175,6 +179,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1105]), /* SCIFA3 */
- 	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
- 	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
-+	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
- };
- 
- #define R8A7791_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
---- 0004/arch/arm/mach-shmobile/include/mach/r8a7791.h
-+++ work/arch/arm/mach-shmobile/include/mach/r8a7791.h	2013-09-03 20:56:52.000000000 +0900
-@@ -3,5 +3,6 @@
- 
- void r8a7791_add_dt_devices(void);
- void r8a7791_clock_init(void);
-+void r8a7791_init_early(void);
- 
- #endif /* __ASM_R8A7791_H__ */
---- 0004/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7791.c	2013-09-03 20:57:19.000000000 +0900
-@@ -23,6 +23,7 @@
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/serial_sci.h>
-+#include <linux/sh_timer.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/r8a7791.h>
-@@ -89,6 +90,25 @@ static inline void r8a7791_register_scif
- 				      sizeof(struct plat_sci_port));
- }
- 
-+static const struct sh_timer_config cmt00_platform_data __initconst = {
-+	.name = "CMT00",
-+	.timer_bit = 0,
-+	.clockevent_rating = 80,
+--- 0001/arch/arm/boot/dts/Makefile
++++ work/arch/arm/boot/dts/Makefile	2013-09-03 21:18:57.000000000 +0900
+@@ -190,6 +190,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm
+ 	r8a7740-armadillo800eva-reference.dtb \
+ 	r8a7779-marzen.dtb \
+ 	r8a7779-marzen-reference.dtb \
++	r8a7791-koelsch.dtb \
+ 	r8a7790-lager.dtb \
+ 	r8a7790-lager-reference.dtb \
+ 	sh73a0-kzm9g.dtb \
+--- /dev/null
++++ work/arch/arm/boot/dts/r8a7791-koelsch.dts	2013-09-03 21:18:58.000000000 +0900
+@@ -0,0 +1,32 @@
++/*
++ * Device Tree Source for the Koelsch board
++ *
++ * Copyright (C) 2013 Renesas Electronics Corporation
++ * Copyright (C) 2013 Renesas Solutions Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++/include/ "r8a7791.dtsi"
++
++/ {
++	model = "Koelsch";
++	compatible = "renesas,koelsch", "renesas,r8a7791";
++
++	chosen {
++		bootargs = "console=ttySC6,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x80000000>;
++	};
++
++	lbsc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++	};
 +};
+--- 0003/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2013-09-03 21:18:57.000000000 +0900
+@@ -219,6 +219,11 @@ config MACH_LAGER_REFERENCE
+ 
+ 	   This is intended to aid developers
+ 
++config MACH_KOELSCH
++	bool "Koelsch board"
++	depends on ARCH_R8A7791
++	select USE_OF
 +
-+static const struct resource cmt00_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xffca0510, 0x0c),
-+	DEFINE_RES_MEM(0xffca0500, 0x04),
-+	DEFINE_RES_IRQ(gic_spi(142)), /* CMT0_0 */
-+};
+ config MACH_KZM9D
+ 	bool "KZM9D board"
+ 	depends on ARCH_EMEV2
+--- 0003/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2013-09-03 21:18:57.000000000 +0900
+@@ -61,6 +61,7 @@ obj-$(CONFIG_MACH_LAGER)	+= board-lager.
+ obj-$(CONFIG_MACH_LAGER_REFERENCE)	+= board-lager-reference.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE)	+= board-armadillo800eva-reference.o
++obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch.o
+ obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
+ obj-$(CONFIG_MACH_KZM9D_REFERENCE)	+= board-kzm9d-reference.o
+ obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
+--- 0001/arch/arm/mach-shmobile/Makefile.boot
++++ work/arch/arm/mach-shmobile/Makefile.boot	2013-09-03 21:22:48.000000000 +0900
+@@ -6,6 +6,7 @@ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA)
+ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
+ loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
++loadaddr-$(CONFIG_MACH_KOELSCH) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9D_REFERENCE) += 0x40008000
+ loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
+--- /dev/null
++++ work/arch/arm/mach-shmobile/board-koelsch.c	2013-09-03 21:18:58.000000000 +0900
+@@ -0,0 +1,44 @@
++/*
++ * Koelsch board support
++ *
++ * Copyright (C) 2013  Renesas Electronics Corporation
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
 +
-+#define r8a7791_register_cmt(idx)					\
-+	platform_device_register_resndata(&platform_bus, "sh_cmt",	\
-+					  idx, cmt##idx##_resources,	\
-+					  ARRAY_SIZE(cmt##idx##_resources), \
-+					  &cmt##idx##_platform_data,	\
-+					  sizeof(struct sh_timer_config))
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <mach/common.h>
++#include <mach/r8a7791.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
 +
- void __init r8a7791_add_dt_devices(void)
- {
- 	r8a7791_register_scif(SCIFA0);
-@@ -106,6 +126,14 @@ void __init r8a7791_add_dt_devices(void)
- 	r8a7791_register_scif(SCIFA3);
- 	r8a7791_register_scif(SCIFA4);
- 	r8a7791_register_scif(SCIFA5);
-+	r8a7791_register_cmt(00);
++static void __init koelsch_add_standard_devices(void)
++{
++	r8a7791_clock_init();
++	r8a7791_add_dt_devices();
 +}
 +
-+void __init r8a7791_init_early(void)
-+{
-+#ifndef CONFIG_ARM_ARCH_TIMER
-+	shmobile_setup_delay(1300, 2, 4); /* Cortex-A15 @ 1300MHz */
-+#endif
- }
- 
- #ifdef CONFIG_USE_OF
-@@ -115,6 +143,7 @@ static const char *r8a7791_boards_compat
- };
- 
- DT_MACHINE_START(R8A7791_DT, "Generic R8A7791 (Flattened Device Tree)")
++static const char * const koelsch_boards_compat_dt[] __initconst = {
++	"renesas,koelsch",
++	NULL,
++};
++
++DT_MACHINE_START(KOELSCH_DT, "koelsch")
 +	.init_early	= r8a7791_init_early,
- 	.dt_compat	= r8a7791_boards_compat_dt,
- MACHINE_END
- #endif /* CONFIG_USE_OF */
++	.init_machine	= koelsch_add_standard_devices,
++	.dt_compat	= koelsch_boards_compat_dt,
++MACHINE_END
