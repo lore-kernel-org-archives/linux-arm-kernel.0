@@ -1,32 +1,74 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Thu, 05 Sep 2013 21:22:59 +0200
-Subject: [PATCH v3 2/2] arm: dt: Exynos5420: populate cpu node enteries
- to 8 cpus
-In-Reply-To: <1378380593-5305-3-git-send-email-chander.kashyap@linaro.org>
-References: <1378380593-5305-1-git-send-email-chander.kashyap@linaro.org>
- <1378380593-5305-3-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <5228DA13.1020901@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu,  5 Sep 2013 12:30:52 -0700
+Subject: [PATCH] ARM: pxa: ssp: Check return values from phandle lookups
+Message-ID: <1378409452-24281-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2013 01:29 PM, Chander Kashyap wrote:
-> Exynos5420 is octacore SoC from samsung.
+Commit a6e56c28a178cef5f (ARM: pxa: ssp: add DT bindings) causes warnings
+when built:
 
-s/octacore/octa-core ?
-s/samsung/Samsung
+arch/arm/plat-pxa/ssp.c: In function 'pxa_ssp_probe':
+arch/arm/plat-pxa/ssp.c:145:17: warning: 'dma_spec.args[0]' may be used
+	uninitialized in this function [-Wmaybe-uninitialized]
 
-> Hence populate all the cpu node enteries.
+Resolve by checking return values and aborting when lookups fail.
 
-s/cpu/CPU ?
-s/enteries/entries
+Cc: Daniel Mack <zonque@gmail.com>
+Cc: Mark Brown <broonie@linaro.org>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
 
-> Signed-off-by: Chander Kashyap<chander.kashyap@linaro.org>
+Haojian, Daniel, I'll include this with our first round of arm-soc
+fixes for 3.12-rc1. Tested/Acked tags would be appreciated, since I
+lack hardware.
 
-Subjects of the dts patches normally start with "ARM: dts:".
 
-I guess this all could be corrected while the patch is being applied
-to the platform maitainter's tree.
+-Olof
 
---
-Thanks,
-Sylwester
+ arch/arm/plat-pxa/ssp.c |   18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
+index c83f27b..3ea0290 100644
+--- a/arch/arm/plat-pxa/ssp.c
++++ b/arch/arm/plat-pxa/ssp.c
+@@ -132,6 +132,7 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+ 	if (dev->of_node) {
+ 		struct of_phandle_args dma_spec;
+ 		struct device_node *np = dev->of_node;
++		int ret;
+ 
+ 		/*
+ 		 * FIXME: we should allocate the DMA channel from this
+@@ -140,14 +141,23 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+ 		 */
+ 
+ 		/* rx */
+-		of_parse_phandle_with_args(np, "dmas", "#dma-cells",
+-					   0, &dma_spec);
++		ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
++						 0, &dma_spec);
++
++		if (ret) {
++			dev_err(dev, "Can't parse dmas property\n");
++			return -ENODEV;
++		}
+ 		ssp->drcmr_rx = dma_spec.args[0];
+ 		of_node_put(dma_spec.np);
+ 
+ 		/* tx */
+-		of_parse_phandle_with_args(np, "dmas", "#dma-cells",
+-					   1, &dma_spec);
++		ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
++						 1, &dma_spec);
++		if (ret) {
++			dev_err(dev, "Can't parse dmas property\n");
++			return -ENODEV;
++		}
+ 		ssp->drcmr_tx = dma_spec.args[0];
+ 		of_node_put(dma_spec.np);
+ 	} else {
+-- 
+1.7.10.4
