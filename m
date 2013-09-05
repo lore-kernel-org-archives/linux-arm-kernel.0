@@ -1,42 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Sep 2013 10:23:16 +0100
-Subject: [PATCH] Documentation/arm64: clarify requirements for DTB
- placement
-In-Reply-To: <1378303802.3485.36.camel@deneb.redhat.com>
-References: <1378303802.3485.36.camel@deneb.redhat.com>
-Message-ID: <20130905092316.GB9696@mudshark.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 5 Sep 2013 11:24:32 +0200
+Subject: [PATCH] net: mvneta: properly disable HW PHY polling and ensure
+ adjust_link() works
+In-Reply-To: <20130905091147.GA28658@1wt.eu>
+References: <1378304478-21237-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130904163245.GI20552@1wt.eu>
+ <CACzLR4uDQK2bkcEJQXLe805EfSA8=eF+YH-FTYovHA0q+8Y9NA@mail.gmail.com>
+ <20130905051223.GB26000@1wt.eu> <20130905092808.617da416@skate>
+ <20130905074426.GD26000@1wt.eu> <20130905102659.25a0f064@skate>
+ <20130905091147.GA28658@1wt.eu>
+Message-ID: <20130905112432.5854119e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 04, 2013 at 03:10:02PM +0100, Mark Salter wrote:
-> The current description of DTB placement requirements does not quite
-> match the kernel code in head.S: __vet_fdt and __create_page_tables.
-> This patch tweaks the text to match the actual requirements placed on
-> it by the code.
+Dear Willy Tarreau,
+
+On Thu, 5 Sep 2013 11:11:47 +0200, Willy Tarreau wrote:
+
 > 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> ---
->  Documentation/arm64/booting.txt | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> > Note that this can be done without doing any change in the bootloader.
+> > For example, on a Mirabox, you can do:
+> > 
+> >    mw.l 0xD0072414 0x5C93; mw.l 0xD0072418 0xF0AD4E01; mw.l 0xD0076414 0x5C94; mw.l 0xD0076418 0xF0AD4E01; bootm
+> > 
+> > to boot your kernel. This will program the MAC addresses for both
+> > network interfaces in the network controllers, so that when booting
+> > Linux, you get:
+> > 
+> > [   42.122881] mvneta d0070000.ethernet eth0: Using hardware mac address f0:ad:4e:01:5c:93
+> > [   42.385398] mvneta d0074000.ethernet eth1: Using hardware mac address f0:ad:4e:01:5c:94
+> > 
+> > You add that to your default U-Boot boot script, and that's it, you
+> > have stable MAC addresses.
 > 
-> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> index 5273c4d..98df4a0 100644
-> --- a/Documentation/arm64/booting.txt
-> +++ b/Documentation/arm64/booting.txt
-> @@ -45,9 +45,9 @@ sees fit.)
->  
->  Requirement: MANDATORY
->  
-> -The device tree blob (dtb) must be no bigger than 2 megabytes in size
-> -and placed at a 2-megabyte boundary within the first 512 megabytes from
-> -the start of the kernel image. This is to allow the kernel to map the
-> +The device tree blob (dtb) must be placed on an 8-byte boundary within
-> +the first 512 megabytes from the start of the kernel image and must not
-> +cross a 2-megabyte boundary. This is to allow the kernel to map the
->  blob using a single section mapping in the initial page tables.
+> Hmmm that's quite interesting. Unfortunately I don't see an easy way to
+> make this directly rely on the ethaddr/eth1addr so that end users can
+> simply cut-n-paste a few lines into the u-boot config. But anyway that
+> can be useful.
 
-Yes, that's a better way of wording the requirements. Thanks!
+I thought about this as well, but I don't think that's possible, the
+U-Boot scripting/parsing capabilities seems to be too limited to
+achieve that, unfortunately.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Best regards,
 
-Will
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
