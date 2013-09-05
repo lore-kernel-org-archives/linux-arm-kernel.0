@@ -1,146 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 5 Sep 2013 15:21:18 +0200
-Subject: [PATCH 1/3] ARM: perf: add support for perf regs API
-In-Reply-To: <1378317854-25965-2-git-send-email-jean.pihet@linaro.org>
-References: <1378317854-25965-1-git-send-email-jean.pihet@linaro.org>
- <1378317854-25965-2-git-send-email-jean.pihet@linaro.org>
-Message-ID: <CAKv+Gu_iANgS2dCQ63EgaDaj0kDUej228YhZF6vsoQ-Yz-3naA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 5 Sep 2013 08:23:22 -0500
+Subject: [PROPOSAL] ARM/FDT: passing multiple binaries to a kernel
+In-Reply-To: <5226F2B3.10606@linaro.org>
+References: <52260608.2030202@linaro.org>
+ <CAL_JsqK9PjpScRO8561PhcyKkxhuL4pgMTCh2-UG_ubybJTcCw@mail.gmail.com>
+ <5226F2B3.10606@linaro.org>
+Message-ID: <CAL_JsqKfcudKiTOr-MrHsq6NidG-5t5S0t08ELTSpOuc2LF4RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 September 2013 20:04, Jean Pihet <jean.pihet@linaro.org> wrote:
-> From: Will Deacon <will.deacon@arm.com>
->
-> This patch implements the functions required for the perf refs API,
+On Wed, Sep 4, 2013 at 3:43 AM, Andre Przywara
+<andre.przywara@linaro.org> wrote:
+> On 09/04/2013 12:00 AM, Rob Herring wrote:
+>>
+>> On Tue, Sep 3, 2013 at 10:53 AM, Andre Przywara
 
-'regs API' not 'refs API'
-
-
-Regards,
-Ard.
-
-
-> allowing the perf tool to interface kernel register dumps with libunwind
-> in order to provide userspace backtracing.
->
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/Kconfig                      |  2 ++
->  arch/arm/include/uapi/asm/Kbuild      |  1 +
->  arch/arm/include/uapi/asm/perf_regs.h | 23 +++++++++++++++++++++++
->  arch/arm/kernel/Makefile              |  1 +
->  arch/arm/kernel/perf_regs.c           | 30 ++++++++++++++++++++++++++++++
->  5 files changed, 57 insertions(+)
->  create mode 100644 arch/arm/include/uapi/asm/perf_regs.h
->  create mode 100644 arch/arm/kernel/perf_regs.c
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 86bf7cb..642bc48 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -49,6 +49,8 @@ config ARM
->         select HAVE_MEMBLOCK
->         select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
->         select HAVE_PERF_EVENTS
-> +       select HAVE_PERF_REGS
-> +       select HAVE_PERF_USER_STACK_DUMP
->         select HAVE_REGS_AND_STACK_ACCESS_API
->         select HAVE_SYSCALL_TRACEPOINTS
->         select HAVE_UID16
-> diff --git a/arch/arm/include/uapi/asm/Kbuild b/arch/arm/include/uapi/asm/Kbuild
-> index 18d76fd..70a1c9d 100644
-> --- a/arch/arm/include/uapi/asm/Kbuild
-> +++ b/arch/arm/include/uapi/asm/Kbuild
-> @@ -7,6 +7,7 @@ header-y += hwcap.h
->  header-y += ioctls.h
->  header-y += kvm_para.h
->  header-y += mman.h
-> +header-y += perf_regs.h
->  header-y += posix_types.h
->  header-y += ptrace.h
->  header-y += setup.h
-> diff --git a/arch/arm/include/uapi/asm/perf_regs.h b/arch/arm/include/uapi/asm/perf_regs.h
-> new file mode 100644
-> index 0000000..ce59448
-> --- /dev/null
-> +++ b/arch/arm/include/uapi/asm/perf_regs.h
-> @@ -0,0 +1,23 @@
-> +#ifndef _ASM_ARM_PERF_REGS_H
-> +#define _ASM_ARM_PERF_REGS_H
-> +
-> +enum perf_event_arm_regs {
-> +       PERF_REG_ARM_R0,
-> +       PERF_REG_ARM_R1,
-> +       PERF_REG_ARM_R2,
-> +       PERF_REG_ARM_R3,
-> +       PERF_REG_ARM_R4,
-> +       PERF_REG_ARM_R5,
-> +       PERF_REG_ARM_R6,
-> +       PERF_REG_ARM_R7,
-> +       PERF_REG_ARM_R8,
-> +       PERF_REG_ARM_R9,
-> +       PERF_REG_ARM_R10,
-> +       PERF_REG_ARM_FP,
-> +       PERF_REG_ARM_IP,
-> +       PERF_REG_ARM_SP,
-> +       PERF_REG_ARM_LR,
-> +       PERF_REG_ARM_PC,
-> +       PERF_REG_ARM_MAX,
-> +};
-> +#endif /* _ASM_ARM_PERF_REGS_H */
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index 86d10dd..c9e05f2 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -78,6 +78,7 @@ obj-$(CONFIG_CPU_XSC3)                += xscale-cp0.o
->  obj-$(CONFIG_CPU_MOHAWK)       += xscale-cp0.o
->  obj-$(CONFIG_CPU_PJ4)          += pj4-cp0.o
->  obj-$(CONFIG_IWMMXT)           += iwmmxt.o
-> +obj-$(CONFIG_PERF_EVENTS)      += perf_regs.o
->  obj-$(CONFIG_HW_PERF_EVENTS)   += perf_event.o perf_event_cpu.o
->  AFLAGS_iwmmxt.o                        := -Wa,-mcpu=iwmmxt
->  obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
-> diff --git a/arch/arm/kernel/perf_regs.c b/arch/arm/kernel/perf_regs.c
-> new file mode 100644
-> index 0000000..6e4379c
-> --- /dev/null
-> +++ b/arch/arm/kernel/perf_regs.c
-> @@ -0,0 +1,30 @@
-> +
-> +#include <linux/errno.h>
-> +#include <linux/kernel.h>
-> +#include <linux/perf_event.h>
-> +#include <linux/bug.h>
-> +#include <asm/perf_regs.h>
-> +#include <asm/ptrace.h>
-> +
-> +u64 perf_reg_value(struct pt_regs *regs, int idx)
-> +{
-> +       if (WARN_ON_ONCE((u32)idx >= PERF_REG_ARM_MAX))
-> +               return 0;
-> +
-> +       return regs->uregs[idx];
-> +}
-> +
-> +#define REG_RESERVED (~((1ULL << PERF_REG_ARM_MAX) - 1))
-> +
-> +int perf_reg_validate(u64 mask)
-> +{
-> +       if (!mask || mask & REG_RESERVED)
-> +               return -EINVAL;
-> +
-> +       return 0;
-> +}
-> +
-> +u64 perf_reg_abi(struct task_struct *task)
-> +{
-> +       return PERF_SAMPLE_REGS_ABI_32;
-> +}
-> --
-> 1.7.11.7
+>> But surely there would be some advantage of reuse by using the
+>> multi-boot protocol since Xen, grub, and OS tools already support it
+>> for x86.
 >
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Yes, but that is x86 only and multiboot is it's nature quite architecture
+> specific. The current(?) multiboot v2 spec has no official ARM support (only
+> x86 and MIPS), so this would need to be "invented" first. While this is
+> technically easy, ARM software currently has no support for multiboot at
+> all: not in u-boot and not in Xen.
+> Multiboot support in Xen lives entirely in the x86 directory, and big parts
+> of it are even in assembly.
+
+If so, I cannot find the assembly and most of it seems to be moved out
+of x86 code now.
+
+Rob
