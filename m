@@ -1,34 +1,30 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 5 Sep 2013 08:23:22 -0500
-Subject: [PROPOSAL] ARM/FDT: passing multiple binaries to a kernel
-In-Reply-To: <5226F2B3.10606@linaro.org>
-References: <52260608.2030202@linaro.org>
- <CAL_JsqK9PjpScRO8561PhcyKkxhuL4pgMTCh2-UG_ubybJTcCw@mail.gmail.com>
- <5226F2B3.10606@linaro.org>
-Message-ID: <CAL_JsqKfcudKiTOr-MrHsq6NidG-5t5S0t08ELTSpOuc2LF4RQ@mail.gmail.com>
+Date: Thu, 5 Sep 2013 08:29:24 -0500
+Subject: [PATCH v2] ARM: highbank: fix debug uart virtual address for LPAE
+In-Reply-To: <20130902124828.GT6617@n2100.arm.linux.org.uk>
+References: <1376784748-31914-1-git-send-email-robherring2@gmail.com>
+ <20130902124828.GT6617@n2100.arm.linux.org.uk>
+Message-ID: <CAL_JsqKugHadYcE498n_OA_fpJxsvU4ME2uVBnRX5-hpitVJnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 4, 2013 at 3:43 AM, Andre Przywara
-<andre.przywara@linaro.org> wrote:
-> On 09/04/2013 12:00 AM, Rob Herring wrote:
+On Mon, Sep 2, 2013 at 7:48 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Aug 17, 2013 at 07:12:28PM -0500, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
 >>
->> On Tue, Sep 3, 2013 at 10:53 AM, Andre Przywara
-
->> But surely there would be some advantage of reuse by using the
->> multi-boot protocol since Xen, grub, and OS tools already support it
->> for x86.
+>> Section entries are 2MB on LPAE, so the DEBUG_LL virtual address must
+>> have the same offset in the 2MB section as the physical address. This
+>> fixes async external aborts when DEBUG_LL is enabled on Midway.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> ---
+>> v2: Rebase on Russell's DEBUG_LL clean-up
 >
->
-> Yes, but that is x86 only and multiboot is it's nature quite architecture
-> specific. The current(?) multiboot v2 spec has no official ARM support (only
-> x86 and MIPS), so this would need to be "invented" first. While this is
-> technically easy, ARM software currently has no support for multiboot at
-> all: not in u-boot and not in Xen.
-> Multiboot support in Xen lives entirely in the x86 directory, and big parts
-> of it are even in assembly.
+> Do you also want to do a patch for this for v3.11, because if it's wrong
+> in my series, it's wrong in mainline at the moment:
 
-If so, I cannot find the assembly and most of it seems to be moved out
-of x86 code now.
+That would be v1 of my patch. There are other fixes needed for LPAE on
+Midway in 3.11, so this fix alone is not really needed.
 
 Rob
