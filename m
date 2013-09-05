@@ -1,68 +1,56 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Thu, 05 Sep 2013 22:51:10 +0200
-Subject: [PATCH v4 3/5] clk: dt: binding for basic multiplexer clock
-In-Reply-To: <5228EA02.3000200@wwwdotorg.org>
-References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
- <1377150793-27864-4-git-send-email-mturquette@linaro.org>
- <2A930389-012E-45C3-93EB-6B4A41DB2EF5@codeaurora.org>
- <20130829011425.8231.78802@quantum>
- <39BAF1F8-41AD-4667-BF76-22BDF709415A@codeaurora.org>
- <20130830203334.10934.10011@quantum> <522110AA.7040700@wwwdotorg.org>
- <20130903232219.10934.67434@quantum> <52277DBF.7080104@wwwdotorg.org>
- <CAPtuhThWHP61FzDBCH5SSFx6kV7==VdF3-M=Lke+cgnrOQL7JQ@mail.gmail.com>
- <5228EA02.3000200@wwwdotorg.org>
-Message-ID: <5228EEBE.5070102@gmail.com>
+From: luka@openwrt.org (Luka Perkov)
+Date: Thu,  5 Sep 2013 23:13:05 +0200
+Subject: [PATCH] ARM: cns3xxx: whitespace cleanup
+Message-ID: <1378415585-23767-1-git-send-email-luka@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2013 10:30 PM, Stephen Warren wrote:
-> On 09/05/2013 12:29 PM, Mike Turquette wrote:
->> >  On Wed, Sep 4, 2013 at 11:36 AM, Stephen Warren<swarren@wwwdotorg.org>  wrote:
->>> >>  On 09/03/2013 05:22 PM, Mike Turquette wrote:
->>>> >>>  Quoting Stephen Warren (2013-08-30 14:37:46)
->>>>> >>>>  On 08/30/2013 02:33 PM, Mike Turquette wrote:
->>> >>  ...
->>>>>> >>>>>  The clock_data_  seems to always have some churn to it. Moving it out to
->>>>>> >>>>>  DT reduces that churn from Linux. My concern above is not about kernel
->>>>>> >>>>>  data size.
->>>>> >>>>
->>>>> >>>>  That sounds like the opposite of what we should be doing.
->>>>> >>>>
->>>>> >>>>  It's fine for kernel code/data to change; that's a natural part of
->>>>> >>>>  development. Obviously, we should minimize churn, through thorough
->>>>> >>>>  review, domain knowledge, etc.
->>>> >>>
->>>> >>>  And with the "clock mapping" style bindings we'll end up changing both
->>>> >>>  the DT binding definition and the kernel. Not great.
->>> >>
->>> >>  What's a "clock mapping" style binding? I guess that means the style
->>> >>  where you have a single DT node that provides multiple clocks, rather
->>> >>  than one DT node per clock?
->>> >>
->>> >>  If the kernel driver changes its internal data, I don't see why that
->>> >>  would have any impact at all on the DT binding definition. We should be
->>> >>  able to use one DT binding definition with arbitrary drivers.
->> >
->> >  Yes, I'm referring to a single node providing multiple clocks. As an
->> >  example see the Exynos 5420 binding:
->> >  Documentation/devicetree/bindings/clock/exynos5420-clock.txt
->> >
->> >  The clock id's are stored as part of the binding definition resulting
->> >  in a mapping scheme that can be fragile.
->
-> The mapping shouldn't be fragile if e.g.
-> include/dt-bindings/clock/exynos5420.h were used to define the values.
-> That way, both the Exynos clock driver and Exynos DT files could both
-> include the header, and would always be in sync.
+Signed-off-by: Luka Perkov <luka@openwrt.org>
+---
+ arch/arm/mach-cns3xxx/core.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-It was our intention to have things done this way since first time the idea
-of the preprocessor support in dtc was proposed, and since very initial
-versions of the exynos clocks driver. I took some time but there have been
-recently already posted patches moving the values definition to common
-headers [1].
-
-[1] http://www.spinics.net/lists/arm-kernel/msg271807.html
-
---
-Thanks,
-Sylwester
+diff --git a/arch/arm/mach-cns3xxx/core.c b/arch/arm/mach-cns3xxx/core.c
+index e38b279..26449a2 100644
+--- a/arch/arm/mach-cns3xxx/core.c
++++ b/arch/arm/mach-cns3xxx/core.c
+@@ -324,19 +324,19 @@ static void __init cns3xxx_init(void)
+ 	dn = of_find_compatible_node(NULL, NULL, "cavium,cns3420-ahci");
+ 	if (of_device_is_available(dn)) {
+ 		u32 tmp;
+-	
++
+ 		tmp = __raw_readl(MISC_SATA_POWER_MODE);
+ 		tmp |= 0x1 << 16; /* Disable SATA PHY 0 from SLUMBER Mode */
+ 		tmp |= 0x1 << 17; /* Disable SATA PHY 1 from SLUMBER Mode */
+ 		__raw_writel(tmp, MISC_SATA_POWER_MODE);
+-	
++
+ 		/* Enable SATA PHY */
+ 		cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY0);
+ 		cns3xxx_pwr_power_up(0x1 << PM_PLL_HM_PD_CTRL_REG_OFFSET_SATA_PHY1);
+-	
++
+ 		/* Enable SATA Clock */
+ 		cns3xxx_pwr_clk_en(0x1 << PM_CLK_GATE_REG_OFFSET_SATA);
+-	
++
+ 		/* De-Asscer SATA Reset */
+ 		cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(SATA));
+ 	}
+@@ -345,11 +345,11 @@ static void __init cns3xxx_init(void)
+ 	if (of_device_is_available(dn)) {
+ 		u32 __iomem *gpioa = IOMEM(CNS3XXX_MISC_BASE_VIRT + 0x0014);
+ 		u32 gpioa_pins = __raw_readl(gpioa);
+-	
++
+ 		/* MMC/SD pins share with GPIOA */
+ 		gpioa_pins |= 0x1fff0004;
+ 		__raw_writel(gpioa_pins, gpioa);
+-	
++
+ 		cns3xxx_pwr_clk_en(CNS3XXX_PWR_CLK_EN(SDIO));
+ 		cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(SDIO));
+ 	}
+-- 
+1.8.4
