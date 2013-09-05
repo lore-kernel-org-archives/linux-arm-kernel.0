@@ -1,131 +1,86 @@
-From: denis.ciocca@st.com (Denis CIOCCA)
-Date: Thu, 5 Sep 2013 10:35:35 +0200
-Subject: [PATCH 06/11] iio: pressure-core: st: Expand and rename
- LPS331AP's channel descriptor
-In-Reply-To: <20130905075953.GF8980@lee--X1>
-References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
- <1378287103-21765-7-git-send-email-lee.jones@linaro.org>
- <522794F1.90301@st.com> <20130905072114.GD8980@lee--X1>
- <52283367.4070603@st.com> <20130905075953.GF8980@lee--X1>
-Message-ID: <52284257.5070802@st.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 05 Sep 2013 10:59:40 +0200
+Subject: [PATCH v3 1/3] ARM: Introduce atomic MMIO modify
+In-Reply-To: <20130830100342.GD62188@MacBook-Pro.local>
+References: <1377253445-2842-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130823103802.GO4600@tarshish> <20130823110748.GD2389@localhost>
+ <20130823113225.GF2389@localhost> <20130823114805.GF10971@arm.com>
+ <20130830090807.GB25628@mudshark.cambridge.arm.com>
+ <20130830091534.GA62188@MacBook-Pro.local>
+ <20130830092032.GD25628@mudshark.cambridge.arm.com>
+ <20130830100342.GD62188@MacBook-Pro.local>
+Message-ID: <522847FC.1080005@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lee, I got your point. For me is ok...
+Hi all,
 
-Denis
-> On Thu, 05 Sep 2013, Denis CIOCCA wrote:
->
->>>>> Due to the MACRO used, the task of reading, understanding and maintaining
->>>>> the LPS331AP's channel descriptor is substantially difficult. This patch
->>>>> is based on the view that it's better to have easy to read, maintainable
->>>>> code than to save a few lines here and there. For that reason we're
->>>>> expanding the array so initialisation is completed in full.
->>>> Also for this one, the channel names are general and can be shared
->>>> between different sensors. For the channel definition it's not a problem
->>>> for me, but I think it's not necessary adds all that code...
->>> I'm not sure what you mean by this. Would you be kind enough to
->>> explain it in a different way please?
->> The channel name (in this case st_press_channels) is not only specific
->> for one sensor but can be shared. Ok in this driver now is used only for
->> the lps331ap but for example in accelerometer driver is used by several
->> sensors. It's possible in the future for new pressure sensors use the
->> same channels definition.
-> Ah yes I see what you mean. Well as you say, for the moment, as
-> they're separated, this naming convention seems the most
-> appropriate. If we add anymore devices which share the definition, we
-> can pick the best naming convention for the situation I think. For
-> instance, I like that you've split the channels up into the number of
-> bits they support in the gyro and accel cases, so something of that
-> nature could be utilised if other device support is added.
->
->> The channel definition is intended the switch by macro
->> ST_SENSORS_LSM_CHANNELS to the full definition, for me is not a problem
->> but I think it's not necessary.
-> If you are familiar with the macro I guess you could get used to
-> working with it, but coming from in as a first time reader, adding a
-> new device was pretty difficult. I had to look up the macro in the
-> header file, then have the original struct open too and cross
-> reference in 3 different places. It's made even more difficult by the
-> macro being in a different order to the original struct.
->
-> Now I've had time to work with it, I could probably work with it as
-> well. I was just thinking about helping out any new person that comes
-> along and tries to add support for a new sensor.
->
->>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>>>> ---
->>>>>     drivers/iio/pressure/st_pressure_core.c | 45 +++++++++++++++++++++++++--------
->>>>>     1 file changed, 34 insertions(+), 11 deletions(-)
+On 30/08/2013 12:03, Catalin Marinas wrote:
+> On Fri, Aug 30, 2013 at 10:20:33AM +0100, Will Deacon wrote:
+>> On Fri, Aug 30, 2013 at 10:15:36AM +0100, Catalin Marinas wrote:
+>>> On Fri, Aug 30, 2013 at 10:08:07AM +0100, Will Deacon wrote:
+>>>> On Fri, Aug 23, 2013 at 12:48:05PM +0100, Catalin Marinas wrote:
+>>>>> On Fri, Aug 23, 2013 at 12:32:26PM +0100, Ezequiel Garcia wrote:
+>>>>>> ... or maybe yes. I'm not seeing {readl,writel}_relaxed as guaranteed
+>>>>>> to exist in every architecture. So, indeed, this seems to be ARM-dependent.
 >>>>>
->>>>> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
->>>>> index becfb25..7ba9299 100644
->>>>> --- a/drivers/iio/pressure/st_pressure_core.c
->>>>> +++ b/drivers/iio/pressure/st_pressure_core.c
->>>>> @@ -58,16 +58,39 @@
->>>>>     #define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
->>>>>     #define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
->>>>>     
->>>>> -static const struct iio_chan_spec st_press_channels[] = {
->>>>> -	ST_SENSORS_LSM_CHANNELS(IIO_PRESSURE,
->>>>> +static const struct iio_chan_spec st_press_lsp331ap_channels[] = {
->>>>> +	{
->>>>> +		.type = IIO_PRESSURE,
->>>>> +		.channel2 = IIO_NO_MOD,
->>>>> +		.address = ST_PRESS_LPS331AP_OUT_XL_ADDR,
->>>>> +		.scan_index = ST_SENSORS_SCAN_X,
->>>>> +		.scan_type = {
->>>>> +			.sign = 'u',
->>>>> +			.realbits = 24,
->>>>> +			.storagebits = 24,
->>>>> +			.endianness = IIO_LE,
->>>>> +		},
->>>>> +		.info_mask_separate =
->>>>>     			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
->>>>> -			ST_SENSORS_SCAN_X, 0, IIO_NO_MOD, 'u', IIO_LE, 24, 24,
->>>>> -			ST_PRESS_LPS331AP_OUT_XL_ADDR),
->>>>> -	ST_SENSORS_LSM_CHANNELS(IIO_TEMP,
->>>>> -			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE) |
->>>>> -						BIT(IIO_CHAN_INFO_OFFSET),
->>>>> -			-1, 0, IIO_NO_MOD, 's', IIO_LE, 16, 16,
->>>>> -			ST_TEMP_LPS331AP_OUT_L_ADDR),
->>>>> +		.modified = 0,
->>>>> +	},
->>>>> +	{
->>>>> +		.type = IIO_TEMP,
->>>>> +		.channel2 = IIO_NO_MOD,
->>>>> +		.address = ST_TEMP_LPS331AP_OUT_L_ADDR,
->>>>> +		.scan_index = -1,
->>>>> +		.scan_type = {
->>>>> +			.sign = 'u',
->>>>> +			.realbits = 16,
->>>>> +			.storagebits = 16,
->>>>> +			.endianness = IIO_LE,
->>>>> +		},
->>>>> +		.info_mask_separate =
->>>>> +			BIT(IIO_CHAN_INFO_RAW) |
->>>>> +			BIT(IIO_CHAN_INFO_SCALE) |
->>>>> +			BIT(IIO_CHAN_INFO_OFFSET),
->>>>> +		.modified = 0,
->>>>> +	},
->>>>>     	IIO_CHAN_SOFT_TIMESTAMP(1)
->>>>>     };
->>>>>     
->>>>> @@ -77,7 +100,7 @@ static const struct st_sensors st_press_sensors[] = {
->>>>>     		.sensors_supported = {
->>>>>     			[0] = LPS331AP_PRESS_DEV_NAME,
->>>>>     		},
->>>>> -		.ch = (struct iio_chan_spec *)st_press_channels,
->>>>> +		.ch = (struct iio_chan_spec *)st_press_lsp331ap_channels,
->>>>>     		.odr = {
->>>>>     			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
->>>>>     			.mask = ST_PRESS_LPS331AP_ODR_MASK,
->>>>> @@ -214,7 +237,7 @@ int st_press_common_probe(struct iio_dev *indio_dev)
->>>>>     	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
->>>>>     	pdata->multiread_bit = pdata->sensor->multi_read_bit;
->>>>>     	indio_dev->channels = pdata->sensor->ch;
->>>>> -	indio_dev->num_channels = ARRAY_SIZE(st_press_channels);
->>>>> +	indio_dev->num_channels = ARRAY_SIZE(st_press_lsp331ap_channels);
->>>>>     
->>>>>     	pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
->>>>>     						&pdata->sensor->fs.fs_avl[0];
+>>>>> There was a discussion couple of years ago to make these part of the IO
+>>>>> specification since many architectures define them:
+>>>>>
+>>>>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/117626
+>>>>>
+>>>>> (and some older threads on linux-arch which I haven't searched)
+>>>>>
+>>>>> We could have some default implementation pointing to readl/writel while
+>>>>> letting the arch code to define more optimised variants.
+>>>>
+>>>> The main thing I dislike about that is the back-to-back dsbs that you will
+>>>> get from the read-(modify)-write. It really makes the non-optimised version
+>>>> needlessly expensive.
+>>>
+>>> Yes, it's pretty bad. But we don't have relaxed (write) accessors on
+>>> other architectures and I'm not sure about their semantics either. I
+>>> guess here it's a data dependency so you cannot write the value before
+>>> reading it, especially since sane architectures should speculate reads
+>>> or writes to device memory.
+>>>
+>>> What about making it always use *_relaxed() accessors if the
+>>> architecture provides them? No need for atomic_io_modify_relaxed().
+>>
+>> The only potential problem there is if somebody uses this function to kick
+>> off a DMA. That would require explicit barriers to enforce ordering against
+>> population of normal, cacheable buffers, which isn't usually the case in
+>> driver code (since we have the dsb/outer_sync in the accessor).
+>>
+>> Perhaps we should just bit the bullet and define relaxed accessors for all
+>> architectures? It's not difficult to default them to the non-relaxed
+>> variants if the architecture doesn't provide an optimised implementation.
+> 
+> Yes, an asm-generic default relaxed would be good (that's what I
+> suggested earlier in this thread and it was discussed in the past). But
+> no-one volunteered ;).
+> 
+
+I would like to make the things move on about this subject. Should it
+be possible to merge this version of the patch set? Currently the
+only users of this new API are drivers for ARM SoCs.
+
+In the meantime, I am willing to introduce an asm-generic default
+relaxed variant of read and write, but as Catalin had already pointed
+in the past
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/117626
+it may take time to get an agreement from all the other architectures.
+
+That's why I propose that this patch set do not depend on the
+introduction of a asm-generic default relaxed variant of read and
+write. Later when it will be accepted then this new API will be moved
+in the asm-generic part.
+
+Thanks,
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
