@@ -1,59 +1,51 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 04 Sep 2013 15:24:31 -0700
-Subject: [PATCH] ARM: omap2: throw the die id into the entropy pool
-In-Reply-To: <1378326324-7170-1-git-send-email-linus.walleij@linaro.org>
- (Linus Walleij's message of "Wed, 4 Sep 2013 22:25:24 +0200")
-References: <1378326324-7170-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <87hae0mdi8.fsf@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 5 Sep 2013 09:09:46 +0900
+Subject: [PATCH v2 0/2] R8A7779/Marzen: HPB-DMAC support for SDHI0
+In-Reply-To: <52279054.5040607@cogentembedded.com>
+References: <201308252143.33458.sergei.shtylyov@cogentembedded.com>
+ <20130826073626.GB10710@verge.net.au>
+ <521B41AB.8040005@cogentembedded.com>
+ <20130827091841.GA30837@verge.net.au>
+ <52279054.5040607@cogentembedded.com>
+Message-ID: <20130905000946.GJ25209@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+On Wed, Sep 04, 2013 at 11:56:04PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 08/27/2013 01:18 PM, Simon Horman wrote:
+> 
+> >>>>    Here's the set of 2 patches against the Simon Horman's 'renesas.git' repo,
+> >>>>'renesas-devel-20130823' tag. Here we add the HPB-DMAC platform code working on
+> >>>>R8A7779 and enable DMA for SDHI0 on Marzen. The patchset depends on the R-Car
+> >>>>HPB-DMAC driver patch posted earlier.
+> 
+> >>>>[1/2] ARM: shmobile: r8a7779: add HPB-DMAC support
+> >>>>[2/2] ARM: shmobile: Marzen: enable DMA for SDHI0
+> 
+> >>>Hi Sergei,
+> 
+> >>>have those patches been merged?
+> 
+> >>    No. The driver they depend on hasn't been merged yet.
+> 
+> >>>If so, do you expect them to appear in v3.12-rc1?
+> 
+> >>    I'm not sure what to expect at this point...
+> 
+> >Thanks, I understand.
+> 
+> >I think that the best thing would be for you to repost this series
+> >once the dependencies have been merge and are available
+> >in a stable branch.
+> 
+>    The driver have been merged by Vinod Koul but I'm not sure which
+> of his branches qualify as stable (his 'next' branch seems to imply
+> non-fast forward updates).
 
-> Atleast eight bytes of this number are totally unique for the device
-> it seems, so this is a perfect candidate for feeding the entropy
-> pool. One byte more or less of constants does not matter so feed in
-> the entire OID struct.
->
-> Cc: Theodore Ts'o <tytso@mit.edu>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/mach-omap2/id.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index 2dc62a2..fc03cc6 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -18,6 +18,7 @@
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
-> +#include <linux/random.h>
->  #include <linux/slab.h>
->  
->  #ifdef CONFIG_SOC_BUS
-> @@ -130,6 +131,17 @@ void omap_get_die_id(struct omap_die_id *odi)
->  	odi->id_3 = read_tap_reg(OMAP_TAP_DIE_ID_3);
->  }
->  
-> +static int __init omap_feed_randpool(void)
-> +{
-> +	struct omap_die_id odi;
-> +
-> +	/* Throw the die ID into the entropy pool at boot */
-> +	omap_get_die_id(&odi);
-> +	add_device_randomness(&odi, sizeof(odi));
-> +	return 0;
-> +}
-> +device_initcall(omap_feed_randpool);
+Thanks Sergei,
 
-Needs to be omap_device_initcall() so it doesn't get called on non-OMAPs
-in a multi-platform kernel.
-
-Otherwise looks good.
-
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
-
-Kevin
+if it is in next at this stage then we should be able
+to assume that it will appear in v3.12-rc1 and we can use
+that as a base once it is available.
