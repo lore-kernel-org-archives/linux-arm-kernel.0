@@ -1,35 +1,35 @@
-From: jwboyer@redhat.com (Josh Boyer)
-Date: Wed, 4 Sep 2013 09:38:50 -0400
-Subject: ARM: OMAP2: Make MACH_OMAP3EVM select NOP_USB_XCEIV
-Message-ID: <20130904133850.GC12834@hansolo.jdub.homelinux.org>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Wed, 4 Sep 2013 21:43:53 -0400
+Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
+In-Reply-To: <20130904113322.GA5859@sirena.org.uk>
+References: <1377828449-18912-1-git-send-email-b32955@freescale.com>
+ <522697E9.1050208@freescale.com>
+ <20130904095523.GT3084@sirena.org.uk>
+ <52270B8E.5080402@freescale.com>
+ <20130904113322.GA5859@sirena.org.uk>
+Message-ID: <20130905014350.GA2261@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board-omap3evm.c file unconditionally calls usb_nop_xceiv_register but
-doesn't ensure this is built-in.  This can lead to build failures like:
+On Wed, Sep 04, 2013 at 12:33:22PM +0100, Mark Brown wrote:
+> On Wed, Sep 04, 2013 at 06:29:34PM +0800, Huang Shijie wrote:
+> > ? 2013?09?04? 17:55, Mark Brown ??:
+> > > On Wed, Sep 04, 2013 at 10:16:09AM +0800, Huang Shijie wrote:
+> 
+> > >> Since this quadspi driver depends on the mtd code, could this driver
+> > >> goes to the kernel by
+> > >> the l2-mtd tree?
+> 
+> > > Why would a SPI driver depend on MTD?
+> 
+> > The patch 1-4 are for m25p80.c, and this quadspi controller drivers
+> > depends on the
+> > patch 1-4.
+> 
+> In what way does the controller driver depend on those changes?
+This driver needs the spi nor command to fill the LUT register, such as
+OPCODE_WREN(0x06), so the patch 1 moves the spi nor command to a seprate
+header spi-nor.h, and this driver includes this new header.
 
-arch/arm/mach-omap2/built-in.o: In function `omap3_evm_init':
-linux-3.12.0-0.rc0.git2.1.fc21.armv7hl/arch/arm/mach-omap2/board-omap3evm.c:686: undefined reference to `usb_nop_xceiv_register'
-make: *** [vmlinux] Error 1
-
-Make MACH_OMAP3EVM select NOP_USB_XCEIV to avoid this.
-
-Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
----
- arch/arm/mach-omap2/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 3eed000..3350389 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -258,6 +258,7 @@ config MACH_OMAP3EVM
- 	depends on ARCH_OMAP3
- 	default y
- 	select OMAP_PACKAGE_CBB
-+	select NOP_USB_XCEIV
- 
- config MACH_OMAP3517EVM
- 	bool "OMAP3517/ AM3517 EVM board"
--- 
-1.8.3.1
+thanks
+Huang Shijie
