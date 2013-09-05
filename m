@@ -1,81 +1,98 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Thu, 5 Sep 2013 16:25:35 +0530
-Subject: [PATCH] ARM: OMAP2+: wakeupgen: AM43x adaptation
-Message-ID: <1378378535-2967-1-git-send-email-afzal@ti.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Thu, 5 Sep 2013 16:59:22 +0530
+Subject: [PATCH v2 2/2] arm: dt: Exynos5420: populate cpu node enteries to
+ 8 cpus
+In-Reply-To: <CAGm_ybintHkLEOYUg=RN4gT8iDww2jyVdtbQZ3kvNbOcO8ewVw@mail.gmail.com>
+References: <1378376550-27762-1-git-send-email-chander.kashyap@linaro.org>
+ <1378376550-27762-3-git-send-email-chander.kashyap@linaro.org>
+ <CAGm_ybintHkLEOYUg=RN4gT8iDww2jyVdtbQZ3kvNbOcO8ewVw@mail.gmail.com>
+Message-ID: <CANuQgHHGMjxWXcCMB+DSLVpybU2_88BcWZqqZTK3DS_E35fJPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM43x has 224 interrupts and 7 banks, make it as maximum values. Keep
-default values as earlier, if am43x is detected, update interrupts and
-banks to maximum.
+Hi Vikas,
 
-Also AM43x has only one cpu, ensure that clearing bitmask at wakeupgen
-is done only for the single existing cpu, existing code assumes that
-there are two cpu's.
+On 5 September 2013 16:09, Vikas Sajjan <sajjan.linux@gmail.com> wrote:
+> Hi Chander,
+>
+> On Thu, Sep 5, 2013 at 3:52 PM, Chander Kashyap
+> <chander.kashyap@linaro.org> wrote:
+>> Exynos5420 is octacore SoC from samsung.
+>> Hence populate all the cpu node enteries.
+>>
+>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/exynos5420.dtsi |   28 ++++++++++++++++++++++++++++
+>>  1 file changed, 28 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+>> index e97c87b..0bd1a40 100644
+>> --- a/arch/arm/boot/dts/exynos5420.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+>> @@ -57,6 +57,34 @@
+>>                         reg = <0x3>;
+>>                         clock-frequency = <1800000000>;
+>>                 };
+>> +
+>> +               cpu4: cpu at 0x100 {
+>
+>
+> you are NOT suppose to use '0x' in dt node name.
+> it should be  cpu4: cpu at 100 {
 
-If bitmask is cleared in wakeupgen for the nonexistent second cpu,
-an imprecise abort happens as soon as Kernel switches to user space.
-It was rootcaused by Sekhar Nori <nsekhar@ti.com>.
+Ok, I will fix it.
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/omap-wakeupgen.c | 18 +++++++++++++-----
- 1 file changed, 13 insertions(+), 5 deletions(-)
+>
+>
+>> +                       device_type = "cpu";
+>> +                       compatible = "arm,cortex-a7";
+>> +                       reg = <0x100>;
+>> +                       clock-frequency = <1000000000>;
+>> +               };
+>> +
+>> +               cpu5: cpu at 0x101 {
+>
+> ditto.
+>
+>
+>> +                       device_type = "cpu";
+>> +                       compatible = "arm,cortex-a7";
+>> +                       reg = <0x101>;
+>> +                       clock-frequency = <1000000000>;
+>> +               };
+>> +
+>> +               cpu6: cpu at 0x102 {
+>
+> ditto.
+>
+>> +                       device_type = "cpu";
+>> +                       compatible = "arm,cortex-a7";
+>> +                       reg = <0x102>;
+>> +                       clock-frequency = <1000000000>;
+>> +               };
+>> +
+>> +               cpu7: cpu at 0x103 {
+>
+> ditto.
+>
+>> +                       device_type = "cpu";
+>> +                       compatible = "arm,cortex-a7";
+>> +                       reg = <0x103>;
+>> +                       clock-frequency = <1000000000>;
+>> +               };
+>>         };
+>>
+>>         clock: clock-controller at 0x10010000 {
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index 813c615..899d4946 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -33,8 +33,11 @@
- #include "omap4-sar-layout.h"
- #include "common.h"
- 
--#define MAX_NR_REG_BANKS	5
--#define MAX_IRQS		160
-+/* maximum value correspond to that of AM43x */
-+#define MAX_NR_REG_BANKS	7
-+#define MAX_IRQS		224
-+#define DEFAULT_NR_REG_BANKS	5
-+#define DEFAULT_IRQS		160
- #define WKG_MASK_ALL		0x00000000
- #define WKG_UNMASK_ALL		0xffffffff
- #define CPU_ENA_OFFSET		0x400
-@@ -47,8 +50,8 @@ static void __iomem *wakeupgen_base;
- static void __iomem *sar_base;
- static DEFINE_RAW_SPINLOCK(wakeupgen_lock);
- static unsigned int irq_target_cpu[MAX_IRQS];
--static unsigned int irq_banks = MAX_NR_REG_BANKS;
--static unsigned int max_irqs = MAX_IRQS;
-+static unsigned int irq_banks = DEFAULT_NR_REG_BANKS;
-+static unsigned int max_irqs = DEFAULT_IRQS;
- static unsigned int omap_secure_apis;
- 
- /*
-@@ -402,6 +405,7 @@ int __init omap_wakeupgen_init(void)
- {
- 	int i;
- 	unsigned int boot_cpu = smp_processor_id();
-+	bool am43x = soc_is_am43xx() ? true : false;
- 
- 	/* Not supported on OMAP4 ES1.0 silicon */
- 	if (omap_rev() == OMAP4430_REV_ES1_0) {
-@@ -418,12 +422,16 @@ int __init omap_wakeupgen_init(void)
- 		irq_banks = OMAP4_NR_BANKS;
- 		max_irqs = OMAP4_NR_IRQS;
- 		omap_secure_apis = 1;
-+	} else if (am43x) {
-+		irq_banks = MAX_NR_REG_BANKS;
-+		max_irqs = MAX_IRQS;
- 	}
- 
- 	/* Clear all IRQ bitmasks at wakeupGen level */
- 	for (i = 0; i < irq_banks; i++) {
- 		wakeupgen_writel(0, i, CPU0_ID);
--		wakeupgen_writel(0, i, CPU1_ID);
-+		if (!am43x)
-+			wakeupgen_writel(0, i, CPU1_ID);
- 	}
- 
- 	/*
+
+
 -- 
-1.8.3.4
+with warm regards,
+Chander Kashyap
