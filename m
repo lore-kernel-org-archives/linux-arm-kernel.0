@@ -1,48 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 5 Sep 2013 15:10:51 +0200
-Subject: [PATCH 3/3] perf: parse the .debug_frame section in case
- .eh_frame is not present
-In-Reply-To: <20130905124508.GE9696@mudshark.cambridge.arm.com>
-References: <1378317854-25965-1-git-send-email-jean.pihet@linaro.org>
- <1378317854-25965-4-git-send-email-jean.pihet@linaro.org>
- <20130905124508.GE9696@mudshark.cambridge.arm.com>
-Message-ID: <CAKv+Gu9ro-_LcxdxEg1wsAXzUeWqwbnqGd+nH-toe7hn-9iKMA@mail.gmail.com>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Thu, 5 Sep 2013 15:10:49 +0200
+Subject: [PATCH 03/22] pinctrl: pinctrl-imx: add imx25 pinctrl driver
+In-Reply-To: <CAOMZO5AZO=BMK9rU-OKjUiQfos=Vw4Hx6aSfPho5yEcD5ercTA@mail.gmail.com>
+References: <1373900227-341-1-git-send-email-denis@eukrea.com>
+ <1373900227-341-4-git-send-email-denis@eukrea.com>
+ <20130716074650.GD30067@S2101-09.ap.freescale.net>
+ <CAOMZO5AZO=BMK9rU-OKjUiQfos=Vw4Hx6aSfPho5yEcD5ercTA@mail.gmail.com>
+Message-ID: <20130905151049.7c59d82b@e6520eb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 September 2013 14:45, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Jean,
->
-> [adding Michael, since I know he was interested in this]
->
-> On Wed, Sep 04, 2013 at 07:04:14PM +0100, Jean Pihet wrote:
->> On ARM the debug info is not present in the .eh_frame sections but
->> instead in .debug_frame.
->> Use libunwind to load and parse the debug info.
->
-> How have you tested this? Regardless of whether or not I apply this patch, I
-> get the same (broken/truncated) callchains for userspace in perf report.
+Hi Fabio,
 
-Same here: I have applied these patches against 3.11 running on a
-Calxeda Highbank, and I never get more than a single entry for the
-userland part of the call stack.
+Le Thu, 5 Sep 2013 10:04:02 -0300,
+Fabio Estevam <festevam@gmail.com> a ?crit :
 
->
-> E.g. the following stupid program (built with -O0 -g):
->
-[...]
->
-> Gives me an incomplete callchain:
->
-> # Overhead   Command      Shared Object                           Symbol
-> # ........  ........  .................  ...............................
-> #
->      0.00%  unwindme  unwindme           [.] bar
->             |
->             --- bar
->
+> Hi Denis,
+> 
+> On Tue, Jul 16, 2013 at 4:46 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > On Mon, Jul 15, 2013 at 04:56:48PM +0200, Denis Carikli wrote:
+> >> This is mostly cut and paste from the imx35 pinctrl driver.
+> >> The data was generated using sed and awk on
+> >>   arch/arm/plat-mxc/include/mach/iomux-mx25.h.
+> >>
+> >> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> >> ---
+> >>  .../bindings/pinctrl/fsl,imx25-pinctrl.txt         |   33 ++
+> >>  arch/arm/boot/dts/imx25-pinfunc.h                  |  513 ++++++++++++++++++++
+> >>  arch/arm/boot/dts/imx25.dtsi                       |    1 +
+> >>  arch/arm/mach-imx/Kconfig                          |    2 +
+> >>  drivers/pinctrl/Kconfig                            |    8 +
+> >>  drivers/pinctrl/Makefile                           |    1 +
+> >>  drivers/pinctrl/pinctrl-imx25.c                    |  351 ++++++++++++++
+> >
+> > Either we split it into driver part and mach part, or I need an ACK from
+> > pinctrl maintainer to take the patch via IMX tree.
+> 
+> Do you plan to re-submit this patch?
 
-I get exactly the same results, just bar and nothing below.
+yes we are working to fix the coments.
 
--- 
-Ard.
+Eric
