@@ -1,7 +1,7 @@
 From: b35083@freescale.com (Jingchang Lu)
-Date: Thu, 5 Sep 2013 17:53:19 +0800
-Subject: [PATCH 3/3] dma: Add Freescale eDMA engine driver support
-Message-ID: <1378374799-16357-1-git-send-email-b35083@freescale.com>
+Date: Thu, 5 Sep 2013 17:55:02 +0800
+Subject: [PATCH v5 3/3] dma: Add Freescale eDMA engine driver support
+Message-ID: <1378374902-16512-1-git-send-email-b35083@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
