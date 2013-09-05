@@ -1,35 +1,44 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 05 Sep 2013 14:51:13 -0400 (EDT)
-Subject: [PATCH] net: mvneta: properly disable HW PHY polling and
- ensure adjust_link() works
-In-Reply-To: <20130904145051.GO19598@titan.lakedaemon.net>
-References: <1378304478-21237-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130904145051.GO19598@titan.lakedaemon.net>
-Message-ID: <20130905.145113.3434775203310652.davem@davemloft.net>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 5 Sep 2013 16:02:57 -0300
+Subject: [PATCH] ARM: mach-imx: clk-imx51-imx53: Fix 'spdif1_pred' clock
+ registration
+Message-ID: <1378407777-26546-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jason Cooper <jason@lakedaemon.net>
-Date: Wed, 4 Sep 2013 10:50:51 -0400
+Since commit beb2d1c1ba (ARM i.MX5: Add S/PDIF clocks), the following clock 
+error appears on mx51:
 
-> On Wed, Sep 04, 2013 at 04:21:18PM +0200, Thomas Petazzoni wrote:
->> This commit fixes a long-standing bug that has been reported by many
->> users: on some Armada 370 platforms, only the network interface that
->> has been used in U-Boot to tftp the kernel works properly in
->> Linux. The other network interfaces can see a 'link up', but are
->> unable to transmit data. The reports were generally made on the Armada
->> 370-based Mirabox, but have also been given on the Armada 370-RD
->> board.
- ...
-> 
-> David,
-> 
-> Offending patch is:
-> 
->   c5aff18 net: mvneta: driver for Marvell Armada 370/XP network unit
-> 
-> Applies and builds cleanly against v3.8.13, v3.9.11, v3.10.10, and v3.11
-> 
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
+TrustZone Interrupt Controller (TZIC) initialized
+i.MX51 clk 180: register failed with -17
+i.MX5 clk 180: register failed with -17
+sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956ms
+CPU identified as i.MX51, silicon rev 3.0
+...
 
-Applied.
+Clock 180 corresponds to 'spdif1_podf' and this clock is getting registered 
+twice.
+
+Fix it, by properly registering the 'spdif1_pred' clock, which should not 
+reference 'spdif1_podf'.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 1a56a33..d9094b9 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -397,7 +397,7 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 				mx51_spdif_xtal_sel, ARRAY_SIZE(mx51_spdif_xtal_sel));
+ 	clk[spdif1_sel] = imx_clk_mux("spdif1_sel", MXC_CCM_CSCMR2, 2, 2,
+ 				spdif_sel, ARRAY_SIZE(spdif_sel));
+-	clk[spdif1_pred] = imx_clk_divider("spdif1_podf", "spdif1_sel", MXC_CCM_CDCDR, 16, 3);
++	clk[spdif1_pred] = imx_clk_divider("spdif1_pred", "spdif1_sel", MXC_CCM_CDCDR, 16, 3);
+ 	clk[spdif1_podf] = imx_clk_divider("spdif1_podf", "spdif1_pred", MXC_CCM_CDCDR, 9, 6);
+ 	clk[spdif1_com_sel] = imx_clk_mux("spdif1_com_sel", MXC_CCM_CSCMR2, 5, 1,
+ 				mx51_spdif1_com_sel, ARRAY_SIZE(mx51_spdif1_com_sel));
+-- 
+1.8.1.2
