@@ -1,52 +1,68 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Thu, 5 Sep 2013 12:27:55 +0900
-Subject: [PATCH v5 0/5] ARM: support for Trusted Foundations secure monitor
-Message-ID: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
+Date: Thu, 5 Sep 2013 12:27:57 +0900
+Subject: [PATCH v5 2/5] ARM: tegra: add support for Trusted Foundations
+In-Reply-To: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
+References: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <1378351680-14696-3-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After several rounds of reviews, this patchset should be close to maturity. This
-fifth version gathers the Reviewed-by tags, addresses the (hopefully) last
-issues, and seeks the Acked-bys of ARM maintainers to be merged, probably
-through the Tegra tree.
+Register the firmware operations for Trusted Foundations if the device
+tree indicates it is active on the device.
 
-Changes since v4:
-- Added ifdefs to isolate open firmware-dependant code
-- Changed BUGS() into more appropriate calls to panic()
-- Fix hard-fail when TF support is not compiled in
-- Make Tegra documentation reference the TF binding
-- Tested extensively
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
+---
+ Documentation/devicetree/bindings/arm/tegra.txt | 5 +++++
+ arch/arm/mach-tegra/Kconfig                     | 1 +
+ arch/arm/mach-tegra/common.c                    | 2 ++
+ 3 files changed, 8 insertions(+)
 
-As there is no consensus on the matter, I have left the TF version in device
-tree as two separate nodes. Comments for or against this and references to prior
-practices regarding version handling in the device tree are welcome.
-
-Alexandre Courbot (5):
-  ARM: add basic Trusted Foundations support
-  ARM: tegra: add support for Trusted Foundations
-  ARM: tegra: split setting of CPU reset handler
-  ARM: tegra: set CPU reset handler with firmware op
-  ARM: tegra: support Trusted Foundations by default
-
- .../arm/firmware/tl,trusted-foundations.txt        | 17 +++++
- Documentation/devicetree/bindings/arm/tegra.txt    |  5 ++
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- arch/arm/Kconfig                                   |  2 +
- arch/arm/Makefile                                  |  1 +
- arch/arm/configs/tegra_defconfig                   |  1 +
- arch/arm/firmware/Kconfig                          | 25 +++++++
- arch/arm/firmware/Makefile                         |  1 +
- arch/arm/firmware/trusted_foundations.c            | 82 ++++++++++++++++++++++
- arch/arm/include/asm/trusted_foundations.h         | 53 ++++++++++++++
- arch/arm/mach-tegra/Kconfig                        |  1 +
- arch/arm/mach-tegra/common.c                       |  2 +
- arch/arm/mach-tegra/reset.c                        | 40 ++++++++---
- 13 files changed, 220 insertions(+), 11 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
- create mode 100644 arch/arm/firmware/Kconfig
- create mode 100644 arch/arm/firmware/Makefile
- create mode 100644 arch/arm/firmware/trusted_foundations.c
- create mode 100644 arch/arm/include/asm/trusted_foundations.h
-
+diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
+index ed9c853..8e51884 100644
+--- a/Documentation/devicetree/bindings/arm/tegra.txt
++++ b/Documentation/devicetree/bindings/arm/tegra.txt
+@@ -32,3 +32,8 @@ board-specific compatible values:
+   nvidia,whistler
+   toradex,colibri_t20-512
+   toradex,iris
++
++Trusted Foundations
++-------------------------------------------
++Tegra supports the Trusted Foundation secure monitor. See the
++"tl,trusted-foundations" binding's documentation for more details.
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index ef3a8da..b6b7c44 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -2,6 +2,7 @@ config ARCH_TEGRA
+ 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+ 	select CLKSRC_OF
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 94a119a..b405e45 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -27,6 +27,7 @@
+ #include <linux/clk-provider.h>
+ 
+ #include <asm/hardware/cache-l2x0.h>
++#include <asm/trusted_foundations.h>
+ 
+ #include "board.h"
+ #include "common.h"
+@@ -99,6 +100,7 @@ static void __init tegra_init_cache(void)
+ 
+ void __init tegra_init_early(void)
+ {
++	of_register_trusted_foundations();
+ 	tegra_cpu_reset_handler_init();
+ 	tegra_apb_io_init();
+ 	tegra_init_fuse();
 -- 
 1.8.4
