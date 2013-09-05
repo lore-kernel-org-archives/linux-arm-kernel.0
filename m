@@ -1,95 +1,69 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 5 Sep 2013 15:45:30 +0800
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EA0C885@DBDE04.ent.ti.com>
-References: <1377828449-18912-1-git-send-email-b32955@freescale.com>
- <522697E9.1050208@freescale.com> <20130904095523.GT3084@sirena.org.uk>
- <52270B8E.5080402@freescale.com> <20130904113322.GA5859@sirena.org.uk>
- <20130905014350.GA2261@gmail.com>
- <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
- <20130905020435.GA3970@gmail.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
- <522817D7.1010206@freescale.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C885@DBDE04.ent.ti.com>
-Message-ID: <5228369A.9000904@freescale.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Thu, 5 Sep 2013 09:44:26 +0200
+Subject: [PATCH] net: mvneta: properly disable HW PHY polling and ensure
+ adjust_link() works
+In-Reply-To: <20130905092808.617da416@skate>
+References: <1378304478-21237-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130904163245.GI20552@1wt.eu>
+ <CACzLR4uDQK2bkcEJQXLe805EfSA8=eF+YH-FTYovHA0q+8Y9NA@mail.gmail.com>
+ <20130905051223.GB26000@1wt.eu> <20130905092808.617da416@skate>
+Message-ID: <20130905074426.GD26000@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?09?05? 14:32, Gupta, Pekon ??:
->> ? 2013?09?05? 12:25, Gupta, Pekon ??:
->>> I would rather suggest to get these values from DT bindings specific to
->> could you show me what values should i set in the DT bindings?
->> The spi nor command? or the dummy? or something else?
->>
-> Taking example of READ command for S25FL128S NOR flash devices..
-> S25FL128S supports following flavors of READ modes.
-> 	4FAST_READ Read Fast (4-byte Address) 0C
-> 	4READ Read (4-byte Address) 13
-> 	4DOR Read Dual Out (4-byte Address) 3C
-> 	4QOR Read Quad Out (4-byte Address) 6C
-> 	4DIOR Dual I/O Read (4-byte Address) BC
-> 	4QIOR Quad I/O Read (4-byte Address) EC
-> 	4DDRFR Read DDR Fast (4-byte Address) 0E
-> 	4DDRDIOR DDR Dual I/O Read (4-byte Address) BE
-> 	4DDRQIOR DDR Quad I/O Read (4-byte Address) EE
->
-> But due to board constrains and your use-case, you would prefer only few
-> read modes. Those opcodes you can specify via following DT property.
-> "qspi, flash-read-command"
->
-> Same way you can have DT property for
-> "qspi, flash-write-command"
-> "qspi, flash-erase-command"
-> "qspi, flash-address-mode" =<4-byte/3-byte>
-> "qspi, flash-dummy-cycles" =<integer>
-thanks for your suggestion.
+Hi Thomas,
 
-I ever thought of this solution.
+On Thu, Sep 05, 2013 at 09:28:08AM +0200, Thomas Petazzoni wrote:
+> I indeed submitted a revised/improved version of your patches some time
+> ago, but they were rejected. See
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173201.html.
 
-But i do not think this is not a good solution. :(
+Thanks for the link, that's indeed what I was referring to. Well, at least
+the most boring part that constantly needed to be rebased was the DT patch.
+Now it's much easier to keep the small remaining patches in one's local tree.
 
-Firstly, the NOR flash S25FL128S may be used by other boards or other 
-platform.
-So if other person uses the S25FL128S, he has to add the SPI NOR 
-command(such as 0xbe, 0xec),
-this is really not needed. Why not add these SPI NOR command now?
+> Since this has been rejected, the available options are:
+> 
+>  (1) Use a DT-capable bootloader that will properly set the MAC
+>      addresses in the DT. Such DT capable bootloaders will soon be made
+>      available by Marvell, but I am really unsure Globalscale will
+>      provide an update for the Mirabox bootloader, rebased on the new
+>      Marvell bootloader that will be DT capable.
 
+One simpler solution for them could be to slightly modify the boot loader
+so that it sets the MAC address on the two ethernet controllers prior to
+boot. Then your code which checks if a MAC is already set will simply
+work.
 
-Secondly, this controller not only needs the write/erase/read, but also 
-need other SPI NOR commands
-such as Write-Enable/Read-status/Configurate the Register. if we add 
-these SPI NOR commands to
-the DT binding, it will be more ugly to veryone. That's why the Patch 1 
-is needed.
+>      As an alternative, we (mainly Sebastian Hesselbarth and myself)
+>      have started adding Armada 370/XP support in the Barebox
+>      bootloader. We can already start Barebox on the Mirabox, but for
+>      now it's quite useless since only the serial port is supported,
+>      there is still no support for the network, SD card, USB or NAND.
+>      This will probably come over time, but it's not going to happen
+>      overnight.
 
+And we must keep in mind that people are generally scared by boot loader
+upgrades, especially when it's for a different one. At least on this
+platform now we have a solution to reflash even after complete failures
+so this is less of a problem.
 
-The only value should be set in the DT is the _dummy_ value. But Add the 
-dummy support should be an other
-patchset's job. I think it is a little complicated to add the dummy support.
+>  (2) Use the "impedance matcher" code written by Daniel Mack and
+>      extended by Jason Cooper, available at
+>      https://github.com/zonque/pxa-impedance-matcher. Essentially, it
+>      inserts a small binary between the installed bootloader and the
+>      kernel, that for example allows to choose a particular DTB amongst
+>      several, depending on the board that is detected. I believe it
+>      could probably be extended to cover other use cases such as
+>      modifying the DTB to add the MAC addresses where appropriate. I've
+>      added Jason Cooper in the Cc list if he wants to comment on that.
 
-The fast-read uses 8bit dummy, the quad-read may needs 6bit dummy, and 
-so on..
+Could be a nice solution as well, indeed.
 
-How can we transfer the dummy value to the device? Add a value to the 
-spi_transfer{}?
-I planed to submit another patchset to fix the dummy issue, since it 
-maybe needs more discussion,
-i did not include the dummy patches in this patch set.
+A last one would be to have the mvneta module accept an array of addresses
+as a module parameter. This way it would just require a minor change in the
+kernel's cmdline to pass the MAC addresses. I remember seeing this in the
+past, I don't remember the platform (maybe the NSLU2 but I could be wrong).
 
-
-
-
-
-
-
-
-> Example: How to select opcodes in DT ?
-> (step-1) eliminate opcode which cannot be used due to board constrains.
->   your board connects only 2 data I/O between device and controller,  So you
->   cannot use any of the QUAD  Read opcodes. Thus your choice is limited to
->   DUAL or SINGLE modes only.
-we have 4 data I/O lines between the device and controller, i only need 
-the Quad mode. :)
-
-thanks
-Huang Shijie
+Cheers,
+Willy
