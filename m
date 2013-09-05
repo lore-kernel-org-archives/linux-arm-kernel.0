@@ -1,31 +1,108 @@
-From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
-Date: Thu, 5 Sep 2013 09:13:13 +0200
-Subject: [PATCH 2/5] Staging/iio/adc/touchscreen/MXS: separate i.MX28
- specific register bits
-In-Reply-To: <20130904143624.GI6329@mwanda>
-References: <1378299706-6742-1-git-send-email-jbe@pengutronix.de>
- <1378299706-6742-3-git-send-email-jbe@pengutronix.de>
- <20130904143624.GI6329@mwanda>
-Message-ID: <201309050913.13349.jbe@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 5 Sep 2013 08:21:14 +0100
+Subject: [PATCH 06/11] iio: pressure-core: st: Expand and rename
+ LPS331AP's channel descriptor
+In-Reply-To: <522794F1.90301@st.com>
+References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
+ <1378287103-21765-7-git-send-email-lee.jones@linaro.org>
+ <522794F1.90301@st.com>
+Message-ID: <20130905072114.GD8980@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
+On Wed, 04 Sep 2013, Denis CIOCCA wrote:
 
-On Wednesday 04 September 2013 16:36:24 Dan Carpenter wrote:
-> On Wed, Sep 04, 2013 at 03:01:43PM +0200, Juergen Beisert wrote:
-> > +#define	LRADC_CTRL0_MX28_PLATE_MASK \
-> > +		LRADC_CTRL0_MX28_YNNSW | LRADC_CTRL0_MX28_YPNSW | \
-> > +		LRADC_CTRL0_MX28_YPPSW | LRADC_CTRL0_MX28_XNNSW | \
-> > +		LRADC_CTRL0_MX28_XNPSW | LRADC_CTRL0_MX28_XPPSW
->
-> Put parenthesis are this macro.
+> > Due to the MACRO used, the task of reading, understanding and maintaining
+> > the LPS331AP's channel descriptor is substantially difficult. This patch
+> > is based on the view that it's better to have easy to read, maintainable
+> > code than to save a few lines here and there. For that reason we're
+> > expanding the array so initialisation is completed in full.
+> Also for this one, the channel names are general and can be shared 
+> between different sensors. For the channel definition it's not a problem 
+> for me, but I think it's not necessary adds all that code...
 
-Good catch. Thanks.
+I'm not sure what you mean by this. Would you be kind enough to
+explain it in a different way please?
 
-Regards,
-Juergen
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >   drivers/iio/pressure/st_pressure_core.c | 45 +++++++++++++++++++++++++--------
+> >   1 file changed, 34 insertions(+), 11 deletions(-)
+> >
+> > diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
+> > index becfb25..7ba9299 100644
+> > --- a/drivers/iio/pressure/st_pressure_core.c
+> > +++ b/drivers/iio/pressure/st_pressure_core.c
+> > @@ -58,16 +58,39 @@
+> >   #define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
+> >   #define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
+> >   
+> > -static const struct iio_chan_spec st_press_channels[] = {
+> > -	ST_SENSORS_LSM_CHANNELS(IIO_PRESSURE,
+> > +static const struct iio_chan_spec st_press_lsp331ap_channels[] = {
+> > +	{
+> > +		.type = IIO_PRESSURE,
+> > +		.channel2 = IIO_NO_MOD,
+> > +		.address = ST_PRESS_LPS331AP_OUT_XL_ADDR,
+> > +		.scan_index = ST_SENSORS_SCAN_X,
+> > +		.scan_type = {
+> > +			.sign = 'u',
+> > +			.realbits = 24,
+> > +			.storagebits = 24,
+> > +			.endianness = IIO_LE,
+> > +		},
+> > +		.info_mask_separate =
+> >   			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
+> > -			ST_SENSORS_SCAN_X, 0, IIO_NO_MOD, 'u', IIO_LE, 24, 24,
+> > -			ST_PRESS_LPS331AP_OUT_XL_ADDR),
+> > -	ST_SENSORS_LSM_CHANNELS(IIO_TEMP,
+> > -			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE) |
+> > -						BIT(IIO_CHAN_INFO_OFFSET),
+> > -			-1, 0, IIO_NO_MOD, 's', IIO_LE, 16, 16,
+> > -			ST_TEMP_LPS331AP_OUT_L_ADDR),
+> > +		.modified = 0,
+> > +	},
+> > +	{
+> > +		.type = IIO_TEMP,
+> > +		.channel2 = IIO_NO_MOD,
+> > +		.address = ST_TEMP_LPS331AP_OUT_L_ADDR,
+> > +		.scan_index = -1,
+> > +		.scan_type = {
+> > +			.sign = 'u',
+> > +			.realbits = 16,
+> > +			.storagebits = 16,
+> > +			.endianness = IIO_LE,
+> > +		},
+> > +		.info_mask_separate =
+> > +			BIT(IIO_CHAN_INFO_RAW) |
+> > +			BIT(IIO_CHAN_INFO_SCALE) |
+> > +			BIT(IIO_CHAN_INFO_OFFSET),
+> > +		.modified = 0,
+> > +	},
+> >   	IIO_CHAN_SOFT_TIMESTAMP(1)
+> >   };
+> >   
+> > @@ -77,7 +100,7 @@ static const struct st_sensors st_press_sensors[] = {
+> >   		.sensors_supported = {
+> >   			[0] = LPS331AP_PRESS_DEV_NAME,
+> >   		},
+> > -		.ch = (struct iio_chan_spec *)st_press_channels,
+> > +		.ch = (struct iio_chan_spec *)st_press_lsp331ap_channels,
+> >   		.odr = {
+> >   			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
+> >   			.mask = ST_PRESS_LPS331AP_ODR_MASK,
+> > @@ -214,7 +237,7 @@ int st_press_common_probe(struct iio_dev *indio_dev)
+> >   	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
+> >   	pdata->multiread_bit = pdata->sensor->multi_read_bit;
+> >   	indio_dev->channels = pdata->sensor->ch;
+> > -	indio_dev->num_channels = ARRAY_SIZE(st_press_channels);
+> > +	indio_dev->num_channels = ARRAY_SIZE(st_press_lsp331ap_channels);
+> >   
+> >   	pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
+> >   						&pdata->sensor->fs.fs_avl[0];
 
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
