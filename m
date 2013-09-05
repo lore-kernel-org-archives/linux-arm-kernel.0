@@ -1,46 +1,61 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  5 Sep 2013 15:23:31 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: Update early timer initialisation
- order
-In-Reply-To: <cover.1378362045.git.horms+renesas@verge.net.au>
-References: <cover.1378362045.git.horms+renesas@verge.net.au>
-Message-ID: <7658ea2fb57831c6836ffcfb20bcb84f3ff55dfb.1378362045.git.horms+renesas@verge.net.au>
+From: yves@cheny.fr (yves at cheny.fr)
+Date: Thu, 05 Sep 2013 08:23:12 +0200
+Subject: [PATCH] net: mvneta: properly disable HW PHY polling and ensure
+ =?UTF-8?Q?adjust=5Flink=28=29=20works?=
+In-Reply-To: <CACzLR4uCQhGzgABV2nMG45EQBNsrW8=j5X7x-=eTSUmSvthLxg@mail.gmail.com>
+References: <1378304478-21237-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130904163245.GI20552@1wt.eu>
+ <CACzLR4uDQK2bkcEJQXLe805EfSA8=eF+YH-FTYovHA0q+8Y9NA@mail.gmail.com>
+ <20130905051223.GB26000@1wt.eu>
+ <CACzLR4uCQhGzgABV2nMG45EQBNsrW8=j5X7x-=eTSUmSvthLxg@mail.gmail.com>
+Message-ID: <ca521df880b08225cb34214e3ef0fc2c@cheny.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-a894fcc2d01a89e6fe3da0845a4d80a5312e1124 ("ARM: smp_twd: Divorce smp_twd
-from local timer API") altered twd_local_timer_common_register() so that it
-may make use of late_timer_init.
+Hi Willy,
+i would be interested too !
 
-This is problematic on marzen with Magnus's recent patch "ARM: shmobile:
-marzen: Switch to DT_MACHINE_START" which switches marzen around to enable
-USE_OF and thus shmobile_timer_init(), which is registered as
-late_time_init by shmobile_earlytimer_init() stops being a no-op.
+thx
+Yves
 
-As a work-around I have updated r8a7779_earlytimer_init() so that
-shmobile_earlytimer_init() is called after r8a7779_register_twd().
-Or in other words, the shmobile_earlytimer_init() setting of
-late_time_init overwrites that of twd_local_timer_common_register().
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Magnus Damm <damm@opensource.se>
----
- arch/arm/mach-shmobile/setup-r8a7779.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 3986877..3c5fae5 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -616,8 +616,8 @@ void __init __weak r8a7779_register_twd(void) { }
- void __init r8a7779_earlytimer_init(void)
- {
- 	r8a7779_clock_init();
--	shmobile_earlytimer_init();
- 	r8a7779_register_twd();
-+	shmobile_earlytimer_init();
- }
- 
- void __init r8a7779_add_early_devices(void)
--- 
-1.8.4
+Le 2013-09-05 07:22, Ethan Tuttle a ?crit?:
+> Understood.  Ultimately, I'll use this board as a router, and stable
+> mac addresses would be better than random.  So I would be interested
+> to try your atag -> device tree patches.  Have they been posted
+> somewhere I can find them?
+> 
+> Thanks Willy.
+> 
+> Ethan
+> 
+> On Wed, Sep 4, 2013 at 10:12 PM, Willy Tarreau <w@1wt.eu> wrote:
+>> Hi,
+>> 
+>> On Wed, Sep 04, 2013 at 09:14:23PM -0700, Ethan Tuttle wrote:
+>>> Just booted with the patch on my Mirabox.  Both interfaces work!
+>>> Thank you Thomas.
+>>> 
+>>> One remaining issue is that the interface which uBoot didn't 
+>>> configure
+>>> is still getting a random mac address:
+>>> 
+>>> mvneta d0070000.ethernet eth0: Using hardware mac address 
+>>> f0:ad:4e:01:dc:97
+>>> mvneta d0074000.ethernet eth1: Using random mac address 
+>>> d2:35:dd:c8:99:48
+>>> 
+>>> This is on 3.11 plus Thomas' patch, which includes the previous fix 
+>>> to
+>>> "read MAC address from hardware when available".  Perhaps that fix
+>>> isn't working with the phylib?
+>> 
+>> No this is unrelated. The MAC isn't configured by the boot loader when
+>> the NIC is not used. U-boot only passes it as a non-standard ATAG. I
+>> have some patches to reinject the non-standard atags into the device
+>> tree if you absolutely need this, but they're not suited for mainline
+>> inclusion from what I understood last time I proposed them (they use
+>> a marvell-specific atag header).
+>> 
+>> Regards,
+>> Willy
+>> 
