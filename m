@@ -1,55 +1,110 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  5 Sep 2013 09:29:18 +0200
-Subject: [PATCH v2] ARM: omap2: throw the die id into the entropy pool
-Message-ID: <1378366158-31183-1-git-send-email-linus.walleij@linaro.org>
+From: denis.ciocca@st.com (Denis CIOCCA)
+Date: Thu, 5 Sep 2013 09:31:51 +0200
+Subject: [PATCH 06/11] iio: pressure-core: st: Expand and rename
+ LPS331AP's channel descriptor
+In-Reply-To: <20130905072114.GD8980@lee--X1>
+References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
+ <1378287103-21765-7-git-send-email-lee.jones@linaro.org>
+ <522794F1.90301@st.com> <20130905072114.GD8980@lee--X1>
+Message-ID: <52283367.4070603@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Atleast eight bytes of this number are totally unique for the device
-it seems, so this is a perfect candidate for feeding the entropy
-pool. One byte more or less of constants does not matter so feed in
-the entire OID struct.
 
-Cc: Theodore Ts'o <tytso@mit.edu>
-Cc: Paul Walmsley <paul@pwsan.com>
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Use omap_device_initcall() to avoid calling on non-OMAPs.
----
- arch/arm/mach-omap2/id.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+>>> Due to the MACRO used, the task of reading, understanding and maintaining
+>>> the LPS331AP's channel descriptor is substantially difficult. This patch
+>>> is based on the view that it's better to have easy to read, maintainable
+>>> code than to save a few lines here and there. For that reason we're
+>>> expanding the array so initialisation is completed in full.
+>> Also for this one, the channel names are general and can be shared
+>> between different sensors. For the channel definition it's not a problem
+>> for me, but I think it's not necessary adds all that code...
+> I'm not sure what you mean by this. Would you be kind enough to
+> explain it in a different way please?
+The channel name (in this case st_press_channels) is not only specific 
+for one sensor but can be shared. Ok in this driver now is used only for 
+the lps331ap but for example in accelerometer driver is used by several 
+sensors. It's possible in the future for new pressure sensors use the 
+same channels definition.
+The channel definition is intended the switch by macro 
+ST_SENSORS_LSM_CHANNELS to the full definition, for me is not a problem 
+but I think it's not necessary.
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 2dc62a2..9260d09 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -18,6 +18,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/random.h>
- #include <linux/slab.h>
- 
- #ifdef CONFIG_SOC_BUS
-@@ -130,6 +131,17 @@ void omap_get_die_id(struct omap_die_id *odi)
- 	odi->id_3 = read_tap_reg(OMAP_TAP_DIE_ID_3);
- }
- 
-+static int __init omap_feed_randpool(void)
-+{
-+	struct omap_die_id odi;
-+
-+	/* Throw the die ID into the entropy pool at boot */
-+	omap_get_die_id(&odi);
-+	add_device_randomness(&odi, sizeof(odi));
-+	return 0;
-+}
-+omap_device_initcall(omap_feed_randpool);
-+
- void __init omap2xxx_check_revision(void)
- {
- 	int i, j;
--- 
-1.8.1.4
+Denis
+
+>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>> ---
+>>>    drivers/iio/pressure/st_pressure_core.c | 45 +++++++++++++++++++++++++--------
+>>>    1 file changed, 34 insertions(+), 11 deletions(-)
+>>>
+>>> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
+>>> index becfb25..7ba9299 100644
+>>> --- a/drivers/iio/pressure/st_pressure_core.c
+>>> +++ b/drivers/iio/pressure/st_pressure_core.c
+>>> @@ -58,16 +58,39 @@
+>>>    #define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
+>>>    #define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
+>>>    
+>>> -static const struct iio_chan_spec st_press_channels[] = {
+>>> -	ST_SENSORS_LSM_CHANNELS(IIO_PRESSURE,
+>>> +static const struct iio_chan_spec st_press_lsp331ap_channels[] = {
+>>> +	{
+>>> +		.type = IIO_PRESSURE,
+>>> +		.channel2 = IIO_NO_MOD,
+>>> +		.address = ST_PRESS_LPS331AP_OUT_XL_ADDR,
+>>> +		.scan_index = ST_SENSORS_SCAN_X,
+>>> +		.scan_type = {
+>>> +			.sign = 'u',
+>>> +			.realbits = 24,
+>>> +			.storagebits = 24,
+>>> +			.endianness = IIO_LE,
+>>> +		},
+>>> +		.info_mask_separate =
+>>>    			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
+>>> -			ST_SENSORS_SCAN_X, 0, IIO_NO_MOD, 'u', IIO_LE, 24, 24,
+>>> -			ST_PRESS_LPS331AP_OUT_XL_ADDR),
+>>> -	ST_SENSORS_LSM_CHANNELS(IIO_TEMP,
+>>> -			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE) |
+>>> -						BIT(IIO_CHAN_INFO_OFFSET),
+>>> -			-1, 0, IIO_NO_MOD, 's', IIO_LE, 16, 16,
+>>> -			ST_TEMP_LPS331AP_OUT_L_ADDR),
+>>> +		.modified = 0,
+>>> +	},
+>>> +	{
+>>> +		.type = IIO_TEMP,
+>>> +		.channel2 = IIO_NO_MOD,
+>>> +		.address = ST_TEMP_LPS331AP_OUT_L_ADDR,
+>>> +		.scan_index = -1,
+>>> +		.scan_type = {
+>>> +			.sign = 'u',
+>>> +			.realbits = 16,
+>>> +			.storagebits = 16,
+>>> +			.endianness = IIO_LE,
+>>> +		},
+>>> +		.info_mask_separate =
+>>> +			BIT(IIO_CHAN_INFO_RAW) |
+>>> +			BIT(IIO_CHAN_INFO_SCALE) |
+>>> +			BIT(IIO_CHAN_INFO_OFFSET),
+>>> +		.modified = 0,
+>>> +	},
+>>>    	IIO_CHAN_SOFT_TIMESTAMP(1)
+>>>    };
+>>>    
+>>> @@ -77,7 +100,7 @@ static const struct st_sensors st_press_sensors[] = {
+>>>    		.sensors_supported = {
+>>>    			[0] = LPS331AP_PRESS_DEV_NAME,
+>>>    		},
+>>> -		.ch = (struct iio_chan_spec *)st_press_channels,
+>>> +		.ch = (struct iio_chan_spec *)st_press_lsp331ap_channels,
+>>>    		.odr = {
+>>>    			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
+>>>    			.mask = ST_PRESS_LPS331AP_ODR_MASK,
+>>> @@ -214,7 +237,7 @@ int st_press_common_probe(struct iio_dev *indio_dev)
+>>>    	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
+>>>    	pdata->multiread_bit = pdata->sensor->multi_read_bit;
+>>>    	indio_dev->channels = pdata->sensor->ch;
+>>> -	indio_dev->num_channels = ARRAY_SIZE(st_press_channels);
+>>> +	indio_dev->num_channels = ARRAY_SIZE(st_press_lsp331ap_channels);
+>>>    
+>>>    	pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
+>>>    						&pdata->sensor->fs.fs_avl[0];
