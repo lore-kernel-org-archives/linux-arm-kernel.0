@@ -1,73 +1,127 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 5 Sep 2013 11:11:47 +0200
-Subject: [PATCH] net: mvneta: properly disable HW PHY polling and ensure
- adjust_link() works
-In-Reply-To: <20130905102659.25a0f064@skate>
-References: <1378304478-21237-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130904163245.GI20552@1wt.eu>
- <CACzLR4uDQK2bkcEJQXLe805EfSA8=eF+YH-FTYovHA0q+8Y9NA@mail.gmail.com>
- <20130905051223.GB26000@1wt.eu> <20130905092808.617da416@skate>
- <20130905074426.GD26000@1wt.eu> <20130905102659.25a0f064@skate>
-Message-ID: <20130905091147.GA28658@1wt.eu>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Thu, 5 Sep 2013 09:11:59 +0000
+Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
+In-Reply-To: <5228369A.9000904@freescale.com>
+References: <1377828449-18912-1-git-send-email-b32955@freescale.com>
+ <522697E9.1050208@freescale.com> <20130904095523.GT3084@sirena.org.uk>
+ <52270B8E.5080402@freescale.com> <20130904113322.GA5859@sirena.org.uk>
+ <20130905014350.GA2261@gmail.com>
+ <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
+ <20130905020435.GA3970@gmail.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
+ <522817D7.1010206@freescale.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA0C885@DBDE04.ent.ti.com>
+ <5228369A.9000904@freescale.com>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA0C907@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 05, 2013 at 10:26:59AM +0200, Thomas Petazzoni wrote:
-> > One simpler solution for them could be to slightly modify the boot loader
-> > so that it sets the MAC address on the two ethernet controllers prior to
-> > boot. Then your code which checks if a MAC is already set will simply
-> > work.
+> ? 2013?09?05? 14:32, Gupta, Pekon ??:
+> >> ? 2013?09?05? 12:25, Gupta, Pekon ??:
+> >>> I would rather suggest to get these values from DT bindings specific to
+> >> could you show me what values should i set in the DT bindings?
+> >> The spi nor command? or the dummy? or something else?
+> >>
+> > Taking example of READ command for S25FL128S NOR flash devices..
+> > S25FL128S supports following flavors of READ modes.
+> > 	4FAST_READ Read Fast (4-byte Address) 0C
+> > 	4READ Read (4-byte Address) 13
+> > 	4DOR Read Dual Out (4-byte Address) 3C
+> > 	4QOR Read Quad Out (4-byte Address) 6C
+> > 	4DIOR Dual I/O Read (4-byte Address) BC
+> > 	4QIOR Quad I/O Read (4-byte Address) EC
+> > 	4DDRFR Read DDR Fast (4-byte Address) 0E
+> > 	4DDRDIOR DDR Dual I/O Read (4-byte Address) BE
+> > 	4DDRQIOR DDR Quad I/O Read (4-byte Address) EE
+> >
+> > But due to board constrains and your use-case, you would prefer only few
+> > read modes. Those opcodes you can specify via following DT property.
+> > "qspi, flash-read-command"
+> >
+> > Same way you can have DT property for
+> > "qspi, flash-write-command"
+> > "qspi, flash-erase-command"
+> > "qspi, flash-address-mode" =<4-byte/3-byte>
+> > "qspi, flash-dummy-cycles" =<integer>
+> thanks for your suggestion.
 > 
-> This works when the network driver is compiled 'statically' inside the
-> kernel. When compiled as a module, then the gatable clock of the
-> network interface will be gated at the end of the kernel boot, before
-> the mvneta module is probe. And gating the network interface clocks
-> means that it will loose its state, including its MAC address. So it's
-> not an entirely perfect solution either, but I admit that on such
-> platforms, the network driver is most likely compiled statically, so it
-> would probably suit the needs of most people.
-
-Agreed.
-
-> Note that this can be done without doing any change in the bootloader.
-> For example, on a Mirabox, you can do:
+> I ever thought of this solution.
 > 
->    mw.l 0xD0072414 0x5C93; mw.l 0xD0072418 0xF0AD4E01; mw.l 0xD0076414 0x5C94; mw.l 0xD0076418 0xF0AD4E01; bootm
+> But i do not think this is not a good solution. :(
 > 
-> to boot your kernel. This will program the MAC addresses for both
-> network interfaces in the network controllers, so that when booting
-> Linux, you get:
+Sorry.. I din't mean to be offensive, I should re-word my feedback as
+your previous solution is not scalable. My suggestion is just a 
+food-for-thought, approvals from other users is required here.
+
+> Firstly, the NOR flash S25FL128S may be used by other boards or other
+> platform.
+> So if other person uses the S25FL128S, he has to add the SPI NOR
+> command(such as 0xbe, 0xec),
+> this is really not needed. Why not add these SPI NOR command now?
 > 
-> [   42.122881] mvneta d0070000.ethernet eth0: Using hardware mac address f0:ad:4e:01:5c:93
-> [   42.385398] mvneta d0074000.ethernet eth1: Using hardware mac address f0:ad:4e:01:5c:94
 > 
-> You add that to your default U-Boot boot script, and that's it, you
-> have stable MAC addresses.
-
-Hmmm that's quite interesting. Unfortunately I don't see an easy way to
-make this directly rely on the ethaddr/eth1addr so that end users can
-simply cut-n-paste a few lines into the u-boot config. But anyway that
-can be useful.
-
-> > A last one would be to have the mvneta module accept an array of addresses
-> > as a module parameter. This way it would just require a minor change in the
-> > kernel's cmdline to pass the MAC addresses. I remember seeing this in the
-> > past, I don't remember the platform (maybe the NSLU2 but I could be wrong).
+> Secondly, this controller not only needs the write/erase/read, but also
+> need other SPI NOR commands
+> such as Write-Enable/Read-status/Configurate the Register. if we add
+> these SPI NOR commands to
+> the DT binding, it will be more ugly to veryone. That's why the Patch 1
+> is needed.
 > 
-> The situation of module parameters to pass MAC addresses was a bit
-> fuzzy. There was once a proposal to add a generic kernel parameter to
-> do this, but it was rejected by David Miller (I believe not on specific
-> implementation details, but on the general idea). However, there are
-> numerous drivers in the tree that do provide a custom module parameter
-> to set MAC addresses.
+> 
+> The only value should be set in the DT is the _dummy_ value. But Add the
+> dummy support should be an other
+> patchset's job. I think it is a little complicated to add the dummy support.
+> 
+> The fast-read uses 8bit dummy, the quad-read may needs 6bit dummy, and
+> so on..
+> 
+> How can we transfer the dummy value to the device? Add a value to the
+> spi_transfer{}?
+> I planed to submit another patchset to fix the dummy issue, since it
+> maybe needs more discussion,
+> i did not include the dummy patches in this patch set.
+> 
+No, SPI generic framework (struct spi_transfer, spi_message,...)
+should be kept independent of any MTD flash specific data handlers.
+<wangyuhang2014@gmail.com> added two new fields (tx_nbits, rx_nbits)
+to spi_device because those properties are part of SPI protocol.
+But, 'dummy_cycles' is no related to SPI protocol. So it should be kept out
+of SPI generic framework.
+This is where if you could use DT based approach, things would have been
+simpler, because you give end-user the freedom to enter device-info from
+device datasheet.
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> > Example: How to select opcodes in DT ?
+> > (step-1) eliminate opcode which cannot be used due to board constrains.
+> >   your board connects only 2 data I/O between device and controller,  So you
+> >   cannot use any of the QUAD  Read opcodes. Thus your choice is limited to
+> >   DUAL or SINGLE modes only.
+> we have 4 data I/O lines between the device and controller, i only need
+> the Quad mode. :)
+> 
+May be because you are currently working on a development EVM or
+demo board, so you can live with QUAD mode.
+But when customer will have custom boards with different QSPI devices 
+then you would end-up  supporting all sorts of configurations :-)
+And in production scenarios, it?s the price economics which mostly dominates
+which part to choose and how to connect it on board.
+Like as I remember some freescale boards have WINBOND QSPI flash
+which uses different opcodes and semantics, so you might need to support
+that too in future.
 
-Yes, I remember using this with the sunhme driver many years ago when
-we did not have access to the onboard rom to retrieve the MAC address.
+So my suggestion is think again. As you are inviting lot of re-work for yourself
+and for others too :-)
 
-> However, with the above suggestion of U-Boot scripting, I believe we
-> have a relatively easy solution for people to use.
+Anyway, if you really want to continue with this is, then please re-name
+include/linux/mtd/spi-nor.h to
+include/linux/mtd/spi-fsl-quadspi.h
+because something specific for your driver should not conflict with
+generic spi-nor framework added later.
 
-We could provide a script to do it more conveniently for the user :-)
-
-Best regards,
-Willy
+with regards, pekon
