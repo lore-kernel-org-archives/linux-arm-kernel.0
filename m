@@ -1,53 +1,60 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 5 Sep 2013 17:59:52 +0100
-Subject: [PATCH v5 05/13] xen/arm,arm64: move Xen initialization
- earlier
-In-Reply-To: <20130905162026.GJ11887@arm.com>
-References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
- <1377801154-29215-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130905162026.GJ11887@arm.com>
-Message-ID: <alpine.DEB.2.02.1309051755560.6397@kaball.uk.xensource.com>
+Date: Thu, 5 Sep 2013 18:02:39 +0100
+Subject: [PATCH v3] ARM: xen: only set pm function ptrs for Xen guests
+In-Reply-To: <alpine.DEB.2.02.1308291409470.6397@kaball.uk.xensource.com>
+References: <1377780232-13545-1-git-send-email-robherring2@gmail.com>
+ <alpine.DEB.2.02.1308291409470.6397@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1309051802210.6397@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Sep 2013, Catalin Marinas wrote:
-> On Thu, Aug 29, 2013 at 07:32:26PM +0100, Stefano Stabellini wrote:
-> > Move Xen initialization earlier, before any DMA requests can be made.
+On Thu, 29 Aug 2013, Stefano Stabellini wrote:
+> On Thu, 29 Aug 2013, Rob Herring wrote:
+> > From: Rob Herring <rob.herring@calxeda.com>
 > > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > xen_pm_init was unconditionally setting pm_power_off and arm_pm_restart
+> > function pointers. This breaks multi-platform kernels. Make this
+> > conditional on running as a Xen guest and make it a late_initcall to
+> > ensure it is setup after platform code for Dom0.
+> > 
+> > Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 > 
-> I guess you should cc the corresponding maintainers here.
-
-Thanks for the reminder, I'll do that.
-
-
-> >  arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
-> >  arch/arm/kernel/setup.c               |    2 ++
-> >  arch/arm/xen/enlighten.c              |   21 ++++++++++++++-------
-> >  arch/arm64/kernel/setup.c             |    2 ++
-> >  4 files changed, 26 insertions(+), 7 deletions(-)
 > 
-> [...]
+> Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 > 
-> > --- a/arch/arm64/kernel/setup.c
-> > +++ b/arch/arm64/kernel/setup.c
-> > @@ -53,6 +53,7 @@
-> >  #include <asm/traps.h>
-> >  #include <asm/memblock.h>
-> >  #include <asm/psci.h>
-> > +#include <asm/xen/hypervisor.h>
+> Added to my queue.
+
+FYI we are going to send a pull request for this patch in the 3.12 merge
+window, asking for a backport to 3.11.
+
+
+> 
+> >  arch/arm/xen/enlighten.c | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > index 8a6295c..7071fca 100644
+> > --- a/arch/arm/xen/enlighten.c
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -273,12 +273,15 @@ core_initcall(xen_guest_init);
 > >  
-> >  unsigned int processor_id;
-> >  EXPORT_SYMBOL(processor_id);
-> > @@ -267,6 +268,7 @@ void __init setup_arch(char **cmdline_p)
-> >  	unflatten_device_tree();
+> >  static int __init xen_pm_init(void)
+> >  {
+> > +	if (!xen_domain())
+> > +		return -ENODEV;
+> > +
+> >  	pm_power_off = xen_power_off;
+> >  	arm_pm_restart = xen_restart;
 > >  
-> >  	psci_init();
-> > +	xen_early_init();
+> >  	return 0;
+> >  }
+> > -subsys_initcall(xen_pm_init);
+> > +late_initcall(xen_pm_init);
+> >  
+> >  static irqreturn_t xen_arm_callback(int irq, void *arg)
+> >  {
+> > -- 
+> > 1.8.1.2
+> > 
 > 
-> So Xen guests don't have any hope for single Image? Basically you set
-> dma_ops unconditionally in xen_early_init(), even if the kernel is not
-> intended to run under Xen.
-
-That should not happen: if we are not running on Xen xen_early_init
-returns early, before calling xen_mm_init.
