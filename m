@@ -1,69 +1,35 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 5 Sep 2013 18:54:56 +0200
-Subject: [PATCH] ASoC: kirkwood: change the compatible string of the
- kirkwood-i2s driver
-In-Reply-To: <1378385791-29551-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1378385791-29551-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130905185456.175f556b@armhf>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 5 Sep 2013 17:54:15 +0100
+Subject: [PATCH v5 03/13] arm64: define DMA_ERROR_CODE
+In-Reply-To: <20130905160536.GH11887@arm.com>
+References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
+ <1377801154-29215-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130905160536.GH11887@arm.com>
+Message-ID: <alpine.DEB.2.02.1309051752500.6397@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  5 Sep 2013 14:56:31 +0200
-Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Thu, 5 Sep 2013, Catalin Marinas wrote:
+> On Thu, Aug 29, 2013 at 07:32:24PM +0100, Stefano Stabellini wrote:
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > CC: catalin.marinas at arm.com
+> > CC: will.deacon at arm.com
+> > ---
+> >  arch/arm64/include/asm/dma-mapping.h |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> > index 8d18100..c2cb8a0 100644
+> > --- a/arch/arm64/include/asm/dma-mapping.h
+> > +++ b/arch/arm64/include/asm/dma-mapping.h
+> > @@ -25,6 +25,7 @@
+> >  
+> >  #define ARCH_HAS_DMA_GET_REQUIRED_MASK
+> >  
+> > +#define DMA_ERROR_CODE	(~0)
+> 
+> I wonder why this isn't more generic. It looks like most (all?)
+> architectures define it in the same way.
 
-> The compatible string of the kirkwood-i2s driver was chosen as
-> "marvell,mvebu-audio". Using such a compatible string is not a good
-> idea, since "mvebu" is the name of a large family of SOCs, in which
-> new, unknown SOCs will be coming in the future. It is therefore
-> impossible to know what will be evolutions of this hardware block in
-> the next generations of the SOCs. For this reason, the recommandation
-> for compatible strings of on-SOCs devices has always been to use the
-> name of the oldest SOC that has the hardware block. New SOCs that have
-> an exactly compatible hardware block can reference it using the same
-> compatible string. See [1], [2] and [3] for various cases were this
-> suggestion was made, including from Rob Herring, a Device Tree binding
-> maintainer.
-> 
-> As an example, there are already small differences between current
-> generations:
-> 
->  * On Kirkwood, only one interrupt is used for audio.
->  * On Dove, two interrupts are used, one for audio data and one for
->    error reporting.
-> 
-> In the near future, I'll be adding audio support to Armada 370, which
-> allows has the same hardware block (but maybe with minor variants).
-> 
-> Therefore, this patch changes the driver to accept
-> "marvell,kirkwood-audio" and "marvell,dove-audio" as compatible
-> strings instead of the too-generic "marvell,mvebu-audio". The reason
-> for the two different compatible strings is the difference in the
-> number of interrupts used by the two SOCs for audio.
-> 
-> This Device Tree binding has never been part of a Linux kernel stable
-> release so far, so it can be changed now without breaking backward
-> compatibility.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-mtd/2012-March/040417.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/161065.html
-> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/087702.html
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-
-The name of the kirwood audio driver has been changed from
-"kirkwood-i2s" to "mvebu-audio" by Russell King
-(http://www.spinics.net/lists/arm-kernel/msg264185.html).
-I have just used this name in the DT.
-
-Then, the second interrupt in Dove is not used in the driver. If it
-should, it would be present in the DTs of the dove boards only, so,
-actually, there is not need to have different compatibles.
-
-Eventually, you are talking about some other mvebu SoCs. Before adding
-any new compatible, it would be nice to know if, for example, some
-changes are needed in the kirkwood/dove audio driver for the Armada 370...
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Actually it's defined as 0 on x86 and ia64.
+All the others define it as ~0.
