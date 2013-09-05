@@ -1,241 +1,361 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 5 Sep 2013 09:38:22 +0200
-Subject: [PATCH 5/8] sdhci: sdhci-esdhc-imx: change pinctrl state
- according to uhs mode
-In-Reply-To: <1378299257-2980-6-git-send-email-b29396@freescale.com>
-References: <1378299257-2980-1-git-send-email-b29396@freescale.com>
- <1378299257-2980-6-git-send-email-b29396@freescale.com>
-Message-ID: <CAPDyKFrCoQ7PMw29krxYsuFHH12NyDsPu7OxGb73QC-dNGXDVg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 5 Sep 2013 08:38:37 +0100
+Subject: [PATCH 05/11] iio: pressure-core: st: Describe LPS331AP defines
+ by name
+In-Reply-To: <522793A9.8040300@st.com>
+References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
+ <1378287103-21765-6-git-send-email-lee.jones@linaro.org>
+ <522793A9.8040300@st.com>
+Message-ID: <20130905073837.GE8980@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 September 2013 14:54, Dong Aisheng <b29396@freescale.com> wrote:
-> Without proper pinctrl state, the card may not be able to work
-> on high speed stablely. e.g. SDR104.
->
-> This patch add pinctrl state switch code according to different
-> uhs mode include 100mhz sate, 200mhz sate and normal state
-> (50Mhz and below).
->
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c          |  110 ++++++++++++++++++++++++++-
->  include/linux/platform_data/mmc-esdhc-imx.h |    4 +
->  2 files changed, 113 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 36b9f63..3e89863 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -49,6 +49,10 @@
->
->  #define ESDHC_TUNING_BLOCK_PATTERN_LEN 64
->
-> +/* pinctrl state */
-> +#define ESDHC_PINCTRL_STATE_100MHZ     "state_100mhz"
-> +#define ESDHC_PINCTRL_STATE_200MHZ     "state_200mhz"
-> +
->  /*
->   * Our interpretation of the SDHCI_HOST_CONTROL register
->   */
-> @@ -90,6 +94,10 @@ struct pltfm_imx_data {
->         u32 scratchpad;
->         enum imx_esdhc_type devtype;
->         struct pinctrl *pinctrl;
-> +       struct pinctrl_state *pins_current;
-> +       struct pinctrl_state *pins_default;
-> +       struct pinctrl_state *pins_100mhz;
-> +       struct pinctrl_state *pins_200mhz;
->         struct esdhc_platform_data boarddata;
->         struct clk *clk_ipg;
->         struct clk *clk_ahb;
-> @@ -642,6 +650,75 @@ static int esdhc_executing_tuning(struct sdhci_host *host, u32 opcode)
->         return ret;
->  }
->
-> +static int esdhc_change_pinstate(struct sdhci_host *host,
-> +                                               unsigned int uhs)
-> +{
-> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +       struct pltfm_imx_data *imx_data = pltfm_host->priv;
-> +       struct pinctrl_state *pinctrl;
-> +       int ret;
-> +
-> +       dev_dbg(mmc_dev(host->mmc), "change pinctrl state for uhs %d\n", uhs);
-> +
-> +       if (IS_ERR(imx_data->pinctrl) ||
-> +               IS_ERR(imx_data->pins_default) ||
-> +               IS_ERR(imx_data->pins_100mhz) ||
-> +               IS_ERR(imx_data->pins_200mhz))
-> +               return -EINVAL;
-> +
-> +       switch (uhs) {
-> +       case MMC_TIMING_UHS_SDR12:
-> +       case MMC_TIMING_UHS_SDR25:
-> +       case MMC_TIMING_UHS_DDR50:
-> +               pinctrl = imx_data->pins_default;
-> +               break;
-> +       case MMC_TIMING_UHS_SDR50:
-> +               pinctrl = imx_data->pins_100mhz;
-> +               break;
-> +       case MMC_TIMING_UHS_SDR104:
-> +               pinctrl = imx_data->pins_200mhz;
-> +               break;
-> +       default:
-> +               /* back to default state for other legacy timing */
-> +               pinctrl = imx_data->pins_default;
-> +       }
-> +
-> +       if (pinctrl == imx_data->pins_current)
-> +               return 0;
-> +
-> +       ret = pinctrl_select_state(imx_data->pinctrl, pinctrl);
-> +       if (!ret)
-> +               imx_data->pins_current = pinctrl;
-> +
-> +       return ret;
-> +}
-> +
-> +static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
-> +{
-> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +       struct pltfm_imx_data *imx_data = pltfm_host->priv;
-> +
-> +       switch (uhs) {
-> +       case MMC_TIMING_UHS_SDR12:
-> +               imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR12;
-> +               break;
-> +       case MMC_TIMING_UHS_SDR25:
-> +               imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR25;
-> +               break;
-> +       case MMC_TIMING_UHS_SDR50:
-> +               imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR50;
-> +               break;
-> +       case MMC_TIMING_UHS_SDR104:
-> +               imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR104;
-> +               break;
-> +       case MMC_TIMING_UHS_DDR50:
-> +               imx_data->uhs_mode = SDHCI_CTRL_UHS_DDR50;
-> +               break;
-> +       }
-> +
-> +       return esdhc_change_pinstate(host, uhs);
-> +}
-> +
->  static const struct sdhci_ops sdhci_esdhc_ops = {
->         .read_l = esdhc_readl_le,
->         .read_w = esdhc_readw_le,
-> @@ -653,6 +730,7 @@ static const struct sdhci_ops sdhci_esdhc_ops = {
->         .get_min_clock = esdhc_pltfm_get_min_clock,
->         .get_ro = esdhc_pltfm_get_ro,
->         .platform_bus_width = esdhc_pltfm_bus_width,
-> +       .set_uhs_signaling = esdhc_set_uhs_signaling,
->         .platform_execute_tuning = esdhc_executing_tuning,
->  };
->
-> @@ -695,6 +773,11 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
->
->         of_property_read_u32(np, "max-frequency", &boarddata->f_max);
->
-> +       if (of_find_property(np, "no-1-8-v", NULL))
-> +               boarddata->support_vsel = false;
-> +       else
-> +               boarddata->support_vsel = true;
-> +
->         return 0;
->  }
->  #else
-> @@ -757,12 +840,20 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->         clk_prepare_enable(imx_data->clk_ipg);
->         clk_prepare_enable(imx_data->clk_ahb);
->
-> -       imx_data->pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> +       imx_data->pinctrl = devm_pinctrl_get(&pdev->dev);
->         if (IS_ERR(imx_data->pinctrl)) {
->                 err = PTR_ERR(imx_data->pinctrl);
->                 goto disable_clk;
->         }
->
-> +       imx_data->pins_default = pinctrl_lookup_state(imx_data->pinctrl,
-> +                                               PINCTRL_STATE_DEFAULT);
+> > They're currently named *_1_*, for 'Sensor 1', but the code will be much
+> > more readable if we use the naming convention *_LPS331AP_* instead.
+> You are right, but the reason is to maintain the same structure of the 
+> other sensors drivers (like accel, gyro and magn). Often some sensors 
+> can use the same data and using 1,2,... I think it's more general.
 
-I believe you should look into the new pinctrl APIs and the new
-sequence at device driver core probe, which automatically fetches
-default, idle and sleep state pins. Additionally it sets the default
-state.
+I've just coded this up for the pressure sensor [1] and in my opinion it
+looks pretty ugly. We save 5 lines in this usecase, but we're
+separating out some of the register addresses from the masks
+etc.
 
-It should likely simplifies some code in this patch.
+Besides some code space #defines don't actually cost anything, so
+unless the register set is almost identical I'd suggest putting them
+in a header file out the way and separating them out like in the
+original patch. I personally think it makes things so much clearer for
+the reader.
 
-Kind regards
-Ulf Hansson
+I haven't looked at the other sensors yet, so perhaps we need to
+evaluate this on a case by case basis, but certainly for this driver,
+as we only support two sensors currently and for the sake of 5 lines I
+think it's better to have them clearly defined per-sensor.
+
+What do you think?
+
+[1]:
+
+/* GROUP VALUES SENSOR */
+#define ST_PRESS_1_ODR_ADDR			0x20
+#define ST_PRESS_1_ODR_AVL_1HZ_VAL		0x01
+#define ST_PRESS_1_PW_ADDR			0x20
+#define ST_PRESS_1_BDU_ADDR			0x20
+#define ST_PRESS_1_MULTIREAD_BIT		true
+
+/* CUSTOM VALUES FOR LPS331AP SENSOR */
+#define ST_PRESS_LPS331AP_WAI_EXP		0xbb
+#define ST_PRESS_LPS331AP_ODR_MASK		0x70
+#define ST_PRESS_LPS331AP_ODR_AVL_7HZ_VAL	0x05
+#define ST_PRESS_LPS331AP_ODR_AVL_13HZ_VAL	0x06
+#define ST_PRESS_LPS331AP_ODR_AVL_25HZ_VAL	0x07
+#define ST_PRESS_LPS331AP_PW_MASK		0x80
+#define ST_PRESS_LPS331AP_FS_ADDR		0x23
+#define ST_PRESS_LPS331AP_FS_MASK		0x30
+#define ST_PRESS_LPS331AP_FS_AVL_1260_VAL	0x00
+#define ST_PRESS_LPS331AP_FS_AVL_1260_GAIN	ST_PRESS_MBAR_TO_KPASCAL(244141)
+#define ST_PRESS_LPS331AP_FS_AVL_TEMP_GAIN	2083000
+#define ST_PRESS_LPS331AP_BDU_MASK		0x04
+#define ST_PRESS_LPS331AP_DRDY_IRQ_ADDR		0x22
+#define ST_PRESS_LPS331AP_DRDY_IRQ_MASK		0x04
+#define ST_PRESS_LPS331AP_TEMP_OFFSET		42500
+#define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
+#define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
+
+/* CUSTOM VALUES FOR LPS001WP SENSOR */
+#define ST_PRESS_LPS001WP_WAI_EXP		0xba
+#define ST_PRESS_LPS001WP_ODR_MASK		0x30
+#define ST_PRESS_LPS001WP_ODR_AVL_7HZ_VAL	0x02
+#define ST_PRESS_LPS001WP_ODR_AVL_13HZ_VAL	0x03
+#define ST_PRESS_LPS001WP_PW_MASK		0x40
+#define ST_PRESS_LPS001WP_BDU_MASK		0x04
+#define ST_PRESS_LPS001WP_OUT_L_ADDR		0x28
+#define ST_TEMP_LPS001WP_OUT_L_ADDR		0x2a
+
+static const struct iio_chan_spec st_press_lsp331ap_channels[] = {
+	{
+		.type = IIO_PRESSURE,
+		.channel2 = IIO_NO_MOD,
+		.address = ST_PRESS_LPS331AP_OUT_XL_ADDR,
+		.scan_index = ST_SENSORS_SCAN_X,
+		.scan_type = {
+			.sign = 'u',
+			.realbits = 24,
+			.storagebits = 24,
+			.endianness = IIO_LE,
+		},
+		.info_mask_separate =
+			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
+		.modified = 0,
+	},
+	{
+		.type = IIO_TEMP,
+		.channel2 = IIO_NO_MOD,
+		.address = ST_TEMP_LPS331AP_OUT_L_ADDR,
+		.scan_index = -1,
+		.scan_type = {
+			.sign = 'u',
+			.realbits = 16,
+			.storagebits = 16,
+			.endianness = IIO_LE,
+		},
+		.info_mask_separate =
+			BIT(IIO_CHAN_INFO_RAW) |
+			BIT(IIO_CHAN_INFO_SCALE) |
+			BIT(IIO_CHAN_INFO_OFFSET),
+		.modified = 0,
+	},
+	IIO_CHAN_SOFT_TIMESTAMP(1)
+};
+
+static const struct iio_chan_spec st_press_lps001wp_channels[] = {
+	{
+		.type = IIO_PRESSURE,
+		.channel2 = IIO_NO_MOD,
+		.address = ST_PRESS_LPS001WP_OUT_L_ADDR,
+		.scan_index = ST_SENSORS_SCAN_X,
+		.scan_type = {
+			.sign = 'u',
+			.realbits = 16,
+			.storagebits = 16,
+			.endianness = IIO_LE,
+		},
+		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
+		.modified = 0,
+	},
+	{
+		.type = IIO_TEMP,
+		.channel2 = IIO_NO_MOD,
+		.address = ST_TEMP_LPS001WP_OUT_L_ADDR,
+		.scan_index = -1,
+		.scan_type = {
+			.sign = 'u',
+			.realbits = 16,
+			.storagebits = 16,
+			.endianness = IIO_LE,
+		},
+		.info_mask_separate =
+			BIT(IIO_CHAN_INFO_RAW) |
+			BIT(IIO_CHAN_INFO_OFFSET),
+		.modified = 0,
+	},
+	IIO_CHAN_SOFT_TIMESTAMP(1)
+};
+
+static const struct st_sensors st_press_sensors[] = {
+	{
+		.wai = ST_PRESS_LPS331AP_WAI_EXP,
+		.sensors_supported = {
+			[0] = LPS331AP_PRESS_DEV_NAME,
+		},
+		.ch = (struct iio_chan_spec *)st_press_lsp331ap_channels,
+		.num_ch = ARRAY_SIZE(st_press_lsp331ap_channels),
+		.odr = {
+			.addr = ST_PRESS_1_ODR_ADDR,
+			.mask = ST_PRESS_LPS331AP_ODR_MASK,
+			.odr_avl = {
+				{ 1, ST_PRESS_1_ODR_AVL_1HZ_VAL, },
+				{ 7, ST_PRESS_LPS331AP_ODR_AVL_7HZ_VAL, },
+				{ 13, ST_PRESS_LPS331AP_ODR_AVL_13HZ_VAL, },
+				{ 25, ST_PRESS_LPS331AP_ODR_AVL_25HZ_VAL, },
+			},
+		},
+		.pw = {
+			.addr = ST_PRESS_1_PW_ADDR,
+			.mask = ST_PRESS_LPS331AP_PW_MASK,
+			.value_on = ST_SENSORS_DEFAULT_POWER_ON_VALUE,
+			.value_off = ST_SENSORS_DEFAULT_POWER_OFF_VALUE,
+		},
+		.fs = {
+			.addr = ST_PRESS_LPS331AP_FS_ADDR,
+			.mask = ST_PRESS_LPS331AP_FS_MASK,
+			.fs_avl = {
+				[0] = {
+					.num = ST_PRESS_FS_AVL_1260MB,
+					.value = ST_PRESS_LPS331AP_FS_AVL_1260_VAL,
+					.gain = ST_PRESS_LPS331AP_FS_AVL_1260_GAIN,
+					.gain2 = ST_PRESS_LPS331AP_FS_AVL_TEMP_GAIN,
+				},
+			},
+		},
+		.bdu = {
+			.addr = ST_PRESS_1_BDU_ADDR,
+			.mask = ST_PRESS_LPS331AP_BDU_MASK,
+		},
+		.drdy_irq = {
+			.addr = ST_PRESS_LPS331AP_DRDY_IRQ_ADDR,
+			.mask = ST_PRESS_LPS331AP_DRDY_IRQ_MASK,
+		},
+		.multi_read_bit = ST_PRESS_1_MULTIREAD_BIT,
+		.bootime = 2,
+	},
+	{
+		.wai = ST_PRESS_LPS001WP_WAI_EXP,
+		.sensors_supported = {
+			[0] = LPS001WP_PRESS_DEV_NAME,
+		},
+		.ch = (struct iio_chan_spec *)st_press_lps001wp_channels,
+		.num_ch = ARRAY_SIZE(st_press_lps001wp_channels),
+		.odr = {
+			.addr = ST_PRESS_1_ODR_ADDR,
+			.mask = ST_PRESS_LPS001WP_ODR_MASK,
+			.odr_avl = {
+				{ 1, ST_PRESS_1_ODR_AVL_1HZ_VAL, },
+				{ 7, ST_PRESS_LPS001WP_ODR_AVL_7HZ_VAL, },
+				{ 13, ST_PRESS_LPS001WP_ODR_AVL_13HZ_VAL, },
+			},
+		},
+		.pw = {
+			.addr = ST_PRESS_1_PW_ADDR,
+			.mask = ST_PRESS_LPS001WP_PW_MASK,
+			.value_on = ST_SENSORS_DEFAULT_POWER_ON_VALUE,
+			.value_off = ST_SENSORS_DEFAULT_POWER_OFF_VALUE,
+		},
+		.fs = {
+			.addr = 0,
+		},
+		.bdu = {
+			.addr = ST_PRESS_1_BDU_ADDR,
+			.mask = ST_PRESS_LPS001WP_BDU_MASK,
+		},
+		.drdy_irq = {
+			.addr = 0,
+		},
+		.multi_read_bit = ST_PRESS_1_MULTIREAD_BIT,
+		.bootime = 2,
+	},
+};
 
 
-> +       if (IS_ERR(imx_data->pins_default)) {
-> +               err = PTR_ERR(imx_data->pins_default);
-> +               dev_err(mmc_dev(host->mmc), "could not get default state\n");
-> +               goto disable_clk;
-> +       }
-> +
->         host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
->
->         if (is_imx25_esdhc(imx_data) || is_imx35_esdhc(imx_data))
-> @@ -839,6 +930,23 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->                 break;
->         }
->
-> +       /* sdr50 and sdr104 needs work on 1.8v signal voltage */
-> +       if ((boarddata->support_vsel) && is_imx6q_usdhc(imx_data)) {
-> +               imx_data->pins_100mhz = pinctrl_lookup_state(imx_data->pinctrl,
-> +                                               ESDHC_PINCTRL_STATE_100MHZ);
-> +               imx_data->pins_200mhz = pinctrl_lookup_state(imx_data->pinctrl,
-> +                                               ESDHC_PINCTRL_STATE_200MHZ);
-> +               if (IS_ERR(imx_data->pins_100mhz) ||
-> +                               IS_ERR(imx_data->pins_200mhz)) {
-> +                       dev_warn(mmc_dev(host->mmc),
-> +                               "could not get ultra high speed state, work on normal mode\n");
-> +                       /* fall back to not support uhs by specify no 1.8v quirk */
-> +                       host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
-> +               }
-> +       } else {
-> +               host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
-> +       }
-> +
->         err = sdhci_add_host(host);
->         if (err)
->                 goto disable_clk;
-> diff --git a/include/linux/platform_data/mmc-esdhc-imx.h b/include/linux/platform_data/mmc-esdhc-imx.h
-> index d44912d..a0f5a8f 100644
-> --- a/include/linux/platform_data/mmc-esdhc-imx.h
-> +++ b/include/linux/platform_data/mmc-esdhc-imx.h
-> @@ -10,6 +10,8 @@
->  #ifndef __ASM_ARCH_IMX_ESDHC_H
->  #define __ASM_ARCH_IMX_ESDHC_H
->
-> +#include <linux/types.h>
-> +
->  enum wp_types {
->         ESDHC_WP_NONE,          /* no WP, neither controller nor gpio */
->         ESDHC_WP_CONTROLLER,    /* mmc controller internal WP */
-> @@ -32,6 +34,7 @@ enum cd_types {
->   * @cd_gpio:   gpio for card_detect interrupt
->   * @wp_type:   type of write_protect method (see wp_types enum above)
->   * @cd_type:   type of card_detect method (see cd_types enum above)
-> + * @support_vsel:  indicate it supports 1.8v switching
->   */
->
->  struct esdhc_platform_data {
-> @@ -41,5 +44,6 @@ struct esdhc_platform_data {
->         enum cd_types cd_type;
->         int max_bus_width;
->         unsigned int f_max;
-> +       bool support_vsel;
->  };
->  #endif /* __ASM_ARCH_IMX_ESDHC_H */
-> --
-> 1.7.1
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > -/* CUSTOM VALUES FOR SENSOR 1 */
+> > -#define ST_PRESS_1_WAI_EXP			0xbb
+> > -#define ST_PRESS_1_ODR_ADDR			0x20
+> > -#define ST_PRESS_1_ODR_MASK			0x70
+> > -#define ST_PRESS_1_ODR_AVL_1HZ_VAL		0x01
+> > -#define ST_PRESS_1_ODR_AVL_7HZ_VAL		0x05
+> > -#define ST_PRESS_1_ODR_AVL_13HZ_VAL		0x06
+> > -#define ST_PRESS_1_ODR_AVL_25HZ_VAL		0x07
+> > -#define ST_PRESS_1_PW_ADDR			0x20
+> > -#define ST_PRESS_1_PW_MASK			0x80
+> > -#define ST_PRESS_1_FS_ADDR			0x23
+> > -#define ST_PRESS_1_FS_MASK			0x30
+> > -#define ST_PRESS_1_FS_AVL_1260_VAL		0x00
+> > -#define ST_PRESS_1_FS_AVL_1260_GAIN		ST_PRESS_MBAR_TO_KPASCAL(244141)
+> > -#define ST_PRESS_1_FS_AVL_TEMP_GAIN		2083000
+> > -#define ST_PRESS_1_BDU_ADDR			0x20
+> > -#define ST_PRESS_1_BDU_MASK			0x04
+> > -#define ST_PRESS_1_DRDY_IRQ_ADDR		0x22
+> > -#define ST_PRESS_1_DRDY_IRQ_MASK		0x04
+> > -#define ST_PRESS_1_MULTIREAD_BIT		true
+> > -#define ST_PRESS_1_TEMP_OFFSET			42500
+> > +/* CUSTOM VALUES FOR LPS331AP SENSOR */
+> > +#define ST_PRESS_LPS331AP_WAI_EXP		0xbb
+> > +#define ST_PRESS_LPS331AP_ODR_ADDR		0x20
+> > +#define ST_PRESS_LPS331AP_ODR_MASK		0x70
+> > +#define ST_PRESS_LPS331AP_ODR_AVL_1HZ_VAL	0x01
+> > +#define ST_PRESS_LPS331AP_ODR_AVL_7HZ_VAL	0x05
+> > +#define ST_PRESS_LPS331AP_ODR_AVL_13HZ_VAL	0x06
+> > +#define ST_PRESS_LPS331AP_ODR_AVL_25HZ_VAL	0x07
+> > +#define ST_PRESS_LPS331AP_PW_ADDR		0x20
+> > +#define ST_PRESS_LPS331AP_PW_MASK		0x80
+> > +#define ST_PRESS_LPS331AP_FS_ADDR		0x23
+> > +#define ST_PRESS_LPS331AP_FS_MASK		0x30
+> > +#define ST_PRESS_LPS331AP_FS_AVL_1260_VAL	0x00
+> > +#define ST_PRESS_LPS331AP_FS_AVL_1260_GAIN	ST_PRESS_MBAR_TO_KPASCAL(244141)
+> > +#define ST_PRESS_LPS331AP_FS_AVL_TEMP_GAIN	2083000
+> > +#define ST_PRESS_LPS331AP_BDU_ADDR		0x20
+> > +#define ST_PRESS_LPS331AP_BDU_MASK		0x04
+> > +#define ST_PRESS_LPS331AP_DRDY_IRQ_ADDR		0x22
+> > +#define ST_PRESS_LPS331AP_DRDY_IRQ_MASK		0x04
+> > +#define ST_PRESS_LPS331AP_MULTIREAD_BIT		true
+> > +#define ST_PRESS_LPS331AP_TEMP_OFFSET		42500
+> > +#define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
+> > +#define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
+> >   
+> >   static const struct iio_chan_spec st_press_channels[] = {
+> >   	ST_SENSORS_LSM_CHANNELS(IIO_PRESSURE,
+> >   			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
+> >   			ST_SENSORS_SCAN_X, 0, IIO_NO_MOD, 'u', IIO_LE, 24, 24,
+> > -			ST_PRESS_DEFAULT_OUT_XL_ADDR),
+> > +			ST_PRESS_LPS331AP_OUT_XL_ADDR),
+> >   	ST_SENSORS_LSM_CHANNELS(IIO_TEMP,
+> >   			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE) |
+> >   						BIT(IIO_CHAN_INFO_OFFSET),
+> >   			-1, 0, IIO_NO_MOD, 's', IIO_LE, 16, 16,
+> > -			ST_TEMP_DEFAULT_OUT_L_ADDR),
+> > +			ST_TEMP_LPS331AP_OUT_L_ADDR),
+> >   	IIO_CHAN_SOFT_TIMESTAMP(1)
+> >   };
+> >   
+> >   static const struct st_sensors st_press_sensors[] = {
+> >   	{
+> > -		.wai = ST_PRESS_1_WAI_EXP,
+> > +		.wai = ST_PRESS_LPS331AP_WAI_EXP,
+> >   		.sensors_supported = {
+> >   			[0] = LPS331AP_PRESS_DEV_NAME,
+> >   		},
+> >   		.ch = (struct iio_chan_spec *)st_press_channels,
+> >   		.odr = {
+> > -			.addr = ST_PRESS_1_ODR_ADDR,
+> > -			.mask = ST_PRESS_1_ODR_MASK,
+> > +			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
+> > +			.mask = ST_PRESS_LPS331AP_ODR_MASK,
+> >   			.odr_avl = {
+> > -				{ 1, ST_PRESS_1_ODR_AVL_1HZ_VAL, },
+> > -				{ 7, ST_PRESS_1_ODR_AVL_7HZ_VAL, },
+> > -				{ 13, ST_PRESS_1_ODR_AVL_13HZ_VAL, },
+> > -				{ 25, ST_PRESS_1_ODR_AVL_25HZ_VAL, },
+> > +				{ 1, ST_PRESS_LPS331AP_ODR_AVL_1HZ_VAL, },
+> > +				{ 7, ST_PRESS_LPS331AP_ODR_AVL_7HZ_VAL, },
+> > +				{ 13, ST_PRESS_LPS331AP_ODR_AVL_13HZ_VAL, },
+> > +				{ 25, ST_PRESS_LPS331AP_ODR_AVL_25HZ_VAL, },
+> >   			},
+> >   		},
+> >   		.pw = {
+> > -			.addr = ST_PRESS_1_PW_ADDR,
+> > -			.mask = ST_PRESS_1_PW_MASK,
+> > +			.addr = ST_PRESS_LPS331AP_PW_ADDR,
+> > +			.mask = ST_PRESS_LPS331AP_PW_MASK,
+> >   			.value_on = ST_SENSORS_DEFAULT_POWER_ON_VALUE,
+> >   			.value_off = ST_SENSORS_DEFAULT_POWER_OFF_VALUE,
+> >   		},
+> >   		.fs = {
+> > -			.addr = ST_PRESS_1_FS_ADDR,
+> > -			.mask = ST_PRESS_1_FS_MASK,
+> > +			.addr = ST_PRESS_LPS331AP_FS_ADDR,
+> > +			.mask = ST_PRESS_LPS331AP_FS_MASK,
+> >   			.fs_avl = {
+> >   				[0] = {
+> >   					.num = ST_PRESS_FS_AVL_1260MB,
+> > -					.value = ST_PRESS_1_FS_AVL_1260_VAL,
+> > -					.gain = ST_PRESS_1_FS_AVL_1260_GAIN,
+> > -					.gain2 = ST_PRESS_1_FS_AVL_TEMP_GAIN,
+> > +					.value = ST_PRESS_LPS331AP_FS_AVL_1260_VAL,
+> > +					.gain = ST_PRESS_LPS331AP_FS_AVL_1260_GAIN,
+> > +					.gain2 = ST_PRESS_LPS331AP_FS_AVL_TEMP_GAIN,
+> >   				},
+> >   			},
+> >   		},
+> >   		.bdu = {
+> > -			.addr = ST_PRESS_1_BDU_ADDR,
+> > -			.mask = ST_PRESS_1_BDU_MASK,
+> > +			.addr = ST_PRESS_LPS331AP_BDU_ADDR,
+> > +			.mask = ST_PRESS_LPS331AP_BDU_MASK,
+> >   		},
+> >   		.drdy_irq = {
+> > -			.addr = ST_PRESS_1_DRDY_IRQ_ADDR,
+> > -			.mask = ST_PRESS_1_DRDY_IRQ_MASK,
+> > +			.addr = ST_PRESS_LPS331AP_DRDY_IRQ_ADDR,
+> > +			.mask = ST_PRESS_LPS331AP_DRDY_IRQ_MASK,
+> >   		},
+> > -		.multi_read_bit = ST_PRESS_1_MULTIREAD_BIT,
+> > +		.multi_read_bit = ST_PRESS_LPS331AP_MULTIREAD_BIT,
+> >   		.bootime = 2,
+> >   	},
+> >   };
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
