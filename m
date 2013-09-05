@@ -1,66 +1,50 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Thu, 5 Sep 2013 12:27:59 +0900
-Subject: [PATCH v5 4/5] ARM: tegra: set CPU reset handler with firmware op
-In-Reply-To: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
-References: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1378351680-14696-5-git-send-email-acourbot@nvidia.com>
+From: ethan@ethantuttle.com (Ethan Tuttle)
+Date: Wed, 4 Sep 2013 21:14:23 -0700
+Subject: [PATCH] net: mvneta: properly disable HW PHY polling and ensure
+ adjust_link() works
+In-Reply-To: <20130904163245.GI20552@1wt.eu>
+References: <1378304478-21237-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130904163245.GI20552@1wt.eu>
+Message-ID: <CACzLR4uDQK2bkcEJQXLe805EfSA8=eF+YH-FTYovHA0q+8Y9NA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a firmware operation to set the CPU reset handler and only resort to
-doing it ourselves if there is none defined.
+Just booted with the patch on my Mirabox.  Both interfaces work!
+Thank you Thomas.
 
-This supports the booting of secondary CPUs on devices using a TrustZone
-secure monitor.
+One remaining issue is that the interface which uBoot didn't configure
+is still getting a random mac address:
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/reset.c | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
+mvneta d0070000.ethernet eth0: Using hardware mac address f0:ad:4e:01:dc:97
+mvneta d0074000.ethernet eth1: Using random mac address d2:35:dd:c8:99:48
 
-diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index 6964117..fc9cf03 100644
---- a/arch/arm/mach-tegra/reset.c
-+++ b/arch/arm/mach-tegra/reset.c
-@@ -21,6 +21,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
-+#include <asm/firmware.h>
- 
- #include "iomap.h"
- #include "irammap.h"
-@@ -65,6 +66,7 @@ static void __init tegra_cpu_reset_handler_enable(void)
- 	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
- 	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
- 						tegra_cpu_reset_handler_offset;
-+	int err;
- 
- 	BUG_ON(is_enabled);
- 	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
-@@ -72,9 +74,18 @@ static void __init tegra_cpu_reset_handler_enable(void)
- 	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
- 			tegra_cpu_reset_handler_size);
- 
--	tegra_cpu_reset_handler_set(reset_address);
--
--	is_enabled = true;
-+	err = call_firmware_op(set_cpu_boot_addr, 0, reset_address);
-+	switch (err) {
-+	case -ENOSYS:
-+		tegra_cpu_reset_handler_set(reset_address);
-+		/* pass-through */
-+	case 0:
-+		is_enabled = true;
-+		break;
-+	default:
-+		pr_crit("Cannot set CPU reset handler: %d\n", err);
-+		BUG();
-+	}
- }
- 
- void __init tegra_cpu_reset_handler_init(void)
--- 
-1.8.4
+This is on 3.11 plus Thomas' patch, which includes the previous fix to
+"read MAC address from hardware when available".  Perhaps that fix
+isn't working with the phylib?
+
+Thanks again,
+
+Ethan
+
+On Wed, Sep 4, 2013 at 9:32 AM, Willy Tarreau <w@1wt.eu> wrote:
+>
+> Hi Thomas!
+>
+> On Wed, Sep 04, 2013 at 04:21:18PM +0200, Thomas Petazzoni wrote:
+> > This commit fixes a long-standing bug that has been reported by many
+> > users: on some Armada 370 platforms, only the network interface that
+> > has been used in U-Boot to tftp the kernel works properly in
+> > Linux. The other network interfaces can see a 'link up', but are
+> > unable to transmit data. The reports were generally made on the Armada
+> > 370-based Mirabox, but have also been given on the Armada 370-RD
+> > board.
+> (...)
+> > This patch has been tested on Armada 370 Mirabox, and now both network
+> > interfaces are usable after boot.
+>
+> Just as a complementary check, I can also confirm that the OpenBlocks
+> AX3 continues to work fine after this change.
+>
+> Best regards!
+> Willy
+>
