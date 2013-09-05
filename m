@@ -1,69 +1,61 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 5 Sep 2013 17:34:40 +0200
-Subject: [PATCH] pwm: pxa: add device tree support to pwm driver
-In-Reply-To: <5228A238.2090202@newsguy.com>
-References: <1378236233-15637-1-git-send-email-mikedunn@newsguy.com>
- <201309050011.01808.marex@denx.de> <5228A238.2090202@newsguy.com>
-Message-ID: <201309051734.40570.marex@denx.de>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Thu, 5 Sep 2013 17:29:48 +0200
+Subject: [PATCH 3/3] perf: parse the .debug_frame section in case
+ .eh_frame is not present
+In-Reply-To: <CAFrcx1koLAnNRBtpAhOoTP0SC-wWknY7ipUmcvnjxKqwDOUmag@mail.gmail.com>
+References: <1378317854-25965-1-git-send-email-jean.pihet@linaro.org>
+ <1378317854-25965-4-git-send-email-jean.pihet@linaro.org>
+ <20130905124508.GE9696@mudshark.cambridge.arm.com>
+ <CAORVsuW-1koTMaSMgjagBz1aJ0AtvVRiM5gs3kwO2Fuvk+DhwQ@mail.gmail.com>
+ <CAKv+Gu8u4PLVfng8ru4RFwA-+Ky0vYEP3V2=vecqndo5Z0sTJg@mail.gmail.com>
+ <20130905131910.GB22351@mudshark.cambridge.arm.com>
+ <CAFrcx1koLAnNRBtpAhOoTP0SC-wWknY7ipUmcvnjxKqwDOUmag@mail.gmail.com>
+Message-ID: <CAFrcx1=V7zRuK767RHCXbu99Mtf+VZrmv7_4mOn7Kb6B8cd2sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mike Dunn,
+Hi,
 
-> On 09/04/2013 03:11 PM, Marek Vasut wrote:
-> 
-> 
-> [...]
-> 
-> >>> What's that "secondary PWM" there? I no longer remember, sorry.
-> >> 
-> >> If pdev->id_entry->driver_data == HAS_SECONDARY_PWM, then
-> >> pwm_chip->npwm=2 when pwmchip_add() is called.  Otherwise
-> >> pwm_chip->npwm=1.  The driver knows that the second pwm's registers are
-> >> at a fixed offset from the first.  For compatibility, the pxa27x maps
-> >> the registers for the third pwm at a distant offset, and makes the
-> >> offset between 3 and 4 the same as between 1 and 2.  Yes, the driver
-> >> mkes this unnecessarily complicated. There should just be one device
-> >> instance per pwm, and dispense with the whole driver_data thing.  I
-> >> guess there's some history there.
-> > 
-> > OK, I checked the datasheet. The register block for PWM<n + 2> is at
-> > offset of 0x10 from PWM<n> , for n in {0, 1} .
-> > 
-> > Why can we not just register four PWM blocks, each with 0x10 register
-> > window size then? I know there's history (maybe), but then, with DT,
-> > this might go away.
-> 
-> Indeed.  That is what I am also thinking.
-> 
-> >>> The question
-> >>> remains still, we can have two entries there (pxa25x and pxa27x) ORR
-> >>> have one entry (pxa25x) + mrvl,has-secondary-pwm entry.
-> >> 
-> >> It looks like defining "compatible" properties that mirror the old
-> >> platform_device_id names won't fly...
-> > 
-> > Yes of course, this won't work. I didn't know the layout exactly.
-> > 
-> >> wildcards are verboten (see Sergei's
-> >> comment).  So your inclination to use one value for the "compatible"
-> >> property is correct.  I think the way to go is to forget the whole
-> >> HAS_SECONDARY_PWM in the DT case, have one device instance per pwm, and
-> >> use "compatible=marvell,pwm". Other suggestions welcome.
-> > 
-> > compatbile=marvell,pxa25x-pwm , no ? The lowest CPU with the block.
-> 
-> Unless I am missing something, the compatible string does not need to
-> replicate any of the existing platform_device_id names, so wouldn't
-> "marvell,pxa" be better?  Except for register mapping and the number of
-> units present on a particular pxa variant, the peripheral is software
-> compatible across all pxa processors.  Plus there is the problem of the
-> 'x' wildcard in "pxa25x-pwm".
+On 5 September 2013 15:33, Jean Pihet <jean.pihet@linaro.org> wrote:
+> On 5 September 2013 15:19, Will Deacon <will.deacon@arm.com> wrote:
+>> On Thu, Sep 05, 2013 at 02:17:30PM +0100, Ard Biesheuvel wrote:
+>>> On 5 September 2013 15:05, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+>>> [..]
+>>> > Here are the commands I have been using:
+>>> >  perf record -g dwarf -- <binary to profile>
+>>> >  perf report --sort symbol --call-graph --stdio
+>>> >
+>>>
+>>> Ah, I failed to add the 'dwarf' after -g, however, in that case, my
+>>> perf report segfaults:
+>>
+>> Same SEGV here.
+> Ouch! I never got the segfault on my side.
 
-So use pxa250 ?
+The segfault is caused by libunwind. With the latest version [1],
+dwarf unwinding works fine.
+Investigation on-going, more to come!
 
-My concern is once marvell comes up with PXA1048576 which will have a different 
-PWM unit, then what will be the name for this new one?
+[1] git://git.sv.gnu.org/libunwind.git
 
-Best regards,
-Marek Vasut
+Regards,
+Jean
+
+>
+> Here is the setup I am using:
+> - OMAP4 Pandaboard,
+> - 13.07 Ubuntu dist from http://www.linaro.org/downloads/,
+> - 3.11 mainline kernel + 3 patches for unwinding info,
+> - patched perf tool,
+> - dbg flavor of the libs installed. Without them installed I do not
+> get the address resolved but no segfaults
+>
+> Can you check if the linked libraries contain the .debug_frame
+> sections? (ldd; readelf -S /lib/arm-linux-gnueabihf/libc-2.17.so|grep
+> debug_frame; readelf -S
+> /usr/lib/debug/lib/arm-linux-gnueabihf/libc-2.17.so|grep debug_frame)?
+>
+>>
+>> Will
+>
+> Jean
