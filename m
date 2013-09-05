@@ -1,30 +1,47 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 5 Sep 2013 08:29:24 -0500
-Subject: [PATCH v2] ARM: highbank: fix debug uart virtual address for LPAE
-In-Reply-To: <20130902124828.GT6617@n2100.arm.linux.org.uk>
-References: <1376784748-31914-1-git-send-email-robherring2@gmail.com>
- <20130902124828.GT6617@n2100.arm.linux.org.uk>
-Message-ID: <CAL_JsqKugHadYcE498n_OA_fpJxsvU4ME2uVBnRX5-hpitVJnA@mail.gmail.com>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Thu, 5 Sep 2013 15:33:10 +0200
+Subject: [PATCH 3/3] perf: parse the .debug_frame section in case
+ .eh_frame is not present
+In-Reply-To: <20130905131910.GB22351@mudshark.cambridge.arm.com>
+References: <1378317854-25965-1-git-send-email-jean.pihet@linaro.org>
+ <1378317854-25965-4-git-send-email-jean.pihet@linaro.org>
+ <20130905124508.GE9696@mudshark.cambridge.arm.com>
+ <CAORVsuW-1koTMaSMgjagBz1aJ0AtvVRiM5gs3kwO2Fuvk+DhwQ@mail.gmail.com>
+ <CAKv+Gu8u4PLVfng8ru4RFwA-+Ky0vYEP3V2=vecqndo5Z0sTJg@mail.gmail.com>
+ <20130905131910.GB22351@mudshark.cambridge.arm.com>
+Message-ID: <CAFrcx1koLAnNRBtpAhOoTP0SC-wWknY7ipUmcvnjxKqwDOUmag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 2, 2013 at 7:48 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Aug 17, 2013 at 07:12:28PM -0500, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
+On 5 September 2013 15:19, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Sep 05, 2013 at 02:17:30PM +0100, Ard Biesheuvel wrote:
+>> On 5 September 2013 15:05, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+>> [..]
+>> > Here are the commands I have been using:
+>> >  perf record -g dwarf -- <binary to profile>
+>> >  perf report --sort symbol --call-graph --stdio
+>> >
 >>
->> Section entries are 2MB on LPAE, so the DEBUG_LL virtual address must
->> have the same offset in the 2MB section as the physical address. This
->> fixes async external aborts when DEBUG_LL is enabled on Midway.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> ---
->> v2: Rebase on Russell's DEBUG_LL clean-up
+>> Ah, I failed to add the 'dwarf' after -g, however, in that case, my
+>> perf report segfaults:
 >
-> Do you also want to do a patch for this for v3.11, because if it's wrong
-> in my series, it's wrong in mainline at the moment:
+> Same SEGV here.
+Ouch! I never got the segfault on my side.
 
-That would be v1 of my patch. There are other fixes needed for LPAE on
-Midway in 3.11, so this fix alone is not really needed.
+Here is the setup I am using:
+- OMAP4 Pandaboard,
+- 13.07 Ubuntu dist from http://www.linaro.org/downloads/,
+- 3.11 mainline kernel + 3 patches for unwinding info,
+- patched perf tool,
+- dbg flavor of the libs installed. Without them installed I do not
+get the address resolved but no segfaults
 
-Rob
+Can you check if the linked libraries contain the .debug_frame
+sections? (ldd; readelf -S /lib/arm-linux-gnueabihf/libc-2.17.so|grep
+debug_frame; readelf -S
+/usr/lib/debug/lib/arm-linux-gnueabihf/libc-2.17.so|grep debug_frame)?
+
+>
+> Will
+
+Jean
