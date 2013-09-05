@@ -1,19 +1,16 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 5 Sep 2013 15:05:57 +0200
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 5 Sep 2013 15:10:51 +0200
 Subject: [PATCH 3/3] perf: parse the .debug_frame section in case
  .eh_frame is not present
 In-Reply-To: <20130905124508.GE9696@mudshark.cambridge.arm.com>
 References: <1378317854-25965-1-git-send-email-jean.pihet@linaro.org>
  <1378317854-25965-4-git-send-email-jean.pihet@linaro.org>
  <20130905124508.GE9696@mudshark.cambridge.arm.com>
-Message-ID: <CAORVsuW-1koTMaSMgjagBz1aJ0AtvVRiM5gs3kwO2Fuvk+DhwQ@mail.gmail.com>
+Message-ID: <CAKv+Gu9ro-_LcxdxEg1wsAXzUeWqwbnqGd+nH-toe7hn-9iKMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-
-On Thu, Sep 5, 2013 at 2:45 PM, Will Deacon <will.deacon@arm.com> wrote:
+On 5 September 2013 14:45, Will Deacon <will.deacon@arm.com> wrote:
 > Hi Jean,
 >
 > [adding Michael, since I know he was interested in this]
@@ -25,35 +22,15 @@ On Thu, Sep 5, 2013 at 2:45 PM, Will Deacon <will.deacon@arm.com> wrote:
 >
 > How have you tested this? Regardless of whether or not I apply this patch, I
 > get the same (broken/truncated) callchains for userspace in perf report.
-Here are the commands I have been using:
- perf record -g dwarf -- <binary to profile>
- perf report --sort symbol --call-graph --stdio
+
+Same here: I have applied these patches against 3.11 running on a
+Calxeda Highbank, and I never get more than a single entry for the
+userland part of the call stack.
 
 >
 > E.g. the following stupid program (built with -O0 -g):
 >
-> --->8
->
-> void bar(void)
-> {
->         int i;
->         for (i = 0; i < 1000000; ++i)
->                 asm volatile("nop" ::: "memory");
-> }
->
-> void foo(void)
-> {
->         bar();
-> }
->
->
-> int main(void)
-> {
->         foo();
->         return 0;
-> }
->
-> 8<---
+[...]
 >
 > Gives me an incomplete callchain:
 >
@@ -63,34 +40,9 @@ Here are the commands I have been using:
 >      0.00%  unwindme  unwindme           [.] bar
 >             |
 >             --- bar
-I get the following with a simple stupid program with a long call chain:
-     0.57%  stress_bt  stress_bt          [.] foo_115
-            |
-            --- foo_115
-                foo_114
-                foo_113
-...
-                foo_92
-                bar
-                doit
-                main
-                __libc_start_main
-
-Things to check:
-- compile the binaries and libraries with -g (-dbg flavor of libs are
-usually ok),
-- use -g dwarf in perf record
-
-
-> This is the same with or without your patch.
 >
-> Will
 
-Thanks for testing!
-Jean
+I get exactly the same results, just bar and nothing below.
 
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Ard.
