@@ -1,33 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Sep 2013 17:05:36 +0100
-Subject: [PATCH v5 03/13] arm64: define DMA_ERROR_CODE
-In-Reply-To: <1377801154-29215-3-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
- <1377801154-29215-3-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130905160536.GH11887@arm.com>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Thu, 05 Sep 2013 09:07:50 -0700
+Subject: [PATCH] pwm: pxa: add device tree support to pwm driver
+In-Reply-To: <201309051734.40570.marex@denx.de>
+References: <1378236233-15637-1-git-send-email-mikedunn@newsguy.com>
+ <201309050011.01808.marex@denx.de> <5228A238.2090202@newsguy.com>
+ <201309051734.40570.marex@denx.de>
+Message-ID: <5228AC56.6020200@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 29, 2013 at 07:32:24PM +0100, Stefano Stabellini wrote:
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: catalin.marinas at arm.com
-> CC: will.deacon at arm.com
-> ---
->  arch/arm64/include/asm/dma-mapping.h |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+On 09/05/2013 08:34 AM, Marek Vasut wrote:
+>>>
+
+[...]
+
+
+>>> compatbile=marvell,pxa25x-pwm , no ? The lowest CPU with the block.
+>>
+>> Unless I am missing something, the compatible string does not need to
+>> replicate any of the existing platform_device_id names, so wouldn't
+>> "marvell,pxa" be better?  Except for register mapping and the number of
+>> units present on a particular pxa variant, the peripheral is software
+>> compatible across all pxa processors.  Plus there is the problem of the
+>> 'x' wildcard in "pxa25x-pwm".
 > 
-> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> index 8d18100..c2cb8a0 100644
-> --- a/arch/arm64/include/asm/dma-mapping.h
-> +++ b/arch/arm64/include/asm/dma-mapping.h
-> @@ -25,6 +25,7 @@
->  
->  #define ARCH_HAS_DMA_GET_REQUIRED_MASK
->  
-> +#define DMA_ERROR_CODE	(~0)
+> So use pxa250 ?
+> 
+> My concern is once marvell comes up with PXA1048576 which will have a different 
+> PWM unit, then what will be the name for this new one?
 
-I wonder why this isn't more generic. It looks like most (all?)
-architectures define it in the same way.
 
--- 
-Catalin
+I see.  OK then, pxa250 it is.
+
+Thanks Marek,
+Mike
