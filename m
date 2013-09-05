@@ -1,65 +1,58 @@
 From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Thu,  5 Sep 2013 14:54:45 +0530
-Subject: [PATCH 1/2] clocksource: mct: extend mct to support 8 local
- interrupts for Exynos5420
+Date: Thu,  5 Sep 2013 14:54:46 +0530
+Subject: [PATCH 2/2] arm: dt: Exynos5420: populate cpu node enteries to 8 cpus
 In-Reply-To: <1378373086-30676-1-git-send-email-chander.kashyap@linaro.org>
 References: <1378373086-30676-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1378373086-30676-2-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1378373086-30676-3-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5420 is octacore SoC from Samsung. Hence extend exynos-mct clocksource
-driver to support 8 local interrupts.
-
-Also extend dt entries for 8 interrupts.
+Exynos5420 is octacore SoC from samsung.
+Hence populate all the cpu node enteries.
 
 Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
 ---
- arch/arm/boot/dts/exynos5420.dtsi |    9 +++++++--
- drivers/clocksource/exynos_mct.c  |    4 ++++
- 2 files changed, 11 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/exynos5420.dtsi |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 6ce2f94..e97c87b 100644
+index e97c87b..59489f6 100644
 --- a/arch/arm/boot/dts/exynos5420.dtsi
 +++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -69,7 +69,8 @@
- 		compatible = "samsung,exynos4210-mct";
- 		reg = <0x101C0000 0x800>;
- 		interrupt-parent = <&mct_map>;
--		interrupts = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>;
-+		interrupts = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>,
-+				<8>, <9>, <10>, <11>;
- 		clocks = <&clock 1>, <&clock 315>;
- 		clock-names = "fin_pll", "mct";
- 
-@@ -84,7 +85,11 @@
- 					<4 &gic 0 120 0>,
- 					<5 &gic 0 121 0>,
- 					<6 &gic 0 122 0>,
--					<7 &gic 0 123 0>;
-+					<7 &gic 0 123 0>,
-+					<8 &gic 0 128 0>,
-+					<9 &gic 0 129 0>,
-+					<10 &gic 0 130 0>,
-+					<11 &gic 0 131 0>;
+@@ -57,6 +57,34 @@
+ 			reg = <0x3>;
+ 			clock-frequency = <1800000000>;
  		};
++
++		cpu4: cpu at 4 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x100>;
++			clock-frequency = <1000000000>;
++		};
++
++		cpu5: cpu at 5 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x101>;
++			clock-frequency = <1000000000>;
++		};
++
++		cpu6: cpu at 6 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x102>;
++			clock-frequency = <1000000000>;
++		};
++
++		cpu7: cpu at 7 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x103>;
++			clock-frequency = <1000000000>;
++		};
  	};
  
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index b2bbc41..ff4711e 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -71,6 +71,10 @@ enum {
- 	MCT_L1_IRQ,
- 	MCT_L2_IRQ,
- 	MCT_L3_IRQ,
-+	MCT_L4_IRQ,
-+	MCT_L5_IRQ,
-+	MCT_L6_IRQ,
-+	MCT_L7_IRQ,
- 	MCT_NR_IRQS,
- };
- 
+ 	clock: clock-controller at 0x10010000 {
 -- 
 1.7.9.5
