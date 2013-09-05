@@ -1,110 +1,316 @@
-From: denis.ciocca@st.com (Denis CIOCCA)
-Date: Thu, 5 Sep 2013 09:31:51 +0200
-Subject: [PATCH 06/11] iio: pressure-core: st: Expand and rename
- LPS331AP's channel descriptor
-In-Reply-To: <20130905072114.GD8980@lee--X1>
-References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
- <1378287103-21765-7-git-send-email-lee.jones@linaro.org>
- <522794F1.90301@st.com> <20130905072114.GD8980@lee--X1>
-Message-ID: <52283367.4070603@st.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 5 Sep 2013 09:33:06 +0200
+Subject: [PATCH 4/8] sdhci: sdhci-esdhci-imx: add sd3.0 clock tuning
+ support
+In-Reply-To: <1378299257-2980-5-git-send-email-b29396@freescale.com>
+References: <1378299257-2980-1-git-send-email-b29396@freescale.com>
+ <1378299257-2980-5-git-send-email-b29396@freescale.com>
+Message-ID: <CAPDyKFq+0vOUUPAdHjFn1fw_sBT+WOoaxgf1nC710p+0QonuuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 4 September 2013 14:54, Dong Aisheng <b29396@freescale.com> wrote:
+> Freescale i.MX6Q/DL uSDHC clock tuning progress is a little different from
+> the standard tuning process defined in host controller spec v3.0.
+> Thus we use platform_execute_tuning instead of standard sdhci tuning.
+>
+> The main difference are:
+> 1) not only generate Buffer Read Ready interrupt when tuning is performing.
+> It generates all other DATA interrupts like the normal data command.
+> 2) SDHCI_CTRL_EXEC_TUNING is not automatically cleared by HW,
+> instead it's controlled by SW.
+> 3) SDHCI_CTRL_TUNED_CLK is not automatically set by HW,
+> it's controlled by SW.
+> 4) the clock delay for every tuning is set by SW.
+>
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+>  drivers/mmc/host/sdhci-esdhc-imx.c |  194 +++++++++++++++++++++++++++++++++++-
+>  1 files changed, 193 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index 3118a82..36b9f63 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -34,9 +34,21 @@
+>  #define ESDHC_WTMK_LVL                 0x44
+>  #define ESDHC_MIX_CTRL                 0x48
+>  #define  ESDHC_MIX_CTRL_AC23EN         (1 << 7)
+> +#define  ESDHC_MIX_CTRL_EXE_TUNE       (1 << 22)
+> +#define  ESDHC_MIX_CTRL_SMPCLK_SEL     (1 << 23)
+> +#define  ESDHC_MIX_CTRL_AUTO_TUNE      (1 << 24)
+> +#define  ESDHC_MIX_CTRL_FBCLK_SEL      (1 << 25)
+>  /* Bits 3 and 6 are not SDHCI standard definitions */
+>  #define  ESDHC_MIX_CTRL_SDHCI_MASK     0xb7
+>
+> +/* tune control register */
+> +#define ESDHC_TUNE_CTRL_STATUS         0x68
+> +#define  ESDHC_TUNE_CTRL_STEP          1
+> +#define  ESDHC_TUNE_CTRL_MIN           0
+> +#define  ESDHC_TUNE_CTRL_MAX           ((1 << 7) - 1)
+> +
+> +#define ESDHC_TUNING_BLOCK_PATTERN_LEN 64
+> +
+>  /*
+>   * Our interpretation of the SDHCI_HOST_CONTROL register
+>   */
+> @@ -87,7 +99,7 @@ struct pltfm_imx_data {
+>                 MULTIBLK_IN_PROCESS, /* exact multiblock cmd in process */
+>                 WAIT_FOR_INT,        /* sent CMD12, waiting for response INT */
+>         } multiblock_status;
+> -
+> +       u32 uhs_mode;
+>  };
+>
+>  static struct platform_device_id imx_esdhc_devtype[] = {
+> @@ -161,6 +173,17 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
+>         struct pltfm_imx_data *imx_data = pltfm_host->priv;
+>         u32 val = readl(host->ioaddr + reg);
+>
+> +       if (unlikely(reg == SDHCI_PRESENT_STATE)) {
+> +               u32 fsl_prss = val;
+> +               val = 0;
+> +               /* save the least 20 bits */
+> +               val |= fsl_prss & 0x000FFFFF;
+> +               /* move dat[0-3] bits */
+> +               val |= (fsl_prss & 0x0F000000) >> 4;
+> +               /* move cmd line bit */
+> +               val |= (fsl_prss & 0x00800000) << 1;
+> +       }
+> +
+>         if (unlikely(reg == SDHCI_CAPABILITIES)) {
+>                 /* In FSL esdhc IC module, only bit20 is used to indicate the
+>                  * ADMA2 capability of esdhc, but this bit is messed up on
+> @@ -175,6 +198,17 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
+>                 }
+>         }
+>
+> +       if (unlikely(reg == SDHCI_CAPABILITIES_1) && is_imx6q_usdhc(imx_data))
+> +               val = SDHCI_SUPPORT_DDR50 | SDHCI_SUPPORT_SDR104
+> +                               | SDHCI_SUPPORT_SDR50;
+> +
+> +       if (unlikely(reg == SDHCI_MAX_CURRENT) && is_imx6q_usdhc(imx_data)) {
+> +               val = 0;
+> +               val |= 0xFF << SDHCI_MAX_CURRENT_330_SHIFT;
+> +               val |= 0xFF << SDHCI_MAX_CURRENT_300_SHIFT;
+> +               val |= 0xFF << SDHCI_MAX_CURRENT_180_SHIFT;
+> +       }
+> +
+>         if (unlikely(reg == SDHCI_INT_STATUS)) {
+>                 if (val & ESDHC_INT_VENDOR_SPEC_DMA_ERR) {
+>                         val &= ~ESDHC_INT_VENDOR_SPEC_DMA_ERR;
+> @@ -253,6 +287,8 @@ static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
+>  {
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>         struct pltfm_imx_data *imx_data = pltfm_host->priv;
+> +       u16 ret = 0;
+> +       u32 val;
+>
+>         if (unlikely(reg == SDHCI_HOST_VERSION)) {
+>                 reg ^= 2;
+> @@ -265,6 +301,25 @@ static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
+>                 }
+>         }
+>
+> +       if (unlikely(reg == SDHCI_HOST_CONTROL2)) {
+> +               val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
+> +               if (val & ESDHC_VENDOR_SPEC_VSELECT)
+> +                       ret |= SDHCI_CTRL_VDD_180;
+> +
+> +               if (is_imx6q_usdhc(imx_data)) {
+> +                       val = readl(host->ioaddr + ESDHC_MIX_CTRL);
+> +                       if (val & ESDHC_MIX_CTRL_EXE_TUNE)
+> +                               ret |= SDHCI_CTRL_EXEC_TUNING;
+> +                       if (val & ESDHC_MIX_CTRL_SMPCLK_SEL)
+> +                               ret |= SDHCI_CTRL_TUNED_CLK;
+> +               }
+> +
+> +               ret |= (imx_data->uhs_mode & SDHCI_CTRL_UHS_MASK);
+> +               ret &= ~SDHCI_CTRL_PRESET_VAL_ENABLE;
+> +
+> +               return ret;
+> +       }
+> +
+>         return readw(host->ioaddr + reg);
+>  }
+>
+> @@ -272,8 +327,32 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+>  {
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>         struct pltfm_imx_data *imx_data = pltfm_host->priv;
+> +       u32 new_val = 0;
+>
+>         switch (reg) {
+> +       case SDHCI_CLOCK_CONTROL:
+> +               new_val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
+> +               if (val & SDHCI_CLOCK_CARD_EN)
+> +                       new_val |= ESDHC_VENDOR_SPEC_FRC_SDCLK_ON;
+> +               else
+> +                       new_val &= ~ESDHC_VENDOR_SPEC_FRC_SDCLK_ON;
+> +                       writel(new_val, host->ioaddr + ESDHC_VENDOR_SPEC);
+> +               return;
+> +       case SDHCI_HOST_CONTROL2:
+> +               new_val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
+> +               if (val & SDHCI_CTRL_VDD_180)
+> +                       new_val |= ESDHC_VENDOR_SPEC_VSELECT;
+> +               else
+> +                       new_val &= ~ESDHC_VENDOR_SPEC_VSELECT;
+> +               writel(new_val, host->ioaddr + ESDHC_VENDOR_SPEC);
+> +               imx_data->uhs_mode = val & SDHCI_CTRL_UHS_MASK;
+> +               new_val = readl(host->ioaddr + ESDHC_MIX_CTRL);
+> +               if (val & SDHCI_CTRL_TUNED_CLK)
+> +                       new_val |= ESDHC_MIX_CTRL_SMPCLK_SEL;
+> +               else
+> +                       new_val &= ~ESDHC_MIX_CTRL_SMPCLK_SEL;
+> +               writel(new_val , host->ioaddr + ESDHC_MIX_CTRL);
+> +               return;
+>         case SDHCI_TRANSFER_MODE:
+>                 if ((imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
+>                                 && (host->cmd->opcode == SD_IO_RW_EXTENDED)
+> @@ -451,6 +530,118 @@ static int esdhc_pltfm_bus_width(struct sdhci_host *host, int width)
+>         return 0;
+>  }
+>
+> +static void esdhc_prepare_tuning(struct sdhci_host *host, u32 val)
+> +{
+> +       u32 reg;
+> +
+> +       reg = readl(host->ioaddr + ESDHC_MIX_CTRL);
+> +       reg |= ESDHC_MIX_CTRL_EXE_TUNE | ESDHC_MIX_CTRL_SMPCLK_SEL |
+> +                       ESDHC_MIX_CTRL_FBCLK_SEL;
+> +       writel(reg, host->ioaddr + ESDHC_MIX_CTRL);
+> +       writel((val << 8), host->ioaddr + ESDHC_TUNE_CTRL_STATUS);
+> +       dev_dbg(mmc_dev(host->mmc),
+> +               "tunning with delay 0x%x ESDHC_TUNE_CTRL_STATUS 0x%x\n",
+> +                       val, readl(host->ioaddr + ESDHC_TUNE_CTRL_STATUS));
+> +}
+> +
+> +static void request_done(struct mmc_request *mrq)
+> +{
+> +       complete(&mrq->completion);
+> +}
+> +
+> +static int esdhc_send_tuning_cmd(struct sdhci_host *host, u32 opcode)
 
->>> Due to the MACRO used, the task of reading, understanding and maintaining
->>> the LPS331AP's channel descriptor is substantially difficult. This patch
->>> is based on the view that it's better to have easy to read, maintainable
->>> code than to save a few lines here and there. For that reason we're
->>> expanding the array so initialisation is completed in full.
->> Also for this one, the channel names are general and can be shared
->> between different sensors. For the channel definition it's not a problem
->> for me, but I think it's not necessary adds all that code...
-> I'm not sure what you mean by this. Would you be kind enough to
-> explain it in a different way please?
-The channel name (in this case st_press_channels) is not only specific 
-for one sensor but can be shared. Ok in this driver now is used only for 
-the lps331ap but for example in accelerometer driver is used by several 
-sensors. It's possible in the future for new pressure sensors use the 
-same channels definition.
-The channel definition is intended the switch by macro 
-ST_SENSORS_LSM_CHANNELS to the full definition, for me is not a problem 
-but I think it's not necessary.
+This function implements protocol related code. It should not reside
+in a host driver but instead as an API in the mmc protocol layer which
+host drivers shall call.
 
-Denis
+I realize that there are already other host drivers implementing
+similar protocol code as here. Those should move to use the new API
+once it is available.
 
->>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>> ---
->>>    drivers/iio/pressure/st_pressure_core.c | 45 +++++++++++++++++++++++++--------
->>>    1 file changed, 34 insertions(+), 11 deletions(-)
->>>
->>> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
->>> index becfb25..7ba9299 100644
->>> --- a/drivers/iio/pressure/st_pressure_core.c
->>> +++ b/drivers/iio/pressure/st_pressure_core.c
->>> @@ -58,16 +58,39 @@
->>>    #define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
->>>    #define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
->>>    
->>> -static const struct iio_chan_spec st_press_channels[] = {
->>> -	ST_SENSORS_LSM_CHANNELS(IIO_PRESSURE,
->>> +static const struct iio_chan_spec st_press_lsp331ap_channels[] = {
->>> +	{
->>> +		.type = IIO_PRESSURE,
->>> +		.channel2 = IIO_NO_MOD,
->>> +		.address = ST_PRESS_LPS331AP_OUT_XL_ADDR,
->>> +		.scan_index = ST_SENSORS_SCAN_X,
->>> +		.scan_type = {
->>> +			.sign = 'u',
->>> +			.realbits = 24,
->>> +			.storagebits = 24,
->>> +			.endianness = IIO_LE,
->>> +		},
->>> +		.info_mask_separate =
->>>    			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
->>> -			ST_SENSORS_SCAN_X, 0, IIO_NO_MOD, 'u', IIO_LE, 24, 24,
->>> -			ST_PRESS_LPS331AP_OUT_XL_ADDR),
->>> -	ST_SENSORS_LSM_CHANNELS(IIO_TEMP,
->>> -			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE) |
->>> -						BIT(IIO_CHAN_INFO_OFFSET),
->>> -			-1, 0, IIO_NO_MOD, 's', IIO_LE, 16, 16,
->>> -			ST_TEMP_LPS331AP_OUT_L_ADDR),
->>> +		.modified = 0,
->>> +	},
->>> +	{
->>> +		.type = IIO_TEMP,
->>> +		.channel2 = IIO_NO_MOD,
->>> +		.address = ST_TEMP_LPS331AP_OUT_L_ADDR,
->>> +		.scan_index = -1,
->>> +		.scan_type = {
->>> +			.sign = 'u',
->>> +			.realbits = 16,
->>> +			.storagebits = 16,
->>> +			.endianness = IIO_LE,
->>> +		},
->>> +		.info_mask_separate =
->>> +			BIT(IIO_CHAN_INFO_RAW) |
->>> +			BIT(IIO_CHAN_INFO_SCALE) |
->>> +			BIT(IIO_CHAN_INFO_OFFSET),
->>> +		.modified = 0,
->>> +	},
->>>    	IIO_CHAN_SOFT_TIMESTAMP(1)
->>>    };
->>>    
->>> @@ -77,7 +100,7 @@ static const struct st_sensors st_press_sensors[] = {
->>>    		.sensors_supported = {
->>>    			[0] = LPS331AP_PRESS_DEV_NAME,
->>>    		},
->>> -		.ch = (struct iio_chan_spec *)st_press_channels,
->>> +		.ch = (struct iio_chan_spec *)st_press_lsp331ap_channels,
->>>    		.odr = {
->>>    			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
->>>    			.mask = ST_PRESS_LPS331AP_ODR_MASK,
->>> @@ -214,7 +237,7 @@ int st_press_common_probe(struct iio_dev *indio_dev)
->>>    	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
->>>    	pdata->multiread_bit = pdata->sensor->multi_read_bit;
->>>    	indio_dev->channels = pdata->sensor->ch;
->>> -	indio_dev->num_channels = ARRAY_SIZE(st_press_channels);
->>> +	indio_dev->num_channels = ARRAY_SIZE(st_press_lsp331ap_channels);
->>>    
->>>    	pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
->>>    						&pdata->sensor->fs.fs_avl[0];
+Kind regards
+Ulf Hansson
+
+> +{
+> +       struct mmc_command cmd = {0};
+> +       struct mmc_request mrq = {0};
+> +       struct mmc_data data = {0};
+> +       struct scatterlist sg;
+> +       char tuning_pattern[ESDHC_TUNING_BLOCK_PATTERN_LEN];
+> +
+> +       cmd.opcode = opcode;
+> +       cmd.arg = 0;
+> +       cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
+> +
+> +       data.blksz = ESDHC_TUNING_BLOCK_PATTERN_LEN;
+> +       data.blocks = 1;
+> +       data.flags = MMC_DATA_READ;
+> +       data.sg = &sg;
+> +       data.sg_len = 1;
+> +
+> +       sg_init_one(&sg, tuning_pattern, sizeof(tuning_pattern));
+> +
+> +       mrq.cmd = &cmd;
+> +       mrq.cmd->mrq = &mrq;
+> +       mrq.data = &data;
+> +       mrq.data->mrq = &mrq;
+> +       mrq.cmd->data = mrq.data;
+> +
+> +       mrq.done = request_done;
+> +       init_completion(&(mrq.completion));
+> +
+> +       disable_irq(host->irq);
+> +       spin_lock(&host->lock);
+> +       host->mrq = &mrq;
+> +
+> +       sdhci_send_command(host, mrq.cmd);
+> +
+> +       spin_unlock(&host->lock);
+> +       enable_irq(host->irq);
+> +
+> +       wait_for_completion(&mrq.completion);
+> +
+> +       if (cmd.error)
+> +               return cmd.error;
+> +       if (data.error)
+> +               return data.error;
+> +
+> +       return 0;
+> +}
+> +
+> +static void esdhc_post_tuning(struct sdhci_host *host)
+> +{
+> +       u32 reg;
+> +
+> +       reg = readl(host->ioaddr + ESDHC_MIX_CTRL);
+> +       reg &= ~ESDHC_MIX_CTRL_EXE_TUNE;
+> +       writel(reg, host->ioaddr + ESDHC_MIX_CTRL);
+> +}
+> +
+> +static int esdhc_executing_tuning(struct sdhci_host *host, u32 opcode)
+> +{
+> +       int min, max, avg, ret;
+> +
+> +       /* find the mininum delay first which can pass tuning*/
+> +       min = ESDHC_TUNE_CTRL_MIN;
+> +       while (min < ESDHC_TUNE_CTRL_MAX) {
+> +               esdhc_prepare_tuning(host, min);
+> +               if (!esdhc_send_tuning_cmd(host, opcode))
+> +                       break;
+> +               min += ESDHC_TUNE_CTRL_STEP;
+> +       }
+> +
+> +       /* find the maxinum delay which can not pass tuning*/
+> +       max = min + ESDHC_TUNE_CTRL_STEP;
+> +       while (max < ESDHC_TUNE_CTRL_MAX) {
+> +               esdhc_prepare_tuning(host, max);
+> +               if (esdhc_send_tuning_cmd(host, opcode)) {
+> +                       max -= ESDHC_TUNE_CTRL_STEP;
+> +                       break;
+> +               }
+> +               max += ESDHC_TUNE_CTRL_STEP;
+> +       }
+> +
+> +       /* use average delay to get the best timing */
+> +       avg = (min + max) / 2;
+> +       esdhc_prepare_tuning(host, avg);
+> +       ret = esdhc_send_tuning_cmd(host, opcode);
+> +       esdhc_post_tuning(host);
+> +
+> +       dev_dbg(mmc_dev(host->mmc), "tunning %s at 0x%x ret %d\n",
+> +               ret ? "failed" : "passed", avg, ret);
+> +
+> +       return ret;
+> +}
+> +
+>  static const struct sdhci_ops sdhci_esdhc_ops = {
+>         .read_l = esdhc_readl_le,
+>         .read_w = esdhc_readw_le,
+> @@ -462,6 +653,7 @@ static const struct sdhci_ops sdhci_esdhc_ops = {
+>         .get_min_clock = esdhc_pltfm_get_min_clock,
+>         .get_ro = esdhc_pltfm_get_ro,
+>         .platform_bus_width = esdhc_pltfm_bus_width,
+> +       .platform_execute_tuning = esdhc_executing_tuning,
+>  };
+>
+>  static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+> --
+> 1.7.1
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
