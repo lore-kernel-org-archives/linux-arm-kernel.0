@@ -1,108 +1,68 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 5 Sep 2013 08:21:14 +0100
-Subject: [PATCH 06/11] iio: pressure-core: st: Expand and rename
- LPS331AP's channel descriptor
-In-Reply-To: <522794F1.90301@st.com>
-References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
- <1378287103-21765-7-git-send-email-lee.jones@linaro.org>
- <522794F1.90301@st.com>
-Message-ID: <20130905072114.GD8980@lee--X1>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 5 Sep 2013 09:28:08 +0200
+Subject: [PATCH] net: mvneta: properly disable HW PHY polling and ensure
+ adjust_link() works
+In-Reply-To: <20130905051223.GB26000@1wt.eu>
+References: <1378304478-21237-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130904163245.GI20552@1wt.eu>
+ <CACzLR4uDQK2bkcEJQXLe805EfSA8=eF+YH-FTYovHA0q+8Y9NA@mail.gmail.com>
+ <20130905051223.GB26000@1wt.eu>
+Message-ID: <20130905092808.617da416@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Sep 2013, Denis CIOCCA wrote:
+Hello,
 
-> > Due to the MACRO used, the task of reading, understanding and maintaining
-> > the LPS331AP's channel descriptor is substantially difficult. This patch
-> > is based on the view that it's better to have easy to read, maintainable
-> > code than to save a few lines here and there. For that reason we're
-> > expanding the array so initialisation is completed in full.
-> Also for this one, the channel names are general and can be shared 
-> between different sensors. For the channel definition it's not a problem 
-> for me, but I think it's not necessary adds all that code...
+On Thu, 5 Sep 2013 07:12:23 +0200, Willy Tarreau wrote:
 
-I'm not sure what you mean by this. Would you be kind enough to
-explain it in a different way please?
+> > This is on 3.11 plus Thomas' patch, which includes the previous fix to
+> > "read MAC address from hardware when available".  Perhaps that fix
+> > isn't working with the phylib?
+> 
+> No this is unrelated. The MAC isn't configured by the boot loader when
+> the NIC is not used. U-boot only passes it as a non-standard ATAG. I
+> have some patches to reinject the non-standard atags into the device
+> tree if you absolutely need this, but they're not suited for mainline
+> inclusion from what I understood last time I proposed them (they use
+> a marvell-specific atag header).
 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >   drivers/iio/pressure/st_pressure_core.c | 45 +++++++++++++++++++++++++--------
-> >   1 file changed, 34 insertions(+), 11 deletions(-)
-> >
-> > diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
-> > index becfb25..7ba9299 100644
-> > --- a/drivers/iio/pressure/st_pressure_core.c
-> > +++ b/drivers/iio/pressure/st_pressure_core.c
-> > @@ -58,16 +58,39 @@
-> >   #define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
-> >   #define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
-> >   
-> > -static const struct iio_chan_spec st_press_channels[] = {
-> > -	ST_SENSORS_LSM_CHANNELS(IIO_PRESSURE,
-> > +static const struct iio_chan_spec st_press_lsp331ap_channels[] = {
-> > +	{
-> > +		.type = IIO_PRESSURE,
-> > +		.channel2 = IIO_NO_MOD,
-> > +		.address = ST_PRESS_LPS331AP_OUT_XL_ADDR,
-> > +		.scan_index = ST_SENSORS_SCAN_X,
-> > +		.scan_type = {
-> > +			.sign = 'u',
-> > +			.realbits = 24,
-> > +			.storagebits = 24,
-> > +			.endianness = IIO_LE,
-> > +		},
-> > +		.info_mask_separate =
-> >   			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
-> > -			ST_SENSORS_SCAN_X, 0, IIO_NO_MOD, 'u', IIO_LE, 24, 24,
-> > -			ST_PRESS_LPS331AP_OUT_XL_ADDR),
-> > -	ST_SENSORS_LSM_CHANNELS(IIO_TEMP,
-> > -			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE) |
-> > -						BIT(IIO_CHAN_INFO_OFFSET),
-> > -			-1, 0, IIO_NO_MOD, 's', IIO_LE, 16, 16,
-> > -			ST_TEMP_LPS331AP_OUT_L_ADDR),
-> > +		.modified = 0,
-> > +	},
-> > +	{
-> > +		.type = IIO_TEMP,
-> > +		.channel2 = IIO_NO_MOD,
-> > +		.address = ST_TEMP_LPS331AP_OUT_L_ADDR,
-> > +		.scan_index = -1,
-> > +		.scan_type = {
-> > +			.sign = 'u',
-> > +			.realbits = 16,
-> > +			.storagebits = 16,
-> > +			.endianness = IIO_LE,
-> > +		},
-> > +		.info_mask_separate =
-> > +			BIT(IIO_CHAN_INFO_RAW) |
-> > +			BIT(IIO_CHAN_INFO_SCALE) |
-> > +			BIT(IIO_CHAN_INFO_OFFSET),
-> > +		.modified = 0,
-> > +	},
-> >   	IIO_CHAN_SOFT_TIMESTAMP(1)
-> >   };
-> >   
-> > @@ -77,7 +100,7 @@ static const struct st_sensors st_press_sensors[] = {
-> >   		.sensors_supported = {
-> >   			[0] = LPS331AP_PRESS_DEV_NAME,
-> >   		},
-> > -		.ch = (struct iio_chan_spec *)st_press_channels,
-> > +		.ch = (struct iio_chan_spec *)st_press_lsp331ap_channels,
-> >   		.odr = {
-> >   			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
-> >   			.mask = ST_PRESS_LPS331AP_ODR_MASK,
-> > @@ -214,7 +237,7 @@ int st_press_common_probe(struct iio_dev *indio_dev)
-> >   	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
-> >   	pdata->multiread_bit = pdata->sensor->multi_read_bit;
-> >   	indio_dev->channels = pdata->sensor->ch;
-> > -	indio_dev->num_channels = ARRAY_SIZE(st_press_channels);
-> > +	indio_dev->num_channels = ARRAY_SIZE(st_press_lsp331ap_channels);
-> >   
-> >   	pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
-> >   						&pdata->sensor->fs.fs_avl[0];
+I indeed submitted a revised/improved version of your patches some time
+ago, but they were rejected. See
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173201.html.
+Since this has been rejected, the available options are:
 
+ (1) Use a DT-capable bootloader that will properly set the MAC
+     addresses in the DT. Such DT capable bootloaders will soon be made
+     available by Marvell, but I am really unsure Globalscale will
+     provide an update for the Mirabox bootloader, rebased on the new
+     Marvell bootloader that will be DT capable.
+
+     As an alternative, we (mainly Sebastian Hesselbarth and myself)
+     have started adding Armada 370/XP support in the Barebox
+     bootloader. We can already start Barebox on the Mirabox, but for
+     now it's quite useless since only the serial port is supported,
+     there is still no support for the network, SD card, USB or NAND.
+     This will probably come over time, but it's not going to happen
+     overnight.
+
+ (2) Use the "impedance matcher" code written by Daniel Mack and
+     extended by Jason Cooper, available at
+     https://github.com/zonque/pxa-impedance-matcher. Essentially, it
+     inserts a small binary between the installed bootloader and the
+     kernel, that for example allows to choose a particular DTB amongst
+     several, depending on the board that is detected. I believe it
+     could probably be extended to cover other use cases such as
+     modifying the DTB to add the MAC addresses where appropriate. I've
+     added Jason Cooper in the Cc list if he wants to comment on that.
+
+ (3) Continue to manually apply the patches from Willy that add support
+     for the Marvell-specific ATAGs.
+
+Best regards,
+
+Thomas
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
