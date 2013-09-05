@@ -1,77 +1,52 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 5 Sep 2013 11:14:04 +0800
-Subject: [PATCH 1/8] mmc: sdhci: add hooks for platform specific tuning
-In-Reply-To: <1378299257-2980-2-git-send-email-b29396@freescale.com>
-References: <1378299257-2980-1-git-send-email-b29396@freescale.com>
- <1378299257-2980-2-git-send-email-b29396@freescale.com>
-Message-ID: <20130905031401.GA775@shlinux1.ap.freescale.net>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Thu, 5 Sep 2013 12:27:55 +0900
+Subject: [PATCH v5 0/5] ARM: support for Trusted Foundations secure monitor
+Message-ID: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 04, 2013 at 08:54:10PM +0800, Dong Aisheng wrote:
-> The tuning of some platforms may not follow the standard host control
-> spec v3.0, e.g. Freescale uSDHC on i.MX6Q/DL.
-> Add a hook here to allow execute platform specific tuning instead of
-> standard host controller tuning.
-> 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> ---
->  drivers/mmc/host/sdhci.c |    8 ++++++++
->  drivers/mmc/host/sdhci.h |    1 +
->  2 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index dd2c083..2890cfd 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1875,6 +1875,14 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
->  		return 0;
->  	}
->  
-> +	if (host->ops->platform_execute_tuning) {
-> +		spin_unlock(&host->lock);
-> +		enable_irq(host->irq);
+After several rounds of reviews, this patchset should be close to maturity. This
+fifth version gathers the Reviewed-by tags, addresses the (hopefully) last
+issues, and seeks the Acked-bys of ARM maintainers to be merged, probably
+through the Tegra tree.
 
-Hmm, you want these two functions be called before
-platform_execute_tuning()?  That probably means you do not need to call
-spin_lock() and disable_irq() for platform_execute_tuning()?  In that
-case, can we not just put this platform hook at the beginning of the
-function, something like below?
+Changes since v4:
+- Added ifdefs to isolate open firmware-dependant code
+- Changed BUGS() into more appropriate calls to panic()
+- Fix hard-fail when TF support is not compiled in
+- Make Tegra documentation reference the TF binding
+- Tested extensively
 
-	host = mmc_priv(mmc);
+As there is no consensus on the matter, I have left the TF version in device
+tree as two separate nodes. Comments for or against this and references to prior
+practices regarding version handling in the device tree are welcome.
 
-	if (host->ops->platform_execute_tuning) {
-		sdhci_runtime_pm_get(host);
-		err = host->ops->platform_execute_tuning(host, opcode);
-		sdhci_runtime_pm_put(host);
-	}
+Alexandre Courbot (5):
+  ARM: add basic Trusted Foundations support
+  ARM: tegra: add support for Trusted Foundations
+  ARM: tegra: split setting of CPU reset handler
+  ARM: tegra: set CPU reset handler with firmware op
+  ARM: tegra: support Trusted Foundations by default
 
-I guess that's more clear to tell that platform_execute_tuning hook is
-there to replace sdhci_execute_tuning() completely.  Is it the case?
+ .../arm/firmware/tl,trusted-foundations.txt        | 17 +++++
+ Documentation/devicetree/bindings/arm/tegra.txt    |  5 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm/Kconfig                                   |  2 +
+ arch/arm/Makefile                                  |  1 +
+ arch/arm/configs/tegra_defconfig                   |  1 +
+ arch/arm/firmware/Kconfig                          | 25 +++++++
+ arch/arm/firmware/Makefile                         |  1 +
+ arch/arm/firmware/trusted_foundations.c            | 82 ++++++++++++++++++++++
+ arch/arm/include/asm/trusted_foundations.h         | 53 ++++++++++++++
+ arch/arm/mach-tegra/Kconfig                        |  1 +
+ arch/arm/mach-tegra/common.c                       |  2 +
+ arch/arm/mach-tegra/reset.c                        | 40 ++++++++---
+ 13 files changed, 220 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+ create mode 100644 arch/arm/firmware/Kconfig
+ create mode 100644 arch/arm/firmware/Makefile
+ create mode 100644 arch/arm/firmware/trusted_foundations.c
+ create mode 100644 arch/arm/include/asm/trusted_foundations.h
 
-Shawn
-
-> +		err = host->ops->platform_execute_tuning(host, opcode);
-> +		sdhci_runtime_pm_put(host);
-> +		return err;
-> +	}
-> +
->  	sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
->  
->  	/*
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index b037f18..976c14b 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -288,6 +288,7 @@ struct sdhci_ops {
->  	unsigned int    (*get_ro)(struct sdhci_host *host);
->  	void	(*platform_reset_enter)(struct sdhci_host *host, u8 mask);
->  	void	(*platform_reset_exit)(struct sdhci_host *host, u8 mask);
-> +	int	(*platform_execute_tuning)(struct sdhci_host *host, u32 opcode);
->  	int	(*set_uhs_signaling)(struct sdhci_host *host, unsigned int uhs);
->  	void	(*hw_reset)(struct sdhci_host *host);
->  	void	(*platform_suspend)(struct sdhci_host *host);
-> -- 
-> 1.7.1
-> 
-> 
+-- 
+1.8.4
