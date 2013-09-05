@@ -1,85 +1,29 @@
-From: sajjan.linux@gmail.com (Vikas Sajjan)
-Date: Thu, 5 Sep 2013 16:09:24 +0530
-Subject: [PATCH v2 2/2] arm: dt: Exynos5420: populate cpu node enteries to
- 8 cpus
-In-Reply-To: <1378376550-27762-3-git-send-email-chander.kashyap@linaro.org>
-References: <1378376550-27762-1-git-send-email-chander.kashyap@linaro.org>
- <1378376550-27762-3-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <CAGm_ybintHkLEOYUg=RN4gT8iDww2jyVdtbQZ3kvNbOcO8ewVw@mail.gmail.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 5 Sep 2013 13:42:56 +0300
+Subject: [PATCH 3/5] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
+ to the LRADC driver
+In-Reply-To: <201309051216.18305.jbe@pengutronix.de>
+References: <1378299706-6742-1-git-send-email-jbe@pengutronix.de>
+ <1378299706-6742-4-git-send-email-jbe@pengutronix.de>
+ <20130904142738.GH6329@mwanda>
+ <201309051216.18305.jbe@pengutronix.de>
+Message-ID: <20130905104256.GK6329@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chander,
+On Thu, Sep 05, 2013 at 12:16:18PM +0200, J?rgen Beisert wrote:
+> I like this simplification, but all the other drivers for the MXS series of 
+> SoCs don't use such a method. Do you think this "new style" will be accepted?
+> 
 
-On Thu, Sep 5, 2013 at 3:52 PM, Chander Kashyap
-<chander.kashyap@linaro.org> wrote:
-> Exynos5420 is octacore SoC from samsung.
-> Hence populate all the cpu node enteries.
->
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> ---
->  arch/arm/boot/dts/exynos5420.dtsi |   28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index e97c87b..0bd1a40 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -57,6 +57,34 @@
->                         reg = <0x3>;
->                         clock-frequency = <1800000000>;
->                 };
-> +
-> +               cpu4: cpu at 0x100 {
+My lradc_plate_mask() is basically the same idea as what Marek said
+about putting the logic into the define.
 
+LRADC....IRQ_MASK(id) (((id) == MX23) ? 0x1ff : 0x1fff)
 
-you are NOT suppose to use '0x' in dt node name.
-it should be  cpu4: cpu at 100 {
+I don't know why Marek is complaining about churn though.  This is
+linux!  We love churn!  And especially in staging, it's our favorite
+thing.  :P
 
-
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a7";
-> +                       reg = <0x100>;
-> +                       clock-frequency = <1000000000>;
-> +               };
-> +
-> +               cpu5: cpu at 0x101 {
-
-ditto.
-
-
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a7";
-> +                       reg = <0x101>;
-> +                       clock-frequency = <1000000000>;
-> +               };
-> +
-> +               cpu6: cpu at 0x102 {
-
-ditto.
-
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a7";
-> +                       reg = <0x102>;
-> +                       clock-frequency = <1000000000>;
-> +               };
-> +
-> +               cpu7: cpu at 0x103 {
-
-ditto.
-
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a7";
-> +                       reg = <0x103>;
-> +                       clock-frequency = <1000000000>;
-> +               };
->         };
->
->         clock: clock-controller at 0x10010000 {
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+regards,
+dan carpenter
