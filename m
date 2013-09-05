@@ -1,134 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 5 Sep 2013 14:43:13 +0800
-Subject: [PATCH 8/8] ARM: dts: imx6qdl: add uhs pinctrl state for usdhc3
-In-Reply-To: <1378299257-2980-9-git-send-email-b29396@freescale.com>
-References: <1378299257-2980-1-git-send-email-b29396@freescale.com>
- <1378299257-2980-9-git-send-email-b29396@freescale.com>
-Message-ID: <20130905064311.GE775@shlinux1.ap.freescale.net>
+From: ethan@ethantuttle.com (Ethan Tuttle)
+Date: Wed, 4 Sep 2013 23:52:48 -0700
+Subject: [PATCH] net: mvneta: properly disable HW PHY polling and ensure
+ adjust_link() works
+In-Reply-To: <20130905064036.GC26000@1wt.eu>
+References: <1378304478-21237-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130904163245.GI20552@1wt.eu>
+ <CACzLR4uDQK2bkcEJQXLe805EfSA8=eF+YH-FTYovHA0q+8Y9NA@mail.gmail.com>
+ <20130905051223.GB26000@1wt.eu>
+ <CACzLR4uCQhGzgABV2nMG45EQBNsrW8=j5X7x-=eTSUmSvthLxg@mail.gmail.com>
+ <ca521df880b08225cb34214e3ef0fc2c@cheny.fr>
+ <20130905064036.GC26000@1wt.eu>
+Message-ID: <CACzLR4s_aR--g-wGWHvJnoOdkLvjLm6fdcpMT6ARxS8D4-g6wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 04, 2013 at 08:54:17PM +0800, Dong Aisheng wrote:
-> This is needed for supporting ultra high speed cards like SD3.0 cards.
-> 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6dl.dtsi            |   33 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx6q.dtsi             |   33 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |    4 ++-
->  3 files changed, 69 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-> index 2b3ecd6..e983b81 100644
-> --- a/arch/arm/boot/dts/imx6dl.dtsi
-> +++ b/arch/arm/boot/dts/imx6dl.dtsi
-> @@ -203,6 +203,39 @@
->  							MX6DL_PAD_SD3_DAT3__SD3_DATA3 0x17059
->  						>;
->  					};
-> +
-> +                                       pinctrl_usdhc3_3: usdhc3grp-3 { /* 100Mhz */
-> +                                               fsl,pins = <
-> +                                                       MX6DL_PAD_SD3_CMD__SD3_CMD 0x170B9
-> +                                                       MX6DL_PAD_SD3_CLK__SD3_CLK 0x100B9
-> +                                                       MX6DL_PAD_SD3_DAT0__SD3_DATA0 0x170B9
-> +                                                       MX6DL_PAD_SD3_DAT1__SD3_DATA1 0x170B9
-> +                                                       MX6DL_PAD_SD3_DAT2__SD3_DATA2 0x170B9
-> +                                                       MX6DL_PAD_SD3_DAT3__SD3_DATA3 0x170B9
-> +                                                       MX6DL_PAD_SD3_DAT4__SD3_DATA4 0x170B9
-> +                                                       MX6DL_PAD_SD3_DAT5__SD3_DATA5 0x170B9
-> +                                                       MX6DL_PAD_SD3_DAT6__SD3_DATA6 0x170B9
-> +                                                       MX6DL_PAD_SD3_DAT7__SD3_DATA7 0x170B9
-> +                                                       MX6DL_PAD_GPIO_18__SD3_VSELECT 0x17059
+Works like a charm!  Thanks for sharing these.
 
-The patch needs to be rebased on my for-next, or linux-next or v3.12-rc1
-(to be available).  Also please use lowercase for hex values.
+It may be a while until an alternative to Marvell's uboot is available
+for the Mirabox, so it's a shame these patches won't be making it into
+the mainline kernel.
 
-Shawn
+Regards,
 
-> +                                               >;
-> +                                       };
-> +
-> +                                       pinctrl_usdhc3_4: usdhc3grp-4 { /* 200Mhz */
-> +                                               fsl,pins = <
-> +                                                       MX6DL_PAD_SD3_CMD__SD3_CMD 0x170F9
-> +                                                       MX6DL_PAD_SD3_CLK__SD3_CLK 0x100F9
-> +                                                       MX6DL_PAD_SD3_DAT0__SD3_DATA0 0x170F9
-> +                                                       MX6DL_PAD_SD3_DAT1__SD3_DATA1 0x170F9
-> +                                                       MX6DL_PAD_SD3_DAT2__SD3_DATA2 0x170F9
-> +                                                       MX6DL_PAD_SD3_DAT3__SD3_DATA3 0x170F9
-> +                                                       MX6DL_PAD_SD3_DAT4__SD3_DATA4 0x170F9
-> +                                                       MX6DL_PAD_SD3_DAT5__SD3_DATA5 0x170F9
-> +                                                       MX6DL_PAD_SD3_DAT6__SD3_DATA6 0x170F9
-> +                                                       MX6DL_PAD_SD3_DAT7__SD3_DATA7 0x170F9
-> +                                                       MX6DL_PAD_GPIO_18__SD3_VSELECT 0x17059
-> +                                               >;
-> +                                       };
-> +
->  				};
->  
->  				weim {
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index ba09dc3..a63b623 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -337,6 +337,39 @@
->  							MX6Q_PAD_SD3_DAT3__SD3_DATA3 0x17059
->  						>;
->  					};
-> +
-> +                                       pinctrl_usdhc3_3: usdhc3grp-3 { /* 100Mhz */
-> +                                               fsl,pins = <
-> +                                                       MX6Q_PAD_SD3_CMD__SD3_CMD 0x170B9
-> +                                                       MX6Q_PAD_SD3_CLK__SD3_CLK 0x100B9
-> +                                                       MX6Q_PAD_SD3_DAT0__SD3_DATA0 0x170B9
-> +                                                       MX6Q_PAD_SD3_DAT1__SD3_DATA1 0x170B9
-> +                                                       MX6Q_PAD_SD3_DAT2__SD3_DATA2 0x170B9
-> +                                                       MX6Q_PAD_SD3_DAT3__SD3_DATA3 0x170B9
-> +                                                       MX6Q_PAD_SD3_DAT4__SD3_DATA4 0x170B9
-> +                                                       MX6Q_PAD_SD3_DAT5__SD3_DATA5 0x170B9
-> +                                                       MX6Q_PAD_SD3_DAT6__SD3_DATA6 0x170B9
-> +                                                       MX6Q_PAD_SD3_DAT7__SD3_DATA7 0x170B9
-> +                                                       MX6Q_PAD_GPIO_18__SD3_VSELECT 0x17059
-> +                                               >;
-> +                                       };
-> +
-> +                                       pinctrl_usdhc3_4: usdhc3grp-4 { /* 200Mhz */
-> +                                               fsl,pins = <
-> +                                                       MX6Q_PAD_SD3_CMD__SD3_CMD 0x170F9
-> +                                                       MX6Q_PAD_SD3_CLK__SD3_CLK 0x100F9
-> +                                                       MX6Q_PAD_SD3_DAT0__SD3_DATA0 0x170F9
-> +                                                       MX6Q_PAD_SD3_DAT1__SD3_DATA1 0x170F9
-> +                                                       MX6Q_PAD_SD3_DAT2__SD3_DATA2 0x170F9
-> +                                                       MX6Q_PAD_SD3_DAT3__SD3_DATA3 0x170F9
-> +                                                       MX6Q_PAD_SD3_DAT4__SD3_DATA4 0x170F9
-> +                                                       MX6Q_PAD_SD3_DAT5__SD3_DATA5 0x170F9
-> +                                                       MX6Q_PAD_SD3_DAT6__SD3_DATA6 0x170F9
-> +                                                       MX6Q_PAD_SD3_DAT7__SD3_DATA7 0x170F9
-> +                                                       MX6Q_PAD_GPIO_18__SD3_VSELECT 0x17059
-> +                                               >;
-> +                                       };
-> +
->  				};
->  
->  				usdhc4 {
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> index e994011..c2c4d85 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> @@ -52,8 +52,10 @@
->  };
->  
->  &usdhc3 {
-> -	pinctrl-names = "default";
-> +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
->  	pinctrl-0 = <&pinctrl_usdhc3_1>;
-> +	pinctrl-1 = <&pinctrl_usdhc3_3>;
-> +	pinctrl-2 = <&pinctrl_usdhc3_4>;
->  	cd-gpios = <&gpio6 15 0>;
->  	wp-gpios = <&gpio1 13 0>;
->  	status = "okay";
-> -- 
-> 1.7.1
-> 
-> 
+Ethan
+
+On Wed, Sep 4, 2013 at 11:40 PM, Willy Tarreau <w@1wt.eu> wrote:
+> On Thu, Sep 05, 2013 at 08:23:12AM +0200, yves at cheny.fr wrote:
+>> Hi Willy,
+>> i would be interested too !
+>>
+>> thx
+>> Yves
+>>
+>> Le 2013-09-05 07:22, Ethan Tuttle a ?crit :
+>> >Understood.  Ultimately, I'll use this board as a router, and stable
+>> >mac addresses would be better than random.  So I would be interested
+>> >to try your atag -> device tree patches.  Have they been posted
+>> >somewhere I can find them?
+>
+> OK guys, here they come. Note that they're now simplified since the
+> eth* aliases have been added to the dts.
+>
+> Willy
+>
