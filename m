@@ -1,68 +1,55 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 5 Sep 2013 09:28:08 +0200
-Subject: [PATCH] net: mvneta: properly disable HW PHY polling and ensure
- adjust_link() works
-In-Reply-To: <20130905051223.GB26000@1wt.eu>
-References: <1378304478-21237-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130904163245.GI20552@1wt.eu>
- <CACzLR4uDQK2bkcEJQXLe805EfSA8=eF+YH-FTYovHA0q+8Y9NA@mail.gmail.com>
- <20130905051223.GB26000@1wt.eu>
-Message-ID: <20130905092808.617da416@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu,  5 Sep 2013 09:29:18 +0200
+Subject: [PATCH v2] ARM: omap2: throw the die id into the entropy pool
+Message-ID: <1378366158-31183-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Atleast eight bytes of this number are totally unique for the device
+it seems, so this is a perfect candidate for feeding the entropy
+pool. One byte more or less of constants does not matter so feed in
+the entire OID struct.
 
-On Thu, 5 Sep 2013 07:12:23 +0200, Willy Tarreau wrote:
+Cc: Theodore Ts'o <tytso@mit.edu>
+Cc: Paul Walmsley <paul@pwsan.com>
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Use omap_device_initcall() to avoid calling on non-OMAPs.
+---
+ arch/arm/mach-omap2/id.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-> > This is on 3.11 plus Thomas' patch, which includes the previous fix to
-> > "read MAC address from hardware when available".  Perhaps that fix
-> > isn't working with the phylib?
-> 
-> No this is unrelated. The MAC isn't configured by the boot loader when
-> the NIC is not used. U-boot only passes it as a non-standard ATAG. I
-> have some patches to reinject the non-standard atags into the device
-> tree if you absolutely need this, but they're not suited for mainline
-> inclusion from what I understood last time I proposed them (they use
-> a marvell-specific atag header).
-
-I indeed submitted a revised/improved version of your patches some time
-ago, but they were rejected. See
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173201.html.
-Since this has been rejected, the available options are:
-
- (1) Use a DT-capable bootloader that will properly set the MAC
-     addresses in the DT. Such DT capable bootloaders will soon be made
-     available by Marvell, but I am really unsure Globalscale will
-     provide an update for the Mirabox bootloader, rebased on the new
-     Marvell bootloader that will be DT capable.
-
-     As an alternative, we (mainly Sebastian Hesselbarth and myself)
-     have started adding Armada 370/XP support in the Barebox
-     bootloader. We can already start Barebox on the Mirabox, but for
-     now it's quite useless since only the serial port is supported,
-     there is still no support for the network, SD card, USB or NAND.
-     This will probably come over time, but it's not going to happen
-     overnight.
-
- (2) Use the "impedance matcher" code written by Daniel Mack and
-     extended by Jason Cooper, available at
-     https://github.com/zonque/pxa-impedance-matcher. Essentially, it
-     inserts a small binary between the installed bootloader and the
-     kernel, that for example allows to choose a particular DTB amongst
-     several, depending on the board that is detected. I believe it
-     could probably be extended to cover other use cases such as
-     modifying the DTB to add the MAC addresses where appropriate. I've
-     added Jason Cooper in the Cc list if he wants to comment on that.
-
- (3) Continue to manually apply the patches from Willy that add support
-     for the Marvell-specific ATAGs.
-
-Best regards,
-
-Thomas
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 2dc62a2..9260d09 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -18,6 +18,7 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/random.h>
+ #include <linux/slab.h>
+ 
+ #ifdef CONFIG_SOC_BUS
+@@ -130,6 +131,17 @@ void omap_get_die_id(struct omap_die_id *odi)
+ 	odi->id_3 = read_tap_reg(OMAP_TAP_DIE_ID_3);
+ }
+ 
++static int __init omap_feed_randpool(void)
++{
++	struct omap_die_id odi;
++
++	/* Throw the die ID into the entropy pool at boot */
++	omap_get_die_id(&odi);
++	add_device_randomness(&odi, sizeof(odi));
++	return 0;
++}
++omap_device_initcall(omap_feed_randpool);
++
+ void __init omap2xxx_check_revision(void)
+ {
+ 	int i, j;
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.1.4
