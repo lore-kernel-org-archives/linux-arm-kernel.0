@@ -1,118 +1,131 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 5 Sep 2013 10:26:59 +0200
-Subject: [PATCH] net: mvneta: properly disable HW PHY polling and ensure
- adjust_link() works
-In-Reply-To: <20130905074426.GD26000@1wt.eu>
-References: <1378304478-21237-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130904163245.GI20552@1wt.eu>
- <CACzLR4uDQK2bkcEJQXLe805EfSA8=eF+YH-FTYovHA0q+8Y9NA@mail.gmail.com>
- <20130905051223.GB26000@1wt.eu> <20130905092808.617da416@skate>
- <20130905074426.GD26000@1wt.eu>
-Message-ID: <20130905102659.25a0f064@skate>
+From: denis.ciocca@st.com (Denis CIOCCA)
+Date: Thu, 5 Sep 2013 10:35:35 +0200
+Subject: [PATCH 06/11] iio: pressure-core: st: Expand and rename
+ LPS331AP's channel descriptor
+In-Reply-To: <20130905075953.GF8980@lee--X1>
+References: <1378287103-21765-1-git-send-email-lee.jones@linaro.org>
+ <1378287103-21765-7-git-send-email-lee.jones@linaro.org>
+ <522794F1.90301@st.com> <20130905072114.GD8980@lee--X1>
+ <52283367.4070603@st.com> <20130905075953.GF8980@lee--X1>
+Message-ID: <52284257.5070802@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Willy Tarreau,
+Lee, I got your point. For me is ok...
 
-On Thu, 5 Sep 2013 09:44:26 +0200, Willy Tarreau wrote:
-
-> On Thu, Sep 05, 2013 at 09:28:08AM +0200, Thomas Petazzoni wrote:
-> > I indeed submitted a revised/improved version of your patches some time
-> > ago, but they were rejected. See
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173201.html.
-> 
-> Thanks for the link, that's indeed what I was referring to. Well, at least
-> the most boring part that constantly needed to be rebased was the DT patch.
-> Now it's much easier to keep the small remaining patches in one's local tree.
-
-Right.
-
-> > Since this has been rejected, the available options are:
-> > 
-> >  (1) Use a DT-capable bootloader that will properly set the MAC
-> >      addresses in the DT. Such DT capable bootloaders will soon be made
-> >      available by Marvell, but I am really unsure Globalscale will
-> >      provide an update for the Mirabox bootloader, rebased on the new
-> >      Marvell bootloader that will be DT capable.
-> 
-> One simpler solution for them could be to slightly modify the boot loader
-> so that it sets the MAC address on the two ethernet controllers prior to
-> boot. Then your code which checks if a MAC is already set will simply
-> work.
-
-This works when the network driver is compiled 'statically' inside the
-kernel. When compiled as a module, then the gatable clock of the
-network interface will be gated at the end of the kernel boot, before
-the mvneta module is probe. And gating the network interface clocks
-means that it will loose its state, including its MAC address. So it's
-not an entirely perfect solution either, but I admit that on such
-platforms, the network driver is most likely compiled statically, so it
-would probably suit the needs of most people.
-
-Note that this can be done without doing any change in the bootloader.
-For example, on a Mirabox, you can do:
-
-   mw.l 0xD0072414 0x5C93; mw.l 0xD0072418 0xF0AD4E01; mw.l 0xD0076414 0x5C94; mw.l 0xD0076418 0xF0AD4E01; bootm
-
-to boot your kernel. This will program the MAC addresses for both
-network interfaces in the network controllers, so that when booting
-Linux, you get:
-
-[   42.122881] mvneta d0070000.ethernet eth0: Using hardware mac address f0:ad:4e:01:5c:93
-[   42.385398] mvneta d0074000.ethernet eth1: Using hardware mac address f0:ad:4e:01:5c:94
-
-You add that to your default U-Boot boot script, and that's it, you
-have stable MAC addresses. Of course, as explained above, that doesn't
-work if you build mvneta as a module.
-
-> >      As an alternative, we (mainly Sebastian Hesselbarth and myself)
-> >      have started adding Armada 370/XP support in the Barebox
-> >      bootloader. We can already start Barebox on the Mirabox, but for
-> >      now it's quite useless since only the serial port is supported,
-> >      there is still no support for the network, SD card, USB or NAND.
-> >      This will probably come over time, but it's not going to happen
-> >      overnight.
-> 
-> And we must keep in mind that people are generally scared by boot loader
-> upgrades, especially when it's for a different one. At least on this
-> platform now we have a solution to reflash even after complete failures
-> so this is less of a problem.
-
-Right, with kwboot working very reliably on Mirabox, I believe this is
-not really an issue.
-
-> >  (2) Use the "impedance matcher" code written by Daniel Mack and
-> >      extended by Jason Cooper, available at
-> >      https://github.com/zonque/pxa-impedance-matcher. Essentially, it
-> >      inserts a small binary between the installed bootloader and the
-> >      kernel, that for example allows to choose a particular DTB amongst
-> >      several, depending on the board that is detected. I believe it
-> >      could probably be extended to cover other use cases such as
-> >      modifying the DTB to add the MAC addresses where appropriate. I've
-> >      added Jason Cooper in the Cc list if he wants to comment on that.
-> 
-> Could be a nice solution as well, indeed.
-> 
-> A last one would be to have the mvneta module accept an array of addresses
-> as a module parameter. This way it would just require a minor change in the
-> kernel's cmdline to pass the MAC addresses. I remember seeing this in the
-> past, I don't remember the platform (maybe the NSLU2 but I could be wrong).
-
-The situation of module parameters to pass MAC addresses was a bit
-fuzzy. There was once a proposal to add a generic kernel parameter to
-do this, but it was rejected by David Miller (I believe not on specific
-implementation details, but on the general idea). However, there are
-numerous drivers in the tree that do provide a custom module parameter
-to set MAC addresses.
-
-However, with the above suggestion of U-Boot scripting, I believe we
-have a relatively easy solution for people to use.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Denis
+> On Thu, 05 Sep 2013, Denis CIOCCA wrote:
+>
+>>>>> Due to the MACRO used, the task of reading, understanding and maintaining
+>>>>> the LPS331AP's channel descriptor is substantially difficult. This patch
+>>>>> is based on the view that it's better to have easy to read, maintainable
+>>>>> code than to save a few lines here and there. For that reason we're
+>>>>> expanding the array so initialisation is completed in full.
+>>>> Also for this one, the channel names are general and can be shared
+>>>> between different sensors. For the channel definition it's not a problem
+>>>> for me, but I think it's not necessary adds all that code...
+>>> I'm not sure what you mean by this. Would you be kind enough to
+>>> explain it in a different way please?
+>> The channel name (in this case st_press_channels) is not only specific
+>> for one sensor but can be shared. Ok in this driver now is used only for
+>> the lps331ap but for example in accelerometer driver is used by several
+>> sensors. It's possible in the future for new pressure sensors use the
+>> same channels definition.
+> Ah yes I see what you mean. Well as you say, for the moment, as
+> they're separated, this naming convention seems the most
+> appropriate. If we add anymore devices which share the definition, we
+> can pick the best naming convention for the situation I think. For
+> instance, I like that you've split the channels up into the number of
+> bits they support in the gyro and accel cases, so something of that
+> nature could be utilised if other device support is added.
+>
+>> The channel definition is intended the switch by macro
+>> ST_SENSORS_LSM_CHANNELS to the full definition, for me is not a problem
+>> but I think it's not necessary.
+> If you are familiar with the macro I guess you could get used to
+> working with it, but coming from in as a first time reader, adding a
+> new device was pretty difficult. I had to look up the macro in the
+> header file, then have the original struct open too and cross
+> reference in 3 different places. It's made even more difficult by the
+> macro being in a different order to the original struct.
+>
+> Now I've had time to work with it, I could probably work with it as
+> well. I was just thinking about helping out any new person that comes
+> along and tries to add support for a new sensor.
+>
+>>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>>>> ---
+>>>>>     drivers/iio/pressure/st_pressure_core.c | 45 +++++++++++++++++++++++++--------
+>>>>>     1 file changed, 34 insertions(+), 11 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
+>>>>> index becfb25..7ba9299 100644
+>>>>> --- a/drivers/iio/pressure/st_pressure_core.c
+>>>>> +++ b/drivers/iio/pressure/st_pressure_core.c
+>>>>> @@ -58,16 +58,39 @@
+>>>>>     #define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
+>>>>>     #define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
+>>>>>     
+>>>>> -static const struct iio_chan_spec st_press_channels[] = {
+>>>>> -	ST_SENSORS_LSM_CHANNELS(IIO_PRESSURE,
+>>>>> +static const struct iio_chan_spec st_press_lsp331ap_channels[] = {
+>>>>> +	{
+>>>>> +		.type = IIO_PRESSURE,
+>>>>> +		.channel2 = IIO_NO_MOD,
+>>>>> +		.address = ST_PRESS_LPS331AP_OUT_XL_ADDR,
+>>>>> +		.scan_index = ST_SENSORS_SCAN_X,
+>>>>> +		.scan_type = {
+>>>>> +			.sign = 'u',
+>>>>> +			.realbits = 24,
+>>>>> +			.storagebits = 24,
+>>>>> +			.endianness = IIO_LE,
+>>>>> +		},
+>>>>> +		.info_mask_separate =
+>>>>>     			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
+>>>>> -			ST_SENSORS_SCAN_X, 0, IIO_NO_MOD, 'u', IIO_LE, 24, 24,
+>>>>> -			ST_PRESS_LPS331AP_OUT_XL_ADDR),
+>>>>> -	ST_SENSORS_LSM_CHANNELS(IIO_TEMP,
+>>>>> -			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE) |
+>>>>> -						BIT(IIO_CHAN_INFO_OFFSET),
+>>>>> -			-1, 0, IIO_NO_MOD, 's', IIO_LE, 16, 16,
+>>>>> -			ST_TEMP_LPS331AP_OUT_L_ADDR),
+>>>>> +		.modified = 0,
+>>>>> +	},
+>>>>> +	{
+>>>>> +		.type = IIO_TEMP,
+>>>>> +		.channel2 = IIO_NO_MOD,
+>>>>> +		.address = ST_TEMP_LPS331AP_OUT_L_ADDR,
+>>>>> +		.scan_index = -1,
+>>>>> +		.scan_type = {
+>>>>> +			.sign = 'u',
+>>>>> +			.realbits = 16,
+>>>>> +			.storagebits = 16,
+>>>>> +			.endianness = IIO_LE,
+>>>>> +		},
+>>>>> +		.info_mask_separate =
+>>>>> +			BIT(IIO_CHAN_INFO_RAW) |
+>>>>> +			BIT(IIO_CHAN_INFO_SCALE) |
+>>>>> +			BIT(IIO_CHAN_INFO_OFFSET),
+>>>>> +		.modified = 0,
+>>>>> +	},
+>>>>>     	IIO_CHAN_SOFT_TIMESTAMP(1)
+>>>>>     };
+>>>>>     
+>>>>> @@ -77,7 +100,7 @@ static const struct st_sensors st_press_sensors[] = {
+>>>>>     		.sensors_supported = {
+>>>>>     			[0] = LPS331AP_PRESS_DEV_NAME,
+>>>>>     		},
+>>>>> -		.ch = (struct iio_chan_spec *)st_press_channels,
+>>>>> +		.ch = (struct iio_chan_spec *)st_press_lsp331ap_channels,
+>>>>>     		.odr = {
+>>>>>     			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
+>>>>>     			.mask = ST_PRESS_LPS331AP_ODR_MASK,
+>>>>> @@ -214,7 +237,7 @@ int st_press_common_probe(struct iio_dev *indio_dev)
+>>>>>     	pdata->num_data_channels = ST_PRESS_NUMBER_DATA_CHANNELS;
+>>>>>     	pdata->multiread_bit = pdata->sensor->multi_read_bit;
+>>>>>     	indio_dev->channels = pdata->sensor->ch;
+>>>>> -	indio_dev->num_channels = ARRAY_SIZE(st_press_channels);
+>>>>> +	indio_dev->num_channels = ARRAY_SIZE(st_press_lsp331ap_channels);
+>>>>>     
+>>>>>     	pdata->current_fullscale = (struct st_sensor_fullscale_avl *)
+>>>>>     						&pdata->sensor->fs.fs_avl[0];
