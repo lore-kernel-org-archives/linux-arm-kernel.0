@@ -1,82 +1,37 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Fri, 6 Sep 2013 02:01:31 +0800
-Subject: [PATCH 0/8] mmc: sdhci-esdhc-imx: add SD3.0 support
-In-Reply-To: <CAPDyKFprH0dixTojis63R0oho6CLaPuzSVDuPia6HWQ6cLYmNA@mail.gmail.com>
-References: <1378299257-2980-1-git-send-email-b29396@freescale.com>
- <CAPDyKFprH0dixTojis63R0oho6CLaPuzSVDuPia6HWQ6cLYmNA@mail.gmail.com>
-Message-ID: <CAA+hA=Sq0UfafVZNV3BXzXBy5Q0_gMXxG9iWgvT6easY7OtJGg@mail.gmail.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 5 Sep 2013 21:15:56 +0300
+Subject: [PATCH 3/5] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
+ to the LRADC driver
+In-Reply-To: <201309051251.39877.marex@denx.de>
+References: <1378299706-6742-1-git-send-email-jbe@pengutronix.de>
+ <201309051216.18305.jbe@pengutronix.de>
+ <20130905104256.GK6329@mwanda> <201309051251.39877.marex@denx.de>
+Message-ID: <20130905181556.GU19256@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Since I work in staging I review hundreds of churn patches per cycle.
+One thing which helps me is my rename_rev.pl script (attached).
 
-On Thu, Sep 5, 2013 at 3:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 4 September 2013 14:54, Dong Aisheng <b29396@freescale.com> wrote:
->> This patch series add SD3.0 support for i.MX6Q/DL.
->> Since freescale i.MX6Q/DL uSDHC clock tuning progress is a little different from
->> the standard tuning process defined in host controller spec v3.0.
->> So we add a hook to allow execute platform specific tuning instead of
->> standard host controller tuning.
->>
->> The main difference are:
->> 1) not only generate Buffer Read Ready interrupt when tuning is performing.
->> It generates all other DATA interrupts like the normal data command.
->> 2) SDHCI_CTRL_EXEC_TUNING is not automatically cleared by HW,
->> instead it's controlled by SW.
->> 3) SDHCI_CTRL_TUNED_CLK is not automatically set by HW,
->> it's controlled by SW.
->> 4) the clock delay for every tuning is set by SW.
->
-> An overall question. Do you have any thoughts around periodic/idle
-> re-tuning. It is has nothing directly to do with this patchset, but
-> since you implemented the tuning sequence here, maybe you have some
-> thoughts around it?
->
+So if I get a patch like the one I'm about to send which introduces
+lradc_reg_set/clear() functions, then I can do this:
 
-It seems sdhci already implements re-tuning mode1 based on timer.
-The i.MX6 supports auto-retuning, so we may not use timer
-based(periodic) re-tuning.
-I plan to add auto-retuning support based on standard host
-controller spec into sdhci driver later if no one else does it.
+cat diff | rename_rev.pl -ea 's/,\n/,/' | \
+	rename_rev.pl -e 's/writel\((.*?),\s+lradc->base \+ (.*?) .*SET\)/lradc_reg_set(lradc, $1, $2)/' \
+		      -e 's/writel\((.*?),\s+lradc->base \+ (.*?) .*CLR\)/lradc_reg_clear(lradc, $1, $2)/'
 
-Regards
-Dong Aisheng
+It simplifies the patch down to its most minimal form.
 
-> Kind regards
-> Ulf Hansson
->
->>
->> Tested on i.MX6Q Sabreauto board.
->>
->> The series is based on latest Linus tree.
->>
->> Dong Aisheng (8):
->>   mmc: sdhci: add hooks for platform specific tuning
->>   mmc: sdhci: allow platform access of sdhci_send_command
->>   sdhci: sdhci-esdhc-imx: support real clock on and off for imx6q
->>   sdhci: sdhci-esdhci-imx: add sd3.0 clock tuning support
->>   sdhci: sdhci-esdhc-imx: change pinctrl state according to uhs mode
->>   mmc: sdhci-esdhc: correct pre_div for imx6q
->>   mmc: sdhci-esdhc: set actual_clock in clock setting
->>   ARM: dts: imx6qdl: add uhs pinctrl state for usdhc3
->>
->>  arch/arm/boot/dts/imx6dl.dtsi               |   33 +++
->>  arch/arm/boot/dts/imx6q.dtsi                |   33 +++
->>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi    |    4 +-
->>  drivers/mmc/host/sdhci-esdhc-imx.c          |  307 ++++++++++++++++++++++++++-
->>  drivers/mmc/host/sdhci-esdhc.h              |   35 +++-
->>  drivers/mmc/host/sdhci.c                    |   12 +-
->>  drivers/mmc/host/sdhci.h                    |    3 +
->>  include/linux/platform_data/mmc-esdhc-imx.h |    4 +
->>  8 files changed, 419 insertions(+), 12 deletions(-)
->>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I should probably automate the first part which strips out some
+line breaks...  I'll post a new version of rename_rev.pl to LKML soon.
+
+regards,
+dan carpenter
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: rename_rev.pl
+Type: text/x-perl
+Size: 4221 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130905/edde38f4/attachment.bin>
