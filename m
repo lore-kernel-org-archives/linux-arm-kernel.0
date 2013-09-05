@@ -1,148 +1,65 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 5 Sep 2013 23:09:27 +0800
-Subject: [PATCH 8/8] ARM: dts: imx6qdl: add uhs pinctrl state for usdhc3
-In-Reply-To: <20130905064311.GE775@shlinux1.ap.freescale.net>
-References: <1378299257-2980-1-git-send-email-b29396@freescale.com>
- <1378299257-2980-9-git-send-email-b29396@freescale.com>
- <20130905064311.GE775@shlinux1.ap.freescale.net>
-Message-ID: <CAA+hA=T=wJiY6H52Ym-0pGD5opfvYwiAVcTx+QBREctcyEZN3w@mail.gmail.com>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Thu, 05 Sep 2013 08:24:40 -0700
+Subject: [PATCH] pwm: pxa: add device tree support to pwm driver
+In-Reply-To: <201309050011.01808.marex@denx.de>
+References: <1378236233-15637-1-git-send-email-mikedunn@newsguy.com>
+ <201309041635.26695.marex@denx.de> <522754A3.8010602@newsguy.com>
+ <201309050011.01808.marex@denx.de>
+Message-ID: <5228A238.2090202@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 5, 2013 at 2:43 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Wed, Sep 04, 2013 at 08:54:17PM +0800, Dong Aisheng wrote:
->> This is needed for supporting ultra high speed cards like SD3.0 cards.
->>
->> Signed-off-by: Dong Aisheng <b29396@freescale.com>
->> ---
->>  arch/arm/boot/dts/imx6dl.dtsi            |   33 ++++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/imx6q.dtsi             |   33 ++++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |    4 ++-
->>  3 files changed, 69 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
->> index 2b3ecd6..e983b81 100644
->> --- a/arch/arm/boot/dts/imx6dl.dtsi
->> +++ b/arch/arm/boot/dts/imx6dl.dtsi
->> @@ -203,6 +203,39 @@
->>                                                       MX6DL_PAD_SD3_DAT3__SD3_DATA3 0x17059
->>                                               >;
->>                                       };
->> +
->> +                                       pinctrl_usdhc3_3: usdhc3grp-3 { /* 100Mhz */
->> +                                               fsl,pins = <
->> +                                                       MX6DL_PAD_SD3_CMD__SD3_CMD 0x170B9
->> +                                                       MX6DL_PAD_SD3_CLK__SD3_CLK 0x100B9
->> +                                                       MX6DL_PAD_SD3_DAT0__SD3_DATA0 0x170B9
->> +                                                       MX6DL_PAD_SD3_DAT1__SD3_DATA1 0x170B9
->> +                                                       MX6DL_PAD_SD3_DAT2__SD3_DATA2 0x170B9
->> +                                                       MX6DL_PAD_SD3_DAT3__SD3_DATA3 0x170B9
->> +                                                       MX6DL_PAD_SD3_DAT4__SD3_DATA4 0x170B9
->> +                                                       MX6DL_PAD_SD3_DAT5__SD3_DATA5 0x170B9
->> +                                                       MX6DL_PAD_SD3_DAT6__SD3_DATA6 0x170B9
->> +                                                       MX6DL_PAD_SD3_DAT7__SD3_DATA7 0x170B9
->> +                                                       MX6DL_PAD_GPIO_18__SD3_VSELECT 0x17059
->
-> The patch needs to be rebased on my for-next, or linux-next or v3.12-rc1
-> (to be available).  Also please use lowercase for hex values.
->
+On 09/04/2013 03:11 PM, Marek Vasut wrote:
+>>>
 
-Okay, got it.
+[...]
 
-Regards
-Dong Aisheng
+>>> What's that "secondary PWM" there? I no longer remember, sorry.
+>>
+>> If pdev->id_entry->driver_data == HAS_SECONDARY_PWM, then pwm_chip->npwm=2
+>> when pwmchip_add() is called.  Otherwise pwm_chip->npwm=1.  The driver
+>> knows that the second pwm's registers are at a fixed offset from the
+>> first.  For compatibility, the pxa27x maps the registers for the third pwm
+>> at a distant offset, and makes the offset between 3 and 4 the same as
+>> between 1 and 2.  Yes, the driver mkes this unnecessarily complicated. 
+>> There should just be one device instance per pwm, and dispense with the
+>> whole driver_data thing.  I guess there's some history there.
+> 
+> OK, I checked the datasheet. The register block for PWM<n + 2> is at offset of 
+> 0x10 from PWM<n> , for n in {0, 1} .
+> 
+> Why can we not just register four PWM blocks, each with 0x10 register window 
+> size then? I know there's history (maybe), but then, with DT, this might go 
+> away.
 
-> Shawn
->
->> +                                               >;
->> +                                       };
->> +
->> +                                       pinctrl_usdhc3_4: usdhc3grp-4 { /* 200Mhz */
->> +                                               fsl,pins = <
->> +                                                       MX6DL_PAD_SD3_CMD__SD3_CMD 0x170F9
->> +                                                       MX6DL_PAD_SD3_CLK__SD3_CLK 0x100F9
->> +                                                       MX6DL_PAD_SD3_DAT0__SD3_DATA0 0x170F9
->> +                                                       MX6DL_PAD_SD3_DAT1__SD3_DATA1 0x170F9
->> +                                                       MX6DL_PAD_SD3_DAT2__SD3_DATA2 0x170F9
->> +                                                       MX6DL_PAD_SD3_DAT3__SD3_DATA3 0x170F9
->> +                                                       MX6DL_PAD_SD3_DAT4__SD3_DATA4 0x170F9
->> +                                                       MX6DL_PAD_SD3_DAT5__SD3_DATA5 0x170F9
->> +                                                       MX6DL_PAD_SD3_DAT6__SD3_DATA6 0x170F9
->> +                                                       MX6DL_PAD_SD3_DAT7__SD3_DATA7 0x170F9
->> +                                                       MX6DL_PAD_GPIO_18__SD3_VSELECT 0x17059
->> +                                               >;
->> +                                       };
->> +
->>                               };
+
+Indeed.  That is what I am also thinking.
+
+
+> 
+>>> The question
+>>> remains still, we can have two entries there (pxa25x and pxa27x) ORR have
+>>> one entry (pxa25x) + mrvl,has-secondary-pwm entry.
 >>
->>                               weim {
->> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
->> index ba09dc3..a63b623 100644
->> --- a/arch/arm/boot/dts/imx6q.dtsi
->> +++ b/arch/arm/boot/dts/imx6q.dtsi
->> @@ -337,6 +337,39 @@
->>                                                       MX6Q_PAD_SD3_DAT3__SD3_DATA3 0x17059
->>                                               >;
->>                                       };
->> +
->> +                                       pinctrl_usdhc3_3: usdhc3grp-3 { /* 100Mhz */
->> +                                               fsl,pins = <
->> +                                                       MX6Q_PAD_SD3_CMD__SD3_CMD 0x170B9
->> +                                                       MX6Q_PAD_SD3_CLK__SD3_CLK 0x100B9
->> +                                                       MX6Q_PAD_SD3_DAT0__SD3_DATA0 0x170B9
->> +                                                       MX6Q_PAD_SD3_DAT1__SD3_DATA1 0x170B9
->> +                                                       MX6Q_PAD_SD3_DAT2__SD3_DATA2 0x170B9
->> +                                                       MX6Q_PAD_SD3_DAT3__SD3_DATA3 0x170B9
->> +                                                       MX6Q_PAD_SD3_DAT4__SD3_DATA4 0x170B9
->> +                                                       MX6Q_PAD_SD3_DAT5__SD3_DATA5 0x170B9
->> +                                                       MX6Q_PAD_SD3_DAT6__SD3_DATA6 0x170B9
->> +                                                       MX6Q_PAD_SD3_DAT7__SD3_DATA7 0x170B9
->> +                                                       MX6Q_PAD_GPIO_18__SD3_VSELECT 0x17059
->> +                                               >;
->> +                                       };
->> +
->> +                                       pinctrl_usdhc3_4: usdhc3grp-4 { /* 200Mhz */
->> +                                               fsl,pins = <
->> +                                                       MX6Q_PAD_SD3_CMD__SD3_CMD 0x170F9
->> +                                                       MX6Q_PAD_SD3_CLK__SD3_CLK 0x100F9
->> +                                                       MX6Q_PAD_SD3_DAT0__SD3_DATA0 0x170F9
->> +                                                       MX6Q_PAD_SD3_DAT1__SD3_DATA1 0x170F9
->> +                                                       MX6Q_PAD_SD3_DAT2__SD3_DATA2 0x170F9
->> +                                                       MX6Q_PAD_SD3_DAT3__SD3_DATA3 0x170F9
->> +                                                       MX6Q_PAD_SD3_DAT4__SD3_DATA4 0x170F9
->> +                                                       MX6Q_PAD_SD3_DAT5__SD3_DATA5 0x170F9
->> +                                                       MX6Q_PAD_SD3_DAT6__SD3_DATA6 0x170F9
->> +                                                       MX6Q_PAD_SD3_DAT7__SD3_DATA7 0x170F9
->> +                                                       MX6Q_PAD_GPIO_18__SD3_VSELECT 0x17059
->> +                                               >;
->> +                                       };
->> +
->>                               };
->>
->>                               usdhc4 {
->> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
->> index e994011..c2c4d85 100644
->> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
->> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
->> @@ -52,8 +52,10 @@
->>  };
->>
->>  &usdhc3 {
->> -     pinctrl-names = "default";
->> +     pinctrl-names = "default", "state_100mhz", "state_200mhz";
->>       pinctrl-0 = <&pinctrl_usdhc3_1>;
->> +     pinctrl-1 = <&pinctrl_usdhc3_3>;
->> +     pinctrl-2 = <&pinctrl_usdhc3_4>;
->>       cd-gpios = <&gpio6 15 0>;
->>       wp-gpios = <&gpio1 13 0>;
->>       status = "okay";
->> --
->> 1.7.1
->>
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> It looks like defining "compatible" properties that mirror the old
+>> platform_device_id names won't fly...
+> 
+> Yes of course, this won't work. I didn't know the layout exactly.
+> 
+>> wildcards are verboten (see Sergei's
+>> comment).  So your inclination to use one value for the "compatible"
+>> property is correct.  I think the way to go is to forget the whole
+>> HAS_SECONDARY_PWM in the DT case, have one device instance per pwm, and
+>> use "compatible=marvell,pwm". Other suggestions welcome.
+> 
+> compatbile=marvell,pxa25x-pwm , no ? The lowest CPU with the block.
+
+
+Unless I am missing something, the compatible string does not need to replicate
+any of the existing platform_device_id names, so wouldn't "marvell,pxa" be
+better?  Except for register mapping and the number of units present on a
+particular pxa variant, the peripheral is software compatible across all pxa
+processors.  Plus there is the problem of the 'x' wildcard in "pxa25x-pwm".
+
+Thanks,
+Mike
