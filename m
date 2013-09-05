@@ -1,9 +1,9 @@
 From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 05 Sep 2013 14:36:19 +0200
-Subject: [PATCH 01/12] ARM: exynos4: create a DT header defining CLK IDs
+Date: Thu, 05 Sep 2013 14:36:27 +0200
+Subject: [PATCH 07/12] ARM: exynos5420: create a DT header defining CLK IDs
 In-Reply-To: <1378384594-4807-1-git-send-email-a.hajda@samsung.com>
 References: <1378384594-4807-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <1378384594-4807-2-git-send-email-a.hajda@samsung.com>
+Message-ID: <1378384594-4807-10-git-send-email-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,246 +13,190 @@ This allows to use macros instead of magic numbers in DT bindings.
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- include/dt-bindings/clock/exynos4.h | 231 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 231 insertions(+)
- create mode 100644 include/dt-bindings/clock/exynos4.h
+ include/dt-bindings/clock/exynos5420.h | 175 +++++++++++++++++++++++++++++++++
+ 1 file changed, 175 insertions(+)
+ create mode 100644 include/dt-bindings/clock/exynos5420.h
 
-diff --git a/include/dt-bindings/clock/exynos4.h b/include/dt-bindings/clock/exynos4.h
+diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
 new file mode 100644
-index 0000000..deb5428
+index 0000000..01e4409
 --- /dev/null
-+++ b/include/dt-bindings/clock/exynos4.h
-@@ -0,0 +1,231 @@
-+#ifndef _DT_BINDINGS_CLOCK_EXYNOS_4_H
-+#define _DT_BINDINGS_CLOCK_EXYNOS_4_H
++++ b/include/dt-bindings/clock/exynos5420.h
+@@ -0,0 +1,175 @@
++#ifndef _DT_BINDINGS_CLOCK_EXYNOS_5420_H
++#define _DT_BINDINGS_CLOCK_EXYNOS_5420_H
 +
 +/* core clocks */
-+#define CLK_XXTI 1
-+#define CLK_XUSBXTI 2
-+#define CLK_FIN_PLL 3
-+#define CLK_FOUT_APLL 4
-+#define CLK_FOUT_MPLL 5
-+#define CLK_FOUT_EPLL 6
-+#define CLK_FOUT_VPLL 7
-+#define CLK_SCLK_APLL 8
-+#define CLK_SCLK_MPLL 9
-+#define CLK_SCLK_EPLL 10
-+#define CLK_SCLK_VPLL 11
-+#define CLK_ARM_CLK 12
-+#define CLK_ACLK200 13
-+#define CLK_ACLK100 14
-+#define CLK_ACLK160 15
-+#define CLK_ACLK133 16
-+#define CLK_MOUT_MPLL_USER_T 17
-+#define CLK_MOUT_MPLL_USER_C 18
-+#define CLK_MOUT_CORE 19
-+#define CLK_MOUT_APLL 20
++#define CLK_FIN_PLL 1
++#define CLK_FOUT_APLL 2
++#define CLK_FOUT_CPLL 3
++#define CLK_FOUT_DPLL 4
++#define CLK_FOUT_EPLL 5
++#define CLK_FOUT_RPLL 6
++#define CLK_FOUT_IPLL 7
++#define CLK_FOUT_SPLL 8
++#define CLK_FOUT_VPLL 9
++#define CLK_FOUT_MPLL 10
++#define CLK_FOUT_BPLL 11
++#define CLK_FOUT_KPLL 12
 +
 +/* gate for special clocks (sclk) */
-+#define CLK_SCLK_FIMC0 128
-+#define CLK_SCLK_FIMC1 129
-+#define CLK_SCLK_FIMC2 130
-+#define CLK_SCLK_FIMC3 131
-+#define CLK_SCLK_CAM0 132
-+#define CLK_SCLK_CAM1 133
-+#define CLK_SCLK_CSIS0 134
-+#define CLK_SCLK_CSIS1 135
-+#define CLK_SCLK_HDMI 136
-+#define CLK_SCLK_MIXER 137
-+#define CLK_SCLK_DAC 138
-+#define CLK_SCLK_PIXEL 139
-+#define CLK_SCLK_FIMD0 140
-+#define CLK_SCLK_MDNIE0 141
-+#define CLK_SCLK_MDNIE_PWM0 142
-+#define CLK_SCLK_MIPI0 143
-+#define CLK_SCLK_AUDIO0 144
-+#define CLK_SCLK_MMC0 145
-+#define CLK_SCLK_MMC1 146
-+#define CLK_SCLK_MMC2 147
-+#define CLK_SCLK_MMC3 148
-+#define CLK_SCLK_MMC4 149
-+#define CLK_SCLK_SATA 150
-+#define CLK_SCLK_UART0 151
-+#define CLK_SCLK_UART1 152
-+#define CLK_SCLK_UART2 153
-+#define CLK_SCLK_UART3 154
-+#define CLK_SCLK_UART4 155
-+#define CLK_SCLK_AUDIO1 156
-+#define CLK_SCLK_AUDIO2 157
-+#define CLK_SCLK_SPDIF 158
-+#define CLK_SCLK_SPI0 159
-+#define CLK_SCLK_SPI1 160
-+#define CLK_SCLK_SPI2 161
-+#define CLK_SCLK_SLIMBUS 162
-+#define CLK_SCLK_FIMD1 163
-+#define CLK_SCLK_MIPI1 164
-+#define CLK_SCLK_PCM1 165
-+#define CLK_SCLK_PCM2 166
-+#define CLK_SCLK_I2S1 167
-+#define CLK_SCLK_I2S2 168
-+#define CLK_SCLK_MIPIHSI 169
-+#define CLK_SCLK_MFC 170
-+#define CLK_SCLK_PCM0 171
-+#define CLK_SCLK_G3D 172
-+#define CLK_SCLK_PWM_ISP 173
-+#define CLK_SCLK_SPI0_ISP 174
-+#define CLK_SCLK_SPI1_ISP 175
-+#define CLK_SCLK_UART_ISP 176
-+#define CLK_SCLK_FIMG2D 177
++#define CLK_SCLK_UART0 128
++#define CLK_SCLK_UART1 129
++#define CLK_SCLK_UART2 130
++#define CLK_SCLK_UART3 131
++#define CLK_SCLK_MMC0 132
++#define CLK_SCLK_MMC1 133
++#define CLK_SCLK_MMC2 134
++#define CLK_SCLK_SPI0 135
++#define CLK_SCLK_SPI1 136
++#define CLK_SCLK_SPI2 137
++#define CLK_SCLK_I2S1 138
++#define CLK_SCLK_I2S2 139
++#define CLK_SCLK_PCM1 140
++#define CLK_SCLK_PCM2 141
++#define CLK_SCLK_SPDIF 142
++#define CLK_SCLK_HDMI 143
++#define CLK_SCLK_PIXEL 144
++#define CLK_SCLK_DP1 145
++#define CLK_SCLK_MIPI1 146
++#define CLK_SCLK_FIMD1 147
++#define CLK_SCLK_MAUDIO0 148
++#define CLK_SCLK_MAUPCM0 149
++#define CLK_SCLK_USBD300 150
++#define CLK_SCLK_USBD301 151
++#define CLK_SCLK_USBPHY300 152
++#define CLK_SCLK_USBPHY301 153
++#define CLK_SCLK_UNIPRO 154
++#define CLK_SCLK_PWM 155
++#define CLK_SCLK_GSCL_WA 156
++#define CLK_SCLK_GSCL_WB 157
++#define CLK_SCLK_HDMIPHY 158
 +
 +/* gate clocks */
-+#define CLK_FIMC0 256
-+#define CLK_FIMC1 257
-+#define CLK_FIMC2 258
-+#define CLK_FIMC3 259
-+#define CLK_CSIS0 260
-+#define CLK_CSIS1 261
-+#define CLK_JPEG 262
-+#define CLK_SMMU_FIMC0 263
-+#define CLK_SMMU_FIMC1 264
-+#define CLK_SMMU_FIMC2 265
-+#define CLK_SMMU_FIMC3 266
-+#define CLK_SMMU_JPEG 267
-+#define CLK_VP 268
-+#define CLK_MIXER 269
-+#define CLK_TVENC 270
-+#define CLK_HDMI 271
-+#define CLK_SMMU_TV 272
-+#define CLK_MFC 273
-+#define CLK_SMMU_MFCL 274
-+#define CLK_SMMU_MFCR 275
-+#define CLK_G3D 276
-+#define CLK_G2D 277
-+#define CLK_ROTATOR 278
-+#define CLK_MDMA 279
-+#define CLK_SMMU_G2D 280
-+#define CLK_SMMU_ROTATOR 281
-+#define CLK_SMMU_MDMA 282
-+#define CLK_FIMD0 283
-+#define CLK_MIE0 284
-+#define CLK_MDNIE0 285
-+#define CLK_DSIM0 286
-+#define CLK_SMMU_FIMD0 287
-+#define CLK_FIMD1 288
-+#define CLK_MIE1 289
-+#define CLK_DSIM1 290
-+#define CLK_SMMU_FIMD1 291
-+#define CLK_PDMA0 292
-+#define CLK_PDMA1 293
-+#define CLK_PCIE_PHY 294
-+#define CLK_SATA_PHY 295
-+#define CLK_TSI 296
-+#define CLK_SDMMC0 297
-+#define CLK_SDMMC1 298
-+#define CLK_SDMMC2 299
-+#define CLK_SDMMC3 300
-+#define CLK_SDMMC4 301
-+#define CLK_SATA 302
-+#define CLK_SROMC 303
-+#define CLK_USB_HOST 304
-+#define CLK_USB_DEVICE 305
-+#define CLK_PCIE 306
-+#define CLK_ONENAND 307
-+#define CLK_NFCON 308
-+#define CLK_SMMU_PCIE 309
-+#define CLK_GPS 310
-+#define CLK_SMMU_GPS 311
-+#define CLK_UART0 312
-+#define CLK_UART1 313
-+#define CLK_UART2 314
-+#define CLK_UART3 315
-+#define CLK_UART4 316
-+#define CLK_I2C0 317
-+#define CLK_I2C1 318
-+#define CLK_I2C2 319
-+#define CLK_I2C3 320
-+#define CLK_I2C4 321
-+#define CLK_I2C5 322
-+#define CLK_I2C6 323
-+#define CLK_I2C7 324
-+#define CLK_I2C_HDMI 325
-+#define CLK_TSADC 326
-+#define CLK_SPI0 327
-+#define CLK_SPI1 328
-+#define CLK_SPI2 329
-+#define CLK_I2S1 330
-+#define CLK_I2S2 331
-+#define CLK_PCM0 332
-+#define CLK_I2S0 333
-+#define CLK_PCM1 334
-+#define CLK_PCM2 335
-+#define CLK_PWM 336
-+#define CLK_SLIMBUS 337
-+#define CLK_SPDIF 338
-+#define CLK_AC97 339
-+#define CLK_MODEMIF 340
-+#define CLK_CHIPID 341
-+#define CLK_SYSREG 342
-+#define CLK_HDMI_CEC 343
-+#define CLK_MCT 344
-+#define CLK_WDT 345
-+#define CLK_RTC 346
-+#define CLK_KEYIF 347
-+#define CLK_AUDSS 348
-+#define CLK_MIPI_HSI 349
-+#define CLK_MDMA2 350
-+#define CLK_PIXELASYNCM0 351
-+#define CLK_PIXELASYNCM1 352
-+#define CLK_FIMC_LITE0 353
-+#define CLK_FIMC_LITE1 354
-+#define CLK_PPMUISPX 355
-+#define CLK_PPMUISPMX 356
-+#define CLK_FIMC_ISP 357
-+#define CLK_FIMC_DRC 358
-+#define CLK_FIMC_FD 359
-+#define CLK_MCUISP 360
-+#define CLK_GICISP 361
-+#define CLK_SMMU_ISP 362
-+#define CLK_SMMU_DRC 363
-+#define CLK_SMMU_FD 364
-+#define CLK_SMMU_LITE0 365
-+#define CLK_SMMU_LITE1 366
-+#define CLK_MCUCTL_ISP 367
-+#define CLK_MPWM_ISP 368
-+#define CLK_I2C0_ISP 369
-+#define CLK_I2C1_ISP 370
-+#define CLK_MTCADC_ISP 371
-+#define CLK_PWM_ISP 372
-+#define CLK_WDT_ISP 373
-+#define CLK_UART_ISP 374
-+#define CLK_ASYNCAXIM 375
-+#define CLK_SMMU_ISPCX 376
-+#define CLK_SPI0_ISP 377
-+#define CLK_SPI1_ISP 378
-+#define CLK_PWM_ISP_SCLK 379
-+#define CLK_SPI0_ISP_SCLK 380
-+#define CLK_SPI1_ISP_SCLK 381
-+#define CLK_UART_ISP_SCLK 382
-+#define CLK_TMU_APBIF 383
++#define CLK_ACLK66_PERIC 256
++#define CLK_UART0 257
++#define CLK_UART1 258
++#define CLK_UART2 259
++#define CLK_UART3 260
++#define CLK_I2C0 261
++#define CLK_I2C1 262
++#define CLK_I2C2 263
++#define CLK_I2C3 264
++#define CLK_I2C4 265
++#define CLK_I2C5 266
++#define CLK_I2C6 267
++#define CLK_I2C7 268
++#define CLK_I2C_HDMI 269
++#define CLK_TSADC 270
++#define CLK_SPI0 271
++#define CLK_SPI1 272
++#define CLK_SPI2 273
++#define CLK_KEYIF 274
++#define CLK_I2S1 275
++#define CLK_I2S2 276
++#define CLK_PCM1 277
++#define CLK_PCM2 278
++#define CLK_PWM 279
++#define CLK_SPDIF 280
++#define CLK_I2C8 281
++#define CLK_I2C9 282
++#define CLK_I2C10 283
++#define CLK_ACLK66_PSGEN 300
++#define CLK_CHIPID 301
++#define CLK_SYSREG 302
++#define CLK_TZPC0 303
++#define CLK_TZPC1 304
++#define CLK_TZPC2 305
++#define CLK_TZPC3 306
++#define CLK_TZPC4 307
++#define CLK_TZPC5 308
++#define CLK_TZPC6 309
++#define CLK_TZPC7 310
++#define CLK_TZPC8 311
++#define CLK_TZPC9 312
++#define CLK_HDMI_CEC 313
++#define CLK_SECKEY 314
++#define CLK_MCT 315
++#define CLK_WDT 316
++#define CLK_RTC 317
++#define CLK_TMU 318
++#define CLK_TMU_GPU 319
++#define CLK_PCLK66_GPIO 330
++#define CLK_ACLK200_FSYS2 350
++#define CLK_MMC0 351
++#define CLK_MMC1 352
++#define CLK_MMC2 353
++#define CLK_SROMC 354
++#define CLK_UFS 355
++#define CLK_ACLK200_FSYS 360
++#define CLK_TSI 361
++#define CLK_PDMA0 362
++#define CLK_PDMA1 363
++#define CLK_RTIC 364
++#define CLK_USBH20 365
++#define CLK_USBD300 366
++#define CLK_USBD301 367
++#define CLK_ACLK400_MSCL 380
++#define CLK_MSCL0 381
++#define CLK_MSCL1 382
++#define CLK_MSCL2 383
++#define CLK_SMMU_MSCL0 384
++#define CLK_SMMU_MSCL1 385
++#define CLK_SMMU_MSCL2 386
++#define CLK_ACLK333 400
++#define CLK_MFC 401
++#define CLK_SMMU_MFCL 402
++#define CLK_SMMU_MFCR 403
++#define CLK_ACLK200_DISP1 410
++#define CLK_DSIM1 411
++#define CLK_DP1 412
++#define CLK_HDMI 413
++#define CLK_ACLK300_DISP1 420
++#define CLK_FIMD1 421
++#define CLK_SMMU_FIMD1 422
++#define CLK_ACLK166 430
++#define CLK_MIXER 431
++#define CLK_ACLK266 440
++#define CLK_ROTATOR 441
++#define CLK_MDMA1 442
++#define CLK_SMMU_ROTATOR 443
++#define CLK_SMMU_MDMA1 444
++#define CLK_ACLK300_JPEG 450
++#define CLK_JPEG 451
++#define CLK_JPEG2 452
++#define CLK_SMMU_JPEG 453
++#define CLK_ACLK300_GSCL 460
++#define CLK_SMMU_GSCL0 461
++#define CLK_SMMU_GSCL1 462
++#define CLK_GSCL_WA 463
++#define CLK_GSCL_WB 464
++#define CLK_GSCL0 465
++#define CLK_GSCL1 466
++#define CLK_CLK_3AA 467
++#define CLK_ACLK266_G2D 470
++#define CLK_SSS 471
++#define CLK_SLIM_SSS 472
++#define CLK_MDMA0 473
++#define CLK_ACLK333_G2D 480
++#define CLK_G2D 481
++#define CLK_ACLK333_432_GSCL 490
++#define CLK_SMMU_3AA 491
++#define CLK_SMMU_FIMCL0 492
++#define CLK_SMMU_FIMCL1 493
++#define CLK_SMMU_FIMCL3 494
++#define CLK_FIMC_LITE3 495
++#define CLK_ACLK_G3D 500
++#define CLK_G3D 501
++#define CLK_SMMU_MIXER 502
 +
 +/* mux clocks */
-+#define CLK_MOUT_FIMC0 384
-+#define CLK_MOUT_FIMC1 385
-+#define CLK_MOUT_FIMC2 386
-+#define CLK_MOUT_FIMC3 387
-+#define CLK_MOUT_CAM0 388
-+#define CLK_MOUT_CAM1 389
-+#define CLK_MOUT_CSIS0 390
-+#define CLK_MOUT_CSIS1 391
-+#define CLK_MOUT_G3D0 392
-+#define CLK_MOUT_G3D1 393
-+#define CLK_MOUT_G3D 394
-+#define CLK_ACLK400_MCUISP 395
++#define CLK_MOUT_HDMI 640
 +
-+/* div clocks */
-+#define CLK_DIV_ISP0 450
-+#define CLK_DIV_ISP1 451
-+#define CLK_DIV_MCUISP0 452
-+#define CLK_DIV_MCUISP1 453
-+#define CLK_DIV_ACLK200 454
-+#define CLK_DIV_ACLK400_MCUISP 455
-+#define CLK_NR_CLKS 456
++/* divider clocks */
++#define CLK_DOUT_PIXEL 768
++#define CLK_NR_CLKS 769
 +
-+#endif /* _DT_BINDINGS_CLOCK_EXYNOS_4_H */
++#endif /* _DT_BINDINGS_CLOCK_EXYNOS_5420_H */
 -- 
 1.8.1.2
