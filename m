@@ -1,47 +1,42 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Thu, 5 Sep 2013 15:33:10 +0200
-Subject: [PATCH 3/3] perf: parse the .debug_frame section in case
- .eh_frame is not present
-In-Reply-To: <20130905131910.GB22351@mudshark.cambridge.arm.com>
-References: <1378317854-25965-1-git-send-email-jean.pihet@linaro.org>
- <1378317854-25965-4-git-send-email-jean.pihet@linaro.org>
- <20130905124508.GE9696@mudshark.cambridge.arm.com>
- <CAORVsuW-1koTMaSMgjagBz1aJ0AtvVRiM5gs3kwO2Fuvk+DhwQ@mail.gmail.com>
- <CAKv+Gu8u4PLVfng8ru4RFwA-+Ky0vYEP3V2=vecqndo5Z0sTJg@mail.gmail.com>
- <20130905131910.GB22351@mudshark.cambridge.arm.com>
-Message-ID: <CAFrcx1koLAnNRBtpAhOoTP0SC-wWknY7ipUmcvnjxKqwDOUmag@mail.gmail.com>
+From: alex.elder@linaro.org (Alex Elder)
+Date: Thu, 05 Sep 2013 08:33:24 -0500
+Subject: [PATCH] clk: only call get_parent if there is one
+Message-ID: <52288824.1060905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 September 2013 15:19, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Sep 05, 2013 at 02:17:30PM +0100, Ard Biesheuvel wrote:
->> On 5 September 2013 15:05, Jean Pihet <jean.pihet@newoldbits.com> wrote:
->> [..]
->> > Here are the commands I have been using:
->> >  perf record -g dwarf -- <binary to profile>
->> >  perf report --sort symbol --call-graph --stdio
->> >
->>
->> Ah, I failed to add the 'dwarf' after -g, however, in that case, my
->> perf report segfaults:
->
-> Same SEGV here.
-Ouch! I never got the segfault on my side.
+In __clk_init(), after a clock is mostly initialized, a scan is done
+of the orphan clocks to see if the clock being registered is the
+parent of any of them.
 
-Here is the setup I am using:
-- OMAP4 Pandaboard,
-- 13.07 Ubuntu dist from http://www.linaro.org/downloads/,
-- 3.11 mainline kernel + 3 patches for unwinding info,
-- patched perf tool,
-- dbg flavor of the libs installed. Without them installed I do not
-get the address resolved but no segfaults
+This code assumes that any clock that provides a get_parent method
+actually has at least one parent, and that's not a valid assumption.
 
-Can you check if the linked libraries contain the .debug_frame
-sections? (ldd; readelf -S /lib/arm-linux-gnueabihf/libc-2.17.so|grep
-debug_frame; readelf -S
-/usr/lib/debug/lib/arm-linux-gnueabihf/libc-2.17.so|grep debug_frame)?
+As a result, an orphan clock with no parent can return *something*
+as the parent index, and that value is blindly used to dereference
+the orphan's parent_names[] array (which will be ZERO_SIZE_PTR or
+NULL).
 
->
-> Will
+Fix this by ensuring get_parent is only called for orphans with at
+least one parent.
 
-Jean
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ drivers/clk/clk.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 54a191c..ea8ff15 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1628,7 +1628,7 @@ int __clk_init(struct device *dev, struct clk *clk)
+ 	 * this clock
+ 	 */
+ 	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
+-		if (orphan->ops->get_parent) {
++		if (orphan->num_parents && orphan->ops->get_parent) {
+ 			i = orphan->ops->get_parent(orphan->hw);
+ 			if (!strcmp(clk->name, orphan->parent_names[i]))
+ 				__clk_reparent(orphan, clk);
+-- 
+1.7.9.5
