@@ -1,36 +1,55 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 5 Sep 2013 10:05:27 +0200
-Subject: [PATCHv7 2/2] ARM: sunxi: dt: Add sunxi-sid to dts for sun4i,
- sun5i and sun7i
-In-Reply-To: <1378204408-1415-3-git-send-email-oliver+list@schinagl.nl>
-References: <1378204408-1415-1-git-send-email-oliver+list@schinagl.nl>
- <1378204408-1415-3-git-send-email-oliver+list@schinagl.nl>
-Message-ID: <20130905080527.GB6180@lukather>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Thu, 5 Sep 2013 08:18:24 +0000
+Subject: [PATCH v4 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <20130903113151.GE15824@intel.com>
+References: <1376633274-17850-1-git-send-email-b35083@freescale.com>
+ <20130828081742.GC11414@intel.com>
+ <B56CDBE15CE27145A4B77D2D24263E8520A8C7@039-SN1MPN1-003.039d.mgd.msft.net>
+ <20130902045050.GE7376@intel.com>
+ <B56CDBE15CE27145A4B77D2D24263E8520D0D4@039-SN1MPN1-004.039d.mgd.msft.net>
+ <20130902063721.GK7376@intel.com>
+ <B56CDBE15CE27145A4B77D2D24263E8520F101@039-SN1MPN1-004.039d.mgd.msft.net>
+ <20130902111200.GP7376@intel.com>
+ <B56CDBE15CE27145A4B77D2D24263E852102A1@039-SN1MPN1-004.039d.mgd.msft.net>
+ <20130903113151.GE15824@intel.com>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E852157C4@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oliver,
-
-On Tue, Sep 03, 2013 at 12:33:28PM +0200, oliver+list at schinagl.nl wrote:
-> From: Oliver Schinagl <oliver@schinagl.nl>
+> -----Original Message-----
+> From: Vinod Koul [mailto:vinod.koul at intel.com]
+> Sent: Tuesday, September 03, 2013 7:32 PM
+> To: Lu Jingchang-B35083
+> Cc: shawn.guo at linaro.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; devicetree at vger.kernel.org
+> Subject: Re: [PATCH v4 3/3] dma: Add Freescale eDMA engine driver support
 > 
-> This patch shall add support for the sunxi-sid driver to the device
-> tree for A10, A10s, A13 and A20.
+> On Tue, Sep 03, 2013 at 05:43:21AM +0000, Lu Jingchang-B35083 wrote:
+> >   Do you mean the DMA_SLAVE_CONFIG device_control? Yeah, the slave
+> driver could pass
+> > the slave_id. But the DMA_SLAVE_CONFIG may be called more than once,
+> and the eDMA
+> > driver just needs to set the slave id once for any given channel, after
+> that the
+> > transfer is transparent to the device.
+> It depends, for a channel requested, if you are only tranferring to a
+> particular
+> slave device then it can be confugured once.
+> so
+> 1. allocate channel
+> 2. dmaengine_slave_config()
 > 
-> Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
+> then you cnan do preare etc multiple times based on need.
+ But if the preferred slave id configuration should be in dmaengine_slave_config,
+I will send out this change in the next version patch.
+Thanks!
 
-Merged in my sunxi/dt-for-3.13 branch.
 
-Maxime
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130905/3342f951/attachment.sig>
+
+
+Best Regards,
+Jingchang
+
+
+ 
