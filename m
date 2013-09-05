@@ -1,41 +1,77 @@
-From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Wed, 4 Sep 2013 23:04:57 -0300
-Subject: [PATCH v2 3/4] ARM: imx6sl: add imx6sl iomux-gpr field define
-In-Reply-To: <9848F2DB572E5649BA045B288BE08FBE01689ED6@039-SN2MPN1-021.039d.mgd.msft.net>
-References: <1378182385-9205-1-git-send-email-B38611@freescale.com>
- <1378182385-9205-4-git-send-email-B38611@freescale.com>
- <CAP9ODKqD05+S6HBnbBw-5Hs7NYVHRDJf014stSQ_AVeaYzVV+Q@mail.gmail.com>
- <9848F2DB572E5649BA045B288BE08FBE01689ED6@039-SN2MPN1-021.039d.mgd.msft.net>
-Message-ID: <CAP9ODKoU2f1vOerkYvvT1DNdz3Waj1u0hUBALGQ0TaLsbMDGbw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 5 Sep 2013 11:14:04 +0800
+Subject: [PATCH 1/8] mmc: sdhci: add hooks for platform specific tuning
+In-Reply-To: <1378299257-2980-2-git-send-email-b29396@freescale.com>
+References: <1378299257-2980-1-git-send-email-b29396@freescale.com>
+ <1378299257-2980-2-git-send-email-b29396@freescale.com>
+Message-ID: <20130905031401.GA775@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 4, 2013 at 11:01 PM, Duan Fugang-B38611
-<B38611@freescale.com> wrote:
-> From: otavio.salvador at gmail.com [mailto:otavio.salvador at gmail.com] On Behalf Of Otavio Salvador
-> Data: Thursday, September 05, 2013 9:45 AM
->
->> To: Duan Fugang-B38611
->> Cc: Shawn Guo; devicetree at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org
->> Subject: Re: [PATCH v2 3/4] ARM: imx6sl: add imx6sl iomux-gpr field define
->>
->> On Tue, Sep 3, 2013 at 1:26 AM, Fugang Duan <B38611@freescale.com> wrote:
->> > Add imx6sl iomux-gpr register field define in "imx6q-iomuxc-gpr.h"
->> > header file, which is not fully define all iomux-gpr registers and
->> > fields, only add fec related macro define.
->> >
->> > Signed-off-by: Fugang Duan  <B38611@freescale.com>
->>
->> The 'q' in the header filename is misleading; wouldn't be better to have
->> it named imx6-iomuxc-gpr.h than?
->>
-> Yes, since there have many same macro define and register define, we put the iomux-gpr header file
-> To one. I will submit one patch to rename the header file to imx6-iomuxc-gpr.h.
+On Wed, Sep 04, 2013 at 08:54:10PM +0800, Dong Aisheng wrote:
+> The tuning of some platforms may not follow the standard host control
+> spec v3.0, e.g. Freescale uSDHC on i.MX6Q/DL.
+> Add a hook here to allow execute platform specific tuning instead of
+> standard host controller tuning.
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+>  drivers/mmc/host/sdhci.c |    8 ++++++++
+>  drivers/mmc/host/sdhci.h |    1 +
+>  2 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index dd2c083..2890cfd 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1875,6 +1875,14 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+>  		return 0;
+>  	}
+>  
+> +	if (host->ops->platform_execute_tuning) {
+> +		spin_unlock(&host->lock);
+> +		enable_irq(host->irq);
 
-Great; thanks! :-)
+Hmm, you want these two functions be called before
+platform_execute_tuning()?  That probably means you do not need to call
+spin_lock() and disable_irq() for platform_execute_tuning()?  In that
+case, can we not just put this platform hook at the beginning of the
+function, something like below?
 
--- 
-Otavio Salvador                             O.S. Systems
-http://www.ossystems.com.br        http://code.ossystems.com.br
-Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
+	host = mmc_priv(mmc);
+
+	if (host->ops->platform_execute_tuning) {
+		sdhci_runtime_pm_get(host);
+		err = host->ops->platform_execute_tuning(host, opcode);
+		sdhci_runtime_pm_put(host);
+	}
+
+I guess that's more clear to tell that platform_execute_tuning hook is
+there to replace sdhci_execute_tuning() completely.  Is it the case?
+
+Shawn
+
+> +		err = host->ops->platform_execute_tuning(host, opcode);
+> +		sdhci_runtime_pm_put(host);
+> +		return err;
+> +	}
+> +
+>  	sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+>  
+>  	/*
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index b037f18..976c14b 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -288,6 +288,7 @@ struct sdhci_ops {
+>  	unsigned int    (*get_ro)(struct sdhci_host *host);
+>  	void	(*platform_reset_enter)(struct sdhci_host *host, u8 mask);
+>  	void	(*platform_reset_exit)(struct sdhci_host *host, u8 mask);
+> +	int	(*platform_execute_tuning)(struct sdhci_host *host, u32 opcode);
+>  	int	(*set_uhs_signaling)(struct sdhci_host *host, unsigned int uhs);
+>  	void	(*hw_reset)(struct sdhci_host *host);
+>  	void	(*platform_suspend)(struct sdhci_host *host);
+> -- 
+> 1.7.1
+> 
+> 
