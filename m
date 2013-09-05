@@ -1,324 +1,81 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 5 Sep 2013 14:00:26 +0800
-Subject: [PATCH 4/8] sdhci: sdhci-esdhci-imx: add sd3.0 clock tuning
- support
-In-Reply-To: <1378299257-2980-5-git-send-email-b29396@freescale.com>
-References: <1378299257-2980-1-git-send-email-b29396@freescale.com>
- <1378299257-2980-5-git-send-email-b29396@freescale.com>
-Message-ID: <20130905060024.GC775@shlinux1.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 5 Sep 2013 15:03:05 +0900
+Subject: [PATCH 1/4] ARM: shmobile: r8a7778: add Ether DT support
+In-Reply-To: <76573995.iPm3QS0b9I@avalon>
+References: <201309010311.05466.sergei.shtylyov@cogentembedded.com>
+ <52262A1B.4050406@cogentembedded.com>
+ <CANqRtoSfsEwqJhh9DgX6jxK5DjH5FeroMAcsvss5o2vAzFk-pg@mail.gmail.com>
+ <76573995.iPm3QS0b9I@avalon>
+Message-ID: <20130905060304.GI14960@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nothing major, only a few nitpicks.
-
-On Wed, Sep 04, 2013 at 08:54:13PM +0800, Dong Aisheng wrote:
-> Freescale i.MX6Q/DL uSDHC clock tuning progress is a little different from
-> the standard tuning process defined in host controller spec v3.0.
-> Thus we use platform_execute_tuning instead of standard sdhci tuning.
+On Wed, Sep 04, 2013 at 11:39:59AM +0200, Laurent Pinchart wrote:
+> On Wednesday 04 September 2013 14:35:14 Magnus Damm wrote:
+> > On Wed, Sep 4, 2013 at 3:27 AM, Sergei Shtylyov wrote:
+> > > On 09/03/2013 07:17 PM, Magnus Damm wrote:
+> > >>> Define the generic R8A777x part of the Ether device node.
+> > >>> 
+> > >>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > >>> 
+> > >>> ---
+> > >>> 
+> > >>>   arch/arm/boot/dts/r8a7778.dtsi |   11 +++++++++++
+> > >>>   1 file changed, 11 insertions(+)
+> > >>> 
+> > >>> Index: renesas/arch/arm/boot/dts/r8a7778.dtsi
+> > >>> ===================================================================
+> > >>> --- renesas.orig/arch/arm/boot/dts/r8a7778.dtsi
+> > >>> +++ renesas/arch/arm/boot/dts/r8a7778.dtsi
+> > >>> @@ -98,4 +98,15 @@
+> > >>>                  reg = <0xfffc000 0x118>;
+> > >>>                  #gpio-range-cells = <3>;
+> > >>>          };
+> > >>> +
+> > >>> +       ether: ethernet at fde00000 {
+> > >>> +               device_type = "network";
+> > >>> +               compatible = "renesas,ether-r8a7779";
+> > >> 
+> > >> Hi Sergei,
+> > >> 
+> > >> Thanks for your patch. What's the reason behind the r8a7778 SoC using
+> > >> a compatible string for r8a7779 like "renesas,ether-r8a7779"?
+> > >
+> > > R8A7779 support has appeared first in Linux and as R8A7778 Ether is
+> > > identical to R8A7779 and no wildcards are allowed in the device tree, I
+> > > decided to use this "compatible" prop.
+> > 
+> > Thanks for your reply, I see.
+> > 
+> > >> It seems that you assume that the r8a7778 ethernet controller is 100%
+> > >> compatible with r8a7779. Is that really true? For earlier versions the
+> > >> sh_eth hardware documentation was anything but accurate, so it seems
+> > >> to me that it must be more safe that r8a7778 would be using
+> > >> "renesas,ether-r8a7778". What do you think?
+> > >
+> > > I think R8A7778 and R8A7779 EtherMACs are identical. I've cross checked
+> > > the documentation at the start of the development and the registers
+> > > appeared to be the same.
+> > 
+> > But even if the current version of the documentation happens to be
+> > similar in it still doesn't guarantee that the IP is the same. And
+> > using the "correct" SoC compatible value doesn't really hurt in any
+> > way, does it?
+> > 
+> > My feeling is that using the identical SoC as compatible value must be
+> > the best option - unless we know for sure they are identical that is.
+> > 
+> > So unless we're 100% certain about IP compatibility I'm trying to
+> > enforce that we either use a strict matching for exactly the same SoC
+> > version or IP block. Using a different maybe-compatible SoC string
+> > seems to be begging for future trouble IMO.
+> > 
+> > Laurent, any opinion?
 > 
-> The main difference are:
-> 1) not only generate Buffer Read Ready interrupt when tuning is performing.
-> It generates all other DATA interrupts like the normal data command.
-> 2) SDHCI_CTRL_EXEC_TUNING is not automatically cleared by HW,
-> instead it's controlled by SW.
-> 3) SDHCI_CTRL_TUNED_CLK is not automatically set by HW,
-> it's controlled by SW.
-> 4) the clock delay for every tuning is set by SW.
-> 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |  194 +++++++++++++++++++++++++++++++++++-
->  1 files changed, 193 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 3118a82..36b9f63 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -34,9 +34,21 @@
->  #define ESDHC_WTMK_LVL			0x44
->  #define ESDHC_MIX_CTRL			0x48
->  #define  ESDHC_MIX_CTRL_AC23EN		(1 << 7)
-> +#define  ESDHC_MIX_CTRL_EXE_TUNE	(1 << 22)
-> +#define  ESDHC_MIX_CTRL_SMPCLK_SEL	(1 << 23)
-> +#define  ESDHC_MIX_CTRL_AUTO_TUNE	(1 << 24)
+> I agree. If we had access to IP version information we could use that to 
+> construct the compatible name. As we don't, the SoC name is the best option, 
+> and to ensure future compatibility we should use the exact SoC version.
 
-It seems unused?
-
-> +#define  ESDHC_MIX_CTRL_FBCLK_SEL	(1 << 25)
->  /* Bits 3 and 6 are not SDHCI standard definitions */
->  #define  ESDHC_MIX_CTRL_SDHCI_MASK	0xb7
->  
-> +/* tune control register */
-> +#define ESDHC_TUNE_CTRL_STATUS		0x68
-> +#define  ESDHC_TUNE_CTRL_STEP		1
-> +#define  ESDHC_TUNE_CTRL_MIN		0
-> +#define  ESDHC_TUNE_CTRL_MAX		((1 << 7) - 1)
-> +
-> +#define ESDHC_TUNING_BLOCK_PATTERN_LEN	64
-> +
->  /*
->   * Our interpretation of the SDHCI_HOST_CONTROL register
->   */
-> @@ -87,7 +99,7 @@ struct pltfm_imx_data {
->  		MULTIBLK_IN_PROCESS, /* exact multiblock cmd in process */
->  		WAIT_FOR_INT,        /* sent CMD12, waiting for response INT */
->  	} multiblock_status;
-> -
-> +	u32 uhs_mode;
->  };
->  
->  static struct platform_device_id imx_esdhc_devtype[] = {
-> @@ -161,6 +173,17 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
->  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
->  	u32 val = readl(host->ioaddr + reg);
->  
-> +	if (unlikely(reg == SDHCI_PRESENT_STATE)) {
-> +		u32 fsl_prss = val;
-> +		val = 0;
-> +		/* save the least 20 bits */
-> +		val |= fsl_prss & 0x000FFFFF;
-
-Nit: you can do the following to save one assignment, right?
-
-		val = fsl_prss & 0x000FFFFF;
-
-> +		/* move dat[0-3] bits */
-> +		val |= (fsl_prss & 0x0F000000) >> 4;
-> +		/* move cmd line bit */
-> +		val |= (fsl_prss & 0x00800000) << 1;
-> +	}
-> +
->  	if (unlikely(reg == SDHCI_CAPABILITIES)) {
->  		/* In FSL esdhc IC module, only bit20 is used to indicate the
->  		 * ADMA2 capability of esdhc, but this bit is messed up on
-> @@ -175,6 +198,17 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
->  		}
->  	}
->  
-> +	if (unlikely(reg == SDHCI_CAPABILITIES_1) && is_imx6q_usdhc(imx_data))
-> +		val = SDHCI_SUPPORT_DDR50 | SDHCI_SUPPORT_SDR104
-> +				| SDHCI_SUPPORT_SDR50;
-> +
-> +	if (unlikely(reg == SDHCI_MAX_CURRENT) && is_imx6q_usdhc(imx_data)) {
-> +		val = 0;
-> +		val |= 0xFF << SDHCI_MAX_CURRENT_330_SHIFT;
-> +		val |= 0xFF << SDHCI_MAX_CURRENT_300_SHIFT;
-> +		val |= 0xFF << SDHCI_MAX_CURRENT_180_SHIFT;
-> +	}
-> +
->  	if (unlikely(reg == SDHCI_INT_STATUS)) {
->  		if (val & ESDHC_INT_VENDOR_SPEC_DMA_ERR) {
->  			val &= ~ESDHC_INT_VENDOR_SPEC_DMA_ERR;
-> @@ -253,6 +287,8 @@ static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
->  {
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-> +	u16 ret = 0;
-> +	u32 val;
->  
->  	if (unlikely(reg == SDHCI_HOST_VERSION)) {
->  		reg ^= 2;
-> @@ -265,6 +301,25 @@ static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
->  		}
->  	}
->  
-> +	if (unlikely(reg == SDHCI_HOST_CONTROL2)) {
-> +		val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
-> +		if (val & ESDHC_VENDOR_SPEC_VSELECT)
-> +			ret |= SDHCI_CTRL_VDD_180;
-> +
-> +		if (is_imx6q_usdhc(imx_data)) {
-> +			val = readl(host->ioaddr + ESDHC_MIX_CTRL);
-> +			if (val & ESDHC_MIX_CTRL_EXE_TUNE)
-> +				ret |= SDHCI_CTRL_EXEC_TUNING;
-> +			if (val & ESDHC_MIX_CTRL_SMPCLK_SEL)
-> +				ret |= SDHCI_CTRL_TUNED_CLK;
-> +		}
-> +
-> +		ret |= (imx_data->uhs_mode & SDHCI_CTRL_UHS_MASK);
-> +		ret &= ~SDHCI_CTRL_PRESET_VAL_ENABLE;
-> +
-> +		return ret;
-> +	}
-> +
->  	return readw(host->ioaddr + reg);
->  }
->  
-> @@ -272,8 +327,32 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
->  {
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-> +	u32 new_val = 0;
->  
->  	switch (reg) {
-> +	case SDHCI_CLOCK_CONTROL:
-> +		new_val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
-> +		if (val & SDHCI_CLOCK_CARD_EN)
-> +			new_val |= ESDHC_VENDOR_SPEC_FRC_SDCLK_ON;
-> +		else
-> +			new_val &= ~ESDHC_VENDOR_SPEC_FRC_SDCLK_ON;
-> +			writel(new_val, host->ioaddr + ESDHC_VENDOR_SPEC);
-> +		return;
-> +	case SDHCI_HOST_CONTROL2:
-> +		new_val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
-> +		if (val & SDHCI_CTRL_VDD_180)
-> +			new_val |= ESDHC_VENDOR_SPEC_VSELECT;
-> +		else
-> +			new_val &= ~ESDHC_VENDOR_SPEC_VSELECT;
-> +		writel(new_val, host->ioaddr + ESDHC_VENDOR_SPEC);
-> +		imx_data->uhs_mode = val & SDHCI_CTRL_UHS_MASK;
-> +		new_val = readl(host->ioaddr + ESDHC_MIX_CTRL);
-> +		if (val & SDHCI_CTRL_TUNED_CLK)
-> +			new_val |= ESDHC_MIX_CTRL_SMPCLK_SEL;
-> +		else
-> +			new_val &= ~ESDHC_MIX_CTRL_SMPCLK_SEL;
-> +		writel(new_val , host->ioaddr + ESDHC_MIX_CTRL);
-> +		return;
->  	case SDHCI_TRANSFER_MODE:
->  		if ((imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
->  				&& (host->cmd->opcode == SD_IO_RW_EXTENDED)
-> @@ -451,6 +530,118 @@ static int esdhc_pltfm_bus_width(struct sdhci_host *host, int width)
->  	return 0;
->  }
->  
-> +static void esdhc_prepare_tuning(struct sdhci_host *host, u32 val)
-> +{
-> +	u32 reg;
-> +
-> +	reg = readl(host->ioaddr + ESDHC_MIX_CTRL);
-> +	reg |= ESDHC_MIX_CTRL_EXE_TUNE | ESDHC_MIX_CTRL_SMPCLK_SEL |
-> +			ESDHC_MIX_CTRL_FBCLK_SEL;
-> +	writel(reg, host->ioaddr + ESDHC_MIX_CTRL);
-> +	writel((val << 8), host->ioaddr + ESDHC_TUNE_CTRL_STATUS);
-
-Nit: unnecessary parentheses around val << 8
-
-> +	dev_dbg(mmc_dev(host->mmc),
-> +		"tunning with delay 0x%x ESDHC_TUNE_CTRL_STATUS 0x%x\n",
-> +			val, readl(host->ioaddr + ESDHC_TUNE_CTRL_STATUS));
-> +}
-> +
-> +static void request_done(struct mmc_request *mrq)
-
-s/request_done/esdhc_request_done to have proper namespace.
-
-> +{
-> +	complete(&mrq->completion);
-> +}
-> +
-> +static int esdhc_send_tuning_cmd(struct sdhci_host *host, u32 opcode)
-> +{
-> +	struct mmc_command cmd = {0};
-> +	struct mmc_request mrq = {0};
-> +	struct mmc_data data = {0};
-> +	struct scatterlist sg;
-> +	char tuning_pattern[ESDHC_TUNING_BLOCK_PATTERN_LEN];
-> +
-> +	cmd.opcode = opcode;
-> +	cmd.arg = 0;
-> +	cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
-> +
-> +	data.blksz = ESDHC_TUNING_BLOCK_PATTERN_LEN;
-> +	data.blocks = 1;
-> +	data.flags = MMC_DATA_READ;
-> +	data.sg = &sg;
-> +	data.sg_len = 1;
-> +
-> +	sg_init_one(&sg, tuning_pattern, sizeof(tuning_pattern));
-> +
-> +	mrq.cmd = &cmd;
-> +	mrq.cmd->mrq = &mrq;
-> +	mrq.data = &data;
-> +	mrq.data->mrq = &mrq;
-> +	mrq.cmd->data = mrq.data;
-> +
-> +	mrq.done = request_done;
-> +	init_completion(&(mrq.completion));
-> +
-> +	disable_irq(host->irq);
-> +	spin_lock(&host->lock);
-> +	host->mrq = &mrq;
-> +
-> +	sdhci_send_command(host, mrq.cmd);
-> +
-> +	spin_unlock(&host->lock);
-> +	enable_irq(host->irq);
-> +
-> +	wait_for_completion(&mrq.completion);
-> +
-> +	if (cmd.error)
-> +		return cmd.error;
-> +	if (data.error)
-> +		return data.error;
-> +
-> +	return 0;
-> +}
-> +
-> +static void esdhc_post_tuning(struct sdhci_host *host)
-> +{
-> +	u32 reg;
-> +
-> +	reg = readl(host->ioaddr + ESDHC_MIX_CTRL);
-> +	reg &= ~ESDHC_MIX_CTRL_EXE_TUNE;
-> +	writel(reg, host->ioaddr + ESDHC_MIX_CTRL);
-> +}
-> +
-> +static int esdhc_executing_tuning(struct sdhci_host *host, u32 opcode)
-> +{
-> +	int min, max, avg, ret;
-> +
-> +	/* find the mininum delay first which can pass tuning*/
-
-Nit: put a space before */
-
-> +	min = ESDHC_TUNE_CTRL_MIN;
-> +	while (min < ESDHC_TUNE_CTRL_MAX) {
-> +		esdhc_prepare_tuning(host, min);
-> +		if (!esdhc_send_tuning_cmd(host, opcode))
-> +			break;
-> +		min += ESDHC_TUNE_CTRL_STEP;
-> +	}
-> +
-> +	/* find the maxinum delay which can not pass tuning*/
-
-Ditto
-
-Shawn
-
-> +	max = min + ESDHC_TUNE_CTRL_STEP;
-> +	while (max < ESDHC_TUNE_CTRL_MAX) {
-> +		esdhc_prepare_tuning(host, max);
-> +		if (esdhc_send_tuning_cmd(host, opcode)) {
-> +			max -= ESDHC_TUNE_CTRL_STEP;
-> +			break;
-> +		}
-> +		max += ESDHC_TUNE_CTRL_STEP;
-> +	}
-> +
-> +	/* use average delay to get the best timing */
-> +	avg = (min + max) / 2;
-> +	esdhc_prepare_tuning(host, avg);
-> +	ret = esdhc_send_tuning_cmd(host, opcode);
-> +	esdhc_post_tuning(host);
-> +
-> +	dev_dbg(mmc_dev(host->mmc), "tunning %s at 0x%x ret %d\n",
-> +		ret ? "failed" : "passed", avg, ret);
-> +
-> +	return ret;
-> +}
-> +
->  static const struct sdhci_ops sdhci_esdhc_ops = {
->  	.read_l = esdhc_readl_le,
->  	.read_w = esdhc_readw_le,
-> @@ -462,6 +653,7 @@ static const struct sdhci_ops sdhci_esdhc_ops = {
->  	.get_min_clock = esdhc_pltfm_get_min_clock,
->  	.get_ro = esdhc_pltfm_get_ro,
->  	.platform_bus_width = esdhc_pltfm_bus_width,
-> +	.platform_execute_tuning = esdhc_executing_tuning,
->  };
->  
->  static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
-> -- 
-> 1.7.1
-> 
-> 
+Using the SoC name is in keeping with recent discussions that
+we have had about compat string names for shmobile. So I agree
+with both Magnus and Laurent here (no surprise!).
