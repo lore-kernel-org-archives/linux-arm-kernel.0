@@ -1,46 +1,66 @@
-From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
-Date: Thu, 5 Sep 2013 12:16:18 +0200
-Subject: [PATCH 3/5] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
- to the LRADC driver
-In-Reply-To: <20130904142738.GH6329@mwanda>
-References: <1378299706-6742-1-git-send-email-jbe@pengutronix.de>
- <1378299706-6742-4-git-send-email-jbe@pengutronix.de>
- <20130904142738.GH6329@mwanda>
-Message-ID: <201309051216.18305.jbe@pengutronix.de>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Thu, 5 Sep 2013 15:45:49 +0530
+Subject: [PATCH 2/2] arm: dt: Exynos5420: populate cpu node enteries to 8
+ cpus
+In-Reply-To: <1772890.cJdvnBcfyj@amdc1227>
+References: <1378373086-30676-1-git-send-email-chander.kashyap@linaro.org>
+ <3875313.jvPsk6a1oV@amdc1227>
+ <CANuQgHGSAGhA_LzU1aP05J86wjjS0qibPTXZM8ka0O3jZz8Kpw@mail.gmail.com>
+ <1772890.cJdvnBcfyj@amdc1227>
+Message-ID: <CANuQgHFkbpHsnWW_c1QVLtuMgPJ-FgNu1ti4LHDJyWDG-s=UsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
+On 5 September 2013 15:40, Tomasz Figa <t.figa@samsung.com> wrote:
+> On Thursday 05 of September 2013 15:33:17 Chander Kashyap wrote:
+>> Hi Tomasz,
+>>
+>> On 5 September 2013 15:25, Tomasz Figa <t.figa@samsung.com> wrote:
+>> > Hi Chander,
+>> >
+>> > On Thursday 05 of September 2013 14:54:46 Chander Kashyap wrote:
+>> >> Exynos5420 is octacore SoC from samsung.
+>> >> Hence populate all the cpu node enteries.
+>> >>
+>> >> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> >> ---
+>> >>
+>> >>  arch/arm/boot/dts/exynos5420.dtsi |   28 ++++++++++++++++++++++++++++
+>> >>  1 file changed, 28 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
+>> >> b/arch/arm/boot/dts/exynos5420.dtsi index e97c87b..59489f6 100644
+>> >> --- a/arch/arm/boot/dts/exynos5420.dtsi
+>> >> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+>> >> @@ -57,6 +57,34 @@
+>> >>
+>> >>                       reg = <0x3>;
+>> >>                       clock-frequency = <1800000000>;
+>> >>
+>> >>               };
+>> >>
+>> >> +
+>> >> +             cpu4: cpu at 4 {
+>> >
+>> > I believe this is a typo. The @unit-address suffix should match the
+>> > value of reg property.
+>>
+>> No this is not typo. It is the MPIDR value of the cpu. (24 bits of
+>> MPIDR register).
+>
+> Right. This is what the reg property should be set to. However, the @unit-
+> address prefix of node name should match the value of reg property, so if
+> the value of reg property is 0x100, then the node should be named cpu at 100.
 
-On Wednesday 04 September 2013 16:27:39 Dan Carpenter wrote:
-> [...]
-> ACTUALLY!  When I look at it now the third argument is almost always
-> "set", "clear" or "toggle".
+Ah ok,
+Thanks. I will spin out a new version and send
 >
-> So we could do:
+> Best regards,
+> Tomasz
 >
-> static inline void lradc_reg_set(struct mxs_lradc *lradc, u32 val,
-> 				size_t chan)
-> {
-> 	writel(val, lradc->base + chan + STMP_OFFSET_REG_SET);
-> }
->
-> So then it would be:
->
-> 	lradc_reg_clear(lradc_plate_mask(lradc), LRADC_CTRL0);
-> 	lradc_reg_set(lradc_enable_touch(lradc), LRADC_CTRL0);
->
-> I've just changed 11 lines of code down to 2 lines of code by hiding the
-> if statement in the header file.
->
-> Please redo this patch along those lines.
 
-I like this simplification, but all the other drivers for the MXS series of 
-SoCs don't use such a method. Do you think this "new style" will be accepted?
 
-Regards,
-Juergen
 
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+with warm regards,
+Chander Kashyap
