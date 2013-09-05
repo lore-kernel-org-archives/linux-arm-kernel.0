@@ -1,69 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Sep 2013 10:05:34 +0100
-Subject: [PATCH 1/1] arm64: Align an assembler string properly
-In-Reply-To: <20130904145059.GC2369@localhost.localdomain>
-References: <CAC8NTUWvEYpugbUfZ3A54zFbS71mnChfCk2sVKUxxxWAHz+nRw@mail.gmail.com>
- <CAC8NTUUdpUxfzn4_nrvMxj_otGmXROEKwio7DQ27BoMv0vwsAw@mail.gmail.com>
- <20130904145059.GC2369@localhost.localdomain>
-Message-ID: <20130905090534.GC11887@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 5 Sep 2013 10:08:42 +0100
+Subject: [PATCH v3 1/3] ARM: Introduce atomic MMIO modify
+In-Reply-To: <522847FC.1080005@free-electrons.com>
+References: <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130823103802.GO4600@tarshish> <20130823110748.GD2389@localhost>
+ <20130823113225.GF2389@localhost> <20130823114805.GF10971@arm.com>
+ <20130830090807.GB25628@mudshark.cambridge.arm.com>
+ <20130830091534.GA62188@MacBook-Pro.local>
+ <20130830092032.GD25628@mudshark.cambridge.arm.com>
+ <20130830100342.GD62188@MacBook-Pro.local>
+ <522847FC.1080005@free-electrons.com>
+Message-ID: <20130905090841.GA9696@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 04, 2013 at 03:50:59PM +0100, Dave P Martin wrote:
-> On Wed, Sep 04, 2013 at 06:22:44PM +0530, Radha Mohan wrote:
-> > Hi Catalin,
-> > Can you please review this?
+On Thu, Sep 05, 2013 at 09:59:40AM +0100, Gregory CLEMENT wrote:
+> Hi all,
+
+Hi Gregory,
+
+> On 30/08/2013 12:03, Catalin Marinas wrote:
+> > On Fri, Aug 30, 2013 at 10:20:33AM +0100, Will Deacon wrote:
+> >> Perhaps we should just bit the bullet and define relaxed accessors for all
+> >> architectures? It's not difficult to default them to the non-relaxed
+> >> variants if the architecture doesn't provide an optimised implementation.
 > > 
-> > regards,
-> > Radha Mohan
+> > Yes, an asm-generic default relaxed would be good (that's what I
+> > suggested earlier in this thread and it was discussed in the past). But
+> > no-one volunteered ;).
 > > 
-> > On Mon, Sep 2, 2013 at 4:18 PM, Radha Mohan <mohun106@gmail.com> wrote:
-> > > From: Corey Minyard <cminyard@mvista.com>
-> > >
-> > > Do a proper align and put it in the right section.
-> > >
-> > > Signed-off-by: Corey Minyard <cminyard@mvista.com>
-> > > ---
-> > >  arch/arm64/mm/proc.S |    3 ++-
-> > >  1 files changed, 2 insertions(+), 1 deletions(-)
-> > >
-> > > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> > > index 76d8320..1f89adc 100644
-> > > --- a/arch/arm64/mm/proc.S
-> > > +++ b/arch/arm64/mm/proc.S
-> > > @@ -95,10 +95,11 @@ ENTRY(cpu_do_switch_mm)
-> > >         ret
-> > >  ENDPROC(cpu_do_switch_mm)
-> > >
-> > > +       .section ".rodata"
-> > >  cpu_name:
-> > >         .ascii  "AArch64 Processor"
-> > > -       .align
-> > >
-> > > +       .align 3
 > 
-> Since cpu_name is local, not referenced, and not next to anything
-> noteworthy (so, unlikely to be found implicitly), I wonder why it's
-> needed at all.
-> 
-> cputable.c:cpu_table just has a C string literal instead, with the same
-> content.
-> 
-> Perhaps proc.S:cpu_name is used in some other way, but I can't see it.
-> The kernel still builds if it is deleted.
+> I would like to make the things move on about this subject. Should it
+> be possible to merge this version of the patch set? Currently the
+> only users of this new API are drivers for ARM SoCs.
 
-I replied couple of days ago but the SMTP server was playing tricks, so
-still not sure whether it is delayed or dropped. Anyway, what I said
-was:
+In the short term then, I'd keep this restricted to ARM. Without relaxed
+accessors available across all architectures, I don't think we can make this
+usefully generic (a readX/writeX version would be horribly slow on ARM).
 
-  Oh, we still have this in proc.S. I moved it long time ago to
-  arch/arm64/kernel/cputable.c but forgot about this. It compiles fine
-  after removing it completely.
+> In the meantime, I am willing to introduce an asm-generic default
+> relaxed variant of read and write, but as Catalin had already pointed
+> in the past
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/117626
+> it may take time to get an agreement from all the other architectures.
 
-And I already pushed a patch to -next removing it (and it will make it
-to mainline shortly.
+I actually wrote those patches yesterday but, in doing so, I realised that
+the kernel doesn't have well-defined semantics for relaxed I/O accessors
+(i.e. different architectures use them to mean different things). That makes
+portability is an issue, even if the functions are defined everywhere.
 
-Thanks.
+> That's why I propose that this patch set do not depend on the
+> introduction of a asm-generic default relaxed variant of read and
+> write. Later when it will be accepted then this new API will be moved
+> in the asm-generic part.
 
--- 
-Catalin
+Indeed, we can't make this generic until we've resolved the issues I mention
+above. I'll start a new thread around that once I've put my thoughts
+together, but that needn't block this patch imo.
+
+That said, I'd still suggest resending a final version of this patch, since
+there were some minor issues with this iteration.
+
+Cheers,
+
+Will
