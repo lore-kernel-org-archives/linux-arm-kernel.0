@@ -1,86 +1,69 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 05 Sep 2013 10:59:40 +0200
-Subject: [PATCH v3 1/3] ARM: Introduce atomic MMIO modify
-In-Reply-To: <20130830100342.GD62188@MacBook-Pro.local>
-References: <1377253445-2842-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130823103802.GO4600@tarshish> <20130823110748.GD2389@localhost>
- <20130823113225.GF2389@localhost> <20130823114805.GF10971@arm.com>
- <20130830090807.GB25628@mudshark.cambridge.arm.com>
- <20130830091534.GA62188@MacBook-Pro.local>
- <20130830092032.GD25628@mudshark.cambridge.arm.com>
- <20130830100342.GD62188@MacBook-Pro.local>
-Message-ID: <522847FC.1080005@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Sep 2013 10:05:34 +0100
+Subject: [PATCH 1/1] arm64: Align an assembler string properly
+In-Reply-To: <20130904145059.GC2369@localhost.localdomain>
+References: <CAC8NTUWvEYpugbUfZ3A54zFbS71mnChfCk2sVKUxxxWAHz+nRw@mail.gmail.com>
+ <CAC8NTUUdpUxfzn4_nrvMxj_otGmXROEKwio7DQ27BoMv0vwsAw@mail.gmail.com>
+ <20130904145059.GC2369@localhost.localdomain>
+Message-ID: <20130905090534.GC11887@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-On 30/08/2013 12:03, Catalin Marinas wrote:
-> On Fri, Aug 30, 2013 at 10:20:33AM +0100, Will Deacon wrote:
->> On Fri, Aug 30, 2013 at 10:15:36AM +0100, Catalin Marinas wrote:
->>> On Fri, Aug 30, 2013 at 10:08:07AM +0100, Will Deacon wrote:
->>>> On Fri, Aug 23, 2013 at 12:48:05PM +0100, Catalin Marinas wrote:
->>>>> On Fri, Aug 23, 2013 at 12:32:26PM +0100, Ezequiel Garcia wrote:
->>>>>> ... or maybe yes. I'm not seeing {readl,writel}_relaxed as guaranteed
->>>>>> to exist in every architecture. So, indeed, this seems to be ARM-dependent.
->>>>>
->>>>> There was a discussion couple of years ago to make these part of the IO
->>>>> specification since many architectures define them:
->>>>>
->>>>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/117626
->>>>>
->>>>> (and some older threads on linux-arch which I haven't searched)
->>>>>
->>>>> We could have some default implementation pointing to readl/writel while
->>>>> letting the arch code to define more optimised variants.
->>>>
->>>> The main thing I dislike about that is the back-to-back dsbs that you will
->>>> get from the read-(modify)-write. It really makes the non-optimised version
->>>> needlessly expensive.
->>>
->>> Yes, it's pretty bad. But we don't have relaxed (write) accessors on
->>> other architectures and I'm not sure about their semantics either. I
->>> guess here it's a data dependency so you cannot write the value before
->>> reading it, especially since sane architectures should speculate reads
->>> or writes to device memory.
->>>
->>> What about making it always use *_relaxed() accessors if the
->>> architecture provides them? No need for atomic_io_modify_relaxed().
->>
->> The only potential problem there is if somebody uses this function to kick
->> off a DMA. That would require explicit barriers to enforce ordering against
->> population of normal, cacheable buffers, which isn't usually the case in
->> driver code (since we have the dsb/outer_sync in the accessor).
->>
->> Perhaps we should just bit the bullet and define relaxed accessors for all
->> architectures? It's not difficult to default them to the non-relaxed
->> variants if the architecture doesn't provide an optimised implementation.
+On Wed, Sep 04, 2013 at 03:50:59PM +0100, Dave P Martin wrote:
+> On Wed, Sep 04, 2013 at 06:22:44PM +0530, Radha Mohan wrote:
+> > Hi Catalin,
+> > Can you please review this?
+> > 
+> > regards,
+> > Radha Mohan
+> > 
+> > On Mon, Sep 2, 2013 at 4:18 PM, Radha Mohan <mohun106@gmail.com> wrote:
+> > > From: Corey Minyard <cminyard@mvista.com>
+> > >
+> > > Do a proper align and put it in the right section.
+> > >
+> > > Signed-off-by: Corey Minyard <cminyard@mvista.com>
+> > > ---
+> > >  arch/arm64/mm/proc.S |    3 ++-
+> > >  1 files changed, 2 insertions(+), 1 deletions(-)
+> > >
+> > > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> > > index 76d8320..1f89adc 100644
+> > > --- a/arch/arm64/mm/proc.S
+> > > +++ b/arch/arm64/mm/proc.S
+> > > @@ -95,10 +95,11 @@ ENTRY(cpu_do_switch_mm)
+> > >         ret
+> > >  ENDPROC(cpu_do_switch_mm)
+> > >
+> > > +       .section ".rodata"
+> > >  cpu_name:
+> > >         .ascii  "AArch64 Processor"
+> > > -       .align
+> > >
+> > > +       .align 3
 > 
-> Yes, an asm-generic default relaxed would be good (that's what I
-> suggested earlier in this thread and it was discussed in the past). But
-> no-one volunteered ;).
+> Since cpu_name is local, not referenced, and not next to anything
+> noteworthy (so, unlikely to be found implicitly), I wonder why it's
+> needed at all.
 > 
+> cputable.c:cpu_table just has a C string literal instead, with the same
+> content.
+> 
+> Perhaps proc.S:cpu_name is used in some other way, but I can't see it.
+> The kernel still builds if it is deleted.
 
-I would like to make the things move on about this subject. Should it
-be possible to merge this version of the patch set? Currently the
-only users of this new API are drivers for ARM SoCs.
+I replied couple of days ago but the SMTP server was playing tricks, so
+still not sure whether it is delayed or dropped. Anyway, what I said
+was:
 
-In the meantime, I am willing to introduce an asm-generic default
-relaxed variant of read and write, but as Catalin had already pointed
-in the past
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/117626
-it may take time to get an agreement from all the other architectures.
+  Oh, we still have this in proc.S. I moved it long time ago to
+  arch/arm64/kernel/cputable.c but forgot about this. It compiles fine
+  after removing it completely.
 
-That's why I propose that this patch set do not depend on the
-introduction of a asm-generic default relaxed variant of read and
-write. Later when it will be accepted then this new API will be moved
-in the asm-generic part.
+And I already pushed a patch to -next removing it (and it will make it
+to mainline shortly.
 
-Thanks,
+Thanks.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Catalin
