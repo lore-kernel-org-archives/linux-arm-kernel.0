@@ -1,77 +1,45 @@
 From: anup.patel@linaro.org (Anup Patel)
-Date: Thu,  5 Sep 2013 20:16:01 +0530
-Subject: [RFC PATCH 2/3] ARM64: KVM: Implement target CPU=Host
+Date: Thu,  5 Sep 2013 20:16:02 +0530
+Subject: =?UTF-8?q?=5BRFC=20PATCH=203/3=5D=20KVM=3A=20ARM=3A=20Update=20documentation=20for=20KVM=5FARM=5FVCPU=5FINIT=20ioctl?=
 In-Reply-To: <1378392362-6773-1-git-send-email-anup.patel@linaro.org>
 References: <1378392362-6773-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1378392362-6773-3-git-send-email-anup.patel@linaro.org>
+Message-ID: <1378392362-6773-4-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements KVM_ARM_TARGET_HOST for KVM ARM64.
-
-If user space provides KVM_ARM_TARGET_HOST as target type in
-KVM_ARM_VCPU_INIT ioctl then we find out appropriate target
-type based on underlying host and return that to user space
-via struct kvm_vcpu_init.
+To implement target type KVM_ARM_TARGET_HOST we make the
+KVM_ARM_VCPU_INIT ioctl bi-direction so that KVM ARM/ARM64
+can return appropriate target type to user space via
+struct kvm_vcpu_init.
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 ---
- arch/arm64/include/asm/kvm_host.h |    2 +-
- arch/arm64/include/uapi/asm/kvm.h |    2 +-
- arch/arm64/kvm/guest.c            |   10 ++++++++--
- 3 files changed, 10 insertions(+), 4 deletions(-)
+ Documentation/virtual/kvm/api.txt |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 0859a4d..9ee431c 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -150,7 +150,7 @@ struct kvm_vcpu_stat {
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index ef925ea..c0a3a05 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2283,7 +2283,7 @@ current state.  "addr" is ignored.
+ Capability: basic
+ Architectures: arm, arm64
+ Type: vcpu ioctl
+-Parameters: struct struct kvm_vcpu_init (in)
++Parameters: struct kvm_vcpu_init (in/out)
+ Returns: 0 on success; -1 on error
+ Errors:
+  ?EINVAL: ???the target is unknown, or the combination of features is invalid.
+@@ -2303,6 +2303,9 @@ Possible features:
+ 	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
+ 	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
  
- struct kvm_vcpu_init;
- int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
--			const struct kvm_vcpu_init *init);
-+			struct kvm_vcpu_init *init);
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
- int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
- struct kvm_one_reg;
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index d9f026b..eeb5726 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -56,7 +56,7 @@ struct kvm_regs {
- #define KVM_ARM_TARGET_FOUNDATION_V8	1
- #define KVM_ARM_TARGET_CORTEX_A57	2
- #define KVM_ARM_TARGET_XGENE_POTENZA	3
--
-+#define KVM_ARM_TARGET_HOST		0x0FFFFFFF
- #define KVM_ARM_NUM_TARGETS		4
- 
- /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index d7bf7d6..261e836 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -230,12 +230,18 @@ int __attribute_const__ kvm_target_cpu(void)
- }
- 
- int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
--			const struct kvm_vcpu_init *init)
-+			struct kvm_vcpu_init *init)
- {
- 	unsigned int i;
- 	int phys_target = kvm_target_cpu();
- 
--	if (init->target != phys_target)
-+	if (phys_target < 0) {
-+		return phys_target;
-+	}
++This ioctl returns updated struct kvm_vcpu_init showing VCPU target 
++type and VCPU features that will be available.
 +
-+	if (init->target == KVM_ARM_TARGET_HOST)
-+		init->target = phys_target;
-+	else if (init->target != phys_target)
- 		return -EINVAL;
  
- 	vcpu->arch.target = phys_target;
+ 4.83 KVM_GET_REG_LIST
+ 
 -- 
 1.7.9.5
