@@ -1,46 +1,129 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Thu, 5 Sep 2013 04:25:39 +0000
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <20130905020435.GA3970@gmail.com>
-References: <1377828449-18912-1-git-send-email-b32955@freescale.com>
- <522697E9.1050208@freescale.com> <20130904095523.GT3084@sirena.org.uk>
- <52270B8E.5080402@freescale.com> <20130904113322.GA5859@sirena.org.uk>
- <20130905014350.GA2261@gmail.com>
- <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
- <20130905020435.GA3970@gmail.com>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 5 Sep 2013 12:32:29 +0800
+Subject: [PATCH 3/8] sdhci: sdhci-esdhc-imx: support real clock on and
+ off for imx6q
+In-Reply-To: <1378299257-2980-4-git-send-email-b29396@freescale.com>
+References: <1378299257-2980-1-git-send-email-b29396@freescale.com>
+ <1378299257-2980-4-git-send-email-b29396@freescale.com>
+Message-ID: <20130905043227.GB775@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shijie,
+On Wed, Sep 04, 2013 at 08:54:12PM +0800, Dong Aisheng wrote:
+> The signal voltage switch follow requires to shutdown and output
 
+s/follow/flow
+
+> clock in a specific sequence according to standard host controller
+> v3.0 spec. In that timing, the card must really receive clock or not.
 > 
-> > Hello Huang,
-> >
-> > >> In what way does the controller driver depend on those changes?
-> > > This driver needs the spi nor command to fill the LUT register, such as
-> > > OPCODE_WREN(0x06), so the patch 1 moves the spi nor command to a
-> seprate
-> > > header spi-nor.h, and this driver includes this new header.
-> > >
-> > Then some questions come up:
-> > - Why does the spi controller need to know this?
-> The hardware works in this way.
-> > - What is this LUT register at all?
-> Please see the patch 1.
-> > - What happens if something different that a flash is connected and
-> >    the data starts with one of these opcodes?
-> Submit a new patch to fix it.
+> However, for i.MX6Q, the uSDHC will not output clock even the clock
+> is enabled until there is command or data in transfer on the bus,
+> which will then cause singal voltage switch always to fail.
 > 
-This is not the correct approach, because for every NOR flash device
-user needs to submit a patch to populate these LUT with CMD, OPERAND
-and DUMMY values specific to that NOR device into these header files.
-As the supported NOR device list grows, the header file would become
-unmanageable and cluttered.
+> For i.MX6Q, we clear ESDHC_VENDOR_SPEC_FRC_SDCLK_ON bit to let
+> controller to gate off clock automatically and set that bit
+> to force clock output if clock is on.
+> 
+> This is required by SD3.0 support.
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+>  drivers/mmc/host/sdhci-esdhc-imx.c |    3 ---
+>  drivers/mmc/host/sdhci-esdhc.h     |   29 ++++++++++++++++++++++++++---
+>  2 files changed, 26 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index 1dd5ba8..3118a82 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -31,9 +31,6 @@
+>  #include "sdhci-esdhc.h"
+>  
+>  #define	ESDHC_CTRL_D3CD			0x08
+> -/* VENDOR SPEC register */
+> -#define ESDHC_VENDOR_SPEC		0xc0
+> -#define  ESDHC_VENDOR_SPEC_SDIO_QUIRK	(1 << 1)
+>  #define ESDHC_WTMK_LVL			0x44
+>  #define ESDHC_MIX_CTRL			0x48
+>  #define  ESDHC_MIX_CTRL_AC23EN		(1 << 7)
+> diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
+> index a2a0642..86fcd5b 100644
+> --- a/drivers/mmc/host/sdhci-esdhc.h
+> +++ b/drivers/mmc/host/sdhci-esdhc.h
+> @@ -14,6 +14,8 @@
+>  #ifndef _DRIVERS_MMC_SDHCI_ESDHC_H
+>  #define _DRIVERS_MMC_SDHCI_ESDHC_H
+>  
+> +#include <linux/of.h>
+> +
+>  /*
+>   * Ops and quirks for the Freescale eSDHC controller.
+>   */
+> @@ -33,6 +35,12 @@
+>  #define ESDHC_CLOCK_HCKEN	0x00000002
+>  #define ESDHC_CLOCK_IPGEN	0x00000001
+>  
+> +/* VENDOR SPEC register */
+> +#define ESDHC_VENDOR_SPEC		0xc0
+> +#define  ESDHC_VENDOR_SPEC_SDIO_QUIRK	(1 << 1)
+> +#define  ESDHC_VENDOR_SPEC_VSELECT	(1 << 1)
 
-I would rather suggest to get these values from DT bindings specific to 
-your fsl-qspi-controller. This way you would provide scalability without
-affecting other framework. This should also help you to keep your 
-MTD driver independent of QSPI-controller driver.
+It would be better to introduce the macro only when it's actually being
+used.
 
-With regards, pekon
+> +#define  ESDHC_VENDOR_SPEC_FRC_SDCLK_ON (1 << 8)
+> +
+>  /* pltfm-specific */
+>  #define ESDHC_HOST_CONTROL_LE	0x20
+>  
+> @@ -52,12 +60,20 @@
+>  static inline void esdhc_set_clock(struct sdhci_host *host, unsigned int clock,
+>  				   unsigned int host_clock)
+>  {
+> +	struct device *dev;
+>  	int pre_div = 2;
+>  	int div = 1;
+> -	u32 temp;
+> -
+> -	if (clock == 0)
+> +	u32 temp, val;
+> +
+> +	dev = mmc_dev(host->mmc);
+> +	if (clock == 0) {
+> +		if (of_device_is_compatible(dev->of_node, "fsl,imx6q-usdhc")) {
+> +			val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
+> +			writel(val & ~ESDHC_VENDOR_SPEC_FRC_SDCLK_ON,
+> +				host->ioaddr + ESDHC_VENDOR_SPEC);
+> +		}
+
+To me, maintaining this esdhc_set_clock() for both imx and powerpc makes
+no sense now.  I think it might be the time to have different versions
+of the function for imx and powerpc, just in esdhc_pltfm_set_clock() and
+esdhc_of_set_clock() respectively.
+
+Shawn
+
+>  		goto out;
+> +	}
+>  
+>  	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+>  	temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN
+> @@ -81,6 +97,13 @@ static inline void esdhc_set_clock(struct sdhci_host *host, unsigned int clock,
+>  		| (div << ESDHC_DIVIDER_SHIFT)
+>  		| (pre_div << ESDHC_PREDIV_SHIFT));
+>  	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+> +
+> +	if (of_device_is_compatible(dev->of_node, "fsl,imx6q-usdhc")) {
+> +		val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
+> +		writel(val | ESDHC_VENDOR_SPEC_FRC_SDCLK_ON,
+> +			host->ioaddr + ESDHC_VENDOR_SPEC);
+> +	}
+> +
+>  	mdelay(1);
+>  out:
+>  	host->clock = clock;
+> -- 
+> 1.7.1
+> 
+> 
