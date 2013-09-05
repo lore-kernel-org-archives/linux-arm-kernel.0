@@ -1,71 +1,41 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 5 Sep 2013 17:30:26 +0800
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EA0C907@DBDE04.ent.ti.com>
-References: <1377828449-18912-1-git-send-email-b32955@freescale.com>
- <522697E9.1050208@freescale.com> <20130904095523.GT3084@sirena.org.uk>
- <52270B8E.5080402@freescale.com> <20130904113322.GA5859@sirena.org.uk>
- <20130905014350.GA2261@gmail.com>
- <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
- <20130905020435.GA3970@gmail.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
- <522817D7.1010206@freescale.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C885@DBDE04.ent.ti.com>
- <5228369A.9000904@freescale.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C907@DBDE04.ent.ti.com>
-Message-ID: <52284F32.2020302@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 Sep 2013 11:34:40 +0200
+Subject: [PATCH RFC v2 01/16] ARM: call clk_of_init from time_init
+In-Reply-To: <cfedb014-695a-49cd-8e41-afabd585496a@DB8EHSMHS006.ehs.local>
+References: <1376964271-22715-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <52279D79.9070408@gmail.com>
+ <cfedb014-695a-49cd-8e41-afabd585496a@DB8EHSMHS006.ehs.local>
+Message-ID: <201309051134.40421.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?09?05? 17:11, Gupta, Pekon ??:
-> No, SPI generic framework (struct spi_transfer, spi_message,...)
-> should be kept independent of any MTD flash specific data handlers.
-> <wangyuhang2014@gmail.com>  added two new fields (tx_nbits, rx_nbits)
-> to spi_device because those properties are part of SPI protocol.
-> But, 'dummy_cycles' is no related to SPI protocol. So it should be kept out
-> of SPI generic framework.
-> This is where if you could use DT based approach, things would have been
-> simpler, because you give end-user the freedom to enter device-info from
-> device datasheet.
-ok. i think i do not need to change the spi code now.
->> >  
->> >  
->> >  
->> >  
->> >  
->> >  
->> >  
->>> >  >  Example: How to select opcodes in DT ?
->>> >  >  (step-1) eliminate opcode which cannot be used due to board constrains.
->>> >  >     your board connects only 2 data I/O between device and controller,  So you
->>> >  >     cannot use any of the QUAD  Read opcodes. Thus your choice is limited to
->>> >  >     DUAL or SINGLE modes only.
->> >  we have 4 data I/O lines between the device and controller, i only need
->> >  the Quad mode.:)
->> >  
-> May be because you are currently working on a development EVM or
-> demo board, so you can live with QUAD mode.
-> But when customer will have custom boards with different QSPI devices
-> then you would end-up  supporting all sorts of configurations:-)
-> And in production scenarios, it?s the price economics which mostly dominates
-> which part to choose and how to connect it on board.
-> Like as I remember some freescale boards have WINBOND QSPI flash
-> which uses different opcodes and semantics, so you might need to support
-> that too in future.
->
-> So my suggestion is think again. As you are inviting lot of re-work for yourself
-> and for others too:-)
->
-> Anyway, if you really want to continue with this is, then please re-name
-> include/linux/mtd/spi-nor.h to
-> include/linux/mtd/spi-fsl-quadspi.h
-> because something specific for your driver should not conflict with
-> generic spi-nor framework added later.
-i think there is no specific thing for this driver. The S25FL128S is a 
-common flash,
-other person may uses it too. Could you show me what is specific?
+On Wednesday 04 September 2013, S?ren Brinkmann wrote:
+> On Wed, Sep 04, 2013 at 10:52:09PM +0200, Sebastian Hesselbarth wrote:
+> > On 09/04/2013 10:41 PM, S?ren Brinkmann wrote:
+> > Anyways, having a custom .init_time gives you full control over
+> > of_clk_init and clocksource_of_init back again thanks to your
+> > suggestion.
+> > 
+> > I'll stop converting zynq and let you decide on your own ;)
+> 
+> As I said, currently it's rather messy and neither solution is perfect.
+> Steffen seemed to already have looked towards syscon and regmap, which
+> are probably the right ways of making the SLCR regs available to other users.
 
-so, i prefer to spi-nor.h.
+Yes, this seems fine. I suspect we will first have to find a way to have
+"early" syscon mappings, which seem to be required for a few other use
+cases as well, but are not trivial to implement in a nice way.
 
-thanks
-Huang Shijie
+> Sure, passing down the pointer is not perfect, but having two drivers
+> map the same memory region seems slightly worse to me. And it would even
+> fail for one driver if you properly used request_mem_region() and friends.
+
+I think the two approaches are equally hacky, no need to change it now
+or rush to a better solution -- let's fix the other of_clk_init() users
+first.
+
+One suggestion though: it might be better to not use CLK_OF_DECLARE
+with of_clk_init(NULL) in cases like this but have an explicit table
+in the clk driver that does not get intermixed with the default table.
+
+	Arnd
