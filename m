@@ -1,42 +1,31 @@
-From: alex.elder@linaro.org (Alex Elder)
-Date: Thu, 05 Sep 2013 08:33:24 -0500
-Subject: [PATCH] clk: only call get_parent if there is one
-Message-ID: <52288824.1060905@linaro.org>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 5 Sep 2013 12:51:39 +0200
+Subject: [PATCH 3/5] Staging/iio/adc/touchscreen/MXS: add i.MX23 support
+ to the LRADC driver
+In-Reply-To: <20130905104256.GK6329@mwanda>
+References: <1378299706-6742-1-git-send-email-jbe@pengutronix.de>
+ <201309051216.18305.jbe@pengutronix.de> <20130905104256.GK6329@mwanda>
+Message-ID: <201309051251.39877.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In __clk_init(), after a clock is mostly initialized, a scan is done
-of the orphan clocks to see if the clock being registered is the
-parent of any of them.
+Dear Dan Carpenter,
 
-This code assumes that any clock that provides a get_parent method
-actually has at least one parent, and that's not a valid assumption.
+> On Thu, Sep 05, 2013 at 12:16:18PM +0200, J?rgen Beisert wrote:
+> > I like this simplification, but all the other drivers for the MXS series
+> > of SoCs don't use such a method. Do you think this "new style" will be
+> > accepted?
+> 
+> My lradc_plate_mask() is basically the same idea as what Marek said
+> about putting the logic into the define.
+> 
+> LRADC....IRQ_MASK(id) (((id) == MX23) ? 0x1ff : 0x1fff)
+> 
+> I don't know why Marek is complaining about churn though.  This is
+> linux!  We love churn!  And especially in staging, it's our favorite
+> thing.  :P
 
-As a result, an orphan clock with no parent can return *something*
-as the parent index, and that value is blindly used to dereference
-the orphan's parent_names[] array (which will be ZERO_SIZE_PTR or
-NULL).
+About time to move this driver out of staging then ;-)
 
-Fix this by ensuring get_parent is only called for orphans with at
-least one parent.
-
-Signed-off-by: Alex Elder <elder@linaro.org>
----
- drivers/clk/clk.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 54a191c..ea8ff15 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1628,7 +1628,7 @@ int __clk_init(struct device *dev, struct clk *clk)
- 	 * this clock
- 	 */
- 	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
--		if (orphan->ops->get_parent) {
-+		if (orphan->num_parents && orphan->ops->get_parent) {
- 			i = orphan->ops->get_parent(orphan->hw);
- 			if (!strcmp(clk->name, orphan->parent_names[i]))
- 				__clk_reparent(orphan, clk);
--- 
-1.7.9.5
+Best regards,
+Marek Vasut
