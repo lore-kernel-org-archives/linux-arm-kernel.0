@@ -1,93 +1,34 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 5 Sep 2013 17:39:43 +0100
-Subject: [Xen-devel] [PATCH v5 02/13] arm: introduce a global dma_ops
- pointer
-In-Reply-To: <5224A47A.3010704@citrix.com>
-References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
- <1377801154-29215-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <5224A47A.3010704@citrix.com>
-Message-ID: <alpine.DEB.2.02.1309051736130.6397@kaball.uk.xensource.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 5 Sep 2013 09:53:13 -0700
+Subject: [PATCH 1/2] tick: broadcast: Deny per-cpu clockevents from being
+ broadcast sources
+In-Reply-To: <1377191201-14696-1-git-send-email-sboyd@codeaurora.org>
+References: <52138784.7050703@linaro.org>
+ <1377191201-14696-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <5f2b2c3b-ed31-47c8-9008-c338492db7d4@VA3EHSMHS030.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2 Sep 2013, Julien Grall wrote:
-> On 08/29/2013 07:32 PM, Stefano Stabellini wrote:
-> > Initially set dma_ops to arm_dma_ops.
-> > 
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> > CC: will.deacon at arm.com
-> > CC: linux at arm.linux.org.uk
-> > 
-> > 
-> > Changes in v3:
-> > -  keep using arm_dma_ops in dmabounce.
-> > ---
-> >  arch/arm/include/asm/dma-mapping.h |    3 ++-
-> >  arch/arm/mm/dma-mapping.c          |    3 +++
-> >  2 files changed, 5 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> > index 0982206..7d6e4f9 100644
-> > --- a/arch/arm/include/asm/dma-mapping.h
-> > +++ b/arch/arm/include/asm/dma-mapping.h
-> > @@ -13,6 +13,7 @@
-> >  #include <asm/cacheflush.h>
-> >  
-> >  #define DMA_ERROR_CODE	(~0)
-> > +extern struct dma_map_ops *dma_ops;
+On Thu, Aug 22, 2013 at 10:06:40AM -0700, Stephen Boyd wrote:
+> On most ARM systems the per-cpu clockevents are truly per-cpu in
+> the sense that they can't be controlled on any other CPU besides
+> the CPU that they interrupt. If one of these clockevents were to
+> become a broadcast source we will run into a lot of trouble
+> because the broadcast source is enabled on the first CPU to go
+> into deep idle (if that CPU suffers from FEAT_C3_STOP) and that
+> could be a different CPU than what the clockevent is interrupting
+> (or even worse the CPU that the clockevent interrupts could be
+> offline).
 > 
-> Hi,
+> Theoretically it's possible to support per-cpu clockevents as the
+> broadcast source but so far we haven't needed this and supporting
+> it is rather complicated. Let's just deny the possibility for now
+> until this becomes a reality (let's hope it never does!).
 > 
-> I tried to build your swiotlb patch series for the Arndale. I have a compilation
-> error because dma_ops is already used in samsung sound driver (sound/soc/samsung/dma.c).
-> 
-> This small fix allow me to built this serie for the Arndale.
-> Do I need to send it separately?
+> Reported-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-This looks like a good fix, I'll append it to the series
+Has this been merged anywhere?
 
-
-> =======================================================================
-> commit 73d4ceded87f52fa958b92d8d8d65be485e90857
-> Author: Julien Grall <julien.grall@linaro.org>
-> Date:   Mon Sep 2 15:36:35 2013 +0100
-> 
->     ASoC: Samsung: Rename dma_ops by samsung_dma_ops
->     
->     The commit "arm: introduce a global dma_ops pointer" introduce compilation issue
->     when CONFIG_SND_SOC_SAMSUNG is enabled.
->     
->     sound/soc/samsung/dma.c:345:27: error: conflicting types for 'dma_ops'
->     /local/home/julien/works/arndale/linux/arch/arm/include/asm/dma-mapping.h:16:28:
->     note: previous declaration of 'dma_ops' was here
->     
->     Signed-off-by: Julien Grall <julien.grall@linaro.org>
-> 
-> diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-> index ddea134..c341603 100644
-> --- a/sound/soc/samsung/dma.c
-> +++ b/sound/soc/samsung/dma.c
-> @@ -342,7 +342,7 @@ static int dma_mmap(struct snd_pcm_substream *substream,
->                                      runtime->dma_bytes);
->  }
->  
-> -static struct snd_pcm_ops dma_ops = {
-> +static struct snd_pcm_ops samsung_dma_ops = {
->         .open           = dma_open,
->         .close          = dma_close,
->         .ioctl          = snd_pcm_lib_ioctl,
-> @@ -429,7 +429,7 @@ out:
->  }
->  
->  static struct snd_soc_platform_driver samsung_asoc_platform = {
-> -       .ops            = &dma_ops,
-> +       .ops            = &samsung_dma_ops,
->         .pcm_new        = dma_new,
->         .pcm_free       = dma_free_dma_buffers,
->  };
-> 
-> -- 
-> Julien Grall
-> 
+	Thanks,
+	S?ren
