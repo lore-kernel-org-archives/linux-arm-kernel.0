@@ -1,42 +1,33 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 5 Sep 2013 14:25:00 +0200
-Subject: [PATCH v2 RFT 2/2] PM / Hibernate: add section for resume options
-In-Reply-To: <1377652437-2379-3-git-send-email-sebastian.capella@linaro.org>
-References: <1377652437-2379-1-git-send-email-sebastian.capella@linaro.org>
- <1377652437-2379-3-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <20130905122500.GE15161@amd.pavel.ucw.cz>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 05 Sep 2013 13:29:33 +0100
+Subject: [PATCH] ARM: shmobile: update SDHI DT compatibility string to the
+ <unit>-<soc> format
+In-Reply-To: <20130905060102.GH14960@verge.net.au> (Simon Horman's message of
+ "Thu, 5 Sep 2013 15:01:03 +0900")
+References: <Pine.LNX.4.64.1308291650120.3786@axis700.grange>
+ <1621893.Re68yLczyK@avalon> <20130905060102.GH14960@verge.net.au>
+Message-ID: <86ob87tpsi.fsf@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi,
 
-On Tue 2013-08-27 18:13:57, Sebastian Capella wrote:
-> Expand the existing documentation to explicitly list the options for
-> resuming a hibernation image, including the manual resume option which
-> can be used from the initrd or initramfs and the kernel init resume.
+On Thu, Sep 05 2013, Simon Horman wrote:
+>> > Ok, the "no real products" is an assumption, that Laurent and Simon kind
+>> > of agreed upon, so, I'm using it here to avoid having to carry old
+>> > compatibility strings with us around. If anyone has other information -
+>> > please shout. Otherwise, I think, it would be the easiest for Chris to ack
+>> > this and for Simon to pull this via the ARM tree for late 3.12 (possibly,
+>> > post -rc1) inclusion.
+>
+> Thanks, I believe that is a good plan.
+>
+> Chris, could we get an Ack?
 
-...it also fixes sysfs path in second hunk.
+Acked-by: Chris Ball <cjb@laptop.org>
 
-> Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-> Cc: Rob Landley <rob@landley.net>
-> Cc: Len Brown <len.brown@intel.com>
-> Cc: Pavel Machek <pavel@ucw.cz>
+Thanks,
 
-Acked-by: Pavel Machek <pavel@ucw.cz>
-
-(Cc-ed trivial so this does not get lost).
-
-> @@ -326,7 +339,7 @@ Q: How can distributions ship a swsusp-supporting kernel with modular
->  disk drivers (especially SATA)?
->  
->  A: Well, it can be done, load the drivers, then do echo into
-> -/sys/power/disk/resume file from initrd. Be sure not to mount
-> +/sys/power/resume file from initrd. Be sure not to mount
->  anything, not even read-only mount, or you are going to lose your
->  data.
->  
-
-
+- Chris.
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
