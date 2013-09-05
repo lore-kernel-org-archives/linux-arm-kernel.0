@@ -1,66 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Sep 2013 10:08:42 +0100
-Subject: [PATCH v3 1/3] ARM: Introduce atomic MMIO modify
-In-Reply-To: <522847FC.1080005@free-electrons.com>
-References: <1377253445-2842-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130823103802.GO4600@tarshish> <20130823110748.GD2389@localhost>
- <20130823113225.GF2389@localhost> <20130823114805.GF10971@arm.com>
- <20130830090807.GB25628@mudshark.cambridge.arm.com>
- <20130830091534.GA62188@MacBook-Pro.local>
- <20130830092032.GD25628@mudshark.cambridge.arm.com>
- <20130830100342.GD62188@MacBook-Pro.local>
- <522847FC.1080005@free-electrons.com>
-Message-ID: <20130905090841.GA9696@mudshark.cambridge.arm.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Thu, 5 Sep 2013 11:11:47 +0200
+Subject: [PATCH] net: mvneta: properly disable HW PHY polling and ensure
+ adjust_link() works
+In-Reply-To: <20130905102659.25a0f064@skate>
+References: <1378304478-21237-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130904163245.GI20552@1wt.eu>
+ <CACzLR4uDQK2bkcEJQXLe805EfSA8=eF+YH-FTYovHA0q+8Y9NA@mail.gmail.com>
+ <20130905051223.GB26000@1wt.eu> <20130905092808.617da416@skate>
+ <20130905074426.GD26000@1wt.eu> <20130905102659.25a0f064@skate>
+Message-ID: <20130905091147.GA28658@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 05, 2013 at 09:59:40AM +0100, Gregory CLEMENT wrote:
-> Hi all,
-
-Hi Gregory,
-
-> On 30/08/2013 12:03, Catalin Marinas wrote:
-> > On Fri, Aug 30, 2013 at 10:20:33AM +0100, Will Deacon wrote:
-> >> Perhaps we should just bit the bullet and define relaxed accessors for all
-> >> architectures? It's not difficult to default them to the non-relaxed
-> >> variants if the architecture doesn't provide an optimised implementation.
-> > 
-> > Yes, an asm-generic default relaxed would be good (that's what I
-> > suggested earlier in this thread and it was discussed in the past). But
-> > no-one volunteered ;).
-> > 
+On Thu, Sep 05, 2013 at 10:26:59AM +0200, Thomas Petazzoni wrote:
+> > One simpler solution for them could be to slightly modify the boot loader
+> > so that it sets the MAC address on the two ethernet controllers prior to
+> > boot. Then your code which checks if a MAC is already set will simply
+> > work.
 > 
-> I would like to make the things move on about this subject. Should it
-> be possible to merge this version of the patch set? Currently the
-> only users of this new API are drivers for ARM SoCs.
+> This works when the network driver is compiled 'statically' inside the
+> kernel. When compiled as a module, then the gatable clock of the
+> network interface will be gated at the end of the kernel boot, before
+> the mvneta module is probe. And gating the network interface clocks
+> means that it will loose its state, including its MAC address. So it's
+> not an entirely perfect solution either, but I admit that on such
+> platforms, the network driver is most likely compiled statically, so it
+> would probably suit the needs of most people.
 
-In the short term then, I'd keep this restricted to ARM. Without relaxed
-accessors available across all architectures, I don't think we can make this
-usefully generic (a readX/writeX version would be horribly slow on ARM).
+Agreed.
 
-> In the meantime, I am willing to introduce an asm-generic default
-> relaxed variant of read and write, but as Catalin had already pointed
-> in the past
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/117626
-> it may take time to get an agreement from all the other architectures.
+> Note that this can be done without doing any change in the bootloader.
+> For example, on a Mirabox, you can do:
+> 
+>    mw.l 0xD0072414 0x5C93; mw.l 0xD0072418 0xF0AD4E01; mw.l 0xD0076414 0x5C94; mw.l 0xD0076418 0xF0AD4E01; bootm
+> 
+> to boot your kernel. This will program the MAC addresses for both
+> network interfaces in the network controllers, so that when booting
+> Linux, you get:
+> 
+> [   42.122881] mvneta d0070000.ethernet eth0: Using hardware mac address f0:ad:4e:01:5c:93
+> [   42.385398] mvneta d0074000.ethernet eth1: Using hardware mac address f0:ad:4e:01:5c:94
+> 
+> You add that to your default U-Boot boot script, and that's it, you
+> have stable MAC addresses.
 
-I actually wrote those patches yesterday but, in doing so, I realised that
-the kernel doesn't have well-defined semantics for relaxed I/O accessors
-(i.e. different architectures use them to mean different things). That makes
-portability is an issue, even if the functions are defined everywhere.
+Hmmm that's quite interesting. Unfortunately I don't see an easy way to
+make this directly rely on the ethaddr/eth1addr so that end users can
+simply cut-n-paste a few lines into the u-boot config. But anyway that
+can be useful.
 
-> That's why I propose that this patch set do not depend on the
-> introduction of a asm-generic default relaxed variant of read and
-> write. Later when it will be accepted then this new API will be moved
-> in the asm-generic part.
+> > A last one would be to have the mvneta module accept an array of addresses
+> > as a module parameter. This way it would just require a minor change in the
+> > kernel's cmdline to pass the MAC addresses. I remember seeing this in the
+> > past, I don't remember the platform (maybe the NSLU2 but I could be wrong).
+> 
+> The situation of module parameters to pass MAC addresses was a bit
+> fuzzy. There was once a proposal to add a generic kernel parameter to
+> do this, but it was rejected by David Miller (I believe not on specific
+> implementation details, but on the general idea). However, there are
+> numerous drivers in the tree that do provide a custom module parameter
+> to set MAC addresses.
 
-Indeed, we can't make this generic until we've resolved the issues I mention
-above. I'll start a new thread around that once I've put my thoughts
-together, but that needn't block this patch imo.
+Yes, I remember using this with the sunhme driver many years ago when
+we did not have access to the onboard rom to retrieve the MAC address.
 
-That said, I'd still suggest resending a final version of this patch, since
-there were some minor issues with this iteration.
+> However, with the above suggestion of U-Boot scripting, I believe we
+> have a relatively easy solution for people to use.
 
-Cheers,
+We could provide a script to do it more conveniently for the user :-)
 
-Will
+Best regards,
+Willy
