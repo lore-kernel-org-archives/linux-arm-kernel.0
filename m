@@ -1,32 +1,36 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Fri, 6 Sep 2013 10:17:54 -0400
-Subject: [PATCH v5 12/13] swiotlb-xen: use xen_alloc/free_coherent_pages
-In-Reply-To: <alpine.DEB.2.02.1309051743450.6397@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
- <1377801154-29215-12-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130830135333.GL21239@phenom.dumpdata.com>
- <alpine.DEB.2.02.1309051743450.6397@kaball.uk.xensource.com>
-Message-ID: <20130906141754.GT2590@phenom.dumpdata.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 6 Sep 2013 09:22:37 -0500
+Subject: [PATCHv2 1/2] ARM: msm: Add support for MSM8974 Dragonboard
+In-Reply-To: <1378425890-4225-1-git-send-email-rvaswani@codeaurora.org>
+References: <1378425890-4225-1-git-send-email-rvaswani@codeaurora.org>
+Message-ID: <20A8A05D-2F56-4127-A494-470833B2DC42@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 05, 2013 at 05:50:45PM +0100, Stefano Stabellini wrote:
-> On Fri, 30 Aug 2013, Konrad Rzeszutek Wilk wrote:
-> > On Thu, Aug 29, 2013 at 07:32:33PM +0100, Stefano Stabellini wrote:
-> > > Use xen_alloc_coherent_pages and xen_free_coherent_pages to allocate or
-> > > free coherent pages.
-> > > 
-> > > We need to be careful handling the pointer returned by
-> > > xen_alloc_coherent_pages, because on ARM the pointer is not equal to
-> > > phys_to_virt(*dma_handle). In fact virt_to_phys on the returned pointer
-> > > doesn't return a valid physical address.
-> > 
-> > Why is it called 'virt_to_phys'? What does it return then?
-> 
-> virt_to_phys only works for kernel direct mapped RAM memory.
-> In this case the virtual address could be an ioremap address, therefore
-> passing it to virt_to_phys would give you another physical address that
-> doesn't correspond to it.
 
-Ah, so very much ARM (and in some way SPARC) specific. I think you need add some comments
-in the code (And git commit) to explain this. Thank you.
+On Sep 5, 2013, at 7:04 PM, Rohit Vaswani wrote:
+
+> This patch adds basic board support for MSM8974 Dragonboard
+> which belongs to the Snapdragon 800 family.
+> For now, just support a basic machine with device tree.
+> 
+> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+> ---
+> arch/arm/boot/dts/Makefile        |  3 ++-
+> arch/arm/boot/dts/msm8974-db.dts  |  7 +++++++
+> arch/arm/boot/dts/msm8974.dtsi    | 30 ++++++++++++++++++++++++++++++
+> arch/arm/mach-msm/Kconfig         | 20 ++++++++++++++++++--
+> arch/arm/mach-msm/Makefile        |  1 +
+> arch/arm/mach-msm/board-dt-8974.c | 23 +++++++++++++++++++++++
+> 6 files changed, 81 insertions(+), 3 deletions(-)
+> create mode 100644 arch/arm/boot/dts/msm8974-db.dts
+> create mode 100644 arch/arm/boot/dts/msm8974.dtsi
+> create mode 100644 arch/arm/mach-msm/board-dt-8974.c
+
+As I mentioned before, its the APQ8074 Dragonboard, not MSM8974
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
