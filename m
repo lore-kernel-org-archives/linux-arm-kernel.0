@@ -1,51 +1,28 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 6 Sep 2013 16:59:28 +0100
-Subject: [PATCH v5 11/13] xen: introduce xen_alloc/free_coherent_pages
-In-Reply-To: <alpine.DEB.2.02.1309061554260.6397@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
- <1377801154-29215-11-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130905160905.GI11887@arm.com>
- <alpine.DEB.2.02.1309051742390.6397@kaball.uk.xensource.com>
- <20130906141444.GE1946@arm.com>
- <alpine.DEB.2.02.1309061554260.6397@kaball.uk.xensource.com>
-Message-ID: <20130906155928.GH1946@arm.com>
+From: yi.li@linaro.org (Yi Li)
+Date: Sat,  7 Sep 2013 00:02:50 +0800
+Subject: [PATCH] Add dmi driver support on arm
+Message-ID: <1378483371-19858-1-git-send-email-yi.li@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 06, 2013 at 03:59:02PM +0100, Stefano Stabellini wrote:
-> On Fri, 6 Sep 2013, Catalin Marinas wrote:
-> > On Thu, Sep 05, 2013 at 05:43:33PM +0100, Stefano Stabellini wrote:
-> > > On Thu, 5 Sep 2013, Catalin Marinas wrote:
-> > > > On Thu, Aug 29, 2013 at 07:32:32PM +0100, Stefano Stabellini wrote:
-> > > > > xen_swiotlb_alloc_coherent needs to allocate a coherent buffer for cpu
-> > > > > and devices. On native x86 and ARMv8 is sufficient to call
-> > > > > __get_free_pages in order to get a coherent buffer, while on ARM we need
-> > > > > to call arm_dma_ops.alloc.
-> > > > 
-> > > > Don't bet on this for ARMv8. It's not mandated for the architecture, so
-> > > > at some point some SoC will require non-cacheable buffers for coherency.
-> > > 
-> > > I see.
-> > > Would it be better if I implemented xen_alloc_coherent_pages on armv8 by
-> > > calling arm64_swiotlb_dma_ops.alloc?
-> > 
-> > What does this buffer do exactly? Is it allocated by guests?
-> 
-> It is allocated by Dom0 to do DMA to/from a device.
-> It is the buffer that is going to be returned by dma_map_ops.alloc to
-> the caller:
-> 
-> On x86:
-> dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> __get_free_pages
-> 
-> On ARM:
-> dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> arm_dma_ops.alloc
-> 
-> On ARM64
-> dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> ????
+From: liyi <yi.li@linaro.org>
 
-OK, I'm getting more confused. Do all the above calls happen in the
-guest, Dom0, or a mix?
+x86 and IA64 have the DMI support, which is useful for supporting
+SMBIOS specification. All these SMBIOS tables will give the hardware
+information for user or applications.
+
+This patch depends on EFI runtime service function which
+not yet upstreamed, it has been generated against the tag
+leg-20130906.0 on git://git.linaro.org/people/graemegregory/linux.git."
+
+liyi (1):
+  ARM:DMI: Add dmi driver support on arm
+
+ arch/arm/Kconfig           |    9 +++++++++
+ arch/arm/include/asm/dmi.h |   12 ++++++++++++
+ arch/arm/kernel/setup.c    |    7 ++++++-
+ 3 files changed, 27 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/include/asm/dmi.h
 
 -- 
-Catalin
+1.7.9.5
