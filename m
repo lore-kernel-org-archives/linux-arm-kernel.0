@@ -1,75 +1,55 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 6 Sep 2013 15:53:58 +0100
-Subject: [PATCH v5 05/13] xen/arm,arm64: move Xen initialization
- earlier
-In-Reply-To: <20130906142301.GA5140@phenom.dumpdata.com>
+Date: Fri, 6 Sep 2013 15:59:02 +0100
+Subject: [PATCH v5 11/13] xen: introduce xen_alloc/free_coherent_pages
+In-Reply-To: <20130906141444.GE1946@arm.com>
 References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
- <1377801154-29215-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130905162026.GJ11887@arm.com>
- <alpine.DEB.2.02.1309051755560.6397@kaball.uk.xensource.com>
- <1378457939.14745.73.camel@kazak.uk.xensource.com>
- <20130906140921.GD1946@arm.com> <20130906142301.GA5140@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1309061553270.6397@kaball.uk.xensource.com>
+ <1377801154-29215-11-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130905160905.GI11887@arm.com>
+ <alpine.DEB.2.02.1309051742390.6397@kaball.uk.xensource.com>
+ <20130906141444.GE1946@arm.com>
+Message-ID: <alpine.DEB.2.02.1309061554260.6397@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Sep 2013, Konrad Rzeszutek Wilk wrote:
-> On Fri, Sep 06, 2013 at 03:09:21PM +0100, Catalin Marinas wrote:
-> > On Fri, Sep 06, 2013 at 09:58:59AM +0100, Ian Campbell wrote:
-> > > On Thu, 2013-09-05 at 17:59 +0100, Stefano Stabellini wrote:
-> > > > On Thu, 5 Sep 2013, Catalin Marinas wrote:
-> > > > > On Thu, Aug 29, 2013 at 07:32:26PM +0100, Stefano Stabellini wrote:
-> > > > > > Move Xen initialization earlier, before any DMA requests can be made.
-> > > > > > 
-> > > > > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > > > 
-> > > > > I guess you should cc the corresponding maintainers here.
-> > > > 
-> > > > Thanks for the reminder, I'll do that.
-> > > > 
-> > > > 
-> > > > > >  arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
-> > > > > >  arch/arm/kernel/setup.c               |    2 ++
-> > > > > >  arch/arm/xen/enlighten.c              |   21 ++++++++++++++-------
-> > > > > >  arch/arm64/kernel/setup.c             |    2 ++
-> > > > > >  4 files changed, 26 insertions(+), 7 deletions(-)
-> > > > > 
-> > > > > [...]
-> > > > > 
-> > > > > > --- a/arch/arm64/kernel/setup.c
-> > > > > > +++ b/arch/arm64/kernel/setup.c
-> > > > > > @@ -53,6 +53,7 @@
-> > > > > >  #include <asm/traps.h>
-> > > > > >  #include <asm/memblock.h>
-> > > > > >  #include <asm/psci.h>
-> > > > > > +#include <asm/xen/hypervisor.h>
-> > > > > >  
-> > > > > >  unsigned int processor_id;
-> > > > > >  EXPORT_SYMBOL(processor_id);
-> > > > > > @@ -267,6 +268,7 @@ void __init setup_arch(char **cmdline_p)
-> > > > > >  	unflatten_device_tree();
-> > > > > >  
-> > > > > >  	psci_init();
-> > > > > > +	xen_early_init();
-> > > > > 
-> > > > > So Xen guests don't have any hope for single Image? Basically you set
-> > > > > dma_ops unconditionally in xen_early_init(), even if the kernel is not
-> > > > > intended to run under Xen.
-> > > > 
-> > > > That should not happen: if we are not running on Xen xen_early_init
-> > > > returns early, before calling xen_mm_init.
+On Fri, 6 Sep 2013, Catalin Marinas wrote:
+> On Thu, Sep 05, 2013 at 05:43:33PM +0100, Stefano Stabellini wrote:
+> > On Thu, 5 Sep 2013, Catalin Marinas wrote:
+> > > On Thu, Aug 29, 2013 at 07:32:32PM +0100, Stefano Stabellini wrote:
+> > > > xen_swiotlb_alloc_coherent needs to allocate a coherent buffer for cpu
+> > > > and devices. On native x86 and ARMv8 is sufficient to call
+> > > > __get_free_pages in order to get a coherent buffer, while on ARM we need
+> > > > to call arm_dma_ops.alloc.
 > > > 
-> > > x96 has a call to init_hypervisor_platform() at approximately this
-> > > location, which detects and calls the init function for any of Xen, KVM,
-> > > hyperv and vmware.
+> > > Don't bet on this for ARMv8. It's not mandated for the architecture, so
+> > > at some point some SoC will require non-cacheable buffers for coherency.
 > > 
-> > I would rather have a core_initcall(xen_early_init()) if possible,
-> > rather than hard-coded calls in setup_arch(). This early stuff is
-> > DT-driven, so in theory you don't need a specific xen call. The only
-> > thing is that you end up with swiotlb_init() and 64MB wasted if the Xen
-> > guest does not plan to use them.
+> > I see.
+> > Would it be better if I implemented xen_alloc_coherent_pages on armv8 by
+> > calling arm64_swiotlb_dma_ops.alloc?
 > 
-> There is a swiotlb_free mechanism in case the allocation was not
-> neccessary.
+> What does this buffer do exactly? Is it allocated by guests?
 
-I think I'll just use the late swiotlb initialization.
+It is allocated by Dom0 to do DMA to/from a device.
+It is the buffer that is going to be returned by dma_map_ops.alloc to
+the caller:
+
+On x86:
+dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> __get_free_pages
+
+On ARM:
+dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> arm_dma_ops.alloc
+
+On ARM64
+dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> ????
+
+
+
+> Currently arm64_swiotlb_dma_ops assume cache-coherent DMA. I have a
+> patch which introduces new ops for non-coherent DMA but this should
+> really be orthogonal to swiotlb. You can basically have 4 combinations
+> of coherent/non-coherent and swiotlb/iommu. Mark Rutland is currently
+> looking into how best to describe this via DT as it may not even be per
+> SoC but per bus or device.
+
+It seems to me that calling arm64_swiotlb_dma_ops.alloc would ensure
+that we allocate the right buffer for the right device?
