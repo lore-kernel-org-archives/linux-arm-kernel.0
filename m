@@ -1,108 +1,75 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Fri, 6 Sep 2013 12:42:37 -0700
-Subject: [RFC 0/4] Create infrastructure for running C code from SRAM.
-In-Reply-To: <20130906161902.GB3558@localhost.localdomain>
-References: <1378226665-27090-1-git-send-email-Russ.Dill@ti.com>
- <20130906111221.GH25647@n2100.arm.linux.org.uk>
- <20130906161902.GB3558@localhost.localdomain>
-Message-ID: <CA+Bv8XZk7cnRCZbw-jexwKnCxSAM81KbSevCtVTKE_0550W7rw@mail.gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 6 Sep 2013 14:51:14 -0500
+Subject: [PATCH v2] ARM: EDMA: Fix clearing of unused list for DT DMA
+ resources
+In-Reply-To: <522A29CF.2090001@newflow.co.uk>
+References: <1377287613-16491-1-git-send-email-joelf@ti.com>
+ <522A2943.4060502@newflow.co.uk> <522A29CF.2090001@newflow.co.uk>
+Message-ID: <522A3232.2090103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 6, 2013 at 9:19 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Fri, Sep 06, 2013 at 12:12:21PM +0100, Russell King - ARM Linux wrote:
->> On Tue, Sep 03, 2013 at 09:44:21AM -0700, Russ Dill wrote:
->> > SRAM handling code is in the process of being moved from arch directories
->> > into drivers/misc/sram.c using device tree and genalloc [1] [2]. This RFC
->> > patchset builds on that, including the limitation that the SRAM address is
->> > not known at compile time. Because the SRAM address is not known at compile
->> > time, the code that runs from SRAM must be compiled with -fPIC. Even if
->> > the code were loaded to a fixed virtual address, portions of the code must
->> > often be run with the MMU disabled.
+On 09/06/2013 02:15 PM, Mark Jackson wrote:
+> On 06/09/13 20:13, Mark Jackson wrote:
+>> On 23/08/13 20:53, Joel Fernandes wrote:
+>>> HWMOD removal for MMC and Crypto is breaking edma_start as the events are
+>>> being manually triggered due to unused channel list not being clear. Atleast
+>>> breakage has been seen on these peripherals, but it is expected Audio (McASP)
+>>> maybe breaking too.
+>>>
+>>> This patch fixes the issue, by reading the "dmas" property from the DT node if
+>>> it exists and clearing the bits in the unused channel list so that these channels
+>>> are not manually triggered.
+>>>
+>>> v2 changes:
+>>> Reduced indendation by returning from if block.
+>>>
+>>> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+>>> Reported-by: Balaji T K <balajitk@ti.com>
+>>> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
+>>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>>> ---
+>>> Note:
+>>> Patch should go in for -rc cycle as it fixes existing crypto drivers.
+>>>
+>>>  arch/arm/common/edma.c | 22 +++++++++++++++++++---
+>>>  1 file changed, 19 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+>>> index 39ad030..3867e7e 100644
+>>> --- a/arch/arm/common/edma.c
+>>> +++ b/arch/arm/common/edma.c
+>>> @@ -560,14 +560,30 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
+>>>  static int prepare_unused_channel_list(struct device *dev, void *data)
+>>>  {
+>>>  	struct platform_device *pdev = to_platform_device(dev);
+>>> -	int i, ctlr;
+>>> +	int i = 0, ctlr;
+>>> +	u32 dma_chan;
+>>> +	const __be32 *dma_chan_p;
+>>> +	struct property *prop;
+>>> +
+>>> +	if (dev->of_node) {
+>>> +		of_property_for_each_u32(dev->of_node, "dmas", prop,
+>>> +					 dma_chan_p, dma_chan) {
+>>> +			if (i++ & 1) {
+>>> +				ctlr = EDMA_CTLR(dma_chan);
+>>> +				clear_bit(EDMA_CHAN_SLOT(dma_chan),
+>>> +					  edma_cc[ctlr]->edma_unused);
+>>> +			}
+>>> +		}
+>>> +		return;
 >>
->> What are you doing about the various gcc utility functions that may be
->> implicitly called from C code such as memcpy and memset?
+>> This should return something here, otherwise we get:-
 >>
->> > The general idea is that for each SRAM user (such as an SoC specific
->> > suspend/resume mechanism) to create a group of sections. The section group
->> > is created with a single macro for each user, but end up looking like this:
->> >
->> > .sram.am33xx : AT(ADDR(.sram.am33xx) - 0) {
->> >   __sram_am33xx_start = .;
->> >   *(.sram.am33xx.*)
->> >   __sram_am33xx_end = .;
->> > }
->> >
->> > Any data or functions that should be copied to SRAM for this use should be
->> > maked with an appropriate __section() attribute. A helper is then added for
->> > translating between the original kernel symbol, and the address of that
->> > function or variable once it has been copied into SRAM. Once control is
->> > passed to a function within the SRAM section grouping, it can access any
->> > variables or functions within that same SRAM section grouping without
->> > translation.
->>
->> What about the relocations which will need to be fixed up - eg, addresses
->> in the literal pool, the GOT table contents, etc?  You say nothing about
->> this.
->
-> I was also thinking about this, and there are more problems.
->
-> As well as what has already been mentioned:
->
->  * Calls from inside the SRAM code to vmlinux (including lib1funcs etc.)
->    will typically break, except on architectures where function calls are
->    (absolute by default not ARM).
+>> arch/arm/common/edma.c: In function 'prepare_unused_channel_list':
+>> arch/arm/common/edma.c:577:3: warning: 'return' with no value, in function returning non-void [-Wreturn-type]
+> 
+> Other than that I can confirm it fixes the issue for me ...
 
-As in the response to RMK, I think compiler flags are enough to
-prevent implicit memcpy/memset calls. The code would not be allowed to
-do divisions, module, or 64 bit multiplication. A make rule would
-check the sram sections for any dynamically relocatable symbols.
+Thanks for pointing that out. Will fix it in the next revision.
 
->  * The compiler/linker won't detect unsafe constructs or code generation,
->    because it assumes that anything built with -fPIC is going to be patched
->    up later by ld.so or equivalent.
 
-Can you provide examples of what some of these other unsafe constructs might be?
+Regards,
 
->  * The GOT is generated by the linker, and is a single table.  Yet each
->    SRAM blob needs to be able to refer to its own GOT entries position-
->    independently.  Moving the blobs independently won't work.
-
-Would GOT entries only exist if there are accesses to .data or .bss?
-The SRAM C code would not support such a thing, only access to data
-and text within the SRAM grouping is allowed. Is there a way to make
-the compiler or linker complain if such an access is done? If not,
-it'd be another make rule as above.
-
-> In other words: -fPIC does not generate position-independent code.
->
-> It generates position-dependent code that is easier to move around than
-> non-fPIC code, but you still need a dynamic linker (or equivalent) to
-> make it all work.
-
-arch/arm/boot/compressed/ seems to manage it. Hopefully, by allowing
-only more limited code, I can get by with less tricks.
-
-> There are various "correct" ways to handle this, the simplest of which
-> is probably to build each SRAM blob as a kernel module, embed the result
-> in the kernel somehow, and then use the module loader infrastructure
-> to handle fixing the module up to the right address.
->
-> But this is still likely to be overkill, given the small scale of the
-> SRAM code.
-
-Yes, I'm pretty sure several people would scream rather loudly if
-getting suspend/resume support on their platform required
-CONFIG_MODULES=y.
-
-> Restricting such code to carefully-written assembler (as now) may be
-> the more practical approrach, unless there's a good example of somewhere
-> that C code would provide a big benefit.
-
-There are currently about 5000 or so lines of assembly code in
-arch/arm that are used for suspend/resume stubs. In one stage of
-am335x development, the sleep/resume stub for am335x was about 1200
-lines long. Since then, a lot of that code has been moved to a
-firmware blob, but there has been some pushback on that, which is why
-I'm investigating this path. Especially given that there are some
-future platforms that will follow the am335x pm model.
+-Joel
