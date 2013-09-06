@@ -1,79 +1,75 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 6 Sep 2013 09:28:14 -0500
-Subject: [PATCHv2 1/2] ARM: msm: Add support for MSM8974 Dragonboard
-In-Reply-To: <1378425890-4225-1-git-send-email-rvaswani@codeaurora.org>
-References: <1378425890-4225-1-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <97899226-465A-4B78-9FFD-B6B14136420B@codeaurora.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 6 Sep 2013 15:53:58 +0100
+Subject: [PATCH v5 05/13] xen/arm,arm64: move Xen initialization
+ earlier
+In-Reply-To: <20130906142301.GA5140@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
+ <1377801154-29215-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130905162026.GJ11887@arm.com>
+ <alpine.DEB.2.02.1309051755560.6397@kaball.uk.xensource.com>
+ <1378457939.14745.73.camel@kazak.uk.xensource.com>
+ <20130906140921.GD1946@arm.com> <20130906142301.GA5140@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1309061553270.6397@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 6 Sep 2013, Konrad Rzeszutek Wilk wrote:
+> On Fri, Sep 06, 2013 at 03:09:21PM +0100, Catalin Marinas wrote:
+> > On Fri, Sep 06, 2013 at 09:58:59AM +0100, Ian Campbell wrote:
+> > > On Thu, 2013-09-05 at 17:59 +0100, Stefano Stabellini wrote:
+> > > > On Thu, 5 Sep 2013, Catalin Marinas wrote:
+> > > > > On Thu, Aug 29, 2013 at 07:32:26PM +0100, Stefano Stabellini wrote:
+> > > > > > Move Xen initialization earlier, before any DMA requests can be made.
+> > > > > > 
+> > > > > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > > > 
+> > > > > I guess you should cc the corresponding maintainers here.
+> > > > 
+> > > > Thanks for the reminder, I'll do that.
+> > > > 
+> > > > 
+> > > > > >  arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
+> > > > > >  arch/arm/kernel/setup.c               |    2 ++
+> > > > > >  arch/arm/xen/enlighten.c              |   21 ++++++++++++++-------
+> > > > > >  arch/arm64/kernel/setup.c             |    2 ++
+> > > > > >  4 files changed, 26 insertions(+), 7 deletions(-)
+> > > > > 
+> > > > > [...]
+> > > > > 
+> > > > > > --- a/arch/arm64/kernel/setup.c
+> > > > > > +++ b/arch/arm64/kernel/setup.c
+> > > > > > @@ -53,6 +53,7 @@
+> > > > > >  #include <asm/traps.h>
+> > > > > >  #include <asm/memblock.h>
+> > > > > >  #include <asm/psci.h>
+> > > > > > +#include <asm/xen/hypervisor.h>
+> > > > > >  
+> > > > > >  unsigned int processor_id;
+> > > > > >  EXPORT_SYMBOL(processor_id);
+> > > > > > @@ -267,6 +268,7 @@ void __init setup_arch(char **cmdline_p)
+> > > > > >  	unflatten_device_tree();
+> > > > > >  
+> > > > > >  	psci_init();
+> > > > > > +	xen_early_init();
+> > > > > 
+> > > > > So Xen guests don't have any hope for single Image? Basically you set
+> > > > > dma_ops unconditionally in xen_early_init(), even if the kernel is not
+> > > > > intended to run under Xen.
+> > > > 
+> > > > That should not happen: if we are not running on Xen xen_early_init
+> > > > returns early, before calling xen_mm_init.
+> > > 
+> > > x96 has a call to init_hypervisor_platform() at approximately this
+> > > location, which detects and calls the init function for any of Xen, KVM,
+> > > hyperv and vmware.
+> > 
+> > I would rather have a core_initcall(xen_early_init()) if possible,
+> > rather than hard-coded calls in setup_arch(). This early stuff is
+> > DT-driven, so in theory you don't need a specific xen call. The only
+> > thing is that you end up with swiotlb_init() and 64MB wasted if the Xen
+> > guest does not plan to use them.
+> 
+> There is a swiotlb_free mechanism in case the allocation was not
+> neccessary.
 
-On Sep 5, 2013, at 7:04 PM, Rohit Vaswani wrote:
-
-> diff --git a/arch/arm/boot/dts/msm8974-db.dts b/arch/arm/boot/dts/msm8974-db.dts
-> new file mode 100644
-> index 0000000..74106a8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/msm8974-db.dts
-> @@ -0,0 +1,7 @@
-> +/include/ "msm8974.dtsi"
-> +
-> +/ {
-> +	model = "Qualcomm MSM8974 Dragonboard";
-> +	compatible = "qcom,msm8974-db", "qcom,msm8974";
-> +};
-> +
-> diff --git a/arch/arm/boot/dts/msm8974.dtsi b/arch/arm/boot/dts/msm8974.dtsi
-> new file mode 100644
-> index 0000000..aa3bb2f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/msm8974.dtsi
-> @@ -0,0 +1,30 @@
-> +/dts-v1/;
-> +
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	model = "Qualcomm MSM8974";
-> +	compatible = "qcom,msm8974";
-> +	interrupt-parent = <&intc>;
-> +
-> +	soc: soc { };
-> +};
-> +
-> +&soc {
-
-We should probably have:
-
-        #address-cells = <1>;
-        #size-cells = <1>;
-        ranges;
-        compatible = "simple-bus"; 
-
-> +	intc: interrupt-controller at f9000000 {
-> +		compatible = "qcom,msm-qgic2";
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		reg = < 0xf9000000 0x1000 >,
-> +		      < 0xf9002000 0x1000 >;
-> +	};
-> +
-
-Let's be consistent on white space around < >
-
-> +	timer {
-> +		compatible = "arm,armv7-timer";
-> +		interrupts = <1 2 0xf08>,
-> +			     <1 3 0xf08>,
-> +			     <1 4 0xf08>,
-> +			     <1 1 0xf08>;
-> +		clock-frequency = <19200000>;
-> +	};
-
-
-
-> +};
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+I think I'll just use the late swiotlb initialization.
