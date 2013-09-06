@@ -1,111 +1,64 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Fri, 6 Sep 2013 10:51:01 +0200
-Subject: [PATCH] ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
-In-Reply-To: <50E637BB-5A62-477C-B943-9687BC3488BC@dominion.thruhere.net>
-References: <1378449204-8601-1-git-send-email-koen@dominion.thruhere.net>
- <52297CCF.3090200@ti.com>
- <50E637BB-5A62-477C-B943-9687BC3488BC@dominion.thruhere.net>
-Message-ID: <A83CF7D5-0A26-4740-9F4D-51E5C1592EEF@dominion.thruhere.net>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Fri, 6 Sep 2013 09:58:59 +0100
+Subject: [PATCH v5 05/13] xen/arm,arm64: move Xen initialization earlier
+In-Reply-To: <alpine.DEB.2.02.1309051755560.6397@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
+ <1377801154-29215-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130905162026.GJ11887@arm.com>
+ <alpine.DEB.2.02.1309051755560.6397@kaball.uk.xensource.com>
+Message-ID: <1378457939.14745.73.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2013-09-05 at 17:59 +0100, Stefano Stabellini wrote:
+> On Thu, 5 Sep 2013, Catalin Marinas wrote:
+> > On Thu, Aug 29, 2013 at 07:32:26PM +0100, Stefano Stabellini wrote:
+> > > Move Xen initialization earlier, before any DMA requests can be made.
+> > > 
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > 
+> > I guess you should cc the corresponding maintainers here.
+> 
+> Thanks for the reminder, I'll do that.
+> 
+> 
+> > >  arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
+> > >  arch/arm/kernel/setup.c               |    2 ++
+> > >  arch/arm/xen/enlighten.c              |   21 ++++++++++++++-------
+> > >  arch/arm64/kernel/setup.c             |    2 ++
+> > >  4 files changed, 26 insertions(+), 7 deletions(-)
+> > 
+> > [...]
+> > 
+> > > --- a/arch/arm64/kernel/setup.c
+> > > +++ b/arch/arm64/kernel/setup.c
+> > > @@ -53,6 +53,7 @@
+> > >  #include <asm/traps.h>
+> > >  #include <asm/memblock.h>
+> > >  #include <asm/psci.h>
+> > > +#include <asm/xen/hypervisor.h>
+> > >  
+> > >  unsigned int processor_id;
+> > >  EXPORT_SYMBOL(processor_id);
+> > > @@ -267,6 +268,7 @@ void __init setup_arch(char **cmdline_p)
+> > >  	unflatten_device_tree();
+> > >  
+> > >  	psci_init();
+> > > +	xen_early_init();
+> > 
+> > So Xen guests don't have any hope for single Image? Basically you set
+> > dma_ops unconditionally in xen_early_init(), even if the kernel is not
+> > intended to run under Xen.
+> 
+> That should not happen: if we are not running on Xen xen_early_init
+> returns early, before calling xen_mm_init.
 
-Op 6 sep. 2013, om 09:10 heeft Koen Kooi <koen@dominion.thruhere.net> het volgende geschreven:
+x96 has a call to init_hypervisor_platform() at approximately this
+location, which detects and calls the init function for any of Xen, KVM,
+hyperv and vmware. I guess only Xen and KVM are currently relevant on
+Linux ARM(64), so perhaps adding similar infrastructure on ARM would be
+overkill at this point. I don't know if KVM needs such an early C-land
+hook, I suppose it needs it even earlier so it can set up the hyp mode
+trampoline from head.S?
 
-> 
-> Op 6 sep. 2013, om 08:57 heeft George Cherian <george.cherian@ti.com> het volgende geschreven:
-> 
->> On 9/6/2013 12:03 PM, Koen Kooi wrote:
->>> The BeagleBone Black is basically a regular BeagleBone with eMMC and HDMI added,
->>> so create a common dtsi both can use. MMC support for AM335x still isn't in, so
->>> only the LDO change has been added.
->>> 
->>> Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
->>> ---
->>> .../{am335x-bone.dts => am335x-bone-common.dtsi}   |   3 -
->>> arch/arm/boot/dts/am335x-bone.dts                  | 256 +--------------------
->>> arch/arm/boot/dts/am335x-boneblack.dts             |  18 ++
->>> 3 files changed, 19 insertions(+), 258 deletions(-)
->>> copy arch/arm/boot/dts/{am335x-bone.dts => am335x-bone-common.dtsi} (99%)
->>> create mode 100644 arch/arm/boot/dts/am335x-boneblack.dts
->> How did you test am335x-boneblack.dtb? where are the Makefile changes for boneblack?
-> 
-> Ah, I missed the makefile in my commit. I have a bunch of other patches on top to make more stuff work.
-> 
-> [..]
-> 
->>> 
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/am335x-boneblack.dts
->>> @@ -0,0 +1,18 @@
->>> +/*
->>> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>> +/dts-v1/;
->>> +
->>> +#include "am33xx.dtsi"
->> Why cant we add am33xx.dtsi  in am335x-bone-common.dtsi ?
-> 
-> That didn't work when I tried it. It did work before the preprocessor changes when using /include/
-> 
->>> +#include "am335x-bone-common.dtsi"
->>> +
->>> +&ldo3_reg {
->>> +	regulator-min-microvolt = <1800000>;
->>> +	regulator-max-microvolt = <1800000>;
->>> +	regulator-always-on;
->>> +};
->>> +
->> With this ldo values mmc was not working for me on Boneblack.
->> got it working with
->> 
->> &ldo3_reg {
->> 	regulator-min-microvolt = <1800000>;
->> 	regulator-max-microvolt = <3300000>;
->> 	regulator-always-on;
->> };
-> 
-> That LDO is shared, the other consumer will get fried if you use 3.3V. I forget if it's DDR3 or HDMI.
-
-On the black the LDOs changed, so for mmc (which (*$)@()$@) still isn't in mainline) you need:
-
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index e76d575..ae90a30 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -362,6 +362,13 @@
-                        regulator-always-on;
-                };
-        };
-+
-+       vmmcsd_fixed: fixedregulator at 0 {
-+               compatible = "regulator-fixed";
-+               regulator-name = "vmmcsd_fixed";
-+               regulator-min-microvolt = <3300000>;
-+               regulator-max-microvolt = <3300000>;
-+       };
- };
- 
- &cpsw_emac0 {
-diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
-index b4237fc..e092a61 100644
---- a/arch/arm/boot/dts/am335x-boneblack.dts
-+++ b/arch/arm/boot/dts/am335x-boneblack.dts
-@@ -16,7 +16,12 @@
-        regulator-always-on;
- };
- 
--&mmc2 {
-+&mmc1 { 
-+       vmmc-supply = <&vmmcsd_fixed>;
-+};
-+
-+&mmc2 { 
-+       vmmc-supply = <&vmmcsd_fixed>;
-        pinctrl-names = "default";
-        pinctrl-0 = <&emmc_pins>;
-        vmmc-supply = <&ldo3_reg>;
+Ian.
