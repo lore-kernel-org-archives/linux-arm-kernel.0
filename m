@@ -1,36 +1,116 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 8 Sep 2013 14:47:25 +0100
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <20130906023605.GA2292@gmail.com>
-References: <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
- <20130905020435.GA3970@gmail.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
- <522817D7.1010206@freescale.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C885@DBDE04.ent.ti.com>
- <5228369A.9000904@freescale.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C907@DBDE04.ent.ti.com>
- <52284F32.2020302@freescale.com>
- <20130905135032.GB3084@sirena.org.uk>
- <20130906023605.GA2292@gmail.com>
-Message-ID: <20130908134725.GQ29403@sirena.org.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 6 Sep 2013 15:44:12 +0200 (CEST)
+Subject: [PATCH v4 12/19] cpufreq: cpufreq-cpu0: remove device tree
+ parsing for cpu nodes
+In-Reply-To: <1376991021-12160-13-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376991021-12160-13-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <Pine.LNX.4.64.1309061539310.11068@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 05, 2013 at 10:36:44PM -0400, Huang Shijie wrote:
-> On Thu, Sep 05, 2013 at 02:50:32PM +0100, Mark Brown wrote:
+Hi
 
-> > Looking at the current header there just seem to be defines in there, no
-> > abstraction for the chips.  Perhaps that is what is missing?
+On Tue, 20 Aug 2013, Sudeep KarkadaNagesha wrote:
 
-> we do not need any abstraction for this chip, we only need the SPI NOR 
-> commands, such as Quad read / DDR quad read.
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> Now that the cpu device registration initialises the of_node(if available)
+> appropriately for all the cpus, parsing here is redundant.
+> 
+> This patch removes all DT parsing and uses cpu->of_node instead.
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> ---
+>  drivers/cpufreq/cpufreq-cpu0.c | 23 ++++-------------------
+>  1 file changed, 4 insertions(+), 19 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.=
+> c
+> index ad1fde2..5b05c26 100644
+> --- a/drivers/cpufreq/cpufreq-cpu0.c
+> +++ b/drivers/cpufreq/cpufreq-cpu0.c
+> @@ -174,29 +174,17 @@ static struct cpufreq_driver cpu0_cpufreq_driver =3D =
+> {
+> =20
+>  static int cpu0_cpufreq_probe(struct platform_device *pdev)
+>  {
+> -=09struct device_node *np, *parent;
+> +=09struct device_node *np;
+>  =09int ret;
+> =20
+> -=09parent =3D of_find_node_by_path("/cpus");
+> -=09if (!parent) {
+> -=09=09pr_err("failed to find OF /cpus\n");
+> -=09=09return -ENOENT;
+> -=09}
+> -
+> -=09for_each_child_of_node(parent, np) {
+> -=09=09if (of_get_property(np, "operating-points", NULL))
+> -=09=09=09break;
+> -=09}
+> +=09cpu_dev =3D &pdev->dev;
+> =20
+> +=09np =3D of_node_get(cpu_dev->of_node);
 
-So the abstraction could say what the commands are, or what's supported
-if they're standard?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130908/9454044d/attachment-0001.sig>
+Has this actually been tested? This seems to break cpufreq-cpu0. The 
+reason is, that this probe function is called not for the DT CPU node, but 
+for a special virtual cpufreq-cpu0 platform device, typically created by 
+platforms, using
+
+	platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
+
+which then of course doesn't have on .of_node associated with it.
+
+Thanks
+Guennadi
+
+>  =09if (!np) {
+>  =09=09pr_err("failed to find cpu0 node\n");
+> -=09=09ret =3D -ENOENT;
+> -=09=09goto out_put_parent;
+> +=09=09return -ENOENT;
+>  =09}
+> =20
+> -=09cpu_dev =3D &pdev->dev;
+> -=09cpu_dev->of_node =3D np;
+> -
+>  =09cpu_reg =3D devm_regulator_get(cpu_dev, "cpu0");
+>  =09if (IS_ERR(cpu_reg)) {
+>  =09=09/*
+> @@ -269,15 +257,12 @@ static int cpu0_cpufreq_probe(struct platform_device =
+> *pdev)
+>  =09}
+> =20
+>  =09of_node_put(np);
+> -=09of_node_put(parent);
+>  =09return 0;
+> =20
+>  out_free_table:
+>  =09opp_free_cpufreq_table(cpu_dev, &freq_table);
+>  out_put_node:
+>  =09of_node_put(np);
+> -out_put_parent:
+> -=09of_node_put(parent);
+>  =09return ret;
+>  }
+> =20
+> --=20
+> 1.8.1.2
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
