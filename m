@@ -1,51 +1,35 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 06 Sep 2013 14:17:08 -0700
-Subject: [PATCH] clk: only call get_parent if there is one
-In-Reply-To: <52288824.1060905@linaro.org>
-References: <52288824.1060905@linaro.org>
-Message-ID: <20130906211708.10934.58897@quantum>
+From: behanw@converseincode.com (behanw at converseincode.com)
+Date: Fri,  6 Sep 2013 17:28:06 -0400
+Subject: [PATCH 0/5] arm: LLVMLinux: Add current_stack_pointer
+Message-ID: <1378502899-1241-1-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alex Elder (2013-09-05 06:33:24)
-> In __clk_init(), after a clock is mostly initialized, a scan is done
-> of the orphan clocks to see if the clock being registered is the
-> parent of any of them.
-> 
-> This code assumes that any clock that provides a get_parent method
-> actually has at least one parent, and that's not a valid assumption.
-> 
-> As a result, an orphan clock with no parent can return *something*
-> as the parent index, and that value is blindly used to dereference
-> the orphan's parent_names[] array (which will be ZERO_SIZE_PTR or
-> NULL).
-> 
-> Fix this by ensuring get_parent is only called for orphans with at
-> least one parent.
-> 
-> Signed-off-by: Alex Elder <elder@linaro.org>
+From: Behan Webster <behanw@converseincode.com>
 
-Thanks for the fix Alex. I'll take this in towards 3.13.
+The LLVMLinux Project is working to be able to build the Linux kernel with
+clang/LLVM. With the release of LLVM 3.3 clang is now able to compile the Linux
+kernel with a number of small patches (available from the LLVMLinux git repo).
 
-Regards,
-Mike
+These patches add a macro to get the current stack pointer which allows for a
+single place in which to do so with ASM. Before this named registers (a gcc
+extension) was used to get the stack pointer. Using ASM is a more portable way
+of getting the stack pointer which works with both gcc and clang.  This macro
+is of the same name used in the X86 arch.
 
-> ---
->  drivers/clk/clk.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 54a191c..ea8ff15 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1628,7 +1628,7 @@ int __clk_init(struct device *dev, struct clk *clk)
->          * this clock
->          */
->         hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
-> -               if (orphan->ops->get_parent) {
-> +               if (orphan->num_parents && orphan->ops->get_parent) {
->                         i = orphan->ops->get_parent(orphan->hw);
->                         if (!strcmp(clk->name, orphan->parent_names[i]))
->                                 __clk_reparent(orphan, clk);
-> -- 
-> 1.7.9.5
+Behan Webster (5):
+  arm: LLVMLinux: Add current_stack_pointer macro for ARM
+  arm: LLVMLinux: use current_stack_pointer for percpu
+  arm: LLVMLinux: Use current_stack_pointer for return_address
+  arm: LLVMLinux: Use current_stack_pointer in save_stack_trace_tsk
+  arm: LLVMLinux: Use current_stack_pointer in unwind_backtrace
+
+ arch/arm/include/asm/percpu.h      | 4 ++--
+ arch/arm/include/asm/thread_info.h | 9 +++++++++
+ arch/arm/kernel/return_address.c   | 3 +--
+ arch/arm/kernel/stacktrace.c       | 4 +---
+ arch/arm/kernel/unwind.c           | 3 +--
+ 5 files changed, 14 insertions(+), 9 deletions(-)
+
+-- 
+1.8.1.2
