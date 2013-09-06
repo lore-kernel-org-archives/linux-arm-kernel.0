@@ -1,65 +1,51 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 06 Sep 2013 17:32:43 +0200
-Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
-In-Reply-To: <CACRpkdavR=fv+y1RCNfdgQypPuRbO6isOSwGsABDrYiGeMdyZw@mail.gmail.com>
-References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
- <344239800.bDEkDg48ZQ@avalon>
- <CACRpkdavR=fv+y1RCNfdgQypPuRbO6isOSwGsABDrYiGeMdyZw@mail.gmail.com>
-Message-ID: <2966898.neCKEkcf1e@avalon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Sep 2013 16:59:28 +0100
+Subject: [PATCH v5 11/13] xen: introduce xen_alloc/free_coherent_pages
+In-Reply-To: <alpine.DEB.2.02.1309061554260.6397@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
+ <1377801154-29215-11-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130905160905.GI11887@arm.com>
+ <alpine.DEB.2.02.1309051742390.6397@kaball.uk.xensource.com>
+ <20130906141444.GE1946@arm.com>
+ <alpine.DEB.2.02.1309061554260.6397@kaball.uk.xensource.com>
+Message-ID: <20130906155928.GH1946@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-Sorry for the late reply.
-
-On Thursday 22 August 2013 00:02:39 Linus Walleij wrote:
-> On Tue, Aug 20, 2013 at 12:04 AM, Laurent Pinchart wrote:
-> > On Wednesday 31 July 2013 01:44:53 Linus Walleij wrote:
-> >> I don't see how sharing works here, or how another user, i.e. another one
-> >> than the user wanting to recieve the IRQ, can validly request such a
-> >> line? What would the usecase for that valid request be?
+On Fri, Sep 06, 2013 at 03:59:02PM +0100, Stefano Stabellini wrote:
+> On Fri, 6 Sep 2013, Catalin Marinas wrote:
+> > On Thu, Sep 05, 2013 at 05:43:33PM +0100, Stefano Stabellini wrote:
+> > > On Thu, 5 Sep 2013, Catalin Marinas wrote:
+> > > > On Thu, Aug 29, 2013 at 07:32:32PM +0100, Stefano Stabellini wrote:
+> > > > > xen_swiotlb_alloc_coherent needs to allocate a coherent buffer for cpu
+> > > > > and devices. On native x86 and ARMv8 is sufficient to call
+> > > > > __get_free_pages in order to get a coherent buffer, while on ARM we need
+> > > > > to call arm_dma_ops.alloc.
+> > > > 
+> > > > Don't bet on this for ARMv8. It's not mandated for the architecture, so
+> > > > at some point some SoC will require non-cacheable buffers for coherency.
+> > > 
+> > > I see.
+> > > Would it be better if I implemented xen_alloc_coherent_pages on armv8 by
+> > > calling arm64_swiotlb_dma_ops.alloc?
 > > 
-> > When the GPIO is wired to a status signal (such as an MMC card detect
-> > signal) the driver might want to read the state of the signal
-> > independently of the interrupt handler.
+> > What does this buffer do exactly? Is it allocated by guests?
 > 
-> That is true. But for such a complex usecase I think it's reasonable that
-> we only specify the GPIO in the device tree, and the driver utilizing the
-> IRQ need to take that and perform gpio_to_irq() on it, and then it still
-> works to use it both ways.
+> It is allocated by Dom0 to do DMA to/from a device.
+> It is the buffer that is going to be returned by dma_map_ops.alloc to
+> the caller:
+> 
+> On x86:
+> dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> __get_free_pages
+> 
+> On ARM:
+> dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> arm_dma_ops.alloc
+> 
+> On ARM64
+> dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> ????
 
-I'm pretty sure I would have had an objection a couple of weeks ago when I was 
-looking into this, but I can't think of another use case for now, so I agree 
-with you.
-
-> >> Basically I believe these two things need to be exclusive in the DT
-> >> world:
-> >> 
-> >> A: request_irq(a resource passed from "interrupts");
-> >>      -> core implicitly performs gpio_request()
-> >>          gpio_direction_input()
-> >> 
-> >> B: gpio_request(a resource passed from "gpios");
-> >>      gpio_direction_input()
-> >>      request_irq(gpio_to_irq())
-> >> 
-> >> Never both. And IIUC that was what happened in the OMAP case.
-> > 
-> > Isn't the core issue that we can translate a GPIO number to an IRQ number,
-> > but not the other way around ? If that could be done, we could request
-> > the GPIO and configure it as an input when the IRQ is requested.
-> 
-> That is true. It would be easier if all GPIO drivers has an irqchip and
-> and irqdomain, then we could implement irq_to_gpio() properly in gpiolib
-> and this would not be a problem. Alas, not all do.
-> 
-> But I also think that the DT contains (as demonstrated by the patch)
-> all information about what interrupts and GPIOs may conflict, so I
-> also see this as something of a consistency check, but it could go
-> in either way.
+OK, I'm getting more confused. Do all the above calls happen in the
+guest, Dom0, or a mix?
 
 -- 
-Regards,
-
-Laurent Pinchart
+Catalin
