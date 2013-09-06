@@ -1,63 +1,66 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Fri, 6 Sep 2013 13:14:23 +0530
-Subject: [RFC PATCH 0/3] Target CPU=Host implementation for KVM ARM/ARM64
-In-Reply-To: <CAFEAcA8z+_N3UQ-RQW9u65BpGRs+aKzhr2O34yOX0DhKZCAqRg@mail.gmail.com>
+From: claudio.fontana@huawei.com (Claudio Fontana)
+Date: Fri, 6 Sep 2013 10:05:11 +0200
+Subject: [RFC PATCH 3/3] KVM: ARM: Update documentation for
+ KVM_ARM_VCPU_INIT ioctl
+In-Reply-To: <1378392362-6773-4-git-send-email-anup.patel@linaro.org>
 References: <1378392362-6773-1-git-send-email-anup.patel@linaro.org>
- <CAFEAcA8z+_N3UQ-RQW9u65BpGRs+aKzhr2O34yOX0DhKZCAqRg@mail.gmail.com>
-Message-ID: <CAAhSdy1Qyum=v3_80SvGB3rKUP_Nxqg7858Uzf4QKdQd4YvzBA@mail.gmail.com>
+ <1378392362-6773-4-git-send-email-anup.patel@linaro.org>
+Message-ID: <52298CB7.6060501@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 5, 2013 at 8:21 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
-> On 5 September 2013 15:45, Anup Patel <anup.patel@linaro.org> wrote:
->> It will be very useful for user space if it has a method for specifying
->> KVM ARM/ARM64 to give a VCPU with target type suitable to underlying host
->> but with particular set of features.
->>
->> In other words, user space might not be interested in having a particular
->> target type for VCPU but it will certainely want particular set of features
->> in the VCPU.
->>
->> The patch tries to implement above described method of specifying VCPU
->> target CPU=Host from user space by extending the KVM_ARM_VCPU_INIT ioctl
->> and having a dummy target KVM_ARM_TARGET_HOST which means Target CPU
->> same as (or suitable to) underlying host.
->
-> I thought the consensus on the call last week was
-> to have an ioctl for "get best CPU for this host"
-> and then for userspace to pass that value to
-> VCPU_INIT ?
+Hi Anup,
 
-I had considered having a separate ioctl for "get best CPU for this host"
-(as per KVM call minutes) but the same thing is possible with existing
-KVM_ARM_VCPU_INIT so why not extend this ioctl. Also, I was finding
-it hard to come up with a use case where having a separate ioctl for
-"get best CPU for this host" would be better for user space.
+I am no native English speaker, but this is my attempt at improving the descriptions:
 
-Further, the approach proposed by this patch also makes the
-KVM_ARM_VCPU_INIT ioctl inline with what we do for KVM x86 that is
-provide only a set of features user space wish and KVM x86 will try to
-provide most of those features with a virtual CPU suitable to host.
+On 05.09.2013 16:46, Anup Patel wrote:
+> To implement target type KVM_ARM_TARGET_HOST we make the
+> KVM_ARM_VCPU_INIT ioctl bi-direction so that KVM ARM/ARM64
+> can return appropriate target type to user space via
+> struct kvm_vcpu_init.
 
-Another advantage I saw in extending KVM_ARM_VCPU_INIT ioctl is
-backward compatibility with current semantics. In other words, this patch
-does not break current KVMTOOL/QEMU and they can implement
-"-cpu host" whenever they wish without using any additional ioctl.
+If I understood correctly:
 
-PFA, KVMTOOL patch which I used to test KVM_ARM_TARGET_HOST.
+To implement target type KVM_ARM_TARGET_HOST we change
+the "struct kvm_cpu_init" input parameter into an in/out
+parameter, so that KVM ARM/ARM64 can inform user space about
+the chosen target type.
 
->
-> -- PMM
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> ---
+>  Documentation/virtual/kvm/api.txt |    5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index ef925ea..c0a3a05 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2283,7 +2283,7 @@ current state.  "addr" is ignored.
+>  Capability: basic
+>  Architectures: arm, arm64
+>  Type: vcpu ioctl
+> -Parameters: struct struct kvm_vcpu_init (in)
+> +Parameters: struct kvm_vcpu_init (in/out)
+>  Returns: 0 on success; -1 on error
+>  Errors:
+>    EINVAL:    the target is unknown, or the combination of features is invalid.
+> @@ -2303,6 +2303,9 @@ Possible features:
+>  	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
+>  	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
+>  
+> +This ioctl returns updated struct kvm_vcpu_init showing VCPU target 
+> +type and VCPU features that will be available.
+> +
 
---Anup
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: kvmtool_cpu_host.patch
-Type: application/octet-stream
-Size: 1377 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130906/da5336f0/attachment.obj>
+This ioctl returns an updated struct kvm_vcpu_init informing about the
+chosen VCPU target type and available VCPU features.
+
+>  
+>  4.83 KVM_GET_REG_LIST
+>  
+> 
+
+Ciao,
+
+Claudio
