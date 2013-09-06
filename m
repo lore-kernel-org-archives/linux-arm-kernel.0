@@ -1,82 +1,73 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 6 Sep 2013 17:19:02 +0100
-Subject: [RFC 0/4] Create infrastructure for running C code from SRAM.
-In-Reply-To: <20130906111221.GH25647@n2100.arm.linux.org.uk>
-References: <1378226665-27090-1-git-send-email-Russ.Dill@ti.com>
- <20130906111221.GH25647@n2100.arm.linux.org.uk>
-Message-ID: <20130906161902.GB3558@localhost.localdomain>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Sep 2013 17:20:18 +0100
+Subject: [PATCH v5 11/13] xen: introduce xen_alloc/free_coherent_pages
+In-Reply-To: <alpine.DEB.2.02.1309061706480.6397@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
+ <1377801154-29215-11-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130905160905.GI11887@arm.com>
+ <alpine.DEB.2.02.1309051742390.6397@kaball.uk.xensource.com>
+ <20130906141444.GE1946@arm.com>
+ <alpine.DEB.2.02.1309061554260.6397@kaball.uk.xensource.com>
+ <20130906155928.GH1946@arm.com>
+ <alpine.DEB.2.02.1309061706480.6397@kaball.uk.xensource.com>
+Message-ID: <20130906162018.GJ1946@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 06, 2013 at 12:12:21PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Sep 03, 2013 at 09:44:21AM -0700, Russ Dill wrote:
-> > SRAM handling code is in the process of being moved from arch directories
-> > into drivers/misc/sram.c using device tree and genalloc [1] [2]. This RFC
-> > patchset builds on that, including the limitation that the SRAM address is
-> > not known at compile time. Because the SRAM address is not known at compile
-> > time, the code that runs from SRAM must be compiled with -fPIC. Even if
-> > the code were loaded to a fixed virtual address, portions of the code must
-> > often be run with the MMU disabled.
-> 
-> What are you doing about the various gcc utility functions that may be
-> implicitly called from C code such as memcpy and memset?
-> 
-> > The general idea is that for each SRAM user (such as an SoC specific
-> > suspend/resume mechanism) to create a group of sections. The section group
-> > is created with a single macro for each user, but end up looking like this:
+On Fri, Sep 06, 2013 at 05:09:52PM +0100, Stefano Stabellini wrote:
+> On Fri, 6 Sep 2013, Catalin Marinas wrote:
+> > On Fri, Sep 06, 2013 at 03:59:02PM +0100, Stefano Stabellini wrote:
+> > > On Fri, 6 Sep 2013, Catalin Marinas wrote:
+> > > > On Thu, Sep 05, 2013 at 05:43:33PM +0100, Stefano Stabellini wrote:
+> > > > > On Thu, 5 Sep 2013, Catalin Marinas wrote:
+> > > > > > On Thu, Aug 29, 2013 at 07:32:32PM +0100, Stefano Stabellini wrote:
+> > > > > > > xen_swiotlb_alloc_coherent needs to allocate a coherent buffer for cpu
+> > > > > > > and devices. On native x86 and ARMv8 is sufficient to call
+> > > > > > > __get_free_pages in order to get a coherent buffer, while on ARM we need
+> > > > > > > to call arm_dma_ops.alloc.
+> > > > > > 
+> > > > > > Don't bet on this for ARMv8. It's not mandated for the architecture, so
+> > > > > > at some point some SoC will require non-cacheable buffers for coherency.
+> > > > > 
+> > > > > I see.
+> > > > > Would it be better if I implemented xen_alloc_coherent_pages on armv8 by
+> > > > > calling arm64_swiotlb_dma_ops.alloc?
+> > > > 
+> > > > What does this buffer do exactly? Is it allocated by guests?
+> > > 
+> > > It is allocated by Dom0 to do DMA to/from a device.
+> > > It is the buffer that is going to be returned by dma_map_ops.alloc to
+> > > the caller:
+> > > 
+> > > On x86:
+> > > dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> __get_free_pages
+> > > 
+> > > On ARM:
+> > > dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> arm_dma_ops.alloc
+> > > 
+> > > On ARM64
+> > > dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> ????
 > > 
-> > .sram.am33xx : AT(ADDR(.sram.am33xx) - 0) {
-> >   __sram_am33xx_start = .;
-> >   *(.sram.am33xx.*)
-> >   __sram_am33xx_end = .;
-> > }
-> > 
-> > Any data or functions that should be copied to SRAM for this use should be
-> > maked with an appropriate __section() attribute. A helper is then added for
-> > translating between the original kernel symbol, and the address of that
-> > function or variable once it has been copied into SRAM. Once control is
-> > passed to a function within the SRAM section grouping, it can access any
-> > variables or functions within that same SRAM section grouping without
-> > translation.
+> > OK, I'm getting more confused. Do all the above calls happen in the
+> > guest, Dom0, or a mix?
 > 
-> What about the relocations which will need to be fixed up - eg, addresses
-> in the literal pool, the GOT table contents, etc?  You say nothing about
-> this.
+> I guess the confusion comes from a difference in terminology: dom0 is a
+> guest like the others, just a bit more privileged. We usually call domU
+> a normal unprivileged guest.
 
-I was also thinking about this, and there are more problems.
+Thanks for the explanation.
 
-As well as what has already been mentioned:
+> The above calls would happen in Dom0 (when an SMMU is not available).
 
- * Calls from inside the SRAM code to vmlinux (including lib1funcs etc.)
-   will typically break, except on architectures where function calls are
-   (absolute by default not ARM).
+So for Dom0, are there cases when it needs xen_swiotlb_alloc_coherent()
+and other cases when it needs the arm_dma_ops.alloc? In Dom0 could we
+not always use the default dma_alloc_coherent()?
 
- * The compiler/linker won't detect unsafe constructs or code generation,
-   because it assumes that anything built with -fPIC is going to be patched
-   up later by ld.so or equivalent.
+> They could also happen in a DomU if we assign a physical device to it
+> (and an SMMU is not available).
 
- * The GOT is generated by the linker, and is a single table.  Yet each
-   SRAM blob needs to be able to refer to its own GOT entries position-
-   independently.  Moving the blobs independently won't work.
+The problem is that you don't necessarily know one kind of coherency you
+know for a physical device. As I said, we plan to do this DT-driven.
 
-In other words: -fPIC does not generate position-independent code.
-
-It generates position-dependent code that is easier to move around than
-non-fPIC code, but you still need a dynamic linker (or equivalent) to
-make it all work.
-
-
-There are various "correct" ways to handle this, the simplest of which
-is probably to build each SRAM blob as a kernel module, embed the result
-in the kernel somehow, and then use the module loader infrastructure
-to handle fixing the module up to the right address.
-
-But this is still likely to be overkill, given the small scale of the
-SRAM code.
-
-Restricting such code to carefully-written assembler (as now) may be
-the more practical approrach, unless there's a good example of somewhere
-that C code would provide a big benefit.
-
-Cheers
----Dave
+-- 
+Catalin
