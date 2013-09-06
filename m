@@ -1,34 +1,64 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Fri, 6 Sep 2013 11:43:24 -0700
-Subject: [PATCH v7 1/3] gpio: bcm281xx: Add GPIO driver
-In-Reply-To: <20130906171400.GC10973@ohporter.com>
-References: <1377882914-30152-1-git-send-email-markus.mayer@linaro.org>
- <1377882914-30152-2-git-send-email-markus.mayer@linaro.org>
- <20130906171400.GC10973@ohporter.com>
-Message-ID: <CAPdLdqnAL-0CRFoOJNZ+okVW7FQ5SO7kuPJeqJC=EKD1+kw5zA@mail.gmail.com>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Fri, 6 Sep 2013 11:50:29 -0700
+Subject: [RFC 0/4] Create infrastructure for running C code from SRAM.
+In-Reply-To: <20130906164059.GC3558@localhost.localdomain>
+References: <1378226665-27090-1-git-send-email-Russ.Dill@ti.com>
+ <52278F84.2080509@elopez.com.ar>
+ <CA+Bv8XaHonrpeNZ6tRCyqpMK1bzgpDTqvLyrsLWEyMY_ky6apQ@mail.gmail.com>
+ <20130906111408.GI25647@n2100.arm.linux.org.uk>
+ <20130906164059.GC3558@localhost.localdomain>
+Message-ID: <CA+Bv8XYz-xP9Lrv_nX+ZDV3bA=d9s_hK_-rZtMtepSKxHmF4hQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> --- /dev/null
->> +++ b/drivers/gpio/gpio-bcm-kona.c
->> @@ -0,0 +1,631 @@
->> +/*
->> + * Copyright (C) 2012-2013 Broadcom Corporation
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation version 2.
->> + *
->> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->> + * kind, whether express or implied; without even the implied warranty
->> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/bitops.h>
+On Fri, Sep 6, 2013 at 9:40 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Fri, Sep 06, 2013 at 12:14:08PM +0100, Russell King - ARM Linux wrote:
+>> On Wed, Sep 04, 2013 at 02:47:51PM -0700, Russ Dill wrote:
+>> > I think this is already taken care of by the way sram.c is using
+>> > genalloc. The allocation returned should be aligned to 32 bytes. The
+>> > thumb bit shouldn't be an issue as code is copied based on the start
+>> > and end makers made by the linker. I may need to add .align statements
+>> > in the linker so that the start and end markers for the copied code
+>> > are aligned to at least 8 bytes.
+>>
+>> I think you need to read up on what fncpy does... there's more to it
+>> than just merely copying code at an appropriate alignment.
 >
-> Need #include <linux/err.h>
+> The technique of putting each loadable blob in a specific vmlinux
+> section, and then adjusting entry-point symbols by adding/subtracting
+> the appropriate offset, probably does work.
+>
+> This relies on the functions' code alignment requirement being
+> honoured by both the vmlinux link map, and the allocator used to find
+> SRAM space to copy the functions to.
+>
+> Searching the entire list of known blobs every time we want to convert
+> a symbol seems unnecessary though.  Surely the caller could know the
+> blob<->symbol mapping anyway?
 
-Thanks, Matt. A new version has been posted.
+It doesn't search the list of known blobs, only loaded blobs. On all
+the platforms I'm aware of, only one SRAM section is loaded with code.
 
--Markus
+> One thing fncpy() doesn't provide is a way to copy groups of functions
+> that call each other, if vmlinux needs to know about any symbol other
+> than the one at the start.  We might need a better mechanism if that is
+> needed.
+>
+>
+> I actually wonder whether fncpy() contains a buglet, whereby
+> flush_icache_range() is used instead of coherent_kern_range().
+> The SRAM is probably not mapped cached, but at least a DSB would be
+> needed before flushing the relevant lines from the I-cache.
+
+It is mapped cached on most platforms.
+
+> However, flush_icache_range() seems to be implemented by a call to
+> coherent_kern_range() anyway, so perhaps that's not a problem.
+>
+> Cheers
+> ---Dave
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
