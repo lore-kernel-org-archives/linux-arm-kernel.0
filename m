@@ -1,189 +1,71 @@
-From: thommyj@gmail.com (Thommy Jakobsson)
-Date: Fri, 6 Sep 2013 09:48:02 +0200 (CEST)
-Subject: kmalloc memory slower than malloc
-Message-ID: <alpine.DEB.2.02.1309060811400.1299@kelly.ryd.net>
+From: george.cherian@ti.com (George Cherian)
+Date: Fri, 6 Sep 2013 13:19:26 +0530
+Subject: [PATCH] ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
+In-Reply-To: <50E637BB-5A62-477C-B943-9687BC3488BC@dominion.thruhere.net>
+References: <1378449204-8601-1-git-send-email-koen@dominion.thruhere.net>
+ <52297CCF.3090200@ti.com>
+ <50E637BB-5A62-477C-B943-9687BC3488BC@dominion.thruhere.net>
+Message-ID: <52298906.6040800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 9/6/2013 12:40 PM, Koen Kooi wrote:
+> Op 6 sep. 2013, om 08:57 heeft George Cherian <george.cherian@ti.com> het volgende geschreven:
+>
+>> On 9/6/2013 12:03 PM, Koen Kooi wrote:
+>>> The BeagleBone Black is basically a regular BeagleBone with eMMC and HDMI added,
+>>> so create a common dtsi both can use. MMC support for AM335x still isn't in, so
+>>> only the LDO change has been added.
+>>>
+>>> Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
+>>> ---
+>>>   .../{am335x-bone.dts => am335x-bone-common.dtsi}   |   3 -
+>>>   arch/arm/boot/dts/am335x-bone.dts                  | 256 +--------------------
+>>>   arch/arm/boot/dts/am335x-boneblack.dts             |  18 ++
+>>>   3 files changed, 19 insertions(+), 258 deletions(-)
+>>>   copy arch/arm/boot/dts/{am335x-bone.dts => am335x-bone-common.dtsi} (99%)
+>>>   create mode 100644 arch/arm/boot/dts/am335x-boneblack.dts
+>> How did you test am335x-boneblack.dtb? where are the Makefile changes for boneblack?
+> Ah, I missed the makefile in my commit. I have a bunch of other patches on top to make more stuff work.
+>
+> [..]
+>
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/am335x-boneblack.dts
+>>> @@ -0,0 +1,18 @@
+>>> +/*
+>>> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + */
+>>> +/dts-v1/;
+>>> +
+>>> +#include "am33xx.dtsi"
+>> Why cant we add am33xx.dtsi  in am335x-bone-common.dtsi ?
+> That didn't work when I tried it. It did work before the preprocessor changes when using /include/
 
-doing a project where I use DMA and a DMA-capable buffer in a driver. This 
-buffer is then mmap:ed to userspace, the driver notice userspace 
-that the device has filled the buffer. Pretty standard setup I think.
-
-The initial problem was that I noticed that the buffer I got through 
-dma_alloc_coherent was very slow to step through in my userspace program. 
-I figured it was due to the memory allocated should be coherent (my hw 
-doesn't have cache coherence for DMA), so I probably got memory with cache 
-turned off. So I switched to a kmalloc and dma_map_single, plan was to  
-get more speed if I did cache invalidations.
-
-After switching to kmalloc in the driver I still got loosy performance 
-though. I run below testdriver and program on a 
-marvell kirkwood 88F6281 (ARM9Em ARMv5TE) and a imx6 (Cortex A9 MP, Armv7) 
-with similar result. The test program is looping through a 4k buffer 
-10000 times, just adding all bytes and measuring how long time it takes. 
-On the kirkwood I get the following printout:
-
-pa_dmabuf = 0x195d8000
-va_dmabuf = 0x401e4000
-pa_kmbuf = 0x19418000
-va_kmbuf = 0x4031c000
-dma_alloc_coherent 3037365us
-kmalloc            3039321us
-malloc              823403us
-
-As you can see the kmalloc is ~3-4times slower to step through than a 
-normal malloc. The addresses in the beginning are just printouts of where 
-the buffers end up, both physical and virtual (in userspace) addresses.
-
-I would have expected the kmalloc buffer to have roughly the same speed as 
-a malloc one. Any ideas what am I doing wrong? or are the assumptions 
-wrong?
-
-
-BR,
-Thommy
-
-relevant driver part:
-------------------------------------------------------------------
-static long device_ioctl(struct file *file,
-			 unsigned int cmd, unsigned long arg){
-
-        dma_addr_t pa = 0;	
-
-	printk("entering ioctl cmd %d\r\n",cmd);
-	switch(cmd)
-	{
-	case DMAMEM:
-		va_dmabuf = dma_alloc_coherent(0,BUFSIZE,&pa,GFP_KERNEL|GFP_DMA);
-		pa_dmabuf = pa;
-		break;
-	case KMEM:
-		va_kmbuf = kmalloc(BUFSIZE,GFP_KERNEL);
-		//pa = dma_map_single(0,va_kmbuf,BUFSIZE,DMA_FROM_DEVICE);
-		pa = __pa(va_kmbuf);
-		pa_kmbuf = pa;
-		break;
-	case DMAMEM_REL:
-		dma_free_coherent(0,BUFSIZE,va_dmabuf,pa_dmabuf);
-		break;
-	case KMEM_REL:
-		kfree(va_kmbuf);
-		break;
-	default:
-		break;
-	} 
- 
-	printk("allocated pa = 0x%08X\r\n",pa);
-
- 	if(copy_to_user((void*)arg, &pa, sizeof(pa)))
-		return -EFAULT;
-	return 0;
-}
-
-static int device_mmap(struct file *filp, struct vm_area_struct *vma)
- {
-	unsigned long size;
-	int res = 0;
-	size = vma->vm_end - vma->vm_start;
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-
-	if (remap_pfn_range(vma, vma->vm_start,
-			    vma->vm_pgoff, size, vma->vm_page_prot)) {
-		res = -ENOBUFS;
-		goto device_mmap_exit;
-	}
-
-	vma->vm_flags &= ~VM_IO;	/* using shared anonymous pages */
-
-device_mmap_exit:
-	return res;
-
- }
+It will work......
+>
+>>> +#include "am335x-bone-common.dtsi"
+>>> +
+>>> +&ldo3_reg {
+>>> +	regulator-min-microvolt = <1800000>;
+>>> +	regulator-max-microvolt = <1800000>;
+>>> +	regulator-always-on;
+>>> +};
+>>> +
+>> With this ldo values mmc was not working for me on Boneblack.
+>> got it working with
+>>
+>> &ldo3_reg {
+>> 	regulator-min-microvolt = <1800000>;
+>> 	regulator-max-microvolt = <3300000>;
+>> 	regulator-always-on;
+>> };
+> That LDO is shared, the other consumer will get fried if you use 3.3V. I forget if it's DDR3 or HDMI.
 
 
-relevant parts of userspace program
------------------------------------------------------------------
-
-	/*
-	 *alloc memory with dma_alloc_coherent
-	*/
-	ioctl(fd,DMAMEM,&pa_dmabuf);
-	if(pa_dmabuf == 0){
-		printf("no dma pa returned\r\n");
-		goto exito;
-	}else{
-		printf("pa_dmabuf = %p\r\n",(void*)pa_dmabuf);
-	}
-
-	va_dmabuf = 
-		mmap(NULL,BUFSIZE,PROT_READ|PROT_WRITE,MAP_SHARED,fd,pa_dmabuf);
-	
-	if(!va_dmabuf || va_dmabuf == (char*)0xFFFFFFFF){
-		perror("no valid va for dmabuf");
-		goto exito;
-	}else{
-		printf("va_dmabuf = %p\r\n",va_dmabuf);
-	}
-
-	/*
-	 * alloc memory with kmalloc
-	 */
-	ioctl(fd,KMEM,&pa_kmbuf);
-        if(pa_kmbuf == 0){
-                printf("no kmalloc pa returned\r\n");
-                goto exito;
-        }else{
-                printf("pa_kmbuf = %p\r\n",(void*)pa_kmbuf);
-        }
-
-        va_kmbuf = 
-                mmap(NULL,BUFSIZE,PROT_READ|PROT_WRITE,MAP_SHARED,fd,pa_kmbuf);
-        
-        if(!va_kmbuf || va_kmbuf == (char*)0xFFFFFFFF){
-                perror("no valid va for kmbuf");
-                goto exito;
-        }else{
-                printf("va_kmbuf = %p\r\n",va_kmbuf);
-        }
-
-
-	/*
-	 * test speed of dma_alloc_coherent buffer
-	 */
-	gettimeofday(&t1,NULL);
-        for(j=0;j<LOOPCNT;j++){
-		for(i=0;i<BUFSIZE;i++)
-                	va_dmabuf[i]++;
-	}	
-        gettimeofday(&t2,NULL);
-        printf("dma_alloc_coherent %ldus\n",
-		(t2.tv_sec-t1.tv_sec)*1000000+(t2.tv_usec-t1.tv_usec));
-
-        /*
-         * test speed of kmalloc buffer
-         */
-        gettimeofday(&t1,NULL);
-        for(j=0;j<LOOPCNT;j++){
-                for(i=0;i<BUFSIZE;i++)
-                        va_kmbuf[i]++;
-        }
-        gettimeofday(&t2,NULL);
-        printf("kmalloc            %ldus\n",
-		(t2.tv_sec-t1.tv_sec)*1000000+(t2.tv_usec-t1.tv_usec));
-
-	/*
-	 * test speed of malloc
-	 */
-	va_mbuf = malloc(BUFSIZE);
-
-        gettimeofday(&t1,NULL);
-        for(j=0;j<LOOPCNT;j++){
-                for(i=0;i<BUFSIZE;i++)
-                        va_mbuf[i]++;
-        }
-        gettimeofday(&t2,NULL);
-        printf("malloc              %ldus\n",
-		(t2.tv_sec-t1.tv_sec)*1000000+(t2.tv_usec-t1.tv_usec));
-	
+-- 
+-George
