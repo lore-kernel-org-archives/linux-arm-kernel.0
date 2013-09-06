@@ -1,85 +1,83 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 6 Sep 2013 18:28:37 +0100
-Subject: [GIT PULL] arm64 patches for 3.12
-Message-ID: <20130906172828.GA8678@arm.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 6 Sep 2013 13:21:46 -0500
+Subject: [PATCH] arm: dts: am33xx: Add mmc nodes for am33xx platform
+In-Reply-To: <1378455712-17379-1-git-send-email-george.cherian@ti.com>
+References: <1378455712-17379-1-git-send-email-george.cherian@ti.com>
+Message-ID: <522A1D3A.8000301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi George,
 
-Please pull the arm64 patches below. Thanks.
+On 09/06/2013 03:21 AM, George Cherian wrote:
+> Add mmc nodes for am33xx platforms
+> 
+> Signed-off-by: George Cherian <george.cherian@ti.com>
+> ---
+> Verified after applying [1] and [2]
+> [1] - [PATCH v4 0/6] dma: edma: Support scatter-lists of any length - https://lkml.org/lkml/2013/8/29/466
+> [2] - [PATCH v2] ARM: dts: add AM33XX EDMA support - https://lkml.org/lkml/2013/8/26/57
 
+Thanks for the verification.
 
-The following changes since commit ee7538a008a45050c8f706d38b600f55953169f9:
+But, this patch should not be applied on its own as it a part of a bigger patch
+I had submitted earlier that includes DTS for other derivative boards and
+bindings Documentation. [3] That's the one to be applied and should be applied
+only after the above patches are merged. I will resubmit this later again once
+pending EDMA changes are merged. Thanks.
 
-  arm64: perf: fix event validation for software group leaders (2013-08-20 12:05:57 +0100)
+[3] https://lkml.org/lkml/2013/6/25/781
 
-are available in the git repository at:
+Regards,
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git tags/arm64-for-linus
-
-for you to fetch changes up to 4d5e0b1527dd330940e8b7180b8d7016fc900352:
-
-  Documentation/arm64: clarify requirements for DTB placement (2013-09-05 17:29:05 +0100)
-
-----------------------------------------------------------------
-- User tagged pointers support (top 8-bit of user pointers automatically
-  ignored by the CPU).
-- Kernel mode NEON (no users for arm64 yet but work in progress).
-- arm64 kernel Image header extended to accommodate future EFI stub.
-- Remove BogoMIPS reporting (not relevant, it's just the timer
-  frequency).
-- Clean-up (EM_AARCH64/EM_ARM to elf-em.h, ELF notes in read-only
-  segment, unused variable).
-- Bug-fixes (RAM boundaries not 2MB aligned, perf, includes).
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      arm64: add support for kernel mode NEON
-
-Catalin Marinas (3):
-      arm64: Enable interrupts in the EL0 undef handler
-      arm64: Fix mapping of memory banks not ending on a PMD_SIZE boundary
-      arm64: Remove unused cpu_name ascii in arch/arm64/mm/proc.S
-
-Chen Gang (1):
-      ARM64: include: asm: include "asm/types.h" in "pgtable-2level-types.h" and "pgtable-3level-types.h"
-
-Dan Aloni (1):
-      Move the EM_ARM and EM_AARCH64 definitions to uapi/linux/elf-em.h
-
-Mark Salter (2):
-      arm64: move elf notes into readonly segment
-      Documentation/arm64: clarify requirements for DTB placement
-
-Roy Franz (1):
-      arm64: Expand arm64 image header
-
-Will Deacon (4):
-      arm64: perf: fix group validation when using enable_on_exec
-      arm64: perf: fix ARMv8 EVTYPE_MASK to include NSH bit
-      arm64: delay: don't bother reporting bogomips in /proc/cpuinfo
-      arm64: mm: permit use of tagged pointers at EL0
-
- Documentation/arm64/booting.txt               | 22 ++++++++++++-----
- Documentation/arm64/tagged-pointers.txt       | 34 +++++++++++++++++++++++++++
- arch/arm/include/asm/elf.h                    |  2 --
- arch/arm64/Kconfig                            |  3 +++
- arch/arm64/include/asm/elf.h                  |  3 ---
- arch/arm64/include/asm/neon.h                 | 14 +++++++++++
- arch/arm64/include/asm/pgtable-2level-types.h |  2 ++
- arch/arm64/include/asm/pgtable-3level-types.h |  2 ++
- arch/arm64/include/asm/pgtable-hwdef.h        |  1 +
- arch/arm64/kernel/entry.S                     |  3 +++
- arch/arm64/kernel/fpsimd.c                    | 28 ++++++++++++++++++++++
- arch/arm64/kernel/head.S                      |  8 +++++++
- arch/arm64/kernel/perf_event.c                |  7 ++++--
- arch/arm64/kernel/setup.c                     |  3 ---
- arch/arm64/kernel/smp.c                       |  6 +----
- arch/arm64/kernel/vmlinux.lds.S               |  3 +--
- arch/arm64/mm/mmu.c                           | 23 ++++++++++++++++--
- arch/arm64/mm/proc.S                          |  6 +----
- include/uapi/linux/elf-em.h                   |  2 ++
- 19 files changed, 142 insertions(+), 30 deletions(-)
- create mode 100644 Documentation/arm64/tagged-pointers.txt
- create mode 100644 arch/arm64/include/asm/neon.h
+-Joel
+>  arch/arm/boot/dts/am33xx.dtsi | 35 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index b0badff..1df512d 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -236,6 +236,41 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		mmc1: mmc at 48061000 {
+> +			compatible = "ti,omap4-hsmmc";
+> +			reg = <0x48060000 0x1000>;
+> +			interrupts = <64>;
+> +			ti,hwmods = "mmc1";
+> +			ti,dual-volt;
+> +			ti,needs-special-reset;
+> +			ti,needs-special-hs-handling;
+> +			dmas = <&edma 24
+> +				&edma 25>;
+> +			dma-names = "tx", "rx";
+> +			status = "disabled";
+> +		};
+> +
+> +		mmc2: mmc at 481d8000 {
+> +			compatible = "ti,omap4-hsmmc";
+> +			reg = <0x481d8000 0x1000>;
+> +			interrupts = <28>;
+> +			ti,hwmods = "mmc2";
+> +			ti,needs-special-reset;
+> +			dmas = <&edma 2
+> +				&edma 3>;
+> +			dma-names = "tx", "rx";
+> +			status = "disabled";
+> +		};
+> +
+> +		mmc3: mmc at 47810000 {
+> +			compatible = "ti,omap4-hsmmc";
+> +			reg = <0x47810000 0x1000>;
+> +			interrupts = <29>;
+> +			ti,hwmods = "mmc3";
+> +			ti,needs-special-reset;
+> +			status = "disabled";
+> +		};
+> +
+>  		wdt2: wdt at 44e35000 {
+>  			compatible = "ti,omap3-wdt";
+>  			ti,hwmods = "wd_timer2";
+> 
