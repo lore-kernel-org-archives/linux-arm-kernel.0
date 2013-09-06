@@ -1,19 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Sep 2013 23:18:57 +0100
-Subject: [PATCH] arm: LLVMLinux: Calculate pt_regs address from fp
-In-Reply-To: <1378503762-7236-2-git-send-email-behanw@converseincode.com>
-References: <1378503762-7236-1-git-send-email-behanw@converseincode.com>
- <1378503762-7236-2-git-send-email-behanw@converseincode.com>
-Message-ID: <20130906221857.GQ6617@n2100.arm.linux.org.uk>
+Date: Fri, 6 Sep 2013 23:20:27 +0100
+Subject: [PATCH 1/5] arm: LLVMLinux: Add current_stack_pointer macro
+ for ARM
+In-Reply-To: <1378502899-1241-2-git-send-email-behanw@converseincode.com>
+References: <1378502899-1241-1-git-send-email-behanw@converseincode.com>
+ <1378502899-1241-2-git-send-email-behanw@converseincode.com>
+Message-ID: <20130906222027.GR6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 06, 2013 at 05:42:41PM -0400, behanw at converseincode.com wrote:
+On Fri, Sep 06, 2013 at 05:28:07PM -0400, behanw at converseincode.com wrote:
 > From: Behan Webster <behanw@converseincode.com>
 > 
-> Use the frame pointer to calculate the end of the stack for current_pt_regs()
-> The existing code uses the stack pointer to do this calculation.
-> Using the frame pointer yeilds the same value in a more portable way.
-> This change supports being able to compile the kernel with gcc and clang.
+> A macro to get the current stack pointer which allows for a single place in
+> which to do so with ASM. Before this named registers (a gcc extension) was used
+> to get the stack pointer. Using ASM is a more portable way of getting the stack
+> pointer which works with both gcc and clang.  This macro is of the same name
+> used in the X86 arch.
 
-What happens when frame pointers are disabled on gcc?
+This will result in less optimal code - rather than the compiler being
+able to mask directly with 'sp', it's going to have to use this bit of
+assembly to first move it into another register.
+
+Why do we want this change?
