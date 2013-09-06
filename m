@@ -1,50 +1,34 @@
 From: markus.mayer@linaro.org (Markus Mayer)
-Date: Fri, 6 Sep 2013 11:40:46 -0700
-Subject: [PATCH v8 3/3] ARM: bcm281xx: Add device node for the GPIO controller
-In-Reply-To: <1378492846-3112-1-git-send-email-markus.mayer@linaro.org>
-References: <1378492846-3112-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <1378492846-3112-4-git-send-email-markus.mayer@linaro.org>
+Date: Fri, 6 Sep 2013 11:43:24 -0700
+Subject: [PATCH v7 1/3] gpio: bcm281xx: Add GPIO driver
+In-Reply-To: <20130906171400.GC10973@ohporter.com>
+References: <1377882914-30152-1-git-send-email-markus.mayer@linaro.org>
+ <1377882914-30152-2-git-send-email-markus.mayer@linaro.org>
+ <20130906171400.GC10973@ohporter.com>
+Message-ID: <CAPdLdqnAL-0CRFoOJNZ+okVW7FQ5SO7kuPJeqJC=EKD1+kw5zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the GPIO controller device node for the Broadcom bcm281xx family of
-mobile SoCs.
+>> --- /dev/null
+>> +++ b/drivers/gpio/gpio-bcm-kona.c
+>> @@ -0,0 +1,631 @@
+>> +/*
+>> + * Copyright (C) 2012-2013 Broadcom Corporation
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation version 2.
+>> + *
+>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>> + * kind, whether express or implied; without even the implied warranty
+>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/bitops.h>
+>
+> Need #include <linux/err.h>
 
-Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Thanks, Matt. A new version has been posted.
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index c0cdf66..a3945e3 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -63,6 +63,22 @@
- 		clock-frequency = <32768>;
- 	};
- 
-+	gpio: gpio at 35003000 {
-+		compatible = "brcm,bcm11351-gpio", "brcm,kona-gpio";
-+		reg = <0x35003000 0x800>;
-+		interrupts =
-+		       <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH
-+			GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		#interrupt-cells = <2>;
-+		gpio-controller;
-+		interrupt-controller;
-+	};
-+
- 	sdio0: sdio at 0x3f180000 {
- 		compatible = "bcm,kona-sdhci";
- 		reg = <0x3f180000 0x10000>;
--- 
-1.7.9.5
+-Markus
