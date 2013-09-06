@@ -1,53 +1,23 @@
-From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Thu,  5 Sep 2013 21:25:50 -0400
-Subject: [PATCH V2] arm: LLVMLinux: use static inline in ARM ftrace.h
-In-Reply-To: 52292B75.8080705@converseincode.com
-Message-ID: <1378430750-11633-1-git-send-email-behanw@converseincode.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 05 Sep 2013 22:58:17 -0400 (EDT)
+Subject: [PATCH] net: stmmac: fix bad merge conflict resolution
+In-Reply-To: <1378429301-19964-1-git-send-email-olof@lixom.net>
+References: <20130905.163725.106795517693348522.davem@davemloft.net>
+ <1378429301-19964-1-git-send-email-olof@lixom.net>
+Message-ID: <20130905.225817.700066425182547791.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Behan Webster <behanw@converseincode.com>
+From: Olof Johansson <olof@lixom.net>
+Date: Thu,  5 Sep 2013 18:01:41 -0700
 
-With compilers which follow the C99 standard (like modern versions of gcc and
-clang), "extern inline" does the wrong thing (emits code for an externally
-linkable version of the inline function). In this case using static inline
-and removing the NULL version of return_address in return_address.c does
-the right thing.
+> Merge commit 06c54055bebf919249aa1eb68312887c3cfe77b4 did a bad conflict
+> resolution accidentally leaving out a closing brace. Add it back.
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+> 
+> This breaks a handful of defconfigs on ARM, so it'd be good to see it
+> applied pretty quickly. Thanks!
 
-Signed-off-by: Behan Webster <behanw@converseincode.com>
----
- arch/arm/include/asm/ftrace.h    | 2 +-
- arch/arm/kernel/return_address.c | 5 -----
- 2 files changed, 1 insertion(+), 6 deletions(-)
-
-diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-index f89515a..2bb8cac 100644
---- a/arch/arm/include/asm/ftrace.h
-+++ b/arch/arm/include/asm/ftrace.h
-@@ -45,7 +45,7 @@ void *return_address(unsigned int);
- 
- #else
- 
--extern inline void *return_address(unsigned int level)
-+static inline void *return_address(unsigned int level)
- {
- 	return NULL;
- }
-diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
-index fafedd8..f6aa84d 100644
---- a/arch/arm/kernel/return_address.c
-+++ b/arch/arm/kernel/return_address.c
-@@ -63,11 +63,6 @@ void *return_address(unsigned int level)
- #warning "TODO: return_address should use unwind tables"
- #endif
- 
--void *return_address(unsigned int level)
--{
--	return NULL;
--}
--
- #endif /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) / else */
- 
- EXPORT_SYMBOL_GPL(return_address);
--- 
-1.8.1.2
+Looks like Linus applied this, thanks Olof.
