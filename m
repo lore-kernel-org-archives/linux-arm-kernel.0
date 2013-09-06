@@ -1,23 +1,41 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 05 Sep 2013 22:58:17 -0400 (EDT)
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 6 Sep 2013 14:19:29 +1000
 Subject: [PATCH] net: stmmac: fix bad merge conflict resolution
-In-Reply-To: <1378429301-19964-1-git-send-email-olof@lixom.net>
+In-Reply-To: <20130905.225817.700066425182547791.davem@davemloft.net>
 References: <20130905.163725.106795517693348522.davem@davemloft.net>
  <1378429301-19964-1-git-send-email-olof@lixom.net>
-Message-ID: <20130905.225817.700066425182547791.davem@davemloft.net>
+ <20130905.225817.700066425182547791.davem@davemloft.net>
+Message-ID: <20130906141929.2f30c62de4eb5c6ad9d3f699@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Olof Johansson <olof@lixom.net>
-Date: Thu,  5 Sep 2013 18:01:41 -0700
+Hi all,
 
-> Merge commit 06c54055bebf919249aa1eb68312887c3cfe77b4 did a bad conflict
-> resolution accidentally leaving out a closing brace. Add it back.
+On Thu, 05 Sep 2013 22:58:17 -0400 (EDT) David Miller <davem@davemloft.net> wrote:
+>
+> From: Olof Johansson <olof@lixom.net>
+> Date: Thu,  5 Sep 2013 18:01:41 -0700
 > 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
+> > Merge commit 06c54055bebf919249aa1eb68312887c3cfe77b4 did a bad conflict
+> > resolution accidentally leaving out a closing brace. Add it back.
+> > 
+> > Signed-off-by: Olof Johansson <olof@lixom.net>
+> > ---
+> > 
+> > This breaks a handful of defconfigs on ARM, so it'd be good to see it
+> > applied pretty quickly. Thanks!
 > 
-> This breaks a handful of defconfigs on ARM, so it'd be good to see it
-> applied pretty quickly. Thanks!
+> Looks like Linus applied this, thanks Olof.
 
-Looks like Linus applied this, thanks Olof.
+And I cherry-picked it into linux-next for today.
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130906/4826a3fa/attachment.sig>
