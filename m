@@ -1,48 +1,75 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 6 Sep 2013 12:01:41 -0500
-Subject: [PATCHv2 1/2] ARM: msm: Add support for MSM8974 Dragonboard
-In-Reply-To: <522A0977.5060703@codeaurora.org>
-References: <1378425890-4225-1-git-send-email-rvaswani@codeaurora.org>
- <20A8A05D-2F56-4127-A494-470833B2DC42@codeaurora.org>
- <522A0977.5060703@codeaurora.org>
-Message-ID: <8E887DF7-5941-480E-8D05-80EFCC960B91@codeaurora.org>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Fri, 6 Sep 2013 13:14:01 -0400
+Subject: [PATCH v7 1/3] gpio: bcm281xx: Add GPIO driver
+In-Reply-To: <1377882914-30152-2-git-send-email-markus.mayer@linaro.org>
+References: <1377882914-30152-1-git-send-email-markus.mayer@linaro.org>
+ <1377882914-30152-2-git-send-email-markus.mayer@linaro.org>
+Message-ID: <20130906171400.GC10973@ohporter.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Aug 30, 2013 at 10:15:12AM -0700, Markus Mayer wrote:
 
-On Sep 6, 2013, at 11:57 AM, Rohit Vaswani wrote:
+<snip>
 
-> On 9/6/2013 7:22 AM, Kumar Gala wrote:
->> On Sep 5, 2013, at 7:04 PM, Rohit Vaswani wrote:
->> 
->>> This patch adds basic board support for MSM8974 Dragonboard
->>> which belongs to the Snapdragon 800 family.
->>> For now, just support a basic machine with device tree.
->>> 
->>> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
->>> ---
->>> arch/arm/boot/dts/Makefile        |  3 ++-
->>> arch/arm/boot/dts/msm8974-db.dts  |  7 +++++++
->>> arch/arm/boot/dts/msm8974.dtsi    | 30 ++++++++++++++++++++++++++++++
->>> arch/arm/mach-msm/Kconfig         | 20 ++++++++++++++++++--
->>> arch/arm/mach-msm/Makefile        |  1 +
->>> arch/arm/mach-msm/board-dt-8974.c | 23 +++++++++++++++++++++++
->>> 6 files changed, 81 insertions(+), 3 deletions(-)
->>> create mode 100644 arch/arm/boot/dts/msm8974-db.dts
->>> create mode 100644 arch/arm/boot/dts/msm8974.dtsi
->>> create mode 100644 arch/arm/mach-msm/board-dt-8974.c
->> As I mentioned before, its the APQ8074 Dragonboard, not MSM8974
-> 
-> We are not going with the internal (mangled) naming schemes for this as the configs etc. are all aligned to MSM8974 and we will only have this 1 platform as our upstream platform.
+> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+> index ef3e983..fcd0751 100644
+> --- a/drivers/gpio/Makefile
+> +++ b/drivers/gpio/Makefile
+> @@ -16,6 +16,7 @@ obj-$(CONFIG_GPIO_ADP5520)	+= gpio-adp5520.o
+>  obj-$(CONFIG_GPIO_ADP5588)	+= gpio-adp5588.o
+>  obj-$(CONFIG_GPIO_AMD8111)	+= gpio-amd8111.o
+>  obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
+> +obj-$(CONFIG_GPIO_BCM_KONA)	+= gpio-bcm-kona.o
+>  obj-$(CONFIG_GPIO_BT8XX)	+= gpio-bt8xx.o
+>  obj-$(CONFIG_GPIO_CLPS711X)	+= gpio-clps711x.o
+>  obj-$(CONFIG_GPIO_CS5535)	+= gpio-cs5535.o
+> diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
+> new file mode 100644
+> index 0000000..f0f7a96
+> --- /dev/null
+> +++ b/drivers/gpio/gpio-bcm-kona.c
+> @@ -0,0 +1,631 @@
+> +/*
+> + * Copyright (C) 2012-2013 Broadcom Corporation
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/bitops.h>
 
-I'm not sure I understand your point.
+Need #include <linux/err.h>
 
-We call it the DB8074 and not DB8974:
+> +#include <linux/io.h>
+> +#include <linux/gpio.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/module.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/irqchip/chained_irq.h>
 
-http://mydragonboard.org/db8074/
+<snip>
 
-- k
+> +	kona_gpio->irq_domain = irq_domain_add_linear(dev->of_node,
+> +						      chip->ngpio,
+> +						      &bcm_kona_irq_ops,
+> +						      kona_gpio);
+> +	if (!kona_gpio->irq_domain) {
+> +		dev_err(dev, "Couldn't allocate IRQ domain\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	kona_gpio->reg_base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(kona_gpio->reg_base)) {
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+gpio-bcm-kona.c:568:2: error: implicit declaration of function ?IS_ERR?
+
+-Matt
