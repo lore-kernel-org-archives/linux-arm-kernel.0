@@ -1,373 +1,499 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri,  6 Sep 2013 12:10:02 -0700
-Subject: [GIT PULL 2/5] ARM: SoC cleanups for 3.12
+Date: Fri,  6 Sep 2013 12:10:03 -0700
+Subject: [GIT PULL 3/5] ARM: SoC DT updates for 3.12
 In-Reply-To: <1378494605-14990-1-git-send-email-olof@lixom.net>
 References: <1378494605-14990-1-git-send-email-olof@lixom.net>
-Message-ID: <1378494605-14990-3-git-send-email-olof@lixom.net>
+Message-ID: <1378494605-14990-4-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch contains code cleanups, moves and removals for 3.12.
+Device tree and bindings updates for 3.12.
 
-There's a large number of various cleanups, and a nice net removal of
-13500 lines of code.
+General additions of various on-chip and on-board peripherals on various
+platforms as support gets added. Some of the bigger changes are:
 
-Highlights worth mentioning are:
+- Addition of (new) PCI-e support on Tegra.
+- More Tegra4 support, including PMC configuration for Dalmore.
+- Addition of a new board for Exynos4 (trats2) and more bindings for 4x12 IP.
+- Addition of Allwinner A20 and A31 SoC and board files.
+- Move of the ST Ericsson device tree files to now use ste-* prefix.
+- More move of hardware description of shmobile platforms to DT.
+- Two new board dts files for Freescale MXs.
 
-- A series of patches from Stephen Boyd removing the ARM local timer API.
-- Move of Qualcomm MSM IOMMU code to drivers/iommu.
-- Samsung PWM driver cleanups from Tomasz Figa, removing legacy PWM driver
-and switching over to the drivers/pwm one.
-- Removal of some unusued auto-generated headers for OMAP2+ (PRM/CM).
-
-There's also a move of a header file out of include/linux/i2c/ to
-platform_data, where it really belongs. It touches mostly ARM platform
-code for include changes so we took it through our tree.
 
 Conflicts:
-
-Kconfig.debug: Keep the new debug/msm.S file from branch, the rest have
-been moved or deleted in rmk's cleanup that you already merged.
+- Small conflicts with a 3.11 fix for tegra. Keep the branch version
+  but move over the regulator-* properties.
 
 ----------------------------------------------------------------
 
-The following changes since commit ba99e38939eb3fcd1c889af53d9db19674d3ef58:
+The following changes since commit c4a76db1d8a31f7d25b9bd5b45a822a15366ec83:
 
-  Merge tag 'fixes-nc-for-linus' into test-merge
+  Merge tag 'cleanup-for-linus' into test-merge
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/cleanup-for-linus
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/dt-for-linus
 
-for you to fetch changes up to 7323f219533e01cc075ba45a76f3e5b214adb23f:
+for you to fetch changes up to 56e9e0f3a3c558b42db2dd5120d3a839e4beb282:
 
-  ARM: OMAP2+: Add back the define for AM33XX_RST_GLOBAL_WARM_SW_MASK
+  Merge branch 'socfpga/dt' into next/dt
 
 ----------------------------------------------------------------
 
-Bartlomiej Zolnierkiewicz (1):
-      ARM: exynos4_defconfig: remove obsolete exynos4_defconfig
+Alexandre Belloni (6):
+      ARM: mxs: dt: cfa10037: make hogpins grabbed by respective drivers
+      ARM: mxs: dt: cfa10049: make hogpins grabbed by respective drivers
+      ARM: mxs: dt: cfa10055: make hogpins grabbed by respective drivers
+      ARM: mxs: dt: cfa10057: remove hogpins
+      ARM: mxs: dt: cfa10036: make hogpins grabbed by respective drivers
+      ARM: at91: Add PMU support for sama5d3
 
-Guennadi Liakhovetski (1):
-      ARM: shmobile: armadillo800eva: remove left-overs
+Amit Daniel Kachhap (1):
+      ARM: dts: Add device tree node for exynos5440 TMU controller
 
-Jingoo Han (1):
-      ARM: SAMSUNG: Remove unnecessary exynos4_default_sdhci*()
+Andrew Bresticker (1):
+      ARM: dts: add audio clock controller for exynos5420
 
-Julia Lawall (1):
-      tegra: simplify use of devm_ioremap_resource
+Andrzej Hajda (3):
+      ARM: dts: Add SPI1 controller and s5c73m3 sensor node for TRATS2
+      ARM: dts: Add Exynos4210 SoC camera port pinctrl nodes
+      ARM: dts: Add S5K5BA sensor regulator definitions for Trats board
 
-Kevin Hilman (5):
-      Merge branch 'msm/cleanup' into next/cleanup
-      Merge tag 'omap-for-v3.12/usb-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/cleanup
-      Merge tag 'zynq-cleanup-for-3.12' of git://git.xilinx.com/linux-xlnx into next/cleanup
-      Merge tag 'tegra-for-3.12-cleanup' of git://git.kernel.org/.../swarren/linux-tegra into next/cleanup
-      Merge tag 'samsung-cleanup-1' of git://git.kernel.org/.../kgene/linux-samsung into next/cleanup
+Arun Kumar K (4):
+      ARM: dts: Update clocks entry in MFC binding documentation
+      ARM: dts: Remove unsused MFC clock from exynos4
+      ARM: dts: Update 5250 MFC node
+      ARM: dts: Add MFC node for exynos 5420
+
+Bill Huang (1):
+      ARM: tegra: configure power off for Dalmore
+
+Brian Lilly (2):
+      ARM: mxs: dt: Add Crystalfontz CFA-10056 device tree
+      ARM: mxs: dt: Add Crystalfontz CFA-10058 device tree
+
+Christian Daudt (3):
+      ARM: dts: align sdio numbers to HW definition
+      ARM: dts: add sdio blocks to bcm28155-ap board
+      ARM: DT: binding fixup to align with vendor-prefixes.txt (DT)
+
+Daniel Mack (2):
+      ARM: pxa: fix DT auxdata for pxa3xx-gpio
+      ARM: pxa: DTS: override gpio node in pxa3xx.dtsi
+
+Dinh Nguyen (3):
+      of: add vendor prefix for Altera Corp.
+      dts: Deprecate ALTR as a vendor prefix
+      dts: Rename DW APB timer compatible strings
+
+Dongjin Kim (1):
+      ARM: dts: Add USB host node for Exynos4
+
+Emilio L?pez (6):
+      ARM: sun5i: dt: Add I2C muxings for sun5i A10S
+      ARM: sun5i: dt: Add I2C controller nodes to the A10S dtsi
+      ARM: sun5i: dt: Enable I2C controllers on A10S-OLinuXino-Micro
+      ARM: sun5i: dt: Add AT24 device on A10S-OLinuXino-Micro
+      ARM: sunxi: make the leds' names conform to the current naming convention
+      ARM: sunxi: dt: Add device tree for Mele A1000
+
+Fabio Estevam (1):
+      ARM: dts: mxs: Add spi alias
+
+Gabriel Fernandez (2):
+      ARM: u8540: Add Pinctrl Device Tree settings for uart0, uart2
+      ARM: u8540: DT: Set pinctrl mapping to i2c0,1,2,4 & 5
+
+Guennadi Liakhovetski (4):
+      ARM: shmobile: r8a73a4: add I2C controller DT nodes
+      ARM: shmobile: ape6evm: add CPUFreq support
+      ARM: shmobile: r8a73a4: add MMCIF and SDHI DT templates
+      ARM: shmobile: r8a7790: add MMCIF and SDHI DT templates
+
+Jacek Anaszewski (1):
+      ARM: dts: Add AK8975 device node for Exynos4412 TRATS2 board
+
+Jay Agarwal (2):
+      ARM: tegra: Enable PCIe controller on Cardhu
+      ARM: dts: tegra: Increase prefetchable PCI memory space
+
+Jean-Christophe PLAGNIOL-VILLARD (3):
+      ARM: at91: at91sam9260: add missing pinctrl-names on mmc
+      ARM: at91: at91rm9200: set default mmc0 pinctrl-names
+      ARM: at91/dt: add at91rm9200 PQFP package version
+
+Joseph Lo (3):
+      ARM: tegra: dalmore: add PM configurations for PMC
+      ARM: tegra: dalmore: fix the irq trigger type of Palmas MFD device
+      ARM: tegra: enable LP1 suspend mode
+
+Kevin Hilman (10):
+      Merge branch 'pxa/dt' into next/dt
+      Merge branch 'zynq/dt' into next/dt
+      Merge tag 'ux500-devicetree-for-v3.12-1' of git://git.kernel.org/.../linusw/linux-stericsson into next/dt
+      Merge tag 'tegra-for-3.12-dt' of git://git.kernel.org/.../swarren/linux-tegra into next/dt
+      Merge tag 'sunxi-dt-for-3.12' of https://github.com/mripard/linux into next/dt
+      Merge tag 'sunxi-dt-for-3.12-2' of https://github.com/mripard/linux into next/dt
+      Merge tag 'samsung-dt-1' of git://git.kernel.org/.../kgene/linux-samsung into next/dt
+      Merge tag 'nomadik-i2c-for-arm-soc' of git://git.kernel.org/.../linusw/linux-nomadik into next/dt
+      Merge tag 'at91-dt' of git://github.com/at91linux/linux-at91 into next/dt
+      Merge tag 'mxs-dt-3.12' of git://git.linaro.org/people/shawnguo/linux-2.6 into next/dt
 
 Kukjin Kim (1):
-      irqchip: exynos: cleanup non-DT stuff in exynos-combiner
+      ARM: dts: re-ordering exynos dtbs in Makefile
 
-Kuninori Morimoto (2):
-      ARM: shmobile: r8a7778: add __initdata on resource and device data
-      ARM: shmobile: r8a7778: remove r8a7778_init_irq()
+Laurent Pinchart (19):
+      ARM: shmobile: r8a73a4: Add pin control device to device tree
+      ARM: shmobile: r8a7740: Add pin control device to device tree
+      ARM: shmobile: r8a7778: Add pin control device to device tree
+      ARM: shmobile: r8a7778: Add GPIO controller devices to device tree
+      ARM: shmobile: r8a7779: Add pin control device to device tree
+      ARM: shmobile: r8a7779: Add GPIO controller devices to device tree
+      ARM: shmobile: r8a7790: Add pin control device to device tree
+      ARM: shmobile: r8a7790: Add GPIO controller devices to device tree
+      ARM: shmobile: sh7372: Add pin control device to device tree
+      ARM: shmobile: sh73a0: Add pin control device to device tree
+      ARM: shmobile: armadillo-reference: Move pinctrl mappings to device tree
+      ARM: shmobile: armadillo-reference: Add st1232 pin mappings
+      ARM: shmobile: armadillo-reference: Move st1232 reset GPIO to DT
+      ARM: shmobile: armadillo-reference: Add LED1-LED4 to the device tree
+      ARM: shmobile: marzen-reference: Move pinctrl mappings to device tree
+      ARM: shmobile: marzen-reference: Add LED2-LED4 to the device tree
+      ARM: shmobile: kzm9g-reference: Move pinctrl mappings to device tree
+      ARM: shmobile: kzm9g-reference: Move SDHI regulators to DT
+      ARM: shmobile: kzm9g-reference: Add LED1-LED4 to the device tree
 
-Lee Jones (5):
-      ARM: dts: Remove '0x's from Exynos4210 DTSI file
-      ARM: dts: Remove '0x's from Exynos4x12 DTSI file
-      ARM: dts: Remove '0x's from Exynos5250 DTS file
-      ARM: dts: Remove '0x's from Exynos5420 DTS file
-      ARM: dts: Remove '0x's from Exynos5440 DTS file
+Laxman Dewangan (3):
+      ARM: tegra: enable gpio-keys on Dalmore
+      ARM: tegra: enable palmas device for dalmore
+      ARM: tegra: define valid function names in DT document
 
-Magnus Damm (15):
-      ARM: shmobile: sh73a0 pinmux platform device cleanup
-      ARM: shmobile: ape6evm: Remove init_irq declaration in machine description
-      ARM: shmobile: lager: Remove init_irq declaration in machine description
-      ARM: shmobile: kzm9g: Remove init_irq declaration in machine description
-      ARM: shmobile: Remove unused EMEV2 auxdata and callback
-      ARM: shmobile: Remove unused r8a7740 auxdata table
-      ARM: shmobile: Remove unused r8a7778 auxdata and callback
-      ARM: shmobile: Remove unused r8a7779 auxdata table
-      ARM: shmobile: Remove unused sh7372 auxdata table
-      ARM: shmobile: Remove unused sh73a0 auxdata table
-      ARM: shmobile: Remove redundant r8a7790 callback
-      ARM: shmobile: Remove unused EMEV2/KZM9D early console
-      ARM: shmobile: Make EMEV2 platform devices more compact
-      ARM: shmobile: Fix EMEV2 clock comment typo
-      ARM: shmobile: Remove unused mach/dma.h
+Lee Jones (19):
+      ARM: ux500: Fix trivial whitespace/tabbing issue
+      ARM: ux500: Add Device Tree nodes for AB8500 External regulators
+      ARM: ux500: Provide a supply name for the AB8500 AUX regulators to use
+      ARM: ux500: Supply external regulator names for Snowball's DT
+      Documentation: Update binding for Nomadik and DBx5x based platforms
+      ARM: ux500: Stop passing MMC's platform data for Device Tree boots
+      ARM: ux500: Remove Toshiba TC35892 I/O Expander's DT entry from Snowball's DTS
+      ARM: ux500: Remove Snowball DTS entry for National Semiconductor LP5521 LED chip
+      ARM: ux500: Remove Snowball DTS entry for TPS61052 chip
+      ARM: ux500: Remove Snowball DTS entry for ROHM BH1780GLI ambient light sensor
+      ARM: ux500: Apply a ste-* prefix onto snowball.dts
+      ARM: ux500: Apply a ste-* prefix onto ccu8540.dts
+      ARM: ux500: Apply a ste-* prefix onto ccu9540.dts
+      ARM: ux500: Apply a ste-* prefix onto href.dtsi
+      ARM: ux500: Apply a ste-* prefix onto hrefprev60.dts Signed-off-by: Lee Jones <lee.jones@linaro.org>
+      ARM: ux500: Apply a ste-* prefix onto hrefv60plus.dts
+      ARM: ux500: Apply a ste-* prefix onto stuib.dtsi
+      ARM: ux500: Apply a ste-* prefix onto dbx5x0.dtsi
+      ARM: ux500: Remove u9540.dts as it's been replaced
 
-Maxime Ripard (4):
-      ARM: shmobile: emev2: Remove init_irq declaration in machine description
-      ARM: shmobile: r8a73a4: Remove init_irq declaration in machine description
-      ARM: shmobile: r8a7790: Remove init_irq declaration in machine description
-      ARM: shmobile: sh73a0: Remove init_irq declaration in machine description
+Linus Walleij (2):
+      ARM: nomadik: switch to use the Nomadik I2C driver
+      ARM: ux500: fix devicetree builds
 
-Olof Johansson (7):
-      Merge tag 'remove-local-timers' of git://git.kernel.org/.../davidb/linux-msm into next/cleanup
-      ARM: imx: fix mismerge of localtimer code
-      Merge tag 'renesas-cleanup-for-v3.12' of git://git.kernel.org/.../horms/renesas into next/cleanup
-      Merge tag 'omap-for-v3.12/cleanup-unused-defines' of git://git.kernel.org/.../tmlind/linux-omap into next/cleanup
-      Merge tag 'v3.12-pwm-cleanup-for-olof' of git://github.com/tom3q/linux into next/cleanup
-      Merge tag 'soc-3.12' of git://git.infradead.org/linux-mvebu into next/cleanup
-      Merge tag 'samsung-defconfig-v2' of git://git.kernel.org/.../kgene/linux-samsung into next/cleanup
+Lothar Wa?mann (5):
+      ARM: dts: mxs: whitespace cleanup
+      ARM: dts: mxs: add labels to most nodes for easier reference
+      ARM: dts: mxs: add another set of saif0_pins (without MCLK)
+      ARM: dts: mxs: add pin config for SSP3 interface
+      ARM: dts: mxs: add pin config for LCD sync and clock pins
 
-Rajendra Nayak (4):
-      ARM: OMAP2: PRM/CM: Cleanup unused header
-      ARM: OMAP3: PRM/CM: Cleanup unused header
-      ARM: OMAP4: PRM/CM: Cleanup unused header
-      ARM: OMAP5: PRM/CM: Cleanup unused header
+Magnus Damm (11):
+      ARM: shmobile: Update KZM9D dts command line
+      ARM: shmobile: Add GIO to EMEV2 dtsi
+      ARM: shmobile: Use DT for GIC on EMEV2 and KZM9D
+      ARM: shmobile: Use DT for SMP on EMEV2 and KZM9D
+      ARM: shmobile: EMEV2 map_io update
+      ARM: shmobile: KZM9D DT reference implementation
+      ARM: shmobile: Add SMSC ethernet chip to KZM9D DT reference
+      ARM: shmobile: Only build clocks when COMMON_CLK=n
+      ARM: shmobile: Introduce ARCH_SHMOBILE_MULTI
+      ARM: shmobile: Add EMEV2 and KZM9D to ARCH_SHMOBILE_MULTI
+      ARM: shmobile: Allow ARCH_SHMOBILE_MULTI timer configuration
 
-Rohit Vaswani (1):
-      ARM: msm: Remove unused and unmapped MSM_TLMM_BASE for 8x60
+Marek Vasut (1):
+      ARM: mxs: Add backlight support for M28EVK
+
+Mark Brown (6):
+      ARM: dts: Hook up IRQ for PMIC on Arndale
+      ARM: dts: Put Arndale fixed voltage regulators on a simple-bus
+      ARM: dts: Hook up supplies for Arndale S5M8767
+      ARM: dts: Add WM1811A audio CODEC to Arndale bindings
+      ARM: dts: Enable USB hub on Arndale
+      ARM: dts: Hook up internal PHY on Arndale
+
+Markus Mayer (2):
+      ARM: bcm281xx: Adding bcm28155-ap.dts
+      ARM: bcm281xx: DT changes for reboot code
+
+Maxime Ripard (10):
+      ARM: sun4i: a10: Remove useless simple-bus reg property
+      ARM: sun4i: dt: Fix A10 SoC bus base address
+      ARM: sun5i: a10s: Remove useless simple-bus reg property
+      ARM: sun5i: dt: Fix A10s SoC bus base address
+      ARM: sun5i: a13: Remove useless simple-bus reg property
+      ARM: sun5i: dt: Fix A13 SoC bus base address
+      ARM: sunxi: Add Allwinner A31 DTSI
+      ARM: sun6i: Add WITS Colombus A31 evaluation kit support
+      ARM: sun7i: Add Allwinner A20 DTSI
+      ARM: sun7i: Add Olimex A20-Olinuxino-Micro support
+
+Mikko Perttunen (1):
+      ARM: tegra: add USB DT entries for Tegra114, Dalmore
+
+Olof Johansson (5):
+      Merge tag 'renesas-dt-for-v3.12' of git://git.kernel.org/.../horms/renesas into next/dt
+      Merge tag 'renesas-pinmux-for-v3.12' of git://git.kernel.org/.../horms/renesas into next/dt
+      Merge tag 'renesas-multiplatform-for-v3.12' of git://git.kernel.org/.../horms/renesas into next/dt
+      Merge branch 'armsoc/for-3.12/dt' of git://github.com/broadcom/bcm11351 into next/dt
+      Merge branch 'socfpga/dt' into next/dt
+
+Otavio Salvador (3):
+      ARM: dts: imx23-evk: enable USB PHY and controller
+      ARM: dts: imx23-evk: enable Low Resolution ADC
+      ARM: dts: imx23-olinuxino: enable Low Resolution ADC
+
+Padmavathi Venna (1):
+      ARM: dts: Correct the /include entry on exynos5420 dtsi file
+
+Richard Genoud (4):
+      ARM: at91/dt: sam9x5: add SSC DMA parameters
+      ARM: at91/dt: sam9x5ek: add WM8731 codec
+      ARM: at91/dt: sam9x5ek: enable SSC
+      ARM: at91/dt: sam9x5ek: add sound configuration
 
 Sachin Kamat (1):
-      ARM: EXYNOS: Cleanup common.h file
+      ARM: dts: Add G2D support to exynos5250
 
-Soren Brinkmann (4):
-      arm: zynq: slcr: Remove redundant header #includes
-      arm: zynq: slcr: Clean up #defines
-      arm: zynq: slcr: Use read-modify-write for register writes
-      arm: zynq: hotplug: Remove unreachable code
+Shawn Guo (1):
+      ARM: dts: mxs: remove old DMA binding data from client nodes
 
-Stephen Boyd (19):
-      Merge branch 'timers/core' of git://git.kernel.org/.../tip/tip into remove-local-timers
-      ARM: smp: Remove duplicate dummy timer implementation
-      ARM: smp_twd: Divorce smp_twd from local timer API
-      ARM: OMAP2+: Divorce from local timer API
-      ARM: EXYNOS4: Divorce mct from local timer API
-      ARM: PRIMA2: Divorce timer-marco from local timer API
-      ARM: msm: Divorce msm_timer from local timer API
-      clocksource: time-armada-370-xp: Fix sparse warning
-      clocksource: time-armada-370-xp: Divorce from local timer API
-      ARM: smp: Remove local timer API
-      ARM: msm: Don't compile __msm_ioremap_caller() unless used
-      ARM: OMAP2+: Fix fallout from localtimer divorce and SMP=n
-      ARM: msm: Move debug-macro.S to include/debug
-      ARM: msm: Remove TMR and TMR0 static mappings
-      ARM: msm: Migrate msm_timer to CLOCKSOURCE_OF_DECLARE
-      ARM: msm: Move mach/board.h contents to common.h
-      ARM: msm: Remove devices-iommu.c
-      iommu/msm: Move mach includes to iommu directory
-      ARM: msm: Only compile io.c on platforms that use it
+Soren Brinkmann (1):
+      arm: zynq: dt: Set correct L2 ram latencies
 
-Sudeep KarkadaNagesha (1):
-      ARM: mach-mvebu: remove redundant DT parsing and validation
+Stephen Warren (6):
+      ARM: tegra: fix DT node ordering in Tegra30 Cardhu
+      ARM: tegra: remove tegra114-pluto.dts
+      ARM: tegra: use TEGRA_GPIO() in a couple more places
+      ARM: tegra: Fix Beaver's PCIe lane configuration
+      ARM: tegra: add Mic Jack to Beaver device tree
+      ARM: tegra: add Mic Jack to Dalmore device tree
 
-Tomasz Figa (20):
-      clocksource: samsung_pwm_timer: Do not request PWM mem region
-      clocksource: samsung_pwm_timer: Correct definition of AUTORELOAD bit
-      clocksource: samsung_pwm_timer: Cache clocksource register address
-      clocksource: samsung_pwm_timer: Do not use clocksource_mmio
-      clocksource: samsung_pwm_timer: Handle suspend/resume correctly
-      ARM: SAMSUNG: Unify base address definitions of timer block
-      ARM: SAMSUNG: Add new PWM platform device
-      ARM: SAMSUNG: Set PWM platform data
-      ARM: SAMSUNG: Move all platforms to new clocksource driver
-      ARM: SAMSUNG: Remove old samsung-time driver
-      ARM: SAMSUNG: Remove unused PWM timer IRQ chip code
-      pwm: samsung: Rename to pwm-samsung-legacy
-      pwm: Add new pwm-samsung driver
-      ARM: SAMSUNG: Rework private data handling in dev-backlight
-      ARM: SAMSUNG: Modify board files to use new PWM platform device
-      pwm: Remove superseded pwm-samsung-legacy driver
-      ARM: SAMSUNG: Remove old PWM timer platform devices
-      ARM: SAMSUNG: Remove pwm-clock infrastructure
-      ARM: SAMSUNG: Remove remaining uses of plat/regs-timer.h header
-      ARM: SAMSUNG: Remove plat/regs-timer.h header
+Sylwester Nawrocki (9):
+      ARM: dts: Correct camera pinctrl nodes for Exynos4x12 SoCs
+      ARM: dts: Add pinctrl entries for Exynos4x12 FIMC-IS peripherals
+      ARM: dts: Add ISP power domain node for Exynos4x12
+      ARM: dts: Use generic DMA bindings for Exynos4 SPI devices
+      ARM: dts: Add camera subsystem device nodes to exynos4.dtsi
+      ARM: dts: Add camera subsystem nodes to exynos4x12.dtsi
+      ARM: dts: Add camera device nodes for Exynos4412 TRATS2 board
+      ARM: dts: Add camera device nodes for Exynos4210 SoCs
+      ARM: dts: Add FIMC nodes for Exynos4210 Trats board
 
-Tony Lindgren (2):
-      Merge tag 'for-v3.11-rc/omap-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.12/cleanup
-      ARM: OMAP2+: Add back the define for AM33XX_RST_GLOBAL_WARM_SW_MASK
+Thierry Reding (8):
+      ARM: tegra: beaver: Enable HDMI output
+      ARM: tegra: Add Tegra20 PCIe support to DT
+      ARM: tegra: tamonten: Add PCIe support
+      ARM: tegra: tec: Add PCIe support
+      ARM: tegra: harmony: Initialize PCIe from DT
+      ARM: tegra: trimslice: Initialize PCIe from DT
+      ARM: tegra: Add Tegra30 PCIe support
+      ARM: tegra: Enable PCIe controller on Beaver
 
-Vivien Didelot (1):
-      gpio: (gpio-pca953x) move header to linux/platform_data/
+Tomasz Figa (1):
+      ARM: dts: Add basic dts for Exynos4412-based Trats 2 board
+
+Tuomas Tynkkynen (1):
+      ARM: tegra: add USB DT entries for Tegra30
+
+Tushar Behera (1):
+      ARM: dts: Add secure-firmware boot support for OrigenQaud board
+
+Vikas Sajjan (6):
+      ARM: dts: Move display-timing information inside FIMD DT node for exynos5250
+      ARM: dts: Update FIMD DT node for Exynos5 SoCs
+      ARM: dts: Add FIMD DT node to exynos5420 DTS files
+      ARM: dts: Update DP controller DT Node for Exynos5 based SoCs
+      ARM: dts: Add DP controller DT node to exynos5420 SoC
+      ARM: dts: Add pin state information for DP HPD support to Exynos5420
+
+Wei Ni (1):
+      ARM: tegra: add DT entry for nct1008 to Cardhu
+
+Yadwinder Singh Brar (1):
+      ARM: dts: Add basic PM domains for EXYNOS5420
+
+voice (3):
+      ARM: at91: at91sam9n12: add pinctrl of TWI
+      ARM: at91: at91sam9n12: add qt1070 support
+      ARM: at91: at91sam9n12: correct pin number of gpio-key
 
 
- arch/arm/Kconfig                                |   24 +-
- arch/arm/Kconfig.debug                          |    9 +-
- arch/arm/boot/dts/exynos4210.dtsi               |    2 +-
- arch/arm/boot/dts/exynos4x12.dtsi               |    2 +-
- arch/arm/boot/dts/exynos5250.dtsi               |   14 +-
- arch/arm/boot/dts/exynos5420.dtsi               |    2 +-
- arch/arm/boot/dts/exynos5440.dtsi               |    2 +-
- arch/arm/configs/exynos4_defconfig              |   68 -
- arch/arm/include/asm/localtimer.h               |   34 -
- .../mach/debug-macro.S => include/debug/msm.S}  |   32 +-
- arch/arm/kernel/smp.c                           |   87 -
- arch/arm/kernel/smp_twd.c                       |   64 +-
- arch/arm/mach-at91/board-snapper9260.c          |    2 +-
- arch/arm/mach-davinci/board-da850-evm.c         |    2 +-
- arch/arm/mach-ep93xx/vision_ep9307.c            |    2 +-
- arch/arm/mach-exynos/common.h                   |   43 -
- arch/arm/mach-highbank/Kconfig                  |    2 +-
- arch/arm/mach-imx/Kconfig                       |    2 +-
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c     |    2 +-
- arch/arm/mach-imx/mach-mxt_td60.c               |    2 +-
- arch/arm/mach-ks8695/board-acs5k.c              |    2 +-
- arch/arm/mach-mmp/ttc_dkb.c                     |    2 +-
- arch/arm/mach-msm/Makefile                      |    9 +-
- arch/arm/mach-msm/board-dt-8660.c               |    4 +-
- arch/arm/mach-msm/board-dt-8960.c               |    3 +-
- arch/arm/mach-msm/board-halibut.c               |    1 -
- arch/arm/mach-msm/board-mahimahi.c              |    2 +-
- arch/arm/mach-msm/board-msm7x30.c               |    1 -
- arch/arm/mach-msm/board-qsd8x50.c               |    1 -
- arch/arm/mach-msm/board-sapphire.c              |    2 +-
- arch/arm/mach-msm/board-trout.c                 |    1 -
- arch/arm/mach-msm/board-trout.h                 |    2 +-
- arch/arm/mach-msm/common.h                      |   18 +-
- arch/arm/mach-msm/devices-iommu.c               |  912 ------
- arch/arm/mach-msm/devices-msm7x30.c             |    2 +-
- arch/arm/mach-msm/devices-qsd8x50.c             |    2 +-
- arch/arm/mach-msm/include/mach/board.h          |   38 -
- arch/arm/mach-msm/include/mach/msm_iomap-8960.h |   46 -
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |   53 -
- arch/arm/mach-msm/include/mach/msm_iomap.h      |   17 -
- arch/arm/mach-msm/include/mach/uncompress.h     |   63 -
- arch/arm/mach-msm/io.c                          |   67 +-
- arch/arm/mach-msm/timer.c                       |  141 +-
- arch/arm/mach-mvebu/platsmp.c                   |   19 +-
- arch/arm/mach-omap2/Kconfig                     |    3 +-
- arch/arm/mach-omap2/board-am3517evm.c           |    2 +-
- arch/arm/mach-omap2/cm-regbits-24xx.h           |  318 ---
- arch/arm/mach-omap2/cm-regbits-33xx.h           |  749 -----
- arch/arm/mach-omap2/cm-regbits-34xx.h           |  632 ----
- arch/arm/mach-omap2/cm-regbits-44xx.h           | 1558 ----------
- arch/arm/mach-omap2/cm-regbits-54xx.h           | 1633 -----------
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c      |    1 -
- arch/arm/mach-omap2/powerdomains54xx_data.c     |    1 -
- arch/arm/mach-omap2/prm-regbits-24xx.h          |  247 --
- arch/arm/mach-omap2/prm-regbits-33xx.h          |  307 +-
- arch/arm/mach-omap2/prm-regbits-34xx.h          |  481 ----
- arch/arm/mach-omap2/prm-regbits-44xx.h          | 2226 ---------------
- arch/arm/mach-omap2/prm-regbits-54xx.h          | 2701 ------------------
- arch/arm/mach-omap2/timer.c                     |    6 +-
- arch/arm/mach-pxa/cm-x300.c                     |    2 +-
- arch/arm/mach-pxa/em-x270.c                     |    2 +-
- arch/arm/mach-pxa/pcm990-baseboard.c            |    2 +-
- arch/arm/mach-pxa/spitz.c                       |    2 +-
- arch/arm/mach-pxa/zeus.c                        |    2 +-
- arch/arm/mach-pxa/zylonite_pxa300.c             |    2 +-
- arch/arm/mach-realview/Kconfig                  |    8 +-
- arch/arm/mach-s3c24xx/Kconfig                   |    6 -
- arch/arm/mach-s3c24xx/clock-s3c2410.c           |    1 -
- arch/arm/mach-s3c24xx/clock-s3c2412.c           |    1 -
- arch/arm/mach-s3c24xx/clock-s3c2416.c           |    2 -
- arch/arm/mach-s3c24xx/clock-s3c2443.c           |    2 -
- arch/arm/mach-s3c24xx/common.c                  |   27 +
- arch/arm/mach-s3c24xx/include/mach/map.h        |    2 +
- arch/arm/mach-s3c24xx/mach-h1940.c              |    4 +-
- arch/arm/mach-s3c24xx/mach-rx1950.c             |    5 +-
- arch/arm/mach-s3c64xx/Kconfig                   |    2 -
- arch/arm/mach-s3c64xx/clock.c                   |    2 -
- arch/arm/mach-s3c64xx/common.c                  |   32 +-
- arch/arm/mach-s3c64xx/include/mach/irqs.h       |    8 -
- arch/arm/mach-s3c64xx/include/mach/map.h        |    1 +
- arch/arm/mach-s3c64xx/irq-pm.c                  |    2 -
- arch/arm/mach-s3c64xx/mach-crag6410.c           |    6 +-
- arch/arm/mach-s3c64xx/mach-hmt.c                |    4 +-
- arch/arm/mach-s3c64xx/mach-smartq.c             |    4 +-
- arch/arm/mach-s3c64xx/mach-smdk6410.c           |    5 +-
- arch/arm/mach-s5p64x0/Kconfig                   |    2 -
- arch/arm/mach-s5p64x0/clock-s5p6440.c           |    2 -
- arch/arm/mach-s5p64x0/clock-s5p6450.c           |    2 -
- arch/arm/mach-s5p64x0/common.c                  |   27 +
- arch/arm/mach-s5p64x0/include/mach/irqs.h       |    2 -
- arch/arm/mach-s5p64x0/include/mach/map.h        |    1 +
- arch/arm/mach-s5p64x0/mach-smdk6440.c           |    5 +-
- arch/arm/mach-s5p64x0/mach-smdk6450.c           |    5 +-
- arch/arm/mach-s5p64x0/pm.c                      |    3 -
- arch/arm/mach-s5pc100/Kconfig                   |    1 -
- arch/arm/mach-s5pc100/clock.c                   |    2 -
- arch/arm/mach-s5pc100/common.c                  |   28 +
- arch/arm/mach-s5pc100/include/mach/irqs.h       |    2 -
- arch/arm/mach-s5pc100/include/mach/map.h        |    1 +
- arch/arm/mach-s5pc100/mach-smdkc100.c           |    5 +-
- arch/arm/mach-s5pv210/Kconfig                   |    1 -
- arch/arm/mach-s5pv210/clock.c                   |    1 -
- arch/arm/mach-s5pv210/common.c                  |   28 +
- arch/arm/mach-s5pv210/include/mach/irqs.h       |    2 -
- arch/arm/mach-s5pv210/include/mach/map.h        |    1 +
- arch/arm/mach-s5pv210/mach-smdkv210.c           |    5 +-
- arch/arm/mach-s5pv210/pm.c                      |   10 -
- arch/arm/mach-shmobile/board-ape6evm.c          |    2 -
- arch/arm/mach-shmobile/board-armadillo800eva.c  |    9 -
- arch/arm/mach-shmobile/board-kzm9d.c            |    2 +-
- arch/arm/mach-shmobile/board-kzm9g-reference.c  |    2 -
- arch/arm/mach-shmobile/board-lager.c            |    2 -
- arch/arm/mach-shmobile/clock-emev2.c            |    2 +-
- arch/arm/mach-shmobile/include/mach/dma.h       |    1 -
- arch/arm/mach-shmobile/include/mach/emev2.h     |    2 +-
- arch/arm/mach-shmobile/include/mach/r8a7778.h   |    1 -
- arch/arm/mach-shmobile/setup-emev2.c            |  353 +--
- arch/arm/mach-shmobile/setup-r8a73a4.c          |    2 -
- arch/arm/mach-shmobile/setup-r8a7740.c          |   16 +-
- arch/arm/mach-shmobile/setup-r8a7778.c          |   72 +-
- arch/arm/mach-shmobile/setup-r8a7779.c          |    7 +-
- arch/arm/mach-shmobile/setup-r8a7790.c          |    7 -
- arch/arm/mach-shmobile/setup-sh7372.c           |    7 +-
- arch/arm/mach-shmobile/setup-sh73a0.c           |   34 +-
- arch/arm/mach-spear/Kconfig                     |    2 +-
- arch/arm/mach-tegra/Kconfig                     |    2 +-
- arch/arm/mach-ux500/Kconfig                     |    2 +-
- arch/arm/mach-vexpress/Kconfig                  |    2 +-
- arch/arm/mach-zynq/Kconfig                      |    2 +-
- arch/arm/mach-zynq/hotplug.c                    |   55 +-
- arch/arm/mach-zynq/slcr.c                       |   45 +-
- arch/arm/plat-samsung/Kconfig                   |   14 -
- arch/arm/plat-samsung/Makefile                  |    3 -
- arch/arm/plat-samsung/dev-backlight.c           |   61 +-
- arch/arm/plat-samsung/devs.c                    |   42 +-
- arch/arm/plat-samsung/include/plat/clock.h      |    4 -
- arch/arm/plat-samsung/include/plat/devs.h       |    1 +
- .../plat-samsung/include/plat/irq-vic-timer.h   |   13 -
- arch/arm/plat-samsung/include/plat/irqs.h       |    9 -
- arch/arm/plat-samsung/include/plat/pwm-clock.h  |   81 -
- arch/arm/plat-samsung/include/plat/pwm-core.h   |   22 +
- arch/arm/plat-samsung/include/plat/regs-timer.h |  124 -
- .../plat-samsung/include/plat/samsung-time.h    |   23 -
- arch/arm/plat-samsung/include/plat/sdhci.h      |   38 -
- arch/arm/plat-samsung/irq-vic-timer.c           |   98 -
- arch/arm/plat-samsung/pwm-clock.c               |  474 ---
- arch/arm/plat-samsung/s5p-irq.c                 |    4 -
- arch/arm/plat-samsung/samsung-time.c            |  394 ---
- arch/x86/platform/mrst/mrst.c                   |    2 +-
- drivers/clocksource/Kconfig                     |    1 -
- drivers/clocksource/exynos_mct.c                |   58 +-
- drivers/clocksource/samsung_pwm_timer.c         |  108 +-
- drivers/clocksource/time-armada-370-xp.c        |   92 +-
- drivers/clocksource/timer-marco.c               |   98 +-
- drivers/gpio/gpio-pca953x.c                     |    2 +-
- drivers/iommu/msm_iommu.c                       |    4 +-
- .../mach/iommu.h => drivers/iommu/msm_iommu.h   |    0
- drivers/iommu/msm_iommu_dev.c                   |    4 +-
- .../iommu/msm_iommu_hw-8xxx.h                   |    0
- drivers/iommu/tegra-smmu.c                      |    2 -
- drivers/irqchip/exynos-combiner.c               |   44 +-
- drivers/memory/tegra20-mc.c                     |    2 -
- drivers/memory/tegra30-mc.c                     |    2 -
- drivers/pwm/pwm-samsung.c                       |  709 +++--
- drivers/video/msm/msm_fb.c                      |    1 -
- include/clocksource/samsung_pwm.h               |    7 +
- include/linux/{i2c => platform_data}/pca953x.h  |    0
- include/linux/time-armada-370-xp.h              |    4 +-
- 168 files changed, 1312 insertions(+), 14806 deletions(-)
- delete mode 100644 arch/arm/configs/exynos4_defconfig
- delete mode 100644 arch/arm/include/asm/localtimer.h
- rename arch/arm/{mach-msm/include/mach/debug-macro.S => include/debug/msm.S} (61%)
- delete mode 100644 arch/arm/mach-msm/devices-iommu.c
- delete mode 100644 arch/arm/mach-msm/include/mach/board.h
- delete mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-8960.h
- delete mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
- delete mode 100644 arch/arm/mach-msm/include/mach/uncompress.h
- delete mode 100644 arch/arm/mach-omap2/prm-regbits-54xx.h
- delete mode 100644 arch/arm/mach-shmobile/include/mach/dma.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/irq-vic-timer.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/pwm-clock.h
- create mode 100644 arch/arm/plat-samsung/include/plat/pwm-core.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/regs-timer.h
- delete mode 100644 arch/arm/plat-samsung/irq-vic-timer.c
- delete mode 100644 arch/arm/plat-samsung/pwm-clock.c
- delete mode 100644 arch/arm/plat-samsung/samsung-time.c
- rename arch/arm/mach-msm/include/mach/iommu.h => drivers/iommu/msm_iommu.h (100%)
- rename arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h => drivers/iommu/msm_iommu_hw-8xxx.h (100%)
- rename include/linux/{i2c => platform_data}/pca953x.h (100%)
+ .../devicetree/bindings/arm/bcm/bcm11351.txt    |   3 +-
+ .../bcm/{bcm,kona-timer.txt => kona-timer.txt}  |   5 +-
+ .../devicetree/bindings/arm/bcm/kona-wdt.txt    |  15 +
+ .../devicetree/bindings/media/s5p-mfc.txt       |  10 +-
+ Documentation/devicetree/bindings/misc/smc.txt  |   5 +-
+ .../mmc/{bcm,kona-sdhci.txt => kona-sdhci.txt}  |   5 +-
+ .../bindings/pinctrl/nvidia,tegra114-pinmux.txt |  11 +
+ .../bindings/pinctrl/nvidia,tegra20-pinmux.txt  |  11 +
+ .../bindings/pinctrl/nvidia,tegra30-pinmux.txt  |  12 +
+ .../devicetree/bindings/pinctrl/ste,nomadik.txt |   6 +-
+ .../devicetree/bindings/rtc/dw-apb.txt          |  34 +-
+ .../bindings/serial/altera_jtaguart.txt         |   3 +-
+ .../devicetree/bindings/serial/altera_uart.txt  |   3 +-
+ .../devicetree/bindings/serio/altera_ps2.txt    |   3 +-
+ .../devicetree/bindings/spi/spi_altera.txt      |   3 +-
+ .../devicetree/bindings/vendor-prefixes.txt     |   1 +
+ arch/arm/Makefile                               |   1 +
+ arch/arm/boot/dts/Makefile                      |  30 +-
+ arch/arm/boot/dts/at91rm9200.dtsi               |   1 +
+ arch/arm/boot/dts/at91rm9200_pqfp.dtsi          |  17 +
+ arch/arm/boot/dts/at91sam9260.dtsi              |   1 +
+ arch/arm/boot/dts/at91sam9n12.dtsi              |  20 +
+ arch/arm/boot/dts/at91sam9n12ek.dts             |  18 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi               |   3 +
+ arch/arm/boot/dts/at91sam9x5ek.dtsi             |  24 +
+ arch/arm/boot/dts/bcm11351-brt.dts              |   8 +-
+ arch/arm/boot/dts/bcm11351.dtsi                 |  33 +-
+ arch/arm/boot/dts/bcm28155-ap.dts               |  45 ++
+ arch/arm/boot/dts/ccu8540.dts                   |  41 --
+ arch/arm/boot/dts/emev2-kzm9d-reference.dts     |  57 ++
+ arch/arm/boot/dts/emev2-kzm9d.dts               |   2 +-
+ arch/arm/boot/dts/emev2.dtsi                    |  59 ++
+ arch/arm/boot/dts/exynos4.dtsi                  | 122 +++-
+ arch/arm/boot/dts/exynos4210-pinctrl.dtsi       |  23 +
+ arch/arm/boot/dts/exynos4210-trats.dts          | 100 +++-
+ arch/arm/boot/dts/exynos4210.dtsi               |  30 +
+ arch/arm/boot/dts/exynos4412-origen.dts         |   5 +
+ arch/arm/boot/dts/exynos4412-trats2.dts         | 579 +++++++++++++++++++
+ arch/arm/boot/dts/exynos4x12-pinctrl.dtsi       |  61 +-
+ arch/arm/boot/dts/exynos4x12.dtsi               | 103 ++++
+ arch/arm/boot/dts/exynos5.dtsi                  |  19 +
+ arch/arm/boot/dts/exynos5250-arndale.dts        | 105 +++-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts       |  32 +-
+ arch/arm/boot/dts/exynos5250.dtsi               |  38 +-
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi       |   7 +
+ arch/arm/boot/dts/exynos5420-smdk5420.dts       |  31 +
+ arch/arm/boot/dts/exynos5420.dtsi               |  75 ++-
+ arch/arm/boot/dts/exynos5440.dtsi               |  27 +
+ arch/arm/boot/dts/imx23-evk.dts                 |  15 +
+ arch/arm/boot/dts/imx23-olinuxino.dts           |   4 +
+ arch/arm/boot/dts/imx23.dtsi                    |  17 +-
+ arch/arm/boot/dts/imx28-cfa10036.dts            |   7 +-
+ arch/arm/boot/dts/imx28-cfa10037.dts            |  19 +-
+ arch/arm/boot/dts/imx28-cfa10049.dts            |  73 ++-
+ arch/arm/boot/dts/imx28-cfa10055.dts            |  38 +-
+ arch/arm/boot/dts/imx28-cfa10056.dts            | 119 ++++
+ arch/arm/boot/dts/imx28-cfa10057.dts            |  23 +-
+ arch/arm/boot/dts/imx28-cfa10058.dts            | 141 +++++
+ arch/arm/boot/dts/imx28-m28evk.dts              |  13 +
+ arch/arm/boot/dts/imx28.dtsi                    | 143 +++--
+ arch/arm/boot/dts/pxa3xx.dtsi                   |  11 +
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts           |  22 +
+ arch/arm/boot/dts/r8a73a4.dtsi                  | 133 +++++
+ .../dts/r8a7740-armadillo800eva-reference.dts   |  34 ++
+ arch/arm/boot/dts/r8a7740.dtsi                  |   8 +
+ arch/arm/boot/dts/r8a7778.dtsi                  |  66 +++
+ arch/arm/boot/dts/r8a7779-marzen-reference.dts  |  49 ++
+ arch/arm/boot/dts/r8a7779.dtsi                  |  90 +++
+ arch/arm/boot/dts/r8a7790.dtsi                  | 132 +++++
+ arch/arm/boot/dts/sama5d3.dtsi                  |   5 +
+ arch/arm/boot/dts/sh7372.dtsi                   |   8 +
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts    |  90 ++-
+ arch/arm/boot/dts/sh73a0.dtsi                   |   8 +
+ arch/arm/boot/dts/socfpga.dtsi                  |   8 +-
+ arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi      | 196 +++++++
+ arch/arm/boot/dts/ste-ccu8540.dts               |  86 +++
+ .../boot/dts/{ccu9540.dts => ste-ccu9540.dts}   |   2 +-
+ .../boot/dts/{dbx5x0.dtsi => ste-dbx5x0.dtsi}   |  30 +-
+ arch/arm/boot/dts/{href.dtsi => ste-href.dtsi}  |   2 +-
+ .../dts/{hrefprev60.dts => ste-hrefprev60.dts}  |   6 +-
+ .../{hrefv60plus.dts => ste-hrefv60plus.dts}    |   6 +-
+ arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi      |  95 +++
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi      |  42 +-
+ .../boot/dts/{snowball.dts => ste-snowball.dts} |  44 +-
+ .../arm/boot/dts/{stuib.dtsi => ste-stuib.dtsi} |   0
+ arch/arm/boot/dts/sun4i-a10-a1000.dts           | 101 ++++
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts      |   6 +-
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts       |   2 +-
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts      |   2 +-
+ arch/arm/boot/dts/sun4i-a10.dtsi                |   3 +-
+ .../arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  27 +-
+ arch/arm/boot/dts/sun5i-a10s.dtsi               |  57 +-
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts       |   2 +-
+ arch/arm/boot/dts/sun5i-a13.dtsi                |   3 +-
+ arch/arm/boot/dts/sun6i-a31-colombus.dts        |  30 +
+ arch/arm/boot/dts/sun6i-a31.dtsi                | 156 +++++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts |  34 ++
+ arch/arm/boot/dts/sun7i-a20.dtsi                | 172 ++++++
+ arch/arm/boot/dts/tegra114-dalmore.dts          | 237 +++++++-
+ arch/arm/boot/dts/tegra114-pluto.dts            |  33 --
+ arch/arm/boot/dts/tegra114.dtsi                 |  62 ++
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi      |   2 +-
+ arch/arm/boot/dts/tegra20-harmony.dts           |  22 +-
+ arch/arm/boot/dts/tegra20-paz00.dts             |   2 +-
+ arch/arm/boot/dts/tegra20-seaboard.dts          |   4 +-
+ arch/arm/boot/dts/tegra20-tamonten.dtsi         |  19 +-
+ arch/arm/boot/dts/tegra20-tec.dts               |   8 +
+ arch/arm/boot/dts/tegra20-trimslice.dts         |  32 +-
+ arch/arm/boot/dts/tegra20-ventana.dts           |   2 +-
+ arch/arm/boot/dts/tegra20-whistler.dts          |   2 +-
+ arch/arm/boot/dts/tegra20.dtsi                  |  55 ++
+ arch/arm/boot/dts/tegra30-beaver.dts            |  64 +-
+ arch/arm/boot/dts/tegra30-cardhu.dtsi           |  64 +-
+ arch/arm/boot/dts/tegra30.dtsi                  | 156 +++++
+ arch/arm/boot/dts/u9540.dts                     |  72 ---
+ arch/arm/boot/dts/zynq-7000.dtsi                |   4 +-
+ arch/arm/mach-nomadik/Kconfig                   |   1 +
+ arch/arm/mach-pxa/pxa-dt.c                      |   2 +-
+ arch/arm/mach-shmobile/Kconfig                  |  64 +-
+ arch/arm/mach-shmobile/Makefile                 |  34 +-
+ arch/arm/mach-shmobile/Makefile.boot            |   1 +
+ .../board-armadillo800eva-reference.c           |  18 +-
+ arch/arm/mach-shmobile/board-kzm9d-reference.c  |  47 ++
+ arch/arm/mach-shmobile/board-kzm9d.c            |   2 -
+ arch/arm/mach-shmobile/board-kzm9g-reference.c  |  47 --
+ arch/arm/mach-shmobile/board-marzen-reference.c |  28 -
+ arch/arm/mach-shmobile/include/mach/emev2.h     |   1 -
+ arch/arm/mach-shmobile/setup-emev2.c            |  26 +-
+ arch/arm/mach-shmobile/smp-emev2.c              |  17 +-
+ arch/arm/mach-ux500/cpu-db8500.c                |   8 +-
+ drivers/input/serio/altera_ps2.c                |   1 +
+ drivers/spi/spi-altera.c                        |   1 +
+ drivers/tty/serial/altera_jtaguart.c            |   1 +
+ drivers/tty/serial/altera_uart.c                |   1 +
+ include/dt-bindings/pinctrl/nomadik.h           |  36 ++
+ 135 files changed, 4721 insertions(+), 682 deletions(-)
+ rename Documentation/devicetree/bindings/arm/bcm/{bcm,kona-timer.txt => kona-timer.txt} (80%)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/kona-wdt.txt
+ rename Documentation/devicetree/bindings/mmc/{bcm,kona-sdhci.txt => kona-sdhci.txt} (67%)
+ create mode 100644 arch/arm/boot/dts/at91rm9200_pqfp.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm28155-ap.dts
+ delete mode 100644 arch/arm/boot/dts/ccu8540.dts
+ create mode 100644 arch/arm/boot/dts/emev2-kzm9d-reference.dts
+ create mode 100644 arch/arm/boot/dts/exynos4412-trats2.dts
+ create mode 100644 arch/arm/boot/dts/imx28-cfa10056.dts
+ create mode 100644 arch/arm/boot/dts/imx28-cfa10058.dts
+ create mode 100644 arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/ste-ccu8540.dts
+ rename arch/arm/boot/dts/{ccu9540.dts => ste-ccu9540.dts} (98%)
+ rename arch/arm/boot/dts/{dbx5x0.dtsi => ste-dbx5x0.dtsi} (96%)
+ rename arch/arm/boot/dts/{href.dtsi => ste-href.dtsi} (99%)
+ rename arch/arm/boot/dts/{hrefprev60.dts => ste-hrefprev60.dts} (92%)
+ rename arch/arm/boot/dts/{hrefv60plus.dts => ste-hrefv60plus.dts} (98%)
+ create mode 100644 arch/arm/boot/dts/ste-nomadik-pinctrl.dtsi
+ rename arch/arm/boot/dts/{snowball.dts => ste-snowball.dts} (93%)
+ rename arch/arm/boot/dts/{stuib.dtsi => ste-stuib.dtsi} (100%)
+ create mode 100644 arch/arm/boot/dts/sun4i-a10-a1000.dts
+ create mode 100644 arch/arm/boot/dts/sun6i-a31-colombus.dts
+ create mode 100644 arch/arm/boot/dts/sun6i-a31.dtsi
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+ create mode 100644 arch/arm/boot/dts/sun7i-a20.dtsi
+ delete mode 100644 arch/arm/boot/dts/tegra114-pluto.dts
+ delete mode 100644 arch/arm/boot/dts/u9540.dts
+ create mode 100644 arch/arm/mach-shmobile/board-kzm9d-reference.c
+ create mode 100644 include/dt-bindings/pinctrl/nomadik.h
