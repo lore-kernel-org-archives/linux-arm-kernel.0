@@ -1,41 +1,37 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 06 Sep 2013 08:56:15 -0400
-Subject: [PATCHv2 2/2] defconfig: msm_defconfig: Enable CONFIG_ARCH_MSM8974
-In-Reply-To: <1378425890-4225-2-git-send-email-rvaswani@codeaurora.org>
-References: <1378425890-4225-1-git-send-email-rvaswani@codeaurora.org>
- <1378425890-4225-2-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <5229D0EF.1030906@codeaurora.org>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 6 Sep 2013 14:58:25 +0200
+Subject: [PATCH 4/5] Staging/iio/adc/touchscreen/MXS: add interrupt driven
+ touch detection
+In-Reply-To: <201309061430.50736.jbe@pengutronix.de>
+References: <1378462123-4830-1-git-send-email-jbe@pengutronix.de>
+ <20130906122611.GT6329@mwanda> <201309061430.50736.jbe@pengutronix.de>
+Message-ID: <201309061458.25841.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rohit,
+Dear J?rgen Beisert,
 
-On 09/05/2013 08:04 PM, Rohit Vaswani wrote:
-> This patch enables MSM8974 build support.
+> On Friday 06 September 2013 14:26:11 Dan Carpenter wrote:
+> > On Fri, Sep 06, 2013 at 12:08:42PM +0200, Juergen Beisert wrote:
+> > > +static int mxs_lradc_read_ts_channel(struct mxs_lradc *lradc)
+> > > +{
+> > > +	u32 reg;
+> > > +	int val;
+> > > +
+> > > +	reg = readl(lradc->base + LRADC_CTRL1);
+> > > +
+> > > +	/* only channels 3 to 5 are of interest here */
+> > > +	if (reg & LRADC_CTRL1_LRADC_IRQ(TS_CH_YP)) {
+> > > +		pr_devel("!3");
+> > 
+> > Gar.  I meant to comment on this the first time this patch was sent.
+> > 
+> > Please remove the pr_devel() calls.  They are nonsense.
 > 
-> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
-> ---
->  arch/arm/configs/msm_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/msm_defconfig b/arch/arm/configs/msm_defconfig
-> index 690b5f9..0ed32e5 100644
-> --- a/arch/arm/configs/msm_defconfig
-> +++ b/arch/arm/configs/msm_defconfig
-> @@ -20,6 +20,7 @@ CONFIG_PARTITION_ADVANCED=y
->  CONFIG_ARCH_MSM=y
->  CONFIG_ARCH_MSM8X60=y
->  CONFIG_ARCH_MSM8960=y
-> +CONFIG_ARCH_MSM8974=y
->  CONFIG_SMP=y
->  CONFIG_PREEMPT=y
->  CONFIG_AEABI=y
+> They are very helpful for development to monitor the statemachine... :) But
+> you are right, I will remove them.
 
-Why not turn it on in the multiplatform defconfig (multi_v7_defconfig)?
+You can put them into a separate patch which can be NAK'd separatelly :)
 
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Best regards,
+Marek Vasut
