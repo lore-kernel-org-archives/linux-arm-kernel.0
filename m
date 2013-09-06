@@ -1,39 +1,46 @@
-From: slapdau@yahoo.com.au (Craig McGeachie)
-Date: Fri, 06 Sep 2013 20:48:48 +1200
-Subject: Query about include/linux/mailbox.h
-In-Reply-To: <CABb+yY0FRYgGSmfSXG+vWcsK0aqg_BwULtH7xY6fqFhLF_i5OA@mail.gmail.com>
-References: <522177C4.8060205@yahoo.com.au>
- <CABb+yY3wX2=1zh-F81YhhhgM6m+m4+fpVoKDn94m-febAhZGRg@mail.gmail.com>
- <5221D15B.4050507@yahoo.com.au>
- <CABb+yY0FRYgGSmfSXG+vWcsK0aqg_BwULtH7xY6fqFhLF_i5OA@mail.gmail.com>
-Message-ID: <522996F0.2040203@yahoo.com.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 6 Sep 2013 10:53:47 +0200
+Subject: [PATCH] ARM: tegra: throw the unique chip ID into the entropy pool
+In-Reply-To: <5228DECA.4090601@wwwdotorg.org>
+References: <1378394938-1551-1-git-send-email-linus.walleij@linaro.org>
+ <5228DECA.4090601@wwwdotorg.org>
+Message-ID: <CACRpkdYVUC+MM2SC446k=HC=FwsJMtD6YQa9Hcu8C9eMKMdYng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2013 01:39 AM, Jassi Brar wrote:
->> See if I can get my head around that framework and what it does, and try
->> fitting the BCM2835 mailbox into it?
+On Thu, Sep 5, 2013 at 9:43 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 09/05/2013 09:28 AM, Linus Walleij wrote:
+>> This adds a hook at common late init to extract the 64 bits of
+>> chip-unique data and throw it into the entropy pool to make it
+>> more device-unique.
 >>
-> Yes. If you point me to your mailbox client drivers, I could also give
-> it a look to see if we need some changes.
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> Stephen: since I don't have the Tegra reference manual I don't
+>> know what "UID" means, but if it means "unique ID" then this
+>> patch should be relevant for initializing the entropy pool.
+>
+> I believe that's what it means, although even the TRM doesn't actually say.
 
-Righty ho. This seems to be a reasonable attempt.
+I sort of half-guessed it from the fact that it was being used
+as random seed in the crypto driver in
+drivers/crypto/tegra-aes.c
 
-https://github.com/rickytarr/linux/tree/subsys-mailbox
-https://github.com/rickytarr/linux/commit/e0c25371581d125e3f6a46f452ce3e95f1d267ee
+> I'll try and remember to apply this after the merge window.
+>
+> Note that the UID value appears to be incorrect on anything other than
+> Tegra20; I'll file an internal bug to track that down.
 
-It compiles cleanly and boots.  Start with bcm2835_defconfig, and then 
-enable Device Drivers -> Mailbox Hardware Support -> BCM 2835 Mailbox. I 
-think it validates that BCM2835 mailbox support can fit into your 
-generic device.
+Hm, that will not affect the kernel entropy pool so much, but
+the crypto driver is in trouble since that seems to be the only
+entropy it's using :-(
 
-But that's as far as I know.  I'm offering this as an early look only 
-(comments and defects welcome). I've got to build something that uses it 
-next.  For all I know it might cause the Raspberry Pi to explode and 
-vaporise any desk it is sitting on.
+If it will return something like a constant, that is actually a quite
+valid case for initializing tmp[1] from the kernel entropy pool
+with get_random_bytes() instead of using UID.
 
-Out of interest, do you have a roadmap for moving this into the kernel 
-mainline?
+I don't know if the Tegra AES needs that specific initializer
+though (it seems not). Shall I propose a patch?
 
-Cheers,
-Craig.
+Yours,
+Linus Walleij
