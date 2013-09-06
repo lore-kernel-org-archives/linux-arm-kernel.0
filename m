@@ -1,24 +1,20 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 6 Sep 2013 10:31:11 +0100
-Subject: [PATCH] ASoC: kirkwood: change the compatible string of the
- kirkwood-i2s driver
-In-Reply-To: <1378385791-29551-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1378385791-29551-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130906093111.GA18774@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Sep 2013 10:28:54 +0100
+Subject: [PATCH v2 1/2] Documentation: arm: early_ioremap/early_memremap
+In-Reply-To: <1378459158-2145-2-git-send-email-leif.lindholm@linaro.org>
+References: <1378459158-2145-1-git-send-email-leif.lindholm@linaro.org>
+ <1378459158-2145-2-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <20130906092853.GP6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 05, 2013 at 02:56:31PM +0200, Thomas Petazzoni wrote:
-> The compatible string of the kirkwood-i2s driver was chosen as
-> "marvell,mvebu-audio". Using such a compatible string is not a good
-> idea, since "mvebu" is the name of a large family of SOCs, in which
-> new, unknown SOCs will be coming in the future. It is therefore
+On Fri, Sep 06, 2013 at 10:19:17AM +0100, Leif Lindholm wrote:
+> +Any residual mappings will be overridden by subsequent kmap() calls (but do
+> +use early_iounmap()).
+> +
+> +Specify 'early_ioremap_debug' on the kernel commandline for verbose output.
+> +
+> +SYNOPSIS
+> +	#include <asm/io.h>
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130906/d2d8304f/attachment-0001.sig>
+linux/io.h please.
