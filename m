@@ -1,26 +1,19 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 06 Sep 2013 23:12:05 +0100
-Subject: [PATCH 1/5] arm: LLVMLinux: Add current_stack_pointer macro for
- ARM
-In-Reply-To: <1378502899-1241-2-git-send-email-behanw@converseincode.com>
- (behanw@converseincode.com's message of "Fri, 6 Sep 2013 17:28:07
- -0400")
-References: <1378502899-1241-1-git-send-email-behanw@converseincode.com>
- <1378502899-1241-2-git-send-email-behanw@converseincode.com>
-Message-ID: <yw1xmwnp1txm.fsf@unicorn.mansr.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Sep 2013 23:18:57 +0100
+Subject: [PATCH] arm: LLVMLinux: Calculate pt_regs address from fp
+In-Reply-To: <1378503762-7236-2-git-send-email-behanw@converseincode.com>
+References: <1378503762-7236-1-git-send-email-behanw@converseincode.com>
+ <1378503762-7236-2-git-send-email-behanw@converseincode.com>
+Message-ID: <20130906221857.GQ6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-behanw at converseincode.com writes:
+On Fri, Sep 06, 2013 at 05:42:41PM -0400, behanw at converseincode.com wrote:
+> From: Behan Webster <behanw@converseincode.com>
+> 
+> Use the frame pointer to calculate the end of the stack for current_pt_regs()
+> The existing code uses the stack pointer to do this calculation.
+> Using the frame pointer yeilds the same value in a more portable way.
+> This change supports being able to compile the kernel with gcc and clang.
 
-> +#define current_stack_pointer ({ \
-> +	unsigned long current_sp; \
-> +	asm ("mov %0, r13" : "=r" (current_sp)); \
-> +	current_sp; \
-> +})
-
-Why do you use 'r13' rather than the more common 'sp' alias?
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+What happens when frame pointers are disabled on gcc?
