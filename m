@@ -1,75 +1,152 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Fri, 6 Sep 2013 13:14:01 -0400
-Subject: [PATCH v7 1/3] gpio: bcm281xx: Add GPIO driver
-In-Reply-To: <1377882914-30152-2-git-send-email-markus.mayer@linaro.org>
-References: <1377882914-30152-1-git-send-email-markus.mayer@linaro.org>
- <1377882914-30152-2-git-send-email-markus.mayer@linaro.org>
-Message-ID: <20130906171400.GC10973@ohporter.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri,  6 Sep 2013 18:23:21 +0100
+Subject: [PATCH 2/2] ARM: vexpress: Add CLCD Device Tree properties
+In-Reply-To: <1378488201-21146-1-git-send-email-pawel.moll@arm.com>
+References: <1378488201-21146-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1378488201-21146-2-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 30, 2013 at 10:15:12AM -0700, Markus Mayer wrote:
+... for V2M-P1 motherboard CLCD (limited to 640x480 16bpp and using
+dedicated video RAM bank) and for V2P-CA9 (up to 1024x768 16bpp).
 
-<snip>
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 25 +++++++++++++++++++++++--
+ arch/arm/boot/dts/vexpress-v2m.dtsi     | 25 +++++++++++++++++++++++--
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts  | 20 ++++++++++++++++++++
+ 3 files changed, 66 insertions(+), 4 deletions(-)
 
-> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-> index ef3e983..fcd0751 100644
-> --- a/drivers/gpio/Makefile
-> +++ b/drivers/gpio/Makefile
-> @@ -16,6 +16,7 @@ obj-$(CONFIG_GPIO_ADP5520)	+= gpio-adp5520.o
->  obj-$(CONFIG_GPIO_ADP5588)	+= gpio-adp5588.o
->  obj-$(CONFIG_GPIO_AMD8111)	+= gpio-amd8111.o
->  obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
-> +obj-$(CONFIG_GPIO_BCM_KONA)	+= gpio-bcm-kona.o
->  obj-$(CONFIG_GPIO_BT8XX)	+= gpio-bt8xx.o
->  obj-$(CONFIG_GPIO_CLPS711X)	+= gpio-clps711x.o
->  obj-$(CONFIG_GPIO_CS5535)	+= gpio-cs5535.o
-> diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
-> new file mode 100644
-> index 0000000..f0f7a96
-> --- /dev/null
-> +++ b/drivers/gpio/gpio-bcm-kona.c
-> @@ -0,0 +1,631 @@
-> +/*
-> + * Copyright (C) 2012-2013 Broadcom Corporation
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/bitops.h>
-
-Need #include <linux/err.h>
-
-> +#include <linux/io.h>
-> +#include <linux/gpio.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/module.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/irqchip/chained_irq.h>
-
-<snip>
-
-> +	kona_gpio->irq_domain = irq_domain_add_linear(dev->of_node,
-> +						      chip->ngpio,
-> +						      &bcm_kona_irq_ops,
-> +						      kona_gpio);
-> +	if (!kona_gpio->irq_domain) {
-> +		dev_err(dev, "Couldn't allocate IRQ domain\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	kona_gpio->reg_base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(kona_gpio->reg_base)) {
-
-gpio-bcm-kona.c:568:2: error: implicit declaration of function ?IS_ERR?
-
--Matt
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+index ac870fb..91dff88 100644
+--- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+@@ -41,7 +41,7 @@
+ 			bank-width = <4>;
+ 		};
+ 
+-		vram at 2,00000000 {
++		v2m_vram: vram at 2,00000000 {
+ 			compatible = "arm,vexpress-vram";
+ 			reg = <2 0x00000000 0x00800000>;
+ 		};
+@@ -233,6 +233,27 @@
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++
++				video-ram = <&v2m_vram>;
++				max-framebuffer-size = <614400>; /* 640x480 16bpp */
++
++				/* This is the best the CLCD can do here */
++				panel-type = "tft";
++				panel-tft-interface = <8 8 8>;
++				display-timings {
++					native-mode = <&v2m_clcd_timing0>;
++					v2m_clcd_timing0: vga {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -282,7 +303,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
+index f142036..4bc348c 100644
+--- a/arch/arm/boot/dts/vexpress-v2m.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
+@@ -40,7 +40,7 @@
+ 			bank-width = <4>;
+ 		};
+ 
+-		vram at 3,00000000 {
++		v2m_vram: vram at 3,00000000 {
+ 			compatible = "arm,vexpress-vram";
+ 			reg = <3 0x00000000 0x00800000>;
+ 		};
+@@ -232,6 +232,27 @@
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++
++				video-ram = <&v2m_vram>;
++				max-framebuffer-size = <614400>; /* 640x480 16bpp */
++
++				/* This is the best the CLCD can do here */
++				panel-type = "tft";
++				panel-tft-interface = <8 8 8>;
++				display-timings {
++					native-mode = <&v2m_clcd_timing0>;
++					v2m_clcd_timing0: vga {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -281,7 +302,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index 62d9b22..fbe1c998 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -73,6 +73,26 @@
+ 		interrupts = <0 44 4>;
+ 		clocks = <&oscclk1>, <&oscclk2>;
+ 		clock-names = "clcdclk", "apb_pclk";
++
++		max-framebuffer-size = <1572864>; /* 1024x768 16bpp */
++
++		/* This is the best the CLCD can do here */
++		panel-type = "tft";
++		panel-tft-interface = <8 8 8>;
++		display-timings {
++			native-mode = <&clcd_timing0>;
++			clcd_timing0: xga {
++				clock-frequency = <63500127>;
++				hactive = <1024>;
++				hback-porch = <152>;
++				hfront-porch = <48>;
++				hsync-len = <104>;
++				vactive = <768>;
++				vback-porch = <23>;
++				vfront-porch = <3>;
++				vsync-len = <4>;
++			};
++		};
+ 	};
+ 
+ 	memory-controller at 100e0000 {
+-- 
+1.8.1.2
