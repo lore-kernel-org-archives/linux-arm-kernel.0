@@ -1,55 +1,37 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 6 Sep 2013 15:59:02 +0100
-Subject: [PATCH v5 11/13] xen: introduce xen_alloc/free_coherent_pages
-In-Reply-To: <20130906141444.GE1946@arm.com>
+Date: Fri, 6 Sep 2013 16:04:22 +0100
+Subject: [PATCH v5 12/13] swiotlb-xen: use
+ xen_alloc/free_coherent_pages
+In-Reply-To: <20130906141754.GT2590@phenom.dumpdata.com>
 References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
- <1377801154-29215-11-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130905160905.GI11887@arm.com>
- <alpine.DEB.2.02.1309051742390.6397@kaball.uk.xensource.com>
- <20130906141444.GE1946@arm.com>
-Message-ID: <alpine.DEB.2.02.1309061554260.6397@kaball.uk.xensource.com>
+ <1377801154-29215-12-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130830135333.GL21239@phenom.dumpdata.com>
+ <alpine.DEB.2.02.1309051743450.6397@kaball.uk.xensource.com>
+ <20130906141754.GT2590@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1309061559080.6397@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Sep 2013, Catalin Marinas wrote:
-> On Thu, Sep 05, 2013 at 05:43:33PM +0100, Stefano Stabellini wrote:
-> > On Thu, 5 Sep 2013, Catalin Marinas wrote:
-> > > On Thu, Aug 29, 2013 at 07:32:32PM +0100, Stefano Stabellini wrote:
-> > > > xen_swiotlb_alloc_coherent needs to allocate a coherent buffer for cpu
-> > > > and devices. On native x86 and ARMv8 is sufficient to call
-> > > > __get_free_pages in order to get a coherent buffer, while on ARM we need
-> > > > to call arm_dma_ops.alloc.
+On Fri, 6 Sep 2013, Konrad Rzeszutek Wilk wrote:
+> On Thu, Sep 05, 2013 at 05:50:45PM +0100, Stefano Stabellini wrote:
+> > On Fri, 30 Aug 2013, Konrad Rzeszutek Wilk wrote:
+> > > On Thu, Aug 29, 2013 at 07:32:33PM +0100, Stefano Stabellini wrote:
+> > > > Use xen_alloc_coherent_pages and xen_free_coherent_pages to allocate or
+> > > > free coherent pages.
+> > > > 
+> > > > We need to be careful handling the pointer returned by
+> > > > xen_alloc_coherent_pages, because on ARM the pointer is not equal to
+> > > > phys_to_virt(*dma_handle). In fact virt_to_phys on the returned pointer
+> > > > doesn't return a valid physical address.
 > > > 
-> > > Don't bet on this for ARMv8. It's not mandated for the architecture, so
-> > > at some point some SoC will require non-cacheable buffers for coherency.
+> > > Why is it called 'virt_to_phys'? What does it return then?
 > > 
-> > I see.
-> > Would it be better if I implemented xen_alloc_coherent_pages on armv8 by
-> > calling arm64_swiotlb_dma_ops.alloc?
+> > virt_to_phys only works for kernel direct mapped RAM memory.
+> > In this case the virtual address could be an ioremap address, therefore
+> > passing it to virt_to_phys would give you another physical address that
+> > doesn't correspond to it.
 > 
-> What does this buffer do exactly? Is it allocated by guests?
+> Ah, so very much ARM (and in some way SPARC) specific. I think you need add some comments
+> in the code (And git commit) to explain this. Thank you.
 
-It is allocated by Dom0 to do DMA to/from a device.
-It is the buffer that is going to be returned by dma_map_ops.alloc to
-the caller:
-
-On x86:
-dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> __get_free_pages
-
-On ARM:
-dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> arm_dma_ops.alloc
-
-On ARM64
-dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> ????
-
-
-
-> Currently arm64_swiotlb_dma_ops assume cache-coherent DMA. I have a
-> patch which introduces new ops for non-coherent DMA but this should
-> really be orthogonal to swiotlb. You can basically have 4 combinations
-> of coherent/non-coherent and swiotlb/iommu. Mark Rutland is currently
-> looking into how best to describe this via DT as it may not even be per
-> SoC but per bus or device.
-
-It seems to me that calling arm64_swiotlb_dma_ops.alloc would ensure
-that we allocate the right buffer for the right device?
+OK
