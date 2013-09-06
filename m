@@ -1,34 +1,67 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 06 Sep 2013 13:50:05 -0700
-Subject: [PATCH] ARM: msm: Remove irqs-*.h files for DT based targets
-In-Reply-To: <1378499517-24014-1-git-send-email-sboyd@codeaurora.org>
-References: <20130906195300.GJ808@joshc.qualcomm.com>
- <1378499517-24014-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <522A3FFD.9020105@codeaurora.org>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Fri, 6 Sep 2013 13:50:27 -0700
+Subject: [RFC 3/4] Misc: SRAM: Hack for allowing executable code in SRAM.
+In-Reply-To: <20130904180638.GC31541@atomide.com>
+References: <1378226665-27090-1-git-send-email-Russ.Dill@ti.com>
+ <1378226665-27090-4-git-send-email-Russ.Dill@ti.com>
+ <20130904180638.GC31541@atomide.com>
+Message-ID: <CA+Bv8XZCeQuUvQ3O9VQwC_XUU0R9bEsGBvzPyb34HYe-ZCvK1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/13 13:31, Stephen Boyd wrote:
-> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-> index 905efc8..30b3342 100644
-> --- a/arch/arm/mach-msm/Kconfig
-> +++ b/arch/arm/mach-msm/Kconfig
-> @@ -50,6 +50,7 @@ config ARCH_MSM8X60
->  	select HAVE_SMP
->  	select MSM_SCM if SMP
->  	select USE_OF
-> +	select SPARSE_IRQ
->  
->  config ARCH_MSM8960
->  	bool "MSM8960"
-> @@ -59,6 +60,7 @@ config ARCH_MSM8960
->  	select GPIO_MSM_V2
->  	select MSM_SCM if SMP
->  	select USE_OF
-> +	select SPARSE_IRQ
+On Wed, Sep 4, 2013 at 11:06 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Russ Dill <Russ.Dill@ti.com> [130903 09:52]:
+>> The generic SRAM mechanism does not ioremap memory in a
+>> manner that allows code to be executed from SRAM. There is
+>> currently no generic way to request ioremap to return a
+>> memory area with execution allowed.
+>>
+>> Insert a temporary hack for proof of concept on ARM.
+>>
+>> Signed-off-by: Russ Dill <Russ.Dill@ti.com>
+>> ---
+>>  drivers/misc/sram.c | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+>> index 08baaab..e059a23 100644
+>> --- a/drivers/misc/sram.c
+>> +++ b/drivers/misc/sram.c
+>> @@ -31,6 +31,7 @@
+>>  #include <linux/genalloc.h>
+>>  #include <linux/sram.h>
+>>  #include <asm-generic/cacheflush.h>
+>> +#include <asm/io.h>
+>>
+>>  #define SRAM_GRANULARITY     32
+>>
+>> @@ -138,7 +139,7 @@ static int sram_probe(struct platform_device *pdev)
+>>       int ret;
+>>
+>>       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> -     virt_base = devm_ioremap_resource(&pdev->dev, res);
+>> +     virt_base = __arm_ioremap_exec(res->start, resource_size(res), false);
+>>       if (IS_ERR(virt_base))
+>>               return PTR_ERR(virt_base);
+>
+> You can get rid of this hack by defining ioremap_exec in
+> include/asm-generic/io.h the same way as ioremap_nocache
+> is done:
+>
+> #ifndef ioremap_exec
+> #define ioremap_exec ioremap
+> #endif
+>
+> Then the arch that need ioremap_exec can define and
+> implement it. Needs to be reviewed on LKML naturally :)
 
-Gah, I guess this needs to be sorted alphabetically.
+The similar statement for nocache in asm-generic/io.h appears in an
+#ifndef CONFIG_MMU block. I think the better example would be
+ioremap_wc, which looks like:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+#ifndef ARCH_HAS_IOREMAP_WC
+#define ioremap_wc ioremap_nocache
+#endif
+
+Course, ioremap_exec on ARM has a slight complication since it has an
+extra bool nocache argument.
