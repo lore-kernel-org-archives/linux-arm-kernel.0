@@ -1,35 +1,46 @@
 From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Fri,  6 Sep 2013 17:28:06 -0400
-Subject: [PATCH 0/5] arm: LLVMLinux: Add current_stack_pointer
-Message-ID: <1378502899-1241-1-git-send-email-behanw@converseincode.com>
+Date: Fri,  6 Sep 2013 17:28:08 -0400
+Subject: [PATCH 2/5] arm: LLVMLinux: use current_stack_pointer for percpu
+In-Reply-To: <1378502899-1241-1-git-send-email-behanw@converseincode.com>
+References: <1378502899-1241-1-git-send-email-behanw@converseincode.com>
+Message-ID: <1378502899-1241-3-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Behan Webster <behanw@converseincode.com>
 
-The LLVMLinux Project is working to be able to build the Linux kernel with
-clang/LLVM. With the release of LLVM 3.3 clang is now able to compile the Linux
-kernel with a number of small patches (available from the LLVMLinux git repo).
+The existing code uses named registers to get the value of the stack pointer.
+The new current_stack_pointer macro is more readable and allows for a central
+portable implementation of how to get the stack pointer with ASM.  This change
+supports being able to compile the kernel with both gcc and Clang.
 
-These patches add a macro to get the current stack pointer which allows for a
-single place in which to do so with ASM. Before this named registers (a gcc
-extension) was used to get the stack pointer. Using ASM is a more portable way
-of getting the stack pointer which works with both gcc and clang.  This macro
-is of the same name used in the X86 arch.
+Signed-off-by: Mark Charlebois <charlebm@gmail.com>
+Signed-off-by: Behan Webster <behanw@converseincode.com>
+Reviewed-by: Jan-Simon M?ller <dl9pf@gmx.de>
+---
+ arch/arm/include/asm/percpu.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Behan Webster (5):
-  arm: LLVMLinux: Add current_stack_pointer macro for ARM
-  arm: LLVMLinux: use current_stack_pointer for percpu
-  arm: LLVMLinux: Use current_stack_pointer for return_address
-  arm: LLVMLinux: Use current_stack_pointer in save_stack_trace_tsk
-  arm: LLVMLinux: Use current_stack_pointer in unwind_backtrace
-
- arch/arm/include/asm/percpu.h      | 4 ++--
- arch/arm/include/asm/thread_info.h | 9 +++++++++
- arch/arm/kernel/return_address.c   | 3 +--
- arch/arm/kernel/stacktrace.c       | 4 +---
- arch/arm/kernel/unwind.c           | 3 +--
- 5 files changed, 14 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
+index 209e650..629a975 100644
+--- a/arch/arm/include/asm/percpu.h
++++ b/arch/arm/include/asm/percpu.h
+@@ -30,14 +30,14 @@ static inline void set_my_cpu_offset(unsigned long off)
+ static inline unsigned long __my_cpu_offset(void)
+ {
+ 	unsigned long off;
+-	register unsigned long *sp asm ("sp");
++	unsigned long sp = current_stack_pointer;
+ 
+ 	/*
+ 	 * Read TPIDRPRW.
+ 	 * We want to allow caching the value, so avoid using volatile and
+ 	 * instead use a fake stack read to hazard against barrier().
+ 	 */
+-	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : "Q" (*sp));
++	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : "Q" (sp));
+ 
+ 	return off;
+ }
 -- 
 1.8.1.2
