@@ -1,64 +1,34 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Fri, 6 Sep 2013 09:58:59 +0100
-Subject: [PATCH v5 05/13] xen/arm,arm64: move Xen initialization earlier
-In-Reply-To: <alpine.DEB.2.02.1309051755560.6397@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
- <1377801154-29215-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130905162026.GJ11887@arm.com>
- <alpine.DEB.2.02.1309051755560.6397@kaball.uk.xensource.com>
-Message-ID: <1378457939.14745.73.camel@kazak.uk.xensource.com>
+From: thommyj@gmail.com (Thommy Jakobsson)
+Date: Fri, 6 Sep 2013 11:04:40 +0200 (CEST)
+Subject: kmalloc memory slower than malloc
+In-Reply-To: <20130906080705.GN6617@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1309060811400.1299@kelly.ryd.net>
+ <20130906080705.GN6617@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1309061051440.1299@kelly.ryd.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-09-05 at 17:59 +0100, Stefano Stabellini wrote:
-> On Thu, 5 Sep 2013, Catalin Marinas wrote:
-> > On Thu, Aug 29, 2013 at 07:32:26PM +0100, Stefano Stabellini wrote:
-> > > Move Xen initialization earlier, before any DMA requests can be made.
-> > > 
-> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > 
-> > I guess you should cc the corresponding maintainers here.
-> 
-> Thanks for the reminder, I'll do that.
-> 
-> 
-> > >  arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
-> > >  arch/arm/kernel/setup.c               |    2 ++
-> > >  arch/arm/xen/enlighten.c              |   21 ++++++++++++++-------
-> > >  arch/arm64/kernel/setup.c             |    2 ++
-> > >  4 files changed, 26 insertions(+), 7 deletions(-)
-> > 
-> > [...]
-> > 
-> > > --- a/arch/arm64/kernel/setup.c
-> > > +++ b/arch/arm64/kernel/setup.c
-> > > @@ -53,6 +53,7 @@
-> > >  #include <asm/traps.h>
-> > >  #include <asm/memblock.h>
-> > >  #include <asm/psci.h>
-> > > +#include <asm/xen/hypervisor.h>
-> > >  
-> > >  unsigned int processor_id;
-> > >  EXPORT_SYMBOL(processor_id);
-> > > @@ -267,6 +268,7 @@ void __init setup_arch(char **cmdline_p)
-> > >  	unflatten_device_tree();
-> > >  
-> > >  	psci_init();
-> > > +	xen_early_init();
-> > 
-> > So Xen guests don't have any hope for single Image? Basically you set
-> > dma_ops unconditionally in xen_early_init(), even if the kernel is not
-> > intended to run under Xen.
-> 
-> That should not happen: if we are not running on Xen xen_early_init
-> returns early, before calling xen_mm_init.
 
-x96 has a call to init_hypervisor_platform() at approximately this
-location, which detects and calls the init function for any of Xen, KVM,
-hyperv and vmware. I guess only Xen and KVM are currently relevant on
-Linux ARM(64), so perhaps adding similar infrastructure on ARM would be
-overkill at this point. I don't know if KVM needs such an early C-land
-hook, I suppose it needs it even earlier so it can set up the hyp mode
-trampoline from head.S?
 
-Ian.
+On Fri, 6 Sep 2013, Russell King - ARM Linux wrote:
+
+> Your driver appears to be exposing physical addresses to userspace.
+> This is a no-go.  This is a massive security hole - it allows userspace
+> to map any physical address and write into that memory.  That includes
+> system flash and all system RAM.
+Sorry Russell, maybe I was unclear, the attached test was just a quick 
+hack to be able to compare kmalloc and dma_coherent_alloc with malloc. This is not 
+code that is part of the actual driver.
+
+> This gives userspace a way to overwrite the kernel with exploits,
+> retrieve sensitive and/or personal data, etc.
+> 
+> Therefore, I will not provide any assistance with this.  Please change
+> your approach so you do not need physical addresses in userspace.
+I see your point, but as I said I do not do that in my driver. I do map 
+in the dmabuffer in userspace though, so I expose a virtual mapping to 
+userspace. I have understand that to be a "normal" approach for speeding 
+things up, or do you consider that to be wrong as well?
+
+thanks,
+Thommy
