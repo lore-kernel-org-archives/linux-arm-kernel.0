@@ -1,67 +1,127 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  6 Sep 2013 17:18:17 +0200
-Subject: [RFC PATCHv2 0/4] Add DT support for fixed PHYs
-Message-ID: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri,  6 Sep 2013 17:18:19 +0200
+Subject: [RFC PATCHv2 2/4] net: phy: extend fixed driver with
+ fixed_phy_register()
+In-Reply-To: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1378480701-12908-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The existing fixed_phy_add() function has several drawbacks that
+prevents it from being used as is for OF-based declaration of fixed
+PHYs:
 
-Here is a second version of the patch set that adds a Device Tree
-binding and the related code to support fixed PHYs. Marked as RFC,
-this patch set is obviously not intended for merging in 3.12.
+ * The address of the PHY on the fake bus needs to be passed, while a
+   dynamic allocation is desired.
 
-Since the first version, the changes have been:
+ * Since the phy_device instantiation is post-poned until the next
+   mdiobus scan, there is no way to associate the fixed PHY with its
+   OF node, which later prevents of_phy_connect() from finding this
+   fixed PHY from a given OF node.
 
- * Instead of using a 'fixed-link' property inside the Ethernet device
-   DT node, with a fairly cryptic succession of integer values, we now
-   use a PHY subnode under the Ethernet device DT node, with explicit
-   properties to configure the duplex, speed, pause and other PHY
-   properties.
+To solve this, this commit introduces fixed_phy_register(), which will
+allocate an available PHY address, add the PHY using fixed_phy_add()
+and instantiate the phy_device structure associated with the provided
+OF node.
 
- * The PHY address is automatically allocated by the kernel and no
-   longer visible in the Device Tree binding.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/net/phy/fixed.c   | 43 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/phy_fixed.h | 11 +++++++++++
+ 2 files changed, 54 insertions(+)
 
- * The PHY device is created directly when the network driver calls
-   of_phy_connect_fixed_link(), and associated to the PHY DT node,
-   which allows the existing of_phy_connect() function to work,
-   without the need to use the deprecated of_phy_connect_fixed_link().
-
-The things I am not entirely happy with yet are:
-
- * The PHY ID is hardcoded to 0xdeadbeef. Ideally, it should be a
-   properly reserved vendor/device identifier, but it isn't clear how
-   to get one allocated for this purpose.
-
- * The fixed_phy_register() function in drivers/net/phy/fixed.c has
-   some OF references. So ideally, I would have preferred to put this
-   code in drivers/of/of_mdio.c, but to call get_phy_device(), we need
-   a reference to the mii_bus structure that represents the fixed MDIO
-   bus.
-
- * There is some error management missing in fixed_phy_register(), but
-   it can certainly be added easily. This RFC is meant to sort out the
-   general idea.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (4):
-  net: phy: decouple PHY id and PHY address in fixed PHY driver
-  net: phy: extend fixed driver with fixed_phy_register()
-  of: provide a binding for fixed link PHYs
-  net: mvneta: add support for fixed links
-
- .../devicetree/bindings/net/fixed-link.txt         | 34 ++++++++++++
- .../bindings/net/marvell-armada-370-neta.txt       |  4 +-
- drivers/net/ethernet/marvell/mvneta.c              | 10 ++--
- drivers/net/phy/fixed.c                            | 63 ++++++++++++++++++----
- drivers/of/of_mdio.c                               | 24 +++++++++
- include/linux/of_mdio.h                            | 15 ++++++
- include/linux/phy_fixed.h                          | 11 ++++
- 7 files changed, 145 insertions(+), 16 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/fixed-link.txt
-
+diff --git a/drivers/net/phy/fixed.c b/drivers/net/phy/fixed.c
+index 0f02403..3f9412b 100644
+--- a/drivers/net/phy/fixed.c
++++ b/drivers/net/phy/fixed.c
+@@ -21,6 +21,7 @@
+ #include <linux/phy_fixed.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
+ 
+ #define MII_REGS_NUM 29
+ 
+@@ -203,6 +204,48 @@ err_regs:
+ }
+ EXPORT_SYMBOL_GPL(fixed_phy_add);
+ 
++static int phy_fixed_addr;
++static DEFINE_SPINLOCK(phy_fixed_addr_lock);
++
++int fixed_phy_register(unsigned int irq,
++		       struct fixed_phy_status *status,
++		       struct device_node *np)
++{
++	struct fixed_mdio_bus *fmb = &platform_fmb;
++	struct phy_device *phy;
++	int phy_addr;
++	int ret;
++
++	/* Get the next available PHY address, up to PHY_MAX_ADDR */
++	spin_lock(&phy_fixed_addr_lock);
++	if (phy_fixed_addr == PHY_MAX_ADDR) {
++		spin_unlock(&phy_fixed_addr_lock);
++		return -ENOSPC;
++	}
++	phy_addr = phy_fixed_addr++;
++	spin_unlock(&phy_fixed_addr_lock);
++
++	ret = fixed_phy_add(PHY_POLL, phy_addr, status);
++	if (ret < 0)
++		return ret;
++
++	phy = get_phy_device(fmb->mii_bus, phy_addr, false);
++	if (!phy || IS_ERR(phy))
++		return -EINVAL;
++
++	of_node_get(np);
++	phy->dev.of_node = np;
++
++	ret = phy_device_register(phy);
++	if (ret) {
++		phy_device_free(phy);
++		of_node_put(np);
++		return ret;
++	}
++
++	return 0;
++}
++
+ static int __init fixed_mdio_bus_init(void)
+ {
+ 	struct fixed_mdio_bus *fmb = &platform_fmb;
+diff --git a/include/linux/phy_fixed.h b/include/linux/phy_fixed.h
+index 509d8f5..902e8a1 100644
+--- a/include/linux/phy_fixed.h
++++ b/include/linux/phy_fixed.h
+@@ -9,15 +9,26 @@ struct fixed_phy_status {
+ 	int asym_pause;
+ };
+ 
++struct device_node;
++
+ #ifdef CONFIG_FIXED_PHY
+ extern int fixed_phy_add(unsigned int irq, int phy_id,
+ 			 struct fixed_phy_status *status);
++extern int fixed_phy_register(unsigned int irq,
++			      struct fixed_phy_status *status,
++			      struct device_node *np);
+ #else
+ static inline int fixed_phy_add(unsigned int irq, int phy_id,
+ 				struct fixed_phy_status *status)
+ {
+ 	return -ENODEV;
+ }
++extern int fixed_phy_register(unsigned int irq,
++			      struct fixed_phy_status *status,
++			      struct device_node *np)
++{
++	return -ENODEV;
++}
+ #endif /* CONFIG_FIXED_PHY */
+ 
+ /*
 -- 
 1.8.1.2
