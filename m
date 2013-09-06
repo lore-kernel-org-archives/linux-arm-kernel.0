@@ -1,75 +1,95 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 6 Sep 2013 15:14:37 +0530
-Subject: [GIT PULL 1/2] DaVinci SoC updates for v3.12
-In-Reply-To: <52291BCD.7030106@ahsoftware.de>
-References: <52151BA6.2060109@ti.com> <87ppt5r1t4.fsf@linaro.org>
- <52291BCD.7030106@ahsoftware.de>
-Message-ID: <5229A405.3090409@ti.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Fri, 6 Sep 2013 15:35:45 +0530
+Subject: [RFC PATCH 0/3] Target CPU=Host implementation for KVM ARM/ARM64
+In-Reply-To: <BB11B00E-5EBD-45F5-89C7-7973919F7184@suse.de>
+References: <1378392362-6773-1-git-send-email-anup.patel@linaro.org>
+ <CAFEAcA8z+_N3UQ-RQW9u65BpGRs+aKzhr2O34yOX0DhKZCAqRg@mail.gmail.com>
+ <CAAhSdy1Qyum=v3_80SvGB3rKUP_Nxqg7858Uzf4QKdQd4YvzBA@mail.gmail.com>
+ <BB11B00E-5EBD-45F5-89C7-7973919F7184@suse.de>
+Message-ID: <CAAhSdy1923zuSako480TTEoysZ6r_j9Z615=psQcQ8O=XyVeJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
-
-On Friday 06 September 2013 05:33 AM, Alexander Holler wrote:
-> Am 22.08.2013 20:57, schrieb Kevin Hilman:
->> Sekhar Nori <nsekhar@ti.com> writes:
+On Fri, Sep 6, 2013 at 2:24 PM, Alexander Graf <agraf@suse.de> wrote:
+>
+> On 06.09.2013, at 09:44, Anup Patel wrote:
+>
+>> On Thu, Sep 5, 2013 at 8:21 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
+>>> On 5 September 2013 15:45, Anup Patel <anup.patel@linaro.org> wrote:
+>>>> It will be very useful for user space if it has a method for specifying
+>>>> KVM ARM/ARM64 to give a VCPU with target type suitable to underlying host
+>>>> but with particular set of features.
+>>>>
+>>>> In other words, user space might not be interested in having a particular
+>>>> target type for VCPU but it will certainely want particular set of features
+>>>> in the VCPU.
+>>>>
+>>>> The patch tries to implement above described method of specifying VCPU
+>>>> target CPU=Host from user space by extending the KVM_ARM_VCPU_INIT ioctl
+>>>> and having a dummy target KVM_ARM_TARGET_HOST which means Target CPU
+>>>> same as (or suitable to) underlying host.
+>>>
+>>> I thought the consensus on the call last week was
+>>> to have an ioctl for "get best CPU for this host"
+>>> and then for userspace to pass that value to
+>>> VCPU_INIT ?
 >>
->>> Hi Arnd, Olof, Kevin,
->>>
->>> Please pull the following DaVinci SoC changes for v3.12
->>>
->>> Thanks,
->>> Sekhar
->>>
->>> The following changes since commit 3b2f64d00c46e1e4e9bd0bb9bb12619adac27a4b:
->>>
->>>   Linux 3.11-rc2 (2013-07-21 12:05:29 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.12/soc
->>>
->>> for you to fetch changes up to 46c1833467c5e555f31cd6f14b342a7383f26885:
->>>
->>>   ARM: davinci: fix clock lookup for mdio device (2013-08-22 00:39:01 +0530)
->>>
->>> ----------------------------------------------------------------
->>> DaVinci SoC updates for v3.12
->>> -----------------------------
->>>
->>> This set of SoC updates contains changes to the
->>> way UART clock is handled to enabled DT-boot to
->>> obtain UART clock frequency instead of relying
->>> on DT-binding being supplied. Similarly handling
->>> of MDIO clock is fixed to make it easier to support
->>> MDIO in DT-boot. Finally there is patch to remove
->>> now unnecessary setting of wake-up capable flag for
->>> RTC.
->>
->> Thanks for the detailed description.
->>
->> Pulled into next/soc
-> 
-> Just a warning, I've tried the patch series for the serial on top of
-> 3.11 and the patch
-> 
-> ARM: davinci: serial: get rid of davinci_uart_config
-> 
-> doesn't even compile here.
-> 
-> The culprit is a misplaced
-> 
-> #include <linux/platform_device.h>
-> 
-> in arch/arm/mach-davinci/include/mach/serial.h
+>> I had considered having a separate ioctl for "get best CPU for this host"
+>> (as per KVM call minutes) but the same thing is possible with existing
+>> KVM_ARM_VCPU_INIT so why not extend this ioctl. Also, I was finding
+>
+> Because it means that everything as of the INIT call is reproducible by user space. There is no way the kernel can do magic behind our back to create a vcpu that user space couldn't create the same way on a different host when you want to live migrate.
 
-I need more information on how to reproduce the issue. This pull request
-was based on v3.11-rc2 and I had verified the build before posting. I
-just verified build on linux-next master too. All builds were verified
-using davinci_all_defconfig and da8xx_omapl_defconfig.
+Yes, whatever we do in INIT call is still reproducible.
 
-Can you please send the error log? Your .config against latest
-linux-next/master will also help.
+Also, the final VCPU target type and VCPU features are returned back to
+the user space.
 
-Thanks,
-Sekhar
+>
+>> it hard to come up with a use case where having a separate ioctl for
+>> "get best CPU for this host" would be better for user space.
+>
+> It can store it and migrate it as part of its migration protocol (probably hard for QEMU's current work flow, but that's QEMU's issue).
+
+Please look at the patch carefully.
+
+The patch makes KVM_ARM_VCPU_INIT ioctl bi-directional this means
+we return the target of VCPU and features of VCPU back to user space.
+
+>
+>> Further, the approach proposed by this patch also makes the
+>> KVM_ARM_VCPU_INIT ioctl inline with what we do for KVM x86 that is
+>> provide only a set of features user space wish and KVM x86 will try to
+>> provide most of those features with a virtual CPU suitable to host.
+>
+> I don't think you fully grasped how the x86 feature negotiation thing works :).
+
+The feature negotiation implemented by this patch is as follows:
+1. user space proposes a VCPU target type (or VCPU same as host) and
+   VCPU features
+2. KVM does the checking and determines appropriate VCPU target type
+   and VCPU features
+3. KVM returns VCPU target type and VCPU features back to user space
+
+Now I am not x86 expert but the above scheme of feature negotiation is
+generic enough.
+
+>
+>> Another advantage I saw in extending KVM_ARM_VCPU_INIT ioctl is
+>> backward compatibility with current semantics. In other words, this patch
+>> does not break current KVMTOOL/QEMU and they can implement
+>> "-cpu host" whenever they wish without using any additional ioctl.
+>
+> It's the opposite actually. By making the ioctl parameter in/out direction you change the ioctl number, breaking the ABI, no?
+
+Originally the ioctl was only "in" and so we are preserving the "in"
+semantics. Thats why it is semantically backward compatible.
+
+I have tested this patch with unmodified QEMU and KVMTOOL.
+
+>
+>
+> Alex
+>
+
+--Anup
