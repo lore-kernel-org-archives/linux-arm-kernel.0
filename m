@@ -1,57 +1,67 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  6 Sep 2013 17:18:21 +0200
-Subject: [RFC PATCHv2 4/4] net: mvneta: add support for fixed links
-In-Reply-To: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1378480701-12908-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri,  6 Sep 2013 17:18:17 +0200
+Subject: [RFC PATCHv2 0/4] Add DT support for fixed PHYs
+Message-ID: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the introduction of of_phy_register_fixed_link(), this patch
-introduces fixed link support in the mvneta driver, for Marvell Armada
-370/XP SOCs.
+Hello,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- .../devicetree/bindings/net/marvell-armada-370-neta.txt        |  4 ++--
- drivers/net/ethernet/marvell/mvneta.c                          | 10 ++++++----
- 2 files changed, 8 insertions(+), 6 deletions(-)
+Here is a second version of the patch set that adds a Device Tree
+binding and the related code to support fixed PHYs. Marked as RFC,
+this patch set is obviously not intended for merging in 3.12.
 
-diff --git a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-index 859a6fa..4d07d4e 100644
---- a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-+++ b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-@@ -4,8 +4,8 @@ Required properties:
- - compatible: should be "marvell,armada-370-neta".
- - reg: address and length of the register set for the device.
- - interrupts: interrupt for the device
--- phy: A phandle to a phy node defining the PHY address (as the reg
--  property, a single integer).
-+- phy: A phandle to the PHY node describing the PHY to which this
-+  Ethernet controller is connected to.
- - phy-mode: The interface between the SoC and the PHY (a string that
-   of_get_phy_mode() can understand)
- - clocks: a pointer to the reference clock for this device.
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index b017818..6da1516 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -2711,10 +2711,12 @@ static int mvneta_probe(struct platform_device *pdev)
- 	}
- 
- 	phy_node = of_parse_phandle(dn, "phy", 0);
--	if (!phy_node) {
--		dev_err(&pdev->dev, "no associated PHY\n");
--		err = -ENODEV;
--		goto err_free_irq;
-+	if (of_phy_is_fixed_link(phy_node)) {
-+		err = of_phy_register_fixed_link(phy_node);
-+		if (err < 0) {
-+			dev_err(&pdev->dev, "cannot register fixed PHY\n");
-+			goto err_free_irq;
-+		}
- 	}
- 
- 	phy_mode = of_get_phy_mode(dn);
+Since the first version, the changes have been:
+
+ * Instead of using a 'fixed-link' property inside the Ethernet device
+   DT node, with a fairly cryptic succession of integer values, we now
+   use a PHY subnode under the Ethernet device DT node, with explicit
+   properties to configure the duplex, speed, pause and other PHY
+   properties.
+
+ * The PHY address is automatically allocated by the kernel and no
+   longer visible in the Device Tree binding.
+
+ * The PHY device is created directly when the network driver calls
+   of_phy_connect_fixed_link(), and associated to the PHY DT node,
+   which allows the existing of_phy_connect() function to work,
+   without the need to use the deprecated of_phy_connect_fixed_link().
+
+The things I am not entirely happy with yet are:
+
+ * The PHY ID is hardcoded to 0xdeadbeef. Ideally, it should be a
+   properly reserved vendor/device identifier, but it isn't clear how
+   to get one allocated for this purpose.
+
+ * The fixed_phy_register() function in drivers/net/phy/fixed.c has
+   some OF references. So ideally, I would have preferred to put this
+   code in drivers/of/of_mdio.c, but to call get_phy_device(), we need
+   a reference to the mii_bus structure that represents the fixed MDIO
+   bus.
+
+ * There is some error management missing in fixed_phy_register(), but
+   it can certainly be added easily. This RFC is meant to sort out the
+   general idea.
+
+Thanks,
+
+Thomas
+
+Thomas Petazzoni (4):
+  net: phy: decouple PHY id and PHY address in fixed PHY driver
+  net: phy: extend fixed driver with fixed_phy_register()
+  of: provide a binding for fixed link PHYs
+  net: mvneta: add support for fixed links
+
+ .../devicetree/bindings/net/fixed-link.txt         | 34 ++++++++++++
+ .../bindings/net/marvell-armada-370-neta.txt       |  4 +-
+ drivers/net/ethernet/marvell/mvneta.c              | 10 ++--
+ drivers/net/phy/fixed.c                            | 63 ++++++++++++++++++----
+ drivers/of/of_mdio.c                               | 24 +++++++++
+ include/linux/of_mdio.h                            | 15 ++++++
+ include/linux/phy_fixed.h                          | 11 ++++
+ 7 files changed, 145 insertions(+), 16 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/fixed-link.txt
+
 -- 
 1.8.1.2
