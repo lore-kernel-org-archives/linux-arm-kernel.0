@@ -1,17 +1,17 @@
 From: jolsa@redhat.com (Jiri Olsa)
-Date: Fri, 6 Sep 2013 12:17:10 +0200
+Date: Fri, 6 Sep 2013 12:17:20 +0200
 Subject: [PATCH 3/3] perf: parse the .debug_frame section in case
  .eh_frame is not present
-In-Reply-To: <CAFrcx1nYS1J5zZjAQMgXrrkz9C332-EJQgj=2vcoidSvLe_JeQ@mail.gmail.com>
+In-Reply-To: <CAFrcx1=QA3EpPAxx7Jx=87WbupAEFQ8L+t9pTJ=+3ucVTE+xtg@mail.gmail.com>
 References: <1378317854-25965-1-git-send-email-jean.pihet@linaro.org>
  <1378317854-25965-4-git-send-email-jean.pihet@linaro.org>
  <20130905163030.GF1100@krava.brq.redhat.com>
- <CAFrcx1nYS1J5zZjAQMgXrrkz9C332-EJQgj=2vcoidSvLe_JeQ@mail.gmail.com>
-Message-ID: <20130906101710.GA2749@krava.brq.redhat.com>
+ <CAFrcx1=QA3EpPAxx7Jx=87WbupAEFQ8L+t9pTJ=+3ucVTE+xtg@mail.gmail.com>
+Message-ID: <20130906101720.GA1055@krava.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 05, 2013 at 06:49:13PM +0200, Jean Pihet wrote:
+On Fri, Sep 06, 2013 at 11:31:17AM +0200, Jean Pihet wrote:
 > Hi Jiri,
 > 
 > On 5 September 2013 18:30, Jiri Olsa <jolsa@redhat.com> wrote:
@@ -52,79 +52,26 @@ On Thu, Sep 05, 2013 at 06:49:13PM +0200, Jean Pihet wrote:
 > > it looks like it is based on what I see in libunwind sources ;-)
 > >
 > > What did I miss?
-> Weird, I do not have the error on x86_64. I am investigating this and
-> will come back to you asap.
-> 
-> >
-> > Also few typo comments below..
-> >
-> > thanks,
-> > jirka
-> >
-> >>
-> >> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-> >> ---
-> >>  tools/perf/util/unwind.c | 70 +++++++++++++++++++++++++++++++++++++-----------
-> >>  1 file changed, 54 insertions(+), 16 deletions(-)
-> >>
-> >> diff --git a/tools/perf/util/unwind.c b/tools/perf/util/unwind.c
-> >> index 958723b..5353b32 100644
-> >> --- a/tools/perf/util/unwind.c
-> >> +++ b/tools/perf/util/unwind.c
-> >> @@ -39,6 +39,14 @@ UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
-> >>
-> >>  #define dwarf_search_unwind_table UNW_OBJ(dwarf_search_unwind_table)
-> >>
-> >> +extern int
-> >> +UNW_OBJ(dwarf_find_debug_frame) (int found, unw_dyn_info_t *di_debug,
-> >> +                                                              unw_word_t ip, unw_word_t segbase,
-> >> +                                                              const char *obj_name, unw_word_t start,
-> >> +                                                              unw_word_t end);
-> >> +
-> >> +#define dwarf_find_debug_frame UNW_OBJ(dwarf_find_debug_frame)
-> >> +
-> >>  #define DW_EH_PE_FORMAT_MASK 0x0f    /* format of the encoded value */
-> >>  #define DW_EH_PE_APPL_MASK   0x70    /* how the value is to be applied */
-> >>
-> >> @@ -245,8 +253,9 @@ static int unwind_spec_ehframe(struct dso *dso, struct machine *machine,
-> >>       return 0;
-> >>  }
-> >>
-> >> -static int read_unwind_spec(struct dso *dso, struct machine *machine,
-> >> -                         u64 *table_data, u64 *segbase, u64 *fde_count)
-> >> +static int read_unwind_spec_eh_frame(struct dso *dso, struct machine *machine,
-> >> +                                  u64 *table_data, u64 *segbase,
-> >> +                                  u64 *fde_count)
-> >>  {
-> >>       int ret = -EINVAL, fd;
-> >>       u64 offset;
-> >> @@ -255,6 +264,7 @@ static int read_unwind_spec(struct dso *dso, struct machine *machine,
-> >>       if (fd < 0)
-> >>               return -EINVAL;
-> >>
-> >> +     /* Check the .eh_frame section for unwinding info */
-> >>       offset = elf_section_offset(fd, ".eh_frame_hdr");
-> >>       close(fd);
-> >>
-> >> @@ -263,10 +273,27 @@ static int read_unwind_spec(struct dso *dso, struct machine *machine,
-> >>                                         table_data, segbase,
-> >>                                         fde_count);
-> >>
-> >> -     /* TODO .debug_frame check if eh_frame_hdr fails */
-> >>       return ret;
-> >>  }
-> >>
-> >> +static int read_unwind_spec_debug_frame(struct dso *dso,
-> >> +                                                                             struct machine *machine, u64 *offset)
-> >> +{
-> >
-> > some strange formatting issue ^^^ ;-)
-> I am using 4-spaces tabs. scripts/checkpatch.pl reported it to me in
-> the form of too long lines.
-> Should I change the code to 8-spaces tabs?
-> 
+> libunwind needs to be configured with --enable-debug-frame for the
+> debug_frame code to be included in the lib.
+> On ARM the flag is always set while it isn't on x86. Here is the
+> culprit below (lines from libunwind configure).
 
-right, if I set tabs to 4 space then it's ok
-so I guess 8 is globally agreed ;-)
+yay, thats it!
 
+> 
+> Should that be changed in configure along with the changes in tools/perf?
+
+I guess it's ok
+
+Other than that tabs misformating the 'perf tool' change looks ok.
+
+I tested the '.eh_frame' code and it's still working. Once
+I figure out how to create a x86 binary with .debug_frame
+data I'll test the code itself ;-)
+
+If you could think of any automated testcase for this that could
+be added under 'tests' that'd be nice (not necessarily)
+
+thanks,
 jirka
