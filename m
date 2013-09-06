@@ -1,59 +1,47 @@
-From: jbe@pengutronix.de (=?iso-8859-1?q?J=FCrgen_Beisert?=)
-Date: Fri, 6 Sep 2013 09:01:01 +0200
-Subject: [patch] iio: mxs-lradc: use helper functions to simplify the code
-In-Reply-To: <20130905181639.GA19090@elgon.mountain>
-References: <20130905181639.GA19090@elgon.mountain>
-Message-ID: <201309060901.01056.jbe@pengutronix.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 6 Sep 2013 16:09:24 +0900
+Subject: [PATCH 00/04] ARM: shmobile: Initial r8a7791 SoC and Koelsch
+ board support
+In-Reply-To: <20130904083833.GF17329@verge.net.au>
+References: <20130904034525.12546.24775.sendpatchset@w520>
+ <20130904083833.GF17329@verge.net.au>
+Message-ID: <20130906070923.GE1025@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
+On Wed, Sep 04, 2013 at 05:38:35PM +0900, Simon Horman wrote:
+> On Wed, Sep 04, 2013 at 12:45:25PM +0900, Magnus Damm wrote:
+> > ARM: shmobile: Initial r8a7791 SoC and Koelsch board supp
+> > 
+> > [PATCH 01/04] ARM: shmobile: Initial r8a7791 SoC support
+> > [PATCH 02/04] ARM: shmobile: r8a7791 SCIF support
+> > [PATCH 03/04] ARM: shmobile: r8a7791 CMT support
+> > [PATCH 04/04] ARM: shmobile: Koelsch support
+> > 
+> > This series adds initial support for r8a7791 and Koelsch. The SoC
+> > is known as r8a7791 which is based on a single cluster Cortex-A15
+> > and makes use of SCIF for serial and CMT for timer. Many other
+> > on-chip I/O devices are available, and support for those will be
+> > added by incremental feature patches.
+> > 
+> > This initial SoC and board support is providing limited DT-only
+> > support and a very basic C-version of board support. In the future
+> > improved PINCTRL and clock framework support will be added together
+> > with arch timer and SMP support.
+> > 
+> > Implemented in same style as r8a7790 SoC V1.
+> > 
+> > Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> > Signed-off-by: Yoshikazu Fujikawa <yoshikazu.fujikawa.ue@renesas.com>
+> > Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+> > [damm at opensource.se: forward porting, cleanups, commit logs, CMT support]
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> 
+> I have lightly tested these and they seem good to me.
+> I have posted a defconfig patch as a follow-up.
+> I would to let these sit for a little bit to give them time to
+> be reviewed by others.
+> 
+> Tested-by: Simon Horman <horms+renesas@verge.net.au>
 
-On Thursday 05 September 2013 20:16:39 Dan Carpenter wrote:
-> I have introduced lradc_reg_set() and lradc_reg_clear().  It simplifies
-> the callers and makes the lines shorter.
->
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
->
-> diff --git a/drivers/staging/iio/adc/mxs-lradc.c
-> b/drivers/staging/iio/adc/mxs-lradc.c index a08c173..da5d04b 100644
-> --- a/drivers/staging/iio/adc/mxs-lradc.c
-> +++ b/drivers/staging/iio/adc/mxs-lradc.c
-> @@ -228,6 +228,16 @@ struct mxs_lradc {
->  #define LRADC_RESOLUTION			12
->  #define LRADC_SINGLE_SAMPLE_MASK		((1 << LRADC_RESOLUTION) - 1)
->
-> +static void lradc_reg_set(struct mxs_lradc *lradc, u32 val, size_t chan)
-> +{
-> +	writel(val, lradc->base + chan + STMP_OFFSET_REG_SET);
-> +}
-> +
-> +static void lradc_reg_clear(struct mxs_lradc *lradc, u32 val, size_t chan)
-> +{
-> +	writel(val, lradc->base + chan + STMP_OFFSET_REG_CLR);
-> +}
-> +
->  /*
->   * Raw I/O operations
->   */
-> @@ -262,21 +272,18 @@ static int mxs_lradc_read_raw(struct iio_dev
-> *iio_dev, * Virtual channel 0 is always used here as the others are always
-> not * used if doing raw sampling.
->  	 */
-> -	writel(LRADC_CTRL1_LRADC_IRQ_EN_MASK,
-> -		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
-> -	writel(0xff, lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
-> +	lradc_reg_clear(lradc, LRADC_CTRL1_LRADC_IRQ_EN_MASK, LRADC_CTRL1);
-> +	lradc_reg_clear(lradc, 0xff, LRADC_CTRL0);
-
-[...]
-
-Oh, I did the same yesterday in preparation of the v2 of my patch series.
-I will send this new version out today.
-
-Regards,
-Juergen
-
--- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+I have queued these up for v3.13.
