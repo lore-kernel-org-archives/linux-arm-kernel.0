@@ -1,80 +1,36 @@
-From: claudio.fontana@huawei.com (Claudio Fontana)
-Date: Fri, 6 Sep 2013 10:09:07 +0200
-Subject: [RFC PATCH 2/3] ARM64: KVM: Implement target CPU=Host
-In-Reply-To: <1378392362-6773-3-git-send-email-anup.patel@linaro.org>
-References: <1378392362-6773-1-git-send-email-anup.patel@linaro.org>
- <1378392362-6773-3-git-send-email-anup.patel@linaro.org>
-Message-ID: <52298DA3.6000100@huawei.com>
+From: Li.Xiubo@freescale.com (Xiubo Li)
+Date: Fri, 6 Sep 2013 16:08:23 +0800
+Subject: [PATCHv3 0/4] Add Freescale FTM PWM driver.
+Message-ID: <1378454907-22728-1-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.09.2013 16:46, Anup Patel wrote:
-> This patch implements KVM_ARM_TARGET_HOST for KVM ARM64.
-> 
-> If user space provides KVM_ARM_TARGET_HOST as target type in
-> KVM_ARM_VCPU_INIT ioctl then we find out appropriate target
-> type based on underlying host and return that to user space
-> via struct kvm_vcpu_init.
-> 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  arch/arm64/include/asm/kvm_host.h |    2 +-
->  arch/arm64/include/uapi/asm/kvm.h |    2 +-
->  arch/arm64/kvm/guest.c            |   10 ++++++++--
->  3 files changed, 10 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 0859a4d..9ee431c 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -150,7 +150,7 @@ struct kvm_vcpu_stat {
->  
->  struct kvm_vcpu_init;
->  int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
-> -			const struct kvm_vcpu_init *init);
-> +			struct kvm_vcpu_init *init);
->  unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
->  int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
->  struct kvm_one_reg;
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index d9f026b..eeb5726 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -56,7 +56,7 @@ struct kvm_regs {
->  #define KVM_ARM_TARGET_FOUNDATION_V8	1
->  #define KVM_ARM_TARGET_CORTEX_A57	2
->  #define KVM_ARM_TARGET_XGENE_POTENZA	3
-> -
-> +#define KVM_ARM_TARGET_HOST		0x0FFFFFFF
->  #define KVM_ARM_NUM_TARGETS		4
->  
->  /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> index d7bf7d6..261e836 100644
-> --- a/arch/arm64/kvm/guest.c
-> +++ b/arch/arm64/kvm/guest.c
-> @@ -230,12 +230,18 @@ int __attribute_const__ kvm_target_cpu(void)
->  }
->  
->  int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
-> -			const struct kvm_vcpu_init *init)
-> +			struct kvm_vcpu_init *init)
->  {
->  	unsigned int i;
->  	int phys_target = kvm_target_cpu();
->  
-> -	if (init->target != phys_target)
-> +	if (phys_target < 0) {
-> +		return phys_target;
-> +	}
-> +
-> +	if (init->target == KVM_ARM_TARGET_HOST)
-> +		init->target = phys_target;
-> +	else if (init->target != phys_target)
->  		return -EINVAL;
->  
->  	vcpu->arch.target = phys_target;
-> 
+Hello,
 
-Acked-by: Claudio Fontana <claudio.fontana@huawei.com>
+This patch series is the Freescale FTM PWM implementation. And there are 8 channels most supported by the FTM PWM. This implementation is only compatible with device tree definition.
+
+This patch series is based on linux-next and has been tested on Vybrid VF610 Tower board using device tree.
+
+Changes in v3:
+- Remove "availabe" field.
+- Remove "fsl,pwm-avaliable-chs" property.
+- ...
+
+Changes in v2:
+- Remove PWM CPWM/EPWM feature and sysfs.
+- Remove some redundant code.
+- Revise some code for more readable.
+- Remove "fsl,pwm-clk-ps", "fsl,pwm-number", "fsl,pwm-channels",etc.
+- Add "fsl,pwm-avaliable-chs", "fsl,pwm-counter-clk", etc.
+- Support 8 channels default in dtsi file.
+- Add counter clock source selection.
+- Rename some function name, macro name, etc.
+- Use PWM's and OF's existing function interfaces.
+- Split clk_unprepare_enable to clk_unprepare and clk_enable,etc.
+- ...
+
+Orignal in v1:
+- Add Freescale FTM PWM driver support.
+- Add Freescale FTM PWM node for VF610.
+- Enable Enables FTM PWM device for Vybrid VF610 TOWER.
+- Add device tree bindings for Freescale.
