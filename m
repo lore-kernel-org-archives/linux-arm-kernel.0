@@ -1,271 +1,614 @@
 From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Fri, 06 Sep 2013 12:12:30 +0200
-Subject: [PATCH v2 01/12] ARM: exynos4: create a DT header defining CLK IDs
+Date: Fri, 06 Sep 2013 12:12:31 +0200
+Subject: [PATCH v2 02/12] ARM: dts: exynos4: convert magic numbers to macros in
+ clock bindings
 In-Reply-To: <1378462361-13680-1-git-send-email-a.hajda@samsung.com>
 References: <1378462361-13680-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <1378462361-13680-2-git-send-email-a.hajda@samsung.com>
+Message-ID: <1378462361-13680-3-git-send-email-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds header file defining clock IDs.
-This allows to use macros instead of magic numbers in DT bindings.
+The patch replaces magic numbers with macros defined in DT header
+in exynos4 clock bindings.
 
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- include/dt-bindings/clock/exynos4.h | 244 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 244 insertions(+)
- create mode 100644 include/dt-bindings/clock/exynos4.h
+ .../devicetree/bindings/clock/exynos4-clock.txt    | 259 +--------------------
+ arch/arm/boot/dts/exynos4.dtsi                     |  55 ++---
+ arch/arm/boot/dts/exynos4210.dtsi                  |   6 +-
+ arch/arm/boot/dts/exynos4412.dtsi                  |   2 +-
+ arch/arm/boot/dts/exynos4x12.dtsi                  |   2 +-
+ 5 files changed, 39 insertions(+), 285 deletions(-)
 
-diff --git a/include/dt-bindings/clock/exynos4.h b/include/dt-bindings/clock/exynos4.h
-new file mode 100644
-index 0000000..75aff33
---- /dev/null
-+++ b/include/dt-bindings/clock/exynos4.h
-@@ -0,0 +1,244 @@
-+/*
-+ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-+ * Author: Andrzej Haja <a.hajda@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Device Tree binding constants for Exynos4 clock controller.
-+*/
-+
-+#ifndef _DT_BINDINGS_CLOCK_EXYNOS_4_H
-+#define _DT_BINDINGS_CLOCK_EXYNOS_4_H
-+
-+/* core clocks */
-+#define CLK_XXTI		1
-+#define CLK_XUSBXTI		2
-+#define CLK_FIN_PLL		3
-+#define CLK_FOUT_APLL		4
-+#define CLK_FOUT_MPLL		5
-+#define CLK_FOUT_EPLL		6
-+#define CLK_FOUT_VPLL		7
-+#define CLK_SCLK_APLL		8
-+#define CLK_SCLK_MPLL		9
-+#define CLK_SCLK_EPLL		10
-+#define CLK_SCLK_VPLL		11
-+#define CLK_ARM_CLK		12
-+#define CLK_ACLK200		13
-+#define CLK_ACLK100		14
-+#define CLK_ACLK160		15
-+#define CLK_ACLK133		16
-+#define CLK_MOUT_MPLL_USER_T	17 /* Exynos4x12 only */
-+#define CLK_MOUT_MPLL_USER_C	18 /* Exynos4x12 only */
-+#define CLK_MOUT_CORE		19
-+#define CLK_MOUT_APLL		20
-+
-+/* gate for special clocks (sclk) */
-+#define CLK_SCLK_FIMC0		128
-+#define CLK_SCLK_FIMC1		129
-+#define CLK_SCLK_FIMC2		130
-+#define CLK_SCLK_FIMC3		131
-+#define CLK_SCLK_CAM0		132
-+#define CLK_SCLK_CAM1		133
-+#define CLK_SCLK_CSIS0		134
-+#define CLK_SCLK_CSIS1		135
-+#define CLK_SCLK_HDMI		136
-+#define CLK_SCLK_MIXER		137
-+#define CLK_SCLK_DAC		138
-+#define CLK_SCLK_PIXEL		139
-+#define CLK_SCLK_FIMD0		140
-+#define CLK_SCLK_MDNIE0		141 /* Exynos4412 only */
-+#define CLK_SCLK_MDNIE_PWM0	142
-+#define CLK_SCLK_MIPI0		143
-+#define CLK_SCLK_AUDIO0		144
-+#define CLK_SCLK_MMC0		145
-+#define CLK_SCLK_MMC1		146
-+#define CLK_SCLK_MMC2		147
-+#define CLK_SCLK_MMC3		148
-+#define CLK_SCLK_MMC4		149
-+#define CLK_SCLK_SATA		150 /* Exynos4210 only */
-+#define CLK_SCLK_UART0		151
-+#define CLK_SCLK_UART1		152
-+#define CLK_SCLK_UART2		153
-+#define CLK_SCLK_UART3		154
-+#define CLK_SCLK_UART4		155
-+#define CLK_SCLK_AUDIO1		156
-+#define CLK_SCLK_AUDIO2		157
-+#define CLK_SCLK_SPDIF		158
-+#define CLK_SCLK_SPI0		159
-+#define CLK_SCLK_SPI1		160
-+#define CLK_SCLK_SPI2		161
-+#define CLK_SCLK_SLIMBUS	162
-+#define CLK_SCLK_FIMD1		163 /* Exynos4210 only */
-+#define CLK_SCLK_MIPI1		164 /* Exynos4210 only */
-+#define CLK_SCLK_PCM1		165
-+#define CLK_SCLK_PCM2		166
-+#define CLK_SCLK_I2S1		167
-+#define CLK_SCLK_I2S2		168
-+#define CLK_SCLK_MIPIHSI	169 /* Exynos4412 only */
-+#define CLK_SCLK_MFC		170
-+#define CLK_SCLK_PCM0		171
-+#define CLK_SCLK_G3D		172
-+#define CLK_SCLK_PWM_ISP	173 /* Exynos4x12 only */
-+#define CLK_SCLK_SPI0_ISP	174 /* Exynos4x12 only */
-+#define CLK_SCLK_SPI1_ISP	175 /* Exynos4x12 only */
-+#define CLK_SCLK_UART_ISP	176 /* Exynos4x12 only */
-+#define CLK_SCLK_FIMG2D		177
-+
-+/* gate clocks */
-+#define CLK_FIMC0		256
-+#define CLK_FIMC1		257
-+#define CLK_FIMC2		258
-+#define CLK_FIMC3		259
-+#define CLK_CSIS0		260
-+#define CLK_CSIS1		261
-+#define CLK_JPEG		262
-+#define CLK_SMMU_FIMC0		263
-+#define CLK_SMMU_FIMC1		264
-+#define CLK_SMMU_FIMC2		265
-+#define CLK_SMMU_FIMC3		266
-+#define CLK_SMMU_JPEG		267
-+#define CLK_VP			268
-+#define CLK_MIXER		269
-+#define CLK_TVENC		270 /* Exynos4210 only */
-+#define CLK_HDMI		271
-+#define CLK_SMMU_TV		272
-+#define CLK_MFC			273
-+#define CLK_SMMU_MFCL		274
-+#define CLK_SMMU_MFCR		275
-+#define CLK_G3D			276
-+#define CLK_G2D			277
-+#define CLK_ROTATOR		278 /* Exynos4210 only */
-+#define CLK_MDMA		279 /* Exynos4210 only */
-+#define CLK_SMMU_G2D		280 /* Exynos4210 only */
-+#define CLK_SMMU_ROTATOR	281 /* Exynos4210 only */
-+#define CLK_SMMU_MDMA		282 /* Exynos4210 only */
-+#define CLK_FIMD0		283
-+#define CLK_MIE0		284
-+#define CLK_MDNIE0		285 /* Exynos4412 only */
-+#define CLK_DSIM0		286
-+#define CLK_SMMU_FIMD0		287
-+#define CLK_FIMD1		288 /* Exynos4210 only */
-+#define CLK_MIE1		289 /* Exynos4210 only */
-+#define CLK_DSIM1		290 /* Exynos4210 only */
-+#define CLK_SMMU_FIMD1		291 /* Exynos4210 only */
-+#define CLK_PDMA0		292
-+#define CLK_PDMA1		293
-+#define CLK_PCIE_PHY		294
-+#define CLK_SATA_PHY		295 /* Exynos4210 only */
-+#define CLK_TSI			296
-+#define CLK_SDMMC0		297
-+#define CLK_SDMMC1		298
-+#define CLK_SDMMC2		299
-+#define CLK_SDMMC3		300
-+#define CLK_SDMMC4		301
-+#define CLK_SATA		302 /* Exynos4210 only */
-+#define CLK_SROMC		303
-+#define CLK_USB_HOST		304
-+#define CLK_USB_DEVICE		305
-+#define CLK_PCIE		306
-+#define CLK_ONENAND		307
-+#define CLK_NFCON		308
-+#define CLK_SMMU_PCIE		309
-+#define CLK_GPS			310
-+#define CLK_SMMU_GPS		311
-+#define CLK_UART0		312
-+#define CLK_UART1		313
-+#define CLK_UART2		314
-+#define CLK_UART3		315
-+#define CLK_UART4		316
-+#define CLK_I2C0		317
-+#define CLK_I2C1		318
-+#define CLK_I2C2		319
-+#define CLK_I2C3		320
-+#define CLK_I2C4		321
-+#define CLK_I2C5		322
-+#define CLK_I2C6		323
-+#define CLK_I2C7		324
-+#define CLK_I2C_HDMI		325
-+#define CLK_TSADC		326
-+#define CLK_SPI0		327
-+#define CLK_SPI1		328
-+#define CLK_SPI2		329
-+#define CLK_I2S1		330
-+#define CLK_I2S2		331
-+#define CLK_PCM0		332
-+#define CLK_I2S0		333
-+#define CLK_PCM1		334
-+#define CLK_PCM2		335
-+#define CLK_PWM			336
-+#define CLK_SLIMBUS		337
-+#define CLK_SPDIF		338
-+#define CLK_AC97		339
-+#define CLK_MODEMIF		340
-+#define CLK_CHIPID		341
-+#define CLK_SYSREG		342
-+#define CLK_HDMI_CEC		343
-+#define CLK_MCT			344
-+#define CLK_WDT			345
-+#define CLK_RTC			346
-+#define CLK_KEYIF		347
-+#define CLK_AUDSS		348
-+#define CLK_MIPI_HSI		349 /* Exynos4210 only */
-+#define CLK_MDMA2		350 /* Exynos4210 only */
-+#define CLK_PIXELASYNCM0	351
-+#define CLK_PIXELASYNCM1	352
-+#define CLK_FIMC_LITE0		353 /* Exynos4x12 only */
-+#define CLK_FIMC_LITE1		354 /* Exynos4x12 only */
-+#define CLK_PPMUISPX		355 /* Exynos4x12 only */
-+#define CLK_PPMUISPMX		356 /* Exynos4x12 only */
-+#define CLK_FIMC_ISP		357 /* Exynos4x12 only */
-+#define CLK_FIMC_DRC		358 /* Exynos4x12 only */
-+#define CLK_FIMC_FD		359 /* Exynos4x12 only */
-+#define CLK_MCUISP		360 /* Exynos4x12 only */
-+#define CLK_GICISP		361 /* Exynos4x12 only */
-+#define CLK_SMMU_ISP		362 /* Exynos4x12 only */
-+#define CLK_SMMU_DRC		363 /* Exynos4x12 only */
-+#define CLK_SMMU_FD		364 /* Exynos4x12 only */
-+#define CLK_SMMU_LITE0		365 /* Exynos4x12 only */
-+#define CLK_SMMU_LITE1		366 /* Exynos4x12 only */
-+#define CLK_MCUCTL_ISP		367 /* Exynos4x12 only */
-+#define CLK_MPWM_ISP		368 /* Exynos4x12 only */
-+#define CLK_I2C0_ISP		369 /* Exynos4x12 only */
-+#define CLK_I2C1_ISP		370 /* Exynos4x12 only */
-+#define CLK_MTCADC_ISP		371 /* Exynos4x12 only */
-+#define CLK_PWM_ISP		372 /* Exynos4x12 only */
-+#define CLK_WDT_ISP		373 /* Exynos4x12 only */
-+#define CLK_UART_ISP		374 /* Exynos4x12 only */
-+#define CLK_ASYNCAXIM		375 /* Exynos4x12 only */
-+#define CLK_SMMU_ISPCX		376 /* Exynos4x12 only */
-+#define CLK_SPI0_ISP		377 /* Exynos4x12 only */
-+#define CLK_SPI1_ISP		378 /* Exynos4x12 only */
-+#define CLK_PWM_ISP_SCLK	379 /* Exynos4x12 only */
-+#define CLK_SPI0_ISP_SCLK	380 /* Exynos4x12 only */
-+#define CLK_SPI1_ISP_SCLK	381 /* Exynos4x12 only */
-+#define CLK_UART_ISP_SCLK	382 /* Exynos4x12 only */
-+#define CLK_TMU_APBIF		383
-+
-+/* mux clocks */
-+#define CLK_MOUT_FIMC0		384
-+#define CLK_MOUT_FIMC1		385
-+#define CLK_MOUT_FIMC2		386
-+#define CLK_MOUT_FIMC3		387
-+#define CLK_MOUT_CAM0		388
-+#define CLK_MOUT_CAM1		389
-+#define CLK_MOUT_CSIS0		390
-+#define CLK_MOUT_CSIS1		391
-+#define CLK_MOUT_G3D0		392
-+#define CLK_MOUT_G3D1		393
-+#define CLK_MOUT_G3D		394
-+#define CLK_ACLK400_MCUISP	395 /* Exynos4x12 only */
-+
-+/* div clocks */
-+#define CLK_DIV_ISP0		450 /* Exynos4x12 only */
-+#define CLK_DIV_ISP1		451 /* Exynos4x12 only */
-+#define CLK_DIV_MCUISP0		452 /* Exynos4x12 only */
-+#define CLK_DIV_MCUISP1		453 /* Exynos4x12 only */
-+#define CLK_DIV_ACLK200		454 /* Exynos4x12 only */
-+#define CLK_DIV_ACLK400_MCUISP	455 /* Exynos4x12 only */
-+
-+/* must be greater than maximal clock id */
-+#define CLK_NR_CLKS		456
-+
-+#endif /* _DT_BINDINGS_CLOCK_EXYNOS_4_H */
+diff --git a/Documentation/devicetree/bindings/clock/exynos4-clock.txt b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
+index c6bf8a6..e30c31e 100644
+--- a/Documentation/devicetree/bindings/clock/exynos4-clock.txt
++++ b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
+@@ -15,259 +15,12 @@ Required Properties:
+ 
+ - #clock-cells: should be 1.
+ 
+-The following is the list of clocks generated by the controller. Each clock is
+-assigned an identifier and client nodes use this identifier to specify the
+-clock which they consume. Some of the clocks are available only on a particular
+-Exynos4 SoC and this is specified where applicable.
+-
+-
+-		 [Core Clocks]
+-
+-  Clock               ID      SoC (if specific)
+-  -----------------------------------------------
+-
+-  xxti                1
+-  xusbxti             2
+-  fin_pll             3
+-  fout_apll           4
+-  fout_mpll           5
+-  fout_epll           6
+-  fout_vpll           7
+-  sclk_apll           8
+-  sclk_mpll           9
+-  sclk_epll           10
+-  sclk_vpll           11
+-  arm_clk             12
+-  aclk200             13
+-  aclk100             14
+-  aclk160             15
+-  aclk133             16
+-  mout_mpll_user_t    17      Exynos4x12
+-  mout_mpll_user_c    18      Exynos4x12
+-  mout_core           19
+-  mout_apll           20
+-
+-
+-            [Clock Gate for Special Clocks]
+-
+-  Clock               ID      SoC (if specific)
+-  -----------------------------------------------
+-
+-  sclk_fimc0          128
+-  sclk_fimc1          129
+-  sclk_fimc2          130
+-  sclk_fimc3          131
+-  sclk_cam0           132
+-  sclk_cam1           133
+-  sclk_csis0          134
+-  sclk_csis1          135
+-  sclk_hdmi           136
+-  sclk_mixer          137
+-  sclk_dac            138
+-  sclk_pixel          139
+-  sclk_fimd0          140
+-  sclk_mdnie0         141     Exynos4412
+-  sclk_mdnie_pwm0 12  142     Exynos4412
+-  sclk_mipi0          143
+-  sclk_audio0         144
+-  sclk_mmc0           145
+-  sclk_mmc1           146
+-  sclk_mmc2           147
+-  sclk_mmc3           148
+-  sclk_mmc4           149
+-  sclk_sata           150     Exynos4210
+-  sclk_uart0          151
+-  sclk_uart1          152
+-  sclk_uart2          153
+-  sclk_uart3          154
+-  sclk_uart4          155
+-  sclk_audio1         156
+-  sclk_audio2         157
+-  sclk_spdif          158
+-  sclk_spi0           159
+-  sclk_spi1           160
+-  sclk_spi2           161
+-  sclk_slimbus        162
+-  sclk_fimd1          163     Exynos4210
+-  sclk_mipi1          164     Exynos4210
+-  sclk_pcm1           165
+-  sclk_pcm2           166
+-  sclk_i2s1           167
+-  sclk_i2s2           168
+-  sclk_mipihsi        169     Exynos4412
+-  sclk_mfc            170
+-  sclk_pcm0           171
+-  sclk_g3d            172
+-  sclk_pwm_isp        173     Exynos4x12
+-  sclk_spi0_isp       174     Exynos4x12
+-  sclk_spi1_isp       175     Exynos4x12
+-  sclk_uart_isp       176     Exynos4x12
+-  sclk_fimg2d         177
+-
+-	      [Peripheral Clock Gates]
+-
+-  Clock               ID      SoC (if specific)
+-  -----------------------------------------------
+-
+-  fimc0               256
+-  fimc1               257
+-  fimc2               258
+-  fimc3               259
+-  csis0               260
+-  csis1               261
+-  jpeg                262
+-  smmu_fimc0          263
+-  smmu_fimc1          264
+-  smmu_fimc2          265
+-  smmu_fimc3          266
+-  smmu_jpeg           267
+-  vp                  268
+-  mixer               269
+-  tvenc               270     Exynos4210
+-  hdmi                271
+-  smmu_tv             272
+-  mfc                 273
+-  smmu_mfcl           274
+-  smmu_mfcr           275
+-  g3d                 276
+-  g2d                 277
+-  rotator             278     Exynos4210
+-  mdma                279     Exynos4210
+-  smmu_g2d            280     Exynos4210
+-  smmu_rotator        281     Exynos4210
+-  smmu_mdma           282     Exynos4210
+-  fimd0               283
+-  mie0                284
+-  mdnie0              285     Exynos4412
+-  dsim0               286
+-  smmu_fimd0          287
+-  fimd1               288     Exynos4210
+-  mie1                289     Exynos4210
+-  dsim1               290     Exynos4210
+-  smmu_fimd1          291     Exynos4210
+-  pdma0               292
+-  pdma1               293
+-  pcie_phy            294
+-  sata_phy            295     Exynos4210
+-  tsi                 296
+-  sdmmc0              297
+-  sdmmc1              298
+-  sdmmc2              299
+-  sdmmc3              300
+-  sdmmc4              301
+-  sata                302     Exynos4210
+-  sromc               303
+-  usb_host            304
+-  usb_device          305
+-  pcie                306
+-  onenand             307
+-  nfcon               308
+-  smmu_pcie           309
+-  gps                 310
+-  smmu_gps            311
+-  uart0               312
+-  uart1               313
+-  uart2               314
+-  uart3               315
+-  uart4               316
+-  i2c0                317
+-  i2c1                318
+-  i2c2                319
+-  i2c3                320
+-  i2c4                321
+-  i2c5                322
+-  i2c6                323
+-  i2c7                324
+-  i2c_hdmi            325
+-  tsadc               326
+-  spi0                327
+-  spi1                328
+-  spi2                329
+-  i2s1                330
+-  i2s2                331
+-  pcm0                332
+-  i2s0                333
+-  pcm1                334
+-  pcm2                335
+-  pwm                 336
+-  slimbus             337
+-  spdif               338
+-  ac97                339
+-  modemif             340
+-  chipid              341
+-  sysreg              342
+-  hdmi_cec            343
+-  mct                 344
+-  wdt                 345
+-  rtc                 346
+-  keyif               347
+-  audss               348
+-  mipi_hsi            349     Exynos4210
+-  mdma2               350     Exynos4210
+-  pixelasyncm0        351
+-  pixelasyncm1        352
+-  fimc_lite0          353     Exynos4x12
+-  fimc_lite1          354     Exynos4x12
+-  ppmuispx            355     Exynos4x12
+-  ppmuispmx           356     Exynos4x12
+-  fimc_isp            357     Exynos4x12
+-  fimc_drc            358     Exynos4x12
+-  fimc_fd             359     Exynos4x12
+-  mcuisp              360     Exynos4x12
+-  gicisp              361     Exynos4x12
+-  smmu_isp            362     Exynos4x12
+-  smmu_drc            363     Exynos4x12
+-  smmu_fd             364     Exynos4x12
+-  smmu_lite0          365     Exynos4x12
+-  smmu_lite1          366     Exynos4x12
+-  mcuctl_isp          367     Exynos4x12
+-  mpwm_isp            368     Exynos4x12
+-  i2c0_isp            369     Exynos4x12
+-  i2c1_isp            370     Exynos4x12
+-  mtcadc_isp          371     Exynos4x12
+-  pwm_isp             372     Exynos4x12
+-  wdt_isp             373     Exynos4x12
+-  uart_isp            374     Exynos4x12
+-  asyncaxim           375     Exynos4x12
+-  smmu_ispcx          376     Exynos4x12
+-  spi0_isp            377     Exynos4x12
+-  spi1_isp            378     Exynos4x12
+-  pwm_isp_sclk        379     Exynos4x12
+-  spi0_isp_sclk       380     Exynos4x12
+-  spi1_isp_sclk       381     Exynos4x12
+-  uart_isp_sclk       382     Exynos4x12
+-  tmu_apbif           383
+-
+-		[Mux Clocks]
+-
+-  Clock			ID	SoC (if specific)
+-  -----------------------------------------------
+-
+-  mout_fimc0		384
+-  mout_fimc1		385
+-  mout_fimc2		386
+-  mout_fimc3		387
+-  mout_cam0		388
+-  mout_cam1		389
+-  mout_csis0		390
+-  mout_csis1		391
+-  mout_g3d0		392
+-  mout_g3d1		393
+-  mout_g3d		394
+-  aclk400_mcuisp	395	Exynos4x12
+-
+-		[Div Clocks]
+-
+-  Clock			ID	SoC (if specific)
+-  -----------------------------------------------
+-
+-  div_isp0		450	Exynos4x12
+-  div_isp1		451	Exynos4x12
+-  div_mcuisp0		452	Exynos4x12
+-  div_mcuisp1		453	Exynos4x12
+-  div_aclk200		454	Exynos4x12
+-  div_aclk400_mcuisp	455	Exynos4x12
++Each clock is assigned an identifier and client nodes can use this identifier
++to specify the clock which they consume.
+ 
++All available clocks are defined as preprocessor macros in
++dt-bindings/clock/exynos4.h header and can be used in device
++tree sources.
+ 
+ Example 1: An example of a clock controller node is listed below.
+ 
+@@ -285,6 +38,6 @@ Example 2: UART controller node that consumes the clock generated by the clock
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x13820000 0x100>;
+ 		interrupts = <0 54 0>;
+-		clocks = <&clock 314>, <&clock 153>;
++		clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
+ 		clock-names = "uart", "clk_uart_baud0";
+ 	};
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 3f94fe8..07b2b44 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -19,6 +19,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <dt-bindings/clock/exynos4.h>
+ #include "skeleton.dtsi"
+ 
+ / {
+@@ -96,7 +97,7 @@
+ 		compatible = "samsung,s3c2410-wdt";
+ 		reg = <0x10060000 0x100>;
+ 		interrupts = <0 43 0>;
+-		clocks = <&clock 345>;
++		clocks = <&clock CLK_WDT>;
+ 		clock-names = "watchdog";
+ 		status = "disabled";
+ 	};
+@@ -105,7 +106,7 @@
+ 		compatible = "samsung,s3c6410-rtc";
+ 		reg = <0x10070000 0x100>;
+ 		interrupts = <0 44 0>, <0 45 0>;
+-		clocks = <&clock 346>;
++		clocks = <&clock CLK_RTC>;
+ 		clock-names = "rtc";
+ 		status = "disabled";
+ 	};
+@@ -114,7 +115,7 @@
+ 		compatible = "samsung,s5pv210-keypad";
+ 		reg = <0x100A0000 0x100>;
+ 		interrupts = <0 109 0>;
+-		clocks = <&clock 347>;
++		clocks = <&clock CLK_KEYIF>;
+ 		clock-names = "keypad";
+ 		status = "disabled";
+ 	};
+@@ -123,7 +124,7 @@
+ 		compatible = "samsung,exynos4210-sdhci";
+ 		reg = <0x12510000 0x100>;
+ 		interrupts = <0 73 0>;
+-		clocks = <&clock 297>, <&clock 145>;
++		clocks = <&clock CLK_SDMMC0>, <&clock CLK_SCLK_MMC0>;
+ 		clock-names = "hsmmc", "mmc_busclk.2";
+ 		status = "disabled";
+ 	};
+@@ -132,7 +133,7 @@
+ 		compatible = "samsung,exynos4210-sdhci";
+ 		reg = <0x12520000 0x100>;
+ 		interrupts = <0 74 0>;
+-		clocks = <&clock 298>, <&clock 146>;
++		clocks = <&clock CLK_SDMMC1>, <&clock CLK_SCLK_MMC1>;
+ 		clock-names = "hsmmc", "mmc_busclk.2";
+ 		status = "disabled";
+ 	};
+@@ -141,7 +142,7 @@
+ 		compatible = "samsung,exynos4210-sdhci";
+ 		reg = <0x12530000 0x100>;
+ 		interrupts = <0 75 0>;
+-		clocks = <&clock 299>, <&clock 147>;
++		clocks = <&clock CLK_SDMMC2>, <&clock CLK_SCLK_MMC2>;
+ 		clock-names = "hsmmc", "mmc_busclk.2";
+ 		status = "disabled";
+ 	};
+@@ -150,7 +151,7 @@
+ 		compatible = "samsung,exynos4210-sdhci";
+ 		reg = <0x12540000 0x100>;
+ 		interrupts = <0 76 0>;
+-		clocks = <&clock 300>, <&clock 148>;
++		clocks = <&clock CLK_SDMMC3>, <&clock CLK_SCLK_MMC3>;
+ 		clock-names = "hsmmc", "mmc_busclk.2";
+ 		status = "disabled";
+ 	};
+@@ -160,7 +161,7 @@
+ 		reg = <0x13400000 0x10000>;
+ 		interrupts = <0 94 0>;
+ 		samsung,power-domain = <&pd_mfc>;
+-		clocks = <&clock 170>, <&clock 273>;
++		clocks = <&clock CLK_SCLK_MFC>, <&clock CLK_MFC>;
+ 		clock-names = "sclk_mfc", "mfc";
+ 		status = "disabled";
+ 	};
+@@ -169,7 +170,7 @@
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x13800000 0x100>;
+ 		interrupts = <0 52 0>;
+-		clocks = <&clock 312>, <&clock 151>;
++		clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
+ 		clock-names = "uart", "clk_uart_baud0";
+ 		status = "disabled";
+ 	};
+@@ -178,7 +179,7 @@
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x13810000 0x100>;
+ 		interrupts = <0 53 0>;
+-		clocks = <&clock 313>, <&clock 152>;
++		clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
+ 		clock-names = "uart", "clk_uart_baud0";
+ 		status = "disabled";
+ 	};
+@@ -187,7 +188,7 @@
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x13820000 0x100>;
+ 		interrupts = <0 54 0>;
+-		clocks = <&clock 314>, <&clock 153>;
++		clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
+ 		clock-names = "uart", "clk_uart_baud0";
+ 		status = "disabled";
+ 	};
+@@ -196,7 +197,7 @@
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x13830000 0x100>;
+ 		interrupts = <0 55 0>;
+-		clocks = <&clock 315>, <&clock 154>;
++		clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
+ 		clock-names = "uart", "clk_uart_baud0";
+ 		status = "disabled";
+ 	};
+@@ -207,7 +208,7 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x13860000 0x100>;
+ 		interrupts = <0 58 0>;
+-		clocks = <&clock 317>;
++		clocks = <&clock CLK_I2C0>;
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c0_bus>;
+@@ -220,7 +221,7 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x13870000 0x100>;
+ 		interrupts = <0 59 0>;
+-		clocks = <&clock 318>;
++		clocks = <&clock CLK_I2C1>;
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c1_bus>;
+@@ -233,7 +234,7 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x13880000 0x100>;
+ 		interrupts = <0 60 0>;
+-		clocks = <&clock 319>;
++		clocks = <&clock CLK_I2C2>;
+ 		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+@@ -244,7 +245,7 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x13890000 0x100>;
+ 		interrupts = <0 61 0>;
+-		clocks = <&clock 320>;
++		clocks = <&clock CLK_I2C3>;
+ 		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+@@ -255,7 +256,7 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x138A0000 0x100>;
+ 		interrupts = <0 62 0>;
+-		clocks = <&clock 321>;
++		clocks = <&clock CLK_I2C4>;
+ 		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+@@ -266,7 +267,7 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x138B0000 0x100>;
+ 		interrupts = <0 63 0>;
+-		clocks = <&clock 322>;
++		clocks = <&clock CLK_I2C5>;
+ 		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+@@ -277,7 +278,7 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x138C0000 0x100>;
+ 		interrupts = <0 64 0>;
+-		clocks = <&clock 323>;
++		clocks = <&clock CLK_I2C6>;
+ 		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+@@ -288,7 +289,7 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x138D0000 0x100>;
+ 		interrupts = <0 65 0>;
+-		clocks = <&clock 324>;
++		clocks = <&clock CLK_I2C7>;
+ 		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+@@ -301,7 +302,7 @@
+ 		rx-dma-channel = <&pdma0 6>; /* preliminary */
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&clock 327>, <&clock 159>;
++		clocks = <&clock CLK_SPI0>, <&clock CLK_SCLK_SPI0>;
+ 		clock-names = "spi", "spi_busclk0";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&spi0_bus>;
+@@ -316,7 +317,7 @@
+ 		rx-dma-channel = <&pdma1 6>; /* preliminary */
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&clock 328>, <&clock 160>;
++		clocks = <&clock CLK_SPI1>, <&clock CLK_SCLK_SPI1>;
+ 		clock-names = "spi", "spi_busclk0";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&spi1_bus>;
+@@ -331,7 +332,7 @@
+ 		rx-dma-channel = <&pdma0 8>; /* preliminary */
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&clock 329>, <&clock 161>;
++		clocks = <&clock CLK_SPI2>, <&clock CLK_SCLK_SPI2>;
+ 		clock-names = "spi", "spi_busclk0";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&spi2_bus>;
+@@ -357,7 +358,7 @@
+ 			compatible = "arm,pl330", "arm,primecell";
+ 			reg = <0x12680000 0x1000>;
+ 			interrupts = <0 35 0>;
+-			clocks = <&clock 292>;
++			clocks = <&clock CLK_PDMA0>;
+ 			clock-names = "apb_pclk";
+ 			#dma-cells = <1>;
+ 			#dma-channels = <8>;
+@@ -368,7 +369,7 @@
+ 			compatible = "arm,pl330", "arm,primecell";
+ 			reg = <0x12690000 0x1000>;
+ 			interrupts = <0 36 0>;
+-			clocks = <&clock 293>;
++			clocks = <&clock CLK_PDMA1>;
+ 			clock-names = "apb_pclk";
+ 			#dma-cells = <1>;
+ 			#dma-channels = <8>;
+@@ -379,7 +380,7 @@
+ 			compatible = "arm,pl330", "arm,primecell";
+ 			reg = <0x12850000 0x1000>;
+ 			interrupts = <0 34 0>;
+-			clocks = <&clock 279>;
++			clocks = <&clock CLK_MDMA>;
+ 			clock-names = "apb_pclk";
+ 			#dma-cells = <1>;
+ 			#dma-channels = <8>;
+@@ -393,7 +394,7 @@
+ 		reg = <0x11c00000 0x20000>;
+ 		interrupt-names = "fifo", "vsync", "lcd_sys";
+ 		interrupts = <11 0>, <11 1>, <11 2>;
+-		clocks = <&clock 140>, <&clock 283>;
++		clocks = <&clock CLK_SCLK_FIMD0>, <&clock CLK_FIMD0>;
+ 		clock-names = "sclk_fimd", "fimd";
+ 		samsung,power-domain = <&pd_lcd0>;
+ 		status = "disabled";
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index b7f358a..0b34e87 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -56,7 +56,7 @@
+ 		interrupt-parent = <&mct_map>;
+ 		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
+ 			     <4 0>, <5 0>;
+-		clocks = <&clock 3>, <&clock 344>;
++		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MCT>;
+ 		clock-names = "fin_pll", "mct";
+ 
+ 		mct_map: mct-map {
+@@ -112,7 +112,7 @@
+ 		interrupt-parent = <&combiner>;
+ 		reg = <0x100C0000 0x100>;
+ 		interrupts = <2 4>;
+-		clocks = <&clock 383>;
++		clocks = <&clock CLK_TMU_APBIF>;
+ 		clock-names = "tmu_apbif";
+ 		status = "disabled";
+ 	};
+@@ -121,7 +121,7 @@
+ 		compatible = "samsung,s5pv210-g2d";
+ 		reg = <0x12800000 0x1000>;
+ 		interrupts = <0 89 0>;
+-		clocks = <&clock 177>, <&clock 277>;
++		clocks = <&clock CLK_SCLK_FIMG2D>, <&clock CLK_G2D>;
+ 		clock-names = "sclk_fimg2d", "fimg2d";
+ 		status = "disabled";
+ 	};
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+index e743e67..e0bb495 100644
+--- a/arch/arm/boot/dts/exynos4412.dtsi
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -43,7 +43,7 @@
+ 		interrupt-parent = <&mct_map>;
+ 		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
+ 			     <4 0>, <5 0>, <6 0>, <7 0>;
+-		clocks = <&clock 3>, <&clock 344>;
++		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MCT>;
+ 		clock-names = "fin_pll", "mct";
+ 
+ 		mct_map: mct-map {
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index 01da194..8bfa206 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -69,7 +69,7 @@
+ 		compatible = "samsung,exynos4212-g2d";
+ 		reg = <0x10800000 0x1000>;
+ 		interrupts = <0 89 0>;
+-		clocks = <&clock 177>, <&clock 277>;
++		clocks = <&clock CLK_SCLK_FIMG2D>, <&clock CLK_G2D>;
+ 		clock-names = "sclk_fimg2d", "fimg2d";
+ 		status = "disabled";
+ 	};
 -- 
 1.8.1.2
