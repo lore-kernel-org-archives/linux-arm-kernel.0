@@ -1,41 +1,327 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 6 Sep 2013 14:19:29 +1000
-Subject: [PATCH] net: stmmac: fix bad merge conflict resolution
-In-Reply-To: <20130905.225817.700066425182547791.davem@davemloft.net>
-References: <20130905.163725.106795517693348522.davem@davemloft.net>
- <1378429301-19964-1-git-send-email-olof@lixom.net>
- <20130905.225817.700066425182547791.davem@davemloft.net>
-Message-ID: <20130906141929.2f30c62de4eb5c6ad9d3f699@canb.auug.org.au>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Fri,  6 Sep 2013 08:33:24 +0200
+Subject: [PATCH] ARM: OMAP2+: am335x-bone*: add DT for BeagleBone Black
+Message-ID: <1378449204-8601-1-git-send-email-koen@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The BeagleBone Black is basically a regular BeagleBone with eMMC and HDMI added,
+so create a common dtsi both can use. MMC support for AM335x still isn't in, so
+only the LDO change has been added.
 
-On Thu, 05 Sep 2013 22:58:17 -0400 (EDT) David Miller <davem@davemloft.net> wrote:
->
-> From: Olof Johansson <olof@lixom.net>
-> Date: Thu,  5 Sep 2013 18:01:41 -0700
-> 
-> > Merge commit 06c54055bebf919249aa1eb68312887c3cfe77b4 did a bad conflict
-> > resolution accidentally leaving out a closing brace. Add it back.
-> > 
-> > Signed-off-by: Olof Johansson <olof@lixom.net>
-> > ---
-> > 
-> > This breaks a handful of defconfigs on ARM, so it'd be good to see it
-> > applied pretty quickly. Thanks!
-> 
-> Looks like Linus applied this, thanks Olof.
+Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
+---
+ .../{am335x-bone.dts => am335x-bone-common.dtsi}   |   3 -
+ arch/arm/boot/dts/am335x-bone.dts                  | 256 +--------------------
+ arch/arm/boot/dts/am335x-boneblack.dts             |  18 ++
+ 3 files changed, 19 insertions(+), 258 deletions(-)
+ copy arch/arm/boot/dts/{am335x-bone.dts => am335x-bone-common.dtsi} (99%)
+ create mode 100644 arch/arm/boot/dts/am335x-boneblack.dts
 
-And I cherry-picked it into linux-next for today.
-
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone-common.dtsi
+similarity index 99%
+copy from arch/arm/boot/dts/am335x-bone.dts
+copy to arch/arm/boot/dts/am335x-bone-common.dtsi
+index d318987..2f66ded 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -5,9 +5,6 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-/dts-v1/;
+-
+-#include "am33xx.dtsi"
+ 
+ / {
+ 	model = "TI AM335x BeagleBone";
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index d318987..7993c48 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -8,258 +8,4 @@
+ /dts-v1/;
+ 
+ #include "am33xx.dtsi"
+-
+-/ {
+-	model = "TI AM335x BeagleBone";
+-	compatible = "ti,am335x-bone", "ti,am33xx";
+-
+-	cpus {
+-		cpu at 0 {
+-			cpu0-supply = <&dcdc2_reg>;
+-		};
+-	};
+-
+-	memory {
+-		device_type = "memory";
+-		reg = <0x80000000 0x10000000>; /* 256 MB */
+-	};
+-
+-	am33xx_pinmux: pinmux at 44e10800 {
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&clkout2_pin>;
+-
+-		user_leds_s0: user_leds_s0 {
+-			pinctrl-single,pins = <
+-				0x54 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_a5.gpio1_21 */
+-				0x58 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_a6.gpio1_22 */
+-				0x5c (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_a7.gpio1_23 */
+-				0x60 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_a8.gpio1_24 */
+-			>;
+-		};
+-
+-		i2c0_pins: pinmux_i2c0_pins {
+-			pinctrl-single,pins = <
+-				0x188 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c0_sda.i2c0_sda */
+-				0x18c (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c0_scl.i2c0_scl */
+-			>;
+-		};
+-
+-		uart0_pins: pinmux_uart0_pins {
+-			pinctrl-single,pins = <
+-				0x170 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart0_rxd.uart0_rxd */
+-				0x174 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* uart0_txd.uart0_txd */
+-			>;
+-		};
+-
+-		clkout2_pin: pinmux_clkout2_pin {
+-			pinctrl-single,pins = <
+-				0x1b4 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* xdma_event_intr1.clkout2 */
+-			>;
+-		};
+-
+-		cpsw_default: cpsw_default {
+-			pinctrl-single,pins = <
+-				/* Slave 1 */
+-				0x110 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxerr.mii1_rxerr */
+-				0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txen.mii1_txen */
+-				0x118 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxdv.mii1_rxdv */
+-				0x11c (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txd3.mii1_txd3 */
+-				0x120 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txd2.mii1_txd2 */
+-				0x124 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txd1.mii1_txd1 */
+-				0x128 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txd0.mii1_txd0 */
+-				0x12c (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_txclk.mii1_txclk */
+-				0x130 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxclk.mii1_rxclk */
+-				0x134 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxd3.mii1_rxd3 */
+-				0x138 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxd2.mii1_rxd2 */
+-				0x13c (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxd1.mii1_rxd1 */
+-				0x140 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxd0.mii1_rxd0 */
+-			>;
+-		};
+-
+-		cpsw_sleep: cpsw_sleep {
+-			pinctrl-single,pins = <
+-				/* Slave 1 reset value */
+-				0x110 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-				0x114 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-				0x118 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-				0x11c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-				0x120 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-				0x124 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-				0x128 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-				0x12c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-				0x130 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-				0x134 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-				0x138 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-				0x13c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-				0x140 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-			>;
+-		};
+-
+-		davinci_mdio_default: davinci_mdio_default {
+-			pinctrl-single,pins = <
+-				/* MDIO */
+-				0x148 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)	/* mdio_data.mdio_data */
+-				0x14c (PIN_OUTPUT_PULLUP | MUX_MODE0)			/* mdio_clk.mdio_clk */
+-			>;
+-		};
+-
+-		davinci_mdio_sleep: davinci_mdio_sleep {
+-			pinctrl-single,pins = <
+-				/* MDIO reset value */
+-				0x148 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-				0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-			>;
+-		};
+-	};
+-
+-	ocp {
+-		uart0: serial at 44e09000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&uart0_pins>;
+-
+-			status = "okay";
+-		};
+-
+-		musb: usb at 47400000 {
+-			status = "okay";
+-
+-			control at 44e10000 {
+-				status = "okay";
+-			};
+-
+-			usb-phy at 47401300 {
+-				status = "okay";
+-			};
+-
+-			usb-phy at 47401b00 {
+-				status = "okay";
+-			};
+-
+-			usb at 47401000 {
+-				status = "okay";
+-			};
+-
+-			usb at 47401800 {
+-				status = "okay";
+-				dr_mode = "host";
+-			};
+-
+-			dma-controller at 07402000  {
+-				status = "okay";
+-			};
+-		};
+-
+-		i2c0: i2c at 44e0b000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c0_pins>;
+-
+-			status = "okay";
+-			clock-frequency = <400000>;
+-
+-			tps: tps at 24 {
+-				reg = <0x24>;
+-			};
+-
+-		};
+-	};
+-
+-	leds {
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&user_leds_s0>;
+-
+-		compatible = "gpio-leds";
+-
+-		led at 2 {
+-			label = "beaglebone:green:heartbeat";
+-			gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "heartbeat";
+-			default-state = "off";
+-		};
+-
+-		led at 3 {
+-			label = "beaglebone:green:mmc0";
+-			gpios = <&gpio1 22 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "mmc0";
+-			default-state = "off";
+-		};
+-
+-		led at 4 {
+-			label = "beaglebone:green:usr2";
+-			gpios = <&gpio1 23 GPIO_ACTIVE_HIGH>;
+-			default-state = "off";
+-		};
+-
+-		led at 5 {
+-			label = "beaglebone:green:usr3";
+-			gpios = <&gpio1 24 GPIO_ACTIVE_HIGH>;
+-			default-state = "off";
+-		};
+-	};
+-};
+-
+-/include/ "tps65217.dtsi"
+-
+-&tps {
+-	regulators {
+-		dcdc1_reg: regulator at 0 {
+-			regulator-always-on;
+-		};
+-
+-		dcdc2_reg: regulator at 1 {
+-			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
+-			regulator-name = "vdd_mpu";
+-			regulator-min-microvolt = <925000>;
+-			regulator-max-microvolt = <1325000>;
+-			regulator-boot-on;
+-			regulator-always-on;
+-		};
+-
+-		dcdc3_reg: regulator at 2 {
+-			/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
+-			regulator-name = "vdd_core";
+-			regulator-min-microvolt = <925000>;
+-			regulator-max-microvolt = <1150000>;
+-			regulator-boot-on;
+-			regulator-always-on;
+-		};
+-
+-		ldo1_reg: regulator at 3 {
+-			regulator-always-on;
+-		};
+-
+-		ldo2_reg: regulator at 4 {
+-			regulator-always-on;
+-		};
+-
+-		ldo3_reg: regulator at 5 {
+-			regulator-always-on;
+-		};
+-
+-		ldo4_reg: regulator at 6 {
+-			regulator-always-on;
+-		};
+-	};
+-};
+-
+-&cpsw_emac0 {
+-	phy_id = <&davinci_mdio>, <0>;
+-	phy-mode = "mii";
+-};
+-
+-&cpsw_emac1 {
+-	phy_id = <&davinci_mdio>, <1>;
+-	phy-mode = "mii";
+-};
+-
+-&mac {
+-	pinctrl-names = "default", "sleep";
+-	pinctrl-0 = <&cpsw_default>;
+-	pinctrl-1 = <&cpsw_sleep>;
+-
+-};
+-
+-&davinci_mdio {
+-	pinctrl-names = "default", "sleep";
+-	pinctrl-0 = <&davinci_mdio_default>;
+-	pinctrl-1 = <&davinci_mdio_sleep>;
+-};
++#include "am335x-bone-common.dtsi"
+diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
+new file mode 100644
+index 0000000..68d12aa
+--- /dev/null
++++ b/arch/arm/boot/dts/am335x-boneblack.dts
+@@ -0,0 +1,18 @@
++/*
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++
++#include "am33xx.dtsi"
++#include "am335x-bone-common.dtsi"
++
++&ldo3_reg {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-always-on;
++};
++
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130906/4826a3fa/attachment.sig>
+1.8.2.1
