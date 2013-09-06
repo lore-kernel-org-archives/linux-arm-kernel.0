@@ -1,49 +1,79 @@
-From: andre.przywara@linaro.org (Andre Przywara)
-Date: Fri, 06 Sep 2013 15:30:47 +0200
-Subject: [PROPOSAL] ARM/FDT: passing multiple binaries to a kernel
-In-Reply-To: <CAL_JsqKfcudKiTOr-MrHsq6NidG-5t5S0t08ELTSpOuc2LF4RQ@mail.gmail.com>
-References: <52260608.2030202@linaro.org>
- <CAL_JsqK9PjpScRO8561PhcyKkxhuL4pgMTCh2-UG_ubybJTcCw@mail.gmail.com>
- <5226F2B3.10606@linaro.org>
- <CAL_JsqKfcudKiTOr-MrHsq6NidG-5t5S0t08ELTSpOuc2LF4RQ@mail.gmail.com>
-Message-ID: <5229D907.7060902@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Sep 2013 15:09:21 +0100
+Subject: [PATCH v5 05/13] xen/arm,arm64: move Xen initialization earlier
+In-Reply-To: <1378457939.14745.73.camel@kazak.uk.xensource.com>
+References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
+ <1377801154-29215-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130905162026.GJ11887@arm.com>
+ <alpine.DEB.2.02.1309051755560.6397@kaball.uk.xensource.com>
+ <1378457939.14745.73.camel@kazak.uk.xensource.com>
+Message-ID: <20130906140921.GD1946@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2013 03:23 PM, Rob Herring wrote:
-> On Wed, Sep 4, 2013 at 3:43 AM, Andre Przywara
-> <andre.przywara@linaro.org> wrote:
->> On 09/04/2013 12:00 AM, Rob Herring wrote:
->>>
->>> On Tue, Sep 3, 2013 at 10:53 AM, Andre Przywara
->
->>> But surely there would be some advantage of reuse by using the
->>> multi-boot protocol since Xen, grub, and OS tools already support it
->>> for x86.
->>
->>
->> Yes, but that is x86 only and multiboot is it's nature quite architecture
->> specific. The current(?) multiboot v2 spec has no official ARM support (only
->> x86 and MIPS), so this would need to be "invented" first. While this is
->> technically easy, ARM software currently has no support for multiboot at
->> all: not in u-boot and not in Xen.
->> Multiboot support in Xen lives entirely in the x86 directory, and big parts
->> of it are even in assembly.
->
-> If so, I cannot find the assembly and most of it seems to be moved out
-> of x86 code now.
+On Fri, Sep 06, 2013 at 09:58:59AM +0100, Ian Campbell wrote:
+> On Thu, 2013-09-05 at 17:59 +0100, Stefano Stabellini wrote:
+> > On Thu, 5 Sep 2013, Catalin Marinas wrote:
+> > > On Thu, Aug 29, 2013 at 07:32:26PM +0100, Stefano Stabellini wrote:
+> > > > Move Xen initialization earlier, before any DMA requests can be made.
+> > > > 
+> > > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > 
+> > > I guess you should cc the corresponding maintainers here.
+> > 
+> > Thanks for the reminder, I'll do that.
+> > 
+> > 
+> > > >  arch/arm/include/asm/xen/hypervisor.h |    8 ++++++++
+> > > >  arch/arm/kernel/setup.c               |    2 ++
+> > > >  arch/arm/xen/enlighten.c              |   21 ++++++++++++++-------
+> > > >  arch/arm64/kernel/setup.c             |    2 ++
+> > > >  4 files changed, 26 insertions(+), 7 deletions(-)
+> > > 
+> > > [...]
+> > > 
+> > > > --- a/arch/arm64/kernel/setup.c
+> > > > +++ b/arch/arm64/kernel/setup.c
+> > > > @@ -53,6 +53,7 @@
+> > > >  #include <asm/traps.h>
+> > > >  #include <asm/memblock.h>
+> > > >  #include <asm/psci.h>
+> > > > +#include <asm/xen/hypervisor.h>
+> > > >  
+> > > >  unsigned int processor_id;
+> > > >  EXPORT_SYMBOL(processor_id);
+> > > > @@ -267,6 +268,7 @@ void __init setup_arch(char **cmdline_p)
+> > > >  	unflatten_device_tree();
+> > > >  
+> > > >  	psci_init();
+> > > > +	xen_early_init();
+> > > 
+> > > So Xen guests don't have any hope for single Image? Basically you set
+> > > dma_ops unconditionally in xen_early_init(), even if the kernel is not
+> > > intended to run under Xen.
+> > 
+> > That should not happen: if we are not running on Xen xen_early_init
+> > returns early, before calling xen_mm_init.
+> 
+> x96 has a call to init_hypervisor_platform() at approximately this
+> location, which detects and calls the init function for any of Xen, KVM,
+> hyperv and vmware.
 
-There is some code that relocates and maps the multiboot structure: in 
-files in the xen/arch/x86/boot directory, including head.S, reloc.c and 
-setup.c.
-That would need to be completely rewritten, not only because it deals 
-with multiboot v1, but also because it is scattered throughout the x86 
-setup code and the initial page setup is different from ARM.
+I would rather have a core_initcall(xen_early_init()) if possible,
+rather than hard-coded calls in setup_arch(). This early stuff is
+DT-driven, so in theory you don't need a specific xen call. The only
+thing is that you end up with swiotlb_init() and 64MB wasted if the Xen
+guest does not plan to use them.
 
-All these things are also done on ARM - but for the device tree already.
-Of course proper multiboot v2 support is doable - but please compare the 
-effort needed for this against this one:
-http://lists.xen.org/archives/html/xen-devel/2013-09/msg00359.html
+> I guess only Xen and KVM are currently relevant on Linux ARM(64), so
+> perhaps adding similar infrastructure on ARM would be overkill at this
+> point. I don't know if KVM needs such an early C-land hook, I suppose
+> it needs it even earlier so it can set up the hyp mode trampoline from
+> head.S?
 
-Regards,
-Andre.
+head.S installs a Hyp stub if it starts in that mode and then forget
+about. Later when KVM is initialised it installs its own code by doing
+an HVC call.
+
+-- 
+Catalin
