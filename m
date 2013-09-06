@@ -1,69 +1,45 @@
-From: mpfj-list@newflow.co.uk (Mark Jackson)
-Date: Fri, 06 Sep 2013 20:15:27 +0100
-Subject: [PATCH v2] ARM: EDMA: Fix clearing of unused list for DT DMA
- resources
-In-Reply-To: <522A2943.4060502@newflow.co.uk>
-References: <1377287613-16491-1-git-send-email-joelf@ti.com>
- <522A2943.4060502@newflow.co.uk>
-Message-ID: <522A29CF.2090001@newflow.co.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 06 Sep 2013 13:29:31 -0600
+Subject: [PATCH v5 1/5] ARM: add basic Trusted Foundations support
+In-Reply-To: <1378351680-14696-2-git-send-email-acourbot@nvidia.com>
+References: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
+ <1378351680-14696-2-git-send-email-acourbot@nvidia.com>
+Message-ID: <522A2D1B.3010508@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/13 20:13, Mark Jackson wrote:
-> On 23/08/13 20:53, Joel Fernandes wrote:
->> HWMOD removal for MMC and Crypto is breaking edma_start as the events are
->> being manually triggered due to unused channel list not being clear. Atleast
->> breakage has been seen on these peripherals, but it is expected Audio (McASP)
->> maybe breaking too.
->>
->> This patch fixes the issue, by reading the "dmas" property from the DT node if
->> it exists and clearing the bits in the unused channel list so that these channels
->> are not manually triggered.
->>
->> v2 changes:
->> Reduced indendation by returning from if block.
->>
->> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
->> Reported-by: Balaji T K <balajitk@ti.com>
->> Cc: Pantel Antoniou <panto@antoniou-consulting.com>
->> Signed-off-by: Joel Fernandes <joelf@ti.com>
->> ---
->> Note:
->> Patch should go in for -rc cycle as it fixes existing crypto drivers.
->>
->>  arch/arm/common/edma.c | 22 +++++++++++++++++++---
->>  1 file changed, 19 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
->> index 39ad030..3867e7e 100644
->> --- a/arch/arm/common/edma.c
->> +++ b/arch/arm/common/edma.c
->> @@ -560,14 +560,30 @@ static int reserve_contiguous_slots(int ctlr, unsigned int id,
->>  static int prepare_unused_channel_list(struct device *dev, void *data)
->>  {
->>  	struct platform_device *pdev = to_platform_device(dev);
->> -	int i, ctlr;
->> +	int i = 0, ctlr;
->> +	u32 dma_chan;
->> +	const __be32 *dma_chan_p;
->> +	struct property *prop;
->> +
->> +	if (dev->of_node) {
->> +		of_property_for_each_u32(dev->of_node, "dmas", prop,
->> +					 dma_chan_p, dma_chan) {
->> +			if (i++ & 1) {
->> +				ctlr = EDMA_CTLR(dma_chan);
->> +				clear_bit(EDMA_CHAN_SLOT(dma_chan),
->> +					  edma_cc[ctlr]->edma_unused);
->> +			}
->> +		}
->> +		return;
-> 
-> This should return something here, otherwise we get:-
-> 
-> arch/arm/common/edma.c: In function 'prepare_unused_channel_list':
-> arch/arm/common/edma.c:577:3: warning: 'return' with no value, in function returning non-void [-Wreturn-type]
+On 09/04/2013 09:27 PM, Alexandre Courbot wrote:
+> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+> can be invoked  using a consistent SMC-based API on all supported
+> platforms. This patch adds initial basic support for Trusted
+> Foundations using the ARM firmware API. Current features are limited
+> to the ability to boot secondary processors.
 
-Other than that I can confirm it fixes the issue for me ...
+> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+...
+> +void of_register_trusted_foundations(void)
+> +{
+> +	struct device_node *node;
+> +	struct trusted_foundations_platform_data pdata;
+> +	int err;
+> +
+> +	node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
+> +
+> +	if (!node)
+> +		return;
 
-Tested-by: Mark Jackson <mpfj@newflow.co.uk>
+If you're going to revise this patch for the comment below, then I would
+suggest removing the blank line before that if statement.
+
+> diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
+
+Do we need to add the following here:
+
+#if !IS_ENABLED(CONFIG_OF)
+static inline void register_trusted_foundations(...) {}
+#endif
+
+So that there is a dummy no-op function for the non-DT-support case? I
+guess Tegra always has CONFIG_OF enabled so that call from
+mach-tegra/common.c in patch 2 will never be an issue, but perhaps it
+might if anyone else uses this?
