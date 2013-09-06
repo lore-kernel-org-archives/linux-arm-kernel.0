@@ -1,65 +1,29 @@
-From: george.cherian@ti.com (George Cherian)
-Date: Fri, 6 Sep 2013 13:51:52 +0530
-Subject: [PATCH] arm: dts: am33xx: Add mmc nodes for am33xx platform
-Message-ID: <1378455712-17379-1-git-send-email-george.cherian@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Sep 2013 09:39:21 +0100
+Subject: [patch] iio: mxs-lradc: use helper functions to simplify the code
+In-Reply-To: <CAOMZO5BmeG3X+cyNcwg0B7hsaqTY5hxjfNiWbxMivinhcZZp7g@mail.gmail.com>
+References: <201309051216.18305.jbe@pengutronix.de>
+ <20130905181639.GA19090@elgon.mountain>
+ <CAOMZO5BmeG3X+cyNcwg0B7hsaqTY5hxjfNiWbxMivinhcZZp7g@mail.gmail.com>
+Message-ID: <20130906083920.GO6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add mmc nodes for am33xx platforms
+On Thu, Sep 05, 2013 at 05:15:02PM -0300, Fabio Estevam wrote:
+> Looks good, just one minor suggestion:
+> 
+> On Thu, Sep 5, 2013 at 3:16 PM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
+> > +static void lradc_reg_set(struct mxs_lradc *lradc, u32 val, size_t chan)
+> > +{
+> > +       writel(val, lradc->base + chan + STMP_OFFSET_REG_SET);
+> > +}
+> > +
+> > +static void lradc_reg_clear(struct mxs_lradc *lradc, u32 val, size_t chan)
+> > +{
+> > +       writel(val, lradc->base + chan + STMP_OFFSET_REG_CLR);
+> > +}
+> 
+> Maybe 'static inline' ?
 
-Signed-off-by: George Cherian <george.cherian@ti.com>
----
-Verified after applying [1] and [2]
-[1] - [PATCH v4 0/6] dma: edma: Support scatter-lists of any length - https://lkml.org/lkml/2013/8/29/466
-[2] - [PATCH v2] ARM: dts: add AM33XX EDMA support - https://lkml.org/lkml/2013/8/26/57
- arch/arm/boot/dts/am33xx.dtsi | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index b0badff..1df512d 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -236,6 +236,41 @@
- 			status = "disabled";
- 		};
- 
-+		mmc1: mmc at 48061000 {
-+			compatible = "ti,omap4-hsmmc";
-+			reg = <0x48060000 0x1000>;
-+			interrupts = <64>;
-+			ti,hwmods = "mmc1";
-+			ti,dual-volt;
-+			ti,needs-special-reset;
-+			ti,needs-special-hs-handling;
-+			dmas = <&edma 24
-+				&edma 25>;
-+			dma-names = "tx", "rx";
-+			status = "disabled";
-+		};
-+
-+		mmc2: mmc at 481d8000 {
-+			compatible = "ti,omap4-hsmmc";
-+			reg = <0x481d8000 0x1000>;
-+			interrupts = <28>;
-+			ti,hwmods = "mmc2";
-+			ti,needs-special-reset;
-+			dmas = <&edma 2
-+				&edma 3>;
-+			dma-names = "tx", "rx";
-+			status = "disabled";
-+		};
-+
-+		mmc3: mmc at 47810000 {
-+			compatible = "ti,omap4-hsmmc";
-+			reg = <0x47810000 0x1000>;
-+			interrupts = <29>;
-+			ti,hwmods = "mmc3";
-+			ti,needs-special-reset;
-+			status = "disabled";
-+		};
-+
- 		wdt2: wdt at 44e35000 {
- 			compatible = "ti,omap3-wdt";
- 			ti,hwmods = "wd_timer2";
--- 
-1.8.1.4
+GCC will already inline these if it thinks they're appropriate for that
+treatment.
