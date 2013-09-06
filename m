@@ -1,37 +1,57 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 6 Sep 2013 16:04:22 +0100
-Subject: [PATCH v5 12/13] swiotlb-xen: use
- xen_alloc/free_coherent_pages
-In-Reply-To: <20130906141754.GT2590@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
- <1377801154-29215-12-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130830135333.GL21239@phenom.dumpdata.com>
- <alpine.DEB.2.02.1309051743450.6397@kaball.uk.xensource.com>
- <20130906141754.GT2590@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1309061559080.6397@kaball.uk.xensource.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri,  6 Sep 2013 17:18:21 +0200
+Subject: [RFC PATCHv2 4/4] net: mvneta: add support for fixed links
+In-Reply-To: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1378480701-12908-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Sep 2013, Konrad Rzeszutek Wilk wrote:
-> On Thu, Sep 05, 2013 at 05:50:45PM +0100, Stefano Stabellini wrote:
-> > On Fri, 30 Aug 2013, Konrad Rzeszutek Wilk wrote:
-> > > On Thu, Aug 29, 2013 at 07:32:33PM +0100, Stefano Stabellini wrote:
-> > > > Use xen_alloc_coherent_pages and xen_free_coherent_pages to allocate or
-> > > > free coherent pages.
-> > > > 
-> > > > We need to be careful handling the pointer returned by
-> > > > xen_alloc_coherent_pages, because on ARM the pointer is not equal to
-> > > > phys_to_virt(*dma_handle). In fact virt_to_phys on the returned pointer
-> > > > doesn't return a valid physical address.
-> > > 
-> > > Why is it called 'virt_to_phys'? What does it return then?
-> > 
-> > virt_to_phys only works for kernel direct mapped RAM memory.
-> > In this case the virtual address could be an ioremap address, therefore
-> > passing it to virt_to_phys would give you another physical address that
-> > doesn't correspond to it.
-> 
-> Ah, so very much ARM (and in some way SPARC) specific. I think you need add some comments
-> in the code (And git commit) to explain this. Thank you.
+Following the introduction of of_phy_register_fixed_link(), this patch
+introduces fixed link support in the mvneta driver, for Marvell Armada
+370/XP SOCs.
 
-OK
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ .../devicetree/bindings/net/marvell-armada-370-neta.txt        |  4 ++--
+ drivers/net/ethernet/marvell/mvneta.c                          | 10 ++++++----
+ 2 files changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
+index 859a6fa..4d07d4e 100644
+--- a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
++++ b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
+@@ -4,8 +4,8 @@ Required properties:
+ - compatible: should be "marvell,armada-370-neta".
+ - reg: address and length of the register set for the device.
+ - interrupts: interrupt for the device
+-- phy: A phandle to a phy node defining the PHY address (as the reg
+-  property, a single integer).
++- phy: A phandle to the PHY node describing the PHY to which this
++  Ethernet controller is connected to.
+ - phy-mode: The interface between the SoC and the PHY (a string that
+   of_get_phy_mode() can understand)
+ - clocks: a pointer to the reference clock for this device.
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index b017818..6da1516 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -2711,10 +2711,12 @@ static int mvneta_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	phy_node = of_parse_phandle(dn, "phy", 0);
+-	if (!phy_node) {
+-		dev_err(&pdev->dev, "no associated PHY\n");
+-		err = -ENODEV;
+-		goto err_free_irq;
++	if (of_phy_is_fixed_link(phy_node)) {
++		err = of_phy_register_fixed_link(phy_node);
++		if (err < 0) {
++			dev_err(&pdev->dev, "cannot register fixed PHY\n");
++			goto err_free_irq;
++		}
+ 	}
+ 
+ 	phy_mode = of_get_phy_mode(dn);
+-- 
+1.8.1.2
