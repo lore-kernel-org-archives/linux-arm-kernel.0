@@ -1,37 +1,40 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 6 Sep 2013 14:58:25 +0200
-Subject: [PATCH 4/5] Staging/iio/adc/touchscreen/MXS: add interrupt driven
- touch detection
-In-Reply-To: <201309061430.50736.jbe@pengutronix.de>
-References: <1378462123-4830-1-git-send-email-jbe@pengutronix.de>
- <20130906122611.GT6329@mwanda> <201309061430.50736.jbe@pengutronix.de>
-Message-ID: <201309061458.25841.marex@denx.de>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Fri, 06 Sep 2013 15:36:10 +0200
+Subject: [GIT PULL 1/2] DaVinci SoC updates for v3.12
+In-Reply-To: <5229A405.3090409@ti.com>
+References: <52151BA6.2060109@ti.com> <87ppt5r1t4.fsf@linaro.org>
+ <52291BCD.7030106@ahsoftware.de> <5229A405.3090409@ti.com>
+Message-ID: <5229DA4A.30205@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear J?rgen Beisert,
+Am 06.09.2013 11:44, schrieb Sekhar Nori:
+> Hi Alexander,
+>> Just a warning, I've tried the patch series for the serial on top of
+>> 3.11 and the patch
+>>
+>> ARM: davinci: serial: get rid of davinci_uart_config
+>>
+>> doesn't even compile here.
+>>
+>> The culprit is a misplaced
+>>
+>> #include <linux/platform_device.h>
+>>
+>> in arch/arm/mach-davinci/include/mach/serial.h
+>
+> I need more information on how to reproduce the issue. This pull request
+> was based on v3.11-rc2 and I had verified the build before posting. I
+> just verified build on linux-next master too. All builds were verified
+> using davinci_all_defconfig and da8xx_omapl_defconfig.
+>
+> Can you please send the error log? Your .config against latest
+> linux-next/master will also help.
+>
 
-> On Friday 06 September 2013 14:26:11 Dan Carpenter wrote:
-> > On Fri, Sep 06, 2013 at 12:08:42PM +0200, Juergen Beisert wrote:
-> > > +static int mxs_lradc_read_ts_channel(struct mxs_lradc *lradc)
-> > > +{
-> > > +	u32 reg;
-> > > +	int val;
-> > > +
-> > > +	reg = readl(lradc->base + LRADC_CTRL1);
-> > > +
-> > > +	/* only channels 3 to 5 are of interest here */
-> > > +	if (reg & LRADC_CTRL1_LRADC_IRQ(TS_CH_YP)) {
-> > > +		pr_devel("!3");
-> > 
-> > Gar.  I meant to comment on this the first time this patch was sent.
-> > 
-> > Please remove the pr_devel() calls.  They are nonsense.
-> 
-> They are very helpful for development to monitor the statemachine... :) But
-> you are right, I will remove them.
+Just enable earlyprintk (DEBUG_LL) so that an assembler file (in this 
+case debug.S) will include that broken serial.h.
 
-You can put them into a separate patch which can be NAK'd separatelly :)
+Regards,
 
-Best regards,
-Marek Vasut
+Alexander Holler
