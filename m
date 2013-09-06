@@ -1,63 +1,51 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Fri, 6 Sep 2013 15:55:38 -0500
-Subject: [PATCH] ARM: msm: Remove irqs-*.h files for DT based targets
-In-Reply-To: <1378499517-24014-1-git-send-email-sboyd@codeaurora.org>
-References: <20130906195300.GJ808@joshc.qualcomm.com>
- <1378499517-24014-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130906205538.GK808@joshc.qualcomm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 06 Sep 2013 14:17:08 -0700
+Subject: [PATCH] clk: only call get_parent if there is one
+In-Reply-To: <52288824.1060905@linaro.org>
+References: <52288824.1060905@linaro.org>
+Message-ID: <20130906211708.10934.58897@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 06, 2013 at 01:31:57PM -0700, Stephen Boyd wrote:
-> We don't want or need the irqs.h files from the DT based MSM
-> targets. Remove these header files and select sparse irq so that
-> we don't try to include the mach/irqs.h file.
+Quoting Alex Elder (2013-09-05 06:33:24)
+> In __clk_init(), after a clock is mostly initialized, a scan is done
+> of the orphan clocks to see if the clock being registered is the
+> parent of any of them.
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> This code assumes that any clock that provides a get_parent method
+> actually has at least one parent, and that's not a valid assumption.
+> 
+> As a result, an orphan clock with no parent can return *something*
+> as the parent index, and that value is blindly used to dereference
+> the orphan's parent_names[] array (which will be ZERO_SIZE_PTR or
+> NULL).
+> 
+> Fix this by ensuring get_parent is only called for orphans with at
+> least one parent.
+> 
+> Signed-off-by: Alex Elder <elder@linaro.org>
+
+Thanks for the fix Alex. I'll take this in towards 3.13.
+
+Regards,
+Mike
+
 > ---
+>  drivers/clk/clk.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> On 09/06, Josh Cartwright wrote:
-> > 
-> > Selecting _only_ ARCH_MSM8974 with these changes breaks the build with:
-> 
-> I've been meaning to fix this. Perhaps you can use this patch as a base
-> and then push the SPARSE_IRQ selection into the DT config?
-
-Sounds sane to me.  AFAICT, we didn't yet have any users of these
-defines upstream.  Using SPARSE_IRQ puts on the path of multiplatform
-support anyway.
-
-FWIW, I tested this by applying this change under Rohit's and squashing
-the following with patch 1/2:
-
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index fe35acf..f4a0aaa 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -50,7 +50,6 @@ config ARCH_MSM8X60
- 	select HAVE_SMP
- 	select MSM_SCM if SMP
- 	select USE_OF
--	select SPARSE_IRQ
- 
- config ARCH_MSM8960
- 	bool "MSM8960"
-@@ -60,7 +59,6 @@ config ARCH_MSM8960
- 	select GPIO_MSM_V2
- 	select MSM_SCM if SMP
- 	select USE_OF
--	select SPARSE_IRQ
- 
- config ARCH_MSM8974
- 	bool "MSM8974"
-@@ -74,6 +72,7 @@ config ARCH_MSM8974
- config ARCH_MSM_DT
- 	def_bool y
- 	depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_MSM8974)
-+	select SPARSE_IRQ
- 
- config MSM_HAS_DEBUG_UART_HS
- 	bool
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 54a191c..ea8ff15 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1628,7 +1628,7 @@ int __clk_init(struct device *dev, struct clk *clk)
+>          * this clock
+>          */
+>         hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
+> -               if (orphan->ops->get_parent) {
+> +               if (orphan->num_parents && orphan->ops->get_parent) {
+>                         i = orphan->ops->get_parent(orphan->hw);
+>                         if (!strcmp(clk->name, orphan->parent_names[i]))
+>                                 __clk_reparent(orphan, clk);
+> -- 
+> 1.7.9.5
