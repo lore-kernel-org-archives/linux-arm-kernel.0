@@ -1,90 +1,61 @@
-From: yi.li@linaro.org (Yi Li)
-Date: Sat,  7 Sep 2013 00:02:51 +0800
-Subject: [PATCH] ARM:DMI: Add dmi driver support on arm
-In-Reply-To: <1378483371-19858-1-git-send-email-yi.li@linaro.org>
-References: <1378483371-19858-1-git-send-email-yi.li@linaro.org>
-Message-ID: <1378483371-19858-2-git-send-email-yi.li@linaro.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 6 Sep 2013 17:09:52 +0100
+Subject: [PATCH v5 11/13] xen: introduce xen_alloc/free_coherent_pages
+In-Reply-To: <20130906155928.GH1946@arm.com>
+References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
+ <1377801154-29215-11-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130905160905.GI11887@arm.com>
+ <alpine.DEB.2.02.1309051742390.6397@kaball.uk.xensource.com>
+ <20130906141444.GE1946@arm.com>
+ <alpine.DEB.2.02.1309061554260.6397@kaball.uk.xensource.com>
+ <20130906155928.GH1946@arm.com>
+Message-ID: <alpine.DEB.2.02.1309061706480.6397@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: liyi <yi.li@linaro.org>
+On Fri, 6 Sep 2013, Catalin Marinas wrote:
+> On Fri, Sep 06, 2013 at 03:59:02PM +0100, Stefano Stabellini wrote:
+> > On Fri, 6 Sep 2013, Catalin Marinas wrote:
+> > > On Thu, Sep 05, 2013 at 05:43:33PM +0100, Stefano Stabellini wrote:
+> > > > On Thu, 5 Sep 2013, Catalin Marinas wrote:
+> > > > > On Thu, Aug 29, 2013 at 07:32:32PM +0100, Stefano Stabellini wrote:
+> > > > > > xen_swiotlb_alloc_coherent needs to allocate a coherent buffer for cpu
+> > > > > > and devices. On native x86 and ARMv8 is sufficient to call
+> > > > > > __get_free_pages in order to get a coherent buffer, while on ARM we need
+> > > > > > to call arm_dma_ops.alloc.
+> > > > > 
+> > > > > Don't bet on this for ARMv8. It's not mandated for the architecture, so
+> > > > > at some point some SoC will require non-cacheable buffers for coherency.
+> > > > 
+> > > > I see.
+> > > > Would it be better if I implemented xen_alloc_coherent_pages on armv8 by
+> > > > calling arm64_swiotlb_dma_ops.alloc?
+> > > 
+> > > What does this buffer do exactly? Is it allocated by guests?
+> > 
+> > It is allocated by Dom0 to do DMA to/from a device.
+> > It is the buffer that is going to be returned by dma_map_ops.alloc to
+> > the caller:
+> > 
+> > On x86:
+> > dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> __get_free_pages
+> > 
+> > On ARM:
+> > dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> arm_dma_ops.alloc
+> > 
+> > On ARM64
+> > dma_map_ops.alloc -> xen_swiotlb_alloc_coherent -> xen_alloc_coherent_pages -> ????
+> 
+> OK, I'm getting more confused. Do all the above calls happen in the
+> guest, Dom0, or a mix?
 
-Add dmi driver support on arm, it depends on efi runtime service
-enabled.
+I guess the confusion comes from a difference in terminology: dom0 is a
+guest like the others, just a bit more privileged. We usually call domU
+a normal unprivileged guest.
 
-Signed-off-by: liyi <yi.li@linaro.org>
----
- arch/arm/Kconfig           |    9 +++++++++
- arch/arm/include/asm/dmi.h |   12 ++++++++++++
- arch/arm/kernel/setup.c    |    7 ++++++-
- 3 files changed, 27 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/include/asm/dmi.h
+The above calls would happen in Dom0 (when an SMMU is not available).
+They could also happen in a DomU if we assign a physical device to it
+(and an SMMU is not available).
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e8daccd..02abb1d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1946,6 +1946,15 @@ config EFI_STUB
- 	  executed directly by EFI firmware.
- 	  See Documentation/efi-stub.txt for more information.
- 
-+config DMI
-+	default y
-+	bool "Enable DMI scanning" if EXPERT
-+	---help---
-+	  Enabled scanning of DMI to identify machine quirks. Say Y
-+	  here unless you have verified that your setup is not
-+	  affected by entries in the DMI blacklist. Required by EFI
-+	  support.
-+
- config SECCOMP
- 	bool
- 	prompt "Enable seccomp to safely compute untrusted bytecode"
-diff --git a/arch/arm/include/asm/dmi.h b/arch/arm/include/asm/dmi.h
-new file mode 100644
-index 0000000..84baf0e
---- /dev/null
-+++ b/arch/arm/include/asm/dmi.h
-@@ -0,0 +1,12 @@
-+#ifndef _ASM_DMI_H
-+#define _ASM_DMI_H 1
-+
-+#include <linux/slab.h>
-+#include <asm/io.h>
-+#include <asm/mach/map.h>
-+/* Use normal IO mappings for DMI */
-+#define dmi_ioremap(x, l) __arm_ioremap((x), (l), MT_MEMORY)
-+#define dmi_iounmap(x, l) __arm_iounmap((x))
-+#define dmi_alloc(l) kmalloc(l, GFP_ATOMIC)
-+
-+#endif
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index a440211..2194554 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -34,13 +34,15 @@
- #ifdef CONFIG_ACPI
- #include <linux/acpi.h>
- #endif
-+#ifdef CONFIG_DMI
-+#include <linux/dmi.h>
-+#endif
- 
- #include <asm/unified.h>
- #include <asm/cp15.h>
- #include <asm/cpu.h>
- #include <asm/cputype.h>
- #include <asm/elf.h>
--#include <asm/io.h>
- #include <asm/procinfo.h>
- #include <asm/psci.h>
- #include <asm/sections.h>
-@@ -1073,3 +1075,6 @@ const struct seq_operations cpuinfo_op = {
- 	.stop	= c_stop,
- 	.show	= c_show
- };
-+#ifdef CONFIG_DMI
-+	core_initcall(dmi_scan_machine);
-+#endif
--- 
-1.7.9.5
+So in general they would happen in any guest that needs to program a
+real device.
