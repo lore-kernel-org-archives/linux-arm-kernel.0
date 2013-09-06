@@ -1,63 +1,34 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Fri, 6 Sep 2013 16:08:27 +0800
-Subject: [PATCHv3 4/4] Documentation: Add device tree bindings for Freescale
- FTM PWM.
-In-Reply-To: <1378454907-22728-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1378454907-22728-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1378454907-22728-5-git-send-email-Li.Xiubo@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Sep 2013 09:07:05 +0100
+Subject: kmalloc memory slower than malloc
+In-Reply-To: <alpine.DEB.2.02.1309060811400.1299@kelly.ryd.net>
+References: <alpine.DEB.2.02.1309060811400.1299@kelly.ryd.net>
+Message-ID: <20130906080705.GN6617@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the Document for Freescale FTM PWM driver under
-Documentation/devicetree/bindings/pwm/.
+On Fri, Sep 06, 2013 at 09:48:02AM +0200, Thommy Jakobsson wrote:
+> Hi,
+> 
+> doing a project where I use DMA and a DMA-capable buffer in a driver. This 
+> buffer is then mmap:ed to userspace, the driver notice userspace 
+> that the device has filled the buffer. Pretty standard setup I think.
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
----
- .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 36 ++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+Your driver appears to be exposing physical addresses to userspace.
+This is a no-go.  This is a massive security hole - it allows userspace
+to map any physical address and write into that memory.  That includes
+system flash and all system RAM.
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-new file mode 100644
-index 0000000..e736806
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-@@ -0,0 +1,36 @@
-+Freescale FTM PWM controller
-+
-+Required properties:
-+- compatible: Should be "fsl,vf610-ftm-pwm"
-+- reg: Physical base address and length of the controller's registers
-+- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-+  the cells format.
-+- clock-names : Includes the following module clock source entries:
-+    "ftm0" (system clock),
-+    "ftm0_fix_sel" (fixed frequency clock),
-+    "ftm0_ext_sel" (external clock)
-+- clocks : Must contain an entry list for entries in clock-names.
-+- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be one of the
-+  entries in clock-names.
-+- For each channel's pinctrl, the "chN-active" and "chN-idle" states should be
-+  implemented at the same time.
-+
-+Example:
-+
-+pwm0: pwm at 40038000 {
-+		compatible = "fsl,vf610-ftm-pwm";
-+		reg = <0x40038000 0x1000>;
-+		#pwm-cells = <3>;
-+		clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
-+		clocks = <&clks VF610_CLK_FTM0>,
-+			<&clks VF610_CLK_FTM0_FIX_SEL>,
-+			<&clks VF610_CLK_FTM0_EXT_SEL>;
-+		pinctrl-names = "ch0-active", "ch0-idle", "ch1-active", "ch1-idle",
-+		....;
-+		pinctrl-0 = <&pinctrl_pwm0_ch0_active>;
-+		pinctrl-1 = <&pinctrl_pwm0_ch0_idle>;
-+		pinctrl-2 = <&pinctrl_pwm0_ch1_active>;
-+		pinctrl-3 = <&pinctrl_pwm0_ch1_idle>;
-+		...
-+		fsl,pwm-counter-clk = "ftm0_ext_sel";
-+};
--- 
-1.8.0
+This gives userspace a way to overwrite the kernel with exploits,
+retrieve sensitive and/or personal data, etc.
+
+Therefore, I will not provide any assistance with this.  Please change
+your approach so you do not need physical addresses in userspace.
+
+I know that some closed source libraries, particularly GPU and video
+decode libraries like to take this approach.  Everyone should be aware
+that such approaches bypass all system security, especially if the GPU
+or video device is accessible to any userspace process.
+
+In your case, your device driver special device node just has to be
+accessible to any userspace process.
