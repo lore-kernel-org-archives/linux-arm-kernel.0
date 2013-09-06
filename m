@@ -1,140 +1,65 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  6 Sep 2013 17:18:20 +0200
-Subject: [RFC PATCHv2 3/4] of: provide a binding for fixed link PHYs
-In-Reply-To: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1378480701-12908-4-git-send-email-thomas.petazzoni@free-electrons.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 06 Sep 2013 17:32:43 +0200
+Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
+In-Reply-To: <CACRpkdavR=fv+y1RCNfdgQypPuRbO6isOSwGsABDrYiGeMdyZw@mail.gmail.com>
+References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
+ <344239800.bDEkDg48ZQ@avalon>
+ <CACRpkdavR=fv+y1RCNfdgQypPuRbO6isOSwGsABDrYiGeMdyZw@mail.gmail.com>
+Message-ID: <2966898.neCKEkcf1e@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Ethernet MACs have a "fixed link", and are not connected to a
-normal MDIO-managed PHY device. For those situations, a Device Tree
-binding allows to describe a "fixed link" using a special PHY node.
+Hi Linus,
 
-This patch adds:
+Sorry for the late reply.
 
- * A documentation for the fixed PHY Device Tree binding.
+On Thursday 22 August 2013 00:02:39 Linus Walleij wrote:
+> On Tue, Aug 20, 2013 at 12:04 AM, Laurent Pinchart wrote:
+> > On Wednesday 31 July 2013 01:44:53 Linus Walleij wrote:
+> >> I don't see how sharing works here, or how another user, i.e. another one
+> >> than the user wanting to recieve the IRQ, can validly request such a
+> >> line? What would the usecase for that valid request be?
+> > 
+> > When the GPIO is wired to a status signal (such as an MMC card detect
+> > signal) the driver might want to read the state of the signal
+> > independently of the interrupt handler.
+> 
+> That is true. But for such a complex usecase I think it's reasonable that
+> we only specify the GPIO in the device tree, and the driver utilizing the
+> IRQ need to take that and perform gpio_to_irq() on it, and then it still
+> works to use it both ways.
 
- * An of_phy_is_fixed_link() function that an Ethernet driver can call
-   on its PHY phandle to find out whether it's a fixed link PHY or
-   not. It should typically be used to know if
-   of_phy_register_fixed_link() should be called.
+I'm pretty sure I would have had an objection a couple of weeks ago when I was 
+looking into this, but I can't think of another use case for now, so I agree 
+with you.
 
- * An of_phy_register_fixed_link() function that instantiates the
-   fixed PHY into the PHY subsystem, so that when the driver calls
-   of_phy_connect(), the PHY device associated to the OF node will be
-   found.
+> >> Basically I believe these two things need to be exclusive in the DT
+> >> world:
+> >> 
+> >> A: request_irq(a resource passed from "interrupts");
+> >>      -> core implicitly performs gpio_request()
+> >>          gpio_direction_input()
+> >> 
+> >> B: gpio_request(a resource passed from "gpios");
+> >>      gpio_direction_input()
+> >>      request_irq(gpio_to_irq())
+> >> 
+> >> Never both. And IIUC that was what happened in the OMAP case.
+> > 
+> > Isn't the core issue that we can translate a GPIO number to an IRQ number,
+> > but not the other way around ? If that could be done, we could request
+> > the GPIO and configure it as an input when the IRQ is requested.
+> 
+> That is true. It would be easier if all GPIO drivers has an irqchip and
+> and irqdomain, then we could implement irq_to_gpio() properly in gpiolib
+> and this would not be a problem. Alas, not all do.
+> 
+> But I also think that the DT contains (as demonstrated by the patch)
+> all information about what interrupts and GPIOs may conflict, so I
+> also see this as something of a consistency check, but it could go
+> in either way.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- .../devicetree/bindings/net/fixed-link.txt         | 34 ++++++++++++++++++++++
- drivers/of/of_mdio.c                               | 24 +++++++++++++++
- include/linux/of_mdio.h                            | 15 ++++++++++
- 3 files changed, 73 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/fixed-link.txt
-
-diff --git a/Documentation/devicetree/bindings/net/fixed-link.txt b/Documentation/devicetree/bindings/net/fixed-link.txt
-new file mode 100644
-index 0000000..9f2a1a50
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/fixed-link.txt
-@@ -0,0 +1,34 @@
-+Fixed link Device Tree binding
-+------------------------------
-+
-+Some Ethernet MACs have a "fixed link", and are not connected to a
-+normal MDIO-managed PHY device. For those situations, a Device Tree
-+binding allows to describe a "fixed link".
-+
-+Such a fixed link situation is described by creating a PHY node as a
-+sub-node of an Ethernet device, with the following properties:
-+
-+* 'fixed-link' (boolean, mandatory), to indicate that this PHY is a
-+  fixed link PHY.
-+* 'speed' (integer, mandatory), to indicate the link speed. Accepted
-+  values are 10, 100 and 1000
-+* 'full-duplex' (boolean, optional), to indicate that full duplex is
-+  used. When absent, half duplex is assumed.
-+* 'pause' (boolean, optional), to indicate that pause should be
-+  enabled.
-+* 'asym-pause' (boolean, optional), to indicate that asym_pause should
-+  be enabled.
-+
-+Example:
-+
-+ethernet at 0 {
-+	...
-+	phy = <&phy0>;
-+	phy0: phy at 0 {
-+	      fixed-link;
-+	      speed = <1000>;
-+	      full-duplex;
-+	};
-+	...
-+};
-+
-diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
-index d5a57a9..0507f8f 100644
---- a/drivers/of/of_mdio.c
-+++ b/drivers/of/of_mdio.c
-@@ -14,6 +14,7 @@
- #include <linux/netdevice.h>
- #include <linux/err.h>
- #include <linux/phy.h>
-+#include <linux/phy_fixed.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
- #include <linux/of_mdio.h>
-@@ -247,3 +248,26 @@ struct phy_device *of_phy_connect_fixed_link(struct net_device *dev,
- 	return IS_ERR(phy) ? NULL : phy;
- }
- EXPORT_SYMBOL(of_phy_connect_fixed_link);
-+
-+#if defined(CONFIG_FIXED_PHY)
-+bool of_phy_is_fixed_link(struct device_node *np)
-+{
-+	return of_property_read_bool(np, "fixed-link");
-+}
-+EXPORT_SYMBOL(of_phy_is_fixed_link);
-+
-+int of_phy_register_fixed_link(struct device_node *np)
-+{
-+	struct fixed_phy_status status = {};
-+
-+	status.link = 1;
-+	status.duplex = of_property_read_bool(np, "full-duplex");
-+	if (of_property_read_u32(np, "speed", &status.speed))
-+		return -EINVAL;
-+	status.pause = of_property_read_bool(np, "pause");
-+	status.asym_pause = of_property_read_bool(np, "asym-pause");
-+
-+	return fixed_phy_register(PHY_POLL, &status, np);
-+}
-+EXPORT_SYMBOL(of_phy_register_fixed_link);
-+#endif
-diff --git a/include/linux/of_mdio.h b/include/linux/of_mdio.h
-index 8163107..2f535ee 100644
---- a/include/linux/of_mdio.h
-+++ b/include/linux/of_mdio.h
-@@ -57,4 +57,19 @@ static inline struct mii_bus *of_mdio_find_bus(struct device_node *mdio_np)
- }
- #endif /* CONFIG_OF */
- 
-+#if defined(CONFIG_OF) && defined(CONFIG_FIXED_PHY)
-+extern int of_phy_register_fixed_link(struct device_node *np);
-+extern bool of_phy_is_fixed_link(struct device_node *np);
-+#else
-+static inline int of_phy_register_fixed_link(struct device_node *np)
-+{
-+	return -ENOSYS;
-+}
-+static inline bool of_phy_is_fixed_link(struct device_node *np)
-+{
-+	return false;
-+}
-+#endif
-+
-+
- #endif /* __LINUX_OF_MDIO_H */
 -- 
-1.8.1.2
+Regards,
+
+Laurent Pinchart
