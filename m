@@ -1,85 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 7 Sep 2013 12:27:26 +0200
-Subject: [RFC PATCHv2 0/4] Add DT support for fixed PHYs
-In-Reply-To: <2916397.Vz9aZYzLyb@lenovo>
-References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <2916397.Vz9aZYzLyb@lenovo>
-Message-ID: <20130907122726.1af7c331@skate>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Sat, 7 Sep 2013 12:45:12 +0200
+Subject: Inte IOP Xscale updates
+In-Reply-To: <20130903134516.GH6617@n2100.arm.linux.org.uk>
+References: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
+ <20130903134516.GH6617@n2100.arm.linux.org.uk>
+Message-ID: <21035.952.938696.169280@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Florian Fainelli,
+Russell King - ARM Linux writes:
+ > On Tue, Sep 03, 2013 at 02:01:45PM +0200, Linus Walleij wrote:
+ > > Hi XScale folks,
+ > > 
+ > > I haven't really seen any functional patches or confirmation that the
+ > > XScale machines in arch/arm/iop* are even booting since 2010 or
+ > > so.
+ > > 
+ > > Can you confirm that you boot-test these machines regularly?
+ > > 
+ > > I am worried that we maintain code that is not used or even working
+ > > see.
+ > > 
+ > > What are your thought about multiplatform and device tree? I am
+ > > pretty certain that if the iop machines were converted to device tree
+ > > we could collapse these machines into one directory with few files,
+ > > but I may be wrong.
+ > 
+ > Just because code doesn't get touched doesn't mean it doesn't work.  In
+ > some cases, that means that the code has reached stability.
+ > 
+ > The IOP platforms are in regular use.  IOP platforms include such
+ > things as TheCUS machines such as the N2100 and others.  The two N2100s
+ > I have here run 3.1.8 and 3.9.5.
 
-On Fri, 06 Sep 2013 21:42:42 +0100, Florian Fainelli wrote:
+I just booted 3.9, 3.10, and 3.11 on my N2100, without problems.
 
-> > Here is a second version of the patch set that adds a Device Tree
-> > binding and the related code to support fixed PHYs. Marked as RFC,
-> > this patch set is obviously not intended for merging in 3.12.
-> 
-> Thanks a lot for continuing on this work, I really like the state of it now.
+Compared to the Kirkwood Qnaps the N2100 is quite slow and noisy,
+so I haven't actually used mine in years.
 
-Thanks for your feedback.
-
-> > Since the first version, the changes have been:
-> > 
-> >  * Instead of using a 'fixed-link' property inside the Ethernet device
-> >    DT node, with a fairly cryptic succession of integer values, we now
-> >    use a PHY subnode under the Ethernet device DT node, with explicit
-> >    properties to configure the duplex, speed, pause and other PHY
-> >    properties.
-> > 
-> >  * The PHY address is automatically allocated by the kernel and no
-> >    longer visible in the Device Tree binding.
-> > 
-> >  * The PHY device is created directly when the network driver calls
-> >    of_phy_connect_fixed_link(), and associated to the PHY DT node,
-> >    which allows the existing of_phy_connect() function to work,
-> >    without the need to use the deprecated of_phy_connect_fixed_link().
-> > 
-> > The things I am not entirely happy with yet are:
-> > 
-> >  * The PHY ID is hardcoded to 0xdeadbeef. Ideally, it should be a
-> >    properly reserved vendor/device identifier, but it isn't clear how
-> >    to get one allocated for this purpose.
-> 
-> Right, we should try to get something better, but we obviously cannot use an 
-> already allocated OUI for this. Can we ask the Linux foundation or a Linux-
-> friendly company to allocate one maybe?
-
-According to http://standards.ieee.org/develop/regauth/oui/oui.txt, the
-Linux Foundation doesn't seem to own any OUI. Should we simply be
-contacting some random companies in this list?
-
-> >  * The fixed_phy_register() function in drivers/net/phy/fixed.c has
-> >    some OF references. So ideally, I would have preferred to put this
-> >    code in drivers/of/of_mdio.c, but to call get_phy_device(), we need
-> >    a reference to the mii_bus structure that represents the fixed MDIO
-> >    bus.
-> 
-> This is not a big deal, not everything in drivers/ is consistent with this, 
-> and making the fixed MDIO bus globally accessible does not sound too great.
-
-Indeed.
-
-> >  * There is some error management missing in fixed_phy_register(), but
-> >    it can certainly be added easily. This RFC is meant to sort out the
-> >    general idea.
-> 
-> Do you think you could add these to got beyond the RFC state? The patchset as 
-> it currently is fine with me if you can address these.
-
-Sure, it shouldn't be too difficult.
-
-In the mean time, I'm interested in hearing comments from other people,
-especially from the Device Tree bindings maintainers: while the
-internal implementation details can always be fixed later on, the DT
-binding should obviously get an approval from the DT maintainers.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+As long as they doesn't cause any maintenance problems I think we
+should just leave the IOP platforms as-is.
