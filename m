@@ -1,40 +1,67 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 7 Sep 2013 07:56:26 +0200
-Subject: crypto/xor.ko fails to build with CONFIG_KERNEL_MODE_NEON=y
-In-Reply-To: <CA+5PVA6iUcY+DCh51R_uwxZ1BOGrS-8-OfaFTF6Bwz9JFDVcUQ@mail.gmail.com>
-References: <CA+5PVA6iUcY+DCh51R_uwxZ1BOGrS-8-OfaFTF6Bwz9JFDVcUQ@mail.gmail.com>
-Message-ID: <645D2350-5007-4EFF-AFFD-8D51BA006292@linaro.org>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Sat,  7 Sep 2013 09:07:13 +0200
+Subject: [PATCH] ARM: davinci: remove deprecated IRQF_DISABLED
+Message-ID: <1378537633-7232-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch proposes to remove the IRQF_DISABLED flag from Davinci code ;)
+It's a NOOP since 2.6.35, and will be removed one day
 
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ arch/arm/mach-davinci/board-da830-evm.c     | 2 +-
+ arch/arm/mach-davinci/board-omapl138-hawk.c | 2 +-
+ arch/arm/mach-davinci/time.c                | 4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-On 7 sep. 2013, at 04:44, Josh Boyer <jwboyer@fedoraproject.org> wrote:
-
-> We enabled CONFIG_KERNEL_MODE_NEON on the armv7hl builds we're doing.
-> It builds for a while, but eventually fails when running modpost on
-> the xor.ko module:
-> 
-> ERROR: "xor_block_neon_inner" [crypto/xor.ko] undefined!
-> make[1]: *** [__modpost] Error 1
-> make: *** [modules] Error 2
-> 
-
-Clearly a bug, thanks for spotting this. I will submit a fix asap. In the mean time, building the xor code into the zImage will help you complete the build.
-
-> I tried adding an EXPORT_SYMBOL_GPL(xor_block_neon_inner); after the
-> structure definition in arch/arm/lib/xor-neon.c but that doesn't seem
-> to have done anything.
-> 
-
-I would expected that to have done the trick, but perhaps it is better to merge the neon code into the main arm/xor source file.
-
-> Before I go chasing this further, I'm curious if anyone else has run into this.
-> 
-
-Cheers,
-Ard.
-
-
-
-> josh
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index 1332de8..3aeae57 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -74,7 +74,7 @@ static int da830_evm_usb_ocic_notify(da8xx_ocic_handler_t handler)
+ 	if (handler != NULL) {
+ 		da830_evm_usb_ocic_handler = handler;
+ 
+-		error = request_irq(irq, da830_evm_usb_ocic_irq, IRQF_DISABLED |
++		error = request_irq(irq, da830_evm_usb_ocic_irq,
+ 				    IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+ 				    "OHCI over-current indicator", NULL);
+ 		if (error)
+diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+index b8c20de..b635012 100644
+--- a/arch/arm/mach-davinci/board-omapl138-hawk.c
++++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+@@ -211,7 +211,7 @@ static int hawk_usb_ocic_notify(da8xx_ocic_handler_t handler)
+ 		hawk_usb_ocic_handler = handler;
+ 
+ 		error = request_irq(irq, omapl138_hawk_usb_ocic_irq,
+-					IRQF_DISABLED | IRQF_TRIGGER_RISING |
++					IRQF_TRIGGER_RISING |
+ 					IRQF_TRIGGER_FALLING,
+ 					"OHCI over-current indicator", NULL);
+ 		if (error)
+diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
+index 7a55b5c..e7ada0c 100644
+--- a/arch/arm/mach-davinci/time.c
++++ b/arch/arm/mach-davinci/time.c
+@@ -181,7 +181,7 @@ static struct timer_s timers[] = {
+ 		.name      = "clockevent",
+ 		.opts      = TIMER_OPTS_DISABLED,
+ 		.irqaction = {
+-			.flags   = IRQF_DISABLED | IRQF_TIMER,
++			.flags   = IRQF_TIMER,
+ 			.handler = timer_interrupt,
+ 		}
+ 	},
+@@ -190,7 +190,7 @@ static struct timer_s timers[] = {
+ 		.period     = ~0,
+ 		.opts       = TIMER_OPTS_PERIODIC,
+ 		.irqaction = {
+-			.flags   = IRQF_DISABLED | IRQF_TIMER,
++			.flags   = IRQF_TIMER,
+ 			.handler = freerun_interrupt,
+ 		}
+ 	},
+-- 
+1.8.1.2
