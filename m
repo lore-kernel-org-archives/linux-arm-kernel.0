@@ -1,109 +1,306 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 7 Sep 2013 18:21:25 +0200
-Subject: [RFC 0/4] Create infrastructure for running C code from SRAM.
-In-Reply-To: <CA+Bv8XbbWoBgrv83RmXLiO8AM0TDP9wNQMUFJKMbN82-0w3Scg@mail.gmail.com>
-References: <1378226665-27090-1-git-send-email-Russ.Dill@ti.com>
- <20130906111221.GH25647@n2100.arm.linux.org.uk>
- <CA+Bv8XbbWoBgrv83RmXLiO8AM0TDP9wNQMUFJKMbN82-0w3Scg@mail.gmail.com>
-Message-ID: <CAKv+Gu-eaS9djmz0d5hzY=jkVb-aPZWrLCUOr8wNb6fWoNpMiA@mail.gmail.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sun, 08 Sep 2013 00:55:21 +0200
+Subject: [PATCH 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <1378488201-21146-1-git-send-email-pawel.moll@arm.com>
+References: <1378488201-21146-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <522BAED9.4020301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 September 2013 21:32, Russ Dill <Russ.Dill@ti.com> wrote:
-> On Fri, Sep 6, 2013 at 4:12 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Tue, Sep 03, 2013 at 09:44:21AM -0700, Russ Dill wrote:
->>> SRAM handling code is in the process of being moved from arch directories
->>> into drivers/misc/sram.c using device tree and genalloc [1] [2]. This RFC
->>> patchset builds on that, including the limitation that the SRAM address is
->>> not known at compile time. Because the SRAM address is not known at compile
->>> time, the code that runs from SRAM must be compiled with -fPIC. Even if
->>> the code were loaded to a fixed virtual address, portions of the code must
->>> often be run with the MMU disabled.
->>
->> What are you doing about the various gcc utility functions that may be
->> implicitly called from C code such as memcpy and memset?
+Hi,
+
+On 09/06/2013 07:23 PM, Pawel Moll wrote:
+> This patch adds basic DT bindings for the PL11x CLCD cells
+> and make their fbdev driver use them.
 >
-> That would create a problem. Would '-ffreestanding' be the correct
-> flag to add?
-
-No, unfortunately, -ffreestanding won't prevent GCC from generating
-implicit calls to memzero() et al. These are mainly issued when using
-initialized non-POD stack variables so avoiding those might help you
-there.
-
-> As far as the family of __aeabi_*, I need to add
-> documentation stating that on ARM, you can't divide, perform modulo,
-> and can't do 64 bit multiplications. I can then add a make rule that
-> will grep the symbol lists of .sram sections for ^__aeabi_. Is this
-> enough?
+> Signed-off-by: Pawel Moll<pawel.moll@arm.com>
+> ---
+>   .../devicetree/bindings/video/arm,pl11x.txt        |  87 +++++++++
+>   drivers/video/Kconfig                              |   1 +
+>   drivers/video/amba-clcd.c                          | 214 +++++++++++++++++++++
+>   3 files changed, 302 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/video/arm,pl11x.txt
 >
+> diff --git a/Documentation/devicetree/bindings/video/arm,pl11x.txt b/Documentation/devicetree/bindings/video/arm,pl11x.txt
+> new file mode 100644
+> index 0000000..178aebb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/arm,pl11x.txt
+> @@ -0,0 +1,87 @@
+> +* ARM PrimeCell Color LCD Controller (CLCD) PL110/PL111
 
-Well, even printk() needs integer division for its %d/%u modifiers, so
-this is really not so easy to achieve.
+nit: Shouldn't the abbreviation be CLCDC ?
 
->>> The general idea is that for each SRAM user (such as an SoC specific
->>> suspend/resume mechanism) to create a group of sections. The section group
->>> is created with a single macro for each user, but end up looking like this:
->>>
->>> .sram.am33xx : AT(ADDR(.sram.am33xx) - 0) {
->>>   __sram_am33xx_start = .;
->>>   *(.sram.am33xx.*)
->>>   __sram_am33xx_end = .;
->>> }
->>>
->>> Any data or functions that should be copied to SRAM for this use should be
->>> maked with an appropriate __section() attribute. A helper is then added for
->>> translating between the original kernel symbol, and the address of that
->>> function or variable once it has been copied into SRAM. Once control is
->>> passed to a function within the SRAM section grouping, it can access any
->>> variables or functions within that same SRAM section grouping without
->>> translation.
->>
->> What about the relocations which will need to be fixed up - eg, addresses
->> in the literal pool, the GOT table contents, etc?  You say nothing about
->> this.
+> +See also Documentation/devicetree/bindings/arm/primecell.txt
+> +
+> +Required properties:
+> +
+> +- compatible: must be one of:
+> +			"arm,pl110", "arm,primecell"
+> +			"arm,pl111", "arm,primecell"
+> +- reg: base address and size of the control registers block
+> +- interrupts: either a single interrupt specifier representing the
+> +		combined interrupt output (CLCDINTR) or an array of
+> +		four interrupt specifiers for CLCDMBEINTR,
+> +		CLCDVCOMPINTR, CLCDLNBUINTR, CLCDFUFINTR; in the
+> +		latter case interrupt names must be specified
+> +		(see below)
+> +- interrupt-names: when four interrupts are specified, their names:
+> +			"mbe", "vcomp", "lnbu", "fuf"
+> +			must be specified in order respective to the
+> +			interrupt specifiers
+> +- clocks: contains phandle and clock specifier pairs for the entries
+> +		in the clock-names property. See
+> +		Documentation/devicetree/binding/clock/clock-bindings.txt
+> +- clocks names: should contain "clcdclk" and "apb_pclk"
+> +
+> +Optional properties:
+> +
+> +- video-ram: phandle to a node describing specialized video memory
+> +		(that is *not* described in the top level "memory" node)
+> +                that must be used as a framebuffer, eg. due to restrictions
+> +		of the system interconnect; the node must contain a
+> +		standard reg property describing the address and the size
+> +		of the memory area
+
+It seems the "specialized video memory" is described by some vendor specific
+DT binding ? Is it documented ? It sounds like you are unnecessarily 
+repeating
+the memory node details here.
+
+Perhaps this binding/driver should use the common reserved memory bindings,
+see thread http://www.spinics.net/lists/devicetree/msg02880.html
+
+> +- max-framebuffer-size: maximum size in bytes of the framebuffer the
+> +			system can handle, eg. in terms of available
+> +			memory bandwidth
+> +
+> +In the simplest case of a display panel being connected directly to the
+> +CLCD, it can be described in the node:
+> +
+> +- panel-dimensions: (optional) array of two numbers (width and height)
+> +			describing physical dimension in mm of the panel
+> +- panel-type: (required) must be "tft" or "stn", defines panel type
+> +- panel-tft-interface: (for "tft" panel type) array of 3 numbers defining
+> +			widths in bits of the R, G and B components
+> +- panel-tft-rb-swapped: (for "tft" panel type) if present means that
+> +			the R&  B components are swapped on the board
+> +- panel-stn-color: (for "stn" panel type) if present means that
+> +			the panel is a colour STN display, if missing
+> +			is a monochrome display
+> +- panel-stn-dual: (for "stn" panel type) if present means that there
+> +			are two STN displays connected
+> +- panel-stn-4bit: (for monochrome "stn" panel) if present means
+> +			that the monochrome display is connected
+> +			via 4 bit-wide interface
+
+Are this vendor specific or common properties ? Shouldn't those be prefixed
+with the vendor name ?
+
+Anyway I think we need an RFC to possibly standardize properties that are
+common across multiple panels and have them listed in a common DT binding.
+
+It sounds a bit disappointing that for same class devices there are being
+introduced custom DT properties for each available device. For instance,
+the first 3 properties above look like they could apply to various display
+panels and controllers.
+
+> +- display-timings: standard display timings sub-node, see
+> +			Documentation/devicetree/bindings/video/display-timing.txt
+> +
+> +Example:
+> +
+> +			clcd at 1f0000 {
+> +				compatible = "arm,pl111", "arm,primecell";
+> +				reg =<0x1f0000 0x1000>;
+> +				interrupts =<14>;
+> +				clocks =<&v2m_oscclk1>,<&smbclk>;
+> +				clock-names = "clcdclk", "apb_pclk";
+> +
+> +				video-ram =<&v2m_vram>;
+> +				max-framebuffer-size =<614400>; /* 640x480 16bpp */
+> +
+> +				panel-type = "tft";
+> +				panel-tft-interface =<8 8 8>;
+> +				display-timings {
+> +					native-mode =<&v2m_clcd_timing0>;
+> +					v2m_clcd_timing0: vga {
+> +						clock-frequency =<25175000>;
+> +						hactive =<640>;
+> +						hback-porch =<40>;
+> +						hfront-porch =<24>;
+> +						hsync-len =<96>;
+> +						vactive =<480>;
+> +						vback-porch =<32>;
+> +						vfront-porch =<11>;
+> +						vsync-len =<2>;
+> +					};
+> +				};
+> +			};
+> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> index 4cf1e1d..375bf63 100644
+> --- a/drivers/video/Kconfig
+> +++ b/drivers/video/Kconfig
+> @@ -316,6 +316,7 @@ config FB_ARMCLCD
+>   	select FB_CFB_FILLRECT
+>   	select FB_CFB_COPYAREA
+>   	select FB_CFB_IMAGEBLIT
+> +	select VIDEOMODE_HELPERS if OF
+>   	help
+>   	  This framebuffer device driver is for the ARM PrimeCell PL110
+>   	  Colour LCD controller.  ARM PrimeCells provide the building
+> diff --git a/drivers/video/amba-clcd.c b/drivers/video/amba-clcd.c
+> index 0a2cce7..145ca5a 100644
+> --- a/drivers/video/amba-clcd.c
+> +++ b/drivers/video/amba-clcd.c
+> @@ -25,6 +25,11 @@
+>   #include<linux/amba/clcd.h>
+>   #include<linux/clk.h>
+>   #include<linux/hardirq.h>
+> +#include<linux/dma-mapping.h>
+> +#include<linux/of.h>
+> +#include<linux/of_address.h>
+> +#include<video/of_display_timing.h>
+> +#include<video/of_videomode.h>
 >
-> The C code would need to be written so that such accesses do not
-> occur. From functions that are in the sram text section, only accesses
-> to other sram sections in their group would be allowed. And above, a
-> compilation step could be added to make the compilation fail when such
-> things happen.
+>   #include<asm/sizes.h>
 >
-
-The point is that, sadly, GCC is just not very good at generating
-relocatable code for embedded targets. Playing with -fvisibility may
-result in code that contains fewer dynamic relocations, but you will
-always end up with a few that need to be fixed up before the code can
-run. Another thing to note is that usually, these relocations can only
-be fixed up once, as the addend is overwritten by the fixed-up
-address. This means that the code can only run in SRAM, and you should
-probably best avoid the module loader machinery as it may clobber the
-addends before you get to process them.
-
-One thing that remains implicit in this discussion is that you are
-executing from SRAM because DRAM is not available (I presume).
-Wouldn't it be better to treat the code that lives in the SRAM as a
-completely separate executable? You can generate a PIE executable that
-supplies minimal memzero et al,  fixup the relocations yourself (look
-at the uboot sources for an example of this) and you will be
-absolutely sure that the code can run completely autonomously. In
-fact, some of this stuff could potentially be reused for other
-disjoint execution domains such as TZ secure world.
-
-Regards,
-Ard.
-
-
-
-> The direction you are going though is good, if this is fragile, it
-> doesn't put us in a better place then having fragile asm that at least
-> complies reliably. As I'm looking towards the future and platforms
-> that are similar to am335x in that they are placing more and more of
-> the PM state machine burden on the CPU, I'd really like to try to make
-> this happen.
+> @@ -542,6 +547,212 @@ static int clcdfb_register(struct clcd_fb *fb)
+>   	return ret;
+>   }
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +#ifdef CONFIG_OF
+> +static int clcdfb_of_get_tft_panel(struct device_node *node,
+> +		struct clcd_panel *panel)
+> +{
+> +	int err;
+> +	u32 rgb[3];
+> +	int r, g, b;
+
+Couldn't these be 'unsigned int' ?
+
+> +	err = of_property_read_u32_array(node, "panel-tft-interface", rgb, 3);
+> +	if (err)
+> +		return err;
+> +
+> +	r = rgb[0];
+> +	g = rgb[1];
+> +	b = rgb[2];
+> +
+> +	/* Bypass pixel clock divider, data output on the falling edge */
+> +	panel->tim2 = TIM2_BCD | TIM2_IPC;
+> +
+> +	/* TFT display, vert. comp. interrupt at the start of the back porch */
+> +	panel->cntl |= CNTL_LCDTFT | CNTL_LCDVCOMP(1);
+> +
+> +	if (r>= 4&&  g>= 4&&  b>= 4)
+> +		panel->caps |= CLCD_CAP_444;
+> +	if (r>= 5&&  g>= 5&&  b>= 5)
+> +		panel->caps |= CLCD_CAP_5551;
+> +	if (r>= 5&&  g>= 6&&  b>= 5)
+> +		panel->caps |= CLCD_CAP_565;
+> +	if (r>= 8&&  g>= 8&&  b>= 8)
+> +		panel->caps |= CLCD_CAP_888;
+> +
+> +	if (of_get_property(node, "panel-tft-rb-swapped", NULL))
+> +		panel->caps&= ~CLCD_CAP_RGB;
+> +	else
+> +		panel->caps&= ~CLCD_CAP_BGR;
+> +
+> +	return 0;
+> +}
+> +
+> +static int clcdfb_of_init_display(struct clcd_fb *fb)
+> +{
+> +	struct device_node *node = fb->dev->dev.of_node;
+> +	u32 max_size;
+> +	u32 dimensions[2];
+> +	char *mode_name;
+> +	int len, err;
+> +	const char *panel_type;
+> +
+> +	fb->panel = devm_kzalloc(&fb->dev->dev, sizeof(*fb->panel), GFP_KERNEL);
+> +	if (!fb->panel)
+> +		return -ENOMEM;
+> +
+> +	err = of_get_fb_videomode(fb->dev->dev.of_node,&fb->panel->mode,
+
+'node' could be reused here.
+
+> +			OF_USE_NATIVE_MODE);
+> +	if (err)
+> +		return err;
+> +
+> +	len = snprintf(NULL, 0, "%ux%u@%u", fb->panel->mode.xres,
+> +			fb->panel->mode.yres, fb->panel->mode.refresh);
+> +	mode_name = devm_kzalloc(&fb->dev->dev, len + 1, GFP_KERNEL);
+> +	snprintf(mode_name, len + 1, "%ux%u@%u", fb->panel->mode.xres,
+> +			fb->panel->mode.yres, fb->panel->mode.refresh);
+
+Don't you want to just use kasprintf() here instead and free mode_name
+manually in the remove() callback ?
+
+> +	fb->panel->mode.name = mode_name;
+> +
+> +	err = of_property_read_u32(node, "max-framebuffer-size",&max_size);
+> +	if (!err)
+> +		fb->panel->bpp = max_size / (fb->panel->mode.xres *
+> +				fb->panel->mode.yres) * 8;
+> +	else
+> +		fb->panel->bpp = 32;
+> +
+> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> +	fb->panel->cntl |= CNTL_BEBO;
+> +#endif
+> +
+> +	if (of_property_read_u32_array(node, "panel-dimensions",
+> +			dimensions, 2) == 0) {
+> +		fb->panel->width = dimensions[0];
+> +		fb->panel->height = dimensions[1];
+> +	} else {
+> +		fb->panel->width = -1;
+> +		fb->panel->height = -1;
+> +	}
+> +
+> +	panel_type = of_get_property(node, "panel-type",&len);
+> +	if (strncmp(panel_type, "tft", len) == 0)
+> +		return clcdfb_of_get_tft_panel(node, fb->panel);
+> +	else
+> +		return -EINVAL;
+> +}
+> +
+> +static int clcdfb_of_vram_setup(struct clcd_fb *fb)
+> +{
+> +	const __be32 *prop = of_get_property(fb->dev->dev.of_node, "video-ram",
+> +			NULL);
+> +	struct device_node *node = of_find_node_by_phandle(be32_to_cpup(prop));
+
+This looks like open coding function of_parse_phandle(), why not just:
+
+	struct device_node *node = of_parse_phandle(fb->dev->dev.of_node,
+					"video-ram", 0);
+?
+> +	u64 size;
+> +	int err;
+> +
+> +	if (!node)
+> +		return -ENODEV;
+> +
+> +	err = clcdfb_of_init_display(fb);
+> +	if (err)
+> +		return err;
+> +
+> +	fb->fb.screen_base = of_iomap(node, 0);
+> +	if (!fb->fb.screen_base)
+> +		return -ENOMEM;
+> +
+> +	fb->fb.fix.smem_start = of_translate_address(node,
+> +			of_get_address(node, 0,&size, NULL));
+> +	fb->fb.fix.smem_len = size;
+> +
+> +	return 0;
+> +}
+
+--
+Thanks,
+Sylwester
