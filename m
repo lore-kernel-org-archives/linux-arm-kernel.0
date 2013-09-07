@@ -1,31 +1,24 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 7 Sep 2013 04:31:35 +0400
-Subject: [PATCH v2 4/4] ARM: shmobile: BOCK-W reference: add Ether PFC settings
-In-Reply-To: <201309070423.30672.sergei.shtylyov@cogentembedded.com>
-References: <201309070423.30672.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201309070431.35908.sergei.shtylyov@cogentembedded.com>
+From: jwboyer@fedoraproject.org (Josh Boyer)
+Date: Fri, 6 Sep 2013 22:44:33 -0400
+Subject: crypto/xor.ko fails to build with CONFIG_KERNEL_MODE_NEON=y
+Message-ID: <CA+5PVA6iUcY+DCh51R_uwxZ1BOGrS-8-OfaFTF6Bwz9JFDVcUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the Ether pin group to bockw_pinctrl_map[].
+Hi,
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+We enabled CONFIG_KERNEL_MODE_NEON on the armv7hl builds we're doing.
+It builds for a while, but eventually fails when running modpost on
+the xor.ko module:
 
----
- arch/arm/mach-shmobile/board-bockw-reference.c |    3 +++
- 1 file changed, 3 insertions(+)
+ERROR: "xor_block_neon_inner" [crypto/xor.ko] undefined!
+make[1]: *** [__modpost] Error 1
+make: *** [modules] Error 2
 
-Index: renesas/arch/arm/mach-shmobile/board-bockw-reference.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-bockw-reference.c
-+++ renesas/arch/arm/mach-shmobile/board-bockw-reference.c
-@@ -29,6 +29,9 @@
-  */
- 
- static const struct pinctrl_map bockw_pinctrl_map[] = {
-+	/* Ether */
-+	PIN_MAP_MUX_GROUP_DEFAULT("fde00000.ethernet", "pfc-r8a7778",
-+				  "ether_rmii", "ether"),
- 	/* SCIF0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
- 				  "scif0_data_a", "scif0"),
+I tried adding an EXPORT_SYMBOL_GPL(xor_block_neon_inner); after the
+structure definition in arch/arm/lib/xor-neon.c but that doesn't seem
+to have done anything.
+
+Before I go chasing this further, I'm curious if anyone else has run into this.
+
+josh
