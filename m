@@ -1,209 +1,213 @@
 From: skannan@codeaurora.org (Saravana Kannan)
-Date: Fri, 06 Sep 2013 20:37:46 -0700
-Subject: [RFC Patch v2 1/3] clk: add support for temporary parent clock
- migration
-In-Reply-To: <CANuQgHHPYYwsqrmW8ehhXjnw06YT9eLjiSDcXRvnp1hXg_nf6w@mail.gmail.com>
-References: <1378208072-10173-1-git-send-email-chander.kashyap@linaro.org>
- <1378208072-10173-2-git-send-email-chander.kashyap@linaro.org>
- <522658EB.3090408@gmail.com>
- <CANuQgHHPYYwsqrmW8ehhXjnw06YT9eLjiSDcXRvnp1hXg_nf6w@mail.gmail.com>
-Message-ID: <522A9F8A.1060407@codeaurora.org>
+Date: Fri, 06 Sep 2013 21:15:26 -0700
+Subject: [PATCH v4 3/5] clk: dt: binding for basic multiplexer clock
+In-Reply-To: <522A267B.4010200@wwwdotorg.org>
+References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
+ <1377150793-27864-4-git-send-email-mturquette@linaro.org>
+ <2A930389-012E-45C3-93EB-6B4A41DB2EF5@codeaurora.org>
+ <20130829011425.8231.78802@quantum>
+ <39BAF1F8-41AD-4667-BF76-22BDF709415A@codeaurora.org>
+ <20130830203334.10934.10011@quantum> <522110AA.7040700@wwwdotorg.org>
+ <20130903232219.10934.67434@quantum> <52277DBF.7080104@wwwdotorg.org>
+ <CAPtuhThWHP61FzDBCH5SSFx6kV7==VdF3-M=Lke+cgnrOQL7JQ@mail.gmail.com>
+ <5228EA02.3000200@wwwdotorg.org> <52297BE2.8010603@ti.com>
+ <522A267B.4010200@wwwdotorg.org>
+Message-ID: <522AA85E.3050206@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2013 11:06 PM, Chander Kashyap wrote:
-> On 4 September 2013 03:17, Sylwester Nawrocki
-> <sylvester.nawrocki@gmail.com> wrote:
->> Hi Chander,
->>
->>
->> On 09/03/2013 01:34 PM, Chander Kashyap wrote:
->>>
->>> Some platforms use to migrate temporarily to another parent during cpu
->>> frequency
->>> scaling, e.g. Exynos and Tegra. Once the frequency is changed the latch on
->>> to
->>> original parent.
->>>
->>> The generic cpufreq-cpu0 driver use clk_set_rate API to scale cpu
->>> frequency.
->>> This patch is an attempt to address the above mentioned requirement.
->>>
->>> This is achieved as follows:
->>>
->>> Add a clk flag "CLK_SET_RATE_TEMP_PARENT" for clocks which need to migrate
->>> to
->>> another parent during set_rate operation on them.
->>>
->>> Add "temp_parent_name" and "tmp_parent" fields to clk structure i.e the
->>> name of
->>> temp_parent_clock and reference to temp_parent_clock.
->>>
->>> Hence in clk_set_rate API check for the "CLK_SET_RATE_TEMP_PARENT" flag,
->>> then
->>> latch on to alternate parent clock temporarily. Once the requested rate is
->>> set
->>> on the clk, re-parent back to original parent clock.
->>>
->>> Signed-off-by: Chander Kashyap<chander.kashyap@linaro.org>
->>> ---
->>>    drivers/clk/clk-mux.c        |   13 +++++++------
->>>    drivers/clk/clk.c            |   43
->>> ++++++++++++++++++++++++++++++++++++++++--
->>>    include/linux/clk-private.h  |   19 +++++++++++--------
->>>    include/linux/clk-provider.h |   10 ++++++----
->>>    4 files changed, 65 insertions(+), 20 deletions(-)
->>>
->>> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
->>> index 4f96ff3..854b3ac 100644
->>> --- a/drivers/clk/clk-mux.c
->>> +++ b/drivers/clk/clk-mux.c
->>> @@ -115,8 +115,8 @@ EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
->>>
->>>    struct clk *clk_register_mux_table(struct device *dev, const char *name,
->>>                  const char **parent_names, u8 num_parents, unsigned long
->>> flags,
->>> -               void __iomem *reg, u8 shift, u32 mask,
->>> -               u8 clk_mux_flags, u32 *table, spinlock_t *lock)
->>> +               const char *temp_parent_name, void __iomem *reg, u8 shift,
->>> +               u32 mask, u8 clk_mux_flags, u32 *table, spinlock_t *lock)
->>
->>
->> I'm not sure this is a good idea to split the changes like this. Applying
->> this patch alone would cause a build break, wouldn't it ?
+On 09/06/2013 12:01 PM, Stephen Warren wrote:
+> On 09/06/2013 12:53 AM, Tero Kristo wrote:
+>> On 09/05/2013 11:30 PM, Stephen Warren wrote:
 >
-> Yes this will build break if patch 1 is applied only.
+> ...
+>>> 1)
+>>>
+>>> At least for large SoCs (rather than e.g. a simple clock generator
+>>> chip/crystal with 1 or 2 outputs), clock drivers need a *lot* of data.
+>>> We can either:
+>>>
+>>> a) Put that data into the clock driver, so it's "just there" for the
+>>> clock driver to use.
+>>>
+>>> b) Represent that data in DT, and write code in the clock driver to
+>>> parse DT when the driver probe()s.
+>>>
+>>> Option (a) is very simple.
 >>
->> The users need to be updated in same patch, so patch 2/3 should be normally
->> folded into this one.
+>> How can you claim option (a) to be very simple compared to (b)? I think
+>> both are as easy / or hard to implement.
 >
-> ok
+> Well, the work required for (b) is a pure super-set of the work require
+> for (a), so clearly (a) is less work (perhaps the issue you're debating
+> is harder/easier rather than more/less work?)
 >
+>>> Option (b) entails writing (and executing) a whole bunch of DT parsing
+>>> code.It's a lot of effort to define the DT binding for the data,
+>>> convert the data into DT format, and write the parsing code. It wastes
+>>> execution time at boot. In the end, the result of the parsing is exactly
+>>> the same data structures that could have been embedded into DT in the
+>>> first place. This seems like a futile effort.
 >>
->> [...]
->>>
->>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->>> index 2db08c0..0e29a5b 100644
->>> --- a/drivers/clk/clk.c
->>> +++ b/drivers/clk/clk.c
->>> @@ -1425,8 +1425,8 @@ static void clk_change_rate(struct clk *clk)
->>>     */
->>>    int clk_set_rate(struct clk *clk, unsigned long rate)
->>>    {
->>> -       struct clk *top, *fail_clk;
->>> -       int ret = 0;
->>> +       struct clk *top, *fail_clk, *parent = NULL;
->>> +       int ret = 0, index;
->>>
->>>          if (!clk)
->>>                  return 0;
->>> @@ -1450,6 +1450,35 @@ int clk_set_rate(struct clk *clk, unsigned long
->>> rate)
->>>                  goto out;
->>>          }
->>>
->>> +       /* Latch on to alternate parent temporarily if needed */
->>> +       if ((clk->flags&  CLK_SET_RATE_TEMP_PARENT)&&
->>> clk->temp_parent_name) {
->>>
->>> +               /* Save current parent before latching on to alternate
->>> parent */
->>> +               parent = clk->parent;
->>> +
->>> +               if (!clk->temp_parent) {
->>> +                       for (index = 0; index<  clk->num_parents; index++)
->>> {
->>> +                               if (!strcmp(clk->parent_names[index],
->>> +                                               clk->temp_parent_name))
->>> +                                       clk->temp_parent =
->>> +
->>> __clk_lookup(clk->temp_parent_name);
->>> +                       }
->>> +
->>> +                       if (!clk->temp_parent) {
->>> +                               pr_warn("%s: wrong temp_parent_name %s",
->>> +                                       __func__, clk->temp_parent_name);
->>> +                               ret = -EINVAL;
->>> +                               goto out;
->>> +                       }
->>> +               }
->>> +
->>> +               ret = clk_set_parent(clk, clk->temp_parent);
->>> +               if (ret) {
->>> +                       pr_warn("%s: failed to set %s parent\n",
->>> +                               __func__, clk->temp_parent->name);
->>> +                       goto out;
->>> +               }
->>> +       }
->>> +
->>>          /* notify that we are about to change rates */
->>>          fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
->>>          if (fail_clk) {
->>> @@ -1464,6 +1493,14 @@ int clk_set_rate(struct clk *clk, unsigned long
->>> rate)
->>>          clk_change_rate(top);
->>>
->>>    out:
->>> +       /* Reparent back to original parent */
->>> +       if (parent) {
->>> +               ret = clk_set_parent(clk, parent);
->>> +               if (ret)
->>> +                       pr_warn("%s: failed to set %s parent\n",
->>> +                                       __func__, parent->name);
->>> +       }
->>> +
->>>          clk_prepare_unlock();
->>>
->>>          return ret;
->>
->> [...]
->>
->>> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
->>> index 8138c94..b70ba4d 100644
->>> --- a/include/linux/clk-private.h
->>> +++ b/include/linux/clk-private.h
->>> @@ -47,6 +47,8 @@ struct clk {
->>>    #ifdef CONFIG_COMMON_CLK_DEBUG
->>>          struct dentry           *dentry;
->>>    #endif
->>> +       const char              *temp_parent_name;
->>> +       struct clk              *temp_parent;
->>
->>
->> Shouldn't such data rather be on struct clk_mux level ? It's only needed
->> for _some_ mux clocks, while it's being added for all the clock types.
->>
->> Or wouldn't just a single "u8 temp_parent_index" field do ? The order of
->> struct clk::parents and struct clk::parent_names is always same, isn't it ?
->> Then if, e.g.
->>
->> parent_names[] = "clk_a", "clk_b", "clk_c";
->>
->> and "clk_c" is the temporary parent clock name, the corresponding clock
->> pointer storage is clk->parents[2] ? It could be used instead of
->> clk->temp_parent, couldn't it ?
->>
+>> Not really, consider a new SoC where you don't have any kind of data at
+>> all. You need to write the data tables anyway, whether they are under DT
+>> or some kernel data struct.
 >
-> Yes can be.
-> The mentioned approach provides sanity check, i.e when parent exists
-> and properly registered.
+> Yes.
+>
+> But beyond writing the data tables, you also don't/do have to write all
+> the DT parsing code based on choosing (a) or (b), etc.
+>
+>> The execution time remain in place for
+>> parsing DT data though, but I wouldn't think this to be a problem. Also,
+>> you should consider multiarch ARM kernel, where same kernel binary
+>> should support multiple SoCs, this would entail having clock data for
+>> all built in to the kernel, which can be a problem also.
+>
+> There's no reason that the clock data has to be built into the kernel at
+> all; we should support even SoC clock drivers as modules in an initrd.
+> Alternatively, drop the unused data from the kernel after boot via
+> __init or similar. Alternatively, "pre-link" the clock driver module
+> into the kernel in a way that allows it to be unloaded after boot even
+> though it was built-in.
+>
+> ...
+>> You can just as easily claim that anything internal to SoC should be
+>> left out from DT, as this is cast in stone (or rather, silicon) also. We
+>> should only use it to describe board layout. Everything else, the kernel
+>> can 'know' by compile time.
+>
+> I did, immediately below:-) And then I went on to explain why that's
+> necessary in many cases.
+>
+> ...
+>> I can turn this around, as you went to this road. Why have DT at all?
+>
+> I believe (at least for ARM) the idea was to avoid churn to the kernel
+> for supporting the numerous different *boards*.
+>
+> The kernel needs and contains drivers for HW blocks, and so since
+> they're there, they may as well encode everything about the HW block.
+>
+> However, in most cases, the kernel shouldn't contain drivers for boards;
+> boards are built from various common components which have drivers. DT
+> is used to describe how those components are inter-connected. Hence, we
+> can hopefully remove all board-related churn from the kernel (once the
+> DT files are moved out of the kernel).
+>
+>> Personally I hate the whole idea of a devicetree, however am forced to
+>> use it as somebody decided it is a good idea to have one. It doesn't
+>> really solve any problems, it just creates new ones in a way of
+>> political BS where everybody claims they know how DT should be used, and
+>> this just prevents people from actually using it at all. Also, it
+>> creates just one new unnecessary dependency for boot, previously we had
+>> bootloader and kernel images which had to be in sync, now we have
+>> bootloader + DT + kernel. What next? Maybe we should move the clock data
+>> into a firmware file of its own?
+>
+> Well, I can sympathize, but I think the time is past for debating that.
+>
+>> Why do you care so much what actually goes into the devicetree?
+>
+> To get DT right.
+>
+> Even if we went back to board files and mach-xxx specific code rather
+> than cleanly separated drivers, it would still be beneficial to have
+> much more oversight of board/mach-xxx code than there was previously.
+> Board files made it very easy to do SoC-specific hacks. To avoid that,
+> in either DT or board files, we're trying to impose standards so that we
+> pick correct, generic, appropriate solutions, rather than letting
+> everyone run of with isolated ad-hoc solutions.
+>
+>> Shouldn't people be let use it how they see fit? For the clock bindings
+>> business this is the same, even if the bindings are there, you are free
+>> to use them if you like, and if you don't like them, you can do things
+>> differently.
+>
+> We'd be better of creating as much standardization as possible, so that
+> all SoCs/boards/.. work as similarly as possible, and we achieve maximal
+> code reuse, design-reuse, and allow people to understand everything
+> rather than just one particular SoC's/board's solution.
+>
+> If we don't get some re-use and standardization out of DT, we really may
+> as well just use board files.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
 
-NACK.
+I didn't read the full thread, but I have talked about this several 
+times with Mike and Stephen Boyd before.
 
-The client of a leaf clock should not have to care about the internals 
-of the clock tree. Nor should the clock framework.
+Here's my view on this.
 
-At a high level, any clock that needs something like this has a mux 
-component. If the clock is prepared and enabled, it should guarantee 
-changing rates without gating the output. If that can't be done, then it 
-needs to see the SET_RATE_GATE flag.
+I think the stance of saying the entire clock tree data should not be in 
+DT is rather absurd and very contradictory to the existing clock DT 
+bindings.
 
-And if it can ensure that the clock remains clocking while it's changing 
-the rate, that's an internal implementation detail of that specific 
-clock/clock driver. That specific implementation should switch the HW to 
-a temporary parent (doesn't need any clk->parent update), do whatever it 
-needs for the new parent, then switch back to it and then return.
+There are two ways to look at how the clock bindings should be:
+
+1) We only care about the clocks that are sent out of a clock controller 
+(CC) HW to other blocks. We don't care about the internals of the CC. In 
+that case, the DT bindings should not have any details about the clock, 
+Just a list of names/ids of the clocks being sent out of the HW block so 
+that the clock provider driver for that CC knows which clock is being 
+clk_get()'ed. The DT shouldn't specify if it's a frickin PLL, mux, 
+divider, gate clock, etc. None of the clients care what is the type of 
+the clock, so why list all that data in DT?
+
+2) We want to document the entire clock tree data in DT so that we don't 
+have to keep adding C files just to capture the data needed to represent 
+the clock tree when the actual code can be 100% reused across several 
+chips. Even in this case, the clients in DT will only care about the 
+clock and not what their type/rest of the data is. So, we will still 
+need to have a list of nodes/phandles (not actual linux devices), names 
+or ids.
+
+But the current clock DT binding is a Frankenstein monster of (1) and 
+(2) that nobody loves. We list the type and other details of the clock 
+leaf nodes, but not the rest of the tree. So, that additional data is 
+useless both to the clients and to the CC driver. There's no benefit to 
+the CC driver in knowing only the partial details of a partial list of 
+clocks (leaf nodes). Would rather pick (1) or (2) instead of the current 
+abomination.
+
+Sure, someone will come and argue, "Oh, but my clock tree is simple, so 
+I can still use just the data and have a portable driver". But that's a 
+very narrow outlook that doesn't scale and work for everyone. And even 
+in that case, I'm fairly certain they are hacking some stuff up and not 
+now truly representing the entire HW clock tree using the clock 
+framework. I mean, which HW has a clock "tree" with just leaf nodes -- 
+that can only be possible if you have one XO (crystal oscillator) for 
+every clock and none of the clock rates are changeable.
+
+And finally to give my preference, I prefer option (2) that represents 
+the entire clock tree in DT and here are the reasons:
+
+A) Wasn't one of the main reasons for ARM using DT to stop code churn 
+for minor changes in HW? I even vaguely remember Linux co,plaining that 
+all us stupid clock folks keeps making code changes to update minor 
+data. So, why are we trying to pick DT bindings that will continue to 
+cause a shit ton of code churn?
+
+B) Also, don't we always complain that HW vendors aren't documenting 
+their HW and opening it up? What better way that describing the entire 
+HW block in DT? It gives you all the details you about it. So, why are 
+we pushing against it? This just seems an arbitrary push back.
+
+C) Clocks change often and in minor ways between chips from the same 
+vendor. DT is a lot more capable and less repetitive than C to list the 
+"diffs". In DT, we can include the clock tree data from another chip and 
+just "fix up" the parts that changed. This would be so much nicer than 
+creating separate C files for each chip or trying to update the 
+structures at runtime based on some vendor specific DT property or 
+compatible string.
+
+Btw, this is the kind of stuff I want to discuss in ARM Summit, but I'm 
+still waiting for an invite :( Hopefully it will come soon enough that I 
+don't miss the ARM Summit because I don't have time to get a UK Visa.
 
 Thanks,
 Saravana
