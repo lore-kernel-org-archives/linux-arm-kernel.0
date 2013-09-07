@@ -1,67 +1,99 @@
 From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Sat,  7 Sep 2013 09:07:13 +0200
-Subject: [PATCH] ARM: davinci: remove deprecated IRQF_DISABLED
-Message-ID: <1378537633-7232-1-git-send-email-michael.opdenacker@free-electrons.com>
+Date: Sat,  7 Sep 2013 09:19:25 +0200
+Subject: [PATCH] ARM: OMAP: remove deprecated IRQF_DISABLED
+Message-ID: <1378538365-7353-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch proposes to remove the IRQF_DISABLED flag from Davinci code ;)
-It's a NOOP since 2.6.35, and will be removed one day
+This patch proposes to remove the IRQF_DISABLED flag from OMAP code
+It's a NOOP since 2.6.35, and will be removed one day.
 
 Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
 ---
- arch/arm/mach-davinci/board-da830-evm.c     | 2 +-
- arch/arm/mach-davinci/board-omapl138-hawk.c | 2 +-
- arch/arm/mach-davinci/time.c                | 4 ++--
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap1/fpga.c     | 3 +--
+ arch/arm/mach-omap1/pm.c       | 1 -
+ arch/arm/mach-omap1/time.c     | 2 +-
+ arch/arm/mach-omap1/timer32k.c | 2 +-
+ arch/arm/mach-omap2/timer.c    | 2 +-
+ arch/arm/plat-omap/dma.c       | 1 -
+ 6 files changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index 1332de8..3aeae57 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -74,7 +74,7 @@ static int da830_evm_usb_ocic_notify(da8xx_ocic_handler_t handler)
- 	if (handler != NULL) {
- 		da830_evm_usb_ocic_handler = handler;
+diff --git a/arch/arm/mach-omap1/fpga.c b/arch/arm/mach-omap1/fpga.c
+index 8bd71b2..3c0e422 100644
+--- a/arch/arm/mach-omap1/fpga.c
++++ b/arch/arm/mach-omap1/fpga.c
+@@ -135,8 +135,7 @@ static struct irq_chip omap_fpga_irq = {
+  * mask_ack routine for all of the FPGA interrupts has been changed from
+  * fpga_mask_ack_irq() to fpga_ack_irq() so that the specific FPGA interrupt
+  * being serviced is left unmasked.  We can do this because the FPGA cascade
+- * interrupt is installed with the IRQF_DISABLED flag, which leaves all
+- * interrupts masked at the CPU while an FPGA interrupt handler executes.
++ * interrupt is run with all interrupts masked.
+  *
+  * Limited testing indicates that this workaround appears to be effective
+  * for the smc9194 Ethernet driver used on the Innovator.  It should work
+diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
+index 358b82c..40a1ae3 100644
+--- a/arch/arm/mach-omap1/pm.c
++++ b/arch/arm/mach-omap1/pm.c
+@@ -628,7 +628,6 @@ static irqreturn_t omap_wakeup_interrupt(int irq, void *dev)
  
--		error = request_irq(irq, da830_evm_usb_ocic_irq, IRQF_DISABLED |
-+		error = request_irq(irq, da830_evm_usb_ocic_irq,
- 				    IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
- 				    "OHCI over-current indicator", NULL);
- 		if (error)
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index b8c20de..b635012 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -211,7 +211,7 @@ static int hawk_usb_ocic_notify(da8xx_ocic_handler_t handler)
- 		hawk_usb_ocic_handler = handler;
+ static struct irqaction omap_wakeup_irq = {
+ 	.name		= "peripheral wakeup",
+-	.flags		= IRQF_DISABLED,
+ 	.handler	= omap_wakeup_interrupt
+ };
  
- 		error = request_irq(irq, omapl138_hawk_usb_ocic_irq,
--					IRQF_DISABLED | IRQF_TRIGGER_RISING |
-+					IRQF_TRIGGER_RISING |
- 					IRQF_TRIGGER_FALLING,
- 					"OHCI over-current indicator", NULL);
- 		if (error)
-diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
-index 7a55b5c..e7ada0c 100644
---- a/arch/arm/mach-davinci/time.c
-+++ b/arch/arm/mach-davinci/time.c
-@@ -181,7 +181,7 @@ static struct timer_s timers[] = {
- 		.name      = "clockevent",
- 		.opts      = TIMER_OPTS_DISABLED,
- 		.irqaction = {
--			.flags   = IRQF_DISABLED | IRQF_TIMER,
-+			.flags   = IRQF_TIMER,
- 			.handler = timer_interrupt,
- 		}
- 	},
-@@ -190,7 +190,7 @@ static struct timer_s timers[] = {
- 		.period     = ~0,
- 		.opts       = TIMER_OPTS_PERIODIC,
- 		.irqaction = {
--			.flags   = IRQF_DISABLED | IRQF_TIMER,
-+			.flags   = IRQF_TIMER,
- 			.handler = freerun_interrupt,
- 		}
- 	},
+diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
+index 80603d2..6b5f298 100644
+--- a/arch/arm/mach-omap1/time.c
++++ b/arch/arm/mach-omap1/time.c
+@@ -160,7 +160,7 @@ static irqreturn_t omap_mpu_timer1_interrupt(int irq, void *dev_id)
+ 
+ static struct irqaction omap_mpu_timer1_irq = {
+ 	.name		= "mpu_timer1",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler	= omap_mpu_timer1_interrupt,
+ };
+ 
+diff --git a/arch/arm/mach-omap1/timer32k.c b/arch/arm/mach-omap1/timer32k.c
+index 0b74246..107e7ab 100644
+--- a/arch/arm/mach-omap1/timer32k.c
++++ b/arch/arm/mach-omap1/timer32k.c
+@@ -156,7 +156,7 @@ static irqreturn_t omap_32k_timer_interrupt(int irq, void *dev_id)
+ 
+ static struct irqaction omap_32k_timer_irq = {
+ 	.name		= "32KHz timer",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler	= omap_32k_timer_interrupt,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index b37e1fc..6552cd9 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -78,7 +78,7 @@ static irqreturn_t omap2_gp_timer_interrupt(int irq, void *dev_id)
+ 
+ static struct irqaction omap2_gp_timer_irq = {
+ 	.name		= "gp_timer",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler	= omap2_gp_timer_interrupt,
+ };
+ 
+diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+index 4d463ca..848eab5 100644
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -1965,7 +1965,6 @@ static irqreturn_t omap2_dma_irq_handler(int irq, void *dev_id)
+ static struct irqaction omap24xx_dma_irq = {
+ 	.name = "DMA",
+ 	.handler = omap2_dma_irq_handler,
+-	.flags = IRQF_DISABLED
+ };
+ 
+ #else
 -- 
 1.8.1.2
