@@ -1,47 +1,56 @@
-From: steev@pwnieexpress.com (Steev Klimaszewski)
-Date: Sat, 7 Sep 2013 08:32:19 -0500
-Subject: [patch 1/1] imx51.dtsi: fix PATA device clock
-In-Reply-To: <20130907132507.353801753@rtp-net.org>
-References: <20130907132507.353801753@rtp-net.org>
-Message-ID: <CAKCjkJYjCMzroCw5mXJ3zpJhiBrgn3+jntB9bmhZyp0vtGiA1g@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat,  7 Sep 2013 16:21:13 +0200
+Subject: [PATCH] ARM: fix modular build of xor_blocks() with NEON enabled
+Message-ID: <1378563673-10637-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minor nit: It's Steev Klimaszewski, not Steve.
+Commit 0195659 introduced a NEON accelerated version of the xor_blocks()
+function, but it needs the changes in this patch to allow it to be built
+as a module rather than statically into the kernel.
 
-On Sat, Sep 7, 2013 at 8:23 AM, Arnaud Patard <arnaud.patard@rtp-net.org> wrote:
-> Commit 718a35006f3fa48540d69bd649ff76ea4cdc1ef2 adds pata support to the
-> imx51.dtsi file and is using clock 161. The problem is that the right clock
-> is 172, according to 5d530bb0ad84d403d1aac79a8a8acf2c2b0a8dd7.
-> Using the clock 172 makes things work again (and kills a nasty system freeze)
->
->
-> Tested-by: Steve Klimaszewski <steev@gentoo.org>
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
->
-> Index: linux-next/arch/arm/boot/dts/imx51.dtsi
-> ===================================================================
-> --- linux-next.orig/arch/arm/boot/dts/imx51.dtsi        2013-09-07 15:08:05.042280170 +0200
-> +++ linux-next/arch/arm/boot/dts/imx51.dtsi     2013-09-07 15:08:37.338278750 +0200
-> @@ -490,7 +490,7 @@
->                                 compatible = "fsl,imx51-pata", "fsl,imx27-pata";
->                                 reg = <0x83fe0000 0x4000>;
->                                 interrupts = <70>;
-> -                               clocks = <&clks 161>;
-> +                               clocks = <&clks 172>;
->                                 status = "disabled";
->                         };
->
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+This patch creates a separate module xor-neon.ko which exports the NEON
+inner xor_blocks() functions depended upon by the regular xor.ko if it
+is built with CONFIG_KERNEL_MODE_NEON=y
 
+Reported-by: Josh Boyer <jwboyer@fedoraproject.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/lib/Makefile   | 4 +++-
+ arch/arm/lib/xor-neon.c | 4 ++++
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+index aaf3a87..6bc2bd3 100644
+--- a/arch/arm/lib/Makefile
++++ b/arch/arm/lib/Makefile
+@@ -49,5 +49,7 @@ $(obj)/csumpartialcopyuser.o:	$(obj)/csumpartialcopygeneric.S
+ ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
+   NEON_FLAGS			:= -mfloat-abi=softfp -mfpu=neon
+   CFLAGS_xor-neon.o		+= $(NEON_FLAGS)
+-  lib-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
++  xor-neon-$(CONFIG_XOR_BLOCKS)	:= xor-neon.o
++  lib-y				+= $(xor-neon-y)
++  obj-m				+= $(xor-neon-m)
+ endif
+diff --git a/arch/arm/lib/xor-neon.c b/arch/arm/lib/xor-neon.c
+index f485e5a..2c40aea 100644
+--- a/arch/arm/lib/xor-neon.c
++++ b/arch/arm/lib/xor-neon.c
+@@ -9,6 +9,9 @@
+  */
+ 
+ #include <linux/raid/xor.h>
++#include <linux/module.h>
++
++MODULE_LICENSE("GPL");
+ 
+ #ifndef __ARM_NEON__
+ #error You should compile this file with '-mfloat-abi=softfp -mfpu=neon'
+@@ -40,3 +43,4 @@ struct xor_block_template const xor_block_neon_inner = {
+ 	.do_4	= xor_8regs_4,
+ 	.do_5	= xor_8regs_5,
+ };
++EXPORT_SYMBOL(xor_block_neon_inner);
 -- 
-This e-mail and any attachments are for the sole use of the intended 
-recipients(s) and may be confidential. Use of any Pwnie Express product 
-signifies your agreement to the Rapid Focus Security EULA<http://pwnieexpress.com/pdfs/RFSEULA.pdf>and is subject to export controls under the U.S. Commerce Department's 
-Export Administration Regulations ("EAR").
+1.8.1.2
