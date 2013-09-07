@@ -1,33 +1,20 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 6 Sep 2013 16:26:41 -0700
-Subject: [GIT PULL] Barrier updates for 3.12
-In-Reply-To: <20130812172843.GH25995@mudshark.cambridge.arm.com>
-References: <20130812172843.GH25995@mudshark.cambridge.arm.com>
-Message-ID: <20130906232641.GG19754@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 7 Sep 2013 04:23:29 +0400
+Subject: [PATCH v2 0/4] Add Ether DT support for R8A7778/BOCK-W reference board
+Message-ID: <201309070423.30672.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12, Will Deacon wrote:
-> Hi Russell,
-> 
-> Please pull the following barriers updates for 3.12. This series gives a
-> notable performance boost in hackbench benchmarks, and facilitates the use
-> of {non,inner}-shareable maintenance and memory barrier operations within
-> the kernel.
-> 
+Hello.
 
-This patchset seems to have broken the build for people with
-older binutils. It looks like gas didn't know about "ish" and
-other exotic barrier flavors until the middle of 2010[1]. The
-binutils I have that doesn't work is from codesourcery. I don't
-know if fixing this is very important though, hopefully people
-have moved on to compilers that aren't 3 years old.
+   Here's the set of 4 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20130906' tag. Here we add the Ether device tree support working
+on the R8A7778/BOCK-W reference board. The patchset requires the 'sh_eth' driver
+device tree support posted earlier in order to work.
 
- $ ld -v
- GNU ld (Sourcery G++ Lite 2010q1-202) 2.19.51.20090709
+[1/4] ARM: shmobile: r8a7778: add Ether DT support
+[2/4] ARM: shmobile: r8a7778: add Ether clock for DT case
+[3/4] ARM: shmobile: bockw-reference: add Ether DT support
+[4/4] ARM: shmobile: BOCK-W reference: add Ether PFC settings
 
-[1] http://sourceware.org/git/?p=binutils.git;a=commitdiff;h=b987d0526127b44414de15862e0d46f85e888c73
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+WBR, Sergei
