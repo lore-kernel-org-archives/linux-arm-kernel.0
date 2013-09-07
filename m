@@ -1,217 +1,55 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Fri, 06 Sep 2013 21:15:26 -0700
-Subject: [PATCH v4 3/5] clk: dt: binding for basic multiplexer clock
-In-Reply-To: <522A267B.4010200@wwwdotorg.org>
-References: <1377150793-27864-1-git-send-email-mturquette@linaro.org>
- <1377150793-27864-4-git-send-email-mturquette@linaro.org>
- <2A930389-012E-45C3-93EB-6B4A41DB2EF5@codeaurora.org>
- <20130829011425.8231.78802@quantum>
- <39BAF1F8-41AD-4667-BF76-22BDF709415A@codeaurora.org>
- <20130830203334.10934.10011@quantum> <522110AA.7040700@wwwdotorg.org>
- <20130903232219.10934.67434@quantum> <52277DBF.7080104@wwwdotorg.org>
- <CAPtuhThWHP61FzDBCH5SSFx6kV7==VdF3-M=Lke+cgnrOQL7JQ@mail.gmail.com>
- <5228EA02.3000200@wwwdotorg.org> <52297BE2.8010603@ti.com>
- <522A267B.4010200@wwwdotorg.org>
-Message-ID: <522AA85E.3050206@codeaurora.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 07 Sep 2013 01:12:03 -0400 (EDT)
+Subject: [PATCH 2/5] arm: LLVMLinux: use current_stack_pointer for percpu
+In-Reply-To: <1378502899-1241-3-git-send-email-behanw@converseincode.com>
+References: <1378502899-1241-1-git-send-email-behanw@converseincode.com>
+ <1378502899-1241-3-git-send-email-behanw@converseincode.com>
+Message-ID: <alpine.LFD.2.03.1309070101330.20709@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2013 12:01 PM, Stephen Warren wrote:
-> On 09/06/2013 12:53 AM, Tero Kristo wrote:
->> On 09/05/2013 11:30 PM, Stephen Warren wrote:
->
-> ...
->>> 1)
->>>
->>> At least for large SoCs (rather than e.g. a simple clock generator
->>> chip/crystal with 1 or 2 outputs), clock drivers need a *lot* of data.
->>> We can either:
->>>
->>> a) Put that data into the clock driver, so it's "just there" for the
->>> clock driver to use.
->>>
->>> b) Represent that data in DT, and write code in the clock driver to
->>> parse DT when the driver probe()s.
->>>
->>> Option (a) is very simple.
->>
->> How can you claim option (a) to be very simple compared to (b)? I think
->> both are as easy / or hard to implement.
->
-> Well, the work required for (b) is a pure super-set of the work require
-> for (a), so clearly (a) is less work (perhaps the issue you're debating
-> is harder/easier rather than more/less work?)
->
->>> Option (b) entails writing (and executing) a whole bunch of DT parsing
->>> code.It's a lot of effort to define the DT binding for the data,
->>> convert the data into DT format, and write the parsing code. It wastes
->>> execution time at boot. In the end, the result of the parsing is exactly
->>> the same data structures that could have been embedded into DT in the
->>> first place. This seems like a futile effort.
->>
->> Not really, consider a new SoC where you don't have any kind of data at
->> all. You need to write the data tables anyway, whether they are under DT
->> or some kernel data struct.
->
-> Yes.
->
-> But beyond writing the data tables, you also don't/do have to write all
-> the DT parsing code based on choosing (a) or (b), etc.
->
->> The execution time remain in place for
->> parsing DT data though, but I wouldn't think this to be a problem. Also,
->> you should consider multiarch ARM kernel, where same kernel binary
->> should support multiple SoCs, this would entail having clock data for
->> all built in to the kernel, which can be a problem also.
->
-> There's no reason that the clock data has to be built into the kernel at
-> all; we should support even SoC clock drivers as modules in an initrd.
-> Alternatively, drop the unused data from the kernel after boot via
-> __init or similar. Alternatively, "pre-link" the clock driver module
-> into the kernel in a way that allows it to be unloaded after boot even
-> though it was built-in.
->
-> ...
->> You can just as easily claim that anything internal to SoC should be
->> left out from DT, as this is cast in stone (or rather, silicon) also. We
->> should only use it to describe board layout. Everything else, the kernel
->> can 'know' by compile time.
->
-> I did, immediately below:-) And then I went on to explain why that's
-> necessary in many cases.
->
-> ...
->> I can turn this around, as you went to this road. Why have DT at all?
->
-> I believe (at least for ARM) the idea was to avoid churn to the kernel
-> for supporting the numerous different *boards*.
->
-> The kernel needs and contains drivers for HW blocks, and so since
-> they're there, they may as well encode everything about the HW block.
->
-> However, in most cases, the kernel shouldn't contain drivers for boards;
-> boards are built from various common components which have drivers. DT
-> is used to describe how those components are inter-connected. Hence, we
-> can hopefully remove all board-related churn from the kernel (once the
-> DT files are moved out of the kernel).
->
->> Personally I hate the whole idea of a devicetree, however am forced to
->> use it as somebody decided it is a good idea to have one. It doesn't
->> really solve any problems, it just creates new ones in a way of
->> political BS where everybody claims they know how DT should be used, and
->> this just prevents people from actually using it at all. Also, it
->> creates just one new unnecessary dependency for boot, previously we had
->> bootloader and kernel images which had to be in sync, now we have
->> bootloader + DT + kernel. What next? Maybe we should move the clock data
->> into a firmware file of its own?
->
-> Well, I can sympathize, but I think the time is past for debating that.
->
->> Why do you care so much what actually goes into the devicetree?
->
-> To get DT right.
->
-> Even if we went back to board files and mach-xxx specific code rather
-> than cleanly separated drivers, it would still be beneficial to have
-> much more oversight of board/mach-xxx code than there was previously.
-> Board files made it very easy to do SoC-specific hacks. To avoid that,
-> in either DT or board files, we're trying to impose standards so that we
-> pick correct, generic, appropriate solutions, rather than letting
-> everyone run of with isolated ad-hoc solutions.
->
->> Shouldn't people be let use it how they see fit? For the clock bindings
->> business this is the same, even if the bindings are there, you are free
->> to use them if you like, and if you don't like them, you can do things
->> differently.
->
-> We'd be better of creating as much standardization as possible, so that
-> all SoCs/boards/.. work as similarly as possible, and we achieve maximal
-> code reuse, design-reuse, and allow people to understand everything
-> rather than just one particular SoC's/board's solution.
->
-> If we don't get some re-use and standardization out of DT, we really may
-> as well just use board files.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+On Fri, 6 Sep 2013, behanw at converseincode.com wrote:
 
-I didn't read the full thread, but I have talked about this several 
-times with Mike and Stephen Boyd before.
+> From: Behan Webster <behanw@converseincode.com>
+> 
+> The existing code uses named registers to get the value of the stack pointer.
+> The new current_stack_pointer macro is more readable and allows for a central
+> portable implementation of how to get the stack pointer with ASM.  This change
+> supports being able to compile the kernel with both gcc and Clang.
+> 
+> Signed-off-by: Mark Charlebois <charlebm@gmail.com>
+> Signed-off-by: Behan Webster <behanw@converseincode.com>
+> Reviewed-by: Jan-Simon M?ller <dl9pf@gmx.de>
+> ---
+>  arch/arm/include/asm/percpu.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
+> index 209e650..629a975 100644
+> --- a/arch/arm/include/asm/percpu.h
+> +++ b/arch/arm/include/asm/percpu.h
+> @@ -30,14 +30,14 @@ static inline void set_my_cpu_offset(unsigned long off)
+>  static inline unsigned long __my_cpu_offset(void)
+>  {
+>  	unsigned long off;
+> -	register unsigned long *sp asm ("sp");
+> +	unsigned long sp = current_stack_pointer;
+>  
+>  	/*
+>  	 * Read TPIDRPRW.
+>  	 * We want to allow caching the value, so avoid using volatile and
+>  	 * instead use a fake stack read to hazard against barrier().
+>  	 */
+> -	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : "Q" (*sp));
+> +	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : "Q" (sp));
 
-Here's my view on this.
+This change doesn't look to be equivalent.  Previously the *sp implied a 
+memory location which doesn't appear to be the case anymore.
 
-I think the stance of saying the entire clock tree data should not be in 
-DT is rather absurd and very contradictory to the existing clock DT 
-bindings.
+this sp trickery was introduced in commit 509eb76ebf97 to solve bad code 
+generation (the commit log has the details).  It would be good if Will 
+Deacon could confirm that his test case still works fine with your 
+change.
 
-There are two ways to look at how the clock bindings should be:
 
-1) We only care about the clocks that are sent out of a clock controller 
-(CC) HW to other blocks. We don't care about the internals of the CC. In 
-that case, the DT bindings should not have any details about the clock, 
-Just a list of names/ids of the clocks being sent out of the HW block so 
-that the clock provider driver for that CC knows which clock is being 
-clk_get()'ed. The DT shouldn't specify if it's a frickin PLL, mux, 
-divider, gate clock, etc. None of the clients care what is the type of 
-the clock, so why list all that data in DT?
-
-2) We want to document the entire clock tree data in DT so that we don't 
-have to keep adding C files just to capture the data needed to represent 
-the clock tree when the actual code can be 100% reused across several 
-chips. Even in this case, the clients in DT will only care about the 
-clock and not what their type/rest of the data is. So, we will still 
-need to have a list of nodes/phandles (not actual linux devices), names 
-or ids.
-
-But the current clock DT binding is a Frankenstein monster of (1) and 
-(2) that nobody loves. We list the type and other details of the clock 
-leaf nodes, but not the rest of the tree. So, that additional data is 
-useless both to the clients and to the CC driver. There's no benefit to 
-the CC driver in knowing only the partial details of a partial list of 
-clocks (leaf nodes). Would rather pick (1) or (2) instead of the current 
-abomination.
-
-Sure, someone will come and argue, "Oh, but my clock tree is simple, so 
-I can still use just the data and have a portable driver". But that's a 
-very narrow outlook that doesn't scale and work for everyone. And even 
-in that case, I'm fairly certain they are hacking some stuff up and not 
-now truly representing the entire HW clock tree using the clock 
-framework. I mean, which HW has a clock "tree" with just leaf nodes -- 
-that can only be possible if you have one XO (crystal oscillator) for 
-every clock and none of the clock rates are changeable.
-
-And finally to give my preference, I prefer option (2) that represents 
-the entire clock tree in DT and here are the reasons:
-
-A) Wasn't one of the main reasons for ARM using DT to stop code churn 
-for minor changes in HW? I even vaguely remember Linux co,plaining that 
-all us stupid clock folks keeps making code changes to update minor 
-data. So, why are we trying to pick DT bindings that will continue to 
-cause a shit ton of code churn?
-
-B) Also, don't we always complain that HW vendors aren't documenting 
-their HW and opening it up? What better way that describing the entire 
-HW block in DT? It gives you all the details you about it. So, why are 
-we pushing against it? This just seems an arbitrary push back.
-
-C) Clocks change often and in minor ways between chips from the same 
-vendor. DT is a lot more capable and less repetitive than C to list the 
-"diffs". In DT, we can include the clock tree data from another chip and 
-just "fix up" the parts that changed. This would be so much nicer than 
-creating separate C files for each chip or trying to update the 
-structures at runtime based on some vendor specific DT property or 
-compatible string.
-
-Btw, this is the kind of stuff I want to discuss in ARM Summit, but I'm 
-still waiting for an invite :( Hopefully it will come soon enough that I 
-don't miss the ARM Summit because I don't have time to get a UK Visa.
-
-Thanks,
-Saravana
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Nicolas
