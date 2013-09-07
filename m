@@ -1,24 +1,213 @@
-From: jwboyer@fedoraproject.org (Josh Boyer)
-Date: Fri, 6 Sep 2013 22:44:33 -0400
-Subject: crypto/xor.ko fails to build with CONFIG_KERNEL_MODE_NEON=y
-Message-ID: <CA+5PVA6iUcY+DCh51R_uwxZ1BOGrS-8-OfaFTF6Bwz9JFDVcUQ@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 06 Sep 2013 20:37:46 -0700
+Subject: [RFC Patch v2 1/3] clk: add support for temporary parent clock
+ migration
+In-Reply-To: <CANuQgHHPYYwsqrmW8ehhXjnw06YT9eLjiSDcXRvnp1hXg_nf6w@mail.gmail.com>
+References: <1378208072-10173-1-git-send-email-chander.kashyap@linaro.org>
+ <1378208072-10173-2-git-send-email-chander.kashyap@linaro.org>
+ <522658EB.3090408@gmail.com>
+ <CANuQgHHPYYwsqrmW8ehhXjnw06YT9eLjiSDcXRvnp1hXg_nf6w@mail.gmail.com>
+Message-ID: <522A9F8A.1060407@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/03/2013 11:06 PM, Chander Kashyap wrote:
+> On 4 September 2013 03:17, Sylwester Nawrocki
+> <sylvester.nawrocki@gmail.com> wrote:
+>> Hi Chander,
+>>
+>>
+>> On 09/03/2013 01:34 PM, Chander Kashyap wrote:
+>>>
+>>> Some platforms use to migrate temporarily to another parent during cpu
+>>> frequency
+>>> scaling, e.g. Exynos and Tegra. Once the frequency is changed the latch on
+>>> to
+>>> original parent.
+>>>
+>>> The generic cpufreq-cpu0 driver use clk_set_rate API to scale cpu
+>>> frequency.
+>>> This patch is an attempt to address the above mentioned requirement.
+>>>
+>>> This is achieved as follows:
+>>>
+>>> Add a clk flag "CLK_SET_RATE_TEMP_PARENT" for clocks which need to migrate
+>>> to
+>>> another parent during set_rate operation on them.
+>>>
+>>> Add "temp_parent_name" and "tmp_parent" fields to clk structure i.e the
+>>> name of
+>>> temp_parent_clock and reference to temp_parent_clock.
+>>>
+>>> Hence in clk_set_rate API check for the "CLK_SET_RATE_TEMP_PARENT" flag,
+>>> then
+>>> latch on to alternate parent clock temporarily. Once the requested rate is
+>>> set
+>>> on the clk, re-parent back to original parent clock.
+>>>
+>>> Signed-off-by: Chander Kashyap<chander.kashyap@linaro.org>
+>>> ---
+>>>    drivers/clk/clk-mux.c        |   13 +++++++------
+>>>    drivers/clk/clk.c            |   43
+>>> ++++++++++++++++++++++++++++++++++++++++--
+>>>    include/linux/clk-private.h  |   19 +++++++++++--------
+>>>    include/linux/clk-provider.h |   10 ++++++----
+>>>    4 files changed, 65 insertions(+), 20 deletions(-)
+>>>
+>>> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+>>> index 4f96ff3..854b3ac 100644
+>>> --- a/drivers/clk/clk-mux.c
+>>> +++ b/drivers/clk/clk-mux.c
+>>> @@ -115,8 +115,8 @@ EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
+>>>
+>>>    struct clk *clk_register_mux_table(struct device *dev, const char *name,
+>>>                  const char **parent_names, u8 num_parents, unsigned long
+>>> flags,
+>>> -               void __iomem *reg, u8 shift, u32 mask,
+>>> -               u8 clk_mux_flags, u32 *table, spinlock_t *lock)
+>>> +               const char *temp_parent_name, void __iomem *reg, u8 shift,
+>>> +               u32 mask, u8 clk_mux_flags, u32 *table, spinlock_t *lock)
+>>
+>>
+>> I'm not sure this is a good idea to split the changes like this. Applying
+>> this patch alone would cause a build break, wouldn't it ?
+>
+> Yes this will build break if patch 1 is applied only.
+>>
+>> The users need to be updated in same patch, so patch 2/3 should be normally
+>> folded into this one.
+>
+> ok
+>
+>>
+>> [...]
+>>>
+>>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>>> index 2db08c0..0e29a5b 100644
+>>> --- a/drivers/clk/clk.c
+>>> +++ b/drivers/clk/clk.c
+>>> @@ -1425,8 +1425,8 @@ static void clk_change_rate(struct clk *clk)
+>>>     */
+>>>    int clk_set_rate(struct clk *clk, unsigned long rate)
+>>>    {
+>>> -       struct clk *top, *fail_clk;
+>>> -       int ret = 0;
+>>> +       struct clk *top, *fail_clk, *parent = NULL;
+>>> +       int ret = 0, index;
+>>>
+>>>          if (!clk)
+>>>                  return 0;
+>>> @@ -1450,6 +1450,35 @@ int clk_set_rate(struct clk *clk, unsigned long
+>>> rate)
+>>>                  goto out;
+>>>          }
+>>>
+>>> +       /* Latch on to alternate parent temporarily if needed */
+>>> +       if ((clk->flags&  CLK_SET_RATE_TEMP_PARENT)&&
+>>> clk->temp_parent_name) {
+>>>
+>>> +               /* Save current parent before latching on to alternate
+>>> parent */
+>>> +               parent = clk->parent;
+>>> +
+>>> +               if (!clk->temp_parent) {
+>>> +                       for (index = 0; index<  clk->num_parents; index++)
+>>> {
+>>> +                               if (!strcmp(clk->parent_names[index],
+>>> +                                               clk->temp_parent_name))
+>>> +                                       clk->temp_parent =
+>>> +
+>>> __clk_lookup(clk->temp_parent_name);
+>>> +                       }
+>>> +
+>>> +                       if (!clk->temp_parent) {
+>>> +                               pr_warn("%s: wrong temp_parent_name %s",
+>>> +                                       __func__, clk->temp_parent_name);
+>>> +                               ret = -EINVAL;
+>>> +                               goto out;
+>>> +                       }
+>>> +               }
+>>> +
+>>> +               ret = clk_set_parent(clk, clk->temp_parent);
+>>> +               if (ret) {
+>>> +                       pr_warn("%s: failed to set %s parent\n",
+>>> +                               __func__, clk->temp_parent->name);
+>>> +                       goto out;
+>>> +               }
+>>> +       }
+>>> +
+>>>          /* notify that we are about to change rates */
+>>>          fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
+>>>          if (fail_clk) {
+>>> @@ -1464,6 +1493,14 @@ int clk_set_rate(struct clk *clk, unsigned long
+>>> rate)
+>>>          clk_change_rate(top);
+>>>
+>>>    out:
+>>> +       /* Reparent back to original parent */
+>>> +       if (parent) {
+>>> +               ret = clk_set_parent(clk, parent);
+>>> +               if (ret)
+>>> +                       pr_warn("%s: failed to set %s parent\n",
+>>> +                                       __func__, parent->name);
+>>> +       }
+>>> +
+>>>          clk_prepare_unlock();
+>>>
+>>>          return ret;
+>>
+>> [...]
+>>
+>>> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+>>> index 8138c94..b70ba4d 100644
+>>> --- a/include/linux/clk-private.h
+>>> +++ b/include/linux/clk-private.h
+>>> @@ -47,6 +47,8 @@ struct clk {
+>>>    #ifdef CONFIG_COMMON_CLK_DEBUG
+>>>          struct dentry           *dentry;
+>>>    #endif
+>>> +       const char              *temp_parent_name;
+>>> +       struct clk              *temp_parent;
+>>
+>>
+>> Shouldn't such data rather be on struct clk_mux level ? It's only needed
+>> for _some_ mux clocks, while it's being added for all the clock types.
+>>
+>> Or wouldn't just a single "u8 temp_parent_index" field do ? The order of
+>> struct clk::parents and struct clk::parent_names is always same, isn't it ?
+>> Then if, e.g.
+>>
+>> parent_names[] = "clk_a", "clk_b", "clk_c";
+>>
+>> and "clk_c" is the temporary parent clock name, the corresponding clock
+>> pointer storage is clk->parents[2] ? It could be used instead of
+>> clk->temp_parent, couldn't it ?
+>>
+>
+> Yes can be.
+> The mentioned approach provides sanity check, i.e when parent exists
+> and properly registered.
+>
 
-We enabled CONFIG_KERNEL_MODE_NEON on the armv7hl builds we're doing.
-It builds for a while, but eventually fails when running modpost on
-the xor.ko module:
+NACK.
 
-ERROR: "xor_block_neon_inner" [crypto/xor.ko] undefined!
-make[1]: *** [__modpost] Error 1
-make: *** [modules] Error 2
+The client of a leaf clock should not have to care about the internals 
+of the clock tree. Nor should the clock framework.
 
-I tried adding an EXPORT_SYMBOL_GPL(xor_block_neon_inner); after the
-structure definition in arch/arm/lib/xor-neon.c but that doesn't seem
-to have done anything.
+At a high level, any clock that needs something like this has a mux 
+component. If the clock is prepared and enabled, it should guarantee 
+changing rates without gating the output. If that can't be done, then it 
+needs to see the SET_RATE_GATE flag.
 
-Before I go chasing this further, I'm curious if anyone else has run into this.
+And if it can ensure that the clock remains clocking while it's changing 
+the rate, that's an internal implementation detail of that specific 
+clock/clock driver. That specific implementation should switch the HW to 
+a temporary parent (doesn't need any clk->parent update), do whatever it 
+needs for the new parent, then switch back to it and then return.
 
-josh
+Thanks,
+Saravana
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
