@@ -1,24 +1,85 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 7 Sep 2013 09:57:13 +0100
-Subject: [RFC 0/4] Create infrastructure for running C code from SRAM.
-In-Reply-To: <20130906164059.GC3558@localhost.localdomain>
-References: <1378226665-27090-1-git-send-email-Russ.Dill@ti.com>
- <52278F84.2080509@elopez.com.ar>
- <CA+Bv8XaHonrpeNZ6tRCyqpMK1bzgpDTqvLyrsLWEyMY_ky6apQ@mail.gmail.com>
- <20130906111408.GI25647@n2100.arm.linux.org.uk>
- <20130906164059.GC3558@localhost.localdomain>
-Message-ID: <20130907085713.GJ25647@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 7 Sep 2013 12:27:26 +0200
+Subject: [RFC PATCHv2 0/4] Add DT support for fixed PHYs
+In-Reply-To: <2916397.Vz9aZYzLyb@lenovo>
+References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <2916397.Vz9aZYzLyb@lenovo>
+Message-ID: <20130907122726.1af7c331@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 06, 2013 at 05:40:59PM +0100, Dave Martin wrote:
-> I actually wonder whether fncpy() contains a buglet, whereby
-> flush_icache_range() is used instead of coherent_kern_range().
-> The SRAM is probably not mapped cached, but at least a DSB would be
-> needed before flushing the relevant lines from the I-cache.
+Dear Florian Fainelli,
 
-flush_icache_range() is correct - it's there to ensure that memory which
-has been written will be readable to the instruction stream.  That's it's
-whole purpose, and it's used when modules are loaded too.
+On Fri, 06 Sep 2013 21:42:42 +0100, Florian Fainelli wrote:
 
-You're reading too much into the name: it doesn't just touch the I cache.
+> > Here is a second version of the patch set that adds a Device Tree
+> > binding and the related code to support fixed PHYs. Marked as RFC,
+> > this patch set is obviously not intended for merging in 3.12.
+> 
+> Thanks a lot for continuing on this work, I really like the state of it now.
+
+Thanks for your feedback.
+
+> > Since the first version, the changes have been:
+> > 
+> >  * Instead of using a 'fixed-link' property inside the Ethernet device
+> >    DT node, with a fairly cryptic succession of integer values, we now
+> >    use a PHY subnode under the Ethernet device DT node, with explicit
+> >    properties to configure the duplex, speed, pause and other PHY
+> >    properties.
+> > 
+> >  * The PHY address is automatically allocated by the kernel and no
+> >    longer visible in the Device Tree binding.
+> > 
+> >  * The PHY device is created directly when the network driver calls
+> >    of_phy_connect_fixed_link(), and associated to the PHY DT node,
+> >    which allows the existing of_phy_connect() function to work,
+> >    without the need to use the deprecated of_phy_connect_fixed_link().
+> > 
+> > The things I am not entirely happy with yet are:
+> > 
+> >  * The PHY ID is hardcoded to 0xdeadbeef. Ideally, it should be a
+> >    properly reserved vendor/device identifier, but it isn't clear how
+> >    to get one allocated for this purpose.
+> 
+> Right, we should try to get something better, but we obviously cannot use an 
+> already allocated OUI for this. Can we ask the Linux foundation or a Linux-
+> friendly company to allocate one maybe?
+
+According to http://standards.ieee.org/develop/regauth/oui/oui.txt, the
+Linux Foundation doesn't seem to own any OUI. Should we simply be
+contacting some random companies in this list?
+
+> >  * The fixed_phy_register() function in drivers/net/phy/fixed.c has
+> >    some OF references. So ideally, I would have preferred to put this
+> >    code in drivers/of/of_mdio.c, but to call get_phy_device(), we need
+> >    a reference to the mii_bus structure that represents the fixed MDIO
+> >    bus.
+> 
+> This is not a big deal, not everything in drivers/ is consistent with this, 
+> and making the fixed MDIO bus globally accessible does not sound too great.
+
+Indeed.
+
+> >  * There is some error management missing in fixed_phy_register(), but
+> >    it can certainly be added easily. This RFC is meant to sort out the
+> >    general idea.
+> 
+> Do you think you could add these to got beyond the RFC state? The patchset as 
+> it currently is fine with me if you can address these.
+
+Sure, it shouldn't be too difficult.
+
+In the mean time, I'm interested in hearing comments from other people,
+especially from the Device Tree bindings maintainers: while the
+internal implementation details can always be fixed later on, the DT
+binding should obviously get an approval from the DT maintainers.
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
