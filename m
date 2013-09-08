@@ -1,116 +1,58 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 6 Sep 2013 15:44:12 +0200 (CEST)
-Subject: [PATCH v4 12/19] cpufreq: cpufreq-cpu0: remove device tree
- parsing for cpu nodes
-In-Reply-To: <1376991021-12160-13-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376991021-12160-13-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <Pine.LNX.4.64.1309061539310.11068@axis700.grange>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 08 Sep 2013 10:16:14 -0700
+Subject: Build error in torvalds kernel 3.11 for omap2plus
+In-Reply-To: <20130908090206.GK25647@n2100.arm.linux.org.uk>
+References: <CABYxbz7m4GdHFNY3fP1Cpv3a_dNTSozdd7dX9yLG6vQ3zZxu9A@mail.gmail.com>
+ <20130908090206.GK25647@n2100.arm.linux.org.uk>
+Message-ID: <522CB0DE.2010102@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On 09/08/2013 02:02 AM, Russell King - ARM Linux wrote:
+> On Sun, Sep 08, 2013 at 11:34:10AM +0530, Anil Kumar wrote:
+>> scripts/kconfig/conf --silentoldconfig Kconfig
+>>    CHK     include/generated/uapi/linux/version.h
+>>    CHK     include/generated/utsrelease.h
+>> make[1]: `include/generated/mach-types.h' is up to date.
+>>    CALL    scripts/checksyscalls.sh
+>>    CHK     include/generated/compile.h
+>>    AS      arch/arm/mm/cache-v7.o
+>> arch/arm/mm/cache-v7.S: Assembler messages:
+>> arch/arm/mm/cache-v7.S:285: Error: garbage following instruction -- `dsb ishst'
+>> arch/arm/mm/cache-v7.S:297: Error: garbage following instruction -- `dsb ishst'
+>> make[1]: *** [arch/arm/mm/cache-v7.o] Error 1
+>> make: *** [arch/arm/mm] Error 2
+>
+> You need a later binutils for these instructions - 2.22 works just fine,
+> even with gcc 4.5.x.
 
-On Tue, 20 Aug 2013, Sudeep KarkadaNagesha wrote:
+Since we are at it:
 
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> 
-> Now that the cpu device registration initialises the of_node(if available)
-> appropriately for all the cpus, parsing here is redundant.
-> 
-> This patch removes all DT parsing and uses cpu->of_node instead.
-> 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> ---
->  drivers/cpufreq/cpufreq-cpu0.c | 23 ++++-------------------
->  1 file changed, 4 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.=
-> c
-> index ad1fde2..5b05c26 100644
-> --- a/drivers/cpufreq/cpufreq-cpu0.c
-> +++ b/drivers/cpufreq/cpufreq-cpu0.c
-> @@ -174,29 +174,17 @@ static struct cpufreq_driver cpu0_cpufreq_driver =3D =
-> {
-> =20
->  static int cpu0_cpufreq_probe(struct platform_device *pdev)
->  {
-> -=09struct device_node *np, *parent;
-> +=09struct device_node *np;
->  =09int ret;
-> =20
-> -=09parent =3D of_find_node_by_path("/cpus");
-> -=09if (!parent) {
-> -=09=09pr_err("failed to find OF /cpus\n");
-> -=09=09return -ENOENT;
-> -=09}
-> -
-> -=09for_each_child_of_node(parent, np) {
-> -=09=09if (of_get_property(np, "operating-points", NULL))
-> -=09=09=09break;
-> -=09}
-> +=09cpu_dev =3D &pdev->dev;
-> =20
-> +=09np =3D of_node_get(cpu_dev->of_node);
+Build reference: v3.11-7887-gb409624
 
-Has this actually been tested? This seems to break cpufreq-cpu0. The 
-reason is, that this probe function is called not for the DT CPU node, but 
-for a special virtual cpufreq-cpu0 platform device, typically created by 
-platforms, using
+Building arm:defconfig ... passed
+Building arm:allmodconfig ... failed
+--------------
+Error log:
+arch/arm/mach-cns3xxx/pcie.c: In function 'cns3xxx_pcie_hw_init':
+arch/arm/mach-cns3xxx/pcie.c:350:1: warning: the frame size of 1064 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO: return_address should use unwind tables" [-Wcpp]
+arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO: return_address should use unwind tables" [-Wcpp]
+/tmp/cce439dZ.s: Assembler messages:
+/tmp/cce439dZ.s:506: Error: selected processor does not support ARM mode `isb '
+/tmp/cce439dZ.s:512: Error: selected processor does not support ARM mode `isb '
+/tmp/cce439dZ.s:513: Error: selected processor does not support ARM mode `dsb '
+/tmp/cce439dZ.s:583: Error: selected processor does not support ARM mode `isb '
+/tmp/cce439dZ.s:589: Error: selected processor does not support ARM mode `isb '
+/tmp/cce439dZ.s:590: Error: selected processor does not support ARM mode `dsb '
+make[1]: *** [arch/arm/mach-vexpress/dcscb.o] Error 1
+make: *** [arch/arm/mach-vexpress] Error 2
+make: *** Waiting for unfinished jobs....
+--------------
 
-	platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
+Any solution for this one ? omap2plus passes for me.
 
-which then of course doesn't have on .of_node associated with it.
+gcc version used is "arm-poky-linux-gnueabi-gcc (GCC) 4.7.2" from poky 1.3.
 
-Thanks
-Guennadi
-
->  =09if (!np) {
->  =09=09pr_err("failed to find cpu0 node\n");
-> -=09=09ret =3D -ENOENT;
-> -=09=09goto out_put_parent;
-> +=09=09return -ENOENT;
->  =09}
-> =20
-> -=09cpu_dev =3D &pdev->dev;
-> -=09cpu_dev->of_node =3D np;
-> -
->  =09cpu_reg =3D devm_regulator_get(cpu_dev, "cpu0");
->  =09if (IS_ERR(cpu_reg)) {
->  =09=09/*
-> @@ -269,15 +257,12 @@ static int cpu0_cpufreq_probe(struct platform_device =
-> *pdev)
->  =09}
-> =20
->  =09of_node_put(np);
-> -=09of_node_put(parent);
->  =09return 0;
-> =20
->  out_free_table:
->  =09opp_free_cpufreq_table(cpu_dev, &freq_table);
->  out_put_node:
->  =09of_node_put(np);
-> -out_put_parent:
-> -=09of_node_put(parent);
->  =09return ret;
->  }
-> =20
-> --=20
-> 1.8.1.2
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Thanks,
+Guenter
