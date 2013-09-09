@@ -1,16 +1,17 @@
 From: gnurou@gmail.com (Alexandre Courbot)
-Date: Mon, 9 Sep 2013 15:15:31 +0900
+Date: Mon, 9 Sep 2013 15:32:08 +0900
 Subject: [PATCH v5 1/5] ARM: add basic Trusted Foundations support
-In-Reply-To: <5228CEDB.1090306@gmail.com>
+In-Reply-To: <CACRpkdaphSqM1oOphC-t1UPmkxaEemC3R3aDfEXb79GWNNyNMA@mail.gmail.com>
 References: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
  <1378351680-14696-2-git-send-email-acourbot@nvidia.com>
- <5228CEDB.1090306@gmail.com>
-Message-ID: <CAAVeFu+MGGBfmm1jwtKGP_d3EjkLdf5B_E_5RT___PVh1e=8jw@mail.gmail.com>
+ <CACRpkdaphSqM1oOphC-t1UPmkxaEemC3R3aDfEXb79GWNNyNMA@mail.gmail.com>
+Message-ID: <CAAVeFuKq=DVeG6BZ0jg_88+X_XroioY15C43wQA1mnvHVcjsLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 6, 2013 at 3:35 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On 09/04/2013 10:27 PM, Alexandre Courbot wrote:
+On Sat, Sep 7, 2013 at 1:48 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Sep 5, 2013 at 5:27 AM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+>
 >> Trusted Foundations is a TrustZone-based secure monitor for ARM that
 >> can be invoked  using a consistent SMC-based API on all supported
 >> platforms. This patch adds initial basic support for Trusted
@@ -20,55 +21,50 @@ On Fri, Sep 6, 2013 at 3:35 AM, Rob Herring <robherring2@gmail.com> wrote:
 >> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 >> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 >> Reviewed-by: Stephen Warren <swarren@nvidia.com>
->> ---
->>  .../arm/firmware/tl,trusted-foundations.txt        | 17 +++++
->>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->>  arch/arm/Kconfig                                   |  2 +
->>  arch/arm/Makefile                                  |  1 +
->>  arch/arm/firmware/Kconfig                          | 25 +++++++
->>  arch/arm/firmware/Makefile                         |  1 +
->>  arch/arm/firmware/trusted_foundations.c            | 82 ++++++++++++++++++++++
->>  arch/arm/include/asm/trusted_foundations.h         | 53 ++++++++++++++
->>  8 files changed, 182 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
->>  create mode 100644 arch/arm/firmware/Kconfig
->>  create mode 100644 arch/arm/firmware/Makefile
->>  create mode 100644 arch/arm/firmware/trusted_foundations.c
->>  create mode 100644 arch/arm/include/asm/trusted_foundations.h
->>
->> diff --git a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
->> new file mode 100644
->> index 0000000..3954bbd
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
->> @@ -0,0 +1,17 @@
->> +Trusted Foundations
->> +
->> +Boards that use the Trusted Foundations secure monitor can signal its
->> +presence by declaring a node compatible with "tl,trusted-foundations"
->> +under the root node.
->> +
->> +Required properties:
->> +- compatible : "tl,trusted-foundations"
->> +- version-major : major version number of Trusted Foundations firmware
->> +- version-minor: minor version number of Trusted Foundations firmware
->> +
->> +Example:
->> +     firmware {
->> +             compatible = "tl,trusted-foundations";
->> +             version-major = <2>;
->> +             version-minor = <8>;
->> +     };
 >
-> I'm wondering how we fit this in with PSCI bindings? Both are pieces of
-> firmware functionality and may co-exist. There's nothing incompatible
-> here, but there should be some commonality. Will future versions of
-> Trusted Foundations follow the SMC calling conventions doc? What about
-> armv8 support.
+> I take it that this means that it is a set of standard routines
+> living in the secure world that can be called by way of this
+> API, correct? The commit message is written a bit like
+> everybody knows what this is about but I don't :-)
 
-I don't have any information about the future of TF unfortunately,
-excepted that it should remain backward-compatible. What is this SMC
-calling convention doc your are talking about btw? Is there a standard
-calling convention defined by ARM?
+It's actually written a bit like I don't really know what this is
+about, thanks for exposing my ignorance. :P
+
+> Some more background here would be nice, like where did this
+> thing come from, and are there other platforms in existance that
+> use trusted foundations or is it a Tegra-only thing? Does a
+> specification of this thing listing available services exist for
+> example?
+
+There is unfortunately no public specification of this AFAIK. Client
+(kernel) side sources are available as Tegra downstream kernel
+releases, but that's about it.
+
+> How does it relate to the (arch-neutral) trusted execution
+> environment and such things that other vendors are pushing for?
+> Can the trusted foundations be used "underneath" such
+> frameworks for trusted applications, or is it a parallell thing
+> altogether?
+
+My understanding is that TF serves the same purpose for ARM only AFAICT.
+
+> I tried googling it, is this a relevant URL?
+> http://www.arm.com/community/partners/display_product/rw/ProductId/5393/
+
+Yes. TF is an essential feature to support in order to boot the kernel
+on some Tegra-based consumer devices (e.g. SHIELD). Basic things such
+as secondary CPU control must be performed through SMCs. It has many
+more features but for the moment I don't see a need to go beyond the
+very basic.
+
+The issue is that as you pointed out, public information is scarce and
+future direction uncertain. That's why this patchset limits itself to
+what is needed to get secondary CPUs running - the procedure is very
+simple and unlikely to change in the future. DT binding is also as
+concise as possible to allow malleability since we cannot predict how
+it will evolve in the future.
+
+I will try to explain better what TF is in the commit log - at least
+as far as I understand it myself.
 
 Alex.
