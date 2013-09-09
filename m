@@ -1,127 +1,54 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Mon, 09 Sep 2013 08:37:35 -0700
-Subject: [PATCH v2] pwm: pxa: add device tree support to pwm driver
-In-Reply-To: <201309090249.47407.marex@denx.de>
-References: <1378669218-10944-1-git-send-email-mikedunn@newsguy.com>
- <201309090249.47407.marex@denx.de>
-Message-ID: <522DEB3F.7090509@newsguy.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  9 Sep 2013 17:39:58 +0200
+Subject: [PATCH 0/8] IOP GPIO refactoring
+Message-ID: <1378741198-12847-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2013 05:49 PM, Marek Vasut wrote:
-> Dear Mike Dunn,
-> 
->> This patch adds device tree support to the pxa's pwm driver.  Only an OF
->> match table is added; nothing needs to be extracted from the device tree
->> node.  The existing platform_device id table is reused for the match table
->> data.  Support for inverted polarity is also added.
->>
->> Tested on a Palm Treo 680 (both platform data and DT cases).
->>
->> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
->> ---
->> Changle log:
->> v2:
->> - of_match_table contains only the "pxa250-pwm" compatible string; require
->> one device instance per pwm
->> - add Documentation/devicetree/bindings/pwm/pxa-pwm.txt
->> - add support for polarity flag in DT and implement set_polarity() method
->>   (the treo 680 inverts the signal between pwm out and backlight)
->> - return -EINVAL instead of -ENODEV if platform data or DT node not found
->> - output dev_info string if platform data missing
->> - expanded CC list of patch
->>
->>  Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 33 +++++++++++++
->>  arch/arm/boot/dts/pxa27x.dtsi                     | 24 ++++++++++
->>  drivers/pwm/pwm-pxa.c                             | 57
->> +++++++++++++++++++++++ 3 files changed, 114 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pwm/pxa-pwm.txt
->>
->> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
->> b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt new file mode 100644
->> index 0000000..7b09bfa
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
->> @@ -0,0 +1,33 @@
->> +Marvell pwm controller
->> +
->> +Required properties:
->> +- compatible:
->> +  for pxa25x, pxa27x, pxa168, pxa910: must be compatible =
->> "marvell,pxa250-pwm"; +- reg: physical base address and length of the
->> registers used by the pwm channel +  NB: One device instance must be
->> created for each pwm that is used, so the +  length covers only the
->> register window for one pwm output, not that of the +  entire pwm
->> controller.  Currently length is 0x10 for all supported devices. +-
->> #pwm-cells: should be 3.
->> +   cell 1: the per-chip index of the PWM to use,
->> +   cell 2: the period in nanoseconds,
-> 
-> Is there no generic OF prop for this?
+This series refactor the IOP GPIO driver to move down to the
+GPIO subsystem, instatiate as a platform device, remap its
+I/O address, and kills off the <mach/gpio.h> dependency.
 
+This is done to get rid of <mach/gpio.h> and the complex
+local GPIO implementation.
 
-Yes, all the pwm drivers with DT support have the same definitions for cell 1
-and 2.  Many have #pwm-cells=2, but for those with #pwm-cells=3, all define cell
-3 the same way also.
+Please do not report the checkpatch warning in patch 5,
+I am only copy/pasting code from one place to another and
+the warning is removed later in the series.
 
+Linus Walleij (8):
+  ARM: plat-iop: move the GPIO driver to drivers/gpio
+  ARM: iop32x: request and issue reset using gpio
+  ARM: iop32x: read N2100 power key using gpiolib
+  gpio: decouple the IOP GPIO driver from platform
+  ARM: plat-iop: remove custom complex GPIO implementation
+  ARM: plat-iop: instantiate GPIO from platform device
+  gpio: iop: use readl/writel accessors
+  ARM: plat-iop: pass physical base for GPIO
 
-> 
->> +   cell 3: flags; set bit 0 to specify inverse polarity.
-> 
-> Do we not have some generic flag to indicate inverted PWM polarity?
+ arch/arm/Kconfig                            |   4 +-
+ arch/arm/include/asm/hardware/iop3xx-gpio.h |  75 ----------------
+ arch/arm/include/asm/hardware/iop3xx.h      |  12 ---
+ arch/arm/mach-iop32x/include/mach/gpio.h    |   6 --
+ arch/arm/mach-iop32x/include/mach/iop32x.h  |   1 -
+ arch/arm/mach-iop32x/iq31244.c              |   7 ++
+ arch/arm/mach-iop32x/iq80321.c              |   7 ++
+ arch/arm/mach-iop32x/n2100.c                |  27 +++++-
+ arch/arm/mach-iop33x/include/mach/gpio.h    |   6 --
+ arch/arm/mach-iop33x/include/mach/iop33x.h  |   1 -
+ arch/arm/mach-iop33x/iq80331.c              |   7 ++
+ arch/arm/mach-iop33x/iq80332.c              |   7 ++
+ arch/arm/plat-iop/Makefile                  |   2 -
+ arch/arm/plat-iop/gpio.c                    |  93 --------------------
+ drivers/gpio/Kconfig                        |   9 ++
+ drivers/gpio/Makefile                       |   1 +
+ drivers/gpio/gpio-iop.c                     | 130 ++++++++++++++++++++++++++++
+ 17 files changed, 194 insertions(+), 201 deletions(-)
+ delete mode 100644 arch/arm/include/asm/hardware/iop3xx-gpio.h
+ delete mode 100644 arch/arm/mach-iop32x/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-iop33x/include/mach/gpio.h
+ delete mode 100644 arch/arm/plat-iop/gpio.c
+ create mode 100644 drivers/gpio/gpio-iop.c
 
-
-Yes, enum pwm_polarity, defined in include/linux/pwm.h.  The pwm drivers with
-polarity support all define cell 3 the same way.  The wording in the bindings
-documentation is a little different in each case, but all essentially say the
-same thing.  In Documentation/devicetree/bindings/pwm/ see for example
-atmel-tcb-pwm.txt and pwm-tiecap.txt.
-
-I'm new to device tree, so maybe I am not understanding correctly this and your
-previous question... All DT properties are described as integers lacking any
-type (aside from their bit width), no?
-
-
-> 
-> [...]
->  
->> +#ifdef CONFIG_OF
->> +/*
->> + * Device tree users should create one device instance for each pwm
->> channel. + * Hence we dispense with the HAS_SECONDARY_PWM and "tell" the
->> original driver + * code that this is a single channel pxa25x-pwm.
->> + */
-> 
-> Above ... pxa250-pwm , no ?
-> 
->> +static struct of_device_id pwm_of_match[] = {
->> +	{ .compatible = "marvell,pxa250-pwm", .data = &pwm_id_table[0]},
-> 
-> Surely, data can be NULL, no ?
-
-
-It could, in which case pxa_pwm_get_id_dt() would explicitly return
-&pwm_id_table[0] instead of the .data element of the of_device_id.  Not sure
-which way is better and why.  That dumb platform_device_id table is causing all
-kinds of nuisance :)
-
-
-> 
-> [...]
-> 
->> @@ -145,6 +199,8 @@ static int pwm_probe(struct platform_device *pdev)
->>  	pwm->chip.ops = &pxa_pwm_ops;
->>  	pwm->chip.base = -1;
->>  	pwm->chip.npwm = (id->driver_data & HAS_SECONDARY_PWM) ? 2 : 1;
->> +	pwm->chip.of_xlate = of_pwm_xlate_with_flags;
->> +	pwm->chip.of_pwm_n_cells = 3;
-> 
-> Are these two settings needed ?
-
-
-Yes.  See drivers/pwm/core.c:of_pwmchip_add(), where they are set to default
-values of of_pwm_simple_xlate and 2 if left uninitialized.
-
-
-Thanks again Marek,
-Mike
+-- 
+1.8.3.1
