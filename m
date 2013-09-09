@@ -1,62 +1,38 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Mon, 9 Sep 2013 15:38:28 +0900
-Subject: [PATCH v5 1/5] ARM: add basic Trusted Foundations support
-In-Reply-To: <522A2D1B.3010508@wwwdotorg.org>
-References: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
- <1378351680-14696-2-git-send-email-acourbot@nvidia.com>
- <522A2D1B.3010508@wwwdotorg.org>
-Message-ID: <CAAVeFuJF-cu9aPCruGPQk9WHV7VAGhGpU0bU6LToxP38YBnS_g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Sep 2013 08:54:59 +0200
+Subject: [PATCH 02/04] ARM: shmobile: r8a7791 SCIF support
+In-Reply-To: <20130909001524.GD21921@verge.net.au>
+References: <20130904034525.12546.24775.sendpatchset@w520>
+ <20130904034608.12546.79411.sendpatchset@w520>
+ <CACRpkdY=j_XRPd9-CV-wj9ajSDZMA1H=k8uK1T2040rmfY=R_A@mail.gmail.com>
+ <20130909001524.GD21921@verge.net.au>
+Message-ID: <CACRpkdYwA0ADogtB8RfkZt2bmdbr-PmjvV1=xBKam15DXi9F8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 7, 2013 at 4:29 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 09/04/2013 09:27 PM, Alexandre Courbot wrote:
->> Trusted Foundations is a TrustZone-based secure monitor for ARM that
->> can be invoked  using a consistent SMC-based API on all supported
->> platforms. This patch adds initial basic support for Trusted
->> Foundations using the ARM firmware API. Current features are limited
->> to the ability to boot secondary processors.
->
->> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
-> ...
->> +void of_register_trusted_foundations(void)
->> +{
->> +     struct device_node *node;
->> +     struct trusted_foundations_platform_data pdata;
->> +     int err;
->> +
->> +     node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
->> +
->> +     if (!node)
->> +             return;
->
-> If you're going to revise this patch for the comment below, then I would
-> suggest removing the blank line before that if statement.
+On Mon, Sep 9, 2013 at 2:15 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Sep 06, 2013 at 06:27:22PM +0200, Linus Walleij wrote:
 
-Sure.
+>> Again this looks like it is piling up more legacy clk
+>> code instead of moving to the new frameworks.
+>>
+>> Please include Mike Turquette on future postings of the
+>> clk code, he's definately our best clock code reviewer.
+>
+> Perhaps I was a bit hasty, but I have already queued up these changes.
+> And moreover I believe they are useful in their current form for
+> back-porting to LTSI-3.4, which I have also already done.
 
->
->> diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
->
-> Do we need to add the following here:
->
-> #if !IS_ENABLED(CONFIG_OF)
-> static inline void register_trusted_foundations(...) {}
-> #endif
->
-> So that there is a dummy no-op function for the non-DT-support case? I
-> guess Tegra always has CONFIG_OF enabled so that call from
-> mach-tegra/common.c in patch 2 will never be an issue, but perhaps it
-> might if anyone else uses this?
+That sounds like you're a bit too trigger-happy ;-)
 
-My expectation is that register_trusted_foundations() is called by the
-platform code once it has established (through whatever mean it likes)
-that Trusted Foundations is required. For platforms supporting DT,
-of_register_trusted_foundations() takes care of that. Platforms that
-don't support DT need another way to decide whether they *need* TF or
-not. Once a platform decided that it needs TF, its absence is not an
-option, and therefore I'd think that register_trusted_foundations()
-should hard-fail if support is not compiled in. Or maybe I missed your
-point?
+> So on those two counts my preference would be for any enhancements
+> to be done as incremental patches on top of this series.
 
-Alex.
+Hm hm. I am worried that it is taken as an OK to proceed
+extending old cruft for new SoCs rather than moving to new
+frameworks. I would agree if such migration patches were
+floating the lists but I am not aware of any patches starting
+to create drivers/clk/sh*, are you?
+
+Yours,
+Linus Walleij
