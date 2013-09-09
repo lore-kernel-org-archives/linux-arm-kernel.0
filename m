@@ -1,106 +1,53 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Mon, 09 Sep 2013 10:24:39 +0100
-Subject: [PATCH v4 12/19] cpufreq: cpufreq-cpu0: remove device tree parsing
- for cpu nodes
-In-Reply-To: <Pine.LNX.4.64.1309061539310.11068@axis700.grange>
-References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1376991021-12160-13-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <Pine.LNX.4.64.1309061539310.11068@axis700.grange>
-Message-ID: <522D93D7.4010307@arm.com>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Mon,  9 Sep 2013 12:00:12 +0200
+Subject: [PATCH 0/3] perf: parse the dwarf backtrace info from .debug_frame
+ section
+Message-ID: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/13 14:44, Guennadi Liakhovetski wrote:
-> Hi
-> 
-> On Tue, 20 Aug 2013, Sudeep KarkadaNagesha wrote:
-> 
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> Now that the cpu device registration initialises the of_node(if available)
->> appropriately for all the cpus, parsing here is redundant.
->>
->> This patch removes all DT parsing and uses cpu->of_node instead.
->>
->> Acked-by: Shawn Guo <shawn.guo@linaro.org>
->> Acked-by: Rob Herring <rob.herring@calxeda.com>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->> ---
->>  drivers/cpufreq/cpufreq-cpu0.c | 23 ++++-------------------
->>  1 file changed, 4 insertions(+), 19 deletions(-)
->>
->> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.=
->> c
->> index ad1fde2..5b05c26 100644
->> --- a/drivers/cpufreq/cpufreq-cpu0.c
->> +++ b/drivers/cpufreq/cpufreq-cpu0.c
->> @@ -174,29 +174,17 @@ static struct cpufreq_driver cpu0_cpufreq_driver =3D =
->> {
->> =20
->>  static int cpu0_cpufreq_probe(struct platform_device *pdev)
->>  {
->> -=09struct device_node *np, *parent;
->> +=09struct device_node *np;
->>  =09int ret;
->> =20
->> -=09parent =3D of_find_node_by_path("/cpus");
->> -=09if (!parent) {
->> -=09=09pr_err("failed to find OF /cpus\n");
->> -=09=09return -ENOENT;
->> -=09}
->> -
->> -=09for_each_child_of_node(parent, np) {
->> -=09=09if (of_get_property(np, "operating-points", NULL))
->> -=09=09=09break;
->> -=09}
->> +=09cpu_dev =3D &pdev->dev;
->> =20
->> +=09np =3D of_node_get(cpu_dev->of_node);
-> 
-> Has this actually been tested? This seems to break cpufreq-cpu0. The 
-> reason is, that this probe function is called not for the DT CPU node, but 
-> for a special virtual cpufreq-cpu0 platform device, typically created by 
-> platforms, using
-> 
-> 	platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
-> 
-> which then of course doesn't have on .of_node associated with it.
-> 
+On ARM the debug info is not present in the .eh_frame sections but
+in .debug_frame instead, in dwarf format.
 
-Hi Guennadi,
+This patch set uses libunwind to load and parse the dwarf debug info from
+the .debug_frame section if no .eh_frame_hdr section is found; also it
+sets the hooks in the perf_regs and libunwind code for ARMv7.
 
-Based on my understanding of the original code:
-        cpu_dev = &pdev->dev;
-	...
-	ret = of_init_opp_table(cpu_dev);
+Dependencies:
+ . if present, libunwind >= 1.1 is needed to prevent a segfault when
+   parsing the dwarf info,
+ . libunwind needs to be configured with --enable-debug-frame
+   to prevent a linkage error. Note: --enable-debug-frame is automatically
+   selected on ARM).
 
-of_init_opp_table needs cpu_dev to be get_cpu_device(0). My
-understanding was that platform using cpufreq-cpu0 sets &pdev->dev to
-get_cpu_device(0). But looks like that's not the case.
-
-Hi Shawn,
-
-Can you please clarify ? The fix would be as below but I would like to
-know if setting cpu_dev to get_cpu_device(0) instead of &pdev->dev has
-any impact on other parts of code using cpu_dev ?
-
-diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-index cbfffa9..871c336 100644
---- a/drivers/cpufreq/cpufreq-cpu0.c
-+++ b/drivers/cpufreq/cpufreq-cpu0.c
-@@ -177,7 +177,7 @@ static int cpu0_cpufreq_probe(struct platform_device
-*pdev)
-        struct device_node *np;
-        int ret;
-
--       cpu_dev = &pdev->dev;
-+       cpu_dev = get_cpu_device(0);
-
-        np = of_node_get(cpu_dev->of_node);
-        if (!np) {
+The generated perf has been tested on ARMv7/OMAP4 and x86_64, using the
+following commands:
+ perf record -g [dwarf] -- <binary>
+ perf report --sort symbol --call-graph --stdio
 
 
-Regards,
-Sudeep
+Jean Pihet (1):
+  perf: parse the .debug_frame section in case .eh_frame is not present
+
+Will Deacon (2):
+  ARM: perf: add support for perf registers API
+  ARM: perf: wire up perf_regs and unwind support for ARM
+
+ arch/arm/Kconfig                        |  2 +
+ arch/arm/include/uapi/asm/Kbuild        |  1 +
+ arch/arm/include/uapi/asm/perf_regs.h   | 23 +++++++++++
+ arch/arm/kernel/Makefile                |  1 +
+ arch/arm/kernel/perf_regs.c             | 30 ++++++++++++++
+ tools/perf/arch/arm/Makefile            |  3 ++
+ tools/perf/arch/arm/include/perf_regs.h | 54 +++++++++++++++++++++++++
+ tools/perf/arch/arm/util/unwind.c       | 48 ++++++++++++++++++++++
+ tools/perf/config/Makefile              |  9 +++--
+ tools/perf/util/unwind.c                | 71 +++++++++++++++++++++++++--------
+ 10 files changed, 223 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/include/uapi/asm/perf_regs.h
+ create mode 100644 arch/arm/kernel/perf_regs.c
+ create mode 100644 tools/perf/arch/arm/include/perf_regs.h
+ create mode 100644 tools/perf/arch/arm/util/unwind.c
+
+-- 
+1.7.11.7
