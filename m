@@ -1,94 +1,61 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 9 Sep 2013 17:46:59 +0100
-Subject: [PATCH v5 11/13] xen: introduce xen_alloc/free_coherent_pages
-In-Reply-To: <8492887B-2509-42B5-A5F9-A711C519D912@arm.com>
-References: <alpine.DEB.2.02.1308291917290.6397@kaball.uk.xensource.com>
- <1377801154-29215-11-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130905160905.GI11887@arm.com>
- <alpine.DEB.2.02.1309051742390.6397@kaball.uk.xensource.com>
- <20130906141444.GE1946@arm.com>
- <alpine.DEB.2.02.1309061554260.6397@kaball.uk.xensource.com>
- <20130906155928.GH1946@arm.com>
- <alpine.DEB.2.02.1309061706480.6397@kaball.uk.xensource.com>
- <20130906162018.GJ1946@arm.com>
- <alpine.DEB.2.02.1309061740050.6397@kaball.uk.xensource.com>
- <8492887B-2509-42B5-A5F9-A711C519D912@arm.com>
-Message-ID: <alpine.DEB.2.02.1309091732230.6397@kaball.uk.xensource.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Mon, 9 Sep 2013 11:56:04 -0500
+Subject: [PATCH RFC v2 2/5] spmi: Linux driver framework for SPMI
+In-Reply-To: <20130909155224.GQ29403@sirena.org.uk>
+References: <cover.1377202730.git.joshc@codeaurora.org>
+ <46db5901fe4d04d09cee8fd81ea1c62068ee9503.1377202730.git.joshc@codeaurora.org>
+ <20130822231054.GA31973@kroah.com>
+ <20130823160625.GP4035@joshc.qualcomm.com>
+ <20130909155224.GQ29403@sirena.org.uk>
+Message-ID: <20130909165604.GM808@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 Sep 2013, Catalin Marinas wrote:
-> >>> They could also happen in a DomU if we assign a physical device to it
-> >>> (and an SMMU is not available).
-> >> 
-> >> The problem is that you don't necessarily know one kind of coherency you
-> >> know for a physical device. As I said, we plan to do this DT-driven.
-> > 
-> > OK, but if I call arm64_swiotlb_dma_ops.alloc passing the right
-> > arguments to it, I should be able to get the right coherency for the
-> > right device, correct?
+Hey Mark-
+
+Thanks for the comments.
+
+On Mon, Sep 09, 2013 at 04:52:24PM +0100, Mark Brown wrote:
+> On Fri, Aug 23, 2013 at 11:06:25AM -0500, Josh Cartwright wrote:
+> > On Thu, Aug 22, 2013 at 04:10:54PM -0700, Greg Kroah-Hartman wrote:
+> > > On Fri, Aug 09, 2013 at 01:37:09PM -0700, Josh Cartwright wrote:
 > 
-> I think it needs a bit more work on the Xen part.  Basically
-> dma_alloc_attrs() calls get_dma_ops() to obtain the best DMA operations
-> for a device.  arm64_swiotlb_dma_ops is just the default implementation
-> and I'll add a _noncoherent variant as well.  Default dma_ops will be
-> set to one of these during boot.  But a device is also allowed to have
-> its own dev->archdata.dma_ops, set via set_dma_ops().
+> > > > +	"Example: Read 4 bytes starting at register address 0x1234 for SID 2\n"
+> > > > +	"\n"
+> > > > +	"echo 0x21234 > address\n"
+> > > > +	"echo 4 > count\n"
+> > > > +	"cat data\n"
+> > > > +	"\n"
+> > > > +	"Example: Write 3 bytes starting at register address 0x1008 for SID 1\n"
+> > > > +	"\n"
+> > > > +	"echo 0x11008 > address\n"
+> > > > +	"echo 0x01 0x02 0x03 > data\n"
+> > > > +	"\n"
+> > > > +	"Note that the count file is not used for writes.  Since 3 bytes are\n"
+> > > > +	"written to the 'data' file, then 3 bytes will be written across the\n"
+> > > > +	"SPMI bus.\n\n";
 > 
-> So even if you set the default dma_ops to Xen ops, you may not get them
-> via dma_alloc_coherent().  I don't see any easier solution other than
-> patching the dma_alloc_attrs() function to issue a Hyp call after the
-> memory has been allocated with the get_dma_ops()->alloc().  But I don't
-> like this either.
+> > > The help file within the kernel is a nice touch :)
+> 
+> > > Or is this only for "debugging"?  If so, please document it as such.
+> 
+> > It's there because it provides a useful interface for debugging of the
+> > controller code, and for simple peek/poke of the slave registers without
+> > having a full driver in place.  Will document this.
+> 
+> This looks awfully like a version of the debugfs interfaces that regmap
+> provides, and indeed the entire bus sounds like something that could
+> idiomatically be supported via regmap.  Have you considered doing that?
+> This would give access to standard tracepoints as well, plus the cache
+> infrastructure.
 
-I see. This problem affects arch/arm as well.
-Either we add an if (!xen_domain()) in get_dma_ops, or we could make
-get_dma_ops a function pointer and let people overwrite it.
-See below the first option implemented for arch/arm on top of the
-swiotlb series:
+It does indeed look like regmap might work out nicely for SPMI.  I
+hadn't seriously considered it just due to a lack of familiarity. I'll
+give it a shot and see if I run into any problems.
 
+Thanks,
+  Josh
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 7d6e4f9..0b8b5e4 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -12,6 +12,8 @@
- #include <asm/memory.h>
- #include <asm/cacheflush.h>
- 
-+#include <xen/xen.h>
-+
- #define DMA_ERROR_CODE	(~0)
- extern struct dma_map_ops *dma_ops;
- extern struct dma_map_ops arm_dma_ops;
-@@ -19,7 +21,7 @@ extern struct dma_map_ops arm_coherent_dma_ops;
- 
- static inline struct dma_map_ops *get_dma_ops(struct device *dev)
- {
--	if (dev && dev->archdata.dma_ops)
-+	if (!xen_domain() && dev && dev->archdata.dma_ops)
- 		return dev->archdata.dma_ops;
- 	return dma_ops;
- }
-diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
-index af2cf8d..c2232fe 100644
---- a/arch/arm/include/asm/xen/page-coherent.h
-+++ b/arch/arm/include/asm/xen/page-coherent.h
-@@ -9,6 +9,8 @@ static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
- 		dma_addr_t *dma_handle, gfp_t flags,
- 		struct dma_attrs *attrs)
- {
-+	if (hwdev && hwdev->archdata.dma_ops)
-+		return hwdev->archdata.dma_ops->alloc(hwdev, size, dma_handle, flags, attrs);
- 	return arm_dma_ops.alloc(hwdev, size, dma_handle, flags, attrs);
- }
- 
-@@ -16,6 +18,8 @@ static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
- 		void *cpu_addr, dma_addr_t dma_handle,
- 		struct dma_attrs *attrs)
- {
-+	if (hwdev && hwdev->archdata.dma_ops)
-+		return hwdev->archdata.dma_ops->free(hwdev, size, cpu_addr, dma_handle, attrs);
- 	return arm_dma_ops.free(hwdev, size, cpu_addr, dma_handle, attrs);
- }
- 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
