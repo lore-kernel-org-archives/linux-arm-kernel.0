@@ -1,86 +1,54 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 9 Sep 2013 23:42:41 +0200 (CEST)
-Subject: "cpufreq: fix serialization issues with freq change notifiers"
- breaks cpufreq too
-In-Reply-To: <1883706.eFcILAzoo8@vostro.rjw.lan>
-References: <Pine.LNX.4.64.1309091656200.6602@axis700.grange>
- <1883706.eFcILAzoo8@vostro.rjw.lan>
-Message-ID: <Pine.LNX.4.64.1309092330560.12376@axis700.grange>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Mon, 9 Sep 2013 17:04:38 -0500
+Subject: [PATCHv3 1/2] ARM: msm: Add support for APQ8074 Dragonboard
+In-Reply-To: <522E40B2.9010301@codeaurora.org>
+References: <1378495943-2572-1-git-send-email-rvaswani@codeaurora.org>
+ <20130906215051.GA29253@quad.lixom.net> <522E09E6.8040300@codeaurora.org>
+ <FFE100A7-8AD6-4E0D-9F64-120DA3564F89@codeaurora.org>
+ <522E21A8.4060408@wwwdotorg.org>
+ <FA33E8F4-3F85-4D8B-83E1-96F5A8F76CE6@codeaurora.org>
+ <522E3BC9.1030105@wwwdotorg.org>
+ <CA05A23E-41CF-4EC6-BB2D-36105048700B@codeaurora.org>
+ <522E40B2.9010301@codeaurora.org>
+Message-ID: <49CC46F4-F6CE-4B1A-B0D5-E4BB779755B8@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael
 
-On Mon, 9 Sep 2013, Rafael J. Wysocki wrote:
+On Sep 9, 2013, at 4:42 PM, Rohit Vaswani wrote:
 
-> Hi,
+> On 9/9/2013 2:25 PM, Kumar Gala wrote:
+>> <snip>
+>> On Fri, Sep 06, 2013 at 12:32:22PM -0700, Rohit Vaswani wrote:
+>>>>>>>>> This patch adds basic board support for APQ8074 Dragonboard
+>>>>>>>>> <snip>
+>>>>>>>>> dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+>>>>>>>>> -	msm8960-cdp.dtb
+>>>>>>>>> +	msm8960-cdp.dtb \
+>>>>>>>>> +	apq8074-dragonboard.dtb
+>>>>>>>> Please add boards alphabetically.
+>>>>>>> Will do.
+>>>>>>>>> dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+>>>>>>>>> 	armada-370-mirabox.dtb \
+>>>>>>>>> 	armada-370-rd.dtb \
+>>>>>>>>> diff --git a/arch/arm/boot/dts/apq8074-dragonboard.dts b/arch/arm/boot/dts/apq8074-dragonboard.dts
+>>>>>>>>> new file mode 100644
+>>>>>>>>> index 0000000..5b7b6a0
+>>>>>>>>> --- /dev/null
+>>>>>>>>> +++ b/arch/arm/boot/dts/apq8074-dragonboard.dts
+>>>>>>>> arch/arm/boot/dts/ is getting really crowded. It's been working best if the SoC
+>>>>>>>> family or vendor is used as a prefix to keep things a bit more organized. In
+>>>>>>>> that spirit, prefixing these with msm-<foo> makes sense. Can you please do so?
+>>>>>>> Sure. But the board is called an APQ8074 and we wanted to keep the naming consistent with that.
+>>>>>> If we do this we should use qcom, not msm as the prefix.  Match the device tree vendor prefix.
 > 
-> On Monday, September 09, 2013 05:11:10 PM Guennadi Liakhovetski wrote:
-> > Sorry guys, I'm trying my best to stop this patch from propagating to 
-> > stable and to get it fixed asap, so, the CC list might be a bit excessive. 
-> > Also trying to fix the originally spare cc list, which makes it impossible 
-> > for me to reply to the original thread, instead have to start a new one.
-> 
-> I'm not sure what you're talking about.  What exactly was wrong with the
-> original CC list in particular?
+> Coming back to this, it would be better if the naming to be consistent with what we call our ARCH - msm and not qcom.
+> msm8974-dragonboard signifies quite clearly what the board is.
 
-I think you advised once to cc cpufreq related mails to linux-pm too at 
-least. I haven't found this patch in my pm archive, have I missed it 
-there?
+I was saying qcom,apq8074-dragonboard or we can do the dir thing as we don't have that mean qcom/msm device trees.
 
-> > Commit
-> > 
-> > commit dceff5ce18801dddc220d6238628619c93bc3cb6
-> > Author: Viresh Kumar <viresh.kumar@linaro.org>
-> > Date:   Sun Sep 1 22:19:37 2013 +0530
-> > 
-> >     cpufreq: fix serialization issues with freq change notifiers
-> > 
-> > breaks .transition_ongoing counting.
-> 
-> Do you know how exactly it breaks that?  If so, care to share that knowledge?
+- k
 
-No, I don't. I only know that in __cpufreq_driver_target() the check for
-
-	if (policy->transition_ongoing) {
-		write_unlock_irqrestore(&cpufreq_driver_lock, flags);
-		return -EBUSY;
-	}
-
-is failing with this patch and cpufreq-cpu0.
-
-> > This leads to cpufreq-cpu0 not working any more. In particular switching the
-> > governor from performance to powersave directly after boot doesn't result in
-> > a frequency switch any more. Reverting this patch fixes the problem again.
-> 
-> However, this is a regression fix, so I'd prefer to fix the problem on top of
-> it instead of reverting this commit entirely.
-
-If I understood correctly, this patch fixed some warnings, that, however, 
-didn't disrupt functionality, is this right? Whereas the patch really 
-seems to break working set ups.
-
-Anyway, we know about the problem now and I believe it'll get fixed one 
-way or another.
-
-Thanks
-Guennadi
-
-> > Tested with today's 
-> > -next.
-> > 
-> > Please, refrain from including into "stable" until clarified!
-> 
-> Well, dropping the commit altogether and dropping the "CC stable" tag are
-> equally disruptive at this point, so I think I'll just defer all of the
-> cpufreq fixes I wanted to push for 3.12 before the ending of the merge
-> window.
-> 
-> Thanks,
-> Rafael
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
