@@ -1,106 +1,32 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 9 Sep 2013 09:09:15 +0900
-Subject: [GIT PULL 3/3] ARM: shmobile: lager: enable Ether
-In-Reply-To: <CAOesGMg=Nq+2bWr3tW5+t5zJi-YH35DWjE=Sr7aeo_6FtKt1Tg@mail.gmail.com>
-References: <cover.1375839719.git.horms+renesas@verge.net.au>
- <4901e136aa5c35873701156c4c0af5b3c2c8faee.1375839719.git.horms+renesas@verge.net.au>
- <87siy3owxj.fsf@linaro.org> <5215115A.1010400@cogentembedded.com>
- <20130822001647.GA6902@verge.net.au>
- <20130822065325.GA6615@quad.lixom.net>
- <20130822070109.GA26589@verge.net.au>
- <CAOesGMjZ+a6EiDa2p3y-_kkQ0uwSHU6zdcTxuphJxNcr7QhDhw@mail.gmail.com>
- <20130822073706.GA32091@verge.net.au>
- <CAOesGMg=Nq+2bWr3tW5+t5zJi-YH35DWjE=Sr7aeo_6FtKt1Tg@mail.gmail.com>
-Message-ID: <20130909000915.GB21921@verge.net.au>
+Date: Mon, 9 Sep 2013 09:11:21 +0900
+Subject: [PATCH v2 0/4] Add Ether DT support for R8A7778/BOCK-W reference
+ board
+In-Reply-To: <201309070423.30672.sergei.shtylyov@cogentembedded.com>
+References: <201309070423.30672.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130909001121.GC21921@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 06, 2013 at 02:32:16PM -0700, Olof Johansson wrote:
-> On Thu, Aug 22, 2013 at 12:37 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Aug 22, 2013 at 12:04:59AM -0700, Olof Johansson wrote:
-> >> On Thu, Aug 22, 2013 at 12:01 AM, Simon Horman <horms@verge.net.au> wrote:
-> >> > On Wed, Aug 21, 2013 at 11:53:25PM -0700, Olof Johansson wrote:
-> >> >> On Thu, Aug 22, 2013 at 09:16:49AM +0900, Simon Horman wrote:
-> >> >> > On Wed, Aug 21, 2013 at 11:13:30PM +0400, Sergei Shtylyov wrote:
-> >> >> > > Hello.
-> >> >> > >
-> >> >> > > On 08/21/2013 08:01 PM, Kevin Hilman wrote:
-> >> >> > >
-> >> >> > > >>Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> >> >> > > >>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >> >> > >
-> >> >> > > >This one is triggering a new build failure in -next:
-> >> >> > >
-> >> >> > > >arch/arm/mach-shmobile/board-lager.c:99:2: error: unknown field 'register_type' specified in initializer
-> >> >> > > >arch/arm/mach-shmobile/board-lager.c:99:19: error: 'SH_ETH_REG_FAST_RCAR' undeclared here (not in a function)
-> >> >> > >
-> >> >> > > >>+/* Ether */
-> >> >> > > >>+static struct sh_eth_plat_data ether_pdata __initdata = {
-> >> >> > > >>+       .phy                    = 0x1,
-> >> >> > > >>+       .edmac_endian           = EDMAC_LITTLE_ENDIAN,
-> >> >> > > >>+       .register_type          = SH_ETH_REG_FAST_RCAR,
-> >> >> > >
-> >> >> > > >and it looks to be because this board is trying to use the register_type
-> >> >> > > >field which was removed by:
-> >> >> > >
-> >> >> > > >commit 8d3214c4e8c8be6efd8ec7a172239ebbd4deb04b
-> >> >> > > >Author: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >> >> > > >Date:   Sun Aug 18 03:13:26 2013 +0400
-> >> >> > > >
-> >> >> > > >     sh_eth: remove 'register_type' field from 'struct sh_eth_plat_data'
-> >> >> > > >
-> >> >> > > >     Now that the 'register_type' field of the 'sh_eth' driver's platform data is not
-> >> >> > > >     used by the driver anymore, it's time to remove it and  its initializers from
-> >> >> > > >     the SH platform code. Also  move *enum* declaring values for this  field from
-> >> >> > > >     <linux/sh_eth.h>  to  the  local driver's  header file as they're only needed
-> >> >> > > >     by the driver itself  now...
-> >> >> > > >
-> >> >> > > >     Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >> >> > > >     Signed-off-by: David S. Miller <davem@davemloft.net>
-> >> >> > >
-> >> >> > >    Looks like in this case I had no choice since R8A7790 support for
-> >> >> > > the 'sh_eth' driver will be added in 3.12 only, so if I merged these
-> >> >> > > patches thru the shmobile tree, we'd have gotten an error in the
-> >> >> > > driver...
-> >> >> > >    I guess it's too early to fix this in any particular tree except
-> >> >> > > for linux-next itself... let me know what I can do.
-> >> >> >
-> >> >> > This patch ("ARM: shmobile: lager: enable Ether") is also targeted at v3.12.
-> >> >> > So it seems to me that a fix for this could go through the shmobile tree
-> >> >> > if it is acceptable to merge net-next into the base of a pull-request.
-> >> >> >
-> >> >> > Kevin, Olof, could you give some guidance here.
-> >> >>
-> >> >> I don't think we want to pull in net-next here just for this -- that is a
-> >> >> massive branch.
-> >> >>
-> >> >> There's no great solution to any of this, unfortunately.
-> >> >>
-> >> >> I think easiest would be if we add a patch that fixes this up _only_ in
-> >> >> for-next, and merge the same patch upstream as soon as net-next lands
-> >> >> (if it lands after arm-soc, otherwise we include it in our branch),
-> >> >> that might be the least painful way to do this.
-> >> >>
-> >> >> That patch would just remove the assignment to register_type in the
-> >> >> board file.
-> >> >
-> >> > That is fine by me.
-> >> >
-> >> > I think it would be easiest to supply the patch to you as
-> >> > a patch in email rather than a pull request.
-> >> >
-> >> > Does that work for you?
-> >>
-> >> Yes, definitely.
-> >
-> > Thanks, I have posted it as
-> > "[PATCH] ARM: shmobile: lager: Do not use register_type field of struct".
+On Sat, Sep 07, 2013 at 04:23:29AM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Ok, I forgot to include this when sending the code up today, so lager
-> is currently broken in mainline. I'll include it in the next branch we
-> send up.
+>    Here's the set of 4 patches against Simon Horman's 'renesas.git' repo,
+> 'renesas-devel-20130906' tag. Here we add the Ether device tree support working
+> on the R8A7778/BOCK-W reference board. The patchset requires the 'sh_eth' driver
+> device tree support posted earlier in order to work.
 
-Thanks Olof,
+These patches seem fine to me.
+Magnus, Morimoto-san, do you have any feedback?
 
-please let me know if there are any problems and you need me
-to help out.
+Assuming that is a run-time dependency I think I can go ahead
+and queue these up for v3.13 once they are reviewed.
+
+> 
+> [1/4] ARM: shmobile: r8a7778: add Ether DT support
+> [2/4] ARM: shmobile: r8a7778: add Ether clock for DT case
+> [3/4] ARM: shmobile: bockw-reference: add Ether DT support
+> [4/4] ARM: shmobile: BOCK-W reference: add Ether PFC settings
+> 
+> WBR, Sergei
+> 
