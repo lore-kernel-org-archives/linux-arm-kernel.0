@@ -1,144 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Sep 2013 10:59:12 +0100
-Subject: [PATCH 2/5] arm: LLVMLinux: use current_stack_pointer for percpu
-In-Reply-To: <alpine.LFD.2.03.1309070101330.20709@syhkavp.arg>
-References: <1378502899-1241-1-git-send-email-behanw@converseincode.com>
- <1378502899-1241-3-git-send-email-behanw@converseincode.com>
- <alpine.LFD.2.03.1309070101330.20709@syhkavp.arg>
-Message-ID: <20130909095912.GA5426@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon,  9 Sep 2013 11:09:56 +0100
+Subject: [PATCH v2 00/14] iio: ST clean-ups and new pressure sensor device
+Message-ID: <1378721410-30937-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+This patch-set includes a few clean-ups surrounding error handling and
+non-mandatory functionality along with regulator support and the addition
+of a new pressure/temperature sensor (LPS001WP). Everything has been
+tested with Device Tree.
 
-On Sat, Sep 07, 2013 at 06:12:03AM +0100, Nicolas Pitre wrote:
-> On Fri, 6 Sep 2013, behanw at converseincode.com wrote:
-> > From: Behan Webster <behanw@converseincode.com>
-> > 
-> > The existing code uses named registers to get the value of the stack pointer.
-> > The new current_stack_pointer macro is more readable and allows for a central
-> > portable implementation of how to get the stack pointer with ASM.  This change
-> > supports being able to compile the kernel with both gcc and Clang.
-> > 
-> > Signed-off-by: Mark Charlebois <charlebm@gmail.com>
-> > Signed-off-by: Behan Webster <behanw@converseincode.com>
-> > Reviewed-by: Jan-Simon M?ller <dl9pf@gmx.de>
-> > ---
-> >  arch/arm/include/asm/percpu.h | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
-> > index 209e650..629a975 100644
-> > --- a/arch/arm/include/asm/percpu.h
-> > +++ b/arch/arm/include/asm/percpu.h
-> > @@ -30,14 +30,14 @@ static inline void set_my_cpu_offset(unsigned long off)
-> >  static inline unsigned long __my_cpu_offset(void)
-> >  {
-> >  	unsigned long off;
-> > -	register unsigned long *sp asm ("sp");
-> > +	unsigned long sp = current_stack_pointer;
-> >  
-> >  	/*
-> >  	 * Read TPIDRPRW.
-> >  	 * We want to allow caching the value, so avoid using volatile and
-> >  	 * instead use a fake stack read to hazard against barrier().
-> >  	 */
-> > -	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : "Q" (*sp));
-> > +	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : "Q" (sp));
-> 
-> This change doesn't look to be equivalent.  Previously the *sp implied a 
-> memory location which doesn't appear to be the case anymore.
+v2:
+ - Rebased onto Linux -next as requested by Jonathan
+ - Reworked clean-up patch to address Jonathan's concerns
+ - Added binding document (inc regulators)
+ - Extended regulator support in the driver
+ - Re-worked Data Ready pin handling
 
-Having looked at the other comments in this thread, I had a crack with the
-following diff:
-
-diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
-index 209e650..ae0ac4e 100644
---- a/arch/arm/include/asm/percpu.h
-+++ b/arch/arm/include/asm/percpu.h
-@@ -30,7 +30,8 @@ static inline void set_my_cpu_offset(unsigned long off)
- static inline unsigned long __my_cpu_offset(void)
- {
-        unsigned long off;
--       register unsigned long *sp asm ("sp");
-+//     register unsigned long *sp asm ("sp");
-+       unsigned long *sp = (unsigned long *)current_stack_pointer;
- 
-        /*
-         * Read TPIDRPRW.
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index 2b8114f..88a587c 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -89,6 +89,15 @@ struct thread_info {
- #define init_stack             (init_thread_union.stack)
- 
- /*
-+ * how to get the current stack pointer from C
-+ */
-+#define current_stack_pointer ({ \
-+       unsigned long current_sp; \
-+       asm ("mov %0, r13" : "=r" (current_sp)); \
-+       current_sp; \
-+})
-+
-+/*
-  * how to get the thread information struct from C
-  */
- static inline struct thread_info *current_thread_info(void) __attribute_const__;
-
-> this sp trickery was introduced in commit 509eb76ebf97 to solve bad code 
-> generation (the commit log has the details).  It would be good if Will 
-> Deacon could confirm that his test case still works fine with your 
-> change.
-
-I resurrected your original test case for the patch in question (see below)
-and the code is worse with the new sp accessor, since it insists on moving
-sp into r3, which forces us to push r4 onto the stack:
-
-Before:
-
-c001ce6c:       ee1d3f90        mrc     15, 0, r3, cr13, cr0, {4}
-c001ce70:       e790c103        ldr     ip, [r0, r3, lsl #2]
-c001ce74:       ee1d3f90        mrc     15, 0, r3, cr13, cr0, {4}
-c001ce78:       e7911103        ldr     r1, [r1, r3, lsl #2]
-c001ce7c:       e7d22003        ldrb    r2, [r2, r3]
-c001ce80:       ee1d3f90        mrc     15, 0, r3, cr13, cr0, {4}
-c001ce84:       e7903103        ldr     r3, [r0, r3, lsl #2]
-c001ce88:       e08c0001        add     r0, ip, r1
-c001ce8c:       e0800002        add     r0, r0, r2
-c001ce90:       e0800003        add     r0, r0, r3
-c001ce94:       e12fff1e        bx      lr
-
-After:
-
-c001ce74:       e52d4004        push    {r4}            ; (str r4, [sp, #-4]!)
-c001ce78:       e1a0300d        mov     r3, sp
-c001ce7c:       ee1dcf90        mrc     15, 0, ip, cr13, cr0, {4}
-c001ce80:       e790410c        ldr     r4, [r0, ip, lsl #2]
-c001ce84:       ee1dcf90        mrc     15, 0, ip, cr13, cr0, {4}
-c001ce88:       e791110c        ldr     r1, [r1, ip, lsl #2]
-c001ce8c:       e7d2200c        ldrb    r2, [r2, ip]
-c001ce90:       ee1d3f90        mrc     15, 0, r3, cr13, cr0, {4}
-c001ce94:       e7903103        ldr     r3, [r0, r3, lsl #2]
-c001ce98:       e0840001        add     r0, r4, r1
-c001ce9c:       e0800002        add     r0, r0, r2
-c001cea0:       e0800003        add     r0, r0, r3
-c001cea4:       e8bd0010        pop     {r4}
-c001cea8:       e12fff1e        bx      lr
-
-Will
-
---->8
-
-int foo(int *a, int *b, char *c)
-{
-	int x, y, z;
-
-	x = a[__my_cpu_offset];
-	barrier();
-	y = b[__my_cpu_offset];
-	z = c[__my_cpu_offset];
-	barrier();
-	return  x + y + z + a[__my_cpu_offset];
-}
+ Documentation/devicetree/bindings/iio/pressure/lps001wp.txt |  21 ++++++++
+ arch/arm/boot/dts/ste-dbx5x0.dtsi                           |   5 --
+ arch/arm/boot/dts/ste-snowball.dts                          |  10 ++++
+ arch/arm/configs/u8500_defconfig                            |   4 ++
+ drivers/iio/common/st_sensors/st_sensors_core.c             |  51 +++++++++++--------
+ drivers/iio/pressure/st_pressure.h                          |   1 +
+ drivers/iio/pressure/st_pressure_core.c                     | 300 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------
+ drivers/iio/pressure/st_pressure_i2c.c                      |   1 +
+ include/linux/iio/common/st_sensors.h                       |   6 +++
+ 9 files changed, 299 insertions(+), 100 deletions(-)
