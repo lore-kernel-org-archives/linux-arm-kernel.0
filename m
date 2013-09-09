@@ -1,131 +1,176 @@
 From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon,  9 Sep 2013 12:00:13 +0200
-Subject: [PATCH 1/3] ARM: perf: add support for perf registers API
+Date: Mon,  9 Sep 2013 12:00:14 +0200
+Subject: [PATCH 2/3] ARM: perf: wire up perf_regs and unwind support for ARM
 In-Reply-To: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
 References: <1378720815-23964-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1378720815-23964-2-git-send-email-jean.pihet@linaro.org>
+Message-ID: <1378720815-23964-3-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-This patch implements the functions required for the perf registers API,
-allowing the perf tool to interface kernel register dumps with libunwind
-in order to provide userspace backtracing.
+This patch hooks in the perf_regs and libunwind code for ARM.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Cc: Jean Pihet <jean.pihet@linaro.org>
 ---
- arch/arm/Kconfig                      |  2 ++
- arch/arm/include/uapi/asm/Kbuild      |  1 +
- arch/arm/include/uapi/asm/perf_regs.h | 23 +++++++++++++++++++++++
- arch/arm/kernel/Makefile              |  1 +
- arch/arm/kernel/perf_regs.c           | 30 ++++++++++++++++++++++++++++++
- 5 files changed, 57 insertions(+)
- create mode 100644 arch/arm/include/uapi/asm/perf_regs.h
- create mode 100644 arch/arm/kernel/perf_regs.c
+ tools/perf/arch/arm/Makefile            |  3 ++
+ tools/perf/arch/arm/include/perf_regs.h | 54 +++++++++++++++++++++++++++++++++
+ tools/perf/arch/arm/util/unwind.c       | 48 +++++++++++++++++++++++++++++
+ tools/perf/config/Makefile              |  7 +++--
+ 4 files changed, 110 insertions(+), 2 deletions(-)
+ create mode 100644 tools/perf/arch/arm/include/perf_regs.h
+ create mode 100644 tools/perf/arch/arm/util/unwind.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 86bf7cb..642bc48 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -49,6 +49,8 @@ config ARM
- 	select HAVE_MEMBLOCK
- 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
- 	select HAVE_PERF_EVENTS
-+	select HAVE_PERF_REGS
-+	select HAVE_PERF_USER_STACK_DUMP
- 	select HAVE_REGS_AND_STACK_ACCESS_API
- 	select HAVE_SYSCALL_TRACEPOINTS
- 	select HAVE_UID16
-diff --git a/arch/arm/include/uapi/asm/Kbuild b/arch/arm/include/uapi/asm/Kbuild
-index 18d76fd..70a1c9d 100644
---- a/arch/arm/include/uapi/asm/Kbuild
-+++ b/arch/arm/include/uapi/asm/Kbuild
-@@ -7,6 +7,7 @@ header-y += hwcap.h
- header-y += ioctls.h
- header-y += kvm_para.h
- header-y += mman.h
-+header-y += perf_regs.h
- header-y += posix_types.h
- header-y += ptrace.h
- header-y += setup.h
-diff --git a/arch/arm/include/uapi/asm/perf_regs.h b/arch/arm/include/uapi/asm/perf_regs.h
+diff --git a/tools/perf/arch/arm/Makefile b/tools/perf/arch/arm/Makefile
+index 15130b5..fe9b61e 100644
+--- a/tools/perf/arch/arm/Makefile
++++ b/tools/perf/arch/arm/Makefile
+@@ -2,3 +2,6 @@ ifndef NO_DWARF
+ PERF_HAVE_DWARF_REGS := 1
+ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
+ endif
++ifndef NO_LIBUNWIND
++LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind.o
++endif
+diff --git a/tools/perf/arch/arm/include/perf_regs.h b/tools/perf/arch/arm/include/perf_regs.h
 new file mode 100644
-index 0000000..ce59448
+index 0000000..2a1cfde
 --- /dev/null
-+++ b/arch/arm/include/uapi/asm/perf_regs.h
-@@ -0,0 +1,23 @@
-+#ifndef _ASM_ARM_PERF_REGS_H
-+#define _ASM_ARM_PERF_REGS_H
++++ b/tools/perf/arch/arm/include/perf_regs.h
+@@ -0,0 +1,54 @@
++#ifndef ARCH_PERF_REGS_H
++#define ARCH_PERF_REGS_H
 +
-+enum perf_event_arm_regs {
-+	PERF_REG_ARM_R0,
-+	PERF_REG_ARM_R1,
-+	PERF_REG_ARM_R2,
-+	PERF_REG_ARM_R3,
-+	PERF_REG_ARM_R4,
-+	PERF_REG_ARM_R5,
-+	PERF_REG_ARM_R6,
-+	PERF_REG_ARM_R7,
-+	PERF_REG_ARM_R8,
-+	PERF_REG_ARM_R9,
-+	PERF_REG_ARM_R10,
-+	PERF_REG_ARM_FP,
-+	PERF_REG_ARM_IP,
-+	PERF_REG_ARM_SP,
-+	PERF_REG_ARM_LR,
-+	PERF_REG_ARM_PC,
-+	PERF_REG_ARM_MAX,
-+};
-+#endif /* _ASM_ARM_PERF_REGS_H */
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 86d10dd..c9e05f2 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -78,6 +78,7 @@ obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
- obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
- obj-$(CONFIG_CPU_PJ4)		+= pj4-cp0.o
- obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
-+obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o
- obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o perf_event_cpu.o
- AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
- obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
-diff --git a/arch/arm/kernel/perf_regs.c b/arch/arm/kernel/perf_regs.c
-new file mode 100644
-index 0000000..6e4379c
---- /dev/null
-+++ b/arch/arm/kernel/perf_regs.c
-@@ -0,0 +1,30 @@
-+
-+#include <linux/errno.h>
-+#include <linux/kernel.h>
-+#include <linux/perf_event.h>
-+#include <linux/bug.h>
++#include <stdlib.h>
++#include "../../util/types.h"
 +#include <asm/perf_regs.h>
-+#include <asm/ptrace.h>
 +
-+u64 perf_reg_value(struct pt_regs *regs, int idx)
++#define PERF_REGS_MASK	((1ULL << PERF_REG_ARM_MAX) - 1)
++#define PERF_REG_IP	PERF_REG_ARM_PC
++#define PERF_REG_SP	PERF_REG_ARM_SP
++
++static inline const char *perf_reg_name(int id)
 +{
-+	if (WARN_ON_ONCE((u32)idx >= PERF_REG_ARM_MAX))
-+		return 0;
++	switch (id) {
++	case PERF_REG_ARM_R0:
++		return "r0";
++	case PERF_REG_ARM_R1:
++		return "r1";
++	case PERF_REG_ARM_R2:
++		return "r2";
++	case PERF_REG_ARM_R3:
++		return "r3";
++	case PERF_REG_ARM_R4:
++		return "r4";
++	case PERF_REG_ARM_R5:
++		return "r5";
++	case PERF_REG_ARM_R6:
++		return "r6";
++	case PERF_REG_ARM_R7:
++		return "r7";
++	case PERF_REG_ARM_R8:
++		return "r8";
++	case PERF_REG_ARM_R9:
++		return "r9";
++	case PERF_REG_ARM_R10:
++		return "r10";
++	case PERF_REG_ARM_FP:
++		return "fp";
++	case PERF_REG_ARM_IP:
++		return "ip";
++	case PERF_REG_ARM_SP:
++		return "sp";
++	case PERF_REG_ARM_LR:
++		return "lr";
++	case PERF_REG_ARM_PC:
++		return "pc";
++	default:
++		return NULL;
++	}
 +
-+	return regs->uregs[idx];
++	return NULL;
 +}
 +
-+#define REG_RESERVED (~((1ULL << PERF_REG_ARM_MAX) - 1))
++#endif /* ARCH_PERF_REGS_H */
+diff --git a/tools/perf/arch/arm/util/unwind.c b/tools/perf/arch/arm/util/unwind.c
+new file mode 100644
+index 0000000..da3dc95
+--- /dev/null
++++ b/tools/perf/arch/arm/util/unwind.c
+@@ -0,0 +1,48 @@
 +
-+int perf_reg_validate(u64 mask)
++#include <errno.h>
++#include <libunwind.h>
++#include "perf_regs.h"
++#include "../../util/unwind.h"
++
++int unwind__arch_reg_id(int regnum)
 +{
-+	if (!mask || mask & REG_RESERVED)
++	switch (regnum) {
++	case UNW_ARM_R0:
++		return PERF_REG_ARM_R0;
++	case UNW_ARM_R1:
++		return PERF_REG_ARM_R1;
++	case UNW_ARM_R2:
++		return PERF_REG_ARM_R2;
++	case UNW_ARM_R3:
++		return PERF_REG_ARM_R3;
++	case UNW_ARM_R4:
++		return PERF_REG_ARM_R4;
++	case UNW_ARM_R5:
++		return PERF_REG_ARM_R5;
++	case UNW_ARM_R6:
++		return PERF_REG_ARM_R6;
++	case UNW_ARM_R7:
++		return PERF_REG_ARM_R7;
++	case UNW_ARM_R8:
++		return PERF_REG_ARM_R8;
++	case UNW_ARM_R9:
++		return PERF_REG_ARM_R9;
++	case UNW_ARM_R10:
++		return PERF_REG_ARM_R10;
++	case UNW_ARM_R11:
++		return PERF_REG_ARM_FP;
++	case UNW_ARM_R12:
++		return PERF_REG_ARM_IP;
++	case UNW_ARM_R13:
++		return PERF_REG_ARM_SP;
++	case UNW_ARM_R14:
++		return PERF_REG_ARM_LR;
++	case UNW_ARM_R15:
++		return PERF_REG_ARM_PC;
++	default:
++		pr_err("unwind: invalid reg id %d\n", regnum);
 +		return -EINVAL;
++	}
 +
-+	return 0;
++	return -EINVAL;
 +}
-+
-+u64 perf_reg_abi(struct task_struct *task)
-+{
-+	return PERF_SAMPLE_REGS_ABI_32;
-+}
+diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
+index b5d9238..7014373 100644
+--- a/tools/perf/config/Makefile
++++ b/tools/perf/config/Makefile
+@@ -29,6 +29,10 @@ ifeq ($(ARCH),x86_64)
+   NO_PERF_REGS := 0
+   LIBUNWIND_LIBS = -lunwind -lunwind-x86_64
+ endif
++ifeq ($(ARCH),arm)
++  NO_PERF_REGS := 0
++  LIBUNWIND_LIBS = -lunwind -lunwind-arm
++endif
+ 
+ ifeq ($(NO_PERF_REGS),0)
+   CFLAGS += -DHAVE_PERF_REGS
+@@ -204,8 +208,7 @@ ifeq ($(call try-cc,$(SOURCE_ELF_MMAP),$(FLAGS_LIBELF),-DLIBELF_MMAP),y)
+ endif # try-cc
+ endif # NO_LIBELF
+ 
+-# There's only x86 (both 32 and 64) support for CFI unwind so far
+-ifneq ($(ARCH),x86)
++ifeq ($(LIBUNWIND_LIBS),)
+   NO_LIBUNWIND := 1
+ endif
+ 
 -- 
 1.7.11.7
