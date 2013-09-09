@@ -1,84 +1,165 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  9 Sep 2013 11:10:09 +0100
-Subject: [PATCH 13/14] iio: sensors-core: st: Clean-up error handling in
- st_sensors_init_sensor()
+Date: Mon,  9 Sep 2013 11:10:00 +0100
+Subject: [PATCH 04/14] iio: pressure-core: st: Describe LPS331AP defines by
+ name
 In-Reply-To: <1378721410-30937-1-git-send-email-lee.jones@linaro.org>
 References: <1378721410-30937-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1378721410-30937-14-git-send-email-lee.jones@linaro.org>
+Message-ID: <1378721410-30937-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Strip out all those unnecessary gotos and just return the error right away.
-
-Aids to simplicity and reduces code.
+They're currently named *_1_*, for 'Sensor 1', but the code will be much
+more readable if we use the naming convention *_LPS331AP_* instead.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/iio/common/st_sensors/st_sensors_core.c | 18 +++++++-----------
- 1 file changed, 7 insertions(+), 11 deletions(-)
+ drivers/iio/pressure/st_pressure_core.c | 94 ++++++++++++++++-----------------
+ 1 file changed, 46 insertions(+), 48 deletions(-)
 
-diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
-index eb261a5..05030e4 100644
---- a/drivers/iio/common/st_sensors/st_sensors_core.c
-+++ b/drivers/iio/common/st_sensors/st_sensors_core.c
-@@ -211,8 +211,7 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
- 		if (sdata->sensor->drdy_irq.mask_int1 == 0) {
- 			dev_err(&indio_dev->dev,
- 					"DRDY on INT1 not available.\n");
--			err = -EINVAL;
--			goto init_error;
-+			return -EINVAL;
- 		}
- 		sdata->drdy_int_pin = 1;
- 		break;
-@@ -220,42 +219,39 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
- 		if (sdata->sensor->drdy_irq.mask_int2 == 0) {
- 			dev_err(&indio_dev->dev,
- 					"DRDY on INT2 not available.\n");
--			err = -EINVAL;
--			goto init_error;
-+			return -EINVAL;
- 		}
- 		sdata->drdy_int_pin = 2;
- 		break;
- 	default:
- 		dev_err(&indio_dev->dev, "DRDY on pdata not valid.\n");
--		err = -EINVAL;
--		goto init_error;
-+		return -EINVAL;
- 	}
+diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
+index ceebd3c..b9cf810 100644
+--- a/drivers/iio/pressure/st_pressure_core.c
++++ b/drivers/iio/pressure/st_pressure_core.c
+@@ -36,94 +36,92 @@
+ 						 ST_PRESS_LSB_PER_CELSIUS)
+ #define ST_PRESS_NUMBER_DATA_CHANNELS		1
  
- 	err = st_sensors_set_enable(indio_dev, false);
- 	if (err < 0)
--		goto init_error;
-+		return err;
+-/* DEFAULT VALUE FOR SENSORS */
+-#define ST_PRESS_DEFAULT_OUT_XL_ADDR		0x28
+-#define ST_TEMP_DEFAULT_OUT_L_ADDR		0x2b
+-
+ /* FULLSCALE */
+ #define ST_PRESS_FS_AVL_1260MB			1260
  
- 	if (sdata->current_fullscale) {
- 		err = st_sensors_set_fullscale(indio_dev,
- 					       sdata->current_fullscale->num);
- 		if (err < 0)
--			goto init_error;
-+			return err;
- 	} else
- 		dev_info(&indio_dev->dev, "Full-scale not possible\n");
+-/* CUSTOM VALUES FOR SENSOR 1 */
+-#define ST_PRESS_1_WAI_EXP			0xbb
+-#define ST_PRESS_1_ODR_ADDR			0x20
+-#define ST_PRESS_1_ODR_MASK			0x70
+-#define ST_PRESS_1_ODR_AVL_1HZ_VAL		0x01
+-#define ST_PRESS_1_ODR_AVL_7HZ_VAL		0x05
+-#define ST_PRESS_1_ODR_AVL_13HZ_VAL		0x06
+-#define ST_PRESS_1_ODR_AVL_25HZ_VAL		0x07
+-#define ST_PRESS_1_PW_ADDR			0x20
+-#define ST_PRESS_1_PW_MASK			0x80
+-#define ST_PRESS_1_FS_ADDR			0x23
+-#define ST_PRESS_1_FS_MASK			0x30
+-#define ST_PRESS_1_FS_AVL_1260_VAL		0x00
+-#define ST_PRESS_1_FS_AVL_1260_GAIN		ST_PRESS_KPASCAL_NANO_SCALE
+-#define ST_PRESS_1_FS_AVL_TEMP_GAIN		ST_PRESS_CELSIUS_NANO_SCALE
+-#define ST_PRESS_1_BDU_ADDR			0x20
+-#define ST_PRESS_1_BDU_MASK			0x04
+-#define ST_PRESS_1_DRDY_IRQ_ADDR		0x22
+-#define ST_PRESS_1_DRDY_IRQ_INT1_MASK		0x04
+-#define ST_PRESS_1_DRDY_IRQ_INT2_MASK		0x20
+-#define ST_PRESS_1_MULTIREAD_BIT		true
+-#define ST_PRESS_1_TEMP_OFFSET			42500
++/* CUSTOM VALUES FOR LPS331AP SENSOR */
++#define ST_PRESS_LPS331AP_WAI_EXP		0xbb
++#define ST_PRESS_LPS331AP_ODR_ADDR		0x20
++#define ST_PRESS_LPS331AP_ODR_MASK		0x70
++#define ST_PRESS_LPS331AP_ODR_AVL_1HZ_VAL	0x01
++#define ST_PRESS_LPS331AP_ODR_AVL_7HZ_VAL	0x05
++#define ST_PRESS_LPS331AP_ODR_AVL_13HZ_VAL	0x06
++#define ST_PRESS_LPS331AP_ODR_AVL_25HZ_VAL	0x07
++#define ST_PRESS_LPS331AP_PW_ADDR		0x20
++#define ST_PRESS_LPS331AP_PW_MASK		0x80
++#define ST_PRESS_LPS331AP_FS_ADDR		0x23
++#define ST_PRESS_LPS331AP_FS_MASK		0x30
++#define ST_PRESS_LPS331AP_FS_AVL_1260_VAL	0x00
++#define ST_PRESS_LPS331AP_FS_AVL_1260_GAIN	ST_PRESS_KPASCAL_NANO_SCALE
++#define ST_PRESS_LPS331AP_FS_AVL_TEMP_GAIN	ST_PRESS_CELSIUS_NANO_SCALE
++#define ST_PRESS_LPS331AP_BDU_ADDR		0x20
++#define ST_PRESS_LPS331AP_BDU_MASK		0x04
++#define ST_PRESS_LPS331AP_DRDY_IRQ_ADDR		0x22
++#define ST_PRESS_LPS331AP_DRDY_IRQ_INT1_MASK	0x04
++#define ST_PRESS_LPS331AP_DRDY_IRQ_INT2_MASK	0x20
++#define ST_PRESS_LPS331AP_MULTIREAD_BIT		true
++#define ST_PRESS_LPS331AP_TEMP_OFFSET		42500
++#define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
++#define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
  
- 	err = st_sensors_set_odr(indio_dev, sdata->odr);
- 	if (err < 0)
--		goto init_error;
-+		return err;
+ static const struct iio_chan_spec st_press_channels[] = {
+ 	ST_SENSORS_LSM_CHANNELS(IIO_PRESSURE,
+ 			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
+ 			ST_SENSORS_SCAN_X, 0, IIO_NO_MOD, 'u', IIO_LE, 24, 24,
+-			ST_PRESS_DEFAULT_OUT_XL_ADDR),
++			ST_PRESS_LPS331AP_OUT_XL_ADDR),
+ 	ST_SENSORS_LSM_CHANNELS(IIO_TEMP,
+ 			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE) |
+ 						BIT(IIO_CHAN_INFO_OFFSET),
+ 			-1, 0, IIO_NO_MOD, 's', IIO_LE, 16, 16,
+-			ST_TEMP_DEFAULT_OUT_L_ADDR),
++			ST_TEMP_LPS331AP_OUT_L_ADDR),
+ 	IIO_CHAN_SOFT_TIMESTAMP(1)
+ };
  
- 	/* set BDU */
- 	err = st_sensors_write_data_with_mask(indio_dev,
- 			sdata->sensor->bdu.addr, sdata->sensor->bdu.mask, true);
- 	if (err < 0)
--		goto init_error;
-+		return err;
- 
- 	err = st_sensors_set_axis_enable(indio_dev, ST_SENSORS_ENABLE_ALL_AXIS);
- 
--init_error:
- 	return err;
- }
- EXPORT_SYMBOL(st_sensors_init_sensor);
+ static const struct st_sensors st_press_sensors[] = {
+ 	{
+-		.wai = ST_PRESS_1_WAI_EXP,
++		.wai = ST_PRESS_LPS331AP_WAI_EXP,
+ 		.sensors_supported = {
+ 			[0] = LPS331AP_PRESS_DEV_NAME,
+ 		},
+ 		.ch = (struct iio_chan_spec *)st_press_channels,
+ 		.odr = {
+-			.addr = ST_PRESS_1_ODR_ADDR,
+-			.mask = ST_PRESS_1_ODR_MASK,
++			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
++			.mask = ST_PRESS_LPS331AP_ODR_MASK,
+ 			.odr_avl = {
+-				{ 1, ST_PRESS_1_ODR_AVL_1HZ_VAL, },
+-				{ 7, ST_PRESS_1_ODR_AVL_7HZ_VAL, },
+-				{ 13, ST_PRESS_1_ODR_AVL_13HZ_VAL, },
+-				{ 25, ST_PRESS_1_ODR_AVL_25HZ_VAL, },
++				{ 1, ST_PRESS_LPS331AP_ODR_AVL_1HZ_VAL, },
++				{ 7, ST_PRESS_LPS331AP_ODR_AVL_7HZ_VAL, },
++				{ 13, ST_PRESS_LPS331AP_ODR_AVL_13HZ_VAL, },
++				{ 25, ST_PRESS_LPS331AP_ODR_AVL_25HZ_VAL, },
+ 			},
+ 		},
+ 		.pw = {
+-			.addr = ST_PRESS_1_PW_ADDR,
+-			.mask = ST_PRESS_1_PW_MASK,
++			.addr = ST_PRESS_LPS331AP_PW_ADDR,
++			.mask = ST_PRESS_LPS331AP_PW_MASK,
+ 			.value_on = ST_SENSORS_DEFAULT_POWER_ON_VALUE,
+ 			.value_off = ST_SENSORS_DEFAULT_POWER_OFF_VALUE,
+ 		},
+ 		.fs = {
+-			.addr = ST_PRESS_1_FS_ADDR,
+-			.mask = ST_PRESS_1_FS_MASK,
++			.addr = ST_PRESS_LPS331AP_FS_ADDR,
++			.mask = ST_PRESS_LPS331AP_FS_MASK,
+ 			.fs_avl = {
+ 				[0] = {
+ 					.num = ST_PRESS_FS_AVL_1260MB,
+-					.value = ST_PRESS_1_FS_AVL_1260_VAL,
+-					.gain = ST_PRESS_1_FS_AVL_1260_GAIN,
+-					.gain2 = ST_PRESS_1_FS_AVL_TEMP_GAIN,
++					.value = ST_PRESS_LPS331AP_FS_AVL_1260_VAL,
++					.gain = ST_PRESS_LPS331AP_FS_AVL_1260_GAIN,
++					.gain2 = ST_PRESS_LPS331AP_FS_AVL_TEMP_GAIN,
+ 				},
+ 			},
+ 		},
+ 		.bdu = {
+-			.addr = ST_PRESS_1_BDU_ADDR,
+-			.mask = ST_PRESS_1_BDU_MASK,
++			.addr = ST_PRESS_LPS331AP_BDU_ADDR,
++			.mask = ST_PRESS_LPS331AP_BDU_MASK,
+ 		},
+ 		.drdy_irq = {
+-			.addr = ST_PRESS_1_DRDY_IRQ_ADDR,
+-			.mask_int1 = ST_PRESS_1_DRDY_IRQ_INT1_MASK,
+-			.mask_int2 = ST_PRESS_1_DRDY_IRQ_INT2_MASK,
++			.addr = ST_PRESS_LPS331AP_DRDY_IRQ_ADDR,
++			.mask_int1 = ST_PRESS_LPS331AP_DRDY_IRQ_INT1_MASK,
++			.mask_int2 = ST_PRESS_LPS331AP_DRDY_IRQ_INT2_MASK,
+ 		},
+-		.multi_read_bit = ST_PRESS_1_MULTIREAD_BIT,
++		.multi_read_bit = ST_PRESS_LPS331AP_MULTIREAD_BIT,
+ 		.bootime = 2,
+ 	},
+ };
 -- 
 1.8.1.2
