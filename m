@@ -1,119 +1,62 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Mon, 9 Sep 2013 16:10:14 -0700
-Subject: [RFC 0/4] Create infrastructure for running C code from SRAM.
-In-Reply-To: <CAKv+Gu-eaS9djmz0d5hzY=jkVb-aPZWrLCUOr8wNb6fWoNpMiA@mail.gmail.com>
-References: <1378226665-27090-1-git-send-email-Russ.Dill@ti.com>
- <20130906111221.GH25647@n2100.arm.linux.org.uk>
- <CA+Bv8XbbWoBgrv83RmXLiO8AM0TDP9wNQMUFJKMbN82-0w3Scg@mail.gmail.com>
- <CAKv+Gu-eaS9djmz0d5hzY=jkVb-aPZWrLCUOr8wNb6fWoNpMiA@mail.gmail.com>
-Message-ID: <CA+Bv8Xbf02WNokiagwpUuvjFrAmHv-jL7APt=TFAd0YbN6h33w@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 09 Sep 2013 16:10:37 -0700
+Subject: [PATCH 2/2] ARM: msm: Create a common board-dt and config
+ ARCH_MSM_DT
+In-Reply-To: <1378767719-27688-2-git-send-email-rvaswani@codeaurora.org>
+References: <1378767719-27688-1-git-send-email-rvaswani@codeaurora.org>
+ <1378767719-27688-2-git-send-email-rvaswani@codeaurora.org>
+Message-ID: <522E556D.1070108@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 7, 2013 at 9:21 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 6 September 2013 21:32, Russ Dill <Russ.Dill@ti.com> wrote:
->> On Fri, Sep 6, 2013 at 4:12 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Tue, Sep 03, 2013 at 09:44:21AM -0700, Russ Dill wrote:
->>>> SRAM handling code is in the process of being moved from arch directories
->>>> into drivers/misc/sram.c using device tree and genalloc [1] [2]. This RFC
->>>> patchset builds on that, including the limitation that the SRAM address is
->>>> not known at compile time. Because the SRAM address is not known at compile
->>>> time, the code that runs from SRAM must be compiled with -fPIC. Even if
->>>> the code were loaded to a fixed virtual address, portions of the code must
->>>> often be run with the MMU disabled.
->>>
->>> What are you doing about the various gcc utility functions that may be
->>> implicitly called from C code such as memcpy and memset?
->>
->> That would create a problem. Would '-ffreestanding' be the correct
->> flag to add?
->
-> No, unfortunately, -ffreestanding won't prevent GCC from generating
-> implicit calls to memzero() et al. These are mainly issued when using
-> initialized non-POD stack variables so avoiding those might help you
-> there.
->> As far as the family of __aeabi_*, I need to add
->> documentation stating that on ARM, you can't divide, perform modulo,
->> and can't do 64 bit multiplications. I can then add a make rule that
->> will grep the symbol lists of .sram sections for ^__aeabi_. Is this
->> enough?
->>
->
-> Well, even printk() needs integer division for its %d/%u modifiers, so
-> this is really not so easy to achieve.
->
->>>> The general idea is that for each SRAM user (such as an SoC specific
->>>> suspend/resume mechanism) to create a group of sections. The section group
->>>> is created with a single macro for each user, but end up looking like this:
->>>>
->>>> .sram.am33xx : AT(ADDR(.sram.am33xx) - 0) {
->>>>   __sram_am33xx_start = .;
->>>>   *(.sram.am33xx.*)
->>>>   __sram_am33xx_end = .;
->>>> }
->>>>
->>>> Any data or functions that should be copied to SRAM for this use should be
->>>> maked with an appropriate __section() attribute. A helper is then added for
->>>> translating between the original kernel symbol, and the address of that
->>>> function or variable once it has been copied into SRAM. Once control is
->>>> passed to a function within the SRAM section grouping, it can access any
->>>> variables or functions within that same SRAM section grouping without
->>>> translation.
->>>
->>> What about the relocations which will need to be fixed up - eg, addresses
->>> in the literal pool, the GOT table contents, etc?  You say nothing about
->>> this.
->>
->> The C code would need to be written so that such accesses do not
->> occur. From functions that are in the sram text section, only accesses
->> to other sram sections in their group would be allowed. And above, a
->> compilation step could be added to make the compilation fail when such
->> things happen.
->>
->
-> The point is that, sadly, GCC is just not very good at generating
-> relocatable code for embedded targets. Playing with -fvisibility may
-> result in code that contains fewer dynamic relocations, but you will
-> always end up with a few that need to be fixed up before the code can
-> run. Another thing to note is that usually, these relocations can only
-> be fixed up once, as the addend is overwritten by the fixed-up
-> address. This means that the code can only run in SRAM, and you should
-> probably best avoid the module loader machinery as it may clobber the
-> addends before you get to process them.
->
-> One thing that remains implicit in this discussion is that you are
-> executing from SRAM because DRAM is not available (I presume).
-> Wouldn't it be better to treat the code that lives in the SRAM as a
-> completely separate executable? You can generate a PIE executable that
-> supplies minimal memzero et al,  fixup the relocations yourself (look
-> at the uboot sources for an example of this) and you will be
-> absolutely sure that the code can run completely autonomously. In
-> fact, some of this stuff could potentially be reused for other
-> disjoint execution domains such as TZ secure world.
+On 09/09/13 16:01, Rohit Vaswani wrote:
+> diff --git a/arch/arm/mach-msm/board-dt.c b/arch/arm/mach-msm/board-dt.c
+> new file mode 100644
+> index 0000000..c140c53
+> --- /dev/null
+> +++ b/arch/arm/mach-msm/board-dt.c
+> @@ -0,0 +1,32 @@
+> +/* Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
 
-This is the path I'm going down, but I'm trying to do it without
-relocations. I'm following the model of arch/arm/boot/compressed and
-generating a relocatable gcc builtin library with weak symbols
-containing lib1funcs.S, string.c, ashldi3.S, and some stubs for div0
-and the unwind symbols, call in sramlib.o.
+Bump to 2013?
 
-I'm then doing an objcopy of the .sramlib section, and the .sram.*
-sections into a single object file and performing a link with a linker
-script like:
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+> +
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/map.h>
+> +
+> +#include "common.h"
+> +
+> +static const char *msm_dt_match[] __initdata = {
 
-SECTIONS
-{
-    .text : { *(.sramlib) }
+static const char * const msm_dt_match[] __initconst is better.
 
-    OVERLAY ALIGN(32) : NOCROSSREFS
-    {
-        .sram.am33xx { *(.sram.am33xx.*) }
-        .sram.am437x { *(.sram.am437x.*) }
-    }
-}
+> +	"qcom,msm8660-fluid",
+> +	"qcom,msm8660-surf",
+> +	"qcom,msm8960-cdp",
+> +	NULL
+> +};
+> +
+> +DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+> +	.smp = smp_ops(msm_smp_ops),
+> +	.dt_compat = msm_dt_match,
+> +MACHINE_END
 
-It produces output without any relocations, but from there I'm a
-little fuzzy on how to get the symbols of functions and variables into
-the kernel. In the meantime, I'll look into the u-boot methods.
+Otherwise feel free to add my reviewed-by.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
