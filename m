@@ -1,46 +1,106 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Sep 2013 11:15:21 +0200
-Subject: [PATCH 01/04] ARM: shmobile: Initial r8a7791 SoC support
-In-Reply-To: <CANqRtoQ0dnG6HwjJSrK8+Qt8wvJhqsJHxgj-LGvnJvS0KT81nw@mail.gmail.com>
-References: <20130904034525.12546.24775.sendpatchset@w520>
- <20130904034557.12546.97503.sendpatchset@w520>
- <CACRpkdb7QkqCmTMua1yJNJxSAWff=0f6a2SWkf6K9SqbW0BOVg@mail.gmail.com>
- <CANqRtoQzLKk3EKcm=EiZCg73fgDBZ1xjPi_6fH_PsGdkr6w5sA@mail.gmail.com>
- <CACRpkdZGLR3=UZ7f-9r02Gea2hTomp+6+bz0BDQOvk9zRHTxxw@mail.gmail.com>
- <CANqRtoQ0dnG6HwjJSrK8+Qt8wvJhqsJHxgj-LGvnJvS0KT81nw@mail.gmail.com>
-Message-ID: <CACRpkdY44c_qzQ6XVjCs86axta-0VBqL8ygH5j+q3z294YXjLA@mail.gmail.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Mon, 09 Sep 2013 10:24:39 +0100
+Subject: [PATCH v4 12/19] cpufreq: cpufreq-cpu0: remove device tree parsing
+ for cpu nodes
+In-Reply-To: <Pine.LNX.4.64.1309061539310.11068@axis700.grange>
+References: <1374492747-13879-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376991021-12160-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1376991021-12160-13-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <Pine.LNX.4.64.1309061539310.11068@axis700.grange>
+Message-ID: <522D93D7.4010307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 9, 2013 at 10:05 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+On 06/09/13 14:44, Guennadi Liakhovetski wrote:
+> Hi
+> 
+> On Tue, 20 Aug 2013, Sudeep KarkadaNagesha wrote:
+> 
+>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>>
+>> Now that the cpu device registration initialises the of_node(if available)
+>> appropriately for all the cpus, parsing here is redundant.
+>>
+>> This patch removes all DT parsing and uses cpu->of_node instead.
+>>
+>> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+>> Acked-by: Rob Herring <rob.herring@calxeda.com>
+>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>> ---
+>>  drivers/cpufreq/cpufreq-cpu0.c | 23 ++++-------------------
+>>  1 file changed, 4 insertions(+), 19 deletions(-)
+>>
+>> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.=
+>> c
+>> index ad1fde2..5b05c26 100644
+>> --- a/drivers/cpufreq/cpufreq-cpu0.c
+>> +++ b/drivers/cpufreq/cpufreq-cpu0.c
+>> @@ -174,29 +174,17 @@ static struct cpufreq_driver cpu0_cpufreq_driver =3D =
+>> {
+>> =20
+>>  static int cpu0_cpufreq_probe(struct platform_device *pdev)
+>>  {
+>> -=09struct device_node *np, *parent;
+>> +=09struct device_node *np;
+>>  =09int ret;
+>> =20
+>> -=09parent =3D of_find_node_by_path("/cpus");
+>> -=09if (!parent) {
+>> -=09=09pr_err("failed to find OF /cpus\n");
+>> -=09=09return -ENOENT;
+>> -=09}
+>> -
+>> -=09for_each_child_of_node(parent, np) {
+>> -=09=09if (of_get_property(np, "operating-points", NULL))
+>> -=09=09=09break;
+>> -=09}
+>> +=09cpu_dev =3D &pdev->dev;
+>> =20
+>> +=09np =3D of_node_get(cpu_dev->of_node);
+> 
+> Has this actually been tested? This seems to break cpufreq-cpu0. The 
+> reason is, that this probe function is called not for the DT CPU node, but 
+> for a special virtual cpufreq-cpu0 platform device, typically created by 
+> platforms, using
+> 
+> 	platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
+> 
+> which then of course doesn't have on .of_node associated with it.
+> 
 
-> At
-> this time though, apart from common clocks, extended DT support and
-> multiplatform I'm not so sure what desired cleanup-wise.
+Hi Guennadi,
 
-It'd be nice to switch shmobile to use AUTO_ZRELADDR, as it is
-the other criteria (apart from common clock) standing in the way
-for multiplatform. (Maybe this just works if you turn it on?)
+Based on my understanding of the original code:
+        cpu_dev = &pdev->dev;
+	...
+	ret = of_init_opp_table(cpu_dev);
 
-For multiplatform you also have to depopulate <mach/*>
-completely, either move stuff down into the mach-folder
-or to <linux/platform_data/*> if absolutely necessary.
-This will be quite some work, especially if the <mach/*>
-path is used in a lot of drivers...
+of_init_opp_table needs cpu_dev to be get_cpu_device(0). My
+understanding was that platform using cpufreq-cpu0 sets &pdev->dev to
+get_cpu_device(0). But looks like that's not the case.
 
-Then we have a quite broad consensus to depopulate arch/arm/*
-of drivers, so for shmobile:
+Hi Shawn,
 
-clock* -> drivers/clk
-cpuidle.c -> drivers/cpuidle (or was this just fixed?)
-intc* -> drivers/irqchips
-sh-gpio.c -> drivers/pinctrl/gpio
+Can you please clarify ? The fix would be as below but I would like to
+know if setting cpu_dev to get_cpu_device(0) instead of &pdev->dev has
+any impact on other parts of code using cpu_dev ?
 
-The last one I know you will soon finish.
+diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
+index cbfffa9..871c336 100644
+--- a/drivers/cpufreq/cpufreq-cpu0.c
++++ b/drivers/cpufreq/cpufreq-cpu0.c
+@@ -177,7 +177,7 @@ static int cpu0_cpufreq_probe(struct platform_device
+*pdev)
+        struct device_node *np;
+        int ret;
 
-Then deleteing all board file stuff that is not using DT.
+-       cpu_dev = &pdev->dev;
++       cpu_dev = get_cpu_device(0);
 
-After all that it's top-notch I think :-)
+        np = of_node_get(cpu_dev->of_node);
+        if (!np) {
 
-Yours,
-Linus Walleij
+
+Regards,
+Sudeep
