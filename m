@@ -1,57 +1,39 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 9 Sep 2013 16:39:35 +0900
-Subject: [PATCH 00/04] ARM: shmobile: Initial r8a7791 SoC and Koelsch
- board support
-In-Reply-To: <20130906070923.GE1025@verge.net.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Sep 2013 09:45:25 +0200
+Subject: [PATCH 01/04] ARM: shmobile: Initial r8a7791 SoC support
+In-Reply-To: <CANqRtoQzLKk3EKcm=EiZCg73fgDBZ1xjPi_6fH_PsGdkr6w5sA@mail.gmail.com>
 References: <20130904034525.12546.24775.sendpatchset@w520>
- <20130904083833.GF17329@verge.net.au>
- <20130906070923.GE1025@verge.net.au>
-Message-ID: <CANqRtoQDJx_n8jk=H6PD2-eets=6VLL-dC88Xx6vTF3CZWyE2Q@mail.gmail.com>
+ <20130904034557.12546.97503.sendpatchset@w520>
+ <CACRpkdb7QkqCmTMua1yJNJxSAWff=0f6a2SWkf6K9SqbW0BOVg@mail.gmail.com>
+ <CANqRtoQzLKk3EKcm=EiZCg73fgDBZ1xjPi_6fH_PsGdkr6w5sA@mail.gmail.com>
+Message-ID: <CACRpkdZGLR3=UZ7f-9r02Gea2hTomp+6+bz0BDQOvk9zRHTxxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Mon, Sep 9, 2013 at 9:21 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
 
-On Fri, Sep 6, 2013 at 4:09 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Sep 04, 2013 at 05:38:35PM +0900, Simon Horman wrote:
->> On Wed, Sep 04, 2013 at 12:45:25PM +0900, Magnus Damm wrote:
->> > ARM: shmobile: Initial r8a7791 SoC and Koelsch board supp
->> >
->> > [PATCH 01/04] ARM: shmobile: Initial r8a7791 SoC support
->> > [PATCH 02/04] ARM: shmobile: r8a7791 SCIF support
->> > [PATCH 03/04] ARM: shmobile: r8a7791 CMT support
->> > [PATCH 04/04] ARM: shmobile: Koelsch support
->> >
->> > This series adds initial support for r8a7791 and Koelsch. The SoC
->> > is known as r8a7791 which is based on a single cluster Cortex-A15
->> > and makes use of SCIF for serial and CMT for timer. Many other
->> > on-chip I/O devices are available, and support for those will be
->> > added by incremental feature patches.
->> >
->> > This initial SoC and board support is providing limited DT-only
->> > support and a very basic C-version of board support. In the future
->> > improved PINCTRL and clock framework support will be added together
->> > with arch timer and SMP support.
->> >
->> > Implemented in same style as r8a7790 SoC V1.
->> >
->> > Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
->> > Signed-off-by: Yoshikazu Fujikawa <yoshikazu.fujikawa.ue@renesas.com>
->> > Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
->> > [damm at opensource.se: forward porting, cleanups, commit logs, CMT support]
->> > Signed-off-by: Magnus Damm <damm@opensource.se>
->>
->> I have lightly tested these and they seem good to me.
->> I have posted a defconfig patch as a follow-up.
->> I would to let these sit for a little bit to give them time to
->> be reviewed by others.
->>
->> Tested-by: Simon Horman <horms+renesas@verge.net.au>
->
-> I have queued these up for v3.13.
+> Fortunately there are plans to convert several mach-shmobile SoCs to
+> common clocks over the next 6 months. As you know, we spent much time
+> and efforts converting to pinctrl last two 6 month periods, and now we
+> will be targeting common clocks.
 
-Thanks. I intend to send incremental patches on top of this series.
+I trust you on this, it's not for me to decide but for the ARM SoC
+maintainers. I think Arnd basically said at one point that it is OK
+to add some new cruft as long as you remove more old cruft at
+the same time, so I guess you will have to make an argument that
+this is happening.
 
-Cheers,
+> There are several incremental patches available for r8a7791, but since
+> this is a new and rare platform it won't be the first SoC we convert
+> to common clocks. So CCF development will happen on r8a7791, but it
+> won't be the first platform.
 
-/ magnus
+This is pretty much the inverse argument of the usual stance of
+the ARM SoC tree - usually we ask that new platforms should use
+new frameworks. I do understand it from a practical point of view,
+that new SoCs only exist in few prototypes.
+
+But again, this is up for the ARM SoC folks to decide.
+
+Yours,
+Linus Walleij
