@@ -1,41 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 9 Sep 2013 16:40:28 +0100
-Subject: [PATCH RESEND 1/2] i2c: prepare runtime PM support for I2C
- client devices
-In-Reply-To: <1378733679-19500-2-git-send-email-mika.westerberg@linux.intel.com>
-References: <1378733679-19500-1-git-send-email-mika.westerberg@linux.intel.com>
- <1378733679-19500-2-git-send-email-mika.westerberg@linux.intel.com>
-Message-ID: <20130909154028.GP29403@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  9 Sep 2013 17:40:31 +0200
+Subject: [PATCH 3/8] ARM: iop32x: read N2100 power key using gpiolib
+Message-ID: <1378741231-12958-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 09, 2013 at 04:34:38PM +0300, Mika Westerberg wrote:
+Refrain from using the custom gpio_line_get() to read the power
+key on the N2100, use the gpiolib function gpio_get() instead.
+Also request the line when initializing the machine.
 
-> +	/*
-> +	 * Enable runtime PM for the client device. If the client wants to
-> +	 * participate on runtime PM it should call pm_runtime_put() in its
-> +	 * probe() callback.
-> +	 *
-> +	 * User still needs to allow the PM runtime before it can actually
-> +	 * happen.
-> +	 */
-> +	pm_runtime_forbid(&client->dev);
-> +	pm_runtime_get_noresume(&client->dev);
-> +	pm_runtime_set_active(&client->dev);
-> +	pm_runtime_enable(&client->dev);
+Cc: Lennert Buytenhek <kernel@wantstofly.org>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Mikael Pettersson <mikpe@it.uu.se>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-iop32x/n2100.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-How is this going to interact with client devices which are already
-enabling runtime PM for themselves, and what are the advantages of doing
-this over having the client device enable runtime PM for itself (given
-that the client still needs an explicit put() adding)?
-
-Given that it's relatively common for devices to have both I2C and SPI
-control it seems like it'd be sensible to keep the policy common between
-the two buses to simplify driver implementation.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130909/5e302705/attachment.sig>
+diff --git a/arch/arm/mach-iop32x/n2100.c b/arch/arm/mach-iop32x/n2100.c
+index cd199c1..d495b4f 100644
+--- a/arch/arm/mach-iop32x/n2100.c
++++ b/arch/arm/mach-iop32x/n2100.c
+@@ -306,7 +306,7 @@ static struct timer_list power_button_poll_timer;
+ 
+ static void power_button_poll(unsigned long dummy)
+ {
+-	if (gpio_line_get(N2100_POWER_BUTTON) == 0) {
++	if (gpio_get_value(N2100_POWER_BUTTON) == 0) {
+ 		ctrl_alt_del();
+ 		return;
+ 	}
+@@ -339,6 +339,14 @@ static void __init n2100_init_machine(void)
+ 	ret = gpio_request(N2100_HARDWARE_RESET, "reset");
+ 	if (ret)
+ 		pr_err("could not request reset GPIO\n");
++	ret = gpio_request(N2100_POWER_BUTTON, "power");
++	if (ret)
++		pr_err("could not request power GPIO\n");
++	else {
++		ret = gpio_direction_input(N2100_POWER_BUTTON);
++		if (ret)
++			pr_err("could not set power GPIO as input\n");
++	}
+ }
+ 
+ MACHINE_START(N2100, "Thecus N2100")
+-- 
+1.8.3.1
