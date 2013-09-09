@@ -1,99 +1,46 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 09 Sep 2013 11:06:52 +0200
-Subject: [PATCH RFC 0/6] ARM: OMAP2+: AM43x/AM335x prcm reset driver
-In-Reply-To: <5228A99D.4020702@ti.com>
-References: <cover.1378129416.git.afzal@ti.com>
- <1378375634.3948.10.camel@pizza.hi.pengutronix.de>
- <5228A99D.4020702@ti.com>
-Message-ID: <1378717612.4151.6.camel@pizza.hi.pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Sep 2013 11:15:21 +0200
+Subject: [PATCH 01/04] ARM: shmobile: Initial r8a7791 SoC support
+In-Reply-To: <CANqRtoQ0dnG6HwjJSrK8+Qt8wvJhqsJHxgj-LGvnJvS0KT81nw@mail.gmail.com>
+References: <20130904034525.12546.24775.sendpatchset@w520>
+ <20130904034557.12546.97503.sendpatchset@w520>
+ <CACRpkdb7QkqCmTMua1yJNJxSAWff=0f6a2SWkf6K9SqbW0BOVg@mail.gmail.com>
+ <CANqRtoQzLKk3EKcm=EiZCg73fgDBZ1xjPi_6fH_PsGdkr6w5sA@mail.gmail.com>
+ <CACRpkdZGLR3=UZ7f-9r02Gea2hTomp+6+bz0BDQOvk9zRHTxxw@mail.gmail.com>
+ <CANqRtoQ0dnG6HwjJSrK8+Qt8wvJhqsJHxgj-LGvnJvS0KT81nw@mail.gmail.com>
+Message-ID: <CACRpkdY44c_qzQ6XVjCs86axta-0VBqL8ygH5j+q3z294YXjLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 05.09.2013, 21:26 +0530 schrieb Afzal Mohammed:
-> Hi Philipp,
-> 
-> On Thursday 05 September 2013 03:37 PM, Philipp Zabel wrote:
-> > Am Montag, den 02.09.2013, 19:41 +0530 schrieb Afzal Mohammed:
-> 
-> >> Two new reset API's are provided to check whether reset is ready and
-> >> to clear reset. This would be required in case IP needs to mix reset
-> >> handling procedure with power/clock managment procedure to achieve
-> >> proper reset and these procedures are sometimes IP specific that would
-> >> make it difficult to handle reset fully in pm_runtime platform support.
-> 
-> >> client IP handling s/w (DT based) should do as follows:
-> 
-> >> 2. In driver, that require reset to be deasserted,
-> >>  (this is the sequence required for gfx on AM43x/AM335x, this would
-> >>   depend on requirements of the IP)
-> >>
-> >> 	mydriver_probe(struct platform device *pdev)
-> >> 	{
-> >> 		:
-> >> 		:
-> >> 		reset_control_get(&pdev->dev, NULL);
-> >> 		reset_control_clear_reset();
-> >> 		reset_control_deassert();
-> >> 		pm_runtime_get_sync();
-> >> 		if (reset_control_is_reset() != true)
-> >> 			goto err;
-> >> 		reset_control_put();
-> >> 		:
-> >> 		:
-> >> 	}
-> 
-> > if possible, I'd like to move this logic into the reset controller
-> > driver. Can this be reordered to enable power before deasserting the
-> > reset line (assuming it is initially asserted)? In this case, I'd
-> > suggest to just call device_reset:
-> > 
-> > 	pm_runtime_get_sync(&pdev->dev);
-> > 	ret = device_reset(&pdev->dev);
-> > 	if (ret)
-> > 		goto err;
-> > 
-> > The ops.reset callback in the prcm driver then can handle clearing
-> > the reset status bit, deasserting the reset control bit, and waiting for
-> > the reset status bit to be set (or timing out with an error).
-> 
-> I too would have loved to have it in such a clean way and was initially
-> proceeding in that direction, but there is an issue specific to OMAP
-> family SoC's, which was required to be taken care of (even though
-> present use case for AM335x/AM43x would work [as it does not have
-> hardware supervised clockdomain mode] with a small change in platform
-> level power management support code - a generic one shared with other
-> OMAP family SoC's)
-> 
-> For a module to be reset, clock domain to which the module clock belongs
-> should be set to software supervised mode. During "pm_runtime_get_sync",
-> in OMAP platform level handling code, it first put clockdomain into
-> software supervised mode, enables clock to module, and once module is
-> ready, module will be put to hardware supervised mode. In hardware
-> supervised mode, reset may not happen.
-> 
-> So if device_reset() is done after pm_runtime_get_sync(), reset may not
-> happen as by the time device_reset() is called, clockdomain would be in
-> hardware supervised mode. But in other case, as reset is already
-> deasserted when pm_runtime_get_sync() is called, module would be reset
-> as it first puts to software supervised mode.
-> 
-> And device reset would happen only upon enabling clock to module (if
-> reset was deasserted) by pm_runtime_get_sync(), so reset status has to
-> be checked after pm call, preventing us having device_reset() before
-> pm_runtime_get_sync(), or else in that case we have to sacrifice on
-> reset status checking (which may not be reliable)
-> 
-> Another alternative would have been to integrate this reset handling in
-> low level power management code thus hiding all reset handling from
-> driver, but as far as I know the reset sequence to be done is sometimes
-> IP specific, preventing it.
+On Mon, Sep 9, 2013 at 10:05 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
 
-So if I understand correctly, the only problem is that on OMAP the clock
-needs to be enabled to deassert the reset, but as long as the clock
-domain is in hardware supervised mode, it won't be enabled?
-Would it be possible to create an internal API to switch the clock
-domain to software supervised mode, which can be used both by the code
-behind pm_runtime_get_sync and reset_control_deassert?
+> At
+> this time though, apart from common clocks, extended DT support and
+> multiplatform I'm not so sure what desired cleanup-wise.
 
-regards
-Philipp
+It'd be nice to switch shmobile to use AUTO_ZRELADDR, as it is
+the other criteria (apart from common clock) standing in the way
+for multiplatform. (Maybe this just works if you turn it on?)
+
+For multiplatform you also have to depopulate <mach/*>
+completely, either move stuff down into the mach-folder
+or to <linux/platform_data/*> if absolutely necessary.
+This will be quite some work, especially if the <mach/*>
+path is used in a lot of drivers...
+
+Then we have a quite broad consensus to depopulate arch/arm/*
+of drivers, so for shmobile:
+
+clock* -> drivers/clk
+cpuidle.c -> drivers/cpuidle (or was this just fixed?)
+intc* -> drivers/irqchips
+sh-gpio.c -> drivers/pinctrl/gpio
+
+The last one I know you will soon finish.
+
+Then deleteing all board file stuff that is not using DT.
+
+After all that it's top-notch I think :-)
+
+Yours,
+Linus Walleij
