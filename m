@@ -1,33 +1,33 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 9 Sep 2013 17:00:24 +0200
-Subject: [PATCH v2 2/4] ARM: dts: add fec phy reset for imx6sl evk board
-In-Reply-To: <20130909145333.GA5815@S2101-09.ap.freescale.net>
-References: <1378182385-9205-1-git-send-email-B38611@freescale.com>
- <1378182385-9205-3-git-send-email-B38611@freescale.com>
- <20130909145333.GA5815@S2101-09.ap.freescale.net>
-Message-ID: <20130909150024.GU30088@pengutronix.de>
+Date: Mon, 9 Sep 2013 17:03:46 +0200
+Subject: [PATCHv3 1/4] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <20130909122008.GC22197@ulmo>
+References: <1378454907-22728-1-git-send-email-Li.Xiubo@freescale.com>
+ <1378454907-22728-2-git-send-email-Li.Xiubo@freescale.com>
+ <20130909122008.GC22197@ulmo>
+Message-ID: <20130909150346.GV30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 09, 2013 at 10:53:36PM +0800, Shawn Guo wrote:
-> On Tue, Sep 03, 2013 at 12:26:23PM +0800, Fugang Duan wrote:
-> > Add fec phy gpio reset for imx6sl evk board. imx6sl evk board
-> > use GPIO4_21 to do phy reset, so add phy-reset-gpios and
-> > phy-reset-duration propery initial for fec device node.
+On Mon, Sep 09, 2013 at 02:20:09PM +0200, Thierry Reding wrote:
+> On Fri, Sep 06, 2013 at 04:08:24PM +0800, Xiubo Li wrote:
+> > The FTM PWM device can be found on Vybrid VF610 Tower and Layerscape LS-1 SoCs.
 > > 
-> > Signed-off-by: Fugang Duan  <B38611@freescale.com>
+> > Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> > Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> > ---
+> >  drivers/pwm/Kconfig       |  10 +
+> >  drivers/pwm/Makefile      |   1 +
+> >  drivers/pwm/pwm-fsl-ftm.c | 505 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 516 insertions(+)
+> >  create mode 100644 drivers/pwm/pwm-fsl-ftm.c
 > 
-> I have to drop this patch for now, because it causes a regression for
-> me.
-> 
-> Before this patch, we can at least get a working fec driver in kernel if
-> U-Boot sets it up properly, e.g. we download kernel from network.  But
-> with the patch, the fec driver stops working on linux-next in the same
-> use case.
+> This looks pretty good to me. I noticed that you didn't Cc Sascha who
+> commented on this a lot. Can you please resend with him Cc'ed to make
+> sure he sees this version of the series?
 
-I think the FEC driver has doesn't wait enough time after it deasserts
-the phy reset before it accesses the phy. At least I once got the
-impression, but I haven't digged deeper so far.
+I'm already aware of this, no need to resend. I'll have a look over it
+tomorrow.
 
 Sascha
 
