@@ -1,70 +1,31 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Mon, 9 Sep 2013 15:32:08 +0900
-Subject: [PATCH v5 1/5] ARM: add basic Trusted Foundations support
-In-Reply-To: <CACRpkdaphSqM1oOphC-t1UPmkxaEemC3R3aDfEXb79GWNNyNMA@mail.gmail.com>
-References: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
- <1378351680-14696-2-git-send-email-acourbot@nvidia.com>
- <CACRpkdaphSqM1oOphC-t1UPmkxaEemC3R3aDfEXb79GWNNyNMA@mail.gmail.com>
-Message-ID: <CAAVeFuKq=DVeG6BZ0jg_88+X_XroioY15C43wQA1mnvHVcjsLQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Sep 2013 08:37:54 +0200
+Subject: Inte IOP Xscale updates
+In-Reply-To: <21035.952.938696.169280@pilspetsen.it.uu.se>
+References: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
+ <20130903134516.GH6617@n2100.arm.linux.org.uk>
+ <21035.952.938696.169280@pilspetsen.it.uu.se>
+Message-ID: <CACRpkdY=GwPyJUDuFBtfb=E5VD8h0mqi9146vRm3XeVjH=F7Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 7, 2013 at 1:48 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Sep 5, 2013 at 5:27 AM, Alexandre Courbot <acourbot@nvidia.com> wrote:
->
->> Trusted Foundations is a TrustZone-based secure monitor for ARM that
->> can be invoked  using a consistent SMC-based API on all supported
->> platforms. This patch adds initial basic support for Trusted
->> Foundations using the ARM firmware API. Current features are limited
->> to the ability to boot secondary processors.
->>
->> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->> Reviewed-by: Stephen Warren <swarren@nvidia.com>
->
-> I take it that this means that it is a set of standard routines
-> living in the secure world that can be called by way of this
-> API, correct? The commit message is written a bit like
-> everybody knows what this is about but I don't :-)
+On Sat, Sep 7, 2013 at 12:45 PM, Mikael Pettersson <mikpe@it.uu.se> wrote:
 
-It's actually written a bit like I don't really know what this is
-about, thanks for exposing my ignorance. :P
+> As long as they doesn't cause any maintenance problems I think we
+> should just leave the IOP platforms as-is.
 
-> Some more background here would be nice, like where did this
-> thing come from, and are there other platforms in existance that
-> use trusted foundations or is it a Tegra-only thing? Does a
-> specification of this thing listing available services exist for
-> example?
+Well I looked over all machines last week and for IOP there is
+one thing that stand out, and it's that iop32x and iop33x are
+using <mach/gpio.h> and that is a headache for me as GPIO
+maintainer, as I want to consolidate that subsystem and get
+away from custom GPIO headers.
 
-There is unfortunately no public specification of this AFAIK. Client
-(kernel) side sources are available as Tegra downstream kernel
-releases, but that's about it.
+But I take it that you're ready to test patches for me, so
+I'll hopefully get around to propose something for the
+iop32x :-)
 
-> How does it relate to the (arch-neutral) trusted execution
-> environment and such things that other vendors are pushing for?
-> Can the trusted foundations be used "underneath" such
-> frameworks for trusted applications, or is it a parallell thing
-> altogether?
+Basically I'd move <asm/hardware/iop3xx-gpio.h> down
+into drivers/gpio as a gpiochip instead.
 
-My understanding is that TF serves the same purpose for ARM only AFAICT.
-
-> I tried googling it, is this a relevant URL?
-> http://www.arm.com/community/partners/display_product/rw/ProductId/5393/
-
-Yes. TF is an essential feature to support in order to boot the kernel
-on some Tegra-based consumer devices (e.g. SHIELD). Basic things such
-as secondary CPU control must be performed through SMCs. It has many
-more features but for the moment I don't see a need to go beyond the
-very basic.
-
-The issue is that as you pointed out, public information is scarce and
-future direction uncertain. That's why this patchset limits itself to
-what is needed to get secondary CPUs running - the procedure is very
-simple and unlikely to change in the future. DT binding is also as
-concise as possible to allow malleability since we cannot predict how
-it will evolve in the future.
-
-I will try to explain better what TF is in the commit log - at least
-as far as I understand it myself.
-
-Alex.
+Yours,
+Linus Walleij
