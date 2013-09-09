@@ -1,39 +1,98 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 9 Sep 2013 15:10:27 -0700
-Subject: Inte IOP Xscale updates
-In-Reply-To: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
-References: <CACRpkdZU5mVU15AK=m-BRmpizKJJVAR98JKf3Qcgy2ms+HG+Hw@mail.gmail.com>
-Message-ID: <CAA9_cmcMLooT6=+PwR9rx4ALmNeKG=qXWn+K_dLJ+CVj9u6tYA@mail.gmail.com>
+Date: Mon, 09 Sep 2013 15:12:03 -0700
+Subject: [PATCH] MAINTAINERS: update email for Dan Williams
+Message-ID: <20130909221154.4969.71486.stgit@dwillia2-mobl1.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 3, 2013 at 5:01 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Hi XScale folks,
->
-> I haven't really seen any functional patches or confirmation that the
-> XScale machines in arch/arm/iop* are even booting since 2010 or
-> so.
->
-> Can you confirm that you boot-test these machines regularly?
->
+Returned to intel.com
 
-I lost access to my boards when I left, but now that I am back I am
-trying to track them down.  iop32x may be the only boards that matter
-here, I never saw an iop13xx outside of the development board.
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Jon Mason <jon.mason@intel.com>
+Cc: Dave Jiang <dave.jiang@intel.com>
+Cc: Neil Brown <neilb@suse.de>
+Cc: Shaohua Li <shli@kernel.org>
+Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+---
+ MAINTAINERS |   18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-> I am worried that we maintain code that is not used or even working
-> see.
->
-> What are your thought about multiplatform and device tree? I am
-> pretty certain that if the iop machines were converted to device tree
-> we could collapse these machines into one directory with few files,
-> but I may be wrong.
->
-
-I have not been following device-tree conversions for how they handle
-legacy boot loaders?
-
-...I'll just start with reviewing your gpio conversion.
-
---
-Dan
+diff --git a/MAINTAINERS b/MAINTAINERS
+index defc053..058fb68 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -914,24 +914,24 @@ F:	arch/arm/mach-pxa/colibri-pxa270-income.c
+ 
+ ARM/INTEL IOP32X ARM ARCHITECTURE
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-M:	Dan Williams <djbw@fb.com>
++M:	Dan Williams <dan.j.williams@intel.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ 
+ ARM/INTEL IOP33X ARM ARCHITECTURE
+-M:	Dan Williams <djbw@fb.com>
++M:	Dan Williams <dan.j.williams@intel.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ 
+ ARM/INTEL IOP13XX ARM ARCHITECTURE
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-M:	Dan Williams <djbw@fb.com>
++M:	Dan Williams <dan.j.williams@intel.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ 
+ ARM/INTEL IQ81342EX MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-M:	Dan Williams <djbw@fb.com>
++M:	Dan Williams <dan.j.williams@intel.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ 
+@@ -956,7 +956,7 @@ F:	drivers/pcmcia/pxa2xx_stargate2.c
+ 
+ ARM/INTEL XSC3 (MANZANO) ARM CORE
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+-M:	Dan Williams <djbw@fb.com>
++M:	Dan Williams <dan.j.williams@intel.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ 
+@@ -1363,7 +1363,7 @@ F:	drivers/platform/x86/asus*.c
+ F:	drivers/platform/x86/eeepc*.c
+ 
+ ASYNCHRONOUS TRANSFERS/TRANSFORMS (IOAT) API
+-M:	Dan Williams <djbw@fb.com>
++M:	Dan Williams <dan.j.williams@intel.com>
+ W:	http://sourceforge.net/projects/xscaleiop
+ S:	Maintained
+ F:	Documentation/crypto/async-tx-api.txt
+@@ -2638,7 +2638,7 @@ T:	git git://git.linaro.org/people/sumitsemwal/linux-dma-buf.git
+ 
+ DMA GENERIC OFFLOAD ENGINE SUBSYSTEM
+ M:	Vinod Koul <vinod.koul@intel.com>
+-M:	Dan Williams <djbw@fb.com>
++M:	Dan Williams <dan.j.williams@intel.com>
+ S:	Supported
+ F:	drivers/dma/
+ F:	include/linux/dma*
+@@ -4263,7 +4263,7 @@ F:	arch/x86/kernel/microcode_core.c
+ F:	arch/x86/kernel/microcode_intel.c
+ 
+ INTEL I/OAT DMA DRIVER
+-M:	Dan Williams <djbw@fb.com>
++M:	Dan Williams <dan.j.williams@intel.com>
+ S:	Maintained
+ F:	drivers/dma/ioat*
+ 
+@@ -4276,7 +4276,7 @@ F:	drivers/iommu/intel-iommu.c
+ F:	include/linux/intel-iommu.h
+ 
+ INTEL IOP-ADMA DMA DRIVER
+-M:	Dan Williams <djbw@fb.com>
++M:	Dan Williams <dan.j.williams@intel.com>
+ S:	Odd fixes
+ F:	drivers/dma/iop-adma.c
+ 
