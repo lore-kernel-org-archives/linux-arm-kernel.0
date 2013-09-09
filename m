@@ -1,32 +1,51 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Sep 2013 22:37:16 +0800
-Subject: [PATCH] ARM: mach-imx: clk-imx51-imx53: Fix 'spdif1_pred' clock
- registration
-In-Reply-To: <1378407777-26546-1-git-send-email-fabio.estevam@freescale.com>
-References: <1378407777-26546-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20130909143715.GE4624@S2101-09.ap.freescale.net>
+Date: Mon, 9 Sep 2013 22:41:43 +0800
+Subject: [patch 1/1] imx51.dtsi: fix PATA device clock
+In-Reply-To: <20130907132507.353801753@rtp-net.org>
+References: <20130907132507.353801753@rtp-net.org>
+Message-ID: <20130909144140.GF4624@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 05, 2013 at 04:02:57PM -0300, Fabio Estevam wrote:
-> Since commit beb2d1c1ba (ARM i.MX5: Add S/PDIF clocks), the following clock 
-> error appears on mx51:
+On Sat, Sep 07, 2013 at 03:23:14PM +0200, Arnaud Patard wrote:
+> Commit 718a35006f3fa48540d69bd649ff76ea4cdc1ef2 adds pata support to the
+> imx51.dtsi file and is using clock 161. The problem is that the right clock
+> is 172, according to 5d530bb0ad84d403d1aac79a8a8acf2c2b0a8dd7.
+> Using the clock 172 makes things work again (and kills a nasty system freeze)
 > 
-> TrustZone Interrupt Controller (TZIC) initialized
-> i.MX51 clk 180: register failed with -17
-> i.MX5 clk 180: register failed with -17
-> sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956ms
-> CPU identified as i.MX51, silicon rev 3.0
-> ...
 > 
-> Clock 180 corresponds to 'spdif1_podf' and this clock is getting registered 
-> twice.
-> 
-> Fix it, by properly registering the 'spdif1_pred' clock, which should not 
-> reference 'spdif1_podf'.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Tested-by: Steve Klimaszewski <steev@gentoo.org>
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
 
-Applied, thanks.
+Applied with the commit log as below.
+
+ARM: imx51.dtsi: fix PATA device clock
+
+Commit 718a350 (ARM: i.MX51: Add PATA support) adds pata support to the
+imx51.dtsi file and is using clock 161. The problem is that the right
+clock is 172, according to commit 5d530bb (ARM: i.MX5: Add PATA and SRTC
+clocks).  Using the clock 172 makes things work again (and kills a nasty
+system freeze).
+
+Tested-by: Steev Klimaszewski <steev@gentoo.org>
+Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
 Shawn
+
+> 
+> Index: linux-next/arch/arm/boot/dts/imx51.dtsi
+> ===================================================================
+> --- linux-next.orig/arch/arm/boot/dts/imx51.dtsi	2013-09-07 15:08:05.042280170 +0200
+> +++ linux-next/arch/arm/boot/dts/imx51.dtsi	2013-09-07 15:08:37.338278750 +0200
+> @@ -490,7 +490,7 @@
+>  				compatible = "fsl,imx51-pata", "fsl,imx27-pata";
+>  				reg = <0x83fe0000 0x4000>;
+>  				interrupts = <70>;
+> -				clocks = <&clks 161>;
+> +				clocks = <&clks 172>;
+>  				status = "disabled";
+>  			};
+>  
+> 
+> 
