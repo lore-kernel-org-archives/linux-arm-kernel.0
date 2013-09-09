@@ -1,62 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 09 Sep 2013 16:10:37 -0700
-Subject: [PATCH 2/2] ARM: msm: Create a common board-dt and config
- ARCH_MSM_DT
-In-Reply-To: <1378767719-27688-2-git-send-email-rvaswani@codeaurora.org>
-References: <1378767719-27688-1-git-send-email-rvaswani@codeaurora.org>
- <1378767719-27688-2-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <522E556D.1070108@codeaurora.org>
+From: alex.elder@linaro.org (Alex Elder)
+Date: Mon, 09 Sep 2013 18:20:23 -0500
+Subject: [PATCH] clk: clean up everything on debugfs error
+Message-ID: <522E57B7.6010603@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/13 16:01, Rohit Vaswani wrote:
-> diff --git a/arch/arm/mach-msm/board-dt.c b/arch/arm/mach-msm/board-dt.c
-> new file mode 100644
-> index 0000000..c140c53
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/board-dt.c
-> @@ -0,0 +1,32 @@
-> +/* Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+If CONFIG_COMMON_CLK_DEBUG is defined, clk_debug_create_one() is
+called to populate a debugfs directory with a few entries that are
+common for all clock types.
 
-Bump to 2013?
+If an error happens after creating the first one debugfs_remove() is
+called on the clock's directory.  The problem with this is that no
+cleanup is done on the debugfs files already created in that
+directory, so the directory never actually gets removed.   This
+problem is silently ignored.
 
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
-> +
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +
-> +#include "common.h"
-> +
-> +static const char *msm_dt_match[] __initdata = {
+Fix this by calling debugfs_remove_recursive() instead.  Reset the
+clk->dentry field to null afterward, to ensure it can't be mistaken
+as a valid pointer.
 
-static const char * const msm_dt_match[] __initconst is better.
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ drivers/clk/clk.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> +	"qcom,msm8660-fluid",
-> +	"qcom,msm8660-surf",
-> +	"qcom,msm8960-cdp",
-> +	NULL
-> +};
-> +
-> +DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
-> +	.smp = smp_ops(msm_smp_ops),
-> +	.dt_compat = msm_dt_match,
-> +MACHINE_END
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 54a191c..727ae7b 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -272,7 +272,8 @@ static int clk_debug_create_one(struct clk *clk,
+struct dentry *pdentry)
+ 	goto out;
 
-Otherwise feel free to add my reviewed-by.
-
+ err_out:
+-	debugfs_remove(clk->dentry);
++	debugfs_remove_recursive(clk->dentry);
++	clk->dentry = NULL;
+ out:
+ 	return ret;
+ }
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
