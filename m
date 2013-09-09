@@ -1,33 +1,74 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 9 Sep 2013 11:07:37 +0800
-Subject: [PATCH v3 0/8] Add the Quadspi driver for vf610-twr
-In-Reply-To: <20130908134725.GQ29403@sirena.org.uk>
-References: <593AEF6C47F46446852B067021A273D6D984000B@MUCSE039.lantiq.com>
- <20130905020435.GA3970@gmail.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C7F4@DBDE04.ent.ti.com>
- <522817D7.1010206@freescale.com>
- <20980858CB6D3A4BAE95CA194937D5E73EA0C885@DBDE04.ent
-Message-ID: <522D3B79.3060707@freescale.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Mon, 9 Sep 2013 15:15:31 +0900
+Subject: [PATCH v5 1/5] ARM: add basic Trusted Foundations support
+In-Reply-To: <5228CEDB.1090306@gmail.com>
+References: <1378351680-14696-1-git-send-email-acourbot@nvidia.com>
+ <1378351680-14696-2-git-send-email-acourbot@nvidia.com>
+ <5228CEDB.1090306@gmail.com>
+Message-ID: <CAAVeFu+MGGBfmm1jwtKGP_d3EjkLdf5B_E_5RT___PVh1e=8jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?09?08? 21:47, Mark Brown ??:
-> On Thu, Sep 05, 2013 at 10:36:44PM -0400, Huang Shijie wrote:
->> On Thu, Sep 05, 2013 at 02:50:32PM +0100, Mark Brown wrote:
->>> Looking at the current header there just seem to be defines in there, no
->>> abstraction for the chips.  Perhaps that is what is missing?
->> we do not need any abstraction for this chip, we only need the SPI NOR 
->> commands, such as Quad read / DDR quad read.
-> So the abstraction could say what the commands are, or what's supported
-thanks.
+On Fri, Sep 6, 2013 at 3:35 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On 09/04/2013 10:27 PM, Alexandre Courbot wrote:
+>> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+>> can be invoked  using a consistent SMC-based API on all supported
+>> platforms. This patch adds initial basic support for Trusted
+>> Foundations using the ARM firmware API. Current features are limited
+>> to the ability to boot secondary processors.
+>>
+>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>>  .../arm/firmware/tl,trusted-foundations.txt        | 17 +++++
+>>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+>>  arch/arm/Kconfig                                   |  2 +
+>>  arch/arm/Makefile                                  |  1 +
+>>  arch/arm/firmware/Kconfig                          | 25 +++++++
+>>  arch/arm/firmware/Makefile                         |  1 +
+>>  arch/arm/firmware/trusted_foundations.c            | 82 ++++++++++++++++++++++
+>>  arch/arm/include/asm/trusted_foundations.h         | 53 ++++++++++++++
+>>  8 files changed, 182 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+>>  create mode 100644 arch/arm/firmware/Kconfig
+>>  create mode 100644 arch/arm/firmware/Makefile
+>>  create mode 100644 arch/arm/firmware/trusted_foundations.c
+>>  create mode 100644 arch/arm/include/asm/trusted_foundations.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+>> new file mode 100644
+>> index 0000000..3954bbd
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+>> @@ -0,0 +1,17 @@
+>> +Trusted Foundations
+>> +
+>> +Boards that use the Trusted Foundations secure monitor can signal its
+>> +presence by declaring a node compatible with "tl,trusted-foundations"
+>> +under the root node.
+>> +
+>> +Required properties:
+>> +- compatible : "tl,trusted-foundations"
+>> +- version-major : major version number of Trusted Foundations firmware
+>> +- version-minor: minor version number of Trusted Foundations firmware
+>> +
+>> +Example:
+>> +     firmware {
+>> +             compatible = "tl,trusted-foundations";
+>> +             version-major = <2>;
+>> +             version-minor = <8>;
+>> +     };
+>
+> I'm wondering how we fit this in with PSCI bindings? Both are pieces of
+> firmware functionality and may co-exist. There's nothing incompatible
+> here, but there should be some commonality. Will future versions of
+> Trusted Foundations follow the SMC calling conventions doc? What about
+> armv8 support.
 
-I have already added the comment for what the commands are, please see
-patch 3 & patch 4.
-> if they're standard?
-In actually, there is no standard for the SPI NOR commands now.
+I don't have any information about the future of TF unfortunately,
+excepted that it should remain backward-compatible. What is this SMC
+calling convention doc your are talking about btw? Is there a standard
+calling convention defined by ARM?
 
-I added these commands just in the Spansion section now.
-(Of course, other NOR vendors may also uses the same commands.)
-
-thanks
-Huang Shijie
+Alex.
