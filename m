@@ -1,165 +1,97 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  9 Sep 2013 11:10:00 +0100
-Subject: [PATCH 04/14] iio: pressure-core: st: Describe LPS331AP defines by
- name
-In-Reply-To: <1378721410-30937-1-git-send-email-lee.jones@linaro.org>
-References: <1378721410-30937-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1378721410-30937-5-git-send-email-lee.jones@linaro.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 9 Sep 2013 19:32:00 +0900
+Subject: [PATCH 01/04] ARM: shmobile: Initial r8a7791 SoC support
+In-Reply-To: <CACRpkdY44c_qzQ6XVjCs86axta-0VBqL8ygH5j+q3z294YXjLA@mail.gmail.com>
+References: <20130904034525.12546.24775.sendpatchset@w520>
+ <20130904034557.12546.97503.sendpatchset@w520>
+ <CACRpkdb7QkqCmTMua1yJNJxSAWff=0f6a2SWkf6K9SqbW0BOVg@mail.gmail.com>
+ <CANqRtoQzLKk3EKcm=EiZCg73fgDBZ1xjPi_6fH_PsGdkr6w5sA@mail.gmail.com>
+ <CACRpkdZGLR3=UZ7f-9r02Gea2hTomp+6+bz0BDQOvk9zRHTxxw@mail.gmail.com>
+ <CANqRtoQ0dnG6HwjJSrK8+Qt8wvJhqsJHxgj-LGvnJvS0KT81nw@mail.gmail.com>
+ <CACRpkdY44c_qzQ6XVjCs86axta-0VBqL8ygH5j+q3z294YXjLA@mail.gmail.com>
+Message-ID: <CANqRtoT9TsDadKX1XgmANGcBhXp8sOgcY=6b7+0nPheKPpHduw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They're currently named *_1_*, for 'Sensor 1', but the code will be much
-more readable if we use the naming convention *_LPS331AP_* instead.
+Hi Linus,
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/iio/pressure/st_pressure_core.c | 94 ++++++++++++++++-----------------
- 1 file changed, 46 insertions(+), 48 deletions(-)
+On Mon, Sep 9, 2013 at 6:15 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Sep 9, 2013 at 10:05 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>
+>> At
+>> this time though, apart from common clocks, extended DT support and
+>> multiplatform I'm not so sure what desired cleanup-wise.
+>
+> It'd be nice to switch shmobile to use AUTO_ZRELADDR, as it is
+> the other criteria (apart from common clock) standing in the way
+> for multiplatform. (Maybe this just works if you turn it on?)
 
-diff --git a/drivers/iio/pressure/st_pressure_core.c b/drivers/iio/pressure/st_pressure_core.c
-index ceebd3c..b9cf810 100644
---- a/drivers/iio/pressure/st_pressure_core.c
-+++ b/drivers/iio/pressure/st_pressure_core.c
-@@ -36,94 +36,92 @@
- 						 ST_PRESS_LSB_PER_CELSIUS)
- #define ST_PRESS_NUMBER_DATA_CHANNELS		1
- 
--/* DEFAULT VALUE FOR SENSORS */
--#define ST_PRESS_DEFAULT_OUT_XL_ADDR		0x28
--#define ST_TEMP_DEFAULT_OUT_L_ADDR		0x2b
--
- /* FULLSCALE */
- #define ST_PRESS_FS_AVL_1260MB			1260
- 
--/* CUSTOM VALUES FOR SENSOR 1 */
--#define ST_PRESS_1_WAI_EXP			0xbb
--#define ST_PRESS_1_ODR_ADDR			0x20
--#define ST_PRESS_1_ODR_MASK			0x70
--#define ST_PRESS_1_ODR_AVL_1HZ_VAL		0x01
--#define ST_PRESS_1_ODR_AVL_7HZ_VAL		0x05
--#define ST_PRESS_1_ODR_AVL_13HZ_VAL		0x06
--#define ST_PRESS_1_ODR_AVL_25HZ_VAL		0x07
--#define ST_PRESS_1_PW_ADDR			0x20
--#define ST_PRESS_1_PW_MASK			0x80
--#define ST_PRESS_1_FS_ADDR			0x23
--#define ST_PRESS_1_FS_MASK			0x30
--#define ST_PRESS_1_FS_AVL_1260_VAL		0x00
--#define ST_PRESS_1_FS_AVL_1260_GAIN		ST_PRESS_KPASCAL_NANO_SCALE
--#define ST_PRESS_1_FS_AVL_TEMP_GAIN		ST_PRESS_CELSIUS_NANO_SCALE
--#define ST_PRESS_1_BDU_ADDR			0x20
--#define ST_PRESS_1_BDU_MASK			0x04
--#define ST_PRESS_1_DRDY_IRQ_ADDR		0x22
--#define ST_PRESS_1_DRDY_IRQ_INT1_MASK		0x04
--#define ST_PRESS_1_DRDY_IRQ_INT2_MASK		0x20
--#define ST_PRESS_1_MULTIREAD_BIT		true
--#define ST_PRESS_1_TEMP_OFFSET			42500
-+/* CUSTOM VALUES FOR LPS331AP SENSOR */
-+#define ST_PRESS_LPS331AP_WAI_EXP		0xbb
-+#define ST_PRESS_LPS331AP_ODR_ADDR		0x20
-+#define ST_PRESS_LPS331AP_ODR_MASK		0x70
-+#define ST_PRESS_LPS331AP_ODR_AVL_1HZ_VAL	0x01
-+#define ST_PRESS_LPS331AP_ODR_AVL_7HZ_VAL	0x05
-+#define ST_PRESS_LPS331AP_ODR_AVL_13HZ_VAL	0x06
-+#define ST_PRESS_LPS331AP_ODR_AVL_25HZ_VAL	0x07
-+#define ST_PRESS_LPS331AP_PW_ADDR		0x20
-+#define ST_PRESS_LPS331AP_PW_MASK		0x80
-+#define ST_PRESS_LPS331AP_FS_ADDR		0x23
-+#define ST_PRESS_LPS331AP_FS_MASK		0x30
-+#define ST_PRESS_LPS331AP_FS_AVL_1260_VAL	0x00
-+#define ST_PRESS_LPS331AP_FS_AVL_1260_GAIN	ST_PRESS_KPASCAL_NANO_SCALE
-+#define ST_PRESS_LPS331AP_FS_AVL_TEMP_GAIN	ST_PRESS_CELSIUS_NANO_SCALE
-+#define ST_PRESS_LPS331AP_BDU_ADDR		0x20
-+#define ST_PRESS_LPS331AP_BDU_MASK		0x04
-+#define ST_PRESS_LPS331AP_DRDY_IRQ_ADDR		0x22
-+#define ST_PRESS_LPS331AP_DRDY_IRQ_INT1_MASK	0x04
-+#define ST_PRESS_LPS331AP_DRDY_IRQ_INT2_MASK	0x20
-+#define ST_PRESS_LPS331AP_MULTIREAD_BIT		true
-+#define ST_PRESS_LPS331AP_TEMP_OFFSET		42500
-+#define ST_PRESS_LPS331AP_OUT_XL_ADDR		0x28
-+#define ST_TEMP_LPS331AP_OUT_L_ADDR		0x2b
- 
- static const struct iio_chan_spec st_press_channels[] = {
- 	ST_SENSORS_LSM_CHANNELS(IIO_PRESSURE,
- 			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
- 			ST_SENSORS_SCAN_X, 0, IIO_NO_MOD, 'u', IIO_LE, 24, 24,
--			ST_PRESS_DEFAULT_OUT_XL_ADDR),
-+			ST_PRESS_LPS331AP_OUT_XL_ADDR),
- 	ST_SENSORS_LSM_CHANNELS(IIO_TEMP,
- 			BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE) |
- 						BIT(IIO_CHAN_INFO_OFFSET),
- 			-1, 0, IIO_NO_MOD, 's', IIO_LE, 16, 16,
--			ST_TEMP_DEFAULT_OUT_L_ADDR),
-+			ST_TEMP_LPS331AP_OUT_L_ADDR),
- 	IIO_CHAN_SOFT_TIMESTAMP(1)
- };
- 
- static const struct st_sensors st_press_sensors[] = {
- 	{
--		.wai = ST_PRESS_1_WAI_EXP,
-+		.wai = ST_PRESS_LPS331AP_WAI_EXP,
- 		.sensors_supported = {
- 			[0] = LPS331AP_PRESS_DEV_NAME,
- 		},
- 		.ch = (struct iio_chan_spec *)st_press_channels,
- 		.odr = {
--			.addr = ST_PRESS_1_ODR_ADDR,
--			.mask = ST_PRESS_1_ODR_MASK,
-+			.addr = ST_PRESS_LPS331AP_ODR_ADDR,
-+			.mask = ST_PRESS_LPS331AP_ODR_MASK,
- 			.odr_avl = {
--				{ 1, ST_PRESS_1_ODR_AVL_1HZ_VAL, },
--				{ 7, ST_PRESS_1_ODR_AVL_7HZ_VAL, },
--				{ 13, ST_PRESS_1_ODR_AVL_13HZ_VAL, },
--				{ 25, ST_PRESS_1_ODR_AVL_25HZ_VAL, },
-+				{ 1, ST_PRESS_LPS331AP_ODR_AVL_1HZ_VAL, },
-+				{ 7, ST_PRESS_LPS331AP_ODR_AVL_7HZ_VAL, },
-+				{ 13, ST_PRESS_LPS331AP_ODR_AVL_13HZ_VAL, },
-+				{ 25, ST_PRESS_LPS331AP_ODR_AVL_25HZ_VAL, },
- 			},
- 		},
- 		.pw = {
--			.addr = ST_PRESS_1_PW_ADDR,
--			.mask = ST_PRESS_1_PW_MASK,
-+			.addr = ST_PRESS_LPS331AP_PW_ADDR,
-+			.mask = ST_PRESS_LPS331AP_PW_MASK,
- 			.value_on = ST_SENSORS_DEFAULT_POWER_ON_VALUE,
- 			.value_off = ST_SENSORS_DEFAULT_POWER_OFF_VALUE,
- 		},
- 		.fs = {
--			.addr = ST_PRESS_1_FS_ADDR,
--			.mask = ST_PRESS_1_FS_MASK,
-+			.addr = ST_PRESS_LPS331AP_FS_ADDR,
-+			.mask = ST_PRESS_LPS331AP_FS_MASK,
- 			.fs_avl = {
- 				[0] = {
- 					.num = ST_PRESS_FS_AVL_1260MB,
--					.value = ST_PRESS_1_FS_AVL_1260_VAL,
--					.gain = ST_PRESS_1_FS_AVL_1260_GAIN,
--					.gain2 = ST_PRESS_1_FS_AVL_TEMP_GAIN,
-+					.value = ST_PRESS_LPS331AP_FS_AVL_1260_VAL,
-+					.gain = ST_PRESS_LPS331AP_FS_AVL_1260_GAIN,
-+					.gain2 = ST_PRESS_LPS331AP_FS_AVL_TEMP_GAIN,
- 				},
- 			},
- 		},
- 		.bdu = {
--			.addr = ST_PRESS_1_BDU_ADDR,
--			.mask = ST_PRESS_1_BDU_MASK,
-+			.addr = ST_PRESS_LPS331AP_BDU_ADDR,
-+			.mask = ST_PRESS_LPS331AP_BDU_MASK,
- 		},
- 		.drdy_irq = {
--			.addr = ST_PRESS_1_DRDY_IRQ_ADDR,
--			.mask_int1 = ST_PRESS_1_DRDY_IRQ_INT1_MASK,
--			.mask_int2 = ST_PRESS_1_DRDY_IRQ_INT2_MASK,
-+			.addr = ST_PRESS_LPS331AP_DRDY_IRQ_ADDR,
-+			.mask_int1 = ST_PRESS_LPS331AP_DRDY_IRQ_INT1_MASK,
-+			.mask_int2 = ST_PRESS_LPS331AP_DRDY_IRQ_INT2_MASK,
- 		},
--		.multi_read_bit = ST_PRESS_1_MULTIREAD_BIT,
-+		.multi_read_bit = ST_PRESS_LPS331AP_MULTIREAD_BIT,
- 		.bootime = 2,
- 	},
- };
--- 
-1.8.1.2
+This works already for the majority of the boards. My gut feeling is
+that it should be the default for multiplatform.
+
+There is one special case when AUTO_ZRELADDR is not working today -
+both Laurent and I spent a bit of time trying to figure it out - but
+it is currently not moving anywhere due to focus elsewhere. It is
+however only triggering on one board - KZM9G - and that board is not
+yet supported by neither common clocks nor multiplatform yet anyway,
+so it's a problem pretty far away in the future.
+
+> For multiplatform you also have to depopulate <mach/*>
+> completely, either move stuff down into the mach-folder
+> or to <linux/platform_data/*> if absolutely necessary.
+> This will be quite some work, especially if the <mach/*>
+> path is used in a lot of drivers...
+
+Fortunately we don't use mach/ in our drivers, so that shouldn't be
+any issue. At least that used to be the case. See it as a nice side
+effect of doing both SH and ARM. =)
+
+> Then we have a quite broad consensus to depopulate arch/arm/*
+> of drivers, so for shmobile:
+>
+> clock* -> drivers/clk
+
+Sure, here we have quite a bit to do, no doubt about that!
+
+> cpuidle.c -> drivers/cpuidle (or was this just fixed?)
+
+I don't know the latest state here. For me it would make sense that
+arch/arm actually contained some shared sleep mode support, but if
+that should be in drivers/ instead then that's really no biggie for
+me. We have some cpuidle code that wants to be moved.
+
+> intc* -> drivers/irqchips
+
+We have some legacy SoCs using INTC tables under mach-shmobile/, but
+it is likely that those SoCs will be phased out before we have working
+generic INTC DT binding support. Everything modern is using GIC plus
+drivers under drivers/irqchips already.
+
+> sh-gpio.c -> drivers/pinctrl/gpio
+>
+> The last one I know you will soon finish.
+
+I believe Laurent has this under control. Actually, from the top of my
+head I don't even know which IP sh-gpio.c is tied to. I know we have a
+couple of drivers in drivers/gpio and also stuff in drivers/pinctrl/,
+but apart from that..
+
+> Then deleteing all board file stuff that is not using DT.
+
+As you noticed, we sort of have a flow of code coming in that is
+written for currently-existing frameworks. Then we have the upstream
+rework and DT support going on in parallel. To aid this we have
+something called DT reference board support, which is basically board
+support code where we add DT bit by bit. Those DT reference boards can
+also be used together with common clocks and multiplatform kernels.
+KZM9D and EMEV2 are multiplatform ready, but lack CCF at this point.
+
+So the idea is that we move individual SoCs and boards over to
+multiplatform and then remove the old board code bit by bit. In
+parallel with this we may phase out old boards and old SoCs.
+
+> After all that it's top-notch I think :-)
+
+Thanks for your suggestions!!
+
+/ magnus
